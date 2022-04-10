@@ -23,7 +23,6 @@ import java.util.concurrent.TimeUnit.NANOSECONDS
 import java.util.Optional
 import com.huawei.boostkit.spark.Constant.{IS_ENABLE_JIT, IS_SKIP_VERIFY_EXP}
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor
-import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor.checkOmniJsonWhiteList
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil.transColBatchToOmniVecs
 import nova.hetu.omniruntime.`type`.DataType
 import nova.hetu.omniruntime.constants.JoinType.OMNI_JOIN_TYPE_INNER
@@ -43,13 +42,13 @@ import org.apache.spark.sql.vectorized.ColumnarBatch
  * Performs a sort merge join of two child relations.
  */
 class ColumnarSortMergeJoinExec(
-                                      leftKeys: Seq[Expression],
-                                      rightKeys: Seq[Expression],
-                                      joinType: JoinType,
-                                      condition: Option[Expression],
-                                      left: SparkPlan,
-                                      right: SparkPlan,
-                                      isSkewJoin: Boolean = false)
+                                 leftKeys: Seq[Expression],
+                                 rightKeys: Seq[Expression],
+                                 joinType: JoinType,
+                                 condition: Option[Expression],
+                                 left: SparkPlan,
+                                 right: SparkPlan,
+                                 isSkewJoin: Boolean = false)
   extends SortMergeJoinExec(
     leftKeys: Seq[Expression],
     rightKeys: Seq[Expression],
@@ -95,7 +94,7 @@ class ColumnarSortMergeJoinExec(
     left.output.zipWithIndex.foreach { case (attr, i) =>
       streamedTypes(i) = OmniExpressionAdaptor.sparkTypeToOmniType(attr.dataType, attr.metadata)
     }
-    val streamedKeyColsExp: Array[AnyRef] = leftKeys.map { x =>
+    leftKeys.map { x =>
       OmniExpressionAdaptor.rewriteToOmniJsonExpressionLiteral(x,
         OmniExpressionAdaptor.getExprIdMap(left.output.map(_.toAttribute)))
     }.toArray
@@ -104,19 +103,15 @@ class ColumnarSortMergeJoinExec(
     right.output.zipWithIndex.foreach { case (attr, i) =>
       bufferedTypes(i) = OmniExpressionAdaptor.sparkTypeToOmniType(attr.dataType, attr.metadata)
     }
-    val bufferedKeyColsExp: Array[AnyRef] = rightKeys.map { x =>
+    rightKeys.map { x =>
       OmniExpressionAdaptor.rewriteToOmniJsonExpressionLiteral(x,
         OmniExpressionAdaptor.getExprIdMap(right.output.map(_.toAttribute)))
     }.toArray
 
-    checkOmniJsonWhiteList("", streamedKeyColsExp)
-    checkOmniJsonWhiteList("", bufferedKeyColsExp)
-
     condition match {
       case Some(expr) =>
-        val filterExpr: String = OmniExpressionAdaptor.rewriteToOmniJsonExpressionLiteral(expr,
+        OmniExpressionAdaptor.rewriteToOmniJsonExpressionLiteral(expr,
           OmniExpressionAdaptor.getExprIdMap(output.map(_.toAttribute)))
-        checkOmniJsonWhiteList(filterExpr, new Array[AnyRef](0))
       case _ => null
     }
   }
@@ -166,7 +161,7 @@ class ColumnarSortMergeJoinExec(
     left.executeColumnar().zipPartitions(right.executeColumnar()) { (streamedIter, bufferedIter) =>
       val filter: Optional[String] = Optional.ofNullable(filterString)
       val startStreamedCodegen = System.nanoTime()
-      val streamedOpFactory = new OmniSmjStreamedtableWithExprOperatorFactory(streamedTypes,
+      val streamedOpFactory = new OmniSmjStreamedTableWithExprOperatorFactory(streamedTypes,
         streamedKeyColsExp, streamedOutputChannel, OMNI_JOIN_TYPE_INNER, filter, new OperatorConfig(IS_ENABLE_JIT, IS_SKIP_VERIFY_EXP))
       val streamedOp = streamedOpFactory.createOperator
       streamedCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startStreamedCodegen)
@@ -180,7 +175,7 @@ class ColumnarSortMergeJoinExec(
       // close operator
       SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
         streamedOp.close()
-        bufferedOpokupOp.close()
+        bufferedOp.close()
       })
 
       val resultSchema = this.schema
@@ -288,7 +283,7 @@ class ColumnarSortMergeJoinExec(
                 new Decimal128Vec(0)
               case _ =>
                 throw new IllegalArgumentException(s"VecType [${types(i).getClass.getSimpleName}]" +
-                  s"is not supported in [${getClass.getSimpleName}]] yet")
+                  s" is not supported in [${getClass.getSimpleName}] yet")
             }
           }
           new VecBatch(vecs, 0)

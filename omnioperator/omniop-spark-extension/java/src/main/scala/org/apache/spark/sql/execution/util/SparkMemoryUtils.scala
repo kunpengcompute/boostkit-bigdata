@@ -23,7 +23,7 @@ import org.apache.spark.{SparkEnv, TaskContext}
 
 object SparkMemoryUtils {
 
-  private val max: Long = SparkEnv.get.conf.getSizeAsBytes("Spark.memory.offHeap.size", "1g")
+  private val max: Long = SparkEnv.get.conf.getSizeAsBytes("spark.memory.offHeap.size", "1g")
   VecAllocator.setRootAllocatorLimit(max)
 
   def init(): Unit = {}
@@ -31,7 +31,7 @@ object SparkMemoryUtils {
   private def getLocalTaskContext: TaskContext = TaskContext.get()
 
   private def inSparkTask(): Boolean = {
-    getLocalTaskContext!= null
+    getLocalTaskContext != null
   }
 
   def addLeakSafeTaskCompletionListener[U](f: TaskContext => U): TaskContext = {
@@ -41,4 +41,4 @@ object SparkMemoryUtils {
     getLocalTaskContext.addTaskCompletionListener(f)
   }
 
-  }
+}
