@@ -1,0 +1,754 @@
+From fb7f4d913bb8764b824c143d46bddd5fdcf1a511 Mon Sep 17 00:00:00 2001
+From: asd <asd>
+Date: Tue, 16 Nov 2021 15:35:58 +0800
+Subject: [PATCH] patch
+
+---
+ hbase-common/pom.xml                               |  6 ++
+ .../apache/hadoop/hbase/io/hfile/BlockType.java    |  3 +
+ .../apache/hadoop/hbase/nio/SingleByteBuff.java    |  2 +-
+ hbase-server/pom.xml                               |  6 ++
+ .../hadoop/hbase/io/hfile/BlockCacheFactory.java   |  6 ++
+ .../apache/hadoop/hbase/io/hfile/CacheStats.java   |  2 +
+ .../hadoop/hbase/io/hfile/CombinedBlockCache.java  |  8 +-
+ .../apache/hadoop/hbase/io/hfile/HFileBlock.java   | 49 +++++++++++-
+ .../hadoop/hbase/io/hfile/HFileBlockIndex.java     | 52 ++++++++++--
+ .../hadoop/hbase/io/hfile/HFileReaderImpl.java     |  3 +
+ .../hadoop/hbase/io/hfile/HFileWriterImpl.java     |  4 +-
+ .../hbase/io/hfile/LoudsTriesLruBlockCache.java    | 93 ++++++++++++++++++++++
+ .../io/hfile/LoudsTriesLruBlockCacheMBean.java     | 13 +++
+ .../hadoop/hbase/io/hfile/LruBlockCache.java       | 45 +++++++++--
+ .../hadoop/hbase/io/hfile/NativeByteBuff.java      | 52 ++++++++++++
+ .../hadoop/hbase/regionserver/HRegionServer.java   |  5 ++
+ 16 files changed, 330 insertions(+), 19 deletions(-)
+ create mode 100644 hbase-server/src/main/java/org/apache/hadoop/hbase/io/hfile/LoudsTriesLruBlockCache.java
+ create mode 100644 hbase-server/src/main/java/org/apache/hadoop/hbase/io/hfile/LoudsTriesLruBlockCacheMBean.java
+ create mode 100644 hbase-server/src/main/java/org/apache/hadoop/hbase/io/hfile/NativeByteBuff.java
+
+diff --git a/hbase-common/pom.xml b/hbase-common/pom.xml
+index c096318..af27cac 100644
+--- a/hbase-common/pom.xml
++++ b/hbase-common/pom.xml
+@@ -183,6 +183,12 @@
+ 
+   <dependencies>
+     <dependency>
++      <groupId>com.huawei</groupId>
++      <artifactId>fake-tries-index-pack</artifactId>
++      <version>2.2.3</version>
++      <scope>provided</scope>
++    </dependency>
++    <dependency>
+       <groupId>org.apache.hbase</groupId>
+       <artifactId>hbase-annotations</artifactId>
+       <type>test-jar</type>
+diff --git a/hbase-common/src/main/java/org/apache/hadoop/hbase/io/hfile/BlockType.java b/hbase-common/src/main/java/org/apache/hadoop/hbase/io/hfile/BlockType.java
+index 4753813..4fa293e 100644
+--- a/hbase-common/src/main/java/org/apache/hadoop/hbase/io/hfile/BlockType.java
++++ b/hbase-common/src/main/java/org/apache/hadoop/hbase/io/hfile/BlockType.java
+@@ -51,6 +51,9 @@ public enum BlockType {
+ 
+   /** Version 2 leaf index block. Appears in the data block section */
+   LEAF_INDEX("IDXLEAF2", BlockCategory.INDEX),
++  
++  /** Tries leaf index block. Appears in the data block section */
++  LEAF_INDEX_TRIES("TRIELEAF", BlockCategory.INDEX),
+ 
+   /** Bloom filter block, version 2 */
+   BLOOM_CHUNK("BLMFBLK2", BlockCategory.BLOOM),
+diff --git a/hbase-common/src/main/java/org/apache/hadoop/hbase/nio/SingleByteBuff.java b/hbase-common/src/main/java/org/apache/hadoop/hbase/nio/SingleByteBuff.java
+index 6d64d7b..e3aaa3f 100644
+--- a/hbase-common/src/main/java/org/apache/hadoop/hbase/nio/SingleByteBuff.java
++++ b/hbase-common/src/main/java/org/apache/hadoop/hbase/nio/SingleByteBuff.java
+@@ -41,7 +41,7 @@ public class SingleByteBuff extends ByteBuff {
+   private static final boolean UNSAFE_UNALIGNED = UnsafeAvailChecker.unaligned();
+ 
+   // Underlying BB
+-  private final ByteBuffer buf;
++  protected final ByteBuffer buf;
+ 
+   // To access primitive values from underlying ByteBuffer using Unsafe
+   private long unsafeOffset;
+diff --git a/hbase-server/pom.xml b/hbase-server/pom.xml
+index a660845..fd55fe3 100644
+--- a/hbase-server/pom.xml
++++ b/hbase-server/pom.xml
+@@ -314,6 +314,12 @@
+   </build>
+   <dependencies>
+     <dependency>
++      <groupId>com.huawei</groupId>
++      <artifactId>fake-tries-index-pack</artifactId>
++      <version>2.2.3</version>
++      <scope>provided</scope>
++    </dependency>
++    <dependency>
+       <groupId>org.apache.hbase.thirdparty</groupId>
+       <artifactId>hbase-shaded-protobuf</artifactId>
+     </dependency>
+diff --git a/hbase-server/src/main/java/org/apache/hadoop/hbase/io/hfile/BlockCacheFactory.java b/hbase-server/src/main/java/org/apache/hadoop/hbase/io/hfile/BlockCacheFactory.java
+index 01fb130..21d6a99 100644
+--- a/hbase-server/src/main/java/org/apache/hadoop/hbase/io/hfile/BlockCacheFactory.java
++++ b/hbase-server/src/main/java/org/apache/hadoop/hbase/io/hfile/BlockCacheFactory.java
+@@ -21,11 +21,13 @@ import static org.apache.hadoop.hbase.HConstants.BUCKET_CACHE_IOENGINE_KEY;
+ import static org.apache.hadoop.hbase.HConstants.BUCKET_CACHE_SIZE_KEY;
+ 
+ import java.io.IOException;
++import java.lang.reflect.InvocationTargetException;
+ 
+ import org.apache.hadoop.conf.Configuration;
+ import org.apache.hadoop.hbase.HConstants;
+ import org.apache.hadoop.hbase.io.hfile.bucket.BucketCache;
+ import org.apache.hadoop.hbase.io.util.MemorySizeUtil;
++import org.apache.hadoop.hbase.regionserver.HRegionServer;
+ import org.apache.hadoop.hbase.util.ReflectionUtils;
+ import org.apache.hadoop.util.StringUtils;
+ import org.apache.yetus.audience.InterfaceAudience;
+@@ -134,6 +136,10 @@ public final class BlockCacheFactory {
+     LOG.info(
+         "Allocating onheap LruBlockCache size=" + StringUtils.byteDesc(cacheSize) + ", blockSize="
+             + StringUtils.byteDesc(blockSize));
++    
++    if (c.getBoolean(LruBlockCache.TRIES_USE_OFFHEAP_KEY, LruBlockCache.DEF_TRIES_USE_OFFHEAP)) {
++      return new LoudsTriesLruBlockCache(cacheSize, blockSize, true, c);
++    }
+     return new LruBlockCache(cacheSize, blockSize, true, c);
+   }
+ 
+diff --git a/hbase-server/src/main/java/org/apache/hadoop/hbase/io/hfile/CacheStats.java b/hbase-server/src/main/java/org/apache/hadoop/hbase/io/hfile/CacheStats.java
+index 7c5b563..93f5cd7 100644
+--- a/hbase-server/src/main/java/org/apache/hadoop/hbase/io/hfile/CacheStats.java
++++ b/hbase-server/src/main/java/org/apache/hadoop/hbase/io/hfile/CacheStats.java
+@@ -161,6 +161,7 @@ public class CacheStats {
+         dataMissCount.increment();
+         break;
+       case LEAF_INDEX:
++      case LEAF_INDEX_TRIES:
+         leafIndexMissCount.increment();
+         break;
+       case BLOOM_CHUNK:
+@@ -209,6 +210,7 @@ public class CacheStats {
+         dataHitCount.increment();
+         break;
+       case LEAF_INDEX:
++      case LEAF_INDEX_TRIES:
+         leafIndexHitCount.increment();
+         break;
+       case BLOOM_CHUNK:
+diff --git a/hbase-server/src/main/java/org/apache/hadoop/hbase/io/hfile/CombinedBlockCache.java b/hbase-server/src/main/java/org/apache/hadoop/hbase/io/hfile/CombinedBlockCache.java
+index b7b9c77..bcd7f17 100644
+--- a/hbase-server/src/main/java/org/apache/hadoop/hbase/io/hfile/CombinedBlockCache.java
++++ b/hbase-server/src/main/java/org/apache/hadoop/hbase/io/hfile/CombinedBlockCache.java
+@@ -380,8 +380,12 @@ public class CombinedBlockCache implements ResizableBlockCache, HeapSize {
+ 
+   @Override
+   public void returnBlock(BlockCacheKey cacheKey, Cacheable block) {
+-    // returnBlock is meaningful for L2 cache alone.
+-    this.l2Cache.returnBlock(cacheKey, block);
++    boolean metaBlock = block.getBlockType().getCategory() != BlockCategory.DATA;
++    if (metaBlock) {
++      onHeapCache.returnBlock(cacheKey, block);
++    } else {
++      l2Cache.returnBlock(cacheKey, block);
++    }
+   }
+ 
+   @VisibleForTesting
+diff --git a/hbase-server/src/main/java/org/apache/hadoop/hbase/io/hfile/HFileBlock.java b/hbase-server/src/main/java/org/apache/hadoop/hbase/io/hfile/HFileBlock.java
+index ebc4564..1406e08 100644
+--- a/hbase-server/src/main/java/org/apache/hadoop/hbase/io/hfile/HFileBlock.java
++++ b/hbase-server/src/main/java/org/apache/hadoop/hbase/io/hfile/HFileBlock.java
+@@ -35,6 +35,10 @@ import org.apache.hadoop.hbase.HConstants;
+ import org.apache.yetus.audience.InterfaceAudience;
+ import org.slf4j.Logger;
+ import org.slf4j.LoggerFactory;
++
++import com.huawei.boostkit.hbase.index.AllocatedMemory;
++import com.huawei.boostkit.hbase.index.OffheapReplaceableCache;
++
+ import org.apache.hadoop.hbase.fs.HFileSystem;
+ import org.apache.hadoop.hbase.io.ByteArrayOutputStream;
+ import org.apache.hadoop.hbase.io.ByteBuffInputStream;
+@@ -111,7 +115,7 @@ import org.apache.hbase.thirdparty.com.google.common.base.Preconditions;
+  * IOEngine is in the bucket subpackage. Pull it up? Then this class knows about bucketcache. Ugh.
+  */
+ @InterfaceAudience.Private
+-public class HFileBlock implements Cacheable {
++public class HFileBlock implements Cacheable, OffheapReplaceableCache {
+   private static final Logger LOG = LoggerFactory.getLogger(HFileBlock.class);
+ 
+   // Block Header fields.
+@@ -179,7 +183,7 @@ public class HFileBlock implements Cacheable {
+    * So, we have this ByteBuff type. Unfortunately, it is spread all about HFileBlock. Would be
+    * good if could be confined to cache-use only but hard-to-do.
+    */
+-  private ByteBuff buf;
++  protected ByteBuff buf;
+ 
+   /** Meta data that holds meta information on the hfileblock.
+    */
+@@ -400,6 +404,20 @@ public class HFileBlock implements Cacheable {
+     this.buf = buf;
+     this.buf.rewind();
+   }
++  
++  public HFileBlock (HFileBlock original, ByteBuff buff, MemoryType memType) {
++    this.blockType = original.blockType;
++    this.buf = buff;
++    buff.put(0, original.buf, 0, original.buf.limit());
++    this.onDiskDataSizeWithHeader = original.onDiskDataSizeWithHeader;
++    this.uncompressedSizeWithoutHeader = original.uncompressedSizeWithoutHeader;
++    this.prevBlockOffset = original.prevBlockOffset;
++    this.onDiskSizeWithoutHeader = original.onDiskSizeWithoutHeader;
++    this.fileContext = original.fileContext;
++    this.offset = original.offset;
++    this.memType = memType;
++    this.nextBlockOnDiskSize = original.nextBlockOnDiskSize;
++  }
+ 
+   /**
+    * Called from constructors.
+@@ -2121,4 +2139,31 @@ public class HFileBlock implements Cacheable {
+   public HFileBlock deepClone() {
+     return new HFileBlock(this, true);
+   }
++
++  @Override
++  public void retain() {
++    if (buf instanceof NativeByteBuff) {
++      ((NativeByteBuff) buf).retain();
++    }
++  }
++
++  @Override
++  public void release() {
++    if (buf instanceof NativeByteBuff) {
++      ((NativeByteBuff) buf).release();
++    }
++  }
++
++  @Override
++  public int dataSize() {
++    return buf.limit();
++  }
++
++  @Override
++  public OffheapReplaceableCache replace(AllocatedMemory allocate) {
++    ByteBuff newBuff = new NativeByteBuff(allocate)
++        .position(allocate.size() - dataSize()).slice();
++    newBuff.put(0, buf, 0, dataSize());
++    return new HFileBlock(this, newBuff, MemoryType.SHARED);
++  }
+ }
+diff --git a/hbase-server/src/main/java/org/apache/hadoop/hbase/io/hfile/HFileBlockIndex.java b/hbase-server/src/main/java/org/apache/hadoop/hbase/io/hfile/HFileBlockIndex.java
+index 90d11ac..0452d24 100644
+--- a/hbase-server/src/main/java/org/apache/hadoop/hbase/io/hfile/HFileBlockIndex.java
++++ b/hbase-server/src/main/java/org/apache/hadoop/hbase/io/hfile/HFileBlockIndex.java
+@@ -47,6 +47,7 @@ import org.apache.hadoop.hbase.io.HeapSize;
+ import org.apache.hadoop.hbase.io.encoding.DataBlockEncoding;
+ import org.apache.hadoop.hbase.io.hfile.HFile.CachingBlockReader;
+ import org.apache.hadoop.hbase.nio.ByteBuff;
++import org.apache.hadoop.hbase.regionserver.HRegionServer;
+ import org.apache.hadoop.hbase.regionserver.KeyValueScanner;
+ import org.apache.hadoop.hbase.util.Bytes;
+ import org.apache.hadoop.hbase.util.ClassSize;
+@@ -54,6 +55,8 @@ import org.apache.hadoop.hbase.util.ObjectIntPair;
+ import org.apache.hadoop.io.WritableUtils;
+ import org.apache.hadoop.util.StringUtils;
+ 
++import com.huawei.boostkit.hbase.index.*;
++
+ /**
+  * Provides functionality to write ({@link BlockIndexWriter}) and read
+  * BlockIndexReader
+@@ -362,6 +365,20 @@ public class HFileBlockIndex {
+           // Locate the entry corresponding to the given key in the non-root
+           // (leaf or intermediate-level) index block.
+           ByteBuff buffer = block.getBufferWithoutHeader();
++          if (block.getBlockType() == BlockType.LEAF_INDEX_TRIES) {
++            ValueInfo blockInfo = LoudsTriesService.get(buffer.asSubByteBuffer(block.getUncompressedSizeWithoutHeader()), key.getRowArray(),
++                key.getRowOffset(), key.getRowLength());
++            if (blockInfo != null) {
++              currentOffset = blockInfo.blockOffset;
++              currentOnDiskSize = blockInfo.blockLength;
++            } else {
++              // This has to be changed
++              // For now change this to key value
++              throw new IOException("The key " + CellUtil.getCellKeyAsString(key) + " is before the"
++                  + " first key of the non-root index block " + block);
++            }
++            continue;
++          }
+           index = locateNonRootIndexEntry(buffer, key, comparator);
+           if (index == -1) {
+             // This has to be changed
+@@ -374,7 +391,8 @@ public class HFileBlockIndex {
+           currentOffset = buffer.getLong();
+           currentOnDiskSize = buffer.getInt();
+ 
+-          // Only update next indexed key if there is a next indexed key in the current level
++          // Only update next indexed key if there is a next indexed key in
++          // the current level
+           byte[] nonRootIndexedKey = getNonRootIndexedKey(buffer, index + 1);
+           if (nonRootIndexedKey != null) {
+             tmpNextIndexKV.setKey(nonRootIndexedKey, 0, nonRootIndexedKey.length);
+@@ -1307,7 +1325,13 @@ public class HFileBlockIndex {
+ 
+       // Write the inline block index to the output stream in the non-root
+       // index block format.
+-      curInlineChunk.writeNonRoot(out);
++      if (HRegionServer.WRITE_TRIES_INDEX) {
++        LoudsTriesService.build(curInlineChunk.getBlockKeyList(),
++            curInlineChunk.getBlockOffsetList().stream().mapToLong(l -> l).toArray(),
++            curInlineChunk.getOnDiskDataSizeList().stream().mapToInt(i -> i).toArray(), out);
++      } else {
++        curInlineChunk.writeNonRoot(out);
++      }
+ 
+       // Save the first key of the inline block so that we can add it to the
+       // parent-level index.
+@@ -1350,7 +1374,7 @@ public class HFileBlockIndex {
+ 
+     @Override
+     public BlockType getInlineBlockType() {
+-      return BlockType.LEAF_INDEX;
++      return HRegionServer.WRITE_TRIES_INDEX ? BlockType.LEAF_INDEX_TRIES : BlockType.LEAF_INDEX;
+     }
+ 
+     /**
+@@ -1554,8 +1578,13 @@ public class HFileBlockIndex {
+       long midKeySubEntry = (totalNumSubEntries - 1) / 2;
+       int midKeyEntry = getEntryBySubEntry(midKeySubEntry);
+ 
+-      baosDos.writeLong(blockOffsets.get(midKeyEntry));
+-      baosDos.writeInt(onDiskDataSizes.get(midKeyEntry));
++      if (HRegionServer.WRITE_TRIES_INDEX) {
++        baosDos.writeLong((long) -1);
++        baosDos.writeInt((int) -1);
++      } else {
++        baosDos.writeLong(blockOffsets.get(midKeyEntry));
++        baosDos.writeInt(onDiskDataSizes.get(midKeyEntry));
++      }
+ 
+       long numSubEntriesBefore = midKeyEntry > 0
+           ? numSubEntriesAt.get(midKeyEntry - 1) : 0;
+@@ -1672,6 +1701,19 @@ public class HFileBlockIndex {
+     public int getOnDiskDataSize(int i) {
+       return onDiskDataSizes.get(i);
+     }
++    
++    public List<byte[]> getBlockKeyList() {
++      return blockKeys;
++    }
++
++    public List<Long> getBlockOffsetList() {
++      return blockOffsets;
++    }
++
++    public List<Integer> getOnDiskDataSizeList() {
++      return onDiskDataSizes;
++    }
++
+ 
+     public long getCumulativeNumKV(int i) {
+       if (i < 0)
+diff --git a/hbase-server/src/main/java/org/apache/hadoop/hbase/io/hfile/HFileReaderImpl.java b/hbase-server/src/main/java/org/apache/hadoop/hbase/io/hfile/HFileReaderImpl.java
+index d1b3a89..8ee4c95 100644
+--- a/hbase-server/src/main/java/org/apache/hadoop/hbase/io/hfile/HFileReaderImpl.java
++++ b/hbase-server/src/main/java/org/apache/hadoop/hbase/io/hfile/HFileReaderImpl.java
+@@ -1577,6 +1577,9 @@ public class HFileReaderImpl implements HFile.Reader, Configurable {
+       // verification.
+       return;
+     }
++    if (actualBlockType == expectedBlockType) return;
++    if (expectedBlockType == BlockType.LEAF_INDEX)
++      expectedBlockType = BlockType.LEAF_INDEX_TRIES;
+     if (actualBlockType != expectedBlockType) {
+       throw new IOException("Expected block type " + expectedBlockType + ", " +
+           "but got " + actualBlockType + ": " + block + ", path=" + path);
+diff --git a/hbase-server/src/main/java/org/apache/hadoop/hbase/io/hfile/HFileWriterImpl.java b/hbase-server/src/main/java/org/apache/hadoop/hbase/io/hfile/HFileWriterImpl.java
+index fa5f1f1..d8e801c 100644
+--- a/hbase-server/src/main/java/org/apache/hadoop/hbase/io/hfile/HFileWriterImpl.java
++++ b/hbase-server/src/main/java/org/apache/hadoop/hbase/io/hfile/HFileWriterImpl.java
+@@ -47,6 +47,7 @@ import org.apache.hadoop.hbase.io.crypto.Encryption;
+ import org.apache.hadoop.hbase.io.encoding.DataBlockEncoding;
+ import org.apache.hadoop.hbase.io.hfile.HFile.FileInfo;
+ import org.apache.hadoop.hbase.io.hfile.HFileBlock.BlockWritable;
++import org.apache.hadoop.hbase.regionserver.HRegionServer;
+ import org.apache.hadoop.hbase.security.EncryptionUtil;
+ import org.apache.hadoop.hbase.security.User;
+ import org.apache.hadoop.hbase.util.BloomFilterWriter;
+@@ -241,7 +242,8 @@ public class HFileWriterImpl implements HFile.Writer {
+       throw new IOException("Key cannot be null or empty");
+     }
+     if (lastCell != null) {
+-      int keyComp = PrivateCellUtil.compareKeyIgnoresMvcc(comparator, lastCell, cell);
++      int keyComp = HRegionServer.WRITE_TRIES_INDEX ? comparator.compareRows(lastCell, cell) :
++    	  PrivateCellUtil.compareKeyIgnoresMvcc(comparator, lastCell, cell);
+ 
+       if (keyComp > 0) {
+         throw new IOException("Added a key not lexically larger than"
+diff --git a/hbase-server/src/main/java/org/apache/hadoop/hbase/io/hfile/LoudsTriesLruBlockCache.java b/hbase-server/src/main/java/org/apache/hadoop/hbase/io/hfile/LoudsTriesLruBlockCache.java
+new file mode 100644
+index 0000000..e4cba9f
+--- /dev/null
++++ b/hbase-server/src/main/java/org/apache/hadoop/hbase/io/hfile/LoudsTriesLruBlockCache.java
+@@ -0,0 +1,93 @@
++package org.apache.hadoop.hbase.io.hfile;
++
++
++import java.util.ArrayList;
++import java.util.HashSet;
++
++import org.apache.hadoop.conf.Configuration;
++import org.apache.hadoop.hbase.io.hfile.Cacheable.MemoryType;
++import org.apache.hadoop.hbase.nio.ByteBuff;
++import org.apache.yetus.audience.InterfaceAudience;
++import org.slf4j.Logger;
++import org.slf4j.LoggerFactory;
++
++import com.huawei.boostkit.hbase.index.IllegalMemoryRequestException;
++import com.huawei.boostkit.hbase.index.InsufficientMemoryException;
++import com.huawei.boostkit.hbase.index.OffheapLruCache;
++import com.huawei.boostkit.hbase.index.OffheapReplaceableCache;
++
++@InterfaceAudience.Private
++public class LoudsTriesLruBlockCache extends LruBlockCache {
++  private static final Logger LOG = LoggerFactory.getLogger(LoudsTriesLruBlockCache.class);
++  private static final String SURF_MEMORY_SIZE_KEY = "hbase.tries.offheap.cache.size";
++  private static final String SURF_RESERVE_RATIO_KEY = "hbase.tries.cache.reserve.ratio";
++  private static final long DEFAULT_SURF_MEMORY_SIZE_KEY = 1024 * 1024 * 1024;
++  private static final float DEFAULT_SURF_RESERVE_RATIO = 0.05f;
++  static {
++    String arch = System.getProperty("os.arch", "");
++    if (!arch.equals("aarch64")) {
++      throw new UnsupportedOperationException("os arch type required aarch64 but actually " + arch);
++    }
++  }
++  
++  private final OffheapLruCache<BlockCacheKey> offHeapCache;
++
++  public LoudsTriesLruBlockCache(long maxSize, long blockSize, boolean evictionThread, Configuration conf) {
++    this(maxSize, blockSize, evictionThread, conf, conf.getLong(SURF_MEMORY_SIZE_KEY, DEFAULT_SURF_MEMORY_SIZE_KEY),
++        conf.getFloat(SURF_RESERVE_RATIO_KEY, DEFAULT_SURF_RESERVE_RATIO));
++  }
++
++  public LoudsTriesLruBlockCache(long maxSize, long blockSize, boolean evictionThread, Configuration conf,
++      long maxMemorySize, float reserveRatio) {
++    super(maxSize, blockSize, evictionThread, conf);
++    offHeapCache = new OffheapLruCache<>(maxMemorySize, reserveRatio, blockSize);
++  }
++
++  @Override
++  public void cacheBlock(BlockCacheKey cacheKey, Cacheable buf, boolean inMemory) {
++    if (!(buf instanceof HFileBlock) || buf.getBlockType() != BlockType.LEAF_INDEX_TRIES) {
++      super.cacheBlock(cacheKey, buf, inMemory);
++      return;
++    }
++    if (!BlockCacheUtil.shouldReplaceExistingCacheBlock(this, cacheKey, buf)) {
++      return;
++    }
++    try {
++      offHeapCache.putCache(cacheKey, (HFileBlock)buf);
++    } catch (InsufficientMemoryException e) {
++      getStats().failInsert();
++      offHeapCache.activateEvictThread();
++    } catch (IllegalMemoryRequestException e) {
++      if (getStats().failInsert() % 50 == 0) {
++        LOG.warn("Trying to cache too large a block " + cacheKey.getHfileName() + " @ " + cacheKey.getOffset() + " is "
++            + buf.heapSize() + " which is larger than " + offHeapCache.getMaxMemory());
++      }
++      return;
++    }
++  }
++  
++  public boolean containsBlock(BlockCacheKey cacheKey) {
++    return offHeapCache.containsKey(cacheKey) || super.containsBlock(cacheKey);
++  }
++  
++  public Cacheable getBlock(BlockCacheKey cacheKey, boolean caching, boolean repeat,
++      boolean updateCacheMetrics) {
++    if (offHeapCache.containsKey(cacheKey)) {
++      return (Cacheable) offHeapCache.getCache(cacheKey);
++    }
++    return super.getBlock(cacheKey, caching, repeat, updateCacheMetrics);
++  }
++
++  @Override
++  public void shutdown() {
++    offHeapCache.shutdown();
++    super.shutdown();
++  }
++
++  @Override
++  public void returnBlock(BlockCacheKey cacheKey, Cacheable cache) {
++    if (cache instanceof OffheapReplaceableCache) {
++      offHeapCache.returnCache((OffheapReplaceableCache) cache);
++    }
++  }
++}
+diff --git a/hbase-server/src/main/java/org/apache/hadoop/hbase/io/hfile/LoudsTriesLruBlockCacheMBean.java b/hbase-server/src/main/java/org/apache/hadoop/hbase/io/hfile/LoudsTriesLruBlockCacheMBean.java
+new file mode 100644
+index 0000000..5281f2c
+--- /dev/null
++++ b/hbase-server/src/main/java/org/apache/hadoop/hbase/io/hfile/LoudsTriesLruBlockCacheMBean.java
+@@ -0,0 +1,13 @@
++package org.apache.hadoop.hbase.io.hfile;
++
++import java.util.ArrayList;
++import java.util.HashSet;
++
++import org.apache.yetus.audience.InterfaceAudience;
++
++@InterfaceAudience.Private
++public interface LoudsTriesLruBlockCacheMBean {
++  int[] getLeakRefCnts();
++  ArrayList<String>[] getLeakStack();
++  HashSet<String> getRetainStacks();
++}
+diff --git a/hbase-server/src/main/java/org/apache/hadoop/hbase/io/hfile/LruBlockCache.java b/hbase-server/src/main/java/org/apache/hadoop/hbase/io/hfile/LruBlockCache.java
+index f8b724c..3b189ff 100644
+--- a/hbase-server/src/main/java/org/apache/hadoop/hbase/io/hfile/LruBlockCache.java
++++ b/hbase-server/src/main/java/org/apache/hadoop/hbase/io/hfile/LruBlockCache.java
+@@ -35,10 +35,12 @@ import java.util.concurrent.locks.ReentrantLock;
+ import org.apache.hadoop.conf.Configuration;
+ import org.apache.hadoop.hbase.io.HeapSize;
+ import org.apache.hadoop.hbase.io.encoding.DataBlockEncoding;
++import org.apache.hadoop.hbase.regionserver.HRegionServer;
+ import org.apache.hadoop.hbase.util.Bytes;
+ import org.apache.hadoop.hbase.util.ClassSize;
+ import org.apache.hadoop.hbase.util.HasThread;
+ import org.apache.hadoop.util.StringUtils;
++import org.apache.hadoop.yarn.webapp.hamlet.Hamlet.HR;
+ import org.apache.yetus.audience.InterfaceAudience;
+ import org.slf4j.Logger;
+ import org.slf4j.LoggerFactory;
+@@ -126,6 +128,8 @@ public class LruBlockCache implements ResizableBlockCache, HeapSize {
+    */
+   private static final String LRU_IN_MEMORY_FORCE_MODE_CONFIG_NAME =
+       "hbase.lru.rs.inmemoryforcemode";
++  
++  static final String TRIES_USE_OFFHEAP_KEY = "hbase.tries.use-offheap";
+ 
+   /* Default Configuration Parameters*/
+ 
+@@ -146,13 +150,15 @@ public class LruBlockCache implements ResizableBlockCache, HeapSize {
+ 
+   private static final boolean DEFAULT_IN_MEMORY_FORCE_MODE = false;
+ 
++  static final boolean DEF_TRIES_USE_OFFHEAP = false;
++
+   /* Statistics thread */
+   private static final int STAT_THREAD_PERIOD = 60 * 5;
+   private static final String LRU_MAX_BLOCK_SIZE = "hbase.lru.max.block.size";
+   private static final long DEFAULT_MAX_BLOCK_SIZE = 16L * 1024L * 1024L;
+ 
+   /** Concurrent map (the cache) */
+-  private transient final Map<BlockCacheKey, LruCachedBlock> map;
++  protected transient final Map<BlockCacheKey, LruCachedBlock> map;
+ 
+   /** Eviction lock (locked when eviction in process) */
+   private transient final ReentrantLock evictionLock = new ReentrantLock(true);
+@@ -177,13 +183,13 @@ public class LruBlockCache implements ResizableBlockCache, HeapSize {
+   private final LongAdder dataBlockSize;
+ 
+   /** Current number of cached elements */
+-  private final AtomicLong elements;
++  protected final AtomicLong elements;
+ 
+   /** Current number of cached data block elements */
+   private final LongAdder dataBlockElements;
+ 
+   /** Cache access count (sequential ID) */
+-  private final AtomicLong count;
++  protected final AtomicLong count;
+ 
+   /** hard capacity limit */
+   private float hardCapacityLimitFactor;
+@@ -218,6 +224,8 @@ public class LruBlockCache implements ResizableBlockCache, HeapSize {
+   /** Whether in-memory hfile's data block has higher priority when evicting */
+   private boolean forceInMemory;
+ 
++  private final boolean triesUseOffheap;
++
+   /**
+    * Where to send victims (blocks evicted/missing from the cache). This is used only when we use an
+    * external cache as L2.
+@@ -252,7 +260,8 @@ public class LruBlockCache implements ResizableBlockCache, HeapSize {
+         DEFAULT_MEMORY_FACTOR,
+         DEFAULT_HARD_CAPACITY_LIMIT_FACTOR,
+         false,
+-        DEFAULT_MAX_BLOCK_SIZE
++        DEFAULT_MAX_BLOCK_SIZE,
++        DEF_TRIES_USE_OFFHEAP
+         );
+   }
+ 
+@@ -269,7 +278,8 @@ public class LruBlockCache implements ResizableBlockCache, HeapSize {
+         conf.getFloat(LRU_HARD_CAPACITY_LIMIT_FACTOR_CONFIG_NAME,
+                       DEFAULT_HARD_CAPACITY_LIMIT_FACTOR),
+         conf.getBoolean(LRU_IN_MEMORY_FORCE_MODE_CONFIG_NAME, DEFAULT_IN_MEMORY_FORCE_MODE),
+-        conf.getLong(LRU_MAX_BLOCK_SIZE, DEFAULT_MAX_BLOCK_SIZE)
++        conf.getLong(LRU_MAX_BLOCK_SIZE, DEFAULT_MAX_BLOCK_SIZE),
++        conf.getBoolean(TRIES_USE_OFFHEAP_KEY, DEF_TRIES_USE_OFFHEAP)
+     );
+   }
+ 
+@@ -277,6 +287,16 @@ public class LruBlockCache implements ResizableBlockCache, HeapSize {
+     this(maxSize, blockSize, true, conf);
+   }
+ 
++  public LruBlockCache(long maxSize, long blockSize, boolean evictionThread,
++      int mapInitialSize, float mapLoadFactor, int mapConcurrencyLevel,
++      float minFactor, float acceptableFactor, float singleFactor,
++      float multiFactor, float memoryFactor, float hardLimitFactor,
++      boolean forceInMemory, long maxBlockSize) {
++    this(maxSize, blockSize, evictionThread, mapInitialSize, mapLoadFactor, mapConcurrencyLevel, minFactor,
++        acceptableFactor, singleFactor, multiFactor, memoryFactor, hardLimitFactor, forceInMemory, maxBlockSize,
++        DEF_TRIES_USE_OFFHEAP);
++  }
++
+   /**
+    * Configurable constructor.  Use this constructor if not using defaults.
+    *
+@@ -296,7 +316,7 @@ public class LruBlockCache implements ResizableBlockCache, HeapSize {
+       int mapInitialSize, float mapLoadFactor, int mapConcurrencyLevel,
+       float minFactor, float acceptableFactor, float singleFactor,
+       float multiFactor, float memoryFactor, float hardLimitFactor,
+-      boolean forceInMemory, long maxBlockSize) {
++      boolean forceInMemory, long maxBlockSize, boolean triesUseOffheap) {
+     this.maxBlockSize = maxBlockSize;
+     if(singleFactor + multiFactor + memoryFactor != 1 ||
+         singleFactor < 0 || multiFactor < 0 || memoryFactor < 0) {
+@@ -336,6 +356,7 @@ public class LruBlockCache implements ResizableBlockCache, HeapSize {
+     // every five minutes.
+     this.scheduleThreadPool.scheduleAtFixedRate(new StatisticsThread(this), STAT_THREAD_PERIOD,
+                                                 STAT_THREAD_PERIOD, TimeUnit.SECONDS);
++    this.triesUseOffheap = triesUseOffheap;
+   }
+ 
+   @Override
+@@ -455,7 +476,7 @@ public class LruBlockCache implements ResizableBlockCache, HeapSize {
+     if (bt != null && bt.isData()) {
+        dataBlockSize.add(heapsize);
+     }
+-    return size.addAndGet(heapsize);
++    return bt == BlockType.LEAF_INDEX_TRIES && triesUseOffheap ? size.get() : size.addAndGet(heapsize);
+   }
+ 
+   /**
+@@ -473,7 +494,10 @@ public class LruBlockCache implements ResizableBlockCache, HeapSize {
+   @Override
+   public Cacheable getBlock(BlockCacheKey cacheKey, boolean caching, boolean repeat,
+       boolean updateCacheMetrics) {
+-    LruCachedBlock cb = map.get(cacheKey);
++    LruCachedBlock cb = map.computeIfPresent(cacheKey, (key, val) -> {
++      handleExistCacheBlock(val);
++      return val;
++    });
+     if (cb == null) {
+       if (!repeat && updateCacheMetrics) {
+         stats.miss(caching, cacheKey.isPrimary(), cacheKey.getBlockType());
+@@ -500,6 +524,9 @@ public class LruBlockCache implements ResizableBlockCache, HeapSize {
+     return cb.getBuffer();
+   }
+ 
++  protected void handleExistCacheBlock(LruCachedBlock val) {
++  }
++
+   /**
+    * Whether the cache contains block with specified cacheKey
+    *
+@@ -622,6 +649,8 @@ public class LruBlockCache implements ResizableBlockCache, HeapSize {
+ 
+       // Scan entire map putting into appropriate buckets
+       for (LruCachedBlock cachedBlock : map.values()) {
++        if (cachedBlock.getBuffer().getBlockType() == BlockType.LEAF_INDEX_TRIES && triesUseOffheap)
++          continue;
+         switch (cachedBlock.getPriority()) {
+           case SINGLE: {
+             bucketSingle.add(cachedBlock);
+diff --git a/hbase-server/src/main/java/org/apache/hadoop/hbase/io/hfile/NativeByteBuff.java b/hbase-server/src/main/java/org/apache/hadoop/hbase/io/hfile/NativeByteBuff.java
+new file mode 100644
+index 0000000..9912895
+--- /dev/null
++++ b/hbase-server/src/main/java/org/apache/hadoop/hbase/io/hfile/NativeByteBuff.java
+@@ -0,0 +1,52 @@
++package org.apache.hadoop.hbase.io.hfile;
++
++import static org.apache.hadoop.hbase.util.UnsafeAccess.theUnsafe;
++
++import java.lang.reflect.Constructor;
++import java.lang.reflect.InvocationTargetException;
++import java.nio.ByteBuffer;
++import java.nio.ByteOrder;
++
++import org.apache.hadoop.hbase.nio.SingleByteBuff;
++import org.apache.hadoop.hbase.util.Pair;
++import org.apache.hbase.thirdparty.io.netty.util.AbstractReferenceCounted;
++import org.apache.hbase.thirdparty.io.netty.util.ReferenceCounted;
++import org.apache.yetus.audience.InterfaceAudience;
++
++import com.huawei.boostkit.hbase.index.AllocatedMemory;
++
++@InterfaceAudience.Private
++public class NativeByteBuff extends SingleByteBuff {
++  private AllocatedMemory memory;
++
++  private NativeByteBuff(AllocatedMemory memory, ByteBuffer buffer) {
++    super(buffer);
++    this.memory = memory;
++  }
++
++  public NativeByteBuff(AllocatedMemory memory) {
++    this(memory, memory.getBuf());
++  }
++
++  @Override
++  public NativeByteBuff slice() {
++    return new NativeByteBuff(memory, this.buf.slice());
++  }
++
++  @Override
++  public NativeByteBuff duplicate() {
++    return new NativeByteBuff(memory, this.buf.duplicate());
++  }
++
++  public void retain() {
++    memory.retain();
++  }
++
++  public void release() {
++    memory.release();
++  }
++  
++  public int refCnt() {
++    return memory.refCnt();
++  }
++}
+diff --git a/hbase-server/src/main/java/org/apache/hadoop/hbase/regionserver/HRegionServer.java b/hbase-server/src/main/java/org/apache/hadoop/hbase/regionserver/HRegionServer.java
+index d88aeef..233bb11 100644
+--- a/hbase-server/src/main/java/org/apache/hadoop/hbase/regionserver/HRegionServer.java
++++ b/hbase-server/src/main/java/org/apache/hadoop/hbase/regionserver/HRegionServer.java
+@@ -3077,6 +3077,10 @@ public class HRegionServer extends HasThread implements
+     }
+   }
+ 
++  public static final String WRITE_TRIES_KEY = "hbase.write.tries";
++  public static final boolean DEF_WRITE_TRIES = false;
++  public static boolean WRITE_TRIES_INDEX = DEF_WRITE_TRIES;
++
+   /**
+    * @see org.apache.hadoop.hbase.regionserver.HRegionServerCommandLine
+    */
+@@ -3084,6 +3088,7 @@ public class HRegionServer extends HasThread implements
+     LOG.info("STARTING executorService " + HRegionServer.class.getSimpleName());
+     VersionInfo.logVersion();
+     Configuration conf = HBaseConfiguration.create();
++    WRITE_TRIES_INDEX = conf.getBoolean(WRITE_TRIES_KEY, DEF_WRITE_TRIES);
+     @SuppressWarnings("unchecked")
+     Class<? extends HRegionServer> regionServerClass = (Class<? extends HRegionServer>) conf
+         .getClass(HConstants.REGION_SERVER_IMPL, HRegionServer.class);
+-- 
+1.8.3.1
+
