@@ -705,8 +705,7 @@ public class DataIoAdapter {
         if (leftExpression instanceof AttributeReference) {
             prestoType = NdpUtils.transOlkDataType(leftExpression.dataType(), false);
             filterProjectionId = putFilterValue(leftExpression, prestoType);
-        } else if (leftExpression instanceof Cast && (operatorName.equals("in")
-                || leftExpression.dataType().toString().toLowerCase(Locale.ENGLISH).equals("datetype"))) {
+        } else if (leftExpression instanceof Cast && operatorName.equals("in")) {
             prestoType = NdpUtils.transOlkDataType(((Cast) leftExpression).child().dataType(), false);
             filterProjectionId = putFilterValue(((Cast) leftExpression).child(), prestoType);
         } else {
