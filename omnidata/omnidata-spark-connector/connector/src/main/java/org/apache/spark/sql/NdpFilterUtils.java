@@ -24,8 +24,6 @@ import java.util.Map;
 
 /**
  * NdpFilterUtils
- *
- * @since 2021-06-30
  */
 public class NdpFilterUtils {
 
@@ -117,4 +115,3 @@ public class NdpFilterUtils {
         return arguments;
     }
 }
-

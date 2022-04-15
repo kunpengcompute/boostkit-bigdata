@@ -5,12 +5,12 @@
     <parent>
         <groupId>org.apache.spark</groupId>
         <artifactId>omnidata-spark-connector-root</artifactId>
-        <version>1.0.0</version>
+        <version>1.1.0</version>
     </parent>
 
     <modelVersion>4.0.0</modelVersion>
     <artifactId>boostkit-omnidata-spark-sql_2.12-3.0.0</artifactId>
-    <version>1.0.0</version>
+    <version>1.1.0</version>
     <description>boostkit omnidata spark sql</description>
     <inceptionYear>2021</inceptionYear>
     <packaging>jar</packaging>
@@ -22,7 +22,7 @@
         <scala.binary.version>2.12</scala.binary.version>
         <spark.version>3.0.0</spark.version>
         <dep.curator.version>2.12.0</dep.curator.version>
-        <dep.hetu.version>1.4.0</dep.hetu.version>
+        <dep.hetu.version>1.4.1</dep.hetu.version>
         <dep.grpc.version>1.35.0</dep.grpc.version>
     </properties>
     <dependencies>
@@ -54,14 +54,8 @@
         </dependency>
         <dependency>
             <groupId>com.huawei.boostkit</groupId>
-            <artifactId>boostkit-omnidata-client-stub</artifactId>
-            <version>1.0.0</version>
-            <scope>compile</scope>
-        </dependency>
-        <dependency>
-            <groupId>com.huawei.boostkit</groupId>
-            <artifactId>boostkit-omnidata-core-stub</artifactId>
-            <version>1.0.0</version>
+            <artifactId>boostkit-omnidata-server-stub</artifactId>
+            <version>1.1.0</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
@@ -141,4 +135,3 @@
         </plugins>
     </build>
 </project>
-

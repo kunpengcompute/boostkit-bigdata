@@ -20,14 +20,10 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /**
- * PushDownManager Operate zookeeper data.
- *
- * @date 2021/3/13 20:26
+ * PushDownManager Operate zookeeper data
  */
 public class PushDownManager {
     private static final Logger LOG = LoggerFactory.getLogger(PushDownManager.class);
-
-    private int aliveOmniDataServerNum = 0;
 
     private static final double TASK_THRESHOLD = 0.8;
 
@@ -36,9 +32,7 @@ public class PushDownManager {
     private CuratorFramework zkClient;
 
     public scala.collection.Map<String, String> getZookeeperData(
-        int timeOut, String parentPath, String zkAddress,
-        int aliveOmniDataServerNum) throws Exception {
-        this.aliveOmniDataServerNum = aliveOmniDataServerNum;
+        int timeOut, String parentPath, String zkAddress) throws Exception {
         Map<String, String> fpuMap = new HashMap<>();
         zkClient = CuratorFrameworkFactory.builder()
             .connectString(zkAddress)
@@ -84,12 +78,11 @@ public class PushDownManager {
             return false;
         }
         for (Map.Entry<String, PushDownData> fpuStatusInfo : fpuStatusInfoMap.entrySet()) {
-            if (fpuStatusInfoMap.size() >= aliveOmniDataServerNum - 2
-                && checkPushDown(fpuStatusInfo.getValue())) {
-                return true;
+            if (!checkPushDown(fpuStatusInfo.getValue())) {
+                return false;
             }
         }
-        return false;
+        return true;
     }
 
     private boolean checkPushDown(PushDownData pushDownData) {
@@ -109,4 +102,3 @@ public class PushDownManager {
         return retMap;
     }
 }
-

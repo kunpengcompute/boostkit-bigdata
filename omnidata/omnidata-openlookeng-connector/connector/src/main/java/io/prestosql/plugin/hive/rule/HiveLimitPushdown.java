@@ -58,6 +58,12 @@ public class HiveLimitPushdown
             SymbolAllocator symbolAllocator,
             PlanNodeIdAllocator idAllocator)
     {
+        requireNonNull(maxSubPlan, "maxSubPlan is null");
+        requireNonNull(session, "session is null");
+        requireNonNull(types, "types is null");
+        requireNonNull(symbolAllocator, "symbolAllocator is null");
+        requireNonNull(idAllocator, "idAllocator is null");
+
         if (!HiveSessionProperties.isOmniDataEnabled(session)) {
             return maxSubPlan;
         }
@@ -72,13 +78,14 @@ public class HiveLimitPushdown
 
         public Visitor(Map<String, Type> types, ConnectorSession session)
         {
-            this.session = session;
-            this.types = types;
+            this.session = requireNonNull(session, "session is null");
+            this.types = requireNonNull(types, "types is null");
         }
 
         @Override
         public PlanNode visitPlan(PlanNode node, Void context)
         {
+            requireNonNull(node, "plan node is null");
             ImmutableList.Builder<PlanNode> children = ImmutableList.builder();
             boolean changed = false;
             for (PlanNode child : node.getSources()) {
@@ -98,6 +105,7 @@ public class HiveLimitPushdown
         @Override
         public PlanNode visitLimit(LimitNode limitNode, Void context)
         {
+            requireNonNull(limitNode, "limit node is null");
             if (!(limitNode.getSource() instanceof TableScanNode && limitNode.isPartial())) {
                 return visitPlan(limitNode, context);
             }

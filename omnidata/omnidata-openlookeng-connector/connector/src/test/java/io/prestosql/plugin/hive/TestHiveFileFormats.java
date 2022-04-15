@@ -608,8 +608,7 @@ public class TestHiveFileFormats
                 ImmutableMap.of(),
                 ImmutableList.of(),
                 Optional.empty(),
-                new HiveOffloadExpression(),
-                ImmutableMap.of());
+                new HiveOffloadExpression());
 
         RecordCursor cursor = ((RecordPageSource) pageSource.get()).getCursor();
 
@@ -665,8 +664,7 @@ public class TestHiveFileFormats
                 ImmutableMap.of(),
                 ImmutableList.of(),
                 Optional.empty(),
-                new HiveOffloadExpression(),
-                ImmutableMap.of());
+                new HiveOffloadExpression());
 
         assertTrue(pageSource.isPresent());
 

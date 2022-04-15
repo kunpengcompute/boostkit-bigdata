@@ -2,8 +2,6 @@ package org.apache.spark.sql;
 
 /**
  * PushDownData
- *
- * @date 2021/3/23 20:30
  */
 public class PushDownData {
     private String datanodeHost;
@@ -52,4 +50,3 @@ public class PushDownData {
         this.maxTasks = maxTasks;
     }
 }
-

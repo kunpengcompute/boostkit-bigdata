@@ -2,7 +2,6 @@ package org.apache.spark.sql;
 
 /**
  * 构造Page传输参数
- * @date 2021/5/18 15:25
  */
 public class PageCandidate {
 
@@ -18,17 +17,17 @@ public class PageCandidate {
 
     private String fileFormat;
 
-    private String sdiPort;
+    public int maxFailedTimes;
 
     public PageCandidate(String filePath, Long startPos, Long splitLen, int columnOffset,
-                         String sdiHosts, String fileFormat, String sdiPort) {
+                         String sdiHosts, String fileFormat, int maxFailedTimes) {
         this.filePath = filePath;
         this.startPos = startPos;
         this.splitLen = splitLen;
         this.columnOffset = columnOffset;
         this.sdiHosts = sdiHosts;
         this.fileFormat = fileFormat;
-        this.sdiPort = sdiPort;
+        this.maxFailedTimes = maxFailedTimes;
     }
 
     public Long getStartPos() {
@@ -55,8 +54,7 @@ public class PageCandidate {
         return fileFormat;
     }
 
-    public String getSdiPort() {
-        return sdiPort;
+    public int getMaxFailedTimes() {
+        return maxFailedTimes;
     }
 }
-

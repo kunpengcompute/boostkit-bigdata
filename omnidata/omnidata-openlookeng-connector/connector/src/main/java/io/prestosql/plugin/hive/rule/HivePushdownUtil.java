@@ -40,6 +40,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static io.prestosql.expressions.LogicalRowExpressions.TRUE_CONSTANT;
 import static io.prestosql.plugin.hive.HiveColumnHandle.ColumnType.DUMMY_OFFLOADED;
 import static io.prestosql.plugin.hive.HiveTableProperties.getHiveStorageFormat;
+import static java.util.Objects.requireNonNull;
 
 public class HivePushdownUtil
 {
@@ -48,7 +49,7 @@ public class HivePushdownUtil
 
     private HivePushdownUtil() {}
 
-    public static Set<HiveColumnHandle> getDataSourceColumns(TableScanNode node)
+    protected static Set<HiveColumnHandle> getDataSourceColumns(TableScanNode node)
     {
         ImmutableSet.Builder<HiveColumnHandle> builder = new ImmutableSet.Builder<>();
         for (Map.Entry<Symbol, ColumnHandle> entry : node.getAssignments().entrySet()) {
@@ -62,25 +63,26 @@ public class HivePushdownUtil
         return builder.build();
     }
 
-    public static Set<VariableReferenceExpression> extractAll(RowExpression expression)
+    protected static Set<VariableReferenceExpression> extractAll(RowExpression expression)
     {
         ImmutableSet.Builder<VariableReferenceExpression> builder = ImmutableSet.builder();
         expression.accept(new VariableReferenceBuilderVisitor(), builder);
         return builder.build();
     }
 
-    public static class VariableReferenceBuilderVisitor
+    protected static class VariableReferenceBuilderVisitor
             extends DefaultRowExpressionTraversalVisitor<ImmutableSet.Builder<VariableReferenceExpression>>
     {
         @Override
         public Void visitVariableReference(VariableReferenceExpression variable, ImmutableSet.Builder<VariableReferenceExpression> builder)
         {
+            requireNonNull(variable, "variable is null");
             builder.add(variable);
             return null;
         }
     }
 
-    public static boolean isColumnsCanOffload(ConnectorTableHandle tableHandle, List<Symbol> outputSymbols, Map<String, Type> typesMap)
+    protected static boolean isColumnsCanOffload(ConnectorTableHandle tableHandle, List<Symbol> outputSymbols, Map<String, Type> typesMap)
     {
         // just for performance, avoid query types
         if (tableHandle instanceof HiveTableHandle) {
@@ -101,6 +103,7 @@ public class HivePushdownUtil
 
     public static void setOmniDataNodeManager(OmniDataNodeManager manager)
     {
+        requireNonNull(manager, "manager is null");
         omniDataNodeManager = Optional.of(manager);
     }
 
@@ -109,7 +112,7 @@ public class HivePushdownUtil
      *
      * @return true/false
      */
-    public static boolean isOmniDataNodesNormal()
+    protected static boolean isOmniDataNodesNormal()
     {
         if (!omniDataNodeManager.isPresent()) {
             return false;
@@ -125,7 +128,7 @@ public class HivePushdownUtil
         return true;
     }
 
-    public static boolean checkStorageFormat(ConnectorTableMetadata metadata)
+    protected static boolean checkStorageFormat(ConnectorTableMetadata metadata)
     {
         HiveStorageFormat hiveStorageFormat = getHiveStorageFormat(metadata.getProperties());
         if (hiveStorageFormat == null) {
@@ -138,7 +141,7 @@ public class HivePushdownUtil
         return true;
     }
 
-    public static boolean checkTableCanOffload(TableScanNode tableScanNode, ConnectorTableMetadata metadata)
+    protected static boolean checkTableCanOffload(TableScanNode tableScanNode, ConnectorTableMetadata metadata)
     {
         // if there are filter conditions added by other optimizers, then return false
         if (tableScanNode.getPredicate().isPresent() && !tableScanNode.getPredicate().get().equals(TRUE_CONSTANT)) {

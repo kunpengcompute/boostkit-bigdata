@@ -51,6 +51,8 @@ public class HivePlanOptimizerProvider
         requireNonNull(functionResolution, "functionResolution is null");
         requireNonNull(partitionManager, "partitionManager is null");
         requireNonNull(functionMetadataManager, "functionMetadataManager is null");
+        requireNonNull(filterCalculatorService, "filterCalculatorService is null");
+        requireNonNull(metadataFactory, "metadataFactory is null");
         this.planOptimizers = ImmutableSet.of(
                 new HiveFilterPushdown(transactionManager, rowExpressionService, functionResolution, partitionManager, filterCalculatorService, functionMetadataManager),
                 new HivePartialAggregationPushdown(transactionManager, functionMetadataManager, functionResolution, metadataFactory),

@@ -282,10 +282,9 @@ public class TestHivePushdownUtil
         HiveConfig hiveConfig = new HiveConfig().setOmniDataEnabled(true)
                 .setFilterOffloadEnabled(true)
                 .setAggregatorOffloadEnabled(true)
-                .setMinFilterOffloadFactor(1)
-                .setMinAggregatorOffloadFactor(1)
-                .setMinOffloadRowNumber(1)
-                .setOmniDataSslEnabled(false);
+                .setFilterOffloadFactor(1)
+                .setAggregatorOffloadFactor(1)
+                .setMinOffloadRowNumber(1);
         return new TestingConnectorSession(
                 new HiveSessionProperties(hiveConfig, new OrcFileWriterConfig(), new ParquetFileWriterConfig()).getSessionProperties());
     }

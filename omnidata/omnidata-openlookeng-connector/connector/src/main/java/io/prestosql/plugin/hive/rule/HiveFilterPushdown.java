@@ -14,7 +14,6 @@
  */
 package io.prestosql.plugin.hive.rule;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -109,7 +108,7 @@ public class HiveFilterPushdown
         this.functionResolution = requireNonNull(functionResolution, "functionResolution is null");
         this.partitionManager = requireNonNull(partitionManager, "partitionManager is null");
         this.functionMetadataManager = requireNonNull(functionMetadataManager, "functionMetadataManager is null");
-        this.filterCalculatorService = filterCalculatorService;
+        this.filterCalculatorService = requireNonNull(filterCalculatorService, "filterCalculatorService is null");
     }
 
     @Override
@@ -120,6 +119,12 @@ public class HiveFilterPushdown
             SymbolAllocator symbolAllocator,
             PlanNodeIdAllocator idAllocator)
     {
+        requireNonNull(maxSubPlan, "maxSubPlan is null");
+        requireNonNull(session, "session is null");
+        requireNonNull(types, "types is null");
+        requireNonNull(symbolAllocator, "symbolAllocator is null");
+        requireNonNull(idAllocator, "idAllocator is null");
+
         if (!HiveSessionProperties.isOmniDataEnabled(session) || !HiveSessionProperties.isFilterOffloadEnabled(session)) {
             return maxSubPlan;
         }
@@ -182,15 +187,13 @@ public class HiveFilterPushdown
             constraint = new Constraint(entireColumnDomain);
         }
         else {
-            // TODO: evaluator is needed? or getTupleDomain().isAll()?
             ConstraintEvaluator evaluator = new ConstraintEvaluator(rowExpressionService, session, columnHandlesMap, decomposedFilter.getRemainingExpression());
             constraint = new Constraint(entireColumnDomain, evaluator::isCandidate);
         }
         return evaluateFilterBenefit(tableHandle, columnHandlesMap, metadata, filterCalculatorService, offloadExpression, constraint, session, typesMap);
     }
 
-    @VisibleForTesting
-    public static ConnectorPushdownFilterResult pushdownFilter(
+    private static ConnectorPushdownFilterResult pushdownFilter(
             HiveMetadata metadata,
             ConnectorSession session,
             ConnectorTableHandle tableHandle,
@@ -211,7 +214,6 @@ public class HiveFilterPushdown
             return new ConnectorPushdownFilterResult(Optional.empty(), TRUE_CONSTANT);
         }
 
-        /// TODO: handle partition column? handle predicate in tableScan node?
         HiveTableHandle hiveTableHandle = (HiveTableHandle) tableHandle;
         Map<String, ColumnHandle> columnHandlesMap = metadata.getColumnHandles(session, tableHandle);
         HiveOffloadExpression oldOffloadExpression = hiveTableHandle.getOffloadExpression();
@@ -249,7 +251,6 @@ public class HiveFilterPushdown
             ConnectorSession session,
             Map<String, Type> typesMap)
     {
-        // TODO: total data size
         TableStatistics statistics = metadata.getTableStatistics(session, tableHandle, constraint, true);
         if (statistics.getRowCount().isUnknown() || statistics.getRowCount().getValue() < HiveSessionProperties.getMinOffloadRowNumber(session)) {
             log.info("Filter:Table %s row number[%d], expect min row number[%d], predicate[%s].",
@@ -269,7 +270,7 @@ public class HiveFilterPushdown
                 allColumns, allColumnTypes, symbolsMap, formSymbolsLayout(allColumns));
         Estimate filteredRowCount = filterStatistics.getRowCount().isUnknown() ? statistics.getRowCount() : filterStatistics.getRowCount();
         double filterFactor = filteredRowCount.getValue() / statistics.getRowCount().getValue();
-        if (filterFactor <= HiveSessionProperties.getMinFilterOffloadFactor(session)) {
+        if (filterFactor <= HiveSessionProperties.getFilterOffloadFactor(session)) {
             log.info("Offloading: table %s, size[%d], predicate[%s], filter factor[%.2f%%].",
                     tableHandle.getTableName(), (long) statistics.getRowCount().getValue(),
                     predicate.toString(), filterFactor * 100);
@@ -288,19 +289,19 @@ public class HiveFilterPushdown
         private final Optional<ConnectorTableHandle> tableHandle;
         private final RowExpression remainingExpression;
 
-        public ConnectorPushdownFilterResult(
+        private ConnectorPushdownFilterResult(
                 Optional<ConnectorTableHandle> tableHandle, RowExpression remainingExpression)
         {
             this.tableHandle = requireNonNull(tableHandle, "handle is null");
             this.remainingExpression = requireNonNull(remainingExpression, "remainingExpression is null");
         }
 
-        public Optional<ConnectorTableHandle> getTableHandle()
+        private Optional<ConnectorTableHandle> getTableHandle()
         {
             return tableHandle;
         }
 
-        public RowExpression getRemainingExpression()
+        private RowExpression getRemainingExpression()
         {
             return remainingExpression;
         }
@@ -329,6 +330,7 @@ public class HiveFilterPushdown
         @Override
         public PlanNode visitPlan(PlanNode node, Void context)
         {
+            requireNonNull(node, "node is null");
             ImmutableList.Builder<PlanNode> children = ImmutableList.builder();
             boolean changed = false;
             for (PlanNode child : node.getSources()) {
@@ -357,6 +359,7 @@ public class HiveFilterPushdown
         @Override
         public PlanNode visitFilter(FilterNode filterNode, Void context)
         {
+            requireNonNull(filterNode, "filterNode is null");
             if (!(filterNode.getSource() instanceof TableScanNode)) {
                 return visitPlan(filterNode, context);
             }
@@ -430,10 +433,10 @@ public class HiveFilterPushdown
 
         public ConstraintEvaluator(RowExpressionService evaluator, ConnectorSession session, Map<String, ColumnHandle> assignments, RowExpression expression)
         {
-            this.assignments = assignments;
-            this.evaluator = evaluator;
-            this.session = session;
-            this.expression = expression;
+            this.assignments = requireNonNull(assignments, "assignments is null");
+            this.evaluator = requireNonNull(evaluator, "evaluator is null");
+            this.session = requireNonNull(session, "session is null");
+            this.expression = requireNonNull(expression, "expression is null");
 
             arguments = ImmutableSet.copyOf(HivePushdownUtil.extractAll(expression)).stream()
                     .map(VariableReferenceExpression::getName)

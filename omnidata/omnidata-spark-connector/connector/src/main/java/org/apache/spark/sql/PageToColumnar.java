@@ -16,8 +16,6 @@ import java.util.List;
 
 /**
  * PageToColumnar
- *
- * @since 2021-03-30
  */
 public class PageToColumnar implements Serializable {
     StructType structType = null;
@@ -60,7 +58,6 @@ public class PageToColumnar implements Serializable {
         return internalRowList;
     }
 }
-
 
 
 

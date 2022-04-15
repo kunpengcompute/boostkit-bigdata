@@ -122,16 +122,22 @@ public class HivePartialAggregationPushdown
 
     @Override
     public PlanNode optimize(
-            PlanNode maxSubplan,
+            PlanNode maxSubPlan,
             ConnectorSession session,
             Map<String, Type> types,
             SymbolAllocator symbolAllocator,
             PlanNodeIdAllocator idAllocator)
     {
+        requireNonNull(maxSubPlan, "maxSubPlan is null");
+        requireNonNull(session, "session is null");
+        requireNonNull(types, "types is null");
+        requireNonNull(symbolAllocator, "symbolAllocator is null");
+        requireNonNull(idAllocator, "idAllocator is null");
+
         if (!HiveSessionProperties.isOmniDataEnabled(session) || !HiveSessionProperties.isAggregatorOffloadEnabled(session)) {
-            return maxSubplan;
+            return maxSubPlan;
         }
-        return maxSubplan.accept(new Visitor(session, idAllocator, types, symbolAllocator), null);
+        return maxSubPlan.accept(new Visitor(session, idAllocator, types, symbolAllocator), null);
     }
 
     private class Visitor
@@ -148,10 +154,10 @@ public class HivePartialAggregationPushdown
                 Map<String, Type> types,
                 SymbolAllocator symbolAllocator)
         {
-            this.session = session;
-            this.idAllocator = idAllocator;
-            this.symbolAllocator = symbolAllocator;
-            this.types = types;
+            this.session = requireNonNull(session, "session is null");
+            this.idAllocator = requireNonNull(idAllocator, "idAllocator is null");
+            this.symbolAllocator = requireNonNull(symbolAllocator, "symbolAllocator is null");
+            this.types = requireNonNull(types, "types is null");
         }
 
         private boolean isAggregationPushdownSupported(AggregationNode partialAggregationNode)
@@ -256,7 +262,7 @@ public class HivePartialAggregationPushdown
             }
 
             double aggregationFactor = getAggregationFactor(partialAggregationNode, session, transactionManager);
-            if (aggregationFactor > HiveSessionProperties.getMinAggregatorOffloadFactor(session)) {
+            if (aggregationFactor > HiveSessionProperties.getAggregatorOffloadFactor(session)) {
                 return Optional.empty();
             }
 
@@ -335,6 +341,7 @@ public class HivePartialAggregationPushdown
         @Override
         public PlanNode visitPlan(PlanNode node, Void context)
         {
+            requireNonNull(node, "plan node is null");
             Optional<PlanNode> pushedDownPlan = tryPartialAggregationPushdown(node);
             return pushedDownPlan.orElseGet(() -> replaceChildren(
                     node,

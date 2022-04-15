@@ -20,7 +20,6 @@ import com.huawei.boostkit.omnidata.model.AggregationInfo;
 import com.huawei.boostkit.omnidata.model.Column;
 import com.huawei.boostkit.omnidata.model.Predicate;
 import io.prestosql.plugin.hive.HiveColumnHandle;
-import io.prestosql.plugin.hive.HiveConfig;
 import io.prestosql.plugin.hive.HiveOffloadExpression;
 import io.prestosql.plugin.hive.HivePartitionKey;
 import io.prestosql.plugin.hive.HiveUtil;
@@ -50,12 +49,6 @@ import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.Maps.uniqueIndex;
-import static com.huawei.boostkit.omnidata.OmniDataProperty.GRPC_CLIENT_CERT_PATH;
-import static com.huawei.boostkit.omnidata.OmniDataProperty.GRPC_CLIENT_PRIVATE_KEY_PATH;
-import static com.huawei.boostkit.omnidata.OmniDataProperty.GRPC_CRL_PATH;
-import static com.huawei.boostkit.omnidata.OmniDataProperty.GRPC_SSL_ENABLED;
-import static com.huawei.boostkit.omnidata.OmniDataProperty.GRPC_TRUST_CA_PATH;
-import static com.huawei.boostkit.omnidata.OmniDataProperty.PKI_DIR;
 import static io.prestosql.expressions.LogicalRowExpressions.TRUE_CONSTANT;
 import static io.prestosql.plugin.hive.HiveColumnHandle.ColumnType.DUMMY_OFFLOADED;
 import static io.prestosql.plugin.hive.HiveColumnHandle.ColumnType.PARTITION_KEY;
@@ -232,19 +225,5 @@ public class PageSourceUtil
                 throwable.addSuppressed(e);
             }
         }
-    }
-
-    public static ImmutableMap getSslConfiguredProperties(HiveConfig hiveConfig)
-    {
-        ImmutableMap.Builder<String, String> properties = new ImmutableMap.Builder<>();
-        properties.put(GRPC_SSL_ENABLED, String.valueOf(hiveConfig.isOmniDataSslEnabled()));
-        if (hiveConfig.isOmniDataSslEnabled()) {
-            hiveConfig.getOmniDataSslPkiDir().ifPresent(entry -> properties.put(PKI_DIR, entry));
-            hiveConfig.getOmniDataSslClientCertFilePath().ifPresent(entry -> properties.put(GRPC_CLIENT_CERT_PATH, entry));
-            hiveConfig.getOmniDataSslPrivateKeyFilePath().ifPresent(entry -> properties.put(GRPC_CLIENT_PRIVATE_KEY_PATH, entry));
-            hiveConfig.getOmniDataSslTrustCertFilePath().ifPresent(entry -> properties.put(GRPC_TRUST_CA_PATH, entry));
-            hiveConfig.getOmniDataSslCrlFilePath().ifPresent(entry -> properties.put(GRPC_CRL_PATH, entry));
-        }
-        return properties.build();
     }
 }

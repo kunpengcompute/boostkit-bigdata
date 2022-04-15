@@ -38,9 +38,6 @@ import javax.validation.constraints.Max;
 import javax.validation.constraints.Min;
 import javax.validation.constraints.NotNull;
 
-import java.io.File;
-import java.io.IOException;
-import java.text.Normalizer;
 import java.util.List;
 import java.util.Optional;
 import java.util.TimeZone;
@@ -67,7 +64,7 @@ public class HiveConfig
 {
     private static final Logger log = Logger.get(HiveConfig.class);
     private static final Splitter SPLITTER = Splitter.on(',').trimResults().omitEmptyStrings();
-    public static final double MIN_OFFLOAD_FACTOR = 0.5;
+    public static final double MAX_OFFLOAD_FACTOR = 0.25;
     public static final long MIN_OFFLOAD_ROW_NUM = 500;
 
     private DataSize maxSplitSize = new DataSize(64, MEGABYTE);
@@ -216,18 +213,11 @@ public class HiveConfig
     private boolean autoVacuumEnabled;
     private boolean orcPredicatePushdownEnabled;
 
-    private boolean omniDataSslEnabled;
-    private Optional<String> omniDataSslPkiDir = Optional.empty();
-    private Optional<String> omniDataSslClientCertFilePath = Optional.empty();
-    private Optional<String> omniDataSslPrivateKeyFilePath = Optional.empty();
-    private Optional<String> omniDataSslTrustCertFilePath = Optional.empty();
-    private Optional<String> omniDataSslCrlFilePath = Optional.empty();
-
-    private boolean omniDataEnabled;
+    private boolean omniDataEnabled = true;
     private boolean filterOffloadEnabled = true;
-    private double minFilterOffloadFactor = MIN_OFFLOAD_FACTOR;
+    private double filterOffloadFactor = MAX_OFFLOAD_FACTOR;
     private boolean aggregatorOffloadEnabled = true;
-    private double minAggregatorOffloadFactor = MIN_OFFLOAD_FACTOR;
+    private double aggregatorOffloadFactor = MAX_OFFLOAD_FACTOR;
     private long minOffloadRowNumber = MIN_OFFLOAD_ROW_NUM;
 
     private int hmsWriteBatchSize = 8;
@@ -1915,105 +1905,6 @@ public class HiveConfig
         return this.workerMetaStoreCacheEnabled;
     }
 
-    public boolean isOmniDataSslEnabled()
-    {
-        return omniDataSslEnabled;
-    }
-
-    private Optional<String> getNormalizedFilePath(String filePath)
-    {
-        if (filePath == null || filePath.isEmpty()) {
-            return Optional.empty();
-        }
-        String outputPath;
-        try {
-            String normalizePath = Normalizer.normalize(filePath, Normalizer.Form.NFKC);
-            outputPath = new File(normalizePath).getCanonicalPath();
-        }
-        catch (IOException | IllegalArgumentException exception) {
-            log.error("File path [%s] is invalid, exception %s", filePath, exception.getMessage());
-            return Optional.empty();
-        }
-        File file = new File(outputPath);
-        if (!file.exists()) {
-            log.error("File [%s] is not exist.", outputPath);
-            return Optional.empty();
-        }
-        return Optional.of(outputPath);
-    }
-
-    @Config("omni-data.ssl.enabled")
-    public HiveConfig setOmniDataSslEnabled(boolean omniDataSslEnabled)
-    {
-        this.omniDataSslEnabled = omniDataSslEnabled;
-        return this;
-    }
-
-    public Optional<String> getOmniDataSslPkiDir()
-    {
-        return omniDataSslPkiDir;
-    }
-
-    @Config("omni-data.ssl.pki.dir")
-    @ConfigDescription("Directory of Public Key Infrastructure.")
-    public HiveConfig setOmniDataSslPkiDir(String omniDataSslPkiDir)
-    {
-        this.omniDataSslPkiDir = getNormalizedFilePath(omniDataSslPkiDir);
-        return this;
-    }
-
-    public Optional<String> getOmniDataSslClientCertFilePath()
-    {
-        return omniDataSslClientCertFilePath;
-    }
-
-    @Config("omni-data.ssl.client.cert.file.path")
-    @ConfigDescription("Path to the SSL client certificate file.")
-    public HiveConfig setOmniDataSslClientCertFilePath(String omniDataSslClientCertFilePath)
-    {
-        this.omniDataSslClientCertFilePath = getNormalizedFilePath(omniDataSslClientCertFilePath);
-        return this;
-    }
-
-    public Optional<String> getOmniDataSslPrivateKeyFilePath()
-    {
-        return omniDataSslPrivateKeyFilePath;
-    }
-
-    @Config("omni-data.ssl.private.key.file.path")
-    @ConfigDescription("Path to the SSL private key file.")
-    public HiveConfig setOmniDataSslPrivateKeyFilePath(String omniDataSslPrivateKeyFilePath)
-    {
-        this.omniDataSslPrivateKeyFilePath = getNormalizedFilePath(omniDataSslPrivateKeyFilePath);
-        return this;
-    }
-
-    public Optional<String> getOmniDataSslTrustCertFilePath()
-    {
-        return omniDataSslTrustCertFilePath;
-    }
-
-    @Config("omni-data.ssl.trust.cert.file.path")
-    @ConfigDescription("Path to the SSL trust certificate file.")
-    public HiveConfig setOmniDataSslTrustCertFilePath(String omniDataSslTrustCertFilePath)
-    {
-        this.omniDataSslTrustCertFilePath = getNormalizedFilePath(omniDataSslTrustCertFilePath);
-        return this;
-    }
-
-    public Optional<String> getOmniDataSslCrlFilePath()
-    {
-        return omniDataSslCrlFilePath;
-    }
-
-    @Config("omni-data.ssl.crl.file.path")
-    @ConfigDescription("Path to the SSL Certificate Revocation List file.")
-    public HiveConfig setOmniDataSslCrlFilePath(String omniDataSslCrlFilePath)
-    {
-        this.omniDataSslCrlFilePath = getNormalizedFilePath(omniDataSslCrlFilePath);
-        return this;
-    }
-
     @Config("hive.filter-offload-enabled")
     @ConfigDescription("Enables offload filter operators to storage device.")
     public HiveConfig setFilterOffloadEnabled(boolean filterOffloadEnabled)
@@ -2053,34 +1944,34 @@ public class HiveConfig
         return aggregatorOffloadEnabled;
     }
 
-    @Config("hive.min-filter-offload-factor")
-    @ConfigDescription("The minimum data filtering threshold for predicate expression offload.")
-    public HiveConfig setMinFilterOffloadFactor(double minFilterOffloadFactor)
+    @Config("hive.filter-offload-factor")
+    @ConfigDescription("The maximum data filtering threshold for predicate expression offload.")
+    public HiveConfig setFilterOffloadFactor(double filterOffloadFactor)
     {
-        this.minFilterOffloadFactor = minFilterOffloadFactor;
+        this.filterOffloadFactor = filterOffloadFactor;
         return this;
     }
 
     @DecimalMin("0.0")
     @DecimalMax("1.0")
-    public double getMinFilterOffloadFactor()
+    public double getFilterOffloadFactor()
     {
-        return minFilterOffloadFactor;
+        return filterOffloadFactor;
     }
 
-    @Config("hive.min-aggregator-offload-factor")
-    @ConfigDescription("The minimum data aggregation threshold for aggregation expression offload.")
-    public HiveConfig setMinAggregatorOffloadFactor(double minAggregatorOffloadFactor)
+    @Config("hive.aggregator-offload-factor")
+    @ConfigDescription("The maximum data aggregation threshold for aggregation expression offload.")
+    public HiveConfig setAggregatorOffloadFactor(double aggregatorOffloadFactor)
     {
-        this.minAggregatorOffloadFactor = minAggregatorOffloadFactor;
+        this.aggregatorOffloadFactor = aggregatorOffloadFactor;
         return this;
     }
 
     @DecimalMin("0.0")
     @DecimalMax("1.0")
-    public double getMinAggregatorOffloadFactor()
+    public double getAggregatorOffloadFactor()
     {
-        return minAggregatorOffloadFactor;
+        return aggregatorOffloadFactor;
     }
 
     @Config("hive.min-offload-row-number")
