@@ -29,17 +29,15 @@ public class PushDownManager {
 
     private static final int ZOOKEEPER_RETRY_INTERVAL_MS = 1000;
 
-    private CuratorFramework zkClient;
-
     public scala.collection.Map<String, String> getZookeeperData(
         int timeOut, String parentPath, String zkAddress) throws Exception {
         Map<String, String> fpuMap = new HashMap<>();
-        zkClient = CuratorFrameworkFactory.builder()
-            .connectString(zkAddress)
-            .sessionTimeoutMs(timeOut)
-            .connectionTimeoutMs(timeOut)
-            .retryPolicy(new RetryForever(ZOOKEEPER_RETRY_INTERVAL_MS))
-            .build();
+        CuratorFramework zkClient = CuratorFrameworkFactory.builder()
+                .connectString(zkAddress)
+                .sessionTimeoutMs(timeOut)
+                .connectionTimeoutMs(timeOut)
+                .retryPolicy(new RetryForever(ZOOKEEPER_RETRY_INTERVAL_MS))
+                .build();
         zkClient.start();
         Map<String, PushDownData> pushDownInfoMap = new HashMap<>();
         InterProcessMutex lock = new InterProcessMutex(zkClient, parentPath);
@@ -61,7 +59,7 @@ public class PushDownManager {
                     return javaMapToScala(new HashMap<>());
                 }
             } catch (InterruptedException | IOException | KeeperException e) {
-                LOG.error("Fail to connect ZooKeeper");
+                LOG.error("Fail to connect ZooKeeper", e);
             } finally {
                 lock.release();
                 zkClient.close();

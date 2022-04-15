@@ -295,7 +295,7 @@
         <dependency>
             <groupId>com.huawei.boostkit</groupId>
             <artifactId>boostkit-omnidata-server</artifactId>
-            <version>1.1.0</version>
+            <version>1.2.0</version>
             <classifier>${dep.os.arch}</classifier>
             <exclusions>
                 <exclusion>

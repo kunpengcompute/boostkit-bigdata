@@ -7,7 +7,7 @@
     <groupId>org.apache.spark</groupId>
     <artifactId>omnidata-spark-connector-root</artifactId>
     <description>OmniData - Spark Connector Root</description>
-    <version>1.1.0</version>
+    <version>1.2.0</version>
     <packaging>pom</packaging>
 
     <modules>
