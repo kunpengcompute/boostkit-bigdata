@@ -38,7 +38,7 @@ case class NdpPushDown(sparkSession: SparkSession)
   private var fpuHosts: scala.collection.Map[String, String] = _
 
   // filter performance blackList: like, startswith, endswith, contains
-  private val filterWhiteList = Set("or", "and", "not", "equalto", "isnotnull", "lessthan",
+  private val filterWhiteList = Set("or", "and", "not", "equalto", "lessthan",
     "greaterthan", "greaterthanorequal", "lessthanorequal", "in", "literal", "isnull",
     "attributereference")
   private val attrWhiteList = Set("long", "integer", "byte", "short", "float", "double",
@@ -117,7 +117,8 @@ case class NdpPushDown(sparkSession: SparkSession)
   private def supportedHiveStringType(attr: Attribute): Boolean = {
     if (attr.dataType.typeName.equals("string")) {
       !attr.metadata.contains("HIVE_TYPE_STRING") ||
-        attr.metadata.getString("HIVE_TYPE_STRING").startsWith("varchar")
+        attr.metadata.getString("HIVE_TYPE_STRING").startsWith("varchar") ||
+        attr.metadata.getString("HIVE_TYPE_STRING").startsWith("char")
     } else {
       false
     }
@@ -174,6 +175,16 @@ case class NdpPushDown(sparkSession: SparkSession)
     replaceWrapper(p)
   }
 
+  def isDynamiCpruning(f: FilterExec): Boolean = {
+    if(f.child.isInstanceOf[NdpScanWrapper] &&
+      f.child.asInstanceOf[NdpScanWrapper].scan.isInstanceOf[FileSourceScanExec] ){
+      f.child.asInstanceOf[NdpScanWrapper].scan.asInstanceOf[FileSourceScanExec].partitionFilters
+        .toString().contains("dynamicpruningexpression")
+    }else{
+      false
+    }
+  }
+
   def pushDownOperatorInternal(plan: SparkPlan): SparkPlan = {
     val p = plan.transformUp {
       case a: AdaptiveSparkPlanExec =>
@@ -190,6 +201,9 @@ case class NdpPushDown(sparkSession: SparkSession)
           logInfo(s"Fail to push down filter, since " +
             s"selectivity[${selectivity.get}] > threshold[${selectivityThreshold}] " +
             s"for condition[${condition}]")
+          f
+        } else if(isDynamiCpruning(f)){
+          logInfo(s"Fail to push down filter, since ${s.scan.nodeName} contains dynamic pruning")
           f
         } else {
           // TODO: move selectivity info to pushdown-info

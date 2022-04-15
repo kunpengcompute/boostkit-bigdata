@@ -37,15 +37,7 @@ import java.util.Map;
  */
 public class NdpUdfExpressions {
 
-    /**
-     *
-     * @param childExpression
-     * @param prestoExpressionInfo
-     * @param fieldMap
-     * @param childType
-     * @param rowArguments
-     */
-    public void checkAttributeReference(Expression childExpression,
+    private void checkAttributeReference(Expression childExpression,
         PrestoExpressionInfo prestoExpressionInfo,
         Map<String, Integer> fieldMap, Type childType, List<RowExpression> rowArguments) {
         if ((childExpression instanceof AttributeReference)) {
@@ -61,6 +53,9 @@ public class NdpUdfExpressions {
         }
     }
 
+    /**
+     * create Udf
+     */
     public void createNdpUdf(Expression udfExpression, PrestoExpressionInfo prestoExpressionInfo,
         Map<String, Integer> fieldMap) {
         if (udfExpression instanceof Length) {
@@ -81,8 +76,8 @@ public class NdpUdfExpressions {
             createNdpSplit((StringSplit) udfExpression, prestoExpressionInfo, fieldMap);
         } else if (udfExpression instanceof GetArrayItem) {
             createNdpSubscript((GetArrayItem) udfExpression, prestoExpressionInfo, fieldMap);
-        } else if (udfExpression instanceof org.apache.spark.sql.hive.HiveSimpleUDF) {
-            createHiveSimpleUdf((HiveSimpleUDF) udfExpression, prestoExpressionInfo, fieldMap);
+        } else if (udfExpression instanceof HiveSimpleUDF) {
+            createHiveSimpleUdf(udfExpression, prestoExpressionInfo, fieldMap);
         } else {
             throw new RuntimeException("unsupported this UDF:" + udfExpression.toString());
         }
@@ -91,7 +86,7 @@ public class NdpUdfExpressions {
     /**
      * Used to create UDF with only a single parameter
      */
-    public void createNdpSingleParameter(NdpUdfEnum udfEnum,
+    private void createNdpSingleParameter(NdpUdfEnum udfEnum,
         Expression expression, Expression childExpression,
         PrestoExpressionInfo prestoExpressionInfo, Map<String, Integer> fieldMap) {
         String signatureName = udfEnum.getSignatureName();
@@ -111,34 +106,34 @@ public class NdpUdfExpressions {
         prestoExpressionInfo.setPrestoRowExpression(resExpression);
     }
 
-    public void createNdpLength(Length expression, PrestoExpressionInfo prestoExpressionInfo,
+    private void createNdpLength(Length expression, PrestoExpressionInfo prestoExpressionInfo,
         Map<String, Integer> fieldMap) {
         createNdpSingleParameter(NdpUdfEnum.LENGTH,
             expression, expression.child(), prestoExpressionInfo, fieldMap);
     }
 
-    public void createNdpUpper(Upper expression, PrestoExpressionInfo prestoExpressionInfo,
+    private void createNdpUpper(Upper expression, PrestoExpressionInfo prestoExpressionInfo,
         Map<String, Integer> fieldMap) {
         createNdpSingleParameter(NdpUdfEnum.UPPER,
             expression, expression.child(), prestoExpressionInfo, fieldMap);
     }
 
-    public void createNdpLower(Lower expression, PrestoExpressionInfo prestoExpressionInfo,
+    private void createNdpLower(Lower expression, PrestoExpressionInfo prestoExpressionInfo,
         Map<String, Integer> fieldMap) {
         createNdpSingleParameter(NdpUdfEnum.LOWER,
             expression, expression.child(), prestoExpressionInfo, fieldMap);
     }
 
-    public void createNdpCast(Cast expression, PrestoExpressionInfo prestoExpressionInfo,
+    private void createNdpCast(Cast expression, PrestoExpressionInfo prestoExpressionInfo,
         Map<String, Integer> fieldMap) {
         createNdpSingleParameter(NdpUdfEnum.CAST,
             expression, expression.child(), prestoExpressionInfo, fieldMap);
     }
 
-    public void createHiveSimpleUdf(HiveSimpleUDF hiveSimpleUDFExpression,
+    private void createHiveSimpleUdf(Expression hiveSimpleUDFExpression,
         PrestoExpressionInfo prestoExpressionInfo,
         Map<String, Integer> fieldMap) {
-        String signatureName = hiveSimpleUDFExpression.name();
+        String signatureName = ((HiveSimpleUDF) hiveSimpleUDFExpression).name();
         List<Expression> hiveSimpleUdf = JavaConverters.seqAsJavaList(
             hiveSimpleUDFExpression.children());
         Type returnType = NdpUtils.transOlkDataType(
@@ -160,7 +155,7 @@ public class NdpUdfExpressions {
         prestoExpressionInfo.setPrestoRowExpression(resExpression);
     }
 
-    public void createNdpSubstring(Substring expression, PrestoExpressionInfo prestoExpressionInfo,
+    private void createNdpSubstring(Substring expression, PrestoExpressionInfo prestoExpressionInfo,
         Map<String, Integer> fieldMap) {
         String signatureName = NdpUdfEnum.SUBSTRING.getSignatureName();
         Type strType = NdpUtils.transOlkDataType(expression.str().dataType(), true);
@@ -186,7 +181,7 @@ public class NdpUdfExpressions {
         prestoExpressionInfo.setReturnType(returnType);
     }
 
-    public void createNdpReplace(StringReplace expression,
+    private void createNdpReplace(StringReplace expression,
         PrestoExpressionInfo prestoExpressionInfo,
         Map<String, Integer> fieldMap) {
         String signatureName = NdpUdfEnum.REPLACE.getSignatureName();
@@ -215,7 +210,7 @@ public class NdpUdfExpressions {
         prestoExpressionInfo.setPrestoRowExpression(resExpression);
     }
 
-    public void createNdpInstr(StringInstr expression, PrestoExpressionInfo prestoExpressionInfo,
+    private void createNdpInstr(StringInstr expression, PrestoExpressionInfo prestoExpressionInfo,
         Map<String, Integer> fieldMap) {
         String signatureName = NdpUdfEnum.INSTR.getSignatureName();
         Type strType = NdpUtils.transOlkDataType(expression.str().dataType(), true);
@@ -238,7 +233,7 @@ public class NdpUdfExpressions {
         prestoExpressionInfo.setPrestoRowExpression(resExpression);
     }
 
-    public void createNdpSplit(StringSplit expression, PrestoExpressionInfo prestoExpressionInfo,
+    private void createNdpSplit(StringSplit expression, PrestoExpressionInfo prestoExpressionInfo,
         Map<String, Integer> fieldMap) {
         String signatureName = NdpUdfEnum.SPLIT.getSignatureName();
         Type strType = NdpUtils.transOlkDataType(expression.str().dataType(), true);
@@ -261,7 +256,7 @@ public class NdpUdfExpressions {
         prestoExpressionInfo.setPrestoRowExpression(resExpression);
     }
 
-    public void createNdpSubscript(GetArrayItem expression,
+    private void createNdpSubscript(GetArrayItem expression,
         PrestoExpressionInfo prestoExpressionInfo,
         Map<String, Integer> fieldMap) {
         String signatureName = NdpUdfEnum.SUBSCRIPT.getSignatureName();
@@ -289,4 +284,3 @@ public class NdpUdfExpressions {
         prestoExpressionInfo.setPrestoRowExpression(resExpression);
     }
 }
-
