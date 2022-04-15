@@ -189,6 +189,7 @@ public final class HiveQueryRunner
                     .put("hive.security", security)
                     .put("hive.max-partitions-per-scan", "1000")
                     .put("hive.assume-canonical-partition-keys", "true")
+                    .put("hive.omnidata-enabled", "false")
                     .build();
             Map<String, String> hiveBucketedProperties = ImmutableMap.<String, String>builder()
                     .putAll(hiveProperties)

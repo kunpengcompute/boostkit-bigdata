@@ -14,6 +14,8 @@
  */
 package io.prestosql.plugin.hive.omnidata;
 
+import static java.util.Objects.requireNonNull;
+
 public class OmniDataNodeStatus
 {
     private String hostAddress;
@@ -22,7 +24,7 @@ public class OmniDataNodeStatus
 
     public OmniDataNodeStatus(String hostAddress, int runningTask, int maxTaskNumber)
     {
-        this.hostAddress = hostAddress;
+        this.hostAddress = requireNonNull(hostAddress, "hostAddress is null");
         this.runningTaskNumber = runningTask;
         this.maxTaskNumber = maxTaskNumber;
     }

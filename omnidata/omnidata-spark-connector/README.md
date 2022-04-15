@@ -15,7 +15,7 @@ Building And Packageing
 
     mvn clean package
 
-(2) Obtain "boostkit-omnidata-spark-sql_2.12-3.0.0-1.0.0.jar" under the "omnidata-spark-connector/connector/target" directory.
+(2) Obtain the jar under the "omnidata-spark-connector/connector/target" directory.
 
 Contribution Guidelines
 ========

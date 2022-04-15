@@ -94,8 +94,8 @@ public final class HiveSessionProperties
     private static final String WRITE_PARTITION_DISTRIBUTION = "write_partition_distribution";
     private static final String FILTER_OFFLOAD = "filter_offload_enabled";
     private static final String AGGREGATOR_OFFLOAD = "aggregator_offload_enabled";
-    private static final String MIN_FILTER_OFFLOAD_FACTOR = "min_filter_offload_factor";
-    private static final String MIN_AGGREGATOR_OFFLOAD_FACTOR = "min_aggregator_offload_factor";
+    private static final String FILTER_OFFLOAD_FACTOR = "filter_offload_factor";
+    private static final String AGGREGATOR_OFFLOAD_FACTOR = "aggregator_offload_factor";
     private static final String MIN_OFFLOAD_ROW_NUMBER = "min_offload_row_number";
     private static final String OMNIDATA_ENABLE = "omnidata_enabled";
     private static final String METASTORE_WRITE_BATCH_SIZE = "metastore_write_batch_size";
@@ -416,14 +416,14 @@ public final class HiveSessionProperties
                         hiveConfig.isOmniDataEnabled(),
                         false),
                 doubleProperty(
-                        MIN_FILTER_OFFLOAD_FACTOR,
+                        FILTER_OFFLOAD_FACTOR,
                         "The minimum data filtering threshold for predicate expression offload.",
-                        hiveConfig.getMinFilterOffloadFactor(),
+                        hiveConfig.getFilterOffloadFactor(),
                         false),
                 doubleProperty(
-                        MIN_AGGREGATOR_OFFLOAD_FACTOR,
+                        AGGREGATOR_OFFLOAD_FACTOR,
                         "The minimum data aggregation threshold for aggregation expression offload.",
-                        hiveConfig.getMinAggregatorOffloadFactor(),
+                        hiveConfig.getAggregatorOffloadFactor(),
                         false),
                 longProperty(
                         MIN_OFFLOAD_ROW_NUMBER,
@@ -714,14 +714,14 @@ public final class HiveSessionProperties
         return session.getProperty(OMNIDATA_ENABLE, Boolean.class);
     }
 
-    public static double getMinFilterOffloadFactor(ConnectorSession session)
+    public static double getFilterOffloadFactor(ConnectorSession session)
     {
-        return session.getProperty(MIN_FILTER_OFFLOAD_FACTOR, Double.class);
+        return session.getProperty(FILTER_OFFLOAD_FACTOR, Double.class);
     }
 
-    public static double getMinAggregatorOffloadFactor(ConnectorSession session)
+    public static double getAggregatorOffloadFactor(ConnectorSession session)
     {
-        return session.getProperty(MIN_AGGREGATOR_OFFLOAD_FACTOR, Double.class);
+        return session.getProperty(AGGREGATOR_OFFLOAD_FACTOR, Double.class);
     }
 
     public static long getMinOffloadRowNumber(ConnectorSession session)

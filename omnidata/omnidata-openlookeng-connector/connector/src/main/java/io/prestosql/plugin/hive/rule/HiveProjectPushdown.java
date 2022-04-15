@@ -48,7 +48,7 @@ public class HiveProjectPushdown
 {
     private HiveProjectPushdown() {}
 
-    public static Optional<TableScanNode> tryProjectPushdown(ProjectNode plan, Map<String, Type> types)
+    protected static Optional<TableScanNode> tryProjectPushdown(ProjectNode plan, Map<String, Type> types)
     {
         if (!(plan.getSource() instanceof TableScanNode)) {
             return Optional.empty();

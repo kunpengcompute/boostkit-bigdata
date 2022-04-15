@@ -1,6 +1,6 @@
 package org.apache.spark.sql;
 
-import com.huawei.boostkit.omnidata.type.*;
+import com.huawei.boostkit.omnidata.decode.type.*;
 
 import io.airlift.slice.Slice;
 import io.prestosql.spi.relation.ConstantExpression;
@@ -47,6 +47,7 @@ import static io.prestosql.spi.type.TinyintType.TINYINT;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static java.lang.Float.floatToIntBits;
 import static java.lang.Float.parseFloat;
+import static org.apache.hadoop.hdfs.DFSUtil.getRandom;
 
 /**
  * NdpUtils
@@ -87,9 +88,13 @@ public class NdpUtils {
                     List<Expression> expressions = JavaConverters
                         .seqAsJavaList(aggregateFunction.children());
                     for (Expression expression : expressions) {
-                        columnName = expression.toString().split("#")[0];
-                        columnTempId = NdpUtils.getColumnId(expression.toString());
-                        break;
+                        columnName = expression.toString().split("#")[0].replaceAll("\\(", "");
+                        Pattern pattern = Pattern.compile(columnName + "#(\\d+)");
+                        Matcher matcher = pattern.matcher(expression.toString());
+                        if(matcher.find()) {
+                            columnTempId = Integer.parseInt(matcher.group(1));
+                            break;
+                        }
                     }
                     break;
                 }
@@ -327,15 +332,9 @@ public class NdpUtils {
         return partitionValue;
     }
 
-    public static Properties getProperties(OmniDataProperties omniDataProperties) {
-        Properties omniProperties = new Properties();
-        omniProperties.put("grpc.ssl.enabled", omniDataProperties.isGrpcSslEnabled());
-        omniProperties.put("grpc.client.cert.file.path", omniDataProperties.getGrpcCertPath());
-        omniProperties.put("grpc.client.private.key.file.path",
-            omniDataProperties.getGrpcKeyPath());
-        omniProperties.put("grpc.trust.ca.file.path", omniDataProperties.getGrpcCaPath());
-        omniProperties.put("pki.dir", omniDataProperties.getPkiDir());
-        return omniProperties;
+    public static int getFpuHosts(int hostSize) {
+        int pushDownNodeIndex = (int) (Math.random() * hostSize);
+        return pushDownNodeIndex;
     }
 
     public static boolean isValidDateFormat(String dateString) {
@@ -358,4 +357,3 @@ public class NdpUtils {
         return isInDate;
     }
 }
-

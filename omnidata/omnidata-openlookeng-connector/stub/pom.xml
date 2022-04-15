@@ -7,15 +7,14 @@
     <groupId>com.huawei.boostkit</groupId>
     <artifactId>omniDataStub</artifactId>
     <packaging>pom</packaging>
-    <version>1.0.0</version>
+    <version>1.1.0</version>
 
     <modules>
-        <module>core</module>
-        <module>client</module>
+        <module>server</module>
     </modules>
 
     <properties>
-        <dep.hetu.version>1.4.0</dep.hetu.version>
+        <dep.hetu.version>1.4.1</dep.hetu.version>
         <dep.os.arch>${os.detected.arch}</dep.os.arch>
     </properties>
 
@@ -23,13 +22,7 @@
         <dependencies>
             <dependency>
                 <groupId>com.huawei.boostkit</groupId>
-                <artifactId>boostkit-omnidata-client</artifactId>
-                <version>${project.version}</version>
-                <classifier>${dep.os.arch}</classifier>
-            </dependency>
-            <dependency>
-                <groupId>com.huawei.boostkit</groupId>
-                <artifactId>boostkit-omnidata-core</artifactId>
+                <artifactId>boostkit-omnidata-server</artifactId>
                 <version>${project.version}</version>
                 <classifier>${dep.os.arch}</classifier>
             </dependency>
@@ -37,7 +30,11 @@
     </dependencyManagement>
 
     <dependencies>
-
+        <dependency>
+            <groupId>de.ruedigermoeller</groupId>
+            <artifactId>fst</artifactId>
+            <version>2.57</version>
+        </dependency>
         <dependency>
             <groupId>io.hetu.core</groupId>
             <artifactId>presto-spi</artifactId>

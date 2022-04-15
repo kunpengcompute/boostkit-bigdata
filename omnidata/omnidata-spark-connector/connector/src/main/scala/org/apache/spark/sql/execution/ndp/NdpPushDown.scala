@@ -36,7 +36,6 @@ case class NdpPushDown(sparkSession: SparkSession)
   extends Rule[SparkPlan] with PredicateHelper {
   private val pushDownEnabled = NdpConf.getNdpEnabled(sparkSession)
   private var fpuHosts: scala.collection.Map[String, String] = _
-
   // filter performance blackList: like, startswith, endswith, contains
   private val filterWhiteList = Set("or", "and", "not", "equalto", "isnotnull", "lessthan",
     "greaterthan", "greaterthanorequal", "lessthanorequal", "in", "literal", "isnull",
@@ -63,7 +62,6 @@ case class NdpPushDown(sparkSession: SparkSession)
   private val timeOut = NdpConf.getNdpZookeeperTimeout(sparkSession)
   private val parentPath = NdpConf.getNdpZookeeperPath(sparkSession)
   private val zkAddress = NdpConf.getNdpZookeeperAddress(sparkSession)
-  private val aliveOmniDataServerNum = NdpConf.getNdpAliveOmnidata(sparkSession)
 
   override def apply(plan: SparkPlan): SparkPlan = {
     if (pushDownEnabled && shouldPushDown(plan) && shouldPushDown()) {
@@ -82,7 +80,9 @@ case class NdpPushDown(sparkSession: SparkSession)
         }
         plan
       case s: FileSourceScanExec =>
-        if (s.metadata.get("Location").toString.contains("[hdfs")) {
+        if (s.metadata.get("Location").toString.contains("[hdfs") ||
+          s.metadata.get("Location").toString.contains("[cephrgw") ||
+          s.metadata.get("Location").toString.contains("[s3a") ) {
           isPush = true
         }
         plan
@@ -95,8 +95,7 @@ case class NdpPushDown(sparkSession: SparkSession)
 
   def shouldPushDown(): Boolean = {
     val pushDownManagerClass = new PushDownManager()
-    fpuHosts = pushDownManagerClass.getZookeeperData(timeOut, parentPath,
-      zkAddress, aliveOmniDataServerNum)
+    fpuHosts = pushDownManagerClass.getZookeeperData(timeOut, parentPath, zkAddress)
     fpuHosts.nonEmpty
   }
 
@@ -172,9 +171,14 @@ case class NdpPushDown(sparkSession: SparkSession)
   }
 
   def pushDownOperator(plan: SparkPlan): SparkPlan = {
+    val p = pushDownOperatorInternal(plan)
+    replaceWrapper(p)
+  }
+
+  def pushDownOperatorInternal(plan: SparkPlan): SparkPlan = {
     val p = plan.transformUp {
       case a: AdaptiveSparkPlanExec =>
-        InsertAdaptiveSparkPlan(a.context)(pushDownOperator(a.initialPlan))
+        pushDownOperatorInternal(a.initialPlan)
       case s: FileSourceScanExec if shouldPushDown(s.relation) =>
         val filters = s.partitionFilters.filter { x =>
           filterWhiteList.contains(x.prettyName) || udfWhiteList.contains(x.prettyName)
@@ -287,6 +291,7 @@ object NdpConf {
   val NDP_GRPC_CLIENT_PRIVATE_KEY_FILE_PATH = "spark.sql.ndp.grpc.client.private.key.file.path"
   val NDP_GRPC_TRUST_CA_FILE_PATH = "spark.sql.ndp.grpc.trust.ca.file.path"
   val NDP_PKI_DIR = "spark.sql.ndp.pki.dir"
+  val NDP_MAX_FAILED_TIMES = "spark.sql.ndp.max.failed.times"
 
   def toBoolean(key: String, value: String, sparkSession: SparkSession): Boolean = {
     try {
@@ -369,15 +374,6 @@ object NdpConf {
     result
   }
 
-  def getNdpAliveOmnidata(sparkSession: SparkSession): Int = {
-    val result = toNumber(NDP_ALIVE_OMNIDATA,
-      sparkSession.conf.getOption(NDP_ALIVE_OMNIDATA).getOrElse("0"),
-      _.toInt, "int", sparkSession)
-    checkLongValue(NDP_ALIVE_OMNIDATA, result, _ >= 0,
-      s"The $NDP_ALIVE_OMNIDATA value must be positive", sparkSession)
-    result
-  }
-
   def getNdpFilterSelectivity(sparkSession: SparkSession): Double = {
     val result = toNumber(NDP_FILTER_SELECTIVITY,
       sparkSession.conf.getOption(NDP_FILTER_SELECTIVITY).getOrElse("0.5"),
@@ -400,37 +396,7 @@ object NdpConf {
     sparkSession.conf.getOption(NDP_ZOOKEEPER_ADDRESS).getOrElse("")
   }
 
-  def getNdpSdiPort(sparkSession: SparkSession): String = {
-    val result = toNumber(NDP_SDI_PORT,
-      sparkSession.conf.getOption(NDP_SDI_PORT).getOrElse("9100"),
-      _.toInt, "int", sparkSession)
-    checkLongValue(NDP_SDI_PORT, result, _ > 0,
-      s"The $NDP_SDI_PORT value must be positive", sparkSession)
-    result.toString
-  }
-
-  def getNdpGrpcSslEnabled(sparkSession: SparkSession): String = {
-    toBoolean(NDP_GRPC_SSL_ENABLED,
-      sparkSession.conf.getOption(NDP_GRPC_SSL_ENABLED).getOrElse("true"), sparkSession).toString
-  }
-
-  def getNdpGrpcClientCertFilePath(sparkSession: SparkSession): String = {
-    sparkSession.conf.getOption(NDP_GRPC_CLIENT_CERT_FILE_PATH)
-      .getOrElse("/opt/conf/client.crt")
-  }
-
-  def getNdpGrpcClientPrivateKeyFilePath(sparkSession: SparkSession): String = {
-    sparkSession.conf.getOption(NDP_GRPC_CLIENT_PRIVATE_KEY_FILE_PATH)
-      .getOrElse("/opt/conf/client.pem")
-  }
-
-  def getNdpGrpcTrustCaFilePath(sparkSession: SparkSession): String = {
-    sparkSession.conf.getOption(NDP_GRPC_TRUST_CA_FILE_PATH)
-      .getOrElse("/opt/conf/ca.crt")
-  }
-
-  def getNdpPkiDir(sparkSession: SparkSession): String = {
-    sparkSession.conf.getOption(NDP_PKI_DIR).getOrElse("/opt/conf/")
+  def getMaxFailedTimes(sparkSession: SparkSession): String = {
+    sparkSession.conf.getOption(NDP_MAX_FAILED_TIMES).getOrElse("3")
   }
 }
-

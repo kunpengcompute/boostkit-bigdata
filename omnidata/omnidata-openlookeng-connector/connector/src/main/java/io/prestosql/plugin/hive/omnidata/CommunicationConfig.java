@@ -16,6 +16,8 @@ package io.prestosql.plugin.hive.omnidata;
 
 import io.airlift.configuration.Config;
 
+import static java.util.Objects.requireNonNull;
+
 public class CommunicationConfig
 {
     private boolean httpsRequired;
@@ -28,7 +30,7 @@ public class CommunicationConfig
     @Config("internal-communication.https.required")
     public CommunicationConfig setHttpsRequired(boolean httpsRequired)
     {
-        this.httpsRequired = httpsRequired;
+        this.httpsRequired = requireNonNull(httpsRequired, "httpsRequired is null");
         return this;
     }
 }

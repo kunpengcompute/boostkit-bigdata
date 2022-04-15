@@ -16,7 +16,7 @@ package io.prestosql.plugin.hive.parquet;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import com.huawei.boostkit.omnidata.block.BlockDeserializer;
+import com.huawei.boostkit.omnidata.decode.impl.OpenLooKengDeserializer;
 import com.huawei.boostkit.omnidata.model.TaskSource;
 import com.huawei.boostkit.omnidata.model.datasource.DataSource;
 import com.huawei.boostkit.omnidata.reader.DataReader;
@@ -75,7 +75,7 @@ import java.util.Set;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Strings.nullToEmpty;
-import static com.huawei.boostkit.omnidata.OmniDataProperty.GRPC_CLIENT_TARGET_LIST;
+import static com.huawei.boostkit.omnidata.transfer.OmniDataProperty.OMNIDATA_CLIENT_TARGET_LIST;
 import static io.prestosql.memory.context.AggregatedMemoryContext.newSimpleAggregatedMemoryContext;
 import static io.prestosql.parquet.ParquetTypeUtils.getColumnIO;
 import static io.prestosql.parquet.ParquetTypeUtils.getDescriptors;
@@ -93,7 +93,6 @@ import static io.prestosql.plugin.hive.HiveUtil.getDeserializerClassName;
 import static io.prestosql.plugin.hive.HiveUtil.shouldUseRecordReaderFromInputFormat;
 import static io.prestosql.plugin.hive.parquet.HdfsParquetDataSource.buildHdfsParquetDataSource;
 import static io.prestosql.plugin.hive.util.PageSourceUtil.buildPushdownContext;
-import static io.prestosql.plugin.hive.util.PageSourceUtil.getSslConfiguredProperties;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
@@ -113,7 +112,6 @@ public class ParquetPageSourceFactory
     private final FileFormatDataSourceStats stats;
 
     private final DateTimeZone timeZone;
-    private final ImmutableMap sslPropertyMap;
     private String omniDataServerTarget;
 
     @Inject
@@ -123,7 +121,6 @@ public class ParquetPageSourceFactory
         this.hdfsEnvironment = requireNonNull(hdfsEnvironment, "hdfsEnvironment is null");
         this.stats = requireNonNull(stats, "stats is null");
         this.timeZone = requireNonNull(hiveConfig, "hiveConfig is null").getParquetDateTimeZone();
-        this.sslPropertyMap = getSslConfiguredProperties(hiveConfig);
     }
 
     @Override
@@ -353,8 +350,7 @@ public class ParquetPageSourceFactory
     {
         AggregatedMemoryContext systemMemoryUsage = newSimpleAggregatedMemoryContext();
         Properties transProperties = new Properties();
-        transProperties.put(GRPC_CLIENT_TARGET_LIST, omniDataServerTarget);
-        transProperties.putAll(sslPropertyMap);
+        transProperties.put(OMNIDATA_CLIENT_TARGET_LIST, omniDataServerTarget);
 
         DataSource parquetPushDownDataSource = new com.huawei.boostkit.omnidata.model.datasource.hdfs.HdfsParquetDataSource(path.toString(), start, length, false);
 
@@ -362,7 +358,7 @@ public class ParquetPageSourceFactory
                 parquetPushDownDataSource,
                 predicate,
                 TaskSource.ONE_MEGABYTES);
-        DataReader dataReader = DataReaderFactory.create(transProperties, readTaskInfo, new BlockDeserializer());
+        DataReader dataReader = DataReaderFactory.create(transProperties, readTaskInfo, new OpenLooKengDeserializer());
 
         return new ParquetPushDownPageSource(
                 dataReader,

@@ -16,14 +16,8 @@ public class PrestoExpressionInfo {
 
     private Type returnType;
 
-    /**
-     * 子表达式中的字段类型
-     */
     private Type fieldDataType;
 
-    /**
-     * 包含字段信息的子表达式，例子:c_name#24
-     */
     private Expression childExpression;
 
     private RowExpression prestoRowExpression;
@@ -71,4 +65,3 @@ public class PrestoExpressionInfo {
         this.childExpression = childExpression;
     }
 }
-

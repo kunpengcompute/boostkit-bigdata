@@ -31,9 +31,7 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * Used to process Spark`s UDF, which is converted to presto.
- *
- * @since 2021-06-24
+ * Used to process Spark`s UDF, which is converted to presto
  */
 public class NdpUdfExpressions {
 
@@ -289,4 +287,3 @@ public class NdpUdfExpressions {
         prestoExpressionInfo.setPrestoRowExpression(resExpression);
     }
 }
-

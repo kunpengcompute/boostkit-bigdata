@@ -2,8 +2,6 @@ package org.apache.spark.sql;
 
 /**
  * udf enum
- *
- * @since 2021-06-26
  */
 public enum NdpUdfEnum {
     // Supported push-down Udf
@@ -42,4 +40,3 @@ public enum NdpUdfEnum {
         this.operatorName = operatorName;
     }
 }
-
