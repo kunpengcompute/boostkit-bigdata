@@ -116,7 +116,7 @@ class FileScanRDDPushDown(
           val tmp: util.ArrayList[Object] = new util.ArrayList[Object]()
           var hasnextIterator = false
           try {
-            hasnextIterator = dataIoClass.hasnextIterator(tmp, pageToColumnarClass,
+            hasnextIterator = dataIoClass.hasNextIterator(tmp, pageToColumnarClass,
               currentFile, isColumnVector)
           } catch {
             case e : Exception =>

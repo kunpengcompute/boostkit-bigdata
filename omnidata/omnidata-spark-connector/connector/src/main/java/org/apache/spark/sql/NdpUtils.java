@@ -333,8 +333,7 @@ public class NdpUtils {
     }
 
     public static int getFpuHosts(int hostSize) {
-        int pushDownNodeIndex = (int) (Math.random() * hostSize);
-        return pushDownNodeIndex;
+        return (int) (Math.random() * hostSize);
     }
 
     public static boolean isValidDateFormat(String dateString) {
