@@ -3150,10 +3150,10 @@ public class TestHiveIntegrationSmokeTest
 
         assertUpdate(createTable, "SELECT count(*) FROM orders");
         assertUpdate("ALTER TABLE test_rename_column RENAME COLUMN orderkey TO new_orderkey");
-        assertQuery("SELECT new_orderkey, orderstatus FROM test_rename_column", "SELECT NULL, orderstatus FROM orders where orderstatus != 'dfd'");
+        assertQuery("SELECT new_orderkey, orderstatus FROM test_rename_column", "SELECT orderkey, orderstatus FROM orders where orderstatus != 'dfd'");
         assertQueryFails("ALTER TABLE test_rename_column RENAME COLUMN \"$path\" TO test", ".* Cannot rename hidden column");
         assertQueryFails("ALTER TABLE test_rename_column RENAME COLUMN orderstatus TO new_orderstatus", "Renaming partition columns is not supported");
-        assertQuery("SELECT new_orderkey, orderstatus FROM test_rename_column", "SELECT NULL, orderstatus FROM orders");
+        assertQuery("SELECT new_orderkey, orderstatus FROM test_rename_column", "SELECT orderkey, orderstatus FROM orders");
         assertUpdate("DROP TABLE test_rename_column");
     }
 
@@ -5097,8 +5097,9 @@ public class TestHiveIntegrationSmokeTest
         Session session = getSession();
         ImmutableList.Builder<TestingHiveStorageFormat> formats = ImmutableList.builder();
         for (HiveStorageFormat hiveStorageFormat : HiveStorageFormat.values()) {
-            if (hiveStorageFormat == HiveStorageFormat.CSV) {
+            if (hiveStorageFormat == HiveStorageFormat.CSV || hiveStorageFormat == HiveStorageFormat.MULTIDELIMIT) {
                 // CSV supports only unbounded VARCHAR type
+                // MULTIDELIMIT is supported only when field.delim property is specified
                 continue;
             }
             formats.add(new TestingHiveStorageFormat(session, hiveStorageFormat));
@@ -5114,7 +5115,7 @@ public class TestHiveIntegrationSmokeTest
     private void assertShowCreateTableOutput(Object actual, String expected)
     {
         List<String> expectedLines = Stream.of(
-                expected.split("\n"))
+                        expected.split("\n"))
                 .map(line -> line.lastIndexOf(',') == (line.length() - 1) ? line.substring(0, line.length() - 1) : line)
                 .collect(Collectors.toList());
 
@@ -5391,7 +5392,7 @@ public class TestHiveIntegrationSmokeTest
                             "(cast(2 as " + type + "),NULL,2)," +
                             "(NULL,NULL,3)," +
                             "(cast(4 as " + type + "),NULL,4)," +
-                    "(NULL,NULL,NULL)",
+                            "(NULL,NULL,NULL)",
                     6);
             assertUpdate(sessionWithOr, "INSERT INTO test_predicate_or_NULL_tmp SELECT * from test_predicate_or_NULL_tmp", 6); /* 12 rows */
             assertUpdate(sessionWithOr, "INSERT INTO test_predicate_or_NULL_tmp SELECT * from test_predicate_or_NULL_tmp", 12); /* 24 rows */
@@ -5403,7 +5404,7 @@ public class TestHiveIntegrationSmokeTest
             assertUpdate(sessionWithOr, "INSERT INTO test_predicate_or_NULL_tmp SELECT * from test_predicate_or_NULL_tmp", 768); /* 1536 rows */
 
             assertUpdate(sessionWithOr, "CREATE TABLE test_predicate_or_NULL WITH (transactional=false, format='orc')" +
-                    " AS SELECT * FROM test_predicate_or_NULL_tmp ORDER BY a, b, c",
+                            " AS SELECT * FROM test_predicate_or_NULL_tmp ORDER BY a, b, c",
                     1536);
 
             List<String> queries = new ArrayList<>();
@@ -6074,7 +6075,7 @@ public class TestHiveIntegrationSmokeTest
         assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
 
         sortResult = computeActual(testSessionSortPrcntDrv25, "select count(orderkey), count(year)," +
-            "year from sorttable10  group by year order by year");
+                "year from sorttable10  group by year order by year");
         assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
 
         sortResult = computeActual(testSessionSortPrcntDrv50, "select count(orderkey), count(year)," +
@@ -6610,6 +6611,52 @@ public class TestHiveIntegrationSmokeTest
     }
 
     @Test
+    public void UnSortAggrePartitionBucketCount1()
+    {
+        initSortBasedAggregation();
+        computeActual("create table lineitem_partition_shipmode_comment_bucket1  with(transactional = false, " +
+                "format = 'ORC', partitioned_by = ARRAY['shipmode', 'comment'], bucketed_by=array['orderkey',  'partkey'], bucket_count=1)" +
+                "  as select * from tpch.tiny.lineitem limit 100");
+
+        String query = "select lineitem_partition_shipmode_comment_bucket1.shipmode, lineitem_partition_shipmode_comment_bucket1.comment " +
+                "from lineitem_partition_shipmode_comment_bucket1 " +
+                "group by shipmode, comment " +
+                "order by shipmode, comment ";
+
+        MaterializedResult sortResult = computeActual(testSessionSort, query);
+        MaterializedResult hashResult = computeActual(query);
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
+        sortResult = computeActual(testSessionSortPrcntDrv50, query);
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
+        sortResult = computeActual(testSessionSortPrcntDrv40, query);
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
+        assertUpdate("DROP TABLE lineitem_partition_shipmode_comment_bucket1");
+    }
+
+    @Test
+    public void SortAggreGroupOnlyPartitionColumns()
+    {
+        initSortBasedAggregation();
+        computeActual("create table lineitem_sort_partition_shipmode_comment_bucket1  with(transactional = false, " +
+                "format = 'ORC', partitioned_by = ARRAY['shipmode', 'comment'], bucketed_by=array['orderkey',  'partkey'], bucket_count=1, sorted_by = ARRAY['orderkey', 'partkey'])" +
+                "  as select * from tpch.tiny.lineitem limit 100");
+
+        String query = "select lineitem_sort_partition_shipmode_comment_bucket1.shipmode, lineitem_sort_partition_shipmode_comment_bucket1.comment " +
+                "from lineitem_sort_partition_shipmode_comment_bucket1 " +
+                "group by shipmode, comment " +
+                "order by shipmode, comment ";
+
+        MaterializedResult sortResult = computeActual(testSessionSort, query);
+        MaterializedResult hashResult = computeActual(query);
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
+        sortResult = computeActual(testSessionSortPrcntDrv50, query);
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
+        sortResult = computeActual(testSessionSortPrcntDrv40, query);
+        assertEquals(sortResult.getMaterializedRows(), hashResult.getMaterializedRows());
+        assertUpdate("DROP TABLE lineitem_sort_partition_shipmode_comment_bucket1");
+    }
+
+    @Test
     public void testAcidFormatColumnNameConflict()
     {
         assertUpdate(String.format("CREATE TABLE test_acid_columnname_conflict (originalTransaction int, currentTransaction int," +
@@ -6621,5 +6668,273 @@ public class TestHiveIntegrationSmokeTest
         assertQuery("SELECT * FROM test_acid_columnname_conflict", "VALUES (1, 2, 3, 4, 5)");
 
         assertUpdate(String.format("DROP TABLE test_acid_columnname_conflict"));
+    }
+
+    @Test
+    public void testMultiDelimitFormat()
+    {
+        assertUpdate(String.format("CREATE TABLE multi_delimit(id int, row int," +
+                " class int )"
+                + "with (format='MULTIDELIMIT', \"field.delim\"='#')"));
+        assertUpdate(String.format("INSERT INTO multi_delimit VALUES (1, 2, 3)"), 1);
+
+        assertQuery("SELECT * FROM multi_delimit", "VALUES (1, 2, 3)");
+
+        assertUpdate(String.format("DROP TABLE multi_delimit"));
+    }
+
+    @Test(expectedExceptions = RuntimeException.class)
+    public void testMultiDelimitFormatWithoutFieldDelim()
+    {
+        assertUpdate(String.format("CREATE TABLE multi_delimit_without_delim(id int, row int," +
+                " class int )"
+                + "with (format='MULTIDELIMIT')"));
+    }
+
+    @Test(expectedExceptions = RuntimeException.class)
+    public void testFieldDelimForORCFormat()
+    {
+        assertUpdate(String.format("CREATE TABLE multi_delimit_without_delim(id int, row int," +
+                " class int )"
+                + "with (format='ORC', \"field.delim\"='#')"));
+    }
+
+    @Test
+    public void testShowViews()
+    {
+        List<String> views = new ArrayList<>(Arrays.asList("v1", "v2", "a1"));
+        List<String> viewsStartingWith = new ArrayList<>(Arrays.asList("v1", "v2"));
+        List<String> viewsEndingWith = new ArrayList<>(Arrays.asList("v1", "a1"));
+        assertUpdate(String.format("CREATE TABLE table1 (id int, row int)"));
+        assertUpdate(String.format("INSERT INTO table1 VALUES(1, 10), (2, 20)"), 2);
+        assertUpdate(String.format("CREATE TABLE table2 (id int, row int)"));
+        assertUpdate(String.format("INSERT INTO table2 VALUES(1, 10), (2, 20)"), 2);
+        assertUpdate(String.format("CREATE TABLE table3 (id int, row int)"));
+        assertUpdate(String.format("INSERT INTO table3 VALUES(1, 10), (2, 20)"), 2);
+        assertUpdate(String.format("CREATE VIEW v1 AS SELECT * FROM table1"));
+        assertUpdate(String.format("CREATE VIEW v2 AS SELECT * FROM table2"));
+        assertUpdate(String.format("CREATE VIEW a1 AS SELECT * FROM table3"));
+        assertTrue(computeActual("SHOW VIEWS").getOnlyColumn().collect(Collectors.toList()).containsAll(views));
+        assertTrue(computeActual("SHOW VIEWS LIKE \'v*\'").getOnlyColumn().collect(Collectors.toList()).containsAll(viewsStartingWith));
+        assertTrue(computeActual("SHOW VIEWS LIKE \'v%\'").getOnlyColumn().collect(Collectors.toList()).containsAll(viewsStartingWith));
+        assertTrue(computeActual("SHOW VIEWS LIKE \'*1\'").getOnlyColumn().collect(Collectors.toList()).containsAll(viewsEndingWith));
+        assertTrue(computeActual("SHOW VIEWS LIKE \'%1\'").getOnlyColumn().collect(Collectors.toList()).containsAll(viewsEndingWith));
+        assertUpdate(String.format("DROP VIEW v1"));
+        assertUpdate(String.format("DROP VIEW v2"));
+        assertUpdate(String.format("DROP VIEW a1"));
+        assertUpdate(String.format("DROP TABLE table1"));
+        assertUpdate(String.format("DROP TABLE table2"));
+        assertUpdate(String.format("DROP TABLE table3"));
+    }
+
+    @Test
+    public void testShowViewsFrom()
+    {
+        List<String> viewsFromFirstSchema = new ArrayList<>(Arrays.asList("v1", "a1"));
+        List<String> viewsFromSecondSchema = new ArrayList<>(Arrays.asList("v2"));
+        assertUpdate(String.format("CREATE SCHEMA schema1"));
+        assertUpdate(String.format("CREATE SCHEMA schema2"));
+        assertUpdate(String.format("CREATE TABLE schema1.table1 (id int, row int)"));
+        assertUpdate(String.format("INSERT INTO schema1.table1 VALUES(1, 10), (2, 20)"), 2);
+        assertUpdate(String.format("CREATE TABLE schema1.table2 (id int, row int)"));
+        assertUpdate(String.format("INSERT INTO schema1.table2 VALUES(1, 10), (2, 20)"), 2);
+        assertUpdate(String.format("CREATE TABLE schema2.table3 (id int, row int)"));
+        assertUpdate(String.format("INSERT INTO schema2.table3 VALUES(1, 10), (2, 20)"), 2);
+        assertUpdate(String.format("CREATE VIEW schema1.v1 AS SELECT * FROM schema1.table1"));
+        assertUpdate(String.format("CREATE VIEW schema1.a1 AS SELECT * FROM schema1.table2"));
+        assertUpdate(String.format("CREATE VIEW schema2.v2 AS SELECT * FROM schema2.table3"));
+        assertTrue(computeActual("SHOW VIEWS FROM schema1").getOnlyColumn().collect(Collectors.toList()).containsAll(viewsFromFirstSchema));
+        assertTrue(computeActual("SHOW VIEWS IN schema1").getOnlyColumn().collect(Collectors.toList()).containsAll(viewsFromFirstSchema));
+        assertTrue(computeActual("SHOW VIEWS FROM schema2").getOnlyColumn().collect(Collectors.toList()).containsAll(viewsFromSecondSchema));
+        assertTrue(computeActual("SHOW VIEWS IN schema2").getOnlyColumn().collect(Collectors.toList()).containsAll(viewsFromSecondSchema));
+        assertUpdate(String.format("DROP VIEW schema1.v1"));
+        assertUpdate(String.format("DROP VIEW schema2.v2"));
+        assertUpdate(String.format("DROP VIEW schema1.a1"));
+        assertUpdate(String.format("DROP TABLE schema1.table1"));
+        assertUpdate(String.format("DROP TABLE schema1.table2"));
+        assertUpdate(String.format("DROP TABLE schema2.table3"));
+        assertUpdate(String.format("DROP SCHEMA schema1"));
+        assertUpdate(String.format("DROP SCHEMA schema2"));
+    }
+
+    @Test
+    public void testAlterTableRenameColumn()
+    {
+        assertUpdate(String.format("CREATE TABLE alter_table_1(id int, name string, age int)"));
+        assertUpdate(String.format("CREATE TABLE alter_table_2(id int, name string, age int) with (transactional=true)"));
+        assertUpdate(String.format("CREATE TABLE alter_table_3(id int, name string, age int) with (partitioned_by=ARRAY['age'])"));
+        assertUpdate(String.format("INSERT INTO alter_table_1 VALUES (1, 'table_1', 10)"), 1);
+        assertUpdate(String.format("INSERT INTO alter_table_2 VALUES (1, 'table_2', 10)"), 1);
+        assertUpdate(String.format("INSERT INTO alter_table_3 VALUES (1, 'table_3', 10)"), 1);
+        assertQuery("SELECT * FROM alter_table_1", "VALUES (1, 'table_1', 10)");
+        assertQuery("SELECT * FROM alter_table_2", "VALUES (1, 'table_2', 10)");
+        assertQuery("SELECT * FROM alter_table_3", "VALUES (1, 'table_3', 10)");
+        assertUpdate(String.format("ALTER TABLE alter_table_1 RENAME COLUMN id to id_new"));
+        assertUpdate(String.format("ALTER TABLE alter_table_2 RENAME COLUMN id to id_new"));
+        assertUpdate(String.format("ALTER TABLE alter_table_3 RENAME COLUMN id to id_new"));
+        assertQuery("SELECT * FROM alter_table_1", "VALUES (1, 'table_1', 10)");
+        assertQuery("SELECT * FROM alter_table_2", "VALUES (1, 'table_2', 10)");
+        assertQuery("SELECT * FROM alter_table_3", "VALUES (1, 'table_3', 10)");
+        assertUpdate(String.format("DROP TABLE alter_table_1"));
+        assertUpdate(String.format("DROP TABLE alter_table_2"));
+        assertUpdate(String.format("DROP TABLE alter_table_3"));
+    }
+
+    @Test
+    public void testAlterTableAddColumn()
+    {
+        assertUpdate(String.format("CREATE TABLE alter_table_4(id int, name string, age int)"));
+        assertUpdate(String.format("CREATE TABLE alter_table_5(id int, name string, age int) with (transactional=true)"));
+        assertUpdate(String.format("CREATE TABLE alter_table_6(id int, name string, age int) with (partitioned_by=ARRAY['age'])"));
+        assertUpdate(String.format("INSERT INTO alter_table_4 VALUES (1, 'table_1', 10)"), 1);
+        assertUpdate(String.format("INSERT INTO alter_table_5 VALUES (1, 'table_2', 10)"), 1);
+        assertUpdate(String.format("INSERT INTO alter_table_6 VALUES (1, 'table_3', 10)"), 1);
+        assertQuery("SELECT * FROM alter_table_4", "VALUES (1, 'table_1', 10)");
+        assertQuery("SELECT * FROM alter_table_5", "VALUES (1, 'table_2', 10)");
+        assertQuery("SELECT * FROM alter_table_6", "VALUES (1, 'table_3', 10)");
+        assertUpdate(String.format("ALTER TABLE alter_table_4 ADD COLUMN new_column int"));
+        assertUpdate(String.format("ALTER TABLE alter_table_5 ADD COLUMN new_column int"));
+        assertUpdate(String.format("ALTER TABLE alter_table_6 ADD COLUMN new_column int"));
+        assertUpdate(String.format("INSERT INTO alter_table_4 VALUES (2, 'table_1', 20, 200)"), 1);
+        assertUpdate(String.format("INSERT INTO alter_table_5 VALUES (2, 'table_2', 20, 200)"), 1);
+        assertUpdate(String.format("INSERT INTO alter_table_6 VALUES (2, 'table_3', 200, 20), (3, 'table_3', 300, 10)"), 2);
+        assertQuery("SELECT * FROM alter_table_4", "VALUES (1, 'table_1', 10, NULL), (2, 'table_1', 20, 200)");
+        assertQuery("SELECT * FROM alter_table_5", "VALUES (1, 'table_2', 10, NULL), (2, 'table_2', 20, 200)");
+        assertQuery("SELECT * FROM alter_table_6", "VALUES (1, 'table_3', NULL, 10), (2, 'table_3', 200, 20), (3, 'table_3', NULL, 10)");
+        assertUpdate(String.format("DROP TABLE alter_table_4"));
+        assertUpdate(String.format("DROP TABLE alter_table_5"));
+        assertUpdate(String.format("DROP TABLE alter_table_6"));
+    }
+
+    @Test
+    public void testAlterTableDropColumn()
+    {
+        assertUpdate(String.format("CREATE TABLE alter_table_7(id int, name int, age int)"));
+        assertUpdate(String.format("CREATE TABLE alter_table_8(id int, name int, age int) with (transactional=true)"));
+        assertUpdate(String.format("CREATE TABLE alter_table_9(id int, name int, age int) with (partitioned_by=ARRAY['age'])"));
+        assertUpdate(String.format("INSERT INTO alter_table_7 VALUES (1, 10, 100)"), 1);
+        assertUpdate(String.format("INSERT INTO alter_table_8 VALUES (1, 10, 100)"), 1);
+        assertUpdate(String.format("INSERT INTO alter_table_9 VALUES (1, 10, 100)"), 1);
+        assertQuery("SELECT * FROM alter_table_7", "VALUES (1, 10, 100)");
+        assertQuery("SELECT * FROM alter_table_8", "VALUES (1, 10, 100)");
+        assertQuery("SELECT * FROM alter_table_9", "VALUES (1, 10, 100)");
+        assertUpdate(String.format("ALTER TABLE alter_table_7 DROP COLUMN id"));
+        assertUpdate(String.format("ALTER TABLE alter_table_8 DROP COLUMN id"));
+        assertUpdate(String.format("ALTER TABLE alter_table_9 DROP COLUMN id"));
+        assertQuery("SELECT * FROM alter_table_7", "VALUES (1, 10)");
+        assertQuery("SELECT * FROM alter_table_8", "VALUES (1, 10)");
+        assertQuery("SELECT * FROM alter_table_9", "VALUES (1, 100)");
+        assertUpdate(String.format("DROP TABLE alter_table_7"));
+        assertUpdate(String.format("DROP TABLE alter_table_8"));
+        assertUpdate(String.format("DROP TABLE alter_table_9"));
+    }
+
+    @Test
+    public void testEscapeCharacter()
+    {
+        testWithAllStorageFormats(this::testEscapeCharacter);
+    }
+
+    private void testEscapeCharacter(Session session, HiveStorageFormat storageFormat)
+    {
+        String tableName = format("test_escape_character_%s", storageFormat);
+        assertUpdate(session, format("CREATE TABLE %s (id varchar) WITH (format = '%s')", tableName, storageFormat));
+        assertUpdate(session, format("INSERT INTO %s VALUES ('\0')", tableName), 1);
+
+        MaterializedResult result = getQueryRunner().execute(session, format("SELECT * FROM %s", tableName));
+        assertEquals(result.getRowCount(), 1);
+        MaterializedRow actualRow = result.getMaterializedRows().get(0);
+        assertEquals(actualRow.getField(0), String.valueOf('\0'));
+
+        assertUpdate(session, format("DROP TABLE %s", tableName));
+    }
+
+    @Test
+    public void testReadFromTableWithStructDataTypeColumns()
+    {
+        assertUpdate("CREATE SCHEMA testReadSchema");
+        assertUpdate("CREATE TABLE testReadSchema.testReadStruct1 (orderkey array(varchar), orderstatus row(big int), lables map(varchar, integer))  WITH (format='orc',transactional=true)");
+        assertUpdate("INSERT INTO testReadSchema.testReadStruct1 VALUES (ARRAY ['YOUNG', 'FASION', 'STYLE'], row(111), MAP(ARRAY ['type', 'grand'], ARRAY [1, 2]))", 1);
+        assertEquals(computeActual("SELECT * FROM testReadSchema.testReadStruct1").getRowCount(), 1);
+        assertUpdate("CREATE TABLE testReadSchema.testReadStruct2 (orderkey array(varchar), orderstatus row(big int, big1 int), lables map(varchar, integer))  WITH (format='orc',transactional=true)");
+        assertUpdate("INSERT INTO testReadSchema.testReadStruct2 VALUES (ARRAY ['YOUNG', 'FASION', 'STYLE'], row(111,222), MAP(ARRAY ['type', 'grand'], ARRAY[1, 2]))", 1);
+        assertEquals(computeActual("SELECT * FROM testReadSchema.testReadStruct2").getRowCount(), 1);
+        assertUpdate("CREATE TABLE testReadSchema.testReadStruct3 (orderkey array(varchar), orderstatus row(big int, big1 int), lables map(varchar, array(int)), orderstatus1 row(big2 int))  WITH (format='orc',transactional=true)");
+        assertUpdate("INSERT INTO testReadSchema.testReadStruct3 VALUES (ARRAY ['YOUNG', 'FASION', 'STYLE'], row(111,222), MAP(ARRAY ['type', 'grand'], ARRAY [ARRAY[1, 2], ARRAY[1,2]]), row(333))", 1);
+        assertEquals(computeActual("SELECT * FROM testReadSchema.testReadStruct3").getRowCount(), 1);
+        assertUpdate("CREATE TABLE testReadSchema.testReadStruct4 (orderkey array(varchar), orderstatus row(big int, big1 int), lables map(varchar, array(int)), orderstatus1 row(big2 int))  WITH (format='orc',transactional=true)");
+        assertUpdate("INSERT INTO testReadSchema.testReadStruct4 VALUES (ARRAY ['YOUNG', 'FASION', 'STYLE'], row(111,222), MAP(ARRAY ['type', 'grand'], ARRAY [ARRAY[1, 2], ARRAY[1,2]]), row(111))", 1);
+        assertEquals(computeActual("SELECT * FROM testReadSchema.testReadStruct4").getRowCount(), 1);
+        assertUpdate("CREATE TABLE testReadSchema.testReadStruct5 (orderkey array(varchar), orderstatus row(big row(big1 int)), lables map(varchar, array(int)), orderstatus1 row(big2 int))  WITH (format='orc',transactional=true)");
+        assertUpdate("INSERT INTO testReadSchema.testReadStruct5 VALUES (ARRAY ['YOUNG', 'FASION', 'STYLE'], row(row(111)), MAP(ARRAY ['type', 'grand'], ARRAY [ARRAY[1, 2], ARRAY[1,2]]), row(111))", 1);
+        assertEquals(computeActual("SELECT * FROM testReadSchema.testReadStruct5").getRowCount(), 1);
+        assertUpdate("DROP TABLE testReadSchema.testReadStruct1");
+        assertUpdate("DROP TABLE testReadSchema.testReadStruct2");
+        assertUpdate("DROP TABLE testReadSchema.testReadStruct3");
+        assertUpdate("DROP TABLE testReadSchema.testReadStruct4");
+        assertUpdate("DROP TABLE testReadSchema.testReadStruct5");
+        assertUpdate("DROP SCHEMA testReadSchema");
+    }
+
+    @Test
+    public void testAlterTableWithStructDataTypeColumns()
+    {
+        assertUpdate("CREATE SCHEMA testReadSchema1");
+        assertUpdate("CREATE TABLE testReadSchema1.testReadStruct6 (orderkey array(varchar), orderstatus array(row(big int)), lables map(varchar, array(int)), orderstatus1 row(big2 int))  WITH (format='orc',transactional=true)");
+        assertUpdate("INSERT INTO testReadSchema1.testReadStruct6 VALUES (ARRAY ['YOUNG', 'FASION', 'STYLE'], ARRAY[row(111), row(222)], MAP(ARRAY ['type', 'grand'], ARRAY [ARRAY[1, 2], ARRAY[1,2]]), row(111))", 1);
+        assertEquals(computeActual("SELECT * FROM testReadSchema1.testReadStruct6").getRowCount(), 1);
+        assertUpdate("ALTER TABLE testReadSchema1.testReadStruct6 RENAME COLUMN orderstatus to new_orderstatus");
+        assertEquals(computeActual("SELECT * FROM testReadSchema1.testReadStruct6").getRowCount(), 1);
+        assertUpdate("DROP TABLE testReadSchema1.testReadStruct6");
+        assertUpdate("DROP SCHEMA testReadSchema1");
+    }
+
+    @Test
+    public void testUpdateWithStructDataTypeColumns()
+    {
+        assertUpdate("CREATE SCHEMA testReadSchema2");
+        assertUpdate("CREATE TABLE testReadSchema2.testReadStruct7 (orderkey array(varchar), orderstatus array(row(big int)), lables map(varchar, array(int)), orderstatus1 row(big2 int))  WITH (format='orc',transactional=true)");
+        assertUpdate("INSERT INTO testReadSchema2.testReadStruct7 VALUES (ARRAY ['YOUNG', 'FASION', 'STYLE'], ARRAY[row(111), row(222)], MAP(ARRAY ['type', 'grand'], ARRAY [ARRAY[1, 2], ARRAY[1,2]]), row(111))", 1);
+        assertEquals(computeActual("SELECT * FROM testReadSchema2.testReadStruct7").getRowCount(), 1);
+        assertUpdate("UPDATE testReadSchema2.testReadStruct7 set orderkey = ARRAY['UPDATE','UPDATE','UPDATE']", 1);
+        assertEquals(computeActual("SELECT * FROM testReadSchema2.testReadStruct7").getRowCount(), 1);
+        assertUpdate("DROP TABLE testReadSchema2.testReadStruct7");
+        assertUpdate("DROP SCHEMA testReadSchema2");
+    }
+
+    @Test
+    public void testReadSingleColumnStructDataTypeColumns()
+    {
+        assertUpdate("CREATE SCHEMA testReadSchema3");
+        assertUpdate("CREATE TABLE testReadSchema3.testReadStruct8 (orderkey array(varchar), orderstatus array(row(big int)), lables map(varchar, array(int)), orderstatus1 row(big2 int))  WITH (format='orc',transactional=true)");
+        assertUpdate("INSERT INTO testReadSchema3.testReadStruct8 VALUES (ARRAY ['YOUNG', 'FASION', 'STYLE'], ARRAY[row(111), row(222)], MAP(ARRAY ['type', 'grand'], ARRAY [ARRAY[1, 2], ARRAY[1,2]]), row(111))", 1);
+        assertEquals(computeActual("SELECT orderkey FROM testReadSchema3.testReadStruct8").getRowCount(), 1);
+        assertEquals(computeActual("SELECT orderstatus FROM testReadSchema3.testReadStruct8").getRowCount(), 1);
+        assertEquals(computeActual("SELECT lables FROM testReadSchema3.testReadStruct8").getRowCount(), 1);
+        assertUpdate("DROP TABLE testReadSchema3.testReadStruct8");
+        assertUpdate("DROP SCHEMA testReadSchema3");
+    }
+
+    @Test
+    public void testReadFromTablesWithPrimitiveAndStructDataTypeColumns()
+    {
+        assertUpdate("CREATE SCHEMA testReadSchema4");
+        assertUpdate("CREATE TABLE testReadSchema4.testReadStruct9 (id int, orderkey array(varchar), name string, orderstatus array(row(big int)), lables map(varchar, array(int)), orderstatus1 row(big2 int), age int, salary double)  WITH (format='orc',transactional=true)");
+        assertUpdate("INSERT INTO testReadSchema4.testReadStruct9 VALUES (1, ARRAY ['YOUNG', 'FASION', 'STYLE'], 'name1', ARRAY[row(111), row(222)], MAP(ARRAY ['type', 'grand'], ARRAY [ARRAY[1, 2], ARRAY[1,2]]), row(111), 30, 2000.5)", 1);
+        assertEquals(computeActual("SELECT id FROM testReadSchema4.testReadStruct9").getRowCount(), 1);
+        assertEquals(computeActual("SELECT name FROM testReadSchema4.testReadStruct9").getRowCount(), 1);
+        assertEquals(computeActual("SELECT orderkey FROM testReadSchema4.testReadStruct9").getRowCount(), 1);
+        assertEquals(computeActual("SELECT orderstatus FROM testReadSchema4.testReadStruct9").getRowCount(), 1);
+        assertEquals(computeActual("SELECT lables FROM testReadSchema4.testReadStruct9").getRowCount(), 1);
+        assertEquals(computeActual("SELECT age FROM testReadSchema4.testReadStruct9").getRowCount(), 1);
+        assertEquals(computeActual("SELECT salary FROM testReadSchema4.testReadStruct9").getRowCount(), 1);
+        assertEquals(computeActual("SELECT id, name, age, salary FROM testReadSchema4.testReadStruct9").getRowCount(), 1);
+        assertEquals(computeActual("SELECT orderkey, orderstatus, lables, orderstatus1 FROM testReadSchema4.testReadStruct9").getRowCount(), 1);
+        assertEquals(computeActual("SELECT id, orderkey, name, orderstatus FROM testReadSchema4.testReadStruct9").getRowCount(), 1);
+        assertEquals(computeActual("SELECT salary, age, lables, orderstatus FROM testReadSchema4.testReadStruct9").getRowCount(), 1);
+        assertEquals(computeActual("SELECT orderkey, name, lables, orderstatus1 FROM testReadSchema4.testReadStruct9").getRowCount(), 1);
+        assertEquals(computeActual("SELECT * FROM testReadSchema4.testReadStruct9").getRowCount(), 1);
+        assertUpdate("DROP TABLE testReadSchema4.testReadStruct9");
+        assertUpdate("DROP SCHEMA testReadSchema4");
     }
 }

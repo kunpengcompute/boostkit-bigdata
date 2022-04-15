@@ -176,6 +176,16 @@ case class NdpPushDown(sparkSession: SparkSession)
     replaceWrapper(p)
   }
 
+  def isDynamiCpruning(f: FilterExec): Boolean = {
+    if(f.child.isInstanceOf[NdpScanWrapper] &&
+      f.child.asInstanceOf[NdpScanWrapper].scan.isInstanceOf[FileSourceScanExec] ){
+      f.child.asInstanceOf[NdpScanWrapper].scan.asInstanceOf[FileSourceScanExec].partitionFilters
+        .toString().contains("dynamicpruningexpression")
+    }else{
+      false
+    }
+  }
+
   def pushDownOperatorInternal(plan: SparkPlan): SparkPlan = {
     val p = plan.transformUp {
       case a: AdaptiveSparkPlanExec =>
@@ -192,6 +202,9 @@ case class NdpPushDown(sparkSession: SparkSession)
           logInfo(s"Fail to push down filter, since " +
             s"selectivity[${selectivity.get}] > threshold[${selectivityThreshold}] " +
             s"for condition[${condition}]")
+          f
+        } else if(isDynamiCpruning(f)){
+          logInfo(s"Fail to push down filter, since ${s.scan.nodeName} contains dynamic pruning")
           f
         } else {
           // TODO: move selectivity info to pushdown-info

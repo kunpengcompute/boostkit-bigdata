@@ -243,8 +243,8 @@ public class HivePageSourceProvider
         if (counter == 0) {
             StringJoiner splitJoiner = new StringJoiner(", ");
             hiveSplit.getAddresses().stream().map(entry -> entry.toString()).forEach(splitJoiner::add);
-            log.warn("Get omniData ip for split[%s] fail, omniDataNodeManager size %d.", splitJoiner.toString(), omniDataNodeManager.getAllNodes().size());
-            return Optional.empty();
+            log.warn("Get omniData ip for split[%s] fail, omniDataNodeManager size %d, get available address randomly", splitJoiner.toString(), omniDataNodeManager.getAllNodes().size());
+            return getSplitOmniDataAddrRandomly(hiveSplit);
         }
         return Optional.of(hostAddressJoiner.toString());
     }
@@ -289,7 +289,7 @@ public class HivePageSourceProvider
 
         List<String> tableColumns = hiveColumns.stream().map(cols -> cols.getName()).collect(toList());
 
-        List<String> missingColumns = tableColumns.stream().filter(cols -> !partitionColumnNames.contains(cols)).collect(toList());
+        List<String> missingColumns = tableColumns.stream().skip(partitionColumnNames.size()).collect(toList());
 
         List<IndexMetadata> indexes = new ArrayList<>();
         if (indexCache != null && session.isHeuristicIndexFilterEnabled()) {
