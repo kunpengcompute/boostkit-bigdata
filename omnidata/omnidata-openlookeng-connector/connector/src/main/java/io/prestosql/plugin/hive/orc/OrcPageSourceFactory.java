@@ -47,10 +47,12 @@ import io.prestosql.plugin.hive.HiveConfig;
 import io.prestosql.plugin.hive.HiveOffloadExpression;
 import io.prestosql.plugin.hive.HivePageSourceFactory;
 import io.prestosql.plugin.hive.HivePartitionKey;
+import io.prestosql.plugin.hive.HivePushDownPageSource;
 import io.prestosql.plugin.hive.HiveSessionProperties;
 import io.prestosql.plugin.hive.HiveType;
 import io.prestosql.plugin.hive.HiveUtil;
 import io.prestosql.plugin.hive.orc.OrcPageSource.ColumnAdaptation;
+import io.prestosql.spi.Page;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.ConnectorPageSource;
 import io.prestosql.spi.connector.ConnectorSession;
@@ -213,7 +215,7 @@ public class OrcPageSourceFactory
                 && expression.isPresent()) {
             Predicate predicate = buildPushdownContext(columns, expression, typeManager,
                     effectivePredicate, partitionKeys, bucketNumber, path);
-            return Optional.of(createOrcPushDownPageSource(path, start, length, predicate, stats));
+            return Optional.of(createOrcPushDownPageSource(path, start, length, predicate));
         }
 
         return createPageSource(
@@ -533,12 +535,11 @@ public class OrcPageSourceFactory
         }
     }
 
-    public OrcPushDownPageSource createOrcPushDownPageSource(
+    public HivePushDownPageSource createOrcPushDownPageSource(
             Path path,
             long start,
             long length,
-            Predicate predicate,
-            FileFormatDataSourceStats stats)
+            Predicate predicate)
     {
         AggregatedMemoryContext systemMemoryUsage = newSimpleAggregatedMemoryContext();
         Properties transProperties = new Properties();
@@ -554,13 +555,9 @@ public class OrcPageSourceFactory
                 orcPushDownDataSource,
                 predicate,
                 TaskSource.ONE_MEGABYTES);
-        DataReader dataReader = DataReaderFactory.create(transProperties, readTaskInfo, new OpenLooKengDeserializer());
+        DataReader<Page> dataReader = DataReaderFactory.create(transProperties, readTaskInfo, new OpenLooKengDeserializer());
 
-        return new OrcPushDownPageSource(
-                dataReader,
-                orcPushDownDataSource,
-                systemMemoryUsage,
-                stats);
+        return new HivePushDownPageSource(dataReader, systemMemoryUsage);
     }
 
     interface FSDataInputStreamProvider

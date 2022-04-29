@@ -166,9 +166,7 @@ public enum FileFormat
         @Override
         public ConnectorPageSource createFileFormatReader(ConnectorSession session, HdfsEnvironment hdfsEnvironment, File targetFile, List<String> columnNames, List<Type> columnTypes)
         {
-            HiveConfig hiveConfig = new HiveConfig();
-            hiveConfig.setParquetTimeZone("UTC");
-            HivePageSourceFactory pageSourceFactory = new ParquetPageSourceFactory(TYPE_MANAGER, hdfsEnvironment, new FileFormatDataSourceStats(), hiveConfig);
+            HivePageSourceFactory pageSourceFactory = new ParquetPageSourceFactory(TYPE_MANAGER, hdfsEnvironment, new FileFormatDataSourceStats(), new HiveConfig().setParquetTimeZone("UTC"));
             return createPageSource(pageSourceFactory, session, targetFile, columnNames, columnTypes, HiveStorageFormat.PARQUET);
         }
 
@@ -248,9 +246,7 @@ public enum FileFormat
         @Override
         public ConnectorPageSource createFileFormatReader(ConnectorSession session, HdfsEnvironment hdfsEnvironment, File targetFile, List<String> columnNames, List<Type> columnTypes)
         {
-            HiveConfig hiveConfig = new HiveConfig();
-            hiveConfig.setParquetTimeZone("UTC");
-            HivePageSourceFactory pageSourceFactory = new ParquetPageSourceFactory(TYPE_MANAGER, hdfsEnvironment, new FileFormatDataSourceStats(), hiveConfig);
+            HivePageSourceFactory pageSourceFactory = new ParquetPageSourceFactory(TYPE_MANAGER, hdfsEnvironment, new FileFormatDataSourceStats(), new HiveConfig().setParquetTimeZone("UTC"));
             return createPageSource(pageSourceFactory, session, targetFile, columnNames, columnTypes, HiveStorageFormat.PARQUET);
         }
 
@@ -312,7 +308,7 @@ public enum FileFormat
                 .createRecordCursor(
                         conf,
                         session,
-                        new Path(targetFile.getAbsolutePath()),
+                        getPath(targetFile),
                         0,
                         targetFile.length(),
                         targetFile.length(),
@@ -347,7 +343,7 @@ public enum FileFormat
                 .createPageSource(
                         conf,
                         session,
-                        new Path(targetFile.getAbsolutePath()),
+                        getPath(targetFile),
                         0,
                         targetFile.length(),
                         targetFile.length(),
@@ -362,6 +358,16 @@ public enum FileFormat
                         false,
                         targetFile.lastModified())
                 .get();
+    }
+
+    private static Path getPath(File targetFile)
+    {
+        try {
+            return new Path(targetFile.getCanonicalPath());
+        }
+        catch (IOException e) {
+            throw new IllegalArgumentException("Path Traversal vulnerabilities may exist！");
+        }
     }
 
     private static class RecordFormatWriter

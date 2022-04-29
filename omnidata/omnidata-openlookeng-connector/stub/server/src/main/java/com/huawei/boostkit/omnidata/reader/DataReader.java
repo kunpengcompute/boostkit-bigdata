@@ -18,4 +18,6 @@ public interface DataReader<T> extends AutoCloseable{
     T getNextPage() throws Exception;
     T getNextPageBlocking() throws Exception;
     boolean isFinished();
+    int getReadPositionCount();
+    int getReadSizeInBytes();
 }

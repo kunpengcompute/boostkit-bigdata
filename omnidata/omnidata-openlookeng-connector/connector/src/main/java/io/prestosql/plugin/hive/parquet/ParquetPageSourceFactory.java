@@ -37,7 +37,9 @@ import io.prestosql.plugin.hive.HiveConfig;
 import io.prestosql.plugin.hive.HiveOffloadExpression;
 import io.prestosql.plugin.hive.HivePageSourceFactory;
 import io.prestosql.plugin.hive.HivePartitionKey;
+import io.prestosql.plugin.hive.HivePushDownPageSource;
 import io.prestosql.plugin.hive.HiveSessionProperties;
+import io.prestosql.spi.Page;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.ConnectorPageSource;
 import io.prestosql.spi.connector.ConnectorSession;
@@ -163,13 +165,7 @@ public class ParquetPageSourceFactory
             com.huawei.boostkit.omnidata.model.Predicate predicate =
                     buildPushdownContext(columns, offloadExpression, typeManager,
                             effectivePredicate, partitionKeys, bucketNumber, path);
-            return Optional.of(createParquetPushDownPageSource(
-                    path,
-                    start,
-                    length,
-                    fileSize,
-                    predicate,
-                    stats));
+            return Optional.of(createParquetPushDownPageSource(path, start, length, predicate));
         }
 
         return createPageSource(
@@ -341,13 +337,11 @@ public class ParquetPageSourceFactory
         }
     }
 
-    public ParquetPushDownPageSource createParquetPushDownPageSource(
+    public HivePushDownPageSource createParquetPushDownPageSource(
             Path path,
             long start,
             long length,
-            long fileSize,
-            com.huawei.boostkit.omnidata.model.Predicate predicate,
-            FileFormatDataSourceStats stats)
+            com.huawei.boostkit.omnidata.model.Predicate predicate)
     {
         AggregatedMemoryContext systemMemoryUsage = newSimpleAggregatedMemoryContext();
         Properties transProperties = new Properties();
@@ -359,13 +353,9 @@ public class ParquetPageSourceFactory
                 parquetPushDownDataSource,
                 predicate,
                 TaskSource.ONE_MEGABYTES);
-        DataReader dataReader = DataReaderFactory.create(transProperties, readTaskInfo, new OpenLooKengDeserializer());
+        DataReader<Page> dataReader = DataReaderFactory.create(transProperties, readTaskInfo, new OpenLooKengDeserializer());
 
-        return new ParquetPushDownPageSource(
-                dataReader,
-                parquetPushDownDataSource,
-                systemMemoryUsage,
-                stats);
+        return new HivePushDownPageSource(dataReader, systemMemoryUsage);
     }
 
     public static TupleDomain<ColumnDescriptor> getParquetTupleDomain(Map<List<String>, RichColumnDescriptor> descriptorsByPath, TupleDomain<HiveColumnHandle> effectivePredicate)
