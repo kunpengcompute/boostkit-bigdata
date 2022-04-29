@@ -214,11 +214,12 @@ public final class SerDeUtils
         BlockBuilder currentBuilder;
 
         boolean builderSynthesized = false;
-        if (builder == null) {
+        BlockBuilder tmpBuilder = builder;
+        if (tmpBuilder == null) {
             builderSynthesized = true;
-            builder = type.createBlockBuilder(null, 1);
+            tmpBuilder = type.createBlockBuilder(null, 1);
         }
-        currentBuilder = builder.beginBlockEntry();
+        currentBuilder = tmpBuilder.beginBlockEntry();
 
         for (Map.Entry<?, ?> entry : map.entrySet()) {
             // Hive skips map entries with null keys
@@ -228,17 +229,18 @@ public final class SerDeUtils
             }
         }
 
-        builder.closeEntry();
+        tmpBuilder.closeEntry();
         if (builderSynthesized) {
-            return (Block) type.getObject(builder, 0);
+            return (Block) type.getObject(tmpBuilder, 0);
         }
         else {
             return null;
         }
     }
 
-    private static Block serializeStruct(Type type, BlockBuilder builder, Object object, StructObjectInspector inspector)
+    private static Block serializeStruct(Type type, BlockBuilder inputBuilder, Object object, StructObjectInspector inspector)
     {
+        BlockBuilder builder = inputBuilder;
         if (object == null) {
             requireNonNull(builder, "parent builder is null").appendNull();
             return null;

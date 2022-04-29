@@ -134,6 +134,7 @@ public class HiveColumnHandle
         return hiveColumnIndex;
     }
 
+    @Override
     public boolean isPartitionKey()
     {
         return columnType == PARTITION_KEY;

@@ -14,7 +14,7 @@
     </modules>
 
     <properties>
-        <dep.hetu.version>1.5.0</dep.hetu.version>
+        <dep.hetu.version>1.6.1</dep.hetu.version>
         <dep.os.arch>${os.detected.arch}</dep.os.arch>
     </properties>
 

@@ -11,48 +11,48 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.prestosql.plugin.hive.orc;
 
-import com.huawei.boostkit.omnidata.model.datasource.DataSource;
+package io.prestosql.plugin.hive;
+
 import com.huawei.boostkit.omnidata.reader.DataReader;
 import io.prestosql.memory.context.AggregatedMemoryContext;
-import io.prestosql.plugin.hive.FileFormatDataSourceStats;
 import io.prestosql.plugin.hive.util.PageSourceUtil;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.connector.ConnectorPageSource;
 
-import static com.google.common.base.MoreObjects.toStringHelper;
+import java.util.OptionalLong;
+
 import static io.prestosql.plugin.hive.HiveErrorCode.HIVE_OPERATOR_OFFLOAD_FAIL;
 import static java.util.Objects.requireNonNull;
 
-public class OrcPushDownPageSource
+public class HivePushDownPageSource
         implements ConnectorPageSource
 {
-    private final DataReader dataReader;
-    private final DataSource dataSource;
-    private boolean closed;
+    private final DataReader<Page> dataReader;
     private final AggregatedMemoryContext systemMemoryContext;
-    private final FileFormatDataSourceStats stats;
-    private long readTimeNanos;
-    private long readBytes;
 
-    public OrcPushDownPageSource(
-            DataReader dataReader,
-            DataSource dataSource,
-            AggregatedMemoryContext systemMemoryContext,
-            FileFormatDataSourceStats stats)
+    private boolean closed;
+    private long readTimeNanos;
+
+    public HivePushDownPageSource(
+            DataReader<Page> dataReader,
+            AggregatedMemoryContext systemMemoryContext)
     {
         this.dataReader = requireNonNull(dataReader, "dataReader is null");
-        this.dataSource = requireNonNull(dataSource, "orcDataSource is null");
-        this.stats = requireNonNull(stats, "stats is null");
         this.systemMemoryContext = requireNonNull(systemMemoryContext, "systemMemoryContext is null");
     }
 
     @Override
     public long getCompletedBytes()
     {
-        return readBytes;
+        return dataReader.getReadSizeInBytes();
+    }
+
+    @Override
+    public OptionalLong getCompletedPositionCount()
+    {
+        return OptionalLong.of(dataReader.getReadPositionCount());
     }
 
     @Override
@@ -79,7 +79,7 @@ public class OrcPushDownPageSource
 
         Page page = null;
         try {
-            page = (Page) dataReader.getNextPageBlocking();
+            page = dataReader.getNextPageBlocking();
         }
         catch (Exception exception) {
             PageSourceUtil.closeWithSuppression(this, exception);
@@ -87,11 +87,14 @@ public class OrcPushDownPageSource
         }
 
         readTimeNanos += System.nanoTime() - start;
-        if (page != null) {
-            readBytes += page.getSizeInBytes();
-        }
 
         return page;
+    }
+
+    @Override
+    public long getSystemMemoryUsage()
+    {
+        return systemMemoryContext.getBytes();
     }
 
     @Override
@@ -107,19 +110,5 @@ public class OrcPushDownPageSource
         catch (Exception e) {
             e.printStackTrace();
         }
-    }
-
-    @Override
-    public String toString()
-    {
-        return toStringHelper(this)
-                .add("dataSource", dataSource.toString())
-                .toString();
-    }
-
-    @Override
-    public long getSystemMemoryUsage()
-    {
-        return systemMemoryContext.getBytes();
     }
 }

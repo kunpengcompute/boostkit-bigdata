@@ -1048,8 +1048,9 @@ public class TestHiveIntegrationSmokeTest
         });
     }
 
-    private void assertFilesAfterCleanup(String tablePath, int expectedNumberOfDirectories)
+    private void assertFilesAfterCleanup(String testTablePath, int expectedNumberOfDirectories)
     {
+        String tablePath = testTablePath;
         int loopNumber = 50;
         if (tablePath.startsWith("file:")) {
             tablePath = tablePath.replace("file:", "");
@@ -4651,7 +4652,7 @@ public class TestHiveIntegrationSmokeTest
         String tableName = "test_create_avro_table_with_schema_url";
         File schemaFile = createAvroSchemaFile();
 
-        String createTableSql = getAvroCreateTableSql(tableName, schemaFile.getAbsolutePath());
+        String createTableSql = getAvroCreateTableSql(tableName, schemaFile.getCanonicalPath());
         String expectedShowCreateTable = getAvroCreateTableSql(tableName, schemaFile.toURI().toString());
 
         assertUpdate(createTableSql);
@@ -4679,7 +4680,7 @@ public class TestHiveIntegrationSmokeTest
         String tableName = "test_alter_avro_table_with_schema_url";
         File schemaFile = createAvroSchemaFile();
 
-        assertUpdate(getAvroCreateTableSql(tableName, schemaFile.getAbsolutePath()));
+        assertUpdate(getAvroCreateTableSql(tableName, schemaFile.getCanonicalPath()));
 
         try {
             if (renameColumn) {
@@ -5188,7 +5189,7 @@ public class TestHiveIntegrationSmokeTest
         assertUpdate(autoVacuumSession, "DROP TABLE auto_vacuum_test_table2");
     }
 
-    private void checkBaseDirectoryExists(String path, boolean delayRequired)
+    private void checkBaseDirectoryExists(String testPath, boolean delayRequired)
     {
         try {
             // Since auto-vacuum runs asynchronously
@@ -5199,6 +5200,8 @@ public class TestHiveIntegrationSmokeTest
         catch (InterruptedException e) {
             // Ignore
         }
+
+        String path = testPath;
         if (path.startsWith("file:")) {
             path = path.replace("file:", "");
         }
@@ -5535,7 +5538,7 @@ public class TestHiveIntegrationSmokeTest
     public void testRuseExchangeGroupSplitsMatchingBetweenProducerConsumer()
     {
         setUpNodes();
-        NodeTaskMap nodeTaskMap = new NodeTaskMap(new FinalizerService());
+        NodeTaskMap nodeTasks = new NodeTaskMap(new FinalizerService());
         StageId stageId = new StageId(new QueryId("query"), 0);
         UUID uuid = UUID.randomUUID();
 
@@ -5556,7 +5559,7 @@ public class TestHiveIntegrationSmokeTest
                 new MockRemoteTaskFactory(remoteTaskExecutor, remoteTaskScheduledExecutor),
                 TEST_SESSION_REUSE,
                 true,
-                nodeTaskMap,
+                nodeTasks,
                 remoteTaskExecutor,
                 new NoOpFailureDetector(),
                 new SplitSchedulerStats(),
@@ -5581,7 +5584,7 @@ public class TestHiveIntegrationSmokeTest
                 new MockRemoteTaskFactory(remoteTaskExecutor, remoteTaskScheduledExecutor),
                 TEST_SESSION_REUSE,
                 true,
-                nodeTaskMap,
+                nodeTasks,
                 remoteTaskExecutor,
                 new NoOpFailureDetector(),
                 new SplitSchedulerStats(),
@@ -5615,7 +5618,7 @@ public class TestHiveIntegrationSmokeTest
     public void testRuseExchangeSplitsGroupNotMatchingBetweenProducerConsumer()
     {
         setUpNodes();
-        NodeTaskMap nodeTaskMap = new NodeTaskMap(new FinalizerService());
+        NodeTaskMap nodeTasks = new NodeTaskMap(new FinalizerService());
         StageId stageId = new StageId(new QueryId("query"), 0);
         UUID uuid = UUID.randomUUID();
 
@@ -5636,7 +5639,7 @@ public class TestHiveIntegrationSmokeTest
                 new MockRemoteTaskFactory(remoteTaskExecutor, remoteTaskScheduledExecutor),
                 TEST_SESSION_REUSE,
                 true,
-                nodeTaskMap,
+                nodeTasks,
                 remoteTaskExecutor,
                 new NoOpFailureDetector(),
                 new SplitSchedulerStats(),
@@ -5661,7 +5664,7 @@ public class TestHiveIntegrationSmokeTest
                 new MockRemoteTaskFactory(remoteTaskExecutor, remoteTaskScheduledExecutor),
                 TEST_SESSION_REUSE,
                 true,
-                nodeTaskMap,
+                nodeTasks,
                 remoteTaskExecutor,
                 new NoOpFailureDetector(),
                 new SplitSchedulerStats(),
@@ -6168,7 +6171,6 @@ public class TestHiveIntegrationSmokeTest
         String str = "";
         String str1;
         for (int i = 0; i < numberOfRows; i++) {
-            //str1 = " ( " + (i + 200) + " , " + i + " ) ";
             str1 = " ( " + (i + 300) + " , " + (i + 200) + " , " + i + " ), ";
             str = str.concat(str1);
             str1 = " ( " + (i + 600) + " , " + (i + 500) + " , " + i + " ) ";
