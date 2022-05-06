@@ -29,12 +29,14 @@ import org.apache.spark.sql.catalyst.planning._
 import org.apache.spark.sql.catalyst.plans.logical.{Filter => LFilter, InsertIntoDir, InsertIntoStatement, LogicalPlan, ScriptTransformation, Statistics}
 import org.apache.spark.sql.catalyst.plans.logical.statsEstimation.FilterEstimation
 import org.apache.spark.sql.catalyst.rules.Rule
+import org.apache.spark.sql.connector.catalog.CatalogV2Util.assertNoNullTypeInSchema
 import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.command.{CreateTableCommand, DDLUtils}
-import org.apache.spark.sql.execution.datasources.CreateTable
+import org.apache.spark.sql.execution.datasources.{CreateTable, DataSourceStrategy}
 import org.apache.spark.sql.execution.ndp.NdpConf
 import org.apache.spark.sql.execution.ndp.NdpConf.{NDP_ENABLED}
 import org.apache.spark.sql.hive.execution._
+import org.apache.spark.sql.hive.execution.HiveScriptTransformationExec
 import org.apache.spark.sql.internal.{HiveSerDe, SQLConf}
 
 
@@ -51,7 +53,7 @@ class ResolveHiveSerdeTable(session: SparkSession) extends Rule[LogicalPlan] {
         throw new AnalysisException("Creating bucketed Hive serde table is not supported yet.")
       }
 
-      val defaultStorage = HiveSerDe.getDefaultStorage(session.sessionState.conf)
+      val defaultStorage = HiveSerDe.getDefaultStorage(conf)
       val options = new HiveOptions(table.storage.properties)
 
       val fileStorage = if (options.fileFormat.isDefined) {
@@ -118,7 +120,6 @@ class DetermineTableStats(session: SparkSession) extends Rule[LogicalPlan] {
   private def hiveTableWithStats(relation: HiveTableRelation): HiveTableRelation = {
     val table = relation.tableMeta
     val partitionCols = relation.partitionCols
-    val conf = session.sessionState.conf
     // For partitioned tables, the partition directory may be outside of the table directory.
     // Which is expensive to get table size. Please see how we implemented it in the AnalyzeTable.
     val sizeInBytes = if (conf.fallBackToHdfsForStatsEnabled && partitionCols.isEmpty) {
@@ -147,7 +148,7 @@ class DetermineTableStats(session: SparkSession) extends Rule[LogicalPlan] {
 
     // handles InsertIntoStatement specially as the table in InsertIntoStatement is not added in its
     // children, hence not matched directly by previous HiveTableRelation case.
-    case i @ InsertIntoStatement(relation: HiveTableRelation, _, _, _, _)
+    case i @ InsertIntoStatement(relation: HiveTableRelation, _, _, _, _, _)
       if DDLUtils.isHiveTable(relation.tableMeta) && relation.tableMeta.stats.isEmpty =>
       i.copy(table = hiveTableWithStats(relation))
   }
@@ -161,7 +162,8 @@ class DetermineTableStats(session: SparkSession) extends Rule[LogicalPlan] {
  */
 object HiveAnalysis extends Rule[LogicalPlan] {
   override def apply(plan: LogicalPlan): LogicalPlan = plan resolveOperators {
-    case InsertIntoStatement(r: HiveTableRelation, partSpec, query, overwrite, ifPartitionNotExists)
+    case InsertIntoStatement(
+        r: HiveTableRelation, partSpec, _, query, overwrite, ifPartitionNotExists)
         if DDLUtils.isHiveTable(r.tableMeta) =>
       InsertIntoHiveTable(r.tableMeta, partSpec, query, overwrite,
         ifPartitionNotExists, query.output.map(_.name))
@@ -192,16 +194,13 @@ object HiveAnalysis extends Rule[LogicalPlan] {
  * `PreprocessTableCreation`, `PreprocessTableInsertion`, `DataSourceAnalysis` and `HiveAnalysis`.
  */
 case class RelationConversions(
-                                conf: SQLConf,
                                 sessionCatalog: HiveSessionCatalog) extends Rule[LogicalPlan] {
   private def isInsertConvertible(relation: HiveTableRelation, isPushDown : Boolean): Boolean = {
     isInsertConvertible(relation.tableMeta, isPushDown)
   }
-
   private def isRelationConvertible(relation: HiveTableRelation, isPushDown : Boolean): Boolean = {
     isRelationConvertible(relation.tableMeta, isPushDown)
   }
-
   private def isConvertible(tableMeta: CatalogTable): Boolean = {
     val serde = tableMeta.storage.serde.getOrElse("").toLowerCase(Locale.ROOT)
     serde.contains("parquet") && SQLConf.get.getConf(HiveUtils.CONVERT_METASTORE_PARQUET) ||
@@ -230,11 +229,11 @@ case class RelationConversions(
     plan resolveOperators {
       // Write path
       case InsertIntoStatement(
-      r: HiveTableRelation, partition, query, overwrite, ifPartitionNotExists)
+          r: HiveTableRelation, partition, cols, query, overwrite, ifPartitionNotExists)
         if query.resolved && DDLUtils.isHiveTable(r.tableMeta) &&
           (!r.isPartitioned || SQLConf.get.getConf(HiveUtils.CONVERT_INSERTING_PARTITIONED_TABLE))
           && isInsertConvertible(r, isPushDown) =>
-        InsertIntoStatement(metastoreCatalog.convert(r), partition,
+        InsertIntoStatement(metastoreCatalog.convert(r), partition, cols,
           query, overwrite, ifPartitionNotExists)
 
       // Read path
@@ -249,6 +248,8 @@ case class RelationConversions(
           isConvertible(tableDesc) && SQLConf.get.getConf(HiveUtils.CONVERT_METASTORE_CTAS) =>
         // validation is required to be done here before relation conversion.
         DDLUtils.checkDataColNames(tableDesc.copy(schema = query.schema))
+        // This is for CREATE TABLE .. STORED AS PARQUET/ORC AS SELECT null
+        assertNoNullTypeInSchema(query.schema)
         OptimizedCreateHiveTableAsSelectCommand(
           tableDesc, query, query.output.map(_.name), mode)
     }
@@ -261,11 +262,11 @@ private[hive] trait HiveStrategies {
 
   val sparkSession: SparkSession
 
-  object Scripts extends Strategy {
+  object HiveScripts extends Strategy {
     def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
       case ScriptTransformation(input, script, output, child, ioschema) =>
-        val hiveIoSchema = HiveScriptIOSchema(ioschema)
-        ScriptTransformationExec(input, script, output, planLater(child), hiveIoSchema) :: Nil
+        val hiveIoSchema = ScriptTransformationIOSchema(ioschema)
+        HiveScriptTransformationExec(input, script, output, planLater(child), hiveIoSchema) :: Nil
       case _ => Nil
     }
   }
@@ -276,27 +277,28 @@ private[hive] trait HiveStrategies {
    */
   object HiveTableScans extends Strategy {
     def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
-      case ScanOperation(projectList, predicates, relation: HiveTableRelation) =>
+      case ScanOperation(projectList, filters, relation: HiveTableRelation) =>
         // Filter out all predicates that only deal with partition keys, these are given to the
         // hive table scan operator to be used for partition pruning.
         val partitionKeyIds = AttributeSet(relation.partitionCols)
-        val (pruningPredicates, otherPredicates) = predicates.partition { predicate =>
-          !predicate.references.isEmpty &&
-          predicate.references.subsetOf(partitionKeyIds)
-        }
+        val normalizedFilters = DataSourceStrategy.normalizeExprs(
+          filters.filter(_.deterministic), relation.output)
 
-        val condition = otherPredicates.reduceLeftOption(And)
+        val condition = filters.reduceLeftOption(And)
         val selectivity = if (condition.nonEmpty) {
           FilterEstimation(LFilter(condition.get, relation))
             .calculateFilterSelectivity(condition.get)
         } else {
           None
         }
+
+        val partitionKeyFilters = DataSourceStrategy.getPushedDownFilters(relation.partitionCols,
+          normalizedFilters)
         pruneFilterProject(
           projectList,
-          otherPredicates,
+          filters.filter(f => f.references.isEmpty || !f.references.subsetOf(partitionKeyIds)),
           identity[Seq[Expression]],
-          HiveTableScanExec(_, relation, pruningPredicates)(sparkSession),
+          HiveTableScanExec(_, relation, partitionKeyFilters.toSeq)(sparkSession),
           selectivity) :: Nil
       case _ =>
         Nil

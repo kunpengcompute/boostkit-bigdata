@@ -47,7 +47,6 @@ import static io.prestosql.spi.type.TinyintType.TINYINT;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static java.lang.Float.floatToIntBits;
 import static java.lang.Float.parseFloat;
-import static org.apache.hadoop.hdfs.DFSUtil.getRandom;
 
 /**
  * NdpUtils
