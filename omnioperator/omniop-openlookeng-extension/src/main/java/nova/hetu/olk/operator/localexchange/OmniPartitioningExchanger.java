@@ -21,6 +21,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 import io.prestosql.operator.HashGenerator;
 import io.prestosql.operator.InterpretedHashGenerator;
 import io.prestosql.operator.PrecomputedHashGenerator;
+import io.prestosql.operator.TaskContext;
 import io.prestosql.operator.exchange.LocalExchangeMemoryManager;
 import io.prestosql.operator.exchange.LocalExchanger;
 import io.prestosql.operator.exchange.LocalPartitionGenerator;
@@ -32,6 +33,8 @@ import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
 import nova.hetu.olk.operator.filterandproject.OmniMergingPageOutput;
 import nova.hetu.olk.tool.BlockUtils;
+import nova.hetu.olk.tool.VecAllocatorHelper;
+import nova.hetu.omniruntime.vector.VecAllocator;
 
 import java.util.Iterator;
 import java.util.List;
@@ -59,7 +62,7 @@ public class OmniPartitioningExchanger
 
     public OmniPartitioningExchanger(List<BiConsumer<PageReference, String>> partitions,
                                      LocalExchangeMemoryManager memoryManager, List<? extends Type> types, List<Integer> partitionChannels,
-                                     Optional<Integer> hashChannel)
+                                     Optional<Integer> hashChannel, TaskContext taskContext)
     {
         this.buffers = ImmutableList.copyOf(requireNonNull(partitions, "partitions is null"));
         this.memoryManager = requireNonNull(memoryManager, "memoryManager is null");
@@ -78,7 +81,9 @@ public class OmniPartitioningExchanger
         for (int i = 0; i < partitionAssignments.length; i++) {
             partitionAssignments[i] = new IntArrayList();
         }
-        mergingPageOutput = new OmniMergingPageOutput(types, 128000, 256);
+        VecAllocator allocator = VecAllocatorHelper.createOperatorLevelAllocator(taskContext,
+                VecAllocator.UNLIMIT, VecAllocatorHelper.DEFAULT_RESERVATION, OmniPartitioningExchanger.class);
+        mergingPageOutput = new OmniMergingPageOutput(types, 128000, 256, allocator);
     }
 
     private Iterator<Optional<Page>> createPagesIterator(Page... pages)

@@ -93,6 +93,13 @@ public class OmniMergingPageOutput
     }
 
     public OmniMergingPageOutput(Iterable<? extends Type> types, long minPageSizeInBytes, int minRowCount,
+                                 VecAllocator vecAllocator)
+    {
+        this(types, minPageSizeInBytes, minRowCount, DEFAULT_MAX_PAGE_SIZE_IN_BYTES);
+        this.vecAllocator = vecAllocator;
+    }
+
+    public OmniMergingPageOutput(Iterable<? extends Type> types, long minPageSizeInBytes, int minRowCount,
                                  int maxPageSizeInBytes)
     {
         List<Type> blockTypes = ImmutableList.copyOf(requireNonNull(types, "types is null"));
