@@ -146,6 +146,7 @@ import nova.hetu.olk.operator.localexchange.LocalExchangeSinkOmniOperator;
 import nova.hetu.olk.operator.localexchange.LocalExchangeSourceOmniOperator;
 import nova.hetu.olk.operator.localexchange.OmniLocalExchange;
 import nova.hetu.olk.tool.OperatorUtils;
+import nova.hetu.olk.tool.VecAllocatorHelper;
 import nova.hetu.omniruntime.constants.FunctionType;
 import nova.hetu.omniruntime.type.DataType;
 
@@ -380,6 +381,7 @@ public class OmniLocalExecutionPlanner
                                    List<PlanNodeId> partitionedSourceOrder, OutputBuffer outputBuffer, Optional<PlanFragmentId> feederCTEId,
                                    Optional<PlanNodeId> feederCTEParentId, Map<String, CommonTableExecutionContext> cteCtx)
     {
+        VecAllocatorHelper.createTaskLevelAllocator(taskContext);
         List<Symbol> outputLayout = partitioningScheme.getOutputLayout();
 
         if (partitioningScheme.getPartitioning().getHandle().equals(FIXED_BROADCAST_DISTRIBUTION)
@@ -450,6 +452,7 @@ public class OmniLocalExecutionPlanner
                                    OutputBuffer outputBuffer, OutputFactory outputOperatorFactory, Optional<PlanFragmentId> feederCTEId,
                                    Optional<PlanNodeId> feederCTEParentId, Map<String, CommonTableExecutionContext> cteCtx)
     {
+        VecAllocatorHelper.createTaskLevelAllocator(taskContext);
         Session session = taskContext.getSession();
         LocalExecutionPlanContext context = new OmniLocalExecutionPlanContext(taskContext, types, metadata,
                 dynamicFilterCacheManager, feederCTEId, feederCTEParentId, cteCtx);

@@ -54,7 +54,7 @@ public class OmniLocalExchange
 
         if (partitioning.equals(FIXED_HASH_DISTRIBUTION)) {
             exchangerSupplier = () -> new OmniPartitioningExchanger(buffers, this.memoryManager, types,
-                    partitionChannels, partitionHashChannel);
+                    partitionChannels, partitionHashChannel, taskContext);
         }
     }
 
@@ -106,7 +106,7 @@ public class OmniLocalExchange
             return localExchangeMap.computeIfAbsent(lifespan, ignored -> {
                 checkState(noMoreSinkFactories);
                 LocalExchange localExchange = new OmniLocalExchange(numSinkFactories, bufferCount, partitioning, types,
-                        partitionChannels, partitionHashChannel, maxBufferedBytes, isForMerge, null, null, false,
+                        partitionChannels, partitionHashChannel, maxBufferedBytes, isForMerge, taskContext, null, false,
                         aggregationType);
                 for (LocalExchangeSinkFactoryId closedSinkFactoryId : closedSinkFactories) {
                     localExchange.getSinkFactory(closedSinkFactoryId).close();
