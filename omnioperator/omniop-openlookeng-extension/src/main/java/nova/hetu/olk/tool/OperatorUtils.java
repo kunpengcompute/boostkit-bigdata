@@ -748,7 +748,8 @@ public final class OperatorUtils
         for (int position = 0; position < positionCount; position++) {
             fieldBlockOffsets[position + 1] = fieldBlockOffsets[position] + 1;
         }
-        return new RowOmniBlock(0, positionCount, nulls, fieldBlockOffsets, rowBlocks);
+        return new RowOmniBlock(0, positionCount, nulls, fieldBlockOffsets, rowBlocks,
+                new ContainerDataType(dataTypes));
     }
 
     /**

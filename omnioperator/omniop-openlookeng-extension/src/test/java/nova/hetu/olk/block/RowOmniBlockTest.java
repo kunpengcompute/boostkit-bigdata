@@ -15,8 +15,11 @@
 
 package nova.hetu.olk.block;
 
+import com.google.common.collect.ImmutableList;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
+import io.prestosql.spi.type.RowType;
+import io.prestosql.spi.type.Type;
 import nova.hetu.omniruntime.vector.BooleanVec;
 import nova.hetu.omniruntime.vector.DoubleVec;
 import nova.hetu.omniruntime.vector.IntVec;
@@ -26,6 +29,7 @@ import org.testng.annotations.Test;
 import java.util.Optional;
 import java.util.UUID;
 
+import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static java.util.Objects.requireNonNull;
 import static nova.hetu.olk.block.RowOmniBlock.fromFieldBlocks;
 import static nova.hetu.olk.mock.MockUtil.fill;
@@ -38,9 +42,9 @@ import static org.mockito.Mockito.mock;
 public class RowOmniBlockTest
         extends AbstractBlockTest
 {
-    private Block<?> rowBlock(Block<?> block)
+    private Block<?> rowBlock(Block<?> block, Type dataType)
     {
-        return fromFieldBlocks(getVecAllocator(), block.getPositionCount(), Optional.empty(), new Block[]{block}, null);
+        return fromFieldBlocks(getVecAllocator(), block.getPositionCount(), Optional.empty(), new Block[]{block}, dataType);
     }
 
     @Override
@@ -68,9 +72,12 @@ public class RowOmniBlockTest
     protected Block<?>[] blocksForTest()
     {
         return new Block<?>[]{
-                rowBlock(requireNonNull(mockBlock(false, false, getVecAllocator(), fill(new String[1], index -> UUID.randomUUID().toString())))),
-                rowBlock(requireNonNull(mockBlock(false, false, getVecAllocator(), fill(new String[2], index -> UUID.randomUUID().toString())))),
-                rowBlock(requireNonNull(mockBlock(false, false, getVecAllocator(), fill(new String[3], index -> UUID.randomUUID().toString()))))
+                rowBlock(requireNonNull(mockBlock(false, false, getVecAllocator(), fill(new String[1], index -> UUID.randomUUID().toString()))),
+                        RowType.from(ImmutableList.of(RowType.field(VARCHAR)))),
+                rowBlock(requireNonNull(mockBlock(false, false, getVecAllocator(), fill(new String[2], index -> UUID.randomUUID().toString()))),
+                        RowType.from(ImmutableList.of(RowType.field(VARCHAR)))),
+                rowBlock(requireNonNull(mockBlock(false, false, getVecAllocator(), fill(new String[3], index -> UUID.randomUUID().toString()))),
+                        RowType.from(ImmutableList.of(RowType.field(VARCHAR))))
         };
     }
 
