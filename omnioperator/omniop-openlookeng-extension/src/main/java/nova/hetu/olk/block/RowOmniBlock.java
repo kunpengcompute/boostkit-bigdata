@@ -20,6 +20,7 @@ import io.prestosql.spi.block.Block;
 import io.prestosql.spi.type.Type;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import nova.hetu.olk.tool.OperatorUtils;
+import nova.hetu.omniruntime.type.ContainerDataType;
 import nova.hetu.omniruntime.type.DataType;
 import nova.hetu.omniruntime.vector.ContainerVec;
 import nova.hetu.omniruntime.vector.Vec;
@@ -64,6 +65,8 @@ public class RowOmniBlock<T>
 
     private final long retainedSizeInBytes;
 
+    private final DataType dataType;
+
     /**
      * Create a row block directly from columnar nulls and field blocks.
      *
@@ -90,7 +93,8 @@ public class RowOmniBlock<T>
                     block.getClass().getSimpleName(), block.getPositionCount(),
                     blockType == null ? null : blockType.getTypeParameters().get(blockIndex));
         }
-        return new RowOmniBlock(0, positionCount, rowIsNull.orElse(null), fieldBlockOffsets, newOffHeapFieldBlocks);
+        return new RowOmniBlock(0, positionCount, rowIsNull.orElse(null), fieldBlockOffsets, newOffHeapFieldBlocks,
+                OperatorUtils.toDataType(blockType));
     }
 
     /**
@@ -101,13 +105,14 @@ public class RowOmniBlock<T>
      * @param rowIsNull the row is null
      * @param fieldBlockOffsets the field block offsets
      * @param fieldBlocks the field blocks
+     * @param dataType data type of block
      * @return the row omni block
      */
     static RowOmniBlock createRowBlockInternal(int startOffset, int positionCount, @Nullable byte[] rowIsNull,
-                                               int[] fieldBlockOffsets, Block[] fieldBlocks)
+                                               int[] fieldBlockOffsets, Block[] fieldBlocks, DataType dataType)
     {
         validateConstructorArguments(startOffset, positionCount, rowIsNull, fieldBlockOffsets, fieldBlocks);
-        return new RowOmniBlock(startOffset, positionCount, rowIsNull, fieldBlockOffsets, fieldBlocks);
+        return new RowOmniBlock(startOffset, positionCount, rowIsNull, fieldBlockOffsets, fieldBlocks, dataType);
     }
 
     /**
@@ -167,7 +172,7 @@ public class RowOmniBlock<T>
             vectorAddresses[i] = nativeVectorAddress;
         }
         ContainerVec containerVec = new ContainerVec(vecAllocator, numFields, this.getPositionCount(), vectorAddresses,
-                dataTypes);
+                ((ContainerDataType) dataType).getFieldTypes());
         containerVec.setNulls(0, this.getRowIsNull(), 0, this.getPositionCount());
         return containerVec;
     }
@@ -182,9 +187,10 @@ public class RowOmniBlock<T>
      * @param rowIsNull the row is null
      * @param fieldBlockOffsets the field block offsets
      * @param fieldBlocks the field blocks
+     * @param dataType data type of block
      */
     public RowOmniBlock(int startOffset, int positionCount, @Nullable byte[] rowIsNull, int[] fieldBlockOffsets,
-                        Block[] fieldBlocks)
+                        Block[] fieldBlocks, DataType dataType)
     {
         super(fieldBlocks.length);
         this.vecAllocator = getVecAllocatorFromBlocks(fieldBlocks);
@@ -201,6 +207,7 @@ public class RowOmniBlock<T>
             retainedSizeInBytes += fieldBlock.getRetainedSizeInBytes();
         }
         this.retainedSizeInBytes = retainedSizeInBytes;
+        this.dataType = dataType;
     }
 
     @Override
@@ -305,7 +312,8 @@ public class RowOmniBlock<T>
         if (allLoaded) {
             return this;
         }
-        return createRowBlockInternal(startOffset, positionCount, rowIsNull, fieldBlockOffsets, loadedFieldBlocks);
+        return createRowBlockInternal(startOffset, positionCount, rowIsNull, fieldBlockOffsets, loadedFieldBlocks,
+                dataType);
     }
 
     @Override
@@ -333,7 +341,8 @@ public class RowOmniBlock<T>
         for (int i = 0; i < numFields; i++) {
             newBlocks[i] = getRawFieldBlocks()[i].copyPositions(fieldBlockPositions.elements(), 0, fieldBlockPositions.size());
         }
-        return createRowBlockInternal(0, length, OperatorUtils.transformBooleanToByte(newRowIsNull), newOffsets, newBlocks);
+        return createRowBlockInternal(0, length, OperatorUtils.transformBooleanToByte(newRowIsNull), newOffsets, newBlocks,
+                dataType);
     }
 
     @Override
