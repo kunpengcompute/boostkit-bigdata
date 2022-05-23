@@ -183,6 +183,14 @@ class JsonifyVisitor
         // Null check on expression value
         if (literal.getValue() == null) {
             constantRoot.put("isNull", true);
+            if (literalType.getId() == DataType.DataTypeId.OMNI_DECIMAL64) {
+                constantRoot.put("precision", ((Decimal64DataType) literalType).getPrecision());
+                constantRoot.put("scale", ((Decimal64DataType) literalType).getScale());
+            }
+            else if (literalType.getId() == DataType.DataTypeId.OMNI_DECIMAL128) {
+                constantRoot.put("precision", ((Decimal128DataType) literalType).getPrecision());
+                constantRoot.put("scale", ((Decimal128DataType) literalType).getScale());
+            }
             return constantRoot;
         }
         constantRoot.put("isNull", false);
