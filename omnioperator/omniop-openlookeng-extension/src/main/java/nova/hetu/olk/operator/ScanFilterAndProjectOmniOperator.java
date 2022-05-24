@@ -65,6 +65,8 @@ import io.prestosql.split.EmptySplit;
 import io.prestosql.split.EmptySplitPageSource;
 import io.prestosql.split.PageSourceProvider;
 import io.prestosql.statestore.StateStoreProvider;
+import nova.hetu.olk.OmniLocalExecutionPlanner;
+import nova.hetu.olk.OmniLocalExecutionPlanner.OmniLocalExecutionPlanContext;
 import nova.hetu.olk.tool.VecAllocatorHelper;
 import nova.hetu.omniruntime.vector.VecAllocator;
 
@@ -116,13 +118,13 @@ public class ScanFilterAndProjectOmniOperator
                                             DataSize minOutputPageSize, int minOutputPageRowCount, Optional<TableScanNode> tableScanNodeOptional,
                                             Optional<StateStoreProvider> stateStoreProviderOptional, Optional<QueryId> queryIdOptional,
                                             Optional<Metadata> metadataOptional, Optional<DynamicFilterCacheManager> dynamicFilterCacheManagerOptional,
-                                            VecAllocator vecAllocator, List<Type> inputTypes)
+                                            VecAllocator vecAllocator, List<Type> inputTypes, OmniLocalExecutionPlanContext context)
     {
         pages = splits.flatTransform(new SplitToPages(session, yieldSignal, pageSourceProvider, cursorProcessor,
                 pageProcessor, table, columns, dynamicFilter, types,
                 requireNonNull(memoryTrackingContext, "memoryTrackingContext is null").aggregateSystemMemoryContext(),
                 minOutputPageSize, minOutputPageRowCount, tableScanNodeOptional, stateStoreProviderOptional,
-                queryIdOptional, metadataOptional, dynamicFilterCacheManagerOptional));
+                queryIdOptional, metadataOptional, dynamicFilterCacheManagerOptional, context));
         this.vecAllocator = vecAllocator;
         this.inputTypes = inputTypes;
     }
@@ -215,6 +217,7 @@ public class ScanFilterAndProjectOmniOperator
         final Optional<Metadata> metadataOptional;
         final Optional<DynamicFilterCacheManager> dynamicFilterCacheManagerOptional;
         final int minOutputPageRowCount;
+        final OmniLocalExecutionPlanContext context;
 
         SplitToPages(Session session, DriverYieldSignal yieldSignal, PageSourceProvider pageSourceProvider,
                      CursorProcessor cursorProcessor, PageProcessor pageProcessor, TableHandle table,
@@ -222,7 +225,8 @@ public class ScanFilterAndProjectOmniOperator
                      AggregatedMemoryContext aggregatedMemoryContext, DataSize minOutputPageSize, int minOutputPageRowCount,
                      Optional<TableScanNode> tableScanNodeOptional, Optional<StateStoreProvider> stateStoreProviderOptional,
                      Optional<QueryId> queryIdOptional, Optional<Metadata> metadataOptional,
-                     Optional<DynamicFilterCacheManager> dynamicFilterCacheManagerOptional)
+                     Optional<DynamicFilterCacheManager> dynamicFilterCacheManagerOptional,
+                     OmniLocalExecutionPlanContext context)
         {
             this.session = requireNonNull(session, "session is null");
             this.yieldSignal = requireNonNull(yieldSignal, "yieldSignal is null");
@@ -247,6 +251,7 @@ public class ScanFilterAndProjectOmniOperator
             this.queryIdOptional = queryIdOptional;
             this.metadataOptional = metadataOptional;
             this.dynamicFilterCacheManagerOptional = dynamicFilterCacheManagerOptional;
+            this.context = context;
         }
 
         @Override
@@ -295,7 +300,7 @@ public class ScanFilterAndProjectOmniOperator
                     .flatMap(page -> pageProcessor.createWorkProcessor(session.toConnectorSession(), yieldSignal,
                             outputMemoryContext, page))
                     .transformProcessor(processor -> mergePages(types, minOutputPageSize.toBytes(),
-                            minOutputPageRowCount, processor, localAggregatedMemoryContext))
+                            minOutputPageRowCount, processor, localAggregatedMemoryContext, context))
                     .withProcessStateMonitor(state -> memoryContext.setBytes(localAggregatedMemoryContext.getBytes()));
         }
     }
@@ -542,6 +547,24 @@ public class ScanFilterAndProjectOmniOperator
         private final Integer consumerTableScanNodeCount;
         private VecAllocator vecAllocator = VecAllocator.GLOBAL_VECTOR_ALLOCATOR;
 
+        private OmniLocalExecutionPlanner.OmniLocalExecutionPlanContext context;
+
+        public ScanFilterAndProjectOmniOperatorFactory(Session session, int operatorId, PlanNodeId planNodeId,
+                                                       PlanNode sourceNode, PageSourceProvider pageSourceProvider, Supplier<CursorProcessor> cursorProcessor,
+                                                       Supplier<PageProcessor> pageProcessor, TableHandle table, Iterable<ColumnHandle> columns,
+                                                       Optional<DynamicFilterSupplier> dynamicFilter, List<Type> types, StateStoreProvider stateStoreProvider,
+                                                       Metadata metadata, DynamicFilterCacheManager dynamicFilterCacheManager, DataSize minOutputPageSize,
+                                                       int minOutputPageRowCount, ReuseExchangeOperator.STRATEGY strategy, UUID reuseTableScanMappingId,
+                                                       boolean spillEnabled, Optional<SpillerFactory> spillerFactory, Integer spillerThreshold, Integer consumerTableScanNodeCount, List<Type> inputTypes,
+                                                       OmniLocalExecutionPlanContext context)
+        {
+            this(session, operatorId, planNodeId, sourceNode, pageSourceProvider, cursorProcessor, pageProcessor, table,
+                    columns, dynamicFilter, types, stateStoreProvider, metadata, dynamicFilterCacheManager, minOutputPageSize, minOutputPageRowCount, strategy,
+                    reuseTableScanMappingId, spillEnabled, spillerFactory, spillerThreshold, consumerTableScanNodeCount,
+                    inputTypes);
+            this.context = context;
+        }
+
         public ScanFilterAndProjectOmniOperatorFactory(Session session, int operatorId, PlanNodeId planNodeId,
                                                        PlanNode sourceNode, PageSourceProvider pageSourceProvider, Supplier<CursorProcessor> cursorProcessor,
                                                        Supplier<PageProcessor> pageProcessor, TableHandle table, Iterable<ColumnHandle> columns,
@@ -629,7 +652,7 @@ public class ScanFilterAndProjectOmniOperator
                     pageSourceProvider, cursorProcessor.get(), pageProcessor.get(), table, columns, dynamicFilter,
                     types, minOutputPageSize, minOutputPageRowCount, this.tableScanNodeOptional,
                     this.stateStoreProviderOptional, queryIdOptional, metadataOptional,
-                    dynamicFilterCacheManagerOptional, vecAllocator, sourceTypes);
+                    dynamicFilterCacheManagerOptional, vecAllocator, sourceTypes, context);
         }
 
         @Override

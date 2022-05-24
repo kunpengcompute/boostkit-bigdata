@@ -23,6 +23,7 @@ import io.prestosql.operator.OperatorFactory;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.type.Type;
+import nova.hetu.olk.tool.BlockUtils;
 import nova.hetu.olk.tool.VecAllocatorHelper;
 import nova.hetu.omniruntime.vector.VecAllocator;
 
@@ -44,6 +45,7 @@ public class DynamicFilterSourceOmniOperator
         extends DynamicFilterSourceOperator
 {
     private VecAllocator vecAllocator;
+    private Page page;
 
     /**
      * Constructor for the Dynamic Filter Source Operator TODO: no need to collect
@@ -60,7 +62,24 @@ public class DynamicFilterSourceOmniOperator
     @Override
     public void addInput(Page page)
     {
+        this.page = page;
         super.addInput(page);
+    }
+
+    @Override
+    public Page getOutput()
+    {
+        Page output = super.getOutput();
+        page = null;
+        return output;
+    }
+
+    @Override
+    public void close()
+    {
+        if (page != null) {
+            BlockUtils.freePage(page);
+        }
     }
 
     public static class DynamicFilterSourceOmniOperatorFactory

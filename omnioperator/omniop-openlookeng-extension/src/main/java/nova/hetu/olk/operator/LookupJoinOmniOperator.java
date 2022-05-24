@@ -36,6 +36,7 @@ import io.prestosql.operator.StaticLookupSourceProvider;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.type.Type;
+import nova.hetu.olk.tool.BlockUtils;
 import nova.hetu.olk.tool.OperatorUtils;
 import nova.hetu.olk.tool.VecAllocatorHelper;
 import nova.hetu.olk.tool.VecBatchToPageIterator;
@@ -269,6 +270,14 @@ public class LookupJoinOmniOperator
         }
         closed = true;
         omniOperator.close();
+
+        // free result if it has next
+        if (result != null) {
+            while (result.hasNext()) {
+                Page next = result.next();
+                BlockUtils.freePage(next);
+            }
+        }
 
         try (Closer closer = Closer.create()) {
             // `afterClose` must be run last.

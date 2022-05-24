@@ -22,6 +22,8 @@ import io.prestosql.operator.WorkProcessor;
 import io.prestosql.operator.project.MergePages;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.type.Type;
+import nova.hetu.olk.OmniLocalExecutionPlanner;
+import nova.hetu.olk.tool.BlockUtils;
 import nova.hetu.olk.tool.VecBatchToPageIterator;
 import nova.hetu.omniruntime.type.DataType;
 import nova.hetu.omniruntime.vector.VecAllocator;
@@ -57,16 +59,18 @@ public class OmniMergePages
     }
 
     public static WorkProcessor<Page> mergePages(Iterable<? extends Type> types, long minPageSizeInBytes,
-                                                 int minRowCount, WorkProcessor<Page> pages, AggregatedMemoryContext memoryContext)
+                                                 int minRowCount, WorkProcessor<Page> pages, AggregatedMemoryContext memoryContext,
+                                                 OmniLocalExecutionPlanner.OmniLocalExecutionPlanContext context)
     {
-        return mergePages(types, minPageSizeInBytes, minRowCount, DEFAULT_MAX_PAGE_SIZE_IN_BYTES, pages, memoryContext);
+        return mergePages(types, minPageSizeInBytes, minRowCount, DEFAULT_MAX_PAGE_SIZE_IN_BYTES, pages, memoryContext, context);
     }
 
     public static WorkProcessor<Page> mergePages(Iterable<? extends Type> types, long minPageSizeInBytes,
-                                                 int minRowCount, int maxPageSizeInBytes, WorkProcessor<Page> pages, AggregatedMemoryContext memoryContext)
+                                                 int minRowCount, int maxPageSizeInBytes, WorkProcessor<Page> pages, AggregatedMemoryContext memoryContext,
+                                                 OmniLocalExecutionPlanner.OmniLocalExecutionPlanContext context)
     {
         return pages.transform(new OmniMergePagesTransformation(types, minPageSizeInBytes, minRowCount,
-                maxPageSizeInBytes, memoryContext.newLocalMemoryContext(MergePages.class.getSimpleName())));
+                maxPageSizeInBytes, memoryContext.newLocalMemoryContext(MergePages.class.getSimpleName()), context));
     }
 
     public static class OmniMergePagesTransformation
@@ -89,6 +93,26 @@ public class OmniMergePages
         private int maxPageSizeInBytes;
 
         private VecAllocator vecAllocator;
+
+        /**
+         * Instantiates a new Omni merge pages.
+         *
+         * @param types the types
+         * @param minPageSizeInBytes the min page size in bytes
+         * @param minRowCount the min row count
+         * @param maxPageSizeInBytes the max page size in bytes
+         * @param memoryContext the memory context
+         * @param context the OmniLocalExecutionPlanContext
+         */
+        public OmniMergePagesTransformation(Iterable<? extends Type> types, long minPageSizeInBytes,
+                                            int minRowCount, int maxPageSizeInBytes, LocalMemoryContext memoryContext,
+                                            OmniLocalExecutionPlanner.OmniLocalExecutionPlanContext context)
+        {
+            this(types, minPageSizeInBytes, minRowCount, maxPageSizeInBytes, memoryContext);
+            if (context != null) {
+                context.onTaskFinished(taskFinished -> this.close());
+            }
+        }
 
         /**
          * Instantiates a new Omni merge pages.
@@ -214,6 +238,18 @@ public class OmniMergePages
             totalPositions = 0;
             pages.clear();
             return finalPage;
+        }
+
+        private void close()
+        {
+            if (queuedPage != null) {
+                BlockUtils.freePage(queuedPage);
+            }
+            if (!pages.isEmpty()) {
+                for (Page page : pages) {
+                    BlockUtils.freePage(page);
+                }
+            }
         }
     }
 }

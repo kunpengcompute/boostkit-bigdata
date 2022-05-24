@@ -29,6 +29,7 @@ import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.plan.AggregationNode.Step;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.type.Type;
+import nova.hetu.olk.tool.BlockUtils;
 import nova.hetu.olk.tool.VecAllocatorHelper;
 import nova.hetu.olk.tool.VecBatchToPageIterator;
 import nova.hetu.omniruntime.constants.FunctionType;
@@ -107,6 +108,13 @@ public class HashAggregationOmniOperator
     @Override
     public void close()
     {
+        // free pages if it has next
+        if (pages != null) {
+            while (pages.hasNext()) {
+                Page next = pages.next();
+                BlockUtils.freePage(next);
+            }
+        }
         omniOperator.close();
     }
 

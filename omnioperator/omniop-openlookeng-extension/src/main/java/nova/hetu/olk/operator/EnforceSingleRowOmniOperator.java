@@ -23,6 +23,7 @@ import io.prestosql.operator.OperatorFactory;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.type.Type;
+import nova.hetu.olk.tool.BlockUtils;
 import nova.hetu.olk.tool.OperatorUtils;
 import nova.hetu.olk.tool.VecAllocatorHelper;
 import nova.hetu.omniruntime.vector.VecAllocator;
@@ -39,6 +40,7 @@ public class EnforceSingleRowOmniOperator
         extends EnforceSingleRowOperator
 {
     private VecAllocator vecAllocator;
+    private Page page;
 
     public EnforceSingleRowOmniOperator(OperatorContext operatorContext, VecAllocator vecAllocator)
     {
@@ -49,6 +51,7 @@ public class EnforceSingleRowOmniOperator
     @Override
     public void addInput(Page page)
     {
+        this.page = page;
         super.addInput(page);
     }
 
@@ -58,9 +61,18 @@ public class EnforceSingleRowOmniOperator
         // Here we need build the page off-heap in case it is SINGLE_NULL_VALUE_PAGE.
         Page output = super.getOutput();
         if (output == null) {
-            return output;
+            return null;
         }
+        page = null;
         return OperatorUtils.transferToOffHeapPages(vecAllocator, output);
+    }
+
+    @Override
+    public void close()
+    {
+        if (page != null) {
+            BlockUtils.freePage(page);
+        }
     }
 
     /**
