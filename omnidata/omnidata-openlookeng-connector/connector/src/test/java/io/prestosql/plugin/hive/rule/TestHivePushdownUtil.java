@@ -172,7 +172,7 @@ public class TestHivePushdownUtil
         return map.entrySet().stream().collect(Collectors.toMap(entry -> new Symbol(entry.getKey()), entry -> entry.getValue()));
     }
 
-    protected static TableScanNode generateTableScanNode(HiveTableHandle hiveTableHandle, HiveColumnHandle... columnHandles)
+    protected static TableScanNode generateTableScanNode(HiveColumnHandle... columnHandles)
     {
         ImmutableMap.Builder<Symbol, ColumnHandle> assignmentsBuilder = ImmutableMap.builder();
         ImmutableList.Builder<Symbol> symbolsBuilder = ImmutableList.builder();
@@ -185,9 +185,26 @@ public class TestHivePushdownUtil
         return PLAN_BUILDER.tableScan(OFFLOAD_TABLE_HANDLE, symbolsBuilder.build(), assignmentsBuilder.build());
     }
 
+    protected static TableScanNode generateTableScanNodeWithAlias(List<String> names, List<HiveColumnHandle> columnHandles)
+    {
+        ImmutableMap.Builder<Symbol, ColumnHandle> assignmentsBuilder = ImmutableMap.builder();
+        ImmutableList.Builder<Symbol> symbolsBuilder = ImmutableList.builder();
+        for (int i = 0; i < names.size(); i++) {
+            Symbol symbol = new Symbol(names.get(i));
+            symbolsBuilder.add(symbol);
+            assignmentsBuilder.put(symbol, columnHandles.get(i));
+        }
+        return PLAN_BUILDER.tableScan(OFFLOAD_TABLE_HANDLE, symbolsBuilder.build(), assignmentsBuilder.build());
+    }
+
     protected static TableScanNode buildTableScanNode(HiveColumnHandle... columnHandles)
     {
-        return generateTableScanNode(OFFLOAD_HIVE_TABLE_HANDLE, columnHandles);
+        return generateTableScanNode(columnHandles);
+    }
+
+    protected static TableScanNode buildTableScanNodeWithAlias(List<String> names, List<HiveColumnHandle> columnHandles)
+    {
+        return generateTableScanNodeWithAlias(names, columnHandles);
     }
 
     protected static AggregationNode buildAggregationNode(
@@ -203,7 +220,7 @@ public class TestHivePushdownUtil
 
     protected static TableScanNode buildTableScanNode()
     {
-        return generateTableScanNode(OFFLOAD_HIVE_TABLE_HANDLE, COLUMN_INT, COLUMN_LONG);
+        return generateTableScanNode(COLUMN_INT, COLUMN_LONG);
     }
 
     protected static LimitNode buildPartialLimitNode(PlanNode source, long count)
@@ -251,6 +268,13 @@ public class TestHivePushdownUtil
         HiveOffloadExpression expression = getCheckedOffloadExpression(node);
         assertTrue(expression.isPresent());
         assertEquals(count, expression.getLimit().getAsLong());
+    }
+
+    protected static void matchFilterOffloadWithAlias(PlanNode node, String predicate)
+    {
+        HiveOffloadExpression expression = getCheckedOffloadExpression(node);
+        assertTrue(expression.isPresent());
+        assertEquals(predicate, expression.getFilterExpression().toString());
     }
 
     protected static void matchFilterOffload(PlanNode node, RowExpression predicate)
