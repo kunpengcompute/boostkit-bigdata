@@ -467,15 +467,21 @@ public class OmniLocalExecutionPlanner
             return null;
         }
 
+        // if there is a data type not support by OmniRuntime, then fall back
         for (DriverFactory driverFactory : context.getDriverFactories()) {
             for (OperatorFactory operatorFactory : driverFactory.getOperatorFactories()) {
-                // if there is a operator not support by OmniRuntime, then fall back
-                // if there is a data type not support by OmniRuntime, then fall back
                 if (notSupportTypes(operatorFactory.getSourceTypes())) {
                     log.warn("There is a data type not support by OmniRuntime: %s",
                             operatorFactory.getSourceTypes().toString());
                     return null;
                 }
+            }
+        }
+        for (OperatorFactory operatorFactory : physicalOperation.getOperatorFactories()) {
+            if (notSupportTypes(operatorFactory.getSourceTypes())) {
+                log.warn("There is a data type not support by OmniRuntime: %s",
+                        operatorFactory.getSourceTypes().toString());
+                return null;
             }
         }
 
@@ -608,7 +614,7 @@ public class OmniLocalExecutionPlanner
             PhysicalOperation source = node.getSource().accept(this, context);
 
             OperatorFactory operatorFactory = new LimitOmniOperator.LimitOmniOperatorFactory(
-                    context.getNextOperatorId(), node.getId(), node.getCount());
+                    context.getNextOperatorId(), node.getId(), node.getCount(), source.getTypes());
             return new PhysicalOperation(operatorFactory, source.getLayout(), context, source);
         }
 

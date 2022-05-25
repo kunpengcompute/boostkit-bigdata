@@ -60,7 +60,7 @@ public class LimitOmniOperatorTest
     @Override
     protected OperatorFactory createOperatorFactory()
     {
-        return new LimitOmniOperatorFactory(operatorId, planNodeId, limit).duplicate();
+        return new LimitOmniOperatorFactory(operatorId, planNodeId, limit, null).duplicate();
     }
 
     @Override
