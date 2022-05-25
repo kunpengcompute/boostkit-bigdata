@@ -261,11 +261,19 @@ public class HiveFilterPushdown
             return false;
         }
 
-        Map<ColumnHandle, String> allColumns = columnHandlesMap.entrySet().stream().collect(Collectors.toMap(Map.Entry::getValue, Map.Entry::getKey));
+        Set<String> predicateVariables = HivePushdownUtil.extractAll(predicate).stream()
+                .map(VariableReferenceExpression::getName).collect(Collectors.toSet());
+        Map<ColumnHandle, String> allColumns = columnHandlesMap.entrySet().stream()
+                .filter(entry -> predicateVariables.contains(entry.getKey())).collect(Collectors.toMap(Map.Entry::getValue, Map.Entry::getKey));
         Map<String, Type> allColumnTypes = allColumns.entrySet().stream().collect(toImmutableMap(
                 entry -> entry.getValue(), entry -> metadata.getColumnMetadata(session, tableHandle, entry.getKey()).getType()));
         Map<Symbol, Type> symbolsMap = typesMap.entrySet().stream()
-                .collect(toImmutableMap(entry -> new Symbol(entry.getKey()), entry -> entry.getValue()));
+                .collect(Collectors.toMap(entry -> new Symbol(entry.getKey()), entry -> entry.getValue()));
+        allColumnTypes.forEach((key, value) -> {
+            if (!symbolsMap.containsKey(key)) {
+                symbolsMap.put(new Symbol(key), value);
+            }
+        });
         TableStatistics filterStatistics = filterCalculatorService.filterStats(statistics, predicate, session,
                 allColumns, allColumnTypes, symbolsMap, formSymbolsLayout(allColumns));
         Estimate filteredRowCount = filterStatistics.getRowCount().isUnknown() ? statistics.getRowCount() : filterStatistics.getRowCount();
