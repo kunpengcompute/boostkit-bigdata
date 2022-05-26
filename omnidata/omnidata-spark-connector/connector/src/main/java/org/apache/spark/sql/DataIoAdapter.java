@@ -703,10 +703,18 @@ public class DataIoAdapter {
             prestoType = NdpUtils.transOlkDataType(((Cast) leftExpression).child().dataType(), false);
             filterProjectionId = putFilterValue(((Cast) leftExpression).child(), prestoType);
         } else {
-            ndpUdfExpressions.createNdpUdf(leftExpression, expressionInfo, fieldMap);
-            putFilterValue(expressionInfo.getChildExpression(), expressionInfo.getFieldDataType());
-            prestoType = expressionInfo.getReturnType();
-            filterProjectionId = expressionInfo.getProjectionId();
+            if (leftExpression instanceof HiveSimpleUDF) {
+                for (int i = 0; i < leftExpression.children().length(); i++) {
+                    Expression childExpr = leftExpression.children().apply(i);
+                    if (!(childExpr instanceof Literal)) {
+                        putFilterValue(childExpr, NdpUtils.transOlkDataType(childExpr.dataType(), false));
+                    }
+                }
+                ndpUdfExpressions.createNdpUdf(leftExpression, expressionInfo, fieldMap);
+            } else {
+                ndpUdfExpressions.createNdpUdf(leftExpression, expressionInfo, fieldMap);
+                putFilterValue(expressionInfo.getChildExpression(), expressionInfo.getFieldDataType());
+            }
         }
         // deal with right expression
         List<Object> argumentValues = new ArrayList<>();
