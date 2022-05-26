@@ -743,10 +743,9 @@ public final class OperatorUtils
             }
         }
         int[] fieldBlockOffsets = new int[positionCount + 1];
-        // null dont't need to pack
-        byte[] nulls = new byte[containerVec.getOffset() + containerVec.getSize()];
+        byte[] nulls = containerVec.getRawValueNulls();
         for (int position = 0; position < positionCount; position++) {
-            fieldBlockOffsets[position + 1] = fieldBlockOffsets[position] + 1;
+            fieldBlockOffsets[position + 1] = fieldBlockOffsets[position] + (nulls[position] == Vec.NULL ? 0 : 1);
         }
         return new RowOmniBlock(0, positionCount, nulls, fieldBlockOffsets, rowBlocks,
                 new ContainerDataType(dataTypes));

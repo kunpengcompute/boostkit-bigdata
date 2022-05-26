@@ -21,6 +21,7 @@ import io.prestosql.operator.OperatorContext;
 import io.prestosql.operator.OperatorFactory;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.type.Type;
 import nova.hetu.olk.tool.VecAllocatorHelper;
 import nova.hetu.olk.tool.VecBatchToPageIterator;
 import nova.hetu.omniruntime.operator.OmniOperator;
@@ -29,6 +30,7 @@ import nova.hetu.omniruntime.vector.VecAllocator;
 import nova.hetu.omniruntime.vector.VecBatch;
 
 import java.util.Iterator;
+import java.util.List;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
@@ -158,6 +160,8 @@ public class LimitOmniOperator
 
         private final OmniLimitOperatorFactory omniLimitOperatorFactory;
 
+        private List<Type> sourceTypes;
+
         /**
          * Instantiates a new Top n omni operator factory.
          *
@@ -165,12 +169,12 @@ public class LimitOmniOperator
          * @param planNodeId the plan node id
          * @param limit the limit record count
          */
-        public LimitOmniOperatorFactory(int operatorId, PlanNodeId planNodeId, long limit)
+        public LimitOmniOperatorFactory(int operatorId, PlanNodeId planNodeId, long limit, List<Type> sourceTypes)
         {
             this.operatorId = operatorId;
             this.planNodeId = requireNonNull(planNodeId, "planNodeId is null");
             this.limit = limit;
-
+            this.sourceTypes = sourceTypes;
             omniLimitOperatorFactory = getOmniLimitOperatorFactory(limit);
         }
 
@@ -198,13 +202,19 @@ public class LimitOmniOperator
         @Override
         public OperatorFactory duplicate()
         {
-            return new LimitOmniOperatorFactory(operatorId, planNodeId, limit);
+            return new LimitOmniOperatorFactory(operatorId, planNodeId, limit, sourceTypes);
         }
 
         @Override
         public boolean isExtensionOperatorFactory()
         {
             return true;
+        }
+
+        @Override
+        public List<Type> getSourceTypes()
+        {
+            return sourceTypes;
         }
     }
 }
