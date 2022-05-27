@@ -55,14 +55,8 @@ public class DistinctLimitOmniOperator
      * @since 20210630
      */
     public static class DistinctLimitOmniOperatorFactory
-            implements OperatorFactory
+            extends AbstractOmniOperatorFactory
     {
-        private final int operatorId;
-
-        private final PlanNodeId planNodeId;
-
-        private final List<Type> sourceTypes;
-
         private final List<Integer> distinctChannels;
 
         private final Optional<Integer> hashChannel;
@@ -133,18 +127,6 @@ public class DistinctLimitOmniOperator
         {
             return new DistinctLimitOmniOperator.DistinctLimitOmniOperatorFactory(operatorId, planNodeId, sourceTypes,
                     distinctChannels, hashChannel, limit);
-        }
-
-        @Override
-        public boolean isExtensionOperatorFactory()
-        {
-            return true;
-        }
-
-        @Override
-        public List<Type> getSourceTypes()
-        {
-            return sourceTypes;
         }
     }
 

@@ -26,6 +26,7 @@ import io.prestosql.operator.project.PageProcessor;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.type.Type;
+import nova.hetu.olk.operator.AbstractOmniOperatorFactory;
 
 import java.util.List;
 import java.util.function.Supplier;
@@ -109,12 +110,8 @@ public class FilterAndProjectOmniOperator
     }
 
     public static class FilterAndProjectOmniOperatorFactory
-            implements OperatorFactory
+            extends AbstractOmniOperatorFactory
     {
-        private final int operatorId;
-
-        private final PlanNodeId planNodeId;
-
         private final Supplier<PageProcessor> processor;
 
         private final List<Type> types;
@@ -124,6 +121,14 @@ public class FilterAndProjectOmniOperator
         private final int minOutputPageRowCount;
 
         private boolean closed;
+
+        public FilterAndProjectOmniOperatorFactory(int operatorId, PlanNodeId planNodeId,
+                                                   Supplier<PageProcessor> processor, List<Type> types, DataSize minOutputPageSize,
+                                                   int minOutputPageRowCount, List<Type> sourceTypes)
+        {
+            this(operatorId, planNodeId, processor, types, minOutputPageSize, minOutputPageRowCount);
+            this.sourceTypes = sourceTypes;
+        }
 
         public FilterAndProjectOmniOperatorFactory(int operatorId, PlanNodeId planNodeId,
                                                    Supplier<PageProcessor> processor, List<Type> types, DataSize minOutputPageSize,
@@ -157,13 +162,7 @@ public class FilterAndProjectOmniOperator
         public OperatorFactory duplicate()
         {
             return new FilterAndProjectOmniOperatorFactory(operatorId, planNodeId, processor, types, minOutputPageSize,
-                    minOutputPageRowCount);
-        }
-
-        @Override
-        public boolean isExtensionOperatorFactory()
-        {
-            return true;
+                    minOutputPageRowCount, sourceTypes);
         }
     }
 }

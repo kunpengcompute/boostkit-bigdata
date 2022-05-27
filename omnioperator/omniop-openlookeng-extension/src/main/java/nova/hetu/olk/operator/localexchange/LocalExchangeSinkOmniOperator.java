@@ -28,6 +28,7 @@ import io.prestosql.operator.exchange.LocalExchangeSinkOperator;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.type.Type;
+import nova.hetu.olk.operator.AbstractOmniOperatorFactory;
 
 import java.util.List;
 import java.util.function.Function;
@@ -51,20 +52,17 @@ public class LocalExchangeSinkOmniOperator
      * The Local exchange sink omni operator factory.
      */
     public static class LocalExchangeSinkOmniOperatorFactory
-            implements OperatorFactory, LocalPlannerAware
+            extends AbstractOmniOperatorFactory implements LocalPlannerAware
     {
         private final LocalExchange.LocalExchangeFactory localExchangeFactory;
 
-        private final int operatorId;
         // There will be a LocalExchangeSinkFactory per LocalExchangeSinkOperatorFactory
         // per Driver Group.
         // A LocalExchangeSinkOperatorFactory needs to have access to
         // LocalExchangeSinkFactories for each Driver Group.
         private final LocalExchange.LocalExchangeSinkFactoryId sinkFactoryId;
-        private final PlanNodeId planNodeId;
         private final Function<Page, Page> pagePreprocessor;
         private boolean closed;
-        private final List<Type> sourceTypes;
 
         public LocalExchangeSinkOmniOperatorFactory(LocalExchange.LocalExchangeFactory localExchangeFactory,
                                                     int operatorId, PlanNodeId planNodeId, LocalExchange.LocalExchangeSinkFactoryId sinkFactoryId,
@@ -122,18 +120,6 @@ public class LocalExchangeSinkOmniOperator
         public void localPlannerComplete()
         {
             localExchangeFactory.noMoreSinkFactories();
-        }
-
-        @Override
-        public boolean isExtensionOperatorFactory()
-        {
-            return true;
-        }
-
-        @Override
-        public List<Type> getSourceTypes()
-        {
-            return sourceTypes;
         }
     }
 }

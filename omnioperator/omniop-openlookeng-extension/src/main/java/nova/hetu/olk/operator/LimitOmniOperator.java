@@ -150,17 +150,11 @@ public class LimitOmniOperator
      * @since 20210630
      */
     public static class LimitOmniOperatorFactory
-            implements OperatorFactory
+            extends AbstractOmniOperatorFactory
     {
-        private final int operatorId;
-
-        private final PlanNodeId planNodeId;
-
         private final long limit;
 
         private final OmniLimitOperatorFactory omniLimitOperatorFactory;
-
-        private List<Type> sourceTypes;
 
         /**
          * Instantiates a new Top n omni operator factory.
@@ -203,18 +197,6 @@ public class LimitOmniOperator
         public OperatorFactory duplicate()
         {
             return new LimitOmniOperatorFactory(operatorId, planNodeId, limit, sourceTypes);
-        }
-
-        @Override
-        public boolean isExtensionOperatorFactory()
-        {
-            return true;
-        }
-
-        @Override
-        public List<Type> getSourceTypes()
-        {
-            return sourceTypes;
         }
     }
 }

@@ -70,12 +70,8 @@ public class HashBuilderOmniOperator
      * @since 20210630
      */
     public static class HashBuilderOmniOperatorFactory
-            implements OperatorFactory
+            extends AbstractOmniOperatorFactory
     {
-        private final int operatorId;
-
-        private final PlanNodeId planNodeId;
-
         private final JoinBridgeManager<PartitionedLookupSourceFactory> lookupSourceFactoryManager;
 
         private final List<Integer> outputChannels;
@@ -85,8 +81,6 @@ public class HashBuilderOmniOperator
         private final Map<Lifespan, Integer> partitionIndexManager = new HashMap<>();
 
         private final OmniHashBuilderOperatorFactory omniHashBuilderOperatorFactory;
-
-        private final List<Type> buildTypes;
 
         private boolean closed;
 
@@ -123,7 +117,7 @@ public class HashBuilderOmniOperator
 
             this.outputChannels = ImmutableList.copyOf(requireNonNull(outputChannels, "outputChannels is null"));
             this.preComputedHashChannel = requireNonNull(preComputedHashChannel, "preComputedHashChannel is null");
-            this.buildTypes = ImmutableList.copyOf(requireNonNull(buildTypes, "sourceTypes is null"));
+            this.sourceTypes = ImmutableList.copyOf(requireNonNull(buildTypes, "buildTypes is null"));
 
             DataType[] omniBuildTypes = OperatorUtils.toDataTypes(buildTypes);
             String[] omniSearchFunctions = searchFunctions.stream().toArray(String[]::new);
@@ -161,12 +155,6 @@ public class HashBuilderOmniOperator
             throw new UnsupportedOperationException("Parallel hash build can not be duplicated");
         }
 
-        @Override
-        public boolean isExtensionOperatorFactory()
-        {
-            return true;
-        }
-
         /**
          * Gets output channels.
          *
@@ -190,12 +178,6 @@ public class HashBuilderOmniOperator
         private int getAndIncrementPartitionIndex(Lifespan lifespan)
         {
             return partitionIndexManager.compute(lifespan, (k, v) -> v == null ? 1 : v + 1) - 1;
-        }
-
-        @Override
-        public List<Type> getSourceTypes()
-        {
-            return buildTypes;
         }
     }
 

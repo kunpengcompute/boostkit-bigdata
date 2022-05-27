@@ -55,15 +55,9 @@ public class LocalMergeSourceOmniOperator
      * @since 20210630
      */
     public static class LocalMergeSourceOmniOperatorFactory
-            implements OperatorFactory
+            extends AbstractOmniOperatorFactory
     {
-        private final int operatorId;
-
-        private final PlanNodeId planNodeId;
-
         private final OmniLocalExchange.LocalExchangeFactory localExchangeFactory;
-
-        private final List<Type> sourceTypes;
 
         private boolean closed;
 
@@ -124,18 +118,6 @@ public class LocalMergeSourceOmniOperator
         public OperatorFactory duplicate()
         {
             throw new UnsupportedOperationException("Source operator factories can not be duplicated");
-        }
-
-        @Override
-        public boolean isExtensionOperatorFactory()
-        {
-            return true;
-        }
-
-        @Override
-        public List<Type> getSourceTypes()
-        {
-            return sourceTypes;
         }
     }
 

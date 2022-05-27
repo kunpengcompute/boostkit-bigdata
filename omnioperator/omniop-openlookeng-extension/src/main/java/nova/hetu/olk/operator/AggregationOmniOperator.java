@@ -145,13 +145,9 @@ public class AggregationOmniOperator
      * @since 20210630
      */
     public static class AggregationOmniOperatorFactory
-            implements OperatorFactory
+            extends AbstractOmniOperatorFactory
     {
         private static final int INVALID_MASK_CHANNEL = -1;
-
-        private final int operatorId;
-        private final PlanNodeId planNodeId;
-        private final List<Type> sourceTypes;
         private final DataType[] sourceDataTypes;
         private final AggregationNode.Step step;
         private final FunctionType[] aggregatorTypes;
@@ -221,18 +217,6 @@ public class AggregationOmniOperator
         {
             return new AggregationOmniOperatorFactory(operatorId, planNodeId, sourceTypes, aggregatorTypes,
                     aggregationInputChannels, maskChannels, aggregationOutputTypes, step);
-        }
-
-        @Override
-        public boolean isExtensionOperatorFactory()
-        {
-            return true;
-        }
-
-        @Override
-        public List<Type> getSourceTypes()
-        {
-            return sourceTypes;
         }
     }
 }

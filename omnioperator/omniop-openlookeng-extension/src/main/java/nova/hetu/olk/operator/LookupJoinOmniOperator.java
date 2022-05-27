@@ -289,14 +289,9 @@ public class LookupJoinOmniOperator
      * @since 20210630
      */
     public static class LookupJoinOmniOperatorFactory
+            extends AbstractOmniOperatorFactory
             implements JoinOperatorFactory
     {
-        private final int operatorId;
-
-        private final PlanNodeId planNodeId;
-
-        private final List<Type> probeTypes;
-
         private final JoinType joinType;
 
         private final Optional<OuterOperatorFactoryResult> outerOperatorFactoryResult;
@@ -332,7 +327,7 @@ public class LookupJoinOmniOperator
         {
             this.operatorId = operatorId;
             this.planNodeId = requireNonNull(planNodeId, "planNodeId is null");
-            this.probeTypes = ImmutableList.copyOf(requireNonNull(probeTypes, "probeTypes is null"));
+            this.sourceTypes = ImmutableList.copyOf(requireNonNull(probeTypes, "probeTypes is null"));
             this.joinType = requireNonNull(joinType, "joinType is null");
 
             this.joinBridgeManager = lookupSourceFactoryManager;
@@ -391,7 +386,7 @@ public class LookupJoinOmniOperator
 
             operatorId = other.operatorId;
             planNodeId = other.planNodeId;
-            probeTypes = other.probeTypes;
+            sourceTypes = other.sourceTypes;
             joinType = other.joinType;
             joinBridgeManager = other.joinBridgeManager;
             outerOperatorFactoryResult = other.outerOperatorFactoryResult;
@@ -418,7 +413,7 @@ public class LookupJoinOmniOperator
 
             joinBridgeManager.probeOperatorCreated(driverContext.getLifespan());
             OmniOperator omniOperator = omniLookupJoinOperatorFactory.createOperator(vecAllocator);
-            return new LookupJoinOmniOperator(operatorContext, probeTypes, joinType, lookupSourceFactory,
+            return new LookupJoinOmniOperator(operatorContext, sourceTypes, joinType, lookupSourceFactory,
                     () -> joinBridgeManager.probeOperatorClosed(driverContext.getLifespan()), omniOperator);
         }
 
@@ -446,18 +441,6 @@ public class LookupJoinOmniOperator
         public Optional<OuterOperatorFactoryResult> createOuterOperatorFactory()
         {
             return outerOperatorFactoryResult;
-        }
-
-        @Override
-        public boolean isExtensionOperatorFactory()
-        {
-            return true;
-        }
-
-        @Override
-        public List<Type> getSourceTypes()
-        {
-            return probeTypes;
         }
     }
 }

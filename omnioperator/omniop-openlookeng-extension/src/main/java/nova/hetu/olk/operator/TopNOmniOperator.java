@@ -151,14 +151,8 @@ public class TopNOmniOperator
      * @since 20210630
      */
     public static class TopNOmniOperatorFactory
-            implements OperatorFactory
+            extends AbstractOmniOperatorFactory
     {
-        private final int operatorId;
-
-        private final PlanNodeId planNodeId;
-
-        private final List<Type> sourceTypes;
-
         private final int topN;
 
         private final ImmutableList<Integer> sortChannels;
@@ -236,18 +230,6 @@ public class TopNOmniOperator
         public OperatorFactory duplicate()
         {
             return new TopNOmniOperatorFactory(operatorId, planNodeId, sourceTypes, topN, sortChannels, sortOrders);
-        }
-
-        @Override
-        public boolean isExtensionOperatorFactory()
-        {
-            return true;
-        }
-
-        @Override
-        public List<Type> getSourceTypes()
-        {
-            return sourceTypes;
         }
     }
 }
