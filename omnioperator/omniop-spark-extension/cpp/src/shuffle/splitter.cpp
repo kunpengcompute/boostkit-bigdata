@@ -704,4 +704,35 @@ int Splitter::SerializingBinaryColumns(int32_t partitionId, spark::Vec& vec, int
     vec.set_offet(OffsetsByte.get(), (itemsTotalLen + 1) * sizeof(int32_t));
 }
 
-int Splitter::protoSpillPartition(int32_t partition_id, std::unique_ptr<BufferedOutputStream> &bufferStream) {}
+int Splitter::protoSpillPartition(int32_t partition_id, std::unique_ptr<BufferedOutputStream> &bufferStream) {
+    LogsDebug(" Spill Pid:%d.", partition_id);
+    SplitRowInfo splitRowInfoTmp;
+    splitRowInfoTmp.copyedRow = 0;
+    splitRowInfoTmp.remainCopyRow = partition_id_cnt_cache_[partition_id];
+    splitRowInfoTmp.cacheBatchIndex.resize(fixed_width_array_idx_.size());
+    splitRowInfoTmp.cacheBatchCopyedLen.resize(fixed_width_array_idx_.size());
+    LogsDebug(" remainCopyRow %d ", splitRowInfoTmp.remainCopyRow);
+    auto partition_cache_batch_num = partition_cached_vectorbatch_[partition_id].size();
+    LogsDebug(" partition_cache_batch_num %lu ", partition_cache_batch_num);
+    int curBatch = 0; // 变长cache batch下标，split已按照options_.spill_batch_row_num切割完成
+    total_spill_row_num_ += splitRowInfoTmpremainCopyRow;
+    while (0 < splitRowInfoTmp.remainCopyRow) {
+        if (options_spill_batch_row_num < splitRowInfoTmp.remainCopyRow) {
+            splitRowInfoTmp.onceCopyRow = options_.spill_batch_row_num;
+        } else {
+            splitRowInfoTmp.onceCopyRow = splitRowInfoTmp.remainCopyRow;
+        }
+
+        vecBatchProto->set_rowcnt(splitRowInfoTmp.onceCopyRow);
+        vecBatchProto->set_veccnt(column_type_id_.size());
+        int fixColIndexTmp = 0;
+        for (size_t indexSchema = 0; indexSchema < column_type_id_.size(); indexSchema++) {
+            spark::Vec * vec = vecBatchProto->add_vecs();
+            switch (column_type_id_[indexSchema]) {
+                case ShuffleTypeId::SHUFFLE_1BYTE:
+                case SHuffleTypeId::SHUFFLE_2BYTE:
+            }
+        }
+    }
+}
+
