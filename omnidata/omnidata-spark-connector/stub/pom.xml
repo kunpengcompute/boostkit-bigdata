@@ -20,7 +20,7 @@
     </modules>
 
     <properties>
-        <dep.hetu.version>1.4.1</dep.hetu.version>
+        <dep.hetu.version>1.6.1</dep.hetu.version>
     </properties>
 
     <dependencies>

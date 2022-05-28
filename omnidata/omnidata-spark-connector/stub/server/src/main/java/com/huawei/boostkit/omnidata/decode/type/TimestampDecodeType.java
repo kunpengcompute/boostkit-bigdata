@@ -8,11 +8,11 @@ package com.huawei.boostkit.omnidata.decode.type;
 import java.util.Optional;
 
 /**
- * Int decode type
+ * Timestamp decode type
  *
  * @since 2021-07-31
  */
-public class IntDecodeType implements DecodeType {
+public class TimestampDecodeType implements DecodeType {
     @Override
     public Optional<Class<?>> getJavaType() {
         return Optional.empty();

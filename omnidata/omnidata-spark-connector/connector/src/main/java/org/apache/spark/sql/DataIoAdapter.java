@@ -15,7 +15,7 @@ import com.huawei.boostkit.omnidata.model.datasource.DataSource;
 import com.huawei.boostkit.omnidata.model.datasource.hdfs.HdfsOrcDataSource;
 import com.huawei.boostkit.omnidata.model.datasource.hdfs.HdfsParquetDataSource;
 import com.huawei.boostkit.omnidata.reader.impl.DataReaderImpl;
-import com.huawei.boostkit.omnidata.decode.impl.SparkDeserializer;
+import com.huawei.boostkit.omnidata.spark.PageDeserializer;
 import com.huawei.boostkit.omnidata.decode.type.DecodeType;
 import com.huawei.boostkit.omnidata.decode.type.LongDecodeType;
 import com.huawei.boostkit.omnidata.decode.type.RowDecodeType;
@@ -96,7 +96,7 @@ import java.util.Set;
  * DataIoAdapter
  */
 public class DataIoAdapter {
-    private int TASK_FAILED_TIMES = 3;
+    private int TASK_FAILED_TIMES = 4;
 
     private List<Type> omnidataTypes = new ArrayList<>();
 
@@ -180,12 +180,16 @@ public class DataIoAdapter {
             omnidataTypes, omnidataColumns, prestoFilter, omnidataProjections,
             ImmutableMap.of(), ImmutableMap.of(), aggregations, limitLong);
         TaskSource taskSource = new TaskSource(dataSource, predicate, 1048576);
-        SparkDeserializer deserializer = initSparkDeserializer();
+        PageDeserializer deserializer = initPageDesializer();
         WritableColumnVector[] page = null;
         int failedTimes = 0;
         String[] sdiHostArray = pageCandidate.getSdiHosts().split(",");
         int randomIndex = (int) (Math.random() * sdiHostArray.length);
-        Iterator<String> sdiHosts = Arrays.stream(sdiHostArray).iterator();
+        List<String> sdiHostList = new ArrayList<>(Arrays.asList(sdiHostArray));
+        Optional<String> availableSdiHost = getRandomAvailableSdiHost(sdiHostArray,
+                JavaConverters.mapAsJavaMap(pushDownOperators.fpuHosts()));
+        availableSdiHost.ifPresent(sdiHostList::add);
+        Iterator<String> sdiHosts = sdiHostList.iterator();
         Set<String> sdiHostSet = new HashSet<>();
         sdiHostSet.add(sdiHostArray[randomIndex]);
         while (sdiHosts.hasNext()) {
@@ -203,7 +207,7 @@ public class DataIoAdapter {
             properties.put("omnidata.client.target.list", ipAddress);
             LOG.info("Push down node info: [hostname :{} ,ip :{}]", sdiHost, ipAddress);
             try {
-                orcDataReader = new DataReaderImpl<SparkDeserializer>(
+                orcDataReader = new DataReaderImpl<PageDeserializer>(
                         properties, taskSource, deserializer);
                 hasNextPage = true;
                 page = (WritableColumnVector[]) orcDataReader.getNextPageBlocking();
@@ -250,7 +254,7 @@ public class DataIoAdapter {
                 ++failedTimes;
             }
         }
-        int retryTime = Math.min(TASK_FAILED_TIMES, sdiHostArray.length);
+        int retryTime = Math.min(TASK_FAILED_TIMES, sdiHostList.size());
         if (failedTimes >= retryTime) {
             LOG.warn("No Omni-data-server to Connect, Task has tried {} times.", retryTime);
             throw new TaskExecutionException("No Omni-data-server to Connect");
@@ -258,6 +262,18 @@ public class DataIoAdapter {
         List<WritableColumnVector[]> l = new ArrayList<>();
         l.add(page);
         return l.iterator();
+    }
+
+    private Optional<String> getRandomAvailableSdiHost(String[] sdiHostArray, Map<String, String> fpuHosts) {
+        List<String> existingHosts = Arrays.asList(sdiHostArray);
+        List<String> allHosts = new ArrayList<>(fpuHosts.values());
+        allHosts.removeAll(existingHosts);
+        if (allHosts.size() > 0) {
+            LOG.info("Add another available host: " + allHosts.get(0));
+            return Optional.of(allHosts.get(0));
+        } else {
+            return Optional.empty();
+        }
     }
 
     public boolean hasNextIterator(List<Object> pageList, PageToColumnar pageToColumnarClass,
@@ -715,6 +731,8 @@ public class DataIoAdapter {
                 ndpUdfExpressions.createNdpUdf(leftExpression, expressionInfo, fieldMap);
                 putFilterValue(expressionInfo.getChildExpression(), expressionInfo.getFieldDataType());
             }
+            prestoType = expressionInfo.getReturnType();
+            filterProjectionId = expressionInfo.getProjectionId();
         }
         // deal with right expression
         List<Object> argumentValues = new ArrayList<>();
@@ -812,16 +830,16 @@ public class DataIoAdapter {
         return argumentValues;
     }
 
-    private SparkDeserializer initSparkDeserializer() {
+    private PageDeserializer initPageDesializer() {
         DecodeType[] columnTypes = columnTypesList.toArray(new DecodeType[0]);
         int[] columnOrders = columnOrdersList.stream().mapToInt(Integer::intValue).toArray();
         DecodeType[] filterTypes = filterTypesList.toArray(new DecodeType[0]);
         int[] filterOrders = filterOrdersList.stream().mapToInt(Integer::intValue).toArray();
-        SparkDeserializer deserializer;
+        PageDeserializer deserializer;
         if (columnTypes.length == 0) {
-            deserializer = new SparkDeserializer(filterTypes, filterOrders);
+            deserializer = new PageDeserializer(filterTypes, filterOrders);
         } else {
-            deserializer = new SparkDeserializer(columnTypes, columnOrders);
+            deserializer = new PageDeserializer(columnTypes, columnOrders);
         }
         return deserializer;
     }

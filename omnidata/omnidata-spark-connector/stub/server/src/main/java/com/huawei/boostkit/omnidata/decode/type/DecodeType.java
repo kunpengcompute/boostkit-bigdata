@@ -5,11 +5,14 @@
 package com.huawei.boostkit.omnidata.decode.type;
 
 
+import java.util.Optional;
+
 /**
  * Decode java type
  *
  * @since 2020-07-31
  */
 public interface DecodeType {
+    Optional<Class<?>> getJavaType();
 }
 

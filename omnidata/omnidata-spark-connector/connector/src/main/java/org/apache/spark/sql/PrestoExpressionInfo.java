@@ -22,6 +22,16 @@ public class PrestoExpressionInfo {
 
     private RowExpression prestoRowExpression;
 
+    private boolean isUDF = false;
+
+    public boolean isUDF() {
+        return isUDF;
+    }
+
+    public void setUDF(boolean UDF) {
+        isUDF = UDF;
+    }
+
     public PrestoExpressionInfo() {
     }
 

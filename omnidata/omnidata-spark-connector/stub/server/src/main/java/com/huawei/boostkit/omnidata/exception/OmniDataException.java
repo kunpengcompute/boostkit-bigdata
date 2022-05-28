@@ -20,5 +20,6 @@ public class OmniDataException extends RuntimeException {
     public OmniErrorCode getErrorCode() {
         return OMNIDATA_GENERIC_ERROR;
     }
+    public OmniDataException(String message) {}
 }
 
