@@ -1,5 +1,8 @@
 package com.huawei.boostkit.spark
 
+import org.apache.spark.internal.Logging
+import org.apache.spark.sql.internal.SQLConf
+
 class ColumnarPluginConfig(conf: SQLConf) extends Logging{
   // enable or disable columnar exchange
   val enableColumnarShuffle: Boolean = conf
@@ -83,7 +86,7 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging{
 
   // columnar shuffle compress block size
   val columnarShuffleCompressBlockSize: Int =
-    conf.getConfString("spark.shuffle.columnar.compressBlockSize", "65535").toInt
+    conf.getConfString("spark.shuffle.columnar.compressBlockSize", "65536").toInt
 
   // enable shuffle compress
   val enableShuffleCompress: Boolean =
