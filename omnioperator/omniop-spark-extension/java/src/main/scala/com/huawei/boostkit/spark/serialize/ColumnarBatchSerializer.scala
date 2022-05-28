@@ -1,13 +1,13 @@
-package com.huawei.booskit.spark.serialize
+package com.huawei.boostkit.spark.serialize
 
 import com.google.common.io.ByteStreams
-import com.huawei.boostkit.spark.ComlumnarPluginConfig
+import com.huawei.boostkit.spark.ColumnarPluginConfig
 import com.huawei.boostkit.spark.compress.{CompressionUtil, DecompressionStream}
 import java.io.{BufferedInputStream, DataInputStream, EOFException, InputStream, OutputStream}
 import java.nio.{ByteBuffer, ByteOrder}
 import scala.reflect.ClassTag
 import org.apache.spark.internal.Logging
-import org.apache.spark.serializer.{DeserializetionStream, SerializationStream, Serializer, SerializerInstance}
+import org.apache.spark.serializer.{DeserializationStream, SerializationStream, Serializer, SerializerInstance}
 import org.apache.spark.sql.execution.metric.SQLMetric
 import org.apache.spark.sql.vectorized.ColumnarBatch
 
@@ -15,13 +15,14 @@ class ColumnarBatchSerializer(readBatchNumRows: SQLMetric, numOutputRows: SQLMet
   extends Serializer
     with Serializable {
   /** Creates a new [[SerializerInstance]]. */
-  new ColumnarBatchSerializerInstance(readBatchNumRows, numOutputRows)
+  override def newInstance(): SerializerInstance =
+    new ColumnarBatchSerializerInstance(readBatchNumRows, numOutputRows)
 }
 
 private class ColumnarBatchSerializerInstance(
     readBatchNumRows: SQLMetric,
     numOutputRows: SQLMetric)
-  extends  SerializerInstance with Logging {
+  extends SerializerInstance with Logging {
   override def deserializeStream(in: InputStream): DeserializationStream = {
     new DeserializationStream {
       val columnarConf = ColumnarPluginConfig.getSessionConf
