@@ -1,6 +1,6 @@
-package scr.main.scala.com.huawei.booskit.spark.expression
+package com.huawei.boostkit.spark.expression
 
-import scr.main.scala.com.huawei.booskit.spark.Constant.{DEFAULT_STRING_TYPE_LENGTH, OMNI_BOOLEAN_TYPE, OMNI_DATE_TYPE, OMNI_DECIMAL128_TYPE, OMNI_DECIMAL64_TYPE, OMNI_DOUBLE_TYPE, OMNI_INTEGER_TYPE, OMNI_LONG_TYPE, OMNI_SHORT_TYPE, OMNI_VARCHAR_TYPE}
+import com.huawei.boostkit.spark.Constant.{DEFAULT_STRING_TYPE_LENGTH, IS_DECIMAL_CHECK, OMNI_BOOLEAN_TYPE, OMNI_DATE_TYPE, OMNI_DECIMAL128_TYPE, OMNI_DECIMAL64_TYPE, OMNI_DOUBLE_TYPE, OMNI_INTEGER_TYPE, OMNI_LONG_TYPE, OMNI_SHORT_TYPE, OMNI_VARCHAR_TYPE}
 
 object OmniExpressionAdaptor extends Logging {
 
@@ -11,7 +11,7 @@ object OmniExpressionAdaptor extends Logging {
       case subString: Substring => getRealExprId(subString.str)
       case attr: Attribute => attr.exprId
       case _ =>
-        throw new RuntimeException(s"Unsupported expression: $expr")
+        throw new UnsupportedOperationException(s"Unsupported expression: $expr")
     }
   }
 
@@ -22,6 +22,8 @@ object OmniExpressionAdaptor extends Logging {
     }
     attrMap
   }
+
+  private def DECIMAL_ALLOWEDTYPES: Seq(DecimalType(7,2), )
 
   def rewriteToOmniExpressionLiteral(expr: Expression, expresIndexMap: Map[ExprId, Int]): String = {
     expr match {
