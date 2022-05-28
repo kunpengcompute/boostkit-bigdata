@@ -1,4 +1,16 @@
-package scr.main.scala.com.huawei.booskit.spark
+package com.huawei.boostkit.spark
+
+import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.catalyst.expressions.Attribute
+import org.apache.spark.sql.catalyst.rules.Rule
+import org.apache.spark.sql.execution._
+import org.apache.spark.sql.execution.adaptive.{BroadcastQueryStageExec, CustomShuffleReaderExec}
+import org.apache.spark.sql.execution.aggregate.HashAggregateExec
+import org.apache.spark.sql.execution.exchange.{BroadcastExchangeExec, ReusedExchangeExec, ShuffleExchangeExec}
+import org.apache.spark.sql.execution.joins._
+import org.apache.spark.sql.execution.window.WindowExec
+import org.apache.spark.sql.types.ColumnarBatchSupportUtil.checkColumnarBatchSupport
 
 case class RowGuard(child: SparkPlan) extends SparkPlan {
   def output: Seq[Attribute] = child.output
@@ -8,7 +20,7 @@ case class RowGuard(child: SparkPlan) extends SparkPlan {
   def children: Seq[SparkPlan] = Seq(child)
 }
 
-case class ColumnarGuardRule() extends Rule[SparkPlan]{
+case class ColumnarGuardRule() extends Rule[SparkPlan] {
   val columnarConf: ColumnarPluginConfig = ColumnarPluginConfig.getSessionConf
   val preferColumnar: Boolean = columnarConf.enablePreferColumnar
   val enableColumnarShuffle: Boolean = columnarConf.enableColumnarShuffle
@@ -26,7 +38,7 @@ case class ColumnarGuardRule() extends Rule[SparkPlan]{
   val enableColumnarSortMergeJoin: Boolean = columnarConf.enableColumnarSortMergeJoin
   val enableShuffledHashJoin: Boolean = columnarConf.enableShuffledHashJoin
   val enableColumnarFileScan: Boolean = columnarConf.enableColumnarFileScan
-  var optimizeLevel: Int = columnarConf.joinOptimizationThrottle
+  val optimizeLevel: Integer = columnarConf.joinOptimizationThrottle
 
   private def tryConvertToColumnar(plan: SparkPlan): Boolean = {
     try {
@@ -42,7 +54,7 @@ case class ColumnarGuardRule() extends Rule[SparkPlan]{
             plan.requiredSchema,
             plan.partitionFilters,
             plan.optionalBucketSet,
-            plan.optionalNumCoalescedBucketSet,
+            plan.optionalNumCoalescedBuckets,
             plan.dataFilters,
             plan.tableIdentifier,
             plan.disableBucketedScan
@@ -52,7 +64,7 @@ case class ColumnarGuardRule() extends Rule[SparkPlan]{
           ColumnarProjectExec(plan.projectList, plan.child).buildCheck()
         case plan: FilterExec =>
           if (!enableColumnarFilter) return false
-          ColumnarFilterExec(plan.condition, plan.child).buildCheck()
+           ColumnarFilterExec(plan.condition, plan.child).buildCheck()
         case plan: HashAggregateExec =>
           if (!enableColumnarHashAgg) return false
           new ColumnarHashAggregateExec(
@@ -70,15 +82,14 @@ case class ColumnarGuardRule() extends Rule[SparkPlan]{
         case plan: BroadcastExchangeExec =>
           if (!enableColumnarBroadcastExchange) return false
           new ColumnarBroadcastExchangeExec(plan.mode, plan.child)
-        case plan: ColumnarTakeOrderedAndProjectExec
-          if (!enableTakeOrderedAndProject) {
-            ColumnarTakeOrderedAndProjectExec(
-              plan.limit,
-              plan.sortOrder,
-              plan.projectList,
-              plan.child).buildCheck()
-          }
-        case plan: Union =>
+        case plan: TakeOrderedAndProjectExec =>
+          if (!enableTakeOrderedAndProject) return false
+          ColumnarTakeOrderedAndProjectExec(
+            plan.limit,
+            plan.sortOrder,
+            plan.projectList,
+            plan.child).buildCheck()
+        case plan: UnionExec =>
           if (!enableColumnarUnion) return false
           ColumnarUnionExec(plan.children).buildCheck()
         case plan: ShuffleExchangeExec =>
@@ -137,7 +148,7 @@ case class ColumnarGuardRule() extends Rule[SparkPlan]{
         case plan: WindowExec =>
           if (!enableColumnarWindow) return false
           ColumnarWindowExec(plan.windowExpression, plan.partitionSpec,
-            plan.orderSpec, plan.child).buildCheck()
+                                 plan.orderSpec, plan.child).buildCheck()
         case plan: ShuffledHashJoinExec =>
           if (!enableShuffledHashJoin) return false
           ColumnarShuffledHashJoinExec(
@@ -152,21 +163,22 @@ case class ColumnarGuardRule() extends Rule[SparkPlan]{
         case p =>
           p
       }
-    } catch {
-      case e: UnsupportedOperationException =>
-        logDebug(s"[OPERATOR FALLBACK] ${e} ${plan.getClass} falls back to Spark operator")
-        return false
-      case _: RuntimeException =>
-        logDebug(s"[OPERATOR FALLBACK] ${plan.getClass} falls back to Spark operator")
-        return false
-      case _: Throwable =>
-        logDebug(s"[OPERATOR FALLBACK] ${plan.getClass} falls back to Spark operator")
-        return false
     }
+      catch {
+        case e: UnsupportedOperationException =>
+          logDebug(s"[OPERATOR FALLBACK] ${e} ${plan.getClass} falls back to Spark operator")
+          return false
+        case _: RuntimeException =>
+          logDebug(s"[OPERATOR FALLBACK] ${plan.getClass} falls back to Spark operator")
+          return false
+        case _: Throwable =>
+          logDebug(s"[OPERATOR FALLBACK] ${plan.getClass} falls back to Spark operator")
+          return false
+      }
     true
-  }
+      }
 
-  private def existsMultiCodegens(plan: SparkPlan, count: Int = 0): Boolean = {
+  private def existsMultiCodegens(plan: SparkPlan, count: Int = 0): Boolean =
     plan match {
       case plan: CodegenSupport if plan.supportCodegen =>
         if ((count + 1) >= optimizeLevel) return true
@@ -176,10 +188,15 @@ case class ColumnarGuardRule() extends Rule[SparkPlan]{
         plan.children.map(existsMultiCodegens(_, count + 1)).exists(_ == true)
       case other => false
     }
+
+  private def supportCodegen(plan: SparkPlan): Boolean = plan match {
+    case plan: CodegenSupport =>
+      plan.supportCodegen
+    case _ => false
   }
 
-  /*
-   * Insert an InputAdapter on top of those that do not support codegen.
+  /**
+   * Inserts an InputAdapter on top of those that do not support codegen.
    */
   private def insertRowGuardRecursive(plan: SparkPlan): SparkPlan = {
     plan match {
@@ -189,7 +206,7 @@ case class ColumnarGuardRule() extends Rule[SparkPlan]{
         RowGuard(p.withNewChildren(p.children.map(insertRowGuardOrNot)))
       case p: ShuffledHashJoinExec =>
         RowGuard(p.withNewChildren(p.children.map(insertRowGuardRecursive)))
-      case p: if !supportCodegen(p) =>
+      case p if !supportCodegen(p) =>
         // insert row guard them recursively
         p.withNewChildren(p.children.map(insertRowGuardOrNot))
       case p: CustomShuffleReaderExec =>
@@ -204,8 +221,13 @@ case class ColumnarGuardRule() extends Rule[SparkPlan]{
     RowGuard(plan.withNewChildren(plan.children.map(insertRowGuardOrNot)))
   }
 
+  /**
+   * Inserts a WholeStageCodegen on top of those that support codegen.
+   */
   private def insertRowGuardOrNot(plan: SparkPlan): SparkPlan = {
     plan match {
+      // For operators that will output domain object, do not insert WholeStageCodegen for it as
+      // domain object can not be written into unsafe row.
       case plan if !preferColumnar && existsMultiCodegens(plan) =>
         insertRowGuardRecursive(plan)
       case plan if !tryConvertToColumnar(plan) =>
@@ -213,7 +235,7 @@ case class ColumnarGuardRule() extends Rule[SparkPlan]{
       case p: BroadcastQueryStageExec =>
         p
       case other =>
-        other.withNewChildren(p.children.map(insertRowGuardOrNot))
+        other.withNewChildren(other.children.map(insertRowGuardOrNot))
     }
   }
 
