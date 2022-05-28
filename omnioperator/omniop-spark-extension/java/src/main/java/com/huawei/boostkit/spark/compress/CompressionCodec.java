@@ -60,7 +60,7 @@ public interface CompressionCodec {
      * modifications are possible. Returns the same object if no modifications
      * are possible.
      * @param modifiers compression modifiers (nullable)
-     * @return code for use after optional modification
+     * @return codec for use after optional modification
      */
     CompressionCodec modify(EnumSet<Modifier> modifiers);
 

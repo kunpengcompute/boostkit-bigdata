@@ -26,11 +26,11 @@ public class DecompressionStream extends InputStream {
 
 
     public void close() throws IOException {
-            this.compressed = null;
-            this.uncompressed = null;
-            if (this.in != null){
-                this.in.close();
-            }
+        this.compressed = null;
+        this.uncompressed = null;
+        if (this.in != null) {
+            this.in.close();
+        }
     }
 
     protected void readHeader() throws IOException {
@@ -53,13 +53,13 @@ public class DecompressionStream extends InputStream {
         int readBytes = 0;
         while (readBytes < chunkLength) {
             int ret = in.read(compressed, readBytes, chunkLength - readBytes);
-            if (ret == -1){
+            if (ret == -1) {
                 finishedReading = true;
                 break;
             }
             readBytes += ret;
         }
-        if(readBytes < chunkLength) {
+        if (readBytes < chunkLength) {
             throw new IOException("failed to read chunk!");
         }
         if (isOriginal) {
@@ -70,6 +70,7 @@ public class DecompressionStream extends InputStream {
         if (uncompressed == null || UNCOMPRESSED_LENGTH > uncompressed.length) {
             uncompressed = new byte[UNCOMPRESSED_LENGTH];
         }
+
         int actualUncompressedLength = codec.decompress(compressed, chunkLength, uncompressed);
         uncompressedLimit = actualUncompressedLength;
     }
@@ -94,7 +95,7 @@ public class DecompressionStream extends InputStream {
     }
 
     private boolean ensureUncompressed() throws IOException {
-        while (uncompressed  == null || (uncompressedLimit - uncompressedCursor) == 0 ) {
+        while (uncompressed == null || (uncompressedLimit - uncompressedCursor) == 0) {
             if (finishedReading){
                 return false;
             }
@@ -104,7 +105,7 @@ public class DecompressionStream extends InputStream {
     }
 
     public int available() throws IOException {
-        if(!ensureUncompressed()) {
+        if (!ensureUncompressed()) {
             return 0;
         }
         return uncompressedLimit - uncompressedCursor;

@@ -30,7 +30,7 @@ public class ShuffleDataSerializer {
             int vecCount = vecBatch.getVecCnt();
             int rowCount = vecBatch.getRowCnt();
             ColumnVector[] vecs = new ColumnVector[vecCount];
-            for (int i = 0; i < vecCount; i++){
+            for (int i = 0; i < vecCount; i++) {
                 vecs[i] = buildVec(vecBatch.getVecs(i), rowCount);
             }
             return new ColumnarBatch(vecs, rowCount);
@@ -39,7 +39,7 @@ public class ShuffleDataSerializer {
         }
     }
 
-    private static ColumnVector buildVec(VecData.Vec protoVec, int vecSize){
+    private static ColumnVector buildVec(VecData.Vec protoVec, int vecSize) {
         VecData.VecType protoTypeId = protoVec.getVecType();
         Vec vec;
         DataType type;

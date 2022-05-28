@@ -25,9 +25,9 @@ public class NativeLoader {
     private static final int BUFFER_SIZE = 1024;
 
     public static NativeLoader getInstance() {
-        if (INSTANCE == null){
+        if (INSTANCE == null) {
             synchronized (NativeLoader.class) {
-                if (INSTANCE == null){
+                if (INSTANCE == null) {
                     INSTANCE = new NativeLoader();
                 }
             }
@@ -52,9 +52,10 @@ public class NativeLoader {
             System.load(tempFile.getAbsolutePath());
             NativeLog.getInstance();
             tempFile.deleteOnExit();
-        }catch (IOException e) {
-            LOG.warn("fail to load library from Jar!errmsg:{}",e.getMessage());
+        } catch (IOException e) {
+            LOG.warn("fail to load library from Jar!errmsg:{}", e.getMessage());
             System.loadLibrary(LIBRARY_NAME);
         }
     }
+
 }

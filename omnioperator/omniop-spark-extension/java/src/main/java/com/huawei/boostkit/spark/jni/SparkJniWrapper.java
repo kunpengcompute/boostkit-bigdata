@@ -57,7 +57,7 @@ public class SparkJniWrapper {
      * split according to the first column as partition id. During splitting, the data in native
      * buffers will be write to disk when the buffers are full.
      *
-     * @param nativeVectorBath Addresses of nativeVectorBatch
+     * @param nativeVectorBatch Addresses of nativeVectorBatch
      */
     public native void split(long splitterId, long nativeVectorBatch);
 

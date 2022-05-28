@@ -40,10 +40,10 @@ public class OrcColumnarBatchJniReader {
         NativeLoader.getInstance();
     }
 
-    public JSONObject getSubJson (ExpressionTree etNode) {
+    public JSONObject getSubJson(ExpressionTree etNode) {
         JSONObject jsonObject = new JSONObject();
         jsonObject.put("op", etNode.getOperator().ordinal());
-        if(etNode.getOperator().toString().equals("LEAF")) {
+        if (etNode.getOperator().toString().equals("LEAF")) {
             jsonObject.put("leaf", etNode.toString());
             return jsonObject;
         }
@@ -60,16 +60,16 @@ public class OrcColumnarBatchJniReader {
         JSONObject jsonObjectList = new JSONObject();
         for (int i = 0; i < leaves.size(); i++) {
             PredicateLeaf pl = leaves.get(i);
-            JSONObject jsonObject = new JSONObject;
+            JSONObject jsonObject = new JSONObject();
             jsonObject.put("op", pl.getOperator().ordinal());
             jsonObject.put("name", pl.getColumnName());
             jsonObject.put("type", pl.getType().ordinal());
-            if(pl.getLiteral() != null){
+            if (pl.getLiteral() != null) {
                 if (pl.getType() == PredicateLeaf.Type.DATE) {
-                    jsonObject.put("literal",((int)Math.ceil(((Date).getLiteral()).getTime()* 1.0/3600/24/1000)) + "");
+                    jsonObject.put("literal",((int)Math.ceil(((Date)pl.getLiteral()).getTime()* 1.0/3600/24/1000)) + "");
                 } else if (pl.getType() == PredicateLeaf.Type.DECIMAL) {
-                    int decimalP =  schema.findSubtype(pl.getColumnName()).getPrecsion();
-                    int decimalS =  schema.findSubtype(pl.getColumnName()).getScale();
+                    int decimalP = schema.findSubtype(pl.getColumnName()).getPrecision();
+                    int decimalS = schema.findSubtype(pl.getColumnName()).getScale();
                     jsonObject.put("literal", pl.getLiteral().toString() + " " + decimalP + " " + decimalS);
                 } else {
                     jsonObject.put("literal", pl.getLiteral().toString());
@@ -81,10 +81,10 @@ public class OrcColumnarBatchJniReader {
                 List<String> lst = new ArrayList<String>();
                 for (Object ob : pl.getLiteralList()) {
                     if (pl.getType() == PredicateLeaf.Type.DECIMAL) {
-                        int decimalP =  schema.findSubtype(pl.getColumnName()).getPrecsion();
+                        int decimalP =  schema.findSubtype(pl.getColumnName()).getPrecision();
                         int decimalS =  schema.findSubtype(pl.getColumnName()).getScale();
                         lst.add(ob.toString() + " " + decimalP + " " + decimalS);
-                    } else if (pl.getType() == PrediateLeaf.Type.DATE) {
+                    } else if (pl.getType() == PredicateLeaf.Type.DATE) {
                         lst.add(((int)Math.ceil(((Date)pl.getLiteral()).getTime()* 1.0/3600/24/1000)) + "");
                     } else {
                         lst.add(ob.toString());
@@ -107,10 +107,10 @@ public class OrcColumnarBatchJniReader {
      */
     public long initializeReaderJava(String path, ReaderOptions options) {
         JSONObject job = new JSONObject();
-        if(options.getOrcTail() == null) {
+        if (options.getOrcTail() == null) {
             job.put("serializedTail", "");
         } else {
-            job.put("serializedTail", options.getOrTail().getSerializedTail().toString());
+            job.put("serializedTail", options.getOrcTail().getSerializedTail().toString());
         }
         job.put("tailLocation", 9223372036854775807L);
         reader = initializeReader(path, job);
@@ -123,9 +123,9 @@ public class OrcColumnarBatchJniReader {
      */
     public long initializeRecordReaderJava(Options options){
         JSONObject job = new JSONObject();
-        if(options.getInclude() == null) {
+        if (options.getInclude() == null) {
             job.put("include", "");
-        }else {
+        } else {
             job.put("include", options.getInclude().toString());
         }
         job.put("offset", options.getOffset());
@@ -184,7 +184,7 @@ public class OrcColumnarBatchJniReader {
     }
 
     public void seekToRow(long rowNumber) {
-        recordReaderSeekToRow(recordReader,rowNumber);
+        recordReaderSeekToRow(recordReader, rowNumber);
     }
 
     public int next(Vec[] vecList) {
@@ -223,7 +223,7 @@ public class OrcColumnarBatchJniReader {
                     break;
                 }
                 default: {
-                    LOGGER.error("UNKNWN TYPE ERROR IN JAVA" + DataType.DataTypeId.values()[typeIds[i]]);
+                    LOGGER.error("UNKNOWN TYPE ERROR IN JAVA" + DataType.DataTypeId.values()[typeIds[i]]);
                 }
             }
             nativeGetId++;

@@ -132,7 +132,7 @@ public class OmniColumnVector extends WritableColumnVector {
             this.doubleDataVec = (DoubleVec) vec;
         } else if (type instanceof StringType) {
             this.charsTypeDataVec = (VarcharVec) vec;
-        } else if (type instanceof DateType)
+        } else if (type instanceof DateType) {
             this.intDataVec = (IntVec) vec;
         } else if (type instanceof ByteType) {
             this.charsTypeDataVec = (VarcharVec) vec;
@@ -187,7 +187,6 @@ public class OmniColumnVector extends WritableColumnVector {
 
     @Override
     public void putNotNull(int rowId) {}
-
 
     @Override
     public void putNull(int rowId) {
@@ -370,7 +369,7 @@ public class OmniColumnVector extends WritableColumnVector {
 
     @Override
     public byte getByte(int rowId) {
-        if (dictionary != null){
+        if (dictionary != null) {
             return (byte) dictionary.decodeToInt(dictionaryIds.getDictId(rowId));
         } else if (dictionaryData != null) {
             return dictionaryData.getBytes(rowId)[0];
@@ -436,7 +435,7 @@ public class OmniColumnVector extends WritableColumnVector {
     }
 
     @Override
-    public short getShort(int rowId){
+    public short getShort(int rowId) {
         if (dictionary != null) {
             return (short) dictionary.decodeToInt(dictionaryIds.getDictId(rowId));
         } else if (dictionaryData != null) {
@@ -495,7 +494,7 @@ public class OmniColumnVector extends WritableColumnVector {
 
     @Override
     public int getInt(int rowId) {
-        if (dictionary != null){
+        if (dictionary != null) {
             return dictionary.decodeToInt(dictionaryIds.getDictId(rowId));
         } else if (dictionaryData != null) {
             return dictionaryData.getInt(rowId);
@@ -563,7 +562,7 @@ public class OmniColumnVector extends WritableColumnVector {
 
     @Override
     public long getLong(int rowId) {
-        if (dictionary != null){
+        if (dictionary != null) {
             return dictionary.decodeToLong(dictionaryIds.getDictId(rowId));
         } else if (dictionaryData != null) {
             return dictionaryData.getLong(rowId);
@@ -607,7 +606,7 @@ public class OmniColumnVector extends WritableColumnVector {
     }
 
     @Override
-    public void putFloatsLittleEndian(int rowId, int count, byte[] src,int srcIndex) {
+    public void putFloatsLittleEndian(int rowId, int count, byte[] src, int srcIndex) {
         throw new UnsupportedOperationException();
     }
 
@@ -750,10 +749,10 @@ public class OmniColumnVector extends WritableColumnVector {
         return false;
     }
 
-    // Split this function out since it is the slow path
+    // Spilt this function out since it is the slow path
     @Override
     protected void reserveInternal(int newCapacity) {
-        if (type instanceof BooleanType){
+        if (type instanceof BooleanType) {
             booleanDataVec = new BooleanVec(newCapacity);
         } else if (type instanceof ByteType) {
             charsTypeDataVec = new VarcharVec(newCapacity * 4, newCapacity);
@@ -773,7 +772,7 @@ public class OmniColumnVector extends WritableColumnVector {
             throw new UnsupportedOperationException();
         } else if (type instanceof DoubleType) {
             doubleDataVec = new DoubleVec(newCapacity);
-        } else if (type instanceof StringType){
+        } else if (type instanceof StringType) {
             // need to set with real column size, suppose char(200) utf8
             charsTypeDataVec = new VarcharVec(newCapacity * 4 * 200, newCapacity);
         } else if (type instanceof DateType) {
@@ -785,7 +784,7 @@ public class OmniColumnVector extends WritableColumnVector {
     }
 
     @Override
-    protected OmniColumnVector reserveNewColumn(int capacity, DataType type){
+    protected OmniColumnVector reserveNewColumn(int capacity, DataType type) {
         return new OmniColumnVector(capacity, type, true);
     }
 }
