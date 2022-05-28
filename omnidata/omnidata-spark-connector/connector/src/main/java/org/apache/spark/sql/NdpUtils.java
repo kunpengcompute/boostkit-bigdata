@@ -4,34 +4,29 @@ import com.huawei.boostkit.omnidata.decode.type.*;
 
 import io.airlift.slice.Slice;
 import io.prestosql.spi.relation.ConstantExpression;
+import io.prestosql.spi.type.*;
 import io.prestosql.spi.type.ArrayType;
-import io.prestosql.spi.type.Type;
+import io.prestosql.spi.type.DecimalType;
 
-import org.apache.spark.sql.catalyst.expressions.Attribute;
-import org.apache.spark.sql.catalyst.expressions.Cast;
-import org.apache.spark.sql.catalyst.expressions.Expression;
-import org.apache.spark.sql.catalyst.expressions.NamedExpression;
+import org.apache.spark.sql.catalyst.expressions.*;
 import org.apache.spark.sql.catalyst.expressions.aggregate.AggregateFunction;
 import org.apache.spark.sql.execution.ndp.AggExeInfo;
 import org.apache.spark.sql.execution.ndp.LimitExeInfo;
-import org.apache.spark.sql.types.DataType;
+import org.apache.spark.sql.types.*;
 import org.apache.spark.sql.types.DateType;
-import org.apache.spark.sql.types.StructField;
-import org.apache.spark.sql.types.StructType;
 
 import scala.Option;
 import scala.collection.JavaConverters;
 import scala.collection.Seq;
 
+import java.lang.reflect.Field;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.time.format.ResolverStyle;
 import java.util.HashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.OptionalLong;
-import java.util.Properties;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -43,11 +38,11 @@ import static io.prestosql.spi.type.DoubleType.DOUBLE;
 import static io.prestosql.spi.type.IntegerType.INTEGER;
 import static io.prestosql.spi.type.RealType.REAL;
 import static io.prestosql.spi.type.SmallintType.SMALLINT;
+import static io.prestosql.spi.type.TimestampType.TIMESTAMP;
 import static io.prestosql.spi.type.TinyintType.TINYINT;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static java.lang.Float.floatToIntBits;
 import static java.lang.Float.parseFloat;
-import static org.apache.hadoop.hdfs.DFSUtil.getRandom;
 
 /**
  * NdpUtils
@@ -137,12 +132,20 @@ public class NdpUtils {
         return columnTempId;
     }
 
-    public static Type transOlkDataType(DataType dataType, boolean isUdfOperator) {
+    public static Type transOlkDataType(DataType dataType, boolean isSparkUdfOperator) {
         String strType = dataType.toString().toLowerCase(Locale.ENGLISH);
-        if (isUdfOperator && "integertype".equalsIgnoreCase(strType)) {
+        if (isSparkUdfOperator && "integertype".equalsIgnoreCase(strType)) {
             strType = "longtype";
         }
+        if (strType.contains("decimal")){
+            String[] decimalInfo = strType.split("\\(")[1].split("\\)")[0].split(",");
+            int precision = Integer.parseInt(decimalInfo[0]);
+            int scale = Integer.parseInt(decimalInfo[1]);
+            return DecimalType.createDecimalType(precision,scale);
+        }
         switch (strType) {
+            case "timestamptype":
+                return TIMESTAMP;
             case "longtype":
                 return BIGINT;
             case "integertype":
@@ -222,7 +225,15 @@ public class NdpUtils {
 
     public static DecodeType transDataIoDataType(DataType dataType) {
         String strType = dataType.toString().toLowerCase(Locale.ENGLISH);
+        if (strType.contains("decimal")) {
+            String[] decimalInfo = strType.split("\\(")[1].split("\\)")[0].split(",");
+            int precision = Integer.parseInt(decimalInfo[0]);
+            int scale = Integer.parseInt(decimalInfo[1]);
+            return new DecimalDecodeType(precision, scale);
+        }
         switch (strType) {
+            case "timestamptype":
+                return new TimestampDecodeType();
             case "integertype":
                 return new IntDecodeType();
             case "shorttype":
@@ -246,8 +257,49 @@ public class NdpUtils {
         }
     }
 
+    public static TypeSignature createTypeSignature(DataType type, boolean isPrestoUdfOperator) {
+        Type realType = NdpUtils.transOlkDataType(type, isPrestoUdfOperator);
+        return createTypeSignature(realType);
+    }
+
+    public static TypeSignature createTypeSignature(Type type) {
+        String typeName = type.toString();
+        if (type instanceof DecimalType) {
+            String[] decimalInfo = typeName.split("\\(")[1].split("\\)")[0].split(",");
+            long precision = Long.parseLong(decimalInfo[0]);
+            long scale = Long.parseLong(decimalInfo[1]);
+            return new TypeSignature("decimal", TypeSignatureParameter.of(precision), TypeSignatureParameter.of(scale));
+        } else {
+            return new TypeSignature(typeName);
+        }
+    }
+
     public static ConstantExpression transArgumentData(String argumentValue, Type argumentType) {
         String strType = argumentType.toString().toLowerCase(Locale.ENGLISH);
+        if (strType.contains("decimal")){
+            String[] parameter = strType.split("\\(")[1].split("\\)")[0].split(",");
+            int precision = Integer.parseInt(parameter[0]);
+            int scale = Integer.parseInt(parameter[1]);
+            BigInteger bigInteger = Decimals.rescale(new BigDecimal(argumentValue),(DecimalType)argumentType).unscaledValue();
+            if ("ShortDecimalType".equals(argumentType.getClass().getSimpleName())){ //short decimal type
+                return new ConstantExpression(bigInteger.longValue(), DecimalType.createDecimalType(precision,scale));
+            } else if ("LongDecimalType".equals(argumentType.getClass().getSimpleName())){ //long decimal type
+                Slice argumentValueSlice = Decimals.encodeUnscaledValue(bigInteger);
+                long[] base = new long[2];
+                base[0] = argumentValueSlice.getLong(0);
+                base[1] = argumentValueSlice.getLong(8);
+                try {
+                    Field filed = Slice.class.getDeclaredField("base");
+                    filed.setAccessible(true);
+                    filed.set(argumentValueSlice,base);
+                }catch (Exception e){
+                    e.printStackTrace();
+                }
+                return new ConstantExpression(argumentValueSlice, DecimalType.createDecimalType(precision,scale));
+            } else {
+                throw new UnsupportedOperationException("unsupported data type " + argumentType.getClass().getSimpleName());
+            }
+        }
         switch (strType) {
             case "bigint":
             case "integer":
@@ -266,6 +318,19 @@ public class NdpUtils {
             case "varchar":
                 Slice charValue = utf8Slice(argumentValue);
                 return new ConstantExpression(charValue, argumentType);
+            case "timestamp":
+                int rawOffset = TimeZone.getDefault().getRawOffset();
+                long timestampValue;
+                if (argumentValue.contains("-")) {
+                    try {
+                        timestampValue = java.sql.Timestamp.valueOf(argumentValue).getTime() + rawOffset;
+                    } catch (Exception e) {
+                        timestampValue = -1;
+                    }
+                } else {
+                    timestampValue = Long.parseLong(argumentValue.substring(0, argumentValue.length() - 3)) + rawOffset;
+                }
+                return new ConstantExpression(timestampValue, argumentType);
             default:
                 throw new UnsupportedOperationException("unsupported data type " + strType);
         }

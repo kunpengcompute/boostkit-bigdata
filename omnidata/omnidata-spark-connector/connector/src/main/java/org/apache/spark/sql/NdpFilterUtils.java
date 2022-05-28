@@ -14,6 +14,7 @@ import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.relation.SpecialForm;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeSignature;
+import io.prestosql.spi.type.TypeSignatureParameter;
 
 import org.apache.spark.sql.catalyst.expressions.Expression;
 
@@ -43,15 +44,32 @@ public class NdpFilterUtils {
         List<RowExpression> multiArguments, String operatorName) {
         RowExpression rowExpression;
         List<RowExpression> rowArguments;
+        String prestoName = prestoType.toString();
+        TypeSignature paramRight;
+        TypeSignature paramLeft;
+        if (prestoType.toString().contains("decimal")) {
+            String[] parameter = prestoName.split("\\(")[1].split("\\)")[0].split(",");
+            long precision = Long.parseLong(parameter[0]);
+            long scale = Long.parseLong(parameter[1]);
+            paramRight = new TypeSignature("decimal", TypeSignatureParameter.of(precision), TypeSignatureParameter.of(scale));
+            paramLeft = new TypeSignature("decimal", TypeSignatureParameter.of(precision), TypeSignatureParameter.of(scale));
+        } else {
+            paramRight = new TypeSignature(prestoName);
+            paramLeft = new TypeSignature(prestoName);
+        }
         Signature signature = new Signature(
-            QualifiedObjectName.valueOfDefaultFunction("$operator$" +
-            signatureName.toLowerCase(Locale.ENGLISH)),
-            FunctionKind.SCALAR, new TypeSignature("boolean"),
-            new TypeSignature(prestoType.toString()), new TypeSignature(prestoType.toString()));
+                QualifiedObjectName.valueOfDefaultFunction("$operator$" +
+                        signatureName.toLowerCase(Locale.ENGLISH)),
+                FunctionKind.SCALAR, new TypeSignature("boolean"),
+                paramRight, paramLeft);
         switch (operatorName.toLowerCase(Locale.ENGLISH)) {
             case "is_null":
                 List<RowExpression> notnullArguments = new ArrayList<>();
-                notnullArguments.add(new InputReferenceExpression(filterProjectionId, prestoType));
+                if (expressionInfo.isUDF()) {
+                    notnullArguments.add(expressionInfo.getPrestoRowExpression());
+                } else {
+                    notnullArguments.add(new InputReferenceExpression(filterProjectionId, prestoType));
+                }
                 rowExpression = new SpecialForm(IS_NULL, BOOLEAN, notnullArguments);
                 break;
             case "in":
@@ -71,6 +89,7 @@ public class NdpFilterUtils {
             case "isempty":
             case "isdeviceidlegal":
             case "ismessycode":
+            case "dateudf":
                 rowExpression = expressionInfo.getPrestoRowExpression();
                 break;
             default:
