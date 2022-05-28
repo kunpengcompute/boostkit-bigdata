@@ -1,20 +1,29 @@
-package scr.main.scala.com.huawei.booskit.spark
+package com.huawei.booskit.spark
+
+import org.apache.spark.sql.Strategy
+import org.apache.spark.sql.catalyst.SQLConfHelper
+import org.apache.spark.sql.catalyst.expressions._
+import org.apache.spark.sql.catalyst.optimizer.{BuildLeft, BuildRight, BuildSide, JoinSelectionHelper}
+import org.apache.spark.sql.catalyst.planning._
+import org.apache.spark.sql.catalyst.plans.logical._
+import org.apache.spark.sql.execution.{joins, SparkPlan}
 
 object ShuffleJoinStrategy extends Strategy
   with PredicateHelper
   with JoinSelectionHelper
   with SQLConfHelper {
 
-  private val columnarPreferShuffledHashJoin = ColumnarPluginConfig.getSessionConf.columnarPreferShuffledHashJoin
+  private val columnarPreferShuffledHashJoin =
+    ColumnarPluginConfig.getConf.columnarPreferShuffledHashJoin
 
   def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
-    case ExtractEquiJoinKeys(joinType, leftKeys, rightKeys, nonEquicond, left, right, hint)
+    case ExtractEquiJoinKeys(joinType, leftKeys, rightKeys, nonEquiCond, left, right, hint)
       if columnarPreferShuffledHashJoin =>
       val enable = getBroadcastBuildSide(left, right, joinType, hint, true, conf).isEmpty &&
-      !hintToSortMergeJoin(hint) &&
-      getShuffleHashJoinBuildSide(left, right, joinType, hint, true, conf).isEmpty &&
-      !hintToShuffleReplicateNL(hint) &&
-      getBroadcastBuildSide(left, right, joinType, hint, false, conf).isEmpty
+        !hintToSortMergeJoin(hint) &&
+        getShuffleHashJoinBuildSide(left, right, joinType, hint, true, conf).isEmpty &&
+        !hintToShuffleReplicateNL(hint) &&
+        getBroadcastBuildSide(left, right, joinType, hint, false, conf).isEmpty
       if (enable) {
         var buildLeft = false
         var buildRight = false
@@ -49,23 +58,25 @@ object ShuffleJoinStrategy extends Strategy
               rightKeys,
               joinType,
               buildSide,
-              nonEquicond,
+              nonEquiCond,
               planLater(left),
               planLater(right)))
         }.getOrElse(Nil)
       } else {
         Nil
       }
+
     case _ => Nil
   }
 
-  private def getBuildSide(canBuildLeft: Boolean,
-                           canBuildRight: Boolean,
-                           left: LogicalPlan,
-                           right: LogicalPlan): Option[BuildSide] = {
+  private def getBuildSide(
+    canBuildLeft: Boolean,
+    canBuildRight: Boolean,
+    left: LogicalPlan,
+    right: LogicalPlan): Option[BuildSide] = {
     if (canBuildLeft && canBuildRight) {
       // returns the smaller side base on its estimated physical size, if we want to build the
-      // both sides
+      // both sides.
       Some(getSmallerSide(left, right))
     } else if (canBuildLeft) {
       Some(BuildLeft)
