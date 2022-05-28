@@ -1,4 +1,4 @@
-package com.huawei.booskit.spark.util
+package com.huawei.boostkit.spark.util
 
 import java.math.BigInteger
 import java.util.concurrent.TimeUnit.NANOSECONDS
@@ -12,7 +12,7 @@ import org.apache.spark.sql.execution.datasources.orc.OrcColumnVector
 import org.apache.spark.sql.execution.metric.SQLMetric
 import org.apache.spark.sql.execution.vectorized.{OmniColumnVector, OnHeapColumnVector}
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.vectorized.{ColmnarBatch, ColumnVector}
+import org.apache.spark.sql.vectorized.{ColumnarBatch, ColumnVector}
 
 import java.util
 
@@ -43,9 +43,9 @@ object OmniAdaptorUtil {
     input
   }
 
-  def transColumnVector(columnVector: ColumnVector, columnSize: Int): Vec = {
-    val dataType: DataType = columnVector.dataType()
-    val vec: Vec = dataType match {
+  def transColumnVector(columnVector: ColumnVector, columnSize : Int): Vec = {
+    val datatype: DataType = columnVector.dataType()
+    val vec: Vec = datatype match {
       case LongType =>
         val vec = new LongVec(columnSize)
         val values = new Array[Long](columnSize)
@@ -129,7 +129,7 @@ object OmniAdaptorUtil {
         vec.put(values, 0, 0, columnSize)
         vec
       case t: DecimalType =>
-        if (DecimalType.is64BitDecimalType(dataType)) {
+        if (DecimalType.is64BitDecimalType(datatype)) {
           val vec = new LongVec(columnSize)
           val values = new Array[Long](columnSize)
           for (i <- 0 until columnSize) {
@@ -160,7 +160,7 @@ object OmniAdaptorUtil {
   }
 
   def genSortParam(output: Seq[Attribute], sortOrder: Seq[SortOrder]):
-    (Array[nova.hetu.omniruntime.`type`.DataType], Array[Int], Array[Int], Array[String]) = {
+      (Array[nova.hetu.omniruntime.`type`.DataType], Array[Int], Array[Int], Array[String]) = {
     val inputColSize: Int = output.size
     val sourceTypes = new Array[nova.hetu.omniruntime.`type`.DataType](inputColSize)
     val ascendings = new Array[Int](sortOrder.size)
@@ -221,11 +221,11 @@ object OmniAdaptorUtil {
         val vectors: Seq[OmniColumnVector] = OmniColumnVector.allocateColumns(
           vecBatch.getRowCount, schema, false)
         vectors.zipWithIndex.foreach { case (vector, i) =>
-            vector.reset()
-            vector.setVec(vecBatch.getVectors()(i))
-            outputDataSize += vecBatch.getVectors()(i).getRealValueBufCapacityInBytes
-            outputDataSize += vecBatch.getVectors()(i).getRealNullBufCapacityInBytes
-            outputDataSize += vecBatch.getVectors()(i).getRealOffsetBufCapacityInBytes
+          vector.reset()
+          vector.setVec(vecBatch.getVectors()(i))
+          outputDataSize += vecBatch.getVectors()(i).getRealValueBufCapacityInBytes
+          outputDataSize += vecBatch.getVectors()(i).getRealNullBufCapacityInBytes
+          outputDataSize += vecBatch.getVectors()(i).getRealOffsetBufCapacityInBytes
         }
         // metrics
         val rowCnt: Int = vecBatch.getRowCount

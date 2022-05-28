@@ -1,4 +1,4 @@
-package com.huawei.booskit.spark
+package com.huawei.boostkit.spark
 
 import org.apache.spark.sql.Strategy
 import org.apache.spark.sql.catalyst.SQLConfHelper
