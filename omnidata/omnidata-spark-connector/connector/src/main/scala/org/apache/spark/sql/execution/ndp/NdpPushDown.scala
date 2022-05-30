@@ -49,15 +49,8 @@ case class NdpPushDown(sparkSession: SparkSession)
   private val sparkUdfWhiteList = Set("substr", "substring", "length", "upper", "lower", "cast",
     "replace", "getarrayitem")
   private val udfPathWhiteList = Set("")
-//  private val udfPathWhiteList = Set("com.huawei.platform.bi.udf.common", "com.huawei.udf",
-//    "com.huawei.platform.bi.udf.service.openalliance",
-//    "com.huawei.platform.bi.udf.service.hnas",
-//    "com.huawei.platform.bi.udf.service.hispace",
-//    "com.huawei.udf.video",
-//    "com.huawei.platform.bi.udf.service.wlan",
-//    "com.huawei.platform.bi.udf.service.vmall", "com.huawei.platform.bi.udf.service.up")
   private val udfWhitelistConf = NdpConf.getNdpUdfWhitelist(sparkSession)
-  private val udfWhitelistProp = NdpConf.getNdpCBGUdfWhitelist("udfname.txt")
+  private val udfWhitelistProp = NdpConf.getNdpUdfWhitelist("udfname.txt")
   private val customUdfWhiteList = if (udfWhitelistConf.nonEmpty) {
     udfWhitelistConf.map(_.split(",")).get.toSet
   } else {
@@ -244,7 +237,7 @@ case class NdpPushDown(sparkSession: SparkSession)
           if (filterSelectivityEnabled && selectivity.nonEmpty) {
             logInfo(s"Selectivity: ${selectivity.get}")
           }
-          // partial pushdown
+          // partial pushDown
           val (otherFilters, pushDownFilters) =
             (splitConjunctivePredicates(condition) ++ s.partitionFilters).partition { x =>
               val containsUDFPath = isUDFInWhiteList(x)
@@ -448,7 +441,7 @@ object NdpConf {
     sparkSession.conf.getOption(NDP_MAX_FAILED_TIMES).getOrElse("3")
   }
 
-  def getNdpCBGUdfWhitelist(sourceName: String): mutable.Set[AnyRef] = {
+  def getNdpUdfWhitelist(sourceName: String): mutable.Set[AnyRef] = {
     val prop = new Properties()
     val inputStream = this.getClass.getResourceAsStream("/"+sourceName)
     if (inputStream==null){

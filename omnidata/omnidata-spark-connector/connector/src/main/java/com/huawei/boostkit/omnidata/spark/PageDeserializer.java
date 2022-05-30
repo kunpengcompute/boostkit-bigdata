@@ -10,6 +10,7 @@ import com.huawei.boostkit.omnidata.decode.Deserializer;
 import com.huawei.boostkit.omnidata.decode.type.DecodeType;
 import com.huawei.boostkit.omnidata.decode.type.DoubleDecodeType;
 import com.huawei.boostkit.omnidata.decode.type.LongDecodeType;
+import com.huawei.boostkit.omnidata.exception.OmniDataException;
 
 import io.airlift.slice.SliceInput;
 import io.hetu.core.transport.execution.buffer.SerializedPage;
@@ -52,17 +53,21 @@ public class PageDeserializer implements Deserializer<WritableColumnVector[]> {
                 decoding.decode(Optional.of(columnTypes[i]), sliceInput);
                 int numFields = sliceInput.readInt();
                 columnVectors[columnOrders[returnId++]] =
-                    decoding.decode(Optional.of(new DoubleDecodeType()), sliceInput).get();
+                        decoding.decode(Optional.of(new DoubleDecodeType()), sliceInput).get();
                 columnVectors[columnOrders[returnId++]] =
-                    decoding.decode(Optional.of(new LongDecodeType()), sliceInput).get();
-                int positionCount = sliceInput.readInt();
-                int[] fieldBlockOffsets = new int[positionCount + 1];
-                sliceInput.readBytes(wrappedIntArray(fieldBlockOffsets));
-                boolean[] rowIsNull =
-                        decoding.decodeNullBits(sliceInput, positionCount).orElseGet(() -> new boolean[positionCount]);
+                        decoding.decode(Optional.of(new LongDecodeType()), sliceInput).get();
+                try {
+                    int positionCount = sliceInput.readInt();
+                    int[] fieldBlockOffsets = new int[positionCount + 1];
+                    sliceInput.readBytes(wrappedIntArray(fieldBlockOffsets));
+                    boolean[] rowIsNull =
+                            decoding.decodeNullBits(sliceInput, positionCount).orElseGet(() -> new boolean[positionCount]);
+                } catch (IndexOutOfBoundsException e) {
+                    throw new OmniDataException(e.getMessage());
+                }
             } else {
                 Optional<WritableColumnVector> optionalResult =
-                    decoding.decode(Optional.of(columnTypes[i]), sliceInput);
+                        decoding.decode(Optional.of(columnTypes[i]), sliceInput);
                 WritableColumnVector columnResult = optionalResult.orElse(null);
                 columnVectors[columnOrders[returnId++]] = columnResult;
             }
