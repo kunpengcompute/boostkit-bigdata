@@ -704,4 +704,250 @@ int Splitter::SerializingBinaryColumns(int32_t partitionId, spark::Vec& vec, int
     vec.set_offet(OffsetsByte.get(), (itemsTotalLen + 1) * sizeof(int32_t));
 }
 
-int Splitter::protoSpillPartition(int32_t partition_id, std::unique_ptr<BufferedOutputStream> &bufferStream) {}
+int Splitter::protoSpillPartition(int32_t partition_id, std::unique_ptr<BufferedOutputStream> &bufferStream) {
+    LogsDebug(" Spill Pid:%d.", partition_id);
+    SplitRowInfo splitRowInfoTmp;
+    splitRowInfoTmp.copyedRow = 0;
+    splitRowInfoTmp.remainCopyRow = partition_id_cnt_cache_[partition_id];
+    splitRowInfoTmp.cacheBatchIndex.resize(fixed_width_array_idx_.size());
+    splitRowInfoTmp.cacheBatchCopyedLen.resize(fixed_width_array_idx_.size());
+    LogsDebug(" remainCopyRow %d ", splitRowInfoTmp.remainCopyRow);
+    auto partition_cache_batch_num = partition_cached_vectorbatch_[partition_id].size();
+    LogsDebug(" partition_cache_batch_num %lu ", partition_cache_batch_num);
+    int curBatch = 0; // 变长cache batch下标，split已按照options_.spill_batch_row_num切割完成
+    total_spill_row_num_ += splitRowInfoTmpremainCopyRow;
+    while (0 < splitRowInfoTmp.remainCopyRow) {
+        if (options_spill_batch_row_num < splitRowInfoTmp.remainCopyRow) {
+            splitRowInfoTmp.onceCopyRow = options_.spill_batch_row_num;
+        } else {
+            splitRowInfoTmp.onceCopyRow = splitRowInfoTmp.remainCopyRow;
+        }
+
+        vecBatchProto->set_rowcnt(splitRowInfoTmp.onceCopyRow);
+        vecBatchProto->set_veccnt(column_type_id_.size());
+        int fixColIndexTmp = 0;
+        for (size_t indexSchema = 0; indexSchema < column_type_id_.size(); indexSchema++) {
+            spark::Vec * vec = vecBatchProto->add_vecs();
+            switch (column_type_id_[indexSchema]) {
+                case ShuffleTypeId::SHUFFLE_1BYTE:
+                case SHuffleTypeId::SHUFFLE_2BYTE:
+                case SHuffleTypeId::SHUFFLE_4BYTE:
+                case SHuffleTypeId::SHUFFLE_8BYTE:
+                case SHuffleTypeId::SHUFFLE_DECIMAL128:{
+                    SerializingFixedColumns(partition_id, *vec, fixColIndexTmp, &splitRowInfoTmp);
+                    fixColIndexTmp++; // 定长序列化数量++
+                    break;
+                }
+                case SHuffleTypeId::SHUFFLE_BINARY: {
+                    SerializingBinaryColumns(partition_id, *vec, indexSchema, curBatch);
+                    break;
+                }
+                default: {
+                    throw std::runtime_error("Unsupported ShuffleType.");
+                }
+            }
+            spark::VecType *vt = vec->mutable_vectype();
+            vt->set_typeid_(CastShuffleTypeIdToVecType(vector_batch_col_types_[indexSchema]));
+            LogsDebug("precesion[indexSchema %d]: %d ", indexSchema, input_col_types.inputDataPrecisions[indexSchema]);
+            LogsDebug("scala[indexSchema %d]: %d ", indexSchema, input_col_types.inputDataScales[indexSchema]);
+            vt->set_precision(input_col_types.inputDataPrecisions[indexSchema]);
+            vt->set_scala(input_col_types.inputDataScales[indexSchema]);
+        }
+        curBatch++;
+
+        uint32_t vecBatchProtoSize = reversebytes_uint32t(vecBatchProto->ByteSize());
+        void *buffer = nullptr;
+        if (!bufferStream->NextNBytes(&buffer, sizeof(vecBatchProtoSize))) {
+            throw "Allocate Memory Failed: Flush Spilled Data, Next failed.!";
+        }
+        // set serizalized bytes to stream
+        memcpy(buffer, &vecBatchProtoSize, sizeof(vecBatchProtoSize));
+        LogsDebug(" A Slice Of vecBatchProtoSize: %d", reversebytes_uint32t(vecBatchProtoSize));
+
+        vecBatchProto->SerializeToZeroCopyStream(bufferStream.get());
+
+        splitRowInfoTmp.remainCopyRow -= splitRowInfoTmp.onceCopyRow;
+        splitRowInfoTmp.copyedRow += splitRowInfoTmp.onceCopyRow;
+        LogsTrace(" SerializeVecBatch:\n%s", vecBatchProto->DebugString().c_str());
+        vecBatchProto->Clear();
+    }
+
+    uint64_t partitionBatchSize = bufferStream->flush();
+    total_bytes_spilled_ += partitionBatchSize;
+    partition_serialization_size_[partition_id] = partitionBatchSize;
+    LogsDebug(" partitionBatch write length: %lu", partitionBatchSize);
+
+    // 及时清理分区数据
+    partition_cached_vectorbatch_[partition_id].clear(); // 定长数据内存释放
+    for (size_t col = 0; col < column_type_id_.size(); col++) {
+        vc_partition_array_buffers_[partition_id][col].clear(); // binary 释放内存
+    }
+
+    return 0;
+}
+
+int Splitter::WriteDataFileProto() {
+    LogsDebug(" spill DataFile: %s ", (options_.next_spilled_file_dir + ".data").c_str());
+    std::unique_ptr<OutputStream> outStream = writeLocalFile(options_.next_spilled_file_dir + ".data");
+    WriterOptions options;
+    // tmp spilled file no need compression
+    options.setCompression(CompressionKind_NONE);
+    std::unique_ptr<StreamsFactory> streamsFactory = createStreamsFactory(options, outStream.get());
+    std::unique_ptr<BufferedOutputStream> bufferStream = streamsFactory->createStream();
+    // 顺序写入每个partition的offset
+    for (auto pid = 0; pic < num_partitions_; ++pid) {
+        protoSpillPartition(pid, bufferStream);
+    }
+    std::fill(std::begin(partition_id_cnt_cache_), std::end(partition_id_cnt_cache_), 0);
+    outStream->close();
+    return 0;
+}
+
+void Splitter::MergeSpilled() {
+    LogsDebug(" Merge Spilled Tmp File.");
+    std::unique_ptr<OutputStream> outStream = writeLocalFile(options_.data_file);
+    LogsDebug(" MergeSpilled target dir: %s ", options_.data_file.c_str());
+    WriteOptions options;
+    options.setCompression(options_.compression_type);
+    options.setCompressionBlockSize(options_.compress_block_size);
+    options.setCompressionStrategy(CompressionStrategy_COMPRESSION);
+    std::unique_ptr<StreamsFactory> streamsFactory = createStreamsFactory(options, outStream.get());
+    std::unique_ptr<BufferedOutputStream> bufferOutPutStream =  steamsFactory->createStream();
+
+    void* bufferOut = nullptr;
+    int sizeOut = 0;
+    for (int pid = 0; pid < num_partitions_; pid++) {
+        LogsDebug(" MergeSplled traversal partition( %d ) ",pid);
+        for (auto &pair : spilled_tmp_files_info_) {
+            auto tmpDataFilePath = pair.first + ".data";
+            auto tmpPartitionOffset = reinterpret_cast<int32_t *>(pair.second->data_)[pid];
+            auto tmpPartitionSize = reinterpret_cast<int32_t *>(pair.second->data_)[pid + 1] - reinterpret_cast<int32_t *>(pair.second->data_)[pid];
+            LogsDebug(" get Partition Stream...tmpPartitionOffset %d tmpPartitionSize %d path %s",
+                      tmpPartitionOffset, tmpPartitionSize, tmpDataFilePatch.c_str());
+            std::unique_ptr<InputStream> inputStream = readLocalFile(tmpDataFilePath);
+            uint64_t targetLen = tmpPartitionSize;
+            uint64_t seekPosit = tmpPartitionOffset;
+            uint64_t onceReadLen = 0;
+            while ((targetLen > 0) && bufferOutPutStream->Next(&bufferOut, &sizeOUt)) {
+                onceReadLen = targetLen > sizeOut ? sizeOut : targetLen;
+                inputStream->read(bufferOut, onceReadLen, seekPosit);
+                targetLen -= onceReadLen;
+                seekPosit += onceReadLen;
+                if (onceReadLen < sizeOut) {
+                    // Reached END.
+                    bufferOutPutStream->BackUp(sizeOut - onceReadLen);
+                    break;
+                }
+            }
+
+            uint64_t flushSize = bufferOutPutStream->flush();
+            total_bytes_written_ += flushSize;
+            LogsDebug(" Merge Flush Partition[%d] flushSize: %ls ", pid, flushSize);
+            partition_lengths_[pid] += flushSize;
+        }
+    }
+    outStream->close();
+}
+
+int Spiltter::DeleteSpilledTmpFile() {
+    for (auto &pair : spilled_tmp_files_info_) {
+        auto tmpDataFilePath = pair.first + ".data";
+        // 释放存储有各个临时文件的偏移数据内存
+        options_.allocator->free(pair.second->data_, pair.second->capacity_);
+        if (IsFileExist(tmpDataFilePath)) {
+            remove(tmpDtaFilePath.c_str());
+        }
+    }
+    // 释放内存空间，Reset spilled_tmp_files_info_, 这个地方是否有内存泄漏的风险？？？
+    spilled_tmp_files_info_.clear();
+    return 0;
+}
+
+int Splitter::SpillToTmpFile() {
+    for (auto pid = 0; pid < num_partitions_; ++pid) {
+        CacheVectorBatch(pid, true);
+        partition_buffer_size_[pid] = 0; //溢写之后将其清零，条件溢写需要重新分配内存
+    }
+
+    options_.next_spilled_file_dir = CreateTempShuffleFile(NextSpilledFileDir());
+    WriteDataFileProto();
+    std::shared_ptr<Buffer> ptrTmp = CaculateSpilledTmpFilePartitionOffsets();
+    spilled_tmp_files_info_[options_.next_spilled_file_dir] = ptrTmp;
+
+    LogsDebug(" free vectorBatch memory...");
+    auto cache_vectorBatch_num = vectorBatch_cache_.size();
+    for (auto i = 0; i < cache_vectorBatch_num; ++i) {
+        ReleaseVectorBatch(*vectorBatch_cache_[i]);
+        delete vectorBatch_cache_[i];
+        vectorBatch_cache_[i] = nullptr;
+    }
+    vectorBatch_cache_.clear();
+    num_row_spilted_ = 0;
+    cached_vectorbatch_size_ = 0;
+    return 0;
+}
+
+Splitter::Splitter(InputDataTypes inputDataTypes, int32_t num_cols, int32_t num_partitions, SpiltOptions options, bool flag)
+        : num_fields_(num_cols);
+          num_partitions_(num_partitions),
+          options_(std::move(options)),
+          singlePartitionFlag(flag),
+          input_col_typtes(inputDataTyptes)
+{
+    LogsDebug("Input Schema colNum: %d", num_cols);
+    ToSplitterTypeId(num_cols);
+}
+
+std::shared_ptr<Splitter> Create(InputDataTypes inputDataTypes,
+                                 int32_t num_cols,
+                                 int32_t num_partitions,
+                                 SplitOptions options,
+                                 bool flag)
+{
+    std::shared_ptr<Splitter> res(
+            new Splitter(inputDataTypes,
+                      num_cols,
+                      num_partitions,
+                      std::move(options),
+                      flage));
+    res->Split_Init();
+    return res;
+}
+
+std::shared_ptr<Splitter> Splitter::Make(
+         const std::string& short_name,
+         InputDataTyptes inputDataTypes,
+         int32_t num_cols,
+         int num_partitions,
+         SplitOptions options) {
+    if (short_name == "hash" || short_name == "rr" || short_name == "range") {
+        return Create(inputDataTyptes, num_cols, num_partitions, std::move(options), false);
+    } else if (short_name == "single") {
+        return Create(inputDataTyptes, num_cols, num_partitions, std::move(options), true);
+    } else {
+        throw("ERROR: Unsupported Splitter Type.");
+    }
+}
+
+std::string Splitter::NextSpilledFileDir() {
+    auto spilled_file_dir = GetSpilledShuffleFileDir(configured_dirs_[dir_selection_],
+                                                     sub_dir_selection_[dir_selection_]);
+    LogsDebug(" spilled_file_dir %s ", spilled_file_dir.c_str());
+    sub_dir_selection_[dir_selection_] =
+            (sub_dir_selection_[dir_selection_] + 1) % options_.num_sub_dirs;
+    dir_selection_ = (dir_selection_ + 1) % configured_dirs_.size();
+    return spilled_file_dir;
+}
+
+int Splitter::Stop() {
+    LogsDebug(" Spill for Splitter Stopped.");
+    TIME_NANO_OR_RAISE(total_spill_time_, SpillToTmpFile());
+    TIME_NANO_OR_RAISE(total_write_time_, MergeSpilled());
+    TIME_NANO_OR_RAISE(total_write_time_, DeleteSpilledTmpFile());
+    LogsDebug("total_spill_row_num_: %d ", total_spill_row_num_);
+    delete vecBatchProto; //free protobuf vecBatch memory
+    return 0;
+}
+
+
+
