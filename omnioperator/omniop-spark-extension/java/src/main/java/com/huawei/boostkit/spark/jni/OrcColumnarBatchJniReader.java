@@ -56,7 +56,7 @@ public class OrcColumnarBatchJniReader {
         return jsonObject;
     }
 
-    public JSONObject getLeavesJson(List<PredicateLeaf> leaves, TypeDescription schema){
+    public JSONObject getLeavesJson(List<PredicateLeaf> leaves, TypeDescription schema) {
         JSONObject jsonObjectList = new JSONObject();
         for (int i = 0; i < leaves.size(); i++) {
             PredicateLeaf pl = leaves.get(i);
@@ -66,7 +66,7 @@ public class OrcColumnarBatchJniReader {
             jsonObject.put("type", pl.getType().ordinal());
             if (pl.getLiteral() != null) {
                 if (pl.getType() == PredicateLeaf.Type.DATE) {
-                    jsonObject.put("literal",((int)Math.ceil(((Date)pl.getLiteral()).getTime()* 1.0/3600/24/1000)) + "");
+                    jsonObject.put("literal", ((int)Math.ceil(((Date)pl.getLiteral()).getTime()* 1.0/3600/24/1000)) + "");
                 } else if (pl.getType() == PredicateLeaf.Type.DECIMAL) {
                     int decimalP = schema.findSubtype(pl.getColumnName()).getPrecision();
                     int decimalS = schema.findSubtype(pl.getColumnName()).getScale();
@@ -77,7 +77,7 @@ public class OrcColumnarBatchJniReader {
             } else {
                 jsonObject.put("literal", "");
             }
-            if((pl.getLiteralList() != null) && (pl.getLiteralList().size() != 0)){
+            if ((pl.getLiteralList() != null) && (pl.getLiteralList().size() != 0)){
                 List<String> lst = new ArrayList<String>();
                 for (Object ob : pl.getLiteralList()) {
                     if (pl.getType() == PredicateLeaf.Type.DECIMAL) {
@@ -119,9 +119,10 @@ public class OrcColumnarBatchJniReader {
 
     /**
      * Init Orc RecordReader.
+     *
      * @param options split file options
      */
-    public long initializeRecordReaderJava(Options options){
+    public long initializeRecordReaderJava(Options options) {
         JSONObject job = new JSONObject();
         if (options.getInclude() == null) {
             job.put("include", "");
@@ -148,8 +149,8 @@ public class OrcColumnarBatchJniReader {
         List<String> optionField = options.getSchema().getFieldNames();
         colsToGet = new int[optionField.size()];
         realColsCnt = 0;
-        for (int i=0; i < optionField.size(); i++) {
-            if (allCols.contains(optionField.get(i))){
+        for (int i = 0; i < optionField.size(); i++) {
+            if (allCols.contains(optionField.get(i))) {
                 colToInclu.add(optionField.get(i));
                 colsToGet[i] = 0;
                 realColsCnt++;

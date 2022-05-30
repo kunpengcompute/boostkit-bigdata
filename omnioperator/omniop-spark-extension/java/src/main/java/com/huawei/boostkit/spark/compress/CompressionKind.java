@@ -22,6 +22,6 @@ package com.huawei.boostkit.spark.compress;
  * An enumeration that lists the generic compression algorithms that
  * can be applied to ORC files.
  */
-public enum  CompressionKind {
+public enum CompressionKind {
     NONE, ZLIB, SNAPPY, LZO, LZ4
 }

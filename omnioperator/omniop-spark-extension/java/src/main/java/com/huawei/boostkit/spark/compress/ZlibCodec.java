@@ -104,8 +104,8 @@ public class ZlibCodec implements CompressionCodec {
 
         for (Modifier m : modifiers){
             switch (m){
-                /* filtered == less LZ77, more huffman */
                 case BINARY:
+                    /* filtered == less LZ77, more huffman */
                     s = Deflater.FILTERED;
                     break;
                 case TEXT:

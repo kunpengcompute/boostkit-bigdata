@@ -37,7 +37,7 @@ public class DecompressionStream extends InputStream {
         int[] b = new int[3];
         for (int i = 0; i < HEADER_SIZE; i++) {
             int ret = in.read();
-            if (ret == -1){
+            if (ret == -1) {
                 finishedReading = true;
                 return;
             }
@@ -96,7 +96,7 @@ public class DecompressionStream extends InputStream {
 
     private boolean ensureUncompressed() throws IOException {
         while (uncompressed == null || (uncompressedLimit - uncompressedCursor) == 0) {
-            if (finishedReading){
+            if (finishedReading) {
                 return false;
             }
             readHeader();
