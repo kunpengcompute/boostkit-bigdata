@@ -11,6 +11,7 @@ import static org.apache.spark.sql.types.DataTypes.TimestampType;
 
 import com.huawei.boostkit.omnidata.decode.AbstractDecoding;
 import com.huawei.boostkit.omnidata.decode.type.*;
+import com.huawei.boostkit.omnidata.exception.OmniDataException;
 
 import io.airlift.slice.SliceInput;
 import io.airlift.slice.Slices;
@@ -39,6 +40,7 @@ import java.util.TimeZone;
  */
 public class PageDecoding extends AbstractDecoding<Optional<WritableColumnVector>> {
     private static Field filedElementsAppended;
+
     static {
         try {
             filedElementsAppended = WritableColumnVector.class.getDeclaredField("elementsAppended");
@@ -61,15 +63,15 @@ public class PageDecoding extends AbstractDecoding<Optional<WritableColumnVector
         WritableColumnVector columnVector = new OnHeapColumnVector(positionCount, DataTypes.ByteType);
         for (int position = 0; position < positionCount; position++) {
             if (valueIsNull == null || !valueIsNull[position]) {
-                columnVector.putByte(position , sliceInput.readByte());
+                columnVector.putByte(position, sliceInput.readByte());
             } else {
                 columnVector.putNull(position);
             }
         }
         try {
-            PageDecoding.filedElementsAppended.set(columnVector,positionCount);
-        }catch (Exception e){
-            e.printStackTrace();
+            PageDecoding.filedElementsAppended.set(columnVector, positionCount);
+        } catch (Exception e) {
+            throw new OmniDataException(e.getMessage());
         }
         return Optional.of(columnVector);
     }
@@ -83,15 +85,15 @@ public class PageDecoding extends AbstractDecoding<Optional<WritableColumnVector
         for (int position = 0; position < positionCount; position++) {
             if (valueIsNull == null || !valueIsNull[position]) {
                 boolean value = sliceInput.readByte() != 0;
-                columnVector.putBoolean(position,value);
+                columnVector.putBoolean(position, value);
             } else {
                 columnVector.putNull(position);
             }
         }
         try {
-            PageDecoding.filedElementsAppended.set(columnVector,positionCount);
-        }catch (Exception e){
-            e.printStackTrace();
+            PageDecoding.filedElementsAppended.set(columnVector, positionCount);
+        } catch (Exception e) {
+            throw new OmniDataException(e.getMessage());
         }
         return Optional.of(columnVector);
     }
@@ -104,15 +106,15 @@ public class PageDecoding extends AbstractDecoding<Optional<WritableColumnVector
         WritableColumnVector columnVector = new OnHeapColumnVector(positionCount, DataTypes.IntegerType);
         for (int position = 0; position < positionCount; position++) {
             if (valueIsNull == null || !valueIsNull[position]) {
-                columnVector.putInt(position,sliceInput.readInt());
+                columnVector.putInt(position, sliceInput.readInt());
             } else {
                 columnVector.putNull(position);
             }
         }
         try {
-            PageDecoding.filedElementsAppended.set(columnVector,positionCount);
-        }catch (Exception e){
-            e.printStackTrace();
+            PageDecoding.filedElementsAppended.set(columnVector, positionCount);
+        } catch (Exception e) {
+            throw new OmniDataException(e.getMessage());
         }
         return Optional.of(columnVector);
     }
@@ -130,15 +132,15 @@ public class PageDecoding extends AbstractDecoding<Optional<WritableColumnVector
         WritableColumnVector columnVector = new OnHeapColumnVector(positionCount, DataTypes.ShortType);
         for (int position = 0; position < positionCount; position++) {
             if (valueIsNull == null || !valueIsNull[position]) {
-                columnVector.putShort(position,sliceInput.readShort());
+                columnVector.putShort(position, sliceInput.readShort());
             } else {
                 columnVector.putNull(position);
             }
         }
         try {
-            PageDecoding.filedElementsAppended.set(columnVector,positionCount);
-        }catch (Exception e){
-            e.printStackTrace();
+            PageDecoding.filedElementsAppended.set(columnVector, positionCount);
+        } catch (Exception e) {
+            throw new OmniDataException(e.getMessage());
         }
         return Optional.of(columnVector);
     }
@@ -151,15 +153,15 @@ public class PageDecoding extends AbstractDecoding<Optional<WritableColumnVector
         WritableColumnVector columnVector = new OnHeapColumnVector(positionCount, DataTypes.LongType);
         for (int position = 0; position < positionCount; position++) {
             if (valueIsNull == null || !valueIsNull[position]) {
-                columnVector.putLong(position,sliceInput.readLong());
+                columnVector.putLong(position, sliceInput.readLong());
             } else {
                 columnVector.putNull(position);
             }
         }
         try {
-            PageDecoding.filedElementsAppended.set(columnVector,positionCount);
-        }catch (Exception e){
-            e.printStackTrace();
+            PageDecoding.filedElementsAppended.set(columnVector, positionCount);
+        } catch (Exception e) {
+            throw new OmniDataException(e.getMessage());
         }
         return Optional.of(columnVector);
     }
@@ -172,15 +174,15 @@ public class PageDecoding extends AbstractDecoding<Optional<WritableColumnVector
         WritableColumnVector columnVector = new OnHeapColumnVector(positionCount, DataTypes.FloatType);
         for (int position = 0; position < positionCount; position++) {
             if (valueIsNull == null || !valueIsNull[position]) {
-                columnVector.putFloat(position,intBitsToFloat(sliceInput.readInt()));
+                columnVector.putFloat(position, intBitsToFloat(sliceInput.readInt()));
             } else {
                 columnVector.putNull(position);
             }
         }
         try {
-            PageDecoding.filedElementsAppended.set(columnVector,positionCount);
-        }catch (Exception e){
-            e.printStackTrace();
+            PageDecoding.filedElementsAppended.set(columnVector, positionCount);
+        } catch (Exception e) {
+            throw new OmniDataException(e.getMessage());
         }
         return Optional.of(columnVector);
     }
@@ -193,15 +195,15 @@ public class PageDecoding extends AbstractDecoding<Optional<WritableColumnVector
         WritableColumnVector columnVector = new OnHeapColumnVector(positionCount, DataTypes.DoubleType);
         for (int position = 0; position < positionCount; position++) {
             if (valueIsNull == null || !valueIsNull[position]) {
-                columnVector.putDouble(position,longBitsToDouble(sliceInput.readLong()));
+                columnVector.putDouble(position, longBitsToDouble(sliceInput.readLong()));
             } else {
                 columnVector.putNull(position);
             }
         }
         try {
-            PageDecoding.filedElementsAppended.set(columnVector,positionCount);
-        }catch (Exception e){
-            e.printStackTrace();
+            PageDecoding.filedElementsAppended.set(columnVector, positionCount);
+        } catch (Exception e) {
+            throw new OmniDataException(e.getMessage());
         }
         return Optional.of(columnVector);
     }
@@ -234,15 +236,15 @@ public class PageDecoding extends AbstractDecoding<Optional<WritableColumnVector
                 curOffset = nextOffset;
                 byte[] bytes = new byte[length];
                 sliceInput.readBytes(bytes, 0, length);
-                columnVector.putByteArray(position,bytes, 0, length);
+                columnVector.putByteArray(position, bytes, 0, length);
             } else {
                 columnVector.putNull(position);
             }
         }
         try {
-            PageDecoding.filedElementsAppended.set(columnVector,positionCount);
-        }catch (Exception e){
-            e.printStackTrace();
+            PageDecoding.filedElementsAppended.set(columnVector, positionCount);
+        } catch (Exception e) {
+            throw new OmniDataException(e.getMessage());
         }
         return Optional.of(columnVector);
     }
@@ -254,7 +256,7 @@ public class PageDecoding extends AbstractDecoding<Optional<WritableColumnVector
 
     @Override
     public Optional<WritableColumnVector> decodeRunLength(Optional<DecodeType> type, SliceInput sliceInput)
-        throws InvocationTargetException, IllegalAccessException {
+            throws InvocationTargetException, IllegalAccessException {
         int positionCount = sliceInput.readInt();
         Optional<WritableColumnVector> resColumnVector = Optional.empty();
 
@@ -280,11 +282,9 @@ public class PageDecoding extends AbstractDecoding<Optional<WritableColumnVector
         Object objResult = method.invoke(pageDeRunLength, positionCount, columnVector);
         if (objResult instanceof Optional) {
             Optional optResult = (Optional) objResult;
-            if (optResult.isPresent()) {
-                if (optResult.get() instanceof WritableColumnVector) {
-                    WritableColumnVector writableColumnVector = (WritableColumnVector) optResult.get();
-                    resColumnVector = Optional.of(writableColumnVector);
-                }
+            if (optResult.isPresent() && (optResult.get() instanceof WritableColumnVector)) {
+                WritableColumnVector writableColumnVector = (WritableColumnVector) optResult.get();
+                resColumnVector = Optional.of(writableColumnVector);
             }
         }
         return resColumnVector;
@@ -303,15 +303,15 @@ public class PageDecoding extends AbstractDecoding<Optional<WritableColumnVector
         WritableColumnVector columnVector = new OnHeapColumnVector(positionCount, DataTypes.DateType);
         for (int position = 0; position < positionCount; position++) {
             if (valueIsNull == null || !valueIsNull[position]) {
-                columnVector.putInt(position,sliceInput.readInt());
+                columnVector.putInt(position, sliceInput.readInt());
             } else {
                 columnVector.putNull(position);
             }
         }
         try {
-            PageDecoding.filedElementsAppended.set(columnVector,positionCount);
-        }catch (Exception e){
-            e.printStackTrace();
+            PageDecoding.filedElementsAppended.set(columnVector, positionCount);
+        } catch (Exception e) {
+            throw new OmniDataException(e.getMessage());
         }
         return Optional.of(columnVector);
     }
@@ -324,15 +324,15 @@ public class PageDecoding extends AbstractDecoding<Optional<WritableColumnVector
         WritableColumnVector columnVector = new OnHeapColumnVector(positionCount, DataTypes.IntegerType);
         for (int position = 0; position < positionCount; position++) {
             if (valueIsNull == null || !valueIsNull[position]) {
-                columnVector.putInt(position,(int) sliceInput.readLong());
+                columnVector.putInt(position, (int) sliceInput.readLong());
             } else {
                 columnVector.putNull(position);
             }
         }
         try {
-            PageDecoding.filedElementsAppended.set(columnVector,positionCount);
-        }catch (Exception e){
-            e.printStackTrace();
+            PageDecoding.filedElementsAppended.set(columnVector, positionCount);
+        } catch (Exception e) {
+            throw new OmniDataException(e.getMessage());
         }
         return Optional.of(columnVector);
     }
@@ -345,15 +345,15 @@ public class PageDecoding extends AbstractDecoding<Optional<WritableColumnVector
         WritableColumnVector columnVector = new OnHeapColumnVector(positionCount, DataTypes.ShortType);
         for (int position = 0; position < positionCount; position++) {
             if (valueIsNull == null || !valueIsNull[position]) {
-                columnVector.putShort(position,(short) sliceInput.readLong());
+                columnVector.putShort(position, (short) sliceInput.readLong());
             } else {
                 columnVector.putNull(position);
             }
         }
         try {
-            PageDecoding.filedElementsAppended.set(columnVector,positionCount);
-        }catch (Exception e){
-            e.printStackTrace();
+            PageDecoding.filedElementsAppended.set(columnVector, positionCount);
+        } catch (Exception e) {
+            throw new OmniDataException(e.getMessage());
         }
         return Optional.of(columnVector);
     }
@@ -366,15 +366,15 @@ public class PageDecoding extends AbstractDecoding<Optional<WritableColumnVector
         WritableColumnVector columnVector = new OnHeapColumnVector(positionCount, DataTypes.ByteType);
         for (int position = 0; position < positionCount; position++) {
             if (valueIsNull == null || !valueIsNull[position]) {
-                columnVector.putByte(position,(byte) sliceInput.readLong());
+                columnVector.putByte(position, (byte) sliceInput.readLong());
             } else {
                 columnVector.putNull(position);
             }
         }
         try {
-            PageDecoding.filedElementsAppended.set(columnVector,positionCount);
-        }catch (Exception e){
-            e.printStackTrace();
+            PageDecoding.filedElementsAppended.set(columnVector, positionCount);
+        } catch (Exception e) {
+            throw new OmniDataException(e.getMessage());
         }
         return Optional.of(columnVector);
     }
@@ -387,15 +387,15 @@ public class PageDecoding extends AbstractDecoding<Optional<WritableColumnVector
         WritableColumnVector columnVector = new OnHeapColumnVector(positionCount, DataTypes.FloatType);
         for (int position = 0; position < positionCount; position++) {
             if (valueIsNull == null || !valueIsNull[position]) {
-                columnVector.putFloat(position,intBitsToFloat((int) sliceInput.readLong()));
+                columnVector.putFloat(position, intBitsToFloat((int) sliceInput.readLong()));
             } else {
                 columnVector.putNull(position);
             }
         }
         try {
-            PageDecoding.filedElementsAppended.set(columnVector,positionCount);
-        }catch (Exception e){
-            e.printStackTrace();
+            PageDecoding.filedElementsAppended.set(columnVector, positionCount);
+        } catch (Exception e) {
+            throw new OmniDataException(e.getMessage());
         }
         return Optional.of(columnVector);
     }
@@ -421,6 +421,8 @@ public class PageDecoding extends AbstractDecoding<Optional<WritableColumnVector
                     case "INT128_ARRAY":
                         value = Decimals.decodeUnscaledValue(sliceInput.readSlice(16));
                         break;
+                    default:
+                        throw new UnsupportedOperationException(decodeName + "is not supported.");
                 }
                 Decimal decimalValue = new Decimal().set(value);
                 columnVector.putDecimal(position, decimalValue, precision);
@@ -431,7 +433,7 @@ public class PageDecoding extends AbstractDecoding<Optional<WritableColumnVector
         try {
             PageDecoding.filedElementsAppended.set(columnVector, positionCount);
         } catch (Exception e) {
-            e.printStackTrace();
+            throw new OmniDataException(e.getMessage());
         }
         return Optional.of(columnVector);
     }
@@ -454,7 +456,7 @@ public class PageDecoding extends AbstractDecoding<Optional<WritableColumnVector
         try {
             PageDecoding.filedElementsAppended.set(columnVector, positionCount);
         } catch (Exception e) {
-            e.printStackTrace();
+            throw new OmniDataException(e.getMessage());
         }
         return Optional.of(columnVector);
     }

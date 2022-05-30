@@ -71,22 +71,22 @@ public class NdpUtils {
     }
 
     public static int getColumnOffsetByAggExeInfo(StructType dataSchema,
-        Seq<AggExeInfo> aggExeInfo) {
+                                                  Seq<AggExeInfo> aggExeInfo) {
         String columnName = "";
         int columnTempId = 0;
         if (aggExeInfo != null && aggExeInfo.size() > 0) {
             List<AggExeInfo> aggExecutionList = JavaConverters.seqAsJavaList(aggExeInfo);
             for (AggExeInfo aggExeInfoTemp : aggExecutionList) {
                 List<AggregateFunction> aggregateExpressions = JavaConverters.seqAsJavaList(
-                    aggExeInfoTemp.aggregateExpressions());
+                        aggExeInfoTemp.aggregateExpressions());
                 for (AggregateFunction aggregateFunction : aggregateExpressions) {
                     List<Expression> expressions = JavaConverters
-                        .seqAsJavaList(aggregateFunction.children());
+                            .seqAsJavaList(aggregateFunction.children());
                     for (Expression expression : expressions) {
                         columnName = expression.toString().split("#")[0].replaceAll("\\(", "");
                         Pattern pattern = Pattern.compile(columnName + "#(\\d+)");
                         Matcher matcher = pattern.matcher(expression.toString());
-                        if(matcher.find()) {
+                        if (matcher.find()) {
                             columnTempId = Integer.parseInt(matcher.group(1));
                             break;
                         }
@@ -94,7 +94,7 @@ public class NdpUtils {
                     break;
                 }
                 List<NamedExpression> namedExpressions = JavaConverters.seqAsJavaList(
-                    aggExeInfoTemp.groupingExpressions());
+                        aggExeInfoTemp.groupingExpressions());
                 for (NamedExpression namedExpression : namedExpressions) {
                     columnName = namedExpression.toString().split("#")[0];
                     columnTempId = NdpUtils.getColumnId(namedExpression.toString());
@@ -137,11 +137,11 @@ public class NdpUtils {
         if (isSparkUdfOperator && "integertype".equalsIgnoreCase(strType)) {
             strType = "longtype";
         }
-        if (strType.contains("decimal")){
+        if (strType.contains("decimal")) {
             String[] decimalInfo = strType.split("\\(")[1].split("\\)")[0].split(",");
             int precision = Integer.parseInt(decimalInfo[0]);
             int scale = Integer.parseInt(decimalInfo[1]);
-            return DecimalType.createDecimalType(precision,scale);
+            return DecimalType.createDecimalType(precision, scale);
         }
         switch (strType) {
             case "timestamptype":
@@ -185,7 +185,7 @@ public class NdpUtils {
 
     public static Type transAggRetType(Type prestoType) {
         if (BIGINT.equals(prestoType) || INTEGER.equals(prestoType) ||
-            SMALLINT.equals(prestoType) || TINYINT.equals(prestoType) || REAL.equals(prestoType)) {
+                SMALLINT.equals(prestoType) || TINYINT.equals(prestoType) || REAL.equals(prestoType)) {
             return BIGINT;
         } else {
             return prestoType;
@@ -276,14 +276,14 @@ public class NdpUtils {
 
     public static ConstantExpression transArgumentData(String argumentValue, Type argumentType) {
         String strType = argumentType.toString().toLowerCase(Locale.ENGLISH);
-        if (strType.contains("decimal")){
+        if (strType.contains("decimal")) {
             String[] parameter = strType.split("\\(")[1].split("\\)")[0].split(",");
             int precision = Integer.parseInt(parameter[0]);
             int scale = Integer.parseInt(parameter[1]);
-            BigInteger bigInteger = Decimals.rescale(new BigDecimal(argumentValue),(DecimalType)argumentType).unscaledValue();
-            if ("ShortDecimalType".equals(argumentType.getClass().getSimpleName())){ //short decimal type
-                return new ConstantExpression(bigInteger.longValue(), DecimalType.createDecimalType(precision,scale));
-            } else if ("LongDecimalType".equals(argumentType.getClass().getSimpleName())){ //long decimal type
+            BigInteger bigInteger = Decimals.rescale(new BigDecimal(argumentValue), (DecimalType) argumentType).unscaledValue();
+            if ("ShortDecimalType".equals(argumentType.getClass().getSimpleName())) { //short decimal type
+                return new ConstantExpression(bigInteger.longValue(), DecimalType.createDecimalType(precision, scale));
+            } else if ("LongDecimalType".equals(argumentType.getClass().getSimpleName())) { //long decimal type
                 Slice argumentValueSlice = Decimals.encodeUnscaledValue(bigInteger);
                 long[] base = new long[2];
                 base[0] = argumentValueSlice.getLong(0);
@@ -291,11 +291,11 @@ public class NdpUtils {
                 try {
                     Field filed = Slice.class.getDeclaredField("base");
                     filed.setAccessible(true);
-                    filed.set(argumentValueSlice,base);
-                }catch (Exception e){
+                    filed.set(argumentValueSlice, base);
+                } catch (Exception e) {
                     e.printStackTrace();
                 }
-                return new ConstantExpression(argumentValueSlice, DecimalType.createDecimalType(precision,scale));
+                return new ConstantExpression(argumentValueSlice, DecimalType.createDecimalType(precision, scale));
             } else {
                 throw new UnsupportedOperationException("unsupported data type " + argumentType.getClass().getSimpleName());
             }
@@ -310,7 +310,7 @@ public class NdpUtils {
                 return new ConstantExpression(longValue, argumentType);
             case "real":
                 return new ConstantExpression(
-                    (long)floatToIntBits(parseFloat(argumentValue)), argumentType);
+                        (long) floatToIntBits(parseFloat(argumentValue)), argumentType);
             case "double":
                 return new ConstantExpression(Double.valueOf(argumentValue), argumentType);
             case "boolean":
@@ -328,7 +328,8 @@ public class NdpUtils {
                         timestampValue = -1;
                     }
                 } else {
-                    timestampValue = Long.parseLong(argumentValue.substring(0, argumentValue.length() - 3)) + rawOffset;
+                    int millisecondsDiffMicroseconds = 3;
+                    timestampValue = Long.parseLong(argumentValue.substring(0, argumentValue.length() - millisecondsDiffMicroseconds)) + rawOffset;
                 }
                 return new ConstantExpression(timestampValue, argumentType);
             default:
@@ -362,7 +363,7 @@ public class NdpUtils {
             case "longtype":
                 return Long.valueOf(columnValue);
             case "floattype":
-                return (long)floatToIntBits(parseFloat(columnValue));
+                return (long) floatToIntBits(parseFloat(columnValue));
             case "doubletype":
                 return Double.valueOf(columnValue);
             case "booleantype":
@@ -377,7 +378,7 @@ public class NdpUtils {
 
     public static OptionalLong convertLimitExeInfo(Option<LimitExeInfo> limitExeInfo) {
         return limitExeInfo.isEmpty() ? OptionalLong.empty()
-            : OptionalLong.of(limitExeInfo.get().limit());
+                : OptionalLong.of(limitExeInfo.get().limit());
     }
 
     public static String getPartitionValue(String filePath, String columnName) {
