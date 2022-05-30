@@ -749,7 +749,7 @@ public class OmniColumnVector extends WritableColumnVector {
         return false;
     }
 
-    // Spilt this function out since it is the slow path。
+    // Spilt this function out since it is the slow path.
     @Override
     protected void reserveInternal(int newCapacity) {
         if (type instanceof BooleanType) {
