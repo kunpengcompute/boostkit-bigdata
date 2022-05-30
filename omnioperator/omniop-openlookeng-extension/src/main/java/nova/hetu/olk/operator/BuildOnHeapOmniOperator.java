@@ -112,12 +112,8 @@ public class BuildOnHeapOmniOperator
      * @since 20220110
      */
     public static class BuildOnHeapOmniOperatorFactory
-            implements OperatorFactory
+            extends AbstractOmniOperatorFactory
     {
-        private final int operatorId;
-
-        private final PlanNodeId planNodeId;
-
         /**
          * Instantiates a new buildOnHeapOmniOperator factory.
          *
@@ -147,12 +143,6 @@ public class BuildOnHeapOmniOperator
         public OperatorFactory duplicate()
         {
             return new BuildOnHeapOmniOperatorFactory(operatorId, planNodeId);
-        }
-
-        @Override
-        public boolean isExtensionOperatorFactory()
-        {
-            return true;
         }
     }
 }

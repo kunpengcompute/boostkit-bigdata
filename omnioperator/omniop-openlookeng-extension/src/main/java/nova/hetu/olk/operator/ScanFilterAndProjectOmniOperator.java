@@ -31,6 +31,7 @@ import io.prestosql.operator.BloomFilterUtils;
 import io.prestosql.operator.DriverContext;
 import io.prestosql.operator.DriverYieldSignal;
 import io.prestosql.operator.OperatorContext;
+import io.prestosql.operator.OperatorFactory;
 import io.prestosql.operator.SourceOperator;
 import io.prestosql.operator.SourceOperatorFactory;
 import io.prestosql.operator.WorkProcessor;
@@ -514,10 +515,9 @@ public class ScanFilterAndProjectOmniOperator
     }
 
     public static class ScanFilterAndProjectOmniOperatorFactory
+            extends AbstractOmniOperatorFactory
             implements SourceOperatorFactory, WorkProcessorSourceOperatorFactory
     {
-        private final int operatorId;
-        private final PlanNodeId planNodeId;
         private final Supplier<CursorProcessor> cursorProcessor;
         private final Supplier<PageProcessor> pageProcessor;
         private final PlanNodeId sourceId;
@@ -540,7 +540,6 @@ public class ScanFilterAndProjectOmniOperator
         private final Optional<SpillerFactory> spillerFactory;
         private final Integer spillerThreshold;
         private final Integer consumerTableScanNodeCount;
-        private final List<Type> inputTypes;
         private VecAllocator vecAllocator = VecAllocator.GLOBAL_VECTOR_ALLOCATOR;
 
         public ScanFilterAndProjectOmniOperatorFactory(Session session, int operatorId, PlanNodeId planNodeId,
@@ -549,12 +548,12 @@ public class ScanFilterAndProjectOmniOperator
                                                        Optional<DynamicFilterSupplier> dynamicFilter, List<Type> types, StateStoreProvider stateStoreProvider,
                                                        Metadata metadata, DynamicFilterCacheManager dynamicFilterCacheManager, DataSize minOutputPageSize,
                                                        int minOutputPageRowCount, ReuseExchangeOperator.STRATEGY strategy, UUID reuseTableScanMappingId,
-                                                       boolean spillEnabled, Optional<SpillerFactory> spillerFactory, Integer spillerThreshold, Integer consumerTableScanNodeCount, List<Type> inputTypes)
+                                                       boolean spillEnabled, Optional<SpillerFactory> spillerFactory, Integer spillerThreshold, Integer consumerTableScanNodeCount, List<Type> sourceTypes)
         {
             this(operatorId, planNodeId, sourceNode.getId(), pageSourceProvider, cursorProcessor, pageProcessor, table,
                     columns, dynamicFilter, types, minOutputPageSize, minOutputPageRowCount, strategy,
                     reuseTableScanMappingId, spillEnabled, spillerFactory, spillerThreshold, consumerTableScanNodeCount,
-                    inputTypes);
+                    sourceTypes);
 
             if (isCrossRegionDynamicFilterEnabled(session)) {
                 if (sourceNode instanceof TableScanNode) {
@@ -575,7 +574,7 @@ public class ScanFilterAndProjectOmniOperator
                                                        Optional<DynamicFilterSupplier> dynamicFilter, List<Type> types, DataSize minOutputPageSize,
                                                        int minOutputPageRowCount, ReuseExchangeOperator.STRATEGY strategy, UUID reuseTableScanMappingId,
                                                        boolean spillEnabled, Optional<SpillerFactory> spillerFactory, Integer spillerThreshold,
-                                                       Integer consumerTableScanNodeCount, List<Type> inputTypes)
+                                                       Integer consumerTableScanNodeCount, List<Type> sourceTypes)
         {
             this.operatorId = operatorId;
             this.planNodeId = requireNonNull(planNodeId, "planNodeId is null");
@@ -595,13 +594,7 @@ public class ScanFilterAndProjectOmniOperator
             this.spillerFactory = requireNonNull(spillerFactory, "spillerFactory is null");
             this.spillerThreshold = spillerThreshold;
             this.consumerTableScanNodeCount = consumerTableScanNodeCount;
-            this.inputTypes = inputTypes;
-        }
-
-        @Override
-        public int getOperatorId()
-        {
-            return operatorId;
+            this.sourceTypes = sourceTypes;
         }
 
         @Override
@@ -636,7 +629,7 @@ public class ScanFilterAndProjectOmniOperator
                     pageSourceProvider, cursorProcessor.get(), pageProcessor.get(), table, columns, dynamicFilter,
                     types, minOutputPageSize, minOutputPageRowCount, this.tableScanNodeOptional,
                     this.stateStoreProviderOptional, queryIdOptional, metadataOptional,
-                    dynamicFilterCacheManagerOptional, vecAllocator, inputTypes);
+                    dynamicFilterCacheManagerOptional, vecAllocator, sourceTypes);
         }
 
         @Override
@@ -646,9 +639,9 @@ public class ScanFilterAndProjectOmniOperator
         }
 
         @Override
-        public boolean isExtensionOperatorFactory()
+        public OperatorFactory duplicate()
         {
-            return true;
+            throw new UnsupportedOperationException("Source operator factories can not be duplicated");
         }
     }
 }

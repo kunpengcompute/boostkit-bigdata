@@ -69,14 +69,8 @@ public class OrderByOmniOperator
      * @since 20210630
      */
     public static class OrderByOmniOperatorFactory
-            implements OperatorFactory
+            extends AbstractOmniOperatorFactory
     {
-        private final int operatorId;
-
-        private final PlanNodeId planNodeId;
-
-        private final List<Type> sourceTypes;
-
         private final int[] outputChannels;
 
         private final int[] sortChannels;
@@ -200,18 +194,6 @@ public class OrderByOmniOperator
         {
             return new OrderByOmniOperatorFactory(operatorId, planNodeId, sourceTypes, outputChannels, sortChannels,
                     sortAscendings, sortNullFirsts, omniSortOperatorFactory);
-        }
-
-        @Override
-        public boolean isExtensionOperatorFactory()
-        {
-            return true;
-        }
-
-        @Override
-        public List<Type> getSourceTypes()
-        {
-            return sourceTypes;
         }
     }
 

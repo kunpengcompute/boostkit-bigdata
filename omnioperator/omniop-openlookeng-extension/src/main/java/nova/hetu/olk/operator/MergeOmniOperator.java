@@ -27,6 +27,7 @@ import io.prestosql.operator.ExchangeClient;
 import io.prestosql.operator.ExchangeClientSupplier;
 import io.prestosql.operator.Operator;
 import io.prestosql.operator.OperatorContext;
+import io.prestosql.operator.OperatorFactory;
 import io.prestosql.operator.SourceOperator;
 import io.prestosql.operator.SourceOperatorFactory;
 import io.prestosql.operator.TaskLocation;
@@ -69,17 +70,12 @@ public class MergeOmniOperator
      * @since 20210630
      */
     public static class MergeOmniOperatorFactory
+            extends AbstractOmniOperatorFactory
             implements SourceOperatorFactory
     {
-        private final int operatorId;
-
-        private final PlanNodeId sourceId;
-
         private final ExchangeClientSupplier exchangeClientSupplier;
 
         private final PagesSerdeFactory serdeFactory;
-
-        private final List<Type> sourceTypes;
 
         private boolean closed;
 
@@ -105,7 +101,7 @@ public class MergeOmniOperator
                                         List<Integer> sortChannels, List<SortOrder> sortOrder)
         {
             this.operatorId = operatorId;
-            this.sourceId = requireNonNull(sourceId, "sourceId is null");
+            this.planNodeId = requireNonNull(sourceId, "sourceId is null");
             this.exchangeClientSupplier = requireNonNull(exchangeClientSupplier, "exchangeClientSupplier is null");
             this.serdeFactory = requireNonNull(serdeFactory, "serdeFactory is null");
             this.sourceTypes = ImmutableList.copyOf(requireNonNull(types, "sourceTypes is null"));
@@ -116,7 +112,7 @@ public class MergeOmniOperator
         @Override
         public PlanNodeId getSourceId()
         {
-            return sourceId;
+            return planNodeId;
         }
 
         @Override
@@ -126,10 +122,10 @@ public class MergeOmniOperator
             VecAllocator vecAllocator = VecAllocatorHelper.createOperatorLevelAllocator(driverContext,
                     VecAllocator.UNLIMIT, MergeOmniOperator.class);
 
-            OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, sourceId,
+            OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId,
                     MergeOmniOperator.class.getSimpleName());
 
-            return new MergeOmniOperator(operatorContext, sourceId, exchangeClientSupplier,
+            return new MergeOmniOperator(operatorContext, planNodeId, exchangeClientSupplier,
                     serdeFactory.createPagesSerde(), orderByOmniOperatorFactory.createOperator(vecAllocator));
         }
 
@@ -140,15 +136,9 @@ public class MergeOmniOperator
         }
 
         @Override
-        public boolean isExtensionOperatorFactory()
+        public OperatorFactory duplicate()
         {
-            return true;
-        }
-
-        @Override
-        public List<Type> getSourceTypes()
-        {
-            return sourceTypes;
+            throw new UnsupportedOperationException("Source operator factories can not be duplicated");
         }
     }
 

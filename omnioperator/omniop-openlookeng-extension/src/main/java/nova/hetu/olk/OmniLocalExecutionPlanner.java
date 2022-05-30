@@ -123,6 +123,7 @@ import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.NodeRef;
 import io.prestosql.statestore.StateStoreProvider;
 import io.prestosql.statestore.listener.StateStoreListenerManager;
+import nova.hetu.olk.operator.AbstractOmniOperatorFactory;
 import nova.hetu.olk.operator.AggregationOmniOperator;
 import nova.hetu.olk.operator.BuildOffHeapOmniOperator;
 import nova.hetu.olk.operator.BuildOnHeapOmniOperator;
@@ -515,14 +516,13 @@ public class OmniLocalExecutionPlanner
         // or add a BuildOffHeapOmniOperator after OlkOperator when it's next operator
         // is
         // OmniOperator.
+        // And their operator id number is odd.
         List<DriverFactory> newDriverFactories = new ArrayList<>();
         for (DriverFactory factory : context.getDriverFactories()) {
             List<OperatorFactory> operatorFactories = factory.getOperatorFactories();
             List<OperatorFactory> newOperatorFactories = new ArrayList<>();
             OperatorFactory currentOperatorFactory;
             OperatorFactory nextOperatorFactory;
-
-            int lastOperatorId = Integer.MAX_VALUE;
 
             int index = 0;
             while (index < operatorFactories.size() - 1) {
@@ -537,13 +537,13 @@ public class OmniLocalExecutionPlanner
                 if (current && !next) {
                     // need to add a BuildOnHeapOmniOperator
                     BuildOnHeapOmniOperator.BuildOnHeapOmniOperatorFactory buildOnHeapOmniOperatorFactory = new BuildOnHeapOmniOperator.BuildOnHeapOmniOperatorFactory(
-                            --lastOperatorId, new PlanNodeId("buildOnHeap"));
+                            ((AbstractOmniOperatorFactory) currentOperatorFactory).getOperatorId() + 1, ((AbstractOmniOperatorFactory) currentOperatorFactory).getPlanNodeId());
                     newOperatorFactories.add(buildOnHeapOmniOperatorFactory);
                 }
                 if (!current && next) {
                     // need to add a BuildOffHeapOmniOperator
                     BuildOffHeapOmniOperator.BuildOffHeapOmniOperatorFactory buildOffHeapOmniOperatorFactory = new BuildOffHeapOmniOperator.BuildOffHeapOmniOperatorFactory(
-                            --lastOperatorId, new PlanNodeId("buildOffHeap"), nextOperatorFactory.getSourceTypes());
+                            ((AbstractOmniOperatorFactory) nextOperatorFactory).getOperatorId() - 1, ((AbstractOmniOperatorFactory) nextOperatorFactory).getPlanNodeId(), nextOperatorFactory.getSourceTypes());
                     newOperatorFactories.add(buildOffHeapOmniOperatorFactory);
                 }
                 index++;
@@ -839,7 +839,7 @@ public class OmniLocalExecutionPlanner
                             context.getNextOperatorId(), planNodeId, pageProcessor,
                             projections.stream().map(expression -> expression.getType()).collect(toImmutableList()),
                             getFilterAndProjectMinOutputPageSize(session),
-                            getFilterAndProjectMinOutputPageRowCount(session));
+                            getFilterAndProjectMinOutputPageRowCount(session), inputTypes);
                 }
                 else {
                     operatorFactory = new FilterAndProjectOperator.FilterAndProjectOperatorFactory(
@@ -1679,6 +1679,17 @@ public class OmniLocalExecutionPlanner
         public void onTaskFinished(Consumer<Boolean> taskFinishHandler)
         {
             taskContext.onTaskFinished(taskFinishHandler);
+        }
+
+        /**
+         * Get next operator id twice and only use thr former
+         */
+        @Override
+        public int getNextOperatorId()
+        {
+            int id = super.getNextOperatorId();
+            super.getNextOperatorId();
+            return id;
         }
     }
 }

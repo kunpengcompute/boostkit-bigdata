@@ -164,14 +164,8 @@ public class WindowOmniOperator
      * @since 20210630
      */
     public static class WindowOmniOperatorFactory
-            implements OperatorFactory
+            extends AbstractOmniOperatorFactory
     {
-        private final int operatorId;
-
-        private final PlanNodeId planNodeId;
-
-        private final List<Type> sourceTypes;
-
         private final ImmutableList<Integer> outputChannels;
 
         private final ImmutableList<WindowFunctionDefinition> windowFunctionDefinitions;
@@ -426,18 +420,6 @@ public class WindowOmniOperator
             return new WindowOmniOperatorFactory(operatorId, planNodeId, sourceTypes, outputChannels,
                     windowFunctionDefinitions, partitionChannels, preGroupedChannels, sortChannels, sortOrder,
                     preSortedChannelPrefix, expectedPositions);
-        }
-
-        @Override
-        public boolean isExtensionOperatorFactory()
-        {
-            return true;
-        }
-
-        @Override
-        public List<Type> getSourceTypes()
-        {
-            return sourceTypes;
         }
     }
 }

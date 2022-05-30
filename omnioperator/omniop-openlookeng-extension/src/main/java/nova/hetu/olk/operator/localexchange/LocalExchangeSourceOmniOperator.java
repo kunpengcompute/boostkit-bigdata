@@ -25,6 +25,7 @@ import io.prestosql.operator.exchange.LocalExchangeSource;
 import io.prestosql.operator.exchange.LocalExchangeSourceOperator;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.type.Type;
+import nova.hetu.olk.operator.AbstractOmniOperatorFactory;
 
 import java.util.List;
 
@@ -47,14 +48,11 @@ public class LocalExchangeSourceOmniOperator
      * The Local exchange source omni operator factory.
      */
     public static class LocalExchangeSourceOmniOperatorFactory
-            implements OperatorFactory
+            extends AbstractOmniOperatorFactory
     {
-        private final int operatorId;
-        private final PlanNodeId planNodeId;
         private final LocalExchange.LocalExchangeFactory localExchangeFactory;
         private final int totalInputChannels;
         private boolean closed;
-        private final List<Type> sourceTypes;
 
         public LocalExchangeSourceOmniOperatorFactory(int operatorId, PlanNodeId planNodeId,
                                                       LocalExchange.LocalExchangeFactory localExchangeFactory, int totalInputChannels, List<Type> types)
@@ -96,18 +94,6 @@ public class LocalExchangeSourceOmniOperator
         public LocalExchange.LocalExchangeFactory getLocalExchangeFactory()
         {
             return localExchangeFactory;
-        }
-
-        @Override
-        public boolean isExtensionOperatorFactory()
-        {
-            return true;
-        }
-
-        @Override
-        public List<Type> getSourceTypes()
-        {
-            return sourceTypes;
         }
     }
 }

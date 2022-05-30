@@ -117,25 +117,19 @@ public class BuildOffHeapOmniOperator
      * @since 20220110
      */
     public static class BuildOffHeapOmniOperatorFactory
-            implements OperatorFactory
+            extends AbstractOmniOperatorFactory
     {
-        private final int operatorId;
-
-        private final PlanNodeId planNodeId;
-
-        private final List<Type> inputTypes;
-
         /**
          * Instantiates a new buildOffHeapOmniOperator factory.
          *
          * @param operatorId the operator id
          * @param planNodeId the plan node id
          */
-        public BuildOffHeapOmniOperatorFactory(int operatorId, PlanNodeId planNodeId, List<Type> inputTypes)
+        public BuildOffHeapOmniOperatorFactory(int operatorId, PlanNodeId planNodeId, List<Type> sourceTypes)
         {
             this.operatorId = operatorId;
             this.planNodeId = requireNonNull(planNodeId, "planNodeId is null");
-            this.inputTypes = inputTypes;
+            this.sourceTypes = sourceTypes;
         }
 
         @Override
@@ -145,7 +139,7 @@ public class BuildOffHeapOmniOperator
                     VecAllocator.UNLIMIT, VecAllocatorHelper.DEFAULT_RESERVATION, BuildOffHeapOmniOperator.class);
             OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId,
                     BuildOffHeapOmniOperator.class.getSimpleName());
-            return new BuildOffHeapOmniOperator(operatorContext, vecAllocator, inputTypes);
+            return new BuildOffHeapOmniOperator(operatorContext, vecAllocator, sourceTypes);
         }
 
         @Override
@@ -156,13 +150,7 @@ public class BuildOffHeapOmniOperator
         @Override
         public OperatorFactory duplicate()
         {
-            return new BuildOffHeapOmniOperatorFactory(operatorId, planNodeId, inputTypes);
-        }
-
-        @Override
-        public boolean isExtensionOperatorFactory()
-        {
-            return true;
+            return new BuildOffHeapOmniOperatorFactory(operatorId, planNodeId, sourceTypes);
         }
     }
 }

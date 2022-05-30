@@ -211,11 +211,8 @@ public class PartitionedOutputOmniOperator
     }
 
     private static class PartitionedOutputOmniOperatorFactory
-            implements OperatorFactory
+            extends AbstractOmniOperatorFactory
     {
-        private final int operatorId;
-        private final PlanNodeId planNodeId;
-        private final List<Type> sourceTypes;
         private final Function<Page, Page> pagePreprocessor;
         private final PartitionFunction partitionFunction;
         private final List<Integer> partitionChannels;
@@ -267,23 +264,11 @@ public class PartitionedOutputOmniOperator
         }
 
         @Override
-        public boolean isExtensionOperatorFactory()
-        {
-            return true;
-        }
-
-        @Override
         public OperatorFactory duplicate()
         {
             return new PartitionedOutputOmniOperatorFactory(operatorId, planNodeId, sourceTypes, pagePreprocessor,
                     partitionFunction, partitionChannels, partitionConstants, replicatesAnyRow, nullChannel,
                     outputBuffer, maxMemory, omniPartitionedOutPutOperatorFactory);
-        }
-
-        @Override
-        public List<Type> getSourceTypes()
-        {
-            return sourceTypes;
         }
     }
 

@@ -170,24 +170,12 @@ public class HashAggregationOmniOperator
      * @since 20210630
      */
     public static class HashAggregationOmniOperatorFactory
-            implements OperatorFactory
+            extends AbstractOmniOperatorFactory
     {
         private static final int INVALID_MASK_CHANNEL = -1;
         private final OmniHashAggregationOperatorFactory omniFactory;
 
         private final Step step;
-
-        private List<Type> sourceTypes;
-
-        /**
-         * The Operator id.
-         */
-        int operatorId;
-
-        /**
-         * The Plan node id.
-         */
-        PlanNodeId planNodeId;
 
         private int[] groupByInputChannels;
 
@@ -327,18 +315,6 @@ public class HashAggregationOmniOperator
             return new HashAggregationOmniOperatorFactory(operatorId, planNodeId, sourceTypes, groupByInputChannels,
                     groupByInputTypes, aggregationInputChannels, aggregationInputTypes, aggregatorTypes, maskChannels,
                     aggregationOutputTypes, step);
-        }
-
-        @Override
-        public boolean isExtensionOperatorFactory()
-        {
-            return true;
-        }
-
-        @Override
-        public List<Type> getSourceTypes()
-        {
-            return sourceTypes;
         }
     }
 }

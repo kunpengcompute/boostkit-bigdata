@@ -64,16 +64,13 @@ public class DynamicFilterSourceOmniOperator
     }
 
     public static class DynamicFilterSourceOmniOperatorFactory
-            implements OperatorFactory
+            extends AbstractOmniOperatorFactory
     {
-        private final int operatorId;
-        private final PlanNodeId planNodeId;
         private final Consumer<Map<Channel, Set>> dynamicPredicateConsumer;
         private final List<Channel> channels;
         private final int maxFilterPositionsCount;
         private final DataSize maxFilterSize;
         private boolean closed;
-        private final List<Type> sourceTypes;
 
         /**
          * Constructor for the Dynamic Filter Source Omni Operator Factory
@@ -119,18 +116,6 @@ public class DynamicFilterSourceOmniOperator
         {
             throw new UnsupportedOperationException(
                     "duplicate() is not supported for DynamicFilterSourceOmniOperatorFactory");
-        }
-
-        @Override
-        public boolean isExtensionOperatorFactory()
-        {
-            return true;
-        }
-
-        @Override
-        public List<Type> getSourceTypes()
-        {
-            return sourceTypes;
         }
     }
 }

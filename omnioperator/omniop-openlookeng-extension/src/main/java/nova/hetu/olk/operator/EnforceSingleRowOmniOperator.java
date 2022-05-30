@@ -67,12 +67,9 @@ public class EnforceSingleRowOmniOperator
      * The enforce single row omni operator factory.
      */
     public static class EnforceSingleRowOmniOperatorFactory
-            implements OperatorFactory
+            extends AbstractOmniOperatorFactory
     {
-        private final int operatorId;
-        private final PlanNodeId planNodeId;
         private boolean closed;
-        private final List<Type> sourceTypes;
 
         /**
          * Instantiates a new Enforce single row omni operator factory.
@@ -108,18 +105,6 @@ public class EnforceSingleRowOmniOperator
         public OperatorFactory duplicate()
         {
             return new EnforceSingleRowOmniOperatorFactory(operatorId, planNodeId, sourceTypes);
-        }
-
-        @Override
-        public boolean isExtensionOperatorFactory()
-        {
-            return true;
-        }
-
-        @Override
-        public List<Type> getSourceTypes()
-        {
-            return sourceTypes;
         }
     }
 }
