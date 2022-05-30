@@ -42,13 +42,13 @@ import org.apache.spark.sql.execution.vectorized.OmniColumnVector
 import org.apache.spark.sql.vectorized.ColumnarBatch
 
 case class ColumnarShuffledHashJoinExec(
-                                          leftKeys: Seq[Expression],
-                                          rightKeys: Seq[Expression],
-                                          joinType: JoinType,
-                                          buildSide: BuildSide,
-                                          condition: Option[Expression],
-                                          left: SparkPlan,
-                                          right: SparkPlan)
+                                         leftKeys: Seq[Expression],
+                                         rightKeys: Seq[Expression],
+                                         joinType: JoinType,
+                                         buildSide: BuildSide,
+                                         condition: Option[Expression],
+                                         left: SparkPlan,
+                                         right: SparkPlan)
   extends HashJoin with ShuffledJoin {
 
   override lazy val metrics = Map(
@@ -65,7 +65,7 @@ case class ColumnarShuffledHashJoinExec(
       "time in omni build getOutput"),
     "buildCodegenTime" -> SQLMetrics.createTimingMetric(sparkContext,
       "time in omni build codegen"),
-    "numOutputVecBatchs" -> SQLMetrics.createMetric(sparkContext,"number of output vecBatchs"),
+    "numOutputVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatchs"),
     "buildDataSize" -> SQLMetrics.createSizeMetric(sparkContext, "build side input data size")
   )
 
@@ -113,8 +113,8 @@ case class ColumnarShuffledHashJoinExec(
       throw new UnsupportedOperationException(s"Join-type[${joinType}] is not supported " +
         s"in ${this.nodeName}")
     }
-    val buildTypes = new Array[DataType](buildOutput.size) // {2, 2}, buildOutput:col1#12,col2#13
-    buildOutput.zipWithIndex.foreach {case (att, i) =>
+    val buildTypes = new Array[DataType](buildOutput.size) // {2,2}, buildOutput:col1#12,col2#13
+    buildOutput.zipWithIndex.foreach { case (att, i) =>
       buildTypes(i) = OmniExpressionAdaptor.sparkTypeToOmniType(att.dataType, att.metadata)
     }
 
@@ -153,8 +153,8 @@ case class ColumnarShuffledHashJoinExec(
       throw new UnsupportedOperationException(s"Join-type[${joinType}] is not supported " +
         s"in ${this.nodeName}")
     }
-    val buildTypes = new Array[DataType](buildOutput.size) // {2, 2}, buildOutput:col1#12,col2#13
-    buildOutput.zipWithIndex.foreach {case (att, i) =>
+    val buildTypes = new Array[DataType](buildOutput.size) // {2,2}, buildOutput:col1#12,col2#13
+    buildOutput.zipWithIndex.foreach { case (att, i) =>
       buildTypes(i) = OmniExpressionAdaptor.sparkTypeToOmniType(att.dataType, att.metadata)
     }
 
@@ -270,10 +270,10 @@ case class ColumnarShuffledHashJoinExec(
           }
 
           override def next(): ColumnarBatch = {
-            val startLookUpGetOp = System.nanoTime()
+            val startLookupGetOp = System.nanoTime()
             val result = results.next()
             res = results.hasNext
-            lookupGetOutputTime += NANOSECONDS.toMillis(System.nanoTime() - startLookUpGetOp)
+            lookupGetOutputTime += NANOSECONDS.toMillis(System.nanoTime() - startLookupGetOp)
             val resultVecs = result.getVectors
             val vecs = OmniColumnVector
               .allocateColumns(result.getRowCount, resultSchema, false)

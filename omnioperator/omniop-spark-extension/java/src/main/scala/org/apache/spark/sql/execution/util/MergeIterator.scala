@@ -66,7 +66,7 @@ class MergeIterator(iter: Iterator[ColumnarBatch], localSchema: StructType,
             vecs(index) = new Decimal128Vec(columnSize)
           }
         case _ =>
-          throw new UnsupportedOperationException("Fail to create omni vector, unsupported fields")
+          throw new RuntimeException("Fail to create omni vector, unsupported fields")
       }
     }
     vecs

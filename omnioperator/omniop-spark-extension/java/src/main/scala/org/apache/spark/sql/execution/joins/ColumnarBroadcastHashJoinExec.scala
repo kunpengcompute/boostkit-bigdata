@@ -25,7 +25,6 @@ import com.huawei.boostkit.spark.Constant.{IS_ENABLE_JIT, IS_SKIP_VERIFY_EXP}
 
 import scala.collection.mutable
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor
-import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor.checkOmniJsonWhiteList
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil.transColBatchToOmniVecs
 import nova.hetu.omniruntime.`type`.DataType
 import nova.hetu.omniruntime.constants.JoinType.OMNI_JOIN_TYPE_INNER
@@ -201,7 +200,7 @@ case class ColumnarBroadcastHashJoinExec(
     buildTypes(i) = OmniExpressionAdaptor.sparkTypeToOmniType(att.dataType, att.metadata)
     }
 
-    val buildJoinColsExp: Array[AnyRef] = buildKeys.map { x =>
+    buildKeys.map { x =>
       OmniExpressionAdaptor.rewriteToOmniJsonExpressionLiteral(x,
         OmniExpressionAdaptor.getExprIdMap(buildOutput.map(_.toAttribute)))
     }.toArray
@@ -210,19 +209,15 @@ case class ColumnarBroadcastHashJoinExec(
     streamedOutput.zipWithIndex.foreach { case (attr, i) =>
       probeTypes(i) = OmniExpressionAdaptor.sparkTypeToOmniType(attr.dataType, attr.metadata)
     }
-    val probeHashColsExp: Array[AnyRef] = streamedKeys.map { x =>
+    streamedKeys.map { x =>
       OmniExpressionAdaptor.rewriteToOmniJsonExpressionLiteral(x,
         OmniExpressionAdaptor.getExprIdMap(streamedOutput.map(_.toAttribute)))
     }.toArray
 
-    checkOmniJsonWhiteList("", buildJoinColsExp)
-    checkOmniJsonWhiteList("", probeHashColsExp)
-
     condition match {
       case Some(expr) =>
-        val filterExpr: String = OmniExpressionAdaptor.rewriteToOmniJsonExpressionLiteral(expr,
-          OmniExpressionAdaptor.getExprIdMap((streamedOutput ++ buildOutput).map(_.toAttribute)))
-        checkOmniJsonWhiteList(filterExpr, new Array[AnyRef](0))
+        Optional.of(OmniExpressionAdaptor.rewriteToOmniJsonExpressionLiteral(expr,
+          OmniExpressionAdaptor.getExprIdMap((streamedOutput ++ buildOutput).map(_.toAttribute))))
       case _ => Optional.empty()
     }
   }
@@ -236,167 +231,168 @@ case class ColumnarBroadcastHashJoinExec(
    * true. By convention the executor that creates a ColumnarBatch is responsible for closing it
    * when it is no longer needed. This allows input formats to be able to reuse batches if needed.
    */
-    override def doExecuteColumnar(): RDD[ColumnarBatch] = {
-      // input/output: {col1#10,col2#11,col1#12,col2#13}
-      val numOutputRows = longMetric("numOutputRows")
-      val numOutputVecBatchs = longMetric("numOutputVecBatchs")
-      val numMergedVecBatchs = longMetric("numMergedVecBatchs")
-      val buildAddInputTime = longMetric("buildAddInputTime")
-      val buildCodegenTime = longMetric("buildCodegenTime")
-      val buildGetOutputTime = longMetric("buildGetOutputTime")
-      val lookupAddInputTime = longMetric("lookupAddInputTime")
-      val lookupCodegenTime = longMetric("lookupCodegenTime")
-      val lookupGetOutputTime = longMetric("lookupGetOutputTime")
+  override def doExecuteColumnar(): RDD[ColumnarBatch] = {
+    // input/output: {col1#10,col2#11,col1#12,col2#13}
+    val numOutputRows = longMetric("numOutputRows")
+    val numOutputVecBatchs = longMetric("numOutputVecBatchs")
+    val numMergedVecBatchs = longMetric("numMergedVecBatchs")
+    val buildAddInputTime = longMetric("buildAddInputTime")
+    val buildCodegenTime = longMetric("buildCodegenTime")
+    val buildGetOutputTime = longMetric("buildGetOutputTime")
+    val lookupAddInputTime = longMetric("lookupAddInputTime")
+    val lookupCodegenTime = longMetric("lookupCodegenTime")
+    val lookupGetOutputTime = longMetric("lookupGetOutputTime")
 
-      if ("INNER" != joinType.sql) {
-        throw new UnsupportedOperationException(s"Join-type[${joinType}] is not supported " +
-          s"in ${this.nodeName}")
+
+    if ("INNER" != joinType.sql) {
+      throw new UnsupportedOperationException(s"Join-type[${joinType}] is not supported " +
+        s"in ${this.nodeName}")
+    }
+
+    val buildTypes = new Array[DataType](buildOutput.size) // {2,2}, buildOutput:col1#12,col2#13
+    buildOutput.zipWithIndex.foreach { case (att, i) =>
+      buildTypes(i) = OmniExpressionAdaptor.sparkTypeToOmniType(att.dataType, att.metadata)
+    }
+
+    // {0}, buildKeys: col1#12
+    val buildOutputCols = buildOutput.indices.toArray // {0,1}
+    val buildJoinColsExp = buildKeys.map { x =>
+      OmniExpressionAdaptor.rewriteToOmniJsonExpressionLiteral(x,
+        OmniExpressionAdaptor.getExprIdMap(buildOutput.map(_.toAttribute)))
+    }.toArray
+    val buildData = buildPlan.executeBroadcast[Array[Array[Byte]]]()
+
+    // TODO: check
+    val buildOutputTypes = buildTypes // {1,1}
+
+    val probeTypes = new Array[DataType](streamedOutput.size) // {2,2}, streamedOutput:col1#10,col2#11
+    streamedOutput.zipWithIndex.foreach { case (attr, i) =>
+      probeTypes(i) = OmniExpressionAdaptor.sparkTypeToOmniType(attr.dataType, attr.metadata)
+    }
+    val probeOutputCols = streamedOutput.indices.toArray // {0,1}
+    val probeHashColsExp = streamedKeys.map { x =>
+      OmniExpressionAdaptor.rewriteToOmniJsonExpressionLiteral(x,
+        OmniExpressionAdaptor.getExprIdMap(streamedOutput.map(_.toAttribute)))
+    }.toArray
+    streamedPlan.executeColumnar().mapPartitionsWithIndexInternal { (index, iter) =>
+      val filter: Optional[String] = condition match {
+        case Some(expr) =>
+          Optional.of(OmniExpressionAdaptor.rewriteToOmniJsonExpressionLiteral(expr,
+            OmniExpressionAdaptor.getExprIdMap((streamedOutput ++ buildOutput).map(_.toAttribute))))
+        case _ => Optional.empty()
+      }
+      val startBuildCodegen = System.nanoTime()
+      val buildOpFactory = new OmniHashBuilderWithExprOperatorFactory(buildTypes,
+        buildJoinColsExp, filter, 1, new OperatorConfig(IS_ENABLE_JIT, IS_SKIP_VERIFY_EXP))
+      val buildOp = buildOpFactory.createOperator()
+      buildCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startBuildCodegen)
+
+      val deserializer = VecBatchSerializerFactory.create()
+      buildData.value.foreach { input =>
+        val startBuildInput = System.nanoTime()
+        buildOp.addInput(deserializer.deserialize(input))
+        buildAddInputTime += NANOSECONDS.toMillis(System.nanoTime() - startBuildInput)
+      }
+      val startBuildGetOp = System.nanoTime()
+      buildOp.getOutput
+      buildGetOutputTime += NANOSECONDS.toMillis(System.nanoTime() - startBuildGetOp)
+
+      val startLookupCodegen = System.nanoTime()
+      val lookupOpFactory = new OmniLookupJoinWithExprOperatorFactory(probeTypes, probeOutputCols,
+        probeHashColsExp, buildOutputCols, buildOutputTypes, OMNI_JOIN_TYPE_INNER, buildOpFactory,
+        new OperatorConfig(IS_ENABLE_JIT, IS_SKIP_VERIFY_EXP))
+      val lookupOp = lookupOpFactory.createOperator()
+      lookupCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startLookupCodegen)
+
+      // close operator
+      SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
+        buildOp.close()
+        lookupOp.close()
+      })
+
+      val resultSchema = this.schema
+      val reverse = this.output != (streamedPlan.output ++ buildPlan.output)
+      var left = 0
+      var leftLen = streamedPlan.output.size
+      var right = streamedPlan.output.size
+      var rightLen = output.size
+      if (reverse) {
+        left = streamedPlan.output.size
+        leftLen = output.size
+        right = 0
+        rightLen = streamedPlan.output.size
       }
 
-      val buildTypes = new Array[DataType](buildOutput.size) // {2, 2}, buildOutput:col1#12,col2#13
-      buildOutput.zipWithIndex.foreach {case (att, i) =>
-        buildTypes(i) = OmniExpressionAdaptor.sparkTypeToOmniType(att.dataType, att.metadata)
-      }
+      val columnarConf: ColumnarPluginConfig = ColumnarPluginConfig.getSessionConf
+      val enableJoinBatchMerge: Boolean = columnarConf.enableJoinBatchMerge
+      val iterBatch = new Iterator[ColumnarBatch] {
+        private var results: java.util.Iterator[VecBatch] = _
+        var res: Boolean = true
 
-      // {0}, buildKeys: col1#12
-      val buildOutputCols = buildOutput.indices.toArray // {0, 1}
-      val buildJoinColsExp = buildKeys.map { x =>
-        OmniExpressionAdaptor.rewriteToOmniJsonExpressionLiteral(x,
-          OmniExpressionAdaptor.getExprIdMap(buildOutput.map(_.toAttribute)))
-      }.toArray
-      val buildData = buildPlan.executeBroadcast[Array[Array[Byte]]]()
+        override def hasNext: Boolean = {
+          while ((results == null || !res) && iter.hasNext) {
+            val batch = iter.next()
+            val input = transColBatchToOmniVecs(batch)
+            val vecBatch = new VecBatch(input, batch.numRows())
+            val startlookupInput = System.nanoTime()
+            lookupOp.addInput(vecBatch)
+            lookupAddInputTime += NANOSECONDS.toMillis(System.nanoTime() - startlookupInput)
 
-      // TODO: check
-      val buildOutputTypes = buildTypes // {1, 1}
+            val startLookupGetOp = System.nanoTime()
+            results = lookupOp.getOutput
+            res = results.hasNext
+            lookupGetOutputTime += NANOSECONDS.toMillis(System.nanoTime() - startLookupGetOp)
 
-      val probeTypes = new Array[DataType](streamedOutput.size) // {2, 2}, streamedOutput:col1#10,col2#11
-      streamedOutput.zipWithIndex.foreach { case (attr, i) =>
-        probeTypes(i) = OmniExpressionAdaptor.sparkTypeToOmniType(attr.dataType, attr.metadata)
-      }
-      val probeOutputCols = streamedOutput.indices.toArray // {0,1}
-      val probeHashColsExp = streamedKeys.map { x =>
-        OmniExpressionAdaptor.rewriteToOmniJsonExpressionLiteral(x,
-          OmniExpressionAdaptor.getExprIdMap(streamedOutput.map(_.toAttribute)))
-      }.toArray
-      streamedPlan.executeColumnar().mapPartitionsWithIndexInternal { (index, iter) =>
-        val filter: Optional[String] = condition match {
-          case Some(expr) =>
-            Optional.of(OmniExpressionAdaptor.rewriteToOmniJsonExpressionLiteral(expr,
-              OmniExpressionAdaptor.getExprIdMap((streamedOutput ++ buildOutput).map(_.toAttribute))))
-          case _ => Optional.empty()
-        }
-        val startBuildCodegen = System.nanoTime()
-        val buildOpFactory = new OmniHashBuilderWithExprOperatorFactory(buildTypes,
-          buildJoinColsExp, filter, 1, new OperatorConfig(IS_ENABLE_JIT, IS_SKIP_VERIFY_EXP))
-        val buildOp = buildOpFactory.createOperator()
-        buildCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startBuildCodegen)
-
-        val deserializer = VecBatchSerializerFactory.create()
-        buildData.value.foreach { input =>
-          val startBuildInput = System.nanoTime()
-          buildOp.addInput(deserializer.deserialize(input))
-          buildAddInputTime += NANOSECONDS.toMillis(System.nanoTime() - startBuildInput)
-        }
-        val startBuildGetOp = System.nanoTime()
-        buildOp.getOutput
-        buildGetOutputTime += NANOSECONDS.toMillis(System.nanoTime() - startBuildGetOp)
-
-        val startLookupCodegen = System.nanoTime()
-        val lookupOpFactory = new OmniLookupJoinWithExprOperatorFactory(probeTypes, probeOutputCols,
-          probeHashColsExp, buildOutputCols, buildOutputTypes, OMNI_JOIN_TYPE_INNER, buildOpFactory,
-          new OperatorConfig(IS_ENABLE_JIT, IS_SKIP_VERIFY_EXP))
-        val lookupOp = lookupOpFactory.createOperator()
-        lookupCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startLookupCodegen)
-
-        // close operator
-        SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
-          buildOp.close()
-          lookupOp.close()
-        })
-
-        val resultSchema = this.schema
-        val reverse = this.output != (streamedPlan.output ++ buildPlan.output)
-        var left = 0
-        var leftLen = streamedPlan.output.size
-        var right = streamedPlan.output.size
-        var rightLen = output.size
-        if (reverse) {
-          left = streamedPlan.output.size
-          leftLen = output.size
-          right = 0
-          rightLen = streamedPlan.output.size
-        }
-
-        val columnarConf: ColumnarPluginConfig = ColumnarPluginConfig.getSessionConf
-        val enableJoinBatchMerge: Boolean = columnarConf.enableJoinBatchMerge
-        val iterBatch = new Iterator[ColumnarBatch] {
-          private var results: java.util.Iterator[VecBatch] = _
-          var res: Boolean = true
-
-          override def hasNext: Boolean = {
-            while ((results == null || !res) && iter.hasNext) {
-              val batch = iter.next()
-              val input = transColBatchToOmniVecs(batch)
-              val vecBatch = new VecBatch(input, batch.numRows())
-              val startLookupInput = System.nanoTime()
-              lookupOp.addInput(vecBatch)
-              lookupAddInputTime += NANOSECONDS.toMillis(System.nanoTime() - startLookupInput)
-
-              val startLookupGetOp = System.nanoTime()
-              results = lookupOp.getOutput
-              res = results.hasNext
-              lookupGetOutputTime += NANOSECONDS.toMillis(System.nanoTime() - startLookupGetOp)
-
-            }
-            if (results == null) {
+          }
+          if (results == null) {
+            false
+          } else {
+            if (!res) {
               false
             } else {
-              if (!res) {
-                false
-              } else {
-                val startLookupGetOp = System.nanoTime()
-                res = results.hasNext
-                lookupGetOutputTime += NANOSECONDS.toMillis(System.nanoTime() - startLookupGetOp)
-                res
-              }
+              val startLookupGetOp = System.nanoTime()
+              res = results.hasNext
+              lookupGetOutputTime += NANOSECONDS.toMillis(System.nanoTime() - startLookupGetOp)
+              res
             }
-
           }
 
-          override def next(): ColumnarBatch = {
-            val startLookUpGetOp = System.nanoTime()
-            val result = results.next()
-            res = results.hasNext
-            lookupGetOutputTime += NANOSECONDS.toMillis(System.nanoTime() - startLookUpGetOp)
-            val resultVecs = result.getVectors
-            val vecs = OmniColumnVector
-              .allocateColumns(result.getRowCount, resultSchema, false)
-            var index = 0
-            for (i <- left until leftLen) {
-              val v = vecs(index)
-              v.reset()
-              v.setVec(resultVecs(i))
-              index += 1
-            }
-            for (i <- right until rightLen) {
-              val v = vecs(index)
-              v.reset()
-              v.setVec(resultVecs(i))
-              index += 1
-            }
-            numOutputRows += result.getRowCount
-            numOutputVecBatchs += 1
-            new ColumnarBatch(vecs.toArray, result.getRowCount)
-          }
         }
 
-        if (enableJoinBatchMerge) {
-          new MergeIterator(iterBatch, resultSchema, numMergedVecBatchs)
-        } else {
-          iterBatch
+        override def next(): ColumnarBatch = {
+          val startLookupGetOp = System.nanoTime()
+          val result = results.next()
+          res = results.hasNext
+          lookupGetOutputTime += NANOSECONDS.toMillis(System.nanoTime() - startLookupGetOp)
+          val resultVecs = result.getVectors
+          val vecs = OmniColumnVector
+            .allocateColumns(result.getRowCount, resultSchema, false)
+          var index = 0
+          for (i <- left until leftLen) {
+            val v = vecs(index)
+            v.reset()
+            v.setVec(resultVecs(i))
+            index += 1
+          }
+          for (i <- right until rightLen) {
+            val v = vecs(index)
+            v.reset()
+            v.setVec(resultVecs(i))
+            index += 1
+          }
+          numOutputRows += result.getRowCount
+          numOutputVecBatchs += 1
+          new ColumnarBatch(vecs.toArray, result.getRowCount)
         }
       }
+
+      if (enableJoinBatchMerge) {
+        new MergeIterator(iterBatch, resultSchema, numMergedVecBatchs)
+      } else {
+        iterBatch
+      }
     }
+  }
 
   override protected def doExecute(): RDD[InternalRow] = {
     throw new UnsupportedOperationException(s"This operator doesn't support doExecute().")
