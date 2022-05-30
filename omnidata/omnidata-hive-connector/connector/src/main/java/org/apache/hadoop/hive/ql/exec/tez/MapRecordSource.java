@@ -22,16 +22,18 @@ import com.huawei.boostkit.omnidata.model.datasource.DataSource;
 import com.huawei.boostkit.omnidata.model.datasource.hdfs.HdfsOrcDataSource;
 import com.huawei.boostkit.omnidata.model.datasource.hdfs.HdfsParquetDataSource;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.ql.exec.AbstractMapOperator;
 import org.apache.hadoop.hive.ql.exec.mr.ExecMapperContext;
 import org.apache.hadoop.hive.ql.exec.tez.tools.KeyValueInputMerger;
 import org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatch;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
+import org.apache.hadoop.hive.ql.omnidata.config.NdpConf;
 import org.apache.hadoop.hive.ql.omnidata.operator.predicate.NdpPredicateInfo;
 import org.apache.hadoop.hive.ql.omnidata.reader.OmniDataReader;
 import org.apache.hadoop.hive.ql.omnidata.serialize.NdpSerializationUtils;
-import org.apache.hadoop.hive.ql.omnidata.status.NdpStatusManager;
 import org.apache.hadoop.hive.ql.plan.TableScanDesc;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.mapred.FileSplit;
@@ -72,7 +74,7 @@ public class MapRecordSource implements RecordSource {
             kvMerger.setIOCxt(execContext.getIoCxt());
         }
         this.reader = reader;
-        aggOptimized = Boolean.parseBoolean(jconf.get(NdpStatusManager.NDP_AGG_OPTIMIZED_ENABLE));
+        aggOptimized = Boolean.parseBoolean(jconf.get(NdpConf.NDP_AGG_OPTIMIZED_ENABLE));
         if (aggOptimized) {
             createOmniDataReader(jconf);
         }
@@ -131,7 +133,8 @@ public class MapRecordSource implements RecordSource {
 
     private boolean pushOmniDataRecord() throws HiveException {
         ExecutorService executorService = new ThreadPoolExecutor(0, Integer.MAX_VALUE, 60L, TimeUnit.SECONDS,
-                new SynchronousQueue<Runnable>());
+                new SynchronousQueue<Runnable>(),
+                new ThreadFactoryBuilder().setNameFormat("omnidata-hive-thread-%d").build());
         ArrayList<Future<List<VectorizedRowBatch>>> results = new ArrayList<>();
         omniDataReaders.forEach(ai -> {
             Future<List<VectorizedRowBatch>> future = executorService.submit(
@@ -149,6 +152,7 @@ public class MapRecordSource implements RecordSource {
                 ex.printStackTrace();
             }
         }
+        executorService.shutdown();
         return false;
     }
 

@@ -8,6 +8,7 @@ import org.apache.curator.framework.recipes.locks.InterProcessMutex;
 import org.apache.curator.retry.RetryForever;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.ql.omnidata.config.NdpConf;
+import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,8 +45,6 @@ public class NdpStatusManager {
 
     public static final String NDP_DATANODE_HOSTNAME_SEPARATOR = ",";
 
-    public static final String NDP_AGG_OPTIMIZED_ENABLE = "hive.sql.ndp.agg.optimized.enable";
-
     /**
      * Get OmniData host resources data from ZooKeeper
      *
@@ -65,6 +64,17 @@ public class NdpStatusManager {
         zkClient.start();
         Map<String, NdpStatusInfo> ndpMap = new HashMap<>();
         String parentPath = ndpConf.getNdpZookeeperStatusNode();
+        try {
+            // verify the path from ZooKeeper
+            Stat stat = zkClient.checkExists().forPath(parentPath);
+            if (stat == null) {
+                LOG.error("OmniData Hive failed to get parent node from ZooKeeper");
+                return ndpMap;
+            }
+        } catch (Exception e) {
+            LOG.error("OmniData Hive failed to get host resources data from ZooKeeper", e);
+            return ndpMap;
+        }
         InterProcessMutex lock = new InterProcessMutex(zkClient, parentPath);
         try {
             if (lock.acquire(ndpConf.getNdpZookeeperRetryInterval(), TimeUnit.MILLISECONDS)) {

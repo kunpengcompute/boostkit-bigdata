@@ -20,7 +20,6 @@ import org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatch;
 import org.apache.hadoop.hive.ql.omnidata.OmniDataUtils;
 import org.apache.hadoop.hive.ql.omnidata.config.NdpConf;
 import org.apache.hadoop.hive.ql.omnidata.decode.PageDeserializer;
-import org.apache.hadoop.hive.ql.omnidata.operator.enums.NdpEngineEnum;
 import org.apache.hadoop.hive.ql.omnidata.operator.predicate.NdpPredicateInfo;
 import org.apache.hadoop.hive.ql.omnidata.status.NdpStatusManager;
 import org.apache.hadoop.mapred.FileSplit;
@@ -35,7 +34,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Properties;
 import java.util.Queue;
 
@@ -57,7 +55,7 @@ public class OmniDataAdapter implements Serializable {
 
     private List<String> omniDataHosts;
 
-    private NdpConf ndpconf;
+    private int ndpReplicationNum;
 
     public OmniDataAdapter(DataSource dataSource, Configuration conf, FileSplit fileSplit,
                            NdpPredicateInfo ndpPredicateInfo) {
@@ -68,32 +66,27 @@ public class OmniDataAdapter implements Serializable {
         } else {
             this.ndpPredicateInfo = ndpPredicateInfo;
         }
-        this.ndpconf = new NdpConf(conf);
+        ndpReplicationNum = NdpConf.getNdpReplicationNum(conf);
         omniDataHosts = getOmniDataHosts(conf, fileSplit);
     }
 
     private List<String> getOmniDataHosts(Configuration conf, FileSplit fileSplit) {
         List<String> omniDataHosts = new ArrayList<>();
-        String engine = HiveConf.getVar(conf, HiveConf.ConfVars.HIVE_EXECUTION_ENGINE).toLowerCase(Locale.ENGLISH);
-        if (engine.equals(NdpEngineEnum.Tez.getEngine())) {
-            List<String> dataNodeHosts = getDataNodeHosts(conf, fileSplit);
-            // shuffle
-            Collections.shuffle(dataNodeHosts);
-            dataNodeHosts.forEach(dn -> {
-                // possibly null
-                if (conf.get(dn) != null) {
-                    omniDataHosts.add(conf.get(dn));
-                }
-            });
-            // add a random available datanode
-            String randomDataNodeHost = NdpStatusManager.getRandomAvailableDataNodeHost(conf, dataNodeHosts);
-            if (randomDataNodeHost.length() > 0) {
-                omniDataHosts.add(conf.get(randomDataNodeHost));
+        List<String> dataNodeHosts = getDataNodeHosts(conf, fileSplit);
+        // shuffle
+        Collections.shuffle(dataNodeHosts);
+        dataNodeHosts.forEach(dn -> {
+            // possibly null
+            if (conf.get(dn) != null) {
+                omniDataHosts.add(conf.get(dn));
             }
-            return omniDataHosts;
-        } else {
-            throw new UnsupportedOperationException(String.format("Engine [%s] is not supported", engine));
+        });
+        // add a random available datanode
+        String randomDataNodeHost = NdpStatusManager.getRandomAvailableDataNodeHost(conf, dataNodeHosts);
+        if (randomDataNodeHost.length() > 0 && conf.get(randomDataNodeHost) != null) {
+            omniDataHosts.add(conf.get(randomDataNodeHost));
         }
+        return omniDataHosts;
     }
 
     private List<String> getDataNodeHosts(Configuration conf, FileSplit fileSplit) {
@@ -105,7 +98,7 @@ public class OmniDataAdapter implements Serializable {
             for (BlockLocation block : blockLocations) {
                 for (String host : block.getHosts()) {
                     hosts.add(host);
-                    if (hosts.size() == ndpconf.getNdpReplicationNum()) {
+                    if (ndpReplicationNum == hosts.size()) {
                         return hosts;
                     }
                 }

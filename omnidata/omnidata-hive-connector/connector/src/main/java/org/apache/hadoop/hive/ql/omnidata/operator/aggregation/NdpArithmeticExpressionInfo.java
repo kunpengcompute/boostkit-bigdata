@@ -9,13 +9,13 @@ package org.apache.hadoop.hive.ql.omnidata.operator.aggregation;
  * @since 2022-01-22
  */
 public class NdpArithmeticExpressionInfo {
-    private boolean isVal[];
+    private boolean[] isVal;
 
-    private int colId[];
+    private int[] colId;
 
-    private String colType[];
+    private String[] colType;
 
-    private String colValue[];
+    private String[] colValue;
 
     public NdpArithmeticExpressionInfo(String vectorExpressionParameters) {
         // vectorExpressionParameters : col 2:bigint, col 6:bigint

@@ -122,7 +122,7 @@ public class NdpPlanResolver implements PhysicalPlanResolver {
         TaskGraphWalker walker = new TaskGraphWalker(dispatcher);
         List<Node> topNodes = new ArrayList<>(pctx.getRootTasks());
         walker.startWalking(topNodes, null);
-        hiveConf.set(NdpStatusManager.NDP_AGG_OPTIMIZED_ENABLE, String.valueOf(isAggOptimized));
+        hiveConf.set(NdpConf.NDP_AGG_OPTIMIZED_ENABLE, String.valueOf(isAggOptimized));
         return pctx;
     }
 
@@ -276,7 +276,6 @@ public class NdpPlanResolver implements PhysicalPlanResolver {
         }
 
         private Optional<RowExpression> getOmniDataFilter(OmniDataPredicate omniDataPredicate) {
-            // ExprNodeGenericFuncDesc need to clone
             NdpFilter ndpFilter = new NdpFilter(filterDesc);
             NdpFilter.NdpFilterMode mode = ndpFilter.getMode();
             if (mode.equals(NdpFilter.NdpFilterMode.PART)) {
@@ -290,6 +289,7 @@ public class NdpPlanResolver implements PhysicalPlanResolver {
                 return Optional.empty();
             }
             OmniDataFilter omniDataFilter = new OmniDataFilter(omniDataPredicate);
+            // ExprNodeGenericFuncDesc need to clone
             RowExpression filterRowExpression = omniDataFilter.getFilterExpression(
                     (ExprNodeGenericFuncDesc) filterDesc.clone(), ndpFilter);
             if (filterRowExpression == null) {

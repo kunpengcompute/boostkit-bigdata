@@ -74,7 +74,7 @@ public class OmniDataAggregation {
                 return;
             }
             int projectId = predicateInfo.getColName2ProjectId()
-                .get(predicateInfo.getColId2ColName().get(outputColumnId));
+                    .get(predicateInfo.getColId2ColName().get(outputColumnId));
             Type omniDataType = OmniDataUtils.transOmniDataType(identityExpression.getOutputTypeInfo().getTypeName());
             groupingKeys.add(new InputReferenceExpression(projectId, omniDataType));
         } else {
@@ -105,26 +105,26 @@ public class OmniDataAggregation {
         if (aggregateFunction.getInputExpression() != null) {
             // count(col_1)
             Type omniDataInputType = OmniDataUtils.transOmniDataType(
-                aggregateFunction.getInputTypeInfo().getTypeName());
+                    aggregateFunction.getInputTypeInfo().getTypeName());
             IdentityExpression identityExpression = (IdentityExpression) aggregateFunction.getInputExpression();
             int columnId = identityExpression.getOutputColumnNum();
             predicateInfo.addProjectionsByAggCount(columnId);
             int projectId = predicateInfo.getColName2ProjectId().get(predicateInfo.getColId2ColName().get(columnId));
             arguments.add(new InputReferenceExpression(projectId, predicateInfo.getTypes().get(projectId)));
             signature = new Signature(QualifiedObjectName.valueOfDefaultFunction("count"), AGGREGATE,
-                BIGINT.getTypeSignature(), omniDataInputType.getTypeSignature());
+                    BIGINT.getTypeSignature(), omniDataInputType.getTypeSignature());
         } else {
             // count(*)
             signature = new Signature(QualifiedObjectName.valueOfDefaultFunction("count"), AGGREGATE,
-                BIGINT.getTypeSignature());
+                    BIGINT.getTypeSignature());
             predicateInfo.getDecodeTypes().add(BIGINT.toString());
             predicateInfo.getDecodeTypesWithAgg().add(false);
         }
         FunctionHandle functionHandle = new BuiltInFunctionHandle(signature);
         CallExpression callExpression = new CallExpression("count", functionHandle, BIGINT, arguments,
-            Optional.empty());
+                Optional.empty());
         aggregationMap.put(String.format("%s_%s", "count", aggregationMap.size()),
-            new AggregationInfo.AggregateFunction(callExpression, false));
+                new AggregationInfo.AggregateFunction(callExpression, false));
     }
 
     private void parseMaxMinSumAggregation(VectorAggregationDesc aggregateFunction) {
@@ -132,9 +132,9 @@ public class OmniDataAggregation {
             String operatorName = aggregateFunction.getAggrDesc().getGenericUDAFName();
             IdentityExpression identityExpression = (IdentityExpression) aggregateFunction.getInputExpression();
             Type omniDataInputType = OmniDataUtils.transOmniDataType(
-                aggregateFunction.getInputTypeInfo().getTypeName());
+                    aggregateFunction.getInputTypeInfo().getTypeName());
             Type omniDataOutputType = OmniDataUtils.transOmniDataType(
-                aggregateFunction.getOutputTypeInfo().getTypeName());
+                    aggregateFunction.getOutputTypeInfo().getTypeName());
             int columnId = identityExpression.getOutputColumnNum();
             predicateInfo.addProjectionsByAgg(columnId);
             if (!predicateInfo.isPushDown()) {
@@ -147,17 +147,17 @@ public class OmniDataAggregation {
                 castAggOutputType(projectId, omniDataInputType, omniDataOutputType);
             }
             FunctionHandle functionHandle = new BuiltInFunctionHandle(
-                new Signature(QualifiedObjectName.valueOfDefaultFunction(operatorName), AGGREGATE,
-                    omniDataOutputType.getTypeSignature(), omniDataOutputType.getTypeSignature()));
+                    new Signature(QualifiedObjectName.valueOfDefaultFunction(operatorName), AGGREGATE,
+                            omniDataOutputType.getTypeSignature(), omniDataOutputType.getTypeSignature()));
             List<RowExpression> arguments = new ArrayList<>();
             arguments.add(new InputReferenceExpression(projectId, predicateInfo.getTypes().get(projectId)));
             CallExpression callExpression = new CallExpression(operatorName, functionHandle, omniDataOutputType,
-                arguments, Optional.empty());
+                    arguments, Optional.empty());
             aggregationMap.put(String.format("%s_%s", operatorName, projectId),
-                new AggregationInfo.AggregateFunction(callExpression, false));
+                    new AggregationInfo.AggregateFunction(callExpression, false));
         } else {
             LOG.info("Aggregation failed to push down, since unsupported this [{}]",
-                aggregateFunction.getInputExpression().getClass());
+                    aggregateFunction.getInputExpression().getClass());
             isPushDownAgg = false;
         }
     }
@@ -166,16 +166,13 @@ public class OmniDataAggregation {
         List<RowExpression> rowArguments = new ArrayList<>();
         rowArguments.add(predicateInfo.getProjections().remove(projectId));
         Signature signature = new Signature(
-            QualifiedObjectName.valueOfDefaultFunction(NdpUdfEnum.CAST.getOperatorName()), FunctionKind.SCALAR,
-            omniDataOutputType.getTypeSignature(), omniDataInputType.getTypeSignature());
+                QualifiedObjectName.valueOfDefaultFunction(NdpUdfEnum.CAST.getOperatorName()), FunctionKind.SCALAR,
+                omniDataOutputType.getTypeSignature(), omniDataInputType.getTypeSignature());
         predicateInfo.getProjections()
-            .add(projectId, new CallExpression(NdpUdfEnum.CAST.getSignatureName(), new BuiltInFunctionHandle(signature),
-                omniDataOutputType, rowArguments, Optional.empty()));
-        predicateInfo.getTypes().remove(projectId);
-        predicateInfo.getTypes().add(projectId, omniDataOutputType);
-        predicateInfo.getDecodeTypes().remove(projectId);
-        predicateInfo.getDecodeTypes().add(projectId, omniDataOutputType.toString());
-        predicateInfo.getDecodeTypesWithAgg().remove(projectId);
-        predicateInfo.getDecodeTypesWithAgg().add(projectId, true);
+                .add(projectId, new CallExpression(NdpUdfEnum.CAST.getSignatureName(), new BuiltInFunctionHandle(signature),
+                        omniDataOutputType, rowArguments, Optional.empty()));
+        predicateInfo.getTypes().set(projectId, omniDataOutputType);
+        predicateInfo.getDecodeTypes().set(projectId, omniDataOutputType.toString());
+        predicateInfo.getDecodeTypesWithAgg().set(projectId, true);
     }
 }

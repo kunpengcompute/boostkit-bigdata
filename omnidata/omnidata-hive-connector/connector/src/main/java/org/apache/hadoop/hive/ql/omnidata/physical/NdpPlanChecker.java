@@ -37,27 +37,27 @@ public class NdpPlanChecker {
     private static final Logger LOG = LoggerFactory.getLogger(NdpPlanChecker.class);
 
     private static final ImmutableSet<String> SUPPORTED_HIVE_TYPES = ImmutableSet.of("bigint", "boolean", "char",
-        "date", "double", "float", "int", "smallint", "string", "tinyint", "varchar");
+            "date", "double", "float", "int", "smallint", "string", "tinyint", "varchar");
 
     private static final ImmutableSet<String> SUPPORTED_AGGREGATE_FUNCTIONS = ImmutableSet.of("count", "avg", "sum",
-        "max", "min");
+            "max", "min");
 
     private static final ImmutableSet<String> AVG_SUM_FUNCTION_HIVE_TYPES = ImmutableSet.of("bigint", "double", "float",
-        "int", "smallint", "tinyint");
+            "int", "smallint", "tinyint");
 
     private static final ImmutableSet<NdpUdfEnum> SUPPORTED_HIVE_UDF = ImmutableSet.of(CAST, INSTR, LENGTH, LOWER,
-        REPLACE, SPLIT, SUBSCRIPT, SUBSTRING, UPPER, SUBSTR);
+            REPLACE, SPLIT, SUBSCRIPT, SUBSTRING, UPPER, SUBSTR);
 
     // unsupported: LIKE
     private static final ImmutableSet<NdpHiveOperatorEnum> SUPPORTED_HIVE_OPERATOR = ImmutableSet.of(AND, BETWEEN,
-        EQUAL, GREATER_THAN, GREATER_THAN_OR_EQUAL, IN, LESS_THAN, LESS_THAN_OR_EQUAL, NOT, NOT_EQUAL, NOT_NULL, NULL,
-        OR);
+            EQUAL, GREATER_THAN, GREATER_THAN_OR_EQUAL, IN, LESS_THAN, LESS_THAN_OR_EQUAL, NOT, NOT_EQUAL, NOT_NULL, NULL,
+            OR);
 
     // NdpLeafOperator.LIKE
     private static final ImmutableSet<NdpLeafOperator> SUPPORTED_HIVE_LEAF_OPERATOR = ImmutableSet.of(
-        NdpLeafOperator.BETWEEN, NdpLeafOperator.IN, NdpLeafOperator.LESS_THAN, NdpLeafOperator.GREATER_THAN,
-        NdpLeafOperator.LESS_THAN_OR_EQUAL, NdpLeafOperator.GREATER_THAN_OR_EQUAL, NdpLeafOperator.EQUAL,
-        NdpLeafOperator.IS_NULL);
+            NdpLeafOperator.BETWEEN, NdpLeafOperator.IN, NdpLeafOperator.LESS_THAN, NdpLeafOperator.GREATER_THAN,
+            NdpLeafOperator.LESS_THAN_OR_EQUAL, NdpLeafOperator.GREATER_THAN_OR_EQUAL, NdpLeafOperator.EQUAL,
+            NdpLeafOperator.IS_NULL);
 
     /**
      * Currently, 'roll up' is not supported.
@@ -84,7 +84,7 @@ public class NdpPlanChecker {
             return true;
         } else {
             LOG.info("Table [{}] failed to push down, since unsupported the number of TableScanOperator's child : [{}]",
-                tableScanOp.getConf().getAlias(), tableScanOp.getNumChild());
+                    tableScanOp.getConf().getAlias(), tableScanOp.getNumChild());
             return false;
         }
     }
@@ -107,12 +107,12 @@ public class NdpPlanChecker {
                     return checkDataFormat(inputFormat, outputFormat, tableName);
                 } else {
                     LOG.info("Table [{}] failed to push down, since PartitionDesc is null",
-                        tableScanOp.getConf().getAlias());
+                            tableName);
                     return false;
                 }
             } else {
                 LOG.info("Table [{}] failed to push down, since unsupported this work: [{}]",
-                    tableScanOp.getConf().getAlias(), work.getClass().getSimpleName());
+                        tableName, work.getClass().getSimpleName());
                 return false;
             }
         } else {
@@ -132,15 +132,15 @@ public class NdpPlanChecker {
      */
     public static boolean checkDataFormat(String inputFormat, String outputFormat, String tableName) {
         if (!(inputFormat.toLowerCase(Locale.ENGLISH).contains("orc") || inputFormat.toLowerCase(Locale.ENGLISH)
-            .contains("parquet"))) {
+                .contains("parquet"))) {
             LOG.info("Table [{}] failed to push down, since unsupported this input data format: [{}]", tableName,
-                inputFormat);
+                    inputFormat);
             return false;
         }
         if (!(outputFormat.toLowerCase(Locale.ENGLISH).contains("orc") || outputFormat.toLowerCase(Locale.ENGLISH)
-            .contains("parquet"))) {
+                .contains("parquet"))) {
             LOG.info("Table [{}] failed to push down, since unsupported this output data format: [{}]", tableName,
-                inputFormat);
+                    inputFormat);
             return false;
         }
         return true;
@@ -166,6 +166,9 @@ public class NdpPlanChecker {
     }
 
     public static boolean checkHostResources(NdpStatusInfo statusInfo) {
+        if (statusInfo == null) {
+            return false;
+        }
         if (statusInfo.getRunningTasks() > statusInfo.getMaxTasks() * statusInfo.getThreshold()) {
             return false;
         }
@@ -174,7 +177,7 @@ public class NdpPlanChecker {
 
     public static boolean checkPushDown(Configuration conf, boolean isPushDown) {
         return isPushDown && conf.get(NdpStatusManager.NDP_DATANODE_HOSTNAMES) != null
-            && conf.get(NdpStatusManager.NDP_DATANODE_HOSTNAMES).length() > 0;
+                && conf.get(NdpStatusManager.NDP_DATANODE_HOSTNAMES).length() > 0;
     }
 
     /**
@@ -227,7 +230,7 @@ public class NdpPlanChecker {
         for (Integer columnId : tableScanOp.getConf().getNeededColumnIDs()) {
             if (!checkHiveType(columnTypes[columnId])) {
                 LOG.info("Table [{}] failed to push down, since unsupported this column type: [{}]",
-                    tableScanOp.getConf().getAlias(), columnTypes[columnId]);
+                        tableScanOp.getConf().getAlias(), columnTypes[columnId]);
                 return false;
             }
         }
@@ -249,7 +252,7 @@ public class NdpPlanChecker {
             return (ExprNodeGenericFuncDesc) nodeDesc;
         }
         LOG.info("FilterOperator failed to push down, since unsupported this ExprNodeDesc: [{}]",
-            nodeDesc.getClass().getSimpleName());
+                nodeDesc.getClass().getSimpleName());
         return null;
     }
 
@@ -268,7 +271,7 @@ public class NdpPlanChecker {
             return (VectorSelectDesc) selectDesc.getVectorDesc();
         }
         LOG.info("VectorSelectOperator failed to push down, since unsupported this SelectDesc: [{}]",
-            selectDesc.getClass().getSimpleName());
+                selectDesc.getClass().getSimpleName());
         return null;
     }
 
@@ -291,8 +294,10 @@ public class NdpPlanChecker {
                 return vectorGroupByOperator.getConf();
             }
         }
+        LOG.info("VectorGroupByOperator failed to push down");
         return null;
     }
+
 
     /**
      * Check whether Limit offset > 0
@@ -334,6 +339,10 @@ public class NdpPlanChecker {
     }
 
     public static boolean checkCountFunction(AggregationDesc agg) {
+        if (agg.getDistinct()) {
+            LOG.info("Aggregation [{}] failed to push down, since unsupported [distinct]", agg.getGenericUDAFName());
+            return false;
+        }
         for (ExprNodeDesc parameter : agg.getParameters()) {
             if (!checkHiveType(parameter.getTypeString())) {
                 return false;
@@ -357,9 +366,9 @@ public class NdpPlanChecker {
             if (!(parameter instanceof ExprNodeConstantDesc)) {
                 isConstant = true;
                 if ((!checkHiveType(parameter.getTypeString())) || (!AVG_SUM_FUNCTION_HIVE_TYPES.contains(
-                    parameter.getTypeString()))) {
+                        parameter.getTypeString()))) {
                     LOG.info("Aggregation [{}] failed to push down, since unsupported this column type: [{}]",
-                        agg.getGenericUDAFName(), parameter.getTypeString());
+                            agg.getGenericUDAFName(), parameter.getTypeString());
                     return false;
                 }
             }
@@ -414,14 +423,11 @@ public class NdpPlanChecker {
      * @return true or false
      */
     public static boolean checkSelectivity(TableScanOperator tableScanOp, NdpConf ndpConf) {
-        if (ndpConf == null) {
-            return false;
-        }
         if (ndpConf.getNdpFilterSelectivityEnable()) {
             double currentSelectivity = getSelectivity(tableScanOp);
             if (currentSelectivity > ndpConf.getNdpFilterSelectivity()) {
                 LOG.info("Table [{}] failed to push down, since selectivity[{}] > threshold[{}]",
-                    tableScanOp.getConf().getAlias(), currentSelectivity, ndpConf.getNdpFilterSelectivity());
+                        tableScanOp.getConf().getAlias(), currentSelectivity, ndpConf.getNdpFilterSelectivity());
                 return false;
             } else {
                 LOG.info("Table [{}] selectivity is {}", tableScanOp.getConf().getAlias(), currentSelectivity);
@@ -441,13 +447,13 @@ public class NdpPlanChecker {
      * @return true or false
      */
     public static boolean checkTableSize(TableScanOperator tableScanOp, NdpConf ndpConf) {
-        if (ndpConf == null || tableScanOp.getConf().getStatistics() == null) {
+        if (tableScanOp.getConf().getStatistics() == null) {
             return false;
         }
         long currentTableSize = tableScanOp.getConf().getStatistics().getDataSize();
         if (currentTableSize < ndpConf.getNdpTablesSizeThreshold()) {
             LOG.info("Table [{}] failed to push down, since table size[{}] < threshold[{}]",
-                tableScanOp.getConf().getAlias(), currentTableSize, ndpConf.getNdpTablesSizeThreshold());
+                    tableScanOp.getConf().getAlias(), currentTableSize, ndpConf.getNdpTablesSizeThreshold());
             return false;
         }
         return true;
