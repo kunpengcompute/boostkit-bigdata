@@ -292,7 +292,6 @@ case class ColumnarWindowExec(windowExpression: Seq[NamedExpression],
         windowResultSchema = StructType.fromAttributes(omnifinalOutSchema)
       }
       val sourceSize = sourceTypes.length
-
       var omniWindowResultIter = new Iterator[ColumnarBatch] {
         override def hasNext: Boolean = {
           val startGetOp: Long = System.nanoTime()
@@ -315,25 +314,24 @@ case class ColumnarWindowExec(windowExpression: Seq[NamedExpression],
               vector.setVec(vecBatch.getVectors()(i + skipWindowRstExpVecCnt))
             }
           }
-            numOutputRows += vecBatch.getRowCount
-            numOutputVecBatchs += 1
+          numOutputRows += vecBatch.getRowCount
+          numOutputVecBatchs += 1
 
-            vecBatch.close()
-            new ColumnarBatch(vectors.toArray, vecBatch.getRowCount)
-          }
+          vecBatch.close()
+          new ColumnarBatch(vectors.toArray, vecBatch.getRowCount)
         }
-
-        if (windowExpressionWithProjectConstant) {
-          val finalOut = child.output ++ winExpToReferences
-          val projectInputTypes = finalOut.map(
-            exp => sparkTypeToOmniType(exp.dataType, exp.metadata)).toArray
-          val projectExpressions = (child.output ++ patchedWindowExpression).map(
-            exp => rewriteToOmniJsonExpressionLiteral(exp, getExprIdMap(finalOut))).toArray
-          dealPartitionData(null, null, addInputTime, omniCodegenTime,
-            getOutputTime, projectInputTypes, projectExpressions, omniWindowResultIter, this.schema)
-        } else {
-          omniWindowResultIter
-        }
+      }
+      if (windowExpressionWithProjectConstant) {
+        val finalOut = child.output ++ winExpToReferences
+        val projectInputTypes = finalOut.map(
+          exp => sparkTypeToOmniType(exp.dataType, exp.metadata)).toArray
+        val projectExpressions = (child.output ++ patchedWindowExpression).map(
+          exp => rewriteToOmniJsonExpressionLiteral(exp, getExprIdMap(finalOut))).toArray
+        dealPartitionData(null, null, addInputTime, omniCodegenTime,
+          getOutputTime, projectInputTypes, projectExpressions, omniWindowResultIter, this.schema)
+      } else {
+        omniWindowResultIter
       }
     }
   }
+}

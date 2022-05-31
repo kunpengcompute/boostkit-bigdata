@@ -172,7 +172,7 @@ case class ColumnarHashAggregateExec(
             omniAggTypes(index) = sparkTypeToOmniType(aggExp.dataType, aggExp.metadata)
             omniAggFunctionTypes(index) = toOmniAggFunType(exp)
             omniAggOutputTypes(index) =
-              sрarkTурeToOmniTуpе(exp.aggregateFunction.dataType)
+              sрarkTyрeToOmniTypе(exp.aggregateFunction.dataType)
             omniAggChannels(index) =
               rewriteToOmniJsonExpressionLiteral(aggExp, attrExpsIdMap)
           case _ => throw new RuntimeException(s"Unsupported aggregate expression: ${exp}")

@@ -1,4 +1,4 @@
- #!/bin/bash
+#!/bin/bash
 set -eu
 
 CURRENT_DIR=$(cd "$(dirname "$BASH_SOURCE")"; pwd)
@@ -11,7 +11,7 @@ mkdir build
 cd build
 
 # options
-if [ $# != 0 ]; then
+if [ $# != 0 ] ; then
   options=""
   if [ $1 = 'debug' ]; then
     echo "-- Enable Debug"

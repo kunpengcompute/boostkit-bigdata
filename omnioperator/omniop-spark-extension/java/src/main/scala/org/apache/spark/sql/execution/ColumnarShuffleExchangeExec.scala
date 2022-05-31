@@ -226,7 +226,7 @@ object ColumnarShuffleExchangeExec extends Logging {
     // only used for fallback range partitioning
     def computeAndAddRangePartitionId(
                                        cbIter: Iterator[ColumnarBatch],
-                                       partitionKeyExtractor: InternalRow=> Any): Iterator[(Int,  ColumnarBatch)] = {
+                                       partitionKeyExtractor: InternalRow => Any): Iterator[(Int, ColumnarBatch)] = {
       val addPid2ColumnBatch = addPidToColumnBatch()
       cbIter.filter(cb => cb.numRows != 0 && cb.numCols != 0).map {
         cb =>
@@ -295,7 +295,7 @@ object ColumnarShuffleExchangeExec extends Logging {
           }
         }, isOrderSensitive = isOrderSensitive)
       case SinglePartition =>
-        rdd.mapPartitionsWithIndexInternal((_, cbIter) =>{
+        rdd.mapPartitionsWithIndexInternal((_, cbIter) => {
           cbIter.map { cb => (0, cb) }
         }, isOrderSensitive = isOrderSensitive)
     }
@@ -334,8 +334,8 @@ object ColumnarShuffleExchangeExec extends Logging {
   def genHashExpr(): (Seq[Expression], Int, Int, Seq[Attribute]) => String = {
     (expressions: Seq[Expression], numPartitions: Int, seed: Int, outputAttributes: Seq[Attribute]) => {
       val exprIdMap = getExprIdMap(outputAttributes)
-      val EXP_JSON_FORMATER1 = ("{\"exprType\": \"FUNCTION\",\"returnType\":1,\"function_name\":\"%s\",\"arguments\":[" +
-        "%s,{\"exprType\": \"LITERAL\",\"dataType\":1,\"isNull\":false,\"value\":%d}]}")
+      val EXP_JSON_FORMATER1 = ("{\"exprType\":\"FUNCTION\",\"returnType\":1,\"function_name\":\"%s\",\"arguments\":[" +
+        "%s,{\"exprType\":\"LITERAL\",\"dataType\":1,\"isNull\":false,\"value\":%d}]}")
       val EXP_JSON_FORMATER2 = ("{\"exprType\": \"FUNCTION\",\"returnType\":1,\"function_name\":\"%s\", \"arguments\": [%s,%s] }")
       var omniExpr: String = ""
       expressions.foreach { expr =>
