@@ -12,6 +12,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.huawei.boostkit.omnidata.exception;
 
 import static com.huawei.boostkit.omnidata.exception.OmniErrorCode.OMNIDATA_GENERIC_ERROR;
