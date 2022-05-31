@@ -115,7 +115,7 @@ public class VariableWidthOmniBlock
         this.offsets = compactOffsets(offsets, arrayOffset, positionCount);
 
         if (slice.hasByteArray()) {
-            this.values.put(0, slice.byteArray(), slice.byteArrayOffset(), this.offsets, 0, positionCount);
+            this.values.put(0, slice.byteArray(), slice.byteArrayOffset(), offsets, arrayOffset, positionCount);
         }
 
         if (valueIsNull != null && valueIsNull.length - arrayOffset < positionCount) {
