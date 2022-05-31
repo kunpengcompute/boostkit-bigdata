@@ -22,14 +22,26 @@ package com.huawei.boostkit.omnidata.decode.type;
 import java.util.Optional;
 
 /**
- * Short decode type
+ * Decimal decode type
  *
  * @since 2021-07-31
  */
-public class ShortDecodeType implements DecodeType {
+public class DecimalDecodeType implements DecodeType {
+
+    public int getPrecision() {
+        return 0;
+    }
+
+    public int getScale() {
+        return 0;
+    }
+
+    public DecimalDecodeType(int v1, int v2) {
+    }
+
     @Override
     public Optional<Class<?>> getJavaType() {
-        return Optional.empty();
+        return Optional.of(DecimalDecodeType.class);
     }
 }
 

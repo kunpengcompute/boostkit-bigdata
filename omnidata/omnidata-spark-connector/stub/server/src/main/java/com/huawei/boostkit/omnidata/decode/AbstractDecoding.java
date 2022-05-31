@@ -16,20 +16,45 @@
  * limitations under the License.
  */
 
-package com.huawei.boostkit.omnidata.decode.type;
+package com.huawei.boostkit.omnidata.decode;
 
+import com.huawei.boostkit.omnidata.decode.type.DecodeType;
 
+import io.airlift.slice.SliceInput;
+
+import java.lang.reflect.Method;
 import java.util.Optional;
 
 /**
- * Short decode type
+ * Abstract decoding
  *
+ * @param <T> decoding type
  * @since 2021-07-31
  */
-public class ShortDecodeType implements DecodeType {
+public abstract class AbstractDecoding<T> implements Decoding<T> {
+
+    private Method getDecodeMethod(String decodeName) {
+        return null;
+    }
+
+    private String getDecodeName(SliceInput input) {
+        return null;
+    }
+
+    private Optional<String> typeToDecodeName(DecodeType type) {
+        return null;
+    }
+
     @Override
-    public Optional<Class<?>> getJavaType() {
-        return Optional.empty();
+    public T decode(Optional<DecodeType> type, SliceInput sliceInput) {
+        return null;
+    }
+
+    public Optional<boolean[]> decodeNullBits(SliceInput sliceInput, int positionCount) {
+        return null;
+    }
+
+    private boolean[] getIsNullValue(byte value) {
+        return null;
     }
 }
-

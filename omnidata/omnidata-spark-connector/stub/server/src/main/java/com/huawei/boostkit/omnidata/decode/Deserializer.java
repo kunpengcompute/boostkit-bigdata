@@ -12,8 +12,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.huawei.boostkit.omnidata.decode;
 
+import io.hetu.core.transport.execution.buffer.SerializedPage;
+
 public interface Deserializer<T> {
+    T deserialize(SerializedPage page);
 }
 
