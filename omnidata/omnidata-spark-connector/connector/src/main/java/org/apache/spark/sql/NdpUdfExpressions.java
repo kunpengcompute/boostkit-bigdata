@@ -7,8 +7,7 @@ import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.relation.CallExpression;
 import io.prestosql.spi.relation.InputReferenceExpression;
 import io.prestosql.spi.relation.RowExpression;
-import io.prestosql.spi.type.Type;
-import io.prestosql.spi.type.TypeSignature;
+import io.prestosql.spi.type.*;
 import scala.collection.JavaConverters;
 
 import org.apache.spark.sql.catalyst.expressions.AttributeReference;
@@ -47,6 +46,8 @@ public class NdpUdfExpressions {
             prestoExpressionInfo.setFieldDataType(
                 NdpUtils.transOlkDataType(childExpression.dataType(), false));
             prestoExpressionInfo.setChildExpression(childExpression);
+        } else if (childExpression instanceof Literal) {
+            rowArguments.add(NdpUtils.transArgumentData(((Literal) childExpression).value().toString(), childType));
         } else {
             createNdpUdf(childExpression, prestoExpressionInfo, fieldMap);
             rowArguments.add(prestoExpressionInfo.getPrestoRowExpression());
@@ -95,10 +96,12 @@ public class NdpUdfExpressions {
         List<RowExpression> rowArguments = new ArrayList<>();
         checkAttributeReference(childExpression,
             prestoExpressionInfo, fieldMap, childType, rowArguments);
+        //add decimal TypeSignature judgment
+        TypeSignature inputParamTypeSignature = NdpUtils.createTypeSignature(childType);
+        TypeSignature returnParamTypeSignature = NdpUtils.createTypeSignature(returnType);
         Signature signature = new Signature(
             QualifiedObjectName.valueOfDefaultFunction(udfEnum.getOperatorName()),
-            FunctionKind.SCALAR, new TypeSignature(
-                returnType.toString()), new TypeSignature(childType.toString()));
+                FunctionKind.SCALAR, returnParamTypeSignature,inputParamTypeSignature);
         RowExpression resExpression = new CallExpression(
             signatureName, new BuiltInFunctionHandle(signature),
             returnType, rowArguments);
@@ -137,21 +140,35 @@ public class NdpUdfExpressions {
         List<Expression> hiveSimpleUdf = JavaConverters.seqAsJavaList(
             hiveSimpleUDFExpression.children());
         Type returnType = NdpUtils.transOlkDataType(
-            hiveSimpleUDFExpression.dataType(), true);
+            hiveSimpleUDFExpression.dataType(), false);
         List<RowExpression> rowArguments = new ArrayList<>();
         Type strTypeCandidate = returnType;
+        Signature signature;
         for (Expression hiveUdf : hiveSimpleUdf) {
-            strTypeCandidate = NdpUtils.transOlkDataType(hiveUdf.dataType(), true);
+            strTypeCandidate = NdpUtils.transOlkDataType(hiveUdf.dataType(), false);
             checkAttributeReference(hiveUdf, prestoExpressionInfo,
                 fieldMap, strTypeCandidate, rowArguments);
         }
-        Signature signature = new Signature(
-            QualifiedObjectName.valueOfDefaultFunction(signatureName),
-            FunctionKind.SCALAR, new TypeSignature(returnType.toString()),
-            new TypeSignature(strTypeCandidate.toString()));
+        if (hiveSimpleUdf.size() > 0) {
+            TypeSignature returnTypeSignature = NdpUtils.createTypeSignature(returnType);
+            TypeSignature[] inputTypeSignatures = new TypeSignature[hiveSimpleUdf.size()];
+            for (int i = 0; i < hiveSimpleUdf.size(); i++) {
+                inputTypeSignatures[i] = NdpUtils.createTypeSignature(hiveSimpleUdf.get(i).dataType(), false);
+            }
+            signature = new Signature(
+                    //TODO
+                    QualifiedObjectName.valueOf("hive", "default", signatureName),
+                    FunctionKind.SCALAR, returnTypeSignature,
+                    inputTypeSignatures);
+        } else {
+            throw new UnsupportedOperationException("The number of UDF parameters is invalid.");
+        }
+        //TODO
+        signatureName = "hive.default." + signatureName.toLowerCase(Locale.ENGLISH);
         RowExpression resExpression = new CallExpression(signatureName.toLowerCase(Locale.ENGLISH),
             new BuiltInFunctionHandle(signature), returnType, rowArguments);
         prestoExpressionInfo.setReturnType(returnType);
+        prestoExpressionInfo.setUDF(true);
         prestoExpressionInfo.setPrestoRowExpression(resExpression);
     }
 

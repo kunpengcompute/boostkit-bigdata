@@ -17,20 +17,24 @@
 
 package org.apache.spark.sql.execution.ndp
 
-import java.util.Locale
-
+import java.util.{Locale, Properties}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{PushDownManager, SparkSession}
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.{And, Attribute, AttributeReference, Expression, NamedExpression, PredicateHelper, UserDefinedExpression}
+import org.apache.spark.sql.catalyst.expressions.{And, Attribute, AttributeReference, BinaryExpression, Expression, NamedExpression, PredicateHelper, UnaryExpression}
 import org.apache.spark.sql.catalyst.expressions.aggregate.{Partial, PartialMerge}
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.{FileSourceScanExec, FilterExec, GlobalLimitExec, LeafExecNode, LocalLimitExec, ProjectExec, SparkPlan}
-import org.apache.spark.sql.execution.adaptive.{AdaptiveSparkPlanExec, InsertAdaptiveSparkPlan}
+import org.apache.spark.sql.execution.adaptive.AdaptiveSparkPlanExec
 import org.apache.spark.sql.execution.aggregate.{BaseAggregateExec, HashAggregateExec, ObjectHashAggregateExec, SortAggregateExec}
 import org.apache.spark.sql.execution.datasources.HadoopFsRelation
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.sources.DataSourceRegister
+import org.apache.spark.sql.hive.HiveSimpleUDF
+import org.apache.hadoop.hive.ql.exec.DefaultUDFMethodResolver
+
+import scala.collection.{JavaConverters, mutable}
+import scala.reflect.runtime.universe
 
 case class NdpPushDown(sparkSession: SparkSession)
   extends Rule[SparkPlan] with PredicateHelper {
@@ -41,16 +45,18 @@ case class NdpPushDown(sparkSession: SparkSession)
     "greaterthan", "greaterthanorequal", "lessthanorequal", "in", "literal", "isnull",
     "attributereference")
   private val attrWhiteList = Set("long", "integer", "byte", "short", "float", "double",
-    "boolean", "date")
+    "boolean", "date", "decimal", "timestamp")
   private val sparkUdfWhiteList = Set("substr", "substring", "length", "upper", "lower", "cast",
     "replace", "getarrayitem")
+  private val udfPathWhiteList = Set("")
   private val udfWhitelistConf = NdpConf.getNdpUdfWhitelist(sparkSession)
+  private val udfWhitelistProp = NdpConf.getNdpUdfWhitelist("udfname.txt")
   private val customUdfWhiteList = if (udfWhitelistConf.nonEmpty) {
     udfWhitelistConf.map(_.split(",")).get.toSet
   } else {
     Set.empty
   }
-  private val udfWhiteList = sparkUdfWhiteList ++ customUdfWhiteList
+  private val udfWhiteList = sparkUdfWhiteList ++ customUdfWhiteList ++ udfWhitelistProp
   private val aggFuncWhiteList = Set("max", "min", "count", "avg", "sum")
   private val aggExpressionWhiteList =
     Set("multiply", "add", "subtract", "divide", "remainder", "literal", "attributereference")
@@ -111,7 +117,7 @@ case class NdpPushDown(sparkSession: SparkSession)
   def shouldPushDown(f: FilterExec, scan: NdpSupport): Boolean = {
     scan.filterExeInfos.isEmpty &&
       f.subqueries.isEmpty &&
-      f.output.forall(x => attrWhiteList.contains(x.dataType.typeName)
+      f.output.forall(x => attrWhiteList.contains(x.dataType.typeName.split("\\(")(0))
         || supportedHiveStringType(x))
   }
 
@@ -186,12 +192,32 @@ case class NdpPushDown(sparkSession: SparkSession)
     }
   }
 
+  def isUDFInWhiteList(expr: Expression): Boolean = {
+    expr match {
+      case be: BinaryExpression =>
+        if (!isUDFInWhiteList(be.left)) false
+        else isUDFInWhiteList(be.right)
+      case ue: UnaryExpression =>
+        isUDFInWhiteList(ue.child)
+      case h: HiveSimpleUDF =>
+        val defaultUDFMethodResolver = h.function.getResolver
+        val runtimeMirror = universe.runtimeMirror(defaultUDFMethodResolver.getClass.getClassLoader)
+        val udfTerm = universe.typeOf[DefaultUDFMethodResolver].decl(universe.TermName("udfClass")).asTerm
+        val udfFiledMirror = runtimeMirror.reflect(defaultUDFMethodResolver).reflectField(udfTerm)
+        val fullPathClassName = udfFiledMirror.get.toString.split(" ")(1)
+        val packagePath = fullPathClassName.splitAt(fullPathClassName.lastIndexOf("."))._1
+        udfPathWhiteList.contains(packagePath)
+      case _ => false
+    }
+  }
+
   def pushDownOperatorInternal(plan: SparkPlan): SparkPlan = {
     val p = plan.transformUp {
       case a: AdaptiveSparkPlanExec =>
         pushDownOperatorInternal(a.initialPlan)
       case s: FileSourceScanExec if shouldPushDown(s.relation) =>
         val filters = s.partitionFilters.filter { x =>
+          //TODO maybe need to adapt to the UDF whitelist.
           filterWhiteList.contains(x.prettyName) || udfWhiteList.contains(x.prettyName)
         }
         NdpScanWrapper(s, s.output, filters)
@@ -211,12 +237,13 @@ case class NdpPushDown(sparkSession: SparkSession)
           if (filterSelectivityEnabled && selectivity.nonEmpty) {
             logInfo(s"Selectivity: ${selectivity.get}")
           }
-          // partial pushdown
+          // partial pushDown
           val (otherFilters, pushDownFilters) =
             (splitConjunctivePredicates(condition) ++ s.partitionFilters).partition { x =>
+              val containsUDFPath = isUDFInWhiteList(x)
               x.find { y =>
               !filterWhiteList.contains(y.prettyName) &&
-                !udfWhiteList.contains(y.prettyName)
+                !udfWhiteList.contains(y.prettyName.toLowerCase) && !containsUDFPath
             }.isDefined
           }
           if (pushDownFilters.nonEmpty) {
@@ -412,5 +439,16 @@ object NdpConf {
 
   def getMaxFailedTimes(sparkSession: SparkSession): String = {
     sparkSession.conf.getOption(NDP_MAX_FAILED_TIMES).getOrElse("3")
+  }
+
+  def getNdpUdfWhitelist(sourceName: String): mutable.Set[AnyRef] = {
+    val prop = new Properties()
+    val inputStream = this.getClass.getResourceAsStream("/"+sourceName)
+    if (inputStream==null){
+      mutable.Set("")
+    }else{
+      prop.load(inputStream)
+      JavaConverters.asScalaSetConverter(prop.keySet()).asScala
+    }
   }
 }

@@ -14,6 +14,9 @@
  */
 package com.huawei.boostkit.omnidata.decode;
 
+import io.hetu.core.transport.execution.buffer.SerializedPage;
+
 public interface Deserializer<T> {
+    T deserialize(SerializedPage page);
 }
 

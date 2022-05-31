@@ -15,7 +15,7 @@ import com.huawei.boostkit.omnidata.model.datasource.DataSource;
 import com.huawei.boostkit.omnidata.model.datasource.hdfs.HdfsOrcDataSource;
 import com.huawei.boostkit.omnidata.model.datasource.hdfs.HdfsParquetDataSource;
 import com.huawei.boostkit.omnidata.reader.impl.DataReaderImpl;
-import com.huawei.boostkit.omnidata.decode.impl.SparkDeserializer;
+import com.huawei.boostkit.omnidata.spark.PageDeserializer;
 import com.huawei.boostkit.omnidata.decode.type.DecodeType;
 import com.huawei.boostkit.omnidata.decode.type.LongDecodeType;
 import com.huawei.boostkit.omnidata.decode.type.RowDecodeType;
@@ -96,7 +96,7 @@ import java.util.Set;
  * DataIoAdapter
  */
 public class DataIoAdapter {
-    private int TASK_FAILED_TIMES = 3;
+    private int TASK_FAILED_TIMES = 4;
 
     private List<Type> omnidataTypes = new ArrayList<>();
 
@@ -138,21 +138,22 @@ public class DataIoAdapter {
 
     /**
      * Contact with Omni-Data-Server
-     * @param pageCandidate file split info
-     * @param sparkOutPut data schema
-     * @param partitionColumn partition column
-     * @param filterOutPut filter schema
+     *
+     * @param pageCandidate     file split info
+     * @param sparkOutPut       data schema
+     * @param partitionColumn   partition column
+     * @param filterOutPut      filter schema
      * @param pushDownOperators push down expressions
      * @return WritableColumnVector data result info
      * @throws TaskExecutionException connect to omni-data-server failed exception
      * @notice 3rd parties api throws Exception, function has to catch basic Exception
      */
     public Iterator<WritableColumnVector[]> getPageIterator(
-        PageCandidate pageCandidate,
-        Seq<Attribute> sparkOutPut,
-        Seq<Attribute> partitionColumn,
-        Seq<Attribute> filterOutPut,
-        PushDownInfo pushDownOperators) throws TaskExecutionException, UnknownHostException {
+            PageCandidate pageCandidate,
+            Seq<Attribute> sparkOutPut,
+            Seq<Attribute> partitionColumn,
+            Seq<Attribute> filterOutPut,
+            PushDownInfo pushDownOperators) throws TaskExecutionException, UnknownHostException {
         // initCandidates
         initCandidates(pageCandidate, filterOutPut);
 
@@ -163,7 +164,7 @@ public class DataIoAdapter {
             partitionColumnName.add(attribute.name());
         }
         List<AggExeInfo> aggExecutionList =
-            JavaConverters.seqAsJavaList(pushDownOperators.aggExecutions());
+                JavaConverters.seqAsJavaList(pushDownOperators.aggExecutions());
         if (aggExecutionList.size() == 0) {
             initColumnInfo(sparkOutPut);
         }
@@ -172,20 +173,24 @@ public class DataIoAdapter {
         Optional<RowExpression> prestoFilter = rowExpression == null ?
                 Optional.empty() : Optional.of(rowExpression);
         Optional<AggregationInfo> aggregations =
-            initAggAndGroupInfo(aggExecutionList);
+                initAggAndGroupInfo(aggExecutionList);
         // create limitLong
         OptionalLong limitLong = NdpUtils.convertLimitExeInfo(pushDownOperators.limitExecution());
 
         Predicate predicate = new Predicate(
-            omnidataTypes, omnidataColumns, prestoFilter, omnidataProjections,
-            ImmutableMap.of(), ImmutableMap.of(), aggregations, limitLong);
+                omnidataTypes, omnidataColumns, prestoFilter, omnidataProjections,
+                ImmutableMap.of(), ImmutableMap.of(), aggregations, limitLong);
         TaskSource taskSource = new TaskSource(dataSource, predicate, 1048576);
-        SparkDeserializer deserializer = initSparkDeserializer();
+        PageDeserializer deserializer = initPageDeserializer();
         WritableColumnVector[] page = null;
         int failedTimes = 0;
         String[] sdiHostArray = pageCandidate.getSdiHosts().split(",");
         int randomIndex = (int) (Math.random() * sdiHostArray.length);
-        Iterator<String> sdiHosts = Arrays.stream(sdiHostArray).iterator();
+        List<String> sdiHostList = new ArrayList<>(Arrays.asList(sdiHostArray));
+        Optional<String> availableSdiHost = getRandomAvailableSdiHost(sdiHostArray,
+                JavaConverters.mapAsJavaMap(pushDownOperators.fpuHosts()));
+        availableSdiHost.ifPresent(sdiHostList::add);
+        Iterator<String> sdiHosts = sdiHostList.iterator();
         Set<String> sdiHostSet = new HashSet<>();
         sdiHostSet.add(sdiHostArray[randomIndex]);
         while (sdiHosts.hasNext()) {
@@ -203,7 +208,7 @@ public class DataIoAdapter {
             properties.put("omnidata.client.target.list", ipAddress);
             LOG.info("Push down node info: [hostname :{} ,ip :{}]", sdiHost, ipAddress);
             try {
-                orcDataReader = new DataReaderImpl<SparkDeserializer>(
+                orcDataReader = new DataReaderImpl<PageDeserializer>(
                         properties, taskSource, deserializer);
                 hasNextPage = true;
                 page = (WritableColumnVector[]) orcDataReader.getNextPageBlocking();
@@ -217,28 +222,28 @@ public class DataIoAdapter {
                 switch (errorCode) {
                     case OMNIDATA_INSUFFICIENT_RESOURCES:
                         LOG.warn("OMNIDATA_INSUFFICIENT_RESOURCES: "
-                            + "OmniData-server's push down queue is full, "
-                            + "begin to find next OmniData-server");
+                                + "OmniData-server's push down queue is full, "
+                                + "begin to find next OmniData-server");
                         break;
                     case OMNIDATA_UNSUPPORTED_OPERATOR:
                         LOG.warn("OMNIDATA_UNSUPPORTED_OPERATOR: "
-                            + "OmniDataException: exist unsupported operator");
+                                + "OmniDataException: exist unsupported operator");
                         break;
                     case OMNIDATA_GENERIC_ERROR:
                         LOG.warn("OMNIDATA_GENERIC_ERROR: Current OmniData-server unavailable, "
-                            + "begin to find next OmniData-server");
+                                + "begin to find next OmniData-server");
                         break;
                     case OMNIDATA_NOT_FOUND:
                         LOG.warn("OMNIDATA_NOT_FOUND: Current OmniData-Server not found, "
-                            + "begin to find next OmniData-server");
+                                + "begin to find next OmniData-server");
                         break;
                     case OMNIDATA_INVALID_ARGUMENT:
                         LOG.warn("OMNIDATA_INVALID_ARGUMENT: INVALID_ARGUMENT, "
-                            + "exist unsupported operator or dataType");
+                                + "exist unsupported operator or dataType");
                         break;
                     case OMNIDATA_IO_ERROR:
                         LOG.warn("OMNIDATA_IO_ERROR: Current OmniData-Server io exception, "
-                            + "begin to find next OmniData-server");
+                                + "begin to find next OmniData-server");
                         break;
                     default:
                         LOG.warn("OmniDataException: OMNIDATA_ERROR.");
@@ -250,7 +255,7 @@ public class DataIoAdapter {
                 ++failedTimes;
             }
         }
-        int retryTime = Math.min(TASK_FAILED_TIMES, sdiHostArray.length);
+        int retryTime = Math.min(TASK_FAILED_TIMES, sdiHostList.size());
         if (failedTimes >= retryTime) {
             LOG.warn("No Omni-data-server to Connect, Task has tried {} times.", retryTime);
             throw new TaskExecutionException("No Omni-data-server to Connect");
@@ -260,9 +265,21 @@ public class DataIoAdapter {
         return l.iterator();
     }
 
+    private Optional<String> getRandomAvailableSdiHost(String[] sdiHostArray, Map<String, String> fpuHosts) {
+        List<String> existingHosts = Arrays.asList(sdiHostArray);
+        List<String> allHosts = new ArrayList<>(fpuHosts.values());
+        allHosts.removeAll(existingHosts);
+        if (allHosts.size() > 0) {
+            LOG.info("Add another available host: " + allHosts.get(0));
+            return Optional.of(allHosts.get(0));
+        } else {
+            return Optional.empty();
+        }
+    }
+
     public boolean hasNextIterator(List<Object> pageList, PageToColumnar pageToColumnarClass,
                                    PartitionedFile partitionFile, boolean isVectorizedReader)
-        throws Exception {
+            throws Exception {
         if (!hasNextPage) {
             return false;
         }
@@ -274,7 +291,7 @@ public class DataIoAdapter {
         List<WritableColumnVector[]> l = new ArrayList<>();
         l.add(page);
         pageList.addAll(pageToColumnarClass
-            .transPageToColumnar(l.iterator(), isVectorizedReader));
+                .transPageToColumnar(l.iterator(), isVectorizedReader));
         return true;
     }
 
@@ -300,7 +317,7 @@ public class DataIoAdapter {
     private RowExpression extractNamedExpression(Expression namedExpression) {
         Type prestoType = NdpUtils.transOlkDataType(namedExpression.dataType(), false);
         int aggProjectionId;
-        String aggColumnName = namedExpression.toString().split("#")[0];
+        String aggColumnName = namedExpression.toString().split("#")[0].toLowerCase(Locale.ENGLISH);
         columnOrdersList.add(columnOrder++);
         columnTypesList.add(NdpUtils.transDataIoDataType(namedExpression.dataType()));
 
@@ -308,14 +325,14 @@ public class DataIoAdapter {
             aggProjectionId = fieldMap.get(aggColumnName);
         } else {
             int columnId = NdpUtils
-                .getColumnId(namedExpression.toString()) - columnOffset;
+                    .getColumnId(namedExpression.toString()) - columnOffset;
             aggProjectionId = fieldMap.size();
             fieldMap.put(aggColumnName, aggProjectionId);
             omnidataTypes.add(prestoType);
             boolean isPartitionKey = partitionColumnName.contains(aggColumnName);
             String partitionValue = NdpUtils.getPartitionValue(filePath, aggColumnName);
             omnidataColumns.add(new Column(columnId, aggColumnName,
-                prestoType, isPartitionKey, partitionValue));
+                    prestoType, isPartitionKey, partitionValue));
             columnNameSet.add(aggColumnName);
             if (null == columnNameMap.get(aggColumnName)) {
                 columnNameMap.put(aggColumnName, columnNameMap.size());
@@ -327,85 +344,85 @@ public class DataIoAdapter {
     }
 
     private void extractSumMaxMinAggregation(Type prestoType, String expressionName,
-        Map<String, AggregationInfo.AggregateFunction> aggregationMap) {
+                                             Map<String, AggregationInfo.AggregateFunction> aggregationMap) {
         String operatorName = expressionName.split("\\(")[0];
         List<RowExpression> arguments = new ArrayList<>();
         Type returnType = NdpUtils.transAggRetType(prestoType);
-        if(operatorName.equals("sum")) {
+        if (operatorName.equals("sum")) {
             columnTypesList.add(NdpUtils.transAggDecodeType(returnType));
         } else {
             columnTypesList.add(NdpUtils.transAggDecodeType(prestoType));
         }
         FunctionHandle functionHandle = new BuiltInFunctionHandle(
-            new Signature(QualifiedObjectName.valueOfDefaultFunction(operatorName), AGGREGATE,
-                prestoType.getTypeSignature(), prestoType.getTypeSignature()));
+                new Signature(QualifiedObjectName.valueOfDefaultFunction(operatorName), AGGREGATE,
+                        prestoType.getTypeSignature(), prestoType.getTypeSignature()));
         int aggProjectionId = fieldMap.get(expressionName);
         RowExpression rowExpression = new InputReferenceExpression(aggProjectionId, prestoType);
         arguments.add(rowExpression);
         CallExpression callExpression = new CallExpression(operatorName,
-            functionHandle, returnType, arguments, Optional.empty());
+                functionHandle, returnType, arguments, Optional.empty());
         aggregationMap.put(String.format("%s_%s", operatorName, columnOrder),
-            new AggregationInfo.AggregateFunction(callExpression, false));
+                new AggregationInfo.AggregateFunction(callExpression, false));
     }
 
     private void extractAvgAggregation(Type prestoType, String expressionName,
-        Map<String, AggregationInfo.AggregateFunction> aggregationMap) {
+                                       Map<String, AggregationInfo.AggregateFunction> aggregationMap) {
         List<RowExpression> arguments = new ArrayList<>();
         int aggProjectionId = fieldMap.get(expressionName);
         RowExpression rowExpression = new InputReferenceExpression(aggProjectionId, prestoType);
         arguments.add(rowExpression);
         FunctionHandle functionHandle = new BuiltInFunctionHandle(
-            new Signature(QualifiedObjectName.valueOfDefaultFunction("avg"), AGGREGATE,
-                DoubleType.DOUBLE.getTypeSignature(), prestoType.getTypeSignature()));
+                new Signature(QualifiedObjectName.valueOfDefaultFunction("avg"), AGGREGATE,
+                        DoubleType.DOUBLE.getTypeSignature(), prestoType.getTypeSignature()));
         List<Type> rowType = Arrays.asList(DoubleType.DOUBLE, BigintType.BIGINT);
         RowType returnType = RowType.anonymous(rowType);
         CallExpression callExpression = new CallExpression("avg",
-            functionHandle, returnType, arguments, Optional.empty());
+                functionHandle, returnType, arguments, Optional.empty());
         aggregationMap.put(String.format("%s_%s", "avg", columnOrder),
-            new AggregationInfo.AggregateFunction(callExpression, false));
+                new AggregationInfo.AggregateFunction(callExpression, false));
     }
 
     private void extractCountAggregation(Type prestoType, String expressionName,
-        Map<String, AggregationInfo.AggregateFunction> aggregationMap) {
+                                         Map<String, AggregationInfo.AggregateFunction> aggregationMap) {
         List<RowExpression> arguments = new ArrayList<>();
         Signature signature = new Signature(QualifiedObjectName.valueOfDefaultFunction("count"),
-            AGGREGATE, BIGINT.getTypeSignature());
+                AGGREGATE, BIGINT.getTypeSignature());
         if (!expressionName.equals("count(1)")) {
             int aggProjectionId = fieldMap.get(expressionName);
             RowExpression rowExpression = new InputReferenceExpression(aggProjectionId, prestoType);
             arguments.add(rowExpression);
             signature = new Signature(QualifiedObjectName.valueOfDefaultFunction("count"),
-                AGGREGATE, BIGINT.getTypeSignature(), prestoType.getTypeSignature());
+                    AGGREGATE, BIGINT.getTypeSignature(), prestoType.getTypeSignature());
         }
         FunctionHandle functionHandle = new BuiltInFunctionHandle(signature);
         CallExpression callExpression = new CallExpression("count",
-            functionHandle, BIGINT, arguments, Optional.empty());
+                functionHandle, BIGINT, arguments, Optional.empty());
         aggregationMap.put(String.format("%s_%s", "count", columnOrder),
-            new AggregationInfo.AggregateFunction(callExpression, false));
+                new AggregationInfo.AggregateFunction(callExpression, false));
     }
 
     private CallExpression createAggBinCall(BinaryArithmetic expression,
-        String operatorName, Type prestoType) {
+                                            String operatorName, Type prestoType) {
         List<RowExpression> arguments = new ArrayList<>();
         Type leftPrestoType = NdpUtils.transOlkDataType(
-            expression.left().dataType(), false);
+                expression.left().dataType(), false);
         Type rightPrestoType = NdpUtils.transOlkDataType(
-            expression.right().dataType(), false);
+                expression.right().dataType(), false);
         FunctionHandle functionHandle = new BuiltInFunctionHandle(
-            new Signature(QualifiedObjectName.valueOfDefaultFunction("$operator$" + operatorName),
-                SCALAR, prestoType.getTypeSignature(),
-                leftPrestoType.getTypeSignature(),
-                rightPrestoType.getTypeSignature()));
+                new Signature(QualifiedObjectName.valueOfDefaultFunction("$operator$" + operatorName),
+                        SCALAR, prestoType.getTypeSignature(),
+                        leftPrestoType.getTypeSignature(),
+                        rightPrestoType.getTypeSignature()));
         arguments.add(createAggProjection(expression.left()));
         arguments.add(createAggProjection(expression.right()));
         return new CallExpression(operatorName, functionHandle,
-            prestoType, arguments, Optional.empty());
+                prestoType, arguments, Optional.empty());
     }
 
     private RowExpression createAggProjection(Expression expression) {
         Type prestoType = NdpUtils.transOlkDataType(expression.dataType(), false);
         AggExpressionType aggExpressionType = AggExpressionType
-            .valueOf(expression.getClass().getSimpleName());
+                .valueOf(expression.getClass().getSimpleName());
         switch (aggExpressionType) {
             case Add:
                 return createAggBinCall((Add) expression, "Add", prestoType);
@@ -419,22 +436,22 @@ public class DataIoAdapter {
                 return createAggBinCall((Remainder) expression, "Remainder", prestoType);
             case Literal:
                 Object value = NdpUtils.transData(
-                    expression.dataType().toString(), expression.toString());
+                        expression.dataType().toString(), expression.toString());
                 return new ConstantExpression(value, prestoType);
             case AttributeReference:
-                String aggColumnName = expression.toString().split("#")[0];
+                String aggColumnName = expression.toString().split("#")[0].toLowerCase(Locale.ENGLISH);
                 int field;
                 if (null == columnNameMap.get(aggColumnName)) {
                     field = columnNameMap.size();
                     columnNameMap.put(aggColumnName, field);
                     int columnId = NdpUtils
-                        .getColumnId(expression.toString()) - columnOffset;
+                            .getColumnId(expression.toString()) - columnOffset;
                     boolean isPartitionKey = partitionColumnName.contains(aggColumnName);
                     String partitionValue = NdpUtils
-                        .getPartitionValue(filePath, aggColumnName);
+                            .getPartitionValue(filePath, aggColumnName);
                     omnidataColumns.add(
-                        new Column(columnId, aggColumnName,
-                            prestoType, isPartitionKey, partitionValue));
+                            new Column(columnId, aggColumnName,
+                                    prestoType, isPartitionKey, partitionValue));
                 } else {
                     field = columnNameMap.get(aggColumnName);
                 }
@@ -456,14 +473,14 @@ public class DataIoAdapter {
     }
 
     private void extractAggregateFunction(AggregateFunction aggregateFunction,
-        Map<String, AggregationInfo.AggregateFunction> aggregationMap) {
+                                          Map<String, AggregationInfo.AggregateFunction> aggregationMap) {
         List<Expression> expressions = JavaConverters.seqAsJavaList(aggregateFunction.children());
         String aggregateFunctionName = aggregateFunction.toString();
         Type prestoType = NdpUtils.transOlkDataType(aggregateFunction.dataType(), false);
         AggregateFunctionType aggregateFunctionType = AggregateFunctionType.valueOf(
-            aggregateFunction.getClass().getSimpleName());
+                aggregateFunction.getClass().getSimpleName());
         for (Expression expression : expressions) {
-            if(!(expression instanceof Literal)){
+            if (!(expression instanceof Literal)) {
                 omnidataProjections.add(createAggProjection(expression));
                 int projectionId = fieldMap.size();
                 fieldMap.put(aggregateFunctionName, projectionId);
@@ -517,8 +534,8 @@ public class DataIoAdapter {
     }
 
     private Optional<AggregationInfo> createAggregationInfo(
-        List<AggregateFunction> aggregateFunctions,
-        List<NamedExpression> namedExpressions) {
+            List<AggregateFunction> aggregateFunctions,
+            List<NamedExpression> namedExpressions) {
         List<RowExpression> groupingKeys = new ArrayList<>();
         Map<String, AggregationInfo.AggregateFunction> aggregationMap = new LinkedHashMap<>();
         boolean isEmpty = true;
@@ -532,17 +549,17 @@ public class DataIoAdapter {
             isEmpty = false;
         }
         return isEmpty ? Optional.empty() : Optional.of(
-            new AggregationInfo(aggregationMap, groupingKeys));
+                new AggregationInfo(aggregationMap, groupingKeys));
     }
 
     private Optional<AggregationInfo> extractAggAndGroupExpression(
-        List<AggExeInfo> aggExecutionList) {
+            List<AggExeInfo> aggExecutionList) {
         Optional<AggregationInfo> resAggregationInfo = Optional.empty();
         for (AggExeInfo aggExeInfo : aggExecutionList) {
             List<AggregateFunction> aggregateExpressions = JavaConverters.seqAsJavaList(
-                aggExeInfo.aggregateExpressions());
+                    aggExeInfo.aggregateExpressions());
             List<NamedExpression> namedExpressions = JavaConverters.seqAsJavaList(
-                aggExeInfo.groupingExpressions());
+                    aggExeInfo.groupingExpressions());
             resAggregationInfo = createAggregationInfo(aggregateExpressions, namedExpressions);
         }
         return resAggregationInfo;
@@ -569,14 +586,14 @@ public class DataIoAdapter {
             tempRowExpression.add(a1);
             tempRowExpression.add(a2);
             resRowExpression = new SpecialForm(SpecialForm.Form.valueOf("OR"),
-                BOOLEAN, tempRowExpression);
+                    BOOLEAN, tempRowExpression);
         } else if (filterExpression instanceof And) {
             RowExpression a1 = getExpression(((And) filterExpression).left());
             RowExpression a2 = getExpression(((And) filterExpression).right());
             tempRowExpression.add(a2);
             tempRowExpression.add(a1);
             resRowExpression = new SpecialForm(SpecialForm.Form.valueOf("AND"),
-                BOOLEAN, tempRowExpression);
+                    BOOLEAN, tempRowExpression);
         } else {
             resRowExpression = getExpression(filterExpression);
         }
@@ -587,7 +604,7 @@ public class DataIoAdapter {
         RowExpression resRowExpression = null;
         List<Expression> rightExpressions = new ArrayList<>();
         ExpressionOperator expressionOperType =
-            ExpressionOperator.valueOf(filterExpression.getClass().getSimpleName());
+                ExpressionOperator.valueOf(filterExpression.getClass().getSimpleName());
         Expression left;
         Expression right;
         String operatorName;
@@ -597,14 +614,14 @@ public class DataIoAdapter {
                 return reverseExpressionTree(filterExpression);
             case Not:
                 Signature notSignature = new Signature(
-                    QualifiedObjectName.valueOfDefaultFunction("not"),
-                    FunctionKind.SCALAR, new TypeSignature("boolean"),
-                    new TypeSignature("boolean"));
+                        QualifiedObjectName.valueOfDefaultFunction("not"),
+                        FunctionKind.SCALAR, new TypeSignature("boolean"),
+                        new TypeSignature("boolean"));
                 RowExpression tempRowExpression = getExpression(((Not) filterExpression).child());
                 List<RowExpression> notArguments = new ArrayList<>();
                 notArguments.add(tempRowExpression);
                 return new CallExpression("not", new BuiltInFunctionHandle(notSignature),
-                    BOOLEAN, notArguments, Optional.empty());
+                        BOOLEAN, notArguments, Optional.empty());
             case EqualTo:
                 if (((EqualTo) filterExpression).left() instanceof Literal) {
                     rightExpressions.add(((EqualTo) filterExpression).left());
@@ -614,22 +631,22 @@ public class DataIoAdapter {
                     left = ((EqualTo) filterExpression).left();
                 }
                 return getRowExpression(left,
-                    "equal", rightExpressions);
+                        "equal", rightExpressions);
             case IsNotNull:
                 Signature isnullSignature = new Signature(
-                    QualifiedObjectName.valueOfDefaultFunction("not"),
-                    FunctionKind.SCALAR, new TypeSignature("boolean"),
-                    new TypeSignature("boolean"));
+                        QualifiedObjectName.valueOfDefaultFunction("not"),
+                        FunctionKind.SCALAR, new TypeSignature("boolean"),
+                        new TypeSignature("boolean"));
                 RowExpression isnullRowExpression =
-                    getRowExpression(((IsNotNull) filterExpression).child(),
-                    "is_null", null);
+                        getRowExpression(((IsNotNull) filterExpression).child(),
+                                "is_null", null);
                 List<RowExpression> isnullArguments = new ArrayList<>();
                 isnullArguments.add(isnullRowExpression);
                 return new CallExpression("not", new BuiltInFunctionHandle(isnullSignature),
-                    BOOLEAN, isnullArguments, Optional.empty());
+                        BOOLEAN, isnullArguments, Optional.empty());
             case IsNull:
                 return getRowExpression(((IsNull) filterExpression).child(),
-                    "is_null", null);
+                        "is_null", null);
             case LessThan:
                 if (((LessThan) filterExpression).left() instanceof Literal) {
                     rightExpressions.add(((LessThan) filterExpression).left());
@@ -641,7 +658,7 @@ public class DataIoAdapter {
                     operatorName = "less_than";
                 }
                 return getRowExpression(left,
-                    operatorName, rightExpressions);
+                        operatorName, rightExpressions);
             case GreaterThan:
                 if (((GreaterThan) filterExpression).left() instanceof Literal) {
                     rightExpressions.add(((GreaterThan) filterExpression).left());
@@ -653,7 +670,7 @@ public class DataIoAdapter {
                     operatorName = "greater_than";
                 }
                 return getRowExpression(left,
-                    operatorName, rightExpressions);
+                        operatorName, rightExpressions);
             case GreaterThanOrEqual:
                 if (((GreaterThanOrEqual) filterExpression).left() instanceof Literal) {
                     rightExpressions.add(((GreaterThanOrEqual) filterExpression).left());
@@ -665,7 +682,7 @@ public class DataIoAdapter {
                     operatorName = "greater_than_or_equal";
                 }
                 return getRowExpression(left,
-                    operatorName, rightExpressions);
+                        operatorName, rightExpressions);
             case LessThanOrEqual:
                 if (((LessThanOrEqual) filterExpression).left() instanceof Literal) {
                     rightExpressions.add(((LessThanOrEqual) filterExpression).left());
@@ -677,21 +694,21 @@ public class DataIoAdapter {
                     operatorName = "less_than_or_equal";
                 }
                 return getRowExpression(left,
-                    operatorName, rightExpressions);
+                        operatorName, rightExpressions);
             case In:
                 List<Expression> rightExpression =
-                    JavaConverters.seqAsJavaList(((In) filterExpression).list());
+                        JavaConverters.seqAsJavaList(((In) filterExpression).list());
                 return getRowExpression(((In) filterExpression).value(), "in", rightExpression);
             case HiveSimpleUDF:
                 return getRowExpression(filterExpression,
-                    ((HiveSimpleUDF) filterExpression).name(), rightExpressions);
+                        ((HiveSimpleUDF) filterExpression).name(), rightExpressions);
             default:
                 return resRowExpression;
         }
     }
 
     private RowExpression getRowExpression(Expression leftExpression, String operatorName,
-        List<Expression> rightExpression) {
+                                           List<Expression> rightExpression) {
         PrestoExpressionInfo expressionInfo = new PrestoExpressionInfo();
         Type prestoType;
         int filterProjectionId;
@@ -703,8 +720,18 @@ public class DataIoAdapter {
             prestoType = NdpUtils.transOlkDataType(((Cast) leftExpression).child().dataType(), false);
             filterProjectionId = putFilterValue(((Cast) leftExpression).child(), prestoType);
         } else {
-            ndpUdfExpressions.createNdpUdf(leftExpression, expressionInfo, fieldMap);
-            putFilterValue(expressionInfo.getChildExpression(), expressionInfo.getFieldDataType());
+            if (leftExpression instanceof HiveSimpleUDF) {
+                for (int i = 0; i < leftExpression.children().length(); i++) {
+                    Expression childExpr = leftExpression.children().apply(i);
+                    if (!(childExpr instanceof Literal)) {
+                        putFilterValue(childExpr, NdpUtils.transOlkDataType(childExpr.dataType(), false));
+                    }
+                }
+                ndpUdfExpressions.createNdpUdf(leftExpression, expressionInfo, fieldMap);
+            } else {
+                ndpUdfExpressions.createNdpUdf(leftExpression, expressionInfo, fieldMap);
+                putFilterValue(expressionInfo.getChildExpression(), expressionInfo.getFieldDataType());
+            }
             prestoType = expressionInfo.getReturnType();
             filterProjectionId = expressionInfo.getProjectionId();
         }
@@ -714,13 +741,13 @@ public class DataIoAdapter {
         int rightProjectionId = -1;
         RowExpression rowExpression;
         if (rightExpression != null && rightExpression.size() > 0 &&
-            rightExpression.get(0) instanceof AttributeReference) {
+                rightExpression.get(0) instanceof AttributeReference) {
             rightProjectionId = putFilterValue(rightExpression.get(0), prestoType);
             multiArguments.add(new InputReferenceExpression(filterProjectionId, prestoType));
             multiArguments.add(new InputReferenceExpression(rightProjectionId, prestoType));
             rowExpression = NdpFilterUtils.generateRowExpression(
                     operatorName, expressionInfo, prestoType, filterProjectionId,
-                null, multiArguments, "multy_columns");
+                    null, multiArguments, "multy_columns");
         } else {
             // get right value
             if (NdpUtils.isInDateExpression(leftExpression, operatorName)) {
@@ -731,7 +758,7 @@ public class DataIoAdapter {
             }
             rowExpression = NdpFilterUtils.generateRowExpression(
                     operatorName, expressionInfo, prestoType, filterProjectionId,
-                argumentValues, null, operatorName);
+                    argumentValues, null, operatorName);
         }
         return rowExpression;
     }
@@ -740,7 +767,7 @@ public class DataIoAdapter {
     private int putFilterValue(Expression valueExpression, Type prestoType) {
         // Filter赋值
         int columnId = NdpUtils.getColumnId(valueExpression.toString()) - columnOffset;
-        String filterColumnName = valueExpression.toString().split("#")[0];
+        String filterColumnName = valueExpression.toString().split("#")[0].toLowerCase(Locale.ENGLISH);
         if (null != fieldMap.get(filterColumnName)) {
             return fieldMap.get(filterColumnName);
         }
@@ -753,7 +780,7 @@ public class DataIoAdapter {
         columnNameSet.add(filterColumnName);
         omnidataProjections.add(new InputReferenceExpression(filterProjectionId, prestoType));
         omnidataColumns.add(new Column(columnId, filterColumnName,
-            prestoType, isPartitionKey, partitionValue));
+                prestoType, isPartitionKey, partitionValue));
         omnidataTypes.add(prestoType);
         if (null == columnNameMap.get(filterColumnName)) {
             columnNameMap.put(filterColumnName, columnNameMap.size());
@@ -765,7 +792,7 @@ public class DataIoAdapter {
     private List<Object> getDateValue(List<Expression> rightExpression) {
         long DAY_TO_MILL_SECS = 24L * 3600L * 1000L;
         List<Object> dateTimes = new ArrayList<>();
-        for (Expression rExpression: rightExpression) {
+        for (Expression rExpression : rightExpression) {
             String dateStr = rExpression.toString();
             if (NdpUtils.isValidDateFormat(dateStr)) {
                 String[] dateStrArray = dateStr.split("-");
@@ -782,8 +809,8 @@ public class DataIoAdapter {
     }
 
     private List<Object> getValue(List<Expression> rightExpression,
-        String operatorName,
-        String sparkType) {
+                                  String operatorName,
+                                  String sparkType) {
         Object objectValue;
         List<Object> argumentValues = new ArrayList<>();
         if (null == rightExpression || rightExpression.size() == 0) {
@@ -804,22 +831,20 @@ public class DataIoAdapter {
         return argumentValues;
     }
 
-    private SparkDeserializer initSparkDeserializer() {
+    private PageDeserializer initPageDeserializer() {
         DecodeType[] columnTypes = columnTypesList.toArray(new DecodeType[0]);
         int[] columnOrders = columnOrdersList.stream().mapToInt(Integer::intValue).toArray();
         DecodeType[] filterTypes = filterTypesList.toArray(new DecodeType[0]);
         int[] filterOrders = filterOrdersList.stream().mapToInt(Integer::intValue).toArray();
-        SparkDeserializer deserializer;
         if (columnTypes.length == 0) {
-            deserializer = new SparkDeserializer(filterTypes, filterOrders);
+            return new PageDeserializer(filterTypes, filterOrders);
         } else {
-            deserializer = new SparkDeserializer(columnTypes, columnOrders);
+            return new PageDeserializer(columnTypes, columnOrders);
         }
-        return deserializer;
     }
 
     private DataSource initDataSource(PageCandidate pageCandidate)
-        throws UnsupportedOperationException {
+            throws UnsupportedOperationException {
         DataSource dataSource;
         String fileFormat = pageCandidate.getFileFormat();
         Long fileStartPos = pageCandidate.getStartPos();
@@ -839,7 +864,7 @@ public class DataIoAdapter {
     }
 
     private Optional<AggregationInfo> initAggAndGroupInfo(
-        List<AggExeInfo> aggExecutionList) {
+            List<AggExeInfo> aggExecutionList) {
         // create AggregationInfo
         return extractAggAndGroupExpression(aggExecutionList);
     }
@@ -854,7 +879,7 @@ public class DataIoAdapter {
         int filterColumnId = 0;
         for (Attribute attribute : outputColumnList) {
             Attribute resAttribute = NdpUtils.getColumnAttribute(attribute, listAtt);
-            String columnName = resAttribute.name();
+            String columnName = resAttribute.name().toLowerCase(Locale.ENGLISH);
             Type type = NdpUtils.transOlkDataType(resAttribute.dataType(), false);
             int columnId = NdpUtils.getColumnId(resAttribute.toString()) - columnOffset;
             isPartitionKey = partitionColumnName.contains(columnName);

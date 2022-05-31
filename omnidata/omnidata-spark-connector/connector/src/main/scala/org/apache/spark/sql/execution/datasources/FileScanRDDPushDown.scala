@@ -65,9 +65,8 @@ class FileScanRDDPushDown(
   }
   var fpuMap = pushDownOperators.fpuHosts
   var fpuList : Seq[String] = Seq()
-  val fpuIterator = fpuMap.toIterator
-  while (fpuIterator.hasNext) {
-    fpuList = fpuList ++ Seq(fpuIterator.next()._1)
+  for (key <- fpuMap.keys) {
+    fpuList = fpuList :+ key
   }
 
   val filterExecution = pushDownOperators.filterExecutions
