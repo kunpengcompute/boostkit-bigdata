@@ -26,7 +26,7 @@ import io.prestosql.spi.relation.CallExpression;
 import io.prestosql.spi.relation.InputReferenceExpression;
 import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.type.*;
-import scala.collection.JavaConverters;
+import scala.collection.JavaConversions;
 
 import org.apache.spark.sql.catalyst.expressions.AttributeReference;
 import org.apache.spark.sql.catalyst.expressions.Cast;
@@ -155,7 +155,7 @@ public class NdpUdfExpressions {
         PrestoExpressionInfo prestoExpressionInfo,
         Map<String, Integer> fieldMap) {
         String signatureName = ((HiveSimpleUDF) hiveSimpleUDFExpression).name();
-        List<Expression> hiveSimpleUdf = JavaConverters.seqAsJavaList(
+        List<Expression> hiveSimpleUdf = JavaConversions.seqAsJavaList(
             hiveSimpleUDFExpression.children());
         Type returnType = NdpUtils.transOlkDataType(
             hiveSimpleUDFExpression.dataType(), false);
@@ -272,13 +272,13 @@ public class NdpUdfExpressions {
         Map<String, Integer> fieldMap) {
         String signatureName = NdpUdfEnum.SPLIT.getSignatureName();
         Type strType = NdpUtils.transOlkDataType(expression.str().dataType(), true);
-        Type regexType = NdpUtils.transOlkDataType(expression.regex().dataType(), true);
+        Type regexType = NdpUtils.transOlkDataType(expression.pattern().dataType(), true);
         Type returnType = NdpUtils.transOlkDataType(expression.dataType(), true);
         List<RowExpression> rowArguments = new ArrayList<>();
         checkAttributeReference(expression.str(),
             prestoExpressionInfo, fieldMap, strType, rowArguments);
         rowArguments.add(NdpUtils.transArgumentData(
-            expression.regex().toString(), regexType));
+            expression.pattern().toString(), regexType));
         Signature signature = new Signature(
             QualifiedObjectName.valueOfDefaultFunction(
                 NdpUdfEnum.SPLIT.getOperatorName()), FunctionKind.SCALAR,

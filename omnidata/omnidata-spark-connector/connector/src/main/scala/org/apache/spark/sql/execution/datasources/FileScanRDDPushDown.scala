@@ -22,7 +22,8 @@ import java.util
 import scala.collection.JavaConverters._
 import scala.collection.mutable
 import org.apache.parquet.io.ParquetDecodingException
-import org.apache.spark.{SparkUpgradeException, TaskContext, Partition => RDDPartition}
+
+import org.apache.spark.{Partition => RDDPartition, TaskContext}
 import org.apache.spark.deploy.SparkHadoopUtil
 import org.apache.spark.rdd.{InputFileBlockHolder, RDD}
 import org.apache.spark.sql.{DataIoAdapter, NdpUtils, PageCandidate, PageToColumnar, PushDownManager, SparkSession}
@@ -33,6 +34,12 @@ import org.apache.spark.sql.execution.ndp.{NdpConf, PushDownInfo}
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.vectorized.ColumnarBatch
 
+
+/**
+ * A collection of file blocks that should be read as a single task
+ * (possibly from multiple partitioned directories).
+ */
+case class FilePartition(index: Int, files: Array[PartitionedFile], var sdi: String = "") extends RDDPartition
 
 /**
  * An RDD that scans a list of file partitions.
@@ -87,12 +94,19 @@ class FileScanRDDPushDown(
 
   override def compute(split: RDDPartition, context: TaskContext): Iterator[InternalRow] = {
     val pageToColumnarClass = new PageToColumnar(requiredSchema, output)
-
     val iterator = new Iterator[Object] with AutoCloseable {
       private val inputMetrics = context.taskMetrics().inputMetrics
       private val existingBytesRead = inputMetrics.bytesRead
+
+      // Find a function that will return the FileSystem bytes read by this thread. Do this before
+      // apply readFunction, because it might read some bytes.
       private val getBytesReadCallback =
       SparkHadoopUtil.get.getFSBytesReadOnThreadCallback()
+
+      // We get our input bytes from thread-local Hadoop FileSystem statistics.
+      // If we do a coalesce, however, we are likely to compute multiple partitions in the same
+      // task and in the same thread, in which case we need to avoid override values written by
+      // previous partitions (SPARK-13071).
       private def incTaskInputMetricsBytesRead(): Unit = {
         inputMetrics.setBytesRead(existingBytesRead + getBytesReadCallback())
       }
@@ -152,7 +166,7 @@ class FileScanRDDPushDown(
       private def nextIterator(): Boolean = {
         if (files.hasNext) {
           currentFile = files.next()
-          // logInfo(s"Reading File $currentFile")
+          // Sets InputFileBlockHolder for the file block's information
           InputFileBlockHolder.set(currentFile.filePath, currentFile.start, currentFile.length)
           val pageCandidate = new PageCandidate(currentFile.filePath, currentFile.start,
             currentFile.length, columnOffset, sdiHosts,
@@ -170,9 +184,7 @@ class FileScanRDDPushDown(
                 s"Expected: ${e.getLogicalType}, Found: ${e.getPhysicalType}"
               throw new QueryExecutionException(message, e)
             case e: ParquetDecodingException =>
-              if (e.getCause.isInstanceOf[SparkUpgradeException]) {
-                throw e.getCause
-              } else if (e.getMessage.contains("Can not read value at")) {
+              if (e.getMessage.contains("Can not read value at")) {
                 val message = "Encounter error while reading parquet files. " +
                   "One possible cause: Parquet column cannot be converted in the " +
                   "corresponding files. Details: "
@@ -199,7 +211,7 @@ class FileScanRDDPushDown(
     iterator.asInstanceOf[Iterator[InternalRow]] // This is an erasure hack.
   }
 
-  override protected def getPartitions: Array[RDDPartition] = {
+  override protected def getPartitions:  Array[RDDPartition] = {
     filePartitions.map { partitionFile => {
       val retHost = mutable.HashMap.empty[String, Long]
       partitionFile.files.foreach { partitionMap => {
@@ -207,7 +219,7 @@ class FileScanRDDPushDown(
           sdiKey => {
             retHost(sdiKey) = retHost.getOrElse(sdiKey, 0L) + partitionMap.length
             sdiKey
-        }}
+          }}
       }}
 
       val datanode = retHost.toSeq.sortWith((x, y) => x._2 > y._2).toIterator
@@ -240,6 +252,21 @@ class FileScanRDDPushDown(
   }
 
   override protected def getPreferredLocations(split: RDDPartition): Seq[String] = {
-    split.asInstanceOf[FilePartition].preferredLocations()
+    val files = split.asInstanceOf[FilePartition].files
+
+    // Computes total number of bytes can be retrieved from each host.
+    val hostToNumBytes = mutable.HashMap.empty[String, Long]
+    files.foreach { file =>
+      file.locations.filter(_ != "localhost").foreach { host =>
+        hostToNumBytes(host) = hostToNumBytes.getOrElse(host, 0L) + file.length
+      }
+    }
+
+    // Takes the first 3 hosts with the most data to be retrieved
+    hostToNumBytes.toSeq.sortBy {
+      case (host, numBytes) => numBytes
+    }.reverse.take(3).map {
+      case (host, numBytes) => host
+    }
   }
 }

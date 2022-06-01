@@ -34,7 +34,7 @@ import org.apache.spark.sql.types.*;
 import org.apache.spark.sql.types.DateType;
 
 import scala.Option;
-import scala.collection.JavaConverters;
+import scala.collection.JavaConversions;
 import scala.collection.Seq;
 
 import java.lang.reflect.Field;
@@ -70,7 +70,7 @@ import static java.lang.Float.parseFloat;
 public class NdpUtils {
 
     public static int getColumnOffset(StructType dataSchema, Seq<Attribute> outPut) {
-        List<Attribute> attributeList = JavaConverters.seqAsJavaList(outPut);
+        List<Attribute> attributeList = JavaConversions.seqAsJavaList(outPut);
         String columnName = "";
         int columnTempId = 0;
         if (attributeList.size() > 0) {
@@ -93,13 +93,13 @@ public class NdpUtils {
         String columnName = "";
         int columnTempId = 0;
         if (aggExeInfo != null && aggExeInfo.size() > 0) {
-            List<AggExeInfo> aggExecutionList = JavaConverters.seqAsJavaList(aggExeInfo);
+            List<AggExeInfo> aggExecutionList = JavaConversions.seqAsJavaList(aggExeInfo);
             for (AggExeInfo aggExeInfoTemp : aggExecutionList) {
-                List<AggregateFunction> aggregateExpressions = JavaConverters.seqAsJavaList(
-                        aggExeInfoTemp.aggregateExpressions());
+                List<AggregateFunction> aggregateExpressions = JavaConversions.seqAsJavaList(
+                    aggExeInfoTemp.aggregateExpressions());
                 for (AggregateFunction aggregateFunction : aggregateExpressions) {
-                    List<Expression> expressions = JavaConverters
-                            .seqAsJavaList(aggregateFunction.children());
+                    List<Expression> expressions = JavaConversions
+                        .seqAsJavaList(aggregateFunction.children());
                     for (Expression expression : expressions) {
                         columnName = expression.toString().split("#")[0].replaceAll("\\(", "");
                         Pattern pattern = Pattern.compile(columnName + "#(\\d+)");
@@ -111,8 +111,8 @@ public class NdpUtils {
                     }
                     break;
                 }
-                List<NamedExpression> namedExpressions = JavaConverters.seqAsJavaList(
-                        aggExeInfoTemp.groupingExpressions());
+                List<NamedExpression> namedExpressions = JavaConversions.seqAsJavaList(
+                    aggExeInfoTemp.groupingExpressions());
                 for (NamedExpression namedExpression : namedExpressions) {
                     columnName = namedExpression.toString().split("#")[0];
                     columnTempId = NdpUtils.getColumnId(namedExpression.toString());

@@ -55,7 +55,7 @@ import io.prestosql.spi.type.DoubleType;
 import io.prestosql.spi.type.RowType;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeSignature;
-import scala.collection.JavaConverters;
+import scala.collection.JavaConversions;
 import scala.collection.Seq;
 
 import org.apache.hadoop.hive.ql.exec.TaskExecutionException;
@@ -177,12 +177,12 @@ public class DataIoAdapter {
 
         // create AggregationInfo
         // init agg candidates
-        List<Attribute> partitionColumnBatch = JavaConverters.seqAsJavaList(partitionColumn);
+        List<Attribute> partitionColumnBatch = JavaConversions.seqAsJavaList(partitionColumn);
         for (Attribute attribute : partitionColumnBatch) {
             partitionColumnName.add(attribute.name());
         }
         List<AggExeInfo> aggExecutionList =
-                JavaConverters.seqAsJavaList(pushDownOperators.aggExecutions());
+            JavaConversions.seqAsJavaList(pushDownOperators.aggExecutions());
         if (aggExecutionList.size() == 0) {
             initColumnInfo(sparkOutPut);
         }
@@ -206,7 +206,7 @@ public class DataIoAdapter {
         int randomIndex = (int) (Math.random() * sdiHostArray.length);
         List<String> sdiHostList = new ArrayList<>(Arrays.asList(sdiHostArray));
         Optional<String> availableSdiHost = getRandomAvailableSdiHost(sdiHostArray,
-                JavaConverters.mapAsJavaMap(pushDownOperators.fpuHosts()));
+                JavaConversions.mapAsJavaMap(pushDownOperators.fpuHosts()));
         availableSdiHost.ifPresent(sdiHostList::add);
         Iterator<String> sdiHosts = sdiHostList.iterator();
         Set<String> sdiHostSet = new HashSet<>();
@@ -328,7 +328,7 @@ public class DataIoAdapter {
         columnOrder = 0;
         filePath = pageCandidate.getFilePath();
         columnOffset = pageCandidate.getColumnOffset();
-        listAtt = JavaConverters.seqAsJavaList(filterOutPut);
+        listAtt = JavaConversions.seqAsJavaList(filterOutPut);
         TASK_FAILED_TIMES = pageCandidate.getMaxFailedTimes();
     }
 
@@ -491,8 +491,8 @@ public class DataIoAdapter {
     }
 
     private void extractAggregateFunction(AggregateFunction aggregateFunction,
-                                          Map<String, AggregationInfo.AggregateFunction> aggregationMap) {
-        List<Expression> expressions = JavaConverters.seqAsJavaList(aggregateFunction.children());
+        Map<String, AggregationInfo.AggregateFunction> aggregationMap) {
+        List<Expression> expressions = JavaConversions.seqAsJavaList(aggregateFunction.children());
         String aggregateFunctionName = aggregateFunction.toString();
         Type prestoType = NdpUtils.transOlkDataType(aggregateFunction.dataType(), false);
         AggregateFunctionType aggregateFunctionType = AggregateFunctionType.valueOf(
@@ -574,17 +574,17 @@ public class DataIoAdapter {
             List<AggExeInfo> aggExecutionList) {
         Optional<AggregationInfo> resAggregationInfo = Optional.empty();
         for (AggExeInfo aggExeInfo : aggExecutionList) {
-            List<AggregateFunction> aggregateExpressions = JavaConverters.seqAsJavaList(
-                    aggExeInfo.aggregateExpressions());
-            List<NamedExpression> namedExpressions = JavaConverters.seqAsJavaList(
-                    aggExeInfo.groupingExpressions());
+            List<AggregateFunction> aggregateExpressions = JavaConversions.seqAsJavaList(
+                aggExeInfo.aggregateExpressions());
+            List<NamedExpression> namedExpressions = JavaConversions.seqAsJavaList(
+                aggExeInfo.groupingExpressions());
             resAggregationInfo = createAggregationInfo(aggregateExpressions, namedExpressions);
         }
         return resAggregationInfo;
     }
 
     private RowExpression extractFilterExpression(Seq<FilterExeInfo> filterExecution) {
-        List<FilterExeInfo> filterExecutionList = JavaConverters.seqAsJavaList(filterExecution);
+        List<FilterExeInfo> filterExecutionList = JavaConversions.seqAsJavaList(filterExecution);
         RowExpression resRowExpression = null;
         for (FilterExeInfo filterExeInfo : filterExecutionList) {
             resRowExpression = reverseExpressionTree(filterExeInfo.filter());
@@ -715,7 +715,7 @@ public class DataIoAdapter {
                         operatorName, rightExpressions);
             case In:
                 List<Expression> rightExpression =
-                        JavaConverters.seqAsJavaList(((In) filterExpression).list());
+                    JavaConversions.seqAsJavaList(((In) filterExpression).list());
                 return getRowExpression(((In) filterExpression).value(), "in", rightExpression);
             case HiveSimpleUDF:
                 return getRowExpression(filterExpression,
@@ -892,7 +892,7 @@ public class DataIoAdapter {
             return;
         }
 
-        List<Attribute> outputColumnList = JavaConverters.seqAsJavaList(sparkOutPut);
+        List<Attribute> outputColumnList = JavaConversions.seqAsJavaList(sparkOutPut);
         boolean isPartitionKey;
         int filterColumnId = 0;
         for (Attribute attribute : outputColumnList) {

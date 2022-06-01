@@ -28,7 +28,7 @@ import org.apache.zookeeper.KeeperException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import scala.collection.JavaConverters;
+import scala.collection.JavaConversions;
 import scala.collection.Map$;
 
 import java.io.IOException;
@@ -111,7 +111,7 @@ public class PushDownManager {
     }
 
     private static scala.collection.Map<String, String> javaMapToScala(Map kafkaParams) {
-        scala.collection.Map scalaMap = JavaConverters.mapAsScalaMap(kafkaParams);
+        scala.collection.Map scalaMap = JavaConversions.mapAsScalaMap(kafkaParams);
         Object objTest = Map$.MODULE$.<String, String>newBuilder().$plus$plus$eq(scalaMap.toSeq());
         Object resultTest = ((scala.collection.mutable.Builder) objTest).result();
         scala.collection.Map<String, String> retMap = (scala.collection.Map) resultTest;

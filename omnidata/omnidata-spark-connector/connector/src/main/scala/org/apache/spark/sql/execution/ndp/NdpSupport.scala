@@ -23,7 +23,7 @@ import scala.collection.mutable.ListBuffer
 import org.apache.spark.sql.catalyst.expressions.{Attribute, Expression, NamedExpression}
 import org.apache.spark.sql.catalyst.expressions.aggregate.AggregateFunction
 import org.apache.spark.sql.execution.SparkPlan
-import org.apache.spark.sql.execution.aggregate.BaseAggregateExec
+import org.apache.spark.sql.execution.aggregate.{HashAggregateExec, ObjectHashAggregateExec, SortAggregateExec}
 
 // filter in aggregate could be push down through aggregate, separate filter and aggregate
 case class AggExeInfo(
@@ -81,7 +81,17 @@ trait NdpSupport extends SparkPlan {
 }
 
 object NdpSupport {
-  def toAggExecution(agg: BaseAggregateExec): AggExeInfo = {
+  def toAggExecution(agg: HashAggregateExec): AggExeInfo = {
+    AggExeInfo(agg.aggregateExpressions.map(_.aggregateFunction),
+      agg.groupingExpressions, agg.output)
+  }
+
+  def toAggExecution(agg: SortAggregateExec): AggExeInfo = {
+    AggExeInfo(agg.aggregateExpressions.map(_.aggregateFunction),
+      agg.groupingExpressions, agg.output)
+  }
+
+  def toAggExecution(agg: ObjectHashAggregateExec): AggExeInfo = {
     AggExeInfo(agg.aggregateExpressions.map(_.aggregateFunction),
       agg.groupingExpressions, agg.output)
   }

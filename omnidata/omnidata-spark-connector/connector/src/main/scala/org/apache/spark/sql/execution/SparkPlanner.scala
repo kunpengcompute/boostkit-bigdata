@@ -17,33 +17,35 @@
 
 package org.apache.spark.sql.execution
 
+import org.apache.spark.SparkContext
 import org.apache.spark.sql._
-import org.apache.spark.sql.catalyst.SQLConfHelper
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
-import org.apache.spark.sql.execution.adaptive.LogicalQueryStageStrategy
 import org.apache.spark.sql.execution.datasources.{DataSourceStrategy, FileSourceStrategy}
 import org.apache.spark.sql.execution.datasources.v2.DataSourceV2Strategy
+import org.apache.spark.sql.internal.SQLConf
 
-class SparkPlanner(val session: SparkSession, val experimentalMethods: ExperimentalMethods)
-  extends SparkStrategies with SQLConfHelper {
+class SparkPlanner(
+                    val sparkContext: SparkContext,
+                    val conf: SQLConf,
+                    val experimentalMethods: ExperimentalMethods)
+  extends SparkStrategies {
 
   def numPartitions: Int = conf.numShufflePartitions
 
   override def strategies: Seq[Strategy] =
     experimentalMethods.extraStrategies ++
       extraPlanningStrategies ++ (
-      LogicalQueryStageStrategy ::
       PythonEvals ::
-      new DataSourceV2Strategy(session) ::
-      FileSourceStrategy ::
-      DataSourceStrategy ::
-      SpecialLimits ::
-      Aggregation ::
-      Window ::
-      JoinSelection ::
-      InMemoryScans ::
-      BasicOperators :: Nil)
+        DataSourceV2Strategy ::
+        FileSourceStrategy ::
+        DataSourceStrategy(conf) ::
+        SpecialLimits ::
+        Aggregation ::
+        Window ::
+        JoinSelection ::
+        InMemoryScans ::
+        BasicOperators :: Nil)
 
   /**
    * Override to add extra planning strategies to the planner. These strategies are tried after
@@ -77,11 +79,11 @@ class SparkPlanner(val session: SparkSession, val experimentalMethods: Experimen
    * provided `scanBuilder` function so that it can avoid unnecessary column materialization.
    */
   def pruneFilterProject(
-      projectList: Seq[NamedExpression],
-      filterPredicates: Seq[Expression],
-      prunePushedDownFilters: Seq[Expression] => Seq[Expression],
-      scanBuilder: Seq[Attribute] => SparkPlan,
-      selectivity: Option[Double]): SparkPlan = {
+                          projectList: Seq[NamedExpression],
+                          filterPredicates: Seq[Expression],
+                          prunePushedDownFilters: Seq[Expression] => Seq[Expression],
+                          scanBuilder: Seq[Attribute] => SparkPlan,
+                          selectivity: Option[Double]): SparkPlan = {
 
     val projectSet = AttributeSet(projectList.flatMap(_.references))
     val filterSet = AttributeSet(filterPredicates.flatMap(_.references))
@@ -95,7 +97,7 @@ class SparkPlanner(val session: SparkSession, val experimentalMethods: Experimen
     // avoided safely.
 
     if (AttributeSet(projectList.map(_.toAttribute)) == projectSet &&
-        filterSet.subsetOf(projectSet)) {
+      filterSet.subsetOf(projectSet)) {
       // When it is possible to just use column pruning to get the right projection and
       // when the columns of this projection are enough to evaluate all filter conditions,
       // just do a scan followed by a filter, with no extra project.
@@ -103,8 +105,7 @@ class SparkPlanner(val session: SparkSession, val experimentalMethods: Experimen
       filterCondition.map(FilterExec(_, scan, selectivity)).getOrElse(scan)
     } else {
       val scan = scanBuilder((projectSet ++ filterSet).toSeq)
-      ProjectExec(projectList, filterCondition.map(FilterExec(_, scan, selectivity))
-        .getOrElse(scan))
+      ProjectExec(projectList, filterCondition.map(FilterExec(_, scan, selectivity)).getOrElse(scan))
     }
   }
 }

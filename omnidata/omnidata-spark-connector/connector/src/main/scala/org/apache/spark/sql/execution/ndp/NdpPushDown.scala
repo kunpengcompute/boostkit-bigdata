@@ -26,8 +26,7 @@ import org.apache.spark.sql.catalyst.expressions.{And, Attribute, AttributeRefer
 import org.apache.spark.sql.catalyst.expressions.aggregate.{Partial, PartialMerge}
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.{FileSourceScanExec, FilterExec, GlobalLimitExec, LeafExecNode, LocalLimitExec, ProjectExec, SparkPlan}
-import org.apache.spark.sql.execution.adaptive.AdaptiveSparkPlanExec
-import org.apache.spark.sql.execution.aggregate.{BaseAggregateExec, HashAggregateExec, ObjectHashAggregateExec, SortAggregateExec}
+import org.apache.spark.sql.execution.aggregate.{HashAggregateExec, ObjectHashAggregateExec, SortAggregateExec}
 import org.apache.spark.sql.execution.datasources.HadoopFsRelation
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.sources.DataSourceRegister
@@ -81,11 +80,6 @@ case class NdpPushDown(sparkSession: SparkSession)
   def shouldPushDown(plan: SparkPlan): Boolean = {
     var isPush = false
     val p = plan.transformUp {
-      case a: AdaptiveSparkPlanExec =>
-        if (shouldPushDown(a.inputPlan)) {
-          isPush = true
-        }
-        plan
       case s: FileSourceScanExec =>
         if (s.metadata.get("Location").toString.contains("[hdfs") ||
           s.metadata.get("Location").toString.contains("[cephrgw") ||
@@ -136,7 +130,7 @@ case class NdpPushDown(sparkSession: SparkSession)
     s.scan.isPushDown && projectList.forall(_.isInstanceOf[AttributeReference])
   }
 
-  def shouldPushDown(agg: BaseAggregateExec, scan: NdpSupport): Boolean = {
+  def shouldPushDown(agg: HashAggregateExec, scan: NdpSupport): Boolean = {
     scan.aggExeInfos.isEmpty &&
       agg.output.forall(x => attrWhiteList.contains(x.dataType.typeName)) &&
       agg.aggregateExpressions.forall{ e =>
@@ -149,14 +143,39 @@ case class NdpPushDown(sparkSession: SparkSession)
     }
   }
 
+  def shouldPushDown(agg: ObjectHashAggregateExec, scan: NdpSupport): Boolean = {
+    scan.aggExeInfos.isEmpty &&
+      agg.output.forall(x => attrWhiteList.contains(x.dataType.typeName)) &&
+      agg.aggregateExpressions.forall{ e =>
+        aggFuncWhiteList.contains(e.aggregateFunction.prettyName) &&
+          (e.mode.equals(PartialMerge) || e.mode.equals(Partial)) &&
+          !e.isDistinct &&
+          e.aggregateFunction.children.forall { g =>
+            aggExpressionWhiteList.contains(g.prettyName)
+          }
+      }
+  }
+
+  def shouldPushDown(agg: SortAggregateExec, scan: NdpSupport): Boolean = {
+    scan.aggExeInfos.isEmpty &&
+      agg.output.forall(x => attrWhiteList.contains(x.dataType.typeName)) &&
+      agg.aggregateExpressions.forall{ e =>
+        aggFuncWhiteList.contains(e.aggregateFunction.prettyName) &&
+          (e.mode.equals(PartialMerge) || e.mode.equals(Partial)) &&
+          !e.isDistinct &&
+          e.aggregateFunction.children.forall { g =>
+            aggExpressionWhiteList.contains(g.prettyName)
+          }
+      }
+  }
+
   def shouldPushDown(scan: NdpSupport): Boolean = {
     scan.limitExeInfo.isEmpty
   }
 
   def filterSelectivityEnabled: Boolean = {
     filterSelectivityEnable &&
-      sparkSession.conf.get(SQLConf.CBO_ENABLED) &&
-      sparkSession.conf.get(SQLConf.PLAN_STATS_ENABLED)
+      sparkSession.conf.get(SQLConf.CBO_ENABLED)
   }
 
   def replaceWrapper(plan: SparkPlan): SparkPlan = {
@@ -214,8 +233,6 @@ case class NdpPushDown(sparkSession: SparkSession)
 
   def pushDownOperatorInternal(plan: SparkPlan): SparkPlan = {
     val p = plan.transformUp {
-      case a: AdaptiveSparkPlanExec =>
-        pushDownOperatorInternal(a.inputPlan)
       case s: FileSourceScanExec if shouldPushDown(s.relation) =>
         val filters = s.partitionFilters.filter { x =>
           //TODO maybe need to adapt to the UDF whitelist.
