@@ -19,18 +19,19 @@ package org.apache.spark.sql.execution.ndp
 
 import java.util.Locale
 
+import org.apache.spark.internal.config.MAX_RESULT_SIZE
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.{PushDownManager, SparkSession}
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.{And, Attribute, AttributeReference, Expression, NamedExpression, PredicateHelper, UserDefinedExpression}
 import org.apache.spark.sql.catalyst.expressions.aggregate.{Partial, PartialMerge}
+import org.apache.spark.sql.catalyst.expressions.{And, Attribute, AttributeReference, Expression, NamedExpression, PredicateHelper}
 import org.apache.spark.sql.catalyst.rules.Rule
-import org.apache.spark.sql.execution.{FileSourceScanExec, FilterExec, GlobalLimitExec, LeafExecNode, LocalLimitExec, ProjectExec, SparkPlan}
-import org.apache.spark.sql.execution.adaptive.{AdaptiveSparkPlanExec, InsertAdaptiveSparkPlan}
+import org.apache.spark.sql.execution.adaptive.AdaptiveSparkPlanExec
 import org.apache.spark.sql.execution.aggregate.{BaseAggregateExec, HashAggregateExec, ObjectHashAggregateExec, SortAggregateExec}
 import org.apache.spark.sql.execution.datasources.HadoopFsRelation
+import org.apache.spark.sql.execution._
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.sources.DataSourceRegister
+import org.apache.spark.sql.{PushDownManager, SparkSession}
 
 case class NdpPushDown(sparkSession: SparkSession)
   extends Rule[SparkPlan] with PredicateHelper {
@@ -66,6 +67,8 @@ case class NdpPushDown(sparkSession: SparkSession)
 
   override def apply(plan: SparkPlan): SparkPlan = {
     if (pushDownEnabled && shouldPushDown(plan) && shouldPushDown()) {
+      val maxResultSize = (sparkSession.sparkContext.getConf.get(MAX_RESULT_SIZE) * 1.2).toLong
+      sparkSession.sparkContext.conf.set(MAX_RESULT_SIZE.key, maxResultSize.toString)
       pushDownOperator(plan)
     } else {
       plan
