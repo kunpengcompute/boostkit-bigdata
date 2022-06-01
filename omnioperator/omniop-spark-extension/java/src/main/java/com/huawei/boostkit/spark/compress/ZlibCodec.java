@@ -15,7 +15,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.huawei.boostkit.spark.compress;
 
 import java.io.IOException;
@@ -30,12 +29,12 @@ public class ZlibCodec implements CompressionCodec {
     private int level;
     private int strategy;
 
-    private ZlibCodec() {
+    public ZlibCodec() {
         level = Deflater.DEFAULT_COMPRESSION;
         strategy = Deflater.DEFAULT_STRATEGY;
     }
 
-    public ZlibCodec(int level, int strategy) {
+    private ZlibCodec(int level, int strategy) {
         this.level = level;
         this.strategy = strategy;
     }
@@ -105,8 +104,8 @@ public class ZlibCodec implements CompressionCodec {
 
         for (Modifier m : modifiers){
             switch (m){
-                /* filtered == less LZ77, more huffman */
                 case BINARY:
+                    /* filtered == less LZ77, more huffman */
                     s = Deflater.FILTERED;
                     break;
                 case TEXT:
