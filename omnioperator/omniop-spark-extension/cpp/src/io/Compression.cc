@@ -50,7 +50,7 @@ namespace spark {
     virtual uint64_t getSize() const override;
 
   protected:
-    void writerHeader(char * buffer, size_t compressedSize, bool original) {
+    void writeHeader(char * buffer, size_t compressedSize, bool original) {
       buffer[0] = static_cast<char>((compressedSize << 1) + (original ? 1 : 0));
       buffer[1] = static_cast<char>(compressedSize >> 7);
       buffer[2] = static_cast<char>(compressedSize >> 15);
