@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.execution.dataSource.orc
+package org.apache.spark.sql.execution.dataSources.orc
 
 import java.io.Serializable
 import java.net.URI
@@ -23,8 +23,8 @@ import java.net.URI
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, Path}
 import org.apache.hadoop.mapreduce._
-import org.apache.hadoop.mapreduce.lib.input.FileInputFormat
-import org.apache.hadoop.mapreduce.task.TaskAttemptContext
+import org.apache.hadoop.mapreduce.lib.input.FileSplit
+import org.apache.hadoop.mapreduce.task.TaskAttemptContextImpl
 import org.apache.orc.{OrcConf, OrcFile, TypeDescription}
 import org.apache.orc.mapreduce.OrcInputFormat
 
@@ -61,7 +61,7 @@ class OmniOrcFileFormat extends FileFormat with DataSourceRegister with Serializ
       requiredSchema: StructType,
       filters: Seq[Filter],
       options: Map[String, String],
-      hadoopConf: Configuration): (PartitionedFile) => Iterator[InternalRow] = {
+      hadoopConf: Configuration): PartitionedFile => Iterator[InternalRow] = {
 
     val resultSchema = StructType(requiredSchema.fields ++ partitionSchema.fields)
     val sqlConf = sparkSession.sessionState.conf
@@ -93,8 +93,8 @@ class OmniOrcFileFormat extends FileFormat with DataSourceRegister with Serializ
       } else {
         // ORC predicate pushdown
         if (orcFilterPushDown) {
-          OrcUtils.readCatalystSchema(filePath, conf, ignoreCorruptFiles).foreach { fileSchema =>
-            OrcFilters.createFilter(fileSchema, filters).foreach { f =>
+          OrcUtils.readCatalystSchema(filePath, conf, ignoreCorruptFiles).foreach { 
+            fileSchema => OrcFilters.createFilter(fileSchema, filters).foreach { f =>
               OrcInputFormat.setSearchArgument(conf, f, fileSchema.fieldNames)
             }
           }
@@ -112,7 +112,7 @@ class OmniOrcFileFormat extends FileFormat with DataSourceRegister with Serializ
         val taskAttemptContext = new TaskAttemptContextImpl(taskConf, attemptId)
 
         // read data from vectorized reader
-          val batchReader = new OrcColumnarBatchReader(capacity)
+          val batchReader = new OmniOrcColumnarBatchReader(capacity)
           // SPARK-23399 Register a task completion listener first to call `close()` in all cases.
           // There is a possibility that `initialize` and `initBatch` hit some errors (like OOM)
           // after opening a file.

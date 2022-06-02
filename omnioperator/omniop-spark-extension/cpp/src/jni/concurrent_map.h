@@ -2,7 +2,7 @@
  * Copyright (c) Huawei Technologies Co., Ltd. 2020-2021. All rights reserved.
  */
 
-#ifdef THESTRAL_PLUGIN_MASTER_CONCURRENT_MAP_H
+#ifndef THESTRAL_PLUGIN_MASTER_CONCURRENT_MAP_H
 #define THESTRAL_PLUGIN_MASTER_CONCURRENT_MAP_H
 
 #include <memory>
@@ -29,7 +29,7 @@ public:
 
     void Erase(jlong module_id) {
         std::lock_guard<std::mutex> lock(mtx_);
-        map_erase(module_id);
+        map_.erase(module_id);
     }
 
     Holder Lookup(jlong module_id) {
@@ -48,14 +48,14 @@ public:
 
     size_t Size() {
         std::lock_guard<std::mutex> lock(mtx_);
-        map_.size();
+        return map_.size();
     }
 private:
     // Initialize the module id starting value to a number greater than zero
     // to allow for easier debugging of uninitialized java variables.
-    static constexpr int init_module_id = 4;
+    static constexpr int init_module_id_ = 4;
 
-    int64_t module_id;
+    int64_t module_id_;
     std::mutex mtx_;
     // map from module ids return to Java and module pointers
     std::unordered_map<jlong, Holder> map_;

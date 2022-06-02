@@ -8,7 +8,7 @@
 #define THESTRAL_PLUGIN_ORCCOLUMNARBATCHJNIREADER_H
 
 #include "orc/ColumnPrinter.hh"
-#include "orc/Exceptions.h"
+#include "orc/Exceptions.hh"
 #include "orc/Type.hh"
 #include "orc/Vector.hh"
 #include "orc/Reader.hh"
@@ -55,7 +55,7 @@ enum class PredicateOperatorType {
  * Signature:   (Ljava/lang/String;Lorg/json/simple/JSONObject;)J
  */
 JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniReader_initializeReader
-        (JNIEnv* env, jobject jObj);
+        (JNIEnv* env, jobject jObj, jstring path, jobject job);
 
 /*
  * Class:       come_huawei_boostkit_spark_jni_OrcColumnarBatchJniReader
@@ -71,7 +71,7 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniRe
  * Signature:   (JLorg/json/simple/JSONObject;)J
  */
 JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniReader_initializeBatch
-        (JNIEnv* env, jobject jObj, jlong rowReader, jlong batchsize);
+        (JNIEnv* env, jobject jObj, jlong rowReader, jlong batchSize);
 
 /*
  * Class:       come_huawei_boostkit_spark_jni_OrcColumnarBatchJniReader
@@ -123,7 +123,7 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniRe
 int getLiteral(orc::Literal &lit, int leafType, std::string value);      
 
 int buildLeafs(int leafOp, std::vector<orc::Literal> &litList, orc::Literal &lit, std::string leafNameString, int leafType,
-    orc::searchArgumentBuilder &builder);
+    orc::SearchArgumentBuilder &builder);
 
 int copyToOminVec(int maxLen, int vcType, int &ominTypeId, uint64_t &ominVecId, orc::ColumnVectorBatch *field);  
 

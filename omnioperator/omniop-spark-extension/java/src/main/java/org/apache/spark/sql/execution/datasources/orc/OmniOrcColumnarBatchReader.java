@@ -113,7 +113,7 @@ public class OmniOrcColumnarBatchReader extends RecordReader<Void, ColumnarBatch
     Reader.Options options =
       OrcColumnarNativeReader.buildOptions(conf, fileSplit.getStart(), fileSplit.getLength());
     recordReader = new OrcColumnarBatchJniReader();
-    recordReader.initializeReaderJava(fileSplit.getpath().toString(), readerOptions);
+    recordReader.initializeReaderJava(fileSplit.getPath().toString(), readerOptions);
     recordReader.initializeRecordReaderJava(options);
   }
 
@@ -167,7 +167,7 @@ public class OmniOrcColumnarBatchReader extends RecordReader<Void, ColumnarBatch
           missingCol.setIsConstant();
           orcVectorWrappers[i] = missingCol;
         } else {
-          orcVectorWrappers[i] = new OmniOrcColumnVector(capacity, dt, false);
+          orcVectorWrappers[i] = new OmniColumnVector(capacity, dt, false);
         }
       }
     }
