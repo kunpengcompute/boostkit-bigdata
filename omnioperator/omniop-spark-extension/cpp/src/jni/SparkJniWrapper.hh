@@ -11,7 +11,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-/**
+/*
  * Class:   com_huawei_boostkit_spark_jni_SparkJniWrapper 
  * Method:  nativeMake
  * Signature:   ()V
