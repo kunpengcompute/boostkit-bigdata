@@ -31,13 +31,13 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved) {
     }
 
     illegal_access_exception_class = 
-        CreateGlobalClassReference(env, "Ljava/lang/IllegalAccessException");
+        CreateGlobalClassReference(env, "Ljava/lang/IllegalAccessException;");
 
     split_result_class = 
         CreateGlobalClassReference(env, "Lcom/huawei/boostkit/spark/vectorized/SplitResult;");
     split_result_constructor = GetMethodID(env, split_result_class, "<init>", "(JJJJJ[J)V");
 
-    runtime_exception_class = CreateGlobalClassReference(env, "Ljava/lang/RuntimeException:");
+    runtime_exception_class = CreateGlobalClassReference(env, "Ljava/lang/RuntimeException;");
 
     return JNI_VERSION;
 }
