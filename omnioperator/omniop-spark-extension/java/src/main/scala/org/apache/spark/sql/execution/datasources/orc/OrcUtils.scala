@@ -96,7 +96,7 @@ object OrcUtils extends Logging {
     files.toIterator.map(file => readSchema(file.getPath, conf, ignoreCorruptFiles)).collectFirst {
       case Some(schema) =>
         logDebug(s"Reading schema from file $files, got Hive schema string: $schema")
-        toCatalystShema(schema)
+        toCatalystSchema(schema)
     }
   }
 
