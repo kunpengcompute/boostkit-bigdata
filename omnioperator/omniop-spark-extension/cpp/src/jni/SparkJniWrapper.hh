@@ -18,7 +18,7 @@ extern "C" {
  */
 JNIEXPORT jlong JNICALL
 Java_com_huawei_boostkit_spark_jni_SparkJniWrapper_nativeMake(
-    JNIEnv* env, joject, jstring partitioning_name_str, jint num_partitions,
+    JNIEnv* env, jobject, jstring partitioning_name_jstr, jint num_partitions,
     jstring jInputType, jint jNumCols, jint buffer_size,
     jstring compression_type_jstr, jstring data_file_jstr, jint num_sub_dirs,
     jstring local_dirs_jstr, jlong compress_block_size,
@@ -26,15 +26,15 @@ Java_com_huawei_boostkit_spark_jni_SparkJniWrapper_nativeMake(
 
 JNIEXPORT jlong JNICALL
 Java_com_huawei_boostkit_spark_jni_SparkJniWrapper_split(
-    JNIEnv* env, joject jObj, jlong splitter_id, jlong jVecBatchAddress);  
+    JNIEnv* env, jobject jObj, jlong splitter_id, jlong jVecBatchAddress);  
 
 JNIEXPORT jobject JNICALL
 Java_com_huawei_boostkit_spark_jni_SparkJniWrapper_stop(
-    JNIEnv* env, joject, jlong splitter_id);  
+    JNIEnv* env, jobject, jlong splitter_id);  
     
 JNIEXPORT void JNICALL
 Java_com_huawei_boostkit_spark_jni_SparkJniWrapper_close(
-    JNIEnv* env, joject, jlong splitter_id);  
+    JNIEnv* env, jobject, jlong splitter_id);  
 
 #ifdef __cplusplus
 }
