@@ -4,7 +4,7 @@ import com.huawei.boostkit.spark.Constant.{DEFAULT_STRING_TYPE_LENGTH, OMNI_BOOL
 
 import nova.hetu.omniruntime.`type`.{BooleanDataType, Date32DataType, Decimal128DataType, Decimal64DataType, DoubleDataType, IntDataType, LongDataType, ShortDataType, VarcharDataType}
 import nova.hetu.omniruntime.constants.FunctionType
-import nova.hetu.omniruntime.constants.FunctionType.{OMNI_AGGREGATION_TYPE_AVG, OMNI_AGGREGATION_TYPE_COUNT_COLUMN, OMNI_AGGREGATION_TYPE_MAX, OMNI_AGGREGATION_TYPE_MIN, OMNI_AGGREGATION_TYPE_SUM, OMNI_WINDOW_TYPE_RANK, OMNI_WINDOW_ROW_NUMBER}
+import nova.hetu.omniruntime.constants.FunctionType.{OMNI_AGGREGATION_TYPE_AVG, OMNI_AGGREGATION_TYPE_COUNT_COLUMN, OMNI_AGGREGATION_TYPE_MAX, OMNI_AGGREGATION_TYPE_MIN, OMNI_AGGREGATION_TYPE_SUM, OMNI_WINDOW_TYPE_RANK, OMNI_WINDOW_TYPE_ROW_NUMBER}
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.expressions._
@@ -307,7 +307,7 @@ object OmniExpressionAdaptor extends Logging {
               DecimalType(checkOverflow.dataType.precision, checkOverflow.dataType.scale)),
             rewriteToOmniJsonExpressionLiteral(checkOverflow.child,
               exprsIndexMap,
-              DecimalType(checkOverflow.dataType.precision, checkOverflow.dataType.scale))
+              DecimalType(checkOverflow.dataType.precision, checkOverflow.dataType.scale)),
             toOmniJsonLiteral(
               Literal(checkOverflow.dataType.precision, IntegerType)),
             toOmniJsonLiteral(
@@ -341,15 +341,15 @@ object OmniExpressionAdaptor extends Logging {
                 toOmniJsonLiteral(
                   Literal(makeDecimal.precision, IntegerType)),
                 toOmniJsonLiteral(
-                  Literal(,makeDecimal.scale, IntegerType)))
+                  Literal(makeDecimal.scale, IntegerType)))
           case _ =>
-            throw new RuntimeException(s"Unsupported dataType for MakeDecimal: ${makeDecimal.child.dataType}")
+            throw new RuntimeException(s"Unsupported datatype for MakeDecimal: ${makeDecimal.child.dataType}")
         }
 
       case promotePrecision: PromotePrecision =>
         rewriteToOmniJsonExpressionLiteral(promotePrecision.child, exprsIndexMap)
 
-      case sub: SubStract =>
+      case sub: Subtract =>
         ("{\"exprType\":\"BINARY\",\"returnType\":%s," +
           "\"operator\":\"SUBTRACT\",\"left\":%s,\"right\":%s}").format(
             sparkTypeToOmniExpJsonType(returnDatatype),
@@ -448,7 +448,7 @@ object OmniExpressionAdaptor extends Logging {
           rewriteToOmniJsonExpressionLiteral(isnotnull.child, exprsIndexMap))
 
       // Substring
-      case subString: SubString =>
+      case subString: Substring =>
         ("{\"exprType\":\"FUNCTION\",\"returnType\":%s," +
           "\"function_name\":\"substr\", \"arguments\":[%s,%s,%s], \"width\": 200}")
           .format(sparkTypeToOmniExpType(subString.dataType),
@@ -566,7 +566,7 @@ object OmniExpressionAdaptor extends Logging {
         } else {
           // NOTES: decimal128 literal value need use string format
           ("{\"exprType\":\"LITERAL\",\"dataType\":%s," +
-            "\"isNull\":%b, \"value\":%s, \"precision\":%s, \"scale\":%s}").format(omniType,
+            "\"isNull\":%b, \"value\":\"%s\", \"precision\":%s, \"scale\":%s}").format(omniType,
             false, value.asInstanceOf[Decimal].toUnscaledLong, dt.precision, dt.scale)
         }
       case _ =>
