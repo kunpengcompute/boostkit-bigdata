@@ -32,10 +32,10 @@ namespace spark {
     MemoryPool* memoryPool;
 
     WriterOptionsPrivate() { // default to Hive_0_12
-      compressionBlockSize = 64 * 1024 * 1024; // 64K
+      compressionBlockSize = 64 * 1024; // 64K
       compression = CompressionKind_ZLIB;
-      compressionStrategy = CompressionStrategy_SPEED:
-      memoryPool = getDefaultPool;
+      compressionStrategy = CompressionStrategy_SPEED;
+      memoryPool = getDefaultPool();
     }
   };
 
@@ -85,7 +85,7 @@ namespace spark {
     return privateBits->compression;
   }
 
-  WriterOptions& WriterOptions;:setCompressionStrategy(
+  WriterOptions& WriterOptions::setCompressionStrategy(
     CompressionStrategy strategy) {
     privateBits->compressionStrategy = strategy;
     return *this;
@@ -95,12 +95,12 @@ namespace spark {
     return privateBits->compressionStrategy;
   }
 
-  WriterOptions& WriterOptions;:setMemoryPool(MemoryPool* memoryPool) {
+  WriterOptions& WriterOptions::setMemoryPool(MemoryPool* memoryPool) {
     privateBits->memoryPool = memoryPool;
     return *this;
   }
 
-  CompressionStrategy WriterOptions::getMemoryPool() const {
+  MemoryPool* WriterOptions::getMemoryPool() const {
     return privateBits->memoryPool;
   }
 

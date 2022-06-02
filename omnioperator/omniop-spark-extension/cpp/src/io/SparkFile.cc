@@ -1,12 +1,12 @@
 /*
  * Copyright (c) Huawei Technologies Co., Ltd. 2021-2021. All rights reserved.
- * Description
+ * Description:
  */
 
 #include "Adaptor.hh"
 #include "SparkFile.hh"
 
-#include <error.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <sys/stat.h>
@@ -61,12 +61,12 @@ namespace spark {
       if (!buf) {
         throw std::runtime_error("Buffer is null");
       }
-      ssize_t byteRead = pread(file, buf, length, static_cast<off_t>(offset));
+      ssize_t bytesRead = pread(file, buf, length, static_cast<off_t>(offset));
 
-      if (byteRead == -1) {
+      if (bytesRead == -1) {
         throw std::runtime_error("Bad read of " + filename);
       }
-      if (static_cast<uint64_t>(byteRead) != length) {
+      if (static_cast<uint64_t>(bytesRead) != length) {
         throw std::runtime_error("Short read of " + filename);
       }
     }
@@ -90,11 +90,11 @@ namespace spark {
 
   OutputStream::~OutputStream() {
     // PASS
-  }
+  };
 
   class FileOutputStream : public OutputStream {
   private:
-    std:string filename;
+    std::string filename;
     int file;
     uint64_t bytesWritten;
     bool closed;
@@ -119,16 +119,16 @@ namespace spark {
       return bytesWritten;
     }
 
-    uint64_t getNaturalReadSize() const override {
+    uint64_t getNaturalWriteSize() const override {
       return 128 * 1024;
     }
 
     void write(const void* buf, size_t length) override {
       if (closed) {
-        throw std::logic_erro("Cannot write to closed stream.");
+        throw std::logic_error("Cannot write to closed stream.");
       }
-      ssize_t bytesWritten = ::write(file, buf, length);
-      if (bytesWritten == -1) {
+      ssize_t bytesWrite = ::write(file, buf, length);
+      if (bytesWrite == -1) {
         throw std::runtime_error("Bad write of " + filename);
       }
       if (static_cast<uint64_t>(bytesWrite) != length) {
@@ -149,7 +149,7 @@ namespace spark {
     }
   };
 
-  FileOutputStream:~FileOutputStream() {
+  FileOutputStream::~FileOutputStream() {
     if (!closed) {
       ::close(file);
       closed = true;

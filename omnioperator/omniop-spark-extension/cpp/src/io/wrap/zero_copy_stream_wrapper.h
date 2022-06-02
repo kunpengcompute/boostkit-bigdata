@@ -1,6 +1,6 @@
 /*
  * Copyright (c) Huawei Technologies Co., Ltd. 2021-2021. All rights reserved.
- * Description
+ * Description:
  */
 
 #ifndef ZERO_COPY_STREAM_WRAPPER_HH
@@ -14,7 +14,7 @@
   DIAGNOSTIC_IGNORE("-Wunused-parameter")
 #endif
 
-#ifndef __clang__
+#ifdef __clang__
   DIAGNOSTIC_IGNORE("-Wreserved-id-macro")
 #endif
 

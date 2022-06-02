@@ -1,6 +1,6 @@
 /*
  * Copyright (c) Huawei Technologies Co., Ltd. 2021-2021. All rights reserved.
- * Description
+ * Description:
  */
 
 #ifndef SPARK_COMPRESSION_HH
@@ -23,7 +23,7 @@ namespace spark {
   std::unique_ptr<BufferedOutputStream>
      createCompressor(CompressionKind kind,
                       OutputStream * outStream,
-                      CompressionStreategy strategy,
+                      CompressionStrategy strategy,
                       uint64_t bufferCapacity,
                       uint64_t compressionBlockSize,
                       MemoryPool& pool);

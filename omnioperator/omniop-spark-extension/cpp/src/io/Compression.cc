@@ -1,6 +1,6 @@
 /*
  * Copyright (c) Huawei Technologies Co., Ltd. 2021-2021. All rights reserved.
- * Description
+ * Description:
  */
 
 #include "Adaptor.hh"
@@ -50,10 +50,10 @@ namespace spark {
     virtual uint64_t getSize() const override;
 
   protected:
-    void writerHeader(char * buffer, size_t compressionSize, bool original) {
-      buffer[0] = static_cast<char>((compressionSize << 1) + (original ? 1 : 0));
-      buffer[1] = static_cast<char>(compressionSize >> 7);
-      buffer[2] = static_cast<char>(compressionSize >> 15);
+    void writerHeader(char * buffer, size_t compressedSize, bool original) {
+      buffer[0] = static_cast<char>((compressedSize << 1) + (original ? 1 : 0));
+      buffer[1] = static_cast<char>(compressedSize >> 7);
+      buffer[2] = static_cast<char>(compressedSize >> 15);
     }
 
     // ensure enough room for compression block header
@@ -66,7 +66,7 @@ namespace spark {
     int level;
 
     // Compressed data output buffer
-    char * outputStream;
+    char * outputBuffer;
 
     // Size for compressionBuffer
     int bufferSize;
@@ -79,7 +79,7 @@ namespace spark {
   };
 
   CompressionStreamBase::CompressionStreamBase(OutputStream * outStream,
-                                               imt compressionLevel,
+                                               int compressionLevel,
                                                uint64_t capacity,
                                                uint64_t blockSize,
                                                MemoryPool& pool) :
@@ -98,7 +98,7 @@ namespace spark {
 
   void CompressionStreamBase::BackUp(int count) {
     if (count > bufferSize) {
-      throw std::logic_error("Cant't backup that much!");
+      throw std::logic_error("Can't backup that much!");
     }
     bufferSize -= count;
   }
@@ -122,14 +122,14 @@ namespace spark {
   void CompressionStreamBase::ensureHeader() {
     // adjust 3 bytes for the compression header
     if (outputPosition + 3 >= outputSize) {
-      int newPosition = outputPosition + 3 -outputSize;
+      int newPosition = outputPosition + 3 - outputSize;
       if (!BufferedOutputStream::Next(
         reinterpret_cast<void **>(&outputBuffer),
         &outputSize)) {
-          throw std::runtime_error(
-            "Failed to get next output buffer from output stream.");
-        }
-        outputPosition = newPosition;
+        throw std::runtime_error(
+          "Failed to get next output buffer from output stream.");
+      }
+      outputPosition = newPosition;
     } else {
       outputPosition += 3;
     }
@@ -138,7 +138,7 @@ namespace spark {
   /**
    * Streaming compression base class
    */
-  class CompressionStream::public CompressionStreamBase {
+  class CompressionStream: public CompressionStreamBase {
   public:
     CompressionStream(OutputStream * outStream,
                           int compressionLevel,
@@ -146,7 +146,7 @@ namespace spark {
                           uint64_t blockSize,
                           MemoryPool& pool);
 
-    virtual bool Next(void** data, int size) override;
+    virtual bool Next(void** data, int*size) override;
     virtual std::string getName() const override = 0;
 
   protected:
@@ -175,7 +175,7 @@ namespace spark {
 
       char * header = outputBuffer + outputPosition - totalCompressedSize - 3;
       if (totalCompressedSize >= static_cast<unsigned long>(bufferSize)) {
-        writerHeader(header, static_cast<size_t>(bufferSize), true);
+        writeHeader(header, static_cast<size_t>(bufferSize), true);
         memcpy(
           header + 3,
           rawInputBuffer.data(),
@@ -186,7 +186,7 @@ namespace spark {
         outputPosition -= backup;
         outputSize -= backup;
       } else {
-        writerHeader(header, totalCompressedSize, false);
+        writeHeader(header, totalCompressedSize, false);
       }
     }
 
@@ -197,15 +197,15 @@ namespace spark {
     return true;
   }
 
-  class ZlibComCompressionStream: public CompressionStream {
+  class ZlibCompressionStream: public CompressionStream {
   public:
-    ZlibComCompressionStream(OutputStream * outputStream,
+    ZlibCompressionStream(OutputStream * outStream,
                              int compressionLevel,
                              uint64_t capacity,
                              uint64_t blockSize,
                              MemoryPool& pool);
 
-    virtual ~ZlibComCompressionStream() override {
+    virtual ~ZlibCompressionStream() override {
       end();
     }
 
@@ -220,21 +220,21 @@ namespace spark {
     z_stream strm;
   };
 
-  ZlibComCompressionStream::ZlibComCompressionStream(
-                           OutputStream * outStream,
-                           int compressionLevel,
-                           uint64_t capacity,
-                           uint64_t blockSize,
-                           MemoryPool& pool)
-                           : CompressionStream(outStream,
-                                               compressionLevel,
-                                               capacity,
-                                               blockSize,
-                                               pool) {
+  ZlibCompressionStream::ZlibCompressionStream(
+                        OutputStream * outStream,
+                        int compressionLevel,
+                        uint64_t capacity,
+                        uint64_t blockSize,
+                        MemoryPool& pool)
+                        : CompressionStream(outStream,
+                                            compressionLevel,
+                                            capacity,
+                                            blockSize,
+                                            pool) {
     init();
   }
 
-  uint64_t ZlibComCompressionStream::doStreamingCompression() {
+  uint64_t ZlibCompressionStream::doStreamingCompression() {
     if (deflateReset(&strm) != Z_OK) {
       throw std::runtime_error("Failed to reset inflate.");
     }
@@ -272,17 +272,17 @@ namespace spark {
     return strm.total_out;
   }
 
-  std::string ZlibComCompressionStream::getName() const {
-    return "ZlibComCompressionStream";
+  std::string ZlibCompressionStream::getName() const {
+    return "ZlibCompressionStream";
   }
 
-  // DIAGNOSTIC_PUSH
+// DIAGNOSTIC_PUSH
 
 #if defined(__GNUC__) || defined(__clang__)
   DIAGNOSTIC_IGNORE("-Wold-style-cast")
 #endif
 
-  void ZlibComCompressionStream::init() {
+  void ZlibCompressionStream::init() {
     strm.zalloc = nullptr;
     strm.zfree = nullptr;
     strm.opaque = nullptr;
@@ -290,11 +290,11 @@ namespace spark {
 
     if (deflateInit2(&strm, level, Z_DEFLATED, -15, 8, Z_DEFAULT_STRATEGY)
         != Z_OK) {
-      throw std::runtime_error("Error while deflateInit2() for zlib.");
+      throw std::runtime_error("Error while calling deflateInit2() for zlib.");
     }
   }
 
-  void ZlibComCompressionStream::end() {
+  void ZlibCompressionStream::end() {
     (void)deflateEnd(&strm);
   }
 
@@ -327,11 +327,11 @@ namespace spark {
                                                    capacity,
                                                    blockSize,
                                                    pool)
-                           . compressionBuffer(pool) {
+                           , compressorBuffer(pool) {
       // PASS
     }
 
-    virtual bool Next(void ** data, int*size) override;
+    virtual bool Next(void** data, int*size) override;
     virtual std::string getName() const override = 0;
 
   protected:
@@ -355,14 +355,14 @@ namespace spark {
 
       const unsigned char * dataToWrite = nullptr;
       int totalSizeToWrite = 0;
-      char * header = outputStream + outputPosition - 3;
+      char * header = outputBuffer + outputPosition - 3;
 
       if (totalCompressedSize >= static_cast<size_t>(bufferSize)) {
-        writerHeader(header, static_cast<size_t>(bufferSize), true);
+        writeHeader(header, static_cast<size_t>(bufferSize), true);
         dataToWrite = rawInputBuffer.data();
         totalSizeToWrite = bufferSize;
       } else {
-        writerHeader(header, totalCompressedSize, false);
+        writeHeader(header, totalCompressedSize, false);
         dataToWrite = compressorBuffer.data();
         totalSizeToWrite = static_cast<int>(totalCompressedSize);
       }
@@ -403,18 +403,18 @@ namespace spark {
   /**
    * LZ4 block compression
    */
-  class Lz4CompressionStream: public BlockCompressionStream {
+  class Lz4CompressionSteam: public BlockCompressionStream {
   public:
-    Lz4CompressionStream(outputStream * outStream,
-                         int compressionLevel,
-                         uint64_t capacity,
-                         uint64_t blockSize,
-                         MemoryPool& pool)
-                         : BlockCompressionStream(outStream,
-                                                  compressionLevel,
-                                                  capacity,
-                                                  blockSize,
-                                                  pool) {
+    Lz4CompressionSteam(OutputStream * outStream,
+                        int compressionLevel,
+                        uint64_t capacity,
+                        uint64_t blockSize,
+                        MemoryPool& pool)
+                        : BlockCompressionStream(outStream,
+                                                 compressionLevel,
+                                                 capacity,
+                                                 blockSize,
+                                                 pool) {
       this->init();
     }
 
@@ -422,7 +422,7 @@ namespace spark {
       return "Lz4CompressionStream";
     }
 
-    virtual ~Lz4CompressionStream() override {
+    virtual ~Lz4CompressionSteam() override {
       this->end();
     }
 
@@ -439,7 +439,7 @@ namespace spark {
     LZ4_stream_t *state;
   };
 
-  uint64_t Lz4CompressionStream::doBlockCompression() {
+  uint64_t Lz4CompressionSteam::doBlockCompression() {
     int result = LZ4_compress_fast_extState(static_cast<void*>(state),
                                             reinterpret_cast<const char*>(rawInputBuffer.data()),
                                             reinterpret_cast<char*>(compressorBuffer.data()),
@@ -447,19 +447,19 @@ namespace spark {
                                             static_cast<int>(compressorBuffer.size()),
                                             level);
     if (result == 0) {
-      throw std::runtime_error("Error during block compression using 1z4.");
+      throw std::runtime_error("Error during block compression using lz4.");
     }
     return static_cast<uint64_t>(result);
   }
 
-  void Lz4CompressionStream::init() {
+  void Lz4CompressionSteam::init() {
     state = LZ4_createStream();
     if (!state) {
       throw std::runtime_error("Error while allocating state for lz4.");
     }
   }
 
-  void Lz4CompressionStream::end() {
+  void Lz4CompressionSteam::end() {
     (void)LZ4_freeStream(state);
     state = nullptr;
   }
@@ -510,7 +510,7 @@ namespace spark {
   /**
    * ZSTD block compression
    */
-  class ZSTDCompressionStream:: public BlockCompressionStream{
+  class ZSTDCompressionStream: public BlockCompressionStream{
   public:
     ZSTDCompressionStream(OutputStream * outStream,
                           int compressionLevel,
@@ -526,7 +526,7 @@ namespace spark {
   }
 
   virtual std::string getName() const override {
-    return "ZSTDCompressionStream";
+    return "ZstdCompressionStream";
   }
 
   virtual ~ZSTDCompressionStream() override {
@@ -543,7 +543,7 @@ namespace spark {
   private:
     void init();
     void end();
-    ZSTD_CCCtx *cctx;
+    ZSTD_CCtx *cctx;
   };
 
   uint64_t ZSTDCompressionStream::doBlockCompression() {
@@ -599,7 +599,7 @@ namespace spark {
     int level = (strategy == CompressionStrategy_SPEED) ?
             Z_BEST_SPEED + 1 : Z_DEFAULT_COMPRESSION;
     return std::unique_ptr<BufferedOutputStream>
-      (new ZlibComCompressionStream(
+      (new ZlibCompressionStream(
               outStream, level, bufferCapacity, compressionBlockSize, pool));
     }
     case CompressionKind_ZSTD: {
@@ -611,9 +611,9 @@ namespace spark {
     }
     case CompressionKind_LZ4: {
       int level = (strategy == CompressionStrategy_SPEED) ?
-                  LZ4_ACCELERATION_MAX : ZSTD_CLEVEL_DEFAULT;
+                  LZ4_ACCELERATION_MAX : LZ4_ACCELERATION_DEFAULT;
       return std::unique_ptr<BufferedOutputStream>
-        (new Lz4CompressionStream(
+        (new Lz4CompressionSteam(
           outStream, level, bufferCapacity, compressionBlockSize, pool));
     }
     case CompressionKind_SNAPPY: {

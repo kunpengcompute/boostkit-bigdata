@@ -1,6 +1,6 @@
 /*
  * Copyright (c) Huawei Technologies Co., Ltd. 2021-2021. All rights reserved.
- * Description
+ * Description:
  */
 
 #include "WriterOptions.hh"
@@ -24,7 +24,7 @@ namespace spark {
     virtual std::unique_ptr<BufferedOutputStream>
                     createStream() const override;
   private:
-    const WriteOptions& options;
+    const WriterOptions& options;
     OutputStream* outStream;
   };
 

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) Huawei Technologies Co., Ltd. 2021-2021. All rights reserved.
- * Description
+ * Description:
  */
 
 #ifndef MEMORYPOOL_HH_
@@ -34,10 +34,10 @@ namespace spark {
     DataBuffer& operator = (DataBuffer& buffer);
 
   public:
-    DataBuffer(Memory& pool, uint64_t _size = 0);
+    DataBuffer(MemoryPool& pool, uint64_t _size = 0);
     virtual ~DataBuffer();
 
-    T* data(); {
+    T* data() {
       return buf;
     }
 
@@ -46,7 +46,7 @@ namespace spark {
     }
 
     uint64_t size() {
-      return currentCapacity;
+      return currentSize;
     }
 
     uint64_t capacity() {
@@ -85,7 +85,7 @@ namespace spark {
   extern template class DataBuffer<char>;
   extern template class DataBuffer<char*>;
   extern template class DataBuffer<double>;
-  extern template class DataBuffer<in64_t>;
+  extern template class DataBuffer<int64_t>;
   extern template class DataBuffer<uint64_t>;
   extern template class DataBuffer<unsigned char>;
 
@@ -95,4 +95,4 @@ namespace spark {
 } // namespace spark
 
 
-#endif /* MEMORYPOOL_HH__ */
+#endif /* MEMORYPOOL_HH_ */

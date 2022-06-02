@@ -1,6 +1,6 @@
 /*
  * Copyright (c) Huawei Technologies Co., Ltd. 2021-2021. All rights reserved.
- * Description
+ * Description:
  */
 
 #ifndef SPARK_FILE_HH
@@ -31,7 +31,7 @@ namespace spark {
 
     /**
      * Read length bytes from the file starting at offset into
-     * the buffer starting at nuf.
+     * the buffer starting at buf.
      * @param buf the starting position of a buffer.
      * @param length the number of bytes to read.
      * @param offset the position in the stream to read from.
@@ -56,7 +56,7 @@ namespace spark {
     /**
      * Get the total length of bytes written.
      */
-    virtual uint64_t getLength(0 const = 0;
+    virtual uint64_t getLength() const = 0;
 
     /**
      * Get the natural size for reads.
@@ -66,7 +66,7 @@ namespace spark {
 
     /**
      * Write/Append length bytes pointed by buf to the file stream
-     * @param buf the starting position a buffer.
+     * @param buf the starting position of a buffer.
      * @param length the number of bytes to write.
      */
     virtual void write(const void* buf, size_t length) = 0;
@@ -77,7 +77,7 @@ namespace spark {
     virtual const std::string& getName() const = 0;
 
     /**
-     * Close the stream and flush any pending dat to the disk.
+     * Close the stream and flush any pending data to the disk.
      */
     virtual void close() = 0;
   };
@@ -95,7 +95,7 @@ namespace spark {
   std::unique_ptr<InputStream> readLocalFile(const std::string& path);
 
   /**
-   * Create a stream to write a local file.
+   * Create a stream to write to a local file.
    * @param path the name of the file in the local file system
    */
   std::unique_ptr<OutputStream> writeLocalFile(const std::string& path);

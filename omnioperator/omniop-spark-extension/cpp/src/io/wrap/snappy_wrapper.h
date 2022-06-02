@@ -1,6 +1,6 @@
 /*
  * Copyright (c) Huawei Technologies Co., Ltd. 2021-2021. All rights reserved.
- * Description
+ * Description:
  */
 
 #ifndef SNAPPY_WRAPPER_HH
@@ -8,7 +8,7 @@
 
 #include "../Adaptor.hh"
 
-#ifndef __clang__
+#ifdef __clang__
   DIAGNOSTIC_IGNORE("-Wreserved-id-macro")
 #endif
 

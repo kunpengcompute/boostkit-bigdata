@@ -1,6 +1,6 @@
 /*
  * Copyright (c) Huawei Technologies Co., Ltd. 2021-2021. All rights reserved.
- * Description
+ * Description:
  */
 
 #ifndef SPARK_WRITER_OPTIONS_HH
@@ -15,7 +15,7 @@ namespace spark {
   struct WriterOptionsPrivate;
 
   enum CompressionStrategy {
-    CompressionStrategy_SPEED = 0;
+    CompressionStrategy_SPEED = 0,
     CompressionStrategy_COMPRESSION
   };
 
@@ -24,7 +24,7 @@ namespace spark {
    */
   class WriterOptions {
     private:
-      std::unique_ptr<WriterOptions> privateBits;
+      std::unique_ptr<WriterOptionsPrivate> privateBits;
     public:
       WriterOptions();
       WriterOptions(const WriterOptions&);
@@ -39,7 +39,7 @@ namespace spark {
 
       /**
        * Get the data compression block size.
-       * @return if not set, return default size.
+       * @return if not set, return default value.
        */
       uint64_t getCompressionBlockSize() const;
 

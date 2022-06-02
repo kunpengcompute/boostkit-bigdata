@@ -1,6 +1,6 @@
 /*
  * Copyright (c) Huawei Technologies Co., Ltd. 2021-2021. All rights reserved.
- * Description
+ * Description:
  */
 
 #ifndef SPARK_OUTPUTSTREAM_HH
@@ -39,7 +39,7 @@ namespace spark {
 
     virtual std::string getName() const;
     virtual uint64_t getSize() const;
-    virtual uint64 flush();
+    virtual uint64_t flush();
     virtual bool NextNBytes(void** data, int size);
 
     virtual bool isCompressed() const { return false; }
@@ -47,4 +47,4 @@ namespace spark {
 
 }
 
-#endif // SPARK_OUPUTSTREAM_HH
+#endif // SPARK_OUTPUTSTREAM_HH

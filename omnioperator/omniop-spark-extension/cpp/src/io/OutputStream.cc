@@ -1,6 +1,6 @@
 /*
  * Copyright (c) Huawei Technologies Co., Ltd. 2021-2021. All rights reserved.
- * Description
+ * Description:
  */
 
 #include "OutputStream.hh"
@@ -67,7 +67,7 @@ namespace spark {
   }
 
   bool BufferedOutputStream::WriteAliasedRaw(const void*, int) {
-    throw std::logic_error("WriterAliasedRaw is not supported.");
+    throw std::logic_error("WriteAliasedRaw is not supported.");
   }
 
   bool BufferedOutputStream::AllowsAliasing() const {
@@ -75,8 +75,8 @@ namespace spark {
   }
 
   std::string BufferedOutputStream::getName() const {
-    std::ostringstream results;
-    result << "BufferedOutputStream" << dataBuffer->size() << " of"
+    std::ostringstream result;
+    result << "BufferedOutputStream " << dataBuffer->size() << " of "
                                             << dataBuffer->capacity();
     return result.str();
   }
@@ -88,7 +88,7 @@ namespace spark {
   uint64_t BufferedOutputStream::flush() {
     uint64_t dataSize = dataBuffer->size();
     outputStream->write(dataBuffer->data(), dataSize);
-    dataBuffer->reserved(0);
+    dataBuffer->resize(0);
     return dataSize;
   }
 

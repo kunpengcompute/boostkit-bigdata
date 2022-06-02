@@ -1,9 +1,9 @@
 /*
  * Copyright (c) Huawei Technologies Co., Ltd. 2021-2021. All rights reserved.
- * Description
+ * Description:
  */
 
-#include "Memory.hh"
+#include "MemoryPool.hh"
 
 #include "Adaptor.hh"
 
@@ -66,7 +66,7 @@ namespace spark {
       }
     } else if (newSize > currentSize) {
       for (uint64_t i = currentSize; i < newSize; ++i) {
-        mew (buf + i) T();
+        new (buf + i) T();
       }
     }
     currentSize = newSize;
@@ -81,7 +81,7 @@ namespace spark {
         memcpy(buf, buf_old, sizeof(T) * currentSize);
         memoryPool.free(reinterpret_cast<char*>(buf_old));
       } else {
-        buf = reinterpret_cast<T*>(memoryPool.malloc(sizeof(T*) * newCapacity));
+        buf = reinterpret_cast<T*>(memoryPool.malloc(sizeof(T) * newCapacity));
       }
       currentCapacity = newCapacity;
     }
@@ -97,7 +97,7 @@ namespace spark {
   }
 
   template <>
-  void DataBuffer<char>::~reserve(uint64_t newSize) {
+  void DataBuffer<char>::resize(uint64_t newSize) {
     reserve(newSize);
     if (newSize > currentSize) {
       memset(buf + currentSize, 0, newSize - currentSize);
@@ -115,7 +115,7 @@ namespace spark {
   }
 
   template <>
-  void DataBuffer<unsigned char>::reserve(uint64_t newSize) {
+  void DataBuffer<unsigned char>::resize(uint64_t newSize) {
     reserve(newSize);
     if (newSize > currentSize) {
       memset(buf + currentSize, 0, newSize - currentSize);

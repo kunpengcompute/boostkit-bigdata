@@ -1,6 +1,6 @@
 /*
  * Copyright (c) Huawei Technologies Co., Ltd. 2021-2021. All rights reserved.
- * Description
+ * Description:
  */
 
 #ifndef SPARK_COLUMN_WRITER_HH
@@ -15,12 +15,12 @@ namespace spark {
     virtual ~StreamsFactory();
 
     virtual std::unique_ptr<BufferedOutputStream>
-                    createStream() conset = 0;
+                    createStream() const = 0;
   };
 
   std::unique_ptr<StreamsFactory> createStreamsFactory(
                                         const WriterOptions& options,
-                                        OutputStream * outStream0;
+                                        OutputStream * outStream);
 }
 
 #endif
