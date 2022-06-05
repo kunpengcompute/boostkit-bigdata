@@ -7,8 +7,8 @@
 
 #include <vector/vector_common.h>
 #include <cstring>
+#include <chrono>
 #include <memory>
-#include <list>
 #include <list>
 #include <set>
 #include <fstream>
@@ -23,7 +23,7 @@
 #include "Buffer.h"
 #include "BinaryLocation.h"
 
-int32_t BytesGen(uint64_t offset, uint64_t nulls, uint64_t values, VCBatchInfo& vcb);
+int32_t BytesGen(uint64_t offsets, uint64_t nulls, uint64_t values, VCBatchInfo& vcb);
 
 uint32_t reversebytes_uint32t(uint32_t value);
 

@@ -35,7 +35,7 @@ class ColumnarShuffleManager(conf: SparkConf) extends ShuffleManager with Loggin
   import ColumnarShuffleManager._
 
   /**
-   * A mapping from shuffle ids to the number of mappers producing output for those shuffles.
+   * A mapping from shuffle ids to the task ids of mappers producing output for those shuffles.
    */
   private[this] val taskIdMapsForShuffle = new ConcurrentHashMap[Int, OpenHashSet[Long]]()
 
@@ -129,8 +129,8 @@ class ColumnarShuffleManager(conf: SparkConf) extends ShuffleManager with Loggin
       endPartition: Int,
       context: TaskContext,
       metrics: ShuffleReadMetricsReporter): ShuffleReader[K, C] = {
-    val blocksByAddress = SparkEnv.get.mapOutputTracker
-      .getMapSizesByExecutorId(handle.shuffleId, startMapIndex, endMapIndex, startPartition, endPartition)
+    val blocksByAddress = SparkEnv.get.mapOutputTracker.getMapSizesByExecutorId(
+      handle.shuffleId, startMapIndex, endMapIndex, startPartition, endPartition)
     if (handle.isInstanceOf[ColumnarShuffleHandle[K, _]]) {
       new BlockStoreShuffleReader(
         handle.asInstanceOf[BaseShuffleHandle[K, _, C]],
@@ -165,7 +165,7 @@ class ColumnarShuffleManager(conf: SparkConf) extends ShuffleManager with Loggin
   }
 }
 
-object ColumnarShuffleManager extends Logging {
+private[spark] object ColumnarShuffleManager extends Logging {
   private def loadShuffleExecutorComponents(conf: SparkConf): ShuffleExecutorComponents = {
     val executorComponents = ShuffleDataIOUtils.loadShuffleDataIO(conf).executor()
     val extraConfigs = conf.getAllWithPrefix(ShuffleDataIOUtils.SHUFFLE_SPARK_CONF_PREFIX).toMap

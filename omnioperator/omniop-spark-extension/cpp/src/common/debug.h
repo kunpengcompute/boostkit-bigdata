@@ -23,14 +23,24 @@
             char logBuf[GLOBAL_LOG_BUF_SIZE];                                                        \
             LogsInfoVargMacro(logBuf, format, ##__VA_ARGS__);                                        \
             std::string logString(logBuf);                                                           \
-            Log(logString, LogType::LOG_INFO);                 c                                     \
+            Log(logString, LogType::LOG_DEBUG);                                                      \
         }                                                                                            \
     } while (0)
 
 
-#define LogsDebug(format, ...)                                                                       \
+#define LogsInfo(format, ...)                                                                        \
     do {                                                                                             \
-        if (static_cast<int>(LogType::LOG_DEBUG) >= GetLogLevel()) {                                 \
+        if (static_cast<int>(LogType::LOG_INFO) >= GetLogLevel()) {                                  \
+            char logBuf[GLOBAL_LOG_BUF_SIZE];                                                        \
+            LogsInfoVargMacro(logBuf, format, ##__VA_ARGS__);                                        \
+            std::string logString(logBuf);                                                           \
+            Log(logString, LogType::LOG_INFO);                                                       \
+        }                                                                                            \
+    } while (0)
+
+#define LogsWarn(format, ...)                                                                        \
+    do {                                                                                             \
+        if (static_cast<int>(LogType::LOG_WARN) >= GetLogLevel()) {                                  \
             char logBuf[GLOBAL_LOG_BUF_SIZE];                                                        \
             LogsInfoVargMacro(logBuf, format, ##__VA_ARGS__);                                        \
             std::string logString(logBuf);                                                           \
@@ -38,13 +48,12 @@
         }                                                                                            \
     } while (0)
 
-
-#define LogsDebug(format, ...)                                                                       \
+#define LogsError(format, ...)                                                                       \
     do {                                                                                             \
-        if (static_cast<int>(LogType::LOG_DEBUG) >= GetLogLevel()) {                                 \
+        if (static_cast<int>(LogType::LOG_ERROR) >= GetLogLevel()) {                                 \
             char logBuf[GLOBAL_LOG_BUF_SIZE];                                                        \
             LogsInfoVargMacro(logBuf, format, ##__VA_ARGS__);                                        \
             std::string logString(logBuf);                                                           \
-            Log(logString, LogType::LOG_DERROR);                                                     \
+            Log(logString, LogType::LOG_ERROR);                                                      \
         }                                                                                            \
     } while (0)
