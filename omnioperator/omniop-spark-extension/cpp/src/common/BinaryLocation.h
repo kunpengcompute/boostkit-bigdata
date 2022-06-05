@@ -26,7 +26,7 @@ public:
 
 class VCBatchInfo {
 public:
-    VCBatchInfo() {
+    VCBatchInfo(uint32_t vcb_capacity) {
         this->vc_list.reserve(vcb_capacity);
         this->vcb_capacity =  vcb_capacity;
         this->vcb_total_len = 0;

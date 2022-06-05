@@ -52,7 +52,7 @@ class ColumnarShuffleWriter[K, V](
   val shuffleCompressBlockSize = columnarConf.columnarShuffleCompressBlockSize
   val shuffleNativeBufferSize = columnarConf.columnarShuffleNativeBufferSize
   val enableShuffleCompress = columnarConf.enableShuffleCompress
-  val shuffleCompressionCodec = columnarConf.columnarShuffleCompressionCode
+  var shuffleCompressionCodec = columnarConf.columnarShuffleCompressionCodec
 
   if (!enableShuffleCompress) {
     shuffleCompressionCodec = "uncompressed"
@@ -101,7 +101,7 @@ class ColumnarShuffleWriter[K, V](
           dep.dataSize += input(col).getRealNullBufCapacityInBytes
           dep.dataSize += input(col).getRealOffsetBufCapacityInBytes
         }
-        val vb = new VecBatch(input, cb.numRows)
+        val vb = new VecBatch(input, cb.numRows())
         jniWrapper.split(nativeSplitter, vb.getNativeVectorBatch)
         dep.splitTime.add(System.nanoTime() - startTime)
         dep.numInputRows.add(cb.numRows)

@@ -3,7 +3,7 @@
  */
 
 #ifndef THESTRAL_PLUGIN_MASTER_UTILS_H
-#define THESTRAL_PLUGIN_MASTER_TUILS_H
+#define THESTRAL_PLUGIN_MASTER_UTILS_H
 
 #include <chrono>
 #include <iomanip>
@@ -15,10 +15,10 @@
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
 
-constexpt char kSep = '/';
+constexpr char kSep = '/';
 
 static std::string GenerateUUID() {
-    boost::uuids::random_genertor generator;
+    boost::uuids::random_generator generator;
     return boost::uuids::to_string(generator());
 }
 
@@ -47,7 +47,7 @@ std::vector<std::string> GetConfiguredLocalDirs() {
         std::string delimiter = ",";
 
         size_t pos;
-        while ((pos = joined_dirs.find(delimiter)) != std::string:npos) {
+        while ((pos = joined_dirs.find(delimiter)) != std::string::npos) {
             auto dir = joined_dirs.substr(0, pos);
             if (dir.length() > 0) {
                 res.push_back(std::move(dir));
@@ -61,13 +61,13 @@ std::vector<std::string> GetConfiguredLocalDirs() {
     } else {
         auto omni_tmp_dir = MakeTemporaryDir("columnar-shuffle-");
         if (!IsFileExist(omni_tmp_dir.c_str())) {
-            mkdir(omni_tmp_dir.c_str(), S_IRWXU|S_IRWXU|S_IRWzXG|S_IROTH|S_IXOTH);
+            mkdir(omni_tmp_dir.c_str(), S_IRWXU|S_IRWXG|S_IROTH|S_IXOTH);
         }
         return std::vector<std::string>{omni_tmp_dir};
     }
 }
 
-std::string EnsureTrailingSlash(const std::sting& v) {
+std::string EnsureTrailingSlash(const std::string& v) {
     if (v.length() > 0 && v.back() != kSep) {
         // XXX How about "C:" on Windows? We probably don't want to turn it into "C:/"...
         // Unless the local filesystem always uses absolute paths
@@ -85,7 +85,7 @@ std::string RemoveLeadingSlash(std::string key) {
 }
 
 std::string ConcatAbstractPath(const std::string& base, const std::string& stem) {
-    if(stem.empth()) {
+    if(stem.empty()) {
         throw std::runtime_error("stem empty! ");
     }
 
@@ -98,7 +98,7 @@ std::string ConcatAbstractPath(const std::string& base, const std::string& stem)
 std::string GetSpilledShuffleFileDir(const std::string& configured_dir,
                                             int32_t sub_dir_id) {
     std::stringstream ss;
-    ss << std::setfill('0') << std::setw(w) << std::hex << sub_dir_id;
+    ss << std::setfill('0') << std::setw(2) << std::hex << sub_dir_id;
     auto dir = ConcatAbstractPath(configured_dir, "shuffle_" + ss.str());
     return dir;
 }
@@ -109,10 +109,10 @@ std::string CreateTempShuffleFile(const std::string& dir) {
     }
 
     if (!IsFileExist(dir.c_str())) {
-        mkdir(dir.c_str(), S_IRWXU|S_IRWXG|S_IROTH|S_IXOTH)
+        mkdir(dir.c_str(), S_IRWXU|S_IRWXG|S_IROTH|S_IXOTH);
     }
 
-    std::string file_path =  ConcatAbstractPath(dir, "tmp_shuffle_" + GenerateUUID());
+    std::string file_path =  ConcatAbstractPath(dir, "temp_shuffle_" + GenerateUUID());
     return file_path;
 }
 

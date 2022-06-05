@@ -60,13 +60,13 @@ class Splitter {
 
     int AllocatePartitionBuffers(int32_t partition_id, int32_t new_size);
 
-    int SpiltFixedWidthValueBuffer(VectorBatch& vb);
+    int SplitFixedWidthValueBuffer(VectorBatch& vb);
 
     int SplitFixedWidthValidityBuffer(VectorBatch& vb);
 
-    int SPlitBinaryArray(VectorBatch& vb);
+    int SplitBinaryArray(VectorBatch& vb);
 
-    int CatcheVectorBatch(int32_t partition_id, bool reset_buffers);
+    int CacheVectorBatch(int32_t partition_id, bool reset_buffers);
 
     void ToSplitterTypeId(int num_cols);
 
@@ -83,7 +83,7 @@ class Splitter {
     std::vector<uint32_t> fixed_nullBuffer_size_; // 当前定长omniAlloc已分配null内存大小byte
     // int32_t num_cache_vector_;
     std::vector<ShuffleTypeId> column_type_id_; // 各列映射SHUFFLE类型，schema列id序列
-    std::vector<std::vector<uint8_t*>> partition_fixed_with_validity_addrs_;
+    std::vector<std::vector<uint8_t*>> partition_fixed_width_validity_addrs_;
     std::vector<std::vector<uint8_t*>> partition_fixed_width_value_addrs_; //
     std::vector<std::vector<std::vector<std::shared_ptr<Buffer>>>> partition_fixed_width_buffers_;
     std::vector<std::vector<std::shared_ptr<Buffer>>> partition_binary_builders_;
@@ -101,7 +101,7 @@ class Splitter {
     std::vector<int32_t> sub_dir_selection_;
     std::vector<std::string> configured_dirs_;
 
-    std::vector<std::vector<std::vector<std::vector<std:;shared_ptr<Buffer>>>>> partition_cached_vectorbatch_;
+    std::vector<std::vector<std::vector<std::vector<std::shared_ptr<Buffer>>>>> partition_cached_vectorbatch_;
     std::vector<VectorBatch*> vectorBatch_cache_;
     /*
      * varchar buffers:
@@ -141,12 +141,12 @@ public:
 
     int Stop();
 
-    int SpilllToTmpFile();
+    int SpillToTmpFile();
 
     Splitter(InputDataTypes inputDataTypes,
              int32_t num_cols,
              int32_t num_partitions,
-             SpliOptions options,
+             SplitOptions options,
              bool flag);
 
     static std::shared_ptr<Splitter> Make(
@@ -156,9 +156,9 @@ public:
             int num_partitions,
             SplitOptions options); 
     
-    std::string NexSpilledFileDir();
+    std::string NextSpilledFileDir();
 
-    int DeleteSpilledTmpFIle();
+    int DeleteSpilledTmpFile();
 
     int64_t TotalBytesWritten() const { return total_bytes_written_; }
 
@@ -168,7 +168,7 @@ public:
 
     int64_t TotalSpillTime() const { return total_spill_time_; }
 
-    int64_t TotalcomputePidTime() const { return total_compute_pid_time_; }
+    int64_t TotalComputePidTime() const { return total_compute_pid_time_; }
 
     const std::vector<int64_t>& PartitionLengths() const { return partition_lengths_; }
 };
