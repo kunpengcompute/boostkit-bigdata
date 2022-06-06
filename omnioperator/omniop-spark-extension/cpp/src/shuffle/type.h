@@ -34,7 +34,7 @@ struct SplitOptions {
     static SplitOptions Defaults();
 };
 
-enum SHuffleTypeId : int {
+enum ShuffleTypeId : int {
     SHUFFLE_1BYTE = 0,
     SHUFFLE_2BYTE = 1,
     SHUFFLE_4BYTE = 2,
