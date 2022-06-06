@@ -194,7 +194,7 @@ public class OmniDataAdapter implements Serializable {
             } catch (Exception e) {
                 LOGGER.error("OmniDataAdapter getBatchFromOmnidata() has error:", e);
                 failedTimes++;
-            }finally {
+            } finally {
                 dataReader.close();
             }
         }
