@@ -234,6 +234,7 @@ public class WindowOmniOperator
             this.operatorId = operatorId;
             this.planNodeId = planNodeId;
             this.sourceTypes = ImmutableList.copyOf(requireNonNull(sourceTypes, "sourceTypes is null"));
+            checkDataTypes(this.sourceTypes);
             this.outputChannels = ImmutableList.copyOf(outputChannels);
             this.windowFunctionDefinitions = ImmutableList.copyOf(windowFunctionDefinitions);
             this.partitionChannels = ImmutableList.copyOf(partitionChannels);

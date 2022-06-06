@@ -134,20 +134,14 @@ public class FilterAndProjectOmniOperator
                                                    Supplier<PageProcessor> processor, List<Type> types, DataSize minOutputPageSize,
                                                    int minOutputPageRowCount, List<Type> sourceTypes)
         {
-            this(operatorId, planNodeId, processor, types, minOutputPageSize, minOutputPageRowCount);
-            this.sourceTypes = sourceTypes;
-        }
-
-        public FilterAndProjectOmniOperatorFactory(int operatorId, PlanNodeId planNodeId,
-                                                   Supplier<PageProcessor> processor, List<Type> types, DataSize minOutputPageSize,
-                                                   int minOutputPageRowCount)
-        {
             this.operatorId = operatorId;
             this.planNodeId = requireNonNull(planNodeId, "planNodeId is null");
             this.processor = requireNonNull(processor, "processor is null");
             this.types = ImmutableList.copyOf(requireNonNull(types, "types is null"));
             this.minOutputPageSize = requireNonNull(minOutputPageSize, "minOutputPageSize is null");
             this.minOutputPageRowCount = minOutputPageRowCount;
+            this.sourceTypes = sourceTypes;
+            checkDataTypes(this.sourceTypes);
         }
 
         @Override

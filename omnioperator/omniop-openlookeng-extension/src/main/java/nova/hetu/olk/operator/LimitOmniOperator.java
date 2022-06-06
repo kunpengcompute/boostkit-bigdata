@@ -177,6 +177,7 @@ public class LimitOmniOperator
             this.planNodeId = requireNonNull(planNodeId, "planNodeId is null");
             this.limit = limit;
             this.sourceTypes = sourceTypes;
+            checkDataTypes(this.sourceTypes);
             omniLimitOperatorFactory = getOmniLimitOperatorFactory(limit);
         }
 

@@ -193,7 +193,7 @@
     </dependencies>
 
     <build>
-        <finalName>omni-openLooKeng-adapter-${openLooKeng.version}</finalName>
+        <finalName>boostkit-omniop-openlookeng-${openLooKeng.version}-${omniruntime.version}-aarch64</finalName>
         <plugins>
             <plugin>
                 <groupId>org.jacoco</groupId>

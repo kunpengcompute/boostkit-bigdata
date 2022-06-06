@@ -337,6 +337,7 @@ public class LookupJoinOmniOperator
             this.operatorId = operatorId;
             this.planNodeId = requireNonNull(planNodeId, "planNodeId is null");
             this.sourceTypes = ImmutableList.copyOf(requireNonNull(probeTypes, "probeTypes is null"));
+            checkDataTypes(this.sourceTypes);
             this.joinType = requireNonNull(joinType, "joinType is null");
 
             this.joinBridgeManager = lookupSourceFactoryManager;

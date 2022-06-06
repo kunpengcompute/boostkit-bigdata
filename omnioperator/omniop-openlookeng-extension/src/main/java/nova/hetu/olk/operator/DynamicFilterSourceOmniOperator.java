@@ -110,6 +110,7 @@ public class DynamicFilterSourceOmniOperator
             this.maxFilterPositionsCount = maxFilterPositionsCount;
             this.maxFilterSize = maxFilterSize;
             this.sourceTypes = sourceTypes;
+            checkDataTypes(this.sourceTypes);
         }
 
         public DynamicFilterSourceOperator createOperator(DriverContext driverContext)

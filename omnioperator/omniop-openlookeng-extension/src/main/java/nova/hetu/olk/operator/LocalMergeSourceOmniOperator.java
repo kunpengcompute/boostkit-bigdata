@@ -85,7 +85,6 @@ public class LocalMergeSourceOmniOperator
             this.planNodeId = requireNonNull(planNodeId, "planNodeId is null");
             this.localExchangeFactory = requireNonNull(localExchangeFactory, "exchange is null");
             this.sourceTypes = ImmutableList.copyOf(requireNonNull(types, "sourceTypes is null"));
-
             this.orderByOmniOperatorFactory = createOrderByOmniOperatorFactory(orderByOmniId, planNodeId, types,
                     outputChannels, sortChannels, orderings);
         }

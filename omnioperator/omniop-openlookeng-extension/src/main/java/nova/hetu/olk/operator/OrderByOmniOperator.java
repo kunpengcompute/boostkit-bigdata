@@ -137,6 +137,7 @@ public class OrderByOmniOperator
             this.operatorId = operatorId;
             this.planNodeId = requireNonNull(planNodeId, "planNodeId is null");
             this.sourceTypes = ImmutableList.copyOf(requireNonNull(sourceTypes, "sourceTypes is null"));
+            checkDataTypes(this.sourceTypes);
             this.outputChannels = outputChannels;
             this.sortChannels = sortChannels;
             this.sortAscendings = sortAscendings;
