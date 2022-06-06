@@ -18,6 +18,7 @@ package nova.hetu.olk.operator.filterandproject;
 import com.google.common.collect.ImmutableList;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.type.Type;
+import nova.hetu.olk.tool.BlockUtils;
 import nova.hetu.olk.tool.OperatorUtils;
 import nova.hetu.olk.tool.VecBatchToPageIterator;
 import nova.hetu.omniruntime.type.DataType;
@@ -261,5 +262,33 @@ public class OmniMergingPageOutput
     private boolean isFull()
     {
         return totalPositions == Integer.MAX_VALUE || currentPageSizeInBytes >= maxPageSizeInBytes;
+    }
+
+    public void close()
+    {
+        // free input page due to it may not be handled
+        while (currentInput != null) {
+            if (currentInput.hasNext()) {
+                Optional<Page> page = currentInput.next();
+                if (page.isPresent()) {
+                    BlockUtils.freePage(page.get());
+                }
+            }
+        }
+
+        // free page in buffer
+        if (!bufferedPages.isEmpty()) {
+            for (Page page : bufferedPages) {
+                BlockUtils.freePage(page);
+            }
+        }
+
+        // free page in output queue
+        while (!outputQueue.isEmpty()) {
+            Page page = outputQueue.poll();
+            if (page != null) {
+                BlockUtils.freePage(page);
+            }
+        }
     }
 }

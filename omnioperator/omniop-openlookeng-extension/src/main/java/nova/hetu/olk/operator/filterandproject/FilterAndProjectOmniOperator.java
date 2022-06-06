@@ -27,6 +27,8 @@ import io.prestosql.spi.Page;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.type.Type;
 import nova.hetu.olk.operator.AbstractOmniOperatorFactory;
+import nova.hetu.olk.tool.VecAllocatorHelper;
+import nova.hetu.omniruntime.vector.VecAllocator;
 
 import java.util.List;
 import java.util.function.Supplier;
@@ -109,6 +111,12 @@ public class FilterAndProjectOmniOperator
         return mergingOutput.getOutput();
     }
 
+    @Override
+    public void close() throws Exception
+    {
+        mergingOutput.close();
+    }
+
     public static class FilterAndProjectOmniOperatorFactory
             extends AbstractOmniOperatorFactory
     {
@@ -146,10 +154,12 @@ public class FilterAndProjectOmniOperator
         public Operator createOperator(DriverContext driverContext)
         {
             checkState(!closed, "Factory is already closed");
+            VecAllocator vecAllocator = VecAllocatorHelper.createOperatorLevelAllocator(driverContext,
+                    VecAllocator.UNLIMIT, FilterAndProjectOmniOperator.class);
             OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId,
                     FilterAndProjectOmniOperator.class.getSimpleName());
             return new FilterAndProjectOmniOperator(operatorContext, processor.get(),
-                    new OmniMergingPageOutput(types, minOutputPageSize.toBytes(), minOutputPageRowCount));
+                    new OmniMergingPageOutput(types, minOutputPageSize.toBytes(), minOutputPageRowCount, vecAllocator));
         }
 
         @Override

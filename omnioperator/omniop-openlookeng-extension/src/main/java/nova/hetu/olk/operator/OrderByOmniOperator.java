@@ -32,6 +32,7 @@ import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.type.Type;
 import io.prestosql.testing.TestingSession;
 import io.prestosql.testing.TestingTaskContext;
+import nova.hetu.olk.tool.BlockUtils;
 import nova.hetu.olk.tool.OperatorUtils;
 import nova.hetu.olk.tool.VecAllocatorHelper;
 import nova.hetu.olk.tool.VecBatchToPageIterator;
@@ -299,6 +300,15 @@ public class OrderByOmniOperator
     @Override
     public void close()
     {
+        // free sortedPages if it has next
+        if (sortedPages != null) {
+            while (sortedPages.hasNext()) {
+                Optional<Page> next = sortedPages.next();
+                if (next.isPresent()) {
+                    BlockUtils.freePage(next.get());
+                }
+            }
+        }
         omniOperator.close();
     }
 }

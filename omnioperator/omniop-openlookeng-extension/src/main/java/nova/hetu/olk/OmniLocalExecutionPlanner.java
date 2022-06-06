@@ -815,7 +815,7 @@ public class OmniLocalExecutionPlanner
                             getFilterAndProjectMinOutputPageSize(session),
                             getFilterAndProjectMinOutputPageRowCount(session), strategy, reuseTableScanMappingId,
                             spillEnabled, Optional.of(spillerFactory), spillerThreshold, consumerTableScanNodeCount,
-                            inputTypes);
+                            inputTypes, (OmniLocalExecutionPlanContext) context);
                 }
                 else {
                     operatorFactory = new ScanFilterAndProjectOperator.ScanFilterAndProjectOperatorFactory(

@@ -22,6 +22,7 @@ import io.prestosql.operator.OperatorFactory;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.type.Type;
+import nova.hetu.olk.tool.BlockUtils;
 import nova.hetu.olk.tool.VecAllocatorHelper;
 import nova.hetu.olk.tool.VecBatchToPageIterator;
 import nova.hetu.omniruntime.operator.OmniOperator;
@@ -88,6 +89,13 @@ public class LimitOmniOperator
     @Override
     public void close() throws Exception
     {
+        // free page if it has next
+        if (pages != null) {
+            while (pages.hasNext()) {
+                Page next = pages.next();
+                BlockUtils.freePage(next);
+            }
+        }
         omniOperator.close();
     }
 

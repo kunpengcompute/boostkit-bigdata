@@ -24,6 +24,7 @@ import io.prestosql.spi.Page;
 import io.prestosql.spi.block.SortOrder;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.type.Type;
+import nova.hetu.olk.tool.BlockUtils;
 import nova.hetu.olk.tool.OperatorUtils;
 import nova.hetu.olk.tool.VecAllocatorHelper;
 import nova.hetu.olk.tool.VecBatchToPageIterator;
@@ -93,6 +94,13 @@ public class TopNOmniOperator
     @Override
     public void close() throws Exception
     {
+        // free pages if it has next
+        if (pages != null) {
+            while (pages.hasNext()) {
+                Page next = pages.next();
+                BlockUtils.freePage(next);
+            }
+        }
         omniOperator.close();
     }
 

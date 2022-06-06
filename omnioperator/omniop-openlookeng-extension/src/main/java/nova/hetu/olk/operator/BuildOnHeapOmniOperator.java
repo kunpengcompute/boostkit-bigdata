@@ -106,6 +106,14 @@ public class BuildOnHeapOmniOperator
         return transferToOnHeapPage(inputPage);
     }
 
+    @Override
+    public void close() throws Exception
+    {
+        if (inputPage != null) {
+            BlockUtils.freePage(inputPage);
+        }
+    }
+
     /**
      * The type buildOnHeapOmniOperator factory.
      *
