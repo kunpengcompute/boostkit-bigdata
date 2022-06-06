@@ -20,8 +20,12 @@ import io.prestosql.operator.Operator;
 import io.prestosql.operator.OperatorContext;
 import io.prestosql.operator.OperatorFactory;
 import io.prestosql.spi.Page;
+import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.StandardErrorCode;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.type.StandardTypes;
 import io.prestosql.spi.type.Type;
+import io.prestosql.spi.type.TypeSignature;
 import nova.hetu.olk.tool.VecAllocatorHelper;
 import nova.hetu.omniruntime.vector.VecAllocator;
 
@@ -130,6 +134,7 @@ public class BuildOffHeapOmniOperator
             this.operatorId = operatorId;
             this.planNodeId = requireNonNull(planNodeId, "planNodeId is null");
             this.sourceTypes = sourceTypes;
+            checkDataTypes(this.sourceTypes);
         }
 
         @Override
@@ -151,6 +156,29 @@ public class BuildOffHeapOmniOperator
         public OperatorFactory duplicate()
         {
             return new BuildOffHeapOmniOperatorFactory(operatorId, planNodeId, sourceTypes);
+        }
+
+        @Override
+        public void checkDataType(Type type)
+        {
+            TypeSignature signature = type.getTypeSignature();
+            String base = signature.getBase();
+
+            switch (base) {
+                case StandardTypes.INTEGER:
+                case StandardTypes.BIGINT:
+                case StandardTypes.DOUBLE:
+                case StandardTypes.BOOLEAN:
+                case StandardTypes.VARBINARY:
+                case StandardTypes.VARCHAR:
+                case StandardTypes.CHAR:
+                case StandardTypes.DECIMAL:
+                case StandardTypes.DATE:
+                case StandardTypes.ROW:
+                    return;
+                default:
+                    throw new PrestoException(StandardErrorCode.NOT_SUPPORTED, "Not support data Type " + base);
+            }
         }
     }
 }

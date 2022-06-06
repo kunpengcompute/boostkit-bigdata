@@ -85,6 +85,7 @@ public class DistinctLimitOmniOperator
             this.operatorId = operatorId;
             this.planNodeId = requireNonNull(planNodeId, "planNodeId is null");
             this.sourceTypes = ImmutableList.copyOf(requireNonNull(sourceTypes, "sourceTypes is null"));
+            checkDataTypes(this.sourceTypes);
             this.distinctChannels = distinctChannels;
             this.hashChannel = requireNonNull(hashChannel, "hash channel is null.");
             this.limit = limit;

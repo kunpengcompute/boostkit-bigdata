@@ -118,6 +118,7 @@ public class HashBuilderOmniOperator
             this.outputChannels = ImmutableList.copyOf(requireNonNull(outputChannels, "outputChannels is null"));
             this.preComputedHashChannel = requireNonNull(preComputedHashChannel, "preComputedHashChannel is null");
             this.sourceTypes = ImmutableList.copyOf(requireNonNull(buildTypes, "buildTypes is null"));
+            checkDataTypes(this.sourceTypes);
 
             DataType[] omniBuildTypes = OperatorUtils.toDataTypes(buildTypes);
             String[] omniSearchFunctions = searchFunctions.stream().toArray(String[]::new);

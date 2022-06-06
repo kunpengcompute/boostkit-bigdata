@@ -75,6 +75,7 @@ public class LocalExchangeSinkOmniOperator
             this.sinkFactoryId = requireNonNull(sinkFactoryId, "sinkFactoryId is null");
             this.pagePreprocessor = requireNonNull(pagePreprocessor, "pagePreprocessor is null");
             this.sourceTypes = ImmutableList.copyOf(requireNonNull(types, "sourceTypes is null"));
+            checkDataTypes(this.sourceTypes);
         }
 
         @Override

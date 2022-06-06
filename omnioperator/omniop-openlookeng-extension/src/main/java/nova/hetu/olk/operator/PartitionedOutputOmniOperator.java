@@ -232,6 +232,7 @@ public class PartitionedOutputOmniOperator
             this.operatorId = operatorId;
             this.planNodeId = requireNonNull(planNodeId, "planNodeId is null");
             this.sourceTypes = requireNonNull(sourceTypes, "sourceTypes is null");
+            checkDataTypes(this.sourceTypes);
             this.pagePreprocessor = requireNonNull(pagePreprocessor, "pagePreprocessor is null");
             this.partitionFunction = requireNonNull(partitionFunction, "partitionFunction is null");
             this.partitionChannels = requireNonNull(partitionChannels, "partitionChannels is null");

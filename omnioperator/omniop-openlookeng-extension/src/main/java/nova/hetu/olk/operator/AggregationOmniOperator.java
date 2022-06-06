@@ -20,9 +20,13 @@ import io.prestosql.operator.Operator;
 import io.prestosql.operator.OperatorContext;
 import io.prestosql.operator.OperatorFactory;
 import io.prestosql.spi.Page;
+import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.StandardErrorCode;
 import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.type.StandardTypes;
 import io.prestosql.spi.type.Type;
+import io.prestosql.spi.type.TypeSignature;
 import nova.hetu.olk.tool.OperatorUtils;
 import nova.hetu.olk.tool.VecAllocatorHelper;
 import nova.hetu.olk.tool.VecBatchToPageIterator;
@@ -175,6 +179,7 @@ public class AggregationOmniOperator
             this.operatorId = operatorId;
             this.planNodeId = requireNonNull(planNodeId, "planNodeId is null");
             this.sourceTypes = sourceTypes;
+            checkDataTypes(this.sourceTypes);
             this.sourceDataTypes = requireNonNull(OperatorUtils.toDataTypes(sourceTypes), "sourceTypes is null");
             this.step = step;
             this.aggregatorTypes = aggregatorTypes;
@@ -217,6 +222,36 @@ public class AggregationOmniOperator
         {
             return new AggregationOmniOperatorFactory(operatorId, planNodeId, sourceTypes, aggregatorTypes,
                     aggregationInputChannels, maskChannels, aggregationOutputTypes, step);
+        }
+
+        @Override
+        public void checkDataType(Type type)
+        {
+            TypeSignature signature = type.getTypeSignature();
+            String base = signature.getBase();
+
+            switch (base) {
+                case StandardTypes.INTEGER:
+                case StandardTypes.BIGINT:
+                case StandardTypes.DOUBLE:
+                case StandardTypes.BOOLEAN:
+                case StandardTypes.VARCHAR:
+                case StandardTypes.CHAR:
+                case StandardTypes.DECIMAL:
+                case StandardTypes.DATE:
+                    return;
+                case StandardTypes.VARBINARY:
+                case StandardTypes.ROW: {
+                    if (this.step == AggregationNode.Step.FINAL) {
+                        return;
+                    }
+                    else if (this.step == AggregationNode.Step.PARTIAL) {
+                        throw new PrestoException(StandardErrorCode.NOT_SUPPORTED, "Not support data Type " + base);
+                    }
+                }
+                default:
+                    throw new PrestoException(StandardErrorCode.NOT_SUPPORTED, "Not support data Type " + base);
+            }
         }
     }
 }

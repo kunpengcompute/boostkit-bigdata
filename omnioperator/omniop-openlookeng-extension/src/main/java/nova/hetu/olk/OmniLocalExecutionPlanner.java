@@ -367,7 +367,6 @@ public class OmniLocalExecutionPlanner
                 case "max":
                     builder.add(OMNI_AGGREGATION_TYPE_MAX);
                     break;
-                // TODO count *
                 default:
                     throw new UnsupportedOperationException(
                             "unsupported Aggregator type by OmniRuntime: " + functionCall.getDisplayName());
@@ -468,26 +467,14 @@ public class OmniLocalExecutionPlanner
             return null;
         }
 
-        // if there is a data type not support by OmniRuntime, then fall back
-        for (DriverFactory driverFactory : context.getDriverFactories()) {
-            for (OperatorFactory operatorFactory : driverFactory.getOperatorFactories()) {
-                if (notSupportTypes(operatorFactory.getSourceTypes())) {
-                    log.warn("There is a data type not support by OmniRuntime: %s",
-                            operatorFactory.getSourceTypes().toString());
-                    return null;
-                }
-            }
-        }
-        for (OperatorFactory operatorFactory : physicalOperation.getOperatorFactories()) {
-            if (notSupportTypes(operatorFactory.getSourceTypes())) {
-                log.warn("There is a data type not support by OmniRuntime: %s",
-                        operatorFactory.getSourceTypes().toString());
-                return null;
-            }
-        }
-
         Function<Page, Page> pagePreprocessor = enforceLayoutProcessor(outputLayout, physicalOperation.getLayout());
         List<Type> outputTypes = outputLayout.stream().map(types::get).collect(toImmutableList());
+
+        if (notSupportTypes(outputTypes)) {
+            log.warn("There is a data type not support by OmniRuntime: %s",
+                    outputTypes.toString());
+            return null;
+        }
 
         context.addDriverFactory(context.isInputDriver(), true,
                 ImmutableList.<OperatorFactory>builder().addAll(physicalOperation.getOperatorFactories())
@@ -1233,7 +1220,6 @@ public class OmniLocalExecutionPlanner
             PhysicalOperation source = node.getSource().accept(this, context);
 
             List<Symbol> orderBySymbols = node.getOrderingScheme().getOrderBy();
-
             List<Integer> orderByChannels = getChannelsForSymbols(orderBySymbols, source.getLayout());
 
             ImmutableList.Builder<SortOrder> sortOrder = ImmutableList.builder();

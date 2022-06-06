@@ -618,6 +618,7 @@ public class ScanFilterAndProjectOmniOperator
             this.spillerThreshold = spillerThreshold;
             this.consumerTableScanNodeCount = consumerTableScanNodeCount;
             this.sourceTypes = sourceTypes;
+            checkDataTypes(this.sourceTypes);
         }
 
         @Override

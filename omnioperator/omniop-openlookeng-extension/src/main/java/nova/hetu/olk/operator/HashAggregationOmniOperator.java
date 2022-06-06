@@ -25,10 +25,14 @@ import io.prestosql.operator.Operator;
 import io.prestosql.operator.OperatorContext;
 import io.prestosql.operator.OperatorFactory;
 import io.prestosql.spi.Page;
+import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.StandardErrorCode;
 import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.plan.AggregationNode.Step;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.type.StandardTypes;
 import io.prestosql.spi.type.Type;
+import io.prestosql.spi.type.TypeSignature;
 import nova.hetu.olk.tool.BlockUtils;
 import nova.hetu.olk.tool.VecAllocatorHelper;
 import nova.hetu.olk.tool.VecBatchToPageIterator;
@@ -221,6 +225,7 @@ public class HashAggregationOmniOperator
             this.operatorId = operatorId;
             this.planNodeId = planNodeId;
             this.sourceTypes = ImmutableList.copyOf(requireNonNull(sourceTypes, "sourceTypes is null"));
+            checkDataTypes(this.sourceTypes);
             this.step = step;
             this.groupByInputChannels = Arrays.copyOf(
                     requireNonNull(groupByInputChannels, "groupByInputChannels is null."), groupByInputChannels.length);
@@ -323,6 +328,36 @@ public class HashAggregationOmniOperator
             return new HashAggregationOmniOperatorFactory(operatorId, planNodeId, sourceTypes, groupByInputChannels,
                     groupByInputTypes, aggregationInputChannels, aggregationInputTypes, aggregatorTypes, maskChannels,
                     aggregationOutputTypes, step);
+        }
+
+        @Override
+        public void checkDataType(Type type)
+        {
+            TypeSignature signature = type.getTypeSignature();
+            String base = signature.getBase();
+
+            switch (base) {
+                case StandardTypes.INTEGER:
+                case StandardTypes.BIGINT:
+                case StandardTypes.DOUBLE:
+                case StandardTypes.BOOLEAN:
+                case StandardTypes.VARCHAR:
+                case StandardTypes.CHAR:
+                case StandardTypes.DECIMAL:
+                case StandardTypes.DATE:
+                    return;
+                case StandardTypes.VARBINARY:
+                case StandardTypes.ROW: {
+                    if (this.step == AggregationNode.Step.FINAL) {
+                        return;
+                    }
+                    else if (this.step == AggregationNode.Step.PARTIAL) {
+                        throw new PrestoException(StandardErrorCode.NOT_SUPPORTED, "Not support data Type " + base);
+                    }
+                }
+                default:
+                    throw new PrestoException(StandardErrorCode.NOT_SUPPORTED, "Not support data Type " + base);
+            }
         }
     }
 }

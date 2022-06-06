@@ -21,6 +21,7 @@ import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
 import io.prestosql.spi.block.LazyBlock;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.type.Type;
 import nova.hetu.olk.block.LazyOmniBlock;
 import nova.hetu.olk.operator.LimitOmniOperator.LimitOmniOperatorFactory;
 import nova.hetu.olk.tool.OperatorUtils;
@@ -29,6 +30,8 @@ import org.powermock.core.classloader.annotations.PrepareForTest;
 import org.testng.annotations.Test;
 
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import java.util.Random;
 import java.util.UUID;
 
@@ -49,6 +52,7 @@ public class LimitOmniOperatorTest
     private final int operatorId = new Random().nextInt();
     private final PlanNodeId planNodeId = new PlanNodeId(UUID.randomUUID().toString());
     private final int limit = Math.abs(new Random().nextInt()) + 1;
+    private List<Type> sourceTypes = Collections.emptyList();
 
     @Override
     protected void setUpMock()
@@ -60,7 +64,7 @@ public class LimitOmniOperatorTest
     @Override
     protected OperatorFactory createOperatorFactory()
     {
-        return new LimitOmniOperatorFactory(operatorId, planNodeId, limit, null).duplicate();
+        return new LimitOmniOperatorFactory(operatorId, planNodeId, limit, sourceTypes).duplicate();
     }
 
     @Override

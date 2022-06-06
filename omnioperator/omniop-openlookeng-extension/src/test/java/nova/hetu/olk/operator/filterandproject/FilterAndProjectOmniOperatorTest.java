@@ -51,12 +51,13 @@ public class FilterAndProjectOmniOperatorTest
     private final List<Type> types = Collections.emptyList();
     private final DataSize minOutputPageSize = new DataSize(1, DataSize.Unit.BYTE);
     private final int minOutputPageRowCount = 0;
+    private List<Type> sourceTypes = Collections.emptyList();
 
     @Override
     protected OperatorFactory createOperatorFactory()
     {
         return new FilterAndProjectOmniOperatorFactory(0, planNodeId, processor, types, minOutputPageSize,
-                minOutputPageRowCount);
+                minOutputPageRowCount, sourceTypes);
     }
 
     @Override
