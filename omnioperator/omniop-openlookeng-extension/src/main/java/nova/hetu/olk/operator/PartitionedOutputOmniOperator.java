@@ -33,10 +33,14 @@ import io.prestosql.operator.PartitionedOutputOperator;
 import io.prestosql.operator.TaskContext;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
+import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.StandardErrorCode;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.predicate.NullableValue;
+import io.prestosql.spi.type.StandardTypes;
 import io.prestosql.spi.type.Type;
+import io.prestosql.spi.type.TypeSignature;
 import nova.hetu.olk.tool.BlockUtils;
 import nova.hetu.olk.tool.OperatorUtils;
 import nova.hetu.olk.tool.VecAllocatorHelper;
@@ -270,6 +274,29 @@ public class PartitionedOutputOmniOperator
             return new PartitionedOutputOmniOperatorFactory(operatorId, planNodeId, sourceTypes, pagePreprocessor,
                     partitionFunction, partitionChannels, partitionConstants, replicatesAnyRow, nullChannel,
                     outputBuffer, maxMemory, omniPartitionedOutPutOperatorFactory);
+        }
+
+        @Override
+        public void checkDataType(Type type)
+        {
+            TypeSignature signature = type.getTypeSignature();
+            String base = signature.getBase();
+
+            switch (base) {
+                case StandardTypes.INTEGER:
+                case StandardTypes.BIGINT:
+                case StandardTypes.DOUBLE:
+                case StandardTypes.BOOLEAN:
+                case StandardTypes.VARBINARY:
+                case StandardTypes.VARCHAR:
+                case StandardTypes.CHAR:
+                case StandardTypes.DECIMAL:
+                case StandardTypes.DATE:
+                case StandardTypes.ROW:
+                    return;
+                default:
+                    throw new PrestoException(StandardErrorCode.NOT_SUPPORTED, "Not support data Type " + base);
+            }
         }
     }
 

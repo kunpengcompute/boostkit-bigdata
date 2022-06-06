@@ -62,7 +62,6 @@ public class LocalExchangeSourceOmniOperator
             this.localExchangeFactory = requireNonNull(localExchangeFactory, "localExchangeFactory is null");
             this.totalInputChannels = totalInputChannels;
             this.sourceTypes = ImmutableList.copyOf(requireNonNull(types, "sourceTypes is null"));
-            checkDataTypes(this.sourceTypes);
         }
 
         @Override

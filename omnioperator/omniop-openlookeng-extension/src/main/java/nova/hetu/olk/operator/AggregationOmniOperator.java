@@ -179,7 +179,6 @@ public class AggregationOmniOperator
             this.operatorId = operatorId;
             this.planNodeId = requireNonNull(planNodeId, "planNodeId is null");
             this.sourceTypes = sourceTypes;
-            checkDataTypes(this.sourceTypes);
             this.sourceDataTypes = requireNonNull(OperatorUtils.toDataTypes(sourceTypes), "sourceTypes is null");
             this.step = step;
             this.aggregatorTypes = aggregatorTypes;
@@ -196,6 +195,7 @@ public class AggregationOmniOperator
                     maskChannelArray[i] = INVALID_MASK_CHANNEL;
                 }
             }
+            checkDataTypes(this.sourceTypes);
             this.omniFactory = new OmniAggregationOperatorFactory(sourceDataTypes, aggregatorTypes,
                     aggregationInputChannels, maskChannelArray, aggregationOutputTypes, step.isInputRaw(),
                     step.isOutputPartial());
