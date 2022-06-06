@@ -4,7 +4,7 @@
 
 package org.apache.spark.sql.execution.datasources.orc;
 
-import com.esotericsoftware.kryo.kryo;
+import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.io.Input;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.hadoop.conf.Configuration;
@@ -43,8 +43,8 @@ public class OrcColumnarNativeReader {
         if (kryoSarg != null && sargColumns != null) {
             byte[] sargBytes = Base64.decodeBase64(kryoSarg);
             SearchArgument sarg =
-                new kryo().readObject(new Input(sargBytes), SearchArgumentImpl.class);
-            options.SearchArgument(sarg, sargColumns.split(","));
+                new Kryo().readObject(new Input(sargBytes), SearchArgumentImpl.class);
+            options.searchArgument(sarg, sargColumns.split(","));
             sarg.getExpression().toString();
         }
         return options;
