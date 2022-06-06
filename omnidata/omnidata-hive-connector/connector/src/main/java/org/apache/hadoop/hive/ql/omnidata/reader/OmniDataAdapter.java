@@ -149,8 +149,9 @@ public class OmniDataAdapter implements Serializable {
         for (String omniDataHost : omniDataHosts) {
             String ipAddress = InetAddress.getByName(omniDataHost).getHostAddress();
             properties.put("omnidata.client.target.list", ipAddress);
+            DataReaderImpl<List<ColumnVector[]>> dataReader = null;
             try {
-                DataReaderImpl<List<ColumnVector[]>> dataReader = new DataReaderImpl<>(properties, taskSource,
+                dataReader = new DataReaderImpl<>(properties, taskSource,
                         deserializer);
                 do {
                     List<ColumnVector[]> page = dataReader.getNextPageBlocking();
@@ -193,6 +194,8 @@ public class OmniDataAdapter implements Serializable {
             } catch (Exception e) {
                 LOGGER.error("OmniDataAdapter getBatchFromOmnidata() has error:", e);
                 failedTimes++;
+            } finally {
+                dataReader.close();
             }
         }
         int retryTime = Math.min(TASK_FAILED_TIMES, omniDataHosts.size());

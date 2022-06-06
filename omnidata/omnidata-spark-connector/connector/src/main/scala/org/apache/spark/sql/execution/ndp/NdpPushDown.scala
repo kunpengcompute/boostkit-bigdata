@@ -445,10 +445,12 @@ object NdpConf {
   def getNdpUdfWhitelist(sourceName: String): mutable.Set[AnyRef] = {
     val prop = new Properties()
     val inputStream = this.getClass.getResourceAsStream("/"+sourceName)
-    if (inputStream==null){
+    if (inputStream == null){
+      inputStream.close()
       mutable.Set("")
-    }else{
+    } else {
       prop.load(inputStream)
+      inputStream.close()
       JavaConverters.asScalaSetConverter(prop.keySet()).asScala
     }
   }
