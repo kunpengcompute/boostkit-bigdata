@@ -225,7 +225,6 @@ public class HashAggregationOmniOperator
             this.operatorId = operatorId;
             this.planNodeId = planNodeId;
             this.sourceTypes = ImmutableList.copyOf(requireNonNull(sourceTypes, "sourceTypes is null"));
-            checkDataTypes(this.sourceTypes);
             this.step = step;
             this.groupByInputChannels = Arrays.copyOf(
                     requireNonNull(groupByInputChannels, "groupByInputChannels is null."), groupByInputChannels.length);
@@ -255,7 +254,7 @@ public class HashAggregationOmniOperator
             this.aggregationOutputTypes = Arrays.copyOf(
                     requireNonNull(aggregationOutputTypes, "aggregationOutputTypes is null."),
                     aggregationOutputTypes.length);
-
+            checkDataTypes(this.sourceTypes);
             this.omniFactory = new OmniHashAggregationOperatorFactory(createExpressions(this.groupByInputChannels),
                     this.groupByInputTypes, createExpressions(this.aggregationInputChannels),
                     this.aggregationInputTypes, this.aggregatorTypes, maskChannelArray, this.aggregationOutputTypes, step.isInputRaw(),

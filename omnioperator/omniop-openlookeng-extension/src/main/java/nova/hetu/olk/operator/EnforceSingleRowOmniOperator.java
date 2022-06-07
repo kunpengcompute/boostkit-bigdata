@@ -94,7 +94,6 @@ public class EnforceSingleRowOmniOperator
             this.operatorId = operatorId;
             this.planNodeId = requireNonNull(planNodeId, "planNodeId is null");
             this.sourceTypes = sourceTypes;
-            checkDataTypes(this.sourceTypes);
         }
 
         @Override

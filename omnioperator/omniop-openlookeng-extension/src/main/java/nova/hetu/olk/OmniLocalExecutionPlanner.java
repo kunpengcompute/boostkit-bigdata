@@ -476,23 +476,30 @@ public class OmniLocalExecutionPlanner
             return null;
         }
 
-        context.addDriverFactory(context.isInputDriver(), true,
-                ImmutableList.<OperatorFactory>builder().addAll(physicalOperation.getOperatorFactories())
-                        .add(outputOperatorFactory.createOutputOperator(context.getNextOperatorId(), plan.getId(),
-                                outputTypes, pagePreprocessor, taskContext))
-                        .build(),
-                context.getDriverInstanceCount(), physicalOperation.getPipelineExecutionStrategy());
-        addLookupOuterDrivers(context);
-        addTransformOperators(context);
+        try {
+            context.addDriverFactory(context.isInputDriver(), true,
+                    ImmutableList.<OperatorFactory>builder().addAll(physicalOperation.getOperatorFactories())
+                            .add(outputOperatorFactory.createOutputOperator(context.getNextOperatorId(), plan.getId(),
+                                    outputTypes, pagePreprocessor, taskContext))
+                            .build(),
+                    context.getDriverInstanceCount(), physicalOperation.getPipelineExecutionStrategy());
+            addLookupOuterDrivers(context);
+            addTransformOperators(context);
 
-        // notify operator factories that planning has completed
-        context.getDriverFactories().stream().map(DriverFactory::getOperatorFactories).flatMap(List::stream)
-                .filter(LocalPlannerAware.class::isInstance).map(LocalPlannerAware.class::cast)
-                .forEach(LocalPlannerAware::localPlannerComplete);
+            // notify operator factories that planning has completed
+            context.getDriverFactories().stream().map(DriverFactory::getOperatorFactories).flatMap(List::stream)
+                    .filter(LocalPlannerAware.class::isInstance).map(LocalPlannerAware.class::cast)
+                    .forEach(LocalPlannerAware::localPlannerComplete);
 
-        log.debug("create the omni local execution plan successful!");
-        return new LocalExecutionPlan(context.getDriverFactories(), partitionedSourceOrder, stageExecutionDescriptor,
-                feederCTEId);
+            log.debug("create the omni local execution plan successful!");
+            return new LocalExecutionPlan(context.getDriverFactories(), partitionedSourceOrder, stageExecutionDescriptor,
+                    feederCTEId);
+        }
+        catch (Exception e) {
+            log.warn("Unable to plan with OmniRuntime Operators for task: " + taskContext.getTaskId() + ", cause: "
+                    + e.getLocalizedMessage());
+            return null;
+        }
     }
 
     private static void addTransformOperators(LocalExecutionPlanContext context)
