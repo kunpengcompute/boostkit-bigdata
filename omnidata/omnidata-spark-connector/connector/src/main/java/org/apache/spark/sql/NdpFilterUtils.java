@@ -47,7 +47,7 @@ import java.util.Map;
 public class NdpFilterUtils {
 
     public static int getFilterProjectionId(Expression expression, Map<String, Integer> fieldMap) {
-        String filterColumnName = expression.toString().split("#")[0];
+        String filterColumnName = expression.toString().split("#")[0].toLowerCase(Locale.ENGLISH);
         if (fieldMap.containsKey(filterColumnName)) {
             return fieldMap.get(filterColumnName);
         } else {
