@@ -49,12 +49,8 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Properties;
-import java.util.Queue;
+import java.util.*;
+
 
 /**
  * Obtains data from OmniData through OmniDataAdapter and converts the data into Hive List<ColumnVector[]>.
@@ -116,7 +112,19 @@ public class OmniDataAdapter implements Serializable {
                     .getFileBlockLocations(fileSplit.getPath(), fileSplit.getStart(), fileSplit.getLength());
             for (BlockLocation block : blockLocations) {
                 for (String host : block.getHosts()) {
-                    hosts.add(host);
+                    if ("localhost".equals(host)) {
+                        List<String> dataNodeHosts = new ArrayList<>(
+                                Arrays.asList(conf.get(NdpStatusManager.NDP_DATANODE_HOSTNAMES)
+                                        .split(NdpStatusManager.NDP_DATANODE_HOSTNAME_SEPARATOR)));
+                        if (dataNodeHosts.size() > ndpReplicationNum) {
+                            hosts.addAll(dataNodeHosts.subList(0, ndpReplicationNum));
+                        } else {
+                            hosts.addAll(dataNodeHosts);
+                        }
+                        return hosts;
+                    } else {
+                        hosts.add(host);
+                    }
                     if (ndpReplicationNum == hosts.size()) {
                         return hosts;
                     }
@@ -159,7 +167,6 @@ public class OmniDataAdapter implements Serializable {
                         pages.addAll(page);
                     }
                 } while (!dataReader.isFinished());
-                dataReader.close();
                 break;
             } catch (OmniDataException omniDataException) {
                 LOGGER.warn("OmniDataAdapter failed node info [hostname :{}]", omniDataHost);
@@ -195,7 +202,9 @@ public class OmniDataAdapter implements Serializable {
                 LOGGER.error("OmniDataAdapter getBatchFromOmnidata() has error:", e);
                 failedTimes++;
             } finally {
-                dataReader.close();
+                if (dataReader != null) {
+                    dataReader.close();
+                }
             }
         }
         int retryTime = Math.min(TASK_FAILED_TIMES, omniDataHosts.size());
