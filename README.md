@@ -1,2 +1,5 @@
 # boostkit-bigdata
 BoostKit Acceleration Packages —— Big Data Component Adaptation Layer
+
+## Notice
+The boostkit-bigdata repo contains acceleration plugins and patches for multiple pieces of open source software including openLooKeng, Apache Spark, Hive, and HBase. Using these plugins and patches depends on other pieces of open source software (which are available in the central repo). You shall understand and agree that when using the other pieces of open source software, you shall strictly comply with their open source licenses and fulfill the obligations specified in the licenses. Any vulnerabilities and security issues of the other open source software are resolved by the corresponding upstream communities based on their own vulnerability and security response mechanisms. Please pay attention to the notifications and version updates released by the upstream communities. The Kunpeng Compute community does not assume any responsibility for the vulnerabilities and security issues of the preceding open source software.
