@@ -335,7 +335,7 @@ public class DataIoAdapter {
     private RowExpression extractNamedExpression(Expression namedExpression) {
         Type prestoType = NdpUtils.transOlkDataType(namedExpression.dataType(), false);
         int aggProjectionId;
-        String aggColumnName = namedExpression.toString().split("#")[0];
+        String aggColumnName = namedExpression.toString().split("#")[0].toLowerCase(Locale.ENGLISH);
         columnOrdersList.add(columnOrder++);
         columnTypesList.add(NdpUtils.transDataIoDataType(namedExpression.dataType()));
 
@@ -457,7 +457,7 @@ public class DataIoAdapter {
                         expression.dataType().toString(), expression.toString());
                 return new ConstantExpression(value, prestoType);
             case AttributeReference:
-                String aggColumnName = expression.toString().split("#")[0];
+                String aggColumnName = expression.toString().split("#")[0].toLowerCase(Locale.ENGLISH);
                 int field;
                 if (null == columnNameMap.get(aggColumnName)) {
                     field = columnNameMap.size();
@@ -785,7 +785,7 @@ public class DataIoAdapter {
     private int putFilterValue(Expression valueExpression, Type prestoType) {
         // Filter赋值
         int columnId = NdpUtils.getColumnId(valueExpression.toString()) - columnOffset;
-        String filterColumnName = valueExpression.toString().split("#")[0];
+        String filterColumnName = valueExpression.toString().split("#")[0].toLowerCase(Locale.ENGLISH);
         if (null != fieldMap.get(filterColumnName)) {
             return fieldMap.get(filterColumnName);
         }
@@ -897,7 +897,7 @@ public class DataIoAdapter {
         int filterColumnId = 0;
         for (Attribute attribute : outputColumnList) {
             Attribute resAttribute = NdpUtils.getColumnAttribute(attribute, listAtt);
-            String columnName = resAttribute.name();
+            String columnName = resAttribute.name().toLowerCase(Locale.ENGLISH);
             Type type = NdpUtils.transOlkDataType(resAttribute.dataType(), false);
             int columnId = NdpUtils.getColumnId(resAttribute.toString()) - columnOffset;
             isPartitionKey = partitionColumnName.contains(columnName);
