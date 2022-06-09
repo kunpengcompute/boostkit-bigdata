@@ -37,12 +37,15 @@ import nova.hetu.omniruntime.type.DataType;
 import nova.hetu.omniruntime.vector.VecAllocator;
 import nova.hetu.omniruntime.vector.VecBatch;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
 import static nova.hetu.olk.tool.OperatorUtils.buildVecBatch;
+import static nova.hetu.omniruntime.constants.FunctionType.OMNI_AGGREGATION_TYPE_AVG;
+import static nova.hetu.omniruntime.constants.FunctionType.OMNI_AGGREGATION_TYPE_SUM;
 
 /**
  * The type Aggregation omni operator.
@@ -241,12 +244,14 @@ public class AggregationOmniOperator
                 case StandardTypes.DATE:
                     return;
                 case StandardTypes.VARBINARY:
-                case StandardTypes.ROW: {
-                    if (this.step == AggregationNode.Step.FINAL) {
+                    if (this.step == AggregationNode.Step.FINAL && this.aggregatorTypes.length != 0 &&
+                            Arrays.stream(this.aggregatorTypes).allMatch(item -> item == OMNI_AGGREGATION_TYPE_AVG || item == OMNI_AGGREGATION_TYPE_SUM)) {
                         return;
                     }
-                    else if (this.step == AggregationNode.Step.PARTIAL) {
-                        throw new PrestoException(StandardErrorCode.NOT_SUPPORTED, "Not support data Type " + base);
+                case StandardTypes.ROW: {
+                    if (this.step == AggregationNode.Step.FINAL && this.aggregatorTypes.length != 0 &&
+                            Arrays.stream(this.aggregatorTypes).allMatch(item -> item == OMNI_AGGREGATION_TYPE_AVG)) {
+                        return;
                     }
                 }
                 default:
