@@ -47,11 +47,14 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
 import static nova.hetu.olk.tool.OperatorUtils.buildVecBatch;
 import static nova.hetu.olk.tool.OperatorUtils.createExpressions;
+import static nova.hetu.omniruntime.constants.FunctionType.OMNI_AGGREGATION_TYPE_AVG;
+import static nova.hetu.omniruntime.constants.FunctionType.OMNI_AGGREGATION_TYPE_SUM;
 
 /**
  * The type Hash aggregation omni operator.
@@ -228,6 +231,12 @@ public class HashAggregationOmniOperator
             this.step = step;
             this.groupByInputChannels = Arrays.copyOf(
                     requireNonNull(groupByInputChannels, "groupByInputChannels is null."), groupByInputChannels.length);
+            List<Type> groupByTypes = Arrays.stream(this.groupByInputChannels)
+                    .mapToObj(channel -> this.sourceTypes.get(channel)).collect(Collectors.toList());
+            if (groupByTypes.stream().map(type -> type.getTypeSignature().getBase())
+                    .anyMatch(item -> item.equals(StandardTypes.ROW))) {
+                throw new PrestoException(StandardErrorCode.NOT_SUPPORTED, "Not Support data Type " + StandardTypes.ROW);
+            }
             this.groupByInputTypes = Arrays.copyOf(
                     requireNonNull(groupByInputTypes, "groupByInputTypes is null."),
                     groupByInputTypes.length);
@@ -346,12 +355,14 @@ public class HashAggregationOmniOperator
                 case StandardTypes.DATE:
                     return;
                 case StandardTypes.VARBINARY:
-                case StandardTypes.ROW: {
-                    if (this.step == AggregationNode.Step.FINAL) {
+                    if (this.step == AggregationNode.Step.FINAL && this.aggregatorTypes.length != 0 &&
+                            Arrays.stream(this.aggregatorTypes).allMatch(item -> item == OMNI_AGGREGATION_TYPE_AVG || item == OMNI_AGGREGATION_TYPE_SUM)) {
                         return;
                     }
-                    else if (this.step == AggregationNode.Step.PARTIAL) {
-                        throw new PrestoException(StandardErrorCode.NOT_SUPPORTED, "Not support data Type " + base);
+                case StandardTypes.ROW: {
+                    if (this.step == AggregationNode.Step.FINAL && this.aggregatorTypes.length != 0 &&
+                            Arrays.stream(this.aggregatorTypes).allMatch(item -> item == OMNI_AGGREGATION_TYPE_AVG)) {
+                        return;
                     }
                 }
                 default:
