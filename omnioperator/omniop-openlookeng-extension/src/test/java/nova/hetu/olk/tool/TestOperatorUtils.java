@@ -150,7 +150,8 @@ public class TestOperatorUtils
         Type type = BIGINT;
         Page page = new Page(buildRowBlockByBuilder(type));
         // transfer on-heap page to off-heap
-        Page offHeapPage = transferToOffHeapPages(VecAllocator.GLOBAL_VECTOR_ALLOCATOR, page);
+        Page offHeapPage = transferToOffHeapPages(VecAllocator.GLOBAL_VECTOR_ALLOCATOR, page,
+                ImmutableList.of(RowType.from(ImmutableList.of(RowType.field(type)))));
         // transfer off-heap page to on-heap
         Page onHeapPage = transferToOnHeapPage(offHeapPage);
         BlockUtils.freePage(offHeapPage);

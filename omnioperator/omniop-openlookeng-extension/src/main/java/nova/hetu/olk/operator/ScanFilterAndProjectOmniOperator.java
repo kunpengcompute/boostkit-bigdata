@@ -321,6 +321,7 @@ public class ScanFilterAndProjectOmniOperator
         boolean isDcTable;
 
         boolean finished;
+        private final List<Type> outputTypes;
 
         RecordCursorToPages(Session session, DriverYieldSignal yieldSignal, CursorProcessor cursorProcessor,
                             List<Type> types, LocalMemoryContext pageSourceMemoryContext, LocalMemoryContext outputMemoryContext,
@@ -350,6 +351,7 @@ public class ScanFilterAndProjectOmniOperator
                     isDcTable = true;
                 }
             }
+            this.outputTypes = types;
         }
 
         @Override
@@ -386,7 +388,7 @@ public class ScanFilterAndProjectOmniOperator
                 }
                 pageBuilder.reset();
                 outputMemoryContext.setBytes(pageBuilder.getRetainedSizeInBytes());
-                page = transferToOffHeapPages(vecAllocator, page, inputTypes);
+                page = transferToOffHeapPages(vecAllocator, page, outputTypes);
                 return ProcessState.ofResult(page);
             }
             else if (finished) {

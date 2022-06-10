@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.huawei.kunpeng</groupId>
+    <artifactId>boostkit-omniop-spark-parent</artifactId>
+    <packaging>pom</packaging>
+    <version>3.1.1-1.0.0</version>
+
+    <name>BoostKit Spark Native Sql Engine Extension Parent Pom</name>
+
+    <properties>
+        <scala.version>2.12.10</scala.version>
+        <scala.binary.version>2.12</scala.binary.version>
+        <spark.version>3.1.1</spark.version>
+        <hadoop.version>2.7.4</hadoop.version>
+        <omni.version>1.2.0-SNAPSHOT</omni.version>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <protobuf.version>3.15.8</protobuf.version>
+        <cpp.test>FALSE</cpp.test>
+        <omniruntime.version>1.0.0</omniruntime.version>
+    </properties>
+    <modules>
+        <module>java</module>
+    </modules>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.apache.spark</groupId>
+                <artifactId>spark-sql_${scala.binary.version}</artifactId>
+                <version>${spark.version}</version>
+                <scope>provided</scope>
+                <exclusions>
+                    <exclusion>
+                        <groupId>org.apache.arrow</groupId>
+                        <artifactId>arrow-vector</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>org.slf4j</groupId>
+                        <artifactId>slf4j-log4j12</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>log4j</groupId>
+                        <artifactId>log4j</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>org.apache.hadoop</groupId>
+                        <artifactId>hadoop-client</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>org.apache.curator</groupId>
+                        <artifactId>curator-recipes</artifactId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.spark</groupId>
+                <artifactId>spark-catalyst_${scala.binary.version}</artifactId>
+                <version>${spark.version}</version>
+                <scope>provided</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.hadoop</groupId>
+                <artifactId>hadoop-client</artifactId>
+                <version>${hadoop.version}</version>
+                <scope>provided</scope>
+                <exclusions>
+                    <exclusion>
+                        <groupId>com.fasterxml.jackson.core</groupId>
+                        <artifactId>jackson-core</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>com.fasterxml.jackson.core</groupId>
+                        <artifactId>jackson-annotations</artifactId>
+                    </exclusion>
+                     <exclusion>
+                        <groupId>com.fasterxml.jackson.core</groupId>
+                        <artifactId>jackson-databind</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>org.slf4j</groupId>
+                        <artifactId>slf4j-log4j12</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>log4j</groupId>
+                        <artifactId>log4j</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>io.netty</groupId>
+                        <artifactId>netty</artifactId>
+                    </exclusion>
+                </exclusions>
+                </dependency>
+                <dependency>
+                    <groupId>com.huawei.boostkit</groupId>
+                    <artifactId>boostkit-omniop-bindings</artifactId>
+                    <version>${omniruntime.version}</version>
+                    <scope>provided</scope>
+                </dependency>
+                <dependency>
+                    <groupId>com.google.protobuf</groupId>
+                    <artifactId>protobuf-java</artifactId>
+                    <version>${protobuf.version}</version>
+                </dependency>
+
+                <!-- test dependencies -->
+                <dependency>
+                    <groupId>org.apache.spark</groupId>
+                    <artifactId>spark-core_${scala.binary.version}</artifactId>
+                    <version>${spark.version}</version>
+                    <type>test-jar</type>
+                    <scope>test</scope>
+                    <exclusions>
+                        <exclusion>
+                            <groupId>org.apache.hadoop</groupId>
+                            <artifactId>hadoop-client</artifactId>
+                        </exclusion>
+                        <exclusion>
+                            <groupId>org.apache.curator</groupId>
+                            <artifactId>curator-recipes</artifactId>
+                        </exclusion>
+                    </exclusions>
+                </dependency>
+                <dependency>
+                    <groupId>junit</groupId>
+                    <artifactId>junit</artifactId>
+                    <version>4.12</version>
+                    <scope>test</scope>
+                </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <profiles>
+        <profile>
+            <id>hadoop-3.2</id>
+            <properties>
+                <hadoop.version>3.2.0</hadoop.version>
+            </properties>
+        </profile>
+    </profiles>
+
+</project>
