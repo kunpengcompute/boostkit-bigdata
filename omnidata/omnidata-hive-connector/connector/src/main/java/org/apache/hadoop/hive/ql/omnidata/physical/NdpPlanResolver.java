@@ -205,6 +205,10 @@ public class NdpPlanResolver implements PhysicalPlanResolver {
                         // get OmniData filter expression
                         if (isPushDownFilter) {
                             filter = getOmniDataFilter(omniDataPredicate);
+                            if (!filter.isPresent()) {
+                                isPushDownFilter = false;
+                                isPushDownAgg = false;
+                            }
                         }
                         // get OmniData agg expression
                         if (isPushDownAgg) {
@@ -304,7 +308,6 @@ public class NdpPlanResolver implements PhysicalPlanResolver {
                 // The AGG does not support part push down
                 isPushDownAgg = false;
             } else if (mode.equals(NdpFilter.NdpFilterMode.NONE)) {
-                isPushDownFilter = false;
                 return Optional.empty();
             }
             OmniDataFilter omniDataFilter = new OmniDataFilter(omniDataPredicate);
@@ -312,7 +315,6 @@ public class NdpPlanResolver implements PhysicalPlanResolver {
             RowExpression filterRowExpression = omniDataFilter.getFilterExpression(
                     (ExprNodeGenericFuncDesc) filterDesc.clone(), ndpFilter);
             if (filterRowExpression == null) {
-                isPushDownFilter = false;
                 return Optional.empty();
             }
             return Optional.of(filterRowExpression);
