@@ -1,7 +1,40 @@
-package scr.main.scala.com.huawei.booskit.spark.util
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package com.huawei.boostkit.spark.util
+
+import java.math.BigInteger
+import java.util.concurrent.TimeUnit.NANOSECONDS
+
+import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor._
+import nova.hetu.omniruntime.operator.OmniOperator
+import nova.hetu.omniruntime.vector._
+
+import org.apache.spark.sql.catalyst.expressions.{Attribute, ExprId, SortOrder}
+import org.apache.spark.sql.execution.datasources.orc.OrcColumnVector
+import org.apache.spark.sql.execution.metric.SQLMetric
+import org.apache.spark.sql.execution.vectorized.{OmniColumnVector, OnHeapColumnVector}
+import org.apache.spark.sql.types._
+import org.apache.spark.sql.vectorized.{ColumnarBatch, ColumnVector}
+
+import java.util
 
 object OmniAdaptorUtil {
-  def transColBatchToOmniVecs(cb: ColumnarBatch, isSlice: Boolean): Array[Vec] = {
+  def transColBatchToOmniVecs(cb: ColumnarBatch): Array[Vec] = {
     transColBatchToOmniVecs(cb, false)
   }
 
@@ -10,14 +43,14 @@ object OmniAdaptorUtil {
     for (i <- 0 until cb.numCols()) {
       val omniVec: Vec = cb.column(i) match {
         case vector: OrcColumnVector =>
-          transColumnVector(vector, cb.numCols())
+          transColumnVector(vector, cb.numRows())
         case vector: OnHeapColumnVector =>
-          transColumnVector(vector, cb.numCols())
+          transColumnVector(vector, cb.numRows())
         case vector: OmniColumnVector =>
           if (!isSlice) {
             vector.getVec
           } else {
-            vector.getVec.slice(0, cb.numCols())
+            vector.getVec.slice(0, cb.numRows())
           }
         case _ =>
           throw new RuntimeException("unsupport column vector!")
@@ -27,9 +60,9 @@ object OmniAdaptorUtil {
     input
   }
 
-  def transColumnVector(columnVector: OrcColumnVector, columnSize: Int): Vec = {
-    val dataType: DataType = columnVector.dataType()
-    val vec: Vec = dataType match {
+  def transColumnVector(columnVector: ColumnVector, columnSize : Int): Vec = {
+    val datatype: DataType = columnVector.dataType()
+    val vec: Vec = datatype match {
       case LongType =>
         val vec = new LongVec(columnSize)
         val values = new Array[Long](columnSize)
@@ -42,7 +75,7 @@ object OmniAdaptorUtil {
         }
         vec.put(values, 0, 0, columnSize)
         vec
-      case DataType | IntegerType =>
+      case DateType | IntegerType =>
         val vec = new IntVec(columnSize)
         val values = new Array[Int](columnSize)
         for (i <- 0 until columnSize) {
@@ -112,8 +145,8 @@ object OmniAdaptorUtil {
         }
         vec.put(values, 0, 0, columnSize)
         vec
-      case DecimalType =>
-        if (DecimalType.is64BitDecimalType(dataType)) {
+      case t: DecimalType =>
+        if (DecimalType.is64BitDecimalType(datatype)) {
           val vec = new LongVec(columnSize)
           val values = new Array[Long](columnSize)
           for (i <- 0 until columnSize) {
@@ -130,7 +163,7 @@ object OmniAdaptorUtil {
           for (i <- 0 until columnSize) {
             if (!columnVector.isNullAt(i)) {
               vec.setBigInteger(i,
-                columnVector.getDecimal(i, t.precision, t.scale).toJavaBigDecimal.unscaledValue())
+                columnVector.getDecimal(i, t.precision, t.scale).toJavaBigInteger)
             } else {
               vec.setNull(i)
             }
@@ -138,24 +171,24 @@ object OmniAdaptorUtil {
           vec
         }
       case _ =>
-        throw new UnsupportedOperationException("unsupport column vector!")
+        throw new RuntimeException("unsupport column vector!")
     }
     vec
   }
 
   def genSortParam(output: Seq[Attribute], sortOrder: Seq[SortOrder]):
-    (Array[nova.hetu.runtime.`type`.DataType], Array[Int], Array[Int], Array[String]) = {
+      (Array[nova.hetu.omniruntime.`type`.DataType], Array[Int], Array[Int], Array[String]) = {
     val inputColSize: Int = output.size
-    val sourceTypes = new Array[nova.hetu.runtime.`type`.DataType](inputColSize)
+    val sourceTypes = new Array[nova.hetu.omniruntime.`type`.DataType](inputColSize)
     val ascendings = new Array[Int](sortOrder.size)
     val nullFirsts = new Array[Int](sortOrder.size)
     val sortColsExp = new Array[String](sortOrder.size)
     val omniAttrExpsIdMap: Map[ExprId, Int] = getExprIdMap(output)
 
     output.zipWithIndex.foreach { case (inputAttr, i) =>
-      sourceTypes(i) = sparkTypeToOmni(inputAttr.dataType, inputAttr.metadata)
+      sourceTypes(i) = sparkTypeToOmniType(inputAttr.dataType, inputAttr.metadata)
     }
-    sortOrder.zipWithIndex.foreach {case (sortAttr, i) =>
+    sortOrder.zipWithIndex.foreach { case (sortAttr, i) =>
       sortColsExp(i) = rewriteToOmniJsonExpressionLiteral(sortAttr.child, omniAttrExpsIdMap)
       ascendings(i) = if (sortAttr.isAscending) {
         1
@@ -204,19 +237,18 @@ object OmniAdaptorUtil {
         getOutputTime += NANOSECONDS.toMillis(System.nanoTime() - startGetOp)
         val vectors: Seq[OmniColumnVector] = OmniColumnVector.allocateColumns(
           vecBatch.getRowCount, schema, false)
-        vectors.zipWithIndex.foreach {
-          case (vector, i) =>
-            vector.reset()
-            vector.setVec(vecBatch.getVectors()(i))
-            outputDataSize += vecBatch.getVectors()(i).getRealValueBufCapacityInBytes
-            outputDataSize += vecBatch.getVectors()(i).getRealNullBufCapacityInBytes
-            outputDataSize += vecBatch.getVectors()(i).getRealOffsetBufCapacityInBytes
+        vectors.zipWithIndex.foreach { case (vector, i) =>
+          vector.reset()
+          vector.setVec(vecBatch.getVectors()(i))
+          outputDataSize += vecBatch.getVectors()(i).getRealValueBufCapacityInBytes
+          outputDataSize += vecBatch.getVectors()(i).getRealNullBufCapacityInBytes
+          outputDataSize += vecBatch.getVectors()(i).getRealOffsetBufCapacityInBytes
         }
         // metrics
         val rowCnt: Int = vecBatch.getRowCount
         numOutputRows += rowCnt
         numOutputVecBatchs += 1
-        // close omni vecbatch
+        // close omni vecbetch
         vecBatch.close()
         new ColumnarBatch(vectors.toArray, rowCnt)
       }

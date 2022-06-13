@@ -1,3 +1,20 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.huawei.boostkit.spark
 
 import org.apache.spark.rdd.RDD
@@ -38,7 +55,7 @@ case class ColumnarGuardRule() extends Rule[SparkPlan] {
   val enableColumnarSortMergeJoin: Boolean = columnarConf.enableColumnarSortMergeJoin
   val enableShuffledHashJoin: Boolean = columnarConf.enableShuffledHashJoin
   val enableColumnarFileScan: Boolean = columnarConf.enableColumnarFileScan
-  val optimizeLevel: Int = columnarConf.joinOptimizationThrottle
+  val optimizeLevel: Integer = columnarConf.joinOptimizationThrottle
 
   private def tryConvertToColumnar(plan: SparkPlan): Boolean = {
     try {
@@ -64,7 +81,7 @@ case class ColumnarGuardRule() extends Rule[SparkPlan] {
           ColumnarProjectExec(plan.projectList, plan.child).buildCheck()
         case plan: FilterExec =>
           if (!enableColumnarFilter) return false
-            ColumnarFilterExec(plan.condition, plan.child).buildCheck()
+           ColumnarFilterExec(plan.condition, plan.child).buildCheck()
         case plan: HashAggregateExec =>
           if (!enableColumnarHashAgg) return false
           new ColumnarHashAggregateExec(
@@ -176,7 +193,7 @@ case class ColumnarGuardRule() extends Rule[SparkPlan] {
           return false
       }
     true
-    }
+      }
 
   private def existsMultiCodegens(plan: SparkPlan, count: Int = 0): Boolean =
     plan match {
