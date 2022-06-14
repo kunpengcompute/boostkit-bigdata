@@ -1,5 +1,7 @@
 package org.apache.spark.sql.benchmark
 
+import org.apache.spark.sql.functions._
+
 object ColumnarJoinBenchmark extends ColumnarBasedBenchmark {
   def broadcastHashJoinLongKey(rowsA: Long): Unit = {
     val rowsB = 1 << 16

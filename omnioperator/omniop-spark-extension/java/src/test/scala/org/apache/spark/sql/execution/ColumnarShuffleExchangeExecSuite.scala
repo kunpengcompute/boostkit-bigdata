@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2020-2021. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2022-2022. All rights reserved.
  */
 
 package org.apache.spark.sql.execution
@@ -19,9 +19,9 @@ class ColumnarShuffleExchangeExecSuite extends ColumnarSparkPlanTest {
     ).toDF("name", "age", "point")
     val res = inputDf.sort(inputDf("age").asc)
     assert(res.queryExecution.executedPlan.find(_.isInstanceOf[ColumnarSortExec]).isDefined,
-      s"ColumnarSortExec not happened, executedPlan as follow: \n${res.queryExecution.executedPlan}")
+      s"ColumnarSortExec not happened, executedPlan as follows: \n${res.queryExecution.executedPlan}")
 
     assert(res.queryExecution.executedPlan.find(_.isInstanceOf[ColumnarShuffleExchangeExec]).isDefined,
-      s"ColumnarShuffleExchangeExec not happened, executedPlan as follow: \n${res.queryExecution.executedPlan}")
+      s"ColumnarShuffleExchangeExec not happened, executedPlan as follows: \n${res.queryExecution.executedPlan}")
   }
 }

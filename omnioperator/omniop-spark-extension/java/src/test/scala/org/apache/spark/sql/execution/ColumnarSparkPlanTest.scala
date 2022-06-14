@@ -1,11 +1,11 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2020-2021. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2022-2022. All rights reserved.
  */
 
 package org.apache.spark.sql.execution
 
 import org.apache.spark.SparkConf
-import org.apache.spark.sql.{AnalysisException, DataFrame, DataSet, QueryTest, Row}
+import org.apache.spark.sql.{AnalysisException, DataFrame, Dataset, QueryTest, Row}
 import org.apache.spark.sql.catalyst.util.stackTraceToString
 import org.apache.spark.sql.internal.{SQLConf, StaticSQLConf}
 import org.apache.spark.sql.test.SharedSparkSession
@@ -13,8 +13,8 @@ import org.apache.spark.sql.test.SharedSparkSession
 private[sql] abstract class ColumnarSparkPlanTest extends SparkPlanTest with SharedSparkSession {
   // setup basic columnar configuration for columnar exec
   override def sparkConf: SparkConf = super.sparkConf
-    .set(staticSQLConf.SPARK_SESSION_EXTENSIONS.key, "com.huawei.boostkit.spark.ColumnarPlugin")
-    .set(SQLConf.WHOLESTAGE.CODEGEN_ENABLED.key, "false")
+    .set(StaticSQLConf.SPARK_SESSION_EXTENSIONS.key, "com.huawei.boostkit.spark.ColumnarPlugin")
+    .set(SQLConf.WHOLESTAGE_CODEGEN_ENABLED.key, "false")
     .set("spark.shuffle.manager", "org.apache.spark.shuffle.sort.ColumnarShuffleManager")
 
   protected def checkAnswer(df: => DataFrame, expectedAnswer: Seq[Row]): Unit = {
@@ -36,7 +36,7 @@ private[sql] abstract class ColumnarSparkPlanTest extends SparkPlanTest with Sha
     QueryTest.checkAnswer(analyzedDF, expectedAnswer)
   }
 
-  def assertEmptyMissingInput(query: DataSet[_]): Unit = {
+  private def assertEmptyMissingInput(query: DataSet[_]): Unit = {
     assert(query.queryExecution.analyzed.missingInput.isEmpty,
       s"The analyzed logical plan has missing inputs:\n${query.queryExecution.analyzed}")
     assert(query.queryExecution.optimizedPlan.missingInput.isEmpty,
