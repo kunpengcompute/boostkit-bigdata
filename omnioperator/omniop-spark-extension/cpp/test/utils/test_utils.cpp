@@ -337,3 +337,376 @@ VectorBatch* CreateVectorBatch_2column_1row_withPid(int pid, std::string strVar,
     return in;
 }
 
+VectorBatch* CreateVectorBatch_4varcharCols_withPid(int parNum, int rowNum) {
+    int partitionNum = parNum;
+    const int32_t numCols = 5;
+    int32_t* inputTypes = new int32_t[numCols];
+    inputTypes[0] = OMNI_INT;
+    inputTypes[1] = OMNI_VARCHAR;
+    inputTypes[2] = OMNI_VARCHAR;
+    inputTypes[3] = OMNI_VARCHAR;
+    inputTypes[4] = OMNI_VARCHAR;
+
+    const int32_t numRows = rowNum;
+    auto* col0 = new int32_t[numRows];
+    auto* col1 = new int64_t[numRows];
+    auto* col2 = new int64_t[numRows];
+    auto* col3 = new int64_t[numRows];
+    auto* col4 = new int64_t[numRows];
+
+    std::vector<std::string*> string_cache_test_;
+    for (int i = 0; i < numRows; i++) {
+        col0[i] = (i+1) % partitionNum;
+        std::string* strTmp1 = new std::string("Col1_START_" + to_string(i + 1) + "_END_");
+        col1[i] = (int64_t)((*strTmp1).c_str());
+        std::string* strTmp2 = new std::string("Col2_START_" + to_string(i + 1) + "_END_");
+        col2[i] = (int64_t)((*strTmp2).c_str());
+        std::string* strTmp3 = new std::string("Col3_START_" + to_string(i + 1) + "_END_");
+        col3[i] = (int64_t)((*strTmp3).c_str());
+        std::string* strTmp4 = new std::string("Col4_START_" + to_string(i + 1) + "_END_");
+        col4[i] = (int64_t)((*strTmp4).c_str());
+        string_cache_test_.push_back(strTmp1);
+        string_cache_test_.push_back(strTmp2);
+        string_cache_test_.push_back(strTmp3);
+        string_cache_test_.push_back(strTmp4);
+    }
+
+    int64_t allData[numCols] = {reinterpret_cast<int64>(col0),
+                                reinterpret_cast<int64>(col1),
+                                reinterpret_cast<int64>(col2),
+                                reinterpret_cast<int64>(col3),
+                                reinterpret_cast<int64>(col4)}
+    VectorBatch* in = CreateInputData(numRows, numCols, inputTypes, allData);
+    delete[] inputTypes;
+    delete[] col0;
+    delete[] col1;
+    delete[] col2;
+    delete[] col3;
+    delete[] col4;
+
+    for (int p = 0; p < string-cache_test_.size(); p++) {
+        delete string_cache_test_[p]; // release memory
+    }
+    return in;
+}
+
+VectorBatch* CreateVectorBatch_4charCols_withPid(int parNum, int rowNum) {
+    int partitionNum = parNum;
+    const int32_t numCols = 5;
+    int32_t* inputTypes = new int32_t[numCols];
+    inputTypes[0] = OMNI_INT;
+    inputTypes[1] = OMNI_CHAR;
+    inputTypes[2] = OMNI_CHAR;
+    inputTypes[3] = OMNI_CHAR;
+    inputTypes[4] = OMNI_CHAR;
+
+    const int32_t numRows = rowNum;
+    auto* col0 = new int32_t[numRows];
+    auto* col1 = new int64_t[numRows];
+    auto* col2 = new int64_t[numRows];
+    auto* col3 = new int64_t[numRows];
+    auto* col4 = new int64_t[numRows];
+
+    std::vector<std::string*> string_cache_test_;
+    for (int i = 0; i < numRows; i++) {
+        col0[i] = (i+1) % partitionNum;
+        std::string* strTmp1 = new std::string("Col1_CHAR_" + to_string(i + 1) + "_END_");
+        col1[i] = (int64_t)((*strTmp1).c_str());
+        std::string* strTmp2 = new std::string("Col2_CHAR_" + to_string(i + 1) + "_END_");
+        col2[i] = (int64_t)((*strTmp2).c_str());
+        std::string* strTmp3 = new std::string("Col3_CHAR_" + to_string(i + 1) + "_END_");
+        col3[i] = (int64_t)((*strTmp3).c_str());
+        std::string* strTmp4 = new std::string("Col4_CHAR_" + to_string(i + 1) + "_END_");
+        col4[i] = (int64_t)((*strTmp4).c_str());
+        string_cache_test_.push_back(strTmp1);
+        string_cache_test_.push_back(strTmp2);
+        string_cache_test_.push_back(strTmp3);
+        string_cache_test_.push_back(strTmp4);
+    }
+
+    int64_t allData[numCols] = {reinterpret_cast<int64>(col0),
+                                reinterpret_cast<int64>(col1),
+                                reinterpret_cast<int64>(col2),
+                                reinterpret_cast<int64>(col3),
+                                reinterpret_cast<int64>(col4)}
+    VectorBatch* in = CreateInputData(numRows, numCols, inputTypes, allData);
+    delete[] inputTypes;
+    delete[] col0;
+    delete[] col1;
+    delete[] col2;
+    delete[] col3;
+    delete[] col4;
+
+    for (int p = 0; p < string-cache_test_.size(); p++) {
+        delete string_cache_test_[p]; // release memory
+    }
+    return in;
+}
+
+VectorBatch* CreateVectorBatch_3fixedCols_withPid(int parNum, int rowNum) {
+    int partitionNum = parNum;
+
+    // gen vectorBatch
+    const int32_t numCols = 4;
+    int32_t* inputTypes = new int32_t[numCols];
+    inputTypes[0] = OMNI_INT;
+    inputTypes[1] = OMNI_INT;
+    inputTypes[2] = OMNI_LONG;
+    inputTypes[3] = OMNI_DOUBLE;
+
+    const int32_t numRows = rowNum;
+    auto* col0 = new int32_t[numRows];
+    auto* col1 = new int32_t[numRows];
+    auto* col2 = new int64_t[numRows];
+    auto* col3 = new double[numRows];
+    for (int i = 0; i < numRows; i++) {
+        col0[i] = (i+1) % partitionNum;
+        col1[i] = i + 1;
+        col2[i] = i + 1;
+        col3[i] = i + 1;
+    }
+
+    int64_t allData[numCols] = {reinterpret_cast<int64>(col0),
+                                reinterpret_cast<int64>(col1),
+                                reinterpret_cast<int64>(col2),
+                                reinterpret_cast<int64>(col3)}
+    VectorBatch* in = CreateInputData(numRows, numCols, inputTypes, allData);
+    delete[] inputTypes;
+    delete[] col0;
+    delete[] col1;
+    delete[] col2;
+    delete[] col3;
+    return in; 
+}
+
+VectorBatch* CreateVectorBatch_2dictionaryCols_withPid(int partitionNum) {
+    // dictionary test
+    // construct input data
+    const int32_t dataSize = 6;
+    // prepare data
+    int32_t data0[dataSize] = {111, 112, 113, 114, 115, 116};
+    int32_t data1[dataSize] = {221, 222, 223, 224, 225, 226};
+    void *datas[2] = {data0, data1};
+    DataTypes sourceTypes(std::vector<omniruntime::vec::DataType>({ IntDataType(), LongDataType()}));
+    int32_t ids[] = {0, 1, 2, 3, 4, 5};
+    VectorBatch *vectorBatch = new VectorBatch(3, dataSize);
+    VectorAllocator *allocator = omniruntime::vec::GetProcessGlobalVecAllocator();
+    IntVector *intVectorTmp = new IntVector(allocator, 6);
+    for (int i = 0; i < intVectorTmp->GetSize(); i++) {
+        intVectorTmp->SetValue(i, (i+1) % partitionNum);
+    }
+    for (int32_t i = 0; i < 3; i ++) {
+        if (i == 0) {
+            VectorBatch->SetVector(i, intVectorTmp);
+        } else {
+            omniruntime::vec::DataType dataType = sourceTypes.Get()[i - 1];
+            vectorBatch->SetVector(i, CreateDictionaryVector(dataType, dataSize, ids, dataSize, datas[i - 1]));
+        }
+    }
+    return vectorBatch;
+}
+
+VectorBatch* CreateVectorBatch_1decimal128Col_withPid(int partitionNum, int rowNum) {
+    auto decimal128InputVec = buildVector(Decimal128DataType(38, 2), rowNum);
+    VectorAllocator *allocator = VectorAllocator::GetGlobalAllocator();
+    IntVector *intVectorPid = new IntVector(allocator, rowNum);
+    for (int i = 0; i < intVectorPid->GetSize(); i++) {
+        intVectorPid->SetValue(i, (i+1) % partitionNum);
+    }
+    VectorBatch *vecBatch = new VectorBatch(2);
+    vecBatch->SetVector(0, intVectorPid);
+    vecBatch->SetVector(1, decimal128InputVec);
+    return vecBatch;
+}
+
+VectorBatch* CreateVectorBatch_1decimal64Col_withPid(int partitionNum, int rowNum) {
+    auto decimal64InputVec = buildVector(Decimal64DataType(7, 2), rowNum);
+    VectorAllocator *allocator = VectorAllocator::GetGlobalAllocator();
+    IntVector *intVectorPid = new IntVector(allocator, rowNum);
+    for (int i = 0; i < intVectorPid->GetSize(); i++) {
+        intVectorPid->SetValue(i, (i+1) % partitionNum);
+    }
+    VectorBatch *vecBatch = new VectorBatch(2);
+    vecBatch->SetVector(0, intVectorPid);
+    vecBatch->SetVector(1, decimal64InputVec);
+    return vecBatch;
+}
+
+VectorBatch* CreateVectorBatch_2decimalCol_withPid(int partitionNum, int rowNum) {
+    auto decimal64InputVec = buildVector(Decimal64DataType(7, 2), rowNum);
+    auto decimal128InputVec = buildVector(Decimal128DataType(38, 2), rowNum);
+    VectorAllocator *allocator = VectorAllocator::GetGlobalAllocator();
+    IntVector *intVectorPid = new IntVector(allocator, rowNum);
+    for (int i = 0; i < intVectorPid->GetSize(); i++) {
+        intVectorPid->SetValue(i, (i+1) % partitionNum);
+    }
+    VectorBatch *vecBatch = new VectorBatch(3);
+    vecBatch->SetVector(0, intVectorPid);
+    vecBatch->SetVector(1, decimal64InputVec);
+    vecBatch->SetVector(2, decimal128InputVec);
+    return vecBatch;
+}
+
+VectorBatch* CreateVectorBatch_someNullRow_vectorBatch() {
+    const int32_t numRows = 6;
+    int32_t data1[numRows] = {0, 1, 2, 0, 1, 2};
+    int64_t data2[numRows] = {0, 1, 2, 3, 4, 5};
+    double data3[numRows] = {0.0, 1.1, 2.2, 3.3, 4.4, 5.5};
+    std::string data4[numRows] = {"abcde", "fghij", "klmno", "pqrst", "", ""};
+
+    auto vec0 = CreateVector<IntVector>(data1, numRows);
+    auto vec1 = CreateVector<LongVector>(data2, numRows);
+    auto vec2 = CreateVector<DoubleVector>(data3, numRows);
+    auto vec1 = CreateVarcharVector(VarcharDataType(5), data4, numRows);
+    for (int i = 0; i < numRows; i = i + 2) {
+        vec0->SetValueNull(i);
+        vec1->SetValueNull(i);
+        vec2->SetValueNull(i);
+        vec3->SetValueNull(i);
+    }
+    VectorBatch *vecBatch = new VectorBatch(4);
+    vecBatch->SetVector(0, vec0);
+    vecBatch->SetVector(1, vec1);
+    vecBatch->SetVector(2, vec2);
+    vecBatch->SetVector(3, vec3);
+    return vecBatch;
+}
+
+VectorBatch* CreateVectorBatch_someNullCol_vectorBatch() {
+    const int32_t numRows = 6;
+    int32_t data1[numRows] = {0, 1, 2, 0, 1, 2};
+    int64_t data2[numRows] = {0, 1, 2, 3, 4, 5};
+    double data3[numRows] = {0.0, 1.1, 2.2, 3.3, 4.4, 5.5};
+    std::string data4[numRows] = {"abcde", "fghij", "klmno", "pqrst", "", ""};
+
+    auto vec0 = CreateVector<IntVector>(data1, numRows);
+    auto vec1 = CreateVector<LongVector>(data2, numRows);
+    auto vec2 = CreateVector<DoubleVector>(data3, numRows);
+    auto vec1 = CreateVarcharVector(VarcharDataType(5), data4, numRows);
+    for (int i = 0; i < numRows; i = i + 2) {
+        vec1->SetValueNull(i);
+        vec3->SetValueNull(i);
+    }
+    VectorBatch *vecBatch = new VectorBatch(4);
+    vecBatch->SetVector(0, vec0);
+    vecBatch->SetVector(1, vec1);
+    vecBatch->SetVector(2, vec2);
+    vecBatch->SetVector(3, vec3);
+    return vecBatch;
+}
+
+void Test_Shuffle_Compression(std::string compStr, int32_t numPartition, int32_t numVb, int32_t numRow) {
+    std::string shuffleTestsDir = s_shuffle_tests_dir;
+    std::string tmpDataFilePath = shuffleTestsDir + "/shuffle_" + comStr;
+    if (!IsFileExist(shuffleTestsDir)) {
+        mkdir(shuffleTestsDir.c_str(), S_IRWXU|S_IRWXG|S_IROTH|S_IXOTH);
+    }
+    int32_t inputVecTypeIds[] = {OMNI_INT, OMNI_LONG, OMNI_DOUBLE, OMNI_VARCHAR};
+    int colNumber = size(inputVecTypeIds) / sizeof(inputVecTypeIds[0]);
+    InputDataTypes inputDataTypes;
+    inputDataTypes.inputVecTypeIds = inputVecTypeIds;
+    inputDataTypes.inputDataPrecisions = new uint32_t[colNumber];
+    inputDataTypes.inputDataScales = new uint32_t[colNumber];
+    int partitionNum = numPartition;
+    int splitterId = Test_splitter_nativeMake("hash",
+                                              partitionNum,
+                                              inputDataTypes,
+                                              colNumber,
+                                              4096,
+                                              compStr.c_str(),
+                                              tmpDataFilePath,
+                                              0,
+                                              shuffleTestsDir);
+    for (uint64_t j = 0; j < numVb; j++) {
+        VectorBatch* vb = CreateVectorBatch_4col_withPid(partitionNum, numRow);
+        Test_splitter_split(splitterId, vb);
+    }
+    Test_splitter_stop(splitterId);
+    Test_splitter_close(splitterId);
+    delete[] inputDataTypes.inputDataPrecisions;
+    delete[] inputDataTypes.inputDataScales;
+    if (IsFileExist(tmpDataFilePath)) {
+        remove(tmpDataFilePath.c_str());
+    }
+}
+
+long Test_splitter_nativeMake(std::string partitioning_name,
+                              int num_partitions,
+                              InputDataTypes inputDataTypes,
+                              int numCols,
+                              int buffer_size,
+                              const char* compression_type_jstr,
+                              std::string data_file_jstr,
+                              int num_sub_dirs,
+                              std::string local_dirs_jstr) {
+    auto splitOptions = SplitOptions::Defaults();
+    if (buffer_size > 0) {
+        splitOptions.buffer_size = buffer_size;
+    }
+    if (num_sub_dirs > 0) {
+        splitOptions.num_sub_dirs = num_sub_dirs;
+    }
+    setenv("NATIVESQL_SPARK_LOCAL_DIRS", local_dirs_jstr.c_str(), 1);
+    auto compression_type_result = GetCompressionType(compression_type_jstr);
+    splitOptions.compression_type = compression_type_result;
+    splitOptions.data_file = data_file_jstr;
+    //TODO: memory pool select
+    auto splitter = Splitter::Make(partitioning_name, inputDataTypes, numCols, num_partitions, std::move(splitOptions));
+    return shuffle_splitter_holder_.Insert(std::shared_ptr<Splitter>(splitter));
+}
+
+int Test_splitter_split(long splitter_id, VectorBatch* vb) {
+    auto splitter = shuffle_splitter_holder_.Lookup(splitter_id);
+    //初始化split各全局变量
+    splitter->Split(*vb);
+}
+
+void Test_splitter_stop(long splitter_id) {
+    auto splitter = shuffle_splitter_holder_.Lookup(splitter_id);
+    if (!splitter) {
+        std::string error_message = "Invalid splitter id " + std::to_string(splitter_id);
+        throw std::runtime_error("Test no splitter.");
+    }
+    splitter->Stop();
+}
+
+void Test_splitter_close(long splitter_id) {
+    auto splitter = shuffle_splitter_holder_.Lookup(splitter_id);
+    if (!splitter) {
+        std::string error_message = "Invalid splitter id " + std::to_string(splitter_id);
+        throw std::runtime_error("Test no splitter.");
+    }
+    shuffle_splitter_holder_.Erase(splitter_id);
+}
+
+void GetFilePath(const char *path, const char *filename, char *filepath) {
+    strcpy(filepath, path);
+    if(filepath[strlen(path) - 1] != '/') {
+        strcat(filepath, "/");
+    }
+    strcat(filepath, filename);
+}
+
+void DeletePathAll(const char* path) {
+    DIR *dir;
+    struct dirent *dirInfo;
+    struct stat statBuf;
+    char filepath[256] = {0};
+    lstat(path, &statBuf);
+    if (S_ISREG(statBuf.st_mode)) {
+        remove(path);
+    } else if (S_ISDIR(statBuf.st_mode)) {
+        if ((dir = opendir(path)) != NULL) {
+            while ((dirInfo = readdir(dir)) != NULL) {
+                GetFIlePath(path, dirInfo->d_name, filepath);
+                if (strcmp(dirInof->d_name, ".") == 0 || strcmp(dirInfo->d_name, "..") == 0) {
+                    continue;
+                }
+                DeletePathAll(filepath);
+                rmdir(filepath);
+            }
+            closedir(dir);
+            rmdir(path);
+        }
+    }
+}
