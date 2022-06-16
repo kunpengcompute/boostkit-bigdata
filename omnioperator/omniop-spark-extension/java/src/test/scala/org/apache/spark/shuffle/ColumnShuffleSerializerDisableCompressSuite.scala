@@ -23,8 +23,8 @@ import java.io.FileInputStream
 import com.huawei.boostkit.spark.serialize.ColumnarBatchSerializer
 import org.apache.spark.{SparkConf, SparkFunSuite}
 import org.apache.spark.sql.execution.metric.{SQLMetric, SQLMetrics}
-import org.apaceh.spark.sql.execution.vectorized.OmniColumnVector
-import org.apaceh.spark.sql.test.SharedSparkSession
+import org.apache.spark.sql.execution.vectorized.OmniColumnVector
+import org.apache.spark.sql.test.SharedSparkSession
 import org.apache.spark.sql.vectorized.ColumnarBatch
 
 class ColumnShuffleSerializerDisableCompressSuite extends SparkFunSuite with SharedSparkSession {

@@ -84,21 +84,21 @@ class ColumnarShuffleWriterSuite extends SharedSparkSession {
                       "{\"id\":\"OMNI_DECIMAL128\",\"width\":0,\"precision\":28,\"scale\":11,\"dateUnit\":\"DAY\",\"timeUnit\":\"SEC\"}]"
 
     when(dependency.partitioner).thenReturn(new HashPartitioner(numPartitions))
-    when(dependency.partitioner).thenReturn(new JavaSerializer(sparkConf))
-    when(dependency.partitioner).thenReturn(
+    when(dependency.serializer).thenReturn(new JavaSerializer(sparkConf))
+    when(dependency.partitionInfo).thenReturn(
       new PartitionInfo("hash", numPartitions, 4, inputTypes))
     // inputTypes e.g:
     // [{"id":"OMNI_INT","width":0,"precision":0,"scale":0,"dateUnit":"DAY","timeUnit":"SEC"},
     // {"id":"OMNI_INT","width":0,"precision":0,"scale":0,"dateUnit":"DAY","timeUnit":"SEC"}]
     when(dependency.dataSize)
       .thenReturn(SQLMetrics.createSizeMetric(spark.sparkContext, "data size"))
-    when(dependency.bytesSplilled)
+    when(dependency.bytesSpilled)
       .thenReturn(SQLMetrics.createSizeMetric(spark.sparkContext, "shuffle bytes spilled"))
     when(dependency.numInputRows)
       .thenReturn(SQLMetrics.createMetric(spark.sparkContext, "number of input rows"))
     when(dependency.splitTime)
       .thenReturn(SQLMetrics.createNanoTimingMetric(spark.sparkContext, "totaltime_split"))
-    when(dependency.splitTime)
+    when(dependency.spillTime)
       .thenReturn(SQLMetrics.createNanoTimingMetric(spark.sparkContext, "totaltime_spill"))
     when(taskContext.taskMetrics()).thenReturn(taskMetrics)
     when(blockResolver.getDataFile(0, 0)).thenReturn(outputFile)
@@ -161,7 +161,7 @@ class ColumnarShuffleWriterSuite extends SharedSparkSession {
     val cb0 = ColumnarShuffleWriterSuite.makeColumnarBatch(
       vectorPid0.getVec.getSize,List(vectorPid0, vector0_1, vector0_2, vector0_3, vector0_4))
     val cb1 = ColumnarShuffleWriterSuite.makeColumnarBatch(
-      vectorPid0.getVec.getSize,List(vectorPid1, vector1_1, vector1_2, vector1_3, vector1_4))
+      vectorPid1.getVec.getSize,List(vectorPid1, vector1_1, vector1_2, vector1_3, vector1_4))
 
     def records: Iterator[(Int, ColumnarBatch)] = Iterator((0, cb0), (0, cb1))
 
