@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2020-2021. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2022-2022. All rights reserved.
  */
 
 package org.apache.spark.sql.execution
@@ -26,6 +26,7 @@ class ColumnarFilterExecSuite extends ColumnarSparkPlanTest {
       (null, "", 4, 2.0),
       (null, null, 1, 1.0),
       (" add", "World", 8, null),
+      (" yeah  ", "yeah", 10, 8.0),
       (" yeah  ", "yeah", 10, 8.0)
     ).toDF("a", "b", "c", "d")
   }
@@ -35,23 +36,23 @@ class ColumnarFilterExecSuite extends ColumnarSparkPlanTest {
     print(res.queryExecution.executedPlan)
     val isColumnarFilterHappen = res.queryExecution.executedPlan
       .find(_.isInstanceOf[ColumnarFilterExec]).isDefined
-    val isColumnarConditionHappen = res.queryExecution.executedPlan
+    val isColumnarConditionProjectHappen = res.queryExecution.executedPlan
       .find(_.isInstanceOf[ColumnarConditionProjectExec]).isDefined
-    assert(isColumnarFilterHappen || isColumnarConditionHappen, s"ColumnarFilterExec not happened, executedPlan as follow: \n${res.queryExecution.executedPlan}")
+    assert(isColumnarFilterHappen || isColumnarConditionProjectHappen, s"ColumnarFilterExec not happened, executedPlan as follows: \n${res.queryExecution.executedPlan}")
   }
 
   test("columnar filter is equal to native") {
     val expr: Expression = (inputDf.col("c") > 3).expr
-    checkTharPlansAgreeTemplate(expr = expr, df = inputDf)
+    checkThatPlansAgreeTemplate(expr = expr, df = inputDf)
   }
 
   test("columnar filter is equal to native with null") {
     val expr: Expression = (inputDfWithNull.col("c") > 3 && inputDf.col("d").isNotNull).expr
-    checkTharPlansAgreeTemplate(expr = expr, df = inputDfWithNull)
+    checkThatPlansAgreeTemplate(expr = expr, df = inputDfWithNull)
   }
 
-  def checkTharPlansAgreeTemplate(expr: Expression, df: DataFrame): Unit = {
-    checkTharPlansAgree(
+  def checkThatPlansAgreeTemplate(expr: Expression, df: DataFrame): Unit = {
+    checkThatPlansAgree(
       df,
       (child: SparkPlan) =>
         ColumnarFilterExec(expr, child = child),

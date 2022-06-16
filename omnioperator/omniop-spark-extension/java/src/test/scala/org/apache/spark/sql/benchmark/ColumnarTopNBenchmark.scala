@@ -11,7 +11,8 @@ object ColumnarTopNBenchmark extends ColumnarBasedBenchmark {
 
     runBenchmark("topN with API") {
       val value = spark.range(N)
-      value.sort(value("id").desc).limit(20).explain
+      value.sort(value("id").desc).limit(20).explain()
+
       columnarBenchmark(s"spark.range(${N}).sort(id.desc).limit(20)", N) {
         val value = spark.range(N)
         value.sort(value("id").desc).limit(20).noop()

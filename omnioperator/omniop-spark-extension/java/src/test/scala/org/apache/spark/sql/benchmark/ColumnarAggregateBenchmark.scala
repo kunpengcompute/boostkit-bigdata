@@ -1,6 +1,8 @@
 package org.apache.spark.sql.benchmark
 
+
 object ColumnarAggregateBenchmark extends ColumnarBasedBenchmark {
+
   override def runBenchmarkSuite(mainArgs: Array[String]): Unit = {
 
     val N = if (mainArgs.isEmpty) {
@@ -11,7 +13,7 @@ object ColumnarAggregateBenchmark extends ColumnarBasedBenchmark {
 
     runBenchmark("stat functions") {
       spark.range(N).groupBy().agg("id" -> "sum").explain()
-      columnarBenchmark(s"spark.range(${N}.groupBy().agg(id -> sum)", N) {
+      columnarBenchmark(s"spark.range(${N}).groupBy().agg(id -> sum)", N) {
         spark.range(N).groupBy().agg("id" -> "sum").noop()
       }
     }

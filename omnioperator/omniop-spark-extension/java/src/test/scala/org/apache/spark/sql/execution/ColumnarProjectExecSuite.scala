@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2020-2021. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2022-2022. All rights reserved.
  */
 
 package org.apache.spark.sql.execution
@@ -25,29 +25,29 @@ class ColumnarProjectExecSuite extends ColumnarSparkPlanTest {
     inputDfWithNull = Seq[(String, String, java.lang.Integer, java.lang.Double)](
       (null, "", 4, 2.0),
       (null, null, 1, 1.0),
-      (" add", "World", 8, null),
+      (" add", "World", 8, 3.0),
       (" yeah  ", "yeah", 10, 8.0)
     ).toDF("a", "b", "c", "d")
   }
 
   test("validate columnar project exec happened") {
-    val res = inputDf.filter("a as t")
+    val res = inputDf.selectExpr("a as t")
     assert(res.queryExecution.executedPlan.find(_.isInstanceOf[ColumnarProjectExec]).isDefined,
-      s"ColumnarProjectExec not happened, executedPlan as follow: \n${res.queryExecution.executedPlan}")
+      s"ColumnarProjectExec not happened, executedPlan as follows: \n${res.queryExecution.executedPlan}")
   }
 
   test("columnar project is equal to native") {
     val projectList: Seq[NamedExpression] = Seq(inputDf.col("a").as("abc").expr.asInstanceOf[NamedExpression])
-    checkTharPlansAgreeTemplate(projectList, inputDf)
+    checkThatPlansAgreeTemplate(projectList, inputDf)
   }
 
   test("columnar project is equal to native with null") {
     val projectList: Seq[NamedExpression] = Seq(inputDfWithNull.col("a").as("abc").expr.asInstanceOf[NamedExpression])
-    checkTharPlansAgreeTemplate(projectList, inputDfWithNull)
+    checkThatPlansAgreeTemplate(projectList, inputDfWithNull)
   }
 
-  def checkTharPlansAgreeTemplate(projectList: Seq[NamedExpression], df: DataFrame): Unit = {
-    checkTharPlansAgree(
+  def checkThatPlansAgreeTemplate(projectList: Seq[NamedExpression], df: DataFrame): Unit = {
+    checkThatPlansAgree(
       df,
       (child: SparkPlan) =>
         ColumnarProjectExec(projectList, child = child),
