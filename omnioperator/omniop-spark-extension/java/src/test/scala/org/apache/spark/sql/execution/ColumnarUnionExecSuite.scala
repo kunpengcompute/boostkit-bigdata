@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2020-2021. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2022-2022. All rights reserved.
  */
 
 package org.apache.spark.sql.execution
@@ -22,16 +22,16 @@ class ColumnarUnionExecSuite extends ColumnarSparkPlanTest {
     ).toDF("a", "b", "c", "d")
 
     right = Seq[(String, String, java.lang.Integer, java.lang.Double)](
-      (null, "", 4, 1.0),
-      (null, null, 2, 2.0),
+      (null, "", 4, 2.0),
+      (null, null, 2, 1.0),
       (" add", "World", 8, 3.0),
       (" yeah  ", "yeah", 10, 8.0)
     ).toDF("a", "b", "c", "d")
   }
 
   test("validate columnar union exec happened") {
-    val res = left.join(right.hint("broadcast"), col("q") === col("c"))
-    assert(res.queryExecution.executedPlan.find(_.isInstanceOf[ColumnarUnionExec]).isDefined, s"ColumnarUnionExec not happened, executedPlan as follow: \n${res.queryExecution.executedPlan}")
+    val res = left.union(right)
+    assert(res.queryExecution.executedPlan.find(_.isInstanceOf[ColumnarUnionExec]).isDefined, s"ColumnarUnionExec not happened, executedPlan as follows: \n${res.queryExecution.executedPlan}")
   }
 
   test("columnar union is equal to expected") {
@@ -45,17 +45,17 @@ class ColumnarUnionExecSuite extends ColumnarSparkPlanTest {
       Row(" yeah  ", "yeah", 10, 8.0))
     val res = left.union(right)
     val result: Array[Row] = res.head(8)
-    assrtResult(expected)(result)
+    assertResult(expected)(result)
   }
 
   test("columnar union is equal to native with null") {
     val df = left.union(right)
-    val children = Seq(left.queryExecution.executedPlan, right..queryExecution.executedPlan)
-    checkTharPlansAgreeTemplate(df, children)
+    val children = Seq(left.queryExecution.executedPlan, right.queryExecution.executedPlan)
+    checkThatPlansAgreeTemplate(df, children)
   }
 
-  def checkTharPlansAgreeTemplate(df: DataFrame, child: Seq[SparkPlan]): Unit = {
-    checkTharPlansAgree(
+  def checkThatPlansAgreeTemplate(df: DataFrame, child: Seq[SparkPlan]): Unit = {
+    checkThatPlansAgree(
       df,
       (_: SparkPlan) =>
         ColumnarUnionExec(child),

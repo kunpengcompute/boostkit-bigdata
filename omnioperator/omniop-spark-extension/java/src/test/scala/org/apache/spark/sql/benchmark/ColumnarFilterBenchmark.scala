@@ -1,5 +1,7 @@
 package org.apache.spark.sql.benchmark
 
+import org.apache.spark.sql.benchmark.ColumnarAggregateBenchmark
+
 object ColumnarFilterBenchmark extends ColumnarBasedBenchmark {
   override def runBenchmarkSuite(mainArgs: Array[String]): Unit = {
 

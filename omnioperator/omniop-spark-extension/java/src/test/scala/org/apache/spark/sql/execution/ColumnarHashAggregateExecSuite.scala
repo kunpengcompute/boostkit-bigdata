@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2020-2021. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2022-2022. All rights reserved.
  */
 
 package org.apache.spark.sql.execution
@@ -21,13 +21,12 @@ class ColumnarHashAggregateExecSuite extends ColumnarSparkPlanTest {
         Row(null, null, 6L, "e"),
         Row(null, 5.0, 7L, "f")
       )), new StructType().add("a", IntegerType).add("b", DoubleType)
-        .add("c", LongType).add("d", StringType)
-    )
+        .add("c", LongType).add("d", StringType))
   }
 
   test("validate columnar hashAgg exec happened") {
     val res = df.groupBy("a").agg(sum("b"))
-    assert(res.queryExecution.executedPlan.find(_.isInstanceOf[ColumnarHashAggregateExec]).isDefined, s"ColumnarHashAggregateExec not happened, executedPlan as follow: \n${res.queryExecution.executedPlan}")
+    assert(res.queryExecution.executedPlan.find(_.isInstanceOf[ColumnarHashAggregateExec]).isDefined, s"ColumnarHashAggregateExec not happened, executedPlan as follows: \n${res.queryExecution.executedPlan}")
   }
 
   test("check columnar hashAgg result") {

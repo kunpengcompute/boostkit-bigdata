@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2020-2021. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2022-2022. All rights reserved.
  */
 
 package org.apache.spark.sql.execution
@@ -22,7 +22,7 @@ class ColumnarExecSuite extends ColumnarSparkPlanTest {
   test("validate columnar transfer exec happened") {
     val res = df.filter("a > 1")
     print(res.queryExecution.executedPlan)
-    assert(res.queryExecution.executedPlan.find(_.isInstanceOf[RowToOmniColumnarExec]).isDefined, s"RowToOmniColumnarExec not happened, executedPlan as follow: \n${res.queryExecution.executedPlan}")
+    assert(res.queryExecution.executedPlan.find(_.isInstanceOf[RowToOmniColumnarExec]).isDefined, s"RowToOmniColumnarExec not happened, executedPlan as follows: \n${res.queryExecution.executedPlan}")
   }
 
   test("validate data type convert") {

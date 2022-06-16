@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Huawei Technologies Co., Ltd. 2020-2021. All rights reserved.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2022-2022. All rights reserved.
  */
 
 package org.apache.spark.sql.execution
@@ -53,26 +53,26 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
 
   test("validate columnar broadcastHashJoin exec happened") {
     val res = left.join(right.hint("broadcast"), col("q") === col("c"))
-    assert(res.queryExecution.executedPlan.find(_.isInstanceOf[ColumnarBroadcastHashJoinExec]).isDefined, s"ColumnarBroadcastHashJoinExec not happened, executedPlan as follow: \n${res.queryExecution.executedPlan}")
+    assert(res.queryExecution.executedPlan.find(_.isInstanceOf[ColumnarBroadcastHashJoinExec]).isDefined, s"ColumnarBroadcastHashJoinExec not happened, executedPlan as follows: \n${res.queryExecution.executedPlan}")
   }
 
   test("validate columnar sortMergeJoin exec happened") {
     val res = left.join(right.hint("mergejoin"), col("q") === col("c"))
-    assert(res.queryExecution.executedPlan.find(_.isInstanceOf[ColumnarSortMergeJoinExec]).isDefined, s"ColumnarSortMergeJoinExec not happened, executedPlan as follow: \n${res.queryExecution.executedPlan}")
+    assert(res.queryExecution.executedPlan.find(_.isInstanceOf[ColumnarSortMergeJoinExec]).isDefined, s"ColumnarSortMergeJoinExec not happened, executedPlan as follows: \n${res.queryExecution.executedPlan}")
   }
 
   test("columnar broadcastHashJoin is equal to native") {
     val df = left.join(right.hint("broadcast"), col("q") === col("c"))
     val leftKeys = Seq(left.col("q").expr)
     val rightKeys = Seq(right.col("c").expr)
-    checkTharPlansAgreeTemplate(expr = expr, leftKeys, rightKeys)
+    checkThatPlansAgreeTemplate(expr = expr, leftKeys, rightKeys)
   }
 
   test("columnar sortMergeJoin is equal to native") {
     val df = left.join(right.hint("mergejoin"), col("q") === col("c"))
     val leftKeys = Seq(left.col("q").expr)
     val rightKeys = Seq(right.col("c").expr)
-    checkTharPlansAgreeTemplate(expr = expr, leftKeys, rightKeys)
+    checkThatPlansAgreeTemplate(df, leftKeys, rightKeys)
   }
 
   test("columnar broadcastHashJoin is equal to native with null") {
@@ -80,20 +80,12 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
       col("q").isNotNull === col("c").isNotNull)
     val leftKeys = Seq(leftWithNull.col("q").isNotNull.expr)
     val rightKeys = Seq(rightWithNull.col("c").isNotNull.expr)
-    checkTharPlansAgreeTemplate(expr = expr, leftKeys, rightKeys)
+    checkThatPlansAgreeTemplate(df, leftKeys, rightKeys)
   }
 
-  test("columnar sortMergeJoin is equal to native with null") {
-    val df = left.join(right.hint("mergejoin"), col("q") === col("c"))
-    val leftKeys = Seq(left.col("q").expr)
-    val rightKeys = Seq(right.col("c").expr)
-    checkTharPlansAgreeTemplate(expr = expr, leftKeys, rightKeys)
-  }
-
-
-  def checkTharPlansAgreeTemplate(df: DataFrame, leftKeys: Seq[Expression],
+  def checkThatPlansAgreeTemplate(df: DataFrame, leftKeys: Seq[Expression],
                                   rightKeys: Seq[Expression]): Unit = {
-    checkTharPlansAgree(
+    checkThatPlansAgree(
       df,
       (child: SparkPlan) =>
         ColumnarBroadcastHashJoinExec(leftKeys, rightKeys, Inner,

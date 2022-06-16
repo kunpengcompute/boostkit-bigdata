@@ -11,7 +11,7 @@ object ColumnarSortBenchmark extends ColumnarBasedBenchmark {
 
     runBenchmark("sort with API") {
       val value = spark.range(N)
-      value.sort(value("id").desc).explain
+      value.sort(value("id").desc).explain()
       columnarBenchmark(s"spark.range(${N}).sort(id.desc)", N) {
         val value = spark.range(N)
         value.sort(value("id").desc).noop()
