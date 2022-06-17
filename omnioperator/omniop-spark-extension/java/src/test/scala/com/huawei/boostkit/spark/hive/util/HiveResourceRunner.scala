@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022-2022. Huawei Technologies Co., Ltd. All rights reserved.
+ * Copyright (C) 2021-2022. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
@@ -29,7 +29,7 @@ class HiveResourceRunner(val spark: SparkSession, val resource: String) {
     ".sql")
 
   def runQuery(caseId: String, roundId: Int, explain: Boolean = false): Unit = {
-    val path = "%s%s.sql".format(resource, caseId)
+    val path = "%s/%s.sql".format(resource, caseId)
     val absolute = HiveResourceRunner.locateResourcePath(path)
     val sql = FileUtils.readFileToString(new File(absolute), StandardCharsets.UTF_8)
     println("Running query %s (round %d)... ".format(caseId, roundId))
@@ -46,7 +46,7 @@ object HiveResourceRunner {
   private def parseCaseIds(dir: String, suffix: String): List[String] = {
     val folder = new File(dir)
     if (!folder.exists()) {
-      throw new IllegalArgumentException("dir does not exist" + dir)
+      throw new IllegalArgumentException("dir does not exist: " + dir)
     }
     folder
       .listFiles(new FilenameFilter {
