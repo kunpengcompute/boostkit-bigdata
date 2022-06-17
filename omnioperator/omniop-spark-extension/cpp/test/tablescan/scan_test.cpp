@@ -69,42 +69,42 @@ TEST_F(ScanTest, test_copy_vec)
 {
     orc::StructVectorBatch *root = static_cast<orc::StructVectorBatch *>(batchPtr);
     int omniType = 0;
-    uint64_t omniVecId = 0;
+    uint64_t ominVecId = 0;
     // int type
-    copyToOmniVec(0, 3, omniType, omniVecId, root->filds[0]);
+    copyToOminVec(0, 3, omniType, ominVecId, root->fields[0]);
     ASSERT_EQ(omniType == 1, true);
-    omniruntime::vec::IntVector *olbInt = (omniruntime::vec::IntVector *)(omniVecId);
+    omniruntime::vec::IntVector *olbInt = (omniruntime::vec::IntVector *)(ominVecId);
     ASSERT_EQ(olbInt->GetValue(0) == 10, true);
     delete olbInt;
 
     // varchar type
-    copyToOmniVec(60, 16, omniType, omniVecId, root->fields[1]);
+    copyToOminVec(60, 16, omniType, ominVecId, root->fields[1]);
     ASSERT_EQ(omniType == 15, true);
     uint8_t *actualChar = nullptr;
-    omniruntime::vec::VarcharVector * olbVc = (omniruntime::vec::VarcharVector *)(omniVecId);
+    omniruntime::vec::VarcharVector * olbVc = (omniruntime::vec::VarcharVector *)(ominVecId);
     int len =  olbVc->GetValue(0, &actualChar);
     std::string actualStr(reinterpret_cast<char *>(actualChar), 0, len);
     ASSERT_EQ(actualStr == "varchar_1", true);
     delete olbVc;
 
     // string type
-    copyToOmniVec(0, 7, omniType, omniVecId, root->fields[2]);
+    copyToOminVec(0, 7, omniType, ominVecId, root->fields[2]);
     ASSERT_EQ(omniType == 15, true);
-    omniruntime::vec::VarcharVector *olbStr = (omniruntime::vec::VarcharVector *)(omniVecId);
+    omniruntime::vec::VarcharVector *olbStr = (omniruntime::vec::VarcharVector *)(ominVecId);
     len = olbStr->GetValue(0, &actualChar);
     std::string actualStr2(reinterpret_cast<char *>(actualChar), 0, len);
     ASSERT_EQ(actualStr2 == "string_type_1", true);
     delete olbStr;
 
     // bigint type
-    copyToOmniVec(0, 4, omniType, omniVecId, root->fields[3]);
-    ASSERT_EQ(omniTYpe == 2, true);
-    omniruntime::vec::LongVector *olbLong = (omniruntime::vec::LongVector *)(omniVecId);
-    ASSERT_EQ(olbLong-GetValue(0) == 10000, true);
+    copyToOminVec(0, 4, omniType, omniVecId, root->fields[3]);
+    ASSERT_EQ(omniType == 2, true);
+    omniruntime::vec::LongVector *olbLong = (omniruntime::vec::LongVector *)(ominVecId);
+    ASSERT_EQ(olbLong->GetValue(0) == 10000, true);
     delete olbLong;
 
     // char type
-    copyToOmniVec(40, 17, omniType, omniVecId, root->fields[4]);
+    copyToOminVec(40, 17, omniType, ominVecId, root->fields[4]);
     ASSERT_EQ(omniType == 15, true);
     omniruntime::vec::VarcharVector *olbChar40 = (omniruntime::vec::VarcharVector *)(omniVecId);
     len = olbChar40->GetValue(0, &actualChar);
@@ -119,7 +119,7 @@ TEST_F(ScanTest, test_build_leafs)
     std::vector<orc::Literal> litList;
     std::string leafNameString;
     int leafType = 0;
-    std::unique_ptr<orc::SearchArgumentBuilder> builder = orc::SearchArigumentFactory::newBuilder();
+    std::unique_ptr<orc::SearchArgumentBuilder> builder = orc::SearchArgumentFactory::newBuilder();
     (*builder).startAnd();
     orc::Literal lit(100L);
 
@@ -142,7 +142,7 @@ TEST_F(ScanTest, test_build_leafs)
     std::string result = ((*builder).end().build())->toString();
     std::string buildString =
         "leaf-0 = (leaf-0 = 100), leaf-1 = (leaf-1 < 100), leaf-2 = (leaf-1 <= 100), leaf-3 = (leaf-1 null_safe_= "
-        "100), leaf-3 = (leaf-1 is null), expt = (and leaf-0 leaf-1 leaf-2 leaf-3 leaf-4)";
+        "100), leaf-4 = (leaf-1 is null), expr = (and leaf-0 leaf-1 leaf-2 leaf-3 leaf-4)";
 
     ASSERT_EQ(buildString == result, true);
 }
