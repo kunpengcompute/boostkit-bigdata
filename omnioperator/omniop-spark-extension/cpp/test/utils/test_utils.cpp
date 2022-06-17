@@ -11,7 +11,7 @@ void ToVectorTypes(const int32_t *dataTypeIds, int32_t dataTypeCount, std::vecto
     for (int i = 0; i < dataTypeCount; ++i) {
         if (dataTypeIds[i] == OMNI_VARCHAR) {
             dataTypes.push_back(VarcharDataType(50));
-            countinue;
+            continue;
         } else if (dataTypeIds[i] == OMNI_CHAR) {
             dataTypes.push_back(CharDataType(50));
             continue;
@@ -20,7 +20,7 @@ void ToVectorTypes(const int32_t *dataTypeIds, int32_t dataTypeCount, std::vecto
     }
 }
 
-VectorBastch* CreateInputData(const int32_t numRows,
+VectorBatch* CreateInputData(const int32_t numRows,
                               const int32_t numCols,
                               int32_t* inputTypeIds,
                               int64_t* allData) 
@@ -46,7 +46,7 @@ VectorBastch* CreateInputData(const int32_t numRows,
             case OMNI_VARCHAR:
             case OMNI_CHAR: {
                 for (int j = 0; j < numRows; ++j) {
-                    int64_t addr = (reinterpred_cast<int64_t *>(allData[i]))[j];
+                    int64_t addr = (reinterpret_cast<int64_t *>(allData[i]))[j];
                     std::string s (reinterpret_cast<char *>(addr));
                     ((VarcharVector *)vecBatch->GetVector(i))->SetValue(j, (uint8_t *)(s.c_str()), s.length());
                 }
@@ -76,7 +76,7 @@ VarcharVector *CreateVarcharVector(VarcharDataType type, std::string *values, in
 
 Decimal128Vector *CreateDecimal128Vector(Decimal128 *values, int32_t length)
 {
-    VectorAllocator *vecAllocator = omniruntime::vec::GetProcessGlocbalVecAllocator();
+    VectorAllocator *vecAllocator = omniruntime::vec::GetProcessGlobalVecAllocator();
     Decimal128Vector *vector = std::make_unique<Decimal128Vector>(vecAllocator, length).release();
     for (int32_t i = 0; i < length; i++) {
         vector->SetValue(i, values[i]);
@@ -170,7 +170,7 @@ Vector *buildVector(const DataType &aggType, int32_t rowNumber)
         case OMNI_VARCHAR:
         case OMNI_CHAR: {
             VarcharDataType charType = (VarcharDataType &)aggType;
-            VarcharVector *col = new VarcharVector(vecAlloctor, charType.GetWidth() * rowNumber, rowNumber);
+            VarcharVector *col = new VarcharVector(vecAllocator, charType.GetWidth() * rowNumber, rowNumber);
             for (int32_t j = 0; j < rowNumber; ++j) {
                 std::string str =  std::to_string(j);
                 col->SetValue(j, reinterpret_cast<const uint8_t *>(str.c_str()), str.size());
@@ -184,7 +184,7 @@ Vector *buildVector(const DataType &aggType, int32_t rowNumber)
     }
 }
 
-VectorBatch *CreateVectorBatch(DataType &types, int32_t rowCount, ...)
+VectorBatch *CreateVectorBatch(DataTypes &types, int32_t rowCount, ...)
 {
     int32_t typesCount = types.GetSize();
     VectorBatch *vectorBatch = std::make_unique<VectorBatch>(typesCount).release();
@@ -218,8 +218,8 @@ VectorBatch* CreateVectorBatch_1row_varchar_withPid(int pid, std::string inputSt
     std::string* strTmp = new std::string(inputString);
     col2[0] = (int64_t)(strTmp->c_str());
 
-    int64_t allData[numCols] = {reinterpret_cast<int64>(col1),
-                                reinterpret_cast<int64>(col2)}
+    int64_t allData[numCols] = {reinterpret_cast<int64_t>(col1),
+                                reinterpret_cast<int64_t>(col2)};
     VectorBatch* in = CreateInputData(numRows, numCols, inputTypes, allData);
     delete[] inputTypes;
     delete[] col1;
@@ -235,7 +235,7 @@ VectorBatch* CreateVectorBatch_1row_varchar_withPid(int pid, std::string inputSt
  * @param {int} rowNum row number
  * @return {VectorBatch} a VectorBatch
  */
-VectorBatch* CreateVectorBatch_4row_withPid(int parNum, int rowNum) {
+VectorBatch* CreateVectorBatch_4col_withPid(int parNum, int rowNum) {
     int partitionNum = parNum;
     const int32_t numCols = 5;
     int32_t* inputTypes = new int32_t[numCols];
@@ -265,11 +265,11 @@ VectorBatch* CreateVectorBatch_4row_withPid(int parNum, int rowNum) {
         col4[i] = (int64_t)((*strTmp).c_str());
     }
 
-    int64_t allData[numCols] = {reinterpret_cast<int64>(col0),
-                                reinterpret_cast<int64>(col1),
-                                reinterpret_cast<int64>(col2),
-                                reinterpret_cast<int64>(col3),
-                                reinterpret_cast<int64>(col4)}
+    int64_t allData[numCols] = {reinterpret_cast<int64_t>(col0),
+                                reinterpret_cast<int64_t>(col1),
+                                reinterpret_cast<int64_t>(col2),
+                                reinterpret_cast<int64_t>(col3),
+                                reinterpret_cast<int64_t>(col4)};
     VectorBatch* in = CreateInputData(numRows, numCols, inputTypes, allData);
     delete[] inputTypes;
     delete[] col0;
@@ -278,7 +278,7 @@ VectorBatch* CreateVectorBatch_4row_withPid(int parNum, int rowNum) {
     delete[] col3;
     delete[] col4;
 
-    for (int p = 0; p < string-cache_test_.size(); p++) {
+    for (int p = 0; p < string_cache_test_.size(); p++) {
         delete string_cache_test_[p]; // release memory
     }
     return in;
@@ -299,8 +299,8 @@ VectorBatch* CreateVectorBatch_1longCol_withPid(int parNum, int rowNum) {
         col1[i] = i + 1;
     }
 
-    int64_t allData[numCols] = {reinterpret_cast<int64>(col0),
-                                reinterpret_cast<int64>(col1)}
+    int64_t allData[numCols] = {reinterpret_cast<int64_t>(col0),
+                                reinterpret_cast<int64_t>(col1)};
     VectorBatch* in = CreateInputData(numRows, numCols, inputTypes, allData);
     delete[] inputTypes;
     delete[] col0;
@@ -321,13 +321,13 @@ VectorBatch* CreateVectorBatch_2column_1row_withPid(int pid, std::string strVar,
     auto* col2 = new int32_t[numRows];
 
     col0[0] = pid;
-    std::strint* strTmp = new std::string(strVar);
+    std::string* strTmp = new std::string(strVar);
     col1[0] = (int64_t)(strTmp->c_str());
     col2[0] = intVar;
 
-    int64_t allData[numCols] = {reinterpret_cast<int64>(col0),
-                                reinterpret_cast<int64>(col1),
-                                reinterpret_cast<int64>(col2)}
+    int64_t allData[numCols] = {reinterpret_cast<int64_t>(col0),
+                                reinterpret_cast<int64_t>(col1),
+                                reinterpret_cast<int64_t>(col2)};
     VectorBatch* in = CreateInputData(numRows, numCols, inputTypes, allData);
     delete[] inputTypes;
     delete[] col0;
@@ -371,11 +371,11 @@ VectorBatch* CreateVectorBatch_4varcharCols_withPid(int parNum, int rowNum) {
         string_cache_test_.push_back(strTmp4);
     }
 
-    int64_t allData[numCols] = {reinterpret_cast<int64>(col0),
-                                reinterpret_cast<int64>(col1),
-                                reinterpret_cast<int64>(col2),
-                                reinterpret_cast<int64>(col3),
-                                reinterpret_cast<int64>(col4)}
+    int64_t allData[numCols] = {reinterpret_cast<int64_t>(col0),
+                                reinterpret_cast<int64_t>(col1),
+                                reinterpret_cast<int64_t>(col2),
+                                reinterpret_cast<int64_t>(col3),
+                                reinterpret_cast<int64_t>(col4)};
     VectorBatch* in = CreateInputData(numRows, numCols, inputTypes, allData);
     delete[] inputTypes;
     delete[] col0;
@@ -384,7 +384,7 @@ VectorBatch* CreateVectorBatch_4varcharCols_withPid(int parNum, int rowNum) {
     delete[] col3;
     delete[] col4;
 
-    for (int p = 0; p < string-cache_test_.size(); p++) {
+    for (int p = 0; p < string_cache_test_.size(); p++) {
         delete string_cache_test_[p]; // release memory
     }
     return in;
@@ -424,11 +424,11 @@ VectorBatch* CreateVectorBatch_4charCols_withPid(int parNum, int rowNum) {
         string_cache_test_.push_back(strTmp4);
     }
 
-    int64_t allData[numCols] = {reinterpret_cast<int64>(col0),
-                                reinterpret_cast<int64>(col1),
-                                reinterpret_cast<int64>(col2),
-                                reinterpret_cast<int64>(col3),
-                                reinterpret_cast<int64>(col4)}
+    int64_t allData[numCols] = {reinterpret_cast<int64_t>(col0),
+                                reinterpret_cast<int64_t>(col1),
+                                reinterpret_cast<int64_t>(col2),
+                                reinterpret_cast<int64_t>(col3),
+                                reinterpret_cast<int64_t>(col4)};
     VectorBatch* in = CreateInputData(numRows, numCols, inputTypes, allData);
     delete[] inputTypes;
     delete[] col0;
@@ -437,7 +437,7 @@ VectorBatch* CreateVectorBatch_4charCols_withPid(int parNum, int rowNum) {
     delete[] col3;
     delete[] col4;
 
-    for (int p = 0; p < string-cache_test_.size(); p++) {
+    for (int p = 0; p < string_cache_test_.size(); p++) {
         delete string_cache_test_[p]; // release memory
     }
     return in;
@@ -460,16 +460,16 @@ VectorBatch* CreateVectorBatch_3fixedCols_withPid(int parNum, int rowNum) {
     auto* col2 = new int64_t[numRows];
     auto* col3 = new double[numRows];
     for (int i = 0; i < numRows; i++) {
-        col0[i] = (i+1) % partitionNum;
+        col0[i] = i % partitionNum;
         col1[i] = i + 1;
         col2[i] = i + 1;
         col3[i] = i + 1;
     }
 
-    int64_t allData[numCols] = {reinterpret_cast<int64>(col0),
-                                reinterpret_cast<int64>(col1),
-                                reinterpret_cast<int64>(col2),
-                                reinterpret_cast<int64>(col3)}
+    int64_t allData[numCols] = {reinterpret_cast<int64_t>(col0),
+                                reinterpret_cast<int64_t>(col1),
+                                reinterpret_cast<int64_t>(col2),
+                                reinterpret_cast<int64_t>(col3)};
     VectorBatch* in = CreateInputData(numRows, numCols, inputTypes, allData);
     delete[] inputTypes;
     delete[] col0;
@@ -485,7 +485,7 @@ VectorBatch* CreateVectorBatch_2dictionaryCols_withPid(int partitionNum) {
     const int32_t dataSize = 6;
     // prepare data
     int32_t data0[dataSize] = {111, 112, 113, 114, 115, 116};
-    int32_t data1[dataSize] = {221, 222, 223, 224, 225, 226};
+    int64_t data1[dataSize] = {221, 222, 223, 224, 225, 226};
     void *datas[2] = {data0, data1};
     DataTypes sourceTypes(std::vector<omniruntime::vec::DataType>({ IntDataType(), LongDataType()}));
     int32_t ids[] = {0, 1, 2, 3, 4, 5};
@@ -497,7 +497,7 @@ VectorBatch* CreateVectorBatch_2dictionaryCols_withPid(int partitionNum) {
     }
     for (int32_t i = 0; i < 3; i ++) {
         if (i == 0) {
-            VectorBatch->SetVector(i, intVectorTmp);
+            vectorBatch->SetVector(i, intVectorTmp);
         } else {
             omniruntime::vec::DataType dataType = sourceTypes.Get()[i - 1];
             vectorBatch->SetVector(i, CreateDictionaryVector(dataType, dataSize, ids, dataSize, datas[i - 1]));
@@ -557,7 +557,7 @@ VectorBatch* CreateVectorBatch_someNullRow_vectorBatch() {
     auto vec0 = CreateVector<IntVector>(data1, numRows);
     auto vec1 = CreateVector<LongVector>(data2, numRows);
     auto vec2 = CreateVector<DoubleVector>(data3, numRows);
-    auto vec1 = CreateVarcharVector(VarcharDataType(5), data4, numRows);
+    auto vec3 = CreateVarcharVector(VarcharDataType(5), data4, numRows);
     for (int i = 0; i < numRows; i = i + 2) {
         vec0->SetValueNull(i);
         vec1->SetValueNull(i);
@@ -582,8 +582,8 @@ VectorBatch* CreateVectorBatch_someNullCol_vectorBatch() {
     auto vec0 = CreateVector<IntVector>(data1, numRows);
     auto vec1 = CreateVector<LongVector>(data2, numRows);
     auto vec2 = CreateVector<DoubleVector>(data3, numRows);
-    auto vec1 = CreateVarcharVector(VarcharDataType(5), data4, numRows);
-    for (int i = 0; i < numRows; i = i + 2) {
+    auto vec3 = CreateVarcharVector(VarcharDataType(5), data4, numRows);
+    for (int i = 0; i < numRows; i = i + 1) {
         vec1->SetValueNull(i);
         vec3->SetValueNull(i);
     }
@@ -597,12 +597,12 @@ VectorBatch* CreateVectorBatch_someNullCol_vectorBatch() {
 
 void Test_Shuffle_Compression(std::string compStr, int32_t numPartition, int32_t numVb, int32_t numRow) {
     std::string shuffleTestsDir = s_shuffle_tests_dir;
-    std::string tmpDataFilePath = shuffleTestsDir + "/shuffle_" + comStr;
+    std::string tmpDataFilePath = shuffleTestsDir + "/shuffle_" + compStr;
     if (!IsFileExist(shuffleTestsDir)) {
         mkdir(shuffleTestsDir.c_str(), S_IRWXU|S_IRWXG|S_IROTH|S_IXOTH);
     }
     int32_t inputVecTypeIds[] = {OMNI_INT, OMNI_LONG, OMNI_DOUBLE, OMNI_VARCHAR};
-    int colNumber = size(inputVecTypeIds) / sizeof(inputVecTypeIds[0]);
+    int colNumber = sizeof(inputVecTypeIds) / sizeof(inputVecTypeIds[0]);
     InputDataTypes inputDataTypes;
     inputDataTypes.inputVecTypeIds = inputVecTypeIds;
     inputDataTypes.inputDataPrecisions = new uint32_t[colNumber];
@@ -698,8 +698,8 @@ void DeletePathAll(const char* path) {
     } else if (S_ISDIR(statBuf.st_mode)) {
         if ((dir = opendir(path)) != NULL) {
             while ((dirInfo = readdir(dir)) != NULL) {
-                GetFIlePath(path, dirInfo->d_name, filepath);
-                if (strcmp(dirInof->d_name, ".") == 0 || strcmp(dirInfo->d_name, "..") == 0) {
+                GetFilePath(path, dirInfo->d_name, filepath);
+                if (strcmp(dirInfo->d_name, ".") == 0 || strcmp(dirInfo->d_name, "..") == 0) {
                     continue;
                 }
                 DeletePathAll(filepath);
