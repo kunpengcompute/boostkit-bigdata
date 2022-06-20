@@ -97,7 +97,7 @@ TEST_F(ScanTest, test_copy_vec)
     delete olbStr;
 
     // bigint type
-    copyToOminVec(0, 4, omniType, omniVecId, root->fields[3]);
+    copyToOminVec(0, 4, omniType, ominVecId, root->fields[3]);
     ASSERT_EQ(omniType == 2, true);
     omniruntime::vec::LongVector *olbLong = (omniruntime::vec::LongVector *)(ominVecId);
     ASSERT_EQ(olbLong->GetValue(0) == 10000, true);
@@ -106,7 +106,7 @@ TEST_F(ScanTest, test_copy_vec)
     // char type
     copyToOminVec(40, 17, omniType, ominVecId, root->fields[4]);
     ASSERT_EQ(omniType == 15, true);
-    omniruntime::vec::VarcharVector *olbChar40 = (omniruntime::vec::VarcharVector *)(omniVecId);
+    omniruntime::vec::VarcharVector *olbChar40 = (omniruntime::vec::VarcharVector *)(ominVecId);
     len = olbChar40->GetValue(0, &actualChar);
     std::string actualStr3(reinterpret_cast<char *>(actualChar), 0, len);
     ASSERT_EQ(actualStr3 == "char_1", true);

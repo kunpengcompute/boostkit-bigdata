@@ -25,7 +25,7 @@ add_dependencies(${TP_TEST_TARGET} ${MY_LINK})
 
 # dependent libraries
 target_link_libraries(${TP_TEST_TARGET}
-        ${GETST_BOTH_LIBRARIES}
+        ${GTEST_BOTH_LIBRARIES}
         ${MY_LINK}
         gtest
         pthread
