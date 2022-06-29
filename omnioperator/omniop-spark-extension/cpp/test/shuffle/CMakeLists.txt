@@ -1,0 +1,10 @@
+aux_source_directory(${CMAKE_CURRENT_LIST_DIR} SHUFFLE_TESTS_LIST)
+set(SHUFFLE_TEST_TARGET shuffletest)
+add_library(${SHUFFLE_TEST_TARGET} STATIC ${SHUFFLE_TESTS_LIST})
+target_compile_options(${SHUFFLE_TEST_TARGET} PUBLIC )
+target_include_directories(${SHUFFLE_TEST_TARGET} PUBLIC ${CMAKE_BINARY_DIR}/src)
+target_include_directories(${SHUFFLE_TEST_TARGET} PUBLIC /opt/lib/include)
+target_include_directories(${SHUFFLE_TEST_TARGET} PUBLIC $ENV{JAVA_HOME}/include)
+target_include_directories(${SHUFFLE_TEST_TARGET} PUBLIC $ENV{JAVA_HOME}/include/linux)
+
+

@@ -1,0 +1,60 @@
+syntax = "proto3";
+
+package spark;
+option java_package = "com.huawei.boostkit.spark.serialize";
+option java_outer_classname = "VecData";
+
+message VecBatch {
+    int32 rowCnt = 1;
+    int32 vecCnt = 2;
+    repeated Vec vecs = 3;
+}
+
+message Vec {
+    VecType vecType = 1;
+    bytes offset = 2;
+    bytes values = 3;
+    bytes nulls = 4;
+}
+
+message VecType {
+    enum VecTypeId {
+        VEC_TYPE_NONE = 0;
+        VEC_TYPE_INT = 1;
+        VEC_TYPE_LONG = 2;
+        VEC_TYPE_DOUBLE = 3;
+        VEC_TYPE_BOOLEAN = 4;
+        VEC_TYPE_SHORT = 5;
+        VEC_TYPE_DECIMAL64 = 6;
+        VEC_TYPE_DECIMAL128 = 7;
+        VEC_TYPE_DATE32 = 8;
+        VEC_TYPE_DATE64 = 9;
+        VEC_TYPE_TIME32 = 10;
+        VEC_TYPE_TIME64 = 11;
+        VEC_TYPE_TIMESTAMP = 12;
+        VEC_TYPE_INTERVAL_MONTHS = 13;
+        VEC_TYPE_INTERVAL_DAY_TIME =14;
+        VEC_TYPE_VARCHAR = 15;
+        VEC_TYPE_CHAR = 16;
+        VEC_TYPE_DICTIONARY = 17;
+        VEC_TYPE_CONTAINER = 18;
+        VEC_TYPE_INVALID = 19;
+    }
+
+    VecTypeId typeId = 1;
+    int32 width = 2;
+    uint32 precision = 3;
+    uint32 scale = 4;
+    enum DateUnit {
+        DAY = 0;
+        MILLI = 1;
+    }
+    DateUnit dateUnit = 5;
+    enum TimeUnit {
+        SEC = 0;
+        MILLISEC = 1;
+        MICROSEC = 2;
+        NANOSEC = 3;
+    }
+    TimeUnit timeUnit = 6;
+}
