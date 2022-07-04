@@ -67,6 +67,8 @@ public class RowOmniBlock<T>
 
     private final DataType dataType;
 
+    private boolean[] isNull;
+
     /**
      * Create a row block directly from columnar nulls and field blocks.
      *
@@ -238,7 +240,10 @@ public class RowOmniBlock<T>
     @Nullable
     public boolean[] getRowIsNull()
     {
-        boolean[] isNull = new boolean[rowIsNull.length];
+        if (isNull != null) {
+            return isNull;
+        }
+        isNull = new boolean[rowIsNull.length];
         for (int i = 0; i < rowIsNull.length; i++) {
             isNull[i] = rowIsNull[i] == Vec.NULL;
         }
