@@ -230,7 +230,7 @@ class JsonifyVisitor
             case OMNI_VARCHAR:
                 String varcharValue;
                 if (literal.getValue() instanceof Slice) {
-                    varcharValue = ((Slice) literal.getValue()).toStringAscii();
+                    varcharValue = ((Slice) literal.getValue()).toStringUtf8();
                 }
                 else {
                     varcharValue = String.valueOf(literal.getValue());
