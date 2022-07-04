@@ -154,4 +154,10 @@ public class LazyOmniBlock<T>
     {
         return lazyBlock;
     }
+
+    @Override
+    public void close()
+    {
+        nativeLazyVec.close();
+    }
 }
