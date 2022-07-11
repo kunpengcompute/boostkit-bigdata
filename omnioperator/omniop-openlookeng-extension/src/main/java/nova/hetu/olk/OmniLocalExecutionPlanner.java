@@ -20,6 +20,7 @@ import com.google.common.collect.Lists;
 import com.google.common.primitives.Ints;
 import io.airlift.log.Logger;
 import io.airlift.node.NodeInfo;
+import io.airlift.slice.Slice;
 import io.airlift.units.DataSize;
 import io.hetu.core.transport.execution.buffer.PagesSerdeFactory;
 import io.prestosql.Session;
@@ -87,6 +88,7 @@ import io.prestosql.spi.plan.TopNNode;
 import io.prestosql.spi.plan.WindowNode;
 import io.prestosql.spi.predicate.NullableValue;
 import io.prestosql.spi.relation.CallExpression;
+import io.prestosql.spi.relation.ConstantExpression;
 import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.spi.type.StandardTypes;
@@ -205,6 +207,7 @@ import static io.prestosql.sql.planner.SystemPartitioningHandle.SINGLE_DISTRIBUT
 import static io.prestosql.sql.planner.plan.ExchangeNode.Scope.LOCAL;
 import static nova.hetu.olk.operator.OrderByOmniOperator.OrderByOmniOperatorFactory.createOrderByOmniOperatorFactory;
 import static nova.hetu.olk.operator.filterandproject.OmniRowExpressionUtil.expressionStringify;
+import static nova.hetu.olk.operator.filterandproject.OmniRowExpressionUtil.generateLikeExpr;
 import static nova.hetu.omniruntime.constants.FunctionType.OMNI_AGGREGATION_TYPE_AVG;
 import static nova.hetu.omniruntime.constants.FunctionType.OMNI_AGGREGATION_TYPE_COUNT_ALL;
 import static nova.hetu.omniruntime.constants.FunctionType.OMNI_AGGREGATION_TYPE_COUNT_COLUMN;
@@ -849,14 +852,8 @@ public class OmniLocalExecutionPlanner
         private Optional<RowExpression> addRowExpression(Optional<RowExpression> rowExpression,
                                                          Optional<RowExpression> translatedFilter)
         {
-            List<RowExpression> newArgs = new LinkedList<RowExpression>();
-            newArgs.add(((CallExpression) translatedFilter.get()).getArguments().get(0));
-            newArgs.add(rowExpression.get());
-            Optional<RowExpression> likeTranslatedFilter = Optional
-                    .of(new CallExpression(((CallExpression) translatedFilter.get()).getDisplayName(),
-                            ((CallExpression) translatedFilter.get()).getFunctionHandle(),
-                            ((CallExpression) translatedFilter.get()).getType(), newArgs));
-            return likeTranslatedFilter;
+            String sqlString = ((Slice) ((ConstantExpression) ((CallExpression) rowExpression.get()).getArguments().get(0)).getValue()).toStringUtf8();
+            return generateLikeExpr(sqlString, translatedFilter);
         }
 
         @Override
