@@ -33,6 +33,7 @@ import io.prestosql.operator.PartitionedLookupSourceFactory;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.type.Type;
+import nova.hetu.olk.tool.BlockUtils;
 import nova.hetu.olk.tool.OperatorUtils;
 import nova.hetu.olk.tool.VecAllocatorHelper;
 import nova.hetu.omniruntime.operator.OmniOperator;
@@ -285,6 +286,7 @@ public class HashBuilderOmniOperator
         checkState(state == State.CONSUMING_INPUT);
         int positionCount = page.getPositionCount();
         if (positionCount == 0) {
+            BlockUtils.freePage(page);
             return;
         }
 

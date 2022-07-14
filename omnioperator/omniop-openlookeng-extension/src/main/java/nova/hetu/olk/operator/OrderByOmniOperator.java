@@ -255,6 +255,7 @@ public class OrderByOmniOperator
 
         int positionCount = page.getPositionCount();
         if (positionCount == 0) {
+            BlockUtils.freePage(page);
             return;
         }
 

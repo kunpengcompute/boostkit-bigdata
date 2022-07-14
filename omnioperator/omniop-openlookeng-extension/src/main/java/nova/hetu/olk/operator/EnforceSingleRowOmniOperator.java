@@ -51,6 +51,13 @@ public class EnforceSingleRowOmniOperator
     @Override
     public void addInput(Page page)
     {
+        requireNonNull(page, "page is null");
+        checkState(needsInput(), "Operator did not expect any more data");
+        if (page.getPositionCount() == 0) {
+            BlockUtils.freePage(page);
+            return;
+        }
+
         this.page = page;
         super.addInput(page);
     }

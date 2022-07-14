@@ -223,6 +223,7 @@ public class DistinctLimitOmniOperator
         requireNonNull(page, "page is null");
 
         if (page.getPositionCount() == 0) {
+            BlockUtils.freePage(page);
             return;
         }
 

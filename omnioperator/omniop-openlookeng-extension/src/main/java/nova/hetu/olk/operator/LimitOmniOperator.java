@@ -123,6 +123,7 @@ public class LimitOmniOperator
 
         int rowCount = page.getPositionCount();
         if (rowCount == 0) {
+            BlockUtils.freePage((page);
             return;
         }
 
