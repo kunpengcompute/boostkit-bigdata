@@ -188,6 +188,7 @@ public class LookupJoinOmniOperator
 
         int positionCount = page.getPositionCount();
         if (positionCount == 0) {
+            BlockUtils.freePage(page);
             return;
         }
         VecBatch vecBatch = buildVecBatch(omniOperator.getVecAllocator(), page, this);

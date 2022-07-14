@@ -100,6 +100,7 @@ public class PartitionedOutputOmniOperator
         requireNonNull(page, "page is null");
 
         if (page.getPositionCount() == 0) {
+            BlockUtils.freePage(page);
             return;
         }
         page = pagePreprocessor.apply(page);
