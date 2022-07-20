@@ -559,7 +559,7 @@ public final class OperatorUtils
         Block block = dictionaryBlock.getDictionary();
         Block omniDictionary = buildOffHeapBlock(vecAllocator, block, block.getClass().getSimpleName(),
                 block.getPositionCount(), blockType);
-        Block dictionaryOmniBlock = new DictionaryOmniBlock((Vec) omniDictionary.getValues(),
+        Block dictionaryOmniBlock = new DictionaryOmniBlock(inputBlock.getPositionCount(), (Vec) omniDictionary.getValues(),
                 dictionaryBlock.getIdsArray());
         omniDictionary.close();
         return dictionaryOmniBlock;
