@@ -1,5 +1,4 @@
 /*
- * Copyright (C) 2018-2021. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -12,10 +11,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.huawei.boostkit.omnidata.decode;
 
-import io.hetu.core.transport.execution.buffer.SerializedPage;
+package io.prestosql.plugin.hive.omnidata.decode.type;
 
-public interface Deserializer<T> {
-    T deserialize(SerializedPage page);
+import java.util.Optional;
+
+/**
+ * Varchar decode type
+ *
+ * @since 2022-07-18
+ */
+public class VarcharDecodeType
+        implements DecodeType
+{
+    @Override
+    public Optional<Class<?>> getJavaType()
+    {
+        return Optional.of(String.class);
+    }
 }
