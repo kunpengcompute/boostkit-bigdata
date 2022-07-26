@@ -23,5 +23,11 @@
             <artifactId>commons-io</artifactId>
             <version>${dep.commons.io.version}</version>
         </dependency>
+        <dependency>
+            <groupId>io.hetu.core</groupId>
+            <artifactId>hetu-transport</artifactId>
+            <version>1.6.1</version>
+            <scope>compile</scope>
+        </dependency>
     </dependencies>
 </project>
