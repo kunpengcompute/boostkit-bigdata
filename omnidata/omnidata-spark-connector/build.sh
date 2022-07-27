@@ -2,11 +2,11 @@
 mvn clean package
 jar_name=`ls -n connector/target/*.jar | grep omnidata-spark | awk -F ' ' '{print$9}' | awk -F '/' '{print$3}'`
 dir_name=`ls -n connector/target/*.jar | grep omnidata-spark | awk -F ' ' '{print$9}' | awk -F '/' '{print$3}' | awk -F '.jar' '{print$1}'`
-rm -r $dir_name
-rm -r $dir_name.zip
-mkdir -p $dir_name
-cp connector/target/$jar_name $dir_name
-cd $dir_name
+rm -r $dir_name-aarch64
+rm -r $dir_name-aarch64.zip
+mkdir -p $dir_name-aarch64
+cp connector/target/$jar_name $dir_name-aarch64
+cd $dir_name-aarch64
 wget https://mirrors.huaweicloud.com/repository/maven/org/bouncycastle/bcpkix-jdk15on/1.68/bcpkix-jdk15on-1.68.jar
 wget https://mirrors.huaweicloud.com/repository/maven/org/apache/curator/curator-client/2.12.0/curator-client-2.12.0.jar
 wget https://mirrors.huaweicloud.com/repository/maven/org/apache/curator/curator-framework/2.12.0/curator-framework-2.12.0.jar
@@ -30,5 +30,5 @@ wget https://mirrors.huaweicloud.com/repository/maven/io/hetu/core/presto-spi/1.
 wget https://mirrors.huaweicloud.com/repository/maven/com/google/protobuf/protobuf-java/3.12.0/protobuf-java-3.12.0.jar
 wget https://mirrors.huaweicloud.com/repository/maven/io/airlift/slice/0.38/slice-0.38.jar
 cd ..
-zip -r -o $dir_name.zip $dir_name
+zip -r -o $dir_name-aarch64.zip $dir_name-aarch64
 rm -r $dir_name
