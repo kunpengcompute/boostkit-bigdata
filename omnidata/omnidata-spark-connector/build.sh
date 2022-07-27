@@ -8,7 +8,7 @@ mkdir -p $dir_name
 cp connector/target/$jar_name $dir_name
 cd $dir_name
 wget https://mirrors.huaweicloud.com/repository/maven/org/bouncycastle/bcpkix-jdk15on/1.68/bcpkix-jdk15on-1.68.jar
-wget https://mirrors.huaweicloud.com/repository/maven/org/apache/curator/curator-client/curator-client-2.12.0.jar
+wget https://mirrors.huaweicloud.com/repository/maven/org/apache/curator/curator-client/2.12.0/curator-client-2.12.0.jar
 wget https://mirrors.huaweicloud.com/repository/maven/org/apache/curator/curator-framework/2.12.0/curator-framework-2.12.0.jar
 wget https://mirrors.huaweicloud.com/repository/maven/org/apache/curator/curator-recipes/2.12.0/curator-recipes-2.12.0.jar
 wget https://mirrors.huaweicloud.com/repository/maven/com/alibaba/fastjson/1.2.76/fastjson-1.2.76.jar
@@ -19,7 +19,7 @@ wget https://mirrors.huaweicloud.com/repository/maven/com/fasterxml/jackson/data
 wget https://mirrors.huaweicloud.com/repository/maven/com/fasterxml/jackson/datatype/jackson-datatype-jdk8/2.12.4/jackson-datatype-jdk8-2.12.4.jar
 wget https://mirrors.huaweicloud.com/repository/maven/com/fasterxml/jackson/datatype/jackson-datatype-joda/2.12.4/jackson-datatype-joda-2.12.4.jar
 wget https://mirrors.huaweicloud.com/repository/maven/com/fasterxml/jackson/datatype/jackson-datatype-jsr310/2.12.4/jackson-datatype-jsr310-2.12.4.jar
-wget https://mirrors.huaweicloud.com/repository/maven/com/fasterxml/jackson/module/jackson-module-parameter-names/2.12.4/jackson-module/jackson-module-parameter-names-2.12.4.jar
+wget https://mirrors.huaweicloud.com/repository/maven/com/fasterxml/jackson/module/jackson-module-parameter-names/2.12.4/jackson-module-parameter-names-2.12.4.jar
 wget https://mirrors.huaweicloud.com/repository/maven/org/jasypt/jasypt/1.9.3/jasypt-1.9.3.jar
 wget https://mirrors.huaweicloud.com/repository/maven/org/openjdk/jol/jol-core/0.2/jol-core-0.2.jar
 wget https://repo1.maven.org/maven2/io/airlift/joni/2.1.5.3/joni-2.1.5.3.jar
