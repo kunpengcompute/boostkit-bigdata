@@ -31,4 +31,4 @@ wget https://mirrors.huaweicloud.com/repository/maven/com/google/protobuf/protob
 wget https://mirrors.huaweicloud.com/repository/maven/io/airlift/slice/0.38/slice-0.38.jar
 cd ..
 zip -r -o $dir_name-aarch64.zip $dir_name-aarch64
-rm -r $dir_name
+rm -r $dir_name-aarch64
