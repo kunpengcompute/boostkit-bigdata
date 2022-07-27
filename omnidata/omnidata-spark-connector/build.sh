@@ -19,10 +19,10 @@ wget https://mirrors.huaweicloud.com/repository/maven/com/fasterxml/jackson/data
 wget https://mirrors.huaweicloud.com/repository/maven/com/fasterxml/jackson/datatype/jackson-datatype-jdk8/2.12.4/jackson-datatype-jdk8-2.12.4.jar
 wget https://mirrors.huaweicloud.com/repository/maven/com/fasterxml/jackson/datatype/jackson-datatype-joda/2.12.4/jackson-datatype-joda-2.12.4.jar
 wget https://mirrors.huaweicloud.com/repository/maven/com/fasterxml/jackson/datatype/jackson-datatype-jsr310/2.12.4/jackson-datatype-jsr310-2.12.4.jar
-wget https://mirrors.huaweicloud.com/repository/maven/com/fasterxml/jackson/module/jackson-module-parameter-name/2.12.4/jackson-module/jackson-module-parameter-name-2.12.4.jar
+wget https://mirrors.huaweicloud.com/repository/maven/com/fasterxml/jackson/module/jackson-module-parameter-names/2.12.4/jackson-module/jackson-module-parameter-names-2.12.4.jar
 wget https://mirrors.huaweicloud.com/repository/maven/org/jasypt/jasypt/1.9.3/jasypt-1.9.3.jar
 wget https://mirrors.huaweicloud.com/repository/maven/org/openjdk/jol/jol-core/0.2/jol-core-0.2.jar
-wget https://repol.maven.org/maven2/io/airlift/joni/2.1.5.3/joni-2.1.5.3.jar
+wget https://repo1.maven.org/maven2/io/airlift/joni/2.1.5.3/joni-2.1.5.3.jar
 wget https://mirrors.huaweicloud.com/repository/maven/io/airlift/log/0.193/log-0.193.jar
 wget https://mirrors.huaweicloud.com/repository/maven/io/perfmark/perfmark-api/0.23.0/perfmark-api-0.23.0.jar
 wget https://mirrors.huaweicloud.com/repository/maven/io/hetu/core/presto-main/1.6.1/presto-main-1.6.1.jar
