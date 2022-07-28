@@ -24,18 +24,20 @@ import static io.airlift.slice.SizeOf.SIZE_OF_INT;
 import static java.lang.Double.longBitsToDouble;
 import static java.lang.Float.intBitsToFloat;
 
-import com.huawei.boostkit.omnidata.decode.AbstractDecoding;
-
-import com.huawei.boostkit.omnidata.decode.type.*;
 import io.airlift.slice.SliceInput;
 import io.airlift.slice.Slices;
-
 import io.prestosql.spi.type.DateType;
+
 import org.apache.hadoop.hive.ql.exec.vector.BytesColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.ColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.DoubleColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.LongColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatch;
+import org.apache.hadoop.hive.ql.omnidata.decode.type.DecodeType;
+import org.apache.hadoop.hive.ql.omnidata.decode.type.LongToFloatDecodeType;
+import org.apache.hadoop.hive.ql.omnidata.decode.type.LongToIntDecodeType;
+import org.apache.hadoop.hive.ql.omnidata.decode.type.LongToByteDecodeType;
+import org.apache.hadoop.hive.ql.omnidata.decode.type.LongToShortDecodeType;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;

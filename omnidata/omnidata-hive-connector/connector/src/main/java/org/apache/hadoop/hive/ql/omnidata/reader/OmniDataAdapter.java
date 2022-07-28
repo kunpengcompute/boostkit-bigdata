@@ -21,7 +21,7 @@ package org.apache.hadoop.hive.ql.omnidata.reader;
 
 import static org.apache.hadoop.hive.ql.omnidata.OmniDataUtils.addPartitionValues;
 
-import com.huawei.boostkit.omnidata.decode.type.DecodeType;
+
 import com.huawei.boostkit.omnidata.exception.OmniDataException;
 import com.huawei.boostkit.omnidata.exception.OmniErrorCode;
 import com.huawei.boostkit.omnidata.model.Predicate;
@@ -39,6 +39,7 @@ import org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatch;
 import org.apache.hadoop.hive.ql.omnidata.OmniDataUtils;
 import org.apache.hadoop.hive.ql.omnidata.config.NdpConf;
 import org.apache.hadoop.hive.ql.omnidata.decode.PageDeserializer;
+import org.apache.hadoop.hive.ql.omnidata.decode.type.DecodeType;
 import org.apache.hadoop.hive.ql.omnidata.operator.predicate.NdpPredicateInfo;
 import org.apache.hadoop.hive.ql.omnidata.status.NdpStatusManager;
 import org.apache.hadoop.mapred.FileSplit;
