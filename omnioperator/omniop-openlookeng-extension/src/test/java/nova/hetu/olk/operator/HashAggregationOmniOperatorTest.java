@@ -20,6 +20,7 @@ import io.prestosql.operator.OperatorFactory;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.type.BooleanType;
 import io.prestosql.spi.type.Type;
 import nova.hetu.olk.operator.HashAggregationOmniOperator.HashAggregationOmniOperatorFactory;
 import nova.hetu.olk.tool.OperatorUtils;
@@ -36,7 +37,6 @@ import java.util.List;
 import java.util.Random;
 import java.util.UUID;
 
-import static java.lang.Math.abs;
 import static nova.hetu.olk.mock.MockUtil.mockNewWithWithAnyArguments;
 import static nova.hetu.olk.mock.MockUtil.mockOmniOperator;
 import static org.junit.Assert.assertEquals;
@@ -57,14 +57,14 @@ public class HashAggregationOmniOperatorTest
 {
     private final int operatorId = new Random().nextInt();
     private final PlanNodeId planNodeId = new PlanNodeId(UUID.randomUUID().toString());
-    private final int[] groupByInputChannels = {abs(new Random().nextInt()), abs(new Random().nextInt())};
+    private final int[] groupByInputChannels = {0};
     private final DataType[] groupByInputTypes = {};
-    private final int[] aggregationInputChannels = {abs(new Random().nextInt()), abs(new Random().nextInt())};
+    private final int[] aggregationInputChannels = {};
     private final DataType[] aggregationInputTypes = {};
     private final FunctionType[] aggregatorTypes = {};
     private final AggregationNode.Step step = AggregationNode.Step.SINGLE;
     private final DataType[] aggregationOutputTypes = {};
-    private final List<Type> sourceTypes = new ArrayList<>();
+    private final List<Type> sourceTypes = Arrays.asList(BooleanType.BOOLEAN);
     private final List<DataType[]> inAndOutputTypes = Arrays.asList(new DataType[]{}, new DataType[]{});
     private OmniHashAggregationOperatorFactory omniHashAggregationOperatorFactory;
     private OmniOperator omniOperator;
