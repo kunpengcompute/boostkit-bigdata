@@ -1,0 +1,92 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+package org.apache.spark.sql.catalyst.optimizer
+
+import org.apache.spark.internal.Logging
+import org.apache.spark.sql.{AnalysisException, SparkSession}
+import org.apache.spark.sql.catalyst.{SQLConfHelper, TableIdentifier}
+import org.apache.spark.sql.catalyst.catalog._
+import org.apache.spark.sql.catalyst.optimizer.rules.MVRewriteRule
+import org.apache.spark.sql.execution.SparkOptimizer
+import org.apache.spark.sql.execution.command.DDLUtils
+import org.apache.spark.sql.types.StructType
+
+object OmniCacheToSparkAdapter extends SQLConfHelper with Logging {
+
+  def buildCatalogTable(
+      table: TableIdentifier,
+      schema: StructType,
+      partitioning: Seq[String],
+      bucketSpec: Option[BucketSpec],
+      properties: Map[String, String],
+      provider: String,
+      location: Option[String],
+      comment: Option[String],
+      storageFormat: CatalogStorageFormat,
+      external: Boolean): CatalogTable = {
+    if (external) {
+      if (DDLUtils.isHiveTable(Some(provider))) {
+        if (location.isEmpty) {
+          throw new AnalysisException(s"CREATE EXTERNAL TABLE must be accompanied by LOCATION")
+        }
+      } else {
+        throw new AnalysisException(s"Operation not allowed: CREATE EXTERNAL TABLE ... USING")
+      }
+    }
+
+    val tableType = if (location.isDefined) {
+      CatalogTableType.EXTERNAL
+    } else {
+      CatalogTableType.MANAGED
+    }
+
+    CatalogTable(
+      identifier = table,
+      tableType = tableType,
+      storage = storageFormat,
+      schema = schema,
+      provider = Some(provider),
+      partitionColumnNames = partitioning,
+      bucketSpec = bucketSpec,
+      properties = properties,
+      comment = comment)
+  }
+
+  def getStorageFormatAndProvider(
+      provider: String,
+      options: Map[String, String],
+      location: Option[String]): (CatalogStorageFormat, String) = {
+    val nonHiveStorageFormat = CatalogStorageFormat.empty.copy(
+      locationUri = location.map(CatalogUtils.stringToURI),
+      properties = options)
+    (nonHiveStorageFormat, provider)
+  }
+}
+
+case class OmniCacheOptimizer(session: SparkSession, optimizer: Optimizer) extends
+    SparkOptimizer(session.sessionState.catalogManager,
+      session.sessionState.catalog,
+      session.sessionState.experimentalMethods) {
+
+  private lazy val mvRules = Seq(Batch("Materialized View Optimizers", Once,
+    Seq(new MVRewriteRule(session)): _*))
+
+  override def defaultBatches: Seq[Batch] = {
+    mvRules ++ super.defaultBatches
+  }
+}
