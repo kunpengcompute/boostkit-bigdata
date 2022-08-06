@@ -37,14 +37,13 @@ object OmniCachePluginConfig {
 
   val MV_LATEST_UPDATE_TIME = "spark.omnicache.latest.update.time"
 
-  val ins: OmniCachePluginConfig = null
+  var ins: OmniCachePluginConfig = null
 
   def getConf: OmniCachePluginConfig = synchronized {
     if (ins == null) {
-      ins
-    } else {
-      ins
+      ins = getSessionConf
     }
+    ins
   }
 
   def getSessionConf: OmniCachePluginConfig = {

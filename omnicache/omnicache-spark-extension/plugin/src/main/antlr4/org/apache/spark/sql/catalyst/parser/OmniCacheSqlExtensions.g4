@@ -119,11 +119,11 @@ singleTableSchema
     ;
 
 statement
-    : createMVHeader (DISABLE REWRITE)? tableProvider?
+    : createMVHeader (DISABLE REWRITE)?
     commentSpec?
     (PARTITIONED BY identifierList)?
       AS query                                                           #createMV
-    | SHOW MATERIALIZED VIEWS (ON multipartIdentifier)                   #showMVs
+    | SHOW MATERIALIZED VIEWS (ON multipartIdentifier)?                  #showMVs
     | DROP MATERIALIZED VIEW (IF EXISTS)? multipartIdentifier            #dropMV
     | EXPLAIN (LOGICAL | FORMATTED | EXTENDED | CODEGEN | COST)?
       statement                                                          #explain

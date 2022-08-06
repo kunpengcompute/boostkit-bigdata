@@ -1,7 +1,7 @@
 package com.huawei.boostkit.spark.util
 
 import com.google.common.collect.Lists
-import com.huawei.boostkit.spark.conf.OmniCachePluginConfig.{MV_QUERY_ORIGINAL_SQL, MV_QUERY_ORIGINAL_SQL_CUR_DB, MV_REWRITE_ENABLED}
+import com.huawei.boostkit.spark.conf.OmniCachePluginConfig._
 import java.util.concurrent.ConcurrentHashMap
 
 import org.apache.spark.sql.SparkSession
@@ -96,17 +96,17 @@ object ViewMetadata extends RewriteHelper {
 
   def addCatalogTableToCache(table: CatalogTable): Unit = this.synchronized {
     saveViewMetadataToMap(table)
-    rebuildGraph()
+    // rebuildGraph()
   }
 
   def removeMVCache(tableName: TableIdentifier): Unit = this.synchronized {
     val viewName = tableName.toString()
-    usesGraph.removeAllVertices(Lists.newArrayList(viewName))
+    // usesGraph.removeAllVertices(Lists.newArrayList(viewName))
     viewToContainsTables.remove(viewName)
     viewToViewQueryPlan.remove(viewName)
     viewToTablePlan.remove(viewName)
     viewToContainsTables.remove(viewName)
-    rebuildGraph()
+    // rebuildGraph()
   }
 
   def init(sparkSession: SparkSession): Unit = {
@@ -128,7 +128,7 @@ object ViewMetadata extends RewriteHelper {
       val tables = omniCacheFilter(catalog, db)
       tables.foreach(tableData => saveViewMetadataToMap(tableData._2))
     }
-    rebuildGraph()
+    // rebuildGraph()
   }
 
   def omniCacheFilter(catalog: SessionCatalog,

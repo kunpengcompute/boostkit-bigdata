@@ -1,27 +1,9 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 package org.apache.spark.sql.catalyst.optimizer
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{AnalysisException, SparkSession}
 import org.apache.spark.sql.catalyst.{SQLConfHelper, TableIdentifier}
 import org.apache.spark.sql.catalyst.catalog._
-import org.apache.spark.sql.catalyst.optimizer.rules.MVRewriteRule
 import org.apache.spark.sql.execution.SparkOptimizer
 import org.apache.spark.sql.execution.command.DDLUtils
 import org.apache.spark.sql.types.StructType
@@ -84,7 +66,8 @@ case class OmniCacheOptimizer(session: SparkSession, optimizer: Optimizer) exten
       session.sessionState.experimentalMethods) {
 
   private lazy val mvRules = Seq(Batch("Materialized View Optimizers", Once,
-    Seq(new MVRewriteRule(session)): _*))
+    Seq(): _*))
+  // Seq(new MVRewriteRule(session)): _*))
 
   override def defaultBatches: Seq[Batch] = {
     mvRules ++ super.defaultBatches

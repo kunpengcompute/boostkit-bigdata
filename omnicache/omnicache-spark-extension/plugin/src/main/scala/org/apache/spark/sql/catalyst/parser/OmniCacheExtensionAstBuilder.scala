@@ -9,12 +9,12 @@ import org.antlr.v4.runtime.tree.{ParseTree, RuleNode}
 import scala.collection.JavaConverters._
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{AnalysisException, SparkSession}
-import org.apache.spark.sql.catalyst.SQLConfHelper
+import org.apache.spark.sql.catalyst.{SQLConfHelper, TableIdentifier}
 import org.apache.spark.sql.catalyst.parser.OmniCacheSqlExtensionsParser._
 import org.apache.spark.sql.catalyst.parser.ParserUtils._
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution._
-import org.apache.spark.sql.execution.command.ExplainCommand
+import org.apache.spark.sql.execution.command.{AlterRewriteMaterializedViewCommand, DropMaterializedViewCommand, ExplainCommand, OmniCacheCreateMvCommand, ShowMaterializedViewCommand}
 
 import java.util.Locale
 
@@ -25,7 +25,6 @@ class OmniCacheExtensionAstBuilder(spark: SparkSession, delegate: ParserInterfac
 
     val (identifier, ifNotExists) = visitCreateMVHeader(ctx.createMVHeader())
     val disableRewrite = Option(ctx.DISABLE()).map(_.getText)
-    val datasource = Option(ctx.tableProvider()).map(_.multipartIdentifier.getText)
     val comment = visitCommentSpecList(ctx.commentSpec())
     val partCols = Option(ctx.identifierList()).map(visitIdentifierList).getOrElse(Seq.empty)
     var properties = Map.empty[String, String]
@@ -42,27 +41,15 @@ class OmniCacheExtensionAstBuilder(spark: SparkSession, delegate: ParserInterfac
         "The mv name is not valid: %s".format(identifier.mkString("."))
       )
     }
-
-    val provider = if (datasource.isEmpty) {
+    val provider =
       OmniCachePluginConfig.getConf.defaultDataSource
-    } else {
-      val lowerDs = datasource.get.toLowerCase(Locale.ROOT)
-      if (OmniCachePluginConfig.getConf.dataSourceSet.contains(lowerDs)) {
-        lowerDs
-      } else {
-        throw new RuntimeException(
-          s"using unknow datasource: ${datasource.get}! only support orc and parquet"
-        )
-      }
-    }
-
     val qe = spark.sql(query).queryExecution
     val logicalPlan = qe.optimizedPlan
     if (RewriteHelper.containsMV(qe.analyzed)) {
       throw new RuntimeException("not support create mv from mv")
     }
-    // TODO
-    null
+    OmniCacheCreateMvCommand(databaseName, name, provider, comment, properties,
+      ifNotExists, partCols, logicalPlan, logicalPlan.output.map(_.name))
   }
 
   override def visitCreateMVHeader(ctx: CreateMVHeaderContext
@@ -77,27 +64,37 @@ class OmniCacheExtensionAstBuilder(spark: SparkSession, delegate: ParserInterfac
     if (multiPart.isDefined) {
       val identifier = multiPart.get
       identifier match {
-        // TODO
-        case _ =>
+        case Seq(mv) => ShowMaterializedViewCommand(None, Some(mv))
+        case Seq(database, mv) => ShowMaterializedViewCommand(Some(database), Some(mv))
+        case _ => throw new AnalysisException(
+          "The mv name is not valid: %s".format(identifier.mkString(".")))
       }
     } else {
-      // TODO
+      ShowMaterializedViewCommand(None, None)
     }
-    null
   }
 
   override def visitDropMV(ctx: DropMVContext): LogicalPlan = withOrigin(ctx) {
     val multiPart = Option(ctx.multipartIdentifier).map(visitMultipartIdentifier)
+    val ifExists = Option(ctx.EXISTS())
     if (multiPart.isDefined) {
       val identifier = multiPart.get
       identifier match {
-        // TODO
-        case _ =>
+        case Seq(mv) => DropMaterializedViewCommand(
+          TableIdentifier(mv, Some(spark.sessionState.catalog.getCurrentDatabase)),
+          ifExists.isDefined,
+          purge = true)
+        case Seq(database, mv) => DropMaterializedViewCommand(
+          TableIdentifier(mv, Some(database)),
+          ifExists.isDefined,
+          purge = true
+        )
+        case _ => throw new AnalysisException(
+          "The mv name is not valid: %s".format(identifier.mkString(".")))
       }
     } else {
-      // TODO
+      throw new AnalysisException("mv name cannot be empty")
     }
-    null
   }
 
   /**
@@ -130,12 +127,18 @@ class OmniCacheExtensionAstBuilder(spark: SparkSession, delegate: ParserInterfac
 
   override def visitAlterRewriteMV(ctx: AlterRewriteMVContext): LogicalPlan = withOrigin(ctx) {
     val identifier = visitMultipartIdentifier(ctx.multipartIdentifier)
+    val enableRewrite = Option(ctx.ENABLE()).isDefined
 
-
-    // TODO
-
-    null
-
+    identifier match {
+      case Seq(mv) => AlterRewriteMaterializedViewCommand(
+        TableIdentifier(mv, Some(spark.sessionState.catalog.getCurrentDatabase)),
+        enableRewrite)
+      case Seq(database, mv) => AlterRewriteMaterializedViewCommand(
+        TableIdentifier(mv, Some(database)),
+        enableRewrite)
+      case _ => throw new AnalysisException(
+        "The mv name is not valid: %s".format(identifier.mkString(".")))
+    }
   }
 
   /**
