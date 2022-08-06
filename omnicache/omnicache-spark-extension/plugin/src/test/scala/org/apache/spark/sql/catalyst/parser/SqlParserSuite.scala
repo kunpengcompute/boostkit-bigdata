@@ -1,7 +1,25 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.apache.spark.sql.catalyst.parser
 
 import com.huawei.boostkit.spark.conf.OmniCachePluginConfig._
 import com.huawei.boostkit.spark.util.ViewMetadata
+
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.catalyst.optimizer.rule.RewriteSuite
@@ -24,7 +42,7 @@ class SqlParserSuite extends RewriteSuite {
     val querySql = "SELECT * FROM column_type"
     val viewName = "mv_create1"
 
-    //test metadata
+    // test metadata
     val catalogTable = catalog.getTableMetadata(TableIdentifier(viewName))
     compareSql(catalogTable.properties.getOrElse(MV_QUERY_ORIGINAL_SQL, ""), querySql.trim)
     assert(catalogTable.properties.getOrElse(MV_REWRITE_ENABLED, "").trim.equals("false"))
@@ -49,7 +67,7 @@ class SqlParserSuite extends RewriteSuite {
     val querySql = "SELECT * FROM column_type"
     val viewName = "mv_create2"
 
-    //test metadata
+    // test metadata
     val catalogTable = catalog.getTableMetadata(TableIdentifier(viewName))
     compareSql(catalogTable.properties.getOrElse(MV_QUERY_ORIGINAL_SQL, ""), querySql.trim)
     assert(catalogTable.properties.getOrElse(MV_REWRITE_ENABLED, "").trim.equals("true"))
@@ -85,7 +103,7 @@ class SqlParserSuite extends RewriteSuite {
         |""".stripMargin
     val viewName = "mv_create_join1"
 
-    //test metadata
+    // test metadata
     val catalogTable = catalog.getTableMetadata(TableIdentifier(viewName))
     compareSql(catalogTable.properties.getOrElse(MV_QUERY_ORIGINAL_SQL, ""), querySql.trim)
     assert(catalogTable.properties.getOrElse(MV_REWRITE_ENABLED, "").trim.equals("false"))
@@ -130,7 +148,7 @@ class SqlParserSuite extends RewriteSuite {
         |""".stripMargin
     val viewName = "mv_create_agg1"
 
-    //test metadata
+    // test metadata
     val catalogTable = catalog.getTableMetadata(TableIdentifier(viewName))
     compareSql(catalogTable.properties.getOrElse(MV_QUERY_ORIGINAL_SQL, ""), querySql.trim)
     assert(catalogTable.properties.getOrElse(MV_REWRITE_ENABLED, "").trim.equals("false"))
@@ -175,7 +193,7 @@ class SqlParserSuite extends RewriteSuite {
         |""".stripMargin
     val viewName = "mv_create_agg2"
 
-    //test metadata
+    // test metadata
     val catalogTable = catalog.getTableMetadata(TableIdentifier(viewName))
     compareSql(catalogTable.properties.getOrElse(MV_QUERY_ORIGINAL_SQL, ""), querySql.trim)
     assert(catalogTable.properties.getOrElse(MV_REWRITE_ENABLED, "").trim.equals("false"))
