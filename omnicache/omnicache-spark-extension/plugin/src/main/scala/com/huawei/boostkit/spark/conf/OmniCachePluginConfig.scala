@@ -22,15 +22,19 @@ import org.apache.spark.sql.internal.SQLConf
 
 class OmniCachePluginConfig(conf: SQLConf) {
 
+  // enable or disable OmniCache
   def enableOmniCache: Boolean = conf
       .getConfString("spark.sql.omnicache.enable", "true").toBoolean
 
+  // show mv querySql length
   def showMVQuerySqlLen: Int = conf
       .getConfString("spark.sql.omnicache.show.length", "50").toInt
 
+  // database where create OmniCache
   val omniCacheDB: String = conf
       .getConfString("spark.sql.omnicache.db", "default")
 
+  // rewrite cur match mv
   def curMatchMV: String = conf
       .getConfString("spark.sql.omnicache.cur.match.mv", "")
 

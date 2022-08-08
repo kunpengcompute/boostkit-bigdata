@@ -24,6 +24,7 @@ import org.apache.spark.sql.catalyst.parser.OmniCacheExtensionSqlParser
 class OmniCache extends (SparkSessionExtensions => Unit) with Logging {
   override def apply(extensions: SparkSessionExtensions): Unit = {
 
+    // OmniCache internal parser
     extensions.injectParser { case (spark, parser) =>
       new OmniCacheExtensionSqlParser(spark, parser)
     }

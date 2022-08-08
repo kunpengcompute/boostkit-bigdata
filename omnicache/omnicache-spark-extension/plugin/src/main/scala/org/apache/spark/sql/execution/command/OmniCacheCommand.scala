@@ -77,6 +77,7 @@ case class OmniCacheCreateMvCommand(
         throw new AnalysisException(
           s"Materialized View $tableIdentWithDB already exists. You need to drop it first")
       } else {
+        // Since the table already exists and the save mode is Ignore,we will just return.
         return Seq.empty
       }
     } else {
@@ -92,12 +93,16 @@ case class OmniCacheCreateMvCommand(
       val tableSchema = CharVarcharUtils.getRawSchema(result.schema)
       val newTable = table.copy(
         storage = table.storage.copy(locationUri = tableLocation),
+        // We will use the schema of resolved.relation as the schema of the table (instead of
+        // the schema of df). It is important since the nullability may be changed by the relation
+        // provider (for example,see org.apache.spark.sql.parquet.DefaultSource).
         schema = tableSchema)
+      // Table location is already validated. No need to check it again during table creation.
       sessionState.catalog.createTable(newTable, ignoreIfExists = false, validateLocation = false)
-
       result match {
         case _: HadoopFsRelation if table.partitionColumnNames.nonEmpty &&
             sparkSession.sqlContext.conf.manageFilesourcePartitions =>
+          // Need to recover partitions into the metastore so our saved data is visible
           sessionState.executePlan(AlterTableRecoverPartitionsCommand(table.identifier)).toRdd
         case _ =>
       }
@@ -146,6 +151,8 @@ case class DropMaterializedViewCommand(
     val isTempView = catalog.isTemporaryTable(tableName)
 
     if (!isTempView && catalog.tableExists(tableName)) {
+      // If the command DROP VIEW is to drop a table or DROP TABLE is to drop a view
+      // issue an exception.
       catalog.getTableMetadata(tableName).tableType match {
         case CatalogTableType.VIEW =>
           throw new AnalysisException(
@@ -173,7 +180,7 @@ case class DropMaterializedViewCommand(
       }
       catalog.refreshTable(tableName)
       catalog.dropTable(tableName, ifExists, purge)
-
+      // remove mv from cache
       ViewMetadata.removeMVCache(tableName)
     } else if (ifExists) {
       // no-op
@@ -245,8 +252,7 @@ case class AlterRewriteMaterializedViewCommand(
     val catalog = sparkSession.sessionState.catalog
     if (catalog.tableExists(tableName)) {
       ViewMetadata.init(sparkSession)
-      if (catalog.tableExists(tableName) &&
-          !isMV(catalog.getTableMetadata(tableName))) {
+      if (!isMV(catalog.getTableMetadata(tableName))) {
         throw new AnalysisException(
           "Cannot alter a table with ALTER MV. Please use ALTER TABLE instead")
       }

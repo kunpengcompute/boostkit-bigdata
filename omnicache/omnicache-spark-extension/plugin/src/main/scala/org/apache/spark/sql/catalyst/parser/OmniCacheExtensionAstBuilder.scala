@@ -36,6 +36,11 @@ import org.apache.spark.sql.execution.command._
 class OmniCacheExtensionAstBuilder(spark: SparkSession, delegate: ParserInterface)
     extends OmniCacheSqlExtensionsBaseVisitor[AnyRef] with SQLConfHelper with Logging {
 
+  /**
+   * Parse CreateMVContext to OmniCacheCreateMvCommand
+   *
+   * @param ctx the parse tree
+   * */
   override def visitCreateMV(ctx: CreateMVContext): LogicalPlan = withOrigin(ctx) {
 
     val (identifier, ifNotExists) = visitCreateMVHeader(ctx.createMVHeader())
@@ -67,6 +72,11 @@ class OmniCacheExtensionAstBuilder(spark: SparkSession, delegate: ParserInterfac
       ifNotExists, partCols, logicalPlan, logicalPlan.output.map(_.name))
   }
 
+  /**
+   * Parse CreateMVHeaderContext to OmniCacheHeader
+   *
+   * @param ctx the parse tree
+   * */
   override def visitCreateMVHeader(ctx: CreateMVHeaderContext
   ): OmniCacheHeader = withOrigin(ctx) {
     val ifNotExists = ctx.EXISTS() != null
@@ -74,6 +84,11 @@ class OmniCacheExtensionAstBuilder(spark: SparkSession, delegate: ParserInterfac
     (multipartIdentifier, ifNotExists)
   }
 
+  /**
+   * Parse ShowMVsContext to ShowMaterializedViewCommand
+   *
+   * @param ctx the parse tree
+   * */
   override def visitShowMVs(ctx: ShowMVsContext): LogicalPlan = withOrigin(ctx) {
     val multiPart = Option(ctx.multipartIdentifier).map(visitMultipartIdentifier)
     if (multiPart.isDefined) {
@@ -89,6 +104,11 @@ class OmniCacheExtensionAstBuilder(spark: SparkSession, delegate: ParserInterfac
     }
   }
 
+  /**
+   * Parse DropMVContext to DropMaterializedViewCommand
+   *
+   * @param ctx the parse tree
+   * */
   override def visitDropMV(ctx: DropMVContext): LogicalPlan = withOrigin(ctx) {
     val multiPart = Option(ctx.multipartIdentifier).map(visitMultipartIdentifier)
     val ifExists = Option(ctx.EXISTS())
@@ -140,6 +160,11 @@ class OmniCacheExtensionAstBuilder(spark: SparkSession, delegate: ParserInterfac
     }
   }
 
+  /**
+   * Parse AlterRewriteMVContext to AlterRewriteMaterializedViewCommand
+   *
+   * @param ctx the parse tree
+   * */
   override def visitAlterRewriteMV(ctx: AlterRewriteMVContext): LogicalPlan = withOrigin(ctx) {
     val identifier = visitMultipartIdentifier(ctx.multipartIdentifier)
     val enableRewrite = Option(ctx.ENABLE()).isDefined

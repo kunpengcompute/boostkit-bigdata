@@ -133,7 +133,8 @@ class SqlParserSuite extends RewriteSuite {
         |  DISABLE REWRITE
         |  PARTITIONED BY (longtype,doubletype,datetype,stringtype)
         |AS
-        |SELECT c1.longtype,c1.doubletype,c1.datetype,c1.stringtype,count(1) as ct,min(c1.longtype) as _min FROM
+        |SELECT c1.longtype,c1.doubletype,c1.datetype,c1.stringtype,
+        |count(1) as ct,min(c1.longtype) as _min FROM
         |column_type c1
         |GROUP BY c1.longtype,c1.doubletype,c1.datetype,c1.stringtype
         |;
@@ -142,7 +143,8 @@ class SqlParserSuite extends RewriteSuite {
 
     val querySql =
       """
-        |SELECT c1.longtype,c1.doubletype,c1.datetype,c1.stringtype,count(1) as ct,min(c1.longtype) as _min FROM
+        |SELECT c1.longtype,c1.doubletype,c1.datetype,c1.stringtype,
+        |count(1) as ct,min(c1.longtype) as _min FROM
         |column_type c1
         |GROUP BY c1.longtype,c1.doubletype,c1.datetype,c1.stringtype
         |""".stripMargin

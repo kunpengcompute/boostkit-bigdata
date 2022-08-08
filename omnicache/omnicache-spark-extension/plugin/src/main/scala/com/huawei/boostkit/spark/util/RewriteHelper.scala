@@ -229,7 +229,7 @@ object RewriteHelper {
 }
 
 case class ExpressionEqual(expression: Expression) {
-
+  // like org.apache.spark.sql.catalyst.expressions.EquivalentExpressions.Expr
   lazy val realExpr: Expression = RewriteHelper.canonicalize(extractRealExpr(expression))
   lazy val sql: String = realExpr.sql
 
