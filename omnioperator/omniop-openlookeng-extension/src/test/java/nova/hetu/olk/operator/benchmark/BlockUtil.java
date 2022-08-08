@@ -19,6 +19,7 @@ import io.airlift.slice.Slice;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.block.DictionaryBlock;
+import io.prestosql.spi.type.CharType;
 import io.prestosql.spi.type.DecimalType;
 import io.prestosql.spi.type.VarcharType;
 
@@ -54,6 +55,17 @@ public final class BlockUtil
         return builder.build();
     }
 
+    public static Block createStringSequenceBlock(int start, int end, CharType type)
+    {
+        BlockBuilder builder = type.createBlockBuilder(null, 100);
+
+        for (int i = start; i < end; i++) {
+            type.writeString(builder, String.valueOf(i));
+        }
+
+        return builder.build();
+    }
+
     public static Block createIntegerSequenceBlock(int start, int end)
     {
         BlockBuilder builder = INTEGER.createFixedSizeBlockBuilder(end - start);
@@ -66,6 +78,22 @@ public final class BlockUtil
     }
 
     public static Block createStringDictionaryBlock(int start, int length, VarcharType type)
+    {
+        checkArgument(length > 5, "block must have more than 5 entries");
+
+        int dictionarySize = length / 5;
+        BlockBuilder builder = type.createBlockBuilder(null, dictionarySize);
+        for (int i = start; i < start + dictionarySize; i++) {
+            type.writeString(builder, String.valueOf(i));
+        }
+        int[] ids = new int[length];
+        for (int i = 0; i < length; i++) {
+            ids[i] = i % dictionarySize;
+        }
+        return new DictionaryBlock(builder.build(), ids);
+    }
+
+    public static Block createStringDictionaryBlock(int start, int length, CharType type)
     {
         checkArgument(length > 5, "block must have more than 5 entries");
 
@@ -120,7 +148,7 @@ public final class BlockUtil
         int dictionarySize = length / 5;
         BlockBuilder builder = REAL.createBlockBuilder(null, dictionarySize);
         for (int i = start; i < start + dictionarySize; i++) {
-            REAL.writeLong(builder, i);
+            REAL.writeLong(builder, floatToRawIntBits((float) i));
         }
         int[] ids = new int[length];
         for (int i = 0; i < length; i++) {
@@ -434,7 +462,7 @@ public final class BlockUtil
         String str = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
         StringBuilder stringBuilder = new StringBuilder();
         for (int j = 0; j < width; j++) {
-            stringBuilder.append(str.charAt(index + offset + j) % str.length());
+            stringBuilder.append(str.charAt((index + offset + j) % str.length()));
         }
         return stringBuilder.toString();
     }

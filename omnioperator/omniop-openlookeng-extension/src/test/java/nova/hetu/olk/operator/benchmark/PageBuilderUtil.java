@@ -18,6 +18,7 @@ package nova.hetu.olk.operator.benchmark;
 import io.prestosql.block.BlockAssertions;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
+import io.prestosql.spi.type.CharType;
 import io.prestosql.spi.type.DecimalType;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.VarcharType;
@@ -67,6 +68,10 @@ public final class PageBuilderUtil
             else if (type instanceof VarcharType) {
                 blocks[i] = BlockUtil.createStringSequenceBlock(initialValue, initialValue + length,
                         (VarcharType) type);
+            }
+            else if (type instanceof CharType) {
+                blocks[i] = BlockUtil.createStringSequenceBlock(initialValue, initialValue + length,
+                        (CharType) type);
             }
             else if (type.equals(BOOLEAN)) {
                 blocks[i] = BlockAssertions.createBooleanSequenceBlock(initialValue, initialValue + length);
@@ -119,6 +124,10 @@ public final class PageBuilderUtil
             else if (type instanceof VarcharType) {
                 blocks[i] = BlockUtil.createStringDictionaryBlock(initialValue, initialValue + length,
                         (VarcharType) type);
+            }
+            else if (type instanceof CharType) {
+                blocks[i] = BlockUtil.createStringDictionaryBlock(initialValue, initialValue + length,
+                        (CharType) type);
             }
             else if (type.equals(BOOLEAN)) {
                 blocks[i] = BlockUtil.createBooleanDictionaryBlock(initialValue, initialValue + length);
