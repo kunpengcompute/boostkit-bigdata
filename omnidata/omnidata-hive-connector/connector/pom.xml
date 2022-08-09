@@ -5,7 +5,7 @@
     <parent>
         <artifactId>omnidata-hive-connector-root</artifactId>
         <groupId>org.apache.hive</groupId>
-        <version>1.3.0</version>
+        <version>1.4.0</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
@@ -22,7 +22,7 @@
         <hadoop.version>3.1.1</hadoop.version>
         <tez.version>0.10.0</tez.version>
         <dep.curator.version>2.12.0</dep.curator.version>
-        <dep.omnidata.server.version>1.3.0</dep.omnidata.server.version>
+        <dep.omnidata.server.version>1.4.0</dep.omnidata.server.version>
         <dep.hetu.version>1.6.1</dep.hetu.version>
         <dep.json.version>2.12.4</dep.json.version>
         <dep.guava.version>26.0-jre</dep.guava.version>
