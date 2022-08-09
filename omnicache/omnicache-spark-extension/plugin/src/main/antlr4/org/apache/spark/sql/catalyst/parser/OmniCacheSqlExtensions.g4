@@ -12,6 +12,7 @@
  * limitations under the License.
  *
  * This file is an adaptation of Presto's presto-parser/src/main/antlr4/com/facebook/presto/sql/parser/SqlBase.g4 grammar.
+ * This file is an adaptation of Spark's spark/sql/catalyst/src/main/antlr4/org/apache/spark/sql/parser/SqlBase.g4 grammar.
  */
 
 grammar OmniCacheSqlExtensions;
