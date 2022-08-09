@@ -145,7 +145,6 @@ class RewriteSuite extends SparkFunSuite with PredicateHelper {
         |);
         |""".stripMargin
     )
-    // TODO why TIMESTAMP '2022-01-01 01:01:01' is invalid
     spark.sql(
       """
         |INSERT INTO TABLE column_type VALUES(
