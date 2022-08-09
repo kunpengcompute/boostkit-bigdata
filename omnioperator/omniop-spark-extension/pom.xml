@@ -8,7 +8,7 @@
     <groupId>com.huawei.kunpeng</groupId>
     <artifactId>boostkit-omniop-spark-parent</artifactId>
     <packaging>pom</packaging>
-    <version>3.1.1-1.0.0</version>
+    <version>3.1.1-1.1.0</version>
 
     <name>BoostKit Spark Native Sql Engine Extension Parent Pom</name>
 
