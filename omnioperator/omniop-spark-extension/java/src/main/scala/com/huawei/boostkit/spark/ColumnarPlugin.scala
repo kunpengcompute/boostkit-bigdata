@@ -36,6 +36,7 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] {
   val enableColumnarFileScan: Boolean = columnarConf.enableColumnarFileScan
   val enableColumnarProject: Boolean = columnarConf.enableColumnarProject
   val enableColumnarFilter: Boolean = columnarConf.enableColumnarFilter
+  val enableColumnarExpand: Boolean = columnarConf.enableColumnarExpand
   val enableColumnarHashAgg: Boolean = columnarConf.enableColumnarHashAgg
   val enableTakeOrderedAndProject: Boolean = columnarConf.enableTakeOrderedAndProject &&
     columnarConf.enableColumnarShuffle
@@ -109,6 +110,10 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] {
       val child = replaceWithColumnarPlan(plan.child)
       logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
       ColumnarFilterExec(plan.condition, child)
+    case plan: ExpandExec if enableColumnarExpand =>
+      val child = replaceWithColumnarPlan(plan.child)
+      logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
+      ColumnarExpandExec(plan.projections, plan.output, child)
     case plan: HashAggregateExec if enableColumnarHashAgg =>
       val child = replaceWithColumnarPlan(plan.child)
       logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")

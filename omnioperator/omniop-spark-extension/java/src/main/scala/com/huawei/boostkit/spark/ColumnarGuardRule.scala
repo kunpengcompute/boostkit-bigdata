@@ -31,9 +31,11 @@ import org.apache.spark.sql.types.ColumnarBatchSupportUtil.checkColumnarBatchSup
 
 case class RowGuard(child: SparkPlan) extends SparkPlan {
   def output: Seq[Attribute] = child.output
+
   protected def doExecute(): RDD[InternalRow] = {
     throw new UnsupportedOperationException
   }
+
   def children: Seq[SparkPlan] = Seq(child)
 }
 
@@ -49,6 +51,7 @@ case class ColumnarGuardRule() extends Rule[SparkPlan] {
   val enableColumnarHashAgg: Boolean = columnarConf.enableColumnarHashAgg
   val enableColumnarProject: Boolean = columnarConf.enableColumnarProject
   val enableColumnarFilter: Boolean = columnarConf.enableColumnarFilter
+  val enableColumnarExpand: Boolean = columnarConf.enableColumnarExpand
   val enableColumnarBroadcastExchange: Boolean = columnarConf.enableColumnarBroadcastExchange &&
     columnarConf.enableColumnarBroadcastJoin
   val enableColumnarBroadcastJoin: Boolean = columnarConf.enableColumnarBroadcastJoin
@@ -81,7 +84,10 @@ case class ColumnarGuardRule() extends Rule[SparkPlan] {
           ColumnarProjectExec(plan.projectList, plan.child).buildCheck()
         case plan: FilterExec =>
           if (!enableColumnarFilter) return false
-           ColumnarFilterExec(plan.condition, plan.child).buildCheck()
+          ColumnarFilterExec(plan.condition, plan.child).buildCheck()
+        case plan: ExpandExec =>
+          if (!enableColumnarExpand) return false
+          ColumnarExpandExec(plan.projections, plan.output, plan.child).buildCheck()
         case plan: HashAggregateExec =>
           if (!enableColumnarHashAgg) return false
           new ColumnarHashAggregateExec(
@@ -165,7 +171,7 @@ case class ColumnarGuardRule() extends Rule[SparkPlan] {
         case plan: WindowExec =>
           if (!enableColumnarWindow) return false
           ColumnarWindowExec(plan.windowExpression, plan.partitionSpec,
-                                 plan.orderSpec, plan.child).buildCheck()
+            plan.orderSpec, plan.child).buildCheck()
         case plan: ShuffledHashJoinExec =>
           if (!enableShuffledHashJoin) return false
           ColumnarShuffledHashJoinExec(
@@ -181,19 +187,19 @@ case class ColumnarGuardRule() extends Rule[SparkPlan] {
           p
       }
     }
-      catch {
-        case e: UnsupportedOperationException =>
-          logDebug(s"[OPERATOR FALLBACK] ${e} ${plan.getClass} falls back to Spark operator")
-          return false
-        case r: RuntimeException =>
-          logDebug(s"[OPERATOR FALLBACK] ${r} ${plan.getClass} falls back to Spark operator")
-          return false
-        case t: Throwable =>
-          logDebug(s"[OPERATOR FALLBACK] ${t} ${plan.getClass} falls back to Spark operator")
-          return false
-      }
+    catch {
+      case e: UnsupportedOperationException =>
+        logDebug(s"[OPERATOR FALLBACK] ${e} ${plan.getClass} falls back to Spark operator")
+        return false
+      case r: RuntimeException =>
+        logDebug(s"[OPERATOR FALLBACK] ${r} ${plan.getClass} falls back to Spark operator")
+        return false
+      case t: Throwable =>
+        logDebug(s"[OPERATOR FALLBACK] ${t} ${plan.getClass} falls back to Spark operator")
+        return false
+    }
     true
-      }
+  }
 
   private def existsMultiCodegens(plan: SparkPlan, count: Int = 0): Boolean =
     plan match {
