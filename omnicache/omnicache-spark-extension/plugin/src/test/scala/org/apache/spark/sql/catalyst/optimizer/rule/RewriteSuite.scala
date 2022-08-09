@@ -18,6 +18,7 @@
 
 package org.apache.spark.sql.catalyst.optimizer.rule
 
+import java.io.File
 import java.util.Locale
 
 import org.apache.spark.SparkFunSuite
@@ -48,6 +49,16 @@ class RewriteSuite extends SparkFunSuite with PredicateHelper {
 
   override def beforeEach(): Unit = {
     enableCachePlugin()
+  }
+
+  def preDropTable(): Unit = {
+    if (File.separatorChar == '\\') {
+      return
+    }
+    spark.sql("DROP TABLE IF EXISTS locations").show()
+    spark.sql("DROP TABLE IF EXISTS depts").show()
+    spark.sql("DROP TABLE IF EXISTS emps").show()
+    spark.sql("DROP TABLE IF EXISTS column_type").show()
   }
 
   def preCreateTable(): Unit = {

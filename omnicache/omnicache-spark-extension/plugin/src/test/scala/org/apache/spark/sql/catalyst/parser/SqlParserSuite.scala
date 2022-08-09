@@ -17,6 +17,7 @@
 
 package org.apache.spark.sql.catalyst.parser
 
+import com.huawei.boostkit.spark.conf.OmniCachePluginConfig
 import com.huawei.boostkit.spark.conf.OmniCachePluginConfig._
 import com.huawei.boostkit.spark.util.ViewMetadata
 
@@ -392,18 +393,18 @@ class SqlParserSuite extends RewriteSuite {
   }
 
   test("mv_show4") {
-    val sql1 =
+    val sql =
       """
         |SELECT c1.*,e1.empname,d1.deptname FROM
         |emps e1 JOIN column_type c1 JOIN depts d1
         |ON e1.empid=c1.empid
         |AND c1.deptno=d1.deptno
-        |""".stripMargin.replaceAll("\n", "").trim
-    val sql2 =
-      """
-        |SELECT c1.*,e1.empname,d1.deptname FROM
-        |emps e1 J
-        |""".stripMargin.replaceAll("\n", "").trim
+        |""".stripMargin.replaceAll("^[\r\n]+", "")
+
+    val sql1 = sql.replaceAll("[\r\n]", "").trim
+    val sql2 = sql.substring(0, OmniCachePluginConfig.getConf.showMVQuerySqlLen)
+        .replaceAll("[\r\n]", "").trim
+
     assert {
       spark.sql(
         """
@@ -412,7 +413,7 @@ class SqlParserSuite extends RewriteSuite {
           |""".stripMargin
       ).collect()
           .map(r => Row(r.getString(0), r.getString(1), r.getString(2),
-            r.getString(4).replaceAll("\n", "").trim))
+            r.getString(4).replaceAll("[\r\n]", "").trim))
           .contains(Row("default", "mv_create_join1", "false", sql1))
     }
     assert {
@@ -423,7 +424,7 @@ class SqlParserSuite extends RewriteSuite {
           |""".stripMargin
       ).collect()
           .map(r => Row(r.getString(0), r.getString(1), r.getString(2),
-            r.getString(4).replaceAll("\n", "").trim))
+            r.getString(4).replaceAll("[\r\n]", "").trim))
           .contains(Row("default", "mv_create_join1", "false", sql2))
     }
   }

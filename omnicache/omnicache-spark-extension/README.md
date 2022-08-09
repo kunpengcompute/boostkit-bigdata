@@ -2,7 +2,7 @@
 
 A SQL Engine Extension for Spark SQL to support Materialized View
 
-## Introduction
+## introduction
 
 Experiments show that there are duplicate subqueries in batch query,and materialized view is a pre-computing and caching
 technology to reduce repeated calculation in batch query in database field.

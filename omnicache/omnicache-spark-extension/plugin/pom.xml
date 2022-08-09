@@ -217,6 +217,7 @@
                     <aggregate>true</aggregate>
                     <highlighting>true</highlighting>
                     <encoding>${project.build.sourceEncoding}</encoding>
+                    <skip>true</skip>
                 </configuration>
             </plugin>
         </plugins>
