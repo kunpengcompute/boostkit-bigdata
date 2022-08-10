@@ -95,7 +95,7 @@ object ViewMetadata extends RewriteHelper {
       viewToTablePlan.putIfAbsent(viewName, mappedViewTablePlan)
     } catch {
       case e: Throwable =>
-        logWarning(s"Failed to saveViewMetadataToMap. errmsg: ${e.getMessage}")
+        logDebug(s"Failed to saveViewMetadataToMap. errmsg: ${e.getMessage}")
         // reset preDatabase
         spark.sessionState.catalogManager.setCurrentNamespace(Array(preDatabase))
     }
@@ -159,7 +159,7 @@ object ViewMetadata extends RewriteHelper {
     } catch {
       // if db exists a table hive materialized view, will throw annalysis exception
       case e: Throwable =>
-        logWarning(s"Failed to listTables in $mvDataBase, errmsg: ${e.getMessage}")
+        logDebug(s"Failed to listTables in $mvDataBase, errmsg: ${e.getMessage}")
         Seq.empty[(TableIdentifier, CatalogTable)]
     }
   }
