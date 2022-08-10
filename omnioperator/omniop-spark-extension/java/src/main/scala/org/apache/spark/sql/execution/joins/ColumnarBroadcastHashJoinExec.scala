@@ -21,7 +21,7 @@ import com.huawei.boostkit.spark.ColumnarPluginConfig
 
 import java.util.concurrent.TimeUnit.NANOSECONDS
 import java.util.Optional
-import com.huawei.boostkit.spark.Constant.{IS_ENABLE_JIT, IS_SKIP_VERIFY_EXP}
+import com.huawei.boostkit.spark.Constant.IS_SKIP_VERIFY_EXP
 
 import scala.collection.mutable
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor
@@ -29,7 +29,7 @@ import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor.checkOmniJsonW
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil.transColBatchToOmniVecs
 import nova.hetu.omniruntime.`type`.DataType
 import nova.hetu.omniruntime.constants.JoinType.OMNI_JOIN_TYPE_INNER
-import nova.hetu.omniruntime.operator.config.OperatorConfig
+import nova.hetu.omniruntime.operator.config.{OperatorConfig, SpillConfig}
 import nova.hetu.omniruntime.operator.join.{OmniHashBuilderWithExprOperatorFactory, OmniLookupJoinWithExprOperatorFactory}
 import nova.hetu.omniruntime.vector.VecBatch
 import nova.hetu.omniruntime.vector.serialize.VecBatchSerializerFactory
@@ -290,7 +290,7 @@ case class ColumnarBroadcastHashJoinExec(
       }
       val startBuildCodegen = System.nanoTime()
       val buildOpFactory = new OmniHashBuilderWithExprOperatorFactory(buildTypes,
-        buildJoinColsExp, filter, 1, new OperatorConfig(IS_ENABLE_JIT, IS_SKIP_VERIFY_EXP))
+        buildJoinColsExp, filter, 1, new OperatorConfig(SpillConfig.NONE, IS_SKIP_VERIFY_EXP))
       val buildOp = buildOpFactory.createOperator()
       buildCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startBuildCodegen)
 
@@ -307,7 +307,7 @@ case class ColumnarBroadcastHashJoinExec(
       val startLookupCodegen = System.nanoTime()
       val lookupOpFactory = new OmniLookupJoinWithExprOperatorFactory(probeTypes, probeOutputCols,
         probeHashColsExp, buildOutputCols, buildOutputTypes, OMNI_JOIN_TYPE_INNER, buildOpFactory,
-        new OperatorConfig(IS_ENABLE_JIT, IS_SKIP_VERIFY_EXP))
+        new OperatorConfig(SpillConfig.NONE, IS_SKIP_VERIFY_EXP))
       val lookupOp = lookupOpFactory.createOperator()
       lookupCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startLookupCodegen)
 

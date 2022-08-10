@@ -46,10 +46,10 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved) {
         return JNI_ERR;
     }
 
-    illegal_access_exception_class = 
+    illegal_access_exception_class =
         CreateGlobalClassReference(env, "Ljava/lang/IllegalAccessException;");
 
-    split_result_class = 
+    split_result_class =
         CreateGlobalClassReference(env, "Lcom/huawei/boostkit/spark/vectorized/SplitResult;");
     split_result_constructor = GetMethodID(env, split_result_class, "<init>", "(JJJJJ[J)V");
 
@@ -86,13 +86,15 @@ Java_com_huawei_boostkit_spark_jni_SparkJniWrapper_nativeMake(
     DataTypes inputVecTypes = Deserialize(inputTypeCharPtr);
     const int32_t *inputVecTypeIds = inputVecTypes.GetIds();
     //
-    std::vector<DataType> inputDataTpyes =  inputVecTypes.Get();
+    std::vector<DataTypePtr> inputDataTpyes =  inputVecTypes.Get();
     int32_t size = inputDataTpyes.size();
     uint32_t *inputDataPrecisions = new uint32_t[size];
     uint32_t *inputDataScales = new uint32_t[size];
     for (int i = 0; i < size; ++i) {
-        inputDataPrecisions[i] = inputDataTpyes[i].GetPrecision();
-        inputDataScales[i] = inputDataTpyes[i].GetScale();
+        if(inputDataTpyes[i]->GetId() == OMNI_DECIMAL64 || inputDataTpyes[i]->GetId() == OMNI_DECIMAL128) {
+            inputDataScales[i] = std::dynamic_pointer_cast<DecimalDataType>(inputDataTpyes[i])->GetScale();
+            inputDataPrecisions[i] = std::dynamic_pointer_cast<DecimalDataType>(inputDataTpyes[i])->GetPrecision();               
+        }
     }
     inputDataTpyes.clear();
 
@@ -207,10 +209,10 @@ Java_com_huawei_boostkit_spark_jni_SparkJniWrapper_stop(
         split_result_class, split_result_constructor, splitter->TotalComputePidTime(),
         splitter->TotalWriteTime(),  splitter->TotalSpillTime(),
         splitter->TotalBytesWritten(),  splitter->TotalBytesSpilled(), partition_length_arr);
-    
+
     return split_result;
 }
-    
+
 JNIEXPORT void JNICALL
 Java_com_huawei_boostkit_spark_jni_SparkJniWrapper_close(
     JNIEnv* env, jobject, jlong splitter_id) {

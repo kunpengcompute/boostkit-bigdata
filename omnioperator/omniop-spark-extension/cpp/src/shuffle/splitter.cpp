@@ -765,8 +765,10 @@ int Splitter::protoSpillPartition(int32_t partition_id, std::unique_ptr<Buffered
             vt->set_typeid_(CastShuffleTypeIdToVecType(vector_batch_col_types_[indexSchema]));
             LogsDebug("precision[indexSchema %d]: %d ", indexSchema, input_col_types.inputDataPrecisions[indexSchema]);
             LogsDebug("scale[indexSchema %d]: %d ", indexSchema, input_col_types.inputDataScales[indexSchema]);
-            vt->set_precision(input_col_types.inputDataPrecisions[indexSchema]);
-            vt->set_scale(input_col_types.inputDataScales[indexSchema]);
+            if(vt->typeid_() == spark::VecType::VEC_TYPE_DECIMAL128 || vt->typeid_() == spark::VecType::VEC_TYPE_DECIMAL64){
+                vt->set_precision(input_col_types.inputDataPrecisions[indexSchema]);
+                vt->set_scale(input_col_types.inputDataScales[indexSchema]);
+            }
         }
         curBatch++;
 

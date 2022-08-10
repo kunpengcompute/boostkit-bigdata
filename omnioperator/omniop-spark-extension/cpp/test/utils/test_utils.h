@@ -24,6 +24,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <dirent.h>
+#include <type/data_types.h>
 #include "../../src/shuffle/splitter.h"
 #include "../../src/jni/concurrent_map.h"
 

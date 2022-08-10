@@ -22,7 +22,7 @@ import java.util.UUID
 import java.util.concurrent.TimeUnit.NANOSECONDS
 
 import com.huawei.boostkit.spark.ColumnarPluginConfig
-import com.huawei.boostkit.spark.Constant.{IS_ENABLE_JIT, IS_SKIP_VERIFY_EXP}
+import com.huawei.boostkit.spark.Constant.IS_SKIP_VERIFY_EXP
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil.{addAllAndGetIterator, genSortParam}
 import nova.hetu.omniruntime.operator.config.{OperatorConfig, SparkSpillConfig}
 import nova.hetu.omniruntime.operator.sort.OmniSortWithExprOperatorFactory
@@ -119,7 +119,7 @@ case class ColumnarSortExec(
         sortSpillDirDiskReserveSize, sortSpillRowThreshold)
       val startCodegen = System.nanoTime()
       val sortOperatorFactory = new OmniSortWithExprOperatorFactory(sourceTypes, outputCols,
-        sortColsExp, ascendings, nullFirsts, new OperatorConfig(IS_ENABLE_JIT, sparkSpillConf, IS_SKIP_VERIFY_EXP))
+        sortColsExp, ascendings, nullFirsts, new OperatorConfig(sparkSpillConf, IS_SKIP_VERIFY_EXP))
       val sortOperator = sortOperatorFactory.createOperator
       omniCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startCodegen)
       SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {

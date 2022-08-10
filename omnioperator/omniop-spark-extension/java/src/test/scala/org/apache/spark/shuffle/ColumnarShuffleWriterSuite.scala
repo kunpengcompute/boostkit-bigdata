@@ -78,10 +78,10 @@ class ColumnarShuffleWriterSuite extends SharedSparkSession {
     shuffleHandle =
       new ColumnarShuffleHandle[Int, ColumnarBatch](shuffleId = 0, dependency = dependency)
 
-    val inputTypes = "[{\"id\":\"OMNI_INT\",\"width\":0,\"precision\":0,\"scale\":0,\"dateUnit\":\"DAY\",\"timeUnit\":\"SEC\"}," +
-                      "{\"id\":\"OMNI_INT\",\"width\":0,\"precision\":0,\"scale\":0,\"dateUnit\":\"DAY\",\"timeUnit\":\"SEC\"}," +
-                      "{\"id\":\"OMNI_DECIMAL64\",\"width\":0,\"precision\":18,\"scale\":3,\"dateUnit\":\"DAY\",\"timeUnit\":\"SEC\"}," +
-                      "{\"id\":\"OMNI_DECIMAL128\",\"width\":0,\"precision\":28,\"scale\":11,\"dateUnit\":\"DAY\",\"timeUnit\":\"SEC\"}]"
+    val inputTypes = "[{\"id\":1}," +
+                      "{\"id\":1}," +
+                      "{\"id\":6,\"precision\":18,\"scale\":3}," +
+                      "{\"id\":7,\"precision\":28,\"scale\":11}]"
 
     when(dependency.partitioner).thenReturn(new HashPartitioner(numPartitions))
     when(dependency.serializer).thenReturn(new JavaSerializer(sparkConf))
