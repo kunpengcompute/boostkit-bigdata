@@ -19,10 +19,10 @@
 package org.apache.spark.sql.execution
 
 import java.util.concurrent.TimeUnit.NANOSECONDS
-import com.huawei.boostkit.spark.Constant.{IS_ENABLE_JIT, IS_SKIP_VERIFY_EXP}
+import com.huawei.boostkit.spark.Constant.IS_SKIP_VERIFY_EXP
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil.transColBatchToOmniVecs
 import nova.hetu.omniruntime.`type`.DataType
-import nova.hetu.omniruntime.operator.config.OperatorConfig
+import nova.hetu.omniruntime.operator.config.{OperatorConfig, SpillConfig}
 import nova.hetu.omniruntime.operator.project.OmniProjectOperatorFactory
 import nova.hetu.omniruntime.vector.VecBatch
 import org.apache.spark.sql.execution.metric.SQLMetric
@@ -42,7 +42,7 @@ object ColumnarProjection {
                         omniExpressions: Array[String], iter: Iterator[ColumnarBatch],
                         schema: StructType): Iterator[ColumnarBatch] = {
     val startCodegen = System.nanoTime()
-    val projectOperatorFactory = new OmniProjectOperatorFactory(omniExpressions, omniInputTypes, 1, new OperatorConfig(IS_ENABLE_JIT, IS_SKIP_VERIFY_EXP))
+    val projectOperatorFactory = new OmniProjectOperatorFactory(omniExpressions, omniInputTypes, 1, new OperatorConfig(SpillConfig.NONE, IS_SKIP_VERIFY_EXP))
     val projectOperator = projectOperatorFactory.createOperator
     omniCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startCodegen)
     // close operator

@@ -21,17 +21,17 @@
 
 using namespace omniruntime::vec;
 
-void ToVectorTypes(const int32_t *dataTypeIds, int32_t dataTypeCount, std::vector<DataType> &dataTypes)
+void ToVectorTypes(const int32_t *dataTypeIds, int32_t dataTypeCount, std::vector<DataTypePtr> &dataTypes)
 {
     for (int i = 0; i < dataTypeCount; ++i) {
         if (dataTypeIds[i] == OMNI_VARCHAR) {
-            dataTypes.push_back(VarcharDataType(50));
+            dataTypes.push_back(std::make_shared<VarcharDataType>(50));
             continue;
         } else if (dataTypeIds[i] == OMNI_CHAR) {
-            dataTypes.push_back(CharDataType(50));
+            dataTypes.push_back(std::make_shared<CharDataType>(50));
             continue;
         }
-        dataTypes.push_back(DataType(dataTypeIds[i]));
+        dataTypes.push_back(std::make_shared<DataType>(dataTypeIds[i]));
     }
 }
 
@@ -41,7 +41,7 @@ VectorBatch* CreateInputData(const int32_t numRows,
                               int64_t* allData) 
 {
     auto *vecBatch = new VectorBatch(numCols, numRows);
-    vector<omniruntime::vec::DataType> inputTypes;
+    vector<omniruntime::vec::DataTypePtr> inputTypes;
     ToVectorTypes(inputTypeIds, numCols, inputTypes);
     vecBatch->NewVectors(omniruntime::vec::GetProcessGlobalVecAllocator(), inputTypes);
     for (int i = 0; i < numCols; ++i) {
@@ -123,13 +123,13 @@ Vector *CreateVector(DataType &vecType, int32_t rowCount, va_list &args)
     }
 }
 
-DictionaryVector *CreateDictionaryVector(DataType &vecType, int32_t rowCount, int32_t *ids, int32_t idsCount, ...)
+DictionaryVector *CreateDictionaryVector(DataType &dataType, int32_t rowCount, int32_t *ids, int32_t idsCount, ...)
 {
     va_list args;
     va_start(args, idsCount);
-    Vector *dictionary = CreateVector(vecType, rowCount, args);
+    Vector *dictionary = CreateVector(dataType, rowCount, args);
     va_end(args);
-    auto vec = std::make_unique<DictionaryVector>(dictionary, ids, idsCount).release();
+    auto vec = new DictionaryVector(dictionary, ids, idsCount);
     delete dictionary;
     return vec;
 }
@@ -199,15 +199,15 @@ Vector *buildVector(const DataType &aggType, int32_t rowNumber)
     }
 }
 
-VectorBatch *CreateVectorBatch(DataTypes &types, int32_t rowCount, ...)
+VectorBatch *CreateVectorBatch(const DataTypes &types, int32_t rowCount, ...)
 {
     int32_t typesCount = types.GetSize();
-    VectorBatch *vectorBatch = std::make_unique<VectorBatch>(typesCount).release();
+    auto *vectorBatch = new VectorBatch(typesCount, rowCount);
     va_list args;
     va_start(args, rowCount);
     for (int32_t i = 0; i < typesCount; i++) {
-        DataType type = types.Get()[i];
-        vectorBatch->SetVector(i, CreateVector(type, rowCount, args));
+        DataTypePtr type = types.GetType(i);
+        vectorBatch->SetVector(i, CreateVector(*type, rowCount, args));
     }
     va_end(args);
     return vectorBatch;
@@ -502,7 +502,7 @@ VectorBatch* CreateVectorBatch_2dictionaryCols_withPid(int partitionNum) {
     int32_t data0[dataSize] = {111, 112, 113, 114, 115, 116};
     int64_t data1[dataSize] = {221, 222, 223, 224, 225, 226};
     void *datas[2] = {data0, data1};
-    DataTypes sourceTypes(std::vector<omniruntime::vec::DataType>({ IntDataType(), LongDataType()}));
+    DataTypes sourceTypes(std::vector<omniruntime::vec::DataTypePtr>({ std::make_unique<IntDataType>(), std::make_unique<LongDataType>()}));
     int32_t ids[] = {0, 1, 2, 3, 4, 5};
     VectorBatch *vectorBatch = new VectorBatch(3, dataSize);
     VectorAllocator *allocator = omniruntime::vec::GetProcessGlobalVecAllocator();
@@ -514,7 +514,7 @@ VectorBatch* CreateVectorBatch_2dictionaryCols_withPid(int partitionNum) {
         if (i == 0) {
             vectorBatch->SetVector(i, intVectorTmp);
         } else {
-            omniruntime::vec::DataType dataType = sourceTypes.Get()[i - 1];
+            omniruntime::vec::DataType dataType = *(sourceTypes.Get()[i - 1]);
             vectorBatch->SetVector(i, CreateDictionaryVector(dataType, dataSize, ids, dataSize, datas[i - 1]));
         }
     }

@@ -1,9 +1,9 @@
 package org.apache.spark.sql.execution
 
-import com.huawei.boostkit.spark.Constant.{IS_ENABLE_JIT, IS_SKIP_VERIFY_EXP}
+import com.huawei.boostkit.spark.Constant.IS_SKIP_VERIFY_EXP
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor.{checkOmniJsonWhiteList, getExprIdMap, rewriteToOmniJsonExpressionLiteral, sparkTypeToOmniType}
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil.transColBatchToOmniVecs
-import nova.hetu.omniruntime.operator.config.OperatorConfig
+import nova.hetu.omniruntime.operator.config.{OperatorConfig, SpillConfig}
 import nova.hetu.omniruntime.operator.project.OmniProjectOperatorFactory
 import nova.hetu.omniruntime.vector.{LongVec, Vec, VecBatch}
 import org.apache.spark.rdd.RDD
@@ -80,7 +80,7 @@ case class ColumnarExpandExec(
     child.executeColumnar().mapPartitionsWithIndexInternal { (index, iter) =>
       val startCodegen = System.nanoTime()
       var projectOperators = omniExpressions.map(exps => {
-        val factory = new OmniProjectOperatorFactory(exps, omniInputTypes, 1, new OperatorConfig(IS_ENABLE_JIT, IS_SKIP_VERIFY_EXP))
+        val factory = new OmniProjectOperatorFactory(exps, omniInputTypes, 1, new OperatorConfig(SpillConfig.NONE, IS_SKIP_VERIFY_EXP))
         factory.createOperator
       })
       omniCodegenTimeMetric += NANOSECONDS.toMillis(System.nanoTime() - startCodegen)

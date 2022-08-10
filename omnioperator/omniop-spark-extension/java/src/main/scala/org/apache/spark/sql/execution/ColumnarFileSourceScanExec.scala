@@ -19,7 +19,7 @@ package org.apache.spark.sql.execution
 
 import java.util.Optional
 import java.util.concurrent.TimeUnit.NANOSECONDS
-import com.huawei.boostkit.spark.Constant.{IS_ENABLE_JIT, IS_SKIP_VERIFY_EXP}
+import com.huawei.boostkit.spark.Constant.IS_SKIP_VERIFY_EXP
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor
 
 import scala.collection.mutable.HashMap
@@ -32,7 +32,7 @@ import nova.hetu.omniruntime.vector.{Vec, VecBatch}
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor._
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil._
 import nova.hetu.omniruntime.constants.JoinType.OMNI_JOIN_TYPE_INNER
-import nova.hetu.omniruntime.operator.config.OperatorConfig
+import nova.hetu.omniruntime.operator.config.{OperatorConfig, SpillConfig}
 import nova.hetu.omniruntime.operator.join.{OmniHashBuilderWithExprOperatorFactory, OmniLookupJoinWithExprOperatorFactory}
 import nova.hetu.omniruntime.operator.project.OmniProjectOperatorFactory
 import nova.hetu.omniruntime.vector.serialize.VecBatchSerializerFactory
@@ -833,14 +833,14 @@ case class ColumnarMultipleOperatorExec(
         omniAggOutputTypes,
         omniAggInputRaw,
         omniAggOutputPartial,
-        new OperatorConfig(IS_ENABLE_JIT, IS_SKIP_VERIFY_EXP))
+        new OperatorConfig(SpillConfig.NONE, IS_SKIP_VERIFY_EXP))
       val aggOperator = aggFactory.createOperator
       omniCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startCodegen)
       SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
         aggOperator.close()
       })
 
-      val projectOperatorFactory1 = new OmniProjectOperatorFactory(proj1OmniExpressions, proj1OmniInputTypes, 1, new OperatorConfig(IS_ENABLE_JIT, IS_SKIP_VERIFY_EXP))
+      val projectOperatorFactory1 = new OmniProjectOperatorFactory(proj1OmniExpressions, proj1OmniInputTypes, 1, new OperatorConfig(SpillConfig.NONE, IS_SKIP_VERIFY_EXP))
       val projectOperator1 = projectOperatorFactory1.createOperator
       // close operator
       addLeakSafeTaskCompletionListener[Unit](_ => {
@@ -849,7 +849,7 @@ case class ColumnarMultipleOperatorExec(
 
       val buildOpFactory1 = new OmniHashBuilderWithExprOperatorFactory(buildTypes1,
         buildJoinColsExp1, if (joinFilter1.nonEmpty) {Optional.of(joinFilter1.get)} else {Optional.empty()}, 1,
-        new OperatorConfig(IS_ENABLE_JIT, IS_SKIP_VERIFY_EXP))
+        new OperatorConfig(SpillConfig.NONE, IS_SKIP_VERIFY_EXP))
       val buildOp1 = buildOpFactory1.createOperator()
       buildData1.value.foreach { input =>
         buildOp1.addInput(deserializer.deserialize(input))
@@ -857,7 +857,7 @@ case class ColumnarMultipleOperatorExec(
       buildOp1.getOutput
       val lookupOpFactory1 = new OmniLookupJoinWithExprOperatorFactory(probeTypes1, probeOutputCols1,
         probeHashColsExp1, buildOutputCols1, buildOutputTypes1, OMNI_JOIN_TYPE_INNER, buildOpFactory1,
-        new OperatorConfig(IS_ENABLE_JIT, IS_SKIP_VERIFY_EXP))
+        new OperatorConfig(SpillConfig.NONE, IS_SKIP_VERIFY_EXP))
       val lookupOp1 = lookupOpFactory1.createOperator()
       // close operator
       SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit]( _ => {
@@ -867,7 +867,7 @@ case class ColumnarMultipleOperatorExec(
         lookupOpFactory1.close()
       })
 
-      val projectOperatorFactory2 = new OmniProjectOperatorFactory(proj2OmniExpressions, proj2OmniInputTypes, 1, new OperatorConfig(IS_ENABLE_JIT, IS_SKIP_VERIFY_EXP))
+      val projectOperatorFactory2 = new OmniProjectOperatorFactory(proj2OmniExpressions, proj2OmniInputTypes, 1, new OperatorConfig(SpillConfig.NONE, IS_SKIP_VERIFY_EXP))
       val projectOperator2 = projectOperatorFactory2.createOperator
       // close operator
       addLeakSafeTaskCompletionListener[Unit](_ => {
@@ -876,7 +876,7 @@ case class ColumnarMultipleOperatorExec(
 
       val buildOpFactory2 = new OmniHashBuilderWithExprOperatorFactory(buildTypes2,
         buildJoinColsExp2, if (joinFilter2.nonEmpty) {Optional.of(joinFilter2.get)} else {Optional.empty()}, 1,
-        new OperatorConfig(IS_ENABLE_JIT, IS_SKIP_VERIFY_EXP))
+        new OperatorConfig(SpillConfig.NONE, IS_SKIP_VERIFY_EXP))
       val buildOp2 = buildOpFactory2.createOperator()
       buildData2.value.foreach { input =>
         buildOp2.addInput(deserializer.deserialize(input))
@@ -884,7 +884,7 @@ case class ColumnarMultipleOperatorExec(
       buildOp2.getOutput
       val lookupOpFactory2 = new OmniLookupJoinWithExprOperatorFactory(probeTypes2, probeOutputCols2,
         probeHashColsExp2, buildOutputCols2, buildOutputTypes2, OMNI_JOIN_TYPE_INNER, buildOpFactory2,
-        new OperatorConfig(IS_ENABLE_JIT, IS_SKIP_VERIFY_EXP))
+        new OperatorConfig(SpillConfig.NONE, IS_SKIP_VERIFY_EXP))
       val lookupOp2 = lookupOpFactory2.createOperator()
       // close operator
       SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit]( _ => {
@@ -894,7 +894,7 @@ case class ColumnarMultipleOperatorExec(
         lookupOpFactory2.close()
       })
 
-      val projectOperatorFactory3 = new OmniProjectOperatorFactory(proj3OmniExpressions, proj3OmniInputTypes, 1, new OperatorConfig(IS_ENABLE_JIT, IS_SKIP_VERIFY_EXP))
+      val projectOperatorFactory3 = new OmniProjectOperatorFactory(proj3OmniExpressions, proj3OmniInputTypes, 1, new OperatorConfig(SpillConfig.NONE, IS_SKIP_VERIFY_EXP))
       val projectOperator3 = projectOperatorFactory3.createOperator
       // close operator
       addLeakSafeTaskCompletionListener[Unit](_ => {
@@ -903,7 +903,7 @@ case class ColumnarMultipleOperatorExec(
 
       val buildOpFactory3 = new OmniHashBuilderWithExprOperatorFactory(buildTypes3,
         buildJoinColsExp3, if (joinFilter3.nonEmpty) {Optional.of(joinFilter3.get)} else {Optional.empty()}, 1,
-        new OperatorConfig(IS_ENABLE_JIT, IS_SKIP_VERIFY_EXP))
+        new OperatorConfig(SpillConfig.NONE, IS_SKIP_VERIFY_EXP))
       val buildOp3 = buildOpFactory3.createOperator()
       buildData3.value.foreach { input =>
         buildOp3.addInput(deserializer.deserialize(input))
@@ -911,7 +911,7 @@ case class ColumnarMultipleOperatorExec(
       buildOp3.getOutput
       val lookupOpFactory3 = new OmniLookupJoinWithExprOperatorFactory(probeTypes3, probeOutputCols3,
         probeHashColsExp3, buildOutputCols3, buildOutputTypes3, OMNI_JOIN_TYPE_INNER, buildOpFactory3,
-        new OperatorConfig(IS_ENABLE_JIT, IS_SKIP_VERIFY_EXP))
+        new OperatorConfig(SpillConfig.NONE, IS_SKIP_VERIFY_EXP))
       val lookupOp3 = lookupOpFactory3.createOperator()
       // close operator
       SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit]( _ => {
@@ -921,7 +921,7 @@ case class ColumnarMultipleOperatorExec(
         lookupOpFactory3.close()
       })
 
-      val projectOperatorFactory4 = new OmniProjectOperatorFactory(proj4OmniExpressions, proj4OmniInputTypes, 1, new OperatorConfig(IS_ENABLE_JIT, IS_SKIP_VERIFY_EXP))
+      val projectOperatorFactory4 = new OmniProjectOperatorFactory(proj4OmniExpressions, proj4OmniInputTypes, 1, new OperatorConfig(SpillConfig.NONE, IS_SKIP_VERIFY_EXP))
       val projectOperator4 = projectOperatorFactory4.createOperator
       // close operator
       addLeakSafeTaskCompletionListener[Unit](_ => {
@@ -930,7 +930,7 @@ case class ColumnarMultipleOperatorExec(
 
       val buildOpFactory4 = new OmniHashBuilderWithExprOperatorFactory(buildTypes4,
         buildJoinColsExp4, if (joinFilter4.nonEmpty) {Optional.of(joinFilter4.get)} else {Optional.empty()}, 1,
-        new OperatorConfig(IS_ENABLE_JIT, IS_SKIP_VERIFY_EXP))
+        new OperatorConfig(SpillConfig.NONE, IS_SKIP_VERIFY_EXP))
       val buildOp4 = buildOpFactory4.createOperator()
       buildData4.value.foreach { input =>
         buildOp4.addInput(deserializer.deserialize(input))
@@ -938,7 +938,7 @@ case class ColumnarMultipleOperatorExec(
       buildOp4.getOutput
       val lookupOpFactory4 = new OmniLookupJoinWithExprOperatorFactory(probeTypes4, probeOutputCols4,
         probeHashColsExp4, buildOutputCols4, buildOutputTypes4, OMNI_JOIN_TYPE_INNER, buildOpFactory4,
-        new OperatorConfig(IS_ENABLE_JIT, IS_SKIP_VERIFY_EXP))
+        new OperatorConfig(SpillConfig.NONE, IS_SKIP_VERIFY_EXP))
       val lookupOp4 = lookupOpFactory4.createOperator()
       // close operator
       SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit]( _ => {
@@ -949,7 +949,7 @@ case class ColumnarMultipleOperatorExec(
       })
 
       val condOperatorFactory = new OmniFilterAndProjectOperatorFactory(
-        conditionExpression, omniCondInputTypes, seqAsJavaList(omniCondExpressions), 1, new OperatorConfig(IS_ENABLE_JIT, IS_SKIP_VERIFY_EXP))
+        conditionExpression, omniCondInputTypes, seqAsJavaList(omniCondExpressions), 1, new OperatorConfig(SpillConfig.NONE, IS_SKIP_VERIFY_EXP))
       val condOperator = condOperatorFactory.createOperator
       omniCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startCodegen)
       // close operator
@@ -1168,14 +1168,14 @@ case class ColumnarMultipleOperatorExec1(
         omniAggOutputTypes,
         omniAggInputRaw,
         omniAggOutputPartial,
-        new OperatorConfig(IS_ENABLE_JIT, IS_SKIP_VERIFY_EXP))
+        new OperatorConfig(SpillConfig.NONE, IS_SKIP_VERIFY_EXP))
       val aggOperator = aggFactory.createOperator
       omniCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startCodegen)
       SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
         aggOperator.close()
       })
 
-      val projectOperatorFactory1 = new OmniProjectOperatorFactory(proj1OmniExpressions, proj1OmniInputTypes, 1, new OperatorConfig(IS_ENABLE_JIT, IS_SKIP_VERIFY_EXP))
+      val projectOperatorFactory1 = new OmniProjectOperatorFactory(proj1OmniExpressions, proj1OmniInputTypes, 1, new OperatorConfig(SpillConfig.NONE, IS_SKIP_VERIFY_EXP))
       val projectOperator1 = projectOperatorFactory1.createOperator
       // close operator
       addLeakSafeTaskCompletionListener[Unit](_ => {
@@ -1184,7 +1184,7 @@ case class ColumnarMultipleOperatorExec1(
 
       val buildOpFactory1 = new OmniHashBuilderWithExprOperatorFactory(buildTypes1,
         buildJoinColsExp1, if (joinFilter1.nonEmpty) {Optional.of(joinFilter1.get)} else {Optional.empty()}, 1,
-        new OperatorConfig(IS_ENABLE_JIT, IS_SKIP_VERIFY_EXP))
+        new OperatorConfig(SpillConfig.NONE, IS_SKIP_VERIFY_EXP))
       val buildOp1 = buildOpFactory1.createOperator()
       buildData1.value.foreach { input =>
         buildOp1.addInput(deserializer.deserialize(input))
@@ -1192,7 +1192,7 @@ case class ColumnarMultipleOperatorExec1(
       buildOp1.getOutput
       val lookupOpFactory1 = new OmniLookupJoinWithExprOperatorFactory(probeTypes1, probeOutputCols1,
         probeHashColsExp1, buildOutputCols1, buildOutputTypes1, OMNI_JOIN_TYPE_INNER, buildOpFactory1,
-        new OperatorConfig(IS_ENABLE_JIT, IS_SKIP_VERIFY_EXP))
+        new OperatorConfig(SpillConfig.NONE, IS_SKIP_VERIFY_EXP))
       val lookupOp1 = lookupOpFactory1.createOperator()
       // close operator
       SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit]( _ => {
@@ -1202,7 +1202,7 @@ case class ColumnarMultipleOperatorExec1(
         lookupOpFactory1.close()
       })
 
-      val projectOperatorFactory2 = new OmniProjectOperatorFactory(proj2OmniExpressions, proj2OmniInputTypes, 1, new OperatorConfig(IS_ENABLE_JIT, IS_SKIP_VERIFY_EXP))
+      val projectOperatorFactory2 = new OmniProjectOperatorFactory(proj2OmniExpressions, proj2OmniInputTypes, 1, new OperatorConfig(SpillConfig.NONE, IS_SKIP_VERIFY_EXP))
       val projectOperator2 = projectOperatorFactory2.createOperator
       // close operator
       addLeakSafeTaskCompletionListener[Unit](_ => {
@@ -1211,7 +1211,7 @@ case class ColumnarMultipleOperatorExec1(
 
       val buildOpFactory2 = new OmniHashBuilderWithExprOperatorFactory(buildTypes2,
         buildJoinColsExp2, if (joinFilter2.nonEmpty) {Optional.of(joinFilter2.get)} else {Optional.empty()}, 1,
-        new OperatorConfig(IS_ENABLE_JIT, IS_SKIP_VERIFY_EXP))
+        new OperatorConfig(SpillConfig.NONE, IS_SKIP_VERIFY_EXP))
       val buildOp2 = buildOpFactory2.createOperator()
       buildData2.value.foreach { input =>
         buildOp2.addInput(deserializer.deserialize(input))
@@ -1219,7 +1219,7 @@ case class ColumnarMultipleOperatorExec1(
       buildOp2.getOutput
       val lookupOpFactory2 = new OmniLookupJoinWithExprOperatorFactory(probeTypes2, probeOutputCols2,
         probeHashColsExp2, buildOutputCols2, buildOutputTypes2, OMNI_JOIN_TYPE_INNER, buildOpFactory2,
-        new OperatorConfig(IS_ENABLE_JIT, IS_SKIP_VERIFY_EXP))
+        new OperatorConfig(SpillConfig.NONE, IS_SKIP_VERIFY_EXP))
       val lookupOp2 = lookupOpFactory2.createOperator()
       // close operator
       SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit]( _ => {
@@ -1229,7 +1229,7 @@ case class ColumnarMultipleOperatorExec1(
         lookupOpFactory2.close()
       })
 
-      val projectOperatorFactory3 = new OmniProjectOperatorFactory(proj3OmniExpressions, proj3OmniInputTypes, 1, new OperatorConfig(IS_ENABLE_JIT, IS_SKIP_VERIFY_EXP))
+      val projectOperatorFactory3 = new OmniProjectOperatorFactory(proj3OmniExpressions, proj3OmniInputTypes, 1, new OperatorConfig(SpillConfig.NONE, IS_SKIP_VERIFY_EXP))
       val projectOperator3 = projectOperatorFactory3.createOperator
       // close operator
       addLeakSafeTaskCompletionListener[Unit](_ => {
@@ -1238,7 +1238,7 @@ case class ColumnarMultipleOperatorExec1(
 
       val buildOpFactory3 = new OmniHashBuilderWithExprOperatorFactory(buildTypes3,
         buildJoinColsExp3, if (joinFilter3.nonEmpty) {Optional.of(joinFilter3.get)} else {Optional.empty()}, 1,
-        new OperatorConfig(IS_ENABLE_JIT, IS_SKIP_VERIFY_EXP))
+        new OperatorConfig(SpillConfig.NONE, IS_SKIP_VERIFY_EXP))
       val buildOp3 = buildOpFactory3.createOperator()
       buildData3.value.foreach { input =>
         buildOp3.addInput(deserializer.deserialize(input))
@@ -1246,7 +1246,7 @@ case class ColumnarMultipleOperatorExec1(
       buildOp3.getOutput
       val lookupOpFactory3 = new OmniLookupJoinWithExprOperatorFactory(probeTypes3, probeOutputCols3,
         probeHashColsExp3, buildOutputCols3, buildOutputTypes3, OMNI_JOIN_TYPE_INNER, buildOpFactory3,
-        new OperatorConfig(IS_ENABLE_JIT, IS_SKIP_VERIFY_EXP))
+        new OperatorConfig(SpillConfig.NONE, IS_SKIP_VERIFY_EXP))
       val lookupOp3 = lookupOpFactory3.createOperator()
       // close operator
       SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit]( _ => {
@@ -1257,7 +1257,7 @@ case class ColumnarMultipleOperatorExec1(
       })
 
       val condOperatorFactory = new OmniFilterAndProjectOperatorFactory(
-        conditionExpression, omniCondInputTypes, seqAsJavaList(omniCondExpressions), 1, new OperatorConfig(IS_ENABLE_JIT, IS_SKIP_VERIFY_EXP))
+        conditionExpression, omniCondInputTypes, seqAsJavaList(omniCondExpressions), 1, new OperatorConfig(SpillConfig.NONE, IS_SKIP_VERIFY_EXP))
       val condOperator = condOperatorFactory.createOperator
       omniCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startCodegen)
       // close operator

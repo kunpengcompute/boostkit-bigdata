@@ -19,12 +19,12 @@ package org.apache.spark.sql.execution
 
 import java.util.concurrent.TimeUnit.NANOSECONDS
 
-import com.huawei.boostkit.spark.Constant.{IS_ENABLE_JIT, IS_SKIP_VERIFY_EXP}
+import com.huawei.boostkit.spark.Constant.IS_SKIP_VERIFY_EXP
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor._
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil.transColBatchToOmniVecs
 import nova.hetu.omniruntime.`type`.DataType
 import nova.hetu.omniruntime.constants.{FunctionType, OmniWindowFrameBoundType, OmniWindowFrameType}
-import nova.hetu.omniruntime.operator.config.OperatorConfig
+import nova.hetu.omniruntime.operator.config.{OperatorConfig, SpillConfig}
 import nova.hetu.omniruntime.operator.window.OmniWindowWithExprOperatorFactory
 import nova.hetu.omniruntime.vector.VecBatch
 import org.apache.spark.rdd.RDD
@@ -343,7 +343,7 @@ case class ColumnarWindowExec(windowExpression: Seq[NamedExpression],
         windowFunType, omminPartitionChannels, preGroupedChannels, sortCols, ascendings,
         nullFirsts, 0, 10000, windowArgKeys, windowFunRetType,
         windowFrameTypes, windowFrameStartTypes, windowFrameStartChannels, windowFrameEndTypes,
-        windowFrameEndChannels, new OperatorConfig(IS_ENABLE_JIT, IS_SKIP_VERIFY_EXP))
+        windowFrameEndChannels, new OperatorConfig(SpillConfig.NONE, IS_SKIP_VERIFY_EXP))
       val windowOperator = windowOperatorFactory.createOperator
       omniCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startCodegen)
 
