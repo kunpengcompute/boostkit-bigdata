@@ -45,8 +45,8 @@ target_link_libraries (${PROJ_TARGET} PUBLIC
         snappy
         lz4
         zstd
-        boostkit-omniop-runtime-1.0.0-aarch64
-        boostkit-omniop-vector-1.0.0-aarch64
+        boostkit-omniop-runtime-1.1.0-aarch64
+        boostkit-omniop-vector-1.1.0-aarch64
         )
 
 set_target_properties(${PROJ_TARGET} PROPERTIES

@@ -31,8 +31,8 @@ target_link_libraries(${TP_TEST_TARGET}
         pthread
         stdc++
         dl
-        boostkit-omniop-runtime-1.0.0-aarch64
-        boostkit-omniop-vector-1.0.0-aarch64
+        boostkit-omniop-runtime-1.1.0-aarch64
+        boostkit-omniop-vector-1.1.0-aarch64
         securec
         spark_columnar_plugin)
 
