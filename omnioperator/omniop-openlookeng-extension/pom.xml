@@ -21,7 +21,7 @@
         <dep.prestosql.apache.hadoop.version>3.2.0-8</dep.prestosql.apache.hadoop.version>
         <dep.prestosql.apache.hive.version>3.1.2-1</dep.prestosql.apache.hive.version>
         <jackson.version>2.10.0</jackson.version>
-        <omniruntime.version>1.0.0</omniruntime.version>
+        <omniruntime.version>1.1.0</omniruntime.version>
     </properties>
 
     <dependencies>
