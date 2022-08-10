@@ -52,7 +52,7 @@ case class OmniCacheCreateMvCommand(
     val identifier = TableIdentifier(name, Option(databaseName))
 
     val (storageFormat, provider) = getStorageFormatAndProvider(
-      providerStr, properties, None
+      providerStr, Map.empty, None
     )
 
     val table = buildCatalogTable(
