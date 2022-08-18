@@ -18,6 +18,7 @@
 
 package org.apache.spark.sql.catalyst.optimizer.rule
 
+import com.huawei.boostkit.spark.util.RewriteHelper._
 import java.io.File
 import java.util.Locale
 
@@ -31,7 +32,6 @@ import org.apache.spark.sql.catalyst.expressions.aggregate.AggregateExpression
 import org.apache.spark.sql.catalyst.plans.{ExistenceJoin, QueryPlan}
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.catalyst.util.{sideBySide, toPrettySQL}
-import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.StringType
 
 class RewriteSuite extends SparkFunSuite with PredicateHelper {
@@ -335,14 +335,6 @@ class RewriteSuite extends SparkFunSuite with PredicateHelper {
     var seq = Seq.empty[AttributeReference]
     nameSeq.foreach(n => seq :+= AttributeReference(n, StringType)())
     seq
-  }
-
-  def enableCachePlugin(): Unit = {
-    SQLConf.get.setConfString("spark.sql.omnicache.enable", "true")
-  }
-
-  def disableCachePlugin(): Unit = {
-    SQLConf.get.setConfString("spark.sql.omnicache.enable", "false")
   }
 
   def getRows(sql: String): Array[Row] = {

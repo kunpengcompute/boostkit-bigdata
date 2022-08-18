@@ -17,8 +17,10 @@
 
 package com.huawei.boostkit.spark.util
 
+import com.google.common.collect.Lists
 import com.huawei.boostkit.spark.conf.OmniCachePluginConfig._
 import java.util.concurrent.ConcurrentHashMap
+import org.apache.calcite.util.graph._
 
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.TableIdentifier
@@ -33,6 +35,10 @@ object ViewMetadata extends RewriteHelper {
 
   val viewToContainsTables = new ConcurrentHashMap[String, Set[TableEqual]]()
 
+  val usesGraph: DirectedGraph[String, DefaultEdge] = DefaultDirectedGraph.create()
+
+  var frozenGraph: Graphs.FrozenGraph[String, DefaultEdge] = Graphs.makeImmutable(usesGraph)
+
   var spark: SparkSession = _
 
   val STATUS_UN_LOAD = "UN_LOAD"
@@ -44,6 +50,10 @@ object ViewMetadata extends RewriteHelper {
   def setSpark(sparkSession: SparkSession): Unit = {
     spark = sparkSession
     status = STATUS_LOADING
+  }
+
+  def usesGraphTopologicalOrderIterator: java.lang.Iterable[String] = {
+    TopologicalOrderIterator.of[String, DefaultEdge](usesGraph)
   }
 
   def saveViewMetadataToMap(catalogTable: CatalogTable): Unit = this.synchronized {
@@ -84,6 +94,14 @@ object ViewMetadata extends RewriteHelper {
       // mappedViewQueryPlan and mappedViewContainsTable
       val (mappedViewQueryPlan, mappedViewContainsTables) = extractTables(viewQueryPlan)
 
+      usesGraph.addVertex(viewName)
+      mappedViewContainsTables
+          .foreach { mappedViewContainsTable =>
+            val name = mappedViewContainsTable.tableName
+            usesGraph.addVertex(name)
+            usesGraph.addEdge(name, viewName)
+          }
+
       // extract view query project's Attr and replace view table's Attr by query project's Attr
       // match function is attributeReferenceEqualSimple, by name and data type
       // Attr of table cannot used, because same Attr in view query and view table,
@@ -111,17 +129,21 @@ object ViewMetadata extends RewriteHelper {
 
   def addCatalogTableToCache(table: CatalogTable): Unit = this.synchronized {
     saveViewMetadataToMap(table)
-    // rebuildGraph()
+    rebuildGraph()
+  }
+
+  def rebuildGraph(): Unit = {
+    frozenGraph = Graphs.makeImmutable(usesGraph)
   }
 
   def removeMVCache(tableName: TableIdentifier): Unit = this.synchronized {
     val viewName = tableName.toString()
-    // usesGraph.removeAllVertices(Lists.newArrayList(viewName))
+    usesGraph.removeAllVertices(Lists.newArrayList(viewName))
     viewToContainsTables.remove(viewName)
     viewToViewQueryPlan.remove(viewName)
     viewToTablePlan.remove(viewName)
     viewToContainsTables.remove(viewName)
-    // rebuildGraph()
+    rebuildGraph()
   }
 
   def init(sparkSession: SparkSession): Unit = {
@@ -143,7 +165,7 @@ object ViewMetadata extends RewriteHelper {
       val tables = omniCacheFilter(catalog, db)
       tables.foreach(tableData => saveViewMetadataToMap(tableData._2))
     }
-    // rebuildGraph()
+    rebuildGraph()
   }
 
   def omniCacheFilter(catalog: SessionCatalog,

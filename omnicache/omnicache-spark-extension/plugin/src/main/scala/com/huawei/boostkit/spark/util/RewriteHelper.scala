@@ -17,14 +17,16 @@
 
 package com.huawei.boostkit.spark.util
 
-import com.google.common.collect.{ArrayListMultimap, HashBiMap, Multimap}
+import com.google.common.collect.{ArrayListMultimap, BiMap, HashBiMap, Multimap}
 import com.huawei.boostkit.spark.conf.OmniCachePluginConfig
 import scala.collection.mutable
+import scala.collection.mutable.ArrayBuffer
 
 import org.apache.spark.sql.catalyst.catalog.{CatalogTable, HiveTableRelation}
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.execution.datasources.LogicalRelation
+import org.apache.spark.sql.internal.SQLConf
 
 class RewriteHelper extends PredicateHelper {
 
@@ -34,6 +36,74 @@ class RewriteHelper extends PredicateHelper {
   val EMPTY_MAP: Map[ExpressionEqual,
       mutable.Set[ExpressionEqual]] = Map[ExpressionEqual, mutable.Set[ExpressionEqual]]()
   val EMPTY_MULTIMAP: Multimap[Int, Int] = ArrayListMultimap.create[Int, Int]
+
+  /**
+   * Rewrite [[EqualTo]] and [[EqualNullSafe]] operator to keep order. The following cases will be
+   * equivalent:
+   * 1. (a = b), (b = a);
+   * 2. (a <=> b), (b <=> a).
+   */
+  private def rewriteEqual(condition: Expression): Expression = condition match {
+    case eq@EqualTo(l: Expression, r: Expression) =>
+      Seq(l, r).sortBy(hashCode).reduce(EqualTo)
+    case eq@EqualNullSafe(l: Expression, r: Expression) =>
+      Seq(l, r).sortBy(hashCode).reduce(EqualNullSafe)
+    case _ => condition // Don't reorder.
+  }
+
+  def hashCode(_ar: Expression): Int = {
+    // See http://stackoverflow.com/questions/113511/hash-code-implementation
+    _ar match {
+      case ar@AttributeReference(_, _, _, _) =>
+        var h = 17
+        h = h * 37 + ar.name.hashCode()
+        h = h * 37 + ar.dataType.hashCode()
+        h = h * 37 + ar.nullable.hashCode()
+        h = h * 37 + ar.metadata.hashCode()
+        h = h * 37 + ar.exprId.hashCode()
+        h
+      case _ => _ar.hashCode()
+    }
+
+  }
+
+  /**
+   * Normalizes plans:
+   * - Filter the filter conditions that appear in a plan. For instance,
+   * ((expr 1 && expr 2) && expr 3), (expr 1 && expr 2 && expr 3), (expr 3 && (expr 1 && expr 2)
+   * etc., will all now be equivalent.
+   * - Sample the seed will replaced by 0L.
+   * - Join conditions will be resorted by hashCode.
+   *
+   * we use new hash function to avoid `ar.qualifier` from alias affect the final order.
+   *
+   */
+  protected def normalizePlan(plan: LogicalPlan): LogicalPlan = {
+    plan transform {
+      case Filter(condition: Expression, child: LogicalPlan) =>
+        Filter(splitConjunctivePredicates(condition).map(rewriteEqual).sortBy(hashCode)
+            .reduce(And), child)
+      case sample: Sample =>
+        sample.copy(seed = 0L)
+      case Join(left, right, joinType, condition, hint) if condition.isDefined =>
+        val newCondition =
+          splitConjunctivePredicates(condition.get).map(rewriteEqual).sortBy(hashCode)
+              .reduce(And)
+        Join(left, right, joinType, Some(newCondition), hint)
+    }
+  }
+
+  def mergeConjunctiveExpressions(e: Seq[Expression]): Expression = {
+    if (e.isEmpty) {
+      return Literal.TrueLiteral
+    }
+    if (e.size == 1) {
+      return e.head
+    }
+    e.reduce { (a, b) =>
+      And(a, b)
+    }
+  }
 
   def fillQualifier(logicalPlan: LogicalPlan,
       exprIdToQualifier: mutable.HashMap[ExprId, AttributeReference]): LogicalPlan = {
@@ -84,6 +154,55 @@ class RewriteHelper extends PredicateHelper {
     topProjectList
   }
 
+  // TODO
+  case class EquivalenceClasses() {
+
+    def getEquivalenceClassesMap: Map[ExpressionEqual, mutable.Set[ExpressionEqual]] = {
+      Map.empty
+    }
+
+    def getEquivalenceClasses: List[mutable.Set[ExpressionEqual]] = {
+      List.empty
+    }
+
+  }
+
+  // TODO
+  def extractPredictExpressions(logicalPlan: LogicalPlan,
+      tableMappings: BiMap[String, String])
+  : (EquivalenceClasses, Seq[ExpressionEqual], Seq[ExpressionEqual]) = {
+    var conjunctivePredicates: Seq[Expression] = Seq()
+    var equiColumnPreds: mutable.Buffer[Expression] = ArrayBuffer()
+    val rangePreds: mutable.Buffer[ExpressionEqual] = ArrayBuffer()
+    val residualPreds: mutable.Buffer[ExpressionEqual] = ArrayBuffer()
+    val normalizedPlan = normalizePlan(logicalPlan)
+    normalizedPlan foreach {
+      case Filter(condition, _) =>
+        conjunctivePredicates ++= splitConjunctivePredicates(condition)
+      case Join(_, _, _, condition, _) =>
+        if (condition.isDefined) {
+          conjunctivePredicates ++= splitConjunctivePredicates(condition.get)
+        }
+      case _ =>
+    }
+    for (e <- conjunctivePredicates) {
+      if (e.isInstanceOf[EqualTo]) {
+        val left = e.asInstanceOf[EqualTo].left
+        val right = e.asInstanceOf[EqualTo].right
+        // TODO
+        residualPreds += ExpressionEqual(e)
+      } else if (e.isInstanceOf[LessThan] || e.isInstanceOf[GreaterThan]
+          || e.isInstanceOf[LessThanOrEqual] || e.isInstanceOf[GreaterThanOrEqual]) {
+        residualPreds += ExpressionEqual(e)
+      } else {
+        residualPreds += ExpressionEqual(e)
+      }
+    }
+
+    val equivalenceClasses: EquivalenceClasses = EquivalenceClasses()
+    (equivalenceClasses, rangePreds, residualPreds)
+  }
+
   def extractTables(logicalPlan: LogicalPlan): (LogicalPlan, Set[TableEqual]) = {
     // tableName->duplicateIndex,start from 0
     val qualifierToIdx = mutable.HashMap.empty[String, Int]
@@ -125,6 +244,65 @@ class RewriteHelper extends PredicateHelper {
     }.toSet
     val mappedQuery = fillQualifier(logicalPlan, exprIdToAttr)
     (mappedQuery, mappedTables)
+  }
+
+  def swapTableColumnReferences[T <: Iterable[Expression]](expression: T,
+      tableMapping: BiMap[String, String],
+      columnMapping: Map[ExpressionEqual,
+          mutable.Set[ExpressionEqual]]): T = {
+    var result: T = expression
+    if (!tableMapping.isEmpty) {
+      result = result.map { expr =>
+        expr.transform {
+          case a: AttributeReference =>
+            val key = a.qualifier.mkString(".")
+            if (tableMapping.containsKey(key)) {
+              val newQualifier = tableMapping.get(key).split(".").toSeq
+              a.copy()(exprId = a.exprId, qualifier = newQualifier)
+            } else {
+              a
+            }
+          case e => e
+        }
+      }.asInstanceOf[T]
+    }
+    if (columnMapping.nonEmpty) {
+      result = result.map { expr =>
+        expr.transform {
+          case e: NamedExpression =>
+            val expressionEqual = ExpressionEqual(e)
+            if (columnMapping.contains(expressionEqual)) {
+              val newAttr = columnMapping(expressionEqual)
+                  .head.expression.asInstanceOf[NamedExpression]
+              newAttr
+            } else {
+              e
+            }
+          case e => e
+        }
+      }.asInstanceOf[T]
+    }
+    result
+  }
+
+  def swapColumnTableReferences[T <: Iterable[Expression]](expression: T,
+      tableMapping: BiMap[String, String],
+      columnMapping: Map[ExpressionEqual,
+          mutable.Set[ExpressionEqual]]): T = {
+    var result = swapTableColumnReferences(expression, EMPTY_BITMAP, columnMapping)
+    result = swapTableColumnReferences(result, tableMapping, EMPTY_MAP)
+    result
+  }
+
+  def swapTableReferences[T <: Iterable[Expression]](expression: T,
+      tableMapping: BiMap[String, String]): T = {
+    swapTableColumnReferences(expression, tableMapping, EMPTY_MAP)
+  }
+
+  def swapColumnReferences[T <: Iterable[Expression]](expression: T,
+      columnMapping: Map[ExpressionEqual,
+          mutable.Set[ExpressionEqual]]): T = {
+    swapTableColumnReferences(expression, EMPTY_BITMAP, columnMapping)
   }
 }
 
@@ -225,6 +403,14 @@ object RewriteHelper {
       case _ =>
     }
     false
+  }
+
+  def enableCachePlugin(): Unit = {
+    SQLConf.get.setConfString("spark.sql.omnicache.enable", "true")
+  }
+
+  def disableCachePlugin(): Unit = {
+    SQLConf.get.setConfString("spark.sql.omnicache.enable", "false")
   }
 }
 
