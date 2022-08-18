@@ -21,7 +21,7 @@ package com.huawei.boostkit.spark.expression
 import com.huawei.boostkit.spark.Constant.{DEFAULT_STRING_TYPE_LENGTH, IS_DECIMAL_CHECK, OMNI_BOOLEAN_TYPE, OMNI_DATE_TYPE, OMNI_DECIMAL128_TYPE, OMNI_DECIMAL64_TYPE, OMNI_DOUBLE_TYPE, OMNI_INTEGER_TYPE, OMNI_LONG_TYPE, OMNI_SHOR_TYPE, OMNI_VARCHAR_TYPE}
 import nova.hetu.omniruntime.`type`.{BooleanDataType, DataTypeSerializer, Date32DataType, Decimal128DataType, Decimal64DataType, DoubleDataType, IntDataType, LongDataType, ShortDataType, VarcharDataType}
 import nova.hetu.omniruntime.constants.FunctionType
-import nova.hetu.omniruntime.constants.FunctionType.{OMNI_AGGREGATION_TYPE_AVG, OMNI_AGGREGATION_TYPE_COUNT_COLUMN, OMNI_AGGREGATION_TYPE_MAX, OMNI_AGGREGATION_TYPE_MIN, OMNI_AGGREGATION_TYPE_SUM, OMNI_WINDOW_TYPE_RANK, OMNI_WINDOW_TYPE_ROW_NUMBER}
+import nova.hetu.omniruntime.constants.FunctionType.{OMNI_AGGREGATION_TYPE_AVG, OMNI_AGGREGATION_TYPE_COUNT_ALL, OMNI_AGGREGATION_TYPE_COUNT_COLUMN, OMNI_AGGREGATION_TYPE_MAX, OMNI_AGGREGATION_TYPE_MIN, OMNI_AGGREGATION_TYPE_SUM, OMNI_WINDOW_TYPE_RANK, OMNI_WINDOW_TYPE_ROW_NUMBER}
 import nova.hetu.omniruntime.operator.OmniExprVerify
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.expressions._
@@ -328,22 +328,18 @@ object OmniExpressionAdaptor extends Logging {
     expr match {
       case unscaledValue: UnscaledValue =>
         ("{\"exprType\":\"FUNCTION\",\"returnType\":%s," +
-          "\"function_name\":\"UnscaledValue\", \"arguments\":[%s, %s, %s]}")
+          "\"function_name\":\"UnscaledValue\", \"arguments\":[%s]}")
           .format(sparkTypeToOmniExpJsonType(unscaledValue.dataType),
-            rewriteToOmniJsonExpressionLiteral(unscaledValue.child, exprsIndexMap),
-            toOmniJsonLiteral(
-              Literal(unscaledValue.child.dataType.asInstanceOf[DecimalType].precision, IntegerType)),
-            toOmniJsonLiteral(
-              Literal(unscaledValue.child.dataType.asInstanceOf[DecimalType].scale, IntegerType)))
+            rewriteToOmniJsonExpressionLiteral(unscaledValue.child, exprsIndexMap))
 
       // omni not support return null, now rewrite to if(IsOverflowDecimal())? NULL:MakeDecimal()
       case checkOverflow: CheckOverflow =>
         ("{\"exprType\":\"IF\",\"returnType\":%s," +
           "\"condition\":{\"exprType\":\"FUNCTION\",\"returnType\":%s," +
-          "\"function_name\":\"IsOverflowDecimal\",\"arguments\":[%s,%s,%s,%s,%s]}," +
+          "\"function_name\":\"IsOverflowDecimal\",\"arguments\":[%s,%s,%s]}," +
           "\"if_true\":%s," +
           "\"if_false\":{\"exprType\":\"FUNCTION\",\"returnType\":%s," +
-          "\"function_name\":\"MakeDecimal\", \"arguments\":[%s,%s,%s,%s,%s]}" +
+          "\"function_name\":\"MakeDecimal\", \"arguments\":[%s]}" +
           "}")
           .format(sparkTypeToOmniExpJsonType(checkOverflow.dataType),
             // IsOverflowDecimal returnType
@@ -351,10 +347,6 @@ object OmniExpressionAdaptor extends Logging {
             // IsOverflowDecimal arguments
             rewriteToOmniJsonExpressionLiteral(checkOverflow.child, exprsIndexMap,
                 DecimalType(checkOverflow.dataType.precision, checkOverflow.dataType.scale)),
-            toOmniJsonLiteral(
-              Literal(checkOverflow.dataType.precision, IntegerType)),
-            toOmniJsonLiteral(
-              Literal(checkOverflow.dataType.scale, IntegerType)),
             toOmniJsonLiteral(
               Literal(checkOverflow.dataType.precision, IntegerType)),
             toOmniJsonLiteral(
@@ -367,41 +359,21 @@ object OmniExpressionAdaptor extends Logging {
               DecimalType(checkOverflow.dataType.precision, checkOverflow.dataType.scale)),
             rewriteToOmniJsonExpressionLiteral(checkOverflow.child,
               exprsIndexMap,
-              DecimalType(checkOverflow.dataType.precision, checkOverflow.dataType.scale)),
-            toOmniJsonLiteral(
-              Literal(checkOverflow.dataType.precision, IntegerType)),
-            toOmniJsonLiteral(
-              Literal(checkOverflow.dataType.scale, IntegerType)),
-            toOmniJsonLiteral(
-              Literal(checkOverflow.dataType.precision, IntegerType)),
-            toOmniJsonLiteral(
-              Literal(checkOverflow.dataType.scale, IntegerType)))
+              DecimalType(checkOverflow.dataType.precision, checkOverflow.dataType.scale)))
 
       case makeDecimal: MakeDecimal =>
         makeDecimal.child.dataType match {
           case decimalChild: DecimalType =>
             ("{\"exprType\": \"FUNCTION\", \"returnType\":%s," +
-              "\"function_name\": \"MakeDecimal\", \"arguments\": [%s,%s,%s,%s,%s]}")
+              "\"function_name\": \"MakeDecimal\", \"arguments\": [%s]}")
               .format(sparkTypeToOmniExpJsonType(makeDecimal.dataType),
-                rewriteToOmniJsonExpressionLiteral(makeDecimal.child, exprsIndexMap),
-                toOmniJsonLiteral(
-                  Literal(decimalChild.precision, IntegerType)),
-                toOmniJsonLiteral(
-                  Literal(decimalChild.scale, IntegerType)),
-                toOmniJsonLiteral(
-                  Literal(makeDecimal.precision, IntegerType)),
-                toOmniJsonLiteral(
-                  Literal(makeDecimal.scale, IntegerType)))
+                rewriteToOmniJsonExpressionLiteral(makeDecimal.child, exprsIndexMap))
 
           case longChild: LongType =>
             ("{\"exprType\": \"FUNCTION\", \"returnType\":%s," +
-              "\"function_name\": \"MakeDecimal\", \"arguments\": [%s,%s,%s]}")
+              "\"function_name\": \"MakeDecimal\", \"arguments\": [%s]}")
               .format(sparkTypeToOmniExpJsonType(makeDecimal.dataType),
-                rewriteToOmniJsonExpressionLiteral(makeDecimal.child, exprsIndexMap),
-                toOmniJsonLiteral(
-                  Literal(makeDecimal.precision, IntegerType)),
-                toOmniJsonLiteral(
-                  Literal(makeDecimal.scale, IntegerType)))
+                rewriteToOmniJsonExpressionLiteral(makeDecimal.child, exprsIndexMap))
           case _ =>
             throw new UnsupportedOperationException(s"Unsupported datatype for MakeDecimal: ${makeDecimal.child.dataType}")
         }
@@ -530,10 +502,8 @@ object OmniExpressionAdaptor extends Logging {
           case dt: DecimalType =>
             if (cast.child.dataType.isInstanceOf[DoubleType]) {
               ("{\"exprType\":\"FUNCTION\",\"returnType\":%s," +
-                "\"function_name\":\"CAST\", \"arguments\":[%s,%s,%s]}")
-                .format(returnType, rewriteToOmniJsonExpressionLiteral(cast.child, exprsIndexMap),
-                  toOmniJsonLiteral(Literal(dt.precision, IntegerType)),
-                  toOmniJsonLiteral(Literal(dt.scale, IntegerType)))
+                "\"function_name\":\"CAST\", \"arguments\":[%s]}")
+                .format(returnType, rewriteToOmniJsonExpressionLiteral(cast.child, exprsIndexMap))
             } else {
               rewriteToOmniJsonExpressionLiteral(
                 MakeDecimal(cast.child, dt.precision, dt.scale), exprsIndexMap)
@@ -667,7 +637,7 @@ object OmniExpressionAdaptor extends Logging {
     }
   }
 
-  def toOmniAggFunType(agg: AggregateExpression, isHashAgg: Boolean = false): FunctionType = {
+  def toOmniAggFunType(agg: AggregateExpression, isHashAgg: Boolean = false, isFinal: Boolean = false): FunctionType = {
     agg.aggregateFunction match {
       case Sum(_) => {
         if (isHashAgg) {
@@ -681,7 +651,11 @@ object OmniExpressionAdaptor extends Logging {
       case Average(_) => OMNI_AGGREGATION_TYPE_AVG
       case Min(_) => OMNI_AGGREGATION_TYPE_MIN
       case Count(Literal(1, IntegerType) :: Nil) | Count(ArrayBuffer(Literal(1, IntegerType))) =>
-        throw new UnsupportedOperationException("Unsupported count(*) or count(1)")
+        if (isFinal) {
+          OMNI_AGGREGATION_TYPE_COUNT_COLUMN
+        } else {
+          OMNI_AGGREGATION_TYPE_COUNT_ALL
+        }
       case Count(_) => OMNI_AGGREGATION_TYPE_COUNT_COLUMN
       case _ => throw new UnsupportedOperationException(s"Unsupported aggregate function: $agg")
     }

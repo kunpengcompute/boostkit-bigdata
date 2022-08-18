@@ -18,7 +18,7 @@
 
 package org.apache.spark.sql.execution
 
-import org.apache.spark.sql.functions.sum
+import org.apache.spark.sql.functions.{sum, count}
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, Row}
 
@@ -56,6 +56,25 @@ class ColumnarHashAggregateExecSuite extends ColumnarSparkPlanTest {
     checkAnswer(
       res,
       Seq(Row(1, 2.0), Row(2, 1.0))
+    )
+  }
+
+  test("Test ColumnarHashAggregateExec happen and result is correct when execute count(*) api") {
+    val res = df.agg(count("*"))
+    assert(res.queryExecution.executedPlan.find(_.isInstanceOf[ColumnarHashAggregateExec]).isDefined, s"ColumnarHashAggregateExec not happened, executedPlan as follows： \n${res.queryExecution.executedPlan}")
+    checkAnswer(
+      res,
+      Seq(Row(5))
+    )
+  }
+
+  test("Test ColumnarHashAggregateExec happen and result " +
+    "is correct when execute count(*) api with group by") {
+    val res = df.groupBy("a").agg(count("*"))
+    assert(res.queryExecution.executedPlan.find(_.isInstanceOf[ColumnarHashAggregateExec]).isDefined, s"ColumnarHashAggregateExec not happened, executedPlan as follows： \n${res.queryExecution.executedPlan}")
+    checkAnswer(
+      res,
+      Seq(Row(1, 2), Row(2, 1), Row(null, 2))
     )
   }
 }

@@ -23,6 +23,7 @@ import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor._
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil.transColBatchToOmniVecs
 import nova.hetu.omniruntime.`type`.DataType
 import nova.hetu.omniruntime.constants.FunctionType
+import nova.hetu.omniruntime.constants.FunctionType.OMNI_AGGREGATION_TYPE_COUNT_ALL
 import nova.hetu.omniruntime.operator.aggregator.OmniHashAggregationWithExprOperatorFactory
 import nova.hetu.omniruntime.operator.config.{OperatorConfig, SpillConfig}
 import nova.hetu.omniruntime.vector.VecBatch
@@ -76,7 +77,7 @@ case class ColumnarHashAggregateExec(
     val omniAggTypes = new Array[DataType](aggregateExpressions.size)
     val omniAggFunctionTypes = new Array[FunctionType](aggregateExpressions.size)
     val omniAggOutputTypes = new Array[DataType](aggregateExpressions.size)
-    val omniAggChannels = new Array[AnyRef](aggregateExpressions.size)
+    var omniAggChannels = new Array[AnyRef](aggregateExpressions.size)
     var index = 0
     for (exp <- aggregateExpressions) {
       if (exp.filter.isDefined) {
@@ -90,12 +91,12 @@ case class ColumnarHashAggregateExec(
           case Sum(_) | Min(_) | Max(_) | Count(_) =>
             val aggExp = exp.aggregateFunction.inputAggBufferAttributes.head
             omniAggTypes(index) = sparkTypeToOmniType(aggExp.dataType, aggExp.metadata)
-            omniAggFunctionTypes(index) = toOmniAggFunType(exp, true)
+            omniAggFunctionTypes(index) = toOmniAggFunType(exp, true, true)
             omniAggOutputTypes(index) =
               sparkTypeToOmniType(exp.aggregateFunction.dataType)
             omniAggChannels(index) =
               rewriteToOmniJsonExpressionLiteral(aggExp, attrExpsIdMap)
-          case _ => throw new UnsupportedOperationException(s"Unsupported aggregate aggregateFunction: $exp")
+          case _ => throw new UnsupportedOperationException(s"Unsupported aggregate aggregateFunction: ${exp}")
         }
       } else if (exp.mode == Partial) {
         omniInputRaw = true
@@ -109,6 +110,9 @@ case class ColumnarHashAggregateExec(
               sparkTypeToOmniType(exp.aggregateFunction.dataType)
             omniAggChannels(index) =
               rewriteToOmniJsonExpressionLiteral(aggExp, attrExpsIdMap)
+            if (omniAggFunctionTypes(index) == OMNI_AGGREGATION_TYPE_COUNT_ALL) {
+              omniAggChannels(index) = null
+            }
           case _ => throw new UnsupportedOperationException(s"Unsupported aggregate aggregateFunction: $exp")
         }
       } else {
@@ -116,7 +120,7 @@ case class ColumnarHashAggregateExec(
       }
       index += 1
     }
-
+    omniAggChannels = omniAggChannels.filter(key => key != null)
     val omniSourceTypes = new Array[DataType](child.outputSet.size)
     val inputIter = child.outputSet.toIterator
     var i = 0
@@ -158,7 +162,7 @@ case class ColumnarHashAggregateExec(
     val omniAggTypes = new Array[DataType](aggregateExpressions.size)
     val omniAggFunctionTypes = new Array[FunctionType](aggregateExpressions.size)
     val omniAggOutputTypes = new Array[DataType](aggregateExpressions.size)
-    val omniAggChannels = new Array[String](aggregateExpressions.size)
+    var omniAggChannels = new Array[String](aggregateExpressions.size)
     var index = 0
     for (exp <- aggregateExpressions) {
       if (exp.filter.isDefined) {
@@ -172,7 +176,7 @@ case class ColumnarHashAggregateExec(
           case Sum(_) | Min(_) | Max(_) | Count(_) =>
             val aggExp = exp.aggregateFunction.inputAggBufferAttributes.head
             omniAggTypes(index) = sparkTypeToOmniType(aggExp.dataType, aggExp.metadata)
-            omniAggFunctionTypes(index) = toOmniAggFunType(exp, true)
+            omniAggFunctionTypes(index) = toOmniAggFunType(exp, true, true)
             omniAggOutputTypes(index) =
               sparkTypeToOmniType(exp.aggregateFunction.dataType)
             omniAggChannels(index) =
@@ -191,6 +195,9 @@ case class ColumnarHashAggregateExec(
               sparkTypeToOmniType(exp.aggregateFunction.dataType)
             omniAggChannels(index) =
               rewriteToOmniJsonExpressionLiteral(aggExp, attrExpsIdMap)
+            if (omniAggFunctionTypes(index) == OMNI_AGGREGATION_TYPE_COUNT_ALL) {
+              omniAggChannels(index) = null
+            }
           case _ => throw new UnsupportedOperationException(s"Unsupported aggregate aggregateFunction: ${exp}")
         }
       } else {
@@ -199,6 +206,7 @@ case class ColumnarHashAggregateExec(
       index += 1
     }
 
+    omniAggChannels = omniAggChannels.filter(key => key != null)
     val omniSourceTypes = new Array[DataType](child.outputSet.size)
     val inputIter = child.outputSet.toIterator
     var i = 0

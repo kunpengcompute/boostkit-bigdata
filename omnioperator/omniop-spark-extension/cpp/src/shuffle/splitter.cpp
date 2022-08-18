@@ -309,7 +309,7 @@ int Splitter::SplitFixedWidthValidityBuffer(VectorBatch& vb){
         }
 
         // 计算并填充数据
-        auto src_addr = const_cast<uint8_t*>((uint8_t*)((vb.GetVector(col_idx))->GetValueNulls()));
+        auto src_addr = const_cast<uint8_t*>((uint8_t*)(VectorHelper::GetNullsAddr(vb.GetVector(col_idx))));
         std::fill(std::begin(partition_buffer_idx_offset_),
                 std::end(partition_buffer_idx_offset_), 0);
         const auto num_rows = vb.GetRowCount();
