@@ -395,7 +395,7 @@ public class NdpStatisticsUtils {
             try {
                 variations.add(vOutContext.getDataTypePhysicalVariation(c));
             } catch (HiveException e) {
-                e.printStackTrace();
+                LOG.error("OmniData Hive failed to get DataTypePhysicalVariation ", e);
             }
         });
         return variations.toArray(new DataTypePhysicalVariation[0]);
@@ -446,7 +446,7 @@ public class NdpStatisticsUtils {
         try {
             NdpStatisticsUtils.updateFilterStats(parseContext, tableScanOp);
         } catch (SemanticException e) {
-            e.printStackTrace();
+            LOG.error("OmniData Hive failed to get updateFilterStats ", e);
         }
         LOG.info("Table [{}] failed to part push down, since selectivity[{}] > threshold[{}]",
                 tableScanOp.getConf().getAlias(), newSelectivity, OmniDataConf.getOmniDataFilterSelectivity(conf));

@@ -371,12 +371,12 @@ public class NdpPlanResolver implements PhysicalPlanResolver {
          */
         private void replaceRawVectorizedRowBatchCtx(TableScanOperator tableScanOp, BaseWork work) {
             VectorizedRowBatchCtx oldCtx = work.getVectorizedRowBatchCtx();
-            VectorizedRowBatchCtx ndpCtx = new VectorizedRowBatchCtx(oldCtx.getRowColumnNames(),
+            VectorizedRowBatchCtx newCtx = new VectorizedRowBatchCtx(oldCtx.getRowColumnNames(),
                     oldCtx.getRowColumnTypeInfos(), oldCtx.getRowdataTypePhysicalVariations(), oldCtx.getDataColumnNums(),
                     oldCtx.getPartitionColumnCount(), oldCtx.getVirtualColumnCount(), oldCtx.getNeededVirtualColumns(),
                     tableScanOp.getOutputVectorizationContext().getScratchColumnTypeNames(),
                     tableScanOp.getOutputVectorizationContext().getScratchDataTypePhysicalVariations());
-            work.setVectorizedRowBatchCtx(ndpCtx);
+            work.setVectorizedRowBatchCtx(newCtx);
         }
 
         private void removeTableScanRawFilter(List<Operator<? extends OperatorDesc>> operators) {
