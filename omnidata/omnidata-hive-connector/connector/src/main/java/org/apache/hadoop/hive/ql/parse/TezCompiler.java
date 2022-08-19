@@ -68,6 +68,7 @@ import org.apache.hadoop.hive.ql.lib.Rule;
 import org.apache.hadoop.hive.ql.lib.RuleRegExp;
 import org.apache.hadoop.hive.ql.log.PerfLogger;
 import org.apache.hadoop.hive.ql.metadata.Hive;
+import org.apache.hadoop.hive.ql.omnidata.config.OmniDataConf;
 import org.apache.hadoop.hive.ql.optimizer.ConstantPropagate;
 import org.apache.hadoop.hive.ql.optimizer.ConstantPropagateProcCtx.ConstantPropagateOption;
 import org.apache.hadoop.hive.ql.optimizer.ConvertJoinMapJoin;
@@ -711,9 +712,14 @@ public class TezCompiler extends TaskCompiler {
       new AnnotateRunTimeStatsOptimizer().resolve(physicalCtx);
     }
 
-    // tez push down entrance
-    NdpPlanResolver ndpPlanResolver = new NdpPlanResolver();
-    ndpPlanResolver.resolve(physicalCtx);
+    if (OmniDataConf.getOmniDataEnabled(conf)) {
+      // Tez OmniData entrance
+      NdpPlanResolver ndpPlanResolver = new NdpPlanResolver();
+      ndpPlanResolver.resolve(physicalCtx);
+    } else {
+      LOG.debug("Skipping OmniData pushdown");
+    }
+
 
     perfLogger.PerfLogEnd(this.getClass().getName(), PerfLogger.TEZ_COMPILER, "optimizeTaskPlan");
   }

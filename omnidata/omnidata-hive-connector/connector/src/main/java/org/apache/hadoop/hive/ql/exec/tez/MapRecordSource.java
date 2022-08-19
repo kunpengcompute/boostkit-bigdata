@@ -18,23 +18,23 @@
 
 package org.apache.hadoop.hive.ql.exec.tez;
 
-import com.huawei.boostkit.omnidata.model.datasource.DataSource;
-import com.huawei.boostkit.omnidata.model.datasource.hdfs.HdfsOrcDataSource;
-import com.huawei.boostkit.omnidata.model.datasource.hdfs.HdfsParquetDataSource;
+import com.huawei.boostkit.omnidata.decode.type.DecodeType;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.ql.exec.AbstractMapOperator;
 import org.apache.hadoop.hive.ql.exec.mr.ExecMapperContext;
 import org.apache.hadoop.hive.ql.exec.tez.tools.KeyValueInputMerger;
 import org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatch;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
-import org.apache.hadoop.hive.ql.omnidata.config.NdpConf;
+import org.apache.hadoop.hive.ql.omnidata.OmniDataUtils;
+import org.apache.hadoop.hive.ql.omnidata.config.OmniDataConf;
+import org.apache.hadoop.hive.ql.omnidata.decode.PageDeserializer;
 import org.apache.hadoop.hive.ql.omnidata.operator.predicate.NdpPredicateInfo;
 import org.apache.hadoop.hive.ql.omnidata.reader.OmniDataReader;
 import org.apache.hadoop.hive.ql.omnidata.serialize.NdpSerializationUtils;
 import org.apache.hadoop.hive.ql.plan.TableScanDesc;
+import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.mapred.FileSplit;
 import org.apache.hadoop.mapred.InputSplit;
@@ -58,13 +58,32 @@ import java.util.concurrent.*;
 
 public class MapRecordSource implements RecordSource {
 
-    public static final Logger LOG = LoggerFactory.getLogger(MapRecordSource.class);
+    private final Logger LOG = LoggerFactory.getLogger(MapRecordSource.class);
+
+    /**
+     * Maximum number of concurrent connections in the omnidata thread pool
+     */
+    public static final int MAX_THREAD_NUMS = 16;
+
     private ExecMapperContext execContext;
+
     private AbstractMapOperator mapOp;
+
     private KeyValueReader reader;
+
     private final boolean grouped = false;
-    private boolean aggOptimized = false;
-    private ArrayList<Map<String, Object>> omniDataReaders = new ArrayList<>();
+
+    private TypeInfo[] rowColumnTypeInfos;
+
+    private ArrayList<FileSplit> fileSplits = new ArrayList<>();
+
+    private NdpPredicateInfo ndpPredicateInfo;
+
+    private boolean isOmniDataPushDown = false;
+
+    private JobConf jconf;
+
+    private ExecutorService executorService;
 
     void init(JobConf jconf, AbstractMapOperator mapOp, KeyValueReader reader) throws IOException {
         execContext = mapOp.getExecContext();
@@ -74,44 +93,35 @@ public class MapRecordSource implements RecordSource {
             kvMerger.setIOCxt(execContext.getIoCxt());
         }
         this.reader = reader;
-        aggOptimized = Boolean.parseBoolean(jconf.get(NdpConf.NDP_AGG_OPTIMIZED_ENABLE));
-        if (aggOptimized) {
-            createOmniDataReader(jconf);
+        if (mapOp.getChildOperators().get(0).getConf() instanceof TableScanDesc) {
+            TableScanDesc tableScanDesc = (TableScanDesc) mapOp.getChildOperators().get(0).getConf();
+            this.ndpPredicateInfo = NdpSerializationUtils.deserializeNdpPredicateInfo(
+                    tableScanDesc.getNdpPredicateInfoStr());
+            this.isOmniDataPushDown = ndpPredicateInfo.getIsPushDown();
+            if (isOmniDataPushDown) {
+                this.jconf = jconf;
+                this.rowColumnTypeInfos = tableScanDesc.getRowColumnTypeInfos();
+                initOmniData();
+            }
         }
     }
 
-    private void createOmniDataReader(JobConf jconf) {
-        String ndpPredicateInfoStr = ((TableScanDesc) mapOp.getChildOperators()
-                .get(0)
-                .getConf()).getNdpPredicateInfoStr();
-        NdpPredicateInfo ndpPredicateInfo = NdpSerializationUtils.deserializeNdpPredicateInfo(ndpPredicateInfoStr);
+    /**
+     * Save InputSplit to fileSplits.
+     * Create a thread pool (executorService) based on parameters.
+     */
+    private void initOmniData() {
         List<InputSplit> inputSplits = ((TezGroupedSplit) ((MRReaderMapred) reader).getSplit()).getGroupedSplits();
-        for (InputSplit inputSplit : inputSplits) {
-            if (inputSplit instanceof FileSplit) {
-                String path = ((FileSplit) inputSplit).getPath().toString();
-                long start = ((FileSplit) inputSplit).getStart();
-                long length = ((FileSplit) inputSplit).getLength();
-                String tableName = mapOp.getConf().getAliases().get(0);
-                String inputFormat = mapOp.getConf()
-                        .getAliasToPartnInfo()
-                        .get(tableName)
-                        .getInputFileFormatClass()
-                        .getSimpleName();
-                DataSource dataSource;
-                if (inputFormat.toLowerCase(Locale.ENGLISH).contains("parquet")) {
-                    dataSource = new HdfsParquetDataSource(path, start, length, false);
-                } else {
-                    dataSource = new HdfsOrcDataSource(path, start, length, false);
-                }
-                Map<String, Object> adapterInfo = new HashMap<String, Object>() {{
-                    put("dataSource", dataSource);
-                    put("jconf", jconf);
-                    put("inputSplit", inputSplit);
-                    put("ndpPredicateInfo", ndpPredicateInfo);
-                }};
-                omniDataReaders.add(adapterInfo);
-            }
-        }
+        int splitSize = inputSplits.size();
+        // init fileSplits
+        inputSplits.forEach(is -> fileSplits.add((FileSplit) is));
+        int threadNums = OmniDataConf.getOmniDataOptimizedThreadNums(jconf);
+        // Need to limit the maximum number of threads to avoid out of memory.
+        threadNums = Math.min(splitSize, threadNums);
+        // init executorService
+        executorService = new ThreadPoolExecutor(threadNums, threadNums, 0L, TimeUnit.MILLISECONDS,
+                new LinkedBlockingDeque<>(),
+                new ThreadFactoryBuilder().setNameFormat("omnidata-hive-optimized-thread-%d").build());
     }
 
     @Override
@@ -122,29 +132,35 @@ public class MapRecordSource implements RecordSource {
     @Override
     public boolean pushRecord() throws HiveException {
         execContext.resetRow();
-
-        if (aggOptimized) {
+        if (isOmniDataPushDown) {
             return pushOmniDataRecord();
         } else {
             return pushRawRecord();
         }
-
     }
 
     private boolean pushOmniDataRecord() throws HiveException {
-        ExecutorService executorService = new ThreadPoolExecutor(0, Integer.MAX_VALUE, 60L, TimeUnit.SECONDS,
-                new SynchronousQueue<Runnable>(),
-                new ThreadFactoryBuilder().setNameFormat("omnidata-hive-thread-%d").build());
-        ArrayList<Future<List<VectorizedRowBatch>>> results = new ArrayList<>();
-        omniDataReaders.forEach(ai -> {
-            Future<List<VectorizedRowBatch>> future = executorService.submit(
-                    new OmniDataReader((DataSource) ai.get("dataSource"), (Configuration) ai.get("jconf"),
-                            (FileSplit) ai.get("inputSplit"), (NdpPredicateInfo) ai.get("ndpPredicateInfo")));
+        // create DecodeType
+        DecodeType[] columnTypes = new DecodeType[ndpPredicateInfo.getDecodeTypes().size()];
+        for (int index = 0; index < columnTypes.length; index++) {
+            String codeType = ndpPredicateInfo.getDecodeTypes().get(index);
+            // If the returned data type is Agg, use transOmniDataAggDecodeType() method.
+            if (ndpPredicateInfo.getDecodeTypesWithAgg().get(index)) {
+                columnTypes[index] = OmniDataUtils.transOmniDataAggDecodeType(codeType);
+            } else {
+                columnTypes[index] = OmniDataUtils.transOmniDataDecodeType(codeType);
+            }
+        }
+        PageDeserializer deserializer = new PageDeserializer(columnTypes);
+        ArrayList<Future<Queue<VectorizedRowBatch>>> results = new ArrayList<>();
+        fileSplits.forEach(fs -> {
+            Future<Queue<VectorizedRowBatch>> future = executorService.submit(
+                    new OmniDataReader(jconf, fs, deserializer, ndpPredicateInfo, rowColumnTypeInfos));
             results.add(future);
         });
-        for (Future<List<VectorizedRowBatch>> future : results) {
+        for (Future<Queue<VectorizedRowBatch>> future : results) {
             try {
-                List<VectorizedRowBatch> rowBatches = future.get();
+                Queue<VectorizedRowBatch> rowBatches = future.get();
                 for (VectorizedRowBatch rowBatch : rowBatches) {
                     mapOp.process(rowBatch);
                 }
@@ -209,7 +225,7 @@ public class MapRecordSource implements RecordSource {
         }
 
         LOG.info("Closing MRReader on error");
-        MRReader mrReader = (MRReader)reader;
+        MRReader mrReader = (MRReader) reader;
         try {
             mrReader.close();
         } catch (IOException ex) {

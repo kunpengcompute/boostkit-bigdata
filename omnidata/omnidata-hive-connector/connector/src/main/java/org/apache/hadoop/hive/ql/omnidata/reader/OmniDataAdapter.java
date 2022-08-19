@@ -21,153 +21,91 @@ package org.apache.hadoop.hive.ql.omnidata.reader;
 
 import static org.apache.hadoop.hive.ql.omnidata.OmniDataUtils.addPartitionValues;
 
-
 import com.huawei.boostkit.omnidata.exception.OmniDataException;
 import com.huawei.boostkit.omnidata.exception.OmniErrorCode;
-import com.huawei.boostkit.omnidata.model.Predicate;
 import com.huawei.boostkit.omnidata.model.TaskSource;
 import com.huawei.boostkit.omnidata.model.datasource.DataSource;
-import com.huawei.boostkit.omnidata.model.datasource.hdfs.HdfsDataSource;
+import com.huawei.boostkit.omnidata.model.datasource.hdfs.HdfsOrcDataSource;
+import com.huawei.boostkit.omnidata.model.datasource.hdfs.HdfsParquetDataSource;
 import com.huawei.boostkit.omnidata.reader.impl.DataReaderImpl;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.exec.TaskExecutionException;
 import org.apache.hadoop.hive.ql.exec.vector.ColumnVector;
-import org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatch;
-import org.apache.hadoop.hive.ql.omnidata.OmniDataUtils;
-import org.apache.hadoop.hive.ql.omnidata.config.NdpConf;
+import org.apache.hadoop.hive.ql.omnidata.config.OmniDataConf;
 import org.apache.hadoop.hive.ql.omnidata.decode.PageDeserializer;
-import org.apache.hadoop.hive.ql.omnidata.decode.type.DecodeType;
 import org.apache.hadoop.hive.ql.omnidata.operator.predicate.NdpPredicateInfo;
 import org.apache.hadoop.hive.ql.omnidata.status.NdpStatusManager;
 import org.apache.hadoop.mapred.FileSplit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.io.Serializable;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import java.util.*;
-
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Locale;
+import java.util.Properties;
+import java.util.Queue;
 
 /**
  * Obtains data from OmniData through OmniDataAdapter and converts the data into Hive List<ColumnVector[]>.
- * If the OmniData task fails due to an exception, the task will be retried.
- * The maximum number of retry times is 4.
  */
 public class OmniDataAdapter implements Serializable {
     private static final Logger LOGGER = LoggerFactory.getLogger(OmniDataAdapter.class);
 
+    /**
+     * The maximum number of retry times is 4.
+     */
     private static final int TASK_FAILED_TIMES = 4;
 
-    private DataSource dataSource;
-
-    private Queue<ColumnVector[]> batchVectors;
-
-    private NdpPredicateInfo ndpPredicateInfo;
+    private TaskSource taskSource;
 
     private List<String> omniDataHosts;
 
-    private int ndpReplicationNum;
+    private PageDeserializer deserializer;
 
-    public OmniDataAdapter(DataSource dataSource, Configuration conf, FileSplit fileSplit,
-                           NdpPredicateInfo ndpPredicateInfo) {
-        this.dataSource = dataSource;
-        if (dataSource instanceof HdfsDataSource && ndpPredicateInfo.getHasPartitionColumn()) {
-            this.ndpPredicateInfo = addPartitionValues(ndpPredicateInfo, ((HdfsDataSource) dataSource).getPath(),
-                    HiveConf.getVar(conf, HiveConf.ConfVars.DEFAULTPARTITIONNAME));
+    public OmniDataAdapter(Configuration conf, FileSplit fileSplit, NdpPredicateInfo ndpPredicateInfo,
+                           PageDeserializer deserializer) {
+        this.deserializer = deserializer;
+        String path = fileSplit.getPath().toString();
+        long start = fileSplit.getStart();
+        long length = fileSplit.getLength();
+        // data source information, for connecting to data source.
+        DataSource dataSource;
+        if (ndpPredicateInfo.getDataFormat().toLowerCase(Locale.ENGLISH).contains("parquet")) {
+            dataSource = new HdfsParquetDataSource(path, start, length, false);
         } else {
-            this.ndpPredicateInfo = ndpPredicateInfo;
+            dataSource = new HdfsOrcDataSource(path, start, length, false);
         }
-        ndpReplicationNum = NdpConf.getNdpReplicationNum(conf);
-        omniDataHosts = getOmniDataHosts(conf, fileSplit);
-    }
-
-    private List<String> getOmniDataHosts(Configuration conf, FileSplit fileSplit) {
-        List<String> omniDataHosts = new ArrayList<>();
-        List<String> dataNodeHosts = getDataNodeHosts(conf, fileSplit);
-        // shuffle
-        Collections.shuffle(dataNodeHosts);
-        dataNodeHosts.forEach(dn -> {
-            // possibly null
-            if (conf.get(dn) != null) {
-                omniDataHosts.add(conf.get(dn));
-            }
-        });
-        // add a random available datanode
-        String randomDataNodeHost = NdpStatusManager.getRandomAvailableDataNodeHost(conf, dataNodeHosts);
-        if (randomDataNodeHost.length() > 0 && conf.get(randomDataNodeHost) != null) {
-            omniDataHosts.add(conf.get(randomDataNodeHost));
+        if (ndpPredicateInfo.getHasPartitionColumn()) {
+            addPartitionValues(ndpPredicateInfo, path, HiveConf.getVar(conf, HiveConf.ConfVars.DEFAULTPARTITIONNAME));
         }
-        return omniDataHosts;
-    }
-
-    private List<String> getDataNodeHosts(Configuration conf, FileSplit fileSplit) {
-        List<String> hosts = new ArrayList<>();
-        try {
-            BlockLocation[] blockLocations = fileSplit.getPath()
-                    .getFileSystem(conf)
-                    .getFileBlockLocations(fileSplit.getPath(), fileSplit.getStart(), fileSplit.getLength());
-            for (BlockLocation block : blockLocations) {
-                for (String host : block.getHosts()) {
-                    if ("localhost".equals(host)) {
-                        List<String> dataNodeHosts = new ArrayList<>(
-                                Arrays.asList(conf.get(NdpStatusManager.NDP_DATANODE_HOSTNAMES)
-                                        .split(NdpStatusManager.NDP_DATANODE_HOSTNAME_SEPARATOR)));
-                        if (dataNodeHosts.size() > ndpReplicationNum) {
-                            hosts.addAll(dataNodeHosts.subList(0, ndpReplicationNum));
-                        } else {
-                            hosts.addAll(dataNodeHosts);
-                        }
-                        return hosts;
-                    } else {
-                        hosts.add(host);
-                    }
-                    if (ndpReplicationNum == hosts.size()) {
-                        return hosts;
-                    }
-                }
-            }
-        } catch (IOException e) {
-            LOGGER.error("OmniDataAdapter getDataNodeHosts() failed", e);
-        }
-        return hosts;
+        this.omniDataHosts = NdpStatusManager.getOmniDataHosts(conf, fileSplit,
+                OmniDataConf.getOmniDataReplicationNum(conf));
+        this.taskSource = new TaskSource(dataSource, ndpPredicateInfo.getPredicate(), 1048576);
     }
 
     public Queue<ColumnVector[]> getBatchFromOmniData() throws UnknownHostException {
-        Predicate predicate = ndpPredicateInfo.getPredicate();
-        TaskSource taskSource = new TaskSource(dataSource, predicate, 1048576);
-        DecodeType[] columnTypes = new DecodeType[ndpPredicateInfo.getDecodeTypes().size()];
-        for (int index = 0; index < columnTypes.length; index++) {
-            String codeType = ndpPredicateInfo.getDecodeTypes().get(index);
-            if (ndpPredicateInfo.getDecodeTypesWithAgg().get(index)) {
-                columnTypes[index] = OmniDataUtils.transOmniDataAggDecodeType(codeType);
-            } else {
-                columnTypes[index] = OmniDataUtils.transOmniDataDecodeType(codeType);
-            }
-        }
-
-        PageDeserializer deserializer = new PageDeserializer(columnTypes);
-
         Queue<ColumnVector[]> pages = new LinkedList<>();
         int failedTimes = 0;
         Properties properties = new Properties();
+        //  If the OmniData task fails due to an exception, the task will look for the next available OmniData host
         for (String omniDataHost : omniDataHosts) {
             String ipAddress = InetAddress.getByName(omniDataHost).getHostAddress();
             properties.put("omnidata.client.target.list", ipAddress);
             DataReaderImpl<List<ColumnVector[]>> dataReader = null;
             try {
-                dataReader = new DataReaderImpl<>(properties, taskSource,
-                        deserializer);
+                dataReader = new DataReaderImpl<>(properties, taskSource, deserializer);
                 do {
                     List<ColumnVector[]> page = dataReader.getNextPageBlocking();
                     if (page != null) {
                         pages.addAll(page);
                     }
                 } while (!dataReader.isFinished());
+                dataReader.close();
                 break;
             } catch (OmniDataException omniDataException) {
                 LOGGER.warn("OmniDataAdapter failed node info [hostname :{}]", omniDataHost);
@@ -199,10 +137,14 @@ public class OmniDataAdapter implements Serializable {
                         LOGGER.warn("OmniDataException: OMNIDATA_ERROR.");
                 }
                 failedTimes++;
+                pages.clear();
+                if (dataReader != null) {
+                    dataReader.close();
+                }
             } catch (Exception e) {
                 LOGGER.error("OmniDataAdapter getBatchFromOmnidata() has error:", e);
                 failedTimes++;
-            } finally {
+                pages.clear();
                 if (dataReader != null) {
                     dataReader.close();
                 }
@@ -215,29 +157,4 @@ public class OmniDataAdapter implements Serializable {
         }
         return pages;
     }
-
-    public boolean nextBatchFromOmniData(VectorizedRowBatch batch) throws UnknownHostException {
-        if (batchVectors == null) {
-            batchVectors = getBatchFromOmniData();
-        }
-        if (!batchVectors.isEmpty()) {
-            ColumnVector[] batchVector = batchVectors.poll();
-            // channelCount: column, positionCount: row
-            int channelCount = batchVector.length;
-            int positionCount = batchVector[0].isNull.length;
-            if (ndpPredicateInfo.getIsPushDownAgg()) {
-                // agg raw return
-                System.arraycopy(batchVector, 0, batch.cols, 0, channelCount);
-            } else {
-                for (int i = 0; i < channelCount; i++) {
-                    int columnId = ndpPredicateInfo.getOutputColumns().get(i);
-                    batch.cols[columnId] = batchVector[i];
-                }
-            }
-            batch.size = positionCount;
-            return true;
-        }
-        return false;
-    }
-
 }

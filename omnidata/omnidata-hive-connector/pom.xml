@@ -7,7 +7,7 @@
     <groupId>org.apache.hive</groupId>
     <artifactId>omnidata-hive-connector-root</artifactId>
     <description>OmniData - Hive Connector Root</description>
-    <version>1.4.0</version>
+    <version>1.3.0</version>
     <packaging>pom</packaging>
 
     <modules>

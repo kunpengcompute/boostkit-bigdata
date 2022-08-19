@@ -75,6 +75,10 @@ public class TableScanDesc extends AbstractOperatorDesc implements IStatsGatherD
   private String tmpStatsDir;
 
   private String ndpPredicateInfoStr;
+  private TypeInfo[] rowColumnTypeInfos;
+  private boolean isPushDownFilter = false;
+  private boolean isPushDownAgg = false;
+  private double omniDataSelectivity = 1.0d;
   private ExprNodeGenericFuncDesc filterExpr;
   private Serializable filterObject;
   private String serializedFilterExpr;
@@ -93,16 +97,13 @@ public class TableScanDesc extends AbstractOperatorDesc implements IStatsGatherD
   private transient List<String> referencedColumns;
 
   public static final String FILTER_EXPR_CONF_STR =
-      "hive.io.filter.expr.serialized";
-
-  public static final String NDP_PREDICATE_EXPR_CONF_STR =
-      "hive.io.ndp.predicate.expr.serialized";
+          "hive.io.filter.expr.serialized";
 
   public static final String FILTER_TEXT_CONF_STR =
-      "hive.io.filter.text";
+          "hive.io.filter.text";
 
   public static final String FILTER_OBJECT_CONF_STR =
-      "hive.io.filter.object";
+          "hive.io.filter.object";
 
   // input file name (big) to bucket number
   private Map<String, Integer> bucketFileNameMapping;
@@ -238,6 +239,38 @@ public class TableScanDesc extends AbstractOperatorDesc implements IStatsGatherD
 
   public void setNdpPredicateInfoStr(String ndpPredicateInfoStr) {
     this.ndpPredicateInfoStr = ndpPredicateInfoStr;
+  }
+
+  public TypeInfo[] getRowColumnTypeInfos() {
+    return rowColumnTypeInfos;
+  }
+
+  public void setRowColumnTypeInfos(TypeInfo[] rowColumnTypeInfos) {
+    this.rowColumnTypeInfos = rowColumnTypeInfos;
+  }
+
+  public boolean isPushDownFilter() {
+    return isPushDownFilter;
+  }
+
+  public void setPushDownFilter(boolean isPushDownFilter) {
+    this.isPushDownFilter = isPushDownFilter;
+  }
+
+  public boolean isPushDownAgg() {
+    return isPushDownAgg;
+  }
+
+  public void setPushDownAgg(boolean isPushDownAgg) {
+    this.isPushDownAgg = isPushDownAgg;
+  }
+
+  public double getOmniDataSelectivity() {
+    return omniDataSelectivity;
+  }
+
+  public void setOmniDataSelectivity(double omniDataSelectivity) {
+    this.omniDataSelectivity = omniDataSelectivity;
   }
 
   // @Signature // XXX
@@ -492,7 +525,7 @@ public class TableScanDesc extends AbstractOperatorDesc implements IStatsGatherD
     private final VectorTableScanDesc vectorTableScanDesc;
 
     public TableScanOperatorExplainVectorization(TableScanDesc tableScanDesc,
-        VectorTableScanDesc vectorTableScanDesc) {
+                                                 VectorTableScanDesc vectorTableScanDesc) {
       // Native vectorization supported.
       super(vectorTableScanDesc, true);
       this.tableScanDesc = tableScanDesc;
@@ -513,13 +546,13 @@ public class TableScanDesc extends AbstractOperatorDesc implements IStatsGatherD
       }
 
       DataTypePhysicalVariation[] projectedColumnDataTypePhysicalVariations =
-          vectorTableScanDesc.getProjectedColumnDataTypePhysicalVariations();
+              vectorTableScanDesc.getProjectedColumnDataTypePhysicalVariations();
 
       return BaseExplainVectorization.getColumnAndTypes(
-          projectionColumns,
-          projectedColumnNames,
-          projectedColumnTypeInfos,
-          projectedColumnDataTypePhysicalVariations).toString();
+              projectionColumns,
+              projectedColumnNames,
+              projectedColumnTypeInfos,
+              projectedColumnDataTypePhysicalVariations).toString();
     }
   }
 
@@ -549,9 +582,9 @@ public class TableScanDesc extends AbstractOperatorDesc implements IStatsGatherD
     if (getClass().getName().equals(other.getClass().getName())) {
       TableScanDesc otherDesc = (TableScanDesc) other;
       return Objects.equals(getQualifiedTable(), otherDesc.getQualifiedTable()) &&
-          ExprNodeDescUtils.isSame(getFilterExpr(), otherDesc.getFilterExpr()) &&
-          getRowLimit() == otherDesc.getRowLimit() &&
-          isGatherStats() == otherDesc.isGatherStats();
+              ExprNodeDescUtils.isSame(getFilterExpr(), otherDesc.getFilterExpr()) &&
+              getRowLimit() == otherDesc.getRowLimit() &&
+              isGatherStats() == otherDesc.isGatherStats();
     }
     return false;
   }
