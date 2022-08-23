@@ -51,6 +51,6 @@ else
   cmake .. -DCMAKE_BUILD_TYPE=Release
 fi
 
-make
+make -j5
 
 set +eu
