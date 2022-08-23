@@ -26,6 +26,8 @@ import org.apache.hadoop.hive.ql.omnidata.operator.enums.NdpUdfEnum;
 import org.apache.hadoop.hive.ql.plan.ExprNodeColumnDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeConstantDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
+import org.apache.hadoop.hive.ql.plan.ExprNodeDynamicListDesc;
+import org.apache.hadoop.hive.ql.plan.ExprNodeDynamicValueDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
 import org.apache.hadoop.hive.ql.udf.UDFLike;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDFBetween;
@@ -91,10 +93,15 @@ public class NdpFilter {
             return;
         }
         // start to part push down
+        // create un push down
+        if (checkDynamicValue(unsupportedFilterDescList)) {
+            this.unPushDownFilterDesc = createNewFuncDesc(rawFuncDesc, unsupportedFilterDescList);
+        } else {
+            mode = NdpFilterMode.NONE;
+            return;
+        }
         // create part push down
         this.pushDownFilterDesc = createNewFuncDesc(rawFuncDesc, supportedFilterDescList);
-        // create un push down
-        this.unPushDownFilterDesc = createNewFuncDesc(rawFuncDesc, unsupportedFilterDescList);
     }
 
     public NdpFilterBinaryTree getBinaryTreeHead() {
@@ -144,6 +151,17 @@ public class NdpFilter {
         binaryTreeHead = new NdpFilterBinaryTree(funcDesc, ndpFilterLeafList);
     }
 
+    private boolean checkDynamicValue(List<ExprNodeDesc> exprNodeDescList) {
+        for (ExprNodeDesc desc : exprNodeDescList) {
+            for (ExprNodeDesc child : desc.getChildren()) {
+                if (child instanceof ExprNodeDynamicValueDesc || child instanceof ExprNodeDynamicListDesc) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
     /**
      * Todo: need to optimization
      *
@@ -156,7 +174,7 @@ public class NdpFilter {
             return newChildren.get(0);
         } else {
             return new ExprNodeGenericFuncDesc(oldFuncDesc.getTypeInfo(), oldFuncDesc.getGenericUDF(),
-                oldFuncDesc.getFuncText(), newChildren);
+                    oldFuncDesc.getFuncText(), newChildren);
         }
     }
 
@@ -176,8 +194,8 @@ public class NdpFilter {
                 break;
             case UNSUPPORTED:
                 // operator unsupported
-                LOG.info("OmniData Hive Part Filter failed to push down, since unsupported this Operator class: [{}]",
-                    operator);
+                LOG.info("OmniData Hive Filter do not to all push down, since unsupported this Operator class: [{}]",
+                        funcDesc.getGenericUDF().getClass().getSimpleName());
                 unsupportedFilterDescList.add(funcDesc);
                 break;
             default:
@@ -259,6 +277,10 @@ public class NdpFilter {
     private boolean checkUdf(ExprNodeGenericFuncDesc funcDesc, NdpHiveOperatorEnum operator) {
         int argumentIndex = 0;
         if (operator.equals(NdpHiveOperatorEnum.BETWEEN)) {
+            // Between not support ExprNodeDynamicValueDesc
+            if (!checkBetween(funcDesc)) {
+                return false;
+            }
             // first argument for BETWEEN should be boolean type
             argumentIndex = 1;
         }
@@ -269,13 +291,18 @@ public class NdpFilter {
             if (udfFuncDesc instanceof ExprNodeGenericFuncDesc) {
                 // check whether the UDF supports push down
                 if (!NdpUdfEnum.checkUdfSupported(((ExprNodeGenericFuncDesc) udfFuncDesc).getGenericUDF())) {
-                    LOG.info("OmniData Hive Part Filter failed to push down, since unsupported this UDF class: [{}]",
-                        udfFuncDesc.getClass());
+                    LOG.info("OmniData Hive Filter failed to all push down, since unsupported this UDF class: [{}]",
+                            ((ExprNodeGenericFuncDesc) udfFuncDesc).getGenericUDF());
                     return false;
                 }
             }
         }
         return true;
+    }
+
+    private boolean checkBetween(ExprNodeGenericFuncDesc funcDesc) {
+        return funcDesc.getChildren().get(2) instanceof ExprNodeConstantDesc && funcDesc.getChildren()
+                .get(3) instanceof ExprNodeConstantDesc;
     }
 
     /**
@@ -318,7 +345,7 @@ public class NdpFilter {
         }
 
         private NdpFilterBinaryTree(NdpOperator ndpOperator, List<ExprNodeGenericFuncDesc> exprNodes,
-            List<NdpFilterLeaf> ndpFilterLeafList) {
+                                    List<NdpFilterLeaf> ndpFilterLeafList) {
             if (exprNodes.size() >= 2) {
                 this.ndpOperator = ndpOperator;
                 leftChild = new NdpFilterBinaryTree(exprNodes.get(0), ndpFilterLeafList);
@@ -375,8 +402,8 @@ public class NdpFilter {
                         restChildren.add((ExprNodeGenericFuncDesc) expr);
                     } else {
                         LOG.info(
-                            "OmniData Hive Filter failed to push down, since Method parseAndOrOperator() unsupported this [{}]",
-                            expr.getClass());
+                                "OmniData Hive Filter failed to push down, since Method parseAndOrOperator() unsupported this [{}]",
+                                expr.getClass());
                         setNdpLeafOperatorUnsupported();
                     }
                 }
@@ -388,8 +415,8 @@ public class NdpFilter {
                 }
             } else {
                 LOG.info(
-                    "OmniData Hive Filter failed to push down, since Method parseAndOrOperator() unsupported this [{}]",
-                    leftExpr.getClass());
+                        "OmniData Hive Filter failed to push down, since Method parseAndOrOperator() unsupported this [{}]",
+                        leftExpr.getClass());
                 setNdpLeafOperatorUnsupported();
             }
         }
@@ -402,8 +429,8 @@ public class NdpFilter {
                     leftChild = new NdpFilterBinaryTree((ExprNodeGenericFuncDesc) expr, ndpFilterLeafList);
                 } else {
                     LOG.info(
-                        "OmniData Hive Filter failed to push down, since Method parseNotOperator() unsupported this [{}]",
-                        expr.getClass());
+                            "OmniData Hive Filter failed to push down, since Method parseNotOperator() unsupported this [{}]",
+                            expr.getClass());
                     setNdpLeafOperatorUnsupported();
                 }
             } else {
@@ -428,8 +455,8 @@ public class NdpFilter {
 
         public void parseFilterOperator(ExprNodeGenericFuncDesc exprNode) {
             Class operator = (exprNode.getGenericUDF() instanceof GenericUDFBridge)
-                ? ((GenericUDFBridge) exprNode.getGenericUDF()).getUdfClass()
-                : exprNode.getGenericUDF().getClass();
+                    ? ((GenericUDFBridge) exprNode.getGenericUDF()).getUdfClass()
+                    : exprNode.getGenericUDF().getClass();
             if (operator == GenericUDFOPAnd.class) {
                 ndpOperator = NdpOperator.AND;
             } else if (operator == GenericUDFOPOr.class) {
@@ -462,8 +489,8 @@ public class NdpFilter {
                 ndpLeafOperator = NdpLeafOperator.LESS_THAN_OR_EQUAL;
             } else if (operator == GenericUDFBetween.class) {
                 ndpOperator = (Boolean) ((ExprNodeConstantDesc) exprNode.getChildren().get(0)).getValue()
-                    ? NdpOperator.NOT
-                    : NdpOperator.LEAF;
+                        ? NdpOperator.NOT
+                        : NdpOperator.LEAF;
                 ndpLeafOperator = NdpLeafOperator.BETWEEN;
             } else if (operator == GenericUDFIn.class) {
                 ndpOperator = NdpOperator.LEAF;
@@ -474,8 +501,8 @@ public class NdpFilter {
             } else {
                 ndpOperator = NdpOperator.LEAF;
                 LOG.info(
-                    "OmniData Hive Filter failed to push down, since Method parseFilterOperator() unsupported this [{}]",
-                    operator);
+                        "OmniData Hive Filter failed to push down, since Method parseFilterOperator() unsupported this [{}]",
+                        operator);
                 setNdpLeafOperatorUnsupported();
             }
         }

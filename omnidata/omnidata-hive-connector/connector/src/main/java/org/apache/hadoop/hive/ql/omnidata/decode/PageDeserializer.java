@@ -25,7 +25,7 @@ import io.airlift.slice.SliceInput;
 import io.hetu.core.transport.execution.buffer.SerializedPage;
 
 import org.apache.hadoop.hive.ql.exec.vector.ColumnVector;
-import org.apache.hadoop.hive.ql.omnidata.decode.type.DecodeType;
+import com.huawei.boostkit.omnidata.decode.type.DecodeType;
 
 import java.util.ArrayList;
 import java.util.List;
