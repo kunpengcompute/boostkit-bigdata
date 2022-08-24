@@ -41,7 +41,7 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.codegen.LazilyGeneratedOrdering
 import org.apache.spark.sql.catalyst.plans.physical._
-import org.apache.spark.sql.execution.exchange.{ENSURE_REQUIREMENTS, ShuffleExchangeExec, ShuffleOrigin}
+import org.apache.spark.sql.execution.exchange.{ENSURE_REQUIREMENTS, ShuffleExchangeExec, ShuffleExchangeLike, ShuffleOrigin}
 import org.apache.spark.sql.execution.exchange.ShuffleExchangeExec.createShuffleWriteProcessor
 import org.apache.spark.sql.execution.metric._
 import org.apache.spark.sql.execution.metric.{SQLMetric, SQLShuffleWriteMetricsReporter}
@@ -56,7 +56,7 @@ class ColumnarShuffleExchangeExec(
                                    override val outputPartitioning: Partitioning,
                                    child: SparkPlan,
                                    shuffleOrigin: ShuffleOrigin = ENSURE_REQUIREMENTS)
-  extends ShuffleExchangeExec(outputPartitioning, child) {
+  extends ShuffleExchangeExec(outputPartitioning, child) with ShuffleExchangeLike{
 
   private lazy val writeMetrics =
     SQLShuffleWriteMetricsReporter.createShuffleWriteMetrics(sparkContext)
@@ -93,6 +93,10 @@ class ColumnarShuffleExchangeExec(
       sparkContext.submitMapStage(columnarShuffleDependency)
     }
   }
+
+  override def numMappers: Int = columnarShuffleDependency.rdd.getNumPartitions
+
+  override def numPartitions: Int = columnarShuffleDependency.partitioner.numPartitions
 
   @transient
   lazy val columnarShuffleDependency: ShuffleDependency[Int, ColumnarBatch, ColumnarBatch] = {
