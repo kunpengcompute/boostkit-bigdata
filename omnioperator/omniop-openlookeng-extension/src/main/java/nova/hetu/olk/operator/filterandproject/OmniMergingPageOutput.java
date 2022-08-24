@@ -267,8 +267,8 @@ public class OmniMergingPageOutput
     public void close()
     {
         // free input page due to it may not be handled
-        while (currentInput != null) {
-            if (currentInput.hasNext()) {
+        if (currentInput != null) {
+            while (currentInput.hasNext()) {
                 Optional<Page> page = currentInput.next();
                 if (page.isPresent()) {
                     BlockUtils.freePage(page.get());
