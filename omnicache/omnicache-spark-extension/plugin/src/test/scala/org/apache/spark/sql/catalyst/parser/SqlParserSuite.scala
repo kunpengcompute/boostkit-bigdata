@@ -23,7 +23,7 @@ import com.huawei.boostkit.spark.util.ViewMetadata
 
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.catalyst.TableIdentifier
-import org.apache.spark.sql.catalyst.optimizer.rule.RewriteSuite
+import org.apache.spark.sql.catalyst.optimizer.rules.RewriteSuite
 
 class SqlParserSuite extends RewriteSuite {
 
