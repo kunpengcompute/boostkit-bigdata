@@ -46,10 +46,7 @@ class MaterializedViewAggregateRuleSuite extends RewriteSuite {
         |SELECT c.empid,c.deptno,c.locationid,sum(c.integertype) as _sum,
         |max(c.longtype) as _max,min(c.floattype) as _min,
         |count(c.doubletype) as _count,count(distinct c.datetype) as _count_distinct,
-        |avg(c.decimaltype) as _avg,
-        |max(c.deptno) as _max2,min(c.deptno) as _min2,
-        |count(c.deptno) as _count2,count(distinct c.deptno) as _count_distinct2,
-        |avg(c.deptno) as _avg2
+        |avg(c.decimaltype) as _avg
         |FROM column_type c
         |GROUP BY c.empid,c.deptno,c.locationid;
         |""".stripMargin
@@ -57,10 +54,21 @@ class MaterializedViewAggregateRuleSuite extends RewriteSuite {
   }
 
   test("mv_agg1_2") {
+    // group by column is same to view,additional agg on column in view
+    val sql =
+      """
+        |SELECT c.empid,c.deptno,c.locationid,sum(c.empid) as _sum
+        |FROM column_type c
+        |GROUP BY c.empid,c.deptno,c.locationid;
+        |""".stripMargin
+    compareNotRewriteAndRows(sql, noData = false)
+  }
+
+  test("mv_agg1_3") {
     // group by column is same to view,additional agg on column not in view
     val sql =
       """
-        |SELECT c.empid,c.deptno,c.locationid,sum(c.bytetype) as _sum,
+        |SELECT c.empid,c.deptno,c.locationid,sum(c.bytetype) as _sum
         |FROM column_type c
         |GROUP BY c.empid,c.deptno,c.locationid;
         |""".stripMargin
@@ -135,10 +143,7 @@ class MaterializedViewAggregateRuleSuite extends RewriteSuite {
       """
         |SELECT c.empid,c.deptno,sum(c.integertype) as _sum,
         |max(c.longtype) as _max,min(c.floattype) as _min,
-        |count(c.doubletype) as _count,
-        |max(c.deptno) as _max2,min(c.deptno) as _min2,
-        |count(c.deptno) as _count2,count(distinct c.deptno) as _count_distinct2,
-        |avg(c.deptno) as _avg2
+        |count(c.doubletype) as _count
         |FROM column_type c
         |GROUP BY c.empid,c.deptno;
         |""".stripMargin
@@ -162,10 +167,7 @@ class MaterializedViewAggregateRuleSuite extends RewriteSuite {
       """
         |SELECT sum(c.integertype) as _sum,
         |max(c.longtype) as _max,min(c.floattype) as _min,
-        |count(c.doubletype) as _count,
-        |max(c.deptno) as _max2,min(c.deptno) as _min2,
-        |count(c.deptno) as _count2,count(distinct c.deptno) as _count_distinct2,
-        |avg(c.deptno) as _avg2
+        |count(c.doubletype) as _count
         |FROM column_type c ;
         |""".stripMargin
     comparePlansAndRows(sql, "default", "mv_agg3", noData = false)
@@ -206,10 +208,7 @@ class MaterializedViewAggregateRuleSuite extends RewriteSuite {
         |SELECT c.empid,c.deptno,c.locationid,sum(c.integertype) as _sum,
         |max(c.longtype) as _max,min(c.floattype) as _min,
         |count(c.doubletype) as _count,count(distinct c.datetype) as _count_distinct,
-        |avg(c.decimaltype) as _avg,
-        |max(c.deptno) as _max2,min(c.deptno) as _min2,
-        |count(c.deptno) as _count2,count(distinct c.deptno) as _count_distinct2,
-        |avg(c.deptno) as _avg2
+        |avg(c.decimaltype) as _avg
         |FROM column_type c JOIN emps e
         |ON c.empid=e.empid
         |AND c.empid=1
@@ -224,10 +223,7 @@ class MaterializedViewAggregateRuleSuite extends RewriteSuite {
       """
         |SELECT c.empid,c.deptno,sum(c.integertype) as _sum,
         |max(c.longtype) as _max,min(c.floattype) as _min,
-        |count(c.doubletype) as _count,
-        |max(c.deptno) as _max2,min(c.deptno) as _min2,
-        |count(c.deptno) as _count2,count(distinct c.deptno) as _count_distinct2,
-        |avg(c.deptno) as _avg2
+        |count(c.doubletype) as _count
         |FROM column_type c JOIN emps e
         |ON c.empid=e.empid
         |AND c.empid=1

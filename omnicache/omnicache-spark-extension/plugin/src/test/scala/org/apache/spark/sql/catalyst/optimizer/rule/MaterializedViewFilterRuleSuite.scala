@@ -41,7 +41,7 @@ class MaterializedViewFilterRuleSuite extends RewriteSuite {
         |SELECT * FROM COLUMN_TYPE WHERE empid=1
         |AND booleantype=TRUE AND bytetype=1 AND shorttype=1 AND integertype=1
         |AND longtype=1 AND floattype=1.0 AND doubletype=1.0
-        |AND datetype=DATE '2022-01-01' AND timestamptype=TIMESTAMP '2022-01-01'
+        |AND datetype=DATE '2022-01-01' AND timestamptype=TIMESTAMP '2022-01-01 00:00:00.0'
         |AND stringtype='stringtype1' AND decimaltype=1.0;
         |""".stripMargin
     comparePlansAndRows(sql, "default", "mv_filter1", noData = false)
@@ -117,7 +117,7 @@ class MaterializedViewFilterRuleSuite extends RewriteSuite {
     val sql =
       """
         |SELECT * FROM COLUMN_TYPE WHERE empid=1
-        |AND stringtype like 'stringtype2';
+        |AND stringtype like 'stringtype1';
         |""".stripMargin
     comparePlansAndRows(sql, "default", "mv_filter1", noData = false)
   }
@@ -269,7 +269,7 @@ class MaterializedViewFilterRuleSuite extends RewriteSuite {
         |AND stringtype='stringtype3'
         |AND timestamptype is null AND decimaltype is not null;
         |""".stripMargin
-    compareNotRewriteAndRows(sql, noData = false)
+    compareNotRewriteAndRows(sql, noData = true)
   }
 
   test("mv_filter2_disable") {

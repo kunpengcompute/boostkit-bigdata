@@ -25,13 +25,16 @@ import org.antlr.v4.runtime.tree.{ParseTree, RuleNode}
 import scala.collection.JavaConverters._
 
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.{AnalysisException, SparkSession}
+import org.apache.spark.sql.{AnalysisException, SaveMode, SparkSession}
 import org.apache.spark.sql.catalyst.{SQLConfHelper, TableIdentifier}
+import org.apache.spark.sql.catalyst.analysis.UnresolvedAttribute
 import org.apache.spark.sql.catalyst.parser.OmniCacheSqlExtensionsParser._
 import org.apache.spark.sql.catalyst.parser.ParserUtils._
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.command._
+import org.apache.spark.sql.execution.datasources._
+import org.apache.spark.sql.hive.HiveSessionCatalog
 
 class OmniCacheExtensionAstBuilder(spark: SparkSession, delegate: ParserInterface)
     extends OmniCacheSqlExtensionsBaseVisitor[AnyRef] with SQLConfHelper with Logging {
@@ -82,6 +85,98 @@ class OmniCacheExtensionAstBuilder(spark: SparkSession, delegate: ParserInterfac
     val ifNotExists = ctx.EXISTS() != null
     val multipartIdentifier = ctx.multipartIdentifier.parts.asScala.map(_.getText)
     (multipartIdentifier, ifNotExists)
+  }
+
+  override def visitRefreshMV(ctx: RefreshMVContext): LogicalPlan = withOrigin(ctx) {
+    val tableIdent = visitMultipartIdentifier(ctx.multipartIdentifier())
+
+    val (databaseName, name) = tableIdent match {
+      case Seq(mv) => (None, mv)
+      case Seq(database, mv) => (Some(database), mv)
+      case _ => throw new AnalysisException(
+        "The mv name is not valid: %s".format(tableIdent.mkString("."))
+      )
+    }
+
+    val tableIdentifier = TableIdentifier(name, databaseName)
+
+    if (!spark.sessionState.catalog.tableExists(tableIdentifier)) {
+      throw new AnalysisException(
+        s"Table or view not found: $tableIdentifier .")
+    }
+
+    var catalogTable = spark.sessionState.catalog.getTableMetadata(tableIdentifier)
+    val queryStr = catalogTable.properties.get(MV_QUERY_ORIGINAL_SQL)
+    if (queryStr.isEmpty) {
+      throw new RuntimeException("cannot refresh a table with refresh mv")
+    }
+
+    // preserver preDatabase and set curDatabase
+    val preDatabase = spark.catalog.currentDatabase
+    val curDatabase = catalogTable.properties.getOrElse(MV_QUERY_ORIGINAL_SQL_CUR_DB, "")
+    if (curDatabase.isEmpty) {
+      throw new RuntimeException(
+        s"mvTable: ${catalogTable.identifier.quotedString}'s curDatabase is empty!")
+    }
+    try {
+      spark.sessionState.catalogManager.setCurrentNamespace(Array(curDatabase))
+      // disable plugin and mv rewrite
+      RewriteHelper.disableCachePlugin()
+      catalogTable = catalogTable.copy(properties =
+        catalogTable.properties + (MV_UPDATE_REWRITE_ENABLED -> "false"))
+      spark.sessionState.catalog.alterTable(catalogTable)
+      val data = spark.sql(queryStr.get).queryExecution.optimizedPlan
+
+      val metastoreCatalog = spark.sessionState.catalog
+          .asInstanceOf[HiveSessionCatalog].metastoreCatalog
+      val hiveTable = DDLUtils.readHiveTable(catalogTable)
+      val hadoopRelation = metastoreCatalog.convert(hiveTable) match {
+        case LogicalRelation(t: HadoopFsRelation, _, _, _) => t
+        case _ => throw new AnalysisException(s"$tableIdentifier should be converted to " +
+            "HadoopFsRelation.")
+      }
+
+      val allPaths = hadoopRelation.location.rootPaths
+      val outputPath = if (allPaths.length == 1) {
+        val path = allPaths.head
+        val fs = path.getFileSystem(spark.sessionState.newHadoopConf())
+        path.makeQualified(fs.getUri, fs.getWorkingDirectory)
+      } else {
+        throw new IllegalArgumentException("Expected exactly one path to be specified, but " +
+            s"got: ${allPaths.mkString(", ")}")
+      }
+
+      val caseSensitive = spark.sessionState.conf.caseSensitiveAnalysis
+      val partitionColumns = catalogTable.partitionColumnNames
+      PartitioningUtils.validatePartitionColumn(data.schema, partitionColumns, caseSensitive)
+
+      val fileIndex = Some(catalogTable.identifier).map { tableIdent =>
+        spark.table(tableIdent).queryExecution.analyzed.collect {
+          case LogicalRelation(t: HadoopFsRelation, _, _, _) => t.location
+        }.head
+      }
+      // For partitioned relation r, r.schema's column ordering can be different from the column
+      // ordering of data.logicalPlan (partition columns are all moved after data column).  This
+      // will be adjusted within InsertIntoHadoopFsRelation.
+      RefreshMaterializedViewCommand(
+        outputPath = outputPath,
+        staticPartitions = Map.empty,
+        ifPartitionNotExists = false,
+        partitionColumns = partitionColumns.map(UnresolvedAttribute.quoted),
+        bucketSpec = hadoopRelation.bucketSpec,
+        fileFormat = hadoopRelation.fileFormat,
+        options = hadoopRelation.options,
+        query = data,
+        mode = SaveMode.Overwrite,
+        catalogTable = Some(catalogTable),
+        fileIndex = fileIndex,
+        outputColumnNames = data.output.map(_.name))
+    } catch {
+      case e: Throwable =>
+        throw e
+    } finally {
+      spark.sessionState.catalogManager.setCurrentNamespace(Array(preDatabase))
+    }
   }
 
   /**

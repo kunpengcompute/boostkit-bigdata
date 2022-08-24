@@ -20,9 +20,9 @@ package org.apache.spark.sql.catalyst.optimizer.rule
 
 import com.huawei.boostkit.spark.conf.OmniCachePluginConfig
 import com.huawei.boostkit.spark.util.RewriteHelper._
-
 import java.io.File
 import java.util.Locale
+
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 import org.apache.spark.sql.catalyst.TableIdentifier
@@ -40,12 +40,12 @@ class RewriteSuite extends SparkFunSuite with PredicateHelper {
 
   System.setProperty("HADOOP_USER_NAME", "root")
   lazy val spark: SparkSession = SparkSession.builder().master("local")
-    .config("spark.sql.extensions", "com.huawei.boostkit.spark.OmniCache")
-    .config("hive.exec.dynamic.partition.mode", "nonstrict")
-    .config("spark.ui.port", "4050")
-    // .config("spark.sql.planChangeLog.level","WARN")
-    .enableHiveSupport()
-    .getOrCreate()
+      .config("spark.sql.extensions", "com.huawei.boostkit.spark.OmniCache")
+      .config("hive.exec.dynamic.partition.mode", "nonstrict")
+      .config("spark.ui.port", "4050")
+      // .config("spark.sql.planChangeLog.level","WARN")
+      .enableHiveSupport()
+      .getOrCreate()
   spark.sparkContext.setLogLevel("WARN")
   lazy val catalog: SessionCatalog = spark.sessionState.catalog
 
@@ -192,7 +192,7 @@ class RewriteSuite extends SparkFunSuite with PredicateHelper {
   preCreateTable()
 
   def transformAllExpressions(plan: LogicalPlan,
-                              rule: PartialFunction[Expression, Expression]): LogicalPlan = {
+      rule: PartialFunction[Expression, Expression]): LogicalPlan = {
     plan.transformUp {
       case q: QueryPlan[_] => q.transformExpressions(rule)
     }
@@ -248,7 +248,7 @@ class RewriteSuite extends SparkFunSuite with PredicateHelper {
     plan transform {
       case Filter(condition: Expression, child: LogicalPlan) =>
         Filter(splitConjunctivePredicates(condition).map(rewriteBinaryComparison)
-          .sortBy(_.hashCode()).reduce(And), child)
+            .sortBy(_.hashCode()).reduce(And), child)
       case sample: Sample =>
         sample.copy(seed = 0L)
       case Join(left, right, joinType, condition, hint) if condition.isDefined =>
@@ -261,7 +261,7 @@ class RewriteSuite extends SparkFunSuite with PredicateHelper {
 
         val newCondition =
           splitConjunctivePredicates(condition.get).map(rewriteBinaryComparison)
-            .sortBy(_.hashCode()).reduce(And)
+              .sortBy(_.hashCode()).reduce(And)
         Join(left, right, newJoinType, Some(newCondition), hint)
     }
   }
@@ -285,9 +285,9 @@ class RewriteSuite extends SparkFunSuite with PredicateHelper {
 
   /** Fails the test if the two plans do not match */
   protected def comparePlans(
-                              plan1: LogicalPlan,
-                              plan2: LogicalPlan,
-                              checkAnalysis: Boolean = true): Unit = {
+      plan1: LogicalPlan,
+      plan2: LogicalPlan,
+      checkAnalysis: Boolean = true): Unit = {
     if (checkAnalysis) {
       // Make sure both plan pass checkAnalysis.
       SimpleAnalyzer.checkAnalysis(plan1)
@@ -310,7 +310,7 @@ class RewriteSuite extends SparkFunSuite with PredicateHelper {
   }
 
   /** Fails the test if the two expressions do not match */
-  protected def compareExpressions(e1: Expression, e2: Expression): Unit = {
+  protected def compareExpression(e1: Expression, e2: Expression): Unit = {
     comparePlans(Filter(e1, OneRowRelation()), Filter(e2, OneRowRelation()), checkAnalysis = false)
   }
 
@@ -385,7 +385,7 @@ class RewriteSuite extends SparkFunSuite with PredicateHelper {
   def compareSql(sql1: String, sql2: String): Unit = {
     assert(
       sql1.trim.toLowerCase(Locale.ROOT) == sql2
-        .trim.toLowerCase(Locale.ROOT)
+          .trim.toLowerCase(Locale.ROOT)
     )
   }
 
@@ -395,7 +395,7 @@ class RewriteSuite extends SparkFunSuite with PredicateHelper {
     } catch {
       case e: Throwable =>
         assert(e.getMessage.toLowerCase(Locale.ROOT)
-          .contains(errorInfo.toLowerCase(Locale.ROOT)))
+            .contains(errorInfo.toLowerCase(Locale.ROOT)))
     }
   }
 

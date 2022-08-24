@@ -126,6 +126,7 @@ statement
       AS query                                                           #createMV
     | SHOW MATERIALIZED VIEWS (ON multipartIdentifier)?                  #showMVs
     | DROP MATERIALIZED VIEW (IF EXISTS)? multipartIdentifier            #dropMV
+    | REFRESH MATERIALIZED VIEW multipartIdentifier                      #refreshMV
     | EXPLAIN (LOGICAL | FORMATTED | EXTENDED | CODEGEN | COST)?
       statement                                                          #explain
     | ALTER MATERIALIZED VIEW multipartIdentifier

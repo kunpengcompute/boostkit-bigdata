@@ -61,6 +61,7 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
 
     // 3.use all tables to fetch views(may match) from ViewMetaData
     val candidateViewPlans = getApplicableMaterializations(queryTables.map(t => t.tableName))
+        .filter(x => !OmniCachePluginConfig.isMVInUpdate(sparkSession, x._1))
     if (candidateViewPlans.isEmpty) {
       return finalPlan
     }
@@ -381,14 +382,43 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
   }
 
   def splitFilter(queryExpression: Expression, viewExpression: Expression): Option[Expression] = {
-
     // 1.canonicalize expression,main for reorder
     val queryExpression2 = RewriteHelper.canonicalize(queryExpression)
     val viewExpression2 = RewriteHelper.canonicalize(viewExpression)
 
     // 2.or is residual predicts,this main deal residual predicts
-    // val z =
+    val z = splitOr(queryExpression2, viewExpression2)
+    if (z.isDefined) {
+      return z
+    }
 
+    // 3.isEquivalent after splitAnd
+    if (isEquivalent(queryExpression2, viewExpression2)) {
+      return Some(Literal.TrueLiteral)
+    }
+
+    // 4.viewExpression2 and not(queryExpression2)
+    val x = andNot(viewExpression2, queryExpression2)
+    // then check some absolutely invalid situation
+    if (mayBeSatisfiable(x)) {
+      // 4.1.queryExpression2 and viewExpression2
+      val x2 = ExprOptUtil.composeConjunctions(
+        Seq(queryExpression2, viewExpression2), nullOnEmpty = false)
+
+      // 4.2.canonicalize
+      val r = RewriteHelper.canonicalize(ExprSimplifier.simplify(x2))
+      if (ExprOptUtil.isAlwaysFalse(r)) {
+        return None
+      }
+
+      // 4.3.isEquivalent,remove views exists,return residue
+      if (isEquivalent(queryExpression2, r)) {
+        val conjs = ExprOptUtil.conjunctions(r).map(ExpressionEqual).toSet
+        val views = ExprOptUtil.conjunctions(viewExpression2).map(ExpressionEqual).toSet
+        val residue = (conjs -- views).map(_.expression).toSeq
+        return Some(ExprOptUtil.composeConjunctions(residue, nullOnEmpty = false))
+      }
+    }
     None
   }
 
@@ -401,8 +431,22 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
    * @return compensation Expression
    */
   def splitOr(queryExpression: Expression, viewExpression: Expression): Option[Expression] = {
-    // TODO
-    None
+    val queries = ExprOptUtil.disjunctions(queryExpression)
+    val views = ExprOptUtil.disjunctions(viewExpression)
+
+    // 1.compare difference which queries residue
+    val difference = queries.map(ExpressionEqual) -- views.map(ExpressionEqual)
+
+    // 2.1.queries equal to views,just return true
+    if (difference.isEmpty && queries.size == views.size) {
+      Some(Literal.TrueLiteral)
+      // 2.2.queries is subset of views,remain queries
+    } else if (difference.isEmpty) {
+      Some(queryExpression)
+      // 2.3.other is invalid
+    } else {
+      None
+    }
   }
 
   /**
@@ -413,8 +457,10 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
    * @return isEquivalent:true;isNotEquivalent:false
    */
   def isEquivalent(queryExpression: Expression, viewExpression: Expression): Boolean = {
-    // TODO
-    true
+    // split expression by and,then compare equals
+    val queries = ExprOptUtil.conjunctions(queryExpression).map(ExpressionEqual).toSet
+    val views = ExprOptUtil.conjunctions(viewExpression).map(ExpressionEqual).toSet
+    queries == views
   }
 
   /**
@@ -458,7 +504,7 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
     // other into normal
     val normal = mutable.Buffer[Expression]()
     val not = mutable.Buffer[Expression]()
-    // TODO
+    ExprOptUtil.decomposeConjunctions(expression, normal, not)
 
     // 2.normal exists FalseLiteral is invalid
     normal.foreach {
@@ -478,7 +524,10 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
     val normalSet = normal.map(ExpressionEqual).toSet
     for (n <- not) {
       // not doesn't recursively split former, there recursively split by and
-      // TODO
+      val ns = ExprOptUtil.conjunctions(n).map(ExpressionEqual).toSet
+      if (ns.subsetOf(normalSet)) {
+        return false
+      }
     }
 
     true

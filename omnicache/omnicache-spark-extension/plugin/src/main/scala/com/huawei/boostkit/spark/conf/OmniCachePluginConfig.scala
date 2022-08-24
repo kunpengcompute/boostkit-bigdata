@@ -17,6 +17,8 @@
 
 package com.huawei.boostkit.spark.conf
 
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.catalyst.catalog.CatalogTable
 import org.apache.spark.sql.internal.SQLConf
 
@@ -52,6 +54,8 @@ object OmniCachePluginConfig {
 
   val MV_REWRITE_ENABLED = "spark.omnicache.rewrite.enable"
 
+  val MV_UPDATE_REWRITE_ENABLED = "spark.omnicache.update.rewrite.enable"
+
   val MV_QUERY_ORIGINAL_SQL = "spark.omnicache.query.sql.original"
 
   val MV_QUERY_ORIGINAL_SQL_CUR_DB = "spark.omnicache.query.sql.cur.db"
@@ -73,5 +77,13 @@ object OmniCachePluginConfig {
 
   def isMV(catalogTable: CatalogTable): Boolean = {
     catalogTable.properties.contains(MV_QUERY_ORIGINAL_SQL)
+  }
+
+  def isMVInUpdate(spark: SparkSession, quotedMvName: String): Boolean = {
+    val names = quotedMvName.replaceAll("`", "")
+        .split("\\.").toSeq
+    val mv = TableIdentifier(names(1), Some(names.head))
+    val catalogTable = spark.sessionState.catalog.getTableMetadata(mv)
+    !catalogTable.properties.getOrElse(MV_UPDATE_REWRITE_ENABLED, "true").toBoolean
   }
 }

@@ -166,12 +166,7 @@ class MaterializedViewAggregateRule(sparkSession: SparkSession)
           // such as max(c1),min(c1),sum(c1),avg(c1),count(distinct c1),
           // if c1 in view,it can support
         } else {
-          expr = expr match {
-            case Alias(AggregateExpression(Count(_), _, _, _, _), _) => return None
-            case e => e
-          }
-          // exist new aggCall
-          projectFlag = false
+          return None
         }
         newQueryAggExpressions :+= expr.asInstanceOf[NamedExpression]
       }
@@ -200,10 +195,7 @@ class MaterializedViewAggregateRule(sparkSession: SparkSession)
             case _ => return None
           }
         } else {
-          expr = expr match {
-            case Alias(AggregateExpression(Count(_), _, _, _, _), _) => return None
-            case e => e
-          }
+          return None
         }
         newQueryAggExpressions :+= expr.asInstanceOf[NamedExpression]
       }
@@ -220,7 +212,6 @@ class MaterializedViewAggregateRule(sparkSession: SparkSession)
     if (rewritedQueryAggExpressions.isEmpty) {
       return None
     }
-
 
     // 5.add project
     if (projectFlag) {

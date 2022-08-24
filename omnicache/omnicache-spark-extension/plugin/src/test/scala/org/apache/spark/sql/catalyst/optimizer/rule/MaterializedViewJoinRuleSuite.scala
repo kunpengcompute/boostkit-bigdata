@@ -85,6 +85,7 @@ class MaterializedViewJoinRuleSuite extends RewriteSuite {
     val sql =
       """
         |SELECT v1.*,l.locationid
+        |FROM
         |(SELECT e.*,d.deptname
         |FROM emps e JOIN depts d
         |ON e.deptno=d.deptno
@@ -100,6 +101,7 @@ class MaterializedViewJoinRuleSuite extends RewriteSuite {
     val sql =
       """
         |SELECT v1.*,d.deptname
+        |FROM
         |(SELECT e.*,l.locationid
         |FROM emps e JOIN locations l
         |ON e.locationid=l.locationid
@@ -126,7 +128,7 @@ class MaterializedViewJoinRuleSuite extends RewriteSuite {
     spark.sql(sql).show()
   }
 
-  test("mv_join1") {
+  test("mv_join2") {
     spark.sql(
       """
         |DROP MATERIALIZED VIEW IF EXISTS mv_join2;
@@ -136,7 +138,7 @@ class MaterializedViewJoinRuleSuite extends RewriteSuite {
       """
         |CREATE MATERIALIZED VIEW IF NOT EXISTS mv_join2
         |AS
-        |SELECT e.*,c1.deptname
+        |SELECT e.*,c1.stringtype
         |FROM emps e JOIN column_type c1
         |ON e.deptno=c1.deptno
         |AND c1.deptno=1;
@@ -148,7 +150,7 @@ class MaterializedViewJoinRuleSuite extends RewriteSuite {
     // view tables is same to query, equal tables
     val sql =
       """
-        |SELECT e.*,c1.deptname
+        |SELECT e.*,c1.stringtype
         |FROM emps e JOIN column_type c1 JOIN column_type c2
         |ON e.deptno=c1.deptno AND e.deptno=c2.deptno
         |AND c1.deptno!=2

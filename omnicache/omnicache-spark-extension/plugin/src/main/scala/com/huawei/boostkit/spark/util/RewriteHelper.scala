@@ -154,7 +154,7 @@ class RewriteHelper extends PredicateHelper {
     topProjectList
   }
 
-  // TODO
+  // TODO delete
   case class EquivalenceClasses() {
 
     def getEquivalenceClassesMap: Map[ExpressionEqual, mutable.Set[ExpressionEqual]] = {
@@ -165,9 +165,12 @@ class RewriteHelper extends PredicateHelper {
       List.empty
     }
 
+    def addEquivalenceClass(p: ExpressionEqual, p2: ExpressionEqual): Unit = {
+
+    }
+
   }
 
-  // TODO
   def extractPredictExpressions(logicalPlan: LogicalPlan,
       tableMappings: BiMap[String, String])
   : (EquivalenceClasses, Seq[ExpressionEqual], Seq[ExpressionEqual]) = {
@@ -175,7 +178,7 @@ class RewriteHelper extends PredicateHelper {
     var equiColumnPreds: mutable.Buffer[Expression] = ArrayBuffer()
     val rangePreds: mutable.Buffer[ExpressionEqual] = ArrayBuffer()
     val residualPreds: mutable.Buffer[ExpressionEqual] = ArrayBuffer()
-    val normalizedPlan = normalizePlan(logicalPlan)
+    val normalizedPlan = normalizePlan(ExprSimplifier.simplify(logicalPlan))
     normalizedPlan foreach {
       case Filter(condition, _) =>
         conjunctivePredicates ++= splitConjunctivePredicates(condition)
@@ -189,17 +192,40 @@ class RewriteHelper extends PredicateHelper {
       if (e.isInstanceOf[EqualTo]) {
         val left = e.asInstanceOf[EqualTo].left
         val right = e.asInstanceOf[EqualTo].right
-        // TODO
-        residualPreds += ExpressionEqual(e)
+        if (ExprOptUtil.isReference(left, allowCast = false)
+            && ExprOptUtil.isReference(right, allowCast = false)) {
+          equiColumnPreds += e
+        } else if ((ExprOptUtil.isReference(left, allowCast = false)
+            && ExprOptUtil.isConstant(right))
+            || (ExprOptUtil.isReference(right, allowCast = false)
+            && ExprOptUtil.isConstant(left))) {
+          rangePreds += ExpressionEqual(e)
+        } else {
+          residualPreds += ExpressionEqual(e)
+        }
       } else if (e.isInstanceOf[LessThan] || e.isInstanceOf[GreaterThan]
           || e.isInstanceOf[LessThanOrEqual] || e.isInstanceOf[GreaterThanOrEqual]) {
-        residualPreds += ExpressionEqual(e)
+        val left = e.asInstanceOf[BinaryComparison].left
+        val right = e.asInstanceOf[BinaryComparison].right
+        if ((ExprOptUtil.isReference(left, allowCast = false)
+            && ExprOptUtil.isConstant(right))
+            || (ExprOptUtil.isReference(right, allowCast = false)
+            && ExprOptUtil.isConstant(left))) {
+          rangePreds += ExpressionEqual(e)
+        } else {
+          residualPreds += ExpressionEqual(e)
+        }
       } else {
         residualPreds += ExpressionEqual(e)
       }
     }
-
+    equiColumnPreds = swapTableReferences(equiColumnPreds, tableMappings)
     val equivalenceClasses: EquivalenceClasses = EquivalenceClasses()
+    for (i <- equiColumnPreds.indices) {
+      val left = equiColumnPreds(i).asInstanceOf[EqualTo].left
+      val right = equiColumnPreds(i).asInstanceOf[EqualTo].right
+      equivalenceClasses.addEquivalenceClass(ExpressionEqual(left), ExpressionEqual(right))
+    }
     (equivalenceClasses, rangePreds, residualPreds)
   }
 
@@ -441,4 +467,47 @@ case class TableEqual(tableName: String, tableNameWithIdx: String,
   }
 
   override def hashCode(): Int = tableNameWithIdx.hashCode()
+}
+
+// TODO delete
+object ExprSimplifier {
+  def simplify(logicalPlan: LogicalPlan): LogicalPlan = {
+    logicalPlan
+  }
+
+  def simplify(expr: Expression): Expression = {
+    expr
+  }
+}
+
+// TODO delete
+object ExprOptUtil {
+  def isReference(expr: Expression, allowCast: Boolean): Boolean = {
+    true
+  }
+
+  def isConstant(expr: Expression): Boolean = {
+    true
+  }
+
+  def disjunctions(expr: Expression): mutable.Buffer[Expression] = {
+    null
+  }
+
+  def conjunctions(expr: Expression): mutable.Buffer[Expression] = {
+    null
+  }
+
+  def decomposeConjunctions(expr: Expression,
+      terms: mutable.Buffer[Expression],
+      notTerms: mutable.Buffer[Expression]): Unit = {
+  }
+
+  def composeConjunctions(terms: Seq[Expression], nullOnEmpty: Boolean): Expression = {
+    null
+  }
+
+  def isAlwaysFalse(expr: Expression): Boolean = {
+    true
+  }
 }
