@@ -1,4 +1,3 @@
-include_directories(SYSTEM "/opt/lib/include")
 include_directories(SYSTEM "/user/local/include")
 
 set (PROJ_TARGET spark_columnar_plugin)
@@ -34,7 +33,6 @@ add_library (${PROJ_TARGET} SHARED ${SOURCE_FILES} ${PROTO_SRCS} ${PROTO_HDRS} $
 target_include_directories(${PROJ_TARGET} PUBLIC $ENV{JAVA_HOME}/include)
 target_include_directories(${PROJ_TARGET} PUBLIC $ENV{JAVA_HOME}/include/linux)
 target_include_directories(${PROJ_TARGET} PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
-target_include_directories(${PROJ_TARGET} PUBLIC /opt/lib/include)
 
 target_link_libraries (${PROJ_TARGET} PUBLIC
         orc

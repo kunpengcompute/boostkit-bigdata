@@ -8,6 +8,3 @@ target_compile_options(${SCAN_TEST_TARGET} PUBLIC )
 
 target_include_directories(${SCAN_TEST_TARGET} PUBLIC $ENV{JAVA_HOME}/include)
 target_include_directories(${SCAN_TEST_TARGET} PUBLIC $ENV{JAVA_HOME}/include/linux)
-target_include_directories(${SCAN_TEST_TARGET} PUBLIC /opt/lib/include)
-
-

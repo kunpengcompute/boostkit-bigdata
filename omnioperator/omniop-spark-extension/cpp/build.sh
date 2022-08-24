@@ -17,6 +17,10 @@
 
 set -eu
 
+export OMNI_INCLUDE_PATH=/opt/lib/include
+export CPLUS_INCLUDE_PATH=$OMNI_INCLUDE_PATH
+echo "OMNI_INCLUDE_PATH=$OMNI_INCLUDE_PATH"
+
 CURRENT_DIR=$(cd "$(dirname "$BASH_SOURCE")"; pwd)
 echo $CURRENT_DIR
 cd ${CURRENT_DIR}
