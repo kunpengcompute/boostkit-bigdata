@@ -31,6 +31,7 @@ import static io.prestosql.spi.type.TinyintType.TINYINT;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static java.lang.Float.floatToIntBits;
 
+
 import com.huawei.boostkit.omnidata.model.Column;
 import com.huawei.boostkit.omnidata.model.Predicate;
 
@@ -40,20 +41,7 @@ import io.prestosql.spi.type.CharType;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.VarcharType;
 
-import org.apache.hadoop.hive.ql.omnidata.decode.type.DecodeType;
-import org.apache.hadoop.hive.ql.omnidata.decode.type.LongDecodeType;
-import org.apache.hadoop.hive.ql.omnidata.decode.type.BooleanDecodeType;
-import org.apache.hadoop.hive.ql.omnidata.decode.type.LongToByteDecodeType;
-import org.apache.hadoop.hive.ql.omnidata.decode.type.VarcharDecodeType;
-import org.apache.hadoop.hive.ql.omnidata.decode.type.LongToIntDecodeType;
-import org.apache.hadoop.hive.ql.omnidata.decode.type.DoubleDecodeType;
-import org.apache.hadoop.hive.ql.omnidata.decode.type.LongToFloatDecodeType;
-import org.apache.hadoop.hive.ql.omnidata.decode.type.LongToShortDecodeType;
-import org.apache.hadoop.hive.ql.omnidata.decode.type.ByteDecodeType;
-import org.apache.hadoop.hive.ql.omnidata.decode.type.DateDecodeType;
-import org.apache.hadoop.hive.ql.omnidata.decode.type.FloatDecodeType;
-import org.apache.hadoop.hive.ql.omnidata.decode.type.IntDecodeType;
-import org.apache.hadoop.hive.ql.omnidata.decode.type.ShortDecodeType;
+import org.apache.hadoop.hive.ql.omnidata.decode.type.*;
 import org.apache.hadoop.hive.ql.omnidata.operator.predicate.NdpPredicateInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.CharTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
@@ -144,7 +132,7 @@ public class OmniDataUtils {
 
     public static Type transAggType(Type dataType) {
         if (BIGINT.equals(dataType) || INTEGER.equals(dataType) || SMALLINT.equals(dataType) || TINYINT.equals(
-            dataType)) {
+                dataType)) {
             return BIGINT;
         } else if (DOUBLE.equals(dataType) || REAL.equals(dataType)) {
             return DOUBLE;
@@ -270,7 +258,7 @@ public class OmniDataUtils {
                     int day = Integer.parseInt(dateStrArray[2]);
                     java.sql.Date date = new java.sql.Date(year, month, day);
                     return new ConstantExpression((date.getTime() - date.getTimezoneOffset() * 60000L) / daToMillSecs,
-                        type);
+                            type);
                 } else {
                     return new ConstantExpression(Long.parseLong(value), type);
                 }
@@ -325,26 +313,22 @@ public class OmniDataUtils {
         }
     }
 
-    public static NdpPredicateInfo addPartitionValues(NdpPredicateInfo oldNdpPredicate, String path,
-        String defaultPartitionValue) {
-        Predicate oldPredicate = oldNdpPredicate.getPredicate();
+    public static void addPartitionValues(NdpPredicateInfo ndpPredicate, String path, String defaultPartitionValue) {
+        Predicate oldPredicate = ndpPredicate.getPredicate();
         List<Column> newColumns = new ArrayList<>();
         for (Column column : oldPredicate.getColumns()) {
             if (column.isPartitionKey()) {
                 String partitionValue = getPartitionValue(path, column.getName(), defaultPartitionValue);
                 newColumns.add(
-                    new Column(column.getFieldId(), column.getName(), column.getType(), true, partitionValue));
+                        new Column(column.getFieldId(), column.getName(), column.getType(), true, partitionValue));
             } else {
                 newColumns.add(column);
             }
         }
         Predicate newPredicate = new Predicate(oldPredicate.getTypes(), newColumns, oldPredicate.getFilter(),
-            oldPredicate.getProjections(), oldPredicate.getDomains(), oldPredicate.getBloomFilters(),
-            oldPredicate.getAggregations(), oldPredicate.getLimit());
-        return new NdpPredicateInfo(oldNdpPredicate.getIsPushDown(), oldNdpPredicate.getIsPushDownAgg(),
-            oldNdpPredicate.getIsPushDownFilter(), oldNdpPredicate.getHasPartitionColumn(), newPredicate,
-            oldNdpPredicate.getOutputColumns(), oldNdpPredicate.getDecodeTypes(),
-            oldNdpPredicate.getDecodeTypesWithAgg());
+                oldPredicate.getProjections(), oldPredicate.getDomains(), oldPredicate.getBloomFilters(),
+                oldPredicate.getAggregations(), oldPredicate.getLimit());
+        ndpPredicate.setPredicate(newPredicate);
     }
 
     private static String getPartitionValue(String filePath, String columnName, String defaultPartitionValue) {

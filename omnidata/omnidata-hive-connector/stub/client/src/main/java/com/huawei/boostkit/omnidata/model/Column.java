@@ -19,37 +19,76 @@
 
 package com.huawei.boostkit.omnidata.model;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.prestosql.spi.type.Type;
 
+import static java.util.Objects.requireNonNull;
+
+/**
+ * Column information
+ *
+ * @since 2021-03-30
+ */
 public class Column {
-    public Column(int fieldId, String name, Type type, boolean isPartiontionKey, Object partiontionKeyValues) {
-    }
+    private int fieldId;
+
+    private String name;
+
+    private Type type;
+
+    private boolean isPartitionKey;
+
+    private Object partitionKeyValue;
 
     public Column(int fieldId, String name, Type type) {
+        this(fieldId, name, type, false, null);
     }
 
+    @JsonCreator
+    public Column(
+            @JsonProperty("fieldId") int fieldId,
+            @JsonProperty("name") String name,
+            @JsonProperty("type") Type type,
+            @JsonProperty("partitionKey") boolean isPartitionKey,
+            @JsonProperty("partitionKeyValue") Object partitionKeyValue) {
+        this.fieldId = fieldId;
+        this.name = requireNonNull(name);
+        this.type = requireNonNull(type);
+        this.isPartitionKey = isPartitionKey;
+        this.partitionKeyValue = partitionKeyValue;
+    }
 
+    @JsonProperty
     public int getFieldId() {
-        return 0;
+        return fieldId;
     }
 
     @JsonProperty
     public String getName() {
-        return "";
+        return name;
     }
 
+    @JsonProperty
     public Type getType() {
-        return null;
+        return type;
     }
 
+    @JsonProperty
     public boolean isPartitionKey() {
-        return false;
+        return isPartitionKey;
     }
 
+    @JsonProperty
     public Object getPartitionKeyValue() {
-        return null;
+        return partitionKeyValue;
     }
+
+    /**
+     * Builder
+     *
+     * @since 2021-03-30
+     */
     public static class Builder {
         private int fieldId;
 
@@ -61,26 +100,58 @@ public class Column {
 
         private Object partitionKeyValue;
 
+        /**
+         * set column fieldId
+         *
+         * @param fieldId column fieldId
+         * @return Builder
+         */
         public Builder setFieldId(int fieldId) {
             this.fieldId = fieldId;
             return this;
         }
 
+        /**
+         * set column type
+         *
+         * @param name column name
+         * @return Builder
+         */
         public Builder setName(String name) {
+            requireNonNull(name);
             this.name = name;
             return this;
         }
 
+        /**
+         * set column type
+         *
+         * @param type column type
+         * @return Builder
+         */
         public Builder setType(Type type) {
+            requireNonNull(type);
             this.type = type;
             return this;
         }
 
-        public Builder setPartitionKey(boolean partitionKey) {
-            isPartitionKey = partitionKey;
+        /**
+         * set partition key
+         *
+         * @param isPartitionedKey whether column is partitioned
+         * @return Builder
+         */
+        public Builder setPartitionKey(boolean isPartitionedKey) {
+            isPartitionKey = isPartitionedKey;
             return this;
         }
 
+        /**
+         * set partition key value
+         *
+         * @param partitionKeyValue column partition key value, this value may be null.
+         * @return Builder
+         */
         public Builder setPartitionKeyValue(Object partitionKeyValue) {
             this.partitionKeyValue = partitionKeyValue;
             return this;
@@ -96,4 +167,3 @@ public class Column {
         }
     }
 }
-

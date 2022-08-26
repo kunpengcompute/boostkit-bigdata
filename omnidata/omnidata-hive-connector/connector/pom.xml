@@ -19,14 +19,15 @@
         <maven.compiler.target>1.8</maven.compiler.target>
         <encoding>UTF-8</encoding>
         <hive.version>3.1.0</hive.version>
-        <hadoop.version>3.1.1</hadoop.version>
+        <hadoop.version>3.2.0</hadoop.version>
         <tez.version>0.10.0</tez.version>
         <dep.curator.version>2.12.0</dep.curator.version>
-        <dep.omnidata.server.version>1.4.0</dep.omnidata.server.version>
+        <dep.omnidata.client.version>1.4.0</dep.omnidata.client.version>
         <dep.hetu.version>1.6.1</dep.hetu.version>
+        <junit.version>4.11</junit.version>
+        <mockito-all.version>1.10.19</mockito-all.version>
         <dep.json.version>2.12.4</dep.json.version>
         <dep.guava.version>26.0-jre</dep.guava.version>
-
     </properties>
 
     <dependencies>
@@ -39,13 +40,11 @@
             <groupId>org.apache.hive</groupId>
             <artifactId>hive-exec</artifactId>
             <version>${hive.version}</version>
-            <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>org.apache.hive</groupId>
             <artifactId>hive-common</artifactId>
             <version>${hive.version}</version>
-            <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>org.apache.hadoop</groupId>
@@ -116,9 +115,8 @@
         </dependency>
         <dependency>
             <groupId>com.huawei.boostkit</groupId>
-            <artifactId>boostkit-omnidata-server-stub</artifactId>
-            <version>${dep.omnidata.server.version}</version>
-            <scope>compile</scope>
+            <artifactId>boostkit-omnidata-client-stub</artifactId>
+            <version>${dep.omnidata.client.version}</version>
         </dependency>
         <dependency>
             <groupId>io.airlift</groupId>
@@ -131,28 +129,42 @@
             <version>4.0.2</version>
         </dependency>
         <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>${junit.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-all</artifactId>
+            <version>${mockito-all.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.curator</groupId>
+            <artifactId>curator-test</artifactId>
+            <version>${dep.curator.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
             <version>${dep.json.version}</version>
-            <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-core</artifactId>
             <version>${dep.json.version}</version>
-            <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-annotations</artifactId>
             <version>${dep.json.version}</version>
-            <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.module</groupId>
             <artifactId>jackson-module-parameter-names</artifactId>
             <version>${dep.json.version}</version>
-            <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.datatype</groupId>
@@ -172,7 +184,13 @@
         <dependency>
             <groupId>com.fasterxml.jackson.datatype</groupId>
             <artifactId>jackson-datatype-jsr310</artifactId>
-            <version>2.11.4</version>
+            <version>${dep.json.version}</version>
         </dependency>
     </dependencies>
+    <!--
+    <build>
+        <sourceDirectory>${basedir}/src/main/java/</sourceDirectory>
+        <testSourceDirectory>${basedir}/src/test/java/</testSourceDirectory>
+    </build>
+    -->
 </project>
