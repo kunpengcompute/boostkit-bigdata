@@ -1,3 +1,5 @@
+aux_source_directory(${CMAKE_CURRENT_LIST_DIR} TEST_ROOT_SRCS)
+
 add_subdirectory(shuffle)
 add_subdirectory(utils)
 add_subdirectory(tablescan)
@@ -5,23 +7,16 @@ add_subdirectory(tablescan)
 # configure
 set(TP_TEST_TARGET tptest)
 set(MY_LINK
-        utilstest
         shuffletest
+        utilstest
         tablescantest
         )
 
 # find gtest package
 find_package(GTest REQUIRED)
 
-set (UT_FILES
-        tptest.cpp
-        shuffle/shuffle_test.cpp
-        tablescan/scan_test.cpp
-        )
-
 # compile a executable file
-add_executable(${TP_TEST_TARGET} ${UT_FILES})
-add_dependencies(${TP_TEST_TARGET} ${MY_LINK})
+add_executable(${TP_TEST_TARGET} ${ROOT_SRCS} ${TEST_ROOT_SRCS})
 
 # dependent libraries
 target_link_libraries(${TP_TEST_TARGET}

@@ -100,11 +100,6 @@
         <version>3.1.1</version>
         <scope>test</scope>
     </dependency>
-<!--<dependency>-->
-<!--<groupId>org.jacoco</groupId>-->
-<!--<artifactId>jacoco-maven-plugin</artifactId>-->
-<!--<version>0.8.3</version>-->
-<!--</dependency>-->
     </dependencies>
     <build>
         <finalName>${artifactId}-${version}${dep.os.arch}</finalName>
@@ -292,42 +287,41 @@
                     </execution>
                 </executions>
             </plugin>
-<!--           <plugin>-->
-<!--              <groupId>org.jacoco</groupId>-->
-<!--              <artifactId>jacoco-maven-plugin</artifactId>-->
-<!--              <version>0.8.3</version>-->
-<!--              <executions>-->
-<!--                  <execution>-->
-<!--                      <id>prepare-agent</id>-->
-<!--                      <goals>-->
-<!--                          <goal>prepare-agent</goal>-->
-<!--                      </goals>-->
-<!--                  </execution>-->
-<!--                  <execution>-->
-<!--                      <id>report</id>-->
-<!--                      <phase>prepare-package</phase>-->
-<!--                      <goals>-->
-<!--                          <goal>report</goal>-->
-<!--                      </goals>-->
-<!--                  </execution>-->
-<!--                  <execution>-->
-<!--                      <id>post-unit-test</id>-->
-<!--                      <phase>test</phase>-->
-<!--                      <goals>-->
-<!--                           <goal>report</goal>-->
-<!--                      </goals>-->
-<!--                      <configuration>-->
-<!--                         <dataFile>target/jacoco.exec</dataFile>-->
-<!--                         <outputDirectory>target/jacoco-ut</outputDirectory>-->
-<!--                      </configuration>-->
-<!--                  </execution>-->
-<!--              </executions>-->
-<!--              <configuration>-->
-<!--              <systemPropertyVariables>-->
-<!--                 <jacoco-agent.destfile>target/jacoco.exec</jacoco-agent.destfile>-->
-<!--                 </systemPropertyVariables>-->
-<!--              </configuration>-->
-<!--           </plugin>-->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>0.8.3</version>
+                <executions>
+                    <execution>
+                        <id>prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>report</id>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>post-unit-test</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <systemPropertyVariables>
+                            <jacoco-agent.destfile>target/jacoco.exec</jacoco-agent.destfile>
+                    </systemPropertyVariables>
+                    <excludes>
+                        <exclude>**com/huawei/boostkit/spark/serialize/*VecData*</exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
             <plugin>
                 <groupId>org.scalatest</groupId>
                 <artifactId>scalatest-maven-plugin</artifactId>
@@ -346,25 +340,6 @@
                         </goals>
                     </execution>
                 </executions>
-            </plugin>
-            <plugin>
-                <groupId>org.scoverage</groupId>
-                <artifactId>scoverage-maven-plugin</artifactId>
-                <version>1.4.11</version>
-                <executions>
-                     <execution>
-                     <id>test</id>
-                     <phase>test</phase>
-                     <goals>
-                         <goal>report</goal>
-                     </goals>
-                     </execution>
-                </executions>
-                <configuration>
-                    <aggregate>true</aggregate>
-                    <highlighting>true</highlighting>
-                    <encoding>${project.build.sourceEncoding}</encoding>
-                </configuration>
             </plugin>
         </plugins>
     </build>

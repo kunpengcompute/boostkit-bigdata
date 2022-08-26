@@ -22,16 +22,16 @@ import java.util.concurrent._
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil.transColBatchToOmniVecs
 import nova.hetu.omniruntime.vector.VecBatch
 import nova.hetu.omniruntime.vector.serialize.VecBatchSerializerFactory
+
 import scala.concurrent.{ExecutionContext, Promise}
 import scala.concurrent.duration.NANOSECONDS
 import scala.util.control.NonFatal
-
 import org.apache.spark.{broadcast, SparkException}
 import org.apache.spark.launcher.SparkLauncher
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.plans.physical.BroadcastMode
-import org.apache.spark.sql.execution.exchange.BroadcastExchangeExec
+import org.apache.spark.sql.execution.exchange.{BroadcastExchangeExec, BroadcastExchangeLike}
 import org.apache.spark.sql.execution.metric.SQLMetrics
 import org.apache.spark.sql.internal.{SQLConf, StaticSQLConf}
 import org.apache.spark.unsafe.map.BytesToBytesMap
@@ -39,7 +39,7 @@ import org.apache.spark.util.{SparkFatalException, ThreadUtils}
 
 
 class ColumnarBroadcastExchangeExec(mode: BroadcastMode, child: SparkPlan)
-  extends BroadcastExchangeExec(mode: BroadcastMode, child: SparkPlan) {
+  extends BroadcastExchangeExec(mode: BroadcastMode, child: SparkPlan) with BroadcastExchangeLike {
   import ColumnarBroadcastExchangeExec._
 
   override def nodeName: String = "OmniColumnarBroadcastExchange"
@@ -53,6 +53,10 @@ class ColumnarBroadcastExchangeExec(mode: BroadcastMode, child: SparkPlan)
 
   @transient
   private lazy val promise = Promise[broadcast.Broadcast[Any]]()
+
+  @transient
+  override lazy val completionFuture: scala.concurrent.Future[broadcast.Broadcast[Any]] =
+    promise.future
 
   @transient
   private val timeout: Long = SQLConf.get.broadcastTimeout

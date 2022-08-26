@@ -16,7 +16,7 @@
  */
 
 
-package org.apache.spark.sql.catalyst.optimizer.rule
+package org.apache.spark.sql.catalyst.optimizer.rules
 
 import com.huawei.boostkit.spark.conf.OmniCachePluginConfig
 import com.huawei.boostkit.spark.util.RewriteHelper._
