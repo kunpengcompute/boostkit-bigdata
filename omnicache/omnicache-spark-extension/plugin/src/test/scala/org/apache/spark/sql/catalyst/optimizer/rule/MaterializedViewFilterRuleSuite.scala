@@ -175,7 +175,7 @@ class MaterializedViewFilterRuleSuite extends RewriteSuite {
   }
 
   test("mv_filter1_12") {
-    // different column type residual predict between and
+    // different column type compare predict between and
     val sql =
       """
         |SELECT * FROM COLUMN_TYPE WHERE empid=1

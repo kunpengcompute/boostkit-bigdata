@@ -130,6 +130,8 @@ class RewriteHelper extends PredicateHelper {
         projectList
       case Aggregate(_, aggregateExpressions, _) =>
         aggregateExpressions
+      case other =>
+        other.output
     }
     val exprIdToQualifier = mutable.HashMap[ExprId, AttributeReference]()
     for ((project, column) <- topProjectList.zip(viewTablePlan.output)) {
