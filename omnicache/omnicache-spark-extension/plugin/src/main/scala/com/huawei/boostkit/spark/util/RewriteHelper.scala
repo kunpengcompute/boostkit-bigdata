@@ -152,6 +152,7 @@ class RewriteHelper extends PredicateHelper {
     val topProjectList: Seq[Expression] = logicalPlan match {
       case Project(projectList, _) => projectList
       case Aggregate(_, aggregateExpressions, _) => aggregateExpressions
+      case e => extractTables(Project(e.output, e))._1.output
     }
     topProjectList
   }
@@ -268,7 +269,7 @@ class RewriteHelper extends PredicateHelper {
           case a: AttributeReference =>
             val key = a.qualifier.mkString(".")
             if (tableMapping.containsKey(key)) {
-              val newQualifier = tableMapping.get(key).split(".").toSeq
+              val newQualifier = tableMapping.get(key).split('.').toSeq
               a.copy()(exprId = a.exprId, qualifier = newQualifier)
             } else {
               a

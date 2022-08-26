@@ -51,7 +51,7 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
     }
     ViewMetadata.init(sparkSession)
     // 1.check query sql is match current rule
-    if (ViewMetadata.isEmpty) {
+    if (ViewMetadata.isEmpty || !isValidPlan(plan)) {
       return finalPlan
     }
 
@@ -383,8 +383,8 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
 
   def splitFilter(queryExpression: Expression, viewExpression: Expression): Option[Expression] = {
     // 1.canonicalize expression,main for reorder
-    val queryExpression2 = RewriteHelper.canonicalize(queryExpression)
-    val viewExpression2 = RewriteHelper.canonicalize(viewExpression)
+    val queryExpression2 = RewriteHelper.canonicalize(ExprSimplifier.simplify(queryExpression))
+    val viewExpression2 = RewriteHelper.canonicalize(ExprSimplifier.simplify(viewExpression))
 
     // 2.or is residual predicts,this main deal residual predicts
     val z = splitOr(queryExpression2, viewExpression2)
