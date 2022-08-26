@@ -156,23 +156,6 @@ class RewriteHelper extends PredicateHelper {
     topProjectList
   }
 
-  // TODO delete
-  case class EquivalenceClasses() {
-
-    def getEquivalenceClassesMap: Map[ExpressionEqual, mutable.Set[ExpressionEqual]] = {
-      Map.empty
-    }
-
-    def getEquivalenceClasses: List[mutable.Set[ExpressionEqual]] = {
-      List.empty
-    }
-
-    def addEquivalenceClass(p: ExpressionEqual, p2: ExpressionEqual): Unit = {
-
-    }
-
-  }
-
   def extractPredictExpressions(logicalPlan: LogicalPlan,
       tableMappings: BiMap[String, String])
   : (EquivalenceClasses, Seq[ExpressionEqual], Seq[ExpressionEqual]) = {
@@ -469,47 +452,4 @@ case class TableEqual(tableName: String, tableNameWithIdx: String,
   }
 
   override def hashCode(): Int = tableNameWithIdx.hashCode()
-}
-
-// TODO delete
-object ExprSimplifier {
-  def simplify(logicalPlan: LogicalPlan): LogicalPlan = {
-    logicalPlan
-  }
-
-  def simplify(expr: Expression): Expression = {
-    expr
-  }
-}
-
-// TODO delete
-object ExprOptUtil {
-  def isReference(expr: Expression, allowCast: Boolean): Boolean = {
-    true
-  }
-
-  def isConstant(expr: Expression): Boolean = {
-    true
-  }
-
-  def disjunctions(expr: Expression): mutable.Buffer[Expression] = {
-    null
-  }
-
-  def conjunctions(expr: Expression): mutable.Buffer[Expression] = {
-    null
-  }
-
-  def decomposeConjunctions(expr: Expression,
-      terms: mutable.Buffer[Expression],
-      notTerms: mutable.Buffer[Expression]): Unit = {
-  }
-
-  def composeConjunctions(terms: Seq[Expression], nullOnEmpty: Boolean): Expression = {
-    null
-  }
-
-  def isAlwaysFalse(expr: Expression): Boolean = {
-    true
-  }
 }

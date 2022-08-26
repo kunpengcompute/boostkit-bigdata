@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.catalyst.optimizer.rule
+package org.apache.spark.sql.catalyst.optimizer.rules
 
 class MaterializedViewJoinRuleSuite extends RewriteSuite {
 
