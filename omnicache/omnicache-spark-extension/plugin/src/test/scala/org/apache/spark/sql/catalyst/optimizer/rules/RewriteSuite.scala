@@ -16,7 +16,7 @@
  */
 
 
-package org.apache.spark.sql.catalyst.optimizer.rule
+package org.apache.spark.sql.catalyst.optimizer.rules
 
 import java.io.File
 import java.util.Locale
