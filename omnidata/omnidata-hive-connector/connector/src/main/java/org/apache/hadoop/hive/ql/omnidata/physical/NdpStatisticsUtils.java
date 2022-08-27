@@ -412,7 +412,7 @@ public class NdpStatisticsUtils {
             // update filter's statistics
             NdpStatisticsUtils.updateFilterStats(parseContext, tableScanOp);
         } catch (HiveException e) {
-            LOG.error(String.valueOf(e));
+            LOG.error("OmniData Hive update filter stats failed", e);
             return false;
         }
         // Calculate the new selection rate
@@ -429,7 +429,8 @@ public class NdpStatisticsUtils {
         try {
             NdpStatisticsUtils.updateFilterStats(parseContext, tableScanOp);
         } catch (SemanticException e) {
-            e.printStackTrace();
+            LOG.error("OmniData Hive update filter stats failed", e);
+            return false;
         }
         LOG.info("Table [{}] failed to part push down, since selectivity[{}] > threshold[{}]",
                 tableScanOp.getConf().getAlias(), newSelectivity, OmniDataConf.getOmniDataFilterSelectivity(conf));

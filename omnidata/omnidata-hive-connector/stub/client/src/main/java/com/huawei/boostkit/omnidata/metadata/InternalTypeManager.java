@@ -24,6 +24,7 @@ import io.prestosql.spi.type.*;
 
 import java.lang.invoke.MethodHandle;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -40,11 +41,11 @@ public class InternalTypeManager implements TypeManager {
     }
 
     public List<Type> getTypes() {
-        return null;
+        return Collections.emptyList();
     }
 
     public Collection<ParametricType> getParametricTypes() {
-        return null;
+        return Collections.emptyList();
     }
 
     public Optional<Type> getCommonSuperType(Type firstType, Type secondType) {

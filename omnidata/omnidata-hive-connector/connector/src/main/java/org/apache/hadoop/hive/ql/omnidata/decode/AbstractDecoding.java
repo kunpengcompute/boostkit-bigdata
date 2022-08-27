@@ -21,13 +21,7 @@ import io.airlift.slice.SliceInput;
 import io.prestosql.spi.type.DateType;
 import io.prestosql.spi.type.RowType;
 
-import org.apache.hadoop.hive.ql.omnidata.decode.type.DecimalDecodeType;
-import org.apache.hadoop.hive.ql.omnidata.decode.type.DecodeType;
-import org.apache.hadoop.hive.ql.omnidata.decode.type.LongToByteDecodeType;
-import org.apache.hadoop.hive.ql.omnidata.decode.type.LongToFloatDecodeType;
-import org.apache.hadoop.hive.ql.omnidata.decode.type.LongToIntDecodeType;
-import org.apache.hadoop.hive.ql.omnidata.decode.type.LongToShortDecodeType;
-import org.apache.hadoop.hive.ql.omnidata.decode.type.TimestampDecodeType;
+import org.apache.hadoop.hive.ql.omnidata.decode.type.*;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
