@@ -636,7 +636,7 @@ class SqlParserSuite extends RewriteSuite {
     spark.sql("DROP MATERIALIZED VIEW IF EXISTS refresh_mv;")
     spark.sql(
       """
-        |CREATE TABLE IF NOT EXISTS refresh_mv PARTITIONED BY (id int)
+        |CREATE MATERIALIZED VIEW IF NOT EXISTS refresh_mv PARTITIONED BY (id)
         |AS
         |SELECT age,id FROM students;
         |""".stripMargin
@@ -668,7 +668,7 @@ class SqlParserSuite extends RewriteSuite {
     spark.sql("DROP MATERIALIZED VIEW IF EXISTS refresh_mv;")
     spark.sql(
       """
-        |CREATE TABLE IF NOT EXISTS refresh_mv
+        |CREATE MATERIALIZED VIEW IF NOT EXISTS refresh_mv
         |AS
         |SELECT age,id FROM students;
         |""".stripMargin
