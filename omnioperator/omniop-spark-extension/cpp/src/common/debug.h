@@ -30,7 +30,7 @@
 #define LogsTrace(format, ...)
 #endif
 
-
+#if defined(TRACE_RUNTIME) || defined(DEBUG_RUNTIME)
 #define LogsDebug(format, ...)                                                                       \
     do {                                                                                             \
         if (static_cast<int>(LogType::LOG_DEBUG) >= GetLogLevel()) {                                 \
@@ -40,7 +40,9 @@
             Log(logString, LogType::LOG_DEBUG);                                                      \
         }                                                                                            \
     } while (0)
-
+#else
+#define LogsDebug(format, ...)
+#endif
 
 #define LogsInfo(format, ...)                                                                        \
     do {                                                                                             \
