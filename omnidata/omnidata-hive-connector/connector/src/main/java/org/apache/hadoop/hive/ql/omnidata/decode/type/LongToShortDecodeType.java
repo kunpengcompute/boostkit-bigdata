@@ -22,12 +22,9 @@ import java.util.Optional;
  *
  * @since 2022-07-28
  */
-public class LongToShortDecodeType
-        implements DecodeType
-{
+public class LongToShortDecodeType implements DecodeType {
     @Override
-    public Optional<Class<?>> getJavaType()
-    {
+    public Optional<Class<?>> getJavaType() {
         return Optional.of(LongToShortDecodeType.class);
     }
 }

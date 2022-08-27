@@ -15,7 +15,6 @@
 
 package org.apache.hadoop.hive.ql.omnidata.decode;
 
-
 import io.airlift.slice.SliceInput;
 
 import org.apache.hadoop.hive.ql.omnidata.decode.type.DecodeType;
@@ -29,12 +28,11 @@ import java.util.Optional;
  * @param <T>
  * @since 2022-07-28
  */
-public interface Decoding<T>
-{
+public interface Decoding<T> {
     /**
      * decode
      *
-     * @param type decode type
+     * @param type       decode type
      * @param sliceInput content
      * @return T
      */
@@ -43,7 +41,7 @@ public interface Decoding<T>
     /**
      * decode array type
      *
-     * @param type type of data to decode
+     * @param type       type of data to decode
      * @param sliceInput data to decode
      * @return T
      */
@@ -53,7 +51,7 @@ public interface Decoding<T>
     /**
      * decode byte array type
      *
-     * @param type type of data to decode
+     * @param type       type of data to decode
      * @param sliceInput data to decode
      * @return T
      */
@@ -63,7 +61,7 @@ public interface Decoding<T>
     /**
      * decode boolean array type
      *
-     * @param type type of data to decode
+     * @param type       type of data to decode
      * @param sliceInput data to decode
      * @return T
      */
@@ -73,7 +71,7 @@ public interface Decoding<T>
     /**
      * decode int array type
      *
-     * @param type type of data to decode
+     * @param type       type of data to decode
      * @param sliceInput data to decode
      * @return T
      */
@@ -83,7 +81,7 @@ public interface Decoding<T>
     /**
      * decode int128 array type
      *
-     * @param type type of data to decode
+     * @param type       type of data to decode
      * @param sliceInput data to decode
      * @return T
      */
@@ -93,7 +91,7 @@ public interface Decoding<T>
     /**
      * decode short array type
      *
-     * @param type type of data to decode
+     * @param type       type of data to decode
      * @param sliceInput data to decode
      * @return T
      */
@@ -103,7 +101,7 @@ public interface Decoding<T>
     /**
      * decode long array type
      *
-     * @param type type of data to decode
+     * @param type       type of data to decode
      * @param sliceInput data to decode
      * @return T
      */
@@ -113,7 +111,7 @@ public interface Decoding<T>
     /**
      * decode float array type
      *
-     * @param type type of data to decode
+     * @param type       type of data to decode
      * @param sliceInput data to decode
      * @return T
      */
@@ -123,7 +121,7 @@ public interface Decoding<T>
     /**
      * decode double array type
      *
-     * @param type type of data to decode
+     * @param type       type of data to decode
      * @param sliceInput data to decode
      * @return T
      */
@@ -133,7 +131,7 @@ public interface Decoding<T>
     /**
      * decode map type
      *
-     * @param type type of data to decode
+     * @param type       type of data to decode
      * @param sliceInput data to decode
      * @return T
      */
@@ -143,7 +141,7 @@ public interface Decoding<T>
     /**
      * decode map element type
      *
-     * @param type type of data to decode
+     * @param type       type of data to decode
      * @param sliceInput data to decode
      * @return T
      */
@@ -153,7 +151,7 @@ public interface Decoding<T>
     /**
      * decode variable width type
      *
-     * @param type type of data to decode
+     * @param type       type of data to decode
      * @param sliceInput data to decode
      * @return T
      */
@@ -163,7 +161,7 @@ public interface Decoding<T>
     /**
      * decode dictionary type
      *
-     * @param type type of data to decode
+     * @param type       type of data to decode
      * @param sliceInput data to decode
      * @return T
      */
@@ -173,11 +171,11 @@ public interface Decoding<T>
     /**
      * decode rle type
      *
-     * @param type type of data to decode
+     * @param type       type of data to decode
      * @param sliceInput data to decode
      * @return T
      * @throws InvocationTargetException throw invocation target exception
-     * @throws IllegalAccessException throw illegal access exception
+     * @throws IllegalAccessException    throw illegal access exception
      */
     @Decode("RLE")
     T decodeRunLength(Optional<DecodeType> type, SliceInput sliceInput)
@@ -186,7 +184,7 @@ public interface Decoding<T>
     /**
      * decode row type
      *
-     * @param type type of data to decode
+     * @param type       type of data to decode
      * @param sliceInput data to decode
      * @return T
      */
@@ -196,7 +194,7 @@ public interface Decoding<T>
     /**
      * decode date type
      *
-     * @param type type of data to decode
+     * @param type       type of data to decode
      * @param sliceInput data to decode
      * @return T
      */
@@ -206,7 +204,7 @@ public interface Decoding<T>
     /**
      * decode long to int type
      *
-     * @param type type of data to decode
+     * @param type       type of data to decode
      * @param sliceInput data to decode
      * @return T
      */
@@ -216,7 +214,7 @@ public interface Decoding<T>
     /**
      * decode long to short type
      *
-     * @param type type of data to decode
+     * @param type       type of data to decode
      * @param sliceInput data to decode
      * @return T
      */
@@ -226,7 +224,7 @@ public interface Decoding<T>
     /**
      * decode long to byte type
      *
-     * @param type type of data to decode
+     * @param type       type of data to decode
      * @param sliceInput data to decode
      * @return T
      */
@@ -236,7 +234,7 @@ public interface Decoding<T>
     /**
      * decode long to float type
      *
-     * @param type type of data to decode
+     * @param type       type of data to decode
      * @param sliceInput data to decode
      * @return T
      */
