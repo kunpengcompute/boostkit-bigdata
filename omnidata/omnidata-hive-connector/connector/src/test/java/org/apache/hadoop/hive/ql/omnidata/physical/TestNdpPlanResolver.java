@@ -80,6 +80,8 @@ import org.apache.zookeeper.CreateMode;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.Serializable;
@@ -93,6 +95,8 @@ import java.util.List;
  * @since 2022-08-24
  */
 public class TestNdpPlanResolver {
+    private static final Logger LOG = LoggerFactory.getLogger(TestNdpPlanResolver.class);
+
     private static TestingServer testZkServer;
 
     private static CuratorFramework testZkClient;
@@ -384,7 +388,7 @@ public class TestNdpPlanResolver {
             assertTrue(tableScanOperator.getConf().isPushDownFilter());
             assertTrue(tableScanOperator.getConf().isPushDownAgg());
         } catch (SemanticException e) {
-            e.printStackTrace();
+            LOG.error("OmniData Hive TestNdpPlanResolver testResolveTezWorkWithAgg() failed ", e);
         }
     }
 
@@ -501,7 +505,7 @@ public class TestNdpPlanResolver {
             assertTrue(tableScanOperator.getConf().isPushDownFilter());
             assertFalse(tableScanOperator.getConf().isPushDownAgg());
         } catch (SemanticException e) {
-            e.printStackTrace();
+            LOG.error("OmniData Hive TestNdpPlanResolver testResolveTezWork() failed ", e);
         }
     }
 }
