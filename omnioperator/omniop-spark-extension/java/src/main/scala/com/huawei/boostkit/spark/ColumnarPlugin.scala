@@ -23,7 +23,7 @@ import org.apache.spark.sql.catalyst.expressions.DynamicPruningSubquery
 import org.apache.spark.sql.catalyst.expressions.aggregate.Partial
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.{RowToOmniColumnarExec, _}
-import org.apache.spark.sql.execution.adaptive.{ColumnarCustomShuffleReaderExec, CustomShuffleReaderExec, QueryStageExec, ShuffleQueryStageExec}
+import org.apache.spark.sql.execution.adaptive.{BroadcastQueryStageExec, ColumnarCustomShuffleReaderExec, CustomShuffleReaderExec, QueryStageExec, ShuffleQueryStageExec}
 import org.apache.spark.sql.execution.aggregate.HashAggregateExec
 import org.apache.spark.sql.execution.exchange.{BroadcastExchangeExec, Exchange, ReusedExchangeExec, ShuffleExchangeExec}
 import org.apache.spark.sql.execution.joins._
@@ -71,6 +71,10 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] {
       val actualPlan: SparkPlan = plan.child match {
         case p: BroadcastHashJoinExec =>
           p.withNewChildren(p.children.map {
+            case RowGuard(queryStage: BroadcastQueryStageExec) =>
+              fallBackBroadcastQueryStage(queryStage)
+            case queryStage: BroadcastQueryStageExec =>
+              fallBackBroadcastQueryStage(queryStage)
             case plan: BroadcastExchangeExec =>
               // if BroadcastHashJoin is row-based, BroadcastExchange should also be row-based
               RowGuard(plan)
@@ -78,6 +82,10 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] {
           })
         case p: BroadcastNestedLoopJoinExec =>
           p.withNewChildren(p.children.map {
+            case RowGuard(queryStage: BroadcastQueryStageExec) =>
+              fallBackBroadcastQueryStage(queryStage)
+            case queryStage: BroadcastQueryStageExec =>
+              fallBackBroadcastQueryStage(queryStage)
             case plan: BroadcastExchangeExec =>
               // if BroadcastNestedLoopJoin is row-based, BroadcastExchange should also be row-based
               RowGuard(plan)
@@ -315,7 +323,7 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] {
     case plan: ShuffleExchangeExec if enableColumnarShuffle =>
       val child = replaceWithColumnarPlan(plan.child)
       logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
-      new ColumnarShuffleExchangeExec(plan.outputPartitioning, child)
+      new ColumnarShuffleExchangeExec(plan.outputPartitioning, child, plan.shuffleOrigin)
     case plan: CustomShuffleReaderExec if columnarConf.enableColumnarShuffle =>
       plan.child match {
         case shuffle: ColumnarShuffleExchangeExec =>
@@ -341,6 +349,25 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] {
       val children = plan.children.map(replaceWithColumnarPlan)
       logInfo(s"Columnar Processing for ${p.getClass} is currently not supported.")
       p.withNewChildren(children)
+  }
+
+  def fallBackBroadcastQueryStage(curPlan: BroadcastQueryStageExec): BroadcastQueryStageExec = {
+    curPlan.plan match {
+      case originalBroadcastPlan: ColumnarBroadcastExchangeExec =>
+        BroadcastQueryStageExec(
+          curPlan.id,
+          BroadcastExchangeExec(
+            originalBroadcastPlan.mode,
+            ColumnarBroadcastExchangeAdaptorExec(originalBroadcastPlan, 1)))
+      case ReusedExchangeExec(_, originalBroadcastPlan: ColumnarBroadcastExchangeExec) =>
+        BroadcastQueryStageExec(
+          curPlan.id,
+          BroadcastExchangeExec(
+            originalBroadcastPlan.mode,
+            ColumnarBroadcastExchangeAdaptorExec(curPlan.plan, 1)))
+      case _ =>
+        curPlan
+    }
   }
 }
 

@@ -117,7 +117,8 @@ case class ColumnarGuardRule() extends Rule[SparkPlan] {
           ColumnarUnionExec(plan.children).buildCheck()
         case plan: ShuffleExchangeExec =>
           if (!enableColumnarShuffle) return false
-          new ColumnarShuffleExchangeExec(plan.outputPartitioning, plan.child).buildCheck()
+          new ColumnarShuffleExchangeExec(plan.outputPartitioning, plan.child, plan.shuffleOrigin)
+            .buildCheck()
         case plan: BroadcastHashJoinExec =>
           // We need to check if BroadcastExchangeExec can be converted to columnar-based.
           // If not, BHJ should also be row-based.

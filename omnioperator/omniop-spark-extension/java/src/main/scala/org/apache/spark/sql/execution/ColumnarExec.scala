@@ -302,29 +302,37 @@ case class OmniColumnarToRowExec(child: SparkPlan) extends ColumnarToRowTransiti
     // plan (this) in the closure.
     val localOutput = this.output
     child.executeColumnar().mapPartitionsInternal { batches =>
-      val toUnsafe = UnsafeProjection.create(localOutput, localOutput)
-      val vecsTmp = new ListBuffer[Vec]
-
-      val batchIter = batches.flatMap { batch =>
-        // store vec since tablescan reuse batch
-        for (i <- 0 until batch.numCols()) {
-          batch.column(i) match {
-            case vector: OmniColumnVector =>
-              vecsTmp.append(vector.getVec)
-            case _ =>
-          }
-        }
-        numInputBatches += 1
-        numOutputRows += batch.numRows()
-        batch.rowIterator().asScala.map(toUnsafe)
-      }
-
-      SparkMemoryUtils.addLeakSafeTaskCompletionListener { _ =>
-        vecsTmp.foreach {vec =>
-          vec.close()
-        }
-      }
-      batchIter
+      ColumnarBatchToInternalRow.convert(localOutput, batches, numOutputRows, numInputBatches)
     }
+  }
+}
+
+object ColumnarBatchToInternalRow {
+
+  def convert(output: Seq[Attribute], batches: Iterator[ColumnarBatch],
+              numOutputRows: SQLMetric, numInputBatches: SQLMetric ): Iterator[InternalRow] = {
+    val toUnsafe = UnsafeProjection.create(output, output)
+    val vecsTmp = new ListBuffer[Vec]
+
+    val batchIter = batches.flatMap { batch =>
+      // store vec since tablescan reuse batch
+      for (i <- 0 until batch.numCols()) {
+        batch.column(i) match {
+          case vector: OmniColumnVector =>
+            vecsTmp.append(vector.getVec)
+          case _ =>
+        }
+      }
+      numInputBatches += 1
+      numOutputRows += batch.numRows()
+      batch.rowIterator().asScala.map(toUnsafe)
+    }
+
+    SparkMemoryUtils.addLeakSafeTaskCompletionListener { _ =>
+      vecsTmp.foreach {vec =>
+        vec.close()
+      }
+    }
+    batchIter
   }
 }

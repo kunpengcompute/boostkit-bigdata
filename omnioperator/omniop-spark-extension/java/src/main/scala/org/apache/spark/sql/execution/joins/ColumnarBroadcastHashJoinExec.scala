@@ -41,7 +41,7 @@ import org.apache.spark.sql.catalyst.expressions.codegen._
 import org.apache.spark.sql.catalyst.optimizer.{BuildLeft, BuildRight, BuildSide}
 import org.apache.spark.sql.catalyst.plans._
 import org.apache.spark.sql.catalyst.plans.physical._
-import org.apache.spark.sql.execution.{CodegenSupport, SparkPlan}
+import org.apache.spark.sql.execution.{CodegenSupport, ColumnarHashedRelation, SparkPlan}
 import org.apache.spark.sql.execution.metric.SQLMetrics
 import org.apache.spark.sql.execution.util.{MergeIterator, SparkMemoryUtils}
 import org.apache.spark.sql.execution.vectorized.OmniColumnVector
@@ -267,7 +267,7 @@ case class ColumnarBroadcastHashJoinExec(
       OmniExpressionAdaptor.rewriteToOmniJsonExpressionLiteral(x,
         OmniExpressionAdaptor.getExprIdMap(buildOutput.map(_.toAttribute)))
     }.toArray
-    val buildData = buildPlan.executeBroadcast[Array[Array[Byte]]]()
+    val relation = buildPlan.executeBroadcast[ColumnarHashedRelation]()
 
     // TODO: check
     val buildOutputTypes = buildTypes // {1,1}
@@ -295,7 +295,7 @@ case class ColumnarBroadcastHashJoinExec(
       buildCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startBuildCodegen)
 
       val deserializer = VecBatchSerializerFactory.create()
-      buildData.value.foreach { input =>
+      relation.value.buildData.foreach { input =>
         val startBuildInput = System.nanoTime()
         buildOp.addInput(deserializer.deserialize(input))
         buildAddInputTime += NANOSECONDS.toMillis(System.nanoTime() - startBuildInput)

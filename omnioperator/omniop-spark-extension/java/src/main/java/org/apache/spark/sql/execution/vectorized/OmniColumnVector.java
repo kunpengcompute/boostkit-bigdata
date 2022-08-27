@@ -192,7 +192,35 @@ public class OmniColumnVector extends WritableColumnVector {
 
     @Override
     public boolean hasNull() {
-        throw new UnsupportedOperationException("hasNull is not supported");
+        if (dictionaryData != null) {
+            return dictionaryData.hasNullValue();
+        }
+        if (type instanceof BooleanType) {
+            return booleanDataVec.hasNullValue();
+        } else if (type instanceof ByteType) {
+            return charsTypeDataVec.hasNullValue();
+        } else if (type instanceof ShortType) {
+            return shortDataVec.hasNullValue();
+        } else if (type instanceof IntegerType) {
+           return intDataVec.hasNullValue();
+        } else if (type instanceof DecimalType) {
+            if (DecimalType.is64BitDecimalType(type)) {
+                return longDataVec.hasNullValue();
+            } else {
+                return decimal128DataVec.hasNullValue();
+            }
+        } else if (type instanceof LongType || DecimalType.is64BitDecimalType(type)) {
+            return longDataVec.hasNullValue();
+        } else if (type instanceof FloatType) {
+            return false;
+        } else if (type instanceof DoubleType) {
+            return doubleDataVec.hasNullValue();
+        } else if (type instanceof StringType) {
+            return charsTypeDataVec.hasNullValue();
+        } else if (type instanceof DateType) {
+            return intDataVec.hasNullValue();
+        }
+        throw new UnsupportedOperationException("hasNull is not supported for type:" + type);
     }
 
     @Override
