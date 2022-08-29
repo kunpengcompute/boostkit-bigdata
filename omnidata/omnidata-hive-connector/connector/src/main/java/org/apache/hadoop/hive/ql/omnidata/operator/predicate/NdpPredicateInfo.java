@@ -24,10 +24,10 @@ import com.huawei.boostkit.omnidata.model.Predicate;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+import org.apache.hadoop.hive.ql.omnidata.physical.NdpVectorizedRowBatchCtx;
+
 import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 
 /**
  * Ndp Predicate Info
@@ -54,6 +54,10 @@ public class NdpPredicateInfo implements Serializable {
 
     private List<Boolean> decodeTypesWithAgg;
 
+    private NdpVectorizedRowBatchCtx ndpVectorizedRowBatchCtx;
+
+    private String dataFormat;
+
     public NdpPredicateInfo() {
     }
 
@@ -63,12 +67,14 @@ public class NdpPredicateInfo implements Serializable {
 
     @JsonCreator
     public NdpPredicateInfo(@JsonProperty("isPushDown") boolean isPushDown,
-        @JsonProperty("isPushDownAgg") boolean isPushDownAgg,
-        @JsonProperty("isPushDownFilter") boolean isPushDownFilter,
-        @JsonProperty("hasPartitionColumn") boolean hasPartitionColumn, @JsonProperty("predicate") Predicate predicate,
-        @JsonProperty("outputColumns") List<Integer> outputColumns,
-        @JsonProperty("decodeTypes") List<String> decodeTypes,
-        @JsonProperty("decodeTypesWithAgg") List<Boolean> decodeTypesWithAgg) {
+                            @JsonProperty("isPushDownAgg") boolean isPushDownAgg,
+                            @JsonProperty("isPushDownFilter") boolean isPushDownFilter,
+                            @JsonProperty("hasPartitionColumn") boolean hasPartitionColumn, @JsonProperty("predicate") Predicate predicate,
+                            @JsonProperty("outputColumns") List<Integer> outputColumns,
+                            @JsonProperty("decodeTypes") List<String> decodeTypes,
+                            @JsonProperty("decodeTypesWithAgg") List<Boolean> decodeTypesWithAgg,
+                            @JsonProperty("ndpVectorizedRowBatchCtx") NdpVectorizedRowBatchCtx ndpVectorizedRowBatchCtx,
+                            @JsonProperty("dataFormat") String dataFormat) {
         this.isPushDown = isPushDown;
         this.isPushDownAgg = isPushDownAgg;
         this.isPushDownFilter = isPushDownFilter;
@@ -77,6 +83,8 @@ public class NdpPredicateInfo implements Serializable {
         this.outputColumns = outputColumns;
         this.decodeTypes = decodeTypes;
         this.decodeTypesWithAgg = decodeTypesWithAgg;
+        this.ndpVectorizedRowBatchCtx = ndpVectorizedRowBatchCtx;
+        this.dataFormat = dataFormat;
     }
 
     @JsonProperty
@@ -119,24 +127,37 @@ public class NdpPredicateInfo implements Serializable {
         return decodeTypesWithAgg;
     }
 
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) {
-            return true;
-        }
-        if (o == null || getClass() != o.getClass()) {
-            return false;
-        }
-        NdpPredicateInfo that = (NdpPredicateInfo) o;
-        return isPushDown == that.isPushDown && isPushDownAgg == that.isPushDownAgg
-            && isPushDownFilter == that.isPushDownFilter && hasPartitionColumn == that.hasPartitionColumn
-            && Objects.equals(predicate, that.predicate) && Objects.equals(outputColumns, that.outputColumns) && Objects
-            .equals(decodeTypes, that.decodeTypes) && Objects.equals(decodeTypesWithAgg, that.decodeTypesWithAgg);
+    @JsonProperty
+    public NdpVectorizedRowBatchCtx getNdpVectorizedRowBatchCtx() {
+        return ndpVectorizedRowBatchCtx;
     }
 
-    @Override
-    public int hashCode() {
-        return Objects.hash(isPushDown, isPushDownAgg, isPushDownFilter, hasPartitionColumn, predicate, outputColumns,
-            decodeTypes, decodeTypesWithAgg);
+    @JsonProperty
+    public String getDataFormat() {
+        return dataFormat;
+    }
+
+    public void setPredicate(Predicate predicate) {
+        this.predicate = predicate;
+    }
+
+    public void setOutputColumns(List<Integer> outputColumns) {
+        this.outputColumns = outputColumns;
+    }
+
+    public void setDecodeTypes(List<String> decodeTypes) {
+        this.decodeTypes = decodeTypes;
+    }
+
+    public void setDecodeTypesWithAgg(List<Boolean> decodeTypesWithAgg) {
+        this.decodeTypesWithAgg = decodeTypesWithAgg;
+    }
+
+    public void setNdpVectorizedRowBatchCtx(NdpVectorizedRowBatchCtx ndpVectorizedRowBatchCtx) {
+        this.ndpVectorizedRowBatchCtx = ndpVectorizedRowBatchCtx;
+    }
+
+    public void setDataFormat(String dataFormat) {
+        this.dataFormat = dataFormat;
     }
 }

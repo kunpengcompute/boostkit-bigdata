@@ -31,18 +31,18 @@ import org.apache.hadoop.hive.ql.exec.vector.VectorFilterOperator;
 import org.apache.hadoop.hive.ql.exec.vector.VectorGroupByOperator;
 import org.apache.hadoop.hive.ql.exec.vector.VectorLimitOperator;
 import org.apache.hadoop.hive.ql.exec.vector.VectorSelectOperator;
-import org.apache.hadoop.hive.ql.omnidata.config.NdpConf;
+import org.apache.hadoop.hive.ql.omnidata.config.OmniDataConf;
 import org.apache.hadoop.hive.ql.omnidata.operator.enums.NdpHiveOperatorEnum;
 import org.apache.hadoop.hive.ql.omnidata.operator.enums.NdpUdfEnum;
 import org.apache.hadoop.hive.ql.omnidata.operator.filter.NdpFilter.*;
 import org.apache.hadoop.hive.ql.omnidata.status.NdpStatusInfo;
-import org.apache.hadoop.hive.ql.omnidata.status.NdpStatusManager;
 import org.apache.hadoop.hive.ql.plan.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Used to check the validity of the operation during the Ndp planning phase.
@@ -112,57 +112,32 @@ public class NdpPlanChecker {
      * Currently, two data formats are supported: Orc and Parquet.
      *
      * @param tableScanOp TableScanOperator
-     * @return true or false
+     * @param work mapWork
+     * @return 'orc' and 'parquet'
      */
-    public static boolean checkDataFormat(TableScanOperator tableScanOp, BaseWork work) {
+    public static Optional<String> getDataFormat(TableScanOperator tableScanOp, BaseWork work) {
         String tableName = tableScanOp.getConf().getAlias();
+        String format = "";
         // TableMetadata may be 'null'
         if (tableScanOp.getConf().getTableMetadata() == null) {
             if (work instanceof MapWork) {
                 PartitionDesc desc = ((MapWork) work).getAliasToPartnInfo().get(tableScanOp.getConf().getAlias());
                 if (desc != null) {
-                    String inputFormat = desc.getInputFileFormatClass().getSimpleName();
-                    String outputFormat = desc.getOutputFileFormatClass().getSimpleName();
-                    return checkDataFormat(inputFormat, outputFormat, tableName);
+                    format = desc.getInputFileFormatClass().getSimpleName();
                 } else {
-                    LOG.info("Table [{}] failed to push down, since PartitionDesc is null",
-                            tableName);
-                    return false;
+                    LOG.info("Table [{}] failed to push down, since PartitionDesc is null", tableName);
                 }
-            } else {
-                LOG.info("Table [{}] failed to push down, since unsupported this work: [{}]",
-                        tableName, work.getClass().getSimpleName());
-                return false;
             }
         } else {
-            String inputFormat = tableScanOp.getConf().getTableMetadata().getInputFormatClass().getSimpleName();
-            String outputFormat = tableScanOp.getConf().getTableMetadata().getOutputFormatClass().getSimpleName();
-            return checkDataFormat(inputFormat, outputFormat, tableName);
+            format = tableScanOp.getConf().getTableMetadata().getInputFormatClass().getSimpleName();
         }
-    }
-
-    /**
-     * Currently, two data formats are supported: Orc and Parquet.
-     *
-     * @param inputFormat hive input data format
-     * @param outputFormat hive output data format
-     * @param tableName hive table name
-     * @return true or false
-     */
-    public static boolean checkDataFormat(String inputFormat, String outputFormat, String tableName) {
-        if (!(inputFormat.toLowerCase(Locale.ENGLISH).contains("orc") || inputFormat.toLowerCase(Locale.ENGLISH)
-                .contains("parquet"))) {
-            LOG.info("Table [{}] failed to push down, since unsupported this input data format: [{}]", tableName,
-                    inputFormat);
-            return false;
+        if (format.toLowerCase(Locale.ENGLISH).contains("orc")) {
+            return Optional.of("orc");
+        } else if (format.toLowerCase(Locale.ENGLISH).contains("parquet")) {
+            return Optional.of("parquet");
+        } else {
+            return Optional.empty();
         }
-        if (!(outputFormat.toLowerCase(Locale.ENGLISH).contains("orc") || outputFormat.toLowerCase(Locale.ENGLISH)
-                .contains("parquet"))) {
-            LOG.info("Table [{}] failed to push down, since unsupported this output data format: [{}]", tableName,
-                    inputFormat);
-            return false;
-        }
-        return true;
     }
 
     /**
@@ -192,11 +167,6 @@ public class NdpPlanChecker {
             return false;
         }
         return true;
-    }
-
-    public static boolean checkPushDown(Configuration conf, boolean isPushDown) {
-        return isPushDown && conf.get(NdpStatusManager.NDP_DATANODE_HOSTNAMES) != null
-                && conf.get(NdpStatusManager.NDP_DATANODE_HOSTNAMES).length() > 0;
     }
 
     /**
@@ -262,17 +232,17 @@ public class NdpPlanChecker {
      * @param vectorFilterOperator VectorFilterOperator
      * @return true or false
      */
-    public static ExprNodeGenericFuncDesc checkFilterOperator(VectorFilterOperator vectorFilterOperator) {
+    public static Optional<ExprNodeGenericFuncDesc> checkFilterOperator(VectorFilterOperator vectorFilterOperator) {
         if (vectorFilterOperator == null) {
-            return null;
+            return Optional.empty();
         }
         ExprNodeDesc nodeDesc = vectorFilterOperator.getConf().getPredicate();
         if (nodeDesc instanceof ExprNodeGenericFuncDesc) {
-            return (ExprNodeGenericFuncDesc) nodeDesc;
+            return Optional.of((ExprNodeGenericFuncDesc) nodeDesc);
         }
         LOG.info("FilterOperator failed to push down, since unsupported this ExprNodeDesc: [{}]",
                 nodeDesc.getClass().getSimpleName());
-        return null;
+        return Optional.empty();
     }
 
     /**
@@ -281,17 +251,17 @@ public class NdpPlanChecker {
      * @param vectorSelectOperator VectorSelectOperator
      * @return true or false
      */
-    public static VectorSelectDesc checkSelectOperator(VectorSelectOperator vectorSelectOperator) {
+    public static Optional<VectorSelectDesc> checkSelectOperator(VectorSelectOperator vectorSelectOperator) {
         if (vectorSelectOperator == null) {
-            return null;
+            return Optional.empty();
         }
         SelectDesc selectDesc = vectorSelectOperator.getConf();
         if (selectDesc.getVectorDesc() instanceof VectorSelectDesc) {
-            return (VectorSelectDesc) selectDesc.getVectorDesc();
+            return Optional.of((VectorSelectDesc) selectDesc.getVectorDesc());
         }
         LOG.info("VectorSelectOperator failed to push down, since unsupported this SelectDesc: [{}]",
                 selectDesc.getClass().getSimpleName());
-        return null;
+        return Optional.empty();
     }
 
     /**
@@ -300,23 +270,22 @@ public class NdpPlanChecker {
      * @param vectorGroupByOperator VectorGroupByOperator
      * @return true or false
      */
-    public static GroupByDesc checkGroupByOperator(VectorGroupByOperator vectorGroupByOperator) {
-        if (vectorGroupByOperator != null) {
+    public static Optional<VectorGroupByDesc> checkGroupByOperator(VectorGroupByOperator vectorGroupByOperator) {
+        if (vectorGroupByOperator != null && vectorGroupByOperator.getVectorDesc() instanceof VectorGroupByDesc) {
             VectorGroupByDesc aggVectorsDesc = (VectorGroupByDesc) vectorGroupByOperator.getVectorDesc();
             // Agg or groupby can be pushed down only when agg or groupby exists.
             if (aggVectorsDesc.getKeyExpressions().length > 0 || aggVectorsDesc.getVecAggrDescs().length > 0) {
                 for (VectorAggregationDesc agg : aggVectorsDesc.getVecAggrDescs()) {
                     if (!checkAggregationDesc(agg.getAggrDesc())) {
-                        return null;
+                        return Optional.empty();
                     }
                 }
-                return vectorGroupByOperator.getConf();
+                return Optional.of(aggVectorsDesc);
             }
         }
         LOG.info("VectorGroupByOperator failed to push down");
-        return null;
+        return Optional.empty();
     }
-
 
     /**
      * Check whether Limit offset > 0
@@ -324,16 +293,16 @@ public class NdpPlanChecker {
      * @param vectorLimitOperator VectorLimitOperator
      * @return true or false
      */
-    public static LimitDesc checkLimitOperator(VectorLimitOperator vectorLimitOperator) {
+    public static Optional<LimitDesc> checkLimitOperator(VectorLimitOperator vectorLimitOperator) {
         if (vectorLimitOperator == null) {
-            return null;
+            return Optional.empty();
         }
         LimitDesc limitDesc = vectorLimitOperator.getConf();
         if (limitDesc.getOffset() == null && limitDesc.getLimit() > 0) {
-            return limitDesc;
+            return Optional.of(limitDesc);
         }
         LOG.info("VectorLimitOperator failed to push down, since unsupported Limit offset > 0");
-        return null;
+        return Optional.empty();
     }
 
     public static boolean checkAggregationDesc(AggregationDesc agg) {
@@ -417,36 +386,20 @@ public class NdpPlanChecker {
         return checkMinFunction(agg);
     }
 
-    public static double getSelectivity(TableScanOperator tableScanOp) {
-        double selectivity = 0.5;
-        if (tableScanOp.getConf().getStatistics() == null) {
-            return selectivity;
-        }
-        try {
-            long tableCount = tableScanOp.getConf().getStatistics().getNumRows();
-            long filterCount = tableScanOp.getChildOperators().get(0).getConf().getStatistics().getNumRows();
-            if (tableCount > 0) {
-                selectivity = 1.0 * filterCount / tableCount;
-            }
-        } catch (Exception e) {
-            LOG.error("Can't calculate the selectivity", e);
-        }
-        return selectivity;
-    }
-
     /**
      * Check whether the filter selectivity is supported
      *
      * @param tableScanOp TableScanOperator
-     * @param ndpConf NdpConf
+     * @param conf OmniDataConf
      * @return true or false
      */
-    public static boolean checkSelectivity(TableScanOperator tableScanOp, NdpConf ndpConf) {
-        if (ndpConf.getNdpFilterSelectivityEnable()) {
-            double currentSelectivity = getSelectivity(tableScanOp);
-            if (currentSelectivity > ndpConf.getNdpFilterSelectivity()) {
+    public static boolean checkSelectivity(TableScanOperator tableScanOp, Configuration conf) {
+        if (OmniDataConf.getOmniDataFilterSelectivityEnabled(conf)) {
+            double currentSelectivity = NdpStatisticsUtils.getSelectivity(tableScanOp);
+            double filterSelectivity = OmniDataConf.getOmniDataFilterSelectivity(conf);
+            if (currentSelectivity > filterSelectivity) {
                 LOG.info("Table [{}] failed to push down, since selectivity[{}] > threshold[{}]",
-                        tableScanOp.getConf().getAlias(), currentSelectivity, ndpConf.getNdpFilterSelectivity());
+                        tableScanOp.getConf().getAlias(), currentSelectivity, filterSelectivity);
                 return false;
             } else {
                 LOG.info("Table [{}] selectivity is {}", tableScanOp.getConf().getAlias(), currentSelectivity);
@@ -462,17 +415,17 @@ public class NdpPlanChecker {
      * Check whether the table size is supported
      *
      * @param tableScanOp TableScanOperator
-     * @param ndpConf NdpConf
+     * @param conf hive conf
      * @return true or false
      */
-    public static boolean checkTableSize(TableScanOperator tableScanOp, NdpConf ndpConf) {
+    public static boolean checkTableSize(TableScanOperator tableScanOp, Configuration conf) {
         if (tableScanOp.getConf().getStatistics() == null) {
             return false;
         }
         long currentTableSize = tableScanOp.getConf().getStatistics().getDataSize();
-        if (currentTableSize < ndpConf.getNdpTablesSizeThreshold()) {
+        if (currentTableSize < OmniDataConf.getOmniDataTablesSizeThreshold(conf)) {
             LOG.info("Table [{}] failed to push down, since table size[{}] < threshold[{}]",
-                    tableScanOp.getConf().getAlias(), currentTableSize, ndpConf.getNdpTablesSizeThreshold());
+                    tableScanOp.getConf().getAlias(), currentTableSize, OmniDataConf.getOmniDataTablesSizeThreshold(conf));
             return false;
         }
         return true;

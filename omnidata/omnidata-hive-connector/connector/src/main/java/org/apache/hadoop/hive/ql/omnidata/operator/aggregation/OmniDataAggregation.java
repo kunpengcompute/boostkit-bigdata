@@ -40,7 +40,6 @@ import org.apache.hadoop.hive.ql.exec.vector.expressions.VectorExpression;
 import org.apache.hadoop.hive.ql.omnidata.OmniDataUtils;
 import org.apache.hadoop.hive.ql.omnidata.operator.predicate.OmniDataPredicate;
 import org.apache.hadoop.hive.ql.omnidata.operator.enums.NdpUdfEnum;
-import org.apache.hadoop.hive.ql.plan.GroupByDesc;
 import org.apache.hadoop.hive.ql.plan.VectorGroupByDesc;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -71,8 +70,7 @@ public class OmniDataAggregation {
         this.predicateInfo = predicateInfo;
     }
 
-    public AggregationInfo getAggregation(GroupByDesc groupByDesc) {
-        VectorGroupByDesc aggVectorsDesc = (VectorGroupByDesc) groupByDesc.getVectorDesc();
+    public AggregationInfo getAggregation(VectorGroupByDesc aggVectorsDesc) {
         List<RowExpression> groupingKeys = new ArrayList<>();
         for (VectorExpression groupExpression : aggVectorsDesc.getKeyExpressions()) {
             createGroupingKey(groupExpression, groupingKeys);

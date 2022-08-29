@@ -15,20 +15,13 @@
 
 package org.apache.hadoop.hive.ql.omnidata.decode;
 
-
 import com.huawei.boostkit.omnidata.exception.OmniDataException;
 
 import io.airlift.slice.SliceInput;
 import io.prestosql.spi.type.DateType;
 import io.prestosql.spi.type.RowType;
 
-import org.apache.hadoop.hive.ql.omnidata.decode.type.DecimalDecodeType;
-import org.apache.hadoop.hive.ql.omnidata.decode.type.DecodeType;
-import org.apache.hadoop.hive.ql.omnidata.decode.type.LongToByteDecodeType;
-import org.apache.hadoop.hive.ql.omnidata.decode.type.LongToFloatDecodeType;
-import org.apache.hadoop.hive.ql.omnidata.decode.type.LongToIntDecodeType;
-import org.apache.hadoop.hive.ql.omnidata.decode.type.LongToShortDecodeType;
-import org.apache.hadoop.hive.ql.omnidata.decode.type.TimestampDecodeType;
+import org.apache.hadoop.hive.ql.omnidata.decode.type.*;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -44,9 +37,7 @@ import java.util.stream.IntStream;
  * @param <T> decoding type
  * @since 2022-07-28
  */
-public abstract class AbstractDecoding<T>
-        implements Decoding<T>
-{
+public abstract class AbstractDecoding<T> implements Decoding<T> {
     private static final Map<String, Method> DECODE_METHODS;
 
     static {
@@ -59,13 +50,11 @@ public abstract class AbstractDecoding<T>
         }
     }
 
-    private Method getDecodeMethod(String decodeName)
-    {
+    private Method getDecodeMethod(String decodeName) {
         return DECODE_METHODS.get(decodeName);
     }
 
-    private String getDecodeName(SliceInput input)
-    {
+    private String getDecodeName(SliceInput input) {
         int length = input.readInt();
         byte[] bytes = new byte[length];
         input.readBytes(bytes);
@@ -73,67 +62,49 @@ public abstract class AbstractDecoding<T>
         return new String(bytes, StandardCharsets.UTF_8);
     }
 
-    private Optional<String> typeToDecodeName(DecodeType type)
-    {
+    private Optional<String> typeToDecodeName(DecodeType type) {
         Class<?> javaType = null;
         if (type.getJavaType().isPresent()) {
             javaType = type.getJavaType().get();
         }
         if (javaType == double.class) {
             return Optional.of("DOUBLE_ARRAY");
-        }
-        else if (javaType == float.class) {
+        } else if (javaType == float.class) {
             return Optional.of("FLOAT_ARRAY");
-        }
-        else if (javaType == int.class) {
+        } else if (javaType == int.class) {
             return Optional.of("INT_ARRAY");
-        }
-        else if (javaType == long.class) {
+        } else if (javaType == long.class) {
             return Optional.of("LONG_ARRAY");
-        }
-        else if (javaType == byte.class) {
+        } else if (javaType == byte.class) {
             return Optional.of("BYTE_ARRAY");
-        }
-        else if (javaType == boolean.class) {
+        } else if (javaType == boolean.class) {
             return Optional.of("BOOLEAN_ARRAY");
-        }
-        else if (javaType == short.class) {
+        } else if (javaType == short.class) {
             return Optional.of("SHORT_ARRAY");
-        }
-        else if (javaType == String.class) {
+        } else if (javaType == String.class) {
             return Optional.of("VARIABLE_WIDTH");
-        }
-        else if (javaType == RowType.class) {
+        } else if (javaType == RowType.class) {
             return Optional.of("ROW");
-        }
-        else if (javaType == DateType.class) {
+        } else if (javaType == DateType.class) {
             return Optional.of("DATE");
-        }
-        else if (javaType == LongToIntDecodeType.class) {
+        } else if (javaType == LongToIntDecodeType.class) {
             return Optional.of("LONG_TO_INT");
-        }
-        else if (javaType == LongToShortDecodeType.class) {
+        } else if (javaType == LongToShortDecodeType.class) {
             return Optional.of("LONG_TO_SHORT");
-        }
-        else if (javaType == LongToByteDecodeType.class) {
+        } else if (javaType == LongToByteDecodeType.class) {
             return Optional.of("LONG_TO_BYTE");
-        }
-        else if (javaType == LongToFloatDecodeType.class) {
+        } else if (javaType == LongToFloatDecodeType.class) {
             return Optional.of("LONG_TO_FLOAT");
-        }
-        else if (javaType == DecimalDecodeType.class) {
+        } else if (javaType == DecimalDecodeType.class) {
             return Optional.of("DECIMAL");
-        }
-        else if (javaType == TimestampDecodeType.class) {
+        } else if (javaType == TimestampDecodeType.class) {
             return Optional.of("TIMESTAMP");
-        }
-        else {
+        } else {
             return Optional.empty();
         }
     }
 
-    private boolean[] getIsNullValue(byte value)
-    {
+    private boolean[] getIsNullValue(byte value) {
         boolean[] isNullValue = new boolean[8];
         isNullValue[0] = ((value & 0b1000_0000) != 0);
         isNullValue[1] = ((value & 0b0100_0000) != 0);
@@ -148,8 +119,7 @@ public abstract class AbstractDecoding<T>
     }
 
     @Override
-    public T decode(Optional<DecodeType> type, SliceInput sliceInput)
-    {
+    public T decode(Optional<DecodeType> type, SliceInput sliceInput) {
         try {
             String decodeName = getDecodeName(sliceInput);
             if (type.isPresent()) {
@@ -164,8 +134,7 @@ public abstract class AbstractDecoding<T>
             }
             Method method = getDecodeMethod(decodeName);
             return (T) method.invoke(this, type, sliceInput);
-        }
-        catch (IllegalAccessException | InvocationTargetException e) {
+        } catch (IllegalAccessException | InvocationTargetException e) {
             throw new OmniDataException("decode failed " + e.getMessage());
         }
     }
@@ -173,13 +142,12 @@ public abstract class AbstractDecoding<T>
     /**
      * decode Null Bits
      *
-     * @param sliceInput sliceInput
+     * @param sliceInput    sliceInput
      * @param positionCount positionCount
      * @return decode boolean[]
      * @since 2022-07-18
      */
-    public Optional<boolean[]> decodeNullBits(SliceInput sliceInput, int positionCount)
-    {
+    public Optional<boolean[]> decodeNullBits(SliceInput sliceInput, int positionCount) {
         if (!sliceInput.readBoolean()) {
             return Optional.empty();
         }
