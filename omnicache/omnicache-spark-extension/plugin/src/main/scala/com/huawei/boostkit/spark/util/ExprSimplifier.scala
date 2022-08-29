@@ -638,16 +638,15 @@ object ExprSimplifier extends PredicateHelper {
 
   // simplify condition with pulledUpPredicates.
   def simplify(logicalPlan: LogicalPlan): LogicalPlan = {
-    val newLogicalPlan = UnwrapCastInBinaryComparison.apply(logicalPlan)
     val originPredicates: mutable.ArrayBuffer[Expression] = ArrayBuffer()
-    newLogicalPlan foreach {
+    logicalPlan foreach {
       case Filter(condition, _) =>
         originPredicates ++= splitConjunctivePredicates(condition)
       case Join(_, _, _, condition, _) if condition.isDefined =>
         originPredicates ++= splitConjunctivePredicates(condition.get)
       case _ =>
     }
-    val inferredPlan = InferFiltersFromConstraints.apply(newLogicalPlan)
+    val inferredPlan = InferFiltersFromConstraints.apply(logicalPlan)
     val inferredPredicates: mutable.ArrayBuffer[Expression] = mutable.ArrayBuffer()
     inferredPlan foreach {
       case Filter(condition, _) =>
@@ -658,7 +657,7 @@ object ExprSimplifier extends PredicateHelper {
     }
     val pulledUpPredicates: Set[Expression] = inferredPredicates.toSet -- originPredicates.toSet
     // cast optimizer
-    val optCastPlan = SimplifyCasts.apply(ConstantFolding.apply(newLogicalPlan))
+    val optCastPlan = SimplifyCasts.apply(ConstantFolding.apply(logicalPlan))
     optCastPlan transform {
       case Filter(condition: Expression, child: LogicalPlan) =>
         val simplifyExpr = ExprSimplifier(true, pulledUpPredicates).simplify(condition)

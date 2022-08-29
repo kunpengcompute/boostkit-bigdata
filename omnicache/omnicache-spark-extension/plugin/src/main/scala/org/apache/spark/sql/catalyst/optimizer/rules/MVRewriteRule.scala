@@ -77,7 +77,7 @@ class MVRewriteRule(session: SparkSession) extends Rule[LogicalPlan] with Loggin
       val mvs = usingMvs.mkString(";").replaceAll("`", "")
       val log = "logicalPlan MVRewrite success,using materialized view:[%s],original sql:%s"
           .format(mvs, sql)
-      logWarning(log)
+      logDebug(log)
       session.sparkContext.listenerBus.post(SparkListenerMVRewriteSuccess(sql, mvs))
     }
     res

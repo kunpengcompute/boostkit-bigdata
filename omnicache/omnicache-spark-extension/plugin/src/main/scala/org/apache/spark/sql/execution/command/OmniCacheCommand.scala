@@ -54,71 +54,74 @@ case class OmniCacheCreateMvCommand(
     query: LogicalPlan,
     outputColumnNames: Seq[String]) extends DataWritingCommand {
   override def run(sparkSession: SparkSession, child: SparkPlan): Seq[Row] = {
-    ViewMetadata.init(sparkSession)
-    val sessionState = sparkSession.sessionState
-    val databaseName = databaseNameOption.getOrElse(sessionState.catalog.getCurrentDatabase)
-    val identifier = TableIdentifier(name, Option(databaseName))
+    try {
+      ViewMetadata.init(sparkSession)
+      val sessionState = sparkSession.sessionState
+      val databaseName = databaseNameOption.getOrElse(sessionState.catalog.getCurrentDatabase)
+      val identifier = TableIdentifier(name, Option(databaseName))
 
-    val (storageFormat, provider) = getStorageFormatAndProvider(
-      providerStr, Map.empty, None
-    )
+      val (storageFormat, provider) = getStorageFormatAndProvider(
+        providerStr, Map.empty, None)
 
-    val table = buildCatalogTable(
-      identifier, new StructType,
-      partitioning, None, properties, provider, None,
-      comment, storageFormat, external = false
-    )
-    val tableIdentWithDB = identifier.copy(database = Some(databaseName))
+      val table = buildCatalogTable(
+        identifier, new StructType,
+        partitioning, None, properties, provider, None,
+        comment, storageFormat, external = false)
+      val tableIdentWithDB = identifier.copy(database = Some(databaseName))
 
-    if (ViewMetadata.isViewExists(identifier.toString())) {
-      if (!ifNotExistsSet) {
-        throw new Exception(
-          s"Materialized view with name $databaseName.$name already exists"
-        )
-      } else {
-        return Seq.empty
+      if (ViewMetadata.isViewExists(identifier.toString())) {
+        if (!ifNotExistsSet) {
+          throw new Exception(
+            s"Materialized view with name $databaseName.$name already exists")
+        } else {
+          return Seq.empty
+        }
       }
+
+      if (sessionState.catalog.tableExists(tableIdentWithDB)) {
+        if (!ifNotExistsSet) {
+          throw new AnalysisException(
+            s"Materialized View $tableIdentWithDB already exists. You need to drop it first")
+        } else {
+          // Since the table already exists and the save mode is Ignore,we will just return.
+          return Seq.empty
+        }
+      } else {
+        assert(table.schema.isEmpty)
+        sparkSession.sessionState.catalog.validateTableLocation(table)
+        val tableLocation = if (table.tableType == CatalogTableType.MANAGED) {
+          Some(sessionState.catalog.defaultTablePath(table.identifier))
+        } else {
+          table.storage.locationUri
+        }
+        val result = saveDataIntoTable(
+          sparkSession, table, tableLocation, child, SaveMode.Overwrite)
+        val tableSchema = CharVarcharUtils.getRawSchema(result.schema)
+        val newTable = table.copy(
+          storage = table.storage.copy(locationUri = tableLocation),
+          // We will use the schema of resolved.relation as the schema of the table (instead of
+          // the schema of df). It is important since the nullability may be changed by the relation
+          // provider (for example,see org.apache.spark.sql.parquet.DefaultSource).
+          schema = tableSchema)
+        // Table location is already validated. No need to check it again during table creation.
+        sessionState.catalog.createTable(newTable, ignoreIfExists = false, validateLocation = false)
+        result match {
+          case _: HadoopFsRelation if table.partitionColumnNames.nonEmpty &&
+              sparkSession.sqlContext.conf.manageFilesourcePartitions =>
+            // Need to recover partitions into the metastore so our saved data is visible
+            sessionState.executePlan(AlterTableRecoverPartitionsCommand(table.identifier)).toRdd
+          case _ =>
+        }
+      }
+
+      CommandUtils.updateTableStats(sparkSession, table)
+      ViewMetadata.addCatalogTableToCache(table)
+    } catch {
+      case e: Throwable =>
+        throw e
+    } finally {
+      RewriteHelper.enableCachePlugin()
     }
-
-    if (sessionState.catalog.tableExists(tableIdentWithDB)) {
-      if (!ifNotExistsSet) {
-        throw new AnalysisException(
-          s"Materialized View $tableIdentWithDB already exists. You need to drop it first")
-      } else {
-        // Since the table already exists and the save mode is Ignore,we will just return.
-        return Seq.empty
-      }
-    } else {
-      assert(table.schema.isEmpty)
-      sparkSession.sessionState.catalog.validateTableLocation(table)
-      val tableLocation = if (table.tableType == CatalogTableType.MANAGED) {
-        Some(sessionState.catalog.defaultTablePath(table.identifier))
-      } else {
-        table.storage.locationUri
-      }
-      val result = saveDataIntoTable(
-        sparkSession, table, tableLocation, child, SaveMode.Overwrite)
-      val tableSchema = CharVarcharUtils.getRawSchema(result.schema)
-      val newTable = table.copy(
-        storage = table.storage.copy(locationUri = tableLocation),
-        // We will use the schema of resolved.relation as the schema of the table (instead of
-        // the schema of df). It is important since the nullability may be changed by the relation
-        // provider (for example,see org.apache.spark.sql.parquet.DefaultSource).
-        schema = tableSchema)
-      // Table location is already validated. No need to check it again during table creation.
-      sessionState.catalog.createTable(newTable, ignoreIfExists = false, validateLocation = false)
-      result match {
-        case _: HadoopFsRelation if table.partitionColumnNames.nonEmpty &&
-            sparkSession.sqlContext.conf.manageFilesourcePartitions =>
-          // Need to recover partitions into the metastore so our saved data is visible
-          sessionState.executePlan(AlterTableRecoverPartitionsCommand(table.identifier)).toRdd
-        case _ =>
-      }
-    }
-
-    CommandUtils.updateTableStats(sparkSession, table)
-    ViewMetadata.addCatalogTableToCache(table)
-
     Seq.empty[Row]
   }
 
@@ -164,8 +167,7 @@ case class DropMaterializedViewCommand(
       catalog.getTableMetadata(tableName).tableType match {
         case CatalogTableType.VIEW =>
           throw new AnalysisException(
-            "Cannot drop a view with DROP TABLE. Please use DROP VIEW instead"
-          )
+            "Cannot drop a view with DROP TABLE. Please use DROP VIEW instead")
         case _ =>
       }
     }
@@ -175,8 +177,7 @@ case class DropMaterializedViewCommand(
       if (catalog.tableExists(tableName) &&
           !isMV(catalog.getTableMetadata(tableName))) {
         throw new AnalysisException(
-          "Cannot drop a table with DROP MV. Please use DROP TABLE instead"
-        )
+          "Cannot drop a table with DROP MV. Please use DROP TABLE instead")
       }
       try {
         val hasViewText = isTempView &&
@@ -201,8 +202,7 @@ case class DropMaterializedViewCommand(
 
 case class ShowMaterializedViewCommand(
     databaseName: Option[String],
-    tableIdentifierPattern: Option[String]
-) extends RunnableCommand {
+    tableIdentifierPattern: Option[String]) extends RunnableCommand {
 
   override val output: Seq[Attribute] = {
     val tableExtendedInfo = Nil
@@ -257,7 +257,6 @@ case class AlterRewriteMaterializedViewCommand(
     ViewMetadata.init(sparkSession)
     val catalog = sparkSession.sessionState.catalog
     if (catalog.tableExists(tableName)) {
-      ViewMetadata.init(sparkSession)
       if (!isMV(catalog.getTableMetadata(tableName))) {
         throw new AnalysisException(
           "Cannot alter a table with ALTER MV. Please use ALTER TABLE instead")
@@ -478,8 +477,8 @@ case class RefreshMaterializedViewCommand(
     }
     // first clear the path determined by the static partition keys (e.g. /table/foo=1)
     val staticPrefixPath = qualifiedOutputPath.suffix(staticPartitionPrefix)
-    if (fs.exists(staticPrefixPath) &&
-        !committer.deleteWithJob(fs, staticPrefixPath, recursive = true)) {
+    if (fs.exists(staticPrefixPath) && !committer
+        .deleteWithJob(fs, staticPrefixPath, recursive = true)) {
       throw new IOException(s"Unable to clear output " +
           s"directory $staticPrefixPath prior to writing to it")
     }

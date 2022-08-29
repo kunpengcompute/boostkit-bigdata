@@ -64,15 +64,23 @@ class OmniCacheExtensionAstBuilder(spark: SparkSession, delegate: ParserInterfac
         "The mv name is not valid: %s".format(identifier.mkString("."))
       )
     }
-    val provider =
-      OmniCachePluginConfig.getConf.defaultDataSource
-    val qe = spark.sql(query).queryExecution
-    val logicalPlan = qe.optimizedPlan
-    if (RewriteHelper.containsMV(qe.analyzed)) {
-      throw new RuntimeException("not support create mv from mv")
+
+    try {
+      val provider =
+        OmniCachePluginConfig.getConf.defaultDataSource
+      RewriteHelper.disableCachePlugin()
+      val qe = spark.sql(query).queryExecution
+      val logicalPlan = qe.optimizedPlan
+      if (RewriteHelper.containsMV(qe.analyzed)) {
+        throw new RuntimeException("not support create mv from mv")
+      }
+      OmniCacheCreateMvCommand(databaseName, name, provider, comment, properties,
+        ifNotExists, partCols, logicalPlan, logicalPlan.output.map(_.name))
+    } catch {
+      case e: Throwable =>
+        RewriteHelper.enableCachePlugin()
+        throw e
     }
-    OmniCacheCreateMvCommand(databaseName, name, provider, comment, properties,
-      ifNotExists, partCols, logicalPlan, logicalPlan.output.map(_.name))
   }
 
   /**
@@ -173,6 +181,7 @@ class OmniCacheExtensionAstBuilder(spark: SparkSession, delegate: ParserInterfac
         outputColumnNames = data.output.map(_.name))
     } catch {
       case e: Throwable =>
+        RewriteHelper.enableCachePlugin()
         throw e
     } finally {
       spark.sessionState.catalogManager.setCurrentNamespace(Array(preDatabase))
