@@ -163,7 +163,7 @@ public class MockUtil
                     when(dictionaryVec.getDictionary()).thenReturn(vec);
                     when(dictionaryVec.slice(anyInt(), anyInt())).thenReturn(dictionaryVec);
                     when(dictionaryVec.getAllocator()).thenReturn(vecAllocator);
-                    blocks.put(j, new DictionaryOmniBlock(0, blockModel.values.length, dictionaryVec, idIndex, block, false, randomDictionaryId()));
+                    blocks.put(j, new DictionaryOmniBlock(0, blockModel.values.length, dictionaryVec, idIndex, false, randomDictionaryId()));
                 }
                 else {
                     blocks.put(j, block);
@@ -242,7 +242,7 @@ public class MockUtil
                 when(dictionaryVec.getDictionary()).thenReturn(vec);
                 when(dictionaryVec.slice(anyInt(), anyInt())).thenReturn(dictionaryVec);
                 when(dictionaryVec.getAllocator()).thenReturn(vecAllocator);
-                block = new DictionaryOmniBlock<Block<?>>(0, object.length, dictionaryVec, idIndex, block, false, randomDictionaryId());
+                block = new DictionaryOmniBlock<Block<?>>(0, object.length, dictionaryVec, idIndex, false, randomDictionaryId());
             }
             if (lazy) {
                 LazyBlock<?> lazyBlock = new LazyBlock<Block<?>>(block.getPositionCount(), instance -> {});

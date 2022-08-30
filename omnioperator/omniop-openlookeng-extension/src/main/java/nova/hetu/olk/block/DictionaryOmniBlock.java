@@ -176,45 +176,6 @@ public class DictionaryOmniBlock<T>
     /**
      * Instantiates a new Dictionary omni block.
      *
-     * @param idsOffset the ids offset
-     * @param positionCount the position count
-     * @param dictionaryVec the dictionary vector
-     * @param dictionary the dictionary
-     * @param ids the ids
-     * @param dictionaryIsCompacted the dictionary is compacted
-     * @param dictionarySourceId the dictionary source id
-     */
-    public DictionaryOmniBlock(int idsOffset, int positionCount, DictionaryVec dictionaryVec, int[] ids,
-                               Block dictionary, boolean dictionaryIsCompacted, DictionaryId dictionarySourceId)
-    {
-        requireNonNull(dictionaryVec, "dictionaryVec is null");
-        requireNonNull(ids, "ids is null");
-
-        if (positionCount < 0) {
-            throw new IllegalArgumentException("positionCount is negative");
-        }
-
-        this.idsOffset = idsOffset;
-        if (ids.length - idsOffset < positionCount) {
-            throw new IllegalArgumentException("ids length is less than positionCount");
-        }
-
-        this.positionCount = positionCount;
-        this.dictionaryVec = dictionaryVec.slice(0, dictionaryVec.getSize());
-        this.dictionary = dictionary.getRegion(0, dictionary.getPositionCount());
-        this.ids = ids;
-        this.dictionarySourceId = requireNonNull(dictionarySourceId, "dictionarySourceId is null");
-        this.retainedSizeInBytes = INSTANCE_SIZE + this.dictionary.getRetainedSizeInBytes() + sizeOf(ids);
-
-        if (dictionaryIsCompacted) {
-            this.sizeInBytes = this.retainedSizeInBytes;
-            this.uniqueIds = this.dictionary.getPositionCount();
-        }
-    }
-
-    /**
-     * Instantiates a new Dictionary omni block.
-     *
      * @param dictionaryIsCompacted the dictionary is compacted
      * @param dictionarySourceId the dictionary source id
      */
@@ -527,7 +488,7 @@ public class DictionaryOmniBlock<T>
     public Block getRegion(int positionOffset, int length)
     {
         checkValidRegion(positionCount, positionOffset, length);
-        return new DictionaryOmniBlock(idsOffset + positionOffset, length, dictionaryVec, ids, dictionary, false,
+        return new DictionaryOmniBlock(idsOffset + positionOffset, length, dictionaryVec, ids, false,
                 dictionarySourceId);
     }
 
