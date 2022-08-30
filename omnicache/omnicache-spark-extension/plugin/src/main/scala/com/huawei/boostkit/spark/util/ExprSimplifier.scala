@@ -6,7 +6,7 @@
  * (the "License"); you may not use this file except in compliance with
  * the License.  You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -262,6 +262,7 @@ case class ExprSimplifier(unknownAsFalse: Boolean,
     val nullOperands: mutable.HashSet[Expression] = mutable.HashSet()
     val notNullOperands: mutable.HashSet[Expression] = mutable.HashSet()
     val comparedOperands: mutable.HashSet[Expression] = mutable.HashSet()
+    val orsOperands: mutable.ListBuffer[Expression] = mutable.ListBuffer()
 
     // Add the predicates from the source to the range terms.
     for (predicate <- pulledUpPredicates) {
@@ -366,6 +367,8 @@ case class ExprSimplifier(unknownAsFalse: Boolean,
           toBeDelTerm.+=(term)
         } else if (term.isInstanceOf[IsNull]) {
           nullOperands.add(term.asInstanceOf[IsNull].child)
+        } else if (term.isInstanceOf[Or]) {
+          orsOperands.+=(term)
         }
       }
     }
@@ -414,7 +417,7 @@ case class ExprSimplifier(unknownAsFalse: Boolean,
     //
     // Example. IS NOT NULL(x) AND x < 5  : x < 5
     for (notNullOperand <- notNullOperands) {
-      if (!comparedOperands.contains(notNullOperand)) {
+      if (!containsSql(comparedOperands.toSet, notNullOperand)) {
         terms.+=(IsNotNull(notNullOperand))
       }
     }
@@ -445,7 +448,8 @@ case class ExprSimplifier(unknownAsFalse: Boolean,
       if (range.hasLowerBound && range.hasUpperBound
           && range.upperEndpoint().equals(range.lowerEndpoint())
           && range.upperBoundType() == range.lowerBoundType()
-          && range.upperBoundType() == BoundType.CLOSED) {
+          && range.upperBoundType() == BoundType.CLOSED
+          && value.right.size() > 1) {
         val comparison = createComparison(value.right.get(0))
         if (comparison.isDefined) {
           val equalExpr = EqualTo(comparison.get.ref, comparison.get.literal)
@@ -461,6 +465,29 @@ case class ExprSimplifier(unknownAsFalse: Boolean,
     // The negated terms: only deterministic expressions
     if (containsSql(terms.toSet, negatedTerms.toSet)) {
       return Literal.FalseLiteral
+    }
+    // simplify And-Ors situation.
+    val breaks3 = new Breaks
+    for (orOp <- orsOperands) {
+      breaks3.breakable {
+        val ors = decomposeDisjunctions(orOp).toSet
+        for (term <- terms) {
+          // Excluding self-simplification
+          if (!term.eq(orOp)) {
+            // Simplification between a orExpression and a orExpression.
+            if (term.isInstanceOf[Or]) {
+              if (containsAllSql(ors, decomposeDisjunctions(term).toSet)) {
+                terms.-=(orOp)
+                breaks3.break()
+              }
+            } else if (containsSql(ors, term)) {
+              // Simplification between a otherExpression and a orExpression.
+              terms.-=(orOp)
+              breaks3.break()
+            }
+          }
+        }
+      }
     }
     composeConjunctions(terms, false)
   }
@@ -536,18 +563,21 @@ case class ExprSimplifier(unknownAsFalse: Boolean,
 }
 
 object ExprSimplifier extends PredicateHelper {
+  // Spark native simplification rules to be executed before this simplification
+  val frontRules = Seq(SimplifyCasts, ConstantFolding)
 
   // simplify condition with pulledUpPredicates.
   def simplify(logicalPlan: LogicalPlan): LogicalPlan = {
     val originPredicates: mutable.ArrayBuffer[Expression] = ArrayBuffer()
-    logicalPlan foreach {
+    val normalizeLogicalPlan = RewriteHelper.normalizePlan(logicalPlan)
+    normalizeLogicalPlan foreach {
       case Filter(condition, _) =>
         originPredicates ++= splitConjunctivePredicates(condition)
       case Join(_, _, _, condition, _) if condition.isDefined =>
         originPredicates ++= splitConjunctivePredicates(condition.get)
       case _ =>
     }
-    val inferredPlan = InferFiltersFromConstraints.apply(logicalPlan)
+    val inferredPlan = InferFiltersFromConstraints.apply(normalizeLogicalPlan)
     val inferredPredicates: mutable.ArrayBuffer[Expression] = mutable.ArrayBuffer()
     inferredPlan foreach {
       case Filter(condition, _) =>
@@ -557,9 +587,12 @@ object ExprSimplifier extends PredicateHelper {
       case _ =>
     }
     val pulledUpPredicates: Set[Expression] = inferredPredicates.toSet -- originPredicates.toSet
-    // cast optimizer
-    val optCastPlan = SimplifyCasts.apply(ConstantFolding.apply(logicalPlan))
-    optCastPlan transform {
+    // front Spark native optimize
+    var optPlan: LogicalPlan = normalizeLogicalPlan
+    for (rule <- frontRules) {
+      optPlan = rule.apply(optPlan)
+    }
+    optPlan transform {
       case Filter(condition: Expression, child: LogicalPlan) =>
         val simplifyExpr = ExprSimplifier(true, pulledUpPredicates).simplify(condition)
         Filter(simplifyExpr, child)
