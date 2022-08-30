@@ -126,22 +126,22 @@ public class ConsList<E> extends AbstractImmutableList<E> {
     }
 
     @Nonnull
-    public <T> T[] toArray(@Nonnull T[] a) {
+    public <T> T[] toArray(@Nonnull T[] array) {
         final int s = size();
-        if (s > a.length) {
-            a = Arrays.copyOf(a, s);
-        } else if (s < a.length) {
-            a[s] = null;
+        if (s > array.length) {
+            array = Arrays.copyOf(array, s);
+        } else if (s < array.length) {
+            array[s] = null;
         }
         int i = 0;
         for (ConsList c = this; ; c = (ConsList) c.rest) {
             //noinspection unchecked
-            a[i++] = (T) c.first;
+            array[i++] = (T) c.first;
             if (!(c.rest instanceof ConsList)) {
                 Object[] a2 = c.rest.toArray();
                 //noinspection SuspiciousSystemArraycopy
-                System.arraycopy(a2, 0, a, i, a2.length);
-                return a;
+                System.arraycopy(a2, 0, array, i, a2.length);
+                return array;
             }
         }
     }
