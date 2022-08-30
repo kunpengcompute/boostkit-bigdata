@@ -30,11 +30,10 @@ import org.apache.spark.sql.catalyst.{SQLConfHelper, TableIdentifier}
 import org.apache.spark.sql.catalyst.analysis.UnresolvedAttribute
 import org.apache.spark.sql.catalyst.parser.OmniCacheSqlExtensionsParser._
 import org.apache.spark.sql.catalyst.parser.ParserUtils._
-import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
+import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, SubqueryAlias}
 import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.command._
 import org.apache.spark.sql.execution.datasources._
-import org.apache.spark.sql.hive.HiveSessionCatalog
 
 class OmniCacheExtensionAstBuilder(spark: SparkSession, delegate: ParserInterface)
     extends OmniCacheSqlExtensionsBaseVisitor[AnyRef] with SQLConfHelper with Logging {
@@ -56,6 +55,7 @@ class OmniCacheExtensionAstBuilder(spark: SparkSession, delegate: ParserInterfac
     properties += (MV_QUERY_ORIGINAL_SQL -> query)
     properties += (MV_REWRITE_ENABLED -> disableRewrite.isEmpty.toString)
     properties += (MV_QUERY_ORIGINAL_SQL_CUR_DB -> spark.sessionState.catalog.getCurrentDatabase)
+    properties += (MV_UPDATE_REWRITE_ENABLED -> "true")
 
     val (databaseName, name) = identifier match {
       case Seq(mv) => (None, mv)
@@ -128,17 +128,12 @@ class OmniCacheExtensionAstBuilder(spark: SparkSession, delegate: ParserInterfac
     }
     try {
       spark.sessionState.catalogManager.setCurrentNamespace(Array(curDatabase))
-      // disable plugin and mv rewrite
+      // disable plugin
       RewriteHelper.disableCachePlugin()
-      catalogTable = catalogTable.copy(properties =
-        catalogTable.properties + (MV_UPDATE_REWRITE_ENABLED -> "false"))
-      spark.sessionState.catalog.alterTable(catalogTable)
       val data = spark.sql(queryStr.get).queryExecution.optimizedPlan
 
-      val metastoreCatalog = spark.sessionState.catalog
-          .asInstanceOf[HiveSessionCatalog].metastoreCatalog
-      val hiveTable = DDLUtils.readHiveTable(catalogTable)
-      val hadoopRelation = metastoreCatalog.convert(hiveTable) match {
+      val hadoopRelation = spark.table(catalogTable.identifier).logicalPlan match {
+        case SubqueryAlias(_, LogicalRelation(t: HadoopFsRelation, _, _, _)) => t
         case LogicalRelation(t: HadoopFsRelation, _, _, _) => t
         case _ => throw new AnalysisException(s"$tableIdentifier should be converted to " +
             "HadoopFsRelation.")

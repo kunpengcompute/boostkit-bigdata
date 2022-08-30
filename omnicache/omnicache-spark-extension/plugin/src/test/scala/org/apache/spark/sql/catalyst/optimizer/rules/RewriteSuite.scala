@@ -64,6 +64,7 @@ class RewriteSuite extends SparkFunSuite with PredicateHelper {
   }
 
   def preCreateTable(): Unit = {
+    preDropTable()
     if (catalog.tableExists(TableIdentifier("locations"))) {
       return
     }

@@ -310,6 +310,12 @@ case class RefreshMaterializedViewCommand(
 
   override def run(sparkSession: SparkSession, child: SparkPlan): Seq[Row] = {
     try {
+      // disable mv rewrite
+      var tableMeta = catalogTable.get
+      tableMeta = tableMeta.copy(properties =
+        tableMeta.properties + (MV_UPDATE_REWRITE_ENABLED -> "false"))
+      sparkSession.sessionState.catalog.alterTable(tableMeta)
+
       // Most formats don't do well with duplicate columns, so lets not allow that
       SchemaUtils.checkColumnNameDuplication(
         outputColumnNames,
