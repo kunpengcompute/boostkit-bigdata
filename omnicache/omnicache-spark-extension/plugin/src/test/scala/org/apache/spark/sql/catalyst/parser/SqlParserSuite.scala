@@ -19,7 +19,7 @@ package org.apache.spark.sql.catalyst.parser
 
 import com.huawei.boostkit.spark.conf.OmniCachePluginConfig
 import com.huawei.boostkit.spark.conf.OmniCachePluginConfig._
-import com.huawei.boostkit.spark.util.ViewMetadata
+import com.huawei.boostkit.spark.util.{RewriteHelper, ViewMetadata}
 
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.catalyst.TableIdentifier
@@ -566,35 +566,16 @@ class SqlParserSuite extends RewriteSuite {
         |;
         |""".stripMargin
     ).show()
-    assert {
-      spark.sql(
-        """
-          |SHOW MATERIALIZED VIEWS ON default.mv_create1;
-          |;
-          |""".stripMargin
-      ).collect()
-          .map(r => Row(r.getString(0), r.getString(1), r.getString(2),
-            r.getString(4), r.getString(5)))
-          .contains(Row("default", "mv_create1", "true", "SELECT * FROM column_type", "true"))
-    }
+    val sql1 = "SELECT * FROM column_type"
+    comparePlansAndRows(sql1, "default", "mv_create1", noData = false)
 
     spark.sql(
       """
-        |ALTER MATERIALIZED VIEW default.mv_create1 DISABLE REWRITE
+        |ALTER MATERIALIZED VIEW default.mv_create1 ENABLE REWRITE
         |;
         |""".stripMargin
     ).show()
-    assert {
-      spark.sql(
-        """
-          |SHOW MATERIALIZED VIEWS ON default.mv_create1;
-          |;
-          |""".stripMargin
-      ).collect()
-          .map(r => Row(r.getString(0), r.getString(1), r.getString(2),
-            r.getString(4), r.getString(5)))
-          .contains(Row("default", "mv_create1", "false", "SELECT * FROM column_type", "false"))
-    }
+    compareNotRewriteAndRows(sql1, noData = false)
   }
 
   test("explain_create") {
@@ -640,5 +621,90 @@ class SqlParserSuite extends RewriteSuite {
         |;
         |""".stripMargin
     ).show()
+  }
+
+  test("refresh_partition_mv") {
+    spark.sql("DROP TABLE IF EXISTS students;")
+    spark.sql(
+      """
+        |CREATE TABLE IF NOT EXISTS students (age int) USING orc
+        |PARTITIONED BY (id int);
+        |""".stripMargin
+    )
+    spark.sql("INSERT INTO TABLE students partition(id=1) values(1);")
+
+    spark.sql("DROP MATERIALIZED VIEW IF EXISTS refresh_mv;")
+    spark.sql(
+      """
+        |CREATE MATERIALIZED VIEW IF NOT EXISTS refresh_mv PARTITIONED BY (id)
+        |AS
+        |SELECT age,id FROM students;
+        |""".stripMargin
+    )
+    spark.sql("INSERT INTO TABLE students partition(id=2) values(2);")
+    spark.sql("REFRESH MATERIALIZED VIEW refresh_mv;")
+
+    val df1 = "SELECT age,id FROM students"
+    val df2 = "SELECT age,id FROM refresh_mv"
+    val tableData2 = spark.sql(df2).collect().sortWith { (a: Row, b: Row) =>
+      a.toString().compareTo(b.toString()) < 0
+    }
+    RewriteHelper.disableCachePlugin()
+    val tableData1 = spark.sql(df1).collect().sortWith { (a: Row, b: Row) =>
+      a.toString().compareTo(b.toString()) < 0
+    }
+    assert(tableData1.sameElements(tableData2))
+  }
+
+  test("refresh_nonpartition_mv") {
+    spark.sql("DROP TABLE IF EXISTS students;")
+    spark.sql(
+      """
+        |CREATE TABLE IF NOT EXISTS students (id int,age int) USING orc;
+        |""".stripMargin
+    )
+    spark.sql("INSERT INTO TABLE students values(1,1);")
+
+    spark.sql("DROP MATERIALIZED VIEW IF EXISTS refresh_mv;")
+    spark.sql(
+      """
+        |CREATE MATERIALIZED VIEW IF NOT EXISTS refresh_mv
+        |AS
+        |SELECT age,id FROM students;
+        |""".stripMargin
+    )
+    spark.sql("INSERT INTO TABLE students values(2,2);")
+    spark.sql("REFRESH MATERIALIZED VIEW refresh_mv;")
+
+    val df1 = "SELECT age,id FROM students"
+    val df2 = "SELECT age,id FROM refresh_mv"
+    val tableData2 = spark.sql(df2).collect().sortWith { (a: Row, b: Row) =>
+      a.toString().compareTo(b.toString()) < 0
+    }
+    RewriteHelper.disableCachePlugin()
+    val tableData1 = spark.sql(df1).collect().sortWith { (a: Row, b: Row) =>
+      a.toString().compareTo(b.toString()) < 0
+    }
+    assert(tableData1.sameElements(tableData2))
+  }
+
+  test("refresh_error1") {
+    compareError("Table or view not found") {
+      spark.sql("REFRESH MATERIALIZED VIEW mv")
+    }
+  }
+
+  test("refresh_error2") {
+    compareError("cannot refresh a table with refresh mv") {
+      spark.sql("REFRESH MATERIALIZED VIEW emps")
+    }
+  }
+
+  test("drop test mv") {
+    spark.sql("DROP MATERIALIZED VIEW IF EXISTS mv_create1;")
+    spark.sql("DROP MATERIALIZED VIEW IF EXISTS mv_create2;")
+    spark.sql("DROP MATERIALIZED VIEW IF EXISTS mv_create_join1;")
+    spark.sql("DROP MATERIALIZED VIEW IF EXISTS mv_create_agg1;")
+    spark.sql("DROP MATERIALIZED VIEW IF EXISTS mv_create_agg2;")
   }
 }

@@ -18,6 +18,8 @@
 
 package org.apache.spark.sql.catalyst.optimizer.rules
 
+import com.huawei.boostkit.spark.conf.OmniCachePluginConfig
+import com.huawei.boostkit.spark.util.RewriteHelper._
 import java.io.File
 import java.util.Locale
 
@@ -25,13 +27,13 @@ import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.catalyst.analysis.SimpleAnalyzer
-import org.apache.spark.sql.catalyst.catalog.SessionCatalog
+import org.apache.spark.sql.catalyst.catalog.{HiveTableRelation, SessionCatalog}
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate.AggregateExpression
 import org.apache.spark.sql.catalyst.plans.{ExistenceJoin, QueryPlan}
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.catalyst.util.{sideBySide, toPrettySQL}
-import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.sql.execution.datasources.LogicalRelation
 import org.apache.spark.sql.types.StringType
 
 class RewriteSuite extends SparkFunSuite with PredicateHelper {
@@ -62,6 +64,7 @@ class RewriteSuite extends SparkFunSuite with PredicateHelper {
   }
 
   def preCreateTable(): Unit = {
+    preDropTable()
     if (catalog.tableExists(TableIdentifier("locations"))) {
       return
     }
@@ -162,6 +165,26 @@ class RewriteSuite extends SparkFunSuite with PredicateHelper {
         |   DATE '2022-02-02',
         |   TIMESTAMP '2022-02-02',
         |   'stringtype2',2.0
+        |);
+        |""".stripMargin
+    )
+    spark.sql(
+      """
+        |INSERT INTO TABLE column_type VALUES(
+        |   1,1,1,null,null,null,null,null,null,null,
+        |   null,
+        |   null,
+        |   null,null
+        |);
+        |""".stripMargin
+    )
+    spark.sql(
+      """
+        |INSERT INTO TABLE column_type VALUES(
+        |   3,3,3,TRUE,3,3,3,3,3.0,3.0,
+        |   DATE '2022-03-03',
+        |   TIMESTAMP '2022-03-03',
+        |   'stringtype3',null
         |);
         |""".stripMargin
     )
@@ -288,7 +311,7 @@ class RewriteSuite extends SparkFunSuite with PredicateHelper {
   }
 
   /** Fails the test if the two expressions do not match */
-  protected def compareExpressions(e1: Expression, e2: Expression): Unit = {
+  protected def compareExpression(e1: Expression, e2: Expression): Unit = {
     comparePlans(Filter(e1, OneRowRelation()), Filter(e2, OneRowRelation()), checkAnalysis = false)
   }
 
@@ -337,14 +360,6 @@ class RewriteSuite extends SparkFunSuite with PredicateHelper {
     seq
   }
 
-  def enableCachePlugin(): Unit = {
-    SQLConf.get.setConfString("spark.sql.omnicache.enable", "true")
-  }
-
-  def disableCachePlugin(): Unit = {
-    SQLConf.get.setConfString("spark.sql.omnicache.enable", "false")
-  }
-
   def getRows(sql: String): Array[Row] = {
     val df = spark.sql(sql)
     val rows = getRows(df)
@@ -383,5 +398,73 @@ class RewriteSuite extends SparkFunSuite with PredicateHelper {
         assert(e.getMessage.toLowerCase(Locale.ROOT)
             .contains(errorInfo.toLowerCase(Locale.ROOT)))
     }
+  }
+
+  def isRewritedByMV(database: String, mv: String, logicalPlan: LogicalPlan): Boolean = {
+    logicalPlan.foreachUp {
+      case _@HiveTableRelation(tableMeta, _, _, _, _) =>
+        if (tableMeta.database == database && tableMeta.identifier.table == mv) {
+          return true
+        }
+      case _@LogicalRelation(_, _, catalogTable, _) =>
+        if (catalogTable.isDefined) {
+          if (catalogTable.get.database == database && catalogTable.get.identifier.table == mv) {
+            return true
+          }
+        }
+      case _ =>
+    }
+    false
+  }
+
+  def isRewritedByMV(mv: String)(df: DataFrame): Boolean = {
+    isRewritedByMV("default", mv)(df)
+  }
+
+  def isRewritedByMV(database: String, mv: String)(df: DataFrame): Boolean = {
+    isRewritedByMV(database, mv, df.queryExecution.optimizedPlan)
+  }
+
+  def comparePlansAndRows(sql: String, database: String, mv: String, noData: Boolean): Unit = {
+    // 1.prepare
+    val (rewritePlan, rewriteRows) = getPlanAndRows(sql)
+
+    // 2.compare plan
+    assert(isRewritedByMV(database, mv, rewritePlan))
+
+    // 3.compare row
+    disableCachePlugin()
+    val expectedRows = getRows(sql)
+    compareRows(rewriteRows, expectedRows, noData)
+  }
+
+  def isNotRewritedByMV(logicalPlan: LogicalPlan): Boolean = {
+    logicalPlan.foreachUp {
+      case h@HiveTableRelation(tableMeta, _, _, _, _) =>
+        if (OmniCachePluginConfig.isMV(tableMeta)) {
+          return false
+        }
+      case h@LogicalRelation(_, _, catalogTable, _) =>
+        if (catalogTable.isDefined) {
+          if (OmniCachePluginConfig.isMV(catalogTable.get)) {
+            return false
+          }
+        }
+      case _ =>
+    }
+    true
+  }
+
+  def compareNotRewriteAndRows(sql: String, noData: Boolean): Unit = {
+    // 1.prepare
+    val (rewritePlan, rewriteRows) = getPlanAndRows(sql)
+
+    // 2.compare plan
+    assert(isNotRewritedByMV(rewritePlan))
+
+    // 3.compare row
+    disableCachePlugin()
+    val expectedRows = getRows(sql)
+    compareRows(rewriteRows, expectedRows, noData)
   }
 }

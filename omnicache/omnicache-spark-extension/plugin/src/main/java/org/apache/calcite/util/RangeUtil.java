@@ -54,8 +54,7 @@ public class RangeUtil {
             // Term is always satisfied given these predicates
             return Literal.TrueLiteral();
         } else if (range2.lowerEndpoint().equals(range2.upperEndpoint())) {
-            if (range2.lowerBoundType() == BoundType.OPEN
-                    || range2.upperBoundType() == BoundType.OPEN) {
+            if (range2.lowerBoundType() == BoundType.OPEN || range2.upperBoundType() == BoundType.OPEN) {
                 // range is a point, but does not include its endpoint, therefore is
                 // effectively empty
                 return Literal.FalseLiteral();
@@ -74,8 +73,7 @@ public class RangeUtil {
         if (value == null || clazz.isInstance(value)) {
             return clazz.cast(value);
         }
-        throw new AssertionError("cannot convert " + literal.dataType().typeName()
-                + " literal to " + clazz);
+        throw new RuntimeException("cannot convert " + literal.dataType().typeName() + " literal to " + clazz);
     }
 
     private static Range<Comparable> range(Expression kind, Comparable c) {
@@ -91,7 +89,7 @@ public class RangeUtil {
             case "greaterthanorequal":
                 return Range.atLeast(c);
             default:
-                throw new AssertionError();
+                throw new RuntimeException();
         }
     }
 
@@ -118,8 +116,7 @@ public class RangeUtil {
                 case "greaterthan":
                 case "greaterthanorequal":
                     BinaryExpression e = (BinaryExpression) predicate;
-                    if (e.left().sql().equals(ref.sql())
-                            && e.right() instanceof Literal) {
+                    if (e.left().sql().equals(ref.sql()) && e.right() instanceof Literal) {
                         final Literal literal = (Literal) e.right();
                         final Comparable c1 = getComparableValueAs(literal);
                         final Range<Comparable> r1 = range(e, c1);
@@ -139,7 +136,8 @@ public class RangeUtil {
         return r0;
     }
 
-    public static Expression compareLiteral(Literal l1, Literal l2, boolean unknownAsFalse, BinaryExpression condition) {
+    public static Expression compareLiteral(Literal l1,
+                                            Literal l2, boolean unknownAsFalse, BinaryExpression condition) {
         final Comparable v0 = getComparableValueAs(l1);
         final Comparable v1 = getComparableValueAs(l2);
         if (v0 == null || v1 == null) {
@@ -158,13 +156,12 @@ public class RangeUtil {
             case "lessthanorequal":
                 return new Literal(comparisonResult <= 0, BooleanType);
             default:
-                throw new AssertionError("Comparison Predicates Required");
+                throw new RuntimeException("Comparison Predicates Required");
         }
     }
 
-    public static Expression processRange(List<Expression> terms,
-                                          Map<String, Pair<Range<Comparable>, List<Expression>>> rangeTerms, Expression predicate,
-                                          Expression ref, Comparable v0, Expression kind) {
+    public static Expression processRange(List<Expression> terms, Map<String, Pair<Range<Comparable>,
+            List<Expression>>> rangeTerms, Expression predicate, Expression ref, Comparable v0, Expression kind) {
         Pair<Range<Comparable>, List<Expression>> p = rangeTerms.get(ref.sql());
         if (p == null) {
             rangeTerms.put(ref.sql(), Pair.of(range(kind, v0), ImmutableList.of(predicate)));
@@ -179,7 +176,8 @@ public class RangeUtil {
                         // Range is empty, not satisfiable
                         return Literal.FalseLiteral();
                     }
-                    rangeTerms.put(ref.sql(), Pair.of(Range.singleton(v0), ImmutableList.of(predicate)));
+                    rangeTerms.put(ref.sql(),
+                            Pair.of(Range.singleton(v0), ImmutableList.of(predicate)));
                     // remove
                     for (Expression e : p.right) {
                         replaceAllExpression(terms, e, Literal.TrueLiteral());
@@ -201,8 +199,7 @@ public class RangeUtil {
                                 return Literal.FalseLiteral();
                             }
                             // a <= x < b OR a < x < b
-                            r = Range.range(r.lowerEndpoint(), r.lowerBoundType(),
-                                    v0, BoundType.OPEN);
+                            r = Range.range(r.lowerEndpoint(), r.lowerBoundType(), v0, BoundType.OPEN);
                         } else {
                             // x < b
                             r = Range.lessThan(v0);
@@ -238,8 +235,7 @@ public class RangeUtil {
                                 return Literal.FalseLiteral();
                             }
                             // a <= x <= b OR a < x <= b
-                            r = Range.range(r.lowerEndpoint(), r.lowerBoundType(),
-                                    v0, BoundType.CLOSED);
+                            r = Range.range(r.lowerEndpoint(), r.lowerBoundType(), v0, BoundType.CLOSED);
                         } else {
                             // x <= b
                             r = Range.atMost(v0);
@@ -276,8 +272,7 @@ public class RangeUtil {
                                 return Literal.FalseLiteral();
                             }
                             // a < x <= b OR a < x < b
-                            r = Range.range(v0, BoundType.OPEN,
-                                    r.upperEndpoint(), r.upperBoundType());
+                            r = Range.range(v0, BoundType.OPEN, r.upperEndpoint(), r.upperBoundType());
                         } else {
                             // x > a
                             r = Range.greaterThan(v0);
@@ -313,8 +308,7 @@ public class RangeUtil {
                                 return Literal.FalseLiteral();
                             }
                             // a <= x <= b OR a <= x < b
-                            r = Range.range(v0, BoundType.CLOSED,
-                                    r.upperEndpoint(), r.upperBoundType());
+                            r = Range.range(v0, BoundType.CLOSED, r.upperEndpoint(), r.upperBoundType());
                         } else {
                             // x >= a
                             r = Range.atLeast(v0);
@@ -337,7 +331,7 @@ public class RangeUtil {
                     break;
                 }
                 default:
-                    throw new AssertionError();
+                    throw new RuntimeException();
             }
             if (removeUpperBound) {
                 ImmutableList.Builder<Expression> newBounds = ImmutableList.builder();
@@ -349,8 +343,7 @@ public class RangeUtil {
                     }
                 }
                 newBounds.add(predicate);
-                rangeTerms.put(ref.sql(),
-                        Pair.of(r, newBounds.build()));
+                rangeTerms.put(ref.sql(), Pair.of(r, newBounds.build()));
             } else if (removeLowerBound) {
                 ImmutableList.Builder<Expression> newBounds = ImmutableList.builder();
                 for (Expression e : p.right) {
@@ -361,8 +354,7 @@ public class RangeUtil {
                     }
                 }
                 newBounds.add(predicate);
-                rangeTerms.put(ref.sql(),
-                        Pair.of(r, newBounds.build()));
+                rangeTerms.put(ref.sql(), Pair.of(r, newBounds.build()));
             }
         }
         // Default

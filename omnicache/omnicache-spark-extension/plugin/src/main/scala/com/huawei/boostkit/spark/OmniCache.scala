@@ -18,8 +18,11 @@
 package com.huawei.boostkit.spark
 
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.SparkSessionExtensions
+import org.apache.spark.sql.{SparkSession, SparkSessionExtensions}
+import org.apache.spark.sql.catalyst.optimizer.OmniCacheOptimizer
 import org.apache.spark.sql.catalyst.parser.OmniCacheExtensionSqlParser
+import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
+import org.apache.spark.sql.catalyst.rules.Rule
 
 class OmniCache extends (SparkSessionExtensions => Unit) with Logging {
   override def apply(extensions: SparkSessionExtensions): Unit = {
@@ -28,6 +31,31 @@ class OmniCache extends (SparkSessionExtensions => Unit) with Logging {
     extensions.injectParser { case (spark, parser) =>
       new OmniCacheExtensionSqlParser(spark, parser)
     }
+    // OmniCache optimizer rules
+    extensions.injectPostHocResolutionRule { (session: SparkSession) =>
+      OmniCacheOptimizerRule(session)
+    }
   }
 }
 
+case class OmniCacheOptimizerRule(session: SparkSession) extends Rule[LogicalPlan] {
+  self =>
+
+  var notAdded = true
+
+  override def apply(plan: LogicalPlan): LogicalPlan = {
+    if (notAdded) {
+      self.synchronized {
+        if (notAdded) {
+          notAdded = false
+          val sessionState = session.sessionState
+          val field = sessionState.getClass.getDeclaredField("optimizer")
+          field.setAccessible(true)
+          field.set(sessionState,
+            OmniCacheOptimizer(session, sessionState.optimizer))
+        }
+      }
+    }
+    plan
+  }
+}

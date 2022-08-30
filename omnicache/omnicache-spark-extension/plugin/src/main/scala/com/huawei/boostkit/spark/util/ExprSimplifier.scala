@@ -2,7 +2,7 @@
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to you under the Apache License, Version 2.0
+ * The ASF licenses this file to You under the Apache License, Version 2.0
  * (the "License"); you may not use this file except in compliance with
  * the License.  You may obtain a copy of the License at
  *
@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.huawei.boostkit.spark.util
 
 import com.google.common.collect.{ArrayListMultimap, BoundType, Multimap, Range => GuavaRange}
@@ -25,7 +26,7 @@ import scala.collection.mutable.ArrayBuffer
 import scala.util.control.Breaks
 
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.catalyst.optimizer.{ConstantFolding, InferFiltersFromConstraints, SimplifyCasts}
+import org.apache.spark.sql.catalyst.optimizer._
 import org.apache.spark.sql.catalyst.plans.logical.{Filter, Join, LogicalPlan, OneRowRelation}
 import org.apache.spark.sql.types.{BooleanType, DataType, NullType}
 
@@ -38,9 +39,9 @@ case class ExprSimplifier(unknownAsFalse: Boolean,
       simplifyAnd(and)
     case or@Or(_, _) =>
       simplifyOrs(or)
-//    case IsNull(_) | IsNotNull(_) |
-//         EqualNullSafe(_, _) | Not(EqualNullSafe(_, _)) =>
-//      simplifyIs(condition)
+    case IsNull(_) | IsNotNull(_) |
+         EqualNullSafe(_, _) | Not(EqualNullSafe(_, _)) =>
+      simplifyIs(condition)
     case not@Not(_) =>
       simplifyNot(not)
     case EqualTo(_, _) | LessThan(_, _) |
@@ -342,7 +343,8 @@ case class ExprSimplifier(unknownAsFalse: Boolean,
           // or weaken terms that are partially implied.
           // E.g. given predicate "x >= 5" and term "x between 3 and 10"
           // we weaken to term to "x between 5 and 10".
-          val term2 = RangeUtil.simplifyUsingPredicates(term, JavaConverters.setAsJavaSet(pulledUpPredicates))
+          val term2 = RangeUtil
+              .simplifyUsingPredicates(term, JavaConverters.setAsJavaSet(pulledUpPredicates))
           if (!term2.sql.equals(term.sql)) {
             terms.remove(i)
             terms.insert(i, term2)
@@ -554,17 +556,116 @@ case class ExprSimplifier(unknownAsFalse: Boolean,
   }
 
   def simplifyIs(condition: Expression): Expression = {
-    Literal.FalseLiteral
+    val child = condition.children.head
+    condition match {
+      // IS_NULL
+      case _: IsNull =>
+        if (!child.nullable) {
+          return Literal.FalseLiteral
+        }
+      // IS_NOT_NULL
+      case _: IsNotNull =>
+        val simplified = simplifyIsNotNull(child)
+        if (simplified.isDefined) {
+          return simplified.get
+        }
+      // IS_TRUE,IS_NOT_FALSE
+      case _@EqualNullSafe(c, Literal.TrueLiteral) =>
+        if (!c.nullable) {
+          return simplify(c)
+        }
+      case _@Not(EqualNullSafe(c, Literal.FalseLiteral)) =>
+        if (!c.nullable) {
+          return simplify(c)
+        }
+      // IS_FALSE,IS_NOT_TRUE
+      case _@EqualNullSafe(c, Literal.FalseLiteral) =>
+        if (!c.nullable) {
+          return simplify(Not(c))
+        }
+      case _@Not(EqualNullSafe(c, Literal.TrueLiteral)) =>
+        if (!c.nullable) {
+          return simplify(Not(c))
+        }
+      case _ =>
+    }
+
+    // child.nullable
+    child match {
+      // NOT
+      case _: Not =>
+        return simplify(ExprOptUtil.negateNullSafe(child))
+      case _ =>
+    }
+
+    // simply child and rebuild as condition
+    val child2 = simplify(child)
+    if (child2 != child) {
+      val condition2 = condition match {
+        case c@IsNull(_) =>
+          c.copy(child = child2)
+        case c@IsNotNull(_) =>
+          c.copy(child = child2)
+        case c@EqualNullSafe(_, Literal.TrueLiteral) =>
+          c.copy(left = child2)
+        case c@Not(c1@EqualNullSafe(_, Literal.FalseLiteral)) =>
+          Not(c1.copy(left = child2))
+        case c@EqualNullSafe(_, Literal.FalseLiteral) =>
+          c.copy(left = child2)
+        case c@Not(c1@EqualNullSafe(_, Literal.TrueLiteral)) =>
+          Not(c1.copy(left = child2))
+        case c =>
+          throw new RuntimeException("unSupport type is predict simplify :%s".format(c))
+      }
+      return condition2
+    }
+
+    // cannot be simplified
+    condition
   }
 
   def simplifyIsNotNull(condition: Expression): Option[Expression] = {
+    if (!condition.nullable) {
+      return Some(Literal.TrueLiteral)
+    }
+    condition match {
+      case c: Literal =>
+        return Some(Literal(!c.nullable))
+      case Not(_) | EqualTo(_, _) |
+           LessThan(_, _) | LessThanOrEqual(_, _) |
+           GreaterThan(_, _) | GreaterThanOrEqual(_, _) |
+           Like(_, _, _) | Add(_, _, _) | Subtract(_, _, _) |
+           Multiply(_, _, _) | Divide(_, _, _) | Cast(_, _, _) |
+           StringTrim(_, _) | StringTrimLeft(_, _) | StringTrimRight(_, _) |
+           Ceil(_) | Floor(_) | Extract(_, _, _) | Greatest(_) | Least(_) |
+           TimeAdd(_, _, _)
+      =>
+        var children = Seq.empty[Expression]
+        condition.children.foreach { child =>
+          val child2 = simplifyIsNotNull(child)
+          if (child2.isEmpty) {
+            children :+= IsNotNull(child)
+          } else if (ExprOptUtil.isAlwaysFalse(child2.get)) {
+            return Some(Literal.FalseLiteral)
+          } else {
+            child2.get match {
+              case Literal.FalseLiteral =>
+                return Some(Literal.FalseLiteral)
+              case _ =>
+                children :+= child2.get
+            }
+          }
+        }
+        return Some(ExprOptUtil.composeConjunctions(children, nullOnEmpty = false))
+      case _ =>
+    }
     None
   }
 }
 
 object ExprSimplifier extends PredicateHelper {
   // Spark native simplification rules to be executed before this simplification
-  val frontRules = Seq(SimplifyCasts, ConstantFolding)
+  val frontRules = Seq(SimplifyCasts, ConstantFolding, UnwrapCastInBinaryComparison, ColumnPruning)
 
   // simplify condition with pulledUpPredicates.
   def simplify(logicalPlan: LogicalPlan): LogicalPlan = {
@@ -609,5 +710,4 @@ object ExprSimplifier extends PredicateHelper {
     val fakePlan = simplify(Filter(expr, OneRowRelation()))
     fakePlan.asInstanceOf[Filter].condition
   }
-
 }

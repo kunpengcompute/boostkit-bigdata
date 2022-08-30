@@ -19,21 +19,30 @@ package org.apache.spark.sql.execution.command
 
 import com.huawei.boostkit.spark.conf.OmniCachePluginConfig
 import com.huawei.boostkit.spark.conf.OmniCachePluginConfig._
-import com.huawei.boostkit.spark.util.ViewMetadata
+import com.huawei.boostkit.spark.util.{RewriteHelper, ViewMetadata}
+import java.io.IOException
 import java.net.URI
+import java.util.Locale
+import org.apache.hadoop.fs.{FileSystem, Path}
 import scala.util.control.NonFatal
 
+import org.apache.spark.internal.io.FileCommitProtocol
 import org.apache.spark.sql.{AnalysisException, Row, SaveMode, SparkSession}
 import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.catalyst.catalog._
+import org.apache.spark.sql.catalyst.catalog.CatalogTypes.TablePartitionSpec
+import org.apache.spark.sql.catalyst.catalog.ExternalCatalogUtils.getPartitionPathString
 import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference}
 import org.apache.spark.sql.catalyst.optimizer.OmniCacheToSparkAdapter._
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
-import org.apache.spark.sql.catalyst.util.CharVarcharUtils
+import org.apache.spark.sql.catalyst.util.{CaseInsensitiveMap, CharVarcharUtils}
 import org.apache.spark.sql.execution.SparkPlan
-import org.apache.spark.sql.execution.datasources.{DataSource, HadoopFsRelation}
+import org.apache.spark.sql.execution.datasources._
+import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.sql.internal.SQLConf.PartitionOverwriteMode
 import org.apache.spark.sql.sources.BaseRelation
 import org.apache.spark.sql.types.{StringType, StructType}
+import org.apache.spark.sql.util.SchemaUtils
 
 case class OmniCacheCreateMvCommand(
     databaseNameOption: Option[String],
@@ -46,71 +55,74 @@ case class OmniCacheCreateMvCommand(
     query: LogicalPlan,
     outputColumnNames: Seq[String]) extends DataWritingCommand {
   override def run(sparkSession: SparkSession, child: SparkPlan): Seq[Row] = {
-    ViewMetadata.init(sparkSession)
-    val sessionState = sparkSession.sessionState
-    val databaseName = databaseNameOption.getOrElse(sessionState.catalog.getCurrentDatabase)
-    val identifier = TableIdentifier(name, Option(databaseName))
+    try {
+      ViewMetadata.init(sparkSession)
+      val sessionState = sparkSession.sessionState
+      val databaseName = databaseNameOption.getOrElse(sessionState.catalog.getCurrentDatabase)
+      val identifier = TableIdentifier(name, Option(databaseName))
 
-    val (storageFormat, provider) = getStorageFormatAndProvider(
-      providerStr, Map.empty, None
-    )
+      val (storageFormat, provider) = getStorageFormatAndProvider(
+        providerStr, Map.empty, None)
 
-    val table = buildCatalogTable(
-      identifier, new StructType,
-      partitioning, None, properties, provider, None,
-      comment, storageFormat, external = false
-    )
-    val tableIdentWithDB = identifier.copy(database = Some(databaseName))
+      val table = buildCatalogTable(
+        identifier, new StructType,
+        partitioning, None, properties, provider, None,
+        comment, storageFormat, external = false)
+      val tableIdentWithDB = identifier.copy(database = Some(databaseName))
 
-    if (ViewMetadata.isViewExists(identifier.toString())) {
-      if (!ifNotExistsSet) {
-        throw new Exception(
-          s"Materialized view with name $databaseName.$name already exists"
-        )
-      } else {
-        return Seq.empty
+      if (ViewMetadata.isViewExists(identifier.toString())) {
+        if (!ifNotExistsSet) {
+          throw new Exception(
+            s"Materialized view with name $databaseName.$name already exists")
+        } else {
+          return Seq.empty
+        }
       }
+
+      if (sessionState.catalog.tableExists(tableIdentWithDB)) {
+        if (!ifNotExistsSet) {
+          throw new AnalysisException(
+            s"Materialized View $tableIdentWithDB already exists. You need to drop it first")
+        } else {
+          // Since the table already exists and the save mode is Ignore,we will just return.
+          return Seq.empty
+        }
+      } else {
+        assert(table.schema.isEmpty)
+        sparkSession.sessionState.catalog.validateTableLocation(table)
+        val tableLocation = if (table.tableType == CatalogTableType.MANAGED) {
+          Some(sessionState.catalog.defaultTablePath(table.identifier))
+        } else {
+          table.storage.locationUri
+        }
+        val result = saveDataIntoTable(
+          sparkSession, table, tableLocation, child, SaveMode.Overwrite)
+        val tableSchema = CharVarcharUtils.getRawSchema(result.schema)
+        val newTable = table.copy(
+          storage = table.storage.copy(locationUri = tableLocation),
+          // We will use the schema of resolved.relation as the schema of the table (instead of
+          // the schema of df). It is important since the nullability may be changed by the relation
+          // provider (for example,see org.apache.spark.sql.parquet.DefaultSource).
+          schema = tableSchema)
+        // Table location is already validated. No need to check it again during table creation.
+        sessionState.catalog.createTable(newTable, ignoreIfExists = false, validateLocation = false)
+        result match {
+          case _: HadoopFsRelation if table.partitionColumnNames.nonEmpty &&
+              sparkSession.sqlContext.conf.manageFilesourcePartitions =>
+            // Need to recover partitions into the metastore so our saved data is visible
+            sessionState.executePlan(AlterTableRecoverPartitionsCommand(table.identifier)).toRdd
+          case _ =>
+        }
+      }
+
+      CommandUtils.updateTableStats(sparkSession, table)
+      ViewMetadata.addCatalogTableToCache(table)
+    } catch {
+      case e: Throwable =>
+        throw e
+    } finally {
+      RewriteHelper.enableCachePlugin()
     }
-
-    if (sessionState.catalog.tableExists(tableIdentWithDB)) {
-      if (!ifNotExistsSet) {
-        throw new AnalysisException(
-          s"Materialized View $tableIdentWithDB already exists. You need to drop it first")
-      } else {
-        // Since the table already exists and the save mode is Ignore,we will just return.
-        return Seq.empty
-      }
-    } else {
-      assert(table.schema.isEmpty)
-      sparkSession.sessionState.catalog.validateTableLocation(table)
-      val tableLocation = if (table.tableType == CatalogTableType.MANAGED) {
-        Some(sessionState.catalog.defaultTablePath(table.identifier))
-      } else {
-        table.storage.locationUri
-      }
-      val result = saveDataIntoTable(
-        sparkSession, table, tableLocation, child, SaveMode.Overwrite)
-      val tableSchema = CharVarcharUtils.getRawSchema(result.schema)
-      val newTable = table.copy(
-        storage = table.storage.copy(locationUri = tableLocation),
-        // We will use the schema of resolved.relation as the schema of the table (instead of
-        // the schema of df). It is important since the nullability may be changed by the relation
-        // provider (for example,see org.apache.spark.sql.parquet.DefaultSource).
-        schema = tableSchema)
-      // Table location is already validated. No need to check it again during table creation.
-      sessionState.catalog.createTable(newTable, ignoreIfExists = false, validateLocation = false)
-      result match {
-        case _: HadoopFsRelation if table.partitionColumnNames.nonEmpty &&
-            sparkSession.sqlContext.conf.manageFilesourcePartitions =>
-          // Need to recover partitions into the metastore so our saved data is visible
-          sessionState.executePlan(AlterTableRecoverPartitionsCommand(table.identifier)).toRdd
-        case _ =>
-      }
-    }
-
-    CommandUtils.updateTableStats(sparkSession, table)
-    ViewMetadata.addCatalogTableToCache(table)
-
     Seq.empty[Row]
   }
 
@@ -156,8 +168,7 @@ case class DropMaterializedViewCommand(
       catalog.getTableMetadata(tableName).tableType match {
         case CatalogTableType.VIEW =>
           throw new AnalysisException(
-            "Cannot drop a view with DROP TABLE. Please use DROP VIEW instead"
-          )
+            "Cannot drop a view with DROP TABLE. Please use DROP VIEW instead")
         case _ =>
       }
     }
@@ -167,8 +178,7 @@ case class DropMaterializedViewCommand(
       if (catalog.tableExists(tableName) &&
           !isMV(catalog.getTableMetadata(tableName))) {
         throw new AnalysisException(
-          "Cannot drop a table with DROP MV. Please use DROP TABLE instead"
-        )
+          "Cannot drop a table with DROP MV. Please use DROP TABLE instead")
       }
       try {
         val hasViewText = isTempView &&
@@ -193,8 +203,7 @@ case class DropMaterializedViewCommand(
 
 case class ShowMaterializedViewCommand(
     databaseName: Option[String],
-    tableIdentifierPattern: Option[String]
-) extends RunnableCommand {
+    tableIdentifierPattern: Option[String]) extends RunnableCommand {
 
   override val output: Seq[Attribute] = {
     val tableExtendedInfo = Nil
@@ -204,7 +213,6 @@ case class ShowMaterializedViewCommand(
         AttributeReference("rewriteEnable", StringType, nullable = false)() ::
         AttributeReference("latestUpdateTime", StringType, nullable = false)() ::
         AttributeReference("originalSql", StringType, nullable = false)() ::
-        AttributeReference("isCached", StringType, nullable = false)() ::
         tableExtendedInfo
   }
 
@@ -238,8 +246,7 @@ case class ShowMaterializedViewCommand(
       original = original.substring(0, Math.min(original.length, showLength))
       val rewriteEnable = properties.getOrElse(MV_REWRITE_ENABLED, "")
       val latestUpdateTime = properties.getOrElse(MV_LATEST_UPDATE_TIME, "")
-      val isCached = ViewMetadata.isViewExists(tableIdent.quotedString).toString
-      Row(database, tableName, rewriteEnable, latestUpdateTime, original, isCached)
+      Row(database, tableName, rewriteEnable, latestUpdateTime, original)
     }
   }
 }
@@ -251,7 +258,6 @@ case class AlterRewriteMaterializedViewCommand(
     ViewMetadata.init(sparkSession)
     val catalog = sparkSession.sessionState.catalog
     if (catalog.tableExists(tableName)) {
-      ViewMetadata.init(sparkSession)
       if (!isMV(catalog.getTableMetadata(tableName))) {
         throw new AnalysisException(
           "Cannot alter a table with ALTER MV. Please use ALTER TABLE instead")
@@ -263,7 +269,7 @@ case class AlterRewriteMaterializedViewCommand(
       catalog.alterTable(newTable)
 
       if (enableRewrite) {
-        ViewMetadata.saveViewMetadataToMap(newTable)
+        ViewMetadata.addCatalogTableToCache(newTable)
       } else {
         ViewMetadata.removeMVCache(tableName)
       }
@@ -271,5 +277,251 @@ case class AlterRewriteMaterializedViewCommand(
       throw new AnalysisException(s"Table or view not found: ${tableName.identifier}")
     }
     Seq.empty
+  }
+}
+
+case class RefreshMaterializedViewCommand(
+    outputPath: Path,
+    staticPartitions: TablePartitionSpec,
+    ifPartitionNotExists: Boolean,
+    partitionColumns: Seq[Attribute],
+    bucketSpec: Option[BucketSpec],
+    fileFormat: FileFormat,
+    options: Map[String, String],
+    query: LogicalPlan,
+    mode: SaveMode,
+    catalogTable: Option[CatalogTable],
+    fileIndex: Option[FileIndex],
+    outputColumnNames: Seq[String])
+    extends DataWritingCommand {
+
+  private lazy val parameters = CaseInsensitiveMap(options)
+
+  private[sql] lazy val dynamicPartitionOverwrite: Boolean = {
+    val partitionOverwriteMode = parameters.get("partitionOverwriteMode")
+        .map(mode => PartitionOverwriteMode.withName(mode.toUpperCase(Locale.ROOT)))
+        .getOrElse(SQLConf.get.partitionOverwriteMode)
+    val enableDynamicOverwrite = partitionOverwriteMode == PartitionOverwriteMode.DYNAMIC
+    // This config only makes sense when we are overwriting a partitioned dataset with dynamic
+    // partition columns.
+    enableDynamicOverwrite && mode == SaveMode.Overwrite &&
+        staticPartitions.size < partitionColumns.length
+  }
+
+  override def run(sparkSession: SparkSession, child: SparkPlan): Seq[Row] = {
+    try {
+      // disable mv rewrite
+      var tableMeta = catalogTable.get
+      tableMeta = tableMeta.copy(properties =
+        tableMeta.properties + (MV_UPDATE_REWRITE_ENABLED -> "false"))
+      sparkSession.sessionState.catalog.alterTable(tableMeta)
+
+      // Most formats don't do well with duplicate columns, so lets not allow that
+      SchemaUtils.checkColumnNameDuplication(
+        outputColumnNames,
+        s"when inserting into $outputPath",
+        sparkSession.sessionState.conf.caseSensitiveAnalysis)
+
+      val hadoopConf = sparkSession.sessionState.newHadoopConfWithOptions(options)
+      val fs = outputPath.getFileSystem(hadoopConf)
+      val qualifiedOutputPath = outputPath.makeQualified(fs.getUri, fs.getWorkingDirectory)
+
+      val partitionsTrackedByCatalog = sparkSession.sessionState.conf.manageFilesourcePartitions &&
+          catalogTable.isDefined &&
+          catalogTable.get.partitionColumnNames.nonEmpty &&
+          catalogTable.get.tracksPartitionsInCatalog
+
+      var initialMatchingPartitions: Seq[TablePartitionSpec] = Nil
+      var customPartitionLocations: Map[TablePartitionSpec, String] = Map.empty
+      var matchingPartitions: Seq[CatalogTablePartition] = Seq.empty
+
+      // When partitions are tracked by the catalog, compute all custom partition locations that
+      // may be relevant to the insertion job.
+      if (partitionsTrackedByCatalog) {
+        matchingPartitions = sparkSession.sessionState.catalog.listPartitions(
+          catalogTable.get.identifier, Some(staticPartitions))
+        initialMatchingPartitions = matchingPartitions.map(_.spec)
+        customPartitionLocations = getCustomPartitionLocations(
+          fs, catalogTable.get, qualifiedOutputPath, matchingPartitions)
+      }
+
+      val jobId = java.util.UUID.randomUUID().toString
+      val committer = FileCommitProtocol.instantiate(
+        sparkSession.sessionState.conf.fileCommitProtocolClass,
+        jobId = jobId,
+        outputPath = outputPath.toString,
+        dynamicPartitionOverwrite = dynamicPartitionOverwrite)
+
+      val doInsertion = if (mode == SaveMode.Append) {
+        true
+      } else {
+        val pathExists = fs.exists(qualifiedOutputPath)
+        (mode, pathExists) match {
+          case (SaveMode.ErrorIfExists, true) =>
+            throw new AnalysisException(s"path $qualifiedOutputPath already exists.")
+          case (SaveMode.Overwrite, true) =>
+            if (ifPartitionNotExists && matchingPartitions.nonEmpty) {
+              false
+            } else if (dynamicPartitionOverwrite) {
+              // For dynamic partition overwrite, do not delete partition directories ahead.
+              true
+            } else {
+              deleteMatchingPartitions(fs, qualifiedOutputPath, customPartitionLocations, committer)
+              true
+            }
+          case (SaveMode.Overwrite, _) | (SaveMode.ErrorIfExists, false) =>
+            true
+          case (SaveMode.Ignore, exists) =>
+            !exists
+          case (s, exists) =>
+            throw new IllegalStateException(s"unsupported save mode $s ($exists)")
+        }
+      }
+
+      if (doInsertion) {
+
+        def refreshUpdatedPartitions(updatedPartitionPaths: Set[String]): Unit = {
+          val updatedPartitions = updatedPartitionPaths.map(PartitioningUtils.parsePathFragment)
+          if (partitionsTrackedByCatalog) {
+            val newPartitions = updatedPartitions -- initialMatchingPartitions
+            if (newPartitions.nonEmpty) {
+              AlterTableAddPartitionCommand(
+                catalogTable.get.identifier, newPartitions.toSeq.map(p => (p, None)),
+                ifNotExists = true).run(sparkSession)
+            }
+            // For dynamic partition overwrite, we never remove partitions but only update existing
+            // ones.
+            if (mode == SaveMode.Overwrite && !dynamicPartitionOverwrite) {
+              val deletedPartitions = initialMatchingPartitions.toSet -- updatedPartitions
+              if (deletedPartitions.nonEmpty) {
+                AlterTableDropPartitionCommand(
+                  catalogTable.get.identifier, deletedPartitions.toSeq,
+                  ifExists = true, purge = false,
+                  retainData = true /* already deleted */).run(sparkSession)
+              }
+            }
+          }
+        }
+
+        // For dynamic partition overwrite, FileOutputCommitter's output path is staging path, files
+        // will be renamed from staging path to final output path during commit job
+        val committerOutputPath = if (dynamicPartitionOverwrite) {
+          FileCommitProtocol.getStagingDir(outputPath.toString, jobId)
+              .makeQualified(fs.getUri, fs.getWorkingDirectory)
+        } else {
+          qualifiedOutputPath
+        }
+
+        val updatedPartitionPaths =
+          FileFormatWriter.write(
+            sparkSession = sparkSession,
+            plan = child,
+            fileFormat = fileFormat,
+            committer = committer,
+            outputSpec = FileFormatWriter.OutputSpec(
+              committerOutputPath.toString, customPartitionLocations, outputColumns),
+            hadoopConf = hadoopConf,
+            partitionColumns = partitionColumns,
+            bucketSpec = bucketSpec,
+            statsTrackers = Seq(basicWriteJobStatsTracker(hadoopConf)),
+            options = options)
+
+
+        // update metastore partition metadata
+        if (updatedPartitionPaths.isEmpty && staticPartitions.nonEmpty
+            && partitionColumns.length == staticPartitions.size) {
+          // Avoid empty static partition can't loaded to datasource table.
+          val staticPathFragment =
+            PartitioningUtils.getPathFragment(staticPartitions, partitionColumns)
+          refreshUpdatedPartitions(Set(staticPathFragment))
+        } else {
+          refreshUpdatedPartitions(updatedPartitionPaths)
+        }
+
+        // refresh cached files in FileIndex
+        fileIndex.foreach(_.refresh())
+        // refresh data cache if table is cached
+        sparkSession.sharedState.cacheManager.recacheByPath(sparkSession, outputPath, fs)
+
+        if (catalogTable.nonEmpty) {
+          CommandUtils.updateTableStats(sparkSession, catalogTable.get)
+        }
+
+      } else {
+        logInfo("Skipping insertion into a relation that already exists.")
+      }
+    } catch {
+      case e: Throwable =>
+        throw e
+    } finally {
+      // enable plugin and mv rewrite
+      var tableMeta = catalogTable.get
+      tableMeta = tableMeta.copy(properties =
+        tableMeta.properties + (MV_UPDATE_REWRITE_ENABLED -> "true"))
+      sparkSession.sessionState.catalog.alterTable(tableMeta)
+      RewriteHelper.enableCachePlugin()
+    }
+    Seq.empty[Row]
+  }
+
+  /**
+   * Deletes all partition files that match the specified static prefix. Partitions with custom
+   * locations are also cleared based on the custom locations map given to this class.
+   */
+  private def deleteMatchingPartitions(
+      fs: FileSystem,
+      qualifiedOutputPath: Path,
+      customPartitionLocations: Map[TablePartitionSpec, String],
+      committer: FileCommitProtocol): Unit = {
+    val staticPartitionPrefix = if (staticPartitions.nonEmpty) {
+      "/" + partitionColumns.flatMap { p =>
+        staticPartitions.get(p.name).map(getPartitionPathString(p.name, _))
+      }.mkString("/")
+    } else {
+      ""
+    }
+    // first clear the path determined by the static partition keys (e.g. /table/foo=1)
+    val staticPrefixPath = qualifiedOutputPath.suffix(staticPartitionPrefix)
+    if (fs.exists(staticPrefixPath) && !committer
+        .deleteWithJob(fs, staticPrefixPath, recursive = true)) {
+      throw new IOException(s"Unable to clear output " +
+          s"directory $staticPrefixPath prior to writing to it")
+    }
+    // now clear all custom partition locations (e.g. /custom/dir/where/foo=2/bar=4)
+    for ((spec, customLoc) <- customPartitionLocations) {
+      assert(
+        (staticPartitions.toSet -- spec).isEmpty,
+        "Custom partition location did not match static partitioning keys")
+      val path = new Path(customLoc)
+      if (fs.exists(path) && !committer.deleteWithJob(fs, path, recursive = true)) {
+        throw new IOException(s"Unable to clear partition " +
+            s"directory $path prior to writing to it")
+      }
+    }
+  }
+
+  /**
+   * Given a set of input partitions, returns those that have locations that differ from the
+   * Hive default (e.g. /k1=v1/k2=v2). These partitions were manually assigned locations by
+   * the user.
+   *
+   * @return a mapping from partition specs to their custom locations
+   */
+  private def getCustomPartitionLocations(
+      fs: FileSystem,
+      table: CatalogTable,
+      qualifiedOutputPath: Path,
+      partitions: Seq[CatalogTablePartition]): Map[TablePartitionSpec, String] = {
+    partitions.flatMap { p =>
+      val defaultLocation = qualifiedOutputPath.suffix(
+        "/" + PartitioningUtils.getPathFragment(p.spec, table.partitionSchema)).toString
+      val catalogLocation = new Path(p.location).makeQualified(
+        fs.getUri, fs.getWorkingDirectory).toString
+      if (catalogLocation != defaultLocation) {
+        Some(p.spec -> catalogLocation)
+      } else {
+        None
+      }
+    }.toMap
   }
 }

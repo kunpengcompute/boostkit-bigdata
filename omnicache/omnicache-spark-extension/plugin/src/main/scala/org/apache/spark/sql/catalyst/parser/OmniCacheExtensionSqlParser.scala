@@ -76,7 +76,8 @@ class OmniCacheExtensionSqlParser(spark: SparkSession,
     normalized.contains("show materialized views") ||
         normalized.contains("create materialized view") ||
         normalized.contains("drop materialized view") ||
-        normalized.contains("alter materialized view")
+        normalized.contains("alter materialized view") ||
+        normalized.contains("refresh materialized view")
   }
 
   def parse[T](command: String)(toResult: OmniCacheSqlExtensionsParser => T): T = {
