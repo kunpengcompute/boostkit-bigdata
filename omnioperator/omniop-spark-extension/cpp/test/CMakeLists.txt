@@ -21,7 +21,10 @@ add_executable(${TP_TEST_TARGET} ${ROOT_SRCS} ${TEST_ROOT_SRCS})
 # dependent libraries
 target_link_libraries(${TP_TEST_TARGET}
         ${GTEST_BOTH_LIBRARIES}
+        ${SOURCE_LINK}
+        -Wl,--whole-archive
         ${MY_LINK}
+        -Wl,--no-whole-archive
         gtest
         pthread
         stdc++
