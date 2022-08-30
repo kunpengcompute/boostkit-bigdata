@@ -663,7 +663,7 @@ case class ExprSimplifier(unknownAsFalse: Boolean,
 
 object ExprSimplifier extends PredicateHelper {
   // Spark native simplification rules to be executed before this simplification
-  val frontRules = Seq(SimplifyCasts, ConstantFolding)
+  val frontRules = Seq(SimplifyCasts, ConstantFolding, UnwrapCastInBinaryComparison, ColumnPruning)
 
   // simplify condition with pulledUpPredicates.
   def simplify(logicalPlan: LogicalPlan): LogicalPlan = {
