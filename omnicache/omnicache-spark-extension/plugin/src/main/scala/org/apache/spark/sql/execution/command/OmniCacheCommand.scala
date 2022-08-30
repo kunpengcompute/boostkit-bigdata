@@ -22,6 +22,7 @@ import com.huawei.boostkit.spark.conf.OmniCachePluginConfig._
 import com.huawei.boostkit.spark.util.{RewriteHelper, ViewMetadata}
 import java.io.IOException
 import java.net.URI
+import java.util.Locale
 import org.apache.hadoop.fs.{FileSystem, Path}
 import scala.util.control.NonFatal
 
@@ -298,9 +299,7 @@ case class RefreshMaterializedViewCommand(
 
   private[sql] lazy val dynamicPartitionOverwrite: Boolean = {
     val partitionOverwriteMode = parameters.get("partitionOverwriteMode")
-        // scalastyle:off caselocale
-        .map(mode => PartitionOverwriteMode.withName(mode.toUpperCase))
-        // scalastyle:on caselocale
+        .map(mode => PartitionOverwriteMode.withName(mode.toUpperCase(Locale.ROOT)))
         .getOrElse(SQLConf.get.partitionOverwriteMode)
     val enableDynamicOverwrite = partitionOverwriteMode == PartitionOverwriteMode.DYNAMIC
     // This config only makes sense when we are overwriting a partitioned dataset with dynamic

@@ -75,7 +75,9 @@ public class Pair<T1, T2>
         return new Pair<>(left, right);
     }
 
-    /** Creates a {@code Pair} from a {@link java.util.Map.Entry}. */
+    /**
+     * Creates a {@code Pair} from a {@link java.util.Map.Entry}.
+     */
     public static <K, V> Pair<K, V> of(Map.Entry<K, V> entry) {
         return of(entry.getKey(), entry.getValue());
     }
@@ -89,11 +91,14 @@ public class Pair<T1, T2>
                 && Objects.equals(this.right, ((Pair) obj).right);
     }
 
-    /** {@inheritDoc}
+    /**
+     * {@inheritDoc}
      *
      * <p>Computes hash code consistent with
-     * {@link java.util.Map.Entry#hashCode()}. */
-    @Override public int hashCode() {
+     * {@link java.util.Map.Entry#hashCode()}.
+     */
+    @Override
+    public int hashCode() {
         int keyHash = left == null ? 0 : left.hashCode();
         int valueHash = right == null ? 0 : right.hashCode();
         return keyHash ^ valueHash;
@@ -199,7 +204,7 @@ public class Pair<T1, T2>
         final int size;
         if (strict) {
             if (ks.size() != vs.size()) {
-                throw new AssertionError();
+                throw new RuntimeException();
             }
             size = ks.size();
         } else {
@@ -372,7 +377,7 @@ public class Pair<T1, T2>
      * <p>For example, {@code adjacents([3, 5, 7])} returns [(3, 5), (5, 7)].</p>
      *
      * @param iterable Source collection
-     * @param <T> Element type
+     * @param <T>      Element type
      * @return Iterable over adjacent element pairs
      */
     public static <T> Iterable<Pair<T, T>> adjacents(final Iterable<T> iterable) {
@@ -412,7 +417,7 @@ public class Pair<T1, T2>
      * <p>For example, {@code firstAnd([3, 5, 7])} returns [(3, 5), (3, 7)].</p>
      *
      * @param iterable Source collection
-     * @param <T> Element type
+     * @param <T>      Element type
      * @return Iterable over pairs of the first element and all other elements
      */
     public static <T> Iterable<Pair<T, T>> firstAnd(final Iterable<T> iterable) {

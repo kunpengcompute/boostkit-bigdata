@@ -2,7 +2,7 @@
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to you under the Apache License, Version 2.0
+ * The ASF licenses this file to You under the Apache License, Version 2.0
  * (the "License"); you may not use this file except in compliance with
  * the License.  You may obtain a copy of the License at
  *
@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.huawei.boostkit.spark.util
 
 import com.google.common.collect.{ArrayListMultimap, BoundType, Multimap, Range => GuavaRange}
@@ -342,7 +343,8 @@ case class ExprSimplifier(unknownAsFalse: Boolean,
           // or weaken terms that are partially implied.
           // E.g. given predicate "x >= 5" and term "x between 3 and 10"
           // we weaken to term to "x between 5 and 10".
-          val term2 = RangeUtil.simplifyUsingPredicates(term, JavaConverters.setAsJavaSet(pulledUpPredicates))
+          val term2 = RangeUtil
+              .simplifyUsingPredicates(term, JavaConverters.setAsJavaSet(pulledUpPredicates))
           if (!term2.sql.equals(term.sql)) {
             terms.remove(i)
             terms.insert(i, term2)
@@ -708,5 +710,4 @@ object ExprSimplifier extends PredicateHelper {
     val fakePlan = simplify(Filter(expr, OneRowRelation()))
     fakePlan.asInstanceOf[Filter].condition
   }
-
 }

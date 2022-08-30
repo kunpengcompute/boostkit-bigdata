@@ -57,7 +57,8 @@ public class DefaultDirectedGraph<V, E extends DefaultEdge> implements DirectedG
     @Override
     public String toString() {
         StringBuilder buf = new StringBuilder();
-        buf.append("graph(").append("vertices: ").append(vertexMap.keySet()).append(", edges: ").append(edges).append(")");
+        buf.append("graph(").append("vertices: ")
+                .append(vertexMap.keySet()).append(", edges: ").append(edges).append(")");
         return buf.toString();
     }
 
