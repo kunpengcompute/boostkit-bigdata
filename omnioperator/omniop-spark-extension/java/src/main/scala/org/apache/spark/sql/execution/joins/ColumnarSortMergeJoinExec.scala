@@ -63,7 +63,9 @@ class ColumnarSortMergeJoinExec(
 
   override def supportCodegen: Boolean = false
 
-  override def nodeName: String = "OmniColumnarSortMergeJoin"
+  override def nodeName: String = {
+    if (isSkewJoin) "OmniColumnarSortMergeJoin(skew=true)" else "OmniColumnarSortMergeJoin"
+  }
 
   val SMJ_NEED_ADD_STREAM_TBL_DATA = 2
   val SMJ_NEED_ADD_BUFFERED_TBL_DATA = 3

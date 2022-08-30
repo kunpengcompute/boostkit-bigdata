@@ -37,62 +37,6 @@ class RewriteHelper extends PredicateHelper {
       mutable.Set[ExpressionEqual]] = Map[ExpressionEqual, mutable.Set[ExpressionEqual]]()
   val EMPTY_MULTIMAP: Multimap[Int, Int] = ArrayListMultimap.create[Int, Int]
 
-  /**
-   * Rewrite [[EqualTo]] and [[EqualNullSafe]] operator to keep order. The following cases will be
-   * equivalent:
-   * 1. (a = b), (b = a);
-   * 2. (a <=> b), (b <=> a).
-   */
-  private def rewriteEqual(condition: Expression): Expression = condition match {
-    case eq@EqualTo(l: Expression, r: Expression) =>
-      Seq(l, r).sortBy(hashCode).reduce(EqualTo)
-    case eq@EqualNullSafe(l: Expression, r: Expression) =>
-      Seq(l, r).sortBy(hashCode).reduce(EqualNullSafe)
-    case _ => condition // Don't reorder.
-  }
-
-  def hashCode(_ar: Expression): Int = {
-    // See http://stackoverflow.com/questions/113511/hash-code-implementation
-    _ar match {
-      case ar@AttributeReference(_, _, _, _) =>
-        var h = 17
-        h = h * 37 + ar.name.hashCode()
-        h = h * 37 + ar.dataType.hashCode()
-        h = h * 37 + ar.nullable.hashCode()
-        h = h * 37 + ar.metadata.hashCode()
-        h = h * 37 + ar.exprId.hashCode()
-        h
-      case _ => _ar.hashCode()
-    }
-
-  }
-
-  /**
-   * Normalizes plans:
-   * - Filter the filter conditions that appear in a plan. For instance,
-   * ((expr 1 && expr 2) && expr 3), (expr 1 && expr 2 && expr 3), (expr 3 && (expr 1 && expr 2)
-   * etc., will all now be equivalent.
-   * - Sample the seed will replaced by 0L.
-   * - Join conditions will be resorted by hashCode.
-   *
-   * we use new hash function to avoid `ar.qualifier` from alias affect the final order.
-   *
-   */
-  protected def normalizePlan(plan: LogicalPlan): LogicalPlan = {
-    plan transform {
-      case Filter(condition: Expression, child: LogicalPlan) =>
-        Filter(splitConjunctivePredicates(condition).map(rewriteEqual).sortBy(hashCode)
-            .reduce(And), child)
-      case sample: Sample =>
-        sample.copy(seed = 0L)
-      case Join(left, right, joinType, condition, hint) if condition.isDefined =>
-        val newCondition =
-          splitConjunctivePredicates(condition.get).map(rewriteEqual).sortBy(hashCode)
-              .reduce(And)
-        Join(left, right, joinType, Some(newCondition), hint)
-    }
-  }
-
   def mergeConjunctiveExpressions(e: Seq[Expression]): Expression = {
     if (e.isEmpty) {
       return Literal.TrueLiteral
@@ -161,10 +105,10 @@ class RewriteHelper extends PredicateHelper {
       tableMappings: BiMap[String, String])
   : (EquivalenceClasses, Seq[ExpressionEqual], Seq[ExpressionEqual]) = {
     var conjunctivePredicates: Seq[Expression] = Seq()
-    var equiColumnPreds: mutable.Buffer[Expression] = ArrayBuffer()
+    var equiColumnsPreds: mutable.Buffer[Expression] = ArrayBuffer()
     val rangePreds: mutable.Buffer[ExpressionEqual] = ArrayBuffer()
     val residualPreds: mutable.Buffer[ExpressionEqual] = ArrayBuffer()
-    val normalizedPlan = normalizePlan(ExprSimplifier.simplify(logicalPlan))
+    val normalizedPlan = ExprSimplifier.simplify(logicalPlan)
     normalizedPlan foreach {
       case Filter(condition, _) =>
         conjunctivePredicates ++= splitConjunctivePredicates(condition)
@@ -180,7 +124,7 @@ class RewriteHelper extends PredicateHelper {
         val right = e.asInstanceOf[EqualTo].right
         if (ExprOptUtil.isReference(left, allowCast = false)
             && ExprOptUtil.isReference(right, allowCast = false)) {
-          equiColumnPreds += e
+          equiColumnsPreds += e
         } else if ((ExprOptUtil.isReference(left, allowCast = false)
             && ExprOptUtil.isConstant(right))
             || (ExprOptUtil.isReference(right, allowCast = false)
@@ -201,15 +145,17 @@ class RewriteHelper extends PredicateHelper {
         } else {
           residualPreds += ExpressionEqual(e)
         }
+      } else if (e.isInstanceOf[Or]) {
+        rangePreds += ExpressionEqual(e)
       } else {
         residualPreds += ExpressionEqual(e)
       }
     }
-    equiColumnPreds = swapTableReferences(equiColumnPreds, tableMappings)
+    equiColumnsPreds = swapTableReferences(equiColumnsPreds, tableMappings)
     val equivalenceClasses: EquivalenceClasses = EquivalenceClasses()
-    for (i <- equiColumnPreds.indices) {
-      val left = equiColumnPreds(i).asInstanceOf[EqualTo].left
-      val right = equiColumnPreds(i).asInstanceOf[EqualTo].right
+    for (i <- equiColumnsPreds.indices) {
+      val left = equiColumnsPreds(i).asInstanceOf[EqualTo].left
+      val right = equiColumnsPreds(i).asInstanceOf[EqualTo].right
       equivalenceClasses.addEquivalenceClass(ExpressionEqual(left), ExpressionEqual(right))
     }
     (equivalenceClasses, rangePreds, residualPreds)
@@ -318,7 +264,78 @@ class RewriteHelper extends PredicateHelper {
   }
 }
 
-object RewriteHelper {
+object RewriteHelper extends PredicateHelper {
+  /**
+   * Rewrite [[EqualTo]] and [[EqualNullSafe]] operator to keep order. The following cases will be
+   * equivalent:
+   * 1. (a = b), (b = a);
+   * 2. (a <=> b), (b <=> a).
+   */
+  private def rewriteEqual(condition: Expression): Expression = condition match {
+    case eq@EqualTo(l: Expression, r: Expression) =>
+      if (l.isInstanceOf[AttributeReference] && r.isInstanceOf[Literal]) {
+        eq
+      } else if (l.isInstanceOf[Literal] && r.isInstanceOf[AttributeReference]) {
+        EqualTo(r, l)
+      } else {
+        Seq(l, r).sortBy(exprHashCode).reduce(EqualTo)
+      }
+    case eq@EqualNullSafe(l: Expression, r: Expression) =>
+      if (l.isInstanceOf[AttributeReference] && r.isInstanceOf[Literal]) {
+        eq
+      } else if (l.isInstanceOf[Literal] && r.isInstanceOf[AttributeReference]) {
+        EqualNullSafe(r, l)
+      } else {
+        Seq(l, r).sortBy(exprHashCode).reduce(EqualNullSafe)
+      }
+    case _ => condition // Don't reorder.
+  }
+
+  private def reSortOrs(condition: Expression): Expression = {
+    splitDisjunctivePredicates(condition).map(rewriteEqual).sortBy(exprHashCode).reduce(Or)
+  }
+
+  private def exprHashCode(_ar: Expression): Int = {
+    // See http://stackoverflow.com/questions/113511/hash-code-implementation
+    _ar match {
+      case ar@AttributeReference(_, _, _, _) =>
+        var h = 17
+        h = h * 37 + ar.name.hashCode()
+        h = h * 37 + ar.dataType.hashCode()
+        h = h * 37 + ar.nullable.hashCode()
+        h = h * 37 + ar.metadata.hashCode()
+        h = h * 37 + ar.exprId.hashCode()
+        h
+      case _ => _ar.hashCode()
+    }
+  }
+
+  /**
+   * Normalizes plans:
+   * - Filter the filter conditions that appear in a plan. For instance,
+   * ((expr 1 && expr 2) && expr 3), (expr 1 && expr 2 && expr 3), (expr 3 && (expr 1 && expr 2)
+   * etc., will all now be equivalent.
+   * - Sample the seed will replaced by 0L.
+   * - Join conditions will be resorted by hashCode.
+   *
+   * we use new hash function to avoid `ar.qualifier` from alias affect the final order.
+   *
+   */
+  def normalizePlan(plan: LogicalPlan): LogicalPlan = {
+    plan transform {
+      case Filter(condition: Expression, child: LogicalPlan) =>
+        Filter(splitConjunctivePredicates(condition).map(reSortOrs)
+            .map(rewriteEqual).sortBy(exprHashCode).reduce(And), child)
+      case sample: Sample =>
+        sample.copy(seed = 0L)
+      case Join(left, right, joinType, condition, hint) if condition.isDefined =>
+        val newCondition =
+          splitConjunctivePredicates(condition.get).map(reSortOrs)
+              .map(rewriteEqual).sortBy(exprHashCode).reduce(And)
+        Join(left, right, joinType, Some(newCondition), hint)
+    }
+  }
+
   def canonicalize(expression: Expression): Expression = {
     val canonicalizedChildren = expression.children.map(RewriteHelper.canonicalize)
     expressionReorder(expression.withNewChildren(canonicalizedChildren))

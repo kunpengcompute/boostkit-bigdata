@@ -32,6 +32,7 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.plans.physical.BroadcastMode
 import org.apache.spark.sql.execution.exchange.{BroadcastExchangeExec, BroadcastExchangeLike}
+import org.apache.spark.sql.execution.joins.{EmptyHashedRelation, HashedRelationBroadcastMode, HashedRelationWithAllNullKeys}
 import org.apache.spark.sql.execution.metric.SQLMetrics
 import org.apache.spark.sql.internal.{SQLConf, StaticSQLConf}
 import org.apache.spark.unsafe.map.BytesToBytesMap
@@ -69,12 +70,19 @@ class ColumnarBroadcastExchangeExec(mode: BroadcastMode, child: SparkPlan)
         // Setup a job group here so later it may get cancelled by groupId if necessary.
         sparkContext.setJobGroup(runId.toString, s"broadcast exchange (runId $runId)",
           interruptOnCancel = true)
+        val nullBatchCount = sparkContext.longAccumulator("nullBatchCount")
         val beforeCollect = System.nanoTime()
         val numRows = longMetric("numOutputRows")
         val dataSize = longMetric("dataSize")
+        var nullRelationFlag = false
         // Use executeCollect/executeCollectIterator to avoid conversion to Scala types
         val input = child.executeColumnar().mapPartitions { iter =>
           val serializer = VecBatchSerializerFactory.create()
+          mode match {
+            case hashRelMode: HashedRelationBroadcastMode =>
+              nullRelationFlag = hashRelMode.isNullAware
+            case _ =>
+          }
           new Iterator[Array[Byte]] {
             override def hasNext: Boolean = {
               iter.hasNext
@@ -82,6 +90,20 @@ class ColumnarBroadcastExchangeExec(mode: BroadcastMode, child: SparkPlan)
 
             override def next(): Array[Byte] = {
               val batch = iter.next()
+              var index = 0
+              // When nullRelationFlag is true, it means anti-join
+              // Only one column of data is involved in the anti-
+              if(nullRelationFlag && batch.numCols()>0) {
+                val vec = batch.column(0)
+                if (vec.hasNull) {
+                  try {
+                    nullBatchCount.add(1)
+                  } catch {
+                    case e : Exception =>
+                      logError(s"compute null BatchCount error : ${e.getMessage}.")
+                  }
+                }
+              }
               val vectors = transColBatchToOmniVecs(batch)
               val vecBatch = new VecBatch(vectors, batch.numRows())
               numRows += vecBatch.getRowCount
@@ -94,6 +116,8 @@ class ColumnarBroadcastExchangeExec(mode: BroadcastMode, child: SparkPlan)
             }
           }
         }.collect()
+        val relation = new ColumnarHashedRelation
+        relation.converterData(mode, nullBatchCount.value, input)
         val numOutputRows = numRows.value
         if (numOutputRows >= MAX_BROADCAST_TABLE_ROWS) {
           throw new SparkException(s"Cannot broadcast the table over " +
@@ -104,7 +128,7 @@ class ColumnarBroadcastExchangeExec(mode: BroadcastMode, child: SparkPlan)
         longMetric("collectTime") += NANOSECONDS.toMillis(beforeBroadcast - beforeCollect)
 
         // Broadcast the relation
-        val broadcasted: broadcast.Broadcast[Any] = sparkContext.broadcast(input)
+        val broadcasted: broadcast.Broadcast[Any] = sparkContext.broadcast(relation)
         longMetric("broadcastTime") += NANOSECONDS.toMillis(
           System.nanoTime() - beforeBroadcast)
         val executionId = sparkContext.getLocalProperty(SQLExecution.EXECUTION_ID_KEY)
@@ -160,6 +184,21 @@ class ColumnarBroadcastExchangeExec(mode: BroadcastMode, child: SparkPlan)
           s"disable broadcast join by setting ${SQLConf.AUTO_BROADCASTJOIN_THRESHOLD.key} to -1",
           ex)
     }
+  }
+}
+
+class ColumnarHashedRelation extends Serializable {
+  var relation: Any = _
+  var buildData: Array[Array[Byte]] = new Array[Array[Byte]](0)
+
+  def converterData(mode: BroadcastMode, nullVecCount: Long, array: Array[Array[Byte]]): Unit = {
+    if (mode.isInstanceOf[HashedRelationBroadcastMode] && array.isEmpty) {
+      relation = EmptyHashedRelation
+    }
+    if (nullVecCount >= 1) {
+      relation = HashedRelationWithAllNullKeys
+    }
+    buildData = array
   }
 }
 

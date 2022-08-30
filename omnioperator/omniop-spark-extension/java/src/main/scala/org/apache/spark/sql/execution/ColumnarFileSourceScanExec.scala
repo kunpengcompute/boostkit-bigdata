@@ -600,7 +600,7 @@ abstract class BaseColumnarFileSourceScanExec(
       OmniExpressionAdaptor.rewriteToOmniJsonExpressionLiteral(x,
         OmniExpressionAdaptor.getExprIdMap(join.getBuildOutput.map(_.toAttribute)))
     }.toArray
-    val buildData = join.getBuildPlan.executeBroadcast[Array[Array[Byte]]]()
+    val relation = join.getBuildPlan.executeBroadcast[ColumnarHashedRelation]()
 
     val buildOutputTypes = buildTypes // {1,1}
 
@@ -620,7 +620,7 @@ abstract class BaseColumnarFileSourceScanExec(
       case _ => None
     }
     (buildTypes, buildJoinColsExp, filter, probeTypes, probeOutputCols,
-      probeHashColsExp, buildOutputCols, buildOutputTypes, buildData)
+      probeHashColsExp, buildOutputCols, buildOutputTypes, relation)
   }
 
   def genFilterOutput(cond: ColumnarFilterExec) = {
@@ -645,7 +645,7 @@ abstract class BaseColumnarFileSourceScanExec(
       OmniExpressionAdaptor.rewriteToOmniJsonExpressionLiteral(x,
         OmniExpressionAdaptor.getExprIdMap(join.getBuildOutput.map(_.toAttribute)))
     }.toArray
-    val buildData = join.getBuildPlan.executeBroadcast[Array[Array[Byte]]]()
+    val relation = join.getBuildPlan.executeBroadcast[ColumnarHashedRelation]()
 
     val buildOutputTypes = buildTypes // {1,1}
 
@@ -677,7 +677,7 @@ abstract class BaseColumnarFileSourceScanExec(
       rightLen = join.getStreamPlan.output.size
     }
     (buildTypes, buildJoinColsExp, filter, probeTypes, probeOutputCols,
-      probeHashColsExp, buildOutputCols, buildOutputTypes, buildData, (left, leftLen, right, rightLen))
+      probeHashColsExp, buildOutputCols, buildOutputTypes, relation, (left, leftLen, right, rightLen))
   }
 }
 
@@ -809,16 +809,16 @@ case class ColumnarMultipleOperatorExec(
     omniAggInputRaw, omniAggOutputPartial, resultIdxToOmniResultIdxMap) = genAggOutput(aggregate)
     val (proj1OmniExpressions, proj1OmniInputTypes) = genProjectOutput(proj1)
     val (buildTypes1, buildJoinColsExp1, joinFilter1, probeTypes1, probeOutputCols1,
-    probeHashColsExp1, buildOutputCols1, buildOutputTypes1, buildData1) = genJoinOutput(join1)
+    probeHashColsExp1, buildOutputCols1, buildOutputTypes1, relation1) = genJoinOutput(join1)
     val (proj2OmniExpressions, proj2OmniInputTypes) = genProjectOutput(proj2)
     val (buildTypes2, buildJoinColsExp2, joinFilter2, probeTypes2, probeOutputCols2,
-    probeHashColsExp2, buildOutputCols2, buildOutputTypes2, buildData2) = genJoinOutput(join2)
+    probeHashColsExp2, buildOutputCols2, buildOutputTypes2, relation2) = genJoinOutput(join2)
     val (proj3OmniExpressions, proj3OmniInputTypes) = genProjectOutput(proj3)
     val (buildTypes3, buildJoinColsExp3, joinFilter3, probeTypes3, probeOutputCols3,
-    probeHashColsExp3, buildOutputCols3, buildOutputTypes3, buildData3) = genJoinOutput(join3)
+    probeHashColsExp3, buildOutputCols3, buildOutputTypes3, relation3) = genJoinOutput(join3)
     val (proj4OmniExpressions, proj4OmniInputTypes) = genProjectOutput(proj4)
     val (buildTypes4, buildJoinColsExp4, joinFilter4, probeTypes4, probeOutputCols4,
-    probeHashColsExp4, buildOutputCols4, buildOutputTypes4, buildData4) = genJoinOutput(join4)
+    probeHashColsExp4, buildOutputCols4, buildOutputTypes4, relation4) = genJoinOutput(join4)
     val (conditionExpression, omniCondInputTypes, omniCondExpressions) = genFilterOutput(filter)
 
     inputRDD.asInstanceOf[RDD[ColumnarBatch]].mapPartitionsInternal { batches =>
@@ -851,7 +851,7 @@ case class ColumnarMultipleOperatorExec(
         buildJoinColsExp1, if (joinFilter1.nonEmpty) {Optional.of(joinFilter1.get)} else {Optional.empty()}, 1,
         new OperatorConfig(SpillConfig.NONE, IS_SKIP_VERIFY_EXP))
       val buildOp1 = buildOpFactory1.createOperator()
-      buildData1.value.foreach { input =>
+      relation1.value.buildData.foreach { input =>
         buildOp1.addInput(deserializer.deserialize(input))
       }
       buildOp1.getOutput
@@ -878,7 +878,7 @@ case class ColumnarMultipleOperatorExec(
         buildJoinColsExp2, if (joinFilter2.nonEmpty) {Optional.of(joinFilter2.get)} else {Optional.empty()}, 1,
         new OperatorConfig(SpillConfig.NONE, IS_SKIP_VERIFY_EXP))
       val buildOp2 = buildOpFactory2.createOperator()
-      buildData2.value.foreach { input =>
+      relation2.value.buildData.foreach { input =>
         buildOp2.addInput(deserializer.deserialize(input))
       }
       buildOp2.getOutput
@@ -905,7 +905,7 @@ case class ColumnarMultipleOperatorExec(
         buildJoinColsExp3, if (joinFilter3.nonEmpty) {Optional.of(joinFilter3.get)} else {Optional.empty()}, 1,
         new OperatorConfig(SpillConfig.NONE, IS_SKIP_VERIFY_EXP))
       val buildOp3 = buildOpFactory3.createOperator()
-      buildData3.value.foreach { input =>
+      relation3.value.buildData.foreach { input =>
         buildOp3.addInput(deserializer.deserialize(input))
       }
       buildOp3.getOutput
@@ -932,7 +932,7 @@ case class ColumnarMultipleOperatorExec(
         buildJoinColsExp4, if (joinFilter4.nonEmpty) {Optional.of(joinFilter4.get)} else {Optional.empty()}, 1,
         new OperatorConfig(SpillConfig.NONE, IS_SKIP_VERIFY_EXP))
       val buildOp4 = buildOpFactory4.createOperator()
-      buildData4.value.foreach { input =>
+      relation4.value.buildData.foreach { input =>
         buildOp4.addInput(deserializer.deserialize(input))
       }
       buildOp4.getOutput
@@ -1131,13 +1131,13 @@ case class ColumnarMultipleOperatorExec1(
     omniAggInputRaw, omniAggOutputPartial, resultIdxToOmniResultIdxMap) = genAggOutput(aggregate)
     val (proj1OmniExpressions, proj1OmniInputTypes) = genProjectOutput(proj1)
     val (buildTypes1, buildJoinColsExp1, joinFilter1, probeTypes1, probeOutputCols1,
-    probeHashColsExp1, buildOutputCols1, buildOutputTypes1, buildData1, reserved1) = genJoinOutputWithReverse(join1)
+    probeHashColsExp1, buildOutputCols1, buildOutputTypes1, relation1, reserved1) = genJoinOutputWithReverse(join1)
     val (proj2OmniExpressions, proj2OmniInputTypes) = genProjectOutput(proj2)
     val (buildTypes2, buildJoinColsExp2, joinFilter2, probeTypes2, probeOutputCols2,
-    probeHashColsExp2, buildOutputCols2, buildOutputTypes2, buildData2, reserved2) = genJoinOutputWithReverse(join2)
+    probeHashColsExp2, buildOutputCols2, buildOutputTypes2, relation2, reserved2) = genJoinOutputWithReverse(join2)
     val (proj3OmniExpressions, proj3OmniInputTypes) = genProjectOutput(proj3)
     val (buildTypes3, buildJoinColsExp3, joinFilter3, probeTypes3, probeOutputCols3,
-    probeHashColsExp3, buildOutputCols3, buildOutputTypes3, buildData3, reserved3) = genJoinOutputWithReverse(join3)
+    probeHashColsExp3, buildOutputCols3, buildOutputTypes3, relation3, reserved3) = genJoinOutputWithReverse(join3)
     val (conditionExpression, omniCondInputTypes, omniCondExpressions) = genFilterOutput(filter)
 
     def reserveVec(o: VecBatch): VecBatch = {
@@ -1186,7 +1186,7 @@ case class ColumnarMultipleOperatorExec1(
         buildJoinColsExp1, if (joinFilter1.nonEmpty) {Optional.of(joinFilter1.get)} else {Optional.empty()}, 1,
         new OperatorConfig(SpillConfig.NONE, IS_SKIP_VERIFY_EXP))
       val buildOp1 = buildOpFactory1.createOperator()
-      buildData1.value.foreach { input =>
+      relation1.value.buildData.foreach { input =>
         buildOp1.addInput(deserializer.deserialize(input))
       }
       buildOp1.getOutput
@@ -1213,7 +1213,7 @@ case class ColumnarMultipleOperatorExec1(
         buildJoinColsExp2, if (joinFilter2.nonEmpty) {Optional.of(joinFilter2.get)} else {Optional.empty()}, 1,
         new OperatorConfig(SpillConfig.NONE, IS_SKIP_VERIFY_EXP))
       val buildOp2 = buildOpFactory2.createOperator()
-      buildData2.value.foreach { input =>
+      relation2.value.buildData.foreach { input =>
         buildOp2.addInput(deserializer.deserialize(input))
       }
       buildOp2.getOutput
@@ -1240,7 +1240,7 @@ case class ColumnarMultipleOperatorExec1(
         buildJoinColsExp3, if (joinFilter3.nonEmpty) {Optional.of(joinFilter3.get)} else {Optional.empty()}, 1,
         new OperatorConfig(SpillConfig.NONE, IS_SKIP_VERIFY_EXP))
       val buildOp3 = buildOpFactory3.createOperator()
-      buildData3.value.foreach { input =>
+      relation3.value.buildData.foreach { input =>
         buildOp3.addInput(deserializer.deserialize(input))
       }
       buildOp3.getOutput

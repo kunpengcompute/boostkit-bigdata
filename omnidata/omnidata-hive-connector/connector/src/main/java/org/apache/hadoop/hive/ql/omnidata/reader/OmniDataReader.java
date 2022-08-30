@@ -19,60 +19,99 @@
 
 package org.apache.hadoop.hive.ql.omnidata.reader;
 
-import com.huawei.boostkit.omnidata.model.datasource.DataSource;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.ql.exec.vector.ColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatch;
+import org.apache.hadoop.hive.ql.omnidata.decode.PageDeserializer;
 import org.apache.hadoop.hive.ql.omnidata.operator.predicate.NdpPredicateInfo;
+import org.apache.hadoop.hive.ql.omnidata.physical.NdpVectorizedRowBatchCtx;
+import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 import org.apache.hadoop.mapred.FileSplit;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.net.UnknownHostException;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.LinkedList;
 import java.util.Queue;
 import java.util.concurrent.Callable;
 
 /**
- * OmniDataReader for agg optimization
+ * OmniDataReader for filter and agg optimization
  *
  * @since 2022-03-07
  */
-public class OmniDataReader implements Callable<List<VectorizedRowBatch>> {
+public class OmniDataReader implements Callable<Queue<VectorizedRowBatch>> {
 
-    private DataSource dataSource;
-
-    private Configuration conf;
-
-    private FileSplit fileSplit;
+    private static final Logger LOG = LoggerFactory.getLogger(OmniDataReader.class);
 
     private NdpPredicateInfo ndpPredicateInfo;
 
-    public OmniDataReader(DataSource dataSource, Configuration conf, FileSplit fileSplit,
-                          NdpPredicateInfo ndpPredicateInfo) {
-        this.dataSource = dataSource;
-        this.conf = conf;
-        this.fileSplit = fileSplit;
+    private NdpVectorizedRowBatchCtx ndpVectorizedRowBatchCtx;
+
+    private TypeInfo[] rowColumnTypeInfos;
+
+    private OmniDataAdapter omniDataAdapter;
+
+    private Object[] partitionValues = null;
+
+    public OmniDataReader(Configuration conf, FileSplit fileSplit, PageDeserializer deserializer,
+                          NdpPredicateInfo ndpPredicateInfo, TypeInfo[] rowColumnTypeInfos) {
         this.ndpPredicateInfo = ndpPredicateInfo;
+        this.rowColumnTypeInfos = rowColumnTypeInfos;
+        this.omniDataAdapter = new OmniDataAdapter(conf, fileSplit, ndpPredicateInfo, deserializer);
+        if (ndpPredicateInfo.getNdpVectorizedRowBatchCtx() != null) {
+            this.ndpVectorizedRowBatchCtx = ndpPredicateInfo.getNdpVectorizedRowBatchCtx();
+            int partitionColumnCount = ndpVectorizedRowBatchCtx.getPartitionColumnCount();
+            if (partitionColumnCount > 0) {
+                partitionValues = new Object[partitionColumnCount];
+                // set partitionValues
+                NdpVectorizedRowBatchCtx.getPartitionValues(ndpVectorizedRowBatchCtx, conf, fileSplit, partitionValues,
+                        this.rowColumnTypeInfos);
+            }
+        }
     }
 
     @Override
-    public List<VectorizedRowBatch> call() throws UnknownHostException {
-        OmniDataAdapter omniDataAdapter = new OmniDataAdapter(dataSource, conf, fileSplit, ndpPredicateInfo);
+    public Queue<VectorizedRowBatch> call() throws UnknownHostException {
         Queue<ColumnVector[]> pages = omniDataAdapter.getBatchFromOmniData();
-        return getVectorizedRowBatch(pages);
+        return ndpPredicateInfo.getIsPushDownAgg()
+                ? createVectorizedRowBatchWithAgg(pages)
+                : createVectorizedRowBatch(pages);
     }
 
-    private List<VectorizedRowBatch> getVectorizedRowBatch(Queue<ColumnVector[]> pages) {
-        List<VectorizedRowBatch> rowBatches = new ArrayList<>();
-        if (!pages.isEmpty()) {
+    private Queue<VectorizedRowBatch> createVectorizedRowBatchWithAgg(Queue<ColumnVector[]> pages) {
+        Queue<VectorizedRowBatch> rowBatches = new LinkedList<>();
+        while (!pages.isEmpty()) {
             ColumnVector[] columnVectors = pages.poll();
             int channelCount = columnVectors.length;
             int positionCount = columnVectors[0].isNull.length;
             VectorizedRowBatch rowBatch = new VectorizedRowBatch(channelCount, positionCount);
+            // agg: copy columnVectors to rowBatch.cols
             System.arraycopy(columnVectors, 0, rowBatch.cols, 0, channelCount);
             rowBatches.add(rowBatch);
         }
         return rowBatches;
     }
+
+    private Queue<VectorizedRowBatch> createVectorizedRowBatch(Queue<ColumnVector[]> pages) {
+        Queue<VectorizedRowBatch> rowBatches = new LinkedList<>();
+        while (!pages.isEmpty()) {
+            ColumnVector[] columnVectors = pages.poll();
+            int channelCount = columnVectors.length;
+            int positionCount = columnVectors[0].isNull.length;
+            // creates a vectorized row batch and the column vectors
+            VectorizedRowBatch rowBatch = ndpVectorizedRowBatchCtx.createVectorizedRowBatch(rowColumnTypeInfos);
+            for (int i = 0; i < channelCount; i++) {
+                int columnId = ndpPredicateInfo.getOutputColumns().get(i);
+                rowBatch.cols[columnId] = columnVectors[i];
+            }
+            rowBatch.size = positionCount;
+            if (partitionValues != null) {
+                ndpVectorizedRowBatchCtx.addPartitionColsToBatch(rowBatch, partitionValues, rowColumnTypeInfos);
+            }
+            rowBatches.add(rowBatch);
+        }
+        return rowBatches;
+    }
+
 }

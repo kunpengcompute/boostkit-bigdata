@@ -24,21 +24,17 @@ import java.util.Optional;
  * @param <V> v
  * @since 2022-07-28
  */
-public class MapDecodeType<K extends DecodeType, V extends DecodeType>
-        implements DecodeType
-{
+public class MapDecodeType<K extends DecodeType, V extends DecodeType> implements DecodeType {
     private final K keyType;
     private final V valueType;
 
-    public MapDecodeType(K keyType, V valueType)
-    {
+    public MapDecodeType(K keyType, V valueType) {
         this.keyType = keyType;
         this.valueType = valueType;
     }
 
     @Override
-    public Optional<Class<?>> getJavaType()
-    {
+    public Optional<Class<?>> getJavaType() {
         return Optional.empty();
     }
 }

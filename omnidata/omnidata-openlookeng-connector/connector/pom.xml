@@ -413,7 +413,7 @@
 
         <dependency>
             <groupId>com.huawei.boostkit</groupId>
-            <artifactId>boostkit-omnidata-server</artifactId>
+            <artifactId>boostkit-omnidata-client</artifactId>
             <version>1.4.0</version>
             <classifier>${dep.os.arch}</classifier>
             <exclusions>

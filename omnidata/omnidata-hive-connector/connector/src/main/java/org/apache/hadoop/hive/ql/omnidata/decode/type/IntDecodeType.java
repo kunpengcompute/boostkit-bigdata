@@ -22,12 +22,9 @@ import java.util.Optional;
  *
  * @since 2022-07-28
  */
-public class IntDecodeType
-        implements DecodeType
-{
+public class IntDecodeType implements DecodeType {
     @Override
-    public Optional<Class<?>> getJavaType()
-    {
+    public Optional<Class<?>> getJavaType() {
         return Optional.of(int.class);
     }
 }

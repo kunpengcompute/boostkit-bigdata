@@ -22,8 +22,7 @@ import java.util.Optional;
  *
  * @since 2022-07-28
  */
-public interface DecodeType
-{
+public interface DecodeType {
     /**
      * get java class type
      *

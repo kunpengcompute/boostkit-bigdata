@@ -22,12 +22,9 @@ import java.util.Optional;
  *
  * @since 2022-07-28
  */
-public class BooleanDecodeType
-        implements DecodeType
-{
+public class BooleanDecodeType implements DecodeType {
     @Override
-    public Optional<Class<?>> getJavaType()
-    {
+    public Optional<Class<?>> getJavaType() {
         return Optional.of(boolean.class);
     }
 }

@@ -56,7 +56,7 @@ class ColumnarShuffleExchangeExec(
                                    override val outputPartitioning: Partitioning,
                                    child: SparkPlan,
                                    shuffleOrigin: ShuffleOrigin = ENSURE_REQUIREMENTS)
-  extends ShuffleExchangeExec(outputPartitioning, child) with ShuffleExchangeLike{
+  extends ShuffleExchangeExec(outputPartitioning, child, shuffleOrigin) with ShuffleExchangeLike{
 
   private lazy val writeMetrics =
     SQLShuffleWriteMetricsReporter.createShuffleWriteMetrics(sparkContext)

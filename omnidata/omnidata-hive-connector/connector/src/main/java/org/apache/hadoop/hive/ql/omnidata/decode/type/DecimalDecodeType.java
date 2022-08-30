@@ -22,31 +22,25 @@ import java.util.Optional;
  *
  * @since 2022-07-28
  */
-public class DecimalDecodeType
-        implements DecodeType
-{
+public class DecimalDecodeType implements DecodeType {
     private final int precision;
     private final int scale;
 
-    public DecimalDecodeType(int precision, int scale)
-    {
+    public DecimalDecodeType(int precision, int scale) {
         this.precision = precision;
         this.scale = scale;
     }
 
-    public int getPrecision()
-    {
+    public int getPrecision() {
         return precision;
     }
 
-    public int getScale()
-    {
+    public int getScale() {
         return scale;
     }
 
     @Override
-    public Optional<Class<?>> getJavaType()
-    {
+    public Optional<Class<?>> getJavaType() {
         return Optional.of(DecimalDecodeType.class);
     }
 }

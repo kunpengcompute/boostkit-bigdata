@@ -23,7 +23,6 @@ import java.lang.annotation.*;
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)
 @BindingAnnotation
-public @interface Decode
-{
+public @interface Decode {
     String value();
 }
