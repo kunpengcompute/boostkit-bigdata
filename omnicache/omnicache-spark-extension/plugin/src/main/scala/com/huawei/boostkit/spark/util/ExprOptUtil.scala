@@ -243,6 +243,18 @@ object ExprOptUtil {
   }
 
   /**
+   * Returns whether the SQL statements of the srcTerms contains the SQL statement of the dstTerm.
+   */
+  def containsSql(srcTerms: Set[Expression], dstTerm: Expression): Boolean = {
+    var sql: mutable.Buffer[String] = mutable.Buffer()
+    for (srcTerm <- srcTerms) {
+      sql.+=(srcTerm.sql)
+    }
+    val sqlSet = sql.toSet
+    sqlSet.contains(dstTerm.sql)
+  }
+
+  /**
    * Returns the kind that you get if you negate this kind.
    * To conform to null semantics, null value should not be compared.
    * For simplification purposes,
@@ -542,7 +554,7 @@ case class EquivalenceClasses() {
   private var cacheEquivalenceClasses: List[mutable.Set[ExpressionEqual]] = List()
 
   def addEquivalenceClass(p: ExpressionEqual, p2: ExpressionEqual): Unit = {
-    // CLear cache
+    // Clear cache
     cacheEquivalenceClassesMap = null
     cacheEquivalenceClasses = null
 
