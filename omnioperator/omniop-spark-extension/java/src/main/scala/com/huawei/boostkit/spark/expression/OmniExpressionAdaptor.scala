@@ -519,6 +519,23 @@ object OmniExpressionAdaptor extends Logging {
           .format(sparkTypeToOmniExpJsonType(abs.dataType),
             rewriteToOmniJsonExpressionLiteral(abs.child, exprsIndexMap))
 
+      case lower: Lower =>
+        "{\"exprType\":\"FUNCTION\",\"returnType\":%s,\"function_name\":\"lower\", \"arguments\":[%s]}"
+          .format(sparkTypeToOmniExpJsonType(lower.dataType),
+            rewriteToOmniJsonExpressionLiteral(lower.child, exprsIndexMap))
+
+      case length: Length =>
+        "{\"exprType\":\"FUNCTION\",\"returnType\":%s,\"function_name\":\"length\", \"arguments\":[%s]}"
+          .format(sparkTypeToOmniExpJsonType(length.dataType),
+            rewriteToOmniJsonExpressionLiteral(length.child, exprsIndexMap))
+
+      case replace: StringReplace =>
+        "{\"exprType\":\"FUNCTION\",\"returnType\":%s,\"function_name\":\"replace\", \"arguments\":[%s,%s,%s]}"
+          .format(sparkTypeToOmniExpJsonType(replace.dataType),
+            rewriteToOmniJsonExpressionLiteral(replace.srcExpr, exprsIndexMap),
+            rewriteToOmniJsonExpressionLiteral(replace.searchExpr, exprsIndexMap),
+            rewriteToOmniJsonExpressionLiteral(replace.replaceExpr, exprsIndexMap))
+
       // In
       case in: In =>
         "{\"exprType\":\"IN\",\"returnType\":%s, \"arguments\":%s}".format(
