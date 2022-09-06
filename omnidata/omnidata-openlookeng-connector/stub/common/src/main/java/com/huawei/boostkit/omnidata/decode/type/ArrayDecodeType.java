@@ -13,21 +13,34 @@
  * limitations under the License.
  */
 
-package io.prestosql.plugin.hive.omnidata.decode.type;
+package com.huawei.boostkit.omnidata.decode.type;
 
 import java.util.Optional;
 
 /**
- * Int decode type
+ * Array decode type
  *
+ * @param <T> decode type
  * @since 2022-07-18
  */
-public class IntDecodeType
+public class ArrayDecodeType<T extends DecodeType>
         implements DecodeType
 {
+    private final T elementType;
+
+    public ArrayDecodeType(T elementType)
+    {
+        this.elementType = elementType;
+    }
+
+    public T getElementType()
+    {
+        return elementType;
+    }
+
     @Override
     public Optional<Class<?>> getJavaType()
     {
-        return Optional.of(int.class);
+        return Optional.empty();
     }
 }

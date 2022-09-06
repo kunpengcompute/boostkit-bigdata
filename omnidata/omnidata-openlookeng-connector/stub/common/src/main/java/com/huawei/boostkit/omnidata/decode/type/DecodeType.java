@@ -13,21 +13,21 @@
  * limitations under the License.
  */
 
-package io.prestosql.plugin.hive.omnidata.decode.type;
+package com.huawei.boostkit.omnidata.decode.type;
 
 import java.util.Optional;
 
 /**
- * Varchar decode type
+ * Dcode java type
  *
  * @since 2022-07-18
  */
-public class VarcharDecodeType
-        implements DecodeType
+public interface DecodeType
 {
-    @Override
-    public Optional<Class<?>> getJavaType()
-    {
-        return Optional.of(String.class);
-    }
+    /**
+     * get java class type
+     *
+     * @return class type
+     */
+    Optional<Class<?>> getJavaType();
 }

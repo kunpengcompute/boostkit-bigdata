@@ -16,6 +16,12 @@
 package io.prestosql.plugin.hive.omnidata.decode;
 
 import com.google.common.collect.ImmutableList;
+import com.huawei.boostkit.omnidata.decode.type.ArrayDecodeType;
+import com.huawei.boostkit.omnidata.decode.type.DecodeType;
+import com.huawei.boostkit.omnidata.decode.type.LongToByteDecodeType;
+import com.huawei.boostkit.omnidata.decode.type.LongToFloatDecodeType;
+import com.huawei.boostkit.omnidata.decode.type.LongToIntDecodeType;
+import com.huawei.boostkit.omnidata.decode.type.LongToShortDecodeType;
 import com.huawei.boostkit.omnidata.exception.OmniDataException;
 import com.huawei.boostkit.omnidata.serialize.OmniDataBlockEncodingSerde;
 import io.airlift.compress.Decompressor;
@@ -27,14 +33,6 @@ import io.hetu.core.transport.execution.buffer.PagesSerdeFactory;
 import io.hetu.core.transport.execution.buffer.SerializedPage;
 import io.prestosql.plugin.hive.omnidata.decode.impl.OpenLooKengDecoding;
 import io.prestosql.plugin.hive.omnidata.decode.impl.OpenLooKengDeserializer;
-import io.prestosql.plugin.hive.omnidata.decode.type.ArrayDecodeType;
-import io.prestosql.plugin.hive.omnidata.decode.type.DateDecodeType;
-import io.prestosql.plugin.hive.omnidata.decode.type.DecodeType;
-import io.prestosql.plugin.hive.omnidata.decode.type.LongDecodeType;
-import io.prestosql.plugin.hive.omnidata.decode.type.LongToByteDecodeType;
-import io.prestosql.plugin.hive.omnidata.decode.type.LongToFloatDecodeType;
-import io.prestosql.plugin.hive.omnidata.decode.type.LongToIntDecodeType;
-import io.prestosql.plugin.hive.omnidata.decode.type.LongToShortDecodeType;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
 import io.prestosql.spi.block.Block;
@@ -119,7 +117,7 @@ public class TestOpenLooKengDeserializer
         // deserialize page
         DecodeType[] decodeTypes = new DecodeType[] {
                 new LongToIntDecodeType(), new LongToShortDecodeType(), new LongToByteDecodeType(),
-                new LongToFloatDecodeType(), new DateDecodeType()
+                new LongToFloatDecodeType()
         };
 
         OpenLooKengDecoding blockDecoding = new OpenLooKengDecoding();
@@ -218,10 +216,10 @@ public class TestOpenLooKengDeserializer
         SerializedPage serializedPage = pagesSerde.serialize(page);
 
         //deserialize page
-        DecodeType[] decodeTypes = new DecodeType[] {new ArrayDecodeType<>(new LongDecodeType())};
+        DecodeType[] decodeTypes = new DecodeType[] {new ArrayDecodeType<>(new LongToIntDecodeType())};
         DecodeType firstType = decodeTypes[0];
         if (firstType instanceof ArrayDecodeType) {
-            assertEquals(((ArrayDecodeType) firstType).getElementType().getClass(), LongDecodeType.class);
+            assertEquals(((ArrayDecodeType) firstType).getElementType().getClass(), LongToIntDecodeType.class);
         }
         else {
             throw new OmniDataException("except arrayType");

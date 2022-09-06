@@ -13,21 +13,40 @@
  * limitations under the License.
  */
 
-package io.prestosql.plugin.hive.omnidata.decode.type;
+package com.huawei.boostkit.omnidata.decode.type;
 
 import java.util.Optional;
 
 /**
- * Byte decode type
+ * Decimal decode type
  *
  * @since 2022-07-18
  */
-public class ByteDecodeType
+public class DecimalDecodeType
         implements DecodeType
 {
+    private final int precision;
+    private final int scale;
+
+    public DecimalDecodeType(int precision, int scale)
+    {
+        this.precision = precision;
+        this.scale = scale;
+    }
+
+    public int getPrecision()
+    {
+        return precision;
+    }
+
+    public int getScale()
+    {
+        return scale;
+    }
+
     @Override
     public Optional<Class<?>> getJavaType()
     {
-        return Optional.of(byte.class);
+        return Optional.of(DecimalDecodeType.class);
     }
 }
