@@ -632,7 +632,11 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
     } else {
       swapColumnTableReferences(viewProjectList, tableMapping, columnMapping)
     }
-    val swapTableAttrs = swapTableReferences(viewTableAttrs, tableMapping)
+    val swapTableAttrs = if (swapTableColumn) {
+      swapTableReferences(viewTableAttrs, tableMapping)
+    } else {
+      viewTableAttrs
+    }
 
     // 2.construct the map of viewQueryProjectExpression to ViewTableAttributeReference
     val viewProjectExprToTableAttr = swapProjectList.map(ExpressionEqual).zip(swapTableAttrs).toMap
