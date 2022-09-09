@@ -73,6 +73,9 @@ class MaterializedViewAggregateRule(sparkSession: SparkSession)
     needTables.foreach { needTable =>
       newViewQueryPlan = Join(newViewQueryPlan, needTable.logicalPlan,
         Inner, None, JoinHint.NONE)
+      newGroupingExpressions = newGroupingExpressions ++ needTable.logicalPlan.output
+      newAggregateExpressions = newAggregateExpressions ++
+          needTable.logicalPlan.output.map(e => Alias(e, e.name)())
     }
     newViewQueryPlan = Aggregate(newGroupingExpressions, newAggregateExpressions, newViewQueryPlan)
 
@@ -83,7 +86,7 @@ class MaterializedViewAggregateRule(sparkSession: SparkSession)
       topViewProject.get.projectList
     }
     val newTopViewProject = Project(projectList, newViewQueryPlan)
-    Some(newViewTablePlan, viewQueryPlan, Some(newTopViewProject))
+    Some(newViewTablePlan, newViewQueryPlan, Some(newTopViewProject))
   }
 
   /**
@@ -111,8 +114,9 @@ class MaterializedViewAggregateRule(sparkSession: SparkSession)
 
     // queryAgg and Group ExpressionEqual
     val queryAggExpressionEquals = swappedQueryAggExpressions.map(ExpressionEqual)
-    val queryGroupExpressionEquals = swapColumnReferences(queryAgg.groupingExpressions,
-      columnMapping).map(ExpressionEqual).toSet
+    val queryGroupExpressionEqualsSeq = swapColumnReferences(queryAgg.groupingExpressions,
+      columnMapping)
+    val queryGroupExpressionEquals = queryGroupExpressionEqualsSeq.map(ExpressionEqual).toSet
 
     // 1.2.prepare viewAgg
     val viewAgg = viewQueryPlan.asInstanceOf[Aggregate]
@@ -137,7 +141,7 @@ class MaterializedViewAggregateRule(sparkSession: SparkSession)
 
     // newQueryAggExpressions and newGroupingExpressions
     var newQueryAggExpressions: Seq[NamedExpression] = Seq.empty
-    var newGroupingExpressions: Seq[Expression] = queryAgg.groupingExpressions
+    var newGroupingExpressions: Seq[Expression] = queryGroupExpressionEqualsSeq
 
     // if subGroupExpressionEquals is empty and aggCalls all in viewAggExpressionEquals,
     // final need project not aggregate

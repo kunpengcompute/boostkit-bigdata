@@ -163,26 +163,23 @@ object ViewMetadata extends RewriteHelper {
     // load from all db
     for (db <- catalog.listDatabases()) {
       val tables = omniCacheFilter(catalog, db)
-      tables.foreach(tableData => saveViewMetadataToMap(tableData._2))
+      tables.foreach(tableData => saveViewMetadataToMap(tableData))
     }
     rebuildGraph()
   }
 
   def omniCacheFilter(catalog: SessionCatalog,
-      mvDataBase: String): Seq[(TableIdentifier, CatalogTable)] = {
-    val aggTableMetaData: TableIdentifier => (TableIdentifier, CatalogTable) = {
-      tableIdentifier => (tableIdentifier, catalog.getTableMetadata(tableIdentifier))
-    }
-
+      mvDataBase: String): Seq[CatalogTable] = {
     try {
-      catalog.listTables(mvDataBase).map(aggTableMetaData).filter { tableData =>
-        tableData._2.properties.contains(MV_QUERY_ORIGINAL_SQL)
+      val allTables = catalog.listTables(mvDataBase)
+      catalog.getTablesByName(allTables).filter { tableData =>
+        tableData.properties.contains(MV_QUERY_ORIGINAL_SQL)
       }
     } catch {
       // if db exists a table hive materialized view, will throw annalysis exception
       case e: Throwable =>
         logDebug(s"Failed to listTables in $mvDataBase, errmsg: ${e.getMessage}")
-        Seq.empty[(TableIdentifier, CatalogTable)]
+        Seq.empty[CatalogTable]
     }
   }
 }

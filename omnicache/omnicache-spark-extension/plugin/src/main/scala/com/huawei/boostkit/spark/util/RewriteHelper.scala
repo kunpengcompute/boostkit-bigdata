@@ -297,17 +297,7 @@ object RewriteHelper extends PredicateHelper {
 
   private def exprHashCode(_ar: Expression): Int = {
     // See http://stackoverflow.com/questions/113511/hash-code-implementation
-    _ar match {
-      case ar@AttributeReference(_, _, _, _) =>
-        var h = 17
-        h = h * 37 + ar.name.hashCode()
-        h = h * 37 + ar.dataType.hashCode()
-        h = h * 37 + ar.nullable.hashCode()
-        h = h * 37 + ar.metadata.hashCode()
-        h = h * 37 + ar.exprId.hashCode()
-        h
-      case _ => _ar.hashCode()
-    }
+    _ar.sql.hashCode
   }
 
   /**
@@ -353,7 +343,7 @@ object RewriteHelper extends PredicateHelper {
   private def orderCommutative(
       e: Expression,
       f: PartialFunction[Expression, Seq[Expression]]): Seq[Expression] =
-    gatherCommutative(e, f).sortBy(_.hashCode())
+    gatherCommutative(e, f).sortBy(exprHashCode)
 
   /** Rearrange expressions that are commutative or associative. */
   private def expressionReorder(e: Expression): Expression = e match {
@@ -363,11 +353,11 @@ object RewriteHelper extends PredicateHelper {
       orderCommutative(m, { case Multiply(l, r, _) => Seq(l, r) }).reduce(Multiply(_, _, f))
 
     case o: Or =>
-      orderCommutative(o, { case Or(l, r) if l.deterministic && r.deterministic => Seq(l, r) })
-          .reduce(Or)
+      val s = splitDisjunctivePredicates(o).map(expressionReorder).sortBy(exprHashCode)
+      s.reduce(Or)
     case a: And =>
-      orderCommutative(a, { case And(l, r) if l.deterministic && r.deterministic => Seq(l, r) })
-          .reduce(And)
+      val s = splitConjunctivePredicates(a).map(expressionReorder).sortBy(exprHashCode)
+      s.reduce(And)
 
     case o: BitwiseOr =>
       orderCommutative(o, { case BitwiseOr(l, r) => Seq(l, r) }).reduce(BitwiseOr)
@@ -376,14 +366,14 @@ object RewriteHelper extends PredicateHelper {
     case x: BitwiseXor =>
       orderCommutative(x, { case BitwiseXor(l, r) => Seq(l, r) }).reduce(BitwiseXor)
 
-    case EqualTo(l, r) if l.hashCode() > r.hashCode() => EqualTo(r, l)
-    case EqualNullSafe(l, r) if l.hashCode() > r.hashCode() => EqualNullSafe(r, l)
+    case EqualTo(l, r) if exprHashCode(l) > exprHashCode(r) => EqualTo(r, l)
+    case EqualNullSafe(l, r) if exprHashCode(l) > exprHashCode(r) => EqualNullSafe(r, l)
 
-    case GreaterThan(l, r) if l.hashCode() > r.hashCode() => LessThan(r, l)
-    case LessThan(l, r) if l.hashCode() > r.hashCode() => GreaterThan(r, l)
+    case GreaterThan(l, r) if exprHashCode(l) > exprHashCode(r) => LessThan(r, l)
+    case LessThan(l, r) if exprHashCode(l) > exprHashCode(r) => GreaterThan(r, l)
 
-    case GreaterThanOrEqual(l, r) if l.hashCode() > r.hashCode() => LessThanOrEqual(r, l)
-    case LessThanOrEqual(l, r) if l.hashCode() > r.hashCode() => GreaterThanOrEqual(r, l)
+    case GreaterThanOrEqual(l, r) if exprHashCode(l) > exprHashCode(r) => LessThanOrEqual(r, l)
+    case LessThanOrEqual(l, r) if exprHashCode(l) > exprHashCode(r) => GreaterThanOrEqual(r, l)
 
     // Note in the following `NOT` cases, `l.hashCode() <= r.hashCode()` holds. The reason is that
     // canonicalization is conducted bottom-up -- see [[Expression.canonicalized]].
@@ -393,7 +383,7 @@ object RewriteHelper extends PredicateHelper {
     case Not(LessThanOrEqual(l, r)) => GreaterThan(l, r)
 
     // order the list in the In operator
-    case In(value, list) if list.length > 1 => In(value, list.sortBy(_.hashCode()))
+    case In(value, list) if list.length > 1 => In(value, list.sortBy(exprHashCode))
 
     case g: Greatest =>
       val newChildren = orderCommutative(g, { case Greatest(children) => children })
