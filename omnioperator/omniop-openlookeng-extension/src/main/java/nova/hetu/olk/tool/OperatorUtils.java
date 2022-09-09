@@ -32,6 +32,7 @@ import io.prestosql.spi.block.LazyBlock;
 import io.prestosql.spi.block.LongArrayBlock;
 import io.prestosql.spi.block.RowBlock;
 import io.prestosql.spi.block.RunLengthEncodedBlock;
+import io.prestosql.spi.block.ShortArrayBlock;
 import io.prestosql.spi.block.VariableWidthBlock;
 import io.prestosql.spi.sql.expression.Types;
 import io.prestosql.spi.type.RowType;
@@ -46,6 +47,7 @@ import nova.hetu.olk.block.IntArrayOmniBlock;
 import nova.hetu.olk.block.LazyOmniBlock;
 import nova.hetu.olk.block.LongArrayOmniBlock;
 import nova.hetu.olk.block.RowOmniBlock;
+import nova.hetu.olk.block.ShortArrayOmniBlock;
 import nova.hetu.olk.block.VariableWidthOmniBlock;
 import nova.hetu.omniruntime.constants.OmniWindowFrameBoundType;
 import nova.hetu.omniruntime.constants.OmniWindowFrameType;
@@ -59,6 +61,7 @@ import nova.hetu.omniruntime.type.Decimal64DataType;
 import nova.hetu.omniruntime.type.DoubleDataType;
 import nova.hetu.omniruntime.type.IntDataType;
 import nova.hetu.omniruntime.type.LongDataType;
+import nova.hetu.omniruntime.type.ShortDataType;
 import nova.hetu.omniruntime.type.VarcharDataType;
 import nova.hetu.omniruntime.vector.BooleanVec;
 import nova.hetu.omniruntime.vector.ContainerVec;
@@ -67,6 +70,7 @@ import nova.hetu.omniruntime.vector.DictionaryVec;
 import nova.hetu.omniruntime.vector.DoubleVec;
 import nova.hetu.omniruntime.vector.IntVec;
 import nova.hetu.omniruntime.vector.LongVec;
+import nova.hetu.omniruntime.vector.ShortVec;
 import nova.hetu.omniruntime.vector.VarcharVec;
 import nova.hetu.omniruntime.vector.Vec;
 import nova.hetu.omniruntime.vector.VecAllocator;
@@ -123,6 +127,8 @@ public final class OperatorUtils
         switch (base) {
             case StandardTypes.INTEGER:
                 return IntDataType.INTEGER;
+            case StandardTypes.SMALLINT:
+                return ShortDataType.SHORT;
             case StandardTypes.BIGINT:
                 return LongDataType.LONG;
             case StandardTypes.DOUBLE:
@@ -239,6 +245,9 @@ public final class OperatorUtils
                 case OMNI_INT:
                 case OMNI_DATE32:
                     vecsResult.add(new IntVec(vecAllocator, totalPositions));
+                    break;
+                case OMNI_SHORT:
+                    vecsResult.add(new ShortVec(vecAllocator, totalPositions));
                     break;
                 case OMNI_LONG:
                 case OMNI_DECIMAL64:
@@ -448,6 +457,35 @@ public final class OperatorUtils
         }
     }
 
+    private static Block buildShortArrayOmniBLock(VecAllocator vecAllocator, Block block, int positionCount,
+                                                  boolean isRLE)
+    {
+        if (isRLE) {
+            byte[] valueIsNull = null;
+            short[] values = new short[positionCount];
+            if (positionCount != 0) {
+                if (block.isNull(0)) {
+                    valueIsNull = new byte[positionCount];
+                    Arrays.fill(valueIsNull, Vec.NULL);
+                }
+                else {
+                    Arrays.fill(values, (short) block.get(0));
+                }
+            }
+            return new ShortArrayOmniBlock(vecAllocator, 0, positionCount, valueIsNull, values);
+        }
+        else {
+            ShortArrayBlock shortArrayBlock = (ShortArrayBlock) block;
+            boolean[] valueIsNull = new boolean[positionCount];
+            short[] values = new short[positionCount];
+            for (int i = 0; i < values.length; i++) {
+                values[i] = (shortArrayBlock).getShort(i, 0);
+                valueIsNull[i] = shortArrayBlock.isNull(i);
+            }
+            return new ShortArrayOmniBlock(vecAllocator, 0, positionCount, transformBooleanToByte(valueIsNull), values);
+        }
+    }
+
     private static Block buildLongArrayOmniBLock(VecAllocator vecAllocator, Block block, int positionCount,
                                                  boolean isRLE)
     {
@@ -605,6 +643,8 @@ public final class OperatorUtils
                 return buildByteArrayOmniBlock(vecAllocator, block, positionCount, isRLE);
             case "IntArrayBlock":
                 return buildIntArrayOmniBLock(vecAllocator, block, positionCount, isRLE);
+            case "ShortArrayBlock":
+                return buildShortArrayOmniBLock(vecAllocator, block, positionCount, isRLE);
             case "LongArrayBlock":
                 if (blockType != null && blockType.equals(DOUBLE)) {
                     return buildDoubleArrayOmniBLock(vecAllocator, block, positionCount, isRLE);
@@ -719,6 +759,10 @@ public final class OperatorUtils
                     rowBlocks[vecIdx] = new IntArrayOmniBlock(positionCount,
                             new IntVec(containerVec.getVector(vecIdx)));
                     break;
+                case OMNI_SHORT:
+                    rowBlocks[vecIdx] = new ShortArrayOmniBlock(positionCount,
+                            new ShortVec(containerVec.getVector(vecIdx)));
+                    break;
                 case OMNI_LONG:
                 case OMNI_DECIMAL64:
                     rowBlocks[vecIdx] = new LongArrayOmniBlock(positionCount,
@@ -810,6 +854,8 @@ public final class OperatorUtils
                 return buildByteArrayBlock(block, positionCount);
             case "IntArrayOmniBlock":
                 return buildIntArrayBLock(block, positionCount);
+            case "ShortArrayOmniBlock":
+                return buildShortArrayBLock(block, positionCount);
             case "LongArrayOmniBlock":
                 return buildLongArrayBLock(block, positionCount);
             case "DoubleArrayOmniBlock":
@@ -885,6 +931,13 @@ public final class OperatorUtils
             }
         }
         return new LongArrayBlock(positionCount, Optional.of(valuesNulls), values);
+    }
+
+    private static Block buildShortArrayBLock(Block block, int positionCount)
+    {
+        ShortVec shortVec = (ShortVec) block.getValues();
+        return new ShortArrayBlock(positionCount, Optional.of(shortVec.getValuesNulls(0, positionCount)),
+                shortVec.get(0, positionCount));
     }
 
     private static Block buildLongArrayBLock(Block block, int positionCount)

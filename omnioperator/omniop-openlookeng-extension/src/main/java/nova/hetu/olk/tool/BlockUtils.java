@@ -22,6 +22,7 @@ import nova.hetu.omniruntime.vector.Decimal128Vec;
 import nova.hetu.omniruntime.vector.DoubleVec;
 import nova.hetu.omniruntime.vector.IntVec;
 import nova.hetu.omniruntime.vector.LongVec;
+import nova.hetu.omniruntime.vector.ShortVec;
 import nova.hetu.omniruntime.vector.VarcharVec;
 
 /**
@@ -69,6 +70,26 @@ public class BlockUtils
             return vec;
         }
         IntVec newValues = vec.copyRegion(index, length);
+        // TODO: is there any other place to close? Use put(bytebuffer) for better
+        // performance
+        vec.close();
+        return newValues;
+    }
+
+    /**
+     * Compact vec short vec.
+     *
+     * @param vec the vec
+     * @param index the index
+     * @param length the length
+     * @return the short vec
+     */
+    public static ShortVec compactVec(ShortVec vec, int index, int length)
+    {
+        if (index == 0 && length == vec.getSize() && vec.getOffset() == 0) {
+            return vec;
+        }
+        ShortVec newValues = vec.copyRegion(index, length);
         // TODO: is there any other place to close? Use put(bytebuffer) for better
         // performance
         vec.close();

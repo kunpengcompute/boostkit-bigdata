@@ -34,6 +34,7 @@ import static io.prestosql.spi.type.Decimals.encodeUnscaledValue;
 import static io.prestosql.spi.type.DoubleType.DOUBLE;
 import static io.prestosql.spi.type.IntegerType.INTEGER;
 import static io.prestosql.spi.type.RealType.REAL;
+import static io.prestosql.spi.type.SmallintType.SMALLINT;
 import static io.prestosql.spi.type.TimestampType.TIMESTAMP;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static java.lang.Float.floatToRawIntBits;
@@ -85,6 +86,22 @@ public final class BlockUtil
         BlockBuilder builder = type.createBlockBuilder(null, dictionarySize);
         for (int i = start; i < start + dictionarySize; i++) {
             type.writeString(builder, String.valueOf(i));
+        }
+        int[] ids = new int[length];
+        for (int i = 0; i < length; i++) {
+            ids[i] = i % dictionarySize;
+        }
+        return new DictionaryBlock(builder.build(), ids);
+    }
+
+    public static Block createShortDictionaryBlock(int start, int length)
+    {
+        checkArgument(length > 5, "block must have more than 5 entries");
+
+        int dictionarySize = length / 5;
+        BlockBuilder builder = SMALLINT.createBlockBuilder(null, dictionarySize);
+        for (int i = start; i < start + dictionarySize; i++) {
+            SMALLINT.writeLong(builder, i);
         }
         int[] ids = new int[length];
         for (int i = 0; i < length; i++) {
@@ -268,6 +285,17 @@ public final class BlockUtil
         return builder.build();
     }
 
+    public static Block createShortBlock(List<Integer> values)
+    {
+        int positionCount = values.size();
+        BlockBuilder builder = SMALLINT.createFixedSizeBlockBuilder(positionCount);
+        for (int i = 0; i < positionCount; i++) {
+            SMALLINT.writeLong(builder, values.get(i));
+        }
+
+        return builder.build();
+    }
+
     public static Block createLongBlock(List<Integer> values)
     {
         int positionCount = values.size();
@@ -382,6 +410,12 @@ public final class BlockUtil
     public static Block createIntegerDictionaryBlock(List<Integer> values)
     {
         Block block = createIntegerBlock(values);
+        return createDictionaryBlock(block);
+    }
+
+    public static Block createShortDictionaryBlock(List<Integer> values)
+    {
+        Block block = createShortBlock(values);
         return createDictionaryBlock(block);
     }
 

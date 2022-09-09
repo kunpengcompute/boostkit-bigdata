@@ -32,6 +32,7 @@ import nova.hetu.omniruntime.vector.DictionaryVec;
 import nova.hetu.omniruntime.vector.DoubleVec;
 import nova.hetu.omniruntime.vector.IntVec;
 import nova.hetu.omniruntime.vector.LongVec;
+import nova.hetu.omniruntime.vector.ShortVec;
 import nova.hetu.omniruntime.vector.VarcharVec;
 import nova.hetu.omniruntime.vector.Vec;
 import nova.hetu.omniruntime.vector.VecEncoding;
@@ -227,6 +228,9 @@ public class DictionaryOmniBlock<T>
             case OMNI_INT:
             case OMNI_DATE32:
                 dictionaryBlock = new IntArrayOmniBlock(dictionary.getSize(), (IntVec) dictionary);
+                break;
+            case OMNI_SHORT:
+                dictionaryBlock = new ShortArrayOmniBlock(dictionary.getSize(), (ShortVec) dictionary);
                 break;
             case OMNI_LONG:
             case OMNI_DECIMAL64:

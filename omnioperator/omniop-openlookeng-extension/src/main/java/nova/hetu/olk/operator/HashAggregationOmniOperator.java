@@ -346,6 +346,7 @@ public class HashAggregationOmniOperator
 
             switch (base) {
                 case StandardTypes.INTEGER:
+                case StandardTypes.SMALLINT:
                 case StandardTypes.BIGINT:
                 case StandardTypes.DOUBLE:
                 case StandardTypes.BOOLEAN:

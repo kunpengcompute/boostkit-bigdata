@@ -33,6 +33,7 @@ import static io.prestosql.spi.type.Decimals.isShortDecimal;
 import static io.prestosql.spi.type.DoubleType.DOUBLE;
 import static io.prestosql.spi.type.IntegerType.INTEGER;
 import static io.prestosql.spi.type.RealType.REAL;
+import static io.prestosql.spi.type.SmallintType.SMALLINT;
 import static io.prestosql.spi.type.TimestampType.TIMESTAMP;
 
 public final class PageBuilderUtil
@@ -112,6 +113,9 @@ public final class PageBuilderUtil
             if (type.equals(INTEGER)) {
                 blocks[i] = BlockUtil.createIntegerDictionaryBlock(initialValue, initialValue + length);
             }
+            else if (type.equals(SMALLINT)) {
+                blocks[i] = BlockUtil.createShortDictionaryBlock(initialValue, initialValue + length);
+            }
             else if (type.equals(BIGINT)) {
                 blocks[i] = BlockUtil.createLongDictionaryBlock(initialValue, initialValue + length);
             }
@@ -162,6 +166,9 @@ public final class PageBuilderUtil
             if (type.equals(INTEGER)) {
                 blocks[i] = BlockUtil.createIntegerBlock(columnValues.get(i));
             }
+            else if (type.equals(SMALLINT)) {
+                blocks[i] = BlockUtil.createShortBlock(columnValues.get(i));
+            }
             else if (type.equals(BIGINT)) {
                 blocks[i] = BlockUtil.createLongBlock(columnValues.get(i));
             }
@@ -204,6 +211,9 @@ public final class PageBuilderUtil
             Type type = types.get(i);
             if (type.equals(INTEGER)) {
                 blocks[i] = BlockUtil.createIntegerDictionaryBlock(columnValues.get(i));
+            }
+            else if (type.equals(SMALLINT)) {
+                blocks[i] = BlockUtil.createShortDictionaryBlock(columnValues.get(i));
             }
             else if (type.equals(BIGINT)) {
                 blocks[i] = BlockUtil.createLongDictionaryBlock(columnValues.get(i));
