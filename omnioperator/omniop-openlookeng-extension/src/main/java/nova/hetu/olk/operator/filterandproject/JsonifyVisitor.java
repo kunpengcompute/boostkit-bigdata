@@ -205,6 +205,9 @@ class JsonifyVisitor
             case OMNI_DATE32:
                 constantRoot.put("value", Integer.parseInt(literal.getValue().toString()));
                 break;
+            case OMNI_SHORT:
+                constantRoot.put("value", Short.parseShort(literal.getValue().toString()));
+                break;
             case OMNI_LONG:
                 constantRoot.put("value", Long.parseLong(literal.getValue().toString()));
                 break;

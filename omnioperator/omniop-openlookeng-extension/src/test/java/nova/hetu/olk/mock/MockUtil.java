@@ -26,6 +26,7 @@ import nova.hetu.olk.block.IntArrayOmniBlock;
 import nova.hetu.olk.block.LazyOmniBlock;
 import nova.hetu.olk.block.LongArrayOmniBlock;
 import nova.hetu.olk.block.RowOmniBlock;
+import nova.hetu.olk.block.ShortArrayOmniBlock;
 import nova.hetu.olk.block.VariableWidthOmniBlock;
 import nova.hetu.omniruntime.operator.OmniOperator;
 import nova.hetu.omniruntime.vector.BooleanVec;
@@ -34,6 +35,7 @@ import nova.hetu.omniruntime.vector.DictionaryVec;
 import nova.hetu.omniruntime.vector.DoubleVec;
 import nova.hetu.omniruntime.vector.IntVec;
 import nova.hetu.omniruntime.vector.LongVec;
+import nova.hetu.omniruntime.vector.ShortVec;
 import nova.hetu.omniruntime.vector.VarcharVec;
 import nova.hetu.omniruntime.vector.Vec;
 import nova.hetu.omniruntime.vector.VecAllocator;
@@ -122,6 +124,10 @@ public class MockUtil
                 vec = mockVec(DoubleVec.class, blockModel.values, vecAllocator);
                 block = new DoubleArrayOmniBlock(blockModel.values.length, (DoubleVec) vec);
             }
+            if (blockModel.values instanceof Short[]) {
+                vec = mockVec(ShortVec.class, blockModel.values, vecAllocator);
+                block = new ShortArrayOmniBlock(blockModel.values.length, (ShortVec) vec);
+            }
             if (blockModel.values instanceof Long[]) {
                 vec = mockVec(LongVec.class, blockModel.values, vecAllocator);
                 block = new LongArrayOmniBlock(blockModel.values.length, (LongVec) vec);
@@ -200,6 +206,11 @@ public class MockUtil
             vec = mockVec(DoubleVec.class, object, vecAllocator);
             when(((DoubleVec) vec).get(anyInt())).thenAnswer(invocationOnMock -> object[(int) invocationOnMock.getArguments()[0]]);
             block = new DoubleArrayOmniBlock(object.length, (DoubleVec) vec);
+        }
+        if (object instanceof Short[]) {
+            vec = mockVec(ShortVec.class, object, vecAllocator);
+            when(((ShortVec) vec).get(anyInt())).thenAnswer(invocationOnMock -> object[(int) invocationOnMock.getArguments()[0]]);
+            block = new ShortArrayOmniBlock(object.length, (ShortVec) vec);
         }
         if (object instanceof Long[]) {
             vec = mockVec(LongVec.class, object, vecAllocator);

@@ -228,6 +228,9 @@ public class DictionaryOmniBlock<T>
             case OMNI_DATE32:
                 dictionaryBlock = new IntArrayOmniBlock(dictionary.getSize(), (IntVec) dictionary);
                 break;
+            case OMNI_SHORT:
+                dictionaryBlock = new ShortArrayOmniBlock(dictionary.getSize(), (ShortVec) dictionary);
+                break;
             case OMNI_LONG:
             case OMNI_DECIMAL64:
                 dictionaryBlock = new LongArrayOmniBlock(dictionary.getSize(), (LongVec) dictionary);

@@ -33,6 +33,7 @@ import nova.hetu.olk.block.IntArrayOmniBlock;
 import nova.hetu.olk.block.LazyOmniBlock;
 import nova.hetu.olk.block.LongArrayOmniBlock;
 import nova.hetu.olk.block.RowOmniBlock;
+import nova.hetu.olk.block.ShortArrayOmniBlock;
 import nova.hetu.olk.block.VariableWidthOmniBlock;
 import nova.hetu.olk.operator.benchmark.PageBuilderUtil;
 import nova.hetu.omniruntime.type.BooleanDataType;
@@ -45,6 +46,7 @@ import nova.hetu.omniruntime.type.Decimal64DataType;
 import nova.hetu.omniruntime.type.DoubleDataType;
 import nova.hetu.omniruntime.type.IntDataType;
 import nova.hetu.omniruntime.type.LongDataType;
+import nova.hetu.omniruntime.type.ShortDataType;
 import nova.hetu.omniruntime.type.VarcharDataType;
 import nova.hetu.omniruntime.vector.BooleanVec;
 import nova.hetu.omniruntime.vector.ContainerVec;
@@ -53,6 +55,7 @@ import nova.hetu.omniruntime.vector.DictionaryVec;
 import nova.hetu.omniruntime.vector.DoubleVec;
 import nova.hetu.omniruntime.vector.IntVec;
 import nova.hetu.omniruntime.vector.LongVec;
+import nova.hetu.omniruntime.vector.ShortVec;
 import nova.hetu.omniruntime.vector.VarcharVec;
 import nova.hetu.omniruntime.vector.Vec;
 import nova.hetu.omniruntime.vector.VecAllocator;
@@ -78,6 +81,7 @@ import static io.prestosql.spi.type.DecimalType.createDecimalType;
 import static io.prestosql.spi.type.DoubleType.DOUBLE;
 import static io.prestosql.spi.type.IntegerType.INTEGER;
 import static io.prestosql.spi.type.RealType.REAL;
+import static io.prestosql.spi.type.SmallintType.SMALLINT;
 import static io.prestosql.spi.type.TimestampType.TIMESTAMP;
 import static io.prestosql.spi.type.VarbinaryType.VARBINARY;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
@@ -103,11 +107,12 @@ import static org.testng.Assert.assertEquals;
 public class TestOperatorUtils
         extends PowerMockTestCase
 {
-    List<Type> types = new ImmutableList.Builder<Type>().add(INTEGER).add(BIGINT).add(REAL).add(DOUBLE).add(VARCHAR)
+    List<Type> types = new ImmutableList.Builder<Type>().add(INTEGER).add(SMALLINT).add(BIGINT).add(REAL).add(DOUBLE).add(VARCHAR)
             .add(DATE).add(TIMESTAMP).add(BOOLEAN).add(createDecimalType(20, 10)).add(createDecimalType(10, 10)).build();
     LazyOmniBlock lazyOmniBlock;
     RowOmniBlock rowOmniBlock;
     IntVec intVec;
+    ShortVec shortVec;
     LongVec longVec;
     DoubleVec doubleVec;
     BooleanVec booleanVec;
@@ -191,6 +196,7 @@ public class TestOperatorUtils
     public void testDataType()
     {
         assertEquals(IntDataType.INTEGER, OperatorUtils.toDataType(INTEGER));
+        assertEquals(ShortDataType.SHORT, OperatorUtils.toDataType(SMALLINT));
         assertEquals(LongDataType.LONG, OperatorUtils.toDataType(BIGINT));
         assertEquals(DoubleDataType.DOUBLE, OperatorUtils.toDataType(DOUBLE));
         assertEquals(BooleanDataType.BOOLEAN, OperatorUtils.toDataType(BOOLEAN));
@@ -214,12 +220,13 @@ public class TestOperatorUtils
     @Test
     public void testCreateBlankVectors()
     {
-        DataType[] dataTypes = new DataType[]{IntDataType.INTEGER, Date32DataType.DATE32, LongDataType.LONG,
+        DataType[] dataTypes = new DataType[]{IntDataType.INTEGER, Date32DataType.DATE32, ShortDataType.SHORT, LongDataType.LONG,
                 Decimal64DataType.DECIMAL64, DoubleDataType.DOUBLE, BooleanDataType.BOOLEAN, VarcharDataType.VARCHAR,
                 CharDataType.CHAR, Decimal128DataType.DECIMAL128, new ContainerDataType(new DataType[]{IntDataType.INTEGER})};
         List<Vec> vecs = new ArrayList<>();
         vecs.add(intVec);
         vecs.add(intVec);
+        vecs.add(shortVec);
         vecs.add(longVec);
         vecs.add(longVec);
         vecs.add(doubleVec);
@@ -310,6 +317,16 @@ public class TestOperatorUtils
         when(doubleVec.getValuesNulls(anyInt(), anyInt())).thenReturn(new boolean[]{true});
         whenNew(DoubleVec.class).withAnyArguments().thenReturn(doubleVec);
         when(doubleArrayOmniBlock.getValues()).thenReturn(doubleVec);
+
+        ShortArrayOmniBlock shortArrayOmniBlock = mock(ShortArrayOmniBlock.class);
+        when(shortArrayOmniBlock.isExtensionBlock()).thenReturn(true);
+        when(shortArrayOmniBlock.getPositionCount()).thenReturn(1);
+        whenNew(ShortArrayOmniBlock.class).withAnyArguments().thenReturn(shortArrayOmniBlock);
+        shortVec = mock(ShortVec.class);
+        when(shortVec.get(anyInt(), anyInt())).thenReturn(new short[]{1});
+        when(shortVec.getValuesNulls(anyInt(), anyInt())).thenReturn(new boolean[]{true});
+        whenNew(ShortVec.class).withAnyArguments().thenReturn(shortVec);
+        when(shortArrayOmniBlock.getValues()).thenReturn(shortVec);
 
         LongArrayOmniBlock longArrayOmniBlock = mock(LongArrayOmniBlock.class);
         when(longArrayOmniBlock.isExtensionBlock()).thenReturn(true);

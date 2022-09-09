@@ -234,6 +234,7 @@ public class OmniLocalExecutionPlanner
         {
             add(StandardTypes.INTEGER);
             add(StandardTypes.DATE);
+            add(StandardTypes.SMALLINT);
             add(StandardTypes.BIGINT);
             add(StandardTypes.VARCHAR);
             add(StandardTypes.CHAR);

@@ -20,6 +20,7 @@ import nova.hetu.omniruntime.vector.Decimal128Vec;
 import nova.hetu.omniruntime.vector.DoubleVec;
 import nova.hetu.omniruntime.vector.IntVec;
 import nova.hetu.omniruntime.vector.LongVec;
+import nova.hetu.omniruntime.vector.ShortVec;
 import nova.hetu.omniruntime.vector.VarcharVec;
 import nova.hetu.omniruntime.vector.Vec;
 import nova.hetu.omniruntime.vector.VecAllocator;
@@ -55,6 +56,8 @@ public class TestBlockUtils
     BooleanVec booleanVecRegion;
     IntVec intVec;
     IntVec intVecRegion;
+    ShortVec shortVec;
+    ShortVec shortVecRegion;
     LongVec longVec;
     LongVec longVecRegion;
     DoubleVec doubleVec;
@@ -78,6 +81,9 @@ public class TestBlockUtils
 
         assertEquals(intVec, compactVec(intVec, 0, 4));
         assertEquals(intVecRegion, compactVec(intVec, 1, 2));
+
+        assertEquals(shortVec, compactVec(shortVec, 0, 4));
+        assertEquals(shortVecRegion, compactVec(shortVec, 1, 2));
 
         assertEquals(longVec, compactVec(longVec, 0, 4));
         assertEquals(longVecRegion, compactVec(longVec, 1, 2));
@@ -107,6 +113,13 @@ public class TestBlockUtils
         when(intVec.getOffset()).thenReturn(0);
         intVecRegion = mock(IntVec.class);
         when(intVec.copyRegion(anyInt(), anyInt())).thenReturn(intVecRegion);
+
+        shortVec = mock(ShortVec.class);
+        whenNew(ShortVec.class).withAnyArguments().thenReturn(shortVec);
+        when(shortVec.getSize()).thenReturn(4);
+        when(shortVec.getOffset()).thenReturn(0);
+        shortVecRegion = mock(ShortVec.class);
+        when(shortVec.copyRegion(anyInt(), anyInt())).thenReturn(shortVecRegion);
 
         longVec = mock(LongVec.class);
         whenNew(LongVec.class).withAnyArguments().thenReturn(longVec);
