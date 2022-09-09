@@ -594,6 +594,18 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
     if (columnsEquiPredictsResult.isEmpty) {
       return None
     }
+    val viewTableAttrSet = viewTableAttrs.map(ExpressionEqual).toSet
+    columnsEquiPredictsResult.get.foreach { expr =>
+      expr.foreach {
+        case attr: AttributeReference =>
+          if (!viewTableAttrSet.contains(ExpressionEqual(attr))) {
+            logDebug(s"attr:%s cannot found in view:%s"
+                .format(attr, OmniCachePluginConfig.getConf.curMatchMV))
+            return None
+          }
+        case _ =>
+      }
+    }
 
     // 5.rewrite rangeCompensation,residualCompensation by viewTableAttrs
     val otherPredictsResult = rewriteExpressions(Seq(compensationRangePredicts.get,
@@ -632,11 +644,7 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
     } else {
       swapColumnTableReferences(viewProjectList, tableMapping, columnMapping)
     }
-    val swapTableAttrs = if (swapTableColumn) {
-      swapTableReferences(viewTableAttrs, tableMapping)
-    } else {
-      viewTableAttrs
-    }
+    val swapTableAttrs = swapTableReferences(viewTableAttrs, tableMapping)
 
     // 2.construct the map of viewQueryProjectExpression to ViewTableAttributeReference
     val viewProjectExprToTableAttr = swapProjectList.map(ExpressionEqual).zip(swapTableAttrs).toMap
