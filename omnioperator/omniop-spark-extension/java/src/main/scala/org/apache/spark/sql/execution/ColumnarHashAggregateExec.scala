@@ -20,12 +20,13 @@ package org.apache.spark.sql.execution
 import java.util.concurrent.TimeUnit.NANOSECONDS
 import com.huawei.boostkit.spark.Constant.IS_SKIP_VERIFY_EXP
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor._
+import com.huawei.boostkit.spark.util.OmniAdaptorUtil
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil.transColBatchToOmniVecs
 import nova.hetu.omniruntime.`type`.DataType
 import nova.hetu.omniruntime.constants.FunctionType
 import nova.hetu.omniruntime.constants.FunctionType.OMNI_AGGREGATION_TYPE_COUNT_ALL
 import nova.hetu.omniruntime.operator.aggregator.OmniHashAggregationWithExprOperatorFactory
-import nova.hetu.omniruntime.operator.config.{OperatorConfig, SpillConfig}
+import nova.hetu.omniruntime.operator.config.{OperatorConfig, OverflowConfig, SpillConfig}
 import nova.hetu.omniruntime.vector.VecBatch
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
@@ -226,7 +227,7 @@ case class ColumnarHashAggregateExec(
         omniAggOutputTypes,
         omniInputRaw,
         omniOutputPartial,
-        new OperatorConfig(SpillConfig.NONE, IS_SKIP_VERIFY_EXP))
+        new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val operator = factory.createOperator
       omniCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startCodegen)
 

@@ -21,10 +21,11 @@ import java.util.concurrent.TimeUnit.NANOSECONDS
 import java.util.Optional
 import com.huawei.boostkit.spark.Constant.IS_SKIP_VERIFY_EXP
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor
+import com.huawei.boostkit.spark.util.OmniAdaptorUtil
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil.transColBatchToOmniVecs
 import nova.hetu.omniruntime.`type`.DataType
 import nova.hetu.omniruntime.constants.JoinType.OMNI_JOIN_TYPE_INNER
-import nova.hetu.omniruntime.operator.config.{OperatorConfig, SpillConfig}
+import nova.hetu.omniruntime.operator.config.{OperatorConfig, OverflowConfig, SpillConfig}
 import nova.hetu.omniruntime.operator.join.{OmniHashBuilderWithExprOperatorFactory, OmniLookupJoinWithExprOperatorFactory}
 import nova.hetu.omniruntime.vector.VecBatch
 import org.apache.spark.TaskContext
@@ -188,8 +189,8 @@ case class ColumnarShuffledHashJoinExec(
           case _ => Optional.empty()
         }
         val startBuildCodegen = System.nanoTime()
-        val buildOpFactory = new OmniHashBuilderWithExprOperatorFactory(buildTypes,
-          buildJoinColsExp, filter, 1, new OperatorConfig(SpillConfig.NONE, IS_SKIP_VERIFY_EXP))
+        val buildOpFactory = new OmniHashBuilderWithExprOperatorFactory(buildTypes, buildJoinColsExp, filter, 1,
+          new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
         val buildOp = buildOpFactory.createOperator()
         buildCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startBuildCodegen)
 
@@ -214,7 +215,7 @@ case class ColumnarShuffledHashJoinExec(
         val startLookupCodegen = System.nanoTime()
         val lookupOpFactory = new OmniLookupJoinWithExprOperatorFactory(probeTypes, probeOutputCols,
           probeHashColsExp, buildOutputCols, buildOutputTypes, OMNI_JOIN_TYPE_INNER, buildOpFactory,
-          new OperatorConfig(SpillConfig.NONE, IS_SKIP_VERIFY_EXP))
+          new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
         val lookupOp = lookupOpFactory.createOperator()
         lookupCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startLookupCodegen)
 

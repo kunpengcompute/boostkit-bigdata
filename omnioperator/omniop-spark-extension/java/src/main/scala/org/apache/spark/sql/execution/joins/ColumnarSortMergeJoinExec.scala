@@ -24,10 +24,11 @@ import java.util.Optional
 import com.huawei.boostkit.spark.Constant.IS_SKIP_VERIFY_EXP
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor.checkOmniJsonWhiteList
+import com.huawei.boostkit.spark.util.OmniAdaptorUtil
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil.transColBatchToOmniVecs
 import nova.hetu.omniruntime.`type`.DataType
 import nova.hetu.omniruntime.constants.JoinType.OMNI_JOIN_TYPE_INNER
-import nova.hetu.omniruntime.operator.config.{OperatorConfig, SpillConfig}
+import nova.hetu.omniruntime.operator.config.{OperatorConfig, OverflowConfig, SpillConfig}
 import nova.hetu.omniruntime.operator.join.{OmniSmjBufferedTableWithExprOperatorFactory, OmniSmjStreamedTableWithExprOperatorFactory}
 import nova.hetu.omniruntime.vector.{BooleanVec, Decimal128Vec, DoubleVec, IntVec, LongVec, VarcharVec, Vec, VecBatch}
 import org.apache.spark.rdd.RDD
@@ -175,13 +176,15 @@ class ColumnarSortMergeJoinExec(
       val filter: Optional[String] = Optional.ofNullable(filterString)
       val startStreamedCodegen = System.nanoTime()
       val streamedOpFactory = new OmniSmjStreamedTableWithExprOperatorFactory(streamedTypes,
-        streamedKeyColsExp, streamedOutputChannel, OMNI_JOIN_TYPE_INNER, filter, new OperatorConfig(SpillConfig.NONE, IS_SKIP_VERIFY_EXP))
+        streamedKeyColsExp, streamedOutputChannel, OMNI_JOIN_TYPE_INNER, filter,
+        new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val streamedOp = streamedOpFactory.createOperator
       streamedCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startStreamedCodegen)
 
       val startBufferedCodegen = System.nanoTime()
       val bufferedOpFactory = new OmniSmjBufferedTableWithExprOperatorFactory(bufferedTypes,
-        bufferedKeyColsExp, bufferedOutputChannel, streamedOpFactory, new OperatorConfig(SpillConfig.NONE, IS_SKIP_VERIFY_EXP))
+        bufferedKeyColsExp, bufferedOutputChannel, streamedOpFactory,
+        new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val bufferedOp = bufferedOpFactory.createOperator
       bufferedCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startBufferedCodegen)
 

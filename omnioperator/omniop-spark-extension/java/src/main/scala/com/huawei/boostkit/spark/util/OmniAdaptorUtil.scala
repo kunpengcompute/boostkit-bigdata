@@ -21,12 +21,14 @@ import java.util.concurrent.TimeUnit.NANOSECONDS
 
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor._
 import nova.hetu.omniruntime.operator.OmniOperator
+import nova.hetu.omniruntime.operator.config.OverflowConfig
 import nova.hetu.omniruntime.vector._
 
 import org.apache.spark.sql.catalyst.expressions.{Attribute, ExprId, SortOrder}
 import org.apache.spark.sql.execution.datasources.orc.OrcColumnVector
 import org.apache.spark.sql.execution.metric.SQLMetric
 import org.apache.spark.sql.execution.vectorized.{OmniColumnVector, OnHeapColumnVector}
+import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.vectorized.{ColumnarBatch, ColumnVector}
 
@@ -260,5 +262,10 @@ object OmniAdaptorUtil {
         new ColumnarBatch(vectors.toArray, rowCnt)
       }
     }
+  }
+
+  def overflowConf(): OverflowConfig.OverflowConfigId = {
+    // TODO: return OVERFLOW_CONFIG_EXCEPTION or OVERFLOW_CONFIG_NULL according to SQLConf.get.ansiEnabled
+    OverflowConfig.OverflowConfigId.OVERFLOW_CONFIG_EXCEPTION
   }
 }

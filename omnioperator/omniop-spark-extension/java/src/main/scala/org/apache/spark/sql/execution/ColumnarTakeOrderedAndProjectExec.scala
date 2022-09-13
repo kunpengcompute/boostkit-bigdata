@@ -21,9 +21,10 @@ import java.util.concurrent.TimeUnit.NANOSECONDS
 import com.huawei.boostkit.spark.Constant.IS_SKIP_VERIFY_EXP
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor.{checkOmniJsonWhiteList, getExprIdMap, rewriteToOmniJsonExpressionLiteral, sparkTypeToOmniType}
 import com.huawei.boostkit.spark.serialize.ColumnarBatchSerializer
+import com.huawei.boostkit.spark.util.OmniAdaptorUtil
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil.{addAllAndGetIterator, genSortParam}
 import nova.hetu.omniruntime.`type`.DataType
-import nova.hetu.omniruntime.operator.config.{OperatorConfig, SpillConfig}
+import nova.hetu.omniruntime.operator.config.{OperatorConfig, OverflowConfig, SpillConfig}
 import nova.hetu.omniruntime.operator.topn.OmniTopNWithExprOperatorFactory
 import org.apache.spark.rdd.RDD
 import org.apache.spark.serializer.Serializer
@@ -107,8 +108,8 @@ case class ColumnarTakeOrderedAndProjectExec(
 
     def computeTopN(iter: Iterator[ColumnarBatch], schema: StructType): Iterator[ColumnarBatch] = {
       val startCodegen = System.nanoTime()
-      val topNOperatorFactory = new OmniTopNWithExprOperatorFactory(sourceTypes, limit,
-        sortColsExp, ascendings, nullFirsts, new OperatorConfig(SpillConfig.NONE, IS_SKIP_VERIFY_EXP))
+      val topNOperatorFactory = new OmniTopNWithExprOperatorFactory(sourceTypes, limit, sortColsExp, ascendings, nullFirsts,
+        new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val topNOperator = topNOperatorFactory.createOperator
       longMetric("omniCodegenTime") += NANOSECONDS.toMillis(System.nanoTime() - startCodegen)
       SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit]( _ => {

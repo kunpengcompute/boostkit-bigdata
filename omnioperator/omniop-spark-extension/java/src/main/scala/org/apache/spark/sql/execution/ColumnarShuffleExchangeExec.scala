@@ -26,10 +26,11 @@ import scala.collection.JavaConverters._
 import scala.concurrent.Future
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor._
 import com.huawei.boostkit.spark.serialize.ColumnarBatchSerializer
+import com.huawei.boostkit.spark.util.OmniAdaptorUtil
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil.transColBatchToOmniVecs
 import com.huawei.boostkit.spark.vectorized.PartitionInfo
 import nova.hetu.omniruntime.`type`.{DataType, DataTypeSerializer}
-import nova.hetu.omniruntime.operator.config.{OperatorConfig, SpillConfig}
+import nova.hetu.omniruntime.operator.config.{OperatorConfig, OverflowConfig, SpillConfig}
 import nova.hetu.omniruntime.operator.project.OmniProjectOperatorFactory
 import nova.hetu.omniruntime.vector.{IntVec, VecBatch}
 import org.apache.spark._
@@ -293,7 +294,8 @@ object ColumnarShuffleExchangeExec extends Logging {
           // omni project
           val genHashExpression = genHashExpr()
           val omniExpr: String = genHashExpression(expressions, numPartitions, defaultMm3HashSeed, outputAttributes)
-          val factory = new OmniProjectOperatorFactory(Array(omniExpr), inputTypes, 1, new OperatorConfig(SpillConfig.NONE, IS_SKIP_VERIFY_EXP))
+          val factory = new OmniProjectOperatorFactory(Array(omniExpr), inputTypes, 1,
+            new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
           val op = factory.createOperator()
 
           cbIter.map { cb =>
