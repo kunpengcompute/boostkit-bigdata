@@ -17,24 +17,24 @@
 
 package org.apache.spark.sql.execution.joins
 
-import java.util.concurrent.TimeUnit.NANOSECONDS
 import java.util.Optional
+import java.util.concurrent.TimeUnit.NANOSECONDS
+
 import com.huawei.boostkit.spark.Constant.IS_SKIP_VERIFY_EXP
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil.transColBatchToOmniVecs
 import nova.hetu.omniruntime.`type`.DataType
-import nova.hetu.omniruntime.constants.JoinType.OMNI_JOIN_TYPE_INNER
 import nova.hetu.omniruntime.operator.config.{OperatorConfig, OverflowConfig, SpillConfig}
-import nova.hetu.omniruntime.operator.join.{OmniHashBuilderWithExprOperatorFactory, OmniLookupJoinWithExprOperatorFactory}
+import nova.hetu.omniruntime.operator.join._
 import nova.hetu.omniruntime.vector.VecBatch
-import org.apache.spark.TaskContext
+
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{Attribute, Expression, SortOrder}
 import org.apache.spark.sql.catalyst.expressions.codegen.CodegenContext
-import org.apache.spark.sql.catalyst.optimizer.BuildSide
-import org.apache.spark.sql.catalyst.plans.{FullOuter, JoinType}
+import org.apache.spark.sql.catalyst.optimizer.{BuildLeft, BuildSide}
+import org.apache.spark.sql.catalyst.plans.{FullOuter, Inner, JoinType}
 import org.apache.spark.sql.catalyst.plans.physical.Partitioning
 import org.apache.spark.sql.execution.SparkPlan
 import org.apache.spark.sql.execution.metric.SQLMetrics
@@ -43,13 +43,13 @@ import org.apache.spark.sql.execution.vectorized.OmniColumnVector
 import org.apache.spark.sql.vectorized.ColumnarBatch
 
 case class ColumnarShuffledHashJoinExec(
-                                         leftKeys: Seq[Expression],
-                                         rightKeys: Seq[Expression],
-                                         joinType: JoinType,
-                                         buildSide: BuildSide,
-                                         condition: Option[Expression],
-                                         left: SparkPlan,
-                                         right: SparkPlan)
+    leftKeys: Seq[Expression],
+    rightKeys: Seq[Expression],
+    joinType: JoinType,
+    buildSide: BuildSide,
+    condition: Option[Expression],
+    left: SparkPlan,
+    right: SparkPlan)
   extends HashJoin with ShuffledJoin {
 
   override lazy val metrics = Map(
@@ -85,35 +85,15 @@ case class ColumnarShuffledHashJoinExec(
     case _ => super.outputOrdering
   }
 
-  /**
-   * This is called by generated Java class, should be public.
-   */
-  def buildHashedRelation(iter: Iterator[InternalRow]): HashedRelation = {
-    val buildDataSize = longMetric("buildDataSize")
-    val buildTime = longMetric("buildTime")
-    val start = System.nanoTime()
-    val context = TaskContext.get()
-    val relation = HashedRelation(
-      iter,
-      buildBoundKeys,
-      taskMemoryManager = context.taskMemoryManager(),
-      // Full outer join needs support for NULL key in HashedRelation.
-      allowsNullKey = joinType == FullOuter)
-    buildTime += NANOSECONDS.toMillis(System.nanoTime() - start)
-    buildDataSize += relation.estimatedSize
-    // This relation is usually used until the end of task.
-    context.addTaskCompletionListener[Unit](_ => relation.close())
-    relation
-  }
-
   protected override def doExecute(): RDD[InternalRow] = {
-    throw new UnsupportedOperationException(s"Join-type[${joinType}] is not supported " +
-      s"in ${this.nodeName}")
+    throw new IllegalStateException(s"Should not be called when supports columnar execution")
   }
 
   def buildCheck(): Unit = {
-    if ("INNER" != joinType.sql) {
-      throw new UnsupportedOperationException(s"Join-type[${joinType}] is not supported " +
+    joinType match {
+      case FullOuter | Inner =>
+      case _ =>
+        throw new UnsupportedOperationException(s"Join-type[${joinType}] is not supported " +
         s"in ${this.nodeName}")
     }
     val buildTypes = new Array[DataType](buildOutput.size) // {2,2}, buildOutput:col1#12,col2#13
@@ -134,6 +114,15 @@ case class ColumnarShuffledHashJoinExec(
       OmniExpressionAdaptor.rewriteToOmniJsonExpressionLiteral(x,
         OmniExpressionAdaptor.getExprIdMap(streamedOutput.map(_.toAttribute)))
     }.toArray
+
+    condition match {
+      case Some(expr) =>
+        val filterExpr = Optional.of(OmniExpressionAdaptor.rewriteToOmniJsonExpressionLiteral(expr,
+          OmniExpressionAdaptor.getExprIdMap((streamedOutput ++ buildOutput).
+            map(_.toAttribute))))
+        OmniExpressionAdaptor.checkOmniJsonWhiteList(filterExpr.get(), new Array[AnyRef](0))
+      case _ => Optional.empty()
+    }
   }
 
   /**
@@ -152,22 +141,15 @@ case class ColumnarShuffledHashJoinExec(
     val lookupGetOutputTime = longMetric("lookupGetOutputTime")
     val buildDataSize = longMetric("buildDataSize")
 
-    if ("INNER" != joinType.sql) {
-      throw new UnsupportedOperationException(s"Join-type[${joinType}] is not supported " +
-        s"in ${this.nodeName}")
-    }
     val buildTypes = new Array[DataType](buildOutput.size) // {2,2}, buildOutput:col1#12,col2#13
     buildOutput.zipWithIndex.foreach { case (att, i) =>
       buildTypes(i) = OmniExpressionAdaptor.sparkTypeToOmniType(att.dataType, att.metadata)
     }
-
     val buildOutputCols = buildOutput.indices.toArray
     val buildJoinColsExp = buildKeys.map { x =>
       OmniExpressionAdaptor.rewriteToOmniJsonExpressionLiteral(x,
         OmniExpressionAdaptor.getExprIdMap(buildOutput.map(_.toAttribute)))
     }.toArray
-
-    val buildOutputTypes = buildTypes
 
     val probeTypes = new Array[DataType](streamedOutput.size)
     streamedOutput.zipWithIndex.foreach { case (attr, i) =>
@@ -189,13 +171,13 @@ case class ColumnarShuffledHashJoinExec(
           case _ => Optional.empty()
         }
         val startBuildCodegen = System.nanoTime()
-        val buildOpFactory = new OmniHashBuilderWithExprOperatorFactory(buildTypes, buildJoinColsExp, filter, 1,
-          new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
+        val buildOpFactory = new OmniHashBuilderWithExprOperatorFactory(buildTypes,
+          buildJoinColsExp, filter, 1, new OperatorConfig(SpillConfig.NONE,
+            new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
         val buildOp = buildOpFactory.createOperator()
         buildCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startBuildCodegen)
 
         while (buildIter.hasNext) {
-
           val cb = buildIter.next()
           val vecs = transColBatchToOmniVecs(cb, false)
           for (i <- 0 until vecs.length) {
@@ -213,13 +195,15 @@ case class ColumnarShuffledHashJoinExec(
         buildGetOutputTime += NANOSECONDS.toMillis(System.nanoTime() - startBuildGetOp)
 
         val startLookupCodegen = System.nanoTime()
-        val lookupOpFactory = new OmniLookupJoinWithExprOperatorFactory(probeTypes, probeOutputCols,
-          probeHashColsExp, buildOutputCols, buildOutputTypes, OMNI_JOIN_TYPE_INNER, buildOpFactory,
-          new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
+        val lookupJoinType = OmniExpressionAdaptor.toOmniJoinType(joinType)
+        val lookupOpFactory = new OmniLookupJoinWithExprOperatorFactory(probeTypes,
+          probeOutputCols, probeHashColsExp, buildOutputCols, buildTypes, lookupJoinType,
+          buildOpFactory, new OperatorConfig(SpillConfig.NONE,
+            new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
+
         val lookupOp = lookupOpFactory.createOperator()
         lookupCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startLookupCodegen)
 
-        // close operator
         SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
           buildOp.close()
           lookupOp.close()
@@ -228,7 +212,7 @@ case class ColumnarShuffledHashJoinExec(
         })
 
         val resultSchema = this.schema
-        val reverse = this.output != (streamedPlan.output ++ buildPlan.output)
+        val reverse = buildSide == BuildLeft
         var left = 0
         var leftLen = streamedPlan.output.size
         var right = streamedPlan.output.size
@@ -240,7 +224,7 @@ case class ColumnarShuffledHashJoinExec(
           rightLen = streamedPlan.output.size
         }
 
-        new Iterator[ColumnarBatch] {
+        val joinIter: Iterator[ColumnarBatch] = new Iterator[ColumnarBatch] {
           private var results: java.util.Iterator[VecBatch] = _
           var res: Boolean = true
 
@@ -257,7 +241,6 @@ case class ColumnarShuffledHashJoinExec(
               results = lookupOp.getOutput
               res = results.hasNext
               lookupGetOutputTime += NANOSECONDS.toMillis(System.nanoTime() - startLookupGetOp)
-
             }
             if (results == null) {
               false
@@ -271,7 +254,6 @@ case class ColumnarShuffledHashJoinExec(
                 res
               }
             }
-
           }
 
           override def next(): ColumnarBatch = {
@@ -299,6 +281,58 @@ case class ColumnarShuffledHashJoinExec(
             numOutputVecBatchs += 1
             new ColumnarBatch(vecs.toArray, result.getRowCount)
           }
+        }
+        if ("FULL OUTER" == joinType.sql) {
+          val lookupOuterOpFactory =
+            new OmniLookupOuterJoinWithExprOperatorFactory(probeTypes, probeOutputCols,
+              probeHashColsExp, buildOutputCols, buildTypes, buildOpFactory,
+              new OperatorConfig(SpillConfig.NONE,
+                new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
+
+          val lookupOuterOp = lookupOuterOpFactory.createOperator()
+          lookupCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startLookupCodegen)
+          SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
+            lookupOuterOp.close()
+            lookupOuterOpFactory.close()
+          })
+
+          val appendIter: Iterator[ColumnarBatch] = new Iterator[ColumnarBatch] {
+            var output: java.util.Iterator[VecBatch] = _
+
+            override def hasNext: Boolean = {
+              if (output == null) {
+                output = lookupOuterOp.getOutput
+              }
+              output.hasNext
+            }
+
+            override def next(): ColumnarBatch = {
+              val result = output.next()
+              val resultVecs = result.getVectors
+              val vecs = OmniColumnVector
+                .allocateColumns(result.getRowCount, resultSchema, false)
+              var index = 0
+              for (i <- left until leftLen) {
+                val v = vecs(index)
+                v.reset()
+                v.setVec(resultVecs(i))
+                index += 1
+              }
+              for (i <- right until rightLen) {
+                val v = vecs(index)
+                v.reset()
+                v.setVec(resultVecs(i))
+                index += 1
+              }
+              numOutputRows += result.getRowCount
+              numOutputVecBatchs += 1
+              new ColumnarBatch(vecs.toArray, result.getRowCount)
+
+            }
+          }
+          joinIter ++ appendIter
+        } else {
+          joinIter
         }
     }
   }
