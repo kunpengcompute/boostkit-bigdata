@@ -400,30 +400,27 @@ int copyToOmniVec(orc::TypeKind vcType, int &omniTypeId, uint64_t &omniVecId, or
     return 1;
 }
 
-int copyToOminDecimalVec(int vcType, int &ominTypeId, uint64_t &ominVecId, orc::ColumnVectorBatch *field)
+int copyToOmniDecimalVec(int precision, int &ominTypeId, uint64_t &ominVecId, orc::ColumnVectorBatch *field)
 {
     VectorAllocator *allocator = VectorAllocator::GetGlobalAllocator();
-    if (vcType > 18) {
+    if (precision > 18) {
         ominTypeId = static_cast<int>(OMNI_DECIMAL128);
         orc::Decimal128VectorBatch *lvb = dynamic_cast<orc::Decimal128VectorBatch *>(field);
         FixedWidthVector<OMNI_DECIMAL128> *originalVector =
             new FixedWidthVector<OMNI_DECIMAL128>(allocator, lvb->numElements);
         for (int i = 0; i < lvb->numElements; i++) {
             if (lvb->notNull.data()[i]) {
-                bool wasNegative = false;
                 int64_t highbits = lvb->values.data()[i].getHighBits();
                 uint64_t lowbits = lvb->values.data()[i].getLowBits();
-                uint64_t high = 0;
-                uint64_t low = 0;
-                if (highbits < 0) {
-                    low = ~lowbits + 1;
-                    high = static_cast<uint64_t>(~highbits);
-                    if (low == 0) {
-                        high += 1;
+                if (highbits < 0) { // int128's 2s' complement code
+                    lowbits = ~lowbits + 1; // 2s' complement code
+                    highbits = ~highbits; //1s' complement code
+                    if (lowbits == 0) {
+                        highbits += 1; // carry a number as in adding
                     }
-                    highbits = high | ((uint64_t)1 << 63);
+                    highbits ^= ((uint64_t)1 << 63);
                 }
-                Decimal128 d128(highbits, low);
+                Decimal128 d128(highbits, lowbits);
                 originalVector->SetValue(i, d128);
             } else {
                 originalVector->SetValueNull(i);
@@ -468,7 +465,7 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniRe
                 if (vcType != orc::TypeKind::DECIMAL) {
                     copyToOmniVec(vcType, ominTypeId, ominVecId, root->fields[id], maxLen);
                 } else {
-                    copyToOminDecimalVec(baseTp.getSubtype(id)->getPrecision(), ominTypeId, ominVecId,
+                    copyToOmniDecimalVec(baseTp.getSubtype(id)->getPrecision(), ominTypeId, ominVecId,
                         root->fields[id]);
                 }
             } catch (omniruntime::exception::OmniException &e) {

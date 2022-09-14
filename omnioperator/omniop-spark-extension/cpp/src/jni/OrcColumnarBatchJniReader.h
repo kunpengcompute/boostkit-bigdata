@@ -142,6 +142,8 @@ int buildLeafs(int leafOp, std::vector<orc::Literal> &litList, orc::Literal &lit
 
 int copyToOmniVec(orc::TypeKind vcType, int &omniTypeId, uint64_t &omniVecId, orc::ColumnVectorBatch *field, ...);  
 
+int copyToOmniDecimalVec(int precision, int &ominTypeId, uint64_t &ominVecId, orc::ColumnVectorBatch *field);
+
 #ifdef __cplusplus
 }
 #endif
