@@ -144,6 +144,8 @@ int copyToOmniVec(orc::TypeKind vcType, int &omniTypeId, uint64_t &omniVecId, or
 
 int copyToOmniDecimalVec(int precision, int &ominTypeId, uint64_t &ominVecId, orc::ColumnVectorBatch *field);
 
+int copyToOmniDecimalVec(int precision, int &ominTypeId, uint64_t &ominVecId, orc::ColumnVectorBatch *field);
+
 #ifdef __cplusplus
 }
 #endif
