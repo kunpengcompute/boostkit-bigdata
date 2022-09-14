@@ -22,7 +22,7 @@ import java.io.{File, FileInputStream}
 
 import com.huawei.boostkit.spark.serialize.ColumnarBatchSerializer
 import com.huawei.boostkit.spark.vectorized.PartitionInfo
-import nova.hetu.omniruntime.`type`.Decimal64DataType
+import nova.hetu.omniruntime.`type`.{DataType, _}
 import nova.hetu.omniruntime.vector._
 import org.apache.spark.{HashPartitioner, SparkConf, TaskContext}
 import org.apache.spark.executor.TaskMetrics
@@ -31,7 +31,7 @@ import org.apache.spark.shuffle.sort.ColumnarShuffleHandle
 import org.apache.spark.sql.execution.metric.{SQLMetric, SQLMetrics}
 import org.apache.spark.sql.execution.vectorized.OmniColumnVector
 import org.apache.spark.sql.test.SharedSparkSession
-import org.apache.spark.sql.types.{DecimalType, IntegerType, LongType}
+import org.apache.spark.sql.types._
 import org.apache.spark.sql.vectorized.{ColumnVector, ColumnarBatch}
 import org.apache.spark.util.Utils
 import org.mockito.Answers.RETURNS_SMART_NULLS
@@ -50,6 +50,7 @@ class ColumnarShuffleWriterSuite extends SharedSparkSession {
     super.sparkConf
       .setAppName("test ColumnarShuffleWriter")
       .set("spark.shuffle.manager", "org.apache.spark.shuffle.sort.ColumnarShuffleManager")
+      .set("spark.shuffle.compress", "false")
 
   private var taskMetrics: TaskMetrics = _
   private var tempDir: File = _
@@ -78,10 +79,12 @@ class ColumnarShuffleWriterSuite extends SharedSparkSession {
     shuffleHandle =
       new ColumnarShuffleHandle[Int, ColumnarBatch](shuffleId = 0, dependency = dependency)
 
-    val inputTypes = "[{\"id\":1}," +
-                      "{\"id\":1}," +
-                      "{\"id\":6,\"precision\":18,\"scale\":3}," +
-                      "{\"id\":7,\"precision\":28,\"scale\":11}]"
+    val types : Array[DataType] = Array[DataType](
+      IntDataType.INTEGER,
+      IntDataType.INTEGER,
+      new Decimal64DataType(18, 3),
+      new Decimal128DataType(28, 11))
+    val inputTypes = DataTypeSerializer.serialize(types)
 
     when(dependency.partitioner).thenReturn(new HashPartitioner(numPartitions))
     when(dependency.serializer).thenReturn(new JavaSerializer(sparkConf))
@@ -146,22 +149,22 @@ class ColumnarShuffleWriterSuite extends SharedSparkSession {
   }
 
   test("write empty column batch") {
-    val vectorPid0 = ColumnarShuffleWriterSuite.initOmniColumnIntVector()
-    val vector0_1 = ColumnarShuffleWriterSuite.initOmniColumnIntVector()
-    val vector0_2 = ColumnarShuffleWriterSuite.initOmniColumnIntVector()
-    val vector0_3 = ColumnarShuffleWriterSuite.initOmniColumnDecimal64Vector()
-    val vector0_4 = ColumnarShuffleWriterSuite.initOmniColumnDecimal128Vector()
+    val vectorPid0 = ColumnarShuffleWriterSuite.initOmniColumnIntVector(Array())
+    val vector0_1 = ColumnarShuffleWriterSuite.initOmniColumnIntVector(Array())
+    val vector0_2 = ColumnarShuffleWriterSuite.initOmniColumnIntVector(Array())
+    val vector0_3 = ColumnarShuffleWriterSuite.initOmniColumnDecimal64Vector(Array())
+    val vector0_4 = ColumnarShuffleWriterSuite.initOmniColumnDecimal128Vector(Array())
 
-    val vectorPid1 = ColumnarShuffleWriterSuite.initOmniColumnIntVector()
-    val vector1_1 = ColumnarShuffleWriterSuite.initOmniColumnIntVector()
-    val vector1_2 = ColumnarShuffleWriterSuite.initOmniColumnIntVector()
-    val vector1_3 = ColumnarShuffleWriterSuite.initOmniColumnDecimal64Vector()
-    val vector1_4 = ColumnarShuffleWriterSuite.initOmniColumnDecimal128Vector()
+    val vectorPid1 = ColumnarShuffleWriterSuite.initOmniColumnIntVector(Array())
+    val vector1_1 = ColumnarShuffleWriterSuite.initOmniColumnIntVector(Array())
+    val vector1_2 = ColumnarShuffleWriterSuite.initOmniColumnIntVector(Array())
+    val vector1_3 = ColumnarShuffleWriterSuite.initOmniColumnDecimal64Vector(Array())
+    val vector1_4 = ColumnarShuffleWriterSuite.initOmniColumnDecimal128Vector(Array())
 
     val cb0 = ColumnarShuffleWriterSuite.makeColumnarBatch(
-      vectorPid0.getVec.getSize,List(vectorPid0, vector0_1, vector0_2, vector0_3, vector0_4))
+      vectorPid0.getVec.getSize, List(vectorPid0, vector0_1, vector0_2, vector0_3, vector0_4))
     val cb1 = ColumnarShuffleWriterSuite.makeColumnarBatch(
-      vectorPid1.getVec.getSize,List(vectorPid1, vector1_1, vector1_2, vector1_3, vector1_4))
+      vectorPid1.getVec.getSize, List(vectorPid1, vector1_1, vector1_2, vector1_3, vector1_4))
 
     def records: Iterator[(Int, ColumnarBatch)] = Iterator((0, cb0), (0, cb1))
 
@@ -184,21 +187,21 @@ class ColumnarShuffleWriterSuite extends SharedSparkSession {
   }
 
   test("write with some empty partitions") {
-    val vectorPid0 = ColumnarShuffleWriterSuite.initOmniColumnIntVector(0, 0, 1, 1)
-    val vector0_1 = ColumnarShuffleWriterSuite.initOmniColumnIntVector(null, null, null, null)
-    val vector0_2 = ColumnarShuffleWriterSuite.initOmniColumnIntVector(100, 100, null, null)
-    val vector0_3 = ColumnarShuffleWriterSuite.initOmniColumnDecimal64Vector(100L, 100L, 100L, 100L)
-    val vector0_4 = ColumnarShuffleWriterSuite.initOmniColumnDecimal128Vector(Array(100L, 100L), Array(100L, 100L), null, null)
+    val vectorPid0 = ColumnarShuffleWriterSuite.initOmniColumnIntVector(Array(0, 0, 1, 1))
+    val vector0_1 = ColumnarShuffleWriterSuite.initOmniColumnIntVector(Array(null, null, null, null))
+    val vector0_2 = ColumnarShuffleWriterSuite.initOmniColumnIntVector(Array(100, 100, null, null))
+    val vector0_3 = ColumnarShuffleWriterSuite.initOmniColumnDecimal64Vector(Array(100L, 100L, 100L, 100L))
+    val vector0_4 = ColumnarShuffleWriterSuite.initOmniColumnDecimal128Vector(Array(Array(100L, 100L), Array(100L, 100L), null, null))
     val cb0 = ColumnarShuffleWriterSuite.makeColumnarBatch(
-      vectorPid0.getVec.getSize,List(vectorPid0, vector0_1, vector0_2, vector0_3, vector0_4))
+      vectorPid0.getVec.getSize, List(vectorPid0, vector0_1, vector0_2, vector0_3, vector0_4))
 
-    val vectorPid1 = ColumnarShuffleWriterSuite.initOmniColumnIntVector(0, 0, 1, 1)
-    val vector1_1 = ColumnarShuffleWriterSuite.initOmniColumnIntVector(null, null, null, null)
-    val vector1_2 = ColumnarShuffleWriterSuite.initOmniColumnIntVector(100, 100, null, null)
-    val vector1_3 = ColumnarShuffleWriterSuite.initOmniColumnDecimal64Vector(100L, 100L, 100L, 100L)
-    val vector1_4 = ColumnarShuffleWriterSuite.initOmniColumnDecimal128Vector(Array(100L, 100L), Array(100L, 100L), null, null)
+    val vectorPid1 = ColumnarShuffleWriterSuite.initOmniColumnIntVector(Array(0, 0, 1, 1))
+    val vector1_1 = ColumnarShuffleWriterSuite.initOmniColumnIntVector(Array(null, null, null, null))
+    val vector1_2 = ColumnarShuffleWriterSuite.initOmniColumnIntVector(Array(100, 100, null, null))
+    val vector1_3 = ColumnarShuffleWriterSuite.initOmniColumnDecimal64Vector(Array(100L, 100L, 100L, 100L))
+    val vector1_4 = ColumnarShuffleWriterSuite.initOmniColumnDecimal128Vector(Array(Array(100L, 100L), Array(100L, 100L), null, null))
     val cb1 = ColumnarShuffleWriterSuite.makeColumnarBatch(
-      vectorPid1.getVec.getSize,List(vectorPid1, vector1_1, vector1_2, vector1_3, vector1_4))
+      vectorPid1.getVec.getSize, List(vectorPid1, vector1_1, vector1_2, vector1_3, vector1_4))
 
     def records: Iterator[(Int, ColumnarBatch)] = Iterator((0, cb0), (0, cb1))
 
@@ -234,11 +237,7 @@ class ColumnarShuffleWriterSuite extends SharedSparkSession {
           assert(batch.numRows == 4)
           assert(batch.numCols == 4)
           (0 until batch.numCols).foreach { i =>
-            val valueVector =
-              batch
-                .column(i)
-                .asInstanceOf[OmniColumnVector]
-                .getVec
+            val valueVector = batch.column(i).asInstanceOf[OmniColumnVector].getVec
             assert(valueVector.getSize == batch.numRows)
           }
           batch.close()
@@ -252,12 +251,29 @@ class ColumnarShuffleWriterSuite extends SharedSparkSession {
 }
 
 object ColumnarShuffleWriterSuite {
-  def initOmniColumnIntVector(values: Integer*): OmniColumnVector = {
+  def initOmniColumnBooleanVector(values: Array[java.lang.Boolean]): OmniColumnVector = {
+    val length = values.length
+    val vecTmp = new BooleanVec(length)
+    (0 until length).foreach { i =>
+      if (values(i) != null) {
+        vecTmp.set(i, values(i))
+      } else {
+        vecTmp.setNull(i)
+      }
+    }
+    val colVecTmp = new OmniColumnVector(length, BooleanType, false)
+    colVecTmp.setVec(vecTmp)
+    colVecTmp
+  }
+
+  def initOmniColumnIntVector(values: Array[java.lang.Integer]): OmniColumnVector = {
     val length = values.length
     val vecTmp = new IntVec(length)
     (0 until length).foreach { i =>
       if (values(i) != null) {
-        vecTmp.set(i, values(i).asInstanceOf[Int])
+        vecTmp.set(i, values(i))
+      } else {
+        vecTmp.setNull(i)
       }
     }
     val colVecTmp = new OmniColumnVector(length, IntegerType, false)
@@ -265,12 +281,74 @@ object ColumnarShuffleWriterSuite {
     colVecTmp
   }
 
-  def initOmniColumnDecimal64Vector(values: java.lang.Long*): OmniColumnVector = {
+  def initOmniColumnShortVector(values: Array[java.lang.Integer]): OmniColumnVector = {
+    val length = values.length
+    val vecTmp = new ShortVec(length)
+    (0 until length).foreach { i =>
+      if (values(i) != null) {
+        vecTmp.set(i, values(i).shortValue())
+      } else {
+        vecTmp.setNull(i)
+      }
+    }
+    val colVecTmp = new OmniColumnVector(length, ShortType, false)
+    colVecTmp.setVec(vecTmp)
+    colVecTmp
+  }
+
+  def initOmniColumnLongVector(values: Array[java.lang.Long]): OmniColumnVector = {
     val length = values.length
     val vecTmp = new LongVec(length)
     (0 until length).foreach { i =>
       if (values(i) != null) {
-        vecTmp.set(i, values(i).asInstanceOf[Long])
+        vecTmp.set(i, values(i))
+      } else {
+        vecTmp.setNull(i)
+      }
+    }
+    val colVecTmp = new OmniColumnVector(length, LongType, false)
+    colVecTmp.setVec(vecTmp)
+    colVecTmp
+  }
+
+  def initOmniColumnDoubleVector(values: Array[java.lang.Double]): OmniColumnVector = {
+    val length = values.length
+    val vecTmp = new DoubleVec(length)
+    (0 until length).foreach { i =>
+      if (values(i) != null) {
+        vecTmp.set(i, values(i))
+      } else {
+        vecTmp.setNull(i)
+      }
+    }
+    val colVecTmp = new OmniColumnVector(length, DoubleType, false)
+    colVecTmp.setVec(vecTmp)
+    colVecTmp
+  }
+
+  def initOmniColumnVarcharVector(values: Array[java.lang.String]): OmniColumnVector = {
+    val length = values.length
+    val vecTmp = new VarcharVec(1024, length)
+    (0 until length).foreach { i =>
+      if (values(i) != null) {
+        vecTmp.set(i, values(i).getBytes())
+      } else {
+        vecTmp.setNull(i)
+      }
+    }
+    val colVecTmp = new OmniColumnVector(length, StringType, false)
+    colVecTmp.setVec(vecTmp)
+    colVecTmp
+  }
+
+  def initOmniColumnDecimal64Vector(values: Array[java.lang.Long]): OmniColumnVector = {
+    val length = values.length
+    val vecTmp = new LongVec(length)
+    (0 until length).foreach { i =>
+      if (values(i) != null) {
+        vecTmp.set(i, values(i))
+      } else {
+        vecTmp.setNull(i)
       }
     }
     val colVecTmp = new OmniColumnVector(length, DecimalType(18, 3), false)
@@ -278,12 +356,14 @@ object ColumnarShuffleWriterSuite {
     colVecTmp
   }
 
-  def initOmniColumnDecimal128Vector(values: Array[Long]*): OmniColumnVector = {
+  def initOmniColumnDecimal128Vector(values: Array[Array[Long]]): OmniColumnVector = {
     val length = values.length
     val vecTmp = new Decimal128Vec(length)
     (0 until length).foreach { i =>
       if (values(i) != null) {
         vecTmp.set(i, values(i))
+      } else {
+        vecTmp.setNull(i)
       }
     }
     val colVecTmp = new OmniColumnVector(length, DecimalType(28, 11), false)

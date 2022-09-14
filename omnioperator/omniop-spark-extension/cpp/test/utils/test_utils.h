@@ -40,7 +40,7 @@ VectorBatch* CreateVectorBatch_1row_varchar_withPid(int pid, std::string inputCh
 
 VectorBatch* CreateVectorBatch_4col_withPid(int parNum, int rowNum);
 
-VectorBatch* CreateVectorBatch_1longCol_withPid(int parNum, int rowNum);
+VectorBatch* CreateVectorBatch_1FixCol_withPid(int parNum, int rowNum, int32_t fixColType);
 
 VectorBatch* CreateVectorBatch_2column_1row_withPid(int pid, std::string strVar, int intVar);
 
@@ -48,7 +48,7 @@ VectorBatch* CreateVectorBatch_4varcharCols_withPid(int parNum, int rowNum);
 
 VectorBatch* CreateVectorBatch_4charCols_withPid(int parNum, int rowNum);
 
-VectorBatch* CreateVectorBatch_3fixedCols_withPid(int parNum, int rowNum);
+VectorBatch* CreateVectorBatch_5fixedCols_withPid(int parNum, int rowNum);
 
 VectorBatch* CreateVectorBatch_2dictionaryCols_withPid(int partitionNum);
 

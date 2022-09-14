@@ -350,62 +350,77 @@ uint64_t copyVarwidth(int maxLen, orc::ColumnVectorBatch *field, int vcType)
     return (uint64_t)originalVector;
 }
 
-int copyToOminVec(int maxLen, int vcType, int &ominTypeId, uint64_t &ominVecId, orc::ColumnVectorBatch *field)
+int copyToOmniVec(orc::TypeKind vcType, int &omniTypeId, uint64_t &omniVecId, orc::ColumnVectorBatch *field, ...)
 {
     switch (vcType) {
-        case orc::TypeKind::DATE:
+        case orc::TypeKind::BOOLEAN: {
+            omniTypeId = static_cast<jint>(OMNI_BOOLEAN);
+            omniVecId = copyFixwidth<OMNI_BOOLEAN, orc::LongVectorBatch>(field);
+            break;
+        }
+        case orc::TypeKind::SHORT: {
+            omniTypeId = static_cast<jint>(OMNI_SHORT);
+            omniVecId = copyFixwidth<OMNI_SHORT, orc::LongVectorBatch>(field);
+            break;
+        }
+        case orc::TypeKind::DATE: {
+            omniTypeId = static_cast<jint>(OMNI_DATE32);
+            omniVecId = copyFixwidth<OMNI_INT, orc::LongVectorBatch>(field);
+            break;
+        }
         case orc::TypeKind::INT: {
-            if (vcType == orc::TypeKind::DATE) {
-                ominTypeId = static_cast<jint>(OMNI_DATE32);
-            } else {
-                ominTypeId = static_cast<jint>(OMNI_INT);
-            }
-            ominVecId = copyFixwidth<OMNI_INT, orc::LongVectorBatch>(field);
+            omniTypeId = static_cast<jint>(OMNI_INT);
+            omniVecId = copyFixwidth<OMNI_INT, orc::LongVectorBatch>(field);
             break;
         }
         case orc::TypeKind::LONG: {
-            ominTypeId = static_cast<int>(OMNI_LONG);
-            ominVecId = copyFixwidth<OMNI_LONG, orc::LongVectorBatch>(field);
+            omniTypeId = static_cast<int>(OMNI_LONG);
+            omniVecId = copyFixwidth<OMNI_LONG, orc::LongVectorBatch>(field);
+            break;
+        }
+        case orc::TypeKind::DOUBLE: {
+            omniTypeId = static_cast<int>(OMNI_DOUBLE);
+            omniVecId = copyFixwidth<OMNI_DOUBLE, orc::DoubleVectorBatch>(field);
             break;
         }
         case orc::TypeKind::CHAR:
         case orc::TypeKind::STRING:
         case orc::TypeKind::VARCHAR: {
-            ominTypeId = static_cast<int>(OMNI_VARCHAR);
-            ominVecId = (uint64_t)copyVarwidth(maxLen, field, vcType);
+            omniTypeId = static_cast<int>(OMNI_VARCHAR);
+            va_list args;
+            va_start(args, field);
+            omniVecId = (uint64_t)copyVarwidth(va_arg(args, int), field, vcType);
+            va_end(args);
             break;
         }
         default: {
-            LogsError("orc::TypeKind::UNKNOWN  ERROR %d", vcType);
+            throw std::runtime_error("Native ColumnarFileScan Not support For This Type: " + vcType);
         }
     }
     return 1;
 }
 
-int copyToOminDecimalVec(int vcType, int &ominTypeId, uint64_t &ominVecId, orc::ColumnVectorBatch *field)
+int copyToOmniDecimalVec(int precision, int &ominTypeId, uint64_t &ominVecId, orc::ColumnVectorBatch *field)
 {
     VectorAllocator *allocator = VectorAllocator::GetGlobalAllocator();
-    if (vcType > 18) {
+    if (precision > 18) {
         ominTypeId = static_cast<int>(OMNI_DECIMAL128);
         orc::Decimal128VectorBatch *lvb = dynamic_cast<orc::Decimal128VectorBatch *>(field);
         FixedWidthVector<OMNI_DECIMAL128> *originalVector =
             new FixedWidthVector<OMNI_DECIMAL128>(allocator, lvb->numElements);
         for (int i = 0; i < lvb->numElements; i++) {
             if (lvb->notNull.data()[i]) {
-                bool wasNegative = false;
                 int64_t highbits = lvb->values.data()[i].getHighBits();
                 uint64_t lowbits = lvb->values.data()[i].getLowBits();
-                uint64_t high = 0;
-                uint64_t low = 0;
-                if (highbits < 0) {
-                    low = ~lowbits + 1;
-                    high = static_cast<uint64_t>(~highbits);
-                    if (low == 0) {
-                        high += 1;
+                if (highbits < 0) { // int128's 2s' complement code
+                    lowbits = ~lowbits + 1; // 2s' complement code
+                    highbits = ~highbits; //1s' complement code
+                    if (lowbits == 0) {
+                        highbits += 1; // carry a number as in adding
                     }
-                    highbits = high | ((uint64_t)1 << 63);
+                    highbits ^= ((uint64_t)1 << 63);
                 }
-                Decimal128 d128(highbits, low);
+                Decimal128 d128(highbits, lowbits);
                 originalVector->SetValue(i, d128);
             } else {
                 originalVector->SetValueNull(i);
@@ -442,15 +457,15 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniRe
         vecCnt = root->fields.size();
         batchRowSize = root->fields[0]->numElements;
         for (int id = 0; id < vecCnt; id++) {
-            int vcType = baseTp.getSubtype(id)->getKind();
+            orc::TypeKind vcType = baseTp.getSubtype(id)->getKind();
             int maxLen = baseTp.getSubtype(id)->getMaximumLength();
             int ominTypeId = 0;
             uint64_t ominVecId = 0;
             try {
                 if (vcType != orc::TypeKind::DECIMAL) {
-                    copyToOminVec(maxLen, vcType, ominTypeId, ominVecId, root->fields[id]);
+                    copyToOmniVec(vcType, ominTypeId, ominVecId, root->fields[id], maxLen);
                 } else {
-                    copyToOminDecimalVec(baseTp.getSubtype(id)->getPrecision(), ominTypeId, ominVecId,
+                    copyToOmniDecimalVec(baseTp.getSubtype(id)->getPrecision(), ominTypeId, ominVecId,
                         root->fields[id]);
                 }
             } catch (omniruntime::exception::OmniException &e) {
