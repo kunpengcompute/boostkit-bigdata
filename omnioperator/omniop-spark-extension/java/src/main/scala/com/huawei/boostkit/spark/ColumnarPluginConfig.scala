@@ -155,7 +155,7 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
   val maxRowCount =
     conf.getConfString("spark.sql.columnar.maxRowCount", "20000").toInt
 
-  val enableOmniJsonExpCheck : Boolean = conf.getConfString("spark.omni.sql.omniJsonExp.check", "true").toBoolean
+  val enableOmniExpCheck : Boolean = conf.getConfString("spark.omni.sql.omniExp.check", "true").toBoolean
 }
 
 

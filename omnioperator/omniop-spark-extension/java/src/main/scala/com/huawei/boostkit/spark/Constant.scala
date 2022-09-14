@@ -32,7 +32,7 @@ object Constant {
   val OMNI_DOUBLE_TYPE: String = DataTypeId.OMNI_DOUBLE.ordinal().toString
   val OMNI_BOOLEAN_TYPE: String = DataTypeId.OMNI_BOOLEAN.ordinal().toString
   val OMNI_DATE_TYPE: String = DataTypeId.OMNI_DATE32.ordinal().toString
-  val IS_CHECK_OMNI_JSON_EXP: Boolean = ColumnarPluginConfig.getSessionConf.enableOmniJsonExpCheck
+  val IS_CHECK_OMNI_EXP: Boolean = ColumnarPluginConfig.getSessionConf.enableOmniExpCheck
   val IS_SKIP_VERIFY_EXP: Boolean = true
   val OMNI_DECIMAL64_TYPE: String = DataTypeId.OMNI_DECIMAL64.ordinal().toString
   val OMNI_DECIMAL128_TYPE: String = DataTypeId.OMNI_DECIMAL128.ordinal().toString

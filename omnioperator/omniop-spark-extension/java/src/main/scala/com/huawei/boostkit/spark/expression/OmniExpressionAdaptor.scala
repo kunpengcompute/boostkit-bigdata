@@ -18,7 +18,7 @@
 
 package com.huawei.boostkit.spark.expression
 
-import com.huawei.boostkit.spark.Constant.{DEFAULT_STRING_TYPE_LENGTH, IS_CHECK_OMNI_JSON_EXP, OMNI_BOOLEAN_TYPE, OMNI_DATE_TYPE, OMNI_DECIMAL128_TYPE, OMNI_DECIMAL64_TYPE, OMNI_DOUBLE_TYPE, OMNI_INTEGER_TYPE, OMNI_LONG_TYPE, OMNI_SHOR_TYPE, OMNI_VARCHAR_TYPE}
+import com.huawei.boostkit.spark.Constant.{DEFAULT_STRING_TYPE_LENGTH, IS_CHECK_OMNI_EXP, OMNI_BOOLEAN_TYPE, OMNI_DATE_TYPE, OMNI_DECIMAL128_TYPE, OMNI_DECIMAL64_TYPE, OMNI_DOUBLE_TYPE, OMNI_INTEGER_TYPE, OMNI_LONG_TYPE, OMNI_SHOR_TYPE, OMNI_VARCHAR_TYPE}
 import nova.hetu.omniruntime.`type`.{BooleanDataType, DataTypeSerializer, Date32DataType, Decimal128DataType, Decimal64DataType, DoubleDataType, IntDataType, LongDataType, ShortDataType, VarcharDataType}
 import nova.hetu.omniruntime.constants.FunctionType
 import nova.hetu.omniruntime.constants.FunctionType.{OMNI_AGGREGATION_TYPE_AVG, OMNI_AGGREGATION_TYPE_COUNT_ALL, OMNI_AGGREGATION_TYPE_COUNT_COLUMN, OMNI_AGGREGATION_TYPE_MAX, OMNI_AGGREGATION_TYPE_MIN, OMNI_AGGREGATION_TYPE_SUM, OMNI_WINDOW_TYPE_RANK, OMNI_WINDOW_TYPE_ROW_NUMBER}
@@ -52,7 +52,7 @@ object OmniExpressionAdaptor extends Logging {
   }
 
   def checkOmniJsonWhiteList(filterExpr: String, projections: Array[AnyRef]): Unit = {
-    if (!IS_CHECK_OMNI_JSON_EXP) {
+    if (!IS_CHECK_OMNI_EXP) {
       return
     }
     // inputTypes will not be checked if parseFormat is json( == 1),
@@ -292,7 +292,10 @@ object OmniExpressionAdaptor extends Logging {
   }
 
   private def unsupportedCastCheck(expr: Expression, cast: Cast): Unit = {
-    if (cast.dataType == StringType && cast.child.dataType != StringType) {
+    def isDecimalOrStringType(dataType: DataType): Boolean = dataType == DecimalType || dataType == StringType
+    // not support Cast(string as !(decimal/string)) and Cast(!(decimal/string) as string)
+    if ((cast.dataType == StringType && !isDecimalOrStringType(cast.child.dataType)) ||
+      (!isDecimalOrStringType(cast.dataType) && cast.child.dataType == StringType)) {
       throw new UnsupportedOperationException(s"Unsupported expression: $expr")
     }
   }
