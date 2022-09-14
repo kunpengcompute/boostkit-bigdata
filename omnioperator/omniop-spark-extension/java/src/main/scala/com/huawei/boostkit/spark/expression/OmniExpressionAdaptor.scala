@@ -18,7 +18,7 @@
 
 package com.huawei.boostkit.spark.expression
 
-import com.huawei.boostkit.spark.Constant.{DEFAULT_STRING_TYPE_LENGTH, IS_DECIMAL_CHECK, OMNI_BOOLEAN_TYPE, OMNI_DATE_TYPE, OMNI_DECIMAL128_TYPE, OMNI_DECIMAL64_TYPE, OMNI_DOUBLE_TYPE, OMNI_INTEGER_TYPE, OMNI_LONG_TYPE, OMNI_SHOR_TYPE, OMNI_VARCHAR_TYPE}
+import com.huawei.boostkit.spark.Constant.{DEFAULT_STRING_TYPE_LENGTH, IS_CHECK_OMNI_JSON_EXP, OMNI_BOOLEAN_TYPE, OMNI_DATE_TYPE, OMNI_DECIMAL128_TYPE, OMNI_DECIMAL64_TYPE, OMNI_DOUBLE_TYPE, OMNI_INTEGER_TYPE, OMNI_LONG_TYPE, OMNI_SHOR_TYPE, OMNI_VARCHAR_TYPE}
 import nova.hetu.omniruntime.`type`.{BooleanDataType, DataTypeSerializer, Date32DataType, Decimal128DataType, Decimal64DataType, DoubleDataType, IntDataType, LongDataType, ShortDataType, VarcharDataType}
 import nova.hetu.omniruntime.constants.FunctionType
 import nova.hetu.omniruntime.constants.FunctionType.{OMNI_AGGREGATION_TYPE_AVG, OMNI_AGGREGATION_TYPE_COUNT_ALL, OMNI_AGGREGATION_TYPE_COUNT_COLUMN, OMNI_AGGREGATION_TYPE_MAX, OMNI_AGGREGATION_TYPE_MIN, OMNI_AGGREGATION_TYPE_SUM, OMNI_WINDOW_TYPE_RANK, OMNI_WINDOW_TYPE_ROW_NUMBER}
@@ -51,19 +51,8 @@ object OmniExpressionAdaptor extends Logging {
     attrMap
   }
 
-  private  def DECIMAL_ALLOWEDTYPES: Seq[DecimalType] = Seq(DecimalType(7,2), DecimalType(17,2), DecimalType(21,6), DecimalType(22,6), DecimalType(38,16))
-
-  def checkDecimalTypeWhiteList(dt: DecimalType): Unit = {
-    if (!IS_DECIMAL_CHECK) {
-      return
-    }
-    if (!DECIMAL_ALLOWEDTYPES.contains(dt)) {
-      throw new UnsupportedOperationException(s"decimal precision and scale not in support scope, ${dt}")
-    }
-  }
-
   def checkOmniJsonWhiteList(filterExpr: String, projections: Array[AnyRef]): Unit = {
-    if (!IS_DECIMAL_CHECK) {
+    if (!IS_CHECK_OMNI_JSON_EXP) {
       return
     }
     // inputTypes will not be checked if parseFormat is json( == 1),
@@ -109,13 +98,13 @@ object OmniExpressionAdaptor extends Logging {
             ("MakeDecimal:%s(%s,%s,%s,%s,%s)")
               .format(sparkTypeToOmniExpJsonType(makeDecimal.dataType),
                 rewriteToOmniExpressionLiteral(makeDecimal.child, exprsIndexMap),
-                decimalChild.precision,decimalChild.scale,
+                decimalChild.precision, decimalChild.scale,
                 makeDecimal.precision, makeDecimal.scale)
           case longChild: LongType =>
             ("MakeDecimal:%s(%s,%s,%s)")
               .format(sparkTypeToOmniExpJsonType(makeDecimal.dataType),
-              rewriteToOmniExpressionLiteral(makeDecimal.child, exprsIndexMap),
-              makeDecimal.precision, makeDecimal.scale)
+                rewriteToOmniExpressionLiteral(makeDecimal.child, exprsIndexMap),
+                makeDecimal.precision, makeDecimal.scale)
           case _ =>
             throw new UnsupportedOperationException(s"Unsupported datatype for MakeDecimal: ${makeDecimal.child.dataType}")
         }
@@ -332,34 +321,8 @@ object OmniExpressionAdaptor extends Logging {
           .format(sparkTypeToOmniExpJsonType(unscaledValue.dataType),
             rewriteToOmniJsonExpressionLiteral(unscaledValue.child, exprsIndexMap))
 
-      // omni not support return null, now rewrite to if(IsOverflowDecimal())? NULL:MakeDecimal()
       case checkOverflow: CheckOverflow =>
-        ("{\"exprType\":\"IF\",\"returnType\":%s," +
-          "\"condition\":{\"exprType\":\"FUNCTION\",\"returnType\":%s," +
-          "\"function_name\":\"IsOverflowDecimal\",\"arguments\":[%s,%s,%s]}," +
-          "\"if_true\":%s," +
-          "\"if_false\":{\"exprType\":\"FUNCTION\",\"returnType\":%s," +
-          "\"function_name\":\"MakeDecimal\", \"arguments\":[%s]}" +
-          "}")
-          .format(sparkTypeToOmniExpJsonType(checkOverflow.dataType),
-            // IsOverflowDecimal returnType
-            sparkTypeToOmniExpJsonType(BooleanType),
-            // IsOverflowDecimal arguments
-            rewriteToOmniJsonExpressionLiteral(checkOverflow.child, exprsIndexMap,
-                DecimalType(checkOverflow.dataType.precision, checkOverflow.dataType.scale)),
-            toOmniJsonLiteral(
-              Literal(checkOverflow.dataType.precision, IntegerType)),
-            toOmniJsonLiteral(
-              Literal(checkOverflow.dataType.scale, IntegerType)),
-            // if_true
-            toOmniJsonLiteral(
-              Literal(null, checkOverflow.dataType)),
-            // if_false
-            sparkTypeToOmniExpJsonType(
-              DecimalType(checkOverflow.dataType.precision, checkOverflow.dataType.scale)),
-            rewriteToOmniJsonExpressionLiteral(checkOverflow.child,
-              exprsIndexMap,
-              DecimalType(checkOverflow.dataType.precision, checkOverflow.dataType.scale)))
+        rewriteToOmniJsonExpressionLiteral(checkOverflow.child, exprsIndexMap, returnDatatype)
 
       case makeDecimal: MakeDecimal =>
         makeDecimal.child.dataType match {
@@ -497,17 +460,6 @@ object OmniExpressionAdaptor extends Logging {
             ("{\"exprType\":\"FUNCTION\",\"returnType\":%s," +
               "\"width\":50,\"function_name\":\"CAST\", \"arguments\":[%s]}")
               .format(returnType, rewriteToOmniJsonExpressionLiteral(cast.child, exprsIndexMap))
-          // for to decimal omni default cast no precision and scale handle
-          // use MakeDecimal to take it
-          case dt: DecimalType =>
-            if (cast.child.dataType.isInstanceOf[DoubleType]) {
-              ("{\"exprType\":\"FUNCTION\",\"returnType\":%s," +
-                "\"function_name\":\"CAST\", \"arguments\":[%s]}")
-                .format(returnType, rewriteToOmniJsonExpressionLiteral(cast.child, exprsIndexMap))
-            } else {
-              rewriteToOmniJsonExpressionLiteral(
-                MakeDecimal(cast.child, dt.precision, dt.scale), exprsIndexMap)
-            }
           case _ =>
             ("{\"exprType\":\"FUNCTION\",\"returnType\":%s," +
               "\"function_name\":\"CAST\",\"arguments\":[%s]}")
@@ -696,7 +648,6 @@ object OmniExpressionAdaptor extends Logging {
       case StringType => OMNI_VARCHAR_TYPE
       case DateType => OMNI_DATE_TYPE
       case dt: DecimalType =>
-        checkDecimalTypeWhiteList(dt)
         if (DecimalType.is64BitDecimalType(dt)) {
           OMNI_DECIMAL64_TYPE
         } else {
@@ -737,7 +688,6 @@ object OmniExpressionAdaptor extends Logging {
       case DateType =>
         Date32DataType.DATE32
       case dt: DecimalType =>
-        checkDecimalTypeWhiteList(dt)
         if (DecimalType.is64BitDecimalType(dt)) {
           new Decimal64DataType(dt.precision, dt.scale)
         } else {
@@ -760,7 +710,6 @@ object OmniExpressionAdaptor extends Logging {
         "{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":%s,\"colVal\":%d,\"width\":%d}"
           .format(omniDataType, colVal, getStringLength(metadata))
       case dt: DecimalType =>
-        checkDecimalTypeWhiteList(dt)
         var omniDataType = OMNI_DECIMAL128_TYPE
         if (DecimalType.is64BitDecimalType(dt)) {
           omniDataType = OMNI_DECIMAL64_TYPE
