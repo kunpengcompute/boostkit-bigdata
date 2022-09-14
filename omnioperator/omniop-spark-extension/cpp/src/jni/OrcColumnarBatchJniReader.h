@@ -140,7 +140,7 @@ int getLiteral(orc::Literal &lit, int leafType, std::string value);
 int buildLeafs(int leafOp, std::vector<orc::Literal> &litList, orc::Literal &lit, std::string leafNameString, int leafType,
     orc::SearchArgumentBuilder &builder);
 
-int copyToOminVec(int maxLen, int vcType, int &ominTypeId, uint64_t &ominVecId, orc::ColumnVectorBatch *field);  
+int copyToOmniVec(orc::TypeKind vcType, int &omniTypeId, uint64_t &omniVecId, orc::ColumnVectorBatch *field, ...);  
 
 #ifdef __cplusplus
 }
