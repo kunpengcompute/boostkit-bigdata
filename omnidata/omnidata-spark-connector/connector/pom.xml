@@ -54,7 +54,7 @@
         </dependency>
         <dependency>
             <groupId>com.huawei.boostkit</groupId>
-            <artifactId>boostkit-omnidata-server-stub</artifactId>
+            <artifactId>boostkit-omnidata-stub</artifactId>
             <version>1.4.0</version>
             <scope>compile</scope>
         </dependency>
