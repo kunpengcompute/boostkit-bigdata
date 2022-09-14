@@ -131,8 +131,13 @@ case class ColumnarHashAggregateExec(
       i += 1
     }
 
-    checkOmniJsonWhiteList("", omniAggChannels)
-    checkOmniJsonWhiteList("", omniGroupByChanel)
+    if (!isSimpleColumnForAll(omniAggChannels.map(channel => channel.toString))) {
+      checkOmniJsonWhiteList("", omniAggChannels)
+    }
+
+    if (!isSimpleColumnForAll(omniGroupByChanel.map(groupByChannel => groupByChannel.toString))) {
+      checkOmniJsonWhiteList("", omniGroupByChanel)
+    }
 
     // check for final project
     if (!omniOutputPartial) {
@@ -141,7 +146,9 @@ case class ColumnarHashAggregateExec(
         exp => sparkTypeToOmniType(exp.dataType, exp.metadata)).toArray
       val projectExpressions: Array[AnyRef] = resultExpressions.map(
         exp => rewriteToOmniJsonExpressionLiteral(exp, getExprIdMap(finalOut))).toArray
-      checkOmniJsonWhiteList("", projectExpressions)
+      if (!isSimpleColumnForAll(projectExpressions.map(expr => expr.toString))) {
+        checkOmniJsonWhiteList("", projectExpressions)
+      }
     }
   }
 

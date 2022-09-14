@@ -201,7 +201,9 @@ object OmniAdaptorUtil {
         case _ => 1
       }
     }
-    checkOmniJsonWhiteList("", sortColsExp.asInstanceOf[Array[AnyRef]])
+    if (!isSimpleColumnForAll(sortColsExp)) {
+      checkOmniJsonWhiteList("", sortColsExp.asInstanceOf[Array[AnyRef]])
+    }
     (sourceTypes, ascendings, nullFirsts, sortColsExp)
   }
 

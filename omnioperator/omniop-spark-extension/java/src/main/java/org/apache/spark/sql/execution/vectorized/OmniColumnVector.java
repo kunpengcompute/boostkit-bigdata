@@ -483,7 +483,7 @@ public class OmniColumnVector extends WritableColumnVector {
         if (dictionary != null) {
             return (short) dictionary.decodeToInt(dictionaryIds.getDictId(rowId));
         } else if (dictionaryData != null) {
-            throw new UnsupportedOperationException("getShort is not supported for dictionary vector");
+            return dictionaryData.getShort(rowId);
         } else {
             return shortDataVec.get(rowId);
         }

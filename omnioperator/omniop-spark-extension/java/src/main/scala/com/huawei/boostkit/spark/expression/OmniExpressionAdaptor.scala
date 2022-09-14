@@ -787,4 +787,23 @@ object OmniExpressionAdaptor extends Logging {
     }
     width
   }
+
+  def isSimpleColumn(expr: String): Boolean = {
+    val indexOfExprType = expr.indexOf("exprType")
+    val lastIndexOfExprType = expr.lastIndexOf("exprType")
+    if (indexOfExprType != -1 && indexOfExprType == lastIndexOfExprType
+      && (expr.contains("FIELD_REFERENCE") || expr.contains("LITERAL"))) {
+      return true
+    }
+    false
+  }
+
+  def isSimpleColumnForAll(exprArr: Array[String]): Boolean = {
+    for (expr <- exprArr) {
+      if (!isSimpleColumn(expr)) {
+        return false
+      }
+    }
+    true
+  }
 }

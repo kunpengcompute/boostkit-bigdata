@@ -21,6 +21,7 @@ import java.util.concurrent.TimeUnit.NANOSECONDS
 import java.util.Optional
 import com.huawei.boostkit.spark.Constant.IS_SKIP_VERIFY_EXP
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor
+import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor.{checkOmniJsonWhiteList, isSimpleColumn, isSimpleColumnForAll}
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil.transColBatchToOmniVecs
 import nova.hetu.omniruntime.`type`.DataType
@@ -121,19 +122,38 @@ case class ColumnarShuffledHashJoinExec(
       buildTypes(i) = OmniExpressionAdaptor.sparkTypeToOmniType(att.dataType, att.metadata)
     }
 
-    buildKeys.map { x =>
+    val buildJoinColsExp = buildKeys.map { x =>
       OmniExpressionAdaptor.rewriteToOmniJsonExpressionLiteral(x,
         OmniExpressionAdaptor.getExprIdMap(buildOutput.map(_.toAttribute)))
     }.toArray
+
+    if (!isSimpleColumnForAll(buildJoinColsExp)) {
+      checkOmniJsonWhiteList("", buildJoinColsExp.asInstanceOf[Array[AnyRef]])
+    }
 
     val probeTypes = new Array[DataType](streamedOutput.size)
     streamedOutput.zipWithIndex.foreach { case (attr, i) =>
       probeTypes(i) = OmniExpressionAdaptor.sparkTypeToOmniType(attr.dataType, attr.metadata)
     }
-    streamedKeys.map { x =>
+
+    val probeHashColsExp = streamedKeys.map { x =>
       OmniExpressionAdaptor.rewriteToOmniJsonExpressionLiteral(x,
         OmniExpressionAdaptor.getExprIdMap(streamedOutput.map(_.toAttribute)))
     }.toArray
+
+    if (!isSimpleColumnForAll(probeHashColsExp)) {
+      checkOmniJsonWhiteList("", probeHashColsExp.asInstanceOf[Array[AnyRef]])
+    }
+
+    condition match {
+      case Some(expr) =>
+        val filterExpr: String = OmniExpressionAdaptor.rewriteToOmniJsonExpressionLiteral(expr,
+          OmniExpressionAdaptor.getExprIdMap((streamedOutput ++ buildOutput).map(_.toAttribute)))
+        if (!isSimpleColumn(filterExpr)) {
+          checkOmniJsonWhiteList(filterExpr, new Array[AnyRef](0))
+        }
+      case _ => Optional.empty()
+    }
   }
 
   /**
