@@ -34,6 +34,9 @@ import org.apache.spark.sql.catalyst.plans.{FullOuter, InnerLike, JoinType, Left
 import org.apache.spark.sql.catalyst.util.CharVarcharUtils.getRawTypeString
 import org.apache.spark.sql.types.{BooleanType, DataType, DateType, Decimal, DecimalType, DoubleType, IntegerType, LongType, Metadata, ShortType, StringType}
 
+import scala.collection.mutable
+import scala.collection.mutable.ArrayBuffer
+
 object OmniExpressionAdaptor extends Logging {
 
   def getRealExprId(expr: Expression): ExprId = {
@@ -448,6 +451,11 @@ object OmniExpressionAdaptor extends Logging {
           sparkTypeToOmniExpJsonType(BooleanType),
           rewriteToOmniJsonExpressionLiteral(isnotnull.child, exprsIndexMap))
 
+      case isNull: IsNull =>
+         "{\"exprType\":\"IS_NULL\",\"returnType\":%s,\"arguments\":[%s]}".format(
+          sparkTypeToOmniExpJsonType(BooleanType),
+          rewriteToOmniJsonExpressionLiteral(isNull.child, exprsIndexMap))
+
       // Substring
       case subString: Substring =>
         ("{\"exprType\":\"FUNCTION\",\"returnType\":%s," +
@@ -516,15 +524,13 @@ object OmniExpressionAdaptor extends Logging {
             rewriteToOmniJsonExpressionLiteral(ifExp.trueValue, exprsIndexMap),
             rewriteToOmniJsonExpressionLiteral(ifExp.falseValue, exprsIndexMap))
 
-      // only support with one case condition, for omni rewrite to if(A, B, C)
       case caseWhen: CaseWhen =>
-        "{\"exprType\":\"IF\",\"returnType\":%s,\"condition\":%s,\"if_true\":%s,\"if_false\":%s}"
-          .format(sparkTypeToOmniExpJsonType(caseWhen.dataType),
-            rewriteToOmniJsonExpressionLiteral(caseWhen.branches(0)._1, exprsIndexMap),
-            rewriteToOmniJsonExpressionLiteral(caseWhen.branches(0)._2, exprsIndexMap),
-            rewriteToOmniJsonExpressionLiteral(caseWhen.elseValue.get, exprsIndexMap))
+        procCaseWhenExpression(caseWhen, exprsIndexMap)
 
       case coalesce: Coalesce =>
+        if (coalesce.children.length > 2) {
+           throw new UnsupportedOperationException(s"Number of parameters is ${coalesce.children.length}. Exceeds the maximum number of parameters, coalesce only supports up to 2 parameters")
+        }
         "{\"exprType\":\"COALESCE\",\"returnType\":%s, \"value1\":%s,\"value2\":%s}".format(
           sparkTypeToOmniExpJsonType(coalesce.dataType),
           rewriteToOmniJsonExpressionLiteral(coalesce.children(0), exprsIndexMap),
@@ -741,6 +747,163 @@ object OmniExpressionAdaptor extends Logging {
       }
     }
     width
+  }
+
+  def procCaseWhenExpression(caseWhen: CaseWhen,
+                             exprsIndexMap: Map[ExprId, Int]): String = {
+    val exprStr = "{\"exprType\":\"IF\",\"returnType\":%s,\"condition\":%s,\"if_true\":%s,\"if_false\":%s}"
+    var exprStrRes = exprStr
+    for (i <- caseWhen.branches.indices) {
+      var ifFalseStr = ""
+      if (i != caseWhen.branches.length - 1) {
+        ifFalseStr = exprStr
+      } else {
+        var elseValue = caseWhen.elseValue
+        if (elseValue.isEmpty) {
+           elseValue = Some(Literal(null, caseWhen.dataType))
+        }
+        ifFalseStr = rewriteToOmniJsonExpressionLiteral(elseValue.get, exprsIndexMap)
+      }
+      exprStrRes = exprStrRes.format(sparkTypeToOmniExpJsonType(caseWhen.dataType),
+        rewriteToOmniJsonExpressionLiteral(caseWhen.branches(i)._1, exprsIndexMap),
+        rewriteToOmniJsonExpressionLiteral(caseWhen.branches(i)._2, exprsIndexMap),
+        ifFalseStr)
+    }
+    exprStrRes
+  }
+
+  def procLikeExpression(likeExpr: Expression,
+                         exprsIndexMap: Map[ExprId, Int]): String = {
+    likeExpr match {
+      case like: Like =>
+        val dataType = like.right.dataType
+        like.right match {
+          case literal: Literal =>
+            ("{\"exprType\":\"FUNCTION\",\"returnType\":%s," +
+              "\"function_name\":\"LIKE\", \"arguments\":[%s, %s]}")
+              .format(sparkTypeToOmniExpJsonType(like.dataType),
+                rewriteToOmniJsonExpressionLiteral(like.left, exprsIndexMap),
+                generateLikeArg(literal,""))
+          case _ =>
+            throw new UnsupportedOperationException(s"Unsupported datatype in like expression: $dataType")
+        }
+      case startsWith: StartsWith =>
+        val dataType = startsWith.right.dataType
+        startsWith.right match {
+          case literal: Literal =>
+            ("{\"exprType\":\"FUNCTION\",\"returnType\":%s," +
+              "\"function_name\":\"LIKE\", \"arguments\":[%s, %s]}")
+              .format(sparkTypeToOmniExpJsonType(startsWith.dataType),
+                rewriteToOmniJsonExpressionLiteral(startsWith.left, exprsIndexMap),
+                generateLikeArg(literal, "startsWith"))
+          case _ =>
+            throw new UnsupportedOperationException(s"Unsupported datatype in like expression: $dataType")
+        }
+      case endsWith: EndsWith =>
+        val dataType = endsWith.right.dataType
+        endsWith.right match {
+          case literal: Literal =>
+            ("{\"exprType\":\"FUNCTION\",\"returnType\":%s," +
+              "\"function_name\":\"LIKE\", \"arguments\":[%s, %s]}")
+              .format(sparkTypeToOmniExpJsonType(endsWith.dataType),
+                rewriteToOmniJsonExpressionLiteral(endsWith.left, exprsIndexMap),
+                generateLikeArg(literal, "endsWith"))
+          case _ =>
+            throw new UnsupportedOperationException(s"Unsupported datatype in like expression: $dataType")
+        }
+      case contains: Contains =>
+        val dataType = contains.right.dataType
+        contains.right match {
+          case literal: Literal =>
+            ("{\"exprType\":\"FUNCTION\",\"returnType\":%s," +
+              "\"function_name\":\"LIKE\", \"arguments\":[%s, %s]}")
+              .format(sparkTypeToOmniExpJsonType(contains.dataType),
+                rewriteToOmniJsonExpressionLiteral(contains.left, exprsIndexMap),
+                generateLikeArg(literal, "contains"))
+          case _ =>
+            throw new UnsupportedOperationException(s"Unsupported datatype in like expression: $dataType")
+        }
+    }
+  }
+
+  def generateLikeArg(literal: Literal, exprFormat: String) : String = {
+    val value = literal.value
+    if (value == null) {
+      return "{\"exprType\":\"LITERAL\",\"dataType\":%s,\"isNull\":%b}".format(sparkTypeToOmniExpJsonType(literal.dataType), true)
+    }
+    var inputValue = value.toString
+    exprFormat match {
+      case "startsWith" =>
+        inputValue = inputValue + "%"
+      case "endsWith" =>
+        inputValue = "%" + inputValue
+      case "contains" =>
+        inputValue = "%" + inputValue + "%"
+      case _ =>
+        inputValue = value.toString
+    }
+
+    val omniType = sparkTypeToOmniExpType(literal.dataType)
+    literal.dataType match {
+      case StringType =>
+        val likeRegExpr = generateLikeRegExpr(inputValue)
+        ("{\"exprType\":\"LITERAL\",\"dataType\":%s," +
+          "\"isNull\":%b, \"value\":\"%s\",\"width\":%d}")
+          .format(omniType, false, likeRegExpr, likeRegExpr.length)
+      case dt: DecimalType =>
+        toOmniJsonLiteral(literal)
+      case _ =>
+        toOmniJsonLiteral(literal)
+    }
+  }
+
+  def generateLikeRegExpr(value : String) : String = {
+      val regexString = new mutable.StringBuilder
+      regexString.append('^')
+      val valueArr =  value.toCharArray
+      for (i <- 0 until valueArr.length) {
+        valueArr(i) match {
+          case '%' =>
+            if (i - 1 < 0 || valueArr(i - 1) != '\\') {
+              regexString.append(".*")
+            } else {
+              regexString.append(valueArr(i))
+            }
+
+          case '_' =>
+            if (i - 1 < 0 || valueArr(i - 1) != '\\') {
+              regexString.append(".")
+            } else {
+              regexString.append(valueArr(i))
+            }
+
+          case '\\' =>
+            regexString.append("\\")
+            regexString.append(valueArr(i))
+
+          case '^' =>
+            regexString.append("\\")
+            regexString.append(valueArr(i))
+
+          case '$' =>
+            regexString.append("\\")
+            regexString.append(valueArr(i))
+
+          case '.' =>
+            regexString.append("\\")
+            regexString.append(valueArr(i))
+
+          case '*' =>
+            regexString.append("\\")
+            regexString.append(valueArr(i))
+
+          case _ =>
+            regexString.append(valueArr(i))
+
+        }
+      }
+      regexString.append('$')
+      regexString.toString()
   }
 
   def toOmniJoinType(joinType: JoinType): nova.hetu.omniruntime.constants.JoinType = {
