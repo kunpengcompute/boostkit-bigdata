@@ -27,7 +27,7 @@ import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor.{checkOmniJson
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil.transColBatchToOmniVecs
 import nova.hetu.omniruntime.`type`.DataType
-import nova.hetu.omniruntime.constants.JoinType.OMNI_JOIN_TYPE_INNER
+import nova.hetu.omniruntime.constants.JoinType._
 import nova.hetu.omniruntime.operator.config.{OperatorConfig, OverflowConfig, SpillConfig}
 import nova.hetu.omniruntime.operator.join.{OmniSmjBufferedTableWithExprOperatorFactory, OmniSmjStreamedTableWithExprOperatorFactory}
 import nova.hetu.omniruntime.vector.{BooleanVec, Decimal128Vec, DoubleVec, IntVec, LongVec, VarcharVec, Vec, VecBatch, ShortVec}
@@ -93,9 +93,12 @@ class ColumnarSortMergeJoinExec(
   )
 
   def buildCheck(): Unit = {
-    if ("INNER" != joinType.sql) {
-      throw new UnsupportedOperationException(s"Join-type[${joinType}] is not supported " +
-        s"in ${this.nodeName}")
+    joinType match {
+      case _: InnerLike | LeftOuter | FullOuter =>
+        // SMJ join support InnerLike | LeftOuter | FullOuter
+      case _ =>
+        throw new UnsupportedOperationException(s"Join-type[${joinType}] is not supported " +
+          s"in ${this.nodeName}")
     }
 
     val streamedTypes = new Array[DataType](left.output.size)
@@ -147,9 +150,13 @@ class ColumnarSortMergeJoinExec(
     val streamVecBatchs = longMetric("numStreamVecBatchs")
     val bufferVecBatchs = longMetric("numBufferVecBatchs")
 
-    if ("INNER" != joinType.sql) {
-      throw new UnsupportedOperationException(s"Join-type[${joinType}] is not supported " +
-        s"in ${this.nodeName}")
+    val omniJoinType : nova.hetu.omniruntime.constants.JoinType = joinType match {
+      case _: InnerLike => OMNI_JOIN_TYPE_INNER
+      case LeftOuter => OMNI_JOIN_TYPE_LEFT
+      case FullOuter => OMNI_JOIN_TYPE_FULL
+      case x =>
+        throw new UnsupportedOperationException(s"ColumnSortMergeJoin Join-type[$x] is not supported " +
+          s"in ${this.nodeName}")
     }
 
     val streamedTypes = new Array[DataType](left.output.size)
@@ -183,7 +190,7 @@ class ColumnarSortMergeJoinExec(
       val filter: Optional[String] = Optional.ofNullable(filterString)
       val startStreamedCodegen = System.nanoTime()
       val streamedOpFactory = new OmniSmjStreamedTableWithExprOperatorFactory(streamedTypes,
-        streamedKeyColsExp, streamedOutputChannel, OMNI_JOIN_TYPE_INNER, filter,
+        streamedKeyColsExp, streamedOutputChannel, omniJoinType, filter,
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val streamedOp = streamedOpFactory.createOperator
       streamedCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startStreamedCodegen)
@@ -208,7 +215,14 @@ class ColumnarSortMergeJoinExec(
       val enableSortMergeJoinBatchMerge: Boolean = columnarConf.enableSortMergeJoinBatchMerge
       val iterBatch = new Iterator[ColumnarBatch] {
 
-        var isFinished = !streamedIter.hasNext || !bufferedIter.hasNext
+        var isFinished : Boolean = joinType match {
+          case _: InnerLike => !streamedIter.hasNext || !bufferedIter.hasNext
+          case LeftOuter => !streamedIter.hasNext
+          case FullOuter => !(streamedIter.hasNext || bufferedIter.hasNext)
+          case x =>
+            throw new UnsupportedOperationException(s"ColumnSortMergeJoin Join-type[$x] is not supported!")
+        }
+
         var isStreamedFinished = false
         var isBufferedFinished = false
         var results: java.util.Iterator[VecBatch] = null
@@ -269,7 +283,7 @@ class ColumnarSortMergeJoinExec(
           if (inputReturnCode == SMJ_FETCH_JOIN_DATA) {
             val startGetOutputTime = System.nanoTime()
             results = bufferedOp.getOutput
-            var hasNext = results.hasNext
+            val hasNext = results.hasNext
             getOutputTime += NANOSECONDS.toMillis(System.nanoTime() - startGetOutputTime)
             if (hasNext) {
               return true
