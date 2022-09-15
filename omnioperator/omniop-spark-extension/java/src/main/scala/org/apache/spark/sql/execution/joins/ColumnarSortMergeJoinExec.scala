@@ -23,13 +23,13 @@ import java.util.Optional
 import com.huawei.boostkit.spark.ColumnarPluginConfig
 import com.huawei.boostkit.spark.Constant.IS_SKIP_VERIFY_EXP
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor
-import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor.checkOmniJsonWhiteList
+import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor.{checkOmniJsonWhiteList, isSimpleColumn, isSimpleColumnForAll}
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil.transColBatchToOmniVecs
 import nova.hetu.omniruntime.`type`.DataType
 import nova.hetu.omniruntime.operator.config.{OperatorConfig, OverflowConfig, SpillConfig}
 import nova.hetu.omniruntime.operator.join.{OmniSmjBufferedTableWithExprOperatorFactory, OmniSmjStreamedTableWithExprOperatorFactory}
-import nova.hetu.omniruntime.vector.{BooleanVec, Decimal128Vec, DoubleVec, IntVec, LongVec, VarcharVec, Vec, VecBatch}
+import nova.hetu.omniruntime.vector.{BooleanVec, Decimal128Vec, DoubleVec, IntVec, LongVec, VarcharVec, Vec, VecBatch, ShortVec}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans._
@@ -115,14 +115,21 @@ class ColumnarSortMergeJoinExec(
         OmniExpressionAdaptor.getExprIdMap(right.output.map(_.toAttribute)))
     }.toArray
 
-    checkOmniJsonWhiteList("", streamedKeyColsExp)
-    checkOmniJsonWhiteList("", bufferedKeyColsExp)
+    if (!isSimpleColumnForAll(streamedKeyColsExp.map(expr => expr.toString))) {
+      checkOmniJsonWhiteList("", streamedKeyColsExp)
+    }
+
+    if (!isSimpleColumnForAll(bufferedKeyColsExp.map(expr => expr.toString))) {
+      checkOmniJsonWhiteList("", bufferedKeyColsExp)
+    }
 
     condition match {
       case Some(expr) =>
         val filterExpr: String = OmniExpressionAdaptor.rewriteToOmniJsonExpressionLiteral(expr,
           OmniExpressionAdaptor.getExprIdMap(output.map(_.toAttribute)))
-        checkOmniJsonWhiteList(filterExpr, new Array[AnyRef](0))
+        if (!isSimpleColumn(filterExpr)) {
+          checkOmniJsonWhiteList(filterExpr, new Array[AnyRef](0))
+        }
       case _ => null
     }
   }
@@ -320,6 +327,8 @@ class ColumnarSortMergeJoinExec(
                 new VarcharVec(0, 0)
               case DataType.DataTypeId.OMNI_DECIMAL128 =>
                 new Decimal128Vec(0)
+              case DataType.DataTypeId.OMNI_SHORT =>
+                new ShortVec(0)
               case _ =>
                 throw new IllegalArgumentException(s"VecType [${types(i).getClass.getSimpleName}]" +
                   s" is not supported in [${getClass.getSimpleName}] yet")

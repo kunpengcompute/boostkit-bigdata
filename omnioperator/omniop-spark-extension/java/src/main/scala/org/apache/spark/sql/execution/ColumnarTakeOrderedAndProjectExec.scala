@@ -19,7 +19,7 @@ package org.apache.spark.sql.execution
 
 import java.util.concurrent.TimeUnit.NANOSECONDS
 import com.huawei.boostkit.spark.Constant.IS_SKIP_VERIFY_EXP
-import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor.{checkOmniJsonWhiteList, getExprIdMap, rewriteToOmniJsonExpressionLiteral, sparkTypeToOmniType}
+import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor.{checkOmniJsonWhiteList, getExprIdMap, isSimpleColumnForAll, rewriteToOmniJsonExpressionLiteral, sparkTypeToOmniType}
 import com.huawei.boostkit.spark.serialize.ColumnarBatchSerializer
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil.{addAllAndGetIterator, genSortParam}
@@ -99,7 +99,9 @@ case class ColumnarTakeOrderedAndProjectExec(
         exp => sparkTypeToOmniType(exp.dataType, exp.metadata)).toArray
       omniExpressions = projectList.map(
         exp => rewriteToOmniJsonExpressionLiteral(exp, getExprIdMap(child.output))).toArray
-      checkOmniJsonWhiteList("", omniExpressions)
+      if (!isSimpleColumnForAll(omniExpressions.map(expr => expr.toString))) {
+        checkOmniJsonWhiteList("", omniExpressions)
+      }
     }
   }
 

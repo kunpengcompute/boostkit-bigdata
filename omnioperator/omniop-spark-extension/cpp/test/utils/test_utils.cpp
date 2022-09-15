@@ -46,6 +46,9 @@ VectorBatch* CreateInputData(const int32_t numRows,
     vecBatch->NewVectors(omniruntime::vec::GetProcessGlobalVecAllocator(), inputTypes);
     for (int i = 0; i < numCols; ++i) {
         switch (inputTypeIds[i]) {
+            case OMNI_BOOLEAN:
+                ((BooleanVector *)vecBatch->GetVector(i))->SetValues(0, (int32_t *)allData[i], numRows);
+                break;
             case OMNI_INT:
                 ((IntVector *)vecBatch->GetVector(i))->SetValues(0, (int32_t *)allData[i], numRows);
                 break;
@@ -56,7 +59,7 @@ VectorBatch* CreateInputData(const int32_t numRows,
                 ((DoubleVector *)vecBatch->GetVector(i))->SetValues(0, (double *)allData[i], numRows);
                 break;
             case OMNI_SHORT:
-                ((IntVector *)vecBatch->GetVector(i))->SetValues(0, (int32_t *)allData[i], numRows);
+                ((ShortVector *)vecBatch->GetVector(i))->SetValues(0, (int16_t *)allData[i], numRows);
                 break;
             case OMNI_VARCHAR:
             case OMNI_CHAR: {
@@ -299,12 +302,12 @@ VectorBatch* CreateVectorBatch_4col_withPid(int parNum, int rowNum) {
     return in;
 }
 
-VectorBatch* CreateVectorBatch_1longCol_withPid(int parNum, int rowNum) {
+VectorBatch* CreateVectorBatch_1FixCol_withPid(int parNum, int rowNum, int32_t fixColType) {
     int partitionNum = parNum;
     const int32_t numCols = 2;
     int32_t* inputTypes = new int32_t[numCols];
     inputTypes[0] = OMNI_INT;
-    inputTypes[1] = OMNI_LONG;
+    inputTypes[1] = fixColType;
 
     const int32_t numRows = rowNum;
     auto* col0 = new int32_t[numRows];
@@ -458,39 +461,49 @@ VectorBatch* CreateVectorBatch_4charCols_withPid(int parNum, int rowNum) {
     return in;
 }
 
-VectorBatch* CreateVectorBatch_3fixedCols_withPid(int parNum, int rowNum) {
+VectorBatch* CreateVectorBatch_5fixedCols_withPid(int parNum, int rowNum) {
     int partitionNum = parNum;
 
     // gen vectorBatch
-    const int32_t numCols = 4;
+    const int32_t numCols = 6;
     int32_t* inputTypes = new int32_t[numCols];
     inputTypes[0] = OMNI_INT;
-    inputTypes[1] = OMNI_INT;
-    inputTypes[2] = OMNI_LONG;
-    inputTypes[3] = OMNI_DOUBLE;
+    inputTypes[1] = OMNI_BOOLEAN;
+    inputTypes[2] = OMNI_SHORT;
+    inputTypes[3] = OMNI_INT;
+    inputTypes[4] = OMNI_LONG;
+    inputTypes[5] = OMNI_DOUBLE;
 
     const int32_t numRows = rowNum;
     auto* col0 = new int32_t[numRows];
-    auto* col1 = new int32_t[numRows];
-    auto* col2 = new int64_t[numRows];
-    auto* col3 = new double[numRows];
+    auto* col1 = new bool[numRows];
+    auto* col2 = new int16_t[numRows];
+    auto* col3 = new int32_t[numRows];
+    auto* col4 = new int64_t[numRows];
+    auto* col5 = new double[numRows];
     for (int i = 0; i < numRows; i++) {
         col0[i] = i % partitionNum;
-        col1[i] = i + 1;
+        col1[i] = (i % 2) == 0 ? true : false;
         col2[i] = i + 1;
         col3[i] = i + 1;
+        col4[i] = i + 1;
+        col5[i] = i + 1;
     }
 
     int64_t allData[numCols] = {reinterpret_cast<int64_t>(col0),
                                 reinterpret_cast<int64_t>(col1),
                                 reinterpret_cast<int64_t>(col2),
-                                reinterpret_cast<int64_t>(col3)};
+                                reinterpret_cast<int64_t>(col3),
+                                reinterpret_cast<int64_t>(col4),
+                                reinterpret_cast<int64_t>(col5)};
     VectorBatch* in = CreateInputData(numRows, numCols, inputTypes, allData);
     delete[] inputTypes;
     delete[] col0;
     delete[] col1;
     delete[] col2;
     delete[] col3;
+    delete[] col4;
+    delete[] col5;
     return in; 
 }
 
@@ -564,26 +577,34 @@ VectorBatch* CreateVectorBatch_2decimalCol_withPid(int partitionNum, int rowNum)
 
 VectorBatch* CreateVectorBatch_someNullRow_vectorBatch() {
     const int32_t numRows = 6;
-    int32_t data1[numRows] = {0, 1, 2, 0, 1, 2};
-    int64_t data2[numRows] = {0, 1, 2, 3, 4, 5};
-    double data3[numRows] = {0.0, 1.1, 2.2, 3.3, 4.4, 5.5};
-    std::string data4[numRows] = {"abcde", "fghij", "klmno", "pqrst", "", ""};
+    bool data0[numRows] = {true, false, true, false, true, false};
+    int16_t data1[numRows] = {0, 1, 2, 3, 4, 6};
+    int32_t data2[numRows] = {0, 1, 2, 0, 1, 2};
+    int64_t data3[numRows] = {0, 1, 2, 3, 4, 5};
+    double data4[numRows] = {0.0, 1.1, 2.2, 3.3, 4.4, 5.5};
+    std::string data5[numRows] = {"abcde", "fghij", "klmno", "pqrst", "", ""};
 
-    auto vec0 = CreateVector<IntVector>(data1, numRows);
-    auto vec1 = CreateVector<LongVector>(data2, numRows);
-    auto vec2 = CreateVector<DoubleVector>(data3, numRows);
-    auto vec3 = CreateVarcharVector(VarcharDataType(5), data4, numRows);
+    auto vec0 = CreateVector<BooleanVector>(data0, numRows);
+    auto vec1 = CreateVector<ShortVector>(data1, numRows);
+    auto vec2 = CreateVector<IntVector>(data2, numRows);
+    auto vec3 = CreateVector<LongVector>(data3, numRows);
+    auto vec4 = CreateVector<DoubleVector>(data4, numRows);
+    auto vec5 = CreateVarcharVector(VarcharDataType(5), data5, numRows);
     for (int i = 0; i < numRows; i = i + 2) {
         vec0->SetValueNull(i);
         vec1->SetValueNull(i);
         vec2->SetValueNull(i);
         vec3->SetValueNull(i);
+        vec4->SetValueNull(i);
+        vec5->SetValueNull(i);
     }
-    VectorBatch *vecBatch = new VectorBatch(4);
+    VectorBatch *vecBatch = new VectorBatch(6);
     vecBatch->SetVector(0, vec0);
     vecBatch->SetVector(1, vec1);
     vecBatch->SetVector(2, vec2);
     vecBatch->SetVector(3, vec3);
+    vecBatch->SetVector(4, vec4);
+    vecBatch->SetVector(5, vec5);
     return vecBatch;
 }
 

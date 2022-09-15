@@ -25,7 +25,7 @@ import scala.collection.mutable
 import com.huawei.boostkit.spark.ColumnarPluginConfig
 import com.huawei.boostkit.spark.Constant.IS_SKIP_VERIFY_EXP
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor
-import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor.checkOmniJsonWhiteList
+import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor.{checkOmniJsonWhiteList, isSimpleColumn, isSimpleColumnForAll}
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil.transColBatchToOmniVecs
 import nova.hetu.omniruntime.`type`.DataType
@@ -226,14 +226,20 @@ case class ColumnarBroadcastHashJoinExec(
         OmniExpressionAdaptor.getExprIdMap(streamedOutput.map(_.toAttribute)))
     }.toArray
 
-    checkOmniJsonWhiteList("", buildJoinColsExp)
-    checkOmniJsonWhiteList("", probeHashColsExp)
+    if (!isSimpleColumnForAll(buildJoinColsExp.map(expr => expr.toString))) {
+      checkOmniJsonWhiteList("", buildJoinColsExp)
+    }
+    if (!isSimpleColumnForAll(probeHashColsExp.map(expr => expr.toString))) {
+      checkOmniJsonWhiteList("", probeHashColsExp)
+    }
 
     condition match {
       case Some(expr) =>
         val filterExpr: String = OmniExpressionAdaptor.rewriteToOmniJsonExpressionLiteral(expr,
           OmniExpressionAdaptor.getExprIdMap((streamedOutput ++ buildOutput).map(_.toAttribute)))
-        checkOmniJsonWhiteList(filterExpr, new Array[AnyRef](0))
+        if (!isSimpleColumn(filterExpr)) {
+          checkOmniJsonWhiteList(filterExpr, new Array[AnyRef](0))
+        }
       case _ => Optional.empty()
     }
   }

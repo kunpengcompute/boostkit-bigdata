@@ -131,7 +131,9 @@ class ColumnarShuffleExchangeExec(
       case HashPartitioning(expressions, numPartitions) =>
         val genHashExpressionFunc = ColumnarShuffleExchangeExec.genHashExpr()
         val hashJSonExpressions = genHashExpressionFunc(expressions, numPartitions, ColumnarShuffleExchangeExec.defaultMm3HashSeed, child.output)
-        checkOmniJsonWhiteList("", Array(hashJSonExpressions))
+        if (!isSimpleColumn(hashJSonExpressions)) {
+          checkOmniJsonWhiteList("", Array(hashJSonExpressions))
+        }
       case _ =>
     }
   }

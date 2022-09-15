@@ -374,13 +374,7 @@ abstract class BaseColumnarFileSourceScanExec(
   def buildCheck(): Unit = {
     output.zipWithIndex.foreach {
       case (attr, i) =>
-         sparkTypeToOmniType(attr.dataType, attr.metadata)
-         if (attr.dataType.isInstanceOf[DecimalType]) {
-           val dt = attr.dataType.asInstanceOf[DecimalType]
-           if (!DecimalType.is64BitDecimalType(dt)) {
-             throw new UnsupportedOperationException(s"ColumnarTableScan is not supported for type:${dt}");
-           }
-         }
+        sparkTypeToOmniType(attr.dataType, attr.metadata)
     }
   }
 

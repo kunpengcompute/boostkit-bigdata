@@ -205,9 +205,13 @@ case class ColumnarWindowExec(windowExpression: Seq[NamedExpression],
         exp => sparkTypeToOmniType(exp.dataType, exp.metadata)).toArray
       val projectExpressions: Array[AnyRef] = (child.output ++ patchedWindowExpression).map(
         exp => rewriteToOmniJsonExpressionLiteral(exp, getExprIdMap(finalOut))).toArray
-      checkOmniJsonWhiteList("", projectExpressions)
+      if (!isSimpleColumnForAll(projectExpressions.map(expr => expr.toString))) {
+        checkOmniJsonWhiteList("", projectExpressions)
+      }
     }
-    checkOmniJsonWhiteList("", windowArgKeys)
+    if (!isSimpleColumnForAll(windowArgKeys.map(key => key.toString))) {
+      checkOmniJsonWhiteList("", windowArgKeys)
+    }
   }
 
   override def doExecuteColumnar(): RDD[ColumnarBatch] = {
