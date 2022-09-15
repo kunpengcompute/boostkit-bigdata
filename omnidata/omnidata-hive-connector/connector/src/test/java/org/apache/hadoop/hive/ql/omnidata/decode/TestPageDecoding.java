@@ -22,16 +22,12 @@ package org.apache.hadoop.hive.ql.omnidata.decode;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.huawei.boostkit.omnidata.decode.type.*;
 import io.airlift.slice.SliceInput;
 import io.prestosql.spi.type.DateType;
 import io.prestosql.spi.type.RowType;
 
 import org.apache.hadoop.hive.ql.exec.vector.ColumnVector;
-import org.apache.hadoop.hive.ql.omnidata.decode.type.DecodeType;
-import org.apache.hadoop.hive.ql.omnidata.decode.type.LongToByteDecodeType;
-import org.apache.hadoop.hive.ql.omnidata.decode.type.LongToFloatDecodeType;
-import org.apache.hadoop.hive.ql.omnidata.decode.type.LongToIntDecodeType;
-import org.apache.hadoop.hive.ql.omnidata.decode.type.LongToShortDecodeType;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;

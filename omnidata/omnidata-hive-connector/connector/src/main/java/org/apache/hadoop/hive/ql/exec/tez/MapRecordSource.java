@@ -21,6 +21,7 @@ package org.apache.hadoop.hive.ql.exec.tez;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
+import com.huawei.boostkit.omnidata.decode.type.DecodeType;
 import org.apache.hadoop.hive.ql.exec.AbstractMapOperator;
 import org.apache.hadoop.hive.ql.exec.mr.ExecMapperContext;
 import org.apache.hadoop.hive.ql.exec.tez.tools.KeyValueInputMerger;
@@ -29,7 +30,6 @@ import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.omnidata.OmniDataUtils;
 import org.apache.hadoop.hive.ql.omnidata.config.OmniDataConf;
 import org.apache.hadoop.hive.ql.omnidata.decode.PageDeserializer;
-import org.apache.hadoop.hive.ql.omnidata.decode.type.DecodeType;
 import org.apache.hadoop.hive.ql.omnidata.operator.predicate.NdpPredicateInfo;
 import org.apache.hadoop.hive.ql.omnidata.reader.OmniDataReader;
 import org.apache.hadoop.hive.ql.omnidata.serialize.NdpSerializationUtils;
