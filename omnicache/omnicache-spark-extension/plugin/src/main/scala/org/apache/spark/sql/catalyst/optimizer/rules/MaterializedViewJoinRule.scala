@@ -38,7 +38,6 @@ class MaterializedViewJoinRule(sparkSession: SparkSession)
     isValidLogicalPlan(logicalPlan)
   }
 
-
   /**
    * queryTableInfo!=viewTableInfo , need do join compensate
    *

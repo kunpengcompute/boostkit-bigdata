@@ -49,7 +49,9 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
     if (ViewMetadata.status == ViewMetadata.STATUS_LOADING) {
       return finalPlan
     }
-    ViewMetadata.init(sparkSession)
+    RewriteTime.withTimeStat("viewMetadata") {
+      ViewMetadata.init(sparkSession)
+    }
     // 1.check query sql is match current rule
     if (ViewMetadata.isEmpty || !isValidPlan(plan)) {
       return finalPlan
@@ -60,8 +62,10 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
     val (queryExpr, queryTables) = extractTables(finalPlan)
 
     // 3.use all tables to fetch views(may match) from ViewMetaData
-    val candidateViewPlans = getApplicableMaterializations(queryTables.map(t => t.tableName))
-        .filter(x => !OmniCachePluginConfig.isMVInUpdate(x._2))
+    val candidateViewPlans = RewriteTime.withTimeStat("getApplicableMaterializations") {
+      getApplicableMaterializations(queryTables.map(t => t.tableName))
+          .filter(x => !OmniCachePluginConfig.isMVInUpdate(x._2))
+    }
     if (candidateViewPlans.isEmpty) {
       return finalPlan
     }
@@ -119,7 +123,9 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
         }
 
         // 4.5.extractPredictExpressions from viewQueryPlan and mappedQueryPlan
-        val queryPredictExpression = extractPredictExpressions(queryExpr, EMPTY_BIMAP)
+        val queryPredictExpression = RewriteTime.withTimeStat("extractPredictExpressions") {
+          extractPredictExpressions(queryExpr, EMPTY_BIMAP)
+        }
 
         val viewProjectList = extractTopProjectList(viewQueryExpr)
         val viewTableAttrs = viewTablePlan.output
@@ -135,14 +141,18 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
         flatListMappings.foreach { queryToViewTableMapping =>
           mappingLoop.breakable {
             val inverseTableMapping = queryToViewTableMapping.inverse()
-            val viewPredictExpression = extractPredictExpressions(viewQueryExpr,
-              inverseTableMapping)
+            val viewPredictExpression = RewriteTime.withTimeStat("extractPredictExpressions") {
+              extractPredictExpressions(viewQueryExpr,
+                inverseTableMapping)
+            }
 
             // 4.7.compute compensationPredicates between viewQueryPlan and queryPlan
-            var newViewTablePlan = computeCompensationPredicates(viewTablePlan,
-              queryPredictExpression, viewPredictExpression, inverseTableMapping,
-              viewPredictExpression._1.getEquivalenceClassesMap,
-              viewProjectList, viewTableAttrs)
+            var newViewTablePlan = RewriteTime.withTimeStat("computeCompensationPredicates") {
+              computeCompensationPredicates(viewTablePlan,
+                queryPredictExpression, viewPredictExpression, inverseTableMapping,
+                viewPredictExpression._1.getEquivalenceClassesMap,
+                viewProjectList, viewTableAttrs)
+            }
             // 4.8.compensationPredicates isEmpty, because view's row data cannot satisfy query
             if (newViewTablePlan.isEmpty) {
               mappingLoop.break()
@@ -150,10 +160,12 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
 
             // 4.9.use viewTablePlan(join compensated), query project,
             // compensationPredicts to rewrite final plan
-            newViewTablePlan = rewriteView(newViewTablePlan.get, viewQueryExpr,
-              queryExpr, inverseTableMapping,
-              queryPredictExpression._1.getEquivalenceClassesMap,
-              viewProjectList, viewTableAttrs)
+            newViewTablePlan = RewriteTime.withTimeStat("rewriteView") {
+              rewriteView(newViewTablePlan.get, viewQueryExpr,
+                queryExpr, inverseTableMapping,
+                queryPredictExpression._1.getEquivalenceClassesMap,
+                viewProjectList, viewTableAttrs)
+            }
             if (newViewTablePlan.isEmpty) {
               mappingLoop.break()
             }
@@ -452,7 +464,6 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
     }
     None
   }
-
 
   /**
    * split expression by or,then compute compensation
@@ -769,5 +780,4 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
       columnMapping: Map[ExpressionEqual, mutable.Set[ExpressionEqual]],
       viewProjectList: Seq[Expression], viewTableAttrs: Seq[Attribute]):
   Option[LogicalPlan]
-
 }

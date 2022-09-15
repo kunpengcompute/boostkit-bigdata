@@ -482,7 +482,7 @@ case class ExprSimplifier(unknownAsFalse: Boolean,
                 breaks3.break()
               }
             } else if (containsSql(ors, term)) {
-              // Simplification between a otherExpression and a orExpression.
+              // Simplification between a otherExpression and a OrExpression.
               terms.-=(orOp)
               breaks3.break()
             }

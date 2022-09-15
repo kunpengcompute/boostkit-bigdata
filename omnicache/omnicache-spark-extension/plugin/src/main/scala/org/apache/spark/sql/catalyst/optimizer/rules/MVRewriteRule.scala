@@ -59,6 +59,7 @@ class MVRewriteRule(session: SparkSession) extends Rule[LogicalPlan] with Loggin
 
   def tryRewritePlan(plan: LogicalPlan): LogicalPlan = {
     val usingMvs = mutable.Set.empty[String]
+    RewriteTime.clear()
     val rewriteStartSecond = System.currentTimeMillis()
     val res = plan.transformDown {
       case p: Project =>
@@ -80,8 +81,10 @@ class MVRewriteRule(session: SparkSession) extends Rule[LogicalPlan] with Loggin
       case p => p
     }
     if (usingMvs.nonEmpty) {
-      if (!RewriteHelper.checkAttrsValid(res)) {
-        return plan
+      RewriteTime.withTimeStat("checkAttrsValid") {
+        if (!RewriteHelper.checkAttrsValid(res)) {
+          return plan
+        }
       }
       val sql = session.sparkContext.getLocalProperty(SparkContext.SPARK_JOB_DESCRIPTION)
       val mvs = usingMvs.mkString(";").replaceAll("`", "")
@@ -92,6 +95,8 @@ class MVRewriteRule(session: SparkSession) extends Rule[LogicalPlan] with Loggin
       logDebug(log)
       session.sparkContext.listenerBus.post(SparkListenerMVRewriteSuccess(sql, mvs))
     }
+    RewriteTime.statFromStartTime("total", rewriteStartSecond)
+    logDebug(RewriteTime.timeStat.toString())
     res
   }
 }
@@ -111,6 +116,27 @@ class MVRewriteSuccessListener(
       case _: SparkListenerMVRewriteSuccess =>
         kvStore.write(event)
       case _ =>
+    }
+  }
+}
+
+object RewriteTime {
+  val timeStat: mutable.Map[String, Long] = mutable.HashMap[String, Long]()
+
+  def statFromStartTime(key: String, startTime: Long): Unit = {
+    timeStat += (key -> (timeStat.getOrElse(key, 0L) + System.currentTimeMillis() - startTime))
+  }
+
+  def clear(): Unit = {
+    timeStat.clear()
+  }
+
+  def withTimeStat[T](key: String)(f: => T): T = {
+    val startTime = System.currentTimeMillis()
+    try {
+      f
+    } finally {
+      statFromStartTime(key, startTime)
     }
   }
 }

@@ -24,7 +24,8 @@ import scala.collection.mutable
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.catalyst.catalog.{CatalogTable, SessionCatalog}
-import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, SubqueryAlias}
+import org.apache.spark.sql.catalyst.optimizer.rules.RewriteTime
+import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, RepartitionByExpression, SubqueryAlias}
 
 object ViewMetadata extends RewriteHelper {
 
@@ -73,11 +74,23 @@ object ViewMetadata extends RewriteHelper {
 
       // db.table
       val tableName = catalogTable.identifier.quotedString
-      val viewTablePlan = spark.table(tableName).queryExecution.analyzed match {
-        case SubqueryAlias(_, child) => child
-        case a@_ => a
+      val viewTablePlan = RewriteTime
+          .withTimeStat("viewTablePlan") {
+            spark.table(tableName).queryExecution.analyzed match {
+              case SubqueryAlias(_, child) => child
+              case a@_ => a
+            }
+          }
+      var viewQueryPlan = RewriteTime
+          .withTimeStat("viewQueryPlan") {
+            spark.sql(viewQuerySql).queryExecution.analyzed
+          }
+      viewQueryPlan = viewQueryPlan match {
+        case RepartitionByExpression(_, child, _) =>
+          child
+        case _ =>
+          viewQueryPlan
       }
-      val viewQueryPlan = spark.sql(viewQuerySql).queryExecution.analyzed
       // reset preDatabase
       spark.sessionState.catalogManager.setCurrentNamespace(Array(preDatabase))
 
@@ -85,7 +98,10 @@ object ViewMetadata extends RewriteHelper {
       val viewName = catalogTable.identifier.toString()
 
       // mappedViewQueryPlan and mappedViewContainsTables
-      val (mappedViewQueryPlan, mappedViewContainsTables) = extractTables(viewQueryPlan)
+      val (mappedViewQueryPlan, mappedViewContainsTables) = RewriteTime
+          .withTimeStat("extractTables") {
+            extractTables(viewQueryPlan)
+          }
 
       mappedViewContainsTables
           .foreach { mappedViewContainsTable =>
@@ -99,7 +115,10 @@ object ViewMetadata extends RewriteHelper {
       // match function is attributeReferenceEqualSimple, by name and data type
       // Attr of table cannot used, because same Attr in view query and view table,
       // it's table is different.
-      val mappedViewTablePlan = mapTablePlanAttrToQuery(viewTablePlan, mappedViewQueryPlan)
+      val mappedViewTablePlan = RewriteTime
+          .withTimeStat("mapTablePlanAttrToQuery") {
+            mapTablePlanAttrToQuery(viewTablePlan, mappedViewQueryPlan)
+          }
 
       viewToContainsTables.put(viewName, mappedViewContainsTables)
       viewToViewQueryPlan.putIfAbsent(viewName, mappedViewQueryPlan)
@@ -149,12 +168,15 @@ object ViewMetadata extends RewriteHelper {
 
   def forceLoad(): Unit = this.synchronized {
     val catalog = spark.sessionState.catalog
-    // val db = OmniCachePluginConfig.getConf.OmniCacheDB
 
     // load from all db
     for (db <- catalog.listDatabases()) {
-      val tables = omniCacheFilter(catalog, db)
-      tables.foreach(tableData => saveViewMetadataToMap(tableData))
+      val tables = RewriteTime.withTimeStat("loadTable") {
+        omniCacheFilter(catalog, db)
+      }
+      RewriteTime.withTimeStat("saveViewMetadataToMap") {
+        tables.foreach(tableData => saveViewMetadataToMap(tableData))
+      }
     }
   }
 
