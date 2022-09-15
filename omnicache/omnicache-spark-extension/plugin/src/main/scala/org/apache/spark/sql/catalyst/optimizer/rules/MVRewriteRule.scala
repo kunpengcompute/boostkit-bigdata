@@ -17,17 +17,21 @@
 
 package org.apache.spark.sql.catalyst.optimizer.rules
 
+import com.fasterxml.jackson.annotation.JsonIgnore
 import com.huawei.boostkit.spark.conf.OmniCachePluginConfig
 import com.huawei.boostkit.spark.util.RewriteHelper
 import scala.collection.mutable
 
 import org.apache.spark.SparkContext
+import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.internal.Logging
-import org.apache.spark.scheduler.SparkListenerEvent
+import org.apache.spark.scheduler.{SparkListener, SparkListenerEvent}
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.plans.logical.{Aggregate, LogicalPlan, Project}
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.command.OmniCacheCreateMvCommand
+import org.apache.spark.status.ElementTrackingStore
+import org.apache.spark.util.kvstore.KVIndex
 
 class MVRewriteRule(session: SparkSession) extends Rule[LogicalPlan] with Logging {
   val omniCacheConf: OmniCachePluginConfig = OmniCachePluginConfig.getConf
@@ -84,5 +88,21 @@ class MVRewriteRule(session: SparkSession) extends Rule[LogicalPlan] with Loggin
   }
 }
 
+@DeveloperApi
 case class SparkListenerMVRewriteSuccess(sql: String, usingMvs: String) extends SparkListenerEvent {
+  @JsonIgnore
+  @KVIndex
+  def id: String = (System.currentTimeMillis() + "%s%s".format(sql, usingMvs).hashCode).toString
+}
+
+class MVRewriteSuccessListener(
+    kvStore: ElementTrackingStore) extends SparkListener with Logging {
+
+  override def onOtherEvent(event: SparkListenerEvent): Unit = {
+    event match {
+      case _: SparkListenerMVRewriteSuccess =>
+        kvStore.write(event)
+      case _ =>
+    }
+  }
 }

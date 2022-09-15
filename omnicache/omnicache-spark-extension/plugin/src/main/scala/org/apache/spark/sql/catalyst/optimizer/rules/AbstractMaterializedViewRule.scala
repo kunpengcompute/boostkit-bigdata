@@ -61,7 +61,7 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
 
     // 3.use all tables to fetch views(may match) from ViewMetaData
     val candidateViewPlans = getApplicableMaterializations(queryTables.map(t => t.tableName))
-        .filter(x => !OmniCachePluginConfig.isMVInUpdate(sparkSession, x._1))
+        .filter(x => !OmniCachePluginConfig.isMVInUpdate(x._2))
     if (candidateViewPlans.isEmpty) {
       return finalPlan
     }
@@ -112,6 +112,9 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
           val (newViewTablePlan, newViewQueryPlan, newTopViewProject) = newViewPlans.get
           viewTablePlan = newViewTablePlan
           viewQueryPlan = newViewQueryPlan
+          if (newTopViewProject.isEmpty) {
+            viewQueryExpr = newViewQueryPlan
+          }
           topViewProject = newTopViewProject
         }
 
@@ -284,6 +287,7 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
       }
     }
     JavaConverters.asScalaIteratorConverter(result.iterator()).asScala.toSeq
+        .sortWith((map1, map2) => map1.toString < map2.toString)
   }
 
   /**
@@ -594,18 +598,6 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
     if (columnsEquiPredictsResult.isEmpty) {
       return None
     }
-    val viewTableAttrSet = viewTableAttrs.map(ExpressionEqual).toSet
-    columnsEquiPredictsResult.get.foreach { expr =>
-      expr.foreach {
-        case attr: AttributeReference =>
-          if (!viewTableAttrSet.contains(ExpressionEqual(attr))) {
-            logDebug(s"attr:%s cannot found in view:%s"
-                .format(attr, OmniCachePluginConfig.getConf.curMatchMV))
-            return None
-          }
-        case _ =>
-      }
-    }
 
     // 5.rewrite rangeCompensation,residualCompensation by viewTableAttrs
     val otherPredictsResult = rewriteExpressions(Seq(compensationRangePredicts.get,
@@ -642,7 +634,7 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
     val swapProjectList = if (swapTableColumn) {
       swapTableColumnReferences(viewProjectList, tableMapping, columnMapping)
     } else {
-      swapColumnTableReferences(viewProjectList, tableMapping, columnMapping)
+      swapTableColumnReferences(viewProjectList, tableMapping, columnMapping)
     }
     val swapTableAttrs = swapTableReferences(viewTableAttrs, tableMapping)
 
@@ -665,11 +657,11 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
     }.asInstanceOf[T]
 
     // 4.iterate result and dfs check every AttributeReference in ViewTableAttributeReference
-    val viewTableAttrSet = swapTableAttrs.map(ExpressionEqual).toSet
+    val viewTableAttrSet = swapTableAttrs.map(_.exprId).toSet
     result.foreach { expr =>
       expr.foreach {
         case attr: AttributeReference =>
-          if (!viewTableAttrSet.contains(ExpressionEqual(attr))) {
+          if (!viewTableAttrSet.contains(attr.exprId)) {
             logDebug(s"attr:%s cannot found in view:%s"
                 .format(attr, OmniCachePluginConfig.getConf.curMatchMV))
             return None

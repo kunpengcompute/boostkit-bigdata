@@ -66,11 +66,20 @@ class MaterializedViewJoinRule(sparkSession: SparkSession)
       topViewProject.get
     }
 
+    var projectList: Seq[NamedExpression] = newViewQueryPlan match {
+      case p: Project =>
+        p.projectList
+      case _ =>
+        newViewQueryPlan.output
+    }
+
     needTables.foreach { needTable =>
       newViewQueryPlan = Join(newViewQueryPlan, needTable.logicalPlan,
         Inner, None, JoinHint.NONE)
+      projectList ++= needTable.logicalPlan.output
     }
-    Some(newViewTablePlan, viewQueryPlan, None)
+    newViewQueryPlan = Project(projectList, newViewQueryPlan)
+    Some(newViewTablePlan, newViewQueryPlan, None)
   }
 
   /**
