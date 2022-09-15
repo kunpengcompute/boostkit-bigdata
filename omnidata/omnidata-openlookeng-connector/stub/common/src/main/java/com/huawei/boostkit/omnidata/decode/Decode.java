@@ -13,21 +13,21 @@
  * limitations under the License.
  */
 
-package io.prestosql.plugin.hive.omnidata.decode.type;
+package com.huawei.boostkit.omnidata.decode;
 
-import java.util.Optional;
+import com.google.inject.BindingAnnotation;
 
-/**
- * Short decode type
- *
- * @since 2022-07-18
- */
-public class ShortDecodeType
-        implements DecodeType
+import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+
+@Documented
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.METHOD)
+@BindingAnnotation
+public @interface Decode
 {
-    @Override
-    public Optional<Class<?>> getJavaType()
-    {
-        return Optional.of(short.class);
-    }
+    String value();
 }

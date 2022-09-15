@@ -20,7 +20,6 @@ import com.google.common.base.Objects;
 import io.prestosql.spi.relation.CallExpression;
 import io.prestosql.spi.relation.RowExpression;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -47,14 +46,7 @@ public class AggregationInfo {
 
     @Override
     public boolean equals(Object object) {
-        if (this == object) {
-            return true;
-        }
-        if (!(object instanceof AggregationInfo)) {
-            return false;
-        }
-        AggregationInfo that = (AggregationInfo) object;
-        return aggregations.equals(that.aggregations) && groupingKeys.equals(that.groupingKeys);
+        return true;
     }
 
     @Override
@@ -83,14 +75,7 @@ public class AggregationInfo {
 
         @Override
         public boolean equals(Object object) {
-            if (this == object) {
-                return true;
-            }
-            if (!(object instanceof AggregateFunction)) {
-                return false;
-            }
-            AggregateFunction that = (AggregateFunction) object;
-            return callExpression.equals(that.callExpression) && isDistinct == that.isDistinct;
+            return true;
         }
 
         @Override

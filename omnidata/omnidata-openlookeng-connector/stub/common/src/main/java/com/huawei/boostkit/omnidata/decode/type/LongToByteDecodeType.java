@@ -13,21 +13,21 @@
  * limitations under the License.
  */
 
-package io.prestosql.plugin.hive.omnidata.decode.type;
+package com.huawei.boostkit.omnidata.decode.type;
 
 import java.util.Optional;
 
 /**
- * Dcode java type
+ * Long To Byte decode
  *
  * @since 2022-07-18
  */
-public interface DecodeType
+public class LongToByteDecodeType
+        implements DecodeType
 {
-    /**
-     * get java class type
-     *
-     * @return class type
-     */
-    Optional<Class<?>> getJavaType();
+    @Override
+    public Optional<Class<?>> getJavaType()
+    {
+        return Optional.of(LongToByteDecodeType.class);
+    }
 }

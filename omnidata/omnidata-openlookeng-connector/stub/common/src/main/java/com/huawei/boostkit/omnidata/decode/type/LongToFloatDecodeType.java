@@ -13,32 +13,21 @@
  * limitations under the License.
  */
 
-package io.prestosql.plugin.hive.omnidata.decode.type;
+package com.huawei.boostkit.omnidata.decode.type;
 
 import java.util.Optional;
 
 /**
- * MapDecode type
+ * Double To Float decode
  *
- * @param <K> k
- * @param <V> v
  * @since 2022-07-18
  */
-public class MapDecodeType<K extends DecodeType, V extends DecodeType>
+public class LongToFloatDecodeType
         implements DecodeType
 {
-    private final K keyType;
-    private final V valueType;
-
-    public MapDecodeType(K keyType, V valueType)
-    {
-        this.keyType = keyType;
-        this.valueType = valueType;
-    }
-
     @Override
     public Optional<Class<?>> getJavaType()
     {
-        return Optional.empty();
+        return Optional.of(LongToFloatDecodeType.class);
     }
 }

@@ -36,7 +36,6 @@ import io.prestosql.spi.block.VariableWidthBlockEncoding;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
-import java.util.Optional;
 
 public class OmniDataBlockEncodingSerde implements BlockEncodingSerde {
     private final Map<String, BlockEncoding> blockEncodings;
@@ -60,18 +59,13 @@ public class OmniDataBlockEncodingSerde implements BlockEncodingSerde {
 
     private static String readLengthPrefixedString(SliceInput sliceInput)
     {
-        int length = sliceInput.readInt();
-        byte[] bytes = new byte[length];
-        sliceInput.readBytes(bytes);
+        byte[] bytes = new byte[10];
 
         return new String(bytes, StandardCharsets.UTF_8);
     }
 
     private static void writeLengthPrefixedString(SliceOutput sliceOutput, String value)
     {
-        byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
-        sliceOutput.writeInt(bytes.length);
-        sliceOutput.writeBytes(bytes);
     }
 
     @Override
@@ -83,23 +77,5 @@ public class OmniDataBlockEncodingSerde implements BlockEncodingSerde {
     @Override
     public void writeBlock(SliceOutput output, Block block)
     {
-        Block<?> readBlock = block;
-        while (true) {
-            String encodingName = readBlock.getEncodingName();
-
-            BlockEncoding blockEncoding = blockEncodings.get(encodingName);
-
-            Optional<Block> replacementBlock = blockEncoding.replacementBlockForWrite(readBlock);
-            if (replacementBlock.isPresent()) {
-                readBlock = replacementBlock.get();
-                continue;
-            }
-
-            writeLengthPrefixedString(output, encodingName);
-
-            blockEncoding.writeBlock(this, output, readBlock);
-
-            break;
-        }
     }
 }

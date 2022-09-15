@@ -13,10 +13,10 @@
  * limitations under the License.
  */
 
-package io.prestosql.plugin.hive.omnidata.decode;
+package com.huawei.boostkit.omnidata.decode;
 
 import io.airlift.slice.SliceInput;
-import io.prestosql.plugin.hive.omnidata.decode.type.DecodeType;
+import com.huawei.boostkit.omnidata.decode.type.DecodeType;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.Optional;
