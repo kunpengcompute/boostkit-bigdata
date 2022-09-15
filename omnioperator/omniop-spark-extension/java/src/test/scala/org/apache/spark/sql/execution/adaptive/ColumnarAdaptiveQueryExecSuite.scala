@@ -270,7 +270,7 @@ class ColumnarAdaptiveQueryExecSuite extends ColumnarSparkPlanTest
         checkAnswer(testDf, Seq())
         val plan = testDf.queryExecution.executedPlan
         print(plan)
-        assert(find(plan)(_.isInstanceOf[BroadcastHashJoinExec]).isDefined)
+        assert(find(plan)(_.isInstanceOf[ColumnarBroadcastHashJoinExec]).isDefined)
         val coalescedReaders = collect(plan) {
           case r: ColumnarCustomShuffleReaderExec => r
         }
