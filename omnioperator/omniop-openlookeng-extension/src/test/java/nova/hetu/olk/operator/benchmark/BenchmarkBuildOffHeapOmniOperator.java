@@ -47,12 +47,14 @@ import java.util.concurrent.TimeUnit;
 
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
+import static io.prestosql.spi.type.DateType.DATE;
+import static io.prestosql.spi.type.DecimalType.createDecimalType;
 import static io.prestosql.spi.type.DoubleType.DOUBLE;
 import static io.prestosql.spi.type.IntegerType.INTEGER;
 import static io.prestosql.spi.type.VarcharType.createVarcharType;
 
 @State(Scope.Thread)
-@Fork(0)
+@Fork(1)
 @Threads(1)
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
@@ -66,6 +68,7 @@ public class BenchmarkBuildOffHeapOmniOperator
     private static final Map<String, ImmutableList<Type>> INPUT_TYPES = ImmutableMap
             .<String, ImmutableList<Type>>builder().put("boolean", ImmutableList.of(BOOLEAN))
             .put("long", ImmutableList.of(BIGINT)).put("int", ImmutableList.of(INTEGER))
+            .put("decimal", ImmutableList.of(createDecimalType())).put("date", ImmutableList.of(DATE))
             .put("double", ImmutableList.of(DOUBLE)).put("varchar", ImmutableList.of(createVarcharType(50)))
             .build();
 
@@ -73,7 +76,7 @@ public class BenchmarkBuildOffHeapOmniOperator
     public static class BenchmarkContext
             extends AbstractOmniOperatorBenchmarkContext
     {
-        @Param({"int", "long", "double", "varchar"})
+        @Param({"int", "long", "boolean", "double", "decimal", "date", "varchar"})
         String testGroup = "int";
 
         @Param({"false", "true"})
@@ -82,17 +85,7 @@ public class BenchmarkBuildOffHeapOmniOperator
         @Override
         protected List<Page> buildPages()
         {
-            List<Type> typesArray = INPUT_TYPES.get(testGroup);
-            List<Page> pages = new ArrayList<>();
-            for (int i = 0; i < TOTAL_PAGES; i++) {
-                if (dictionaryBlocks) {
-                    pages.add(PageBuilderUtil.createSequencePageWithDictionaryBlocks(typesArray, ROWS_PER_PAGE));
-                }
-                else {
-                    pages.add(PageBuilderUtil.createSequencePage(typesArray, ROWS_PER_PAGE));
-                }
-            }
-            return pages;
+            return buildPages(INPUT_TYPES.get(testGroup), TOTAL_PAGES, ROWS_PER_PAGE, dictionaryBlocks);
         }
 
         @Override

@@ -40,7 +40,6 @@ import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 import org.openjdk.jmh.runner.options.VerboseMode;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -53,7 +52,7 @@ import static io.prestosql.spi.type.IntegerType.INTEGER;
 import static io.prestosql.spi.type.VarcharType.createVarcharType;
 
 @State(Scope.Thread)
-@Fork(0)
+@Fork(1)
 @Threads(1)
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
@@ -86,7 +85,7 @@ public class BenchmarkDistinctLimitOmniOperator
     public static class BenchmarkContext
             extends AbstractOmniOperatorBenchmarkContext
     {
-        @Param({"1", "100", "10000", "100000"})
+        @Param({"100", "10000", "100000"})
         private String limit = "100";
 
         @Param({"group1", "group2", "group3", "group4", "group5", "group6", "group7", "group8"})
@@ -101,18 +100,7 @@ public class BenchmarkDistinctLimitOmniOperator
         @Override
         protected List<Page> buildPages()
         {
-            List<Type> typesArray = INPUT_TYPES.get(testGroup);
-            List<Page> pages = new ArrayList<>(TOTAL_PAGES);
-            for (int i = 0; i < TOTAL_PAGES; i++) {
-                if (dictionaryBlocks) {
-                    pages.add(PageBuilderUtil.createSequencePageWithDictionaryBlocks(typesArray,
-                            Integer.parseInt(rowsPerPageStr)));
-                }
-                else {
-                    pages.add(PageBuilderUtil.createSequencePage(typesArray, Integer.parseInt(rowsPerPageStr)));
-                }
-            }
-            return pages;
+            return buildPages(INPUT_TYPES.get(testGroup), TOTAL_PAGES, Integer.parseInt(rowsPerPageStr), dictionaryBlocks);
         }
 
         @Override

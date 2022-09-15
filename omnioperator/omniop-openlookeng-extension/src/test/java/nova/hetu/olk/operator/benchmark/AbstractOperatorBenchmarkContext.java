@@ -23,6 +23,8 @@ import io.prestosql.operator.Operator;
 import io.prestosql.operator.OperatorFactory;
 import io.prestosql.operator.TaskContext;
 import io.prestosql.spi.Page;
+import io.prestosql.spi.type.Type;
+import io.prestosql.testing.TestingSnapshotUtils;
 import io.prestosql.testing.TestingTaskContext;
 import nova.hetu.olk.tool.BlockUtils;
 import nova.hetu.olk.tool.VecAllocatorHelper;
@@ -30,12 +32,14 @@ import nova.hetu.omniruntime.vector.VecAllocator;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.TearDown;
 
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static io.airlift.concurrent.Threads.daemonThreadsNamed;
@@ -109,15 +113,15 @@ public abstract class AbstractOperatorBenchmarkContext
     public void setupIteration()
     {
         beforeSetupIteration();
-        InvocationContext invocationContext = new InvocationContext();
-        invocationContext.driverContext = createTaskContext()
+        InvocationContext testInvocationContext = new InvocationContext();
+        testInvocationContext.driverContext = createTaskContext()
                 .addPipelineContext(0, true, true, false)
                 .addDriverContext();
-        invocationContext.pages = new LinkedList<>(forkPages(this.pageTemplate));
+        testInvocationContext.pages = new LinkedList<>(forkPages(this.pageTemplate));
         if (!INCLUDE_CREATE_OPERATOR) {
-            invocationContext.operator = operatorFactory.createOperator(invocationContext.driverContext);
+            testInvocationContext.operator = operatorFactory.createOperator(testInvocationContext.driverContext);
         }
-        this.invocationContext = invocationContext;
+        this.invocationContext = testInvocationContext;
         afterSetupIteration();
     }
 
@@ -126,6 +130,20 @@ public abstract class AbstractOperatorBenchmarkContext
     }
 
     protected abstract List<Page> buildPages();
+
+    protected List<Page> buildPages(List<Type> typesArray, int totalPages, int rowsPerPage, boolean dictionaryBlocks)
+    {
+        List<Page> pages = new ArrayList<>(totalPages);
+        for (int i = 0; i < totalPages; i++) {
+            if (dictionaryBlocks) {
+                pages.add(PageBuilderUtil.createSequencePageWithDictionaryBlocks(typesArray, rowsPerPage));
+            }
+            else {
+                pages.add(PageBuilderUtil.createSequencePage(typesArray, rowsPerPage));
+            }
+        }
+        return pages;
+    }
 
     protected abstract List<Page> forkPages(List<Page> pages);
 
@@ -181,6 +199,15 @@ public abstract class AbstractOperatorBenchmarkContext
         beforeCleanupTrial();
         executor.shutdownNow();
         scheduledExecutor.shutdownNow();
+        try {
+            Field field = TestingSnapshotUtils.NOOP_SNAPSHOT_UTILS.getClass().getDeclaredField("deleteSnapshotExecutor");
+            field.setAccessible(true);
+            ScheduledThreadPoolExecutor snapshotExecutor = (ScheduledThreadPoolExecutor) field.get(TestingSnapshotUtils.NOOP_SNAPSHOT_UTILS);
+            snapshotExecutor.shutdownNow();
+        }
+        catch (Exception e) {
+            System.out.println(e);
+        }
         afterCleanupTrial();
     }
 
@@ -202,7 +229,7 @@ public abstract class AbstractOperatorBenchmarkContext
             invocationContext.operator.close();
         }
         catch (Exception e) {
-            e.printStackTrace();
+            System.out.println(e);
         }
     }
 

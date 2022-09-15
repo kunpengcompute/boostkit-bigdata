@@ -71,7 +71,7 @@ import static java.lang.String.format;
 import static org.openjdk.jmh.annotations.Scope.Thread;
 
 @State(Scope.Thread)
-@Fork(0)
+@Fork(1)
 @Threads(1)
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
@@ -114,21 +114,6 @@ public class BenchmarkHashAggregationOlkOperator
             .put("sql6", ImmutableList.of(INTEGER, INTEGER))
             .put("sql7", ImmutableList.of(FIXED_WIDTH_VARCHAR, FIXED_WIDTH_VARCHAR, FIXED_WIDTH_VARCHAR))
             .put("sql9", ImmutableList.of(BIGINT, BIGINT, BIGINT, FIXED_WIDTH_VARCHAR)).build();
-    private static final Map<String, List<Integer>> aggChannels = new ImmutableMap.Builder<String, List<Integer>>()
-            .put("sql2", ImmutableList.of(6)).put("sql4", ImmutableList.of(4)).put("sql6", ImmutableList.of(2))
-            .put("sql7", ImmutableList.of(3, 4, 5, 6, 7)).put("sql9", ImmutableList.of(4, 5)).build();
-    private static final Map<String, List<Type>> aggInputTypes = new ImmutableMap.Builder<String, List<Type>>()
-            .put("sql2", ImmutableList.of(BIGINT)).put("sql4", ImmutableList.of(BIGINT))
-            .put("sql6", ImmutableList.of(BIGINT)).put("sql7", ImmutableList.of(BIGINT, BIGINT, BIGINT, BIGINT, BIGINT))
-            .put("sql9", ImmutableList.of(BIGINT, BIGINT)).build();
-    private static final Map<String, List<Type>> aggOutputTypes = new ImmutableMap.Builder<String, List<Type>>()
-            .put("sql2", ImmutableList.of(BIGINT)).put("sql4", ImmutableList.of(BIGINT))
-            .put("sql6", ImmutableList.of(BIGINT)).put("sql7", ImmutableList.of(BIGINT, BIGINT, BIGINT, BIGINT, BIGINT))
-            .put("sql9", ImmutableList.of(BIGINT, BIGINT)).build();
-    private static final Map<String, List<String>> aggFuncTypes = new ImmutableMap.Builder<String, List<String>>()
-            .put("sql2", ImmutableList.of("sum")).put("sql4", ImmutableList.of("sum"))
-            .put("sql6", ImmutableList.of("sum")).put("sql7", ImmutableList.of("sum", "sum", "sum", "sum", "sum"))
-            .put("sql9", ImmutableList.of("sum", "sum")).build();
 
     public static final int TOTAL_PAGES = 140;
     public static final int ROWS_PER_PAGE = 10_000;

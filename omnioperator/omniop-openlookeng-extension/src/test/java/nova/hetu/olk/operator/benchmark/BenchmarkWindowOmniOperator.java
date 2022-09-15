@@ -72,7 +72,7 @@ import static io.prestosql.spi.type.VarcharType.createVarcharType;
 import static org.openjdk.jmh.annotations.Scope.Thread;
 
 @State(Scope.Thread)
-@Fork(0)
+@Fork(1)
 @Threads(1)
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
@@ -143,8 +143,8 @@ public class BenchmarkWindowOmniOperator
     private static final Map<String, ImmutableList<Integer>> PARTITION_CHANNELS = ImmutableMap
             .<String, ImmutableList<Integer>>builder().put("group1", ImmutableList.of(0, 1))
             .put("group2", ImmutableList.of(0, 1, 2)).put("group3", ImmutableList.of(0, 1, 2, 3, 4))
-            .put("group4", ImmutableList.of(0, 1, 2, 3)).put("group5", ImmutableList.of(1))
-            .put("group6", ImmutableList.of(1)).put("group7", ImmutableList.of(0, 2, 3, 4)).build();
+            .put("group4", ImmutableList.of(0, 1, 2, 3)).put("group5", ImmutableList.of(0, 1))
+            .put("group6", ImmutableList.of(0, 1)).put("group7", ImmutableList.of(0, 1, 3, 4)).build();
     private static final Map<String, ImmutableList<Type>> INPUT_TYPES = ImmutableMap
             .<String, ImmutableList<Type>>builder().put("group1", ImmutableList.of(BIGINT, BIGINT, BIGINT, BIGINT))
             .put("group2", ImmutableList.of(BIGINT, BIGINT, BIGINT, BIGINT))
@@ -178,12 +178,8 @@ public class BenchmarkWindowOmniOperator
         @Param({"false", "true"})
         boolean dictionaryBlocks;
 
-        public int rowsPerPartition;
-
-        @Param("0")
+        @Param({"0", "1", "2"})
         public int numberOfPregroupedColumns;
-
-        public int partitionsPerGroup;
 
         public static WindowOmniOperator.WindowOmniOperatorFactory createFactoryUnbounded(
                 List<? extends Type> sourceTypes, List<Integer> outputChannels,
@@ -199,17 +195,7 @@ public class BenchmarkWindowOmniOperator
         @Override
         protected List<Page> buildPages()
         {
-            List<Type> typesArray = INPUT_TYPES.get(testGroup);
-            List<Page> pages = new ArrayList<>();
-            for (int i = 0; i < TOTAL_PAGES; i++) {
-                if (dictionaryBlocks) {
-                    pages.add(PageBuilderUtil.createSequencePageWithDictionaryBlocks(typesArray, ROWS_PER_PAGE));
-                }
-                else {
-                    pages.add(PageBuilderUtil.createSequencePage(typesArray, ROWS_PER_PAGE));
-                }
-            }
-            return pages;
+            return buildPages(INPUT_TYPES.get(testGroup), TOTAL_PAGES, ROWS_PER_PAGE, dictionaryBlocks);
         }
 
         @Override
