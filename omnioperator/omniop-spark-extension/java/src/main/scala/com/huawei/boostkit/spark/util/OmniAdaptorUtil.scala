@@ -267,7 +267,9 @@ object OmniAdaptorUtil {
   }
 
   def overflowConf(): OverflowConfig.OverflowConfigId = {
-    // TODO: return OVERFLOW_CONFIG_EXCEPTION or OVERFLOW_CONFIG_NULL according to SQLConf.get.ansiEnabled
-    OverflowConfig.OverflowConfigId.OVERFLOW_CONFIG_EXCEPTION
+    if (SQLConf.get.ansiEnabled)
+      OverflowConfig.OverflowConfigId.OVERFLOW_CONFIG_EXCEPTION
+    else
+      OverflowConfig.OverflowConfigId.OVERFLOW_CONFIG_NULL
   }
 }
