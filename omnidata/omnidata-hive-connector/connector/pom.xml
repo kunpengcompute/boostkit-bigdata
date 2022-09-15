@@ -22,7 +22,7 @@
         <hadoop.version>3.2.0</hadoop.version>
         <tez.version>0.10.0</tez.version>
         <dep.curator.version>2.12.0</dep.curator.version>
-        <dep.omnidata.client.version>1.4.0</dep.omnidata.client.version>
+        <dep.omnidata.stub.version>1.4.0</dep.omnidata.stub.version>
         <dep.hetu.version>1.6.1</dep.hetu.version>
         <junit.version>4.11</junit.version>
         <mockito-all.version>1.10.19</mockito-all.version>
@@ -115,8 +115,8 @@
         </dependency>
         <dependency>
             <groupId>com.huawei.boostkit</groupId>
-            <artifactId>boostkit-omnidata-client-stub</artifactId>
-            <version>${dep.omnidata.client.version}</version>
+            <artifactId>boostkit-omnidata-stub</artifactId>
+            <version>${dep.omnidata.stub.version}</version>
         </dependency>
         <dependency>
             <groupId>io.airlift</groupId>

@@ -19,12 +19,12 @@
 
 package org.apache.hadoop.hive.ql.omnidata.decode;
 
+import com.huawei.boostkit.omnidata.decode.type.DecodeType;
+import com.huawei.boostkit.omnidata.decode.type.LongDecodeType;
 import io.hetu.core.transport.execution.buffer.SerializedPage;
 
 import org.apache.hadoop.hive.ql.exec.vector.ColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.LongColumnVector;
-import org.apache.hadoop.hive.ql.omnidata.decode.type.DecodeType;
-import org.apache.hadoop.hive.ql.omnidata.decode.type.LongDecodeType;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -54,7 +54,7 @@ public class TestPageDeserializer {
         testColumnVector.isNull[0] = false;
         testColumnVector.vector[0] = 749980;
         testColumnVectors[0] = testColumnVector;
-        if (columnVectors.get(0)[0] instanceof LongColumnVector) {
+        if (columnVectors != null && columnVectors.get(0)[0] instanceof LongColumnVector) {
             Assert.assertEquals(((LongColumnVector) columnVectors.get(0)[0]).vector[0],
                     ((LongColumnVector) testColumnVectors[0]).vector[0]);
         }

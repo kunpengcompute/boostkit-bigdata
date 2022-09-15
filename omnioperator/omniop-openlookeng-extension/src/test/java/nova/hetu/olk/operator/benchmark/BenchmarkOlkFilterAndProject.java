@@ -70,7 +70,7 @@ import static org.openjdk.jmh.annotations.Level.Iteration;
 import static org.openjdk.jmh.annotations.Scope.Thread;
 
 @State(Thread)
-@Fork(0)
+@Fork(1)
 @Threads(1)
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)

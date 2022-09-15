@@ -80,7 +80,7 @@ import static org.openjdk.jmh.annotations.Scope.Thread;
 @State(Thread)
 @OutputTimeUnit(MILLISECONDS)
 @BenchmarkMode(AverageTime)
-@Fork(0)
+@Fork(2)
 @Threads(1)
 @Warmup(iterations = 3, time = 1)
 @Measurement(iterations = 5, time = 1)
@@ -429,7 +429,7 @@ public class BenchmarkHashJoinOlkOperators
                 buildOperator.close();
             }
             catch (Exception e) {
-                e.printStackTrace();
+                System.out.println(e);
             }
             buildDriverContext.finished();
             buildDriverContext.getPipelineContext().getTaskContext().getTaskStateMachine().finished();

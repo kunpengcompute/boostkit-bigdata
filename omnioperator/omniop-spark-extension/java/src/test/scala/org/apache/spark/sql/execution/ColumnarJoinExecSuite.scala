@@ -21,12 +21,13 @@ package org.apache.spark.sql.execution
 import org.apache.spark.sql.{DataFrame, Row}
 import org.apache.spark.sql.catalyst.expressions.Expression
 import org.apache.spark.sql.catalyst.optimizer.BuildRight
-import org.apache.spark.sql.catalyst.plans.{Inner, JoinType}
-import org.apache.spark.sql.execution.joins.{BroadcastHashJoinExec, ColumnarBroadcastHashJoinExec, ColumnarShuffledHashJoinExec, ColumnarSortMergeJoinExec}
+import org.apache.spark.sql.catalyst.plans.{FullOuter, Inner, JoinType, LeftOuter}
+import org.apache.spark.sql.execution.joins.{BroadcastHashJoinExec, ColumnarBroadcastHashJoinExec, ColumnarShuffledHashJoinExec, ColumnarSortMergeJoinExec, SortMergeJoinExec}
 import org.apache.spark.sql.functions.col
 
 // refer to joins package
 class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
+
   import testImplicits.{localSeqToDatasetHolder, newProductEncoder}
 
   private var left: DataFrame = _
@@ -85,14 +86,49 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
     val df = left.join(right.hint("broadcast"), col("q") === col("c"))
     val leftKeys = Seq(left.col("q").expr)
     val rightKeys = Seq(right.col("c").expr)
-    checkThatPlansAgreeTemplate(df, leftKeys, rightKeys)
+    checkThatPlansAgreeTemplateForBHJ(df, leftKeys, rightKeys)
   }
 
-  test("columnar sortMergeJoin is equal to native") {
+  test("columnar sortMergeJoin Inner Join is equal to native") {
     val df = left.join(right.hint("mergejoin"), col("q") === col("c"))
     val leftKeys = Seq(left.col("q").expr)
     val rightKeys = Seq(right.col("c").expr)
-    checkThatPlansAgreeTemplate(df, leftKeys, rightKeys)
+    checkThatPlansAgreeTemplateForSMJ(df, leftKeys, rightKeys, Inner)
+  }
+
+  test("columnar sortMergeJoin Inner Join is equal to native With NULL") {
+    val df = leftWithNull.join(rightWithNull.hint("mergejoin"), col("q") === col("c"))
+    val leftKeys = Seq(leftWithNull.col("q").expr)
+    val rightKeys = Seq(rightWithNull.col("c").expr)
+    checkThatPlansAgreeTemplateForSMJ(df, leftKeys, rightKeys, Inner)
+  }
+
+  test("columnar sortMergeJoin LeftOuter Join is equal to native") {
+    val df = left.join(right.hint("mergejoin"), col("q") === col("c"))
+    val leftKeys = Seq(left.col("q").expr)
+    val rightKeys = Seq(right.col("c").expr)
+    checkThatPlansAgreeTemplateForSMJ(df, leftKeys, rightKeys, LeftOuter)
+  }
+
+  test("columnar sortMergeJoin LeftOuter Join is equal to native With NULL") {
+    val df = leftWithNull.join(rightWithNull.hint("mergejoin"), col("q") === col("c"))
+    val leftKeys = Seq(leftWithNull.col("q").expr)
+    val rightKeys = Seq(rightWithNull.col("c").expr)
+    checkThatPlansAgreeTemplateForSMJ(df, leftKeys, rightKeys, LeftOuter)
+  }
+
+  test("columnar sortMergeJoin FullOuter Join is equal to native") {
+    val df = left.join(right.hint("mergejoin"), col("q") === col("c"))
+    val leftKeys = Seq(left.col("q").expr)
+    val rightKeys = Seq(right.col("c").expr)
+    checkThatPlansAgreeTemplateForSMJ(df, leftKeys, rightKeys, FullOuter)
+  }
+
+  test("columnar sortMergeJoin FullOuter Join is equal to native With NULL") {
+    val df = leftWithNull.join(rightWithNull.hint("mergejoin"), col("q") === col("c"))
+    val leftKeys = Seq(leftWithNull.col("q").expr)
+    val rightKeys = Seq(rightWithNull.col("c").expr)
+    checkThatPlansAgreeTemplateForSMJ(df, leftKeys, rightKeys, FullOuter)
   }
 
   test("columnar broadcastHashJoin is equal to native with null") {
@@ -100,11 +136,11 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
       col("q").isNotNull === col("c").isNotNull)
     val leftKeys = Seq(leftWithNull.col("q").isNotNull.expr)
     val rightKeys = Seq(rightWithNull.col("c").isNotNull.expr)
-    checkThatPlansAgreeTemplate(df, leftKeys, rightKeys)
+    checkThatPlansAgreeTemplateForBHJ(df, leftKeys, rightKeys)
   }
 
-  def checkThatPlansAgreeTemplate(df: DataFrame, leftKeys: Seq[Expression],
-                                  rightKeys: Seq[Expression], joinType: JoinType = Inner): Unit = {
+  def checkThatPlansAgreeTemplateForBHJ(df: DataFrame, leftKeys: Seq[Expression],
+                                        rightKeys: Seq[Expression], joinType: JoinType = Inner): Unit = {
     checkThatPlansAgree(
       df,
       (child: SparkPlan) =>
@@ -186,5 +222,18 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
       Row(" yeah  ", "yeah", 10, 8.0, "", "Hello", 2, 2.0),
       Row(" yeah  ", "yeah", 10, 8.0, "abc", "", 4, 1.0)
     ), false)
+  }
+
+  def checkThatPlansAgreeTemplateForSMJ(df: DataFrame, leftKeys: Seq[Expression],
+                                        rightKeys: Seq[Expression], joinType: JoinType): Unit = {
+    checkThatPlansAgree(
+      df,
+      (child: SparkPlan) =>
+        new ColumnarSortMergeJoinExec(leftKeys, rightKeys, joinType,
+          None, child, child),
+      (child: SparkPlan) =>
+        SortMergeJoinExec(leftKeys, rightKeys, joinType,
+          None, child, child),
+      sortAnswers = true)
   }
 }

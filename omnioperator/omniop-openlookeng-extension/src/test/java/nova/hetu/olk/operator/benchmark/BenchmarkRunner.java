@@ -16,13 +16,18 @@
 package nova.hetu.olk.operator.benchmark;
 
 import org.apache.commons.io.FileUtils;
+import org.junit.Ignore;
 import org.openjdk.jmh.results.format.ResultFormatType;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 import org.openjdk.jmh.runner.options.VerboseMode;
+import org.testng.annotations.Test;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileReader;
+import java.net.URL;
 
 public class BenchmarkRunner
 {
@@ -45,13 +50,31 @@ public class BenchmarkRunner
         FileUtils.forceMkdir(new File("benchmark-result"));
         String benchmarkName = benchmarkClassName.replaceAll("\\.java", "");
         Options options = new OptionsBuilder().verbosity(VerboseMode.NORMAL)
-                .include(".*" + benchmarkName + ".*")
+                .include("nova.hetu.olk.operator.benchmark." + benchmarkName + ".*")
                 .shouldDoGC(true)
                 .resultFormat(ResultFormatType.CSV)
                 .result(System.getProperty("user.dir") + "/benchmark-result/" + benchmarkName + ".csv")
-                .forks(0)
                 .build();
         new Runner(options).run();
-        System.exit(0);
+    }
+
+    @Test(timeOut = -1)
+    @Ignore
+    public void benchmarkRes()
+    {
+        URL url = getClass().getClassLoader().getResource("operator.ini");
+        File file = new File(url.getFile());
+        try (BufferedReader bufferedReader = new BufferedReader(new FileReader(file))) {
+            String operator;
+            while ((operator = bufferedReader.readLine()) != null) {
+                if (operator.contains("#") || operator.contains("//")) {
+                    continue;
+                }
+                runBenchmark(operator);
+            }
+        }
+        catch (Exception e) {
+            System.out.println(e);
+        }
     }
 }

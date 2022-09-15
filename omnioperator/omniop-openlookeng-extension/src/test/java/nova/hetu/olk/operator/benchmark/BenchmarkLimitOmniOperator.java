@@ -40,19 +40,19 @@ import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 import org.openjdk.jmh.runner.options.VerboseMode;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import static io.prestosql.spi.type.BigintType.BIGINT;
+import static io.prestosql.spi.type.DateType.DATE;
 import static io.prestosql.spi.type.DecimalType.createDecimalType;
 import static io.prestosql.spi.type.DoubleType.DOUBLE;
 import static io.prestosql.spi.type.IntegerType.INTEGER;
 import static io.prestosql.spi.type.VarcharType.createVarcharType;
 
 @State(Scope.Thread)
-@Fork(0)
+@Fork(1)
 @Threads(1)
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
@@ -69,22 +69,17 @@ public class BenchmarkLimitOmniOperator
             .put("group5", ImmutableList.of(INTEGER, createVarcharType(16)))
             .put("group6", ImmutableList.of(INTEGER, BIGINT, createDecimalType(), DOUBLE))
             .put("group7", ImmutableList.of(createVarcharType(20), createVarcharType(30), createVarcharType(50)))
+            .put("group8", ImmutableList.of(DATE))
             .build();
-
-    private static final Map<String, List<Integer>> SORT_CHANNELS = ImmutableMap.<String, List<Integer>>builder()
-            .put("group1", ImmutableList.of(0)).put("group2", ImmutableList.of(0))
-            .put("group3", ImmutableList.of(0)).put("group4", ImmutableList.of(0))
-            .put("group5", ImmutableList.of(0, 1)).put("group6", ImmutableList.of(0, 1, 2, 3))
-            .put("group7", ImmutableList.of(0, 1, 2)).build();
 
     @State(Scope.Thread)
     public static class BenchmarkContext
             extends AbstractOmniOperatorBenchmarkContext
     {
-        @Param({"1", "100", "1000"})
+        @Param({"100", "1000", "100000"})
         private String limit = "100";
 
-        @Param({"group1", "group2", "group3"})
+        @Param({"group1", "group2", "group3", "group4", "group5", "group6", "group7", "group8"})
         String testGroup = "group1";
 
         @Param({"false", "true"})
@@ -96,18 +91,7 @@ public class BenchmarkLimitOmniOperator
         @Override
         protected List<Page> buildPages()
         {
-            List<Type> typesArray = INPUT_TYPES.get(testGroup);
-            List<Page> pages = new ArrayList<>(TOTAL_PAGES);
-            for (int i = 0; i < TOTAL_PAGES; i++) {
-                if (dictionaryBlocks) {
-                    pages.add(PageBuilderUtil.createSequencePageWithDictionaryBlocks(typesArray,
-                            Integer.parseInt(rowsPerPageStr)));
-                }
-                else {
-                    pages.add(PageBuilderUtil.createSequencePage(typesArray, Integer.parseInt(rowsPerPageStr)));
-                }
-            }
-            return pages;
+            return buildPages(INPUT_TYPES.get(testGroup), TOTAL_PAGES, Integer.parseInt(rowsPerPageStr), dictionaryBlocks);
         }
 
         @Override

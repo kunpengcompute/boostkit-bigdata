@@ -47,12 +47,15 @@ import java.util.concurrent.TimeUnit;
 
 import static io.prestosql.spi.block.SortOrder.ASC_NULLS_FIRST;
 import static io.prestosql.spi.block.SortOrder.DESC_NULLS_FIRST;
+import static io.prestosql.spi.type.BigintType.BIGINT;
+import static io.prestosql.spi.type.DecimalType.createDecimalType;
+import static io.prestosql.spi.type.DoubleType.DOUBLE;
 import static io.prestosql.spi.type.IntegerType.INTEGER;
 import static io.prestosql.spi.type.VarcharType.createVarcharType;
 import static nova.hetu.olk.operator.OrderByOmniOperator.OrderByOmniOperatorFactory.createOrderByOmniOperatorFactory;
 
 @State(Scope.Thread)
-@Fork(0)
+@Fork(1)
 @Threads(1)
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
@@ -66,16 +69,16 @@ public class BenchmarkOrderByOmniOperator
     private static final Map<String, ImmutableList<Type>> INPUT_TYPES = ImmutableMap
             .<String, ImmutableList<Type>>builder().put("group1", ImmutableList.of(createVarcharType(16)))
             .put("group2", ImmutableList.of(INTEGER, INTEGER))
-            .put("group3", ImmutableList.of(INTEGER, INTEGER, INTEGER))
-            .put("group4", ImmutableList.of(INTEGER, INTEGER))
+            .put("group3", ImmutableList.of(INTEGER, INTEGER, DOUBLE))
+            .put("group4", ImmutableList.of(INTEGER, BIGINT))
             .put("group5", ImmutableList.of(createVarcharType(16)))
-            .put("group6", ImmutableList.of(INTEGER, INTEGER, INTEGER))
+            .put("group6", ImmutableList.of(INTEGER, BIGINT, createDecimalType()))
             .put("group7", ImmutableList.of(createVarcharType(20), createVarcharType(30), createVarcharType(50)))
             .put("group8", ImmutableList.of(createVarcharType(50), INTEGER))
             .put("group9",
                     ImmutableList.of(INTEGER, createVarcharType(60), createVarcharType(20), createVarcharType(30)))
             .put("group10",
-                    ImmutableList.of(INTEGER, createVarcharType(50), INTEGER, INTEGER, createVarcharType(50)))
+                    ImmutableList.of(INTEGER, createVarcharType(50), INTEGER, DOUBLE, createVarcharType(50)))
             .build();
 
     private static final Map<String, List<Integer>> SORT_CHANNELS = new ImmutableMap.Builder<String, List<Integer>>()
@@ -111,17 +114,7 @@ public class BenchmarkOrderByOmniOperator
         @Override
         protected List<Page> buildPages()
         {
-            List<Type> typesArray = INPUT_TYPES.get(testGroup);
-            List<Page> pages = new ArrayList<>();
-            for (int i = 0; i < TOTAL_PAGES; i++) {
-                if (dictionaryBlocks) {
-                    pages.add(PageBuilderUtil.createSequencePageWithDictionaryBlocks(typesArray, ROWS_PER_PAGE));
-                }
-                else {
-                    pages.add(PageBuilderUtil.createSequencePage(typesArray, ROWS_PER_PAGE));
-                }
-            }
-            return pages;
+            return buildPages(INPUT_TYPES.get(testGroup), TOTAL_PAGES, ROWS_PER_PAGE, dictionaryBlocks);
         }
 
         @Override
