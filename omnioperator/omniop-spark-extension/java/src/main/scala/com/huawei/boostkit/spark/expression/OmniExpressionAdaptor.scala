@@ -18,18 +18,21 @@
 
 package com.huawei.boostkit.spark.expression
 
+import scala.collection.mutable.ArrayBuffer
+
 import com.huawei.boostkit.spark.Constant.{DEFAULT_STRING_TYPE_LENGTH, IS_CHECK_OMNI_EXP, OMNI_BOOLEAN_TYPE, OMNI_DATE_TYPE, OMNI_DECIMAL128_TYPE, OMNI_DECIMAL64_TYPE, OMNI_DOUBLE_TYPE, OMNI_INTEGER_TYPE, OMNI_LONG_TYPE, OMNI_SHOR_TYPE, OMNI_VARCHAR_TYPE}
 import nova.hetu.omniruntime.`type`.{BooleanDataType, DataTypeSerializer, Date32DataType, Decimal128DataType, Decimal64DataType, DoubleDataType, IntDataType, LongDataType, ShortDataType, VarcharDataType}
 import nova.hetu.omniruntime.constants.FunctionType
 import nova.hetu.omniruntime.constants.FunctionType.{OMNI_AGGREGATION_TYPE_AVG, OMNI_AGGREGATION_TYPE_COUNT_ALL, OMNI_AGGREGATION_TYPE_COUNT_COLUMN, OMNI_AGGREGATION_TYPE_MAX, OMNI_AGGREGATION_TYPE_MIN, OMNI_AGGREGATION_TYPE_SUM, OMNI_WINDOW_TYPE_RANK, OMNI_WINDOW_TYPE_ROW_NUMBER}
+import nova.hetu.omniruntime.constants.JoinType._
 import nova.hetu.omniruntime.operator.OmniExprVerify
+
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate._
+import org.apache.spark.sql.catalyst.plans.{FullOuter, InnerLike, JoinType, LeftOuter, RightOuter}
 import org.apache.spark.sql.catalyst.util.CharVarcharUtils.getRawTypeString
 import org.apache.spark.sql.types.{BooleanType, DataType, DateType, Decimal, DecimalType, DoubleType, IntegerType, LongType, Metadata, ShortType, StringType}
-
-import scala.collection.mutable.ArrayBuffer
 
 object OmniExpressionAdaptor extends Logging {
 
@@ -738,6 +741,21 @@ object OmniExpressionAdaptor extends Logging {
       }
     }
     width
+  }
+
+  def toOmniJoinType(joinType: JoinType): nova.hetu.omniruntime.constants.JoinType = {
+    joinType match {
+      case FullOuter =>
+        OMNI_JOIN_TYPE_FULL
+      case _: InnerLike =>
+        OMNI_JOIN_TYPE_INNER
+      case LeftOuter =>
+        OMNI_JOIN_TYPE_LEFT
+      case RightOuter =>
+        OMNI_JOIN_TYPE_RIGHT
+      case _ =>
+        throw new UnsupportedOperationException(s"Join-type[$joinType] is not supported.")
+    }
   }
 
   def isSimpleColumn(expr: String): Boolean = {
