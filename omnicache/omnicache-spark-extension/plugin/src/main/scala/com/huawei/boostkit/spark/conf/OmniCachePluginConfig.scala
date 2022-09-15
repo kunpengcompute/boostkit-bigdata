@@ -90,8 +90,8 @@ object OmniCachePluginConfig {
   }
 
   def isMVInUpdate(viewTablePlan: LogicalPlan): Boolean = {
-    val logicalPlan = viewTablePlan.asInstanceOf[LogicalRelation]
-    !logicalPlan.catalogTable.get
+    val logicalRelation = viewTablePlan.asInstanceOf[LogicalRelation]
+    !logicalRelation.catalogTable.get
         .properties.getOrElse(MV_UPDATE_REWRITE_ENABLED, "true").toBoolean
   }
 }

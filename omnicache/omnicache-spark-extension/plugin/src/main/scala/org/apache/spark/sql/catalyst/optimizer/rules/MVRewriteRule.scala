@@ -27,14 +27,14 @@ import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.internal.Logging
 import org.apache.spark.scheduler.{SparkListener, SparkListenerEvent}
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.catalyst.plans.logical.{Aggregate, LogicalPlan, Project}
+import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.command.OmniCacheCreateMvCommand
 import org.apache.spark.status.ElementTrackingStore
 import org.apache.spark.util.kvstore.KVIndex
 
 class MVRewriteRule(session: SparkSession) extends Rule[LogicalPlan] with Logging {
-  val omniCacheConf: OmniCachePluginConfig = OmniCachePluginConfig.getConf
+  val omniCacheConf: OmniCachePluginConfig = OmniCachePluginConfig.getSessionConf
 
   val joinRule = new MaterializedViewJoinRule(session)
   val aggregateRule = new MaterializedViewAggregateRule(session)
@@ -59,6 +59,7 @@ class MVRewriteRule(session: SparkSession) extends Rule[LogicalPlan] with Loggin
 
   def tryRewritePlan(plan: LogicalPlan): LogicalPlan = {
     val usingMvs = mutable.Set.empty[String]
+    val rewriteStartSecond = System.currentTimeMillis()
     val res = plan.transformDown {
       case p: Project =>
         joinRule.perform(Some(p), p.child, usingMvs)
@@ -70,17 +71,24 @@ class MVRewriteRule(session: SparkSession) extends Rule[LogicalPlan] with Loggin
             RewriteHelper.extractAllAttrsFromExpression(a.aggregateExpressions).toSeq, a.child)
           val rewritedChild = joinRule.perform(Some(child), child.child, usingMvs)
           if (rewritedChild != child) {
-            rewritedPlan = a.copy(child = rewritedChild)
+            val projectChild = rewritedChild.asInstanceOf[Project]
+            rewritedPlan = a.copy(child = Project(
+              projectChild.projectList ++ projectChild.child.output, projectChild.child))
           }
         }
         rewritedPlan
       case p => p
     }
     if (usingMvs.nonEmpty) {
+      if (!RewriteHelper.checkAttrsValid(res)) {
+        return plan
+      }
       val sql = session.sparkContext.getLocalProperty(SparkContext.SPARK_JOB_DESCRIPTION)
       val mvs = usingMvs.mkString(";").replaceAll("`", "")
-      val log = "logicalPlan MVRewrite success,using materialized view:[%s],original sql:%s"
-          .format(mvs, sql)
+      val costSecond = (System.currentTimeMillis() - rewriteStartSecond).toString
+      val log = ("logicalPlan MVRewrite success," +
+          "using materialized view:[%s],cost %s milliseconds,original sql:%s")
+          .format(mvs, costSecond, sql)
       logDebug(log)
       session.sparkContext.listenerBus.post(SparkListenerMVRewriteSuccess(sql, mvs))
     }

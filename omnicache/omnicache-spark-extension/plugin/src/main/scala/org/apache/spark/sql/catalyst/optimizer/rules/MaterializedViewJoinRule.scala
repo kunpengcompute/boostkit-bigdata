@@ -22,14 +22,14 @@ import com.huawei.boostkit.spark.util.{ExpressionEqual, TableEqual}
 import scala.collection.mutable
 
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.catalyst.expressions.{Attribute, Expression, NamedExpression}
+import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans.Inner
-import org.apache.spark.sql.catalyst.plans.logical.{Join, JoinHint, LogicalPlan, Project}
+import org.apache.spark.sql.catalyst.plans.logical._
 
 class MaterializedViewJoinRule(sparkSession: SparkSession)
     extends AbstractMaterializedViewRule(sparkSession: SparkSession) {
   /**
-   * cehck plan if match current rule
+   * check plan if match current rule
    *
    * @param logicalPlan LogicalPlan
    * @return true:matched ; false:unMatched

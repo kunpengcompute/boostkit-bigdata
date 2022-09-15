@@ -28,14 +28,14 @@ import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.execution.datasources.LogicalRelation
 import org.apache.spark.sql.internal.SQLConf
 
-class RewriteHelper extends PredicateHelper {
+trait RewriteHelper extends PredicateHelper {
 
   val SESSION_CATALOG_NAME: String = "spark_catalog"
 
-  val EMPTY_BITMAP: HashBiMap[String, String] = HashBiMap.create[String, String]()
+  val EMPTY_BIMAP: HashBiMap[String, String] = HashBiMap.create[String, String]()
   val EMPTY_MAP: Map[ExpressionEqual,
       mutable.Set[ExpressionEqual]] = Map[ExpressionEqual, mutable.Set[ExpressionEqual]]()
-  val EMPTY_MULTIMAP: Multimap[Int, Int] = ArrayListMultimap.create[Int, Int]
+  val EMPTY_MULTIMAP: Multimap[Int, Int] = ArrayListMultimap.create[Int, Int]()
 
   def mergeConjunctiveExpressions(e: Seq[Expression]): Expression = {
     if (e.isEmpty) {
@@ -81,8 +81,9 @@ class RewriteHelper extends PredicateHelper {
     for ((project, column) <- topProjectList.zip(viewTablePlan.output)) {
       project match {
         // only map attr
-        case _@Alias(attr@AttributeReference(_, _, _, _), _) =>
-          exprIdToQualifier += (column.exprId -> attr)
+        case a@Alias(attr@AttributeReference(_, _, _, _), _) =>
+          exprIdToQualifier += (column.exprId ->
+              attr.copy(name = a.name)(exprId = attr.exprId, qualifier = attr.qualifier))
         case a@AttributeReference(_, _, _, _) =>
           exprIdToQualifier += (column.exprId -> a)
         // skip function
@@ -204,11 +205,11 @@ class RewriteHelper extends PredicateHelper {
     (mappedQuery, mappedTables)
   }
 
-  def swapTableColumnReferences[T <: Iterable[Expression]](expression: T,
+  def swapTableColumnReferences[T <: Iterable[Expression]](expressions: T,
       tableMapping: BiMap[String, String],
       columnMapping: Map[ExpressionEqual,
           mutable.Set[ExpressionEqual]]): T = {
-    var result: T = expression
+    var result: T = expressions
     if (!tableMapping.isEmpty) {
       result = result.map { expr =>
         expr.transform {
@@ -243,24 +244,24 @@ class RewriteHelper extends PredicateHelper {
     result
   }
 
-  def swapColumnTableReferences[T <: Iterable[Expression]](expression: T,
+  def swapColumnTableReferences[T <: Iterable[Expression]](expressions: T,
       tableMapping: BiMap[String, String],
       columnMapping: Map[ExpressionEqual,
           mutable.Set[ExpressionEqual]]): T = {
-    var result = swapTableColumnReferences(expression, EMPTY_BITMAP, columnMapping)
+    var result = swapTableColumnReferences(expressions, EMPTY_BIMAP, columnMapping)
     result = swapTableColumnReferences(result, tableMapping, EMPTY_MAP)
     result
   }
 
-  def swapTableReferences[T <: Iterable[Expression]](expression: T,
+  def swapTableReferences[T <: Iterable[Expression]](expressions: T,
       tableMapping: BiMap[String, String]): T = {
-    swapTableColumnReferences(expression, tableMapping, EMPTY_MAP)
+    swapTableColumnReferences(expressions, tableMapping, EMPTY_MAP)
   }
 
-  def swapColumnReferences[T <: Iterable[Expression]](expression: T,
+  def swapColumnReferences[T <: Iterable[Expression]](expressions: T,
       columnMapping: Map[ExpressionEqual,
           mutable.Set[ExpressionEqual]]): T = {
-    swapTableColumnReferences(expression, EMPTY_BITMAP, columnMapping)
+    swapTableColumnReferences(expressions, EMPTY_BIMAP, columnMapping)
   }
 }
 
@@ -430,6 +431,36 @@ object RewriteHelper extends PredicateHelper {
 
   def disableCachePlugin(): Unit = {
     SQLConf.get.setConfString("spark.sql.omnicache.enable", "false")
+  }
+
+  def checkAttrsValid(logicalPlan: LogicalPlan): Boolean = {
+    logicalPlan.foreachUp {
+      case _: LeafNode =>
+      case plan =>
+        val attributeSets = plan.expressions.map { expression =>
+          AttributeSet.fromAttributeSets(
+            expression.collect {
+              case s: SubqueryExpression =>
+                var res = s.references
+                s.plan.transformAllExpressions {
+                  case e@OuterReference(ar) =>
+                    res ++= AttributeSet(ar.references)
+                    e
+                  case e => e
+                }
+                res
+              case e => e.references
+            })
+        }
+        val request = AttributeSet.fromAttributeSets(attributeSets)
+        val input = plan.inputSet
+        val missing = request -- input
+        if (missing.nonEmpty) {
+          logWarning("checkAttrsValid failed for missing:%s".format(missing))
+          return false
+        }
+    }
+    true
   }
 }
 

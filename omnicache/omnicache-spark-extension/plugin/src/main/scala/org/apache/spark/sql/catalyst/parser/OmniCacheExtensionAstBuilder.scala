@@ -35,6 +35,11 @@ import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.command._
 import org.apache.spark.sql.execution.datasources._
 
+/**
+ * Parse extended AST to LogicalPlan
+ *
+ * @param delegate Spark default ParserInterface
+ */
 class OmniCacheExtensionAstBuilder(spark: SparkSession, delegate: ParserInterface)
     extends OmniCacheSqlExtensionsBaseVisitor[AnyRef] with SQLConfHelper with Logging {
 
@@ -61,8 +66,7 @@ class OmniCacheExtensionAstBuilder(spark: SparkSession, delegate: ParserInterfac
       case Seq(mv) => (None, mv)
       case Seq(database, mv) => (Some(database), mv)
       case _ => throw new AnalysisException(
-        "The mv name is not valid: %s".format(identifier.mkString("."))
-      )
+        "The mv name is not valid: %s".format(identifier.mkString(".")))
     }
 
     try {
@@ -102,8 +106,7 @@ class OmniCacheExtensionAstBuilder(spark: SparkSession, delegate: ParserInterfac
       case Seq(mv) => (None, mv)
       case Seq(database, mv) => (Some(database), mv)
       case _ => throw new AnalysisException(
-        "The mv name is not valid: %s".format(tableIdent.mkString("."))
-      )
+        "The mv name is not valid: %s".format(tableIdent.mkString(".")))
     }
 
     val tableIdentifier = TableIdentifier(name, databaseName)
@@ -119,7 +122,7 @@ class OmniCacheExtensionAstBuilder(spark: SparkSession, delegate: ParserInterfac
       throw new RuntimeException("cannot refresh a table with refresh mv")
     }
 
-    // preserver preDatabase and set curDatabase
+    // preserve preDatabase and set curDatabase
     val preDatabase = spark.catalog.currentDatabase
     val curDatabase = catalogTable.properties.getOrElse(MV_QUERY_ORIGINAL_SQL_CUR_DB, "")
     if (curDatabase.isEmpty) {
@@ -179,6 +182,7 @@ class OmniCacheExtensionAstBuilder(spark: SparkSession, delegate: ParserInterfac
         RewriteHelper.enableCachePlugin()
         throw e
     } finally {
+      // reset preDatabase
       spark.sessionState.catalogManager.setCurrentNamespace(Array(preDatabase))
     }
   }
@@ -221,8 +225,7 @@ class OmniCacheExtensionAstBuilder(spark: SparkSession, delegate: ParserInterfac
         case Seq(database, mv) => DropMaterializedViewCommand(
           TableIdentifier(mv, Some(database)),
           ifExists.isDefined,
-          purge = true
-        )
+          purge = true)
         case _ => throw new AnalysisException(
           "The mv name is not valid: %s".format(identifier.mkString(".")))
       }
@@ -297,6 +300,9 @@ class OmniCacheExtensionAstBuilder(spark: SparkSession, delegate: ParserInterfac
     visit(ctx.statement).asInstanceOf[LogicalPlan]
   }
 
+  /**
+   * alias tuple2
+   */
   type OmniCacheHeader = (Seq[String], Boolean)
 
   /**

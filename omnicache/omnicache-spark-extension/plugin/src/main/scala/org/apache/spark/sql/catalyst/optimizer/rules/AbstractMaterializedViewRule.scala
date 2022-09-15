@@ -119,12 +119,12 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
         }
 
         // 4.5.extractPredictExpressions from viewQueryPlan and mappedQueryPlan
-        val queryPredictExpression = extractPredictExpressions(queryExpr, EMPTY_BITMAP)
+        val queryPredictExpression = extractPredictExpressions(queryExpr, EMPTY_BIMAP)
 
         val viewProjectList = extractTopProjectList(viewQueryExpr)
         val viewTableAttrs = viewTablePlan.output
 
-        // 4.6.if a table emps used >=2 times in s sql (query and view)
+        // 4.6.if a table emps used >=2 times in a sql (query and view)
         // we should try the combination,switch the seq
         // view:SELECT V1.locationid,V2.empname FROM emps V1 JOIN emps V2
         // ON V1.deptno='1' AND V2.deptno='2' AND V1.empname = V2.empname;
@@ -143,7 +143,7 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
               queryPredictExpression, viewPredictExpression, inverseTableMapping,
               viewPredictExpression._1.getEquivalenceClassesMap,
               viewProjectList, viewTableAttrs)
-            // 4.8.compensationPredicates isEmpty, because view's row data cannot satify query
+            // 4.8.compensationPredicates isEmpty, because view's row data cannot satisfy query
             if (newViewTablePlan.isEmpty) {
               mappingLoop.break()
             }
@@ -168,13 +168,19 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
   }
 
   /**
-   * cehck plan if match current rule
+   * check plan if match current rule
    *
    * @param logicalPlan LogicalPlan
    * @return true:matched ; false:unMatched
    */
   def isValidPlan(logicalPlan: LogicalPlan): Boolean
 
+  /**
+   * basic check for all rule
+   *
+   * @param logicalPlan LogicalPlan
+   * @return true:matched ; false:unMatched
+   */
   def isValidLogicalPlan(logicalPlan: LogicalPlan): Boolean = {
     logicalPlan.foreach {
       case _: LogicalRelation =>
@@ -202,18 +208,18 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
       LogicalPlan, LogicalPlan)] = {
     // viewName, viewTablePlan, viewQueryPlan
     var viewPlans = Seq.empty[(String, LogicalPlan, LogicalPlan)]
+    val viewNames = mutable.Set.empty[String]
     // 1.topological iterate graph
-    ViewMetadata.usesGraphTopologicalOrderIterator.forEach { viewName =>
-      // 2.check this node is mv
-      if (ViewMetadata.viewToTablePlan.containsKey(viewName)
-          // 3.iterate mv used tables and check edge of (table,mv) in graph
-          && usesTable(viewName, ViewMetadata
-          .viewToContainsTables.get(viewName), ViewMetadata.frozenGraph)) {
-        // 4.add plan info
-        val viewQueryPlan = ViewMetadata.viewToViewQueryPlan.get(viewName)
-        val viewTablePlan = ViewMetadata.viewToTablePlan.get(viewName)
-        viewPlans +:= (viewName, viewTablePlan, viewQueryPlan)
+    tableNames.foreach { tableName =>
+      if (ViewMetadata.tableToViews.containsKey(tableName)) {
+        viewNames ++= ViewMetadata.tableToViews.get(tableName)
       }
+    }
+    viewNames.foreach { viewName =>
+      // 4.add plan info
+      val viewQueryPlan = ViewMetadata.viewToViewQueryPlan.get(viewName)
+      val viewTablePlan = ViewMetadata.viewToTablePlan.get(viewName)
+      viewPlans +:= (viewName, viewTablePlan, viewQueryPlan)
     }
     viewPlans
   }
@@ -242,7 +248,7 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
    * @param viewTablePlan  viewTablePlan
    * @param viewQueryPlan  viewQueryPlan
    * @param topViewProject topViewProject
-   * @param needTables     needTables
+   * @param needTables     need join compensate tables
    * @return join compensated viewTablePlan
    */
   def compensateViewPartial(viewTablePlan: LogicalPlan,
@@ -251,6 +257,14 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
       needTables: Set[TableEqual]):
   Option[(LogicalPlan, LogicalPlan, Option[Project])] = None
 
+  /**
+   * We map every table in the query to a table with the same qualified
+   * name (all query tables are contained in the view, thus this is equivalent
+   * to mapping every table in the query to a view table).
+   *
+   * @param queryTables queryTables
+   * @return
+   */
   def generateTableMappings(queryTables: Set[TableEqual]): Seq[BiMap[String, String]] = {
     val multiMapTables: Multimap[String, String] = ArrayListMultimap.create()
     for (t1 <- queryTables) {
@@ -272,7 +286,7 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
         }
         // continue
       } else {
-        // Multiple reference: flatten
+        // Multiple references: flatten
         val newResult: ImmutableList.Builder[BiMap[String, String]] = ImmutableList.builder()
         t2s.forEach { target =>
           result.forEach { m =>
@@ -350,10 +364,17 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
     Some(compensationPredicate)
   }
 
+  /**
+   * extractPossibleMapping {queryEquivalenceClasses:[contained viewEquivalenceClasses]}
+   *
+   * @param queryEquivalenceClasses queryEquivalenceClasses
+   * @param viewEquivalenceClasses  viewEquivalenceClasses
+   * @return {queryEquivalenceClasses:[contained viewEquivalenceClasses]}
+   */
   def extractPossibleMapping(queryEquivalenceClasses: List[mutable.Set[ExpressionEqual]],
       viewEquivalenceClasses: List[mutable.Set[ExpressionEqual]]): Option[Multimap[Int, Int]] = {
     // extractPossibleMapping {queryEquivalenceClasses:[contained viewEquivalenceClasses]}
-    // query:c1=c2=c3=c4  view:c1=c2  ,c3=c4
+    // query:c1=c2=c3=c4  view:c1=c2 , c3=c4
     val mapping = ArrayListMultimap.create[Int, Int]()
 
     val breakLoop = new Breaks
@@ -385,6 +406,12 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
     Some(mapping)
   }
 
+  /**
+   *
+   * @param queryExpression queryExpression
+   * @param viewExpression  viewExpression
+   * @return compensate Expression
+   */
   def splitFilter(queryExpression: Expression, viewExpression: Expression): Option[Expression] = {
     // 1.canonicalize expression,main for reorder
     val queryExpression2 = RewriteHelper.canonicalize(ExprSimplifier.simplify(queryExpression))
@@ -438,7 +465,7 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
     val queries = ExprOptUtil.disjunctions(queryExpression)
     val views = ExprOptUtil.disjunctions(viewExpression)
 
-    // 1.compare difference which queries residue
+    // 1.compute difference which queries residue
     val difference = queries.map(ExpressionEqual) -- views.map(ExpressionEqual)
 
     // 2.1.queries equal to views,just return true
@@ -537,9 +564,8 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
     true
   }
 
-
   /**
-   * compute compensationPredicts between viewQueryPlan and mappedQueryPlan
+   * compute compensationPredicates between viewQueryPlan and mappedQueryPlan
    *
    * @param viewTablePlan   viewTablePlan
    * @param queryPredict    queryPredict
@@ -619,10 +645,10 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
    * @param swapTableColumn true:swapTableColumn;false:swapColumnTable
    * @param tableMapping    tableMapping
    * @param columnMapping   columnMapping
-   * @param viewProjectList viewProjectList
+   * @param viewProjectList viewProjectList/viewAggExpression
    * @param viewTableAttrs  viewTableAttrs
    * @tparam T T <: Iterable[Expression]
-   * @return rewriteExprs
+   * @return rewritedExprs
    */
   def rewriteExpressions[T <: Iterable[Expression]](
       exprsToRewrite: T, swapTableColumn: Boolean,
@@ -657,11 +683,11 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
     }.asInstanceOf[T]
 
     // 4.iterate result and dfs check every AttributeReference in ViewTableAttributeReference
-    val viewTableAttrSet = swapTableAttrs.map(_.exprId).toSet
+    val viewTableAttrsSet = swapTableAttrs.map(_.exprId).toSet
     result.foreach { expr =>
       expr.foreach {
         case attr: AttributeReference =>
-          if (!viewTableAttrSet.contains(attr.exprId)) {
+          if (!viewTableAttrsSet.contains(attr.exprId)) {
             logDebug(s"attr:%s cannot found in view:%s"
                 .format(attr, OmniCachePluginConfig.getConf.curMatchMV))
             return None
@@ -671,7 +697,6 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
     }
     Some(result)
   }
-
 
   /**
    * if the rewrite expression exprId != origin expression exprId,
@@ -698,6 +723,16 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
 
   /**
    * replace and alias expression or attr by viewTableAttr
+   *
+   * @param exprsToRewrite    exprsToRewrite
+   * @param swapTableColumn   true:swapTableColumn;false:swapColumnTable
+   * @param tableMapping      tableMapping
+   * @param columnMapping     columnMapping
+   * @param viewProjectList   viewProjectList/viewAggExpression
+   * @param viewTableAttrs    viewTableAttrs
+   * @param originExpressions originExpressions
+   * @tparam T T <: Iterable[Expression]
+   * @return rewrited and alias expression
    */
   def rewriteAndAliasExpressions[T <: Iterable[Expression]](
       exprsToRewrite: T, swapTableColumn: Boolean,

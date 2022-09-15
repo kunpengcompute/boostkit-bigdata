@@ -31,7 +31,7 @@ import org.apache.spark.sql.catalyst.plans.logical._
 class MaterializedViewAggregateRule(sparkSession: SparkSession)
     extends AbstractMaterializedViewRule(sparkSession: SparkSession) {
   /**
-   * cehck plan if match current rule
+   * check plan if match current rule
    *
    * @param logicalPlan LogicalPlan
    * @return true:matched ; false:unMatched
@@ -42,7 +42,6 @@ class MaterializedViewAggregateRule(sparkSession: SparkSession)
     }
     logicalPlan.children.forall(isValidLogicalPlan)
   }
-
 
   /**
    * queryTableInfo!=viewTableInfo , need do join compensate
@@ -208,7 +207,6 @@ class MaterializedViewAggregateRule(sparkSession: SparkSession)
     // 4.rewrite and alias queryAggExpressions
     // if the rewrite expression exprId != origin expression exprId,
     // replace by Alias(rewrite expression,origin.name)(exprId=origin.exprId)
-
     val rewritedQueryAggExpressions = rewriteAndAliasExpressions(newQueryAggExpressions,
       swapTableColumn = true, tableMapping, columnMapping,
       viewProjectList, viewTableAttrs, queryAgg.aggregateExpressions)
@@ -240,5 +238,4 @@ class MaterializedViewAggregateRule(sparkSession: SparkSession)
       qualifier = qualifier, explicitMetadata = alias.explicitMetadata,
       nonInheritableMetadataKeys = alias.nonInheritableMetadataKeys)
   }
-
 }

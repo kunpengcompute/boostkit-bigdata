@@ -35,7 +35,7 @@ import org.apache.spark.scheduler.ReplayListenerBus
 import org.apache.spark.scheduler.ReplayListenerBus.{ReplayEventsFilter, SELECT_ALL_FILTER}
 import org.apache.spark.sql.catalyst.optimizer.rules._
 import org.apache.spark.sql.execution.ui._
-import org.apache.spark.status.{AppHistoryServerPlugin, AppStatusListener, ElementTrackingStore}
+import org.apache.spark.status._
 import org.apache.spark.util.Utils
 import org.apache.spark.util.kvstore.{InMemoryStore, KVStore}
 
@@ -100,6 +100,7 @@ class LogsParser(conf: SparkConf, eventLogDir: String, outPutDir: String) extend
         val node = getNodeInfo(graph)
 
         val jsonMap = Map(
+          "executionId" -> executionId.toString,
           "original query" -> query,
           "materialized views" -> mvs,
           "physical plan" -> planDesc,
@@ -110,7 +111,7 @@ class LogsParser(conf: SparkConf, eventLogDir: String, outPutDir: String) extend
     }
     // write json file into hdfs
     val jsonFile: String = Json(DefaultFormats).write(jsons)
-    writeFiles(fs, outPutDir + "/" + fileName + ".json", jsonFile)
+    writeFile(fs, outPutDir + "/" + fileName + ".json", jsonFile)
   }
 
   /**
@@ -122,14 +123,14 @@ class LogsParser(conf: SparkConf, eventLogDir: String, outPutDir: String) extend
   def getMVRewriteSuccessInfo(store: KVStore): mutable.Map[String, String] = {
     val infos = mutable.Map.empty[String, String]
     try {
-      // The ApplicationInfo may not be available when Spark is starting up
+      // The ApplicationInfo may not be available when Spark is starting up.
       Utils.tryWithResource(
         store.view(classOf[SparkListenerMVRewriteSuccess])
             .closeableIterator()
       ) { it =>
         while (it.hasNext) {
           val info = it.next()
-          infos += (info.sql, info.usingMvs)
+          infos += (info.sql -> info.usingMvs)
         }
       }
     } catch {
@@ -206,7 +207,7 @@ class LogsParser(conf: SparkConf, eventLogDir: String, outPutDir: String) extend
    */
   private[spark] def rebuildAppStore(store: KVStore, reader: EventLogFileReader): Unit = {
     // Disable async updates, since they cause higher memory usage, and it's ok to take longer
-    // to parse the event logs in the SHS
+    // to parse the event logs in the SHS.
     val replayConf = conf.clone().set(ASYNC_TRACKING_ENABLED, false)
     val trackingStore = new ElementTrackingStore(store, replayConf)
     val replayBus = new ReplayListenerBus()
@@ -276,7 +277,7 @@ class LogsParser(conf: SparkConf, eventLogDir: String, outPutDir: String) extend
    * @param logPath logPath
    * @param context logInfo
    */
-  private def writeFiles(fs: FileSystem, logPath: String, context: String): Unit = {
+  private def writeFile(fs: FileSystem, logPath: String, context: String): Unit = {
     val os = fs.create(new Path(logPath))
     os.write(context.getBytes())
     os.close()

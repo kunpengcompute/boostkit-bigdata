@@ -73,6 +73,7 @@
     </dependencies>
 
     <build>
+        <finalName>${artifactId}-${version}${dep.os.arch}</finalName>
         <outputDirectory>target/scala-${scala.binary.version}/classes</outputDirectory>
         <testOutputDirectory>target/scala-${scala.binary.version}/test-classes</testOutputDirectory>
         <plugins>

@@ -10,7 +10,7 @@
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
-    <artifactId>boostkit-omnicache-spark-log-parser</artifactId>
+    <artifactId>boostkit-omnicache-logparser-spark</artifactId>
     <packaging>jar</packaging>
     <version>3.1.1-1.0.0</version>
 
@@ -78,6 +78,7 @@
     </dependencies>
 
     <build>
+        <finalName>${artifactId}-${version}${dep.os.arch}</finalName>
         <outputDirectory>target/scala-${scala.binary.version}/classes</outputDirectory>
         <testOutputDirectory>target/scala-${scala.binary.version}/test-classes</testOutputDirectory>
         <plugins>

@@ -17,10 +17,9 @@
 
 package com.huawei.boostkit.spark.util
 
-import com.google.common.collect.Lists
 import com.huawei.boostkit.spark.conf.OmniCachePluginConfig._
 import java.util.concurrent.ConcurrentHashMap
-import org.apache.calcite.util.graph._
+import scala.collection.mutable
 
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.TableIdentifier
@@ -35,9 +34,7 @@ object ViewMetadata extends RewriteHelper {
 
   val viewToContainsTables = new ConcurrentHashMap[String, Set[TableEqual]]()
 
-  val usesGraph: DirectedGraph[String, DefaultEdge] = DefaultDirectedGraph.create()
-
-  var frozenGraph: Graphs.FrozenGraph[String, DefaultEdge] = Graphs.makeImmutable(usesGraph)
+  val tableToViews = new ConcurrentHashMap[String, mutable.Set[String]]()
 
   var spark: SparkSession = _
 
@@ -50,10 +47,6 @@ object ViewMetadata extends RewriteHelper {
   def setSpark(sparkSession: SparkSession): Unit = {
     spark = sparkSession
     status = STATUS_LOADING
-  }
-
-  def usesGraphTopologicalOrderIterator: java.lang.Iterable[String] = {
-    TopologicalOrderIterator.of[String, DefaultEdge](usesGraph)
   }
 
   def saveViewMetadataToMap(catalogTable: CatalogTable): Unit = this.synchronized {
@@ -91,15 +84,15 @@ object ViewMetadata extends RewriteHelper {
       // spark_catalog.db.table
       val viewName = catalogTable.identifier.toString()
 
-      // mappedViewQueryPlan and mappedViewContainsTable
+      // mappedViewQueryPlan and mappedViewContainsTables
       val (mappedViewQueryPlan, mappedViewContainsTables) = extractTables(viewQueryPlan)
 
-      usesGraph.addVertex(viewName)
       mappedViewContainsTables
           .foreach { mappedViewContainsTable =>
             val name = mappedViewContainsTable.tableName
-            usesGraph.addVertex(name)
-            usesGraph.addEdge(name, viewName)
+            val views = tableToViews.getOrDefault(name, mutable.Set.empty)
+            views += viewName
+            tableToViews.put(name, views)
           }
 
       // extract view query project's Attr and replace view table's Attr by query project's Attr
@@ -113,7 +106,7 @@ object ViewMetadata extends RewriteHelper {
       viewToTablePlan.putIfAbsent(viewName, mappedViewTablePlan)
     } catch {
       case e: Throwable =>
-        logDebug(s"Failed to saveViewMetadataToMap. errmsg: ${e.getMessage}")
+        logDebug(s"Failed to saveViewMetadataToMap,errmsg: ${e.getMessage}")
         // reset preDatabase
         spark.sessionState.catalogManager.setCurrentNamespace(Array(preDatabase))
     }
@@ -129,21 +122,19 @@ object ViewMetadata extends RewriteHelper {
 
   def addCatalogTableToCache(table: CatalogTable): Unit = this.synchronized {
     saveViewMetadataToMap(table)
-    rebuildGraph()
-  }
-
-  def rebuildGraph(): Unit = {
-    frozenGraph = Graphs.makeImmutable(usesGraph)
   }
 
   def removeMVCache(tableName: TableIdentifier): Unit = this.synchronized {
     val viewName = tableName.toString()
-    usesGraph.removeAllVertices(Lists.newArrayList(viewName))
     viewToContainsTables.remove(viewName)
     viewToViewQueryPlan.remove(viewName)
     viewToTablePlan.remove(viewName)
-    viewToContainsTables.remove(viewName)
-    rebuildGraph()
+    tableToViews.forEach { (key, value) =>
+      if (value.contains(viewName)) {
+        value -= viewName
+        tableToViews.put(key, value)
+      }
+    }
   }
 
   def init(sparkSession: SparkSession): Unit = {
@@ -165,7 +156,6 @@ object ViewMetadata extends RewriteHelper {
       val tables = omniCacheFilter(catalog, db)
       tables.foreach(tableData => saveViewMetadataToMap(tableData))
     }
-    rebuildGraph()
   }
 
   def omniCacheFilter(catalog: SessionCatalog,
@@ -176,7 +166,7 @@ object ViewMetadata extends RewriteHelper {
         tableData.properties.contains(MV_QUERY_ORIGINAL_SQL)
       }
     } catch {
-      // if db exists a table hive materialized view, will throw annalysis exception
+      // if db exists a table hive materialized view, will throw analysis exception
       case e: Throwable =>
         logDebug(s"Failed to listTables in $mvDataBase, errmsg: ${e.getMessage}")
         Seq.empty[CatalogTable]
