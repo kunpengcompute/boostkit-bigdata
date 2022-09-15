@@ -87,7 +87,7 @@ case class ColumnarShuffledHashJoinExec(
   }
 
   protected override def doExecute(): RDD[InternalRow] = {
-    throw new IllegalStateException(s"Should not be called when supports columnar execution")
+    throw new UnsupportedOperationException(s"Should not be called when supports columnar execution")
   }
 
   def buildCheck(): Unit = {

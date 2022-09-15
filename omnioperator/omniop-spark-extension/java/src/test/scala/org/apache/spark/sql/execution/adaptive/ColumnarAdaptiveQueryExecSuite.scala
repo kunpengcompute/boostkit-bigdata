@@ -264,7 +264,6 @@ class ColumnarAdaptiveQueryExecSuite extends ColumnarSparkPlanTest
       }
 
       withSQLConf(SQLConf.AUTO_BROADCASTJOIN_THRESHOLD.key -> "1") {
-        // currently, we only support "inner" join type
         val testDf = df1.where('a > 10).join(df2.where('b > 10), Seq("id"), "left_outer")
           .groupBy('a).count()
         checkAnswer(testDf, Seq())

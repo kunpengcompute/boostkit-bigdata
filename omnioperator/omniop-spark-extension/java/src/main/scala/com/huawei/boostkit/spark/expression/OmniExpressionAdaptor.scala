@@ -30,7 +30,7 @@ import nova.hetu.omniruntime.operator.OmniExprVerify
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate._
-import org.apache.spark.sql.catalyst.plans.{FullOuter, Inner, JoinType, LeftOuter, RightOuter}
+import org.apache.spark.sql.catalyst.plans.{FullOuter, InnerLike, JoinType, LeftOuter, RightOuter}
 import org.apache.spark.sql.catalyst.util.CharVarcharUtils.getRawTypeString
 import org.apache.spark.sql.types.{BooleanType, DataType, DateType, Decimal, DecimalType, DoubleType, IntegerType, LongType, Metadata, ShortType, StringType}
 
@@ -795,7 +795,7 @@ object OmniExpressionAdaptor extends Logging {
     joinType match {
       case FullOuter =>
         OMNI_JOIN_TYPE_FULL
-      case Inner =>
+      case _: InnerLike =>
         OMNI_JOIN_TYPE_INNER
       case LeftOuter =>
         OMNI_JOIN_TYPE_LEFT
