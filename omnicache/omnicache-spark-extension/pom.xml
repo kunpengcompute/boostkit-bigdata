@@ -12,6 +12,7 @@
 
     <modules>
         <module>plugin</module>
+        <module>log-parser</module>
     </modules>
 
     <name>BoostKit Spark MaterializedView Sql Engine Extension Parent Pom</name>
@@ -34,6 +35,7 @@
         <maven.checkstyle.version>3.1.2</maven.checkstyle.version>
         <scoverage.maven.version>1.4.11</scoverage.maven.version>
         <puppycrawl.checkstyle.version>8.29</puppycrawl.checkstyle.version>
+        <dep.os.arch></dep.os.arch>
     </properties>
 
     <dependencyManagement>

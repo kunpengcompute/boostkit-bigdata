@@ -54,6 +54,7 @@ case class OmniCacheCreateMvCommand(
     partitioning: Seq[String],
     query: LogicalPlan,
     outputColumnNames: Seq[String]) extends DataWritingCommand {
+
   override def run(sparkSession: SparkSession, child: SparkPlan): Seq[Row] = {
     try {
       ViewMetadata.init(sparkSession)
@@ -84,7 +85,7 @@ case class OmniCacheCreateMvCommand(
           throw new AnalysisException(
             s"Materialized View $tableIdentWithDB already exists. You need to drop it first")
         } else {
-          // Since the table already exists and the save mode is Ignore,we will just return.
+          // Since the table already exists and the save mode is Ignore, we will just return.
           return Seq.empty
         }
       } else {
@@ -102,10 +103,11 @@ case class OmniCacheCreateMvCommand(
           storage = table.storage.copy(locationUri = tableLocation),
           // We will use the schema of resolved.relation as the schema of the table (instead of
           // the schema of df). It is important since the nullability may be changed by the relation
-          // provider (for example,see org.apache.spark.sql.parquet.DefaultSource).
+          // provider (for example, see org.apache.spark.sql.parquet.DefaultSource).
           schema = tableSchema)
         // Table location is already validated. No need to check it again during table creation.
         sessionState.catalog.createTable(newTable, ignoreIfExists = false, validateLocation = false)
+
         result match {
           case _: HadoopFsRelation if table.partitionColumnNames.nonEmpty &&
               sparkSession.sqlContext.conf.manageFilesourcePartitions =>
@@ -153,10 +155,19 @@ case class OmniCacheCreateMvCommand(
   }
 }
 
+/**
+ * Drops a materialized view from the metastore and removes it if it is cached.
+ *
+ * The syntax of this command is:
+ * {{{
+ *   DROP MATERIALIZED VIEW [IF EXISTS] view_name;
+ * }}}
+ */
 case class DropMaterializedViewCommand(
     tableName: TableIdentifier,
     ifExists: Boolean,
     purge: Boolean) extends RunnableCommand {
+
   override def run(sparkSession: SparkSession): Seq[Row] = {
     ViewMetadata.init(sparkSession)
     val catalog = sparkSession.sessionState.catalog
@@ -201,13 +212,18 @@ case class DropMaterializedViewCommand(
   }
 }
 
+/**
+ * ShowMaterializedViewCommand RunnableCommand
+ *
+ */
 case class ShowMaterializedViewCommand(
     databaseName: Option[String],
     tableIdentifierPattern: Option[String]) extends RunnableCommand {
+  // The result of SHOW MaterializedView has three basic columns:
+  // database, tableName and originalSql.
 
   override val output: Seq[Attribute] = {
     val tableExtendedInfo = Nil
-
     AttributeReference("database", StringType, nullable = false)() ::
         AttributeReference("mvName", StringType, nullable = false)() ::
         AttributeReference("rewriteEnable", StringType, nullable = false)() ::
@@ -254,6 +270,7 @@ case class ShowMaterializedViewCommand(
 case class AlterRewriteMaterializedViewCommand(
     tableName: TableIdentifier,
     enableRewrite: Boolean) extends RunnableCommand {
+
   override def run(sparkSession: SparkSession): Seq[Row] = {
     ViewMetadata.init(sparkSession)
     val catalog = sparkSession.sessionState.catalog
@@ -379,7 +396,6 @@ case class RefreshMaterializedViewCommand(
       }
 
       if (doInsertion) {
-
         def refreshUpdatedPartitions(updatedPartitionPaths: Set[String]): Unit = {
           val updatedPartitions = updatedPartitionPaths.map(PartitioningUtils.parsePathFragment)
           if (partitionsTrackedByCatalog) {
@@ -446,7 +462,6 @@ case class RefreshMaterializedViewCommand(
         if (catalogTable.nonEmpty) {
           CommandUtils.updateTableStats(sparkSession, catalogTable.get)
         }
-
       } else {
         logInfo("Skipping insertion into a relation that already exists.")
       }
