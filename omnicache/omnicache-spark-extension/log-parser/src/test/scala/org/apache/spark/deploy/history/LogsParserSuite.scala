@@ -17,7 +17,7 @@
 
 package org.apache.spark.deploy.history
 
-import java.io.FileInputStream
+import java.io.{FileInputStream, FileNotFoundException}
 
 import org.apache.commons.io.IOUtils
 import org.json4s.DefaultFormats
@@ -41,5 +41,37 @@ class LogsParserSuite extends SparkFunSuite {
       map.contains("materialized views") &&
           map("physical plan").contains(map("materialized views"))
     ))
+  }
+
+  test("error_invalid_param") {
+    assertThrows[RuntimeException] {
+      val path = this.getClass.getResource("/").getPath
+      val args: Array[String] = Array(path, "eventlog/parse")
+      ParseLog.main(args)
+    }
+    assertThrows[RuntimeException] {
+      val path = this.getClass.getResource("/").getPath
+      val args: Array[String] = Array(path, "eventlog/parse"
+        , "application_1663257594501_0003.lz4", "1")
+      ParseLog.main(args)
+    }
+  }
+
+  test("error_invalid_logname") {
+    assertThrows[RuntimeException] {
+      val path = this.getClass.getResource("/").getPath
+      val args: Array[String] = Array(path, "eventlog/parse"
+        , "xxx.lz4")
+      ParseLog.main(args)
+    }
+  }
+
+  test("error_log_not_exist") {
+    assertThrows[FileNotFoundException] {
+      val path = this.getClass.getResource("/").getPath
+      val args: Array[String] = Array(path, "eventlog/parse"
+        , "application_1663257594501_00031.lz4")
+      ParseLog.main(args)
+    }
   }
 }

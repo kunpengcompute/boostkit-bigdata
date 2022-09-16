@@ -456,7 +456,7 @@ object RewriteHelper extends PredicateHelper {
         val input = plan.inputSet
         val missing = request -- input
         if (missing.nonEmpty) {
-          logWarning("checkAttrsValid failed for missing:%s".format(missing))
+          logDebug("checkAttrsValid failed for missing:%s".format(missing))
           return false
         }
     }

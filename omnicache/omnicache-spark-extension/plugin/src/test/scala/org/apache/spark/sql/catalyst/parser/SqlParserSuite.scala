@@ -560,6 +560,7 @@ class SqlParserSuite extends RewriteSuite {
   }
 
   test("mv_is_cached") {
+    spark.sql("DROP MATERIALIZED VIEW IF EXISTS mv_create2;")
     spark.sql(
       """
         |ALTER MATERIALIZED VIEW default.mv_create1 ENABLE REWRITE

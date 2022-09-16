@@ -292,7 +292,7 @@ arg2: log file to be parsed, eg. application_1646816941391_0115.lz4
 object ParseLog extends Logging {
   def main(args: Array[String]): Unit = {
     if (args == null || args.length != 3) {
-      logWarning("input params is invalid,such as below\n" +
+      throw new RuntimeException("input params is invalid,such as below\n" +
           "arg0: spark.eventLog.dir, eg. hdfs://server1:9000/spark2-history\n" +
           "arg1: output dir in hdfs, eg. hdfs://server1:9000/logParser\n" +
           "arg2: log file to be parsed, eg. application_1646816941391_0115.lz4\n")
@@ -318,7 +318,7 @@ object ParseLog extends Logging {
       val appId = matcher.group
       logParser.parseAppHistoryLog(appId, logName)
     } else {
-      logWarning(logName + " is illegal")
+      throw new RuntimeException(logName + " is illegal")
     }
   }
 }

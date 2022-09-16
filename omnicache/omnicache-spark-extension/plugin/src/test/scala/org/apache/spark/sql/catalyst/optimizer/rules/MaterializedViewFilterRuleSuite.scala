@@ -296,7 +296,7 @@ class MaterializedViewFilterRuleSuite extends RewriteSuite {
       """
         |SELECT * FROM COLUMN_TYPE WHERE doubletype=rand()
         |""".stripMargin
-    compareNotRewriteAndRows(sql, noData = false)
+    compareNotRewriteAndRows(sql, noData = true)
 
     RewriteHelper.enableCachePlugin()
     val sql2 =
@@ -326,7 +326,7 @@ class MaterializedViewFilterRuleSuite extends RewriteSuite {
         |""".stripMargin
     )
     val sql = "SELECT if(e.deptno<3,e.empid,e.deptno) as _if FROM emps e"
-    comparePlansAndRows(sql, "default", "mv_if", noData = false)
+    comparePlansAndRows(sql, "default", "mv_filter_if", noData = false)
     spark.sql(
       """
         |DROP MATERIALIZED VIEW IF EXISTS mv_filter_if;
