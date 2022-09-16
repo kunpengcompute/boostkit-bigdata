@@ -623,7 +623,7 @@ object OmniExpressionAdaptor extends Logging {
       case Sum(_) => {
         if (isHashAgg) {
           if (agg.dataType.isInstanceOf[DecimalType]) {
-            new UnsupportedOperationException("HashAgg not supported decimal input")
+            throw new UnsupportedOperationException("HashAgg not supported decimal input")
           }
         }
         OMNI_AGGREGATION_TYPE_SUM
