@@ -150,6 +150,8 @@ public class DataIoAdapter {
 
     private int columnOrder = 0;
 
+    private int taskTimeout = 300;
+
     private NdpUdfExpressions ndpUdfExpressions = new NdpUdfExpressions();
 
     private static final Logger LOG = LoggerFactory.getLogger(DataIoAdapter.class);
@@ -224,6 +226,7 @@ public class DataIoAdapter {
             String ipAddress = InetAddress.getByName(sdiHost).getHostAddress();
             Properties properties = new Properties();
             properties.put("omnidata.client.target.list", ipAddress);
+            properties.put("omnidata.client.task.timeout", taskTimeout);
             LOG.info("Push down node info: [hostname :{} ,ip :{}]", sdiHost, ipAddress);
             try {
                 orcDataReader = new DataReaderImpl<PageDeserializer>(
@@ -330,6 +333,7 @@ public class DataIoAdapter {
         columnOffset = pageCandidate.getColumnOffset();
         listAtt = JavaConverters.seqAsJavaList(filterOutPut);
         TASK_FAILED_TIMES = pageCandidate.getMaxFailedTimes();
+        taskTimeout = pageCandidate.getTaskTimeout();
     }
 
     private RowExpression extractNamedExpression(Expression namedExpression) {

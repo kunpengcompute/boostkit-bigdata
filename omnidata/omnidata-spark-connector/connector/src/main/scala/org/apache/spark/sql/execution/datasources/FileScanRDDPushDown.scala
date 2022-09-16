@@ -84,6 +84,7 @@ class FileScanRDDPushDown(
   private val timeOut = NdpConf.getNdpZookeeperTimeout(sparkSession)
   private val parentPath = NdpConf.getNdpZookeeperPath(sparkSession)
   private val zkAddress = NdpConf.getNdpZookeeperAddress(sparkSession)
+  private val taskTimeout = NdpConf.getTaskTimeout(sparkSession)
 
   override def compute(split: RDDPartition, context: TaskContext): Iterator[InternalRow] = {
     val pageToColumnarClass = new PageToColumnar(requiredSchema, output)
@@ -156,7 +157,7 @@ class FileScanRDDPushDown(
           InputFileBlockHolder.set(currentFile.filePath, currentFile.start, currentFile.length)
           val pageCandidate = new PageCandidate(currentFile.filePath, currentFile.start,
             currentFile.length, columnOffset, sdiHosts,
-            fileFormat.toString, maxFailedTimes)
+            fileFormat.toString, maxFailedTimes, taskTimeout)
           val dataIoPage = dataIoClass.getPageIterator(pageCandidate, output,
             partitionColumns, filterOutput, pushDownOperators)
           currentIterator = pageToColumnarClass.transPageToColumnar(dataIoPage,
