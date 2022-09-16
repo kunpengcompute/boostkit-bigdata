@@ -12,6 +12,7 @@
 
     <modules>
         <module>plugin</module>
+        <module>log-parser</module>
     </modules>
 
     <name>BoostKit Spark MaterializedView Sql Engine Extension Parent Pom</name>

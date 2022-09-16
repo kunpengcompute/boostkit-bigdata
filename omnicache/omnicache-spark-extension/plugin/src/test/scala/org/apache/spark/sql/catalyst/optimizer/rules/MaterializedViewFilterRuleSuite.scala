@@ -17,6 +17,8 @@
 
 package org.apache.spark.sql.catalyst.optimizer.rules
 
+import com.huawei.boostkit.spark.util.RewriteHelper
+
 class MaterializedViewFilterRuleSuite extends RewriteSuite {
 
   test("mv_filter1") {
@@ -273,7 +275,101 @@ class MaterializedViewFilterRuleSuite extends RewriteSuite {
   }
 
   test("mv_filter2_disable") {
-    val sql = "ALTER MATERIALIZED VIEW mv_filter1 DISABLE REWRITE;"
+    val sql = "ALTER MATERIALIZED VIEW mv_filter2 DISABLE REWRITE;"
     spark.sql(sql).show()
+  }
+
+  test("mv_filter_rand") {
+    spark.sql(
+      """
+        |DROP MATERIALIZED VIEW IF EXISTS mv_filter_rand;
+        |""".stripMargin
+    )
+    spark.sql(
+      """
+        |CREATE MATERIALIZED VIEW IF NOT EXISTS mv_filter_rand
+        |AS
+        |SELECT * FROM COLUMN_TYPE WHERE doubletype=rand(1)
+        |""".stripMargin
+    )
+    val sql =
+      """
+        |SELECT * FROM COLUMN_TYPE WHERE doubletype=rand()
+        |""".stripMargin
+    compareNotRewriteAndRows(sql, noData = false)
+
+    RewriteHelper.enableCachePlugin()
+    val sql2 =
+      """
+        |SELECT * FROM COLUMN_TYPE WHERE doubletype=rand(1)
+        |""".stripMargin
+    comparePlansAndRows(sql2, "default", "mv_filter_rand", noData = true)
+
+    spark.sql(
+      """
+        |DROP MATERIALIZED VIEW IF EXISTS mv_filter_rand;
+        |""".stripMargin
+    )
+  }
+
+  test("mv_filter_if") {
+    spark.sql(
+      """
+        |DROP MATERIALIZED VIEW IF EXISTS mv_filter_if;
+        |""".stripMargin
+    )
+    spark.sql(
+      """
+        |CREATE MATERIALIZED VIEW IF NOT EXISTS mv_filter_if
+        |AS
+        |SELECT e.empid,e.deptno,if(e.deptno<2,e.empid,e.deptno) as _if FROM emps e;
+        |""".stripMargin
+    )
+    val sql = "SELECT if(e.deptno<3,e.empid,e.deptno) as _if FROM emps e"
+    comparePlansAndRows(sql, "default", "mv_if", noData = false)
+    spark.sql(
+      """
+        |DROP MATERIALIZED VIEW IF EXISTS mv_filter_if;
+        |""".stripMargin
+    )
+  }
+
+  test("mv_filter3") {
+    // or
+    spark.sql(
+      """
+        |DROP MATERIALIZED VIEW IF EXISTS mv_filter3;
+        |""".stripMargin
+    )
+
+    spark.sql(
+      """
+        |CREATE MATERIALIZED VIEW IF NOT EXISTS mv_filter3
+        |AS
+        |SELECT * FROM COLUMN_TYPE WHERE empid=3
+        |OR bytetype>1 OR shorttype<5 OR integertype>=1 OR longtype<=5
+        |OR floattype in(3.0) OR doubletype not in(2.0)
+        |OR datetype between DATE '2021-01-01' and DATE '2023-01-01'
+        |OR stringtype='stringtype3'
+        |OR timestamptype is not null OR decimaltype is null;
+        |""".stripMargin
+    )
+
+    val sql =
+      """
+        |SELECT * FROM COLUMN_TYPE WHERE empid=3
+        |OR bytetype>1 OR shorttype<5 OR integertype>=1 OR longtype<=5
+        |OR floattype in(3.0) OR doubletype not in(2.0)
+        |OR datetype between DATE '2021-01-01' and DATE '2023-01-01'
+        |OR stringtype='stringtype3'
+        |OR timestamptype is not null OR decimaltype is null;
+        |""".stripMargin
+    comparePlansAndRows(sql, "default", "mv_filter3", noData = false)
+    spark.sql(
+      """
+        |DROP MATERIALIZED VIEW IF EXISTS mv_filter3;
+        |""".stripMargin
+    )
+
   }
 }

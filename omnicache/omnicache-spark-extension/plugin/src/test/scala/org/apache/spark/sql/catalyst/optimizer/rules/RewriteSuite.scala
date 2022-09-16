@@ -15,7 +15,6 @@
  * limitations under the License.
  */
 
-
 package org.apache.spark.sql.catalyst.optimizer.rules
 
 import com.huawei.boostkit.spark.conf.OmniCachePluginConfig
