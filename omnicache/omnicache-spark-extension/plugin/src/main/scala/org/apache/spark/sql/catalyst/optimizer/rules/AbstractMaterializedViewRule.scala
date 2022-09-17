@@ -699,7 +699,7 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
       expr.foreach {
         case attr: AttributeReference =>
           if (!viewTableAttrsSet.contains(attr.exprId)) {
-            logDebug(s"attr:%s cannot found in view:%s"
+            logBasedOnLevel(s"attr:%s cannot found in view:%s"
                 .format(attr, OmniCachePluginConfig.getConf.curMatchMV))
             return None
           }

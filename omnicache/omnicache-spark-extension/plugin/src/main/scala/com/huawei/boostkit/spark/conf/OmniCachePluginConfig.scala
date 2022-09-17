@@ -17,6 +17,8 @@
 
 package com.huawei.boostkit.spark.conf
 
+import java.util.Locale
+
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.catalyst.catalog.CatalogTable
@@ -50,6 +52,10 @@ class OmniCachePluginConfig(conf: SQLConf) {
       .getConfString("spark.sql.omnicache.default.datasource", "orc")
 
   val dataSourceSet: Set[String] = Set("orc", "parquet")
+
+  def logLevel: String = conf
+      .getConfString("spark.sql.omnicache.logLevel", "DEBUG")
+      .toUpperCase(Locale.ROOT)
 }
 
 object OmniCachePluginConfig {

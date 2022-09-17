@@ -19,7 +19,7 @@ package org.apache.spark.sql.catalyst.optimizer.rules
 
 import com.fasterxml.jackson.annotation.JsonIgnore
 import com.huawei.boostkit.spark.conf.OmniCachePluginConfig
-import com.huawei.boostkit.spark.util.RewriteHelper
+import com.huawei.boostkit.spark.util.{RewriteHelper, RewriteLogger}
 import scala.collection.mutable
 
 import org.apache.spark.SparkContext
@@ -33,8 +33,8 @@ import org.apache.spark.sql.execution.command.OmniCacheCreateMvCommand
 import org.apache.spark.status.ElementTrackingStore
 import org.apache.spark.util.kvstore.KVIndex
 
-class MVRewriteRule(session: SparkSession) extends Rule[LogicalPlan] with Logging {
-  val omniCacheConf: OmniCachePluginConfig = OmniCachePluginConfig.getSessionConf
+class MVRewriteRule(session: SparkSession) extends Rule[LogicalPlan] with RewriteLogger {
+  val omniCacheConf: OmniCachePluginConfig = OmniCachePluginConfig.getConf
 
   val joinRule = new MaterializedViewJoinRule(session)
   val aggregateRule = new MaterializedViewAggregateRule(session)
@@ -92,11 +92,11 @@ class MVRewriteRule(session: SparkSession) extends Rule[LogicalPlan] with Loggin
       val log = ("logicalPlan MVRewrite success," +
           "using materialized view:[%s],cost %s milliseconds,original sql:%s")
           .format(mvs, costSecond, sql)
-      logDebug(log)
+      logBasedOnLevel(log)
       session.sparkContext.listenerBus.post(SparkListenerMVRewriteSuccess(sql, mvs))
     }
     RewriteTime.statFromStartTime("total", rewriteStartSecond)
-    logDebug(RewriteTime.timeStat.toString())
+    logBasedOnLevel(RewriteTime.timeStat.toString())
     res
   }
 }

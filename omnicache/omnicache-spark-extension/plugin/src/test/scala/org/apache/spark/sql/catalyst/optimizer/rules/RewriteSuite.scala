@@ -43,6 +43,7 @@ class RewriteSuite extends SparkFunSuite with PredicateHelper {
       .config("hive.exec.dynamic.partition.mode", "nonstrict")
       .config("spark.ui.port", "4050")
       // .config("spark.sql.planChangeLog.level","WARN")
+      .config("spark.sql.omnicache.logLevel", "WARN")
       .enableHiveSupport()
       .getOrCreate()
   spark.sparkContext.setLogLevel("WARN")

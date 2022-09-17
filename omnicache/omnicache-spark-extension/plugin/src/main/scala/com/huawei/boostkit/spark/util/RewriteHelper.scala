@@ -28,7 +28,7 @@ import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.execution.datasources.LogicalRelation
 import org.apache.spark.sql.internal.SQLConf
 
-trait RewriteHelper extends PredicateHelper {
+trait RewriteHelper extends PredicateHelper with RewriteLogger {
 
   val SESSION_CATALOG_NAME: String = "spark_catalog"
 
@@ -265,7 +265,7 @@ trait RewriteHelper extends PredicateHelper {
   }
 }
 
-object RewriteHelper extends PredicateHelper {
+object RewriteHelper extends PredicateHelper with RewriteLogger {
   /**
    * Rewrite [[EqualTo]] and [[EqualNullSafe]] operator to keep order. The following cases will be
    * equivalent:
@@ -456,7 +456,7 @@ object RewriteHelper extends PredicateHelper {
         val input = plan.inputSet
         val missing = request -- input
         if (missing.nonEmpty) {
-          logDebug("checkAttrsValid failed for missing:%s".format(missing))
+          logBasedOnLevel("checkAttrsValid failed for missing:%s".format(missing))
           return false
         }
     }
