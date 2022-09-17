@@ -90,6 +90,7 @@ import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.Maps.uniqueIndex;
 import static com.huawei.boostkit.omnidata.transfer.OmniDataProperty.HOSTADDRESS_DELIMITER;
 import static com.huawei.boostkit.omnidata.transfer.OmniDataProperty.OMNIDATA_CLIENT_TARGET_LIST;
+import static com.huawei.boostkit.omnidata.transfer.OmniDataProperty.OMNIDATA_CLIENT_TASK_TIMEOUT;
 import static io.prestosql.plugin.hive.HiveColumnHandle.ColumnType.DUMMY_OFFLOADED;
 import static io.prestosql.plugin.hive.HiveColumnHandle.ColumnType.REGULAR;
 import static io.prestosql.plugin.hive.HiveColumnHandle.MAX_PARTITION_KEY_COLUMN_INDEX;
@@ -117,6 +118,7 @@ public class HivePageSourceProvider
     private final IndexCache indexCache;
     private final Set<HiveSelectivePageSourceFactory> selectivePageSourceFactories;
     private final OmniDataNodeManager omniDataNodeManager;
+    private final int omniDataClientTaskTimeout;
 
     @Inject
     public HivePageSourceProvider(
@@ -138,6 +140,8 @@ public class HivePageSourceProvider
         this.typeManager = requireNonNull(typeManager, "typeManager is null");
         this.indexCache = indexCache;
         this.selectivePageSourceFactories = selectivePageSourceFactories;
+        this.omniDataClientTaskTimeout =
+                requireNonNull(hiveConfig, "hiveConfig is null").getOmniDataClientTaskTimeout();
     }
 
     public HivePageSourceProvider(
@@ -158,6 +162,8 @@ public class HivePageSourceProvider
         this.indexCache = indexCache;
         this.selectivePageSourceFactories = selectivePageSourceFactories;
         this.omniDataNodeManager = null;
+        this.omniDataClientTaskTimeout =
+                requireNonNull(hiveConfig, "hiveConfig is null").getOmniDataClientTaskTimeout();
     }
 
     @Override
@@ -516,7 +522,7 @@ public class HivePageSourceProvider
         throw new IllegalStateException("Could not find a file reader for split " + split);
     }
 
-    public static Optional<ConnectorPageSource> createHivePageSource(
+    public Optional<ConnectorPageSource> createHivePageSource(
             Set<HiveRecordCursorProvider> cursorProviders,
             Set<HivePageSourceFactory> pageSourceFactories,
             Configuration configuration,
@@ -674,7 +680,7 @@ public class HivePageSourceProvider
         return Optional.empty();
     }
 
-    private static ConnectorPageSource createPushDownPageSource(
+    private ConnectorPageSource createPushDownPageSource(
             Path path,
             long start,
             long length,
@@ -686,6 +692,7 @@ public class HivePageSourceProvider
         AggregatedMemoryContext systemMemoryUsage = AggregatedMemoryContext.newSimpleAggregatedMemoryContext();
         Properties transProperties = new Properties();
         transProperties.put(OMNIDATA_CLIENT_TARGET_LIST, omniDataServerTarget);
+        transProperties.put(OMNIDATA_CLIENT_TASK_TIMEOUT, this.omniDataClientTaskTimeout);
 
         DataSource pushDownDataSource = new HdfsRecordDataSource(path.toString(), start, length, fileSize, schema);
 
