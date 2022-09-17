@@ -20,9 +20,10 @@ package org.apache.spark.sql.execution
 import java.util.concurrent.TimeUnit.NANOSECONDS
 import com.huawei.boostkit.spark.Constant.IS_SKIP_VERIFY_EXP
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor._
+import com.huawei.boostkit.spark.util.OmniAdaptorUtil
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil.transColBatchToOmniVecs
 import nova.hetu.omniruntime.`type`.DataType
-import nova.hetu.omniruntime.operator.config.{OperatorConfig, SpillConfig}
+import nova.hetu.omniruntime.operator.config.{OperatorConfig, OverflowConfig, SpillConfig}
 import nova.hetu.omniruntime.operator.filter.OmniFilterAndProjectOperatorFactory
 import nova.hetu.omniruntime.vector.VecBatch
 
@@ -195,7 +196,8 @@ case class ColumnarFilterExec(condition: Expression, child: SparkPlan)
     child.executeColumnar().mapPartitionsWithIndexInternal { (index, iter) =>
       val startCodegen = System.nanoTime()
       val filterOperatorFactory = new OmniFilterAndProjectOperatorFactory(
-        omniExpression, omniInputTypes, seqAsJavaList(omniProjectIndices), 1, new OperatorConfig(SpillConfig.NONE, IS_SKIP_VERIFY_EXP))
+        omniExpression, omniInputTypes, seqAsJavaList(omniProjectIndices), 1,
+        new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val filterOperator = filterOperatorFactory.createOperator
       omniCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startCodegen)
 
@@ -293,7 +295,8 @@ case class ColumnarConditionProjectExec(projectList: Seq[NamedExpression],
     child.executeColumnar().mapPartitionsWithIndexInternal { (index, iter) =>
       val startCodegen = System.nanoTime()
       val operatorFactory = new OmniFilterAndProjectOperatorFactory(
-        conditionExpression, omniInputTypes, seqAsJavaList(omniExpressions), 1, new OperatorConfig(SpillConfig.NONE, IS_SKIP_VERIFY_EXP))
+        conditionExpression, omniInputTypes, seqAsJavaList(omniExpressions), 1,
+        new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val operator = operatorFactory.createOperator
       omniCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startCodegen)
       // close operator

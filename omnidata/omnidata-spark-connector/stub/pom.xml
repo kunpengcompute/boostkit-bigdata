@@ -3,27 +3,35 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <parent>
-        <groupId>org.apache.spark</groupId>
         <artifactId>omnidata-spark-connector-root</artifactId>
+        <groupId>org.apache.spark</groupId>
         <version>1.4.0</version>
     </parent>
-
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.huawei.boostkit</groupId>
-    <artifactId>omniDataStub</artifactId>
-    <packaging>pom</packaging>
+    <artifactId>boostkit-omnidata-stub</artifactId>
     <version>1.4.0</version>
-
-    <modules>
-        <module>server</module>
-    </modules>
-
+    <packaging>jar</packaging>
     <properties>
         <dep.hetu.version>1.6.1</dep.hetu.version>
     </properties>
-
     <dependencies>
+        <dependency>
+            <groupId>com.google.inject</groupId>
+            <artifactId>guice</artifactId>
+            <version>4.2.2</version>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>2.12.4</version>
+        </dependency>
+        <dependency>
+            <groupId>io.airlift</groupId>
+            <artifactId>slice</artifactId>
+            <version>0.38</version>
+        </dependency>
         <dependency>
             <groupId>io.hetu.core</groupId>
             <artifactId>presto-spi</artifactId>
@@ -38,6 +46,15 @@
 
     <build>
         <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <source>8</source>
+                    <target>8</target>
+                </configuration>
+            </plugin>
+
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>
@@ -64,4 +81,5 @@
             </plugin>
         </plugins>
     </build>
+
 </project>

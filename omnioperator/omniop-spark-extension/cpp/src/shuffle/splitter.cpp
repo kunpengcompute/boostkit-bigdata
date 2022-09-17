@@ -374,13 +374,6 @@ int Splitter::DoSplit(VectorBatch& vb) {
         first_vector_batch_ = true;
     }
 
-    for (auto col = 0; col < fixed_width_array_idx_.size(); ++col) {
-        auto col_idx = fixed_width_array_idx_[col];
-        if (vb.GetVector(col_idx)->GetValueNulls() != nullptr) {
-            input_fixed_width_has_null_[col] = true;
-        }
-    }
-
     // prepare partition buffers and spill if necessary
     for (auto pid = 0; pid < num_partitions_; ++pid) {
         if (fixed_width_array_idx_.size() > 0 &&
@@ -427,56 +420,59 @@ void Splitter::ToSplitterTypeId(int num_cols)
 {
     for (int i = 0; i < num_cols; ++i) {
         switch (input_col_types.inputVecTypeIds[i]) {
-            case OMNI_INT:{
-                column_type_id_.push_back(ShuffleTypeId::SHUFFLE_4BYTE);
-                vector_batch_col_types_.push_back(OMNI_INT);
+            case OMNI_BOOLEAN: {
+                CastOmniToShuffleType(OMNI_BOOLEAN, SHUFFLE_1BYTE);
                 break;
             }
-            case OMNI_LONG:{
-                column_type_id_.push_back(ShuffleTypeId::SHUFFLE_8BYTE);
-                vector_batch_col_types_.push_back(OMNI_LONG);
+            case OMNI_SHORT: {
+                CastOmniToShuffleType(OMNI_SHORT, SHUFFLE_2BYTE);
                 break;
             }
-            case OMNI_DOUBLE:{
-                column_type_id_.push_back(ShuffleTypeId::SHUFFLE_8BYTE);
-                vector_batch_col_types_.push_back(OMNI_DOUBLE);
+            case OMNI_INT: {
+                CastOmniToShuffleType(OMNI_INT, SHUFFLE_4BYTE);
                 break;
             }
-            case OMNI_DATE32:{
-                column_type_id_.push_back(ShuffleTypeId::SHUFFLE_4BYTE);
-                vector_batch_col_types_.push_back(OMNI_DATE32);
+            case OMNI_LONG: {
+                CastOmniToShuffleType(OMNI_LONG, SHUFFLE_8BYTE);
                 break;
             }
-            case OMNI_DATE64:{
-                column_type_id_.push_back(ShuffleTypeId::SHUFFLE_8BYTE);
-                vector_batch_col_types_.push_back(OMNI_DATE64);
+            case OMNI_DOUBLE: {
+                CastOmniToShuffleType(OMNI_DOUBLE, SHUFFLE_8BYTE);
                 break;
             }
-            case OMNI_DECIMAL64:{
-                column_type_id_.push_back(ShuffleTypeId::SHUFFLE_8BYTE);
-                vector_batch_col_types_.push_back(OMNI_DECIMAL64);
+            case OMNI_DATE32: {
+                CastOmniToShuffleType(OMNI_DATE32, SHUFFLE_4BYTE);
                 break;
             }
-            case OMNI_DECIMAL128:{
-                column_type_id_.push_back(ShuffleTypeId::SHUFFLE_DECIMAL128);
-                vector_batch_col_types_.push_back(OMNI_DECIMAL128);
+            case OMNI_DATE64: {
+                CastOmniToShuffleType(OMNI_DATE64, SHUFFLE_8BYTE);
                 break;
             }
-            case OMNI_CHAR:{
-                column_type_id_.push_back(ShuffleTypeId::SHUFFLE_BINARY);
-                vector_batch_col_types_.push_back(OMNI_CHAR);
+            case OMNI_DECIMAL64: {
+                CastOmniToShuffleType(OMNI_DECIMAL64, SHUFFLE_8BYTE);
                 break;
             }
-            case OMNI_VARCHAR:{
-                column_type_id_.push_back(ShuffleTypeId::SHUFFLE_BINARY);
-                vector_batch_col_types_.push_back(OMNI_VARCHAR);
+            case OMNI_DECIMAL128: {
+                CastOmniToShuffleType(OMNI_DECIMAL128, SHUFFLE_DECIMAL128);
                 break;
             }
-            default:{
-                throw std::runtime_error("Unsupported DataTypeId.");
+            case OMNI_CHAR: {
+                CastOmniToShuffleType(OMNI_CHAR, SHUFFLE_BINARY);
+                break;
             }
+            case OMNI_VARCHAR: {
+                CastOmniToShuffleType(OMNI_VARCHAR, SHUFFLE_BINARY);
+                break;
+            }
+            default: throw std::runtime_error("Unsupported DataTypeId: " + input_col_types.inputVecTypeIds[i]);
         }
     }
+}
+
+void Splitter::CastOmniToShuffleType(DataTypeId omniType, ShuffleTypeId shuffleType)
+{
+    vector_batch_col_types_.push_back(omniType);
+    column_type_id_.push_back(shuffleType);
 }
 
 int Splitter::Split_Init(){
@@ -527,7 +523,6 @@ int Splitter::Split_Init(){
     partition_fixed_width_validity_addrs_.resize(num_fixed_width);
     partition_fixed_width_value_addrs_.resize(num_fixed_width);
     partition_fixed_width_buffers_.resize(num_fixed_width);
-    input_fixed_width_has_null_.resize(num_fixed_width, false);
     for (auto i = 0; i < num_fixed_width; ++i) {
         partition_fixed_width_validity_addrs_[i].resize(num_partitions_);
         partition_fixed_width_value_addrs_[i].resize(num_partitions_);

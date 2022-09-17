@@ -78,6 +78,7 @@ import java.util.Set;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Strings.nullToEmpty;
 import static com.huawei.boostkit.omnidata.transfer.OmniDataProperty.OMNIDATA_CLIENT_TARGET_LIST;
+import static com.huawei.boostkit.omnidata.transfer.OmniDataProperty.OMNIDATA_CLIENT_TASK_TIMEOUT;
 import static io.prestosql.memory.context.AggregatedMemoryContext.newSimpleAggregatedMemoryContext;
 import static io.prestosql.parquet.ParquetTypeUtils.getColumnIO;
 import static io.prestosql.parquet.ParquetTypeUtils.getDescriptors;
@@ -114,6 +115,7 @@ public class ParquetPageSourceFactory
     private final FileFormatDataSourceStats stats;
 
     private final DateTimeZone timeZone;
+    private final int omniDataClientTaskTimeout;
     private String omniDataServerTarget;
 
     @Inject
@@ -123,6 +125,8 @@ public class ParquetPageSourceFactory
         this.hdfsEnvironment = requireNonNull(hdfsEnvironment, "hdfsEnvironment is null");
         this.stats = requireNonNull(stats, "stats is null");
         this.timeZone = requireNonNull(hiveConfig, "hiveConfig is null").getParquetDateTimeZone();
+        this.omniDataClientTaskTimeout =
+                requireNonNull(hiveConfig, "hiveConfig is null").getOmniDataClientTaskTimeout();
     }
 
     @Override
@@ -346,6 +350,7 @@ public class ParquetPageSourceFactory
         AggregatedMemoryContext systemMemoryUsage = newSimpleAggregatedMemoryContext();
         Properties transProperties = new Properties();
         transProperties.put(OMNIDATA_CLIENT_TARGET_LIST, omniDataServerTarget);
+        transProperties.put(OMNIDATA_CLIENT_TASK_TIMEOUT, this.omniDataClientTaskTimeout);
 
         DataSource parquetPushDownDataSource = new com.huawei.boostkit.omnidata.model.datasource.hdfs.HdfsParquetDataSource(path.toString(), start, length, false);
 

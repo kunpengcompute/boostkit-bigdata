@@ -98,6 +98,7 @@ import static com.google.common.base.Strings.nullToEmpty;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.Maps.uniqueIndex;
 import static com.huawei.boostkit.omnidata.transfer.OmniDataProperty.OMNIDATA_CLIENT_TARGET_LIST;
+import static com.huawei.boostkit.omnidata.transfer.OmniDataProperty.OMNIDATA_CLIENT_TASK_TIMEOUT;
 import static io.prestosql.memory.context.AggregatedMemoryContext.newSimpleAggregatedMemoryContext;
 import static io.prestosql.orc.OrcReader.INITIAL_BATCH_SIZE;
 import static io.prestosql.orc.OrcReader.handleCacheLoadException;
@@ -154,6 +155,7 @@ public class OrcPageSourceFactory
     private final OrcCacheStore orcCacheStore;
     private final int domainCompactionThreshold;
     private final DateTimeZone legacyTimeZone;
+    private final int omniDataClientTaskTimeout;
     private String omniDataServerTarget;
 
     @Inject
@@ -167,6 +169,8 @@ public class OrcPageSourceFactory
         this.orcCacheStore = orcCacheStore;
         this.domainCompactionThreshold = config.getDomainCompactionThreshold();
         this.legacyTimeZone = requireNonNull(config, "hiveConfig is null").getOrcLegacyDateTimeZone();
+        this.omniDataClientTaskTimeout =
+                requireNonNull(config, "hiveConfig is null").getOmniDataClientTaskTimeout();
         this.omniDataServerTarget = null;
     }
 
@@ -544,6 +548,7 @@ public class OrcPageSourceFactory
         AggregatedMemoryContext systemMemoryUsage = newSimpleAggregatedMemoryContext();
         Properties transProperties = new Properties();
         transProperties.put(OMNIDATA_CLIENT_TARGET_LIST, omniDataServerTarget);
+        transProperties.put(OMNIDATA_CLIENT_TASK_TIMEOUT, this.omniDataClientTaskTimeout);
 
         DataSource orcPushDownDataSource = new com.huawei.boostkit.omnidata.model.datasource.hdfs.HdfsOrcDataSource(
                 path.toString(),

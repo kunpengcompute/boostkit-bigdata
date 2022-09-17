@@ -13,21 +13,12 @@
     <artifactId>boostkit-omnidata-client</artifactId>
     <packaging>jar</packaging>
 
-    <properties>
-        <dep.commons.io.version>2.8.0</dep.commons.io.version>
-    </properties>
-
     <dependencies>
         <dependency>
-            <groupId>commons-io</groupId>
-            <artifactId>commons-io</artifactId>
-            <version>${dep.commons.io.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>io.hetu.core</groupId>
-            <artifactId>hetu-transport</artifactId>
-            <version>1.6.1</version>
-            <scope>compile</scope>
+            <groupId>com.huawei.boostkit</groupId>
+            <artifactId>boostkit-omnidata-common</artifactId>
+            <version>${project.version}</version>
+            <classifier>${dep.os.arch}</classifier>
         </dependency>
     </dependencies>
 </project>

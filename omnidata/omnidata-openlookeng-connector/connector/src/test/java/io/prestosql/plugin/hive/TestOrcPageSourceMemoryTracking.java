@@ -113,6 +113,7 @@ import static io.prestosql.plugin.hive.HiveColumnHandle.ColumnType.REGULAR;
 import static io.prestosql.plugin.hive.HiveTestUtils.HDFS_ENVIRONMENT;
 import static io.prestosql.plugin.hive.HiveTestUtils.SESSION;
 import static io.prestosql.plugin.hive.HiveTestUtils.TYPE_MANAGER;
+import static io.prestosql.plugin.hive.HiveTestUtils.getDefaultHiveSelectiveFactories;
 import static io.prestosql.spi.type.VarcharType.createUnboundedVarcharType;
 import static io.prestosql.sql.relational.Expressions.field;
 import static io.prestosql.testing.TestingHandles.TEST_TABLE_HANDLE;
@@ -153,6 +154,7 @@ public class TestOrcPageSourceMemoryTracking
 
     private File tempFile;
     private TestPreparer testPreparer;
+    private static HivePageSourceProvider hivePageSourceProvider;
 
     @DataProvider(name = "rowCount")
     public static Object[][] rowCount()
@@ -164,6 +166,8 @@ public class TestOrcPageSourceMemoryTracking
     public void setUp()
             throws Exception
     {
+        HiveConfig config = new HiveConfig();
+        hivePageSourceProvider = new HivePageSourceProvider(config, HiveTestUtils.createTestHdfsEnvironment(config), HiveTestUtils.getDefaultHiveRecordCursorProvider(config), HiveTestUtils.getDefaultHiveDataStreamFactories(config), HiveTestUtils.TYPE_MANAGER, HiveTestUtils.getNoOpIndexCache(), getDefaultHiveSelectiveFactories(config));
         tempFile = File.createTempFile("presto_test_orc_page_source_memory_tracking", "orc");
         tempFile.delete();
         testPreparer = new TestPreparer(tempFile.getCanonicalPath());
@@ -492,7 +496,7 @@ public class TestOrcPageSourceMemoryTracking
                     Duration.ofMillis(new HiveConfig().getOrcBloomFiltersCacheTtl().toMillis()),
                     new HiveConfig().getOrcRowDataCacheMaximumWeight(), Duration.ofMillis(new HiveConfig().getOrcRowDataCacheTtl().toMillis()),
                     new HiveConfig().isOrcCacheStatsMetricCollectionEnabled()));
-            return HivePageSourceProvider.createHivePageSource(
+            return hivePageSourceProvider.createHivePageSource(
                     ImmutableSet.of(),
                     ImmutableSet.of(orcPageSourceFactory),
                     new Configuration(),

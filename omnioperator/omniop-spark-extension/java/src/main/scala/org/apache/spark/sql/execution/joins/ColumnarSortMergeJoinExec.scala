@@ -17,19 +17,20 @@
 
 package org.apache.spark.sql.execution.joins
 
-import com.huawei.boostkit.spark.ColumnarPluginConfig
-
 import java.util.concurrent.TimeUnit.NANOSECONDS
 import java.util.Optional
+
+import com.huawei.boostkit.spark.ColumnarPluginConfig
 import com.huawei.boostkit.spark.Constant.IS_SKIP_VERIFY_EXP
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor
-import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor.checkOmniJsonWhiteList
+import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor.{checkOmniJsonWhiteList, isSimpleColumn, isSimpleColumnForAll}
+import com.huawei.boostkit.spark.util.OmniAdaptorUtil
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil.transColBatchToOmniVecs
 import nova.hetu.omniruntime.`type`.DataType
-import nova.hetu.omniruntime.constants.JoinType.OMNI_JOIN_TYPE_INNER
-import nova.hetu.omniruntime.operator.config.{OperatorConfig, SpillConfig}
+import nova.hetu.omniruntime.constants.JoinType._
+import nova.hetu.omniruntime.operator.config.{OperatorConfig, OverflowConfig, SpillConfig}
 import nova.hetu.omniruntime.operator.join.{OmniSmjBufferedTableWithExprOperatorFactory, OmniSmjStreamedTableWithExprOperatorFactory}
-import nova.hetu.omniruntime.vector.{BooleanVec, Decimal128Vec, DoubleVec, IntVec, LongVec, VarcharVec, Vec, VecBatch}
+import nova.hetu.omniruntime.vector.{BooleanVec, Decimal128Vec, DoubleVec, IntVec, LongVec, VarcharVec, Vec, VecBatch, ShortVec}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans._
@@ -92,9 +93,12 @@ class ColumnarSortMergeJoinExec(
   )
 
   def buildCheck(): Unit = {
-    if ("INNER" != joinType.sql) {
-      throw new UnsupportedOperationException(s"Join-type[${joinType}] is not supported " +
-        s"in ${this.nodeName}")
+    joinType match {
+      case _: InnerLike | LeftOuter | FullOuter =>
+        // SMJ join support InnerLike | LeftOuter | FullOuter
+      case _ =>
+        throw new UnsupportedOperationException(s"Join-type[${joinType}] is not supported " +
+          s"in ${this.nodeName}")
     }
 
     val streamedTypes = new Array[DataType](left.output.size)
@@ -115,14 +119,21 @@ class ColumnarSortMergeJoinExec(
         OmniExpressionAdaptor.getExprIdMap(right.output.map(_.toAttribute)))
     }.toArray
 
-    checkOmniJsonWhiteList("", streamedKeyColsExp)
-    checkOmniJsonWhiteList("", bufferedKeyColsExp)
+    if (!isSimpleColumnForAll(streamedKeyColsExp.map(expr => expr.toString))) {
+      checkOmniJsonWhiteList("", streamedKeyColsExp)
+    }
+
+    if (!isSimpleColumnForAll(bufferedKeyColsExp.map(expr => expr.toString))) {
+      checkOmniJsonWhiteList("", bufferedKeyColsExp)
+    }
 
     condition match {
       case Some(expr) =>
         val filterExpr: String = OmniExpressionAdaptor.rewriteToOmniJsonExpressionLiteral(expr,
           OmniExpressionAdaptor.getExprIdMap(output.map(_.toAttribute)))
-        checkOmniJsonWhiteList(filterExpr, new Array[AnyRef](0))
+        if (!isSimpleColumn(filterExpr)) {
+          checkOmniJsonWhiteList(filterExpr, new Array[AnyRef](0))
+        }
       case _ => null
     }
   }
@@ -139,9 +150,13 @@ class ColumnarSortMergeJoinExec(
     val streamVecBatchs = longMetric("numStreamVecBatchs")
     val bufferVecBatchs = longMetric("numBufferVecBatchs")
 
-    if ("INNER" != joinType.sql) {
-      throw new UnsupportedOperationException(s"Join-type[${joinType}] is not supported " +
-        s"in ${this.nodeName}")
+    val omniJoinType : nova.hetu.omniruntime.constants.JoinType = joinType match {
+      case _: InnerLike => OMNI_JOIN_TYPE_INNER
+      case LeftOuter => OMNI_JOIN_TYPE_LEFT
+      case FullOuter => OMNI_JOIN_TYPE_FULL
+      case x =>
+        throw new UnsupportedOperationException(s"ColumnSortMergeJoin Join-type[$x] is not supported " +
+          s"in ${this.nodeName}")
     }
 
     val streamedTypes = new Array[DataType](left.output.size)
@@ -174,14 +189,20 @@ class ColumnarSortMergeJoinExec(
     left.executeColumnar().zipPartitions(right.executeColumnar()) { (streamedIter, bufferedIter) =>
       val filter: Optional[String] = Optional.ofNullable(filterString)
       val startStreamedCodegen = System.nanoTime()
+      val lookupJoinType = OmniExpressionAdaptor.toOmniJoinType(joinType)
       val streamedOpFactory = new OmniSmjStreamedTableWithExprOperatorFactory(streamedTypes,
-        streamedKeyColsExp, streamedOutputChannel, OMNI_JOIN_TYPE_INNER, filter, new OperatorConfig(SpillConfig.NONE, IS_SKIP_VERIFY_EXP))
+        streamedKeyColsExp, streamedOutputChannel, lookupJoinType, filter,
+        new OperatorConfig(SpillConfig.NONE,
+          new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
+
       val streamedOp = streamedOpFactory.createOperator
       streamedCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startStreamedCodegen)
 
       val startBufferedCodegen = System.nanoTime()
       val bufferedOpFactory = new OmniSmjBufferedTableWithExprOperatorFactory(bufferedTypes,
-        bufferedKeyColsExp, bufferedOutputChannel, streamedOpFactory, new OperatorConfig(SpillConfig.NONE, IS_SKIP_VERIFY_EXP))
+        bufferedKeyColsExp, bufferedOutputChannel, streamedOpFactory,
+        new OperatorConfig(SpillConfig.NONE,
+          new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val bufferedOp = bufferedOpFactory.createOperator
       bufferedCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startBufferedCodegen)
 
@@ -198,13 +219,20 @@ class ColumnarSortMergeJoinExec(
       val enableSortMergeJoinBatchMerge: Boolean = columnarConf.enableSortMergeJoinBatchMerge
       val iterBatch = new Iterator[ColumnarBatch] {
 
-        var isFinished = !streamedIter.hasNext || !bufferedIter.hasNext
+        var isFinished : Boolean = joinType match {
+          case _: InnerLike => !streamedIter.hasNext || !bufferedIter.hasNext
+          case LeftOuter => !streamedIter.hasNext
+          case FullOuter => !(streamedIter.hasNext || bufferedIter.hasNext)
+          case x =>
+            throw new UnsupportedOperationException(s"ColumnSortMergeJoin Join-type[$x] is not supported!")
+        }
+
         var isStreamedFinished = false
         var isBufferedFinished = false
         var results: java.util.Iterator[VecBatch] = null
 
         def checkAndClose() : Unit = {
-            while(streamedIter.hasNext) {
+            while (streamedIter.hasNext) {
               streamVecBatchs += 1
               streamedIter.next().close()
             }
@@ -259,7 +287,7 @@ class ColumnarSortMergeJoinExec(
           if (inputReturnCode == SMJ_FETCH_JOIN_DATA) {
             val startGetOutputTime = System.nanoTime()
             results = bufferedOp.getOutput
-            var hasNext = results.hasNext
+            val hasNext = results.hasNext
             getOutputTime += NANOSECONDS.toMillis(System.nanoTime() - startGetOutputTime)
             if (hasNext) {
               return true
@@ -314,6 +342,8 @@ class ColumnarSortMergeJoinExec(
                 new VarcharVec(0, 0)
               case DataType.DataTypeId.OMNI_DECIMAL128 =>
                 new Decimal128Vec(0)
+              case DataType.DataTypeId.OMNI_SHORT =>
+                new ShortVec(0)
               case _ =>
                 throw new IllegalArgumentException(s"VecType [${types(i).getClass.getSimpleName}]" +
                   s" is not supported in [${getClass.getSimpleName}] yet")

@@ -47,11 +47,13 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import static io.prestosql.spi.type.BigintType.BIGINT;
+import static io.prestosql.spi.type.DecimalType.createDecimalType;
+import static io.prestosql.spi.type.DoubleType.DOUBLE;
 import static io.prestosql.spi.type.IntegerType.INTEGER;
 import static io.prestosql.spi.type.VarcharType.createVarcharType;
 
 @State(Scope.Thread)
-@Fork(0)
+@Fork(1)
 @Threads(1)
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
@@ -65,22 +67,24 @@ public class BenchmarkTopNOlkOperator
             .<String, ImmutableList<Type>>builder().put("group1", ImmutableList.of(createVarcharType(16)))
             .put("group2", ImmutableList.of(INTEGER, INTEGER))
             .put("group3", ImmutableList.of(INTEGER, INTEGER, INTEGER))
-            .put("group4", ImmutableList.of(BIGINT, INTEGER)).put("group5", ImmutableList.of(createVarcharType(16)))
-            .put("group6", ImmutableList.of(INTEGER, INTEGER, INTEGER))
+            .put("group4", ImmutableList.of(BIGINT)).put("group5", ImmutableList.of(DOUBLE))
+            .put("group6", ImmutableList.of(INTEGER, DOUBLE, BIGINT))
             .put("group7", ImmutableList.of(createVarcharType(20), createVarcharType(30), createVarcharType(50)))
-            .put("group8", ImmutableList.of(createVarcharType(50), INTEGER))
+            .put("group8", ImmutableList.of(createDecimalType()))
             .put("group9",
                     ImmutableList.of(INTEGER, createVarcharType(60), createVarcharType(20), createVarcharType(30)))
             .put("group10",
-                    ImmutableList.of(INTEGER, createVarcharType(50), INTEGER, INTEGER, createVarcharType(50)))
+                    ImmutableList.of(INTEGER, createVarcharType(50), INTEGER, DOUBLE, createVarcharType(50)))
+            .put("group11", ImmutableList.of(BIGINT, DOUBLE)).put("group12", ImmutableList.of(BIGINT, createDecimalType()))
             .build();
 
     private static final Map<String, List<Integer>> SORT_CHANNELS = ImmutableMap.<String, List<Integer>>builder()
             .put("group1", ImmutableList.of(0)).put("group2", ImmutableList.of(0, 1))
-            .put("group3", ImmutableList.of(0, 1, 2)).put("group4", ImmutableList.of(0, 1))
+            .put("group3", ImmutableList.of(0, 1, 2)).put("group4", ImmutableList.of(0))
             .put("group5", ImmutableList.of(0)).put("group6", ImmutableList.of(0, 1, 2))
-            .put("group7", ImmutableList.of(0, 1, 2)).put("group8", ImmutableList.of(0, 1))
-            .put("group9", ImmutableList.of(0, 1, 2, 3)).put("group10", ImmutableList.of(0, 1, 2, 3)).build();
+            .put("group7", ImmutableList.of(0, 1, 2)).put("group8", ImmutableList.of(0))
+            .put("group9", ImmutableList.of(0, 1, 2, 3)).put("group10", ImmutableList.of(0, 1, 2, 3, 4))
+            .put("group11", ImmutableList.of(0, 1)).put("group12", ImmutableList.of(0, 1)).build();
 
     @State(Scope.Thread)
     public static class BenchmarkContext
@@ -89,7 +93,7 @@ public class BenchmarkTopNOlkOperator
         @Param({"1", "10", "100", "1000", "10000"})
         private String topN = "100";
 
-        @Param({"group1", "group2", "group3", "group4", "group5", "group6", "group7", "group8", "group9", "group10"})
+        @Param({"group1", "group2", "group3", "group4", "group5", "group6", "group7", "group8", "group9", "group10", "group11", "group12"})
         String testGroup = "group1";
 
         @Param({"false", "true"})
@@ -108,18 +112,7 @@ public class BenchmarkTopNOlkOperator
         @Override
         protected List<Page> buildPages()
         {
-            List<Type> typesArray = INPUT_TYPES.get(testGroup);
-            List<Page> pages = new ArrayList<>();
-            for (int i = 0; i < TOTAL_PAGES; i++) {
-                if (dictionaryBlocks) {
-                    pages.add(PageBuilderUtil.createSequencePageWithDictionaryBlocks(typesArray,
-                            Integer.parseInt(rowsPerPageStr)));
-                }
-                else {
-                    pages.add(PageBuilderUtil.createSequencePage(typesArray, Integer.parseInt(rowsPerPageStr)));
-                }
-            }
-            return pages;
+            return buildPages(INPUT_TYPES.get(testGroup), TOTAL_PAGES, Integer.parseInt(rowsPerPageStr), dictionaryBlocks);
         }
 
         @Override
@@ -144,10 +137,6 @@ public class BenchmarkTopNOlkOperator
 
     public static void main(String[] args) throws RunnerException
     {
-        BenchmarkContext data = new BenchmarkContext();
-        data.setup();
-        new BenchmarkTopNOlkOperator().topN(data);
-
         Options options = new OptionsBuilder().verbosity(VerboseMode.NORMAL)
                 .include(".*" + BenchmarkTopNOlkOperator.class.getSimpleName() + ".*").build();
 

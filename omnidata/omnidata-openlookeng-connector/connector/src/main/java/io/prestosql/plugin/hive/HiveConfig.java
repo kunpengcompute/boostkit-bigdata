@@ -238,6 +238,8 @@ public class HiveConfig
 
     private boolean workerMetaStoreCacheEnabled;
 
+    private int omniDataClientTaskTimeout = 300; // OmniData client task timeout, 300 seconds
+
     @Config("hive.max-initial-splits")
     public HiveConfig setMaxInitialSplits(int maxInitialSplits)
     {
@@ -1986,5 +1988,17 @@ public class HiveConfig
     public long getMinOffloadRowNumber()
     {
         return minOffloadRowNumber;
+    }
+
+    @Config("omnidata.client.task.timeout")
+    public HiveConfig setOmniDataClientTaskTimeout(int omniDataClientTaskTimeout)
+    {
+        this.omniDataClientTaskTimeout = omniDataClientTaskTimeout;
+        return this;
+    }
+
+    public int getOmniDataClientTaskTimeout()
+    {
+        return this.omniDataClientTaskTimeout;
     }
 }

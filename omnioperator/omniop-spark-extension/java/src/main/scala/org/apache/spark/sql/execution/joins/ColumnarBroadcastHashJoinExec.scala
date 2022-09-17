@@ -17,22 +17,23 @@
 
 package org.apache.spark.sql.execution.joins
 
-import com.huawei.boostkit.spark.ColumnarPluginConfig
-
-import java.util.concurrent.TimeUnit.NANOSECONDS
 import java.util.Optional
-import com.huawei.boostkit.spark.Constant.IS_SKIP_VERIFY_EXP
+import java.util.concurrent.TimeUnit.NANOSECONDS
 
 import scala.collection.mutable
+
+import com.huawei.boostkit.spark.ColumnarPluginConfig
+import com.huawei.boostkit.spark.Constant.IS_SKIP_VERIFY_EXP
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor
-import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor.checkOmniJsonWhiteList
+import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor.{checkOmniJsonWhiteList, isSimpleColumn, isSimpleColumnForAll}
+import com.huawei.boostkit.spark.util.OmniAdaptorUtil
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil.transColBatchToOmniVecs
 import nova.hetu.omniruntime.`type`.DataType
-import nova.hetu.omniruntime.constants.JoinType.OMNI_JOIN_TYPE_INNER
-import nova.hetu.omniruntime.operator.config.{OperatorConfig, SpillConfig}
+import nova.hetu.omniruntime.operator.config.{OperatorConfig, OverflowConfig, SpillConfig}
 import nova.hetu.omniruntime.operator.join.{OmniHashBuilderWithExprOperatorFactory, OmniLookupJoinWithExprOperatorFactory}
 import nova.hetu.omniruntime.vector.VecBatch
 import nova.hetu.omniruntime.vector.serialize.VecBatchSerializerFactory
+
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
@@ -54,14 +55,14 @@ import org.apache.spark.sql.vectorized.ColumnarBatch
  * relation is not shuffled.
  */
 case class ColumnarBroadcastHashJoinExec(
-                                  leftKeys: Seq[Expression],
-                                  rightKeys: Seq[Expression],
-                                  joinType: JoinType,
-                                  buildSide: BuildSide,
-                                  condition: Option[Expression],
-                                  left: SparkPlan,
-                                  right: SparkPlan,
-                                  isNullAwareAntiJoin: Boolean = false)
+    leftKeys: Seq[Expression],
+    rightKeys: Seq[Expression],
+    joinType: JoinType,
+    buildSide: BuildSide,
+    condition: Option[Expression],
+    left: SparkPlan,
+    right: SparkPlan,
+    isNullAwareAntiJoin: Boolean = false)
   extends HashJoin {
 
   if (isNullAwareAntiJoin) {
@@ -74,12 +75,18 @@ case class ColumnarBroadcastHashJoinExec(
 
   override lazy val metrics = Map(
     "numOutputRows" -> SQLMetrics.createMetric(sparkContext, "number of output rows"),
-    "lookupAddInputTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni lookup addInput"),
-    "lookupGetOutputTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni lookup getOutput"),
-    "lookupCodegenTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni lookup codegen"),
-    "buildAddInputTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni build addInput"),
-    "buildGetOutputTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni build getOutput"),
-    "buildCodegenTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni build codegen"),
+    "lookupAddInputTime" ->
+      SQLMetrics.createTimingMetric(sparkContext, "time in omni lookup addInput"),
+    "lookupGetOutputTime" ->
+      SQLMetrics.createTimingMetric(sparkContext, "time in omni lookup getOutput"),
+    "lookupCodegenTime" ->
+      SQLMetrics.createTimingMetric(sparkContext, "time in omni lookup codegen"),
+    "buildAddInputTime" ->
+      SQLMetrics.createTimingMetric(sparkContext, "time in omni build addInput"),
+    "buildGetOutputTime" ->
+      SQLMetrics.createTimingMetric(sparkContext, "time in omni build getOutput"),
+    "buildCodegenTime" ->
+      SQLMetrics.createTimingMetric(sparkContext, "time in omni build codegen"),
     "numOutputVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatchs"),
     "numMergedVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of merged vecBatchs")
   )
@@ -193,9 +200,11 @@ case class ColumnarBroadcastHashJoinExec(
   }
 
   def buildCheck(): Unit = {
-    if ("INNER" != joinType.sql) {
-      throw new UnsupportedOperationException(s"Join-type[${joinType}] is not supported " +
-      s"in ${this.nodeName}")
+    joinType match {
+      case LeftOuter | Inner =>
+      case _ =>
+        throw new UnsupportedOperationException(s"Join-type[${joinType}] is not supported " +
+          s"in ${this.nodeName}")
     }
 
     val buildTypes = new Array[DataType](buildOutput.size) // {2, 2}, buildOutput:col1#12,col2#13
@@ -217,14 +226,20 @@ case class ColumnarBroadcastHashJoinExec(
         OmniExpressionAdaptor.getExprIdMap(streamedOutput.map(_.toAttribute)))
     }.toArray
 
-    checkOmniJsonWhiteList("", buildJoinColsExp)
-    checkOmniJsonWhiteList("", probeHashColsExp)
+    if (!isSimpleColumnForAll(buildJoinColsExp.map(expr => expr.toString))) {
+      checkOmniJsonWhiteList("", buildJoinColsExp)
+    }
+    if (!isSimpleColumnForAll(probeHashColsExp.map(expr => expr.toString))) {
+      checkOmniJsonWhiteList("", probeHashColsExp)
+    }
 
     condition match {
       case Some(expr) =>
         val filterExpr: String = OmniExpressionAdaptor.rewriteToOmniJsonExpressionLiteral(expr,
           OmniExpressionAdaptor.getExprIdMap((streamedOutput ++ buildOutput).map(_.toAttribute)))
-        checkOmniJsonWhiteList(filterExpr, new Array[AnyRef](0))
+        if (!isSimpleColumn(filterExpr)) {
+          checkOmniJsonWhiteList(filterExpr, new Array[AnyRef](0))
+        }
       case _ => Optional.empty()
     }
   }
@@ -249,12 +264,6 @@ case class ColumnarBroadcastHashJoinExec(
     val lookupAddInputTime = longMetric("lookupAddInputTime")
     val lookupCodegenTime = longMetric("lookupCodegenTime")
     val lookupGetOutputTime = longMetric("lookupGetOutputTime")
-
-
-    if ("INNER" != joinType.sql) {
-      throw new UnsupportedOperationException(s"Join-type[${joinType}] is not supported " +
-        s"in ${this.nodeName}")
-    }
 
     val buildTypes = new Array[DataType](buildOutput.size) // {2,2}, buildOutput:col1#12,col2#13
     buildOutput.zipWithIndex.foreach { case (att, i) =>
@@ -289,8 +298,10 @@ case class ColumnarBroadcastHashJoinExec(
         case _ => Optional.empty()
       }
       val startBuildCodegen = System.nanoTime()
-      val buildOpFactory = new OmniHashBuilderWithExprOperatorFactory(buildTypes,
-        buildJoinColsExp, filter, 1, new OperatorConfig(SpillConfig.NONE, IS_SKIP_VERIFY_EXP))
+      val buildOpFactory =
+        new OmniHashBuilderWithExprOperatorFactory(buildTypes, buildJoinColsExp, filter, 1,
+        new OperatorConfig(SpillConfig.NONE,
+          new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val buildOp = buildOpFactory.createOperator()
       buildCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startBuildCodegen)
 
@@ -305,9 +316,11 @@ case class ColumnarBroadcastHashJoinExec(
       buildGetOutputTime += NANOSECONDS.toMillis(System.nanoTime() - startBuildGetOp)
 
       val startLookupCodegen = System.nanoTime()
+      val lookupJoinType = OmniExpressionAdaptor.toOmniJoinType(joinType)
       val lookupOpFactory = new OmniLookupJoinWithExprOperatorFactory(probeTypes, probeOutputCols,
-        probeHashColsExp, buildOutputCols, buildOutputTypes, OMNI_JOIN_TYPE_INNER, buildOpFactory,
-        new OperatorConfig(SpillConfig.NONE, IS_SKIP_VERIFY_EXP))
+        probeHashColsExp, buildOutputCols, buildOutputTypes, lookupJoinType, buildOpFactory,
+        new OperatorConfig(SpillConfig.NONE,
+          new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val lookupOp = lookupOpFactory.createOperator()
       lookupCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startLookupCodegen)
 
@@ -320,7 +333,7 @@ case class ColumnarBroadcastHashJoinExec(
       })
 
       val resultSchema = this.schema
-      val reverse = this.output != (streamedPlan.output ++ buildPlan.output)
+      val reverse = buildSide == BuildLeft
       var left = 0
       var leftLen = streamedPlan.output.size
       var right = streamedPlan.output.size
@@ -442,5 +455,4 @@ case class ColumnarBroadcastHashJoinExec(
   protected override def codegenAnti(ctx: CodegenContext, input: Seq[ExprCode]): String = {
     throw new UnsupportedOperationException(s"This operator doesn't support codegenAnti().")
   }
-  
 }

@@ -27,5 +27,10 @@ public class OmniDataProperty {
      * constant string for "omnidata.client.target"
      */
     public static final String OMNIDATA_CLIENT_TARGET = "omnidata.client.target";
+
+    /**
+     * constant string for "omnidata.client.task.timeout"
+     */
+    public static final String OMNIDATA_CLIENT_TASK_TIMEOUT = "omnidata.client.task.timeout";
 }
 

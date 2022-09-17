@@ -21,11 +21,7 @@ package com.huawei.boostkit.spark.jni;
 import nova.hetu.omniruntime.type.DataType;
 import nova.hetu.omniruntime.type.Decimal64DataType;
 import nova.hetu.omniruntime.type.Decimal128DataType;
-import nova.hetu.omniruntime.vector.IntVec;
-import nova.hetu.omniruntime.vector.LongVec;
-import nova.hetu.omniruntime.vector.VarcharVec;
-import nova.hetu.omniruntime.vector.Decimal128Vec;
-import nova.hetu.omniruntime.vector.Vec;
+import nova.hetu.omniruntime.vector.*;
 
 import org.apache.hadoop.hive.ql.io.sarg.ExpressionTree;
 import org.apache.hadoop.hive.ql.io.sarg.PredicateLeaf;
@@ -231,13 +227,26 @@ public class OrcColumnarBatchJniReader {
                 continue;
             }
             switch (DataType.DataTypeId.values()[typeIds[nativeGetId]]) {
+                case OMNI_BOOLEAN: {
+                    vecList[i] = new BooleanVec(vecNativeIds[nativeGetId]);
+                    break;
+                }
+                case OMNI_SHORT: {
+                    vecList[i] = new ShortVec(vecNativeIds[nativeGetId]);
+                    break;
+                }
                 case OMNI_DATE32:
                 case OMNI_INT: {
                     vecList[i] = new IntVec(vecNativeIds[nativeGetId]);
                     break;
                 }
-                case OMNI_LONG: {
+                case OMNI_LONG:
+                case OMNI_DECIMAL64: {
                     vecList[i] = new LongVec(vecNativeIds[nativeGetId]);
+                    break;
+                }
+                case OMNI_DOUBLE: {
+                    vecList[i] = new DoubleVec(vecNativeIds[nativeGetId]);
                     break;
                 }
                 case OMNI_VARCHAR: {
@@ -248,12 +257,9 @@ public class OrcColumnarBatchJniReader {
                     vecList[i] = new Decimal128Vec(vecNativeIds[nativeGetId], Decimal128DataType.DECIMAL128);
                     break;
                 }
-                case OMNI_DECIMAL64: {
-                    vecList[i] = new LongVec(vecNativeIds[nativeGetId]);
-                    break;
-                }
                 default: {
-                    LOGGER.error("UNKNOWN TYPE ERROR IN JAVA" + DataType.DataTypeId.values()[typeIds[i]]);
+                    throw new RuntimeException("UnSupport type for ColumnarFileScan:" +
+                            DataType.DataTypeId.values()[typeIds[i]]);
                 }
             }
             nativeGetId++;

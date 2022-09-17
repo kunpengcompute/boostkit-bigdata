@@ -66,6 +66,8 @@ public class OmniDataAdapter implements Serializable {
 
     private PageDeserializer deserializer;
 
+    private int taskTimeout;
+
     public OmniDataAdapter(Configuration conf, FileSplit fileSplit, NdpPredicateInfo ndpPredicateInfo,
                            PageDeserializer deserializer) {
         this.deserializer = deserializer;
@@ -85,6 +87,7 @@ public class OmniDataAdapter implements Serializable {
         this.omniDataHosts = NdpStatusManager.getOmniDataHosts(conf, fileSplit,
                 OmniDataConf.getOmniDataReplicationNum(conf));
         this.taskSource = new TaskSource(dataSource, ndpPredicateInfo.getPredicate(), 1048576);
+        this.taskTimeout = OmniDataConf.getOmnidataClientTaskTimeout(conf);
     }
 
     public Queue<ColumnVector[]> getBatchFromOmniData() throws UnknownHostException {
@@ -95,6 +98,7 @@ public class OmniDataAdapter implements Serializable {
         for (String omniDataHost : omniDataHosts) {
             String ipAddress = InetAddress.getByName(omniDataHost).getHostAddress();
             properties.put("omnidata.client.target.list", ipAddress);
+            properties.put(OmniDataConf.OMNIDATA_CLIENT_TASK_TIMEOUT, taskTimeout);
             DataReaderImpl<List<ColumnVector[]>> dataReader = null;
             try {
                 dataReader = new DataReaderImpl<>(properties, taskSource, deserializer);

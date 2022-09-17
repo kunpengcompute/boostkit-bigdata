@@ -76,6 +76,7 @@ import static io.prestosql.plugin.hive.HiveStorageFormat.TEXTFILE;
 import static io.prestosql.plugin.hive.HiveTestUtils.HDFS_ENVIRONMENT;
 import static io.prestosql.plugin.hive.HiveTestUtils.TYPE_MANAGER;
 import static io.prestosql.plugin.hive.HiveTestUtils.createGenericHiveRecordCursorProvider;
+import static io.prestosql.plugin.hive.HiveTestUtils.getDefaultHiveSelectiveFactories;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 import static org.apache.hadoop.hive.metastore.api.hive_metastoreConstants.FILE_INPUT_FORMAT;
@@ -94,6 +95,7 @@ public class TestHiveFileFormats
     private static final FileFormatDataSourceStats STATS = new FileFormatDataSourceStats();
     private static TestingConnectorSession parquetPageSourceSession = new TestingConnectorSession(new HiveSessionProperties(createParquetHiveConfig(false), new OrcFileWriterConfig(), new ParquetFileWriterConfig()).getSessionProperties());
     private static TestingConnectorSession parquetPageSourceSessionUseName = new TestingConnectorSession(new HiveSessionProperties(createParquetHiveConfig(true), new OrcFileWriterConfig(), new ParquetFileWriterConfig()).getSessionProperties());
+    private static HivePageSourceProvider hivePageSourceProvider;
 
     @DataProvider(name = "rowCount")
     public static Object[][] rowCountProvider()
@@ -104,6 +106,8 @@ public class TestHiveFileFormats
     @BeforeClass(alwaysRun = true)
     public void setUp()
     {
+        HiveConfig config = new HiveConfig();
+        hivePageSourceProvider = new HivePageSourceProvider(config, HiveTestUtils.createTestHdfsEnvironment(config), HiveTestUtils.getDefaultHiveRecordCursorProvider(config), HiveTestUtils.getDefaultHiveDataStreamFactories(config), HiveTestUtils.TYPE_MANAGER, HiveTestUtils.getNoOpIndexCache(), getDefaultHiveSelectiveFactories(config));
         // ensure the expected timezone is configured for this VM
         assertEquals(TimeZone.getDefault().getID(),
                 "America/Bahia_Banderas",
@@ -582,7 +586,7 @@ public class TestHiveFileFormats
 
         Configuration configuration = new Configuration();
         configuration.set("io.compression.codecs", LzoCodec.class.getName() + "," + LzopCodec.class.getName());
-        Optional<ConnectorPageSource> pageSource = HivePageSourceProvider.createHivePageSource(
+        Optional<ConnectorPageSource> pageSource = hivePageSourceProvider.createHivePageSource(
                 ImmutableSet.of(cursorProvider),
                 ImmutableSet.of(),
                 configuration,
@@ -638,7 +642,7 @@ public class TestHiveFileFormats
 
         List<HiveColumnHandle> columnHandles = getColumnHandles(testColumns);
 
-        Optional<ConnectorPageSource> pageSource = HivePageSourceProvider.createHivePageSource(
+        Optional<ConnectorPageSource> pageSource = hivePageSourceProvider.createHivePageSource(
                 ImmutableSet.of(),
                 ImmutableSet.of(sourceFactory),
                 new Configuration(),

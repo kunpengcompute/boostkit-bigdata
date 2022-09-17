@@ -15,12 +15,12 @@
 
 package io.prestosql.plugin.hive.omnidata.decode.impl;
 
+import com.huawei.boostkit.omnidata.decode.AbstractDecoding;
+import com.huawei.boostkit.omnidata.decode.type.ArrayDecodeType;
+import com.huawei.boostkit.omnidata.decode.type.DecodeType;
 import io.airlift.slice.Slice;
 import io.airlift.slice.SliceInput;
 import io.airlift.slice.Slices;
-import io.prestosql.plugin.hive.omnidata.decode.AbstractDecoding;
-import io.prestosql.plugin.hive.omnidata.decode.type.ArrayDecodeType;
-import io.prestosql.plugin.hive.omnidata.decode.type.DecodeType;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.ByteArrayBlock;
 import io.prestosql.spi.block.DictionaryBlock;

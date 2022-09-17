@@ -57,7 +57,6 @@ import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 import org.openjdk.jmh.runner.options.VerboseMode;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -79,7 +78,7 @@ import static org.openjdk.jmh.annotations.Scope.Thread;
 @SuppressWarnings({"PackageVisibleField", "FieldCanBeLocal"})
 @State(Scope.Thread)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
-@Fork(0)
+@Fork(1)
 @Threads(1)
 @Warmup(iterations = 3, time = 1)
 @Measurement(iterations = 5, time = 1)
@@ -105,7 +104,8 @@ public class BenchmarkFilterAndProjectOmniOperator
             .put("q3", ImmutableList.of(VARCHAR, VARCHAR, INTEGER))
             .put("q4", ImmutableList.of(VARCHAR, INTEGER, INTEGER))
             .put("q5", ImmutableList.of(CHAR, INTEGER, INTEGER))
-            .put("q6", ImmutableList.of(VARCHAR, BIGINT, INTEGER)).put("q7", ImmutableList.of(VARCHAR, INTEGER))
+            .put("q6", ImmutableList.of(VARCHAR, BIGINT, INTEGER))
+            .put("q7", ImmutableList.of(VARCHAR, INTEGER))
             .put("q8", ImmutableList.of(VARCHAR, VARCHAR, BIGINT, INTEGER))
             .put("q9", ImmutableList.of(BIGINT, INTEGER, INTEGER, VARCHAR))
             .put("q10", ImmutableList.of(BIGINT, INTEGER, INTEGER, VARCHAR)).build();
@@ -145,17 +145,8 @@ public class BenchmarkFilterAndProjectOmniOperator
         @Override
         protected List<Page> buildPages()
         {
-            List<Type> types = INPUT_TYPES.get(this.query);
-            List<Page> pages = new ArrayList<>();
-            for (int i = 0; i < TOTAL_POSITIONS / positionsPerPage; i++) {
-                if (dictionaryBlocks) {
-                    pages.add(PageBuilderUtil.createSequencePageWithDictionaryBlocks(types, positionsPerPage));
-                }
-                else {
-                    pages.add(PageBuilderUtil.createSequencePage(types, positionsPerPage));
-                }
-            }
-            return pages;
+            return buildPages(INPUT_TYPES.get(this.query), TOTAL_POSITIONS / positionsPerPage,
+                    positionsPerPage, dictionaryBlocks);
         }
 
         @Override
@@ -235,6 +226,7 @@ public class BenchmarkFilterAndProjectOmniOperator
                     break;
                 }
                 case "q5": {
+                    // 'concat' function lead to MEMORY_LEAK
                     builder.add(rowExpression("concat(concat('foo', char0), 'lish')"));
                     builder.add(rowExpression("integer1"));
                     builder.add(rowExpression("integer2"));
@@ -247,7 +239,7 @@ public class BenchmarkFilterAndProjectOmniOperator
                     break;
                 }
                 case "q7": {
-                    builder.add(rowExpression("substr(varchar0, 1, 1)"));
+                    builder.add(rowExpression("substr(varchar0, 0, 1)"));
                     builder.add(rowExpression("integer1"));
                     break;
                 }
@@ -262,14 +254,14 @@ public class BenchmarkFilterAndProjectOmniOperator
                     builder.add(rowExpression("bigint0"));
                     builder.add(rowExpression("cast(integer1 as BIGINT)"));
                     builder.add(rowExpression("cast(integer2 as BIGINT)"));
-                    builder.add(rowExpression("substr(varchar3, 1, 1)"));
+                    builder.add(rowExpression("substr(varchar3, 0, 1)"));
                     break;
                 }
                 case "q10": {
                     builder.add(rowExpression("bigint0"));
                     builder.add(rowExpression("cast(integer1 as BIGINT)"));
                     builder.add(rowExpression("integer2"));
-                    builder.add(rowExpression("substr(varchar3, 1, 1)"));
+                    builder.add(rowExpression("substr(varchar3, 0, 1)"));
                     break;
                 }
                 default:

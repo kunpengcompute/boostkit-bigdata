@@ -32,6 +32,7 @@ import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static java.lang.Float.floatToIntBits;
 
 
+import com.huawei.boostkit.omnidata.decode.type.*;
 import com.huawei.boostkit.omnidata.model.Column;
 import com.huawei.boostkit.omnidata.model.Predicate;
 
@@ -41,7 +42,6 @@ import io.prestosql.spi.type.CharType;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.VarcharType;
 
-import org.apache.hadoop.hive.ql.omnidata.decode.type.*;
 import org.apache.hadoop.hive.ql.omnidata.operator.predicate.NdpPredicateInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.CharTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;

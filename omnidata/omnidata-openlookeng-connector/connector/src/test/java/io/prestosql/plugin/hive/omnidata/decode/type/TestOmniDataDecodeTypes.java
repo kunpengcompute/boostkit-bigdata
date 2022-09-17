@@ -15,10 +15,10 @@
 
 package io.prestosql.plugin.hive.omnidata.decode.type;
 
-import io.prestosql.spi.type.RowType;
+import com.huawei.boostkit.omnidata.decode.type.DecimalDecodeType;
+import com.huawei.boostkit.omnidata.decode.type.DecodeType;
+import com.huawei.boostkit.omnidata.decode.type.TimestampDecodeType;
 import org.testng.annotations.Test;
-
-import java.util.Optional;
 
 import static org.testng.Assert.assertEquals;
 
@@ -39,41 +39,5 @@ public class TestOmniDataDecodeTypes
         // Test TimestampDecodeType
         DecodeType timestampDecodeType = new TimestampDecodeType();
         assertEquals(timestampDecodeType.getJavaType().get(), TimestampDecodeType.class);
-
-        // Test VarcharDecodeType
-        DecodeType varcharDecodeType = new VarcharDecodeType();
-        assertEquals(varcharDecodeType.getJavaType().get(), String.class);
-
-        // Test ShortDecodeType
-        DecodeType shortDecodeType = new ShortDecodeType();
-        assertEquals(shortDecodeType.getJavaType().get(), short.class);
-
-        // Test RowDecodeType
-        DecodeType rowDecodeType = new RowDecodeType();
-        assertEquals(rowDecodeType.getJavaType().get(), RowType.class);
-
-        // Test MapDecodeType
-        DecodeType mapDecodeType = new MapDecodeType(new ShortDecodeType(), new ShortDecodeType());
-        assertEquals(mapDecodeType.getJavaType(), Optional.empty());
-
-        // Test IntDecodeType
-        DecodeType intDecodeType = new IntDecodeType();
-        assertEquals(intDecodeType.getJavaType().get(), int.class);
-
-        // Test FloatDecodeType
-        DecodeType floatDecodeType = new FloatDecodeType();
-        assertEquals(floatDecodeType.getJavaType().get(), float.class);
-
-        // Test DoubleDecodeType
-        DecodeType doubleDecodeType = new DoubleDecodeType();
-        assertEquals(doubleDecodeType.getJavaType().get(), double.class);
-
-        // Test ByteDecodeType
-        DecodeType byteDecodeType = new ByteDecodeType();
-        assertEquals(byteDecodeType.getJavaType().get(), byte.class);
-
-        // Test BooleanDecodeType
-        DecodeType booleanDecodeType = new BooleanDecodeType();
-        assertEquals(booleanDecodeType.getJavaType().get(), boolean.class);
     }
 }

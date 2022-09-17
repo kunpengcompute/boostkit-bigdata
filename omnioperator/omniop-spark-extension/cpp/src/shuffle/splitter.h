@@ -85,6 +85,8 @@ class Splitter {
 
     void ToSplitterTypeId(int num_cols);
 
+    void CastOmniToShuffleType(DataTypeId omniType, ShuffleTypeId shuffleType);
+
     void MergeSpilled();
 
     std::vector<int32_t> partition_id_; // 记录当前vb每一行的pid

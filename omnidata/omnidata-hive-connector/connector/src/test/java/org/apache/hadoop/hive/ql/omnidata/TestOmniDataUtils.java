@@ -32,6 +32,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
+import com.huawei.boostkit.omnidata.decode.type.*;
 import com.huawei.boostkit.omnidata.model.Column;
 import com.huawei.boostkit.omnidata.model.Predicate;
 
@@ -42,20 +43,6 @@ import io.prestosql.spi.type.CharType;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.VarcharType;
 
-import org.apache.hadoop.hive.ql.omnidata.decode.type.BooleanDecodeType;
-import org.apache.hadoop.hive.ql.omnidata.decode.type.ByteDecodeType;
-import org.apache.hadoop.hive.ql.omnidata.decode.type.DateDecodeType;
-import org.apache.hadoop.hive.ql.omnidata.decode.type.DecodeType;
-import org.apache.hadoop.hive.ql.omnidata.decode.type.DoubleDecodeType;
-import org.apache.hadoop.hive.ql.omnidata.decode.type.FloatDecodeType;
-import org.apache.hadoop.hive.ql.omnidata.decode.type.IntDecodeType;
-import org.apache.hadoop.hive.ql.omnidata.decode.type.LongDecodeType;
-import org.apache.hadoop.hive.ql.omnidata.decode.type.LongToByteDecodeType;
-import org.apache.hadoop.hive.ql.omnidata.decode.type.LongToFloatDecodeType;
-import org.apache.hadoop.hive.ql.omnidata.decode.type.LongToIntDecodeType;
-import org.apache.hadoop.hive.ql.omnidata.decode.type.LongToShortDecodeType;
-import org.apache.hadoop.hive.ql.omnidata.decode.type.ShortDecodeType;
-import org.apache.hadoop.hive.ql.omnidata.decode.type.VarcharDecodeType;
 import org.apache.hadoop.hive.ql.omnidata.operator.predicate.NdpPredicateInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.CharTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.VarcharTypeInfo;

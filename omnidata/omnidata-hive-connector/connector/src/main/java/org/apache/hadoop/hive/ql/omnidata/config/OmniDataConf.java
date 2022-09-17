@@ -134,6 +134,11 @@ public class OmniDataConf {
     public static final String DFS_REPLICATION = "dfs.replication";
 
     /**
+     *omnidata task.timeout, default:300
+     */
+    public static final String OMNIDATA_CLIENT_TASK_TIMEOUT = "omnidata.client.task.timeout";
+
+    /**
      * get the value of a parameter: omnidata.hive.enabled
      *
      * @param conf hive conf
@@ -390,5 +395,17 @@ public class OmniDataConf {
         int replicationNum = conf.getInt(DFS_REPLICATION, 3);
         checkArgument(replicationNum > 0, String.format("The %s value must be positive", DFS_REPLICATION));
         return replicationNum;
+    }
+
+    /**
+     * get the value of omnidata client parameter: omnidata.client.task.timeout
+     *
+     * @param conf hive conf
+     * @return timeout
+     */
+    public static int getOmnidataClientTaskTimeout(Configuration conf) {
+        int timeout = conf.getInt(OMNIDATA_CLIENT_TASK_TIMEOUT, 300);
+        checkArgument(timeout > 0, String.format("The %s value must be positive", OMNIDATA_CLIENT_TASK_TIMEOUT));
+        return timeout;
     }
 }
