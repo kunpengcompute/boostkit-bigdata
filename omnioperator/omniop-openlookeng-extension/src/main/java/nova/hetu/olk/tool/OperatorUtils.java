@@ -96,6 +96,7 @@ import static javassist.bytecode.StackMap.DOUBLE;
 public final class OperatorUtils
 {
     private static final Logger log = Logger.get(OperatorUtils.class);
+    private static final int VARCHARVEC_INIT_CAPACITY_PER_POSITION = 200;
 
     private OperatorUtils()
     {
@@ -261,7 +262,9 @@ public final class OperatorUtils
                     break;
                 case OMNI_VARCHAR:
                 case OMNI_CHAR:
-                    vecsResult.add(new VarcharVec(vecAllocator, totalPositions * ((VarcharDataType) type).getWidth(),
+                    // Blank varcharVec uses 200 bytes for initialization in each position,
+                    // and it will automatically expand capacity if additional capacity is required.
+                    vecsResult.add(new VarcharVec(vecAllocator, totalPositions * VARCHARVEC_INIT_CAPACITY_PER_POSITION,
                             totalPositions));
                     break;
                 case OMNI_DECIMAL128:
