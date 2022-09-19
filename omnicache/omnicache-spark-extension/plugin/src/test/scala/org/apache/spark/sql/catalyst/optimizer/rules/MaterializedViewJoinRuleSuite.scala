@@ -17,6 +17,8 @@
 
 package org.apache.spark.sql.catalyst.optimizer.rules
 
+import com.huawei.boostkit.spark.util.RewriteHelper
+
 class MaterializedViewJoinRuleSuite extends RewriteSuite {
 
   test("mv_join1") {
@@ -150,12 +152,14 @@ class MaterializedViewJoinRuleSuite extends RewriteSuite {
     // view tables is same to query, equal tables
     val sql =
       """
-        |SELECT e.*,c1.stringtype
+        |SELECT e.*,c2.stringtype
         |FROM emps e JOIN column_type c1 JOIN column_type c2
         |ON e.deptno=c1.deptno AND e.deptno=c2.deptno
         |AND c1.deptno!=2
         |AND c2.deptno=1;
         |""".stripMargin
+    comparePlansAndRows(sql, "default", "mv_join2", noData = false)
+    RewriteHelper.enableCachePlugin()
     comparePlansAndRows(sql, "default", "mv_join2", noData = false)
   }
 

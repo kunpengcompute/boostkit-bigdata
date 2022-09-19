@@ -17,19 +17,23 @@
 
 package org.apache.spark.sql.catalyst.optimizer.rules
 
+import com.fasterxml.jackson.annotation.JsonIgnore
 import com.huawei.boostkit.spark.conf.OmniCachePluginConfig
-import com.huawei.boostkit.spark.util.RewriteHelper
+import com.huawei.boostkit.spark.util.{RewriteHelper, RewriteLogger}
 import scala.collection.mutable
 
 import org.apache.spark.SparkContext
+import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.internal.Logging
-import org.apache.spark.scheduler.SparkListenerEvent
+import org.apache.spark.scheduler.{SparkListener, SparkListenerEvent}
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.catalyst.plans.logical.{Aggregate, LogicalPlan, Project}
+import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.command.OmniCacheCreateMvCommand
+import org.apache.spark.status.ElementTrackingStore
+import org.apache.spark.util.kvstore.KVIndex
 
-class MVRewriteRule(session: SparkSession) extends Rule[LogicalPlan] with Logging {
+class MVRewriteRule(session: SparkSession) extends Rule[LogicalPlan] with RewriteLogger {
   val omniCacheConf: OmniCachePluginConfig = OmniCachePluginConfig.getConf
 
   val joinRule = new MaterializedViewJoinRule(session)
@@ -55,6 +59,8 @@ class MVRewriteRule(session: SparkSession) extends Rule[LogicalPlan] with Loggin
 
   def tryRewritePlan(plan: LogicalPlan): LogicalPlan = {
     val usingMvs = mutable.Set.empty[String]
+    RewriteTime.clear()
+    val rewriteStartSecond = System.currentTimeMillis()
     val res = plan.transformDown {
       case p: Project =>
         joinRule.perform(Some(p), p.child, usingMvs)
@@ -66,23 +72,71 @@ class MVRewriteRule(session: SparkSession) extends Rule[LogicalPlan] with Loggin
             RewriteHelper.extractAllAttrsFromExpression(a.aggregateExpressions).toSeq, a.child)
           val rewritedChild = joinRule.perform(Some(child), child.child, usingMvs)
           if (rewritedChild != child) {
-            rewritedPlan = a.copy(child = rewritedChild)
+            val projectChild = rewritedChild.asInstanceOf[Project]
+            rewritedPlan = a.copy(child = Project(
+              projectChild.projectList ++ projectChild.child.output, projectChild.child))
           }
         }
         rewritedPlan
       case p => p
     }
     if (usingMvs.nonEmpty) {
+      RewriteTime.withTimeStat("checkAttrsValid") {
+        if (!RewriteHelper.checkAttrsValid(res)) {
+          return plan
+        }
+      }
       val sql = session.sparkContext.getLocalProperty(SparkContext.SPARK_JOB_DESCRIPTION)
       val mvs = usingMvs.mkString(";").replaceAll("`", "")
-      val log = "logicalPlan MVRewrite success,using materialized view:[%s],original sql:%s"
-          .format(mvs, sql)
-      logDebug(log)
+      val costSecond = (System.currentTimeMillis() - rewriteStartSecond).toString
+      val log = ("logicalPlan MVRewrite success," +
+          "using materialized view:[%s],cost %s milliseconds,original sql:%s")
+          .format(mvs, costSecond, sql)
+      logBasedOnLevel(log)
       session.sparkContext.listenerBus.post(SparkListenerMVRewriteSuccess(sql, mvs))
     }
+    RewriteTime.statFromStartTime("total", rewriteStartSecond)
+    logBasedOnLevel(RewriteTime.timeStat.toString())
     res
   }
 }
 
+@DeveloperApi
 case class SparkListenerMVRewriteSuccess(sql: String, usingMvs: String) extends SparkListenerEvent {
+  @JsonIgnore
+  @KVIndex
+  def id: String = (System.currentTimeMillis() + "%s%s".format(sql, usingMvs).hashCode).toString
+}
+
+class MVRewriteSuccessListener(
+    kvStore: ElementTrackingStore) extends SparkListener with Logging {
+
+  override def onOtherEvent(event: SparkListenerEvent): Unit = {
+    event match {
+      case _: SparkListenerMVRewriteSuccess =>
+        kvStore.write(event)
+      case _ =>
+    }
+  }
+}
+
+object RewriteTime {
+  val timeStat: mutable.Map[String, Long] = mutable.HashMap[String, Long]()
+
+  def statFromStartTime(key: String, startTime: Long): Unit = {
+    timeStat += (key -> (timeStat.getOrElse(key, 0L) + System.currentTimeMillis() - startTime))
+  }
+
+  def clear(): Unit = {
+    timeStat.clear()
+  }
+
+  def withTimeStat[T](key: String)(f: => T): T = {
+    val startTime = System.currentTimeMillis()
+    try {
+      f
+    } finally {
+      statFromStartTime(key, startTime)
+    }
+  }
 }

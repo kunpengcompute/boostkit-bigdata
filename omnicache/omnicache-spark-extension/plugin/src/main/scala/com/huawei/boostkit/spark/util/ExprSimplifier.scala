@@ -30,7 +30,6 @@ import org.apache.spark.sql.catalyst.optimizer._
 import org.apache.spark.sql.catalyst.plans.logical.{Filter, Join, LogicalPlan, OneRowRelation}
 import org.apache.spark.sql.types.{BooleanType, DataType, NullType}
 
-
 case class ExprSimplifier(unknownAsFalse: Boolean,
     pulledUpPredicates: Set[Expression]) {
 
@@ -476,14 +475,14 @@ case class ExprSimplifier(unknownAsFalse: Boolean,
         for (term <- terms) {
           // Excluding self-simplification
           if (!term.eq(orOp)) {
-            // Simplification between a orExpression and a orExpression.
+            // Simplification between a OrExpression and a OrExpression.
             if (term.isInstanceOf[Or]) {
               if (containsAllSql(ors, decomposeDisjunctions(term).toSet)) {
                 terms.-=(orOp)
                 breaks3.break()
               }
             } else if (containsSql(ors, term)) {
-              // Simplification between a otherExpression and a orExpression.
+              // Simplification between a otherExpression and a OrExpression.
               terms.-=(orOp)
               breaks3.break()
             }
@@ -615,7 +614,7 @@ case class ExprSimplifier(unknownAsFalse: Boolean,
         case c@Not(c1@EqualNullSafe(_, Literal.TrueLiteral)) =>
           Not(c1.copy(left = child2))
         case c =>
-          throw new RuntimeException("unSupport type is predict simplify :%s".format(c))
+          throw new RuntimeException("unSupport type is predicate simplify :%s".format(c))
       }
       return condition2
     }

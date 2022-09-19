@@ -162,7 +162,7 @@ class MaterializedViewAggregateRuleSuite extends RewriteSuite {
   }
 
   test("mv_agg3_3") {
-    // group by column(is empty) is subset of view,,additional agg on view column
+    // group by column(is empty) is subset of view,additional agg on view column
     val sql =
       """
         |SELECT sum(c.integertype) as _sum,
@@ -232,8 +232,112 @@ class MaterializedViewAggregateRuleSuite extends RewriteSuite {
     comparePlansAndRows(sql, "default", "mv_agg4", noData = false)
   }
 
+  test("mv_agg4_3") {
+    // group by column,agg is same to view, join more
+    val sql =
+      """
+        |SELECT c.empid,c.deptno,c.locationid,sum(c.integertype) as _sum,
+        |max(c.longtype) as _max,min(c.floattype) as _min,
+        |count(c.doubletype) as _count,count(distinct c.datetype) as _count_distinct,
+        |avg(c.decimaltype) as _avg
+        |FROM column_type c JOIN emps e JOIN locations l
+        |ON c.empid=e.empid
+        |AND c.locationid=l.locationid
+        |AND c.empid=1
+        |GROUP BY c.empid,c.deptno,c.locationid;
+        |""".stripMargin
+    comparePlansAndRows(sql, "default", "mv_agg4", noData = false)
+  }
+
   test("mv_agg4_disable") {
     val sql = "ALTER MATERIALIZED VIEW mv_agg4 DISABLE REWRITE;"
     spark.sql(sql).show()
+  }
+
+  test("mv_agg5") {
+    spark.sql(
+      """
+        |DROP MATERIALIZED VIEW IF EXISTS mv_agg5;
+        |""".stripMargin
+    )
+    spark.sql(
+      """
+        |CREATE MATERIALIZED VIEW IF NOT EXISTS mv_agg5
+        |AS
+        |SELECT c.empid,c.deptno,c.locationid,sum(c.integertype) as _sum,
+        |max(c.longtype) as _max,min(c.floattype) as _min,
+        |count(c.doubletype) as _count,count(distinct c.datetype) as _count_distinct,
+        |avg(c.decimaltype) as _avg
+        |FROM column_type c JOIN emps e
+        |ON c.empid=e.empid
+        |AND c.empid=1
+        |GROUP BY c.empid,c.deptno,c.locationid;
+        |""".stripMargin
+    )
+  }
+
+  test("mv_agg5_1") {
+    val sql =
+      """
+        |SELECT c.empid,c.deptno,sum(c.integertype) as _sum,
+        |max(c.longtype) as _max,min(c.floattype) as _min,
+        |count(c.doubletype) as _count
+        |FROM column_type c JOIN emps e
+        |ON c.empid=e.empid
+        |AND c.empid=1
+        |GROUP BY c.empid,c.deptno;
+        |""".stripMargin
+    comparePlansAndRows(sql, "default", "mv_agg5", noData = false)
+  }
+
+  test("mv_agg5_2") {
+    val sql =
+      """
+        |SELECT c.empid,c.deptno,count(distinct c.datetype) as _count_distinct
+        |FROM column_type c JOIN emps e
+        |ON c.empid=e.empid
+        |AND c.empid=1
+        |GROUP BY c.empid,c.deptno;
+        |""".stripMargin
+    comparePlansAndRows(sql, "default", "mv_agg5", noData = false)
+    spark.sql(
+      """
+        |DROP MATERIALIZED VIEW IF EXISTS mv_agg5;
+        |""".stripMargin
+    )
+  }
+
+  test("mv_agg6") {
+    spark.sql(
+      """
+        |DROP MATERIALIZED VIEW IF EXISTS mv_agg6;
+        |""".stripMargin
+    )
+    spark.sql(
+      """
+        |CREATE MATERIALIZED VIEW IF NOT EXISTS mv_agg6
+        |AS
+        |SELECT c.empid,c.deptno,c.locationid,sum(distinct c.integertype) as _sum,
+        |max(distinct c.longtype) as _max,min(distinct c.floattype) as _min,
+        |count(distinct c.doubletype) as _count
+        |FROM column_type c
+        |GROUP BY c.empid,c.deptno,c.locationid;
+        |""".stripMargin
+    )
+
+    val sql =
+      """
+        |SELECT c.empid,c.deptno,sum(distinct c.integertype) as _sum,
+        |max(distinct c.longtype) as _max,min(distinct c.floattype) as _min,
+        |count(distinct c.doubletype) as _count
+        |FROM column_type c
+        |GROUP BY c.empid,c.deptno;
+        |""".stripMargin
+    comparePlansAndRows(sql, "default", "mv_agg6", noData = false)
+    spark.sql(
+      """
+        |DROP MATERIALIZED VIEW IF EXISTS mv_agg6;
+        |""".stripMargin
+    )
   }
 }

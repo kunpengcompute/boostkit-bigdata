@@ -22,14 +22,14 @@ import com.huawei.boostkit.spark.util.{ExpressionEqual, TableEqual}
 import scala.collection.mutable
 
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.catalyst.expressions.{Attribute, Expression, NamedExpression}
+import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans.Inner
-import org.apache.spark.sql.catalyst.plans.logical.{Join, JoinHint, LogicalPlan, Project}
+import org.apache.spark.sql.catalyst.plans.logical._
 
 class MaterializedViewJoinRule(sparkSession: SparkSession)
     extends AbstractMaterializedViewRule(sparkSession: SparkSession) {
   /**
-   * cehck plan if match current rule
+   * check plan if match current rule
    *
    * @param logicalPlan LogicalPlan
    * @return true:matched ; false:unMatched
@@ -37,7 +37,6 @@ class MaterializedViewJoinRule(sparkSession: SparkSession)
   override def isValidPlan(logicalPlan: LogicalPlan): Boolean = {
     isValidLogicalPlan(logicalPlan)
   }
-
 
   /**
    * queryTableInfo!=viewTableInfo , need do join compensate
@@ -66,11 +65,20 @@ class MaterializedViewJoinRule(sparkSession: SparkSession)
       topViewProject.get
     }
 
+    var projectList: Seq[NamedExpression] = newViewQueryPlan match {
+      case p: Project =>
+        p.projectList
+      case _ =>
+        newViewQueryPlan.output
+    }
+
     needTables.foreach { needTable =>
       newViewQueryPlan = Join(newViewQueryPlan, needTable.logicalPlan,
         Inner, None, JoinHint.NONE)
+      projectList ++= needTable.logicalPlan.output
     }
-    Some(newViewTablePlan, viewQueryPlan, None)
+    newViewQueryPlan = Project(projectList, newViewQueryPlan)
+    Some(newViewTablePlan, newViewQueryPlan, None)
   }
 
   /**

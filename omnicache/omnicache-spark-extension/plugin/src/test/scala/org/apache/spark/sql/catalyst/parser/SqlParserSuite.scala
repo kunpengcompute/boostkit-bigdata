@@ -560,6 +560,7 @@ class SqlParserSuite extends RewriteSuite {
   }
 
   test("mv_is_cached") {
+    spark.sql("DROP MATERIALIZED VIEW IF EXISTS mv_create2;")
     spark.sql(
       """
         |ALTER MATERIALIZED VIEW default.mv_create1 ENABLE REWRITE
@@ -568,10 +569,10 @@ class SqlParserSuite extends RewriteSuite {
     ).show()
     val sql1 = "SELECT * FROM column_type"
     comparePlansAndRows(sql1, "default", "mv_create1", noData = false)
-
+    RewriteHelper.enableCachePlugin()
     spark.sql(
       """
-        |ALTER MATERIALIZED VIEW default.mv_create1 ENABLE REWRITE
+        |ALTER MATERIALIZED VIEW default.mv_create1 DISABLE REWRITE
         |;
         |""".stripMargin
     ).show()

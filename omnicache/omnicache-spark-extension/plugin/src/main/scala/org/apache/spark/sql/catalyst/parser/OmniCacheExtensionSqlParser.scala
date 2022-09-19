@@ -19,7 +19,7 @@ package org.apache.spark.sql.catalyst.parser
 
 import java.util.Locale
 
-import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
+import org.antlr.v4.runtime._
 import org.antlr.v4.runtime.atn.PredictionMode
 import org.antlr.v4.runtime.misc.ParseCancellationException
 

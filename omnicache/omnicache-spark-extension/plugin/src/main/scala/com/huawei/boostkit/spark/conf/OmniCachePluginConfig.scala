@@ -17,9 +17,13 @@
 
 package com.huawei.boostkit.spark.conf
 
+import java.util.Locale
+
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.catalyst.catalog.CatalogTable
+import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
+import org.apache.spark.sql.execution.datasources.LogicalRelation
 import org.apache.spark.sql.internal.SQLConf
 
 class OmniCachePluginConfig(conf: SQLConf) {
@@ -48,6 +52,10 @@ class OmniCachePluginConfig(conf: SQLConf) {
       .getConfString("spark.sql.omnicache.default.datasource", "orc")
 
   val dataSourceSet: Set[String] = Set("orc", "parquet")
+
+  def logLevel: String = conf
+      .getConfString("spark.sql.omnicache.logLevel", "DEBUG")
+      .toUpperCase(Locale.ROOT)
 }
 
 object OmniCachePluginConfig {
@@ -85,5 +93,11 @@ object OmniCachePluginConfig {
     val mv = TableIdentifier(names(1), Some(names.head))
     val catalogTable = spark.sessionState.catalog.getTableMetadata(mv)
     !catalogTable.properties.getOrElse(MV_UPDATE_REWRITE_ENABLED, "true").toBoolean
+  }
+
+  def isMVInUpdate(viewTablePlan: LogicalPlan): Boolean = {
+    val logicalRelation = viewTablePlan.asInstanceOf[LogicalRelation]
+    !logicalRelation.catalogTable.get
+        .properties.getOrElse(MV_UPDATE_REWRITE_ENABLED, "true").toBoolean
   }
 }
