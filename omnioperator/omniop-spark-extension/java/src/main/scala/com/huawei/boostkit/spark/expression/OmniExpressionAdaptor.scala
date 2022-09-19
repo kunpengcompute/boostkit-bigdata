@@ -27,13 +27,16 @@ import nova.hetu.omniruntime.constants.FunctionType.{OMNI_AGGREGATION_TYPE_AVG, 
 import nova.hetu.omniruntime.constants.JoinType._
 import nova.hetu.omniruntime.operator.OmniExprVerify
 
+import com.huawei.boostkit.spark.ColumnarPluginConfig
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate._
 import org.apache.spark.sql.catalyst.plans.{FullOuter, InnerLike, JoinType, LeftOuter, RightOuter}
 import org.apache.spark.sql.catalyst.util.CharVarcharUtils.getRawTypeString
+import org.apache.spark.sql.hive.HiveUdfAdaptorUtil
 import org.apache.spark.sql.types.{BooleanType, DataType, DateType, Decimal, DecimalType, DoubleType, IntegerType, LongType, Metadata, ShortType, StringType}
 
+import java.util.Locale
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
@@ -540,8 +543,31 @@ object OmniExpressionAdaptor extends Logging {
         getConcatJsonStr(concat, exprsIndexMap)
       case attr: Attribute => toOmniJsonAttribute(attr, exprsIndexMap(attr.exprId))
       case _ =>
+        if (HiveUdfAdaptorUtil.isHiveUdf(expr) && ColumnarPluginConfig.getSessionConf.enableColumnarUdf) {
+          val hiveUdf = HiveUdfAdaptorUtil.asHiveSimpleUDF(expr)
+          val nameSplit = hiveUdf.name.split("\\.")
+          val udfName = if (nameSplit.size == 1) nameSplit(0).toLowerCase(Locale.ROOT) else nameSplit(1).toLowerCase(Locale.ROOT)
+          return ("{\"exprType\":\"FUNCTION\",\"returnType\":%s,\"function_name\":\"%s\"," +
+            "\"arguments\":[%s]}").format(sparkTypeToOmniExpJsonType(hiveUdf.dataType), udfName,
+            getJsonExprArgumentsByChildren(hiveUdf.children, exprsIndexMap))
+        }
         throw new UnsupportedOperationException(s"Unsupported expression: $expr")
     }
+  }
+
+  private def getJsonExprArgumentsByChildren(children: Seq[Expression],
+                                             exprsIndexMap: Map[ExprId, Int]): String = {
+    val size = children.size
+    val stringBuild = new mutable.StringBuilder
+    if (size == 0) {
+      return stringBuild.toString()
+    }
+    for (i <- 0 until size - 1) {
+      stringBuild.append(rewriteToOmniJsonExpressionLiteral(children(i), exprsIndexMap))
+      stringBuild.append(",")
+    }
+    stringBuild.append(rewriteToOmniJsonExpressionLiteral(children(size - 1), exprsIndexMap))
+    stringBuild.toString()
   }
 
   private def checkInputDataTypes(children: Seq[Expression]): Unit = {
