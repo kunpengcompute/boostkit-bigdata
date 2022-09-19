@@ -188,6 +188,56 @@ class RewriteSuite extends SparkFunSuite with PredicateHelper {
         |);
         |""".stripMargin
     )
+    spark.sql(
+      """
+        |INSERT INTO TABLE column_type VALUES(
+        |   4,4,4,TRUE,4,4,4,4,4.0,4.0,
+        |   DATE '2022-04-04',
+        |   TIMESTAMP '2022-04-04',
+        |   null,4.0
+        |);
+        |""".stripMargin
+    )
+    spark.sql(
+      """
+        |INSERT INTO TABLE column_type VALUES(
+        |   4,4,4,TRUE,4,4,4,4,4.0,4.0,
+        |   DATE '2022-04-04',
+        |   null,
+        |   null,4.0
+        |);
+        |""".stripMargin
+    )
+    spark.sql(
+      """
+        |INSERT INTO TABLE column_type VALUES(
+        |   4,4,4,TRUE,4,4,4,4,4.0,4.0,
+        |   DATE '2022-04-04',
+        |   TIMESTAMP '2022-04-04',
+        |   'stringtype4',null
+        |);
+        |""".stripMargin
+    )
+    spark.sql(
+      """
+        |INSERT INTO TABLE column_type VALUES(
+        |   1,1,2,TRUE,1,1,1,1,1.0,1.0,
+        |   DATE '2022-01-01',
+        |   TIMESTAMP '2022-01-01',
+        |   'stringtype1',1.0
+        |);
+        |""".stripMargin
+    )
+    spark.sql(
+      """
+        |INSERT INTO TABLE column_type VALUES(
+        |   1,1,2,TRUE,1,1,1,1,1.0,1.0,
+        |   DATE '2022-01-02',
+        |   TIMESTAMP '2022-01-01',
+        |   'stringtype1',1.0
+        |);
+        |""".stripMargin
+    )
   }
 
   preCreateTable()

@@ -73,8 +73,7 @@ class MaterializedViewAggregateRule(sparkSession: SparkSession)
       newViewQueryPlan = Join(newViewQueryPlan, needTable.logicalPlan,
         Inner, None, JoinHint.NONE)
       newGroupingExpressions = newGroupingExpressions ++ needTable.logicalPlan.output
-      newAggregateExpressions = newAggregateExpressions ++
-          needTable.logicalPlan.output.map(e => Alias(e, e.name)())
+      newAggregateExpressions = newAggregateExpressions ++ needTable.logicalPlan.output
     }
     newViewQueryPlan = Aggregate(newGroupingExpressions, newAggregateExpressions, newViewQueryPlan)
 
@@ -82,7 +81,7 @@ class MaterializedViewAggregateRule(sparkSession: SparkSession)
     val projectList = if (topViewProject.isEmpty) {
       newViewQueryPlan.output
     } else {
-      topViewProject.get.projectList
+      topViewProject.get.projectList ++ needTables.flatMap(t => t.logicalPlan.output)
     }
     val newTopViewProject = Project(projectList, newViewQueryPlan)
     Some(newViewTablePlan, newViewQueryPlan, Some(newTopViewProject))
@@ -144,7 +143,8 @@ class MaterializedViewAggregateRule(sparkSession: SparkSession)
 
     // if subGroupExpressionEquals is empty and aggCalls all in viewAggExpressionEquals,
     // final need project not aggregate
-    var projectFlag = subGroupExpressionEquals.isEmpty
+    val isJoinCompensated = viewTablePlan.isInstanceOf[Join]
+    var projectFlag = subGroupExpressionEquals.isEmpty && !isJoinCompensated
 
     // 3.1.viewGroupExpressionEquals is same to queryGroupExpressionEquals
     if (projectFlag) {
@@ -177,6 +177,13 @@ class MaterializedViewAggregateRule(sparkSession: SparkSession)
     } else {
       queryAggExpressionEquals.foreach { aggCall =>
         var expr = aggCall.expression
+        expr match {
+          case Alias(AggregateExpression(_, _, isDistinct, _, _), _) =>
+            if (isDistinct) {
+              return None
+            }
+          case _ =>
+        }
         // rollUp and use viewTableAttr
         if (viewAggExpressionEquals.contains(aggCall)) {
           val viewTableAttr = viewTableAttrs(viewAggExpressionEqualsOrdinal(aggCall))

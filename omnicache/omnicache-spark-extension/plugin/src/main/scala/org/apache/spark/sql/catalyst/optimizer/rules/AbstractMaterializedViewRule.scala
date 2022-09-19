@@ -116,9 +116,7 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
           val (newViewTablePlan, newViewQueryPlan, newTopViewProject) = newViewPlans.get
           viewTablePlan = newViewTablePlan
           viewQueryPlan = newViewQueryPlan
-          if (newTopViewProject.isEmpty) {
-            viewQueryExpr = newViewQueryPlan
-          }
+          viewQueryExpr = newViewQueryPlan
           topViewProject = newTopViewProject
         }
 
