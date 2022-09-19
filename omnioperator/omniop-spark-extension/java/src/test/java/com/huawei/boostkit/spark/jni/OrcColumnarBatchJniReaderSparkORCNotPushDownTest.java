@@ -104,5 +104,9 @@ public class OrcColumnarBatchJniReaderSparkORCNotPushDownTest extends TestCase {
         String tmp2 = new String(vec3.get(4095));
         assertTrue(tmp2.equals("Find"));
         assertTrue(vec4.get(4095) == 6);
+        vec1.close();
+        vec2.close();
+        vec3.close();
+        vec4.close();
     }
 }

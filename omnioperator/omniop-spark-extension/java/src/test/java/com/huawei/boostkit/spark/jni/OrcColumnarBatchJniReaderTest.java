@@ -114,6 +114,8 @@ public class OrcColumnarBatchJniReaderTest extends TestCase {
         assertTrue(((LongVec) vecs[0]).get(0) == 1);
         String str = new String(((VarcharVec) vecs[1]).get(0));
         assertTrue(str.equals("AAAAAAAABAAAAAAA"));
+        vecs[0].close();
+        vecs[1].close();
     }
 
 }

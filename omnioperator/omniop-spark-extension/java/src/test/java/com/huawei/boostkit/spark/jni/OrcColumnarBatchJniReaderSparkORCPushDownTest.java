@@ -152,5 +152,9 @@ public class OrcColumnarBatchJniReaderSparkORCPushDownTest extends TestCase {
         String tmp2 = new String(vec3.get(4070));
         assertTrue(tmp2.equals("Particular, arab cases shall like less current, different names. Computers start for the changes. Scottish, trying exercises operate marks; long, supreme miners may ro"));
         assertTrue(vec4.get(1000) == 0);
+        vec1.close();
+        vec2.close();
+        vec3.close();
+        vec4.close();
     }
 }

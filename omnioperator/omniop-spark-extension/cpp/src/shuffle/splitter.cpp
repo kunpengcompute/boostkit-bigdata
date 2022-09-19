@@ -767,7 +767,10 @@ int Splitter::protoSpillPartition(int32_t partition_id, std::unique_ptr<Buffered
         }
         curBatch++;
 
-        uint32_t vecBatchProtoSize = reversebytes_uint32t(vecBatchProto->ByteSize());
+        if (vecBatchProto->ByteSizeLong() > UINT32_MAX) {
+            throw std::runtime_error("Unsafe static_cast long to uint_32t.");
+        }
+        uint32_t vecBatchProtoSize = reversebytes_uint32t(static_cast<uint32_t>(vecBatchProto->ByteSizeLong()));
         void *buffer = nullptr;
         if (!bufferStream->NextNBytes(&buffer, sizeof(vecBatchProtoSize))) {
             LogsError("Allocate Memory Failed: Flush Spilled Data, Next failed.");

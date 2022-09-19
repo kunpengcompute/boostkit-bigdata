@@ -5,7 +5,7 @@ project(spark-thestral-plugin)
 cmake_minimum_required(VERSION 3.10)
 
 # configure cmake
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_COMPILER "g++")
 
 set(root_directory ${PROJECT_BINARY_DIR})

@@ -149,6 +149,8 @@ public class OrcColumnarBatchJniReaderPushDownTest extends TestCase {
         String tmp2 = new String(vec2.get(20));
         assertTrue(tmp1.equals("AAAAAAAAKAAAAAAA"));
         assertTrue(tmp2.equals("AAAAAAAAEBAAAAAA"));
+        vec1.close();
+        vec2.close();
     }
 
 }
