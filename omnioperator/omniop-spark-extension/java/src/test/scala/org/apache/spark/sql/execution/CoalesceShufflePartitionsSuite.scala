@@ -308,7 +308,7 @@ class CoalesceShufflePartitionsSuite extends SparkFunSuite with BeforeAndAfterAl
     }
   }
 
-  test("SPARK-24705 adaptive query execution works correctly when exchange reuse enabled") {
+  ignore("SPARK-24705 adaptive query execution works correctly when exchange reuse enabled") {
     val test: SparkSession => Unit = { spark: SparkSession =>
       spark.sql("SET spark.sql.exchange.reuse=true")
       val df = spark.range(1).selectExpr("id AS key", "id AS value")
