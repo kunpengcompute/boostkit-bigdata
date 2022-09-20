@@ -301,10 +301,10 @@ object OmniExpressionAdaptor extends Logging {
   }
 
   private def unsupportedCastCheck(expr: Expression, cast: Cast): Unit = {
-    def isDecimalOrStringType(dataType: DataType): Boolean = (dataType.isInstanceOf[DecimalType]) || (dataType.isInstanceOf[StringType])
+    def isDecimalOrStringType(dataType: DataType): Boolean = dataType == DecimalType || dataType == StringType
     // not support Cast(string as !(decimal/string)) and Cast(!(decimal/string) as string)
-    if ((cast.dataType.isInstanceOf[StringType] && !isDecimalOrStringType(cast.child.dataType)) ||
-      (!isDecimalOrStringType(cast.dataType) && cast.child.dataType.isInstanceOf[StringType])) {
+    if ((cast.dataType == StringType && !isDecimalOrStringType(cast.child.dataType)) ||
+      (!isDecimalOrStringType(cast.dataType) && cast.child.dataType == StringType)) {
       throw new UnsupportedOperationException(s"Unsupported expression: $expr")
     }
   }
