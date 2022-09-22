@@ -67,6 +67,15 @@ public class OrcColumnarBatchJniReader {
         return jsonObject;
     }
 
+    public String PadZeroForDecimals(String [] decimalStrArray, int decimalScale) {
+        String decimalVal = ""; // Integer without decimals, eg: 12345
+        if (decimalStrArray.length == 2) { // Integer with decimals, eg: 12345.6
+            decimalVal = decimalStrArray[1];
+        }
+        // If the length of the formatted number string is insufficient, pad '0's.
+        return String.format("%1$-" + decimalScale + "s", decimalVal).replace(' ', '0');
+    }
+
     public JSONObject getLeavesJson(List<PredicateLeaf> leaves, TypeDescription schema) {
         JSONObject jsonObjectList = new JSONObject();
         for (int i = 0; i < leaves.size(); i++) {
@@ -82,13 +91,8 @@ public class OrcColumnarBatchJniReader {
                     int decimalP = schema.findSubtype(pl.getColumnName()).getPrecision();
                     int decimalS = schema.findSubtype(pl.getColumnName()).getScale();
                     String[] spiltValues = pl.getLiteral().toString().split("\\.");
-                    String strToAdd = "";
-                    if (spiltValues.length == 2) {
-                        strToAdd = String.format("%1$" + decimalS + "s", spiltValues[1]).replace(' ', '0');
-                    } else {
-                        strToAdd = String.format("%1$" + decimalS + "s", "").replace(' ', '0');
-                    }
-                    jsonObject.put("literal", spiltValues[0] + "." + strToAdd + " " + decimalP + " " + decimalS);
+                    String scalePadZeroStr = PadZeroForDecimals(spiltValues, decimalS);
+                    jsonObject.put("literal", spiltValues[0] + "." + scalePadZeroStr + " " + decimalP + " " + decimalS);
                 } else {
                     jsonObject.put("literal", pl.getLiteral().toString());
                 }
@@ -102,13 +106,8 @@ public class OrcColumnarBatchJniReader {
                         int decimalP =  schema.findSubtype(pl.getColumnName()).getPrecision();
                         int decimalS =  schema.findSubtype(pl.getColumnName()).getScale();
                         String[] spiltValues = ob.toString().split("\\.");
-                        String strToAdd = "";
-                        if (spiltValues.length == 2) {
-                            strToAdd = String.format("%1$" + decimalS + "s", spiltValues[1]).replace(' ', '0');
-                        } else {
-                            strToAdd = String.format("%1$" + decimalS + "s", "").replace(' ', '0');
-                        }
-                        lst.add(spiltValues[0] + "." + strToAdd + " " + decimalP + " " + decimalS);
+                        String scalePadZeroStr = PadZeroForDecimals(spiltValues, decimalS);
+                        lst.add(spiltValues[0] + "." + scalePadZeroStr + " " + decimalP + " " + decimalS);
                     } else if (pl.getType() == PredicateLeaf.Type.DATE) {
                         lst.add(((int)Math.ceil(((Date)pl.getLiteral()).getTime()* 1.0/3600/24/1000)) + "");
                     } else {
