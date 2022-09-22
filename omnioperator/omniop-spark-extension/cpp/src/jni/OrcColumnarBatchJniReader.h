@@ -137,6 +137,8 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniRe
 
 int getLiteral(orc::Literal &lit, int leafType, std::string value);      
 
+bool stringToBool(std::string boolStr);
+
 int buildLeafs(int leafOp, std::vector<orc::Literal> &litList, orc::Literal &lit, std::string leafNameString, int leafType,
     orc::SearchArgumentBuilder &builder);
 

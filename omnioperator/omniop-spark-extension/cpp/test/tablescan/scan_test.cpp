@@ -66,20 +66,89 @@ protected:
     }
 };
 
-TEST_F(ScanTest, test_get_literal)
+TEST_F(ScanTest, test_literal_get_long)
 {
     orc::Literal tmpLit(0L);
+
     // test get long
-    getLiteral(tmpLit, 0, "123456789");
-    ASSERT_EQ(tmpLit.toString(), "123456789");
+    getLiteral(tmpLit, (int)(orc::PredicateDataType::LONG), "655361");
+    ASSERT_EQ(tmpLit.getLong(), 655361);
+    getLiteral(tmpLit, (int)(orc::PredicateDataType::LONG), "-655361");
+    ASSERT_EQ(tmpLit.getLong(), -655361);
+    getLiteral(tmpLit, (int)(orc::PredicateDataType::LONG), "0");
+    ASSERT_EQ(tmpLit.getLong(), 0);
+}
+
+TEST_F(ScanTest, test_literal_get_float)
+{
+    orc::Literal tmpLit(0L);
+
+    // test get float
+    getLiteral(tmpLit, (int)(orc::PredicateDataType::FLOAT), "12345.6789");
+    ASSERT_EQ(tmpLit.getFloat(), 12345.6789);
+    getLiteral(tmpLit, (int)(orc::PredicateDataType::FLOAT), "-12345.6789");
+    ASSERT_EQ(tmpLit.getFloat(), -12345.6789);
+    getLiteral(tmpLit, (int)(orc::PredicateDataType::FLOAT), "0");
+    ASSERT_EQ(tmpLit.getFloat(), 0);
+}
+
+TEST_F(ScanTest, test_literal_get_string)
+{
+    orc::Literal tmpLit(0L);
 
     // test get string
-    getLiteral(tmpLit, 2, "testStringForLit");
-    ASSERT_EQ(tmpLit.toString(), "testStringForLit");
+    getLiteral(tmpLit, (int)(orc::PredicateDataType::STRING), "testStringForLit");
+    ASSERT_EQ(tmpLit.getString(), "testStringForLit");
+    getLiteral(tmpLit, (int)(orc::PredicateDataType::STRING), "");
+    ASSERT_EQ(tmpLit.getString(), "");
+}
+
+TEST_F(ScanTest, test_literal_get_date)
+{
+    orc::Literal tmpLit(0L);
 
     // test get date
-    getLiteral(tmpLit, 3, "987654321");
-    ASSERT_EQ(tmpLit.toString(), "987654321");
+    getLiteral(tmpLit, (int)(orc::PredicateDataType::DATE), "987654321");
+    ASSERT_EQ(tmpLit.getDate(), 987654321);
+}
+
+TEST_F(ScanTest, test_literal_get_decimal)
+{
+    orc::Literal tmpLit(0L);
+
+    // test get decimal
+    getLiteral(tmpLit, (int)(orc::PredicateDataType::DECIMAL), "199999999999998.998000 22 6");
+    ASSERT_EQ(tmpLit.getDecimal().toString(), "199999999999998.998000");
+    getLiteral(tmpLit, (int)(orc::PredicateDataType::DECIMAL), "10.998000 10 6");
+    ASSERT_EQ(tmpLit.getDecimal().toString(), "10.998000");
+    getLiteral(tmpLit, (int)(orc::PredicateDataType::DECIMAL), "-10.998000 10 6");
+    ASSERT_EQ(tmpLit.getDecimal().toString(), "-10.998000");
+    getLiteral(tmpLit, (int)(orc::PredicateDataType::DECIMAL), "9999.999999 10 6");
+    ASSERT_EQ(tmpLit.getDecimal().toString(), "9999.999999");
+    getLiteral(tmpLit, (int)(orc::PredicateDataType::DECIMAL), "-0.000000 10 6");
+    ASSERT_EQ(tmpLit.getDecimal().toString(), "0.000000");
+}
+
+TEST_F(ScanTest, test_literal_get_bool)
+{
+    orc::Literal tmpLit(0L);
+
+    // test get bool
+    getLiteral(tmpLit, (int)(orc::PredicateDataType::BOOLEAN), "true");
+    ASSERT_EQ(tmpLit.getBool(), true);
+    getLiteral(tmpLit, (int)(orc::PredicateDataType::BOOLEAN), "True");
+    ASSERT_EQ(tmpLit.getBool(), true);
+    getLiteral(tmpLit, (int)(orc::PredicateDataType::BOOLEAN), "false");
+    ASSERT_EQ(tmpLit.getBool(), false);
+    getLiteral(tmpLit, (int)(orc::PredicateDataType::BOOLEAN), "False");
+    ASSERT_EQ(tmpLit.getBool(), false);
+    std::string tmpStr = "";
+    try {
+        getLiteral(tmpLit, (int)(orc::PredicateDataType::BOOLEAN), "exception");
+    } catch (std::exception &e) {
+        tmpStr = e.what();
+    }
+    ASSERT_EQ(tmpStr, "Invalid input for stringToBool.");
 }
 
 TEST_F(ScanTest, test_copy_intVec)

@@ -124,11 +124,27 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniRe
     return (jlong)(readerNew);
 }
 
+bool stringToBool(string boolStr)
+{
+    transform(boolStr.begin(), boolStr.end(), boolStr.begin(), ::tolower);
+    if (boolStr == "true") {
+       return true;
+    } else if (boolStr == "false") {
+       return false;
+    } else {
+       throw std::runtime_error("Invalid input for stringToBool.");
+    }
+}
+
 int getLiteral(orc::Literal &lit, int leafType, string value)
 {
     switch ((orc::PredicateDataType)leafType) {
         case orc::PredicateDataType::LONG: {
             lit = orc::Literal(static_cast<int64_t>(std::stol(value)));
+            break;
+        }
+        case orc::PredicateDataType::FLOAT: {
+            lit = orc::Literal(static_cast<double>(std::stod(value)));
             break;
         }
         case orc::PredicateDataType::STRING: {
@@ -141,6 +157,7 @@ int getLiteral(orc::Literal &lit, int leafType, string value)
         }
         case orc::PredicateDataType::DECIMAL: {
             vector<std::string> valList;
+            // Decimal(22, 6) eg: value ("19999999999998,998000 22 6")
             istringstream tmpAllStr(value);
             string tmpStr;
             while (tmpAllStr >> tmpStr) {
@@ -151,8 +168,13 @@ int getLiteral(orc::Literal &lit, int leafType, string value)
                 static_cast<int32_t>(std::stoi(valList[2])));
             break;
         }
+        case orc::PredicateDataType::BOOLEAN: {
+            lit = orc::Literal(static_cast<bool>(stringToBool(value)));
+            break;
+        }
         default: {
-            LogsError("ERROR: TYPE ERROR: TYPEID");
+            LogsError("tableScan jni getLiteral unsupported leafType: " + leafType);
+            throw std::runtime_error("tableScan jni getLiteral unsupported leafType: " + leafType);
         }
     }
     return 0;
