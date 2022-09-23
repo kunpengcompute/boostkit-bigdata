@@ -17,6 +17,8 @@
 
 package org.apache.spark.deploy.history
 
+import java.io.FileNotFoundException
+import java.text.SimpleDateFormat
 import java.util.ServiceLoader
 import java.util.regex.Pattern
 
@@ -49,65 +51,81 @@ class LogsParser(conf: SparkConf, eventLogDir: String, outPutDir: String) extend
   /**
    * parseAppHistoryLog
    *
-   * @param appId    appId
-   * @param fileName fileName
+   * @param appId appId
    */
-  def parseAppHistoryLog(appId: String, fileName: String): Unit = {
-    val inMemoryStore = new InMemoryStore()
-    val reader = EventLogFileReader(fs, new Path(eventLogDir, appId))
-    rebuildAppStore(inMemoryStore, reader.get)
-
-    val sqlStatusStore = new SQLAppStatusStore(inMemoryStore)
-    val mvRewriteSuccessInfo = getMVRewriteSuccessInfo(inMemoryStore)
-
-    // create OutputDir
-    if (!fs.exists(new Path(outPutDir))) {
-      fs.mkdirs(new Path(outPutDir))
-    }
-
-    // continue for curLoop
-    val curLoop = new Breaks
-
+  def parseAppHistoryLog(appId: String): Seq[Map[String, String]] = {
     var jsons = Seq.empty[Map[String, String]]
-    sqlStatusStore.executionsList().foreach { execution =>
-      curLoop.breakable {
-        // skip unNormal execution
-        val isRunning = execution.completionTime.isEmpty ||
-            execution.jobs.exists { case (_, status) => status == JobExecutionStatus.RUNNING }
-        val isFailed = execution
-            .jobs.exists { case (_, status) => status == JobExecutionStatus.FAILED }
-        if (isRunning || isFailed) {
-          curLoop.break()
-        }
 
-        val uiData = execution
-        val executionId = uiData.executionId
-        val planDesc = uiData.physicalPlanDescription
-        val query = uiData.description
-        var mvs = mvRewriteSuccessInfo.getOrElse(query, "")
-        if (mvs.nonEmpty) {
-          mvs.split(";").foreach { mv =>
-            if (!planDesc.contains(mv)) {
-              mvs = ""
+    try {
+      val inMemoryStore = new InMemoryStore()
+      val reader = EventLogFileReader(fs, new Path(eventLogDir, appId))
+      rebuildAppStore(inMemoryStore, reader.get)
+
+      val sqlStatusStore = new SQLAppStatusStore(inMemoryStore)
+      val mvRewriteSuccessInfo = getMVRewriteSuccessInfo(inMemoryStore)
+
+      // create OutputDir
+      if (!fs.exists(new Path(outPutDir))) {
+        fs.mkdirs(new Path(outPutDir))
+      }
+
+      // continue for curLoop
+      val curLoop = new Breaks
+
+      sqlStatusStore.executionsList().foreach { execution =>
+        curLoop.breakable {
+          // skip unNormal execution
+          val isRunning = execution.completionTime.isEmpty ||
+              execution.jobs.exists { case (_, status) => status == JobExecutionStatus.RUNNING }
+          val isFailed = execution
+              .jobs.exists { case (_, status) => status == JobExecutionStatus.FAILED }
+          if (isRunning || isFailed) {
+            curLoop.break()
+          }
+
+          val uiData = execution
+          val executionId = uiData.executionId
+          val planDesc = uiData.physicalPlanDescription
+          val query = uiData.description
+          var mvs = mvRewriteSuccessInfo.getOrElse(query, "")
+          if (mvs.nonEmpty) {
+            mvs.split(";").foreach { mv =>
+              if (!planDesc.contains(mv)) {
+                mvs = ""
+              }
             }
           }
+
+          // write dot
+          val graph: SparkPlanGraph = sqlStatusStore.planGraph(executionId)
+          sqlStatusStore.planGraph(executionId)
+          val metrics = sqlStatusStore.executionMetrics(executionId)
+          val node = getNodeInfo(graph)
+
+          val jsonMap = Map(
+            "logName" -> appId,
+            "executionId" -> executionId.toString,
+            "original query" -> query,
+            "materialized views" -> mvs,
+            "physical plan" -> planDesc,
+            "dot metrics" -> graph.makeDotFile(metrics),
+            "node metrics" -> node)
+          jsons :+= jsonMap
         }
-
-        // write dot
-        val graph: SparkPlanGraph = sqlStatusStore.planGraph(executionId)
-        sqlStatusStore.planGraph(executionId)
-        val metrics = sqlStatusStore.executionMetrics(executionId)
-        val node = getNodeInfo(graph)
-
-        val jsonMap = Map(
-          "executionId" -> executionId.toString,
-          "original query" -> query,
-          "materialized views" -> mvs,
-          "physical plan" -> planDesc,
-          "dot metrics" -> graph.makeDotFile(metrics),
-          "node metrics" -> node)
-        jsons :+= jsonMap
       }
+    } catch {
+      case e: FileNotFoundException =>
+        throw e
+      case e: Throwable =>
+        logWarning(s"Failed to parseAppHistoryLog ${appId} for ${e.getMessage}")
+    }
+    jsons
+  }
+
+  def parseAppHistoryLogs(appIds: Seq[String], fileName: String): Unit = {
+    var jsons = Seq.empty[Map[String, String]]
+    appIds.foreach { appId =>
+      jsons ++= parseAppHistoryLog(appId)
     }
     // write json file into hdfs
     val jsonFile: String = Json(DefaultFormats).write(jsons)
@@ -282,6 +300,24 @@ class LogsParser(conf: SparkConf, eventLogDir: String, outPutDir: String) extend
     os.write(context.getBytes())
     os.close()
   }
+
+  def listAppHistoryLogs(pattern: Pattern, startTime: Long, endTime: Long): Seq[String] = {
+    var appHistoryLogs = Seq.empty[String]
+    fs.listStatus(new Path(eventLogDir)).foreach { log =>
+      val logTime = log.getModificationTime
+      if (startTime <= logTime && logTime <= endTime) {
+        val name = log.getPath.getName
+        val matcher = pattern.matcher(name)
+        if (matcher.find) {
+          val appId = matcher.group
+          appHistoryLogs +:= appId
+        } else {
+          logDebug(name + " is illegal")
+        }
+      }
+    }
+    appHistoryLogs
+  }
 }
 
 /*
@@ -311,14 +347,56 @@ object ParseLog extends Logging {
     val logParser = new LogsParser(conf, sparkEventLogDir, outputDir)
 
     // file pattern
-    val regex = "application_[0-9]+._[0-9]+.lz4"
+    val regex = "^application_[0-9]+._[0-9]+.lz4$"
     val pattern = Pattern.compile(regex)
     val matcher = pattern.matcher(logName)
     if (matcher.find) {
       val appId = matcher.group
-      logParser.parseAppHistoryLog(appId, logName)
+      logParser.parseAppHistoryLogs(Seq(appId), logName)
     } else {
       throw new RuntimeException(logName + " is illegal")
     }
+  }
+}
+
+/*
+arg0: spark.eventLog.dir, eg. hdfs://server1:9000/spark2-history
+arg1: output dir in hdfs, eg. hdfs://server1:9000/logParser
+arg2: outFileName, eg.  log_parse_1646816941391
+arg3: startTime, eg. 2022-09-15 11:00
+arg4: endTime, eg. 2022-09-25 11:00
+ */
+object ParseLogs extends Logging {
+  def main(args: Array[String]): Unit = {
+    if (args == null || args.length != 5) {
+      throw new RuntimeException("input params is invalid,such as below\n" +
+          "arg0: spark.eventLog.dir, eg. hdfs://server1:9000/spark2-history\n" +
+          "arg1: output dir in hdfs, eg. hdfs://server1:9000/logParser\n" +
+          "arg2: outFileName, eg.  log_parse_1646816941391\n" +
+          "arg3: startTime, eg.  2022-09-15 11:00\n" +
+          "arg4: endTime, eg.  2022-09-25 11:00\n")
+    }
+    val sparkEventLogDir = args(0)
+    val outputDir = args(1)
+    val logName = args(2)
+    val startTime = args(3)
+    val endTime = args(4)
+
+    val conf = new SparkConf
+    // spark.eventLog.dir
+    conf.set("spark.eventLog.dir", sparkEventLogDir)
+    // spark.eventLog.compress
+    conf.set("spark.eventLog.compress", "true")
+    // fs.hdfs.impl
+    conf.set("fs.hdfs.impl", "org.apache.hadoop.hdfs.DistributedFileSystem")
+    val logParser = new LogsParser(conf, sparkEventLogDir, outputDir)
+
+    // file pattern
+    val regex = "^application_[0-9]+._[0-9]+.lz4$"
+    val pattern = Pattern.compile(regex)
+    val dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm")
+    val appIds = logParser.listAppHistoryLogs(pattern,
+      dateFormat.parse(startTime).getTime, dateFormat.parse(endTime).getTime)
+    logParser.parseAppHistoryLogs(appIds, logName)
   }
 }

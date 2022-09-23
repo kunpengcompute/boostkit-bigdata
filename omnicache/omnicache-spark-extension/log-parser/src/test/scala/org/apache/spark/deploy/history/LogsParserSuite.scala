@@ -43,6 +43,22 @@ class LogsParserSuite extends SparkFunSuite {
     ))
   }
 
+  test("parse logs") {
+    val path = this.getClass.getResource("/").getPath
+    val args: Array[String] = Array(path, "eventlog/parse"
+      , "log_parse_1646816941391", "2022-09-15 11:00", "2022-09-25 11:00")
+    ParseLogs.main(args)
+    val fis = new FileInputStream("eventlog/parse/log_parse_1646816941391.json")
+    val lines = IOUtils.readLines(fis, "UTF-8")
+    IOUtils.closeQuietly(fis)
+    val json: Seq[Map[String, String]] = Json(DefaultFormats)
+        .read[Seq[Map[String, String]]](lines.get(0))
+    assert(json.exists(map =>
+      map.contains("materialized views") &&
+          map("physical plan").contains(map("materialized views"))
+    ))
+  }
+
   test("error_invalid_param") {
     assertThrows[RuntimeException] {
       val path = this.getClass.getResource("/").getPath
