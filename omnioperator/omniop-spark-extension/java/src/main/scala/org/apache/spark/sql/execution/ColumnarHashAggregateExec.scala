@@ -54,6 +54,20 @@ case class ColumnarHashAggregateExec(
   extends BaseAggregateExec
     with AliasAwareOutputPartitioning {
 
+  override def verboseStringWithOperatorId(): String = {
+    s"""
+       |$formattedNodeName
+       |${ExplainUtils.generateFieldString("Input", child.output ++ child.output.map(_.dataType))}
+       |${ExplainUtils.generateFieldString("Keys", groupingExpressions ++ groupingExpressions.map(_.dataType))}
+       |${ExplainUtils.generateFieldString("Functions", aggregateExpressions ++ aggregateExpressions.map(_.dataType))}
+       |${ExplainUtils.generateFieldString("Functions-modes", aggregateExpressions.map(_.mode))}
+       |${ExplainUtils.generateFieldString("Functions-children", aggregateExpressions.flatMap(aggexp => aggexp.aggregateFunction.children) ++ aggregateExpressions.flatMap(aggexp => aggexp.aggregateFunction.children).map(_.dataType))}
+       |${ExplainUtils.generateFieldString("Functions-inputAggBufferAttributes", aggregateExpressions.flatMap(aggexp => aggexp.aggregateFunction.inputAggBufferAttributes) ++ aggregateExpressions.flatMap(aggexp => aggexp.aggregateFunction.inputAggBufferAttributes).map(_.dataType))}
+       |${ExplainUtils.generateFieldString("Aggregate Attributes", aggregateAttributes ++ aggregateAttributes.map(_.dataType))}
+       |${ExplainUtils.generateFieldString("Results", resultExpressions ++ resultExpressions.map(_.dataType))}
+       |""".stripMargin
+  }
+
   override lazy val metrics = Map(
     "addInputTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni addInput"),
     "numInputRows" -> SQLMetrics.createMetric(sparkContext, "number of input rows"),
@@ -83,12 +97,9 @@ case class ColumnarHashAggregateExec(
       if (exp.filter.isDefined) {
         throw new UnsupportedOperationException("Unsupported filter in AggregateExpression")
       }
-      if (exp.isDistinct) {
-        throw new UnsupportedOperationException(s"Unsupported aggregate expression with distinct flag")
-      }
       if (exp.mode == Final) {
         exp.aggregateFunction match {
-          case Sum(_) | Min(_) | Max(_) | Count(_) =>
+          case Sum(_) | Min(_) | Max(_) | Count(_) | Average(_) | First(_,_)  =>
             omniAggFunctionTypes(index) = toOmniAggFunType(exp, true, true)
             omniAggOutputTypes(index) = toOmniAggInOutType(exp.aggregateFunction.dataType)
             omniAggChannels(index) =
@@ -97,9 +108,24 @@ case class ColumnarHashAggregateExec(
             omniOutputPartials(index) = false
           case _ => throw new UnsupportedOperationException(s"Unsupported aggregate aggregateFunction: ${exp}")
         }
+      } else if (exp.mode == PartialMerge) {
+        exp.aggregateFunction match {
+          case Sum(_) | Min(_) | Max(_) | Count(_) | Average(_) | First(_,_)  =>
+            omniAggFunctionTypes(index) = toOmniAggFunType(exp, true)
+            omniAggOutputTypes(index) =
+              toOmniAggInOutType(exp.aggregateFunction.inputAggBufferAttributes)
+            omniAggChannels(index) =
+              toOmniAggInOutJSonExp(exp.aggregateFunction.inputAggBufferAttributes, attrExpsIdMap)
+            omniInputRaws(index) = false
+            omniOutputPartials(index) = true
+            if (omniAggFunctionTypes(index) == OMNI_AGGREGATION_TYPE_COUNT_ALL) {
+              omniAggChannels(index) = null
+            }
+          case _ => throw new UnsupportedOperationException(s"Unsupported aggregate aggregateFunction: ${exp}")
+        }
       } else if (exp.mode == Partial) {
         exp.aggregateFunction match {
-          case Sum(_) | Min(_) | Max(_) | Count(_) =>
+          case Sum(_) | Min(_) | Max(_) | Count(_) | Average(_) | First(_,_)  =>
             omniAggFunctionTypes(index) = toOmniAggFunType(exp, true)
             omniAggOutputTypes(index) =
               toOmniAggInOutType(exp.aggregateFunction.inputAggBufferAttributes)
@@ -177,12 +203,9 @@ case class ColumnarHashAggregateExec(
       if (exp.filter.isDefined) {
         throw new UnsupportedOperationException("Unsupported filter in AggregateExpression")
       }
-      if (exp.isDistinct) {
-        throw new UnsupportedOperationException("Unsupported aggregate expression with distinct flag")
-      }
       if (exp.mode == Final) {
         exp.aggregateFunction match {
-          case Sum(_) | Min(_) | Max(_) | Count(_) =>
+          case Sum(_) | Min(_) | Max(_) | Count(_) | Average(_) | First(_,_)  =>
             omniAggFunctionTypes(index) = toOmniAggFunType(exp, true, true)
             omniAggOutputTypes(index) =
               toOmniAggInOutType(exp.aggregateFunction.dataType)
@@ -190,6 +213,21 @@ case class ColumnarHashAggregateExec(
               toOmniAggInOutJSonExp(exp.aggregateFunction.inputAggBufferAttributes, attrExpsIdMap)
             omniInputRaws(index) = false
             omniOutputPartials(index) = false
+          case _ => throw new UnsupportedOperationException(s"Unsupported aggregate aggregateFunction: ${exp}")
+        }
+      } else if (exp.mode == PartialMerge) {
+        exp.aggregateFunction match {
+          case Sum(_) | Min(_) | Max(_) | Count(_) | Average(_) | First(_,_)  =>
+            omniAggFunctionTypes(index) = toOmniAggFunType(exp, true)
+            omniAggOutputTypes(index) =
+              toOmniAggInOutType(exp.aggregateFunction.inputAggBufferAttributes)
+            omniAggChannels(index) =
+              toOmniAggInOutJSonExp(exp.aggregateFunction.inputAggBufferAttributes, attrExpsIdMap)
+            omniInputRaws(index) = false
+            omniOutputPartials(index) = true
+            if (omniAggFunctionTypes(index) == OMNI_AGGREGATION_TYPE_COUNT_ALL) {
+              omniAggChannels(index) = null
+            }
           case _ => throw new UnsupportedOperationException(s"Unsupported aggregate aggregateFunction: ${exp}")
         }
       } else if (exp.mode == Partial) {

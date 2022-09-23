@@ -23,7 +23,7 @@ import scala.collection.mutable.ArrayBuffer
 import com.huawei.boostkit.spark.Constant.{DEFAULT_STRING_TYPE_LENGTH, IS_CHECK_OMNI_EXP, OMNI_BOOLEAN_TYPE, OMNI_DATE_TYPE, OMNI_DECIMAL128_TYPE, OMNI_DECIMAL64_TYPE, OMNI_DOUBLE_TYPE, OMNI_INTEGER_TYPE, OMNI_LONG_TYPE, OMNI_SHOR_TYPE, OMNI_VARCHAR_TYPE}
 import nova.hetu.omniruntime.`type`.{BooleanDataType, DataTypeSerializer, Date32DataType, Decimal128DataType, Decimal64DataType, DoubleDataType, IntDataType, LongDataType, ShortDataType, VarcharDataType}
 import nova.hetu.omniruntime.constants.FunctionType
-import nova.hetu.omniruntime.constants.FunctionType.{OMNI_AGGREGATION_TYPE_AVG, OMNI_AGGREGATION_TYPE_COUNT_ALL, OMNI_AGGREGATION_TYPE_COUNT_COLUMN, OMNI_AGGREGATION_TYPE_MAX, OMNI_AGGREGATION_TYPE_MIN, OMNI_AGGREGATION_TYPE_SUM, OMNI_WINDOW_TYPE_RANK, OMNI_WINDOW_TYPE_ROW_NUMBER}
+import nova.hetu.omniruntime.constants.FunctionType.{OMNI_AGGREGATION_TYPE_AVG, OMNI_AGGREGATION_TYPE_COUNT_ALL, OMNI_AGGREGATION_TYPE_COUNT_COLUMN, OMNI_AGGREGATION_TYPE_FIRST_INCLUDENULL, OMNI_AGGREGATION_TYPE_FIRST_IGNORENULL, OMNI_AGGREGATION_TYPE_MAX, OMNI_AGGREGATION_TYPE_MIN, OMNI_AGGREGATION_TYPE_SUM, OMNI_WINDOW_TYPE_RANK, OMNI_WINDOW_TYPE_ROW_NUMBER}
 import nova.hetu.omniruntime.constants.JoinType._
 import nova.hetu.omniruntime.operator.OmniExprVerify
 
@@ -38,7 +38,6 @@ import org.apache.spark.sql.types.{BooleanType, DataType, DateType, Decimal, Dec
 
 import java.util.Locale
 import scala.collection.mutable
-import scala.collection.mutable.ArrayBuffer
 
 object OmniExpressionAdaptor extends Logging {
 
@@ -646,14 +645,7 @@ object OmniExpressionAdaptor extends Logging {
 
   def toOmniAggFunType(agg: AggregateExpression, isHashAgg: Boolean = false, isFinal: Boolean = false): FunctionType = {
     agg.aggregateFunction match {
-      case Sum(_) => {
-        if (isHashAgg) {
-          if (agg.dataType.isInstanceOf[DecimalType]) {
-            throw new UnsupportedOperationException("HashAgg not supported decimal input")
-          }
-        }
-        OMNI_AGGREGATION_TYPE_SUM
-      }
+      case Sum(_) => OMNI_AGGREGATION_TYPE_SUM
       case Max(_) => OMNI_AGGREGATION_TYPE_MAX
       case Average(_) => OMNI_AGGREGATION_TYPE_AVG
       case Min(_) => OMNI_AGGREGATION_TYPE_MIN
@@ -664,6 +656,8 @@ object OmniExpressionAdaptor extends Logging {
           OMNI_AGGREGATION_TYPE_COUNT_ALL
         }
       case Count(_) => OMNI_AGGREGATION_TYPE_COUNT_COLUMN
+      case First(_, true) => OMNI_AGGREGATION_TYPE_FIRST_IGNORENULL
+      case First(_, false) => OMNI_AGGREGATION_TYPE_FIRST_INCLUDENULL
       case _ => throw new UnsupportedOperationException(s"Unsupported aggregate function: $agg")
     }
   }
