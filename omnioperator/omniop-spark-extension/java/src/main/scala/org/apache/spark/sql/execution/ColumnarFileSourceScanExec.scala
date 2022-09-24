@@ -522,12 +522,13 @@ abstract class BaseColumnarFileSourceScanExec(
     }
     aggIndexOffset += agg.groupingExpressions.size
 
-    val omniAggInputRaw = true
-    val omniAggOutputPartial = true
+    val omniAggInputRaws = new Array[Boolean](agg.aggregateExpressions.size)
+    val omniAggOutputPartials =new Array[Boolean](agg.aggregateExpressions.size)
     val omniAggTypes = new Array[DataType](agg.aggregateExpressions.size)
     val omniAggFunctionTypes = new Array[FunctionType](agg.aggregateExpressions.size)
-    val omniAggOutputTypes = new Array[DataType](agg.aggregateExpressions.size)
-    val omniAggChannels = new Array[String](agg.aggregateExpressions.size)
+    val omniAggOutputTypes = new Array[Array[DataType]](agg.aggregateExpressions.size)
+    val omniAggChannels = new Array[Array[String]](agg.aggregateExpressions.size)
+
     var omniAggindex = 0
     for (exp <- agg.aggregateExpressions) {
       if (exp.mode == Final) {
@@ -543,9 +544,11 @@ abstract class BaseColumnarFileSourceScanExec(
             omniAggTypes(omniAggindex) = sparkTypeToOmniType(aggExp.dataType)
             omniAggFunctionTypes(omniAggindex) = toOmniAggFunType(exp, true)
             omniAggOutputTypes(omniAggindex) =
-              sparkTypeToOmniType(exp.aggregateFunction.dataType)
+              toOmniAggInOutType(exp.aggregateFunction.inputAggBufferAttributes)
             omniAggChannels(omniAggindex) =
-              rewriteToOmniJsonExpressionLiteral(aggExp, attrAggExpsIdMap)
+              toOmniAggInOutJSonExp(exp.aggregateFunction.children, attrAggExpsIdMap)
+            omniAggInputRaws(omniAggindex) = true
+            omniAggOutputPartials(omniAggindex) = true
           case _ => throw new UnsupportedOperationException(s"Unsupported aggregate aggregateFunction: $exp")
         }
       } else {
@@ -571,7 +574,7 @@ abstract class BaseColumnarFileSourceScanExec(
       i += 1
     }
     (omniGroupByChanel, omniAggChannels, omniAggSourceTypes, omniAggFunctionTypes, omniAggOutputTypes,
-      omniAggInputRaw, omniAggOutputPartial, resultIdxToOmniResultIdxMap)
+      omniAggInputRaws, omniAggOutputPartials, resultIdxToOmniResultIdxMap)
   }
 
   def genProjectOutput(project: ColumnarProjectExec) = {

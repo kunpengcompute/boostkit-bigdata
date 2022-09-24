@@ -676,6 +676,22 @@ object OmniExpressionAdaptor extends Logging {
     }
   }
 
+  def toOmniAggInOutJSonExp(attribute: Seq[Expression], exprsIndexMap: Map[ExprId, Int]):
+    Array[String] = {
+      attribute.map(attr => rewriteToOmniJsonExpressionLiteral(attr, exprsIndexMap)).toArray
+  }
+
+  def toOmniAggInOutType(attribute: Seq[AttributeReference]):
+    Array[nova.hetu.omniruntime.`type`.DataType] = {
+      attribute.map(attr =>
+        sparkTypeToOmniType(attr.dataType, attr.metadata)).toArray
+  }
+
+  def toOmniAggInOutType(dataType: DataType, metadata: Metadata = Metadata.empty):
+    Array[nova.hetu.omniruntime.`type`.DataType] = {
+         Array[nova.hetu.omniruntime.`type`.DataType](sparkTypeToOmniType(dataType, metadata))
+  }
+
   def sparkTypeToOmniExpType(datatype: DataType): String = {
     datatype match {
       case ShortType => OMNI_SHOR_TYPE
