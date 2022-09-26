@@ -479,13 +479,20 @@ public final class OperatorUtils
         }
         else {
             ShortArrayBlock shortArrayBlock = (ShortArrayBlock) block;
-            boolean[] valueIsNull = new boolean[positionCount];
             short[] values = new short[positionCount];
             for (int i = 0; i < values.length; i++) {
-                values[i] = (shortArrayBlock).getShort(i, 0);
-                valueIsNull[i] = shortArrayBlock.isNull(i);
+                values[i] = shortArrayBlock.getShort(i, 0);
             }
-            return new ShortArrayOmniBlock(vecAllocator, 0, positionCount, transformBooleanToByte(valueIsNull), values);
+            if (shortArrayBlock.mayHaveNull()) {
+                byte[] valueIsNull = new byte[positionCount];
+                for (int i = 0; i < values.length; i++) {
+                    if(shortArrayBlock.isNull(i)) {
+                        valueIsNull[i] = 1;
+                    }
+                }
+                return new ShortArrayOmniBlock(vecAllocator, 0, positionCount, valueIsNull, values);
+            }
+            return new ShortArrayOmniBlock(vecAllocator, 0, positionCount, null, values);
         }
     }
 
