@@ -486,7 +486,7 @@ public final class OperatorUtils
             if (shortArrayBlock.mayHaveNull()) {
                 byte[] valueIsNull = new byte[positionCount];
                 for (int i = 0; i < values.length; i++) {
-                    if(shortArrayBlock.isNull(i)) {
+                    if (shortArrayBlock.isNull(i)) {
                         valueIsNull[i] = 1;
                     }
                 }
