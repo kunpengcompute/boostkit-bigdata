@@ -535,7 +535,7 @@ abstract class BaseColumnarFileSourceScanExec(
         throw new UnsupportedOperationException(s"Unsupported final aggregate expression in operator fusion, exp: $exp")
       } else if (exp.mode == Partial) {
         exp.aggregateFunction match {
-          case Sum(_) | Min(_) | Average(_) | Max(_) | Count(_) =>
+          case Sum(_) | Min(_) | Average(_) | Max(_) | Count(_) | First(_, _) =>
             val aggExp = exp.aggregateFunction.children.head
             omniOutputExressionOrder += {
               exp.aggregateFunction.inputAggBufferAttributes.head.exprId ->
@@ -548,6 +548,24 @@ abstract class BaseColumnarFileSourceScanExec(
             omniAggChannels(omniAggindex) =
               toOmniAggInOutJSonExp(exp.aggregateFunction.children, attrAggExpsIdMap)
             omniAggInputRaws(omniAggindex) = true
+            omniAggOutputPartials(omniAggindex) = true
+          case _ => throw new UnsupportedOperationException(s"Unsupported aggregate aggregateFunction: $exp")
+        }
+      } else if (exp.mode == PartialMerge) {
+        exp.aggregateFunction match {
+          case Sum(_) | Min(_) | Average(_) | Max(_) | Count(_) | First(_, _) =>
+            val aggExp = exp.aggregateFunction.children.head
+            omniOutputExressionOrder += {
+              exp.aggregateFunction.inputAggBufferAttributes.head.exprId ->
+                (omniAggindex + aggIndexOffset)
+            }
+            omniAggTypes(omniAggindex) = sparkTypeToOmniType(aggExp.dataType)
+            omniAggFunctionTypes(omniAggindex) = toOmniAggFunType(exp, true)
+            omniAggOutputTypes(omniAggindex) =
+              toOmniAggInOutType(exp.aggregateFunction.inputAggBufferAttributes)
+            omniAggChannels(omniAggindex) =
+              toOmniAggInOutJSonExp(exp.aggregateFunction.inputAggBufferAttributes, attrAggExpsIdMap)
+            omniAggInputRaws(omniAggindex) = false
             omniAggOutputPartials(omniAggindex) = true
           case _ => throw new UnsupportedOperationException(s"Unsupported aggregate aggregateFunction: $exp")
         }

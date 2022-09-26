@@ -38,7 +38,7 @@ import org.apache.spark.sql.execution.metric.SQLMetrics
 import org.apache.spark.sql.execution.util.SparkMemoryUtils
 import org.apache.spark.sql.execution.vectorized.OmniColumnVector
 import org.apache.spark.sql.execution.window.WindowExecBase
-import org.apache.spark.sql.types.{DecimalType, StructType}
+import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.vectorized.ColumnarBatch
 
 case class ColumnarWindowExec(windowExpression: Seq[NamedExpression],
@@ -80,14 +80,6 @@ case class ColumnarWindowExec(windowExpression: Seq[NamedExpression],
 
   override protected def doExecute(): RDD[InternalRow] = {
     throw new UnsupportedOperationException(s"This operator doesn't support doExecute().")
-  }
-
-  def checkAggFunInOutDataType(funcInDataType: org.apache.spark.sql.types.DataType, funcOutDataType: org.apache.spark.sql.types.DataType): Unit = {
-     //for decimal, only support decimal64 to decimal128 output
-     if(funcInDataType.isInstanceOf[DecimalType] && funcOutDataType.isInstanceOf[DecimalType]) {
-        if (!DecimalType.is64BitDecimalType(funcOutDataType.asInstanceOf[DecimalType]))
-          throw new UnsupportedOperationException(s"output only support decimal128 type, inDataType:${funcInDataType} outDataType:${funcOutDataType}" )
-     }
   }
 
   def getWindowFrameParam(frame: SpecifiedWindowFrame): (OmniWindowFrameType,
@@ -183,7 +175,6 @@ case class ColumnarWindowExec(windowExpression: Seq[NamedExpression],
               windowFunType(index) = toOmniAggFunType(agg)
               windowArgKeys = aggFunc.children.map(
                 exp => {
-                  checkAggFunInOutDataType(function.dataType, exp.dataType)
                   rewriteToOmniJsonExpressionLiteral(exp, omniAttrExpsIdMap)
                 }).toArray
             case _ => throw new UnsupportedOperationException(s"Unsupported window function: ${function}")
