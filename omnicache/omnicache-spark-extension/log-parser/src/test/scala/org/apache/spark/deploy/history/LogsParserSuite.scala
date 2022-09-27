@@ -18,8 +18,11 @@
 package org.apache.spark.deploy.history
 
 import java.io.{FileInputStream, FileNotFoundException}
+import java.text.SimpleDateFormat
+import java.util.Date
 
 import org.apache.commons.io.IOUtils
+import org.apache.commons.lang3.time.DateUtils
 import org.json4s.DefaultFormats
 import org.json4s.jackson.Json
 
@@ -45,8 +48,10 @@ class LogsParserSuite extends SparkFunSuite {
 
   test("parse logs") {
     val path = this.getClass.getResource("/").getPath
+    val endTime = new SimpleDateFormat("yyyy-MM-dd HH:mm")
+        .format(DateUtils.addDays(new Date(), 7))
     val args: Array[String] = Array(path, "eventlog/parse"
-      , "log_parse_1646816941391", "2022-09-15 11:00", "2022-09-25 11:00")
+      , "log_parse_1646816941391", "2022-09-15 11:00", endTime)
     ParseLogs.main(args)
     val fis = new FileInputStream("eventlog/parse/log_parse_1646816941391.json")
     val lines = IOUtils.readLines(fis, "UTF-8")
