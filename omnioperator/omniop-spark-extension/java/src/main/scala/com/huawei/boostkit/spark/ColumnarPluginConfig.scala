@@ -18,14 +18,22 @@
 
 package com.huawei.boostkit.spark
 
+import org.apache.spark.SparkEnv
 import org.apache.spark.internal.Logging
+import org.apache.spark.shuffle.sort.ColumnarShuffleManager
 import org.apache.spark.sql.internal.SQLConf
 
 class ColumnarPluginConfig(conf: SQLConf) extends Logging {
   // enable or disable columnar exchange
-  val enableColumnarShuffle: Boolean = conf
+  val columnarShuffleStr:String = conf
     .getConfString("spark.shuffle.manager", "sort")
-    .equals("org.apache.spark.shuffle.sort.ColumnarShuffleManager")
+
+  val enableColumnarShuffle: Boolean = 
+    if (!(columnarShuffleStr.equals("sort") || (columnarShuffleStr.equals("tungsten-sort")))) {
+      SparkEnv.get.shuffleManager.isInstanceOf[ColumnarShuffleManager]
+    } else {
+      false
+    }
 
   // enable or disable columnar hashagg
   val enableColumnarHashAgg: Boolean =

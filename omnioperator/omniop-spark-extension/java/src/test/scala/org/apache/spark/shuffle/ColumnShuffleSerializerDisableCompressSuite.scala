@@ -48,7 +48,7 @@ class ColumnShuffleSerializerDisableCompressSuite extends SharedSparkSession {
   override def sparkConf: SparkConf =
     super.sparkConf
       .setAppName("test shuffle serializer disable compress")
-      .set("spark.shuffle.manager", "org.apache.spark.shuffle.sort.ColumnarShuffleManager")
+      .set("spark.shuffle.manager", "org.apache.spark.shuffle.sort.OmniColumnarShuffleManager")
       .set("spark.shuffle.compress", "false")
 
   private var taskMetrics: TaskMetrics = _
