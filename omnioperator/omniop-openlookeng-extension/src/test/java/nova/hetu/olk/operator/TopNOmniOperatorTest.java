@@ -30,7 +30,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-import static nova.hetu.olk.mock.MockUtil.mockNewWithWithAnyArguments;
+import static nova.hetu.olk.mock.MockUtil.mockNewVecWithAnyArguments;
 import static nova.hetu.olk.mock.MockUtil.mockOmniOperator;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
@@ -53,7 +53,7 @@ public class TopNOmniOperatorTest
     protected void setUpMock()
     {
         super.setUpMock();
-        mockNewWithWithAnyArguments(OmniTopNOperatorFactory.class);
+        mockNewVecWithAnyArguments(OmniTopNOperatorFactory.class);
     }
 
     protected OperatorFactory createOperatorFactory()

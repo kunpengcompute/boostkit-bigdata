@@ -24,7 +24,7 @@ import java.util.UUID;
 
 import static nova.hetu.olk.mock.MockUtil.fill;
 import static nova.hetu.olk.mock.MockUtil.mockBlock;
-import static nova.hetu.olk.mock.MockUtil.mockNewWithWithAnyArguments;
+import static nova.hetu.olk.mock.MockUtil.mockNewVecWithAnyArguments;
 import static org.junit.Assert.assertTrue;
 
 @PrepareForTest(VariableWidthOmniBlock.class)
@@ -35,7 +35,7 @@ public class VariableWidthOmniBlockTest
     protected void setupMock()
     {
         super.setupMock();
-        mockNewWithWithAnyArguments(VarcharVec.class);
+        mockNewVecWithAnyArguments(VarcharVec.class);
     }
 
     @Override

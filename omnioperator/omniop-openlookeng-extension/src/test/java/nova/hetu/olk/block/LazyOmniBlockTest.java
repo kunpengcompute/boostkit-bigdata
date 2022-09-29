@@ -30,7 +30,7 @@ import java.util.Random;
 
 import static nova.hetu.olk.mock.MockUtil.fill;
 import static nova.hetu.olk.mock.MockUtil.mockBlock;
-import static nova.hetu.olk.mock.MockUtil.mockNewWithWithAnyArguments;
+import static nova.hetu.olk.mock.MockUtil.mockNewVecWithAnyArguments;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -49,11 +49,11 @@ public class LazyOmniBlockTest
     protected void setupMock()
     {
         super.setupMock();
-        mockNewWithWithAnyArguments(LazyVec.class);
-        mockNewWithWithAnyArguments(BooleanVec.class);
-        mockNewWithWithAnyArguments(IntVec.class);
-        mockNewWithWithAnyArguments(DoubleVec.class);
-        mockNewWithWithAnyArguments(FixedWidthVec.class);
+        mockNewVecWithAnyArguments(LazyVec.class);
+        mockNewVecWithAnyArguments(BooleanVec.class);
+        mockNewVecWithAnyArguments(IntVec.class);
+        mockNewVecWithAnyArguments(DoubleVec.class);
+        mockNewVecWithAnyArguments(FixedWidthVec.class);
     }
 
     @Override

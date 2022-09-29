@@ -37,7 +37,7 @@ import java.util.Random;
 import java.util.UUID;
 
 import static io.prestosql.operator.Operator.NOT_BLOCKED;
-import static nova.hetu.olk.mock.MockUtil.mockNewWithWithAnyArguments;
+import static nova.hetu.olk.mock.MockUtil.mockNewVecWithAnyArguments;
 import static nova.hetu.olk.mock.MockUtil.mockOmniOperator;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -74,7 +74,7 @@ public class HashBuilderOmniOperatorTest
     {
         super.setUpMock();
         lookupSourceFactoryManager = mock(JoinBridgeManager.class);
-        mockNewWithWithAnyArguments(OmniHashBuilderOperatorFactory.class);
+        mockNewVecWithAnyArguments(OmniHashBuilderOperatorFactory.class);
     }
 
     @Override

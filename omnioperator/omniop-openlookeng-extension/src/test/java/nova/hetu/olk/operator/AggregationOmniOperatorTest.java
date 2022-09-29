@@ -37,7 +37,7 @@ import java.util.Optional;
 import java.util.Random;
 import java.util.UUID;
 
-import static nova.hetu.olk.mock.MockUtil.mockNewWithWithAnyArguments;
+import static nova.hetu.olk.mock.MockUtil.mockNewVecWithAnyArguments;
 import static nova.hetu.olk.mock.MockUtil.mockOmniOperator;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -74,7 +74,7 @@ public class AggregationOmniOperatorTest
     @Override
     protected OperatorFactory createOperatorFactory()
     {
-        OmniAggregationOperatorFactory factory = mockNewWithWithAnyArguments(OmniAggregationOperatorFactory.class);
+        OmniAggregationOperatorFactory factory = mockNewVecWithAnyArguments(OmniAggregationOperatorFactory.class);
         doReturn(omniOperator).when(factory).createOperator(any());
         return new AggregationOmniOperatorFactory(operatorId, planNodeId,
                 sourceTypes, aggregatorTypes, aggregationInputChannels, maskChannelList, aggregationOutputTypes, step);

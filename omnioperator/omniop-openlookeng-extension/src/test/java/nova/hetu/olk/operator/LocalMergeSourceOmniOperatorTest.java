@@ -43,7 +43,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import static io.prestosql.operator.Operator.NOT_BLOCKED;
 import static java.util.Arrays.asList;
-import static nova.hetu.olk.mock.MockUtil.mockNewWithWithAnyArguments;
+import static nova.hetu.olk.mock.MockUtil.mockNewVecWithAnyArguments;
 import static nova.hetu.olk.mock.MockUtil.mockOmniOperator;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -88,7 +88,7 @@ public class LocalMergeSourceOmniOperatorTest
     {
         super.setUpMock();
         OrderByOmniOperator orderByOmniOperator = mock(OrderByOmniOperator.class);
-        OrderByOmniOperator.OrderByOmniOperatorFactory orderByOmniOperatorFactory = mockNewWithWithAnyArguments(OrderByOmniOperator.OrderByOmniOperatorFactory.class);
+        OrderByOmniOperator.OrderByOmniOperatorFactory orderByOmniOperatorFactory = mockNewVecWithAnyArguments(OrderByOmniOperator.OrderByOmniOperatorFactory.class);
         mockStatic(OrderByOmniOperator.OrderByOmniOperatorFactory.class);
         when(OrderByOmniOperator.OrderByOmniOperatorFactory.createOrderByOmniOperatorFactory(
                 anyInt(), any(PlanNodeId.class), anyList(), anyList(), anyList(), anyList()

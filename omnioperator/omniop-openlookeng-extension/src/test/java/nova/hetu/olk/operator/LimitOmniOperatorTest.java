@@ -35,7 +35,7 @@ import java.util.List;
 import java.util.Random;
 import java.util.UUID;
 
-import static nova.hetu.olk.mock.MockUtil.mockNewWithWithAnyArguments;
+import static nova.hetu.olk.mock.MockUtil.mockNewVecWithAnyArguments;
 import static nova.hetu.olk.mock.MockUtil.mockOmniOperator;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
@@ -58,7 +58,7 @@ public class LimitOmniOperatorTest
     protected void setUpMock()
     {
         super.setUpMock();
-        mockNewWithWithAnyArguments(OmniLimitOperatorFactory.class);
+        mockNewVecWithAnyArguments(OmniLimitOperatorFactory.class);
     }
 
     @Override

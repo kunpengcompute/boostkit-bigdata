@@ -66,7 +66,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static io.prestosql.execution.Lifespan.taskWide;
 import static nova.hetu.olk.mock.MockUtil.block;
 import static nova.hetu.olk.mock.MockUtil.fill;
-import static nova.hetu.olk.mock.MockUtil.mockNewWithWithAnyArguments;
+import static nova.hetu.olk.mock.MockUtil.mockNewVecWithAnyArguments;
 import static nova.hetu.olk.mock.MockUtil.mockPage;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
@@ -178,12 +178,12 @@ public class AbstractOperatorTest
 
     protected void setUpMock()
     {
-        VecBatch vecBatch = mockNewWithWithAnyArguments(VecBatch.class);
+        VecBatch vecBatch = mockNewVecWithAnyArguments(VecBatch.class);
         when(vecBatch.getVectors()).thenReturn(new Vec[0]);
-        mockNewWithWithAnyArguments(LazyVec.class);
-        mockNewWithWithAnyArguments(Vec.class);
-        mockNewWithWithAnyArguments(BooleanVec.class);
-        mockNewWithWithAnyArguments(FixedWidthVec.class);
+        mockNewVecWithAnyArguments(LazyVec.class);
+        mockNewVecWithAnyArguments(Vec.class);
+        mockNewVecWithAnyArguments(BooleanVec.class);
+        mockNewVecWithAnyArguments(FixedWidthVec.class);
     }
 
     protected OperatorFactory createOperatorFactory()

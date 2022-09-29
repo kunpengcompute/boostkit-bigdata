@@ -35,7 +35,7 @@ import java.util.UUID;
 
 import static io.prestosql.spi.block.SortOrder.values;
 import static java.util.stream.Collectors.toList;
-import static nova.hetu.olk.mock.MockUtil.mockNewWithWithAnyArguments;
+import static nova.hetu.olk.mock.MockUtil.mockNewVecWithAnyArguments;
 import static nova.hetu.olk.mock.MockUtil.mockOmniOperator;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
@@ -62,7 +62,7 @@ public class WindowOmniOperatorTest
     protected void setUpMock()
     {
         super.setUpMock();
-        mockNewWithWithAnyArguments(OmniWindowOperatorFactory.class);
+        mockNewVecWithAnyArguments(OmniWindowOperatorFactory.class);
     }
 
     @Override

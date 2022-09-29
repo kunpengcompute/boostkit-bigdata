@@ -37,7 +37,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-import static nova.hetu.olk.mock.MockUtil.mockNewWithWithAnyArguments;
+import static nova.hetu.olk.mock.MockUtil.mockNewVecWithAnyArguments;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
@@ -77,7 +77,7 @@ public class MergeOmniOperatorTest
     {
         super.setUpMock();
         OrderByOmniOperator orderByOmniOperator = mock(OrderByOmniOperator.class);
-        OrderByOmniOperator.OrderByOmniOperatorFactory orderByOmniOperatorFactory = mockNewWithWithAnyArguments(OrderByOmniOperator.OrderByOmniOperatorFactory.class);
+        OrderByOmniOperator.OrderByOmniOperatorFactory orderByOmniOperatorFactory = mockNewVecWithAnyArguments(OrderByOmniOperator.OrderByOmniOperatorFactory.class);
         mockStatic(OrderByOmniOperator.OrderByOmniOperatorFactory.class);
         when(OrderByOmniOperator.OrderByOmniOperatorFactory.createOrderByOmniOperatorFactory(
                 anyInt(), any(PlanNodeId.class), anyList(), anyList(), anyList(), anyList()

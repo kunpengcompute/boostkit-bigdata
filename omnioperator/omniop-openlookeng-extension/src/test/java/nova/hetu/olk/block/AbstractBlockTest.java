@@ -69,7 +69,7 @@ public class AbstractBlockTest
     @BeforeMethod
     public void setUp()
     {
-        vecAllocator = MockUtil.mockNewWithWithAnyArguments(VecAllocator.class);
+        vecAllocator = MockUtil.mockNewVecWithAnyArguments(VecAllocator.class);
         this.setupMock();
     }
 
