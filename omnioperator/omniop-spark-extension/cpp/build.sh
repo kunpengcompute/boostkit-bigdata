@@ -15,10 +15,15 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-set -eu
+set -e
 
-export OMNI_INCLUDE_PATH=/opt/lib/include
-export CPLUS_INCLUDE_PATH=$OMNI_INCLUDE_PATH
+if [ -z "$OMNI_HOME" ]; then
+  echo "OMNI_HOME is empty"
+  OMNI_HOME=/opt
+fi
+
+export OMNI_INCLUDE_PATH=$OMNI_HOME/lib/include
+export CPLUS_INCLUDE_PATH=$OMNI_INCLUDE_PATH:$CPLUS_INCLUDE_PATH
 echo "OMNI_INCLUDE_PATH=$OMNI_INCLUDE_PATH"
 
 CURRENT_DIR=$(cd "$(dirname "$BASH_SOURCE")"; pwd)
