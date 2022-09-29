@@ -24,7 +24,6 @@ import scala.collection.mutable
 
 import org.apache.spark.SparkContext
 import org.apache.spark.annotation.DeveloperApi
-import org.apache.spark.internal.Logging
 import org.apache.spark.scheduler.{SparkListener, SparkListenerEvent}
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.plans.logical._
@@ -109,7 +108,7 @@ case class SparkListenerMVRewriteSuccess(sql: String, usingMvs: String) extends 
 }
 
 class MVRewriteSuccessListener(
-    kvStore: ElementTrackingStore) extends SparkListener with Logging {
+    kvStore: ElementTrackingStore) extends SparkListener with RewriteLogger {
 
   override def onOtherEvent(event: SparkListenerEvent): Unit = {
     event match {

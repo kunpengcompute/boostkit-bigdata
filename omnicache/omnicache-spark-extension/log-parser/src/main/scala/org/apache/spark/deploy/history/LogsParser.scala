@@ -17,11 +17,11 @@
 
 package org.apache.spark.deploy.history
 
+import com.huawei.boostkit.spark.util.RewriteLogger
 import java.io.FileNotFoundException
 import java.text.SimpleDateFormat
 import java.util.ServiceLoader
 import java.util.regex.Pattern
-
 import org.apache.hadoop.fs.{FileStatus, FileSystem, Path}
 import org.json4s.DefaultFormats
 import org.json4s.jackson.Json
@@ -31,7 +31,6 @@ import scala.util.control.Breaks
 
 import org.apache.spark.{JobExecutionStatus, SparkConf}
 import org.apache.spark.deploy.SparkHadoopUtil
-import org.apache.spark.internal.Logging
 import org.apache.spark.internal.config.Status.ASYNC_TRACKING_ENABLED
 import org.apache.spark.scheduler.ReplayListenerBus
 import org.apache.spark.scheduler.ReplayListenerBus.{ReplayEventsFilter, SELECT_ALL_FILTER}
@@ -41,7 +40,7 @@ import org.apache.spark.status._
 import org.apache.spark.util.Utils
 import org.apache.spark.util.kvstore.{InMemoryStore, KVStore}
 
-class LogsParser(conf: SparkConf, eventLogDir: String, outPutDir: String) extends Logging {
+class LogsParser(conf: SparkConf, eventLogDir: String, outPutDir: String) extends RewriteLogger {
 
   private val LINE_SEPARATOR = "\n"
   private val hadoopConf = SparkHadoopUtil.get.newConfiguration(conf)
@@ -325,7 +324,7 @@ arg0: spark.eventLog.dir, eg. hdfs://server1:9000/spark2-history
 arg1: output dir in hdfs, eg. hdfs://server1:9000/logParser
 arg2: log file to be parsed, eg. application_1646816941391_0115.lz4
  */
-object ParseLog extends Logging {
+object ParseLog extends RewriteLogger {
   def main(args: Array[String]): Unit = {
     if (args == null || args.length != 3) {
       throw new RuntimeException("input params is invalid,such as below\n" +
@@ -366,7 +365,7 @@ arg2: outFileName, eg.  log_parse_1646816941391
 arg3: startTime, eg. 2022-09-15 11:00
 arg4: endTime, eg. 2022-09-25 11:00
  */
-object ParseLogs extends Logging {
+object ParseLogs extends RewriteLogger {
   def main(args: Array[String]): Unit = {
     if (args == null || args.length != 5) {
       throw new RuntimeException("input params is invalid,such as below\n" +

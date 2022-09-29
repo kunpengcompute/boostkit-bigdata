@@ -17,13 +17,12 @@
 
 package org.apache.spark.sql.catalyst.parser
 
+import com.huawei.boostkit.spark.util.RewriteLogger
 import java.util.Locale
-
 import org.antlr.v4.runtime._
 import org.antlr.v4.runtime.atn.PredictionMode
 import org.antlr.v4.runtime.misc.ParseCancellationException
 
-import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{AnalysisException, SparkSession}
 import org.apache.spark.sql.catalyst._
 import org.apache.spark.sql.catalyst.expressions.Expression
@@ -32,7 +31,7 @@ import org.apache.spark.sql.catalyst.trees.Origin
 import org.apache.spark.sql.types.{DataType, StructType}
 
 class OmniCacheExtensionSqlParser(spark: SparkSession,
-    delegate: ParserInterface) extends ParserInterface with SQLConfHelper with Logging {
+    delegate: ParserInterface) extends ParserInterface with SQLConfHelper with RewriteLogger {
 
   lazy val astBuilder = new OmniCacheExtensionAstBuilder(spark, delegate)
 

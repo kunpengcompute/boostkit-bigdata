@@ -19,12 +19,11 @@ package org.apache.spark.sql.catalyst.parser
 
 import com.huawei.boostkit.spark.conf.OmniCachePluginConfig
 import com.huawei.boostkit.spark.conf.OmniCachePluginConfig._
-import com.huawei.boostkit.spark.util.RewriteHelper
+import com.huawei.boostkit.spark.util.{RewriteHelper, RewriteLogger}
 import org.antlr.v4.runtime.ParserRuleContext
 import org.antlr.v4.runtime.tree.{ParseTree, RuleNode}
 import scala.collection.JavaConverters._
 
-import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{AnalysisException, SaveMode, SparkSession}
 import org.apache.spark.sql.catalyst.{SQLConfHelper, TableIdentifier}
 import org.apache.spark.sql.catalyst.analysis.UnresolvedAttribute
@@ -41,7 +40,7 @@ import org.apache.spark.sql.execution.datasources._
  * @param delegate Spark default ParserInterface
  */
 class OmniCacheExtensionAstBuilder(spark: SparkSession, delegate: ParserInterface)
-    extends OmniCacheSqlExtensionsBaseVisitor[AnyRef] with SQLConfHelper with Logging {
+    extends OmniCacheSqlExtensionsBaseVisitor[AnyRef] with SQLConfHelper with RewriteLogger {
 
   /**
    * Parse CreateMVContext to OmniCacheCreateMvCommand
