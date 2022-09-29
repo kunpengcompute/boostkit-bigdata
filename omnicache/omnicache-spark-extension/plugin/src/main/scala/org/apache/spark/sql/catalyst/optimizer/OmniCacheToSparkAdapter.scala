@@ -17,7 +17,8 @@
 
 package org.apache.spark.sql.catalyst.optimizer
 
-import org.apache.spark.internal.Logging
+import com.huawei.boostkit.spark.util.RewriteLogger
+
 import org.apache.spark.sql.{AnalysisException, SparkSession}
 import org.apache.spark.sql.catalyst.{SQLConfHelper, TableIdentifier}
 import org.apache.spark.sql.catalyst.catalog._
@@ -26,7 +27,7 @@ import org.apache.spark.sql.execution.SparkOptimizer
 import org.apache.spark.sql.execution.command.DDLUtils
 import org.apache.spark.sql.types.StructType
 
-object OmniCacheToSparkAdapter extends SQLConfHelper with Logging {
+object OmniCacheToSparkAdapter extends SQLConfHelper with RewriteLogger {
 
   def buildCatalogTable(
       table: TableIdentifier,

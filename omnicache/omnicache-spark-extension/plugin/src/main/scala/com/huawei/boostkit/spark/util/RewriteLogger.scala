@@ -25,6 +25,8 @@ trait RewriteLogger extends Logging {
 
   private def logLevel: String = OmniCachePluginConfig.getConf.logLevel
 
+  private val logFlag = "[OmniCache]"
+
   def logBasedOnLevel(f: => String): Unit = {
     logLevel match {
       case "TRACE" => logTrace(f)
@@ -34,5 +36,25 @@ trait RewriteLogger extends Logging {
       case "ERROR" => logError(f)
       case _ => logTrace(f)
     }
+  }
+
+  override def logInfo(msg: => String): Unit = {
+    super.logInfo(s"$logFlag $msg")
+  }
+
+  override def logDebug(msg: => String): Unit = {
+    super.logDebug(s"$logFlag $msg")
+  }
+
+  override def logTrace(msg: => String): Unit = {
+    super.logTrace(s"$logFlag $msg")
+  }
+
+  override def logWarning(msg: => String): Unit = {
+    super.logWarning(s"$logFlag $msg")
+  }
+
+  override def logError(msg: => String): Unit = {
+    super.logError(s"$logFlag $msg")
   }
 }

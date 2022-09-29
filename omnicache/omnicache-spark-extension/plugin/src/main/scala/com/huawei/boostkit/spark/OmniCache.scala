@@ -17,14 +17,15 @@
 
 package com.huawei.boostkit.spark
 
-import org.apache.spark.internal.Logging
+import com.huawei.boostkit.spark.util.RewriteLogger
+
 import org.apache.spark.sql.{SparkSession, SparkSessionExtensions}
 import org.apache.spark.sql.catalyst.optimizer.OmniCacheOptimizer
 import org.apache.spark.sql.catalyst.parser.OmniCacheExtensionSqlParser
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.catalyst.rules.Rule
 
-class OmniCache extends (SparkSessionExtensions => Unit) with Logging {
+class OmniCache extends (SparkSessionExtensions => Unit) with RewriteLogger {
   override def apply(extensions: SparkSessionExtensions): Unit = {
 
     // OmniCache internal parser
