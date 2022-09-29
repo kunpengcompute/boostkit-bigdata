@@ -26,7 +26,7 @@ import java.util.function.Supplier;
 
 import static nova.hetu.olk.mock.MockUtil.fill;
 import static nova.hetu.olk.mock.MockUtil.mockBlock;
-import static nova.hetu.olk.mock.MockUtil.mockNewWithWithAnyArguments;
+import static nova.hetu.olk.mock.MockUtil.mockNewVecWithAnyArguments;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
@@ -57,7 +57,7 @@ public class DictionaryOmniBlockTest
     protected void setupMock()
     {
         super.setupMock();
-        mockNewWithWithAnyArguments(DictionaryVec.class);
+        mockNewVecWithAnyArguments(DictionaryVec.class);
     }
 
     @Override

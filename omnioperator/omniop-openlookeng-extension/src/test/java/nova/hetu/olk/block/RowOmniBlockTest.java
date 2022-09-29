@@ -34,7 +34,7 @@ import static java.util.Objects.requireNonNull;
 import static nova.hetu.olk.block.RowOmniBlock.fromFieldBlocks;
 import static nova.hetu.olk.mock.MockUtil.fill;
 import static nova.hetu.olk.mock.MockUtil.mockBlock;
-import static nova.hetu.olk.mock.MockUtil.mockNewWithWithAnyArguments;
+import static nova.hetu.olk.mock.MockUtil.mockNewVecWithAnyArguments;
 import static org.junit.Assert.assertEquals;
 import static org.mockito.Mockito.mock;
 
@@ -51,9 +51,9 @@ public class RowOmniBlockTest
     protected void setupMock()
     {
         super.setupMock();
-        mockNewWithWithAnyArguments(BooleanVec.class);
-        mockNewWithWithAnyArguments(IntVec.class);
-        mockNewWithWithAnyArguments(DoubleVec.class);
+        mockNewVecWithAnyArguments(BooleanVec.class);
+        mockNewVecWithAnyArguments(IntVec.class);
+        mockNewVecWithAnyArguments(DoubleVec.class);
     }
 
     @Override

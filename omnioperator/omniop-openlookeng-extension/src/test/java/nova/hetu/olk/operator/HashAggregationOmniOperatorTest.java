@@ -37,7 +37,7 @@ import java.util.List;
 import java.util.Random;
 import java.util.UUID;
 
-import static nova.hetu.olk.mock.MockUtil.mockNewWithWithAnyArguments;
+import static nova.hetu.olk.mock.MockUtil.mockNewVecWithAnyArguments;
 import static nova.hetu.olk.mock.MockUtil.mockOmniOperator;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -73,7 +73,7 @@ public class HashAggregationOmniOperatorTest
     protected void setUpMock()
     {
         super.setUpMock();
-        omniHashAggregationOperatorFactory = mockNewWithWithAnyArguments(OmniHashAggregationOperatorFactory.class);
+        omniHashAggregationOperatorFactory = mockNewVecWithAnyArguments(OmniHashAggregationOperatorFactory.class);
         omniOperator = mockOmniOperator();
         when(omniHashAggregationOperatorFactory.createOperator(any())).thenReturn(omniOperator);
     }

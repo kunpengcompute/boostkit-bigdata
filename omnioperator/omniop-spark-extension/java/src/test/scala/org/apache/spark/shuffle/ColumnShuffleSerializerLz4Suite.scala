@@ -48,7 +48,7 @@ class ColumnShuffleSerializerLz4Suite extends SharedSparkSession {
   override def sparkConf: SparkConf =
     super.sparkConf
       .setAppName("test shuffle serializer for lz4")
-      .set("spark.shuffle.manager", "org.apache.spark.shuffle.sort.ColumnarShuffleManager")
+      .set("spark.shuffle.manager", "org.apache.spark.shuffle.sort.OmniColumnarShuffleManager")
       .set("spark.shuffle.compress", "true")
       .set("spark.io.compression.codec", "lz4")
 

@@ -25,7 +25,7 @@ import java.util.Random;
 
 import static nova.hetu.olk.mock.MockUtil.fill;
 import static nova.hetu.olk.mock.MockUtil.mockBlock;
-import static nova.hetu.olk.mock.MockUtil.mockNewWithWithAnyArguments;
+import static nova.hetu.olk.mock.MockUtil.mockNewVecWithAnyArguments;
 import static org.junit.Assert.assertTrue;
 
 @PrepareForTest(Int128ArrayOmniBlock.class)
@@ -42,7 +42,7 @@ public class Int128ArrayOmniBlockTest
     protected void setupMock()
     {
         super.setupMock();
-        mockNewWithWithAnyArguments(Decimal128Vec.class);
+        mockNewVecWithAnyArguments(Decimal128Vec.class);
     }
 
     @Override

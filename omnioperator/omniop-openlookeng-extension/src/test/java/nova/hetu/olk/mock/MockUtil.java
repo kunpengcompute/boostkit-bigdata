@@ -15,6 +15,7 @@
 
 package nova.hetu.olk.mock;
 
+import io.airlift.log.Logger;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.LazyBlock;
@@ -29,6 +30,7 @@ import nova.hetu.olk.block.RowOmniBlock;
 import nova.hetu.olk.block.ShortArrayOmniBlock;
 import nova.hetu.olk.block.VariableWidthOmniBlock;
 import nova.hetu.omniruntime.operator.OmniOperator;
+import nova.hetu.omniruntime.type.DataType;
 import nova.hetu.omniruntime.vector.BooleanVec;
 import nova.hetu.omniruntime.vector.Decimal128Vec;
 import nova.hetu.omniruntime.vector.DictionaryVec;
@@ -49,6 +51,13 @@ import java.util.Optional;
 import java.util.function.Function;
 
 import static io.prestosql.spi.block.DictionaryId.randomDictionaryId;
+import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_BOOLEAN;
+import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_DECIMAL128;
+import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_DOUBLE;
+import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_INT;
+import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_LONG;
+import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_VARCHAR;
+import static nova.hetu.omniruntime.vector.VecEncoding.OMNI_VEC_ENCODING_FLAT;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyInt;
 import static org.powermock.api.mockito.PowerMockito.doAnswer;
@@ -58,6 +67,8 @@ import static org.powermock.api.mockito.PowerMockito.whenNew;
 
 public class MockUtil
 {
+    private static final Logger log = Logger.get(MockUtil.class);
+
     private MockUtil()
     {
     }
@@ -139,7 +150,7 @@ public class MockUtil
 
                     long[] toReturn = new long[result.length];
                     for (int i = 0; i < result.length; i++) {
-                        toReturn[i] = result[i];
+                        toReturn[i] = (long) result[i];
                     }
                     return toReturn;
                 }).when((Decimal128Vec) vec).get(anyInt());
@@ -192,18 +203,22 @@ public class MockUtil
     {
         Block<?> block = null;
         Vec vec = null;
+        DataType dataType = mock(DataType.class);
         if (object instanceof Boolean[]) {
             vec = mockVec(BooleanVec.class, object, vecAllocator);
+            when(dataType.getId()).thenReturn(OMNI_BOOLEAN);
             when(((BooleanVec) vec).get(anyInt())).thenAnswer(invocationOnMock -> object[(int) invocationOnMock.getArguments()[0]]);
             block = new ByteArrayOmniBlock(object.length, (BooleanVec) vec);
         }
         if (object instanceof Integer[]) {
             vec = mockVec(IntVec.class, object, vecAllocator);
+            when(dataType.getId()).thenReturn(OMNI_INT);
             when(((IntVec) vec).get(anyInt())).thenAnswer(invocationOnMock -> object[(int) invocationOnMock.getArguments()[0]]);
             block = new IntArrayOmniBlock(object.length, (IntVec) vec);
         }
         if (object instanceof Double[]) {
             vec = mockVec(DoubleVec.class, object, vecAllocator);
+            when(dataType.getId()).thenReturn(OMNI_DOUBLE);
             when(((DoubleVec) vec).get(anyInt())).thenAnswer(invocationOnMock -> object[(int) invocationOnMock.getArguments()[0]]);
             block = new DoubleArrayOmniBlock(object.length, (DoubleVec) vec);
         }
@@ -214,16 +229,18 @@ public class MockUtil
         }
         if (object instanceof Long[]) {
             vec = mockVec(LongVec.class, object, vecAllocator);
+            when(dataType.getId()).thenReturn(OMNI_LONG);
             when(((LongVec) vec).get(anyInt())).thenAnswer(invocationOnMock -> object[(int) invocationOnMock.getArguments()[0]]);
             block = new LongArrayOmniBlock(object.length, (LongVec) vec);
         }
         if (object instanceof Long[][]) {
             vec = mockVec(Decimal128Vec.class, object, vecAllocator);
+            when(dataType.getId()).thenReturn(OMNI_DECIMAL128);
             doAnswer(invocationOnMock -> {
                 Long[] result = (Long[]) object[(int) invocationOnMock.getArguments()[0]];
                 long[] toReturn = new long[result.length];
                 for (int i = 0; i < result.length; i++) {
-                    toReturn[i] = result[i];
+                    toReturn[i] = (long) result[i];
                 }
                 return toReturn;
             }).when((Decimal128Vec) vec).get(anyInt());
@@ -231,6 +248,7 @@ public class MockUtil
         }
         if (object instanceof String[]) {
             vec = mockVec(VarcharVec.class, object, vecAllocator);
+            when(dataType.getId()).thenReturn(OMNI_VARCHAR);
             int[] offsets = new int[object.length + 1];
             int startPosition = 0;
             for (int i = 0; i < object.length; i++) {
@@ -253,7 +271,9 @@ public class MockUtil
                 when(dictionaryVec.getDictionary()).thenReturn(vec);
                 when(dictionaryVec.slice(anyInt(), anyInt())).thenReturn(dictionaryVec);
                 when(dictionaryVec.getAllocator()).thenReturn(vecAllocator);
-                block = new DictionaryOmniBlock<Block<?>>(0, object.length, dictionaryVec, idIndex, false, randomDictionaryId());
+                when(vec.getEncoding()).thenReturn(OMNI_VEC_ENCODING_FLAT);
+                when(vec.getType()).thenReturn(dataType);
+                block = new DictionaryOmniBlock<Block<?>>(dictionaryVec, false, randomDictionaryId());
             }
             if (lazy) {
                 LazyBlock<?> lazyBlock = new LazyBlock<Block<?>>(block.getPositionCount(), instance -> {});
@@ -265,7 +285,7 @@ public class MockUtil
         return null;
     }
 
-    public static <T> T mockNewWithWithAnyArguments(Class<T> target)
+    public static <T> T mockNewVecWithAnyArguments(Class<T> target)
     {
         T instance = mock(target);
 
@@ -273,7 +293,7 @@ public class MockUtil
             whenNew(target).withAnyArguments().thenReturn(instance);
         }
         catch (Exception e) {
-            e.printStackTrace();
+            log.info(e.getMessage());
         }
         return instance;
     }

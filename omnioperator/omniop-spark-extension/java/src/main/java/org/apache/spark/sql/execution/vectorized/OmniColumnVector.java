@@ -20,6 +20,7 @@ package org.apache.spark.sql.execution.vectorized;
 
 import nova.hetu.omniruntime.vector.*;
 
+import org.apache.spark.sql.catalyst.util.RebaseDateTime;
 import org.apache.spark.sql.types.*;
 import org.apache.spark.unsafe.Platform;
 import org.apache.spark.unsafe.types.UTF8String;
@@ -72,11 +73,23 @@ public class OmniColumnVector extends WritableColumnVector {
     private VarcharVec charsTypeDataVec;
     private DictionaryVec dictionaryData;
 
+    private boolean needConvert = false; // only used by tableScan
+
     // init vec
     private boolean initVec;
 
     public OmniColumnVector(int capacity, DataType type, boolean initVec) {
         super(capacity, type);
+        this.initVec = initVec;
+        if (this.initVec) {
+            reserveInternal(capacity);
+        }
+        reset();
+    }
+
+    public OmniColumnVector(int capacity, DataType type, boolean initVec, boolean needConvert) {
+        super(capacity, type);
+        this.needConvert = needConvert;
         this.initVec = initVec;
         if (this.initVec) {
             reserveInternal(capacity);
@@ -538,13 +551,15 @@ public class OmniColumnVector extends WritableColumnVector {
 
     @Override
     public int getInt(int rowId) {
+        int valueInt;
         if (dictionary != null) {
-            return dictionary.decodeToInt(dictionaryIds.getDictId(rowId));
+            valueInt = dictionary.decodeToInt(dictionaryIds.getDictId(rowId));
         } else if (dictionaryData != null) {
-            return dictionaryData.getInt(rowId);
+            valueInt = dictionaryData.getInt(rowId);
         } else {
-            return intDataVec.get(rowId);
+            valueInt = intDataVec.get(rowId);
         }
+        return needConvert ? RebaseDateTime.rebaseJulianToGregorianDays(valueInt) : valueInt;
     }
 
     @Override
@@ -552,7 +567,8 @@ public class OmniColumnVector extends WritableColumnVector {
         assert (dictionary == null);
         int[] array = new int[count];
         for (int i = 0; i < count; i++) {
-            array[i] = intDataVec.get(rowId + i);
+            array[i] = needConvert ? RebaseDateTime.rebaseJulianToGregorianDays(intDataVec.get(rowId + i)) :
+                       intDataVec.get(rowId + i);
         }
         return array;
     }

@@ -36,7 +36,7 @@ import java.util.Random;
 import java.util.UUID;
 
 import static java.util.Arrays.asList;
-import static nova.hetu.olk.mock.MockUtil.mockNewWithWithAnyArguments;
+import static nova.hetu.olk.mock.MockUtil.mockNewVecWithAnyArguments;
 import static nova.hetu.olk.mock.MockUtil.mockOmniOperator;
 import static nova.hetu.olk.mock.MockUtil.mockPage;
 import static org.junit.Assert.assertEquals;
@@ -64,7 +64,7 @@ public class DistinctLimitOmniOperatorTest
     protected void setUpMock()
     {
         super.setUpMock();
-        mockNewWithWithAnyArguments(OmniDistinctLimitOperatorFactory.class);
+        mockNewVecWithAnyArguments(OmniDistinctLimitOperatorFactory.class);
     }
 
     @Override

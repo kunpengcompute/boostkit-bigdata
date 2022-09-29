@@ -42,7 +42,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static nova.hetu.olk.mock.MockUtil.mockNewWithWithAnyArguments;
+import static nova.hetu.olk.mock.MockUtil.mockNewVecWithAnyArguments;
 import static nova.hetu.olk.mock.MockUtil.mockOmniOperator;
 import static nova.hetu.olk.operator.LookupJoinOmniOperators.JoinType;
 import static nova.hetu.olk.operator.LookupJoinOmniOperators.JoinType.FULL_OUTER;
@@ -94,7 +94,7 @@ public class LookupJoinOmniOperatorTest
     protected void setUpMock()
     {
         super.setUpMock();
-        mockNewWithWithAnyArguments(OmniLookupJoinOperatorFactory.class);
+        mockNewVecWithAnyArguments(OmniLookupJoinOperatorFactory.class);
         when((lookupSourceFactoryManager).getJoinBridge(any())).thenReturn(lookupSourceFactory);
         when(lookupSourceFactoryManager.getBuildExecutionStrategy()).thenReturn(PipelineExecutionStrategy.GROUPED_EXECUTION);
         when(lookupSourceProvider.withLease(any())).thenReturn(0L);

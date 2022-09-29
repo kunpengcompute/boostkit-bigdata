@@ -10,6 +10,11 @@ set(CMAKE_CXX_COMPILER "g++")
 
 set(root_directory ${PROJECT_BINARY_DIR})
 
+if (DEFINED COVERAGE)
+    if(${COVERAGE} STREQUAL "ON")
+        set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -ftest-coverage -fprofile-arcs")
+    endif()
+endif()
 # configure file
 configure_file(
     "${PROJECT_SOURCE_DIR}/config.h.in"
