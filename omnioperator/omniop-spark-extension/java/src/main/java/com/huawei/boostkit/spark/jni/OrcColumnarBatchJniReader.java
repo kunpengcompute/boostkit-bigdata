@@ -91,8 +91,12 @@ public class OrcColumnarBatchJniReader {
                     int decimalP = schema.findSubtype(pl.getColumnName()).getPrecision();
                     int decimalS = schema.findSubtype(pl.getColumnName()).getScale();
                     String[] spiltValues = pl.getLiteral().toString().split("\\.");
-                    String scalePadZeroStr = PadZeroForDecimals(spiltValues, decimalS);
-                    jsonObject.put("literal", spiltValues[0] + "." + scalePadZeroStr + " " + decimalP + " " + decimalS);
+                    if (decimalS == 0) {
+                        jsonObject.put("literal", spiltValues[0] + " " + decimalP + " " + decimalS);
+                    } else {
+                        String scalePadZeroStr = PadZeroForDecimals(spiltValues, decimalS);
+                        jsonObject.put("literal", spiltValues[0] + "." + scalePadZeroStr + " " + decimalP + " " + decimalS);
+                    }
                 } else {
                     jsonObject.put("literal", pl.getLiteral().toString());
                 }
@@ -106,8 +110,12 @@ public class OrcColumnarBatchJniReader {
                         int decimalP =  schema.findSubtype(pl.getColumnName()).getPrecision();
                         int decimalS =  schema.findSubtype(pl.getColumnName()).getScale();
                         String[] spiltValues = ob.toString().split("\\.");
-                        String scalePadZeroStr = PadZeroForDecimals(spiltValues, decimalS);
-                        lst.add(spiltValues[0] + "." + scalePadZeroStr + " " + decimalP + " " + decimalS);
+                        if (decimalS == 0) {
+                            lst.add(spiltValues[0] + " " + decimalP + " " + decimalS);
+                        } else {
+                            String scalePadZeroStr = PadZeroForDecimals(spiltValues, decimalS);
+                            lst.add(spiltValues[0] + "." + scalePadZeroStr + " " + decimalP + " " + decimalS);
+                        }
                     } else if (pl.getType() == PredicateLeaf.Type.DATE) {
                         lst.add(((int)Math.ceil(((Date)pl.getLiteral()).getTime()* 1.0/3600/24/1000)) + "");
                     } else {
