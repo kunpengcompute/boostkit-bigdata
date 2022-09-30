@@ -11,19 +11,18 @@
 
     <properties>
         <dep.os.arch>${os.detected.arch}</dep.os.arch>
-        <dep.json.version>2.13.2</dep.json.version>
-        <dep.logback.version>1.2.9</dep.logback.version>
+        <dep.json.version>2.11.4</dep.json.version>
+        <dep.logback.version>1.2.3</dep.logback.version>
         <dep.hetu.version>1.6.1</dep.hetu.version>
         <dep.airlift.version>206</dep.airlift.version>
-        <dep.curator.version>5.3.0</dep.curator.version>
-        <dep.org.eclipse.jetty.version>9.4.48.v20220622</dep.org.eclipse.jetty.version>
+        <dep.curator.version>2.12.0</dep.curator.version>
     </properties>
 
     <dependencies>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
-            <version>2.13.2.1</version>
+            <version>${dep.json.version}</version>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
@@ -39,44 +38,20 @@
             <groupId>com.fasterxml.jackson.datatype</groupId>
             <artifactId>jackson-datatype-jdk8</artifactId>
             <version>${dep.json.version}</version>
-            <exclusions>
-                <exclusion>
-                    <artifactId>jackson-databind</artifactId>
-                    <groupId>com.fasterxml.jackson.core</groupId>
-                </exclusion>
-            </exclusions>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.datatype</groupId>
             <artifactId>jackson-datatype-jsr310</artifactId>
             <version>${dep.json.version}</version>
-            <exclusions>
-                <exclusion>
-                    <artifactId>jackson-databind</artifactId>
-                    <groupId>com.fasterxml.jackson.core</groupId>
-                </exclusion>
-            </exclusions>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.datatype</groupId>
             <artifactId>jackson-datatype-joda</artifactId>
-            <version>2.12.3</version>
+            <version>${dep.json.version}</version>
             <exclusions>
                 <exclusion>
                     <groupId>joda-time</groupId>
                     <artifactId>joda-time</artifactId>
-                </exclusion>
-                <exclusion>
-                    <artifactId>jackson-databind</artifactId>
-                    <groupId>com.fasterxml.jackson.core</groupId>
-                </exclusion>
-                <exclusion>
-                    <artifactId>jackson-core</artifactId>
-                    <groupId>com.fasterxml.jackson.core</groupId>
-                </exclusion>
-                <exclusion>
-                    <artifactId>jackson-annotations</artifactId>
-                    <groupId>com.fasterxml.jackson.core</groupId>
                 </exclusion>
             </exclusions>
         </dependency>
@@ -84,22 +59,16 @@
             <groupId>com.fasterxml.jackson.module</groupId>
             <artifactId>jackson-module-parameter-names</artifactId>
             <version>${dep.json.version}</version>
-            <exclusions>
-                <exclusion>
-                    <artifactId>jackson-databind</artifactId>
-                    <groupId>com.fasterxml.jackson.core</groupId>
-                </exclusion>
-            </exclusions>
         </dependency>
         <dependency>
             <groupId>commons-cli</groupId>
             <artifactId>commons-cli</artifactId>
-            <version>1.5.0</version>
+            <version>1.4</version>
         </dependency>
         <dependency>
             <groupId>commons-io</groupId>
             <artifactId>commons-io</artifactId>
-            <version>2.11.0</version>
+            <version>2.4</version>
         </dependency>
         <dependency>
             <groupId>org.apache.commons</groupId>
@@ -130,12 +99,12 @@
         <dependency>
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
-            <version>31.0.1-jre</version>
+            <version>30.0-jre</version>
         </dependency>
         <dependency>
             <groupId>io.prestosql.hadoop</groupId>
             <artifactId>hadoop-apache</artifactId>
-            <version>3.2.0-9</version>
+            <version>3.2.0-8</version>
         </dependency>
         <dependency>
             <groupId>io.hetu.core</groupId>
@@ -150,29 +119,7 @@
                     <groupId>com.esotericsoftware</groupId>
                     <artifactId>kryo</artifactId>
                 </exclusion>
-                <exclusion>
-                    <artifactId>jackson-annotations</artifactId>
-                    <groupId>com.fasterxml.jackson.core</groupId>
-                </exclusion>
-                <exclusion>
-                    <artifactId>gson</artifactId>
-                    <groupId>com.google.code.gson</groupId>
-                </exclusion>
-                <exclusion>
-                    <artifactId>joda-time</artifactId>
-                    <groupId>joda-time</groupId>
-                </exclusion>
             </exclusions>
-        </dependency>
-        <dependency>
-            <groupId>com.esotericsoftware</groupId>
-            <artifactId>kryo</artifactId>
-            <version>5.3.0</version>
-        </dependency>
-        <dependency>
-            <groupId>com.google.code.gson</groupId>
-            <artifactId>gson</artifactId>
-            <version>2.9.0</version>
         </dependency>
         <dependency>
             <groupId>io.hetu.core</groupId>
@@ -186,10 +133,6 @@
                 <exclusion>
                     <groupId>io.airlift</groupId>
                     <artifactId>slice</artifactId>
-                </exclusion>
-                <exclusion>
-                    <artifactId>kryo</artifactId>
-                    <groupId>com.esotericsoftware</groupId>
                 </exclusion>
             </exclusions>
         </dependency>
@@ -248,22 +191,6 @@
                     <groupId>com.fasterxml.jackson.core</groupId>
                     <artifactId>jackson-annotations</artifactId>
                 </exclusion>
-                <exclusion>
-                    <artifactId>commons-text</artifactId>
-                    <groupId>org.apache.commons</groupId>
-                </exclusion>
-                <exclusion>
-                    <artifactId>fastutil</artifactId>
-                    <groupId>it.unimi.dsi</groupId>
-                </exclusion>
-                <exclusion>
-                    <artifactId>guice</artifactId>
-                    <groupId>com.google.inject</groupId>
-                </exclusion>
-                <exclusion>
-                    <artifactId>joda-time</artifactId>
-                    <groupId>joda-time</groupId>
-                </exclusion>
             </exclusions>
         </dependency>
         <dependency>
@@ -291,43 +218,7 @@
                     <groupId>joda-time</groupId>
                     <artifactId>joda-time</artifactId>
                 </exclusion>
-                <exclusion>
-                    <artifactId>fastutil</artifactId>
-                    <groupId>it.unimi.dsi</groupId>
-                </exclusion>
-                <exclusion>
-                    <artifactId>hive-apache</artifactId>
-                    <groupId>io.prestosql.hive</groupId>
-                </exclusion>
             </exclusions>
-        </dependency>
-        <dependency>
-            <groupId>io.prestosql.hive</groupId>
-            <artifactId>hive-apache</artifactId>
-            <version>3.1.2-5</version>
-            <exclusions>
-                <exclusion>
-                    <artifactId>aircompressor</artifactId>
-                    <groupId>io.airlift</groupId>
-                </exclusion>
-                <exclusion>
-                    <artifactId>joda-time</artifactId>
-                    <groupId>joda-time</groupId>
-                </exclusion>
-                <exclusion>
-                    <artifactId>slf4j-api</artifactId>
-                    <groupId>org.slf4j</groupId>
-                </exclusion>
-                <exclusion>
-                    <artifactId>libthrift</artifactId>
-                    <groupId>org.apache.thrift</groupId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-        <dependency>
-            <groupId>it.unimi.dsi</groupId>
-            <artifactId>fastutil</artifactId>
-            <version>8.5.8</version>
         </dependency>
         <dependency>
             <groupId>io.hetu.core</groupId>
@@ -346,17 +237,6 @@
             <version>1.3</version>
         </dependency>
         <dependency>
-            <groupId>com.google.inject</groupId>
-            <artifactId>guice</artifactId>
-            <version>5.1.0</version>
-            <exclusions>
-                <exclusion>
-                    <artifactId>guava</artifactId>
-                    <groupId>com.google.guava</groupId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-        <dependency>
             <groupId>io.airlift</groupId>
             <artifactId>json</artifactId>
             <version>${dep.airlift.version}</version>
@@ -368,53 +248,6 @@
                 <exclusion>
                     <groupId>com.google.inject</groupId>
                     <artifactId>guice</artifactId>
-                </exclusion>
-                <exclusion>
-                    <artifactId>jackson-annotations</artifactId>
-                    <groupId>com.fasterxml.jackson.core</groupId>
-                </exclusion>
-                <exclusion>
-                    <artifactId>jackson-core</artifactId>
-                    <groupId>com.fasterxml.jackson.core</groupId>
-                </exclusion>
-                <exclusion>
-                    <artifactId>jackson-databind</artifactId>
-                    <groupId>com.fasterxml.jackson.core</groupId>
-                </exclusion>
-                <exclusion>
-                    <artifactId>jackson-datatype-jdk8</artifactId>
-                    <groupId>com.fasterxml.jackson.datatype</groupId>
-                </exclusion>
-                <exclusion>
-                    <artifactId>jackson-datatype-joda</artifactId>
-                    <groupId>com.fasterxml.jackson.datatype</groupId>
-                </exclusion>
-                <exclusion>
-                    <artifactId>jackson-datatype-jsr310</artifactId>
-                    <groupId>com.fasterxml.jackson.datatype</groupId>
-                </exclusion>
-                <exclusion>
-                    <artifactId>jackson-module-parameter-names</artifactId>
-                    <groupId>com.fasterxml.jackson.module</groupId>
-                </exclusion>
-                <exclusion>
-                    <artifactId>jackson-datatype-guava</artifactId>
-                    <groupId>com.fasterxml.jackson.datatype</groupId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-        <dependency>
-            <groupId>com.fasterxml.jackson.datatype</groupId>
-            <artifactId>jackson-datatype-guava</artifactId>
-            <version>2.13.2</version>
-            <exclusions>
-                <exclusion>
-                    <artifactId>guava</artifactId>
-                    <groupId>com.google.guava</groupId>
-                </exclusion>
-                <exclusion>
-                    <artifactId>jackson-databind</artifactId>
-                    <groupId>com.fasterxml.jackson.core</groupId>
                 </exclusion>
             </exclusions>
         </dependency>
@@ -429,11 +262,6 @@
             <version>2.1.5.3</version>
         </dependency>
         <dependency>
-            <groupId>org.ow2.asm</groupId>
-            <artifactId>asm</artifactId>
-            <version>9.1</version>
-        </dependency>
-        <dependency>
             <groupId>io.airlift</groupId>
             <artifactId>bytecode</artifactId>
             <version>1.2</version>
@@ -441,10 +269,6 @@
                 <exclusion>
                     <groupId>com.google.guava</groupId>
                     <artifactId>guava</artifactId>
-                </exclusion>
-                <exclusion>
-                    <artifactId>asm</artifactId>
-                    <groupId>org.ow2.asm</groupId>
                 </exclusion>
             </exclusions>
         </dependency>
@@ -460,10 +284,6 @@
                 <exclusion>
                     <groupId>com.google.inject</groupId>
                     <artifactId>guice</artifactId>
-                </exclusion>
-                <exclusion>
-                    <artifactId>byte-buddy</artifactId>
-                    <groupId>net.bytebuddy</groupId>
                 </exclusion>
             </exclusions>
         </dependency>
@@ -488,69 +308,7 @@
                     <groupId>io.airlift</groupId>
                     <artifactId>stats</artifactId>
                 </exclusion>
-                <exclusion>
-                    <artifactId>jackson-annotations</artifactId>
-                    <groupId>com.fasterxml.jackson.core</groupId>
-                </exclusion>
-                <exclusion>
-                    <artifactId>logback-core</artifactId>
-                    <groupId>ch.qos.logback</groupId>
-                </exclusion>
-                <exclusion>
-                    <artifactId>http2-client</artifactId>
-                    <groupId>org.eclipse.jetty.http2</groupId>
-                </exclusion>
-                <exclusion>
-                    <artifactId>http2-http-client-transport</artifactId>
-                    <groupId>org.eclipse.jetty.http2</groupId>
-                </exclusion>
-                <exclusion>
-                    <artifactId>jetty-client</artifactId>
-                    <groupId>org.eclipse.jetty</groupId>
-                </exclusion>
-                <exclusion>
-                    <artifactId>jetty-http</artifactId>
-                    <groupId>org.eclipse.jetty</groupId>
-                </exclusion>
-                <exclusion>
-                    <artifactId>jetty-io</artifactId>
-                    <groupId>org.eclipse.jetty</groupId>
-                </exclusion>
-                <exclusion>
-                    <artifactId>jetty-util</artifactId>
-                    <groupId>org.eclipse.jetty</groupId>
-                </exclusion>
             </exclusions>
-        </dependency>
-        <dependency>
-            <groupId>org.eclipse.jetty</groupId>
-            <artifactId>jetty-client</artifactId>
-            <version>${dep.org.eclipse.jetty.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.eclipse.jetty</groupId>
-            <artifactId>jetty-io</artifactId>
-            <version>${dep.org.eclipse.jetty.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.eclipse.jetty</groupId>
-            <artifactId>jetty-util</artifactId>
-            <version>${dep.org.eclipse.jetty.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.eclipse.jetty</groupId>
-            <artifactId>jetty-http</artifactId>
-            <version>${dep.org.eclipse.jetty.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.eclipse.jetty.http2</groupId>
-            <artifactId>http2-client</artifactId>
-            <version>${dep.org.eclipse.jetty.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.eclipse.jetty.http2</groupId>
-            <artifactId>http2-http-client-transport</artifactId>
-            <version>${dep.org.eclipse.jetty.version}</version>
         </dependency>
         <dependency>
             <groupId>io.airlift</groupId>
@@ -570,12 +328,12 @@
         <dependency>
             <groupId>org.apache.lucene</groupId>
             <artifactId>lucene-analyzers-common</artifactId>
-            <version>8.9.0</version>
+            <version>7.2.1</version>
         </dependency>
         <dependency>
             <groupId>joda-time</groupId>
             <artifactId>joda-time</artifactId>
-            <version>2.10.13</version>
+            <version>2.10.5</version>
         </dependency>
         <dependency>
             <groupId>javax.inject</groupId>
@@ -599,10 +357,6 @@
                     <groupId>org.slf4j</groupId>
                     <artifactId>slf4j-api</artifactId>
                 </exclusion>
-                <exclusion>
-                    <artifactId>curator-client</artifactId>
-                    <groupId>org.apache.curator</groupId>
-                </exclusion>
             </exclusions>
         </dependency>
         <dependency>
@@ -611,28 +365,9 @@
             <version>${dep.curator.version}</version>
         </dependency>
         <dependency>
-            <groupId>org.apache.curator</groupId>
-            <artifactId>curator-client</artifactId>
-            <version>${dep.curator.version}</version>
-            <exclusions>
-                <exclusion>
-                    <artifactId>guava</artifactId>
-                    <groupId>com.google.guava</groupId>
-                </exclusion>
-                <exclusion>
-                    <artifactId>zookeeper</artifactId>
-                    <groupId>org.apache.zookeeper</groupId>
-                </exclusion>
-                <exclusion>
-                    <artifactId>slf4j-api</artifactId>
-                    <groupId>org.slf4j</groupId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-        <dependency>
             <groupId>org.apache.zookeeper</groupId>
             <artifactId>zookeeper</artifactId>
-            <version>3.8.0</version>
+            <version>3.4.6</version>
             <exclusions>
                 <exclusion>
                     <groupId>org.slf4j</groupId>
@@ -666,76 +401,7 @@
                     <groupId>org.slf4j</groupId>
                     <artifactId>slf4j-api</artifactId>
                 </exclusion>
-                <exclusion>
-                    <artifactId>commons-io</artifactId>
-                    <groupId>commons-io</groupId>
-                </exclusion>
-                <exclusion>
-                    <artifactId>logback-classic</artifactId>
-                    <groupId>ch.qos.logback</groupId>
-                </exclusion>
-                <exclusion>
-                    <artifactId>logback-core</artifactId>
-                    <groupId>ch.qos.logback</groupId>
-                </exclusion>
-                <exclusion>
-                    <artifactId>netty-buffer</artifactId>
-                    <groupId>io.netty</groupId>
-                </exclusion>
-                <exclusion>
-                    <artifactId>netty-handler</artifactId>
-                    <groupId>io.netty</groupId>
-                </exclusion>
-                <exclusion>
-                    <artifactId>netty-transport-native-epoll</artifactId>
-                    <groupId>io.netty</groupId>
-                </exclusion>
             </exclusions>
-        </dependency>
-        <dependency>
-            <groupId>io.netty</groupId>
-            <artifactId>netty-buffer</artifactId>
-            <version>4.1.82.Final</version>
-        </dependency>
-        <dependency>
-            <groupId>io.netty</groupId>
-            <artifactId>netty-codec</artifactId>
-            <version>4.1.82.Final</version>
-        </dependency>
-        <dependency>
-            <groupId>io.netty</groupId>
-            <artifactId>netty-common</artifactId>
-            <version>4.1.82.Final</version>
-        </dependency>
-        <dependency>
-            <groupId>io.netty</groupId>
-            <artifactId>netty-handler</artifactId>
-            <version>4.1.82.Final</version>
-        </dependency>
-        <dependency>
-            <groupId>io.netty</groupId>
-            <artifactId>netty-resolver</artifactId>
-            <version>4.1.82.Final</version>
-        </dependency>
-        <dependency>
-            <groupId>io.netty</groupId>
-            <artifactId>netty-transport</artifactId>
-            <version>4.1.82.Final</version>
-        </dependency>
-        <dependency>
-            <groupId>io.netty</groupId>
-            <artifactId>netty-transport-classes-epoll</artifactId>
-            <version>4.1.82.Final</version>
-        </dependency>
-        <dependency>
-            <groupId>io.netty</groupId>
-            <artifactId>netty-transport-native-epoll</artifactId>
-            <version>4.1.82.Final</version>
-        </dependency>
-        <dependency>
-            <groupId>io.netty</groupId>
-            <artifactId>netty-transport-native-unix-common</artifactId>
-            <version>4.1.82.Final</version>
         </dependency>
         <dependency>
             <groupId>de.ruedigermoeller</groupId>
@@ -759,23 +425,12 @@
         <dependency>
             <groupId>org.objenesis</groupId>
             <artifactId>objenesis</artifactId>
-            <version>3.2</version>
+            <version>3.1</version>
         </dependency>
         <dependency>
             <groupId>org.apache.hadoop</groupId>
             <artifactId>hadoop-aws</artifactId>
-            <version>3.2.3</version>
-            <exclusions>
-                <exclusion>
-                    <artifactId>aws-java-sdk-bundle</artifactId>
-                    <groupId>com.amazonaws</groupId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-        <dependency>
-            <groupId>com.amazonaws</groupId>
-            <artifactId>aws-java-sdk-bundle</artifactId>
-            <version>1.12.307</version>
+            <version>3.2.0</version>
         </dependency>
         <dependency>
             <groupId>org.slf4j</groupId>
@@ -791,7 +446,7 @@
         <dependency>
             <groupId>org.apache.hive</groupId>
             <artifactId>hive-llap-common</artifactId>
-            <version>3.1.3</version>
+            <version>3.1.0</version>
             <exclusions>
                 <exclusion>
                     <groupId>joda-time</groupId>
@@ -938,11 +593,6 @@
                     <artifactId>hive-serde</artifactId>
                 </exclusion>
             </exclusions>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.thrift</groupId>
-            <artifactId>libthrift</artifactId>
-            <version>0.17.0</version>
         </dependency>
     </dependencies>
 
