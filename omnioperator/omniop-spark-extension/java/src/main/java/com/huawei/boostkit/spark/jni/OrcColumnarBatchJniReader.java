@@ -23,6 +23,7 @@ import nova.hetu.omniruntime.type.Decimal64DataType;
 import nova.hetu.omniruntime.type.Decimal128DataType;
 import nova.hetu.omniruntime.vector.*;
 
+import org.apache.spark.sql.catalyst.util.RebaseDateTime;
 import org.apache.hadoop.hive.ql.io.sarg.ExpressionTree;
 import org.apache.hadoop.hive.ql.io.sarg.PredicateLeaf;
 import org.apache.orc.OrcFile.ReaderOptions;
@@ -220,6 +221,14 @@ public class OrcColumnarBatchJniReader {
         recordReaderSeekToRow(recordReader, rowNumber);
     }
 
+    public void convertJulianToGreGorian(IntVec intVec, long rowNumber) {
+        int gregorianValue;
+        for (int rowIndex = 0; rowIndex < rowNumber; rowIndex++) {
+            gregorianValue = RebaseDateTime.rebaseJulianToGregorianDays(intVec.get(rowIndex));
+            intVec.set(rowIndex, gregorianValue);
+        }
+    }
+
     public int next(Vec[] vecList) {
         int vectorCnt = vecList.length;
         int[] typeIds = new int[realColsCnt];
@@ -242,7 +251,11 @@ public class OrcColumnarBatchJniReader {
                     vecList[i] = new ShortVec(vecNativeIds[nativeGetId]);
                     break;
                 }
-                case OMNI_DATE32:
+                case OMNI_DATE32: {
+                    vecList[i] = new IntVec(vecNativeIds[nativeGetId]);
+                    convertJulianToGreGorian((IntVec)(vecList[i]), rtn);
+                    break;
+                }
                 case OMNI_INT: {
                     vecList[i] = new IntVec(vecNativeIds[nativeGetId]);
                     break;

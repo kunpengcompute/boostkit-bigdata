@@ -73,23 +73,11 @@ public class OmniColumnVector extends WritableColumnVector {
     private VarcharVec charsTypeDataVec;
     private DictionaryVec dictionaryData;
 
-    private boolean needConvert = false; // only used by tableScan
-
     // init vec
     private boolean initVec;
 
     public OmniColumnVector(int capacity, DataType type, boolean initVec) {
         super(capacity, type);
-        this.initVec = initVec;
-        if (this.initVec) {
-            reserveInternal(capacity);
-        }
-        reset();
-    }
-
-    public OmniColumnVector(int capacity, DataType type, boolean initVec, boolean needConvert) {
-        super(capacity, type);
-        this.needConvert = needConvert;
         this.initVec = initVec;
         if (this.initVec) {
             reserveInternal(capacity);
@@ -551,15 +539,13 @@ public class OmniColumnVector extends WritableColumnVector {
 
     @Override
     public int getInt(int rowId) {
-        int valueInt;
         if (dictionary != null) {
-            valueInt = dictionary.decodeToInt(dictionaryIds.getDictId(rowId));
+            return dictionary.decodeToInt(dictionaryIds.getDictId(rowId));
         } else if (dictionaryData != null) {
-            valueInt = dictionaryData.getInt(rowId);
+            return dictionaryData.getInt(rowId);
         } else {
-            valueInt = intDataVec.get(rowId);
+            return intDataVec.get(rowId);
         }
-        return needConvert ? RebaseDateTime.rebaseJulianToGregorianDays(valueInt) : valueInt;
     }
 
     @Override
@@ -567,8 +553,7 @@ public class OmniColumnVector extends WritableColumnVector {
         assert (dictionary == null);
         int[] array = new int[count];
         for (int i = 0; i < count; i++) {
-            array[i] = needConvert ? RebaseDateTime.rebaseJulianToGregorianDays(intDataVec.get(rowId + i)) :
-                       intDataVec.get(rowId + i);
+            array[i] = intDataVec.get(rowId + i);
         }
         return array;
     }
