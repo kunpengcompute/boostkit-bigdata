@@ -11,13 +11,13 @@ wget https://mirrors.huaweicloud.com/repository/maven/org/bouncycastle/bcpkix-jd
 wget https://mirrors.huaweicloud.com/repository/maven/org/apache/curator/curator-client/2.12.0/curator-client-2.12.0.jar
 wget https://mirrors.huaweicloud.com/repository/maven/org/apache/curator/curator-framework/2.12.0/curator-framework-2.12.0.jar
 wget https://mirrors.huaweicloud.com/repository/maven/org/apache/curator/curator-recipes/2.12.0/curator-recipes-2.12.0.jar
-wget https://mirrors.huaweicloud.com/repository/maven/com/alibaba/fastjson/1.2.83/fastjson-1.2.83.jar
+wget https://mirrors.huaweicloud.com/repository/maven/com/alibaba/fastjson/1.2.76/fastjson-1.2.76.jar
 wget https://mirrors.huaweicloud.com/repository/maven/de/ruedigermoeller/fst/2.57/fst-2.57.jar
 wget https://mirrors.huaweicloud.com/repository/maven/com/google/guava/guava/26.0-jre/guava-26.0-jre.jar
 wget https://mirrors.huaweicloud.com/repository/maven/io/hetu/core/hetu-transport/1.6.1/hetu-transport-1.6.1.jar
 wget https://mirrors.huaweicloud.com/repository/maven/com/fasterxml/jackson/datatype/jackson-datatype-guava/2.12.4/jackson-datatype-guava-2.12.4.jar
 wget https://mirrors.huaweicloud.com/repository/maven/com/fasterxml/jackson/datatype/jackson-datatype-jdk8/2.12.4/jackson-datatype-jdk8-2.12.4.jar
-wget https://mirrors.huaweicloud.com/repository/maven/com/fasterxml/jackson/datatype/jackson-datatype-joda/2.13.3/jackson-datatype-joda-2.13.3.jar
+wget https://mirrors.huaweicloud.com/repository/maven/com/fasterxml/jackson/datatype/jackson-datatype-joda/2.12.4/jackson-datatype-joda-2.12.4.jar
 wget https://mirrors.huaweicloud.com/repository/maven/com/fasterxml/jackson/datatype/jackson-datatype-jsr310/2.12.4/jackson-datatype-jsr310-2.12.4.jar
 wget https://mirrors.huaweicloud.com/repository/maven/com/fasterxml/jackson/module/jackson-module-parameter-names/2.12.4/jackson-module-parameter-names-2.12.4.jar
 wget https://mirrors.huaweicloud.com/repository/maven/org/jasypt/jasypt/1.9.3/jasypt-1.9.3.jar
