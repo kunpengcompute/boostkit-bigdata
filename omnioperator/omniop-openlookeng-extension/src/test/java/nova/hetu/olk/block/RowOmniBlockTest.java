@@ -21,6 +21,7 @@ import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.type.RowType;
 import io.prestosql.spi.type.Type;
 import nova.hetu.omniruntime.vector.BooleanVec;
+import nova.hetu.omniruntime.vector.ContainerVec;
 import nova.hetu.omniruntime.vector.DoubleVec;
 import nova.hetu.omniruntime.vector.IntVec;
 import org.powermock.core.classloader.annotations.PrepareForTest;
@@ -35,6 +36,7 @@ import static nova.hetu.olk.block.RowOmniBlock.fromFieldBlocks;
 import static nova.hetu.olk.mock.MockUtil.fill;
 import static nova.hetu.olk.mock.MockUtil.mockBlock;
 import static nova.hetu.olk.mock.MockUtil.mockNewVecWithAnyArguments;
+import static nova.hetu.olk.mock.MockUtil.mockVec;
 import static org.junit.Assert.assertEquals;
 import static org.mockito.Mockito.mock;
 
@@ -44,7 +46,7 @@ public class RowOmniBlockTest
 {
     private Block<?> rowBlock(Block<?> block, Type dataType)
     {
-        return fromFieldBlocks(getVecAllocator(), block.getPositionCount(), Optional.empty(), new Block[]{block}, dataType);
+        return fromFieldBlocks(getVecAllocator(), block.getPositionCount(), Optional.empty(), new Block[]{block}, dataType, mockVec(ContainerVec.class, new Block[]{block}, getVecAllocator()));
     }
 
     @Override
@@ -54,6 +56,7 @@ public class RowOmniBlockTest
         mockNewVecWithAnyArguments(BooleanVec.class);
         mockNewVecWithAnyArguments(IntVec.class);
         mockNewVecWithAnyArguments(DoubleVec.class);
+        mockNewVecWithAnyArguments(ContainerVec.class);
     }
 
     @Override

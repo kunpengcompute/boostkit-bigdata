@@ -623,7 +623,7 @@ public final class OperatorUtils
             }
         }
         return RowOmniBlock.fromFieldBlocks(vecAllocator, rowBlock.getPositionCount(), Optional.of(valueIsNull),
-                rowBlock.getRawFieldBlocks(), blockType);
+                rowBlock.getRawFieldBlocks(), blockType, null);
     }
 
     /**
@@ -802,7 +802,7 @@ public final class OperatorUtils
             fieldBlockOffsets[position + 1] = fieldBlockOffsets[position] + (nulls[position] == Vec.NULL ? 0 : 1);
         }
         return new RowOmniBlock(0, positionCount, nulls, fieldBlockOffsets, rowBlocks,
-                new ContainerDataType(dataTypes));
+                new ContainerDataType(dataTypes), containerVec);
     }
 
     /**

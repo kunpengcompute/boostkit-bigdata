@@ -69,6 +69,8 @@ public class RowOmniBlock<T>
 
     private boolean[] isNull;
 
+    private ContainerVec containerVec;
+
     /**
      * Create a row block directly from columnar nulls and field blocks.
      *
@@ -79,7 +81,7 @@ public class RowOmniBlock<T>
      * @return the block
      */
     public static <T> Block<T> fromFieldBlocks(VecAllocator vecAllocator, int positionCount, Optional<byte[]> rowIsNull,
-                                               Block<T>[] fieldBlocks, Type blockType)
+                                               Block<T>[] fieldBlocks, Type blockType, ContainerVec containerVec)
     {
         int[] fieldBlockOffsets = new int[positionCount + 1];
         for (int position = 0; position < positionCount; position++) {
@@ -96,7 +98,7 @@ public class RowOmniBlock<T>
                     blockType == null ? null : blockType.getTypeParameters().get(blockIndex));
         }
         return new RowOmniBlock(0, positionCount, rowIsNull.orElse(null), fieldBlockOffsets, newOffHeapFieldBlocks,
-                OperatorUtils.toDataType(blockType));
+                OperatorUtils.toDataType(blockType), containerVec);
     }
 
     /**
@@ -114,7 +116,7 @@ public class RowOmniBlock<T>
                                                int[] fieldBlockOffsets, Block[] fieldBlocks, DataType dataType)
     {
         validateConstructorArguments(startOffset, positionCount, rowIsNull, fieldBlockOffsets, fieldBlocks);
-        return new RowOmniBlock(startOffset, positionCount, rowIsNull, fieldBlockOffsets, fieldBlocks, dataType);
+        return new RowOmniBlock(startOffset, positionCount, rowIsNull, fieldBlockOffsets, fieldBlocks, dataType, null);
     }
 
     /**
@@ -164,19 +166,23 @@ public class RowOmniBlock<T>
     @Override
     public Vec getValues()
     {
+        return containerVec;
+    }
+
+    private ContainerVec buildContainVec()
+    {
         Block[] rawFieldBlocks = this.getRawFieldBlocks();
         int numFields = rawFieldBlocks.length;
         long[] vectorAddresses = new long[numFields];
-        DataType[] dataTypes = new DataType[numFields];
         for (int i = 0; i < numFields; ++i) {
             Vec vec = (Vec) rawFieldBlocks[i].getValues();
             long nativeVectorAddress = vec.getNativeVector();
             vectorAddresses[i] = nativeVectorAddress;
         }
-        ContainerVec containerVec = new ContainerVec(vecAllocator, numFields, this.getPositionCount(), vectorAddresses,
+        ContainerVec vec = new ContainerVec(vecAllocator, numFields, this.getPositionCount(), vectorAddresses,
                 ((ContainerDataType) dataType).getFieldTypes());
-        containerVec.setNulls(0, this.getRowIsNull(), 0, this.getPositionCount());
-        return containerVec;
+        vec.setNulls(0, this.getRowIsNull(), 0, this.getPositionCount());
+        return vec;
     }
 
     /**
@@ -192,7 +198,7 @@ public class RowOmniBlock<T>
      * @param dataType data type of block
      */
     public RowOmniBlock(int startOffset, int positionCount, @Nullable byte[] rowIsNull, int[] fieldBlockOffsets,
-                        Block[] fieldBlocks, DataType dataType)
+                        Block[] fieldBlocks, DataType dataType, ContainerVec containerVec)
     {
         super(fieldBlocks.length);
         this.vecAllocator = getVecAllocatorFromBlocks(fieldBlocks);
@@ -210,6 +216,7 @@ public class RowOmniBlock<T>
         }
         this.retainedSizeInBytes = retainedSizeInBytes;
         this.dataType = dataType;
+        this.containerVec = containerVec == null ? buildContainVec() : containerVec;
     }
 
     @Override
@@ -353,8 +360,8 @@ public class RowOmniBlock<T>
     @Override
     public void close()
     {
-        for (Block<T> fieldBlock : fieldBlocks) {
-            fieldBlock.close();
+        if (containerVec != null) {
+            containerVec.close();
         }
     }
 }
