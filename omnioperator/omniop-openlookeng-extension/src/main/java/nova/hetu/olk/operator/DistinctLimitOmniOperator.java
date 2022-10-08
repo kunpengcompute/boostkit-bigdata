@@ -213,7 +213,7 @@ public class DistinctLimitOmniOperator
             return false;
         }
 
-        return ((outputCount < limit) && (pages == null));
+        return true;
     }
 
     @Override
@@ -222,7 +222,7 @@ public class DistinctLimitOmniOperator
         checkState(!finishing, "Operator is already finishing");
         requireNonNull(page, "page is null");
 
-        if (page.getPositionCount() == 0) {
+        if ((outputCount >= limit) || page.getPositionCount() == 0) {
             BlockUtils.freePage(page);
             return;
         }
@@ -235,7 +235,9 @@ public class DistinctLimitOmniOperator
     @Override
     public Page getOutput()
     {
-        finished = (finishing) ? true : finished;
+        if (finishing) {
+            finished = true;
+        }
         if (pages == null) {
             return null;
         }
@@ -246,7 +248,6 @@ public class DistinctLimitOmniOperator
             outputCount += page.getPositionCount();
         }
         pages = null;
-        finished = (outputCount >= limit) ? true : finished;
         return page;
     }
 }
