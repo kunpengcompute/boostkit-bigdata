@@ -343,6 +343,11 @@ case class ColumnarWindowExec(windowExpression: Seq[NamedExpression],
       val windowOperator = windowOperatorFactory.createOperator
       omniCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startCodegen)
 
+      // close operator
+      SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
+        windowOperator.close()
+      })
+
       while (iter.hasNext) {
         val batch = iter.next()
         val input = transColBatchToOmniVecs(batch)
@@ -357,11 +362,6 @@ case class ColumnarWindowExec(windowExpression: Seq[NamedExpression],
       val startGetOp = System.nanoTime()
       val results = windowOperator.getOutput
       getOutputTime += NANOSECONDS.toMillis(System.nanoTime() - startGetOp)
-
-      // close operator
-      SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
-        windowOperator.close()
-      })
 
       var windowResultSchema = this.schema
       if (windowExpressionWithProjectConstant) {

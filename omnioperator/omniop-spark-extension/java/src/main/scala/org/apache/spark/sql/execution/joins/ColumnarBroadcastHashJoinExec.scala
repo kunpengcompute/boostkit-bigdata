@@ -305,6 +305,12 @@ case class ColumnarBroadcastHashJoinExec(
       val buildOp = buildOpFactory.createOperator()
       buildCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startBuildCodegen)
 
+      // close operator
+      SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
+        buildOp.close()
+        buildOpFactory.close()
+      })
+
       val deserializer = VecBatchSerializerFactory.create()
       relation.value.buildData.foreach { input =>
         val startBuildInput = System.nanoTime()
@@ -326,9 +332,7 @@ case class ColumnarBroadcastHashJoinExec(
 
       // close operator
       SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
-        buildOp.close()
         lookupOp.close()
-        buildOpFactory.close()
         lookupOpFactory.close()
       })
 
