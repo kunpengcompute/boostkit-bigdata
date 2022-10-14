@@ -109,9 +109,6 @@ public class OmniMergePages
                                             OmniLocalExecutionPlanner.OmniLocalExecutionPlanContext context)
         {
             this(types, minPageSizeInBytes, minRowCount, maxPageSizeInBytes, memoryContext);
-            if (context != null) {
-                context.onTaskFinished(taskFinished -> this.close());
-            }
         }
 
         /**
@@ -240,7 +237,7 @@ public class OmniMergePages
             return finalPage;
         }
 
-        private void close()
+        public void close()
         {
             if (queuedPage != null) {
                 BlockUtils.freePage(queuedPage);

@@ -89,16 +89,19 @@ public class OmniPageProcessor
         if (filter.isPresent()) {
             PageFilter pageFilter = filter.get();
             this.omniPageFilterOperator = Optional.of(((OmniPageFilter) pageFilter).getOperator(vecAllocator));
-            if (context != null) {
-                context.onTaskFinished(taskFinished -> this.omniPageFilterOperator.get().close());
-            }
         }
         else {
             this.omniProjectionOperator = Optional.of(projection.getFactory().createOperator(vecAllocator));
-            if (context != null) {
-                context.onTaskFinished(taskFinished -> this.omniProjectionOperator.get().close());
-            }
         }
+    }
+
+    /**
+     * Close Filter and Projection Operator
+     */
+    public void close()
+    {
+        omniPageFilterOperator.ifPresent(OmniPageFilter.OmniPageFilterOperator::close);
+        omniProjectionOperator.ifPresent(OmniOperator::close);
     }
 
     public OmniProjection getProjection()
