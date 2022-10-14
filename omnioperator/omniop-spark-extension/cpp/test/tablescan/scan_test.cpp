@@ -258,29 +258,35 @@ TEST_F(ScanTest, test_copy_shortVec)
 
 TEST_F(ScanTest, test_build_leafs)
 {
-    int leafOp = 0;
     std::vector<orc::Literal> litList;
     std::string leafNameString;
-    int leafType = 0;
     std::unique_ptr<orc::SearchArgumentBuilder> builder = orc::SearchArgumentFactory::newBuilder();
     (*builder).startAnd();
     orc::Literal lit(100L);
 
-
-    // test equal
-    buildLeafs(0, litList, lit, "leaf-0", 0, *builder);
+    // test EQUALS
+    buildLeaves(PredicateOperatorType::EQUALS, litList, lit, "leaf-0", orc::PredicateDataType::LONG, *builder);
 
     // test LESS_THAN
-    buildLeafs(2, litList, lit, "leaf-1", 0, *builder);
+    buildLeaves(PredicateOperatorType::LESS_THAN, litList, lit, "leaf-1", orc::PredicateDataType::LONG, *builder);
 
     // test LESS_THAN_EQUALS
-    buildLeafs(3, litList, lit, "leaf-1", 0, *builder);
+    buildLeaves(PredicateOperatorType::LESS_THAN_EQUALS, litList, lit, "leaf-1", orc::PredicateDataType::LONG, *builder);
 
     // test NULL_SAFE_EQUALS
-    buildLeafs(1, litList, lit, "leaf-1", 0, *builder);
+    buildLeaves(PredicateOperatorType::NULL_SAFE_EQUALS, litList, lit, "leaf-1", orc::PredicateDataType::LONG, *builder);
 
     // test IS_NULL
-    buildLeafs(6, litList, lit, "leaf-1", 0, *builder);
+    buildLeaves(PredicateOperatorType::IS_NULL, litList, lit, "leaf-1", orc::PredicateDataType::LONG, *builder);
+
+    // test BETWEEN
+    std::string tmpStr = "";
+    try {
+        buildLeaves(PredicateOperatorType::BETWEEN, litList, lit, "leaf-1", orc::PredicateDataType::LONG, *builder);
+    } catch (std::exception &e) {
+        tmpStr = e.what();
+    }
+    ASSERT_EQ(tmpStr, "table scan buildLeaves BETWEEN is not supported!");
 
     std::string result = ((*builder).end().build())->toString();
     std::string buildString =

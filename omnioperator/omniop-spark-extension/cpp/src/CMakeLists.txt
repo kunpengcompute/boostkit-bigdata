@@ -14,6 +14,7 @@ set (SOURCE_FILES
         common/common.cpp
         jni/SparkJniWrapper.cpp
         jni/OrcColumnarBatchJniReader.cpp
+        jni/jni_common.cpp
         )
 
 #Find required protobuf package

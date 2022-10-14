@@ -18,6 +18,8 @@
  */
 
 #include "OrcColumnarBatchJniReader.h"
+#include "jni_common.h"
+
 using namespace omniruntime::vec;
 using namespace std;
 using namespace orc;
@@ -94,6 +96,7 @@ void JNI_OnUnload(JavaVM *vm, const void *reserved)
 JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniReader_initializeReader(JNIEnv *env,
     jobject jObj, jstring path, jobject jsonObj)
 {
+    JNI_FUNC_START
     /*
      * init logger and jni env method id
      */
@@ -122,6 +125,7 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniRe
     env->ReleaseStringUTFChars(path, pathPtr);
     orc::Reader *readerNew = reader.release();
     return (jlong)(readerNew);
+    JNI_FUNC_END(runtimeExceptionClass)
 }
 
 bool stringToBool(string boolStr)
@@ -173,49 +177,51 @@ int getLiteral(orc::Literal &lit, int leafType, string value)
             break;
         }
         default: {
-            LogsError("tableScan jni getLiteral unsupported leafType: " + leafType);
             throw std::runtime_error("tableScan jni getLiteral unsupported leafType: " + leafType);
         }
     }
     return 0;
 }
 
-int buildLeafs(int leafOp, vector<Literal> &litList, Literal &lit, string leafNameString, int leafType,
+int buildLeaves(PredicateOperatorType leafOp, vector<Literal> &litList, Literal &lit, string leafNameString, PredicateDataType leafType,
     SearchArgumentBuilder &builder)
 {
-    switch ((PredicateOperatorType)leafOp) {
+    switch (leafOp) {
         case PredicateOperatorType::LESS_THAN: {
-            builder.lessThan(leafNameString, (PredicateDataType)leafType, lit);
+            builder.lessThan(leafNameString, leafType, lit);
             break;
         }
         case PredicateOperatorType::LESS_THAN_EQUALS: {
-            builder.lessThanEquals(leafNameString, (PredicateDataType)leafType, lit);
+            builder.lessThanEquals(leafNameString, leafType, lit);
             break;
         }
         case PredicateOperatorType::EQUALS: {
-            builder.equals(leafNameString, (PredicateDataType)leafType, lit);
+            builder.equals(leafNameString, leafType, lit);
             break;
         }
         case PredicateOperatorType::NULL_SAFE_EQUALS: {
-            builder.nullSafeEquals(leafNameString, (PredicateDataType)leafType, lit);
+            builder.nullSafeEquals(leafNameString, leafType, lit);
             break;
         }
         case PredicateOperatorType::IS_NULL: {
-            builder.isNull(leafNameString, (PredicateDataType)leafType);
+            builder.isNull(leafNameString, leafType);
             break;
         }
         case PredicateOperatorType::IN: {
-            builder.in(leafNameString, (PredicateDataType)leafType, litList);
+            builder.in(leafNameString, leafType, litList);
             break;
         }
+        case PredicateOperatorType::BETWEEN: {
+            throw std::runtime_error("table scan buildLeaves BETWEEN is not supported!");
+        }
         default: {
-            LogsError("ERROR operator ID");
+            throw std::runtime_error("table scan buildLeaves illegal input!");
         }
     }
     return 1;
 }
 
-int initLeafs(JNIEnv *env, SearchArgumentBuilder &builder, jobject &jsonExp, jobject &jsonLeaves)
+int initLeaves(JNIEnv *env, SearchArgumentBuilder &builder, jobject &jsonExp, jobject &jsonLeaves)
 {
     jstring leaf = (jstring)env->CallObjectMethod(jsonExp, jsonMethodString, env->NewStringUTF("leaf"));
     jobject leafJsonObj = env->CallObjectMethod(jsonLeaves, jsonMethodJsonObj, leaf);
@@ -242,7 +248,7 @@ int initLeafs(JNIEnv *env, SearchArgumentBuilder &builder, jobject &jsonExp, job
             litList.push_back(lit);
         }
     }
-    buildLeafs((int)leafOp, litList, lit, leafNameString, (int)leafType, builder);
+    buildLeaves((PredicateOperatorType)leafOp, litList, lit, leafNameString, (PredicateDataType)leafType, builder);
     return 1;
 }
 
@@ -250,7 +256,7 @@ int initExpressionTree(JNIEnv *env, SearchArgumentBuilder &builder, jobject &jso
 {
     int op = env->CallIntMethod(jsonExp, jsonMethodInt, env->NewStringUTF("op"));
     if (op == (int)(Operator::LEAF)) {
-        initLeafs(env, builder, jsonExp, jsonLeaves);
+        initLeaves(env, builder, jsonExp, jsonLeaves);
     } else {
         switch ((Operator)op) {
             case Operator::OR: {
@@ -264,6 +270,9 @@ int initExpressionTree(JNIEnv *env, SearchArgumentBuilder &builder, jobject &jso
             case Operator::NOT: {
                 builder.startNot();
                 break;
+            }
+            default: {
+                throw std::runtime_error("tableScan jni initExpressionTree Unsupported op: " + op);
             }
         }
         jobject childList = env->CallObjectMethod(jsonExp, jsonMethodObj, env->NewStringUTF("child"));
@@ -281,6 +290,7 @@ int initExpressionTree(JNIEnv *env, SearchArgumentBuilder &builder, jobject &jso
 JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniReader_initializeRecordReader(JNIEnv *env,
     jobject jObj, jlong reader, jobject jsonObj)
 {
+    JNI_FUNC_START
     orc::Reader *readerPtr = (orc::Reader *)reader;
     // get offset from json obj
     jlong offset = env->CallLongMethod(jsonObj, jsonMethodLong, env->NewStringUTF("offset"));
@@ -318,20 +328,22 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniRe
         rowReaderOpts.searchArgument(std::unique_ptr<SearchArgument>(sargBuilded.release()));
     }
 
-
     std::unique_ptr<orc::RowReader> rowReader = readerPtr->createRowReader(rowReaderOpts);
     return (jlong)(rowReader.release());
+    JNI_FUNC_END(runtimeExceptionClass)
 }
 
 
 JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniReader_initializeBatch(JNIEnv *env,
     jobject jObj, jlong rowReader, jlong batchSize)
 {
+    JNI_FUNC_START
     orc::RowReader *rowReaderPtr = (orc::RowReader *)(rowReader);
     uint64_t batchLen = (uint64_t)batchSize;
     std::unique_ptr<orc::ColumnVectorBatch> batch = rowReaderPtr->createRowBatch(batchLen);
     orc::ColumnVectorBatch *rtn = batch.release();
     return (jlong)rtn;
+    JNI_FUNC_END(runtimeExceptionClass)
 }
 
 template <DataTypeId TYPE_ID, typename ORC_TYPE> uint64_t copyFixwidth(orc::ColumnVectorBatch *field)
@@ -422,11 +434,11 @@ int copyToOmniVec(orc::TypeKind vcType, int &omniTypeId, uint64_t &omniVecId, or
     return 1;
 }
 
-int copyToOmniDecimalVec(int precision, int &ominTypeId, uint64_t &ominVecId, orc::ColumnVectorBatch *field)
+int copyToOmniDecimalVec(int precision, int &omniTypeId, uint64_t &omniVecId, orc::ColumnVectorBatch *field)
 {
     VectorAllocator *allocator = VectorAllocator::GetGlobalAllocator();
     if (precision > 18) {
-        ominTypeId = static_cast<int>(OMNI_DECIMAL128);
+        omniTypeId = static_cast<int>(OMNI_DECIMAL128);
         orc::Decimal128VectorBatch *lvb = dynamic_cast<orc::Decimal128VectorBatch *>(field);
         FixedWidthVector<OMNI_DECIMAL128> *originalVector =
             new FixedWidthVector<OMNI_DECIMAL128>(allocator, lvb->numElements);
@@ -448,9 +460,9 @@ int copyToOmniDecimalVec(int precision, int &ominTypeId, uint64_t &ominVecId, or
                 originalVector->SetValueNull(i);
             }
         }
-        ominVecId = (uint64_t)originalVector;
+        omniVecId = (uint64_t)originalVector;
     } else {
-        ominTypeId = static_cast<int>(OMNI_DECIMAL64);
+        omniTypeId = static_cast<int>(OMNI_DECIMAL64);
         orc::Decimal64VectorBatch *lvb = dynamic_cast<orc::Decimal64VectorBatch *>(field);
         FixedWidthVector<OMNI_LONG> *originalVector = new FixedWidthVector<OMNI_LONG>(allocator, lvb->numElements);
         for (int i = 0; i < lvb->numElements; i++) {
@@ -460,7 +472,7 @@ int copyToOmniDecimalVec(int precision, int &ominTypeId, uint64_t &ominVecId, or
                 originalVector->SetValueNull(i);
             }
         }
-        ominVecId = (uint64_t)originalVector;
+        omniVecId = (uint64_t)originalVector;
     }
     return 1;
 }
@@ -468,6 +480,7 @@ int copyToOmniDecimalVec(int precision, int &ominTypeId, uint64_t &ominVecId, or
 JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniReader_recordReaderNext(JNIEnv *env,
     jobject jObj, jlong rowReader, jlong reader, jlong batch, jintArray typeId, jlongArray vecNativeId)
 {
+    JNI_FUNC_START
     orc::RowReader *rowReaderPtr = (orc::RowReader *)rowReader;
     orc::ColumnVectorBatch *columnVectorBatch = (orc::ColumnVectorBatch *)batch;
     orc::Reader *readerPtr = (orc::Reader *)reader;
@@ -481,25 +494,21 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniRe
         for (int id = 0; id < vecCnt; id++) {
             orc::TypeKind vcType = baseTp.getSubtype(id)->getKind();
             int maxLen = baseTp.getSubtype(id)->getMaximumLength();
-            int ominTypeId = 0;
-            uint64_t ominVecId = 0;
-            try {
-                if (vcType != orc::TypeKind::DECIMAL) {
-                    copyToOmniVec(vcType, ominTypeId, ominVecId, root->fields[id], maxLen);
-                } else {
-                    copyToOmniDecimalVec(baseTp.getSubtype(id)->getPrecision(), ominTypeId, ominVecId,
-                        root->fields[id]);
-                }
-            } catch (omniruntime::exception::OmniException &e) {
-                env->ThrowNew(runtimeExceptionClass, e.what());
-                return (jlong)batchRowSize;
+            int omniTypeId = 0;
+            uint64_t omniVecId = 0;
+            if (vcType != orc::TypeKind::DECIMAL) {
+                copyToOmniVec(vcType, omniTypeId, omniVecId, root->fields[id], maxLen);
+            } else {
+                copyToOmniDecimalVec(baseTp.getSubtype(id)->getPrecision(), omniTypeId, omniVecId,
+                    root->fields[id]);
             }
-            env->SetIntArrayRegion(typeId, id, 1, &ominTypeId);
-            jlong ominVec = static_cast<jlong>(ominVecId);
-            env->SetLongArrayRegion(vecNativeId, id, 1, &ominVec);
+            env->SetIntArrayRegion(typeId, id, 1, &omniTypeId);
+            jlong omniVec = static_cast<jlong>(omniVecId);
+            env->SetLongArrayRegion(vecNativeId, id, 1, &omniVec);
         }
     }
     return (jlong)batchRowSize;
+    JNI_FUNC_END(runtimeExceptionClass)
 }
 
 /*
@@ -510,9 +519,11 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniRe
 JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniReader_recordReaderGetRowNumber(
     JNIEnv *env, jobject jObj, jlong rowReader)
 {
+    JNI_FUNC_START
     orc::RowReader *rowReaderPtr = (orc::RowReader *)rowReader;
     uint64_t rownum = rowReaderPtr->getRowNumber();
     return (jlong)rownum;
+    JNI_FUNC_END(runtimeExceptionClass)
 }
 
 /*
@@ -523,9 +534,11 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniRe
 JNIEXPORT jfloat JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniReader_recordReaderGetProgress(
     JNIEnv *env, jobject jObj, jlong rowReader)
 {
+    JNI_FUNC_START
     jfloat curProgress = 1;
-    throw std::runtime_error("recordReaderGetProgress is unsupported");
+    env->ThrowNew(runtimeExceptionClass, "recordReaderGetProgress is unsupported");
     return curProgress;
+    JNI_FUNC_END(runtimeExceptionClass)
 }
 
 /*
@@ -536,21 +549,23 @@ JNIEXPORT jfloat JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniR
 JNIEXPORT void JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniReader_recordReaderClose(JNIEnv *env,
     jobject jObj, jlong rowReader, jlong reader, jlong batchReader)
 {
+    JNI_FUNC_START
     orc::ColumnVectorBatch *columnVectorBatch = (orc::ColumnVectorBatch *)batchReader;
     if (nullptr == columnVectorBatch) {
-        throw std::runtime_error("delete nullptr error for batch reader");
+        env->ThrowNew(runtimeExceptionClass, "delete nullptr error for batch reader");
     }
     delete columnVectorBatch;
     orc::RowReader *rowReaderPtr = (orc::RowReader *)rowReader;
     if (nullptr == rowReaderPtr) {
-        throw std::runtime_error("delete nullptr error for row reader");
+        env->ThrowNew(runtimeExceptionClass, "delete nullptr error for row reader");
     }
     delete rowReaderPtr;
     orc::Reader *readerPtr = (orc::Reader *)reader;
     if (nullptr == readerPtr) {
-        throw std::runtime_error("delete nullptr error for reader");
+        env->ThrowNew(runtimeExceptionClass, "delete nullptr error for reader");
     }
     delete readerPtr;
+    JNI_FUNC_END(runtimeExceptionClass)
 }
 
 /*
@@ -561,14 +576,17 @@ JNIEXPORT void JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniRea
 JNIEXPORT void JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniReader_recordReaderSeekToRow(JNIEnv *env,
     jobject jObj, jlong rowReader, jlong rowNumber)
 {
+    JNI_FUNC_START
     orc::RowReader *rowReaderPtr = (orc::RowReader *)rowReader;
     rowReaderPtr->seekToRow((long)rowNumber);
+    JNI_FUNC_END(runtimeExceptionClass)
 }
 
 
 JNIEXPORT jobjectArray JNICALL
 Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniReader_getAllColumnNames(JNIEnv *env, jobject jObj, jlong reader)
 {
+    JNI_FUNC_START
     orc::Reader *readerPtr = (orc::Reader *)reader;
     int32_t cols = static_cast<int32_t>(readerPtr->getType().getSubtypeCount());
     jobjectArray ret =
@@ -577,14 +595,17 @@ Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniReader_getAllColumnNames(J
         env->SetObjectArrayElement(ret, i, env->NewStringUTF(readerPtr->getType().getFieldName(i).data()));
     }
     return ret;
+    JNI_FUNC_END(runtimeExceptionClass)
 }
 
 JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniReader_getNumberOfRows(JNIEnv *env,
     jobject jObj, jlong rowReader, jlong batch)
 {
+    JNI_FUNC_START
     orc::RowReader *rowReaderPtr = (orc::RowReader *)rowReader;
     orc::ColumnVectorBatch *columnVectorBatch = (orc::ColumnVectorBatch *)batch;
     rowReaderPtr->next(*columnVectorBatch);
     jlong rows = columnVectorBatch->numElements;
     return rows;
+    JNI_FUNC_END(runtimeExceptionClass)
 }
