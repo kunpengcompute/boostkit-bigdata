@@ -224,6 +224,14 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
     ), false)
   }
 
+  test("ColumnarBroadcastHashJoin is not rolled back with not_equal filter expr") {
+    val res = left.join(right.hint("broadcast"), left("a") <=> right("a"))
+    assert(
+      res.queryExecution.executedPlan.find(_.isInstanceOf[ColumnarBroadcastHashJoinExec]).isDefined,
+      s"ColumnarBroadcastHashJoinExec not happened, " +
+        s"executedPlan as follows： \n${res.queryExecution.executedPlan}")
+  }
+
   def checkThatPlansAgreeTemplateForSMJ(df: DataFrame, leftKeys: Seq[Expression],
                                         rightKeys: Seq[Expression], joinType: JoinType): Unit = {
     checkThatPlansAgree(

@@ -65,6 +65,15 @@ class ColumnarFilterExecSuite extends ColumnarSparkPlanTest {
     checkThatPlansAgreeTemplate(expr = expr, df = inputDfWithNull)
   }
 
+  test("ColumnarFilterExec is not rolled back with not_equal filter expr") {
+    val res = inputDf.filter("c != d")
+    val isColumnarFilterHappen = res.queryExecution.executedPlan
+      .find(_.isInstanceOf[ColumnarFilterExec]).isDefined
+    val isColumnarConditionProjectHappen = res.queryExecution.executedPlan
+      .find(_.isInstanceOf[ColumnarConditionProjectExec]).isDefined
+    assert(isColumnarFilterHappen || isColumnarConditionProjectHappen, s"ColumnarFilterExec not happened, executedPlan as follows： \n${res.queryExecution.executedPlan}")
+  }
+
   def checkThatPlansAgreeTemplate(expr: Expression, df: DataFrame): Unit = {
     checkThatPlansAgree(
       df,
