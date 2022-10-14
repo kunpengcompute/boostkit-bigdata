@@ -583,13 +583,10 @@ abstract class BaseColumnarFileSourceScanExec(
       }
     }
 
-    val omniAggSourceTypes = new Array[DataType](agg.child.outputSet.size)
-    val inputIter = agg.child.outputSet.toIterator
-    var i = 0
-    while (inputIter.hasNext) {
-      val inputAttr = inputIter.next()
-      omniAggSourceTypes(i) = sparkTypeToOmniType(inputAttr.dataType, inputAttr.metadata)
-      i += 1
+    val omniAggSourceTypes = new Array[DataType](agg.child.output.size)
+    agg.child.output.zipWithIndex.foreach {
+      case (attr, i) =>
+        omniAggSourceTypes(i) = sparkTypeToOmniType(attr.dataType, attr.metadata)
     }
     (omniGroupByChanel, omniAggChannels, omniAggSourceTypes, omniAggFunctionTypes, omniAggOutputTypes,
       omniAggInputRaws, omniAggOutputPartials, resultIdxToOmniResultIdxMap)

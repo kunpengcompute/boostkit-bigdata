@@ -121,8 +121,7 @@ case class ColumnarWindowExec(windowExpression: Seq[NamedExpression],
   }
 
   def buildCheck(): Unit = {
-    val inputColSize = child.outputSet.size
-    val sourceTypes = new Array[DataType](inputColSize)
+    val sourceTypes = new Array[DataType](child.output.size)
     val winExpressions: Seq[Expression] = windowFrameExpressionFactoryPairs.flatMap(_._1)
     val windowFunType = new Array[FunctionType](winExpressions.size)
     var windowArgKeys = new Array[AnyRef](winExpressions.size)
@@ -134,13 +133,10 @@ case class ColumnarWindowExec(windowExpression: Seq[NamedExpression],
     val windowFrameEndTypes = new Array[OmniWindowFrameBoundType](winExpressions.size)
     val winddowFrameEndChannels = new Array[Int](winExpressions.size)
     var attrMap: Map[String, Int] = Map()
-    val inputIter = child.outputSet.toIterator
-    var i = 0
-    while (inputIter.hasNext) {
-      val inputAttr = inputIter.next()
-      sourceTypes(i) = sparkTypeToOmniType(inputAttr.dataType, inputAttr.metadata)
-      attrMap += (inputAttr.name -> i)
-      i += 1
+    child.output.zipWithIndex.foreach {
+      case (inputIter, i) =>
+        sourceTypes(i) = sparkTypeToOmniType(inputIter.dataType, inputIter.metadata)
+        attrMap += (inputIter.name -> i)
     }
 
     var windowExpressionWithProject = false
@@ -214,8 +210,7 @@ case class ColumnarWindowExec(windowExpression: Seq[NamedExpression],
     val numOutputVecBatchs = longMetric("numOutputVecBatchs")
     val getOutputTime = longMetric("getOutputTime")
 
-    val inputColSize = child.outputSet.size
-    val sourceTypes = new Array[DataType](inputColSize)
+    val sourceTypes = new Array[DataType](child.output.size)
     val sortCols = new Array[Int](orderSpec.size)
     val ascendings = new Array[Int](orderSpec.size)
     val nullFirsts = new Array[Int](orderSpec.size)
@@ -233,18 +228,15 @@ case class ColumnarWindowExec(windowExpression: Seq[NamedExpression],
     val windowFrameEndChannels = new Array[Int](winExpressions.size)
 
     var attrMap: Map[String, Int] = Map()
-    val inputIter = child.outputSet.toIterator
-    var i = 0
-    while (inputIter.hasNext) {
-      val inputAttr = inputIter.next()
-      sourceTypes(i) = sparkTypeToOmniType(inputAttr.dataType, inputAttr.metadata)
-      attrMap += (inputAttr.name -> i)
-      i += 1
+    child.output.zipWithIndex.foreach {
+      case (inputIter, i) =>
+        sourceTypes(i) = sparkTypeToOmniType(inputIter.dataType, inputIter.metadata)
+        attrMap += (inputIter.name -> i)
     }
     // partition column parameters
 
     // sort column parameters
-    i = 0
+    var i = 0
     for (sortAttr <- orderSpec) {
       if (attrMap.contains(sortAttr.child.asInstanceOf[AttributeReference].name)) {
         sortCols(i) = attrMap(sortAttr.child.asInstanceOf[AttributeReference].name)
