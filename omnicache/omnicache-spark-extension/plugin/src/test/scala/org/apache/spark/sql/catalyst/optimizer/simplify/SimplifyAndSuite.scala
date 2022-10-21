@@ -681,6 +681,21 @@ class SimplifyAndSuite extends RewriteSuite {
     assert(res.sql.equals("(spark_catalog.default.t1.`ID` = 5)"))
   }
 
+  test("simplify_simplifyAndEqualTo") {
+    val df = spark.sql(
+      """
+        |SELECT * FROM T1
+        |WHERE ID = 5 AND ID = 5 AND ID = 5;
+        |""".stripMargin
+    )
+    val targetCondition = df.queryExecution.analyzed
+    // set unknownAsFalse = true
+    val simplify = ExprSimplifier(unknownAsFalse = true, pulledUpPredicates)
+    val res = simplify.simplify(targetCondition
+        .asInstanceOf[Project].child.asInstanceOf[Filter].condition)
+    assert(res.sql.equals("(spark_catalog.default.t1.`ID` = 5)"))
+  }
+
   test("clean env") {
     // clean
     spark.sql(
