@@ -101,7 +101,8 @@ import static org.testng.Assert.assertEquals;
         OperatorUtils.class
 })
 @SuppressStaticInitializationFor({"nova.hetu.omniruntime.vector.VecAllocator",
-        "nova.hetu.omniruntime.vector.Vec"
+        "nova.hetu.omniruntime.vector.Vec",
+        "nova.hetu.olk.block.RowOmniBlock"
 })
 @PowerMockIgnore("javax.management.*")
 public class TestOperatorUtils
@@ -381,7 +382,7 @@ public class TestOperatorUtils
         when(rowOmniBlock.isExtensionBlock()).thenReturn(true);
         when(rowOmniBlock.getPositionCount()).thenReturn(1);
         when(rowOmniBlock.getRowIsNull()).thenReturn(new boolean[]{false});
-        when(rowOmniBlock.getRawFieldBlocks()).thenReturn(new Block[]{buildRowBlockByBuilder(BIGINT)});
+        when(rowOmniBlock.getRawFieldBlocks()).thenReturn(new Block[]{longArrayOmniBlock});
         whenNew(RowOmniBlock.class).withAnyArguments().thenReturn(rowOmniBlock);
 
         containerVec = mock(ContainerVec.class);

@@ -169,7 +169,7 @@ public class RowOmniBlock<T>
         return containerVec;
     }
 
-    private ContainerVec buildContainVec()
+    private ContainerVec buildContainerVec()
     {
         Block[] rawFieldBlocks = this.getRawFieldBlocks();
         int numFields = rawFieldBlocks.length;
@@ -216,7 +216,7 @@ public class RowOmniBlock<T>
         }
         this.retainedSizeInBytes = retainedSizeInBytes;
         this.dataType = dataType;
-        this.containerVec = containerVec == null ? buildContainVec() : containerVec;
+        this.containerVec = containerVec == null ? buildContainerVec() : containerVec;
     }
 
     @Override

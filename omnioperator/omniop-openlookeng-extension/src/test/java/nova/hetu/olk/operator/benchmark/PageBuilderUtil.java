@@ -57,6 +57,9 @@ public final class PageBuilderUtil
             if (type.equals(INTEGER)) {
                 blocks[i] = BlockUtil.createIntegerSequenceBlock(initialValue, initialValue + length);
             }
+            else if (type.equals(SMALLINT)) {
+                blocks[i] = BlockUtil.createShortSequenceBlock(initialValue, initialValue + length);
+            }
             else if (type.equals(BIGINT)) {
                 blocks[i] = BlockAssertions.createLongSequenceBlock(initialValue, initialValue + length);
             }
