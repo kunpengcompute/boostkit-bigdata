@@ -536,17 +536,11 @@ abstract class SparkStrategies extends QueryPlanner[SparkPlan] {
     def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
       case PhysicalOperation(projectList, filters, mem: InMemoryRelation) =>
         val condition = filters.reduceLeftOption(And)
-        val selectivity = if (condition.nonEmpty) {
-          FilterEstimation(Filter(condition.get, mem)).calculateFilterSelectivity(condition.get)
-        } else {
-          None
-        }
         pruneFilterProject(
           projectList,
           filters,
           identity[Seq[Expression]], // All filters still need to be evaluated.
-          InMemoryTableScanExec(_, filters, mem),
-          selectivity) :: Nil
+          InMemoryTableScanExec(_, filters, mem)) :: Nil
       case _ => Nil
     }
   }
@@ -687,13 +681,10 @@ abstract class SparkStrategies extends QueryPlanner[SparkPlan] {
       case logical.Project(projectList, child) =>
         execution.ProjectExec(projectList, planLater(child)) :: Nil
       case l @ logical.Filter(condition, child) =>
-        val selectivity = FilterEstimation(l).calculateFilterSelectivity(l.condition)
-        execution.FilterExec(condition, planLater(child), selectivity) :: Nil
+        execution.FilterExec(condition, planLater(child)) :: Nil
       case f: logical.TypedFilter =>
         val condition = f.typedCondition(f.deserializer)
-        val filter = Filter(condition, f.child)
-        val selectivity = FilterEstimation(filter).calculateFilterSelectivity(condition)
-        execution.FilterExec(condition, planLater(f.child), selectivity) :: Nil
+        execution.FilterExec(condition, planLater(f.child)) :: Nil
       case e @ logical.Expand(_, _, child) =>
         execution.ExpandExec(e.projections, e.output, planLater(child)) :: Nil
       case logical.Sample(lb, ub, withReplacement, seed, child) =>

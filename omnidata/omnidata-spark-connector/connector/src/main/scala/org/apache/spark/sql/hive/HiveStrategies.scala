@@ -285,12 +285,6 @@ private[hive] trait HiveStrategies {
           filters.filter(_.deterministic), relation.output)
 
         val condition = filters.reduceLeftOption(And)
-        val selectivity = if (condition.nonEmpty) {
-          FilterEstimation(LFilter(condition.get, relation))
-            .calculateFilterSelectivity(condition.get)
-        } else {
-          None
-        }
 
         val partitionKeyFilters = DataSourceStrategy.getPushedDownFilters(relation.partitionCols,
           normalizedFilters)
@@ -298,8 +292,7 @@ private[hive] trait HiveStrategies {
           projectList,
           filters.filter(f => f.references.isEmpty || !f.references.subsetOf(partitionKeyIds)),
           identity[Seq[Expression]],
-          HiveTableScanExec(_, relation, partitionKeyFilters.toSeq)(sparkSession),
-          selectivity) :: Nil
+          HiveTableScanExec(_, relation, partitionKeyFilters.toSeq)(sparkSession)) :: Nil
       case _ =>
         Nil
     }

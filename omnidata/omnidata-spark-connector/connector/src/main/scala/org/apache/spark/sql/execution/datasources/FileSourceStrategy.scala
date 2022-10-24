@@ -228,13 +228,7 @@ object FileSourceStrategy extends Strategy with PredicateHelper with Logging {
           partitionColumns)
 
       val afterScanFilter = afterScanFilters.toSeq.reduceOption(expressions.And)
-      val selectivity = if (afterScanFilter.nonEmpty) {
-        FilterEstimation(LFilter(afterScanFilter.get, l))
-          .calculateFilterSelectivity(afterScanFilter.get)
-      } else {
-        None
-      }
-      val withFilter = afterScanFilter.map(execution.FilterExec(_, scan, selectivity))
+      val withFilter = afterScanFilter.map(execution.FilterExec(_, scan))
         .getOrElse(scan)
       val withProjections = if (projects == withFilter.output) {
         withFilter

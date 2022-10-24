@@ -18,6 +18,8 @@
 
 package org.apache.spark.sql.execution.ndp
 
+import org.apache.derby.vti.Restriction.AND
+
 import java.util.{Locale, Properties}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{PushDownManager, SparkSession}
@@ -33,6 +35,8 @@ import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.sources.DataSourceRegister
 import org.apache.spark.sql.hive.HiveSimpleUDF
 import org.apache.hadoop.hive.ql.exec.DefaultUDFMethodResolver
+import org.apache.spark.sql.catalyst.plans.logical.Filter
+import org.apache.spark.sql.catalyst.plans.logical.statsEstimation.FilterEstimation
 
 import scala.collection.{JavaConverters, mutable}
 import scala.reflect.runtime.universe
@@ -46,7 +50,7 @@ case class NdpPushDown(sparkSession: SparkSession)
     "greaterthan", "greaterthanorequal", "lessthanorequal", "in", "literal", "isnull",
     "attributereference")
   private val attrWhiteList = Set("long", "integer", "byte", "short", "float", "double",
-    "boolean", "date", "decimal", "timestamp")
+    "boolean", "date", "decimal", "timestamp", "string")
   private val sparkUdfWhiteList = Set("substr", "substring", "length", "upper", "lower", "cast",
     "replace", "getarrayitem")
   private val udfPathWhiteList = Set("")
@@ -63,10 +67,12 @@ case class NdpPushDown(sparkSession: SparkSession)
     Set("multiply", "add", "subtract", "divide", "remainder", "literal", "attributereference")
   private val selectivityThreshold = NdpConf.getNdpFilterSelectivity(sparkSession)
   private val tableSizeThreshold = NdpConf.getNdpTableSizeThreshold(sparkSession)
+  private val maxNdpTableSize = NdpConf.getMaxNdpTableSize(sparkSession)
   private val filterSelectivityEnable = NdpConf.getNdpFilterSelectivityEnable(sparkSession)
   private val tableFileFormatWhiteList = Set("orc", "parquet")
   private val parquetSchemaMergingEnabled = NdpConf.getParquetMergeSchema(sparkSession)
   private val timeOut = NdpConf.getNdpZookeeperTimeout(sparkSession)
+  private val sizeofString = NdpConf.getSizeofString(sparkSession)
   private val parentPath = NdpConf.getNdpZookeeperPath(sparkSession)
   private val zkAddress = NdpConf.getNdpZookeeperAddress(sparkSession)
 
@@ -106,13 +112,34 @@ case class NdpPushDown(sparkSession: SparkSession)
     fpuHosts.nonEmpty
   }
 
-  def shouldPushDown(relation: HadoopFsRelation): Boolean = {
+  def shouldPushDown(relation: HadoopFsRelation, output: Seq[Attribute]): Boolean = {
     val isSupportFormat = relation.fileFormat match {
       case source: DataSourceRegister =>
         tableFileFormatWhiteList.contains(source.shortName().toLowerCase(Locale.ROOT))
       case _ => false
     }
-    isSupportFormat && relation.sizeInBytes > tableSizeThreshold.toLong
+    var outputColumnTypeSize = 0
+    var tableColumnTpyeSize = 0
+    relation.dataSchema.map( r => {
+      r.dataType.typeName match {
+        case "string" => tableColumnTpyeSize += sizeofString
+          logDebug(s"string  table column type size is : ${sizeofString}")
+        case _ =>  tableColumnTpyeSize += r.dataType.defaultSize
+          logDebug(s"table column type name is : ${r.dataType.typeName}")
+          logDebug(s"other table column type size is : ${r.dataType.defaultSize}")
+      }
+    })
+    output.map( r => {
+      logDebug(s"first table column type name is : ${r.dataType.typeName}")
+      r.dataType.typeName match {
+        case "string" => outputColumnTypeSize += sizeofString
+        case _ =>  outputColumnTypeSize += r.dataType.defaultSize
+      }
+    })
+    val selectRatio = outputColumnTypeSize * 1.0 / tableColumnTpyeSize
+    logDebug(s"Selected table size is : ${selectRatio * relation.sizeInBytes / 1024 / 1024}MB")
+    logDebug(s"Max table size is : ${maxNdpTableSize / 1024 / 1024}MB")
+    isSupportFormat && relation.sizeInBytes > tableSizeThreshold.toLong && selectRatio * relation.sizeInBytes < maxNdpTableSize
   }
 
   def shouldPushDown(f: FilterExec, scan: NdpSupport): Boolean = {
@@ -185,10 +212,10 @@ case class NdpPushDown(sparkSession: SparkSession)
 
   def isDynamiCpruning(f: FilterExec): Boolean = {
     if(f.child.isInstanceOf[NdpScanWrapper] &&
-      f.child.asInstanceOf[NdpScanWrapper].scan.isInstanceOf[FileSourceScanExec] ){
+      f.child.asInstanceOf[NdpScanWrapper].scan.isInstanceOf[FileSourceScanExec] ) {
       f.child.asInstanceOf[NdpScanWrapper].scan.asInstanceOf[FileSourceScanExec].partitionFilters
         .toString().contains("dynamicpruningexpression")
-    }else{
+    } else {
       false
     }
   }
@@ -213,21 +240,33 @@ case class NdpPushDown(sparkSession: SparkSession)
   }
 
   def pushDownOperatorInternal(plan: SparkPlan): SparkPlan = {
+    val b = plan.logicalLink.get.stats
+
     val p = plan.transformUp {
       case a: AdaptiveSparkPlanExec =>
         pushDownOperatorInternal(a.inputPlan)
-      case s: FileSourceScanExec if shouldPushDown(s.relation) =>
+      case s: FileSourceScanExec if shouldPushDown(s.relation, s.output) =>
         val filters = s.partitionFilters.filter { x =>
           //TODO maybe need to adapt to the UDF whitelist.
           filterWhiteList.contains(x.prettyName) || udfWhiteList.contains(x.prettyName)
         }
         NdpScanWrapper(s, s.output, filters)
-      case f @ FilterExec(condition, s: NdpScanWrapper, selectivity) if shouldPushDown(f, s.scan) =>
+      case f @ FilterExec(condition, s: NdpScanWrapper) if shouldPushDown(f, s.scan) =>
+        var selectivity2 : Option[Double] = Some(1.0)
+        val bb = s.logicalLink.get.children.map{ x =>
+          if (x.isInstanceOf[Filter]) {
+            val cc = FilterEstimation(x.asInstanceOf[Filter]).calculateFilterSelectivity(x.asInstanceOf[Filter].condition)
+            selectivity2 = cc
+          }
+        }
+        // val selectivity2 = FilterEstimation(f.child.asInstanceOf[Filter]).calculateFilterSelectivity(condition)
+        // val selectivity2 = FilterEstimation(f.child.logicalLink.get.children.asInstanceOf[Filter]).calculateFilterSelectivity(condition)
         if (filterSelectivityEnabled &&
-          selectivity.nonEmpty &&
-          selectivity.get > selectivityThreshold.toDouble) {
+          selectivity2.nonEmpty &&
+          selectivity2.get > selectivityThreshold.toDouble) {
+          logError(s"selectivity2 is : ${selectivity2.get}")
           logInfo(s"Fail to push down filter, since " +
-            s"selectivity[${selectivity.get}] > threshold[${selectivityThreshold}] " +
+            s"selectivity2[${selectivity2.get}] > threshold[${selectivityThreshold}] " +
             s"for condition[${condition}]")
           f
         } else if(isDynamiCpruning(f)){
@@ -235,8 +274,8 @@ case class NdpPushDown(sparkSession: SparkSession)
           f
         } else {
           // TODO: move selectivity info to pushdown-info
-          if (filterSelectivityEnabled && selectivity.nonEmpty) {
-            logInfo(s"Selectivity: ${selectivity.get}")
+          if (filterSelectivityEnabled && selectivity2.nonEmpty) {
+            logError(s"Selectivity: ${selectivity2.get}")
           }
           // partial pushDown
           val (otherFilters, pushDownFilters) =
@@ -321,7 +360,9 @@ object NdpConf {
   val PARQUET_MERGESCHEMA = "spark.sql.parquet.mergeSchema"
   val NDP_FILTER_SELECTIVITY_ENABLE = "spark.sql.ndp.filter.selectivity.enable"
   val NDP_TABLE_SIZE_THRESHOLD = "spark.sql.ndp.table.size.threshold"
+  val MAX_NDP_TABLE_SIZE = "spark.sql.max.ndp.table.size"
   val NDP_ZOOKEEPER_TIMEOUT = "spark.sql.ndp.zookeeper.timeout"
+  val NDP_SIZEOF_STRING = "spark.sql.ndp.sizeof.string"
   val NDP_ALIVE_OMNIDATA = "spark.sql.ndp.alive.omnidata"
   val NDP_FILTER_SELECTIVITY = "spark.sql.ndp.filter.selectivity"
   val NDP_UDF_WHITELIST = "spark.sql.ndp.udf.whitelist"
@@ -408,12 +449,30 @@ object NdpConf {
     result
   }
 
+  def getMaxNdpTableSize(sparkSession: SparkSession): Long = {
+    val result = toNumber(MAX_NDP_TABLE_SIZE,
+      sparkSession.conf.getOption(MAX_NDP_TABLE_SIZE).getOrElse("10240"),
+      _.toLong, "long", sparkSession)
+    checkLongValue(MAX_NDP_TABLE_SIZE, result, _ > 0,
+      s"The $MAX_NDP_TABLE_SIZE value must be positive", sparkSession)
+    result
+  }
+
   def getNdpZookeeperTimeout(sparkSession: SparkSession): Int = {
     val result = toNumber(NDP_ZOOKEEPER_TIMEOUT,
       sparkSession.conf.getOption(NDP_ZOOKEEPER_TIMEOUT).getOrElse("5000"),
       _.toInt, "int", sparkSession)
     checkLongValue(NDP_ZOOKEEPER_TIMEOUT, result, _ > 0,
       s"The $NDP_ZOOKEEPER_TIMEOUT value must be positive", sparkSession)
+    result
+  }
+
+  def getSizeofString(sparkSession: SparkSession): Int = {
+    val result = toNumber(NDP_SIZEOF_STRING,
+      sparkSession.conf.getOption(NDP_SIZEOF_STRING).getOrElse("20"),
+      _.toInt, "int", sparkSession)
+    checkLongValue(NDP_SIZEOF_STRING, result, _ > 0,
+      s"The $NDP_SIZEOF_STRING value must be positive", sparkSession)
     result
   }
 
