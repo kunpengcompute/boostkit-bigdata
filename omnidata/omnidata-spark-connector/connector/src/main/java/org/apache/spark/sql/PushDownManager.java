@@ -67,7 +67,7 @@ public class PushDownManager {
                     if (!path.contains("-lock-")) {
                         byte[] data = zkClient.getData().forPath(parentPath + "/" + path);
                         PushDownData statusInfo = mapper.readValue(data, PushDownData.class);
-                        fpuMap.put(path, statusInfo.getDatanodeHost());
+                        fpuMap.put(statusInfo.getDatanodeHost(), path);
                         pushDownInfoMap.put(path, statusInfo);
                     }
                 }

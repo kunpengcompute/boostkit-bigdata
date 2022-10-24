@@ -422,8 +422,7 @@ object DataSourceStrategy
         relation.relation,
         relation.catalogTable.map(_.identifier))
       filterCondition.map{ x =>
-        val selectivity = FilterEstimation(LFilter(x, relation)).calculateFilterSelectivity(x)
-        execution.FilterExec(x, scan, selectivity)
+        execution.FilterExec(x, scan)
       }.getOrElse(scan)
     } else {
       // A set of column attributes that are only referenced by pushed down filters.  We can
@@ -448,8 +447,7 @@ object DataSourceStrategy
         relation.catalogTable.map(_.identifier))
       execution.ProjectExec(
         projects, filterCondition.map{x =>
-          val selectivity = FilterEstimation(LFilter(x, relation)).calculateFilterSelectivity(x)
-          execution.FilterExec(x, scan, selectivity)
+          execution.FilterExec(x, scan)
         }.getOrElse(scan))
     }
   }

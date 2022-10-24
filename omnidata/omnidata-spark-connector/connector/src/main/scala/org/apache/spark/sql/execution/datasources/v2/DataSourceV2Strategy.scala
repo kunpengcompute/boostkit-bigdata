@@ -44,10 +44,9 @@ class DataSourceV2Strategy(session: SparkSession) extends Strategy with Predicat
       project: Seq[NamedExpression],
       filters: Seq[Expression],
       scan: LeafExecNode,
-      needsUnsafeConversion: Boolean,
-      selectivity: Option[Double]): SparkPlan = {
+      needsUnsafeConversion: Boolean): SparkPlan = {
     val filterCondition = filters.reduceLeftOption(And)
-    val withFilter = filterCondition.map(FilterExec(_, scan, selectivity)).getOrElse(scan)
+    val withFilter = filterCondition.map(FilterExec(_, scan)).getOrElse(scan)
 
     if (withFilter.output != project || needsUnsafeConversion) {
       ProjectExec(project, withFilter)
@@ -107,13 +106,8 @@ class DataSourceV2Strategy(session: SparkSession) extends Strategy with Predicat
         v1Relation,
         tableIdentifier = None)
       val condition = filters.reduceLeftOption(And)
-      val selectivity = if (condition.nonEmpty) {
-        FilterEstimation(LFilter(condition.get, relation)).calculateFilterSelectivity(condition.get)
-      } else {
-        None
-      }
       withProjectAndFilter(project, filters, dsScan,
-        needsUnsafeConversion = false, selectivity) :: Nil
+        needsUnsafeConversion = false) :: Nil
 
     case PhysicalOperation(project, filters, relation: DataSourceV2ScanRelation) =>
       // projection and filters were already pushed down in the optimizer.
@@ -121,13 +115,8 @@ class DataSourceV2Strategy(session: SparkSession) extends Strategy with Predicat
       // not support columnar, a projection is added to convert the rows to UnsafeRow.
       val batchExec = BatchScanExec(relation.output, relation.scan)
       val condition = filters.reduceLeftOption(And)
-      val selectivity = if (condition.nonEmpty) {
-        FilterEstimation(LFilter(condition.get, relation)).calculateFilterSelectivity(condition.get)
-      } else {
-        None
-      }
       withProjectAndFilter(project, filters, batchExec,
-        !batchExec.supportsColumnar, selectivity) :: Nil
+        !batchExec.supportsColumnar) :: Nil
 
     case r: StreamingDataSourceV2Relation if r.startOffset.isDefined && r.endOffset.isDefined =>
       val microBatchStream = r.stream.asInstanceOf[MicroBatchStream]

@@ -29,8 +29,9 @@ import org.apache.spark.sql.connector.read.InputPartition
  * A collection of file blocks that should be read as a single task
  * (possibly from multiple partitioned directories).
  */
-case class FilePartition(index: Int, files: Array[PartitionedFile], var sdi: String = "")
+case class FilePartition(index: Int, files: Array[PartitionedFile])
   extends Partition with InputPartition {
+  var sdi = ""
   override def preferredLocations(): Array[String] = {
     // Computes total number of bytes can be retrieved from each host.
     val hostToNumBytes = mutable.HashMap.empty[String, Long]
