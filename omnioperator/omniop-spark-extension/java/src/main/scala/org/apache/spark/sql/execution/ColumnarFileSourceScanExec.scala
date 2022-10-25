@@ -21,6 +21,7 @@ import java.util.Optional
 import java.util.concurrent.TimeUnit.NANOSECONDS
 import com.huawei.boostkit.spark.Constant.IS_SKIP_VERIFY_EXP
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor
+import com.huawei.boostkit.spark.ColumnarPluginConfig
 
 import scala.collection.mutable.HashMap
 import scala.collection.JavaConverters._
@@ -285,12 +286,15 @@ abstract class BaseColumnarFileSourceScanExec(
        |""".stripMargin
   }
 
-  lazy val inputRDD: RDD[InternalRow] = {
-    val fileFormat: FileFormat = relation.fileFormat match {
+  val enableOrcNativeFileScan: Boolean = ColumnarPluginConfig.getSessionConf.enableOrcNativeFileScan
+  lazy val inputRDD: RDD[InternalRow] = if (enableOrcNativeFileScan) {
+    relation.fileFormat match {
       case orcFormat: OrcFileFormat =>
         new OmniOrcFileFormat()
       case _ =>
         throw new UnsupportedOperationException("Unsupported FileFormat!")
+    } else {
+      relation.fileFormat
     }
     val readFile: (PartitionedFile) => Iterator[InternalRow] =
       fileFormat.buildReaderWithPartitionValues(
@@ -395,9 +399,18 @@ abstract class BaseColumnarFileSourceScanExec(
 
         override def next(): ColumnarBatch = {
           val batch = batches.next()
+          val input = transColBatchToOmniVecs(batch)
+          val vecBatch = new VecBatch(input, batch.numRows())
+          val vectors: Seq[OmniColumnVector] = OmniColumnVector.allocateColumns(
+            vecBatch.getRowCount, requiredSchema, false)
+          vectors.zipWithIndex.foreach { case (vector, i) =>
+            vector.reset()
+            vector.setVec(vecBatch.getVectors()(i))
+          }
           numOutputRows += batch.numRows()
           numOutputVecBatchs += 1
-          batch
+          vecBatch.close()
+          new ColumnarBatch(vectors.toArray, vecBatch.getRowCount)
         }
       }
     }
