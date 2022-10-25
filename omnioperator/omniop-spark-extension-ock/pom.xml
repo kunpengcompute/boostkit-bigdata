@@ -18,8 +18,10 @@
      <input.version>spark-3.1</input.version>
      <scala.plugin.version>3.2.0</scala.plugin.version>
      <maven.plugin.version>3.1.1</maven.plugin.version>
+     <global.version>22.0.0</global.version>
    </properties>
 
+   <groupId>com.huawei.ock</groupId>
    <artifactId>ock-omniop-shuffle-manager</artifactId>
    <packaging>jar</packaging>
    <description>Huawei Open Computing Kit for Spark, shuffle manager</description>
