@@ -46,13 +46,13 @@
      </dependency>
      <dependency>
        <groupId>${spark.groupId}</groupId>
-       <artifactId>spark-net-common_${scala.compat.version}</artifactId>
+       <artifactId>spark-network-common_${scala.compat.version}</artifactId>
        <version>${spark.version}</version>
        <scope>provided</scope>
      </dependency>
      <dependency>
        <groupId>${spark.groupId}</groupId>
-       <artifactId>spark-net-shuffle_${scala.compat.version}</artifactId>
+       <artifactId>spark-network-shuffle_${scala.compat.version}</artifactId>
        <version>${spark.version}</version>
        <scope>provided</scope>
      </dependency>
@@ -138,6 +138,10 @@
        </plugin>
        <plugin>
          <groupId>org.apache.maven.plugins</groupId>
+         <artifactId>maven-jar-plugin</artifactId>
+       </plugin>
+       <plugin>
+         <groupId>org.apache.maven.plugins</groupId>
          <artifactId>maven-compiler-plugin</artifactId>
          <version>3.1</version>
          <configuration>
@@ -150,8 +154,8 @@
          </configuration>
        </plugin>
        <plugin>
-         <groupId>org.codehaus.mojo</groupId>
          <artifactId>exec-maven-plugin</artifactId>
+         <groupId>org.codehaus.mojo</groupId>
          <version>3.0.0</version>
          <executions>
            <execution>
@@ -173,7 +177,7 @@
        <plugin>
          <groupId>org.xolstice.maven.plugins</groupId>
          <artifactId>protobuf-maven-plugin</artifactId>
-         <version>${protobuf-maven-version}</version>
+         <version>${protobuf.maven.version}</version>
          <configuration>
            <protoSourceRoot>${project.basedir}/../cpp/src/proto</protoSourceRoot>
          </configuration>
