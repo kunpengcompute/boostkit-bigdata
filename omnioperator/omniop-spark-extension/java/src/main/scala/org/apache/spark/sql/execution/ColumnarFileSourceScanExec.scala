@@ -287,12 +287,14 @@ abstract class BaseColumnarFileSourceScanExec(
   }
 
   val enableOrcNativeFileScan: Boolean = ColumnarPluginConfig.getSessionConf.enableOrcNativeFileScan
-  lazy val inputRDD: RDD[InternalRow] = if (enableOrcNativeFileScan) {
-    relation.fileFormat match {
-      case orcFormat: OrcFileFormat =>
-        new OmniOrcFileFormat()
-      case _ =>
-        throw new UnsupportedOperationException("Unsupported FileFormat!")
+  lazy val inputRDD: RDD[InternalRow] = {
+    val fileFormat: FileFormat = if (enableOrcNativeFileScan) {
+      relation.fileFormat match {
+        case orcFormat: OrcFileFormat =>
+          new OmniOrcFileFormat()
+        case _ =>
+          throw new UnsupportedOperationException("Unsupported FileFormat!")
+      }
     } else {
       relation.fileFormat
     }
