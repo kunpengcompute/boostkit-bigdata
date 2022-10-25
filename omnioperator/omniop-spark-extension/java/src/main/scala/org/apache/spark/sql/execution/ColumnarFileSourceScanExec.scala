@@ -388,6 +388,7 @@ abstract class BaseColumnarFileSourceScanExec(
     val numOutputRows = longMetric("numOutputRows")
     val scanTime = longMetric("scanTime")
     val numOutputVecBatchs = longMetric("numOutputVecBatchs")
+    val localSchema = this.schema
     inputRDD.asInstanceOf[RDD[ColumnarBatch]].mapPartitionsInternal { batches =>
       new Iterator[ColumnarBatch] {
 
@@ -404,7 +405,7 @@ abstract class BaseColumnarFileSourceScanExec(
           val input = transColBatchToOmniVecs(batch)
           val vecBatch = new VecBatch(input, batch.numRows())
           val vectors: Seq[OmniColumnVector] = OmniColumnVector.allocateColumns(
-            vecBatch.getRowCount, requiredSchema, false)
+            vecBatch.getRowCount, localSchema, false)
           vectors.zipWithIndex.foreach { case (vector, i) =>
             vector.reset()
             vector.setVec(vecBatch.getVectors()(i))
