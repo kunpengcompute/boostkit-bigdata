@@ -4,12 +4,6 @@
      xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
    <modelVersion>4.0.0</modelVersion>
 
-   <parent>
-     <groupId>com.huawei.ock</groupId>
-     <artifactId>ock-parent</artifactId>
-     <version>22.0.0</version>
-   </parent>
-
    <properties>
      <cpp.dir>cpp/</cpp.dir>
      <cpp.build.dir>cpp/build/releases/</cpp.build.dir>
@@ -190,33 +184,6 @@
              </goals>
            </execution>
          </executions>
-       </plugin>
-       <plugin>
-         <groupId>com.github.wvengen</groupId>
-         <artifactId>proguard-maven-plugin</artifactId>
-         <version>${proguard.version}</version>
-         <executions>
-           <execution>
-             <phase>package</phase>
-             <goals>
-               <goal>proguard</goal>
-             </goals>
-           </execution>
-         </executions>
-         <configuration>
-           <injar>./ock-omniop-shuffle-manager-${global.version}-for-spark-3.1.jar</injar>
-           <outjar>../ock-omniop-shuffle-manager-${global.version}-for-spark-3.1.jar</outjar>
-           <obfuscate>true</obfuscate>
-           <proguardInclude>../build/ock-omniop-shuffle-manager-configuration-spark-3.1.jar</proguardInclude>
-           <addMavenDescriptor>false</addMavenDescriptor>
-         </configuration>
-         <dependencies>
-           <dependency>
-             <groupId>com.guardsquare</groupId>
-             <artifactId>proguard-base</artifactId>
-             <version>${guardsquare.version}</version>
-           </dependency>
-         </dependencies>
        </plugin>
        <plugin>
          <groupId>com.huawei.bepcloud</groupId>
