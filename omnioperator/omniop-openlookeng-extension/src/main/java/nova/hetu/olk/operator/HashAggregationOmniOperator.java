@@ -32,7 +32,6 @@ import io.prestosql.spi.plan.AggregationNode.Step;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.type.StandardTypes;
 import io.prestosql.spi.type.Type;
-import io.prestosql.spi.type.TypeSignature;
 import nova.hetu.olk.tool.BlockUtils;
 import nova.hetu.olk.tool.VecAllocatorHelper;
 import nova.hetu.olk.tool.VecBatchToPageIterator;
@@ -53,8 +52,6 @@ import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
 import static nova.hetu.olk.tool.OperatorUtils.buildVecBatch;
 import static nova.hetu.olk.tool.OperatorUtils.createExpressions;
-import static nova.hetu.omniruntime.constants.FunctionType.OMNI_AGGREGATION_TYPE_AVG;
-import static nova.hetu.omniruntime.constants.FunctionType.OMNI_AGGREGATION_TYPE_SUM;
 
 /**
  * The type Hash aggregation omni operator.
@@ -263,7 +260,7 @@ public class HashAggregationOmniOperator
             this.aggregationOutputTypes = Arrays.copyOf(
                     requireNonNull(aggregationOutputTypes, "aggregationOutputTypes is null."),
                     aggregationOutputTypes.length);
-            checkDataTypes(this.sourceTypes);
+            checkDataTypes(this.sourceTypes, this.aggregatorTypes, this.aggregationInputChannels, this.step);
             this.omniFactory = new OmniHashAggregationOperatorFactory(createExpressions(this.groupByInputChannels),
                     this.groupByInputTypes, createExpressions(this.aggregationInputChannels),
                     this.aggregationInputTypes, this.aggregatorTypes, maskChannelArray, this.aggregationOutputTypes, step.isInputRaw(),
@@ -336,39 +333,6 @@ public class HashAggregationOmniOperator
             return new HashAggregationOmniOperatorFactory(operatorId, planNodeId, sourceTypes, groupByInputChannels,
                     groupByInputTypes, aggregationInputChannels, aggregationInputTypes, aggregatorTypes, maskChannels,
                     aggregationOutputTypes, step);
-        }
-
-        @Override
-        public void checkDataType(Type type)
-        {
-            TypeSignature signature = type.getTypeSignature();
-            String base = signature.getBase();
-
-            switch (base) {
-                case StandardTypes.INTEGER:
-                case StandardTypes.SMALLINT:
-                case StandardTypes.BIGINT:
-                case StandardTypes.DOUBLE:
-                case StandardTypes.BOOLEAN:
-                case StandardTypes.VARCHAR:
-                case StandardTypes.CHAR:
-                case StandardTypes.DECIMAL:
-                case StandardTypes.DATE:
-                    return;
-                case StandardTypes.VARBINARY:
-                    if (this.step == AggregationNode.Step.FINAL && this.aggregatorTypes.length != 0 &&
-                            Arrays.stream(this.aggregatorTypes).allMatch(item -> item == OMNI_AGGREGATION_TYPE_AVG || item == OMNI_AGGREGATION_TYPE_SUM)) {
-                        return;
-                    }
-                case StandardTypes.ROW: {
-                    if (this.step == AggregationNode.Step.FINAL && this.aggregatorTypes.length != 0 &&
-                            Arrays.stream(this.aggregatorTypes).allMatch(item -> item == OMNI_AGGREGATION_TYPE_AVG)) {
-                        return;
-                    }
-                }
-                default:
-                    throw new PrestoException(StandardErrorCode.NOT_SUPPORTED, "Not support data Type " + base);
-            }
         }
     }
 }
