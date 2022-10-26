@@ -217,7 +217,6 @@ class JsonifyVisitor
                 constantRoot.put("scale", ((Decimal64DataType) literalType).getScale());
                 break;
             case OMNI_DECIMAL128:
-                // FIXME: Need to Support 128 bits properly
                 String d128Val;
                 if (literal.getValue() instanceof Slice) {
                     d128Val = Decimals.decodeUnscaledValue((Slice) literal.getValue()).toString();
@@ -242,7 +241,6 @@ class JsonifyVisitor
                 constantRoot.put("width", ((VarcharDataType) literalType).getWidth());
                 break;
             case OMNI_NONE:
-                // TODO: Support UNKNOWN presto type in DataType
                 // omni-runtime treat NONE regardless of its value
                 constantRoot.put("value", "UNKNOWN");
                 break;
@@ -257,7 +255,7 @@ class JsonifyVisitor
     public ObjectNode visitLambda(LambdaDefinitionExpression lambda, Void context)
     {
         ObjectNode lambdaRoot = MAPPER.createObjectNode();
-        // TODO: add lambda support in omni-runtime
+        // omniruntime does not support lambda now
         lambdaRoot.put("exprType", "LAMBDA");
         return lambdaRoot;
     }

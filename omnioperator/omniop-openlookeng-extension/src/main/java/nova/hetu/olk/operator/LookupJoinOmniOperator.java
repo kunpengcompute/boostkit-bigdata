@@ -224,7 +224,6 @@ public class LookupJoinOmniOperator
             return null;
         }
 
-        // TODO introduce explicit state (enum), like in HBO
         if (!tryFetchLookupSourceProvider()) {
             if (!(state == State.FINISHING)) {
                 return null;

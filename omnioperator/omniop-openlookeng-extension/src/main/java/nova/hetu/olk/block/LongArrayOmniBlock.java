@@ -271,7 +271,7 @@ public class LongArrayOmniBlock
 
     @Override
     @Deprecated
-    // TODO: Remove when we fix intermediate types on aggregations.
+    // Remove when we fix intermediate types on aggregations.
     public int getInt(int position, int offset)
     {
         checkReadablePosition(position);

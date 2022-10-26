@@ -48,8 +48,7 @@ public class DynamicFilterSourceOmniOperator
     private Page page;
 
     /**
-     * Constructor for the Dynamic Filter Source Operator TODO: no need to collect
-     * dynamic filter if it's cached
+     * Constructor for the Dynamic Filter Source Operator
      */
     public DynamicFilterSourceOmniOperator(OperatorContext context,
                                            Consumer<Map<Channel, Set>> dynamicPredicateConsumer, List<Channel> channels, PlanNodeId planNodeId,
