@@ -36,7 +36,6 @@ class OmniExpressionAdaptorSuite extends SparkFunSuite {
     AttributeReference("d", BooleanType)(), AttributeReference("e", IntegerType)(),
     AttributeReference("f", StringType)(), AttributeReference("g", StringType)())
 
-  // todo: CaseWhen,InSet
   test("expression rewrite") {
     checkExpressionRewrite("$operator$ADD:1(#0,#1)", Add(allAttribute(0), allAttribute(1)))
     checkExpressionRewrite("$operator$ADD:1(#0,1:1)", Add(allAttribute(0), Literal(1)))

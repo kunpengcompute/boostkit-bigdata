@@ -278,7 +278,6 @@ case class ColumnarBroadcastHashJoinExec(
     }.toArray
     val relation = buildPlan.executeBroadcast[ColumnarHashedRelation]()
 
-    // TODO: check
     val buildOutputTypes = buildTypes // {1,1}
 
     val probeTypes = new Array[DataType](streamedOutput.size) // {2,2}, streamedOutput:col1#10,col2#11

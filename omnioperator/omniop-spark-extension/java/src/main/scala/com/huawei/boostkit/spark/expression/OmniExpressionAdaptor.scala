@@ -42,7 +42,6 @@ import scala.collection.mutable
 object OmniExpressionAdaptor extends Logging {
 
   def getRealExprId(expr: Expression): ExprId = {
-    // TODO support more complex expression
     expr match {
       case alias: Alias => getRealExprId(alias.child)
       case subString: Substring => getRealExprId(subString.str)

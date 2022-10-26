@@ -686,7 +686,6 @@ long Test_splitter_nativeMake(std::string partitioning_name,
     auto compression_type_result = GetCompressionType(compression_type_jstr);
     splitOptions.compression_type = compression_type_result;
     splitOptions.data_file = data_file_jstr;
-    //TODO: memory pool select
     auto splitter = Splitter::Make(partitioning_name, inputDataTypes, numCols, num_partitions, std::move(splitOptions));
     return shuffle_splitter_holder_.Insert(std::shared_ptr<Splitter>(splitter));
 }

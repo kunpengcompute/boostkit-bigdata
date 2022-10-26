@@ -104,7 +104,6 @@ public class OmniOrcColumnarBatchReader extends RecordReader<Void, ColumnarBatch
 
   @Override
   public void close() throws IOException {
-    // TODO close omni vec
     if (recordReader != null) {
       recordReader.close();
       recordReader = null;
@@ -196,7 +195,6 @@ public class OmniOrcColumnarBatchReader extends RecordReader<Void, ColumnarBatch
    * by copying from ORC VectorizedRowBatch columns to Spark ColumnarBatch columns.
    */
   private boolean nextBatch() throws IOException {
-    // TODO recordReader.nextBatch(wrap.batch());
      int batchSize = capacity;
     if ((requiredFields.length == 1 && requestedDataColIds[0] == -1) || requiredFields.length == 0) {
         batchSize = (int) recordReader.getNumberOfRowsJava();
