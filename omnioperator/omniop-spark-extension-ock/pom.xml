@@ -191,24 +191,6 @@
            </execution>
          </executions>
        </plugin>
-       <plugin>
-         <groupId>com.huawei.bepcloud</groupId>
-         <artifactId>rebuild-maven-plugin</artifactId>
-         <version>2.1.T1</version>
-         <executions>
-           <execution>
-             <id>rebuild_1</id>
-             <goals>
-               <goal>rebuild</goal>
-               <goal>fixFileTimeAttr</goal>
-             </goals>
-             <configuration>
-               <outputDirectory>${project.build.directory}/../</outputDirectory>
-               <overwrite>true</overwrite>
-             </configuration>
-           </execution>
-         </executions>
-       </plugin>
      </plugins>
      <pluginManagement>
        <plugins>
