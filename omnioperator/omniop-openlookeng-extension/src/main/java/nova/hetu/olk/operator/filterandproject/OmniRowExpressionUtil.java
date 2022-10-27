@@ -366,7 +366,7 @@ public class OmniRowExpressionUtil
         Optional<RowExpression> likeTranslatedFilter = Optional
                 .of(new CallExpression(((CallExpression) translatedExpr.get()).getDisplayName().toUpperCase(Locale.ROOT),
                         ((CallExpression) translatedExpr.get()).getFunctionHandle(),
-                        ((CallExpression) translatedExpr.get()).getType(), newArgs));
+                        translatedExpr.get().getType(), newArgs));
         return likeTranslatedFilter;
     }
 }

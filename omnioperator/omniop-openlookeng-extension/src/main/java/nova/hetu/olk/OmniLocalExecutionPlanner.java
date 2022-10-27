@@ -1335,7 +1335,7 @@ public class OmniLocalExecutionPlanner
 
             // Execution must be plugged in here
             if (!node.getDynamicFilters().isEmpty()) {
-                // log.debug("[Join] Dynamic filters: %s", node.getDynamicFilters());
+                log.debug("[Join] Dynamic filters: %s", node.getDynamicFilters());
             }
 
             List<Symbol> leftSymbols = Lists.transform(clauses, JoinNode.EquiJoinClause::getLeft);

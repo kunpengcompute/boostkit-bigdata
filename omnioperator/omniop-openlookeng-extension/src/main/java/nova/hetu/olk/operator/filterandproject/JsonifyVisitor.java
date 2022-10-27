@@ -13,7 +13,6 @@ import io.prestosql.spi.relation.RowExpressionVisitor;
 import io.prestosql.spi.relation.SpecialForm;
 import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.spi.type.Decimals;
-import io.prestosql.spi.type.TypeSignature;
 import nova.hetu.olk.tool.OperatorUtils;
 import nova.hetu.omniruntime.type.CharDataType;
 import nova.hetu.omniruntime.type.DataType;
@@ -46,7 +45,7 @@ class JsonifyVisitor
         if (callName.startsWith(OPERATOR_PREFIX)) {
             callName = callName.substring(OPERATOR_PREFIX.length()).toUpperCase(Locale.ROOT);
         }
-        TypeSignature callSignature = call.getType().getTypeSignature();
+
         DataType returnType = OperatorUtils.toDataType(call.getType());
         int typeId = returnType.getId().ordinal();
         // Binary operator in rowExpression
