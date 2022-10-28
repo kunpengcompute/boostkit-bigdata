@@ -73,10 +73,10 @@ object OrcUtils extends Logging {
     } catch {
       case e: org.apache.orc.FileFormatException =>
         if (ignoreCorruptFiles) {
-          logWarning(s"Skipped the footer in the corrupted file: $file", e)
+          logWarning(s"Skipped the footer in the corrupted file", e)
           None
         } else {
-          throw new SparkException(s"Could not read footer for file: $file", e)
+          throw new SparkException(s"Could not read footer for file", e)
         }
     }
   }
