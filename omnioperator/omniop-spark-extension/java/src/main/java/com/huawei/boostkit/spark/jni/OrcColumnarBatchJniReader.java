@@ -19,7 +19,6 @@
 package com.huawei.boostkit.spark.jni;
 
 import nova.hetu.omniruntime.type.DataType;
-import nova.hetu.omniruntime.type.Decimal64DataType;
 import nova.hetu.omniruntime.type.Decimal128DataType;
 import nova.hetu.omniruntime.vector.*;
 
@@ -68,7 +67,7 @@ public class OrcColumnarBatchJniReader {
         return jsonObject;
     }
 
-    public String PadZeroForDecimals(String [] decimalStrArray, int decimalScale) {
+    public String padZeroForDecimals(String [] decimalStrArray, int decimalScale) {
         String decimalVal = ""; // Integer without decimals, eg: 12345
         if (decimalStrArray.length == 2) { // Integer with decimals, eg: 12345.6
             decimalVal = decimalStrArray[1];
@@ -95,7 +94,7 @@ public class OrcColumnarBatchJniReader {
                     if (decimalS == 0) {
                         jsonObject.put("literal", spiltValues[0] + " " + decimalP + " " + decimalS);
                     } else {
-                        String scalePadZeroStr = PadZeroForDecimals(spiltValues, decimalS);
+                        String scalePadZeroStr = padZeroForDecimals(spiltValues, decimalS);
                         jsonObject.put("literal", spiltValues[0] + "." + scalePadZeroStr + " " + decimalP + " " + decimalS);
                     }
                 } else {
@@ -114,7 +113,7 @@ public class OrcColumnarBatchJniReader {
                         if (decimalS == 0) {
                             lst.add(spiltValues[0] + " " + decimalP + " " + decimalS);
                         } else {
-                            String scalePadZeroStr = PadZeroForDecimals(spiltValues, decimalS);
+                            String scalePadZeroStr = padZeroForDecimals(spiltValues, decimalS);
                             lst.add(spiltValues[0] + "." + scalePadZeroStr + " " + decimalP + " " + decimalS);
                         }
                     } else if (pl.getType() == PredicateLeaf.Type.DATE) {
@@ -165,7 +164,7 @@ public class OrcColumnarBatchJniReader {
         job.put("offset", options.getOffset());
         job.put("length", options.getLength());
         if (options.getSearchArgument() != null) {
-            LOGGER.debug("SearchArgument:" + options.getSearchArgument().toString());
+            LOGGER.debug("SearchArgument: {}", options.getSearchArgument().toString());
             JSONObject jsonexpressionTree = getSubJson(options.getSearchArgument().getExpression());
             job.put("expressionTree", jsonexpressionTree);
             JSONObject jsonleaves = getLeavesJson(options.getSearchArgument().getLeaves(), options.getSchema());
