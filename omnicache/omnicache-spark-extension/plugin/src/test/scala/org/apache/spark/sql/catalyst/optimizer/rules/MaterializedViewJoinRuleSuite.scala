@@ -49,6 +49,114 @@ class MaterializedViewJoinRuleSuite extends RewriteSuite {
     comparePlansAndRows(sql, "default", "mv_join1", noData = false)
   }
 
+  test("mv_join1_1_subQuery") {
+    // is same to view
+    val sql =
+      """
+        |SELECT e.*,d.deptname1
+        |FROM
+        | (SELECT
+        | empid as empid,
+        | deptno as deptno,
+        | empname as empname1
+        | FROM
+        | emps)
+        | e JOIN
+        | (SELECT
+        | deptno as deptno,
+        | deptname as deptname1
+        | FROM
+        | depts)
+        | d
+        |ON e.deptno=d.deptno;
+        |""".stripMargin
+    comparePlansAndRows(sql, "default", "mv_join1", noData = false)
+  }
+
+  test("mv_join1_1_subQuery2") {
+    spark.sql(
+      """
+        |CREATE MATERIALIZED VIEW IF NOT EXISTS mv_join1_subQuery2
+        |AS
+        |SELECT e.*,d.deptname
+        |FROM emps e JOIN depts d
+        |ON substring(e.deptno,0,1) =substring(d.deptno,0,1) ;
+        |""".stripMargin
+    )
+
+    // is same to view
+    val sql =
+      """
+        |SELECT e.*,d.deptname1
+        |FROM
+        | (SELECT
+        | empid as empid,
+        | substring(deptno,0,1) as deptno,
+        | empname as empname1
+        | FROM
+        | emps)
+        | e JOIN
+        | (SELECT
+        | substring(deptno,0,1)  as deptno,
+        | deptname as deptname1
+        | FROM
+        | depts)
+        | d
+        |ON e.deptno=d.deptno;
+        |""".stripMargin
+    comparePlansAndRows(sql, "default", "mv_join1_subQuery2", noData = false)
+    spark.sql("DROP MATERIALIZED VIEW IF EXISTS mv_join1_subQuery2")
+  }
+
+  test("mv_join1_1_subQuery3") {
+    spark.sql(
+      """
+        |CREATE MATERIALIZED VIEW IF NOT EXISTS mv_join1_subQuery3
+        |AS
+        |SELECT e.*,d.deptname,l.state
+        |FROM emps e JOIN depts d JOIN locations l
+        |ON substring(e.deptno,0,1) =substring(d.deptno,0,1)
+        |AND e.locationid=l.locationid;
+        |""".stripMargin
+    )
+
+    // is same to view
+    val sql =
+      """
+        |SELECT k.*,l.state
+        |FROM
+        |(SELECT e.*,d.deptname1
+        |FROM
+        | (SELECT
+        | empid as empid,
+        | substring(deptno,0,1) as deptno,
+        | empname as empname1,
+        | locationid as locationid
+        | FROM
+        | emps)
+        | e JOIN
+        | (SELECT
+        | substring(deptno,0,1)  as deptno,
+        | deptname as deptname1
+        | FROM
+        | depts)
+        | d
+        |ON e.deptno=d.deptno)
+        |k JOIN
+        |(SELECT
+        |locationid as locationid,
+        |state as state
+        |FROM
+        |locations
+        |)
+        |l
+        |ON k.locationid=l.locationid
+        |;
+        |""".stripMargin
+    comparePlansAndRows(sql, "default", "mv_join1_subQuery3", noData = false)
+    spark.sql("DROP MATERIALIZED VIEW IF EXISTS mv_join1_subQuery3")
+  }
+
   test("mv_join1_2") {
     // is same to view, join order different
     val sql =

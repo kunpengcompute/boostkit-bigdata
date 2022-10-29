@@ -707,6 +707,6 @@ object ExprSimplifier extends PredicateHelper {
   // simplify condition without pulledUpPredicates.
   def simplify(expr: Expression): Expression = {
     val fakePlan = simplify(Filter(expr, OneRowRelation()))
-    fakePlan.asInstanceOf[Filter].condition
+    RewriteHelper.canonicalize(fakePlan.asInstanceOf[Filter].condition)
   }
 }

@@ -18,7 +18,7 @@
 package org.apache.spark.sql.catalyst.optimizer.rules
 
 import com.google.common.collect.BiMap
-import com.huawei.boostkit.spark.util.{ExpressionEqual, TableEqual}
+import com.huawei.boostkit.spark.util.{ExpressionEqual, RewriteHelper, TableEqual}
 import scala.collection.mutable
 
 import org.apache.spark.sql.SparkSession
@@ -50,7 +50,7 @@ class MaterializedViewJoinRule(sparkSession: SparkSession)
   override def compensateViewPartial(viewTablePlan: LogicalPlan,
       viewQueryPlan: LogicalPlan,
       topViewProject: Option[Project],
-      needTables: Set[TableEqual]):
+      needTables: Seq[TableEqual]):
   Option[(LogicalPlan, LogicalPlan, Option[Project])] = {
     // newViewTablePlan
     var newViewTablePlan = viewTablePlan
@@ -102,7 +102,9 @@ class MaterializedViewJoinRule(sparkSession: SparkSession)
 
     // queryProjectList
     val queryProjectList = extractTopProjectList(queryPlan).map(_.asInstanceOf[NamedExpression])
-    val swapQueryProjectList = swapColumnReferences(queryProjectList, columnMapping)
+    val origins = generateOrigins(queryPlan)
+    val originQueryProjectList = queryProjectList.map(x => findOriginExpression(origins, x))
+    val swapQueryProjectList = swapColumnReferences(originQueryProjectList, columnMapping)
 
     // rewrite and alias queryProjectList
     // if the rewrite expression exprId != origin expression exprId,
@@ -111,11 +113,9 @@ class MaterializedViewJoinRule(sparkSession: SparkSession)
       swapTableColumn = true, tableMapping, columnMapping,
       viewProjectList, viewTableAttrs, queryProjectList)
 
-    if (rewritedQueryProjectList.isEmpty) {
-      return None
-    }
-
+    val res = Project(rewritedQueryProjectList.get
+        .map(_.asInstanceOf[NamedExpression]), viewTablePlan)
     // add project
-    Some(Project(rewritedQueryProjectList.get, viewTablePlan))
+    Some(res)
   }
 }

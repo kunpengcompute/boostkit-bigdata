@@ -36,6 +36,7 @@
         <scoverage.maven.version>1.4.11</scoverage.maven.version>
         <puppycrawl.checkstyle.version>8.29</puppycrawl.checkstyle.version>
         <dep.os.arch></dep.os.arch>
+        <scoverage.skip>true</scoverage.skip>
     </properties>
 
     <dependencyManagement>
@@ -57,23 +58,6 @@
             </dependency>
 
             <!-- test dependencies -->
-            <dependency>
-                <groupId>org.apache.spark</groupId>
-                <artifactId>spark-core_${scala.binary.version}</artifactId>
-                <version>${spark.version}</version>
-                <type>test-jar</type>
-                <scope>test</scope>
-                <exclusions>
-                    <exclusion>
-                        <groupId>org.apache.hadoop</groupId>
-                        <artifactId>hadoop-client</artifactId>
-                    </exclusion>
-                    <exclusion>
-                        <groupId>org.apache.curator</groupId>
-                        <artifactId>curator-recipes</artifactId>
-                    </exclusion>
-                </exclusions>
-            </dependency>
             <dependency>
                 <groupId>junit</groupId>
                 <artifactId>junit</artifactId>

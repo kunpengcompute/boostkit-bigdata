@@ -18,7 +18,7 @@
 package org.apache.spark.sql.catalyst.optimizer.rules
 
 import com.google.common.collect.BiMap
-import com.huawei.boostkit.spark.util.{ExpressionEqual, TableEqual}
+import com.huawei.boostkit.spark.util.{ExpressionEqual, RewriteHelper, TableEqual}
 import scala.collection.mutable
 
 import org.apache.spark.sql.SparkSession
@@ -26,6 +26,7 @@ import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate._
 import org.apache.spark.sql.catalyst.plans.Inner
 import org.apache.spark.sql.catalyst.plans.logical._
+import org.apache.spark.sql.types.DecimalType
 
 
 class MaterializedViewAggregateRule(sparkSession: SparkSession)
@@ -55,7 +56,7 @@ class MaterializedViewAggregateRule(sparkSession: SparkSession)
   override def compensateViewPartial(viewTablePlan: LogicalPlan,
       viewQueryPlan: LogicalPlan,
       topViewProject: Option[Project],
-      needTables: Set[TableEqual]):
+      needTables: Seq[TableEqual]):
   Option[(LogicalPlan, LogicalPlan, Option[Project])] = {
     // newViewTablePlan
     var newViewTablePlan = viewTablePlan
@@ -144,7 +145,7 @@ class MaterializedViewAggregateRule(sparkSession: SparkSession)
     // if subGroupExpressionEquals is empty and aggCalls all in viewAggExpressionEquals,
     // final need project not aggregate
     val isJoinCompensated = viewTablePlan.isInstanceOf[Join]
-    var projectFlag = subGroupExpressionEquals.isEmpty && !isJoinCompensated
+    val projectFlag = subGroupExpressionEquals.isEmpty && !isJoinCompensated
 
     // 3.1.viewGroupExpressionEquals is same to queryGroupExpressionEquals
     if (projectFlag) {
@@ -191,7 +192,17 @@ class MaterializedViewAggregateRule(sparkSession: SparkSession)
           val qualifier = viewTableAttr.qualifier
           expr = expr match {
             case a@Alias(agg@AggregateExpression(Sum(_), _, _, _, _), _) =>
-              copyAlias(a, agg.copy(aggregateFunction = Sum(viewTableAttr)), qualifier)
+              viewTableAttr match {
+                case DecimalType.Expression(prec, scale) =>
+                  if (prec - 10 > 0) {
+                    copyAlias(a, MakeDecimal(agg.copy(aggregateFunction =
+                      Sum(UnscaledValue(viewTableAttr))), prec, scale), qualifier)
+                  } else {
+                    copyAlias(a, agg.copy(aggregateFunction = Sum(viewTableAttr)), qualifier)
+                  }
+                case _ =>
+                  copyAlias(a, agg.copy(aggregateFunction = Sum(viewTableAttr)), qualifier)
+              }
             case a@Alias(agg@AggregateExpression(Min(_), _, _, _, _), _) =>
               copyAlias(a, agg.copy(aggregateFunction = Min(viewTableAttr)), qualifier)
             case a@Alias(agg@AggregateExpression(Max(_), _, _, _, _), _) =>
@@ -201,6 +212,8 @@ class MaterializedViewAggregateRule(sparkSession: SparkSession)
             case a@Alias(AttributeReference(_, _, _, _), _) =>
               copyAlias(a, viewTableAttr, viewTableAttr.qualifier)
             case AttributeReference(_, _, _, _) => viewTableAttr
+            case Literal(_, _) | Alias(Literal(_, _), _) =>
+              expr
             // other agg like avg or user_defined udaf not support rollUp
             case _ => return None
           }
@@ -223,21 +236,26 @@ class MaterializedViewAggregateRule(sparkSession: SparkSession)
     }
 
     // 5.add project
-    if (projectFlag) {
-      // 5.1.not need agg,just project
-      Some(Project(rewritedQueryAggExpressions.get, viewTablePlan))
-    } else {
-      // 5.2.need agg,rewrite GroupingExpressions and new agg
-      val rewritedGroupingExpressions = rewriteAndAliasExpressions(newGroupingExpressions,
-        swapTableColumn = true, tableMapping, columnMapping,
-        viewProjectList, viewTableAttrs,
-        newGroupingExpressions.map(_.asInstanceOf[NamedExpression]))
-      if (rewritedGroupingExpressions.isEmpty) {
-        return None
+    val res =
+      if (projectFlag) {
+        // 5.1.not need agg,just project
+        Some(Project(rewritedQueryAggExpressions.get, viewTablePlan))
+      } else {
+        // 5.2.need agg,rewrite GroupingExpressions and new agg
+        val rewritedGroupingExpressions = rewriteAndAliasExpressions(newGroupingExpressions,
+          swapTableColumn = true, tableMapping, columnMapping,
+          viewProjectList, viewTableAttrs,
+          newGroupingExpressions.map(_.asInstanceOf[NamedExpression]))
+        if (rewritedGroupingExpressions.isEmpty) {
+          return None
+        }
+        Some(Aggregate(rewritedGroupingExpressions.get,
+          rewritedQueryAggExpressions.get, viewTablePlan))
       }
-      Some(Aggregate(rewritedGroupingExpressions.get,
-        rewritedQueryAggExpressions.get, viewTablePlan))
+    if (!RewriteHelper.checkAttrsValid(res.get)) {
+      return None
     }
+    res
   }
 
   def copyAlias(alias: Alias, child: Expression, qualifier: Seq[String]): Alias = {

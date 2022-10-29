@@ -41,22 +41,6 @@
 
         <!-- test dependencies -->
         <dependency>
-            <groupId>org.apache.spark</groupId>
-            <artifactId>spark-core_${scala.binary.version}</artifactId>
-            <type>test-jar</type>
-            <scope>test</scope>
-            <exclusions>
-                <exclusion>
-                    <groupId>org.apache.hadoop</groupId>
-                    <artifactId>hadoop-client</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>org.apache.curator</groupId>
-                    <artifactId>curator-recipes</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-        <dependency>
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>
             <scope>test</scope>
@@ -227,7 +211,7 @@
                     <aggregate>true</aggregate>
                     <highlighting>true</highlighting>
                     <encoding>${project.build.sourceEncoding}</encoding>
-                    <skip>true</skip>
+                    <skip>${scoverage.skip}</skip>
                 </configuration>
             </plugin>
         </plugins>

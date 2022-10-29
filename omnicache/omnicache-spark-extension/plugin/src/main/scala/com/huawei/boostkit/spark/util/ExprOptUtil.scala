@@ -611,6 +611,8 @@ case class EquivalenceClasses() {
     }
     cacheEquivalenceClasses
   }
+
+  override def toString: String = nodeToEquivalenceClass.toString()
 }
 
 object EquivalenceClasses {

@@ -18,11 +18,13 @@
 package org.apache.spark.deploy.history
 
 import com.huawei.boostkit.spark.util.RewriteLogger
-import java.io.FileNotFoundException
+import java.io.{File, FileNotFoundException}
 import java.text.SimpleDateFormat
 import java.util.ServiceLoader
 import java.util.regex.Pattern
+import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, FileSystem, Path}
+import org.apache.hadoop.security.UserGroupInformation
 import org.json4s.DefaultFormats
 import org.json4s.jackson.Json
 import scala.collection.JavaConverters.iterableAsScalaIterableConverter
@@ -43,9 +45,36 @@ import org.apache.spark.util.kvstore.{InMemoryStore, KVStore}
 class LogsParser(conf: SparkConf, eventLogDir: String, outPutDir: String) extends RewriteLogger {
 
   private val LINE_SEPARATOR = "\n"
-  private val hadoopConf = SparkHadoopUtil.get.newConfiguration(conf)
+  private val hadoopConf = confLoad()
   // Visible for testing
   private[history] val fs: FileSystem = new Path(eventLogDir).getFileSystem(hadoopConf)
+
+  def confLoad(): Configuration = {
+    val configuration: Configuration = SparkHadoopUtil.get.newConfiguration(conf)
+    val xmls = Seq("hdfs-site.xml", "core-site.xml")
+    val xmlDir = System.getProperty("omnicache.hdfs_conf", ".")
+    xmls.foreach { xml =>
+      val file = new File(xmlDir, xml)
+      if (file.exists()) {
+        configuration.addResource(new Path(file.getAbsolutePath))
+      }
+    }
+
+    // security mode
+    if ("kerberos".equalsIgnoreCase(configuration.get("hadoop.security.authentication"))) {
+      val krb5Conf = System.getProperty("omnicache.krb5_conf", "/etc/krb5.conf")
+      System.setProperty("java.security.krb5.conf", krb5Conf)
+      val principal = System.getProperty("omnicache.principal")
+      val keytab = System.getProperty("omnicache.keytab")
+      if (principal == null || keytab == null) {
+        throw new RuntimeException("omnicache.principal or omnicache.keytab cannot be null")
+      }
+      System.setProperty("java.security.krb5.conf", krb5Conf)
+      UserGroupInformation.setConfiguration(configuration)
+      UserGroupInformation.loginUserFromKeytab(principal, keytab)
+    }
+    configuration
+  }
 
   /**
    * parseAppHistoryLog
@@ -75,9 +104,9 @@ class LogsParser(conf: SparkConf, eventLogDir: String, outPutDir: String) extend
         curLoop.breakable {
           // skip unNormal execution
           val isRunning = execution.completionTime.isEmpty ||
-              execution.jobs.exists { case (_, status) => status == JobExecutionStatus.RUNNING }
+            execution.jobs.exists { case (_, status) => status == JobExecutionStatus.RUNNING }
           val isFailed = execution
-              .jobs.exists { case (_, status) => status == JobExecutionStatus.FAILED }
+            .jobs.exists { case (_, status) => status == JobExecutionStatus.FAILED }
           if (isRunning || isFailed) {
             curLoop.break()
           }
@@ -116,7 +145,7 @@ class LogsParser(conf: SparkConf, eventLogDir: String, outPutDir: String) extend
       case e: FileNotFoundException =>
         throw e
       case e: Throwable =>
-        logWarning(s"Failed to parseAppHistoryLog ${appId} for ${e.getMessage}")
+        logWarning(s"Failed to parseAppHistoryLog $appId for ${e.getMessage}")
     }
     jsons
   }
@@ -143,7 +172,7 @@ class LogsParser(conf: SparkConf, eventLogDir: String, outPutDir: String) extend
       // The ApplicationInfo may not be available when Spark is starting up.
       Utils.tryWithResource(
         store.view(classOf[SparkListenerMVRewriteSuccess])
-            .closeableIterator()
+          .closeableIterator()
       ) { it =>
         while (it.hasNext) {
           val info = it.next()
@@ -165,7 +194,7 @@ class LogsParser(conf: SparkConf, eventLogDir: String, outPutDir: String) extend
    */
   def getNodeInfo(graph: SparkPlanGraph): String = {
     // write node
-    val tmpContext = new StringBuilder
+    val tmpContext = new mutable.StringBuilder
     tmpContext.append("[PlanMetric]")
     nextLine(tmpContext)
     graph.allNodes.foreach { node =>
@@ -206,13 +235,13 @@ class LogsParser(conf: SparkConf, eventLogDir: String, outPutDir: String) extend
           tmpContext.append(s"${cluster.nodes(i).id} ")
         }
         nextLine(tmpContext)
-      case node =>
+      case _ =>
     }
     nextLine(tmpContext)
     tmpContext.toString()
   }
 
-  def nextLine(context: StringBuilder): Unit = {
+  def nextLine(context: mutable.StringBuilder): Unit = {
     context.append(LINE_SEPARATOR)
   }
 
@@ -272,9 +301,9 @@ class LogsParser(conf: SparkConf, eventLogDir: String, outPutDir: String) extend
    * @param eventsFilter   ReplayEventsFilter
    */
   private def parseAppEventLogs(logFiles: Seq[FileStatus],
-      replayBus: ReplayListenerBus,
-      maybeTruncated: Boolean,
-      eventsFilter: ReplayEventsFilter = SELECT_ALL_FILTER): Unit = {
+                                replayBus: ReplayListenerBus,
+                                maybeTruncated: Boolean,
+                                eventsFilter: ReplayEventsFilter = SELECT_ALL_FILTER): Unit = {
     // stop replaying next log files if ReplayListenerBus indicates some error or halt
     var continueReplay = true
     logFiles.foreach { file =>
@@ -325,12 +354,14 @@ arg1: output dir in hdfs, eg. hdfs://server1:9000/logParser
 arg2: log file to be parsed, eg. application_1646816941391_0115.lz4
  */
 object ParseLog extends RewriteLogger {
+  val regex = ".*application_[0-9]+_[0-9]+.*(\\.lz4)?$"
+
   def main(args: Array[String]): Unit = {
     if (args == null || args.length != 3) {
       throw new RuntimeException("input params is invalid,such as below\n" +
-          "arg0: spark.eventLog.dir, eg. hdfs://server1:9000/spark2-history\n" +
-          "arg1: output dir in hdfs, eg. hdfs://server1:9000/logParser\n" +
-          "arg2: log file to be parsed, eg. application_1646816941391_0115.lz4\n")
+        "arg0: spark.eventLog.dir, eg. hdfs://server1:9000/spark2-history\n" +
+        "arg1: output dir in hdfs, eg. hdfs://server1:9000/logParser\n" +
+        "arg2: log file to be parsed, eg. application_1646816941391_0115.lz4\n")
     }
     val sparkEventLogDir = args(0)
     val outputDir = args(1)
@@ -346,7 +377,6 @@ object ParseLog extends RewriteLogger {
     val logParser = new LogsParser(conf, sparkEventLogDir, outputDir)
 
     // file pattern
-    val regex = "^application_[0-9]+._[0-9]+.lz4$"
     val pattern = Pattern.compile(regex)
     val matcher = pattern.matcher(logName)
     if (matcher.find) {
@@ -369,11 +399,11 @@ object ParseLogs extends RewriteLogger {
   def main(args: Array[String]): Unit = {
     if (args == null || args.length != 5) {
       throw new RuntimeException("input params is invalid,such as below\n" +
-          "arg0: spark.eventLog.dir, eg. hdfs://server1:9000/spark2-history\n" +
-          "arg1: output dir in hdfs, eg. hdfs://server1:9000/logParser\n" +
-          "arg2: outFileName, eg.  log_parse_1646816941391\n" +
-          "arg3: startTime, eg.  2022-09-15 11:00\n" +
-          "arg4: endTime, eg.  2022-09-25 11:00\n")
+        "arg0: spark.eventLog.dir, eg. hdfs://server1:9000/spark2-history\n" +
+        "arg1: output dir in hdfs, eg. hdfs://server1:9000/logParser\n" +
+        "arg2: outFileName, eg.  log_parse_1646816941391\n" +
+        "arg3: startTime, eg.  2022-09-15 11:00\n" +
+        "arg4: endTime, eg.  2022-09-25 11:00\n")
     }
     val sparkEventLogDir = args(0)
     val outputDir = args(1)
@@ -391,7 +421,7 @@ object ParseLogs extends RewriteLogger {
     val logParser = new LogsParser(conf, sparkEventLogDir, outputDir)
 
     // file pattern
-    val regex = "^application_[0-9]+._[0-9]+.lz4$"
+    val regex = ParseLog.regex
     val pattern = Pattern.compile(regex)
     val dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm")
     val appIds = logParser.listAppHistoryLogs(pattern,

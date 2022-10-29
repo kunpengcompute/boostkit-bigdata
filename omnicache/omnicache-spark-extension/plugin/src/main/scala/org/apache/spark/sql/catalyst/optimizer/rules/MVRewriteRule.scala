@@ -66,7 +66,7 @@ class MVRewriteRule(session: SparkSession) extends Rule[LogicalPlan] with Rewrit
       case a: Aggregate =>
         var rewritedPlan = aggregateRule.perform(None, a, usingMvs)
         // below agg may be join/filter can be rewrite
-        if (rewritedPlan == a) {
+        if (rewritedPlan == a && !a.child.isInstanceOf[Project]) {
           val child = Project(
             RewriteHelper.extractAllAttrsFromExpression(a.aggregateExpressions).toSeq, a.child)
           val rewritedChild = joinRule.perform(Some(child), child.child, usingMvs)
@@ -82,6 +82,8 @@ class MVRewriteRule(session: SparkSession) extends Rule[LogicalPlan] with Rewrit
     if (usingMvs.nonEmpty) {
       RewriteTime.withTimeStat("checkAttrsValid") {
         if (!RewriteHelper.checkAttrsValid(res)) {
+          RewriteTime.statFromStartTime("total", rewriteStartSecond)
+          logBasedOnLevel(RewriteTime.timeStat.toString())
           return plan
         }
       }

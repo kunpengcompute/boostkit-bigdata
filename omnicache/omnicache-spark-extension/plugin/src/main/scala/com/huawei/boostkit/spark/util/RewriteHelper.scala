@@ -102,6 +102,43 @@ trait RewriteHelper extends PredicateHelper with RewriteLogger {
     topProjectList
   }
 
+  def extractAllProjectList(logicalPlan: LogicalPlan): Seq[Expression] = {
+    var allProjectList: Seq[Expression] = Seq.empty[Expression]
+    logicalPlan.foreach {
+      case Project(projectList, _) => allProjectList ++= projectList
+      case e =>
+    }
+    allProjectList
+  }
+
+  def generateOrigins(logicalPlan: LogicalPlan): Map[ExprId, Expression] = {
+    var origins = Map.empty[ExprId, Expression]
+    logicalPlan.transformAllExpressions {
+      case a@Alias(child, _) =>
+        origins += (a.exprId -> child)
+        a
+      case e => e
+    }
+    origins
+  }
+
+  def findOriginExpression(origins: Map[ExprId, Expression],
+      expression: Expression): Expression = {
+    def dfs(expr: Expression): Expression = {
+      expr.transform {
+        case attr: AttributeReference =>
+          if (origins.contains(attr.exprId)) {
+            origins(attr.exprId)
+          } else {
+            attr
+          }
+        case e => e
+      }
+    }
+
+    dfs(expression)
+  }
+
   def extractPredictExpressions(logicalPlan: LogicalPlan,
       tableMappings: BiMap[String, String])
   : (EquivalenceClasses, Seq[ExpressionEqual], Seq[ExpressionEqual]) = {
@@ -119,7 +156,10 @@ trait RewriteHelper extends PredicateHelper with RewriteLogger {
         }
       case _ =>
     }
-    for (e <- conjunctivePredicates) {
+
+    val origins = generateOrigins(logicalPlan)
+    for (src <- conjunctivePredicates) {
+      val e = findOriginExpression(origins, src)
       if (e.isInstanceOf[EqualTo]) {
         val left = e.asInstanceOf[EqualTo].left
         val right = e.asInstanceOf[EqualTo].right
@@ -166,18 +206,19 @@ trait RewriteHelper extends PredicateHelper with RewriteLogger {
     // tableName->duplicateIndex,start from 0
     val qualifierToIdx = mutable.HashMap.empty[String, Int]
     // logicalPlan->(tableName,duplicateIndex)
-    val tablePlanToIdx = mutable.HashMap.empty[LogicalPlan, (String, Int, String)]
+    val tablePlanToIdx = mutable.HashMap.empty[LogicalPlan, (String, Int, String, Long)]
     // exprId->AttributeReference,use this to replace LogicalPlan's attr
     val exprIdToAttr = mutable.HashMap.empty[ExprId, AttributeReference]
 
     val addIdxAndAttrInfo = (catalogTable: CatalogTable, logicalPlan: LogicalPlan,
-        attrs: Seq[AttributeReference]) => {
+        attrs: Seq[AttributeReference], seq: Long) => {
       val table = catalogTable.identifier.toString()
       val idx = qualifierToIdx.getOrElse(table, -1) + 1
       qualifierToIdx += (table -> idx)
       tablePlanToIdx += (logicalPlan -> (table,
           idx, Seq(SESSION_CATALOG_NAME, catalogTable.database,
-        catalogTable.identifier.table, String.valueOf(idx)).mkString(".")))
+        catalogTable.identifier.table, String.valueOf(idx)).mkString("."),
+          seq))
       attrs.foreach { attr =>
         val newAttr = attr.copy()(exprId = attr.exprId, qualifier =
           Seq(SESSION_CATALOG_NAME, catalogTable.database,
@@ -186,20 +227,38 @@ trait RewriteHelper extends PredicateHelper with RewriteLogger {
       }
     }
 
+    var seq = 0L
     logicalPlan.foreachUp {
       case h@HiveTableRelation(tableMeta, _, _, _, _) =>
-        addIdxAndAttrInfo(tableMeta, h, h.output)
+        seq += 1
+        addIdxAndAttrInfo(tableMeta, h, h.output, seq)
       case h@LogicalRelation(_, _, catalogTable, _) =>
+        seq += 1
         if (catalogTable.isDefined) {
-          addIdxAndAttrInfo(catalogTable.get, h, h.output)
+          addIdxAndAttrInfo(catalogTable.get, h, h.output, seq)
         }
       case _ =>
     }
 
+    logicalPlan.transformAllExpressions {
+      case a@Alias(child, name) =>
+        child match {
+          case attr: AttributeReference =>
+            if (exprIdToAttr.contains(attr.exprId)) {
+              val d = exprIdToAttr(attr.exprId)
+              exprIdToAttr += (a.exprId -> d
+                  .copy(name = name)(exprId = a.exprId, qualifier = d.qualifier))
+            }
+          case _ =>
+        }
+        a
+      case e => e
+    }
+
     val mappedTables = tablePlanToIdx.keySet.map { tablePlan =>
-      val (tableName, idx, qualifier) = tablePlanToIdx(tablePlan)
+      val (tableName, idx, qualifier, seq) = tablePlanToIdx(tablePlan)
       TableEqual(tableName, "%s.%d".format(tableName, idx),
-        qualifier, fillQualifier(tablePlan, exprIdToAttr))
+        qualifier, fillQualifier(tablePlan, exprIdToAttr), seq)
     }.toSet
     val mappedQuery = fillQualifier(logicalPlan, exprIdToAttr)
     (mappedQuery, mappedTables)
@@ -434,8 +493,10 @@ object RewriteHelper extends PredicateHelper with RewriteLogger {
   }
 
   def checkAttrsValid(logicalPlan: LogicalPlan): Boolean = {
+    logDetail(s"checkAttrsValid for plan:$logicalPlan")
     logicalPlan.foreachUp {
       case _: LeafNode =>
+      case _: Expand =>
       case plan =>
         val attributeSets = plan.expressions.map { expression =>
           AttributeSet.fromAttributeSets(
@@ -480,10 +541,12 @@ case class ExpressionEqual(expression: Expression) {
     case Alias(child, _) => extractRealExpr(child)
     case other => other
   }
+
+  override def toString: String = s"ExpressionEqual($sql)"
 }
 
 case class TableEqual(tableName: String, tableNameWithIdx: String,
-    qualifier: String, logicalPlan: LogicalPlan) {
+    qualifier: String, logicalPlan: LogicalPlan, seq: Long) {
 
   override def equals(obj: Any): Boolean = obj match {
     case other: TableEqual => tableNameWithIdx == other.tableNameWithIdx

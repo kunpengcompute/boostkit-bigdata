@@ -170,14 +170,22 @@ object ViewMetadata extends RewriteHelper {
     val catalog = spark.sessionState.catalog
 
     // load from all db
-    for (db <- catalog.listDatabases()) {
-      val tables = RewriteTime.withTimeStat("loadTable") {
+    val dbs = RewriteTime.withTimeStat("loadDbs") {
+      if (getConf.omniCacheDB.nonEmpty) {
+        getConf.omniCacheDB.split(",").toSeq
+      } else {
+        catalog.listDatabases()
+      }
+    }
+    for (db <- dbs) {
+      val tables = RewriteTime.withTimeStat(s"loadTable from $db") {
         omniCacheFilter(catalog, db)
       }
       RewriteTime.withTimeStat("saveViewMetadataToMap") {
         tables.foreach(tableData => saveViewMetadataToMap(tableData))
       }
     }
+    logDetail(s"tableToViews:$tableToViews")
   }
 
   def omniCacheFilter(catalog: SessionCatalog,

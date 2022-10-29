@@ -45,6 +45,7 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
   def perform(topProject: Option[Project], plan: LogicalPlan,
       usingMvs: mutable.Set[String]): LogicalPlan = {
     var finalPlan = if (topProject.isEmpty) plan else topProject.get
+    logDetail(s"enter rule:${this.getClass.getName} perform for plan:$finalPlan")
 
     if (ViewMetadata.status == ViewMetadata.STATUS_LOADING) {
       return finalPlan
@@ -54,12 +55,18 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
     }
     // 1.check query sql is match current rule
     if (ViewMetadata.isEmpty || !isValidPlan(plan)) {
+      if (ViewMetadata.isEmpty) {
+        logDetail("ViewMetadata.isEmpty")
+      } else {
+        logDetail(s"queryPlan isValidPlan")
+      }
       return finalPlan
     }
 
     // 2.extract tablesInfo from queryPlan and replace the AttributeReference
     // in plan using tableAttr
     val (queryExpr, queryTables) = extractTables(finalPlan)
+    logDetail(s"queryTables:$queryTables")
 
     // 3.use all tables to fetch views(may match) from ViewMetaData
     val candidateViewPlans = RewriteTime.withTimeStat("getApplicableMaterializations") {
@@ -67,6 +74,7 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
           .filter(x => !OmniCachePluginConfig.isMVInUpdate(x._2))
     }
     if (candidateViewPlans.isEmpty) {
+      logDetail(s"no candidateViewPlans")
       return finalPlan
     }
 
@@ -77,8 +85,11 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
     // 4.iterate views,try match and rewrite
     for ((viewName, srcViewTablePlan, srcViewQueryPlan) <- candidateViewPlans) {
       curPlanLoop.breakable {
+        logDetail(s"iterate view:$viewName, viewTablePlan:$srcViewTablePlan, " +
+            s"viewQueryPlan:$srcViewQueryPlan")
         // 4.1.check view query sql is match current rule
         if (!isValidPlan(srcViewQueryPlan)) {
+          logDetail(s"viewPlan isValidPlan:$srcViewQueryPlan")
           curPlanLoop.break()
         }
 
@@ -102,14 +113,21 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
         // 4.4.compute the relation of viewTableInfo and queryTableInfo
         // 4.4.1.queryTableInfo containsAll viewTableInfo
         if (!viewTables.subsetOf(queryTables)) {
+          logDetail(s"viewTables is not subsetOf queryTables")
           curPlanLoop.break()
         }
 
         // 4.4.2.queryTableInfo!=viewTableInfo, need do join compensate
         val needCompensateTables = queryTables -- viewTables
+        logDetail(s"needCompensateTables:$needCompensateTables")
         if (needCompensateTables.nonEmpty) {
+          val sortedNeedCompensateTables = needCompensateTables.toSeq.sortWith {
+            (t1: TableEqual, t2: TableEqual) =>
+              t1.seq < t2.seq
+          }
+          logDetail(f"sortedNeedCompensateTables:$sortedNeedCompensateTables")
           val newViewPlans = compensateViewPartial(viewTablePlan,
-            viewQueryPlan, topViewProject, needCompensateTables)
+            viewQueryPlan, topViewProject, sortedNeedCompensateTables)
           if (newViewPlans.isEmpty) {
             curPlanLoop.break()
           }
@@ -124,6 +142,7 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
         val queryPredictExpression = RewriteTime.withTimeStat("extractPredictExpressions") {
           extractPredictExpressions(queryExpr, EMPTY_BIMAP)
         }
+        logDetail(s"queryPredictExpression:$queryPredictExpression")
 
         val viewProjectList = extractTopProjectList(viewQueryExpr)
         val viewTableAttrs = viewTablePlan.output
@@ -139,10 +158,12 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
         flatListMappings.foreach { queryToViewTableMapping =>
           mappingLoop.breakable {
             val inverseTableMapping = queryToViewTableMapping.inverse()
+            logDetail(s"iterate queryToViewTableMapping:$inverseTableMapping")
             val viewPredictExpression = RewriteTime.withTimeStat("extractPredictExpressions") {
               extractPredictExpressions(viewQueryExpr,
                 inverseTableMapping)
             }
+            logDetail(s"viewPredictExpression:$viewPredictExpression")
 
             // 4.7.compute compensationPredicates between viewQueryPlan and queryPlan
             var newViewTablePlan = RewriteTime.withTimeStat("computeCompensationPredicates") {
@@ -151,20 +172,25 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
                 viewPredictExpression._1.getEquivalenceClassesMap,
                 viewProjectList, viewTableAttrs)
             }
+            logDetail(s"computeCompensationPredicates plan:$newViewTablePlan")
             // 4.8.compensationPredicates isEmpty, because view's row data cannot satisfy query
             if (newViewTablePlan.isEmpty) {
+              logDetail("computeCompensationPredicates plan isEmpty")
               mappingLoop.break()
             }
 
             // 4.9.use viewTablePlan(join compensated), query project,
             // compensationPredicts to rewrite final plan
+
             newViewTablePlan = RewriteTime.withTimeStat("rewriteView") {
               rewriteView(newViewTablePlan.get, viewQueryExpr,
                 queryExpr, inverseTableMapping,
                 queryPredictExpression._1.getEquivalenceClassesMap,
                 viewProjectList, viewTableAttrs)
             }
-            if (newViewTablePlan.isEmpty) {
+            logDetail(s"rewriteView plan:$newViewTablePlan")
+            if (newViewTablePlan.isEmpty || !RewriteHelper.checkAttrsValid(newViewTablePlan.get)) {
+              logDetail("rewriteView plan isEmpty")
               mappingLoop.break()
             }
             finalPlan = newViewTablePlan.get
@@ -264,7 +290,7 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
   def compensateViewPartial(viewTablePlan: LogicalPlan,
       viewQueryPlan: LogicalPlan,
       topViewProject: Option[Project],
-      needTables: Set[TableEqual]):
+      needTables: Seq[TableEqual]):
   Option[(LogicalPlan, LogicalPlan, Option[Project])] = None
 
   /**
@@ -323,6 +349,7 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
    */
   def generateEquivalenceClasses(queryEC: EquivalenceClasses,
       viewEC: EquivalenceClasses): Option[Expression] = {
+    logDetail(s"generateEquivalenceClasses queryEC:$queryEC, viewEC:$viewEC")
     // 1.all empty,valid
     if (queryEC.getEquivalenceClassesMap.isEmpty && viewEC.getEquivalenceClassesMap.isEmpty) {
       return Some(Literal.TrueLiteral)
@@ -330,6 +357,7 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
 
     // 2.query is empty,invalid
     if (queryEC.getEquivalenceClassesMap.isEmpty && viewEC.getEquivalenceClassesMap.nonEmpty) {
+      logDetail("queryEC.isEmpty && viewEC.nonEmpty")
       return None
     }
 
@@ -338,7 +366,9 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
     val viewEquivalenceClasses = viewEC.getEquivalenceClasses
     val mappingOp: Option[Multimap[Int, Int]] = extractPossibleMapping(queryEquivalenceClasses,
       viewEquivalenceClasses)
+    logDetail(s"queryEc to viewEc mappingOp:$mappingOp")
     if (mappingOp.isEmpty) {
+      logDetail("mappingOp.isEmpty")
       return None
     }
     val mapping = mappingOp.get
@@ -423,6 +453,7 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
    * @return compensate Expression
    */
   def splitFilter(queryExpression: Expression, viewExpression: Expression): Option[Expression] = {
+    logDetail(s"splitFilter for queryExpression:$queryExpression, viewExpression:$viewExpression")
     // 1.canonicalize expression,main for reorder
     val queryExpression2 = RewriteHelper.canonicalize(ExprSimplifier.simplify(queryExpression))
     val viewExpression2 = RewriteHelper.canonicalize(ExprSimplifier.simplify(viewExpression))
@@ -440,15 +471,18 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
 
     // 4.viewExpression2 and not(queryExpression2)
     val x = andNot(viewExpression2, queryExpression2)
+    logDetail(s"view andNot query:$x")
     // then check some absolutely invalid situation
     if (mayBeSatisfiable(x)) {
       // 4.1.queryExpression2 and viewExpression2
       val x2 = ExprOptUtil.composeConjunctions(
         Seq(queryExpression2, viewExpression2), nullOnEmpty = false)
+      logDetail(s"query and view :$x2")
 
       // 4.2.canonicalize
       val r = RewriteHelper.canonicalize(ExprSimplifier.simplify(x2))
       if (ExprOptUtil.isAlwaysFalse(r)) {
+        logDetail(s"query and view isAlwaysFalse:$r")
         return None
       }
 
@@ -459,7 +493,9 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
         val residue = (conjs -- views).map(_.expression).toSeq
         return Some(ExprOptUtil.composeConjunctions(residue, nullOnEmpty = false))
       }
+      logDetail(s"query != (query and view):$queryExpression2 != $r")
     }
+    logDetail(s"view andNot query not satisfy")
     None
   }
 
@@ -599,7 +635,9 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
     // 1.compute equalColumnCompensation
     val compensationColumnsEquiPredicts = generateEquivalenceClasses(
       queryPredict._1, viewPredict._1)
+    logDetail(s"compensationColumnsEquiPredicts:$compensationColumnsEquiPredicts")
     if (compensationColumnsEquiPredicts.isEmpty) {
+      logDetail("compensationColumnsEquiPredicts.isEmpty")
       return None
     }
 
@@ -611,7 +649,9 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
     val compensationRangePredicts = splitFilter(
       mergeConjunctiveExpressions(queryRangePredicts),
       mergeConjunctiveExpressions(viewRangePredicts))
+    logDetail(s"compensationRangePredicts:$compensationRangePredicts")
     if (compensationRangePredicts.isEmpty) {
+      logDetail("compensationRangePredicts.isEmpty")
       return None
     }
 
@@ -623,7 +663,9 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
     val compensationResidualPredicts = splitFilter(
       mergeConjunctiveExpressions(queryResidualPredicts),
       mergeConjunctiveExpressions(viewResidualPredicts))
+    logDetail(s"compensationResidualPredicts:$compensationResidualPredicts")
     if (compensationResidualPredicts.isEmpty) {
+      logDetail("compensationResidualPredicts.isEmpty")
       return None
     }
 
@@ -631,6 +673,7 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
     val columnsEquiPredictsResult = rewriteExpressions(Seq(compensationColumnsEquiPredicts.get),
       swapTableColumn = false, tableMapping, columnMapping, viewProjectList, viewTableAttrs)
     if (columnsEquiPredictsResult.isEmpty) {
+      logDetail("columnsEquiPredictsResult.isEmpty")
       return None
     }
 
@@ -639,6 +682,7 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
       compensationResidualPredicts.get),
       swapTableColumn = true, tableMapping, queryColumnMapping, viewProjectList, viewTableAttrs)
     if (otherPredictsResult.isEmpty) {
+      logDetail("otherPredictsResult.isEmpty")
       return None
     }
 
@@ -690,20 +734,6 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
         case e => e
       }
     }.asInstanceOf[T]
-
-    // 4.iterate result and dfs check every AttributeReference in ViewTableAttributeReference
-    val viewTableAttrsSet = swapTableAttrs.map(_.exprId).toSet
-    result.foreach { expr =>
-      expr.foreach {
-        case attr: AttributeReference =>
-          if (!viewTableAttrsSet.contains(attr.exprId)) {
-            logBasedOnLevel(s"attr:%s cannot found in view:%s"
-                .format(attr, OmniCachePluginConfig.getConf.curMatchMV))
-            return None
-          }
-        case _ =>
-      }
-    }
     Some(result)
   }
 
@@ -715,19 +745,24 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
    * @param originExpressions originExpressions
    * @return aliasExpressions
    */
-  def aliasExpressions(newExpressions: Seq[NamedExpression],
+  def aliasExpressions(newExpressions: Seq[Expression],
       originExpressions: Seq[NamedExpression]): Seq[NamedExpression] = {
     val result = newExpressions.zip(originExpressions)
         .map { q =>
           val rewrited = q._1
           val origin = q._2
-          if (rewrited.exprId == origin.exprId) {
-            rewrited
-          } else {
-            Alias(rewrited, origin.name)(exprId = origin.exprId)
+          rewrited match {
+            case r: NamedExpression =>
+              if (r.exprId == origin.exprId) {
+                rewrited
+              } else {
+                Alias(rewrited, origin.name)(exprId = origin.exprId)
+              }
+            case _ =>
+              Alias(rewrited, origin.name)(exprId = origin.exprId)
           }
         }
-    result
+    result.map(_.asInstanceOf[NamedExpression])
   }
 
   /**
@@ -756,7 +791,7 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
     }
 
     val aliasedExpressions = aliasExpressions(
-      rewritedExpressions.get.map(_.asInstanceOf[NamedExpression]).toSeq, originExpressions)
+      rewritedExpressions.get.toSeq, originExpressions)
     Some(aliasedExpressions.asInstanceOf[T])
   }
 

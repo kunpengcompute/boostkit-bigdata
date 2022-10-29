@@ -38,7 +38,7 @@ class OmniCachePluginConfig(conf: SQLConf) {
 
   // database where create OmniCache
   val omniCacheDB: String = conf
-      .getConfString("spark.sql.omnicache.db", "default")
+      .getConfString("spark.sql.omnicache.dbs", "")
 
   // rewrite cur match mv
   def curMatchMV: String = conf
@@ -56,6 +56,10 @@ class OmniCachePluginConfig(conf: SQLConf) {
   def logLevel: String = conf
       .getConfString("spark.sql.omnicache.logLevel", "DEBUG")
       .toUpperCase(Locale.ROOT)
+
+  def enableSqlLog: Boolean = conf
+      .getConfString("spark.sql.omnicache.sql.log.enable", "true")
+      .toBoolean
 }
 
 object OmniCachePluginConfig {
