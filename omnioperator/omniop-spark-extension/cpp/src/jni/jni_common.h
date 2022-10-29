@@ -24,8 +24,6 @@
 
 #include "../common/common.h"
 
-static jclass illegal_access_exception_class;
-
 spark::CompressionKind GetCompressionType(JNIEnv* env, jstring codec_jstr);
 
 jclass CreateGlobalClassReference(JNIEnv* env, const char* class_name);
@@ -39,6 +37,16 @@ jmethodID GetMethodID(JNIEnv* env, jclass this_class, const char* name, const ch
     catch (const std::exception &e)                 \
     {                                               \
         env->ThrowNew(exceptionClass, e.what());    \
+        return 0;                                   \
+    }                                               \
+
+
+#define JNI_FUNC_END_VOID(exceptionClass)           \
+    }                                               \
+    catch (const std::exception &e)                 \
+    {                                               \
+        env->ThrowNew(exceptionClass, e.what());    \
+        return;                                     \
     }                                               \
 
 #endif //THESTRAL_PLUGIN_MASTER_JNI_COMMON_H

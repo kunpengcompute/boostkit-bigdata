@@ -352,7 +352,7 @@ template <DataTypeId TYPE_ID, typename ORC_TYPE> uint64_t copyFixwidth(orc::Colu
     using T = typename NativeType<TYPE_ID>::type;
     ORC_TYPE *lvb = dynamic_cast<ORC_TYPE *>(field);
     FixedWidthVector<TYPE_ID> *originalVector = new FixedWidthVector<TYPE_ID>(allocator, lvb->numElements);
-    for (int i = 0; i < lvb->numElements; i++) {
+    for (uint i = 0; i < lvb->numElements; i++) {
         if (lvb->notNull.data()[i]) {
             originalVector->SetValue(i, (T)(lvb->data.data()[i]));
         } else {
@@ -370,7 +370,7 @@ uint64_t copyVarwidth(int maxLen, orc::ColumnVectorBatch *field, int vcType)
     uint64_t totalLen =
         maxLen * (lvb->numElements) > lvb->getMemoryUsage() ? maxLen * (lvb->numElements) : lvb->getMemoryUsage();
     VarcharVector *originalVector = new VarcharVector(allocator, totalLen, lvb->numElements);
-    for (int i = 0; i < lvb->numElements; i++) {
+    for (uint i = 0; i < lvb->numElements; i++) {
         if (lvb->notNull.data()[i]) {
             string tmpStr(reinterpret_cast<const char *>(lvb->data.data()[i]), lvb->length.data()[i]);
             if (vcType == orc::TypeKind::CHAR && tmpStr.back() == ' ') {
@@ -442,7 +442,7 @@ int copyToOmniDecimalVec(int precision, int &omniTypeId, uint64_t &omniVecId, or
         orc::Decimal128VectorBatch *lvb = dynamic_cast<orc::Decimal128VectorBatch *>(field);
         FixedWidthVector<OMNI_DECIMAL128> *originalVector =
             new FixedWidthVector<OMNI_DECIMAL128>(allocator, lvb->numElements);
-        for (int i = 0; i < lvb->numElements; i++) {
+        for (uint i = 0; i < lvb->numElements; i++) {
             if (lvb->notNull.data()[i]) {
                 int64_t highbits = lvb->values.data()[i].getHighBits();
                 uint64_t lowbits = lvb->values.data()[i].getLowBits();
@@ -465,7 +465,7 @@ int copyToOmniDecimalVec(int precision, int &omniTypeId, uint64_t &omniVecId, or
         omniTypeId = static_cast<int>(OMNI_DECIMAL64);
         orc::Decimal64VectorBatch *lvb = dynamic_cast<orc::Decimal64VectorBatch *>(field);
         FixedWidthVector<OMNI_LONG> *originalVector = new FixedWidthVector<OMNI_LONG>(allocator, lvb->numElements);
-        for (int i = 0; i < lvb->numElements; i++) {
+        for (uint i = 0; i < lvb->numElements; i++) {
             if (lvb->notNull.data()[i]) {
                 originalVector->SetValue(i, (int64_t)(lvb->values.data()[i]));
             } else {
@@ -478,12 +478,11 @@ int copyToOmniDecimalVec(int precision, int &omniTypeId, uint64_t &omniVecId, or
 }
 
 JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniReader_recordReaderNext(JNIEnv *env,
-    jobject jObj, jlong rowReader, jlong reader, jlong batch, jintArray typeId, jlongArray vecNativeId)
+    jobject jObj, jlong rowReader, jlong batch, jintArray typeId, jlongArray vecNativeId)
 {
     JNI_FUNC_START
     orc::RowReader *rowReaderPtr = (orc::RowReader *)rowReader;
     orc::ColumnVectorBatch *columnVectorBatch = (orc::ColumnVectorBatch *)batch;
-    orc::Reader *readerPtr = (orc::Reader *)reader;
     const orc::Type &baseTp = rowReaderPtr->getSelectedType();
     int vecCnt = 0;
     long batchRowSize = 0;
@@ -565,7 +564,7 @@ JNIEXPORT void JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniRea
         env->ThrowNew(runtimeExceptionClass, "delete nullptr error for reader");
     }
     delete readerPtr;
-    JNI_FUNC_END(runtimeExceptionClass)
+    JNI_FUNC_END_VOID(runtimeExceptionClass)
 }
 
 /*
@@ -579,7 +578,7 @@ JNIEXPORT void JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniRea
     JNI_FUNC_START
     orc::RowReader *rowReaderPtr = (orc::RowReader *)rowReader;
     rowReaderPtr->seekToRow((long)rowNumber);
-    JNI_FUNC_END(runtimeExceptionClass)
+    JNI_FUNC_END_VOID(runtimeExceptionClass)
 }
 
 

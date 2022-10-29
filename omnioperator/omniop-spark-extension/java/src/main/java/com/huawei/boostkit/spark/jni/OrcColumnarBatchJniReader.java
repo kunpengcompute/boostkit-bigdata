@@ -232,7 +232,7 @@ public class OrcColumnarBatchJniReader {
         int vectorCnt = vecList.length;
         int[] typeIds = new int[realColsCnt];
         long[] vecNativeIds = new long[realColsCnt];
-        long rtn = recordReaderNext(recordReader, reader, batchReader, typeIds, vecNativeIds);
+        long rtn = recordReaderNext(recordReader, batchReader, typeIds, vecNativeIds);
         if (rtn == 0) {
             return 0;
         }
@@ -292,7 +292,7 @@ public class OrcColumnarBatchJniReader {
 
     public native long initializeBatch(long rowReader, long batchSize);
 
-    public native long recordReaderNext(long rowReader, long reader, long batchReader, int[] typeId, long[] vecNativeId);
+    public native long recordReaderNext(long rowReader, long batchReader, int[] typeId, long[] vecNativeId);
 
     public native long recordReaderGetRowNumber(long rowReader);
 

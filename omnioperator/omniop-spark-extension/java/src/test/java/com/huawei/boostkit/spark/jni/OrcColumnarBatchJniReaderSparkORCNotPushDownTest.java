@@ -91,7 +91,7 @@ public class OrcColumnarBatchJniReaderSparkORCNotPushDownTest extends TestCase {
     public void testNext() {
         int[] typeId = new int[4];
         long[] vecNativeId = new long[4];
-        long rtn = orcColumnarBatchJniReader.recordReaderNext(orcColumnarBatchJniReader.recordReader, orcColumnarBatchJniReader.reader, orcColumnarBatchJniReader.batchReader, typeId, vecNativeId);
+        long rtn = orcColumnarBatchJniReader.recordReaderNext(orcColumnarBatchJniReader.recordReader, orcColumnarBatchJniReader.batchReader, typeId, vecNativeId);
         assertTrue(rtn == 4096);
         LongVec vec1 = new LongVec(vecNativeId[0]);
         VarcharVec vec2 = new VarcharVec(vecNativeId[1]);

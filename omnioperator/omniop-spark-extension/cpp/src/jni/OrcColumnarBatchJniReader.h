@@ -94,7 +94,7 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniRe
  * Signature:   (J[I[J)J
  */
 JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniReader_recordReaderNext
-        (JNIEnv *, jobject, jlong, jlong, jlong, jintArray, jlongArray);
+        (JNIEnv *, jobject, jlong, jlong, jintArray, jlongArray);
 
 /*
  * Class:       com_huawei_boostkit_spark_jni_OrcColumnarBatchJniReader

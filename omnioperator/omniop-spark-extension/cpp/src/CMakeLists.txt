@@ -52,6 +52,4 @@ set_target_properties(${PROJ_TARGET} PROPERTIES
                       LIBRARY_OUTPUT_DIRECTORY ${root_directory}/releases
 )
 
-target_compile_options(${PROJ_TARGET} PUBLIC -g -O2 -fPIC)
-
 install(TARGETS ${PROJ_TARGET} DESTINATION lib)

@@ -31,7 +31,6 @@ static  jint JNI_VERSION = JNI_VERSION_1_8;
 
 static jclass split_result_class;
 static jclass runtime_exception_class;
-static jclass excepiton_class;
 
 static jmethodID split_result_constructor;
 
@@ -46,9 +45,6 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved) {
     if (vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION) != JNI_OK) {
         return JNI_ERR;
     }
-
-    illegal_access_exception_class =
-        CreateGlobalClassReference(env, "Ljava/lang/IllegalAccessException;");
 
     split_result_class =
         CreateGlobalClassReference(env, "Lcom/huawei/boostkit/spark/vectorized/SplitResult;");
@@ -81,6 +77,11 @@ Java_com_huawei_boostkit_spark_jni_SparkJniWrapper_nativeMake(
     if (partitioning_name_jstr == nullptr) {
         env->ThrowNew(runtime_exception_class,
                     std::string("Short partitioning name can't be null").c_str());
+        return 0;
+    }
+    if (jInputType == nullptr) {
+        env->ThrowNew(runtime_exception_class,
+                    std::string("input types can't be null").c_str());
         return 0;
     }
 
@@ -180,6 +181,7 @@ Java_com_huawei_boostkit_spark_jni_SparkJniWrapper_split(
     auto vecBatch = (VectorBatch *) jVecBatchAddress;
 
     splitter->Split(*vecBatch);
+    return 0L;
     JNI_FUNC_END(runtime_exception_class)
 }
 
@@ -217,5 +219,5 @@ Java_com_huawei_boostkit_spark_jni_SparkJniWrapper_close(
         env->ThrowNew(runtime_exception_class, error_message.c_str());
     }
     shuffle_splitter_holder_.Erase(splitter_id);
-    JNI_FUNC_END(runtime_exception_class)
+    JNI_FUNC_END_VOID(runtime_exception_class)
 }

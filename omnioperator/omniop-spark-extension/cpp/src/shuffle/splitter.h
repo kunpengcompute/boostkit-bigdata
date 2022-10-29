@@ -59,12 +59,12 @@ class Splitter {
 
     std::shared_ptr<Buffer> CaculateSpilledTmpFilePartitionOffsets();
 
-    int SerializingFixedColumns(int32_t partitionId,
+    void SerializingFixedColumns(int32_t partitionId,
                                 spark::Vec& vec,
                                 int fixColIndexTmp,
                                 SplitRowInfo* splitRowInfoTmp);
 
-    int SerializingBinaryColumns(int32_t partitionId,
+    void SerializingBinaryColumns(int32_t partitionId,
                                 spark::Vec& vec,
                                 int colIndex,
                                 int curBatch);

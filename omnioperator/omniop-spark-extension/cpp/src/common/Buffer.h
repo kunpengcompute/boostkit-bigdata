@@ -33,6 +33,8 @@
                 capacity_(capacity) {
         }
 
+        ~Buffer() {}
+
  public:
         uint8_t * data_;
         int64_t size_;

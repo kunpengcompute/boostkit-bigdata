@@ -17,7 +17,6 @@
 
 package com.huawei.boostkit.spark.compress;
 
-import io.airlift.compress.snappy.SnappyCompressor;
 import io.airlift.compress.snappy.SnappyDecompressor;
 
 import java.io.IOException;
@@ -25,7 +24,7 @@ import java.io.IOException;
 public class SnappyCodec extends AircompressorCodec {
 
     SnappyCodec() {
-        super(new SnappyCompressor(), new SnappyDecompressor());
+        super(new SnappyDecompressor());
     }
 
     @Override
