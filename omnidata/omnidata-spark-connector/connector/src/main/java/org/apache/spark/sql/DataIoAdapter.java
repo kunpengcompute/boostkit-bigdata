@@ -238,42 +238,13 @@ public class DataIoAdapter {
                     hasNextPage = false;
                 }
                 break;
-            } catch (OmniDataException omniDataException) {
-                OmniErrorCode errorCode = omniDataException.getErrorCode();
-                switch (errorCode) {
-                    case OMNIDATA_INSUFFICIENT_RESOURCES:
-                        LOG.warn("OMNIDATA_INSUFFICIENT_RESOURCES: "
-                                + "OmniData-server's push down queue is full, "
-                                + "begin to find next OmniData-server");
-                        break;
-                    case OMNIDATA_UNSUPPORTED_OPERATOR:
-                        LOG.warn("OMNIDATA_UNSUPPORTED_OPERATOR: "
-                                + "OmniDataException: exist unsupported operator");
-                        break;
-                    case OMNIDATA_GENERIC_ERROR:
-                        LOG.warn("OMNIDATA_GENERIC_ERROR: Current OmniData-server unavailable, "
-                                + "begin to find next OmniData-server");
-                        break;
-                    case OMNIDATA_NOT_FOUND:
-                        LOG.warn("OMNIDATA_NOT_FOUND: Current OmniData-Server not found, "
-                                + "begin to find next OmniData-server");
-                        break;
-                    case OMNIDATA_INVALID_ARGUMENT:
-                        LOG.warn("OMNIDATA_INVALID_ARGUMENT: INVALID_ARGUMENT, "
-                                + "exist unsupported operator or dataType");
-                        break;
-                    case OMNIDATA_IO_ERROR:
-                        LOG.warn("OMNIDATA_IO_ERROR: Current OmniData-Server io exception, "
-                                + "begin to find next OmniData-server");
-                        break;
-                    default:
-                        LOG.warn("OmniDataException: OMNIDATA_ERROR.");
-                }
-                LOG.warn("Push down failed node info [hostname :{} ,ip :{}]", sdiHost, ipAddress);
-                ++failedTimes;
             } catch (Exception e) {
                 LOG.warn("Push down failed node info [hostname :{} ,ip :{}]", sdiHost, ipAddress, e);
                 ++failedTimes;
+                if (orcDataReader != null) {
+                    orcDataReader.close();
+                    hasNextPage = false;
+                }
             }
         }
         int retryTime = Math.min(TASK_FAILED_TIMES, sdiHostList.size());
