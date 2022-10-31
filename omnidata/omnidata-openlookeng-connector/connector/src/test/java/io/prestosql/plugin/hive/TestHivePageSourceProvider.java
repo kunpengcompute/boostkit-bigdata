@@ -15,6 +15,10 @@
 package io.prestosql.plugin.hive;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import io.prestosql.plugin.hive.omnidata.OmniDataNodeManager;
+import io.prestosql.plugin.hive.omnidata.OmniDataNodeStatus;
+import io.prestosql.spi.HostAddress;
 import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.function.BuiltInFunctionHandle;
 import io.prestosql.spi.function.FunctionKind;
@@ -22,19 +26,39 @@ import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.predicate.Domain;
 import io.prestosql.spi.predicate.ValueSet;
 import io.prestosql.spi.relation.CallExpression;
+import io.prestosql.spi.relation.InputReferenceExpression;
 import io.prestosql.spi.relation.VariableReferenceExpression;
 import io.prestosql.spi.type.TypeSignature;
+import org.apache.hadoop.fs.Path;
 import org.eclipse.jetty.util.URIUtil;
 import org.testng.annotations.Test;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.net.URI;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalInt;
+import java.util.OptionalLong;
+import java.util.Properties;
 
+import static io.prestosql.plugin.hive.HiveBucketing.BucketingVersion.BUCKETING_V1;
 import static io.prestosql.plugin.hive.HivePageSourceProvider.modifyDomain;
+import static io.prestosql.plugin.hive.HiveTestUtils.TYPE_MANAGER;
+import static io.prestosql.plugin.hive.HiveTestUtils.createTestHdfsEnvironment;
+import static io.prestosql.plugin.hive.HiveTestUtils.getDefaultHiveDataStreamFactories;
+import static io.prestosql.plugin.hive.HiveTestUtils.getDefaultHiveRecordCursorProvider;
+import static io.prestosql.plugin.hive.HiveTestUtils.getDefaultHiveSelectiveFactories;
+import static io.prestosql.plugin.hive.HiveTestUtils.getNoOpIndexCache;
+import static io.prestosql.plugin.hive.HiveType.HIVE_LONG;
+import static io.prestosql.plugin.hive.HiveType.HIVE_STRING;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
+import static io.prestosql.spi.type.SmallintType.SMALLINT;
+import static org.mockito.Mockito.mock;
 import static org.testng.Assert.assertEquals;
 
 public class TestHivePageSourceProvider
@@ -176,5 +200,65 @@ public class TestHivePageSourceProvider
         domain = modifyDomain(domain, Optional.of(filter));
         assertEquals(domain.getValues().getRanges().getSpan().getHigh().getValue(), Long.valueOf(40));
         assertEquals(domain.getValues().getRanges().getSpan().getLow().getValueBlock(), Optional.empty());
+    }
+
+    @Test
+    public void testGetSplitOmniDataAddr() throws NoSuchMethodException, InvocationTargetException, IllegalAccessException {
+        Properties schema = new Properties();
+        schema.setProperty("foo", "bar");
+        schema.setProperty("bar", "baz");
+
+        ImmutableList<HivePartitionKey> partitionKeys = ImmutableList.of(new HivePartitionKey("a", "apple"), new HivePartitionKey("b", "42"));
+        ImmutableList<HostAddress> addresses = ImmutableList.of(HostAddress.fromParts("127.0.0.1", 44), HostAddress.fromParts("127.0.0.1", 45));
+
+        DeleteDeltaLocations.Builder deleteDeltaLocationsBuilder = DeleteDeltaLocations.builder(new Path("file:///data/fullacid"));
+        deleteDeltaLocationsBuilder.addDeleteDelta(new Path("file:///data/fullacid/delete_delta_0000004_0000004_0000"), 4L, 4L, 0);
+        deleteDeltaLocationsBuilder.addDeleteDelta(new Path("file:///data/fullacid/delete_delta_0000007_0000007_0000"), 7L, 7L, 0);
+        DeleteDeltaLocations deleteDeltaLocations = deleteDeltaLocationsBuilder.build().get();
+
+        Map<String, String> customSplitInfo = ImmutableMap.of("key", "value");
+
+        HiveSplit hiveSplit = new HiveSplit(
+                "db",
+                "table",
+                "partitionId",
+                "path",
+                42,
+                87,
+                88,
+                0,
+                schema,
+                partitionKeys,
+                addresses,
+                OptionalInt.empty(),
+                true,
+                ImmutableMap.of(1, HIVE_STRING),
+                Optional.of(new HiveSplit.BucketConversion(
+                        BUCKETING_V1,
+                        32,
+                        16,
+                        ImmutableList.of(new HiveColumnHandle("col", HIVE_LONG, BIGINT.getTypeSignature(), 5, HiveColumnHandle.ColumnType.REGULAR, Optional.of("comment"))))),
+                false,
+                Optional.of(deleteDeltaLocations),
+                Optional.empty(),
+                false,
+                customSplitInfo);
+
+        HiveOffloadExpression hiveOffloadExpression =
+                new HiveOffloadExpression(Collections.emptySet(), new InputReferenceExpression(0, SMALLINT), Optional.empty(), OptionalLong.of(5), Collections.emptyMap());
+
+        Method method = HivePageSourceProvider.class.getDeclaredMethod("getSplitOmniDataAddr", HiveOffloadExpression.class, HiveSplit.class);
+        method.setAccessible(true);
+
+        HiveConfig config = new HiveConfig();
+        OmniDataNodeManager omniDataNodeManager = new OmniDataNodeManager();
+        HivePageSourceProvider hivePageSourceProvider = new HivePageSourceProvider(omniDataNodeManager, config, createTestHdfsEnvironment(config), getDefaultHiveRecordCursorProvider(config), getDefaultHiveDataStreamFactories(config), TYPE_MANAGER, getNoOpIndexCache(), getDefaultHiveSelectiveFactories(config));
+        Object actual = method.invoke(hivePageSourceProvider, hiveOffloadExpression, hiveSplit);
+        assertEquals(actual, Optional.empty());
+
+        omniDataNodeManager.setAllNodesForTest("127.0.0.1", mock(OmniDataNodeStatus.class));
+        hivePageSourceProvider = new HivePageSourceProvider(omniDataNodeManager, config, createTestHdfsEnvironment(config), getDefaultHiveRecordCursorProvider(config), getDefaultHiveDataStreamFactories(config), TYPE_MANAGER, getNoOpIndexCache(), getDefaultHiveSelectiveFactories(config));
+        actual = method.invoke(hivePageSourceProvider, hiveOffloadExpression, hiveSplit);
+        assertEquals(actual.toString(), "Optional[null,null]");
     }
 }
