@@ -237,8 +237,9 @@ public class HivePageSourceProvider
             int copyIndex = Math.abs(i + seed) % copyNumber;
             try {
                 String hostIp = InetAddress.getByName(hiveSplit.getAddresses().get(copyIndex).getHostText()).getHostAddress();
-                if (omniDataNodeManager.getAllNodes().containsKey(hostIp)) {
-                    hostAddressJoiner.add(omniDataNodeManager.getAllNodes().get(hostIp).getHostAddress());
+                OmniDataNodeStatus omniDataNodeStatus = omniDataNodeManager.getAllNodes().getOrDefault(hostIp, null);
+                if (omniDataNodeStatus != null) {
+                    hostAddressJoiner.add(omniDataNodeStatus.getHostAddress());
                     counter++;
                 }
             }
