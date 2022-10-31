@@ -237,7 +237,7 @@ public class PageDecoding extends AbstractDecoding<Optional<WritableColumnVector
         int positionCount = sliceInput.readInt();
 
         int[] offsets = new int[positionCount + 1];
-        sliceInput.readBytes(Slices.wrappedIntArray(offsets), SIZE_OF_INT, positionCount * SIZE_OF_INT);
+        sliceInput.readBytes(Slices.wrappedIntArray(offsets), SIZE_OF_INT, Math.multiplyExact(positionCount, SIZE_OF_INT));
         boolean[] valueIsNull = decodeNullBits(sliceInput, positionCount).orElse(null);
         int blockSize = sliceInput.readInt();
         int curOffset = offsets[0];
