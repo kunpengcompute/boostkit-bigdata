@@ -37,8 +37,10 @@ public class PageCandidate {
 
     public int maxFailedTimes;
 
+    private int taskTimeout;
+
     public PageCandidate(String filePath, Long startPos, Long splitLen, int columnOffset,
-                         String sdiHosts, String fileFormat, int maxFailedTimes) {
+                         String sdiHosts, String fileFormat, int maxFailedTimes, int taskTimeout) {
         this.filePath = filePath;
         this.startPos = startPos;
         this.splitLen = splitLen;
@@ -46,6 +48,7 @@ public class PageCandidate {
         this.sdiHosts = sdiHosts;
         this.fileFormat = fileFormat;
         this.maxFailedTimes = maxFailedTimes;
+        this.taskTimeout = taskTimeout;
     }
 
     public Long getStartPos() {
@@ -74,5 +77,9 @@ public class PageCandidate {
 
     public int getMaxFailedTimes() {
         return maxFailedTimes;
+    }
+
+    public int getTaskTimeout() {
+        return taskTimeout;
     }
 }

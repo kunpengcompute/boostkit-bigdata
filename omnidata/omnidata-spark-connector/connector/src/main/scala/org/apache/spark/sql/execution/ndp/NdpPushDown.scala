@@ -334,6 +334,7 @@ object NdpConf {
   val NDP_GRPC_TRUST_CA_FILE_PATH = "spark.sql.ndp.grpc.trust.ca.file.path"
   val NDP_PKI_DIR = "spark.sql.ndp.pki.dir"
   val NDP_MAX_FAILED_TIMES = "spark.sql.ndp.max.failed.times"
+  val NDP_CLIENT_TASK_TIMEOUT = "spark.sql.ndp.task.timeout"
 
   def toBoolean(key: String, value: String, sparkSession: SparkSession): Boolean = {
     try {
@@ -440,6 +441,15 @@ object NdpConf {
 
   def getMaxFailedTimes(sparkSession: SparkSession): String = {
     sparkSession.conf.getOption(NDP_MAX_FAILED_TIMES).getOrElse("3")
+  }
+
+  def getTaskTimeout(sparkSession: SparkSession): Int = {
+    val result = toNumber(NDP_CLIENT_TASK_TIMEOUT,
+      sparkSession.conf.getOption(NDP_CLIENT_TASK_TIMEOUT).getOrElse("300"),
+      _.toInt, "int", sparkSession)
+    checkLongValue(NDP_CLIENT_TASK_TIMEOUT, result, _ > 0,
+      s"The $NDP_CLIENT_TASK_TIMEOUT value must be positive", sparkSession)
+    result
   }
 
   def getNdpUdfWhitelist(sourceName: String): mutable.Set[AnyRef] = {
