@@ -242,6 +242,11 @@ public class OmniDataNodeManager
         return allNodes;
     }
 
+    public void setAllNodesForTest(String ipAddress, OmniDataNodeStatus nodeStatus)
+    {
+        allNodes.put(ipAddress, nodeStatus);
+    }
+
     private class OmniDataNodeManagerResponseHandler<T>
             implements ResponseHandler<T, DiscoveryException>
     {
