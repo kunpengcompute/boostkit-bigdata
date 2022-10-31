@@ -203,7 +203,8 @@ public class TestHivePageSourceProvider
     }
 
     @Test
-    public void testGetSplitOmniDataAddr() throws NoSuchMethodException, InvocationTargetException, IllegalAccessException {
+    public void testGetSplitOmniDataAddr() throws NoSuchMethodException, InvocationTargetException, IllegalAccessException
+    {
         Properties schema = new Properties();
         schema.setProperty("foo", "bar");
         schema.setProperty("bar", "baz");
