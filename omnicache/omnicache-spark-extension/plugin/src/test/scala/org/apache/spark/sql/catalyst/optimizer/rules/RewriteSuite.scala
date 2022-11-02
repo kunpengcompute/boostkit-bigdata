@@ -42,7 +42,7 @@ class RewriteSuite extends SparkFunSuite with PredicateHelper {
       .config("spark.sql.extensions", "com.huawei.boostkit.spark.OmniCache")
       .config("hive.exec.dynamic.partition.mode", "nonstrict")
       .config("spark.ui.port", "4050")
-      // .config("spark.sql.planChangeLog.level","WARN")
+//      .config("spark.sql.planChangeLog.level", "WARN")
       .config("spark.sql.omnicache.logLevel", "WARN")
       .enableHiveSupport()
       .getOrCreate()
@@ -105,6 +105,16 @@ class RewriteSuite extends SparkFunSuite with PredicateHelper {
         |INSERT INTO TABLE depts VALUES(2,'deptname2');
         |""".stripMargin
     )
+    spark.sql(
+      """
+        |INSERT INTO TABLE depts VALUES(3,'deptname3');
+        |""".stripMargin
+    )
+    spark.sql(
+      """
+        |INSERT INTO TABLE depts VALUES(4,'deptname4');
+        |""".stripMargin
+    )
 
     spark.sql(
       """
@@ -125,6 +135,12 @@ class RewriteSuite extends SparkFunSuite with PredicateHelper {
     spark.sql(
       """
         |INSERT INTO TABLE emps VALUES(2,2,2,'empname2',2.0);
+        |""".stripMargin
+    )
+
+    spark.sql(
+      """
+        |INSERT INTO TABLE emps VALUES(3,null,3,'empname3',3.0);
         |""".stripMargin
     )
 

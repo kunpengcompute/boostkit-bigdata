@@ -180,7 +180,7 @@ public class RangeUtil {
                             Pair.of(Range.singleton(v0), ImmutableList.of(predicate)));
                     // remove
                     for (Expression e : p.right) {
-                        replaceAllExpression(terms, e, Literal.TrueLiteral());
+                        replaceExpression(terms, e, Literal.TrueLiteral());
                     }
                     break;
                 }
@@ -337,7 +337,7 @@ public class RangeUtil {
                 ImmutableList.Builder<Expression> newBounds = ImmutableList.builder();
                 for (Expression e : p.right) {
                     if (ExprOptUtil.isUpperBound(e)) {
-                        replaceAllExpression(terms, e, Literal.TrueLiteral());
+                        replaceExpression(terms, e, Literal.TrueLiteral());
                     } else {
                         newBounds.add(e);
                     }
@@ -348,7 +348,7 @@ public class RangeUtil {
                 ImmutableList.Builder<Expression> newBounds = ImmutableList.builder();
                 for (Expression e : p.right) {
                     if (ExprOptUtil.isLowerBound(e)) {
-                        replaceAllExpression(terms, e, Literal.TrueLiteral());
+                        replaceExpression(terms, e, Literal.TrueLiteral());
                     } else {
                         newBounds.add(e);
                     }
@@ -361,10 +361,10 @@ public class RangeUtil {
         return null;
     }
 
-    private static boolean replaceAllExpression(List<Expression> terms, Expression oldVal, Expression newVal) {
+    private static boolean replaceExpression(List<Expression> terms, Expression oldVal, Expression newVal) {
         boolean result = false;
         for (int i = 0; i < terms.size(); i++) {
-            if (terms.get(i).equals(oldVal)) {
+            if (terms.get(i) == oldVal) {
                 terms.set(i, newVal);
                 result = true;
             }
