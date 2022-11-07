@@ -200,7 +200,7 @@ bool OckMergeReader::CopyDataToVector(Vector *dstVector, uint32_t colIndex)
     auto *nullsAddress = (uint8_t *)dstVector->GetValueNulls();
     auto *valuesAddress = (uint8_t *)dstVector->GetValues();
     uint32_t *offsetsAddress = (uint32_t *)dstVector->GetValueOffsets();
-    dstVector->SetValueNulls(true);
+    dstVector->SetNullFlag(true);
     uint32_t totalSize = 0;
     uint32_t currentSize = 0;
 
