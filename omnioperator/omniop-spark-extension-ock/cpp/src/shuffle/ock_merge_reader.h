@@ -15,7 +15,8 @@ public:
     bool Initialize(const int32_t *typeIds, uint32_t colNum);
     bool GetMergeVectorBatch(uint8_t *&address, uint32_t remain, uint32_t maxRowNum, uint32_t maxSize);
 
-    bool CopyPartDataToVector(uint8_t *&nulls, uint8_t *&values, OckVector &srcVector, uint32_t colIndex);
+    bool CopyPartDataToVector(uint8_t *&nulls, uint8_t *&values, uint32_t &remainingSize, uint32_t &remainingCapacity,
+         OckVector &srcVector);
     bool CopyDataToVector(omniruntime::vec::Vector *dstVector, uint32_t colIndex);
 
     [[nodiscard]] inline uint32_t GetVectorBatchLength() const
@@ -35,6 +36,7 @@ private:
     bool ScanOneVectorBatch(uint8_t *&startAddress);
     static constexpr int capacityOffset = 4;
     static constexpr int decimal128Size = 16;
+    static constexpr int maxCapacityInBytes = 1073741824;
 
 private:
     // point to shuffle blob current vector batch data header

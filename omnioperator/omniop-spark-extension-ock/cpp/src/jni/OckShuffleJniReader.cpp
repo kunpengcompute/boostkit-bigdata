@@ -20,11 +20,16 @@ static const char *exceptionClass = "java/lang/Exception";
 
 static void JniInitialize(JNIEnv *env)
 {
+    if (UNLIKELY(env ==nullptr)) {
+        LOG_ERROR("JNIEnv is null.");
+        return;
+    }
     std::lock_guard<std::mutex> lk(gInitLock);
     if (UNLIKELY(gLongClass == nullptr)) {
         gLongClass = env->FindClass("java/lang/Long");
         if (UNLIKELY(gLongClass == nullptr)) {
             env->ThrowNew(env->FindClass(exceptionClass), "Failed to find class java/lang/Long");
+            return;
         }
 
         gLongValueFieldId = env->GetFieldID(gLongClass, "value", "J");
@@ -38,24 +43,43 @@ static void JniInitialize(JNIEnv *env)
 JNIEXPORT jlong JNICALL Java_com_huawei_ock_spark_jni_OckShuffleJniReader_make(JNIEnv *env, jobject,
     jintArray jTypeIds)
 {
+    if (UNLIKELY(env == nullptr)) {
+        LOG_ERROR("JNIEnv is null.");
+        return 0;
+    }
+    if (UNLIKELY(jTypeIds == nullptr)) {
+        env->ThrowNew(env->FindClass(exceptionClass), "jTypeIds is null.");
+        return 0;
+    }
     std::shared_ptr<OckMergeReader> instance = std::make_shared<OckMergeReader>();
     if (UNLIKELY(instance == nullptr)) {
         env->ThrowNew(env->FindClass(exceptionClass), "Failed to create instance for ock merge reader");
         return 0;
     }
 
-    bool result = instance->Initialize(env->GetIntArrayElements(jTypeIds, nullptr), env->GetArrayLength(jTypeIds));
+    auto typeIds = env->GetIntArrayElements(jTypeIds, nullptr);
+    if (UNLIKELY(typeIds == nullptr)) {
+        env->ThrowNew(env->FindClass(exceptionClass), "Failed to get int array elements.");
+        return 0;
+    }
+    bool result = instance->Initialize(typeIds, env->GetArrayLength(jTypeIds));
     if (UNLIKELY(!result)) {
+        env->ReleaseIntArrayElements(jTypeIds, typeIds, JNI_ABORT);
         env->ThrowNew(env->FindClass(exceptionClass), "Failed to initialize ock merge reader");
         return 0;
     }
-
+    env->ReleaseIntArrayElements(jTypeIds, typeIds, JNI_ABORT);
     return gBlobReader.Insert(instance);
 }
 
 JNIEXPORT jint JNICALL Java_com_huawei_ock_spark_jni_OckShuffleJniReader_nativeGetVectorBatch(JNIEnv *env, jobject,
     jlong jReaderId, jlong jAddress, jint jRemain, jint jMaxRow, jint jMaxSize, jobject jRowCnt)
 {
+    if (UNLIKELY(env == nullptr)) {
+        LOG_ERROR("JNIEnv is null.");
+        return -1;
+    }
+
     auto mergeReader = gBlobReader.Lookup(jReaderId);
     if (UNLIKELY(!mergeReader)) {
         std::string errMsg = "Invalid reader id " + std::to_string(jReaderId);
@@ -80,6 +104,10 @@ JNIEXPORT jint JNICALL Java_com_huawei_ock_spark_jni_OckShuffleJniReader_nativeG
 JNIEXPORT jint JNICALL Java_com_huawei_ock_spark_jni_OckShuffleJniReader_nativeGetVecValueLength(JNIEnv *env,
     jobject, jlong jReaderId, jint jColIndex)
 {
+    if (UNLIKELY(env == nullptr)) {
+        LOG_ERROR("JNIEnv is null.");
+        return 0;
+    }
     auto mergeReader = gBlobReader.Lookup(jReaderId);
     if (UNLIKELY(!mergeReader)) {
         std::string errMsg = "Invalid reader id " + std::to_string(jReaderId);
@@ -100,6 +128,11 @@ JNIEXPORT jint JNICALL Java_com_huawei_ock_spark_jni_OckShuffleJniReader_nativeG
 JNIEXPORT void JNICALL Java_com_huawei_ock_spark_jni_OckShuffleJniReader_nativeCopyVecDataInVB(JNIEnv *env,
     jobject, jlong jReaderId, jlong dstNativeVec, jint jColIndex)
 {
+    if (UNLIKELY(env == nullptr)) {
+        LOG_ERROR("JNIEnv is null.");
+        return;
+    }
+
     auto dstVector = reinterpret_cast<Vector *>(dstNativeVec); // get from scala which is real vector
     if (UNLIKELY(dstVector == nullptr)) {
         std::string errMsg = "Invalid dst vector address for reader id " + std::to_string(jReaderId);

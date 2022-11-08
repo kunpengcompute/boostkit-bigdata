@@ -47,7 +47,7 @@ bool OckSplitter::ToSplitterTypeId(const int32_t *vBColTypes)
                 break;
             }
             case OMNI_CHAR:
-            case OMNI_VARCHAR: {           // unknown length for value vector, calculate later
+            case OMNI_VARCHAR: {        // unknown length for value vector, calculate later
                 mMinDataLenInVBByRow += uint32Size; // 4 means offset
                 mVBColShuffleTypes.emplace_back(ShuffleTypeId::SHUFFLE_BINARY);
                 mColIndexOfVarVec.emplace_back(colIndex);
@@ -70,11 +70,15 @@ bool OckSplitter::ToSplitterTypeId(const int32_t *vBColTypes)
     return true;
 }
 
-void OckSplitter::InitCacheRegion()
+bool OckSplitter::InitCacheRegion()
 {
     mCacheRegion.reserve(mPartitionNum);
     mCacheRegion.resize(mPartitionNum);
 
+    if (UNLIKELY(mOckBuffer->GetRegionSize() * 2 < mMinDataLenInVB || mMinDataLenInVBByRow == 0)) {
+        LOG_DEBUG("regionSize * doubleNum should be bigger than mMinDataLenInVB %d", mMinDataLenInVBByRow);
+        return false;
+    }
     uint32_t rowNum = (mOckBuffer->GetRegionSize() * 2 - mMinDataLenInVB) / mMinDataLenInVBByRow;
     LOG_INFO("Each region can cache row number is %d", rowNum);
 
@@ -84,6 +88,7 @@ void OckSplitter::InitCacheRegion()
         region.mLength = 0;
         region.mRowNum = 0;
     }
+    return true;
 }
 
 bool OckSplitter::Initialize(const int32_t *colTypeIds)
@@ -176,27 +181,58 @@ bool OckSplitter::WriteFixedWidthValueTemple(Vector *vector, bool isDict, std::v
     T *srcValues = nullptr;
 
     if (isDict) {
-        auto ids = static_cast<int32_t *>(mAllocator->alloc(mCurrentVB->GetRowCount() * sizeof(int32_t)));
+        int32_t idsNum = mCurrentVB->GetRowCount();
+        int64_t idsSizeInBytes = idsNum * sizeof(int32_t);
+        auto ids = static_cast<int32_t *>(mAllocator->alloc(idsSizeInBytes));
         if (UNLIKELY(ids == nullptr)) {
             LOG_ERROR("Failed to allocate space for fixed width value ids.");
             return false;
         }
 
         auto dictionary =
-            (reinterpret_cast<DictionaryVector *>(vector))->ExtractDictionaryAndIds(0, mCurrentVB->GetRowCount(), ids);
+            (reinterpret_cast<DictionaryVector *>(vector))->ExtractDictionaryAndIds(0, idsNum, ids);
         if (UNLIKELY(dictionary == nullptr)) {
             LOG_ERROR("Failed to get dictionary");
+            mAllocator->free((uint8_t *)(ids), idsSizeInBytes);
             return false;
         }
         srcValues = reinterpret_cast<T *>(VectorHelper::GetValuesAddr(dictionary));
-        for (uint32_t index = 0; index < rowNum; ++index) {
-            *dstValues++ = srcValues[reinterpret_cast<int32_t *>(ids)[rowIndexes[index]]]; // write value to local blob
+        if (UNLIKELY(srcValues == nullptr)) {
+            LOG_ERROR("Source values address is null.");
+            mAllocator->free((uint8_t *)(ids), idsSizeInBytes);
+            return false;
         }
-        mAllocator->free((uint8_t *)(ids), mCurrentVB->GetRowCount() * sizeof(int32_t));
+        int32_t srcRowCount = dictionary->GetSize();
+        for (uint32_t index = 0; index < rowNum; ++index) {
+            uint32_t idIndex = rowIndexes[index];
+            if (UNLIKELY(idIndex >= idsNum)) {
+                LOG_ERROR("Invalid idIndex %d, idsNum.", idIndex, idsNum);
+                mAllocator->free((uint8_t *)(ids), idsSizeInBytes);
+                return false;
+            }
+            uint32_t rowIndex = reinterpret_cast<int32_t *>(ids)[idIndex];
+            if (UNLIKELY(rowIndex >= srcRowCount)) {
+                LOG_ERROR("Invalid rowIndex %d, srcRowCount %d.", rowIndex, srcRowCount);
+                mAllocator->free((uint8_t *)(ids), idsSizeInBytes);
+                return false;
+            }
+            *dstValues++ = srcValues[rowIndex]; // write value to local blob
+        }
+        mAllocator->free((uint8_t *)(ids), idsSizeInBytes);
     } else {
         srcValues = reinterpret_cast<T *>(VectorHelper::GetValuesAddr(vector));
+        if (UNLIKELY(srcValues == nullptr)) {
+            LOG_ERROR("Source values address is null.");
+            return false;
+        }
+        int32_t srcRowCount = vector->GetSize();
         for (uint32_t index = 0; index < rowNum; ++index) {
-            *dstValues++ = srcValues[rowIndexes[index]]; // write value to local blob
+            uint32_t rowIndex = rowIndexes[index];
+            if (UNLIKELY(rowIndex >= srcRowCount)) {
+                LOG_ERROR("Invalid rowIndex %d, srcRowCount %d.", rowIndex, srcRowCount);
+                return false;
+            }
+            *dstValues++ = srcValues[rowIndex]; // write value to local blob
         }
     }
 
@@ -205,37 +241,67 @@ bool OckSplitter::WriteFixedWidthValueTemple(Vector *vector, bool isDict, std::v
     return true;
 }
 
-bool OckSplitter::WriteDecimal128(Vector *vector, bool isDict, std::vector<uint32_t> &rowIndexes,
-                                  uint32_t rowNum, uint64_t *&address)
+bool OckSplitter::WriteDecimal128(Vector *vector, bool isDict, std::vector<uint32_t> &rowIndexes, uint32_t rowNum,
+    uint64_t *&address)
 {
     uint64_t *dstValues = address;
     uint64_t *srcValues = nullptr;
 
     if (isDict) {
-        auto ids = static_cast<int32_t *>(mAllocator->alloc(mCurrentVB->GetRowCount() * sizeof(int32_t)));
+        uint32_t idsNum = mCurrentVB->GetRowCount();
+        int64_t idsSizeInBytes = idsNum * sizeof(int32_t);
+        auto ids = static_cast<int32_t *>(mAllocator->alloc(idsSizeInBytes));
         if (UNLIKELY(ids == nullptr)) {
             LOG_ERROR("Failed to allocate space for fixed width value ids.");
             return false;
         }
 
-        auto dictionary =
-            (reinterpret_cast<DictionaryVector *>(vector))->ExtractDictionaryAndIds(0, mCurrentVB->GetRowCount(), ids);
+        auto dictionary = (reinterpret_cast<DictionaryVector *>(vector))->ExtractDictionaryAndIds(0, idsNum, ids);
         if (UNLIKELY(dictionary == nullptr)) {
             LOG_ERROR("Failed to get dictionary");
+            mAllocator->free((uint8_t *)(ids), idsSizeInBytes);
             return false;
         }
 
         srcValues = reinterpret_cast<uint64_t *>(VectorHelper::GetValuesAddr(dictionary));
-        for (uint32_t index = 0; index < rowNum; ++index) {
-            *dstValues++ = srcValues[reinterpret_cast<uint32_t *>(ids)[rowIndexes[index]] << 1];
-            *dstValues++ = srcValues[(reinterpret_cast<uint32_t *>(ids)[rowIndexes[index]] << 1) | 1];
+        if (UNLIKELY(srcValues == nullptr)) {
+            LOG_ERROR("Source values address is null.");
+            mAllocator->free((uint8_t *)(ids), idsSizeInBytes);
+            return false;
         }
-        mAllocator->free((uint8_t *)(ids), mCurrentVB->GetRowCount() * sizeof(int32_t));
+        int32_t srcRowCount = dictionary->GetSize();
+        for (uint32_t index = 0; index < rowNum; ++index) {
+            uint32_t idIndex = rowIndexes[index];
+            if (UNLIKELY(idIndex >= idsNum)) {
+                LOG_ERROR("Invalid idIndex %d, idsNum.", idIndex, idsNum);
+                mAllocator->free((uint8_t *)(ids), idsSizeInBytes);
+                return false;
+            }
+            uint32_t rowIndex = reinterpret_cast<int32_t *>(ids)[idIndex];
+            if (UNLIKELY(rowIndex >= srcRowCount)) {
+                LOG_ERROR("Invalid rowIndex %d, srcRowCount %d.", rowIndex, srcRowCount);
+                mAllocator->free((uint8_t *)(ids), idsSizeInBytes);
+                return false;
+            }
+            *dstValues++ = srcValues[rowIndex << 1];
+            *dstValues++ = srcValues[rowIndex << 1 | 1];
+        }
+        mAllocator->free((uint8_t *)(ids), idsSizeInBytes);
     } else {
         srcValues = reinterpret_cast<uint64_t *>(VectorHelper::GetValuesAddr(vector));
+        if (UNLIKELY(srcValues == nullptr)) {
+            LOG_ERROR("Source values address is null.");
+            return false;
+        }
+        int32_t srcRowCount = vector->GetSize();
         for (uint32_t index = 0; index < rowNum; ++index) {
+            uint32_t rowIndex = rowIndexes[index];
+            if (UNLIKELY(rowIndex >= srcRowCount)) {
+                LOG_ERROR("Invalid rowIndex %d, srcRowCount %d.", rowIndex, srcRowCount);
+                return false;
+            }
             *dstValues++ = srcValues[rowIndexes[index] << 1]; // write value to local blob
-            *dstValues++ = srcValues[(rowIndexes[index] << 1) | 1]; // write value to local blob
+            *dstValues++ = srcValues[rowIndexes[index] << 1 | 1]; // write value to local blob
         }
     }
 
@@ -243,8 +309,8 @@ bool OckSplitter::WriteDecimal128(Vector *vector, bool isDict, std::vector<uint3
     return true;
 }
 
-bool OckSplitter::WriteFixedWidthValue(Vector *vector, ShuffleTypeId typeId,
-    std::vector<uint32_t> &rowIndexes, uint32_t rowNum, uint8_t *&address)
+bool OckSplitter::WriteFixedWidthValue(Vector *vector, ShuffleTypeId typeId, std::vector<uint32_t> &rowIndexes, 
+    uint32_t rowNum, uint8_t *&address)
 {
     bool isDict = (vector->GetEncoding() == OMNI_VEC_ENCODING_DICTIONARY);
     switch (typeId) {
@@ -285,8 +351,8 @@ bool OckSplitter::WriteFixedWidthValue(Vector *vector, ShuffleTypeId typeId,
     return true;
 }
 
-bool OckSplitter::WriteVariableWidthValue(Vector *vector, std::vector<uint32_t> &rowIndexes,
-    uint32_t rowNum, uint8_t *&address)
+bool OckSplitter::WriteVariableWidthValue(Vector *vector, std::vector<uint32_t> &rowIndexes, uint32_t rowNum,
+    uint8_t *&address)
 {
     bool isDict = (vector->GetEncoding() == OMNI_VEC_ENCODING_DICTIONARY);
     auto *offsetAddress = reinterpret_cast<int32_t *>(address);            // point the offset space base address
@@ -295,11 +361,17 @@ bool OckSplitter::WriteVariableWidthValue(Vector *vector, std::vector<uint32_t> 
 
     int32_t length = 0;
     uint8_t *srcValues = nullptr;
+    uint32_t vectorSize = vector->GetSize();
     for (uint32_t rowCnt = 0; rowCnt < rowNum; rowCnt++) {
+        uint32_t rowIndex = rowIndexes[rowCnt];
+        if (UNLIKELY(rowIndex >= vectorSize)) {
+            LOG_ERROR("Invalid rowIndex %d, vectorSize %d.", rowIndex, vectorSize);
+            return false;
+        }
         if (isDict) {
-            length = reinterpret_cast<DictionaryVector *>(vector)->GetVarchar(rowIndexes[rowCnt], &srcValues);
+            length = reinterpret_cast<DictionaryVector *>(vector)->GetVarchar(rowIndex, &srcValues);
         } else {
-            length = reinterpret_cast<VarcharVector *>(vector)->GetValue(rowIndexes[rowCnt], &srcValues);
+            length = reinterpret_cast<VarcharVector *>(vector)->GetValue(rowIndex, &srcValues);
         }
         // write the null value in the vector with row index to local blob
         if (UNLIKELY(length > 0 && memcpy_s(valueAddress, length, srcValues, length) != EOK)) {
@@ -353,6 +425,10 @@ bool OckSplitter::WritePartVectorBatch(VectorBatch &vb, uint32_t partitionId)
     uint32_t regionId = 0;
     // backspace from local blob the region end address to remove preoccupied bytes for the vector batch region
     auto address = mOckBuffer->GetEndAddressOfRegion(partitionId, regionId, vbRegion->mLength);
+    if (UNLIKELY(address == nullptr)) {
+        LOG_ERROR("Failed to get address with partitionId %d", partitionId);
+        return false;
+    }
     // write the header information of the vector batch in local blob
     auto header = reinterpret_cast<VBDataHeaderDesc *>(address);
     header->length = vbRegion->mLength;
@@ -360,6 +436,10 @@ bool OckSplitter::WritePartVectorBatch(VectorBatch &vb, uint32_t partitionId)
 
     if (!mOckBuffer->IsCompress()) { // record write bytes when don't need compress
         mTotalWriteBytes += header->length;
+    }
+    if (UNLIKELY(partitionId > mPartitionLengths.size())) {
+        LOG_ERROR("Illegal partitionId %d", partitionId);
+        return false;
     }
     mPartitionLengths[partitionId] += header->length; // we can't get real length when compress
 
@@ -382,6 +462,10 @@ bool OckSplitter::WritePartVectorBatch(VectorBatch &vb, uint32_t partitionId)
 
 bool OckSplitter::FlushAllRegionAndGetNewBlob(VectorBatch &vb)
 {
+    if (UNLIKELY(mPartitionNum > mCacheRegion.size())) {
+        LOG_ERROR("Illegal mPartitionNum  %d", mPartitionNum);
+        return false;
+    }
     for (uint32_t partitionId = 0; partitionId < mPartitionNum; ++partitionId) {
         if (mCacheRegion[partitionId].mRowNum == 0) {
             continue;
@@ -421,6 +505,10 @@ bool OckSplitter::FlushAllRegionAndGetNewBlob(VectorBatch &vb)
 bool OckSplitter::PreoccupiedBufferSpace(VectorBatch &vb, uint32_t partitionId, uint32_t rowIndex, uint32_t rowLength,
     bool newRegion)
 {
+    if (UNLIKELY(partitionId > mCacheRegion.size())) {
+        LOG_ERROR("Illegal partitionId  %d", partitionId);
+        return false;
+    }
     uint32_t preoccupiedSize = rowLength;
     if (mCacheRegion[partitionId].mRowNum == 0) {
         preoccupiedSize += mMinDataLenInVB; // means create a new vector batch, so will cost header

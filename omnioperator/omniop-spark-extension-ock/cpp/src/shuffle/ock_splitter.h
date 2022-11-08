@@ -70,7 +70,10 @@ public:
             return false;
         }
 
-        InitCacheRegion();
+        if (UNLIKELY(!InitCacheRegion())) {
+            LOG_ERROR("Failed to initialize CacheRegion");
+            return false;
+        }
         return true;
     }
 
@@ -98,7 +101,7 @@ private:
         return mIsSinglePt ? 0 : mPtViewInCurVB->GetValue(rowIndex);
     }
 
-    void InitCacheRegion();
+    bool InitCacheRegion();
 
     inline void ResetCacheRegion()
     {
@@ -159,6 +162,7 @@ private:
     static constexpr uint32_t uint64Size = 8;
     static constexpr uint32_t decimal128Size = 16;
     static constexpr uint32_t vbHeaderSize = 8;
+    static constexpr uint32_t doubleNum = 2;
     /* the region use for all vector batch ---------------------------------------------------------------- */
     // this splitter which corresponding to one map task in one shuffle, so some params is same
     uint32_t mPartitionNum = 0;

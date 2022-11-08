@@ -23,9 +23,21 @@ bool OckHashWriteBuffer::Initialize(uint32_t regionSize, uint32_t minCapacity, u
     mIsCompress = isCompress;
     uint32_t bufferNeed = regionSize * mPartitionNum;
     mDataCapacity = std::min(std::max(bufferNeed, minCapacity), maxCapacity);
+    if (UNLIKELY(mDataCapacity < mSinglePartitionAndRegionUsedSize * mPartitionNum)) {
+        LogError("mDataCapacity should be bigger than mSinglePartitionAndRegionUsedSize * mPartitionNum");
+        return false;
+    }
     mRegionPtRecordOffset = mDataCapacity - mSinglePartitionAndRegionUsedSize * mPartitionNum;
+    if (UNLIKELY(mDataCapacity < mSingleRegionUsedSize * mPartitionNum)) {
+        LogError("mDataCapacity should be bigger than mSingleRegionUsedSize * mPartitionNum");
+        return false;
+    }
     mRegionUsedRecordOffset = mDataCapacity - mSingleRegionUsedSize * mPartitionNum;
 
+    if (UNLIKELY(mDataCapacity / mPartitionNum < mSinglePartitionAndRegionUsedSize)) {
+        LogError("mDataCapacity / mPartitionNum should be bigger than mSinglePartitionAndRegionUsedSize");
+        return false;
+    }
     mEachPartitionSize = mDataCapacity / mPartitionNum - mSinglePartitionAndRegionUsedSize;
     mDoublePartitionSize = reserveSize * mEachPartitionSize;
 
@@ -76,6 +88,10 @@ OckHashWriteBuffer::ResultFlag OckHashWriteBuffer::PreoccupiedDataSpace(uint32_t
         return ResultFlag::UNEXPECTED;
     }
 
+    if (UNLIKELY(mTotalSize > UINT32_MAX -length)) {
+        LogError("mTotalSize + length exceed UINT32_MAX");
+        return ResultFlag::UNEXPECTED;
+    }
     // 1. get the new region id for partitionId
     uint32_t regionId = UINT32_MAX;
     if (newRegion && !GetNewRegion(partitionId, regionId)) {
@@ -98,7 +114,7 @@ OckHashWriteBuffer::ResultFlag OckHashWriteBuffer::PreoccupiedDataSpace(uint32_t
         (mDoublePartitionSize - mRegionUsedSize[regionId] - mRegionUsedSize[nearRegionId]);
     if (remainBufLength >= length) {
         mRegionUsedSize[regionId] += length;
-        mTotalSize += length; // todo check
+        mTotalSize += length;
         return ResultFlag::ENOUGH;
     }
 
@@ -111,8 +127,16 @@ uint8_t *OckHashWriteBuffer::GetEndAddressOfRegion(uint32_t partitionId, uint32_
     regionId = mPtCurrentRegionId[partitionId];
 
     if ((regionId % groupSize) == 0) {
+        if (UNLIKELY(regionId * mEachPartitionSize + mRegionUsedSize[regionId] < length)) {
+            LogError("regionId * mEachPartitionSize + mRegionUsedSize[regionId] shoulld be bigger than length");
+            return nullptr;
+        }
         offset = regionId * mEachPartitionSize + mRegionUsedSize[regionId] - length;
     } else {
+        if (UNLIKELY((regionId + 1) * mEachPartitionSize < mRegionUsedSize[regionId])) {
+            LogError("(regionId + 1) * mEachPartitionSize  shoulld be bigger than mRegionUsedSize[regionId]");
+            return nullptr;
+        }
         offset = (regionId + 1) * mEachPartitionSize - mRegionUsedSize[regionId];
     }
 

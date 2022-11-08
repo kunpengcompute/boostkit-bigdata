@@ -67,6 +67,10 @@ bool OckMergeReader::GenerateVector(OckVector &vector, uint32_t rowNum, int32_t 
             vector.SetValueOffsets(static_cast<void *>(address));
             address += capacityOffset * (rowNum + 1); // 4 means value cost 4Byte
             vector.SetCapacityInBytes(*reinterpret_cast<int32_t *>(address - capacityOffset));
+            if (UNLIKELY(vector.GetCapacityInBytes() > maxCapacityInBytes)) {
+                LOG_ERROR("vector capacityInBytes exceed maxCapacityInBytes");
+                return false;
+            }
             break;
         }
         default: {
@@ -83,6 +87,11 @@ bool OckMergeReader::GenerateVector(OckVector &vector, uint32_t rowNum, int32_t 
 
 bool OckMergeReader::CalVectorValueLength(uint32_t colIndex, uint32_t &length)
 {
+    if (UNLIKELY(colIndex >= mVectorBatch->mColumnsHead.size() ||
+        colIndex >= mVectorBatch->mVectorValueLength.size())) {
+        LOG_ERROR("Illegal index for column index %d", colIndex);
+        return false;
+    }
     OckVector *vector = mVectorBatch->mColumnsHead[colIndex];
     for (uint32_t cnt = 0; cnt < mMergeCnt; ++cnt) {
         if (UNLIKELY(vector == nullptr)) {
@@ -110,6 +119,10 @@ bool OckMergeReader::ScanOneVectorBatch(uint8_t *&startAddress)
     OckVector *curVector = nullptr;
     for (uint32_t colIndex = 0; colIndex < mColNum; colIndex++) {
         curVector = mVectorBatch->mColumnsCur[colIndex];
+        if (UNLIKELY(curVector == nullptr)) {
+            LOG_ERROR("curVector is null, index %d", colIndex);
+            return false;
+        }
         if (UNLIKELY(!GenerateVector(*curVector, mCurVBHeader->rowNum, mColTypeIds[colIndex], address))) {
             LOG_ERROR("Failed to generate vector");
             return false;
@@ -169,24 +182,35 @@ bool OckMergeReader::GetMergeVectorBatch(uint8_t *&startAddress, uint32_t remain
     return true;
 }
 
-bool OckMergeReader::CopyPartDataToVector(uint8_t *&nulls, uint8_t *&values,
-    OckVector &srcVector, uint32_t colIndex)
+bool OckMergeReader::CopyPartDataToVector(uint8_t *&nulls, uint8_t *&values, uint32_t &remainingSize, 
+    uint32_t &remainingCapacity, OckVector &srcVector)
 {
-    errno_t ret = memcpy_s(nulls, srcVector.GetSize(), srcVector.GetValueNulls(), srcVector.GetSize());
+    uint32_t srcSize = srcVector.GetSize();
+    if (UNLIKELY(remainingSize < srcSize)) {
+        LOG_ERROR("Not eneough resource. remainingSize %d, srcSize %d.", remainingSize, srcSize);
+        return false;
+    }
+    errno_t ret = memcpy_s(nulls, remainingSize, srcVector.GetValueNulls(), srcSize);
     if (UNLIKELY(ret != EOK)) {
         LOG_ERROR("Failed to copy null vector");
         return false;
     }
-    nulls += srcVector.GetSize();
+    nulls += srcSize;
+    remainingSize -= srcSize;
 
-    if (srcVector.GetCapacityInBytes() > 0) {
-        ret = memcpy_s(values, srcVector.GetCapacityInBytes(), srcVector.GetValues(),
-            srcVector.GetCapacityInBytes());
+    uint32_t srcCapacity = srcVector.GetCapacityInBytes();
+    if (UNLIKELY(remainingCapacity < srcCapacity)) {
+        LOG_ERROR("Not enough resource. remainingCapacity %d, srcCapacity %d", remainingCapacity, srcCapacity);
+        return false;
+    }
+    if (srcCapacity > 0) {
+        ret = memcpy_s(values, remainingCapacity, srcVector.GetValues(), srcCapacity);
         if (UNLIKELY(ret != EOK)) {
             LOG_ERROR("Failed to copy values vector");
             return false;
         }
-        values += srcVector.GetCapacityInBytes();
+        values += srcCapacity;
+        remainingCapacity -=srcCapacity;
     }
 
     return true;
@@ -203,6 +227,12 @@ bool OckMergeReader::CopyDataToVector(Vector *dstVector, uint32_t colIndex)
     dstVector->SetNullFlag(true);
     uint32_t totalSize = 0;
     uint32_t currentSize = 0;
+    if (dstVector->GetSize() < 0 || dstVector->GetCapacityInBytes() < 0) {
+        LOG_ERROR("Invalid vector size %d or capacity %d", dstVector->GetSize(), dstVector->GetCapacityInBytes());
+        return false;
+    }
+    uint32_t remainingSize = (uint32_t)dstVector->GetSize();
+    uint32_t remainingCapacity = (uint32_t)dstVector->GetCapacityInBytes();
 
     for (uint32_t cnt = 0; cnt < mMergeCnt; ++cnt) {
         if (UNLIKELY(srcVector == nullptr)) {
@@ -210,7 +240,7 @@ bool OckMergeReader::CopyDataToVector(Vector *dstVector, uint32_t colIndex)
             return false;
         }
 
-        if (UNLIKELY(!CopyPartDataToVector(nullsAddress, valuesAddress, *srcVector, colIndex))) {
+        if (UNLIKELY(!CopyPartDataToVector(nullsAddress, valuesAddress, remainingSize, remainingCapacity, *srcVector))) {
             return false;
         }
 
