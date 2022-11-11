@@ -17,7 +17,7 @@
 
 package org.apache.spark.sql.execution
 
-import nova.hetu.omniruntime.vector.Vec
+import java.util.concurrent.TimeUnit.NANOSECONDS
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable.ListBuffer
@@ -33,6 +33,8 @@ import org.apache.spark.sql.execution.util.SparkMemoryUtils
 import org.apache.spark.sql.execution.vectorized.{OffHeapColumnVector, OmniColumnVector, WritableColumnVector}
 import org.apache.spark.sql.types.{BooleanType, ByteType, CalendarIntervalType, DataType, DateType, DecimalType, DoubleType, IntegerType, LongType, ShortType, StringType, StructType, TimestampType}
 import org.apache.spark.sql.vectorized.ColumnarBatch
+
+import nova.hetu.omniruntime.vector.Vec
 
 /**
  * Holds a user defined rule that can be used to inject columnar implementations of various
@@ -226,13 +228,15 @@ case class RowToOmniColumnarExec(child: SparkPlan) extends RowToColumnarTransiti
 
   override lazy val metrics: Map[String, SQLMetric] = Map(
     "numInputRows" -> SQLMetrics.createMetric(sparkContext, "number of input rows"),
-    "numOutputBatches" -> SQLMetrics.createMetric(sparkContext, "number of output batches")
+    "numOutputBatches" -> SQLMetrics.createMetric(sparkContext, "number of output batches"),
+    "rowToOmniColumnarTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in row to OmniColumnar")
   )
 
   override def doExecuteColumnar(): RDD[ColumnarBatch] = {
     val enableOffHeapColumnVector = sqlContext.conf.offHeapColumnVectorEnabled
     val numInputRows = longMetric("numInputRows")
     val numOutputBatches = longMetric("numOutputBatches")
+    val rowToOmniColumnarTime = longMetric("rowToOmniColumnarTime")
     // Instead of creating a new config we are reusing columnBatchSize. In the future if we do
     // combine with some of the Arrow conversion tools we will need to unify some of the configs.
     val numRows = conf.columnBatchSize
@@ -249,6 +253,7 @@ case class RowToOmniColumnarExec(child: SparkPlan) extends RowToColumnarTransiti
           }
 
           override def next(): ColumnarBatch = {
+            val startTime = System.nanoTime()
             val vectors: Seq[WritableColumnVector] = OmniColumnVector.allocateColumns(numRows,
               localSchema, true)
             val cb: ColumnarBatch = new ColumnarBatch(vectors.toArray)
@@ -268,6 +273,7 @@ case class RowToOmniColumnarExec(child: SparkPlan) extends RowToColumnarTransiti
             cb.setNumRows(rowCount)
             numInputRows += rowCount
             numOutputBatches += 1
+            rowToOmniColumnarTime += NANOSECONDS.toMillis(System.nanoTime() - startTime)
             cb
           }
         }
@@ -292,17 +298,19 @@ case class OmniColumnarToRowExec(child: SparkPlan) extends ColumnarToRowTransiti
 
   override lazy val metrics: Map[String, SQLMetric] = Map(
     "numOutputRows" -> SQLMetrics.createMetric(sparkContext, "number of output rows"),
-    "numInputBatches" -> SQLMetrics.createMetric(sparkContext, "number of input batches")
+    "numInputBatches" -> SQLMetrics.createMetric(sparkContext, "number of input batches"),
+    "omniColumnarToRowTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omniColumnar to row")
   )
 
   override def doExecute(): RDD[InternalRow] = {
     val numOutputRows = longMetric("numOutputRows")
     val numInputBatches = longMetric("numInputBatches")
+    val omniColumnarToRowTime = longMetric("omniColumnarToRowTime")
     // This avoids calling `output` in the RDD closure, so that we don't need to include the entire
     // plan (this) in the closure.
     val localOutput = this.output
     child.executeColumnar().mapPartitionsInternal { batches =>
-      ColumnarBatchToInternalRow.convert(localOutput, batches, numOutputRows, numInputBatches)
+      ColumnarBatchToInternalRow.convert(localOutput, batches, numOutputRows, numInputBatches, omniColumnarToRowTime)
     }
   }
 }
@@ -310,10 +318,11 @@ case class OmniColumnarToRowExec(child: SparkPlan) extends ColumnarToRowTransiti
 object ColumnarBatchToInternalRow {
 
   def convert(output: Seq[Attribute], batches: Iterator[ColumnarBatch],
-              numOutputRows: SQLMetric, numInputBatches: SQLMetric ): Iterator[InternalRow] = {
+              numOutputRows: SQLMetric, numInputBatches: SQLMetric,
+              rowToOmniColumnarTime: SQLMetric): Iterator[InternalRow] = {
+    val startTime = System.nanoTime()
     val toUnsafe = UnsafeProjection.create(output, output)
     val vecsTmp = new ListBuffer[Vec]
-
     val batchIter = batches.flatMap { batch =>
       // store vec since tablescan reuse batch
       for (i <- 0 until batch.numCols()) {
@@ -325,7 +334,9 @@ object ColumnarBatchToInternalRow {
       }
       numInputBatches += 1
       numOutputRows += batch.numRows()
-      batch.rowIterator().asScala.map(toUnsafe)
+      val iter = batch.rowIterator().asScala.map(toUnsafe)
+      rowToOmniColumnarTime += NANOSECONDS.toMillis(System.nanoTime() - startTime)
+      iter
     }
 
     SparkMemoryUtils.addLeakSafeTaskCompletionListener { _ =>
