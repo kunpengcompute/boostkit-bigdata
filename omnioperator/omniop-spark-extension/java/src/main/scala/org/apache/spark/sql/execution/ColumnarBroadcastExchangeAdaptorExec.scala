@@ -42,6 +42,7 @@ case class ColumnarBroadcastExchangeAdaptorExec(child: SparkPlan, numPartitions:
   override def doExecute(): RDD[InternalRow] = {
     val numOutputRows: SQLMetric = longMetric("numOutputRows")
     val numOutputBatches: SQLMetric = longMetric("numOutputBatches")
+    val processTime: SQLMetric = longMetric("processTime")
     val inputRdd: BroadcastColumnarRDD = BroadcastColumnarRDD(
       sparkContext,
       metrics,
@@ -49,7 +50,7 @@ case class ColumnarBroadcastExchangeAdaptorExec(child: SparkPlan, numPartitions:
       child.executeBroadcast(),
       StructType.fromAttributes(child.output))
     inputRdd.mapPartitions { batches =>
-      ColumnarBatchToInternalRow.convert(output, batches, numOutputRows, numOutputBatches)
+      ColumnarBatchToInternalRow.convert(output, batches, numOutputRows, numOutputBatches, processTime)
     }
   }
 

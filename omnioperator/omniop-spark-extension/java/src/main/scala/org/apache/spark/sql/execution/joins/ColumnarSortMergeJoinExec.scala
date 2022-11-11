@@ -76,15 +76,15 @@ class ColumnarSortMergeJoinExec(
   override lazy val metrics = Map(
     "numOutputRows" -> SQLMetrics.createMetric(sparkContext, "number of output rows"),
     "streamedAddInputTime" ->
-      SQLMetrics.createMetric(sparkContext, "time in omni streamed addInput"),
+      SQLMetrics.createTimingMetric(sparkContext, "time in omni streamed addInput"),
     "streamedCodegenTime" ->
-      SQLMetrics.createMetric(sparkContext, "time in omni streamed codegen"),
+      SQLMetrics.createTimingMetric(sparkContext, "time in omni streamed codegen"),
     "bufferedAddInputTime" ->
-      SQLMetrics.createMetric(sparkContext, "time in omni buffered addInput"),
+      SQLMetrics.createTimingMetric(sparkContext, "time in omni buffered addInput"),
     "bufferedCodegenTime" ->
-      SQLMetrics.createMetric(sparkContext, "time in omni buffered codegen"),
+      SQLMetrics.createTimingMetric(sparkContext, "time in omni buffered codegen"),
     "getOutputTime" ->
-      SQLMetrics.createMetric(sparkContext, "time in omni buffered getOutput"),
+      SQLMetrics.createTimingMetric(sparkContext, "time in omni buffered getOutput"),
     "numOutputVecBatchs" ->
       SQLMetrics.createMetric(sparkContext, "number of output vecBatchs"),
     "numMergedVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of merged vecBatchs"),
