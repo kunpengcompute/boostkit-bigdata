@@ -15,9 +15,14 @@ using namespace ock::dopspark;
 bool OckMergeReader::Initialize(const int32_t *typeIds, uint32_t colNum)
 {
     mColNum = colNum;
-    mVectorBatch = new (std::nothrow) VBDataDesc(colNum);
+    mVectorBatch = std::make_shared<VBDataDesc>();
     if (UNLIKELY(mVectorBatch == nullptr)) {
         LOG_ERROR("Failed to new instance for vector batch description");
+        return false;
+    }
+
+    if (UNLIKELY(!mVectorBatch->Initialize(colNum))) {
+        LOG_ERROR("Failed to initialize vector batch.");
         return false;
     }
 
@@ -29,45 +34,45 @@ bool OckMergeReader::Initialize(const int32_t *typeIds, uint32_t colNum)
     return true;
 }
 
-bool OckMergeReader::GenerateVector(OckVector &vector, uint32_t rowNum, int32_t typeId, uint8_t *&startAddress)
+bool OckMergeReader::GenerateVector(OckVectorPtr &vector, uint32_t rowNum, int32_t typeId, uint8_t *&startAddress)
 {
     uint8_t *address = startAddress;
-    vector.SetValueNulls(static_cast<void *>(address));
-    vector.SetSize(rowNum);
+    vector->SetValueNulls(static_cast<void *>(address));
+    vector->SetSize(rowNum);
     address += rowNum;
 
     switch (typeId) {
         case OMNI_BOOLEAN: {
-            vector.SetCapacityInBytes(sizeof(uint8_t) * rowNum);
+            vector->SetCapacityInBytes(sizeof(uint8_t) * rowNum);
             break;
         }
         case OMNI_SHORT: {
-            vector.SetCapacityInBytes(sizeof(uint16_t) * rowNum);
+            vector->SetCapacityInBytes(sizeof(uint16_t) * rowNum);
             break;
         }
         case OMNI_INT:
         case OMNI_DATE32: {
-            vector.SetCapacityInBytes(sizeof(uint32_t) * rowNum);
+            vector->SetCapacityInBytes(sizeof(uint32_t) * rowNum);
             break;
         }
         case OMNI_LONG:
         case OMNI_DOUBLE:
         case OMNI_DECIMAL64:
         case OMNI_DATE64: {
-            vector.SetCapacityInBytes(sizeof(uint64_t) * rowNum);
+            vector->SetCapacityInBytes(sizeof(uint64_t) * rowNum);
             break;
         }
         case OMNI_DECIMAL128: {
-            vector.SetCapacityInBytes(decimal128Size * rowNum); // 16 means value cost 16Byte
+            vector->SetCapacityInBytes(decimal128Size * rowNum); // 16 means value cost 16Byte
             break;
         }
         case OMNI_CHAR:
         case OMNI_VARCHAR: { // unknown length for value vector, calculate later
             // will add offset_vector_len when the length of values_vector is variable
-            vector.SetValueOffsets(static_cast<void *>(address));
+            vector->SetValueOffsets(static_cast<void *>(address));
             address += capacityOffset * (rowNum + 1); // 4 means value cost 4Byte
-            vector.SetCapacityInBytes(*reinterpret_cast<int32_t *>(address - capacityOffset));
-            if (UNLIKELY(vector.GetCapacityInBytes() > maxCapacityInBytes)) {
+            vector->SetCapacityInBytes(*reinterpret_cast<int32_t *>(address - capacityOffset));
+            if (UNLIKELY(vector->GetCapacityInBytes() > maxCapacityInBytes)) {
                 LOG_ERROR("vector capacityInBytes exceed maxCapacityInBytes");
                 return false;
             }
@@ -79,31 +84,26 @@ bool OckMergeReader::GenerateVector(OckVector &vector, uint32_t rowNum, int32_t 
         }
     }
 
-    vector.SetValues(static_cast<void *>(address));
-    address += vector.GetCapacityInBytes();
+    vector->SetValues(static_cast<void *>(address));
+    address += vector->GetCapacityInBytes();
     startAddress = address;
     return true;
 }
 
 bool OckMergeReader::CalVectorValueLength(uint32_t colIndex, uint32_t &length)
 {
-    if (UNLIKELY(colIndex >= mVectorBatch->mColumnsHead.size() ||
-        colIndex >= mVectorBatch->mVectorValueLength.size())) {
-        LOG_ERROR("Illegal index for column index %d", colIndex);
-        return false;
-    }
-    OckVector *vector = mVectorBatch->mColumnsHead[colIndex];
+    auto vector = mVectorBatch->GetColumnHead(colIndex);
+    length = 0;
     for (uint32_t cnt = 0; cnt < mMergeCnt; ++cnt) {
         if (UNLIKELY(vector == nullptr)) {
             LOG_ERROR("Failed to calculate value length for column index %d", colIndex);
             return false;
         }
-
-        mVectorBatch->mVectorValueLength[colIndex] += vector->GetCapacityInBytes();
+        length += vector->GetCapacityInBytes();
         vector = vector->GetNextVector();
     }
 
-    length = mVectorBatch->mVectorValueLength[colIndex];
+    mVectorBatch->SetColumnCapacity(colIndex, length);
     return true;
 }
 
@@ -111,41 +111,27 @@ bool OckMergeReader::ScanOneVectorBatch(uint8_t *&startAddress)
 {
     uint8_t *address = startAddress;
     // get vector batch msg as vb_data_batch memory layout (upper)
-    mCurVBHeader = reinterpret_cast<VBHeaderPtr>(address);
-    mVectorBatch->mHeader.rowNum += mCurVBHeader->rowNum;
-    mVectorBatch->mHeader.length += mCurVBHeader->length;
+    auto curVBHeader = reinterpret_cast<VBHeaderPtr>(address);
+    mVectorBatch->AddTotalCapacity(curVBHeader->length);
+    mVectorBatch->AddTotalRowNum(curVBHeader->rowNum);
     address += sizeof(struct VBDataHeaderDesc);
 
     OckVector *curVector = nullptr;
     for (uint32_t colIndex = 0; colIndex < mColNum; colIndex++) {
-        curVector = mVectorBatch->mColumnsCur[colIndex];
+        auto curVector = mVectorBatch->GetCurColumn(colIndex);
         if (UNLIKELY(curVector == nullptr)) {
             LOG_ERROR("curVector is null, index %d", colIndex);
             return false;
         }
-        if (UNLIKELY(!GenerateVector(*curVector, mCurVBHeader->rowNum, mColTypeIds[colIndex], address))) {
+        if (UNLIKELY(!GenerateVector(curVector, curVBHeader->rowNum, mColTypeIds[colIndex], address))) {
             LOG_ERROR("Failed to generate vector");
             return false;
         }
-
-        if (curVector->GetNextVector() == nullptr) {
-            curVector = new (std::nothrow) OckVector();
-            if (UNLIKELY(curVector == nullptr)) {
-                LOG_ERROR("Failed to new instance for ock vector");
-                return false;
-            }
-
-            // set next vector in the column merge list, and current column vector point to it
-            mVectorBatch->mColumnsCur[colIndex]->SetNextVector(curVector);
-            mVectorBatch->mColumnsCur[colIndex] = curVector;
-        } else {
-            mVectorBatch->mColumnsCur[colIndex] = curVector->GetNextVector();
-        }
     }
 
-    if (UNLIKELY((uint32_t)(address - startAddress) != mCurVBHeader->length)) {
+    if (UNLIKELY((uint32_t)(address - startAddress) != curVBHeader->length)) {
         LOG_ERROR("Failed to scan one vector batch as invalid date setting %d vs %d",
-                  (uint32_t)(address - startAddress), mCurVBHeader->length);
+                  (uint32_t)(address - startAddress), curVBHeader->length);
         return false;
     }
 
@@ -172,25 +158,24 @@ bool OckMergeReader::GetMergeVectorBatch(uint8_t *&startAddress, uint32_t remain
         }
 
         mMergeCnt++;
-        if (mVectorBatch->mHeader.rowNum >= maxRowNum || mVectorBatch->mHeader.length >= maxSize) {
+        if (mVectorBatch->GetTotalRowNum() >= maxRowNum || mVectorBatch->GetTotalCapacity() >= maxSize) {
             break;
         }
     }
 
     startAddress = address;
-
     return true;
 }
 
 bool OckMergeReader::CopyPartDataToVector(uint8_t *&nulls, uint8_t *&values, uint32_t &remainingSize, 
-    uint32_t &remainingCapacity, OckVector &srcVector)
+    uint32_t &remainingCapacity, OckVectorPtr &srcVector)
 {
-    uint32_t srcSize = srcVector.GetSize();
+    uint32_t srcSize = srcVector->GetSize();
     if (UNLIKELY(remainingSize < srcSize)) {
         LOG_ERROR("Not eneough resource. remainingSize %d, srcSize %d.", remainingSize, srcSize);
         return false;
     }
-    errno_t ret = memcpy_s(nulls, remainingSize, srcVector.GetValueNulls(), srcSize);
+    errno_t ret = memcpy_s(nulls, remainingSize, srcVector->GetValueNulls(), srcSize);
     if (UNLIKELY(ret != EOK)) {
         LOG_ERROR("Failed to copy null vector");
         return false;
@@ -198,13 +183,13 @@ bool OckMergeReader::CopyPartDataToVector(uint8_t *&nulls, uint8_t *&values, uin
     nulls += srcSize;
     remainingSize -= srcSize;
 
-    uint32_t srcCapacity = srcVector.GetCapacityInBytes();
+    uint32_t srcCapacity = srcVector->GetCapacityInBytes();
     if (UNLIKELY(remainingCapacity < srcCapacity)) {
         LOG_ERROR("Not enough resource. remainingCapacity %d, srcCapacity %d", remainingCapacity, srcCapacity);
         return false;
     }
     if (srcCapacity > 0) {
-        ret = memcpy_s(values, remainingCapacity, srcVector.GetValues(), srcCapacity);
+        ret = memcpy_s(values, remainingCapacity, srcVector->GetValues(), srcCapacity);
         if (UNLIKELY(ret != EOK)) {
             LOG_ERROR("Failed to copy values vector");
             return false;
@@ -219,7 +204,7 @@ bool OckMergeReader::CopyPartDataToVector(uint8_t *&nulls, uint8_t *&values, uin
 bool OckMergeReader::CopyDataToVector(Vector *dstVector, uint32_t colIndex)
 {
     // point to first src vector in list
-    OckVector *srcVector = mVectorBatch->mColumnsHead[colIndex];
+    auto srcVector = mVectorBatch->GetColumnHead(colIndex);
 
     auto *nullsAddress = (uint8_t *)dstVector->GetValueNulls();
     auto *valuesAddress = (uint8_t *)dstVector->GetValues();
@@ -240,7 +225,7 @@ bool OckMergeReader::CopyDataToVector(Vector *dstVector, uint32_t colIndex)
             return false;
         }
 
-        if (UNLIKELY(!CopyPartDataToVector(nullsAddress, valuesAddress, remainingSize, remainingCapacity, *srcVector))) {
+        if (UNLIKELY(!CopyPartDataToVector(nullsAddress, valuesAddress, remainingSize, remainingCapacity, srcVector))) {
             return false;
         }
 
@@ -257,9 +242,9 @@ bool OckMergeReader::CopyDataToVector(Vector *dstVector, uint32_t colIndex)
 
     if (mColTypeIds[colIndex] == OMNI_CHAR || mColTypeIds[colIndex] == OMNI_VARCHAR) {
         *offsetsAddress = totalSize;
-        if (UNLIKELY(totalSize != mVectorBatch->mVectorValueLength[colIndex])) {
+        if (UNLIKELY(totalSize != mVectorBatch->GetColumnCapacity(colIndex))) {
             LOG_ERROR("Failed to calculate variable vector value length, %d to %d", totalSize,
-                      mVectorBatch->mVectorValueLength[colIndex]);
+                      mVectorBatch->GetColumnCapacity(colIndex));
             return false;
         }
     }

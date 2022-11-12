@@ -51,6 +51,9 @@ class OckColumnarShuffleBufferIterator[T](
             NativeShuffle.destroyMapTaskInfo(mapTaskToHostInfo.getNativeObjHandle)
             mapTaskToHostInfo.setNativeObjHandle(0)
         }
+        blobMap.values.foreach(reader => {
+            reader.close()
+        })
     }
 
     private[this] def throwFetchException(fetchError: FetchError): Unit = {

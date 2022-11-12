@@ -152,6 +152,8 @@ public class OckShuffleJniReader {
 
     private native long make(int[] typeIds);
 
+    private native long close(long readerId);
+
     private native int nativeGetVectorBatch(long readerId, long vbDataAddr, int capacity, int maxRow,
         int maxDataSize, Long rowCnt);
 

@@ -6,7 +6,7 @@
 #define SPARK_THESTRAL_PLUGIN_OCK_TYPE_H
 
 #include "ock_vector.h"
-#include "common/debug.h"
+#include "common/common.h"
 
 namespace ock {
 namespace dopspark {
@@ -33,58 +33,118 @@ enum class ShuffleTypeId : int {
 using VBHeaderPtr = struct VBDataHeaderDesc {
     uint32_t length = 0; // 4Byte
     uint32_t rowNum = 0; // 4Byte
-} __attribute__((packed)) * ;
+} __attribute__((packed)) *;
 
-using VBDataDescPtr = struct VBDataDesc {
-    explicit VBDataDesc(uint32_t colNum)
+class VBDataDesc {
+public:
+    VBDataDesc() = default;
+    ~VBDataDesc()
     {
+        for (auto &vector : mColumnsHead) {
+            if (vector == nullptr) {
+                continue;
+            }
+            auto currVector = vector;
+            while (currVector->GetNextVector() != nullptr) {
+                auto nextVector = currVector->GetNextVector();
+                currVector->SetNextVector(nullptr);
+                currVector = nextVector;
+            }
+        }
+    }
+
+    bool Initialize(uint32_t colNum)
+    {
+        this->colNum = colNum;
         mHeader.rowNum = 0;
         mHeader.length = 0;
-        mColumnsHead.reserve(colNum);
         mColumnsHead.resize(colNum);
-        mColumnsCur.reserve(colNum);
         mColumnsCur.resize(colNum);
-        mVectorValueLength.reserve(colNum);
-        mVectorValueLength.resize(colNum);
+        mColumnsCapacity.resize(colNum);
 
-        for (auto &index : mColumnsHead) {
-            index = new (std::nothrow) OckVector();
+        for (auto &vector : mColumnsHead) {
+            vector = std::make_shared<OckVector>();
+            if (vector == nullptr) {
+                mColumnsHead.clear();
+                return false;
+            }
         }
+        return true;
     }
 
     inline void Reset()
     {
         mHeader.rowNum = 0;
         mHeader.length = 0;
-        std::fill(mVectorValueLength.begin(), mVectorValueLength.end(), 0);
+        std::fill(mColumnsCapacity.begin(), mColumnsCapacity.end(), 0);
         for (uint32_t index = 0; index < mColumnsCur.size(); ++index) {
             mColumnsCur[index] = mColumnsHead[index];
         }
     }
 
-    VBDataHeaderDesc mHeader;
-    std::vector<uint32_t> mVectorValueLength;
-    std::vector<OckVector *> mColumnsCur;
-    std::vector<OckVector *> mColumnsHead; // Array[List[OckVector *]]
-} * ;
-}
-}
-#define PROFILE_START_L1(name)                \
-    long tcDiff##name = 0;                    \
-    struct timespec tcStart##name = { 0, 0 }; \
-    clock_gettime(CLOCK_MONOTONIC, &tcStart##name);
-
-#define PROFILE_END_L1(name)                                                                     \
-    struct timespec tcEnd##name = { 0, 0 };                                                      \
-    clock_gettime(CLOCK_MONOTONIC, &tcEnd##name);                                                \
-                                                                                                 \
-    long diffSec##name = tcEnd##name.tv_sec - tcStart##name.tv_sec;                              \
-    if (diffSec##name == 0) {                                                                    \
-        tcDiff##name = tcEnd##name.tv_nsec - tcStart##name.tv_nsec;                              \
-    } else {                                                                                     \
-        tcDiff##name = diffSec##name * 1000000000 + tcEnd##name.tv_nsec - tcStart##name.tv_nsec; \
+    std::shared_ptr<OckVector> GetColumnHead(uint32_t colIndex) {
+        if (colIndex >= colNum) {
+            return nullptr;
+        }
+        return mColumnsHead[colIndex];
     }
 
-#define PROFILE_VALUE(name) tcDiff##name
+    void SetColumnCapacity(uint32_t colIndex, uint32_t length) {
+        mColumnsCapacity[colIndex] = length;
+    }
+
+    uint32_t GetColumnCapacity(uint32_t colIndex) {
+        return mColumnsCapacity[colIndex];
+    }
+
+    std::shared_ptr<OckVector> GetCurColumn(uint32_t colIndex)
+    {
+        if (colIndex >= colNum) {
+            return nullptr;
+        }
+        auto currVector = mColumnsCur[colIndex];
+        if (currVector->GetNextVector() == nullptr) {
+            auto newCurVector = std::make_shared<OckVector>();
+            if (UNLIKELY(newCurVector == nullptr)) {
+                LOG_ERROR("Failed to new instance for ock vector");
+                return nullptr;
+            }
+            currVector->SetNextVector(newCurVector);
+            mColumnsCur[colIndex] = newCurVector;
+        } else {
+            mColumnsCur[colIndex] = currVector->GetNextVector();
+        }
+        return currVector;
+    }
+
+    uint32_t GetTotalCapacity()
+    {
+        return mHeader.length;
+    }
+
+    uint32_t GetTotalRowNum()
+    {
+        return mHeader.rowNum;
+    }
+
+    void AddTotalCapacity(uint32_t length) {
+        mHeader.length += length;
+    }
+
+    void AddTotalRowNum(uint32_t rowNum)
+    {
+        mHeader.rowNum +=rowNum;
+    }
+
+private:
+    uint32_t colNum = 0;
+    VBDataHeaderDesc mHeader;
+    std::vector<uint32_t> mColumnsCapacity;
+    std::vector<OckVectorPtr> mColumnsCur;
+    std::vector<OckVectorPtr> mColumnsHead; // Array[List[OckVector *]]
+};
+using VBDataDescPtr = std::shared_ptr<VBDataDesc>;
+}
+}
 
 #endif // SPARK_THESTRAL_PLUGIN_OCK_TYPE_H

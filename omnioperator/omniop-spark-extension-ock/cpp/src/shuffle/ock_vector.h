@@ -69,12 +69,12 @@ public:
         valueOffsetsAddress = address;
     }
 
-    inline void SetNextVector(OckVector *next)
+    inline void SetNextVector(std::shared_ptr<OckVector> next)
     {
         mNext = next;
     }
 
-    inline OckVector *GetNextVector()
+    inline std::shared_ptr<OckVector> GetNextVector()
     {
         return mNext;
     }
@@ -87,8 +87,9 @@ private:
     void *valueNullsAddress = nullptr;
     void *valueOffsetsAddress = nullptr;
 
-    OckVector *mNext = nullptr;
+    std::shared_ptr<OckVector> mNext = nullptr;
 };
+using OckVectorPtr = std::shared_ptr<OckVector>;
 }
 }
 #endif // SPARK_THESTRAL_PLUGIN_OCK_VECTOR_H

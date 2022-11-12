@@ -20,6 +20,12 @@ JNIEXPORT jlong JNICALL Java_com_huawei_ock_spark_jni_OckShuffleJniReader_make(J
 
 /*
  * Class:     com_huawei_ock_spark_jni_OckShuffleJniReader
+ * Method:    close
+ * Signature: (JI)I
+ */
+JNIEXPORT void JNICALL Java_com_huawei_ock_spark_jni_OckShuffleJniReader_close(JNIEnv *env, jobject, jlong jReaderId);
+/*
+ * Class:     com_huawei_ock_spark_jni_OckShuffleJniReader
  * Method:    nativeGetVectorBatch
  * Signature: (JJIII;Ljava/lang/Long;)I
  */

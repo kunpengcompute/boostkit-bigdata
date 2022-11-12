@@ -127,6 +127,10 @@ std::shared_ptr<OckSplitter> OckSplitter::Create(const int32_t *colTypeIds, int3
 std::shared_ptr<OckSplitter> OckSplitter::Make(const std::string &partitionMethod, int partitionNum,
     const int32_t *colTypeIds, int32_t colNum, uint64_t threadId)
 {
+    if (UNLIKELY(colTypeIds == nullptr || colNum == 0)) {
+        LOG_ERROR("colTypeIds is null or colNum is 0, colNum %d", colNum);
+        return nullptr;
+    }
     if (partitionMethod == "hash" || partitionMethod == "rr" || partitionMethod == "range") {
         return Create(colTypeIds, colNum, partitionNum, false, threadId);
     } else if (UNLIKELY(partitionMethod == "single")) {
@@ -361,7 +365,7 @@ bool OckSplitter::WriteVariableWidthValue(Vector *vector, std::vector<uint32_t> 
 
     int32_t length = 0;
     uint8_t *srcValues = nullptr;
-    uint32_t vectorSize = vector->GetSize();
+    int32_t vectorSize = vector->GetSize();
     for (uint32_t rowCnt = 0; rowCnt < rowNum; rowCnt++) {
         uint32_t rowIndex = rowIndexes[rowCnt];
         if (UNLIKELY(rowIndex >= vectorSize)) {

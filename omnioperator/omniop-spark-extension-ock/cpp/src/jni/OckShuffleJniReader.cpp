@@ -72,6 +72,16 @@ JNIEXPORT jlong JNICALL Java_com_huawei_ock_spark_jni_OckShuffleJniReader_make(J
     return gBlobReader.Insert(instance);
 }
 
+JNIEXPORT void JNICALL Java_com_huawei_ock_spark_jni_OckShuffleJniReader_close(JNIEnv *, jobject, jlong)
+{
+    if (UNLIKELY(env == nullptr)) {
+        LOG_ERROR("JNIENV is null.");
+        return;
+    }
+
+    gBlobReader.Erase(jReaderId);
+}
+
 JNIEXPORT jint JNICALL Java_com_huawei_ock_spark_jni_OckShuffleJniReader_nativeGetVectorBatch(JNIEnv *env, jobject,
     jlong jReaderId, jlong jAddress, jint jRemain, jint jMaxRow, jint jMaxSize, jobject jRowCnt)
 {
