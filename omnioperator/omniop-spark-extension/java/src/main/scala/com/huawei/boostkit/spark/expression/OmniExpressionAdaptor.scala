@@ -500,6 +500,11 @@ object OmniExpressionAdaptor extends Logging {
           .format(sparkTypeToOmniExpJsonType(lower.dataType),
             rewriteToOmniJsonExpressionLiteral(lower.child, exprsIndexMap))
 
+      case upper: Upper =>
+        "{\"exprType\":\"FUNCTION\",\"returnType\":%s,\"function_name\":\"upper\", \"arguments\":[%s]}"
+          .format(sparkTypeToOmniExpJsonType(upper.dataType),
+            rewriteToOmniJsonExpressionLiteral(upper.child, exprsIndexMap))
+
       case length: Length =>
         "{\"exprType\":\"FUNCTION\",\"returnType\":%s,\"function_name\":\"length\", \"arguments\":[%s]}"
           .format(sparkTypeToOmniExpJsonType(length.dataType),
