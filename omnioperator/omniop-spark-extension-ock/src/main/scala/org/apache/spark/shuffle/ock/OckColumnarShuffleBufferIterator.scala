@@ -52,7 +52,7 @@ class OckColumnarShuffleBufferIterator[T](
             mapTaskToHostInfo.setNativeObjHandle(0)
         }
         blobMap.values.foreach(reader => {
-            reader.close()
+            reader.doClose()
         })
     }
 

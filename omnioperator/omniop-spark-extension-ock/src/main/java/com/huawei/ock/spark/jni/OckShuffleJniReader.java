@@ -150,6 +150,14 @@ public class OckShuffleJniReader {
         nativeCopyVecDataInVB(nativeReader, dstVec.getNativeVector(), colIndex);
     }
 
+    /**
+     * close reader.
+     *
+     */
+    public void doClose() {
+        close(nativeReader);
+    }
+
     private native long make(int[] typeIds);
 
     private native long close(long readerId);
