@@ -5,7 +5,7 @@
 Introduction
 ============
 
-The omnidata spark connector library running on Kunpeng processors is a Spark SQL plugin that pushes computing-side operators to storage nodes for computing. It is developed based on original APIs of Apache [Spark 3.0.0](https://github.com/apache/spark/tree/v3.0.0). This library applies to the big data storage separation scenario or large-scale fusion scenario where a large number of compute nodes read data from remote nodes. In this scenario, a large amount of raw data is transferred from storage nodes to compute nodes over the network for processing, resulting in a low proportion of valid data and a huge waste of network bandwidth. You can find the latest documentation, including a programming guide, on the project web page. This README file only contains basic setup instructions.
+The omnidata spark connector library running on Kunpeng processors is a Spark SQL plugin that pushes computing-side operators to storage nodes for computing. It is developed based on original APIs of Apache [Spark 3.1.1](https://github.com/apache/spark/tree/v3.1.1). This library applies to the big data storage separation scenario or large-scale fusion scenario where a large number of compute nodes read data from remote nodes. In this scenario, a large amount of raw data is transferred from storage nodes to compute nodes over the network for processing, resulting in a low proportion of valid data and a huge waste of network bandwidth. You can find the latest documentation, including a programming guide, on the project web page. This README file only contains basic setup instructions.
 
 
 Building And Packageing
