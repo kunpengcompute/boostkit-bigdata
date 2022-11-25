@@ -43,8 +43,9 @@ import javax.inject.Inject;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.URI;
-import java.net.URISyntaxException;
+import java.net.UnknownHostException;
 import java.text.Normalizer;
 import java.util.Map;
 import java.util.Set;
@@ -159,15 +160,31 @@ public class OmniDataNodeManager
 
         Set<ServiceDescriptor> services = getServices().getServiceDescriptors().stream().collect(toImmutableSet());
         for (ServiceDescriptor service : services) {
-            URI uri = getHttpUri(service, httpsRequired);
-            String localHdfsIpAddress = service.getProperties().get("local.hdfs.server.address");
+            String hostMachineHostName = service.getProperties().get("host.machine.hostname");
+            String omniDataHostName = service.getProperties().get("omni-data.hostname");
             String runningTaskNumber = service.getProperties().get("runningTaskNumber");
             String maxTaskNumber = service.getProperties().get("maxTaskNumber");
-            if (uri.getHost() != null && localHdfsIpAddress != null) {
+
+            if (hostMachineHostName != null && omniDataHostName != null) {
+                String hostMachineIpAddress;
                 try {
-                    OmniDataNodeStatus nodeStatus = new OmniDataNodeStatus(uri.getHost(),
+                    hostMachineIpAddress = InetAddress.getByName(hostMachineHostName).getHostAddress();
+                }
+                catch (UnknownHostException e) {
+                    throw new DiscoveryException("Can not get the host address of the host machine");
+                }
+                String omniDataIpAddress;
+                try {
+                    omniDataIpAddress = InetAddress.getByName(omniDataHostName).getHostAddress();
+                }
+                catch (UnknownHostException e) {
+                    throw new DiscoveryException("Can not get the host address of the OmniData");
+                }
+
+                try {
+                    OmniDataNodeStatus nodeStatus = new OmniDataNodeStatus(omniDataIpAddress,
                             Integer.parseInt(runningTaskNumber), Integer.parseInt(maxTaskNumber));
-                    allNodes.put(localHdfsIpAddress, nodeStatus);
+                    allNodes.put(hostMachineIpAddress, nodeStatus);
                 }
                 catch (RuntimeException ignored) {
                     throw new PrestoException(GENERIC_INTERNAL_ERROR, "omnidata node manger receive wrong arguments");
@@ -222,19 +239,6 @@ public class OmniDataNodeManager
                 }
             });
         }
-    }
-
-    private static URI getHttpUri(ServiceDescriptor descriptor, boolean httpsRequired)
-    {
-        String url = descriptor.getProperties().get(httpsRequired ? "https" : "http");
-        if (url != null) {
-            try {
-                return new URI(url);
-            }
-            catch (URISyntaxException ignored) {
-            }
-        }
-        return null;
     }
 
     public synchronized Map<String, OmniDataNodeStatus> getAllNodes()
