@@ -426,7 +426,7 @@ class ColumnarDecimalCastSuite extends ColumnarSparkPlanTest{
     "when cast double to decimal") {
     val res = spark.sql("select c_double_normal, cast(c_double_normal as decimal(8, 4))," +
       "cast(c_double_normal as decimal(32,4)) from deci_double")
-    assertOmniProjectHappened(res)
+    assertOmniProjectNotHappened(res)
     checkAnswer(
       res,
       Seq(
@@ -441,7 +441,7 @@ class ColumnarDecimalCastSuite extends ColumnarSparkPlanTest{
     "when cast double to decimal overflow with spark.sql.ansi.enabled=false") {
     val res = spark.sql("select c_double_normal, cast(c_double_normal as decimal(8, 6))," +
       "cast(c_double_normal as decimal(32,30)) from deci_double")
-    assertOmniProjectHappened(res)
+    assertOmniProjectNotHappened(res)
     checkAnswer(
       res,
       Seq(
@@ -456,7 +456,7 @@ class ColumnarDecimalCastSuite extends ColumnarSparkPlanTest{
     "when cast double to decimal with null") {
     val res = spark.sql("select c_double_null, cast(c_double_null as decimal(8, 4))," +
       "cast(c_double_null as decimal(34,4)) from deci_double")
-    assertOmniProjectHappened(res)
+    assertOmniProjectNotHappened(res)
     checkAnswer(
       res,
       Seq(
