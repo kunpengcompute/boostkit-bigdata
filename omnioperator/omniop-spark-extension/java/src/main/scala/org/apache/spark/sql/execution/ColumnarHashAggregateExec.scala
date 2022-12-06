@@ -257,16 +257,14 @@ case class ColumnarHashAggregateExec(
 
     child.executeColumnar().mapPartitionsWithIndex { (index, iter) =>
       val startCodegen = System.nanoTime()
-      val factory = new OmniHashAggregationWithExprOperatorFactory(
+      val operator = OmniAdaptorUtil.getAggOperator(groupingExpressions,
         omniGroupByChanel,
         omniAggChannels,
         omniSourceTypes,
         omniAggFunctionTypes,
         omniAggOutputTypes,
         omniInputRaws,
-        omniOutputPartials,
-        new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
-      val operator = factory.createOperator
+        omniOutputPartials)
       omniCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startCodegen)
 
       // close operator
