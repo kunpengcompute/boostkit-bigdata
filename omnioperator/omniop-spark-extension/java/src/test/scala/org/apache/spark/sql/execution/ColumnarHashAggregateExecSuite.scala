@@ -79,64 +79,64 @@ class ColumnarHashAggregateExecSuite extends ColumnarSparkPlanTest {
   }
 
   test("test hashAgg null") {
-    var res = df.filter(df("a")===3).groupBy("a").agg(sum("a"))
+    var res = df.filter(df("a").equalTo(3)).groupBy("a").agg(sum("a"))
     checkAnswer(
       res,
-      Seq(null)
+      Seq.empty
     )
-    res = df.filter(df("a") === 3).groupBy("a").agg(max("a"))
+    res = df.filter(df("a").equalTo(3)).groupBy("a").agg(max("a"))
     checkAnswer(
       res,
-      Seq(null)
+      Seq.empty
     )
-    res = df.filter(df("a") === 3).groupBy("a").agg(min("a"))
+    res = df.filter(df("a").equalTo(3)).groupBy("a").agg(min("a"))
     checkAnswer(
       res,
-      Seq(null)
+      Seq.empty
     )
-    res = df.filter(df("a") === 3).groupBy("a").agg(avg("a"))
+    res = df.filter(df("a").equalTo(3)).groupBy("a").agg(avg("a"))
     checkAnswer(
       res,
-      Seq(null)
+      Seq.empty
     )
-    res = df.filter(df("a") === 3).groupBy("a").agg(first("a"))
+    res = df.filter(df("a").equalTo(3)).groupBy("a").agg(first("a"))
     checkAnswer(
       res,
-      Seq(null)
+      Seq.empty
     )
-    res = df.filter(df("a") === 3).groupBy("a").agg(count("a"))
+    res = df.filter(df("a").equalTo(3)).groupBy("a").agg(count("a"))
     checkAnswer(
       res,
-      Seq(null)
+      Seq.empty
     )
   }
   test("test agg null") {
-    var res = df.filter(df("a") === 3).agg(sum("a"))
+    var res = df.filter(df("a").equalTo(3)).agg(sum("a"))
     checkAnswer(
       res,
       Seq(Row(null))
     )
-    res = df.filter(df("a") === 3).agg(max("a"))
+    res = df.filter(df("a").equalTo(3)).agg(max("a"))
     checkAnswer(
       res,
       Seq(Row(null))
     )
-    res = df.filter(df("a") === 3).agg(min("a"))
+    res = df.filter(df("a").equalTo(3)).agg(min("a"))
     checkAnswer(
       res,
       Seq(Row(null))
     )
-    res = df.filter(df("a") === 3).agg(avg("a"))
+    res = df.filter(df("a").equalTo(3)).agg(avg("a"))
     checkAnswer(
       res,
       Seq(Row(null))
     )
-    res = df.filter(df("a") === 3).agg(first("a"))
+    res = df.filter(df("a").equalTo(3)).agg(first("a"))
     checkAnswer(
       res,
       Seq(Row(null))
     )
-    res = df.filter(df("a") === 3).agg(count("a"))
+    res = df.filter(df("a").equalTo(3)).agg(count("a"))
     checkAnswer(
       res,
       Seq(Row(0))
