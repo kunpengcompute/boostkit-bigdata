@@ -26,6 +26,8 @@ class ColumnarBuiltInFuncSuite extends ColumnarSparkPlanTest{
 
   private var buildInDf: DataFrame = _
 
+  private var buildInDfNum: DataFrame = _
+
   protected override def beforeAll(): Unit = {
     super.beforeAll()
     buildInDf = Seq[(String, String, String, String, Long, Int, String, String)](
@@ -35,6 +37,14 @@ class ColumnarBuiltInFuncSuite extends ColumnarSparkPlanTest{
       (null, "char4     ", "varchar4", "varchar400", 1004L, 4, null, "varchar400_normal")
     ).toDF("char_null", "char_normal", "varchar_null", "varchar_empty", "long_col", "int_col", "ch_col", "varchar_normal")
     buildInDf.createOrReplaceTempView("builtin_table")
+
+    buildInDfNum = Seq[(Double, Int, Double, Int)](
+      (123.12345, 1, -123.12345, 134),
+      (123.1257, 2, -123.1257, 1267),
+      (123.12, 3, -123.12, 1650),
+      (123.1, 4, -123.1, 166667)
+    ).toDF("double1", "int2", "double3", "int4")
+    buildInDfNum.createOrReplaceTempView("test_table")
   }
 
   test("Test ColumnarProjectExec happen and result is same as native " +
@@ -434,5 +444,195 @@ class ColumnarBuiltInFuncSuite extends ColumnarSparkPlanTest{
     val res = spark.sql(sql)
     if (isUseOmni) assertOmniProjectHappen(res) else assertOmniProjectNotHappen(res)
     checkAnswer(res, expected)
+  }
+
+  test("Round(int,2)") {
+    val res = spark.sql("select round(int2,2) as res from test_table")
+    val executedPlan = res.queryExecution.executedPlan
+    assert(executedPlan.find(_.isInstanceOf[ColumnarProjectExec]).isDefined, s"ColumnarProjectExec not happened, executedPlan as follows： \n$executedPlan")
+    assert(executedPlan.find(_.isInstanceOf[ProjectExec]).isEmpty, s"ProjectExec happened, executedPlan as follows： \n$executedPlan")
+    checkAnswer(
+      res,
+      Seq(
+        Row(1),
+        Row(2),
+        Row(3),
+        Row(4)
+      )
+    )
+  }
+
+  test("Round(double,2)") {
+    val res = spark.sql("select round(double1,2) as res from test_table")
+    val executedPlan = res.queryExecution.executedPlan
+    assert(executedPlan.find(_.isInstanceOf[ColumnarProjectExec]).isDefined, s"ColumnarProjectExec not happened, executedPlan as follows： \n$executedPlan")
+    assert(executedPlan.find(_.isInstanceOf[ProjectExec]).isEmpty, s"ProjectExec happened, executedPlan as follows： \n$executedPlan")
+    checkAnswer(
+      res,
+      Seq(
+        Row(123.12),
+        Row(123.13),
+        Row(123.12),
+        Row(123.1)
+      )
+    )
+  }
+
+  test("Round(int,-1)") {
+    val res = spark.sql("select round(int2,-1) as res from test_table")
+    val executedPlan = res.queryExecution.executedPlan
+    assert(executedPlan.find(_.isInstanceOf[ColumnarProjectExec]).isDefined, s"ColumnarProjectExec not happened, executedPlan as follows： \n$executedPlan")
+    assert(executedPlan.find(_.isInstanceOf[ProjectExec]).isEmpty, s"ProjectExec happened, executedPlan as follows： \n$executedPlan")
+    checkAnswer(
+      res,
+      Seq(
+        Row(0),
+        Row(0),
+        Row(0),
+        Row(0)
+      )
+    )
+  }
+
+  test("Round(double,0)") {
+    val res = spark.sql("select round(double1,0) as res from test_table")
+    val executedPlan = res.queryExecution.executedPlan
+    assert(executedPlan.find(_.isInstanceOf[ColumnarProjectExec]).isDefined, s"ColumnarProjectExec not happened, executedPlan as follows： \n$executedPlan")
+    assert(executedPlan.find(_.isInstanceOf[ProjectExec]).isEmpty, s"ProjectExec happened, executedPlan as follows： \n$executedPlan")
+    checkAnswer(
+      res,
+      Seq(
+        Row(123),
+        Row(123),
+        Row(123),
+        Row(123)
+      )
+    )
+  }
+
+  test("Round(-double,2)") {
+    val res = spark.sql("select round(double3,2) as res from test_table")
+    val executedPlan = res.queryExecution.executedPlan
+    assert(executedPlan.find(_.isInstanceOf[ColumnarProjectExec]).isDefined, s"ColumnarProjectExec not happened, executedPlan as follows： \n$executedPlan")
+    assert(executedPlan.find(_.isInstanceOf[ProjectExec]).isEmpty, s"ProjectExec happened, executedPlan as follows： \n$executedPlan")
+    checkAnswer(
+      res,
+      Seq(
+        Row(-123.12),
+        Row(-123.13),
+        Row(-123.12),
+        Row(-123.1)
+      )
+    )
+  }
+
+  test("Round(int,-2)") {
+    val res = spark.sql("select round(int4,-2) as res from test_table")
+    val executedPlan = res.queryExecution.executedPlan
+    assert(executedPlan.find(_.isInstanceOf[ColumnarProjectExec]).isDefined, s"ColumnarProjectExec not happened, executedPlan as follows： \n$executedPlan")
+    assert(executedPlan.find(_.isInstanceOf[ProjectExec]).isEmpty, s"ProjectExec happened, executedPlan as follows： \n$executedPlan")
+    checkAnswer(
+      res,
+      Seq(
+        Row(100),
+        Row(1300),
+        Row(1700),
+        Row(166700)
+      )
+    )
+  }
+
+  test("Round decimal") {
+    var res = spark.sql("select round(2.5, 0) as res from test_table")
+    var executedPlan = res.queryExecution.executedPlan
+    assert(executedPlan.find(_.isInstanceOf[ColumnarProjectExec]).isDefined, s"ColumnarProjectExec not happened, executedPlan as follows： \n$executedPlan")
+    assert(executedPlan.find(_.isInstanceOf[ProjectExec]).isEmpty, s"ProjectExec happened, executedPlan as follows： \n$executedPlan")
+    checkAnswer(
+      res,
+      Seq(
+        Row(3),
+        Row(3),
+        Row(3),
+        Row(3)
+      )
+    )
+    res = spark.sql("select round(3.5, 0) as res from test_table")
+    executedPlan = res.queryExecution.executedPlan
+    assert(executedPlan.find(_.isInstanceOf[ColumnarProjectExec]).isDefined, s"ColumnarProjectExec not happened, executedPlan as follows： \n$executedPlan")
+    assert(executedPlan.find(_.isInstanceOf[ProjectExec]).isEmpty, s"ProjectExec happened, executedPlan as follows： \n$executedPlan")
+    checkAnswer(
+      res,
+      Seq(
+        Row(4),
+        Row(4),
+        Row(4),
+        Row(4)
+      )
+    )
+    res = spark.sql("select round(-2.5, 0) as res from test_table")
+    executedPlan = res.queryExecution.executedPlan
+    assert(executedPlan.find(_.isInstanceOf[ColumnarProjectExec]).isDefined, s"ColumnarProjectExec not happened, executedPlan as follows： \n$executedPlan")
+    assert(executedPlan.find(_.isInstanceOf[ProjectExec]).isEmpty, s"ProjectExec happened, executedPlan as follows： \n$executedPlan")
+    checkAnswer(
+      res,
+      Seq(
+        Row(-3),
+        Row(-3),
+        Row(-3),
+        Row(-3)
+      )
+    )
+    res = spark.sql("select round(-3.5, 0) as res from test_table")
+    executedPlan = res.queryExecution.executedPlan
+    assert(executedPlan.find(_.isInstanceOf[ColumnarProjectExec]).isDefined, s"ColumnarProjectExec not happened, executedPlan as follows： \n$executedPlan")
+    assert(executedPlan.find(_.isInstanceOf[ProjectExec]).isEmpty, s"ProjectExec happened, executedPlan as follows： \n$executedPlan")
+    checkAnswer(
+      res,
+      Seq(
+        Row(-4),
+        Row(-4),
+        Row(-4),
+        Row(-4)
+      )
+    )
+    res = spark.sql("select round(-0.35, 1) as res from test_table")
+    executedPlan = res.queryExecution.executedPlan
+    assert(executedPlan.find(_.isInstanceOf[ColumnarProjectExec]).isDefined, s"ColumnarProjectExec not happened, executedPlan as follows： \n$executedPlan")
+    assert(executedPlan.find(_.isInstanceOf[ProjectExec]).isEmpty, s"ProjectExec happened, executedPlan as follows： \n$executedPlan")
+    checkAnswer(
+      res,
+      Seq(
+        Row(-0.4),
+        Row(-0.4),
+        Row(-0.4),
+        Row(-0.4)
+      )
+    )
+    res = spark.sql("select round(-35, -1) as res from test_table")
+    executedPlan = res.queryExecution.executedPlan
+    assert(executedPlan.find(_.isInstanceOf[ColumnarProjectExec]).isDefined, s"ColumnarProjectExec not happened, executedPlan as follows： \n$executedPlan")
+    assert(executedPlan.find(_.isInstanceOf[ProjectExec]).isEmpty, s"ProjectExec happened, executedPlan as follows： \n$executedPlan")
+    checkAnswer(
+      res,
+      Seq(
+        Row(-40),
+        Row(-40),
+        Row(-40),
+        Row(-40)
+      )
+    )
+    res = spark.sql("select round(null, 0) as res from test_table")
+    executedPlan = res.queryExecution.executedPlan
+    assert(executedPlan.find(_.isInstanceOf[ColumnarProjectExec]).isDefined, s"ColumnarProjectExec not happened, executedPlan as follows： \n$executedPlan")
+    assert(executedPlan.find(_.isInstanceOf[ProjectExec]).isEmpty, s"ProjectExec happened, executedPlan as follows： \n$executedPlan")
+    checkAnswer(
+      res,
+      Seq(
+        Row(null),
+        Row(null),
+        Row(null),
+        Row(null)
+      )
+    )
   }
 }
