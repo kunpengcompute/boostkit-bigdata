@@ -558,6 +558,11 @@ object OmniExpressionAdaptor extends Logging {
 
       case concat: Concat =>
         getConcatJsonStr(concat, exprsIndexMap)
+      case round: Round =>
+        "{\"exprType\":\"FUNCTION\",\"returnType\":%s,\"function_name\":\"round\", \"arguments\":[%s,%s]}"
+          .format(sparkTypeToOmniExpJsonType(round.dataType),
+            rewriteToOmniJsonExpressionLiteral(round.child, exprsIndexMap),
+            rewriteToOmniJsonExpressionLiteral(round.scale, exprsIndexMap))
       case attr: Attribute => toOmniJsonAttribute(attr, exprsIndexMap(attr.exprId))
       case _ =>
         if (HiveUdfAdaptorUtil.isHiveUdf(expr) && ColumnarPluginConfig.getSessionConf.enableColumnarUdf) {
