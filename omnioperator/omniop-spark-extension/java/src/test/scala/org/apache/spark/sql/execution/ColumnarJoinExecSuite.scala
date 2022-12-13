@@ -21,7 +21,7 @@ package org.apache.spark.sql.execution
 import org.apache.spark.sql.{DataFrame, Row}
 import org.apache.spark.sql.catalyst.expressions.Expression
 import org.apache.spark.sql.catalyst.optimizer.BuildRight
-import org.apache.spark.sql.catalyst.plans.{FullOuter, Inner, JoinType, LeftOuter}
+import org.apache.spark.sql.catalyst.plans.{FullOuter, Inner, JoinType, LeftAnti, LeftOuter, LeftSemi}
 import org.apache.spark.sql.execution.joins.{BroadcastHashJoinExec, ColumnarBroadcastHashJoinExec, ColumnarShuffledHashJoinExec, ColumnarSortMergeJoinExec, SortMergeJoinExec}
 import org.apache.spark.sql.functions.col
 
@@ -129,6 +129,34 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
     val leftKeys = Seq(leftWithNull.col("q").expr)
     val rightKeys = Seq(rightWithNull.col("c").expr)
     checkThatPlansAgreeTemplateForSMJ(df, leftKeys, rightKeys, FullOuter)
+  }
+
+  test("columnar sortMergeJoin LeftSemi Join is equal to native") {
+    val df = left.join(right.hint("mergejoin"), col("q") === col("c"))
+    val leftKeys = Seq(left.col("q").expr)
+    val rightKeys = Seq(right.col("c").expr)
+    checkThatPlansAgreeTemplateForSMJ(df, leftKeys, rightKeys, LeftSemi)
+  }
+
+  test("columnar sortMergeJoin LeftSemi Join is equal to native With NULL") {
+    val df = leftWithNull.join(rightWithNull.hint("mergejoin"), col("q") === col("c"))
+    val leftKeys = Seq(leftWithNull.col("q").expr)
+    val rightKeys = Seq(rightWithNull.col("c").expr)
+    checkThatPlansAgreeTemplateForSMJ(df, leftKeys, rightKeys, LeftSemi)
+  }
+
+  test("columnar sortMergeJoin LeftAnti Join is equal to native") {
+    val df = left.join(right.hint("mergejoin"), col("q") === col("c"))
+    val leftKeys = Seq(left.col("q").expr)
+    val rightKeys = Seq(right.col("c").expr)
+    checkThatPlansAgreeTemplateForSMJ(df, leftKeys, rightKeys, LeftAnti)
+  }
+
+  test("columnar sortMergeJoin LeftAnti Join is equal to native With NULL") {
+    val df = leftWithNull.join(rightWithNull.hint("mergejoin"), col("q") === col("c"))
+    val leftKeys = Seq(leftWithNull.col("q").expr)
+    val rightKeys = Seq(rightWithNull.col("c").expr)
+    checkThatPlansAgreeTemplateForSMJ(df, leftKeys, rightKeys, LeftAnti)
   }
 
   test("columnar broadcastHashJoin is equal to native with null") {
