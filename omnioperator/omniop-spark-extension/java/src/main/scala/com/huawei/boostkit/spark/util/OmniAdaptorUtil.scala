@@ -45,16 +45,14 @@ object OmniAdaptorUtil {
     val input = new Array[Vec](cb.numCols())
     for (i <- 0 until cb.numCols()) {
       val omniVec: Vec = cb.column(i) match {
-        case vector: OrcColumnVector =>
-          transColumnVector(vector, cb.numRows())
-        case vector: OnHeapColumnVector =>
-          transColumnVector(vector, cb.numRows())
         case vector: OmniColumnVector =>
           if (!isSlice) {
             vector.getVec
           } else {
             vector.getVec.slice(0, cb.numRows())
           }
+        case vector: ColumnVector =>
+          transColumnVector(vector, cb.numRows())
         case _ =>
           throw new UnsupportedOperationException("unsupport column vector!")
       }
