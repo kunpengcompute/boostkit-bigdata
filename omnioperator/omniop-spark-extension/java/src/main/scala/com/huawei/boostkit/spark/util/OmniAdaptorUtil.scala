@@ -25,7 +25,6 @@ import nova.hetu.omniruntime.operator.config.OverflowConfig
 import nova.hetu.omniruntime.vector._
 
 import org.apache.spark.sql.catalyst.expressions.{Attribute, ExprId, SortOrder}
-import org.apache.spark.sql.execution.datasources.orc.OrcColumnVector
 import org.apache.spark.sql.execution.metric.SQLMetric
 import org.apache.spark.sql.execution.vectorized.{OmniColumnVector, OnHeapColumnVector}
 import org.apache.spark.sql.internal.SQLConf
@@ -43,16 +42,14 @@ object OmniAdaptorUtil {
     val input = new Array[Vec](cb.numCols())
     for (i <- 0 until cb.numCols()) {
       val omniVec: Vec = cb.column(i) match {
-        case vector: OrcColumnVector =>
-          transColumnVector(vector, cb.numRows())
-        case vector: OnHeapColumnVector =>
-          transColumnVector(vector, cb.numRows())
         case vector: OmniColumnVector =>
           if (!isSlice) {
             vector.getVec
           } else {
             vector.getVec.slice(0, cb.numRows())
           }
+        case vector: ColumnVector =>
+          transColumnVector(vector, cb.numRows())
         case _ =>
           throw new UnsupportedOperationException("unsupport column vector!")
       }

@@ -21,6 +21,7 @@ import java.util.Optional
 import java.util.concurrent.TimeUnit.NANOSECONDS
 import com.huawei.boostkit.spark.Constant.IS_SKIP_VERIFY_EXP
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor
+import com.huawei.boostkit.spark.ColumnarPluginConfig
 
 import scala.collection.mutable.HashMap
 import scala.collection.JavaConverters._
@@ -285,12 +286,17 @@ abstract class BaseColumnarFileSourceScanExec(
        |""".stripMargin
   }
 
+  val enableOrcNativeFileScan: Boolean = ColumnarPluginConfig.getSessionConf.enableOrcNativeFileScan
   lazy val inputRDD: RDD[InternalRow] = {
-    val fileFormat: FileFormat = relation.fileFormat match {
-      case orcFormat: OrcFileFormat =>
-        new OmniOrcFileFormat()
-      case _ =>
-        throw new UnsupportedOperationException("Unsupported FileFormat!")
+    val fileFormat: FileFormat = if (enableOrcNativeFileScan) {
+      relation.fileFormat match {
+        case orcFormat: OrcFileFormat =>
+          new OmniOrcFileFormat()
+        case _ =>
+          throw new UnsupportedOperationException("Unsupported FileFormat!")
+      }
+    } else {
+      relation.fileFormat
     }
     val readFile: (PartitionedFile) => Iterator[InternalRow] =
       fileFormat.buildReaderWithPartitionValues(
@@ -382,6 +388,7 @@ abstract class BaseColumnarFileSourceScanExec(
     val numOutputRows = longMetric("numOutputRows")
     val scanTime = longMetric("scanTime")
     val numOutputVecBatchs = longMetric("numOutputVecBatchs")
+    val localSchema = this.schema
     inputRDD.asInstanceOf[RDD[ColumnarBatch]].mapPartitionsInternal { batches =>
       new Iterator[ColumnarBatch] {
 
@@ -395,9 +402,18 @@ abstract class BaseColumnarFileSourceScanExec(
 
         override def next(): ColumnarBatch = {
           val batch = batches.next()
+          val input = transColBatchToOmniVecs(batch)
+          val vecBatch = new VecBatch(input, batch.numRows)
+          val vectors: Seq[OmniColumnVector] = OmniColumnVector.allocateColumns(
+            vecBatch.getRowCount, localSchema, false)
+          vectors.zipWithIndex.foreach { case (vector, i) =>
+            vector.reset()
+            vector.setVec(vecBatch.getVectors()(i))
+          }
           numOutputRows += batch.numRows()
           numOutputVecBatchs += 1
-          batch
+          vecBatch.close()
+          new ColumnarBatch(vectors.toArray, vecBatch.getRowCount)
         }
       }
     }
