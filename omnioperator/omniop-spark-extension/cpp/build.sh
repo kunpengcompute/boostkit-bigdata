@@ -23,6 +23,7 @@ if [ -z "$OMNI_HOME" ]; then
 fi
 
 export OMNI_INCLUDE_PATH=$OMNI_HOME/lib/include
+export OMNI_INCLUDE_PATH=$OMNI_INCLUDE_PATH:$OMNI_HOME/lib
 export CPLUS_INCLUDE_PATH=$OMNI_INCLUDE_PATH:$CPLUS_INCLUDE_PATH
 echo "OMNI_INCLUDE_PATH=$OMNI_INCLUDE_PATH"
 
@@ -69,7 +70,7 @@ if [ $# != 0 ] ; then
   if [ $1 = 'coverage' ]; then
     ./test/tptest --gtest_output=xml:test_detail.xml
     lcov --d ../ --c --output-file test.info --rc lcov_branch_coverage=1
-    lcov --remove test.info '*/opt/buildtools/include/*' '*/usr/include/*' '*/usr/lib/*' '*/usr/lib64/*' '*/usr/local/include/*' '*/usr/local/lib/*' '*/usr/local/lib64/*' -o final.info --rc lcov_branch_coverage=1
+    lcov --remove test.info '*/opt/lib/include/*' '*test/*' '*build/src/*' '*/usr/include/*' '*/usr/lib/*' '*/usr/lib64/*' '*/usr/local/include/*' '*/usr/local/lib/*' '*/usr/local/lib64/*' -o final.info --rc lcov_branch_coverage=1
     genhtml final.info -o test_coverage --branch-coverage --rc lcov_branch_coverage=1
   fi
 fi

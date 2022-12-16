@@ -620,7 +620,6 @@ class ColumnarAdaptiveQueryExecSuite extends ColumnarSparkPlanTest
       assert(smj.size == 2)
       val bhj = findTopLevelColumnarBroadcastHashJoin(adaptivePlan)
       assert(bhj.size == 1)
-      // TODO: check whey we don't have SMJ
       checkNumLocalShuffleReaders(adaptivePlan, 2)
     }
   }

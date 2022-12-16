@@ -36,7 +36,6 @@ import org.apache.spark.sql.execution.vectorized.ColumnVectorUtils;
 import org.apache.spark.sql.execution.vectorized.OmniColumnVector;
 import org.apache.spark.sql.execution.vectorized.OnHeapColumnVector;
 import org.apache.spark.sql.types.DataType;
-import org.apache.spark.sql.types.DateType;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 import org.apache.spark.sql.vectorized.ColumnarBatch;
@@ -105,7 +104,6 @@ public class OmniOrcColumnarBatchReader extends RecordReader<Void, ColumnarBatch
 
   @Override
   public void close() throws IOException {
-    // TODO close omni vec
     if (recordReader != null) {
       recordReader.close();
       recordReader = null;
@@ -182,7 +180,7 @@ public class OmniOrcColumnarBatchReader extends RecordReader<Void, ColumnarBatch
           missingCol.setIsConstant();
           orcVectorWrappers[i] = missingCol;
         } else {
-          orcVectorWrappers[i] = new OmniColumnVector(capacity, dt, false, (dt instanceof DateType));
+          orcVectorWrappers[i] = new OmniColumnVector(capacity, dt, false);
         }
       }
     }
@@ -197,7 +195,6 @@ public class OmniOrcColumnarBatchReader extends RecordReader<Void, ColumnarBatch
    * by copying from ORC VectorizedRowBatch columns to Spark ColumnarBatch columns.
    */
   private boolean nextBatch() throws IOException {
-    // TODO recordReader.nextBatch(wrap.batch());
      int batchSize = capacity;
     if ((requiredFields.length == 1 && requestedDataColIds[0] == -1) || requiredFields.length == 0) {
         batchSize = (int) recordReader.getNumberOfRowsJava();

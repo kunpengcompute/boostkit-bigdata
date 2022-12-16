@@ -115,6 +115,9 @@ public class FilterAndProjectOmniOperator
     public void close() throws Exception
     {
         mergingOutput.close();
+        if (processor instanceof OmniPageProcessor) {
+            ((OmniPageProcessor) processor).close();
+        }
     }
 
     public static class FilterAndProjectOmniOperatorFactory

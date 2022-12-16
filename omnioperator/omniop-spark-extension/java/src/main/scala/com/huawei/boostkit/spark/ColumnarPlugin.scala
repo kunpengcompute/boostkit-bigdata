@@ -426,7 +426,6 @@ case class ColumnarOverrideRules(session: SparkSession) extends ColumnarRule wit
   var isSupportAdaptive: Boolean = true
 
   private def supportAdaptive(plan: SparkPlan): Boolean = {
-    // TODO migrate dynamic-partition-pruning onto adaptive execution.
     // Only QueryStage will have Exchange as Leaf Plan
     val isLeafPlanExchange = plan match {
       case e: Exchange => true

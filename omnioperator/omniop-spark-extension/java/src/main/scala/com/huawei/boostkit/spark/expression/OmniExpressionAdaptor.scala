@@ -42,7 +42,6 @@ import scala.collection.mutable
 object OmniExpressionAdaptor extends Logging {
 
   def getRealExprId(expr: Expression): ExprId = {
-    // TODO support more complex expression
     expr match {
       case alias: Alias => getRealExprId(alias.child)
       case subString: Substring => getRealExprId(subString.str)
@@ -442,10 +441,19 @@ object OmniExpressionAdaptor extends Logging {
       case alias: Alias => rewriteToOmniJsonExpressionLiteral(alias.child, exprsIndexMap)
       case literal: Literal => toOmniJsonLiteral(literal)
       case not: Not =>
-        "{\"exprType\":\"UNARY\",\"returnType\":%s,\"operator\":\"not\",\"expr\":%s}".format(
-          sparkTypeToOmniExpJsonType(BooleanType),
-          rewriteToOmniJsonExpressionLiteral(not.child, exprsIndexMap))
-
+        not.child match {
+          case isnull: IsNull =>
+            "{\"exprType\":\"UNARY\",\"returnType\":%s,\"operator\":\"not\",\"expr\":%s}".format(
+              sparkTypeToOmniExpJsonType(BooleanType),
+              rewriteToOmniJsonExpressionLiteral(isnull, exprsIndexMap))
+          case equal: EqualTo =>
+            ("{\"exprType\":\"BINARY\",\"returnType\":%s," +
+              "\"operator\":\"NOT_EQUAL\",\"left\":%s,\"right\":%s}").format(
+              sparkTypeToOmniExpJsonType(equal.dataType),
+              rewriteToOmniJsonExpressionLiteral(equal.left, exprsIndexMap),
+              rewriteToOmniJsonExpressionLiteral(equal.right, exprsIndexMap))
+          case _ => throw new UnsupportedOperationException(s"Unsupported expression: $expr")
+        }
       case isnotnull: IsNotNull =>
         ("{\"exprType\":\"UNARY\",\"returnType\":%s, \"operator\":\"not\","
           + "\"expr\":{\"exprType\":\"IS_NULL\",\"returnType\":%s,"

@@ -202,9 +202,9 @@ abstract class BaseColumnarFileSourceScanExec(
           files.map(_.getPath.getName).groupBy(file => BucketingUtils.getBucketId(file))
         val singleFilePartitions = bucketToFilesGrouping.forall(p => p._2.length <= 1)
 
-        // TODO SPARK-24528 Sort order is currently ignored if buckets are coalesced.
+        // SPARK-24528 Sort order is currently ignored if buckets are coalesced.
         if (singleFilePartitions && optionalNumCoalescedBuckets.isEmpty) {
-          // TODO Currently Spark does not support writing columns sorting in descending order
+          // Currently Spark does not support writing columns sorting in descending order
           // so using Ascending order. This can be fixed in future
           sortColumns.map(attribute => SortOrder(attribute, Ascending))
         } else {
@@ -241,7 +241,7 @@ abstract class BaseColumnarFileSourceScanExec(
         "DataFilters" -> seqToString(dataFilters),
         "Location" -> locationDesc)
 
-    // TODO(SPARK-32986): Add bucketed scan info in explain output of FileSourceScanExec
+    // (SPARK-32986): Add bucketed scan info in explain output of FileSourceScanExec
     if (bucketedScan) {
       relation.bucketSpec.map { spec =>
         val numSelectedBuckets = optionalBucketSet.map { b =>
@@ -434,7 +434,7 @@ abstract class BaseColumnarFileSourceScanExec(
           .getOrElse(sys.error(s"Invalid bucket file ${f.filePath}"))
       }
 
-    // TODO(SPARK-32985): Decouple bucket filter pruning and bucketed table scan
+    // (SPARK-32985): Decouple bucket filter pruning and bucketed table scan
     val prunedFilesGroupedToBuckets = if (optionalBucketSet.isDefined) {
       val bucketSet = optionalBucketSet.get
       filesGroupedToBuckets.filter {
@@ -583,13 +583,10 @@ abstract class BaseColumnarFileSourceScanExec(
       }
     }
 
-    val omniAggSourceTypes = new Array[DataType](agg.child.outputSet.size)
-    val inputIter = agg.child.outputSet.toIterator
-    var i = 0
-    while (inputIter.hasNext) {
-      val inputAttr = inputIter.next()
-      omniAggSourceTypes(i) = sparkTypeToOmniType(inputAttr.dataType, inputAttr.metadata)
-      i += 1
+    val omniAggSourceTypes = new Array[DataType](agg.child.output.size)
+    agg.child.output.zipWithIndex.foreach {
+      case (attr, i) =>
+        omniAggSourceTypes(i) = sparkTypeToOmniType(attr.dataType, attr.metadata)
     }
     (omniGroupByChanel, omniAggChannels, omniAggSourceTypes, omniAggFunctionTypes, omniAggOutputTypes,
       omniAggInputRaws, omniAggOutputPartials, resultIdxToOmniResultIdxMap)
@@ -868,6 +865,13 @@ case class ColumnarMultipleOperatorExec(
         buildJoinColsExp1, if (joinFilter1.nonEmpty) {Optional.of(joinFilter1.get)} else {Optional.empty()}, 1,
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val buildOp1 = buildOpFactory1.createOperator()
+
+      // close operator
+      SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
+        buildOp1.close()
+        buildOpFactory1.close()
+      })
+
       relation1.value.buildData.foreach { input =>
         buildOp1.addInput(deserializer.deserialize(input))
       }
@@ -878,9 +882,7 @@ case class ColumnarMultipleOperatorExec(
       val lookupOp1 = lookupOpFactory1.createOperator()
       // close operator
       SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit]( _ => {
-        buildOp1.close()
         lookupOp1.close()
-        buildOpFactory1.close()
         lookupOpFactory1.close()
       })
 
@@ -896,6 +898,13 @@ case class ColumnarMultipleOperatorExec(
         buildJoinColsExp2, if (joinFilter2.nonEmpty) {Optional.of(joinFilter2.get)} else {Optional.empty()}, 1,
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val buildOp2 = buildOpFactory2.createOperator()
+
+      // close operator
+      SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
+        buildOp2.close()
+        buildOpFactory2.close()
+      })
+
       relation2.value.buildData.foreach { input =>
         buildOp2.addInput(deserializer.deserialize(input))
       }
@@ -904,11 +913,10 @@ case class ColumnarMultipleOperatorExec(
         probeHashColsExp2, buildOutputCols2, buildOutputTypes2, OMNI_JOIN_TYPE_INNER, buildOpFactory2,
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val lookupOp2 = lookupOpFactory2.createOperator()
+
       // close operator
       SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit]( _ => {
-        buildOp2.close()
         lookupOp2.close()
-        buildOpFactory2.close()
         lookupOpFactory2.close()
       })
 
@@ -924,6 +932,13 @@ case class ColumnarMultipleOperatorExec(
         buildJoinColsExp3, if (joinFilter3.nonEmpty) {Optional.of(joinFilter3.get)} else {Optional.empty()}, 1,
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val buildOp3 = buildOpFactory3.createOperator()
+
+      // close operator
+      SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
+        buildOp3.close()
+        buildOpFactory3.close()
+      })
+
       relation3.value.buildData.foreach { input =>
         buildOp3.addInput(deserializer.deserialize(input))
       }
@@ -932,11 +947,10 @@ case class ColumnarMultipleOperatorExec(
         probeHashColsExp3, buildOutputCols3, buildOutputTypes3, OMNI_JOIN_TYPE_INNER, buildOpFactory3,
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val lookupOp3 = lookupOpFactory3.createOperator()
+
       // close operator
       SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit]( _ => {
-        buildOp3.close()
         lookupOp3.close()
-        buildOpFactory3.close()
         lookupOpFactory3.close()
       })
 
@@ -952,6 +966,13 @@ case class ColumnarMultipleOperatorExec(
         buildJoinColsExp4, if (joinFilter4.nonEmpty) {Optional.of(joinFilter4.get)} else {Optional.empty()}, 1,
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val buildOp4 = buildOpFactory4.createOperator()
+
+      // close operator
+      SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
+        buildOp4.close()
+        buildOpFactory4.close()
+      })
+
       relation4.value.buildData.foreach { input =>
         buildOp4.addInput(deserializer.deserialize(input))
       }
@@ -960,11 +981,10 @@ case class ColumnarMultipleOperatorExec(
         probeHashColsExp4, buildOutputCols4, buildOutputTypes4, OMNI_JOIN_TYPE_INNER, buildOpFactory4,
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val lookupOp4 = lookupOpFactory4.createOperator()
+
       // close operator
       SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit]( _ => {
-        buildOp4.close()
         lookupOp4.close()
-        buildOpFactory4.close()
         lookupOpFactory4.close()
       })
 
@@ -1067,7 +1087,6 @@ case class ColumnarMultipleOperatorExec(
 
   override val nodeName: String = "OmniColumnarMultipleOperatorExec"
 
-  // TODO:
   override protected def doCanonicalize(): SparkPlan = WrapperLeafExec()
 }
 
@@ -1208,6 +1227,13 @@ case class ColumnarMultipleOperatorExec1(
         buildJoinColsExp1, if (joinFilter1.nonEmpty) {Optional.of(joinFilter1.get)} else {Optional.empty()}, 1,
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val buildOp1 = buildOpFactory1.createOperator()
+
+      // close operator
+      SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
+        buildOp1.close()
+        buildOpFactory1.close()
+      })
+
       relation1.value.buildData.foreach { input =>
         buildOp1.addInput(deserializer.deserialize(input))
       }
@@ -1216,11 +1242,10 @@ case class ColumnarMultipleOperatorExec1(
         probeHashColsExp1, buildOutputCols1, buildOutputTypes1, OMNI_JOIN_TYPE_INNER, buildOpFactory1,
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val lookupOp1 = lookupOpFactory1.createOperator()
+
       // close operator
       SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit]( _ => {
-        buildOp1.close()
         lookupOp1.close()
-        buildOpFactory1.close()
         lookupOpFactory1.close()
       })
 
@@ -1236,6 +1261,13 @@ case class ColumnarMultipleOperatorExec1(
         buildJoinColsExp2, if (joinFilter2.nonEmpty) {Optional.of(joinFilter2.get)} else {Optional.empty()}, 1,
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val buildOp2 = buildOpFactory2.createOperator()
+
+      // close operator
+      SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
+        buildOp2.close()
+        buildOpFactory2.close()
+      })
+
       relation2.value.buildData.foreach { input =>
         buildOp2.addInput(deserializer.deserialize(input))
       }
@@ -1244,11 +1276,10 @@ case class ColumnarMultipleOperatorExec1(
         probeHashColsExp2, buildOutputCols2, buildOutputTypes2, OMNI_JOIN_TYPE_INNER, buildOpFactory2,
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val lookupOp2 = lookupOpFactory2.createOperator()
+
       // close operator
       SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit]( _ => {
-        buildOp2.close()
         lookupOp2.close()
-        buildOpFactory2.close()
         lookupOpFactory2.close()
       })
 
@@ -1264,6 +1295,13 @@ case class ColumnarMultipleOperatorExec1(
         buildJoinColsExp3, if (joinFilter3.nonEmpty) {Optional.of(joinFilter3.get)} else {Optional.empty()}, 1,
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val buildOp3 = buildOpFactory3.createOperator()
+
+      // close operator
+      SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
+        buildOp3.close()
+        buildOpFactory3.close()
+      })
+
       relation3.value.buildData.foreach { input =>
         buildOp3.addInput(deserializer.deserialize(input))
       }
@@ -1272,11 +1310,10 @@ case class ColumnarMultipleOperatorExec1(
         probeHashColsExp3, buildOutputCols3, buildOutputTypes3, OMNI_JOIN_TYPE_INNER, buildOpFactory3,
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val lookupOp3 = lookupOpFactory3.createOperator()
+
       // close operator
       SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit]( _ => {
-        buildOp3.close()
         lookupOp3.close()
-        buildOpFactory3.close()
         lookupOpFactory3.close()
       })
 
@@ -1381,26 +1418,5 @@ case class ColumnarMultipleOperatorExec1(
 
   override val nodeName: String = "ColumnarMultipleOperatorExec1"
 
-  // TODO: exchange reuse
-/*  override def doCanonicalize(): ColumnarMultipleOperatorExec1 = {
-    ColumnarMultipleOperatorExec1(
-      aggregate,
-      proj1,
-      join1,
-      proj2,
-      join2,
-      proj3,
-      join3,
-      filter,
-    relation,
-    output,
-    requiredSchema,
-    partitionFilters,
-    optionalBucketSet,
-    optionalNumCoalescedBuckets,
-    dataFilters,
-    tableIdentifier,
-    disableBucketedScan)
-  }*/
   override protected def doCanonicalize(): SparkPlan = WrapperLeafExec()
 }

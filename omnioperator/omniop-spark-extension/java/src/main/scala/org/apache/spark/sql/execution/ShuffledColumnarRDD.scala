@@ -52,7 +52,6 @@ class ShuffledColumnarRDD(
   override val partitioner: Option[Partitioner] =
     if (partitionSpecs.forall(_.isInstanceOf[CoalescedPartitionSpec])) {
       val indices = partitionSpecs.map(_.asInstanceOf[CoalescedPartitionSpec].startReducerIndex)
-      // TODO this check is based on assumptions of callers' behavior but is sufficient for now.
       if (indices.toSet.size == partitionSpecs.length) {
         Some(new CoalescedPartitioner(dependency.partitioner, indices))
       } else {
@@ -72,7 +71,6 @@ class ShuffledColumnarRDD(
     val tracker = SparkEnv.get.mapOutputTracker.asInstanceOf[MapOutputTrackerMaster]
     partition.asInstanceOf[ShuffledColumnarRDDPartition].spec match {
       case CoalescedPartitionSpec(startReducerIndex, endReducerIndex) =>
-        // TODO order by partition size.
         startReducerIndex.until(endReducerIndex).flatMap { reducerIndex =>
           tracker.getPreferredLocationsForShuffle(dependency, reducerIndex)
         }

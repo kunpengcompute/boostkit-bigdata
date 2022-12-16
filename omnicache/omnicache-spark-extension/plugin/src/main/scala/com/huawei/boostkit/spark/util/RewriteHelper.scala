@@ -555,3 +555,29 @@ case class TableEqual(tableName: String, tableNameWithIdx: String,
 
   override def hashCode(): Int = tableNameWithIdx.hashCode()
 }
+
+case class AttributeReferenceEqual(attr: AttributeReference) {
+  override def toString: String = attr.sql
+
+  override def equals(obj: Any): Boolean = obj match {
+    case attrEqual: AttributeReferenceEqual =>
+      attr.name == attrEqual.attr.name && attr.dataType == attrEqual.attr.dataType &&
+          attr.nullable == attrEqual.attr.nullable && attr.metadata == attrEqual.attr.metadata &&
+          attr.qualifier == attrEqual.attr.qualifier
+//    case attribute: AttributeReference =>
+//      attr.name == attribute.name && attr.dataType == attribute.dataType &&
+//          attr.nullable == attribute.nullable && attr.metadata == attribute.metadata &&
+//          attr.qualifier == attribute.qualifier
+    case _ => false
+  }
+
+  override def hashCode(): Int = {
+    var h = 17
+    h = h * 37 + attr.name.hashCode()
+    h = h * 37 + attr.dataType.hashCode()
+    h = h * 37 + attr.nullable.hashCode()
+    h = h * 37 + attr.metadata.hashCode()
+    h = h * 37 + attr.qualifier.hashCode()
+    h
+  }
+}

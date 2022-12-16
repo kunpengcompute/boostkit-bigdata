@@ -188,6 +188,11 @@ case class ColumnarShuffledHashJoinExec(
         val buildOp = buildOpFactory.createOperator()
         buildCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startBuildCodegen)
 
+        SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
+          buildOp.close()
+          buildOpFactory.close()
+        })
+
         while (buildIter.hasNext) {
           val cb = buildIter.next()
           val vecs = transColBatchToOmniVecs(cb, false)
@@ -216,9 +221,7 @@ case class ColumnarShuffledHashJoinExec(
         lookupCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startLookupCodegen)
 
         SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
-          buildOp.close()
           lookupOp.close()
-          buildOpFactory.close()
           lookupOpFactory.close()
         })
 

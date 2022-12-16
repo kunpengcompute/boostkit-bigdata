@@ -73,7 +73,7 @@ long Test_splitter_nativeMake(std::string partitioning_name,
                               int num_sub_dirs,
                               std::string local_dirs_jstr);
 
-int Test_splitter_split(long splitter_id, VectorBatch* vb);
+void Test_splitter_split(long splitter_id, VectorBatch* vb);
 
 void Test_splitter_stop(long splitter_id);
 

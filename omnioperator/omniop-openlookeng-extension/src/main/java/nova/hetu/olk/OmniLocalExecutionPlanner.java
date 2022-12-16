@@ -698,7 +698,7 @@ public class OmniLocalExecutionPlanner
                 reuseTableScanMappingId = tableScanNode.getReuseTableScanMappingId();
                 consumerTableScanNodeCount = tableScanNode.getConsumerTableScanNodeCount();
             }
-            // TODO: This is a simple hack, it will be replaced when we add ability to push
+            // This is a simple hack, it will be replaced when we add ability to push
             // down sampling into connectors.
             // SYSTEM sampling is performed in the coordinator by dropping some random
             // splits so the SamplingNode can be skipped here.
@@ -760,7 +760,7 @@ public class OmniLocalExecutionPlanner
 
             Optional<RowExpression> translatedFilter = extractStaticFilters(filterExpression, metadata);
 
-            // TODO: Execution must be plugged in here
+            // Execution must be plugged in here
             Supplier<List<Map<ColumnHandle, DynamicFilter>>> dynamicFilterSupplier = getDynamicFilterSupplier(
                     Optional.of(extractDynamicFilterUnionResult), sourceNode, context);
             Optional<DynamicFilterSupplier> dynamicFilter = Optional.empty();
@@ -1333,9 +1333,9 @@ public class OmniLocalExecutionPlanner
 
             List<JoinNode.EquiJoinClause> clauses = node.getCriteria();
 
-            // TODO: Execution must be plugged in here
+            // Execution must be plugged in here
             if (!node.getDynamicFilters().isEmpty()) {
-                // log.debug("[Join] Dynamic filters: %s", node.getDynamicFilters());
+                log.debug("[Join] Dynamic filters: %s", node.getDynamicFilters());
             }
 
             List<Symbol> leftSymbols = Lists.transform(clauses, JoinNode.EquiJoinClause::getLeft);

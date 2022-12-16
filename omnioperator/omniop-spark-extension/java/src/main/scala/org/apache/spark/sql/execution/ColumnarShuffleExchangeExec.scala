@@ -305,7 +305,6 @@ object ColumnarShuffleExchangeExec extends Logging {
             op.addInput(new VecBatch(vecs, cb.numRows()))
             val res = op.getOutput
             if (res.hasNext) {
-              // TODO call next() once while get all result?
               val retBatch = res.next()
               val pidVec = retBatch.getVectors()(0)
               // close return VecBatch

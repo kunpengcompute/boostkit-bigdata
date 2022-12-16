@@ -47,8 +47,7 @@ public class OrcColumnarNativeReader {
         if (schema != null) {
             options.schema(schema);
         } else {
-            // TODO
-            LOGGER.error("TODO: null schema should support");
+            LOGGER.error("null schema should support");
         }
         options.include(OrcInputFormat.parseInclude(schema,
             OrcConf.INCLUDE_COLUMNS.getString(conf)));

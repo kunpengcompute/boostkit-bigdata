@@ -26,6 +26,7 @@ import org.apache.spark.SparkContext
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.scheduler.{SparkListener, SparkListenerEvent}
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.catalyst.plans.{FullOuter, LeftAnti, LeftOuter, LeftSemi, RightOuter}
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.command.OmniCacheCreateMvCommand
@@ -36,6 +37,7 @@ class MVRewriteRule(session: SparkSession) extends Rule[LogicalPlan] with Rewrit
   val omniCacheConf: OmniCachePluginConfig = OmniCachePluginConfig.getConf
 
   val joinRule = new MaterializedViewJoinRule(session)
+  val outJoinRule = new MaterializedViewOutJoinRule(session)
   val aggregateRule = new MaterializedViewAggregateRule(session)
 
   override def apply(logicalPlan: LogicalPlan): LogicalPlan = {
@@ -62,9 +64,17 @@ class MVRewriteRule(session: SparkSession) extends Rule[LogicalPlan] with Rewrit
     val rewriteStartSecond = System.currentTimeMillis()
     val res = plan.transformDown {
       case p: Project =>
-        joinRule.perform(Some(p), p.child, usingMvs)
+        if (containsOuterJoin(p)) {
+          outJoinRule.perform(p, usingMvs)
+        } else {
+          joinRule.perform(Some(p), p.child, usingMvs)
+        }
       case a: Aggregate =>
-        var rewritedPlan = aggregateRule.perform(None, a, usingMvs)
+        var rewritedPlan = if (containsOuterJoin(a)) {
+          outJoinRule.perform(a, usingMvs)
+        } else {
+          aggregateRule.perform(None, a, usingMvs)
+        }
         // below agg may be join/filter can be rewrite
         if (rewritedPlan == a && !a.child.isInstanceOf[Project]) {
           val child = Project(
@@ -99,6 +109,22 @@ class MVRewriteRule(session: SparkSession) extends Rule[LogicalPlan] with Rewrit
     RewriteTime.statFromStartTime("total", rewriteStartSecond)
     logBasedOnLevel(RewriteTime.timeStat.toString())
     res
+  }
+
+  def containsOuterJoin(plan: LogicalPlan): Boolean = {
+    plan.foreach {
+      case j: Join =>
+        j.joinType match {
+          case _: LeftOuter.type => return true
+          case _: RightOuter.type => return true
+          case _: FullOuter.type => return true
+          case _: LeftSemi.type => return true
+          case _: LeftAnti.type => return true
+          case _ =>
+        }
+      case _ =>
+    }
+    false
   }
 }
 

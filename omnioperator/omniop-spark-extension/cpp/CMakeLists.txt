@@ -10,6 +10,9 @@ set(CMAKE_CXX_COMPILER "g++")
 
 set(root_directory ${PROJECT_BINARY_DIR})
 
+set(CMAKE_CXX_FLAGS_DEBUG "-pipe -g -Wall -fPIC -fno-common -fno-stack-protector")
+set(CMAKE_CXX_FLAGS_RELEASE "-O2 -pipe -Wall -Wtrampolines -D_FORTIFY_SOURCE=2 -O2 -fPIC -finline-functions -fstack-protector-strong -s -Wl,-z,noexecstack -Wl,-z,relro,-z,now")
+
 if (DEFINED COVERAGE)
     if(${COVERAGE} STREQUAL "ON")
         set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -ftest-coverage -fprofile-arcs")

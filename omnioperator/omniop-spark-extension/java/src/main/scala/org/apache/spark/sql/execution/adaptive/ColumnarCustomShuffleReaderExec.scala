@@ -52,7 +52,6 @@ case class ColumnarCustomShuffleReaderExec(
   override lazy val outputPartitioning: Partitioning = {
     // If it is a local shuffle reader with one mapper per task, then the output partitioning is
     // the same as the plan before shuffle.
-    // TODO this check is based on assumptions of callers' behavior but is sufficient for now.
     if (partitionSpecs.nonEmpty &&
       partitionSpecs.forall(_.isInstanceOf[PartialMapperPartitionSpec]) &&
       partitionSpecs.map(_.asInstanceOf[PartialMapperPartitionSpec].mapIndex).toSet.size ==

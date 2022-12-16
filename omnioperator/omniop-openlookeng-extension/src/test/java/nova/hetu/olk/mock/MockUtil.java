@@ -32,6 +32,7 @@ import nova.hetu.olk.block.VariableWidthOmniBlock;
 import nova.hetu.omniruntime.operator.OmniOperator;
 import nova.hetu.omniruntime.type.DataType;
 import nova.hetu.omniruntime.vector.BooleanVec;
+import nova.hetu.omniruntime.vector.ContainerVec;
 import nova.hetu.omniruntime.vector.Decimal128Vec;
 import nova.hetu.omniruntime.vector.DictionaryVec;
 import nova.hetu.omniruntime.vector.DoubleVec;
@@ -117,7 +118,7 @@ public class MockUtil
             if (blockModel.rowBlock) {
                 for (Object value : blockModel.values) {
                     Page page = mockPage(block(blockModel.lazy, blockModel.dictionary, (Object[]) value));
-                    blocks.put(j, RowOmniBlock.fromFieldBlocks(vecAllocator, page.getPositionCount(), Optional.empty(), page.getBlocks(), null));
+                    blocks.put(j, RowOmniBlock.fromFieldBlocks(vecAllocator, page.getPositionCount(), Optional.empty(), page.getBlocks(), null, mockVec(ContainerVec.class, page.getBlocks(), vecAllocator)));
                 }
             }
 

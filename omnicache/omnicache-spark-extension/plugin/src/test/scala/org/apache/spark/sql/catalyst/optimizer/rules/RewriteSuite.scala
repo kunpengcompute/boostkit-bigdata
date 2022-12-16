@@ -69,10 +69,8 @@ class RewriteSuite extends AnyFunSuite
   }
 
   def preCreateTable(): Unit = {
-    disableCachePlugin()
     preDropTable()
     if (catalog.tableExists(TableIdentifier("locations"))) {
-      enableCachePlugin()
       return
     }
     spark.sql(
@@ -112,6 +110,16 @@ class RewriteSuite extends AnyFunSuite
         |INSERT INTO TABLE depts VALUES(2,'deptname2');
         |""".stripMargin
     )
+    spark.sql(
+      """
+        |INSERT INTO TABLE depts VALUES(3,'deptname3');
+        |""".stripMargin
+    )
+    spark.sql(
+      """
+        |INSERT INTO TABLE depts VALUES(4,'deptname4');
+        |""".stripMargin
+    )
 
     spark.sql(
       """
@@ -132,6 +140,12 @@ class RewriteSuite extends AnyFunSuite
     spark.sql(
       """
         |INSERT INTO TABLE emps VALUES(2,2,2,'empname2',2.0);
+        |""".stripMargin
+    )
+
+    spark.sql(
+      """
+        |INSERT INTO TABLE emps VALUES(3,null,3,'empname3',3.0);
         |""".stripMargin
     )
 
@@ -245,7 +259,6 @@ class RewriteSuite extends AnyFunSuite
         |);
         |""".stripMargin
     )
-    enableCachePlugin()
   }
 
   preCreateTable()
@@ -458,8 +471,7 @@ class RewriteSuite extends AnyFunSuite
     }
   }
 
-  def isRewritedByMV(database: String, mvSrc: String, logicalPlan: LogicalPlan): Boolean = {
-    val mv = mvSrc.toLowerCase(Locale.ROOT)
+  def isRewritedByMV(database: String, mv: String, logicalPlan: LogicalPlan): Boolean = {
     logicalPlan.foreachUp {
       case _@HiveTableRelation(tableMeta, _, _, _, _) =>
         if (tableMeta.database == database && tableMeta.identifier.table == mv) {
@@ -489,21 +501,12 @@ class RewriteSuite extends AnyFunSuite
     val (rewritePlan, rewriteRows) = getPlanAndRows(sql)
 
     // 2.compare plan
-    val isRewrited = isRewritedByMV(database, mv, rewritePlan)
-    if (!isRewrited) {
-      logWarning(s"sql ${sql} ;logicalPlan ${rewritePlan} is not rewritedByMV ${mv}")
-    }
-    assert(isRewrited)
-
-    if (noData) {
-      return
-    }
+    assert(isRewritedByMV(database, mv, rewritePlan))
 
     // 3.compare row
     disableCachePlugin()
     val expectedRows = getRows(sql)
     compareRows(rewriteRows, expectedRows, noData)
-    enableCachePlugin()
   }
 
   def isNotRewritedByMV(logicalPlan: LogicalPlan): Boolean = {
@@ -534,6 +537,5 @@ class RewriteSuite extends AnyFunSuite
     disableCachePlugin()
     val expectedRows = getRows(sql)
     compareRows(rewriteRows, expectedRows, noData)
-    enableCachePlugin()
   }
 }

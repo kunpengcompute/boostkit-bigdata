@@ -20,12 +20,18 @@ import io.prestosql.operator.Operator;
 import io.prestosql.operator.OperatorFactory;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.StandardErrorCode;
+import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.type.StandardTypes;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeSignature;
+import nova.hetu.omniruntime.constants.FunctionType;
 
 import java.util.List;
+
+import static nova.hetu.omniruntime.constants.FunctionType.OMNI_AGGREGATION_TYPE_AVG;
+import static nova.hetu.omniruntime.constants.FunctionType.OMNI_AGGREGATION_TYPE_COUNT_ALL;
+import static nova.hetu.omniruntime.constants.FunctionType.OMNI_AGGREGATION_TYPE_SUM;
 
 public abstract class AbstractOmniOperatorFactory
         implements OperatorFactory
@@ -71,6 +77,47 @@ public abstract class AbstractOmniOperatorFactory
     {
         for (Type type : types) {
             checkDataType(type);
+        }
+    }
+
+    public static void checkDataTypes(final List<Type> sourceTypes,
+                                      final FunctionType[] aggregatorTypes,
+                                      final int[] aggregationInputChannels,
+                                      final AggregationNode.Step step)
+    {
+        int channelIndex = 0;
+        for (FunctionType fType : aggregatorTypes) {
+            if (fType == OMNI_AGGREGATION_TYPE_COUNT_ALL) {
+                continue;
+            }
+
+            String base = sourceTypes.get(aggregationInputChannels[channelIndex++]).getTypeSignature().getBase();
+            switch (base) {
+                case StandardTypes.INTEGER:
+                case StandardTypes.BIGINT:
+                case StandardTypes.DOUBLE:
+                case StandardTypes.BOOLEAN:
+                case StandardTypes.SMALLINT:
+                case StandardTypes.VARCHAR:
+                case StandardTypes.CHAR:
+                case StandardTypes.DECIMAL:
+                case StandardTypes.DATE:
+                    continue;
+                case StandardTypes.VARBINARY:
+                    if (step == AggregationNode.Step.FINAL
+                            && (fType == OMNI_AGGREGATION_TYPE_AVG || fType == OMNI_AGGREGATION_TYPE_SUM)) {
+                        continue;
+                    }
+                case StandardTypes.ROW: {
+                    if (step == AggregationNode.Step.FINAL && fType == OMNI_AGGREGATION_TYPE_AVG) {
+                        continue;
+                    }
+                }
+                default:
+                    throw new PrestoException(
+                            StandardErrorCode.NOT_SUPPORTED,
+                            "Not support data Type " + base + " for aggregation " + fType + " with step " + step);
+            }
         }
     }
 

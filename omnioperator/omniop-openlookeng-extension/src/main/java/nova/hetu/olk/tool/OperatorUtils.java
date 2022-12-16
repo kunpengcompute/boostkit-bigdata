@@ -484,13 +484,17 @@ public final class OperatorUtils
                 values[i] = shortArrayBlock.getShort(i, 0);
             }
             if (shortArrayBlock.mayHaveNull()) {
+                boolean hasNull = false;
                 byte[] valueIsNull = new byte[positionCount];
                 for (int i = 0; i < values.length; i++) {
                     if (shortArrayBlock.isNull(i)) {
                         valueIsNull[i] = 1;
+                        hasNull = true;
                     }
                 }
-                return new ShortArrayOmniBlock(vecAllocator, 0, positionCount, valueIsNull, values);
+                if (hasNull) {
+                    return new ShortArrayOmniBlock(vecAllocator, 0, positionCount, valueIsNull, values);
+                }
             }
             return new ShortArrayOmniBlock(vecAllocator, 0, positionCount, null, values);
         }
@@ -623,7 +627,7 @@ public final class OperatorUtils
             }
         }
         return RowOmniBlock.fromFieldBlocks(vecAllocator, rowBlock.getPositionCount(), Optional.of(valueIsNull),
-                rowBlock.getRawFieldBlocks(), blockType);
+                rowBlock.getRawFieldBlocks(), blockType, null);
     }
 
     /**
@@ -802,7 +806,7 @@ public final class OperatorUtils
             fieldBlockOffsets[position + 1] = fieldBlockOffsets[position] + (nulls[position] == Vec.NULL ? 0 : 1);
         }
         return new RowOmniBlock(0, positionCount, nulls, fieldBlockOffsets, rowBlocks,
-                new ContainerDataType(dataTypes));
+                new ContainerDataType(dataTypes), containerVec);
     }
 
     /**

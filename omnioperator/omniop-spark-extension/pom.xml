@@ -99,6 +99,7 @@
                     <groupId>com.huawei.boostkit</groupId>
                     <artifactId>boostkit-omniop-bindings</artifactId>
                     <version>${omniruntime.version}</version>
+                    <classifier>aarch64</classifier>
                     <scope>provided</scope>
                 </dependency>
                 <dependency>

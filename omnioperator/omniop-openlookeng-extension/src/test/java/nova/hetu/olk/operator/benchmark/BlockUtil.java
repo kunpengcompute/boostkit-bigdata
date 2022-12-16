@@ -78,6 +78,17 @@ public final class BlockUtil
         return builder.build();
     }
 
+    public static Block createShortSequenceBlock(int start, int end)
+    {
+        BlockBuilder builder = SMALLINT.createFixedSizeBlockBuilder(end - start);
+
+        for (int i = start; i < end; i++) {
+            SMALLINT.writeLong(builder, i);
+        }
+
+        return builder.build();
+    }
+
     public static Block createStringDictionaryBlock(int start, int length, VarcharType type)
     {
         checkArgument(length > 5, "block must have more than 5 entries");

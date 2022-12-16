@@ -46,17 +46,4 @@ class ColumnarWindowExecSuite extends ColumnarSparkPlanTest with SharedSparkSess
     res2.head(10).foreach(row => println(row))
     assert(res2.queryExecution.executedPlan.find(_.isInstanceOf[ColumnarWindowExec]).isDefined, s"ColumnarWindowExec not happened, executedPlan as follows： \n${res2.queryExecution.executedPlan}")
   }
-
-  // todo: window check answer
-  //  test("lead/lag with negative offset") {
-  //    val df = Seq((1, "1"), (2, "2"), (1, "3"), (2, "4")).toDF("key", "value")
-  //    val window = Window.partitionBy($"key").orderBy($"value")
-  //
-  //    checkAnswer(
-  //      df.select(
-  //        $"key",
-  //        lead("value", -1).over(window),
-  //        lag("value", -1).over(window)),
-  //      Row(1, null, "3") :: Row(1, "1", null) :: Row(2, null, "4") :: Row(2, "2", null) :: Nil)
-  //  }
 }

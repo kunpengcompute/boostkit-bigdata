@@ -18,57 +18,12 @@
 package com.huawei.boostkit.spark.compress;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.util.EnumSet;
 import java.util.zip.DataFormatException;
-import java.util.zip.Deflater;
 import java.util.zip.Inflater;
 
 public class ZlibCodec implements CompressionCodec {
 
-    private int level;
-    private int strategy;
-
-    public ZlibCodec() {
-        level = Deflater.DEFAULT_COMPRESSION;
-        strategy = Deflater.DEFAULT_STRATEGY;
-    }
-
-    private ZlibCodec(int level, int strategy) {
-        this.level = level;
-        this.strategy = strategy;
-    }
-
-    @Override
-    public boolean compress(ByteBuffer in, ByteBuffer out,
-                            ByteBuffer overflow) throws IOException {
-        int length = in.remaining();
-        int outSize = 0;
-        Deflater deflater = new Deflater(level, true);
-        try {
-            deflater.setStrategy(strategy);
-            deflater.setInput(in.array(), in.arrayOffset() + in.position(), length);
-            deflater.finish();
-            int offset = out.arrayOffset() + out.position();
-            while (!deflater.finished() && (length > outSize)) {
-                int size = deflater.deflate(out.array(), offset, out.remaining());
-                out.position(size + out.position());
-                outSize += size;
-                offset += size;
-                // if we run out of space in the out buffer, use the overflow
-                if (out.remaining() == 0) {
-                    if (overflow == null) {
-                        return false;
-                    }
-                    out = overflow;
-                    offset = out.arrayOffset() + out.position();
-                }
-            }
-        }finally {
-            deflater.end();
-        }
-        return length > outSize;
-    }
+    public ZlibCodec() {}
 
     @Override
     public int decompress(byte[] input, int inputLength, byte[] output) throws IOException {
@@ -90,53 +45,5 @@ public class ZlibCodec implements CompressionCodec {
             inflater.end();
         }
         return offset;
-    }
-
-    @Override
-    public CompressionCodec modify(/* @Nullable */ EnumSet<Modifier> modifiers){
-
-        if (modifiers == null){
-            return this;
-        }
-
-        int l = this.level;
-        int s = this.strategy;
-
-        for (Modifier m : modifiers){
-            switch (m){
-                case BINARY:
-                    /* filtered == less LZ77, more huffman */
-                    s = Deflater.FILTERED;
-                    break;
-                case TEXT:
-                    s = Deflater.DEFAULT_STRATEGY;
-                    break;
-                case FASTEST:
-                    // deflate_fast looking for 8 byte patterns
-                    l = Deflater.BEST_SPEED;
-                    break;
-                case FAST:
-                    // deflate_fast looking for 16 byte patterns
-                    l = Deflater.BEST_SPEED + 1;
-                    break;
-                case DEFAULT:
-                    // deflate_slow looking for 128 byte patterns
-                    l = Deflater.DEFAULT_COMPRESSION;
-                    break;
-                default:
-                    break;
-            }
-        }
-        return new ZlibCodec(l,s);
-    }
-
-    @Override
-    public void reset(){
-        level = Deflater.DEFAULT_COMPRESSION;
-        strategy = Deflater.DEFAULT_STRATEGY;
-    }
-
-    @Override
-    public void close(){
     }
 }

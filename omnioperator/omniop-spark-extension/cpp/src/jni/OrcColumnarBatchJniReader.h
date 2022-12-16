@@ -94,7 +94,7 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniRe
  * Signature:   (J[I[J)J
  */
 JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniReader_recordReaderNext
-        (JNIEnv *, jobject, jlong, jlong, jlong, jintArray, jlongArray);
+        (JNIEnv *, jobject, jlong, jlong, jintArray, jlongArray);
 
 /*
  * Class:       com_huawei_boostkit_spark_jni_OrcColumnarBatchJniReader
@@ -137,16 +137,16 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniRe
 
 int getLiteral(orc::Literal &lit, int leafType, std::string value);      
 
-bool stringToBool(std::string boolStr);
-
-int buildLeafs(int leafOp, std::vector<orc::Literal> &litList, orc::Literal &lit, std::string leafNameString, int leafType,
+int buildLeaves(PredicateOperatorType leafOp, std::vector<orc::Literal> &litList, orc::Literal &lit, std::string leafNameString, orc::PredicateDataType leafType,
     orc::SearchArgumentBuilder &builder);
+
+bool stringToBool(std::string boolStr);
 
 int copyToOmniVec(orc::TypeKind vcType, int &omniTypeId, uint64_t &omniVecId, orc::ColumnVectorBatch *field, ...);  
 
-int copyToOmniDecimalVec(int precision, int &ominTypeId, uint64_t &ominVecId, orc::ColumnVectorBatch *field);
+int copyToOmniDecimalVec(int precision, int &omniTypeId, uint64_t &omniVecId, orc::ColumnVectorBatch *field);
 
-int copyToOmniDecimalVec(int precision, int &ominTypeId, uint64_t &ominVecId, orc::ColumnVectorBatch *field);
+int copyToOmniDecimalVec(int precision, int &omniTypeId, uint64_t &omniVecId, orc::ColumnVectorBatch *field);
 
 #ifdef __cplusplus
 }

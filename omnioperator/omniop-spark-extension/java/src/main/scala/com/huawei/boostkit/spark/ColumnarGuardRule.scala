@@ -192,6 +192,10 @@ case class ColumnarGuardRule() extends Rule[SparkPlan] {
       case e: UnsupportedOperationException =>
         logDebug(s"[OPERATOR FALLBACK] ${e} ${plan.getClass} falls back to Spark operator")
         return false
+      case l: UnsatisfiedLinkError =>
+        throw l
+      case f: NoClassDefFoundError =>
+        throw f
       case r: RuntimeException =>
         logDebug(s"[OPERATOR FALLBACK] ${r} ${plan.getClass} falls back to Spark operator")
         return false

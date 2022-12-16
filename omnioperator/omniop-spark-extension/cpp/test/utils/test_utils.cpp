@@ -296,7 +296,7 @@ VectorBatch* CreateVectorBatch_4col_withPid(int parNum, int rowNum) {
     delete[] col3;
     delete[] col4;
 
-    for (int p = 0; p < string_cache_test_.size(); p++) {
+    for (uint p = 0; p < string_cache_test_.size(); p++) {
         delete string_cache_test_[p]; // release memory
     }
     return in;
@@ -402,7 +402,7 @@ VectorBatch* CreateVectorBatch_4varcharCols_withPid(int parNum, int rowNum) {
     delete[] col3;
     delete[] col4;
 
-    for (int p = 0; p < string_cache_test_.size(); p++) {
+    for (uint p = 0; p < string_cache_test_.size(); p++) {
         delete string_cache_test_[p]; // release memory
     }
     return in;
@@ -455,7 +455,7 @@ VectorBatch* CreateVectorBatch_4charCols_withPid(int parNum, int rowNum) {
     delete[] col3;
     delete[] col4;
 
-    for (int p = 0; p < string_cache_test_.size(); p++) {
+    for (uint p = 0; p < string_cache_test_.size(); p++) {
         delete string_cache_test_[p]; // release memory
     }
     return in;
@@ -653,7 +653,7 @@ void Test_Shuffle_Compression(std::string compStr, int32_t numPartition, int32_t
                                               tmpDataFilePath,
                                               0,
                                               shuffleTestsDir);
-    for (uint64_t j = 0; j < numVb; j++) {
+    for (int64_t j = 0; j < numVb; j++) {
         VectorBatch* vb = CreateVectorBatch_4col_withPid(partitionNum, numRow);
         Test_splitter_split(splitterId, vb);
     }
@@ -686,12 +686,11 @@ long Test_splitter_nativeMake(std::string partitioning_name,
     auto compression_type_result = GetCompressionType(compression_type_jstr);
     splitOptions.compression_type = compression_type_result;
     splitOptions.data_file = data_file_jstr;
-    //TODO: memory pool select
     auto splitter = Splitter::Make(partitioning_name, inputDataTypes, numCols, num_partitions, std::move(splitOptions));
     return shuffle_splitter_holder_.Insert(std::shared_ptr<Splitter>(splitter));
 }
 
-int Test_splitter_split(long splitter_id, VectorBatch* vb) {
+void Test_splitter_split(long splitter_id, VectorBatch* vb) {
     auto splitter = shuffle_splitter_holder_.Lookup(splitter_id);
     //初始化split各全局变量
     splitter->Split(*vb);

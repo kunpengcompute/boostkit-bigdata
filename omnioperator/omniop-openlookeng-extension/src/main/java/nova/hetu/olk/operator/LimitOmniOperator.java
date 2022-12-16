@@ -112,17 +112,17 @@ public class LimitOmniOperator
             return false;
         }
 
-        return ((remainingLimit > 0) && (pages == null));
+        return true;
     }
 
     @Override
     public void addInput(Page page)
     {
-        checkState(!finished, "Operator is already finishing");
+        checkState(!finishing, "Operator is already finishing");
         requireNonNull(page, "page is null");
 
         int rowCount = page.getPositionCount();
-        if (rowCount == 0) {
+        if (remainingLimit == 0 || rowCount == 0) {
             BlockUtils.freePage(page);
             return;
         }
@@ -137,7 +137,7 @@ public class LimitOmniOperator
     @Override
     public Page getOutput()
     {
-        if ((finishing) || (remainingLimit == 0)) {
+        if (finishing) {
             finished = true;
         }
 

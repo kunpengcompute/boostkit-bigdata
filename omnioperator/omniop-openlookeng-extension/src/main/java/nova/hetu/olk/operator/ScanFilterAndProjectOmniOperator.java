@@ -42,6 +42,7 @@ import io.prestosql.operator.WorkProcessorSourceOperatorAdapter;
 import io.prestosql.operator.WorkProcessorSourceOperatorFactory;
 import io.prestosql.operator.project.CursorProcessor;
 import io.prestosql.operator.project.CursorProcessorOutput;
+import io.prestosql.operator.project.MergePages;
 import io.prestosql.operator.project.PageProcessor;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
@@ -67,6 +68,8 @@ import io.prestosql.split.PageSourceProvider;
 import io.prestosql.statestore.StateStoreProvider;
 import nova.hetu.olk.OmniLocalExecutionPlanner;
 import nova.hetu.olk.OmniLocalExecutionPlanner.OmniLocalExecutionPlanContext;
+import nova.hetu.olk.operator.filterandproject.OmniMergePages;
+import nova.hetu.olk.operator.filterandproject.OmniPageProcessor;
 import nova.hetu.olk.tool.VecAllocatorHelper;
 import nova.hetu.omniruntime.vector.VecAllocator;
 
@@ -91,12 +94,13 @@ import static io.prestosql.operator.WorkProcessor.TransformationState.finished;
 import static io.prestosql.operator.WorkProcessor.TransformationState.ofResult;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
-import static nova.hetu.olk.operator.filterandproject.OmniMergePages.mergePages;
 import static nova.hetu.olk.tool.OperatorUtils.transferToOffHeapPages;
 
 public class ScanFilterAndProjectOmniOperator
         implements WorkProcessorSourceOperator
 {
+    private static final int MAX_MIN_PAGE_SIZE = 1024 * 1024;
+
     private final WorkProcessor<Page> pages;
 
     private RecordCursor cursor;
@@ -108,6 +112,9 @@ public class ScanFilterAndProjectOmniOperator
     private long readTimeNanos;
     private VecAllocator vecAllocator;
     private List<Type> inputTypes;
+    private OmniMergePages.OmniMergePagesTransformation omniMergePagesTransformation;
+
+    private PageProcessor pageProcessor;
 
     private static final Logger log = Logger.get(ScanFilterAndProjectOmniOperator.class);
 
@@ -127,6 +134,7 @@ public class ScanFilterAndProjectOmniOperator
                 queryIdOptional, metadataOptional, dynamicFilterCacheManagerOptional, context));
         this.vecAllocator = vecAllocator;
         this.inputTypes = inputTypes;
+        this.pageProcessor = requireNonNull(pageProcessor, "processor is null");
     }
 
     @Override
@@ -182,6 +190,9 @@ public class ScanFilterAndProjectOmniOperator
         if (pageSource != null) {
             try {
                 pageSource.close();
+                if (omniMergePagesTransformation != null) {
+                    omniMergePagesTransformation.close();
+                }
             }
             catch (IOException e) {
                 throw new UncheckedIOException(e);
@@ -189,6 +200,9 @@ public class ScanFilterAndProjectOmniOperator
         }
         else if (cursor != null) {
             cursor.close();
+        }
+        if (pageProcessor instanceof OmniPageProcessor) {
+            ((OmniPageProcessor) pageProcessor).close();
         }
     }
 
@@ -292,6 +306,8 @@ public class ScanFilterAndProjectOmniOperator
 
         WorkProcessor<Page> processPageSource()
         {
+            omniMergePagesTransformation = new OmniMergePages.OmniMergePagesTransformation(types, minOutputPageSize.toBytes(),
+                    minOutputPageRowCount, MAX_MIN_PAGE_SIZE, localAggregatedMemoryContext.newLocalMemoryContext(MergePages.class.getSimpleName()), context);
             return WorkProcessor
                     .create(new ConnectorPageSourceToPages(
                             pageSourceMemoryContext, tableScanNodeOptional, stateStoreProviderOptional, queryIdOptional,
@@ -299,8 +315,7 @@ public class ScanFilterAndProjectOmniOperator
                     .yielding(yieldSignal::isSet)
                     .flatMap(page -> pageProcessor.createWorkProcessor(session.toConnectorSession(), yieldSignal,
                             outputMemoryContext, page))
-                    .transformProcessor(processor -> mergePages(types, minOutputPageSize.toBytes(),
-                            minOutputPageRowCount, processor, localAggregatedMemoryContext, context))
+                    .transformProcessor(processor -> processor.transform(omniMergePagesTransformation))
                     .withProcessStateMonitor(state -> memoryContext.setBytes(localAggregatedMemoryContext.getBytes()));
         }
     }

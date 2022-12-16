@@ -144,13 +144,10 @@ case class ColumnarHashAggregateExec(
       index += 1
     }
     omniAggChannels = omniAggChannels.filter(key => key != null)
-    val omniSourceTypes = new Array[DataType](child.outputSet.size)
-    val inputIter = child.outputSet.toIterator
-    var i = 0
-    while (inputIter.hasNext) {
-      val inputAttr = inputIter.next()
-      omniSourceTypes(i) = sparkTypeToOmniType(inputAttr.dataType, inputAttr.metadata)
-      i += 1
+    val omniSourceTypes = new Array[DataType](child.output.size)
+    child.output.zipWithIndex.foreach {
+      case (attr, i) =>
+        omniSourceTypes(i) = sparkTypeToOmniType(attr.dataType, attr.metadata)
     }
 
     for (aggChannel <-omniAggChannels) {
@@ -252,13 +249,10 @@ case class ColumnarHashAggregateExec(
     }
 
     omniAggChannels = omniAggChannels.filter(key => key != null)
-    val omniSourceTypes = new Array[DataType](child.outputSet.size)
-    val inputIter = child.outputSet.toIterator
-    var i = 0
-    while (inputIter.hasNext) {
-      val inputAttr = inputIter.next()
-      omniSourceTypes(i) = sparkTypeToOmniType(inputAttr.dataType, inputAttr.metadata)
-      i += 1
+    val omniSourceTypes = new Array[DataType](child.output.size)
+    child.output.zipWithIndex.foreach {
+      case (attr, i) =>
+        omniSourceTypes(i) = sparkTypeToOmniType(attr.dataType, attr.metadata)
     }
 
     child.executeColumnar().mapPartitionsWithIndex { (index, iter) =>

@@ -118,4 +118,15 @@ public class OrcColumnarBatchJniReaderTest extends TestCase {
         vecs[1].close();
     }
 
+    @Test
+    public void testGetProgress() {
+        String tmp = "";
+        try {
+            double progressValue = orcColumnarBatchJniReader.getProgress();
+        } catch (Exception e) {
+            tmp = e.getMessage();
+        } finally {
+            assertTrue(tmp.equals("recordReaderGetProgress is unsupported"));
+        }
+    }
 }

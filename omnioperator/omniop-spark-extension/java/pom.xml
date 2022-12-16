@@ -73,6 +73,7 @@
     <dependency>
         <groupId>com.huawei.boostkit</groupId>
         <artifactId>boostkit-omniop-bindings</artifactId>
+        <classifier>aarch64</classifier>
     </dependency>
     <dependency>
         <groupId>junit</groupId>

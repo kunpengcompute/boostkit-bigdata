@@ -50,8 +50,6 @@ public class BlockUtils
             return vec;
         }
         BooleanVec newValues = vec.copyRegion(index, length);
-        // TODO: is there any other place to close? Use put(bytebuffer) for better
-        // performance
         vec.close();
         return newValues;
     }
@@ -70,8 +68,6 @@ public class BlockUtils
             return vec;
         }
         IntVec newValues = vec.copyRegion(index, length);
-        // TODO: is there any other place to close? Use put(bytebuffer) for better
-        // performance
         vec.close();
         return newValues;
     }
@@ -90,8 +86,6 @@ public class BlockUtils
             return vec;
         }
         ShortVec newValues = vec.copyRegion(index, length);
-        // TODO: is there any other place to close? Use put(bytebuffer) for better
-        // performance
         vec.close();
         return newValues;
     }
@@ -110,8 +104,6 @@ public class BlockUtils
             return vec;
         }
         LongVec newValues = vec.copyRegion(index, length);
-        // TODO: is there any other place to close? Use put(bytebuffer) for better
-        // performance
         vec.close();
         return newValues;
     }
@@ -130,8 +122,6 @@ public class BlockUtils
             return vec;
         }
         DoubleVec newValues = vec.copyRegion(index, length);
-        // TODO: is there any other place to close? Use put(bytebuffer) for better
-        // performance
         vec.close();
         return newValues;
     }
@@ -150,7 +140,6 @@ public class BlockUtils
             return vec;
         }
         VarcharVec newValues = vec.copyRegion(index, length);
-        // TODO: is there any other place to close original vec?
         vec.close();
         return newValues;
     }
@@ -169,7 +158,6 @@ public class BlockUtils
             return vec;
         }
         Decimal128Vec newValues = vec.copyRegion(index, length);
-        // TODO: is there any other place to close original vec?
         vec.close();
         return newValues;
     }

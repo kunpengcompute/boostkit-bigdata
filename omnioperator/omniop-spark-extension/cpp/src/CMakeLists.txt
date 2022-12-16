@@ -14,6 +14,7 @@ set (SOURCE_FILES
         common/common.cpp
         jni/SparkJniWrapper.cpp
         jni/OrcColumnarBatchJniReader.cpp
+        jni/jni_common.cpp
         )
 
 #Find required protobuf package
@@ -50,7 +51,5 @@ target_link_libraries (${PROJ_TARGET} PUBLIC
 set_target_properties(${PROJ_TARGET} PROPERTIES
                       LIBRARY_OUTPUT_DIRECTORY ${root_directory}/releases
 )
-
-target_compile_options(${PROJ_TARGET} PUBLIC -g -O2 -fPIC)
 
 install(TARGETS ${PROJ_TARGET} DESTINATION lib)

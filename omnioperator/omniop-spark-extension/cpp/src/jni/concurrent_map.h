@@ -34,6 +34,7 @@ template <typename Holder>
 class ConcurrentMap {
 public:
     ConcurrentMap() : module_id_(init_module_id_) {}
+    ~ConcurrentMap() {}
 
     jlong Insert(Holder holder) {
         std::lock_guard<std::mutex> lock(mtx_);

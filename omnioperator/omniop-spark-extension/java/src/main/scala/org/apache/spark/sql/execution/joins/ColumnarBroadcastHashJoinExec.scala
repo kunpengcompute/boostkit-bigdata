@@ -278,7 +278,6 @@ case class ColumnarBroadcastHashJoinExec(
     }.toArray
     val relation = buildPlan.executeBroadcast[ColumnarHashedRelation]()
 
-    // TODO: check
     val buildOutputTypes = buildTypes // {1,1}
 
     val probeTypes = new Array[DataType](streamedOutput.size) // {2,2}, streamedOutput:col1#10,col2#11
@@ -305,6 +304,12 @@ case class ColumnarBroadcastHashJoinExec(
       val buildOp = buildOpFactory.createOperator()
       buildCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startBuildCodegen)
 
+      // close operator
+      SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
+        buildOp.close()
+        buildOpFactory.close()
+      })
+
       val deserializer = VecBatchSerializerFactory.create()
       relation.value.buildData.foreach { input =>
         val startBuildInput = System.nanoTime()
@@ -326,9 +331,7 @@ case class ColumnarBroadcastHashJoinExec(
 
       // close operator
       SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
-        buildOp.close()
         lookupOp.close()
-        buildOpFactory.close()
         lookupOpFactory.close()
       })
 

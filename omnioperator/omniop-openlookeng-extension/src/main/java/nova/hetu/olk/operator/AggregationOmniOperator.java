@@ -20,13 +20,9 @@ import io.prestosql.operator.Operator;
 import io.prestosql.operator.OperatorContext;
 import io.prestosql.operator.OperatorFactory;
 import io.prestosql.spi.Page;
-import io.prestosql.spi.PrestoException;
-import io.prestosql.spi.StandardErrorCode;
 import io.prestosql.spi.plan.AggregationNode;
 import io.prestosql.spi.plan.PlanNodeId;
-import io.prestosql.spi.type.StandardTypes;
 import io.prestosql.spi.type.Type;
-import io.prestosql.spi.type.TypeSignature;
 import nova.hetu.olk.tool.OperatorUtils;
 import nova.hetu.olk.tool.VecAllocatorHelper;
 import nova.hetu.olk.tool.VecBatchToPageIterator;
@@ -37,15 +33,12 @@ import nova.hetu.omniruntime.type.DataType;
 import nova.hetu.omniruntime.vector.VecAllocator;
 import nova.hetu.omniruntime.vector.VecBatch;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
 import static nova.hetu.olk.tool.OperatorUtils.buildVecBatch;
-import static nova.hetu.omniruntime.constants.FunctionType.OMNI_AGGREGATION_TYPE_AVG;
-import static nova.hetu.omniruntime.constants.FunctionType.OMNI_AGGREGATION_TYPE_SUM;
 
 /**
  * The type Aggregation omni operator.
@@ -198,7 +191,7 @@ public class AggregationOmniOperator
                     maskChannelArray[i] = INVALID_MASK_CHANNEL;
                 }
             }
-            checkDataTypes(this.sourceTypes);
+            checkDataTypes(this.sourceTypes, this.aggregatorTypes, this.aggregationInputChannels, this.step);
             this.omniFactory = new OmniAggregationOperatorFactory(sourceDataTypes, aggregatorTypes,
                     aggregationInputChannels, maskChannelArray, aggregationOutputTypes, step.isInputRaw(),
                     step.isOutputPartial());
@@ -225,39 +218,6 @@ public class AggregationOmniOperator
         {
             return new AggregationOmniOperatorFactory(operatorId, planNodeId, sourceTypes, aggregatorTypes,
                     aggregationInputChannels, maskChannels, aggregationOutputTypes, step);
-        }
-
-        @Override
-        public void checkDataType(Type type)
-        {
-            TypeSignature signature = type.getTypeSignature();
-            String base = signature.getBase();
-
-            switch (base) {
-                case StandardTypes.INTEGER:
-                case StandardTypes.SMALLINT:
-                case StandardTypes.BIGINT:
-                case StandardTypes.DOUBLE:
-                case StandardTypes.BOOLEAN:
-                case StandardTypes.VARCHAR:
-                case StandardTypes.CHAR:
-                case StandardTypes.DECIMAL:
-                case StandardTypes.DATE:
-                    return;
-                case StandardTypes.VARBINARY:
-                    if (this.step == AggregationNode.Step.FINAL && this.aggregatorTypes.length != 0 &&
-                            Arrays.stream(this.aggregatorTypes).allMatch(item -> item == OMNI_AGGREGATION_TYPE_AVG || item == OMNI_AGGREGATION_TYPE_SUM)) {
-                        return;
-                    }
-                case StandardTypes.ROW: {
-                    if (this.step == AggregationNode.Step.FINAL && this.aggregatorTypes.length != 0 &&
-                            Arrays.stream(this.aggregatorTypes).allMatch(item -> item == OMNI_AGGREGATION_TYPE_AVG)) {
-                        return;
-                    }
-                }
-                default:
-                    throw new PrestoException(StandardErrorCode.NOT_SUPPORTED, "Not support data Type " + base);
-            }
         }
     }
 }

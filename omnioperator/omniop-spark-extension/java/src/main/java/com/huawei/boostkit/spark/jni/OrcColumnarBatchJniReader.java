@@ -19,10 +19,10 @@
 package com.huawei.boostkit.spark.jni;
 
 import nova.hetu.omniruntime.type.DataType;
-import nova.hetu.omniruntime.type.Decimal64DataType;
 import nova.hetu.omniruntime.type.Decimal128DataType;
 import nova.hetu.omniruntime.vector.*;
 
+import org.apache.spark.sql.catalyst.util.RebaseDateTime;
 import org.apache.hadoop.hive.ql.io.sarg.ExpressionTree;
 import org.apache.hadoop.hive.ql.io.sarg.PredicateLeaf;
 import org.apache.orc.OrcFile.ReaderOptions;
@@ -67,7 +67,7 @@ public class OrcColumnarBatchJniReader {
         return jsonObject;
     }
 
-    public String PadZeroForDecimals(String [] decimalStrArray, int decimalScale) {
+    public String padZeroForDecimals(String [] decimalStrArray, int decimalScale) {
         String decimalVal = ""; // Integer without decimals, eg: 12345
         if (decimalStrArray.length == 2) { // Integer with decimals, eg: 12345.6
             decimalVal = decimalStrArray[1];
@@ -94,7 +94,7 @@ public class OrcColumnarBatchJniReader {
                     if (decimalS == 0) {
                         jsonObject.put("literal", spiltValues[0] + " " + decimalP + " " + decimalS);
                     } else {
-                        String scalePadZeroStr = PadZeroForDecimals(spiltValues, decimalS);
+                        String scalePadZeroStr = padZeroForDecimals(spiltValues, decimalS);
                         jsonObject.put("literal", spiltValues[0] + "." + scalePadZeroStr + " " + decimalP + " " + decimalS);
                     }
                 } else {
@@ -113,7 +113,7 @@ public class OrcColumnarBatchJniReader {
                         if (decimalS == 0) {
                             lst.add(spiltValues[0] + " " + decimalP + " " + decimalS);
                         } else {
-                            String scalePadZeroStr = PadZeroForDecimals(spiltValues, decimalS);
+                            String scalePadZeroStr = padZeroForDecimals(spiltValues, decimalS);
                             lst.add(spiltValues[0] + "." + scalePadZeroStr + " " + decimalP + " " + decimalS);
                         }
                     } else if (pl.getType() == PredicateLeaf.Type.DATE) {
@@ -164,7 +164,7 @@ public class OrcColumnarBatchJniReader {
         job.put("offset", options.getOffset());
         job.put("length", options.getLength());
         if (options.getSearchArgument() != null) {
-            LOGGER.debug("SearchArgument:" + options.getSearchArgument().toString());
+            LOGGER.debug("SearchArgument: {}", options.getSearchArgument().toString());
             JSONObject jsonexpressionTree = getSubJson(options.getSearchArgument().getExpression());
             job.put("expressionTree", jsonexpressionTree);
             JSONObject jsonleaves = getLeavesJson(options.getSearchArgument().getLeaves(), options.getSchema());
@@ -220,11 +220,19 @@ public class OrcColumnarBatchJniReader {
         recordReaderSeekToRow(recordReader, rowNumber);
     }
 
+    public void convertJulianToGreGorian(IntVec intVec, long rowNumber) {
+        int gregorianValue;
+        for (int rowIndex = 0; rowIndex < rowNumber; rowIndex++) {
+            gregorianValue = RebaseDateTime.rebaseJulianToGregorianDays(intVec.get(rowIndex));
+            intVec.set(rowIndex, gregorianValue);
+        }
+    }
+
     public int next(Vec[] vecList) {
         int vectorCnt = vecList.length;
         int[] typeIds = new int[realColsCnt];
         long[] vecNativeIds = new long[realColsCnt];
-        long rtn = recordReaderNext(recordReader, reader, batchReader, typeIds, vecNativeIds);
+        long rtn = recordReaderNext(recordReader, batchReader, typeIds, vecNativeIds);
         if (rtn == 0) {
             return 0;
         }
@@ -242,7 +250,11 @@ public class OrcColumnarBatchJniReader {
                     vecList[i] = new ShortVec(vecNativeIds[nativeGetId]);
                     break;
                 }
-                case OMNI_DATE32:
+                case OMNI_DATE32: {
+                    vecList[i] = new IntVec(vecNativeIds[nativeGetId]);
+                    convertJulianToGreGorian((IntVec)(vecList[i]), rtn);
+                    break;
+                }
                 case OMNI_INT: {
                     vecList[i] = new IntVec(vecNativeIds[nativeGetId]);
                     break;
@@ -280,7 +292,7 @@ public class OrcColumnarBatchJniReader {
 
     public native long initializeBatch(long rowReader, long batchSize);
 
-    public native long recordReaderNext(long rowReader, long reader, long batchReader, int[] typeId, long[] vecNativeId);
+    public native long recordReaderNext(long rowReader, long batchReader, int[] typeId, long[] vecNativeId);
 
     public native long recordReaderGetRowNumber(long rowReader);
 

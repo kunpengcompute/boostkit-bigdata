@@ -142,7 +142,6 @@
              <message key="ws.notPreceded"
              value="GenericWhitespace ''{0}'' is not preceded with whitespace."/>
         </module>
-        <!-- TODO: 11/09/15 disabled - indentation is currently inconsistent -->
         <!--
         <module name="Indentation">
             <property name="basicOffset" value="4"/>
@@ -153,7 +152,6 @@
             <property name="arrayInitIndent" value="4"/>
         </module>
         -->
-        <!-- TODO: 11/09/15 disabled - order is currently wrong in many places -->
         <!--
         <module name="ImportOrder">
             <property name="separated" value="true"/>

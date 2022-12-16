@@ -134,7 +134,6 @@ public class OmniPageFilter
      */
     public void close()
     {
-        // ((JFilterAndProjectOperator) omniOperator).close();
     }
 
     /**

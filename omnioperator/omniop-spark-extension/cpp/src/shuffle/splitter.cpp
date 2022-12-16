@@ -122,7 +122,7 @@ int Splitter::AllocatePartitionBuffers(int32_t partition_id, int32_t new_size) {
 
 int Splitter::SplitFixedWidthValueBuffer(VectorBatch& vb) {
     const auto num_rows = vb.GetRowCount();
-    for (auto col = 0; col < fixed_width_array_idx_.size(); ++col) {
+    for (uint col = 0; col < fixed_width_array_idx_.size(); ++col) {
         std::fill(std::begin(partition_buffer_idx_offset_),
                   std::end(partition_buffer_idx_offset_), 0);
         auto col_idx_vb = fixed_width_array_idx_[col];
@@ -288,7 +288,7 @@ int Splitter::SplitBinaryArray(VectorBatch& vb)
 }
 
 int Splitter::SplitFixedWidthValidityBuffer(VectorBatch& vb){
-    for (auto col = 0; col < fixed_width_array_idx_.size(); ++col) {
+    for (uint col = 0; col < fixed_width_array_idx_.size(); ++col) {
         auto col_idx = fixed_width_array_idx_[col];
         auto& dst_addrs = partition_fixed_width_validity_addrs_[col];
         // 分配内存并初始化
@@ -501,7 +501,7 @@ int Splitter::Split_Init(){
         options_.data_file = CreateTempShuffleFile(configured_dirs_[0]);
     }
 
-    for (int i = 0; i < column_type_id_.size(); ++i) {
+    for (uint i = 0; i < column_type_id_.size(); ++i) {
         switch (column_type_id_[i]) {
             case ShuffleTypeId::SHUFFLE_1BYTE:
             case ShuffleTypeId::SHUFFLE_2BYTE:
@@ -523,7 +523,7 @@ int Splitter::Split_Init(){
     partition_fixed_width_validity_addrs_.resize(num_fixed_width);
     partition_fixed_width_value_addrs_.resize(num_fixed_width);
     partition_fixed_width_buffers_.resize(num_fixed_width);
-    for (auto i = 0; i < num_fixed_width; ++i) {
+    for (uint i = 0; i < num_fixed_width; ++i) {
         partition_fixed_width_validity_addrs_[i].resize(num_partitions_);
         partition_fixed_width_value_addrs_[i].resize(num_partitions_);
         partition_fixed_width_buffers_[i].resize(num_partitions_);
@@ -612,7 +612,7 @@ spark::VecType::VecTypeId CastShuffleTypeIdToVecType(int32_t tmpType) {
     }
 };
 
-int Splitter::SerializingFixedColumns(int32_t partitionId,
+void Splitter::SerializingFixedColumns(int32_t partitionId,
                                       spark::Vec& vec,
                                       int fixColIndexTmp,
                                       SplitRowInfo* splitRowInfoTmp)
@@ -631,9 +631,9 @@ int Splitter::SerializingFixedColumns(int32_t partitionId,
             throw std::runtime_error("Allocator for tmp buffer Failed! ");
         }
         // options_.spill_batch_row_num长度切割与拼接
-        int destCopyedLength = 0;
-        int memCopyLen = 0;
-        int cacheBatchSize = 0;
+        uint destCopyedLength = 0;
+        uint memCopyLen = 0;
+        uint cacheBatchSize = 0;
         while (destCopyedLength < onceCopyLen) {
             if (splitRowInfoTmp->cacheBatchIndex[fixColIndexTmp] >= partition_cached_vectorbatch_[partitionId].size()) { // 数组越界保护
                 throw std::runtime_error("Columnar shuffle CacheBatchIndex out of bound.");
@@ -693,7 +693,7 @@ int Splitter::SerializingFixedColumns(int32_t partitionId,
     // partition_cached_vectorbatch_[partition_id][cache_index][col][1]代表value
 }
 
-int Splitter::SerializingBinaryColumns(int32_t partitionId, spark::Vec& vec, int colIndex, int curBatch)
+void Splitter::SerializingBinaryColumns(int32_t partitionId, spark::Vec& vec, int colIndex, int curBatch)
 {
     LogsDebug(" vc_partition_array_buffers_[partitionId:%d][colIndex:%d] cacheBatchNum:%lu curBatch:%d", partitionId, colIndex, vc_partition_array_buffers_[partitionId][colIndex].size(), curBatch);
     VCBatchInfo vcb = vc_partition_array_buffers_[partitionId][colIndex][curBatch];
@@ -718,11 +718,10 @@ int Splitter::protoSpillPartition(int32_t partition_id, std::unique_ptr<Buffered
     splitRowInfoTmp.remainCopyRow = partition_id_cnt_cache_[partition_id];
     splitRowInfoTmp.cacheBatchIndex.resize(fixed_width_array_idx_.size());
     splitRowInfoTmp.cacheBatchCopyedLen.resize(fixed_width_array_idx_.size());
-    auto partition_cache_batch_num = partition_cached_vectorbatch_[partition_id].size();
-    LogsDebug(" Spill Pid %d , remainCopyRow %d , partition_cache_batch_num %lu .", 
-               partition_id, 
-               splitRowInfoTmp.remainCopyRow, 
-               partition_cache_batch_num);
+    LogsDebug(" Spill Pid %d , remainCopyRow %d , partition_cache_batch_num %lu .",
+               partition_id,
+               splitRowInfoTmp.remainCopyRow,
+               partition_cached_vectorbatch_[partition_id].size());
     int curBatch = 0; // 变长cache batch下标，split已按照options_.spill_batch_row_num切割完成
     total_spill_row_num_ += splitRowInfoTmp.remainCopyRow;
     while (0 < splitRowInfoTmp.remainCopyRow) {
@@ -840,9 +839,9 @@ void Splitter::MergeSpilled() {
             LogsDebug(" get Partition Stream...tmpPartitionOffset %d tmpPartitionSize %d path %s",
                       tmpPartitionOffset, tmpPartitionSize, tmpDataFilePath.c_str());
             std::unique_ptr<InputStream> inputStream = readLocalFile(tmpDataFilePath);
-            uint64_t targetLen = tmpPartitionSize;
-            uint64_t seekPosit = tmpPartitionOffset;
-            uint64_t onceReadLen = 0;
+            int64_t targetLen = tmpPartitionSize;
+            int64_t seekPosit = tmpPartitionOffset;
+            int64_t onceReadLen = 0;
             while ((targetLen > 0) && bufferOutPutStream->Next(&bufferOut, &sizeOut)) {
                 onceReadLen = targetLen > sizeOut ? sizeOut : targetLen;
                 inputStream->read(bufferOut, onceReadLen, seekPosit);
@@ -890,7 +889,7 @@ int Splitter::SpillToTmpFile() {
     spilled_tmp_files_info_[options_.next_spilled_file_dir] = ptrTmp;
 
     auto cache_vectorBatch_num = vectorBatch_cache_.size();
-    for (auto i = 0; i < cache_vectorBatch_num; ++i) {
+    for (uint64_t i = 0; i < cache_vectorBatch_num; ++i) {
         ReleaseVectorBatch(*vectorBatch_cache_[i]);
         if (nullptr == vectorBatch_cache_[i]) {
             throw std::runtime_error("delete nullptr error for free vectorBatch");
@@ -905,11 +904,11 @@ int Splitter::SpillToTmpFile() {
 }
 
 Splitter::Splitter(InputDataTypes inputDataTypes, int32_t num_cols, int32_t num_partitions, SplitOptions options, bool flag)
-        : num_fields_(num_cols),
+        : input_col_types(inputDataTypes),
+          singlePartitionFlag(flag),
           num_partitions_(num_partitions),
           options_(std::move(options)),
-          singlePartitionFlag(flag),
-          input_col_types(inputDataTypes)
+          num_fields_(num_cols)
 {
     LogsDebug("Input Schema colNum: %d", num_cols);
     ToSplitterTypeId(num_cols);
