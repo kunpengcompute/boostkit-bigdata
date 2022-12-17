@@ -36,7 +36,7 @@ class OmniCachePluginConfig(conf: SQLConf) {
   def showMVQuerySqlLen: Int = conf
       .getConfString("spark.sql.omnicache.show.length", "50").toInt
 
-  // database where create OmniCache
+  // database where create OmniCache, like omnicache,omnicache1
   val omniCacheDB: String = conf
       .getConfString("spark.sql.omnicache.dbs", "")
 
@@ -48,30 +48,52 @@ class OmniCachePluginConfig(conf: SQLConf) {
     conf.setConfString("spark.sql.omnicache.cur.match.mv", mv)
   }
 
+  // mv table datasource
   val defaultDataSource: String = conf
       .getConfString("spark.sql.omnicache.default.datasource", "orc")
 
   val dataSourceSet: Set[String] = Set("orc", "parquet")
 
+  // omnicache loglevel
   def logLevel: String = conf
       .getConfString("spark.sql.omnicache.logLevel", "DEBUG")
       .toUpperCase(Locale.ROOT)
 
+  // set parsed sql as JobDescription
   def enableSqlLog: Boolean = conf
-      .getConfString("spark.sql.omnicache.sql.log.enable", "true")
+      .getConfString("spark.sql.omnicache.log.enable", "false")
       .toBoolean
+
+  // omnicache metadata path
+  def metadataPath: String = conf
+      .getConfString("spark.sql.omnicache.metadata.path", "/user/omnicache/metadata")
+
+  // enable omnicache init by query
+  lazy val enableMetadataInitByQuery: Boolean = conf
+      .getConfString("spark.sql.omnicache.metadata.initbyquery.enable", "false")
+      .toBoolean
+
+  // metadata index tail lines
+  val metadataIndexTailLines: Long = conf
+      .getConfString("spark.sql.omnicache.metadata.index.tail.lines", "5")
+      .toLong
+
 }
 
 object OmniCachePluginConfig {
-
+  // mv if enable for rewrite
   val MV_REWRITE_ENABLED = "spark.omnicache.rewrite.enable"
 
+  // mv if enable for rewrite when update
   val MV_UPDATE_REWRITE_ENABLED = "spark.omnicache.update.rewrite.enable"
 
+  // mv query original sql
   val MV_QUERY_ORIGINAL_SQL = "spark.omnicache.query.sql.original"
 
+  // mv query original sql exec db
   val MV_QUERY_ORIGINAL_SQL_CUR_DB = "spark.omnicache.query.sql.cur.db"
 
+  // mv latest update time
   val MV_LATEST_UPDATE_TIME = "spark.omnicache.latest.update.time"
 
   var ins: Option[OmniCachePluginConfig] = None
@@ -87,10 +109,24 @@ object OmniCachePluginConfig {
     new OmniCachePluginConfig(SQLConf.get)
   }
 
+  /**
+   *
+   * check if table is mv
+   *
+   * @param catalogTable catalogTable
+   * @return true:is mv; false:is not mv
+   */
   def isMV(catalogTable: CatalogTable): Boolean = {
     catalogTable.properties.contains(MV_QUERY_ORIGINAL_SQL)
   }
 
+  /**
+   * check if mv is in update
+   *
+   * @param spark        spark
+   * @param quotedMvName quotedMvName
+   * @return true:is in update; false:is not in update
+   */
   def isMVInUpdate(spark: SparkSession, quotedMvName: String): Boolean = {
     val names = quotedMvName.replaceAll("`", "")
         .split("\\.").toSeq
@@ -99,6 +135,12 @@ object OmniCachePluginConfig {
     !catalogTable.properties.getOrElse(MV_UPDATE_REWRITE_ENABLED, "true").toBoolean
   }
 
+  /**
+   * check if mv is in update
+   *
+   * @param viewTablePlan viewTablePlan
+   * @return true:is in update; false:is not in update
+   */
   def isMVInUpdate(viewTablePlan: LogicalPlan): Boolean = {
     val logicalRelation = viewTablePlan.asInstanceOf[LogicalRelation]
     !logicalRelation.catalogTable.get

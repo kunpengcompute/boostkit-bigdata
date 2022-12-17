@@ -35,12 +35,18 @@
         <maven.checkstyle.version>3.1.2</maven.checkstyle.version>
         <scoverage.maven.version>1.4.11</scoverage.maven.version>
         <puppycrawl.checkstyle.version>8.29</puppycrawl.checkstyle.version>
+        <kryo-shaded.version>4.0.2</kryo-shaded.version>
         <dep.os.arch></dep.os.arch>
         <scoverage.skip>true</scoverage.skip>
     </properties>
 
     <dependencyManagement>
         <dependencies>
+            <dependency>
+                <groupId>com.esotericsoftware</groupId>
+                <artifactId>kryo-shaded</artifactId>
+                <version>${kryo-shaded.version}</version>
+            </dependency>
             <dependency>
                 <groupId>org.apache.spark</groupId>
                 <artifactId>spark-sql_${scala.binary.version}</artifactId>

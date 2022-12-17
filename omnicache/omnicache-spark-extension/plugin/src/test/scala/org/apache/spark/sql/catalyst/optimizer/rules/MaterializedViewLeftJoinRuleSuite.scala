@@ -66,7 +66,7 @@ class MaterializedViewLeftJoinRuleSuite extends RewriteSuite {
       """
         |SELECT e.*,d.deptname, l.locationid
         |FROM emps e LEFT JOIN depts d ON e.deptno=d.deptno JOIN locations l
-        |ON e.locationid=l.locationid where e.deptno = 5;
+        |ON e.locationid=l.locationid where e.deptno >= 5;
         |""".stripMargin
     comparePlansAndRows(sql, "default", "mv_left_join", noData = true)
   }

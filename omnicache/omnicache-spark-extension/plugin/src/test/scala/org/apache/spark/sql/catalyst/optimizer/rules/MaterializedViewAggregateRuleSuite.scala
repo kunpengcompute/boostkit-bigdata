@@ -178,7 +178,6 @@ class MaterializedViewAggregateRuleSuite extends RewriteSuite {
     spark.sql(sql).show()
   }
 
-
   test("mv_agg4") {
     spark.sql(
       """

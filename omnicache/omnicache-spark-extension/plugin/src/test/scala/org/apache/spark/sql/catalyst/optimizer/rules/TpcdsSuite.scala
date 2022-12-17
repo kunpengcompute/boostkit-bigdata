@@ -17,7 +17,10 @@
 
 package org.apache.spark.sql.catalyst.optimizer.rules
 
+import com.huawei.boostkit.spark.util.ViewMetadata
+import java.util
 import org.apache.commons.io.IOUtils
+import org.apache.hadoop.fs.Path
 import scala.collection.mutable
 
 import org.apache.spark.sql.catalyst.TableIdentifier
@@ -89,7 +92,7 @@ class TpcdsSuite extends RewriteSuite {
         |LIMIT 100
         |
         |""".stripMargin
-    compareNotRewriteAndRows(sql, noData = true)
+    comparePlansAndRows(sql, "default", "mv536", noData = true)
     spark.sql("DROP MATERIALIZED VIEW IF EXISTS mv536")
   }
 
@@ -199,4 +202,308 @@ class TpcdsSuite extends RewriteSuite {
     comparePlansAndRows(sql, "default", "mv_q11", noData = true)
     spark.sql("DROP MATERIALIZED VIEW IF EXISTS mv_q11")
   }
+  test("resort") {
+    spark.sql("DROP MATERIALIZED VIEW IF EXISTS mv103")
+    spark.sql(
+      """
+        |CREATE MATERIALIZED VIEW IF NOT EXISTS mv103
+        |PARTITIONED BY (ss_sold_date_sk)
+        |AS
+        |SELECT
+        | item.i_item_id,
+        | store_sales.ss_ext_discount_amt,
+        | store_sales.ss_quantity,
+        | item.i_item_desc,
+        | item.i_product_name,
+        | item.i_manufact_id,
+        | store_sales.ss_sold_date_sk,
+        | item.i_brand_id,
+        | item.i_item_sk,
+        | date_dim.d_moy,
+        | item.i_category,
+        | store_sales.ss_item_sk,
+        | item.i_brand,
+        | date_dim.d_date,
+        | date_dim.d_month_seq,
+        | item.i_wholesale_cost,
+        | date_dim.d_dom,
+        | store_sales.ss_net_paid,
+        | store_sales.ss_addr_sk,
+        | item.i_color,
+        | store_sales.ss_store_sk,
+        | store_sales.ss_cdemo_sk,
+        | store_sales.ss_list_price,
+        | store_sales.ss_wholesale_cost,
+        | store_sales.ss_ticket_number,
+        | date_dim.d_year,
+        | store_sales.ss_hdemo_sk,
+        | store_sales.ss_customer_sk,
+        | item.i_manufact,
+        | store_sales.ss_sales_price,
+        | item.i_current_price,
+        | item.i_class,
+        | store_sales.ss_ext_list_price,
+        | date_dim.d_quarter_name,
+        | item.i_units,
+        | item.i_manager_id,
+        | date_dim.d_day_name,
+        | store_sales.ss_coupon_amt,
+        | item.i_category_id,
+        | store_sales.ss_promo_sk,
+        | store_sales.ss_net_profit,
+        | date_dim.d_qoy,
+        | date_dim.d_week_seq,
+        | store_sales.ss_ext_sales_price,
+        | item.i_size,
+        | store_sales.ss_sold_time_sk,
+        | item.i_class_id,
+        | date_dim.d_dow,
+        | store_sales.ss_ext_wholesale_cost,
+        | store_sales.ss_ext_tax,
+        | date_dim.d_date_sk
+        |FROM
+        | date_dim,
+        | item,
+        | store_sales
+        |WHERE
+        | store_sales.ss_item_sk = item.i_item_sk
+        | AND date_dim.d_date_sk = store_sales.ss_sold_date_sk
+        | AND (item.i_manager_id = 8 OR item.i_manager_id = 1 OR item.i_manager_id = 28)
+        | AND (date_dim.d_year = 1998 OR date_dim.d_year = 2000 OR date_dim.d_year = 1999)
+        | AND date_dim.d_moy = 11
+        |DISTRIBUTE BY ss_sold_date_sk;
+        |""".stripMargin
+    )
+    spark.sql("DROP MATERIALIZED VIEW IF EXISTS mv9")
+    spark.sql(
+      """
+        |CREATE MATERIALIZED VIEW IF NOT EXISTS mv9
+        |AS
+        |SELECT
+        | date_dim.d_year,
+        | item.i_category,
+        | item.i_item_id,
+        | item.i_class,
+        | item.i_current_price,
+        | item.i_item_desc,
+        | item.i_brand,
+        | date_dim.d_date,
+        | item.i_manufact_id,
+        | item.i_manager_id,
+        | item.i_brand_id,
+        | item.i_category_id,
+        | date_dim.d_moy,
+        | item.i_item_sk,
+        | sum(store_sales.ss_ext_sales_price) AS AGG0,
+        | count(1) AS AGG1
+        |FROM
+        | date_dim,
+        | item,
+        | store_sales
+        |WHERE
+        | store_sales.ss_item_sk = item.i_item_sk
+        | AND store_sales.ss_sold_date_sk = date_dim.d_date_sk
+        |GROUP BY
+        | date_dim.d_year,
+        | item.i_category,
+        | item.i_item_id,
+        | item.i_class,
+        | item.i_current_price,
+        | item.i_item_desc,
+        | item.i_brand,
+        | date_dim.d_date,
+        | item.i_manufact_id,
+        | item.i_manager_id,
+        | item.i_brand_id,
+        | item.i_category_id,
+        | date_dim.d_moy,
+        | item.i_item_sk;
+        |""".stripMargin
+    )
+    val os = ViewMetadata.fs.create(new Path(ViewMetadata.metadataPriorityPath, "mv103_9"))
+    val list = new util.ArrayList[String]()
+    list.add("default.mv9,default.mv103")
+    IOUtils.writeLines(list, "\n", os)
+    os.close()
+    ViewMetadata.loadViewPriorityFromFile()
+    val sql =
+      """
+        |SELECT
+        |  dt.d_year,
+        |  item.i_category_id,
+        |  item.i_category,
+        |  sum(ss_ext_sales_price)
+        |FROM date_dim dt, store_sales, item
+        |WHERE dt.d_date_sk = store_sales.ss_sold_date_sk
+        |  AND store_sales.ss_item_sk = item.i_item_sk
+        |  AND item.i_manager_id = 1
+        |  AND dt.d_moy = 11
+        |  AND dt.d_year = 2000
+        |GROUP BY dt.d_year
+        |  , item.i_category_id
+        |  , item.i_category
+        |ORDER BY sum(ss_ext_sales_price) DESC, dt.d_year
+        |  , item.i_category_id
+        |  , item.i_category
+        |LIMIT 100
+        |
+        |""".stripMargin
+    spark.sql(sql).explain()
+    comparePlansAndRows(sql, "default", "mv9", noData = true)
+    spark.sql("DROP MATERIALIZED VIEW IF EXISTS mv103")
+    spark.sql("DROP MATERIALIZED VIEW IF EXISTS mv9")
+  }
+
+  test("resort2") {
+    spark.sql("DROP MATERIALIZED VIEW IF EXISTS mv103")
+    spark.sql(
+      """
+        |CREATE MATERIALIZED VIEW IF NOT EXISTS mv103
+        |PARTITIONED BY (ss_sold_date_sk)
+        |AS
+        |SELECT
+        | item.i_item_id,
+        | store_sales.ss_ext_discount_amt,
+        | store_sales.ss_quantity,
+        | item.i_item_desc,
+        | item.i_product_name,
+        | item.i_manufact_id,
+        | store_sales.ss_sold_date_sk,
+        | item.i_brand_id,
+        | item.i_item_sk,
+        | date_dim.d_moy,
+        | item.i_category,
+        | store_sales.ss_item_sk,
+        | item.i_brand,
+        | date_dim.d_date,
+        | date_dim.d_month_seq,
+        | item.i_wholesale_cost,
+        | date_dim.d_dom,
+        | store_sales.ss_net_paid,
+        | store_sales.ss_addr_sk,
+        | item.i_color,
+        | store_sales.ss_store_sk,
+        | store_sales.ss_cdemo_sk,
+        | store_sales.ss_list_price,
+        | store_sales.ss_wholesale_cost,
+        | store_sales.ss_ticket_number,
+        | date_dim.d_year,
+        | store_sales.ss_hdemo_sk,
+        | store_sales.ss_customer_sk,
+        | item.i_manufact,
+        | store_sales.ss_sales_price,
+        | item.i_current_price,
+        | item.i_class,
+        | store_sales.ss_ext_list_price,
+        | date_dim.d_quarter_name,
+        | item.i_units,
+        | item.i_manager_id,
+        | date_dim.d_day_name,
+        | store_sales.ss_coupon_amt,
+        | item.i_category_id,
+        | store_sales.ss_promo_sk,
+        | store_sales.ss_net_profit,
+        | date_dim.d_qoy,
+        | date_dim.d_week_seq,
+        | store_sales.ss_ext_sales_price,
+        | item.i_size,
+        | store_sales.ss_sold_time_sk,
+        | item.i_class_id,
+        | date_dim.d_dow,
+        | store_sales.ss_ext_wholesale_cost,
+        | store_sales.ss_ext_tax,
+        | date_dim.d_date_sk
+        |FROM
+        | date_dim,
+        | item,
+        | store_sales
+        |WHERE
+        | store_sales.ss_item_sk = item.i_item_sk
+        | AND date_dim.d_date_sk = store_sales.ss_sold_date_sk
+        | AND (item.i_manager_id = 8 OR item.i_manager_id = 1 OR item.i_manager_id = 28)
+        | AND (date_dim.d_year = 1998 OR date_dim.d_year = 2000 OR date_dim.d_year = 1999)
+        | AND date_dim.d_moy = 11
+        |DISTRIBUTE BY ss_sold_date_sk;
+        |""".stripMargin
+    )
+    spark.sql("DROP MATERIALIZED VIEW IF EXISTS mv9")
+    spark.sql(
+      """
+        |CREATE MATERIALIZED VIEW IF NOT EXISTS mv9
+        |AS
+        |SELECT
+        | date_dim.d_year,
+        | item.i_category,
+        | item.i_item_id,
+        | item.i_class,
+        | item.i_current_price,
+        | item.i_item_desc,
+        | item.i_brand,
+        | date_dim.d_date,
+        | item.i_manufact_id,
+        | item.i_manager_id,
+        | item.i_brand_id,
+        | item.i_category_id,
+        | date_dim.d_moy,
+        | item.i_item_sk,
+        | sum(store_sales.ss_ext_sales_price) AS AGG0,
+        | count(1) AS AGG1
+        |FROM
+        | date_dim,
+        | item,
+        | store_sales
+        |WHERE
+        | store_sales.ss_item_sk = item.i_item_sk
+        | AND store_sales.ss_sold_date_sk = date_dim.d_date_sk
+        |GROUP BY
+        | date_dim.d_year,
+        | item.i_category,
+        | item.i_item_id,
+        | item.i_class,
+        | item.i_current_price,
+        | item.i_item_desc,
+        | item.i_brand,
+        | date_dim.d_date,
+        | item.i_manufact_id,
+        | item.i_manager_id,
+        | item.i_brand_id,
+        | item.i_category_id,
+        | date_dim.d_moy,
+        | item.i_item_sk;
+        |""".stripMargin
+    )
+    val os = ViewMetadata.fs.create(new Path(ViewMetadata.metadataPriorityPath, "mv103_9"))
+    val list = new util.ArrayList[String]()
+    list.add("default.mv103,default.mv9")
+    IOUtils.writeLines(list, "\n", os)
+    os.close()
+    ViewMetadata.loadViewPriorityFromFile()
+    val sql =
+      """
+        |SELECT
+        |  dt.d_year,
+        |  item.i_category_id,
+        |  item.i_category,
+        |  sum(ss_ext_sales_price)
+        |FROM date_dim dt, store_sales, item
+        |WHERE dt.d_date_sk = store_sales.ss_sold_date_sk
+        |  AND store_sales.ss_item_sk = item.i_item_sk
+        |  AND item.i_manager_id = 1
+        |  AND dt.d_moy = 11
+        |  AND dt.d_year = 2000
+        |GROUP BY dt.d_year
+        |  , item.i_category_id
+        |  , item.i_category
+        |ORDER BY sum(ss_ext_sales_price) DESC, dt.d_year
+        |  , item.i_category_id
+        |  , item.i_category
+        |LIMIT 100
+        |
+        |""".stripMargin
+    spark.sql(sql).explain()
+    comparePlansAndRows(sql, "default", "mv103", noData = true)
+    spark.sql("DROP MATERIALIZED VIEW IF EXISTS mv103")
+    spark.sql("DROP MATERIALIZED VIEW IF EXISTS mv9")
+  }
 }
+

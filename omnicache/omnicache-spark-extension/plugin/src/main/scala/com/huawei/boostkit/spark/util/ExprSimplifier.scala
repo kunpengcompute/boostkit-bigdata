@@ -27,7 +27,9 @@ import scala.util.control.Breaks
 
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.optimizer._
+import org.apache.spark.sql.catalyst.optimizer.rules.RewriteTime
 import org.apache.spark.sql.catalyst.plans.logical.{Filter, Join, LogicalPlan, OneRowRelation}
+import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.types.{BooleanType, DataType, NullType}
 
 case class ExprSimplifier(unknownAsFalse: Boolean,
@@ -472,6 +474,14 @@ case class ExprSimplifier(unknownAsFalse: Boolean,
     for (orOp <- orsOperands) {
       breaks3.breakable {
         val ors = decomposeDisjunctions(orOp).toSet
+        val others = terms.filter(!_.eq(orOp)).toSet
+        for (or <- ors) {
+          if (containsAllSql(others, conjunctions(or).toSet)) {
+            terms.-=(orOp)
+            breaks3.break()
+          }
+        }
+
         for (term <- terms) {
           // Excluding self-simplification
           if (!term.eq(orOp)) {
@@ -664,49 +674,51 @@ case class ExprSimplifier(unknownAsFalse: Boolean,
 
 object ExprSimplifier extends PredicateHelper {
   // Spark native simplification rules to be executed before this simplification
-  val frontRules = Seq(SimplifyCasts, ConstantFolding, UnwrapCastInBinaryComparison, ColumnPruning)
+  val frontRules: Seq[Rule[LogicalPlan]] = Seq()
 
   // simplify condition with pulledUpPredicates.
   def simplify(logicalPlan: LogicalPlan): LogicalPlan = {
-    val originPredicates: mutable.ArrayBuffer[Expression] = ArrayBuffer()
-    val normalizeLogicalPlan = RewriteHelper.normalizePlan(logicalPlan)
-    normalizeLogicalPlan foreach {
-      case Filter(condition, _) =>
-        originPredicates ++= splitConjunctivePredicates(condition)
-      case Join(_, _, _, condition, _) if condition.isDefined =>
-        originPredicates ++= splitConjunctivePredicates(condition.get)
-      case _ =>
-    }
-    val inferredPlan = InferFiltersFromConstraints.apply(normalizeLogicalPlan)
-    val inferredPredicates: mutable.ArrayBuffer[Expression] = mutable.ArrayBuffer()
-    inferredPlan foreach {
-      case Filter(condition, _) =>
-        inferredPredicates ++= splitConjunctivePredicates(condition)
-      case Join(_, _, _, condition, _) if condition.isDefined =>
-        inferredPredicates ++= splitConjunctivePredicates(condition.get)
-      case _ =>
-    }
-    val pulledUpPredicates: Set[Expression] = inferredPredicates.toSet -- originPredicates.toSet
-    // front Spark native optimize
-    var optPlan: LogicalPlan = normalizeLogicalPlan
-    for (rule <- frontRules) {
-      optPlan = rule.apply(optPlan)
-    }
-    optPlan transform {
-      case Filter(condition: Expression, child: LogicalPlan) =>
-        val simplifyExpr = ExprSimplifier(true, pulledUpPredicates).simplify(condition)
-        Filter(simplifyExpr, child)
-      case Join(left, right, joinType, condition, hint) if condition.isDefined =>
-        val simplifyExpr = ExprSimplifier(true, pulledUpPredicates).simplify(condition.get)
-        Join(left, right, joinType, Some(simplifyExpr), hint)
-      case other@_ =>
-        other
+    RewriteTime.withTimeStat("ExprSimplifier.simplify") {
+      val originPredicates: mutable.ArrayBuffer[Expression] = ArrayBuffer()
+      val normalizeLogicalPlan = logicalPlan
+      normalizeLogicalPlan foreach {
+        case Filter(condition, _) =>
+          originPredicates ++= splitConjunctivePredicates(condition)
+        case Join(_, _, _, condition, _) if condition.isDefined =>
+          originPredicates ++= splitConjunctivePredicates(condition.get)
+        case _ =>
+      }
+      val inferredPlan = InferFiltersFromConstraints.apply(normalizeLogicalPlan)
+      val inferredPredicates: mutable.ArrayBuffer[Expression] = mutable.ArrayBuffer()
+      inferredPlan foreach {
+        case Filter(condition, _) =>
+          inferredPredicates ++= splitConjunctivePredicates(condition)
+        case Join(_, _, _, condition, _) if condition.isDefined =>
+          inferredPredicates ++= splitConjunctivePredicates(condition.get)
+        case _ =>
+      }
+      val pulledUpPredicates: Set[Expression] = inferredPredicates.toSet -- originPredicates.toSet
+      // front Spark native optimize
+      var optPlan: LogicalPlan = normalizeLogicalPlan
+      for (rule <- frontRules) {
+        optPlan = rule.apply(optPlan)
+      }
+      optPlan transform {
+        case Filter(condition: Expression, child: LogicalPlan) =>
+          val simplifyExpr = ExprSimplifier(true, pulledUpPredicates).simplify(condition)
+          Filter(simplifyExpr, child)
+        case Join(left, right, joinType, condition, hint) if condition.isDefined =>
+          val simplifyExpr = ExprSimplifier(true, pulledUpPredicates).simplify(condition.get)
+          Join(left, right, joinType, Some(simplifyExpr), hint)
+        case other@_ =>
+          other
+      }
     }
   }
 
   // simplify condition without pulledUpPredicates.
   def simplify(expr: Expression): Expression = {
-    val fakePlan = simplify(Filter(expr, OneRowRelation()))
+    val fakePlan = simplify(Filter(RewriteHelper.canonicalize(expr), OneRowRelation()))
     RewriteHelper.canonicalize(fakePlan.asInstanceOf[Filter].condition)
   }
 }

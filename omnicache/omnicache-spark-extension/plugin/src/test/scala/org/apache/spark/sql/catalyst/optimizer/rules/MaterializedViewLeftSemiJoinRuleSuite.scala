@@ -78,14 +78,7 @@ class MaterializedViewLeftSemiJoinRuleSuite extends RewriteSuite {
         |FROM emps e1 SEMI JOIN depts d ON e1.deptno=d.deptno JOIN emps e2
         |on e1.deptno = e2.deptno where e1.deptno >= 2;
         |""".stripMargin
-    val df = spark.sql(sql)
-    val optPlan = df.queryExecution.optimizedPlan
-    disableCachePlugin()
-    val df2 = spark.sql(sql)
-    val srcPlan = df2.queryExecution.optimizedPlan
-    enableCachePlugin()
-    assert(optPlan.toString().replaceAll("#\\d+", "")
-        .equals(srcPlan.toString().replaceAll("#\\d+", "")))
+    comparePlansAndRows(sql, "default", "mv_left_semi_join", noData = true)
   }
 
   test("mv_left_semi_join_4") {

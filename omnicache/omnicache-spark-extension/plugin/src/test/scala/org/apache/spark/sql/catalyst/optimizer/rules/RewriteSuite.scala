@@ -48,7 +48,10 @@ class RewriteSuite extends AnyFunSuite
       .config("spark.ui.port", "4050")
       // .config("spark.sql.planChangeLog.level", "WARN")
       .config("spark.sql.omnicache.logLevel", "WARN")
+      .config("spark.sql.omnicache.dbs", "default")
+      .config("spark.sql.omnicache.metadata.initbyquery.enable", "false")
       .config("hive.in.test", "true")
+      .config("spark.sql.omnicache.metadata.path", "./user/omnicache/metadata")
       .enableHiveSupport()
       .getOrCreate()
   spark.sparkContext.setLogLevel("WARN")
@@ -69,8 +72,10 @@ class RewriteSuite extends AnyFunSuite
   }
 
   def preCreateTable(): Unit = {
+    disableCachePlugin()
     preDropTable()
     if (catalog.tableExists(TableIdentifier("locations"))) {
+      enableCachePlugin()
       return
     }
     spark.sql(
@@ -259,6 +264,7 @@ class RewriteSuite extends AnyFunSuite
         |);
         |""".stripMargin
     )
+    enableCachePlugin()
   }
 
   preCreateTable()
@@ -471,19 +477,29 @@ class RewriteSuite extends AnyFunSuite
     }
   }
 
-  def isRewritedByMV(database: String, mv: String, logicalPlan: LogicalPlan): Boolean = {
-    logicalPlan.foreachUp {
+  def isRewritedByMV(database: String, mvSrc: String, logicalPlan: LogicalPlan): Boolean = {
+    val mv = mvSrc.toLowerCase(Locale.ROOT)
+    logicalPlan.foreach {
       case _@HiveTableRelation(tableMeta, _, _, _, _) =>
-        if (tableMeta.database == database && tableMeta.identifier.table == mv) {
+        if (tableMeta.database == database && tableMeta.identifier.table.contains(mv)) {
           return true
         }
       case _@LogicalRelation(_, _, catalogTable, _) =>
         if (catalogTable.isDefined) {
-          if (catalogTable.get.database == database && catalogTable.get.identifier.table == mv) {
+          if (catalogTable.get.database == database && catalogTable.get.identifier
+              .table.contains(mv)) {
             return true
           }
         }
-      case _ =>
+      case p =>
+        p.transformAllExpressions {
+          case s: SubqueryExpression =>
+            if (isRewritedByMV(database, mv, s.plan)) {
+              return true
+            }
+            s
+          case e => e
+        }
     }
     false
   }
@@ -501,12 +517,21 @@ class RewriteSuite extends AnyFunSuite
     val (rewritePlan, rewriteRows) = getPlanAndRows(sql)
 
     // 2.compare plan
-    assert(isRewritedByMV(database, mv, rewritePlan))
+    val isRewrited = isRewritedByMV(database, mv, rewritePlan)
+    if (!isRewrited) {
+      logWarning(s"sql $sql; logicalPlan $rewritePlan is not rewritedByMV $mv")
+    }
+    assert(isRewrited)
+
+    if (noData) {
+      return
+    }
 
     // 3.compare row
     disableCachePlugin()
     val expectedRows = getRows(sql)
     compareRows(rewriteRows, expectedRows, noData)
+    enableCachePlugin()
   }
 
   def isNotRewritedByMV(logicalPlan: LogicalPlan): Boolean = {
@@ -537,5 +562,6 @@ class RewriteSuite extends AnyFunSuite
     disableCachePlugin()
     val expectedRows = getRows(sql)
     compareRows(rewriteRows, expectedRows, noData)
+    enableCachePlugin()
   }
 }

@@ -170,7 +170,12 @@ class MaterializedViewAggregateRule(sparkSession: SparkSession)
           // such as max(c1),min(c1),sum(c1),avg(c1),count(distinct c1),
           // if c1 in view,it can support
         } else {
-          return None
+          expr match {
+            case Literal(_, _) | Alias(Literal(_, _), _) =>
+            case _ =>
+              logDetail(s"expr:$expr cannot found in viewQueryPlan")
+              return None
+          }
         }
         newQueryAggExpressions :+= expr.asInstanceOf[NamedExpression]
       }
@@ -192,7 +197,7 @@ class MaterializedViewAggregateRule(sparkSession: SparkSession)
           val qualifier = viewTableAttr.qualifier
           expr = expr match {
             case a@Alias(agg@AggregateExpression(Sum(_), _, _, _, _), _) =>
-              viewTableAttr match {
+              agg.resultAttribute match {
                 case DecimalType.Expression(prec, scale) =>
                   if (prec - 10 > 0) {
                     copyAlias(a, MakeDecimal(agg.copy(aggregateFunction =
@@ -211,14 +216,37 @@ class MaterializedViewAggregateRule(sparkSession: SparkSession)
               copyAlias(a, agg.copy(aggregateFunction = Sum(viewTableAttr)), qualifier)
             case a@Alias(AttributeReference(_, _, _, _), _) =>
               copyAlias(a, viewTableAttr, viewTableAttr.qualifier)
+            case a@Alias(agg@AggregateExpression(Average(child), _, _, _, _), _) =>
+              val count = ExpressionEqual(agg.copy(aggregateFunction = Count(child)))
+              if (viewAggExpressionEquals.contains(count)) {
+                val countAttr = viewTableAttrs(viewAggExpressionEqualsOrdinal(count))
+                    .asInstanceOf[AttributeReference]
+                copyAlias(a, Divide(
+                  agg.copy(aggregateFunction = Sum(Multiply(viewTableAttr, countAttr)),
+                    resultId = NamedExpression.newExprId),
+                  agg.copy(aggregateFunction = Sum(countAttr),
+                    resultId = NamedExpression.newExprId)),
+                  qualifier)
+              } else {
+                return None
+              }
+            case Alias(AggregateExpression(_, _, _, _, _), _) =>
+              return None
             case AttributeReference(_, _, _, _) => viewTableAttr
             case Literal(_, _) | Alias(Literal(_, _), _) =>
               expr
+            case a@Alias(_, _) =>
+              copyAlias(a, viewTableAttr, qualifier)
             // other agg like avg or user_defined udaf not support rollUp
             case _ => return None
           }
         } else {
-          return None
+          expr match {
+            case Literal(_, _) | Alias(Literal(_, _), _) =>
+            case _ =>
+              logDetail(s"expr:$expr cannot found in viewQueryPlan")
+              return None
+          }
         }
         newQueryAggExpressions :+= expr.asInstanceOf[NamedExpression]
       }
@@ -241,6 +269,15 @@ class MaterializedViewAggregateRule(sparkSession: SparkSession)
         // 5.1.not need agg,just project
         Some(Project(rewritedQueryAggExpressions.get, viewTablePlan))
       } else {
+        // cast function to alias(NamedExpression)
+        newGroupingExpressions = newGroupingExpressions.map {
+          case attr: AttributeReference =>
+            attr
+          case alias: Alias =>
+            alias
+          case e =>
+            Alias(e, e.prettyName)()
+        }
         // 5.2.need agg,rewrite GroupingExpressions and new agg
         val rewritedGroupingExpressions = rewriteAndAliasExpressions(newGroupingExpressions,
           swapTableColumn = true, tableMapping, columnMapping,
@@ -249,7 +286,23 @@ class MaterializedViewAggregateRule(sparkSession: SparkSession)
         if (rewritedGroupingExpressions.isEmpty) {
           return None
         }
-        Some(Aggregate(rewritedGroupingExpressions.get,
+
+        var rewritedGroupingExpressionsRes = rewritedGroupingExpressions.get
+        val rewritedGroupingExpressionsSet = rewritedGroupingExpressionsRes
+            .map(ExpressionEqual).toSet
+        rewritedQueryAggExpressions.get.foreach {
+          case alias@Alias(AttributeReference(_, _, _, _), _) =>
+            if (!rewritedGroupingExpressionsSet.contains(ExpressionEqual(alias))) {
+              rewritedGroupingExpressionsRes +:= alias
+            }
+          case attr@AttributeReference(_, _, _, _) =>
+            if (!rewritedGroupingExpressionsSet.contains(ExpressionEqual(attr))) {
+              rewritedGroupingExpressionsRes +:= attr
+            }
+          case _ =>
+        }
+
+        Some(Aggregate(rewritedGroupingExpressionsRes,
           rewritedQueryAggExpressions.get, viewTablePlan))
       }
     if (!RewriteHelper.checkAttrsValid(res.get)) {
@@ -262,5 +315,66 @@ class MaterializedViewAggregateRule(sparkSession: SparkSession)
     alias.copy(child = child)(exprId = alias.exprId,
       qualifier = qualifier, explicitMetadata = alias.explicitMetadata,
       nonInheritableMetadataKeys = alias.nonInheritableMetadataKeys)
+  }
+}
+
+class MaterializedViewOutJoinAggregateRule(sparkSession: SparkSession)
+    extends MaterializedViewAggregateRule(sparkSession: SparkSession) {
+
+  /**
+   * check plan if match current rule
+   *
+   * @param logicalPlan LogicalPlan
+   * @return true:matched ; false:unMatched
+   */
+  override def isValidPlan(logicalPlan: LogicalPlan): Boolean = {
+    if (!logicalPlan.isInstanceOf[Aggregate]) {
+      return false
+    }
+    logicalPlan.children.forall(isValidOutJoinLogicalPlan)
+  }
+
+  /**
+   * queryTableInfo!=viewTableInfo , need do join compensate
+   *
+   * @param viewTablePlan  viewTablePlan
+   * @param viewQueryPlan  viewQueryPlan
+   * @param topViewProject topViewProject
+   * @param needTables     needTables
+   * @return join compensated viewTablePlan
+   */
+  override def compensateViewPartial(viewTablePlan: LogicalPlan,
+      viewQueryPlan: LogicalPlan,
+      topViewProject: Option[Project],
+      needTables: Seq[TableEqual]):
+  Option[(LogicalPlan, LogicalPlan, Option[Project])] = {
+    Some(viewTablePlan, viewQueryPlan, None)
+  }
+
+  /**
+   * use viewTablePlan(join compensated) ,query project ,
+   * compensationPredicts to rewrite final plan
+   *
+   * @param viewTablePlan   viewTablePlan(join compensated)
+   * @param viewQueryPlan   viewQueryPlan
+   * @param queryPlan       queryPlan
+   * @param tableMapping    tableMapping
+   * @param columnMapping   columnMapping
+   * @param viewProjectList viewProjectList
+   * @param viewTableAttrs  viewTableAttrs
+   * @return final plan
+   */
+  override def rewriteView(viewTablePlan: LogicalPlan, viewQueryPlan: LogicalPlan,
+      queryPlan: LogicalPlan, tableMapping: BiMap[String, String],
+      columnMapping: Map[ExpressionEqual, mutable.Set[ExpressionEqual]],
+      viewProjectList: Seq[Expression], viewTableAttrs: Seq[Attribute]):
+  Option[LogicalPlan] = {
+    val simplifiedQueryPlanString = simplifiedPlanString(findOriginExpression(queryPlan))
+    val simplifiedViewPlanString = simplifiedPlanString(findOriginExpression(viewQueryPlan))
+    if (simplifiedQueryPlanString != simplifiedViewPlanString) {
+      return None
+    }
+    super.rewriteView(viewTablePlan, viewQueryPlan, queryPlan,
+      tableMapping, columnMapping, viewProjectList, viewTableAttrs)
   }
 }

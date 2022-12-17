@@ -24,11 +24,16 @@ import scala.collection.mutable.ArrayBuffer
 
 import org.apache.spark.sql.catalyst.catalog.{CatalogTable, HiveTableRelation}
 import org.apache.spark.sql.catalyst.expressions._
+import org.apache.spark.sql.catalyst.optimizer._
+import org.apache.spark.sql.catalyst.optimizer.rules.RewriteTime
 import org.apache.spark.sql.catalyst.plans.logical._
+import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.datasources.LogicalRelation
 import org.apache.spark.sql.internal.SQLConf
 
 trait RewriteHelper extends PredicateHelper with RewriteLogger {
+
+  type ViewMetadataPackageType = (String, LogicalPlan, LogicalPlan)
 
   val SESSION_CATALOG_NAME: String = "spark_catalog"
 
@@ -37,21 +42,27 @@ trait RewriteHelper extends PredicateHelper with RewriteLogger {
       mutable.Set[ExpressionEqual]] = Map[ExpressionEqual, mutable.Set[ExpressionEqual]]()
   val EMPTY_MULTIMAP: Multimap[Int, Int] = ArrayListMultimap.create[Int, Int]()
 
-  def mergeConjunctiveExpressions(e: Seq[Expression]): Expression = {
-    if (e.isEmpty) {
+  /**
+   * merge expressions by and
+   */
+  def mergeConjunctiveExpressions(exprs: Seq[Expression]): Expression = {
+    if (exprs.isEmpty) {
       return Literal.TrueLiteral
     }
-    if (e.size == 1) {
-      return e.head
+    if (exprs.size == 1) {
+      return exprs.head
     }
-    e.reduce { (a, b) =>
+    exprs.reduce { (a, b) =>
       And(a, b)
     }
   }
 
-  def fillQualifier(logicalPlan: LogicalPlan,
+  /**
+   * fill attr's qualifier
+   */
+  def fillQualifier(plan: LogicalPlan,
       exprIdToQualifier: mutable.HashMap[ExprId, AttributeReference]): LogicalPlan = {
-    val newLogicalPlan = logicalPlan.transform {
+    val newLogicalPlan = plan.transform {
       case plan =>
         plan.transformExpressions {
           case a: AttributeReference =>
@@ -66,10 +77,13 @@ trait RewriteHelper extends PredicateHelper with RewriteLogger {
     newLogicalPlan
   }
 
+  /**
+   * fill viewTablePlan's attr's qualifier by viewQueryPlan
+   */
   def mapTablePlanAttrToQuery(viewTablePlan: LogicalPlan,
       viewQueryPlan: LogicalPlan): LogicalPlan = {
     // map by index
-    val topProjectList: Seq[NamedExpression] = viewQueryPlan match {
+    var topProjectList: Seq[NamedExpression] = viewQueryPlan match {
       case Project(projectList, _) =>
         projectList
       case Aggregate(_, aggregateExpressions, _) =>
@@ -93,8 +107,12 @@ trait RewriteHelper extends PredicateHelper with RewriteLogger {
     fillQualifier(viewTablePlan, exprIdToQualifier)
   }
 
-  def extractTopProjectList(logicalPlan: LogicalPlan): Seq[Expression] = {
-    val topProjectList: Seq[Expression] = logicalPlan match {
+
+  /**
+   * extract logicalPlan output expressions
+   */
+  def extractTopProjectList(plan: LogicalPlan): Seq[Expression] = {
+    val topProjectList: Seq[Expression] = plan match {
       case Project(projectList, _) => projectList
       case Aggregate(_, aggregateExpressions, _) => aggregateExpressions
       case e => extractTables(Project(e.output, e))._1.output
@@ -102,18 +120,12 @@ trait RewriteHelper extends PredicateHelper with RewriteLogger {
     topProjectList
   }
 
-  def extractAllProjectList(logicalPlan: LogicalPlan): Seq[Expression] = {
-    var allProjectList: Seq[Expression] = Seq.empty[Expression]
-    logicalPlan.foreach {
-      case Project(projectList, _) => allProjectList ++= projectList
-      case e =>
-    }
-    allProjectList
-  }
-
-  def generateOrigins(logicalPlan: LogicalPlan): Map[ExprId, Expression] = {
+  /**
+   * generate (alias_exprId,alias_child_expression)
+   */
+  def generateOrigins(plan: LogicalPlan): Map[ExprId, Expression] = {
     var origins = Map.empty[ExprId, Expression]
-    logicalPlan.transformAllExpressions {
+    plan.transformAllExpressions {
       case a@Alias(child, _) =>
         origins += (a.exprId -> child)
         a
@@ -122,6 +134,32 @@ trait RewriteHelper extends PredicateHelper with RewriteLogger {
     origins
   }
 
+  /**
+   * find aliased_attr's original expression
+   */
+  def findOriginExpression(plan: LogicalPlan): LogicalPlan = {
+    val origins = generateOrigins(plan)
+    findOriginExpression(origins, plan)
+  }
+
+  /**
+   * find aliased_attr's original expression
+   */
+  def findOriginExpression(origins: Map[ExprId, Expression], plan: LogicalPlan): LogicalPlan = {
+    plan.transformAllExpressions {
+      case a: Alias =>
+        a.copy(child = findOriginExpression(origins, a.child))(exprId = ExprId(0),
+          qualifier = a.qualifier,
+          explicitMetadata = a.explicitMetadata,
+          nonInheritableMetadataKeys = a.nonInheritableMetadataKeys)
+      case expr =>
+        findOriginExpression(origins, expr)
+    }
+  }
+
+  /**
+   * find aliased_attr's original expression
+   */
   def findOriginExpression(origins: Map[ExprId, Expression],
       expression: Expression): Expression = {
     def dfs(expr: Expression): Expression = {
@@ -139,25 +177,48 @@ trait RewriteHelper extends PredicateHelper with RewriteLogger {
     dfs(expression)
   }
 
-  def extractPredictExpressions(logicalPlan: LogicalPlan,
+  /**
+   * flag for which condition to extract
+   */
+  val FILTER_CONDITION: Int = 1
+  val JOIN_CONDITION: Int = 1 << 1
+  val ALL_CONDITION: Int = FILTER_CONDITION | JOIN_CONDITION
+
+  /**
+   * extract condition from (join and filter),
+   * then transform attr's qualifier by tableMappings
+   */
+  def extractPredictExpressions(plan: LogicalPlan,
       tableMappings: BiMap[String, String])
+  : (EquivalenceClasses, Seq[ExpressionEqual], Seq[ExpressionEqual]) = {
+    extractPredictExpressions(plan, tableMappings, ALL_CONDITION)
+  }
+
+  /**
+   * extract condition from plan by flag,
+   * then transform attr's qualifier by tableMappings
+   */
+  def extractPredictExpressions(plan: LogicalPlan,
+      tableMappings: BiMap[String, String], conditionFlag: Int)
   : (EquivalenceClasses, Seq[ExpressionEqual], Seq[ExpressionEqual]) = {
     var conjunctivePredicates: Seq[Expression] = Seq()
     var equiColumnsPreds: mutable.Buffer[Expression] = ArrayBuffer()
     val rangePreds: mutable.Buffer[ExpressionEqual] = ArrayBuffer()
     val residualPreds: mutable.Buffer[ExpressionEqual] = ArrayBuffer()
-    val normalizedPlan = ExprSimplifier.simplify(logicalPlan)
+    val normalizedPlan = plan
     normalizedPlan foreach {
       case Filter(condition, _) =>
-        conjunctivePredicates ++= splitConjunctivePredicates(condition)
+        if ((conditionFlag & FILTER_CONDITION) > 0) {
+          conjunctivePredicates ++= splitConjunctivePredicates(condition)
+        }
       case Join(_, _, _, condition, _) =>
-        if (condition.isDefined) {
+        if (condition.isDefined & ((conditionFlag & JOIN_CONDITION) > 0)) {
           conjunctivePredicates ++= splitConjunctivePredicates(condition.get)
         }
       case _ =>
     }
 
-    val origins = generateOrigins(logicalPlan)
+    val origins = generateOrigins(plan)
     for (src <- conjunctivePredicates) {
       val e = findOriginExpression(origins, src)
       if (e.isInstanceOf[EqualTo]) {
@@ -181,12 +242,17 @@ trait RewriteHelper extends PredicateHelper with RewriteLogger {
         if ((ExprOptUtil.isReference(left, allowCast = false)
             && ExprOptUtil.isConstant(right))
             || (ExprOptUtil.isReference(right, allowCast = false)
-            && ExprOptUtil.isConstant(left))) {
+            && ExprOptUtil.isConstant(left))
+            || (left.isInstanceOf[CaseWhen]
+            && ExprOptUtil.isConstant(right))
+            || (right.isInstanceOf[CaseWhen]
+            && ExprOptUtil.isConstant(left))
+        ) {
           rangePreds += ExpressionEqual(e)
         } else {
           residualPreds += ExpressionEqual(e)
         }
-      } else if (e.isInstanceOf[Or]) {
+      } else if (e.isInstanceOf[Or] || e.isInstanceOf[IsNull] || e.isInstanceOf[In]) {
         rangePreds += ExpressionEqual(e)
       } else {
         residualPreds += ExpressionEqual(e)
@@ -202,7 +268,13 @@ trait RewriteHelper extends PredicateHelper with RewriteLogger {
     (equivalenceClasses, rangePreds, residualPreds)
   }
 
-  def extractTables(logicalPlan: LogicalPlan): (LogicalPlan, Set[TableEqual]) = {
+  /**
+   * extract used tables from logicalPlan
+   * and fill attr's qualifier
+   *
+   * @return (used tables,filled qualifier plan)
+   */
+  def extractTables(plan: LogicalPlan): (LogicalPlan, Set[TableEqual]) = {
     // tableName->duplicateIndex,start from 0
     val qualifierToIdx = mutable.HashMap.empty[String, Int]
     // logicalPlan->(tableName,duplicateIndex)
@@ -228,7 +300,7 @@ trait RewriteHelper extends PredicateHelper with RewriteLogger {
     }
 
     var seq = 0L
-    logicalPlan.foreachUp {
+    plan.foreachUp {
       case h@HiveTableRelation(tableMeta, _, _, _, _) =>
         seq += 1
         addIdxAndAttrInfo(tableMeta, h, h.output, seq)
@@ -240,7 +312,7 @@ trait RewriteHelper extends PredicateHelper with RewriteLogger {
       case _ =>
     }
 
-    logicalPlan.transformAllExpressions {
+    plan.transformAllExpressions {
       case a@Alias(child, name) =>
         child match {
           case attr: AttributeReference =>
@@ -260,10 +332,38 @@ trait RewriteHelper extends PredicateHelper with RewriteLogger {
       TableEqual(tableName, "%s.%d".format(tableName, idx),
         qualifier, fillQualifier(tablePlan, exprIdToAttr), seq)
     }.toSet
-    val mappedQuery = fillQualifier(logicalPlan, exprIdToAttr)
+    val mappedQuery = fillQualifier(plan, exprIdToAttr)
     (mappedQuery, mappedTables)
   }
 
+  /**
+   * extract used tables from logicalPlan
+   *
+   * @return used tables
+   */
+  def extractTablesOnly(plan: LogicalPlan): mutable.Set[String] = {
+    val tables = mutable.Set[String]()
+    plan.foreachUp {
+      case HiveTableRelation(tableMeta, _, _, _, _) =>
+        tables += tableMeta.identifier.toString()
+      case h@LogicalRelation(_, _, catalogTable, _) =>
+        if (catalogTable.isDefined) {
+          tables += catalogTable.get.identifier.toString()
+        }
+      case p =>
+        p.transformAllExpressions {
+          case e: SubqueryExpression =>
+            tables ++= extractTablesOnly(e.plan)
+            e
+          case e => e
+        }
+    }
+    tables
+  }
+
+  /**
+   * transform plan's attr by tableMapping then columnMapping
+   */
   def swapTableColumnReferences[T <: Iterable[Expression]](expressions: T,
       tableMapping: BiMap[String, String],
       columnMapping: Map[ExpressionEqual,
@@ -303,6 +403,9 @@ trait RewriteHelper extends PredicateHelper with RewriteLogger {
     result
   }
 
+  /**
+   * transform plan's attr by columnMapping then tableMapping
+   */
   def swapColumnTableReferences[T <: Iterable[Expression]](expressions: T,
       tableMapping: BiMap[String, String],
       columnMapping: Map[ExpressionEqual,
@@ -312,15 +415,120 @@ trait RewriteHelper extends PredicateHelper with RewriteLogger {
     result
   }
 
+  /**
+   * transform plan's attr by tableMapping
+   */
   def swapTableReferences[T <: Iterable[Expression]](expressions: T,
       tableMapping: BiMap[String, String]): T = {
     swapTableColumnReferences(expressions, tableMapping, EMPTY_MAP)
   }
 
+  /**
+   * transform plan's attr by columnMapping
+   */
   def swapColumnReferences[T <: Iterable[Expression]](expressions: T,
       columnMapping: Map[ExpressionEqual,
           mutable.Set[ExpressionEqual]]): T = {
     swapTableColumnReferences(expressions, EMPTY_BIMAP, columnMapping)
+  }
+
+  /**
+   * generate string for simplifiedPlan
+   *
+   * @param plan plan
+   * @return string for simplifiedPlan
+   */
+  def simplifiedPlanString(plan: LogicalPlan): String = {
+    val EMPTY_STRING = ""
+    ExprSimplifier.simplify(plan).collect {
+      case Join(_, _, joinType, condition, hint) =>
+        joinType.toString + condition.getOrElse(Literal.TrueLiteral).sql + hint.toString()
+      case HiveTableRelation(tableMeta, _, _, _, _) =>
+        tableMeta.identifier.toString()
+      case LogicalRelation(_, _, catalogTable, _) =>
+        if (catalogTable.isDefined) {
+          catalogTable.get.identifier.toString()
+        } else {
+          EMPTY_STRING
+        }
+      case _ =>
+        EMPTY_STRING
+    }.mkString(EMPTY_STRING)
+  }
+
+  /**
+   * check attr in viewTableAttrs
+   *
+   * @param expression     expression
+   * @param viewTableAttrs viewTableAttrs
+   * @return true:in ;false:not in
+   */
+  def isValidExpression(expression: Expression, viewTableAttrs: Set[Attribute]): Boolean = {
+    expression.foreach {
+      case attr: AttributeReference =>
+        if (!viewTableAttrs.contains(attr)) {
+          return false
+        }
+      case _ =>
+    }
+    true
+  }
+
+  /**
+   * partitioned mv columns differ to mv query projectList, sort mv query projectList
+   */
+  def sortProjectListForPartition(plan: LogicalPlan, catalogTable: CatalogTable): LogicalPlan = {
+    if (catalogTable.partitionColumnNames.isEmpty) {
+      return plan
+    }
+    val partitionColumnNames = catalogTable.partitionColumnNames.toSet
+    plan match {
+      case Project(projectList, child) =>
+        var newProjectList = projectList.filter(x => !partitionColumnNames.contains(x.name))
+        val projectMap = projectList.map(x => (x.name, x)).toMap
+        newProjectList = newProjectList ++ partitionColumnNames.map(x => projectMap(x))
+        Project(newProjectList, child)
+      case Aggregate(groupingExpressions, aggregateExpressions, child) =>
+        var newProjectList = aggregateExpressions
+            .filter(x => !partitionColumnNames.contains(x.name))
+        val projectMap = aggregateExpressions.map(x => (x.name, x)).toMap
+        newProjectList = newProjectList ++ partitionColumnNames.map(x => projectMap(x))
+        Aggregate(groupingExpressions, newProjectList, child)
+      case p => p
+    }
+  }
+
+  /**
+   * use all tables to fetch views(may match) from ViewMetaData
+   *
+   * @param tableNames tableNames in query sql
+   * @return Seq[(viewName, viewTablePlan, viewQueryPlan)]
+   */
+  def getApplicableMaterializations(tableNames: Set[String]): Seq[ViewMetadataPackageType] = {
+    // viewName, viewTablePlan, viewQueryPlan
+    var viewPlans = Seq.empty[(String, LogicalPlan, LogicalPlan)]
+
+    ViewMetadata.viewToContainsTables.forEach { (viewName, tableEquals) =>
+      // 1.add plan info
+      if (tableEquals.map(_.tableName).subsetOf(tableNames)) {
+        val viewQueryPlan = ViewMetadata.viewToViewQueryPlan.get(viewName)
+        val viewTablePlan = ViewMetadata.viewToTablePlan.get(viewName)
+        viewPlans +:= (viewName, viewTablePlan, viewQueryPlan)
+      }
+    }
+    resortMaterializations(viewPlans)
+  }
+
+  /**
+   * resort materializations by priority
+   */
+  def resortMaterializations(candidateViewPlans: Seq[(String,
+      LogicalPlan, LogicalPlan)]): Seq[(String, LogicalPlan, LogicalPlan)] = {
+    val tuples = candidateViewPlans.sortWith((c1, c2) =>
+      ViewMetadata.viewPriority.getOrDefault(c1._1, 0) >
+          ViewMetadata.viewPriority.getOrDefault(c2._1, 0)
+    )
+    tuples
   }
 }
 
@@ -387,8 +595,10 @@ object RewriteHelper extends PredicateHelper with RewriteLogger {
   }
 
   def canonicalize(expression: Expression): Expression = {
-    val canonicalizedChildren = expression.children.map(RewriteHelper.canonicalize)
-    expressionReorder(expression.withNewChildren(canonicalizedChildren))
+    RewriteTime.withTimeStat("canonicalize") {
+      val canonicalizedChildren = expression.children.map(RewriteHelper.canonicalize)
+      expressionReorder(expression.withNewChildren(canonicalizedChildren))
+    }
   }
 
   /** Collects adjacent commutative operations. */
@@ -455,6 +665,9 @@ object RewriteHelper extends PredicateHelper with RewriteLogger {
     case _ => e
   }
 
+  /**
+   * extract all attrs used in expressions
+   */
   def extractAllAttrsFromExpression(expressions: Seq[Expression]): Set[AttributeReference] = {
     var attrs = Set[AttributeReference]()
     expressions.foreach { e =>
@@ -467,8 +680,11 @@ object RewriteHelper extends PredicateHelper with RewriteLogger {
     attrs
   }
 
-  def containsMV(logicalPlan: LogicalPlan): Boolean = {
-    logicalPlan.foreachUp {
+  /**
+   * check if logicalPlan use mv
+   */
+  def containsMV(plan: LogicalPlan): Boolean = {
+    plan.foreachUp {
       case _@HiveTableRelation(tableMeta, _, _, _, _) =>
         if (OmniCachePluginConfig.isMV(tableMeta)) {
           return true
@@ -492,9 +708,12 @@ object RewriteHelper extends PredicateHelper with RewriteLogger {
     SQLConf.get.setConfString("spark.sql.omnicache.enable", "false")
   }
 
-  def checkAttrsValid(logicalPlan: LogicalPlan): Boolean = {
-    logDetail(s"checkAttrsValid for plan:$logicalPlan")
-    logicalPlan.foreachUp {
+  /**
+   * check if plan's input attrs satisfy used attrs
+   */
+  def checkAttrsValid(plan: LogicalPlan): Boolean = {
+    logDetail(s"checkAttrsValid for plan:$plan")
+    plan.foreachUp {
       case _: LeafNode =>
       case _: Expand =>
       case plan =>
@@ -523,6 +742,21 @@ object RewriteHelper extends PredicateHelper with RewriteLogger {
     }
     true
   }
+
+  /**
+   * use rules to optimize queryPlan and viewQueryPlan
+   */
+  def optimizePlan(plan: LogicalPlan): LogicalPlan = {
+    val rules: Seq[Rule[LogicalPlan]] = Seq(
+      SimplifyCasts, ConstantFolding, UnwrapCastInBinaryComparison, ColumnPruning)
+    var res = plan
+    RewriteTime.withTimeStat("optimizePlan") {
+      rules.foreach { rule =>
+        res = rule.apply(res)
+      }
+    }
+    res
+  }
 }
 
 case class ExpressionEqual(expression: Expression) {
@@ -537,9 +771,12 @@ case class ExpressionEqual(expression: Expression) {
 
   override def hashCode(): Int = sql.hashCode()
 
-  def extractRealExpr(expression: Expression): Expression = expression match {
-    case Alias(child, _) => extractRealExpr(child)
-    case other => other
+  def extractRealExpr(expression: Expression): Expression = {
+    expression.transform {
+      case Alias(child, _) => child
+      case Cast(child, _, _) => child
+      case other => other
+    }
   }
 
   override def toString: String = s"ExpressionEqual($sql)"
@@ -564,10 +801,10 @@ case class AttributeReferenceEqual(attr: AttributeReference) {
       attr.name == attrEqual.attr.name && attr.dataType == attrEqual.attr.dataType &&
           attr.nullable == attrEqual.attr.nullable && attr.metadata == attrEqual.attr.metadata &&
           attr.qualifier == attrEqual.attr.qualifier
-//    case attribute: AttributeReference =>
-//      attr.name == attribute.name && attr.dataType == attribute.dataType &&
-//          attr.nullable == attribute.nullable && attr.metadata == attribute.metadata &&
-//          attr.qualifier == attribute.qualifier
+    //    case attribute: AttributeReference =>
+    //      attr.name == attribute.name && attr.dataType == attribute.dataType &&
+    //          attr.nullable == attribute.nullable && attr.metadata == attribute.metadata &&
+    //          attr.qualifier == attribute.qualifier
     case _ => false
   }
 

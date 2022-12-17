@@ -209,11 +209,11 @@ object ExprOptUtil {
       return false
     }
     var sql: mutable.Buffer[String] = mutable.Buffer()
-    for (srcTerm <- srcTerms) {
+    for (srcTerm <- srcTerms.map(RewriteHelper.canonicalize)) {
       sql.+=(srcTerm.sql)
     }
     val sqlSet = sql.toSet
-    for (dstTerm <- dstTerms) {
+    for (dstTerm <- dstTerms.map(RewriteHelper.canonicalize)) {
       if (!sqlSet.contains(dstTerm.sql)) {
         return false
       }
@@ -293,10 +293,10 @@ object ExprOptUtil {
 
   /** Returns the kind that you get if you apply NOT to this kind.
    *
-   * <p>For example, {@code IS_NOT_NULL.negate()} returns {@link #IS_NULL}.
+   * <p>For example, {@code IS_NOT_NULL.negate()} returns {@link # IS_NULL}.
    *
-   * <p>For {@link #IS_TRUE}, {@link #IS_FALSE}, {@link #IS_NOT_TRUE},
-   * {@link #IS_NOT_FALSE}, nullable inputs need to be treated carefully.
+   * <p>For {@link # IS_TRUE}, {@link # IS_FALSE}, {@link # IS_NOT_TRUE},
+   * {@link # IS_NOT_FALSE}, nullable inputs need to be treated carefully.
    *
    * <p>{@code NOT(IS_TRUE(null))} = {@code NOT(false)} = {@code true},
    * while {@code IS_FALSE(null)} = {@code false},
