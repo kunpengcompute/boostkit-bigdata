@@ -35,7 +35,7 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{Attribute, Expression, SortOrder}
 import org.apache.spark.sql.catalyst.expressions.codegen.CodegenContext
 import org.apache.spark.sql.catalyst.optimizer.{BuildLeft, BuildSide}
-import org.apache.spark.sql.catalyst.plans.{FullOuter, Inner, JoinType}
+import org.apache.spark.sql.catalyst.plans.{FullOuter, Inner, InnerLike, JoinType, LeftExistence, LeftSemi}
 import org.apache.spark.sql.catalyst.plans.physical.Partitioning
 import org.apache.spark.sql.execution.SparkPlan
 import org.apache.spark.sql.execution.metric.SQLMetrics
@@ -92,7 +92,7 @@ case class ColumnarShuffledHashJoinExec(
 
   def buildCheck(): Unit = {
     joinType match {
-      case FullOuter | Inner =>
+      case FullOuter | Inner | LeftSemi =>
       case _ =>
         throw new UnsupportedOperationException(s"Join-type[${joinType}] is not supported " +
         s"in ${this.nodeName}")
@@ -156,7 +156,16 @@ case class ColumnarShuffledHashJoinExec(
     buildOutput.zipWithIndex.foreach { case (att, i) =>
       buildTypes(i) = OmniExpressionAdaptor.sparkTypeToOmniType(att.dataType, att.metadata)
     }
-    val buildOutputCols = buildOutput.indices.toArray
+
+    val buildOutputCols: Array[Int] = joinType match {
+      case _: InnerLike | FullOuter =>
+        buildOutput.indices.toArray
+      case LeftExistence(_) =>
+        Array[Int]()
+      case x =>
+        throw new UnsupportedOperationException(s"ColumnShuffledHashJoin Join-type[$x] is not supported!")
+    }
+
     val buildJoinColsExp = buildKeys.map { x =>
       OmniExpressionAdaptor.rewriteToOmniJsonExpressionLiteral(x,
         OmniExpressionAdaptor.getExprIdMap(buildOutput.map(_.toAttribute)))
