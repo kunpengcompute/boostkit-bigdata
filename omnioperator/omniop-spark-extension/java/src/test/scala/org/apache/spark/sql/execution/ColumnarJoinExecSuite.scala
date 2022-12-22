@@ -252,6 +252,30 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
     ), false)
   }
 
+  test("validate columnar shuffledHashJoin left semi join happened") {
+    val res = left.join(right.hint("SHUFFLE_HASH"), col("q") === col("c"), "leftsemi")
+    assert(
+      res.queryExecution.executedPlan.find(_.isInstanceOf[ColumnarShuffledHashJoinExec]).isDefined,
+      s"ColumnarShuffledHashJoinExec not happened," +
+        s" executedPlan as follows: \n${res.queryExecution.executedPlan}")
+  }
+
+  test("columnar shuffledHashJoin left semi join is equal to native") {
+    val df = left.join(right.hint("SHUFFLE_HASH"), col("q") === col("c"), "leftsemi")
+    checkAnswer(df, _ => df.queryExecution.executedPlan, Seq(
+      Row("abc", "", 4, 2.0),
+      Row("", "Hello", 1, 1.0)
+    ), false)
+  }
+
+  test("columnar shuffledHashJoin left semi join is equal to native with null") {
+    val df = leftWithNull.join(rightWithNull.hint("SHUFFLE_HASH"),
+      col("q") === col("c"), "leftsemi")
+    checkAnswer(df, _ => df.queryExecution.executedPlan, Seq(
+      Row("abc", null, 4, 2.0)
+    ), false)
+  }
+
   test("ColumnarBroadcastHashJoin is not rolled back with not_equal filter expr") {
     val res = left.join(right.hint("broadcast"), left("a") <=> right("a"))
     assert(
