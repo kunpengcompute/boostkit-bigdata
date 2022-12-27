@@ -19,9 +19,7 @@ package org.apache.spark.sql.execution.joins
 
 import java.util.Optional
 import java.util.concurrent.TimeUnit.NANOSECONDS
-
 import scala.collection.mutable
-
 import com.huawei.boostkit.spark.ColumnarPluginConfig
 import com.huawei.boostkit.spark.Constant.IS_SKIP_VERIFY_EXP
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor
@@ -33,7 +31,6 @@ import nova.hetu.omniruntime.operator.config.{OperatorConfig, OverflowConfig, Sp
 import nova.hetu.omniruntime.operator.join.{OmniHashBuilderWithExprOperatorFactory, OmniLookupJoinWithExprOperatorFactory}
 import nova.hetu.omniruntime.vector.VecBatch
 import nova.hetu.omniruntime.vector.serialize.VecBatchSerializerFactory
-
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
@@ -47,6 +44,8 @@ import org.apache.spark.sql.execution.metric.SQLMetrics
 import org.apache.spark.sql.execution.util.{MergeIterator, SparkMemoryUtils}
 import org.apache.spark.sql.execution.vectorized.OmniColumnVector
 import org.apache.spark.sql.vectorized.ColumnarBatch
+
+import scala.collection.mutable.ListBuffer
 
 /**
  * Performs an inner hash join of two child relations.  When the output RDD of this operator is
@@ -62,7 +61,8 @@ case class ColumnarBroadcastHashJoinExec(
     condition: Option[Expression],
     left: SparkPlan,
     right: SparkPlan,
-    isNullAwareAntiJoin: Boolean = false)
+    isNullAwareAntiJoin: Boolean = false,
+    projectList: Seq[NamedExpression] = Seq.empty)
   extends HashJoin {
 
   if (isNullAwareAntiJoin) {
@@ -271,20 +271,24 @@ case class ColumnarBroadcastHashJoinExec(
     }
 
     // {0}, buildKeys: col1#12
-    val buildOutputCols = buildOutput.indices.toArray // {0,1}
+    val buildOutputCols = getIndexArray(buildOutput, projectList) // {0,1}
     val buildJoinColsExp = buildKeys.map { x =>
       OmniExpressionAdaptor.rewriteToOmniJsonExpressionLiteral(x,
         OmniExpressionAdaptor.getExprIdMap(buildOutput.map(_.toAttribute)))
     }.toArray
     val relation = buildPlan.executeBroadcast[ColumnarHashedRelation]()
 
-    val buildOutputTypes = buildTypes // {1,1}
+    val prunedBuildOutput = pruneOutput(buildOutput, projectList)
+    val buildOutputTypes = new Array[DataType](prunedBuildOutput.size) // {2,2}, buildOutput:col1#12,col2#13
+    prunedBuildOutput.zipWithIndex.foreach { case (att, i) =>
+      buildOutputTypes(i) = OmniExpressionAdaptor.sparkTypeToOmniType(att.dataType, att.metadata)
+    }
 
     val probeTypes = new Array[DataType](streamedOutput.size) // {2,2}, streamedOutput:col1#10,col2#11
     streamedOutput.zipWithIndex.foreach { case (attr, i) =>
       probeTypes(i) = OmniExpressionAdaptor.sparkTypeToOmniType(attr.dataType, attr.metadata)
     }
-    val probeOutputCols = streamedOutput.indices.toArray // {0,1}
+    val probeOutputCols = getIndexArray(streamedOutput, projectList) // {0,1}
     val probeHashColsExp = streamedKeys.map { x =>
       OmniExpressionAdaptor.rewriteToOmniJsonExpressionLiteral(x,
         OmniExpressionAdaptor.getExprIdMap(streamedOutput.map(_.toAttribute)))
@@ -335,17 +339,19 @@ case class ColumnarBroadcastHashJoinExec(
         lookupOpFactory.close()
       })
 
+      val streamedPlanOutput = pruneOutput(streamedPlan.output, projectList)
+      val prunedOutput = streamedPlanOutput ++ prunedBuildOutput
       val resultSchema = this.schema
       val reverse = buildSide == BuildLeft
       var left = 0
-      var leftLen = streamedPlan.output.size
-      var right = streamedPlan.output.size
+      var leftLen = streamedPlanOutput.size
+      var right = streamedPlanOutput.size
       var rightLen = output.size
       if (reverse) {
-        left = streamedPlan.output.size
+        left = streamedPlanOutput.size
         leftLen = output.size
         right = 0
-        rightLen = streamedPlan.output.size
+        rightLen = streamedPlanOutput.size
       }
 
       val columnarConf: ColumnarPluginConfig = ColumnarPluginConfig.getSessionConf
@@ -392,18 +398,22 @@ case class ColumnarBroadcastHashJoinExec(
           val resultVecs = result.getVectors
           val vecs = OmniColumnVector
             .allocateColumns(result.getRowCount, resultSchema, false)
-          var index = 0
-          for (i <- left until leftLen) {
-            val v = vecs(index)
-            v.reset()
-            v.setVec(resultVecs(i))
-            index += 1
-          }
-          for (i <- right until rightLen) {
-            val v = vecs(index)
-            v.reset()
-            v.setVec(resultVecs(i))
-            index += 1
+          if (projectList.nonEmpty) {
+            reorderVecs(prunedOutput, projectList, resultVecs, vecs)
+          } else {
+            var index = 0
+            for (i <- left until leftLen) {
+              val v = vecs(index)
+              v.reset()
+              v.setVec(resultVecs(i))
+              index += 1
+            }
+            for (i <- right until rightLen) {
+              val v = vecs(index)
+              v.reset()
+              v.setVec(resultVecs(i))
+              index += 1
+            }
           }
           numOutputRows += result.getRowCount
           numOutputVecBatchs += 1
@@ -457,5 +467,69 @@ case class ColumnarBroadcastHashJoinExec(
 
   protected override def codegenAnti(ctx: CodegenContext, input: Seq[ExprCode]): String = {
     throw new UnsupportedOperationException(s"This operator doesn't support codegenAnti().")
+  }
+
+  override def output: Seq[Attribute] = {
+    joinType match {
+      case _: InnerLike =>
+        pruneOutput(left.output ++ right.output, projectList)
+      case LeftOuter =>
+        pruneOutput(left.output ++ right.output.map(_.withNullability(true)), projectList)
+      case RightOuter =>
+        pruneOutput(left.output.map(_.withNullability(true)) ++ right.output, projectList)
+      case j: ExistenceJoin =>
+        pruneOutput(left.output :+ j.exists, projectList)
+      case LeftExistence(_) =>
+        pruneOutput(left.output, projectList)
+      case x =>
+        throw new IllegalArgumentException(s"HashJoin should not take $x as the JoinType")
+    }
+  }
+
+  def pruneOutput(output: Seq[Attribute], projectList: Seq[NamedExpression]): Seq[Attribute] = {
+      if (projectList.nonEmpty) {
+        val projectOutput = ListBuffer[Attribute]()
+        for (project <- projectList) {
+          for (col <- output) {
+            if (col.exprId.equals(project.exprId)) {
+               projectOutput += col
+            }
+          }
+        }
+        projectOutput
+      } else {
+        output
+      }
+  }
+
+  def getIndexArray(output: Seq[Attribute], projectList: Seq[NamedExpression]): Array[Int] = {
+    if (projectList.nonEmpty) {
+      val indexList = ListBuffer[Int]()
+      for (project <- projectList) {
+        for (i <- output.indices) {
+          val col = output(i)
+          if (col.exprId.equals(project.exprId)) {
+            indexList += i
+          }
+        }
+      }
+      indexList.toArray
+    } else {
+      output.indices.toArray
+    }
+  }
+
+  def reorderVecs(prunedOutput: Seq[Attribute], projectList: Seq[NamedExpression], resultVecs: Array[nova.hetu.omniruntime.vector.Vec], vecs: Array[OmniColumnVector]) = {
+      for (index <- projectList.indices) {
+           val project = projectList(index)
+           for (i <- prunedOutput.indices) {
+               val col = prunedOutput(i)
+               if (col.exprId.equals(project.exprId)) {
+                 val v = vecs(index)
+                 v.reset()
+                 v.setVec(resultVecs(i))
+               }
+           }
+      }
   }
 }

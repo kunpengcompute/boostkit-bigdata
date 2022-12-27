@@ -24,6 +24,7 @@ import org.apache.spark.sql.catalyst.optimizer.BuildRight
 import org.apache.spark.sql.catalyst.plans.{FullOuter, Inner, JoinType, LeftAnti, LeftOuter, LeftSemi}
 import org.apache.spark.sql.execution.joins.{BroadcastHashJoinExec, ColumnarBroadcastHashJoinExec, ColumnarShuffledHashJoinExec, ColumnarSortMergeJoinExec, SortMergeJoinExec}
 import org.apache.spark.sql.functions.col
+import org.apache.spark.sql.types.{IntegerType, StringType, StructType}
 
 // refer to joins package
 class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
@@ -34,6 +35,8 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
   private var right: DataFrame = _
   private var leftWithNull: DataFrame = _
   private var rightWithNull: DataFrame = _
+  private var person_test: DataFrame = _
+  private var order_test: DataFrame = _
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
@@ -64,6 +67,29 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
       (" add", null, 1, null),
       (" yeah  ", null, null, 4.0)
     ).toDF("a", "b", "c", "d")
+
+    person_test = spark.createDataFrame(
+      sparkContext.parallelize(Seq(
+        Row(3, "Carter"),
+        Row(1, "Adams"),
+        Row(2, "Bush")
+      )), new StructType()
+        .add("id_p", IntegerType)
+        .add("name", StringType))
+    person_test.createOrReplaceTempView("person_test")
+
+    order_test = spark.createDataFrame(
+      sparkContext.parallelize(Seq(
+        Row(5, 34764, 65),
+        Row(1, 77895, 3),
+        Row(2, 44678, 3),
+        Row(4, 24562, 1),
+        Row(3, 22456, 1)
+      )), new StructType()
+        .add("id_o", IntegerType)
+        .add("order_no", IntegerType)
+        .add("id_p", IntegerType))
+    order_test.createOrReplaceTempView("order_test")
   }
 
   test("validate columnar broadcastHashJoin exec happened") {
@@ -295,5 +321,65 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
         SortMergeJoinExec(leftKeys, rightKeys, joinType,
           None, child, child),
       sortAnswers = true)
+  }
+
+  test("bhj project funsion exec") {
+    val omniResult = person_test.join(order_test.hint("broadcast"), person_test("id_p") === order_test("id_p"), "leftouter")
+      .select(person_test("name"), order_test("order_no"))
+    val omniPlan = omniResult.queryExecution.executedPlan
+    assert(omniPlan.find(_.isInstanceOf[ColumnarProjectExec]).isEmpty,
+      s"SQL:\n@OmniEnv no ColumnarProjectExec,omniPlan:${omniPlan}")
+    checkAnswer(omniResult, _ => omniPlan, Seq(
+      Row("Carter", 44678),
+      Row("Carter", 77895),
+      Row("Adams", 22456),
+      Row("Adams", 24562),
+      Row("Bush", null)
+    ), false)
+  }
+
+  test("bhj project funsion exec duplicate") {
+    val omniResult = person_test.join(order_test.hint("broadcast"), person_test("id_p") === order_test("id_p"), "leftouter")
+      .select(person_test("name"), order_test("order_no"), order_test("id_p"))
+    val omniPlan = omniResult.queryExecution.executedPlan
+    assert(omniPlan.find(_.isInstanceOf[ColumnarProjectExec]).isEmpty,
+      s"SQL:\n@OmniEnv no ColumnarProjectExec,omniPlan:${omniPlan}")
+    checkAnswer(omniResult, _ => omniPlan, Seq(
+      Row("Carter", 44678, 3),
+      Row("Carter", 77895, 3),
+      Row("Adams", 22456, 1),
+      Row("Adams", 24562, 1),
+      Row("Bush", null, null)
+    ), false)
+  }
+
+  test("bhj project funsion exec reorder") {
+    val omniResult = person_test.join(order_test.hint("broadcast"), person_test("id_p") === order_test("id_p"), "leftouter")
+      .select(order_test("order_no"), person_test("name"), order_test("id_p"))
+    val omniPlan = omniResult.queryExecution.executedPlan
+    assert(omniPlan.find(_.isInstanceOf[ColumnarProjectExec]).isEmpty,
+      s"SQL:\n@OmniEnv no ColumnarProjectExec,omniPlan:${omniPlan}")
+    checkAnswer(omniResult, _ => omniPlan, Seq(
+      Row(44678, "Carter", 3),
+      Row(77895, "Carter", 3),
+      Row(22456, "Adams", 1),
+      Row(24562, "Adams", 1),
+      Row(null, "Bush", null)
+    ), false)
+  }
+
+  test("bhj project no funsion exec") {
+    val omniResult = person_test.join(order_test.hint("broadcast"), person_test("id_p") === order_test("id_p"), "leftouter")
+      .select(order_test("order_no").plus(1), person_test("name"))
+    val omniPlan = omniResult.queryExecution.executedPlan
+    assert(omniPlan.find(_.isInstanceOf[ColumnarProjectExec]).isDefined,
+      s"SQL:\n@OmniEnv have ColumnarProjectExec,omniPlan:${omniPlan}")
+    checkAnswer(omniResult, _ => omniPlan, Seq(
+      Row(44679, "Carter"),
+      Row(77896, "Carter"),
+      Row(22457, "Adams"),
+      Row(24563, "Adams"),
+      Row(null, "Bush")
+    ), false)
   }
 }
