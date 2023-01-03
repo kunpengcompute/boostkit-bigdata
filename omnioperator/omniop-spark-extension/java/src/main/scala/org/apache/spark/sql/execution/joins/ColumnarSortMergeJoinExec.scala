@@ -94,8 +94,8 @@ class ColumnarSortMergeJoinExec(
 
   def buildCheck(): Unit = {
     joinType match {
-      case _: InnerLike | LeftOuter | FullOuter =>
-        // SMJ join support InnerLike | LeftOuter | FullOuter
+      case _: InnerLike | LeftOuter | FullOuter | LeftSemi | LeftAnti =>
+        // SMJ join support InnerLike | LeftOuter | FullOuter | LeftSemi | LeftAnti
       case _ =>
         throw new UnsupportedOperationException(s"Join-type[${joinType}] is not supported " +
           s"in ${this.nodeName}")
@@ -130,7 +130,7 @@ class ColumnarSortMergeJoinExec(
     condition match {
       case Some(expr) =>
         val filterExpr: String = OmniExpressionAdaptor.rewriteToOmniJsonExpressionLiteral(expr,
-          OmniExpressionAdaptor.getExprIdMap(output.map(_.toAttribute)))
+          OmniExpressionAdaptor.getExprIdMap((left.output ++ right.output).map(_.toAttribute)))
         if (!isSimpleColumn(filterExpr)) {
           checkOmniJsonWhiteList(filterExpr, new Array[AnyRef](0))
         }
@@ -150,15 +150,6 @@ class ColumnarSortMergeJoinExec(
     val streamVecBatchs = longMetric("numStreamVecBatchs")
     val bufferVecBatchs = longMetric("numBufferVecBatchs")
 
-    val omniJoinType : nova.hetu.omniruntime.constants.JoinType = joinType match {
-      case _: InnerLike => OMNI_JOIN_TYPE_INNER
-      case LeftOuter => OMNI_JOIN_TYPE_LEFT
-      case FullOuter => OMNI_JOIN_TYPE_FULL
-      case x =>
-        throw new UnsupportedOperationException(s"ColumnSortMergeJoin Join-type[$x] is not supported " +
-          s"in ${this.nodeName}")
-    }
-
     val streamedTypes = new Array[DataType](left.output.size)
     left.output.zipWithIndex.foreach { case (attr, i) =>
       streamedTypes(i) = OmniExpressionAdaptor.sparkTypeToOmniType(attr.dataType, attr.metadata)
@@ -177,12 +168,19 @@ class ColumnarSortMergeJoinExec(
       OmniExpressionAdaptor.rewriteToOmniJsonExpressionLiteral(x,
         OmniExpressionAdaptor.getExprIdMap(right.output.map(_.toAttribute)))
     }.toArray
-    val bufferedOutputChannel = right.output.indices.toArray
+    val bufferedOutputChannel: Array[Int] = joinType match {
+      case _: InnerLike | LeftOuter | FullOuter =>
+        right.output.indices.toArray
+      case LeftExistence(_) =>
+        Array[Int]()
+      case x =>
+        throw new UnsupportedOperationException(s"ColumnSortMergeJoin Join-type[$x] is not supported!")
+    }
 
     val filterString: String = condition match {
       case Some(expr) =>
         OmniExpressionAdaptor.rewriteToOmniJsonExpressionLiteral(expr,
-          OmniExpressionAdaptor.getExprIdMap(output.map(_.toAttribute)))
+          OmniExpressionAdaptor.getExprIdMap((left.output ++ right.output).map(_.toAttribute)))
       case _ => null
     }
 
@@ -220,8 +218,8 @@ class ColumnarSortMergeJoinExec(
       val iterBatch = new Iterator[ColumnarBatch] {
 
         var isFinished : Boolean = joinType match {
-          case _: InnerLike => !streamedIter.hasNext || !bufferedIter.hasNext
-          case LeftOuter => !streamedIter.hasNext
+          case _: InnerLike | LeftSemi => !streamedIter.hasNext || !bufferedIter.hasNext
+          case LeftOuter | LeftAnti => !streamedIter.hasNext
           case FullOuter => !(streamedIter.hasNext || bufferedIter.hasNext)
           case x =>
             throw new UnsupportedOperationException(s"ColumnSortMergeJoin Join-type[$x] is not supported!")

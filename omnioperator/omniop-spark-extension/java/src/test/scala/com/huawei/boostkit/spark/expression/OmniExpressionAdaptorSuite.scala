@@ -248,6 +248,10 @@ class OmniExpressionAdaptorSuite extends SparkFunSuite {
     checkJsonExprRewrite("{\"exprType\":\"FUNCTION\",\"returnType\":1,\"function_name\":\"abs\"," +
       " \"arguments\":[{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":1,\"colVal\":0}]}",
       Abs(allAttribute(0)))
+
+    checkJsonExprRewrite("{\"exprType\":\"FUNCTION\",\"returnType\":1,\"function_name\":\"round\"," +
+      " \"arguments\":[{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":1,\"colVal\":0},{\"exprType\":\"LITERAL\",\"dataType\":1, \"isNull\":false, \"value\":2}]}",
+      Round(allAttribute(0), Literal(2)))
   }
 
   protected def checkExpressionRewrite(expected: Any, expression: Expression): Unit = {

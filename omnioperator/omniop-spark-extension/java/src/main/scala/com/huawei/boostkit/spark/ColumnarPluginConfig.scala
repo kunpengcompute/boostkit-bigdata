@@ -80,6 +80,11 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
     .getConfString("spark.omni.sql.columnar.nativefilescan", "true")
     .toBoolean
 
+  // enable native table scan
+  val enableOrcNativeFileScan: Boolean = conf
+    .getConfString("spark.omni.sql.columnar.orcNativefilescan", "true")
+    .toBoolean
+
   val enableColumnarSortMergeJoin: Boolean = conf
     .getConfString("spark.omni.sql.columnar.sortMergeJoin", "true")
     .toBoolean
