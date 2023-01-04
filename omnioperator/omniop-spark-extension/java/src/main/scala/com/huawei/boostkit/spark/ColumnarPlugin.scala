@@ -53,6 +53,7 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] {
   val enableColumnarUnion: Boolean = columnarConf.enableColumnarUnion
   val enableFusion: Boolean = columnarConf.enableFusion
   var isSupportAdaptive: Boolean = true
+  val enableColumnarProjectFusion: Boolean = columnarConf.enableColumnarProjectFusion
 
   def apply(plan: SparkPlan): SparkPlan = {
     replaceWithColumnarPlan(plan)
@@ -120,9 +121,7 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] {
         case ColumnarFilterExec(condition, child) =>
           ColumnarConditionProjectExec(plan.projectList, condition, child)
         case join : ColumnarBroadcastHashJoinExec =>
-          val omniExpressions = plan.projectList.map(
-            exp => OmniExpressionAdaptor.rewriteToOmniJsonExpressionLiteral(exp, OmniExpressionAdaptor.getExprIdMap(join.output))).toArray
-          if (OmniExpressionAdaptor.isSimpleColumnForAll(omniExpressions.map(expr => expr.toString))) {
+          if (plan.projectList.forall(project => OmniExpressionAdaptor.isSimpleProjectForAll(project)) && enableColumnarProjectFusion) {
              ColumnarBroadcastHashJoinExec(
                join.leftKeys,
                join.rightKeys,
