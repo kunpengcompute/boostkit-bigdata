@@ -323,7 +323,7 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
       sortAnswers = true)
   }
 
-  test("bhj project funsion exec") {
+  test("BroadcastHashJoin and project funsion test") {
     val omniResult = person_test.join(order_test.hint("broadcast"), person_test("id_p") === order_test("id_p"), "leftouter")
       .select(person_test("name"), order_test("order_no"))
     val omniPlan = omniResult.queryExecution.executedPlan
@@ -338,7 +338,7 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
     ), false)
   }
 
-  test("bhj project funsion exec duplicate") {
+  test("BroadcastHashJoin and project funsion test for duplicate column") {
     val omniResult = person_test.join(order_test.hint("broadcast"), person_test("id_p") === order_test("id_p"), "leftouter")
       .select(person_test("name"), order_test("order_no"), order_test("id_p"))
     val omniPlan = omniResult.queryExecution.executedPlan
@@ -353,7 +353,7 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
     ), false)
   }
 
-  test("bhj project funsion exec reorder") {
+  test("BroadcastHashJoin and project funsion test for reorder columns") {
     val omniResult = person_test.join(order_test.hint("broadcast"), person_test("id_p") === order_test("id_p"), "leftouter")
       .select(order_test("order_no"), person_test("name"), order_test("id_p"))
     val omniPlan = omniResult.queryExecution.executedPlan
@@ -368,7 +368,7 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
     ), false)
   }
 
-  test("bhj project no funsion exec") {
+  test("BroadcastHashJoin and project are not fused test") {
     val omniResult = person_test.join(order_test.hint("broadcast"), person_test("id_p") === order_test("id_p"), "leftouter")
       .select(order_test("order_no").plus(1), person_test("name"))
     val omniPlan = omniResult.queryExecution.executedPlan
@@ -380,6 +380,21 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
       Row(22457, "Adams"),
       Row(24563, "Adams"),
       Row(null, "Bush")
+    ), false)
+  }
+
+  test("BroadcastHashJoin and project funsion test for alias") {
+    val omniResult = person_test.join(order_test.hint("broadcast"), person_test("id_p") === order_test("id_p"), "leftouter")
+      .select(person_test("name").as("name1"), order_test("order_no").as("order_no1"))
+    val omniPlan = omniResult.queryExecution.executedPlan
+    assert(omniPlan.find(_.isInstanceOf[ColumnarProjectExec]).isEmpty,
+      s"SQL:\n@OmniEnv no ColumnarProjectExec,omniPlan:${omniPlan}")
+    checkAnswer(omniResult, _ => omniPlan, Seq(
+      Row("Carter", 44678),
+      Row("Carter", 77895),
+      Row("Adams", 22456),
+      Row("Adams", 24562),
+      Row("Bush", null)
     ), false)
   }
 }

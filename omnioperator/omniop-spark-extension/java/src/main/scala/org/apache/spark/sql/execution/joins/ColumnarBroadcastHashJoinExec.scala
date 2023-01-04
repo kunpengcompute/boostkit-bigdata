@@ -470,19 +470,23 @@ case class ColumnarBroadcastHashJoinExec(
   }
 
   override def output: Seq[Attribute] = {
-    joinType match {
-      case _: InnerLike =>
-        pruneOutput(left.output ++ right.output, projectList)
-      case LeftOuter =>
-        pruneOutput(left.output ++ right.output.map(_.withNullability(true)), projectList)
-      case RightOuter =>
-        pruneOutput(left.output.map(_.withNullability(true)) ++ right.output, projectList)
-      case j: ExistenceJoin =>
-        pruneOutput(left.output :+ j.exists, projectList)
-      case LeftExistence(_) =>
-        pruneOutput(left.output, projectList)
-      case x =>
-        throw new IllegalArgumentException(s"HashJoin should not take $x as the JoinType")
+    if (projectList.nonEmpty) {
+      projectList.map(_.toAttribute)
+    } else {
+      joinType match {
+        case _: InnerLike =>
+          left.output ++ right.output
+        case LeftOuter =>
+          left.output ++ right.output.map(_.withNullability(true))
+        case RightOuter =>
+          left.output.map(_.withNullability(true)) ++ right.output
+        case j: ExistenceJoin =>
+          left.output :+ j.exists
+        case LeftExistence(_) =>
+          left.output
+        case x =>
+          throw new IllegalArgumentException(s"HashJoin should not take $x as the JoinType")
+      }
     }
   }
 
@@ -491,7 +495,7 @@ case class ColumnarBroadcastHashJoinExec(
         val projectOutput = ListBuffer[Attribute]()
         for (project <- projectList) {
           for (col <- output) {
-            if (col.exprId.equals(project.exprId)) {
+            if (col.exprId.equals(getProjectAliasExprId(project))) {
                projectOutput += col
             }
           }
@@ -508,7 +512,7 @@ case class ColumnarBroadcastHashJoinExec(
       for (project <- projectList) {
         for (i <- output.indices) {
           val col = output(i)
-          if (col.exprId.equals(project.exprId)) {
+          if (col.exprId.equals(getProjectAliasExprId(project))) {
             indexList += i
           }
         }
@@ -524,12 +528,22 @@ case class ColumnarBroadcastHashJoinExec(
            val project = projectList(index)
            for (i <- prunedOutput.indices) {
                val col = prunedOutput(i)
-               if (col.exprId.equals(project.exprId)) {
+               if (col.exprId.equals(getProjectAliasExprId(project))) {
                  val v = vecs(index)
                  v.reset()
                  v.setVec(resultVecs(i))
                }
            }
+      }
+  }
+
+  def getProjectAliasExprId(project: NamedExpression): ExprId = {
+      project match {
+        case alias: Alias =>
+          // The condition of parameter is restricted. If parameter type is alias, its child type must be attributeReference.
+          alias.child.asInstanceOf[AttributeReference].exprId
+        case _ =>
+          project.exprId
       }
   }
 }

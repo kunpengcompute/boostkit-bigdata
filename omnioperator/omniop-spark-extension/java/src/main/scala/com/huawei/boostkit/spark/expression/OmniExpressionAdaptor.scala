@@ -1002,4 +1002,15 @@ object OmniExpressionAdaptor extends Logging {
     }
     true
   }
+
+  def isSimpleProjectForAll(project: NamedExpression): Boolean = {
+    project match {
+      case attribute: AttributeReference =>
+        true
+      case alias: Alias =>
+        alias.child.isInstanceOf[AttributeReference]
+      case _ =>
+        false
+    }
+  }
 }
