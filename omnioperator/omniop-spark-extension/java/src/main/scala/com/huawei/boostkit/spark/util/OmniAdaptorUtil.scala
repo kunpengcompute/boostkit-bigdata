@@ -17,19 +17,22 @@
 
 package com.huawei.boostkit.spark.util
 
+import com.huawei.boostkit.spark.Constant.IS_SKIP_VERIFY_EXP
+
 import java.util.concurrent.TimeUnit.NANOSECONDS
-
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor._
+import nova.hetu.omniruntime.constants.FunctionType
 import nova.hetu.omniruntime.operator.OmniOperator
-import nova.hetu.omniruntime.operator.config.OverflowConfig
+import nova.hetu.omniruntime.operator.aggregator.{OmniAggregationWithExprOperatorFactory, OmniHashAggregationWithExprOperatorFactory}
+import nova.hetu.omniruntime.operator.config.{OperatorConfig, OverflowConfig, SpillConfig}
 import nova.hetu.omniruntime.vector._
-
-import org.apache.spark.sql.catalyst.expressions.{Attribute, ExprId, SortOrder}
+import org.apache.spark.sql.catalyst.expressions.{Attribute, ExprId, NamedExpression, SortOrder}
+import org.apache.spark.sql.execution.datasources.orc.OrcColumnVector
 import org.apache.spark.sql.execution.metric.SQLMetric
 import org.apache.spark.sql.execution.vectorized.{OmniColumnVector, OnHeapColumnVector}
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.vectorized.{ColumnarBatch, ColumnVector}
+import org.apache.spark.sql.vectorized.{ColumnVector, ColumnarBatch}
 
 import java.util
 
@@ -268,5 +271,38 @@ object OmniAdaptorUtil {
       OverflowConfig.OverflowConfigId.OVERFLOW_CONFIG_EXCEPTION
     else
       OverflowConfig.OverflowConfigId.OVERFLOW_CONFIG_NULL
+  }
+
+  def getAggOperator(groupingExpressions: Seq[NamedExpression],
+                     omniGroupByChanel: Array[String],
+                     omniAggChannels: Array[Array[String]],
+                     omniSourceTypes: Array[nova.hetu.omniruntime.`type`.DataType],
+                     omniAggFunctionTypes: Array[FunctionType],
+                     omniAggOutputTypes: Array[Array[nova.hetu.omniruntime.`type`.DataType]],
+                     omniInputRaws: Array[Boolean],
+                     omniOutputPartials: Array[Boolean]): OmniOperator = {
+    var operator: OmniOperator = null
+    if (groupingExpressions.nonEmpty) {
+      operator = new OmniHashAggregationWithExprOperatorFactory(
+        omniGroupByChanel,
+        omniAggChannels,
+        omniSourceTypes,
+        omniAggFunctionTypes,
+        omniAggOutputTypes,
+        omniInputRaws,
+        omniOutputPartials,
+        new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP)).createOperator
+    } else {
+      operator = new OmniAggregationWithExprOperatorFactory(
+        omniGroupByChanel,
+        omniAggChannels,
+        omniSourceTypes,
+        omniAggFunctionTypes,
+        omniAggOutputTypes,
+        omniInputRaws,
+        omniOutputPartials,
+        new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP)).createOperator
+    }
+    operator
   }
 }

@@ -18,7 +18,7 @@
 
 package org.apache.spark.sql.execution
 
-import org.apache.spark.sql.functions.{sum, count}
+import org.apache.spark.sql.functions.{avg, count, first, max, min, sum}
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, Row}
 
@@ -75,6 +75,71 @@ class ColumnarHashAggregateExecSuite extends ColumnarSparkPlanTest {
     checkAnswer(
       res,
       Seq(Row(1, 2), Row(2, 1), Row(null, 2))
+    )
+  }
+
+  test("test hashAgg null") {
+    var res = df.filter(df("a").equalTo(3)).groupBy("a").agg(sum("a"))
+    checkAnswer(
+      res,
+      Seq.empty
+    )
+    res = df.filter(df("a").equalTo(3)).groupBy("a").agg(max("a"))
+    checkAnswer(
+      res,
+      Seq.empty
+    )
+    res = df.filter(df("a").equalTo(3)).groupBy("a").agg(min("a"))
+    checkAnswer(
+      res,
+      Seq.empty
+    )
+    res = df.filter(df("a").equalTo(3)).groupBy("a").agg(avg("a"))
+    checkAnswer(
+      res,
+      Seq.empty
+    )
+    res = df.filter(df("a").equalTo(3)).groupBy("a").agg(first("a"))
+    checkAnswer(
+      res,
+      Seq.empty
+    )
+    res = df.filter(df("a").equalTo(3)).groupBy("a").agg(count("a"))
+    checkAnswer(
+      res,
+      Seq.empty
+    )
+  }
+  test("test agg null") {
+    var res = df.filter(df("a").equalTo(3)).agg(sum("a"))
+    checkAnswer(
+      res,
+      Seq(Row(null))
+    )
+    res = df.filter(df("a").equalTo(3)).agg(max("a"))
+    checkAnswer(
+      res,
+      Seq(Row(null))
+    )
+    res = df.filter(df("a").equalTo(3)).agg(min("a"))
+    checkAnswer(
+      res,
+      Seq(Row(null))
+    )
+    res = df.filter(df("a").equalTo(3)).agg(avg("a"))
+    checkAnswer(
+      res,
+      Seq(Row(null))
+    )
+    res = df.filter(df("a").equalTo(3)).agg(first("a"))
+    checkAnswer(
+      res,
+      Seq(Row(null))
+    )
+    res = df.filter(df("a").equalTo(3)).agg(count("a"))
+    checkAnswer(
+      res,
+      Seq(Row(0))
     )
   }
 }

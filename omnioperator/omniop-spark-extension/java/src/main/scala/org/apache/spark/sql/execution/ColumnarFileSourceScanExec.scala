@@ -854,16 +854,14 @@ case class ColumnarMultipleOperatorExec(
       // for join
       val deserializer = VecBatchSerializerFactory.create()
       val startCodegen = System.nanoTime()
-      val aggFactory = new OmniHashAggregationWithExprOperatorFactory(
+      val aggOperator = OmniAdaptorUtil.getAggOperator(aggregate.groupingExpressions,
         omniGroupByChanel,
         omniAggChannels,
         omniAggSourceTypes,
         omniAggFunctionTypes,
         omniAggOutputTypes,
         omniAggInputRaw,
-        omniAggOutputPartial,
-        new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
-      val aggOperator = aggFactory.createOperator
+        omniAggOutputPartial)
       omniCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startCodegen)
       SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
         aggOperator.close()
@@ -1216,16 +1214,14 @@ case class ColumnarMultipleOperatorExec1(
       // for join
       val deserializer = VecBatchSerializerFactory.create()
       val startCodegen = System.nanoTime()
-      val aggFactory = new OmniHashAggregationWithExprOperatorFactory(
+      val aggOperator = OmniAdaptorUtil.getAggOperator(aggregate.groupingExpressions,
         omniGroupByChanel,
         omniAggChannels,
         omniAggSourceTypes,
         omniAggFunctionTypes,
         omniAggOutputTypes,
         omniAggInputRaw,
-        omniAggOutputPartial,
-        new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
-      val aggOperator = aggFactory.createOperator
+        omniAggOutputPartial)
       omniCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startCodegen)
       SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
         aggOperator.close()
