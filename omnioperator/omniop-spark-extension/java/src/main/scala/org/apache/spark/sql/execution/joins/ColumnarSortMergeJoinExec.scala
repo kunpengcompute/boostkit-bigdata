@@ -70,7 +70,9 @@ class ColumnarSortMergeJoinExec(
 
   val SMJ_NEED_ADD_STREAM_TBL_DATA = 2
   val SMJ_NEED_ADD_BUFFERED_TBL_DATA = 3
-  val SMJ_NO_RESULT = 4
+  val SCAN_FINISH = 4
+
+  val RES_INIT = 0
   val SMJ_FETCH_JOIN_DATA = 5
 
   override lazy val metrics = Map(
@@ -95,7 +97,7 @@ class ColumnarSortMergeJoinExec(
   def buildCheck(): Unit = {
     joinType match {
       case _: InnerLike | LeftOuter | FullOuter | LeftSemi | LeftAnti =>
-        // SMJ join support InnerLike | LeftOuter | FullOuter | LeftSemi | LeftAnti
+      // SMJ join support InnerLike | LeftOuter | FullOuter | LeftSemi | LeftAnti
       case _ =>
         throw new UnsupportedOperationException(s"Join-type[${joinType}] is not supported " +
           s"in ${this.nodeName}")
@@ -228,16 +230,30 @@ class ColumnarSortMergeJoinExec(
         var isStreamedFinished = false
         var isBufferedFinished = false
         var results: java.util.Iterator[VecBatch] = null
+        var flowControlCode: Int = SMJ_NEED_ADD_STREAM_TBL_DATA
+        var resCode: Int = RES_INIT
 
         def checkAndClose() : Unit = {
-            while (streamedIter.hasNext) {
-              streamVecBatchs += 1
-              streamedIter.next().close()
-            }
-            while(bufferedIter.hasNext) {
-              bufferVecBatchs += 1
-              bufferedIter.next().close()
-            }
+          while (streamedIter.hasNext) {
+            streamVecBatchs += 1
+            streamedIter.next().close()
+          }
+          while(bufferedIter.hasNext) {
+            bufferVecBatchs += 1
+            bufferedIter.next().close()
+          }
+        }
+
+        // FLOW_CONTROL_CODE has 3 values: 2,3,4
+        // 2-> add streamTable data
+        // 3-> add buffedTable data
+        // 4-> streamTable and buffedTable scan is finished
+        // RES_CODE has 2 values: 0,5
+        // 0-> init status code, it means no result to fetch
+        // 5-> operator produced result data, we should fetch data
+        def decodeOpStatus(code: Int): Unit = {
+          flowControlCode = code >> 16
+          resCode = code & 0xFFFF
         }
 
         override def hasNext: Boolean = {
@@ -248,21 +264,20 @@ class ColumnarSortMergeJoinExec(
           if (results != null && results.hasNext) {
             return true
           }
-          // reset results and find next results
+          // reset results and RES_CODE
           results = null
-          // Add streamed data first
-          var inputReturnCode = SMJ_NEED_ADD_STREAM_TBL_DATA
-          while (inputReturnCode == SMJ_NEED_ADD_STREAM_TBL_DATA
-            || inputReturnCode == SMJ_NEED_ADD_BUFFERED_TBL_DATA) {
-            if (inputReturnCode == SMJ_NEED_ADD_STREAM_TBL_DATA) {
+          resCode = RES_INIT
+          // add data until operator produce results or scan is finished
+          while (resCode == RES_INIT && flowControlCode != SCAN_FINISH){
+            if (flowControlCode == SMJ_NEED_ADD_STREAM_TBL_DATA) {
               val startBuildStreamedInput = System.nanoTime()
               if (!isStreamedFinished && streamedIter.hasNext) {
                 val batch = streamedIter.next()
                 streamVecBatchs += 1
                 val inputVecBatch = transColBatchToVecBatch(batch)
-                inputReturnCode = streamedOp.addInput(inputVecBatch)
+                decodeOpStatus(streamedOp.addInput(inputVecBatch))
               } else {
-                inputReturnCode = streamedOp.addInput(createEofVecBatch(streamedTypes))
+                decodeOpStatus(streamedOp.addInput(createEofVecBatch(streamedTypes)))
                 isStreamedFinished = true
               }
               streamedAddInputTime +=
@@ -273,38 +288,31 @@ class ColumnarSortMergeJoinExec(
                 val batch = bufferedIter.next()
                 bufferVecBatchs += 1
                 val inputVecBatch = transColBatchToVecBatch(batch)
-                inputReturnCode = bufferedOp.addInput(inputVecBatch)
+                decodeOpStatus(bufferedOp.addInput(inputVecBatch))
               } else {
-                inputReturnCode = bufferedOp.addInput(createEofVecBatch(bufferedTypes))
+                decodeOpStatus(bufferedOp.addInput(createEofVecBatch(bufferedTypes)))
                 isBufferedFinished = true
               }
               bufferedAddInputTime +=
                 NANOSECONDS.toMillis(System.nanoTime() - startBuildBufferedInput)
             }
           }
-          if (inputReturnCode == SMJ_FETCH_JOIN_DATA) {
+          if (resCode == SMJ_FETCH_JOIN_DATA) {
             val startGetOutputTime = System.nanoTime()
             results = bufferedOp.getOutput
             val hasNext = results.hasNext
             getOutputTime += NANOSECONDS.toMillis(System.nanoTime() - startGetOutputTime)
-            if (hasNext) {
-              return true
-            } else {
-              isFinished = true
-              results = null
-              checkAndClose()
-              return false
-            }
+            return hasNext
           }
 
-          if (inputReturnCode == SMJ_NO_RESULT) {
+          if (flowControlCode == SCAN_FINISH) {
             isFinished = true
             results = null
             checkAndClose()
             return false
           }
 
-          throw new UnsupportedOperationException(s"Unknown return code ${inputReturnCode}")
+          throw new UnsupportedOperationException(s"Unknown return code ${flowControlCode},${resCode} ")
         }
 
         override def next(): ColumnarBatch = {
