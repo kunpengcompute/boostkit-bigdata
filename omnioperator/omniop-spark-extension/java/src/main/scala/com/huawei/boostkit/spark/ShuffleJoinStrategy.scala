@@ -22,6 +22,7 @@ import org.apache.spark.sql.catalyst.SQLConfHelper
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.optimizer.{BuildLeft, BuildRight, BuildSide, JoinSelectionHelper}
 import org.apache.spark.sql.catalyst.planning._
+import org.apache.spark.sql.catalyst.plans.LeftSemi
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.execution.{joins, SparkPlan}
 
@@ -63,22 +64,43 @@ object ShuffleJoinStrategy extends Strategy
           buildRight = true
         }
 
-        getBuildSide(
-          canBuildShuffledHashJoinLeft(joinType) && buildLeft,
-          canBuildShuffledHashJoinRight(joinType) && buildRight,
-          left,
-          right
-        ).map {
-          buildSide =>
-            Seq(joins.ShuffledHashJoinExec(
-              leftKeys,
-              rightKeys,
-              joinType,
-              buildSide,
-              nonEquiCond,
-              planLater(left),
-              planLater(right)))
-        }.getOrElse(Nil)
+        // for leftSemi join, use cbo static to take effect
+        if (joinType == LeftSemi) {
+          getShuffleHashJoinBuildSide(left,
+            right,
+            joinType,
+            hint,
+            false,
+            conf)
+            .map {
+              buildSide =>
+                Seq(joins.ShuffledHashJoinExec(
+                  leftKeys,
+                  rightKeys,
+                  joinType,
+                  buildSide,
+                  nonEquiCond,
+                  planLater(left),
+                  planLater(right)))
+            }.getOrElse(Nil)
+        } else {
+          getBuildSide(
+            canBuildShuffledHashJoinLeft(joinType) && buildLeft,
+            canBuildShuffledHashJoinRight(joinType) && buildRight,
+            left,
+            right
+          ).map {
+            buildSide =>
+              Seq(joins.ShuffledHashJoinExec(
+                leftKeys,
+                rightKeys,
+                joinType,
+                buildSide,
+                nonEquiCond,
+                planLater(left),
+                planLater(right)))
+          }.getOrElse(Nil)
+        }
       } else {
         Nil
       }
