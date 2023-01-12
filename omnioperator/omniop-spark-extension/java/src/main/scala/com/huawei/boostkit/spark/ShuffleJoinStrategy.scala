@@ -22,7 +22,6 @@ import org.apache.spark.sql.catalyst.SQLConfHelper
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.optimizer.{BuildLeft, BuildRight, BuildSide, JoinSelectionHelper}
 import org.apache.spark.sql.catalyst.planning._
-import org.apache.spark.sql.catalyst.plans.LeftSemi
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.execution.{joins, SparkPlan}
 
@@ -33,6 +32,9 @@ object ShuffleJoinStrategy extends Strategy
 
   private val columnarPreferShuffledHashJoin =
     ColumnarPluginConfig.getConf.columnarPreferShuffledHashJoin
+
+  private val columnarPreferShuffledHashJoinCBO =
+    ColumnarPluginConfig.getConf.columnarPreferShuffledHashJoinCBO
 
   def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
     case ExtractEquiJoinKeys(joinType, leftKeys, rightKeys, nonEquiCond, left, right, hint)
@@ -64,8 +66,8 @@ object ShuffleJoinStrategy extends Strategy
           buildRight = true
         }
 
-        // for leftSemi join, use cbo static to take effect
-        if (joinType == LeftSemi) {
+        // use cbo statistics to take effect
+        if (columnarPreferShuffledHashJoinCBO) {
           getShuffleHashJoinBuildSide(left,
             right,
             joinType,
