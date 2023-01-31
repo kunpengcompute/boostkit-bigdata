@@ -183,20 +183,16 @@ class MaterializedViewAggregateRule(sparkSession: SparkSession)
     } else {
       queryAggExpressionEquals.foreach { aggCall =>
         var expr = aggCall.expression
-        expr match {
-          case Alias(AggregateExpression(_, _, isDistinct, _, _), _) =>
-            if (isDistinct) {
-              return None
-            }
-          case _ =>
-        }
         // rollUp and use viewTableAttr
         if (viewAggExpressionEquals.contains(aggCall)) {
           val viewTableAttr = viewTableAttrs(viewAggExpressionEqualsOrdinal(aggCall))
               .asInstanceOf[AttributeReference]
           val qualifier = viewTableAttr.qualifier
           expr = expr match {
-            case a@Alias(agg@AggregateExpression(Sum(_), _, _, _, _), _) =>
+            case a@Alias(agg@AggregateExpression(Sum(_), _, isDistinct, _, _), _) =>
+              if (isDistinct) {
+                return None
+              }
               agg.resultAttribute match {
                 case DecimalType.Expression(prec, scale) =>
                   if (prec - 10 > 0) {
@@ -212,11 +208,17 @@ class MaterializedViewAggregateRule(sparkSession: SparkSession)
               copyAlias(a, agg.copy(aggregateFunction = Min(viewTableAttr)), qualifier)
             case a@Alias(agg@AggregateExpression(Max(_), _, _, _, _), _) =>
               copyAlias(a, agg.copy(aggregateFunction = Max(viewTableAttr)), qualifier)
-            case a@Alias(agg@AggregateExpression(Count(_), _, _, _, _), _) =>
+            case a@Alias(agg@AggregateExpression(Count(_), _, isDistinct, _, _), _) =>
+              if (isDistinct) {
+                return None
+              }
               copyAlias(a, agg.copy(aggregateFunction = Sum(viewTableAttr)), qualifier)
             case a@Alias(AttributeReference(_, _, _, _), _) =>
               copyAlias(a, viewTableAttr, viewTableAttr.qualifier)
-            case a@Alias(agg@AggregateExpression(Average(child), _, _, _, _), _) =>
+            case a@Alias(agg@AggregateExpression(Average(child), _, isDistinct, _, _), _) =>
+              if (isDistinct) {
+                return None
+              }
               val count = ExpressionEqual(agg.copy(aggregateFunction = Count(child)))
               if (viewAggExpressionEquals.contains(count)) {
                 val countAttr = viewTableAttrs(viewAggExpressionEqualsOrdinal(count))

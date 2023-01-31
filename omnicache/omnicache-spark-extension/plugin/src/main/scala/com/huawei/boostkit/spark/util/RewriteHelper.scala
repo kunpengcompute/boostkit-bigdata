@@ -26,6 +26,7 @@ import org.apache.spark.sql.catalyst.catalog.{CatalogTable, HiveTableRelation}
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.optimizer._
 import org.apache.spark.sql.catalyst.optimizer.rules.RewriteTime
+import org.apache.spark.sql.catalyst.plans.JoinType
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.datasources.LogicalRelation
@@ -440,7 +441,7 @@ trait RewriteHelper extends PredicateHelper with RewriteLogger {
    */
   def simplifiedPlanString(plan: LogicalPlan): String = {
     val EMPTY_STRING = ""
-    ExprSimplifier.simplify(plan).collect {
+    RewriteHelper.canonicalize(ExprSimplifier.simplify(plan)).collect {
       case Join(_, _, joinType, condition, hint) =>
         joinType.toString + condition.getOrElse(Literal.TrueLiteral).sql + hint.toString()
       case HiveTableRelation(tableMeta, _, _, _, _) =>
@@ -598,6 +599,24 @@ object RewriteHelper extends PredicateHelper with RewriteLogger {
     RewriteTime.withTimeStat("canonicalize") {
       val canonicalizedChildren = expression.children.map(RewriteHelper.canonicalize)
       expressionReorder(expression.withNewChildren(canonicalizedChildren))
+    }
+  }
+
+  def canonicalize(plan: LogicalPlan): LogicalPlan = {
+    RewriteTime.withTimeStat("canonicalize") {
+      plan transform {
+        case f@Filter(condition: Expression, child: LogicalPlan) =>
+          f.copy(canonicalize(condition), child)
+        case j@Join(left: LogicalPlan, right: LogicalPlan, joinType: JoinType,
+        condition: Option[Expression], hint: JoinHint) =>
+          if (condition.isDefined) {
+            j.copy(left, right, joinType, Option(canonicalize(condition.get)), hint)
+          } else {
+            j
+          }
+        case e =>
+          e
+      }
     }
   }
 

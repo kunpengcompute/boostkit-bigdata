@@ -100,6 +100,11 @@ class LogsParser(conf: SparkConf, eventLogDir: String, outPutDir: String) extend
               }
             }
           }
+          val duration = if (uiData.completionTime.isDefined) {
+            (uiData.completionTime.get.getTime - uiData.submissionTime) + "ms"
+          } else {
+            "Unfinished"
+          }
 
           // write dot
           val graph: SparkPlanGraph = sqlStatusStore.planGraph(executionId)
@@ -114,7 +119,8 @@ class LogsParser(conf: SparkConf, eventLogDir: String, outPutDir: String) extend
             "materialized views" -> mvs,
             "physical plan" -> planDesc,
             "dot metrics" -> graph.makeDotFile(metrics),
-            "node metrics" -> node)
+            "node metrics" -> node,
+            "duration" -> duration)
           jsons :+= jsonMap
         }
       }
