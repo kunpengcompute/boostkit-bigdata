@@ -642,7 +642,7 @@ object ViewMetadata extends RewriteHelper {
   def deleteViewMetadata(identifier: TableIdentifier): Unit = {
     removeMVCache(identifier)
     val viewName = formatViewName(identifier)
-    fs.delete(new Path(metadataPath, viewName), true)
+    fs.delete(new Path(new Path(metadataPath, identifier.database.get), viewName), true)
   }
 
   /**
