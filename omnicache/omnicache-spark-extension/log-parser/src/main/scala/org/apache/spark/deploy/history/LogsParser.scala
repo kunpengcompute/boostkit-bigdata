@@ -110,7 +110,7 @@ class LogsParser(conf: SparkConf, eventLogDir: String, outPutDir: String) extend
           val graph: SparkPlanGraph = sqlStatusStore.planGraph(executionId)
           sqlStatusStore.planGraph(executionId)
           val metrics = sqlStatusStore.executionMetrics(executionId)
-          val node = getNodeInfo(graph)
+          val node = getNodeInfo(graph, metrics)
 
           val jsonMap = Map(
             "logName" -> appId,
@@ -175,7 +175,7 @@ class LogsParser(conf: SparkConf, eventLogDir: String, outPutDir: String) extend
    * @param graph SparkPlanGraph
    * @return NodeInfo
    */
-  def getNodeInfo(graph: SparkPlanGraph): String = {
+  def getNodeInfo(graph: SparkPlanGraph, metricsValue: Map[Long, String]): String = {
     // write node
     val tmpContext = new mutable.StringBuilder
     tmpContext.append("[PlanMetric]")
@@ -184,20 +184,16 @@ class LogsParser(conf: SparkConf, eventLogDir: String, outPutDir: String) extend
       tmpContext.append(s"id:${node.id} name:${node.name} desc:${node.desc}")
       nextLine(tmpContext)
       node.metrics.foreach { metric =>
-        metric.toString
-        tmpContext.append("SQLPlanMetric(")
-        tmpContext.append(metric.name)
-        tmpContext.append(",")
-        if (metric.metricType == "timing") {
-          tmpContext.append(s"${metric.accumulatorId * 1000000} ns, ")
-        } else if (metric.metricType == "nsTiming") {
-          tmpContext.append(s"${metric.accumulatorId} ns, ")
-        } else {
-          tmpContext.append(s"${metric.accumulatorId}, ")
+        val value = metricsValue.get(metric.accumulatorId)
+        if (value.isDefined) {
+          tmpContext.append("SQLPlanMetric(")
+              .append(metric.name)
+              .append(",")
+              .append(getMetrics(value.get)).append(", ")
+              .append(metric.metricType)
+              .append(")")
+          nextLine(tmpContext)
         }
-        tmpContext.append(metric.metricType)
-        tmpContext.append(")")
-        nextLine(tmpContext)
       }
       nextLine(tmpContext)
       nextLine(tmpContext)
@@ -222,6 +218,34 @@ class LogsParser(conf: SparkConf, eventLogDir: String, outPutDir: String) extend
     }
     nextLine(tmpContext)
     tmpContext.toString()
+  }
+
+  def getMetrics(context: String): String = {
+    val separator = '\n'
+    val detail = s"total (min, med, max (stageId: taskId))$separator"
+    if (!context.contains(detail)) {
+      return context
+    }
+    // get metrics like 'total (min, med, max (stageId: taskId))'.
+    val lines = context.split(separator)
+    val res = lines.map(_.replaceAll(" \\(", ", ")
+        .replace("stage ", "")
+        .replace("task ", "")
+        .replace(")", "")
+        .replace(":", ", ")
+        .split(",")).reduce((t1, t2) => {
+      val sb = new StringBuilder
+      sb.append('[')
+      for (i <- 0 until (t1.size)) {
+        sb.append(t1(i)).append(":").append(t2(i))
+        if (i != t1.size - 1) {
+          sb.append(", ")
+        }
+      }
+      sb.append(']')
+      Array(sb.toString())
+    })
+    res(0)
   }
 
   def nextLine(context: mutable.StringBuilder): Unit = {
