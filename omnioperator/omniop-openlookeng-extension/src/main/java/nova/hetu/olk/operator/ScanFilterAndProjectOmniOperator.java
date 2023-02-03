@@ -47,8 +47,14 @@ import io.prestosql.operator.project.PageProcessor;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
 import io.prestosql.spi.QueryId;
+import io.prestosql.spi.connector.CatalogName;
 import io.prestosql.spi.connector.ColumnHandle;
 import io.prestosql.spi.connector.ConnectorPageSource;
+import io.prestosql.spi.connector.ConnectorPageSourceProvider;
+import io.prestosql.spi.connector.ConnectorSession;
+import io.prestosql.spi.connector.ConnectorSplit;
+import io.prestosql.spi.connector.ConnectorTableHandle;
+import io.prestosql.spi.connector.ConnectorTransactionHandle;
 import io.prestosql.spi.connector.RecordCursor;
 import io.prestosql.spi.connector.RecordPageSource;
 import io.prestosql.spi.connector.UpdatablePageSource;
@@ -75,6 +81,7 @@ import nova.hetu.omniruntime.vector.VecAllocator;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -84,6 +91,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static io.airlift.concurrent.MoreFutures.toListenableFuture;
 import static io.airlift.units.DataSize.Unit.BYTE;
@@ -268,6 +276,63 @@ public class ScanFilterAndProjectOmniOperator
             this.context = context;
         }
 
+        // this method mimics the logic from PageSourceManager.createPageSource(..), with the exception that it check if the
+        // underlying/real PageSourceProvider has a specialized implementation that returns OmniBlock Page that we can leverage.
+        private ConnectorPageSource createPageSourceForSplit(Split split)
+        {
+            requireNonNull(columns, "columns is null");
+            checkArgument(split.getCatalogName().equals(table.getCatalogName()), "mismatched split and table");
+            CatalogName catalogName = split.getCatalogName();
+
+            ConnectorPageSourceProvider provider = pageSourceProvider.getPageSourceProvider(catalogName);
+
+            try {
+                Class<? extends ConnectorPageSourceProvider> pageSourceProviderCls = provider.getClass();
+                Method createOmniPageSourceMethod = pageSourceProviderCls.getMethod("createOmniPageSource",
+                        ConnectorTransactionHandle.class,
+                        ConnectorSession.class,
+                        ConnectorSplit.class,
+                        ConnectorTableHandle.class,
+                        List.class,
+                        Optional.class);
+                Object object = createOmniPageSourceMethod.invoke(provider,
+                        table.getTransaction(),
+                        session.toConnectorSession(catalogName),
+                        split.getConnectorSplit(),
+                        table.getConnectorHandle(),
+                        columns,
+                        dynamicFilter);
+                if (object instanceof ConnectorPageSource) {
+                    return (ConnectorPageSource) object;
+                }
+            }
+            catch (Exception e) {
+                // we log at debug level here, since it is optional for connector page source to implement  "createOmniPageSource"
+                if (log.isDebugEnabled()) {
+                    log.debug("Attempt to use createOmniPageSource failed: %s", e.getMessage());
+                }
+                // let it fall through, and let fallback to regular page source
+            }
+
+            if (!dynamicFilter.isPresent()) {
+                return provider.createPageSource(
+                        table.getTransaction(),
+                        session.toConnectorSession(catalogName),
+                        split.getConnectorSplit(),
+                        table.getConnectorHandle(),
+                        columns);
+            }
+            else {
+                return provider.createPageSource(
+                        table.getTransaction(),
+                        session.toConnectorSession(catalogName),
+                        split.getConnectorSplit(),
+                        table.getConnectorHandle(),
+                        columns,
+                        dynamicFilter);
+            }
+        }
+
         @Override
         public TransformationState<WorkProcessor<Page>> process(Split split)
         {
@@ -283,7 +348,7 @@ public class ScanFilterAndProjectOmniOperator
                 source = new EmptySplitPageSource();
             }
             else {
-                source = pageSourceProvider.createPageSource(session, split, table, columns, dynamicFilter);
+                source = createPageSourceForSplit(split);
             }
 
             if (source instanceof RecordPageSource) {
