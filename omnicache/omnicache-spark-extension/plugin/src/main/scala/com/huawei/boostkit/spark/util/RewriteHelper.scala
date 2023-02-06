@@ -182,8 +182,11 @@ trait RewriteHelper extends PredicateHelper with RewriteLogger {
    * flag for which condition to extract
    */
   val FILTER_CONDITION: Int = 1
-  val JOIN_CONDITION: Int = 1 << 1
-  val ALL_CONDITION: Int = FILTER_CONDITION | JOIN_CONDITION
+  val INNER_JOIN_CONDITION: Int = 1 << 1
+  val OUTER_JOIN_CONDITION: Int = 1 << 2
+  val COMPENSABLE_CONDITION: Int = FILTER_CONDITION | INNER_JOIN_CONDITION
+  val ALL_JOIN_CONDITION: Int = INNER_JOIN_CONDITION | OUTER_JOIN_CONDITION
+  val ALL_CONDITION: Int = INNER_JOIN_CONDITION | OUTER_JOIN_CONDITION | FILTER_CONDITION
 
   /**
    * extract condition from (join and filter),
@@ -192,7 +195,7 @@ trait RewriteHelper extends PredicateHelper with RewriteLogger {
   def extractPredictExpressions(plan: LogicalPlan,
       tableMappings: BiMap[String, String])
   : (EquivalenceClasses, Seq[ExpressionEqual], Seq[ExpressionEqual]) = {
-    extractPredictExpressions(plan, tableMappings, ALL_CONDITION)
+    extractPredictExpressions(plan, tableMappings, COMPENSABLE_CONDITION)
   }
 
   /**
@@ -212,9 +215,18 @@ trait RewriteHelper extends PredicateHelper with RewriteLogger {
         if ((conditionFlag & FILTER_CONDITION) > 0) {
           conjunctivePredicates ++= splitConjunctivePredicates(condition)
         }
-      case Join(_, _, _, condition, _) =>
-        if (condition.isDefined & ((conditionFlag & JOIN_CONDITION) > 0)) {
-          conjunctivePredicates ++= splitConjunctivePredicates(condition.get)
+      case Join(_, _, joinType, condition, _) =>
+        joinType.sql match {
+          case "CROSS" =>
+          case "INNER" =>
+            if (condition.isDefined & ((conditionFlag & INNER_JOIN_CONDITION) > 0)) {
+              conjunctivePredicates ++= splitConjunctivePredicates(condition.get)
+            }
+          case "LEFT OUTER" | "RIGHT OUTER" | "FULL OUTER" | "LEFT SEMI" | "LEFT ANTI" =>
+            if (condition.isDefined & ((conditionFlag & OUTER_JOIN_CONDITION) > 0)) {
+              conjunctivePredicates ++= splitConjunctivePredicates(condition.get)
+            }
+          case _ =>
         }
       case _ =>
     }
@@ -439,11 +451,25 @@ trait RewriteHelper extends PredicateHelper with RewriteLogger {
    * @param plan plan
    * @return string for simplifiedPlan
    */
-  def simplifiedPlanString(plan: LogicalPlan): String = {
+  def simplifiedPlanString(plan: LogicalPlan, jt: Int): String = {
     val EMPTY_STRING = ""
     RewriteHelper.canonicalize(ExprSimplifier.simplify(plan)).collect {
       case Join(_, _, joinType, condition, hint) =>
-        joinType.toString + condition.getOrElse(Literal.TrueLiteral).sql + hint.toString()
+        joinType.sql match {
+          case "INNER" =>
+            if ((INNER_JOIN_CONDITION & jt) > 0) {
+              joinType.toString + condition.getOrElse(Literal.TrueLiteral).sql + hint.toString()
+            }
+          case "LEFT OUTER" | "RIGHT OUTER" | "FULL OUTER" | "LEFT SEMI" | "LEFT ANTI" =>
+            if ((OUTER_JOIN_CONDITION & jt) > 0) {
+              joinType.toString + condition.getOrElse(Literal.TrueLiteral).sql + hint.toString()
+            }
+          case _ =>
+        }
+      case Filter(condition: Expression, _) =>
+        if ((FILTER_CONDITION & jt) > 0) {
+          condition.sql
+        }
       case HiveTableRelation(tableMeta, _, _, _, _) =>
         tableMeta.identifier.toString()
       case LogicalRelation(_, _, catalogTable, _) =>

@@ -57,16 +57,27 @@ class MaterializedViewOutJoinRule(sparkSession: SparkSession)
   }
 
   /**
-   * extract filter condition
+   * compute compensationPredicates between viewQueryPlan and mappedQueryPlan
    *
-   * @param plan          logicalPlan
-   * @param tableMappings tableMappings
-   * @return PredictExpressions
+   * @param viewTablePlan   viewTablePlan
+   * @param queryPredict    queryPredict
+   * @param viewPredict     viewPredict
+   * @param tableMapping    tableMapping
+   * @param columnMapping   columnMapping
+   * @param viewProjectList viewProjectList
+   * @param viewTableAttrs  viewTableAttrs
+   * @return predictCompensationPlan
    */
-  override def extractPredictExpressions(plan: LogicalPlan,
-      tableMappings: BiMap[String, String])
-  : (EquivalenceClasses, Seq[ExpressionEqual], Seq[ExpressionEqual]) = {
-    extractPredictExpressions(plan, tableMappings, FILTER_CONDITION)
+  override def computeCompensationPredicates(viewTablePlan: LogicalPlan,
+      queryPredict: (EquivalenceClasses, Seq[ExpressionEqual],
+          Seq[ExpressionEqual]),
+      viewPredict: (EquivalenceClasses, Seq[ExpressionEqual],
+          Seq[ExpressionEqual]),
+      tableMapping: BiMap[String, String],
+      columnMapping: Map[ExpressionEqual, mutable.Set[ExpressionEqual]],
+      viewProjectList: Seq[Expression], viewTableAttrs: Seq[Attribute]):
+  Option[LogicalPlan] = {
+    Some(viewTablePlan)
   }
 
   /**
@@ -101,70 +112,53 @@ class MaterializedViewOutJoinRule(sparkSession: SparkSession)
       viewProjectList: Seq[Expression], viewTableAttrs: Seq[Attribute]):
   Option[LogicalPlan] = {
 
-    // queryProjectList
-    val queryProjectList = extractTopProjectList(queryPlan).map(_.asInstanceOf[NamedExpression])
-    val origins = generateOrigins(queryPlan)
-    val originQueryProjectList = queryProjectList.map(x => findOriginExpression(origins, x))
-    val swapQueryProjectList = swapColumnReferences(originQueryProjectList, columnMapping)
-    var simplifiedQueryPlanString = simplifiedPlanString(findOriginExpression(origins, queryPlan))
+    val queryOrigins = generateOrigins(queryPlan)
 
     val viewTableAttrsSet = viewTableAttrs.toSet
     val viewOrigins = generateOrigins(viewQueryPlan)
     val originViewProjectList = viewProjectList.map(x => findOriginExpression(viewOrigins, x))
     val simplifiedViewPlanString =
-      simplifiedPlanString(findOriginExpression(viewOrigins, viewQueryPlan))
+      simplifiedPlanString(findOriginExpression(viewOrigins, viewQueryPlan), OUTER_JOIN_CONDITION)
 
-    if (simplifiedQueryPlanString == simplifiedViewPlanString) {
-      // rewrite and alias queryProjectList
-      // if the rewrite expression exprId != origin expression exprId,
-      // replace by Alias(rewrite expression,origin.name)(exprId=origin.exprId)
-      val rewritedQueryProjectList = rewriteAndAliasExpressions(swapQueryProjectList,
-        swapTableColumn = true, tableMapping, columnMapping,
-        originViewProjectList, viewTableAttrs, queryProjectList)
-
-      val res = Project(rewritedQueryProjectList.get
-          .map(_.asInstanceOf[NamedExpression]), viewTablePlan)
-      // add project
-      return Some(res)
-    }
-
-    var filter: Option[Filter] = None
-    var flag = false
-    var res = queryPlan.transform {
+    // Push down the topmost filter condition
+    val pushDownQueryPLan = PushDownPredicates.apply(queryPlan)
+    var rewritten = false
+    val res = pushDownQueryPLan.transform {
       case curPlan: Join =>
-        simplifiedQueryPlanString = simplifiedPlanString(findOriginExpression(origins, curPlan))
+        val simplifiedQueryPlanString = simplifiedPlanString(
+          findOriginExpression(queryOrigins, curPlan), OUTER_JOIN_CONDITION)
         if (simplifiedQueryPlanString == simplifiedViewPlanString) {
-          val (curProject: Project, _) = extractTables(Project(curPlan.output, curPlan))
-          val curProjectList = curProject.projectList
-              .map(x => findOriginExpression(origins, x).asInstanceOf[NamedExpression])
-          val swapCurProjectList = swapColumnReferences(curProjectList, columnMapping)
-          val rewritedQueryProjectList = rewriteAndAliasExpressions(swapCurProjectList,
-            swapTableColumn = true, tableMapping, columnMapping,
-            originViewProjectList, viewTableAttrs, curProjectList)
+          val viewExpr = extractPredictExpressions(
+            findOriginExpression(viewOrigins, viewQueryPlan), EMPTY_BIMAP, COMPENSABLE_CONDITION)
+          val queryExpr = extractPredictExpressions(
+            findOriginExpression(queryOrigins, curPlan), EMPTY_BIMAP, COMPENSABLE_CONDITION)
+          val compensatedViewTablePlan = super.computeCompensationPredicates(viewTablePlan,
+            queryExpr, viewExpr, tableMapping, columnMapping,
+            extractTopProjectList(viewQueryPlan), viewTablePlan.output)
 
-          flag = true
-          val projectChild = viewTablePlan match {
-            case f@Filter(_, child) =>
-              filter = Some(f)
-              child
-            case _ =>
-              viewTablePlan
+          if (compensatedViewTablePlan.isEmpty) {
+            curPlan
+          } else {
+            rewritten = true
+            val (curProject: Project, _) = extractTables(Project(curPlan.output, curPlan))
+            val curProjectList = curProject.projectList
+                .map(x => findOriginExpression(queryOrigins, x).asInstanceOf[NamedExpression])
+            val swapCurProjectList = swapColumnReferences(curProjectList, columnMapping)
+            val rewritedQueryProjectList = rewriteAndAliasExpressions(swapCurProjectList,
+              swapTableColumn = true, tableMapping, columnMapping,
+              originViewProjectList, viewTableAttrs, curProjectList)
+
+            Project(rewritedQueryProjectList.get
+                .filter(x => isValidExpression(x, viewTableAttrsSet))
+                ++ viewTableAttrs.map(_.asInstanceOf[NamedExpression])
+              , compensatedViewTablePlan.get)
           }
-          Project(rewritedQueryProjectList.get
-              .filter(x => isValidExpression(x, viewTableAttrsSet))
-              ++ viewTableAttrs.map(_.asInstanceOf[NamedExpression])
-            , projectChild)
         } else {
           curPlan
         }
       case p => p
     }
-    if (flag) {
-      if (filter.isDefined) {
-        val queryProject = res.asInstanceOf[Project]
-        res = queryProject.withNewChildren(Seq(
-          filter.get.withNewChildren(Seq(queryProject.child))))
-      }
+    if (rewritten) {
       Some(res)
     } else {
       None

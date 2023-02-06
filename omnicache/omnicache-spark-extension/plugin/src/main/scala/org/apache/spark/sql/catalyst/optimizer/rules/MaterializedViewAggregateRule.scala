@@ -371,8 +371,11 @@ class MaterializedViewOutJoinAggregateRule(sparkSession: SparkSession)
       columnMapping: Map[ExpressionEqual, mutable.Set[ExpressionEqual]],
       viewProjectList: Seq[Expression], viewTableAttrs: Seq[Attribute]):
   Option[LogicalPlan] = {
-    val simplifiedQueryPlanString = simplifiedPlanString(findOriginExpression(queryPlan))
-    val simplifiedViewPlanString = simplifiedPlanString(findOriginExpression(viewQueryPlan))
+    // TODO Perhaps the inner join condition and Filter condition should be compensated.
+    val simplifiedViewPlanString = simplifiedPlanString(
+      findOriginExpression(viewQueryPlan), ALL_CONDITION)
+    val simplifiedQueryPlanString = simplifiedPlanString(
+      findOriginExpression(queryPlan), ALL_CONDITION)
     if (simplifiedQueryPlanString != simplifiedViewPlanString) {
       return None
     }
