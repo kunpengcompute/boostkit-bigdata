@@ -17,6 +17,7 @@
 
 package org.apache.spark.sql.catalyst.parser
 
+import com.huawei.boostkit.spark.conf.OmniCachePluginConfig
 import com.huawei.boostkit.spark.util.RewriteLogger
 import java.util.Locale
 import org.antlr.v4.runtime._
@@ -36,6 +37,9 @@ class OmniCacheExtensionSqlParser(spark: SparkSession,
   lazy val astBuilder = new OmniCacheExtensionAstBuilder(spark, delegate)
 
   override def parsePlan(sqlText: String): LogicalPlan = {
+    if (OmniCachePluginConfig.getConf.enableSqlLog) {
+      spark.sparkContext.setJobDescription(sqlText)
+    }
     if (isMaterializedViewCommand(sqlText)) {
       val plan = parse(sqlText) { parser =>
         astBuilder.visit(parser.singleStatement()).asInstanceOf[LogicalPlan]

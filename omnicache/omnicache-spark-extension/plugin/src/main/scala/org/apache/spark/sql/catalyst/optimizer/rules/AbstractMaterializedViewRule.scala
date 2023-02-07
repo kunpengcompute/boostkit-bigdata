@@ -27,7 +27,7 @@ import scala.util.control.Breaks
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.catalog.HiveTableRelation
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.catalyst.plans.Inner
+import org.apache.spark.sql.catalyst.plans._
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.execution.datasources.LogicalRelation
 
@@ -37,140 +37,154 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
   /**
    * try match the queryPlan and viewPlan ,then rewrite by viewPlan
    *
-   * @param topProject queryTopProject
-   * @param plan       queryPlan
-   * @param usingMvs   usingMvs
+   * @param topProject        queryTopProject
+   * @param plan              queryPlan
+   * @param usingMvs          usingMvs
+   * @param candidateViewPlan candidateViewPlan
    * @return performedPlan
    */
   def perform(topProject: Option[Project], plan: LogicalPlan,
-      usingMvs: mutable.Set[String]): LogicalPlan = {
+      usingMvs: mutable.Set[String],
+      candidateViewPlan: ViewMetadataPackageType): LogicalPlan = {
     var finalPlan = if (topProject.isEmpty) plan else topProject.get
+    logDetail(s"enter rule:${this.getClass.getName} perform for plan:$finalPlan")
 
-    if (ViewMetadata.status == ViewMetadata.STATUS_LOADING) {
-      return finalPlan
-    }
-    RewriteTime.withTimeStat("viewMetadata") {
-      ViewMetadata.init(sparkSession)
-    }
     // 1.check query sql is match current rule
     if (ViewMetadata.isEmpty || !isValidPlan(plan)) {
+      if (ViewMetadata.isEmpty) {
+        logDetail("ViewMetadata.isEmpty")
+      } else {
+        logDetail(s"queryPlan isValidPlan")
+      }
       return finalPlan
     }
 
     // 2.extract tablesInfo from queryPlan and replace the AttributeReference
     // in plan using tableAttr
     val (queryExpr, queryTables) = extractTables(finalPlan)
+    logDetail(s"queryTables:$queryTables")
 
     // 3.use all tables to fetch views(may match) from ViewMetaData
-    val candidateViewPlans = RewriteTime.withTimeStat("getApplicableMaterializations") {
-      getApplicableMaterializations(queryTables.map(t => t.tableName))
-          .filter(x => !OmniCachePluginConfig.isMVInUpdate(x._2))
-    }
-    if (candidateViewPlans.isEmpty) {
-      return finalPlan
-    }
 
     // continue for curPlanLoop,mappingLoop
     val curPlanLoop = new Breaks
     val mappingLoop = new Breaks
 
     // 4.iterate views,try match and rewrite
-    for ((viewName, srcViewTablePlan, srcViewQueryPlan) <- candidateViewPlans) {
-      curPlanLoop.breakable {
-        // 4.1.check view query sql is match current rule
-        if (!isValidPlan(srcViewQueryPlan)) {
+    val (viewName, srcViewTablePlan, srcViewQueryPlan) = candidateViewPlan
+    curPlanLoop.breakable {
+      logDetail(s"iterate view:$viewName, viewTablePlan:$srcViewTablePlan, " +
+          s"viewQueryPlan:$srcViewQueryPlan")
+      // 4.1.check view query sql is match current rule
+      if (!isValidPlan(srcViewQueryPlan)) {
+        logDetail(s"viewPlan isValidPlan:$srcViewQueryPlan")
+        curPlanLoop.break()
+      }
+
+      OmniCachePluginConfig.getConf.setCurMatchMV(viewName)
+      // 4.2.view plans
+      var viewTablePlan = aliasViewTablePlan(srcViewTablePlan, queryExpr)
+      var viewQueryPlan = srcViewQueryPlan
+      var topViewProject: Option[Project] = None
+      var viewQueryExpr: LogicalPlan = viewQueryPlan
+      viewQueryPlan match {
+        case p: Project =>
+          topViewProject = Some(p)
+          viewQueryPlan = p.child
+          viewQueryExpr = p
+        case _ =>
+      }
+
+      // 4.3.extract tablesInfo from viewPlan
+      val viewTables = ViewMetadata.viewToContainsTables.get(viewName)
+
+      // 4.4.compute the relation of viewTableInfo and queryTableInfo
+      // 4.4.1.queryTableInfo containsAll viewTableInfo
+      if (!viewTables.subsetOf(queryTables)) {
+        logDetail(s"viewTables is not subsetOf queryTables")
+        curPlanLoop.break()
+      }
+
+      // 4.4.2.queryTableInfo!=viewTableInfo, need do join compensate
+      val needCompensateTables = queryTables -- viewTables
+      logDetail(s"needCompensateTables:$needCompensateTables")
+      if (needCompensateTables.nonEmpty) {
+        val sortedNeedCompensateTables = needCompensateTables.toSeq.sortWith {
+          (t1: TableEqual, t2: TableEqual) =>
+            t1.seq < t2.seq
+        }
+        logDetail(f"sortedNeedCompensateTables:$sortedNeedCompensateTables")
+        val newViewPlans = compensateViewPartial(viewTablePlan,
+          viewQueryExpr, topViewProject, sortedNeedCompensateTables)
+        if (newViewPlans.isEmpty) {
           curPlanLoop.break()
         }
+        val (newViewTablePlan, newViewQueryPlan, newTopViewProject) = newViewPlans.get
+        viewTablePlan = newViewTablePlan
+        viewQueryPlan = newViewQueryPlan
+        viewQueryExpr = newViewQueryPlan
+        topViewProject = newTopViewProject
+      }
 
-        OmniCachePluginConfig.getConf.setCurMatchMV(viewName)
-        // 4.2.view plans
-        var viewTablePlan = srcViewTablePlan
-        var viewQueryPlan = srcViewQueryPlan
-        var topViewProject: Option[Project] = None
-        var viewQueryExpr: LogicalPlan = viewQueryPlan
-        viewQueryPlan match {
-          case p: Project =>
-            topViewProject = Some(p)
-            viewQueryPlan = p.child
-            viewQueryExpr = p
-          case _ =>
-        }
+      // 4.5.extractPredictExpressions from viewQueryPlan and mappedQueryPlan
+      val queryPredictExpression = RewriteTime.withTimeStat("extractPredictExpressions") {
+        extractPredictExpressions(queryExpr, EMPTY_BIMAP)
+      }
+      logDetail(s"queryPredictExpression:$queryPredictExpression")
 
-        // 4.3.extract tablesInfo from viewPlan
-        val viewTables = ViewMetadata.viewToContainsTables.get(viewName)
+      val viewProjectList = extractTopProjectList(viewQueryExpr)
+      val viewTableAttrs = viewTablePlan.output
 
-        // 4.4.compute the relation of viewTableInfo and queryTableInfo
-        // 4.4.1.queryTableInfo containsAll viewTableInfo
-        if (!viewTables.subsetOf(queryTables)) {
-          curPlanLoop.break()
-        }
+      // 4.6.if a table emps used >=2 times in a sql (query and view)
+      // we should try the combination,switch the seq
+      // view:SELECT V1.locationid,V2.empname FROM emps V1 JOIN emps V2
+      // ON V1.deptno='1' AND V2.deptno='2' AND V1.empname = V2.empname;
+      // query:SELECT V2.locationid,V1.empname FROM emps V1 JOIN emps V2
+      // ON V1.deptno='2' AND V2.deptno='1' AND V1.empname = V2.empname;
+      val flatListMappings: Seq[BiMap[String, String]] = generateTableMappings(queryTables)
 
-        // 4.4.2.queryTableInfo!=viewTableInfo, need do join compensate
-        val needCompensateTables = queryTables -- viewTables
-        if (needCompensateTables.nonEmpty) {
-          val newViewPlans = compensateViewPartial(viewTablePlan,
-            viewQueryPlan, topViewProject, needCompensateTables)
-          if (newViewPlans.isEmpty) {
-            curPlanLoop.break()
+      flatListMappings.foreach { queryToViewTableMapping =>
+        mappingLoop.breakable {
+          val inverseTableMapping = queryToViewTableMapping.inverse()
+          logDetail(s"iterate queryToViewTableMapping:$inverseTableMapping")
+          val viewPredictExpression = RewriteTime.withTimeStat("extractPredictExpressions") {
+            extractPredictExpressions(viewQueryExpr,
+              inverseTableMapping)
           }
-          val (newViewTablePlan, newViewQueryPlan, newTopViewProject) = newViewPlans.get
-          viewTablePlan = newViewTablePlan
-          viewQueryPlan = newViewQueryPlan
-          viewQueryExpr = newViewQueryPlan
-          topViewProject = newTopViewProject
-        }
+          logDetail(s"viewPredictExpression:$viewPredictExpression")
 
-        // 4.5.extractPredictExpressions from viewQueryPlan and mappedQueryPlan
-        val queryPredictExpression = RewriteTime.withTimeStat("extractPredictExpressions") {
-          extractPredictExpressions(queryExpr, EMPTY_BIMAP)
-        }
-
-        val viewProjectList = extractTopProjectList(viewQueryExpr)
-        val viewTableAttrs = viewTablePlan.output
-
-        // 4.6.if a table emps used >=2 times in a sql (query and view)
-        // we should try the combination,switch the seq
-        // view:SELECT V1.locationid,V2.empname FROM emps V1 JOIN emps V2
-        // ON V1.deptno='1' AND V2.deptno='2' AND V1.empname = V2.empname;
-        // query:SELECT V2.locationid,V1.empname FROM emps V1 JOIN emps V2
-        // ON V1.deptno='2' AND V2.deptno='1' AND V1.empname = V2.empname;
-        val flatListMappings: Seq[BiMap[String, String]] = generateTableMappings(queryTables)
-
-        flatListMappings.foreach { queryToViewTableMapping =>
-          mappingLoop.breakable {
-            val inverseTableMapping = queryToViewTableMapping.inverse()
-            val viewPredictExpression = RewriteTime.withTimeStat("extractPredictExpressions") {
-              extractPredictExpressions(viewQueryExpr,
-                inverseTableMapping)
-            }
-
-            // 4.7.compute compensationPredicates between viewQueryPlan and queryPlan
-            var newViewTablePlan = RewriteTime.withTimeStat("computeCompensationPredicates") {
-              computeCompensationPredicates(viewTablePlan,
-                queryPredictExpression, viewPredictExpression, inverseTableMapping,
-                viewPredictExpression._1.getEquivalenceClassesMap,
-                viewProjectList, viewTableAttrs)
-            }
-            // 4.8.compensationPredicates isEmpty, because view's row data cannot satisfy query
-            if (newViewTablePlan.isEmpty) {
-              mappingLoop.break()
-            }
-
-            // 4.9.use viewTablePlan(join compensated), query project,
-            // compensationPredicts to rewrite final plan
-            newViewTablePlan = RewriteTime.withTimeStat("rewriteView") {
-              rewriteView(newViewTablePlan.get, viewQueryExpr,
-                queryExpr, inverseTableMapping,
-                queryPredictExpression._1.getEquivalenceClassesMap,
-                viewProjectList, viewTableAttrs)
-            }
-            if (newViewTablePlan.isEmpty) {
-              mappingLoop.break()
-            }
-            finalPlan = newViewTablePlan.get
-            usingMvs += viewName
-            return finalPlan
+          // 4.7.compute compensationPredicates between viewQueryPlan and queryPlan
+          var newViewTablePlan = RewriteTime.withTimeStat("computeCompensationPredicates") {
+            computeCompensationPredicates(viewTablePlan,
+              queryPredictExpression, viewPredictExpression, inverseTableMapping,
+              viewPredictExpression._1.getEquivalenceClassesMap,
+              viewProjectList, viewTableAttrs)
           }
+          logDetail(s"computeCompensationPredicates plan:$newViewTablePlan")
+          // 4.8.compensationPredicates isEmpty, because view's row data cannot satisfy query
+          if (newViewTablePlan.isEmpty) {
+            logDetail("computeCompensationPredicates plan isEmpty")
+            mappingLoop.break()
+          }
+
+          // 4.9.use viewTablePlan(join compensated), query project,
+          // compensationPredicts to rewrite final plan
+
+          newViewTablePlan = RewriteTime.withTimeStat("rewriteView") {
+            rewriteView(newViewTablePlan.get, viewQueryExpr,
+              queryExpr, inverseTableMapping,
+              queryPredictExpression._1.getEquivalenceClassesMap,
+              viewProjectList, viewTableAttrs)
+          }
+          logDetail(s"rewriteView plan:$newViewTablePlan")
+          if (newViewTablePlan.isEmpty || !RewriteHelper.checkAttrsValid(newViewTablePlan.get)) {
+            logDetail("rewriteView plan isEmpty")
+            mappingLoop.break()
+          }
+          finalPlan = newViewTablePlan.get
+          finalPlan = sparkSession.sessionState.analyzer.execute(finalPlan)
+          usingMvs += viewName
+          return finalPlan
         }
       }
     }
@@ -209,29 +223,31 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
   }
 
   /**
-   * use all tables to fetch views(may match) from ViewMetaData
+   * basic check for outjoin
    *
-   * @param tableNames tableNames in query sql
-   * @return Seq[(viewName, viewTablePlan, viewQueryPlan)]
+   * @param logicalPlan LogicalPlan
+   * @return true:matched ; false:unMatched
    */
-  def getApplicableMaterializations(tableNames: Set[String]): Seq[(String,
-      LogicalPlan, LogicalPlan)] = {
-    // viewName, viewTablePlan, viewQueryPlan
-    var viewPlans = Seq.empty[(String, LogicalPlan, LogicalPlan)]
-    val viewNames = mutable.Set.empty[String]
-    // 1.topological iterate graph
-    tableNames.foreach { tableName =>
-      if (ViewMetadata.tableToViews.containsKey(tableName)) {
-        viewNames ++= ViewMetadata.tableToViews.get(tableName)
-      }
+  def isValidOutJoinLogicalPlan(logicalPlan: LogicalPlan): Boolean = {
+    logicalPlan.foreach {
+      case _: LogicalRelation =>
+      case _: HiveTableRelation =>
+      case _: Project =>
+      case _: Filter =>
+      case j: Join =>
+        j.joinType match {
+          case _: Inner.type =>
+          case _: LeftOuter.type =>
+          case _: RightOuter.type =>
+          case _: FullOuter.type =>
+          case _: LeftSemi.type =>
+          case _: LeftAnti.type =>
+          case _ => return false
+        }
+      case _: SubqueryAlias =>
+      case _ => return false
     }
-    viewNames.foreach { viewName =>
-      // 4.add plan info
-      val viewQueryPlan = ViewMetadata.viewToViewQueryPlan.get(viewName)
-      val viewTablePlan = ViewMetadata.viewToTablePlan.get(viewName)
-      viewPlans +:= (viewName, viewTablePlan, viewQueryPlan)
-    }
-    viewPlans
+    true
   }
 
   /**
@@ -264,7 +280,7 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
   def compensateViewPartial(viewTablePlan: LogicalPlan,
       viewQueryPlan: LogicalPlan,
       topViewProject: Option[Project],
-      needTables: Set[TableEqual]):
+      needTables: Seq[TableEqual]):
   Option[(LogicalPlan, LogicalPlan, Option[Project])] = None
 
   /**
@@ -323,6 +339,7 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
    */
   def generateEquivalenceClasses(queryEC: EquivalenceClasses,
       viewEC: EquivalenceClasses): Option[Expression] = {
+    logDetail(s"generateEquivalenceClasses queryEC:$queryEC, viewEC:$viewEC")
     // 1.all empty,valid
     if (queryEC.getEquivalenceClassesMap.isEmpty && viewEC.getEquivalenceClassesMap.isEmpty) {
       return Some(Literal.TrueLiteral)
@@ -330,6 +347,7 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
 
     // 2.query is empty,invalid
     if (queryEC.getEquivalenceClassesMap.isEmpty && viewEC.getEquivalenceClassesMap.nonEmpty) {
+      logDetail("queryEC.isEmpty && viewEC.nonEmpty")
       return None
     }
 
@@ -338,7 +356,9 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
     val viewEquivalenceClasses = viewEC.getEquivalenceClasses
     val mappingOp: Option[Multimap[Int, Int]] = extractPossibleMapping(queryEquivalenceClasses,
       viewEquivalenceClasses)
+    logDetail(s"queryEc to viewEc mappingOp:$mappingOp")
     if (mappingOp.isEmpty) {
+      logDetail("mappingOp.isEmpty")
       return None
     }
     val mapping = mappingOp.get
@@ -423,9 +443,10 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
    * @return compensate Expression
    */
   def splitFilter(queryExpression: Expression, viewExpression: Expression): Option[Expression] = {
+    logDetail(s"splitFilter for queryExpression:$queryExpression, viewExpression:$viewExpression")
     // 1.canonicalize expression,main for reorder
-    val queryExpression2 = RewriteHelper.canonicalize(ExprSimplifier.simplify(queryExpression))
-    val viewExpression2 = RewriteHelper.canonicalize(ExprSimplifier.simplify(viewExpression))
+    val queryExpression2 = ExprSimplifier.simplify(queryExpression)
+    val viewExpression2 = ExprSimplifier.simplify(viewExpression)
 
     // 2.or is residual predicts,this main deal residual predicts
     val z = splitOr(queryExpression2, viewExpression2)
@@ -440,15 +461,18 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
 
     // 4.viewExpression2 and not(queryExpression2)
     val x = andNot(viewExpression2, queryExpression2)
+    logDetail(s"view andNot query:$x")
     // then check some absolutely invalid situation
     if (mayBeSatisfiable(x)) {
       // 4.1.queryExpression2 and viewExpression2
       val x2 = ExprOptUtil.composeConjunctions(
         Seq(queryExpression2, viewExpression2), nullOnEmpty = false)
+      logDetail(s"query and view :$x2")
 
       // 4.2.canonicalize
-      val r = RewriteHelper.canonicalize(ExprSimplifier.simplify(x2))
+      val r = ExprSimplifier.simplify(x2)
       if (ExprOptUtil.isAlwaysFalse(r)) {
+        logDetail(s"query and view isAlwaysFalse:$r")
         return None
       }
 
@@ -459,7 +483,9 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
         val residue = (conjs -- views).map(_.expression).toSeq
         return Some(ExprOptUtil.composeConjunctions(residue, nullOnEmpty = false))
       }
+      logDetail(s"query != (query and view):$queryExpression2 != $r")
     }
+    logDetail(s"view andNot query not satisfy")
     None
   }
 
@@ -599,7 +625,9 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
     // 1.compute equalColumnCompensation
     val compensationColumnsEquiPredicts = generateEquivalenceClasses(
       queryPredict._1, viewPredict._1)
+    logDetail(s"compensationColumnsEquiPredicts:$compensationColumnsEquiPredicts")
     if (compensationColumnsEquiPredicts.isEmpty) {
+      logDetail("compensationColumnsEquiPredicts.isEmpty")
       return None
     }
 
@@ -611,7 +639,9 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
     val compensationRangePredicts = splitFilter(
       mergeConjunctiveExpressions(queryRangePredicts),
       mergeConjunctiveExpressions(viewRangePredicts))
+    logDetail(s"compensationRangePredicts:$compensationRangePredicts")
     if (compensationRangePredicts.isEmpty) {
+      logDetail("compensationRangePredicts.isEmpty")
       return None
     }
 
@@ -623,7 +653,9 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
     val compensationResidualPredicts = splitFilter(
       mergeConjunctiveExpressions(queryResidualPredicts),
       mergeConjunctiveExpressions(viewResidualPredicts))
+    logDetail(s"compensationResidualPredicts:$compensationResidualPredicts")
     if (compensationResidualPredicts.isEmpty) {
+      logDetail("compensationResidualPredicts.isEmpty")
       return None
     }
 
@@ -631,6 +663,7 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
     val columnsEquiPredictsResult = rewriteExpressions(Seq(compensationColumnsEquiPredicts.get),
       swapTableColumn = false, tableMapping, columnMapping, viewProjectList, viewTableAttrs)
     if (columnsEquiPredictsResult.isEmpty) {
+      logDetail("columnsEquiPredictsResult.isEmpty")
       return None
     }
 
@@ -639,6 +672,7 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
       compensationResidualPredicts.get),
       swapTableColumn = true, tableMapping, queryColumnMapping, viewProjectList, viewTableAttrs)
     if (otherPredictsResult.isEmpty) {
+      logDetail("otherPredictsResult.isEmpty")
       return None
     }
 
@@ -679,6 +713,10 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
     // 3.iterate exprsToRewrite and dfs mapping expression to ViewTableAttributeReference by map
     val result = exprsToRewrite.map { expr =>
       expr.transform {
+        case e@Literal(_, _) =>
+          e
+        case e@Alias(Literal(_, _), _) =>
+          e
         case e: NamedExpression =>
           val expressionEqual = ExpressionEqual(e)
           if (viewProjectExprToTableAttr.contains(expressionEqual)) {
@@ -690,21 +728,34 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
         case e => e
       }
     }.asInstanceOf[T]
+    Some(result)
+  }
 
-    // 4.iterate result and dfs check every AttributeReference in ViewTableAttributeReference
-    val viewTableAttrsSet = swapTableAttrs.map(_.exprId).toSet
-    result.foreach { expr =>
-      expr.foreach {
-        case attr: AttributeReference =>
-          if (!viewTableAttrsSet.contains(attr.exprId)) {
-            logBasedOnLevel(s"attr:%s cannot found in view:%s"
-                .format(attr, OmniCachePluginConfig.getConf.curMatchMV))
-            return None
-          }
-        case _ =>
+  /**
+   * alias ViewTablePlan's attr by queryPlan's attr
+   *
+   * @param viewTablePlan viewTablePlan
+   * @param queryPlan     queryPlan
+   * @return aliasViewTablePlan
+   */
+  def aliasViewTablePlan(viewTablePlan: LogicalPlan, queryPlan: LogicalPlan): LogicalPlan = {
+    val viewTableAttrs = viewTablePlan.output
+    var alias = Map[String, AttributeReference]()
+    queryPlan.transformAllExpressions {
+      case attr: AttributeReference =>
+        alias += (attr.sql -> attr)
+        attr
+      case e => e
+    }
+    val aliasViewTableAttrs = viewTableAttrs.map { attr =>
+      val queryAttr = alias.get(attr.sql)
+      if (queryAttr.isDefined) {
+        Alias(attr, queryAttr.get.name)(exprId = queryAttr.get.exprId)
+      } else {
+        attr
       }
     }
-    Some(result)
+    Project(aliasViewTableAttrs, viewTablePlan)
   }
 
   /**
@@ -715,19 +766,24 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
    * @param originExpressions originExpressions
    * @return aliasExpressions
    */
-  def aliasExpressions(newExpressions: Seq[NamedExpression],
+  def aliasExpressions(newExpressions: Seq[Expression],
       originExpressions: Seq[NamedExpression]): Seq[NamedExpression] = {
     val result = newExpressions.zip(originExpressions)
         .map { q =>
           val rewrited = q._1
           val origin = q._2
-          if (rewrited.exprId == origin.exprId) {
-            rewrited
-          } else {
-            Alias(rewrited, origin.name)(exprId = origin.exprId)
+          rewrited match {
+            case r: NamedExpression =>
+              if (r.exprId == origin.exprId) {
+                rewrited
+              } else {
+                Alias(rewrited, origin.name)(exprId = origin.exprId)
+              }
+            case _ =>
+              Alias(rewrited, origin.name)(exprId = origin.exprId)
           }
         }
-    result
+    result.map(_.asInstanceOf[NamedExpression])
   }
 
   /**
@@ -756,7 +812,7 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
     }
 
     val aliasedExpressions = aliasExpressions(
-      rewritedExpressions.get.map(_.asInstanceOf[NamedExpression]).toSeq, originExpressions)
+      rewritedExpressions.get.toSeq, originExpressions)
     Some(aliasedExpressions.asInstanceOf[T])
   }
 

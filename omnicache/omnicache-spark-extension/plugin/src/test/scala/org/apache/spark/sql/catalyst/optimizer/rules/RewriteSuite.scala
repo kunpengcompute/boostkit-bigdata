@@ -21,8 +21,9 @@ import com.huawei.boostkit.spark.conf.OmniCachePluginConfig
 import com.huawei.boostkit.spark.util.RewriteHelper._
 import java.io.File
 import java.util.Locale
+import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach}
+import org.scalatest.funsuite.AnyFunSuite
 
-import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.catalyst.analysis.SimpleAnalyzer
@@ -35,15 +36,22 @@ import org.apache.spark.sql.catalyst.util.{sideBySide, toPrettySQL}
 import org.apache.spark.sql.execution.datasources.LogicalRelation
 import org.apache.spark.sql.types.StringType
 
-class RewriteSuite extends SparkFunSuite with PredicateHelper {
+class RewriteSuite extends AnyFunSuite
+    with BeforeAndAfterAll
+    with BeforeAndAfterEach
+    with PredicateHelper {
 
   System.setProperty("HADOOP_USER_NAME", "root")
   lazy val spark: SparkSession = SparkSession.builder().master("local")
       .config("spark.sql.extensions", "com.huawei.boostkit.spark.OmniCache")
       .config("hive.exec.dynamic.partition.mode", "nonstrict")
       .config("spark.ui.port", "4050")
-      // .config("spark.sql.planChangeLog.level","WARN")
+      // .config("spark.sql.planChangeLog.level", "WARN")
       .config("spark.sql.omnicache.logLevel", "WARN")
+      .config("spark.sql.omnicache.dbs", "default")
+      .config("spark.sql.omnicache.metadata.initbyquery.enable", "false")
+      .config("hive.in.test", "true")
+      .config("spark.sql.omnicache.metadata.path", "./user/omnicache/metadata")
       .enableHiveSupport()
       .getOrCreate()
   spark.sparkContext.setLogLevel("WARN")
@@ -64,8 +72,10 @@ class RewriteSuite extends SparkFunSuite with PredicateHelper {
   }
 
   def preCreateTable(): Unit = {
+    disableCachePlugin()
     preDropTable()
     if (catalog.tableExists(TableIdentifier("locations"))) {
+      enableCachePlugin()
       return
     }
     spark.sql(
@@ -105,6 +115,16 @@ class RewriteSuite extends SparkFunSuite with PredicateHelper {
         |INSERT INTO TABLE depts VALUES(2,'deptname2');
         |""".stripMargin
     )
+    spark.sql(
+      """
+        |INSERT INTO TABLE depts VALUES(3,'deptname3');
+        |""".stripMargin
+    )
+    spark.sql(
+      """
+        |INSERT INTO TABLE depts VALUES(4,'deptname4');
+        |""".stripMargin
+    )
 
     spark.sql(
       """
@@ -125,6 +145,12 @@ class RewriteSuite extends SparkFunSuite with PredicateHelper {
     spark.sql(
       """
         |INSERT INTO TABLE emps VALUES(2,2,2,'empname2',2.0);
+        |""".stripMargin
+    )
+
+    spark.sql(
+      """
+        |INSERT INTO TABLE emps VALUES(3,null,3,'empname3',3.0);
         |""".stripMargin
     )
 
@@ -238,6 +264,7 @@ class RewriteSuite extends SparkFunSuite with PredicateHelper {
         |);
         |""".stripMargin
     )
+    enableCachePlugin()
   }
 
   preCreateTable()
@@ -450,19 +477,29 @@ class RewriteSuite extends SparkFunSuite with PredicateHelper {
     }
   }
 
-  def isRewritedByMV(database: String, mv: String, logicalPlan: LogicalPlan): Boolean = {
-    logicalPlan.foreachUp {
+  def isRewritedByMV(database: String, mvSrc: String, logicalPlan: LogicalPlan): Boolean = {
+    val mv = mvSrc.toLowerCase(Locale.ROOT)
+    logicalPlan.foreach {
       case _@HiveTableRelation(tableMeta, _, _, _, _) =>
-        if (tableMeta.database == database && tableMeta.identifier.table == mv) {
+        if (tableMeta.database == database && tableMeta.identifier.table.contains(mv)) {
           return true
         }
       case _@LogicalRelation(_, _, catalogTable, _) =>
         if (catalogTable.isDefined) {
-          if (catalogTable.get.database == database && catalogTable.get.identifier.table == mv) {
+          if (catalogTable.get.database == database && catalogTable.get.identifier
+              .table.contains(mv)) {
             return true
           }
         }
-      case _ =>
+      case p =>
+        p.transformAllExpressions {
+          case s: SubqueryExpression =>
+            if (isRewritedByMV(database, mv, s.plan)) {
+              return true
+            }
+            s
+          case e => e
+        }
     }
     false
   }
@@ -480,12 +517,21 @@ class RewriteSuite extends SparkFunSuite with PredicateHelper {
     val (rewritePlan, rewriteRows) = getPlanAndRows(sql)
 
     // 2.compare plan
-    assert(isRewritedByMV(database, mv, rewritePlan))
+    val isRewrited = isRewritedByMV(database, mv, rewritePlan)
+    if (!isRewrited) {
+      logWarning(s"sql $sql; logicalPlan $rewritePlan is not rewritedByMV $mv")
+    }
+    assert(isRewrited)
+
+    if (noData) {
+      return
+    }
 
     // 3.compare row
     disableCachePlugin()
     val expectedRows = getRows(sql)
     compareRows(rewriteRows, expectedRows, noData)
+    enableCachePlugin()
   }
 
   def isNotRewritedByMV(logicalPlan: LogicalPlan): Boolean = {
@@ -516,5 +562,6 @@ class RewriteSuite extends SparkFunSuite with PredicateHelper {
     disableCachePlugin()
     val expectedRows = getRows(sql)
     compareRows(rewriteRows, expectedRows, noData)
+    enableCachePlugin()
   }
 }

@@ -17,11 +17,12 @@
 
 package org.apache.spark.deploy.history
 
-import com.huawei.boostkit.spark.util.RewriteLogger
+import com.huawei.boostkit.spark.util.{KerberosUtil, RewriteLogger}
 import java.io.FileNotFoundException
 import java.text.SimpleDateFormat
 import java.util.ServiceLoader
 import java.util.regex.Pattern
+import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, FileSystem, Path}
 import org.json4s.DefaultFormats
 import org.json4s.jackson.Json
@@ -43,9 +44,14 @@ import org.apache.spark.util.kvstore.{InMemoryStore, KVStore}
 class LogsParser(conf: SparkConf, eventLogDir: String, outPutDir: String) extends RewriteLogger {
 
   private val LINE_SEPARATOR = "\n"
-  private val hadoopConf = SparkHadoopUtil.get.newConfiguration(conf)
+  private val hadoopConf = confLoad()
   // Visible for testing
   private[history] val fs: FileSystem = new Path(eventLogDir).getFileSystem(hadoopConf)
+
+  def confLoad(): Configuration = {
+    val configuration: Configuration = SparkHadoopUtil.get.newConfiguration(conf)
+    KerberosUtil.newConfiguration(configuration)
+  }
 
   /**
    * parseAppHistoryLog
@@ -94,12 +100,17 @@ class LogsParser(conf: SparkConf, eventLogDir: String, outPutDir: String) extend
               }
             }
           }
+          val duration = if (uiData.completionTime.isDefined) {
+            (uiData.completionTime.get.getTime - uiData.submissionTime) + "ms"
+          } else {
+            "Unfinished"
+          }
 
           // write dot
           val graph: SparkPlanGraph = sqlStatusStore.planGraph(executionId)
           sqlStatusStore.planGraph(executionId)
           val metrics = sqlStatusStore.executionMetrics(executionId)
-          val node = getNodeInfo(graph)
+          val node = getNodeInfo(graph, metrics)
 
           val jsonMap = Map(
             "logName" -> appId,
@@ -108,7 +119,8 @@ class LogsParser(conf: SparkConf, eventLogDir: String, outPutDir: String) extend
             "materialized views" -> mvs,
             "physical plan" -> planDesc,
             "dot metrics" -> graph.makeDotFile(metrics),
-            "node metrics" -> node)
+            "node metrics" -> node,
+            "duration" -> duration)
           jsons :+= jsonMap
         }
       }
@@ -116,7 +128,7 @@ class LogsParser(conf: SparkConf, eventLogDir: String, outPutDir: String) extend
       case e: FileNotFoundException =>
         throw e
       case e: Throwable =>
-        logWarning(s"Failed to parseAppHistoryLog ${appId} for ${e.getMessage}")
+        logWarning(s"Failed to parseAppHistoryLog $appId for ${e.getMessage}")
     }
     jsons
   }
@@ -163,29 +175,25 @@ class LogsParser(conf: SparkConf, eventLogDir: String, outPutDir: String) extend
    * @param graph SparkPlanGraph
    * @return NodeInfo
    */
-  def getNodeInfo(graph: SparkPlanGraph): String = {
+  def getNodeInfo(graph: SparkPlanGraph, metricsValue: Map[Long, String]): String = {
     // write node
-    val tmpContext = new StringBuilder
+    val tmpContext = new mutable.StringBuilder
     tmpContext.append("[PlanMetric]")
     nextLine(tmpContext)
     graph.allNodes.foreach { node =>
       tmpContext.append(s"id:${node.id} name:${node.name} desc:${node.desc}")
       nextLine(tmpContext)
       node.metrics.foreach { metric =>
-        metric.toString
-        tmpContext.append("SQLPlanMetric(")
-        tmpContext.append(metric.name)
-        tmpContext.append(",")
-        if (metric.metricType == "timing") {
-          tmpContext.append(s"${metric.accumulatorId * 1000000} ns, ")
-        } else if (metric.metricType == "nsTiming") {
-          tmpContext.append(s"${metric.accumulatorId} ns, ")
-        } else {
-          tmpContext.append(s"${metric.accumulatorId}, ")
+        val value = metricsValue.get(metric.accumulatorId)
+        if (value.isDefined) {
+          tmpContext.append("SQLPlanMetric(")
+              .append(metric.name)
+              .append(",")
+              .append(getMetrics(value.get)).append(", ")
+              .append(metric.metricType)
+              .append(")")
+          nextLine(tmpContext)
         }
-        tmpContext.append(metric.metricType)
-        tmpContext.append(")")
-        nextLine(tmpContext)
       }
       nextLine(tmpContext)
       nextLine(tmpContext)
@@ -206,13 +214,41 @@ class LogsParser(conf: SparkConf, eventLogDir: String, outPutDir: String) extend
           tmpContext.append(s"${cluster.nodes(i).id} ")
         }
         nextLine(tmpContext)
-      case node =>
+      case _ =>
     }
     nextLine(tmpContext)
     tmpContext.toString()
   }
 
-  def nextLine(context: StringBuilder): Unit = {
+  def getMetrics(context: String): String = {
+    val separator = '\n'
+    val detail = s"total (min, med, max (stageId: taskId))$separator"
+    if (!context.contains(detail)) {
+      return context
+    }
+    // get metrics like 'total (min, med, max (stageId: taskId))'.
+    val lines = context.split(separator)
+    val res = lines.map(_.replaceAll(" \\(", ", ")
+        .replace("stage ", "")
+        .replace("task ", "")
+        .replace(")", "")
+        .replace(":", ", ")
+        .split(",")).reduce((t1, t2) => {
+      val sb = new StringBuilder
+      sb.append('[')
+      for (i <- 0 until (t1.size)) {
+        sb.append(t1(i)).append(":").append(t2(i))
+        if (i != t1.size - 1) {
+          sb.append(", ")
+        }
+      }
+      sb.append(']')
+      Array(sb.toString())
+    })
+    res(0)
+  }
+
+  def nextLine(context: mutable.StringBuilder): Unit = {
     context.append(LINE_SEPARATOR)
   }
 
@@ -325,6 +361,8 @@ arg1: output dir in hdfs, eg. hdfs://server1:9000/logParser
 arg2: log file to be parsed, eg. application_1646816941391_0115.lz4
  */
 object ParseLog extends RewriteLogger {
+  val regex = ".*application_[0-9]+_[0-9]+.*(\\.lz4)?$"
+
   def main(args: Array[String]): Unit = {
     if (args == null || args.length != 3) {
       throw new RuntimeException("input params is invalid,such as below\n" +
@@ -346,7 +384,6 @@ object ParseLog extends RewriteLogger {
     val logParser = new LogsParser(conf, sparkEventLogDir, outputDir)
 
     // file pattern
-    val regex = "^application_[0-9]+._[0-9]+.lz4$"
     val pattern = Pattern.compile(regex)
     val matcher = pattern.matcher(logName)
     if (matcher.find) {
@@ -391,7 +428,7 @@ object ParseLogs extends RewriteLogger {
     val logParser = new LogsParser(conf, sparkEventLogDir, outputDir)
 
     // file pattern
-    val regex = "^application_[0-9]+._[0-9]+.lz4$"
+    val regex = ParseLog.regex
     val pattern = Pattern.compile(regex)
     val dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm")
     val appIds = logParser.listAppHistoryLogs(pattern,

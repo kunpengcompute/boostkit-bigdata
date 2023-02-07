@@ -25,10 +25,12 @@ import org.apache.commons.io.IOUtils
 import org.apache.commons.lang3.time.DateUtils
 import org.json4s.DefaultFormats
 import org.json4s.jackson.Json
+import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach}
+import org.scalatest.funsuite.AnyFunSuite
 
-import org.apache.spark.SparkFunSuite
-
-class LogsParserSuite extends SparkFunSuite {
+class LogsParserSuite extends AnyFunSuite
+    with BeforeAndAfterAll
+    with BeforeAndAfterEach {
 
   test("parse") {
     val path = this.getClass.getResource("/").getPath
