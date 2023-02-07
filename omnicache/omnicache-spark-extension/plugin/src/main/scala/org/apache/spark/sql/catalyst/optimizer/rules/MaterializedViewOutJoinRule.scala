@@ -120,7 +120,7 @@ class MaterializedViewOutJoinRule(sparkSession: SparkSession)
     val simplifiedViewPlanString =
       simplifiedPlanString(findOriginExpression(viewOrigins, viewQueryPlan), OUTER_JOIN_CONDITION)
 
-    // Push down the topmost filter condition
+    // Push down the topmost filter condition for simplifiedPlanString() matching.
     val pushDownQueryPLan = PushDownPredicates.apply(queryPlan)
     var rewritten = false
     val res = pushDownQueryPLan.transform {
@@ -128,6 +128,7 @@ class MaterializedViewOutJoinRule(sparkSession: SparkSession)
         val simplifiedQueryPlanString = simplifiedPlanString(
           findOriginExpression(queryOrigins, curPlan), OUTER_JOIN_CONDITION)
         if (simplifiedQueryPlanString == simplifiedViewPlanString) {
+          // Predicate compensation for matching execution plans.
           val viewExpr = extractPredictExpressions(
             findOriginExpression(viewOrigins, viewQueryPlan), EMPTY_BIMAP, COMPENSABLE_CONDITION)
           val queryExpr = extractPredictExpressions(

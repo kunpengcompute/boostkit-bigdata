@@ -26,7 +26,7 @@ import org.apache.spark.sql.catalyst.catalog.{CatalogTable, HiveTableRelation}
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.optimizer._
 import org.apache.spark.sql.catalyst.optimizer.rules.RewriteTime
-import org.apache.spark.sql.catalyst.plans.JoinType
+import org.apache.spark.sql.catalyst.plans.{Cross, FullOuter, Inner, JoinType, LeftAnti, LeftOuter, LeftSemi, RightOuter}
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.datasources.LogicalRelation
@@ -216,13 +216,13 @@ trait RewriteHelper extends PredicateHelper with RewriteLogger {
           conjunctivePredicates ++= splitConjunctivePredicates(condition)
         }
       case Join(_, _, joinType, condition, _) =>
-        joinType.sql match {
-          case "CROSS" =>
-          case "INNER" =>
+        joinType match {
+          case Cross =>
+          case Inner =>
             if (condition.isDefined & ((conditionFlag & INNER_JOIN_CONDITION) > 0)) {
               conjunctivePredicates ++= splitConjunctivePredicates(condition.get)
             }
-          case "LEFT OUTER" | "RIGHT OUTER" | "FULL OUTER" | "LEFT SEMI" | "LEFT ANTI" =>
+          case LeftOuter | RightOuter | FullOuter | LeftSemi | LeftAnti =>
             if (condition.isDefined & ((conditionFlag & OUTER_JOIN_CONDITION) > 0)) {
               conjunctivePredicates ++= splitConjunctivePredicates(condition.get)
             }
@@ -449,26 +449,34 @@ trait RewriteHelper extends PredicateHelper with RewriteLogger {
    * generate string for simplifiedPlan
    *
    * @param plan plan
+   * @param jt joinType
    * @return string for simplifiedPlan
    */
   def simplifiedPlanString(plan: LogicalPlan, jt: Int): String = {
     val EMPTY_STRING = ""
     RewriteHelper.canonicalize(ExprSimplifier.simplify(plan)).collect {
       case Join(_, _, joinType, condition, hint) =>
-        joinType.sql match {
-          case "INNER" =>
+        joinType match {
+          case Inner =>
             if ((INNER_JOIN_CONDITION & jt) > 0) {
               joinType.toString + condition.getOrElse(Literal.TrueLiteral).sql + hint.toString()
+            } else {
+              EMPTY_STRING
             }
-          case "LEFT OUTER" | "RIGHT OUTER" | "FULL OUTER" | "LEFT SEMI" | "LEFT ANTI" =>
+          case LeftOuter | RightOuter | FullOuter | LeftSemi | LeftAnti =>
             if ((OUTER_JOIN_CONDITION & jt) > 0) {
               joinType.toString + condition.getOrElse(Literal.TrueLiteral).sql + hint.toString()
+            } else {
+              EMPTY_STRING
             }
           case _ =>
+            EMPTY_STRING
         }
       case Filter(condition: Expression, _) =>
         if ((FILTER_CONDITION & jt) > 0) {
           condition.sql
+        } else {
+          EMPTY_STRING
         }
       case HiveTableRelation(tableMeta, _, _, _, _) =>
         tableMeta.identifier.toString()
@@ -631,14 +639,14 @@ object RewriteHelper extends PredicateHelper with RewriteLogger {
   def canonicalize(plan: LogicalPlan): LogicalPlan = {
     RewriteTime.withTimeStat("canonicalize") {
       plan transform {
-        case f@Filter(condition: Expression, child: LogicalPlan) =>
-          f.copy(canonicalize(condition), child)
-        case j@Join(left: LogicalPlan, right: LogicalPlan, joinType: JoinType,
+        case filter@Filter(condition: Expression, child: LogicalPlan) =>
+          filter.copy(canonicalize(condition), child)
+        case join@Join(left: LogicalPlan, right: LogicalPlan, joinType: JoinType,
         condition: Option[Expression], hint: JoinHint) =>
           if (condition.isDefined) {
-            j.copy(left, right, joinType, Option(canonicalize(condition.get)), hint)
+            join.copy(left, right, joinType, Option(canonicalize(condition.get)), hint)
           } else {
-            j
+            join
           }
         case e =>
           e

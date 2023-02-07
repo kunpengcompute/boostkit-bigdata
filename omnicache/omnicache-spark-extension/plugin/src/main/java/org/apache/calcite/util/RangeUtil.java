@@ -34,7 +34,12 @@ import java.util.Set;
 import static org.apache.spark.sql.types.DataTypes.NullType;
 import static org.apache.spark.sql.types.DataTypes.BooleanType;
 
-public class RangeUtil {
+public final class RangeUtil {
+
+    private RangeUtil() {
+        throw new IllegalStateException("Utility class");
+    }
+
     public static Expression simplifyUsingPredicates(Expression expr, Set<Expression> pulledUpPredicates) {
         Option<Comparison> opt = ExprOptUtil.createComparison(expr);
         if (opt.isEmpty() || opt.get().literal().value() == null) {

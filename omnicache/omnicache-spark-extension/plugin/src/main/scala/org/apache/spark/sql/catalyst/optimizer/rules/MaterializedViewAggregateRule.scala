@@ -195,12 +195,8 @@ class MaterializedViewAggregateRule(sparkSession: SparkSession)
               }
               agg.resultAttribute match {
                 case DecimalType.Expression(prec, scale) =>
-                  if (prec - 10 > 0) {
-                    copyAlias(a, MakeDecimal(agg.copy(aggregateFunction =
-                      Sum(UnscaledValue(viewTableAttr))), prec, scale), qualifier)
-                  } else {
-                    copyAlias(a, agg.copy(aggregateFunction = Sum(viewTableAttr)), qualifier)
-                  }
+                  copyAlias(a, MakeDecimal(agg.copy(aggregateFunction =
+                    Sum(UnscaledValue(viewTableAttr))), prec, scale), qualifier)
                 case _ =>
                   copyAlias(a, agg.copy(aggregateFunction = Sum(viewTableAttr)), qualifier)
               }
@@ -371,7 +367,6 @@ class MaterializedViewOutJoinAggregateRule(sparkSession: SparkSession)
       columnMapping: Map[ExpressionEqual, mutable.Set[ExpressionEqual]],
       viewProjectList: Seq[Expression], viewTableAttrs: Seq[Attribute]):
   Option[LogicalPlan] = {
-    // TODO Perhaps the inner join condition and Filter condition should be compensated.
     val simplifiedViewPlanString = simplifiedPlanString(
       findOriginExpression(viewQueryPlan), ALL_CONDITION)
     val simplifiedQueryPlanString = simplifiedPlanString(

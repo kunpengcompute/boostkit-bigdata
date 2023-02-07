@@ -17,8 +17,6 @@
 
 package org.apache.spark.sql.catalyst.optimizer.rules
 
-import scala.io.Source
-
 import org.scalatest.funsuite.AnyFunSuite
 
 import org.apache.spark.sql.SparkSession
@@ -41,8 +39,7 @@ class TpcdsNativeSuite extends AnyFunSuite {
     if (catalog.tableExists(TableIdentifier("store_sales"))) {
       return
     }
-    val ddlPath = this.getClass.getResource("/tpcds_ddl.sql").getPath
-    val ddls = Source.fromFile(ddlPath).mkString.split(';')
+    val ddls = TpcdsUtils.getResource("/", "tpcds_ddl.sql").split(';')
     ddls.foreach(ddl => spark_native.sql(ddl))
   }
 
@@ -52,8 +49,7 @@ class TpcdsNativeSuite extends AnyFunSuite {
    */
   test("Run the native tpcds sql") {
     val sqlNum = 72
-    val filePath = s"${this.getClass.getResource("/tpcds").getPath}/q${sqlNum}.sql"
-    val sql = Source.fromFile(filePath).mkString
+    val sql = TpcdsUtils.getResource("/tpcds", s"q${sqlNum}.sql")
     val df = spark_native.sql(sql)
     val qe = df.queryExecution
     df.explain()

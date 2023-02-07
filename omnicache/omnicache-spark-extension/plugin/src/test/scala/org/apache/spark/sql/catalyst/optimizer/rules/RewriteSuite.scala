@@ -23,6 +23,7 @@ import java.io.File
 import java.util.Locale
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach}
 import org.scalatest.funsuite.AnyFunSuite
+import scala.io.Source
 
 import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 import org.apache.spark.sql.catalyst.TableIdentifier
@@ -35,6 +36,7 @@ import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.catalyst.util.{sideBySide, toPrettySQL}
 import org.apache.spark.sql.execution.datasources.LogicalRelation
 import org.apache.spark.sql.types.StringType
+
 
 class RewriteSuite extends AnyFunSuite
     with BeforeAndAfterAll
@@ -563,5 +565,19 @@ class RewriteSuite extends AnyFunSuite
     val expectedRows = getRows(sql)
     compareRows(rewriteRows, expectedRows, noData)
     enableCachePlugin()
+  }
+}
+
+object TpcdsUtils {
+  /**
+   * Obtain the contents of the resource file
+   *
+   * @param path     If the path of the file relative to reousrce is "/tpcds", enter "/tpcds".
+   * @param fileName If the file name is q14.sql, enter q14.sql here
+   * @return
+   */
+  def getResource(path: String = "/", fileName: String): String = {
+    val filePath = s"${this.getClass.getResource(path).getPath}/${fileName}"
+    Source.fromFile(filePath).mkString
   }
 }

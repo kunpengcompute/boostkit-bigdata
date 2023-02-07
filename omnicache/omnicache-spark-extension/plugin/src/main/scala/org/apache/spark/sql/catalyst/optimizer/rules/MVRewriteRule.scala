@@ -158,11 +158,11 @@ class MVRewriteRule(session: SparkSession) extends Rule[LogicalPlan] with Rewrit
     plan.foreach {
       case j: Join =>
         j.joinType match {
-          case _: LeftOuter.type => return true
-          case _: RightOuter.type => return true
-          case _: FullOuter.type => return true
-          case _: LeftSemi.type => return true
-          case _: LeftAnti.type => return true
+          case LeftOuter => return true
+          case RightOuter => return true
+          case FullOuter => return true
+          case LeftSemi => return true
+          case LeftAnti => return true
           case _ =>
         }
       case _ =>

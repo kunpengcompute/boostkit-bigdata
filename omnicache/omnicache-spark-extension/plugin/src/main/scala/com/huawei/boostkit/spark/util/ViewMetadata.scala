@@ -236,6 +236,7 @@ object ViewMetadata extends RewriteHelper {
     loadViewContainsTablesFromFile()
     loadViewMetadataFromFile()
     loadViewPriorityFromFile()
+    checkViewMetadataComplete()
   }
 
   /**
@@ -505,14 +506,17 @@ object ViewMetadata extends RewriteHelper {
    */
   def filterValidMetadata(): Array[FileStatus] = {
     val files = fs.listStatus(metadataPath).flatMap(x => fs.listStatus(x.getPath))
-    if (OmniCachePluginConfig.getConf.omniCacheDB.isEmpty) {
-      return files
+    val dbs = if (OmniCachePluginConfig.getConf.omniCacheDB.nonEmpty) {
+      OmniCachePluginConfig.getConf.omniCacheDB
+          .split(",").map(_.toLowerCase(Locale.ROOT)).toSet
+    } else {
+      fs.listStatus(metadataPath).map(_.getPath.getName).toSet
     }
-    val dbs = OmniCachePluginConfig.getConf.omniCacheDB
-        .split(",").map(_.toLowerCase(Locale.ROOT)).toSet
     val dbTables = mutable.Set.empty[String]
     dbs.foreach { db =>
-      dbTables ++= spark.sessionState.catalog.listTables(db).map(formatViewName)
+      if (spark.sessionState.catalog.databaseExists(db)) {
+        dbTables ++= spark.sessionState.catalog.listTables(db).map(formatViewName)
+      }
     }
     var res = files.filter { file =>
       dbTables.contains(file.getPath.getName)
@@ -531,6 +535,7 @@ object ViewMetadata extends RewriteHelper {
 
     res
   }
+
 
   /**
    * load mv metadata from file
@@ -657,5 +662,24 @@ object ViewMetadata extends RewriteHelper {
    */
   def isViewEnable(jsons: Map[String, String]): Boolean = {
     jsons.contains(MV_REWRITE_ENABLED) && jsons(MV_REWRITE_ENABLED).toBoolean
+  }
+
+  /**
+   * check mv metadata load complete
+   */
+  def checkViewMetadataComplete(): Unit = {
+    val loadSize = viewToViewQueryPlan.size()
+    var checkRes = true
+    checkRes &&= (loadSize == viewToTablePlan.size())
+    checkRes &&= (loadSize == viewToContainsTables.size())
+    checkRes &&= (loadSize == viewProperties.size())
+    if (!checkRes) {
+      viewToViewQueryPlan.clear()
+      viewToTablePlan.clear()
+      viewToContainsTables.clear()
+      viewProperties.clear()
+      tableToViews.clear()
+      viewProperties.clear()
+    }
   }
 }
