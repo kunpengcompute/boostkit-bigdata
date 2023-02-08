@@ -57,7 +57,7 @@ class MergeIterator(iter: Iterator[ColumnarBatch], localSchema: StructType,
           vecs(index) = new BooleanVec(columnSize)
         case StringType =>
           val vecType: DataType = sparkTypeToOmniType(field.dataType, field.metadata)
-          vecs(index) = new VarcharVec(VarcharVec.INIT_CAPACITY_IN_BYTES, columnSize)
+          vecs(index) = new VarcharVec(columnSize)
         case dt: DecimalType =>
           if (DecimalType.is64BitDecimalType(dt)) {
             vecs(index) = new LongVec(columnSize)

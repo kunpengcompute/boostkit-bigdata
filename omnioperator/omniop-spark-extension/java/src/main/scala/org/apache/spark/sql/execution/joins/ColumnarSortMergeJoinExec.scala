@@ -152,7 +152,7 @@ case class ColumnarSortMergeJoinExec(
     val joinCondStr = if (condition.isDefined) {
       s"${condition.get}${condition.get.dataType}"
     } else "None"
-    
+
     s"""
        |$formattedNodeName
        |$simpleStringWithNodeId
@@ -437,7 +437,7 @@ case class ColumnarSortMergeJoinExec(
               case DataType.DataTypeId.OMNI_BOOLEAN =>
                 new BooleanVec(0)
               case DataType.DataTypeId.OMNI_CHAR | DataType.DataTypeId.OMNI_VARCHAR =>
-                new VarcharVec(0, 0)
+                new VarcharVec(0)
               case DataType.DataTypeId.OMNI_DECIMAL128 =>
                 new Decimal128Vec(0)
               case DataType.DataTypeId.OMNI_SHORT =>

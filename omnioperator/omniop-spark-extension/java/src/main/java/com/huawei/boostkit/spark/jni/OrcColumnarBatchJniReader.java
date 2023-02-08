@@ -19,7 +19,6 @@
 package com.huawei.boostkit.spark.jni;
 
 import nova.hetu.omniruntime.type.DataType;
-import nova.hetu.omniruntime.type.Decimal128DataType;
 import nova.hetu.omniruntime.vector.*;
 
 import org.apache.spark.sql.catalyst.util.RebaseDateTime;
@@ -273,7 +272,7 @@ public class OrcColumnarBatchJniReader {
                     break;
                 }
                 case OMNI_DECIMAL128: {
-                    vecList[i] = new Decimal128Vec(vecNativeIds[nativeGetId], Decimal128DataType.DECIMAL128);
+                    vecList[i] = new Decimal128Vec(vecNativeIds[nativeGetId]);
                     break;
                 }
                 default: {

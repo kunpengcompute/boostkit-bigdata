@@ -158,7 +158,7 @@ TEST_F(ScanTest, test_copy_intVec)
     // int type
     copyToOmniVec(orc::TypeKind::INT, omniType, omniVecId, root->fields[0]);
     ASSERT_EQ(omniType, omniruntime::type::OMNI_INT);
-    omniruntime::vec::IntVector *olbInt = (omniruntime::vec::IntVector *)(omniVecId);
+    auto *olbInt = (omniruntime::vec::Vector<int32_t> *)(omniVecId);
     ASSERT_EQ(olbInt->GetValue(0), 10);
     delete olbInt;
 }
@@ -170,10 +170,9 @@ TEST_F(ScanTest, test_copy_varCharVec)
     // varchar type
     copyToOmniVec(orc::TypeKind::VARCHAR, omniType, omniVecId, root->fields[1], 60);
     ASSERT_EQ(omniType, omniruntime::type::OMNI_VARCHAR);
-    uint8_t *actualChar = nullptr;
-    omniruntime::vec::VarcharVector *olbVc = (omniruntime::vec::VarcharVector *)(omniVecId);
-    int len = olbVc->GetValue(0, &actualChar);
-    std::string actualStr(reinterpret_cast<char *>(actualChar), 0, len);
+    auto *olbVc = (omniruntime::vec::Vector<omniruntime::vec::LargeStringContainer<std::string_view>> *)(
+            omniVecId);
+    std::string_view actualStr = olbVc->GetValue(0);
     ASSERT_EQ(actualStr, "varchar_1");
     delete olbVc;
 }
@@ -182,14 +181,13 @@ TEST_F(ScanTest, test_copy_stringVec)
 {
     int omniType = 0;
     uint64_t omniVecId = 0;
-    uint8_t *actualChar = nullptr;
     // string type
     copyToOmniVec(orc::TypeKind::STRING, omniType, omniVecId, root->fields[2]);
     ASSERT_EQ(omniType, omniruntime::type::OMNI_VARCHAR);
-    omniruntime::vec::VarcharVector *olbStr = (omniruntime::vec::VarcharVector *)(omniVecId);
-    int len = olbStr->GetValue(0, &actualChar);
-    std::string actualStr2(reinterpret_cast<char *>(actualChar), 0, len);
-    ASSERT_EQ(actualStr2, "string_type_1");
+    auto *olbStr = (omniruntime::vec::Vector<omniruntime::vec::LargeStringContainer<std::string_view>> *)(
+            omniVecId);
+    std::string_view actualStr = olbStr->GetValue(0);
+    ASSERT_EQ(actualStr, "string_type_1");
     delete olbStr;
 }
 
@@ -200,7 +198,7 @@ TEST_F(ScanTest, test_copy_longVec)
     // bigint type
     copyToOmniVec(orc::TypeKind::LONG, omniType, omniVecId, root->fields[3]);
     ASSERT_EQ(omniType, omniruntime::type::OMNI_LONG);
-    omniruntime::vec::LongVector *olbLong = (omniruntime::vec::LongVector *)(omniVecId);
+    auto *olbLong = (omniruntime::vec::Vector<int64_t> *)(omniVecId);
     ASSERT_EQ(olbLong->GetValue(0), 10000);
     delete olbLong;
 }
@@ -209,15 +207,14 @@ TEST_F(ScanTest, test_copy_charVec)
 {
     int omniType = 0;
     uint64_t omniVecId = 0;
-    uint8_t *actualChar = nullptr;
     // char type
     copyToOmniVec(orc::TypeKind::CHAR, omniType, omniVecId, root->fields[4], 40);
     ASSERT_EQ(omniType, omniruntime::type::OMNI_VARCHAR);
-    omniruntime::vec::VarcharVector *olbChar40 = (omniruntime::vec::VarcharVector *)(omniVecId);
-    int len = olbChar40->GetValue(0, &actualChar);
-    std::string actualStr3(reinterpret_cast<char *>(actualChar), 0, len);
-    ASSERT_EQ(actualStr3, "char_1");
-    delete olbChar40;
+    auto *olbChar = (omniruntime::vec::Vector<omniruntime::vec::LargeStringContainer<std::string_view>> *)(
+            omniVecId);
+    std::string_view actualStr = olbChar->GetValue(0);
+    ASSERT_EQ(actualStr, "char_1");
+    delete olbChar;
 }
 
 TEST_F(ScanTest, test_copy_doubleVec)
@@ -227,7 +224,7 @@ TEST_F(ScanTest, test_copy_doubleVec)
     // double type
     copyToOmniVec(orc::TypeKind::DOUBLE, omniType, omniVecId, root->fields[6]);
     ASSERT_EQ(omniType, omniruntime::type::OMNI_DOUBLE);
-    omniruntime::vec::DoubleVector *olbDouble = (omniruntime::vec::DoubleVector *)(omniVecId);
+    auto *olbDouble = (omniruntime::vec::Vector<double> *)(omniVecId);
     ASSERT_EQ(olbDouble->GetValue(0), 1111.1111);
     delete olbDouble;
 }
@@ -239,7 +236,7 @@ TEST_F(ScanTest, test_copy_booleanVec)
     // boolean type
     copyToOmniVec(orc::TypeKind::BOOLEAN, omniType, omniVecId, root->fields[9]);
     ASSERT_EQ(omniType, omniruntime::type::OMNI_BOOLEAN);
-    omniruntime::vec::BooleanVector *olbBoolean = (omniruntime::vec::BooleanVector *)(omniVecId);
+    auto *olbBoolean = (omniruntime::vec::Vector<bool> *)(omniVecId);
     ASSERT_EQ(olbBoolean->GetValue(0), true);
     delete olbBoolean;
 }
@@ -251,7 +248,7 @@ TEST_F(ScanTest, test_copy_shortVec)
     // short type
     copyToOmniVec(orc::TypeKind::SHORT, omniType, omniVecId, root->fields[10]);
     ASSERT_EQ(omniType, omniruntime::type::OMNI_SHORT);
-    omniruntime::vec::ShortVector *olbShort = (omniruntime::vec::ShortVector *)(omniVecId);
+    auto *olbShort = (omniruntime::vec::Vector<short> *)(omniVecId);
     ASSERT_EQ(olbShort->GetValue(0), 11);
     delete olbShort;
 }

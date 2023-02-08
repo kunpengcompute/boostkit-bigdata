@@ -242,7 +242,7 @@ TEST_F (ShuffleTest, Split_Short_10WRows) {
                                               0,
                                               tmpTestingDir);
     for (uint64_t j = 0; j < 100; j++) {
-        VectorBatch* vb = CreateVectorBatch_1FixCol_withPid(partitionNum, 1000, OMNI_SHORT);
+        VectorBatch* vb = CreateVectorBatch_1FixCol_withPid(partitionNum, 1000, ShortType());
         Test_splitter_split(splitterId, vb);
     }
     Test_splitter_stop(splitterId);
@@ -270,7 +270,7 @@ TEST_F (ShuffleTest, Split_Boolean_10WRows) {
                                               0,
                                               tmpTestingDir);
     for (uint64_t j = 0; j < 100; j++) {
-        VectorBatch* vb = CreateVectorBatch_1FixCol_withPid(partitionNum, 1000, OMNI_BOOLEAN);
+        VectorBatch* vb = CreateVectorBatch_1FixCol_withPid(partitionNum, 1000, BooleanType());
         Test_splitter_split(splitterId, vb);
     }
     Test_splitter_stop(splitterId);
@@ -298,7 +298,7 @@ TEST_F (ShuffleTest, Split_Long_100WRows) {
                                               0,
                                               tmpTestingDir);
     for (uint64_t j = 0; j < 100; j++) {
-        VectorBatch* vb = CreateVectorBatch_1FixCol_withPid(partitionNum, 10000, OMNI_LONG);
+        VectorBatch* vb = CreateVectorBatch_1FixCol_withPid(partitionNum, 10000, LongType());
         Test_splitter_split(splitterId, vb);
     }
     Test_splitter_stop(splitterId);
