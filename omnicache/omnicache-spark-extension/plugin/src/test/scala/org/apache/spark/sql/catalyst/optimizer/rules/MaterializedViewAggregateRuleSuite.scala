@@ -532,4 +532,52 @@ class MaterializedViewAggregateRuleSuite extends RewriteSuite {
         |""".stripMargin
     )
   }
+
+  // min(distinct)/max(distinct)/avg() enhance
+  test("mv_agg9") {
+    spark.sql(
+      """
+        |DROP MATERIALIZED VIEW IF EXISTS mv_agg9;
+        |""".stripMargin
+    )
+    spark.sql(
+      """
+        |CREATE MATERIALIZED VIEW IF NOT EXISTS mv_agg9
+        |AS
+        |SELECT c.empid,c.deptno,c.locationid,
+        |min(distinct c.integertype) as _min_dist,
+        |max(distinct c.longtype) as _max_dist,
+        |count(c.decimaltype) as _count,
+        |avg(c.decimaltype) as _avg
+        |FROM column_type c JOIN emps e
+        |ON c.empid=e.empid
+        |AND c.empid=1
+        |GROUP BY c.empid,c.deptno,c.locationid;
+        |""".stripMargin
+    )
+  }
+
+  test("mv_agg9_1") {
+    val sql =
+      """
+        |SELECT c.empid,c.deptno,
+        |min(distinct c.integertype) as _min_dist,
+        |max(distinct c.longtype) as _max_dist,
+        |count(c.decimaltype) as _count,
+        |avg(c.decimaltype) as _avg
+        |FROM column_type c JOIN emps e
+        |ON c.empid=e.empid
+        |AND c.empid=1
+        |GROUP BY c.empid,c.deptno;
+        |""".stripMargin
+    comparePlansAndRows(sql, "default", "mv_agg9", noData = true)
+  }
+
+  test("drop_mv_agg9") {
+    spark.sql(
+      """
+        |DROP MATERIALIZED VIEW IF EXISTS mv_agg9;
+        |""".stripMargin
+    )
+  }
 }

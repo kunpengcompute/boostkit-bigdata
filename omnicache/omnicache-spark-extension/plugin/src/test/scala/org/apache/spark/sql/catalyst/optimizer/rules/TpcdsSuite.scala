@@ -505,5 +505,41 @@ class TpcdsSuite extends RewriteSuite {
     spark.sql("DROP MATERIALIZED VIEW IF EXISTS mv103")
     spark.sql("DROP MATERIALIZED VIEW IF EXISTS mv9")
   }
+
+  test("subQuery condition 01") {
+    spark.sql("DROP MATERIALIZED VIEW IF EXISTS sc01")
+    spark.sql(
+      """
+        |CREATE MATERIALIZED VIEW IF NOT EXISTS sc01 AS
+        |SELECT *
+        |FROM catalog_sales t1
+        | LEFT JOIN (select * from inventory where inv_item_sk > 100 or
+        | inv_date_sk < 40) t2 ON (cs_item_sk = t2.inv_item_sk)
+        | LEFT JOIN warehouse t3 ON (t3.w_warehouse_sk = t2.inv_warehouse_sk)
+        | Join item t4 ON (t4.i_item_sk = t1.cs_item_sk)
+        |WHERE t2.inv_quantity_on_hand < t1.cs_quantity;
+        |""".stripMargin
+    )
+    val sql =
+      """
+        |SELECT
+        | i_item_desc,
+        | w_warehouse_name,
+        | count(CASE WHEN p_promo_sk IS NULL
+        |   THEN 1
+        |     ELSE 0 END) promo,
+        | count(*) total_cnt
+        |FROM catalog_sales t1
+        | LEFT JOIN (select * from inventory where inv_item_sk > 100) t2
+        | ON (cs_item_sk = t2.inv_item_sk)
+        | LEFT JOIN warehouse t3 ON (t3.w_warehouse_sk = t2.inv_warehouse_sk)
+        | Join item t4 ON (t4.i_item_sk = t1.cs_item_sk)
+        | LEFT JOIN promotion ON (cs_item_sk = p_promo_sk)
+        |WHERE t2.inv_quantity_on_hand < t1.cs_quantity
+        |GROUP BY i_item_desc, w_warehouse_name;
+        |""".stripMargin
+    comparePlansAndRows(sql, "default", "sc01", noData = true)
+    spark.sql("DROP MATERIALIZED VIEW IF EXISTS sc01")
+  }
 }
 
