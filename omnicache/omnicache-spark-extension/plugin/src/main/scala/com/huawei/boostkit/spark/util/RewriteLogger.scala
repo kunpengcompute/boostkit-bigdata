@@ -38,6 +38,14 @@ trait RewriteLogger extends Logging {
     }
   }
 
+  def logDetail(f: => String): Unit = {
+    logLevel match {
+      case "ERROR" =>
+        logWarning(f)
+      case _ =>
+    }
+  }
+
   override def logInfo(msg: => String): Unit = {
     super.logInfo(s"$logFlag $msg")
   }

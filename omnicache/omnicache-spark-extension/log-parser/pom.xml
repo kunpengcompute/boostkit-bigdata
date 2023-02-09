@@ -16,20 +16,11 @@
 
     <name>log-parser</name>
 
-    <properties>
-        <guava.version>14.0.1</guava.version>
-    </properties>
-
     <dependencies>
         <dependency>
             <groupId>com.huawei.kunpeng</groupId>
             <artifactId>boostkit-omnicache-spark</artifactId>
             <version>3.1.1-1.0.0</version>
-        </dependency>
-        <dependency>
-            <groupId>com.google.guava</groupId>
-            <artifactId>guava</artifactId>
-            <version>${guava.version}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.spark</groupId>
@@ -45,22 +36,6 @@
         </dependency>
 
         <!-- test dependencies -->
-        <dependency>
-            <groupId>org.apache.spark</groupId>
-            <artifactId>spark-core_${scala.binary.version}</artifactId>
-            <type>test-jar</type>
-            <scope>test</scope>
-            <exclusions>
-                <exclusion>
-                    <groupId>org.apache.hadoop</groupId>
-                    <artifactId>hadoop-client</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>org.apache.curator</groupId>
-                    <artifactId>curator-recipes</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
         <dependency>
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>
@@ -232,7 +207,7 @@
                     <aggregate>true</aggregate>
                     <highlighting>true</highlighting>
                     <encoding>${project.build.sourceEncoding}</encoding>
-                    <skip>true</skip>
+                    <skip>${scoverage.skip}</skip>
                 </configuration>
             </plugin>
         </plugins>

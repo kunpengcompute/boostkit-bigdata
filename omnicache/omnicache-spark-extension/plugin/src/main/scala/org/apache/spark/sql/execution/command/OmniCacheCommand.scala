@@ -202,7 +202,7 @@ case class DropMaterializedViewCommand(
       catalog.refreshTable(tableName)
       catalog.dropTable(tableName, ifExists, purge)
       // remove mv from cache
-      ViewMetadata.removeMVCache(tableName)
+      ViewMetadata.deleteViewMetadata(tableName)
     } else if (ifExists) {
       // no-op
     } else {
@@ -288,6 +288,7 @@ case class AlterRewriteMaterializedViewCommand(
       if (enableRewrite) {
         ViewMetadata.addCatalogTableToCache(newTable)
       } else {
+        ViewMetadata.addCatalogTableToCache(newTable)
         ViewMetadata.removeMVCache(tableName)
       }
     } else {

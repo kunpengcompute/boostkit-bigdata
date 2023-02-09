@@ -178,7 +178,6 @@ class MaterializedViewAggregateRuleSuite extends RewriteSuite {
     spark.sql(sql).show()
   }
 
-
   test("mv_agg4") {
     spark.sql(
       """
@@ -457,6 +456,79 @@ class MaterializedViewAggregateRuleSuite extends RewriteSuite {
     spark.sql(
       """
         |DROP MATERIALIZED VIEW IF EXISTS mv_agg7;
+        |""".stripMargin
+    )
+  }
+
+  test("mv_agg8_1") {
+    // Aggregation hence(The group by field is different):
+    // min(distinct ) / max(distinct )
+    spark.sql(
+      """
+        |DROP MATERIALIZED VIEW IF EXISTS mv_agg8_1;
+        |""".stripMargin
+    )
+    spark.sql(
+      """
+        |CREATE MATERIALIZED VIEW IF NOT EXISTS mv_agg8_1
+        |AS
+        |SELECT
+        |c.deptno,
+        |c.locationid,
+        |max(c.longtype) as _max,
+        |min(c.floattype) as _min
+        |FROM column_type c
+        |GROUP BY c.empid,c.deptno,c.locationid;
+        |""".stripMargin
+    )
+    val sql =
+      """
+        |SELECT
+        |max(c.longtype) as _max,
+        |min(c.floattype) as _min
+        |FROM column_type c
+        |GROUP BY c.deptno,c.locationid;
+        |""".stripMargin
+    comparePlansAndRows(sql, "default", "mv_agg8_1", noData = false)
+    spark.sql(
+      """
+        |DROP MATERIALIZED VIEW IF EXISTS mv_agg8_1;
+        |""".stripMargin
+    )
+  }
+
+  test("mv_agg8_2") {
+    // Aggregation hence(The group by field is different):
+    // avg()
+    spark.sql(
+      """
+        |DROP MATERIALIZED VIEW IF EXISTS mv_agg8_2;
+        |""".stripMargin
+    )
+    spark.sql(
+      """
+        |CREATE MATERIALIZED VIEW IF NOT EXISTS mv_agg8_2
+        |AS
+        |SELECT
+        |c.deptno,
+        |c.locationid,
+        |avg(c.longtype) as _avg,
+        |count(c.longtype) as _count
+        |FROM column_type c
+        |GROUP BY c.empid,c.deptno,c.locationid;
+        |""".stripMargin
+    )
+    val sql =
+      """
+        |SELECT
+        |avg(c.longtype) as _avg
+        |FROM column_type c
+        |GROUP BY c.deptno,c.locationid;
+        |""".stripMargin
+    comparePlansAndRows(sql, "default", "mv_agg8_2", noData = false)
+    spark.sql(
+      """
+        |DROP MATERIALIZED VIEW IF EXISTS mv_agg8_2;
         |""".stripMargin
     )
   }

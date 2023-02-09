@@ -459,7 +459,7 @@ class SqlParserSuite extends RewriteSuite {
           .properties(MV_REWRITE_ENABLED).toBoolean
     )
     assert(
-      !ViewMetadata.isViewExists(table.quotedString)
+      !ViewMetadata.isViewExists(ViewMetadata.formatViewName(table))
     )
     spark.sql(
       """
@@ -472,7 +472,7 @@ class SqlParserSuite extends RewriteSuite {
           .properties(MV_REWRITE_ENABLED).toBoolean
     )
     assert(
-      ViewMetadata.isViewExists(table.quotedString)
+      ViewMetadata.isViewExists(ViewMetadata.formatViewName(table))
     )
   }
 
@@ -495,7 +495,7 @@ class SqlParserSuite extends RewriteSuite {
           .properties(MV_REWRITE_ENABLED).toBoolean
     )
     assert(
-      ViewMetadata.isViewExists(table.quotedString)
+      ViewMetadata.isViewExists(ViewMetadata.formatViewName(table))
     )
     spark.sql(
       """
@@ -508,7 +508,7 @@ class SqlParserSuite extends RewriteSuite {
           .properties(MV_REWRITE_ENABLED).toBoolean
     )
     assert(
-      !ViewMetadata.isViewExists(table.quotedString)
+      !ViewMetadata.isViewExists(ViewMetadata.formatViewName(table))
     )
   }
 
@@ -531,7 +531,7 @@ class SqlParserSuite extends RewriteSuite {
           .properties(MV_REWRITE_ENABLED).toBoolean
     )
     assert(
-      !ViewMetadata.isViewExists(table.quotedString)
+      !ViewMetadata.isViewExists(ViewMetadata.formatViewName(table))
     )
     spark.sql(
       """
@@ -544,7 +544,7 @@ class SqlParserSuite extends RewriteSuite {
           .properties(MV_REWRITE_ENABLED).toBoolean
     )
     assert(
-      ViewMetadata.isViewExists(table.quotedString)
+      ViewMetadata.isViewExists(ViewMetadata.formatViewName(table))
     )
   }
 
