@@ -32,6 +32,7 @@ import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.datasources.LogicalRelation
 import org.apache.spark.sql.internal.SQLConf
 
+
 trait RewriteHelper extends PredicateHelper with RewriteLogger {
 
   type ViewMetadataPackageType = (String, LogicalPlan, LogicalPlan)
@@ -449,7 +450,7 @@ trait RewriteHelper extends PredicateHelper with RewriteLogger {
    * generate string for simplifiedPlan
    *
    * @param plan plan
-   * @param jt joinType
+   * @param jt   joinType
    * @return string for simplifiedPlan
    */
   def simplifiedPlanString(plan: LogicalPlan, jt: Int): String = {
@@ -809,6 +810,29 @@ object RewriteHelper extends PredicateHelper with RewriteLogger {
       }
     }
     res
+  }
+
+  def getMVDatabase(MVTablePlan: LogicalPlan): Option[String] = {
+    MVTablePlan.foreach {
+      case _@HiveTableRelation(tableMeta, _, _, _, _) =>
+        return Some(tableMeta.database)
+      case _@LogicalRelation(_, _, catalogTable, _) =>
+        if (catalogTable.isDefined) {
+          return Some(catalogTable.get.database)
+        }
+      case _: LocalRelation =>
+      case _ =>
+    }
+    None
+  }
+
+  def daysToMillisecond(days: Long): Long = {
+    if (days > 3650 || days < 0) {
+      throw new IllegalArgumentException(
+        "The day time cannot be less than 0"
+            + "or exceed 3650.")
+    }
+    days * 24 * 60 * 60 * 1000
   }
 }
 

@@ -54,6 +54,7 @@ class RewriteSuite extends AnyFunSuite
       .config("spark.sql.omnicache.metadata.initbyquery.enable", "false")
       .config("hive.in.test", "true")
       .config("spark.sql.omnicache.metadata.path", "./user/omnicache/metadata")
+      .config("spark.sql.omnicache.washout.automatic.enable", "false")
       .enableHiveSupport()
       .getOrCreate()
   spark.sparkContext.setLogLevel("WARN")

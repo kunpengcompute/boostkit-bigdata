@@ -80,7 +80,11 @@ object KryoSerDeUtil {
         kryoSerializer.newKryo()
       }
       val input = new Input()
-      input.setBuffer(byteArray)
+      if (byteArray == null || byteArray.size == 0) {
+        input.setBuffer(new Array[Byte](4096))
+      } else {
+        input.setBuffer(byteArray)
+      }
 
       val obj = RewriteTime.withTimeStat("deserialize.readClassAndObject.C") {
         kryo.readClassAndObject(input)

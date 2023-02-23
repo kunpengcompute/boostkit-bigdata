@@ -37,7 +37,7 @@ class OmniCachePluginConfig(conf: SQLConf) {
       .getConfString("spark.sql.omnicache.show.length", "50").toInt
 
   // database where create OmniCache, like omnicache,omnicache1
-  val omniCacheDB: String = conf
+  def omniCacheDB: String = conf
       .getConfString("spark.sql.omnicache.dbs", "")
 
   // rewrite cur match mv
@@ -49,7 +49,7 @@ class OmniCachePluginConfig(conf: SQLConf) {
   }
 
   // mv table datasource
-  val defaultDataSource: String = conf
+  def defaultDataSource: String = conf
       .getConfString("spark.sql.omnicache.default.datasource", "orc")
 
   val dataSourceSet: Set[String] = Set("orc", "parquet")
@@ -69,14 +69,42 @@ class OmniCachePluginConfig(conf: SQLConf) {
       .getConfString("spark.sql.omnicache.metadata.path", "/user/omnicache/metadata")
 
   // enable omnicache init by query
-  lazy val enableMetadataInitByQuery: Boolean = conf
+  def enableMetadataInitByQuery: Boolean = conf
       .getConfString("spark.sql.omnicache.metadata.initbyquery.enable", "false")
       .toBoolean
 
   // metadata index tail lines
-  val metadataIndexTailLines: Long = conf
+  def metadataIndexTailLines: Long = conf
       .getConfString("spark.sql.omnicache.metadata.index.tail.lines", "5")
       .toLong
+
+  // Minimum unused time required for wash out. The default unit is "day".
+  def minimumUnusedDaysForWashOut: Int = conf
+      .getConfString("spark.sql.omnicache.washout.unused.day", "30")
+      .toInt
+
+  // The number of materialized views to be reserved.
+  def reserveViewQuantityByViewCount: Int = conf
+      .getConfString("spark.sql.omnicache.washout.reserve.quantity.byViewCnt", "25")
+      .toInt
+
+  def dropViewQuantityBySpaceConsumed: Int = conf
+      .getConfString("spark.sql.omnicache.washout.drop.quantity.bySpaceConsumed", "3")
+      .toInt
+
+  // The default unit is "day".
+  def automaticWashOutTimeInterval: Int = conf
+      .getConfString("spark.sql.omnicache.washout.automatic.time.interval", "35")
+      .toInt
+
+  // The minimum number of views that trigger automatic wash out.
+  def automaticWashOutMinimumViewQuantity: Int = conf
+      .getConfString("spark.sql.omnicache.washout.automatic.view.quantity", "20")
+      .toInt
+
+  def enableAutoWashOut: Boolean = conf
+      .getConfString("spark.sql.omnicache.washout.automatic.enable", "false")
+      .toBoolean
 
 }
 

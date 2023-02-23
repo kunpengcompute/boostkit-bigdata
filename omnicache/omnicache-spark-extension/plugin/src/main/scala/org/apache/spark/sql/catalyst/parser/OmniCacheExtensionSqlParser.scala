@@ -34,7 +34,7 @@ import org.apache.spark.sql.types.{DataType, StructType}
 class OmniCacheExtensionSqlParser(spark: SparkSession,
     delegate: ParserInterface) extends ParserInterface with SQLConfHelper with RewriteLogger {
 
-  lazy val astBuilder = new OmniCacheExtensionAstBuilder(spark, delegate)
+  private lazy val astBuilder = new OmniCacheExtensionAstBuilder(spark, delegate)
 
   override def parsePlan(sqlText: String): LogicalPlan = {
     if (OmniCachePluginConfig.getConf.enableSqlLog) {
@@ -74,13 +74,14 @@ class OmniCacheExtensionSqlParser(spark: SparkSession,
     delegate.parseDataType(sqlText)
   }
 
-  def isMaterializedViewCommand(sqlText: String): Boolean = {
+  private def isMaterializedViewCommand(sqlText: String): Boolean = {
     val normalized = sqlText.toLowerCase(Locale.ROOT).trim().replaceAll("\\s+", " ")
     normalized.contains("show materialized views") ||
         normalized.contains("create materialized view") ||
         normalized.contains("drop materialized view") ||
         normalized.contains("alter materialized view") ||
-        normalized.contains("refresh materialized view")
+        normalized.contains("refresh materialized view") ||
+        (normalized.contains("wash out") && normalized.contains("materialized view"))
   }
 
   def parse[T](command: String)(toResult: OmniCacheSqlExtensionsParser => T): T = {
