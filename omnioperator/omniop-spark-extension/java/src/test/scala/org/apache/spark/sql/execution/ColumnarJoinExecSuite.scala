@@ -412,4 +412,30 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
       Row("Bush", null)
     ), false)
   }
+
+  test("validate columnar shuffledHashJoin left anti join happened") {
+    val res = left.join(right.hint("SHUFFLE_HASH"), col("q") === col("c"), "leftanti")
+    assert(
+      res.queryExecution.executedPlan.find(_.isInstanceOf[ColumnarShuffledHashJoinExec]).isDefined,
+      s"ColumnarShuffledHashJoinExec not happened," +
+        s" executedPlan as follows: \n${res.queryExecution.executedPlan}")
+  }
+
+  test("columnar shuffledHashJoin left anti join is equal to native") {
+    val df = left.join(right.hint("SHUFFLE_HASH"), col("q") === col("c"), "leftanti")
+    checkAnswer(df, _ => df.queryExecution.executedPlan, Seq(
+      Row(" yeah  ", "yeah", 10, 8.0),
+      Row(" add", "World", 8, 3.0)
+    ), false)
+  }
+
+  test("columnar shuffledHashJoin left anti join is equal to native with null") {
+    val df = leftWithNull.join(rightWithNull.hint("SHUFFLE_HASH"),
+      col("q") === col("c"), "leftanti")
+    checkAnswer(df, _ => df.queryExecution.executedPlan, Seq(
+      Row("", "Hello", null, 1.0),
+      Row(" yeah  ", "yeah", 10, 8.0),
+      Row(" add", "World", 8, 3.0)
+    ), false)
+  }
 }
