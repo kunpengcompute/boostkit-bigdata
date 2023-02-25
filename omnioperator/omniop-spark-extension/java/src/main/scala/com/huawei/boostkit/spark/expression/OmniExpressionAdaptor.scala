@@ -305,11 +305,6 @@ object OmniExpressionAdaptor extends Logging {
       (!isDecimalOrStringType(cast.dataType) && cast.child.dataType.isInstanceOf[StringType])) {
       throw new UnsupportedOperationException(s"Unsupported expression: $expr")
     }
-
-    // not support Cast(double as decimal)
-    if (cast.dataType.isInstanceOf[DecimalType] && cast.child.dataType.isInstanceOf[DoubleType]) {
-      throw new UnsupportedOperationException(s"Unsupported expression: $expr")
-    }
   }
 
   def toOmniLiteral(literal: Literal): String = {
