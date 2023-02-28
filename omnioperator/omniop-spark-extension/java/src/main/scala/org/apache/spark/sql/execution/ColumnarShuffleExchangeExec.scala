@@ -18,8 +18,6 @@
 package org.apache.spark.sql.execution
 
 import com.huawei.boostkit.spark.ColumnarPluginConfig
-
-import java.util.Random
 import com.huawei.boostkit.spark.Constant.IS_SKIP_VERIFY_EXP
 
 import scala.collection.JavaConverters._
@@ -41,8 +39,9 @@ import org.apache.spark.shuffle.ColumnarShuffleDependency
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.codegen.LazilyGeneratedOrdering
+import org.apache.spark.sql.catalyst.plans.logical.Statistics
 import org.apache.spark.sql.catalyst.plans.physical._
-import org.apache.spark.sql.execution.exchange.{ENSURE_REQUIREMENTS, ShuffleExchangeExec, ShuffleExchangeLike, ShuffleOrigin}
+import org.apache.spark.sql.execution.exchange.{ENSURE_REQUIREMENTS, ShuffleExchangeLike, ShuffleOrigin}
 import org.apache.spark.sql.execution.exchange.ShuffleExchangeExec.createShuffleWriteProcessor
 import org.apache.spark.sql.execution.metric._
 import org.apache.spark.sql.execution.metric.{SQLMetric, SQLShuffleWriteMetricsReporter}
@@ -53,16 +52,17 @@ import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.{IntegerType, StructType}
 import org.apache.spark.sql.vectorized.ColumnarBatch
 import org.apache.spark.util.MutablePair
+import org.apache.spark.util.random.XORShiftRandom
 
-class ColumnarShuffleExchangeExec(
-                                   override val outputPartitioning: Partitioning,
-                                   child: SparkPlan,
-                                   shuffleOrigin: ShuffleOrigin = ENSURE_REQUIREMENTS)
-  extends ShuffleExchangeExec(outputPartitioning, child, shuffleOrigin) with ShuffleExchangeLike{
+case class ColumnarShuffleExchangeExec(
+  override val outputPartitioning: Partitioning,
+  child: SparkPlan,
+  shuffleOrigin: ShuffleOrigin = ENSURE_REQUIREMENTS)
+  extends ShuffleExchangeLike {
 
   private lazy val writeMetrics =
     SQLShuffleWriteMetricsReporter.createShuffleWriteMetrics(sparkContext)
-  override lazy val readMetrics =
+  private[sql] lazy val readMetrics =
     SQLShuffleReadMetricsReporter.createShuffleReadMetrics(sparkContext)
   override lazy val metrics: Map[String, SQLMetric] = Map(
     "dataSize" -> SQLMetrics.createSizeMetric(sparkContext, "data size"),
@@ -100,9 +100,19 @@ class ColumnarShuffleExchangeExec(
 
   override def numPartitions: Int = columnarShuffleDependency.partitioner.numPartitions
 
+  override def getShuffleRDD(partitionSpecs: Array[ShufflePartitionSpec]): RDD[ColumnarBatch] = {
+    new ShuffledColumnarRDD(columnarShuffleDependency, readMetrics, partitionSpecs)
+  }
+
+  override def runtimeStatistics: Statistics = {
+    val dataSize = metrics("dataSize").value
+    val rowCount = metrics(SQLShuffleWriteMetricsReporter.SHUFFLE_RECORDS_WRITTEN).value
+    Statistics(dataSize, Some(rowCount))
+  }
+
   @transient
   lazy val columnarShuffleDependency: ShuffleDependency[Int, ColumnarBatch, ColumnarBatch] = {
-    ColumnarShuffleExchangeExec.prepareShuffleDependency(
+    val dep = ColumnarShuffleExchangeExec.prepareShuffleDependency(
       inputColumnarRDD,
       child.output,
       outputPartitioning,
@@ -113,8 +123,8 @@ class ColumnarShuffleExchangeExec(
       longMetric("numInputRows"),
       longMetric("splitTime"),
       longMetric("spillTime"))
+    dep
   }
-
   var cachedShuffleRDD: ShuffledColumnarRDD = _
 
   override def doExecute(): RDD[InternalRow] = {
@@ -155,6 +165,8 @@ class ColumnarShuffleExchangeExec(
       cachedShuffleRDD
     }
   }
+  override protected def withNewChildInternal(newChild: SparkPlan): ColumnarShuffleExchangeExec =
+    copy(child = newChild)
 }
 
 object ColumnarShuffleExchangeExec extends Logging {
@@ -229,7 +241,8 @@ object ColumnarShuffleExchangeExec extends Logging {
       (columnarBatch: ColumnarBatch, numPartitions: Int) => {
         val pidArr = new Array[Int](columnarBatch.numRows())
         for (i <- 0 until columnarBatch.numRows()) {
-          val position = new Random(TaskContext.get().partitionId()).nextInt(numPartitions)
+          val partitionId = TaskContext.get().partitionId()
+          val position = new XORShiftRandom(partitionId).nextInt(numPartitions)
           pidArr(i) = position + 1
         }
         val vec = new IntVec(columnarBatch.numRows())
@@ -324,6 +337,7 @@ object ColumnarShuffleExchangeExec extends Logging {
         rdd.mapPartitionsWithIndexInternal((_, cbIter) => {
           cbIter.map { cb => (0, cb) }
         }, isOrderSensitive = isOrderSensitive)
+      case _ => throw new IllegalStateException(s"Exchange not implemented for $newPartitioning")
     }
 
     val numCols = outputAttributes.size
@@ -341,6 +355,7 @@ object ColumnarShuffleExchangeExec extends Logging {
         new PartitionInfo("hash", numPartitions, numCols, intputTypes)
       case RangePartitioning(ordering, numPartitions) =>
         new PartitionInfo("range", numPartitions, numCols, intputTypes)
+      case _ => throw new IllegalStateException(s"Exchange not implemented for $newPartitioning")
     }
 
     new ColumnarShuffleDependency[Int, ColumnarBatch, ColumnarBatch](

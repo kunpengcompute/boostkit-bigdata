@@ -18,6 +18,7 @@
 package org.apache.spark.sql.execution
 
 import java.util.concurrent.TimeUnit.NANOSECONDS
+
 import com.huawei.boostkit.spark.Constant.IS_SKIP_VERIFY_EXP
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor._
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil
@@ -32,8 +33,9 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate._
+import org.apache.spark.sql.catalyst.expressions.codegen.{CodegenContext, ExprCode}
 import org.apache.spark.sql.execution.ColumnarProjection.dealPartitionData
-import org.apache.spark.sql.execution.aggregate.BaseAggregateExec
+import org.apache.spark.sql.execution.aggregate.{AggregateCodegenSupport, BaseAggregateExec}
 import org.apache.spark.sql.execution.metric.SQLMetrics
 import org.apache.spark.sql.execution.util.SparkMemoryUtils
 import org.apache.spark.sql.execution.vectorized.OmniColumnVector
@@ -45,14 +47,18 @@ import org.apache.spark.sql.vectorized.ColumnarBatch
  */
 case class ColumnarHashAggregateExec(
                                       requiredChildDistributionExpressions: Option[Seq[Expression]],
+                                      isStreaming: Boolean,
+                                      numShufflePartitions: Option[Int],
                                       groupingExpressions: Seq[NamedExpression],
                                       aggregateExpressions: Seq[AggregateExpression],
                                       aggregateAttributes: Seq[Attribute],
                                       initialInputBufferOffset: Int,
                                       resultExpressions: Seq[NamedExpression],
                                       child: SparkPlan)
-  extends BaseAggregateExec
-    with AliasAwareOutputPartitioning {
+  extends AggregateCodegenSupport {
+
+  override protected def withNewChildInternal(newChild: SparkPlan): ColumnarHashAggregateExec =
+    copy(child = newChild)
 
   override def verboseStringWithOperatorId(): String = {
     s"""
@@ -77,6 +83,15 @@ case class ColumnarHashAggregateExec(
     "numOutputRows" -> SQLMetrics.createMetric(sparkContext, "number of output rows"),
     "numOutputVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatchs"))
 
+  protected override def needHashTable: Boolean = true
+
+  protected override def doConsumeWithKeys(ctx: CodegenContext, input: Seq[ExprCode]): String = {
+    throw new UnsupportedOperationException("ColumnarHashAgg code-gen does not support grouping keys")
+  }
+
+  protected override def doProduceWithKeys(ctx: CodegenContext): String = {
+    throw new UnsupportedOperationException("ColumnarHashAgg code-gen does not support grouping keys")
+  }
 
   override def supportsColumnar: Boolean = true
 
@@ -99,7 +114,7 @@ case class ColumnarHashAggregateExec(
       }
       if (exp.mode == Final) {
         exp.aggregateFunction match {
-          case Sum(_) | Min(_) | Max(_) | Count(_) | Average(_) | First(_,_)  =>
+          case Sum(_, _) | Min(_) | Max(_) | Count(_) | Average(_, _) | First(_,_)  =>
             omniAggFunctionTypes(index) = toOmniAggFunType(exp, true, true)
             omniAggOutputTypes(index) = toOmniAggInOutType(exp.aggregateFunction.dataType)
             omniAggChannels(index) =
@@ -110,7 +125,7 @@ case class ColumnarHashAggregateExec(
         }
       } else if (exp.mode == PartialMerge) {
         exp.aggregateFunction match {
-          case Sum(_) | Min(_) | Max(_) | Count(_) | Average(_) | First(_,_)  =>
+          case Sum(_, _) | Min(_) | Max(_) | Count(_) | Average(_, _) | First(_,_)  =>
             omniAggFunctionTypes(index) = toOmniAggFunType(exp, true)
             omniAggOutputTypes(index) =
               toOmniAggInOutType(exp.aggregateFunction.inputAggBufferAttributes)
@@ -125,7 +140,7 @@ case class ColumnarHashAggregateExec(
         }
       } else if (exp.mode == Partial) {
         exp.aggregateFunction match {
-          case Sum(_) | Min(_) | Max(_) | Count(_) | Average(_) | First(_,_)  =>
+          case Sum(_, _) | Min(_) | Max(_) | Count(_) | Average(_, _) | First(_,_)  =>
             omniAggFunctionTypes(index) = toOmniAggFunType(exp, true)
             omniAggOutputTypes(index) =
               toOmniAggInOutType(exp.aggregateFunction.inputAggBufferAttributes)
@@ -150,7 +165,7 @@ case class ColumnarHashAggregateExec(
         omniSourceTypes(i) = sparkTypeToOmniType(attr.dataType, attr.metadata)
     }
 
-    for (aggChannel <-omniAggChannels) {
+    for (aggChannel <- omniAggChannels) {
       if (!isSimpleColumnForAll(aggChannel)) {
         checkOmniJsonWhiteList("", aggChannel.toArray)
       }
@@ -202,7 +217,7 @@ case class ColumnarHashAggregateExec(
       }
       if (exp.mode == Final) {
         exp.aggregateFunction match {
-          case Sum(_) | Min(_) | Max(_) | Count(_) | Average(_) | First(_,_)  =>
+          case Sum(_, _) | Min(_) | Max(_) | Count(_) | Average(_, _) | First(_, _) =>
             omniAggFunctionTypes(index) = toOmniAggFunType(exp, true, true)
             omniAggOutputTypes(index) =
               toOmniAggInOutType(exp.aggregateFunction.dataType)
@@ -214,7 +229,7 @@ case class ColumnarHashAggregateExec(
         }
       } else if (exp.mode == PartialMerge) {
         exp.aggregateFunction match {
-          case Sum(_) | Min(_) | Max(_) | Count(_) | Average(_) | First(_,_)  =>
+          case Sum(_, _) | Min(_) | Max(_) | Count(_) | Average(_, _) | First(_, _) =>
             omniAggFunctionTypes(index) = toOmniAggFunType(exp, true)
             omniAggOutputTypes(index) =
               toOmniAggInOutType(exp.aggregateFunction.inputAggBufferAttributes)
@@ -229,7 +244,7 @@ case class ColumnarHashAggregateExec(
         }
       } else if (exp.mode == Partial) {
         exp.aggregateFunction match {
-          case Sum(_) | Min(_) | Max(_) | Count(_) | Average(_) | First(_,_)  =>
+          case Sum(_, _) | Min(_) | Max(_) | Count(_) | Average(_, _) | First(_, _) =>
             omniAggFunctionTypes(index) = toOmniAggFunType(exp, true)
             omniAggOutputTypes(index) =
               toOmniAggInOutType(exp.aggregateFunction.inputAggBufferAttributes)
@@ -336,12 +351,5 @@ case class ColumnarHashAggregateExec(
 
   override protected def doExecute(): RDD[InternalRow] = {
     throw new UnsupportedOperationException("This operator doesn't support doExecute().")
-  }
-}
-
-object ColumnarHashAggregateExec {
-  def supportsAggregate(aggregateBufferAttributes: Seq[Attribute]): Boolean = {
-    val aggregationBufferSchema = StructType.fromAttributes(aggregateBufferAttributes)
-    UnsafeFixedWidthAggregationMap.supportsAggregationBufferSchema(aggregationBufferSchema)
   }
 }

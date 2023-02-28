@@ -355,6 +355,18 @@ public class OmniColumnVector extends WritableColumnVector {
     }
 
     @Override
+    public void putBooleans(int rowId, byte src) {
+        booleanDataVec.set(rowId, (src & 1) == 1);
+        booleanDataVec.set(rowId + 1, (src >>> 1 & 1) == 1);
+        booleanDataVec.set(rowId + 2, (src >>> 2 & 1) == 1);
+        booleanDataVec.set(rowId + 3, (src >>> 3 & 1) == 1);
+        booleanDataVec.set(rowId + 4, (src >>> 4 & 1) == 1);
+        booleanDataVec.set(rowId + 5, (src >>> 5 & 1) == 1);
+        booleanDataVec.set(rowId + 6, (src >>> 6 & 1) == 1);
+        booleanDataVec.set(rowId + 7, (src >>> 7 & 1) == 1);
+    }
+
+    @Override
     public boolean getBoolean(int rowId) {
         if (dictionaryData != null) {
             return dictionaryData.getBoolean(rowId);
@@ -451,6 +463,11 @@ public class OmniColumnVector extends WritableColumnVector {
     @Override
     protected UTF8String getBytesAsUTF8String(int rowId, int count) {
         return UTF8String.fromBytes(getBytes(rowId, count), rowId, count);
+    }
+
+    @Override
+    public ByteBuffer getByteBuffer(int rowId, int count) {
+        throw new UnsupportedOperationException("getByteBuffer is not supported");
     }
 
     //

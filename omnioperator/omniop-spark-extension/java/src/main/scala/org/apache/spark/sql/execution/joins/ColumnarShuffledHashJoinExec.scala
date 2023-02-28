@@ -50,7 +50,8 @@ case class ColumnarShuffledHashJoinExec(
     buildSide: BuildSide,
     condition: Option[Expression],
     left: SparkPlan,
-    right: SparkPlan)
+    right: SparkPlan,
+    isSkewJoin: Boolean)
   extends HashJoin with ShuffledJoin {
 
   override lazy val metrics = Map(
@@ -80,6 +81,9 @@ case class ColumnarShuffledHashJoinExec(
   override def output: Seq[Attribute] = super[ShuffledJoin].output
 
   override def outputPartitioning: Partitioning = super[ShuffledJoin].outputPartitioning
+
+  override protected def withNewChildrenInternal(newLeft: SparkPlan, newRight: SparkPlan):
+    ColumnarShuffledHashJoinExec = copy(left = newLeft, right = newRight)
 
   override def outputOrdering: Seq[SortOrder] = joinType match {
     case FullOuter => Nil

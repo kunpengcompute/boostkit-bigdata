@@ -49,6 +49,9 @@ case class ColumnarTakeOrderedAndProjectExec(
 
   override def nodeName: String = "OmniColumnarTakeOrderedAndProject"
 
+  override protected def withNewChildInternal(newChild: SparkPlan):
+    ColumnarTakeOrderedAndProjectExec = copy(child = newChild)
+
   val serializer: Serializer = new ColumnarBatchSerializer(
     longMetric("avgReadBatchNumRows"),
     longMetric("numOutputRows"))

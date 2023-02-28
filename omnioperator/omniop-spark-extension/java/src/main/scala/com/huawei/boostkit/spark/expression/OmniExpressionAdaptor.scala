@@ -668,9 +668,9 @@ object OmniExpressionAdaptor extends Logging {
 
   def toOmniAggFunType(agg: AggregateExpression, isHashAgg: Boolean = false, isFinal: Boolean = false): FunctionType = {
     agg.aggregateFunction match {
-      case Sum(_) => OMNI_AGGREGATION_TYPE_SUM
+      case Sum(_, _) => OMNI_AGGREGATION_TYPE_SUM
       case Max(_) => OMNI_AGGREGATION_TYPE_MAX
-      case Average(_) => OMNI_AGGREGATION_TYPE_AVG
+      case Average(_, _) => OMNI_AGGREGATION_TYPE_AVG
       case Min(_) => OMNI_AGGREGATION_TYPE_MIN
       case Count(Literal(1, IntegerType) :: Nil) | Count(ArrayBuffer(Literal(1, IntegerType))) =>
         if (isFinal) {

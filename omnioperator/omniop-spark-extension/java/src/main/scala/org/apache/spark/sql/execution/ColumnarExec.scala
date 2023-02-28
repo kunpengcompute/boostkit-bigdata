@@ -31,8 +31,9 @@ import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.metric.{SQLMetric, SQLMetrics}
 import org.apache.spark.sql.execution.util.SparkMemoryUtils
 import org.apache.spark.sql.execution.vectorized.{OffHeapColumnVector, OmniColumnVector, WritableColumnVector}
-import org.apache.spark.sql.types.{BooleanType, ByteType, CalendarIntervalType, DataType, DateType, DecimalType, DoubleType, IntegerType, LongType, ShortType, StringType, StructType, TimestampType}
+import org.apache.spark.sql.types.{BinaryType, BooleanType, ByteType, CalendarIntervalType, DataType, DateType, DecimalType, DoubleType, IntegerType, LongType, ShortType, StringType, StructType, TimestampType}
 import org.apache.spark.sql.vectorized.ColumnarBatch
+import org.apache.spark.util.Utils
 
 import nova.hetu.omniruntime.vector.Vec
 
@@ -101,6 +102,7 @@ private object RowToColumnConverter {
 
   private def getConverterForType(dataType: DataType, nullable: Boolean): TypeConverter = {
     val core = dataType match {
+      case BinaryType => BinaryConverter
       case BooleanType => BooleanConverter
       case ByteType => ByteConverter
       case ShortType => ShortConverter
@@ -120,6 +122,13 @@ private object RowToColumnConverter {
       }
     } else {
       core
+    }
+  }
+
+  private object BinaryConverter extends TypeConverter {
+    override def append(row: SpecializedGetters, column: Int, cv: WritableColumnVector): Unit = {
+      val bytes = row.getBinary(column)
+      cv.appendByteArray(bytes, 0, bytes.length)
     }
   }
 
@@ -232,8 +241,11 @@ case class RowToOmniColumnarExec(child: SparkPlan) extends RowToColumnarTransiti
     "rowToOmniColumnarTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in row to OmniColumnar")
   )
 
+  override protected def withNewChildInternal(newChild: SparkPlan): RowToOmniColumnarExec =
+    copy(child = newChild)
+
   override def doExecuteColumnar(): RDD[ColumnarBatch] = {
-    val enableOffHeapColumnVector = sqlContext.conf.offHeapColumnVectorEnabled
+    val enableOffHeapColumnVector = session.sqlContext.conf.offHeapColumnVectorEnabled
     val numInputRows = longMetric("numInputRows")
     val numOutputBatches = longMetric("numOutputBatches")
     val rowToOmniColumnarTime = longMetric("rowToOmniColumnarTime")
@@ -313,6 +325,9 @@ case class OmniColumnarToRowExec(child: SparkPlan) extends ColumnarToRowTransiti
       ColumnarBatchToInternalRow.convert(localOutput, batches, numOutputRows, numInputBatches, omniColumnarToRowTime)
     }
   }
+
+  override protected def withNewChildInternal(newChild: SparkPlan):
+    OmniColumnarToRowExec = copy(child = newChild)
 }
 
 object ColumnarBatchToInternalRow {
