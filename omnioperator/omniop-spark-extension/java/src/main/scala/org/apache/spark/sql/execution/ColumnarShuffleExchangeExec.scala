@@ -47,6 +47,7 @@ import org.apache.spark.sql.execution.exchange.ShuffleExchangeExec.createShuffle
 import org.apache.spark.sql.execution.metric._
 import org.apache.spark.sql.execution.metric.{SQLMetric, SQLShuffleWriteMetricsReporter}
 import org.apache.spark.sql.execution.util.MergeIterator
+import org.apache.spark.sql.execution.util.SparkMemoryUtils.addLeakSafeTaskCompletionListener
 import org.apache.spark.sql.execution.vectorized.OmniColumnVector
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.{IntegerType, StructType}
@@ -299,6 +300,10 @@ object ColumnarShuffleExchangeExec extends Logging {
           val factory = new OmniProjectOperatorFactory(Array(omniExpr), inputTypes, 1,
             new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
           val op = factory.createOperator()
+          // close operator
+          addLeakSafeTaskCompletionListener[Unit](_ => {
+            op.close()
+          })
 
           cbIter.map { cb =>
             val vecs = transColBatchToOmniVecs(cb, true)

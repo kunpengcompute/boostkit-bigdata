@@ -548,21 +548,21 @@ int Splitter::Split(VectorBatch& vb )
 }
 
 std::shared_ptr<Buffer> Splitter::CaculateSpilledTmpFilePartitionOffsets() {
-    void *ptr_tmp = static_cast<void *>(options_.allocator->alloc((num_partitions_ + 1) * sizeof(uint32_t)));
+    void *ptr_tmp = static_cast<void *>(options_.allocator->alloc((num_partitions_ + 1) * sizeof(uint64_t)));
     if (nullptr == ptr_tmp) {
         throw std::runtime_error("Allocator for partitionOffsets Failed! ");
     }
-    std::shared_ptr<Buffer> ptrPartitionOffsets (new Buffer((uint8_t*)ptr_tmp, 0, (num_partitions_ + 1) * sizeof(uint32_t)));
-    uint32_t pidOffset = 0;
+    std::shared_ptr<Buffer> ptrPartitionOffsets (new Buffer((uint8_t*)ptr_tmp, 0, (num_partitions_ + 1) * sizeof(uint64_t)));
+    uint64_t pidOffset = 0;
     // 顺序记录每个partition的offset
     auto pid = 0;
     for (pid = 0; pid < num_partitions_; ++pid) {
-        reinterpret_cast<uint32_t *>(ptrPartitionOffsets->data_)[pid] = pidOffset;
+        reinterpret_cast<uint64_t *>(ptrPartitionOffsets->data_)[pid] = pidOffset;
         pidOffset += partition_serialization_size_[pid];
         // reset partition_cached_vectorbatch_size_ to 0
         partition_serialization_size_[pid] = 0;
     }
-    reinterpret_cast<uint32_t *>(ptrPartitionOffsets->data_)[pid] = pidOffset;
+    reinterpret_cast<uint64_t *>(ptrPartitionOffsets->data_)[pid] = pidOffset;
     return ptrPartitionOffsets;
 }
 
@@ -834,14 +834,14 @@ void Splitter::MergeSpilled() {
         LogsDebug(" MergeSplled traversal partition( %d ) ",pid);
         for (auto &pair : spilled_tmp_files_info_) {
             auto tmpDataFilePath = pair.first + ".data";
-            auto tmpPartitionOffset = reinterpret_cast<int32_t *>(pair.second->data_)[pid];
-            auto tmpPartitionSize = reinterpret_cast<int32_t *>(pair.second->data_)[pid + 1] - reinterpret_cast<int32_t *>(pair.second->data_)[pid];
+            auto tmpPartitionOffset = reinterpret_cast<uint64_t *>(pair.second->data_)[pid];
+            auto tmpPartitionSize = reinterpret_cast<uint64_t *>(pair.second->data_)[pid + 1] - reinterpret_cast<uint64_t *>(pair.second->data_)[pid];
             LogsDebug(" get Partition Stream...tmpPartitionOffset %d tmpPartitionSize %d path %s",
                       tmpPartitionOffset, tmpPartitionSize, tmpDataFilePath.c_str());
             std::unique_ptr<InputStream> inputStream = readLocalFile(tmpDataFilePath);
-            int64_t targetLen = tmpPartitionSize;
-            int64_t seekPosit = tmpPartitionOffset;
-            int64_t onceReadLen = 0;
+            uint64_t targetLen = tmpPartitionSize;
+            uint64_t seekPosit = tmpPartitionOffset;
+            uint64_t onceReadLen = 0;
             while ((targetLen > 0) && bufferOutPutStream->Next(&bufferOut, &sizeOut)) {
                 onceReadLen = targetLen > sizeOut ? sizeOut : targetLen;
                 inputStream->read(bufferOut, onceReadLen, seekPosit);

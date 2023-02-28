@@ -17,6 +17,7 @@
 
 package com.huawei.boostkit.spark
 
+import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{SparkSession, SparkSessionExtensions}
 import org.apache.spark.sql.catalyst.expressions.DynamicPruningSubquery
@@ -52,6 +53,7 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] {
   val enableColumnarUnion: Boolean = columnarConf.enableColumnarUnion
   val enableFusion: Boolean = columnarConf.enableFusion
   var isSupportAdaptive: Boolean = true
+  val enableColumnarProjectFusion: Boolean = columnarConf.enableColumnarProjectFusion
 
   def apply(plan: SparkPlan): SparkPlan = {
     replaceWithColumnarPlan(plan)
@@ -118,6 +120,21 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] {
       child match {
         case ColumnarFilterExec(condition, child) =>
           ColumnarConditionProjectExec(plan.projectList, condition, child)
+        case join : ColumnarBroadcastHashJoinExec =>
+          if (plan.projectList.forall(project => OmniExpressionAdaptor.isSimpleProjectForAll(project)) && enableColumnarProjectFusion) {
+             ColumnarBroadcastHashJoinExec(
+               join.leftKeys,
+               join.rightKeys,
+               join.joinType,
+               join.buildSide,
+               join.condition,
+               join.left,
+               join.right,
+               join.isNullAwareAntiJoin,
+               plan.projectList)
+          } else {
+            ColumnarProjectExec(plan.projectList, child)
+          }
         case _ =>
           ColumnarProjectExec(plan.projectList, child)
       }
@@ -145,7 +162,7 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] {
             join4 @ ColumnarBroadcastHashJoinExec(_, _, _, _, _,
             filter @ ColumnarFilterExec(_,
             scan @ ColumnarFileSourceScanExec(_, _, _, _, _, _, _, _, _)
-            ), _, _)), _, _)), _, _)), _, _))
+            ), _, _, _)), _, _, _)), _, _, _)), _, _, _))
               if checkBhjRightChild(
                 child.asInstanceOf[ColumnarProjectExec].child.children(1)
                   .asInstanceOf[ColumnarBroadcastExchangeExec].child) =>
@@ -176,7 +193,7 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] {
             proj3 @ ColumnarProjectExec(_,
             join3 @ ColumnarBroadcastHashJoinExec(_, _, _, _, _, _,
             filter @ ColumnarFilterExec(_,
-            scan @ ColumnarFileSourceScanExec(_, _, _, _, _, _, _, _, _)), _)) , _, _)), _, _))
+            scan @ ColumnarFileSourceScanExec(_, _, _, _, _, _, _, _, _)), _, _)) , _, _, _)), _, _, _))
               if checkBhjRightChild(
                 child.asInstanceOf[ColumnarProjectExec].child.children(1)
                   .asInstanceOf[ColumnarBroadcastExchangeExec].child) =>
@@ -205,7 +222,7 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] {
             proj3 @ ColumnarProjectExec(_,
             join3 @ ColumnarBroadcastHashJoinExec(_, _, _, _, _,
             filter @ ColumnarFilterExec(_,
-            scan @ ColumnarFileSourceScanExec(_, _, _, _, _, _, _, _, _)), _, _)) , _, _)), _, _))
+            scan @ ColumnarFileSourceScanExec(_, _, _, _, _, _, _, _, _)), _, _, _)) , _, _, _)), _, _, _))
               if checkBhjRightChild(
                 child.asInstanceOf[ColumnarProjectExec].child.children(1)
                   .asInstanceOf[ColumnarBroadcastExchangeExec].child) =>

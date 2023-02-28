@@ -31,7 +31,7 @@ import com.huawei.boostkit.spark.ColumnarPluginConfig
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate._
-import org.apache.spark.sql.catalyst.plans.{FullOuter, InnerLike, JoinType, LeftOuter, RightOuter}
+import org.apache.spark.sql.catalyst.plans.{FullOuter, InnerLike, JoinType, LeftAnti, LeftOuter, LeftSemi, RightOuter}
 import org.apache.spark.sql.catalyst.util.CharVarcharUtils.getRawTypeString
 import org.apache.spark.sql.hive.HiveUdfAdaptorUtil
 import org.apache.spark.sql.types.{BooleanType, DataType, DateType, Decimal, DecimalType, DoubleType, IntegerType, LongType, Metadata, ShortType, StringType}
@@ -500,6 +500,11 @@ object OmniExpressionAdaptor extends Logging {
           .format(sparkTypeToOmniExpJsonType(lower.dataType),
             rewriteToOmniJsonExpressionLiteral(lower.child, exprsIndexMap))
 
+      case upper: Upper =>
+        "{\"exprType\":\"FUNCTION\",\"returnType\":%s,\"function_name\":\"upper\", \"arguments\":[%s]}"
+          .format(sparkTypeToOmniExpJsonType(upper.dataType),
+            rewriteToOmniJsonExpressionLiteral(upper.child, exprsIndexMap))
+
       case length: Length =>
         "{\"exprType\":\"FUNCTION\",\"returnType\":%s,\"function_name\":\"length\", \"arguments\":[%s]}"
           .format(sparkTypeToOmniExpJsonType(length.dataType),
@@ -548,6 +553,11 @@ object OmniExpressionAdaptor extends Logging {
 
       case concat: Concat =>
         getConcatJsonStr(concat, exprsIndexMap)
+      case round: Round =>
+        "{\"exprType\":\"FUNCTION\",\"returnType\":%s,\"function_name\":\"round\", \"arguments\":[%s,%s]}"
+          .format(sparkTypeToOmniExpJsonType(round.dataType),
+            rewriteToOmniJsonExpressionLiteral(round.child, exprsIndexMap),
+            rewriteToOmniJsonExpressionLiteral(round.scale, exprsIndexMap))
       case attr: Attribute => toOmniJsonAttribute(attr, exprsIndexMap(attr.exprId))
       case _ =>
         if (HiveUdfAdaptorUtil.isHiveUdf(expr) && ColumnarPluginConfig.getSessionConf.enableColumnarUdf) {
@@ -960,6 +970,10 @@ object OmniExpressionAdaptor extends Logging {
         OMNI_JOIN_TYPE_LEFT
       case RightOuter =>
         OMNI_JOIN_TYPE_RIGHT
+      case LeftSemi =>
+        OMNI_JOIN_TYPE_LEFT_SEMI
+      case LeftAnti =>
+        OMNI_JOIN_TYPE_LEFT_ANTI
       case _ =>
         throw new UnsupportedOperationException(s"Join-type[$joinType] is not supported.")
     }
@@ -982,5 +996,16 @@ object OmniExpressionAdaptor extends Logging {
       }
     }
     true
+  }
+
+  def isSimpleProjectForAll(project: NamedExpression): Boolean = {
+    project match {
+      case attribute: AttributeReference =>
+        true
+      case alias: Alias =>
+        alias.child.isInstanceOf[AttributeReference]
+      case _ =>
+        false
+    }
   }
 }

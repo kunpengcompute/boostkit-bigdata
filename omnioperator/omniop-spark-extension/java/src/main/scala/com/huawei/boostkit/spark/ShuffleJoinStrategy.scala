@@ -63,22 +63,43 @@ object ShuffleJoinStrategy extends Strategy
           buildRight = true
         }
 
-        getBuildSide(
-          canBuildShuffledHashJoinLeft(joinType) && buildLeft,
-          canBuildShuffledHashJoinRight(joinType) && buildRight,
-          left,
-          right
-        ).map {
-          buildSide =>
-            Seq(joins.ShuffledHashJoinExec(
-              leftKeys,
-              rightKeys,
-              joinType,
-              buildSide,
-              nonEquiCond,
-              planLater(left),
-              planLater(right)))
-        }.getOrElse(Nil)
+        // use cbo statistics to take effect if CBO is enable
+        if (conf.cboEnabled) {
+          getShuffleHashJoinBuildSide(left,
+            right,
+            joinType,
+            hint,
+            false,
+            conf)
+            .map {
+              buildSide =>
+                Seq(joins.ShuffledHashJoinExec(
+                  leftKeys,
+                  rightKeys,
+                  joinType,
+                  buildSide,
+                  nonEquiCond,
+                  planLater(left),
+                  planLater(right)))
+            }.getOrElse(Nil)
+        } else {
+          getBuildSide(
+            canBuildShuffledHashJoinLeft(joinType) && buildLeft,
+            canBuildShuffledHashJoinRight(joinType) && buildRight,
+            left,
+            right
+          ).map {
+            buildSide =>
+              Seq(joins.ShuffledHashJoinExec(
+                leftKeys,
+                rightKeys,
+                joinType,
+                buildSide,
+                nonEquiCond,
+                planLater(left),
+                planLater(right)))
+          }.getOrElse(Nil)
+        }
       } else {
         Nil
       }
