@@ -201,7 +201,7 @@ case class ColumnarBroadcastHashJoinExec(
 
   def buildCheck(): Unit = {
     joinType match {
-      case LeftOuter | Inner =>
+      case LeftOuter | Inner | LeftSemi =>
       case _ =>
         throw new UnsupportedOperationException(s"Join-type[${joinType}] is not supported " +
           s"in ${this.nodeName}")
@@ -271,7 +271,14 @@ case class ColumnarBroadcastHashJoinExec(
     }
 
     // {0}, buildKeys: col1#12
-    val buildOutputCols = getIndexArray(buildOutput, projectList) // {0,1}
+    val buildOutputCols: Array[Int] = joinType match {
+      case _: InnerLike | FullOuter =>
+        getIndexArray(buildOutput, projectList)
+      case LeftExistence(_) =>
+        Array[Int]()
+      case x =>
+        throw new UnsupportedOperationException(s"ColumnBroadcastHashJoin Join-type[$x] is not supported!")
+    }
     val buildJoinColsExp = buildKeys.map { x =>
       OmniExpressionAdaptor.rewriteToOmniJsonExpressionLiteral(x,
         OmniExpressionAdaptor.getExprIdMap(buildOutput.map(_.toAttribute)))
