@@ -7,6 +7,7 @@ package org.apache.spark.shuffle.ock
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil.transColBatchToOmniVecs
 import com.huawei.boostkit.spark.vectorized.SplitResult
 import com.huawei.ock.spark.jni.OckShuffleJniWriter
+import com.huawei.ock.ucache.shuffle.NativeShuffle
 import nova.hetu.omniruntime.vector.VecBatch
 import org.apache.spark.internal.Logging
 import org.apache.spark.scheduler.MapStatus
@@ -140,6 +141,7 @@ class OckColumnarShuffleWriter[K, V](
       } else {
         stopping = true
         if (success) {
+          NativeShuffle.shuffleStageSetShuffleId("Spark_"+applicationId, context.stageId(), handle.shuffleId)
           Option(mapStatus)
         } else {
           None
