@@ -193,6 +193,21 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
     checkThatPlansAgreeTemplateForBHJ(df, leftKeys, rightKeys)
   }
 
+  test("columnar broadcastHashJoin LeftSemi Join is equal to native") {
+    val df = left.join(right.hint("broadcast"), col("q") === col("c"))
+    val leftKeys = Seq(left.col("q").expr)
+    val rightKeys = Seq(right.col("c").expr)
+    checkThatPlansAgreeTemplateForBHJ(df, leftKeys, rightKeys, LeftSemi)
+  }
+
+  test("columnar broadcastHashJoin LeftSemi Join is equal to native with null") {
+    val df = leftWithNull.join(rightWithNull.hint("broadcast"),
+      col("q").isNotNull === col("c").isNotNull)
+    val leftKeys = Seq(leftWithNull.col("q").isNotNull.expr)
+    val rightKeys = Seq(rightWithNull.col("c").isNotNull.expr)
+    checkThatPlansAgreeTemplateForBHJ(df, leftKeys, rightKeys, LeftSemi)
+  }
+
   def checkThatPlansAgreeTemplateForBHJ(df: DataFrame, leftKeys: Seq[Expression],
                                         rightKeys: Seq[Expression], joinType: JoinType = Inner): Unit = {
     checkThatPlansAgree(
