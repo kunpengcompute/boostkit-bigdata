@@ -272,7 +272,7 @@ case class ColumnarBroadcastHashJoinExec(
 
     // {0}, buildKeys: col1#12
     val buildOutputCols: Array[Int] = joinType match {
-      case _: InnerLike | FullOuter =>
+      case Inner | LeftOuter =>
         getIndexArray(buildOutput, projectList)
       case LeftExistence(_) =>
         Array[Int]()
