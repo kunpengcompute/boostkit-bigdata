@@ -24,6 +24,7 @@
 #include <stdio.h>
 #include <sys/stat.h>
 #include <string.h>
+#include <stdexcept>
 
 #ifdef _MSC_VER
 #include <io.h>
