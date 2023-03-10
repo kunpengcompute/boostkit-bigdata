@@ -96,8 +96,8 @@ class ColumnarSortMergeJoinExec(
 
   def buildCheck(): Unit = {
     joinType match {
-      case _: InnerLike | LeftOuter | FullOuter | LeftSemi | LeftAnti =>
-      // SMJ join support InnerLike | LeftOuter | FullOuter | LeftSemi | LeftAnti
+      case Inner | LeftOuter | FullOuter | LeftSemi | LeftAnti =>
+      // SMJ join support Inner | LeftOuter | FullOuter | LeftSemi | LeftAnti
       case _ =>
         throw new UnsupportedOperationException(s"Join-type[${joinType}] is not supported " +
           s"in ${this.nodeName}")
@@ -171,7 +171,7 @@ class ColumnarSortMergeJoinExec(
         OmniExpressionAdaptor.getExprIdMap(right.output.map(_.toAttribute)))
     }.toArray
     val bufferedOutputChannel: Array[Int] = joinType match {
-      case _: InnerLike | LeftOuter | FullOuter =>
+      case Inner | LeftOuter | FullOuter =>
         right.output.indices.toArray
       case LeftExistence(_) =>
         Array[Int]()
@@ -220,7 +220,7 @@ class ColumnarSortMergeJoinExec(
       val iterBatch = new Iterator[ColumnarBatch] {
 
         var isFinished : Boolean = joinType match {
-          case _: InnerLike | LeftSemi => !streamedIter.hasNext || !bufferedIter.hasNext
+          case Inner | LeftSemi => !streamedIter.hasNext || !bufferedIter.hasNext
           case LeftOuter | LeftAnti => !streamedIter.hasNext
           case FullOuter => !(streamedIter.hasNext || bufferedIter.hasNext)
           case x =>
