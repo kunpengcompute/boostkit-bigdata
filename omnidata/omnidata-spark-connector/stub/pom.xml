@@ -5,13 +5,13 @@
     <parent>
         <artifactId>omnidata-spark-connector-root</artifactId>
         <groupId>org.apache.spark</groupId>
-        <version>1.4.0</version>
+        <version>1.5.0</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.huawei.boostkit</groupId>
     <artifactId>boostkit-omnidata-stub</artifactId>
-    <version>1.4.0</version>
+    <version>1.5.0</version>
     <packaging>jar</packaging>
     <properties>
         <dep.hetu.version>1.6.1</dep.hetu.version>
