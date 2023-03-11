@@ -109,7 +109,7 @@ case class ColumnarBroadcastHashJoinExec(
 
   override lazy val outputPartitioning: Partitioning = {
     joinType match {
-      case _: InnerLike if sqlContext.conf.broadcastHashJoinOutputPartitioningExpandLimit > 0 =>
+      case Inner if sqlContext.conf.broadcastHashJoinOutputPartitioningExpandLimit > 0 =>
         streamedPlan.outputPartitioning match {
           case h: HashPartitioning => expandOutputPartitioning(h)
           case c: PartitioningCollection => expandOutputPartitioning(c)
@@ -445,7 +445,7 @@ case class ColumnarBroadcastHashJoinExec(
   }
 
   private def multipleOutputForOneInput: Boolean = joinType match {
-    case _: InnerLike | LeftOuter | RightOuter =>
+    case Inner | LeftOuter | RightOuter =>
       // For inner and outer joins, one row from the streamed side may produce multiple result rows,
       // if the build side has duplicated keys. Note that here we wait for the broadcast to be
       // finished, which is a no-op because it's already finished when we wait it in `doProduce`.
@@ -481,7 +481,7 @@ case class ColumnarBroadcastHashJoinExec(
       projectList.map(_.toAttribute)
     } else {
       joinType match {
-        case _: InnerLike =>
+        case Inner =>
           left.output ++ right.output
         case LeftOuter =>
           left.output ++ right.output.map(_.withNullability(true))
