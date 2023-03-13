@@ -21,7 +21,7 @@ import com.huawei.boostkit.spark.conf.OmniCachePluginConfig
 import com.huawei.boostkit.spark.conf.OmniCachePluginConfig._
 import com.huawei.boostkit.spark.util.{RewriteHelper, ViewMetadata}
 import com.huawei.boostkit.spark.util.ViewMetadata.formatViewName
-import java.io.IOException
+import java.io.{FileNotFoundException, IOException}
 import java.net.URI
 import java.util.Locale
 import org.apache.hadoop.fs.{FileSystem, Path}
@@ -655,9 +655,18 @@ case class WashOutMaterializedViewCommand(
         val tableName = view.split("\\.")(1)
         val tableLocation = ViewMetadata.spark.sessionState.catalog.defaultTablePath(
           TableIdentifier(tableName, Some(dbName)))
-        val spaceConsumed =
-          ViewMetadata.fs.getContentSummary(new Path(tableLocation)).getSpaceConsumed
-        viewInfos.put(view, spaceConsumed)
+        var spaceConsumed = Long.MaxValue
+        try {
+          spaceConsumed = ViewMetadata.fs.getContentSummary(
+            new Path(tableLocation)).getSpaceConsumed
+        } catch {
+          case _: FileNotFoundException =>
+            log.info(f"Can not find table: $tableName. It may have been deleted.")
+          case _ =>
+            log.warn("[washOutViewsBySpace] Something unknown happens.")
+        } finally {
+          viewInfos.put(view, spaceConsumed)
+        }
     }
     val topN = viewInfos.toList.sorted {
       (x: (String, Long), y: (String, Long)) => {

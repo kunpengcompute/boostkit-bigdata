@@ -76,7 +76,9 @@ object ViewMetadata extends RewriteHelper {
   private val VIEW_CONTAINS_TABLES_FILE = "viewContainsTables"
   private val WASH_OUT_TIMESTAMP = "washOutTimestamp"
 
-  private lazy val kryoSerializer = new KryoSerializer(spark.sparkContext.getConf)
+  private var kryoSerializer: KryoSerializer = _
+
+  private val SEPARATOR: Char = 0xA
 
   /**
    * set sparkSession
@@ -84,6 +86,8 @@ object ViewMetadata extends RewriteHelper {
   def setSpark(sparkSession: SparkSession): Unit = {
     spark = sparkSession
     status = STATUS_LOADING
+
+    kryoSerializer = new KryoSerializer(spark.sparkContext.getConf)
 
     metadataPath = new Path(OmniCachePluginConfig.getConf.metadataPath)
     metadataPriorityPath = new Path(metadataPath, "priority")
@@ -378,7 +382,7 @@ object ViewMetadata extends RewriteHelper {
 
     jsons += (MV_REWRITE_ENABLED -> properties(MV_REWRITE_ENABLED))
 
-    saveMapToDisk(dbName, viewName, jsons, isAppend = false)
+    saveMapToDisk(dbName, viewName, jsons, isAppend = false, lineFeed = false)
   }
 
   /**
@@ -397,7 +401,7 @@ object ViewMetadata extends RewriteHelper {
     val data = loadViewContainsTablesFromFile(dbName)
     data.put(viewName, (viewToContainsTables.get(viewName).map(_.tableName),
         System.currentTimeMillis()))
-    saveMapToDisk(dbName, VIEW_CONTAINS_TABLES_FILE, data, isAppend = true)
+    saveMapToDisk(dbName, VIEW_CONTAINS_TABLES_FILE, data, isAppend = true, lineFeed = true)
   }
 
   /**
@@ -656,7 +660,7 @@ object ViewMetadata extends RewriteHelper {
           data.put(name, info)
         }
     }
-    saveMapToDisk(dbName, VIEW_CNT_FILE, data, isAppend = false)
+    saveMapToDisk(dbName, VIEW_CNT_FILE, data, isAppend = false, lineFeed = false)
   }
 
   private def loadViewCount(): Unit = {
@@ -719,10 +723,10 @@ object ViewMetadata extends RewriteHelper {
       val readByte = is.readByte()
       readByte match {
         // \n
-        case 0xA =>
-          lineReady = true
-        // \r
-        case 0xD =>
+        case SEPARATOR =>
+          if (bytes.size != 0) {
+            lineReady = true
+          }
         case _ =>
           bytes +:= readByte.toChar
       }
@@ -773,7 +777,8 @@ object ViewMetadata extends RewriteHelper {
       dbName: String,
       fileName: String,
       data: mutable.Map[K, V],
-      isAppend: Boolean): Unit = {
+      isAppend: Boolean,
+      lineFeed: Boolean): Unit = {
     val dbPath = new Path(metadataPath, dbName)
     val file = new Path(dbPath, fileName)
     val os = if (!fs.exists(file) || !isAppend || fs.isInstanceOf[LocalFileSystem]) {
@@ -784,6 +789,10 @@ object ViewMetadata extends RewriteHelper {
     // append
     val jsonFile = Json(DefaultFormats).write(data)
     os.write(jsonFile.getBytes())
+    // line feed
+    if (lineFeed) {
+      os.write(SEPARATOR)
+    }
     os.close()
   }
 
@@ -834,7 +843,7 @@ object ViewMetadata extends RewriteHelper {
     saveStrToDisk(new Path(metadataPath, WASH_OUT_TIMESTAMP), str, isAppend = false)
   }
 
-  private def loadWashOutTimestamp(): Unit = {
+  def loadWashOutTimestamp(): Unit = {
     val ciphertext = loadStrFromDisk(new Path(metadataPath, WASH_OUT_TIMESTAMP))
     val timestamp = KryoSerDeUtil.deserializeFromStr[mutable.Map[String, Long]](
       kryoSerializer, ciphertext)
