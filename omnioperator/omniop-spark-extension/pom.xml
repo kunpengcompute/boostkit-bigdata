@@ -8,7 +8,7 @@
     <groupId>com.huawei.kunpeng</groupId>
     <artifactId>boostkit-omniop-spark-parent</artifactId>
     <packaging>pom</packaging>
-    <version>3.1.1-1.1.0</version>
+    <version>3.1.1-1.2.0</version>
 
     <name>BoostKit Spark Native Sql Engine Extension Parent Pom</name>
 
@@ -21,7 +21,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <protobuf.version>3.15.8</protobuf.version>
         <cpp.test>FALSE</cpp.test>
-        <omniruntime.version>1.1.0</omniruntime.version>
+        <omniruntime.version>1.2.0</omniruntime.version>
     </properties>
     <modules>
         <module>java</module>
