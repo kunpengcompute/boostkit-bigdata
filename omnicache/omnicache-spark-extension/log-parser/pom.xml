@@ -6,13 +6,13 @@
     <parent>
         <groupId>com.huawei.kunpeng</groupId>
         <artifactId>boostkit-omnicache-spark-parent</artifactId>
-        <version>3.1.1-1.0.0</version>
+        <version>3.1.1-1.1.0</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
     <artifactId>boostkit-omnicache-logparser-spark</artifactId>
     <packaging>jar</packaging>
-    <version>3.1.1-1.0.0</version>
+    <version>3.1.1-1.1.0</version>
 
     <name>log-parser</name>
 
@@ -20,7 +20,7 @@
         <dependency>
             <groupId>com.huawei.kunpeng</groupId>
             <artifactId>boostkit-omnicache-spark</artifactId>
-            <version>3.1.1-1.0.0</version>
+            <version>3.1.1-1.1.0</version>
         </dependency>
         <dependency>
             <groupId>org.apache.spark</groupId>
