@@ -36,14 +36,14 @@ import org.apache.spark.util.kvstore.KVIndex
 
 class MVRewriteRule(session: SparkSession)
     extends Rule[LogicalPlan] with RewriteHelper with RewriteLogger {
-  var cannotRewritePlans: Set[LogicalPlan] = Set[LogicalPlan]()
+  private var cannotRewritePlans: Set[LogicalPlan] = Set[LogicalPlan]()
 
-  val omniCacheConf: OmniCachePluginConfig = OmniCachePluginConfig.getConf
+  private val omniCacheConf: OmniCachePluginConfig = OmniCachePluginConfig.getConf
 
-  val joinRule = new MaterializedViewJoinRule(session)
-  val outJoinRule = new MaterializedViewOutJoinRule(session)
-  val aggregateRule = new MaterializedViewAggregateRule(session)
-  val outJoinAggregateRule = new MaterializedViewOutJoinAggregateRule(session)
+  private val joinRule = new MaterializedViewJoinRule(session)
+  private val outJoinRule = new MaterializedViewOutJoinRule(session)
+  private val aggregateRule = new MaterializedViewAggregateRule(session)
+  private val outJoinAggregateRule = new MaterializedViewOutJoinAggregateRule(session)
 
   override def apply(logicalPlan: LogicalPlan): LogicalPlan = {
     if (!omniCacheConf.enableOmniCache || cannotRewritePlans.contains(logicalPlan)) {
@@ -57,8 +57,8 @@ class MVRewriteRule(session: SparkSession)
           tryRewritePlan(logicalPlan)
       }
     } catch {
-      case e: Throwable =>
-        logWarning(s"Failed to rewrite plan with mv,errmsg: ${e.getMessage}")
+      case _: Throwable =>
+        logError(s"Failed to rewrite plan with mv.")
         logicalPlan
     }
   }

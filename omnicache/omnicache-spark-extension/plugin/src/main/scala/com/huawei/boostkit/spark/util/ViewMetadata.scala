@@ -20,6 +20,7 @@ package com.huawei.boostkit.spark.util
 import com.huawei.boostkit.spark.conf.OmniCachePluginConfig
 import com.huawei.boostkit.spark.conf.OmniCachePluginConfig._
 import com.huawei.boostkit.spark.util.serde.KryoSerDeUtil
+import java.io.IOException
 import java.util.Locale
 import java.util.concurrent.{ConcurrentHashMap, Executors, TimeUnit}
 import java.util.concurrent.atomic.AtomicLong
@@ -36,6 +37,7 @@ import org.apache.spark.sql.catalyst.catalog.{CatalogTable, SessionCatalog}
 import org.apache.spark.sql.catalyst.expressions.{Alias, AttributeReference, ExprId, NamedExpression}
 import org.apache.spark.sql.catalyst.optimizer.rules.RewriteTime
 import org.apache.spark.sql.catalyst.plans.logical._
+
 
 object ViewMetadata extends RewriteHelper {
 
@@ -180,8 +182,10 @@ object ViewMetadata extends RewriteHelper {
     } catch {
       case e: Throwable =>
         logDebug(s"Failed to saveViewMetadataToMap,errmsg: ${e.getMessage}")
-        // reset preDatabase
-        spark.sessionState.catalogManager.setCurrentNamespace(Array(preDatabase))
+        throw new IOException(s"Failed to save ViewMetadata to file.")
+    } finally {
+      // reset preDatabase
+      spark.sessionState.catalogManager.setCurrentNamespace(Array(preDatabase))
     }
   }
 
@@ -288,17 +292,20 @@ object ViewMetadata extends RewriteHelper {
    */
   def omniCacheFilter(catalog: SessionCatalog,
       mvDataBase: String): Seq[CatalogTable] = {
+    var res: Seq[CatalogTable] = Seq.empty[CatalogTable]
     try {
       val allTables = catalog.listTables(mvDataBase)
-      catalog.getTablesByName(allTables).filter { tableData =>
+      res = catalog.getTablesByName(allTables).filter { tableData =>
         tableData.properties.contains(MV_QUERY_ORIGINAL_SQL)
       }
     } catch {
       // if db exists a table hive materialized view, will throw analysis exception
       case e: Throwable =>
         logDebug(s"Failed to listTables in $mvDataBase, errmsg: ${e.getMessage}")
-        Seq.empty[CatalogTable]
+        res = Seq.empty[CatalogTable]
+        throw new UnsupportedOperationException("hive materialized view is not supported.")
     }
+    res
   }
 
   /**

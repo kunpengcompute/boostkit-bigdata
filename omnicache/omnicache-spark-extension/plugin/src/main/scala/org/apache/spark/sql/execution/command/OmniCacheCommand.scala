@@ -23,6 +23,7 @@ import com.huawei.boostkit.spark.util.{RewriteHelper, ViewMetadata}
 import com.huawei.boostkit.spark.util.ViewMetadata.formatViewName
 import java.io.{FileNotFoundException, IOException}
 import java.net.URI
+import java.rmi.UnexpectedException
 import java.util.Locale
 import org.apache.hadoop.fs.{FileSystem, Path}
 import scala.collection.{mutable, JavaConverters}
@@ -663,7 +664,8 @@ case class WashOutMaterializedViewCommand(
           case _: FileNotFoundException =>
             log.info(f"Can not find table: $tableName. It may have been deleted.")
           case _ =>
-            log.warn("[washOutViewsBySpace] Something unknown happens.")
+            throw new UnexpectedException(
+              "Something unknown happens when wash out views by space")
         } finally {
           viewInfos.put(view, spaceConsumed)
         }
