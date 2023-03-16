@@ -139,9 +139,9 @@ washOutExpressions
     ;
 
 washOutStrategy
-    : UNUSED_DAYS washOutValue
-    | RESERVE_QUANTITY_BY_VIEW_COUNT washOutValue
-    | DROP_QUANTITY_BY_SPACE_CONSUMED washOutValue
+    : UNUSED_DAYS (washOutValue)?
+    | RESERVE_QUANTITY_BY_VIEW_COUNT (washOutValue)?
+    | DROP_QUANTITY_BY_SPACE_CONSUMED (washOutValue)?
     ;
 
 washOutValue
