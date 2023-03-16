@@ -275,4 +275,17 @@ class MaterializedViewJoinRuleSuite extends RewriteSuite {
     val sql = "ALTER MATERIALIZED VIEW mv_join2 DISABLE REWRITE;"
     spark.sql(sql).show()
   }
+
+  test("join all mv") {
+    spark.sql(
+      """
+        |DROP MATERIALIZED VIEW IF EXISTS mv_join1;
+        |""".stripMargin
+    )
+    spark.sql(
+      """
+        |DROP MATERIALIZED VIEW IF EXISTS mv_join2;
+        |""".stripMargin
+    )
+  }
 }

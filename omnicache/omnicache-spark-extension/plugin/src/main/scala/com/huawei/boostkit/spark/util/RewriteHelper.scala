@@ -194,8 +194,8 @@ trait RewriteHelper extends PredicateHelper with RewriteLogger {
    * then transform attr's qualifier by tableMappings
    */
   def extractPredictExpressions(plan: LogicalPlan,
-      tableMappings: BiMap[String, String])
-  : (EquivalenceClasses, Seq[ExpressionEqual], Seq[ExpressionEqual]) = {
+      tableMappings: BiMap[String, String]): (
+      EquivalenceClasses, Seq[ExpressionEqual], Seq[ExpressionEqual]) = {
     extractPredictExpressions(plan, tableMappings, COMPENSABLE_CONDITION)
   }
 
@@ -204,8 +204,8 @@ trait RewriteHelper extends PredicateHelper with RewriteLogger {
    * then transform attr's qualifier by tableMappings
    */
   def extractPredictExpressions(plan: LogicalPlan,
-      tableMappings: BiMap[String, String], conditionFlag: Int)
-  : (EquivalenceClasses, Seq[ExpressionEqual], Seq[ExpressionEqual]) = {
+      tableMappings: BiMap[String, String], conditionFlag: Int): (
+      EquivalenceClasses, Seq[ExpressionEqual], Seq[ExpressionEqual]) = {
     var conjunctivePredicates: Seq[Expression] = Seq()
     var equiColumnsPreds: mutable.Buffer[Expression] = ArrayBuffer()
     val rangePreds: mutable.Buffer[ExpressionEqual] = ArrayBuffer()
@@ -833,6 +833,15 @@ object RewriteHelper extends PredicateHelper with RewriteLogger {
             + "or exceed 3650.")
     }
     days * 24 * 60 * 60 * 1000
+  }
+
+  def secondsToMillisecond(seconds: Long): Long = {
+    if (seconds > 31536000L || seconds < 0L) {
+      throw new IllegalArgumentException(
+        "The second time cannot be less than 0"
+            + "or exceed 31536000.")
+    }
+    seconds * 1000
   }
 }
 

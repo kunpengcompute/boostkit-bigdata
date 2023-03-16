@@ -236,7 +236,7 @@ class WashOutMVSuite extends RewriteSuite {
 
   test("auto wash out") {
     spark.sessionState.conf.setConfString(
-      "spark.sql.omnicache.washout.unused.day", "1")
+      "spark.sql.omnicache.washout.unused.day", "0")
     spark.sessionState.conf.setConfString(
       "spark.sql.omnicache.washout.reserve.quantity.byViewCnt", "1")
     spark.sessionState.conf.setConfString(
@@ -247,6 +247,8 @@ class WashOutMVSuite extends RewriteSuite {
       "spark.sql.omnicache.washout.automatic.view.quantity", "1")
     spark.sessionState.conf.setConfString(
       "spark.sql.omnicache.washout.automatic.enable", "true")
+    spark.sessionState.conf.setConfString(
+      "spark.sql.omnicache.washout.automatic.checkTime.interval", "0")
     spark.sql(
       f"""
          |CREATE MATERIALIZED VIEW IF NOT EXISTS wash_mv1

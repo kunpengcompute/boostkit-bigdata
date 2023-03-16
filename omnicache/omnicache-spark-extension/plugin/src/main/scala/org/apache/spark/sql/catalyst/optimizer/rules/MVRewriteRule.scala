@@ -20,6 +20,7 @@ package org.apache.spark.sql.catalyst.optimizer.rules
 import com.fasterxml.jackson.annotation.JsonIgnore
 import com.huawei.boostkit.spark.conf.OmniCachePluginConfig
 import com.huawei.boostkit.spark.util.{RewriteHelper, RewriteLogger, ViewMetadata}
+import com.huawei.boostkit.spark.util.ViewMetadata._
 import java.util.concurrent.LinkedBlockingQueue
 import scala.collection.mutable
 
@@ -78,7 +79,12 @@ class MVRewriteRule(session: SparkSession)
 
     // automatic wash out
     if (OmniCachePluginConfig.getConf.enableAutoWashOut) {
-      automaticWashOutCheck()
+      val autoCheckInterval: Long = RewriteHelper.secondsToMillisecond(
+        OmniCachePluginConfig.getConf.autoCheckWashOutTimeInterval)
+      val autoWashOutTime: Long = ViewMetadata.autoWashOutTimestamp.getOrElse(0)
+      if ((System.currentTimeMillis() - autoWashOutTime) >= autoCheckInterval) {
+        automaticWashOutCheck()
+      }
     }
 
     var res = RewriteHelper.optimizePlan(plan)
@@ -151,9 +157,6 @@ class MVRewriteRule(session: SparkSession)
           .format(mvs, costSecond)
       logBasedOnLevel(log)
       session.sparkContext.listenerBus.post(SparkListenerMVRewriteSuccess(sql, mvs))
-
-      // After the sql rewrite is complete, store the new viewCnt.
-      ViewMetadata.saveViewCountToFile()
     } else {
       res = plan
       cannotRewritePlans += res
@@ -180,10 +183,12 @@ class MVRewriteRule(session: SparkSession)
   }
 
   private def automaticWashOutCheck(): Unit = {
-    val timeInterval = OmniCachePluginConfig.getConf.automaticWashOutTimeInterval
+    val timeInterval = OmniCachePluginConfig.getConf.autoWashOutTimeInterval
     val threshold = System.currentTimeMillis() - RewriteHelper.daysToMillisecond(timeInterval)
-
     val viewQuantity = OmniCachePluginConfig.getConf.automaticWashOutMinimumViewQuantity
+
+    loadViewCount()
+    loadWashOutTimestamp()
 
     if (ViewMetadata.viewCnt.size() >= viewQuantity &&
         (ViewMetadata.washOutTimestamp.isEmpty ||
@@ -191,6 +196,7 @@ class MVRewriteRule(session: SparkSession)
                 ViewMetadata.washOutTimestamp.get <= threshold))) {
       ViewMetadata.spark.sql("WASH OUT MATERIALIZED VIEW")
       logInfo("WASH OUT MATERIALIZED VIEW BY AUTOMATICALLY.")
+      ViewMetadata.autoWashOutTimestamp = Some(System.currentTimeMillis())
     }
   }
 }

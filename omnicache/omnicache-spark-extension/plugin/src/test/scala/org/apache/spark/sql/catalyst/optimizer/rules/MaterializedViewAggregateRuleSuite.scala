@@ -580,4 +580,27 @@ class MaterializedViewAggregateRuleSuite extends RewriteSuite {
         |""".stripMargin
     )
   }
+
+  test("drop all mv") {
+    spark.sql(
+      """
+        |DROP MATERIALIZED VIEW IF EXISTS mv_agg1;
+        |""".stripMargin
+    )
+    spark.sql(
+      """
+        |DROP MATERIALIZED VIEW IF EXISTS mv_agg2;
+        |""".stripMargin
+    )
+    spark.sql(
+      """
+        |DROP MATERIALIZED VIEW IF EXISTS mv_agg3;
+        |""".stripMargin
+    )
+    spark.sql(
+      """
+        |DROP MATERIALIZED VIEW IF EXISTS mv_agg4;
+        |""".stripMargin
+    )
+  }
 }
