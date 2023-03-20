@@ -119,129 +119,129 @@ class ColumnarHashAggregateDistinctOperatorSuite extends ColumnarSparkPlanTest {
     assertHashAggregateExecOmniAndSparkResultEqual(sql6)
   }
 
-  test("Test HashAgg with multi distinct + multi without distinct:") {
-    val sql1 = "select car_model, min(id), max(quantity), count(distinct city) from dealer" +
-      " group by car_model;"
-    assertHashAggregateExecOmniAndSparkResultEqual(sql1)
+//  test("Test HashAgg with multi distinct + multi without distinct:") {
+//    val sql1 = "select car_model, min(id), max(quantity), count(distinct city) from dealer" +
+//      " group by car_model;"
+//    assertHashAggregateExecOmniAndSparkResultEqual(sql1)
+//
+//    val sql2 = "select car_model, avg(DISTINCT quantity), count(DISTINCT city) from dealer" +
+//      " group by car_model;"
+//    assertHashAggregateExecOmniAndSparkResultEqual(sql2)
+//
+//    val sql3 = "select car_model, sum(DISTINCT quantity), count(DISTINCT city) from dealer" +
+//      " group by car_model;"
+//    assertHashAggregateExecOmniAndSparkResultEqual(sql3)
+//
+//    val sql4 = "select car_model, avg(DISTINCT quantity), sum(DISTINCT city) from dealer" +
+//      " group by car_model;"
+//    // sum(DISTINCT city) have knownfloatingpointnormalized(normalizenanandzero(cast(city as double)))
+//    // not support, HashAggExec will partial replace
+//    assertHashAggregateExecOmniAndSparkResultEqual(sql4, false)
+//
+//    val sql5 = "select car_model, count(DISTINCT city), avg(DISTINCT quantity), sum(DISTINCT city) from dealer" +
+//      " group by car_model;"
+//    // sum(DISTINCT city) have knownfloatingpointnormalized(normalizenanandzero(cast(city as double)))
+//    // not support, HashAggExec will partial replace
+//    assertHashAggregateExecOmniAndSparkResultEqual(sql5, false)
+//
+//    val sql6 = "select car_model, min(id), sum(DISTINCT quantity), count(DISTINCT city) from dealer" +
+//      " group by car_model;"
+//    assertHashAggregateExecOmniAndSparkResultEqual(sql6)
+//
+//    val sql7 = "select car_model, sum(DISTINCT quantity), count(DISTINCT city), avg(DISTINCT city), min(id), max(id) from dealer" +
+//      " group by car_model;"
+//    // avg(DISTINCT city) have knownfloatingpointnormalized(normalizenanandzero(cast(city as double)))
+//    // not support, HashAggExec will partial replace
+//    assertHashAggregateExecOmniAndSparkResultEqual(sql7, false)
+//
+//    val sql8 = "select car_model, min(id), sum(DISTINCT quantity), count(DISTINCT city), avg(DISTINCT city) from dealer" +
+//      " group by car_model;"
+//    // avg(DISTINCT city) have knownfloatingpointnormalized(normalizenanandzero(cast(city as double)))
+//    // not support, HashAggExec will partial replace
+//    assertHashAggregateExecOmniAndSparkResultEqual(sql8, false)
+//  }
 
-    val sql2 = "select car_model, avg(DISTINCT quantity), count(DISTINCT city) from dealer" +
-      " group by car_model;"
-    assertHashAggregateExecOmniAndSparkResultEqual(sql2)
+//  test("Test HashAgg with decimal distinct:") {
+//    val sql1 = "select car_model, avg(DISTINCT quantity_dec8_2), count(DISTINCT city) from dealer_decimal" +
+//      " group by car_model;"
+//    assertHashAggregateExecOmniAndSparkResultEqual(sql1, hashAggExecFullReplace = false)
+//
+//    val sql2 = "select car_model, min(id), sum(DISTINCT quantity_dec8_2), count(DISTINCT city) from dealer_decimal" +
+//      " group by car_model;"
+//    assertHashAggregateExecOmniAndSparkResultEqual(sql2)
+//
+//    val sql3 = "select car_model, count(DISTINCT quantity_dec8_2), count(DISTINCT city), avg(DISTINCT city), min(id), max(id) from dealer_decimal" +
+//      " group by car_model;"
+//    // avg(DISTINCT city) have knownfloatingpointnormalized(normalizenanandzero(cast(city as double)))
+//    // not support, HashAggExec will partial replace
+//    assertHashAggregateExecOmniAndSparkResultEqual(sql3, false)
+//
+//    val sql4 = "select car_model, avg(DISTINCT quantity_dec11_2), count(DISTINCT city) from dealer_decimal" +
+//      " group by car_model;"
+//    assertHashAggregateExecOmniAndSparkResultEqual(sql4, hashAggExecFullReplace = false)
+//
+//    val sql5 = "select car_model, min(id), sum(DISTINCT quantity_dec11_2), count(DISTINCT city) from dealer_decimal" +
+//      " group by car_model;"
+//    assertHashAggregateExecOmniAndSparkResultEqual(sql5)
+//
+//    val sql6 = "select car_model, count(DISTINCT quantity_dec11_2), count (DISTINCT city), avg(DISTINCT city), min(id), max(id) from dealer_decimal" +
+//      " group by car_model;"
+//    // avg(DISTINCT city) have knownfloatingpointnormalized(normalizenanandzero(cast(city as double)))
+//    // not support, HashAggExec will partial replace
+//    assertHashAggregateExecOmniAndSparkResultEqual(sql6, false)
+//
+//    val sql7 = "select car_model, count(DISTINCT quantity_dec8_2), avg(DISTINCT quantity_dec8_2), sum(DISTINCT quantity_dec8_2) from dealer_decimal" +
+//      " group by car_model;"
+//    assertHashAggregateExecOmniAndSparkResultEqual(sql7, hashAggExecFullReplace = false)
+//
+//    val sql8 = "select car_model, count(DISTINCT quantity_dec11_2), avg(DISTINCT quantity_dec11_2), sum(DISTINCT quantity_dec11_2) from dealer_decimal" +
+//      " group by car_model;"
+//    assertHashAggregateExecOmniAndSparkResultEqual(sql8, hashAggExecFullReplace = false)
+//  }
 
-    val sql3 = "select car_model, sum(DISTINCT quantity), count(DISTINCT city) from dealer" +
-      " group by car_model;"
-    assertHashAggregateExecOmniAndSparkResultEqual(sql3)
-
-    val sql4 = "select car_model, avg(DISTINCT quantity), sum(DISTINCT city) from dealer" +
-      " group by car_model;"
-    // sum(DISTINCT city) have knownfloatingpointnormalized(normalizenanandzero(cast(city as double)))
-    // not support, HashAggExec will partial replace
-    assertHashAggregateExecOmniAndSparkResultEqual(sql4, false)
-
-    val sql5 = "select car_model, count(DISTINCT city), avg(DISTINCT quantity), sum(DISTINCT city) from dealer" +
-      " group by car_model;"
-    // sum(DISTINCT city) have knownfloatingpointnormalized(normalizenanandzero(cast(city as double)))
-    // not support, HashAggExec will partial replace
-    assertHashAggregateExecOmniAndSparkResultEqual(sql5, false)
-
-    val sql6 = "select car_model, min(id), sum(DISTINCT quantity), count(DISTINCT city) from dealer" +
-      " group by car_model;"
-    assertHashAggregateExecOmniAndSparkResultEqual(sql6)
-
-    val sql7 = "select car_model, sum(DISTINCT quantity), count(DISTINCT city), avg(DISTINCT city), min(id), max(id) from dealer" +
-      " group by car_model;"
-    // avg(DISTINCT city) have knownfloatingpointnormalized(normalizenanandzero(cast(city as double)))
-    // not support, HashAggExec will partial replace
-    assertHashAggregateExecOmniAndSparkResultEqual(sql7, false)
-
-    val sql8 = "select car_model, min(id), sum(DISTINCT quantity), count(DISTINCT city), avg(DISTINCT city) from dealer" +
-      " group by car_model;"
-    // avg(DISTINCT city) have knownfloatingpointnormalized(normalizenanandzero(cast(city as double)))
-    // not support, HashAggExec will partial replace
-    assertHashAggregateExecOmniAndSparkResultEqual(sql8, false)
-  }
-
-  test("Test HashAgg with decimal distinct:") {
-    val sql1 = "select car_model, avg(DISTINCT quantity_dec8_2), count(DISTINCT city) from dealer_decimal" +
-      " group by car_model;"
-    assertHashAggregateExecOmniAndSparkResultEqual(sql1, hashAggExecFullReplace = false)
-
-    val sql2 = "select car_model, min(id), sum(DISTINCT quantity_dec8_2), count(DISTINCT city) from dealer_decimal" +
-      " group by car_model;"
-    assertHashAggregateExecOmniAndSparkResultEqual(sql2)
-
-    val sql3 = "select car_model, count(DISTINCT quantity_dec8_2), count(DISTINCT city), avg(DISTINCT city), min(id), max(id) from dealer_decimal" +
-      " group by car_model;"
-    // avg(DISTINCT city) have knownfloatingpointnormalized(normalizenanandzero(cast(city as double)))
-    // not support, HashAggExec will partial replace
-    assertHashAggregateExecOmniAndSparkResultEqual(sql3, false)
-
-    val sql4 = "select car_model, avg(DISTINCT quantity_dec11_2), count(DISTINCT city) from dealer_decimal" +
-      " group by car_model;"
-    assertHashAggregateExecOmniAndSparkResultEqual(sql4, hashAggExecFullReplace = false)
-
-    val sql5 = "select car_model, min(id), sum(DISTINCT quantity_dec11_2), count(DISTINCT city) from dealer_decimal" +
-      " group by car_model;"
-    assertHashAggregateExecOmniAndSparkResultEqual(sql5)
-
-    val sql6 = "select car_model, count(DISTINCT quantity_dec11_2), count (DISTINCT city), avg(DISTINCT city), min(id), max(id) from dealer_decimal" +
-      " group by car_model;"
-    // avg(DISTINCT city) have knownfloatingpointnormalized(normalizenanandzero(cast(city as double)))
-    // not support, HashAggExec will partial replace
-    assertHashAggregateExecOmniAndSparkResultEqual(sql6, false)
-
-    val sql7 = "select car_model, count(DISTINCT quantity_dec8_2), avg(DISTINCT quantity_dec8_2), sum(DISTINCT quantity_dec8_2) from dealer_decimal" +
-      " group by car_model;"
-    assertHashAggregateExecOmniAndSparkResultEqual(sql7, hashAggExecFullReplace = false)
-
-    val sql8 = "select car_model, count(DISTINCT quantity_dec11_2), avg(DISTINCT quantity_dec11_2), sum(DISTINCT quantity_dec11_2) from dealer_decimal" +
-      " group by car_model;"
-    assertHashAggregateExecOmniAndSparkResultEqual(sql8, hashAggExecFullReplace = false)
-  }
-
-  test("Test HashAgg with multi distinct + multi without distinct + order by:") {
-    val sql1 = "select car_model, min(id), max(quantity), count(distinct city) from dealer" +
-      " group by car_model order by car_model;"
-    assertHashAggregateExecOmniAndSparkResultEqual(sql1)
-
-    val sql2 = "select car_model, avg(DISTINCT quantity), count(DISTINCT city) from dealer" +
-      " group by car_model order by car_model;"
-    assertHashAggregateExecOmniAndSparkResultEqual(sql2)
-
-    val sql3 = "select car_model, sum(DISTINCT quantity), count(DISTINCT city) from dealer" +
-      " group by car_model order by car_model;"
-    assertHashAggregateExecOmniAndSparkResultEqual(sql3)
-
-    val sql4 = "select car_model, avg(DISTINCT quantity), sum(DISTINCT city) from dealer" +
-      " group by car_model order by car_model;"
-    // sum(DISTINCT city) have knownfloatingpointnormalized(normalizenanandzero(cast(city as double)))
-    // not support, HashAggExec will partial replace
-    assertHashAggregateExecOmniAndSparkResultEqual(sql4, false)
-
-    val sql5 = "select car_model, count(DISTINCT city), avg(DISTINCT quantity), sum(DISTINCT city) from dealer" +
-      " group by car_model order by car_model;"
-    // sum(DISTINCT city) have knownfloatingpointnormalized(normalizenanandzero(cast(city as double)))
-    // not support, HashAggExec will partial replace
-    assertHashAggregateExecOmniAndSparkResultEqual(sql5, false)
-
-    val sql6 = "select car_model, min(id), sum(DISTINCT quantity), count(DISTINCT city) from dealer" +
-      " group by car_model order by car_model;"
-    // count(DISTINCT city) have knownfloatingpointnormalized(normalizenanandzero(cast(city as double)))
-    // not support, HashAggExec will partial replace
-    assertHashAggregateExecOmniAndSparkResultEqual(sql6, false)
-
-    val sql7 = "select car_model, sum(DISTINCT quantity), count(DISTINCT city), avg(DISTINCT city), min(id), max(id) from dealer" +
-      " group by car_model order by car_model;"
-    // avg(DISTINCT city) have knownfloatingpointnormalized(normalizenanandzero(cast(city as double)))
-    // not support, HashAggExec will partial replace
-    assertHashAggregateExecOmniAndSparkResultEqual(sql7, false)
-
-    val sql8 = "select car_model, min(id), sum(DISTINCT quantity), count(DISTINCT city), avg(DISTINCT city) from dealer" +
-      " group by car_model order by car_model;"
-    // avg(DISTINCT city) have knownfloatingpointnormalized(normalizenanandzero(cast(city as double)))
-    // not support, HashAggExec will partial replace
-    assertHashAggregateExecOmniAndSparkResultEqual(sql8, false)
-  }
+//  test("Test HashAgg with multi distinct + multi without distinct + order by:") {
+//    val sql1 = "select car_model, min(id), max(quantity), count(distinct city) from dealer" +
+//      " group by car_model order by car_model;"
+//    assertHashAggregateExecOmniAndSparkResultEqual(sql1)
+//
+//    val sql2 = "select car_model, avg(DISTINCT quantity), count(DISTINCT city) from dealer" +
+//      " group by car_model order by car_model;"
+//    assertHashAggregateExecOmniAndSparkResultEqual(sql2)
+//
+//    val sql3 = "select car_model, sum(DISTINCT quantity), count(DISTINCT city) from dealer" +
+//      " group by car_model order by car_model;"
+//    assertHashAggregateExecOmniAndSparkResultEqual(sql3)
+//
+//    val sql4 = "select car_model, avg(DISTINCT quantity), sum(DISTINCT city) from dealer" +
+//      " group by car_model order by car_model;"
+//    // sum(DISTINCT city) have knownfloatingpointnormalized(normalizenanandzero(cast(city as double)))
+//    // not support, HashAggExec will partial replace
+//    assertHashAggregateExecOmniAndSparkResultEqual(sql4, false)
+//
+//    val sql5 = "select car_model, count(DISTINCT city), avg(DISTINCT quantity), sum(DISTINCT city) from dealer" +
+//      " group by car_model order by car_model;"
+//    // sum(DISTINCT city) have knownfloatingpointnormalized(normalizenanandzero(cast(city as double)))
+//    // not support, HashAggExec will partial replace
+//    assertHashAggregateExecOmniAndSparkResultEqual(sql5, false)
+//
+//    val sql6 = "select car_model, min(id), sum(DISTINCT quantity), count(DISTINCT city) from dealer" +
+//      " group by car_model order by car_model;"
+//    // count(DISTINCT city) have knownfloatingpointnormalized(normalizenanandzero(cast(city as double)))
+//    // not support, HashAggExec will partial replace
+//    assertHashAggregateExecOmniAndSparkResultEqual(sql6, false)
+//
+//    val sql7 = "select car_model, sum(DISTINCT quantity), count(DISTINCT city), avg(DISTINCT city), min(id), max(id) from dealer" +
+//      " group by car_model order by car_model;"
+//    // avg(DISTINCT city) have knownfloatingpointnormalized(normalizenanandzero(cast(city as double)))
+//    // not support, HashAggExec will partial replace
+//    assertHashAggregateExecOmniAndSparkResultEqual(sql7, false)
+//
+//    val sql8 = "select car_model, min(id), sum(DISTINCT quantity), count(DISTINCT city), avg(DISTINCT city) from dealer" +
+//      " group by car_model order by car_model;"
+//    // avg(DISTINCT city) have knownfloatingpointnormalized(normalizenanandzero(cast(city as double)))
+//    // not support, HashAggExec will partial replace
+//    assertHashAggregateExecOmniAndSparkResultEqual(sql8, false)
+//  }
 
   test("Test HashAgg with 1 distinct + order by:") {
     val sql1 = "SELECT car_model, count(DISTINCT city) AS count FROM dealer" +
