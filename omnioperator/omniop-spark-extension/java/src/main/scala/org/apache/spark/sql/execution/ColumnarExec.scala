@@ -298,8 +298,6 @@ case class RowToOmniColumnarExec(child: SparkPlan) extends RowToColumnarTransiti
 
 
 case class OmniColumnarToRowExec(child: SparkPlan) extends ColumnarToRowTransition {
-  assert(child.supportsColumnar)
-
   override def nodeName: String = "OmniColumnarToRow"
 
   override def output: Seq[Attribute] = child.output
