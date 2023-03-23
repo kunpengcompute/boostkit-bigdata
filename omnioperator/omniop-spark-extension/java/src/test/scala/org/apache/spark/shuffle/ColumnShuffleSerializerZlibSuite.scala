@@ -200,7 +200,7 @@ class ColumnShuffleSerializerZlibSuite extends SharedSparkSession {
 
     val shuffleWriteMetrics = taskContext.taskMetrics().shuffleWriteMetrics
     assert(shuffleWriteMetrics.bytesWritten === outputFile.length())
-    assert(shuffleWriteMetrics.recordsWritten === records.length)
+    assert(shuffleWriteMetrics.recordsWritten === pidArray.length * 2)
 
     assert(taskMetrics.diskBytesSpilled === 0)
     assert(taskMetrics.memoryBytesSpilled === 0)
