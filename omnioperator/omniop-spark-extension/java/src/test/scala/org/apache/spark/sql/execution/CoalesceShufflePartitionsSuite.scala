@@ -328,7 +328,7 @@ class CoalesceShufflePartitionsSuite extends SparkFunSuite with BeforeAndAfterAl
         .asInstanceOf[AdaptiveSparkPlanExec].executedPlan
       assert(finalPlan.collect {
         case ShuffleQueryStageExec(_, r: ReusedExchangeExec, _) => r
-      }.length == 2)
+      }.length == 2, s"finalPlan: ${finalPlan}")
       assert(
         finalPlan.collect {
           case r @ CoalescedShuffleRead() => r
@@ -417,7 +417,7 @@ class CoalesceShufflePartitionsSuite extends SparkFunSuite with BeforeAndAfterAl
       assert(
         finalPlan.collect {
           case r @ CoalescedShuffleRead() => r
-        }.size == 2)
+        }.size == 2, s"finalPlan: ${finalPlan}")
     }
     withSparkSession(test, 100, None)
   }
