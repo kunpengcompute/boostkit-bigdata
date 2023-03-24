@@ -41,7 +41,8 @@ class ColumnarExecSuite extends ColumnarSparkPlanTest {
   }
 
   test("validate columnar transfer exec happened") {
-    val sql1 = "SELECT * FROM dealer where a > 1"
+    val sql1 = "SELECT car_model, count(DISTINCT quantity) AS count FROM dealer" +
+      " GROUP BY car_model;"
     assertColumnarToRowOmniAndSparkResultEqual(sql1)
   }
 
