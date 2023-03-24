@@ -322,26 +322,54 @@ object ColumnarBatchToInternalRow {
               rowToOmniColumnarTime: SQLMetric): Iterator[InternalRow] = {
     val startTime = System.nanoTime()
     val toUnsafe = UnsafeProjection.create(output, output)
-    val vecsTmp = new ListBuffer[Vec]
+
     val batchIter = batches.flatMap { batch =>
-      // store vec since tablescan reuse batch
+
+      // toClosedVecs closed case:
+      // 1) all rows of batch fetched and closed
+      // 2) only fetch parital rows(eg: top-n, limit-n), closed at task CompletionListener callback
+      val toClosedVecs = new ListBuffer[Vec]
       for (i <- 0 until batch.numCols()) {
         batch.column(i) match {
           case vector: OmniColumnVector =>
-            vecsTmp.append(vector.getVec)
+            toClosedVecs.append(vector.getVec)
           case _ =>
         }
       }
+
       numInputBatches += 1
-      numOutputRows += batch.numRows()
       val iter = batch.rowIterator().asScala.map(toUnsafe)
       rowToOmniColumnarTime += NANOSECONDS.toMillis(System.nanoTime() - startTime)
-      iter
-    }
 
-    SparkMemoryUtils.addLeakSafeTaskCompletionListener { _ =>
-      vecsTmp.foreach {vec =>
-        vec.close()
+      new Iterator[InternalRow] {
+        val numOutputRowsMetric: SQLMetric = numOutputRows
+        var closed = false
+
+        SparkMemoryUtils.addLeakSafeTaskCompletionListener { _ =>
+          // only invoke if fetch partial rows of batch
+          if (!closed) {
+            toClosedVecs.foreach {vec =>
+              vec.close()
+            }
+          }
+        }
+
+        override  def hasNext: Boolean = {
+          val has = iter.hasNext
+          // fetch all rows and closed
+          if (!has && !closed) {
+            toClosedVecs.foreach {vec =>
+              vec.close()
+            }
+            closed = true
+          }
+          has
+        }
+
+        override def next(): InternalRow = {
+          numOutputRowsMetric += 1
+          iter.next()
+        }
       }
     }
     batchIter
