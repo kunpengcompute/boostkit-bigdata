@@ -41,7 +41,7 @@ class ColumnarExecSuite extends ColumnarSparkPlanTest {
   }
 
   test("validate columnar transfer exec happened") {
-    val sql1 = "SELECT * FROM dealer where a > 1"
+    val sql1 = "SELECT a + 1 FROM dealer"
     assertColumnarToRowOmniAndSparkResultEqual(sql1)
   }
 
