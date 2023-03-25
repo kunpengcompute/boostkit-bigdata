@@ -65,7 +65,7 @@ class ColumnarBroadcastExchangeExec(mode: BroadcastMode, child: SparkPlan)
   @transient
   override lazy val relationFuture: Future[broadcast.Broadcast[Any]] = {
     SQLExecution.withThreadLocalCaptured[broadcast.Broadcast[Any]](
-      sqlContext.sparkSession, ColumnarBroadcastExchangeExec.executionContext) {
+      session.sqlContext.sparkSession, ColumnarBroadcastExchangeExec.executionContext) {
       try {
         // Setup a job group here so later it may get cancelled by groupId if necessary.
         sparkContext.setJobGroup(runId.toString, s"broadcast exchange (runId $runId)",
@@ -158,6 +158,9 @@ class ColumnarBroadcastExchangeExec(mode: BroadcastMode, child: SparkPlan)
       }
     }
   }
+
+  override protected def withNewChildInternal(newChild: SparkPlan): ColumnarBroadcastExchangeExec =
+    new ColumnarBroadcastExchangeExec(this.mode, newChild)
 
   override protected def doPrepare(): Unit = {
     // Materialize the future.

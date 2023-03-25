@@ -68,6 +68,12 @@ class ColumnarSortMergeJoinExec(
     if (isSkewJoin) "OmniColumnarSortMergeJoin(skew=true)" else "OmniColumnarSortMergeJoin"
   }
 
+  override protected def withNewChildrenInternal(newLeft: SparkPlan,
+                                                 newRight: SparkPlan): ColumnarSortMergeJoinExec = {
+    new ColumnarSortMergeJoinExec(this.leftKeys, this.rightKeys, this.joinType,
+      this.condition, newLeft, newRight, this.isSkewJoin)
+  }
+
   val SMJ_NEED_ADD_STREAM_TBL_DATA = 2
   val SMJ_NEED_ADD_BUFFERED_TBL_DATA = 3
   val SCAN_FINISH = 4

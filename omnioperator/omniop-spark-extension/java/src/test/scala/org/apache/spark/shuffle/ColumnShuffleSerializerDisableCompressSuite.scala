@@ -107,14 +107,14 @@ class ColumnShuffleSerializerDisableCompressSuite extends SharedSparkSession {
     when(blockResolver.getDataFile(0, 0)).thenReturn(outputFile)
 
     doAnswer { (invocationOnMock: InvocationOnMock) =>
-      val tmp = invocationOnMock.getArguments()(3).asInstanceOf[File]
+      val tmp = invocationOnMock.getArguments()(4).asInstanceOf[File]
       if (tmp != null) {
         outputFile.delete
         tmp.renameTo(outputFile)
       }
       null
     }.when(blockResolver)
-      .writeIndexFileAndCommit(anyInt, anyLong, any(classOf[Array[Long]]), any(classOf[File]))
+      .writeMetadataFileAndCommit(anyInt, anyLong, any(classOf[Array[Long]]), any(classOf[Array[Long]]), any(classOf[File]))
   }
 
   override def afterEach(): Unit = {
@@ -198,7 +198,7 @@ class ColumnShuffleSerializerDisableCompressSuite extends SharedSparkSession {
 
     val shuffleWriteMetrics = taskContext.taskMetrics().shuffleWriteMetrics
     assert(shuffleWriteMetrics.bytesWritten === outputFile.length())
-    assert(shuffleWriteMetrics.recordsWritten === records.length)
+    assert(shuffleWriteMetrics.recordsWritten === pidArray.length * 2)
 
     assert(taskMetrics.diskBytesSpilled === 0)
     assert(taskMetrics.memoryBytesSpilled === 0)

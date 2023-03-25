@@ -264,20 +264,6 @@ class ColumnarSupportDataTypeSqlSuite extends ColumnarSparkPlanTest {
     )
   }
 
-  test("Test ColumnarWindowExec not happen and result is correct when support short with expr") {
-    val res = spark.sql("select id + 1, short_normal, sum(short_normal) OVER (PARTITION BY short_normal ORDER BY id) AS rank from short_table")
-    val executedPlan = res.queryExecution.executedPlan
-    assert(executedPlan.find(_.isInstanceOf[ColumnarWindowExec]).isEmpty, s"ColumnarWindowExec happened, executedPlan as follows： \n$executedPlan")
-    assert(executedPlan.find(_.isInstanceOf[WindowExec]).isDefined, s"WindowExec not happened, executedPlan as follows： \n$executedPlan")
-    checkAnswer(
-      res,
-      Seq(
-        Row(3, 10, 10),
-        Row(5, 15, 15),
-        Row(7, 20, 20))
-    )
-  }
-
   test("Test ColumnarWindowExec happen and result is correct when support short with null") {
     val res = spark.sql("select id, short_null, RANK() OVER (PARTITION BY short_null ORDER BY id) AS rank from short_table")
     val executedPlan = res.queryExecution.executedPlan

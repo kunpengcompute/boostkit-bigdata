@@ -153,7 +153,7 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
     .toBoolean
 
   val enableFusion: Boolean = conf
-    .getConfString("spark.omni.sql.columnar.fusion", "true")
+    .getConfString("spark.omni.sql.columnar.fusion", "false")
     .toBoolean
 
   // Pick columnar shuffle hash join if one side join count > = 0 to build local hash map, and is
