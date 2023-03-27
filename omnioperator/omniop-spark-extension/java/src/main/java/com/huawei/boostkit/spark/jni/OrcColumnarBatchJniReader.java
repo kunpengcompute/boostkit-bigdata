@@ -117,7 +117,7 @@ public class OrcColumnarBatchJniReader {
                             lst.add(spiltValues[0] + "." + scalePadZeroStr + " " + decimalP + " " + decimalS);
                         }
                     } else if (pl.getType() == PredicateLeaf.Type.DATE) {
-                        lst.add(((int)Math.ceil(((Date)pl.getLiteral()).getTime()* 1.0/3600/24/1000)) + "");
+                        lst.add(((int)Math.ceil(((Date)ob).getTime()* 1.0/3600/24/1000)) + "");
                     } else {
                         lst.add(ob.toString());
                     }
