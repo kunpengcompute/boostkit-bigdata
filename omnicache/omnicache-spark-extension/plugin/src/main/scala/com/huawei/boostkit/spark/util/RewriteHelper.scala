@@ -351,28 +351,37 @@ trait RewriteHelper extends PredicateHelper with RewriteLogger {
   }
 
   /**
-   * extract used tables from logicalPlan
+   * extract used CatalogTables from logicalPlan
    *
-   * @return used tables
+   * @return used CatalogTables
    */
-  def extractTablesOnly(plan: LogicalPlan): mutable.Set[String] = {
-    val tables = mutable.Set[String]()
+  def extractCatalogTablesOnly(plan: LogicalPlan): Seq[CatalogTable] = {
+    var tables = mutable.Seq[CatalogTable]()
     plan.foreachUp {
       case HiveTableRelation(tableMeta, _, _, _, _) =>
-        tables += tableMeta.identifier.toString()
-      case h@LogicalRelation(_, _, catalogTable, _) =>
+        tables +:= tableMeta
+      case LogicalRelation(_, _, catalogTable, _) =>
         if (catalogTable.isDefined) {
-          tables += catalogTable.get.identifier.toString()
+          tables +:= catalogTable.get
         }
       case p =>
         p.transformAllExpressions {
           case e: SubqueryExpression =>
-            tables ++= extractTablesOnly(e.plan)
+            tables ++= extractCatalogTablesOnly(e.plan)
             e
           case e => e
         }
     }
     tables
+  }
+
+  /**
+   * extract used tables from logicalPlan
+   *
+   * @return used tables
+   */
+  def extractTablesOnly(plan: LogicalPlan): Set[String] = {
+    extractCatalogTablesOnly(plan).map(_.identifier.toString()).toSet
   }
 
   /**
@@ -756,10 +765,20 @@ object RewriteHelper extends PredicateHelper with RewriteLogger {
 
   def enableCachePlugin(): Unit = {
     SQLConf.get.setConfString("spark.sql.omnicache.enable", "true")
+    SQLConf.get.setConfString("spark.sql.omnicache.log.enable", "true")
   }
 
   def disableCachePlugin(): Unit = {
     SQLConf.get.setConfString("spark.sql.omnicache.enable", "false")
+    SQLConf.get.setConfString("spark.sql.omnicache.log.enable", "false")
+  }
+
+  def enableSqlLog(): Unit = {
+    SQLConf.get.setConfString("spark.sql.omnicache.log.enable", "true")
+  }
+
+  def disableSqlLog(): Unit = {
+    SQLConf.get.setConfString("spark.sql.omnicache.log.enable", "false")
   }
 
   /**

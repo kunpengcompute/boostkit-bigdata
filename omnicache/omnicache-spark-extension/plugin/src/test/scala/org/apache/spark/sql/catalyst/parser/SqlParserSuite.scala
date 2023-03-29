@@ -708,4 +708,75 @@ class SqlParserSuite extends RewriteSuite {
     spark.sql("DROP MATERIALIZED VIEW IF EXISTS mv_create_agg1;")
     spark.sql("DROP MATERIALIZED VIEW IF EXISTS mv_create_agg2;")
   }
+
+  test("mv_auto_update1") {
+    spark.sql("DROP MATERIALIZED VIEW IF EXISTS mv_auto_update1;")
+    spark.sql(
+      """
+        |CREATE MATERIALIZED VIEW IF NOT EXISTS mv_auto_update1
+        |AS
+        |SELECT * FROM emps;
+        |""".stripMargin)
+
+    val uri = spark.sessionState.catalog
+        .getTableMetadata(TableIdentifier("mv_auto_update1"))
+        .storage.locationUri.get
+    val lastTime = ViewMetadata.getPathTime(uri)
+
+    spark.sql(
+      """
+        |INSERT INTO TABLE emps VALUES(1,1,1,'empname1',1.0);
+        |""".stripMargin
+    )
+
+    val sql = "SELECT * FROM emps;"
+    comparePlansAndRows(sql, "default", "mv_auto_update1", noData = false)
+    val nowTime = ViewMetadata.getPathTime(uri)
+    assert(nowTime > lastTime)
+    spark.sql("DROP MATERIALIZED VIEW IF EXISTS mv_auto_update1;")
+  }
+
+  test("mv_auto_update2") {
+    spark.sql(
+      """
+        |DROP MATERIALIZED VIEW IF EXISTS mv_auto_update2;
+        |""".stripMargin
+    )
+    spark.sql(
+      """
+        |CREATE MATERIALIZED VIEW IF NOT EXISTS mv_auto_update2
+        |AS
+        |SELECT e.*,d.deptname
+        |FROM emps e JOIN depts d
+        |ON e.deptno=d.deptno;
+        |""".stripMargin
+    )
+
+    val uri = spark.sessionState.catalog
+        .getTableMetadata(TableIdentifier("mv_auto_update2"))
+        .storage.locationUri.get
+    val lastTime = ViewMetadata.getPathTime(uri)
+
+    spark.sql(
+      """
+        |INSERT INTO TABLE emps VALUES(1,1,1,'empname1',1.0);
+        |""".stripMargin
+    )
+    spark.sql(
+      """
+        |INSERT INTO TABLE depts VALUES(1,'deptname1');
+        |""".stripMargin
+    )
+
+    val sql =
+      """
+        |SELECT e.*,d.deptname,l.locationid
+        |FROM emps e JOIN depts d JOIN locations l
+        |ON e.deptno=d.deptno AND e.locationid=l.locationid;
+        |""".stripMargin
+    comparePlansAndRows(sql, "default", "mv_auto_update2", noData = false)
+    val nowTime = ViewMetadata.getPathTime(uri)
+    assert(nowTime > lastTime)
+    spark.sql("DROP MATERIALIZED VIEW IF EXISTS mv_auto_update2;")
+  }
 }

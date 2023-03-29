@@ -50,6 +50,7 @@ class MVRewriteRule(session: SparkSession)
     if (!omniCacheConf.enableOmniCache || cannotRewritePlans.contains(logicalPlan)) {
       return logicalPlan
     }
+    RewriteHelper.disableSqlLog()
     try {
       logicalPlan match {
         case _: Command | ExplainCommand(_, _) =>
@@ -58,9 +59,11 @@ class MVRewriteRule(session: SparkSession)
           tryRewritePlan(logicalPlan)
       }
     } catch {
-      case _: Throwable =>
+      case e: Throwable =>
         logError(s"Failed to rewrite plan with mv.")
         logicalPlan
+    } finally {
+      RewriteHelper.enableSqlLog()
     }
   }
 
