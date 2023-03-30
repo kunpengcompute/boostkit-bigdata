@@ -54,6 +54,7 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] {
   val enableFusion: Boolean = columnarConf.enableFusion
   var isSupportAdaptive: Boolean = true
   val enableColumnarProjectFusion: Boolean = columnarConf.enableColumnarProjectFusion
+  val enableColumnarLimit: Boolean = columnarConf.enableColumnarLimit
 
   def apply(plan: SparkPlan): SparkPlan = {
     replaceWithColumnarPlan(plan)
@@ -369,6 +370,14 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] {
         case _ =>
           plan
       }
+    case plan: LocalLimitExec if enableColumnarLimit =>
+      val child = replaceWithColumnarPlan(plan.child)
+      logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
+      ColumnarLocalLimitExec(plan.limit, child)
+    case plan: GlobalLimitExec if enableColumnarLimit =>
+      val child = replaceWithColumnarPlan(plan.child)
+      logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
+      ColumnarGlobalLimitExec(plan.limit, child)
     case p =>
       val children = plan.children.map(replaceWithColumnarPlan)
       logInfo(s"Columnar Processing for ${p.getClass} is currently not supported.")

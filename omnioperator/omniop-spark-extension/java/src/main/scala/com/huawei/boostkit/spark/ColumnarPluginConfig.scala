@@ -177,6 +177,8 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
   val enableOmniExpCheck : Boolean = conf.getConfString("spark.omni.sql.omniExp.check", "true").toBoolean
 
   val enableColumnarProjectFusion : Boolean = conf.getConfString("spark.omni.sql.columnar.projectFusion", "true").toBoolean
+
+  val enableColumnarLimit : Boolean = conf.getConfString("spark.omni.sql.columnar.limit", "true").toBoolean
 }
 
 
