@@ -30,7 +30,7 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.plans.{FullOuter, LeftAnti, LeftOuter, LeftSemi, RightOuter}
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.catalyst.rules.Rule
-import org.apache.spark.sql.execution.command.ExplainCommand
+import org.apache.spark.sql.execution.command.{ExplainCommand, OmniCacheCreateMvCommand}
 import org.apache.spark.status.ElementTrackingStore
 import org.apache.spark.util.kvstore.KVIndex
 
@@ -51,7 +51,7 @@ class MVRewriteRule(session: SparkSession)
     }
     try {
       logicalPlan match {
-        case _: Command | ExplainCommand(_, _) =>
+        case _: OmniCacheCreateMvCommand | ExplainCommand(_, _) =>
           logicalPlan
         case _ =>
           tryRewritePlan(logicalPlan)
@@ -187,8 +187,7 @@ class MVRewriteRule(session: SparkSession)
 
     if (ViewMetadata.viewCnt.size() >= viewQuantity &&
         (ViewMetadata.washOutTimestamp.isEmpty ||
-            (ViewMetadata.washOutTimestamp.isDefined &&
-                ViewMetadata.washOutTimestamp.get <= threshold))) {
+            (ViewMetadata.washOutTimestamp.get <= threshold))) {
       ViewMetadata.spark.sql("WASH OUT MATERIALIZED VIEW")
       logInfo("WASH OUT MATERIALIZED VIEW BY AUTOMATICALLY.")
     }

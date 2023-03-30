@@ -302,7 +302,6 @@ object ViewMetadata extends RewriteHelper {
       // if db exists a table hive materialized view, will throw analysis exception
       case e: Throwable =>
         logDebug(s"Failed to listTables in $mvDataBase, errmsg: ${e.getMessage}")
-        res = Seq.empty[CatalogTable]
         throw new UnsupportedOperationException("hive materialized view is not supported.")
     }
     res

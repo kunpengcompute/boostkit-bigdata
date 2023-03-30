@@ -8,7 +8,7 @@
     <groupId>com.huawei.kunpeng</groupId>
     <artifactId>boostkit-omnicache-spark-parent</artifactId>
     <packaging>pom</packaging>
-    <version>3.1.1-1.1.0</version>
+    <version>${omniCache.version}</version>
 
     <modules>
         <module>plugin</module>
@@ -18,6 +18,7 @@
     <name>BoostKit Spark MaterializedView Sql Engine Extension Parent Pom</name>
 
     <properties>
+        <omniCache.version>3.1.1-1.1.0</omniCache.version>
         <scala.version>2.12.10</scala.version>
         <scala.binary.version>2.12</scala.binary.version>
         <java.version>1.8</java.version>

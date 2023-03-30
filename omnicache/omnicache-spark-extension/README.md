@@ -29,6 +29,6 @@ pull the OmniCache code and compile it to get the jar package
 ```shell
 git clone https://gitee.com/kunpengcompute/boostkit-bigdata.git
 cd boostkit-bigdata/omnicache/omnicache-spark-extension
-# This step can be compiled, tested and packaged to get plugin/boostkit-omnicache-spark-3.1.1-1.1.0.jar
+# This step can be compiled, tested and packaged to get plugin/boostkit-omnicache-spark-${omniCache.version}.jar
 mvn clean package
 ```

@@ -6,13 +6,13 @@
     <parent>
         <groupId>com.huawei.kunpeng</groupId>
         <artifactId>boostkit-omnicache-spark-parent</artifactId>
-        <version>3.1.1-1.1.0</version>
+        <version>${omniCache.version}</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
     <artifactId>boostkit-omnicache-spark</artifactId>
     <packaging>jar</packaging>
-    <version>3.1.1-1.1.0</version>
+    <version>${omniCache.version}</version>
 
     <name>plugin</name>
 

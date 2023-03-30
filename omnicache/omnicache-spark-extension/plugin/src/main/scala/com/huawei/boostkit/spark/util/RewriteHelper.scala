@@ -830,7 +830,7 @@ object RewriteHelper extends PredicateHelper with RewriteLogger {
     if (days > 3650 || days < 0) {
       throw new IllegalArgumentException(
         "The day time cannot be less than 0"
-            + "or exceed 3650.")
+            + " or exceed 3650.")
     }
     days * 24 * 60 * 60 * 1000
   }
