@@ -91,11 +91,12 @@ object ExprOptUtil {
     if (expr == null) {
       return
     }
-    if (expr.isInstanceOf[And]) {
-      decomposeConjunctions(expr.asInstanceOf[And].left, buf)
-      decomposeConjunctions(expr.asInstanceOf[And].right, buf)
-    } else {
-      buf.+=(expr)
+    expr match {
+      case and: And =>
+        decomposeConjunctions(and.left, buf)
+        decomposeConjunctions(and.right, buf)
+      case _ =>
+        buf.+=(expr)
     }
   }
 
@@ -130,7 +131,7 @@ object ExprOptUtil {
     makeOr(terms, nullOnEmpty)
   }
 
-  def makeOr(terms: Seq[Expression], nullOnEmpty: Boolean): Expression = {
+  private def makeOr(terms: Seq[Expression], nullOnEmpty: Boolean): Expression = {
     if (terms.isEmpty) {
       if (nullOnEmpty) null else Literal(false, BooleanType)
     } else if (terms.size == 1) {
@@ -149,7 +150,7 @@ object ExprOptUtil {
     }
   }
 
-  def makeAnd(terms: Seq[Expression], nullOnEmpty: Boolean): Expression = {
+  private def makeAnd(terms: Seq[Expression], nullOnEmpty: Boolean): Expression = {
     if (terms.isEmpty) {
       if (nullOnEmpty) null else Literal(true, BooleanType)
     } else if (terms.size == 1) {
@@ -192,17 +193,17 @@ object ExprOptUtil {
     }
   }
 
-  def isLiteralFalse(e: Expression): Boolean = {
+  private def isLiteralFalse(e: Expression): Boolean = {
     e.isInstanceOf[Literal] && e.sql.equals("false")
   }
 
-  def isLiteralTrue(e: Expression): Boolean = {
+  private def isLiteralTrue(e: Expression): Boolean = {
     e.isInstanceOf[Literal] && e.sql.equals("true")
   }
 
   /**
-   * @return Whether the expression.sql in {@code srcTerms}
-   *         contains all expression.sql in {@code dstTerms}
+   * @return Whether the expression.sql in srcTerms
+   *         contains all expression.sql in stTerms
    */
   def containsAllSql(srcTerms: Set[Expression], dstTerms: Set[Expression]): Boolean = {
     if (dstTerms.isEmpty || srcTerms.isEmpty) {
@@ -222,8 +223,8 @@ object ExprOptUtil {
   }
 
   /**
-   * @return Whether the expression.sql in {@code srcTerms}
-   *         contains at least one expression.sql in {@code dstTerms}
+   * @return Whether the expression.sql in srcTerms
+   *         contains at least one expression.sql in dstTerms
    */
   def containsSql(srcTerms: Set[Expression], dstTerms: Set[Expression]): Boolean = {
     if (dstTerms.isEmpty || srcTerms.isEmpty) {

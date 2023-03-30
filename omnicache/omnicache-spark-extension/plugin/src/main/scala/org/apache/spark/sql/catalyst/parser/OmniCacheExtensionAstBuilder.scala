@@ -115,7 +115,7 @@ class OmniCacheExtensionAstBuilder(spark: SparkSession, delegate: ParserInterfac
         s"Table or view not found: $tableIdentifier .")
     }
 
-    var catalogTable = spark.sessionState.catalog.getTableMetadata(tableIdentifier)
+    val catalogTable = spark.sessionState.catalog.getTableMetadata(tableIdentifier)
     val queryStr = catalogTable.properties.get(MV_QUERY_ORIGINAL_SQL)
     if (queryStr.isEmpty) {
       throw new RuntimeException("cannot refresh a table with refresh mv")
@@ -311,7 +311,7 @@ class OmniCacheExtensionAstBuilder(spark: SparkSession, delegate: ParserInterfac
     string(ctx.STRING)
   }
 
-  protected def typedVisit[T](ctx: ParseTree): T = {
+  private def typedVisit[T](ctx: ParseTree): T = {
     ctx.accept(this).asInstanceOf[T]
   }
 
@@ -323,7 +323,7 @@ class OmniCacheExtensionAstBuilder(spark: SparkSession, delegate: ParserInterfac
   /**
    * Create an optional comment string.
    */
-  protected def visitCommentSpecList(ctx: CommentSpecContext): Option[String] = {
+  private def visitCommentSpecList(ctx: CommentSpecContext): Option[String] = {
     Option(ctx).map(visitCommentSpec)
   }
 
@@ -347,5 +347,31 @@ class OmniCacheExtensionAstBuilder(spark: SparkSession, delegate: ParserInterfac
    */
   override def visitIdentifierSeq(ctx: IdentifierSeqContext): Seq[String] = withOrigin(ctx) {
     ctx.ident.asScala.map(_.getText)
+  }
+
+  override def visitWashOutMV(ctx: WashOutMVContext): LogicalPlan = {
+    val dropAll = if (ctx.ALL() == null) false else true
+    val strategy = if (ctx.washOutExpressions() != null) {
+      visitWashOutExpressions(ctx.washOutExpressions())
+    } else {
+      Option.empty
+    }
+
+    WashOutMaterializedViewCommand(dropAll, strategy)
+  }
+
+  override def visitWashOutStrategy(ctx: WashOutStrategyContext): (String, Int) = {
+    val key = ctx.children.get(0).getText
+    val value = ctx.children.get(1).getText.toInt
+    (key, value)
+  }
+
+  override def visitWashOutExpressions(
+      ctx: WashOutExpressionsContext): Option[List[(String, Int)]] = withOrigin(ctx) {
+    if (ctx.washOutStrategy() != null) {
+      Some(ctx.washOutStrategy().asScala.map(visitWashOutStrategy).toList)
+    } else {
+      Option.empty
+    }
   }
 }

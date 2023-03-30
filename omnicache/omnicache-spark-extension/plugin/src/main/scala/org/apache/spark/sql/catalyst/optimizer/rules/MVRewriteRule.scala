@@ -34,15 +34,16 @@ import org.apache.spark.sql.execution.command.{ExplainCommand, OmniCacheCreateMv
 import org.apache.spark.status.ElementTrackingStore
 import org.apache.spark.util.kvstore.KVIndex
 
-class MVRewriteRule(session: SparkSession) extends Rule[LogicalPlan] with RewriteHelper {
-  var cannotRewritePlans: Set[LogicalPlan] = Set[LogicalPlan]()
+class MVRewriteRule(session: SparkSession)
+    extends Rule[LogicalPlan] with RewriteHelper with RewriteLogger {
+  private var cannotRewritePlans: Set[LogicalPlan] = Set[LogicalPlan]()
 
-  val omniCacheConf: OmniCachePluginConfig = OmniCachePluginConfig.getConf
+  private val omniCacheConf: OmniCachePluginConfig = OmniCachePluginConfig.getConf
 
-  val joinRule = new MaterializedViewJoinRule(session)
-  val outJoinRule = new MaterializedViewOutJoinRule(session)
-  val aggregateRule = new MaterializedViewAggregateRule(session)
-  val outJoinAggregateRule = new MaterializedViewOutJoinAggregateRule(session)
+  private val joinRule = new MaterializedViewJoinRule(session)
+  private val outJoinRule = new MaterializedViewOutJoinRule(session)
+  private val aggregateRule = new MaterializedViewAggregateRule(session)
+  private val outJoinAggregateRule = new MaterializedViewOutJoinAggregateRule(session)
 
   override def apply(logicalPlan: LogicalPlan): LogicalPlan = {
     if (!omniCacheConf.enableOmniCache || cannotRewritePlans.contains(logicalPlan)) {
@@ -56,14 +57,14 @@ class MVRewriteRule(session: SparkSession) extends Rule[LogicalPlan] with Rewrit
           tryRewritePlan(logicalPlan)
       }
     } catch {
-      case e: Throwable =>
-        logWarning(s"Failed to rewrite plan with mv,errmsg: ${e.getMessage}")
+      case _: Throwable =>
+        logError(s"Failed to rewrite plan with mv.")
         logicalPlan
     }
   }
 
   def tryRewritePlan(plan: LogicalPlan): LogicalPlan = {
-    val usingMvs = mutable.Set.empty[String]
+    val usingMvInfos = mutable.Set.empty[(String, String)]
     RewriteTime.clear()
     val rewriteStartSecond = System.currentTimeMillis()
 
@@ -73,6 +74,11 @@ class MVRewriteRule(session: SparkSession) extends Rule[LogicalPlan] with Rewrit
     // init viewMetadata by full queryPlan
     RewriteTime.withTimeStat("viewMetadata") {
       ViewMetadata.init(session, Some(plan))
+    }
+
+    // automatic wash out
+    if (OmniCachePluginConfig.getConf.enableAutoWashOut) {
+      automaticWashOutCheck()
     }
 
     var res = RewriteHelper.optimizePlan(plan)
@@ -94,15 +100,15 @@ class MVRewriteRule(session: SparkSession) extends Rule[LogicalPlan] with Rewrit
               r match {
                 case p: Project =>
                   if (containsOuterJoin(p)) {
-                    outJoinRule.perform(Some(p), p.child, usingMvs, candidateViewPlan)
+                    outJoinRule.perform(Some(p), p.child, usingMvInfos, candidateViewPlan)
                   } else {
-                    joinRule.perform(Some(p), p.child, usingMvs, candidateViewPlan)
+                    joinRule.perform(Some(p), p.child, usingMvInfos, candidateViewPlan)
                   }
                 case a: Aggregate =>
                   var rewritedPlan = if (containsOuterJoin(a)) {
-                    outJoinAggregateRule.perform(None, a, usingMvs, candidateViewPlan)
+                    outJoinAggregateRule.perform(None, a, usingMvInfos, candidateViewPlan)
                   } else {
-                    aggregateRule.perform(None, a, usingMvs, candidateViewPlan)
+                    aggregateRule.perform(None, a, usingMvInfos, candidateViewPlan)
                   }
                   // below agg may be join/filter can be rewrite
                   if (rewritedPlan == a && !a.child.isInstanceOf[Project]) {
@@ -110,9 +116,9 @@ class MVRewriteRule(session: SparkSession) extends Rule[LogicalPlan] with Rewrit
                       RewriteHelper.extractAllAttrsFromExpression(
                         a.aggregateExpressions).toSeq, a.child)
                     val rewritedChild = if (containsOuterJoin(a)) {
-                      outJoinRule.perform(Some(child), child.child, usingMvs, candidateViewPlan)
+                      outJoinRule.perform(Some(child), child.child, usingMvInfos, candidateViewPlan)
                     } else {
-                      joinRule.perform(Some(child), child.child, usingMvs, candidateViewPlan)
+                      joinRule.perform(Some(child), child.child, usingMvInfos, candidateViewPlan)
                     }
                     if (rewritedChild != child) {
                       val projectChild = rewritedChild.asInstanceOf[Project]
@@ -129,7 +135,7 @@ class MVRewriteRule(session: SparkSession) extends Rule[LogicalPlan] with Rewrit
     }
 
     RewriteTime.queue.add(("load_mv.nums", ViewMetadata.viewToTablePlan.size()))
-    if (usingMvs.nonEmpty) {
+    if (usingMvInfos.nonEmpty) {
       RewriteTime.withTimeStat("checkAttrsValid") {
         if (!RewriteHelper.checkAttrsValid(res)) {
           RewriteTime.statFromStartTime("total", rewriteStartSecond)
@@ -138,13 +144,16 @@ class MVRewriteRule(session: SparkSession) extends Rule[LogicalPlan] with Rewrit
         }
       }
       val sql = session.sparkContext.getLocalProperty(SparkContext.SPARK_JOB_DESCRIPTION)
-      val mvs = usingMvs.mkString(";").replaceAll("`", "")
+      val mvs = usingMvInfos.mkString(";").replaceAll("`", "")
       val costSecond = (System.currentTimeMillis() - rewriteStartSecond).toString
       val log = ("logicalPlan MVRewrite success," +
           "using materialized view:[%s],cost %s milliseconds,")
           .format(mvs, costSecond)
       logBasedOnLevel(log)
       session.sparkContext.listenerBus.post(SparkListenerMVRewriteSuccess(sql, mvs))
+
+      // After the sql rewrite is complete, store the new viewCnt.
+      ViewMetadata.saveViewCountToFile()
     } else {
       res = plan
       cannotRewritePlans += res
@@ -168,6 +177,20 @@ class MVRewriteRule(session: SparkSession) extends Rule[LogicalPlan] with Rewrit
       case _ =>
     }
     false
+  }
+
+  private def automaticWashOutCheck(): Unit = {
+    val timeInterval = OmniCachePluginConfig.getConf.automaticWashOutTimeInterval
+    val threshold = System.currentTimeMillis() - RewriteHelper.daysToMillisecond(timeInterval)
+
+    val viewQuantity = OmniCachePluginConfig.getConf.automaticWashOutMinimumViewQuantity
+
+    if (ViewMetadata.viewCnt.size() >= viewQuantity &&
+        (ViewMetadata.washOutTimestamp.isEmpty ||
+            (ViewMetadata.washOutTimestamp.get <= threshold))) {
+      ViewMetadata.spark.sql("WASH OUT MATERIALIZED VIEW")
+      logInfo("WASH OUT MATERIALIZED VIEW BY AUTOMATICALLY.")
+    }
   }
 }
 

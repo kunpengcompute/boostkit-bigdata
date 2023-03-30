@@ -131,8 +131,22 @@ statement
       statement                                                          #explain
     | ALTER MATERIALIZED VIEW multipartIdentifier
       (ENABLE|DISABLE) REWRITE                                           #alterRewriteMV
+    | WASHOUT (ALL)? MATERIALIZED VIEW (washOutExpressions)?             #washOutMV
     ;
 
+washOutExpressions
+    : USING washOutStrategy (',' washOutStrategy)*
+    ;
+
+washOutStrategy
+    : UNUSED_DAYS washOutValue
+    | RESERVE_QUANTITY_BY_VIEW_COUNT washOutValue
+    | DROP_QUANTITY_BY_SPACE_CONSUMED washOutValue
+    ;
+
+washOutValue
+    : INTEGER_VALUE
+    ;
 
 createMVHeader
     : CREATE MATERIALIZED VIEW (IF NOT EXISTS)? multipartIdentifier
@@ -1370,6 +1384,10 @@ ADD: 'ADD';
 AFTER: 'AFTER';
 ALL: 'ALL';
 ALTER: 'ALTER';
+WASHOUT: 'WASH OUT';
+UNUSED_DAYS: 'UNUSED_DAYS';
+RESERVE_QUANTITY_BY_VIEW_COUNT: 'RESERVE_QUANTITY_BY_VIEW_COUNT';
+DROP_QUANTITY_BY_SPACE_CONSUMED: 'DROP_QUANTITY_BY_SPACE_CONSUMED';
 ANALYZE: 'ANALYZE';
 AND: 'AND';
 ANTI: 'ANTI';

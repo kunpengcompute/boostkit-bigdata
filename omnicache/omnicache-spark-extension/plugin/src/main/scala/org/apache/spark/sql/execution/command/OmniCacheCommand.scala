@@ -20,10 +20,13 @@ package org.apache.spark.sql.execution.command
 import com.huawei.boostkit.spark.conf.OmniCachePluginConfig
 import com.huawei.boostkit.spark.conf.OmniCachePluginConfig._
 import com.huawei.boostkit.spark.util.{RewriteHelper, ViewMetadata}
-import java.io.IOException
+import com.huawei.boostkit.spark.util.ViewMetadata.formatViewName
+import java.io.{FileNotFoundException, IOException}
 import java.net.URI
+import java.rmi.UnexpectedException
 import java.util.Locale
 import org.apache.hadoop.fs.{FileSystem, Path}
+import scala.collection.{mutable, JavaConverters}
 import scala.util.control.NonFatal
 
 import org.apache.spark.internal.io.FileCommitProtocol
@@ -37,12 +40,14 @@ import org.apache.spark.sql.catalyst.optimizer.OmniCacheToSparkAdapter._
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.catalyst.util.{CaseInsensitiveMap, CharVarcharUtils}
 import org.apache.spark.sql.execution.SparkPlan
+import org.apache.spark.sql.execution.command.WashOutStrategy._
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.internal.SQLConf.PartitionOverwriteMode
 import org.apache.spark.sql.sources.BaseRelation
 import org.apache.spark.sql.types.{StringType, StructType}
 import org.apache.spark.sql.util.SchemaUtils
+
 
 case class OmniCacheCreateMvCommand(
     databaseNameOption: Option[String],
@@ -118,6 +123,12 @@ case class OmniCacheCreateMvCommand(
       }
 
       CommandUtils.updateTableStats(sparkSession, table)
+
+      // init ViewMetadata.viewCnt
+      ViewMetadata.viewCnt.put(
+        formatViewName(table.identifier),
+        Array(0, System.currentTimeMillis()))
+
       ViewMetadata.addCatalogTableToCache(table)
     } catch {
       case e: Throwable =>
@@ -540,4 +551,142 @@ case class RefreshMaterializedViewCommand(
       }
     }.toMap
   }
+}
+
+/**
+ * Eliminate the least used materialized view.
+ *
+ * The syntax of this command is:
+ * {{{
+ *   WASH OUT MATERIALIZED VIEW;
+ * }}}
+ */
+case class WashOutMaterializedViewCommand(
+    dropAll: Boolean,
+    strategy: Option[List[(String, Int)]]) extends RunnableCommand {
+
+  private val logFlag = "[OmniCache]"
+
+  override def run(sparkSession: SparkSession): Seq[Row] = {
+    ViewMetadata.init(sparkSession)
+    if (dropAll) {
+      washOutAllMV()
+      return Seq.empty[Row]
+    }
+    if (strategy.isDefined) {
+      strategy.get.foreach {
+        infos: (String, Int) =>
+          infos._1 match {
+            case UNUSED_DAYS =>
+              washOutByUnUsedDays(Some(infos._2))
+            case RESERVE_QUANTITY_BY_VIEW_COUNT =>
+              washOutByReserveQuantity(Some(infos._2))
+            case DROP_QUANTITY_BY_SPACE_CONSUMED =>
+              washOutViewsBySpace(Some(infos._2))
+            case _ =>
+          }
+      }
+    } else {
+      // default wash out strategy.
+      washOutByUnUsedDays(Option.empty)
+      washOutByReserveQuantity(Option.empty)
+    }
+
+    // save wash out timestamp
+    ViewMetadata.washOutTimestamp = Some(System.currentTimeMillis())
+    ViewMetadata.saveWashOutTimestamp()
+
+    Seq.empty[Row]
+  }
+
+  private def washOutAllMV(): Unit = {
+    ViewMetadata.viewCnt.forEach {
+      (viewName, _) =>
+        ViewMetadata.spark.sql("DROP MATERIALIZED VIEW IF EXISTS " + viewName)
+    }
+    logInfo(f"$logFlag WASH OUT ALL MATERIALIZED VIEW.")
+  }
+
+  private def washOutByUnUsedDays(para: Option[Int]): Unit = {
+    val unUsedDays = para.getOrElse(
+      OmniCachePluginConfig.getConf.minimumUnusedDaysForWashOut)
+    val curTime = System.currentTimeMillis()
+    val threshold = curTime - RewriteHelper.daysToMillisecond(unUsedDays.toLong)
+    ViewMetadata.viewCnt.forEach {
+      (viewName, viewInfo) =>
+        if (viewInfo(1) <= threshold) {
+          ViewMetadata.spark.sql("DROP MATERIALIZED VIEW IF EXISTS " + viewName)
+        }
+    }
+    logInfo(f"$logFlag WASH OUT MATERIALIZED VIEW " +
+        f"USING $UNUSED_DAYS $unUsedDays.")
+  }
+
+  private def washOutByReserveQuantity(para: Option[Int]): Unit = {
+    val reserveQuantity = para.getOrElse(
+      OmniCachePluginConfig.getConf.reserveViewQuantityByViewCount)
+    var viewCntList = JavaConverters.mapAsScalaMap(ViewMetadata.viewCnt).toList
+    if (viewCntList.size <= reserveQuantity) {
+      return
+    }
+    viewCntList = viewCntList.sorted {
+      (x: (String, Array[Long]), y: (String, Array[Long])) => {
+        if (y._2(0) != x._2(0)) {
+          y._2(0).compare(x._2(0))
+        } else {
+          y._2(1).compare(x._2(1))
+        }
+      }
+    }
+    for (i <- reserveQuantity until viewCntList.size) {
+      ViewMetadata.spark.sql("DROP MATERIALIZED VIEW IF EXISTS " + viewCntList(i)._1)
+    }
+    logInfo(f"$logFlag WASH OUT MATERIALIZED VIEW " +
+        f"USING $RESERVE_QUANTITY_BY_VIEW_COUNT $reserveQuantity.")
+  }
+
+  private def washOutViewsBySpace(para: Option[Int]): Unit = {
+    val dropQuantity = para.getOrElse(
+      OmniCachePluginConfig.getConf.dropViewQuantityBySpaceConsumed)
+    val views = JavaConverters.mapAsScalaMap(ViewMetadata.viewCnt).toList.map(_._1)
+    val viewInfos = mutable.Map[String, Long]()
+    views.foreach {
+      view =>
+        val dbName = view.split("\\.")(0)
+        val tableName = view.split("\\.")(1)
+        val tableLocation = ViewMetadata.spark.sessionState.catalog.defaultTablePath(
+          TableIdentifier(tableName, Some(dbName)))
+        var spaceConsumed = Long.MaxValue
+        try {
+          spaceConsumed = ViewMetadata.fs.getContentSummary(
+            new Path(tableLocation)).getSpaceConsumed
+        } catch {
+          case _: FileNotFoundException =>
+            log.info(f"Can not find table: $tableName. It may have been deleted.")
+          case _ =>
+            throw new UnexpectedException(
+              "Something unknown happens when wash out views by space")
+        } finally {
+          viewInfos.put(view, spaceConsumed)
+        }
+    }
+    val topN = viewInfos.toList.sorted {
+      (x: (String, Long), y: (String, Long)) => {
+        y._2.compare(x._2)
+      }
+    }.slice(0, dropQuantity)
+    topN.foreach {
+      view =>
+        ViewMetadata.spark.sql("DROP MATERIALIZED VIEW IF EXISTS " + view._1)
+    }
+    logInfo(f"$logFlag WASH OUT MATERIALIZED VIEW " +
+        f"USING $DROP_QUANTITY_BY_SPACE_CONSUMED $dropQuantity.")
+  }
+
+}
+
+object WashOutStrategy {
+  val UNUSED_DAYS = "UNUSED_DAYS"
+  val RESERVE_QUANTITY_BY_VIEW_COUNT = "RESERVE_QUANTITY_BY_VIEW_COUNT"
+  val DROP_QUANTITY_BY_SPACE_CONSUMED = "DROP_QUANTITY_BY_SPACE_CONSUMED"
 }

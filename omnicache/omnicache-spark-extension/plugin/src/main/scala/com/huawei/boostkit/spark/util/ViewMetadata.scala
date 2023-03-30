@@ -20,12 +20,12 @@ package com.huawei.boostkit.spark.util
 import com.huawei.boostkit.spark.conf.OmniCachePluginConfig
 import com.huawei.boostkit.spark.conf.OmniCachePluginConfig._
 import com.huawei.boostkit.spark.util.serde.KryoSerDeUtil
+import java.io.IOException
 import java.util.Locale
 import java.util.concurrent.{ConcurrentHashMap, Executors, TimeUnit}
 import java.util.concurrent.atomic.AtomicLong
 import org.apache.commons.io.IOUtils
-import org.apache.hadoop.fs.{FileStatus, FileSystem, Path}
-import org.apache.hadoop.hdfs.DistributedFileSystem
+import org.apache.hadoop.fs.{FileStatus, FileSystem, LocalFileSystem, Path}
 import org.json4s.DefaultFormats
 import org.json4s.jackson.Json
 import scala.collection.{mutable, JavaConverters}
@@ -37,6 +37,7 @@ import org.apache.spark.sql.catalyst.catalog.{CatalogTable, SessionCatalog}
 import org.apache.spark.sql.catalyst.expressions.{Alias, AttributeReference, ExprId, NamedExpression}
 import org.apache.spark.sql.catalyst.optimizer.rules.RewriteTime
 import org.apache.spark.sql.catalyst.plans.logical._
+
 
 object ViewMetadata extends RewriteHelper {
 
@@ -52,6 +53,9 @@ object ViewMetadata extends RewriteHelper {
 
   val viewPriority = new ConcurrentHashMap[String, Long]()
 
+  // Map (viewName <- Array(viewCounts, lastUsedMillisecond))
+  val viewCnt = new ConcurrentHashMap[String, Array[Long]]()
+
   var spark: SparkSession = _
 
   var fs: FileSystem = _
@@ -61,11 +65,22 @@ object ViewMetadata extends RewriteHelper {
 
   var initQueryPlan: Option[LogicalPlan] = None
 
+  var washOutTimestamp: Option[Long] = Option.empty
+
   val STATUS_UN_LOAD = "UN_LOAD"
   val STATUS_LOADING = "LOADING"
   val STATUS_LOADED = "LOADED"
 
   var status: String = STATUS_UN_LOAD
+
+  private val VIEW_CNT_FILE = "viewCount"
+  private val DEFAULT_DATABASE = "default"
+  private val VIEW_CONTAINS_TABLES_FILE = "viewContainsTables"
+  private val WASH_OUT_TIMESTAMP = "washOutTimestamp"
+
+  private var kryoSerializer: KryoSerializer = _
+
+  private val SEPARATOR: Char = 0xA
 
   /**
    * set sparkSession
@@ -73,6 +88,8 @@ object ViewMetadata extends RewriteHelper {
   def setSpark(sparkSession: SparkSession): Unit = {
     spark = sparkSession
     status = STATUS_LOADING
+
+    kryoSerializer = new KryoSerializer(spark.sparkContext.getConf)
 
     metadataPath = new Path(OmniCachePluginConfig.getConf.metadataPath)
     metadataPriorityPath = new Path(metadataPath, "priority")
@@ -165,8 +182,10 @@ object ViewMetadata extends RewriteHelper {
     } catch {
       case e: Throwable =>
         logDebug(s"Failed to saveViewMetadataToMap,errmsg: ${e.getMessage}")
-        // reset preDatabase
-        spark.sessionState.catalogManager.setCurrentNamespace(Array(preDatabase))
+        throw new IOException(s"Failed to save ViewMetadata to file.")
+    } finally {
+      // reset preDatabase
+      spark.sessionState.catalogManager.setCurrentNamespace(Array(preDatabase))
     }
   }
 
@@ -203,6 +222,7 @@ object ViewMetadata extends RewriteHelper {
     viewToViewQueryPlan.remove(viewName)
     viewToTablePlan.remove(viewName)
     viewProperties.remove(viewName)
+    viewCnt.remove(viewName)
     tableToViews.forEach { (key, value) =>
       if (value.contains(viewName)) {
         value -= viewName
@@ -232,10 +252,13 @@ object ViewMetadata extends RewriteHelper {
     status = STATUS_LOADED
   }
 
+  // Called when ViewMetadata is initialized.
   def forceLoad(): Unit = this.synchronized {
     loadViewContainsTablesFromFile()
     loadViewMetadataFromFile()
     loadViewPriorityFromFile()
+    loadViewCount()
+    loadWashOutTimestamp()
     checkViewMetadataComplete()
   }
 
@@ -269,17 +292,19 @@ object ViewMetadata extends RewriteHelper {
    */
   def omniCacheFilter(catalog: SessionCatalog,
       mvDataBase: String): Seq[CatalogTable] = {
+    var res: Seq[CatalogTable] = Seq.empty[CatalogTable]
     try {
       val allTables = catalog.listTables(mvDataBase)
-      catalog.getTablesByName(allTables).filter { tableData =>
+      res = catalog.getTablesByName(allTables).filter { tableData =>
         tableData.properties.contains(MV_QUERY_ORIGINAL_SQL)
       }
     } catch {
       // if db exists a table hive materialized view, will throw analysis exception
       case e: Throwable =>
         logDebug(s"Failed to listTables in $mvDataBase, errmsg: ${e.getMessage}")
-        Seq.empty[CatalogTable]
+        throw new UnsupportedOperationException("hive materialized view is not supported.")
     }
+    res
   }
 
   /**
@@ -346,13 +371,11 @@ object ViewMetadata extends RewriteHelper {
    */
   def saveViewMetadataToFile(kryoSerializer: KryoSerializer, dbName: String,
       viewName: String): Unit = {
-    val dbPath = new Path(metadataPath, dbName)
-    val file = new Path(dbPath, viewName)
     val tablePlan = reassignExprId(viewToTablePlan.get(viewName))
     val queryPlan = reassignExprId(viewToViewQueryPlan.get(viewName))
     val properties = viewProperties.get(viewName)
 
-    var jsons = Map[String, String]()
+    val jsons = mutable.Map[String, String]()
 
     val tablePlanStr = KryoSerDeUtil.serializePlan(kryoSerializer, tablePlan)
     jsons += ("tablePlan" -> tablePlanStr)
@@ -365,51 +388,33 @@ object ViewMetadata extends RewriteHelper {
 
     jsons += (MV_REWRITE_ENABLED -> properties(MV_REWRITE_ENABLED))
 
-    val os = fs.create(file, true)
-    val jsonFile: String = Json(DefaultFormats).write(jsons)
-    os.write(jsonFile.getBytes())
-    os.close()
+    saveMapToDisk(dbName, viewName, jsons, isAppend = false, lineFeed = false)
   }
 
   /**
    * save mv metadata to file
    */
   def saveViewMetadataToFile(dbName: String, viewName: String): Unit = {
-    val kryoSerializer = new KryoSerializer(spark.sparkContext.getConf)
     saveViewMetadataToFile(kryoSerializer, dbName, viewName)
     saveViewContainsTablesToFile(dbName, viewName)
+    saveViewCountToFile(dbName)
   }
 
   /**
    * save view contains tables to file
    */
   def saveViewContainsTablesToFile(dbName: String, viewName: String): Unit = {
-    val jsons = loadViewContainsTablesFromFile(dbName)
-    val dbPath = new Path(metadataPath, dbName)
-    val file = new Path(dbPath, "viewContainsTables")
-    val os = if (!fs.exists(file) || !fs.isInstanceOf[DistributedFileSystem]) {
-      fs.create(file, true)
-    } else {
-      fs.append(file)
-    }
-    jsons.put(viewName, (viewToContainsTables.get(viewName).map(_.tableName),
+    val data = loadViewContainsTablesFromFile(dbName)
+    data.put(viewName, (viewToContainsTables.get(viewName).map(_.tableName),
         System.currentTimeMillis()))
-    // append
-    val jsonFile = Json(DefaultFormats).write(jsons)
-    os.write(jsonFile.getBytes())
-    os.close()
+    saveMapToDisk(dbName, VIEW_CONTAINS_TABLES_FILE, data, isAppend = true, lineFeed = true)
   }
 
   /**
    * load view contains tables to file
    */
   def loadViewContainsTablesFromFile(): mutable.Map[String, (Set[String], Long)] = {
-    val dbs = if (OmniCachePluginConfig.getConf.omniCacheDB.nonEmpty) {
-      OmniCachePluginConfig.getConf.omniCacheDB
-          .split(",").map(_.toLowerCase(Locale.ROOT)).toSet
-    } else {
-      fs.listStatus(metadataPath).map(_.getPath.getName).toSet
-    }
+    val dbs = getDBs
 
     val jsons = mutable.Map[String, (Set[String], Long)]().empty
     dbs.foreach { db =>
@@ -427,54 +432,15 @@ object ViewMetadata extends RewriteHelper {
    * load view contains tables to file
    */
   def loadViewContainsTablesFromFile(dbName: String): mutable.Map[String, (Set[String], Long)] = {
-    val dbPath = new Path(metadataPath, dbName)
-    val file = new Path(dbPath, "viewContainsTables")
-    if (!fs.exists(file)) {
-      return mutable.Map[String, (Set[String], Long)]().empty
-    }
-
-    val is = fs.open(file)
-    var pos = fs.getFileStatus(file).getLen - 1
-    var readLines = OmniCachePluginConfig.getConf.metadataIndexTailLines
-    var lineReady = false
     val jsons = mutable.Map[String, (Set[String], Long)]().empty
-    var bytes = mutable.Seq.empty[Char]
-
-    // tail the file
-    while (pos >= 0) {
-      is.seek(pos)
-      val readByte = is.readByte()
-      readByte match {
-        // \n
-        case 0xA =>
-          lineReady = true
-        // \r
-        case 0xD =>
-        case _ =>
-          bytes +:= readByte.toChar
-      }
-      pos -= 1
-
-      // find \n or file start
-      if (lineReady || pos < 0) {
-        val line = bytes.mkString("")
-        val properties = Json(DefaultFormats).read[mutable.Map[String, (Set[String], Long)]](line)
-        for ((view, (tables, time)) <- properties) {
-          if (!jsons.contains(view) || jsons(view)._2 < time) {
-            jsons += (view -> (tables, time))
+    loadDataFromDisk(dbName, VIEW_CONTAINS_TABLES_FILE, isTailLines = true, jsons) {
+      (preData, curData) =>
+        for ((view, (tables, time)) <- curData) {
+          if (!preData.contains(view) || preData(view)._2 < time) {
+            preData += (view -> (tables, time))
           }
         }
-        lineReady = false
-        bytes = mutable.Seq.empty[Char]
-
-        readLines -= 1
-        if (readLines <= 0) {
-          return jsons
-        }
-      }
     }
-
-    jsons
   }
 
   /**
@@ -506,12 +472,7 @@ object ViewMetadata extends RewriteHelper {
    */
   def filterValidMetadata(): Array[FileStatus] = {
     val files = fs.listStatus(metadataPath).flatMap(x => fs.listStatus(x.getPath))
-    val dbs = if (OmniCachePluginConfig.getConf.omniCacheDB.nonEmpty) {
-      OmniCachePluginConfig.getConf.omniCacheDB
-          .split(",").map(_.toLowerCase(Locale.ROOT)).toSet
-    } else {
-      fs.listStatus(metadataPath).map(_.getPath.getName).toSet
-    }
+    val dbs = getDBs
     val dbTables = mutable.Set.empty[String]
     dbs.foreach { db =>
       if (spark.sessionState.catalog.databaseExists(db)) {
@@ -544,7 +505,6 @@ object ViewMetadata extends RewriteHelper {
     if (!fs.exists(metadataPath)) {
       return
     }
-    val kryoSerializer = new KryoSerializer(spark.sparkContext.getConf)
 
     val files = RewriteTime.withTimeStat("listStatus") {
       filterValidMetadata()
@@ -648,6 +608,7 @@ object ViewMetadata extends RewriteHelper {
     removeMVCache(identifier)
     val viewName = formatViewName(identifier)
     fs.delete(new Path(new Path(metadataPath, identifier.database.get), viewName), true)
+    saveViewCountToFile(identifier.database.getOrElse(DEFAULT_DATABASE))
   }
 
   /**
@@ -680,6 +641,220 @@ object ViewMetadata extends RewriteHelper {
       viewProperties.clear()
       tableToViews.clear()
       viewProperties.clear()
+    }
+  }
+
+  // Called when apply a MV rewrite.
+  def saveViewCountToFile(): Unit = {
+    val dbs = mutable.Set[String]()
+    ViewMetadata.viewCnt.forEach {
+      (name, _) =>
+        dbs.add(name.split("\\.")(0))
+    }
+    for (db <- dbs) {
+      saveViewCountToFile(db)
+    }
+  }
+
+  // Called when creating a new MV.
+  def saveViewCountToFile(dbName: String): Unit = {
+    val data: mutable.Map[String, Array[Long]] = mutable.Map[String, Array[Long]]()
+    ViewMetadata.viewCnt.forEach {
+      (name, info) =>
+        val db = name.split("\\.")(0)
+        if (db.equals(dbName)) {
+          data.put(name, info)
+        }
+    }
+    saveMapToDisk(dbName, VIEW_CNT_FILE, data, isAppend = false, lineFeed = false)
+  }
+
+  private def loadViewCount(): Unit = {
+    val dbs = getDBs
+    val viewCounts = mutable.Map[String, Array[Long]]().empty
+    dbs.foreach { db =>
+      viewCounts ++= loadDataFromDisk(db, VIEW_CNT_FILE, isTailLines = true, viewCounts) {
+        (preData, newData) =>
+          for (data <- newData) {
+            preData += data
+          }
+      }
+    }
+    // set view count into ViewMetadata.viewCnt
+    for (viewCount <- viewCounts) {
+      viewCnt.put(viewCount._1, viewCount._2)
+    }
+  }
+
+  /**
+   * load data from disk.
+   *
+   * @param dbName   Which directory in the metadata stores this data.
+   * @param fileName Which file in the metadata directory stores this data.
+   * @param isTailLines
+   * @param data     Data to be stored and data is of type Map.
+   * @tparam K is the type of key for the Map
+   * @tparam V V is the type of value for the Map
+   * @return
+   */
+  private def loadDataFromDisk[K: Manifest, V: Manifest](
+      dbName: String,
+      fileName: String,
+      isTailLines: Boolean,
+      data: mutable.Map[K, V])
+      (addNewDataToPreData: (mutable.Map[K, V], mutable.Map[K, V]) => Unit): mutable.Map[K, V] = {
+
+    val dbPath = new Path(metadataPath, dbName)
+    val filePath = new Path(dbPath, fileName)
+    loadMapFromDisk(filePath, isTailLines, data)(addNewDataToPreData)
+  }
+
+  private def loadMapFromDisk[K: Manifest, V: Manifest](
+      filePath: Path,
+      isTailLines: Boolean,
+      data: mutable.Map[K, V])
+      (addNewDataToPreData: (mutable.Map[K, V], mutable.Map[K, V]) => Unit): mutable.Map[K, V] = {
+    val newData = data.empty
+    if (!fs.exists(filePath)) {
+      return newData
+    }
+    var readLines = OmniCachePluginConfig.getConf.metadataIndexTailLines
+    val is = fs.open(filePath)
+    var pos = fs.getFileStatus(filePath).getLen - 1
+    var lineReady = false
+    var bytes = mutable.Seq.empty[Char]
+    // tail the file
+    while (pos >= 0) {
+      is.seek(pos)
+      val readByte = is.readByte()
+      readByte match {
+        // \n
+        case SEPARATOR =>
+          if (bytes.size != 0) {
+            lineReady = true
+          }
+        case _ =>
+          bytes +:= readByte.toChar
+      }
+      pos -= 1
+
+      // find \n or file start
+      if (lineReady || pos < 0) {
+        val line = bytes.mkString("")
+        val properties = Json(DefaultFormats)
+            .read[mutable.Map[K, V]](line)
+        addNewDataToPreData(newData, properties)
+        lineReady = false
+        bytes = mutable.Seq.empty[Char]
+
+        if (isTailLines) {
+          readLines -= 1
+          if (readLines <= 0) {
+            return newData
+          }
+        }
+      }
+    }
+    is.close()
+    newData
+  }
+
+  private def loadStrFromDisk(filePath: Path): String = {
+    if (!fs.exists(filePath)) {
+      return ""
+    }
+    val in = fs.open(filePath)
+    val ciphertext = IOUtils.toByteArray(in).map(_.toChar).mkString("")
+    in.close()
+    ciphertext
+  }
+
+  /**
+   * save data to disk.
+   * Metadata information is classified by DBNames.
+   *
+   * @param dbName   Which directory in the metadata stores this data.
+   * @param fileName Which file in the metadata directory stores this data.
+   * @param data     Data to be stored and data is of type Map.
+   * @tparam K K is the type of key for the Map
+   * @tparam V V is the type of value for the Map
+   */
+  def saveMapToDisk[K: Manifest, V: Manifest](
+      dbName: String,
+      fileName: String,
+      data: mutable.Map[K, V],
+      isAppend: Boolean,
+      lineFeed: Boolean): Unit = {
+    val dbPath = new Path(metadataPath, dbName)
+    val file = new Path(dbPath, fileName)
+    val os = if (!fs.exists(file) || !isAppend || fs.isInstanceOf[LocalFileSystem]) {
+      fs.create(file, true)
+    } else {
+      fs.append(file)
+    }
+    // append
+    val jsonFile = Json(DefaultFormats).write(data)
+    os.write(jsonFile.getBytes())
+    // line feed
+    if (lineFeed) {
+      os.write(SEPARATOR)
+    }
+    os.close()
+  }
+
+  private def saveStrToDisk(
+      file: Path,
+      data: String,
+      isAppend: Boolean): Unit = {
+    val os = if (!fs.exists(file) || !isAppend || fs.isInstanceOf[LocalFileSystem]) {
+      fs.create(file, true)
+    } else {
+      fs.append(file)
+    }
+    IOUtils.write(data, os)
+    os.close()
+  }
+
+  /**
+   * If "spark.sql.omnicache.dbs" specifies databases,
+   * the databases are used.
+   * Otherwise, all databases in the metadata directory are obtained by default.
+   *
+   * @return
+   */
+  private def getDBs: Set[String] = {
+    if (OmniCachePluginConfig.getConf.omniCacheDB.nonEmpty) {
+      OmniCachePluginConfig.getConf.omniCacheDB
+          .split(",").map(_.toLowerCase(Locale.ROOT)).toSet
+    } else {
+      fs.listStatus(metadataPath).map(_.getPath.getName).toSet
+    }
+  }
+
+  // just for test.
+  def getViewCntPath: String = {
+    VIEW_CNT_FILE
+  }
+
+  def getDefaultDatabase: String = {
+    DEFAULT_DATABASE
+  }
+
+  def saveWashOutTimestamp(): Unit = {
+    val map = mutable.Map[String, Long]()
+    if (washOutTimestamp.isDefined) {
+      map += ("washOutTimestamp" -> washOutTimestamp.get)
+    }
+    val str = KryoSerDeUtil.serializeToStr(kryoSerializer, map)
+    saveStrToDisk(new Path(metadataPath, WASH_OUT_TIMESTAMP), str, isAppend = false)
+  }
+
+  def loadWashOutTimestamp(): Unit = {
+    val ciphertext = loadStrFromDisk(new Path(metadataPath, WASH_OUT_TIMESTAMP))
+    val timestamp = KryoSerDeUtil.deserializeFromStr[mutable.Map[String, Long]](
+      kryoSerializer, ciphertext)
+    if (timestamp != null) {
+      washOutTimestamp = timestamp.get(WASH_OUT_TIMESTAMP)
     }
   }
 }

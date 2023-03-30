@@ -39,12 +39,12 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
    *
    * @param topProject        queryTopProject
    * @param plan              queryPlan
-   * @param usingMvs          usingMvs
+   * @param usingMvInfos      usingMvInfos
    * @param candidateViewPlan candidateViewPlan
    * @return performedPlan
    */
   def perform(topProject: Option[Project], plan: LogicalPlan,
-      usingMvs: mutable.Set[String],
+      usingMvInfos: mutable.Set[(String, String)],
       candidateViewPlan: ViewMetadataPackageType): LogicalPlan = {
     var finalPlan = if (topProject.isEmpty) plan else topProject.get
     logDetail(s"enter rule:${this.getClass.getName} perform for plan:$finalPlan")
@@ -72,6 +72,7 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
 
     // 4.iterate views,try match and rewrite
     val (viewName, srcViewTablePlan, srcViewQueryPlan) = candidateViewPlan
+    val viewDatabase = RewriteHelper.getMVDatabase(srcViewTablePlan)
     curPlanLoop.breakable {
       logDetail(s"iterate view:$viewName, viewTablePlan:$srcViewTablePlan, " +
           s"viewQueryPlan:$srcViewQueryPlan")
@@ -181,9 +182,15 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
             logDetail("rewriteView plan isEmpty")
             mappingLoop.break()
           }
+          assert(viewDatabase.isDefined)
+          if (RewriteHelper.containsMV(newViewTablePlan.get)) {
+            val preViewCnt = ViewMetadata.viewCnt.getOrDefault(
+              viewName, Array[Long](0, System.currentTimeMillis()))
+            ViewMetadata.viewCnt.put(viewName, Array(preViewCnt(0) + 1, System.currentTimeMillis()))
+          }
           finalPlan = newViewTablePlan.get
           finalPlan = sparkSession.sessionState.analyzer.execute(finalPlan)
-          usingMvs += viewName
+          usingMvInfos += viewName -> viewDatabase.get
           return finalPlan
         }
       }
