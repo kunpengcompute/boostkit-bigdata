@@ -30,7 +30,6 @@ import java.util.Optional;
 public class IntDecodeType implements DecodeType {
     @Override
     public Optional<Class<?>> getJavaType() {
-        return Optional.empty();
+        return Optional.of(int.class);
     }
 }
-

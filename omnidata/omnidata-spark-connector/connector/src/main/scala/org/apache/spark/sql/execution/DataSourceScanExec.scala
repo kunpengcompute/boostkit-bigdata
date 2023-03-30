@@ -17,30 +17,33 @@
 
 package org.apache.spark.sql.execution
 
+import com.sun.xml.internal.bind.v2.TODO
+
 import java.util.concurrent.TimeUnit._
-
 import scala.collection.mutable.HashMap
-
 import org.apache.commons.lang3.StringUtils
 import org.apache.hadoop.fs.Path
-
 import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.{PushDownData, PushDownManager, SparkSession}
 import org.apache.spark.sql.catalyst.{InternalRow, TableIdentifier}
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans.QueryPlan
 import org.apache.spark.sql.catalyst.plans.physical.{HashPartitioning, Partitioning, UnknownPartitioning}
 import org.apache.spark.sql.catalyst.util.truncatedString
-import org.apache.spark.sql.execution.datasources.{FileScanRDDPushDown, _}
+import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.parquet.{ParquetFileFormat => ParquetSource}
 import org.apache.spark.sql.execution.metric.{SQLMetric, SQLMetrics}
-import org.apache.spark.sql.execution.ndp.NdpSupport
+import org.apache.spark.sql.execution.ndp.NdpConf.{getNdpPartialPushdown, getNdpPartialPushdownEnable, getTaskTimeout}
+import org.apache.spark.sql.execution.ndp.{NdpConf, NdpSupport}
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.sources.{BaseRelation, Filter}
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.vectorized.ColumnarBatch
 import org.apache.spark.util.Utils
 import org.apache.spark.util.collection.BitSet
+
+import scala.util.Random
 
 trait DataSourceScanExec extends LeafExecNode {
   def relation: BaseRelation
@@ -160,7 +163,7 @@ case class RowDataSourceScanExec(
  * @param disableBucketedScan Disable bucketed scan based on physical query plan, see rule
  *                            [[DisableUnnecessaryBucketedScan]] for details.
  */
-case class FileSourceScanExec(
+abstract class BaseFileSourceScanExec(
     @transient relation: HadoopFsRelation,
     output: Seq[Attribute],
     requiredSchema: StructType,
@@ -169,7 +172,7 @@ case class FileSourceScanExec(
     optionalNumCoalescedBuckets: Option[Int],
     dataFilters: Seq[Expression],
     tableIdentifier: Option[TableIdentifier],
-    partiTionColumn: Seq[Attribute],
+    partitionColumn: Seq[Attribute],
     disableBucketedScan: Boolean = false
     )
   extends DataSourceScanExec with NdpSupport {
@@ -573,13 +576,8 @@ case class FileSourceScanExec(
         FilePartition(bucketId, prunedFilesGroupedToBuckets.getOrElse(bucketId, Array.empty))
       }
     }
-      if (isPushDown) {
-        new FileScanRDDPushDown(fsRelation.sparkSession, filePartitions, requiredSchema, output,
-          relation.dataSchema, ndpOperators, partiTionColumn, supportsColumnar, fsRelation.fileFormat)
-      } else {
-        new FileScanRDD(fsRelation.sparkSession, readFile, filePartitions)
-      }
 
+    RDDPushDown(fsRelation, filePartitions, readFile)
   }
 
   /**
@@ -620,13 +618,7 @@ case class FileSourceScanExec(
       val partitions =
         FilePartition.getFilePartitions(relation.sparkSession, splitFiles, maxSplitBytes)
 
-      if (isPushDown) {
-        new FileScanRDDPushDown(fsRelation.sparkSession, partitions, requiredSchema, output,
-          relation.dataSchema, ndpOperators, partiTionColumn, supportsColumnar, fsRelation.fileFormat)
-      } else {
-        // TODO 重写一个FileScanRDD 重新调用
-        new FileScanRDD(fsRelation.sparkSession, readFile, partitions)
-      }
+      RDDPushDown(fsRelation, partitions, readFile)
     }
 
   // Filters unused DynamicPruningExpression expressions - one which has been replaced
@@ -655,8 +647,73 @@ case class FileSourceScanExec(
       optionalNumCoalescedBuckets,
       QueryPlan.normalizePredicates(dataFilters, filterOutput),
       None,
-      partiTionColumn.map(QueryPlan.normalizeExpressions(_, output)),
+      partitionColumn.map(QueryPlan.normalizeExpressions(_, output)),
       disableBucketedScan
       )
   }
+
+  private def RDDPushDown(fsRelation: HadoopFsRelation, filePartitions: Seq[FilePartition], readFile: (PartitionedFile) => Iterator[InternalRow]): RDD[InternalRow] = {
+    if (isPushDown) {
+      val partialCondition = allFilterExecInfo.nonEmpty && aggExeInfos.isEmpty && limitExeInfo.isEmpty && getNdpPartialPushdownEnable(fsRelation.sparkSession)
+      val partialPdRate = getNdpPartialPushdown(fsRelation.sparkSession)
+      var partialChildOutput = Seq[Attribute]()
+      if (partialCondition) {
+        partialChildOutput = allFilterExecInfo.head.child.output
+        logInfo(s"partial push down rate: ${partialPdRate}")
+      }
+      new FileScanRDDPushDown(fsRelation.sparkSession, filePartitions, requiredSchema, output,
+        relation.dataSchema, ndpOperators, partitionColumn, supportsColumnar, fsRelation.fileFormat, readFile, partialCondition, partialPdRate, zkRate, partialChildOutput)
+    } else {
+      new FileScanRDD(fsRelation.sparkSession, readFile, filePartitions)
+    }
+  }
 }
+
+case class FileSourceScanExec(
+    @transient relation: HadoopFsRelation,
+    output: Seq[Attribute],
+    requiredSchema: StructType,
+    partitionFilters: Seq[Expression],
+    optionalBucketSet: Option[BitSet],
+    optionalNumCoalescedBuckets: Option[Int],
+    dataFilters: Seq[Expression],
+    tableIdentifier: Option[TableIdentifier],
+    partitionColumn: Seq[Attribute],
+    disableBucketedScan: Boolean = false)
+  extends BaseFileSourceScanExec(
+    relation,
+    output,
+    requiredSchema,
+    partitionFilters,
+    optionalBucketSet,
+    optionalNumCoalescedBuckets,
+    dataFilters,
+    tableIdentifier,
+    partitionColumn,
+    disableBucketedScan)  {
+
+}
+
+case class NdpFileSourceScanExec(
+    @transient relation: HadoopFsRelation,
+    output: Seq[Attribute],
+    requiredSchema: StructType,
+    partitionFilters: Seq[Expression],
+    optionalBucketSet: Option[BitSet],
+    optionalNumCoalescedBuckets: Option[Int],
+    dataFilters: Seq[Expression],
+    tableIdentifier: Option[TableIdentifier],
+    partitionColumn: Seq[Attribute],
+    disableBucketedScan: Boolean = false)
+  extends BaseFileSourceScanExec(
+    relation,
+    output,
+    requiredSchema,
+    partitionFilters,
+    optionalBucketSet,
+    optionalNumCoalescedBuckets,
+    dataFilters,
+    tableIdentifier,
+    partitionColumn,
+    disableBucketedScan)  {
+    }

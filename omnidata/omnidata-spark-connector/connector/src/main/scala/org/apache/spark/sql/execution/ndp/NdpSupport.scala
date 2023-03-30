@@ -18,12 +18,15 @@
 
 package org.apache.spark.sql.execution.ndp
 
-import scala.collection.mutable.ListBuffer
+import org.apache.spark.sql.PushDownData
 
+import scala.collection.mutable.ListBuffer
 import org.apache.spark.sql.catalyst.expressions.{Attribute, Expression, NamedExpression}
 import org.apache.spark.sql.catalyst.expressions.aggregate.AggregateFunction
-import org.apache.spark.sql.execution.SparkPlan
+import org.apache.spark.sql.execution.{FilterExec, SparkPlan}
 import org.apache.spark.sql.execution.aggregate.BaseAggregateExec
+
+import scala.collection.mutable
 
 // filter in aggregate could be push down through aggregate, separate filter and aggregate
 case class AggExeInfo(
@@ -48,6 +51,16 @@ trait NdpSupport extends SparkPlan {
   val aggExeInfos = new ListBuffer[AggExeInfo]()
   var limitExeInfo: Option[LimitExeInfo] = None
   var fpuHosts: scala.collection.Map[String, String] = _
+  val allFilterExecInfo = new ListBuffer[FilterExec]()
+  var zkRate: Double = 1.0
+
+  def partialPushDownFilter(filter: FilterExec): Unit = {
+    allFilterExecInfo += filter
+  }
+
+  def partialPushDownFilterList(filters: ListBuffer[FilterExec]): Unit = {
+    allFilterExecInfo ++= filters
+  }
 
   def pushDownFilter(filter: FilterExeInfo): Unit = {
     filterExeInfos += filter
@@ -78,6 +91,10 @@ trait NdpSupport extends SparkPlan {
   def isPushDown: Boolean = filterExeInfos.nonEmpty ||
     aggExeInfos.nonEmpty ||
     limitExeInfo.nonEmpty
+
+  def pushZkRate(pRate: Double): Unit = {
+      zkRate = pRate
+  }
 }
 
 object NdpSupport {

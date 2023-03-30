@@ -19,9 +19,17 @@
 
 package com.huawei.boostkit.omnidata.serialize;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+
+import com.google.common.collect.ImmutableMap;
+
 import io.airlift.slice.SliceInput;
 import io.airlift.slice.SliceOutput;
 import io.prestosql.spi.block.*;
+
+import java.nio.charset.StandardCharsets;
+import java.util.Map;
+import java.util.Optional;
 
 /**
  * Block Encoding Serde
@@ -29,15 +37,63 @@ import io.prestosql.spi.block.*;
  * @since 2021-07-31
  */
 public final class OmniDataBlockEncodingSerde implements BlockEncodingSerde {
+    private final Map<String, BlockEncoding> blockEncodings;
+
+    public OmniDataBlockEncodingSerde() {
+        blockEncodings =
+                ImmutableMap.<String, BlockEncoding>builder()
+                        .put(VariableWidthBlockEncoding.NAME, new VariableWidthBlockEncoding())
+                        .put(ByteArrayBlockEncoding.NAME, new ByteArrayBlockEncoding())
+                        .put(ShortArrayBlockEncoding.NAME, new ShortArrayBlockEncoding())
+                        .put(IntArrayBlockEncoding.NAME, new IntArrayBlockEncoding())
+                        .put(LongArrayBlockEncoding.NAME, new LongArrayBlockEncoding())
+                        .put(Int128ArrayBlockEncoding.NAME, new Int128ArrayBlockEncoding())
+                        .put(DictionaryBlockEncoding.NAME, new DictionaryBlockEncoding())
+                        .put(ArrayBlockEncoding.NAME, new ArrayBlockEncoding())
+                        .put(RowBlockEncoding.NAME, new RowBlockEncoding())
+                        .put(SingleRowBlockEncoding.NAME, new SingleRowBlockEncoding())
+                        .put(RunLengthBlockEncoding.NAME, new RunLengthBlockEncoding())
+                        .put(LazyBlockEncoding.NAME, new LazyBlockEncoding())
+                        .build();
+    }
+
+    private static String readLengthPrefixedString(SliceInput sliceInput) {
+        int length = sliceInput.readInt();
+        byte[] bytes = new byte[length];
+        sliceInput.readBytes(bytes);
+        return new String(bytes, StandardCharsets.UTF_8);
+    }
+
+    private static void writeLengthPrefixedString(SliceOutput sliceOutput, String value) {
+        byte[] bytes = value.getBytes(UTF_8);
+        sliceOutput.writeInt(bytes.length);
+        sliceOutput.writeBytes(bytes);
+    }
 
     @Override
-    public Block readBlock(SliceInput input) {
-        return null;
+    public Block<?> readBlock(SliceInput input) {
+        return blockEncodings.get(readLengthPrefixedString(input)).readBlock(this, input);
     }
 
     @Override
     public void writeBlock(SliceOutput output, Block block) {
+        Block<?> readBlock = block;
+        while (true) {
+            String encodingName = readBlock.getEncodingName();
 
+            BlockEncoding blockEncoding = blockEncodings.get(encodingName);
+
+            Optional<Block> replacementBlock = blockEncoding.replacementBlockForWrite(readBlock);
+            if (replacementBlock.isPresent()) {
+                readBlock = replacementBlock.get();
+                continue;
+            }
+
+            writeLengthPrefixedString(output, encodingName);
+
+            blockEncoding.writeBlock(this, output, readBlock);
+
+            break;
+        }
     }
 }
-

@@ -26,8 +26,6 @@ import static io.prestosql.spi.type.BooleanType.BOOLEAN;
 import com.huawei.boostkit.omnidata.decode.type.DecodeType;
 import com.huawei.boostkit.omnidata.decode.type.LongDecodeType;
 import com.huawei.boostkit.omnidata.decode.type.RowDecodeType;
-import com.huawei.boostkit.omnidata.exception.OmniDataException;
-import com.huawei.boostkit.omnidata.exception.OmniErrorCode;
 import com.huawei.boostkit.omnidata.model.AggregationInfo;
 import com.huawei.boostkit.omnidata.model.Column;
 import com.huawei.boostkit.omnidata.model.Predicate;
@@ -83,7 +81,6 @@ import org.apache.spark.sql.catalyst.expressions.Or;
 import org.apache.spark.sql.catalyst.expressions.Remainder;
 import org.apache.spark.sql.catalyst.expressions.Subtract;
 import org.apache.spark.sql.catalyst.expressions.aggregate.AggregateFunction;
-import org.apache.spark.sql.execution.datasources.PartitionedFile;
 import org.apache.spark.sql.execution.ndp.AggExeInfo;
 import org.apache.spark.sql.execution.ndp.FilterExeInfo;
 import org.apache.spark.sql.execution.ndp.PushDownInfo;
@@ -126,7 +123,7 @@ public class DataIoAdapter {
 
     private boolean hasNextPage = false;
 
-    private DataReaderImpl orcDataReader = null;
+    private DataReaderImpl<WritableColumnVector[]> orcDataReader = null;
 
     private List<DecodeType> columnTypesList = new ArrayList<>();
 
@@ -156,6 +153,10 @@ public class DataIoAdapter {
 
     private static final Logger LOG = LoggerFactory.getLogger(DataIoAdapter.class);
 
+    private boolean isPushDownAgg = true;
+
+    private boolean isOperatorCombineEnabled;
+
     /**
      * Contact with Omni-Data-Server
      *
@@ -177,69 +178,81 @@ public class DataIoAdapter {
         // initCandidates
         initCandidates(pageCandidate, filterOutPut);
 
-        // create AggregationInfo
-        // init agg candidates
-        List<Attribute> partitionColumnBatch = JavaConverters.seqAsJavaList(partitionColumn);
-        for (Attribute attribute : partitionColumnBatch) {
-            partitionColumnName.add(attribute.name());
-        }
-        List<AggExeInfo> aggExecutionList =
-                JavaConverters.seqAsJavaList(pushDownOperators.aggExecutions());
-        if (aggExecutionList.size() == 0) {
+        // add partition column
+        JavaConverters.seqAsJavaList(partitionColumn).forEach(a -> partitionColumnName.add(a.name()));
+
+        // init column info
+        if (pushDownOperators.aggExecutions().size() == 0) {
+            isPushDownAgg = false;
             initColumnInfo(sparkOutPut);
         }
-        DataSource dataSource = initDataSource(pageCandidate);
-        RowExpression rowExpression = initFilter(pushDownOperators.filterExecutions());
-        Optional<RowExpression> prestoFilter = rowExpression == null ?
-                Optional.empty() : Optional.of(rowExpression);
-        Optional<AggregationInfo> aggregations =
-                initAggAndGroupInfo(aggExecutionList);
-        // create limitLong
+
+        // create filter
+        Optional<RowExpression> filterRowExpression = initFilter(pushDownOperators.filterExecutions());
+
+        // create agg
+        Optional<AggregationInfo> aggregations = initAggAndGroupInfo(pushDownOperators.aggExecutions());
+
+        // create limit
         OptionalLong limitLong = NdpUtils.convertLimitExeInfo(pushDownOperators.limitExecution());
 
+        // create TaskSource
+        DataSource dataSource = initDataSource(pageCandidate);
         Predicate predicate = new Predicate(
-                omnidataTypes, omnidataColumns, prestoFilter, omnidataProjections,
+                omnidataTypes, omnidataColumns, filterRowExpression, omnidataProjections,
                 ImmutableMap.of(), ImmutableMap.of(), aggregations, limitLong);
         TaskSource taskSource = new TaskSource(dataSource, predicate, 1048576);
+
+        // create deserializer
+        this.isOperatorCombineEnabled =
+                pageCandidate.isOperatorCombineEnabled() && NdpUtils.checkOmniOpColumns(omnidataColumns);
         PageDeserializer deserializer = initPageDeserializer();
-        WritableColumnVector[] page = null;
-        int failedTimes = 0;
-        String[] sdiHostArray = pageCandidate.getSdiHosts().split(",");
-        int randomIndex = (int) (Math.random() * sdiHostArray.length);
-        List<String> sdiHostList = new ArrayList<>(Arrays.asList(sdiHostArray));
-        Optional<String> availableSdiHost = getRandomAvailableSdiHost(sdiHostArray,
+
+        // get available host
+        String[] pushDownHostArray = pageCandidate.getpushDownHosts().split(",");
+        List<String> pushDownHostList = new ArrayList<>(Arrays.asList(pushDownHostArray));
+        Optional<String> availablePushDownHost = getRandomAvailablePushDownHost(pushDownHostArray,
                 JavaConverters.mapAsJavaMap(pushDownOperators.fpuHosts()));
-        availableSdiHost.ifPresent(sdiHostList::add);
-        Iterator<String> sdiHosts = sdiHostList.iterator();
-        Set<String> sdiHostSet = new HashSet<>();
-        sdiHostSet.add(sdiHostArray[randomIndex]);
-        while (sdiHosts.hasNext()) {
-            String sdiHost;
+        availablePushDownHost.ifPresent(pushDownHostList::add);
+        return getIterator(pushDownHostList.iterator(), taskSource, pushDownHostArray, deserializer,
+                pushDownHostList.size());
+    }
+
+    private Iterator<WritableColumnVector[]> getIterator(Iterator<String> pushDownHosts, TaskSource taskSource,
+                                                         String[] pushDownHostArray, PageDeserializer deserializer,
+                                                         int pushDownHostsSize) throws UnknownHostException {
+        int randomIndex = (int) (Math.random() * pushDownHostArray.length);
+        int failedTimes = 0;
+        WritableColumnVector[] page = null;
+        Set<String> pushDownHostSet = new HashSet<>();
+        pushDownHostSet.add(pushDownHostArray[randomIndex]);
+        while (pushDownHosts.hasNext()) {
+            String pushDownHost;
             if (failedTimes == 0) {
-                sdiHost = sdiHostArray[randomIndex];
+                pushDownHost = pushDownHostArray[randomIndex];
             } else {
-                sdiHost = sdiHosts.next();
-                if (sdiHostSet.contains(sdiHost)) {
+                pushDownHost = pushDownHosts.next();
+                if (pushDownHostSet.contains(pushDownHost)) {
                     continue;
                 }
             }
-            String ipAddress = InetAddress.getByName(sdiHost).getHostAddress();
+            String ipAddress = InetAddress.getByName(pushDownHost).getHostAddress();
             Properties properties = new Properties();
             properties.put("omnidata.client.target.list", ipAddress);
             properties.put("omnidata.client.task.timeout", taskTimeout);
-            LOG.info("Push down node info: [hostname :{} ,ip :{}]", sdiHost, ipAddress);
+            LOG.info("Push down node info: [hostname :{} ,ip :{}]", pushDownHost, ipAddress);
             try {
-                orcDataReader = new DataReaderImpl<PageDeserializer>(
+                orcDataReader = new DataReaderImpl<>(
                         properties, taskSource, deserializer);
                 hasNextPage = true;
-                page = (WritableColumnVector[]) orcDataReader.getNextPageBlocking();
+                page = orcDataReader.getNextPageBlocking();
                 if (orcDataReader.isFinished()) {
                     orcDataReader.close();
                     hasNextPage = false;
                 }
                 break;
             } catch (Exception e) {
-                LOG.warn("Push down failed node info [hostname :{} ,ip :{}]", sdiHost, ipAddress, e);
+                LOG.warn("Push down failed node info [hostname :{} ,ip :{}]", pushDownHost, ipAddress, e);
                 ++failedTimes;
                 if (orcDataReader != null) {
                     orcDataReader.close();
@@ -247,7 +260,7 @@ public class DataIoAdapter {
                 }
             }
         }
-        int retryTime = Math.min(TASK_FAILED_TIMES, sdiHostList.size());
+        int retryTime = Math.min(TASK_FAILED_TIMES, pushDownHostsSize);
         if (failedTimes >= retryTime) {
             LOG.warn("No Omni-data-server to Connect, Task has tried {} times.", retryTime);
             throw new TaskExecutionException("No Omni-data-server to Connect");
@@ -257,8 +270,9 @@ public class DataIoAdapter {
         return l.iterator();
     }
 
-    private Optional<String> getRandomAvailableSdiHost(String[] sdiHostArray, Map<String, String> fpuHosts) {
-        List<String> existingHosts = Arrays.asList(sdiHostArray);
+    private Optional<String> getRandomAvailablePushDownHost(String[] pushDownHostArray,
+                                                            Map<String, String> fpuHosts) {
+        List<String> existingHosts = Arrays.asList(pushDownHostArray);
         List<String> allHosts = new ArrayList<>(fpuHosts.values());
         allHosts.removeAll(existingHosts);
         if (allHosts.size() > 0) {
@@ -270,20 +284,20 @@ public class DataIoAdapter {
     }
 
     public boolean hasNextIterator(List<Object> pageList, PageToColumnar pageToColumnarClass,
-                                   PartitionedFile partitionFile, boolean isVectorizedReader)
-            throws Exception {
+                                   boolean isVectorizedReader) {
         if (!hasNextPage) {
             return false;
         }
-        WritableColumnVector[] page = (WritableColumnVector[]) orcDataReader.getNextPageBlocking();
+        WritableColumnVector[] page = orcDataReader.getNextPageBlocking();
         if (orcDataReader.isFinished()) {
             orcDataReader.close();
+            hasNextPage = false;
             return false;
         }
         List<WritableColumnVector[]> l = new ArrayList<>();
         l.add(page);
         pageList.addAll(pageToColumnarClass
-                .transPageToColumnar(l.iterator(), isVectorizedReader));
+                .transPageToColumnar(l.iterator(), isVectorizedReader, isOperatorCombineEnabled));
         return true;
     }
 
@@ -305,6 +319,7 @@ public class DataIoAdapter {
         listAtt = JavaConverters.seqAsJavaList(filterOutPut);
         TASK_FAILED_TIMES = pageCandidate.getMaxFailedTimes();
         taskTimeout = pageCandidate.getTaskTimeout();
+        isPushDownAgg = true;
     }
 
     private RowExpression extractNamedExpression(Expression namedExpression) {
@@ -327,9 +342,7 @@ public class DataIoAdapter {
             omnidataColumns.add(new Column(columnId, aggColumnName,
                     prestoType, isPartitionKey, partitionValue));
             columnNameSet.add(aggColumnName);
-            if (null == columnNameMap.get(aggColumnName)) {
-                columnNameMap.put(aggColumnName, columnNameMap.size());
-            }
+            columnNameMap.computeIfAbsent(aggColumnName, k -> columnNameMap.size());
             omnidataProjections.add(new InputReferenceExpression(aggProjectionId, prestoType));
         }
 
@@ -545,28 +558,6 @@ public class DataIoAdapter {
                 new AggregationInfo(aggregationMap, groupingKeys));
     }
 
-    private Optional<AggregationInfo> extractAggAndGroupExpression(
-            List<AggExeInfo> aggExecutionList) {
-        Optional<AggregationInfo> resAggregationInfo = Optional.empty();
-        for (AggExeInfo aggExeInfo : aggExecutionList) {
-            List<AggregateFunction> aggregateExpressions = JavaConverters.seqAsJavaList(
-                    aggExeInfo.aggregateExpressions());
-            List<NamedExpression> namedExpressions = JavaConverters.seqAsJavaList(
-                    aggExeInfo.groupingExpressions());
-            resAggregationInfo = createAggregationInfo(aggregateExpressions, namedExpressions);
-        }
-        return resAggregationInfo;
-    }
-
-    private RowExpression extractFilterExpression(Seq<FilterExeInfo> filterExecution) {
-        List<FilterExeInfo> filterExecutionList = JavaConverters.seqAsJavaList(filterExecution);
-        RowExpression resRowExpression = null;
-        for (FilterExeInfo filterExeInfo : filterExecutionList) {
-            resRowExpression = reverseExpressionTree(filterExeInfo.filter());
-        }
-        return resRowExpression;
-    }
-
     private RowExpression reverseExpressionTree(Expression filterExpression) {
         RowExpression resRowExpression = null;
         if (filterExpression == null) {
@@ -599,7 +590,6 @@ public class DataIoAdapter {
         ExpressionOperator expressionOperType =
                 ExpressionOperator.valueOf(filterExpression.getClass().getSimpleName());
         Expression left;
-        Expression right;
         String operatorName;
         switch (expressionOperType) {
             case Or:
@@ -624,7 +614,7 @@ public class DataIoAdapter {
                     left = ((EqualTo) filterExpression).left();
                 }
                 return getRowExpression(left,
-                        "equal", rightExpressions);
+                        "EQUAL", rightExpressions);
             case IsNotNull:
                 Signature isnullSignature = new Signature(
                         QualifiedObjectName.valueOfDefaultFunction("not"),
@@ -644,11 +634,11 @@ public class DataIoAdapter {
                 if (((LessThan) filterExpression).left() instanceof Literal) {
                     rightExpressions.add(((LessThan) filterExpression).left());
                     left = ((LessThan) filterExpression).right();
-                    operatorName = "greater_than";
+                    operatorName = "GREATER_THAN";
                 } else {
                     rightExpressions.add(((LessThan) filterExpression).right());
                     left = ((LessThan) filterExpression).left();
-                    operatorName = "less_than";
+                    operatorName = "LESS_THAN";
                 }
                 return getRowExpression(left,
                         operatorName, rightExpressions);
@@ -656,11 +646,11 @@ public class DataIoAdapter {
                 if (((GreaterThan) filterExpression).left() instanceof Literal) {
                     rightExpressions.add(((GreaterThan) filterExpression).left());
                     left = ((GreaterThan) filterExpression).right();
-                    operatorName = "less_than";
+                    operatorName = "LESS_THAN";
                 } else {
                     rightExpressions.add(((GreaterThan) filterExpression).right());
                     left = ((GreaterThan) filterExpression).left();
-                    operatorName = "greater_than";
+                    operatorName = "GREATER_THAN";
                 }
                 return getRowExpression(left,
                         operatorName, rightExpressions);
@@ -668,11 +658,11 @@ public class DataIoAdapter {
                 if (((GreaterThanOrEqual) filterExpression).left() instanceof Literal) {
                     rightExpressions.add(((GreaterThanOrEqual) filterExpression).left());
                     left = ((GreaterThanOrEqual) filterExpression).right();
-                    operatorName = "less_than_or_equal";
+                    operatorName = "LESS_THAN_OR_EQUAL";
                 } else {
                     rightExpressions.add(((GreaterThanOrEqual) filterExpression).right());
                     left = ((GreaterThanOrEqual) filterExpression).left();
-                    operatorName = "greater_than_or_equal";
+                    operatorName = "GREATER_THAN_OR_EQUAL";
                 }
                 return getRowExpression(left,
                         operatorName, rightExpressions);
@@ -680,11 +670,11 @@ public class DataIoAdapter {
                 if (((LessThanOrEqual) filterExpression).left() instanceof Literal) {
                     rightExpressions.add(((LessThanOrEqual) filterExpression).left());
                     left = ((LessThanOrEqual) filterExpression).right();
-                    operatorName = "greater_than_or_equal";
+                    operatorName = "GREATER_THAN_OR_EQUAL";
                 } else {
                     rightExpressions.add(((LessThanOrEqual) filterExpression).right());
                     left = ((LessThanOrEqual) filterExpression).left();
-                    operatorName = "less_than_or_equal";
+                    operatorName = "LESS_THAN_OR_EQUAL";
                 }
                 return getRowExpression(left,
                         operatorName, rightExpressions);
@@ -729,9 +719,9 @@ public class DataIoAdapter {
             filterProjectionId = expressionInfo.getProjectionId();
         }
         // deal with right expression
-        List<Object> argumentValues = new ArrayList<>();
+        List<Object> argumentValues;
         List<RowExpression> multiArguments = new ArrayList<>();
-        int rightProjectionId = -1;
+        int rightProjectionId;
         RowExpression rowExpression;
         if (rightExpression != null && rightExpression.size() > 0 &&
                 rightExpression.get(0) instanceof AttributeReference) {
@@ -756,9 +746,9 @@ public class DataIoAdapter {
         return rowExpression;
     }
 
-    // column projection赋值
+    // column projection
     private int putFilterValue(Expression valueExpression, Type prestoType) {
-        // Filter赋值
+        // set filter
         int columnId = NdpUtils.getColumnId(valueExpression.toString()) - columnOffset;
         String filterColumnName = valueExpression.toString().split("#")[0].toLowerCase(Locale.ENGLISH);
         if (null != fieldMap.get(filterColumnName)) {
@@ -767,14 +757,17 @@ public class DataIoAdapter {
         boolean isPartitionKey = partitionColumnName.contains(filterColumnName);
         int filterProjectionId = fieldMap.size();
         fieldMap.put(filterColumnName, filterProjectionId);
-        filterTypesList.add(NdpUtils.transDataIoDataType(valueExpression.dataType()));
-        filterOrdersList.add(filterProjectionId);
+
         String partitionValue = NdpUtils.getPartitionValue(filePath, filterColumnName);
         columnNameSet.add(filterColumnName);
-        omnidataProjections.add(new InputReferenceExpression(filterProjectionId, prestoType));
         omnidataColumns.add(new Column(columnId, filterColumnName,
                 prestoType, isPartitionKey, partitionValue));
-        omnidataTypes.add(prestoType);
+        if (isPushDownAgg) {
+            filterTypesList.add(NdpUtils.transDataIoDataType(valueExpression.dataType()));
+            filterOrdersList.add(filterProjectionId);
+            omnidataProjections.add(new InputReferenceExpression(filterProjectionId, prestoType));
+            omnidataTypes.add(prestoType);
+        }
         if (null == columnNameMap.get(filterColumnName)) {
             columnNameMap.put(filterColumnName, columnNameMap.size());
         }
@@ -804,22 +797,18 @@ public class DataIoAdapter {
     private List<Object> getValue(List<Expression> rightExpression,
                                   String operatorName,
                                   String sparkType) {
-        Object objectValue;
         List<Object> argumentValues = new ArrayList<>();
         if (null == rightExpression || rightExpression.size() == 0) {
             return argumentValues;
         }
-        switch (operatorName.toLowerCase(Locale.ENGLISH)) {
-            case "in":
-                List<Object> inValue = new ArrayList<>();
-                for (Expression rExpression : rightExpression) {
-                    inValue.add(rExpression.toString());
-                }
-                argumentValues = inValue;
-                break;
-            default:
-                argumentValues.add(rightExpression.get(0).toString());
-                break;
+        if ("in".equals(operatorName.toLowerCase(Locale.ENGLISH))) {
+            List<Object> inValue = new ArrayList<>();
+            for (Expression rExpression : rightExpression) {
+                inValue.add(rExpression.toString());
+            }
+            argumentValues = inValue;
+        } else {
+            argumentValues.add(rightExpression.get(0).toString());
         }
         return argumentValues;
     }
@@ -830,9 +819,9 @@ public class DataIoAdapter {
         DecodeType[] filterTypes = filterTypesList.toArray(new DecodeType[0]);
         int[] filterOrders = filterOrdersList.stream().mapToInt(Integer::intValue).toArray();
         if (columnTypes.length == 0) {
-            return new PageDeserializer(filterTypes, filterOrders);
+            return new PageDeserializer(filterTypes, filterOrders, isOperatorCombineEnabled);
         } else {
-            return new PageDeserializer(columnTypes, columnOrders);
+            return new PageDeserializer(columnTypes, columnOrders, isOperatorCombineEnabled);
         }
     }
 
@@ -852,14 +841,28 @@ public class DataIoAdapter {
         return dataSource;
     }
 
-    private RowExpression initFilter(Seq<FilterExeInfo> filterExecutions) {
-        return extractFilterExpression(filterExecutions);
+    private Optional<RowExpression> initFilter(Seq<FilterExeInfo> filterExecutions) {
+        List<FilterExeInfo> filterExecutionList = JavaConverters.seqAsJavaList(filterExecutions);
+        Optional<RowExpression> resRowExpression = Optional.empty();
+        for (FilterExeInfo filterExeInfo : filterExecutionList) {
+            resRowExpression = Optional.ofNullable(reverseExpressionTree(filterExeInfo.filter()));
+        }
+        return resRowExpression;
     }
 
     private Optional<AggregationInfo> initAggAndGroupInfo(
-            List<AggExeInfo> aggExecutionList) {
-        // create AggregationInfo
-        return extractAggAndGroupExpression(aggExecutionList);
+            Seq<AggExeInfo> aggExeInfoSeq) {
+        List<AggExeInfo> aggExecutionList =
+                JavaConverters.seqAsJavaList(aggExeInfoSeq);
+        Optional<AggregationInfo> resAggregationInfo = Optional.empty();
+        for (AggExeInfo aggExeInfo : aggExecutionList) {
+            List<AggregateFunction> aggregateExpressions = JavaConverters.seqAsJavaList(
+                    aggExeInfo.aggregateExpressions());
+            List<NamedExpression> namedExpressions = JavaConverters.seqAsJavaList(
+                    aggExeInfo.groupingExpressions());
+            resAggregationInfo = createAggregationInfo(aggregateExpressions, namedExpressions);
+        }
+        return resAggregationInfo;
     }
 
     private void initColumnInfo(Seq<Attribute> sparkOutPut) {
@@ -887,6 +890,8 @@ public class DataIoAdapter {
             ++filterColumnId;
         }
     }
+
+    public boolean isOperatorCombineEnabled() {
+        return isOperatorCombineEnabled;
+    }
 }
-
-
