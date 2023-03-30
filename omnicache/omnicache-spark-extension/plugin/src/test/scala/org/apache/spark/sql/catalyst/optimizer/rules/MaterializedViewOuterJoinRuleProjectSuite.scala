@@ -17,6 +17,8 @@
 
 package org.apache.spark.sql.catalyst.optimizer.rules
 
+import org.apache.spark.sql.catalyst.optimizer.rules.RewriteSuite._
+
 class MaterializedViewOuterJoinRuleProjectSuite extends OuterJoinSuite {
 
   test("create_project_outJoin_view_0") {

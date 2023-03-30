@@ -17,6 +17,8 @@
 
 package org.apache.spark.sql.catalyst.optimizer.rules
 
+import org.apache.spark.sql.catalyst.optimizer.rules.RewriteSuite._
+
 class OuterJoinSuite extends RewriteSuite {
 
   // Since FULL OUTER JOIN cannot push the predicate down,

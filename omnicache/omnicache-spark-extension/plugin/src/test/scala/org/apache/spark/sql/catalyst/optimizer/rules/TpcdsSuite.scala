@@ -22,13 +22,15 @@ import java.util
 import org.apache.commons.io.IOUtils
 import org.apache.hadoop.fs.Path
 import scala.collection.mutable
+import scala.io.Source
 
 import org.apache.spark.sql.catalyst.TableIdentifier
+import org.apache.spark.sql.catalyst.optimizer.rules.RewriteSuite._
 
 class TpcdsSuite extends RewriteSuite {
 
   def createTable(): Unit = {
-    if (catalog.tableExists(TableIdentifier("store_sales"))) {
+    if (RewriteSuite.catalog.tableExists(TableIdentifier("store_sales"))) {
       return
     }
     val fis = this.getClass.getResourceAsStream("/tpcds_ddl.sql")
@@ -92,7 +94,7 @@ class TpcdsSuite extends RewriteSuite {
         |LIMIT 100
         |
         |""".stripMargin
-    comparePlansAndRows(sql, "default", "mv536", noData = true)
+    RewriteSuite.comparePlansAndRows(sql, "default", "mv536", noData = true)
     spark.sql("DROP MATERIALIZED VIEW IF EXISTS mv536")
   }
 
@@ -199,7 +201,7 @@ class TpcdsSuite extends RewriteSuite {
         |LIMIT 100
         |
         |""".stripMargin
-    comparePlansAndRows(sql, "default", "mv_q11", noData = true)
+    RewriteSuite.comparePlansAndRows(sql, "default", "mv_q11", noData = true)
     spark.sql("DROP MATERIALIZED VIEW IF EXISTS mv_q11")
   }
   test("resort") {
@@ -349,7 +351,7 @@ class TpcdsSuite extends RewriteSuite {
         |
         |""".stripMargin
     spark.sql(sql).explain()
-    comparePlansAndRows(sql, "default", "mv9", noData = true)
+    RewriteSuite.comparePlansAndRows(sql, "default", "mv9", noData = true)
     spark.sql("DROP MATERIALIZED VIEW IF EXISTS mv103")
     spark.sql("DROP MATERIALIZED VIEW IF EXISTS mv9")
   }
@@ -501,7 +503,7 @@ class TpcdsSuite extends RewriteSuite {
         |
         |""".stripMargin
     spark.sql(sql).explain()
-    comparePlansAndRows(sql, "default", "mv103", noData = true)
+    RewriteSuite.comparePlansAndRows(sql, "default", "mv103", noData = true)
     spark.sql("DROP MATERIALIZED VIEW IF EXISTS mv103")
     spark.sql("DROP MATERIALIZED VIEW IF EXISTS mv9")
   }
@@ -538,8 +540,22 @@ class TpcdsSuite extends RewriteSuite {
         |WHERE t2.inv_quantity_on_hand < t1.cs_quantity
         |GROUP BY i_item_desc, w_warehouse_name;
         |""".stripMargin
-    comparePlansAndRows(sql, "default", "sc01", noData = true)
+    RewriteSuite.comparePlansAndRows(sql, "default", "sc01", noData = true)
     spark.sql("DROP MATERIALIZED VIEW IF EXISTS sc01")
+  }
+}
+
+object TpcdsUtils {
+  /**
+   * Obtain the contents of the resource file
+   *
+   * @param path     If the path of the file relative to reousrce is "/tpcds", enter "/tpcds".
+   * @param fileName If the file name is q14.sql, enter q14.sql here
+   * @return
+   */
+  def getResource(path: String = "/", fileName: String): String = {
+    val filePath = s"${this.getClass.getResource(path).getPath}/${fileName}"
+    Source.fromFile(filePath).mkString
   }
 }
 

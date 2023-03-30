@@ -17,7 +17,7 @@
 
 package org.apache.spark.sql.catalyst.optimizer.rules
 
-import com.huawei.boostkit.spark.util.RewriteHelper.{disableCachePlugin, enableCachePlugin}
+import org.apache.spark.sql.catalyst.optimizer.rules.RewriteSuite._
 
 class MaterializedViewOuterJoinRuleAggSuite extends OuterJoinSuite {
 

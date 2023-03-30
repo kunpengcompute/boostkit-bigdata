@@ -193,7 +193,8 @@ trait RewriteHelper extends PredicateHelper with RewriteLogger {
    * extract condition from (join and filter),
    * then transform attr's qualifier by tableMappings
    */
-  def extractPredictExpressions(plan: LogicalPlan,
+  def extractPredictExpressions(
+      plan: LogicalPlan,
       tableMappings: BiMap[String, String]): (
       EquivalenceClasses, Seq[ExpressionEqual], Seq[ExpressionEqual]) = {
     extractPredictExpressions(plan, tableMappings, COMPENSABLE_CONDITION)
@@ -569,6 +570,10 @@ trait RewriteHelper extends PredicateHelper with RewriteLogger {
 }
 
 object RewriteHelper extends PredicateHelper with RewriteLogger {
+
+  private val secondsInAYear = 31536000L
+  private val daysInTenYear = 3650
+
   /**
    * Rewrite [[EqualTo]] and [[EqualNullSafe]] operator to keep order. The following cases will be
    * equivalent:
@@ -827,19 +832,19 @@ object RewriteHelper extends PredicateHelper with RewriteLogger {
   }
 
   def daysToMillisecond(days: Long): Long = {
-    if (days > 3650 || days < 0) {
+    if (days > daysInTenYear || days < 0) {
       throw new IllegalArgumentException(
-        "The day time cannot be less than 0"
-            + " or exceed 3650.")
+        "The day time cannot be less than 0 days"
+            + " or exceed 3650 days.")
     }
     days * 24 * 60 * 60 * 1000
   }
 
   def secondsToMillisecond(seconds: Long): Long = {
-    if (seconds > 31536000L || seconds < 0L) {
+    if (seconds > secondsInAYear || seconds < 0L) {
       throw new IllegalArgumentException(
-        "The second time cannot be less than 0"
-            + " or exceed 31536000.")
+        "The second time cannot be less than 0 seconds"
+            + " or exceed 31536000 seconds.")
     }
     seconds * 1000
   }

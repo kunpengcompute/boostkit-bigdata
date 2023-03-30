@@ -23,7 +23,6 @@ import java.io.File
 import java.util.Locale
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach}
 import org.scalatest.funsuite.AnyFunSuite
-import scala.io.Source
 
 import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 import org.apache.spark.sql.catalyst.TableIdentifier
@@ -31,6 +30,7 @@ import org.apache.spark.sql.catalyst.analysis.SimpleAnalyzer
 import org.apache.spark.sql.catalyst.catalog.{HiveTableRelation, SessionCatalog}
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate.AggregateExpression
+import org.apache.spark.sql.catalyst.optimizer.rules.RewriteSuite.spark
 import org.apache.spark.sql.catalyst.plans.{ExistenceJoin, QueryPlan}
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.catalyst.util.{sideBySide, toPrettySQL}
@@ -44,24 +44,14 @@ class RewriteSuite extends AnyFunSuite
     with PredicateHelper {
 
   System.setProperty("HADOOP_USER_NAME", "root")
-  lazy val spark: SparkSession = SparkSession.builder().master("local")
-      .config("spark.sql.extensions", "com.huawei.boostkit.spark.OmniCache")
-      .config("hive.exec.dynamic.partition.mode", "nonstrict")
-      .config("spark.ui.port", "4050")
-      // .config("spark.sql.planChangeLog.level", "WARN")
-      .config("spark.sql.omnicache.logLevel", "WARN")
-      .config("spark.sql.omnicache.dbs", "default")
-      .config("spark.sql.omnicache.metadata.initbyquery.enable", "false")
-      .config("hive.in.test", "true")
-      .config("spark.sql.omnicache.metadata.path", "./user/omnicache/metadata")
-      .config("spark.sql.omnicache.washout.automatic.enable", "false")
-      .enableHiveSupport()
-      .getOrCreate()
-  spark.sparkContext.setLogLevel("WARN")
-  lazy val catalog: SessionCatalog = spark.sessionState.catalog
+
 
   override def beforeEach(): Unit = {
     enableCachePlugin()
+  }
+
+  override def beforeAll(): Unit = {
+    preCreateTable()
   }
 
   def preDropTable(): Unit = {
@@ -77,7 +67,7 @@ class RewriteSuite extends AnyFunSuite
   def preCreateTable(): Unit = {
     disableCachePlugin()
     preDropTable()
-    if (catalog.tableExists(TableIdentifier("locations"))) {
+    if (RewriteSuite.catalog.tableExists(TableIdentifier("locations"))) {
       enableCachePlugin()
       return
     }
@@ -269,8 +259,28 @@ class RewriteSuite extends AnyFunSuite
     )
     enableCachePlugin()
   }
+}
 
-  preCreateTable()
+object RewriteSuite extends AnyFunSuite
+    with BeforeAndAfterAll
+    with BeforeAndAfterEach
+    with PredicateHelper {
+
+  val spark: SparkSession = SparkSession.builder().master("local")
+      .config("spark.sql.extensions", "com.huawei.boostkit.spark.OmniCache")
+      .config("hive.exec.dynamic.partition.mode", "nonstrict")
+      .config("spark.ui.port", "4050")
+      // .config("spark.sql.planChangeLog.level", "WARN")
+      .config("spark.sql.omnicache.logLevel", "WARN")
+      .config("spark.sql.omnicache.dbs", "default")
+      .config("spark.sql.omnicache.metadata.initbyquery.enable", "false")
+      .config("hive.in.test", "true")
+      .config("spark.sql.omnicache.metadata.path", "./user/omnicache/metadata")
+      .config("spark.sql.omnicache.washout.automatic.enable", "false")
+      .enableHiveSupport()
+      .getOrCreate()
+  spark.sparkContext.setLogLevel("WARN")
+  lazy val catalog: SessionCatalog = spark.sessionState.catalog
 
   def transformAllExpressions(plan: LogicalPlan,
       rule: PartialFunction[Expression, Expression]): LogicalPlan = {
@@ -566,19 +576,5 @@ class RewriteSuite extends AnyFunSuite
     val expectedRows = getRows(sql)
     compareRows(rewriteRows, expectedRows, noData)
     enableCachePlugin()
-  }
-}
-
-object TpcdsUtils {
-  /**
-   * Obtain the contents of the resource file
-   *
-   * @param path     If the path of the file relative to reousrce is "/tpcds", enter "/tpcds".
-   * @param fileName If the file name is q14.sql, enter q14.sql here
-   * @return
-   */
-  def getResource(path: String = "/", fileName: String): String = {
-    val filePath = s"${this.getClass.getResource(path).getPath}/${fileName}"
-    Source.fromFile(filePath).mkString
   }
 }

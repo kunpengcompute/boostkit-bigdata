@@ -31,7 +31,8 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.plans.{FullOuter, LeftAnti, LeftOuter, LeftSemi, RightOuter}
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.catalyst.rules.Rule
-import org.apache.spark.sql.execution.command.{ExplainCommand, OmniCacheCreateMvCommand}
+import org.apache.spark.sql.execution.datasources.InsertIntoHadoopFsRelationCommand
+import org.apache.spark.sql.hive.execution.{CreateHiveTableAsSelectCommand, InsertIntoHiveTable, OptimizedCreateHiveTableAsSelectCommand}
 import org.apache.spark.status.ElementTrackingStore
 import org.apache.spark.util.kvstore.KVIndex
 
@@ -52,13 +53,21 @@ class MVRewriteRule(session: SparkSession)
     }
     try {
       logicalPlan match {
-        case _: OmniCacheCreateMvCommand | ExplainCommand(_, _) =>
+        case _: CreateHiveTableAsSelectCommand =>
+          tryRewritePlan(logicalPlan)
+        case _: OptimizedCreateHiveTableAsSelectCommand =>
+          tryRewritePlan(logicalPlan)
+        case _: InsertIntoHadoopFsRelationCommand =>
+          tryRewritePlan(logicalPlan)
+        case _: InsertIntoHiveTable =>
+          tryRewritePlan(logicalPlan)
+        case _: Command =>
           logicalPlan
         case _ =>
           tryRewritePlan(logicalPlan)
       }
     } catch {
-      case _: Throwable =>
+      case e: Throwable =>
         logError(s"Failed to rewrite plan with mv.")
         logicalPlan
     }

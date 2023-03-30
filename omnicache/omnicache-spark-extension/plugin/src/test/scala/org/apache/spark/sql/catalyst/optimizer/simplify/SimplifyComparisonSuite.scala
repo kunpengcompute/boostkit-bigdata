@@ -21,6 +21,7 @@ import com.huawei.boostkit.spark.util.ExprSimplifier
 
 import org.apache.spark.sql.catalyst.expressions.{BinaryComparison, Expression, GreaterThan, LessThan, LessThanOrEqual, Literal}
 import org.apache.spark.sql.catalyst.optimizer.rules.RewriteSuite
+import org.apache.spark.sql.catalyst.optimizer.rules.RewriteSuite._
 import org.apache.spark.sql.catalyst.plans.logical.{Filter, Project}
 
 

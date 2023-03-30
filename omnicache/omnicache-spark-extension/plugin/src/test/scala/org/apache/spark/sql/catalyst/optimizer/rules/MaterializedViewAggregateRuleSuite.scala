@@ -17,6 +17,8 @@
 
 package org.apache.spark.sql.catalyst.optimizer.rules
 
+import org.apache.spark.sql.catalyst.optimizer.rules.RewriteSuite._
+
 class MaterializedViewAggregateRuleSuite extends RewriteSuite {
 
   test("mv_agg1") {
