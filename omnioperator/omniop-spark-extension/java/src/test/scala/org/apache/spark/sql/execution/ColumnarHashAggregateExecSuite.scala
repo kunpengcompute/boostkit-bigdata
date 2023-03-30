@@ -36,6 +36,16 @@ class ColumnarHashAggregateExecSuite extends ColumnarSparkPlanTest {
         Row(null, 5.0, 7L, "f")
       )), new StructType().add("a", IntegerType).add("b", DoubleType)
         .add("c", LongType).add("d", StringType))
+    df.createOrReplaceTempView("df_tbl")
+  }
+
+  test("check columnar hashAgg filter result") {
+    val res = spark.sql("select a, sum(b) filter (where c > 1) from df_tbl group by a")
+    assert(res.queryExecution.executedPlan.find(_.isInstanceOf[ColumnarHashAggregateExec]).isDefined, s"ColumnarHashAggregateExec not happened, executedPlan as follows： \n${res.queryExecution.executedPlan}")
+    checkAnswer(
+      res,
+      Seq(Row(null, 5.0), Row(1, 2.0), Row(2, 1.0))
+    )
   }
 
   test("validate columnar hashAgg exec happened") {

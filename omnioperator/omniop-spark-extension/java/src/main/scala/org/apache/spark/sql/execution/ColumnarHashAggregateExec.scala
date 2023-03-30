@@ -107,10 +107,12 @@ case class ColumnarHashAggregateExec(
     val omniAggFunctionTypes = new Array[FunctionType](aggregateExpressions.size)
     val omniAggOutputTypes = new Array[Array[DataType]](aggregateExpressions.size)
     var omniAggChannels = new Array[Array[String]](aggregateExpressions.size)
+    val omniAggChannelsFilter = new Array[String](aggregateExpressions.size)
     var index = 0
     for (exp <- aggregateExpressions) {
       if (exp.filter.isDefined) {
-        throw new UnsupportedOperationException("Unsupported filter in AggregateExpression")
+        omniAggChannelsFilter(index) =
+          rewriteToOmniJsonExpressionLiteral(exp.filter.get, attrExpsIdMap)
       }
       if (exp.mode == Final) {
         exp.aggregateFunction match {
@@ -175,6 +177,12 @@ case class ColumnarHashAggregateExec(
       checkOmniJsonWhiteList("", omniGroupByChanel)
     }
 
+    for (filter <- omniAggChannelsFilter) {
+      if (filter != null && !isSimpleColumn(filter)) {
+        checkOmniJsonWhiteList(filter, new Array[AnyRef](0))
+      }
+    }
+
     // final steps contail all Final mode aggregate
     if (aggregateExpressions.filter(_.mode == Final).size == aggregateExpressions.size) {
       val finalOut = groupingExpressions.map(_.toAttribute) ++ aggregateAttributes
@@ -206,6 +214,7 @@ case class ColumnarHashAggregateExec(
     val omniAggFunctionTypes = new Array[FunctionType](aggregateExpressions.size)
     val omniAggOutputTypes = new Array[Array[DataType]](aggregateExpressions.size)
     var omniAggChannels = new Array[Array[String]](aggregateExpressions.size)
+    val omniAggChannelsFilter = new Array[String](aggregateExpressions.size)
 
     val finalStep =
       (aggregateExpressions.filter (_.mode == Final).size == aggregateExpressions.size)
@@ -213,7 +222,8 @@ case class ColumnarHashAggregateExec(
     var index = 0
     for (exp <- aggregateExpressions) {
       if (exp.filter.isDefined) {
-        throw new UnsupportedOperationException("Unsupported filter in AggregateExpression")
+        omniAggChannelsFilter(index) =
+          rewriteToOmniJsonExpressionLiteral(exp.filter.get, attrExpsIdMap)
       }
       if (exp.mode == Final) {
         exp.aggregateFunction match {
@@ -275,6 +285,7 @@ case class ColumnarHashAggregateExec(
       val operator = OmniAdaptorUtil.getAggOperator(groupingExpressions,
         omniGroupByChanel,
         omniAggChannels,
+        omniAggChannelsFilter,
         omniSourceTypes,
         omniAggFunctionTypes,
         omniAggOutputTypes,
