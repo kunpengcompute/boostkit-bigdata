@@ -64,9 +64,9 @@ trait ColumnarToRowTransition extends UnaryExecNode
  * Provides an optimized set of APIs to append row based data to an array of
  * [[WritableColumnVector]].
  */
-private[execution] class RowToColumnConverter(schema: StructType) extends Serializable {
+private[execution] class OmniRowToColumnConverter(schema: StructType) extends Serializable {
   private val converters = schema.fields.map {
-    f => RowToColumnConverter.getConverterForType(f.dataType, f.nullable)
+    f => OmniRowToColumnConverter.getConverterForType(f.dataType, f.nullable)
   }
 
   final def convert(row: InternalRow, vectors: Array[WritableColumnVector]): Unit = {
@@ -82,7 +82,7 @@ private[execution] class RowToColumnConverter(schema: StructType) extends Serial
  * Provides an optimized set of APIs to extract a column from a row and append it to a
  * [[WritableColumnVector]].
  */
-private object RowToColumnConverter {
+private object OmniRowToColumnConverter {
   SparkMemoryUtils.init()
 
   private abstract class TypeConverter extends Serializable {
@@ -246,7 +246,7 @@ case class RowToOmniColumnarExec(child: SparkPlan) extends RowToColumnarTransiti
     child.execute().mapPartitionsInternal { rowIterator =>
       if (rowIterator.hasNext) {
         new Iterator[ColumnarBatch] {
-          private val converters = new RowToColumnConverter(localSchema)
+          private val converters = new OmniRowToColumnConverter(localSchema)
 
           override def hasNext: Boolean = {
             rowIterator.hasNext
