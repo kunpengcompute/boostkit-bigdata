@@ -38,6 +38,7 @@ import org.apache.spark.sql.execution.ColumnarProjection.dealPartitionData
 import org.apache.spark.sql.execution.metric.SQLMetrics
 import org.apache.spark.sql.execution.util.SparkMemoryUtils.addLeakSafeTaskCompletionListener
 import org.apache.spark.sql.execution.vectorized.OmniColumnVector
+import org.apache.spark.sql.expression.ColumnarExpressionConverter
 import org.apache.spark.sql.types.{LongType, StructType}
 import org.apache.spark.sql.vectorized.ColumnarBatch
 
@@ -199,10 +200,10 @@ case class ColumnarFilterExec(condition: Expression, child: SparkPlan)
       exp => sparkTypeToOmniType(exp.dataType, exp.metadata)).toArray
     val omniProjectIndices = child.output.map(
       exp => sparkProjectionToOmniJsonProjection(exp, omniAttrExpsIdMap(exp.exprId))).toArray
-    val omniExpression = rewriteToOmniJsonExpressionLiteral(condition, omniAttrExpsIdMap)
 
     child.executeColumnar().mapPartitionsWithIndexInternal { (index, iter) =>
       val startCodegen = System.nanoTime()
+      val omniExpression = rewriteToOmniJsonExpressionLiteral(condition, omniAttrExpsIdMap)
       val filterOperatorFactory = new OmniFilterAndProjectOperatorFactory(
         omniExpression, omniInputTypes, seqAsJavaList(omniProjectIndices), 1,
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
@@ -301,10 +302,10 @@ case class ColumnarConditionProjectExec(projectList: Seq[NamedExpression],
       exp => sparkTypeToOmniType(exp.dataType, exp.metadata)).toArray
     val omniExpressions = projectList.map(
       exp => rewriteToOmniJsonExpressionLiteral(exp, omniAttrExpsIdMap)).toArray
-    val conditionExpression = rewriteToOmniJsonExpressionLiteral(condition, omniAttrExpsIdMap)
 
     child.executeColumnar().mapPartitionsWithIndexInternal { (index, iter) =>
       val startCodegen = System.nanoTime()
+      val conditionExpression = rewriteToOmniJsonExpressionLiteral(condition, omniAttrExpsIdMap)
       val operatorFactory = new OmniFilterAndProjectOperatorFactory(
         conditionExpression, omniInputTypes, seqAsJavaList(omniExpressions), 1,
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))

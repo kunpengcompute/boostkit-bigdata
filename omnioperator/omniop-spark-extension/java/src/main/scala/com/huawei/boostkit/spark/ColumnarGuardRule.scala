@@ -210,6 +210,7 @@ case class ColumnarGuardRule() extends Rule[SparkPlan] {
       case f: NoClassDefFoundError =>
         throw f
       case r: RuntimeException =>
+        if (r.getMessage.contains("Subquery scalar-subquery") && r.getMessage.contains("has not finished")) return true
         logDebug(s"[OPERATOR FALLBACK] ${r} ${plan.getClass} falls back to Spark operator")
         return false
       case t: Throwable =>

@@ -31,8 +31,11 @@ import com.huawei.boostkit.spark.ColumnarPluginConfig
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate._
+import org.apache.spark.sql.catalyst.plans.logical.Subquery
 import org.apache.spark.sql.catalyst.plans.{FullOuter, Inner, JoinType, LeftAnti, LeftOuter, LeftSemi, RightOuter}
 import org.apache.spark.sql.catalyst.util.CharVarcharUtils.getRawTypeString
+import org.apache.spark.sql.execution.ColumnarBloomFilterSubquery
+import org.apache.spark.sql.expression.ColumnarExpressionConverter
 import org.apache.spark.sql.hive.HiveUdfAdaptorUtil
 import org.apache.spark.sql.types.{BooleanType, DataType, DateType, Decimal, DecimalType, DoubleType, IntegerType, LongType, Metadata, ShortType, StringType}
 
@@ -558,12 +561,42 @@ object OmniExpressionAdaptor extends Logging {
 
       case concat: Concat =>
         getConcatJsonStr(concat, exprsIndexMap)
+
       case round: Round =>
         "{\"exprType\":\"FUNCTION\",\"returnType\":%s,\"function_name\":\"round\", \"arguments\":[%s,%s]}"
           .format(sparkTypeToOmniExpJsonType(round.dataType),
             rewriteToOmniJsonExpressionLiteral(round.child, exprsIndexMap),
             rewriteToOmniJsonExpressionLiteral(round.scale, exprsIndexMap))
+
       case attr: Attribute => toOmniJsonAttribute(attr, exprsIndexMap(attr.exprId))
+
+      // might_contain
+      case bloomFilterMightContain: BloomFilterMightContain =>
+        ("{\"exprType\":\"FUNCTION\",\"returnType\":%s," +
+          "\"function_name\":\"might_contain\", \"arguments\":[%s,%s]}")
+          .format(sparkTypeToOmniExpJsonType(bloomFilterMightContain.dataType),
+            rewriteToOmniJsonExpressionLiteral(
+              ColumnarExpressionConverter.replaceWithColumnarExpression(bloomFilterMightContain.bloomFilterExpression),
+              exprsIndexMap
+            ),
+            rewriteToOmniJsonExpressionLiteral(bloomFilterMightContain.valueExpression, exprsIndexMap, returnDatatype))
+
+      case columnarBloomFilterSubquery: ColumnarBloomFilterSubquery =>
+        val bfAddress: Long = columnarBloomFilterSubquery.eval().asInstanceOf[Long]
+        if (bfAddress == 0L) {
+          ("{\"exprType\":\"LITERAL\",\"dataType\":2,\"isNull\":true,\"value\":%d}")
+            .format(bfAddress)
+        } else {
+          ("{\"exprType\":\"LITERAL\",\"dataType\":2,\"isNull\":false,\"value\":%d}")
+            .format(bfAddress)
+        }
+
+      case hash: Murmur3Hash =>
+        genMurMur3HashExpr(hash.children, hash.seed, exprsIndexMap)
+
+      case xxHash: XxHash64 =>
+        genXxHash64Expr(xxHash.children, xxHash.seed, exprsIndexMap)
+
       case _ =>
         if (HiveUdfAdaptorUtil.isHiveUdf(expr) && ColumnarPluginConfig.getSessionConf.enableColumnarUdf) {
           val hiveUdf = HiveUdfAdaptorUtil.asHiveSimpleUDF(expr)
@@ -618,6 +651,38 @@ object OmniExpressionAdaptor extends Logging {
         rewriteToOmniJsonExpressionLiteral(children(i), exprsIndexMap))
     }
     res
+  }
+
+  // gen murmur3hash partition expression
+  private def genMurMur3HashExpr(expressions: Seq[Expression], seed: Int, exprsIndexMap: Map[ExprId, Int]): String = {
+    var omniExpr: String = ""
+    expressions.foreach { expr =>
+      val colExpr = rewriteToOmniJsonExpressionLiteral(expr, exprsIndexMap)
+      if (omniExpr.isEmpty) {
+        omniExpr = ("{\"exprType\":\"FUNCTION\",\"returnType\":1,\"function_name\":\"%s\",\"arguments\":[" +
+          "%s,{\"exprType\":\"LITERAL\",\"dataType\":1,\"isNull\":false,\"value\":%d}]}").format("mm3hash", colExpr, seed)
+      } else {
+        omniExpr = ("{\"exprType\":\"FUNCTION\",\"returnType\":1,\"function_name\":\"%s\",\"arguments\":[%s,%s]}")
+          .format("mm3hash", colExpr, omniExpr)
+      }
+    }
+    omniExpr
+  }
+
+  // gen XxHash64 partition expression
+  private def genXxHash64Expr(expressions: Seq[Expression], seed: Long, exprsIndexMap: Map[ExprId, Int]): String = {
+    var omniExpr: String = ""
+    expressions.foreach { expr =>
+      val colExpr = rewriteToOmniJsonExpressionLiteral(expr, exprsIndexMap)
+      if (omniExpr.isEmpty) {
+        omniExpr = ("{\"exprType\":\"FUNCTION\",\"returnType\":2,\"function_name\":\"%s\",\"arguments\":[" +
+          "%s,{\"exprType\":\"LITERAL\",\"dataType\":2,\"isNull\":false,\"value\":%d}]}").format("xxhash64", colExpr, seed)
+      } else {
+        omniExpr = ("{\"exprType\":\"FUNCTION\",\"returnType\":2,\"function_name\":\"%s\",\"arguments\":[%s,%s]}")
+          .format("xxhash64", colExpr, omniExpr)
+      }
+    }
+    omniExpr
   }
 
   def toOmniJsonAttribute(attr: Attribute, colVal: Int): String = {

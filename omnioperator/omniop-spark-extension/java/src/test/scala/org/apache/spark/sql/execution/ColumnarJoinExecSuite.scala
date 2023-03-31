@@ -375,7 +375,7 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
       sortAnswers = true)
   }
 
-  test("BroadcastHashJoin and project fusion test") {
+  test("BroadcastHashJoin and project funsion test") {
     val omniResult = person_test.join(order_test.hint("broadcast"), person_test("id_p") === order_test("id_p"), "leftouter")
       .select(person_test("name"), order_test("order_no"))
     val omniPlan = omniResult.queryExecution.executedPlan
@@ -390,7 +390,7 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
     ), false)
   }
 
-  test("BroadcastHashJoin and project fusion test for duplicate column") {
+  test("BroadcastHashJoin and project funsion test for duplicate column") {
     val omniResult = person_test.join(order_test.hint("broadcast"), person_test("id_p") === order_test("id_p"), "leftouter")
       .select(person_test("name"), order_test("order_no"), order_test("id_p"))
     val omniPlan = omniResult.queryExecution.executedPlan
@@ -405,7 +405,7 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
     ), false)
   }
 
-  test("BroadcastHashJoin and project fusion test for reorder columns") {
+  test("BroadcastHashJoin and project funsion test for reorder columns") {
     val omniResult = person_test.join(order_test.hint("broadcast"), person_test("id_p") === order_test("id_p"), "leftouter")
       .select(order_test("order_no"), person_test("name"), order_test("id_p"))
     val omniPlan = omniResult.queryExecution.executedPlan
@@ -420,7 +420,7 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
     ), false)
   }
 
-  test("BroadcastHashJoin and project are not fused test") {
+  test("BroadcastHashJoin and project are not funsed test") {
     val omniResult = person_test.join(order_test.hint("broadcast"), person_test("id_p") === order_test("id_p"), "leftouter")
       .select(order_test("order_no").plus(1), person_test("name"))
     val omniPlan = omniResult.queryExecution.executedPlan
@@ -435,7 +435,7 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
     ), false)
   }
 
-  test("BroadcastHashJoin and project fusion test for alias") {
+  test("BroadcastHashJoin and project funsion test for alias") {
     val omniResult = person_test.join(order_test.hint("broadcast"), person_test("id_p") === order_test("id_p"), "leftouter")
       .select(person_test("name").as("name1"), order_test("order_no").as("order_no1"))
     val omniPlan = omniResult.queryExecution.executedPlan
@@ -476,7 +476,7 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
     ), false)
   }
 
-  test("shuffledHashJoin and project fusion test") {
+  test("shuffledHashJoin and project funsion test") {
     val omniResult = person_test.join(order_test.hint("SHUFFLE_HASH"), person_test("id_p") === order_test("id_p"), "inner")
       .select(person_test("name"), order_test("order_no"))
     val omniPlan = omniResult.queryExecution.executedPlan
@@ -490,7 +490,7 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
     ), false)
   }
 
-  test("ShuffledHashJoin and project fusion test for duplicate column") {
+  test("ShuffledHashJoin and project funsion test for duplicate column") {
     val omniResult = person_test.join(order_test.hint("SHUFFLE_HASH"), person_test("id_p") === order_test("id_p"), "inner")
       .select(person_test("name"), order_test("order_no"), order_test("id_p"))
     val omniPlan = omniResult.queryExecution.executedPlan
@@ -504,7 +504,7 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
     ), false)
   }
 
-  test("ShuffledHashJoin and project fusion test for reorder columns") {
+  test("ShuffledHashJoin and project funsion test for reorder columns") {
     val omniResult = person_test.join(order_test.hint("SHUFFLE_HASH"), person_test("id_p") === order_test("id_p"), "inner")
       .select(order_test("order_no"), person_test("name"), order_test("id_p"))
     val omniPlan = omniResult.queryExecution.executedPlan
@@ -518,7 +518,7 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
     ), false)
   }
 
-  test("ShuffledHashJoin and project are not fused test") {
+  test("ShuffledHashJoin and project are not funsed test") {
     val omniResult = person_test.join(order_test.hint("SHUFFLE_HASH"), person_test("id_p") === order_test("id_p"), "inner")
       .select(order_test("order_no").plus(1), person_test("name"))
     val omniPlan = omniResult.queryExecution.executedPlan
@@ -532,7 +532,7 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
     ), false)
   }
 
-  test("ShuffledHashJoin and project fusion test for alias") {
+  test("ShuffledHashJoin and project funsion test for alias") {
     val omniResult = person_test.join(order_test.hint("SHUFFLE_HASH"), person_test("id_p") === order_test("id_p"), "inner")
       .select(person_test("name").as("name1"), order_test("order_no").as("order_no1"))
     val omniPlan = omniResult.queryExecution.executedPlan
@@ -546,7 +546,7 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
     ), false)
   }
 
-  test("SortMergeJoin and project fusion test") {
+  test("SortMergeJoin and project funsion test") {
     val omniResult = person_test.join(order_test.hint("MERGEJOIN"), person_test("id_p") === order_test("id_p"), "inner")
       .select(person_test("name"), order_test("order_no"))
     val omniPlan = omniResult.queryExecution.executedPlan
@@ -560,7 +560,7 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
     ), false)
   }
 
-  test("SortMergeJoin and project fusion test for duplicate column") {
+  test("SortMergeJoin and project funsion test for duplicate column") {
     val omniResult = person_test.join(order_test.hint("MERGEJOIN"), person_test("id_p") === order_test("id_p"), "inner")
       .select(person_test("name"), order_test("order_no"), order_test("id_p"))
     val omniPlan = omniResult.queryExecution.executedPlan
@@ -574,7 +574,7 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
     ), false)
   }
 
-  test("SortMergeJoin and project fusion test for reorder columns") {
+  test("SortMergeJoin and project funsion test for reorder columns") {
     val omniResult = person_test.join(order_test.hint("MERGEJOIN"), person_test("id_p") === order_test("id_p"), "inner")
       .select(order_test("order_no"), person_test("name"), order_test("id_p"))
     val omniPlan = omniResult.queryExecution.executedPlan
@@ -588,7 +588,7 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
     ), false)
   }
 
-  test("SortMergeJoin and project are not fused test") {
+  test("SortMergeJoin and project are not funsed test") {
     val omniResult = person_test.join(order_test.hint("MERGEJOIN"), person_test("id_p") === order_test("id_p"), "inner")
       .select(order_test("order_no").plus(1), person_test("name"))
     val omniPlan = omniResult.queryExecution.executedPlan
@@ -602,7 +602,7 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
     ), false)
   }
 
-  test("SortMergeJoin and project fusion test for alias") {
+  test("SortMergeJoin and project funsion test for alias") {
     val omniResult = person_test.join(order_test.hint("MERGEJOIN"), person_test("id_p") === order_test("id_p"), "inner")
       .select(person_test("name").as("name1"), order_test("order_no").as("order_no1"))
     val omniPlan = omniResult.queryExecution.executedPlan
