@@ -20,6 +20,7 @@ package org.apache.spark.sql;
 
 import com.huawei.boostkit.omnidata.decode.type.*;
 
+import com.huawei.boostkit.omnidata.model.Column;
 import io.airlift.slice.Slice;
 import io.prestosql.spi.relation.ConstantExpression;
 import io.prestosql.spi.type.*;
@@ -33,6 +34,8 @@ import org.apache.spark.sql.execution.ndp.LimitExeInfo;
 import org.apache.spark.sql.types.*;
 import org.apache.spark.sql.types.DateType;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import scala.Option;
 import scala.collection.JavaConverters;
 import scala.collection.Seq;
@@ -69,6 +72,26 @@ import static java.lang.Float.parseFloat;
  */
 public class NdpUtils {
 
+    /**
+     * Types supported by OmniOperator.
+     */
+    public static final Set<String> supportTypes = new HashSet<String>() {
+        {
+            add(StandardTypes.INTEGER);
+            add(StandardTypes.DATE);
+            add(StandardTypes.SMALLINT);
+            add(StandardTypes.BIGINT);
+            add(StandardTypes.VARCHAR);
+            add(StandardTypes.CHAR);
+            add(StandardTypes.DECIMAL);
+            add(StandardTypes.ROW);
+            add(StandardTypes.DOUBLE);
+            add(StandardTypes.VARBINARY);
+            add(StandardTypes.BOOLEAN);
+        }
+    };
+    private static final Logger LOG = LoggerFactory.getLogger(NdpUtils.class);
+
     public static int getColumnOffset(StructType dataSchema, Seq<Attribute> outPut) {
         List<Attribute> attributeList = JavaConverters.seqAsJavaList(outPut);
         String columnName = "";
@@ -92,6 +115,7 @@ public class NdpUtils {
                                                   Seq<AggExeInfo> aggExeInfo) {
         String columnName = "";
         int columnTempId = 0;
+        boolean isFind = false;
         if (aggExeInfo != null && aggExeInfo.size() > 0) {
             List<AggExeInfo> aggExecutionList = JavaConverters.seqAsJavaList(aggExeInfo);
             for (AggExeInfo aggExeInfoTemp : aggExecutionList) {
@@ -106,10 +130,13 @@ public class NdpUtils {
                         Matcher matcher = pattern.matcher(expression.toString());
                         if (matcher.find()) {
                             columnTempId = Integer.parseInt(matcher.group(1));
+                            isFind = true;
                             break;
                         }
                     }
-                    break;
+                    if (isFind) {
+                        break;
+                    }
                 }
                 List<NamedExpression> namedExpressions = JavaConverters.seqAsJavaList(
                         aggExeInfoTemp.groupingExpressions());
@@ -238,7 +265,7 @@ public class NdpUtils {
         if (DATE.equals(prestoType)) {
             return new DateDecodeType();
         }
-        throw new RuntimeException("unsupported this prestoType:" + prestoType);
+        throw new UnsupportedOperationException("unsupported this prestoType:" + prestoType);
     }
 
     public static DecodeType transDataIoDataType(DataType dataType) {
@@ -271,7 +298,7 @@ public class NdpUtils {
             case "datetype":
                 return new DateDecodeType();
             default:
-                throw new RuntimeException("unsupported this type:" + strType);
+                throw new UnsupportedOperationException("unsupported this type:" + strType);
         }
     }
 
@@ -438,5 +465,22 @@ public class NdpUtils {
             isInDate = ((Cast) expression).child().dataType() instanceof DateType;
         }
         return isInDate;
+    }
+
+    /**
+     * Check if the input pages contains datatypes unsuppoted by OmniColumnVector.
+     *
+     * @param columns Input columns
+     * @return false if contains unsupported type
+     */
+    public static boolean checkOmniOpColumns(List<Column> columns) {
+        for (Column column : columns) {
+            String base = column.getType().getTypeSignature().getBase();
+            if (!supportTypes.contains(base)) {
+                LOG.info("Unsupported operator data type {}, rollback", base);
+                return false;
+            }
+        }
+        return true;
     }
 }

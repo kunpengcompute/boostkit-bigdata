@@ -31,24 +31,27 @@ public class PageCandidate {
 
     public int columnOffset;
 
-    public String sdiHosts;
+    public String pushDownHosts;
 
-    private String fileFormat;
+    private final String fileFormat;
 
     public int maxFailedTimes;
 
-    private int taskTimeout;
+    private final int taskTimeout;
 
-    public PageCandidate(String filePath, Long startPos, Long splitLen, int columnOffset,
-                         String sdiHosts, String fileFormat, int maxFailedTimes, int taskTimeout) {
+    private final boolean isOperatorCombineEnabled;
+
+    public PageCandidate(String filePath, Long startPos, Long splitLen, int columnOffset, String pushDownHosts,
+                         String fileFormat, int maxFailedTimes, int taskTimeout, boolean isOperatorCombineEnabled) {
         this.filePath = filePath;
         this.startPos = startPos;
         this.splitLen = splitLen;
         this.columnOffset = columnOffset;
-        this.sdiHosts = sdiHosts;
+        this.pushDownHosts = pushDownHosts;
         this.fileFormat = fileFormat;
         this.maxFailedTimes = maxFailedTimes;
         this.taskTimeout = taskTimeout;
+        this.isOperatorCombineEnabled = isOperatorCombineEnabled;
     }
 
     public Long getStartPos() {
@@ -67,8 +70,8 @@ public class PageCandidate {
         return columnOffset;
     }
 
-    public String getSdiHosts() {
-        return sdiHosts;
+    public String getpushDownHosts() {
+        return pushDownHosts;
     }
 
     public String getFileFormat() {
@@ -81,5 +84,9 @@ public class PageCandidate {
 
     public int getTaskTimeout() {
         return taskTimeout;
+    }
+
+    public boolean isOperatorCombineEnabled() {
+        return isOperatorCombineEnabled;
     }
 }

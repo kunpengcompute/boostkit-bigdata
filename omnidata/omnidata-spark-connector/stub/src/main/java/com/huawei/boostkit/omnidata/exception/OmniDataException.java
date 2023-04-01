@@ -23,9 +23,14 @@ import static com.huawei.boostkit.omnidata.exception.OmniErrorCode.OMNIDATA_GENE
 
 public class OmniDataException extends RuntimeException {
     public OmniDataException(String message) {
+        super(message);
     }
     public OmniErrorCode getErrorCode() {
         return OMNIDATA_GENERIC_ERROR;
     }
-}
 
+    @Override
+    public String getMessage() {
+        return super.getMessage();
+    }
+}

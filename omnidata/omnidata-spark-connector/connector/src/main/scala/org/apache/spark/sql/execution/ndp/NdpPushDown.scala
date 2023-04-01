@@ -19,13 +19,14 @@
 package org.apache.spark.sql.execution.ndp
 
 import java.util.{Locale, Properties}
+
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.{PushDownManager, SparkSession}
+import org.apache.spark.sql.{PushDownData, PushDownManager, SparkSession}
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{And, Attribute, AttributeReference, BinaryExpression, Expression, NamedExpression, PredicateHelper, UnaryExpression}
 import org.apache.spark.sql.catalyst.expressions.aggregate.{Partial, PartialMerge}
 import org.apache.spark.sql.catalyst.rules.Rule
-import org.apache.spark.sql.execution.{FileSourceScanExec, FilterExec, GlobalLimitExec, LeafExecNode, LocalLimitExec, ProjectExec, SparkPlan}
+import org.apache.spark.sql.execution.{FileSourceScanExec, FilterExec, GlobalLimitExec, LeafExecNode, LocalLimitExec, NdpFileSourceScanExec, ProjectExec, SparkPlan}
 import org.apache.spark.sql.execution.adaptive.AdaptiveSparkPlanExec
 import org.apache.spark.sql.execution.aggregate.{BaseAggregateExec, HashAggregateExec, ObjectHashAggregateExec, SortAggregateExec}
 import org.apache.spark.sql.execution.datasources.HadoopFsRelation
@@ -41,6 +42,7 @@ case class NdpPushDown(sparkSession: SparkSession)
   extends Rule[SparkPlan] with PredicateHelper {
   private val pushDownEnabled = NdpConf.getNdpEnabled(sparkSession)
   private var fpuHosts: scala.collection.Map[String, String] = _
+  private var zkRate: Double = 1.0
   // filter performance blackList: like, startswith, endswith, contains
   private val filterWhiteList = Set("or", "and", "not", "equalto", "isnotnull", "lessthan",
     "greaterthan", "greaterthanorequal", "lessthanorequal", "in", "literal", "isnull",
@@ -102,7 +104,19 @@ case class NdpPushDown(sparkSession: SparkSession)
 
   def shouldPushDown(): Boolean = {
     val pushDownManagerClass = new PushDownManager()
-    fpuHosts = pushDownManagerClass.getZookeeperData(timeOut, parentPath, zkAddress)
+    val fpuMap = pushDownManagerClass.getZookeeperData(timeOut, parentPath, zkAddress)
+    val fmap = mutable.Map[String,String]()
+    var rts = 0
+    var mts = 0
+    for (kv <- fpuMap) {
+      fmap.put(kv._1, kv._2.getDatanodeHost)
+      rts += kv._2.getRunningTasks
+      mts += kv._2.getMaxTasks
+    }
+    if (rts != 0 && mts != 0 && (rts.toDouble / mts.toDouble) > 0.4) {
+      zkRate = 0.5
+    }
+    fpuHosts = fmap
     fpuHosts.nonEmpty
   }
 
@@ -165,11 +179,26 @@ case class NdpPushDown(sparkSession: SparkSession)
         if (s.scan.isPushDown) {
           s.scan match {
             case f: FileSourceScanExec =>
-              val scan = f.copy(output = s.scanOutput)
-              scan.pushDown(s.scan)
-              scan.fpuHosts(fpuHosts)
-              logInfo(s"Push down with [${scan.ndpOperators}]")
-              scan
+              val ndpScan = NdpFileSourceScanExec(
+                f.relation,
+                s.scanOutput,
+                f.requiredSchema,
+                f.partitionFilters,
+                f.optionalBucketSet,
+                f.optionalNumCoalescedBuckets,
+                f.dataFilters,
+                f.tableIdentifier,
+                f.partitionColumn,
+                f.disableBucketedScan
+              )
+              ndpScan.pushZkRate(zkRate)
+              if (s.scan.allFilterExecInfo.nonEmpty) {
+                ndpScan.partialPushDownFilterList(s.scan.allFilterExecInfo)
+              }
+              ndpScan.pushDown(s.scan)
+              ndpScan.fpuHosts(fpuHosts)
+              logInfo(s"Push down with [${ndpScan.ndpOperators}]")
+              ndpScan
             case _ => throw new UnsupportedOperationException()
           }
         } else {
@@ -177,6 +206,7 @@ case class NdpPushDown(sparkSession: SparkSession)
         }
     }
   }
+
 
   def pushDownOperator(plan: SparkPlan): SparkPlan = {
     val p = pushDownOperatorInternal(plan)
@@ -234,6 +264,7 @@ case class NdpPushDown(sparkSession: SparkSession)
           logInfo(s"Fail to push down filter, since ${s.scan.nodeName} contains dynamic pruning")
           f
         } else {
+          s.scan.partialPushDownFilter(f);
           // TODO: move selectivity info to pushdown-info
           if (filterSelectivityEnabled && selectivity.nonEmpty) {
             logInfo(s"Selectivity: ${selectivity.get}")
@@ -320,6 +351,7 @@ object NdpConf {
   val NDP_ENABLED = "spark.sql.ndp.enabled"
   val PARQUET_MERGESCHEMA = "spark.sql.parquet.mergeSchema"
   val NDP_FILTER_SELECTIVITY_ENABLE = "spark.sql.ndp.filter.selectivity.enable"
+  val NDP_OPERATOR_COMBINE_ENABLED = "spark.sql.ndp.operator.combine.enable"
   val NDP_TABLE_SIZE_THRESHOLD = "spark.sql.ndp.table.size.threshold"
   val NDP_ZOOKEEPER_TIMEOUT = "spark.sql.ndp.zookeeper.timeout"
   val NDP_ALIVE_OMNIDATA = "spark.sql.ndp.alive.omnidata"
@@ -335,6 +367,8 @@ object NdpConf {
   val NDP_PKI_DIR = "spark.sql.ndp.pki.dir"
   val NDP_MAX_FAILED_TIMES = "spark.sql.ndp.max.failed.times"
   val NDP_CLIENT_TASK_TIMEOUT = "spark.sql.ndp.task.timeout"
+  val NDP_PARTIAL_PUSHDOWN = "spark.sql.ndp.partial.pushdown"
+  val NDP_PARTIAL_PUSHDOWN_ENABLE = "spark.sql.ndp.partial.pushdown.enable"
 
   def toBoolean(key: String, value: String, sparkSession: SparkSession): Boolean = {
     try {
@@ -399,6 +433,11 @@ object NdpConf {
       sparkSession.conf.getOption(NDP_FILTER_SELECTIVITY_ENABLE).getOrElse("true"), sparkSession)
   }
 
+  def getNdpOperatorCombineEnabled(sparkSession: SparkSession): Boolean = {
+    toBoolean(NDP_OPERATOR_COMBINE_ENABLED,
+      sparkSession.conf.getOption(NDP_OPERATOR_COMBINE_ENABLED).getOrElse("false"), sparkSession)
+  }
+
   def getNdpTableSizeThreshold(sparkSession: SparkSession): Long = {
     val result = toNumber(NDP_TABLE_SIZE_THRESHOLD,
       sparkSession.conf.getOption(NDP_TABLE_SIZE_THRESHOLD).getOrElse("10240"),
@@ -425,6 +464,21 @@ object NdpConf {
       selectivity => selectivity >= 0.0 && selectivity <= 1.0,
       s"The $NDP_FILTER_SELECTIVITY value must be in [0.0, 1.0].", sparkSession)
     result
+  }
+
+  def getNdpPartialPushdown(sparkSession: SparkSession): Double = {
+    val partialNum = toNumber(NDP_PARTIAL_PUSHDOWN,
+      sparkSession.conf.getOption(NDP_PARTIAL_PUSHDOWN).getOrElse("1"),
+      _.toDouble, "double", sparkSession)
+    checkDoubleValue(NDP_PARTIAL_PUSHDOWN, partialNum,
+      rate => rate >= 0.0 && rate <= 1.0,
+      s"The $NDP_PARTIAL_PUSHDOWN value must be in [0.0, 1.0].", sparkSession)
+    partialNum
+  }
+
+  def getNdpPartialPushdownEnable(sparkSession: SparkSession): Boolean = {
+    toBoolean(NDP_PARTIAL_PUSHDOWN_ENABLE,
+      sparkSession.conf.getOption(NDP_PARTIAL_PUSHDOWN_ENABLE).getOrElse("false"), sparkSession)
   }
 
   def getNdpUdfWhitelist(sparkSession: SparkSession): Option[String] = {
