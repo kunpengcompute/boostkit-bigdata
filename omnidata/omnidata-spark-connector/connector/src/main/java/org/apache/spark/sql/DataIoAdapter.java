@@ -490,7 +490,8 @@ public class DataIoAdapter {
                 omnidataProjections.add(createAggProjection(expression));
                 int projectionId = fieldMap.size();
                 fieldMap.put(aggregateFunctionName, projectionId);
-                if (aggregateFunctionType.equals(AggregateFunctionType.Count)) {
+                if (aggregateFunctionType.equals(AggregateFunctionType.Count) ||
+                        aggregateFunctionType.equals(AggregateFunctionType.Average)) {
                     prestoType = NdpUtils.transOlkDataType(expression.dataType(), false);
                 }
                 omnidataTypes.add(prestoType);
