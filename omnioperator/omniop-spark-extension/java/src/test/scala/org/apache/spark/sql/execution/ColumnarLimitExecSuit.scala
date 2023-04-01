@@ -46,7 +46,7 @@ class ColumnarLimitExecSuit extends ColumnarSparkPlanTest {
 
   test("Push down limit through LEFT SEMI and LEFT ANTI join") {
     withTable("left_table", "nonempty_right_table", "empty_right_table") {
-      spark.sql("SET spark.sql.adaptive.enable=false")
+      spark.sql("SET spark.sql.adaptive.enabled=false")
       spark.range(5).toDF().repartition(1).write.saveAsTable("left_table")
       spark.range(3).write.saveAsTable("nonempty_right_table")
       spark.range(0).write.saveAsTable("empty_right_table")
@@ -79,7 +79,7 @@ class ColumnarLimitExecSuit extends ColumnarSparkPlanTest {
     val res = left.join(right.hint("broadcast"), col("a") === col("x"), "leftouter").limit(3)
     assert(
       res.queryExecution.executedPlan.find(_.isInstanceOf[ColumnarLocalLimitExec]).isDefined,
-      s"ColumnarShuffledHashJoinExec not happened," +
+      s"ColumnarLocalLimitExec not happened," +
         s" executedPlan as follows: \n${res.queryExecution.executedPlan}")
   }
 }
