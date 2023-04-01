@@ -25,7 +25,7 @@ import com.huawei.boostkit.spark.Constant.IS_SKIP_VERIFY_EXP
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor.{checkOmniJsonWhiteList, isSimpleColumn, isSimpleColumnForAll}
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil
-import com.huawei.boostkit.spark.util.OmniAdaptorUtil.transColBatchToOmniVecs
+import com.huawei.boostkit.spark.util.OmniAdaptorUtil.{getIndexArray, pruneOutput, reorderVecs, transColBatchToOmniVecs}
 import nova.hetu.omniruntime.`type`.DataType
 import nova.hetu.omniruntime.operator.config.{OperatorConfig, OverflowConfig, SpillConfig}
 import nova.hetu.omniruntime.operator.join.{OmniHashBuilderWithExprOperatorFactory, OmniLookupJoinWithExprOperatorFactory}
@@ -39,7 +39,7 @@ import org.apache.spark.sql.catalyst.expressions.codegen._
 import org.apache.spark.sql.catalyst.optimizer.{BuildLeft, BuildRight, BuildSide}
 import org.apache.spark.sql.catalyst.plans._
 import org.apache.spark.sql.catalyst.plans.physical._
-import org.apache.spark.sql.execution.{CodegenSupport, ColumnarHashedRelation, SparkPlan}
+import org.apache.spark.sql.execution.{CodegenSupport, ColumnarHashedRelation, ExplainUtils, SparkPlan}
 import org.apache.spark.sql.execution.metric.SQLMetrics
 import org.apache.spark.sql.execution.util.{MergeIterator, SparkMemoryUtils}
 import org.apache.spark.sql.execution.vectorized.OmniColumnVector
@@ -64,6 +64,24 @@ case class ColumnarBroadcastHashJoinExec(
     isNullAwareAntiJoin: Boolean = false,
     projectList: Seq[NamedExpression] = Seq.empty)
   extends HashJoin {
+
+  override def verboseStringWithOperatorId(): String = {
+    val joinCondStr = if (condition.isDefined) {
+      s"${condition.get}${condition.get.dataType}"
+    } else "None"
+    s"""
+       |$formattedNodeName
+       |$simpleStringWithNodeId
+       |${ExplainUtils.generateFieldString("buildOutput", buildOutput ++ buildOutput.map(_.dataType))}
+       |${ExplainUtils.generateFieldString("streamedOutput", streamedOutput ++ streamedOutput.map(_.dataType))}
+       |${ExplainUtils.generateFieldString("leftKeys", leftKeys ++ leftKeys.map(_.dataType))}
+       |${ExplainUtils.generateFieldString("rightKeys", rightKeys ++ rightKeys.map(_.dataType))}
+       |${ExplainUtils.generateFieldString("condition", joinCondStr)}
+       |${ExplainUtils.generateFieldString("projectList", projectList.map(_.toAttribute) ++ projectList.map(_.toAttribute).map(_.dataType))}
+       |${ExplainUtils.generateFieldString("output", output ++ output.map(_.dataType))}
+       |Condition : $condition
+       |""".stripMargin
+  }
 
   if (isNullAwareAntiJoin) {
     require(leftKeys.length == 1, "leftKeys length should be 1")
@@ -497,60 +515,5 @@ case class ColumnarBroadcastHashJoinExec(
     }
   }
 
-  def pruneOutput(output: Seq[Attribute], projectList: Seq[NamedExpression]): Seq[Attribute] = {
-      if (projectList.nonEmpty) {
-        val projectOutput = ListBuffer[Attribute]()
-        for (project <- projectList) {
-          for (col <- output) {
-            if (col.exprId.equals(getProjectAliasExprId(project))) {
-               projectOutput += col
-            }
-          }
-        }
-        projectOutput
-      } else {
-        output
-      }
-  }
 
-  def getIndexArray(output: Seq[Attribute], projectList: Seq[NamedExpression]): Array[Int] = {
-    if (projectList.nonEmpty) {
-      val indexList = ListBuffer[Int]()
-      for (project <- projectList) {
-        for (i <- output.indices) {
-          val col = output(i)
-          if (col.exprId.equals(getProjectAliasExprId(project))) {
-            indexList += i
-          }
-        }
-      }
-      indexList.toArray
-    } else {
-      output.indices.toArray
-    }
-  }
-
-  def reorderVecs(prunedOutput: Seq[Attribute], projectList: Seq[NamedExpression], resultVecs: Array[nova.hetu.omniruntime.vector.Vec], vecs: Array[OmniColumnVector]) = {
-      for (index <- projectList.indices) {
-           val project = projectList(index)
-           for (i <- prunedOutput.indices) {
-               val col = prunedOutput(i)
-               if (col.exprId.equals(getProjectAliasExprId(project))) {
-                 val v = vecs(index)
-                 v.reset()
-                 v.setVec(resultVecs(i))
-               }
-           }
-      }
-  }
-
-  def getProjectAliasExprId(project: NamedExpression): ExprId = {
-      project match {
-        case alias: Alias =>
-          // The condition of parameter is restricted. If parameter type is alias, its child type must be attributeReference.
-          alias.child.asInstanceOf[AttributeReference].exprId
-        case _ =>
-          project.exprId
-      }
-  }
 }
