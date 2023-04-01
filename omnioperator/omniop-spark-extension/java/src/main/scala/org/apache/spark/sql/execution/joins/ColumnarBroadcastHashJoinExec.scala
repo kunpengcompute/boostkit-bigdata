@@ -130,7 +130,7 @@ case class ColumnarBroadcastHashJoinExec(
 
   override lazy val outputPartitioning: Partitioning = {
     joinType match {
-      case _: InnerLike if session.sqlContext.conf.broadcastHashJoinOutputPartitioningExpandLimit > 0 =>
+      case Inner if session.sqlContext.conf.broadcastHashJoinOutputPartitioningExpandLimit > 0 =>
         streamedPlan.outputPartitioning match {
           case h: HashPartitioning => expandOutputPartitioning(h)
           case c: PartitioningCollection => expandOutputPartitioning(c)
@@ -222,7 +222,7 @@ case class ColumnarBroadcastHashJoinExec(
 
   def buildCheck(): Unit = {
     joinType match {
-      case LeftOuter | Inner =>
+      case LeftOuter | Inner | LeftSemi =>
       case _ =>
         throw new UnsupportedOperationException(s"Join-type[${joinType}] is not supported " +
           s"in ${this.nodeName}")
@@ -292,7 +292,14 @@ case class ColumnarBroadcastHashJoinExec(
     }
 
     // {0}, buildKeys: col1#12
-    val buildOutputCols = getIndexArray(buildOutput, projectList) // {0,1}
+    val buildOutputCols: Array[Int] = joinType match {
+      case Inner | LeftOuter =>
+        getIndexArray(buildOutput, projectList)
+      case LeftExistence(_) =>
+        Array[Int]()
+      case x =>
+        throw new UnsupportedOperationException(s"ColumnBroadcastHashJoin Join-type[$x] is not supported!")
+    }
     val buildJoinColsExp = buildKeys.map { x =>
       OmniExpressionAdaptor.rewriteToOmniJsonExpressionLiteral(x,
         OmniExpressionAdaptor.getExprIdMap(buildOutput.map(_.toAttribute)))
@@ -455,7 +462,7 @@ case class ColumnarBroadcastHashJoinExec(
   }
 
   private def multipleOutputForOneInput: Boolean = joinType match {
-    case _: InnerLike | LeftOuter | RightOuter =>
+    case Inner | LeftOuter | RightOuter =>
       // For inner and outer joins, one row from the streamed side may produce multiple result rows,
       // if the build side has duplicated keys. Note that here we wait for the broadcast to be
       // finished, which is a no-op because it's already finished when we wait it in `doProduce`.
@@ -491,7 +498,7 @@ case class ColumnarBroadcastHashJoinExec(
       projectList.map(_.toAttribute)
     } else {
       joinType match {
-        case _: InnerLike =>
+        case Inner =>
           left.output ++ right.output
         case LeftOuter =>
           left.output ++ right.output.map(_.withNullability(true))

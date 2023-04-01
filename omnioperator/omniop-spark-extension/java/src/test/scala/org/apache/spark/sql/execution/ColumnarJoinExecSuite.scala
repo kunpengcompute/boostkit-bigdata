@@ -193,6 +193,29 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
     checkThatPlansAgreeTemplateForBHJ(df, leftKeys, rightKeys)
   }
 
+  test("validate columnar broadcastHashJoin left semi join happened") {
+    val res = left.join(right.hint("broadcast"), col("q") === col("c"), "leftsemi")
+    assert(
+      res.queryExecution.executedPlan.find(_.isInstanceOf[ColumnarBroadcastHashJoinExec]).isDefined,
+      s"ColumnarBroadcastHashJoinExec not happened," +
+        s" executedPlan as follows: \n${res.queryExecution.executedPlan}")
+  }
+
+  test("columnar broadcastHashJoin LeftSemi Join is equal to native") {
+    val df = left.join(right.hint("broadcast"), col("q") === col("c"))
+    val leftKeys = Seq(left.col("q").expr)
+    val rightKeys = Seq(right.col("c").expr)
+    checkThatPlansAgreeTemplateForBHJ(df, leftKeys, rightKeys, LeftSemi)
+  }
+
+  test("columnar broadcastHashJoin LeftSemi Join is equal to native with null") {
+    val df = leftWithNull.join(rightWithNull.hint("broadcast"),
+      col("q").isNotNull === col("c").isNotNull)
+    val leftKeys = Seq(leftWithNull.col("q").isNotNull.expr)
+    val rightKeys = Seq(rightWithNull.col("c").isNotNull.expr)
+    checkThatPlansAgreeTemplateForBHJ(df, leftKeys, rightKeys, LeftSemi)
+  }
+
   def checkThatPlansAgreeTemplateForBHJ(df: DataFrame, leftKeys: Seq[Expression],
                                         rightKeys: Seq[Expression], joinType: JoinType = Inner): Unit = {
     checkThatPlansAgree(
@@ -302,6 +325,35 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
     ), false)
   }
 
+  test("validate columnar shuffledHashJoin left outer join happened") {
+    val res = left.join(right.hint("SHUFFLE_HASH"), col("q") === col("c"), "leftouter")
+    assert(
+      res.queryExecution.executedPlan.find(_.isInstanceOf[ColumnarShuffledHashJoinExec]).isDefined,
+      s"ColumnarShuffledHashJoinExec not happened," +
+        s" executedPlan as follows: \n${res.queryExecution.executedPlan}")
+  }
+
+  test("columnar shuffledHashJoin left outer join is equal to native") {
+    val df = left.join(right.hint("SHUFFLE_HASH"), col("q") === col("c"), "leftouter")
+    checkAnswer(df, _ => df.queryExecution.executedPlan, Seq(
+      Row("abc", "", 4, 2.0, "abc", "", 4, 1.0),
+      Row(" yeah  ", "yeah", 10, 8.0, null, null, null, null),
+      Row("", "Hello", 1, 1.0, " add", "World", 1, 3.0),
+      Row(" add", "World", 8, 3.0, null, null, null, null)
+    ), false)
+  }
+
+  test("columnar shuffledHashJoin left outer join is equal to native with null") {
+    val df = leftWithNull.join(rightWithNull.hint("SHUFFLE_HASH"),
+      col("q") === col("c"), "leftouter")
+    checkAnswer(df, _ => df.queryExecution.executedPlan, Seq(
+      Row("", "Hello", null, 1.0, null, null, null, null),
+      Row("abc", null, 4, 2.0, "abc", "", 4, 1.0),
+      Row(" yeah  ", "yeah", 10, 8.0, null, null, null, null),
+      Row(" add", "World", 8, 3.0, null, null, null, null)
+    ), false)
+  }
+
   test("ColumnarBroadcastHashJoin is not rolled back with not_equal filter expr") {
     val res = left.join(right.hint("broadcast"), left("a") <=> right("a"))
     assert(
@@ -395,6 +447,32 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
       Row("Adams", 22456),
       Row("Adams", 24562),
       Row("Bush", null)
+    ), false)
+  }
+
+  test("validate columnar shuffledHashJoin left anti join happened") {
+    val res = left.join(right.hint("SHUFFLE_HASH"), col("q") === col("c"), "leftanti")
+    assert(
+      res.queryExecution.executedPlan.find(_.isInstanceOf[ColumnarShuffledHashJoinExec]).isDefined,
+      s"ColumnarShuffledHashJoinExec not happened," +
+        s" executedPlan as follows: \n${res.queryExecution.executedPlan}")
+  }
+
+  test("columnar shuffledHashJoin left anti join is equal to native") {
+    val df = left.join(right.hint("SHUFFLE_HASH"), col("q") === col("c"), "leftanti")
+    checkAnswer(df, _ => df.queryExecution.executedPlan, Seq(
+      Row(" yeah  ", "yeah", 10, 8.0),
+      Row(" add", "World", 8, 3.0)
+    ), false)
+  }
+
+  test("columnar shuffledHashJoin left anti join is equal to native with null") {
+    val df = leftWithNull.join(rightWithNull.hint("SHUFFLE_HASH"),
+      col("q") === col("c"), "leftanti")
+    checkAnswer(df, _ => df.queryExecution.executedPlan, Seq(
+      Row("", "Hello", null, 1.0),
+      Row(" yeah  ", "yeah", 10, 8.0),
+      Row(" add", "World", 8, 3.0)
     ), false)
   }
 
