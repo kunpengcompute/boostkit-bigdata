@@ -54,7 +54,8 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] {
   val enableFusion: Boolean = columnarConf.enableFusion
   var isSupportAdaptive: Boolean = true
   val enableColumnarProjectFusion: Boolean = columnarConf.enableColumnarProjectFusion
-  val enableColumnarLimit: Boolean = columnarConf.enableColumnarLimit
+  val enableLocalColumnarLimit: Boolean = columnarConf.enableLocalColumnarLimit
+  val enableGlobalColumnarLimit: Boolean = columnarConf.enableGlobalColumnarLimit
 
   def apply(plan: SparkPlan): SparkPlan = {
     replaceWithColumnarPlan(plan)
