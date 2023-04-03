@@ -371,11 +371,11 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] {
         case _ =>
           plan
       }
-    case plan: LocalLimitExec if enableColumnarLimit =>
+    case plan: LocalLimitExec if enableLocalColumnarLimit =>
       val child = replaceWithColumnarPlan(plan.child)
       logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
       ColumnarLocalLimitExec(plan.limit, child)
-    case plan: GlobalLimitExec if enableColumnarLimit =>
+    case plan: GlobalLimitExec if enableGlobalColumnarLimit =>
       val child = replaceWithColumnarPlan(plan.child)
       logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
       ColumnarGlobalLimitExec(plan.limit, child)
