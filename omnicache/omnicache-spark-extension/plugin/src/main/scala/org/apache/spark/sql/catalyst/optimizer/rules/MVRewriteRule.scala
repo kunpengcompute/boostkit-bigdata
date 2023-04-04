@@ -20,6 +20,7 @@ package org.apache.spark.sql.catalyst.optimizer.rules
 import com.fasterxml.jackson.annotation.JsonIgnore
 import com.huawei.boostkit.spark.conf.OmniCachePluginConfig
 import com.huawei.boostkit.spark.util.{RewriteHelper, RewriteLogger, ViewMetadata}
+import com.huawei.boostkit.spark.util.ViewMetadata._
 import java.util.concurrent.LinkedBlockingQueue
 import scala.collection.mutable
 
@@ -30,7 +31,8 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.plans.{FullOuter, LeftAnti, LeftOuter, LeftSemi, RightOuter}
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.catalyst.rules.Rule
-import org.apache.spark.sql.execution.command.{ExplainCommand, OmniCacheCreateMvCommand}
+import org.apache.spark.sql.execution.datasources.InsertIntoHadoopFsRelationCommand
+import org.apache.spark.sql.hive.execution.{CreateHiveTableAsSelectCommand, InsertIntoHiveTable, OptimizedCreateHiveTableAsSelectCommand}
 import org.apache.spark.status.ElementTrackingStore
 import org.apache.spark.util.kvstore.KVIndex
 
@@ -51,13 +53,21 @@ class MVRewriteRule(session: SparkSession)
     }
     try {
       logicalPlan match {
-        case _: OmniCacheCreateMvCommand | ExplainCommand(_, _) =>
+        case _: CreateHiveTableAsSelectCommand =>
+          tryRewritePlan(logicalPlan)
+        case _: OptimizedCreateHiveTableAsSelectCommand =>
+          tryRewritePlan(logicalPlan)
+        case _: InsertIntoHadoopFsRelationCommand =>
+          tryRewritePlan(logicalPlan)
+        case _: InsertIntoHiveTable =>
+          tryRewritePlan(logicalPlan)
+        case _: Command =>
           logicalPlan
         case _ =>
           tryRewritePlan(logicalPlan)
       }
     } catch {
-      case _: Throwable =>
+      case e: Throwable =>
         logError(s"Failed to rewrite plan with mv.")
         logicalPlan
     }
@@ -78,7 +88,12 @@ class MVRewriteRule(session: SparkSession)
 
     // automatic wash out
     if (OmniCachePluginConfig.getConf.enableAutoWashOut) {
-      automaticWashOutCheck()
+      val autoCheckInterval: Long = RewriteHelper.secondsToMillisecond(
+        OmniCachePluginConfig.getConf.autoCheckWashOutTimeInterval)
+      val autoWashOutTime: Long = ViewMetadata.autoWashOutTimestamp.getOrElse(0)
+      if ((System.currentTimeMillis() - autoWashOutTime) >= autoCheckInterval) {
+        automaticWashOutCheck()
+      }
     }
 
     var res = RewriteHelper.optimizePlan(plan)
@@ -151,9 +166,6 @@ class MVRewriteRule(session: SparkSession)
           .format(mvs, costSecond)
       logBasedOnLevel(log)
       session.sparkContext.listenerBus.post(SparkListenerMVRewriteSuccess(sql, mvs))
-
-      // After the sql rewrite is complete, store the new viewCnt.
-      ViewMetadata.saveViewCountToFile()
     } else {
       res = plan
       cannotRewritePlans += res
@@ -180,16 +192,19 @@ class MVRewriteRule(session: SparkSession)
   }
 
   private def automaticWashOutCheck(): Unit = {
-    val timeInterval = OmniCachePluginConfig.getConf.automaticWashOutTimeInterval
+    val timeInterval = OmniCachePluginConfig.getConf.autoWashOutTimeInterval
     val threshold = System.currentTimeMillis() - RewriteHelper.daysToMillisecond(timeInterval)
-
     val viewQuantity = OmniCachePluginConfig.getConf.automaticWashOutMinimumViewQuantity
+
+    loadViewCount()
+    loadWashOutTimestamp()
 
     if (ViewMetadata.viewCnt.size() >= viewQuantity &&
         (ViewMetadata.washOutTimestamp.isEmpty ||
             (ViewMetadata.washOutTimestamp.get <= threshold))) {
       ViewMetadata.spark.sql("WASH OUT MATERIALIZED VIEW")
       logInfo("WASH OUT MATERIALIZED VIEW BY AUTOMATICALLY.")
+      ViewMetadata.autoWashOutTimestamp = Some(System.currentTimeMillis())
     }
   }
 }

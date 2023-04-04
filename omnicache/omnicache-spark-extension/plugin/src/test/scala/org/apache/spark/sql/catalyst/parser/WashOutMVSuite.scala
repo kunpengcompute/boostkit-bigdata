@@ -19,21 +19,26 @@ package org.apache.spark.sql.catalyst.parser
 
 import com.huawei.boostkit.spark.conf.OmniCachePluginConfig
 import com.huawei.boostkit.spark.exception.OmniCacheException
+import com.huawei.boostkit.spark.util.RewriteHelper.{disableCachePlugin, enableCachePlugin}
 import com.huawei.boostkit.spark.util.ViewMetadata
+import java.io.File
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.hadoop.io.IOUtils
 import org.json4s.DefaultFormats
 import org.json4s.jackson.Json
+import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach}
+import org.scalatest.funsuite.AnyFunSuite
 import scala.collection.mutable
 import scala.util.Random
 
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.catalyst.TableIdentifier
+import org.apache.spark.sql.catalyst.catalog.SessionCatalog
 import org.apache.spark.sql.catalyst.optimizer.rules.RewriteSuite
 import org.apache.spark.sql.execution.command.WashOutStrategy
 
-
-class WashOutMVSuite extends RewriteSuite {
+class WashOutMVSuite extends WashOutBase {
 
   test("view count accumulate") {
     spark.sql(
@@ -61,7 +66,7 @@ class WashOutMVSuite extends RewriteSuite {
         |ON e1.empid=c1.empid
         |AND c1.deptno=d1.deptno
         |""".stripMargin
-    comparePlansAndRows(sql1, "default", "view_count", noData = false)
+    RewriteSuite.comparePlansAndRows(sql1, "default", "view_count", noData = false)
     assert(ViewMetadata.viewCnt.get("default.view_count")(0) == 1)
 
     val sql2 =
@@ -71,10 +76,10 @@ class WashOutMVSuite extends RewriteSuite {
         |ON e1.empid=c1.empid
         |AND c1.deptno=d1.deptno
         |""".stripMargin
-    compareNotRewriteAndRows(sql2, noData = false)
+    RewriteSuite.compareNotRewriteAndRows(sql2, noData = false)
     assert(ViewMetadata.viewCnt.get("default.view_count")(0) == 1)
 
-    comparePlansAndRows(sql1, "default", "view_count", noData = false)
+    RewriteSuite.comparePlansAndRows(sql1, "default", "view_count", noData = false)
     assert(ViewMetadata.viewCnt.get("default.view_count")(0) == 2)
 
     spark.sql(
@@ -107,7 +112,7 @@ class WashOutMVSuite extends RewriteSuite {
         (ViewMetadata.getDefaultDatabase + f".wash_mv$i", Array(curTimes, i)))
       // rewrite sql curTimes.
       for (_ <- 1 to curTimes) {
-        comparePlansAndRows(sql, "default", s"wash_mv$i", noData = true)
+        RewriteSuite.comparePlansAndRows(sql, "default", s"wash_mv$i", noData = true)
       }
     }
     val toDel = viewsInfo.sorted {
@@ -236,7 +241,7 @@ class WashOutMVSuite extends RewriteSuite {
 
   test("auto wash out") {
     spark.sessionState.conf.setConfString(
-      "spark.sql.omnicache.washout.unused.day", "1")
+      "spark.sql.omnicache.washout.unused.day", "0")
     spark.sessionState.conf.setConfString(
       "spark.sql.omnicache.washout.reserve.quantity.byViewCnt", "1")
     spark.sessionState.conf.setConfString(
@@ -247,6 +252,8 @@ class WashOutMVSuite extends RewriteSuite {
       "spark.sql.omnicache.washout.automatic.view.quantity", "1")
     spark.sessionState.conf.setConfString(
       "spark.sql.omnicache.washout.automatic.enable", "true")
+    spark.sessionState.conf.setConfString(
+      "spark.sql.omnicache.washout.automatic.checkTime.interval", "0")
     spark.sql(
       f"""
          |CREATE MATERIALIZED VIEW IF NOT EXISTS wash_mv1
@@ -264,16 +271,248 @@ class WashOutMVSuite extends RewriteSuite {
         |SELECT * FROM COLUMN_TYPE WHERE empid=100;
         |""".stripMargin
     val plan = spark.sql(sql).queryExecution.optimizedPlan
-    assert(isNotRewritedByMV(plan))
+    assert(RewriteSuite.isNotRewritedByMV(plan))
     spark.sessionState.conf.setConfString(
       "spark.sql.omnicache.washout.automatic.enable", "false")
   }
+}
 
-  test("drop all test mv") {
-    spark.sql("WASH OUT ALL MATERIALIZED VIEW")
+class WashOutBase extends AnyFunSuite
+    with BeforeAndAfterAll
+    with BeforeAndAfterEach {
+
+  System.setProperty("HADOOP_USER_NAME", "root")
+  lazy val spark: SparkSession = SparkSession.builder().master("local")
+      .config("spark.sql.extensions", "com.huawei.boostkit.spark.OmniCache")
+      .config("hive.exec.dynamic.partition.mode", "nonstrict")
+      .config("spark.ui.port", "4050")
+      // .config("spark.sql.planChangeLog.level", "WARN")
+      .config("spark.sql.omnicache.logLevel", "WARN")
+      .config("spark.sql.omnicache.dbs", "default")
+      .config("spark.sql.omnicache.metadata.initbyquery.enable", "false")
+      .config("hive.in.test", "true")
+      .config("spark.sql.omnicache.metadata.path", "./user/omnicache/metadata")
+      .config("spark.sql.omnicache.washout.automatic.enable", "false")
+      .enableHiveSupport()
+      .getOrCreate()
+  spark.sparkContext.setLogLevel("WARN")
+  lazy val catalog: SessionCatalog = spark.sessionState.catalog
+
+  override def beforeEach(): Unit = {
+    enableCachePlugin()
   }
 
-  private def loadData[K: Manifest, V: Manifest](file: Path,
+  override def beforeAll(): Unit = {
+    preCreateTable()
+  }
+
+  def preDropTable(): Unit = {
+    if (File.separatorChar == '\\') {
+      return
+    }
+    spark.sql("DROP TABLE IF EXISTS locations").show()
+    spark.sql("DROP TABLE IF EXISTS depts").show()
+    spark.sql("DROP TABLE IF EXISTS emps").show()
+    spark.sql("DROP TABLE IF EXISTS column_type").show()
+  }
+
+  def preCreateTable(): Unit = {
+    disableCachePlugin()
+    preDropTable()
+    if (catalog.tableExists(TableIdentifier("locations"))) {
+      enableCachePlugin()
+      return
+    }
+    spark.sql(
+      """
+        |CREATE TABLE IF NOT EXISTS locations(
+        |  locationid INT,
+        |  state STRING
+        |);
+        |""".stripMargin
+    )
+    spark.sql(
+      """
+        |INSERT INTO TABLE locations VALUES(1,'state1');
+        |""".stripMargin
+    )
+    spark.sql(
+      """
+        |INSERT INTO TABLE locations VALUES(2,'state2');
+        |""".stripMargin
+    )
+
+    spark.sql(
+      """
+        |CREATE TABLE IF NOT EXISTS depts(
+        |  deptno INT,
+        |  deptname STRING
+        |);
+        |""".stripMargin
+    )
+    spark.sql(
+      """
+        |INSERT INTO TABLE depts VALUES(1,'deptname1');
+        |""".stripMargin
+    )
+    spark.sql(
+      """
+        |INSERT INTO TABLE depts VALUES(2,'deptname2');
+        |""".stripMargin
+    )
+    spark.sql(
+      """
+        |INSERT INTO TABLE depts VALUES(3,'deptname3');
+        |""".stripMargin
+    )
+    spark.sql(
+      """
+        |INSERT INTO TABLE depts VALUES(4,'deptname4');
+        |""".stripMargin
+    )
+
+    spark.sql(
+      """
+        |CREATE TABLE IF NOT EXISTS emps(
+        |  empid INT,
+        |  deptno INT,
+        |  locationid INT,
+        |  empname STRING,
+        |  salary DOUBLE
+        |);
+        |""".stripMargin
+    )
+    spark.sql(
+      """
+        |INSERT INTO TABLE emps VALUES(1,1,1,'empname1',1.0);
+        |""".stripMargin
+    )
+    spark.sql(
+      """
+        |INSERT INTO TABLE emps VALUES(2,2,2,'empname2',2.0);
+        |""".stripMargin
+    )
+
+    spark.sql(
+      """
+        |INSERT INTO TABLE emps VALUES(3,null,3,'empname3',3.0);
+        |""".stripMargin
+    )
+
+    spark.sql(
+      """
+        |CREATE TABLE IF NOT EXISTS column_type(
+        |  empid INT,
+        |  deptno INT,
+        |  locationid INT,
+        |  booleantype BOOLEAN,
+        |  bytetype BYTE,
+        |  shorttype SHORT,
+        |  integertype INT,
+        |  longtype LONG,
+        |  floattype FLOAT,
+        |  doubletype DOUBLE,
+        |  datetype DATE,
+        |  timestamptype TIMESTAMP,
+        |  stringtype STRING,
+        |  decimaltype DECIMAL
+        |);
+        |""".stripMargin
+    )
+    spark.sql(
+      """
+        |INSERT INTO TABLE column_type VALUES(
+        |   1,1,1,TRUE,1,1,1,1,1.0,1.0,
+        |   DATE '2022-01-01',
+        |   TIMESTAMP '2022-01-01',
+        |   'stringtype1',1.0
+        |);
+        |""".stripMargin
+    )
+    spark.sql(
+      """
+        |INSERT INTO TABLE column_type VALUES(
+        |   2,2,2,TRUE,2,2,2,2,2.0,2.0,
+        |   DATE '2022-02-02',
+        |   TIMESTAMP '2022-02-02',
+        |   'stringtype2',2.0
+        |);
+        |""".stripMargin
+    )
+    spark.sql(
+      """
+        |INSERT INTO TABLE column_type VALUES(
+        |   1,1,1,null,null,null,null,null,null,null,
+        |   null,
+        |   null,
+        |   null,null
+        |);
+        |""".stripMargin
+    )
+    spark.sql(
+      """
+        |INSERT INTO TABLE column_type VALUES(
+        |   3,3,3,TRUE,3,3,3,3,3.0,3.0,
+        |   DATE '2022-03-03',
+        |   TIMESTAMP '2022-03-03',
+        |   'stringtype3',null
+        |);
+        |""".stripMargin
+    )
+    spark.sql(
+      """
+        |INSERT INTO TABLE column_type VALUES(
+        |   4,4,4,TRUE,4,4,4,4,4.0,4.0,
+        |   DATE '2022-04-04',
+        |   TIMESTAMP '2022-04-04',
+        |   null,4.0
+        |);
+        |""".stripMargin
+    )
+    spark.sql(
+      """
+        |INSERT INTO TABLE column_type VALUES(
+        |   4,4,4,TRUE,4,4,4,4,4.0,4.0,
+        |   DATE '2022-04-04',
+        |   null,
+        |   null,4.0
+        |);
+        |""".stripMargin
+    )
+    spark.sql(
+      """
+        |INSERT INTO TABLE column_type VALUES(
+        |   4,4,4,TRUE,4,4,4,4,4.0,4.0,
+        |   DATE '2022-04-04',
+        |   TIMESTAMP '2022-04-04',
+        |   'stringtype4',null
+        |);
+        |""".stripMargin
+    )
+    spark.sql(
+      """
+        |INSERT INTO TABLE column_type VALUES(
+        |   1,1,2,TRUE,1,1,1,1,1.0,1.0,
+        |   DATE '2022-01-01',
+        |   TIMESTAMP '2022-01-01',
+        |   'stringtype1',1.0
+        |);
+        |""".stripMargin
+    )
+    spark.sql(
+      """
+        |INSERT INTO TABLE column_type VALUES(
+        |   1,1,2,TRUE,1,1,1,1,1.0,1.0,
+        |   DATE '2022-01-02',
+        |   TIMESTAMP '2022-01-01',
+        |   'stringtype1',1.0
+        |);
+        |""".stripMargin
+    )
+    enableCachePlugin()
+  }
+
+  def loadData[K: Manifest, V: Manifest](file: Path,
       buffer: mutable.Map[K, V]): Unit = {
     try {
       val fs = file.getFileSystem(new Configuration)
@@ -291,7 +530,7 @@ class WashOutMVSuite extends RewriteSuite {
     }
   }
 
-  private def saveData[K: Manifest, V: Manifest](file: Path,
+  def saveData[K: Manifest, V: Manifest](file: Path,
       buffer: mutable.Map[K, V]): Unit = {
     try {
       val fs = file.getFileSystem(new Configuration)

@@ -17,6 +17,8 @@
 
 package org.apache.spark.sql.catalyst.optimizer.rules
 
+import org.apache.spark.sql.catalyst.optimizer.rules.RewriteSuite._
+
 class MaterializedViewAggregateRuleSuite extends RewriteSuite {
 
   test("mv_agg1") {
@@ -577,6 +579,29 @@ class MaterializedViewAggregateRuleSuite extends RewriteSuite {
     spark.sql(
       """
         |DROP MATERIALIZED VIEW IF EXISTS mv_agg9;
+        |""".stripMargin
+    )
+  }
+
+  test("drop all mv") {
+    spark.sql(
+      """
+        |DROP MATERIALIZED VIEW IF EXISTS mv_agg1;
+        |""".stripMargin
+    )
+    spark.sql(
+      """
+        |DROP MATERIALIZED VIEW IF EXISTS mv_agg2;
+        |""".stripMargin
+    )
+    spark.sql(
+      """
+        |DROP MATERIALIZED VIEW IF EXISTS mv_agg3;
+        |""".stripMargin
+    )
+    spark.sql(
+      """
+        |DROP MATERIALIZED VIEW IF EXISTS mv_agg4;
         |""".stripMargin
     )
   }

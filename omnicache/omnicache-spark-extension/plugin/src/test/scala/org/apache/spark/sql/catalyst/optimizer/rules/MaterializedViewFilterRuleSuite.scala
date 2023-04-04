@@ -19,6 +19,8 @@ package org.apache.spark.sql.catalyst.optimizer.rules
 
 import com.huawei.boostkit.spark.util.RewriteHelper
 
+import org.apache.spark.sql.catalyst.optimizer.rules.RewriteSuite._
+
 class MaterializedViewFilterRuleSuite extends RewriteSuite {
 
   test("mv_filter1") {

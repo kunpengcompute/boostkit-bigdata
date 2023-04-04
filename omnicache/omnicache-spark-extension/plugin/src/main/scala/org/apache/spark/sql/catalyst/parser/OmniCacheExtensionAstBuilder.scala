@@ -360,14 +360,17 @@ class OmniCacheExtensionAstBuilder(spark: SparkSession, delegate: ParserInterfac
     WashOutMaterializedViewCommand(dropAll, strategy)
   }
 
-  override def visitWashOutStrategy(ctx: WashOutStrategyContext): (String, Int) = {
+  override def visitWashOutStrategy(ctx: WashOutStrategyContext): (String, Option[Int]) = {
     val key = ctx.children.get(0).getText
-    val value = ctx.children.get(1).getText.toInt
-    (key, value)
+    if (ctx.children.size() >= 2) {
+      (key, Some(ctx.children.get(1).getText.toInt))
+    } else {
+      (key, Option.empty)
+    }
   }
 
   override def visitWashOutExpressions(
-      ctx: WashOutExpressionsContext): Option[List[(String, Int)]] = withOrigin(ctx) {
+      ctx: WashOutExpressionsContext): Option[List[(String, Option[Int])]] = withOrigin(ctx) {
     if (ctx.washOutStrategy() != null) {
       Some(ctx.washOutStrategy().asScala.map(visitWashOutStrategy).toList)
     } else {

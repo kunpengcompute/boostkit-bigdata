@@ -53,7 +53,7 @@ object ViewMetadata extends RewriteHelper {
 
   val viewPriority = new ConcurrentHashMap[String, Long]()
 
-  // Map (viewName <- Array(viewCounts, lastUsedMillisecond))
+  // Map (viewName <- Array(viewCounts, lastUsedMillisecond, fileModifyTime))
   val viewCnt = new ConcurrentHashMap[String, Array[Long]]()
 
   var spark: SparkSession = _
@@ -66,6 +66,7 @@ object ViewMetadata extends RewriteHelper {
   var initQueryPlan: Option[LogicalPlan] = None
 
   var washOutTimestamp: Option[Long] = Option.empty
+  var autoWashOutTimestamp: Option[Long] = Option.empty
 
   val STATUS_UN_LOAD = "UN_LOAD"
   val STATUS_LOADING = "LOADING"
@@ -73,14 +74,17 @@ object ViewMetadata extends RewriteHelper {
 
   var status: String = STATUS_UN_LOAD
 
-  private val VIEW_CNT_FILE = "viewCount"
-  private val DEFAULT_DATABASE = "default"
-  private val VIEW_CONTAINS_TABLES_FILE = "viewContainsTables"
-  private val WASH_OUT_TIMESTAMP = "washOutTimestamp"
+  val VIEW_CNT_FILE = "viewCount"
+  val VIEW_CNT_FILE_LOCK = "viewCount.lock"
+  val DEFAULT_DATABASE = "default"
+  val VIEW_CONTAINS_TABLES_FILE = "viewContainsTables"
+  val WASH_OUT_TIMESTAMP = "washOutTimestamp"
 
   private var kryoSerializer: KryoSerializer = _
 
   private val SEPARATOR: Char = 0xA
+
+  val UNLOAD: Int = -1
 
   /**
    * set sparkSession
@@ -222,7 +226,6 @@ object ViewMetadata extends RewriteHelper {
     viewToViewQueryPlan.remove(viewName)
     viewToTablePlan.remove(viewName)
     viewProperties.remove(viewName)
-    viewCnt.remove(viewName)
     tableToViews.forEach { (key, value) =>
       if (value.contains(viewName)) {
         value -= viewName
@@ -258,7 +261,6 @@ object ViewMetadata extends RewriteHelper {
     loadViewMetadataFromFile()
     loadViewPriorityFromFile()
     loadViewCount()
-    loadWashOutTimestamp()
     checkViewMetadataComplete()
   }
 
@@ -397,7 +399,6 @@ object ViewMetadata extends RewriteHelper {
   def saveViewMetadataToFile(dbName: String, viewName: String): Unit = {
     saveViewMetadataToFile(kryoSerializer, dbName, viewName)
     saveViewContainsTablesToFile(dbName, viewName)
-    saveViewCountToFile(dbName)
   }
 
   /**
@@ -434,7 +435,7 @@ object ViewMetadata extends RewriteHelper {
   def loadViewContainsTablesFromFile(dbName: String): mutable.Map[String, (Set[String], Long)] = {
     val jsons = mutable.Map[String, (Set[String], Long)]().empty
     loadDataFromDisk(dbName, VIEW_CONTAINS_TABLES_FILE, isTailLines = true, jsons) {
-      (preData, curData) =>
+      (preData, curData, modifyTime) =>
         for ((view, (tables, time)) <- curData) {
           if (!preData.contains(view) || preData(view)._2 < time) {
             preData += (view -> (tables, time))
@@ -608,7 +609,6 @@ object ViewMetadata extends RewriteHelper {
     removeMVCache(identifier)
     val viewName = formatViewName(identifier)
     fs.delete(new Path(new Path(metadataPath, identifier.database.get), viewName), true)
-    saveViewCountToFile(identifier.database.getOrElse(DEFAULT_DATABASE))
   }
 
   /**
@@ -669,17 +669,31 @@ object ViewMetadata extends RewriteHelper {
     saveMapToDisk(dbName, VIEW_CNT_FILE, data, isAppend = false, lineFeed = false)
   }
 
-  private def loadViewCount(): Unit = {
+  def loadViewCount(): Unit = {
     val dbs = getDBs
-    val viewCounts = mutable.Map[String, Array[Long]]().empty
-    dbs.foreach { db =>
-      viewCounts ++= loadDataFromDisk(db, VIEW_CNT_FILE, isTailLines = true, viewCounts) {
-        (preData, newData) =>
-          for (data <- newData) {
-            preData += data
-          }
-      }
+    dbs.foreach {
+      db =>
+        loadViewCount(db)
     }
+  }
+
+  def loadViewCount(dbName: String): Unit = {
+    // clear viewCnt info in dbName
+    val iterator = viewCnt.entrySet.iterator
+    while (iterator.hasNext) {
+      val entry = iterator.next
+      if (entry.getKey.split("\\.")(0) equals dbName) iterator.remove
+    }
+
+    val viewCounts = mutable.Map[String, Array[Long]]().empty
+    viewCounts ++= loadDataFromDisk(dbName, VIEW_CNT_FILE, isTailLines = true, viewCounts) {
+      (preData, newData, modifyTime) =>
+        for (data <- newData) {
+          val dataWithModifyTime = (data._1, data._2.slice(0, 2) ++ Array(modifyTime))
+          preData += dataWithModifyTime
+        }
+    }
+
     // set view count into ViewMetadata.viewCnt
     for (viewCount <- viewCounts) {
       viewCnt.put(viewCount._1, viewCount._2)
@@ -702,7 +716,10 @@ object ViewMetadata extends RewriteHelper {
       fileName: String,
       isTailLines: Boolean,
       data: mutable.Map[K, V])
-      (addNewDataToPreData: (mutable.Map[K, V], mutable.Map[K, V]) => Unit): mutable.Map[K, V] = {
+      (addNewDataToPreData: (
+          mutable.Map[K, V],
+              mutable.Map[K, V],
+              Long) => Unit): mutable.Map[K, V] = {
 
     val dbPath = new Path(metadataPath, dbName)
     val filePath = new Path(dbPath, fileName)
@@ -713,7 +730,10 @@ object ViewMetadata extends RewriteHelper {
       filePath: Path,
       isTailLines: Boolean,
       data: mutable.Map[K, V])
-      (addNewDataToPreData: (mutable.Map[K, V], mutable.Map[K, V]) => Unit): mutable.Map[K, V] = {
+      (addNewDataToPreData: (
+          mutable.Map[K, V],
+              mutable.Map[K, V],
+              Long) => Unit): mutable.Map[K, V] = {
     val newData = data.empty
     if (!fs.exists(filePath)) {
       return newData
@@ -721,6 +741,7 @@ object ViewMetadata extends RewriteHelper {
     var readLines = OmniCachePluginConfig.getConf.metadataIndexTailLines
     val is = fs.open(filePath)
     var pos = fs.getFileStatus(filePath).getLen - 1
+    val modifyTime = fs.getFileStatus(filePath).getModificationTime
     var lineReady = false
     var bytes = mutable.Seq.empty[Char]
     // tail the file
@@ -743,7 +764,7 @@ object ViewMetadata extends RewriteHelper {
         val line = bytes.mkString("")
         val properties = Json(DefaultFormats)
             .read[mutable.Map[K, V]](line)
-        addNewDataToPreData(newData, properties)
+        addNewDataToPreData(newData, properties, modifyTime)
         lineReady = false
         bytes = mutable.Seq.empty[Char]
 
@@ -822,7 +843,7 @@ object ViewMetadata extends RewriteHelper {
    *
    * @return
    */
-  private def getDBs: Set[String] = {
+  def getDBs: Set[String] = {
     if (OmniCachePluginConfig.getConf.omniCacheDB.nonEmpty) {
       OmniCachePluginConfig.getConf.omniCacheDB
           .split(",").map(_.toLowerCase(Locale.ROOT)).toSet
@@ -856,5 +877,13 @@ object ViewMetadata extends RewriteHelper {
     if (timestamp != null) {
       washOutTimestamp = timestamp.get(WASH_OUT_TIMESTAMP)
     }
+  }
+
+  def getViewCntModifyTime(viewCnt: ConcurrentHashMap[String, Array[Long]]): Option[Long] = {
+    viewCnt.forEach {
+      (_, value) =>
+        return Some(value(2))
+    }
+    Option.empty
   }
 }

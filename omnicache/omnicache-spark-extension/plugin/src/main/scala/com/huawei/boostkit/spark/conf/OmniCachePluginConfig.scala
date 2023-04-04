@@ -93,8 +93,13 @@ class OmniCachePluginConfig(conf: SQLConf) {
       .toInt
 
   // The default unit is "day".
-  def automaticWashOutTimeInterval: Int = conf
+  def autoWashOutTimeInterval: Int = conf
       .getConfString("spark.sql.omnicache.washout.automatic.time.interval", "35")
+      .toInt
+
+  // Check "auto wash out" at intervals during the same session. The default unit is "second".
+  def autoCheckWashOutTimeInterval: Int = conf
+      .getConfString("spark.sql.omnicache.washout.automatic.checkTime.interval", "3600")
       .toInt
 
   // The minimum number of views that trigger automatic wash out.

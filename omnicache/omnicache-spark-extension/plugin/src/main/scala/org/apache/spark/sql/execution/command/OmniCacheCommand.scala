@@ -20,7 +20,8 @@ package org.apache.spark.sql.execution.command
 import com.huawei.boostkit.spark.conf.OmniCachePluginConfig
 import com.huawei.boostkit.spark.conf.OmniCachePluginConfig._
 import com.huawei.boostkit.spark.util.{RewriteHelper, ViewMetadata}
-import com.huawei.boostkit.spark.util.ViewMetadata.formatViewName
+import com.huawei.boostkit.spark.util.ViewMetadata._
+import com.huawei.boostkit.spark.util.lock.{FileLock, OmniCacheAtomic}
 import java.io.{FileNotFoundException, IOException}
 import java.net.URI
 import java.rmi.UnexpectedException
@@ -63,6 +64,7 @@ case class OmniCacheCreateMvCommand(
   override def run(sparkSession: SparkSession, child: SparkPlan): Seq[Row] = {
     try {
       ViewMetadata.init(sparkSession)
+      loadViewCount()
       val sessionState = sparkSession.sessionState
       val databaseName = databaseNameOption.getOrElse(sessionState.catalog.getCurrentDatabase)
       val identifier = TableIdentifier(name, Option(databaseName))
@@ -124,10 +126,25 @@ case class OmniCacheCreateMvCommand(
 
       CommandUtils.updateTableStats(sparkSession, table)
 
-      // init ViewMetadata.viewCnt
-      ViewMetadata.viewCnt.put(
-        formatViewName(table.identifier),
-        Array(0, System.currentTimeMillis()))
+      // atomic save ViewMetadata.viewCnt
+      val dbName = table.identifier.database.getOrElse(DEFAULT_DATABASE)
+      val dbPath = new Path(metadataPath, dbName)
+      val dbViewCnt = new Path(dbPath, VIEW_CNT_FILE)
+      val fileLock = FileLock(fs, new Path(dbPath, VIEW_CNT_FILE_LOCK))
+      OmniCacheAtomic.funcWithSpinLock(fileLock) {
+        () =>
+          val viewName = formatViewName(table.identifier)
+          if (fs.exists(dbViewCnt)) {
+            val curModifyTime = fs.getFileStatus(dbViewCnt).getModificationTime
+            if (ViewMetadata.getViewCntModifyTime(viewCnt).getOrElse(0L) != curModifyTime) {
+              loadViewCount(dbName)
+            }
+          }
+          ViewMetadata.viewCnt.put(
+            viewName, Array(0, System.currentTimeMillis(), UNLOAD))
+          saveViewCountToFile(dbName)
+          loadViewCount(dbName)
+      }
 
       ViewMetadata.addCatalogTableToCache(table)
     } catch {
@@ -214,6 +231,25 @@ case class DropMaterializedViewCommand(
       catalog.dropTable(tableName, ifExists, purge)
       // remove mv from cache
       ViewMetadata.deleteViewMetadata(tableName)
+
+      // atomic del ViewMetadata.viewCnt
+      val dbName = tableName.database.getOrElse(DEFAULT_DATABASE)
+      val dbPath = new Path(metadataPath, dbName)
+      val dbViewCnt = new Path(dbPath, VIEW_CNT_FILE)
+      val filelock = FileLock(fs, new Path(dbPath, VIEW_CNT_FILE_LOCK))
+      OmniCacheAtomic.funcWithSpinLock(filelock) {
+        () =>
+          val viewName = formatViewName(tableName)
+          if (fs.exists(dbViewCnt)) {
+            val curModifyTime = fs.getFileStatus(dbViewCnt).getModificationTime
+            if (ViewMetadata.getViewCntModifyTime(viewCnt).getOrElse(0L) != curModifyTime) {
+              loadViewCount(dbName)
+            }
+          }
+          ViewMetadata.viewCnt.remove(viewName)
+          saveViewCountToFile(dbName)
+          loadViewCount(dbName)
+      }
     } else if (ifExists) {
       // no-op
     } else {
@@ -563,33 +599,33 @@ case class RefreshMaterializedViewCommand(
  */
 case class WashOutMaterializedViewCommand(
     dropAll: Boolean,
-    strategy: Option[List[(String, Int)]]) extends RunnableCommand {
+    strategy: Option[List[(String, Option[Int])]]) extends RunnableCommand {
 
   private val logFlag = "[OmniCache]"
 
   override def run(sparkSession: SparkSession): Seq[Row] = {
     ViewMetadata.init(sparkSession)
+    loadViewCount()
     if (dropAll) {
       washOutAllMV()
       return Seq.empty[Row]
     }
     if (strategy.isDefined) {
       strategy.get.foreach {
-        infos: (String, Int) =>
+        infos: (String, Option[Int]) =>
           infos._1 match {
             case UNUSED_DAYS =>
-              washOutByUnUsedDays(Some(infos._2))
+              washOutByUnUsedDays(infos._2)
             case RESERVE_QUANTITY_BY_VIEW_COUNT =>
-              washOutByReserveQuantity(Some(infos._2))
+              washOutByReserveQuantity(infos._2)
             case DROP_QUANTITY_BY_SPACE_CONSUMED =>
-              washOutViewsBySpace(Some(infos._2))
+              washOutViewsBySpace(infos._2)
             case _ =>
           }
       }
     } else {
       // default wash out strategy.
       washOutByUnUsedDays(Option.empty)
-      washOutByReserveQuantity(Option.empty)
     }
 
     // save wash out timestamp

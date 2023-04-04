@@ -20,7 +20,10 @@ package org.apache.spark.sql.catalyst.optimizer.rules
 import com.google.common.collect._
 import com.huawei.boostkit.spark.conf.OmniCachePluginConfig
 import com.huawei.boostkit.spark.util._
+import com.huawei.boostkit.spark.util.ViewMetadata._
+import com.huawei.boostkit.spark.util.lock.{FileLock, OmniCacheAtomic}
 import org.apache.calcite.util.graph.{DefaultEdge, Graphs}
+import org.apache.hadoop.fs.Path
 import scala.collection.{mutable, JavaConverters}
 import scala.util.control.Breaks
 
@@ -184,9 +187,26 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
           }
           assert(viewDatabase.isDefined)
           if (RewriteHelper.containsMV(newViewTablePlan.get)) {
-            val preViewCnt = ViewMetadata.viewCnt.getOrDefault(
-              viewName, Array[Long](0, System.currentTimeMillis()))
-            ViewMetadata.viewCnt.put(viewName, Array(preViewCnt(0) + 1, System.currentTimeMillis()))
+            // atomic update ViewMetadata.viewCnt
+            val dbName = viewName.split("\\.")(0)
+            val dbPath = new Path(metadataPath, dbName)
+            val dbViewCnt = new Path(dbPath, VIEW_CNT_FILE)
+            val fileLock = FileLock(fs, new Path(dbPath, VIEW_CNT_FILE_LOCK))
+            OmniCacheAtomic.funcWithSpinLock(fileLock) {
+              () =>
+                if (fs.exists(dbViewCnt)) {
+                  val curModifyTime = fs.getFileStatus(dbViewCnt).getModificationTime
+                  if (ViewMetadata.getViewCntModifyTime(viewCnt).getOrElse(0L) != curModifyTime) {
+                    loadViewCount(dbName)
+                  }
+                }
+                val preViewCnt = ViewMetadata.viewCnt.getOrDefault(
+                  viewName, Array[Long](0, System.currentTimeMillis()))
+                ViewMetadata.viewCnt.put(
+                  viewName, Array(preViewCnt(0) + 1, System.currentTimeMillis()))
+                saveViewCountToFile(dbName)
+                loadViewCount(dbName)
+            }
           }
           finalPlan = newViewTablePlan.get
           finalPlan = sparkSession.sessionState.analyzer.execute(finalPlan)

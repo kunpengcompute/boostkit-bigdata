@@ -19,6 +19,8 @@ package org.apache.spark.sql.catalyst.optimizer.rules
 
 import com.huawei.boostkit.spark.util.RewriteHelper.{disableCachePlugin, enableCachePlugin}
 
+import org.apache.spark.sql.catalyst.optimizer.rules.RewriteSuite._
+
 class MaterializedViewLeftSemiJoinRuleSuite extends RewriteSuite {
 
   test("mv_left_semi_join") {

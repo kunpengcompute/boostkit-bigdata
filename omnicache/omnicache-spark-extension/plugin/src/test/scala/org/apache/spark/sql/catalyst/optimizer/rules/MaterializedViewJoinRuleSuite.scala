@@ -19,6 +19,8 @@ package org.apache.spark.sql.catalyst.optimizer.rules
 
 import com.huawei.boostkit.spark.util.RewriteHelper
 
+import org.apache.spark.sql.catalyst.optimizer.rules.RewriteSuite._
+
 class MaterializedViewJoinRuleSuite extends RewriteSuite {
 
   test("mv_join1") {
@@ -274,5 +276,18 @@ class MaterializedViewJoinRuleSuite extends RewriteSuite {
   test("mv_join2_disable") {
     val sql = "ALTER MATERIALIZED VIEW mv_join2 DISABLE REWRITE;"
     spark.sql(sql).show()
+  }
+
+  test("join all mv") {
+    spark.sql(
+      """
+        |DROP MATERIALIZED VIEW IF EXISTS mv_join1;
+        |""".stripMargin
+    )
+    spark.sql(
+      """
+        |DROP MATERIALIZED VIEW IF EXISTS mv_join2;
+        |""".stripMargin
+    )
   }
 }

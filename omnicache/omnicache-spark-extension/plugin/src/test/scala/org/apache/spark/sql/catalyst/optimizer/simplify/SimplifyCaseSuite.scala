@@ -21,6 +21,7 @@ import com.huawei.boostkit.spark.util.ExprSimplifier
 
 import org.apache.spark.sql.catalyst.expressions.Expression
 import org.apache.spark.sql.catalyst.optimizer.rules.RewriteSuite
+import org.apache.spark.sql.catalyst.optimizer.rules.RewriteSuite._
 import org.apache.spark.sql.catalyst.plans.logical.Project
 
 class SimplifyCaseSuite extends RewriteSuite {
