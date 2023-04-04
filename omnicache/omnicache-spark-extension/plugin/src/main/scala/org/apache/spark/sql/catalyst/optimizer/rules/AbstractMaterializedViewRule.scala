@@ -208,6 +208,9 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
                 loadViewCount(dbName)
             }
           }
+
+          ViewMetadata.checkViewDataReady(viewName)
+
           finalPlan = newViewTablePlan.get
           finalPlan = sparkSession.sessionState.analyzer.execute(finalPlan)
           usingMvInfos += viewName -> viewDatabase.get

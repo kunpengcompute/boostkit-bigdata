@@ -61,7 +61,7 @@ class OmniCachePluginConfig(conf: SQLConf) {
 
   // set parsed sql as JobDescription
   def enableSqlLog: Boolean = conf
-      .getConfString("spark.sql.omnicache.log.enable", "false")
+      .getConfString("spark.sql.omnicache.log.enable", "true")
       .toBoolean
 
   // omnicache metadata path
@@ -128,6 +128,9 @@ object OmniCachePluginConfig {
 
   // mv latest update time
   val MV_LATEST_UPDATE_TIME = "spark.omnicache.latest.update.time"
+
+  // spark job descriptor
+  val SPARK_JOB_DESCRIPTION = "spark.job.description"
 
   var ins: Option[OmniCachePluginConfig] = None
 
