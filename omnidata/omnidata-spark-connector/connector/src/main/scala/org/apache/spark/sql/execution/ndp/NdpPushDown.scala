@@ -23,7 +23,7 @@ import java.util.{Locale, Properties}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{PushDownData, PushDownManager, SparkSession}
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.{And, Attribute, AttributeReference, BinaryExpression, Expression, NamedExpression, PredicateHelper, UnaryExpression}
+import org.apache.spark.sql.catalyst.expressions.{Alias, And, Attribute, AttributeReference, BinaryExpression, Expression, NamedExpression, PredicateHelper, UnaryExpression}
 import org.apache.spark.sql.catalyst.expressions.aggregate.{Partial, PartialMerge}
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.{FileSourceScanExec, FilterExec, GlobalLimitExec, LeafExecNode, LocalLimitExec, NdpFileSourceScanExec, ProjectExec, SparkPlan}
@@ -153,13 +153,34 @@ case class NdpPushDown(sparkSession: SparkSession)
   def shouldPushDown(agg: BaseAggregateExec, scan: NdpSupport): Boolean = {
     scan.aggExeInfos.isEmpty &&
       agg.output.forall(x => attrWhiteList.contains(x.dataType.typeName)) &&
-      agg.aggregateExpressions.forall{ e =>
-      aggFuncWhiteList.contains(e.aggregateFunction.prettyName) &&
-        (e.mode.equals(PartialMerge) || e.mode.equals(Partial)) &&
-        !e.isDistinct &&
-        e.aggregateFunction.children.forall { g =>
-          aggExpressionWhiteList.contains(g.prettyName)
-        }
+      agg.aggregateExpressions.forall { e =>
+        aggFuncWhiteList.contains(e.aggregateFunction.prettyName) &&
+          (e.mode.equals(PartialMerge) || e.mode.equals(Partial)) &&
+          !e.isDistinct &&
+          e.aggregateFunction.children.forall { g =>
+            aggExpressionWhiteList.contains(g.prettyName)
+          }
+      } &&
+      isSimpleExpressions(agg.groupingExpressions)
+  }
+
+  def isSimpleExpressions(groupingExpressions: Seq[NamedExpression]): Boolean = {
+    groupingExpressions.foreach(ge =>
+      if (!isSimpleExpression(ge)) {
+        return false
+      }
+    )
+    true
+  }
+
+  def isSimpleExpression(groupingExpression: NamedExpression): Boolean = {
+    groupingExpression match {
+      case _: AttributeReference =>
+        true
+      case alias: Alias =>
+        alias.child.isInstanceOf[AttributeReference]
+      case _ =>
+        false
     }
   }
 

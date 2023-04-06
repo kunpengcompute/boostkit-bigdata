@@ -32,6 +32,7 @@ import io.airlift.slice.Slices;
 import io.prestosql.spi.type.DateType;
 import io.prestosql.spi.type.Decimals;
 
+import org.apache.spark.sql.catalyst.util.RebaseDateTime;
 import org.apache.spark.sql.execution.vectorized.OmniColumnVector;
 import org.apache.spark.sql.execution.vectorized.OnHeapColumnVector;
 import org.apache.spark.sql.execution.vectorized.WritableColumnVector;
@@ -431,8 +432,12 @@ public class PageDecoding extends AbstractDecoding<Optional<WritableColumnVector
                 columnVector.putBoolean(position, sliceInput.readByte() != 0);
                 break;
             case "int":
-            case "date":
                 columnVector.putInt(position, sliceInput.readInt());
+                break;
+            case "date":
+                int src = sliceInput.readInt();
+                int trans = RebaseDateTime.rebaseJulianToGregorianDays(src);
+                columnVector.putInt(position, trans);
                 break;
             case "short":
                 columnVector.putShort(position, sliceInput.readShort());

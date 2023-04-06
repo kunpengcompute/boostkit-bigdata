@@ -322,12 +322,12 @@ public class DataIoAdapter {
         isPushDownAgg = true;
     }
 
-    private RowExpression extractNamedExpression(Expression namedExpression) {
-        Type prestoType = NdpUtils.transOlkDataType(namedExpression.dataType(), false);
+    private RowExpression extractNamedExpression(NamedExpression namedExpression) {
+        Type prestoType = NdpUtils.transOlkDataType(((Expression) namedExpression).dataType(), false);
         int aggProjectionId;
-        String aggColumnName = namedExpression.toString().split("#")[0].toLowerCase(Locale.ENGLISH);
+        String aggColumnName = namedExpression.name();
         columnOrdersList.add(columnOrder++);
-        columnTypesList.add(NdpUtils.transDataIoDataType(namedExpression.dataType()));
+        columnTypesList.add(NdpUtils.transDataIoDataType(((Expression) namedExpression).dataType()));
 
         if (null != fieldMap.get(aggColumnName)) {
             aggProjectionId = fieldMap.get(aggColumnName);
@@ -490,8 +490,8 @@ public class DataIoAdapter {
                 omnidataProjections.add(createAggProjection(expression));
                 int projectionId = fieldMap.size();
                 fieldMap.put(aggregateFunctionName, projectionId);
-                if (aggregateFunctionType.equals(AggregateFunctionType.Count) ||
-                        aggregateFunctionType.equals(AggregateFunctionType.Average)) {
+                if (aggregateFunctionType.equals(AggregateFunctionType.Count)
+                        || aggregateFunctionType.equals(AggregateFunctionType.Average)) {
                     prestoType = NdpUtils.transOlkDataType(expression.dataType(), false);
                 }
                 omnidataTypes.add(prestoType);
@@ -547,7 +547,7 @@ public class DataIoAdapter {
         Map<String, AggregationInfo.AggregateFunction> aggregationMap = new LinkedHashMap<>();
         boolean isEmpty = true;
         for (NamedExpression namedExpression : namedExpressions) {
-            RowExpression groupingKey = extractNamedExpression((Expression) namedExpression);
+            RowExpression groupingKey = extractNamedExpression(namedExpression);
             groupingKeys.add(groupingKey);
             isEmpty = false;
         }
@@ -680,9 +680,20 @@ public class DataIoAdapter {
                 return getRowExpression(left,
                         operatorName, rightExpressions);
             case In:
+                if (!(filterExpression instanceof In)) {
+                    return resRowExpression;
+                }
+                In in = (In) filterExpression;
                 List<Expression> rightExpression =
-                        JavaConverters.seqAsJavaList(((In) filterExpression).list());
-                return getRowExpression(((In) filterExpression).value(), "in", rightExpression);
+                        JavaConverters.seqAsJavaList(in.list());
+                // check if filed on right
+                if (rightExpression.size() == 1 && rightExpression.get(0) instanceof AttributeReference
+                        && in.value() instanceof Literal) {
+                    List<Expression> newRightExpression = new ArrayList<>();
+                    newRightExpression.add(in.value());
+                    return getRowExpression(rightExpression.get(0), "in", newRightExpression);
+                }
+                return getRowExpression(in.value(), "in", rightExpression);
             case HiveSimpleUDF:
                 return getRowExpression(filterExpression,
                         ((HiveSimpleUDF) filterExpression).name(), rightExpressions);

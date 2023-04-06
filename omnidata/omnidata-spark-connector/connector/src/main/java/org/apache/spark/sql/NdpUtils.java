@@ -141,7 +141,7 @@ public class NdpUtils {
                 List<NamedExpression> namedExpressions = JavaConverters.seqAsJavaList(
                         aggExeInfoTemp.groupingExpressions());
                 for (NamedExpression namedExpression : namedExpressions) {
-                    columnName = namedExpression.toString().split("#")[0];
+                    columnName = namedExpression.name();
                     columnTempId = NdpUtils.getColumnId(namedExpression.toString());
                     break;
                 }
@@ -172,7 +172,11 @@ public class NdpUtils {
             String adf = columnArrayId.substring(0, columnArrayId.length() - 1);
             columnTempId = Integer.parseInt(adf);
         } else {
-            columnTempId = Integer.parseInt(columnArrayId);
+            if (columnArrayId.contains(")")) {
+                columnTempId = Integer.parseInt(columnArrayId.split("\\)")[0].replaceAll("[^(\\d+)]", ""));
+            } else {
+                columnTempId = Integer.parseInt(columnArrayId);
+            }
         }
         return columnTempId;
     }
@@ -319,31 +323,58 @@ public class NdpUtils {
         }
     }
 
+    /**
+     * Convert decimal data to a constant expression
+     *
+     * @param strType       dataType
+     * @param argumentValue value
+     * @param argumentType  argumentType
+     * @return ConstantExpression
+     */
+    public static ConstantExpression transArgumentDecimalData(String strType, String argumentValue, Type argumentType) {
+        String[] parameter = strType.split("\\(")[1].split("\\)")[0].split(",");
+        int precision = Integer.parseInt(parameter[0]);
+        int scale = Integer.parseInt(parameter[1]);
+        if (argumentValue.equals("null")) {
+            return new ConstantExpression(null, DecimalType.createDecimalType(precision, scale));
+        }
+        BigInteger bigInteger =
+                Decimals.rescale(new BigDecimal(argumentValue), (DecimalType) argumentType).unscaledValue();
+        if ("ShortDecimalType".equals(argumentType.getClass().getSimpleName())) { //short decimal type
+            return new ConstantExpression(bigInteger.longValue(), DecimalType.createDecimalType(precision, scale));
+        } else if ("LongDecimalType".equals(argumentType.getClass().getSimpleName())) { //long decimal type
+            Slice argumentValueSlice = Decimals.encodeUnscaledValue(bigInteger);
+            long[] base = new long[2];
+            base[0] = argumentValueSlice.getLong(0);
+            base[1] = argumentValueSlice.getLong(8);
+            try {
+                Field filed = Slice.class.getDeclaredField("base");
+                filed.setAccessible(true);
+                filed.set(argumentValueSlice, base);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            return new ConstantExpression(argumentValueSlice, DecimalType.createDecimalType(precision, scale));
+        } else {
+            throw new UnsupportedOperationException("unsupported data type " + argumentType.getClass().getSimpleName());
+        }
+    }
+
+    /**
+     * Convert data to a constant expression
+     * process 'null' data
+     *
+     * @param argumentValue value
+     * @param argumentType  argumentType
+     * @return ConstantExpression
+     */
     public static ConstantExpression transArgumentData(String argumentValue, Type argumentType) {
         String strType = argumentType.toString().toLowerCase(Locale.ENGLISH);
         if (strType.contains("decimal")) {
-            String[] parameter = strType.split("\\(")[1].split("\\)")[0].split(",");
-            int precision = Integer.parseInt(parameter[0]);
-            int scale = Integer.parseInt(parameter[1]);
-            BigInteger bigInteger = Decimals.rescale(new BigDecimal(argumentValue), (DecimalType) argumentType).unscaledValue();
-            if ("ShortDecimalType".equals(argumentType.getClass().getSimpleName())) { //short decimal type
-                return new ConstantExpression(bigInteger.longValue(), DecimalType.createDecimalType(precision, scale));
-            } else if ("LongDecimalType".equals(argumentType.getClass().getSimpleName())) { //long decimal type
-                Slice argumentValueSlice = Decimals.encodeUnscaledValue(bigInteger);
-                long[] base = new long[2];
-                base[0] = argumentValueSlice.getLong(0);
-                base[1] = argumentValueSlice.getLong(8);
-                try {
-                    Field filed = Slice.class.getDeclaredField("base");
-                    filed.setAccessible(true);
-                    filed.set(argumentValueSlice, base);
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-                return new ConstantExpression(argumentValueSlice, DecimalType.createDecimalType(precision, scale));
-            } else {
-                throw new UnsupportedOperationException("unsupported data type " + argumentType.getClass().getSimpleName());
-            }
+            return transArgumentDecimalData(strType, argumentValue, argumentType);
+        }
+        if (argumentValue.equals("null") && !strType.equals("varchar")) {
+            return new ConstantExpression(null, argumentType);
         }
         switch (strType) {
             case "bigint":
@@ -351,8 +382,7 @@ public class NdpUtils {
             case "date":
             case "tinyint":
             case "smallint":
-                long longValue = Long.parseLong(argumentValue);
-                return new ConstantExpression(longValue, argumentType);
+                return new ConstantExpression(Long.parseLong(argumentValue), argumentType);
             case "real":
                 return new ConstantExpression(
                         (long) floatToIntBits(parseFloat(argumentValue)), argumentType);
@@ -374,7 +404,8 @@ public class NdpUtils {
                     }
                 } else {
                     int millisecondsDiffMicroseconds = 3;
-                    timestampValue = Long.parseLong(argumentValue.substring(0, argumentValue.length() - millisecondsDiffMicroseconds)) + rawOffset;
+                    timestampValue = Long.parseLong(argumentValue.substring(0,
+                            argumentValue.length() - millisecondsDiffMicroseconds)) + rawOffset;
                 }
                 return new ConstantExpression(timestampValue, argumentType);
             default:
