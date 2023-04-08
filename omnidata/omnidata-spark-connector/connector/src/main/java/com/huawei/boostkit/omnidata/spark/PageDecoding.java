@@ -33,6 +33,7 @@ import io.prestosql.spi.type.DateType;
 import io.prestosql.spi.type.Decimals;
 
 import org.apache.spark.sql.catalyst.util.RebaseDateTime;
+import org.apache.spark.sql.execution.util.SparkMemoryUtils;
 import org.apache.spark.sql.execution.vectorized.OmniColumnVector;
 import org.apache.spark.sql.execution.vectorized.OnHeapColumnVector;
 import org.apache.spark.sql.execution.vectorized.WritableColumnVector;
@@ -65,6 +66,7 @@ public class PageDecoding extends AbstractDecoding<Optional<WritableColumnVector
     private static Field filedElementsAppended;
 
     static {
+        SparkMemoryUtils.init();
         try {
             filedElementsAppended = WritableColumnVector.class.getDeclaredField("elementsAppended");
             filedElementsAppended.setAccessible(true);
