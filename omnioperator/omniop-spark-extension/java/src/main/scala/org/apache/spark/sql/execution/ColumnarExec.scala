@@ -285,7 +285,8 @@ case class RowToOmniColumnarExec(child: SparkPlan) extends RowToColumnarTransiti
 }
 
 
-case class OmniColumnarToRowExec(child: SparkPlan) extends ColumnarToRowTransition {
+case class OmniColumnarToRowExec(child: SparkPlan,
+                                 mayPartialFetch: Boolean = true) extends ColumnarToRowTransition {
   assert(child.supportsColumnar)
 
   override def nodeName: String = "OmniColumnarToRow"
@@ -302,6 +303,14 @@ case class OmniColumnarToRowExec(child: SparkPlan) extends ColumnarToRowTransiti
     "omniColumnarToRowTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omniColumnar to row")
   )
 
+  override def verboseStringWithOperatorId(): String = {
+    s"""
+       |$formattedNodeName
+       |$simpleStringWithNodeId
+       |${ExplainUtils.generateFieldString("mayPartialFetch", String.valueOf(mayPartialFetch))}
+       |""".stripMargin
+  }
+
   override def doExecute(): RDD[InternalRow] = {
     val numOutputRows = longMetric("numOutputRows")
     val numInputBatches = longMetric("numInputBatches")
@@ -310,7 +319,7 @@ case class OmniColumnarToRowExec(child: SparkPlan) extends ColumnarToRowTransiti
     // plan (this) in the closure.
     val localOutput = this.output
     child.executeColumnar().mapPartitionsInternal { batches =>
-      ColumnarBatchToInternalRow.convert(localOutput, batches, numOutputRows, numInputBatches, omniColumnarToRowTime)
+      ColumnarBatchToInternalRow.convert(localOutput, batches, numOutputRows, numInputBatches, omniColumnarToRowTime, mayPartialFetch)
     }
   }
 }
@@ -319,7 +328,8 @@ object ColumnarBatchToInternalRow {
 
   def convert(output: Seq[Attribute], batches: Iterator[ColumnarBatch],
               numOutputRows: SQLMetric, numInputBatches: SQLMetric,
-              rowToOmniColumnarTime: SQLMetric): Iterator[InternalRow] = {
+              rowToOmniColumnarTime: SQLMetric,
+              mayPartialFetch: Boolean = true): Iterator[InternalRow] = {
     val startTime = System.nanoTime()
     val toUnsafe = UnsafeProjection.create(output, output)
 
@@ -345,11 +355,13 @@ object ColumnarBatchToInternalRow {
         val numOutputRowsMetric: SQLMetric = numOutputRows
         var closed = false
 
-        SparkMemoryUtils.addLeakSafeTaskCompletionListener { _ =>
-          // only invoke if fetch partial rows of batch
-          if (!closed) {
-            toClosedVecs.foreach {vec =>
-              vec.close()
+        // only invoke if fetch partial rows of batch
+        if (mayPartialFetch) {
+          SparkMemoryUtils.addLeakSafeTaskCompletionListener { _ =>
+            if (!closed) {
+              toClosedVecs.foreach {vec =>
+                vec.close()
+              }
             }
           }
         }

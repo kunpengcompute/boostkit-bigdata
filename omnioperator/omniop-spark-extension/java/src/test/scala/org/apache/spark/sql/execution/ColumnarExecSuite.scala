@@ -42,37 +42,37 @@ class ColumnarExecSuite extends ColumnarSparkPlanTest {
 
   test("validate columnar transfer exec happened") {
     val sql1 = "SELECT a + 1 FROM dealer"
-    assertColumnarToRowOmniAndSparkResultEqual(sql1)
+    assertColumnarToRowOmniAndSparkResultEqual(sql1, false)
   }
 
   test("spark limit with columnarToRow as child") {
 
     // fetch parital
     val sql1 = "select * from (select a, b+2 from dealer order by a, b+2) limit 2"
-    assertColumnarToRowOmniAndSparkResultEqual(sql1)
+    assertColumnarToRowOmniAndSparkResultEqual(sql1, false)
 
     // fetch all
     val sql2 = "select a, b+2 from dealer limit 6"
-    assertColumnarToRowOmniAndSparkResultEqual(sql2)
+    assertColumnarToRowOmniAndSparkResultEqual(sql2, true)
 
     // fetch all
     val sql3 = "select a, b+2 from dealer limit 10"
-    assertColumnarToRowOmniAndSparkResultEqual(sql3)
+    assertColumnarToRowOmniAndSparkResultEqual(sql3, true)
 
     // fetch parital
     val sql4 = "select a, b+2 from dealer order by a limit 2"
-    assertColumnarToRowOmniAndSparkResultEqual(sql4)
+    assertColumnarToRowOmniAndSparkResultEqual(sql4, false)
 
     // fetch all
     val sql5 = "select a, b+2 from dealer order by a limit 6"
-    assertColumnarToRowOmniAndSparkResultEqual(sql5)
+    assertColumnarToRowOmniAndSparkResultEqual(sql5, false)
 
     // fetch all
     val sql6 = "select a, b+2 from dealer order by a limit 10"
-    assertColumnarToRowOmniAndSparkResultEqual(sql6)
+    assertColumnarToRowOmniAndSparkResultEqual(sql6, false)
   }
 
-  private def assertColumnarToRowOmniAndSparkResultEqual(sql: String): Unit = {
+  private def assertColumnarToRowOmniAndSparkResultEqual(sql: String, mayPartialFetch: Boolean = true): Unit = {
 
     spark.conf.set("spark.omni.sql.columnar.takeOrderedAndProject", true)
     spark.conf.set("spark.omni.sql.columnar.project", true)
@@ -80,6 +80,9 @@ class ColumnarExecSuite extends ColumnarSparkPlanTest {
     val omniPlan = omniResult.queryExecution.executedPlan
     assert(omniPlan.find(_.isInstanceOf[OmniColumnarToRowExec]).isDefined,
       s"SQL:${sql}\n@OmniEnv no OmniColumnarToRowExec,omniPlan:${omniPlan}")
+    assert(omniPlan.find(_.isInstanceOf[OmniColumnarToRowExec]).get
+      .asInstanceOf[OmniColumnarToRowExec].mayPartialFetch == mayPartialFetch,
+      s"SQL:${sql}\n@OmniEnv OmniColumnarToRowExec mayPartialFetch value wrong:${omniPlan}")
 
     spark.conf.set("spark.omni.sql.columnar.takeOrderedAndProject", false)
     spark.conf.set("spark.omni.sql.columnar.project", false)
