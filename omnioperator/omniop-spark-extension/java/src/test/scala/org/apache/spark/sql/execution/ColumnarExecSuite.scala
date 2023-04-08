@@ -18,33 +18,82 @@
 
 package org.apache.spark.sql.execution
 
-import org.apache.spark.sql.Row
+import org.apache.spark.sql.{DataFrame, Row}
 import org.apache.spark.sql.types.{BooleanType, DoubleType, IntegerType, StructType}
 
 class ColumnarExecSuite extends ColumnarSparkPlanTest {
-  private lazy val df = spark.createDataFrame(
-    sparkContext.parallelize(Seq(
-      Row(1, 2.0, false),
-      Row(1, 2.0, false),
-      Row(2, 1.0, false),
-      Row(null, null, false),
-      Row(null, 5.0, false),
-      Row(6, null, false)
-    )), new StructType().add("a", IntegerType).add("b", DoubleType)
-      .add("c", BooleanType))
+  private var dealer: DataFrame = _
 
-  test("validate columnar transfer exec happened") {
-    val res = df.filter("a > 1")
-    print(res.queryExecution.executedPlan)
-    assert(res.queryExecution.executedPlan.find(_.isInstanceOf[RowToOmniColumnarExec]).isDefined, s"RowToOmniColumnarExec not happened, executedPlan as follows： \n${res.queryExecution.executedPlan}")
+  protected override def beforeAll(): Unit = {
+    super.beforeAll()
+
+    dealer = spark.createDataFrame(
+      sparkContext.parallelize(Seq(
+        Row(1, 2.0, false),
+        Row(1, 2.0, false),
+        Row(2, 1.0, false),
+        Row(null, null, false),
+        Row(null, 5.0, false),
+        Row(6, null, false)
+      )), new StructType().add("a", IntegerType).add("b", DoubleType)
+        .add("c", BooleanType))
+    dealer.createOrReplaceTempView("dealer")
   }
 
-  test("validate data type convert") {
-    val res = df.filter("a > 1")
-    print(res.queryExecution.executedPlan)
+  test("validate columnar transfer exec happened") {
+    val sql1 = "SELECT a + 1 FROM dealer"
+    assertColumnarToRowOmniAndSparkResultEqual(sql1, false)
+  }
 
-    checkAnswer(
-      df.filter("a > 1"),
-      Row(2, 1.0, false) :: Row(6, null, false) :: Nil)
+  test("spark limit with columnarToRow as child") {
+
+    // fetch parital
+    val sql1 = "select * from (select a, b+2 from dealer order by a, b+2) limit 2"
+    assertColumnarToRowOmniAndSparkResultEqual(sql1, false)
+
+    // fetch all
+    val sql2 = "select a, b+2 from dealer limit 6"
+    assertColumnarToRowOmniAndSparkResultEqual(sql2, true)
+
+    // fetch all
+    val sql3 = "select a, b+2 from dealer limit 10"
+    assertColumnarToRowOmniAndSparkResultEqual(sql3, true)
+
+    // fetch parital
+    val sql4 = "select a, b+2 from dealer order by a limit 2"
+    assertColumnarToRowOmniAndSparkResultEqual(sql4, false)
+
+    // fetch all
+    val sql5 = "select a, b+2 from dealer order by a limit 6"
+    assertColumnarToRowOmniAndSparkResultEqual(sql5, false)
+
+    // fetch all
+    val sql6 = "select a, b+2 from dealer order by a limit 10"
+    assertColumnarToRowOmniAndSparkResultEqual(sql6, false)
+  }
+
+  private def assertColumnarToRowOmniAndSparkResultEqual(sql: String, mayPartialFetch: Boolean = true): Unit = {
+
+    spark.conf.set("spark.omni.sql.columnar.takeOrderedAndProject", true)
+    spark.conf.set("spark.omni.sql.columnar.project", true)
+    val omniResult = spark.sql(sql)
+    val omniPlan = omniResult.queryExecution.executedPlan
+    assert(omniPlan.find(_.isInstanceOf[OmniColumnarToRowExec]).isDefined,
+      s"SQL:${sql}\n@OmniEnv no OmniColumnarToRowExec,omniPlan:${omniPlan}")
+    assert(omniPlan.find(_.isInstanceOf[OmniColumnarToRowExec]).get
+      .asInstanceOf[OmniColumnarToRowExec].mayPartialFetch == mayPartialFetch,
+      s"SQL:${sql}\n@OmniEnv OmniColumnarToRowExec mayPartialFetch value wrong:${omniPlan}")
+
+    spark.conf.set("spark.omni.sql.columnar.takeOrderedAndProject", false)
+    spark.conf.set("spark.omni.sql.columnar.project", false)
+    val sparkResult = spark.sql(sql)
+    val sparkPlan = sparkResult.queryExecution.executedPlan
+    assert(sparkPlan.find(_.isInstanceOf[OmniColumnarToRowExec]).isEmpty,
+      s"SQL:${sql}\n@SparkEnv have OmniColumnarToRowExec,sparkPlan:${sparkPlan}")
+
+    assert(omniResult.except(sparkResult).isEmpty,
+      s"SQL:${sql}\nomniResult:${omniResult.show()}\nsparkResult:${sparkResult.show()}\n")
+    spark.conf.set("spark.omni.sql.columnar.takeOrderedAndProject", true)
+    spark.conf.set("spark.omni.sql.columnar.project", true)
   }
 }
