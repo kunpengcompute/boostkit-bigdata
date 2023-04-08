@@ -73,7 +73,9 @@ abstract class BaseColumnarFileSourceScanExec(
     optionalNumCoalescedBuckets: Option[Int],
     dataFilters: Seq[Expression],
     tableIdentifier: Option[TableIdentifier],
-    disableBucketedScan: Boolean = false)
+    needPriv: Boolean = false,
+    disableBucketedScan: Boolean = false,
+    outputAllAttributes: Seq[Attribute] = Seq.empty[Attribute])
   extends DataSourceScanExec {
 
   lazy val metadataColumns: Seq[AttributeReference] =
@@ -317,6 +319,18 @@ abstract class BaseColumnarFileSourceScanExec(
     } else {
       relation.fileFormat
     }
+
+    // Prepare conf for persist bad records
+    val userBadRecordsPath = BadRecordsWriterUtils.getUserBadRecordsPath(relation.sparkSession)
+    val options = if (userBadRecordsPath.isDefined) {
+      val badRecordsPathWithTableIdentifier = BadRecordsWriterUtils.addTableIdentifierToPath(
+        userBadRecordsPath.get, tableIdentifier)
+      relation.options ++ Map(
+        "badRecordsPath" -> badRecordsPathWithTableIdentifier)
+    } else {
+      relation.options
+    }
+
     val readFile: (PartitionedFile) => Iterator[InternalRow] =
       fileFormat.buildReaderWithPartitionValues(
         sparkSession = relation.sparkSession,
@@ -324,8 +338,8 @@ abstract class BaseColumnarFileSourceScanExec(
         partitionSchema = relation.partitionSchema,
         requiredSchema = requiredSchema,
         filters = pushedDownFilters,
-        options = relation.options,
-        hadoopConf = relation.sparkSession.sessionState.newHadoopConfWithOptions(relation.options))
+        options = options,
+        hadoopConf = relation.sparkSession.sessionState.newHadoopConfWithOptions(options))
 
     val readRDD = if (bucketedScan) {
       createBucketedReadRDD(relation.bucketSpec.get, readFile, dynamicallySelectedPartitions,
@@ -525,7 +539,7 @@ abstract class BaseColumnarFileSourceScanExec(
         _ => true
     }
 
-    val splitFiles = selectedPartitions.flatMap { partition =>
+    var splitFiles = selectedPartitions.flatMap { partition =>
       partition.files.flatMap { file =>
         // getPath() is very expensive so we only want to call it once in this block:
         val filePath = file.getPath
@@ -545,7 +559,13 @@ abstract class BaseColumnarFileSourceScanExec(
           Seq.empty
         }
       }
-    }.sortBy(_.length)(implicitly[Ordering[Long]].reverse)
+    }
+
+    if (fsRelation.sparkSession.sessionState.conf.fileListSortBy == "length") {
+      splitFiles = splitFiles.sortBy(_.length)(implicitly[Ordering[Long]].reverse)
+    } else {
+      splitFiles = splitFiles.sortBy(_.filePath)
+    }
 
     val partitions =
       FilePartition.getFilePartitions(relation.sparkSession, splitFiles, maxSplitBytes)
@@ -754,7 +774,9 @@ case class ColumnarFileSourceScanExec(
     optionalNumCoalescedBuckets: Option[Int],
     dataFilters: Seq[Expression],
     tableIdentifier: Option[TableIdentifier],
-    disableBucketedScan: Boolean = false)
+    needPriv: Boolean = false,
+    disableBucketedScan: Boolean = false,
+    outputAllAttributes: Seq[Attribute] = Seq.empty[Attribute])
   extends BaseColumnarFileSourceScanExec(
     relation,
     output,
@@ -764,7 +786,9 @@ case class ColumnarFileSourceScanExec(
     optionalNumCoalescedBuckets,
     dataFilters,
     tableIdentifier,
-    disableBucketedScan) {
+    needPriv,
+    disableBucketedScan,
+    outputAllAttributes) {
   override def doCanonicalize(): ColumnarFileSourceScanExec = {
     ColumnarFileSourceScanExec(
       relation,
@@ -776,7 +800,9 @@ case class ColumnarFileSourceScanExec(
       optionalNumCoalescedBuckets,
       QueryPlan.normalizePredicates(dataFilters, output),
       None,
-      disableBucketedScan)
+      needPriv,
+      disableBucketedScan,
+      outputAllAttributes)
   }
 }
 

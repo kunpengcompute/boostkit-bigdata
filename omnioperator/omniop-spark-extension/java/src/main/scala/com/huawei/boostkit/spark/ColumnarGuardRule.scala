@@ -46,6 +46,7 @@ case class ColumnarGuardRule() extends Rule[SparkPlan] {
   val columnarConf: ColumnarPluginConfig = ColumnarPluginConfig.getSessionConf
   val preferColumnar: Boolean = columnarConf.enablePreferColumnar
   val enableColumnarShuffle: Boolean = columnarConf.enableColumnarShuffle
+  val enableColumnarTopNSort: Boolean = columnarConf.enableColumnarTopNSort
   val enableColumnarSort: Boolean = columnarConf.enableColumnarSort
   val enableTakeOrderedAndProject: Boolean = columnarConf.enableTakeOrderedAndProject &&
     columnarConf.enableColumnarShuffle
@@ -80,7 +81,9 @@ case class ColumnarGuardRule() extends Rule[SparkPlan] {
             plan.optionalNumCoalescedBuckets,
             plan.dataFilters,
             plan.tableIdentifier,
-            plan.disableBucketedScan
+            plan.needPriv,
+            plan.disableBucketedScan,
+            plan.outputAllAttributes
           ).buildCheck()
         case plan: ProjectExec =>
           if (!enableColumnarProject) return false
@@ -103,6 +106,10 @@ case class ColumnarGuardRule() extends Rule[SparkPlan] {
             plan.initialInputBufferOffset,
             plan.resultExpressions,
             plan.child).buildCheck()
+        case plan: TopNSortExec =>
+          if (!enableColumnarTopNSort) return false
+          ColumnarTopNSortExec(plan.n, plan.strictTopN, plan.partitionSpec,
+            plan.sortOrder, plan.global, plan.child).buildCheck()
         case plan: SortExec =>
           if (!enableColumnarSort) return false
           ColumnarSortExec(plan.sortOrder, plan.global,

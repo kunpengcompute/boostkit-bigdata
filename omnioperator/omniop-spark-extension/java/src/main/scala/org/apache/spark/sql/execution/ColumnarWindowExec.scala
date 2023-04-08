@@ -126,6 +126,9 @@ case class ColumnarWindowExec(windowExpression: Seq[NamedExpression],
     var windowExpressionWithProject = false
     winExpressions.zipWithIndex.foreach { case (x, index) =>
       x.foreach {
+        case w@WindowExpression(AggregateExpression(_, _, true, _, _), _) =>
+          throw new UnsupportedOperationException(s"Distinct window functions are not supported: $w")
+
         case e@WindowExpression(function, spec) =>
           if (spec.frameSpecification.isInstanceOf[SpecifiedWindowFrame]) {
             val winFram = spec.frameSpecification.asInstanceOf[SpecifiedWindowFrame]

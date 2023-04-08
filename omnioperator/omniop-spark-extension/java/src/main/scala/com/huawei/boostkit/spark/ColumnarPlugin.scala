@@ -46,6 +46,7 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] {
   val enableColumnarBroadcastJoin: Boolean = columnarConf.enableColumnarBroadcastJoin &&
     columnarConf.enableColumnarBroadcastExchange
   val enableColumnarSortMergeJoin: Boolean = columnarConf.enableColumnarSortMergeJoin
+  val enableColumnarTopNSort: Boolean = columnarConf.enableColumnarTopNSort
   val enableColumnarSort: Boolean = columnarConf.enableColumnarSort
   val enableColumnarWindow: Boolean = columnarConf.enableColumnarWindow
   val enableColumnarShuffle: Boolean = columnarConf.enableColumnarShuffle
@@ -110,7 +111,9 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] {
         plan.optionalNumCoalescedBuckets,
         plan.dataFilters,
         plan.tableIdentifier,
-        plan.disableBucketedScan
+        plan.needPriv,
+        plan.disableBucketedScan,
+        plan.outputAllAttributes
       )
     case range: RangeExec =>
       new ColumnarRangeExec(range.range)
@@ -161,7 +164,7 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] {
             proj4 @ ColumnarProjectExec(_,
             join4 @ ColumnarBroadcastHashJoinExec(_, _, _, _, _,
             filter @ ColumnarFilterExec(_,
-            scan @ ColumnarFileSourceScanExec(_, _, _, _, _, _, _, _, _)
+            scan @ ColumnarFileSourceScanExec(_, _, _, _, _, _, _, _, _, _, _)
             ), _, _, _)), _, _, _)), _, _, _)), _, _, _))
               if checkBhjRightChild(
                 child.asInstanceOf[ColumnarProjectExec].child.children(1)
@@ -193,7 +196,7 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] {
             proj3 @ ColumnarProjectExec(_,
             join3 @ ColumnarBroadcastHashJoinExec(_, _, _, _, _, _,
             filter @ ColumnarFilterExec(_,
-            scan @ ColumnarFileSourceScanExec(_, _, _, _, _, _, _, _, _)), _, _)) , _, _, _)), _, _, _))
+            scan @ ColumnarFileSourceScanExec(_, _, _, _, _, _, _, _, _, _, _)), _, _)) , _, _, _)), _, _, _))
               if checkBhjRightChild(
                 child.asInstanceOf[ColumnarProjectExec].child.children(1)
                   .asInstanceOf[ColumnarBroadcastExchangeExec].child) =>
@@ -222,7 +225,7 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] {
             proj3 @ ColumnarProjectExec(_,
             join3 @ ColumnarBroadcastHashJoinExec(_, _, _, _, _,
             filter @ ColumnarFilterExec(_,
-            scan @ ColumnarFileSourceScanExec(_, _, _, _, _, _, _, _, _)), _, _, _)) , _, _, _)), _, _, _))
+            scan @ ColumnarFileSourceScanExec(_, _, _, _, _, _, _, _, _, _, _)), _, _, _)) , _, _, _)), _, _, _))
               if checkBhjRightChild(
                 child.asInstanceOf[ColumnarProjectExec].child.children(1)
                   .asInstanceOf[ColumnarBroadcastExchangeExec].child) =>
@@ -332,6 +335,10 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] {
         left,
         right,
         plan.isSkewJoin)
+    case plan: TopNSortExec if enableColumnarTopNSort =>
+      val child = replaceWithColumnarPlan(plan.child)
+      logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
+      ColumnarTopNSortExec(plan.n, plan.strictTopN, plan.partitionSpec, plan.sortOrder, plan.global, child)
     case plan: SortExec if enableColumnarSort =>
       val child = replaceWithColumnarPlan(plan.child)
       logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
