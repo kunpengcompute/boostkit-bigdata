@@ -333,22 +333,6 @@ case class ColumnarBroadcastHashJoinExec(
       val buildOp = buildOpFactory.createOperator()
       buildCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startBuildCodegen)
 
-      // close operator
-      SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
-        buildOp.close()
-        buildOpFactory.close()
-      })
-
-      val deserializer = VecBatchSerializerFactory.create()
-      relation.value.buildData.foreach { input =>
-        val startBuildInput = System.nanoTime()
-        buildOp.addInput(deserializer.deserialize(input))
-        buildAddInputTime += NANOSECONDS.toMillis(System.nanoTime() - startBuildInput)
-      }
-      val startBuildGetOp = System.nanoTime()
-      buildOp.getOutput
-      buildGetOutputTime += NANOSECONDS.toMillis(System.nanoTime() - startBuildGetOp)
-
       val startLookupCodegen = System.nanoTime()
       val lookupJoinType = OmniExpressionAdaptor.toOmniJoinType(joinType)
       val lookupOpFactory = new OmniLookupJoinWithExprOperatorFactory(probeTypes, probeOutputCols,
@@ -361,8 +345,20 @@ case class ColumnarBroadcastHashJoinExec(
       // close operator
       SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
         lookupOp.close()
+        buildOp.close()
         lookupOpFactory.close()
+        buildOpFactory.close()
       })
+
+      val deserializer = VecBatchSerializerFactory.create()
+      relation.value.buildData.foreach { input =>
+        val startBuildInput = System.nanoTime()
+        buildOp.addInput(deserializer.deserialize(input))
+        buildAddInputTime += NANOSECONDS.toMillis(System.nanoTime() - startBuildInput)
+      }
+      val startBuildGetOp = System.nanoTime()
+      buildOp.getOutput
+      buildGetOutputTime += NANOSECONDS.toMillis(System.nanoTime() - startBuildGetOp)
 
       val streamedPlanOutput = pruneOutput(streamedPlan.output, projectList)
       val prunedOutput = streamedPlanOutput ++ prunedBuildOutput

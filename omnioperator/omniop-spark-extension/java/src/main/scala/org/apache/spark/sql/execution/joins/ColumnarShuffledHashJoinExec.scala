@@ -226,8 +226,19 @@ case class ColumnarShuffledHashJoinExec(
         val buildOp = buildOpFactory.createOperator()
         buildCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startBuildCodegen)
 
+        val startLookupCodegen = System.nanoTime()
+        val lookupJoinType = OmniExpressionAdaptor.toOmniJoinType(joinType)
+        val lookupOpFactory = new OmniLookupJoinWithExprOperatorFactory(probeTypes,
+          probeOutputCols, probeHashColsExp, buildOutputCols, buildOutputTypes, lookupJoinType,
+          buildOpFactory, new OperatorConfig(SpillConfig.NONE,
+            new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
+        val lookupOp = lookupOpFactory.createOperator()
+        lookupCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startLookupCodegen)
+
         SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
+          lookupOp.close()
           buildOp.close()
+          lookupOpFactory.close()
           buildOpFactory.close()
         })
 
@@ -247,21 +258,6 @@ case class ColumnarShuffledHashJoinExec(
         val startBuildGetOp = System.nanoTime()
         buildOp.getOutput
         buildGetOutputTime += NANOSECONDS.toMillis(System.nanoTime() - startBuildGetOp)
-
-        val startLookupCodegen = System.nanoTime()
-        val lookupJoinType = OmniExpressionAdaptor.toOmniJoinType(joinType)
-        val lookupOpFactory = new OmniLookupJoinWithExprOperatorFactory(probeTypes,
-          probeOutputCols, probeHashColsExp, buildOutputCols, buildOutputTypes, lookupJoinType,
-          buildOpFactory, new OperatorConfig(SpillConfig.NONE,
-            new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
-
-        val lookupOp = lookupOpFactory.createOperator()
-        lookupCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startLookupCodegen)
-
-        SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
-          lookupOp.close()
-          lookupOpFactory.close()
-        })
 
         val streamedPlanOutput = pruneOutput(streamedPlan.output, projectList)
         val prunedOutput = streamedPlanOutput ++ prunedBuildOutput

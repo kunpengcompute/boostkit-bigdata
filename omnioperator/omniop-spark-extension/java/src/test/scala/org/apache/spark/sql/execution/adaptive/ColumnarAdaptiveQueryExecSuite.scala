@@ -255,7 +255,7 @@ class ColumnarAdaptiveQueryExecSuite extends ColumnarSparkPlanTest
           .groupBy('a).count()
         checkAnswer(testDf, Seq())
         val plan = testDf.queryExecution.executedPlan
-        assert(find(plan)(_.isInstanceOf[SortMergeJoinExec]).isDefined)
+        assert(find(plan)(_.isInstanceOf[ColumnarSortMergeJoinExec]).isDefined)
         val coalescedReaders = collect(plan) {
           case r: ColumnarCustomShuffleReaderExec => r
         }
@@ -599,7 +599,7 @@ class ColumnarAdaptiveQueryExecSuite extends ColumnarSparkPlanTest
           "join testData2 t3 on t2.a = t3.a where t2.b = 1")
       val smj = findTopLevelSortMergeJoin(plan)
       assert(smj.size == 2)
-      val smj2 = findTopLevelSortMergeJoin(adaptivePlan)
+      val smj2 = findTopLevelColumnarSortMergeJoin(adaptivePlan)
       assert(smj2.size == 2, origPlan.toString)
     }
   }
@@ -727,7 +727,7 @@ class ColumnarAdaptiveQueryExecSuite extends ColumnarSparkPlanTest
           .createOrReplaceTempView("skewData2")
 
         def checkSkewJoin(
-                           joins: Seq[SortMergeJoinExec],
+                           joins: Seq[ColumnarSortMergeJoinExec],
                            leftSkewNum: Int,
                            rightSkewNum: Int): Unit = {
           assert(joins.size == 1 && joins.head.isSkewJoin)

@@ -25,15 +25,19 @@ import com.huawei.boostkit.spark.Constant.IS_SKIP_VERIFY_EXP
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor.{checkOmniJsonWhiteList, isSimpleColumn, isSimpleColumnForAll}
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil
-import com.huawei.boostkit.spark.util.OmniAdaptorUtil.transColBatchToOmniVecs
+import com.huawei.boostkit.spark.util.OmniAdaptorUtil.{getIndexArray, pruneOutput, reorderVecs, transColBatchToOmniVecs}
 import nova.hetu.omniruntime.`type`.DataType
 import nova.hetu.omniruntime.constants.JoinType._
 import nova.hetu.omniruntime.operator.config.{OperatorConfig, OverflowConfig, SpillConfig}
 import nova.hetu.omniruntime.operator.join.{OmniSmjBufferedTableWithExprOperatorFactory, OmniSmjStreamedTableWithExprOperatorFactory}
 import nova.hetu.omniruntime.vector.{BooleanVec, Decimal128Vec, DoubleVec, IntVec, LongVec, VarcharVec, Vec, VecBatch, ShortVec}
 import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
+import org.apache.spark.sql.catalyst.expressions.codegen._
+import org.apache.spark.sql.catalyst.expressions.codegen.Block._
 import org.apache.spark.sql.catalyst.plans._
+import org.apache.spark.sql.catalyst.plans.physical._
 import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.metric.SQLMetrics
 import org.apache.spark.sql.execution.util.{MergeIterator, SparkMemoryUtils}
@@ -43,22 +47,16 @@ import org.apache.spark.sql.vectorized.ColumnarBatch
 /**
  * Performs a sort merge join of two child relations.
  */
-class ColumnarSortMergeJoinExec(
-                                 leftKeys: Seq[Expression],
-                                 rightKeys: Seq[Expression],
-                                 joinType: JoinType,
-                                 condition: Option[Expression],
-                                 left: SparkPlan,
-                                 right: SparkPlan,
-                                 isSkewJoin: Boolean = false)
-  extends SortMergeJoinExec(
+case class ColumnarSortMergeJoinExec(
     leftKeys: Seq[Expression],
     rightKeys: Seq[Expression],
     joinType: JoinType,
     condition: Option[Expression],
     left: SparkPlan,
     right: SparkPlan,
-    isSkewJoin: Boolean) with CodegenSupport {
+    isSkewJoin: Boolean = false,
+    projectList: Seq[NamedExpression] = Seq.empty)
+  extends ShuffledJoin with CodegenSupport {
 
   override def supportsColumnar: Boolean = true
 
@@ -67,6 +65,62 @@ class ColumnarSortMergeJoinExec(
   override def nodeName: String = {
     if (isSkewJoin) "OmniColumnarSortMergeJoin(skew=true)" else "OmniColumnarSortMergeJoin"
   }
+
+  override def stringArgs: Iterator[Any] = super.stringArgs.toSeq.dropRight(1).iterator
+
+  override def requiredChildDistribution: Seq[Distribution] = {
+    if (isSkewJoin) {
+      UnspecifiedDistribution :: UnspecifiedDistribution :: Nil
+    } else {
+      super.requiredChildDistribution
+    }
+  }
+
+  override def outputOrdering: Seq[SortOrder] = joinType match {
+    case _: InnerLike =>
+      val leftKeyOrdering = getKeyOrdering(leftKeys, left.outputOrdering)
+      val rightKeyOrdering = getKeyOrdering(rightKeys, right.outputOrdering)
+      leftKeyOrdering.zip(rightKeyOrdering).map { case (lKey, rKey) =>
+        val sameOrderExpressions = ExpressionSet(lKey.sameOrderExpressions ++ rKey.children)
+        SortOrder(lKey.child, Ascending, sameOrderExpressions.toSeq)
+      }
+    case LeftOuter => getKeyOrdering(leftKeys, left.outputOrdering)
+    case RightOuter => getKeyOrdering(rightKeys, right.outputOrdering)
+    case FullOuter => Nil
+    case x =>
+      throw new IllegalArgumentException(
+        s"${getClass.getSimpleName} should not take $x as the JoinType")
+  }
+
+  private def getKeyOrdering(keys: Seq[Expression], childOutputOrdering: Seq[SortOrder])
+    : Seq[SortOrder] = {
+    val requiredOrdering = requiredOrders(keys)
+    if (SortOrder.orderingSatisfies(childOutputOrdering, requiredOrdering)) {
+      keys.zip(childOutputOrdering).map { case (key, childOrder) =>
+        val sameOrderExpressionSet = ExpressionSet(childOrder.children) - key
+        SortOrder(key, Ascending, sameOrderExpressionSet.toSeq)
+      }
+    } else {
+      requiredOrdering
+    }
+  }
+
+  override def requiredChildOrdering: Seq[Seq[SortOrder]] =
+    requiredOrders(leftKeys) :: requiredOrders(rightKeys) :: Nil
+
+  private def requiredOrders(keys: Seq[Expression]): Seq[SortOrder] = {
+    keys.map(SortOrder(_, Ascending))
+  }
+
+  override def output : Seq[Attribute] = {
+    if (projectList.nonEmpty) {
+      projectList.map(_.toAttribute)
+    } else {
+      super[ShuffledJoin].output
+    }
+  }
+
+  override def needCopyResult: Boolean = true
 
   val SMJ_NEED_ADD_STREAM_TBL_DATA = 2
   val SMJ_NEED_ADD_BUFFERED_TBL_DATA = 3
@@ -93,6 +147,37 @@ class ColumnarSortMergeJoinExec(
     "numStreamVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of streamed vecBatchs"),
     "numBufferVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of buffered vecBatchs")
   )
+
+  override def verboseStringWithOperatorId(): String = {
+    val joinCondStr = if (condition.isDefined) {
+      s"${condition.get}${condition.get.dataType}"
+    } else "None"
+    
+    s"""
+       |$formattedNodeName
+       |$simpleStringWithNodeId
+       |${ExplainUtils.generateFieldString("Stream input", left.output ++ left.output.map(_.dataType))}
+       |${ExplainUtils.generateFieldString("Buffer input", right.output ++ right.output.map(_.dataType))}
+       |${ExplainUtils.generateFieldString("Left keys", leftKeys ++ leftKeys.map(_.dataType))}
+       |${ExplainUtils.generateFieldString("Right keys", rightKeys ++ rightKeys.map(_.dataType))}
+       |${ExplainUtils.generateFieldString("Join condition", joinCondStr)}
+       |${ExplainUtils.generateFieldString("Project List", projectList ++ projectList.map(_.dataType))}
+       |${ExplainUtils.generateFieldString("Output", output ++ output.map(_.dataType))}
+       |Condition : $condition
+       |""".stripMargin
+  }
+
+  protected override def doExecute(): RDD[InternalRow] = {
+     throw new UnsupportedOperationException(s"This operator doesn't support doExecute.")
+  }
+
+  protected override def doProduce(ctx: CodegenContext): String = {
+     throw new UnsupportedOperationException(s"This operator doesn't support doProduce.")
+  }
+
+  override def inputRDDs(): Seq[RDD[InternalRow]] = {
+    left.execute() :: right.execute() :: Nil
+  }
 
   def buildCheck(): Unit = {
     joinType match {
@@ -160,7 +245,7 @@ class ColumnarSortMergeJoinExec(
       OmniExpressionAdaptor.rewriteToOmniJsonExpressionLiteral(x,
         OmniExpressionAdaptor.getExprIdMap(left.output.map(_.toAttribute)))
     }.toArray
-    val streamedOutputChannel = left.output.indices.toArray
+    val streamedOutputChannel = getIndexArray(left.output, projectList)
 
     val bufferedTypes = new Array[DataType](right.output.size)
     right.output.zipWithIndex.foreach { case (attr, i) =>
@@ -172,7 +257,7 @@ class ColumnarSortMergeJoinExec(
     }.toArray
     val bufferedOutputChannel: Array[Int] = joinType match {
       case Inner | LeftOuter | FullOuter =>
-        right.output.indices.toArray
+        getIndexArray(right.output, projectList)
       case LeftExistence(_) =>
         Array[Int]()
       case x =>
@@ -214,6 +299,9 @@ class ColumnarSortMergeJoinExec(
         streamedOpFactory.close()
       })
 
+      val prunedStreamOutput = pruneOutput(left.output, projectList)
+      val prunedBufferOutput = pruneOutput(right.output, projectList)
+      val prunedOutput = prunedStreamOutput ++ prunedBufferOutput
       val resultSchema = this.schema
       val columnarConf: ColumnarPluginConfig = ColumnarPluginConfig.getSessionConf
       val enableSortMergeJoinBatchMerge: Boolean = columnarConf.enableSortMergeJoinBatchMerge
@@ -321,10 +409,14 @@ class ColumnarSortMergeJoinExec(
           getOutputTime += NANOSECONDS.toMillis(System.nanoTime() - startGetOutputTime)
           val resultVecs = result.getVectors
           val vecs = OmniColumnVector.allocateColumns(result.getRowCount, resultSchema, false)
-          for (index <- output.indices) {
-            val v = vecs(index)
-            v.reset()
-            v.setVec(resultVecs(index))
+          if (projectList.nonEmpty) {
+            reorderVecs(prunedOutput, projectList, resultVecs, vecs)
+          } else {
+            for (index <- output.indices) {
+              val v = vecs(index)
+              v.reset()
+              v.setVec(resultVecs(index))
+            }
           }
           numOutputVecBatchs += 1
           numOutputRows += result.getRowCount
