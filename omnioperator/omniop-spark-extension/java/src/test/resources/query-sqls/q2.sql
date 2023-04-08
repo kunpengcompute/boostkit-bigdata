@@ -1,48 +1,81 @@
-with v1 as (
- select i_category, i_brand,
-        s_store_name, s_company_name,
-        d_year, d_moy,
-        sum(ss_sales_price) sum_sales,
-        avg(sum(ss_sales_price)) over
-          (partition by i_category, i_brand,
-                     s_store_name,s_company_name,d_year)
-          avg_monthly_sales,
-          rank() over
-           (partition by i_category, i_brand,
-           s_store_name,s_company_name
-           order by d_year,d_moy) rn
- from item, store_sales, date_dim, store
- where ss_item_sk = i_item_sk and
-       ss_sold_date_sk = d_date_sk and
-       ss_store_sk = s_store_sk and
-       (
-         d_year = 2000 or
-         ( d_year = 2000-1 and d_moy =12) or
-         ( d_year = 2000+1 and d_moy =1)
-       )
- group by i_category, i_brand, 
-          s_store_name, s_company_name, 
-          d_year, d_moy), 
- v2 as( 
- select v1.i_category, v1.i_brand
-        ,v1.d_year
-        ,v1.avg_monthly_sales
-        ,v1.sum_sales, v1_lag.sum_sales psum, v1_lead.sum_sales nsum
- from v1, v1 v1_lag, v1 v1_lead 
- where v1.i_category = v1_lag.i_category and
-       v1.i_category = v1_lead.i_category and
-       v1.i_brand = v1_lag.i_brand and
-       v1.i_brand = v1_lead.i_brand and
-       v1.s_store_name = v1_lag.s_store_name and
-       v1.s_store_name = v1_lead.s_store_name and
-       v1.s_company_name = v1_lag.s_company_name and
-       v1.s_company_name = v1_lead.s_company_name and
-       v1.rn = v1_lag.rn + 1 and
-       v1.rn = v1_lead.rn -1)
-select *
-from v2
-where d_year = 2000 and
-      avg_monthly_sales > 0 and
-      case when avg_monthly_sales > 0 then abs(sum_sales - avg_monthly_sales) / avg_monthly_sales else null end > 0.1
-order by sum_sales - avg_monthly_sales, d_year
-limit 100;
+WITH wscs AS
+( SELECT
+    sold_date_sk,
+    sales_price
+  FROM (SELECT
+    ws_sold_date_sk sold_date_sk,
+    ws_ext_sales_price sales_price
+  FROM web_sales) x
+  UNION ALL
+  (SELECT
+    cs_sold_date_sk sold_date_sk,
+    cs_ext_sales_price sales_price
+  FROM catalog_sales)),
+    wswscs AS
+  ( SELECT
+    d_week_seq,
+    sum(CASE WHEN (d_day_name = 'Sunday')
+      THEN sales_price
+        ELSE NULL END)
+    sun_sales,
+    sum(CASE WHEN (d_day_name = 'Monday')
+      THEN sales_price
+        ELSE NULL END)
+    mon_sales,
+    sum(CASE WHEN (d_day_name = 'Tuesday')
+      THEN sales_price
+        ELSE NULL END)
+    tue_sales,
+    sum(CASE WHEN (d_day_name = 'Wednesday')
+      THEN sales_price
+        ELSE NULL END)
+    wed_sales,
+    sum(CASE WHEN (d_day_name = 'Thursday')
+      THEN sales_price
+        ELSE NULL END)
+    thu_sales,
+    sum(CASE WHEN (d_day_name = 'Friday')
+      THEN sales_price
+        ELSE NULL END)
+    fri_sales,
+    sum(CASE WHEN (d_day_name = 'Saturday')
+      THEN sales_price
+        ELSE NULL END)
+    sat_sales
+  FROM wscs, date_dim
+  WHERE d_date_sk = sold_date_sk
+  GROUP BY d_week_seq)
+SELECT
+  d_week_seq1,
+  round(sun_sales1 / sun_sales2, 2),
+  round(mon_sales1 / mon_sales2, 2),
+  round(tue_sales1 / tue_sales2, 2),
+  round(wed_sales1 / wed_sales2, 2),
+  round(thu_sales1 / thu_sales2, 2),
+  round(fri_sales1 / fri_sales2, 2),
+  round(sat_sales1 / sat_sales2, 2)
+FROM
+  (SELECT
+    wswscs.d_week_seq d_week_seq1,
+    sun_sales sun_sales1,
+    mon_sales mon_sales1,
+    tue_sales tue_sales1,
+    wed_sales wed_sales1,
+    thu_sales thu_sales1,
+    fri_sales fri_sales1,
+    sat_sales sat_sales1
+  FROM wswscs, date_dim
+  WHERE date_dim.d_week_seq = wswscs.d_week_seq AND d_year = 2001) y,
+  (SELECT
+    wswscs.d_week_seq d_week_seq2,
+    sun_sales sun_sales2,
+    mon_sales mon_sales2,
+    tue_sales tue_sales2,
+    wed_sales wed_sales2,
+    thu_sales thu_sales2,
+    fri_sales fri_sales2,
+    sat_sales sat_sales2
+  FROM wswscs, date_dim
+  WHERE date_dim.d_week_seq = wswscs.d_week_seq AND d_year = 2001 + 1) z
+WHERE d_week_seq1 = d_week_seq2 - 53
+ORDER BY d_week_seq1

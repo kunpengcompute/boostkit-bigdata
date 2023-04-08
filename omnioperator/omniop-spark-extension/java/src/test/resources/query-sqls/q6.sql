@@ -1,25 +1,21 @@
-select *
-from (select i_manager_id
-             ,sum(ss_sales_price) sum_sales
-             ,avg(sum(ss_sales_price)) over (partition by i_manager_id) avg_monthly_sales
-      from item
-          ,store_sales
-          ,date_dim
-          ,store 
-      where ss_item_sk = i_item_sk
-and ss_sold_date_sk = d_date_sk
-and ss_sold_date_sk between 2452123 and 2452487
-and ss_store_sk = s_store_sk
-and d_month_seq in (1219,1219+1,1219+2,1219+3,1219+4,1219+5,1219+6,1219+7,1219+8,1219+9,1219+10,1219+11) 
-and ((    i_category in ('Books','Children','Electronics') 
-      and i_class in ('personal','portable','reference','self-help') 
-      and i_brand in ('scholaramalgamalg #14','scholaramalgamalg #7', 'exportiunivamalg #9','scholaramalgamalg #9')) 
-or(    i_category in ('Women','Music','Men') 
-   and i_class in ('accessories','classical','fragrances','pants') 
-   and i_brand in ('amalgimporto #1','edu packscholar #1','exportiimporto #1', 'importoamalg #1')))
-group by i_manager_id, d_moy) tmp1 
-where case when avg_monthly_sales > 0 then abs (sum_sales - avg_monthly_sales) / avg_monthly_sales else null end > 0.1
-order by i_manager_id
-        ,avg_monthly_sales
-        ,sum_sales
-limit 100;
+SELECT
+  a.ca_state state,
+  count(*) cnt
+FROM
+  customer_address a, customer c, store_sales s, date_dim d, item i
+WHERE a.ca_address_sk = c.c_current_addr_sk
+  AND c.c_customer_sk = s.ss_customer_sk
+  AND s.ss_sold_date_sk = d.d_date_sk
+  AND s.ss_item_sk = i.i_item_sk
+  AND d.d_month_seq =
+  (SELECT DISTINCT (d_month_seq)
+  FROM date_dim
+  WHERE d_year = 2000 AND d_moy = 1)
+  AND i.i_current_price > 1.2 *
+  (SELECT avg(j.i_current_price)
+  FROM item j
+  WHERE j.i_category = i.i_category)
+GROUP BY a.ca_state
+HAVING count(*) >= 10
+ORDER BY cnt
+LIMIT 100
