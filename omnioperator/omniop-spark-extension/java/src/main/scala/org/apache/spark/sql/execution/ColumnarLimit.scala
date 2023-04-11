@@ -17,7 +17,6 @@
 
 package org.apache.spark.sql.execution
 
-import java.util.concurrent.TimeUnit.NANOSECONDS
 import com.huawei.boostkit.spark.Constant.IS_SKIP_VERIFY_EXP
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor.{checkOmniJsonWhiteList, getExprIdMap, isSimpleColumnForAll, rewriteToOmniJsonExpressionLiteral, sparkTypeToOmniType}
 import com.huawei.boostkit.spark.serialize.ColumnarBatchSerializer
@@ -29,20 +28,85 @@ import nova.hetu.omniruntime.operator.topn.OmniTopNWithExprOperatorFactory
 import org.apache.spark.rdd.RDD
 import org.apache.spark.serializer.Serializer
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.catalyst.plans.physical.{Partitioning, SinglePartition}
+import org.apache.spark.sql.catalyst.expressions.{Attribute, NamedExpression, SortOrder}
+import org.apache.spark.sql.catalyst.plans.physical.{AllTuples, Distribution, Partitioning, SinglePartition}
 import org.apache.spark.sql.catalyst.util.truncatedString
 import org.apache.spark.sql.execution.ColumnarProjection.dealPartitionData
-import org.apache.spark.sql.execution.metric._
+import org.apache.spark.sql.execution.metric.{SQLMetric, SQLMetrics, SQLShuffleReadMetricsReporter, SQLShuffleWriteMetricsReporter}
 import org.apache.spark.sql.execution.util.SparkMemoryUtils
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.vectorized.ColumnarBatch
 
+import java.util.concurrent.TimeUnit.NANOSECONDS
+
+trait ColumnarBaseLimitExec extends LimitExec {
+
+  override def outputOrdering: Seq[SortOrder] = child.outputOrdering
+
+  override def outputPartitioning: Partitioning = child.outputPartitioning
+
+  override def supportsColumnar: Boolean = true
+
+  override def output: Seq[Attribute] = child.output
+
+  protected override def doExecuteColumnar(): RDD[ColumnarBatch] = {
+    child.executeColumnar().mapPartitions { iter =>
+      val hasInput = iter.hasNext
+      if (hasInput) {
+        new Iterator[ColumnarBatch] {
+          var rowCount = 0
+          override def hasNext: Boolean = {
+            val hasNext = iter.hasNext
+            hasNext && (rowCount < limit)
+          }
+
+          override def next(): ColumnarBatch = {
+            val output = iter.next()
+            val preRowCount = rowCount
+            rowCount += output.numRows
+            if (rowCount > limit) {
+              val newSize = limit - preRowCount
+              output.setNumRows(newSize)
+            }
+            output
+          }
+        }
+      } else {
+        Iterator.empty
+      }
+    }
+  }
+
+  protected override def doExecute() = {
+    throw new UnsupportedOperationException("This operator doesn't support doExecute()")
+  }
+}
+
+case class ColumnarLocalLimitExec(limit: Int, child: SparkPlan)
+  extends ColumnarBaseLimitExec{
+
+  override def nodeName: String = "OmniColumnarLocalLimit"
+
+  override protected def withNewChildInternal(newChild: SparkPlan): SparkPlan =
+    copy(child = newChild)
+}
+
+case class ColumnarGlobalLimitExec(limit: Int, child: SparkPlan)
+  extends ColumnarBaseLimitExec{
+
+  override def requiredChildDistribution: List[Distribution] = AllTuples :: Nil
+
+  override def nodeName: String = "OmniColumnarGlobalLimit"
+
+  override protected def withNewChildInternal(newChild: SparkPlan): SparkPlan =
+    copy(child = newChild)
+}
+
 case class ColumnarTakeOrderedAndProjectExec(
-    limit: Int,
-    sortOrder: Seq[SortOrder],
-    projectList: Seq[NamedExpression],
-    child: SparkPlan)
+                                              limit: Int,
+                                              sortOrder: Seq[SortOrder],
+                                              projectList: Seq[NamedExpression],
+                                              child: SparkPlan)
   extends UnaryExecNode {
 
   override def supportsColumnar: Boolean = true
@@ -50,7 +114,7 @@ case class ColumnarTakeOrderedAndProjectExec(
   override def nodeName: String = "OmniColumnarTakeOrderedAndProject"
 
   override protected def withNewChildInternal(newChild: SparkPlan):
-    ColumnarTakeOrderedAndProjectExec = copy(child = newChild)
+  ColumnarTakeOrderedAndProjectExec = copy(child = newChild)
 
   val serializer: Serializer = new ColumnarBatchSerializer(
     longMetric("avgReadBatchNumRows"),
