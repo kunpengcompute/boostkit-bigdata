@@ -164,7 +164,7 @@ class ColumnarHashAggregateDistinctOperatorSuite extends ColumnarSparkPlanTest {
   test("Test HashAgg with decimal distinct:") {
     val sql1 = "select car_model, avg(DISTINCT quantity_dec8_2), count(DISTINCT city) from dealer_decimal" +
       " group by car_model;"
-    assertHashAggregateExecOmniAndSparkResultEqual(sql1)
+    assertHashAggregateExecOmniAndSparkResultEqual(sql1, false)
 
     val sql2 = "select car_model, min(id), sum(DISTINCT quantity_dec8_2), count(DISTINCT city) from dealer_decimal" +
       " group by car_model;"
@@ -178,7 +178,7 @@ class ColumnarHashAggregateDistinctOperatorSuite extends ColumnarSparkPlanTest {
 
     val sql4 = "select car_model, avg(DISTINCT quantity_dec11_2), count(DISTINCT city) from dealer_decimal" +
       " group by car_model;"
-    assertHashAggregateExecOmniAndSparkResultEqual(sql4)
+    assertHashAggregateExecOmniAndSparkResultEqual(sql4, false)
 
     val sql5 = "select car_model, min(id), sum(DISTINCT quantity_dec11_2), count(DISTINCT city) from dealer_decimal" +
       " group by car_model;"
@@ -192,11 +192,11 @@ class ColumnarHashAggregateDistinctOperatorSuite extends ColumnarSparkPlanTest {
 
     val sql7 = "select car_model, count(DISTINCT quantity_dec8_2), avg(DISTINCT quantity_dec8_2), sum(DISTINCT quantity_dec8_2) from dealer_decimal" +
       " group by car_model;"
-    assertHashAggregateExecOmniAndSparkResultEqual(sql7)
+    assertHashAggregateExecOmniAndSparkResultEqual(sql7, false)
 
     val sql8 = "select car_model, count(DISTINCT quantity_dec11_2), avg(DISTINCT quantity_dec11_2), sum(DISTINCT quantity_dec11_2) from dealer_decimal" +
       " group by car_model;"
-    assertHashAggregateExecOmniAndSparkResultEqual(sql8)
+    assertHashAggregateExecOmniAndSparkResultEqual(sql8, false)
   }
 
   test("Test HashAgg with multi distinct + multi without distinct + order by:") {
