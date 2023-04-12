@@ -297,7 +297,8 @@ case class RowToOmniColumnarExec(child: SparkPlan) extends RowToColumnarTransiti
 }
 
 
-case class OmniColumnarToRowExec(child: SparkPlan) extends ColumnarToRowTransition {
+case class OmniColumnarToRowExec(child: SparkPlan,
+                                 mayPartialFetch: Boolean = true) extends ColumnarToRowTransition {
   override def nodeName: String = "OmniColumnarToRow"
 
   override def output: Seq[Attribute] = child.output
@@ -312,6 +313,14 @@ case class OmniColumnarToRowExec(child: SparkPlan) extends ColumnarToRowTransiti
     "omniColumnarToRowTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omniColumnar to row")
   )
 
+  override def verboseStringWithOperatorId(): String = {
+    s"""
+       |$formattedNodeName
+       |$simpleStringWithNodeId
+       |${ExplainUtils.generateFieldString("mayPartialFetch", String.valueOf(mayPartialFetch))}
+       |""".stripMargin
+  }
+
   override def doExecute(): RDD[InternalRow] = {
     val numOutputRows = longMetric("numOutputRows")
     val numInputBatches = longMetric("numInputBatches")
@@ -320,7 +329,7 @@ case class OmniColumnarToRowExec(child: SparkPlan) extends ColumnarToRowTransiti
     // plan (this) in the closure.
     val localOutput = this.output
     child.executeColumnar().mapPartitionsInternal { batches =>
-      ColumnarBatchToInternalRow.convert(localOutput, batches, numOutputRows, numInputBatches, omniColumnarToRowTime)
+      ColumnarBatchToInternalRow.convert(localOutput, batches, numOutputRows, numInputBatches, omniColumnarToRowTime, mayPartialFetch)
     }
   }
 
@@ -332,29 +341,60 @@ object ColumnarBatchToInternalRow {
 
   def convert(output: Seq[Attribute], batches: Iterator[ColumnarBatch],
               numOutputRows: SQLMetric, numInputBatches: SQLMetric,
-              rowToOmniColumnarTime: SQLMetric): Iterator[InternalRow] = {
+              rowToOmniColumnarTime: SQLMetric,
+              mayPartialFetch: Boolean = true): Iterator[InternalRow] = {
     val startTime = System.nanoTime()
     val toUnsafe = UnsafeProjection.create(output, output)
-    val vecsTmp = new ListBuffer[Vec]
+
     val batchIter = batches.flatMap { batch =>
-      // store vec since tablescan reuse batch
+
+      // toClosedVecs closed case:
+      // 1) all rows of batch fetched and closed
+      // 2) only fetch parital rows(eg: top-n, limit-n), closed at task CompletionListener callback
+      val toClosedVecs = new ListBuffer[Vec]
       for (i <- 0 until batch.numCols()) {
         batch.column(i) match {
           case vector: OmniColumnVector =>
-            vecsTmp.append(vector.getVec)
+            toClosedVecs.append(vector.getVec)
           case _ =>
         }
       }
+
       numInputBatches += 1
-      numOutputRows += batch.numRows()
       val iter = batch.rowIterator().asScala.map(toUnsafe)
       rowToOmniColumnarTime += NANOSECONDS.toMillis(System.nanoTime() - startTime)
-      iter
-    }
 
-    SparkMemoryUtils.addLeakSafeTaskCompletionListener { _ =>
-      vecsTmp.foreach {vec =>
-        vec.close()
+      new Iterator[InternalRow] {
+        val numOutputRowsMetric: SQLMetric = numOutputRows
+        var closed = false
+
+        // only invoke if fetch partial rows of batch
+        if (mayPartialFetch) {
+          SparkMemoryUtils.addLeakSafeTaskCompletionListener { _ =>
+            if (!closed) {
+              toClosedVecs.foreach {vec =>
+                vec.close()
+              }
+            }
+          }
+        }
+
+        override  def hasNext: Boolean = {
+          val has = iter.hasNext
+          // fetch all rows and closed
+          if (!has && !closed) {
+            toClosedVecs.foreach {vec =>
+              vec.close()
+            }
+            closed = true
+          }
+          has
+        }
+
+        override def next(): InternalRow = {
+          numOutputRowsMetric += 1
+          iter.next()
+        }
       }
     }
     batchIter
