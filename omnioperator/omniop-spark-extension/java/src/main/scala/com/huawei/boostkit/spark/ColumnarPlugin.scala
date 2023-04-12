@@ -20,7 +20,7 @@ package com.huawei.boostkit.spark
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{SparkSession, SparkSessionExtensions}
-import org.apache.spark.sql.catalyst.expressions.DynamicPruningSubquery
+import org.apache.spark.sql.catalyst.expressions.{Ascending, DynamicPruningSubquery, SortOrder}
 import org.apache.spark.sql.catalyst.expressions.aggregate.Partial
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.{RowToOmniColumnarExec, _}
@@ -360,7 +360,16 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] {
     case plan: WindowExec if enableColumnarWindow =>
       val child = replaceWithColumnarPlan(plan.child)
       logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
-      ColumnarWindowExec(plan.windowExpression, plan.partitionSpec, plan.orderSpec, child)
+      child match {
+        case ColumnarSortExec(sortOrder, _, sortChild, _) =>
+          if (Seq(plan.partitionSpec.map(SortOrder(_, Ascending)) ++ plan.orderSpec) == Seq(sortOrder)) {
+            ColumnarWindowExec(plan.windowExpression, plan.partitionSpec, plan.orderSpec, sortChild)
+          } else {
+            ColumnarWindowExec(plan.windowExpression, plan.partitionSpec, plan.orderSpec, child)
+          }
+        case _ =>
+          ColumnarWindowExec(plan.windowExpression, plan.partitionSpec, plan.orderSpec, child)
+      }
     case plan: UnionExec if enableColumnarUnion =>
       val children = plan.children.map(replaceWithColumnarPlan)
       logDebug(s"Columnar Processing for ${plan.getClass} is currently supported.")
