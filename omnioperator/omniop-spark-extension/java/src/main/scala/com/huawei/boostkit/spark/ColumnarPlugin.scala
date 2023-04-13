@@ -155,6 +155,20 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] {
           } else {
             ColumnarProjectExec(plan.projectList, child)
           }
+        case join : ColumnarSortMergeJoinExec =>
+          if (plan.projectList.forall(project => OmniExpressionAdaptor.isSimpleProjectForAll(project)) && enableColumnarProjectFusion) {
+            ColumnarSortMergeJoinExec(
+              join.leftKeys,
+              join.rightKeys,
+              join.joinType,
+              join.condition,
+              join.left,
+              join.right,
+              join.isSkewJoin,
+              plan.projectList)
+          } else {
+            ColumnarProjectExec(plan.projectList, child)
+          }
         case _ =>
           ColumnarProjectExec(plan.projectList, child)
       }
