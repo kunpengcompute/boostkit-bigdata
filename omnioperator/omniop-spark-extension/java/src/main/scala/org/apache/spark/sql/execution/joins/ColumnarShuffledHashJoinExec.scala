@@ -24,20 +24,20 @@ import com.huawei.boostkit.spark.Constant.IS_SKIP_VERIFY_EXP
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor.{checkOmniJsonWhiteList, isSimpleColumn, isSimpleColumnForAll}
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil
-import com.huawei.boostkit.spark.util.OmniAdaptorUtil.transColBatchToOmniVecs
+import com.huawei.boostkit.spark.util.OmniAdaptorUtil.{getIndexArray, pruneOutput, reorderVecs, transColBatchToOmniVecs}
 import nova.hetu.omniruntime.`type`.DataType
 import nova.hetu.omniruntime.operator.config.{OperatorConfig, OverflowConfig, SpillConfig}
-import nova.hetu.omniruntime.operator.join._
+import nova.hetu.omniruntime.operator.join.{OmniHashBuilderWithExprOperatorFactory, OmniLookupJoinWithExprOperatorFactory, OmniLookupOuterJoinWithExprOperatorFactory}
 import nova.hetu.omniruntime.vector.VecBatch
 
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.{Attribute, Expression, SortOrder}
+import org.apache.spark.sql.catalyst.expressions.{Attribute, Expression, NamedExpression, SortOrder}
 import org.apache.spark.sql.catalyst.expressions.codegen.CodegenContext
 import org.apache.spark.sql.catalyst.optimizer.{BuildLeft, BuildSide}
 import org.apache.spark.sql.catalyst.plans.{FullOuter, Inner, InnerLike, JoinType, LeftExistence, LeftSemi}
 import org.apache.spark.sql.catalyst.plans.physical.Partitioning
-import org.apache.spark.sql.execution.SparkPlan
+import org.apache.spark.sql.execution.{ExplainUtils, SparkPlan}
 import org.apache.spark.sql.execution.metric.SQLMetrics
 import org.apache.spark.sql.execution.util.SparkMemoryUtils
 import org.apache.spark.sql.execution.vectorized.OmniColumnVector
@@ -51,8 +51,27 @@ case class ColumnarShuffledHashJoinExec(
     condition: Option[Expression],
     left: SparkPlan,
     right: SparkPlan,
-    isSkewJoin: Boolean)
+    isSkewJoin: Boolean,
+    projectList: Seq[NamedExpression] = Seq.empty)
   extends HashJoin with ShuffledJoin {
+
+  override def verboseStringWithOperatorId(): String = {
+    val joinCondStr = if (condition.isDefined) {
+      s"${condition.get}${condition.get.dataType}"
+    } else "None"
+    s"""
+       |$formattedNodeName
+       |$simpleStringWithNodeId
+       |${ExplainUtils.generateFieldString("buildOutput", buildOutput ++ buildOutput.map(_.dataType))}
+       |${ExplainUtils.generateFieldString("streamedOutput", streamedOutput ++ streamedOutput.map(_.dataType))}
+       |${ExplainUtils.generateFieldString("leftKeys", leftKeys ++ leftKeys.map(_.dataType))}
+       |${ExplainUtils.generateFieldString("rightKeys", rightKeys ++ rightKeys.map(_.dataType))}
+       |${ExplainUtils.generateFieldString("condition", joinCondStr)}
+       |${ExplainUtils.generateFieldString("projectList", projectList.map(_.toAttribute) ++ projectList.map(_.toAttribute).map(_.dataType))}
+       |${ExplainUtils.generateFieldString("output", output ++ output.map(_.dataType))}
+       |Condition : $condition
+       |""".stripMargin
+  }
 
   override lazy val metrics = Map(
     "numOutputRows" -> SQLMetrics.createMetric(sparkContext, "number of output rows"),
@@ -78,7 +97,13 @@ case class ColumnarShuffledHashJoinExec(
 
   override def nodeName: String = "OmniColumnarShuffledHashJoin"
 
-  override def output: Seq[Attribute] = super[ShuffledJoin].output
+  override def output: Seq[Attribute] = {
+    if (projectList.nonEmpty) {
+      projectList.map(_.toAttribute)
+    } else {
+      super[ShuffledJoin].output
+     }
+  }
 
   override def outputPartitioning: Partitioning = super[ShuffledJoin].outputPartitioning
 
@@ -163,7 +188,7 @@ case class ColumnarShuffledHashJoinExec(
 
     val buildOutputCols: Array[Int] = joinType match {
       case _: InnerLike | FullOuter =>
-        buildOutput.indices.toArray
+        getIndexArray(buildOutput, projectList)
       case LeftExistence(_) =>
         Array[Int]()
       case x =>
@@ -175,11 +200,17 @@ case class ColumnarShuffledHashJoinExec(
         OmniExpressionAdaptor.getExprIdMap(buildOutput.map(_.toAttribute)))
     }.toArray
 
+    val prunedBuildOutput = pruneOutput(buildOutput, projectList)
+    val buildOutputTypes = new Array[DataType](prunedBuildOutput.size) // {2,2}, buildOutput:col1#12,col2#13
+    prunedBuildOutput.zipWithIndex.foreach { case (att, i) =>
+      buildOutputTypes(i) = OmniExpressionAdaptor.sparkTypeToOmniType(att.dataType, att.metadata)
+    }
+
     val probeTypes = new Array[DataType](streamedOutput.size)
     streamedOutput.zipWithIndex.foreach { case (attr, i) =>
       probeTypes(i) = OmniExpressionAdaptor.sparkTypeToOmniType(attr.dataType, attr.metadata)
     }
-    val probeOutputCols = streamedOutput.indices.toArray
+    val probeOutputCols = getIndexArray(streamedOutput, projectList)
     val probeHashColsExp = streamedKeys.map { x =>
       OmniExpressionAdaptor.rewriteToOmniJsonExpressionLiteral(x,
         OmniExpressionAdaptor.getExprIdMap(streamedOutput.map(_.toAttribute)))
@@ -201,8 +232,19 @@ case class ColumnarShuffledHashJoinExec(
         val buildOp = buildOpFactory.createOperator()
         buildCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startBuildCodegen)
 
+        val startLookupCodegen = System.nanoTime()
+        val lookupJoinType = OmniExpressionAdaptor.toOmniJoinType(joinType)
+        val lookupOpFactory = new OmniLookupJoinWithExprOperatorFactory(probeTypes,
+          probeOutputCols, probeHashColsExp, buildOutputCols, buildOutputTypes, lookupJoinType,
+          buildOpFactory, new OperatorConfig(SpillConfig.NONE,
+            new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
+        val lookupOp = lookupOpFactory.createOperator()
+        lookupCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startLookupCodegen)
+
         SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
+          lookupOp.close()
           buildOp.close()
+          lookupOpFactory.close()
           buildOpFactory.close()
         })
 
@@ -223,32 +265,19 @@ case class ColumnarShuffledHashJoinExec(
         buildOp.getOutput
         buildGetOutputTime += NANOSECONDS.toMillis(System.nanoTime() - startBuildGetOp)
 
-        val startLookupCodegen = System.nanoTime()
-        val lookupJoinType = OmniExpressionAdaptor.toOmniJoinType(joinType)
-        val lookupOpFactory = new OmniLookupJoinWithExprOperatorFactory(probeTypes,
-          probeOutputCols, probeHashColsExp, buildOutputCols, buildTypes, lookupJoinType,
-          buildOpFactory, new OperatorConfig(SpillConfig.NONE,
-            new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
-
-        val lookupOp = lookupOpFactory.createOperator()
-        lookupCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startLookupCodegen)
-
-        SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
-          lookupOp.close()
-          lookupOpFactory.close()
-        })
-
+        val streamedPlanOutput = pruneOutput(streamedPlan.output, projectList)
+        val prunedOutput = streamedPlanOutput ++ prunedBuildOutput
         val resultSchema = this.schema
         val reverse = buildSide == BuildLeft
         var left = 0
-        var leftLen = streamedPlan.output.size
-        var right = streamedPlan.output.size
+        var leftLen = streamedPlanOutput.size
+        var right = streamedPlanOutput.size
         var rightLen = output.size
         if (reverse) {
-          left = streamedPlan.output.size
+          left = streamedPlanOutput.size
           leftLen = output.size
           right = 0
-          rightLen = streamedPlan.output.size
+          rightLen = streamedPlanOutput.size
         }
 
         val joinIter: Iterator[ColumnarBatch] = new Iterator[ColumnarBatch] {
@@ -291,18 +320,22 @@ case class ColumnarShuffledHashJoinExec(
             val resultVecs = result.getVectors
             val vecs = OmniColumnVector
               .allocateColumns(result.getRowCount, resultSchema, false)
-            var index = 0
-            for (i <- left until leftLen) {
-              val v = vecs(index)
-              v.reset()
-              v.setVec(resultVecs(i))
-              index += 1
-            }
-            for (i <- right until rightLen) {
-              val v = vecs(index)
-              v.reset()
-              v.setVec(resultVecs(i))
-              index += 1
+            if (projectList.nonEmpty) {
+              reorderVecs(prunedOutput, projectList, resultVecs, vecs)
+            } else {
+              var index = 0
+              for (i <- left until leftLen) {
+                val v = vecs(index)
+                v.reset()
+                v.setVec(resultVecs(i))
+                index += 1
+              }
+              for (i <- right until rightLen) {
+                val v = vecs(index)
+                v.reset()
+                v.setVec(resultVecs(i))
+                index += 1
+              }
             }
             numOutputRows += result.getRowCount
             numOutputVecBatchs += 1
@@ -312,7 +345,7 @@ case class ColumnarShuffledHashJoinExec(
         if ("FULL OUTER" == joinType.sql) {
           val lookupOuterOpFactory =
             new OmniLookupOuterJoinWithExprOperatorFactory(probeTypes, probeOutputCols,
-              probeHashColsExp, buildOutputCols, buildTypes, buildOpFactory,
+              probeHashColsExp, buildOutputCols, buildOutputTypes, buildOpFactory,
               new OperatorConfig(SpillConfig.NONE,
                 new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
 
@@ -338,18 +371,22 @@ case class ColumnarShuffledHashJoinExec(
               val resultVecs = result.getVectors
               val vecs = OmniColumnVector
                 .allocateColumns(result.getRowCount, resultSchema, false)
-              var index = 0
-              for (i <- left until leftLen) {
-                val v = vecs(index)
-                v.reset()
-                v.setVec(resultVecs(i))
-                index += 1
-              }
-              for (i <- right until rightLen) {
-                val v = vecs(index)
-                v.reset()
-                v.setVec(resultVecs(i))
-                index += 1
+              if (projectList.nonEmpty) {
+                reorderVecs(prunedOutput, projectList, resultVecs, vecs)
+              } else {
+                var index = 0
+                for (i <- left until leftLen) {
+                  val v = vecs(index)
+                  v.reset()
+                  v.setVec(resultVecs(i))
+                  index += 1
+                }
+                for (i <- right until rightLen) {
+                  val v = vecs(index)
+                  v.reset()
+                  v.setVec(resultVecs(i))
+                  index += 1
+                }
               }
               numOutputRows += result.getRowCount
               numOutputVecBatchs += 1

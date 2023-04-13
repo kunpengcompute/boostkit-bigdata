@@ -26,7 +26,7 @@ import nova.hetu.omniruntime.operator.OmniOperator
 import nova.hetu.omniruntime.operator.aggregator.{OmniAggregationWithExprOperatorFactory, OmniHashAggregationWithExprOperatorFactory}
 import nova.hetu.omniruntime.operator.config.{OperatorConfig, OverflowConfig, SpillConfig}
 import nova.hetu.omniruntime.vector._
-import org.apache.spark.sql.catalyst.expressions.{Attribute, ExprId, NamedExpression, SortOrder}
+import org.apache.spark.sql.catalyst.expressions.{Alias, Attribute, AttributeReference, ExprId, NamedExpression, SortOrder}
 import org.apache.spark.sql.execution.datasources.orc.OrcColumnVector
 import org.apache.spark.sql.execution.metric.SQLMetric
 import org.apache.spark.sql.execution.vectorized.{OmniColumnVector, OnHeapColumnVector}
@@ -34,6 +34,7 @@ import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.vectorized.{ColumnVector, ColumnarBatch}
 
+import scala.collection.mutable.ListBuffer
 import java.util
 
 object OmniAdaptorUtil {
@@ -304,5 +305,62 @@ object OmniAdaptorUtil {
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP)).createOperator
     }
     operator
+  }
+
+  def pruneOutput(output: Seq[Attribute], projectList: Seq[NamedExpression]): Seq[Attribute] = {
+    if (projectList.nonEmpty) {
+      val projectOutput = ListBuffer[Attribute]()
+      for (project <- projectList) {
+        for (col <- output) {
+          if (col.exprId.equals(getProjectAliasExprId(project))) {
+            projectOutput += col
+          }
+        }
+      }
+      projectOutput
+    } else {
+      output
+    }
+  }
+
+  def getIndexArray(output: Seq[Attribute], projectList: Seq[NamedExpression]): Array[Int] = {
+    if (projectList.nonEmpty) {
+      val indexList = ListBuffer[Int]()
+      for (project <- projectList) {
+        for (i <- output.indices) {
+          val col = output(i)
+          if (col.exprId.equals(getProjectAliasExprId(project))) {
+            indexList += i
+          }
+        }
+      }
+      indexList.toArray
+    } else {
+      output.indices.toArray
+    }
+  }
+
+  def reorderVecs(prunedOutput: Seq[Attribute], projectList: Seq[NamedExpression], resultVecs: Array[nova.hetu.omniruntime.vector.Vec], vecs: Array[OmniColumnVector]) = {
+    for (index <- projectList.indices) {
+      val project = projectList(index)
+      for (i <- prunedOutput.indices) {
+        val col = prunedOutput(i)
+        if (col.exprId.equals(getProjectAliasExprId(project))) {
+          val v = vecs(index)
+          v.reset()
+          v.setVec(resultVecs(i))
+        }
+      }
+    }
+  }
+
+  def getProjectAliasExprId(project: NamedExpression): ExprId = {
+    project match {
+      case alias: Alias =>
+        // The condition of parameter is restricted. If parameter type is alias, its child type must be attributeReference.
+        alias.child.asInstanceOf[AttributeReference].exprId
+      case _ =>
+        project.exprId
+    }
   }
 }

@@ -323,7 +323,7 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
       sortAnswers = true)
   }
 
-  test("BroadcastHashJoin and project funsion test") {
+  test("BroadcastHashJoin and project fusion test") {
     val omniResult = person_test.join(order_test.hint("broadcast"), person_test("id_p") === order_test("id_p"), "leftouter")
       .select(person_test("name"), order_test("order_no"))
     val omniPlan = omniResult.queryExecution.executedPlan
@@ -338,7 +338,7 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
     ), false)
   }
 
-  test("BroadcastHashJoin and project funsion test for duplicate column") {
+  test("BroadcastHashJoin and project fusion test for duplicate column") {
     val omniResult = person_test.join(order_test.hint("broadcast"), person_test("id_p") === order_test("id_p"), "leftouter")
       .select(person_test("name"), order_test("order_no"), order_test("id_p"))
     val omniPlan = omniResult.queryExecution.executedPlan
@@ -353,7 +353,7 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
     ), false)
   }
 
-  test("BroadcastHashJoin and project funsion test for reorder columns") {
+  test("BroadcastHashJoin and project fusion test for reorder columns") {
     val omniResult = person_test.join(order_test.hint("broadcast"), person_test("id_p") === order_test("id_p"), "leftouter")
       .select(order_test("order_no"), person_test("name"), order_test("id_p"))
     val omniPlan = omniResult.queryExecution.executedPlan
@@ -383,7 +383,7 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
     ), false)
   }
 
-  test("BroadcastHashJoin and project funsion test for alias") {
+  test("BroadcastHashJoin and project fusion test for alias") {
     val omniResult = person_test.join(order_test.hint("broadcast"), person_test("id_p") === order_test("id_p"), "leftouter")
       .select(person_test("name").as("name1"), order_test("order_no").as("order_no1"))
     val omniPlan = omniResult.queryExecution.executedPlan
@@ -397,4 +397,77 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
       Row("Bush", null)
     ), false)
   }
+
+  test("shuffledHashJoin and project fusion test") {
+    val omniResult = person_test.join(order_test.hint("SHUFFLE_HASH"), person_test("id_p") === order_test("id_p"), "inner")
+      .select(person_test("name"), order_test("order_no"))
+    val omniPlan = omniResult.queryExecution.executedPlan
+    assert(omniPlan.find(_.isInstanceOf[ColumnarProjectExec]).isEmpty,
+      s"SQL:\n@OmniEnv no ColumnarProjectExec,omniPlan:${omniPlan}")
+    checkAnswer(omniResult, _ => omniPlan, Seq(
+      Row("Carter", 44678),
+      Row("Carter", 77895),
+      Row("Adams", 22456),
+      Row("Adams", 24562)
+    ), false)
+  }
+
+  test("ShuffledHashJoin and project fusion test for duplicate column") {
+    val omniResult = person_test.join(order_test.hint("SHUFFLE_HASH"), person_test("id_p") === order_test("id_p"), "inner")
+      .select(person_test("name"), order_test("order_no"), order_test("id_p"))
+    val omniPlan = omniResult.queryExecution.executedPlan
+    assert(omniPlan.find(_.isInstanceOf[ColumnarProjectExec]).isEmpty,
+      s"SQL:\n@OmniEnv no ColumnarProjectExec,omniPlan:${omniPlan}")
+    checkAnswer(omniResult, _ => omniPlan, Seq(
+      Row("Carter", 44678, 3),
+      Row("Carter", 77895, 3),
+      Row("Adams", 22456, 1),
+      Row("Adams", 24562, 1)
+    ), false)
+  }
+
+  test("ShuffledHashJoin and project fusion test for reorder columns") {
+    val omniResult = person_test.join(order_test.hint("SHUFFLE_HASH"), person_test("id_p") === order_test("id_p"), "inner")
+      .select(order_test("order_no"), person_test("name"), order_test("id_p"))
+    val omniPlan = omniResult.queryExecution.executedPlan
+    assert(omniPlan.find(_.isInstanceOf[ColumnarProjectExec]).isEmpty,
+      s"SQL:\n@OmniEnv no ColumnarProjectExec,omniPlan:${omniPlan}")
+    checkAnswer(omniResult, _ => omniPlan, Seq(
+      Row(44678, "Carter", 3),
+      Row(77895, "Carter", 3),
+      Row(22456, "Adams", 1),
+      Row(24562, "Adams", 1)
+    ), false)
+  }
+
+  test("ShuffledHashJoin and project are not fused test") {
+    val omniResult = person_test.join(order_test.hint("SHUFFLE_HASH"), person_test("id_p") === order_test("id_p"), "inner")
+      .select(order_test("order_no").plus(1), person_test("name"))
+    val omniPlan = omniResult.queryExecution.executedPlan
+    assert(omniPlan.find(_.isInstanceOf[ColumnarProjectExec]).isDefined,
+      s"SQL:\n@OmniEnv have ColumnarProjectExec,omniPlan:${omniPlan}")
+    checkAnswer(omniResult, _ => omniPlan, Seq(
+      Row(44679, "Carter"),
+      Row(77896, "Carter"),
+      Row(22457, "Adams"),
+      Row(24563, "Adams")
+    ), false)
+  }
+
+  test("ShuffledHashJoin and project fusion test for alias") {
+    val omniResult = person_test.join(order_test.hint("SHUFFLE_HASH"), person_test("id_p") === order_test("id_p"), "inner")
+      .select(person_test("name").as("name1"), order_test("order_no").as("order_no1"))
+    val omniPlan = omniResult.queryExecution.executedPlan
+    assert(omniPlan.find(_.isInstanceOf[ColumnarProjectExec]).isEmpty,
+      s"SQL:\n@OmniEnv no ColumnarProjectExec,omniPlan:${omniPlan}")
+    checkAnswer(omniResult, _ => omniPlan, Seq(
+      Row("Carter", 44678),
+      Row("Carter", 77895),
+      Row("Adams", 22456),
+      Row("Adams", 24562)
+    ), false)
+  }
+
+
+
 }
