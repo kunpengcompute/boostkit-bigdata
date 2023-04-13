@@ -33,9 +33,6 @@ object ShuffleJoinStrategy extends Strategy
   private val columnarPreferShuffledHashJoin =
     ColumnarPluginConfig.getConf.columnarPreferShuffledHashJoin
 
-  private val columnarPreferShuffledHashJoinCBO =
-    ColumnarPluginConfig.getConf.columnarPreferShuffledHashJoinCBO
-
   def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
     case ExtractEquiJoinKeys(joinType, leftKeys, rightKeys, nonEquiCond, _, left, right, hint)
       if columnarPreferShuffledHashJoin =>
@@ -66,8 +63,8 @@ object ShuffleJoinStrategy extends Strategy
           buildRight = true
         }
 
-        // use cbo statistics to take effect
-        if (columnarPreferShuffledHashJoinCBO) {
+        // use cbo statistics to take effect if CBO is enable
+        if (conf.cboEnabled) {
           getShuffleHashJoinBuildSide(left,
             right,
             joinType,

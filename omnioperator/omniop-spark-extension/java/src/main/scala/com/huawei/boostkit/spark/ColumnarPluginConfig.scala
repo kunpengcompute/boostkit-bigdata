@@ -166,10 +166,6 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
   val columnarPreferShuffledHashJoin =
     conf.getConfString("spark.sql.join.columnar.preferShuffledHashJoin", "false").toBoolean
 
-  // replace to SHJ by statistics
-  val columnarPreferShuffledHashJoinCBO =
-    conf.getConfString("spark.sql.join.columnar.preferShuffledHashJoinCBO", "true").toBoolean
-
   val maxBatchSizeInBytes =
     conf.getConfString("spark.sql.columnar.maxBatchSizeInBytes", "2097152").toInt
 
