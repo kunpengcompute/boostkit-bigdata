@@ -232,6 +232,7 @@ int Splitter::SplitBinaryArray(VectorBatch& vb)
         switch (column_type_id_[colSchema]) {
             case SHUFFLE_BINARY: {
                 auto colVb = singlePartitionFlag ? colSchema : colSchema + 1;
+                varcharVectorCache.insert(vb.GetVector(colVb)); // record varchar vector for release
                 if (vb.GetVector(colVb)->GetEncoding() == OMNI_VEC_ENCODING_DICTIONARY) {
                     for (auto row = 0; row < numRows; ++row) {
                         auto pid = partition_id_[row];
@@ -401,11 +402,12 @@ int Splitter::DoSplit(VectorBatch& vb) {
 
     // Binary split last vector batch...
     SplitBinaryArray(vb);
-    vectorBatch_cache_.push_back(&vb); // record for release vector
+    num_row_splited_ += vb.GetRowCount();
+    // release the fixed width vector and release vectorBatch at the same time
+    ReleaseVectorBatch(&vb);
 
     // 阈值检查，是否溢写
-    num_row_splited_ += vb.GetRowCount();
-    if (num_row_splited_ + vb.GetRowCount() >= SHUFFLE_SPILL_NUM_ELEMENTS_FORCE_SPILL_THRESHOLD) {
+    if (num_row_splited_ >= SHUFFLE_SPILL_NUM_ELEMENTS_FORCE_SPILL_THRESHOLD) {
         LogsDebug(" Spill For Row Num Threshold.");
         TIME_NANO_OR_RAISE(total_spill_time_, SpillToTmpFile());
     }
@@ -887,17 +889,7 @@ int Splitter::SpillToTmpFile() {
     WriteDataFileProto();
     std::shared_ptr<Buffer> ptrTmp = CaculateSpilledTmpFilePartitionOffsets();
     spilled_tmp_files_info_[options_.next_spilled_file_dir] = ptrTmp;
-
-    auto cache_vectorBatch_num = vectorBatch_cache_.size();
-    for (uint64_t i = 0; i < cache_vectorBatch_num; ++i) {
-        ReleaseVectorBatch(*vectorBatch_cache_[i]);
-        if (nullptr == vectorBatch_cache_[i]) {
-            throw std::runtime_error("delete nullptr error for free vectorBatch");
-        }
-        delete vectorBatch_cache_[i];
-        vectorBatch_cache_[i] = nullptr;
-    }
-    vectorBatch_cache_.clear();
+    ReleaseVarcharVector();
     num_row_splited_ = 0;
     cached_vectorbatch_size_ = 0;
     return 0;

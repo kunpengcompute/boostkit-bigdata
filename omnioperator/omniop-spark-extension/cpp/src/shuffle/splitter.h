@@ -119,7 +119,6 @@ class Splitter {
     std::vector<std::string> configured_dirs_;
 
     std::vector<std::vector<std::vector<std::vector<std::shared_ptr<Buffer>>>>> partition_cached_vectorbatch_;
-    std::vector<VectorBatch*> vectorBatch_cache_;
     /*
      * varchar buffers:
      *  partition_array_buffers_[partition_id][col_id][varcharBatch_id]
@@ -136,6 +135,33 @@ class Splitter {
     std::vector<int64_t> partition_lengths_;
 
 private:
+    void ReleaseVarcharVector()
+    {
+        std::set<Vector *>::iterator it;
+        for (it = varcharVectorCache.begin(); it != varcharVectorCache.end(); it++) {
+            delete *it;
+        }
+        varcharVectorCache.clear();
+    }
+
+    void ReleaseVectorBatch(VectorBatch *vb)
+    {
+        int vectorCnt = vb->GetVectorCount();
+        std::set<Vector *> vectorAddress; // vector deduplication
+        for (int vecIndex = 0; vecIndex < vectorCnt; vecIndex++) {
+            Vector *vector = vb->GetVector(vecIndex);
+            // not varchar vector can be released;
+            if (varcharVectorCache.find(vector) == varcharVectorCache.end() &&
+                vectorAddress.find(vector) == vectorAddress.end()) {
+                vectorAddress.insert(vector);
+                delete vector;
+            }
+        }
+        vectorAddress.clear();
+        delete vb;
+    }
+
+    std::set<Vector *> varcharVectorCache;
     bool first_vector_batch_ = false;
     std::vector<DataTypeId> vector_batch_col_types_;
     InputDataTypes input_col_types;
