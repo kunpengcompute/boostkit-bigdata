@@ -339,8 +339,8 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
     val df = leftWithNull.join(rightWithNull.hint("SHUFFLE_HASH"),
       col("q") === col("c"), "leftouter")
     checkAnswer(df, _ => df.queryExecution.executedPlan, Seq(
-      Row("", "Hello", null, 1.0, null, null, null, null),
       Row("abc", null, 4, 2.0, "abc", "", 4, 1.0),
+      Row("", "Hello", null, 1.0, null, null, null, null),
       Row(" yeah  ", "yeah", 10, 8.0, null, null, null, null),
       Row(" add", "World", 8, 3.0, null, null, null, null)
     ), false)

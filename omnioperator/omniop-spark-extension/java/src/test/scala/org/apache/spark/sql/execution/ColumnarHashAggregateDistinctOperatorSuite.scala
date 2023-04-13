@@ -67,6 +67,11 @@ class ColumnarHashAggregateDistinctOperatorSuite extends ColumnarSparkPlanTest {
     dealer_decimal.createOrReplaceTempView("dealer_decimal")
   }
 
+  test("check columnar hashAgg filter result with distinct") {
+    val sql1 = "select id, count(distinct car_model) filter (where quantity is not null) from dealer group by id"
+    assertHashAggregateExecOmniAndSparkResultEqual(sql1)
+  }
+
   test("Test HashAgg with 1 distinct:") {
     val sql1 = "SELECT car_model, count(DISTINCT quantity) AS count FROM dealer" +
       " GROUP BY car_model;"
