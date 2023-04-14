@@ -130,6 +130,16 @@ class OmniCacheExtensionAstBuilder(spark: SparkSession, delegate: ParserInterfac
     }
     try {
       spark.sessionState.catalogManager.setCurrentNamespace(Array(curDatabase))
+      val fileIndex = spark
+          .sql(queryStr.get)
+          .queryExecution
+          .sparkPlan
+          .collect {
+            case FileSourceScanExec(relation, _, _, _, _, _, _, _, _)
+            => relation.location
+            case RowDataSourceScanExec(_, _, _, _, _, relation: HadoopFsRelation, _)
+            => relation.location
+          }
       // disable plugin
       RewriteHelper.disableCachePlugin()
       val data = spark.sql(queryStr.get).queryExecution.optimizedPlan
@@ -155,11 +165,6 @@ class OmniCacheExtensionAstBuilder(spark: SparkSession, delegate: ParserInterfac
       val partitionColumns = catalogTable.partitionColumnNames
       PartitioningUtils.validatePartitionColumn(data.schema, partitionColumns, caseSensitive)
 
-      val fileIndex = Some(catalogTable.identifier).map { tableIdent =>
-        spark.table(tableIdent).queryExecution.analyzed.collect {
-          case LogicalRelation(t: HadoopFsRelation, _, _, _) => t.location
-        }.head
-      }
       // For partitioned relation r, r.schema's column ordering can be different from the column
       // ordering of data.logicalPlan (partition columns are all moved after data column).  This
       // will be adjusted within InsertIntoHadoopFsRelation.

@@ -88,11 +88,16 @@ object ViewMetadata extends RewriteHelper {
 
   val UNLOAD: Int = -1
 
+  private var REFRESH_STAT: String = _
+  private val BUSY = "BUSY"
+  private val IDLE = "IDLE"
+
   /**
    * set sparkSession
    */
   def setSpark(sparkSession: SparkSession): Unit = {
     spark = sparkSession
+    REFRESH_STAT = IDLE
     status = STATUS_LOADING
 
     kryoSerializer = new KryoSerializer(spark.sparkContext.getConf)
@@ -929,9 +934,13 @@ object ViewMetadata extends RewriteHelper {
   }
 
   def checkViewDataReady(viewName: String): Unit = {
+    if (REFRESH_STAT equals BUSY) {
+      return
+    }
     val lastTime = getLastViewDependsTableTime(viewName)
     val nowTime = getViewDependsTableTime(viewName)
     if (lastTime != nowTime) {
+      REFRESH_STAT = BUSY
       RewriteTime.withTimeStat("REFRESH MV") {
         val sqlText = spark.sparkContext.getLocalProperty(SPARK_JOB_DESCRIPTION)
         RewriteHelper.enableSqlLog()
@@ -949,6 +958,7 @@ object ViewMetadata extends RewriteHelper {
       }.toString()
       logBasedOnLevel(s"REFRESH MATERIALIZED VIEW $viewName; " +
           s"for depends table has updated $updateReason")
+      REFRESH_STAT = IDLE
     }
   }
 }

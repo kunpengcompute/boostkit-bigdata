@@ -359,7 +359,7 @@ case class RefreshMaterializedViewCommand(
     query: LogicalPlan,
     mode: SaveMode,
     catalogTable: Option[CatalogTable],
-    fileIndex: Option[FileIndex],
+    fileIndex: Seq[FileIndex],
     outputColumnNames: Seq[String])
     extends DataWritingCommand {
 
