@@ -76,6 +76,26 @@
         <classifier>aarch64</classifier>
     </dependency>
     <dependency>
+        <groupId>com.huaweicloud</groupId>
+        <artifactId>esdk-obs-java-optimised</artifactId>
+        <version>3.21.8.2</version>
+        <scope>provided</scope>
+        <exclusions>
+            <exclusion>
+                <artifactId>jackson-databind</artifactId>
+                <groupId>com.fasterxml.jackson.core</groupId>
+            </exclusion>
+            <exclusion>
+                <artifactId>jackson-annotations</artifactId>
+                <groupId>com.fasterxml.jackson.core</groupId>
+            </exclusion>
+            <exclusion>
+                <artifactId>jackson-core</artifactId>
+                <groupId>com.fasterxml.jackson.core</groupId>
+            </exclusion>
+        </exclusions>
+    </dependency>
+    <dependency>
         <groupId>junit</groupId>
         <artifactId>junit</artifactId>
         <scope>test</scope>

@@ -18,6 +18,8 @@
 
 package com.huawei.boostkit.spark.jni;
 
+import com.huawei.boostkit.spark.ObsConf;
+
 import nova.hetu.omniruntime.type.DataType;
 import nova.hetu.omniruntime.type.Decimal128DataType;
 import nova.hetu.omniruntime.vector.*;
@@ -148,12 +150,17 @@ public class OrcColumnarBatchJniReader {
             job.put("serializedTail", options.getOrcTail().getSerializedTail().toString());
         }
         job.put("tailLocation", 9223372036854775807L);
+
         // handle delegate token for native orc reader
         OrcColumnarBatchJniReader.tokenDebug("initializeReader");
         JSONObject tokensJsonObj = constructTokensJSONObject();
         if (null != tokensJsonObj) {
             job.put("tokens", tokensJsonObj);
         }
+
+        // just used for obs
+        job.put("obsInfo", constructObsJSONObject());
+
         reader = initializeReader(path, job);
         return reader;
     }
@@ -355,6 +362,17 @@ public class OrcColumnarBatchJniReader {
             LOGGER.debug("\n\n================== tokens-json ==================\n" + tokensJsonItem.toString());
             return tokensJsonItem;
         }
+    }
+
+    public static JSONObject constructObsJSONObject() {
+        JSONObject obsJsonItem = new JSONObject();
+        obsJsonItem.put("endpoint", ObsConf.getEndpoint());
+        synchronized (ObsConf.getLock()) {
+            obsJsonItem.put("ak", ObsConf.getAk());
+            obsJsonItem.put("sk", ObsConf.getSk());
+            obsJsonItem.put("token", ObsConf.getToken());
+        }
+        return obsJsonItem;
     }
 
     public static void tokenDebug(String mesg) {
