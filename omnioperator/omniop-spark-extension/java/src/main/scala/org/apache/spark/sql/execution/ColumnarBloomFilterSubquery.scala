@@ -23,7 +23,7 @@ import org.apache.spark.sql.catalyst.expressions.{ExprId, Expression}
 import org.apache.spark.sql.catalyst.expressions.codegen.{CodegenContext, ExprCode}
 import nova.hetu.omniruntime.operator.filter.OmniBloomFilterOperatorFactory
 import nova.hetu.omniruntime.vector.{IntVec, LongVec, Vec, VecBatch}
-import org.apache.spark.SparkException
+import org.apache.spark.{ SparkContext, SparkEnv, SparkException}
 import org.apache.spark.sql.execution.util.SparkMemoryUtils.addLeakSafeTaskCompletionListener
 
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream, DataInputStream, OutputStream}
@@ -41,10 +41,13 @@ case class ColumnarBloomFilterSubquery(plan: BaseSubqueryExec, exprId: ExprId, s
   override def nullable: Boolean = true
   override def toString: String = scalarSubquery.toString
   override def eval(input: InternalRow): Any = {
-    result = scalarSubquery.eval(input)
     var ret = 0L
-    if (result != null) {
-      ret = copyToNativeBloomFilter()
+    // if eval at driver side, return 0
+    if (SparkEnv.get.executorId != SparkContext.DRIVER_IDENTIFIER) {
+      result = scalarSubquery.eval(input)
+      if (result != null) {
+        ret = copyToNativeBloomFilter()
+      }
     }
     ret
   }
