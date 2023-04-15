@@ -23,10 +23,10 @@ import java.util.{Locale, Properties}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{PushDownData, PushDownManager, SparkSession}
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.{Alias, And, Attribute, AttributeReference, BinaryExpression, Expression, NamedExpression, PredicateHelper, UnaryExpression}
-import org.apache.spark.sql.catalyst.expressions.aggregate.{Partial, PartialMerge}
+import org.apache.spark.sql.catalyst.expressions.{Alias, And, Attribute, AttributeReference, BinaryExpression, Cast, Expression, NamedExpression, PredicateHelper, UnaryExpression}
+import org.apache.spark.sql.catalyst.expressions.aggregate.{AggregateExpression, Partial, PartialMerge}
 import org.apache.spark.sql.catalyst.rules.Rule
-import org.apache.spark.sql.execution.{FileSourceScanExec, FilterExec, GlobalLimitExec, LeafExecNode, LocalLimitExec, NdpFileSourceScanExec, ProjectExec, SparkPlan}
+import org.apache.spark.sql.execution.{CollectLimitExec, FileSourceScanExec, FilterExec, GlobalLimitExec, LeafExecNode, LocalLimitExec, NdpFileSourceScanExec, ProjectExec, SparkPlan}
 import org.apache.spark.sql.execution.adaptive.AdaptiveSparkPlanExec
 import org.apache.spark.sql.execution.aggregate.{BaseAggregateExec, HashAggregateExec, ObjectHashAggregateExec, SortAggregateExec}
 import org.apache.spark.sql.execution.datasources.HadoopFsRelation
@@ -34,6 +34,7 @@ import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.sources.DataSourceRegister
 import org.apache.spark.sql.hive.HiveSimpleUDF
 import org.apache.hadoop.hive.ql.exec.DefaultUDFMethodResolver
+import org.apache.spark.sql.catalyst.trees.TreeNode
 
 import scala.collection.{JavaConverters, mutable}
 import scala.reflect.runtime.universe
@@ -161,7 +162,15 @@ case class NdpPushDown(sparkSession: SparkSession)
             aggExpressionWhiteList.contains(g.prettyName)
           }
       } &&
-      isSimpleExpressions(agg.groupingExpressions)
+      isSimpleExpressions(agg.groupingExpressions) && !hasCastExpressions(agg.aggregateExpressions)
+  }
+
+  def hasCastExpressions(aggExps: Seq[AggregateExpression]): Boolean = {
+    if(aggExps.isEmpty) return false
+    aggExps.foreach(aggExp =>
+      if(aggExp.find(_.isInstanceOf[Cast]).isDefined) return true
+    )
+    false
   }
 
   def isSimpleExpressions(groupingExpressions: Seq[NamedExpression]): Boolean = {
@@ -347,6 +356,13 @@ case class NdpPushDown(sparkSession: SparkSession)
       case l @ LocalLimitExec(limit, s: NdpScanWrapper) if shouldPushDown(s.scan) =>
         s.scan.pushDownLimit(LimitExeInfo(limit))
         s.update(l.output)
+      case l @ CollectLimitExec(limit, s: NdpScanWrapper) if shouldPushDown(s.scan) =>
+        s.scan.pushDownLimit(LimitExeInfo(limit))
+        l
+      case l @ CollectLimitExec(limit,
+      agg @ HashAggregateExec(_, _, _, _, _, _, s: NdpScanWrapper)) if shouldPushDown(s.scan) =>
+        s.scan.pushDownLimit(LimitExeInfo(limit))
+        l
     }
     replaceWrapper(p)
   }
