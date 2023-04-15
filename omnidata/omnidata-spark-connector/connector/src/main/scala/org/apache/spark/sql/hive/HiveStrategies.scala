@@ -19,22 +19,20 @@ package org.apache.spark.sql.hive
 
 import java.io.IOException
 import java.util.Locale
-
 import org.apache.hadoop.fs.{FileSystem, Path}
-
 import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.catalog._
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.planning._
-import org.apache.spark.sql.catalyst.plans.logical.{Filter => LFilter, InsertIntoDir, InsertIntoStatement, LogicalPlan, ScriptTransformation, Statistics}
+import org.apache.spark.sql.catalyst.plans.logical.{InsertIntoDir, InsertIntoStatement, LogicalPlan, ScriptTransformation, Statistics, Filter => LFilter}
 import org.apache.spark.sql.catalyst.plans.logical.statsEstimation.FilterEstimation
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.connector.catalog.CatalogV2Util.assertNoNullTypeInSchema
 import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.command.{CreateTableCommand, DDLUtils}
 import org.apache.spark.sql.execution.datasources.{CreateTable, DataSourceStrategy}
-import org.apache.spark.sql.execution.ndp.NdpConf
-import org.apache.spark.sql.execution.ndp.NdpConf.{NDP_ENABLED}
+import org.apache.spark.sql.execution.ndp.{NdpConf, NdpFilterEstimation}
+import org.apache.spark.sql.execution.ndp.NdpConf.NDP_ENABLED
 import org.apache.spark.sql.hive.execution._
 import org.apache.spark.sql.hive.execution.HiveScriptTransformationExec
 import org.apache.spark.sql.internal.{HiveSerDe, SQLConf}
@@ -286,7 +284,7 @@ private[hive] trait HiveStrategies {
 
         val condition = filters.reduceLeftOption(And)
         val selectivity = if (condition.nonEmpty) {
-          FilterEstimation(LFilter(condition.get, relation))
+          NdpFilterEstimation(FilterEstimation(LFilter(condition.get, relation)))
             .calculateFilterSelectivity(condition.get)
         } else {
           None

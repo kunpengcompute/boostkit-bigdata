@@ -18,7 +18,6 @@
 package org.apache.spark.sql.execution.datasources.v2
 
 import scala.collection.JavaConverters._
-
 import org.apache.spark.sql.{AnalysisException, Dataset, SparkSession, Strategy}
 import org.apache.spark.sql.catalyst.analysis.{ResolvedNamespace, ResolvedPartitionSpec, ResolvedTable}
 import org.apache.spark.sql.catalyst.expressions.{And, Expression, NamedExpression, PredicateHelper, SubqueryExpression}
@@ -30,6 +29,7 @@ import org.apache.spark.sql.connector.catalog.{CatalogV2Util, Identifier, Stagin
 import org.apache.spark.sql.connector.read.streaming.{ContinuousStream, MicroBatchStream}
 import org.apache.spark.sql.execution.{FilterExec, LeafExecNode, LocalTableScanExec, ProjectExec, RowDataSourceScanExec, SparkPlan}
 import org.apache.spark.sql.execution.datasources.DataSourceStrategy
+import org.apache.spark.sql.execution.ndp.NdpFilterEstimation
 import org.apache.spark.sql.execution.streaming.continuous.{WriteToContinuousDataSource, WriteToContinuousDataSourceExec}
 import org.apache.spark.sql.sources.{BaseRelation, TableScan}
 import org.apache.spark.sql.util.CaseInsensitiveStringMap
@@ -108,7 +108,7 @@ class DataSourceV2Strategy(session: SparkSession) extends Strategy with Predicat
         tableIdentifier = None)
       val condition = filters.reduceLeftOption(And)
       val selectivity = if (condition.nonEmpty) {
-        FilterEstimation(LFilter(condition.get, relation)).calculateFilterSelectivity(condition.get)
+        NdpFilterEstimation(FilterEstimation(LFilter(condition.get, relation))).calculateFilterSelectivity(condition.get)
       } else {
         None
       }
@@ -122,7 +122,7 @@ class DataSourceV2Strategy(session: SparkSession) extends Strategy with Predicat
       val batchExec = BatchScanExec(relation.output, relation.scan)
       val condition = filters.reduceLeftOption(And)
       val selectivity = if (condition.nonEmpty) {
-        FilterEstimation(LFilter(condition.get, relation)).calculateFilterSelectivity(condition.get)
+        NdpFilterEstimation(FilterEstimation(LFilter(condition.get, relation))).calculateFilterSelectivity(condition.get)
       } else {
         None
       }
