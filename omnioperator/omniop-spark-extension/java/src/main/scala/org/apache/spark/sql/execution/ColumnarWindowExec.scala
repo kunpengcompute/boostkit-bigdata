@@ -204,7 +204,7 @@ case class ColumnarWindowExec(windowExpression: Seq[NamedExpression],
     val winExpressions: Seq[Expression] = windowFrameExpressionFactoryPairs.flatMap(_._1)
     val windowFunType = new Array[FunctionType](winExpressions.size)
     val omminPartitionChannels = new Array[Int](partitionSpec.size)
-    val preGroupedChannels = new Array[Int](winExpressions.size)
+    val preGroupedChannels = new Array[Int](0)
     var windowArgKeys = new Array[String](winExpressions.size)
     val windowFunRetType = new Array[DataType](winExpressions.size)
     val omniAttrExpsIdMap = getExprIdMap(child.output)

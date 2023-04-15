@@ -18,7 +18,7 @@
 
 package org.apache.spark.sql.execution
 
-import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.{DataFrame, Row}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.test.SharedSparkSession
@@ -45,5 +45,17 @@ class ColumnarWindowExecSuite extends ColumnarSparkPlanTest with SharedSparkSess
     val res2 = inputDf.withColumn("max", max("c").over(res1))
     res2.head(10).foreach(row => println(row))
     assert(res2.queryExecution.executedPlan.find(_.isInstanceOf[ColumnarWindowExec]).isDefined, s"ColumnarWindowExec not happened, executedPlan as follows： \n${res2.queryExecution.executedPlan}")
+  }
+
+  test("check columnar window result") {
+    val res1 = Window.partitionBy("a").orderBy('c.asc)
+    val res2 = inputDf.withColumn("max", max("c").over(res1))
+    assert(res2.queryExecution.executedPlan.find(_.isInstanceOf[ColumnarSortExec]).isEmpty, s"ColumnarSortExec happened, executedPlan as follows： \n${res2.queryExecution.executedPlan}")
+    assert(res2.queryExecution.executedPlan.find(_.isInstanceOf[ColumnarWindowExec]).isDefined, s"ColumnarWindowExec not happened, executedPlan as follows： \n${res2.queryExecution.executedPlan}")
+    checkAnswer(
+      res2,
+      Seq(Row(" add", "World", 8, 3.0, 8), Row(" yeah  ", "yeah", 10, 8.0, 10), Row("abc", "", 4, 2.0, 4),
+        Row("abc", "", 10, 8.0, 10), Row("", "Hello", 1, 1.0, 1))
+    )
   }
 }
