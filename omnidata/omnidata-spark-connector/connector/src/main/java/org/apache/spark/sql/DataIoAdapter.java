@@ -53,6 +53,7 @@ import io.prestosql.spi.type.DoubleType;
 import io.prestosql.spi.type.RowType;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeSignature;
+import org.apache.spark.sql.types.DateType;
 import scala.collection.JavaConverters;
 import scala.collection.Seq;
 
@@ -716,8 +717,13 @@ public class DataIoAdapter {
             prestoType = NdpUtils.transOlkDataType(leftExpression.dataType(), false);
             filterProjectionId = putFilterValue(leftExpression, prestoType);
         } else if (leftExpression instanceof Cast && operatorName.equals("in")) {
-            prestoType = NdpUtils.transOlkDataType(((Cast) leftExpression).child().dataType(), false);
-            filterProjectionId = putFilterValue(((Cast) leftExpression).child(), prestoType);
+            if (((Cast) leftExpression).child().dataType() instanceof DateType) {
+                prestoType = NdpUtils.transOlkDataType(((Cast) leftExpression).child().dataType(), false);
+            } else {
+                prestoType = NdpUtils.transOlkDataType(leftExpression.dataType(), false);
+            }
+            filterProjectionId = putFilterValue(((Cast) leftExpression).child(),
+                    NdpUtils.transOlkDataType(((Cast) leftExpression).child().dataType(), false));
         } else {
             if (leftExpression instanceof HiveSimpleUDF) {
                 for (int i = 0; i < leftExpression.children().length(); i++) {
