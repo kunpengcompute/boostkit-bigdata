@@ -599,6 +599,21 @@ public class DataIoAdapter {
             case And:
                 return reverseExpressionTree(filterExpression);
             case Not:
+                if (!(filterExpression instanceof Not)) {
+                    return resRowExpression;
+                }
+                if (((Not) filterExpression).child() instanceof EqualTo) {
+                    EqualTo equalToExpression = (EqualTo) ((Not) filterExpression).child();
+                    if (equalToExpression.left() instanceof Literal) {
+                        rightExpressions.add(equalToExpression.left());
+                        left = equalToExpression.right();
+                    } else {
+                        rightExpressions.add(equalToExpression.right());
+                        left = equalToExpression.left();
+                    }
+                    return getRowExpression(left,
+                            "NOT_EQUAL", rightExpressions);
+                }
                 Signature notSignature = new Signature(
                         QualifiedObjectName.valueOfDefaultFunction("not"),
                         FunctionKind.SCALAR, new TypeSignature("boolean"),
