@@ -367,9 +367,7 @@ uint64_t copyVarwidth(int maxLen, orc::ColumnVectorBatch *field, int vcType)
 {
     VectorAllocator *allocator = omniruntime::vec::GetProcessGlobalVecAllocator();
     orc::StringVectorBatch *lvb = dynamic_cast<orc::StringVectorBatch *>(field);
-    uint64_t totalLen =
-        maxLen * (lvb->numElements) > lvb->getMemoryUsage() ? maxLen * (lvb->numElements) : lvb->getMemoryUsage();
-    VarcharVector *originalVector = new VarcharVector(allocator, totalLen, lvb->numElements);
+    VarcharVector *originalVector = new VarcharVector(allocator, lvb->numElements);
     for (uint i = 0; i < lvb->numElements; i++) {
         if (lvb->notNull.data()[i]) {
             string tmpStr(reinterpret_cast<const char *>(lvb->data.data()[i]), lvb->length.data()[i]);
