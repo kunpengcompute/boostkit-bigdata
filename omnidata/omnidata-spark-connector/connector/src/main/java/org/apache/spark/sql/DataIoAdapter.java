@@ -537,7 +537,8 @@ public class DataIoAdapter {
         LessThanOrEqual,
         In,
         HiveSimpleUDF,
-        IsNull
+        IsNull,
+        AttributeReference
     }
 
     private Optional<AggregationInfo> createAggregationInfo(
@@ -697,6 +698,9 @@ public class DataIoAdapter {
             case HiveSimpleUDF:
                 return getRowExpression(filterExpression,
                         ((HiveSimpleUDF) filterExpression).name(), rightExpressions);
+            case AttributeReference:
+                Type type = NdpUtils.transOlkDataType(filterExpression.dataType(), false);
+                return new InputReferenceExpression(putFilterValue(filterExpression, type), type);
             default:
                 return resRowExpression;
         }
