@@ -277,6 +277,7 @@ object OmniAdaptorUtil {
   def getAggOperator(groupingExpressions: Seq[NamedExpression],
                      omniGroupByChanel: Array[String],
                      omniAggChannels: Array[Array[String]],
+                     omniAggChannelsFilter: Array[String],
                      omniSourceTypes: Array[nova.hetu.omniruntime.`type`.DataType],
                      omniAggFunctionTypes: Array[FunctionType],
                      omniAggOutputTypes: Array[Array[nova.hetu.omniruntime.`type`.DataType]],
@@ -287,6 +288,7 @@ object OmniAdaptorUtil {
       operator = new OmniHashAggregationWithExprOperatorFactory(
         omniGroupByChanel,
         omniAggChannels,
+        omniAggChannelsFilter,
         omniSourceTypes,
         omniAggFunctionTypes,
         omniAggOutputTypes,
@@ -297,6 +299,7 @@ object OmniAdaptorUtil {
       operator = new OmniAggregationWithExprOperatorFactory(
         omniGroupByChanel,
         omniAggChannels,
+        omniAggChannelsFilter,
         omniSourceTypes,
         omniAggFunctionTypes,
         omniAggOutputTypes,
