@@ -22,6 +22,7 @@ import static io.prestosql.spi.function.FunctionKind.AGGREGATE;
 import static io.prestosql.spi.function.FunctionKind.SCALAR;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
+import static io.prestosql.spi.type.VarcharType.createVarcharType;
 
 import com.huawei.boostkit.omnidata.decode.type.DecodeType;
 import com.huawei.boostkit.omnidata.decode.type.LongDecodeType;
@@ -48,12 +49,7 @@ import io.prestosql.spi.relation.ConstantExpression;
 import io.prestosql.spi.relation.InputReferenceExpression;
 import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.relation.SpecialForm;
-import io.prestosql.spi.type.BigintType;
-import io.prestosql.spi.type.DoubleType;
-import io.prestosql.spi.type.RowType;
-import io.prestosql.spi.type.Type;
-import io.prestosql.spi.type.TypeSignature;
-import org.apache.spark.sql.types.DateType;
+import io.prestosql.spi.type.*;
 import scala.collection.JavaConverters;
 import scala.collection.Seq;
 
@@ -63,7 +59,6 @@ import org.apache.spark.sql.catalyst.expressions.And;
 import org.apache.spark.sql.catalyst.expressions.Attribute;
 import org.apache.spark.sql.catalyst.expressions.AttributeReference;
 import org.apache.spark.sql.catalyst.expressions.BinaryArithmetic;
-import org.apache.spark.sql.catalyst.expressions.Cast;
 import org.apache.spark.sql.catalyst.expressions.Divide;
 import org.apache.spark.sql.catalyst.expressions.EqualTo;
 import org.apache.spark.sql.catalyst.expressions.Expression;
@@ -324,7 +319,13 @@ public class DataIoAdapter {
     }
 
     private RowExpression extractNamedExpression(NamedExpression namedExpression) {
-        Type prestoType = NdpUtils.transOlkDataType(((Expression) namedExpression).dataType(), false);
+        Attribute attribute = null;
+        boolean isInputDataType = true;
+        if (namedExpression instanceof Attribute) {
+            attribute = (Attribute) namedExpression;
+            isInputDataType = false;
+        }
+        Type prestoType = NdpUtils.transOlkDataType(((Expression) namedExpression).dataType(), attribute, false, isInputDataType);
         int aggProjectionId;
         String aggColumnName = namedExpression.name();
         columnOrdersList.add(columnOrder++);
@@ -411,10 +412,22 @@ public class DataIoAdapter {
     private CallExpression createAggBinCall(BinaryArithmetic expression,
                                             String operatorName, Type prestoType) {
         List<RowExpression> arguments = new ArrayList<>();
+        Attribute attributeLeft = null;
+        boolean isInputDataTypeLeft = true;
+        if (expression.left() instanceof Attribute) {
+            attributeLeft = (Attribute) expression.left();
+            isInputDataTypeLeft = false;
+        }
+        Attribute attributeRight = null;
+        boolean isInputDataTypeRight = true;
+        if (expression.right() instanceof Attribute) {
+            attributeRight = (Attribute) expression.right();
+            isInputDataTypeRight = false;
+        }
         Type leftPrestoType = NdpUtils.transOlkDataType(
-                expression.left().dataType(), false);
+                expression.left().dataType(), attributeLeft, false, isInputDataTypeLeft);
         Type rightPrestoType = NdpUtils.transOlkDataType(
-                expression.right().dataType(), false);
+                expression.right().dataType(), attributeRight, false, isInputDataTypeRight);
         FunctionHandle functionHandle = new BuiltInFunctionHandle(
                 new Signature(QualifiedObjectName.valueOfDefaultFunction("$operator$" + operatorName),
                         SCALAR, prestoType.getTypeSignature(),
@@ -427,7 +440,13 @@ public class DataIoAdapter {
     }
 
     private RowExpression createAggProjection(Expression expression) {
-        Type prestoType = NdpUtils.transOlkDataType(expression.dataType(), false);
+        Attribute attribute = null;
+        boolean isInputDataType = true;
+        if (expression instanceof Attribute) {
+            attribute = (Attribute) expression;
+            isInputDataType = false;
+        }
+        Type prestoType = NdpUtils.transOlkDataType(expression.dataType(), attribute, false, isInputDataType);
         AggExpressionType aggExpressionType = AggExpressionType
                 .valueOf(expression.getClass().getSimpleName());
         switch (aggExpressionType) {
@@ -440,11 +459,9 @@ public class DataIoAdapter {
             case Divide:
                 return createAggBinCall((Divide) expression, "Divide", prestoType);
             case Remainder:
-                return createAggBinCall((Remainder) expression, "Remainder", prestoType);
+                return createAggBinCall((Remainder) expression, "Modulus", prestoType);
             case Literal:
-                Object value = NdpUtils.transData(
-                        expression.dataType().toString(), expression.toString());
-                return new ConstantExpression(value, prestoType);
+                return NdpUtils.transArgumentData(expression.toString(), prestoType);
             case AttributeReference:
                 String aggColumnName = expression.toString().split("#")[0].toLowerCase(Locale.ENGLISH);
                 int field;
@@ -483,7 +500,7 @@ public class DataIoAdapter {
                                           Map<String, AggregationInfo.AggregateFunction> aggregationMap) {
         List<Expression> expressions = JavaConverters.seqAsJavaList(aggregateFunction.children());
         String aggregateFunctionName = aggregateFunction.toString();
-        Type prestoType = NdpUtils.transOlkDataType(aggregateFunction.dataType(), false);
+        Type prestoType = NdpUtils.transOlkDataType(aggregateFunction.dataType(), null, false, true);
         AggregateFunctionType aggregateFunctionType = AggregateFunctionType.valueOf(
                 aggregateFunction.getClass().getSimpleName());
         for (Expression expression : expressions) {
@@ -493,7 +510,13 @@ public class DataIoAdapter {
                 fieldMap.put(aggregateFunctionName, projectionId);
                 if (aggregateFunctionType.equals(AggregateFunctionType.Count)
                         || aggregateFunctionType.equals(AggregateFunctionType.Average)) {
-                    prestoType = NdpUtils.transOlkDataType(expression.dataType(), false);
+                    Attribute attribute = null;
+                    boolean isInputDataType = true;
+                    if (expression instanceof Attribute) {
+                        attribute = (Attribute) expression;
+                        isInputDataType = false;
+                    }
+                    prestoType = NdpUtils.transOlkDataType(expression.dataType(), attribute, false, isInputDataType);
                 }
                 omnidataTypes.add(prestoType);
                 break;
@@ -715,7 +738,7 @@ public class DataIoAdapter {
                 return getRowExpression(filterExpression,
                         ((HiveSimpleUDF) filterExpression).name(), rightExpressions);
             case AttributeReference:
-                Type type = NdpUtils.transOlkDataType(filterExpression.dataType(), false);
+                Type type = NdpUtils.transOlkDataType(filterExpression.dataType(), (Attribute) filterExpression,  false, false);
                 return new InputReferenceExpression(putFilterValue(filterExpression, type), type);
             default:
                 return resRowExpression;
@@ -729,29 +752,23 @@ public class DataIoAdapter {
         int filterProjectionId;
         // deal with left expression only UDF and Attribute
         if (leftExpression instanceof AttributeReference) {
-            prestoType = NdpUtils.transOlkDataType(leftExpression.dataType(), false);
+            prestoType = NdpUtils.transOlkDataType(leftExpression.dataType(), (Attribute) leftExpression, false, false);
             filterProjectionId = putFilterValue(leftExpression, prestoType);
-        } else if (leftExpression instanceof Cast && operatorName.equals("in")) {
-            if (((Cast) leftExpression).child().dataType() instanceof DateType) {
-                prestoType = NdpUtils.transOlkDataType(((Cast) leftExpression).child().dataType(), false);
-            } else {
-                prestoType = NdpUtils.transOlkDataType(leftExpression.dataType(), false);
-            }
-            filterProjectionId = putFilterValue(((Cast) leftExpression).child(),
-                    NdpUtils.transOlkDataType(((Cast) leftExpression).child().dataType(), false));
-        } else {
-            if (leftExpression instanceof HiveSimpleUDF) {
-                for (int i = 0; i < leftExpression.children().length(); i++) {
-                    Expression childExpr = leftExpression.children().apply(i);
-                    if (!(childExpr instanceof Literal)) {
-                        putFilterValue(childExpr, NdpUtils.transOlkDataType(childExpr.dataType(), false));
-                    }
+        } else if (leftExpression instanceof HiveSimpleUDF) {
+            for (int i = 0; i < leftExpression.children().length(); i++) {
+                Expression childExpr = leftExpression.children().apply(i);
+                if (childExpr instanceof Attribute) {
+                    putFilterValue(childExpr, NdpUtils.transOlkDataType(childExpr.dataType(), (Attribute) childExpr, false, false));
+                } else if (!(childExpr instanceof Literal)) {
+                    putFilterValue(childExpr, NdpUtils.transOlkDataType(childExpr.dataType(), null, false, true));
                 }
-                ndpUdfExpressions.createNdpUdf(leftExpression, expressionInfo, fieldMap);
-            } else {
-                ndpUdfExpressions.createNdpUdf(leftExpression, expressionInfo, fieldMap);
-                putFilterValue(expressionInfo.getChildExpression(), expressionInfo.getFieldDataType());
             }
+            ndpUdfExpressions.createNdpUdf(leftExpression, expressionInfo, fieldMap);
+            prestoType = expressionInfo.getReturnType();
+            filterProjectionId = expressionInfo.getProjectionId();
+        } else {
+            ndpUdfExpressions.createNdpUdf(leftExpression, expressionInfo, fieldMap);
+            putFilterValue(expressionInfo.getChildExpression(), expressionInfo.getFieldDataType());
             prestoType = expressionInfo.getReturnType();
             filterProjectionId = expressionInfo.getProjectionId();
         }
@@ -770,12 +787,8 @@ public class DataIoAdapter {
                     null, multiArguments, "multy_columns");
         } else {
             // get right value
-            if (NdpUtils.isInDateExpression(leftExpression, operatorName)) {
-                argumentValues = getDateValue(rightExpression);
-            } else {
-                argumentValues = getValue(rightExpression, operatorName,
-                        leftExpression.dataType().toString());
-            }
+            argumentValues = getValue(rightExpression, operatorName,
+                    leftExpression.dataType().toString());
             rowExpression = NdpFilterUtils.generateRowExpression(
                     operatorName, expressionInfo, prestoType, filterProjectionId,
                     argumentValues, null, operatorName);
@@ -809,26 +822,6 @@ public class DataIoAdapter {
             columnNameMap.put(filterColumnName, columnNameMap.size());
         }
         return filterProjectionId;
-    }
-
-    // for date parse
-    private List<Object> getDateValue(List<Expression> rightExpression) {
-        long DAY_TO_MILL_SECS = 24L * 3600L * 1000L;
-        List<Object> dateTimes = new ArrayList<>();
-        for (Expression rExpression : rightExpression) {
-            String dateStr = rExpression.toString();
-            if (NdpUtils.isValidDateFormat(dateStr)) {
-                String[] dateStrArray = dateStr.split("-");
-                int year = Integer.parseInt(dateStrArray[0]) - 1900;
-                int month = Integer.parseInt(dateStrArray[1]) - 1;
-                int day = Integer.parseInt(dateStrArray[2]);
-                Date date = new Date(year, month, day);
-                dateTimes.add(String.valueOf((date.getTime() - date.getTimezoneOffset() * 60000L) / DAY_TO_MILL_SECS));
-            } else {
-                throw new UnsupportedOperationException("decode date failed: " + dateStr);
-            }
-        }
-        return dateTimes;
     }
 
     private List<Object> getValue(List<Expression> rightExpression,
@@ -913,7 +906,10 @@ public class DataIoAdapter {
         for (Attribute attribute : outputColumnList) {
             Attribute resAttribute = NdpUtils.getColumnAttribute(attribute, listAtt);
             String columnName = resAttribute.name().toLowerCase(Locale.ENGLISH);
-            Type type = NdpUtils.transOlkDataType(resAttribute.dataType(), false);
+            Type type = NdpUtils.transOlkDataType(resAttribute.dataType(), resAttribute, false, false);
+            if (type instanceof CharType) {
+                type = createVarcharType(((CharType) type).getLength());
+            }
             int columnId = NdpUtils.getColumnId(resAttribute.toString()) - columnOffset;
             isPartitionKey = partitionColumnName.contains(columnName);
             String partitionValue = NdpUtils.getPartitionValue(filePath, columnName);
