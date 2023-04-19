@@ -56,10 +56,10 @@ public class NdpFilterUtils {
     }
 
     public static  RowExpression generateRowExpression(
-        String signatureName, PrestoExpressionInfo expressionInfo,
-        Type prestoType, int filterProjectionId,
-        List<Object> argumentValues,
-        List<RowExpression> multiArguments, String operatorName) {
+            String signatureName, PrestoExpressionInfo expressionInfo,
+            Type prestoType, int filterProjectionId,
+            List<Object> argumentValues,
+            List<RowExpression> multiArguments, String operatorName) {
         RowExpression rowExpression;
         List<RowExpression> rowArguments;
         String prestoName = prestoType.toString();
@@ -91,18 +91,24 @@ public class NdpFilterUtils {
                 rowExpression = new SpecialForm(IS_NULL, BOOLEAN, notnullArguments);
                 break;
             case "in":
-                rowArguments = getConstantArguments(prestoType, argumentValues, filterProjectionId);
+                if (expressionInfo.getReturnType() != null) {
+                    rowArguments = getUdfArguments(prestoType,
+                            argumentValues, expressionInfo.getPrestoRowExpression());
+                } else {
+                    rowArguments = getConstantArguments(prestoType,
+                            argumentValues, filterProjectionId);
+                }
                 rowExpression = new SpecialForm(IN, BOOLEAN, rowArguments);
                 break;
             case "multy_columns":
                 Signature signatureMulti = new Signature(
-                    QualifiedObjectName.valueOfDefaultFunction("$operator$"
-                    + signatureName.toLowerCase(Locale.ENGLISH)),
-                    FunctionKind.SCALAR, new TypeSignature("boolean"),
-                    new TypeSignature(prestoType.toString()),
-                    new TypeSignature(prestoType.toString()));
+                        QualifiedObjectName.valueOfDefaultFunction("$operator$"
+                                + signatureName.toLowerCase(Locale.ENGLISH)),
+                        FunctionKind.SCALAR, new TypeSignature("boolean"),
+                        new TypeSignature(prestoType.toString()),
+                        new TypeSignature(prestoType.toString()));
                 rowExpression = new CallExpression(signatureName,
-                    new BuiltInFunctionHandle(signatureMulti), BOOLEAN, multiArguments);
+                        new BuiltInFunctionHandle(signatureMulti), BOOLEAN, multiArguments);
                 break;
             case "isempty":
             case "isdeviceidlegal":
@@ -113,40 +119,40 @@ public class NdpFilterUtils {
             default:
                 if (expressionInfo.getReturnType() != null) {
                     rowArguments = getUdfArguments(prestoType,
-                        argumentValues, expressionInfo.getPrestoRowExpression());
+                            argumentValues, expressionInfo.getPrestoRowExpression());
                 } else {
                     rowArguments = getConstantArguments(prestoType,
-                        argumentValues, filterProjectionId);
+                            argumentValues, filterProjectionId);
                 }
                 rowExpression = new CallExpression(signatureName,
-                    new BuiltInFunctionHandle(signature), BOOLEAN, rowArguments);
+                        new BuiltInFunctionHandle(signature), BOOLEAN, rowArguments);
                 break;
         }
         return rowExpression;
     }
 
     public static List<RowExpression> getConstantArguments(Type typeStr,
-        List<Object> argumentValues,
-        int columnId) {
+                                                           List<Object> argumentValues,
+                                                           int columnId) {
         List<RowExpression> arguments = new ArrayList<>();
         arguments.add(new InputReferenceExpression(columnId, typeStr));
         if (null != argumentValues && argumentValues.size() > 0) {
             for (Object argumentValue : argumentValues) {
                 arguments.add(NdpUtils
-                    .transArgumentData(argumentValue.toString(), typeStr));
+                        .transArgumentData(argumentValue.toString(), typeStr));
             }
         }
         return arguments;
     }
 
     public static  List<RowExpression> getUdfArguments(Type typeStr, List<Object> argumentValues,
-        RowExpression callExpression) {
+                                                       RowExpression callExpression) {
         List<RowExpression> arguments = new ArrayList<>();
         arguments.add(callExpression);
         if (null != argumentValues && argumentValues.size() > 0) {
             for (Object argumentValue : argumentValues) {
                 arguments.add(NdpUtils
-                    .transArgumentData(argumentValue.toString(), typeStr));
+                        .transArgumentData(argumentValue.toString(), typeStr));
             }
         }
         return arguments;
