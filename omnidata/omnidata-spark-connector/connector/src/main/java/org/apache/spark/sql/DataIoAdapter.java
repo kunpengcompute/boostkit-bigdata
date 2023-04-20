@@ -907,9 +907,6 @@ public class DataIoAdapter {
             Attribute resAttribute = NdpUtils.getColumnAttribute(attribute, listAtt);
             String columnName = resAttribute.name().toLowerCase(Locale.ENGLISH);
             Type type = NdpUtils.transOlkDataType(resAttribute.dataType(), resAttribute, false, false);
-            if (type instanceof CharType) {
-                type = createVarcharType(((CharType) type).getLength());
-            }
             int columnId = NdpUtils.getColumnId(resAttribute.toString()) - columnOffset;
             isPartitionKey = partitionColumnName.contains(columnName);
             String partitionValue = NdpUtils.getPartitionValue(filePath, columnName);
