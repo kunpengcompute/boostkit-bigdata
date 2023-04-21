@@ -27,10 +27,11 @@
 #include "orc/Type.hh"
 #include "orc/Vector.hh"
 #include "orc/Reader.hh"
-#include "orc/OrcFile.hh"
 #include "orc/MemoryPool.hh"
 #include "orc/sargs/SearchArgument.hh"
 #include "orc/sargs/Literal.hh"
+#include "io/orcfile/OrcFileRewrite.hh"
+#include "hdfspp/options.h"
 #include <getopt.h>
 #include <string>
 #include <memory>

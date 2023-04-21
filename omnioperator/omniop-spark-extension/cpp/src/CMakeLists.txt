@@ -10,6 +10,8 @@ set (SOURCE_FILES
         io/OutputStream.cc
         io/SparkFile.cc
         io/WriterOptions.cc
+        io/orcfile/OrcFileRewrite.cc
+        io/orcfile/OrcHdfsFileRewrite.cc
         shuffle/splitter.cpp
         common/common.cpp
         jni/SparkJniWrapper.cpp
@@ -44,7 +46,6 @@ target_link_libraries (${PROJ_TARGET} PUBLIC
         snappy
         lz4
         zstd
-        boostkit-omniop-runtime-1.2.0-aarch64
         boostkit-omniop-vector-1.2.0-aarch64
         )
 

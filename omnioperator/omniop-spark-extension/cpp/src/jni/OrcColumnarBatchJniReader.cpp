@@ -23,6 +23,7 @@
 using namespace omniruntime::vec;
 using namespace std;
 using namespace orc;
+using namespace hdfs;
 
 jclass runtimeExceptionClass;
 jclass jsonClass;
@@ -93,6 +94,133 @@ void JNI_OnUnload(JavaVM *vm, const void *reserved)
     env->DeleteGlobalRef(runtimeExceptionClass);
 }
 
+bool isLegalHex(const char c) {
+    if ((c >= '0') && (c <= '9')) {
+        return true;
+    }
+
+    if ((c >= 'a') && (c <= 'f')) {
+        return true;
+    }
+
+    if ((c >= 'A') && (c <= 'F')) {
+        return true;
+    }
+
+    return false;
+}
+
+uint8_t hexStrToValue(const char c) {
+    if ((c >= '0') && (c <= '9')) {
+        return c - '0';
+    }
+
+    if ((c >= 'A') && (c <= 'F')) {
+        return c - 'A' + 10;
+    }
+
+    return c - 'a' + 10;
+}
+
+void transHexToByte(const std::string &origin, std::string &result) {
+    const uint32_t strLenPerByte = 2;
+    const char* srcStr = origin.c_str();
+    char first;
+    char second;
+
+    if (origin.size() % strLenPerByte) {
+        LogsError("Input string(%s) length(%u) must be multiple of 2.", srcStr, origin.size());
+        return;
+    }
+
+    result.resize(origin.size() / strLenPerByte);
+    for (uint32_t i = 0; i < origin.size(); i += strLenPerByte) {
+        first = srcStr[i];
+        second = srcStr[i + 1];
+        if (!isLegalHex(first) || !isLegalHex(second)) {
+            LogsError("Input string(%s) is not legal at about index=%d.", srcStr, i);
+            result.resize(0);
+            return;
+        }
+
+        result[i / strLenPerByte] = ((hexStrToValue(first) & 0x0F) << 4) + (hexStrToValue(second) & 0x0F);
+    }
+
+    return;
+}
+
+void parseTokens(JNIEnv* env, jobject jsonObj, std::vector<Token*>& tokenVector) {
+    const char* strTokens = "tokens";
+    const char* strToken = "token";
+    const char* strIdentifier = "identifier";
+    const char* strPassword = "password";
+    const char* strService = "service";
+    const char* strTokenKind = "kind";
+
+    jboolean hasTokens = env->CallBooleanMethod(jsonObj, jsonMethodHas, env->NewStringUTF(strTokens));
+    if (!hasTokens) {
+        return;
+    }
+    
+    jobject tokensObj = env->CallObjectMethod(jsonObj, jsonMethodObj, env->NewStringUTF(strTokens));
+    if (tokensObj == NULL) {
+        return;
+    }
+
+    jobjectArray tokenJsonArray = (jobjectArray)env->CallObjectMethod(tokensObj, jsonMethodObj, env->NewStringUTF(strToken));
+    if (tokenJsonArray == NULL) {
+        return;
+    }
+
+    uint32_t count = env->GetArrayLength(tokenJsonArray);
+    for (uint32_t i = 0; i < count; i++) {
+        jobject child = env->GetObjectArrayElement(tokenJsonArray, i);
+
+        jstring jIdentifier = (jstring)env->CallObjectMethod(child, jsonMethodString, env->NewStringUTF(strIdentifier));
+        jstring jPassword = (jstring)env->CallObjectMethod(child, jsonMethodString, env->NewStringUTF(strPassword));
+        jstring jService = (jstring)env->CallObjectMethod(child, jsonMethodString, env->NewStringUTF(strService));
+        jstring jKind = (jstring)env->CallObjectMethod(child, jsonMethodString, env->NewStringUTF(strTokenKind));
+
+        auto identifierStr = env->GetStringUTFChars(jIdentifier, nullptr);
+        std::string inIdentifier(identifierStr);
+        env->ReleaseStringUTFChars(jIdentifier, identifierStr);
+        transform(inIdentifier.begin(), inIdentifier.end(), inIdentifier.begin(), ::tolower);
+        std::string identifier;
+        transHexToByte(inIdentifier, identifier);
+
+        auto passwordStr = env->GetStringUTFChars(jPassword, nullptr);
+        std::string inPassword(passwordStr);
+        env->ReleaseStringUTFChars(jPassword, passwordStr);
+        transform(inPassword.begin(), inPassword.end(), inPassword.begin(), ::tolower);
+        std::string password;
+        transHexToByte(inPassword, password);
+
+        auto kindStr = env->GetStringUTFChars(jKind, nullptr);
+        std::string kind(kindStr);
+        env->ReleaseStringUTFChars(jKind, kindStr);
+
+        auto serviceStr = env->GetStringUTFChars(jService, nullptr);
+        std::string service(serviceStr);
+        env->ReleaseStringUTFChars(jService, serviceStr);
+
+        Token* token = new Token();
+        token->setIdentifier(identifier);
+        token->setPassword(password);
+        token->setService(service);
+        token->setKind(kind);
+
+        tokenVector.push_back(token);
+    }
+}
+
+void deleteTokens(std::vector<Token*>& tokenVector) {
+    for (auto token : tokenVector) {
+        delete(token);
+    }
+
+    tokenVector.clear();
+}
+
 JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniReader_initializeReader(JNIEnv *env,
     jobject jObj, jstring path, jobject jsonObj)
 {
@@ -121,9 +249,13 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniRe
         env->ReleaseStringUTFChars(serTailJstr, ptr);
     }
 
-    std::unique_ptr<orc::Reader> reader = createReader(orc::readFile(filePath), readerOptions);
+    std::vector<Token*> tokens;
+    parseTokens(env, jsonObj, tokens);
+
+    std::unique_ptr<orc::Reader> reader = createReader(orc::readFileRewrite(filePath, tokens), readerOptions);
     env->ReleaseStringUTFChars(path, pathPtr);
     orc::Reader *readerNew = reader.release();
+    deleteTokens(tokens);
     return (jlong)(readerNew);
     JNI_FUNC_END(runtimeExceptionClass)
 }
