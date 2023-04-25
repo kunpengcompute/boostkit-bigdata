@@ -895,21 +895,13 @@ object ViewMetadata extends RewriteHelper {
   }
 
   def getViewDependsTableTime(viewName: String): Map[String, String] = {
-    var catalogTables: Seq[CatalogTable] = Seq()
+    var catalogTables: Set[CatalogTable] = Set()
     viewToContainsTables.get(viewName).map(_.logicalPlan)
-        .foreach {
-          case HiveTableRelation(tableMeta, _, _, _, _) =>
-            catalogTables +:= tableMeta
-          case LogicalRelation(_, _, catalogTable, _) =>
-            if (catalogTable.isDefined) {
-              catalogTables +:= catalogTable.get
-            }
-          case _ =>
-        }
+        .foreach(plan => catalogTables ++= extractCatalogTablesOnly(plan))
     getViewDependsTableTime(catalogTables)
   }
 
-  def getViewDependsTableTime(catalogTables: Seq[CatalogTable]): Map[String, String] = {
+  def getViewDependsTableTime(catalogTables: Set[CatalogTable]): Map[String, String] = {
     var viewDependsTableTime = Map[String, String]()
     catalogTables.foreach { catalogTable =>
       viewDependsTableTime += (formatViewName(catalogTable.identifier) ->

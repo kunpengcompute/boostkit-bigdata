@@ -356,7 +356,7 @@ trait RewriteHelper extends PredicateHelper with RewriteLogger {
    *
    * @return used CatalogTables
    */
-  def extractCatalogTablesOnly(plan: LogicalPlan): Seq[CatalogTable] = {
+  def extractCatalogTablesOnly(plan: LogicalPlan): Set[CatalogTable] = {
     var tables = mutable.Seq[CatalogTable]()
     plan.foreachUp {
       case HiveTableRelation(tableMeta, _, _, _, _) =>
@@ -373,7 +373,7 @@ trait RewriteHelper extends PredicateHelper with RewriteLogger {
           case e => e
         }
     }
-    tables
+    tables.toSet
   }
 
   /**
@@ -382,7 +382,7 @@ trait RewriteHelper extends PredicateHelper with RewriteLogger {
    * @return used tables
    */
   def extractTablesOnly(plan: LogicalPlan): Set[String] = {
-    extractCatalogTablesOnly(plan).map(_.identifier.toString()).toSet
+    extractCatalogTablesOnly(plan).map(_.identifier.toString())
   }
 
   /**
