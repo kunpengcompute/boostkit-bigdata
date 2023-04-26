@@ -74,7 +74,10 @@ case class OmniCacheCreateMvCommand(
 
       val table = buildCatalogTable(
         identifier, new StructType,
-        partitioning, None, properties, provider, None,
+        partitioning, None,
+        properties ++ Map(MV_LATEST_UPDATE_TIME ->
+            ViewMetadata.getViewDependsTableTimeStr(query)),
+        provider, None,
         comment, storageFormat, external = false)
       val tableIdentWithDB = identifier.copy(database = Some(databaseName))
 
@@ -356,7 +359,7 @@ case class RefreshMaterializedViewCommand(
     query: LogicalPlan,
     mode: SaveMode,
     catalogTable: Option[CatalogTable],
-    fileIndex: Option[FileIndex],
+    fileIndex: Seq[FileIndex],
     outputColumnNames: Seq[String])
     extends DataWritingCommand {
 

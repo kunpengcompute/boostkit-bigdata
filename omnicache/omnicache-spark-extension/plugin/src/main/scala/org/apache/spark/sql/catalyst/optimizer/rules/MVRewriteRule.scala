@@ -51,6 +51,7 @@ class MVRewriteRule(session: SparkSession)
     if (!omniCacheConf.enableOmniCache || cannotRewritePlans.contains(logicalPlan)) {
       return logicalPlan
     }
+    RewriteHelper.disableSqlLog()
     try {
       logicalPlan match {
         case _: CreateHiveTableAsSelectCommand =>
@@ -70,6 +71,8 @@ class MVRewriteRule(session: SparkSession)
       case e: Throwable =>
         logError(s"Failed to rewrite plan with mv.")
         logicalPlan
+    } finally {
+      RewriteHelper.enableSqlLog()
     }
   }
 

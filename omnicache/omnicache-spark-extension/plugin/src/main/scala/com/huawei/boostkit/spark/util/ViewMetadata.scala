@@ -21,6 +21,7 @@ import com.huawei.boostkit.spark.conf.OmniCachePluginConfig
 import com.huawei.boostkit.spark.conf.OmniCachePluginConfig._
 import com.huawei.boostkit.spark.util.serde.KryoSerDeUtil
 import java.io.IOException
+import java.net.URI
 import java.util.Locale
 import java.util.concurrent.{ConcurrentHashMap, Executors, TimeUnit}
 import java.util.concurrent.atomic.AtomicLong
@@ -33,10 +34,11 @@ import scala.collection.{mutable, JavaConverters}
 import org.apache.spark.serializer.KryoSerializer
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.TableIdentifier
-import org.apache.spark.sql.catalyst.catalog.{CatalogTable, SessionCatalog}
+import org.apache.spark.sql.catalyst.catalog.{CatalogTable, HiveTableRelation, SessionCatalog}
 import org.apache.spark.sql.catalyst.expressions.{Alias, AttributeReference, ExprId, NamedExpression}
 import org.apache.spark.sql.catalyst.optimizer.rules.RewriteTime
 import org.apache.spark.sql.catalyst.plans.logical._
+import org.apache.spark.sql.execution.datasources.LogicalRelation
 
 
 object ViewMetadata extends RewriteHelper {
@@ -86,11 +88,16 @@ object ViewMetadata extends RewriteHelper {
 
   val UNLOAD: Int = -1
 
+  private var REFRESH_STAT: String = _
+  private val BUSY = "BUSY"
+  private val IDLE = "IDLE"
+
   /**
    * set sparkSession
    */
   def setSpark(sparkSession: SparkSession): Unit = {
     spark = sparkSession
+    REFRESH_STAT = IDLE
     status = STATUS_LOADING
 
     kryoSerializer = new KryoSerializer(spark.sparkContext.getConf)
@@ -885,5 +892,65 @@ object ViewMetadata extends RewriteHelper {
         return Some(value(2))
     }
     Option.empty
+  }
+
+  def getViewDependsTableTime(viewName: String): Map[String, String] = {
+    var catalogTables: Set[CatalogTable] = Set()
+    viewToContainsTables.get(viewName).map(_.logicalPlan)
+        .foreach(plan => catalogTables ++= extractCatalogTablesOnly(plan))
+    getViewDependsTableTime(catalogTables)
+  }
+
+  def getViewDependsTableTime(catalogTables: Set[CatalogTable]): Map[String, String] = {
+    var viewDependsTableTime = Map[String, String]()
+    catalogTables.foreach { catalogTable =>
+      viewDependsTableTime += (formatViewName(catalogTable.identifier) ->
+          getPathTime(catalogTable.storage.locationUri.get).toString)
+    }
+    viewDependsTableTime
+  }
+
+  def getViewDependsTableTimeStr(viewQueryPlan: LogicalPlan): String = {
+    val str: String = Json(DefaultFormats).write(
+      getViewDependsTableTime(extractCatalogTablesOnly(viewQueryPlan)))
+    str
+  }
+
+  def getLastViewDependsTableTime(viewName: String): Map[String, String] = {
+    Json(DefaultFormats).read[Map[String, String]](
+      viewProperties.get(viewName)(MV_LATEST_UPDATE_TIME))
+  }
+
+  def getPathTime(uri: URI): Long = {
+    fs.getFileStatus(new Path(uri)).getModificationTime
+  }
+
+  def checkViewDataReady(viewName: String): Unit = {
+    if (REFRESH_STAT equals BUSY) {
+      return
+    }
+    val lastTime = getLastViewDependsTableTime(viewName)
+    val nowTime = getViewDependsTableTime(viewName)
+    if (lastTime != nowTime) {
+      REFRESH_STAT = BUSY
+      RewriteTime.withTimeStat("REFRESH MV") {
+        val sqlText = spark.sparkContext.getLocalProperty(SPARK_JOB_DESCRIPTION)
+        RewriteHelper.enableSqlLog()
+        spark.sql(s"REFRESH MATERIALIZED VIEW $viewName;")
+        RewriteHelper.disableSqlLog()
+        spark.sparkContext.setJobDescription(sqlText)
+        val newProperty = ViewMetadata.viewProperties.get(viewName) +
+            (MV_LATEST_UPDATE_TIME -> Json(DefaultFormats).write(nowTime))
+        ViewMetadata.viewProperties.put(viewName, newProperty)
+        val viewDB = viewName.split("\\.")(0)
+        saveViewMetadataToFile(viewDB, viewName)
+      }
+      val updateReason = nowTime.toSeq.filter { kv =>
+        !lastTime.contains(kv._1) || lastTime(kv._1) != kv._2
+      }.toString()
+      logBasedOnLevel(s"REFRESH MATERIALIZED VIEW $viewName; " +
+          s"for depends table has updated $updateReason")
+      REFRESH_STAT = IDLE
+    }
   }
 }
