@@ -99,8 +99,6 @@ class FileScanRDDPushDown(
   private val zkAddress = NdpConf.getNdpZookeeperAddress(sparkSession)
   private val taskTimeout = NdpConf.getTaskTimeout(sparkSession)
   private val operatorCombineEnabled = NdpConf.getNdpOperatorCombineEnabled(sparkSession)
-  private val ignoreCorruptFiles = sparkSession.sessionState.conf.ignoreCorruptFiles
-  private val ignoreMissingFiles = sparkSession.sessionState.conf.ignoreMissingFiles
 
   override def compute(split: RDDPartition, context: TaskContext): Iterator[InternalRow] = {
     val pageToColumnarClass = new PageToColumnar(requiredSchema, output)
@@ -314,8 +312,8 @@ class FileScanRDDPushDown(
         currentFile = files.next()
         InputFileBlockHolder.set(currentFile.filePath, currentFile.start, currentFile.length)
         predicate.initialize(0)
+        val toUnsafe = UnsafeProjection.create(output, filterOutput)
         if (isColumnVector) {
-          val toUnsafe = UnsafeProjection.create(output, filterOutput)
           currentIterator = readCurrentFile().asInstanceOf[Iterator[ColumnarBatch]]
             .map { c =>
               val rowIterator = c.rowIterator().asScala
@@ -352,7 +350,7 @@ class FileScanRDDPushDown(
             val r = predicate.eval(row)
             r
           }
-          currentIterator = rowIterator
+          currentIterator = rowIterator.map(toUnsafe)
         }
         iteHasNext()
       } else {
