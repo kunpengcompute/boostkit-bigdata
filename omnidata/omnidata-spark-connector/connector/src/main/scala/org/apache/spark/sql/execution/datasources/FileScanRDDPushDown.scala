@@ -33,8 +33,9 @@ import org.apache.spark.sql.execution.ndp.{FilterExeInfo, NdpConf, PushDownInfo}
 import org.apache.spark.sql.execution.vectorized.{OffHeapColumnVector, OnHeapColumnVector, WritableColumnVector}
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.vectorized.ColumnarBatch
+import org.apache.spark.util.NextIterator
 
-import java.io.FileNotFoundException
+import java.io.{FileNotFoundException, IOException}
 import scala.util.Random
 
 
@@ -98,6 +99,8 @@ class FileScanRDDPushDown(
   private val zkAddress = NdpConf.getNdpZookeeperAddress(sparkSession)
   private val taskTimeout = NdpConf.getTaskTimeout(sparkSession)
   private val operatorCombineEnabled = NdpConf.getNdpOperatorCombineEnabled(sparkSession)
+  private val ignoreCorruptFiles = sparkSession.sessionState.conf.ignoreCorruptFiles
+  private val ignoreMissingFiles = sparkSession.sessionState.conf.ignoreMissingFiles
 
   override def compute(split: RDDPartition, context: TaskContext): Iterator[InternalRow] = {
     val pageToColumnarClass = new PageToColumnar(requiredSchema, output)
@@ -311,48 +314,55 @@ class FileScanRDDPushDown(
         currentFile = files.next()
         InputFileBlockHolder.set(currentFile.filePath, currentFile.start, currentFile.length)
         predicate.initialize(0)
-        currentIterator = readCurrentFile()
-          .map {c =>
-            val rowIterator = c.rowIterator().asScala
-            val ri = rowIterator.filter { row =>
-              val r = predicate.eval(row)
-              r
-            }
+        if (isColumnVector) {
+          val toUnsafe = UnsafeProjection.create(output, filterOutput)
+          currentIterator = readCurrentFile().asInstanceOf[Iterator[ColumnarBatch]]
+            .map { c =>
+              val rowIterator = c.rowIterator().asScala
+              val ri = rowIterator.filter { row =>
+                val r = predicate.eval(row)
+                r
+              }
 
-            val localOutput = output
-            val toUnsafe = UnsafeProjection.create(localOutput, filterOutput)
-            val projectRi = ri.map(toUnsafe)
-            val vectors: Seq[WritableColumnVector] = if (enableOffHeapColumnVector) {
-              OffHeapColumnVector.allocateColumns(columnBatchSize, StructType.fromAttributes(output))
-            } else {
-              OnHeapColumnVector.allocateColumns(columnBatchSize, StructType.fromAttributes(output))
-            }
-            val cb: ColumnarBatch = new ColumnarBatch(vectors.toArray)
+              val projectRi = ri.map(toUnsafe)
+              val vectors: Seq[WritableColumnVector] = if (enableOffHeapColumnVector) {
+                OffHeapColumnVector.allocateColumns(columnBatchSize, StructType.fromAttributes(output))
+              } else {
+                OnHeapColumnVector.allocateColumns(columnBatchSize, StructType.fromAttributes(output))
+              }
+              val cb: ColumnarBatch = new ColumnarBatch(vectors.toArray)
 
-            TaskContext.get().addTaskCompletionListener[Unit] { _ =>
-              cb.close()
-            }
+              TaskContext.get().addTaskCompletionListener[Unit] { _ =>
+                cb.close()
+              }
 
-            cb.setNumRows(0)
-            vectors.foreach(_.reset())
-            var rowCount = 0
-            while (rowCount < columnBatchSize && projectRi.hasNext) {
-              val row = projectRi.next()
-              converters.convert(row, vectors.toArray)
-              rowCount += 1
+              cb.setNumRows(0)
+              vectors.foreach(_.reset())
+              var rowCount = 0
+              while (rowCount < columnBatchSize && projectRi.hasNext) {
+                val row = projectRi.next()
+                converters.convert(row, vectors.toArray)
+                rowCount += 1
+              }
+              cb.setNumRows(rowCount)
+              cb
             }
-            cb.setNumRows(rowCount)
-            cb
+        } else {
+          val rowIterator = readCurrentFile().filter { row =>
+            val r = predicate.eval(row)
+            r
           }
+          currentIterator = rowIterator
+        }
         iteHasNext()
       } else {
         unset()
       }
     }
 
-    private def readCurrentFile(): Iterator[ColumnarBatch] = {
+    private def readCurrentFile(): Iterator[InternalRow] = {
       try {
-        readFunction(currentFile).asInstanceOf[Iterator[ColumnarBatch]]
+        readFunction(currentFile)
       } catch {
         case e: FileNotFoundException =>
           throw new FileNotFoundException(
