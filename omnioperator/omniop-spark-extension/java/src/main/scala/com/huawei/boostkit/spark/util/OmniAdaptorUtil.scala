@@ -123,7 +123,7 @@ object OmniAdaptorUtil {
           }
           offsets(i + 1) = totalSize
         }
-        val vec = new VarcharVec(totalSize, columnSize)
+        val vec = new VarcharVec(columnSize)
         val values = new Array[Byte](totalSize)
         for (i <- 0 until columnSize) {
           if (null != columnVector.getUTF8String(i)) {

@@ -32,15 +32,62 @@ static ConcurrentMap<std::shared_ptr<Splitter>> shuffle_splitter_holder_;
 
 static std::string s_shuffle_tests_dir = "/tmp/shuffleTests";
 
-VectorBatch* CreateInputData(const int32_t numRows, const int32_t numCols, int32_t* inputTypeIds, int64_t* allData);
+VectorBatch *CreateVectorBatch(const DataTypes &types, int32_t rowCount, ...);
 
-Vector *buildVector(const DataType &aggType, int32_t rowNumber);
+std::unique_ptr<BaseVector> CreateVector(DataType &dataType, int32_t rowCount, va_list &args);
+
+template <typename T> std::unique_ptr<BaseVector> CreateVector(int32_t length, T *values)
+{
+    std::unique_ptr<Vector<T>> vector = std::make_unique<Vector<T>>(length);
+    for (int32_t i = 0; i < length; i++) {
+        vector->SetValue(i, values[i]);
+    }
+    return vector;
+}
+
+template <omniruntime::type::DataTypeId typeId>
+std::unique_ptr<BaseVector> CreateFlatVector(int32_t length, va_list &args)
+{
+    using namespace omniruntime::type;
+    using T = typename NativeType<typeId>::type;
+    using VarcharVector = Vector<LargeStringContainer<std::string_view>>;
+    if constexpr (std::is_same_v<T, std::string_view> || std::is_same_v<T, uint8_t>) {
+        std::unique_ptr<VarcharVector> vector = std::make_unique<VarcharVector>(length);
+        std::string *str = va_arg(args, std::string *);
+        for (int32_t i = 0; i < length; i++) {
+            std::string_view value(str[i].data(), str[i].length());
+            vector->SetValue(i, value);
+        }
+        return vector;
+    } else {
+        std::unique_ptr<Vector<T>> vector = std::make_unique<Vector<T>>(length);
+        T *value = va_arg(args, T *);
+        for (int32_t i = 0; i < length; i++) {
+            vector->SetValue(i, value[i]);
+        }
+        return vector;
+    }
+}
+
+std::unique_ptr<BaseVector> CreateDictionaryVector(DataType &dataType, int32_t rowCount, int32_t *ids, int32_t idsCount,
+    ...);
+
+template <DataTypeId typeId>
+std::unique_ptr<BaseVector> CreateDictionary(BaseVector *vector, int32_t *ids, int32_t size)
+{
+    using T = typename NativeType<typeId>::type;
+    if constexpr (std::is_same_v<T, std::string_view> || std::is_same_v<T, uint8_t>) {
+        return VectorHelper::CreateStringDictionary(ids, size,
+            reinterpret_cast<Vector<LargeStringContainer<std::string_view>> *>(vector));
+    }
+    return VectorHelper::CreateDictionary(ids, size, reinterpret_cast<Vector<T> *>(vector));
+}
 
 VectorBatch* CreateVectorBatch_1row_varchar_withPid(int pid, std::string inputChar);
 
 VectorBatch* CreateVectorBatch_4col_withPid(int parNum, int rowNum);
 
-VectorBatch* CreateVectorBatch_1FixCol_withPid(int parNum, int rowNum, int32_t fixColType);
+VectorBatch* CreateVectorBatch_1FixCol_withPid(int parNum, int rowNum, DataTypePtr fixColType);
 
 VectorBatch* CreateVectorBatch_2column_1row_withPid(int pid, std::string strVar, int intVar);
 
@@ -78,14 +125,6 @@ void Test_splitter_split(long splitter_id, VectorBatch* vb);
 void Test_splitter_stop(long splitter_id);
 
 void Test_splitter_close(long splitter_id);
-
-template <typename T, typename V> T *CreateVector(V *values, int32_t length)
-{
-    VectorAllocator *vecAllocator = omniruntime::vec::GetProcessGlobalVecAllocator();
-    auto vector = new T(vecAllocator, length);
-    vector->SetValues(0, values, length);
-    return vector;
-}
 
 void GetFilePath(const char *path, const char *filename, char *filepath);
 

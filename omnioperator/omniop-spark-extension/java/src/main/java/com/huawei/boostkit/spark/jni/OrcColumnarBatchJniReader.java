@@ -288,7 +288,7 @@ public class OrcColumnarBatchJniReader {
                     break;
                 }
                 case OMNI_DECIMAL128: {
-                    vecList[i] = new Decimal128Vec(vecNativeIds[nativeGetId], Decimal128DataType.DECIMAL128);
+                    vecList[i] = new Decimal128Vec(vecNativeIds[nativeGetId]);
                     break;
                 }
                 default: {

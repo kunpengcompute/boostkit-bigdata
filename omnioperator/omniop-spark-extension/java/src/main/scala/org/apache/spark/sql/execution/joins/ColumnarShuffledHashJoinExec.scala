@@ -337,9 +337,11 @@ case class ColumnarShuffledHashJoinExec(
                 index += 1
               }
             }
-            numOutputRows += result.getRowCount
+            val rowCnt: Int = result.getRowCount
+            numOutputRows += rowCnt
             numOutputVecBatchs += 1
-            new ColumnarBatch(vecs.toArray, result.getRowCount)
+            result.close()
+            new ColumnarBatch(vecs.toArray, rowCnt)
           }
         }
         if ("FULL OUTER" == joinType.sql) {

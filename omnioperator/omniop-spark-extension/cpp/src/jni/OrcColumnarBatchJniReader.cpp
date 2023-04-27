@@ -21,6 +21,7 @@
 #include "jni_common.h"
 
 using namespace omniruntime::vec;
+using namespace omniruntime::type;
 using namespace std;
 using namespace orc;
 using namespace hdfs;
@@ -480,40 +481,37 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniRe
 
 template <DataTypeId TYPE_ID, typename ORC_TYPE> uint64_t copyFixwidth(orc::ColumnVectorBatch *field)
 {
-    VectorAllocator *allocator = omniruntime::vec::GetProcessGlobalVecAllocator();
     using T = typename NativeType<TYPE_ID>::type;
     ORC_TYPE *lvb = dynamic_cast<ORC_TYPE *>(field);
-    FixedWidthVector<TYPE_ID> *originalVector = new FixedWidthVector<TYPE_ID>(allocator, lvb->numElements);
+    auto originalVector = std::make_unique<Vector<T>>(lvb->numElements);
     for (uint i = 0; i < lvb->numElements; i++) {
         if (lvb->notNull.data()[i]) {
             originalVector->SetValue(i, (T)(lvb->data.data()[i]));
         } else {
-            originalVector->SetValueNull(i);
+            originalVector->SetNull(i);
         }
     }
-    return (uint64_t)originalVector;
+    return reinterpret_cast<uint64_t>(originalVector.release());
 }
 
 
-uint64_t copyVarwidth(int maxLen, orc::ColumnVectorBatch *field, int vcType)
+uint64_t copyVarwidth(orc::ColumnVectorBatch *field, int vcType)
 {
-    VectorAllocator *allocator = omniruntime::vec::GetProcessGlobalVecAllocator();
     orc::StringVectorBatch *lvb = dynamic_cast<orc::StringVectorBatch *>(field);
-    uint64_t totalLen =
-        maxLen * (lvb->numElements) > lvb->getMemoryUsage() ? maxLen * (lvb->numElements) : lvb->getMemoryUsage();
-    VarcharVector *originalVector = new VarcharVector(allocator, totalLen, lvb->numElements);
+    auto originalVector = std::make_unique<Vector<LargeStringContainer<std::string_view>>>(lvb->numElements);
     for (uint i = 0; i < lvb->numElements; i++) {
         if (lvb->notNull.data()[i]) {
             string tmpStr(reinterpret_cast<const char *>(lvb->data.data()[i]), lvb->length.data()[i]);
             if (vcType == orc::TypeKind::CHAR && tmpStr.back() == ' ') {
                 tmpStr.erase(tmpStr.find_last_not_of(" ") + 1);
             }
-            originalVector->SetValue(i, reinterpret_cast<const uint8_t *>(tmpStr.data()), tmpStr.length());
+            auto data = std::string_view(tmpStr.data(), tmpStr.length());
+            originalVector->SetValue(i, data);
         } else {
-            originalVector->SetValueNull(i);
+            originalVector->SetNull(i);
         }
     }
-    return (uint64_t)originalVector;
+    return reinterpret_cast<uint64_t>(originalVector.release());
 }
 
 int copyToOmniVec(orc::TypeKind vcType, int &omniTypeId, uint64_t &omniVecId, orc::ColumnVectorBatch *field, ...)
@@ -553,10 +551,7 @@ int copyToOmniVec(orc::TypeKind vcType, int &omniTypeId, uint64_t &omniVecId, or
         case orc::TypeKind::STRING:
         case orc::TypeKind::VARCHAR: {
             omniTypeId = static_cast<int>(OMNI_VARCHAR);
-            va_list args;
-            va_start(args, field);
-            omniVecId = (uint64_t)copyVarwidth(va_arg(args, int), field, vcType);
-            va_end(args);
+            omniVecId = copyVarwidth(field, vcType);
             break;
         }
         default: {
@@ -568,12 +563,10 @@ int copyToOmniVec(orc::TypeKind vcType, int &omniTypeId, uint64_t &omniVecId, or
 
 int copyToOmniDecimalVec(int precision, int &omniTypeId, uint64_t &omniVecId, orc::ColumnVectorBatch *field)
 {
-    VectorAllocator *allocator = VectorAllocator::GetGlobalAllocator();
     if (precision > 18) {
         omniTypeId = static_cast<int>(OMNI_DECIMAL128);
         orc::Decimal128VectorBatch *lvb = dynamic_cast<orc::Decimal128VectorBatch *>(field);
-        FixedWidthVector<OMNI_DECIMAL128> *originalVector =
-            new FixedWidthVector<OMNI_DECIMAL128>(allocator, lvb->numElements);
+        auto originalVector = std::make_unique<Vector<Decimal128>>(lvb->numElements);
         for (uint i = 0; i < lvb->numElements; i++) {
             if (lvb->notNull.data()[i]) {
                 int64_t highbits = lvb->values.data()[i].getHighBits();
@@ -589,22 +582,22 @@ int copyToOmniDecimalVec(int precision, int &omniTypeId, uint64_t &omniVecId, or
                 Decimal128 d128(highbits, lowbits);
                 originalVector->SetValue(i, d128);
             } else {
-                originalVector->SetValueNull(i);
+                originalVector->SetNull(i);
             }
         }
-        omniVecId = (uint64_t)originalVector;
+        omniVecId = reinterpret_cast<uint64_t>(originalVector.release());
     } else {
         omniTypeId = static_cast<int>(OMNI_DECIMAL64);
         orc::Decimal64VectorBatch *lvb = dynamic_cast<orc::Decimal64VectorBatch *>(field);
-        FixedWidthVector<OMNI_LONG> *originalVector = new FixedWidthVector<OMNI_LONG>(allocator, lvb->numElements);
+        auto originalVector = std::make_unique<Vector<int64_t>>(lvb->numElements);
         for (uint i = 0; i < lvb->numElements; i++) {
             if (lvb->notNull.data()[i]) {
                 originalVector->SetValue(i, (int64_t)(lvb->values.data()[i]));
             } else {
-                originalVector->SetValueNull(i);
+                originalVector->SetNull(i);
             }
         }
-        omniVecId = (uint64_t)originalVector;
+        omniVecId = reinterpret_cast<uint64_t>(originalVector.release());
     }
     return 1;
 }

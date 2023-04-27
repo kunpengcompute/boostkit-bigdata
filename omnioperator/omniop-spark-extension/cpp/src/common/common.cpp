@@ -77,20 +77,3 @@ int IsFileExist(const std::string path)
 {
     return !access(path.c_str(), F_OK);
 }
-
-void ReleaseVectorBatch(omniruntime::vec::VectorBatch& vb)
-{
-    int tmpVectorNum = vb.GetVectorCount();
-    std::set<Vector *> vectorBatchAddresses;
-    vectorBatchAddresses.clear();
-    for (int vecIndex = 0; vecIndex < tmpVectorNum; ++vecIndex) {
-        vectorBatchAddresses.insert(vb.GetVector(vecIndex));
-    }
-    for (Vector * tmpAddress : vectorBatchAddresses) {
-        if (nullptr == tmpAddress) {
-            throw std::runtime_error("delete nullptr error for release vectorBatch");
-        }
-        delete tmpAddress;
-    }
-    vectorBatchAddresses.clear();
-}

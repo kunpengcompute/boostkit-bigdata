@@ -45,6 +45,4 @@ spark::CompressionKind GetCompressionType(const std::string& name);
 
 int IsFileExist(const std::string path);
 
-void ReleaseVectorBatch(omniruntime::vec::VectorBatch& vb);
-
 #endif //CPP_COMMON_H
