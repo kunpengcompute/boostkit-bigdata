@@ -40,7 +40,7 @@ struct SplitOptions {
     int64_t thread_id = -1;
     int64_t task_attempt_id = -1;
 
-    BaseAllocator *allocator = omniruntime::mem::GetProcessRootAllocator();
+    Allocator *allocator = Allocator::GetAllocator();
 
     uint64_t spill_batch_row_num = 4096; // default value
     uint64_t spill_mem_threshold = 1024 * 1024 * 1024; // default value

@@ -141,7 +141,7 @@ abstract class ColumnShuffleTest {
                 }
                 case OMNI_VARCHAR:
                 case OMNI_CHAR: {
-                    tmpVec = new VarcharVec(rowNum * 16, rowNum);
+                    tmpVec = new VarcharVec(rowNum);
                     for (int j = 0; j < rowNum; j++) {
                         ((VarcharVec)tmpVec).set(j, ("VAR_" + (j + 1) + "_END").getBytes(StandardCharsets.UTF_8));
                         if (mixHalfNull && (j % 2) == 0) {
@@ -196,7 +196,7 @@ abstract class ColumnShuffleTest {
 
     public List<Vec> buildValChar(int pid, String varChar) {
         IntVec c0 = new IntVec(1);
-        VarcharVec c1 = new VarcharVec(8, 1);
+        VarcharVec c1 = new VarcharVec(1);
         c0.set(0, pid);
         c1.set(0, varChar.getBytes(StandardCharsets.UTF_8));
         List<Vec> columns = new ArrayList<>();

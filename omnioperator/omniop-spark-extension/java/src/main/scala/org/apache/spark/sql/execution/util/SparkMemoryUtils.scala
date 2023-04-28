@@ -17,14 +17,14 @@
 
 package org.apache.spark.sql.execution.util
 
-import nova.hetu.omniruntime.vector.VecAllocator
-
+import nova.hetu.omniruntime.memory
+import nova.hetu.omniruntime.memory.MemoryManager
 import org.apache.spark.{SparkEnv, TaskContext}
 
 object SparkMemoryUtils {
 
   private val max: Long = SparkEnv.get.conf.getSizeAsBytes("spark.memory.offHeap.size", "1g")
-  VecAllocator.setRootAllocatorLimit(max)
+  MemoryManager.setGlobalMemoryLimit(max)
 
   def init(): Unit = {}
 

@@ -32,7 +32,7 @@ class HiveResourceRunner(val spark: SparkSession, val resource: String) {
     val path = "%s/%s.sql".format(resource, caseId)
     val absolute = HiveResourceRunner.locateResourcePath(path)
     val sql = FileUtils.readFileToString(new File(absolute), StandardCharsets.UTF_8)
-    println("Running query %s (round %d)... ".format(caseId, roundId))
+    println("===== Running query %s (round %d) =====".format(caseId, roundId))
     val df = spark.sql(sql)
     if (explain) {
       df.explain(extended = true)

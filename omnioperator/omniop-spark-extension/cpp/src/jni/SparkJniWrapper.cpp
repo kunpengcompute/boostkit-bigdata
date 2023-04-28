@@ -89,17 +89,17 @@ Java_com_huawei_boostkit_spark_jni_SparkJniWrapper_nativeMake(
     DataTypes inputVecTypes = Deserialize(inputTypeCharPtr);
     const int32_t *inputVecTypeIds = inputVecTypes.GetIds();
     //
-    std::vector<DataTypePtr> inputDataTpyes =  inputVecTypes.Get();
-    int32_t size = inputDataTpyes.size();
+    std::vector<DataTypePtr> inputDataTypes =  inputVecTypes.Get();
+    int32_t size = inputDataTypes.size();
     uint32_t *inputDataPrecisions = new uint32_t[size];
     uint32_t *inputDataScales = new uint32_t[size];
     for (int i = 0; i < size; ++i) {
-        if(inputDataTpyes[i]->GetId() == OMNI_DECIMAL64 || inputDataTpyes[i]->GetId() == OMNI_DECIMAL128) {
-            inputDataScales[i] = std::dynamic_pointer_cast<DecimalDataType>(inputDataTpyes[i])->GetScale();
-            inputDataPrecisions[i] = std::dynamic_pointer_cast<DecimalDataType>(inputDataTpyes[i])->GetPrecision();               
+        if (inputDataTypes[i]->GetId() == OMNI_DECIMAL64 || inputDataTypes[i]->GetId() == OMNI_DECIMAL128) {
+            inputDataScales[i] = std::dynamic_pointer_cast<DecimalDataType>(inputDataTypes[i])->GetScale();
+            inputDataPrecisions[i] = std::dynamic_pointer_cast<DecimalDataType>(inputDataTypes[i])->GetPrecision();               
         }
     }
-    inputDataTpyes.clear();
+    inputDataTypes.clear();
 
     InputDataTypes inputDataTypesTmp;
     inputDataTypesTmp.inputVecTypeIds = (int32_t *)inputVecTypeIds;

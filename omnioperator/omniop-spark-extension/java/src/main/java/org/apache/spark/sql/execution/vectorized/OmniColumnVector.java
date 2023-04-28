@@ -194,32 +194,32 @@ public class OmniColumnVector extends WritableColumnVector {
     @Override
     public boolean hasNull() {
         if (dictionaryData != null) {
-            return dictionaryData.hasNullValue();
+            return dictionaryData.hasNull();
         }
         if (type instanceof BooleanType) {
-            return booleanDataVec.hasNullValue();
+            return booleanDataVec.hasNull();
         } else if (type instanceof ByteType) {
-            return charsTypeDataVec.hasNullValue();
+            return charsTypeDataVec.hasNull();
         } else if (type instanceof ShortType) {
-            return shortDataVec.hasNullValue();
+            return shortDataVec.hasNull();
         } else if (type instanceof IntegerType) {
-           return intDataVec.hasNullValue();
+           return intDataVec.hasNull();
         } else if (type instanceof DecimalType) {
             if (DecimalType.is64BitDecimalType(type)) {
-                return longDataVec.hasNullValue();
+                return longDataVec.hasNull();
             } else {
-                return decimal128DataVec.hasNullValue();
+                return decimal128DataVec.hasNull();
             }
         } else if (type instanceof LongType || DecimalType.is64BitDecimalType(type)) {
-            return longDataVec.hasNullValue();
+            return longDataVec.hasNull();
         } else if (type instanceof FloatType) {
             return false;
         } else if (type instanceof DoubleType) {
-            return doubleDataVec.hasNullValue();
+            return doubleDataVec.hasNull();
         } else if (type instanceof StringType) {
-            return charsTypeDataVec.hasNullValue();
+            return charsTypeDataVec.hasNull();
         } else if (type instanceof DateType) {
-            return intDataVec.hasNullValue();
+            return intDataVec.hasNull();
         }
         throw new UnsupportedOperationException("hasNull is not supported for type:" + type);
     }
@@ -823,7 +823,7 @@ public class OmniColumnVector extends WritableColumnVector {
         if (type instanceof BooleanType) {
             booleanDataVec = new BooleanVec(newCapacity);
         } else if (type instanceof ByteType) {
-            charsTypeDataVec = new VarcharVec(newCapacity * 4, newCapacity);
+            charsTypeDataVec = new VarcharVec(newCapacity);
         } else if (type instanceof ShortType) {
             shortDataVec = new ShortVec(newCapacity);
         } else if (type instanceof IntegerType) {
@@ -842,7 +842,7 @@ public class OmniColumnVector extends WritableColumnVector {
             doubleDataVec = new DoubleVec(newCapacity);
         } else if (type instanceof StringType) {
             // need to set with real column size, suppose char(200) utf8
-            charsTypeDataVec = new VarcharVec(newCapacity * 4 * 200, newCapacity);
+            charsTypeDataVec = new VarcharVec(newCapacity);
         } else if (type instanceof DateType) {
             intDataVec = new IntVec(newCapacity);
         } else {

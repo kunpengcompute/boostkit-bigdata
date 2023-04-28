@@ -41,7 +41,6 @@ using namespace spark;
 using namespace google::protobuf::io;
 using namespace omniruntime::vec;
 using namespace omniruntime::type;
-using namespace omniruntime::mem;
 
 struct SplitRowInfo {
     uint32_t copyedRow = 0;
@@ -137,7 +136,7 @@ class Splitter {
 private:
     void ReleaseVarcharVector()
     {
-        std::set<Vector *>::iterator it;
+        std::set<BaseVector *>::iterator it;
         for (it = varcharVectorCache.begin(); it != varcharVectorCache.end(); it++) {
             delete *it;
         }
@@ -147,9 +146,9 @@ private:
     void ReleaseVectorBatch(VectorBatch *vb)
     {
         int vectorCnt = vb->GetVectorCount();
-        std::set<Vector *> vectorAddress; // vector deduplication
+        std::set<BaseVector *> vectorAddress; // vector deduplication
         for (int vecIndex = 0; vecIndex < vectorCnt; vecIndex++) {
-            Vector *vector = vb->GetVector(vecIndex);
+            BaseVector *vector = vb->Get(vecIndex);
             // not varchar vector can be released;
             if (varcharVectorCache.find(vector) == varcharVectorCache.end() &&
                 vectorAddress.find(vector) == vectorAddress.end()) {
@@ -161,7 +160,7 @@ private:
         delete vb;
     }
 
-    std::set<Vector *> varcharVectorCache;
+    std::set<BaseVector *> varcharVectorCache;
     bool first_vector_batch_ = false;
     std::vector<DataTypeId> vector_batch_col_types_;
     InputDataTypes input_col_types;
@@ -176,7 +175,7 @@ public:
 
     std::map<std::string, std::shared_ptr<Buffer>> spilled_tmp_files_info_;
 
-    VecBatch *vecBatchProto = new VecBatch(); //protobuf 序列化对象结构
+    spark::VecBatch *vecBatchProto = new VecBatch(); // protobuf 序列化对象结构
 
     virtual int Split_Init();
 

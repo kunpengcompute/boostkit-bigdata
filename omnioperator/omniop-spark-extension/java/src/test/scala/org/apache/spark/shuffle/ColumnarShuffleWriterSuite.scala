@@ -328,7 +328,7 @@ object ColumnarShuffleWriterSuite {
 
   def initOmniColumnVarcharVector(values: Array[java.lang.String]): OmniColumnVector = {
     val length = values.length
-    val vecTmp = new VarcharVec(1024, length)
+    val vecTmp = new VarcharVec(length)
     (0 until length).foreach { i =>
       if (values(i) != null) {
         vecTmp.set(i, values(i).getBytes())
