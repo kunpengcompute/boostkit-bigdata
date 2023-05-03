@@ -31,6 +31,7 @@ import org.apache.spark.sql.catalyst.expressions.{And, Attribute, BasePredicate,
 import org.apache.spark.sql.execution.{QueryExecutionException, RowToColumnConverter}
 import org.apache.spark.sql.execution.ndp.{FilterExeInfo, NdpConf, PushDownInfo}
 import org.apache.spark.sql.execution.vectorized.{OffHeapColumnVector, OnHeapColumnVector, WritableColumnVector}
+import org.apache.spark.sql.internal.SQLConf.ORC_IMPLEMENTATION
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.vectorized.ColumnarBatch
 import org.apache.spark.util.NextIterator
@@ -99,6 +100,7 @@ class FileScanRDDPushDown(
   private val zkAddress = NdpConf.getNdpZookeeperAddress(sparkSession)
   private val taskTimeout = NdpConf.getTaskTimeout(sparkSession)
   private val operatorCombineEnabled = NdpConf.getNdpOperatorCombineEnabled(sparkSession)
+  val orcImpl = sparkSession.sessionState.conf.getConf(ORC_IMPLEMENTATION)
 
   override def compute(split: RDDPartition, context: TaskContext): Iterator[InternalRow] = {
     val pageToColumnarClass = new PageToColumnar(requiredSchema, output)
@@ -208,7 +210,7 @@ class FileScanRDDPushDown(
         val tmp: util.ArrayList[Object] = new util.ArrayList[Object]()
         var hasnextIterator = false
         try {
-          hasnextIterator = dataIoClass.hasNextIterator(tmp, pageToColumnarClass, isColumnVector)
+          hasnextIterator = dataIoClass.hasNextIterator(tmp, pageToColumnarClass, isColumnVector, output, orcImpl)
         } catch {
           case e : Exception =>
             throw e
@@ -252,7 +254,7 @@ class FileScanRDDPushDown(
         val dataIoPage = dataIoClass.getPageIterator(pageCandidate, output,
           partitionColumns, filterOutput, pushDownOperators)
         currentIterator = pageToColumnarClass.transPageToColumnar(dataIoPage,
-          isColumnVector, dataIoClass.isOperatorCombineEnabled).asScala.iterator
+          isColumnVector, dataIoClass.isOperatorCombineEnabled, output, orcImpl).asScala.iterator
         iteHasNext()
       } else {
         unset()

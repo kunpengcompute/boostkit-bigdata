@@ -280,7 +280,7 @@ public class DataIoAdapter {
     }
 
     public boolean hasNextIterator(List<Object> pageList, PageToColumnar pageToColumnarClass,
-                                   boolean isVectorizedReader) {
+                                   boolean isVectorizedReader, Seq<Attribute> sparkOutput, String orcImpl) {
         if (!hasNextPage) {
             return false;
         }
@@ -293,7 +293,7 @@ public class DataIoAdapter {
         List<WritableColumnVector[]> l = new ArrayList<>();
         l.add(page);
         pageList.addAll(pageToColumnarClass
-                .transPageToColumnar(l.iterator(), isVectorizedReader, isOperatorCombineEnabled));
+                .transPageToColumnar(l.iterator(), isVectorizedReader, isOperatorCombineEnabled, sparkOutput, orcImpl));
         return true;
     }
 

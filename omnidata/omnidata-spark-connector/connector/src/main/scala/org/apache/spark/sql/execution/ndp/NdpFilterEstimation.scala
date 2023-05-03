@@ -274,7 +274,7 @@ case class NdpFilterEstimation(filterEstimation: FilterEstimation) extends Loggi
   def convertInternalVal(value: String, selectStrLen: Int): String = {
     var calValue = ""
     if (value.length > selectStrLen) {
-      calValue = value.substring(0, selectStrLen - 1)
+      calValue = value.substring(0, selectStrLen)
     } else {
       calValue = String.format(s"%-${selectStrLen}s", value)
     }
