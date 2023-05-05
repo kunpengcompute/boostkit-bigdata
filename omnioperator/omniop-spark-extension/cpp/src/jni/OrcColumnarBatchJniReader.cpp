@@ -19,6 +19,7 @@
 
 #include "OrcColumnarBatchJniReader.h"
 #include "jni_common.h"
+#include "../io/OrcObsFile.hh"
 
 using namespace omniruntime::vec;
 using namespace omniruntime::type;
@@ -222,6 +223,38 @@ void deleteTokens(std::vector<Token*>& tokenVector) {
     tokenVector.clear();
 }
 
+void parseObs(JNIEnv* env, jobject jsonObj, ObsConfig &obsInfo) {
+    jobject obsObject = env->CallObjectMethod(jsonObj, jsonMethodObj, env->NewStringUTF("obsInfo"));
+    if (obsObject == NULL) {
+        return;
+    }
+
+    jstring jEndpoint = (jstring)env->CallObjectMethod(obsObject, jsonMethodString, env->NewStringUTF("endpoint"));
+    auto endpointCharPtr = env->GetStringUTFChars(jEndpoint, JNI_FALSE);
+    std::string endpoint = endpointCharPtr;
+    obsInfo.hostLen = endpoint.length() + 1;
+    strcpy_s(obsInfo.hostName, obsInfo.hostLen, endpoint.c_str());
+    env->ReleaseStringUTFChars(jEndpoint, endpointCharPtr);
+
+    jstring jAk = (jstring)env->CallObjectMethod(obsObject, jsonMethodString, env->NewStringUTF("ak"));
+    auto akCharPtr = env->GetStringUTFChars(jAk, JNI_FALSE);
+    std::string ak = akCharPtr;
+    strcpy_s(obsInfo.accessKey, ak.length() + 1, ak.c_str());
+    env->ReleaseStringUTFChars(jAk, akCharPtr);
+
+    jstring jSk = (jstring)env->CallObjectMethod(obsObject, jsonMethodString, env->NewStringUTF("sk"));
+    auto skCharPtr = env->GetStringUTFChars(jSk, JNI_FALSE);
+    std::string sk = skCharPtr;
+    strcpy_s(obsInfo.secretKey, sk.length() + 1, sk.c_str());
+    env->ReleaseStringUTFChars(jSk, skCharPtr);
+
+    jstring jToken = (jstring)env->CallObjectMethod(obsObject, jsonMethodString, env->NewStringUTF("token"));
+    auto tokenCharPtr = env->GetStringUTFChars(jToken, JNI_FALSE);
+    std::string token = tokenCharPtr;
+    strcpy_s(obsInfo.token, token.length() + 1, token.c_str());
+    env->ReleaseStringUTFChars(jToken, tokenCharPtr);
+}
+
 JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniReader_initializeReader(JNIEnv *env,
     jobject jObj, jstring path, jobject jsonObj)
 {
@@ -253,7 +286,15 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniRe
     std::vector<Token*> tokens;
     parseTokens(env, jsonObj, tokens);
 
-    std::unique_ptr<orc::Reader> reader = createReader(orc::readFileRewrite(filePath, tokens), readerOptions);
+    std::unique_ptr<orc::Reader> reader;
+    if (0 == strncmp(filePath.c_str(), "obs://", OBS_PROTOCOL_SIZE)) {
+        ObsConfig obsInfo;
+        parseObs(env, jsonObj, obsInfo);
+        reader = createReader(orc::readObsFile(filePath, &obsInfo), readerOptions);
+    } else {
+        reader = createReader(orc::readFileRewrite(filePath, tokens), readerOptions);
+    }
+
     env->ReleaseStringUTFChars(path, pathPtr);
     orc::Reader *readerNew = reader.release();
     deleteTokens(tokens);

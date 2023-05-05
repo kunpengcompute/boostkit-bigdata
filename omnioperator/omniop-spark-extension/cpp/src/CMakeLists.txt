@@ -7,6 +7,7 @@ set (SOURCE_FILES
         io/ColumnWriter.cc
         io/Compression.cc
         io/MemoryPool.cc
+        io/OrcObsFile.cc
         io/OutputStream.cc
         io/SparkFile.cc
         io/WriterOptions.cc
@@ -46,6 +47,7 @@ target_link_libraries (${PROJ_TARGET} PUBLIC
         snappy
         lz4
         zstd
+        eSDKOBS
         boostkit-omniop-vector-1.2.0-aarch64
         )
 
