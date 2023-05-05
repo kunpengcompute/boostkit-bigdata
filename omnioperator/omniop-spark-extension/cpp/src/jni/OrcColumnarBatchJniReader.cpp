@@ -204,6 +204,11 @@ void parseTokens(JNIEnv* env, jobject jsonObj, std::vector<Token*>& tokenVector)
         std::string service(serviceStr);
         env->ReleaseStringUTFChars(jService, serviceStr);
 
+        transform(kind.begin(), kind.end(), kind.begin(), ::tolower);
+        if (kind != "hdfs_delegation_token") {
+            continue; // only hdfs delegation token is useful for liborc
+        }
+
         Token* token = new Token();
         token->setIdentifier(identifier);
         token->setPassword(password);
@@ -216,7 +221,7 @@ void parseTokens(JNIEnv* env, jobject jsonObj, std::vector<Token*>& tokenVector)
 
 void deleteTokens(std::vector<Token*>& tokenVector) {
     for (auto token : tokenVector) {
-        delete(token);
+        delete token;
     }
 
     tokenVector.clear();
