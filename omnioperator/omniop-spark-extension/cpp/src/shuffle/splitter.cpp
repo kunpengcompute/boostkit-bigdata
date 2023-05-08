@@ -27,7 +27,7 @@ SplitOptions SplitOptions::Defaults() { return SplitOptions(); }
 // 计算分区id,每个batch初始化
 int Splitter::ComputeAndCountPartitionId(VectorBatch& vb) {
     auto num_rows = vb.GetRowCount();
-    std::fill(std::begin(partition_id_cnt_cur_), std::end(partition_id_cnt_cur_), 0);
+    std::memset(partition_id_cnt_cur_, 0, num_partitions_ * sizeof(int32_t));
     partition_id_.resize(num_rows);
 
     if (singlePartitionFlag) {
@@ -123,8 +123,7 @@ int Splitter::AllocatePartitionBuffers(int32_t partition_id, int32_t new_size) {
 int Splitter::SplitFixedWidthValueBuffer(VectorBatch& vb) {
     const auto num_rows = vb.GetRowCount();
     for (uint col = 0; col < fixed_width_array_idx_.size(); ++col) {
-        std::fill(std::begin(partition_buffer_idx_offset_),
-                  std::end(partition_buffer_idx_offset_), 0);
+        std::memset(partition_buffer_idx_offset_, 0, num_partitions_ * sizeof(int32_t));
         auto col_idx_vb = fixed_width_array_idx_[col];
         auto col_idx_schema = singlePartitionFlag ? col_idx_vb : (col_idx_vb - 1);
         const auto& dst_addrs =  partition_fixed_width_value_addrs_[col];
@@ -318,8 +317,7 @@ int Splitter::SplitFixedWidthValidityBuffer(VectorBatch& vb){
         // 计算并填充数据
         auto src_addr = const_cast<uint8_t *>((uint8_t *)(
                 reinterpret_cast<int64_t>(omniruntime::vec::unsafe::UnsafeBaseVector::GetNulls(vb.Get(col_idx)))));
-        std::fill(std::begin(partition_buffer_idx_offset_),
-                std::end(partition_buffer_idx_offset_), 0);
+        std::memset(partition_buffer_idx_offset_, 0, num_partitions_ * sizeof(int32_t));
         const auto num_rows = vb.GetRowCount();
         for (auto row = 0; row < num_rows; ++row) {
             auto pid = partition_id_[row];
@@ -480,17 +478,34 @@ void Splitter::CastOmniToShuffleType(DataTypeId omniType, ShuffleTypeId shuffleT
 int Splitter::Split_Init(){
     num_row_splited_ = 0;
     cached_vectorbatch_size_ = 0;
-    partition_id_cnt_cur_.resize(num_partitions_);
-    partition_id_cnt_cache_.resize(num_partitions_);
-    partition_buffer_size_.resize(num_partitions_);
-    partition_buffer_idx_base_.resize(num_partitions_);
-    partition_buffer_idx_offset_.resize(num_partitions_);
+
+    partition_id_cnt_cur_ = static_cast<int32_t *>(malloc(num_partitions_ * sizeof(int32_t)));
+    std::memset(partition_id_cnt_cur_, 0, num_partitions_ * sizeof(int32_t));
+
+    partition_id_cnt_cache_ = static_cast<uint64_t *>(malloc(num_partitions_ * sizeof(uint64_t)));
+    std::memset(partition_id_cnt_cache_, 0, num_partitions_ * sizeof(uint64_t));
+
+    partition_buffer_size_ = static_cast<int32_t *>(malloc(num_partitions_ * sizeof(int32_t)));
+    std::memset(partition_buffer_size_, 0, num_partitions_ * sizeof(int32_t));
+
+    partition_buffer_idx_base_ = static_cast<int32_t *>(malloc(num_partitions_ * sizeof(int32_t)));
+    std::memset(partition_buffer_idx_base_, 0, num_partitions_ * sizeof(int32_t));
+
+    partition_buffer_idx_offset_ = static_cast<int32_t *>(malloc(num_partitions_ * sizeof(int32_t)));
+    std::memset(partition_buffer_idx_offset_, 0, num_partitions_ * sizeof(int32_t));
+
+    partition_serialization_size_ = static_cast<uint32_t *>(malloc(num_partitions_ * sizeof(uint32_t)));
+    std::memset(partition_serialization_size_, 0, num_partitions_ * sizeof(uint32_t));
+
     partition_cached_vectorbatch_.resize(num_partitions_);
-    partition_serialization_size_.resize(num_partitions_);
     fixed_width_array_idx_.clear();
     partition_lengths_.resize(num_partitions_);
-    fixed_valueBuffer_size_.resize(num_partitions_);
-    fixed_nullBuffer_size_.resize(num_partitions_);
+
+    fixed_valueBuffer_size_ = static_cast<uint32_t *>(malloc(num_partitions_ * sizeof(uint32_t)));
+    std::memset(fixed_valueBuffer_size_, 0, num_partitions_ * sizeof(uint32_t));
+
+    fixed_nullBuffer_size_ = static_cast<uint32_t *>(malloc(num_partitions_ * sizeof(uint32_t)));
+    std::memset(fixed_nullBuffer_size_, 0, num_partitions_ * sizeof(uint32_t));
 
     //obtain configed dir from Environment Variables
     configured_dirs_ = GetConfiguredLocalDirs();
@@ -815,7 +830,7 @@ int Splitter::WriteDataFileProto() {
     for (auto pid = 0; pid < num_partitions_; ++pid) {
         protoSpillPartition(pid, bufferStream);
     }
-    std::fill(std::begin(partition_id_cnt_cache_), std::end(partition_id_cnt_cache_), 0);
+    std::memset(partition_id_cnt_cache_, 0, num_partitions_ * sizeof(uint64_t));
     outStream->close();
     return 0;
 }
@@ -956,5 +971,13 @@ int Splitter::Stop() {
         throw std::runtime_error("delete nullptr error for free protobuf vecBatch memory");
     }
     delete vecBatchProto; //free protobuf vecBatch memory
+    delete partition_id_cnt_cur_;
+    delete partition_id_cnt_cache_;
+    delete fixed_valueBuffer_size_;
+    delete fixed_nullBuffer_size_;
+    delete partition_buffer_size_;
+    delete partition_buffer_idx_base_;
+    delete partition_buffer_idx_offset_;
+    delete partition_serialization_size_;
     return 0;
 }
