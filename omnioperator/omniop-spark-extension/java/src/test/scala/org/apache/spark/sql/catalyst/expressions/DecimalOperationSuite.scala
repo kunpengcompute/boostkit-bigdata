@@ -16,14 +16,15 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.execution
+package org.apache.spark.sql.catalyst.expressions
 
+import org.apache.spark.sql.execution.{ColumnarConditionProjectExec, ColumnarSparkPlanTest}
 import org.apache.spark.sql.types.Decimal
 import org.apache.spark.sql.{Column, DataFrame}
 
 import java.math.MathContext
 
-class DecimalOperationSuite extends ColumnarSparkPlanTest {
+class DecimalOperationSuite extends ColumnarSparkPlanTest{
 
   import testImplicits.{localSeqToDatasetHolder, newProductEncoder}
 
