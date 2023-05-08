@@ -281,7 +281,7 @@ class CastSuite extends ColumnarSparkPlanTest {
 
     val result2 = spark.sql("select cast('999999999999999999999999999999' as float);")
     val output2 = result2.collect().toSeq.head.getFloat(0)
-    assertResult(1.0E30, s"sql: ${sql}")(output2)
+    assertResult(1.0E30F, s"sql: ${sql}")(output2)
 
     val result3 = spark.sql("select cast('false' as float);")
     val exception3 = intercept[Exception](
