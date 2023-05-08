@@ -110,8 +110,6 @@ class Splitter {
     std::vector<int32_t> partition_buffer_idx_offset_; //split定长列时用于统计offset的临时变量
     std::vector<uint32_t> partition_serialization_size_; // 记录序列化后的各partition大小，用于stop返回partition偏移 in bytes
 
-    std::vector<bool> input_fixed_width_has_null_; // 定长列是否含有null标志数组
-
     // configured local dirs for spilled file
     int32_t dir_selection_ = 0;
     std::vector<int32_t> sub_dir_selection_;
@@ -161,7 +159,6 @@ private:
     }
 
     std::set<BaseVector *> varcharVectorCache;
-    bool first_vector_batch_ = false;
     std::vector<DataTypeId> vector_batch_col_types_;
     InputDataTypes input_col_types;
     std::vector<int32_t> binary_array_empirical_size_;

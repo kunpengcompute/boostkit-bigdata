@@ -375,13 +375,6 @@ int Splitter::CacheVectorBatch(int32_t partition_id, bool reset_buffers) {
 }
 
 int Splitter::DoSplit(VectorBatch& vb) {
-    // for the first input record batch, scan binary arrays and large binary
-    // arrays to get their empirical sizes
-
-    if (!first_vector_batch_) {
-        first_vector_batch_ = true;
-    }
-
     // prepare partition buffers and spill if necessary
     for (auto pid = 0; pid < num_partitions_; ++pid) {
         if (fixed_width_array_idx_.size() > 0 &&
