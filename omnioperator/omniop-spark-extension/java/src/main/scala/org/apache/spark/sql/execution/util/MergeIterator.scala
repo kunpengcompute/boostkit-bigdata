@@ -97,6 +97,8 @@ class MergeIterator(iter: Iterator[ColumnarBatch], localSchema: StructType,
         src.close()
       }
     }
+    // close bufferedBatch
+    bufferedBatch.foreach(batch => batch.close())
   }
 
   private def flush(): Unit = {
