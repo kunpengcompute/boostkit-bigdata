@@ -35,6 +35,7 @@ import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.parquet.{ParquetFileFormat => ParquetSource}
 import org.apache.spark.sql.execution.metric.{SQLMetric, SQLMetrics}
 import org.apache.spark.sql.execution.ndp.NdpConf.{getNdpPartialPushdown, getNdpPartialPushdownEnable, getTaskTimeout}
+import org.apache.spark.sql.execution.ndp.NdpSupport.isFilterHasChar
 import org.apache.spark.sql.execution.ndp.{NdpConf, NdpSupport}
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.sources.{BaseRelation, Filter}
@@ -654,7 +655,7 @@ abstract class BaseFileSourceScanExec(
 
   private def RDDPushDown(fsRelation: HadoopFsRelation, filePartitions: Seq[FilePartition], readFile: (PartitionedFile) => Iterator[InternalRow]): RDD[InternalRow] = {
     if (isPushDown) {
-      val partialCondition = allFilterExecInfo.nonEmpty && aggExeInfos.isEmpty && limitExeInfo.isEmpty && getNdpPartialPushdownEnable(fsRelation.sparkSession)
+      val partialCondition = allFilterExecInfo.nonEmpty && aggExeInfos.isEmpty && limitExeInfo.isEmpty && getNdpPartialPushdownEnable(fsRelation.sparkSession) && !isFilterHasChar(ndpOperators)
       val partialPdRate = getNdpPartialPushdown(fsRelation.sparkSession)
       var partialChildOutput = Seq[Attribute]()
       if (partialCondition) {

@@ -23,8 +23,10 @@ import org.apache.spark.sql.PushDownData
 import scala.collection.mutable.ListBuffer
 import org.apache.spark.sql.catalyst.expressions.{Attribute, Expression, NamedExpression}
 import org.apache.spark.sql.catalyst.expressions.aggregate.AggregateFunction
+import org.apache.spark.sql.catalyst.util.CharVarcharUtils.getRawTypeString
 import org.apache.spark.sql.execution.{FilterExec, SparkPlan}
 import org.apache.spark.sql.execution.aggregate.BaseAggregateExec
+import org.apache.spark.sql.types.StringType
 
 import scala.collection.mutable
 
@@ -101,5 +103,20 @@ object NdpSupport {
   def toAggExecution(agg: BaseAggregateExec): AggExeInfo = {
     AggExeInfo(agg.aggregateExpressions.map(_.aggregateFunction),
       agg.groupingExpressions, agg.output)
+  }
+
+  def isFilterHasChar(ndpOperator: PushDownInfo): Boolean = {
+    var result = false
+    for (filterInfo <- ndpOperator.filterExecutions) {
+      filterInfo.filter.foreach {
+        case attribute: Attribute if attribute.dataType.isInstanceOf[StringType] =>
+          val rawType = getRawTypeString(attribute.metadata)
+          if (rawType.isDefined && rawType.get.startsWith("char")) {
+            return true
+          }
+        case _ => result = false
+      }
+    }
+    result
   }
 }
