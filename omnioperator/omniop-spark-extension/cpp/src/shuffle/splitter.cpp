@@ -134,17 +134,20 @@ int Splitter::SplitFixedWidthValueBuffer(VectorBatch& vb) {
             auto ids_addr = VectorHelper::UnsafeGetValues(vb.Get(col_idx_vb), type_id);
             auto src_addr = reinterpret_cast<int64_t>(VectorHelper::UnsafeGetDictionary(vb.Get(col_idx_vb), type_id));
             switch (column_type_id_[col_idx_schema]) {
-#define PROCESS(SHUFFLE_TYPE, CTYPE)                                                           \
-    case SHUFFLE_TYPE:                                                                         \
-        for (auto row = 0; row < num_rows; ++row) {                                            \
-            auto pid = partition_id_[row];                                                     \
-            auto dst_offset =                                                                  \
-                partition_buffer_idx_base_[pid] + partition_buffer_idx_offset_[pid];           \
-            reinterpret_cast<CTYPE*>(dst_addrs[pid])[dst_offset] =                             \
-            reinterpret_cast<CTYPE*>(src_addr)[reinterpret_cast<int32_t *>(ids_addr)[row]];    \
-            partition_fixed_width_buffers_[col][pid][1]->size_ += (1 << SHUFFLE_TYPE);         \
-            partition_buffer_idx_offset_[pid]++;                                               \
-        }                                                                                      \
+#define PROCESS(SHUFFLE_TYPE, CTYPE)                                                             \
+    case SHUFFLE_TYPE:                                                                           \
+        {                                                                                        \
+            auto shuffle_size = (1 << SHUFFLE_TYPE);                                             \
+            for (auto row = 0; row < num_rows; ++row) {                                          \
+                auto pid = partition_id_[row];                                                   \
+                auto dst_offset =                                                                \
+                    partition_buffer_idx_base_[pid] + partition_buffer_idx_offset_[pid];         \
+                reinterpret_cast<CTYPE*>(dst_addrs[pid])[dst_offset] =                           \
+                reinterpret_cast<CTYPE*>(src_addr)[reinterpret_cast<int32_t *>(ids_addr)[row]];  \
+                partition_fixed_width_buffers_[col][pid][1]->size_ += shuffle_size;              \
+                partition_buffer_idx_offset_[pid]++;                                             \
+            }                                                                                    \
+        }                                                                                        \
     break;
                 PROCESS(SHUFFLE_1BYTE, uint8_t)
                 PROCESS(SHUFFLE_2BYTE, uint16_t)
@@ -152,19 +155,21 @@ int Splitter::SplitFixedWidthValueBuffer(VectorBatch& vb) {
                 PROCESS(SHUFFLE_8BYTE, uint64_t)
 #undef PROCESS
                 case SHUFFLE_DECIMAL128:
-                    for (auto row = 0; row < num_rows; ++row) {
-                        auto pid =  partition_id_[row];
-                        auto dst_offset =
-                                partition_buffer_idx_base_[pid] + partition_buffer_idx_offset_[pid];
-                        // 前64位取值、赋值
-                        reinterpret_cast<uint64_t*>(dst_addrs[pid])[dst_offset << 1] =
-                        reinterpret_cast<uint64_t*>(src_addr)[reinterpret_cast<int32_t *>(ids_addr)[row] << 1];
-                        // 后64位取值、赋值
-                        reinterpret_cast<uint64_t*>(dst_addrs[pid])[(dst_offset << 1) | 1] =
-                        reinterpret_cast<uint64_t*>(src_addr)[(reinterpret_cast<int32_t *>(ids_addr)[row] << 1) | 1];
-                        partition_fixed_width_buffers_[col][pid][1]->size_ +=
-                                (1 << SHUFFLE_DECIMAL128); //decimal128 16Bytes
-                        partition_buffer_idx_offset_[pid]++;
+                    {
+                        auto shuffle_size = (1 << SHUFFLE_DECIMAL128);
+                        for (auto row = 0; row < num_rows; ++row) {
+                            auto pid =  partition_id_[row];
+                            auto dst_offset =
+                                    partition_buffer_idx_base_[pid] + partition_buffer_idx_offset_[pid];
+                            // 前64位取值、赋值
+                            reinterpret_cast<uint64_t*>(dst_addrs[pid])[dst_offset << 1] =
+                            reinterpret_cast<uint64_t*>(src_addr)[reinterpret_cast<int32_t *>(ids_addr)[row] << 1];
+                            // 后64位取值、赋值
+                            reinterpret_cast<uint64_t*>(dst_addrs[pid])[(dst_offset << 1) | 1] =
+                            reinterpret_cast<uint64_t*>(src_addr)[(reinterpret_cast<int32_t *>(ids_addr)[row] << 1) | 1];
+                            partition_fixed_width_buffers_[col][pid][1]->size_ += shuffle_size; //decimal128 16Bytes
+                            partition_buffer_idx_offset_[pid]++;
+                        }
                     }
                     break;
                 default: {
@@ -178,14 +183,17 @@ int Splitter::SplitFixedWidthValueBuffer(VectorBatch& vb) {
             switch (column_type_id_[col_idx_schema]) {
 #define PROCESS(SHUFFLE_TYPE, CTYPE)                                                           \
     case SHUFFLE_TYPE:                                                                         \
-        for (auto row = 0; row < num_rows; ++row) {                                            \
-            auto pid = partition_id_[row];                                                     \
-            auto dst_offset =                                                                  \
-                partition_buffer_idx_base_[pid] + partition_buffer_idx_offset_[pid];           \
-            reinterpret_cast<CTYPE*>(dst_addrs[pid])[dst_offset] =                             \
-                reinterpret_cast<CTYPE*>(src_addr)[row];                                       \
-            partition_fixed_width_buffers_[col][pid][1]->size_ += (1 << SHUFFLE_TYPE);          \
-            partition_buffer_idx_offset_[pid]++;                                               \
+        {                                                                                      \
+            auto shuffle_size = (1 << SHUFFLE_TYPE);                                           \
+            for (auto row = 0; row < num_rows; ++row) {                                        \
+                auto pid = partition_id_[row];                                                 \
+                auto dst_offset =                                                              \
+                    partition_buffer_idx_base_[pid] + partition_buffer_idx_offset_[pid];       \
+                reinterpret_cast<CTYPE*>(dst_addrs[pid])[dst_offset] =                         \
+                    reinterpret_cast<CTYPE*>(src_addr)[row];                                   \
+                partition_fixed_width_buffers_[col][pid][1]->size_ += shuffle_size;            \
+                partition_buffer_idx_offset_[pid]++;                                           \
+            }                                                                                  \
         }                                                                                      \
     break;
                 PROCESS(SHUFFLE_1BYTE, uint8_t)
@@ -194,17 +202,19 @@ int Splitter::SplitFixedWidthValueBuffer(VectorBatch& vb) {
                 PROCESS(SHUFFLE_8BYTE, uint64_t)
 #undef PROCESS
                 case SHUFFLE_DECIMAL128:
-                    for (auto row = 0; row < num_rows; ++row) {
-                        auto pid =  partition_id_[row];
-                        auto dst_offset =
-                                partition_buffer_idx_base_[pid] + partition_buffer_idx_offset_[pid];
-                        reinterpret_cast<uint64_t*>(dst_addrs[pid])[dst_offset << 1] =
-                                reinterpret_cast<uint64_t*>(src_addr)[row << 1]; // 前64位取值、赋值
-                        reinterpret_cast<uint64_t*>(dst_addrs[pid])[(dst_offset << 1) | 1] =
-                                reinterpret_cast<uint64_t*>(src_addr)[(row << 1) | 1]; // 后64位取值、赋值
-                        partition_fixed_width_buffers_[col][pid][1]->size_ +=
-                                (1 << SHUFFLE_DECIMAL128); //decimal128 16Bytes
-                        partition_buffer_idx_offset_[pid]++;
+                    {
+                        auto shuffle_size = (1 << SHUFFLE_DECIMAL128);
+                        for (auto row = 0; row < num_rows; ++row) {
+                            auto pid =  partition_id_[row];
+                            auto dst_offset =
+                                    partition_buffer_idx_base_[pid] + partition_buffer_idx_offset_[pid];
+                            reinterpret_cast<uint64_t*>(dst_addrs[pid])[dst_offset << 1] =
+                                    reinterpret_cast<uint64_t*>(src_addr)[row << 1]; // 前64位取值、赋值
+                            reinterpret_cast<uint64_t*>(dst_addrs[pid])[(dst_offset << 1) | 1] =
+                                    reinterpret_cast<uint64_t*>(src_addr)[(row << 1) | 1]; // 后64位取值、赋值
+                            partition_fixed_width_buffers_[col][pid][1]->size_ += shuffle_size; //decimal128 16Bytes
+                            partition_buffer_idx_offset_[pid]++;
+                        }
                     }
                     break;
                 default: {
