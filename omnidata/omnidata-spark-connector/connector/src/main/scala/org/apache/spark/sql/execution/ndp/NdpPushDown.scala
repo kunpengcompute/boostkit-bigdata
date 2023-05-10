@@ -19,7 +19,6 @@
 package org.apache.spark.sql.execution.ndp
 
 import java.util.{Locale, Properties}
-
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{PushDownData, PushDownManager, SparkSession}
 import org.apache.spark.sql.catalyst.InternalRow
@@ -34,6 +33,7 @@ import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.sources.DataSourceRegister
 import org.apache.spark.sql.hive.HiveSimpleUDF
 import org.apache.hadoop.hive.ql.exec.DefaultUDFMethodResolver
+import org.apache.spark.TaskContext
 import org.apache.spark.sql.catalyst.trees.TreeNode
 
 import scala.collection.{JavaConverters, mutable}
@@ -406,6 +406,7 @@ object NdpConf {
   val NDP_CLIENT_TASK_TIMEOUT = "spark.sql.ndp.task.timeout"
   val NDP_PARTIAL_PUSHDOWN = "spark.sql.ndp.partial.pushdown"
   val NDP_PARTIAL_PUSHDOWN_ENABLE = "spark.sql.ndp.partial.pushdown.enable"
+  val NDP_DOMIAN_GENERATE_ENABLE = "spark.sql.ndp.domain.generate.enable"
 
   def toBoolean(key: String, value: String, sparkSession: SparkSession): Boolean = {
     try {
@@ -516,6 +517,11 @@ object NdpConf {
   def getNdpPartialPushdownEnable(sparkSession: SparkSession): Boolean = {
     toBoolean(NDP_PARTIAL_PUSHDOWN_ENABLE,
       sparkSession.conf.getOption(NDP_PARTIAL_PUSHDOWN_ENABLE).getOrElse("false"), sparkSession)
+  }
+
+  def getNdpDomainGenerateEnable(taskContext: TaskContext): Boolean = {
+    taskContext.getLocalProperties.getProperty(NDP_DOMIAN_GENERATE_ENABLE, "true")
+        .equalsIgnoreCase("true")
   }
 
   def getNdpUdfWhitelist(sparkSession: SparkSession): Option[String] = {

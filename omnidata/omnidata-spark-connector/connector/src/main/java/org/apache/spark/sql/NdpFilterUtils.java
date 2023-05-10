@@ -62,19 +62,8 @@ public class NdpFilterUtils {
             List<RowExpression> multiArguments, String operatorName) {
         RowExpression rowExpression;
         List<RowExpression> rowArguments;
-        String prestoName = prestoType.toString();
-        TypeSignature paramRight;
-        TypeSignature paramLeft;
-        if (prestoType.toString().contains("decimal")) {
-            String[] parameter = prestoName.split("\\(")[1].split("\\)")[0].split(",");
-            long precision = Long.parseLong(parameter[0]);
-            long scale = Long.parseLong(parameter[1]);
-            paramRight = new TypeSignature("decimal", TypeSignatureParameter.of(precision), TypeSignatureParameter.of(scale));
-            paramLeft = new TypeSignature("decimal", TypeSignatureParameter.of(precision), TypeSignatureParameter.of(scale));
-        } else {
-            paramRight = new TypeSignature(prestoName);
-            paramLeft = new TypeSignature(prestoName);
-        }
+        TypeSignature paramRight = prestoType.getTypeSignature();
+        TypeSignature paramLeft = prestoType.getTypeSignature();
         Signature signature = new Signature(
                 QualifiedObjectName.valueOfDefaultFunction("$operator$" +
                         signatureName.toLowerCase(Locale.ENGLISH)),
@@ -105,8 +94,8 @@ public class NdpFilterUtils {
                         QualifiedObjectName.valueOfDefaultFunction("$operator$"
                                 + signatureName.toLowerCase(Locale.ENGLISH)),
                         FunctionKind.SCALAR, new TypeSignature("boolean"),
-                        new TypeSignature(prestoType.toString()),
-                        new TypeSignature(prestoType.toString()));
+                        prestoType.getTypeSignature(),
+                        prestoType.getTypeSignature());
                 rowExpression = new CallExpression(signatureName,
                         new BuiltInFunctionHandle(signatureMulti), BOOLEAN, multiArguments);
                 break;

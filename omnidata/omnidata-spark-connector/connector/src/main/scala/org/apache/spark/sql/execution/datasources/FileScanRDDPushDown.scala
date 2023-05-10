@@ -17,6 +17,9 @@
 
 package org.apache.spark.sql.execution.datasources
 
+import com.google.common.collect.ImmutableMap
+import io.prestosql.spi.relation.RowExpression
+
 import java.util
 import scala.collection.JavaConverters._
 import scala.collection.mutable
@@ -37,6 +40,7 @@ import org.apache.spark.sql.vectorized.ColumnarBatch
 import org.apache.spark.util.NextIterator
 
 import java.io.{FileNotFoundException, IOException}
+import java.util.Optional
 import scala.util.Random
 
 

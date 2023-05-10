@@ -39,17 +39,18 @@ import com.huawei.boostkit.omnidata.spark.PageDeserializer;
 
 import com.google.common.collect.ImmutableMap;
 
+import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.connector.QualifiedObjectName;
 import io.prestosql.spi.function.BuiltInFunctionHandle;
 import io.prestosql.spi.function.FunctionHandle;
 import io.prestosql.spi.function.FunctionKind;
 import io.prestosql.spi.function.Signature;
-import io.prestosql.spi.relation.CallExpression;
-import io.prestosql.spi.relation.ConstantExpression;
-import io.prestosql.spi.relation.InputReferenceExpression;
-import io.prestosql.spi.relation.RowExpression;
-import io.prestosql.spi.relation.SpecialForm;
+import io.prestosql.spi.predicate.Domain;
+import io.prestosql.spi.relation.*;
 import io.prestosql.spi.type.*;
+import io.prestosql.sql.relational.RowExpressionDomainTranslator;
+import org.apache.spark.TaskContext;
+import org.apache.spark.sql.execution.ndp.NdpConf;
 import scala.collection.JavaConverters;
 import scala.collection.Seq;
 
@@ -108,6 +109,8 @@ import java.util.Set;
  */
 public class DataIoAdapter {
     private int TASK_FAILED_TIMES = 4;
+
+    private int MAX_PAGE_SIZE_IN_BYTES = 1048576;
 
     private List<Type> omnidataTypes = new ArrayList<>();
 
@@ -194,10 +197,11 @@ public class DataIoAdapter {
 
         // create TaskSource
         DataSource dataSource = initDataSource(pageCandidate);
+
         Predicate predicate = new Predicate(
                 omnidataTypes, omnidataColumns, filterRowExpression, omnidataProjections,
-                ImmutableMap.of(), ImmutableMap.of(), aggregations, limitLong);
-        TaskSource taskSource = new TaskSource(dataSource, predicate, 1048576);
+                buildDomains(filterRowExpression), ImmutableMap.of(), aggregations, limitLong);
+        TaskSource taskSource = new TaskSource(dataSource, predicate, MAX_PAGE_SIZE_IN_BYTES);
 
         // create deserializer
         this.isOperatorCombineEnabled =
@@ -738,7 +742,7 @@ public class DataIoAdapter {
                 return getRowExpression(filterExpression,
                         ((HiveSimpleUDF) filterExpression).name(), rightExpressions);
             case AttributeReference:
-                Type type = NdpUtils.transOlkDataType(filterExpression.dataType(), (Attribute) filterExpression,  false, false);
+                Type type = NdpUtils.transOlkDataType(filterExpression.dataType(), (Attribute) filterExpression, false, false);
                 return new InputReferenceExpression(putFilterValue(filterExpression, type), type);
             default:
                 return resRowExpression;
@@ -871,7 +875,7 @@ public class DataIoAdapter {
         return dataSource;
     }
 
-    private Optional<RowExpression> initFilter(Seq<FilterExeInfo> filterExecutions) {
+    public Optional<RowExpression> initFilter(Seq<FilterExeInfo> filterExecutions) {
         List<FilterExeInfo> filterExecutionList = JavaConverters.seqAsJavaList(filterExecutions);
         Optional<RowExpression> resRowExpression = Optional.empty();
         for (FilterExeInfo filterExeInfo : filterExecutionList) {
@@ -923,5 +927,43 @@ public class DataIoAdapter {
 
     public boolean isOperatorCombineEnabled() {
         return isOperatorCombineEnabled;
+    }
+
+    public ImmutableMap buildDomains(Optional<RowExpression> filterRowExpression) {
+        long startTime = System.currentTimeMillis();
+        ImmutableMap.Builder<String, Domain> domains = ImmutableMap.builder();
+        if (filterRowExpression.isPresent() && NdpConf.getNdpDomainGenerateEnable(TaskContext.get())) {
+            ConnectorSession session = MetaStore.getConnectorSession();
+            RowExpressionDomainTranslator domainTranslator = new RowExpressionDomainTranslator(MetaStore.getMetadata());
+            DomainTranslator.ColumnExtractor<InputReferenceExpression> columnExtractor = (expression, domain) -> {
+                if (expression instanceof InputReferenceExpression) {
+                    return Optional.of((InputReferenceExpression) expression);
+                }
+                return Optional.empty();
+            };
+            DomainTranslator.ExtractionResult<InputReferenceExpression> extractionResult = domainTranslator
+                    .fromPredicate(session, filterRowExpression.get(), columnExtractor);
+            if (!extractionResult.getTupleDomain().isNone()) {
+                extractionResult.getTupleDomain().getDomains().get().forEach((columnHandle, domain) -> {
+                    Type type = domain.getType();
+                    // unSupport dataType skip
+                    if (type instanceof MapType ||
+                            type instanceof ArrayType ||
+                            type instanceof RowType ||
+                            type instanceof DecimalType ||
+                            type instanceof TimestampType) {
+                        return;
+                    }
+                    domains.put(omnidataColumns.get(columnHandle.getField()).getName(), domain);
+                });
+            }
+        }
+
+        ImmutableMap<String, Domain> domainImmutableMap = domains.build();
+        long costTime = System.currentTimeMillis() - startTime;
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Push down generate domain cost time:" + costTime + ";generate domain:" + domainImmutableMap.size());
+        }
+        return domainImmutableMap;
     }
 }

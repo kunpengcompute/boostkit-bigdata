@@ -28,6 +28,11 @@
     </properties>
     <dependencies>
         <dependency>
+            <groupId>io.hetu.core</groupId>
+            <artifactId>presto-expressions</artifactId>
+            <version>${dep.hetu.version}</version>
+        </dependency>
+        <dependency>
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-hive_2.12</artifactId>
             <version>${spark.version}</version>
@@ -86,25 +91,21 @@
             <groupId>io.airlift</groupId>
             <artifactId>stats</artifactId>
             <version>206</version>
-            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.apache.lucene</groupId>
             <artifactId>lucene-analyzers-common</artifactId>
             <version>7.2.1</version>
-            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>it.unimi.dsi</groupId>
             <artifactId>fastutil</artifactId>
             <version>6.5.9</version>
-            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>io.airlift</groupId>
             <artifactId>bytecode</artifactId>
             <version>1.2</version>
-            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>io.hetu.core</groupId>
@@ -116,7 +117,6 @@
             <groupId>io.airlift</groupId>
             <artifactId>json</artifactId>
             <version>206</version>
-            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.testng</groupId>
