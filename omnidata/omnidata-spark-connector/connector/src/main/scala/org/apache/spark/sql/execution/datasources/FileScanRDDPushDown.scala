@@ -37,9 +37,8 @@ import org.apache.spark.sql.execution.vectorized.{OffHeapColumnVector, OnHeapCol
 import org.apache.spark.sql.internal.SQLConf.ORC_IMPLEMENTATION
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.vectorized.ColumnarBatch
-import org.apache.spark.util.NextIterator
 
-import java.io.{FileNotFoundException, IOException}
+import java.io.FileNotFoundException
 import java.util.Optional
 import scala.util.Random
 
@@ -48,20 +47,20 @@ import scala.util.Random
  * An RDD that scans a list of file partitions.
  */
 class FileScanRDDPushDown(
-    @transient private val sparkSession: SparkSession,
-    @transient val filePartitions: Seq[FilePartition],
-    requiredSchema: StructType,
-    output: Seq[Attribute],
-    dataSchema: StructType,
-    pushDownOperators: PushDownInfo,
-    partitionColumns: Seq[Attribute],
-    isColumnVector: Boolean,
-    fileFormat: FileFormat,
-    readFunction: (PartitionedFile) => Iterator[InternalRow],
-    partialCondition: Boolean,
-    partialPdRate: Double,
-    zkPdRate: Double,
-    partialChildOutput: Seq[Attribute])
+                           @transient private val sparkSession: SparkSession,
+                           @transient val filePartitions: Seq[FilePartition],
+                           requiredSchema: StructType,
+                           output: Seq[Attribute],
+                           dataSchema: StructType,
+                           pushDownOperators: PushDownInfo,
+                           partitionColumns: Seq[Attribute],
+                           isColumnVector: Boolean,
+                           fileFormat: FileFormat,
+                           readFunction: (PartitionedFile) => Iterator[InternalRow],
+                           partialCondition: Boolean,
+                           partialPdRate: Double,
+                           zkPdRate: Double,
+                           partialChildOutput: Seq[Attribute])
   extends RDD[InternalRow](sparkSession.sparkContext, Nil) {
 
   var columnOffset = -1
@@ -142,7 +141,7 @@ class FileScanRDDPushDown(
           sdiKey => {
             retHost(sdiKey) = retHost.getOrElse(sdiKey, 0L) + partitionMap.length
             sdiKey
-        }}
+          }}
       }}
 
       val datanode = retHost.toSeq.sortWith((x, y) => x._2 > y._2).toIterator
@@ -184,8 +183,8 @@ class FileScanRDDPushDown(
   }
 
   class PushDownIterator(split: RDDPartition,
-                     context: TaskContext,
-                     pageToColumnarClass: PageToColumnar)
+                         context: TaskContext,
+                         pageToColumnarClass: PageToColumnar)
     extends Iterator[Object] with AutoCloseable {
 
     val inputMetrics: InputMetrics = context.taskMetrics().inputMetrics
@@ -300,9 +299,9 @@ class FileScanRDDPushDown(
   }
 
   class PartialPushDownIterator(split: RDDPartition,
-                         context: TaskContext,
-                         pageToColumnarClass: PageToColumnar,
-                         predicate: BasePredicate)
+                                context: TaskContext,
+                                pageToColumnarClass: PageToColumnar,
+                                predicate: BasePredicate)
     extends PushDownIterator(split: RDDPartition, context: TaskContext, pageToColumnarClass: PageToColumnar) {
 
     override def hasNext: Boolean = {
@@ -319,7 +318,7 @@ class FileScanRDDPushDown(
         InputFileBlockHolder.set(currentFile.filePath, currentFile.start, currentFile.length)
         predicate.initialize(0)
         val toUnsafe = UnsafeProjection.create(output, filterOutput)
-        if (isColumnVector) {
+        if (isColumnVector)  {
           currentIterator = readCurrentFile().asInstanceOf[Iterator[ColumnarBatch]]
             .map { c =>
               val rowIterator = c.rowIterator().asScala

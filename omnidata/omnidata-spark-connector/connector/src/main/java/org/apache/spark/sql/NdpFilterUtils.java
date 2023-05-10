@@ -32,7 +32,6 @@ import io.prestosql.spi.relation.RowExpression;
 import io.prestosql.spi.relation.SpecialForm;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeSignature;
-import io.prestosql.spi.type.TypeSignatureParameter;
 
 import org.apache.spark.sql.catalyst.expressions.Expression;
 
@@ -128,7 +127,7 @@ public class NdpFilterUtils {
         if (null != argumentValues && argumentValues.size() > 0) {
             for (Object argumentValue : argumentValues) {
                 arguments.add(NdpUtils
-                        .transArgumentData(argumentValue.toString(), typeStr));
+                        .transConstantExpression(argumentValue.toString(), typeStr));
             }
         }
         return arguments;
@@ -141,7 +140,7 @@ public class NdpFilterUtils {
         if (null != argumentValues && argumentValues.size() > 0) {
             for (Object argumentValue : argumentValues) {
                 arguments.add(NdpUtils
-                        .transArgumentData(argumentValue.toString(), typeStr));
+                        .transConstantExpression(argumentValue.toString(), typeStr));
             }
         }
         return arguments;

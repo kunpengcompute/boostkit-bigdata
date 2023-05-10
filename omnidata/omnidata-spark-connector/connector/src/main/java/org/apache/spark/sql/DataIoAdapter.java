@@ -22,7 +22,6 @@ import static io.prestosql.spi.function.FunctionKind.AGGREGATE;
 import static io.prestosql.spi.function.FunctionKind.SCALAR;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
-import static io.prestosql.spi.type.VarcharType.createVarcharType;
 
 import com.huawei.boostkit.omnidata.decode.type.DecodeType;
 import com.huawei.boostkit.omnidata.decode.type.LongDecodeType;
@@ -46,7 +45,11 @@ import io.prestosql.spi.function.FunctionHandle;
 import io.prestosql.spi.function.FunctionKind;
 import io.prestosql.spi.function.Signature;
 import io.prestosql.spi.predicate.Domain;
-import io.prestosql.spi.relation.*;
+import io.prestosql.spi.relation.CallExpression;
+import io.prestosql.spi.relation.DomainTranslator;
+import io.prestosql.spi.relation.InputReferenceExpression;
+import io.prestosql.spi.relation.RowExpression;
+import io.prestosql.spi.relation.SpecialForm;
 import io.prestosql.spi.type.*;
 import io.prestosql.sql.relational.RowExpressionDomainTranslator;
 import org.apache.spark.TaskContext;
@@ -89,7 +92,6 @@ import org.slf4j.LoggerFactory;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import java.sql.Date;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -284,7 +286,7 @@ public class DataIoAdapter {
     }
 
     public boolean hasNextIterator(List<Object> pageList, PageToColumnar pageToColumnarClass,
-                                   boolean isVectorizedReader, Seq<Attribute> sparkOutput, String orcImpl) {
+                                   boolean isVectorizedReader, Seq<Attribute> sparkOutPut, String orcImpl) {
         if (!hasNextPage) {
             return false;
         }
@@ -297,7 +299,7 @@ public class DataIoAdapter {
         List<WritableColumnVector[]> l = new ArrayList<>();
         l.add(page);
         pageList.addAll(pageToColumnarClass
-                .transPageToColumnar(l.iterator(), isVectorizedReader, isOperatorCombineEnabled, sparkOutput, orcImpl));
+                .transPageToColumnar(l.iterator(), isVectorizedReader, isOperatorCombineEnabled, sparkOutPut, orcImpl));
         return true;
     }
 
@@ -323,17 +325,12 @@ public class DataIoAdapter {
     }
 
     private RowExpression extractNamedExpression(NamedExpression namedExpression) {
-        Attribute attribute = null;
-        boolean isInputDataType = true;
-        if (namedExpression instanceof Attribute) {
-            attribute = (Attribute) namedExpression;
-            isInputDataType = false;
-        }
-        Type prestoType = NdpUtils.transOlkDataType(((Expression) namedExpression).dataType(), attribute, false, isInputDataType);
+        Type prestoType = NdpUtils.transOlkDataType(((Expression) namedExpression).dataType(), namedExpression,
+                false);
         int aggProjectionId;
         String aggColumnName = namedExpression.name();
         columnOrdersList.add(columnOrder++);
-        columnTypesList.add(NdpUtils.transDataIoDataType(((Expression) namedExpression).dataType()));
+        columnTypesList.add(NdpUtils.transDecodeType(((Expression) namedExpression).dataType()));
 
         if (null != fieldMap.get(aggColumnName)) {
             aggProjectionId = fieldMap.get(aggColumnName);
@@ -416,22 +413,10 @@ public class DataIoAdapter {
     private CallExpression createAggBinCall(BinaryArithmetic expression,
                                             String operatorName, Type prestoType) {
         List<RowExpression> arguments = new ArrayList<>();
-        Attribute attributeLeft = null;
-        boolean isInputDataTypeLeft = true;
-        if (expression.left() instanceof Attribute) {
-            attributeLeft = (Attribute) expression.left();
-            isInputDataTypeLeft = false;
-        }
-        Attribute attributeRight = null;
-        boolean isInputDataTypeRight = true;
-        if (expression.right() instanceof Attribute) {
-            attributeRight = (Attribute) expression.right();
-            isInputDataTypeRight = false;
-        }
         Type leftPrestoType = NdpUtils.transOlkDataType(
-                expression.left().dataType(), attributeLeft, false, isInputDataTypeLeft);
+                expression.left().dataType(), expression.left(), false);
         Type rightPrestoType = NdpUtils.transOlkDataType(
-                expression.right().dataType(), attributeRight, false, isInputDataTypeRight);
+                expression.right().dataType(), expression.right(), false);
         FunctionHandle functionHandle = new BuiltInFunctionHandle(
                 new Signature(QualifiedObjectName.valueOfDefaultFunction("$operator$" + operatorName),
                         SCALAR, prestoType.getTypeSignature(),
@@ -444,13 +429,7 @@ public class DataIoAdapter {
     }
 
     private RowExpression createAggProjection(Expression expression) {
-        Attribute attribute = null;
-        boolean isInputDataType = true;
-        if (expression instanceof Attribute) {
-            attribute = (Attribute) expression;
-            isInputDataType = false;
-        }
-        Type prestoType = NdpUtils.transOlkDataType(expression.dataType(), attribute, false, isInputDataType);
+        Type prestoType = NdpUtils.transOlkDataType(expression.dataType(), expression, false);
         AggExpressionType aggExpressionType = AggExpressionType
                 .valueOf(expression.getClass().getSimpleName());
         switch (aggExpressionType) {
@@ -465,7 +444,7 @@ public class DataIoAdapter {
             case Remainder:
                 return createAggBinCall((Remainder) expression, "Modulus", prestoType);
             case Literal:
-                return NdpUtils.transArgumentData(expression.toString(), prestoType);
+                return NdpUtils.transConstantExpression(expression.toString(), prestoType);
             case AttributeReference:
                 String aggColumnName = expression.toString().split("#")[0].toLowerCase(Locale.ENGLISH);
                 int field;
@@ -504,7 +483,7 @@ public class DataIoAdapter {
                                           Map<String, AggregationInfo.AggregateFunction> aggregationMap) {
         List<Expression> expressions = JavaConverters.seqAsJavaList(aggregateFunction.children());
         String aggregateFunctionName = aggregateFunction.toString();
-        Type prestoType = NdpUtils.transOlkDataType(aggregateFunction.dataType(), null, false, true);
+        Type prestoType = NdpUtils.transOlkDataType(aggregateFunction.dataType(), false);
         AggregateFunctionType aggregateFunctionType = AggregateFunctionType.valueOf(
                 aggregateFunction.getClass().getSimpleName());
         for (Expression expression : expressions) {
@@ -514,13 +493,7 @@ public class DataIoAdapter {
                 fieldMap.put(aggregateFunctionName, projectionId);
                 if (aggregateFunctionType.equals(AggregateFunctionType.Count)
                         || aggregateFunctionType.equals(AggregateFunctionType.Average)) {
-                    Attribute attribute = null;
-                    boolean isInputDataType = true;
-                    if (expression instanceof Attribute) {
-                        attribute = (Attribute) expression;
-                        isInputDataType = false;
-                    }
-                    prestoType = NdpUtils.transOlkDataType(expression.dataType(), attribute, false, isInputDataType);
+                    prestoType = NdpUtils.transOlkDataType(expression.dataType(), expression, false);
                 }
                 omnidataTypes.add(prestoType);
                 break;
@@ -742,7 +715,8 @@ public class DataIoAdapter {
                 return getRowExpression(filterExpression,
                         ((HiveSimpleUDF) filterExpression).name(), rightExpressions);
             case AttributeReference:
-                Type type = NdpUtils.transOlkDataType(filterExpression.dataType(), (Attribute) filterExpression, false, false);
+                Type type = NdpUtils.transOlkDataType(filterExpression.dataType(), filterExpression,
+                        false);
                 return new InputReferenceExpression(putFilterValue(filterExpression, type), type);
             default:
                 return resRowExpression;
@@ -756,15 +730,16 @@ public class DataIoAdapter {
         int filterProjectionId;
         // deal with left expression only UDF and Attribute
         if (leftExpression instanceof AttributeReference) {
-            prestoType = NdpUtils.transOlkDataType(leftExpression.dataType(), (Attribute) leftExpression, false, false);
+            prestoType = NdpUtils.transOlkDataType(leftExpression.dataType(), leftExpression, false);
             filterProjectionId = putFilterValue(leftExpression, prestoType);
         } else if (leftExpression instanceof HiveSimpleUDF) {
             for (int i = 0; i < leftExpression.children().length(); i++) {
                 Expression childExpr = leftExpression.children().apply(i);
                 if (childExpr instanceof Attribute) {
-                    putFilterValue(childExpr, NdpUtils.transOlkDataType(childExpr.dataType(), (Attribute) childExpr, false, false));
+                    putFilterValue(childExpr, NdpUtils.transOlkDataType(childExpr.dataType(),
+                            childExpr, false));
                 } else if (!(childExpr instanceof Literal)) {
-                    putFilterValue(childExpr, NdpUtils.transOlkDataType(childExpr.dataType(), null, false, true));
+                    putFilterValue(childExpr, NdpUtils.transOlkDataType(childExpr.dataType(), false));
                 }
             }
             ndpUdfExpressions.createNdpUdf(leftExpression, expressionInfo, fieldMap);
@@ -817,7 +792,7 @@ public class DataIoAdapter {
         omnidataColumns.add(new Column(columnId, filterColumnName,
                 prestoType, isPartitionKey, partitionValue));
         if (isPushDownAgg) {
-            filterTypesList.add(NdpUtils.transDataIoDataType(valueExpression.dataType()));
+            filterTypesList.add(NdpUtils.transDecodeType(valueExpression.dataType()));
             filterOrdersList.add(filterProjectionId);
             omnidataProjections.add(new InputReferenceExpression(filterProjectionId, prestoType));
             omnidataTypes.add(prestoType);
@@ -910,14 +885,14 @@ public class DataIoAdapter {
         for (Attribute attribute : outputColumnList) {
             Attribute resAttribute = NdpUtils.getColumnAttribute(attribute, listAtt);
             String columnName = resAttribute.name().toLowerCase(Locale.ENGLISH);
-            Type type = NdpUtils.transOlkDataType(resAttribute.dataType(), resAttribute, false, false);
+            Type type = NdpUtils.transOlkDataType(resAttribute.dataType(), resAttribute, false);
             int columnId = NdpUtils.getColumnId(resAttribute.toString()) - columnOffset;
             isPartitionKey = partitionColumnName.contains(columnName);
             String partitionValue = NdpUtils.getPartitionValue(filePath, columnName);
             omnidataColumns.add(new Column(columnId,
                     columnName, type, isPartitionKey, partitionValue));
             omnidataTypes.add(type);
-            filterTypesList.add(NdpUtils.transDataIoDataType(resAttribute.dataType()));
+            filterTypesList.add(NdpUtils.transDecodeType(resAttribute.dataType()));
             filterOrdersList.add(filterColumnId);
             omnidataProjections.add(new InputReferenceExpression(filterColumnId, type));
             fieldMap.put(columnName, filterColumnId);
@@ -946,7 +921,7 @@ public class DataIoAdapter {
             if (!extractionResult.getTupleDomain().isNone()) {
                 extractionResult.getTupleDomain().getDomains().get().forEach((columnHandle, domain) -> {
                     Type type = domain.getType();
-                    // unSupport dataType skip
+                    //  unSupport dataType skip
                     if (type instanceof MapType ||
                             type instanceof ArrayType ||
                             type instanceof RowType ||
@@ -954,6 +929,7 @@ public class DataIoAdapter {
                             type instanceof TimestampType) {
                         return;
                     }
+
                     domains.put(omnidataColumns.get(columnHandle.getField()).getName(), domain);
                 });
             }
