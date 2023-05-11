@@ -89,28 +89,26 @@ class Splitter {
     void MergeSpilled();
 
     std::vector<int32_t> partition_id_; // 记录当前vb每一行的pid
-    std::vector<int32_t> partition_id_cnt_cur_; // 统计不同partition记录的行数(当前处理中的vb)
-    std::vector<uint64_t> partition_id_cnt_cache_; // 统计不同partition记录的行数，cache住的
+    int32_t *partition_id_cnt_cur_; // 统计不同partition记录的行数(当前处理中的vb)
+    uint64_t *partition_id_cnt_cache_; // 统计不同partition记录的行数，cache住的
     // column number
     uint32_t num_row_splited_; // cached row number
     uint64_t cached_vectorbatch_size_; // cache total vectorbatch size in bytes
     uint64_t current_fixed_alloc_buffer_size_ = 0;
-    std::vector<uint32_t> fixed_valueBuffer_size_; // 当前定长omniAlloc已经分配value内存大小byte
-    std::vector<uint32_t> fixed_nullBuffer_size_; // 当前定长omniAlloc已分配null内存大小byte
+    uint32_t *fixed_valueBuffer_size_; // 当前定长omniAlloc已经分配value内存大小byte
+    uint32_t *fixed_nullBuffer_size_; // 当前定长omniAlloc已分配null内存大小byte
     // int32_t num_cache_vector_;
     std::vector<ShuffleTypeId> column_type_id_; // 各列映射SHUFFLE类型，schema列id序列
     std::vector<std::vector<uint8_t*>> partition_fixed_width_validity_addrs_;
     std::vector<std::vector<uint8_t*>> partition_fixed_width_value_addrs_; //
     std::vector<std::vector<std::vector<std::shared_ptr<Buffer>>>> partition_fixed_width_buffers_;
     std::vector<std::vector<std::shared_ptr<Buffer>>> partition_binary_builders_;
-    std::vector<int32_t> partition_buffer_size_; // 各分区的buffer大小
     std::vector<int32_t> fixed_width_array_idx_; // 记录各定长类型列的序号，VB 列id序列
     std::vector<int32_t> binary_array_idx_; //记录各变长类型列序号
-    std::vector<int32_t> partition_buffer_idx_base_; //当前已缓存的各partition行数据记录，用于定位缓冲buffer当前可用位置
-    std::vector<int32_t> partition_buffer_idx_offset_; //split定长列时用于统计offset的临时变量
-    std::vector<uint32_t> partition_serialization_size_; // 记录序列化后的各partition大小，用于stop返回partition偏移 in bytes
-
-    std::vector<bool> input_fixed_width_has_null_; // 定长列是否含有null标志数组
+    int32_t *partition_buffer_size_; // 各分区的buffer大小
+    int32_t *partition_buffer_idx_base_; //当前已缓存的各partition行数据记录，用于定位缓冲buffer当前可用位置
+    int32_t *partition_buffer_idx_offset_; //split定长列时用于统计offset的临时变量
+    uint32_t *partition_serialization_size_; // 记录序列化后的各partition大小，用于stop返回partition偏移 in bytes
 
     // configured local dirs for spilled file
     int32_t dir_selection_ = 0;
@@ -161,7 +159,6 @@ private:
     }
 
     std::set<BaseVector *> varcharVectorCache;
-    bool first_vector_batch_ = false;
     std::vector<DataTypeId> vector_batch_col_types_;
     InputDataTypes input_col_types;
     std::vector<int32_t> binary_array_empirical_size_;
