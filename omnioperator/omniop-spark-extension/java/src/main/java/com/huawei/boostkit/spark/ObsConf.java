@@ -18,6 +18,8 @@
 
 package com.huawei.boostkit.spark;
 
+import com.huawei.boostkit.spark.ColumnarPluginConfig;
+
 import com.obs.services.IObsCredentialsProvider;
 import com.obs.services.model.ISecurityKey;
 
@@ -28,16 +30,12 @@ import org.slf4j.LoggerFactory;
 public class ObsConf {
     private static final Logger LOG = LoggerFactory.getLogger(ObsConf.class);
 
-    private static String endpointConf = "fs.obs.endpoint";
-    private static String accessKeyConf = "fs.obs.access.key";
-    private static String secretKeyConf = "fs.obs.secret.key";
-    private static String providerConf = "fs.obs.security.provider";
-
     private static String endpoint;
     private static String accessKey = "";
     private static String secretKey = "";
     private static String token = "";
     private static IObsCredentialsProvider securityProvider;
+    private static boolean syncToGetToken = false;
     private static byte[] lock = new byte[0];
 
     private ObsConf() {
@@ -45,6 +43,10 @@ public class ObsConf {
 
     private static void init() {
         Configuration conf = new Configuration();
+        String endpointConf = "fs.obs.endpoint";
+        String accessKeyConf = "fs.obs.access.key";
+        String secretKeyConf = "fs.obs.secret.key";
+        String providerConf = "fs.obs.security.provider";
         endpoint = conf.get(endpointConf, "");
         if ("".equals(endpoint)) {
             LOG.warn("Key parameter {} is missing in the configuration file.", endpointConf);
@@ -57,12 +59,13 @@ public class ObsConf {
                 LOG.error("Key parameters such as {}, {}, or {} are missing or the parameter value is incorrect.",
                         accessKeyConf, secretKeyConf, providerConf);
             } else {
-                getSecurityKey(conf);
+                getSecurityKey(conf, providerConf);
             }
         }
+        syncToGetToken = ColumnarPluginConfig.getConf().enableSyncGetObsToken();
     }
 
-    private static void getSecurityKey(Configuration conf) {
+    private static void getSecurityKey(Configuration conf, String providerConf) {
         try {
             Class<?> securityProviderClass = conf.getClass(providerConf, null);
 
@@ -73,14 +76,9 @@ public class ObsConf {
 
             securityProvider = (IObsCredentialsProvider) securityProviderClass.getDeclaredConstructor().newInstance();
             updateSecurityKey();
-            Thread updateKeyThread = new Thread(new MyRunnable());
-            updateKeyThread.setUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
-                @Override
-                public void uncaughtException(Thread t, Throwable e) {
-                    LOG.error("Failed to get securityKey: {}, {}", t.getName(), e.getMessage());
-                }
-            });
-            updateKeyThread.start();
+            if (!syncToGetToken) {
+                timerGetSecurityKey();
+            }
         } catch (Exception e) {
             LOG.error("get obs ak/sk/token failed.");
         }
@@ -95,6 +93,17 @@ public class ObsConf {
         }
     }
 
+    private static void timerGetSecurityKey() {
+        Thread updateKeyThread = new Thread(new MyRunnable());
+        updateKeyThread.setUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
+            @Override
+            public void uncaughtException(Thread t, Throwable e) {
+                LOG.error("Failed to get securityKey: {}, {}", t.getName(), e.getMessage());
+            }
+        });
+        updateKeyThread.start();
+    }
+
     public static String getEndpoint() {
         if (endpoint == null) {
             init();
@@ -103,6 +112,9 @@ public class ObsConf {
     }
 
     public static String getAk() {
+        if (syncToGetToken) {
+            updateSecurityKey();
+        }
         return accessKey;
     }
 
@@ -121,10 +133,11 @@ public class ObsConf {
     private static class MyRunnable implements Runnable {
         @Override
         public void run() {
+            long sleepTime = ColumnarPluginConfig.getConf().timeGetObsToken();
             while (true) {
                 try {
                     updateSecurityKey();
-                    Thread.sleep(300000);
+                    Thread.sleep(sleepTime);
                 } catch (InterruptedException e) {
                     break;
                 }
