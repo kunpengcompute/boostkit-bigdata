@@ -145,7 +145,8 @@ namespace orc {
 
         get_object_metadata(&option, &objectInfo, 0, &responseHandler, &data);
         if (OBS_STATUS_OK != data.retStatus) {
-            throw ParseError("get obs object(" + filename + ") metadata failed.");
+            throw ParseError("get obs object(" + filename + ") metadata failed, error_code: " +
+                obs_get_status_name(data.retStatus));
         }
         totalLength = data.length;
 
@@ -177,8 +178,9 @@ namespace orc {
             get_object(&option, &objectInfo, &conditions, 0, &handler, &data);
             if (OBS_STATUS_OK != data.retStatus) {
                 LogsError("get obs object failed, length=%ld, readLength=%ld, offset=%ld",
-                            data.length, data.readLength, offset);
-                throw ParseError("get obs object(" + filename + ") failed.");
+                    data.length, data.readLength, offset);
+                throw ParseError("get obs object(" + filename + ") failed, error_code: " +
+                    obs_get_status_name(data.retStatus));
             }
 
             // read data buffer size = 0, no more remaining data need to read
