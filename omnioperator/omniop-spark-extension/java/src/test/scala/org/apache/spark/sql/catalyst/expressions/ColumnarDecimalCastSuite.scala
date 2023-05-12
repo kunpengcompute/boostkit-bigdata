@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.execution.forsql
+package org.apache.spark.sql.catalyst.expressions
 
 import org.apache.spark.sql.execution.{ColumnarProjectExec, ColumnarSparkPlanTest, ProjectExec}
 import org.apache.spark.sql.types.Decimal
