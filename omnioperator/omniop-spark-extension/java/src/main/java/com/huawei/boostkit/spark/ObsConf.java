@@ -83,6 +83,7 @@ public class ObsConf {
 
     private static boolean checkSecurityKeyValid(ISecurityKey iSecurityKey) {
         if (null == iSecurityKey) {
+            LOG.error("iSecurityKey is null");
             return false;
         }
         if (null == iSecurityKey.getAccessKey()
@@ -90,7 +91,7 @@ public class ObsConf {
                 || null == iSecurityKey.getSecurityToken()) {
             return false;
         }
-        return false;
+        return true;
     }
 
     private static void updateSecurityKey() {
