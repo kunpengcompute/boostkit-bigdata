@@ -364,7 +364,7 @@ public class OrcColumnarBatchJniReader {
         }
     }
 
-    public static JSONObject constructObsJSONObject() {
+    public JSONObject constructObsJSONObject() {
         JSONObject obsJsonItem = new JSONObject();
         obsJsonItem.put("endpoint", ObsConf.getEndpoint());
         synchronized (ObsConf.getLock()) {

@@ -35,10 +35,12 @@ public class ObsConf {
     private static String token = "";
     private static IObsCredentialsProvider securityProvider;
     private static boolean syncToGetToken = false;
+    private static int retryTimes = 10;
     private static Object lock = new Object();
 
     private ObsConf() {
         syncToGetToken = ColumnarPluginConfig.getConf().enableSyncGetObsToken();
+        retryTimes = ColumnarPluginConfig.getConf().retryTimesGetObsToken();
     }
 
     private static void init() {
@@ -96,9 +98,11 @@ public class ObsConf {
 
     private static void updateSecurityKey() {
         ISecurityKey iSecurityKey = securityProvider.getSecurityKey();
-        while(!checkSecurityKeyValid(iSecurityKey)) {
+        int count = 0;
+        while(!checkSecurityKeyValid(iSecurityKey) && count < retryTimes) {
             LOG.error("Get securityKey failed,try again");
             iSecurityKey = securityProvider.getSecurityKey();
+            count++;
         }
         synchronized (lock) {
             accessKey = iSecurityKey.getAccessKey();
@@ -120,7 +124,9 @@ public class ObsConf {
 
     public static String getEndpoint() {
         if (endpoint == null) {
-            init();
+            synchronized (lock) {
+                init();
+            }
         }
         return endpoint;
     }

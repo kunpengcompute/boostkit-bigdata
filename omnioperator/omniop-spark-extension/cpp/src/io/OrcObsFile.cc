@@ -129,11 +129,11 @@ namespace orc {
         option.bucket_options.token = obsInfo.token;
     }
 
-    ObsFileInputStream::ObsFileInputStream(std::string _filename, ObsConfig *obsInfo) {
+    ObsFileInputStream::ObsFileInputStream(std::string _filename, ObsConfig *obsConf) {
         filename = _filename;
         init_obs_options(&option);
 
-        getObsInfo(obsInfo);
+        getObsInfo(obsConf);
 
         CallbackData data;
         data.retStatus = OBS_STATUS_BUTT;
