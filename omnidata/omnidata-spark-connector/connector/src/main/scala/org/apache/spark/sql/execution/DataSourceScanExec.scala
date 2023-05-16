@@ -17,14 +17,13 @@
 
 package org.apache.spark.sql.execution
 
-import com.sun.xml.internal.bind.v2.TODO
+
 
 import java.util.concurrent.TimeUnit._
 import scala.collection.mutable.HashMap
 import org.apache.commons.lang3.StringUtils
 import org.apache.hadoop.fs.Path
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.{PushDownData, PushDownManager, SparkSession}
 import org.apache.spark.sql.catalyst.{InternalRow, TableIdentifier}
 import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.catalyst.expressions._
@@ -35,7 +34,6 @@ import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.parquet.{ParquetFileFormat => ParquetSource}
 import org.apache.spark.sql.execution.metric.{SQLMetric, SQLMetrics}
 import org.apache.spark.sql.execution.ndp.NdpConf.{getNdpPartialPushdown, getNdpPartialPushdownEnable, getTaskTimeout}
-import org.apache.spark.sql.execution.ndp.NdpSupport.isFilterHasChar
 import org.apache.spark.sql.execution.ndp.{NdpConf, NdpSupport}
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.sources.{BaseRelation, Filter}
@@ -44,7 +42,7 @@ import org.apache.spark.sql.vectorized.ColumnarBatch
 import org.apache.spark.util.Utils
 import org.apache.spark.util.collection.BitSet
 
-import scala.util.Random
+
 
 trait DataSourceScanExec extends LeafExecNode {
   def relation: BaseRelation
@@ -655,7 +653,7 @@ abstract class BaseFileSourceScanExec(
 
   private def RDDPushDown(fsRelation: HadoopFsRelation, filePartitions: Seq[FilePartition], readFile: (PartitionedFile) => Iterator[InternalRow]): RDD[InternalRow] = {
     if (isPushDown) {
-      val partialCondition = allFilterExecInfo.nonEmpty && aggExeInfos.isEmpty && limitExeInfo.isEmpty && getNdpPartialPushdownEnable(fsRelation.sparkSession) && !isFilterHasChar(ndpOperators)
+      val partialCondition = allFilterExecInfo.nonEmpty && aggExeInfos.isEmpty && limitExeInfo.isEmpty && getNdpPartialPushdownEnable(fsRelation.sparkSession)
       val partialPdRate = getNdpPartialPushdown(fsRelation.sparkSession)
       var partialChildOutput = Seq[Attribute]()
       if (partialCondition) {

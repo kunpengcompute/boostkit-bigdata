@@ -17,8 +17,6 @@
 
 package org.apache.spark.sql.execution.datasources
 
-import com.google.common.collect.ImmutableMap
-import io.prestosql.spi.relation.RowExpression
 
 import java.util
 import scala.collection.JavaConverters._
@@ -31,6 +29,7 @@ import org.apache.spark.rdd.{InputFileBlockHolder, RDD}
 import org.apache.spark.sql.{DataIoAdapter, NdpUtils, PageCandidate, PageToColumnar, PushDownManager, SparkSession}
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{And, Attribute, BasePredicate, Expression, Predicate, UnsafeProjection}
+import org.apache.spark.sql.execution.ndp.NdpSupport.filterStripEnd
 import org.apache.spark.sql.execution.{QueryExecutionException, RowToColumnConverter}
 import org.apache.spark.sql.execution.ndp.{FilterExeInfo, NdpConf, PushDownInfo}
 import org.apache.spark.sql.execution.vectorized.{OffHeapColumnVector, OnHeapColumnVector, WritableColumnVector}
@@ -39,7 +38,6 @@ import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.vectorized.ColumnarBatch
 
 import java.io.FileNotFoundException
-import java.util.Optional
 import scala.util.Random
 
 
@@ -103,7 +101,7 @@ class FileScanRDDPushDown(
   private val zkAddress = NdpConf.getNdpZookeeperAddress(sparkSession)
   private val taskTimeout = NdpConf.getTaskTimeout(sparkSession)
   private val operatorCombineEnabled = NdpConf.getNdpOperatorCombineEnabled(sparkSession)
-  val orcImpl = sparkSession.sessionState.conf.getConf(ORC_IMPLEMENTATION)
+  val orcImpl: String = sparkSession.sessionState.conf.getConf(ORC_IMPLEMENTATION)
 
   override def compute(split: RDDPartition, context: TaskContext): Iterator[InternalRow] = {
     val pageToColumnarClass = new PageToColumnar(requiredSchema, output)
@@ -111,7 +109,13 @@ class FileScanRDDPushDown(
     if (isPartialPushDown(partialCondition, partialPdRate, zkPdRate)) {
       logDebug("partial push down task on spark")
       val partialFilterCondition = pushDownOperators.filterExecutions.reduce((a, b) => FilterExeInfo(And(a.filter, b.filter), partialChildOutput))
-      val predicate = Predicate.create(partialFilterCondition.filter, partialChildOutput)
+      var partialFilter : Expression = null
+      if (orcImpl.equals("hive")) {
+        partialFilter = partialFilterCondition.filter
+      } else {
+        partialFilter = filterStripEnd(partialFilterCondition.filter)
+      }
+      val predicate = Predicate.create(partialFilter, partialChildOutput)
       predicate.initialize(0)
       iterator = new PartialPushDownIterator(split, context, pageToColumnarClass, predicate)
     } else {
