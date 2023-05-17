@@ -29,16 +29,18 @@ import org.slf4j.LoggerFactory;
 
 public class ObsConf {
     private static final Logger LOG = LoggerFactory.getLogger(ObsConf.class);
-
     private static String endpoint;
     private static String accessKey = "";
     private static String secretKey = "";
     private static String token = "";
     private static IObsCredentialsProvider securityProvider;
     private static boolean syncToGetToken = false;
-    private static byte[] lock = new byte[0];
+    private static int retryTimes = 10;
+    private static Object lock = new Object();
 
     private ObsConf() {
+        syncToGetToken = ColumnarPluginConfig.getConf().enableSyncGetObsToken();
+        retryTimes = ColumnarPluginConfig.getConf().retryTimesGetObsToken();
     }
 
     private static void init() {
@@ -62,18 +64,15 @@ public class ObsConf {
                 getSecurityKey(conf, providerConf);
             }
         }
-        syncToGetToken = ColumnarPluginConfig.getConf().enableSyncGetObsToken();
     }
 
     private static void getSecurityKey(Configuration conf, String providerConf) {
         try {
             Class<?> securityProviderClass = conf.getClass(providerConf, null);
-
             if (securityProviderClass == null) {
                 LOG.error("Failed to get securityProviderClass {}.", conf.get(providerConf, ""));
                 return;
             }
-
             securityProvider = (IObsCredentialsProvider) securityProviderClass.getDeclaredConstructor().newInstance();
             updateSecurityKey();
             if (!syncToGetToken) {
@@ -84,8 +83,27 @@ public class ObsConf {
         }
     }
 
+    private static boolean checkSecurityKeyValid(ISecurityKey iSecurityKey) {
+        if (null == iSecurityKey) {
+            LOG.error("iSecurityKey is null");
+            return false;
+        }
+        if (null == iSecurityKey.getAccessKey()
+                || null == iSecurityKey.getSecretKey()
+                || null == iSecurityKey.getSecurityToken()) {
+            return false;
+        }
+        return true;
+    }
+
     private static void updateSecurityKey() {
         ISecurityKey iSecurityKey = securityProvider.getSecurityKey();
+        int count = 0;
+        while(!checkSecurityKeyValid(iSecurityKey) && count < retryTimes) {
+            LOG.error("Get securityKey failed,try again");
+            iSecurityKey = securityProvider.getSecurityKey();
+            count++;
+        }
         synchronized (lock) {
             accessKey = iSecurityKey.getAccessKey();
             secretKey = iSecurityKey.getSecretKey();
@@ -106,15 +124,14 @@ public class ObsConf {
 
     public static String getEndpoint() {
         if (endpoint == null) {
-            init();
+            synchronized (lock) {
+                init();
+            }
         }
         return endpoint;
     }
 
     public static String getAk() {
-        if (syncToGetToken) {
-            updateSecurityKey();
-        }
         return accessKey;
     }
 
@@ -126,7 +143,10 @@ public class ObsConf {
         return token;
     }
 
-    public static byte[] getLock() {
+    public static Object getLock() {
+        if (syncToGetToken) {
+            updateSecurityKey();
+        }
         return lock;
     }
 

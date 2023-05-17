@@ -99,6 +99,11 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
     .getConfString("spark.omni.sql.columnar.timeGetObsToken", "60000")
     .toLong
 
+  // retry times to get obs ak/sk/token
+  val retryTimesGetObsToken: Integer = conf
+    .getConfString("spark.omni.sql.columnar.retryTimesGetObsToken", "10")
+    .toInt
+
   val enableColumnarSortMergeJoin: Boolean = conf
     .getConfString("spark.omni.sql.columnar.sortMergeJoin", "true")
     .toBoolean

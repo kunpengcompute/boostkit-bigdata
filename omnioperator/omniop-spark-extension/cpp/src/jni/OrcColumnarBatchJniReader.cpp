@@ -231,6 +231,7 @@ void deleteTokens(std::vector<Token*>& tokenVector) {
 void parseObs(JNIEnv* env, jobject jsonObj, ObsConfig &obsInfo) {
     jobject obsObject = env->CallObjectMethod(jsonObj, jsonMethodObj, env->NewStringUTF("obsInfo"));
     if (obsObject == NULL) {
+        LogsWarn("get obs info failed, obs info is null.");
         return;
     }
 
