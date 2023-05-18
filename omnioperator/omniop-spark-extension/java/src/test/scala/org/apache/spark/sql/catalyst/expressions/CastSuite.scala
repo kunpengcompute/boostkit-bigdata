@@ -17,7 +17,7 @@
 
 package org.apache.spark.sql.catalyst.expressions
 
-import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.{Column, DataFrame}
 import org.apache.spark.sql.execution.ColumnarSparkPlanTest
 import org.apache.spark.sql.types.{DataType, Decimal}
 
@@ -36,9 +36,20 @@ class CastSuite extends ColumnarSparkPlanTest {
         new Decimal().set(BigDecimal("123456789123456.456789", MathContext.UNLIMITED), 21, 6)),
       (1, false, -10, -10, -10, -10, -10.0F, -10.0D, "-10", new Decimal().set(BigDecimal("-10.12", MathContext.UNLIMITED), 4, 2),
         new Decimal().set(BigDecimal("-123456789123456.456789", MathContext.UNLIMITED), 21, 6)),
+      (2, false, 0, 0, 0, 0, 0, 0, "0", new Decimal().set(BigDecimal("0", MathContext.UNLIMITED), 4, 2),
+        new Decimal().set(BigDecimal("0", MathContext.UNLIMITED), 21, 6)),
+      (3, true, 127, 32767, 2147483647, 9223372036854775807L, 1.0E30F, 1.0E30D, "0",
+        new Decimal().set(BigDecimal("99.99", MathContext.UNLIMITED), 4, 2),
+        new Decimal().set(BigDecimal("999999999999999.999999", MathContext.UNLIMITED), 21, 6)),
     ).toDF("id", "c_boolean", "c_byte", "c_short", "c_int", "c_long", "c_float", "c_double", "c_string",
       "c_deci64", "c_deci128")
+
+    // Decimal in DataFrame is decimal(38,16), so need to cast to the target decimal type
+    cast_table = cast_table.withColumn("c_deci64", Column("c_deci64").cast("decimal(4,2)"))
+      .withColumn("c_deci128", Column("c_deci128").cast("decimal(21,6)"))
+
     cast_table.createOrReplaceTempView("cast_table")
+    cast_table.printSchema()
   }
 
   test("cast null as boolean") {
@@ -326,5 +337,334 @@ class CastSuite extends ColumnarSparkPlanTest {
     assertResult("-10.0", s"sql: ${sql}")(output2)
   }
 
+  test("cast string to decimal64") {
+    val result1 = spark.sql("select cast('10' as decimal(4,2));")
+    val output1 = result1.collect().toSeq.head.getDecimal(0)
+    assertResult("10.00", s"sql: ${sql}")(output1.toString)
 
+    val result2 = spark.sql("select cast('999999999999999999999999999999' as decimal(4,2));")
+    val output2 = result2.collect().toSeq.head.getDecimal(0)
+    assertResult(null, s"sql: ${sql}")(output2)
+
+    val result3 = spark.sql("select cast('false' as decimal(4,2));")
+    val output3 =result3.collect().toSeq.head.getDecimal(0)
+    assertResult(null, s"sql: ${sql}")(output3)
+  }
+
+  test("cast decimal64 to string") {
+    val result1 = spark.sql("select cast(c_deci64 as string) from cast_table where id=0;")
+    val output1 = result1.collect().toSeq.head.getString(0)
+    assertResult("10.12", s"sql: ${sql}")(output1)
+
+    val result2 = spark.sql("select cast(c_deci64 as string) from cast_table where id=1;")
+    val output2 = result2.collect().toSeq.head.getString(0)
+    assertResult("-10.12", s"sql: ${sql}")(output2)
+  }
+
+  test("cast string to decimal128") {
+    val result1 = spark.sql("select cast('10' as decimal(21,6));")
+    val output1 = result1.collect().toSeq.head.getDecimal(0)
+    assertResult("10.000000", s"sql: ${sql}")(output1.toString)
+
+    val result2 = spark.sql("select cast('999999999999999999999999999999' as decimal(21,6));")
+    val output2 = result2.collect().toSeq.head.getDecimal(0)
+    assertResult(null, s"sql: ${sql}")(output2)
+
+    val result3 = spark.sql("select cast('false' as decimal(21,6));")
+    val output3 = result3.collect().toSeq.head.getDecimal(0)
+    assertResult(null, s"sql: ${sql}")(output3)
+  }
+
+  test("cast decimal128 to string") {
+    val result1 = spark.sql("select cast(c_deci128 as string) from cast_table where id=0;")
+    val output1 = result1.collect().toSeq.head.getString(0)
+    assertResult("123456789123456.456789", s"sql: ${sql}")(output1)
+
+    val result2 = spark.sql("select cast(c_deci128 as string) from cast_table where id=1;")
+    val output2 = result2.collect().toSeq.head.getString(0)
+    assertResult("-123456789123456.456789", s"sql: ${sql}")(output2)
+  }
+
+  // cast from boolean
+  test("cast boolean to byte") {
+    val result1 = spark.sql("select cast(c_boolean as byte) from cast_table where id=0;")
+    val output1 = result1.collect().toSeq.head.getByte(0)
+    assertResult(1, s"sql: ${sql}")(output1)
+
+    val result2 = spark.sql("select cast(c_boolean as byte) from cast_table where id=1;")
+    val output2 = result2.collect().toSeq.head.getByte(0)
+    assertResult(0, s"sql: ${sql}")(output2)
+  }
+
+  test("cast boolean to short") {
+    val result1 = spark.sql("select cast(c_boolean as short) from cast_table where id=0;")
+    val output1 = result1.collect().toSeq.head.getShort(0)
+    assertResult(1, s"sql: ${sql}")(output1)
+
+    val result2 = spark.sql("select cast(c_boolean as short) from cast_table where id=1;")
+    val output2 = result2.collect().toSeq.head.getShort(0)
+    assertResult(0, s"sql: ${sql}")(output2)
+  }
+
+  test("cast boolean to int") {
+    val result1 = spark.sql("select cast(c_boolean as int) from cast_table where id=0;")
+    val output1 = result1.collect().toSeq.head.getInt(0)
+    assertResult(1, s"sql: ${sql}")(output1)
+
+    val result2 = spark.sql("select cast(c_boolean as int) from cast_table where id=1;")
+    val output2 = result2.collect().toSeq.head.getInt(0)
+    assertResult(0, s"sql: ${sql}")(output2)
+  }
+
+  test("cast boolean to long") {
+    val result1 = spark.sql("select cast(c_boolean as long) from cast_table where id=0;")
+    val output1 = result1.collect().toSeq.head.getLong(0)
+    assertResult(1, s"sql: ${sql}")(output1)
+
+    val result2 = spark.sql("select cast(c_boolean as long) from cast_table where id=1;")
+    val output2 = result2.collect().toSeq.head.getLong(0)
+    assertResult(0, s"sql: ${sql}")(output2)
+  }
+
+  test("cast boolean to float") {
+    val result1 = spark.sql("select cast(c_boolean as float) from cast_table where id=0;")
+    val output1 = result1.collect().toSeq.head.getFloat(0)
+    assertResult(1.0F, s"sql: ${sql}")(output1)
+
+    val result2 = spark.sql("select cast(c_boolean as float) from cast_table where id=1;")
+    val output2 = result2.collect().toSeq.head.getFloat(0)
+    assertResult(0.0F, s"sql: ${sql}")(output2)
+  }
+
+  test("cast boolean to double") {
+    val result1 = spark.sql("select cast(c_boolean as double) from cast_table where id=0;")
+    val output1 = result1.collect().toSeq.head.getDouble(0)
+    assertResult(1.0D, s"sql: ${sql}")(output1)
+
+    val result2 = spark.sql("select cast(c_boolean as double) from cast_table where id=1;")
+    val output2 = result2.collect().toSeq.head.getDouble(0)
+    assertResult(0.0D, s"sql: ${sql}")(output2)
+  }
+
+  test("cast boolean to decimal64") {
+    val result1 = spark.sql("select cast(c_boolean as decimal(4,2)) from cast_table where id=0;")
+    val output1 = result1.collect().toSeq.head.getDecimal(0)
+    assertResult("1.00", s"sql: ${sql}")(output1.toString)
+
+    val result2 = spark.sql("select cast(c_boolean as decimal(4,2)) from cast_table where id=1;")
+    val output2 = result2.collect().toSeq.head.getDecimal(0)
+    assertResult("0.00", s"sql: ${sql}")(output2.toString)
+  }
+
+  test("cast boolean to decimal128") {
+    val result1 = spark.sql("select cast(c_boolean as decimal(21,6)) from cast_table where id=0;")
+    val output1 = result1.collect().toSeq.head.getDecimal(0)
+    assertResult("1.000000", s"sql: ${sql}")(output1.toString)
+
+    val result2 = spark.sql("select cast(c_boolean as decimal(21,6)) from cast_table where id=1;")
+    val output2 = result2.collect().toSeq.head.getDecimal(0)
+    assertResult("0.000000", s"sql: ${sql}")(output2.toString)
+  }
+
+  // cast from byte
+  test("cast byte to boolean") {
+    val result1 = spark.sql("select cast(c_byte as boolean) from cast_table where id=0;")
+    val output1 = result1.collect().toSeq.head.getBoolean(0)
+    assertResult(true, s"sql: ${sql}")(output1)
+
+    val result2 = spark.sql("select cast(c_byte as boolean) from cast_table where id=1;")
+    val output2 = result2.collect().toSeq.head.getBoolean(0)
+    assertResult(true, s"sql: ${sql}")(output2)
+
+    val result3= spark.sql("select cast(c_byte as boolean) from cast_table where id=2;")
+    val output3 = result3.collect().toSeq.head.getBoolean(0)
+    assertResult(false, s"sql: ${sql}")(output3)
+  }
+
+  test("cast byte to short") {
+    val result1 = spark.sql("select cast(c_byte as short) from cast_table where id=0;")
+    val output1 = result1.collect().toSeq.head.getShort(0)
+    assertResult(10, s"sql: ${sql}")(output1)
+
+    val result2 = spark.sql("select cast(c_byte as short) from cast_table where id=1;")
+    val output2 = result2.collect().toSeq.head.getShort(0)
+    assertResult(-10, s"sql: ${sql}")(output2)
+  }
+
+  test("cast byte to int") {
+    val result1 = spark.sql("select cast(c_byte as int) from cast_table where id=0;")
+    val output1 = result1.collect().toSeq.head.getInt(0)
+    assertResult(10, s"sql: ${sql}")(output1)
+
+    val result2 = spark.sql("select cast(c_byte as int) from cast_table where id=1;")
+    val output2 = result2.collect().toSeq.head.getInt(0)
+    assertResult(-10, s"sql: ${sql}")(output2)
+  }
+
+  test("cast byte to long") {
+    val result1 = spark.sql("select cast(c_byte as long) from cast_table where id=0;")
+    val output1 = result1.collect().toSeq.head.getLong(0)
+    assertResult(10, s"sql: ${sql}")(output1)
+
+    val result2 = spark.sql("select cast(c_byte as long) from cast_table where id=1;")
+    val output2 = result2.collect().toSeq.head.getLong(0)
+    assertResult(-10, s"sql: ${sql}")(output2)
+  }
+
+  test("cast byte to float") {
+    val result1 = spark.sql("select cast(c_byte as float) from cast_table where id=0;")
+    val output1 = result1.collect().toSeq.head.getFloat(0)
+    assertResult(10.0F, s"sql: ${sql}")(output1)
+
+    val result2 = spark.sql("select cast(c_byte as float) from cast_table where id=1;")
+    val output2 = result2.collect().toSeq.head.getFloat(0)
+    assertResult(-10.0F, s"sql: ${sql}")(output2)
+  }
+
+  test("cast byte to double") {
+    val result1 = spark.sql("select cast(c_byte as double) from cast_table where id=0;")
+    val output1 = result1.collect().toSeq.head.getDouble(0)
+    assertResult(10.0D, s"sql: ${sql}")(output1)
+
+    val result2 = spark.sql("select cast(c_byte as double) from cast_table where id=1;")
+    val output2 = result2.collect().toSeq.head.getDouble(0)
+    assertResult(-10.0D, s"sql: ${sql}")(output2)
+  }
+
+  test("cast byte to decimal64") {
+    val result1 = spark.sql("select cast(c_byte as decimal(4,2)) from cast_table where id=0;")
+    val output1 = result1.collect().toSeq.head.getDecimal(0)
+    assertResult("10.00", s"sql: ${sql}")(output1.toString)
+
+    val result2 = spark.sql("select cast(c_byte as decimal(4,2)) from cast_table where id=1;")
+    val output2 = result2.collect().toSeq.head.getDecimal(0)
+    assertResult("-10.00", s"sql: ${sql}")(output2.toString)
+  }
+
+  test("cast byte to decimal128") {
+    val result1 = spark.sql("select cast(c_byte as decimal(21,6)) from cast_table where id=0;")
+    val output1 = result1.collect().toSeq.head.getDecimal(0)
+    assertResult("10.000000", s"sql: ${sql}")(output1.toString)
+
+    val result2 = spark.sql("select cast(c_byte as decimal(21,6)) from cast_table where id=1;")
+    val output2 = result2.collect().toSeq.head.getDecimal(0)
+    assertResult("-10.000000", s"sql: ${sql}")(output2.toString)
+  }
+
+  // cast from short
+  test("cast short to boolean") {
+    val result1 = spark.sql("select cast(c_short as boolean) from cast_table where id=0;")
+    val output1 = result1.collect().toSeq.head.getBoolean(0)
+    assertResult(true, s"sql: ${sql}")(output1)
+
+    val result2 = spark.sql("select cast(c_short as boolean) from cast_table where id=1;")
+    val output2 = result2.collect().toSeq.head.getBoolean(0)
+    assertResult(true, s"sql: ${sql}")(output2)
+
+    val result3 = spark.sql("select cast(c_short as boolean) from cast_table where id=2;")
+    val output3 = result3.collect().toSeq.head.getBoolean(0)
+    assertResult(false, s"sql: ${sql}")(output3)
+  }
+
+  test("cast short to byte") {
+    val result1 = spark.sql("select cast(c_short as byte) from cast_table where id=0;")
+    val output1 = result1.collect().toSeq.head.getByte(0)
+    assertResult(10, s"sql: ${sql}")(output1)
+
+    val result2 = spark.sql("select cast(c_short as byte) from cast_table where id=1;")
+    val output2 = result2.collect().toSeq.head.getByte(0)
+    assertResult(-10, s"sql: ${sql}")(output2)
+
+    val result3 = spark.sql("select cast(c_short as byte) from cast_table where id=3;")
+    val output3 = result3.collect().toSeq.head.getByte(0)
+    assertResult(-1, s"sql: ${sql}")(output3)
+  }
+
+  test("cast short to int") {
+    val result1 = spark.sql("select cast(c_short as int) from cast_table where id=0;")
+    val output1 = result1.collect().toSeq.head.getInt(0)
+    assertResult(10, s"sql: ${sql}")(output1)
+
+    val result2 = spark.sql("select cast(c_short as int) from cast_table where id=1;")
+    val output2 = result2.collect().toSeq.head.getInt(0)
+    assertResult(-10, s"sql: ${sql}")(output2)
+
+    val result3 = spark.sql("select cast(c_short as int) from cast_table where id=3;")
+    val output3 = result3.collect().toSeq.head.getInt(0)
+    assertResult(32767, s"sql: ${sql}")(output3)
+  }
+
+  test("cast short to long") {
+    val result1 = spark.sql("select cast(c_short as long) from cast_table where id=0;")
+    val output1 = result1.collect().toSeq.head.getLong(0)
+    assertResult(10, s"sql: ${sql}")(output1)
+
+    val result2 = spark.sql("select cast(c_short as long) from cast_table where id=1;")
+    val output2 = result2.collect().toSeq.head.getLong(0)
+    assertResult(-10, s"sql: ${sql}")(output2)
+
+    val result3 = spark.sql("select cast(c_short as long) from cast_table where id=3;")
+    val output3 = result3.collect().toSeq.head.getLong(0)
+    assertResult(32767, s"sql: ${sql}")(output3)
+  }
+
+  test("cast short to float") {
+    val result1 = spark.sql("select cast(c_short as float) from cast_table where id=0;")
+    val output1 = result1.collect().toSeq.head.getFloat(0)
+    assertResult(10.0F, s"sql: ${sql}")(output1)
+
+    val result2 = spark.sql("select cast(c_short as float) from cast_table where id=1;")
+    val output2 = result2.collect().toSeq.head.getFloat(0)
+    assertResult(-10.0F, s"sql: ${sql}")(output2)
+
+    val result3 = spark.sql("select cast(c_short as float) from cast_table where id=3;")
+    val output3 = result3.collect().toSeq.head.getFloat(0)
+    assertResult(32767.0F, s"sql: ${sql}")(output3)
+  }
+
+  test("cast short to double") {
+    val result1 = spark.sql("select cast(c_short as double) from cast_table where id=0;")
+    val output1 = result1.collect().toSeq.head.getDouble(0)
+    assertResult(10.0D, s"sql: ${sql}")(output1)
+
+    val result2 = spark.sql("select cast(c_short as double) from cast_table where id=1;")
+    val output2 = result2.collect().toSeq.head.getDouble(0)
+    assertResult(-10.0D, s"sql: ${sql}")(output2)
+
+    val result3 = spark.sql("select cast(c_short as double) from cast_table where id=3;")
+    val output3 = result3.collect().toSeq.head.getDouble(0)
+    assertResult(32767.0D, s"sql: ${sql}")(output3)
+  }
+
+  test("cast short to decimal64") {
+    val result1 = spark.sql("select cast(c_short as decimal(4,2)) from cast_table where id=0;")
+    val output1 = result1.collect().toSeq.head.getDecimal(0)
+    assertResult("10.00", s"sql: ${sql}")(output1.toString)
+
+    val result2 = spark.sql("select cast(c_short as decimal(4,2)) from cast_table where id=1;")
+    val output2 = result2.collect().toSeq.head.getDecimal(0)
+    assertResult("-10.00", s"sql: ${sql}")(output2.toString)
+
+    val result3 = spark.sql("select cast(c_short as decimal(4,2)) from cast_table where id=3;")
+    val output3 = result3.collect().toSeq.head.getDecimal(0)
+    assertResult(null, s"sql: ${sql}")(output3)
+
+    val result4 = spark.sql("select cast(c_short as decimal(9,2)) from cast_table where id=3;")
+    val output4 = result4.collect().toSeq.head.getDecimal(0)
+    assertResult("32767.00", s"sql: ${sql}")(output4.toString)
+  }
+
+  test("cast short to decimal128") {
+    val result1 = spark.sql("select cast(c_short as decimal(21,6)) from cast_table where id=0;")
+    val output1 = result1.collect().toSeq.head.getDecimal(0)
+    assertResult("10.000000", s"sql: ${sql}")(output1.toString)
+
+    val result2 = spark.sql("select cast(c_short as decimal(21,6)) from cast_table where id=1;")
+    val output2 = result2.collect().toSeq.head.getDecimal(0)
+    assertResult("-10.000000", s"sql: ${sql}")(output2.toString)
+
+    val result3 = spark.sql("select cast(c_short as decimal(21,6)) from cast_table where id=3;")
+    val output3 = result3.collect().toSeq.head.getDecimal(0)
+    assertResult("32767.000000", s"sql: ${sql}")(output3.toString)
+  }
 }
