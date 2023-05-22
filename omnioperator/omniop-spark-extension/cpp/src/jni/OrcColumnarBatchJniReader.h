@@ -22,28 +22,27 @@
 #ifndef THESTRAL_PLUGIN_ORCCOLUMNARBATCHJNIREADER_H
 #define THESTRAL_PLUGIN_ORCCOLUMNARBATCHJNIREADER_H
 
-#include "orc/ColumnPrinter.hh"
-#include "orc/Exceptions.hh"
-#include "orc/Type.hh"
-#include "orc/Vector.hh"
-#include "orc/Reader.hh"
-#include "orc/OrcFile.hh"
-#include "orc/MemoryPool.hh"
-#include "orc/sargs/SearchArgument.hh"
-#include "orc/sargs/Literal.hh"
-#include <getopt.h>
-#include <string>
 #include <memory>
 #include <iostream>
 #include <string>
-#include <stdio.h>
-#include "jni.h"
-#include "json/json.h"
-#include "vector/vector_common.h"
-#include "util/omni_exception.h"
-#include <time.h>
+#include <cstdio>
+#include <ctime>
 #include <sstream>
-#include "../common/debug.h"
+#include <orc/ColumnPrinter.hh>
+#include <orc/Exceptions.hh>
+#include <orc/Type.hh>
+#include <orc/Vector.hh>
+#include <orc/Reader.hh>
+#include <orc/OrcFile.hh>
+#include <orc/MemoryPool.hh>
+#include <orc/sargs/SearchArgument.hh>
+#include <orc/sargs/Literal.hh>
+#include <getopt.h>
+#include <jni.h>
+#include <json/json.h>
+#include <vector/vector_common.h>
+#include <util/omni_exception.h>
+#include "common/debug.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -135,16 +134,14 @@ JNIEXPORT jobjectArray JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBat
 JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniReader_getNumberOfRows(JNIEnv *env,
         jobject jObj, jlong rowReader, jlong batch);
 
-int getLiteral(orc::Literal &lit, int leafType, std::string value);      
+int GetLiteral(orc::Literal &lit, int leafType, const std::string &value);
 
-int buildLeaves(PredicateOperatorType leafOp, std::vector<orc::Literal> &litList, orc::Literal &lit, std::string leafNameString, orc::PredicateDataType leafType,
-    orc::SearchArgumentBuilder &builder);
+int BuildLeaves(PredicateOperatorType leafOp, std::vector<orc::Literal> &litList, orc::Literal &lit,
+    const std::string &leafNameString, orc::PredicateDataType leafType, orc::SearchArgumentBuilder &builder);
 
-bool stringToBool(std::string boolStr);
+bool StringToBool(const std::string &boolStr);
 
-int copyToOmniVec(orc::TypeKind vcType, int &omniTypeId, uint64_t &omniVecId, orc::ColumnVectorBatch *field, ...);  
-
-int copyToOmniDecimalVec(int precision, int &omniTypeId, uint64_t &omniVecId, orc::ColumnVectorBatch *field);
+int CopyToOmniVec(const orc::Type *type, int &omniTypeId, uint64_t &omniVecId, orc::ColumnVectorBatch *field);
 
 #ifdef __cplusplus
 }
