@@ -18,6 +18,8 @@
 package org.apache.spark.sql.execution.datasources
 
 
+import com.google.common.collect.ImmutableMap
+
 import java.util
 import scala.collection.JavaConverters._
 import scala.collection.mutable
@@ -204,6 +206,7 @@ class FileScanRDDPushDown(
     var currentIterator: Iterator[Object] = null
     val sdiHosts: String = split.asInstanceOf[FilePartition].sdi
     val dataIoClass = new DataIoAdapter()
+    val domains: ImmutableMap[_,_] = dataIoClass.buildDomains(output,partitionColumns, filterOutput, pushDownOperators)
 
     def hasNext: Boolean = {
       // Kill the task in case it has been marked as killed. This logic is from
@@ -259,7 +262,7 @@ class FileScanRDDPushDown(
           currentFile.length, columnOffset, sdiHosts,
           fileFormat.toString, maxFailedTimes, taskTimeout,operatorCombineEnabled)
         val dataIoPage = dataIoClass.getPageIterator(pageCandidate, output,
-          partitionColumns, filterOutput, pushDownOperators)
+          partitionColumns, filterOutput, pushDownOperators, domains)
         currentIterator = pageToColumnarClass.transPageToColumnar(dataIoPage,
           isColumnVector, dataIoClass.isOperatorCombineEnabled, output, orcImpl).asScala.iterator
         iteHasNext()
