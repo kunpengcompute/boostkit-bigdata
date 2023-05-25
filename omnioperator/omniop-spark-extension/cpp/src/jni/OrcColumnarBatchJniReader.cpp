@@ -26,85 +26,12 @@ using namespace omniruntime::type;
 using namespace std;
 using namespace orc;
 
-jclass runtimeExceptionClass;
-jclass jsonClass;
-jclass arrayListClass;
-jmethodID jsonMethodInt;
-jmethodID jsonMethodLong;
-jmethodID jsonMethodHas;
-jmethodID jsonMethodString;
-jmethodID jsonMethodJsonObj;
-jmethodID arrayListGet;
-jmethodID arrayListSize;
-jmethodID jsonMethodObj;
-
 static constexpr int32_t MAX_DECIMAL64_DIGITS = 18;
-
-int initJniId(JNIEnv *env)
-{
-    /*
-     * init table scan log
-     */
-    jsonClass = env->FindClass("org/json/JSONObject");
-    arrayListClass = env->FindClass("java/util/ArrayList");
-
-    arrayListGet = env->GetMethodID(arrayListClass, "get", "(I)Ljava/lang/Object;");
-    arrayListSize = env->GetMethodID(arrayListClass, "size", "()I");
-
-    // get int method
-    jsonMethodInt = env->GetMethodID(jsonClass, "getInt", "(Ljava/lang/String;)I");
-    if (jsonMethodInt == NULL)
-        return -1;
-
-    // get long method
-    jsonMethodLong = env->GetMethodID(jsonClass, "getLong", "(Ljava/lang/String;)J");
-    if (jsonMethodLong == NULL)
-        return -1;
-
-    // get has method
-    jsonMethodHas = env->GetMethodID(jsonClass, "has", "(Ljava/lang/String;)Z");
-    if (jsonMethodHas == NULL)
-        return -1;
-
-    // get string method
-    jsonMethodString = env->GetMethodID(jsonClass, "getString", "(Ljava/lang/String;)Ljava/lang/String;");
-    if (jsonMethodString == NULL)
-        return -1;
-
-    // get json object method
-    jsonMethodJsonObj = env->GetMethodID(jsonClass, "getJSONObject", "(Ljava/lang/String;)Lorg/json/JSONObject;");
-    if (jsonMethodJsonObj == NULL)
-        return -1;
-
-    // get json object method
-    jsonMethodObj = env->GetMethodID(jsonClass, "get", "(Ljava/lang/String;)Ljava/lang/Object;");
-    if (jsonMethodJsonObj == NULL)
-        return -1;
-
-    jclass local_class = env->FindClass("Ljava/lang/RuntimeException;");
-    runtimeExceptionClass = (jclass)env->NewGlobalRef(local_class);
-    env->DeleteLocalRef(local_class);
-    if (runtimeExceptionClass == NULL)
-        return -1;
-
-    return 0;
-}
-
-void JNI_OnUnload(JavaVM *vm, const void *reserved)
-{
-    JNIEnv *env = nullptr;
-    vm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_8);
-    env->DeleteGlobalRef(runtimeExceptionClass);
-}
 
 JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniReader_initializeReader(JNIEnv *env,
     jobject jObj, jstring path, jobject jsonObj)
 {
     JNI_FUNC_START
-    /*
-     * init logger and jni env method id
-     */
-    initJniId(env);
 
     /*
      * get tailLocation from json obj

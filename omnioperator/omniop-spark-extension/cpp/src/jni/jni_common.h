@@ -21,8 +21,7 @@
 #define THESTRAL_PLUGIN_MASTER_JNI_COMMON_H
 
 #include <jni.h>
-
-#include "../common/common.h"
+#include "common/common.h"
 
 spark::CompressionKind GetCompressionType(JNIEnv* env, jstring codec_jstr);
 
@@ -48,5 +47,23 @@ jmethodID GetMethodID(JNIEnv* env, jclass this_class, const char* name, const ch
         env->ThrowNew(exceptionClass, e.what());    \
         return;                                     \
     }                                               \
+
+extern jclass runtimeExceptionClass;
+extern jclass splitResultClass;
+extern jclass jsonClass;
+extern jclass arrayListClass;
+extern jclass threadClass;
+
+extern jmethodID jsonMethodInt;
+extern jmethodID jsonMethodLong;
+extern jmethodID jsonMethodHas;
+extern jmethodID jsonMethodString;
+extern jmethodID jsonMethodJsonObj;
+extern jmethodID arrayListGet;
+extern jmethodID arrayListSize;
+extern jmethodID jsonMethodObj;
+extern jmethodID splitResultConstructor;
+extern jmethodID currentThread;
+extern jmethodID threadGetId;
 
 #endif //THESTRAL_PLUGIN_MASTER_JNI_COMMON_H
