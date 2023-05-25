@@ -422,17 +422,17 @@ long Test_splitter_nativeMake(std::string partitioning_name,
     splitOptions.compression_type = compression_type_result;
     splitOptions.data_file = data_file_jstr;
     auto splitter = Splitter::Make(partitioning_name, inputDataTypes, numCols, num_partitions, std::move(splitOptions));
-    return shuffle_splitter_holder_.Insert(std::shared_ptr<Splitter>(splitter));
+    return testShuffleSplitterHolder.Insert(std::shared_ptr<Splitter>(splitter));
 }
 
 void Test_splitter_split(long splitter_id, VectorBatch* vb) {
-    auto splitter = shuffle_splitter_holder_.Lookup(splitter_id);
-    //初始化split各全局变量
+    auto splitter = testShuffleSplitterHolder.Lookup(splitter_id);
+    // Initialize split global variables
     splitter->Split(*vb);
 }
 
 void Test_splitter_stop(long splitter_id) {
-    auto splitter = shuffle_splitter_holder_.Lookup(splitter_id);
+    auto splitter = testShuffleSplitterHolder.Lookup(splitter_id);
     if (!splitter) {
         std::string error_message = "Invalid splitter id " + std::to_string(splitter_id);
         throw std::runtime_error("Test no splitter.");
@@ -441,12 +441,12 @@ void Test_splitter_stop(long splitter_id) {
 }
 
 void Test_splitter_close(long splitter_id) {
-    auto splitter = shuffle_splitter_holder_.Lookup(splitter_id);
+    auto splitter = testShuffleSplitterHolder.Lookup(splitter_id);
     if (!splitter) {
         std::string error_message = "Invalid splitter id " + std::to_string(splitter_id);
         throw std::runtime_error("Test no splitter.");
     }
-    shuffle_splitter_holder_.Erase(splitter_id);
+    testShuffleSplitterHolder.Erase(splitter_id);
 }
 
 void GetFilePath(const char *path, const char *filename, char *filepath) {

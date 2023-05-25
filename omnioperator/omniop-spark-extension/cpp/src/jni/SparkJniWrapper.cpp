@@ -20,68 +20,31 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-#include "../io/SparkFile.hh"
-#include "../io/ColumnWriter.hh"
-#include "../shuffle/splitter.h"
+#include "io/SparkFile.hh"
+#include "io/ColumnWriter.hh"
 #include "jni_common.h"
 #include "SparkJniWrapper.hh"
-#include "concurrent_map.h"
-
-static  jint JNI_VERSION = JNI_VERSION_1_8;
-
-static jclass split_result_class;
-static jclass runtime_exception_class;
-
-static jmethodID split_result_constructor;
 
 using namespace spark;
 using namespace google::protobuf::io;
 using namespace omniruntime::vec;
 
-static ConcurrentMap<std::shared_ptr<Splitter>> shuffle_splitter_holder_;
-
-jint JNI_OnLoad(JavaVM* vm, void* reserved) {
-    JNIEnv* env;
-    if (vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION) != JNI_OK) {
-        return JNI_ERR;
-    }
-
-    split_result_class =
-        CreateGlobalClassReference(env, "Lcom/huawei/boostkit/spark/vectorized/SplitResult;");
-    split_result_constructor = GetMethodID(env, split_result_class, "<init>", "(JJJJJ[J)V");
-
-    runtime_exception_class = CreateGlobalClassReference(env, "Ljava/lang/RuntimeException;");
-
-    return JNI_VERSION;
-}
-
-void JNI_OnUnload(JavaVM* vm, void* reserved) {
-    JNIEnv* env;
-    vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION);
-
-    env->DeleteGlobalRef(split_result_class);
-
-    env->DeleteGlobalRef(runtime_exception_class);
-
-    shuffle_splitter_holder_.Clear();
-}
-
-JNIEXPORT jlong JNICALL
-Java_com_huawei_boostkit_spark_jni_SparkJniWrapper_nativeMake(
+JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_SparkJniWrapper_nativeMake(
     JNIEnv* env, jobject, jstring partitioning_name_jstr, jint num_partitions,
     jstring jInputType, jint jNumCols, jint buffer_size,
     jstring compression_type_jstr, jstring data_file_jstr, jint num_sub_dirs,
     jstring local_dirs_jstr, jlong compress_block_size,
-    jint spill_batch_row, jlong spill_memory_threshold) {
+    jint spill_batch_row, jlong spill_memory_threshold)
+{
     JNI_FUNC_START
     if (partitioning_name_jstr == nullptr) {
-        env->ThrowNew(runtime_exception_class,
-                    std::string("Short partitioning name can't be null").c_str());
+        env->ThrowNew(runtimeExceptionClass,
+            std::string("Short partitioning name can't be null").c_str());
         return 0;
     }
     if (jInputType == nullptr) {
-        env->ThrowNew(runtime_exception_class,
-                    std::string("input types can't be null").c_str());
+        env->ThrowNew(runtimeExceptionClass,
+            std::string("input types can't be null").c_str());
         return 0;
     }
 
@@ -107,13 +70,13 @@ Java_com_huawei_boostkit_spark_jni_SparkJniWrapper_nativeMake(
     inputDataTypesTmp.inputDataScales = inputDataScales;
 
     if (data_file_jstr == nullptr) {
-        env->ThrowNew(runtime_exception_class,
-                    std::string("Shuffle DataFile can't be null").c_str());
+        env->ThrowNew(runtimeExceptionClass,
+            std::string("Shuffle DataFile can't be null").c_str());
         return 0;
     }
     if (local_dirs_jstr == nullptr) {
-        env->ThrowNew(runtime_exception_class,
-                    std::string("Shuffle DataFile can't be null").c_str());
+        env->ThrowNew(runtimeExceptionClass,
+            std::string("Shuffle DataFile can't be null").c_str());
         return 0;
     }
 
@@ -141,40 +104,38 @@ Java_com_huawei_boostkit_spark_jni_SparkJniWrapper_nativeMake(
     setenv("NATIVESQL_SPARK_LOCAL_DIRS", local_dirs, 1);
     env->ReleaseStringUTFChars(local_dirs_jstr, local_dirs);
 
-    if (spill_batch_row > 0){
+    if (spill_batch_row > 0) {
         splitOptions.spill_batch_row_num = spill_batch_row;
     }
-    if (spill_memory_threshold > 0){
+    if (spill_memory_threshold > 0) {
         splitOptions.spill_mem_threshold = spill_memory_threshold;
     }
-    if (compress_block_size > 0){
+    if (compress_block_size > 0) {
         splitOptions.compress_block_size = compress_block_size;
     }
 
-    jclass cls = env->FindClass("java/lang/Thread");
-    jmethodID mid = env->GetStaticMethodID(cls, "currentThread", "()Ljava/lang/Thread;");
-    jobject thread = env->CallStaticObjectMethod(cls, mid);
+    jobject thread = env->CallStaticObjectMethod(threadClass, currentThread);
     if (thread == NULL) {
         std::cout << "Thread.currentThread() return NULL" <<std::endl;
     } else {
-        jmethodID mid_getid = env->GetMethodID(cls, "getId", "()J");
-        jlong sid = env->CallLongMethod(thread, mid_getid);
+        jlong sid = env->CallLongMethod(thread, threadGetId);
         splitOptions.thread_id = (int64_t)sid;
     }
 
-    auto splitter = Splitter::Make(partitioning_name, inputDataTypesTmp, jNumCols, num_partitions, std::move(splitOptions));
-    return shuffle_splitter_holder_.Insert(std::shared_ptr<Splitter>(splitter));
-    JNI_FUNC_END(runtime_exception_class)
+    auto splitter = Splitter::Make(partitioning_name, inputDataTypesTmp, jNumCols, num_partitions,
+        std::move(splitOptions));
+    return g_shuffleSplitterHolder.Insert(std::shared_ptr<Splitter>(splitter));
+    JNI_FUNC_END(runtimeExceptionClass)
 }
 
-JNIEXPORT jlong JNICALL
-Java_com_huawei_boostkit_spark_jni_SparkJniWrapper_split(
-    JNIEnv *env, jobject jObj, jlong splitter_id, jlong jVecBatchAddress) {
+JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_SparkJniWrapper_split(
+    JNIEnv *env, jobject jObj, jlong splitter_id, jlong jVecBatchAddress)
+{
     JNI_FUNC_START
-    auto splitter = shuffle_splitter_holder_.Lookup(splitter_id);
+    auto splitter = g_shuffleSplitterHolder.Lookup(splitter_id);
     if (!splitter) {
         std::string error_message = "Invalid splitter id " + std::to_string(splitter_id);
-        env->ThrowNew(runtime_exception_class, error_message.c_str());
+        env->ThrowNew(runtimeExceptionClass, error_message.c_str());
         return -1;
     }
 
@@ -182,17 +143,17 @@ Java_com_huawei_boostkit_spark_jni_SparkJniWrapper_split(
 
     splitter->Split(*vecBatch);
     return 0L;
-    JNI_FUNC_END(runtime_exception_class)
+    JNI_FUNC_END(runtimeExceptionClass)
 }
 
-JNIEXPORT jobject JNICALL
-Java_com_huawei_boostkit_spark_jni_SparkJniWrapper_stop(
-    JNIEnv* env, jobject, jlong splitter_id) {
+JNIEXPORT jobject JNICALL Java_com_huawei_boostkit_spark_jni_SparkJniWrapper_stop(
+    JNIEnv* env, jobject, jlong splitter_id)
+{
     JNI_FUNC_START
-    auto splitter = shuffle_splitter_holder_.Lookup(splitter_id);
+    auto splitter = g_shuffleSplitterHolder.Lookup(splitter_id);
     if (!splitter) {
         std::string error_message = "Invalid splitter id " + std::to_string(splitter_id);
-        env->ThrowNew(runtime_exception_class, error_message.c_str());
+        env->ThrowNew(runtimeExceptionClass, error_message.c_str());
     }
     splitter->Stop();
 
@@ -201,23 +162,23 @@ Java_com_huawei_boostkit_spark_jni_SparkJniWrapper_stop(
     auto src = reinterpret_cast<const jlong*>(partition_length.data());
     env->SetLongArrayRegion(partition_length_arr, 0, partition_length.size(), src);
     jobject split_result = env->NewObject(
-        split_result_class, split_result_constructor, splitter->TotalComputePidTime(),
+        splitResultClass, splitResultConstructor, splitter->TotalComputePidTime(),
         splitter->TotalWriteTime(),  splitter->TotalSpillTime(),
         splitter->TotalBytesWritten(),  splitter->TotalBytesSpilled(), partition_length_arr);
 
     return split_result;
-    JNI_FUNC_END(runtime_exception_class)
+    JNI_FUNC_END(runtimeExceptionClass)
 }
 
-JNIEXPORT void JNICALL
-Java_com_huawei_boostkit_spark_jni_SparkJniWrapper_close(
-    JNIEnv* env, jobject, jlong splitter_id) {
+JNIEXPORT void JNICALL Java_com_huawei_boostkit_spark_jni_SparkJniWrapper_close(
+    JNIEnv* env, jobject, jlong splitter_id)
+{
     JNI_FUNC_START
-    auto splitter = shuffle_splitter_holder_.Lookup(splitter_id);
+    auto splitter = g_shuffleSplitterHolder.Lookup(splitter_id);
     if (!splitter) {
         std::string error_message = "Invalid splitter id " + std::to_string(splitter_id);
-        env->ThrowNew(runtime_exception_class, error_message.c_str());
+        env->ThrowNew(runtimeExceptionClass, error_message.c_str());
     }
-    shuffle_splitter_holder_.Erase(splitter_id);
-    JNI_FUNC_END_VOID(runtime_exception_class)
+    g_shuffleSplitterHolder.Erase(splitter_id);
+    JNI_FUNC_END_VOID(runtimeExceptionClass)
 }
