@@ -553,7 +553,6 @@ object NdpConf {
     val prop = new Properties()
     val inputStream = this.getClass.getResourceAsStream("/"+sourceName)
     if (inputStream == null){
-      inputStream.close()
       mutable.Set("")
     } else {
       prop.load(inputStream)
