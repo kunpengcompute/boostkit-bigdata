@@ -356,7 +356,7 @@ class FileScanRDDPushDown(
               }
               cb.setNumRows(rowCount)
               cb
-            }
+            }.filter(columnarBatch => columnarBatch.numRows() != 0)
         } else {
           val rowIterator = readCurrentFile().filter { row =>
             val r = predicate.eval(row)

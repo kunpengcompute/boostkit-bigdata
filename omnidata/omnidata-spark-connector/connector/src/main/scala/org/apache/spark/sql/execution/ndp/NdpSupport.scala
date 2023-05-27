@@ -129,13 +129,17 @@ object NdpSupport {
         EqualTo(left, Literal(UTF8String.fromString(stripEnd(right.value.toString, " ")), right.dataType))
       case equalto @ EqualTo(left: Literal, right: Attribute) if isCharType(right) =>
         EqualTo(Literal(UTF8String.fromString(stripEnd(left.value.toString, " ")), left.dataType), right)
-      case in @ In(value: Attribute, list: Seq[Literal]) if isCharType(value) =>
-        In(value, list.map(literal => Literal(UTF8String.fromString(stripEnd(literal.value.toString, " ")), literal.dataType)))
+      case in @ In(value: Attribute, list: Seq[_]) if isCharType(value) && isSeqLiteral(list) =>
+        In(value, list.map(literal => Literal(UTF8String.fromString(stripEnd(literal.asInstanceOf[Literal].value.toString, " ")), literal.dataType)))
     }
     f
   }
 
   def isCharType(value: Attribute): Boolean = {
     value.dataType.isInstanceOf[StringType] && getRawTypeString(value.metadata).isDefined && getRawTypeString(value.metadata).get.startsWith("char")
+  }
+
+  def isSeqLiteral[T](list: Seq[T]): Boolean = {
+    list.forall(x => x.isInstanceOf[Literal])
   }
 }
