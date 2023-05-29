@@ -438,7 +438,8 @@ case class ColumnarPostOverrides() extends Rule[SparkPlan] {
     // simple check plan tree have OmniColumnarToRow and no LimitExec and TakeOrderedAndProjectExec plan
     val noParitalFetch = if (plan.find(_.isInstanceOf[OmniColumnarToRowExec]).isDefined) {
         (!plan.find(node =>
-            node.isInstanceOf[LimitExec] || node.isInstanceOf[TakeOrderedAndProjectExec]).isDefined)
+            node.isInstanceOf[LimitExec] || node.isInstanceOf[TakeOrderedAndProjectExec] ||
+            node.isInstanceOf[SortMergeJoinExec]).isDefined)
     } else {
       false
     }
