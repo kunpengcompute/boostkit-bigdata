@@ -91,6 +91,7 @@ case class ColumnarSortMergeJoinExec(
     case LeftOuter => getKeyOrdering(leftKeys, left.outputOrdering)
     case RightOuter => getKeyOrdering(rightKeys, right.outputOrdering)
     case FullOuter => Nil
+    case LeftExistence(_) => getKeyOrdering(leftKeys, left.outputOrdering)
     case x =>
       throw new IllegalArgumentException(
         s"${getClass.getSimpleName} should not take $x as the JoinType")
