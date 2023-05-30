@@ -19,10 +19,11 @@ package org.apache.spark.sql.execution
 
 import java.util.concurrent.TimeUnit.NANOSECONDS
 import com.huawei.boostkit.spark.Constant.IS_SKIP_VERIFY_EXP
+import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor._
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil.{addAllAndGetIterator, genSortParam}
 import nova.hetu.omniruntime.operator.config.{OperatorConfig, OverflowConfig, SpillConfig}
-import nova.hetu.omniruntime.operator.topn.OmniTopNWithExprOperatorFactory
+import nova.hetu.omniruntime.operator.topnsort.OmniTopNSortWithExprOperatorFactory
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{Attribute, Expression, SortOrder}
@@ -69,30 +70,31 @@ case class ColumnarTopNSortExec(
     "numOutputVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatchs"))
 
   def buildCheck(): Unit = {
-    if (!strictTopN) {
-      throw new UnsupportedOperationException(s"Unsupported strictTopN is false")
-    }
-    if (!partitionSpec.isEmpty) {
-      throw new UnsupportedOperationException(s"Unsupported partitionSpec parameter")
-    }
+    val omniAttrExpsIdMap = getExprIdMap(child.output)
+    val omniPartitionChanels: Array[AnyRef] = partitionSpec.map(
+      exp => rewriteToOmniJsonExpressionLiteral(exp, omniAttrExpsIdMap)).toArray
+    checkOmniJsonWhiteList("", omniPartitionChanels)
     genSortParam(child.output, sortOrder)
   }
 
   override def doExecuteColumnar(): RDD[ColumnarBatch] = {
     val omniCodegenTime = longMetric("omniCodegenTime")
-
+    val omniAttrExpsIdMap = getExprIdMap(child.output)
+    val omniPartitionChanels = partitionSpec.map(
+      exp => rewriteToOmniJsonExpressionLiteral(exp, omniAttrExpsIdMap)).toArray
     val (sourceTypes, ascendings, nullFirsts, sortColsExp) = genSortParam(child.output, sortOrder)
 
     child.executeColumnar().mapPartitionsWithIndexInternal { (_, iter) =>
       val startCodegen = System.nanoTime()
-      val topNOperatorFactory = new OmniTopNWithExprOperatorFactory(sourceTypes, n, sortColsExp, ascendings, nullFirsts,
+      val topNSortOperatorFactory = new OmniTopNSortWithExprOperatorFactory(sourceTypes, n,
+        strictTopN, omniPartitionChanels, sortColsExp, ascendings, nullFirsts,
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
-      val topNOperator = topNOperatorFactory.createOperator
+      val topNSortOperator = topNSortOperatorFactory.createOperator
       omniCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startCodegen)
       SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
-        topNOperator.close()
+        topNSortOperator.close()
       })
-      addAllAndGetIterator(topNOperator, iter, this.schema,
+      addAllAndGetIterator(topNSortOperator, iter, this.schema,
         longMetric("addInputTime"), longMetric("numInputVecBatchs"), longMetric("numInputRows"),
         longMetric("getOutputTime"), longMetric("numOutputVecBatchs"), longMetric("numOutputRows"),
         longMetric("outputDataSize"))

@@ -53,6 +53,9 @@ class ColumnarTopNSortExecSuite extends ColumnarSparkPlanTest {
 
     val sql2 = "select * from (SELECT city, row_number() OVER (ORDER BY sales) AS rn FROM dealer) where rn <4 order by rn;"
     assertColumnarTopNSortExecAndSparkResultEqual(sql2, false)
+
+    val sql3 = "select * from (SELECT city, row_number() OVER (PARTITION BY city ORDER BY sales) AS rn FROM dealer) where rn <4 order by rn;"
+    assertColumnarTopNSortExecAndSparkResultEqual(sql3, false)
   }
 
   private def assertColumnarTopNSortExecAndSparkResultEqual(sql: String, hasColumnarTopNSortExec: Boolean = true): Unit = {
