@@ -39,8 +39,10 @@
 
 namespace orc {
   std::unique_ptr<InputStream> readFileRewrite(const std::string& path, std::vector<hdfs::Token*>& tokens) {
-    if(strncmp (path.c_str(), "hdfs://", 7) == 0){
+    if (strncmp(path.c_str(), "hdfs://", 7) == 0) {
       return orc::readHdfsFileRewrite(std::string(path), tokens);
+    } else if (strncmp(path.c_str(), "file:", 5) == 0) {
+      return orc::readLocalFile(std::string(path.substr(5)));
     } else {
       return orc::readLocalFile(std::string(path));
     }
