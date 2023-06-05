@@ -19,6 +19,7 @@ package org.apache.spark.sql.execution
 
 import java.util.concurrent._
 
+import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil.transColBatchToOmniVecs
 import nova.hetu.omniruntime.vector.VecBatch
 import nova.hetu.omniruntime.vector.serialize.VecBatchSerializerFactory
@@ -51,6 +52,10 @@ class ColumnarBroadcastExchangeExec(mode: BroadcastMode, child: SparkPlan)
     "numOutputRows" -> SQLMetrics.createMetric(sparkContext, "number of output rows"),
     "collectTime" -> SQLMetrics.createTimingMetric(sparkContext, "time to collect"),
     "broadcastTime" -> SQLMetrics.createTimingMetric(sparkContext, "time to broadcast"))
+
+  def buildCheck(): Unit = {
+    child.output.foreach(attr => OmniExpressionAdaptor.sparkTypeToOmniType(attr.dataType, attr.metadata))
+  }
 
   @transient
   private lazy val promise = Promise[broadcast.Broadcast[Any]]()

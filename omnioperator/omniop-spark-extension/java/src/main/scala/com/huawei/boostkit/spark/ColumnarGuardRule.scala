@@ -62,6 +62,8 @@ case class ColumnarGuardRule() extends Rule[SparkPlan] {
   val enableColumnarSortMergeJoin: Boolean = columnarConf.enableColumnarSortMergeJoin
   val enableShuffledHashJoin: Boolean = columnarConf.enableShuffledHashJoin
   val enableColumnarFileScan: Boolean = columnarConf.enableColumnarFileScan
+  val enableLocalColumnarLimit: Boolean = columnarConf.enableLocalColumnarLimit
+  val enableGlobalColumnarLimit: Boolean = columnarConf.enableGlobalColumnarLimit
   val optimizeLevel: Integer = columnarConf.joinOptimizationThrottle
 
   private def tryConvertToColumnar(plan: SparkPlan): Boolean = {
@@ -116,7 +118,7 @@ case class ColumnarGuardRule() extends Rule[SparkPlan] {
             plan.child, plan.testSpillFrequency).buildCheck()
         case plan: BroadcastExchangeExec =>
           if (!enableColumnarBroadcastExchange) return false
-          new ColumnarBroadcastExchangeExec(plan.mode, plan.child)
+          new ColumnarBroadcastExchangeExec(plan.mode, plan.child).buildCheck()
         case plan: TakeOrderedAndProjectExec =>
           if (!enableTakeOrderedAndProject) return false
           ColumnarTakeOrderedAndProjectExec(
@@ -196,6 +198,12 @@ case class ColumnarGuardRule() extends Rule[SparkPlan] {
             plan.left,
             plan.right,
             plan.isSkewJoin).buildCheck()
+        case plan: LocalLimitExec =>
+          if (!enableLocalColumnarLimit) return false
+          ColumnarLocalLimitExec(plan.limit, plan.child).buildCheck()
+        case plan: GlobalLimitExec =>
+          if (!enableGlobalColumnarLimit) return false
+          ColumnarGlobalLimitExec(plan.limit, plan.child).buildCheck()
         case plan: BroadcastNestedLoopJoinExec => return false
         case p =>
           p

@@ -89,6 +89,10 @@ case class ColumnarLocalLimitExec(limit: Int, child: SparkPlan)
 
   override protected def withNewChildInternal(newChild: SparkPlan): SparkPlan =
     copy(child = newChild)
+
+  def buildCheck(): Unit = {
+    child.output.foreach(attr => sparkTypeToOmniType(attr.dataType, attr.metadata))
+  }
 }
 
 case class ColumnarGlobalLimitExec(limit: Int, child: SparkPlan)
@@ -100,6 +104,10 @@ case class ColumnarGlobalLimitExec(limit: Int, child: SparkPlan)
 
   override protected def withNewChildInternal(newChild: SparkPlan): SparkPlan =
     copy(child = newChild)
+
+  def buildCheck(): Unit = {
+    child.output.foreach(attr => sparkTypeToOmniType(attr.dataType, attr.metadata))
+  }
 }
 
 case class ColumnarTakeOrderedAndProjectExec(
