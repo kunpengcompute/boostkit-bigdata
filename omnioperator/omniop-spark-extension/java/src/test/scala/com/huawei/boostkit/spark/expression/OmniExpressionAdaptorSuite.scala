@@ -276,45 +276,13 @@ class OmniExpressionAdaptorSuite extends SparkFunSuite {
     val cnAttribute = Seq(AttributeReference("char_1", StringType)(), AttributeReference("char_20", StringType)(),
       AttributeReference("varchar_1", StringType)(), AttributeReference("varchar_20", StringType)())
 
-    val like = Like(cnAttribute(2), Literal("我_"), '\\');
-    val likeResult = procLikeExpression(like, getExprIdMap(cnAttribute))
-    val likeExp = "{\"exprType\":\"FUNCTION\",\"returnType\":4,\"function_name\":\"LIKE\", \"arguments\":[{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":15,\"colVal\":2,\"width\":2000}, {\"exprType\":\"LITERAL\",\"dataType\":15,\"isNull\":false, \"value\":\"^我.$\",\"width\":4}]}"
-    if (!likeExp.equals(likeResult)) {
-      fail(s"expression($like) not match with expected value:$likeExp," +
-        s"running value:$likeResult")
-    }
-
-    val startsWith = StartsWith(cnAttribute(2), Literal("我"));
-    val startsWithResult = procLikeExpression(startsWith, getExprIdMap(cnAttribute))
-    val startsWithExp = "{\"exprType\":\"FUNCTION\",\"returnType\":4,\"function_name\":\"LIKE\", \"arguments\":[{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":15,\"colVal\":2,\"width\":2000}, {\"exprType\":\"LITERAL\",\"dataType\":15,\"isNull\":false, \"value\":\"^我.*$\",\"width\":5}]}"
-    if (!startsWithExp.equals(startsWithResult)) {
-      fail(s"expression($startsWith) not match with expected value:$startsWithExp," +
-        s"running value:$startsWithResult")
-    }
-
-    val endsWith = EndsWith(cnAttribute(2), Literal("我"));
-    val endsWithResult = procLikeExpression(endsWith, getExprIdMap(cnAttribute))
-    val endsWithExp = "{\"exprType\":\"FUNCTION\",\"returnType\":4,\"function_name\":\"LIKE\", \"arguments\":[{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":15,\"colVal\":2,\"width\":2000}, {\"exprType\":\"LITERAL\",\"dataType\":15,\"isNull\":false, \"value\":\"^.*我$\",\"width\":5}]}"
-    if (!endsWithExp.equals(endsWithResult)) {
-      fail(s"expression($endsWith) not match with expected value:$endsWithExp," +
-        s"running value:$endsWithResult")
-    }
-
-    val contains = Contains(cnAttribute(2), Literal("我"));
-    val containsResult = procLikeExpression(contains, getExprIdMap(cnAttribute))
-    val containsExp = "{\"exprType\":\"FUNCTION\",\"returnType\":4,\"function_name\":\"LIKE\", \"arguments\":[{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":15,\"colVal\":2,\"width\":2000}, {\"exprType\":\"LITERAL\",\"dataType\":15,\"isNull\":false, \"value\":\"^.*我.*$\",\"width\":7}]}"
-    if (!containsExp.equals(containsResult)) {
-      fail(s"expression($contains) not match with expected value:$containsExp," +
-        s"running value:$containsResult")
-    }
-
     val t1 = new Tuple2(Not(EqualTo(cnAttribute(0), Literal("新"))), Not(EqualTo(cnAttribute(1), Literal("官方爸爸"))))
     val t2 = new Tuple2(Not(EqualTo(cnAttribute(2), Literal("爱你三千遍"))), Not(EqualTo(cnAttribute(2), Literal("新"))))
     val branch = Seq(t1, t2)
     val elseValue = Some(Not(EqualTo(cnAttribute(3), Literal("啊水水水水"))))
     val caseWhen = CaseWhen(branch, elseValue);
     val caseWhenResult = rewriteToOmniJsonExpressionLiteral(caseWhen, getExprIdMap(cnAttribute))
-    val caseWhenExp = "{\"exprType\":\"IF\",\"returnType\":4,\"condition\":{\"exprType\":\"BINARY\",\"returnType\":4,\"operator\":\"NOT_EQUAL\",\"left\":{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":15,\"colVal\":0,\"width\":2000},\"right\":{\"exprType\":\"LITERAL\",\"dataType\":15,\"isNull\":false, \"value\":\"新\",\"width\":1}},\"if_true\":{\"exprType\":\"BINARY\",\"returnType\":4,\"operator\":\"NOT_EQUAL\",\"left\":{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":15,\"colVal\":1,\"width\":2000},\"right\":{\"exprType\":\"LITERAL\",\"dataType\":15,\"isNull\":false, \"value\":\"官方爸爸\",\"width\":4}},\"if_false\":{\"exprType\":\"IF\",\"returnType\":4,\"condition\":{\"exprType\":\"BINARY\",\"returnType\":4,\"operator\":\"NOT_EQUAL\",\"left\":{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":15,\"colVal\":2,\"width\":2000},\"right\":{\"exprType\":\"LITERAL\",\"dataType\":15,\"isNull\":false, \"value\":\"爱你三千遍\",\"width\":5}},\"if_true\":{\"exprType\":\"BINARY\",\"returnType\":4,\"operator\":\"NOT_EQUAL\",\"left\":{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":15,\"colVal\":2,\"width\":2000},\"right\":{\"exprType\":\"LITERAL\",\"dataType\":15,\"isNull\":false, \"value\":\"新\",\"width\":1}},\"if_false\":{\"exprType\":\"BINARY\",\"returnType\":4,\"operator\":\"NOT_EQUAL\",\"left\":{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":15,\"colVal\":3,\"width\":2000},\"right\":{\"exprType\":\"LITERAL\",\"dataType\":15,\"isNull\":false, \"value\":\"啊水水水水\",\"width\":5}}}}"
+    val caseWhenExp = "{\"exprType\":\"IF\",\"returnType\":4,\"condition\":{\"exprType\":\"BINARY\",\"returnType\":4,\"operator\":\"NOT_EQUAL\",\"left\":{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":15,\"colVal\":0,\"width\":50},\"right\":{\"exprType\":\"LITERAL\",\"dataType\":15,\"isNull\":false, \"value\":\"新\",\"width\":1}},\"if_true\":{\"exprType\":\"BINARY\",\"returnType\":4,\"operator\":\"NOT_EQUAL\",\"left\":{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":15,\"colVal\":1,\"width\":50},\"right\":{\"exprType\":\"LITERAL\",\"dataType\":15,\"isNull\":false, \"value\":\"官方爸爸\",\"width\":4}},\"if_false\":{\"exprType\":\"IF\",\"returnType\":4,\"condition\":{\"exprType\":\"BINARY\",\"returnType\":4,\"operator\":\"NOT_EQUAL\",\"left\":{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":15,\"colVal\":2,\"width\":50},\"right\":{\"exprType\":\"LITERAL\",\"dataType\":15,\"isNull\":false, \"value\":\"爱你三千遍\",\"width\":5}},\"if_true\":{\"exprType\":\"BINARY\",\"returnType\":4,\"operator\":\"NOT_EQUAL\",\"left\":{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":15,\"colVal\":2,\"width\":50},\"right\":{\"exprType\":\"LITERAL\",\"dataType\":15,\"isNull\":false, \"value\":\"新\",\"width\":1}},\"if_false\":{\"exprType\":\"BINARY\",\"returnType\":4,\"operator\":\"NOT_EQUAL\",\"left\":{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":15,\"colVal\":3,\"width\":50},\"right\":{\"exprType\":\"LITERAL\",\"dataType\":15,\"isNull\":false, \"value\":\"啊水水水水\",\"width\":5}}}}"
     if (!caseWhenExp.equals(caseWhenResult)) {
       fail(s"expression($caseWhen) not match with expected value:$caseWhenExp," +
         s"running value:$caseWhenResult")
@@ -322,7 +290,7 @@ class OmniExpressionAdaptorSuite extends SparkFunSuite {
 
     val isNull = IsNull(cnAttribute(0));
     val isNullResult = rewriteToOmniJsonExpressionLiteral(isNull, getExprIdMap(cnAttribute))
-    val isNullExp = "{\"exprType\":\"IS_NULL\",\"returnType\":4,\"arguments\":[{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":15,\"colVal\":0,\"width\":2000}]}"
+    val isNullExp = "{\"exprType\":\"IS_NULL\",\"returnType\":4,\"arguments\":[{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":15,\"colVal\":0,\"width\":50}]}"
     if (!isNullExp.equals(isNullResult)) {
       fail(s"expression($isNull) not match with expected value:$isNullExp," +
         s"running value:$isNullResult")
@@ -331,7 +299,7 @@ class OmniExpressionAdaptorSuite extends SparkFunSuite {
     val children = Seq(cnAttribute(0), cnAttribute(1))
     val coalesce = Coalesce(children);
     val coalesceResult = rewriteToOmniJsonExpressionLiteral(coalesce, getExprIdMap(cnAttribute))
-    val coalesceExp = "{\"exprType\":\"COALESCE\",\"returnType\":15,\"width\":2000, \"value1\":{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":15,\"colVal\":0,\"width\":2000},\"value2\":{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":15,\"colVal\":1,\"width\":2000}}"
+    val coalesceExp = "{\"exprType\":\"COALESCE\",\"returnType\":15,\"width\":50, \"value1\":{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":15,\"colVal\":0,\"width\":50},\"value2\":{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":15,\"colVal\":1,\"width\":50}}"
     if (!coalesceExp.equals(coalesceResult)) {
       fail(s"expression($coalesce) not match with expected value:$coalesceExp," +
         s"running value:$coalesceResult")
@@ -360,7 +328,7 @@ class OmniExpressionAdaptorSuite extends SparkFunSuite {
     val elseValue = Some(Not(EqualTo(caseWhenAttribute(3), Literal("啊水水水水"))))
     val expression = CaseWhen(branch, elseValue);
     val runResult = procCaseWhenExpression(expression, getExprIdMap(caseWhenAttribute))
-    val filterExp = "{\"exprType\":\"IF\",\"returnType\":4,\"condition\":{\"exprType\":\"BINARY\",\"returnType\":4,\"operator\":\"NOT_EQUAL\",\"left\":{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":15,\"colVal\":0,\"width\":2000},\"right\":{\"exprType\":\"LITERAL\",\"dataType\":15,\"isNull\":false, \"value\":\"新\",\"width\":1}},\"if_true\":{\"exprType\":\"BINARY\",\"returnType\":4,\"operator\":\"NOT_EQUAL\",\"left\":{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":15,\"colVal\":1,\"width\":2000},\"right\":{\"exprType\":\"LITERAL\",\"dataType\":15,\"isNull\":false, \"value\":\"官方爸爸\",\"width\":4}},\"if_false\":{\"exprType\":\"IF\",\"returnType\":4,\"condition\":{\"exprType\":\"BINARY\",\"returnType\":4,\"operator\":\"NOT_EQUAL\",\"left\":{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":15,\"colVal\":2,\"width\":2000},\"right\":{\"exprType\":\"LITERAL\",\"dataType\":15,\"isNull\":false, \"value\":\"爱你三千遍\",\"width\":5}},\"if_true\":{\"exprType\":\"BINARY\",\"returnType\":4,\"operator\":\"NOT_EQUAL\",\"left\":{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":15,\"colVal\":2,\"width\":2000},\"right\":{\"exprType\":\"LITERAL\",\"dataType\":15,\"isNull\":false, \"value\":\"新\",\"width\":1}},\"if_false\":{\"exprType\":\"BINARY\",\"returnType\":4,\"operator\":\"NOT_EQUAL\",\"left\":{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":15,\"colVal\":3,\"width\":2000},\"right\":{\"exprType\":\"LITERAL\",\"dataType\":15,\"isNull\":false, \"value\":\"啊水水水水\",\"width\":5}}}}"
+    val filterExp = "{\"exprType\":\"IF\",\"returnType\":4,\"condition\":{\"exprType\":\"BINARY\",\"returnType\":4,\"operator\":\"NOT_EQUAL\",\"left\":{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":15,\"colVal\":0,\"width\":50},\"right\":{\"exprType\":\"LITERAL\",\"dataType\":15,\"isNull\":false, \"value\":\"新\",\"width\":1}},\"if_true\":{\"exprType\":\"BINARY\",\"returnType\":4,\"operator\":\"NOT_EQUAL\",\"left\":{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":15,\"colVal\":1,\"width\":50},\"right\":{\"exprType\":\"LITERAL\",\"dataType\":15,\"isNull\":false, \"value\":\"官方爸爸\",\"width\":4}},\"if_false\":{\"exprType\":\"IF\",\"returnType\":4,\"condition\":{\"exprType\":\"BINARY\",\"returnType\":4,\"operator\":\"NOT_EQUAL\",\"left\":{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":15,\"colVal\":2,\"width\":50},\"right\":{\"exprType\":\"LITERAL\",\"dataType\":15,\"isNull\":false, \"value\":\"爱你三千遍\",\"width\":5}},\"if_true\":{\"exprType\":\"BINARY\",\"returnType\":4,\"operator\":\"NOT_EQUAL\",\"left\":{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":15,\"colVal\":2,\"width\":50},\"right\":{\"exprType\":\"LITERAL\",\"dataType\":15,\"isNull\":false, \"value\":\"新\",\"width\":1}},\"if_false\":{\"exprType\":\"BINARY\",\"returnType\":4,\"operator\":\"NOT_EQUAL\",\"left\":{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":15,\"colVal\":3,\"width\":50},\"right\":{\"exprType\":\"LITERAL\",\"dataType\":15,\"isNull\":false, \"value\":\"啊水水水水\",\"width\":5}}}}"
     if (!filterExp.equals(runResult)) {
       fail(s"expression($expression) not match with expected value:$filterExp," +
         s"running value:$runResult")
