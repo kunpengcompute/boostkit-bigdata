@@ -25,10 +25,10 @@
 #include <stdio.h>
 #include <dirent.h>
 #include <type/data_types.h>
-#include "../../src/shuffle/splitter.h"
-#include "../../src/jni/concurrent_map.h"
+#include "shuffle/splitter.h"
+#include "jni/concurrent_map.h"
 
-static ConcurrentMap<std::shared_ptr<Splitter>> shuffle_splitter_holder_;
+static ConcurrentMap<std::shared_ptr<Splitter>> testShuffleSplitterHolder;
 
 static std::string s_shuffle_tests_dir = "/tmp/shuffleTests";
 

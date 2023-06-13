@@ -39,6 +39,7 @@ protected:
         if (IsFileExist(tmpTestingDir)) {
             DeletePathAll(tmpTestingDir.c_str());
         }
+        testShuffleSplitterHolder.Clear();
     }
 
     // run before each case...
