@@ -16,7 +16,7 @@
         <scala.version>2.12.10</scala.version>
         <scala.binary.version>2.12</scala.binary.version>
         <spark.version>3.3.1-h0.cbu.mrs.321.r7</spark.version>
-        <hadoop.version>3.2.2</hadoop.version>
+        <hadoop.version>3.3.1-h0.cbu.mrs.321.r7</hadoop.version>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <protobuf.version>3.13.0-h19</protobuf.version>
@@ -172,14 +172,4 @@
                 </dependency>
         </dependencies>
     </dependencyManagement>
-
-    <profiles>
-        <profile>
-            <id>hadoop-3.2</id>
-            <properties>
-                <hadoop.version>3.2.0</hadoop.version>
-            </properties>
-        </profile>
-    </profiles>
-
 </project>

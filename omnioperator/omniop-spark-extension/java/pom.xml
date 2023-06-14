@@ -31,29 +31,9 @@
     <!-- These dependencies are added only to upgrade component version to avoid some vulnerabilities.-->
     <!-- Start of Dependency.-->
     <dependency>
-        <groupId>commons-beanutils</groupId>
-        <artifactId>commons-beanutils</artifactId>
-        <version>1.9.4</version>
-    </dependency>
-    <dependency>
-        <groupId>org.checkerframework</groupId>
-        <artifactId>checker-qual</artifactId>
-        <version>3.8.0</version>
-    </dependency>
-    <dependency>
-        <groupId>com.google.errorprone</groupId>
-        <artifactId>error_prone_annotations</artifactId>
-        <version>2.4.0</version>
-    </dependency>
-    <dependency>
         <groupId>com.google.guava</groupId>
         <artifactId>guava</artifactId>
         <version>31.0.1-jre</version>
-    </dependency>
-    <dependency>
-        <groupId>xerces</groupId>
-        <artifactId>xercesImpl</artifactId>
-        <version>2.12.2</version>
     </dependency>
     <!-- End of Dependency-->
     <dependency>
@@ -78,7 +58,7 @@
     <dependency>
         <groupId>com.huaweicloud</groupId>
         <artifactId>esdk-obs-java-optimised</artifactId>
-        <version>3.21.8.2</version>
+        <version>3.22.10.2</version>
         <scope>provided</scope>
         <exclusions>
             <exclusion>
