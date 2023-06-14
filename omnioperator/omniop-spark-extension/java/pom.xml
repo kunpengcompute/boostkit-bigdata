@@ -58,7 +58,8 @@
     <dependency>
         <groupId>com.huaweicloud</groupId>
         <artifactId>esdk-obs-java-optimised</artifactId>
-        <version>3.22.10.2</version>
+        <!--active version is 3.22.10.2, workaroud for maven repo-->
+        <version>3.21.8.2</version>
         <scope>provided</scope>
         <exclusions>
             <exclusion>
