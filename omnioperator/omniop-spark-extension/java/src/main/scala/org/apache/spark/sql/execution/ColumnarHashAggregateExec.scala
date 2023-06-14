@@ -128,16 +128,13 @@ case class ColumnarHashAggregateExec(
       } else if (exp.mode == PartialMerge) {
         exp.aggregateFunction match {
           case Sum(_, _) | Min(_) | Max(_) | Count(_) | Average(_, _) | First(_,_)  =>
-            omniAggFunctionTypes(index) = toOmniAggFunType(exp, true)
+            omniAggFunctionTypes(index) = toOmniAggFunType(exp, true, true)
             omniAggOutputTypes(index) =
               toOmniAggInOutType(exp.aggregateFunction.inputAggBufferAttributes)
             omniAggChannels(index) =
               toOmniAggInOutJSonExp(exp.aggregateFunction.inputAggBufferAttributes, attrExpsIdMap)
             omniInputRaws(index) = false
             omniOutputPartials(index) = true
-            if (omniAggFunctionTypes(index) == OMNI_AGGREGATION_TYPE_COUNT_ALL) {
-              omniAggChannels(index) = null
-            }
           case _ => throw new UnsupportedOperationException(s"Unsupported aggregate aggregateFunction: ${exp}")
         }
       } else if (exp.mode == Partial) {
@@ -255,16 +252,13 @@ case class ColumnarHashAggregateExec(
       } else if (exp.mode == Partial) {
         exp.aggregateFunction match {
           case Sum(_, _) | Min(_) | Max(_) | Count(_) | Average(_, _) | First(_, _) =>
-            omniAggFunctionTypes(index) = toOmniAggFunType(exp, true)
+            omniAggFunctionTypes(index) = toOmniAggFunType(exp, true, true)
             omniAggOutputTypes(index) =
               toOmniAggInOutType(exp.aggregateFunction.inputAggBufferAttributes)
             omniAggChannels(index) =
               toOmniAggInOutJSonExp(exp.aggregateFunction.children, attrExpsIdMap)
             omniInputRaws(index) = true
             omniOutputPartials(index) = true
-            if (omniAggFunctionTypes(index) == OMNI_AGGREGATION_TYPE_COUNT_ALL) {
-              omniAggChannels(index) = null
-            }
           case _ => throw new UnsupportedOperationException(s"Unsupported aggregate aggregateFunction: ${exp}")
         }
       } else {
