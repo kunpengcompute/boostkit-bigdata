@@ -262,7 +262,7 @@ class FileScanRDDPushDown(
           currentFile.length, columnOffset, sdiHosts,
           fileFormat.toString, maxFailedTimes, taskTimeout,operatorCombineEnabled)
         val dataIoPage = dataIoClass.getPageIterator(pageCandidate, output,
-          partitionColumns, filterOutput, pushDownOperators, domains)
+          partitionColumns, filterOutput, pushDownOperators, domains, isColumnVector)
         currentIterator = pageToColumnarClass.transPageToColumnar(dataIoPage,
           isColumnVector, dataIoClass.isOperatorCombineEnabled, output, orcImpl).asScala.iterator
         iteHasNext()

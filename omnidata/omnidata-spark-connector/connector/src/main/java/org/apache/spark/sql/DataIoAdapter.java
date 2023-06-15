@@ -177,7 +177,8 @@ public class DataIoAdapter {
             Seq<Attribute> partitionColumn,
             Seq<Attribute> filterOutPut,
             PushDownInfo pushDownOperators,
-            ImmutableMap domains) throws TaskExecutionException, UnknownHostException {
+            ImmutableMap domains,
+            Boolean isColumnVector) throws TaskExecutionException, UnknownHostException {
         // initCandidates
         initCandidates(pageCandidate, filterOutPut);
 
@@ -209,7 +210,8 @@ public class DataIoAdapter {
 
         // create deserializer
         this.isOperatorCombineEnabled =
-                pageCandidate.isOperatorCombineEnabled() && NdpUtils.checkOmniOpColumns(omnidataColumns);
+                pageCandidate.isOperatorCombineEnabled() && NdpUtils.checkOmniOpColumns(omnidataColumns)
+                && isColumnVector;
         PageDeserializer deserializer = initPageDeserializer();
 
         // get available host
