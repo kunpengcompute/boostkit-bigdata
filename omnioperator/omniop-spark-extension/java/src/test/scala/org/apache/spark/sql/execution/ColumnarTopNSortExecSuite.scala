@@ -48,13 +48,13 @@ class ColumnarTopNSortExecSuite extends ColumnarSparkPlanTest {
   }
 
   test("Test topNSort") {
-    val sql1 ="select * from (SELECT city, row_number() OVER (ORDER BY sales) AS rn FROM dealer) where rn<4 order by rn;"
+    val sql1 ="select * from (SELECT city, rank() OVER (ORDER BY sales) AS rn FROM dealer) where rn<4 order by rk;"
     assertColumnarTopNSortExecAndSparkResultEqual(sql1, true)
 
-    val sql2 = "select * from (SELECT city, row_number() OVER (ORDER BY sales) AS rn FROM dealer) where rn <4 order by rn;"
+    val sql2 = "select * from (SELECT city, rank() OVER (ORDER BY sales) AS rn FROM dealer) where rn <4 order by rk;"
     assertColumnarTopNSortExecAndSparkResultEqual(sql2, false)
 
-    val sql3 = "select * from (SELECT city, row_number() OVER (PARTITION BY city ORDER BY sales) AS rn FROM dealer) where rn <4 order by rn;"
+    val sql3 = "select * from (SELECT city, rank() OVER (PARTITION BY city ORDER BY sales) AS rk FROM dealer) where rk <4 order by rk;"
     assertColumnarTopNSortExecAndSparkResultEqual(sql3, false)
   }
 
