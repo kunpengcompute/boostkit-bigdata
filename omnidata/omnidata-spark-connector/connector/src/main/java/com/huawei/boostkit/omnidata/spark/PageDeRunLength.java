@@ -264,7 +264,7 @@ public class PageDeRunLength {
         WritableColumnVector columnVector = getColumnVector(isOperatorCombineEnabled, positionCount,
                 writableColumnVector);
         for (int rowId = 0; rowId < positionCount; rowId++) {
-            if (writableColumnVector.isNullAt(rowId)) {
+            if (writableColumnVector.isNullAt(rowId) || value == null) {
                 columnVector.putNull(rowId);
             } else {
                 columnVector.putDecimal(rowId, value, precision);
