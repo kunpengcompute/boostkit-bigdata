@@ -118,7 +118,7 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
     .getConfString("spark.omni.sql.columnar.broadcastJoin.merge", "false").toBoolean
 
   val enableSortMergeJoinBatchMerge: Boolean = conf
-    .getConfString("spark.omni.sql.columnar.sortMergeJoin.merge", "true").toBoolean
+    .getConfString("spark.omni.sql.columnar.sortMergeJoin.merge", "false").toBoolean
 
   // prefer to use columnar operators if set to true
   val enablePreferColumnar: Boolean =

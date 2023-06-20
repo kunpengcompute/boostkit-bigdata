@@ -70,6 +70,11 @@ case class ColumnarTopNSortExec(
     "numOutputVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatchs"))
 
   def buildCheck(): Unit = {
+    // current only support rank function of window
+    // strictTopN true for row_number, false for rank
+    if (strictTopN) {
+      throw new UnsupportedOperationException(s"Unsupported strictTopN is true")
+    }
     val omniAttrExpsIdMap = getExprIdMap(child.output)
     val omniPartitionChanels: Array[AnyRef] = partitionSpec.map(
       exp => rewriteToOmniJsonExpressionLiteral(exp, omniAttrExpsIdMap)).toArray
