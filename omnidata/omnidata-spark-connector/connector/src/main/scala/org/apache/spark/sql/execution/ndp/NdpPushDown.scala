@@ -18,12 +18,14 @@
 
 package org.apache.spark.sql.execution.ndp
 
+import com.huawei.boostkit.omnidata.spark.NdpPluginEnableFlag
+
 import java.util.{Locale, Properties}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{PushDownData, PushDownManager, SparkSession}
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{Alias, And, Attribute, AttributeReference, BinaryExpression, Cast, Expression, NamedExpression, PredicateHelper, UnaryExpression}
-import org.apache.spark.sql.catalyst.expressions.aggregate.{AggregateExpression, Partial, PartialMerge}
+import org.apache.spark.sql.catalyst.expressions.aggregate.{AggregateExpression, AggregateFunction, Average, Partial, PartialMerge}
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.{CollectLimitExec, FileSourceScanExec, FilterExec, GlobalLimitExec, LeafExecNode, LocalLimitExec, NdpFileSourceScanExec, ProjectExec, SparkPlan}
 import org.apache.spark.sql.execution.adaptive.AdaptiveSparkPlanExec
@@ -34,7 +36,8 @@ import org.apache.spark.sql.sources.DataSourceRegister
 import org.apache.spark.sql.hive.HiveSimpleUDF
 import org.apache.hadoop.hive.ql.exec.DefaultUDFMethodResolver
 import org.apache.spark.TaskContext
-import org.apache.spark.sql.catalyst.trees.TreeNode
+import org.apache.spark.sql.execution.ndp.NdpConf.getOptimizerPushDownEnable
+import org.apache.spark.sql.types.{DoubleType, FloatType}
 
 import scala.collection.{JavaConverters, mutable}
 import scala.reflect.runtime.universe
@@ -73,8 +76,13 @@ case class NdpPushDown(sparkSession: SparkSession)
   private val parentPath = NdpConf.getNdpZookeeperPath(sparkSession)
   private val zkAddress = NdpConf.getNdpZookeeperAddress(sparkSession)
 
+  private var isNdpPluginOptimizerPush = false
+
   override def apply(plan: SparkPlan): SparkPlan = {
-    if (pushDownEnabled && shouldPushDown(plan) && shouldPushDown()) {
+    isNdpPluginOptimizerPush = NdpPluginEnableFlag.isEnable(plan.session) && getOptimizerPushDownEnable(plan.session)
+    if(isNdpPluginOptimizerPush && pushDownEnabled && shouldPushDown(plan) && shouldPushDown()){
+      pushDownScanWithOutOtherOperator(plan)
+    } else if (!isNdpPluginOptimizerPush && pushDownEnabled && shouldPushDown(plan) && shouldPushDown()) {
       pushDownOperator(plan)
     } else {
       plan
@@ -153,7 +161,8 @@ case class NdpPushDown(sparkSession: SparkSession)
 
   def shouldPushDown(agg: BaseAggregateExec, scan: NdpSupport): Boolean = {
     scan.aggExeInfos.isEmpty &&
-      agg.output.forall(x => attrWhiteList.contains(x.dataType.typeName)) &&
+      agg.output.forall(x => attrWhiteList.contains(x.dataType.typeName.split("\\(")(0))
+        || supportedHiveStringType(x)) &&
       agg.aggregateExpressions.forall { e =>
         aggFuncWhiteList.contains(e.aggregateFunction.prettyName) &&
           (e.mode.equals(PartialMerge) || e.mode.equals(Partial)) &&
@@ -162,7 +171,8 @@ case class NdpPushDown(sparkSession: SparkSession)
             aggExpressionWhiteList.contains(g.prettyName)
           }
       } &&
-      isSimpleExpressions(agg.groupingExpressions) && !hasCastExpressions(agg.aggregateExpressions)
+      isSimpleExpressions(agg.groupingExpressions) && !hasCastExpressions(agg.aggregateExpressions) &&
+      isAvgSupportDataType(agg)
   }
 
   def hasCastExpressions(aggExps: Seq[AggregateExpression]): Boolean = {
@@ -171,6 +181,25 @@ case class NdpPushDown(sparkSession: SparkSession)
       if(aggExp.find(_.isInstanceOf[Cast]).isDefined) return true
     )
     false
+  }
+
+  def isAvgSupportDataType(agg: BaseAggregateExec): Boolean = {
+    agg.aggregateExpressions.forall { e =>
+      e.aggregateFunction match {
+        case average: Average =>
+          val avg = average
+          val resType = avg.dataType
+          val paramType = avg.child.dataType
+          if (resType.isInstanceOf[DoubleType]) {
+            return paramType.isInstanceOf[DoubleType]
+          }
+          if (resType.isInstanceOf[FloatType]) {
+            return paramType.isInstanceOf[FloatType]
+          }
+          false
+        case _ => true
+      }
+    }
   }
 
   def isSimpleExpressions(groupingExpressions: Seq[NamedExpression]): Boolean = {
@@ -227,6 +256,9 @@ case class NdpPushDown(sparkSession: SparkSession)
               }
               ndpScan.pushDown(s.scan)
               ndpScan.fpuHosts(fpuHosts)
+              if(isNdpPluginOptimizerPush) {
+                f.fpuHosts(fpuHosts)
+              }
               logInfo(s"Push down with [${ndpScan.ndpOperators}]")
               ndpScan
             case _ => throw new UnsupportedOperationException()
@@ -241,6 +273,12 @@ case class NdpPushDown(sparkSession: SparkSession)
   def pushDownOperator(plan: SparkPlan): SparkPlan = {
     val p = pushDownOperatorInternal(plan)
     replaceWrapper(p)
+  }
+
+  def pushDownScanWithOutOtherOperator(plan: SparkPlan): SparkPlan = {
+    val p = pushDownOperatorInternal(plan)
+    replaceWrapper(p)
+    plan
   }
 
   def isDynamiCpruning(f: FilterExec): Boolean = {
@@ -304,10 +342,10 @@ case class NdpPushDown(sparkSession: SparkSession)
             (splitConjunctivePredicates(condition) ++ s.partitionFilters).partition { x =>
               val containsUDFPath = isUDFInWhiteList(x)
               x.find { y =>
-              !filterWhiteList.contains(y.prettyName) &&
-                !udfWhiteList.contains(y.prettyName.toLowerCase) && !containsUDFPath
-            }.isDefined
-          }
+                !filterWhiteList.contains(y.prettyName) &&
+                  !udfWhiteList.contains(y.prettyName.toLowerCase) && !containsUDFPath
+              }.isDefined
+            }
           if (pushDownFilters.nonEmpty) {
             s.scan.pushDownFilter(FilterExeInfo(pushDownFilters.reduce(And), f.output))
           }
@@ -406,7 +444,10 @@ object NdpConf {
   val NDP_CLIENT_TASK_TIMEOUT = "spark.sql.ndp.task.timeout"
   val NDP_PARTIAL_PUSHDOWN = "spark.sql.ndp.partial.pushdown"
   val NDP_PARTIAL_PUSHDOWN_ENABLE = "spark.sql.ndp.partial.pushdown.enable"
-  val NDP_DOMIAN_GENERATE_ENABLE = "spark.sql.ndp.domain.generate.enable"
+  val NDP_DOMAIN_GENERATE_ENABLE="spark.sql.ndp.domain.generate.enable"
+  val NDP_OPTIMIZER_PUSH_DOWN_ENABLE="spark.sql.ndp.optimizer.pushdown.enabled"
+  val NDP_OPTIMIZER_PUSH_DOWN_THRESHOLD="spark.sql.ndp.optimizer.pushdown.threshold"
+  val NDP_OPTIMIZER_PUSH_DOWN_PRETHREAD_TASK="spark.sql.ndp.optimizer.pushdown.prethreadtask"
 
   def toBoolean(key: String, value: String, sparkSession: SparkSession): Boolean = {
     try {
@@ -519,9 +560,32 @@ object NdpConf {
       sparkSession.conf.getOption(NDP_PARTIAL_PUSHDOWN_ENABLE).getOrElse("false"), sparkSession)
   }
 
-  def getNdpDomainGenerateEnable(taskContext: TaskContext): Boolean = {
-    taskContext.getLocalProperties.getProperty(NDP_DOMIAN_GENERATE_ENABLE, "true")
-        .equalsIgnoreCase("true")
+  def getNdpDomainGenerateEnable(taskContext:TaskContext): Boolean = {
+    taskContext.getLocalProperties.getProperty(NDP_DOMAIN_GENERATE_ENABLE,"true")
+      .equalsIgnoreCase("true")
+  }
+
+  def getOptimizerPushDownEnable(sparkSession: SparkSession): Boolean = {
+    toBoolean(NDP_OPTIMIZER_PUSH_DOWN_ENABLE,
+      sparkSession.conf.getOption(NDP_OPTIMIZER_PUSH_DOWN_ENABLE).getOrElse("true"), sparkSession)
+  }
+
+  def getOptimizerPushDownThreshold(sparkSession: SparkSession): Int = {
+    val result = toNumber(NDP_OPTIMIZER_PUSH_DOWN_THRESHOLD,
+      sparkSession.conf.getOption(NDP_OPTIMIZER_PUSH_DOWN_THRESHOLD).getOrElse("4500"),
+      _.toInt, "long", sparkSession)
+    checkLongValue(NDP_OPTIMIZER_PUSH_DOWN_THRESHOLD, result, _ > 0,
+      s"The $NDP_OPTIMIZER_PUSH_DOWN_THRESHOLD value must be positive", sparkSession)
+    result
+  }
+
+  def getOptimizerPushDownPreThreadTask(sparkSession: SparkSession): Int = {
+    val result = toNumber(NDP_OPTIMIZER_PUSH_DOWN_PRETHREAD_TASK,
+      sparkSession.conf.getOption(NDP_OPTIMIZER_PUSH_DOWN_PRETHREAD_TASK).getOrElse("1"),
+      _.toInt, "int", sparkSession)
+    checkLongValue(NDP_OPTIMIZER_PUSH_DOWN_PRETHREAD_TASK, result, _ > 0,
+      s"The $NDP_OPTIMIZER_PUSH_DOWN_PRETHREAD_TASK value must be positive", sparkSession)
+    result
   }
 
   def getNdpUdfWhitelist(sparkSession: SparkSession): Option[String] = {
