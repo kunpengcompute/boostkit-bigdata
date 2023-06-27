@@ -166,6 +166,7 @@ public class DataIoAdapter {
      * @param partitionColumn   partition column
      * @param filterOutPut      filter schema
      * @param pushDownOperators push down expressions
+     * @param domains              domain map
      * @return WritableColumnVector data result info
      * @throws TaskExecutionException connect to omni-data-server failed exception
      * @notice 3rd parties api throws Exception, function has to catch basic Exception
@@ -175,7 +176,8 @@ public class DataIoAdapter {
             Seq<Attribute> sparkOutPut,
             Seq<Attribute> partitionColumn,
             Seq<Attribute> filterOutPut,
-            PushDownInfo pushDownOperators) throws TaskExecutionException, UnknownHostException {
+            PushDownInfo pushDownOperators,
+            ImmutableMap domains) throws TaskExecutionException, UnknownHostException {
         // initCandidates
         initCandidates(pageCandidate, filterOutPut);
 
@@ -202,7 +204,7 @@ public class DataIoAdapter {
 
         Predicate predicate = new Predicate(
                 omnidataTypes, omnidataColumns, filterRowExpression, omnidataProjections,
-                buildDomains(filterRowExpression), ImmutableMap.of(), aggregations, limitLong);
+                domains, ImmutableMap.of(), aggregations, limitLong);
         TaskSource taskSource = new TaskSource(dataSource, predicate, MAX_PAGE_SIZE_IN_BYTES);
 
         // create deserializer
@@ -211,11 +213,20 @@ public class DataIoAdapter {
         PageDeserializer deserializer = initPageDeserializer();
 
         // get available host
-        String[] pushDownHostArray = pageCandidate.getpushDownHosts().split(",");
-        List<String> pushDownHostList = new ArrayList<>(Arrays.asList(pushDownHostArray));
-        Optional<String> availablePushDownHost = getRandomAvailablePushDownHost(pushDownHostArray,
-                JavaConverters.mapAsJavaMap(pushDownOperators.fpuHosts()));
-        availablePushDownHost.ifPresent(pushDownHostList::add);
+        List<String> pushDownHostList = new ArrayList<>();
+        String[] pushDownHostArray;
+        if (pageCandidate.getpushDownHosts().length() == 0) {
+            Optional<String> availablePushDownHost = getRandomAvailablePushDownHost(new String[]{},
+                    JavaConverters.mapAsJavaMap(pushDownOperators.fpuHosts()));
+            availablePushDownHost.ifPresent(pushDownHostList::add);
+            pushDownHostArray = pushDownHostList.toArray(new String[]{});
+        } else {
+            pushDownHostArray = pageCandidate.getpushDownHosts().split(",");
+            pushDownHostList = new ArrayList<>(Arrays.asList(pushDownHostArray));
+            Optional<String> availablePushDownHost = getRandomAvailablePushDownHost(pushDownHostArray,
+                    JavaConverters.mapAsJavaMap(pushDownOperators.fpuHosts()));
+            availablePushDownHost.ifPresent(pushDownHostList::add);
+        }
         return getIterator(pushDownHostList.iterator(), taskSource, pushDownHostArray, deserializer,
                 pushDownHostList.size());
     }
@@ -275,11 +286,12 @@ public class DataIoAdapter {
     private Optional<String> getRandomAvailablePushDownHost(String[] pushDownHostArray,
                                                             Map<String, String> fpuHosts) {
         List<String> existingHosts = Arrays.asList(pushDownHostArray);
-        List<String> allHosts = new ArrayList<>(fpuHosts.values());
+        List<String> allHosts = new ArrayList<>(fpuHosts.keySet());
         allHosts.removeAll(existingHosts);
         if (allHosts.size() > 0) {
-            LOG.info("Add another available host: " + allHosts.get(0));
-            return Optional.of(allHosts.get(0));
+            int randomIndex = (int) (Math.random() * allHosts.size());
+            LOG.info("Add another available host: " + allHosts.get(randomIndex));
+            return Optional.of(allHosts.get(randomIndex));
         } else {
             return Optional.empty();
         }
@@ -304,24 +316,11 @@ public class DataIoAdapter {
     }
 
     private void initCandidates(PageCandidate pageCandidate, Seq<Attribute> filterOutPut) {
-        omnidataTypes.clear();
-        omnidataColumns.clear();
-        omnidataProjections.clear();
-        fieldMap.clear();
-        columnNameSet.clear();
-        columnTypesList.clear();
-        columnOrdersList.clear();
-        filterTypesList.clear();
-        filterOrdersList.clear();
-        partitionColumnName.clear();
-        columnNameMap.clear();
-        columnOrder = 0;
+        initCandidatesBeforeDomain(filterOutPut);
         filePath = pageCandidate.getFilePath();
         columnOffset = pageCandidate.getColumnOffset();
-        listAtt = JavaConverters.seqAsJavaList(filterOutPut);
         TASK_FAILED_TIMES = pageCandidate.getMaxFailedTimes();
         taskTimeout = pageCandidate.getTaskTimeout();
-        isPushDownAgg = true;
     }
 
     private RowExpression extractNamedExpression(NamedExpression namedExpression) {
@@ -904,7 +903,44 @@ public class DataIoAdapter {
         return isOperatorCombineEnabled;
     }
 
-    public ImmutableMap buildDomains(Optional<RowExpression> filterRowExpression) {
+    private void initCandidatesBeforeDomain(Seq<Attribute> filterOutPut) {
+        omnidataTypes.clear();
+        omnidataColumns.clear();
+        omnidataProjections.clear();
+        columnNameSet.clear();
+        columnTypesList.clear();
+        columnOrdersList.clear();
+        fieldMap.clear();
+        filterTypesList.clear();
+        filterOrdersList.clear();
+        columnNameMap.clear();
+        columnOrder = 0;
+        partitionColumnName.clear();
+        listAtt = JavaConverters.seqAsJavaList(filterOutPut);
+        isPushDownAgg = true;
+    }
+
+    public ImmutableMap buildDomains(
+            Seq<Attribute> sparkOutPut,
+            Seq<Attribute> partitionColumn,
+            Seq<Attribute> filterOutPut,
+            PushDownInfo pushDownOperators) {
+
+        // initCandidates
+        initCandidatesBeforeDomain(filterOutPut);
+
+        // add partition column
+        JavaConverters.seqAsJavaList(partitionColumn).forEach(a -> partitionColumnName.add(a.name()));
+
+        // init column info
+        if (pushDownOperators.aggExecutions().size() == 0) {
+            isPushDownAgg = false;
+            initColumnInfo(sparkOutPut);
+        }
+
+        // create filter
+        Optional<RowExpression> filterRowExpression = initFilter(pushDownOperators.filterExecutions());
+
         long startTime = System.currentTimeMillis();
         ImmutableMap.Builder<String, Domain> domains = ImmutableMap.builder();
         if (filterRowExpression.isPresent() && NdpConf.getNdpDomainGenerateEnable(TaskContext.get())) {
