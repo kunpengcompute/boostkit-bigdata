@@ -2,20 +2,16 @@ package org.apache.spark.sql.execution.ndp
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.expressions._
+import org.apache.spark.sql.catalyst.plans.logical.statsEstimation.{ColumnStatsMap, DefaultValueInterval, EstimationUtils, FilterEstimation, NullValueInterval, NumericValueInterval, ValueInterval}
 import org.apache.spark.sql.catalyst.plans.logical.LeafNode
 import org.apache.spark.sql.catalyst.plans.logical.statsEstimation.EstimationUtils.ceil
-import org.apache.spark.sql.catalyst.plans.logical.statsEstimation.{ColumnStatsMap, FilterEstimation}
-import org.apache.spark.sql.types.{BinaryType, BooleanType, DateType, NumericType, StringType, TimestampType}
+import org.apache.spark.sql.types.{BinaryType, BooleanType, DataType, DateType, NumericType, StringType, TimestampType}
 
 import scala.collection.immutable.HashSet
 import scala.collection.mutable
 
 case class NdpFilterEstimation(filterEstimation: FilterEstimation) extends Logging {
 
-  /* 1 character corresponds to 3 ascii code values,
-   * and double have 15 significant digits,
-   * so MAX_LEN = 15 / 3
-  */
   private val MAX_LEN = 5
 
   private val childStats = filterEstimation.plan.child.stats
@@ -48,7 +44,7 @@ case class NdpFilterEstimation(filterEstimation: FilterEstimation) extends Loggi
 
       // The foldable Not has been processed in the ConstantFolding rule
       // This is a top-down traversal. The Not could be pushed down by the above two cases.
-      case Not(l@Literal(null, _)) =>
+      case Not(l @ Literal(null, _)) =>
         calculateSingleCondition(l, update = false)
 
       case Not(cond) =>
@@ -76,24 +72,24 @@ case class NdpFilterEstimation(filterEstimation: FilterEstimation) extends Loggi
       case Equality(l: Literal, ar: Attribute) =>
         filterEstimation.evaluateEquality(ar, l, update)
 
-      case op@LessThan(ar: Attribute, l: Literal) =>
+      case op @ LessThan(ar: Attribute, l: Literal) =>
         evaluateBinary(op, ar, l, update)
-      case op@LessThan(l: Literal, ar: Attribute) =>
+      case op @ LessThan(l: Literal, ar: Attribute) =>
         evaluateBinary(GreaterThan(ar, l), ar, l, update)
 
-      case op@LessThanOrEqual(ar: Attribute, l: Literal) =>
+      case op @ LessThanOrEqual(ar: Attribute, l: Literal) =>
         evaluateBinary(op, ar, l, update)
-      case op@LessThanOrEqual(l: Literal, ar: Attribute) =>
+      case op @ LessThanOrEqual(l: Literal, ar: Attribute) =>
         evaluateBinary(GreaterThanOrEqual(ar, l), ar, l, update)
 
-      case op@GreaterThan(ar: Attribute, l: Literal) =>
+      case op @ GreaterThan(ar: Attribute, l: Literal) =>
         evaluateBinary(op, ar, l, update)
-      case op@GreaterThan(l: Literal, ar: Attribute) =>
+      case op @ GreaterThan(l: Literal, ar: Attribute) =>
         evaluateBinary(LessThan(ar, l), ar, l, update)
 
-      case op@GreaterThanOrEqual(ar: Attribute, l: Literal) =>
+      case op @ GreaterThanOrEqual(ar: Attribute, l: Literal) =>
         evaluateBinary(op, ar, l, update)
-      case op@GreaterThanOrEqual(l: Literal, ar: Attribute) =>
+      case op @ GreaterThanOrEqual(l: Literal, ar: Attribute) =>
         evaluateBinary(LessThanOrEqual(ar, l), ar, l, update)
 
       case In(ar: Attribute, expList)
@@ -119,19 +115,19 @@ case class NdpFilterEstimation(filterEstimation: FilterEstimation) extends Loggi
       case IsNotNull(ar: Attribute) if filterEstimation.plan.child.isInstanceOf[LeafNode] =>
         filterEstimation.evaluateNullCheck(ar, isNull = false, update)
 
-      case op@Equality(attrLeft: Attribute, attrRight: Attribute) =>
+      case op @ Equality(attrLeft: Attribute, attrRight: Attribute) =>
         filterEstimation.evaluateBinaryForTwoColumns(op, attrLeft, attrRight, update)
 
-      case op@LessThan(attrLeft: Attribute, attrRight: Attribute) =>
+      case op @ LessThan(attrLeft: Attribute, attrRight: Attribute) =>
         filterEstimation.evaluateBinaryForTwoColumns(op, attrLeft, attrRight, update)
 
-      case op@LessThanOrEqual(attrLeft: Attribute, attrRight: Attribute) =>
+      case op @ LessThanOrEqual(attrLeft: Attribute, attrRight: Attribute) =>
         filterEstimation.evaluateBinaryForTwoColumns(op, attrLeft, attrRight, update)
 
-      case op@GreaterThan(attrLeft: Attribute, attrRight: Attribute) =>
+      case op @ GreaterThan(attrLeft: Attribute, attrRight: Attribute) =>
         filterEstimation.evaluateBinaryForTwoColumns(op, attrLeft, attrRight, update)
 
-      case op@GreaterThanOrEqual(attrLeft: Attribute, attrRight: Attribute) =>
+      case op @ GreaterThanOrEqual(attrLeft: Attribute, attrRight: Attribute) =>
         filterEstimation.evaluateBinaryForTwoColumns(op, attrLeft, attrRight, update)
 
       case _ =>
@@ -166,10 +162,10 @@ case class NdpFilterEstimation(filterEstimation: FilterEstimation) extends Loggi
   }
 
   def evaluateBinaryForString(
-                                op: BinaryComparison,
-                                attr: Attribute,
-                                literal: Literal,
-                                update: Boolean): Option[Double] = {
+                               op: BinaryComparison,
+                               attr: Attribute,
+                               literal: Literal,
+                               update: Boolean): Option[Double] = {
 
     if (!colStatsMap.hasMinMaxStats(attr) || !colStatsMap.hasDistinctCount(attr)) {
       logDebug("[CBO] No statistics for " + attr)
@@ -177,16 +173,16 @@ case class NdpFilterEstimation(filterEstimation: FilterEstimation) extends Loggi
     }
 
     val colStat = colStatsMap(attr)
-    if (colStat.min.isEmpty || colStat.max.isEmpty) {
+    if (colStat.min.get == null || colStat.max.get == null || colStat.min.isEmpty || colStat.max.isEmpty) {
       return None
     }
     val maxStr = colStat.max.get.toString
     val minStr = colStat.min.get.toString
     val literalStr = literal.value.toString
     var maxStrLen = 0
-    maxStrLen = Math.max(maxStr.length, maxStrLen)
-    maxStrLen = Math.max(minStr.length, maxStrLen)
-    maxStrLen = Math.max(literalStr.length, maxStrLen)
+    maxStrLen = Math.max(maxStr.length, maxStrLen);
+    maxStrLen = Math.max(minStr.length, maxStrLen);
+    maxStrLen = Math.max(literalStr.length, maxStrLen);
     val selectStrLen = Math.min(maxStrLen, MAX_LEN)
 
     val max = convertInternalVal(maxStr, selectStrLen).toDouble
@@ -267,7 +263,7 @@ case class NdpFilterEstimation(filterEstimation: FilterEstimation) extends Loggi
         colStatsMap.update(attr, newStats)
       }
     }
-    logDebug("calculate filter selectivity for string:" + percent.toString)
+    logDebug("calculate filter selectivity for String :" + percent.toString)
     Some(percent)
   }
 

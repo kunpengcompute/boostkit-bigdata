@@ -62,12 +62,12 @@ public class PageToColumnar implements Serializable {
     }
 
     public List<Object> transPageToColumnar(Iterator<WritableColumnVector[]> writableColumnVectors,
-                                            boolean isVectorizedReader, boolean isOperatorCombineEnabled, Seq<Attribute> sparkOutput, String orcImpl) {
+                                            boolean isVectorizedReader, boolean isOperatorCombineEnabled, Seq<Attribute> sparkOutPut, String orcImpl) {
         if (isOperatorCombineEnabled) {
-            LOG.info("OmniRuntime PushDown column info: OmniColumnVector transform to Columnar");
+            LOG.debug("OmniRuntime PushDown column info: OmniColumnVector transform to Columnar");
         }
         List<Object> internalRowList = new ArrayList<>();
-        List<Attribute> outputColumnList = JavaConverters.seqAsJavaList(sparkOutput);
+        List<Attribute> outputColumnList = JavaConverters.seqAsJavaList(sparkOutPut);
         while (writableColumnVectors.hasNext()) {
             WritableColumnVector[] columnVector = writableColumnVectors.next();
             if (columnVector == null) {
@@ -83,7 +83,7 @@ public class PageToColumnar implements Serializable {
                 internalRowList.add(columnarBatch);
             } else {
                 for (int j = 0; j < positionCount; j++) {
-                    procVectorForOrcHive(columnVector, orcImpl, outputColumnList, j);
+                    procVectorForOrcHive(columnVector, orcImpl,  outputColumnList, j);
                     MutableColumnarRow mutableColumnarRow =
                             new MutableColumnarRow(columnVector);
                     mutableColumnarRow.rowId = j;
@@ -93,20 +93,19 @@ public class PageToColumnar implements Serializable {
         }
         return internalRowList;
     }
-
     public void procVectorForOrcHive(WritableColumnVector[] columnVectors, String orcImpl, List<Attribute> outputColumnList, int rowId) {
         if (orcImpl.equals(ORC_HIVE)) {
-           for (int i = 0; i < columnVectors.length; i++) {
-               if (columnVectors[i].dataType() instanceof StringType) {
-                   Attribute attribute = outputColumnList.get(i);
-                   Metadata metadata = attribute.metadata();
-                   putPaddingChar(columnVectors[i], metadata, rowId);
-               }
-           }
+            for (int i = 0; i < columnVectors.length; i++) {
+                if (columnVectors[i].dataType() instanceof StringType) {
+                    Attribute attribute = outputColumnList.get(i);
+                    Metadata metadata = attribute.metadata();
+                    putPaddingChar(columnVectors[i], metadata, rowId);
+                }
+            }
         }
     }
 
-    private void putPaddingChar(WritableColumnVector columnVector, Metadata metadata, int rowId) {
+    public void putPaddingChar(WritableColumnVector columnVector, Metadata metadata, int rowId) {
         if (CharVarcharUtils.getRawTypeString(metadata).isDefined()) {
             String metadataStr = CharVarcharUtils.getRawTypeString(metadata).get();
             Pattern pattern = Pattern.compile("(?<=\\()\\d+(?=\\))");

@@ -24,6 +24,7 @@ import org.apache.spark.sql.catalyst.catalog.{CatalogColumnStat, CatalogStatisti
 import org.apache.spark.sql.catalyst.expressions.Attribute
 import org.apache.spark.sql.catalyst.plans.logical.{ColumnStat, LogicalPlan}
 import org.apache.spark.sql.catalyst.util.{DateFormatter, TimestampFormatter}
+import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types._
 
 import java.time.ZoneOffset
@@ -37,7 +38,7 @@ import java.time.ZoneOffset
 case class NdpAnalyzeColumnCommand(
                                  tableIdent: TableIdentifier,
                                  columnNames: Option[Seq[String]],
-                                 allColumns: Boolean) extends RunnableCommand {
+                                 allColumns: Boolean) extends LeafRunnableCommand {
 
   override def run(sparkSession: SparkSession): Seq[Row] = {
     require(columnNames.isDefined ^ allColumns, "Parameter `columnNames` or `allColumns` are " +
@@ -118,10 +119,11 @@ case class NdpAnalyzeColumnCommand(
       val relation = sparkSession.table(tableIdent).logicalPlan
       val columnsToAnalyze = getColumnsToAnalyze(tableIdent, relation, columnNames, allColumns)
 
+      SQLConf.get.setConfString("spark.omni.sql.ndpPlugin.castDecimal.enabled", "false")
       // Compute stats for the computed list of columns.
       val (rowCount, newColStats) =
         NdpCommandUtils.computeColumnStats(sparkSession, relation, columnsToAnalyze)
-
+      SQLConf.get.setConfString("spark.omni.sql.ndpPlugin.castDecimal.enabled", "true")
       val newColCatalogStats = newColStats.map {
         case (attr, columnStat) =>
           attr.name -> toCatalogColumnStat(columnStat, attr.name, attr.dataType)
@@ -151,7 +153,7 @@ case class NdpAnalyzeColumnCommand(
 
   private def toExternalString(v: Any, colName: String, dataType: DataType): String = {
     val externalValue = dataType match {
-      case DateType => DateFormatter(ZoneOffset.UTC).format(v.asInstanceOf[Int])
+      case DateType => DateFormatter().format(v.asInstanceOf[Int])
       case TimestampType => getTimestampFormatter(isParsing = false).format(v.asInstanceOf[Long])
       case BooleanType | _: IntegralType | FloatType | DoubleType | StringType => v
       case _: DecimalType => v.asInstanceOf[Decimal].toJavaBigDecimal

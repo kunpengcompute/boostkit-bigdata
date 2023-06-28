@@ -80,6 +80,11 @@ import org.slf4j.LoggerFactory;
 import java.lang.reflect.Field;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.sql.Date;
+import java.text.SimpleDateFormat;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.time.format.ResolverStyle;
 import java.util.HashMap;
 import java.util.*;
 import java.util.regex.Matcher;
@@ -400,10 +405,15 @@ public class NdpUtils {
         switch (strType) {
             case "bigint":
             case "integer":
-            case "date":
             case "tinyint":
             case "smallint":
                 return new ConstantExpression(Long.parseLong(argumentValue), argumentType);
+            case "date":
+                if (isValidDateFormat(argumentValue)) {
+                    return new ConstantExpression(getTimeStampFromDateString(argumentValue), argumentType);
+                }else {
+                    throw new UnsupportedOperationException("unsupported date format");
+                }
             case "real":
                 return new ConstantExpression(
                         (long) floatToIntBits(parseFloat(argumentValue)), argumentType);
@@ -507,5 +517,28 @@ public class NdpUtils {
         } else {
             return str;
         }
+    }
+
+    public static boolean isValidDateFormat(String dateString) {
+        boolean isValid = true;
+        String pattern = "yyyy-MM-dd";
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern(pattern).withResolverStyle(ResolverStyle.STRICT);
+        try {
+            formatter.parse(dateString);
+        } catch (DateTimeParseException e) {
+            isValid = false;
+        }
+        return isValid;
+    }
+
+    public static long getTimeStampFromDateString(String dateString) {
+        long dayToMillSecs = 24L * 3600L * 1000L;
+        String[] dateStrArray = dateString.split("-");
+        int year = Integer.parseInt(dateStrArray[0]) - 1900;
+        int month = Integer.parseInt(dateStrArray[1]) - 1;
+        int day = Integer.parseInt(dateStrArray[2]);
+        java.sql.Date date = new Date(year, month, day);
+        return Long.parseLong(
+                String.valueOf((date.getTime() - date.getTimezoneOffset() * 60000L) / dayToMillSecs));
     }
 }

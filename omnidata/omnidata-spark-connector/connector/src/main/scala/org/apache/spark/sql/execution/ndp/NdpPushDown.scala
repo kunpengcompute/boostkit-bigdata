@@ -24,7 +24,7 @@ import java.util.{Locale, Properties}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{PushDownData, PushDownManager, SparkSession}
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.{Alias, And, Attribute, AttributeReference, BinaryExpression, Cast, Expression, NamedExpression, PredicateHelper, UnaryExpression}
+import org.apache.spark.sql.catalyst.expressions.{Alias, And, Attribute, AttributeReference, BinaryExpression, Cast, Expression,NamedExpression, PredicateHelper, UnaryExpression}
 import org.apache.spark.sql.catalyst.expressions.aggregate.{AggregateExpression, AggregateFunction, Average, Partial, PartialMerge}
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.{CollectLimitExec, FileSourceScanExec, FilterExec, GlobalLimitExec, LeafExecNode, LocalLimitExec, NdpFileSourceScanExec, ProjectExec, SparkPlan}
@@ -342,10 +342,10 @@ case class NdpPushDown(sparkSession: SparkSession)
             (splitConjunctivePredicates(condition) ++ s.partitionFilters).partition { x =>
               val containsUDFPath = isUDFInWhiteList(x)
               x.find { y =>
-                !filterWhiteList.contains(y.prettyName) &&
-                  !udfWhiteList.contains(y.prettyName.toLowerCase) && !containsUDFPath
-              }.isDefined
-            }
+              !filterWhiteList.contains(y.prettyName) &&
+                !udfWhiteList.contains(y.prettyName.toLowerCase) && !containsUDFPath
+            }.isDefined
+          }
           if (pushDownFilters.nonEmpty) {
             s.scan.pushDownFilter(FilterExeInfo(pushDownFilters.reduce(And), f.output))
           }
@@ -562,7 +562,7 @@ object NdpConf {
 
   def getNdpDomainGenerateEnable(taskContext:TaskContext): Boolean = {
     taskContext.getLocalProperties.getProperty(NDP_DOMAIN_GENERATE_ENABLE,"true")
-      .equalsIgnoreCase("true")
+        .equalsIgnoreCase("true")
   }
 
   def getOptimizerPushDownEnable(sparkSession: SparkSession): Boolean = {

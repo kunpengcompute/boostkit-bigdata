@@ -1,26 +1,20 @@
 /*
- * Copyright (C) Huawei Technologies Co., Ltd. 2021-2022. All rights reserved.
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
- * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to You under the Apache License, Version 2.0
- * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2020-2021. All rights reserved.
  */
 
 package org.apache.spark.sql;
 
-import avro.shaded.com.google.common.collect.ImmutableSet;
 import com.esotericsoftware.kryo.Kryo;
-import io.prestosql.metadata.*;
+import com.google.common.collect.ImmutableSet;
+import io.prestosql.metadata.AnalyzePropertyManager;
+import io.prestosql.metadata.ColumnPropertyManager;
+import io.prestosql.metadata.FunctionAndTypeManager;
+import io.prestosql.metadata.HandleResolver;
+import io.prestosql.metadata.Metadata;
+import io.prestosql.metadata.MetadataManager;
+import io.prestosql.metadata.SchemaPropertyManager;
+import io.prestosql.metadata.SessionPropertyManager;
+import io.prestosql.metadata.TablePropertyManager;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.security.ConnectorIdentity;
 import io.prestosql.spi.type.TimeZoneKey;
@@ -33,7 +27,9 @@ import java.util.Optional;
 import java.util.TimeZone;
 
 /**
- * MetaStore
+ * Used to initialize some common classes
+ *
+ * @since 2023.04
  */
 public class MetaStore {
     private static final Metadata metadata = initCompiler();
@@ -45,8 +41,23 @@ public class MetaStore {
     private static Metadata initCompiler() {
         FeaturesConfig featuresConfig = new FeaturesConfig();
         TransactionManager transactionManager = new NoOpTransactionManager();
-        return new MetadataManager(new FunctionAndTypeManager(transactionManager, featuresConfig, new HandleResolver(), ImmutableSet.of(), new Kryo()), featuresConfig, new SessionPropertyManager(), new SchemaPropertyManager(), new TablePropertyManager(), new ColumnPropertyManager(), new AnalyzePropertyManager(), transactionManager, null);
+        return new MetadataManager(
+                new FunctionAndTypeManager(
+                        transactionManager,
+                        featuresConfig,
+                        new HandleResolver(),
+                        ImmutableSet.of(),
+                        new Kryo()),
+                featuresConfig,
+                new SessionPropertyManager(),
+                new SchemaPropertyManager(),
+                new TablePropertyManager(),
+                new ColumnPropertyManager(),
+                new AnalyzePropertyManager(),
+                transactionManager,
+                null);
     }
+
 
     /**
      * get Metadata instance
@@ -95,7 +106,7 @@ public class MetaStore {
             }
 
             @Override
-            public <T> T getProperty(String name, Class<T> type) {
+            public <T extends Object> T getProperty(String name, Class<T> cls) {
                 return null;
             }
         };

@@ -1,17 +1,19 @@
 package org.apache.spark.sql.execution.command
 
-import scala.collection.mutable
-
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.{AnalysisException, SparkSession}
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.catalyst.expressions.aggregate._
-import org.apache.spark.sql.catalyst.plans.logical._
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.catalyst.expressions.{Alias, Attribute, AttributeMap, Cast, Ceil, Coalesce, CreateNamedStruct, CreateStruct, Expression, Least, Length, Literal, Subtract}
+import org.apache.spark.sql.catalyst.expressions.aggregate.{AggregateFunction, ApproxCountDistinctForIntervals, ApproximatePercentile, Average, Count, HyperLogLogPlusPlus, Max, Min}
+import org.apache.spark.sql.catalyst.plans.logical.{Aggregate, ColumnStat, Histogram, HistogramBin, LogicalPlan}
 import org.apache.spark.sql.catalyst.util.{ArrayData, GenericArrayData}
+import org.apache.spark.sql.errors.QueryCompilationErrors
 import org.apache.spark.sql.execution.QueryExecution
+import org.apache.spark.sql.functions.countDistinct
 import org.apache.spark.sql.internal.SQLConf
-import org.apache.spark.sql.types._
+import org.apache.spark.sql.types.{ArrayType, BinaryType, BooleanType, DataType, DateType, DecimalType, DoubleType, FloatType, IntegralType, LongType, StringType, TimestampType}
+
+import scala.collection.mutable
 
 object NdpCommandUtils extends Logging {
 
@@ -51,7 +53,6 @@ object NdpCommandUtils extends Logging {
     (rowCount, columnStats)
   }
 
-  /** Computes percentiles for each attribute. */
   private def computePercentiles(
                                   attributesToAnalyze: Seq[Attribute],
                                   sparkSession: SparkSession,
@@ -90,27 +91,6 @@ object NdpCommandUtils extends Logging {
     AttributeMap(attributePercentiles.toSeq)
   }
 
-
-  /** Returns true iff the we support gathering histogram on column of the given type. */
-  private def supportsHistogram(dataType: DataType): Boolean = dataType match {
-    case _: IntegralType => true
-    case _: DecimalType => true
-    case DoubleType | FloatType => true
-    case DateType => true
-    case TimestampType => true
-    case _ => false
-  }
-
-  /**
-   * Constructs an expression to compute column statistics for a given column.
-   *
-   * The expression should create a single struct column with the following schema:
-   * distinctCount: Long, min: T, max: T, nullCount: Long, avgLen: Long, maxLen: Long,
-   * distinctCountsForIntervals: Array[Long]
-   *
-   * Together with [[rowToColumnStat]], this function is used to create [[ColumnStat]] and
-   * as a result should stay in sync with it.
-   */
   private def statExprs(
                          col: Attribute,
                          conf: SQLConf,
@@ -118,12 +98,11 @@ object NdpCommandUtils extends Logging {
     def struct(exprs: Expression*): CreateNamedStruct = CreateStruct(exprs.map { expr =>
       expr.transformUp { case af: AggregateFunction => af.toAggregateExpression() }
     })
-
     val one = Literal(1.toLong, LongType)
 
     // the approximate ndv (num distinct value) should never be larger than the number of rows
     val numNonNulls = if (col.nullable) Count(col) else Count(one)
-    val ndv = Least(Seq(HyperLogLogPlusPlus(col, conf.ndvMaxError), numNonNulls))
+    val ndv = countDistinct(col.name).expr
     val numNulls = Subtract(Count(one), numNonNulls)
     val defaultSize = Literal(col.dataType.defaultSize.toLong, LongType)
     val nullArray = Literal(null, ArrayType(LongType))
@@ -160,15 +139,20 @@ object NdpCommandUtils extends Logging {
           Coalesce(Seq(Cast(Max(Length(col)), LongType), defaultSize)),
           nullArray)
       case _ =>
-        throw new AnalysisException("Analyzing column statistics is not supported for column " +
-          s"${col.name} of data type: ${col.dataType}.")
+        throw QueryCompilationErrors.analyzingColumnStatisticsNotSupportedForColumnTypeError(
+          col.name, col.dataType)
     }
   }
 
-  /**
-   * Convert a struct for column stats (defined in `statExprs`) into
-   * [[org.apache.spark.sql.catalyst.plans.logical.ColumnStat]].
-   */
+  private def supportsHistogram(dataType: DataType): Boolean = dataType match {
+    case _: IntegralType => true
+    case _: DecimalType => true
+    case DoubleType | FloatType => true
+    case DateType => true
+    case TimestampType => true
+    case _ => false
+  }
+
   private def rowToColumnStat(
                                row: InternalRow,
                                attr: Attribute,
