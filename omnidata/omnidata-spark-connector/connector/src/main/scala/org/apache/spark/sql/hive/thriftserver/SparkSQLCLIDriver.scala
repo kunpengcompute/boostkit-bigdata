@@ -17,8 +17,7 @@
 
 package org.apache.spark.sql.hive.thriftserver
 
-import com.huawei.boostkit.omnidata.spark.NdpPluginEnableFlag
-
+import com.huawei.boostkit.omnioffload.spark.NdpPluginEnableFlag
 import java.io._
 import java.nio.charset.StandardCharsets.UTF_8
 import java.util.{Locale, ArrayList => JArrayList, List => JList}

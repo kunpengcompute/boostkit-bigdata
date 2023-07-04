@@ -1,4 +1,4 @@
-package com.huawei.boostkit.omnidata.spark
+package com.huawei.boostkit.omnioffload.spark
 
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.aggregate.HashAggregateExec

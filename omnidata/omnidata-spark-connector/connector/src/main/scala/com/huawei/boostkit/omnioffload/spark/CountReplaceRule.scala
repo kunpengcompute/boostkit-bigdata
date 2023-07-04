@@ -1,4 +1,4 @@
-package com.huawei.boostkit.omnidata.spark
+package com.huawei.boostkit.omnioffload.spark
 
 import org.apache.spark.sql.catalyst.expressions.aggregate.{AggregateExpression, Count}
 import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Literal, NamedExpression}

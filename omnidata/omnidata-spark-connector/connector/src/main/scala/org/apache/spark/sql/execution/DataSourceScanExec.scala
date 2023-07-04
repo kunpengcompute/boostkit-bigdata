@@ -17,10 +17,7 @@
 
 package org.apache.spark.sql.execution
 
-
-
-import com.huawei.boostkit.omnidata.spark.NdpPluginEnableFlag
-
+import com.huawei.boostkit.omnioffload.spark.NdpPluginEnableFlag
 import java.util.concurrent.TimeUnit._
 import scala.collection.mutable.HashMap
 import org.apache.commons.lang3.StringUtils

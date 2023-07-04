@@ -18,8 +18,7 @@
 
 package org.apache.spark.sql.execution.ndp
 
-import com.huawei.boostkit.omnidata.spark.NdpPluginEnableFlag
-
+import com.huawei.boostkit.omnioffload.spark.NdpPluginEnableFlag
 import java.util.{Locale, Properties}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{PushDownData, PushDownManager, SparkSession}

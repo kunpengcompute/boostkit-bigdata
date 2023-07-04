@@ -1,5 +1,6 @@
-package com.huawei.boostkit.omnidata.spark
+package com.huawei.boostkit.omnioffload.spark
 
+import com.huawei.boostkit.omnidata.spark.NdpConnectorUtils
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.catalog.{CatalogTable, HiveTableRelation}
