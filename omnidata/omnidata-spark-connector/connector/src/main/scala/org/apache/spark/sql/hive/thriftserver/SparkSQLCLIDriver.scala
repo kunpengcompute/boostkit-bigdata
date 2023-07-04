@@ -111,6 +111,9 @@ private[hive] object SparkSQLCLIDriver extends Logging {
           // TODO use operator argument ,no extension
           // return
         }
+        if (sql.contains("cluster by") || sql.contains("order by") || sql.contains("sort by")) {
+          return
+        }
         if (!sys.props.contains("spark.memory.offHeap.enabled")) {
           return
         }
