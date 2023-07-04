@@ -53,7 +53,7 @@ case class SimpleCountFileScanExec(
                                     dataFilters: Seq[Expression],
                                     tableIdentifier: Option[TableIdentifier],
                                     disableBucketedScan: Boolean = false,
-                                    isDistinctCount: Boolean = false)
+                                    isEmptyIter: Boolean = false)
   extends DataSourceScanExec {
 
   // Note that some vals referring the file-based relation are lazy intentionally
@@ -282,7 +282,7 @@ case class SimpleCountFileScanExec(
   }
 
   lazy val inputRDD: RDD[InternalRow] = {
-    val readFile: (PartitionedFile) => Iterator[InternalRow] = if (isDistinctCount) {
+    val readFile: (PartitionedFile) => Iterator[InternalRow] = if (isEmptyIter) {
       emptyReadPartitionValues()
     } else {
       simpleReadPartitionValues()

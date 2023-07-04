@@ -1,7 +1,7 @@
 package com.huawei.boostkit.omnidata.spark
 
 import org.apache.spark.sql.catalyst.expressions.aggregate.{AggregateExpression, Count}
-import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Literal}
+import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Literal, NamedExpression}
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.aggregate.{HashAggregateExec, SimpleCountAggregateExec}
 import org.apache.spark.sql.execution.command.DataWritingCommandExec
@@ -11,23 +11,27 @@ import org.apache.spark.sql.execution.{ColumnarHashAggregateExec, ColumnarShuffl
 
 object CountReplaceRule extends Rule[SparkPlan] {
   var columnStat: BigInt = -1
+  var isCountPlan: Boolean = false
 
   override def apply(plan: SparkPlan): SparkPlan = {
-    if (shouldReplaceDistinctCount(plan)) {
-      replaceDistinctCountPlan(plan)
+    if (shouldReplaceDistinctCount(plan) || shouldReplaceCountOne(plan)) {
+      replaceCountPlan(plan)
     } else {
       plan
     }
   }
 
-  def shouldReplaceCount(plan: SparkPlan): Boolean = {
+  def shouldReplaceCountOne(plan: SparkPlan): Boolean = {
     plan match {
       case DataWritingCommandExec(_,
-      finalAgg@HashAggregateExec(_, _, aggExps: Seq[AggregateExpression], _, _, _,
+      finalAgg@HashAggregateExec(_, groups: Seq[NamedExpression], aggExps: Seq[AggregateExpression], _, _, _,
       shuffle@ShuffleExchangeExec(_,
       ptAgg@HashAggregateExec(_, _, _, _, _, _,
       ColumnarToRowExec(
       scan: FileSourceScanExec)), _))) =>
+        if (groups.nonEmpty) {
+          return false
+        }
         if(aggExps.isEmpty){
           return false
         }
@@ -50,6 +54,17 @@ object CountReplaceRule extends Rule[SparkPlan] {
         if (!scan.relation.fileFormat.isInstanceOf[ParquetFileFormat]) {
           return false
         }
+
+        
+        val countTable = scan.tableIdentifier.get
+        val countValue = plan.session.sqlContext.sparkSession.sessionState.catalog
+          .getTableMetadata(countTable)
+          .stats.get.rowCount
+        if (countValue.isEmpty) {
+          return false
+        }
+        columnStat = countValue.get
+        isCountPlan = true
         true
       case _ => false
     }
@@ -66,6 +81,9 @@ object CountReplaceRule extends Rule[SparkPlan] {
       HashAggregateExec(_, _, _, _, _, _,
       ColumnarToRowExec(
       scanExec: FileSourceScanExec)), _))), _))) =>
+        if (topFinalAgg.groupingExpressions.nonEmpty) {
+          return false
+        }
         val aggExps = topFinalAgg.aggregateExpressions
         if (aggExps.size != 1) {
           return false
@@ -102,9 +120,31 @@ object CountReplaceRule extends Rule[SparkPlan] {
     }
   }
 
-  def replaceDistinctCountPlan(plan: SparkPlan): SparkPlan = plan match {
-    case agg: HashAggregateExec =>
-      val child = replaceDistinctCountPlan(agg.child)
+  def replaceCountPlan(plan: SparkPlan): SparkPlan = plan match {
+    case scan: FileSourceScanExec if(isCountPlan)=>
+      SimpleCountFileScanExec(scan.relation,
+        scan.output,
+        scan.requiredSchema,
+        scan.partitionFilters,
+        scan.optionalBucketSet,
+        scan.optionalNumCoalescedBuckets,
+        scan.dataFilters,
+        scan.tableIdentifier,
+        scan.disableBucketedScan,
+        isEmptyIter = true)
+    case agg@HashAggregateExec(_, _, _, _, _, _,shuffle: ShuffleExchangeExec) if(isCountPlan) =>
+      val child = replaceCountPlan(agg.child)
+      SimpleCountAggregateExec(agg.requiredChildDistributionExpressions,
+        agg.groupingExpressions,
+        agg.aggregateExpressions,
+        agg.aggregateAttributes,
+        agg.initialInputBufferOffset,
+        agg.resultExpressions,
+        child,
+        isDistinctCount = true,
+        columnStat)
+    case agg: HashAggregateExec if(!isCountPlan) =>
+      val child = replaceCountPlan(agg.child)
       SimpleCountAggregateExec(agg.requiredChildDistributionExpressions,
         agg.groupingExpressions,
         agg.aggregateExpressions,
@@ -115,7 +155,7 @@ object CountReplaceRule extends Rule[SparkPlan] {
         isDistinctCount = true,
         columnStat)
     case p =>
-      val children = plan.children.map(replaceDistinctCountPlan)
+      val children = plan.children.map(replaceCountPlan)
       p.withNewChildren(children)
   }
 }

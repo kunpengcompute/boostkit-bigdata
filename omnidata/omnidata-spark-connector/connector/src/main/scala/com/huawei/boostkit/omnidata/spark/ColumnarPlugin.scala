@@ -31,15 +31,19 @@ case class NdpOverrides() extends Rule[SparkPlan] {
   var pushDownTaskCount: Int = -1
   var isSMJ = false
   var isSort = false
+  var isCount = false
   var hasCoalesce = false
   var hasShuffle = false
 
   def apply(plan: SparkPlan): SparkPlan = {
     pushDownTaskCount = getOptimizerPushDownThreshold(plan.session)
-    if (CountReplaceRule.shouldReplaceCount(plan)) {
+    if (CountReplaceRule.shouldReplaceCountOne(plan)) {
+      isCount = true
       pushDownTaskCount = 200
+      SQLConf.get.setConfString(SQLConf.FILES_MAX_PARTITION_BYTES.key, "512MB")
     }
     if (CountReplaceRule.shouldReplaceDistinctCount(plan)) {
+      isCount = true
       pushDownTaskCount = 2000
     }
     val ruleList = Seq(CountReplaceRule)
@@ -82,7 +86,7 @@ case class NdpOverrides() extends Rule[SparkPlan] {
         isSort = true
         RadixSortExec(sortOrder, global, child, testSpillFrequency)
       case p@DataWritingCommandExec(cmd, child) =>
-        if (isSort || isVagueAndAccurateHd(child)) {
+        if (isSort || isCount || isVagueAndAccurateHd(child)) {
           p
         } else {
           hasCoalesce = true
