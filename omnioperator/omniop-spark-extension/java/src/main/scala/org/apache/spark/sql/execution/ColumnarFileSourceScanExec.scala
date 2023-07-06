@@ -806,8 +806,7 @@ case class ColumnarFileSourceScanExec(
       QueryPlan.normalizePredicates(dataFilters, output),
       None,
       needPriv,
-      disableBucketedScan,
-      outputAllAttributes)
+      disableBucketedScan)
   }
 }
 
