@@ -93,7 +93,7 @@ class OmniOrcFileFormat extends FileFormat with DataSourceRegister with Serializ
       } else {
         // ORC predicate pushdown
         if (orcFilterPushDown) {
-          OrcUtils.readCatalystSchema(filePath, conf, ignoreCorruptFiles).foreach { 
+          OrcUtils.readCatalystSchema(filePath, conf, ignoreCorruptFiles).foreach {
             fileSchema => OrcFilters.createFilter(fileSchema, filters).foreach { f =>
               OrcInputFormat.setSearchArgument(conf, f, fileSchema.fieldNames)
             }

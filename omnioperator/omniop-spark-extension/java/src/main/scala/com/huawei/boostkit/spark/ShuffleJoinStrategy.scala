@@ -22,8 +22,10 @@ import org.apache.spark.sql.catalyst.SQLConfHelper
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.optimizer.{BuildLeft, BuildRight, BuildSide, JoinSelectionHelper}
 import org.apache.spark.sql.catalyst.planning._
+import org.apache.spark.sql.catalyst.plans.JoinType
 import org.apache.spark.sql.catalyst.plans.logical._
-import org.apache.spark.sql.execution.{joins, SparkPlan}
+import org.apache.spark.sql.execution.{SparkPlan, joins}
+import org.apache.spark.sql.internal.SQLConf
 
 object ShuffleJoinStrategy extends Strategy
   with PredicateHelper
@@ -105,6 +107,39 @@ object ShuffleJoinStrategy extends Strategy
       }
 
     case _ => Nil
+  }
+
+  override def getShuffleHashJoinBuildSide(
+                                   left: LogicalPlan,
+                                   right: LogicalPlan,
+                                   joinType: JoinType,
+                                   hint: JoinHint,
+                                   hintOnly: Boolean,
+                                   conf: SQLConf): Option[BuildSide] = {
+    val buildLeft = if (hintOnly) {
+      hintToShuffleHashJoinLeft(hint)
+    } else {
+      canBuildLocalHashMapBySize(left, conf) && muchSmaller(left, right)
+    }
+    val buildRight = if (hintOnly) {
+      hintToShuffleHashJoinRight(hint)
+    } else {
+      canBuildLocalHashMapBySize(right, conf) && muchSmaller(right, left)
+    }
+    getBuildSide(
+      canBuildShuffledHashJoinLeft(joinType) && buildLeft,
+      canBuildShuffledHashJoinRight(joinType) && buildRight,
+      left,
+      right
+    )
+  }
+
+  private def canBuildLocalHashMapBySize(plan: LogicalPlan, conf: SQLConf): Boolean = {
+    plan.stats.sizeInBytes < conf.autoBroadcastJoinThreshold * conf.numShufflePartitions
+  }
+
+  private def muchSmaller(a: LogicalPlan, b: LogicalPlan): Boolean = {
+    a.stats.sizeInBytes * 3 <= b.stats.sizeInBytes
   }
 
   private def getBuildSide(

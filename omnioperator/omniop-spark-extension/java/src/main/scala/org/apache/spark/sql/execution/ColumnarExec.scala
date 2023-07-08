@@ -18,10 +18,8 @@
 package org.apache.spark.sql.execution
 
 import java.util.concurrent.TimeUnit.NANOSECONDS
-
 import scala.collection.JavaConverters._
 import scala.collection.mutable.ListBuffer
-
 import org.apache.spark.broadcast
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
@@ -31,9 +29,8 @@ import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.metric.{SQLMetric, SQLMetrics}
 import org.apache.spark.sql.execution.util.SparkMemoryUtils
 import org.apache.spark.sql.execution.vectorized.{OffHeapColumnVector, OmniColumnVector, WritableColumnVector}
-import org.apache.spark.sql.types.{BooleanType, ByteType, CalendarIntervalType, DataType, DateType, DecimalType, DoubleType, IntegerType, LongType, ShortType, StringType, StructType, TimestampType}
+import org.apache.spark.sql.types.{BinaryType, BooleanType, ByteType, CalendarIntervalType, DataType, DateType, DecimalType, DoubleType, IntegerType, LongType, ShortType, StringType, StructType, TimestampType}
 import org.apache.spark.sql.vectorized.ColumnarBatch
-
 import nova.hetu.omniruntime.vector.Vec
 
 /**
@@ -101,6 +98,7 @@ private object OmniRowToColumnConverter {
 
   private def getConverterForType(dataType: DataType, nullable: Boolean): TypeConverter = {
     val core = dataType match {
+      case BinaryType => BinaryConverter
       case BooleanType => BooleanConverter
       case ByteType => ByteConverter
       case ShortType => ShortConverter
@@ -120,6 +118,13 @@ private object OmniRowToColumnConverter {
       }
     } else {
       core
+    }
+  }
+
+  private object BinaryConverter extends TypeConverter {
+    override def append(row: SpecializedGetters, column: Int, cv: WritableColumnVector): Unit = {
+      val bytes = row.getBinary(column)
+      cv.appendByteArray(bytes, 0, bytes.length)
     }
   }
 
@@ -232,8 +237,11 @@ case class RowToOmniColumnarExec(child: SparkPlan) extends RowToColumnarTransiti
     "rowToOmniColumnarTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in row to OmniColumnar")
   )
 
+  override protected def withNewChildInternal(newChild: SparkPlan): RowToOmniColumnarExec =
+    copy(child = newChild)
+
   override def doExecuteColumnar(): RDD[ColumnarBatch] = {
-    val enableOffHeapColumnVector = sqlContext.conf.offHeapColumnVectorEnabled
+    val enableOffHeapColumnVector = session.sqlContext.conf.offHeapColumnVectorEnabled
     val numInputRows = longMetric("numInputRows")
     val numOutputBatches = longMetric("numOutputBatches")
     val rowToOmniColumnarTime = longMetric("rowToOmniColumnarTime")
@@ -285,7 +293,8 @@ case class RowToOmniColumnarExec(child: SparkPlan) extends RowToColumnarTransiti
 }
 
 
-case class OmniColumnarToRowExec(child: SparkPlan) extends ColumnarToRowTransition {
+case class OmniColumnarToRowExec(child: SparkPlan,
+                                 mayPartialFetch: Boolean = true) extends ColumnarToRowTransition {
   assert(child.supportsColumnar)
 
   override def nodeName: String = "OmniColumnarToRow"
@@ -302,6 +311,14 @@ case class OmniColumnarToRowExec(child: SparkPlan) extends ColumnarToRowTransiti
     "omniColumnarToRowTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omniColumnar to row")
   )
 
+  override def verboseStringWithOperatorId(): String = {
+    s"""
+       |$formattedNodeName
+       |$simpleStringWithNodeId
+       |${ExplainUtils.generateFieldString("mayPartialFetch", String.valueOf(mayPartialFetch))}
+       |""".stripMargin
+  }
+
   override def doExecute(): RDD[InternalRow] = {
     val numOutputRows = longMetric("numOutputRows")
     val numInputBatches = longMetric("numInputBatches")
@@ -310,16 +327,20 @@ case class OmniColumnarToRowExec(child: SparkPlan) extends ColumnarToRowTransiti
     // plan (this) in the closure.
     val localOutput = this.output
     child.executeColumnar().mapPartitionsInternal { batches =>
-      ColumnarBatchToInternalRow.convert(localOutput, batches, numOutputRows, numInputBatches, omniColumnarToRowTime)
+      ColumnarBatchToInternalRow.convert(localOutput, batches, numOutputRows, numInputBatches, omniColumnarToRowTime, mayPartialFetch)
     }
   }
+
+  override protected def withNewChildInternal(newChild: SparkPlan):
+    OmniColumnarToRowExec = copy(child = newChild)
 }
 
 object ColumnarBatchToInternalRow {
 
   def convert(output: Seq[Attribute], batches: Iterator[ColumnarBatch],
               numOutputRows: SQLMetric, numInputBatches: SQLMetric,
-              rowToOmniColumnarTime: SQLMetric): Iterator[InternalRow] = {
+              rowToOmniColumnarTime: SQLMetric,
+              mayPartialFetch: Boolean = true): Iterator[InternalRow] = {
     val startTime = System.nanoTime()
     val toUnsafe = UnsafeProjection.create(output, output)
 
@@ -345,11 +366,13 @@ object ColumnarBatchToInternalRow {
         val numOutputRowsMetric: SQLMetric = numOutputRows
         var closed = false
 
-        SparkMemoryUtils.addLeakSafeTaskCompletionListener { _ =>
-          // only invoke if fetch partial rows of batch
-          if (!closed) {
-            toClosedVecs.foreach {vec =>
-              vec.close()
+        // only invoke if fetch partial rows of batch
+        if (mayPartialFetch) {
+          SparkMemoryUtils.addLeakSafeTaskCompletionListener { _ =>
+            if (!closed) {
+              toClosedVecs.foreach {vec =>
+                vec.close()
+              }
             }
           }
         }

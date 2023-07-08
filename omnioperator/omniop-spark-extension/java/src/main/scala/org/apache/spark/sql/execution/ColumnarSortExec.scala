@@ -56,6 +56,9 @@ case class ColumnarSortExec(
 
   override def outputPartitioning: Partitioning = child.outputPartitioning
 
+  override protected def withNewChildInternal(newChild: SparkPlan): ColumnarSortExec =
+    copy(child = newChild)
+
   override def requiredChildDistribution: Seq[Distribution] =
     if (global) OrderedDistribution(sortOrder) :: Nil else UnspecifiedDistribution :: Nil
 

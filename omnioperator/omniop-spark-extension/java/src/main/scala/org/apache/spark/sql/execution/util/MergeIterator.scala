@@ -57,8 +57,7 @@ class MergeIterator(iter: Iterator[ColumnarBatch], localSchema: StructType,
           vecs(index) = new BooleanVec(columnSize)
         case StringType =>
           val vecType: DataType = sparkTypeToOmniType(field.dataType, field.metadata)
-          vecs(index) = new VarcharVec(vecType.asInstanceOf[VarcharDataType].getWidth * columnSize,
-            columnSize)
+          vecs(index) = new VarcharVec(columnSize)
         case dt: DecimalType =>
           if (DecimalType.is64BitDecimalType(dt)) {
             vecs(index) = new LongVec(columnSize)
@@ -98,6 +97,8 @@ class MergeIterator(iter: Iterator[ColumnarBatch], localSchema: StructType,
         src.close()
       }
     }
+    // close bufferedBatch
+    bufferedBatch.foreach(batch => batch.close())
   }
 
   private def flush(): Unit = {

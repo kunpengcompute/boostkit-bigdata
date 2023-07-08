@@ -22,7 +22,7 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.Attribute
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution._
-import org.apache.spark.sql.execution.adaptive.{BroadcastQueryStageExec, CustomShuffleReaderExec}
+import org.apache.spark.sql.execution.adaptive.{BroadcastQueryStageExec, OmniAQEShuffleReadExec}
 import org.apache.spark.sql.execution.aggregate.HashAggregateExec
 import org.apache.spark.sql.execution.exchange.{BroadcastExchangeExec, ReusedExchangeExec, ShuffleExchangeExec}
 import org.apache.spark.sql.execution.joins._
@@ -37,6 +37,9 @@ case class RowGuard(child: SparkPlan) extends SparkPlan {
   }
 
   def children: Seq[SparkPlan] = Seq(child)
+
+  override protected def withNewChildrenInternal(newChildren: IndexedSeq[SparkPlan]): SparkPlan =
+    legacyWithNewChildren(newChildren)
 }
 
 case class ColumnarGuardRule() extends Rule[SparkPlan] {
@@ -127,9 +130,9 @@ case class ColumnarGuardRule() extends Rule[SparkPlan] {
           left match {
             case exec: BroadcastExchangeExec =>
               new ColumnarBroadcastExchangeExec(exec.mode, exec.child)
-            case BroadcastQueryStageExec(_, plan: BroadcastExchangeExec) =>
+            case BroadcastQueryStageExec(_, plan: BroadcastExchangeExec, _) =>
               new ColumnarBroadcastExchangeExec(plan.mode, plan.child)
-            case BroadcastQueryStageExec(_, plan: ReusedExchangeExec) =>
+            case BroadcastQueryStageExec(_, plan: ReusedExchangeExec, _) =>
               plan match {
                 case ReusedExchangeExec(_, b: BroadcastExchangeExec) =>
                   new ColumnarBroadcastExchangeExec(b.mode, b.child)
@@ -141,9 +144,9 @@ case class ColumnarGuardRule() extends Rule[SparkPlan] {
           right match {
             case exec: BroadcastExchangeExec =>
               new ColumnarBroadcastExchangeExec(exec.mode, exec.child)
-            case BroadcastQueryStageExec(_, plan: BroadcastExchangeExec) =>
+            case BroadcastQueryStageExec(_, plan: BroadcastExchangeExec, _) =>
               new ColumnarBroadcastExchangeExec(plan.mode, plan.child)
-            case BroadcastQueryStageExec(_, plan: ReusedExchangeExec) =>
+            case BroadcastQueryStageExec(_, plan: ReusedExchangeExec, _) =>
               plan match {
                 case ReusedExchangeExec(_, b: BroadcastExchangeExec) =>
                   new ColumnarBroadcastExchangeExec(b.mode, b.child)
@@ -182,7 +185,8 @@ case class ColumnarGuardRule() extends Rule[SparkPlan] {
             plan.buildSide,
             plan.condition,
             plan.left,
-            plan.right).buildCheck()
+            plan.right,
+            plan.isSkewJoin).buildCheck()
         case plan: BroadcastNestedLoopJoinExec => return false
         case p =>
           p
@@ -237,7 +241,7 @@ case class ColumnarGuardRule() extends Rule[SparkPlan] {
       case p if !supportCodegen(p) =>
         // insert row guard them recursively
         p.withNewChildren(p.children.map(insertRowGuardOrNot))
-      case p: CustomShuffleReaderExec =>
+      case p: OmniAQEShuffleReadExec =>
         p.withNewChildren(p.children.map(insertRowGuardOrNot))
       case p: BroadcastQueryStageExec =>
         p

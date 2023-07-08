@@ -46,9 +46,15 @@ case class ColumnarWindowExec(windowExpression: Seq[NamedExpression],
                               orderSpec: Seq[SortOrder], child: SparkPlan)
   extends WindowExecBase {
 
+  override def output: Seq[Attribute] =
+    child.output ++ windowExpression.map(_.toAttribute)
+
   override def nodeName: String = "OmniColumnarWindow"
 
   override def supportsColumnar: Boolean = true
+
+  override protected def withNewChildInternal(newChild: SparkPlan): ColumnarWindowExec =
+    copy(child = newChild)
 
   override lazy val metrics = Map(
     "addInputTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni addInput"),
@@ -58,25 +64,6 @@ case class ColumnarWindowExec(windowExpression: Seq[NamedExpression],
     "getOutputTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni getOutput"),
     "numOutputRows" -> SQLMetrics.createMetric(sparkContext, "number of output rows"),
     "numOutputVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatchs"))
-
-  override def output: Seq[Attribute] =
-    child.output ++ windowExpression.map(_.toAttribute)
-
-  override def requiredChildDistribution: Seq[Distribution] = {
-    if (partitionSpec.isEmpty) {
-      // Only show warning when the number of bytes is larger than 100 MiB?
-      logWarning("No Partition Defined for Window operation! Moving all data to a single "
-        + "partition, this can cause serious performance degradation.")
-      AllTuples :: Nil
-    } else ClusteredDistribution(partitionSpec) :: Nil
-  }
-
-  override def requiredChildOrdering: Seq[Seq[SortOrder]] =
-    Seq(partitionSpec.map(SortOrder(_, Ascending)) ++ orderSpec)
-
-  override def outputOrdering: Seq[SortOrder] = child.outputOrdering
-
-  override def outputPartitioning: Partitioning = child.outputPartitioning
 
   override protected def doExecute(): RDD[InternalRow] = {
     throw new UnsupportedOperationException(s"This operator doesn't support doExecute().")
@@ -217,7 +204,7 @@ case class ColumnarWindowExec(windowExpression: Seq[NamedExpression],
     val winExpressions: Seq[Expression] = windowFrameExpressionFactoryPairs.flatMap(_._1)
     val windowFunType = new Array[FunctionType](winExpressions.size)
     val omminPartitionChannels = new Array[Int](partitionSpec.size)
-    val preGroupedChannels = new Array[Int](winExpressions.size)
+    val preGroupedChannels = new Array[Int](0)
     var windowArgKeys = new Array[String](winExpressions.size)
     val windowFunRetType = new Array[DataType](winExpressions.size)
     val omniAttrExpsIdMap = getExprIdMap(child.output)

@@ -25,7 +25,7 @@ import com.huawei.boostkit.spark.Constant.IS_SKIP_VERIFY_EXP
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor.{checkOmniJsonWhiteList, isSimpleColumn, isSimpleColumnForAll}
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil
-import com.huawei.boostkit.spark.util.OmniAdaptorUtil.transColBatchToOmniVecs
+import com.huawei.boostkit.spark.util.OmniAdaptorUtil.{getIndexArray, pruneOutput, reorderVecs, transColBatchToOmniVecs}
 import nova.hetu.omniruntime.`type`.DataType
 import nova.hetu.omniruntime.operator.config.{OperatorConfig, OverflowConfig, SpillConfig}
 import nova.hetu.omniruntime.operator.join.{OmniHashBuilderWithExprOperatorFactory, OmniLookupJoinWithExprOperatorFactory}
@@ -39,7 +39,7 @@ import org.apache.spark.sql.catalyst.expressions.codegen._
 import org.apache.spark.sql.catalyst.optimizer.{BuildLeft, BuildRight, BuildSide}
 import org.apache.spark.sql.catalyst.plans._
 import org.apache.spark.sql.catalyst.plans.physical._
-import org.apache.spark.sql.execution.{CodegenSupport, ColumnarHashedRelation, SparkPlan}
+import org.apache.spark.sql.execution.{CodegenSupport, ColumnarHashedRelation, ExplainUtils, SparkPlan}
 import org.apache.spark.sql.execution.metric.SQLMetrics
 import org.apache.spark.sql.execution.util.{MergeIterator, SparkMemoryUtils}
 import org.apache.spark.sql.execution.vectorized.OmniColumnVector
@@ -64,6 +64,24 @@ case class ColumnarBroadcastHashJoinExec(
     isNullAwareAntiJoin: Boolean = false,
     projectList: Seq[NamedExpression] = Seq.empty)
   extends HashJoin {
+
+  override def verboseStringWithOperatorId(): String = {
+    val joinCondStr = if (condition.isDefined) {
+      s"${condition.get}${condition.get.dataType}"
+    } else "None"
+    s"""
+       |$formattedNodeName
+       |$simpleStringWithNodeId
+       |${ExplainUtils.generateFieldString("buildOutput", buildOutput ++ buildOutput.map(_.dataType))}
+       |${ExplainUtils.generateFieldString("streamedOutput", streamedOutput ++ streamedOutput.map(_.dataType))}
+       |${ExplainUtils.generateFieldString("leftKeys", leftKeys ++ leftKeys.map(_.dataType))}
+       |${ExplainUtils.generateFieldString("rightKeys", rightKeys ++ rightKeys.map(_.dataType))}
+       |${ExplainUtils.generateFieldString("condition", joinCondStr)}
+       |${ExplainUtils.generateFieldString("projectList", projectList.map(_.toAttribute) ++ projectList.map(_.toAttribute).map(_.dataType))}
+       |${ExplainUtils.generateFieldString("output", output ++ output.map(_.dataType))}
+       |Condition : $condition
+       |""".stripMargin
+  }
 
   if (isNullAwareAntiJoin) {
     require(leftKeys.length == 1, "leftKeys length should be 1")
@@ -97,6 +115,9 @@ case class ColumnarBroadcastHashJoinExec(
 
   override def nodeName: String = "OmniColumnarBroadcastHashJoin"
 
+  override protected def withNewChildrenInternal(newLeft: SparkPlan, newRight: SparkPlan):
+    ColumnarBroadcastHashJoinExec = copy(left = newLeft, right = newRight)
+
   override def requiredChildDistribution: Seq[Distribution] = {
     val mode = HashedRelationBroadcastMode(buildBoundKeys, isNullAwareAntiJoin)
     buildSide match {
@@ -109,7 +130,7 @@ case class ColumnarBroadcastHashJoinExec(
 
   override lazy val outputPartitioning: Partitioning = {
     joinType match {
-      case Inner if sqlContext.conf.broadcastHashJoinOutputPartitioningExpandLimit > 0 =>
+      case Inner if session.sqlContext.conf.broadcastHashJoinOutputPartitioningExpandLimit > 0 =>
         streamedPlan.outputPartitioning match {
           case h: HashPartitioning => expandOutputPartitioning(h)
           case c: PartitioningCollection => expandOutputPartitioning(c)
@@ -150,7 +171,7 @@ case class ColumnarBroadcastHashJoinExec(
   // Seq("a", "b", "c"), Seq("a", "b", "y"), Seq("a", "x", "c"), Seq("a", "x", "y").
   // The expanded expressions are returned as PartitioningCollection.
   private def expandOutputPartitioning(partitioning: HashPartitioning): PartitioningCollection = {
-    val maxNumCombinations = sqlContext.conf.broadcastHashJoinOutputPartitioningExpandLimit
+    val maxNumCombinations = session.sqlContext.conf.broadcastHashJoinOutputPartitioningExpandLimit
     var currentNumCombinations = 0
 
     def generateExprCombinations(
@@ -315,22 +336,6 @@ case class ColumnarBroadcastHashJoinExec(
       val buildOp = buildOpFactory.createOperator()
       buildCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startBuildCodegen)
 
-      // close operator
-      SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
-        buildOp.close()
-        buildOpFactory.close()
-      })
-
-      val deserializer = VecBatchSerializerFactory.create()
-      relation.value.buildData.foreach { input =>
-        val startBuildInput = System.nanoTime()
-        buildOp.addInput(deserializer.deserialize(input))
-        buildAddInputTime += NANOSECONDS.toMillis(System.nanoTime() - startBuildInput)
-      }
-      val startBuildGetOp = System.nanoTime()
-      buildOp.getOutput
-      buildGetOutputTime += NANOSECONDS.toMillis(System.nanoTime() - startBuildGetOp)
-
       val startLookupCodegen = System.nanoTime()
       val lookupJoinType = OmniExpressionAdaptor.toOmniJoinType(joinType)
       val lookupOpFactory = new OmniLookupJoinWithExprOperatorFactory(probeTypes, probeOutputCols,
@@ -343,8 +348,20 @@ case class ColumnarBroadcastHashJoinExec(
       // close operator
       SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
         lookupOp.close()
+        buildOp.close()
         lookupOpFactory.close()
+        buildOpFactory.close()
       })
+
+      val deserializer = VecBatchSerializerFactory.create()
+      relation.value.buildData.foreach { input =>
+        val startBuildInput = System.nanoTime()
+        buildOp.addInput(deserializer.deserialize(input))
+        buildAddInputTime += NANOSECONDS.toMillis(System.nanoTime() - startBuildInput)
+      }
+      val startBuildGetOp = System.nanoTime()
+      buildOp.getOutput
+      buildGetOutputTime += NANOSECONDS.toMillis(System.nanoTime() - startBuildGetOp)
 
       val streamedPlanOutput = pruneOutput(streamedPlan.output, projectList)
       val prunedOutput = streamedPlanOutput ++ prunedBuildOutput
@@ -422,9 +439,11 @@ case class ColumnarBroadcastHashJoinExec(
               index += 1
             }
           }
-          numOutputRows += result.getRowCount
+          val rowCnt: Int = result.getRowCount
+          numOutputRows += rowCnt
           numOutputVecBatchs += 1
-          new ColumnarBatch(vecs.toArray, result.getRowCount)
+          result.close()
+          new ColumnarBatch(vecs.toArray, rowCnt)
         }
       }
 

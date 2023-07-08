@@ -37,10 +37,10 @@ int Splitter::ComputeAndCountPartitionId(VectorBatch& vb) {
             partition_id_[i] = 0;
         }
     } else {
-        IntVector* hashVct =  static_cast<IntVector *>(vb.GetVector(0));
+        auto hash_vct = reinterpret_cast<Vector<int32_t> *>(vb.Get(0));
         for (auto i = 0; i < num_rows; ++i) {
             // positive mod
-            int32_t pid =  hashVct->GetValue(i);
+            int32_t pid = hash_vct->GetValue(i);
             if (pid >= num_partitions_) {
                 LogsError(" Illegal pid Value: %d >= partition number %d .", pid, num_partitions_);
                 throw std::runtime_error("Shuffle pidVec Illegal pid Value!");
@@ -76,7 +76,7 @@ int Splitter::AllocatePartitionBuffers(int32_t partition_id, int32_t new_size) {
             case SHUFFLE_8BYTE:
             case SHUFFLE_DECIMAL128:
             default: {
-                void *ptr_tmp = static_cast<void *>(options_.allocator->alloc(new_size * (1 << column_type_id_[i])));
+                void *ptr_tmp = static_cast<void *>(options_.allocator->Alloc(new_size * (1 << column_type_id_[i])));
                 fixed_valueBuffer_size_[partition_id] = new_size * (1 << column_type_id_[i]);
                 if (nullptr == ptr_tmp) {
                     throw std::runtime_error("Allocator for AllocatePartitionBuffers Failed! ");
@@ -128,15 +128,12 @@ int Splitter::SplitFixedWidthValueBuffer(VectorBatch& vb) {
         auto col_idx_vb = fixed_width_array_idx_[col];
         auto col_idx_schema = singlePartitionFlag ? col_idx_vb : (col_idx_vb - 1);
         const auto& dst_addrs =  partition_fixed_width_value_addrs_[col];
-        if (vb.GetVector(col_idx_vb)->GetEncoding() == OMNI_VEC_ENCODING_DICTIONARY) {
+        if (vb.Get(col_idx_vb)->GetEncoding() == OMNI_DICTIONARY) {
             LogsDebug("Dictionary Columnar process!");
-            auto ids_tmp =  static_cast<int32_t *>(options_.allocator->alloc(num_rows * sizeof(int32_t)));
-            Buffer *ids (new Buffer((uint8_t*)ids_tmp, 0, num_rows * sizeof(int32_t)));
-            if (ids->data_ == nullptr) {
-                throw std::runtime_error("Allocator for SplitFixedWidthValueBuffer ids Failed! ");
-            }
-            auto dictionaryTmp = ((DictionaryVector *)(vb.GetVector(col_idx_vb)))->ExtractDictionaryAndIds(0, num_rows, (int32_t *)(ids->data_));
-            auto src_addr = VectorHelper::GetValuesAddr(dictionaryTmp);
+
+            DataTypeId type_id = vector_batch_col_types_.at(col_idx_schema);
+            auto ids_addr = VectorHelper::UnsafeGetValues(vb.Get(col_idx_vb), type_id);
+            auto src_addr = reinterpret_cast<int64_t>(VectorHelper::UnsafeGetDictionary(vb.Get(col_idx_vb), type_id));
             switch (column_type_id_[col_idx_schema]) {
 #define PROCESS(SHUFFLE_TYPE, CTYPE)                                                           \
     case SHUFFLE_TYPE:                                                                         \
@@ -145,8 +142,8 @@ int Splitter::SplitFixedWidthValueBuffer(VectorBatch& vb) {
             auto dst_offset =                                                                  \
                 partition_buffer_idx_base_[pid] + partition_buffer_idx_offset_[pid];           \
             reinterpret_cast<CTYPE*>(dst_addrs[pid])[dst_offset] =                             \
-            reinterpret_cast<CTYPE*>(src_addr)[reinterpret_cast<int32_t*>(ids->data_)[row]];   \
-            partition_fixed_width_buffers_[col][pid][1]->size_ += (1 << SHUFFLE_TYPE);          \
+            reinterpret_cast<CTYPE*>(src_addr)[reinterpret_cast<int32_t *>(ids_addr)[row]];    \
+            partition_fixed_width_buffers_[col][pid][1]->size_ += (1 << SHUFFLE_TYPE);         \
             partition_buffer_idx_offset_[pid]++;                                               \
         }                                                                                      \
     break;
@@ -160,10 +157,12 @@ int Splitter::SplitFixedWidthValueBuffer(VectorBatch& vb) {
                         auto pid =  partition_id_[row];
                         auto dst_offset =
                                 partition_buffer_idx_base_[pid] + partition_buffer_idx_offset_[pid];
+                        // 前64位取值、赋值
                         reinterpret_cast<uint64_t*>(dst_addrs[pid])[dst_offset << 1] =
-                        reinterpret_cast<uint64_t*>(src_addr)[reinterpret_cast<int32_t *>(ids->data_)[row] << 1]; // 前64位取值、赋值
-                        reinterpret_cast<uint64_t*>(dst_addrs[pid])[dst_offset << 1 | 1] =
-                        reinterpret_cast<uint64_t*>(src_addr)[reinterpret_cast<int32_t *>(ids->data_)[row] << 1 | 1]; // 后64位取值、赋值
+                        reinterpret_cast<uint64_t*>(src_addr)[reinterpret_cast<int32_t *>(ids_addr)[row] << 1];
+                        // 后64位取值、赋值
+                        reinterpret_cast<uint64_t*>(dst_addrs[pid])[(dst_offset << 1) | 1] =
+                        reinterpret_cast<uint64_t*>(src_addr)[(reinterpret_cast<int32_t *>(ids_addr)[row] << 1) | 1];
                         partition_fixed_width_buffers_[col][pid][1]->size_ +=
                                 (1 << SHUFFLE_DECIMAL128); //decimal128 16Bytes
                         partition_buffer_idx_offset_[pid]++;
@@ -174,13 +173,9 @@ int Splitter::SplitFixedWidthValueBuffer(VectorBatch& vb) {
                     throw std::runtime_error("SplitFixedWidthValueBuffer not match this type: " + column_type_id_[col_idx_schema]);
                 }
             }
-            options_.allocator->free(ids->data_, ids->capacity_);
-            if (nullptr == ids) {
-                throw std::runtime_error("delete nullptr error for ids");
-            }
-            delete ids;
         } else {
-            auto src_addr = VectorHelper::GetValuesAddr(vb.GetVector(col_idx_vb));
+            DataTypeId type_id = vector_batch_col_types_.at(col_idx_schema);
+            auto src_addr = reinterpret_cast<int64_t>(VectorHelper::UnsafeGetValues(vb.Get(col_idx_vb), type_id));
             switch (column_type_id_[col_idx_schema]) {
 #define PROCESS(SHUFFLE_TYPE, CTYPE)                                                           \
     case SHUFFLE_TYPE:                                                                         \
@@ -225,54 +220,65 @@ int Splitter::SplitFixedWidthValueBuffer(VectorBatch& vb) {
 
 int Splitter::SplitBinaryArray(VectorBatch& vb)
 {
-    const auto numRows = vb.GetRowCount();
-    auto vecCntVb = vb.GetVectorCount();
-    auto vecCntSchema = singlePartitionFlag ? vecCntVb : vecCntVb - 1;
-    for (auto colSchema = 0; colSchema < vecCntSchema; ++colSchema) {
-        switch (column_type_id_[colSchema]) {
+    const auto num_rows = vb.GetRowCount();
+    auto vec_cnt_vb = vb.GetVectorCount();
+    auto vec_cnt_schema = singlePartitionFlag ? vec_cnt_vb : vec_cnt_vb - 1;
+    for (auto col_schema = 0; col_schema < vec_cnt_schema; ++col_schema) {
+        switch (column_type_id_[col_schema]) {
             case SHUFFLE_BINARY: {
-                auto colVb = singlePartitionFlag ? colSchema : colSchema + 1;
-                varcharVectorCache.insert(vb.GetVector(colVb)); // record varchar vector for release
-                if (vb.GetVector(colVb)->GetEncoding() == OMNI_VEC_ENCODING_DICTIONARY) {
-                    for (auto row = 0; row < numRows; ++row) {
+                auto col_vb = singlePartitionFlag ? col_schema : col_schema + 1;
+                varcharVectorCache.insert(vb.Get(col_vb));
+                if (vb.Get(col_vb)->GetEncoding() == OMNI_DICTIONARY) {
+                    auto vc = reinterpret_cast<Vector<DictionaryContainer<std::string_view, LargeStringContainer>> *>(
+                            vb.Get(col_vb));
+                    for (auto row = 0; row < num_rows; ++row) {
                         auto pid = partition_id_[row];
                         uint8_t *dst = nullptr;
-                        auto str_len = ((DictionaryVector *)(vb.GetVector(colVb)))->GetVarchar(row, &dst);
-                        bool isnull = ((DictionaryVector *)(vb.GetVector(colVb)))->IsValueNull(row);
+                        uint32_t str_len = 0;
+                        if (!vc->IsNull(row)) {
+                            std::string_view value = vc->GetValue(row);
+                            dst = reinterpret_cast<uint8_t *>(reinterpret_cast<int64_t>(value.data()));
+                            str_len = static_cast<uint32_t>(value.length());
+                        }
+                        bool is_null = vc->IsNull(row);
                         cached_vectorbatch_size_ += str_len; // 累计变长部分cache数据
-                        VCLocation cl((uint64_t) dst, str_len, isnull);
-                        if ((vc_partition_array_buffers_[pid][colSchema].size() != 0) &&
-                            (vc_partition_array_buffers_[pid][colSchema].back().getVcList().size() <
+                        VCLocation cl((uint64_t) dst, str_len, is_null);
+                        if ((vc_partition_array_buffers_[pid][col_schema].size() != 0) &&
+                            (vc_partition_array_buffers_[pid][col_schema].back().getVcList().size() <
                             options_.spill_batch_row_num)) {
-                            vc_partition_array_buffers_[pid][colSchema].back().getVcList().push_back(cl);
-                            vc_partition_array_buffers_[pid][colSchema].back().vcb_total_len += str_len;
+                            vc_partition_array_buffers_[pid][col_schema].back().getVcList().push_back(cl);
+                            vc_partition_array_buffers_[pid][col_schema].back().vcb_total_len += str_len;
                         } else {
                             VCBatchInfo svc(options_.spill_batch_row_num);
                             svc.getVcList().push_back(cl);
                             svc.vcb_total_len += str_len;
-                            vc_partition_array_buffers_[pid][colSchema].push_back(svc);
+                            vc_partition_array_buffers_[pid][col_schema].push_back(svc);
                         }
                     }
                 } else {
-                    VarcharVector *vc = nullptr;
-                    vc = static_cast<VarcharVector *>(vb.GetVector(colVb));
-                    for (auto row = 0; row < numRows; ++row) {
+                    auto vc = reinterpret_cast<Vector<LargeStringContainer<std::string_view>> *>(vb.Get(col_vb));
+                    for (auto row = 0; row < num_rows; ++row) {
                         auto pid = partition_id_[row];
                         uint8_t *dst = nullptr;
-                        int str_len = vc->GetValue(row, &dst);
-                        bool isnull = vc->IsValueNull(row);
+                        uint32_t str_len = 0;
+                        if (!vc->IsNull(row)) {
+                            std::string_view value = vc->GetValue(row);
+                            dst = reinterpret_cast<uint8_t *>(reinterpret_cast<int64_t>(value.data()));
+                            str_len = static_cast<uint32_t>(value.length());
+                        }
+                        bool is_null = vc->IsNull(row);
                         cached_vectorbatch_size_ += str_len; // 累计变长部分cache数据
-                        VCLocation cl((uint64_t) dst, str_len, isnull);
-                        if ((vc_partition_array_buffers_[pid][colSchema].size() != 0) &&
-                            (vc_partition_array_buffers_[pid][colSchema].back().getVcList().size() <
+                        VCLocation cl((uint64_t) dst, str_len, is_null);
+                        if ((vc_partition_array_buffers_[pid][col_schema].size() != 0) &&
+                            (vc_partition_array_buffers_[pid][col_schema].back().getVcList().size() <
                             options_.spill_batch_row_num)) {
-                            vc_partition_array_buffers_[pid][colSchema].back().getVcList().push_back(cl);
-                            vc_partition_array_buffers_[pid][colSchema].back().vcb_total_len += str_len;
+                            vc_partition_array_buffers_[pid][col_schema].back().getVcList().push_back(cl);
+                            vc_partition_array_buffers_[pid][col_schema].back().vcb_total_len += str_len;
                         } else {
                             VCBatchInfo svc(options_.spill_batch_row_num);
                             svc.getVcList().push_back(cl);
                             svc.vcb_total_len += str_len;
-                            vc_partition_array_buffers_[pid][colSchema].push_back(svc);
+                            vc_partition_array_buffers_[pid][col_schema].push_back(svc);
                         }
                     }
                 }
@@ -297,7 +303,7 @@ int Splitter::SplitFixedWidthValidityBuffer(VectorBatch& vb){
             if (partition_id_cnt_cur_[pid] > 0 && dst_addrs[pid] == nullptr) {
                 // init bitmap if it's null
                 auto new_size = partition_id_cnt_cur_[pid] > options_.buffer_size ? partition_id_cnt_cur_[pid] : options_.buffer_size;
-                auto ptr_tmp = static_cast<uint8_t *>(options_.allocator->alloc(new_size));
+                auto ptr_tmp = static_cast<uint8_t *>(options_.allocator->Alloc(new_size));
                 if (nullptr == ptr_tmp) {
                     throw std::runtime_error("Allocator for ValidityBuffer Failed! ");
                 }
@@ -310,7 +316,8 @@ int Splitter::SplitFixedWidthValidityBuffer(VectorBatch& vb){
         }
 
         // 计算并填充数据
-        auto src_addr = const_cast<uint8_t*>((uint8_t*)(VectorHelper::GetNullsAddr(vb.GetVector(col_idx))));
+        auto src_addr = const_cast<uint8_t *>((uint8_t *)(
+                reinterpret_cast<int64_t>(omniruntime::vec::unsafe::UnsafeBaseVector::GetNulls(vb.Get(col_idx)))));
         std::fill(std::begin(partition_buffer_idx_offset_),
                 std::end(partition_buffer_idx_offset_), 0);
         const auto num_rows = vb.GetRowCount();
@@ -550,7 +557,7 @@ int Splitter::Split(VectorBatch& vb )
 }
 
 std::shared_ptr<Buffer> Splitter::CaculateSpilledTmpFilePartitionOffsets() {
-    void *ptr_tmp = static_cast<void *>(options_.allocator->alloc((num_partitions_ + 1) * sizeof(uint64_t)));
+    void *ptr_tmp = static_cast<void *>(options_.allocator->Alloc((num_partitions_ + 1) * sizeof(uint64_t)));
     if (nullptr == ptr_tmp) {
         throw std::runtime_error("Allocator for partitionOffsets Failed! ");
     }
@@ -606,7 +613,7 @@ spark::VecType::VecTypeId CastShuffleTypeIdToVecType(int32_t tmpType) {
             return spark::VecType::VEC_TYPE_CHAR;
         case OMNI_CONTAINER:
             return spark::VecType::VEC_TYPE_CONTAINER;
-        case OMNI_INVALID:
+        case DataTypeId::OMNI_INVALID:
             return spark::VecType::VEC_TYPE_INVALID;
         default: {
             throw std::runtime_error("castShuffleTypeIdToVecType() unexpected ShuffleTypeId");
@@ -625,9 +632,9 @@ void Splitter::SerializingFixedColumns(int32_t partitionId,
         colIndexTmpSchema = singlePartitionFlag ? fixed_width_array_idx_[fixColIndexTmp] : fixed_width_array_idx_[fixColIndexTmp] - 1;
         auto onceCopyLen = splitRowInfoTmp->onceCopyRow * (1 << column_type_id_[colIndexTmpSchema]);
         // 临时内存，拷贝拼接onceCopyRow批，用完释放
-        void *ptr_value_tmp = static_cast<void *>(options_.allocator->alloc(onceCopyLen));
+        void *ptr_value_tmp = static_cast<void *>(options_.allocator->Alloc(onceCopyLen));
         std::shared_ptr<Buffer> ptr_value (new Buffer((uint8_t*)ptr_value_tmp, 0, onceCopyLen));
-        void *ptr_validity_tmp = static_cast<void *>(options_.allocator->alloc(splitRowInfoTmp->onceCopyRow));
+        void *ptr_validity_tmp = static_cast<void *>(options_.allocator->Alloc(splitRowInfoTmp->onceCopyRow));
         std::shared_ptr<Buffer> ptr_validity (new Buffer((uint8_t*)ptr_validity_tmp, 0, splitRowInfoTmp->onceCopyRow));
         if (nullptr == ptr_value->data_ || nullptr == ptr_validity->data_) {
             throw std::runtime_error("Allocator for tmp buffer Failed! ");
@@ -659,9 +666,9 @@ void Splitter::SerializingFixedColumns(int32_t partitionId,
                        partition_cached_vectorbatch_[partitionId][splitRowInfoTmp->cacheBatchIndex[fixColIndexTmp]][fixColIndexTmp][0]->data_ + (splitRowInfoTmp->cacheBatchCopyedLen[fixColIndexTmp] / (1 << column_type_id_[colIndexTmpSchema])),
                        memCopyLen / (1 << column_type_id_[colIndexTmpSchema]));
                 // 释放内存
-                options_.allocator->free(partition_cached_vectorbatch_[partitionId][splitRowInfoTmp->cacheBatchIndex[fixColIndexTmp]][fixColIndexTmp][0]->data_,
+                options_.allocator->Free(partition_cached_vectorbatch_[partitionId][splitRowInfoTmp->cacheBatchIndex[fixColIndexTmp]][fixColIndexTmp][0]->data_,
                                          partition_cached_vectorbatch_[partitionId][splitRowInfoTmp->cacheBatchIndex[fixColIndexTmp]][fixColIndexTmp][0]->capacity_);
-                options_.allocator->free(partition_cached_vectorbatch_[partitionId][splitRowInfoTmp->cacheBatchIndex[fixColIndexTmp]][fixColIndexTmp][1]->data_,
+                options_.allocator->Free(partition_cached_vectorbatch_[partitionId][splitRowInfoTmp->cacheBatchIndex[fixColIndexTmp]][fixColIndexTmp][1]->data_,
                                          partition_cached_vectorbatch_[partitionId][splitRowInfoTmp->cacheBatchIndex[fixColIndexTmp]][fixColIndexTmp][1]->capacity_);
                 destCopyedLength += memCopyLen;
                 splitRowInfoTmp->cacheBatchIndex[fixColIndexTmp] += 1; // cacheBatchIndex下标后移
@@ -688,8 +695,8 @@ void Splitter::SerializingFixedColumns(int32_t partitionId,
         vec.set_values(ptr_value->data_, onceCopyLen);
         vec.set_nulls(ptr_validity->data_, splitRowInfoTmp->onceCopyRow);
         // 临时内存，拷贝拼接onceCopyRow批，用完释放
-        options_.allocator->free(ptr_value->data_, ptr_value->capacity_);
-        options_.allocator->free(ptr_validity->data_, ptr_validity->capacity_);
+        options_.allocator->Free(ptr_value->data_, ptr_value->capacity_);
+        options_.allocator->Free(ptr_validity->data_, ptr_validity->capacity_);
     }
     // partition_cached_vectorbatch_[partition_id][cache_index][col][0]代表ByteMap,
     // partition_cached_vectorbatch_[partition_id][cache_index][col][1]代表value
@@ -869,7 +876,7 @@ int Splitter::DeleteSpilledTmpFile() {
     for (auto &pair : spilled_tmp_files_info_) {
         auto tmpDataFilePath = pair.first + ".data";
         // 释放存储有各个临时文件的偏移数据内存
-        options_.allocator->free(pair.second->data_, pair.second->capacity_);
+        options_.allocator->Free(pair.second->data_, pair.second->capacity_);
         if (IsFileExist(tmpDataFilePath)) {
             remove(tmpDataFilePath.c_str());
         }
@@ -958,6 +965,3 @@ int Splitter::Stop() {
     delete vecBatchProto; //free protobuf vecBatch memory
     return 0;
 }
-
-
-

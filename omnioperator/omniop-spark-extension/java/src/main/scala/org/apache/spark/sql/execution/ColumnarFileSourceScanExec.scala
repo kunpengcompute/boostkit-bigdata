@@ -496,20 +496,35 @@ abstract class BaseColumnarFileSourceScanExec(
     logInfo(s"Planning scan with bin packing, max size: $maxSplitBytes bytes, " +
       s"open cost is considered as scanning $openCostInBytes bytes.")
 
-    val splitFiles = selectedPartitions.flatMap { partition =>
+    // Filter files with bucket pruning if possible
+    val bucketingEnabled = fsRelation.sparkSession.sessionState.conf.bucketingEnabled
+    val shouldProcess: Path => Boolean = optionalBucketSet match {
+      case Some(bucketSet) if bucketingEnabled =>
+        // Do not prune the file if bucket file name is invalid
+        filePath => BucketingUtils.getBucketId(filePath.getName).forall(bucketSet.get)
+      case _ =>
+        _ => true
+    }
+
+    var splitFiles = selectedPartitions.flatMap { partition =>
       partition.files.flatMap { file =>
         // getPath() is very expensive so we only want to call it once in this block:
         val filePath = file.getPath
-        val isSplitable = relation.fileFormat.isSplitable(
-          relation.sparkSession, relation.options, filePath)
-        PartitionedFileUtil.splitFiles(
-          sparkSession = relation.sparkSession,
-          file = file,
-          filePath = filePath,
-          isSplitable = isSplitable,
-          maxSplitBytes = maxSplitBytes,
-          partitionValues = partition.values
-        )
+
+        if (shouldProcess(filePath)) {
+          val isSplitable = relation.fileFormat.isSplitable(
+            relation.sparkSession, relation.options, filePath)
+          PartitionedFileUtil.splitFiles(
+            sparkSession = relation.sparkSession,
+            file = file,
+            filePath = filePath,
+            isSplitable = isSplitable,
+            maxSplitBytes = maxSplitBytes,
+            partitionValues = partition.values
+          )
+        } else {
+          Seq.empty
+        }
       }
     }.sortBy(_.length)(implicitly[Ordering[Long]].reverse)
 
@@ -544,14 +559,19 @@ abstract class BaseColumnarFileSourceScanExec(
     val omniAggFunctionTypes = new Array[FunctionType](agg.aggregateExpressions.size)
     val omniAggOutputTypes = new Array[Array[DataType]](agg.aggregateExpressions.size)
     val omniAggChannels = new Array[Array[String]](agg.aggregateExpressions.size)
+    val omniAggChannelsFilter = new Array[String](agg.aggregateExpressions.size)
 
     var omniAggindex = 0
     for (exp <- agg.aggregateExpressions) {
+      if (exp.filter.isDefined) {
+        omniAggChannelsFilter(omniAggindex) =
+          rewriteToOmniJsonExpressionLiteral(exp.filter.get, attrAggExpsIdMap)
+      }
       if (exp.mode == Final) {
         throw new UnsupportedOperationException(s"Unsupported final aggregate expression in operator fusion, exp: $exp")
       } else if (exp.mode == Partial) {
         exp.aggregateFunction match {
-          case Sum(_) | Min(_) | Average(_) | Max(_) | Count(_) | First(_, _) =>
+          case Sum(_, _) | Min(_) | Average(_, _) | Max(_) | Count(_) | First(_, _) =>
             val aggExp = exp.aggregateFunction.children.head
             omniOutputExressionOrder += {
               exp.aggregateFunction.inputAggBufferAttributes.head.exprId ->
@@ -569,7 +589,7 @@ abstract class BaseColumnarFileSourceScanExec(
         }
       } else if (exp.mode == PartialMerge) {
         exp.aggregateFunction match {
-          case Sum(_) | Min(_) | Average(_) | Max(_) | Count(_) | First(_, _) =>
+          case Sum(_, _) | Min(_) | Average(_, _) | Max(_) | Count(_) | First(_, _) =>
             val aggExp = exp.aggregateFunction.children.head
             omniOutputExressionOrder += {
               exp.aggregateFunction.inputAggBufferAttributes.head.exprId ->
@@ -604,8 +624,8 @@ abstract class BaseColumnarFileSourceScanExec(
       case (attr, i) =>
         omniAggSourceTypes(i) = sparkTypeToOmniType(attr.dataType, attr.metadata)
     }
-    (omniGroupByChanel, omniAggChannels, omniAggSourceTypes, omniAggFunctionTypes, omniAggOutputTypes,
-      omniAggInputRaws, omniAggOutputPartials, resultIdxToOmniResultIdxMap)
+    (omniGroupByChanel, omniAggChannels, omniAggChannelsFilter, omniAggSourceTypes, omniAggFunctionTypes,
+      omniAggOutputTypes, omniAggInputRaws, omniAggOutputPartials, resultIdxToOmniResultIdxMap)
   }
 
   def genProjectOutput(project: ColumnarProjectExec) = {
@@ -834,8 +854,8 @@ case class ColumnarMultipleOperatorExec(
     val omniCodegenTime = longMetric("omniJitTime")
     val getOutputTime = longMetric("outputTime")
 
-    val (omniGroupByChanel, omniAggChannels, omniAggSourceTypes, omniAggFunctionTypes, omniAggOutputTypes,
-    omniAggInputRaw, omniAggOutputPartial, resultIdxToOmniResultIdxMap) = genAggOutput(aggregate)
+    val (omniGroupByChanel, omniAggChannels, omniAggChannelsFilter, omniAggSourceTypes, omniAggFunctionTypes,
+    omniAggOutputTypes, omniAggInputRaw, omniAggOutputPartial, resultIdxToOmniResultIdxMap) = genAggOutput(aggregate)
     val (proj1OmniExpressions, proj1OmniInputTypes) = genProjectOutput(proj1)
     val (buildTypes1, buildJoinColsExp1, joinFilter1, probeTypes1, probeOutputCols1,
     probeHashColsExp1, buildOutputCols1, buildOutputTypes1, relation1) = genJoinOutput(join1)
@@ -857,6 +877,7 @@ case class ColumnarMultipleOperatorExec(
       val aggOperator = OmniAdaptorUtil.getAggOperator(aggregate.groupingExpressions,
         omniGroupByChanel,
         omniAggChannels,
+        omniAggChannelsFilter,
         omniAggSourceTypes,
         omniAggFunctionTypes,
         omniAggOutputTypes,
@@ -1181,8 +1202,8 @@ case class ColumnarMultipleOperatorExec1(
     val omniCodegenTime = longMetric("omniJitTime")
     val getOutputTime = longMetric("outputTime")
 
-    val (omniGroupByChanel, omniAggChannels, omniAggSourceTypes, omniAggFunctionTypes, omniAggOutputTypes,
-    omniAggInputRaw, omniAggOutputPartial, resultIdxToOmniResultIdxMap) = genAggOutput(aggregate)
+    val (omniGroupByChanel, omniAggChannels, omniAggChannelsFilter, omniAggSourceTypes, omniAggFunctionTypes,
+    omniAggOutputTypes, omniAggInputRaw, omniAggOutputPartial, resultIdxToOmniResultIdxMap) = genAggOutput(aggregate)
     val (proj1OmniExpressions, proj1OmniInputTypes) = genProjectOutput(proj1)
     val (buildTypes1, buildJoinColsExp1, joinFilter1, probeTypes1, probeOutputCols1,
     probeHashColsExp1, buildOutputCols1, buildOutputTypes1, relation1, reserved1) = genJoinOutputWithReverse(join1)
@@ -1217,6 +1238,7 @@ case class ColumnarMultipleOperatorExec1(
       val aggOperator = OmniAdaptorUtil.getAggOperator(aggregate.groupingExpressions,
         omniGroupByChanel,
         omniAggChannels,
+        omniAggChannelsFilter,
         omniAggSourceTypes,
         omniAggFunctionTypes,
         omniAggOutputTypes,

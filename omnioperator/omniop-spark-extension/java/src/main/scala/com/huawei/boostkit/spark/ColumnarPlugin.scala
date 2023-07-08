@@ -20,11 +20,11 @@ package com.huawei.boostkit.spark
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{SparkSession, SparkSessionExtensions}
-import org.apache.spark.sql.catalyst.expressions.DynamicPruningSubquery
+import org.apache.spark.sql.catalyst.expressions.{Ascending, DynamicPruningSubquery, SortOrder}
 import org.apache.spark.sql.catalyst.expressions.aggregate.Partial
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.{RowToOmniColumnarExec, _}
-import org.apache.spark.sql.execution.adaptive.{BroadcastQueryStageExec, ColumnarCustomShuffleReaderExec, CustomShuffleReaderExec, QueryStageExec, ShuffleQueryStageExec}
+import org.apache.spark.sql.execution.adaptive.{BroadcastQueryStageExec, OmniAQEShuffleReadExec, AQEShuffleReadExec, QueryStageExec, ShuffleQueryStageExec}
 import org.apache.spark.sql.execution.aggregate.HashAggregateExec
 import org.apache.spark.sql.execution.exchange.{BroadcastExchangeExec, Exchange, ReusedExchangeExec, ShuffleExchangeExec}
 import org.apache.spark.sql.execution.joins._
@@ -122,16 +122,45 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] {
           ColumnarConditionProjectExec(plan.projectList, condition, child)
         case join : ColumnarBroadcastHashJoinExec =>
           if (plan.projectList.forall(project => OmniExpressionAdaptor.isSimpleProjectForAll(project)) && enableColumnarProjectFusion) {
-             ColumnarBroadcastHashJoinExec(
-               join.leftKeys,
-               join.rightKeys,
-               join.joinType,
-               join.buildSide,
-               join.condition,
-               join.left,
-               join.right,
-               join.isNullAwareAntiJoin,
-               plan.projectList)
+            ColumnarBroadcastHashJoinExec(
+              join.leftKeys,
+              join.rightKeys,
+              join.joinType,
+              join.buildSide,
+              join.condition,
+              join.left,
+              join.right,
+              join.isNullAwareAntiJoin,
+              plan.projectList)
+          } else {
+            ColumnarProjectExec(plan.projectList, child)
+          }
+        case join : ColumnarShuffledHashJoinExec =>
+          if (plan.projectList.forall(project => OmniExpressionAdaptor.isSimpleProjectForAll(project)) && enableColumnarProjectFusion) {
+            ColumnarShuffledHashJoinExec(
+              join.leftKeys,
+              join.rightKeys,
+              join.joinType,
+              join.buildSide,
+              join.condition,
+              join.left,
+              join.right,
+              join.isSkewJoin,
+              plan.projectList)
+          } else {
+            ColumnarProjectExec(plan.projectList, child)
+          }
+        case join : ColumnarSortMergeJoinExec =>
+          if (plan.projectList.forall(project => OmniExpressionAdaptor.isSimpleProjectForAll(project)) && enableColumnarProjectFusion) {
+            ColumnarSortMergeJoinExec(
+              join.leftKeys,
+              join.rightKeys,
+              join.joinType,
+              join.condition,
+              join.left,
+              join.right,
+              join.isSkewJoin,
+              plan.projectList)
           } else {
             ColumnarProjectExec(plan.projectList, child)
           }
@@ -311,7 +340,8 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] {
         plan.buildSide,
         plan.condition,
         left,
-        right)
+        right,
+        plan.isSkewJoin)
     case plan: SortMergeJoinExec if enableColumnarSortMergeJoin =>
       logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
       val left = replaceWithColumnarPlan(plan.left)
@@ -332,7 +362,16 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] {
     case plan: WindowExec if enableColumnarWindow =>
       val child = replaceWithColumnarPlan(plan.child)
       logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
-      ColumnarWindowExec(plan.windowExpression, plan.partitionSpec, plan.orderSpec, child)
+      child match {
+        case ColumnarSortExec(sortOrder, _, sortChild, _) =>
+          if (Seq(plan.partitionSpec.map(SortOrder(_, Ascending)) ++ plan.orderSpec) == Seq(sortOrder)) {
+            ColumnarWindowExec(plan.windowExpression, plan.partitionSpec, plan.orderSpec, sortChild)
+          } else {
+            ColumnarWindowExec(plan.windowExpression, plan.partitionSpec, plan.orderSpec, child)
+          }
+        case _ =>
+          ColumnarWindowExec(plan.windowExpression, plan.partitionSpec, plan.orderSpec, child)
+      }
     case plan: UnionExec if enableColumnarUnion =>
       val children = plan.children.map(replaceWithColumnarPlan)
       logDebug(s"Columnar Processing for ${plan.getClass} is currently supported.")
@@ -341,19 +380,19 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] {
       val child = replaceWithColumnarPlan(plan.child)
       logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
       new ColumnarShuffleExchangeExec(plan.outputPartitioning, child, plan.shuffleOrigin)
-    case plan: CustomShuffleReaderExec if columnarConf.enableColumnarShuffle =>
+    case plan: AQEShuffleReadExec if columnarConf.enableColumnarShuffle =>
       plan.child match {
         case shuffle: ColumnarShuffleExchangeExec =>
           logDebug(s"Columnar Processing for ${plan.getClass} is currently supported.")
-          ColumnarCustomShuffleReaderExec(plan.child, plan.partitionSpecs)
-        case ShuffleQueryStageExec(_, shuffle: ColumnarShuffleExchangeExec) =>
+          OmniAQEShuffleReadExec(plan.child, plan.partitionSpecs)
+        case ShuffleQueryStageExec(_, shuffle: ColumnarShuffleExchangeExec, _) =>
           logDebug(s"Columnar Processing for ${plan.getClass} is currently supported.")
-          ColumnarCustomShuffleReaderExec(plan.child, plan.partitionSpecs)
-        case ShuffleQueryStageExec(_, reused: ReusedExchangeExec) =>
+          OmniAQEShuffleReadExec(plan.child, plan.partitionSpecs)
+        case ShuffleQueryStageExec(_, reused: ReusedExchangeExec, _) =>
           reused match {
             case ReusedExchangeExec(_, shuffle: ColumnarShuffleExchangeExec) =>
               logDebug(s"Columnar Processing for ${plan.getClass} is currently supported.")
-              ColumnarCustomShuffleReaderExec(
+              OmniAQEShuffleReadExec(
                 plan.child,
                 plan.partitionSpecs)
             case _ =>
@@ -375,13 +414,15 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] {
           curPlan.id,
           BroadcastExchangeExec(
             originalBroadcastPlan.mode,
-            ColumnarBroadcastExchangeAdaptorExec(originalBroadcastPlan, 1)))
+            ColumnarBroadcastExchangeAdaptorExec(originalBroadcastPlan, 1)),
+          curPlan._canonicalized)
       case ReusedExchangeExec(_, originalBroadcastPlan: ColumnarBroadcastExchangeExec) =>
         BroadcastQueryStageExec(
           curPlan.id,
           BroadcastExchangeExec(
             originalBroadcastPlan.mode,
-            ColumnarBroadcastExchangeAdaptorExec(curPlan.plan, 1)))
+            ColumnarBroadcastExchangeAdaptorExec(curPlan.plan, 1)),
+          curPlan._canonicalized)
       case _ =>
         curPlan
     }
@@ -394,7 +435,22 @@ case class ColumnarPostOverrides() extends Rule[SparkPlan] {
   var isSupportAdaptive: Boolean = true
 
   def apply(plan: SparkPlan): SparkPlan = {
-    replaceWithColumnarPlan(plan)
+    handleColumnarToRowParitalFetch(replaceWithColumnarPlan(plan))
+  }
+
+  private def handleColumnarToRowParitalFetch(plan: SparkPlan): SparkPlan = {
+    // simple check plan tree have OmniColumnarToRow and no LimitExec and TakeOrderedAndProjectExec plan
+    val noParitalFetch = if (plan.find(_.isInstanceOf[OmniColumnarToRowExec]).isDefined) {
+        (!plan.find(node =>
+            node.isInstanceOf[LimitExec] || node.isInstanceOf[TakeOrderedAndProjectExec]).isDefined)
+    } else {
+      false
+    }
+    val newPlan = plan.transformUp {
+      case c: OmniColumnarToRowExec if noParitalFetch =>
+        c.copy(c.child, false)
+    }
+    newPlan
   }
 
   def setAdaptiveSupport(enable: Boolean): Unit = { isSupportAdaptive = enable }
@@ -409,11 +465,26 @@ case class ColumnarPostOverrides() extends Rule[SparkPlan] {
     case ColumnarToRowExec(child: ColumnarBroadcastExchangeExec) =>
       replaceWithColumnarPlan(child)
     case plan: ColumnarToRowExec =>
-      val child = replaceWithColumnarPlan(plan.child)
-      if (conf.getConfString("spark.omni.sql.columnar.columnarToRow", "true").toBoolean) {
-        OmniColumnarToRowExec(child)
-      } else {
-        ColumnarToRowExec(child)
+      plan.child match {
+        case child: BroadcastQueryStageExec =>
+          child.plan match {
+            case originalBroadcastPlan: ColumnarBroadcastExchangeExec =>
+              BroadcastQueryStageExec(
+                child.id,
+                BroadcastExchangeExec(
+                  originalBroadcastPlan.mode,
+                  ColumnarBroadcastExchangeAdaptorExec(originalBroadcastPlan, 1)), child._canonicalized)
+            case ReusedExchangeExec(_, originalBroadcastPlan: ColumnarBroadcastExchangeExec) =>
+              BroadcastQueryStageExec(
+                child.id,
+                BroadcastExchangeExec(
+                  originalBroadcastPlan.mode,
+                  ColumnarBroadcastExchangeAdaptorExec(child.plan, 1)), child._canonicalized)
+            case _ =>
+              replaceColumnarToRow(plan, conf)
+          }
+        case _ =>
+          replaceColumnarToRow(plan, conf)
       }
     case r: SparkPlan
       if !r.isInstanceOf[QueryStageExec] && !r.supportsColumnar && r.children.exists(c =>
@@ -421,7 +492,11 @@ case class ColumnarPostOverrides() extends Rule[SparkPlan] {
       val children = r.children.map {
         case c: ColumnarToRowExec =>
           val child = replaceWithColumnarPlan(c.child)
-          OmniColumnarToRowExec(child)
+          if (conf.getConfString("spark.omni.sql.columnar.columnarToRow", "true").toBoolean) {
+            OmniColumnarToRowExec(child)
+          } else {
+            ColumnarToRowExec(child)
+          }
         case other =>
           replaceWithColumnarPlan(other)
       }
@@ -429,6 +504,15 @@ case class ColumnarPostOverrides() extends Rule[SparkPlan] {
     case p =>
       val children = p.children.map(replaceWithColumnarPlan)
       p.withNewChildren(children)
+  }
+
+  def replaceColumnarToRow(plan: ColumnarToRowExec, conf: SQLConf) : SparkPlan = {
+    val child = replaceWithColumnarPlan(plan.child)
+    if (conf.getConfString("spark.omni.sql.columnar.columnarToRow", "true").toBoolean) {
+      OmniColumnarToRowExec(child)
+    } else {
+      ColumnarToRowExec(child)
+    }
   }
 }
 

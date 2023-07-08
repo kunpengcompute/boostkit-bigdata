@@ -17,15 +17,13 @@
  * limitations under the License.
  */
 
-#include "gtest/gtest.h"
-#include <stdint.h>
-#include <string.h>
-#include "../../src/jni/OrcColumnarBatchJniReader.h"
+#include <cstdint>
+#include <gtest/gtest.h>
+#include <orc/sargs/SearchArgument.hh>
+#include "jni/OrcColumnarBatchJniReader.h"
 #include "scan_test.h"
-#include "orc/sargs/SearchArgument.hh"
 
 static std::string filename = "/resources/orc_data_all_type";
-static orc::ColumnVectorBatch *batchPtr;
 static orc::StructVectorBatch *root;
 
 /* 
@@ -53,17 +51,24 @@ protected:
         orc::ReaderOptions readerOpts;
         orc::RowReaderOptions rowReaderOptions;
         std::unique_ptr<orc::Reader> reader = orc::createReader(orc::readFile(PROJECT_PATH + filename), readerOpts);
-        std::unique_ptr<orc::RowReader> rowReader = reader->createRowReader();
+        rowReader = reader->createRowReader().release();
         std::unique_ptr<orc::ColumnVectorBatch> batch = rowReader->createRowBatch(4096);
         rowReader->next(*batch);
-        batchPtr = batch.release();
-        root = static_cast<orc::StructVectorBatch *>(batchPtr);
+        types = &(rowReader->getSelectedType());
+        root = static_cast<orc::StructVectorBatch *>(batch.release());
     }
 
     // run after each case...
     virtual void TearDown() override {
-        delete batchPtr;
+        delete root;
+        root = nullptr;
+        types = nullptr;
+        delete rowReader;
+        rowReader = nullptr;
     }
+
+    const orc::Type *types;
+    orc::RowReader *rowReader;
 };
 
 TEST_F(ScanTest, test_literal_get_long)
@@ -71,11 +76,11 @@ TEST_F(ScanTest, test_literal_get_long)
     orc::Literal tmpLit(0L);
 
     // test get long
-    getLiteral(tmpLit, (int)(orc::PredicateDataType::LONG), "655361");
+    GetLiteral(tmpLit, (int)(orc::PredicateDataType::LONG), "655361");
     ASSERT_EQ(tmpLit.getLong(), 655361);
-    getLiteral(tmpLit, (int)(orc::PredicateDataType::LONG), "-655361");
+    GetLiteral(tmpLit, (int)(orc::PredicateDataType::LONG), "-655361");
     ASSERT_EQ(tmpLit.getLong(), -655361);
-    getLiteral(tmpLit, (int)(orc::PredicateDataType::LONG), "0");
+    GetLiteral(tmpLit, (int)(orc::PredicateDataType::LONG), "0");
     ASSERT_EQ(tmpLit.getLong(), 0);
 }
 
@@ -84,11 +89,11 @@ TEST_F(ScanTest, test_literal_get_float)
     orc::Literal tmpLit(0L);
 
     // test get float
-    getLiteral(tmpLit, (int)(orc::PredicateDataType::FLOAT), "12345.6789");
+    GetLiteral(tmpLit, (int)(orc::PredicateDataType::FLOAT), "12345.6789");
     ASSERT_EQ(tmpLit.getFloat(), 12345.6789);
-    getLiteral(tmpLit, (int)(orc::PredicateDataType::FLOAT), "-12345.6789");
+    GetLiteral(tmpLit, (int)(orc::PredicateDataType::FLOAT), "-12345.6789");
     ASSERT_EQ(tmpLit.getFloat(), -12345.6789);
-    getLiteral(tmpLit, (int)(orc::PredicateDataType::FLOAT), "0");
+    GetLiteral(tmpLit, (int)(orc::PredicateDataType::FLOAT), "0");
     ASSERT_EQ(tmpLit.getFloat(), 0);
 }
 
@@ -97,9 +102,9 @@ TEST_F(ScanTest, test_literal_get_string)
     orc::Literal tmpLit(0L);
 
     // test get string
-    getLiteral(tmpLit, (int)(orc::PredicateDataType::STRING), "testStringForLit");
+    GetLiteral(tmpLit, (int)(orc::PredicateDataType::STRING), "testStringForLit");
     ASSERT_EQ(tmpLit.getString(), "testStringForLit");
-    getLiteral(tmpLit, (int)(orc::PredicateDataType::STRING), "");
+    GetLiteral(tmpLit, (int)(orc::PredicateDataType::STRING), "");
     ASSERT_EQ(tmpLit.getString(), "");
 }
 
@@ -108,7 +113,7 @@ TEST_F(ScanTest, test_literal_get_date)
     orc::Literal tmpLit(0L);
 
     // test get date
-    getLiteral(tmpLit, (int)(orc::PredicateDataType::DATE), "987654321");
+    GetLiteral(tmpLit, (int)(orc::PredicateDataType::DATE), "987654321");
     ASSERT_EQ(tmpLit.getDate(), 987654321);
 }
 
@@ -117,15 +122,15 @@ TEST_F(ScanTest, test_literal_get_decimal)
     orc::Literal tmpLit(0L);
 
     // test get decimal
-    getLiteral(tmpLit, (int)(orc::PredicateDataType::DECIMAL), "199999999999998.998000 22 6");
+    GetLiteral(tmpLit, (int)(orc::PredicateDataType::DECIMAL), "199999999999998.998000 22 6");
     ASSERT_EQ(tmpLit.getDecimal().toString(), "199999999999998.998000");
-    getLiteral(tmpLit, (int)(orc::PredicateDataType::DECIMAL), "10.998000 10 6");
+    GetLiteral(tmpLit, (int)(orc::PredicateDataType::DECIMAL), "10.998000 10 6");
     ASSERT_EQ(tmpLit.getDecimal().toString(), "10.998000");
-    getLiteral(tmpLit, (int)(orc::PredicateDataType::DECIMAL), "-10.998000 10 6");
+    GetLiteral(tmpLit, (int)(orc::PredicateDataType::DECIMAL), "-10.998000 10 6");
     ASSERT_EQ(tmpLit.getDecimal().toString(), "-10.998000");
-    getLiteral(tmpLit, (int)(orc::PredicateDataType::DECIMAL), "9999.999999 10 6");
+    GetLiteral(tmpLit, (int)(orc::PredicateDataType::DECIMAL), "9999.999999 10 6");
     ASSERT_EQ(tmpLit.getDecimal().toString(), "9999.999999");
-    getLiteral(tmpLit, (int)(orc::PredicateDataType::DECIMAL), "-0.000000 10 6");
+    GetLiteral(tmpLit, (int)(orc::PredicateDataType::DECIMAL), "-0.000000 10 6");
     ASSERT_EQ(tmpLit.getDecimal().toString(), "0.000000");
 }
 
@@ -134,17 +139,17 @@ TEST_F(ScanTest, test_literal_get_bool)
     orc::Literal tmpLit(0L);
 
     // test get bool
-    getLiteral(tmpLit, (int)(orc::PredicateDataType::BOOLEAN), "true");
+    GetLiteral(tmpLit, (int)(orc::PredicateDataType::BOOLEAN), "true");
     ASSERT_EQ(tmpLit.getBool(), true);
-    getLiteral(tmpLit, (int)(orc::PredicateDataType::BOOLEAN), "True");
+    GetLiteral(tmpLit, (int)(orc::PredicateDataType::BOOLEAN), "True");
     ASSERT_EQ(tmpLit.getBool(), true);
-    getLiteral(tmpLit, (int)(orc::PredicateDataType::BOOLEAN), "false");
+    GetLiteral(tmpLit, (int)(orc::PredicateDataType::BOOLEAN), "false");
     ASSERT_EQ(tmpLit.getBool(), false);
-    getLiteral(tmpLit, (int)(orc::PredicateDataType::BOOLEAN), "False");
+    GetLiteral(tmpLit, (int)(orc::PredicateDataType::BOOLEAN), "False");
     ASSERT_EQ(tmpLit.getBool(), false);
     std::string tmpStr = "";
     try {
-        getLiteral(tmpLit, (int)(orc::PredicateDataType::BOOLEAN), "exception");
+        GetLiteral(tmpLit, (int)(orc::PredicateDataType::BOOLEAN), "exception");
     } catch (std::exception &e) {
         tmpStr = e.what();
     }
@@ -156,9 +161,9 @@ TEST_F(ScanTest, test_copy_intVec)
     int omniType = 0;
     uint64_t omniVecId = 0;
     // int type
-    copyToOmniVec(orc::TypeKind::INT, omniType, omniVecId, root->fields[0]);
+    CopyToOmniVec(types->getSubtype(0), omniType, omniVecId, root->fields[0]);
     ASSERT_EQ(omniType, omniruntime::type::OMNI_INT);
-    omniruntime::vec::IntVector *olbInt = (omniruntime::vec::IntVector *)(omniVecId);
+    auto *olbInt = (omniruntime::vec::Vector<int32_t> *)(omniVecId);
     ASSERT_EQ(olbInt->GetValue(0), 10);
     delete olbInt;
 }
@@ -168,12 +173,11 @@ TEST_F(ScanTest, test_copy_varCharVec)
     int omniType = 0;
     uint64_t omniVecId = 0;
     // varchar type
-    copyToOmniVec(orc::TypeKind::VARCHAR, omniType, omniVecId, root->fields[1], 60);
+    CopyToOmniVec(types->getSubtype(1), omniType, omniVecId, root->fields[1]);
     ASSERT_EQ(omniType, omniruntime::type::OMNI_VARCHAR);
-    uint8_t *actualChar = nullptr;
-    omniruntime::vec::VarcharVector *olbVc = (omniruntime::vec::VarcharVector *)(omniVecId);
-    int len = olbVc->GetValue(0, &actualChar);
-    std::string actualStr(reinterpret_cast<char *>(actualChar), 0, len);
+    auto *olbVc = (omniruntime::vec::Vector<omniruntime::vec::LargeStringContainer<std::string_view>> *)(
+            omniVecId);
+    std::string_view actualStr = olbVc->GetValue(0);
     ASSERT_EQ(actualStr, "varchar_1");
     delete olbVc;
 }
@@ -182,14 +186,13 @@ TEST_F(ScanTest, test_copy_stringVec)
 {
     int omniType = 0;
     uint64_t omniVecId = 0;
-    uint8_t *actualChar = nullptr;
     // string type
-    copyToOmniVec(orc::TypeKind::STRING, omniType, omniVecId, root->fields[2]);
+    CopyToOmniVec(types->getSubtype(2), omniType, omniVecId, root->fields[2]);
     ASSERT_EQ(omniType, omniruntime::type::OMNI_VARCHAR);
-    omniruntime::vec::VarcharVector *olbStr = (omniruntime::vec::VarcharVector *)(omniVecId);
-    int len = olbStr->GetValue(0, &actualChar);
-    std::string actualStr2(reinterpret_cast<char *>(actualChar), 0, len);
-    ASSERT_EQ(actualStr2, "string_type_1");
+    auto *olbStr = (omniruntime::vec::Vector<omniruntime::vec::LargeStringContainer<std::string_view>> *)(
+            omniVecId);
+    std::string_view actualStr = olbStr->GetValue(0);
+    ASSERT_EQ(actualStr, "string_type_1");
     delete olbStr;
 }
 
@@ -198,9 +201,9 @@ TEST_F(ScanTest, test_copy_longVec)
     int omniType = 0;
     uint64_t omniVecId = 0;
     // bigint type
-    copyToOmniVec(orc::TypeKind::LONG, omniType, omniVecId, root->fields[3]);
+    CopyToOmniVec(types->getSubtype(3), omniType, omniVecId, root->fields[3]);
     ASSERT_EQ(omniType, omniruntime::type::OMNI_LONG);
-    omniruntime::vec::LongVector *olbLong = (omniruntime::vec::LongVector *)(omniVecId);
+    auto *olbLong = (omniruntime::vec::Vector<int64_t> *)(omniVecId);
     ASSERT_EQ(olbLong->GetValue(0), 10000);
     delete olbLong;
 }
@@ -209,15 +212,14 @@ TEST_F(ScanTest, test_copy_charVec)
 {
     int omniType = 0;
     uint64_t omniVecId = 0;
-    uint8_t *actualChar = nullptr;
     // char type
-    copyToOmniVec(orc::TypeKind::CHAR, omniType, omniVecId, root->fields[4], 40);
+    CopyToOmniVec(types->getSubtype(4), omniType, omniVecId, root->fields[4]);
     ASSERT_EQ(omniType, omniruntime::type::OMNI_VARCHAR);
-    omniruntime::vec::VarcharVector *olbChar40 = (omniruntime::vec::VarcharVector *)(omniVecId);
-    int len = olbChar40->GetValue(0, &actualChar);
-    std::string actualStr3(reinterpret_cast<char *>(actualChar), 0, len);
-    ASSERT_EQ(actualStr3, "char_1");
-    delete olbChar40;
+    auto *olbChar = (omniruntime::vec::Vector<omniruntime::vec::LargeStringContainer<std::string_view>> *)(
+            omniVecId);
+    std::string_view actualStr = olbChar->GetValue(0);
+    ASSERT_EQ(actualStr, "char_1");
+    delete olbChar;
 }
 
 TEST_F(ScanTest, test_copy_doubleVec)
@@ -225,9 +227,9 @@ TEST_F(ScanTest, test_copy_doubleVec)
     int omniType = 0;
     uint64_t omniVecId = 0;
     // double type
-    copyToOmniVec(orc::TypeKind::DOUBLE, omniType, omniVecId, root->fields[6]);
+    CopyToOmniVec(types->getSubtype(6), omniType, omniVecId, root->fields[6]);
     ASSERT_EQ(omniType, omniruntime::type::OMNI_DOUBLE);
-    omniruntime::vec::DoubleVector *olbDouble = (omniruntime::vec::DoubleVector *)(omniVecId);
+    auto *olbDouble = (omniruntime::vec::Vector<double> *)(omniVecId);
     ASSERT_EQ(olbDouble->GetValue(0), 1111.1111);
     delete olbDouble;
 }
@@ -237,9 +239,9 @@ TEST_F(ScanTest, test_copy_booleanVec)
     int omniType = 0;
     uint64_t omniVecId = 0;
     // boolean type
-    copyToOmniVec(orc::TypeKind::BOOLEAN, omniType, omniVecId, root->fields[9]);
+    CopyToOmniVec(types->getSubtype(9), omniType, omniVecId, root->fields[9]);
     ASSERT_EQ(omniType, omniruntime::type::OMNI_BOOLEAN);
-    omniruntime::vec::BooleanVector *olbBoolean = (omniruntime::vec::BooleanVector *)(omniVecId);
+    auto *olbBoolean = (omniruntime::vec::Vector<bool> *)(omniVecId);
     ASSERT_EQ(olbBoolean->GetValue(0), true);
     delete olbBoolean;
 }
@@ -249,9 +251,9 @@ TEST_F(ScanTest, test_copy_shortVec)
     int omniType = 0;
     uint64_t omniVecId = 0;
     // short type
-    copyToOmniVec(orc::TypeKind::SHORT, omniType, omniVecId, root->fields[10]);
+    CopyToOmniVec(types->getSubtype(10), omniType, omniVecId, root->fields[10]);
     ASSERT_EQ(omniType, omniruntime::type::OMNI_SHORT);
-    omniruntime::vec::ShortVector *olbShort = (omniruntime::vec::ShortVector *)(omniVecId);
+    auto *olbShort = (omniruntime::vec::Vector<short> *)(omniVecId);
     ASSERT_EQ(olbShort->GetValue(0), 11);
     delete olbShort;
 }
@@ -265,24 +267,26 @@ TEST_F(ScanTest, test_build_leafs)
     orc::Literal lit(100L);
 
     // test EQUALS
-    buildLeaves(PredicateOperatorType::EQUALS, litList, lit, "leaf-0", orc::PredicateDataType::LONG, *builder);
+    BuildLeaves(PredicateOperatorType::EQUALS, litList, lit, "leaf-0", orc::PredicateDataType::LONG, *builder);
 
     // test LESS_THAN
-    buildLeaves(PredicateOperatorType::LESS_THAN, litList, lit, "leaf-1", orc::PredicateDataType::LONG, *builder);
+    BuildLeaves(PredicateOperatorType::LESS_THAN, litList, lit, "leaf-1", orc::PredicateDataType::LONG, *builder);
 
     // test LESS_THAN_EQUALS
-    buildLeaves(PredicateOperatorType::LESS_THAN_EQUALS, litList, lit, "leaf-1", orc::PredicateDataType::LONG, *builder);
+    BuildLeaves(PredicateOperatorType::LESS_THAN_EQUALS, litList, lit, "leaf-1", orc::PredicateDataType::LONG,
+        *builder);
 
     // test NULL_SAFE_EQUALS
-    buildLeaves(PredicateOperatorType::NULL_SAFE_EQUALS, litList, lit, "leaf-1", orc::PredicateDataType::LONG, *builder);
+    BuildLeaves(PredicateOperatorType::NULL_SAFE_EQUALS, litList, lit, "leaf-1", orc::PredicateDataType::LONG,
+        *builder);
 
     // test IS_NULL
-    buildLeaves(PredicateOperatorType::IS_NULL, litList, lit, "leaf-1", orc::PredicateDataType::LONG, *builder);
+    BuildLeaves(PredicateOperatorType::IS_NULL, litList, lit, "leaf-1", orc::PredicateDataType::LONG, *builder);
 
     // test BETWEEN
     std::string tmpStr = "";
     try {
-        buildLeaves(PredicateOperatorType::BETWEEN, litList, lit, "leaf-1", orc::PredicateDataType::LONG, *builder);
+        BuildLeaves(PredicateOperatorType::BETWEEN, litList, lit, "leaf-1", orc::PredicateDataType::LONG, *builder);
     } catch (std::exception &e) {
         tmpStr = e.what();
     }
