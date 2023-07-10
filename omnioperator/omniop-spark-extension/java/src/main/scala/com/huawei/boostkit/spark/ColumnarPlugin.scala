@@ -22,6 +22,7 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{SparkSession, SparkSessionExtensions}
 import org.apache.spark.sql.catalyst.expressions.{Ascending, DynamicPruningSubquery, SortOrder}
 import org.apache.spark.sql.catalyst.expressions.aggregate.Partial
+import org.apache.spark.sql.catalyst.optimizer.{DelayCartesianProduct, HeuristicJoinReorder}
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.{RowToOmniColumnarExec, _}
 import org.apache.spark.sql.execution.adaptive.{BroadcastQueryStageExec, ColumnarCustomShuffleReaderExec, CustomShuffleReaderExec, QueryStageExec, ShuffleQueryStageExec}
@@ -539,5 +540,7 @@ class ColumnarPlugin extends (SparkSessionExtensions => Unit) with Logging {
     logInfo("Using BoostKit Spark Native Sql Engine Extension to Speed Up Your Queries.")
     extensions.injectColumnar(session => ColumnarOverrideRules(session))
     extensions.injectPlannerStrategy(_ => ShuffleJoinStrategy)
+    extensions.injectOptimizerRule(_ => DelayCartesianProduct)
+    extensions.injectOptimizerRule(_ => HeuristicJoinReorder)
   }
 }
