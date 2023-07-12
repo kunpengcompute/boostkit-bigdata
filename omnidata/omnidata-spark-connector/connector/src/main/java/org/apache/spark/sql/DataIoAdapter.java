@@ -215,11 +215,20 @@ public class DataIoAdapter {
         PageDeserializer deserializer = initPageDeserializer();
 
         // get available host
-        String[] pushDownHostArray = pageCandidate.getpushDownHosts().split(",");
-        List<String> pushDownHostList = new ArrayList<>(Arrays.asList(pushDownHostArray));
-        Optional<String> availablePushDownHost = getRandomAvailablePushDownHost(pushDownHostArray,
-                JavaConverters.mapAsJavaMap(pushDownOperators.fpuHosts()));
-        availablePushDownHost.ifPresent(pushDownHostList::add);
+                List<String> pushDownHostList = new ArrayList<>();
+        String[] pushDownHostArray;
+        if (pageCandidate.getpushDownHosts().length() == 0) {
+            Optional<String> availablePushDownHost = getRandomAvailablePushDownHost(new String[]{},
+                    JavaConverters.mapAsJavaMap(pushDownOperators.fpuHosts()));
+            availablePushDownHost.ifPresent(pushDownHostList::add);
+            pushDownHostArray = pushDownHostList.toArray(new String[]{});
+        } else {
+            pushDownHostArray = pageCandidate.getpushDownHosts().split(",");
+            pushDownHostList = new ArrayList<>(Arrays.asList(pushDownHostArray));
+            Optional<String> availablePushDownHost = getRandomAvailablePushDownHost(pushDownHostArray,
+                    JavaConverters.mapAsJavaMap(pushDownOperators.fpuHosts()));
+            availablePushDownHost.ifPresent(pushDownHostList::add);
+        }
         return getIterator(pushDownHostList.iterator(), taskSource, pushDownHostArray, deserializer,
                 pushDownHostList.size());
     }
@@ -279,11 +288,12 @@ public class DataIoAdapter {
     private Optional<String> getRandomAvailablePushDownHost(String[] pushDownHostArray,
                                                             Map<String, String> fpuHosts) {
         List<String> existingHosts = Arrays.asList(pushDownHostArray);
-        List<String> allHosts = new ArrayList<>(fpuHosts.values());
+        List<String> allHosts = new ArrayList<>(fpuHosts.keySet());
         allHosts.removeAll(existingHosts);
         if (allHosts.size() > 0) {
-            LOG.info("Add another available host: " + allHosts.get(0));
-            return Optional.of(allHosts.get(0));
+            int randomIndex = (int) (Math.random() * allHosts.size());
+            LOG.info("Add another available host: " + allHosts.get(randomIndex));
+            return Optional.of(allHosts.get(randomIndex));
         } else {
             return Optional.empty();
         }

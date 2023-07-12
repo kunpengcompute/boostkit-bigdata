@@ -77,7 +77,7 @@ class FileScanRDDPushDown(
     columnOffset = NdpUtils.getColumnOffset(dataSchema, output)
     filterOutput = output
   }
-  var fpuMap = pushDownOperators.fpuHosts
+  var fpuMap = pushDownOperators.fpuHosts.map(term => (term._2, term._1))
   var fpuList : Seq[String] = Seq()
   for (key <- fpuMap.keys) {
     fpuList = fpuList :+ key
