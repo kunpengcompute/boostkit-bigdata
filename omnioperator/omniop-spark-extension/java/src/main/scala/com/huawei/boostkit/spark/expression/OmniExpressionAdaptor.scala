@@ -678,7 +678,7 @@ object OmniExpressionAdaptor extends Logging {
         } else {
           OMNI_AGGREGATION_TYPE_COUNT_ALL
         }
-      case Count(_) => OMNI_AGGREGATION_TYPE_COUNT_COLUMN
+      case Count(_) if agg.aggregateFunction.children.size == 1 => OMNI_AGGREGATION_TYPE_COUNT_COLUMN
       case First(_, true) => OMNI_AGGREGATION_TYPE_FIRST_IGNORENULL
       case First(_, false) => OMNI_AGGREGATION_TYPE_FIRST_INCLUDENULL
       case _ => throw new UnsupportedOperationException(s"Unsupported aggregate function: $agg")
