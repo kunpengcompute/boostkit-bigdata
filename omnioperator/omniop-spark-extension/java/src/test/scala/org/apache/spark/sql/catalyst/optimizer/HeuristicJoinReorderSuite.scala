@@ -144,7 +144,7 @@ class HeuristicJoinReorderSuite extends PlanTest {
       Some((Seq((x, Cross), (y, Cross), (z, Inner)), Seq("x.b".attr === "y.d".attr))))
   }
 
-  test("DelayCartesianProduct: beiqi scenario") {
+  test("DelayCartesianProduct: basic scenario") {
     val T = IOV_ALARM_DAILY.subquery('T)
     val DT = DETAILS.subquery('DT)
     val C = IOV_BIZ_CAR_INFO_ALL2.subquery('C)
