@@ -32,8 +32,9 @@ import org.apache.spark.sql.execution.joins._
 import org.apache.spark.sql.execution.window.WindowExec
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.ColumnarBatchSupportUtil.checkColumnarBatchSupport
+import org.apache.spark.sql.catalyst.expressions._
 
-case class ColumnarPreOverrides() extends Rule[SparkPlan] {
+case class ColumnarPreOverrides() extends Rule[SparkPlan] with PredicateHelper{
   val columnarConf: ColumnarPluginConfig = ColumnarPluginConfig.getSessionConf
   val enableColumnarFileScan: Boolean = columnarConf.enableColumnarFileScan
   val enableColumnarProject: Boolean = columnarConf.enableColumnarProject
@@ -55,7 +56,8 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] {
   val enableFusion: Boolean = columnarConf.enableFusion
   var isSupportAdaptive: Boolean = true
   val enableColumnarProjectFusion: Boolean = columnarConf.enableColumnarProjectFusion
-
+  val enableColumnarTopNSort: Boolean = columnarConf.enableColumnarTopNSort
+  val topNSortThreshold: Int = columnarConf.topNSortThreshold
   def apply(plan: SparkPlan): SparkPlan = {
     replaceWithColumnarPlan(plan)
   }
@@ -67,6 +69,19 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] {
       case _: ColumnarFilterExec | _: ColumnarConditionProjectExec => true
       case _ => false
     }
+  }
+
+  def isTopNExpression(e: Expression): Boolean = e match {
+    case Alias(child, _) => isTopNExpression(child)
+    case WindowExpression(windowFunction, _)
+        if windowFunction.isInstanceOf[Rank] =>
+      true
+    case _ => false
+  }
+
+  def isStrictTopN(e: Expression): Boolean = e match {
+    case Alias(child, _) => isStrictTopN(child)
+    case WindowExpression(windowFunction, _) => windowFunction.isInstanceOf[RowNumber]
   }
 
   def replaceWithColumnarPlan(plan: SparkPlan): SparkPlan = plan match {
@@ -168,9 +183,63 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] {
           ColumnarProjectExec(plan.projectList, child)
       }
     case plan: FilterExec if enableColumnarFilter =>
+      if(enableColumnarTopNSort) {
+        val filterExec = plan.transform {
+          case f@FilterExec(condition,
+          w@WindowExec(Seq(windowExpression), _, orderSpec, sort: SortExec))
+            if orderSpec.nonEmpty && isTopNExpression(windowExpression) =>
+            var topn = Int.MaxValue
+            val nonTopNConditions = splitConjunctivePredicates(condition).filter {
+              case LessThan(e: NamedExpression, IntegerLiteral(n))
+                if e.exprId == windowExpression.exprId =>
+                topn = Math.min(topn, n - 1)
+                false
+              case LessThanOrEqual(e: NamedExpression, IntegerLiteral(n))
+                if e.exprId == windowExpression.exprId =>
+                topn = Math.min(topn, n)
+                false
+              case GreaterThan(IntegerLiteral(n), e: NamedExpression)
+                if e.exprId == windowExpression.exprId =>
+                topn = Math.min(topn, n - 1)
+                false
+              case GreaterThanOrEqual(IntegerLiteral(n), e: NamedExpression)
+                if e.exprId == windowExpression.exprId =>
+                topn = Math.min(topn, n)
+                false
+              case EqualTo(e: NamedExpression, IntegerLiteral(n))
+                if n == 1 && e.exprId == windowExpression.exprId =>
+                topn = 1
+                false
+              case EqualTo(IntegerLiteral(n), e: NamedExpression)
+                if n == 1 && e.exprId == windowExpression.exprId =>
+                topn = 1
+                false
+              case _ => true
+            }
+
+            if (topn > 0 && topn <= topNSortThreshold) {
+              val strictTopN = isStrictTopN(windowExpression)
+              val topNSortExec = ColumnarTopNSortExec(
+                topn, strictTopN, w.partitionSpec, w.orderSpec, sort.global, replaceWithColumnarPlan(sort.child))
+              logInfo(s"Columnar Processing for ${topNSortExec.getClass} is currently supported.")
+              val newCondition = if (nonTopNConditions.isEmpty) {
+                Literal.TrueLiteral
+              } else {
+                nonTopNConditions.reduce(And)
+              }
+              val window = ColumnarWindowExec(w.windowExpression, w.partitionSpec, w.orderSpec, topNSortExec)
+              return ColumnarFilterExec(newCondition, window)
+            } else {
+              logInfo{s"topn: ${topn} is bigger than topNSortThreshold: ${topNSortThreshold}."}
+              val child = replaceWithColumnarPlan(f.child)
+              return ColumnarFilterExec(f.condition, child)
+            }
+        }
+      }
       val child = replaceWithColumnarPlan(plan.child)
       logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
       ColumnarFilterExec(plan.condition, child)
+
     case plan: ExpandExec if enableColumnarExpand =>
       val child = replaceWithColumnarPlan(plan.child)
       logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")

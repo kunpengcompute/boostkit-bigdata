@@ -55,6 +55,13 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
   val enableColumnarSort: Boolean =
     conf.getConfString("spark.omni.sql.columnar.sort", "true").toBoolean
 
+  // enable or disable topNSort
+  val enableColumnarTopNSort: Boolean =
+    conf.getConfString("spark.omni.sql.columnar.topnsort", "true").toBoolean
+
+  val topNSortThreshold: Int =
+    conf.getConfString("spark.omni.sql.columnar.topnsortthreshold", "100").toInt
+
   val enableColumnarUnion: Boolean =
     conf.getConfString("spark.omni.sql.columnar.union", "true").toBoolean
 
