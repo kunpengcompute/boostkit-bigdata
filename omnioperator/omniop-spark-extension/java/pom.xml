@@ -7,7 +7,7 @@
     <parent>
         <groupId>com.huawei.kunpeng</groupId>
         <artifactId>boostkit-omniop-spark-parent</artifactId>
-        <version>3.1.1-1.2.0</version>
+        <version>3.1.1-1.3.0</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
