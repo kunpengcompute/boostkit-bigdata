@@ -87,7 +87,7 @@ class OckColumnarShuffleBufferIterator[T](
         // create buffers, or blobIds
         // use bagName, numBuffers and bufferSize to create buffers in low level
         if (totalFetchNum != 0) {
-            NativeShuffle.shuffleStreamReadStart(sequenceId)
+            NativeShuffle.shuffleStreamReadStart(sequenceId, endPartition)
             hasBlob = true
         }
 
