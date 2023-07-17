@@ -8,7 +8,6 @@
 
 #include "common/common.h"
 
-using namespace omniruntime::type;
 using namespace omniruntime::vec;
 using namespace ock::dopspark;
 
@@ -201,23 +200,29 @@ bool OckMergeReader::CopyPartDataToVector(uint8_t *&nulls, uint8_t *&values, uin
     return true;
 }
 
-bool OckMergeReader::CopyDataToVector(Vector *dstVector, uint32_t colIndex)
+bool OckMergeReader::CopyDataToVector(BaseVector *dstVector, uint32_t colIndex)
 {
     // point to first src vector in list
     auto srcVector = mVectorBatch->GetColumnHead(colIndex);
 
-    auto *nullsAddress = (uint8_t *)dstVector->GetValueNulls();
-    auto *valuesAddress = (uint8_t *)dstVector->GetValues();
-    uint32_t *offsetsAddress = (uint32_t *)dstVector->GetValueOffsets();
+    auto *nullsAddress = (uint8_t *)omniruntime::vec::unsafe::UnsafeBaseVector::GetNulls(dstVector);
+    auto *valuesAddress = (uint8_t *)VectorHelper::UnsafeGetValues(dstVector, mColTypeIds[colIndex]);
+    uint32_t *offsetsAddress = (uint32_t *)VectorHelper::UnsafeGetOffsetsAddr(dstVector, mColTypeIds[colIndex]);
     dstVector->SetNullFlag(true);
     uint32_t totalSize = 0;
     uint32_t currentSize = 0;
-    if (dstVector->GetSize() < 0 || dstVector->GetCapacityInBytes() < 0) {
-        LOG_ERROR("Invalid vector size %d or capacity %d", dstVector->GetSize(), dstVector->GetCapacityInBytes());
+    if (dstVector->GetSize() < 0) {
+        LOG_ERROR("Invalid vector size %d", dstVector->GetSize());
         return false;
     }
     uint32_t remainingSize = (uint32_t)dstVector->GetSize();
-    uint32_t remainingCapacity = (uint32_t)dstVector->GetCapacityInBytes();
+    uint32_t remainingCapacity = 0;
+    if (mColTypeIds[colIndex] == OMNI_CHAR || mColTypeIds[colIndex] == OMNI_VARCHAR) {
+        auto *varCharVector = reinterpret_cast<Vector<LargeStringContainer<std::string_view>> *>(dstVector);
+        remainingCapacity = omniruntime::vec::unsafe::UnsafeStringVector::GetContainer(varCharVector)->GetCapacityInBytes();
+    } else {
+        remainingCapacity = GetDataSize(colIndex) *remainingSize;
+    }
 
     for (uint32_t cnt = 0; cnt < mMergeCnt; ++cnt) {
         if (UNLIKELY(srcVector == nullptr)) {
