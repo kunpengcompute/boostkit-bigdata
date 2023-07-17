@@ -23,49 +23,49 @@ bool OckSplitter::ToSplitterTypeId(const int32_t *vBColTypes)
     for (uint32_t colIndex = 0; colIndex < mColNum; ++colIndex) {
         switch (vBColTypes[colIndex]) {
             case OMNI_BOOLEAN: {
-                CasOmniToShuffleType(OMNI_BOOLEAN, ShuffleTypeId::SHUFFLE_1BYTE, uint8Size);
+                CastOmniToShuffleType(OMNI_BOOLEAN, ShuffleTypeId::SHUFFLE_1BYTE, uint8Size);
                 break;
             }
             case OMNI_SHORT: {
-                CasOmniToShuffleType(OMNI_SHORT, ShuffleTypeId::SHUFFLE_2BYTE, uint16Size);
+                CastOmniToShuffleType(OMNI_SHORT, ShuffleTypeId::SHUFFLE_2BYTE, uint16Size);
                 break;
             }
             case OMNI_DATE32: {
-                CasOmniToShuffleType(OMNI_DATE32, ShuffleTypeId::SHUFFLE_4BYTE, uint32Size);
+                CastOmniToShuffleType(OMNI_DATE32, ShuffleTypeId::SHUFFLE_4BYTE, uint32Size);
                 break;
             }
             case OMNI_INT: {
-                CasOmniToShuffleType(OMNI_INT, ShuffleTypeId::SHUFFLE_4BYTE, uint32Size);
+                CastOmniToShuffleType(OMNI_INT, ShuffleTypeId::SHUFFLE_4BYTE, uint32Size);
                 break;
             }
             case OMNI_DATE64: {
-                CasOmniToShuffleType(OMNI_DATE64, ShuffleTypeId::SHUFFLE_8BYTE, uint64Size);
+                CastOmniToShuffleType(OMNI_DATE64, ShuffleTypeId::SHUFFLE_8BYTE, uint64Size);
                 break;
             }
             case OMNI_DOUBLE: {
-                CasOmniToShuffleType(OMNI_DOUBLE, ShuffleTypeId::SHUFFLE_8BYTE, uint64Size);
+                CastOmniToShuffleType(OMNI_DOUBLE, ShuffleTypeId::SHUFFLE_8BYTE, uint64Size);
                 break;
             }
             case OMNI_DECIMAL64: {
-                CasOmniToShuffleType(OMNI_DECIMAL64, ShuffleTypeId::SHUFFLE_8BYTE, uint64Size);
+                CastOmniToShuffleType(OMNI_DECIMAL64, ShuffleTypeId::SHUFFLE_8BYTE, uint64Size);
                 break;
             }
             case OMNI_LONG: {
-                CasOmniToShuffleType(OMNI_LONG, ShuffleTypeId::SHUFFLE_8BYTE, uint64Size);
+                CastOmniToShuffleType(OMNI_LONG, ShuffleTypeId::SHUFFLE_8BYTE, uint64Size);
                 break;
             }
             case OMNI_CHAR: {
-                CasOmniToShuffleType(OMNI_CHAR, ShuffleTypeId::SHUFFLE_BINARY, uint32Size);
+                CastOmniToShuffleType(OMNI_CHAR, ShuffleTypeId::SHUFFLE_BINARY, uint32Size);
                 mColIndexOfVarVec.emplace_back(colIndex);
                 break;
             }
             case OMNI_VARCHAR: {        // unknown length for value vector, calculate later
-                CasOmniToShuffleType(OMNI_VARCHAR, ShuffleTypeId::SHUFFLE_BINARY, uint32Size);
+                CastOmniToShuffleType(OMNI_VARCHAR, ShuffleTypeId::SHUFFLE_BINARY, uint32Size);
                 mColIndexOfVarVec.emplace_back(colIndex);
                 break;
             }
             case OMNI_DECIMAL128: {
-                CasOmniToShuffleType(OMNI_DECIMAL128, ShuffleTypeId::SHUFFLE_DECIMAL128, decima128Size);
+                CastOmniToShuffleType(OMNI_DECIMAL128, ShuffleTypeId::SHUFFLE_DECIMAL128, decima128Size);
                 break;
             }
             default: {
