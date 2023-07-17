@@ -23,49 +23,49 @@ bool OckSplitter::ToSplitterTypeId(const int32_t *vBColTypes)
     for (uint32_t colIndex = 0; colIndex < mColNum; ++colIndex) {
         switch (vBColTypes[colIndex]) {
             case OMNI_BOOLEAN: {
-                CasOmniToShuffleType(OMNI_BOOLEAN, SHUFFLE_1BYTE, uint8Size);
+                CasOmniToShuffleType(OMNI_BOOLEAN, ShuffleTypeId::SHUFFLE_1BYTE, uint8Size);
                 break;
             }
             case OMNI_SHORT: {
-                CasOmniToShuffleType(OMNI_SHORT, SHUFFLE_2BYTE, uint16Size);
+                CasOmniToShuffleType(OMNI_SHORT, ShuffleTypeId::SHUFFLE_2BYTE, uint16Size);
                 break;
             }
             case OMNI_DATE32: {
-                CasOmniToShuffleType(OMNI_DATE32, SHUFFLE_4BYTE, uint32Size);
+                CasOmniToShuffleType(OMNI_DATE32, ShuffleTypeId::SHUFFLE_4BYTE, uint32Size);
                 break;
             }
             case OMNI_INT: {
-                CasOmniToShuffleType(OMNI_INT, SHUFFLE_4BYTE, uint32Size);
+                CasOmniToShuffleType(OMNI_INT, ShuffleTypeId::SHUFFLE_4BYTE, uint32Size);
                 break;
             }
             case OMNI_DATE64: {
-                CasOmniToShuffleType(OMNI_DATE64, SHUFFLE_8BYTE, uint64Size);
+                CasOmniToShuffleType(OMNI_DATE64, ShuffleTypeId::SHUFFLE_8BYTE, uint64Size);
                 break;
             }
             case OMNI_DOUBLE: {
-                CasOmniToShuffleType(OMNI_DOUBLE, SHUFFLE_8BYTE, uint64Size);
+                CasOmniToShuffleType(OMNI_DOUBLE, ShuffleTypeId::SHUFFLE_8BYTE, uint64Size);
                 break;
             }
             case OMNI_DECIMAL64: {
-                CasOmniToShuffleType(OMNI_DECIMAL64, SHUFFLE_8BYTE, uint64Size);
+                CasOmniToShuffleType(OMNI_DECIMAL64, ShuffleTypeId::SHUFFLE_8BYTE, uint64Size);
                 break;
             }
             case OMNI_LONG: {
-                CasOmniToShuffleType(OMNI_LONG, SHUFFLE_8BYTE, uint64Size);
+                CasOmniToShuffleType(OMNI_LONG, ShuffleTypeId::SHUFFLE_8BYTE, uint64Size);
                 break;
             }
             case OMNI_CHAR: {
-                CasOmniToShuffleType(OMNI_CHAR, SHUFFLE_BINARY, uint32Size);
+                CasOmniToShuffleType(OMNI_CHAR, ShuffleTypeId::SHUFFLE_BINARY, uint32Size);
                 mColIndexOfVarVec.emplace_back(colIndex);
                 break;
             }
             case OMNI_VARCHAR: {        // unknown length for value vector, calculate later
-                CasOmniToShuffleType(OMNI_VARCHAR, SHUFFLE_BINARY, uint32Size);
+                CasOmniToShuffleType(OMNI_VARCHAR, ShuffleTypeId::SHUFFLE_BINARY, uint32Size);
                 mColIndexOfVarVec.emplace_back(colIndex);
                 break;
             }
             case OMNI_DECIMAL128: {
-                CasOmniToShuffleType(OMNI_DECIMAL128, SHUFFLE_DECIMAL128, decima128Size);
+                CasOmniToShuffleType(OMNI_DECIMAL128, ShuffleTypeId::SHUFFLE_DECIMAL128, decima128Size);
                 break;
             }
             default: {
@@ -157,11 +157,11 @@ uint32_t OckSplitter::GetVarVecValue(VectorBatch &vb, uint32_t rowIndex, uint32_
     if (vector->GetEncoding() == OMNI_DICTIONARY) {
         auto vc = reinterpret_cast<Vector<DictionaryContainer<std::string_view, LargeStringContainer>> *>(vector);
         std::string_view value = vc->GetValue(rowIndex);
-        return static_cast<uint32_t>(value.length);
+        return static_cast<uint32_t>(value.length());
     } else {
         auto vc = reinterpret_cast<Vector<LargeStringContainer<std::string_view>> *>(vector);
         std::string_view value = vc->GetValue(rowIndex);
-        return static_cast<uint32_t>(value.length);
+        return static_cast<uint32_t>(value.length());
     }
 }
 
@@ -200,11 +200,10 @@ bool OckSplitter::WriteFixedWidthValueTemple(BaseVector *vector, bool isDict, st
     if (isDict) {
         int32_t idsNum = mCurrentVB->GetRowCount();
         int64_t idsSizeInBytes = idsNum * sizeof(int32_t);
-        auto ids = VectorHelper::UnsafeGetValues(vector, DataTypeId);
-        srcValues = reinterpret_cast<T *>(VectorHelper::UnsafeGetDictionary(vector, DataTypeId));
+        auto ids = VectorHelper::UnsafeGetValues(vector, dataTypeId);
+        srcValues = reinterpret_cast<T *>(VectorHelper::UnsafeGetDictionary(vector, dataTypeId));
         if (UNLIKELY(srcValues == nullptr)) {
             LOG_ERROR("Source values address is null.");
-            mAllocator->free((uint8_t *)(ids), idsSizeInBytes);
             return false;
         }
 
@@ -212,13 +211,11 @@ bool OckSplitter::WriteFixedWidthValueTemple(BaseVector *vector, bool isDict, st
             uint32_t idIndex = rowIndexes[index];
             if (UNLIKELY(idIndex >= idsNum)) {
                 LOG_ERROR("Invalid idIndex %d, idsNum.", idIndex, idsNum);
-                mAllocator->free((uint8_t *)(ids), idsSizeInBytes);
                 return false;
             }
             uint32_t rowIndex = reinterpret_cast<int32_t *>(ids)[idIndex];
             *dstValues++ = srcValues[rowIndex]; // write value to local blob
         }
-        mAllocator->free((uint8_t *)(ids), idsSizeInBytes);
     } else {
         srcValues = reinterpret_cast<T *>(VectorHelper::UnsafeGetValues(vector, dataTypeId));
         if (UNLIKELY(srcValues == nullptr)) {
@@ -249,14 +246,12 @@ bool OckSplitter::WriteDecimal128(BaseVector *vector, bool isDict, std::vector<u
 
     if (isDict) {
         uint32_t idsNum = mCurrentVB->GetRowCount();
-        int64_t idsSizeInBytes = idsNum * sizeof(int32_t);
         auto ids = VectorHelper::UnsafeGetValues(vector, dataTypeId);
         srcValues = reinterpret_cast<uint64_t *>(VectorHelper::UnsafeGetDictionary(vector, dataTypeId));
         if (UNLIKELY(srcValues == nullptr)) {
             LOG_ERROR("Source values address is null.");
             return false;
         }
-        int32_t srcRowCount = dictionary->GetSize();
         for (uint32_t index = 0; index < rowNum; ++index) {
             uint32_t idIndex = rowIndexes[index];
             if (UNLIKELY(idIndex >= idsNum)) {
@@ -354,12 +349,12 @@ bool OckSplitter::WriteVariableWidthValue(BaseVector *vector, std::vector<uint32
         }
         if (isDict) {
             auto vc = reinterpret_cast<Vector<DictionaryContainer<std::string_view, LargeStringContainer>> *>(vector);
-            std::string value = vc->GetValue(rowIndex);
+            std::string_view value = vc->GetValue(rowIndex);
             srcValues = reinterpret_cast<uint8_t *>(reinterpret_cast<int64_t>(value.data()));
             length = static_cast<uint32_t>(value.length());
         } else {
             auto vc = reinterpret_cast<Vector<LargeStringContainer<std::string_view>> *>(vector);
-            std::string value = vc->GetValue(rowIndex);
+            std::string_view value = vc->GetValue(rowIndex);
             srcValues = reinterpret_cast<uint8_t *>(reinterpret_cast<int64_t>(value.data()));
             length = static_cast<uint32_t>(value.length());
         }
