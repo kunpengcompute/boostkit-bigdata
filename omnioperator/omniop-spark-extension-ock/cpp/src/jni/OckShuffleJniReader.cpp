@@ -10,6 +10,7 @@
 #include "OckShuffleJniReader.h"
 
 using namespace omniruntime::vec;
+using namespace omniruntime::type;
 using namespace ock::dopspark;
 
 static std::mutex gInitLock;
