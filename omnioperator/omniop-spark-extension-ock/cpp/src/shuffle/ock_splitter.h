@@ -99,7 +99,7 @@ private:
         return mIsSinglePt ? 0 : mPtViewInCurVB->GetValue(rowIndex);
     }
 
-    void CastOmniToShffleType(DataTypeId omniType, ShuffleTypeId shuffleType, uint32_t size)
+    void CastOmniToShuffleType(DataTypeId omniType, ShuffleTypeId shuffleType, uint32_t size)
     {
         mVBColDataTypes.emplace_back(omniType);
         mVBColShuffleTypes.emplace_back(shuffleType);
