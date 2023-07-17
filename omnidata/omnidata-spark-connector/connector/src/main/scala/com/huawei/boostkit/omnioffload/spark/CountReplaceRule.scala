@@ -57,9 +57,12 @@ object CountReplaceRule extends Rule[SparkPlan] {
 
         
         val countTable = scan.tableIdentifier.get
-        val countValue = plan.session.sqlContext.sparkSession.sessionState.catalog
-          .getTableMetadata(countTable)
-          .stats.get.rowCount
+        val stats = plan.session.sqlContext.sparkSession.sessionState.catalog
+          .getTableMetadata(countTable).stats
+        if (stats.isEmpty) {
+          return false
+        }
+        val countValue = stats.get.rowCount
         if (countValue.isEmpty) {
           return false
         }
@@ -105,9 +108,13 @@ object CountReplaceRule extends Rule[SparkPlan] {
         }
         val distinctColumn = scanExec.schema.head.name
         val distinctTable = scanExec.tableIdentifier.get
-        val colStatsMap = plan.session.sqlContext.sparkSession.sessionState.catalog
-          .getTableMetadata(distinctTable)
-          .stats.map(_.colStats).getOrElse(Map.empty)
+
+        val stats = plan.session.sqlContext.sparkSession.sessionState.catalog
+          .getTableMetadata(distinctTable).stats
+        if (stats.isEmpty) {
+          return false
+        }
+        val colStatsMap = stats.map(_.colStats).getOrElse(Map.empty)
         if (colStatsMap.isEmpty) {
           return false
         }

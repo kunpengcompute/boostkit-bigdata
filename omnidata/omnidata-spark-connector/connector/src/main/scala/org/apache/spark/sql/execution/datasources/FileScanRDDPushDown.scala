@@ -116,12 +116,12 @@ class FileScanRDDPushDown(
 
   var pushDownIterator : PushDownIterator = null
   var forceOmniDataPushDown : Boolean = false
-  var isFirstFakePushDown : Boolean = true
+  var isFirstOptimizerPushDown : Boolean = true
 
   override def compute(split: RDDPartition, context: TaskContext): Iterator[InternalRow] = {
     if(isOptimizerPushDown){
       logDebug("optimizer push down")
-      computeSparkRDDAndFakePushDown(split, context)
+      computeSparkRDDAndOptimizerPushDown(split, context)
     } else {
       logDebug("Really push down")
       computePushDownRDD(split, context)
@@ -182,10 +182,10 @@ class FileScanRDDPushDown(
   }
 
   var threadPushDownCount:Int = 0
-  var fakePushSplits: Array[RDDPartition] = Array()
+  var pushSplits: Array[RDDPartition] = Array()
   var loopTimes = 0
 
-  def doFakePush(split: RDDPartition, context: TaskContext, scan: FileScanRDDPushDown): Unit = {
+  def doOptimizerPush(split: RDDPartition, context: TaskContext, scan: FileScanRDDPushDown): Unit = {
     val uniqueID = context.taskAttemptId()
     val partID = context.partitionId()
     val taskSizeD = taskTotal.toDouble
@@ -201,7 +201,7 @@ class FileScanRDDPushDown(
       case filePartition: FilePartition =>
         val files: Array[PartitionedFile] = Array(filePartition.files.head)
         pushDownRDDPartition = new FilePartition(filePartition.index, files, filePartition.sdi)
-        fakePushSplits = fakePushSplits :+ pushDownRDDPartition
+        pushSplits = pushSplits :+ pushDownRDDPartition
       case _ =>
     }
 
@@ -218,17 +218,17 @@ class FileScanRDDPushDown(
 
     if (uniqueID % taskSpace == 0) {
       log.debug("do optimizer push down RDD")
-      val fakePushDownThread = new OptimizerPushDownThread(Thread.currentThread(), fakePushSplits, context, scan, log)
-      fakePushDownThread.start()
+      val pushDownThread = new OptimizerPushDownThread(Thread.currentThread(), pushSplits, context, scan, log)
+      pushDownThread.start()
     } else {
       log.debug("do spark push down RDD")
     }
 
   }
 
-  def computeSparkRDDAndFakePushDown(split: RDDPartition, context: TaskContext): Iterator[InternalRow] = {
-    //this code (computeSparkRDDAndFakePushDown) from spark FileScanRDD
-    doFakePush(split, context, this)
+  def computeSparkRDDAndOptimizerPushDown(split: RDDPartition, context: TaskContext): Iterator[InternalRow] = {
+    //this code (computeSparkRDDAndOptimizerPushDown) from spark FileScanRDD
+    doOptimizerPush(split, context, this)
     val iterator = new Iterator[Object] with AutoCloseable {
       private val inputMetrics = context.taskMetrics().inputMetrics
       private val existingBytesRead = inputMetrics.bytesRead

@@ -13,11 +13,9 @@ import org.apache.spark.sql.execution.command.{CreateDataSourceTableAsSelectComm
 import org.apache.spark.sql.execution.datasources.LogicalRelation
 import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.aggregate.{HashAggregateExec, SortAggregateExec}
-import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.execution.exchange.ShuffleExchangeExec
 import org.apache.spark.sql.execution.joins._
 import org.apache.spark.sql.execution.ndp.NdpConf.getOptimizerPushDownThreshold
-import org.apache.spark.sql.execution.ndp.NdpPushDown
 import org.apache.spark.sql.hive.execution.CreateHiveTableAsSelectCommand
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types._
@@ -28,25 +26,15 @@ import scala.collection.JavaConverters
 
 case class NdpOverrides() extends Rule[SparkPlan] {
 
-  var numPartitions: Int = SQLConf.get.getConfString("spark.omni.sql.ndpPlugin.coalesce.numPartitions", "10000").toInt
+  var numPartitions: Int = -1
   var pushDownTaskCount: Int = -1
   var isSMJ = false
   var isSort = false
-  var isCount = false
   var hasCoalesce = false
   var hasShuffle = false
 
   def apply(plan: SparkPlan): SparkPlan = {
-    pushDownTaskCount = getOptimizerPushDownThreshold(plan.session)
-    if (CountReplaceRule.shouldReplaceCountOne(plan)) {
-      isCount = true
-      pushDownTaskCount = 200
-      SQLConf.get.setConfString(SQLConf.FILES_MAX_PARTITION_BYTES.key, "512MB")
-    }
-    if (CountReplaceRule.shouldReplaceDistinctCount(plan)) {
-      isCount = true
-      pushDownTaskCount = 2000
-    }
+    preRuleApply(plan)
     val ruleList = Seq(CountReplaceRule)
     val afterPlan = ruleList.foldLeft(plan) { case (sp, rule) =>
       val result = rule.apply(sp)
@@ -54,10 +42,29 @@ case class NdpOverrides() extends Rule[SparkPlan] {
     }
     val optimizedPlan = replaceWithOptimizedPlan(afterPlan)
     val finalPlan = replaceWithScanPlan(optimizedPlan)
-    if (isSMJ) {
-      SQLConf.get.setConfString(SQLConf.FILES_MAX_PARTITION_BYTES.key, "536870912")
-    }
+    postRuleApply(finalPlan)
     finalPlan
+  }
+
+  def preRuleApply(plan: SparkPlan): Unit = {
+    numPartitions = SQLConf.get.getConfString("spark.omni.sql.ndpPlugin.coalesce.numPartitions",
+      NdpConnectorUtils.getNdpNumPartitionsStr("10000")).toInt
+    pushDownTaskCount = NdpConnectorUtils.getPushDownTaskTotal(getOptimizerPushDownThreshold(plan.session))
+    if (CountReplaceRule.shouldReplaceCountOne(plan)) {
+      pushDownTaskCount = NdpConnectorUtils.getCountTaskTotal(200)
+      SQLConf.get.setConfString(SQLConf.FILES_MAX_PARTITION_BYTES.key,
+        NdpConnectorUtils.getCountMaxPartSize("512MB"))
+    }
+    if (CountReplaceRule.shouldReplaceDistinctCount(plan)) {
+      pushDownTaskCount = NdpConnectorUtils.getCountDistinctTaskTotal(2000)
+    }
+  }
+
+  def postRuleApply(plan: SparkPlan): Unit = {
+    if (isSMJ) {
+      SQLConf.get.setConfString(SQLConf.FILES_MAX_PARTITION_BYTES.key,
+        NdpConnectorUtils.getSMJMaxPartSize("536870912"))
+    }
   }
 
   //now set task total number, we can use this number pushDown task in thread
@@ -77,7 +84,7 @@ case class NdpOverrides() extends Rule[SparkPlan] {
 
   def replaceWithOptimizedPlan(plan: SparkPlan): SparkPlan = {
     val p = plan.transformUp {
-      case shuffle:ShuffleExchangeExec =>
+      case shuffle: ShuffleExchangeExec =>
         hasShuffle = true
         shuffle
       case p@ColumnarSortExec(sortOrder, global, child, testSpillFrequency) if isRadixSortExecEnable(sortOrder) =>
@@ -87,27 +94,37 @@ case class NdpOverrides() extends Rule[SparkPlan] {
         isSort = true
         RadixSortExec(sortOrder, global, child, testSpillFrequency)
       case p@DataWritingCommandExec(cmd, child) =>
-        if (isSort || isCount || isVagueAndAccurateHd(child)) {
+        if (isSort || isVagueAndAccurateHd(child)) {
           p
         } else {
           hasCoalesce = true
           DataWritingCommandExec(cmd, CoalesceExec(numPartitions, child))
         }
-      case p@ColumnarSortMergeJoinExec(leftKeys, rightKeys, joinType, condition, left, right, isSkewJoin, projectList) if joinType.equals(LeftOuter) =>
+      case p@ColumnarSortMergeJoinExec(_, _, joinType, _, _, _, _, projectList)
+        if joinType.equals(LeftOuter) =>
         isSMJ = true
-        numPartitions = 5000
-        ColumnarSortMergeJoinExec(leftKeys = p.leftKeys, rightKeys = p.rightKeys, joinType = LeftAnti, condition = p.condition, left = p.left, right = p.right, isSkewJoin = p.isSkewJoin, projectList)
-      case p@SortMergeJoinExec(leftKeys, rightKeys, joinType, condition, left, right, isSkewJoin) if joinType.equals(LeftOuter) =>
+        numPartitions = NdpConnectorUtils.getSMJNumPartitions(5000)
+        ColumnarSortMergeJoinExec(leftKeys = p.leftKeys, rightKeys = p.rightKeys, joinType = LeftAnti,
+          condition = p.condition, left = p.left, right = p.right, isSkewJoin = p.isSkewJoin, projectList)
+      case p@SortMergeJoinExec(_, _, joinType, _, _, _, _)
+        if joinType.equals(LeftOuter) =>
         isSMJ = true
-        numPartitions = 5000
-        SortMergeJoinExec(leftKeys = p.leftKeys, rightKeys = p.rightKeys, joinType = LeftAnti, condition = p.condition, left = p.left, right = p.right, isSkewJoin = p.isSkewJoin)
-      case p@ColumnarBroadcastHashJoinExec(leftKeys, rightKeys, joinType, buildSide, condition, left, right, isNullAwareAntiJoin, projectList) if joinType.equals(LeftOuter) =>
-        ColumnarBroadcastHashJoinExec(leftKeys = p.leftKeys, rightKeys = p.rightKeys, joinType = LeftAnti, buildSide = p.buildSide, condition = p.condition, left = p.left, right = p.right, isNullAwareAntiJoin = p.isNullAwareAntiJoin, projectList)
-      case p@BroadcastHashJoinExec(leftKeys, rightKeys, joinType, buildSide, condition, left, right, isNullAwareAntiJoin) if joinType.equals(LeftOuter) =>
-        BroadcastHashJoinExec(leftKeys = p.leftKeys, rightKeys = p.rightKeys, joinType = LeftAnti, buildSide = p.buildSide, condition = p.condition, left = p.left, right = p.right, isNullAwareAntiJoin = p.isNullAwareAntiJoin)
-      case p@ColumnarShuffledHashJoinExec(leftKeys, rightKeys, joinType, buildSide, condition, left, right, projectList) if joinType.equals(LeftOuter) =>
-        ColumnarShuffledHashJoinExec(p.leftKeys, p.rightKeys, LeftAnti, p.buildSide, p.condition, p.left, p.right, projectList)
-      case p@ShuffledHashJoinExec(leftKeys, rightKeys, joinType, buildSide, condition, left, right, isSkewJoin) if joinType.equals(LeftOuter) =>
+        numPartitions = NdpConnectorUtils.getSMJNumPartitions(5000)
+        SortMergeJoinExec(leftKeys = p.leftKeys, rightKeys = p.rightKeys, joinType = LeftAnti, condition = p.condition,
+          left = p.left, right = p.right, isSkewJoin = p.isSkewJoin)
+      case p@ColumnarBroadcastHashJoinExec(_, _, joinType, _, _, _, _, _, projectList) if joinType.equals(LeftOuter) =>
+        ColumnarBroadcastHashJoinExec(leftKeys = p.leftKeys, rightKeys = p.rightKeys,
+          joinType = LeftAnti, buildSide = p.buildSide, condition = p.condition, left = p.left,
+          right = p.right, isNullAwareAntiJoin = p.isNullAwareAntiJoin, projectList)
+      case p@BroadcastHashJoinExec(_, _, joinType, _, _, _, _, _) if joinType.equals(LeftOuter) =>
+        BroadcastHashJoinExec(leftKeys = p.leftKeys, rightKeys = p.rightKeys, joinType = LeftAnti,
+          buildSide = p.buildSide, condition = p.condition, left = p.left, right = p.right,
+          isNullAwareAntiJoin = p.isNullAwareAntiJoin)
+      case p@ColumnarShuffledHashJoinExec(_, _, joinType, _, _, _, _, projectList)
+        if joinType.equals(LeftOuter) =>
+        ColumnarShuffledHashJoinExec(p.leftKeys, p.rightKeys, LeftAnti, p.buildSide, p.condition,
+          p.left, p.right, projectList)
+      case p@ShuffledHashJoinExec(_, _, joinType, _, _, _, _, isSkewJoin) if joinType.equals(LeftOuter) =>
         ShuffledHashJoinExec(p.leftKeys, p.rightKeys, LeftAnti, p.buildSide, p.condition, p.left, p.right, isSkewJoin)
       case p@FilterExec(condition, child: OmniColumnarToRowExec, selectivity) =>
         val childPlan = child.transform {
@@ -128,20 +145,22 @@ case class NdpOverrides() extends Rule[SparkPlan] {
         }
         FilterExec(condition, childPlan, selectivity)
       case c1@OmniColumnarToRowExec(c2@ColumnarFilterExec(condition, c3: FileSourceScanExec)) =>
-        numPartitions = 1000
+        numPartitions = NdpConnectorUtils.getOmniColumnarNumPartitions(1000)
         if (isAccurate(condition)) {
-          pushDownTaskCount = 400
+          pushDownTaskCount = NdpConnectorUtils.getOmniColumnarTaskCount(400)
         }
         FilterExec(condition, ColumnarToRowExec(c3))
-      case p@FilterExec(condition, child, selectivity) if isAccurate(condition) =>
-        numPartitions = 1000
-        pushDownTaskCount = 400
+      case p@FilterExec(condition, _, _) if isAccurate(condition) =>
+        numPartitions = NdpConnectorUtils.getFilterPartitions(1000)
+        pushDownTaskCount = NdpConnectorUtils.getFilterTaskCount(400)
         p
-      case p@ColumnarConditionProjectExec(projectList, condition, child) if condition.toString().startsWith("isnull") && (child.isInstanceOf[ColumnarSortMergeJoinExec]
-        || child.isInstanceOf[ColumnarBroadcastHashJoinExec] || child.isInstanceOf[ColumnarShuffledHashJoinExec]) =>
+      case p@ColumnarConditionProjectExec(projectList, condition, child)
+        if condition.toString().startsWith("isnull") && (child.isInstanceOf[ColumnarSortMergeJoinExec]
+          || child.isInstanceOf[ColumnarBroadcastHashJoinExec] || child.isInstanceOf[ColumnarShuffledHashJoinExec]) =>
         ColumnarProjectExec(changeProjectList(projectList), child)
-      case p@ProjectExec(projectList, filter: FilterExec) if filter.condition.toString().startsWith("isnull") && (filter.child.isInstanceOf[SortMergeJoinExec]
-        || filter.child.isInstanceOf[BroadcastHashJoinExec] || filter.child.isInstanceOf[ShuffledHashJoinExec]) =>
+      case p@ProjectExec(projectList, filter: FilterExec)
+        if filter.condition.toString().startsWith("isnull") && (filter.child.isInstanceOf[SortMergeJoinExec]
+          || filter.child.isInstanceOf[BroadcastHashJoinExec] || filter.child.isInstanceOf[ShuffledHashJoinExec]) =>
         ProjectExec(changeProjectList(projectList), filter.child)
       case p: SortAggregateExec if p.child.isInstanceOf[OmniColumnarToRowExec]
         && p.child.asInstanceOf[OmniColumnarToRowExec].child.isInstanceOf[ColumnarSortExec]
@@ -173,9 +192,11 @@ case class NdpOverrides() extends Rule[SparkPlan] {
           p.resultExpressions,
           SortExec(omniColumnarSort.sortOrder,
             omniColumnarSort.global,
-            ShuffleExchangeExec(omniShuffleExchange.outputPartitioning, rowToOmniColumnar.child, omniShuffleExchange.shuffleOrigin),
+            ShuffleExchangeExec(omniShuffleExchange.outputPartitioning, rowToOmniColumnar.child,
+              omniShuffleExchange.shuffleOrigin),
             omniColumnarSort.testSpillFrequency))
-      case p@OmniColumnarToRowExec(agg: ColumnarHashAggregateExec) if agg.groupingExpressions.nonEmpty && agg.child.isInstanceOf[ColumnarShuffleExchangeExec] =>
+      case p@OmniColumnarToRowExec(agg: ColumnarHashAggregateExec)
+        if agg.groupingExpressions.nonEmpty && agg.child.isInstanceOf[ColumnarShuffleExchangeExec] =>
         val omniExchange = agg.child.asInstanceOf[ColumnarShuffleExchangeExec]
         val omniHashAgg = omniExchange.child.asInstanceOf[ColumnarHashAggregateExec]
         HashAggregateExec(agg.requiredChildDistributionExpressions,
@@ -318,11 +339,14 @@ case class NdpOptimizerRules(session: SparkSession) extends Rule[LogicalPlan] {
   )
 
   val SORT_REPARTITION_SIZE: Int = SQLConf.get.getConfString(
-    "spark.omni.sql.ndpPlugin.sort.repartition.size", "104857600").toInt
+    "spark.omni.sql.ndpPlugin.sort.repartition.size",
+    NdpConnectorUtils.getSortRepartitionSizeStr("104857600")).toInt
   val DECIMAL_PRECISION: Int = SQLConf.get.getConfString(
-    "spark.omni.sql.ndpPlugin.cast.decimal.precision", "15").toInt
+    "spark.omni.sql.ndpPlugin.cast.decimal.precision",
+    NdpConnectorUtils.getCastDecimalPrecisionStr("15")).toInt
   val MAX_PARTITION_BYTES_ENABLE_FACTOR: Int = SQLConf.get.getConfString(
-    "spark.omni.sql.ndpPlugin.max.partitionBytesEnable.factor", "2").toInt
+    "spark.omni.sql.ndpPlugin.max.partitionBytesEnable.factor",
+    NdpConnectorUtils.getNdpMaxPtFactorStr("2")).toInt
 
 
   override def apply(plan: LogicalPlan): LogicalPlan = {
@@ -347,9 +371,11 @@ case class NdpOptimizerRules(session: SparkSession) extends Rule[LogicalPlan] {
           .toBoolean =>
         var ifCast = false
         if (groupingExpressions.nonEmpty && hasCount(aggregateExpressions)) {
-          SQLConf.get.setConfString(SQLConf.FILES_MAX_PARTITION_BYTES.key, "1024MB")
+          SQLConf.get.setConfString(SQLConf.FILES_MAX_PARTITION_BYTES.key,
+            NdpConnectorUtils.getCountAggMaxFilePtBytesStr("1024MB"))
         } else if (groupingExpressions.nonEmpty && hasAvg(aggregateExpressions)) {
-          SQLConf.get.setConfString(SQLConf.FILES_MAX_PARTITION_BYTES.key, "256MB")
+          SQLConf.get.setConfString(SQLConf.FILES_MAX_PARTITION_BYTES.key,
+            NdpConnectorUtils.getAvgAggMaxFilePtBytesStr("256MB"))
           ifCast = true
         }
         if (ifCast) {
@@ -363,7 +389,8 @@ case class NdpOptimizerRules(session: SparkSession) extends Rule[LogicalPlan] {
       case j@Join(_, _, Inner, condition, _) =>
         // turnOffOperator()
         // 6-x-bhj
-        SQLConf.get.setConfString(SQLConf.FILES_MAX_PARTITION_BYTES.key, "512MB")
+        SQLConf.get.setConfString(SQLConf.FILES_MAX_PARTITION_BYTES.key,
+          NdpConnectorUtils.getBhjMaxFilePtBytesStr("512MB"))
         if (condition.isDefined) {
           condition.get match {
             case e@EqualTo(attr1: AttributeReference, attr2: AttributeReference) =>
@@ -444,9 +471,11 @@ case class NdpOptimizerRules(session: SparkSession) extends Rule[LogicalPlan] {
     // agg shuffle partition 200 ,other 5000
     if (existsTable && existsAgg) {
       // SQLConf.get.setConfString(SQLConf.FILES_MAX_PARTITION_BYTES.key, "536870912")
-      SQLConf.get.setConfString(SQLConf.SHUFFLE_PARTITIONS.key, "200")
+      SQLConf.get.setConfString(SQLConf.SHUFFLE_PARTITIONS.key,
+        NdpConnectorUtils.getAggShufflePartitionsStr("200"))
     } else {
-      SQLConf.get.setConfString(SQLConf.SHUFFLE_PARTITIONS.key, "5000")
+      SQLConf.get.setConfString(SQLConf.SHUFFLE_PARTITIONS.key,
+        NdpConnectorUtils.getShufflePartitionsStr("5000"))
     }
     repartitionShuffleForSort(fs, tables, planContents)
     repartitionHdfsReadForDistinct(fs, tables, plan)
@@ -461,7 +490,8 @@ case class NdpOptimizerRules(session: SparkSession) extends Rule[LogicalPlan] {
     if (tables.length == 1
       && SORT_REPARTITION_PLANS.exists(planContent.contains(_))) {
       val partitions = Math.max(1, fs.getContentSummary(new Path(tables.head)).getLength / SORT_REPARTITION_SIZE)
-      SQLConf.get.setConfString(SQLConf.SHUFFLE_PARTITIONS.key, "1000")
+      SQLConf.get.setConfString(SQLConf.SHUFFLE_PARTITIONS.key,
+        NdpConnectorUtils.getSortShufflePartitionsStr("1000"))
       // SQLConf.get.setConfString("spark.shuffle.sort.bypassMergeThreshold", "1000")
       turnOffOperator()
     }
@@ -477,14 +507,8 @@ case class NdpOptimizerRules(session: SparkSession) extends Rule[LogicalPlan] {
 
     plan.foreach {
       case Aggregate(groupingExpressions, aggregateExpressions, _) if groupingExpressions == aggregateExpressions =>
-        val executors = SQLConf.get.getConfString("spark.executor.instances", "14").toLong
-        val cores = SQLConf.get.getConfString("spark.executor.cores", "21").toLong
-        val multi = SQLConf.get.getConfString("spark.omni.sql.ndpPlugin.read.cores.multi", "16").toFloat
-        val partitionByte = (fs.getContentSummary(new Path(tables.head)).getLength / (executors * cores * multi)).toLong
-        //        SQLConf.get.setConfString(SQLConf.FILES_MAX_PARTITION_BYTES.key,
-        //          Math.max(SQLConf.get.filesMaxPartitionBytes, partitionByte).toString)
-        SQLConf.get.setConfString(SQLConf.FILES_MAX_PARTITION_BYTES.key, "1024MB")
-        // println(s"partitionByte:${partitionByte},partitions:${executors * cores * multi}")
+        SQLConf.get.setConfString(SQLConf.FILES_MAX_PARTITION_BYTES.key,
+          NdpConnectorUtils.getGroupMaxFilePtBytesStr("1024MB"))
         return
       case _ =>
     }

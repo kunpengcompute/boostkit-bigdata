@@ -571,7 +571,7 @@ object NdpConf {
 
   def getOptimizerPushDownThreshold(sparkSession: SparkSession): Int = {
     val result = toNumber(NDP_OPTIMIZER_PUSH_DOWN_THRESHOLD,
-      sparkSession.conf.getOption(NDP_OPTIMIZER_PUSH_DOWN_THRESHOLD).getOrElse("4500"),
+      sparkSession.conf.getOption(NDP_OPTIMIZER_PUSH_DOWN_THRESHOLD).getOrElse("1000"),
       _.toInt, "int", sparkSession)
     checkLongValue(NDP_OPTIMIZER_PUSH_DOWN_THRESHOLD, result, _ > 0,
       s"The $NDP_OPTIMIZER_PUSH_DOWN_THRESHOLD value must be positive", sparkSession)
