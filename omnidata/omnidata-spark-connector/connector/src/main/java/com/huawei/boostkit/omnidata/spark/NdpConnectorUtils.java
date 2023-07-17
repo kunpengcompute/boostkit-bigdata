@@ -134,6 +134,16 @@ public class NdpConnectorUtils {
                 System.getenv("GROUP_MAX_FILE_BYTES") : BytesStr;
     }
 
+    public static String getMixSqlBaseMaxFilePtBytesStr(String BytesStr) {
+        return System.getenv("MIX_SQL_BASE_MAX_FILE_BYTES") != null ?
+                System.getenv("MIX_SQL_BASE_MAX_FILE_BYTES") : BytesStr;
+    }
+
+    public static String getMixSqlAccurateMaxFilePtBytesStr(String BytesStr) {
+        return System.getenv("MIX_SQL_ACCURATE_MAX_FILE_BYTES") != null ?
+                System.getenv("MIX_SQL_ACCURATE_MAX_FILE_BYTES") : BytesStr;
+    }
+
     public static String getAggShufflePartitionsStr(String BytesStr) {
         return System.getenv("AGG_SHUFFLE_PARTITIONS") != null ?
                 System.getenv("AGG_SHUFFLE_PARTITIONS") : BytesStr;
