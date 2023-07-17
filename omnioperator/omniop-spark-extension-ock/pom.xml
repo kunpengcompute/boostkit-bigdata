@@ -18,14 +18,14 @@
      <input.version>spark-3.1</input.version>
      <scala.plugin.version>3.2.0</scala.plugin.version>
      <maven.plugin.version>3.1.1</maven.plugin.version>
-     <global.version>22.0.0</global.version>
+     <global.version>23.0.0</global.version>
    </properties>
 
    <groupId>com.huawei.ock</groupId>
    <artifactId>ock-omniop-shuffle-manager</artifactId>
    <packaging>jar</packaging>
    <description>Huawei Open Computing Kit for Spark, shuffle manager</description>
-   <version>22.0.0</version>
+   <version>23.0.0</version>
 
    <dependencies>
      <dependency>
@@ -66,12 +66,12 @@
      <dependency>
        <groupId>com.huawei.boostkit</groupId>
        <artifactId>boostkit-omniop-bindings</artifactId>
-       <version>1.1.0</version>
+       <version>1.2.0</version>
      </dependency>
      <dependency>
        <groupId>com.huawei.kunpeng</groupId>
        <artifactId>boostkit-omniop-spark</artifactId>
-       <version>3.1.1-1.1.0</version>
+       <version>3.1.1-1.2.0</version>
      </dependency>
      <dependency>
        <groupId>com.huawei.ock</groupId>
@@ -128,7 +128,7 @@
              <goals>
                <goal>compile</goal>
                <goal>testCompile</goal>
-             </goals> 
+             </goals>
              <configuration>
                <args>
                  <arg>-dependencyfile</arg>
