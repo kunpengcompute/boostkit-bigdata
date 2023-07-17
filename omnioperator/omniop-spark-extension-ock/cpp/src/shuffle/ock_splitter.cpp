@@ -65,7 +65,7 @@ bool OckSplitter::ToSplitterTypeId(const int32_t *vBColTypes)
                 break;
             }
             case OMNI_DECIMAL128: {
-                CastOmniToShuffleType(OMNI_DECIMAL128, ShuffleTypeId::SHUFFLE_DECIMAL128, decima128Size);
+                CastOmniToShuffleType(OMNI_DECIMAL128, ShuffleTypeId::SHUFFLE_DECIMAL128, decimal128Size);
                 break;
             }
             default: {
