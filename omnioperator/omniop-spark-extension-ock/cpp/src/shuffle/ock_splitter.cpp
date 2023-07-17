@@ -259,10 +259,6 @@ bool OckSplitter::WriteDecimal128(BaseVector *vector, bool isDict, std::vector<u
                 return false;
             }
             uint32_t rowIndex = reinterpret_cast<int32_t *>(ids)[idIndex];
-            if (UNLIKELY(rowIndex >= srcRowCount)) {
-                LOG_ERROR("Invalid rowIndex %d, srcRowCount %d.", rowIndex, srcRowCount);
-                return false;
-            }
             *dstValues++ = srcValues[rowIndex << 1];
             *dstValues++ = srcValues[rowIndex << 1 | 1];
         }
