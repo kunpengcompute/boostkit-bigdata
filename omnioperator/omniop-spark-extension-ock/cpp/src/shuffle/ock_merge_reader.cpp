@@ -221,7 +221,7 @@ bool OckMergeReader::CopyDataToVector(BaseVector *dstVector, uint32_t colIndex)
         auto *varCharVector = reinterpret_cast<Vector<LargeStringContainer<std::string_view>> *>(dstVector);
         remainingCapacity = omniruntime::vec::unsafe::UnsafeStringVector::GetContainer(varCharVector)->GetCapacityInBytes();
     } else {
-        remainingCapacity = GetDataSize(colIndex) *remainingSize;
+        remainingCapacity = GetDataSize(colIndex) * remainingSize;
     }
 
     for (uint32_t cnt = 0; cnt < mMergeCnt; ++cnt) {
