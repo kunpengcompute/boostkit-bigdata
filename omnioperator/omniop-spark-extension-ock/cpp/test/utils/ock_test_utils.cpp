@@ -213,12 +213,23 @@ VectorBatch *OckCreateVectorBatch_4varcharCols_withPid(int parNum, int rowNum)
     auto *col2 = new std::string[numRows];
     auto *col3 = new std::string[numRows];
     auto *col4 = new std::string[numRows];
-    for (int i = 0; i < numRows; i++) {
-        col0[i] = 
+    col0[i] = (i + 1) % partitionNum;
+        std::string strTmp1 = std::string("Col1_START_" + to_string(i + 1) + "_END_");
+        col1[i] = std::move(strTmp1);
+        std::string strTmp2 = std::string("Col2_START_" + to_string(i + 1) + "_END_");
+        col2[i] = std::move(strTmp2);
+        std::string strTmp3 = std::string("Col3_START_" + to_string(i + 1) + "_END_");
+        col3[i] = std::move(strTmp3);
+        std::string strTmp4 = std::string("Col4_START_" + to_string(i + 1) + "_END_");
+        col4[i] = std::move(strTmp4);
     }
-    VectorBatch *in = OckCreateInputData(inputTypes, numCols, col1, col2);
+
+    VectorBatch* in = CreateVectorBatch(inputTypes, numRows, col0, col1, col2, col3, col4);
+    delete[] col0;
     delete[] col1;
     delete[] col2;
+    delete[] col3;
+    delete[] col4;
     return in;
 }
 
@@ -232,229 +243,104 @@ VectorBatch *OckCreateVectorBatch_4varcharCols_withPid(int parNum, int rowNum)
 VectorBatch *OckCreateVectorBatch_4col_withPid(int parNum, int rowNum)
 {
     int partitionNum = parNum;
-    const int32_t numCols = 6;
-    auto *inputTypes = new int32_t[numCols];
-    inputTypes[0] = OMNI_INT;
-    inputTypes[1] = OMNI_INT;
-    inputTypes[2] = OMNI_LONG;
-    inputTypes[3] = OMNI_DOUBLE;
-    inputTypes[4] = OMNI_VARCHAR;
-    inputTypes[5] = OMNI_SHORT;
-
+    DataTypes inputTypes(std::vector<DataTypePtr>)({ IntType(), VarcharType(), VarcharType(), VarcharType(), VarcharType() });
+    
     const int32_t numRows = rowNum;
     auto *col0 = new int32_t[numRows];
     auto *col1 = new int32_t[numRows];
     auto *col2 = new int64_t[numRows];
     auto *col3 = new double[numRows];
-    auto *col4 = new int64_t[numRows];
-    auto *col5 = new int16_t[numRows];
+    auto *col4 = new std::string[numRows];
     std::string startStr = "_START_";
     std::string endStr = "_END_";
-
-    std::vector<std::string *> string_cache_test_;
+    std::vector<std::string*> string_cache_test_;
     for (int i = 0; i < numRows; i++) {
         col0[i] = (i + 1) % partitionNum;
         col1[i] = i + 1;
         col2[i] = i + 1;
         col3[i] = i + 1;
-        auto *strTmp = new std::string(startStr + std::to_string(i + 1) + endStr);
-        string_cache_test_.push_back(strTmp);
-        col4[i] = (int64_t)((*strTmp).c_str());
+        std::string strTmp = std::string(startStr + to_string(i + 1) + endStr);
+        col4[i] = std::move(strTmp);
+    }
+
+    VectorBatch* in = CreateVectorBatch(inputTypes, numRows, col0, col1, col2, col3, col4);
+    delete[] col0;
+    delete[] col1;
+    delete[] col2;
+    delete[] col3;
+    delete[] col4;
+    return in;
+}
+
+VectorBatch* CreateVectorBatch_2column_1row_withPid(int pid, std::string strVar, int intVar) {
+    DataTypes inputTypes(std::vector<DataTypePtr>({ IntType(), VarcharType(), IntType() }));
+
+    const int32_t numRows = 1;
+    auto* col0 = new int32_t[numRows];
+    auto* col1 = new std::string[numRows];
+    auto* col2 = new int32_t[numRows];
+
+    col0[0] = pid;
+    col1[0] = std::move(strVar);
+    col2[0] = intVar;
+
+    VectorBatch* in = CreateVectorBatch(inputTypes, numRows, col0, col1, col2);
+    delete[] col0;
+    delete[] col1;
+    delete[] col2;
+    return in;
+}
+
+VectorBatch *OckCreateVectorBatch_1fixedCols_withPid(int parNum, int rowNum, dataTypePtr fixColType)
+{
+    int partitionNum = parNum;
+    DataTypes inputTypes(std::vector<DataTypePtr>({ IntType(), std::move(fixColType) }));
+
+    const int32_t numRows = rowNum;
+    auto* col0 = new int32_t[numRows];
+    auto* col1 = new int64_t[numRows];
+    for (int i = 0; i < numRows; i++) {
+        col0[i] = (i + 1) % partitionNum;
+        col1[i] = i + 1;
+    }
+
+    VectorBatch* in = CreateVectorBatch(inputTypes, numRows, col0, col1);
+    delete[] col0;
+    delete[] col1;
+    return in; 
+}
+
+VectorBatch *OckCreateVectorBatch_5fixedCols_withPid(int parNum, int rowNum)
+{
+    int partitionNum = parNum;
+    // gen vectorBatch
+    DataTypes inputTypes(
+        std::vector<DataTypePtr>({ IntType(), BooleanType(), ShortType(), IntType(), LongType(), DoubleType() }));
+
+    const int32_t numRows = rowNum;
+    auto* col0 = new int32_t[numRows];
+    auto* col1 = new bool[numRows];
+    auto* col2 = new int16_t[numRows];
+    auto* col3 = new int32_t[numRows];
+    auto* col4 = new int64_t[numRows];
+    auto* col5 = new double[numRows];
+    for (int i = 0; i < numRows; i++) {
+        col0[i] = i % partitionNum;
+        col1[i] = (i % 2) == 0 ? true : false;
+        col2[i] = i + 1;
+        col3[i] = i + 1;
+        col4[i] = i + 1;
         col5[i] = i + 1;
     }
 
-    int64_t allData[numCols] = {reinterpret_cast<int64_t>(col0),
-                                reinterpret_cast<int64_t>(col1),
-                                reinterpret_cast<int64_t>(col2),
-                                reinterpret_cast<int64_t>(col3),
-                                reinterpret_cast<int64_t>(col4),
-                                reinterpret_cast<int64_t>(col5)};
-    VectorBatch *in = OckCreateInputData(numRows, numCols, inputTypes, allData);
-    delete[] inputTypes;
+    VectorBatch* in = CreateVectorBatch(inputTypes, numRows, col0, col1, col2, col3, col4, col5);
     delete[] col0;
     delete[] col1;
     delete[] col2;
     delete[] col3;
     delete[] col4;
-
-    for (int p = 0; p < string_cache_test_.size(); p++) {
-        delete string_cache_test_[p]; // 释放内存
-    }
-    return in;
-}
-
-VectorBatch *OckCreateVectorBatch_1longCol_withPid(int parNum, int rowNum)
-{
-    int partitionNum = parNum;
-    const int32_t numCols = 2;
-    auto *inputTypes = new int32_t[numCols];
-    inputTypes[0] = OMNI_INT;
-    inputTypes[1] = OMNI_LONG;
-
-    const int32_t numRows = rowNum;
-    auto *col0 = new int32_t[numRows];
-    auto *col1 = new int64_t[numRows];
-    for (int i = 0; i < numRows; i++) {
-        col0[i] = (i + 1) % partitionNum;
-        col1[i] = i + 1;
-    }
-
-    int64_t allData[numCols] = {reinterpret_cast<int64_t>(col0),
-                                reinterpret_cast<int64_t>(col1)};
-    VectorBatch *in = OckCreateInputData(numRows, numCols, inputTypes, allData);
-    for (int i = 0; i < 2; i++) {
-        delete (int64_t *)allData[i]; // 释放内存
-    }
-    return in;
-}
-
-VectorBatch *OckCreateVectorBatch_2column_1row_withPid(int pid, std::string strVar, int intVar)
-{
-    const int32_t numCols = 3;
-    auto *inputTypes = new int32_t[numCols];
-    inputTypes[0] = OMNI_INT;
-    inputTypes[1] = OMNI_VARCHAR;
-    inputTypes[2] = OMNI_INT;
-
-    const int32_t numRows = 1;
-    auto *col0 = new int32_t[numRows];
-    auto *col1 = new int64_t[numRows];
-    auto *col2 = new int32_t[numRows];
-
-    col0[0] = pid;
-    auto *strTmp = new std::string(strVar);
-    col1[0] = (int64_t)(strTmp->c_str());
-    col2[0] = intVar;
-
-    int64_t allData[numCols] = {reinterpret_cast<int64_t>(col0),
-                                reinterpret_cast<int64_t>(col1),
-                                reinterpret_cast<int64_t>(col2)};
-    VectorBatch *in = OckCreateInputData(numRows, numCols, inputTypes, allData);
-    delete[] inputTypes;
-    delete[] col0;
-    delete[] col1;
-    delete[] col2;
-    delete strTmp;
-    return in;
-}
-
-VectorBatch *OckCreateVectorBatch_4varcharCols_withPid(int parNum, int rowNum)
-{
-    int partitionNum = parNum;
-    const int32_t numCols = 5;
-    auto *inputTypes = new int32_t[numCols];
-    inputTypes[0] = OMNI_INT;
-    inputTypes[1] = OMNI_VARCHAR;
-    inputTypes[2] = OMNI_VARCHAR;
-    inputTypes[3] = OMNI_VARCHAR;
-    inputTypes[4] = OMNI_VARCHAR;
-
-    const int32_t numRows = rowNum;
-    auto *col0 = new int32_t[numRows];
-    auto *col1 = new int64_t[numRows];
-    auto *col2 = new int64_t[numRows];
-    auto *col3 = new int64_t[numRows];
-    auto *col4 = new int64_t[numRows];
-
-    std::vector<std::string *> string_cache_test_;
-    for (int i = 0; i < numRows; i++) {
-        col0[i] = (i + 1) % partitionNum;
-        auto *strTmp1 = new std::string("Col1_START_" + std::to_string(i + 1) + "_END_");
-        col1[i] = (int64_t)((*strTmp1).c_str());
-        auto *strTmp2 = new std::string("Col2_START_" + std::to_string(i + 1) + "_END_");
-        col2[i] = (int64_t)((*strTmp2).c_str());
-        auto *strTmp3 = new std::string("Col3_START_" + std::to_string(i + 1) + "_END_");
-        col3[i] = (int64_t)((*strTmp3).c_str());
-        auto *strTmp4 = new std::string("Col4_START_" + std::to_string(i + 1) + "_END_");
-        col4[i] = (int64_t)((*strTmp4).c_str());
-        string_cache_test_.push_back(strTmp1);
-        string_cache_test_.push_back(strTmp2);
-        string_cache_test_.push_back(strTmp3);
-        string_cache_test_.push_back(strTmp4);
-    }
-
-    int64_t allData[numCols] = {reinterpret_cast<int64_t>(col0),
-                                reinterpret_cast<int64_t>(col1),
-                                reinterpret_cast<int64_t>(col2),
-                                reinterpret_cast<int64_t>(col3),
-                                reinterpret_cast<int64_t>(col4)};
-    VectorBatch *in = OckCreateInputData(numRows, numCols, inputTypes, allData);
-    delete[] inputTypes;
-    delete[] col0;
-    delete[] col1;
-    delete[] col2;
-    delete[] col3;
-    delete[] col4;
-
-    for (int p = 0; p < string_cache_test_.size(); p++) {
-        delete string_cache_test_[p]; // 释放内存
-    }
-    return in;
-}
-
-VectorBatch *OckCreateVectorBatch_1fixedCols_withPid(int parNum, int32_t rowNum)
-{
-    int partitionNum = parNum;
-
-    // gen vectorBatch
-    const int32_t numCols = 1;
-    auto *inputTypes = new int32_t[numCols];
-    // inputTypes[0] = OMNI_INT;
-    inputTypes[0] = OMNI_LONG;
-
-    const uint32_t numRows = rowNum;
-
-    std::cout << "gen row " << numRows << std::endl;
-    // auto *col0 = new int32_t[numRows];
-    auto *col1 = new int64_t[numRows];
-    for (int i = 0; i < numRows; i++) {
-        // col0[i] = 0; // i % partitionNum;
-        col1[i] = i + 1;
-    }
-
-    int64_t allData[numCols] = {reinterpret_cast<int64_t>(col1)};
-    VectorBatch *in = OckCreateInputData(numRows, numCols, inputTypes, allData);
-    delete[] inputTypes;
-    // delete[] col0;
-    delete[] col1;
-    return in;
-}
-
-VectorBatch *OckCreateVectorBatch_3fixedCols_withPid(int parNum, int rowNum)
-{
-    int partitionNum = parNum;
-
-    // gen vectorBatch
-    const int32_t numCols = 4;
-    auto *inputTypes = new int32_t[numCols];
-    inputTypes[0] = OMNI_INT;
-    inputTypes[1] = OMNI_INT;
-    inputTypes[2] = OMNI_LONG;
-    inputTypes[3] = OMNI_DOUBLE;
-
-    const int32_t numRows = rowNum;
-    auto *col0 = new int32_t[numRows];
-    auto *col1 = new int32_t[numRows];
-    auto *col2 = new int64_t[numRows];
-    auto *col3 = new double[numRows];
-    for (int i = 0; i < numRows; i++) {
-        col0[i] = i % partitionNum;
-        col1[i] = i + 1;
-        col2[i] = i + 1;
-        col3[i] = i + 1;
-    }
-
-    int64_t allData[numCols] = {reinterpret_cast<int64_t>(col0),
-                                reinterpret_cast<int64_t>(col1),
-                                reinterpret_cast<int64_t>(col2),
-                                reinterpret_cast<int64_t>(col3)};
-    VectorBatch *in = OckCreateInputData(numRows, numCols, inputTypes, allData);
-    delete[] inputTypes;
-    delete[] col0;
-    delete[] col1;
-    delete[] col2;
-    delete[] col3;
-    return in;
+    delete[] col5;
+    return in; 
 }
 
 VectorBatch *OckCreateVectorBatch_2dictionaryCols_withPid(int partitionNum)
@@ -463,121 +349,121 @@ VectorBatch *OckCreateVectorBatch_2dictionaryCols_withPid(int partitionNum)
     // construct input data
     const int32_t dataSize = 6;
     // prepare data
-    int32_t data0[dataSize] = {111, 112, 113, 114, 115, 116};
-    int64_t data1[dataSize] = {221, 222, 223, 224, 225, 226};
-    int64_t data2[dataSize] = {111, 222, 333, 444, 555, 666};
-    Decimal128 data3[dataSize] = {Decimal128(0, 1), Decimal128(0, 2), Decimal128(0, 3), Decimal128(0, 4), Decimal128(0, 5), Decimal128(0, 6)};
-    void *datas[4] = {data0, data1, data2, data3};
-
-    DataTypes sourceTypes(std::vector<omniruntime::vec::DataType>({ IntDataType(), LongDataType(), Decimal64DataType(7, 2), Decimal128DataType(38, 2)}));
-
+    auto *col0 = new int32_t[dataSize];
+    for (int32_t i = 0; i< dataSize; i++) {
+        col0[i] = (i + 1) % partitionNum;
+    }
+    int32_t col1[dataSize] = {111, 112, 113, 114, 115, 116};
+    int64_t col2[dataSize] = {221, 222, 223, 224, 225, 226};
+    void *datas[2] = {col1, col2};
+    DataTypes sourceTypes(std::vector<DataTypePtr>({ IntType(), LongType() }));
     int32_t ids[] = {0, 1, 2, 3, 4, 5};
-    auto vectorBatch = new VectorBatch(5, dataSize);
-    VectorAllocator *allocator = omniruntime::vec::GetProcessGlobalVecAllocator();
-    auto intVectorTmp = new IntVector(allocator, 6);
-    for (int i = 0; i < intVectorTmp->GetSize(); i++) {
-        intVectorTmp->SetValue(i, (i + 1) % partitionNum);
-    }
-    for (int32_t i = 0; i < 5; i++) {
-        if (i == 0) {
-            vectorBatch->SetVector(i, intVectorTmp);
-        } else {
-            omniruntime::vec::DataType dataType = sourceTypes.Get()[i - 1];
-            vectorBatch->SetVector(i, OckCreateDictionaryVector(dataType, dataSize, ids, dataSize, datas[i - 1]));
-        }
-    }
+
+    VectorBatch *vectorBatch = new VectorBatch(dataSize);
+    auto Vec0 = CreateVector<int32_t>(dataSize, col0);
+    vectorBatch->Append(Vec0.release());
+    auto dicVec0 = CreateDictionaryVector(*sourceTypes.GetType(0), dataSize, ids, dataSize, datas[0]);
+    auto dicVec1 = CreateDictionaryVector(*sourceTypes.GetType(1), dataSize, ids, dataSize, datas[1]);
+    vectorBatch->Append(dicVec0.release());
+    vectorBatch->Append(dicVec1.release());
+
+    delete[] col0;
     return vectorBatch;
 }
 
 VectorBatch *OckCreateVectorBatch_1decimal128Col_withPid(int partitionNum)
 {
-    int32_t ROW_PER_VEC_BATCH = 999;
-    auto decimal128InputVec = OckbuildVector(Decimal128DataType(38, 2), ROW_PER_VEC_BATCH);
-    VectorAllocator *allocator = omniruntime::vec::GetProcessGlobalVecAllocator();
-    auto *intVectorPid = new IntVector(allocator, ROW_PER_VEC_BATCH);
-    for (int i = 0; i < intVectorPid->GetSize(); i++) {
-        intVectorPid->SetValue(i, (i + 1) % partitionNum);
+    const int32_t numRows = rowNum;
+    DataTypes inputTypes(std::vector<DataTypePtr>({ IntType(), Decimal128Type(38, 2) }));
+    
+    auto *col0 = new int32_t[numRows];
+    auto *col1 = new Decimal128[numRows];
+    for (int32_t i = 0; i < numRows; i++) {
+        col0[i] = (i + 1) % partitionNum;
+        col1[i] = Decimal128(0, 1);
     }
-    auto *vecBatch = new VectorBatch(2);
-    vecBatch->SetVector(0, intVectorPid);
-    vecBatch->SetVector(1, decimal128InputVec);
-    return vecBatch;
+    
+    VectorBatch* in = CreateVectorBatch(inputTypes, numRows, col0, col1);
+    delete[] col0;
+    delete[] col1;
+    return in;
 }
 
 VectorBatch *OckCreateVectorBatch_1decimal64Col_withPid(int partitionNum, int rowNum) {
-    auto decimal64InputVec = OckbuildVector(Decimal64DataType(7, 2), rowNum);
-    VectorAllocator *allocator = VectorAllocator::GetGlobalAllocator();
-    IntVector *intVectorPid = new IntVector(allocator, rowNum);
-    for (int i = 0; i < intVectorPid->GetSize(); i++) {
-        intVectorPid->SetValue(i, (i+1) % partitionNum);
+    const int32_t numRows = rowNum;
+    DataTypes inputTypes(std::vector<DataTypePtr>({ IntType(), Decimal64Type(7, 2) }));
+    
+    auto *col0 = new int32_t[numRows];
+    auto *col1 = new int64_t[numRows];
+    for (int32_t i = 0; i < numRows; i++) {
+        col0[i] = (i + 1) % partitionNum;
+        col1[i] = 1;
     }
-    VectorBatch *vecBatch = new VectorBatch(2);
-    vecBatch->SetVector(0, intVectorPid);
-    vecBatch->SetVector(1, decimal64InputVec);
-    return vecBatch;
+    
+    VectorBatch* in = CreateVectorBatch(inputTypes, numRows, col0, col1);
+    delete[] col0;
+    delete[] col1;
+    return in;
 }
 
 VectorBatch *OckCreateVectorBatch_2decimalCol_withPid(int partitionNum, int rowNum) {
-    auto decimal64InputVec = OckbuildVector(Decimal64DataType(7, 2), rowNum);
-    auto decimal128InputVec = OckbuildVector(Decimal128DataType(38, 2), rowNum);
-    VectorAllocator *allocator = VectorAllocator::GetGlobalAllocator();
-    IntVector *intVectorPid = new IntVector(allocator, rowNum);
-    for (int i = 0; i < intVectorPid->GetSize(); i++) {
-        intVectorPid->SetValue(i, (i+1) % partitionNum);
+    const int32_t numRows = rowNum;
+    DataTypes inputTypes(std::vector<DataTypePtr>({ IntType(), Decimal64Type(7, 2), Decimal128Type(38, 2) }));
+    
+    auto *col0 = new int32_t[numRows];
+    auto *col1 = new int64_t[numRows];
+    auto *col2 = new Decimal128[numRows];
+    for (int32_t i = 0; i < numRows; i++) {
+        col0[i] = (i + 1) % partitionNum;
+        col1[i] = 1;
+        col2[i] = Decimal128(0, 1);
     }
-    VectorBatch *vecBatch = new VectorBatch(3);
-    vecBatch->SetVector(0, intVectorPid);
-    vecBatch->SetVector(1, decimal64InputVec);
-    vecBatch->SetVector(2, decimal128InputVec);
-    return vecBatch;
+    
+    VectorBatch* in = CreateVectorBatch(inputTypes, numRows, col0, col1, col2);
+    delete[] col0;
+    delete[] col1;
+    delete[] col2;
+    return in;
 }
 
 VectorBatch *OckCreateVectorBatch_someNullRow_vectorBatch()
 {
     const int32_t numRows = 6;
-    int32_t data1[numRows] = {0, 1, 2, 0, 1, 2};
-    int64_t data2[numRows] = {0, 1, 2, 3, 4, 5};
-    double data3[numRows] = {0.0, 1.1, 2.2, 3.3, 4.4, 5.5};
-    std::string data4[numRows] = {"abcde", "fghij", "klmno", "pqrst", "", ""};
+    const int32_t numCols = 6;
+    bool data0[numRows] = {true, false, true, false, true, false};
+    int16_t data1[numRows] = {0, 1, 2, 3, 4, 6};
+    int32_t data2[numRows] = {0, 1, 2, 0, 1, 2};
+    int64_t data3[numRows] = {0, 1, 2, 3, 4, 5};
+    double data4[numRows] = {0.0, 1.1, 2.2, 3.3, 4.4, 5.5};
+    std::string data5[numRows] = {"abcde", "fghij", "klmno", "pqrst", "", ""};
 
-    auto vec0 = OckCreateVector<IntVector>(data1, numRows);
-    auto vec1 = OckCreateVector<LongVector>(data2, numRows);
-    auto vec2 = OckCreateVector<DoubleVector>(data3, numRows);
-    auto vec3 = OckCreateVarcharVector(VarcharDataType(varcharType), data4, numRows);
-    for (int i = 0; i < numRows; i = i + 2) {
-        vec0->SetValueNull(i, false);
-        vec1->SetValueNull(i, false);
-        vec2->SetValueNull(i, false);
+    DataTypes inputTypes(
+        std::vector<DataTypePtr>({ BooleanType(), ShortType(), IntType(), LongType(), DoubleType(), VarcharType(5) }));
+    VectorBatch* vecBatch = CreateVectorBatch(inputTypes, numRows, data0, data1, data2, data3, data4, data5);
+    for (int32_t i = 0; i < numCols; i++) {
+        for (int32_t j = 0; j < numRows; j = j + 2) {
+            vecBatch->Get(i)->SetNull(j);
+        }
     }
-    auto *vecBatch = new VectorBatch(4);
-    vecBatch->SetVector(0, vec0);
-    vecBatch->SetVector(1, vec1);
-    vecBatch->SetVector(2, vec2);
-    vecBatch->SetVector(3, vec3);
     return vecBatch;
 }
 
 VectorBatch *OckCreateVectorBatch_someNullCol_vectorBatch()
 {
     const int32_t numRows = 6;
+    const int32_t numCols = 4;
     int32_t data1[numRows] = {0, 1, 2, 0, 1, 2};
     int64_t data2[numRows] = {0, 1, 2, 3, 4, 5};
     double data3[numRows] = {0.0, 1.1, 2.2, 3.3, 4.4, 5.5};
     std::string data4[numRows] = {"abcde", "fghij", "klmno", "pqrst", "", ""};
 
-    auto vec0 = OckCreateVector<IntVector>(data1, numRows);
-    auto vec1 = OckCreateVector<LongVector>(data2, numRows);
-    auto vec2 = OckCreateVector<DoubleVector>(data3, numRows);
-    auto vec3 = OckCreateVarcharVector(VarcharDataType(varcharType), data4, numRows);
-    for (int i = 0; i < numRows; i = i + 1) {
-        vec1->SetValueNull(i);
-        vec3->SetValueNull(i);
+    DataTypes inputTypes(std::vector<DataTypePtr>({ IntType(), LongType(), DoubleType(), VarcharType(5) }));
+    VectorBatch* vecBatch = CreateVectorBatch(inputTypes, numRows, data1, data2, data3, data4);
+    for (int32_t i = 0; i < numCols; i = i + 2) {
+        for (int32_t j = 0; j < numRows; j++) {
+            vecBatch->Get(i)->SetNull(j);
+        }
     }
-    auto *vecBatch = new VectorBatch(4);
-    vecBatch->SetVector(0, vec0);
-    vecBatch->SetVector(1, vec1);
-    vecBatch->SetVector(2, vec2);
-    vecBatch->SetVector(3, vec3);
     return vecBatch;
 }
 
