@@ -10,7 +10,7 @@
 using namespace omniruntime::vec;
 using namespace omniruntime::type;
 
-void OckToVectorTypes(const int32_t *dataTypeIds, int32_t dataTypeCount, std::vector<DataType> &dataTypes)
+/*void OckToVectorTypes(const int32_t *dataTypeIds, int32_t dataTypeCount, std::vector<DataType> &dataTypes)
 {
     for (int i = 0; i < dataTypeCount; ++i) {
         if (dataTypeIds[i] == OMNI_VARCHAR) {
@@ -22,125 +22,39 @@ void OckToVectorTypes(const int32_t *dataTypeIds, int32_t dataTypeCount, std::ve
         }
         dataTypes.emplace_back(DataType(dataTypeIds[i]));
     }
-}
+}*/
 
-VectorBatch *OckCreateInputData(const int32_t numRows, const int32_t numCols, int32_t *inputTypeIds, int64_t *allData)
+VectorBatch *OckCreateInputData(const DataType &types, int32_t rowCount, ...)
 {
-    auto *vecBatch = new VectorBatch(numCols, numRows);
-    std::vector<omniruntime::vec::DataType> inputTypes;
-    OckToVectorTypes(inputTypeIds, numCols, inputTypes);
-    vecBatch->NewVectors(VectorAllocator::GetGlobalAllocator(), inputTypes);
-    for (int i = 0; i < numCols; ++i) {
-        switch (inputTypeIds[i]) {
-            case OMNI_INT:
-                ((IntVector *)vecBatch->GetVector(i))->SetValues(0, (int32_t *)allData[i], numRows);
-                break;
-            case OMNI_LONG:
-                ((LongVector *)vecBatch->GetVector(i))->SetValues(0, (int64_t *)allData[i], numRows);
-                break;
-            case OMNI_DOUBLE:
-                ((DoubleVector *)vecBatch->GetVector(i))->SetValues(0, (double *)allData[i], numRows);
-                break;
-            case OMNI_SHORT:
-                ((IntVector *)vecBatch->GetVector(i))->SetValues(0, (int32_t *)allData[i], numRows);
-                break;
-            case OMNI_VARCHAR:
-            case OMNI_CHAR: {
-                for (int j = 0; j < numRows; ++j) {
-                    int64_t addr = (reinterpret_cast<int64_t *>(allData[i]))[j];
-                    std::string s(reinterpret_cast<char *>(addr));
-                    ((VarcharVector *)vecBatch->GetVector(i))->SetValue(j, (uint8_t *)(s.c_str()), s.length());
-                }
-                break;
-            }
-            case OMNI_DECIMAL128:
-                ((Decimal128Vector *)vecBatch->GetVector(i))->SetValues(0, (int64_t *)allData[i], numRows);
-                break;
-            default: {
-                LogError("No such data type %d", inputTypeIds[i]);
-            }
-        }
+    int32_t typesCount = types.GetSize();
+    auto *vecBatch = new VectorBatch(rowCount);
+    va_list args;
+    va_start(args, rowCount);
+    for (int32_t i = 0; i< typesCount; i++) {
+        dataTypePtr = type = types.GetType(i);
+        VectorBatch->Append(CreateVector(*type, rowCount, args).release());
     }
+    va_end(args);
     return vecBatch;
 }
 
-VarcharVector *OckCreateVarcharVector(VarcharDataType type, std::string *values, int32_t length)
+std::unique_ptr<BaseVector> CreateVector(DataType &dataType, int32_t rowCount, va_list &args)
 {
-    VectorAllocator *vecAllocator = VectorAllocator::GetGlobalAllocator();
-    uint32_t width = type.GetWidth();
-    VarcharVector *vector = std::make_unique<VarcharVector>(vecAllocator, length * width, length).release();
-    uint32_t offset = 0;
-    for (int32_t i = 0; i < length; i++) {
-        vector->SetValue(i, reinterpret_cast<const uint8_t *>(values[i].c_str()), values[i].length());
-        bool isNull = values[i].empty() ? true : false;
-        vector->SetValueNull(i, isNull);
-        vector->SetValueOffset(i, offset);
-        offset += values[i].length();
-    }
-
-    if (length > 0) {
-        vector->SetValueOffset(values->size(), offset);
-    }
-
-    std::stringstream offsetValue;
-    offsetValue << "{ ";
-    for (uint32_t index = 0; index < length; index++) {
-        offsetValue << vector->GetValueOffset(index) << ", ";
-    }
-
-    offsetValue << vector->GetValueOffset(values->size()) << " }";
-
-    LOG_INFO("%s", offsetValue.str().c_str());
-
-    return vector;
+    return DYNAMIC_TYPE_DISPATCH(CreateFlatVector, dataType.GetId(), rowCount, args);
 }
 
-Decimal128Vector *OckCreateDecimal128Vector(Decimal128 *values, int32_t length)
-{
-    VectorAllocator *vecAllocator = VectorAllocator::GetGlobalAllocator();
-    Decimal128Vector *vector = std::make_unique<Decimal128Vector>(vecAllocator, length).release();
-    for (int32_t i = 0; i < length; i++) {
-        vector->SetValue(i, values[i]);
-    }
-    return vector;
-}
 
-Vector *OckCreateVector(DataType &vecType, int32_t rowCount, va_list &args)
-{
-    switch (vecType.GetId()) {
-        case OMNI_INT:
-        case OMNI_DATE32:
-            return OckCreateVector<IntVector>(va_arg(args, int32_t *), rowCount);
-        case OMNI_LONG:
-        case OMNI_DECIMAL64:
-            return OckCreateVector<LongVector>(va_arg(args, int64_t *), rowCount);
-        case OMNI_DOUBLE:
-            return OckCreateVector<DoubleVector>(va_arg(args, double *), rowCount);
-        case OMNI_BOOLEAN:
-            return OckCreateVector<BooleanVector>(va_arg(args, bool *), rowCount);
-        case OMNI_VARCHAR:
-        case OMNI_CHAR:
-            return OckCreateVarcharVector(static_cast<VarcharDataType &>(vecType), va_arg(args, std::string *),
-                rowCount);
-        case OMNI_DECIMAL128:
-            return OckCreateDecimal128Vector(va_arg(args, Decimal128 *), rowCount);
-        default:
-            std::cerr << "Unsupported type : " << vecType.GetId() << std::endl;
-            return nullptr;
-    }
-}
-
-DictionaryVector *OckCreateDictionaryVector(DataType &vecType, int32_t rowCount, int32_t *ids, int32_t idsCount, ...)
+std::unique_ptr<BaseVector> CreateDictionaryVector(DataType &dataType, int32_t rowCount, int32_t *ids, int32_t idsCount,
+     ..)
 {
     va_list args;
     va_start(args, idsCount);
-    Vector *dictionary = OckCreateVector(vecType, rowCount, args);
+    std::unique_ptr<BaseVector> dictionary = CreateVector(dataType, rowCount, args);
     va_end(args);
-    auto vec = std::make_unique<DictionaryVector>(dictionary, ids, idsCount).release();
-    delete dictionary;
-    return vec;
+    return DYNAMIC_TYPE_DISPATCH(CreateDictionary, dataType.GetId(), dictionary.get(), ids, idsCount);
 }
 
+/*
 Vector *OckbuildVector(const DataType &aggType, int32_t rowNumber)
 {
     VectorAllocator *vecAllocator = VectorAllocator::GetGlobalAllocator();
@@ -212,47 +126,37 @@ Vector *OckbuildVector(const DataType &aggType, int32_t rowNumber)
             return nullptr;
         }
     }
-}
+}*/
 
-Vector *OckNewbuildVector(const DataTypeId &typeId, int32_t rowNumber)
+BaseVector *OckNewbuildVector(const DataTypeId &typeId, int32_t rowNumber)
 {
-    VectorAllocator *vecAllocator = VectorAllocator::GetGlobalAllocator();
-    switch (typeId) {
+        switch (typeId) {
         case OMNI_SHORT: {
-            auto *col = new ShortVector(vecAllocator, rowNumber);
-            return col;
+            return new Vector<uint16_t>(rowNumber);
         }
         case OMNI_NONE: {
-            auto *col = new LongVector(vecAllocator, rowNumber);
-            return col;
+            return new Vector<uint64_t>(rowNumber);
         }
         case OMNI_INT:
         case OMNI_DATE32: {
-            auto *col = new IntVector(vecAllocator, rowNumber);
-            return col;
+            return new Vector<uint32_t>(rowNumber);
         }
         case OMNI_LONG:
         case OMNI_DECIMAL64: {
-            auto *col = new LongVector(vecAllocator, rowNumber);
-            return col;
+            return new Vector<uint64_t>(rowNumber);
         }
         case OMNI_DOUBLE: {
-            auto *col = new DoubleVector(vecAllocator, rowNumber);
-            return col;
+            return new Vector<uint64_t>(rowNumber);
         }
         case OMNI_BOOLEAN: {
-            auto *col = new BooleanVector(vecAllocator, rowNumber);
-            return col;
+            return new Vector<uint8_t>(rowNumber);
         }
         case OMNI_DECIMAL128: {
-            auto *col = new Decimal128Vector(vecAllocator, rowNumber);
-            return col;
+            return new Vector<Decimal128>(rowNumber);
         }
         case OMNI_VARCHAR:
         case OMNI_CHAR: {
-            VarcharDataType charType = (VarcharDataType &)typeId;
-            auto *col = new VarcharVector(vecAllocator, charType.GetWidth() * rowNumber, rowNumber);
-            return col;
+            return new Vector<LargeStringContainer<std::string_view>>(rowNumber);
         }
         default: {
             LogError("No such %d type support", typeId);
@@ -261,15 +165,15 @@ Vector *OckNewbuildVector(const DataTypeId &typeId, int32_t rowNumber)
     }
 }
 
-VectorBatch *OckCreateVectorBatch(DataTypes &types, int32_t rowCount, ...)
+VectorBatch *OckCreateVectorBatch(const DataTypes &types, int32_t rowCount, ...)
 {
     int32_t typesCount = types.GetSize();
-    VectorBatch *vectorBatch = std::make_unique<VectorBatch>(typesCount).release();
+    auto *vectorBatch = new vecBatch(rowCount);
     va_list args;
     va_start(args, rowCount);
     for (int32_t i = 0; i < typesCount; i++) {
-        DataType type = types.Get()[i];
-        vectorBatch->SetVector(i, OckCreateVector(type, rowCount, args));
+        dataTypePtr type = types.GetType(i);
+        vectorBatch->Append(OckCreateVector(*type, rowCount, args).release());
     }
     va_end(args);
     return vectorBatch;
@@ -286,23 +190,35 @@ VectorBatch *OckCreateVectorBatch_1row_varchar_withPid(int pid, const std::strin
 {
     // gen vectorBatch
     const int32_t numCols = 2;
-    auto inputTypes = new int32_t[numCols];
-    inputTypes[0] = OMNI_INT;
-    inputTypes[1] = OMNI_VARCHAR;
-
+    DataTypes inputTypes(std::vector<DataTypePtr>)({ IntType(), VarcharType()});
     const int32_t numRows = 1;
     auto *col1 = new int32_t[numRows];
     col1[0] = pid;
-    auto *col2 = new int64_t[numRows];
-    auto *strTmp = new std::string(std::move(inputString));
-    col2[0] = (int64_t)(strTmp->c_str());
-
-    int64_t allData[numCols] = {reinterpret_cast<int64_t>(col1),
-                                reinterpret_cast<int64_t>(col2)};
-    VectorBatch *in = OckCreateInputData(numRows, numCols, inputTypes, allData);
+    auto *col2 = new std::string[numRows];
+    col2[0] = std::move(inputString);
+    VectorBatch *in = OckCreateInputData(inputTypes, numCols, col1, col2);
     delete[] col1;
     delete[] col2;
-    delete strTmp;
+    return in;
+}
+
+VectorBatch *OckCreateVectorBatch_4varcharCols_withPid(int parNum, int rowNum)
+{
+    int partitionNum = parNum;
+    const int32_t numCols = 5;
+    DataTypes inputTypes(std::vector<DataTypePtr>)({ IntType(), VarcharType(), VarcharType(), VarcharType(), VarcharType() });
+    const int32_t numRows = rowNum;
+    auto *col0 = new int32_t[numRows];
+    auto *col1 = new std::string[numRows];
+    auto *col2 = new std::string[numRows];
+    auto *col3 = new std::string[numRows];
+    auto *col4 = new std::string[numRows];
+    for (int i = 0; i < numRows; i++) {
+        col0[i] = 
+    }
+    VectorBatch *in = OckCreateInputData(inputTypes, numCols, col1, col2);
+    delete[] col1;
+    delete[] col2;
     return in;
 }
 
