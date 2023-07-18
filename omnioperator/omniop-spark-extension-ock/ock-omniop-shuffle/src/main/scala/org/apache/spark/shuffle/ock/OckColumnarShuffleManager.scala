@@ -4,7 +4,7 @@
 
 package org.apache.spark.shuffle.ock
 
-import com.huawei.ock.ucache.common.exception.ApplicationException
+import com.huawei.ock.common.exception.ApplicationException
 import com.huawei.ock.ucache.shuffle.NativeShuffle
 import org.apache.spark._
 import org.apache.spark.executor.TempShuffleReadMetrics

@@ -10,6 +10,7 @@
 #include "OckShuffleJniReader.h"
 
 using namespace omniruntime::vec;
+using namespace omniruntime::type;
 using namespace ock::dopspark;
 
 static std::mutex gInitLock;
@@ -143,7 +144,7 @@ JNIEXPORT void JNICALL Java_com_huawei_ock_spark_jni_OckShuffleJniReader_nativeC
         return;
     }
 
-    auto dstVector = reinterpret_cast<Vector *>(dstNativeVec); // get from scala which is real vector
+    auto dstVector = reinterpret_cast<BaseVector *>(dstNativeVec); // get from scala which is real vector
     if (UNLIKELY(dstVector == nullptr)) {
         std::string errMsg = "Invalid dst vector address for reader id " + std::to_string(jReaderId);
         env->ThrowNew(env->FindClass(exceptionClass), errMsg.c_str());

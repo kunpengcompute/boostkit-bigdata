@@ -88,7 +88,7 @@ OckHashWriteBuffer::ResultFlag OckHashWriteBuffer::PreoccupiedDataSpace(uint32_t
         return ResultFlag::UNEXPECTED;
     }
 
-    if (UNLIKELY(mTotalSize > UINT32_MAX -length)) {
+    if (UNLIKELY(mTotalSize > UINT32_MAX - length)) {
         LogError("mTotalSize + length exceed UINT32_MAX");
         return ResultFlag::UNEXPECTED;
     }

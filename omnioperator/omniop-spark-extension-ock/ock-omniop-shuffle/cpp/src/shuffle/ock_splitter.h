@@ -20,8 +20,6 @@
 #include "vec_data.pb.h"
 #include "ock_hash_write_buffer.h"
 
-#include "memory/base_allocator.h"
-
 using namespace spark;
 using namespace omniruntime::vec;
 using namespace omniruntime::type;
@@ -92,7 +90,7 @@ private:
         bool isSinglePt, uint64_t threadId);
     bool ToSplitterTypeId(const int32_t *vBColTypes);
 
-    uint32_t GetVarVecValue(VectorBatch &vb, uint32_t rowIndex, uint32_t colIndex, uint8_t **address) const;
+    uint32_t GetVarVecValue(VectorBatch &vb, uint32_t rowIndex, uint32_t colIndex) const;
     uint32_t GetRowLengthInBytes(VectorBatch &vb, uint32_t rowIndex) const;
 
     inline uint32_t GetPartitionIdOfRow(uint32_t rowIndex)
@@ -101,6 +99,12 @@ private:
         return mIsSinglePt ? 0 : mPtViewInCurVB->GetValue(rowIndex);
     }
 
+    void CastOmniToShuffleType(DataTypeId omniType, ShuffleTypeId shuffleType, uint32_t size)
+    {
+        mVBColDataTypes.emplace_back(omniType);
+        mVBColShuffleTypes.emplace_back(shuffleType);
+        mMinDataLenInVBByRow += size;
+    }
     bool InitCacheRegion();
 
     inline void ResetCacheRegion()
@@ -140,21 +144,19 @@ private:
         bool newRegion);
     bool WritePartVectorBatch(VectorBatch &vb, uint32_t partitionId);
 
-    static bool WriteNullValues(Vector *vector, std::vector<uint32_t> &rowIndexes, uint32_t rowNum, uint8_t *&address);
+    static bool WriteNullValues(BaseVector *vector, std::vector<uint32_t> &rowIndexes, uint32_t rowNum, uint8_t *&address);
     template <typename T>
-    bool WriteFixedWidthValueTemple(Vector *vector, bool isDict, std::vector<uint32_t> &rowIndexes, uint32_t rowNum,
-        T *&address);
-    bool WriteDecimal128(Vector *vector, bool isDict, std::vector<uint32_t> &rowIndexes, uint32_t rowNum, uint64_t *&address);
-    bool WriteFixedWidthValue(Vector *vector, ShuffleTypeId typeId, std::vector<uint32_t> &rowIndexes,
-        uint32_t rowNum, uint8_t *&address);
-    static bool WriteVariableWidthValue(Vector *vector, std::vector<uint32_t> &rowIndexes, uint32_t rowNum,
+    bool WriteFixedWidthValueTemple(BaseVector *vector, bool isDict, std::vector<uint32_t> &rowIndexes, uint32_t rowNum,
+        T *&address, DataTypeId dataTypeId);
+    bool WriteDecimal128(BaseVector *vector, bool isDict, std::vector<uint32_t> &rowIndexes, uint32_t rowNum, uint64_t *&address, DataTypeId dataTypeId);
+    bool WriteFixedWidthValue(BaseVector *vector, ShuffleTypeId typeId, std::vector<uint32_t> &rowIndexes,
+        uint32_t rowNum, uint8_t *&address, DataTypeId dataTypeId);
+    static bool WriteVariableWidthValue(BaseVector *vector, std::vector<uint32_t> &rowIndexes, uint32_t rowNum,
         uint8_t *&address);
     bool WriteOneVector(VectorBatch &vb, uint32_t colIndex, std::vector<uint32_t> &rowIndexes, uint32_t rowNum,
         uint8_t **address);
 
 private:
-    BaseAllocator *mAllocator = omniruntime::mem::GetProcessRootAllocator();
-
     static constexpr uint32_t vbDataHeadLen = 8; // Byte
     static constexpr uint32_t uint8Size = 1;
     static constexpr uint32_t uint16Size = 2;
@@ -191,7 +193,7 @@ private:
     std::vector<VBRegion> mCacheRegion {};
 
     // the vector point to vector0 in current vb which record rowIndex -> ptId
-    IntVector *mPtViewInCurVB = nullptr;
+    Vector<int32_t> *mPtViewInCurVB = nullptr;
 
     /* ock shuffle resource -------------------------------------------------------------------------------- */
     OckHashWriteBuffer *mOckBuffer = nullptr;

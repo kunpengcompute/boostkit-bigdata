@@ -10,6 +10,7 @@
 
 namespace ock {
 namespace dopspark {
+using namespace omniruntime::type;
 class OckMergeReader {
 public:
     bool Initialize(const int32_t *typeIds, uint32_t colNum);
@@ -17,7 +18,7 @@ public:
 
     bool CopyPartDataToVector(uint8_t *&nulls, uint8_t *&values, uint32_t &remainingSize, uint32_t &remainingCapacity,
          OckVectorPtr &srcVector);
-    bool CopyDataToVector(omniruntime::vec::Vector *dstVector, uint32_t colIndex);
+    bool CopyDataToVector(omniruntime::vec::BaseVector *dstVector, uint32_t colIndex);
 
     [[nodiscard]] inline uint32_t GetVectorBatchLength() const
     {
@@ -30,6 +31,35 @@ public:
     }
 
     bool CalVectorValueLength(uint32_t colIndex, uint32_t &length);
+
+    inline uint32_t GetDataSize(int32_t colIndex)
+    {
+        switch (mColTypeIds[colIndex]) {
+            case OMNI_BOOLEAN: {
+                return sizeof(uint8_t);
+            }
+            case OMNI_SHORT: {
+                return sizeof(uint16_t);
+            }
+            case OMNI_INT:
+            case OMNI_DATE32: {
+                return sizeof(uint32_t);
+            }
+            case OMNI_LONG:
+            case OMNI_DOUBLE:
+            case OMNI_DECIMAL64:
+            case OMNI_DATE64: {
+                return sizeof(uint64_t);
+            }
+            case OMNI_DECIMAL128: {
+                return decimal128Size;
+            }
+            default: {
+                LOG_ERROR("Unsupported data type id %d", mColTypeIds[colIndex]);
+                return false;
+            }
+        }
+    }
 
 private:
     static bool GenerateVector(OckVectorPtr &vector, uint32_t rowNum, int32_t typeId, uint8_t *&startAddress);

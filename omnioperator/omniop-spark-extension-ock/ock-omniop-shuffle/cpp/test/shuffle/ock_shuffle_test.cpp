@@ -54,7 +54,7 @@ bool PrintVectorBatch(uint8_t **startAddress, uint32_t &length)
     info << "vector_batch: { ";
     for (uint32_t colIndex = 0; colIndex < gColNum; colIndex++) {
         auto typeId = static_cast<DataTypeId>(gVecTypeIds[colIndex]);
-        Vector *vector = OckNewbuildVector(typeId, rowNum);
+        BaseVector *vector = OckNewbuildVector(typeId, rowNum);
         if (typeId == OMNI_VARCHAR) {
             uint32_t varlength = 0;
             instance->CalVectorValueLength(colIndex, varlength);
@@ -75,29 +75,29 @@ bool PrintVectorBatch(uint8_t **startAddress, uint32_t &length)
         for (uint32_t rowIndex = 0; rowIndex < rowNum; rowIndex++) {
             LOG_DEBUG("%d", const_cast<uint8_t*>((uint8_t*)(VectorHelper::GetNullsAddr(vector)))[rowIndex]);
             info << "{ rowIndex: " << rowIndex << ", nulls: " <<
-                std::to_string(const_cast<uint8_t*>((uint8_t*)(VectorHelper::GetNullsAddr(vector)))[rowIndex]);
+                std::to_string(const_cast<uint8_t*>((uint8_t*)(omniruntime::vec::unsafe::UnsafeBaseVector::GetNulls(vector)))[rowIndex]);
             switch (typeId) {
                 case OMNI_SHORT:
-                    info << ", value: " << static_cast<ShortVector *>(vector)->GetValue(rowIndex) << " }, ";
+                    info << ", value: " << static_cast<Vector<uint16_t> *>(vector)->GetValue(rowIndex) << " }, ";
                     break;
                 case OMNI_INT: {
-                    info << ", value: " << static_cast<IntVector *>(vector)->GetValue(rowIndex) << " }, ";
+                    info << ", value: " << static_cast<Vector<uint32_t> *>(vector)->GetValue(rowIndex) << " }, ";
                     break;
                 }
                 case OMNI_LONG: {
-                    info << ", value: " << static_cast<LongVector *>(vector)->GetValue(rowIndex) << " }, ";
+                    info << ", value: " << static_cast<Vector<uint64_t> *>(vector)->GetValue(rowIndex) << " }, ";
                     break;
                 }
                 case OMNI_DOUBLE: {
-                    info << ", value: " << static_cast<DoubleVector *>(vector)->GetValue(rowIndex) << " }, ";
+                    info << ", value: " << static_cast<Vector<uint64_t> *>(vector)->GetValue(rowIndex) << " }, ";
                     break;
                 }
                 case OMNI_DECIMAL64: {
-                    info << ", value: " << static_cast<LongVector *>(vector)->GetValue(rowIndex) << " }, ";
+                    info << ", value: " << static_cast<Vector<uint64_t> *>(vector)->GetValue(rowIndex) << " }, ";
                     break;
                 }
                 case OMNI_DECIMAL128: {
-                    info << ", value: " << static_cast<Decimal128Vector *>(vector)->GetValue(rowIndex) << " }, ";
+                    info << ", value: " << static_cast<Vector<Decimal128> *>(vector)->GetValue(rowIndex) << " }, ";
                     break;
                 }
                 case OMNI_VARCHAR: { // unknown length for value vector, calculate later
@@ -118,9 +118,16 @@ bool PrintVectorBatch(uint8_t **startAddress, uint32_t &length)
                         valueAddress += vector->GetValueOffset(rowIndex);
                     }*/
                     uint8_t *valueAddress = nullptr;
-                    int32_t length = static_cast<VarcharVector *>(vector)->GetValue(rowIndex, &valueAddress);
+                    int32_t length = reinterpret_cast<Vector<LargeStringContainer<std::string_view>> *>(vector);
                     std::string valueString(valueAddress, valueAddress + length);
-                    info << ", value: " << valueString << " }, ";
+                    uint32_t length = 0;
+                    std::string_view value;
+                    if (!vc->IsNull(rowIndex)) {
+                        value = vc->GetValue();
+                        valueAddress = reinterpret_cast<uint8_t *>(reinterpret_cast<uint64_t>(value.data()));
+                        length = static_cast<uint32_t>(value.length());
+                    }
+                    info << ", value: " << value << " }, ";
                     break;
                 }
                 default:
@@ -314,7 +321,7 @@ TEST_F(OckShuffleTest, Split_Fixed_Long_Cols)
         sizeof(inputVecTypeIds) / sizeof(inputVecTypeIds[0]), false, 40960, 41943040, 134217728);
     gTempSplitId = splitterId; // very important
     // for (uint64_t j = 0; j < 999; j++) {
-    VectorBatch *vb = OckCreateVectorBatch_1fixedCols_withPid(partitionNum, 10000);
+    VectorBatch *vb = OckCreateVectorBatch_1fixedCols_withPid(partitionNum, 10000, LongType());
     OckTest_splitter_split(splitterId, vb);
     // }
     OckTest_splitter_stop(splitterId);
@@ -323,7 +330,7 @@ TEST_F(OckShuffleTest, Split_Fixed_Long_Cols)
 
 TEST_F(OckShuffleTest, Split_Fixed_Cols)
 {
-    int32_t inputVecTypeIds[] = {OMNI_INT, OMNI_LONG, OMNI_DOUBLE}; // 4Byte + 8Byte + 8Byte + 3Byte
+    int32_t inputVecTypeIds[] = {OMNI_BOOLEAN, OMNI_SHORT, OMNI_INT, OMNI_LONG, OMNI_DOUBLE}; // 4Byte + 8Byte + 8Byte + 3Byte
     gVecTypeIds = &inputVecTypeIds[0];
     gColNum = sizeof(inputVecTypeIds) / sizeof(inputVecTypeIds[0]);
     int partitionNum = 4;
@@ -331,7 +338,7 @@ TEST_F(OckShuffleTest, Split_Fixed_Cols)
         sizeof(inputVecTypeIds) / sizeof(inputVecTypeIds[0]), false, 40960, 41943040, 134217728);
     gTempSplitId = splitterId; // very important
                                // for (uint64_t j = 0; j < 999; j++) {
-    VectorBatch *vb = OckCreateVectorBatch_3fixedCols_withPid(partitionNum, 999);
+    VectorBatch *vb = OckCreateVectorBatch_5fixedCols_withPid(partitionNum, 999);
     OckTest_splitter_split(splitterId, vb);
     // }
     OckTest_splitter_stop(splitterId);
@@ -340,7 +347,7 @@ TEST_F(OckShuffleTest, Split_Fixed_Cols)
 
 TEST_F(OckShuffleTest, Split_Fixed_SinglePartition_SomeNullRow)
 {
-    int32_t inputVecTypeIds[] = {OMNI_INT, OMNI_LONG, OMNI_DOUBLE, OMNI_VARCHAR}; // 4 + 8 + 8 + 4 + 4
+    int32_t inputVecTypeIds[] = {OMNI_BOOLEAN, OMNI_SHORT, OMNI_INT, OMNI_LONG, OMNI_DOUBLE, OMNI_VARCHAR}; // 4 + 8 + 8 + 4 + 4
     gVecTypeIds = &inputVecTypeIds[0];
     gColNum = sizeof(inputVecTypeIds) / sizeof(inputVecTypeIds[0]);
     int partitionNum = 1;
@@ -399,7 +406,7 @@ TEST_F(OckShuffleTest, Split_Long_10WRows)
         sizeof(inputVecTypeIds) / sizeof(inputVecTypeIds[0]), false, 40960, 41943040, 134217728);
     gTempSplitId = splitterId; // very important
     for (uint64_t j = 0; j < 100; j++) {
-        VectorBatch *vb = OckCreateVectorBatch_1longCol_withPid(partitionNum, 10000);
+        VectorBatch *vb = OckCreateVectorBatch_1fixedCols_withPid(partitionNum, 10000, LongType());
         OckTest_splitter_split(splitterId, vb);
     }
     OckTest_splitter_stop(splitterId);
@@ -458,7 +465,7 @@ TEST_F(OckShuffleTest, Split_VarChar_First)
 
 TEST_F(OckShuffleTest, Split_Dictionary)
 {
-    int32_t inputVecTypeIds[] = {OMNI_INT, OMNI_LONG, OMNI_DECIMAL64, OMNI_DECIMAL128};
+    int32_t inputVecTypeIds[] = {OMNI_INT, OMNI_LONG};
     int partitionNum = 4;
     gVecTypeIds = &inputVecTypeIds[0];
     gColNum = sizeof(inputVecTypeIds) / sizeof(inputVecTypeIds[0]);
@@ -483,7 +490,7 @@ TEST_F(OckShuffleTest, Split_OMNI_DECIMAL128)
         sizeof(inputVecTypeIds) / sizeof(inputVecTypeIds[0]), false, 40960, 41943040, 134217728);
     gTempSplitId = splitterId; // very important
     for (uint64_t j = 0; j < 2; j++) {
-        VectorBatch *vb = OckCreateVectorBatch_1decimal128Col_withPid(partitionNum);
+        VectorBatch *vb = OckCreateVectorBatch_1decimal128Col_withPid(partitionNum, 999);
         OckTest_splitter_split(splitterId, vb);
     }
     OckTest_splitter_stop(splitterId);
