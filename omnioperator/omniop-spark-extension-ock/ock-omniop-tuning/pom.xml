@@ -22,7 +22,7 @@
    </properties>
 
    <groupId>com.huawei.ock</groupId>
-   <artifactId>ock-omniop-shuffle-manager</artifactId>
+   <artifactId>ock-omniop-tuning</artifactId>
    <packaging>jar</packaging>
    <description>Huawei Open Computing Kit for Spark, shuffle manager</description>
    <version>23.0.0</version>
