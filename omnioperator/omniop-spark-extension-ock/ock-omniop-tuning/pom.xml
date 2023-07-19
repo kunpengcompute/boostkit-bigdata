@@ -5,15 +5,10 @@
    <modelVersion>4.0.0</modelVersion>
 
    <properties>
-     <cpp.dir>cpp/</cpp.dir>
-     <cpp.build.dir>cpp/build/releases/</cpp.build.dir>
-     <plugin.cpp.test>FALSE</plugin.cpp.test>
-     <protobuf.maven.version>0.6.1</protobuf.maven.version>
      <spark.version>3.1.2</spark.version>
      <scala.version>2.12.10</scala.version>
      <scala.compat.version>2.12</scala.compat.version>
      <scalaTest.version>3.2.3</scalaTest.version>
-     <mockito.version>3.4.6</mockito.version>
      <spark.groupId>org.apache.spark</spark.groupId>
      <input.version>spark-3.1</input.version>
      <scala.plugin.version>3.2.0</scala.plugin.version>
@@ -24,7 +19,7 @@
    <groupId>com.huawei.ock</groupId>
    <artifactId>ock-omniop-tuning</artifactId>
    <packaging>jar</packaging>
-   <description>Huawei Open Computing Kit for Spark, shuffle manager</description>
+   <description>Huawei Open Computing Kit for Spark, BoostTuning for OmniOperator</description>
    <version>23.0.0</version>
 
    <dependencies>
@@ -42,21 +37,25 @@
      </dependency>
      <dependency>
        <groupId>${spark.groupId}</groupId>
+       <artifactId>spark-catalyst_${scala.compat.version}</artifactId>
+       <version>${spark.version}</version>
+       <scope>provided</scope>
+     </dependency>
+     <dependency>
+       <groupId>${spark.groupId}</groupId>
        <artifactId>spark-sql_${scala.compat.version}</artifactId>
        <version>${spark.version}</version>
        <scope>provided</scope>
      </dependency>
      <dependency>
-       <groupId>${spark.groupId}</groupId>
-       <artifactId>spark-network-common_${scala.compat.version}</artifactId>
-       <version>${spark.version}</version>
-       <scope>provided</scope>
+       <groupId>com.huawei.ock</groupId>
+       <artifactId>ock-adaptive-tuning</artifactId>
+       <version>${global.version}</version>
      </dependency>
      <dependency>
-       <groupId>${spark.groupId}</groupId>
-       <artifactId>spark-network-shuffle_${scala.compat.version}</artifactId>
-       <version>${spark.version}</version>
-       <scope>provided</scope>
+       <groupId>com.huawei.ock</groupId>
+       <artifactId>ock-tuning-sdk</artifactId>
+       <version>${global.version}</version>
      </dependency>
      <dependency>
        <groupId>com.huawei.ock</groupId>
@@ -74,46 +73,16 @@
        <version>3.1.1-1.2.0</version>
      </dependency>
      <dependency>
-       <groupId>com.huawei.ock</groupId>
-       <artifactId>ock-broadcast-sdk</artifactId>
-       <version>${global.version}</version>
-       <exclusions>
-         <exclusion>
-           <groupId>com.huawei.ock</groupId>
-           <artifactId>ock-common-sdk</artifactId>
-         </exclusion>
-       </exclusions>
-     </dependency>
-     <dependency>
-       <groupId>com.huawei.ock</groupId>
-       <artifactId>ock-shuffle-manager</artifactId>
-       <version>${global.version}</version>
-     </dependency>
-     <dependency>
        <groupId>org.scalatest</groupId>
        <artifactId>scalatest_${scala.compat.version}</artifactId>
        <version>${scalaTest.version}</version>
        <scope>test</scope>
      </dependency>
-     <dependency>
-       <groupId>org.mockito</groupId>
-       <artifactId>mockito-core</artifactId>
-       <version>${mockito.version}</version>
-       <scope>test</scope>
-     </dependency>
    </dependencies>
 
    <build>
-     <!--suppress UnresolvedMavenProperty -->
      <finalName>${project.artifactId}-${project.version}-for-${input.version}</finalName>
-     <resources>
-       <resource>
-         <directory>${cpp.build.dir}</directory>
-       </resource>
-     </resources>
-     <outputDirectory>target/scala-${scala.binary.version}/classes</outputDirectory>
-     <testOutputDirectory>target/scala-${scala.binary.version}/test-classes</testOutputDirectory>
-<!--    <sourceDirectory>src/main/scala</sourceDirectory>-->
+     <sourceDirectory>src/main/scala</sourceDirectory>
      <plugins>
        <plugin>
          <!-- see http://davidb.github.com/scala-maven-plugin -->
@@ -154,42 +123,6 @@
              <arg>-Xlint:all</arg>
            </compilerArgs>
          </configuration>
-       </plugin>
-       <plugin>
-         <artifactId>exec-maven-plugin</artifactId>
-         <groupId>org.codehaus.mojo</groupId>
-         <version>3.0.0</version>
-         <executions>
-           <execution>
-             <id>Build CPP</id>
-             <phase>generate-resources</phase>
-             <goals>
-               <goal>exec</goal>
-             </goals>
-             <configuration>
-               <executable>bash</executable>
-               <arguments>
-                 <argument>${cpp.dir}/build.sh</argument>
-                 <argument>${plugin.cpp.test}</argument>
-               </arguments>
-             </configuration>
-           </execution>
-         </executions>
-       </plugin>
-       <plugin>
-         <groupId>org.xolstice.maven.plugins</groupId>
-         <artifactId>protobuf-maven-plugin</artifactId>
-         <version>${protobuf.maven.version}</version>
-         <configuration>
-           <protoSourceRoot>${project.basedir}/../cpp/src/proto</protoSourceRoot>
-         </configuration>
-         <executions>
-           <execution>
-             <goals>
-               <goal>compile</goal>
-             </goals>
-           </execution>
-         </executions>
        </plugin>
      </plugins>
      <pluginManagement>
