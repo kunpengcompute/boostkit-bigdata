@@ -38,7 +38,7 @@ target_include_directories(${PROJ_TARGET} PUBLIC /opt/lib/include)
 target_link_libraries (${PROJ_TARGET} PUBLIC
         protobuf.a
         z
-        boostkit-omniop-vector-1.3.0-aarch64
+        boostkit-omniop-vector-1.2.0-aarch64
         ock_shuffle
         gcov
         )
