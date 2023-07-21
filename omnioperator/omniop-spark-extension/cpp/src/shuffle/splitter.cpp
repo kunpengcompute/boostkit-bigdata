@@ -131,9 +131,8 @@ int Splitter::SplitFixedWidthValueBuffer(VectorBatch& vb) {
         if (vb.Get(col_idx_vb)->GetEncoding() == OMNI_DICTIONARY) {
             LogsDebug("Dictionary Columnar process!");
 
-            DataTypeId type_id = vector_batch_col_types_.at(col_idx_schema);
-            auto ids_addr = VectorHelper::UnsafeGetValues(vb.Get(col_idx_vb), type_id);
-            auto src_addr = reinterpret_cast<int64_t>(VectorHelper::UnsafeGetDictionary(vb.Get(col_idx_vb), type_id));
+            auto ids_addr = VectorHelper::UnsafeGetValues(vb.Get(col_idx_vb));
+            auto src_addr = reinterpret_cast<int64_t>(VectorHelper::UnsafeGetDictionary(vb.Get(col_idx_vb)));
             switch (column_type_id_[col_idx_schema]) {
 #define PROCESS(SHUFFLE_TYPE, CTYPE)                                                           \
     case SHUFFLE_TYPE:                                                                         \
@@ -174,8 +173,7 @@ int Splitter::SplitFixedWidthValueBuffer(VectorBatch& vb) {
                 }
             }
         } else {
-            DataTypeId type_id = vector_batch_col_types_.at(col_idx_schema);
-            auto src_addr = reinterpret_cast<int64_t>(VectorHelper::UnsafeGetValues(vb.Get(col_idx_vb), type_id));
+            auto src_addr = reinterpret_cast<int64_t>(VectorHelper::UnsafeGetValues(vb.Get(col_idx_vb)));
             switch (column_type_id_[col_idx_schema]) {
 #define PROCESS(SHUFFLE_TYPE, CTYPE)                                                           \
     case SHUFFLE_TYPE:                                                                         \
