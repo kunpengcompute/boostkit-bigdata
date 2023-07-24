@@ -101,7 +101,6 @@ private:
 
     void CastOmniToShuffleType(DataTypeId omniType, ShuffleTypeId shuffleType, uint32_t size)
     {
-        mVBColDataTypes.emplace_back(omniType);
         mVBColShuffleTypes.emplace_back(shuffleType);
         mMinDataLenInVBByRow += size;
     }
@@ -147,10 +146,10 @@ private:
     static bool WriteNullValues(BaseVector *vector, std::vector<uint32_t> &rowIndexes, uint32_t rowNum, uint8_t *&address);
     template <typename T>
     bool WriteFixedWidthValueTemple(BaseVector *vector, bool isDict, std::vector<uint32_t> &rowIndexes, uint32_t rowNum,
-        T *&address, DataTypeId dataTypeId);
-    bool WriteDecimal128(BaseVector *vector, bool isDict, std::vector<uint32_t> &rowIndexes, uint32_t rowNum, uint64_t *&address, DataTypeId dataTypeId);
+        T *&address);
+    bool WriteDecimal128(BaseVector *vector, bool isDict, std::vector<uint32_t> &rowIndexes, uint32_t rowNum, uint64_t *&address);
     bool WriteFixedWidthValue(BaseVector *vector, ShuffleTypeId typeId, std::vector<uint32_t> &rowIndexes,
-        uint32_t rowNum, uint8_t *&address, DataTypeId dataTypeId);
+        uint32_t rowNum, uint8_t *&address);
     static bool WriteVariableWidthValue(BaseVector *vector, std::vector<uint32_t> &rowIndexes, uint32_t rowNum,
         uint8_t *&address);
     bool WriteOneVector(VectorBatch &vb, uint32_t colIndex, std::vector<uint32_t> &rowIndexes, uint32_t rowNum,
