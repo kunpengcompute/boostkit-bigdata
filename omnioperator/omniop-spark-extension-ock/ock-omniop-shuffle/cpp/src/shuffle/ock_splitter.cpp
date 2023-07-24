@@ -192,7 +192,7 @@ bool OckSplitter::WriteNullValues(BaseVector *vector, std::vector<uint32_t> &row
 
 template <typename T>
 bool OckSplitter::WriteFixedWidthValueTemple(BaseVector *vector, bool isDict, std::vector<uint32_t> &rowIndexes,
-    uint32_t rowNum, T *&address, DataTypeId dataTypeId)
+    uint32_t rowNum, T *&address)
 {
     T *dstValues = address;
     T *srcValues = nullptr;
@@ -200,8 +200,8 @@ bool OckSplitter::WriteFixedWidthValueTemple(BaseVector *vector, bool isDict, st
     if (isDict) {
         int32_t idsNum = mCurrentVB->GetRowCount();
         int64_t idsSizeInBytes = idsNum * sizeof(int32_t);
-        auto ids = VectorHelper::UnsafeGetValues(vector, dataTypeId);
-        srcValues = reinterpret_cast<T *>(VectorHelper::UnsafeGetDictionary(vector, dataTypeId));
+        auto ids = VectorHelper::UnsafeGetValues(vector);
+        srcValues = reinterpret_cast<T *>(VectorHelper::UnsafeGetDictionary(vector));
         if (UNLIKELY(srcValues == nullptr)) {
             LOG_ERROR("Source values address is null.");
             return false;
@@ -217,7 +217,7 @@ bool OckSplitter::WriteFixedWidthValueTemple(BaseVector *vector, bool isDict, st
             *dstValues++ = srcValues[rowIndex]; // write value to local blob
         }
     } else {
-        srcValues = reinterpret_cast<T *>(VectorHelper::UnsafeGetValues(vector, dataTypeId));
+        srcValues = reinterpret_cast<T *>(VectorHelper::UnsafeGetValues(vector));
         if (UNLIKELY(srcValues == nullptr)) {
             LOG_ERROR("Source values address is null.");
             return false;
@@ -239,15 +239,15 @@ bool OckSplitter::WriteFixedWidthValueTemple(BaseVector *vector, bool isDict, st
 }
 
 bool OckSplitter::WriteDecimal128(BaseVector *vector, bool isDict, std::vector<uint32_t> &rowIndexes, uint32_t rowNum,
-    uint64_t *&address, DataTypeId dataTypeId)
+    uint64_t *&address)
 {
     uint64_t *dstValues = address;
     uint64_t *srcValues = nullptr;
 
     if (isDict) {
         uint32_t idsNum = mCurrentVB->GetRowCount();
-        auto ids = VectorHelper::UnsafeGetValues(vector, dataTypeId);
-        srcValues = reinterpret_cast<uint64_t *>(VectorHelper::UnsafeGetDictionary(vector, dataTypeId));
+        auto ids = VectorHelper::UnsafeGetValues(vector);
+        srcValues = reinterpret_cast<uint64_t *>(VectorHelper::UnsafeGetDictionary(vector));
         if (UNLIKELY(srcValues == nullptr)) {
             LOG_ERROR("Source values address is null.");
             return false;
@@ -263,7 +263,7 @@ bool OckSplitter::WriteDecimal128(BaseVector *vector, bool isDict, std::vector<u
             *dstValues++ = srcValues[rowIndex << 1 | 1];
         }
     } else {
-        srcValues = reinterpret_cast<uint64_t *>(VectorHelper::UnsafeGetValues(vector, dataTypeId));
+        srcValues = reinterpret_cast<uint64_t *>(VectorHelper::UnsafeGetValues(vector));
         if (UNLIKELY(srcValues == nullptr)) {
             LOG_ERROR("Source values address is null.");
             return false;
@@ -285,35 +285,35 @@ bool OckSplitter::WriteDecimal128(BaseVector *vector, bool isDict, std::vector<u
 }
 
 bool OckSplitter::WriteFixedWidthValue(BaseVector *vector, ShuffleTypeId typeId, std::vector<uint32_t> &rowIndexes, 
-    uint32_t rowNum, uint8_t *&address, DataTypeId dataTypeId)
+    uint32_t rowNum, uint8_t *&address)
 {
     bool isDict = (vector->GetEncoding() == OMNI_DICTIONARY);
     switch (typeId) {
         case ShuffleTypeId::SHUFFLE_1BYTE: {
-            WriteFixedWidthValueTemple<uint8_t>(vector, isDict, rowIndexes, rowNum, address, dataTypeId);
+            WriteFixedWidthValueTemple<uint8_t>(vector, isDict, rowIndexes, rowNum, address);
             break;
         }
         case ShuffleTypeId::SHUFFLE_2BYTE: {
             auto *addressFormat = reinterpret_cast<uint16_t *>(address);
-            WriteFixedWidthValueTemple<uint16_t>(vector, isDict, rowIndexes, rowNum, addressFormat, dataTypeId);
+            WriteFixedWidthValueTemple<uint16_t>(vector, isDict, rowIndexes, rowNum, addressFormat);
             address = reinterpret_cast<uint8_t *>(addressFormat);
             break;
         }
         case ShuffleTypeId::SHUFFLE_4BYTE: {
             auto *addressFormat = reinterpret_cast<uint32_t *>(address);
-            WriteFixedWidthValueTemple<uint32_t>(vector, isDict, rowIndexes, rowNum, addressFormat, dataTypeId);
+            WriteFixedWidthValueTemple<uint32_t>(vector, isDict, rowIndexes, rowNum, addressFormat);
             address = reinterpret_cast<uint8_t *>(addressFormat);
             break;
         }
         case ShuffleTypeId::SHUFFLE_8BYTE: {
             auto *addressFormat = reinterpret_cast<uint64_t *>(address);
-            WriteFixedWidthValueTemple<uint64_t>(vector, isDict, rowIndexes, rowNum, addressFormat, dataTypeId);
+            WriteFixedWidthValueTemple<uint64_t>(vector, isDict, rowIndexes, rowNum, addressFormat);
             address = reinterpret_cast<uint8_t *>(addressFormat);
             break;
         }
         case ShuffleTypeId::SHUFFLE_DECIMAL128: {
             auto *addressFormat = reinterpret_cast<uint64_t *>(address);
-            WriteDecimal128(vector, isDict, rowIndexes, rowNum, addressFormat, dataTypeId);
+            WriteDecimal128(vector, isDict, rowIndexes, rowNum, addressFormat);
             address = reinterpret_cast<uint8_t *>(addressFormat);
             break;
         }
@@ -386,11 +386,11 @@ bool OckSplitter::WriteOneVector(VectorBatch &vb, uint32_t colIndex, std::vector
     }
 
     ShuffleTypeId typeId = mIsSinglePt ? mVBColShuffleTypes[colIndex] : mVBColShuffleTypes[colIndex - 1];
-    DataTypeId dataTypeId = mIsSinglePt ? mVBColDataTypes[colIndex] : mVBColDataTypes[colIndex - 1];
+
     if (typeId == ShuffleTypeId::SHUFFLE_BINARY) {
         return WriteVariableWidthValue(vector, rowIndexes, rowNum, *address);
     } else {
-        return WriteFixedWidthValue(vector, typeId, rowIndexes, rowNum, *address, dataTypeId);
+        return WriteFixedWidthValue(vector, typeId, rowIndexes, rowNum, *address);
     }
 }
 

@@ -67,7 +67,7 @@ void OckTest_splitter_stop(long splitter_id);
 
 void OckTest_splitter_close(long splitter_id);
 
-template <typename T> std::unique_ptr<BaseVector> CreateVector(int32_t length, T *values)
+template <typename T> BaseVector *CreateVector(int32_t length, T *values)
 {
     std::unique_ptr<Vector<T>> vector = std::make_unique<Vector<T>>(length);
     for (int32_t i = 0; i < length; i++) {
@@ -77,13 +77,13 @@ template <typename T> std::unique_ptr<BaseVector> CreateVector(int32_t length, T
 }
 
 template <omniruntime::type::DataTypeId typeId>
-std::unique_ptr<BaseVector> CreateFlatVector(int32_t length, va_list &args)
+BaseVector *CreateFlatVector(int32_t length, va_list &args)
 {
     using namespace omniruntime::type;
     using T = typename NativeType<typeId>::type;
     using VarcharVector = Vector<LargeStringContainer<std::string_view>>;
-    if constexpr (std::is_same_v<T, std::string_view> || std::is_same_v<T, uint8_t>) {
-        std::unique_ptr<VarcharVector> vector = std::make_unique<VarcharVector>(length);
+    if constexpr (std::is_same_v<T, std::string_view>) {
+        VarcharVector *vector = new VarcharVector(length);
         std::string *str = va_arg(args, std::string *);
         for (int32_t i = 0; i < length; i++) {
             std::string_view value(str[i].data(), str[i].length());
@@ -91,7 +91,7 @@ std::unique_ptr<BaseVector> CreateFlatVector(int32_t length, va_list &args)
         }
         return vector;
     } else {
-        std::unique_ptr<Vector<T>> vector = std::make_unique<Vector<T>>(length);
+        Vector<T> *vector = new Vector<T>(length);
         T *value = va_arg(args, T *);
         for (int32_t i = 0; i < length; i++) {
             vector->SetValue(i, value[i]);
@@ -101,14 +101,15 @@ std::unique_ptr<BaseVector> CreateFlatVector(int32_t length, va_list &args)
 }
 
 template <DataTypeId typeId>
-std::unique_ptr<BaseVector> CreateDictionary(BaseVector *vector, int32_t *ids, int32_t size)
+BaseVector *CreateDictionary(BaseVector *vector, int32_t *ids, int32_t size)
 {
     using T = typename NativeType<typeId>::type;
-    if constexpr (std::is_same_v<T, std::string_view> || std::is_same_v<T, uint8_t>) {
+    if constexpr (std::is_same_v<T, std::string_view>) {
         return VectorHelper::CreateStringDictionary(ids, size,
             reinterpret_cast<Vector<LargeStringContainer<std::string_view>> *>(vector));
+    } else {
+        return VectorHelper::CreateDictionary(ids, size, reinterpret_cast<Vector<T> *>(vector));
     }
-    return VectorHelper::CreateDictionary(ids, size, reinterpret_cast<Vector<T> *>(vector));
 }
 
 

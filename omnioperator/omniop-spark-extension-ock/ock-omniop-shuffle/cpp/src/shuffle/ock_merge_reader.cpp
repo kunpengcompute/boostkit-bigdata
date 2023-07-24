@@ -206,8 +206,8 @@ bool OckMergeReader::CopyDataToVector(BaseVector *dstVector, uint32_t colIndex)
     auto srcVector = mVectorBatch->GetColumnHead(colIndex);
 
     auto *nullsAddress = (uint8_t *)omniruntime::vec::unsafe::UnsafeBaseVector::GetNulls(dstVector);
-    auto *valuesAddress = (uint8_t *)VectorHelper::UnsafeGetValues(dstVector, mColTypeIds[colIndex]);
-    uint32_t *offsetsAddress = (uint32_t *)VectorHelper::UnsafeGetOffsetsAddr(dstVector, mColTypeIds[colIndex]);
+    auto *valuesAddress = (uint8_t *)VectorHelper::UnsafeGetValues(dstVector);
+    uint32_t *offsetsAddress = (uint32_t *)VectorHelper::UnsafeGetOffsetsAddr(dstVector);
     dstVector->SetNullFlag(true);
     uint32_t totalSize = 0;
     uint32_t currentSize = 0;

@@ -32,26 +32,26 @@ VectorBatch *OckCreateInputData(const DataType &types, int32_t rowCount, ...)
     va_start(args, rowCount);
     for (int32_t i = 0; i< typesCount; i++) {
         dataTypePtr = type = types.GetType(i);
-        VectorBatch->Append(CreateVector(*type, rowCount, args).release());
+        VectorBatch->Append(CreateVector(*type, rowCount, args));
     }
     va_end(args);
     return vecBatch;
 }
 
-std::unique_ptr<BaseVector> CreateVector(DataType &dataType, int32_t rowCount, va_list &args)
+BaseVector *CreateVector(DataType &dataType, int32_t rowCount, va_list &args)
 {
     return DYNAMIC_TYPE_DISPATCH(CreateFlatVector, dataType.GetId(), rowCount, args);
 }
 
 
-std::unique_ptr<BaseVector> CreateDictionaryVector(DataType &dataType, int32_t rowCount, int32_t *ids, int32_t idsCount,
+BaseVector *CreateDictionaryVector(DataType &dataType, int32_t rowCount, int32_t *ids, int32_t idsCount,
      ..)
 {
     va_list args;
     va_start(args, idsCount);
-    std::unique_ptr<BaseVector> dictionary = CreateVector(dataType, rowCount, args);
+    BaseVector *dictionary = CreateVector(dataType, rowCount, args);
     va_end(args);
-    return DYNAMIC_TYPE_DISPATCH(CreateDictionary, dataType.GetId(), dictionary.get(), ids, idsCount);
+    return DYNAMIC_TYPE_DISPATCH(CreateDictionary, dataType.GetId(), dictionary, ids, idsCount);
 }
 
 /*
@@ -173,7 +173,7 @@ VectorBatch *OckCreateVectorBatch(const DataTypes &types, int32_t rowCount, ...)
     va_start(args, rowCount);
     for (int32_t i = 0; i < typesCount; i++) {
         dataTypePtr type = types.GetType(i);
-        vectorBatch->Append(OckCreateVector(*type, rowCount, args).release());
+        vectorBatch->Append(OckCreateVector(*type, rowCount, args));
     }
     va_end(args);
     return vectorBatch;
@@ -361,11 +361,11 @@ VectorBatch *OckCreateVectorBatch_2dictionaryCols_withPid(int partitionNum)
 
     VectorBatch *vectorBatch = new VectorBatch(dataSize);
     auto Vec0 = CreateVector<int32_t>(dataSize, col0);
-    vectorBatch->Append(Vec0.release());
+    vectorBatch->Append(Vec0);
     auto dicVec0 = CreateDictionaryVector(*sourceTypes.GetType(0), dataSize, ids, dataSize, datas[0]);
     auto dicVec1 = CreateDictionaryVector(*sourceTypes.GetType(1), dataSize, ids, dataSize, datas[1]);
-    vectorBatch->Append(dicVec0.release());
-    vectorBatch->Append(dicVec1.release());
+    vectorBatch->Append(dicVec0);
+    vectorBatch->Append(dicVec1);
 
     delete[] col0;
     return vectorBatch;
