@@ -309,11 +309,21 @@ public class DataIoAdapter {
         if (!hasNextPage) {
             return false;
         }
-        WritableColumnVector[] page = orcDataReader.getNextPageBlocking();
-        if (orcDataReader.isFinished()) {
-            orcDataReader.close();
-            hasNextPage = false;
-            return false;
+        WritableColumnVector[] page = null;
+        try {
+            page = orcDataReader.getNextPageBlocking();
+            if (orcDataReader.isFinished()) {
+                orcDataReader.close();
+                hasNextPage = false;
+                return false;
+            }
+        } catch (Exception e) {
+            LOG.error("Push down failed", e);
+            if (orcDataReader != null) {
+                orcDataReader.close();
+                hasNextPage = false;
+            }
+            throw e;
         }
         List<WritableColumnVector[]> l = new ArrayList<>();
         l.add(page);
