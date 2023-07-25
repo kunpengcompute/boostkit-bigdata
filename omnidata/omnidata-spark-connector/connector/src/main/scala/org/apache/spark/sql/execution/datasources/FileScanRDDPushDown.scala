@@ -311,6 +311,17 @@ class FileScanRDDPushDown(
                                 predicate: BasePredicate)
     extends PushDownIterator(split: RDDPartition, context: TaskContext, pageToColumnarClass: PageToColumnar) {
 
+    val vectors: Seq[WritableColumnVector] = if (enableOffHeapColumnVector) {
+      OffHeapColumnVector.allocateColumns(columnBatchSize, StructType.fromAttributes(output))
+    } else {
+      OnHeapColumnVector.allocateColumns(columnBatchSize, StructType.fromAttributes(output))
+    }
+    val cb: ColumnarBatch = new ColumnarBatch(vectors.toArray)
+
+    TaskContext.get().addTaskCompletionListener[Unit] { _ =>
+      cb.close()
+    }
+
     override def hasNext: Boolean = {
       // Kill the task in case it has been marked as killed. This logic is from
       // InterruptibleIterator, but we inline it here instead of wrapping the iterator in order
@@ -335,17 +346,6 @@ class FileScanRDDPushDown(
               }
 
               val projectRi = ri.map(toUnsafe)
-              val vectors: Seq[WritableColumnVector] = if (enableOffHeapColumnVector) {
-                OffHeapColumnVector.allocateColumns(columnBatchSize, StructType.fromAttributes(output))
-              } else {
-                OnHeapColumnVector.allocateColumns(columnBatchSize, StructType.fromAttributes(output))
-              }
-              val cb: ColumnarBatch = new ColumnarBatch(vectors.toArray)
-
-              TaskContext.get().addTaskCompletionListener[Unit] { _ =>
-                cb.close()
-              }
-
               cb.setNumRows(0)
               vectors.foreach(_.reset())
               var rowCount = 0
