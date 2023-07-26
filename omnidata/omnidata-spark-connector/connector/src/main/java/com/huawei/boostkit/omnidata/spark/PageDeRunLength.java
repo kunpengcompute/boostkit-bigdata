@@ -44,12 +44,6 @@ public class PageDeRunLength {
         }
     }
 
-    private final boolean isOperatorCombineEnabled;
-
-    public PageDeRunLength(boolean isOperatorCombineEnabled) {
-        this.isOperatorCombineEnabled = isOperatorCombineEnabled;
-    }
-
     /**
      * decompress byteColumnVector
      *
@@ -60,8 +54,7 @@ public class PageDeRunLength {
     public Optional<WritableColumnVector> decompressByteArray(int positionCount,
                                                               WritableColumnVector writableColumnVector) throws Exception {
         byte value = writableColumnVector.getByte(0);
-        WritableColumnVector columnVector = getColumnVector(isOperatorCombineEnabled, positionCount,
-                writableColumnVector);
+        WritableColumnVector columnVector = getColumnVector(positionCount, writableColumnVector);
         if (writableColumnVector.isNullAt(0)) {
             columnVector.putNulls(0, positionCount);
         } else {
@@ -85,8 +78,7 @@ public class PageDeRunLength {
     public Optional<WritableColumnVector> decompressBooleanArray(int positionCount,
                                                                  WritableColumnVector writableColumnVector) throws Exception {
         boolean value = writableColumnVector.getBoolean(0);
-        WritableColumnVector columnVector = getColumnVector(isOperatorCombineEnabled, positionCount,
-                writableColumnVector);
+        WritableColumnVector columnVector = getColumnVector(positionCount, writableColumnVector);
         if (writableColumnVector.isNullAt(0)) {
             columnVector.putNulls(0, positionCount);
         } else {
@@ -110,8 +102,7 @@ public class PageDeRunLength {
     public Optional<WritableColumnVector> decompressIntArray(int positionCount,
                                                              WritableColumnVector writableColumnVector) throws Exception {
         int value = writableColumnVector.getInt(0);
-        WritableColumnVector columnVector = getColumnVector(isOperatorCombineEnabled, positionCount,
-                writableColumnVector);
+        WritableColumnVector columnVector = getColumnVector(positionCount, writableColumnVector);
         if (writableColumnVector.isNullAt(0)) {
             columnVector.putNulls(0, positionCount);
         } else {
@@ -135,8 +126,7 @@ public class PageDeRunLength {
     public Optional<WritableColumnVector> decompressShortArray(int positionCount,
                                                                WritableColumnVector writableColumnVector) throws Exception {
         short value = writableColumnVector.getShort(0);
-        WritableColumnVector columnVector = getColumnVector(isOperatorCombineEnabled, positionCount,
-                writableColumnVector);
+        WritableColumnVector columnVector = getColumnVector(positionCount, writableColumnVector);
         if (writableColumnVector.isNullAt(0)) {
             columnVector.putNulls(0, positionCount);
         } else {
@@ -160,8 +150,7 @@ public class PageDeRunLength {
     public Optional<WritableColumnVector> decompressLongArray(int positionCount,
                                                               WritableColumnVector writableColumnVector) throws Exception {
         long value = writableColumnVector.getLong(0);
-        WritableColumnVector columnVector = getColumnVector(isOperatorCombineEnabled, positionCount,
-                writableColumnVector);
+        WritableColumnVector columnVector = getColumnVector(positionCount, writableColumnVector);
         if (writableColumnVector.isNullAt(0)) {
             columnVector.putNulls(0, positionCount);
         } else {
@@ -185,8 +174,7 @@ public class PageDeRunLength {
     public Optional<WritableColumnVector> decompressFloatArray(int positionCount,
                                                                WritableColumnVector writableColumnVector) throws Exception {
         float value = writableColumnVector.getFloat(0);
-        WritableColumnVector columnVector = getColumnVector(isOperatorCombineEnabled, positionCount,
-                writableColumnVector);
+        WritableColumnVector columnVector = getColumnVector(positionCount, writableColumnVector);
         if (writableColumnVector.isNullAt(0)) {
             columnVector.putNulls(0, positionCount);
         } else {
@@ -210,8 +198,7 @@ public class PageDeRunLength {
     public Optional<WritableColumnVector> decompressDoubleArray(int positionCount,
                                                                 WritableColumnVector writableColumnVector) throws Exception {
         double value = writableColumnVector.getDouble(0);
-        WritableColumnVector columnVector = getColumnVector(isOperatorCombineEnabled, positionCount,
-                writableColumnVector);
+        WritableColumnVector columnVector = getColumnVector(positionCount, writableColumnVector);
         if (writableColumnVector.isNullAt(0)) {
             columnVector.putNulls(0, positionCount);
         } else {
@@ -234,8 +221,7 @@ public class PageDeRunLength {
      */
     public Optional<WritableColumnVector> decompressVariableWidth(int positionCount,
                                                                   WritableColumnVector writableColumnVector) throws Exception {
-        WritableColumnVector columnVector = getColumnVector(isOperatorCombineEnabled, positionCount,
-                writableColumnVector);
+        WritableColumnVector columnVector = getColumnVector(positionCount, writableColumnVector);
         if (writableColumnVector.isNullAt(0)) {
             columnVector.putNulls(0, positionCount);
         } else {
@@ -261,8 +247,7 @@ public class PageDeRunLength {
         int precision = ((DecimalType) writableColumnVector.dataType()).precision();
         int scale = ((DecimalType) writableColumnVector.dataType()).scale();
         Decimal value = writableColumnVector.getDecimal(0, precision, scale);
-        WritableColumnVector columnVector = getColumnVector(isOperatorCombineEnabled, positionCount,
-                writableColumnVector);
+        WritableColumnVector columnVector = getColumnVector(positionCount, writableColumnVector);
         for (int rowId = 0; rowId < positionCount; rowId++) {
             if (writableColumnVector.isNullAt(rowId) || value == null) {
                 columnVector.putNull(rowId);
@@ -278,14 +263,7 @@ public class PageDeRunLength {
         return Optional.of(columnVector);
     }
 
-    private WritableColumnVector getColumnVector(boolean isOperatorCombineEnabled, int positionCount,
-                                                 WritableColumnVector writableColumnVector) {
-        WritableColumnVector columnVector ;
-        if (isOperatorCombineEnabled) {
-            columnVector = new OmniColumnVector(positionCount, writableColumnVector.dataType(), true);
-        } else {
-            columnVector = new OnHeapColumnVector(positionCount, writableColumnVector.dataType());
-        }
-        return columnVector;
+    private WritableColumnVector getColumnVector(int positionCount, WritableColumnVector writableColumnVector) {
+        return new OnHeapColumnVector(positionCount, writableColumnVector.dataType());
     }
 }

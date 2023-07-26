@@ -58,11 +58,13 @@ public class PageDeserializer implements Deserializer<WritableColumnVector[]> {
      */
     public PageDeserializer(DecodeType[] columnTypes, int[] columnOrders, boolean isOperatorCombineEnabled) {
         this.columnTypes = columnTypes;
-        this.decoding = new PageDecoding(isOperatorCombineEnabled);
-        this.columnOrders = columnOrders;
         if (isOperatorCombineEnabled) {
-            LOG.info("OmniRuntime PushDown deserialization info: deserialize to OmniColumnVector");
+            this.decoding = new OperatorPageDecoding();
+            LOG.debug("OmniRuntime PushDown deserialization info: deserialize to OmniColumnVector");
+        } else {
+            this.decoding = new PageDecoding();
         }
+        this.columnOrders = columnOrders;
     }
 
     @Override

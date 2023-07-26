@@ -37,6 +37,7 @@ import org.apache.spark.sql.execution.util.SparkMemoryUtils;
 import org.apache.spark.sql.execution.vectorized.OmniColumnVector;
 import org.apache.spark.sql.execution.vectorized.OnHeapColumnVector;
 import org.apache.spark.sql.execution.vectorized.WritableColumnVector;
+import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.Decimal;
 import org.apache.spark.sql.types.DecimalType;
@@ -63,27 +64,15 @@ public class PageDecoding extends AbstractDecoding<Optional<WritableColumnVector
     /**
      * Log appended files.
      */
-    private static Field filedElementsAppended;
+    static Field filedElementsAppended;
 
     static {
-        SparkMemoryUtils.init();
         try {
             filedElementsAppended = WritableColumnVector.class.getDeclaredField("elementsAppended");
             filedElementsAppended.setAccessible(true);
         } catch (NoSuchFieldException e) {
             e.printStackTrace();
         }
-    }
-
-    private final boolean isOperatorCombineEnabled;
-
-    /**
-     * Initialize PageDecoding.
-     *
-     * @param isOperatorCombineEnabled whether to apply OmniOperator combination
-     */
-    public PageDecoding(boolean isOperatorCombineEnabled) {
-        this.isOperatorCombineEnabled = isOperatorCombineEnabled;
     }
 
     @Override
@@ -93,33 +82,17 @@ public class PageDecoding extends AbstractDecoding<Optional<WritableColumnVector
 
     @Override
     public Optional<WritableColumnVector> decodeByteArray(Optional<DecodeType> type, SliceInput sliceInput) {
-        int positionCount = sliceInput.readInt();
-        WritableColumnVector columnVector = new OnHeapColumnVector(positionCount, DataTypes.ByteType);
-        return getWritableColumnVector(sliceInput, positionCount, columnVector, "byte");
+        return decodeSimple(sliceInput, DataTypes.ByteType, "byte");
     }
 
     @Override
     public Optional<WritableColumnVector> decodeBooleanArray(Optional<DecodeType> type, SliceInput sliceInput) {
-        int positionCount = sliceInput.readInt();
-        WritableColumnVector columnVector;
-        if (isOperatorCombineEnabled) {
-            columnVector = new OmniColumnVector(positionCount, DataTypes.BooleanType, true);
-        } else {
-            columnVector = new OnHeapColumnVector(positionCount, DataTypes.BooleanType);
-        }
-        return getWritableColumnVector(sliceInput, positionCount, columnVector, "boolean");
+        return decodeSimple(sliceInput, DataTypes.BooleanType, "boolean");
     }
 
     @Override
     public Optional<WritableColumnVector> decodeIntArray(Optional<DecodeType> type, SliceInput sliceInput) {
-        int positionCount = sliceInput.readInt();
-        WritableColumnVector columnVector;
-        if (isOperatorCombineEnabled) {
-            columnVector = new OmniColumnVector(positionCount, DataTypes.IntegerType, true);
-        } else {
-            columnVector = new OnHeapColumnVector(positionCount, DataTypes.IntegerType);
-        }
-        return getWritableColumnVector(sliceInput, positionCount, columnVector, "int");
+        return decodeSimple(sliceInput, DataTypes.IntegerType, "int");
     }
 
     @Override
@@ -129,45 +102,22 @@ public class PageDecoding extends AbstractDecoding<Optional<WritableColumnVector
 
     @Override
     public Optional<WritableColumnVector> decodeShortArray(Optional<DecodeType> type, SliceInput sliceInput) {
-        int positionCount = sliceInput.readInt();
-        WritableColumnVector columnVector;
-        if (isOperatorCombineEnabled) {
-            columnVector = new OmniColumnVector(positionCount, DataTypes.ShortType, true);
-        } else {
-            columnVector = new OnHeapColumnVector(positionCount, DataTypes.ShortType);
-        }
-        return getWritableColumnVector(sliceInput, positionCount, columnVector, "short");
+        return decodeSimple(sliceInput, DataTypes.ShortType, "short");
     }
 
     @Override
     public Optional<WritableColumnVector> decodeLongArray(Optional<DecodeType> type, SliceInput sliceInput) {
-        int positionCount = sliceInput.readInt();
-        WritableColumnVector columnVector;
-        if (isOperatorCombineEnabled) {
-            columnVector = new OmniColumnVector(positionCount, DataTypes.LongType, true);
-        } else {
-            columnVector = new OnHeapColumnVector(positionCount, DataTypes.LongType);
-        }
-        return getWritableColumnVector(sliceInput, positionCount, columnVector, "long");
+        return decodeSimple(sliceInput, DataTypes.LongType, "long");
     }
 
     @Override
     public Optional<WritableColumnVector> decodeFloatArray(Optional<DecodeType> type, SliceInput sliceInput) {
-        int positionCount = sliceInput.readInt();
-        WritableColumnVector columnVector = new OnHeapColumnVector(positionCount, DataTypes.FloatType);
-        return getWritableColumnVector(sliceInput, positionCount, columnVector, "float");
+        return decodeSimple(sliceInput, DataTypes.FloatType, "float");
     }
 
     @Override
     public Optional<WritableColumnVector> decodeDoubleArray(Optional<DecodeType> type, SliceInput sliceInput) {
-        int positionCount = sliceInput.readInt();
-        WritableColumnVector columnVector;
-        if (isOperatorCombineEnabled) {
-            columnVector = new OmniColumnVector(positionCount, DataTypes.DoubleType, true);
-        } else {
-            columnVector = new OnHeapColumnVector(positionCount, DataTypes.DoubleType);
-        }
-        return getWritableColumnVector(sliceInput, positionCount, columnVector, "double");
+        return decodeSimple(sliceInput, DataTypes.DoubleType, "double");
     }
 
     @Override
@@ -180,22 +130,17 @@ public class PageDecoding extends AbstractDecoding<Optional<WritableColumnVector
         throw new UnsupportedOperationException();
     }
 
-    @Override
-    public Optional<WritableColumnVector> decodeVariableWidth(Optional<DecodeType> type, SliceInput sliceInput) {
-        int positionCount = sliceInput.readInt();
-
+    protected Optional<WritableColumnVector> decodeVariableWidthBase(
+            Optional<DecodeType> type,
+            SliceInput sliceInput,
+            WritableColumnVector columnVector,
+            int positionCount) {
         int[] offsets = new int[positionCount + 1];
         sliceInput.readBytes(Slices.wrappedIntArray(offsets), SIZE_OF_INT, Math.multiplyExact(positionCount, SIZE_OF_INT));
         boolean[] valueIsNull = decodeNullBits(sliceInput, positionCount).orElse(null);
         int blockSize = sliceInput.readInt();
         int curOffset = offsets[0];
         int nextOffset;
-        WritableColumnVector columnVector;
-        if (isOperatorCombineEnabled) {
-            columnVector = new OmniColumnVector(positionCount, DataTypes.StringType, true);
-        } else {
-            columnVector = new OnHeapColumnVector(positionCount, DataTypes.StringType);
-        }
         for (int position = 0; position < positionCount; position++) {
             if (valueIsNull == null || !valueIsNull[position]) {
                 nextOffset = offsets[position + 1];
@@ -221,12 +166,21 @@ public class PageDecoding extends AbstractDecoding<Optional<WritableColumnVector
     }
 
     @Override
+    public Optional<WritableColumnVector> decodeVariableWidth(Optional<DecodeType> type, SliceInput sliceInput) {
+        int positionCount = sliceInput.readInt();
+        return decodeVariableWidthBase(type, sliceInput,
+                new OnHeapColumnVector(positionCount, DataTypes.StringType), positionCount);
+    }
+
+    @Override
     public Optional<WritableColumnVector> decodeDictionary(Optional<DecodeType> type, SliceInput sliceInput) {
         throw new UnsupportedOperationException();
     }
 
-    @Override
-    public Optional<WritableColumnVector> decodeRunLength(Optional<DecodeType> type, SliceInput sliceInput)
+    protected Optional<WritableColumnVector> decodeRunLengthBase(
+            Optional<DecodeType> type,
+            SliceInput sliceInput,
+            PageDeRunLength pageDeRunLength)
             throws InvocationTargetException, IllegalAccessException {
         int positionCount = sliceInput.readInt();
         Optional<WritableColumnVector> resColumnVector = Optional.empty();
@@ -249,7 +203,6 @@ public class PageDecoding extends AbstractDecoding<Optional<WritableColumnVector
             decompressMethods.put(method.getName(), method);
         }
         Method method = decompressMethods.get(decodeName);
-        PageDeRunLength pageDeRunLength = new PageDeRunLength(isOperatorCombineEnabled);
         Object objResult = method.invoke(pageDeRunLength, positionCount, columnVector);
         if (objResult instanceof Optional) {
             Optional optResult = (Optional) objResult;
@@ -262,58 +215,44 @@ public class PageDecoding extends AbstractDecoding<Optional<WritableColumnVector
     }
 
     @Override
+    public Optional<WritableColumnVector> decodeRunLength(Optional<DecodeType> type, SliceInput sliceInput)
+            throws InvocationTargetException, IllegalAccessException {
+        return decodeRunLengthBase(type, sliceInput, new PageDeRunLength());
+    }
+
+    @Override
     public Optional<WritableColumnVector> decodeRow(Optional<DecodeType> type, SliceInput sliceInput) {
         return Optional.empty();
     }
 
     @Override
     public Optional<WritableColumnVector> decodeDate(Optional<DecodeType> type, SliceInput sliceInput) {
-        int positionCount = sliceInput.readInt();
-        WritableColumnVector columnVector;
-        if (isOperatorCombineEnabled) {
-            columnVector = new OmniColumnVector(positionCount, DataTypes.DateType, true);
-        } else {
-            columnVector = new OnHeapColumnVector(positionCount, DataTypes.DateType);
-        }
-        return getWritableColumnVector(sliceInput, positionCount, columnVector, "date");
+        return decodeSimple(sliceInput, DataTypes.DateType, "date");
     }
 
     @Override
     public Optional<WritableColumnVector> decodeLongToInt(Optional<DecodeType> type, SliceInput sliceInput) {
-        int positionCount = sliceInput.readInt();
-        WritableColumnVector columnVector;
-        if (isOperatorCombineEnabled) {
-            columnVector = new OmniColumnVector(positionCount, DataTypes.IntegerType, true);
-        } else {
-            columnVector = new OnHeapColumnVector(positionCount, DataTypes.IntegerType);
-        }
-        return getWritableColumnVector(sliceInput, positionCount, columnVector, "longToInt");
+        return decodeSimple(sliceInput, DataTypes.IntegerType, "longToInt");
     }
 
     @Override
     public Optional<WritableColumnVector> decodeLongToShort(Optional<DecodeType> type, SliceInput sliceInput) {
-        int positionCount = sliceInput.readInt();
-        WritableColumnVector columnVector;
-        if (isOperatorCombineEnabled) {
-            columnVector = new OmniColumnVector(positionCount, DataTypes.ShortType, true);
-        } else {
-            columnVector = new OnHeapColumnVector(positionCount, DataTypes.ShortType);
-        }
-        return getWritableColumnVector(sliceInput, positionCount, columnVector, "longToShort");
+        return decodeSimple(sliceInput, DataTypes.ShortType, "longToShort");
     }
 
     @Override
     public Optional<WritableColumnVector> decodeLongToByte(Optional<DecodeType> type, SliceInput sliceInput) {
-        int positionCount = sliceInput.readInt();
-        WritableColumnVector columnVector = new OnHeapColumnVector(positionCount, DataTypes.ByteType);
-        return getWritableColumnVector(sliceInput, positionCount, columnVector, "longToByte");
+        return decodeSimple(sliceInput, DataTypes.ByteType, "longToByte");
     }
 
     @Override
     public Optional<WritableColumnVector> decodeLongToFloat(Optional<DecodeType> type, SliceInput sliceInput) {
-        int positionCount = sliceInput.readInt();
-        WritableColumnVector columnVector = new OnHeapColumnVector(positionCount, DataTypes.FloatType);
-        return getWritableColumnVector(sliceInput, positionCount, columnVector, "longToFloat");
+        return decodeSimple(sliceInput, DataTypes.FloatType, "longToFloat");
+    }
+
+
+    private WritableColumnVector createColumnVectorForDecimal(int positionCount, DecimalType decimalType) {
+        return new OnHeapColumnVector(positionCount, decimalType);
     }
 
     @Override
@@ -327,12 +266,7 @@ public class PageDecoding extends AbstractDecoding<Optional<WritableColumnVector
         }
         int scale = decimalDecodeType.getScale();
         int precision = decimalDecodeType.getPrecision();
-        WritableColumnVector columnVector;
-        if (isOperatorCombineEnabled) {
-            columnVector = new OmniColumnVector(positionCount, new DecimalType(precision, scale), true);
-        } else {
-            columnVector = new OnHeapColumnVector(positionCount, new DecimalType(precision, scale));
-        }
+        WritableColumnVector columnVector = createColumnVectorForDecimal(positionCount, new DecimalType(precision, scale));
         boolean[] valueIsNull = decodeNullBits(sliceInput, positionCount).orElse(null);
         for (int position = 0; position < positionCount; position++) {
             if (valueIsNull == null || !valueIsNull[position]) {
@@ -363,12 +297,10 @@ public class PageDecoding extends AbstractDecoding<Optional<WritableColumnVector
 
     @Override
     public Optional<WritableColumnVector> decodeTimestamp(Optional<DecodeType> type, SliceInput sliceInput) {
-        int positionCount = sliceInput.readInt();
-        WritableColumnVector columnVector = new OnHeapColumnVector(positionCount, TimestampType);
-        return getWritableColumnVector(sliceInput, positionCount, columnVector, "timestamp");
+        return decodeSimple(sliceInput, DataTypes.TimestampType, "timestamp");
     }
 
-    private Optional<String> typeToDecodeName(Optional<DecodeType> optType) {
+    Optional<String> typeToDecodeName(Optional<DecodeType> optType) {
         Class<?> javaType = null;
         if (!optType.isPresent()) {
             return Optional.empty();
@@ -407,8 +339,8 @@ public class PageDecoding extends AbstractDecoding<Optional<WritableColumnVector
         return Optional.empty();
     }
 
-    private Optional<WritableColumnVector> getWritableColumnVector(SliceInput sliceInput, int positionCount,
-                                                                   WritableColumnVector columnVector, String type) {
+    Optional<WritableColumnVector> getWritableColumnVector(SliceInput sliceInput, int positionCount,
+                                                           WritableColumnVector columnVector, String type) {
         boolean[] valueIsNull = decodeNullBits(sliceInput, positionCount).orElse(null);
         for (int position = 0; position < positionCount; position++) {
             if (valueIsNull == null || !valueIsNull[position]) {
@@ -472,5 +404,14 @@ public class PageDecoding extends AbstractDecoding<Optional<WritableColumnVector
                 break;
             default:
         }
+    }
+
+    private Optional<WritableColumnVector> decodeSimple(
+            SliceInput sliceInput,
+            DataType dataType,
+            String dataTypeName) {
+        int positionCount = sliceInput.readInt();
+        WritableColumnVector columnVector = new OnHeapColumnVector(positionCount, dataType);
+        return getWritableColumnVector(sliceInput, positionCount, columnVector, dataTypeName);
     }
 }
