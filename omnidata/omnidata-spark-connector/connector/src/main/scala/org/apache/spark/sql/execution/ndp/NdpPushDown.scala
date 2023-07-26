@@ -22,7 +22,7 @@ import java.util.{Locale, Properties}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{PushDownData, PushDownManager, SparkSession}
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.{Alias, And, Attribute, AttributeReference, BinaryExpression, Cast, Expression, NamedExpression, PredicateHelper, UnaryExpression}
+import org.apache.spark.sql.catalyst.expressions.{Alias, And, Attribute, AttributeReference, BinaryExpression, Cast, Expression, Literal, NamedExpression, PredicateHelper, UnaryExpression}
 import org.apache.spark.sql.catalyst.expressions.aggregate.{AggregateExpression, Partial, PartialMerge}
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.{CollectLimitExec, FileSourceScanExec, FilterExec, GlobalLimitExec, LeafExecNode, LocalLimitExec, NdpFileSourceScanExec, ProjectExec, SparkPlan}
@@ -34,7 +34,6 @@ import org.apache.spark.sql.sources.DataSourceRegister
 import org.apache.spark.sql.hive.HiveSimpleUDF
 import org.apache.hadoop.hive.ql.exec.DefaultUDFMethodResolver
 import org.apache.spark.TaskContext
-import org.apache.spark.sql.catalyst.trees.TreeNode
 
 import scala.collection.{JavaConverters, mutable}
 import scala.reflect.runtime.universe
@@ -49,7 +48,7 @@ case class NdpPushDown(sparkSession: SparkSession)
     "greaterthan", "greaterthanorequal", "lessthanorequal", "in", "literal", "isnull",
     "attributereference")
   private val attrWhiteList = Set("long", "integer", "byte", "short", "float", "double",
-    "boolean", "date", "decimal", "timestamp")
+    "boolean", "date", "decimal")
   private val sparkUdfWhiteList = Set("substr", "substring", "length", "upper", "lower", "cast",
     "replace", "getarrayitem")
   private val udfPathWhiteList = Set("")
@@ -133,12 +132,11 @@ case class NdpPushDown(sparkSession: SparkSession)
   def shouldPushDown(f: FilterExec, scan: NdpSupport): Boolean = {
     scan.filterExeInfos.isEmpty &&
       f.subqueries.isEmpty &&
-      f.output.forall(x => attrWhiteList.contains(x.dataType.typeName.split("\\(")(0))
-        || supportedHiveStringType(x))
+      f.output.forall(isOutputTypeSupport)
   }
 
   private def supportedHiveStringType(attr: Attribute): Boolean = {
-    if (attr.dataType.typeName.equals("string")) {
+    if ("string".equals(getTypeName(attr))) {
       !attr.metadata.contains("HIVE_TYPE_STRING") ||
         attr.metadata.getString("HIVE_TYPE_STRING").startsWith("varchar") ||
         attr.metadata.getString("HIVE_TYPE_STRING").startsWith("char")
@@ -153,16 +151,42 @@ case class NdpPushDown(sparkSession: SparkSession)
 
   def shouldPushDown(agg: BaseAggregateExec, scan: NdpSupport): Boolean = {
     scan.aggExeInfos.isEmpty &&
-      agg.output.forall(x => attrWhiteList.contains(x.dataType.typeName)) &&
-      agg.aggregateExpressions.forall { e =>
-        aggFuncWhiteList.contains(e.aggregateFunction.prettyName) &&
-          (e.mode.equals(PartialMerge) || e.mode.equals(Partial)) &&
-          !e.isDistinct &&
-          e.aggregateFunction.children.forall { g =>
-            aggExpressionWhiteList.contains(g.prettyName)
-          }
+      agg.output.forall(x =>
+        attrWhiteList.contains(x.dataType.typeName) ||
+          supportedHiveStringType(x)) &&
+      agg.aggregateExpressions.forall(isAggregateExpressionSupport) &&
+      agg.groupingExpressions.forall(isSimpleExpression)
+  }
+
+  def isOutputTypeSupport(attr: Attribute): Boolean = {
+    attrWhiteList.contains(getTypeName(attr)) || supportedHiveStringType(attr)
+  }
+
+  def getTypeName(expression: Expression): String = {
+    expression.dataType.typeName.split("\\(")(0)
+  }
+
+  def isAggregateExpressionSupport(e: AggregateExpression): Boolean = {
+    aggFuncWhiteList.contains(e.aggregateFunction.prettyName) &&
+      (e.mode.equals(PartialMerge) || e.mode.equals(Partial)) &&
+      !e.isDistinct &&
+      e.aggregateFunction.children.forall { g =>
+        aggExpressionWhiteList.contains(g.prettyName) ||
+        // aggExpression should not be constant "null"
+        // col1 is stringType, select max(col1 + "s") from test; ==> spark plan will contains max(null)
+        !isConstantNull(g)
       } &&
-      isSimpleExpressions(agg.groupingExpressions) && !hasCastExpressions(agg.aggregateExpressions)
+    // unsupported Cast in Agg
+    e.find(_.isInstanceOf[Cast]).isEmpty
+  }
+
+  def isConstantNull(expression: Expression): Boolean = {
+    expression match {
+      case literal: Literal =>
+        literal.value == null
+      case _ =>
+        false
+    }
   }
 
   def hasCastExpressions(aggExps: Seq[AggregateExpression]): Boolean = {

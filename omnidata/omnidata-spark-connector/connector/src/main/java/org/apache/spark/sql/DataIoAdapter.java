@@ -20,6 +20,7 @@ package org.apache.spark.sql;
 
 import static io.prestosql.spi.function.FunctionKind.AGGREGATE;
 import static io.prestosql.spi.function.FunctionKind.SCALAR;
+import static io.prestosql.spi.relation.SpecialForm.Form.IN;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
 
@@ -714,14 +715,7 @@ public class DataIoAdapter {
                 In in = (In) filterExpression;
                 List<Expression> rightExpression =
                         JavaConverters.seqAsJavaList(in.list());
-                // check if filed on right
-                if (rightExpression.size() == 1 && rightExpression.get(0) instanceof AttributeReference
-                        && in.value() instanceof Literal) {
-                    List<Expression> newRightExpression = new ArrayList<>();
-                    newRightExpression.add(in.value());
-                    return getRowExpression(rightExpression.get(0), "in", newRightExpression);
-                }
-                return getRowExpression(in.value(), "in", rightExpression);
+                return getRowExpressionForIn(in.value(), rightExpression);
             case HiveSimpleUDF:
                 return getRowExpression(filterExpression,
                         ((HiveSimpleUDF) filterExpression).name(), rightExpressions);
@@ -736,32 +730,10 @@ public class DataIoAdapter {
 
     private RowExpression getRowExpression(Expression leftExpression, String operatorName,
                                            List<Expression> rightExpression) {
-        PrestoExpressionInfo expressionInfo = new PrestoExpressionInfo();
-        Type prestoType;
-        int filterProjectionId;
-        // deal with left expression only UDF and Attribute
-        if (leftExpression instanceof AttributeReference) {
-            prestoType = NdpUtils.transOlkDataType(leftExpression.dataType(), leftExpression, false);
-            filterProjectionId = putFilterValue(leftExpression, prestoType);
-        } else if (leftExpression instanceof HiveSimpleUDF) {
-            for (int i = 0; i < leftExpression.children().length(); i++) {
-                Expression childExpr = leftExpression.children().apply(i);
-                if (childExpr instanceof Attribute) {
-                    putFilterValue(childExpr, NdpUtils.transOlkDataType(childExpr.dataType(),
-                            childExpr, false));
-                } else if (!(childExpr instanceof Literal)) {
-                    putFilterValue(childExpr, NdpUtils.transOlkDataType(childExpr.dataType(), false));
-                }
-            }
-            ndpUdfExpressions.createNdpUdf(leftExpression, expressionInfo, fieldMap);
-            prestoType = expressionInfo.getReturnType();
-            filterProjectionId = expressionInfo.getProjectionId();
-        } else {
-            ndpUdfExpressions.createNdpUdf(leftExpression, expressionInfo, fieldMap);
-            putFilterValue(expressionInfo.getChildExpression(), expressionInfo.getFieldDataType());
-            prestoType = expressionInfo.getReturnType();
-            filterProjectionId = expressionInfo.getProjectionId();
-        }
+        ColumnInfo columnInfo = getColumnInfo(leftExpression);
+        PrestoExpressionInfo expressionInfo = columnInfo.getExpressionInfo();
+        Type prestoType = columnInfo.getPrestoType();
+        int filterProjectionId = columnInfo.getFilterProjectionId();
         // deal with right expression
         List<Object> argumentValues;
         List<RowExpression> multiArguments = new ArrayList<>();
@@ -784,6 +756,65 @@ public class DataIoAdapter {
                     argumentValues, null, operatorName);
         }
         return rowExpression;
+    }
+
+    private ColumnInfo getColumnInfo(Expression expression) {
+        PrestoExpressionInfo expressionInfo = new PrestoExpressionInfo();
+        Type prestoType;
+        int filterProjectionId;
+        // deal with expression only UDF and Attribute
+        if (expression instanceof AttributeReference) {
+            prestoType = NdpUtils.transOlkDataType(expression.dataType(), expression, false);
+            filterProjectionId = putFilterValue(expression, prestoType);
+        } else if (expression instanceof HiveSimpleUDF) {
+            for (int i = 0; i < expression.children().length(); i++) {
+                Expression childExpr = expression.children().apply(i);
+                if (childExpr instanceof Attribute) {
+                    putFilterValue(childExpr, NdpUtils.transOlkDataType(childExpr.dataType(),
+                            childExpr, false));
+                } else if (!(childExpr instanceof Literal)) {
+                    putFilterValue(childExpr, NdpUtils.transOlkDataType(childExpr.dataType(), false));
+                }
+            }
+            ndpUdfExpressions.createNdpUdf(expression, expressionInfo, fieldMap);
+            prestoType = expressionInfo.getReturnType();
+            filterProjectionId = expressionInfo.getProjectionId();
+        } else {
+            ndpUdfExpressions.createNdpUdf(expression, expressionInfo, fieldMap);
+            putFilterValue(expressionInfo.getChildExpression(), expressionInfo.getFieldDataType());
+            prestoType = expressionInfo.getReturnType();
+            filterProjectionId = expressionInfo.getProjectionId();
+        }
+        return new ColumnInfo(expressionInfo, prestoType, filterProjectionId);
+    }
+
+
+    private RowExpression getRowExpressionForIn(Expression leftExpression, List<Expression> rightExpression) {
+        List<Expression> expressionList = new ArrayList<>(rightExpression.size() + 1);
+        expressionList.add(leftExpression);
+        expressionList.addAll(rightExpression);
+        // get filter type
+        Type filterType = null;
+        for (Expression expression : expressionList) {
+            if (!(expression instanceof Literal)){
+                if (expression instanceof AttributeReference) {
+                    filterType = NdpUtils.transOlkDataType(expression.dataType(), expression, false);
+                } else {
+                    filterType = NdpUtils.transOlkDataType(expression.dataType(), true);
+                }
+                break;
+            }
+        }
+        // create rowArguments
+        List<RowExpression> rowArguments = new ArrayList<>();
+        for (Expression expression : expressionList) {
+            if (expression instanceof Literal) {
+                rowArguments.add(NdpUtils.transConstantExpression(expression.toString(), filterType));
+            } else{
+                rowArguments.add(NdpFilterUtils.createRowExpressionForIn(getColumnInfo(expression)));
+            }
+        }
+        return new SpecialForm(IN, BOOLEAN, rowArguments);
     }
 
     // column projection

@@ -133,6 +133,20 @@ public class NdpFilterUtils {
         return arguments;
     }
 
+    /**
+     * creat RowExpression for in
+     *
+     * @param columnInfo column info
+     * @return RowExpression produced by column info
+     */
+    public static RowExpression createRowExpressionForIn(ColumnInfo columnInfo) {
+        if (columnInfo.getExpressionInfo().getReturnType() != null) {
+            return columnInfo.getExpressionInfo().getPrestoRowExpression();
+        } else {
+            return new InputReferenceExpression(columnInfo.getFilterProjectionId(), columnInfo.getPrestoType());
+        }
+    }
+
     public static  List<RowExpression> getUdfArguments(Type typeStr, List<Object> argumentValues,
                                                        RowExpression callExpression) {
         List<RowExpression> arguments = new ArrayList<>();

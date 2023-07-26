@@ -27,6 +27,7 @@ import org.apache.spark.sql.types.Metadata;
 import org.apache.spark.sql.types.StringType;
 import org.apache.spark.sql.types.StructType;
 import org.apache.spark.sql.vectorized.ColumnarBatch;
+import org.apache.spark.unsafe.types.UTF8String;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import scala.collection.JavaConverters;
@@ -116,7 +117,11 @@ public class PageToColumnar implements Serializable {
                 len = matcher.group();
             }
             if (metadataStr.startsWith(METADATA_CHAR)) {
-                String vecStr = columnVector.getUTF8String(rowId).toString();
+                UTF8String utf8String = columnVector.getUTF8String(rowId);
+                if (utf8String == null) {
+                    return;
+                }
+                String vecStr = utf8String.toString();
                 String vecStrPad = rightPad(vecStr, Integer.parseInt(len), ' ');
                 byte[] bytes = vecStrPad.getBytes(StandardCharsets.UTF_8);
                 if (columnVector instanceof OnHeapColumnVector) {
