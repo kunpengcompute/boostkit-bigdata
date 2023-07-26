@@ -151,7 +151,11 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
 
   // columnar sort spill threshold
   val columnarSortSpillRowThreshold: Integer =
-    conf.getConfString("spark.omni.sql.columnar.sortSpill.rowThreshold", "200000").toInt
+    conf.getConfString("spark.omni.sql.columnar.sortSpill.rowThreshold", Integer.MAX_VALUE.toString).toInt
+
+  // columnar sort spill threshold - Percentage of memory usage, associate with the "spark.memory.offHeap" together
+  val columnarSortSpillMemPctThreshold: Integer =
+    conf.getConfString("spark.omni.sql.columnar.sortSpill.memFraction", "90").toInt
 
   // columnar sort spill dir disk reserve Size, default 10GB
   val columnarSortSpillDirDiskReserveSize:Long =
