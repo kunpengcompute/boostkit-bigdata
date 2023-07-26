@@ -113,6 +113,7 @@ case class ColumnarSortExec(
     child.executeColumnar().mapPartitionsWithIndexInternal { (_, iter) =>
       val columnarConf = ColumnarPluginConfig.getSessionConf
       val sortSpillRowThreshold = columnarConf.columnarSortSpillRowThreshold
+      val sortSpillMemPctThreshold = columnarConf.columnarSortSpillMemPctThreshold
       val sortSpillDirDiskReserveSize = columnarConf.columnarSortSpillDirDiskReserveSize
       val sortSpillEnable = columnarConf.enableSortSpill
       val sortlocalDirs: Array[File] = generateLocalDirs(sparkConfTmp)
@@ -120,7 +121,7 @@ case class ColumnarSortExec(
       val dirId = hash % sortlocalDirs.length
       val spillPathDir = sortlocalDirs(dirId).getCanonicalPath
       val sparkSpillConf = new SparkSpillConfig(sortSpillEnable, spillPathDir,
-        sortSpillDirDiskReserveSize, sortSpillRowThreshold)
+        sortSpillDirDiskReserveSize, sortSpillRowThreshold, sortSpillMemPctThreshold)
       val startCodegen = System.nanoTime()
       val sortOperatorFactory = new OmniSortWithExprOperatorFactory(sourceTypes, outputCols, sortColsExp, ascendings, nullFirsts,
         new OperatorConfig(sparkSpillConf, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
