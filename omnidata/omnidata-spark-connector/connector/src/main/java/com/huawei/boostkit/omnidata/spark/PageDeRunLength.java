@@ -18,7 +18,6 @@
 
 package com.huawei.boostkit.omnidata.spark;
 
-import org.apache.spark.sql.execution.vectorized.OmniColumnVector;
 import org.apache.spark.sql.execution.vectorized.OnHeapColumnVector;
 import org.apache.spark.sql.execution.vectorized.WritableColumnVector;
 import org.apache.spark.sql.types.Decimal;
@@ -263,7 +262,7 @@ public class PageDeRunLength {
         return Optional.of(columnVector);
     }
 
-    private WritableColumnVector getColumnVector(int positionCount, WritableColumnVector writableColumnVector) {
-        return new OnHeapColumnVector(positionCount, writableColumnVector.dataType());
+    protected WritableColumnVector getColumnVector(int positionCount, WritableColumnVector writableColumnVector) {
+        return PageDecoding.createColumnVector(positionCount, writableColumnVector.dataType());
     }
 }

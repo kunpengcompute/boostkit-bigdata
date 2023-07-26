@@ -27,7 +27,8 @@ import org.apache.spark.sql.execution.vectorized.WritableColumnVector;
  * @since 2023-07-20
  */
 public class OperatorPageDeRunLength extends PageDeRunLength {
-    private WritableColumnVector getColumnVector(int positionCount, WritableColumnVector writableColumnVector) {
+    @Override
+    protected WritableColumnVector getColumnVector(int positionCount, WritableColumnVector writableColumnVector) {
         return new OmniColumnVector(positionCount, writableColumnVector.dataType(), true);
     }
 }

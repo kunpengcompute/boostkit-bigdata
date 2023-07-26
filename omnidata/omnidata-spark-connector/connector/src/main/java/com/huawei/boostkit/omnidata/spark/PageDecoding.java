@@ -21,7 +21,6 @@ package com.huawei.boostkit.omnidata.spark;
 import static io.airlift.slice.SizeOf.SIZE_OF_INT;
 import static java.lang.Double.longBitsToDouble;
 import static java.lang.Float.intBitsToFloat;
-import static org.apache.spark.sql.types.DataTypes.TimestampType;
 
 import com.huawei.boostkit.omnidata.decode.AbstractDecoding;
 import com.huawei.boostkit.omnidata.decode.type.*;
@@ -33,10 +32,10 @@ import io.prestosql.spi.type.DateType;
 import io.prestosql.spi.type.Decimals;
 
 import org.apache.spark.sql.catalyst.util.RebaseDateTime;
-import org.apache.spark.sql.execution.util.SparkMemoryUtils;
-import org.apache.spark.sql.execution.vectorized.OmniColumnVector;
+import org.apache.spark.sql.execution.vectorized.OffHeapColumnVector;
 import org.apache.spark.sql.execution.vectorized.OnHeapColumnVector;
 import org.apache.spark.sql.execution.vectorized.WritableColumnVector;
+import org.apache.spark.sql.internal.SQLConf;
 import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.Decimal;
@@ -148,7 +147,7 @@ public class PageDecoding extends AbstractDecoding<Optional<WritableColumnVector
                 curOffset = nextOffset;
                 byte[] bytes = new byte[length];
                 sliceInput.readBytes(bytes, 0, length);
-                if (columnVector instanceof OnHeapColumnVector) {
+                if (columnVector instanceof OnHeapColumnVector || columnVector instanceof OffHeapColumnVector) {
                     columnVector.putByteArray(position, bytes, 0, length);
                 } else {
                     columnVector.putBytes(position, length, bytes, 0);
@@ -169,7 +168,7 @@ public class PageDecoding extends AbstractDecoding<Optional<WritableColumnVector
     public Optional<WritableColumnVector> decodeVariableWidth(Optional<DecodeType> type, SliceInput sliceInput) {
         int positionCount = sliceInput.readInt();
         return decodeVariableWidthBase(type, sliceInput,
-                new OnHeapColumnVector(positionCount, DataTypes.StringType), positionCount);
+                createColumnVector(positionCount, DataTypes.StringType), positionCount);
     }
 
     @Override
@@ -251,8 +250,8 @@ public class PageDecoding extends AbstractDecoding<Optional<WritableColumnVector
     }
 
 
-    private WritableColumnVector createColumnVectorForDecimal(int positionCount, DecimalType decimalType) {
-        return new OnHeapColumnVector(positionCount, decimalType);
+    protected WritableColumnVector createColumnVectorForDecimal(int positionCount, DecimalType decimalType) {
+        return createColumnVector(positionCount, decimalType);
     }
 
     @Override
@@ -406,12 +405,21 @@ public class PageDecoding extends AbstractDecoding<Optional<WritableColumnVector
         }
     }
 
-    private Optional<WritableColumnVector> decodeSimple(
+    protected Optional<WritableColumnVector> decodeSimple(
             SliceInput sliceInput,
             DataType dataType,
             String dataTypeName) {
         int positionCount = sliceInput.readInt();
-        WritableColumnVector columnVector = new OnHeapColumnVector(positionCount, dataType);
+        WritableColumnVector columnVector = createColumnVector(positionCount, dataType);
         return getWritableColumnVector(sliceInput, positionCount, columnVector, dataTypeName);
+    }
+
+    protected static WritableColumnVector createColumnVector(int positionCount, DataType dataType) {
+        boolean offHeapEnable = SQLConf.get().offHeapColumnVectorEnabled();
+        if (offHeapEnable) {
+            return new OffHeapColumnVector(positionCount, dataType);
+        } else {
+            return new OnHeapColumnVector(positionCount, dataType);
+        }
     }
 }

@@ -18,38 +18,17 @@
 
 package com.huawei.boostkit.omnidata.spark;
 
-import com.huawei.boostkit.omnidata.decode.AbstractDecoding;
 import com.huawei.boostkit.omnidata.decode.type.*;
-import com.huawei.boostkit.omnidata.exception.OmniDataException;
 import io.airlift.slice.SliceInput;
-import io.airlift.slice.Slices;
-import io.prestosql.spi.type.DateType;
-import io.prestosql.spi.type.Decimals;
-import org.apache.spark.sql.catalyst.util.RebaseDateTime;
 import org.apache.spark.sql.execution.util.SparkMemoryUtils;
 import org.apache.spark.sql.execution.vectorized.OmniColumnVector;
-import org.apache.spark.sql.execution.vectorized.OnHeapColumnVector;
 import org.apache.spark.sql.execution.vectorized.WritableColumnVector;
 import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.DataTypes;
-import org.apache.spark.sql.types.Decimal;
 import org.apache.spark.sql.types.DecimalType;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.math.BigInteger;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Optional;
-import java.util.TimeZone;
-
-import static io.airlift.slice.SizeOf.SIZE_OF_INT;
-import static java.lang.Double.longBitsToDouble;
-import static java.lang.Float.intBitsToFloat;
-import static org.apache.spark.sql.types.DataTypes.TimestampType;
 
 /**
  * Decode data to spark writableColumnVector for combine with operator
@@ -75,11 +54,13 @@ public class OperatorPageDecoding extends PageDecoding {
         return decodeRunLengthBase(type, sliceInput, new OperatorPageDeRunLength());
     }
 
-    private WritableColumnVector createColumnVectorForDecimal(int positionCount, DecimalType decimalType) {
+    @Override
+    protected WritableColumnVector createColumnVectorForDecimal(int positionCount, DecimalType decimalType) {
         return new OmniColumnVector(positionCount, decimalType, true);
     }
 
-    private Optional<WritableColumnVector> decodeSimple(
+    @Override
+    protected Optional<WritableColumnVector> decodeSimple(
             SliceInput sliceInput,
             DataType dataType,
             String dataTypeName) {
