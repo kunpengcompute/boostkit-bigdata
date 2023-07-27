@@ -171,7 +171,7 @@ case class NdpPushDown(sparkSession: SparkSession)
       (e.mode.equals(PartialMerge) || e.mode.equals(Partial)) &&
       !e.isDistinct &&
       e.aggregateFunction.children.forall { g =>
-        aggExpressionWhiteList.contains(g.prettyName) ||
+        aggExpressionWhiteList.contains(g.prettyName) &&
         // aggExpression should not be constant "null"
         // col1 is stringType, select max(col1 + "s") from test; ==> spark plan will contains max(null)
         !isConstantNull(g)
@@ -187,23 +187,6 @@ case class NdpPushDown(sparkSession: SparkSession)
       case _ =>
         false
     }
-  }
-
-  def hasCastExpressions(aggExps: Seq[AggregateExpression]): Boolean = {
-    if(aggExps.isEmpty) return false
-    aggExps.foreach(aggExp =>
-      if(aggExp.find(_.isInstanceOf[Cast]).isDefined) return true
-    )
-    false
-  }
-
-  def isSimpleExpressions(groupingExpressions: Seq[NamedExpression]): Boolean = {
-    groupingExpressions.foreach(ge =>
-      if (!isSimpleExpression(ge)) {
-        return false
-      }
-    )
-    true
   }
 
   def isSimpleExpression(groupingExpression: NamedExpression): Boolean = {
