@@ -7,18 +7,24 @@
     <groupId>com.huawei.boostkit</groupId>
     <artifactId>omnidata-server-lib</artifactId>
     <packaging>pom</packaging>
-    <version>1.4.0</version>
+    <version>1.5.0</version>
 
     <properties>
         <dep.os.arch>${os.detected.arch}</dep.os.arch>
         <dep.json.version>2.11.4</dep.json.version>
         <dep.logback.version>1.2.3</dep.logback.version>
-        <dep.hetu.version>1.6.1</dep.hetu.version>
+        <dep.hetu.version>1.9.0</dep.hetu.version>
         <dep.airlift.version>206</dep.airlift.version>
         <dep.curator.version>2.12.0</dep.curator.version>
+        <dep.net.openhft.version>0.9</dep.net.openhft.version>
     </properties>
 
     <dependencies>
+        <dependency>
+            <groupId>net.openhft</groupId>
+            <artifactId>zero-allocation-hashing</artifactId>
+            <version>${dep.net.openhft.version}</version>
+        </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
@@ -95,11 +101,6 @@
                     <artifactId>slf4j-api</artifactId>
                 </exclusion>
             </exclusions>
-        </dependency>
-        <dependency>
-            <groupId>com.google.guava</groupId>
-            <artifactId>guava</artifactId>
-            <version>30.0-jre</version>
         </dependency>
         <dependency>
             <groupId>io.prestosql.hadoop</groupId>
@@ -230,6 +231,21 @@
                     <artifactId>*</artifactId>
                 </exclusion>
             </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>io.hetu.core</groupId>
+            <artifactId>presto-expressions</artifactId>
+            <version>${dep.hetu.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.hetu.core</groupId>
+            <artifactId>hetu-common</artifactId>
+            <version>${dep.hetu.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <version>30.0-jre</version>
         </dependency>
         <dependency>
             <groupId>io.airlift</groupId>

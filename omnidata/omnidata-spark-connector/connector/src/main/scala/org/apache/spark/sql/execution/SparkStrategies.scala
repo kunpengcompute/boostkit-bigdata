@@ -18,7 +18,7 @@
 package org.apache.spark.sql.execution
 
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.{execution, AnalysisException, Strategy}
+import org.apache.spark.sql.{AnalysisException, Strategy, execution}
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.encoders.RowEncoder
 import org.apache.spark.sql.catalyst.expressions._
@@ -34,6 +34,7 @@ import org.apache.spark.sql.execution.aggregate.AggUtils
 import org.apache.spark.sql.execution.columnar.{InMemoryRelation, InMemoryTableScanExec}
 import org.apache.spark.sql.execution.command._
 import org.apache.spark.sql.execution.exchange.{REPARTITION, REPARTITION_WITH_NUM, ShuffleExchangeExec}
+import org.apache.spark.sql.execution.ndp.NdpFilterEstimation
 import org.apache.spark.sql.execution.python._
 import org.apache.spark.sql.execution.streaming._
 import org.apache.spark.sql.execution.streaming.sources.MemoryPlan
@@ -537,7 +538,7 @@ abstract class SparkStrategies extends QueryPlanner[SparkPlan] {
       case PhysicalOperation(projectList, filters, mem: InMemoryRelation) =>
         val condition = filters.reduceLeftOption(And)
         val selectivity = if (condition.nonEmpty) {
-          FilterEstimation(Filter(condition.get, mem)).calculateFilterSelectivity(condition.get)
+          NdpFilterEstimation(FilterEstimation(Filter(condition.get, mem))).calculateFilterSelectivity(condition.get)
         } else {
           None
         }
@@ -605,8 +606,13 @@ abstract class SparkStrategies extends QueryPlanner[SparkPlan] {
   object BasicOperators extends Strategy {
     def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
       case d: DataWritingCommand => DataWritingCommandExec(d, planLater(d.query)) :: Nil
-      case r: RunnableCommand => ExecutedCommandExec(r) :: Nil
-
+      case r: RunnableCommand =>
+        r match {
+          case cmd: AnalyzeColumnCommand if conf.getConfString("spark.sql.ndp.string.analyze.enabled","true").toBoolean =>
+            ExecutedCommandExec(NdpAnalyzeColumnCommand(cmd.tableIdent, cmd.columnNames, cmd.allColumns)) :: Nil
+          case _ =>
+            ExecutedCommandExec(r) :: Nil
+        }
       case MemoryPlan(sink, output) =>
         val encoder = RowEncoder(StructType.fromAttributes(output))
         val toRow = encoder.createSerializer()
@@ -687,12 +693,12 @@ abstract class SparkStrategies extends QueryPlanner[SparkPlan] {
       case logical.Project(projectList, child) =>
         execution.ProjectExec(projectList, planLater(child)) :: Nil
       case l @ logical.Filter(condition, child) =>
-        val selectivity = FilterEstimation(l).calculateFilterSelectivity(l.condition)
+        val selectivity = NdpFilterEstimation(FilterEstimation(l)).calculateFilterSelectivity(l.condition)
         execution.FilterExec(condition, planLater(child), selectivity) :: Nil
       case f: logical.TypedFilter =>
         val condition = f.typedCondition(f.deserializer)
         val filter = Filter(condition, f.child)
-        val selectivity = FilterEstimation(filter).calculateFilterSelectivity(condition)
+        val selectivity = NdpFilterEstimation(FilterEstimation(filter)).calculateFilterSelectivity(condition)
         execution.FilterExec(condition, planLater(f.child), selectivity) :: Nil
       case e @ logical.Expand(_, _, child) =>
         execution.ExpandExec(e.projections, e.output, planLater(child)) :: Nil

@@ -23,8 +23,9 @@ import org.apache.spark.sql.catalyst.catalog.BucketSpec
 import org.apache.spark.sql.catalyst.expressions
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.planning.ScanOperation
-import org.apache.spark.sql.catalyst.plans.logical.{Filter => LFilter, LogicalPlan}
+import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Filter => LFilter}
 import org.apache.spark.sql.catalyst.plans.logical.statsEstimation.FilterEstimation
+import org.apache.spark.sql.execution.ndp.NdpFilterEstimation
 import org.apache.spark.sql.execution.{FileSourceScanExec, SparkPlan}
 import org.apache.spark.sql.types.{DoubleType, FloatType}
 import org.apache.spark.util.collection.BitSet
@@ -229,7 +230,7 @@ object FileSourceStrategy extends Strategy with PredicateHelper with Logging {
 
       val afterScanFilter = afterScanFilters.toSeq.reduceOption(expressions.And)
       val selectivity = if (afterScanFilter.nonEmpty) {
-        FilterEstimation(LFilter(afterScanFilter.get, l))
+        NdpFilterEstimation(FilterEstimation(LFilter(afterScanFilter.get, l)))
           .calculateFilterSelectivity(afterScanFilter.get)
       } else {
         None

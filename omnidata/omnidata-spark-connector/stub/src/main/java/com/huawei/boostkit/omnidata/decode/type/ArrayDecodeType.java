@@ -29,9 +29,18 @@ import java.util.Optional;
  * @since 2021-07-31
  */
 public class ArrayDecodeType<T extends DecodeType> implements DecodeType {
+    private final T elementType;
+
+    public ArrayDecodeType(T elementType) {
+        this.elementType = elementType;
+    }
+
+    public T getElementType() {
+        return elementType;
+    }
+
     @Override
     public Optional<Class<?>> getJavaType() {
         return Optional.empty();
     }
 }
-

@@ -17,19 +17,8 @@
  * limitations under the License.
  */
 
-package com.huawei.boostkit.omnidata.decode.type;
+package org.apache.spark.sql.execution.util
 
-
-import java.util.Optional;
-
-/**
- * Int decode type
- *
- * @since 2021-07-31
- */
-public class IntDecodeType implements DecodeType {
-    @Override
-    public Optional<Class<?>> getJavaType() {
-        return Optional.of(int.class);
-    }
+object SparkMemoryUtils {
+  def init(): Unit = {}
 }

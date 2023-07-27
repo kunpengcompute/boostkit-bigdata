@@ -20,7 +20,6 @@ package com.huawei.boostkit.omnidata.spark;
 
 import org.apache.spark.sql.execution.vectorized.OnHeapColumnVector;
 import org.apache.spark.sql.execution.vectorized.WritableColumnVector;
-import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.Decimal;
 import org.apache.spark.sql.types.DecimalType;
 
@@ -54,7 +53,7 @@ public class PageDeRunLength {
     public Optional<WritableColumnVector> decompressByteArray(int positionCount,
                                                               WritableColumnVector writableColumnVector) throws Exception {
         byte value = writableColumnVector.getByte(0);
-        WritableColumnVector columnVector = new OnHeapColumnVector(positionCount, DataTypes.ByteType);
+        WritableColumnVector columnVector = getColumnVector(positionCount, writableColumnVector);
         if (writableColumnVector.isNullAt(0)) {
             columnVector.putNulls(0, positionCount);
         } else {
@@ -78,7 +77,7 @@ public class PageDeRunLength {
     public Optional<WritableColumnVector> decompressBooleanArray(int positionCount,
                                                                  WritableColumnVector writableColumnVector) throws Exception {
         boolean value = writableColumnVector.getBoolean(0);
-        WritableColumnVector columnVector = new OnHeapColumnVector(positionCount, DataTypes.BooleanType);
+        WritableColumnVector columnVector = getColumnVector(positionCount, writableColumnVector);
         if (writableColumnVector.isNullAt(0)) {
             columnVector.putNulls(0, positionCount);
         } else {
@@ -102,7 +101,7 @@ public class PageDeRunLength {
     public Optional<WritableColumnVector> decompressIntArray(int positionCount,
                                                              WritableColumnVector writableColumnVector) throws Exception {
         int value = writableColumnVector.getInt(0);
-        WritableColumnVector columnVector = new OnHeapColumnVector(positionCount, DataTypes.IntegerType);
+        WritableColumnVector columnVector = getColumnVector(positionCount, writableColumnVector);
         if (writableColumnVector.isNullAt(0)) {
             columnVector.putNulls(0, positionCount);
         } else {
@@ -126,7 +125,7 @@ public class PageDeRunLength {
     public Optional<WritableColumnVector> decompressShortArray(int positionCount,
                                                                WritableColumnVector writableColumnVector) throws Exception {
         short value = writableColumnVector.getShort(0);
-        WritableColumnVector columnVector = new OnHeapColumnVector(positionCount, DataTypes.ShortType);
+        WritableColumnVector columnVector = getColumnVector(positionCount, writableColumnVector);
         if (writableColumnVector.isNullAt(0)) {
             columnVector.putNulls(0, positionCount);
         } else {
@@ -150,7 +149,7 @@ public class PageDeRunLength {
     public Optional<WritableColumnVector> decompressLongArray(int positionCount,
                                                               WritableColumnVector writableColumnVector) throws Exception {
         long value = writableColumnVector.getLong(0);
-        WritableColumnVector columnVector = new OnHeapColumnVector(positionCount, DataTypes.LongType);
+        WritableColumnVector columnVector = getColumnVector(positionCount, writableColumnVector);
         if (writableColumnVector.isNullAt(0)) {
             columnVector.putNulls(0, positionCount);
         } else {
@@ -174,7 +173,7 @@ public class PageDeRunLength {
     public Optional<WritableColumnVector> decompressFloatArray(int positionCount,
                                                                WritableColumnVector writableColumnVector) throws Exception {
         float value = writableColumnVector.getFloat(0);
-        WritableColumnVector columnVector = new OnHeapColumnVector(positionCount, DataTypes.FloatType);
+        WritableColumnVector columnVector = getColumnVector(positionCount, writableColumnVector);
         if (writableColumnVector.isNullAt(0)) {
             columnVector.putNulls(0, positionCount);
         } else {
@@ -198,7 +197,7 @@ public class PageDeRunLength {
     public Optional<WritableColumnVector> decompressDoubleArray(int positionCount,
                                                                 WritableColumnVector writableColumnVector) throws Exception {
         double value = writableColumnVector.getDouble(0);
-        WritableColumnVector columnVector = new OnHeapColumnVector(positionCount, DataTypes.DoubleType);
+        WritableColumnVector columnVector = getColumnVector(positionCount, writableColumnVector);
         if (writableColumnVector.isNullAt(0)) {
             columnVector.putNulls(0, positionCount);
         } else {
@@ -221,7 +220,7 @@ public class PageDeRunLength {
      */
     public Optional<WritableColumnVector> decompressVariableWidth(int positionCount,
                                                                   WritableColumnVector writableColumnVector) throws Exception {
-        WritableColumnVector columnVector = new OnHeapColumnVector(positionCount, DataTypes.StringType);
+        WritableColumnVector columnVector = getColumnVector(positionCount, writableColumnVector);
         if (writableColumnVector.isNullAt(0)) {
             columnVector.putNulls(0, positionCount);
         } else {
@@ -247,9 +246,9 @@ public class PageDeRunLength {
         int precision = ((DecimalType) writableColumnVector.dataType()).precision();
         int scale = ((DecimalType) writableColumnVector.dataType()).scale();
         Decimal value = writableColumnVector.getDecimal(0, precision, scale);
-        WritableColumnVector columnVector = new OnHeapColumnVector(positionCount, writableColumnVector.dataType());
+        WritableColumnVector columnVector = getColumnVector(positionCount, writableColumnVector);
         for (int rowId = 0; rowId < positionCount; rowId++) {
-            if (writableColumnVector.isNullAt(rowId)) {
+            if (writableColumnVector.isNullAt(rowId) || value == null) {
                 columnVector.putNull(rowId);
             } else {
                 columnVector.putDecimal(rowId, value, precision);
@@ -261,5 +260,9 @@ public class PageDeRunLength {
             throw new Exception(e.getMessage());
         }
         return Optional.of(columnVector);
+    }
+
+    protected WritableColumnVector getColumnVector(int positionCount, WritableColumnVector writableColumnVector) {
+        return PageDecoding.createColumnVector(positionCount, writableColumnVector.dataType());
     }
 }
