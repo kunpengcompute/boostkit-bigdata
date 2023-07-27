@@ -10,7 +10,7 @@ import org.apache.spark.sql.execution.adaptive.ock.rule._
 
 class OmniOpBoostTuningExtension extends (SparkSessionExtensions => Unit) {
     override def apply(extensions: SparkSessionExtensions): Unit = {
-        extensions.injectQueryStagePrepRule(_ => OmniOpBoostTuningQueryStagePrepRule())
+        extensions.injectQueryStagePrepRule(_ => BoostTuningQueryStagePrepRule())
         extensions.injectColumnar(_ => OmniOpBoostTuningColumnarRule(
           OmniOpBoostTuningPreColumnarRule(), OmniOpBoostTuningPostColumnarRule()))
         SparkContext.getActive.get.addSparkListener(new BoostTuningListener())

@@ -86,7 +86,7 @@ case class BoostTuningColumnarShuffleExchangeExec(
     UpStreamPartitionEstimator(),
     ColumnarSamplePartitionEstimator(helper.executionMem)) ++ Seq(
     SinglePartitionEstimator(),
-    ElementsForceSpillPartitionEstimator()
+    ColumnarElementsForceSpillPartitionEstimator()
   )
 
   override def supportsColumnar: Boolean = true

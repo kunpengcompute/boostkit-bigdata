@@ -34,10 +34,10 @@ case class OmniOpBoostTuningPreColumnarRule() extends Rule[SparkPlan] {
 
     delegate.reportQueryShuffleMetrics(query, plan)
 
-    replaceOminiQueryExchange(plan)  
+    replaceOmniQueryExchange(plan)  
   }
 
-  def replaceOminiQueryExchange(plan: SparkPlan): SparkPlan = {
+  def replaceOmniQueryExchange(plan: SparkPlan): SparkPlan = {
     plan.transformUp {
       case ex: ColumnarShuffleExchangeExec =>
         BoostTuningColumnarShuffleExchangeExec(
@@ -54,20 +54,30 @@ case class OmniOpBoostTuningPostColumnarRule() extends Rule[SparkPlan] {
 
   override def apply(plan: SparkPlan): SparkPlan = {
 
-    val newPlan = additionalReplaceWithColumnarPlan(plan)
+    var newPlan = plan match {
+      case b: BoostTuningShuffleExchangeLike =>
+        b.child match {
+          case ColumnarToRowExec(child) =>
+            BoostTuningColumnarShuffleExchangeExec(b.outputPartitioning, child, b.shuffleOrigin, b.getContext)
+          case _ => b
+        }
+      case _ => plan
+    }
+
+    newPlan = additionalReplaceWithColumnarPlan(newPlan)
 
     newPlan.transformUp {
       case c: CustomShuffleReaderExec if ColumnarPluginConfig.getConf.enableColumnarShuffle =>
         c.child match {
-          case shuffle: BoostTuningShuffleExchangeLike =>
+          case shuffle: BoostTuningColumnarShuffleExchangeExec =>
             logDebug(s"Columnar Processing for ${c.getClass} is currently supported.")
             BoostTuningColumnarCustomShuffleReaderExec(c.child, c.partitionSpecs)
-          case ShuffleQueryStageExec(_, shuffle: BoostTuningShuffleExchangeLike) =>
+          case ShuffleQueryStageExec(_, shuffle: BoostTuningColumnarShuffleExchangeExec) =>
             logDebug(s"Columnar Processing for ${c.getClass} is currently supported.")
             BoostTuningColumnarCustomShuffleReaderExec(c.child, c.partitionSpecs)
           case ShuffleQueryStageExec(_, reused: ReusedExchangeExec) =>
             reused match {
-              case ReusedExchangeExec(_, shuffle: BoostTuningShuffleExchangeLike) =>
+              case ReusedExchangeExec(_, shuffle: BoostTuningColumnarShuffleExchangeExec) =>
                 logDebug(s"Columnar Processing for ${c.getClass} is currently supported.")
                 BoostTuningColumnarCustomShuffleReaderExec(c.child, c.partitionSpecs)
               case _ =>
