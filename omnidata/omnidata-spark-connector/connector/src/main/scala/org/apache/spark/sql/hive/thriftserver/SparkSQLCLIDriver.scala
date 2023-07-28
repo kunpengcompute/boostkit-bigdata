@@ -125,8 +125,10 @@ private[hive] object SparkSQLCLIDriver extends Logging {
         if (!sys.props.contains("spark.memory.offHeap.size")) {
           return
         }
-        val offHeapSize = sys.props("spark.memory.offHeap.size").split("g")(0).toInt
-        val executorMemorySize = sys.props("spark.executor.memory").split("g")(0).toInt + offHeapSize
+        val offHeapSize = sys.props("spark.memory.offHeap.size")
+            .toLowerCase(Locale.ROOT).split("g")(0).toInt
+        val executorMemorySize = sys.props("spark.executor.memory")
+            .toLowerCase(Locale.ROOT).split("g")(0).toInt + offHeapSize
         sys.props("spark.executor.memory") = s"${executorMemorySize}g"
         sys.props("spark.memory.offHeap.enabled") = "false"
         sys.props.remove("spark.memory.offHeap.size")
