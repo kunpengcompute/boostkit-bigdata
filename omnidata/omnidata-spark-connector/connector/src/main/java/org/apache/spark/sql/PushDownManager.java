@@ -47,9 +47,8 @@ public class PushDownManager {
 
     private static final int ZOOKEEPER_RETRY_INTERVAL_MS = 1000;
 
-    public scala.collection.Map<String, String> getZookeeperData(
-        int timeOut, String parentPath, String zkAddress) throws Exception {
-        Map<String, String> fpuMap = new HashMap<>();
+    public scala.collection.Map<String, PushDownData> getZookeeperData(
+            int timeOut, String parentPath, String zkAddress) throws Exception {
         CuratorFramework zkClient = CuratorFrameworkFactory.builder()
                 .connectString(zkAddress)
                 .sessionTimeoutMs(timeOut)
@@ -67,12 +66,11 @@ public class PushDownManager {
                     if (!path.contains("-lock-")) {
                         byte[] data = zkClient.getData().forPath(parentPath + "/" + path);
                         PushDownData statusInfo = mapper.readValue(data, PushDownData.class);
-                        fpuMap.put(path, statusInfo.getDatanodeHost());
                         pushDownInfoMap.put(path, statusInfo);
                     }
                 }
                 if (checkAllPushDown(pushDownInfoMap)) {
-                    return javaMapToScala(fpuMap);
+                    return javaMapToScala(pushDownInfoMap);
                 } else {
                     return javaMapToScala(new HashMap<>());
                 }
@@ -110,11 +108,11 @@ public class PushDownManager {
         return true;
     }
 
-    private static scala.collection.Map<String, String> javaMapToScala(Map kafkaParams) {
+    private static scala.collection.Map<String, PushDownData> javaMapToScala(Map kafkaParams) {
         scala.collection.Map scalaMap = JavaConverters.mapAsScalaMap(kafkaParams);
         Object objTest = Map$.MODULE$.<String, String>newBuilder().$plus$plus$eq(scalaMap.toSeq());
         Object resultTest = ((scala.collection.mutable.Builder) objTest).result();
-        scala.collection.Map<String, String> retMap = (scala.collection.Map) resultTest;
+        scala.collection.Map<String, PushDownData> retMap = (scala.collection.Map) resultTest;
         return retMap;
     }
 }

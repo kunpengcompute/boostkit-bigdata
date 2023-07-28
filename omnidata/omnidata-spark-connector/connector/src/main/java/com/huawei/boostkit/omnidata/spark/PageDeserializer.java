@@ -30,6 +30,8 @@ import io.airlift.slice.SliceInput;
 import io.hetu.core.transport.execution.buffer.SerializedPage;
 
 import org.apache.spark.sql.execution.vectorized.WritableColumnVector;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Optional;
 
@@ -39,15 +41,29 @@ import java.util.Optional;
  * @since 2021-03-30
  */
 public class PageDeserializer implements Deserializer<WritableColumnVector[]> {
+    private static final Logger LOG = LoggerFactory.getLogger(PageDeserializer.class);
+
     private final PageDecoding decoding;
 
     private final DecodeType[] columnTypes;
 
     private final int[] columnOrders;
 
-    public PageDeserializer(DecodeType[] columnTypes, int[] columnOrders) {
+    /**
+     * initialize page deserializer
+     *
+     * @param columnTypes              column type
+     * @param columnOrders             column index
+     * @param isOperatorCombineEnabled whether combine is enabled
+     */
+    public PageDeserializer(DecodeType[] columnTypes, int[] columnOrders, boolean isOperatorCombineEnabled) {
         this.columnTypes = columnTypes;
-        this.decoding = new PageDecoding();
+        if (isOperatorCombineEnabled) {
+            this.decoding = new OperatorPageDecoding();
+            LOG.debug("OmniRuntime PushDown deserialization info: deserialize to OmniColumnVector");
+        } else {
+            this.decoding = new PageDecoding();
+        }
         this.columnOrders = columnOrders;
     }
 
@@ -56,6 +72,7 @@ public class PageDeserializer implements Deserializer<WritableColumnVector[]> {
         if (page.isEncrypted()) {
             throw new UnsupportedOperationException("unsupported compressed page.");
         }
+
         SliceInput sliceInput = page.getSlice().getInput();
         int numberOfBlocks = sliceInput.readInt();
         int returnLength = columnOrders.length;
@@ -88,5 +105,4 @@ public class PageDeserializer implements Deserializer<WritableColumnVector[]> {
         }
         return columnVectors;
     }
-
 }

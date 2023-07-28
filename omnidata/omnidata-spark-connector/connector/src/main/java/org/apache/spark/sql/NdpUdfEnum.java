@@ -27,7 +27,7 @@ public enum NdpUdfEnum {
     LENGTH("length","length"),
     UPPER("upper","upper"),
     LOWER("lower","lower"),
-    CAST("cast","$operator$cast"),
+    CAST("CAST","$operator$cast"),
     REPLACE("replace","replace"),
     INSTR("instr","instr"),
     SUBSCRIPT("SUBSCRIPT","$operator$subscript"),
