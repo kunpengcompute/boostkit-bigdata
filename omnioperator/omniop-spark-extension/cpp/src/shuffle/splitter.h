@@ -70,6 +70,8 @@ class Splitter {
 
     int protoSpillPartition(int32_t partition_id, std::unique_ptr<BufferedOutputStream> &bufferStream);
 
+    int32_t ProtoWritePartition(int32_t partition_id, std::unique_ptr<BufferedOutputStream> &bufferStream, void *bufferOut, int32_t &sizeOut);
+
     int ComputeAndCountPartitionId(VectorBatch& vb);
 
     int AllocatePartitionBuffers(int32_t partition_id, int32_t new_size);
@@ -88,6 +90,9 @@ class Splitter {
 
     void MergeSpilled();
 
+    void WriteSplit();
+
+    bool isSpill = false;
     std::vector<int32_t> partition_id_; // 记录当前vb每一行的pid
     std::vector<int32_t> partition_id_cnt_cur_; // 统计不同partition记录的行数(当前处理中的vb)
     std::vector<uint64_t> partition_id_cnt_cache_; // 统计不同partition记录的行数，cache住的

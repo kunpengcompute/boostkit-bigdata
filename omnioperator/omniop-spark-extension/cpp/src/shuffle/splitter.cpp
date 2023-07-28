@@ -415,10 +415,12 @@ int Splitter::DoSplit(VectorBatch& vb) {
     if (num_row_splited_ >= SHUFFLE_SPILL_NUM_ELEMENTS_FORCE_SPILL_THRESHOLD) {
         LogsDebug(" Spill For Row Num Threshold.");
         TIME_NANO_OR_RAISE(total_spill_time_, SpillToTmpFile());
+        isSpill = true;
     }
     if (cached_vectorbatch_size_ + current_fixed_alloc_buffer_size_ >= options_.spill_mem_threshold) {
         LogsDebug(" Spill For Memory Size Threshold.");
         TIME_NANO_OR_RAISE(total_spill_time_, SpillToTmpFile());
+        isSpill = true;
     }
     return 0;
 }
@@ -719,6 +721,88 @@ void Splitter::SerializingBinaryColumns(int32_t partitionId, spark::Vec& vec, in
     vec.set_offset(OffsetsByte.get(), (itemsTotalLen + 1) * sizeof(int32_t));
 }
 
+int32_t Splitter::ProtoWritePartition(int32_t partition_id, std::unique_ptr<BufferedOutputStream> &bufferStream, void *bufferOut, int32_t &sizeOut) {
+    SplitRowInfo splitRowInfoTmp;
+    splitRowInfoTmp.copyedRow = 0;
+    splitRowInfoTmp.remainCopyRow = partition_id_cnt_cache_[partition_id];
+    splitRowInfoTmp.cacheBatchIndex.resize(fixed_width_array_idx_.size());
+    splitRowInfoTmp.cacheBatchCopyedLen.resize(fixed_width_array_idx_.size());
+
+    int curBatch = 0;
+    while (0 < splitRowInfoTmp.remainCopyRow) {
+        if (options_.spill_batch_row_num < splitRowInfoTmp.remainCopyRow) {
+            splitRowInfoTmp.onceCopyRow = options_.spill_batch_row_num;
+        } else {
+            splitRowInfoTmp.onceCopyRow = splitRowInfoTmp.remainCopyRow;
+        }
+
+        vecBatchProto->set_rowcnt(splitRowInfoTmp.onceCopyRow);
+        vecBatchProto->set_veccnt(column_type_id_.size());
+        int fixColIndexTmp = 0;
+        for (size_t indexSchema = 0; indexSchema < column_type_id_.size(); indexSchema++) {
+            spark::Vec * vec = vecBatchProto->add_vecs();
+            switch (column_type_id_[indexSchema]) {
+                case ShuffleTypeId::SHUFFLE_1BYTE:
+                case ShuffleTypeId::SHUFFLE_2BYTE:
+                case ShuffleTypeId::SHUFFLE_4BYTE:
+                case ShuffleTypeId::SHUFFLE_8BYTE:
+                case ShuffleTypeId::SHUFFLE_DECIMAL128:{
+                    SerializingFixedColumns(partition_id, *vec, fixColIndexTmp, &splitRowInfoTmp);
+                    fixColIndexTmp++; // 定长序列化数量++
+                    break;
+                }
+                case ShuffleTypeId::SHUFFLE_BINARY: {
+                    SerializingBinaryColumns(partition_id, *vec, indexSchema, curBatch);
+                    break;
+                }
+                default: {
+                    throw std::runtime_error("Unsupported ShuffleType.");
+                }
+            }
+            spark::VecType *vt = vec->mutable_vectype();
+            vt->set_typeid_(CastShuffleTypeIdToVecType(vector_batch_col_types_[indexSchema]));
+            LogsDebug("precision[indexSchema %d]: %d , scale[indexSchema %d]: %d ",
+                      indexSchema, input_col_types.inputDataPrecisions[indexSchema],
+                      indexSchema, input_col_types.inputDataScales[indexSchema]);
+            if(vt->typeid_() == spark::VecType::VEC_TYPE_DECIMAL128 || vt->typeid_() == spark::VecType::VEC_TYPE_DECIMAL64){
+                vt->set_precision(input_col_types.inputDataPrecisions[indexSchema]);
+                vt->set_scale(input_col_types.inputDataScales[indexSchema]);
+            }
+        }
+        curBatch++;
+
+        if (vecBatchProto->ByteSizeLong() > UINT32_MAX) {
+            throw std::runtime_error("Unsafe static_cast long to uint_32t.");
+        }
+        uint32_t vecBatchProtoSize = reversebytes_uint32t(static_cast<uint32_t>(vecBatchProto->ByteSizeLong()));
+        if (bufferStream->Next(&bufferOut, &sizeOut)) {
+            std::memcpy(bufferOut, &vecBatchProtoSize, sizeof(vecBatchProtoSize));
+            if (sizeof(vecBatchProtoSize) < sizeOut) {
+                bufferStream->BackUp(sizeOut - sizeof(vecBatchProtoSize));
+            }
+        }
+
+        vecBatchProto->SerializeToZeroCopyStream(bufferStream.get());
+        splitRowInfoTmp.remainCopyRow -= splitRowInfoTmp.onceCopyRow;
+        splitRowInfoTmp.copyedRow += splitRowInfoTmp.onceCopyRow;
+        vecBatchProto->Clear();
+    }
+
+    uint64_t partitionBatchSize = bufferStream->flush();
+    total_bytes_written_ += partitionBatchSize;
+    partition_lengths_[partition_id] += partitionBatchSize;
+    LogsDebug(" partitionBatch write length: %lu", partitionBatchSize);
+
+   // 及时清理分区数据
+    partition_cached_vectorbatch_[partition_id].clear(); // 定长数据内存释放
+    for (size_t col = 0; col < column_type_id_.size(); col++) {
+        vc_partition_array_buffers_[partition_id][col].clear(); // binary 释放内存
+    }
+
+    return 0;
+
+}
+
 int Splitter::protoSpillPartition(int32_t partition_id, std::unique_ptr<BufferedOutputStream> &bufferStream) {
     SplitRowInfo splitRowInfoTmp;
     splitRowInfoTmp.copyedRow = 0;
@@ -826,6 +910,11 @@ int Splitter::WriteDataFileProto() {
 }
 
 void Splitter::MergeSpilled() {
+    for (auto pid = 0; pid < num_partitions_; ++pid) {
+        CacheVectorBatch(pid, true);
+        partition_buffer_size_[pid] = 0; //溢写之后将其清零，条件溢写需要重新分配内存
+    }
+
     std::unique_ptr<OutputStream> outStream = writeLocalFile(options_.data_file);
     LogsDebug(" Merge Spilled Tmp File: %s ", options_.data_file.c_str());
     WriterOptions options;
@@ -838,6 +927,7 @@ void Splitter::MergeSpilled() {
     void* bufferOut = nullptr;
     int sizeOut = 0;
     for (int pid = 0; pid < num_partitions_; pid++) {
+        ProtoWritePartition(pid, bufferOutPutStream, bufferOut, sizeOut);
         LogsDebug(" MergeSplled traversal partition( %d ) ",pid);
         for (auto &pair : spilled_tmp_files_info_) {
             auto tmpDataFilePath = pair.first + ".data";
@@ -867,6 +957,38 @@ void Splitter::MergeSpilled() {
             partition_lengths_[pid] += flushSize;
         }
     }
+
+    std::fill(std::begin(partition_id_cnt_cache_), std::end(partition_id_cnt_cache_), 0);
+    ReleaseVarcharVector();
+    num_row_splited_ = 0;
+    cached_vectorbatch_size_ = 0;
+    outStream->close();
+}
+
+void Splitter::WriteSplit() {
+    for (auto pid = 0; pid < num_partitions_; ++pid) {
+        CacheVectorBatch(pid, true);
+        partition_buffer_size_[pid] = 0; //溢写之后将其清零，条件溢写需要重新分配内存
+    }
+
+    std::unique_ptr<OutputStream> outStream = writeLocalFile(options_.data_file);
+    WriterOptions options;
+    options.setCompression(options_.compression_type);
+    options.setCompressionBlockSize(options_.compress_block_size);
+    options.setCompressionStrategy(CompressionStrategy_COMPRESSION);
+    std::unique_ptr<StreamsFactory> streamsFactory = createStreamsFactory(options, outStream.get());
+    std::unique_ptr<BufferedOutputStream> bufferOutPutStream =  streamsFactory->createStream();
+
+    void* bufferOut = nullptr;
+    int32_t sizeOut = 0;
+    for (auto pid = 0; pid < num_partitions_; ++ pid) {
+        ProtoWritePartition(pid, bufferOutPutStream, bufferOut, sizeOut);
+    }
+
+    std::fill(std::begin(partition_id_cnt_cache_), std::end(partition_id_cnt_cache_), 0);
+    ReleaseVarcharVector();
+    num_row_splited_ = 0;
+    cached_vectorbatch_size_ = 0;
     outStream->close();
 }
 
@@ -953,10 +1075,13 @@ std::string Splitter::NextSpilledFileDir() {
 }
 
 int Splitter::Stop() {
-    TIME_NANO_OR_RAISE(total_spill_time_, SpillToTmpFile());
-    TIME_NANO_OR_RAISE(total_write_time_, MergeSpilled());
-    TIME_NANO_OR_RAISE(total_write_time_, DeleteSpilledTmpFile());
-    LogsDebug(" Spill For Splitter Stopped. total_spill_row_num_: %ld ", total_spill_row_num_);
+    if (isSpill) {
+        TIME_NANO_OR_RAISE(total_write_time_, MergeSpilled());
+        TIME_NANO_OR_RAISE(total_write_time_, DeleteSpilledTmpFile());
+        LogsDebug(" Spill For Splitter Stopped. total_spill_row_num_: %ld ", total_spill_row_num_);
+    } else {
+        TIME_NANO_OR_RAISE(total_write_time_, WriteSplit());
+    }
     if (nullptr == vecBatchProto) {
         throw std::runtime_error("delete nullptr error for free protobuf vecBatch memory");
     }
