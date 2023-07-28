@@ -403,17 +403,15 @@ abstract class BaseColumnarFileSourceScanExec(
         override def next(): ColumnarBatch = {
           val batch = batches.next()
           val input = transColBatchToOmniVecs(batch)
-          val vecBatch = new VecBatch(input, batch.numRows)
           val vectors: Seq[OmniColumnVector] = OmniColumnVector.allocateColumns(
-            vecBatch.getRowCount, localSchema, false)
+            batch.numRows, localSchema, false)
           vectors.zipWithIndex.foreach { case (vector, i) =>
             vector.reset()
-            vector.setVec(vecBatch.getVectors()(i))
+            vector.setVec(input(i))
           }
-          numOutputRows += batch.numRows()
+          numOutputRows += batch.numRows
           numOutputVecBatchs += 1
-          vecBatch.close()
-          new ColumnarBatch(vectors.toArray, vecBatch.getRowCount)
+          new ColumnarBatch(vectors.toArray, batch.numRows)
         }
       }
     }
