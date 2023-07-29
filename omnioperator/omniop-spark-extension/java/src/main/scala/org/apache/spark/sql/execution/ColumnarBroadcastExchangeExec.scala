@@ -19,6 +19,7 @@ package org.apache.spark.sql.execution
 
 import java.util.concurrent._
 
+import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor.sparkTypeToOmniType
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil.transColBatchToOmniVecs
 import nova.hetu.omniruntime.vector.VecBatch
 import nova.hetu.omniruntime.vector.serialize.VecBatchSerializerFactory
@@ -61,6 +62,11 @@ class ColumnarBroadcastExchangeExec(mode: BroadcastMode, child: SparkPlan)
 
   @transient
   private val timeout: Long = SQLConf.get.broadcastTimeout
+
+  def buildCheck(): Unit = {
+    child.output.map(
+      exp => sparkTypeToOmniType(exp.dataType, exp.metadata)).toArray
+  }
 
   @transient
   override lazy val relationFuture: Future[broadcast.Broadcast[Any]] = {

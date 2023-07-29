@@ -104,7 +104,7 @@ case class ColumnarGuardRule() extends Rule[SparkPlan] {
             plan.child, plan.testSpillFrequency).buildCheck()
         case plan: BroadcastExchangeExec =>
           if (!enableColumnarBroadcastExchange) return false
-          new ColumnarBroadcastExchangeExec(plan.mode, plan.child)
+          new ColumnarBroadcastExchangeExec(plan.mode, plan.child).buildCheck()
         case plan: TakeOrderedAndProjectExec =>
           if (!enableTakeOrderedAndProject) return false
           ColumnarTakeOrderedAndProjectExec(
