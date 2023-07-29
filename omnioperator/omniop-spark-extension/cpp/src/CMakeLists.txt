@@ -15,6 +15,8 @@ set (SOURCE_FILES
         jni/SparkJniWrapper.cpp
         jni/OrcColumnarBatchJniReader.cpp
         jni/jni_common.cpp
+        jni/ParquetColumnarBatchJniReader.cpp
+        tablescan/ParquetReader.cpp
         )
 
 #Find required protobuf package
@@ -30,12 +32,19 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR})
 protobuf_generate_cpp(PROTO_SRCS_VB PROTO_HDRS_VB proto/vec_data.proto)
 add_library (${PROJ_TARGET} SHARED ${SOURCE_FILES} ${PROTO_SRCS} ${PROTO_HDRS} ${PROTO_SRCS_VB} ${PROTO_HDRS_VB})
 
+find_package(Arrow REQUIRED)
+find_package(ArrowDataset REQUIRED)
+find_package(Parquet REQUIRED)
+
 #JNI
 target_include_directories(${PROJ_TARGET} PUBLIC $ENV{JAVA_HOME}/include)
 target_include_directories(${PROJ_TARGET} PUBLIC $ENV{JAVA_HOME}/include/linux)
 target_include_directories(${PROJ_TARGET} PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
 
 target_link_libraries (${PROJ_TARGET} PUBLIC
+        Arrow::arrow_shared
+        ArrowDataset::arrow_dataset_shared
+        Parquet::parquet_shared
         orc
         crypto
         sasl2

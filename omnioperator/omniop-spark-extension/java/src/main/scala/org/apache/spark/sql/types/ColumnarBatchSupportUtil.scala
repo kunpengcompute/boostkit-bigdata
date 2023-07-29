@@ -15,28 +15,31 @@
  * limitations under the License.
  */
 
- package org.apache.spark.sql.types
+package org.apache.spark.sql.types
 
 import org.apache.spark.sql.execution.FileSourceScanExec
- import org.apache.spark.sql.execution.datasources.orc.OrcFileFormat
- import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.sql.execution.datasources.orc.OrcFileFormat
+import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
+import org.apache.spark.sql.internal.SQLConf
 
- object ColumnarBatchSupportUtil {
-     def checkColumnarBatchSupport(conf: SQLConf, plan: FileSourceScanExec): Boolean = {
-         val isSupportFormat: Boolean = {
-             plan.relation.fileFormat match {
-                case _: OrcFileFormat =>
-                    conf.orcVectorizedReaderEnabled
-                case _ =>
-                    false
-             }
-         }
-         val supportBatchReader: Boolean = {
-             val partitionSchema = plan.relation.partitionSchema
-             val resultSchema = StructType(plan.requiredSchema.fields ++ partitionSchema.fields)
-             conf.orcVectorizedReaderEnabled && resultSchema.forall(_.dataType.isInstanceOf[AtomicType])
-         }
-         supportBatchReader && isSupportFormat
-     }
- }
+object ColumnarBatchSupportUtil {
+   def checkColumnarBatchSupport(conf: SQLConf, plan: FileSourceScanExec): Boolean = {
+       val isSupportFormat: Boolean = {
+           plan.relation.fileFormat match {
+              case _: OrcFileFormat =>
+                  conf.orcVectorizedReaderEnabled
+              case _: ParquetFileFormat =>
+                conf.parquetVectorizedReaderEnabled
+              case _ =>
+                  false
+           }
+       }
+       val supportBatchReader: Boolean = {
+           val partitionSchema = plan.relation.partitionSchema
+           val resultSchema = StructType(plan.requiredSchema.fields ++ partitionSchema.fields)
+           (conf.orcVectorizedReaderEnabled || conf.parquetVectorizedReaderEnabled) && resultSchema.forall(_.dataType.isInstanceOf[AtomicType])
+       }
+       supportBatchReader && isSupportFormat
+   }
+}
  

@@ -50,6 +50,7 @@ import org.apache.spark.sql.catalyst.plans.physical.{HashPartitioning, Partition
 import org.apache.spark.sql.execution.aggregate.HashAggregateExec
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.orc.{OmniOrcFileFormat, OrcFileFormat}
+import org.apache.spark.sql.execution.datasources.parquet.{OmniParquetFileFormat, ParquetFileFormat}
 import org.apache.spark.sql.execution.joins.ColumnarBroadcastHashJoinExec
 import org.apache.spark.sql.execution.metric.{SQLMetric, SQLMetrics}
 import org.apache.spark.sql.execution.util.SparkMemoryUtils
@@ -59,8 +60,6 @@ import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.{DecimalType, StructType}
 import org.apache.spark.sql.vectorized.ColumnarBatch
 import org.apache.spark.util.collection.BitSet
-
-
 
 abstract class BaseColumnarFileSourceScanExec(
     @transient relation: HadoopFsRelation,
@@ -73,6 +72,10 @@ abstract class BaseColumnarFileSourceScanExec(
     tableIdentifier: Option[TableIdentifier],
     disableBucketedScan: Boolean = false)
   extends DataSourceScanExec {
+
+  override val nodeName: String = {
+    s"OmniScan $relation ${tableIdentifier.map(_.unquotedString).getOrElse("")}"
+  }
 
   override lazy val supportsColumnar: Boolean = true
 
@@ -286,12 +289,19 @@ abstract class BaseColumnarFileSourceScanExec(
        |""".stripMargin
   }
 
+  val enableColumnarFileScan: Boolean = ColumnarPluginConfig.getSessionConf.enableColumnarFileScan
   val enableOrcNativeFileScan: Boolean = ColumnarPluginConfig.getSessionConf.enableOrcNativeFileScan
   lazy val inputRDD: RDD[InternalRow] = {
-    val fileFormat: FileFormat = if (enableOrcNativeFileScan) {
+    val fileFormat: FileFormat = if (enableColumnarFileScan) {
       relation.fileFormat match {
         case orcFormat: OrcFileFormat =>
-          new OmniOrcFileFormat()
+          if (enableOrcNativeFileScan) {
+            new OmniOrcFileFormat()
+          } else {
+            relation.fileFormat
+          }
+        case parquetFormat: ParquetFileFormat =>
+          new OmniParquetFileFormat()
         case _ =>
           throw new UnsupportedOperationException("Unsupported FileFormat!")
       }
