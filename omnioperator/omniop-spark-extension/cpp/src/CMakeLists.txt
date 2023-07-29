@@ -48,7 +48,7 @@ target_link_libraries (${PROJ_TARGET} PUBLIC
         lz4
         zstd
         eSDKOBS
-        boostkit-omniop-vector-1.2.0-aarch64
+        boostkit-omniop-vector-1.3.0-aarch64
         )
 
 set_target_properties(${PROJ_TARGET} PROPERTIES
