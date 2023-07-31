@@ -18,6 +18,7 @@
 
 package com.huawei.boostkit.spark.jni;
 
+import com.huawei.boostkit.spark.ObsConf;
 import nova.hetu.omniruntime.type.DataType;
 import nova.hetu.omniruntime.vector.*;
 
@@ -46,6 +47,8 @@ public class ParquetColumnarBatchJniReader {
         job.put("rowGroupIndices", rowgroupIndices.stream().mapToInt(Integer::intValue).toArray());
         job.put("columnIndices", columnIndices.stream().mapToInt(Integer::intValue).toArray());
         job.put("ugi", ugi);
+        // just used for obs
+        job.put("obsInfo", ObsConf.constructObsJSONObject());
         parquetReader = initializeReader(job);
         return parquetReader;
     }

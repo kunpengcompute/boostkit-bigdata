@@ -26,6 +26,7 @@ import com.obs.services.model.ISecurityKey;
 import org.apache.hadoop.conf.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.json.JSONObject;
 
 public class ObsConf {
     private static final Logger LOG = LoggerFactory.getLogger(ObsConf.class);
@@ -163,5 +164,16 @@ public class ObsConf {
                 }
             }
         }
+    }
+
+    public static JSONObject constructObsJSONObject() {
+        JSONObject obsJsonItem = new JSONObject();
+        obsJsonItem.put("endpoint", ObsConf.getEndpoint());
+        synchronized (ObsConf.getLock()) {
+            obsJsonItem.put("ak", ObsConf.getAk());
+            obsJsonItem.put("sk", ObsConf.getSk());
+            obsJsonItem.put("token", ObsConf.getToken());
+        }
+        return obsJsonItem;
     }
 }
