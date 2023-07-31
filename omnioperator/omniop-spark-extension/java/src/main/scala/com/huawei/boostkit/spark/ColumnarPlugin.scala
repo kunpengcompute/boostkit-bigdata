@@ -47,6 +47,7 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] with PredicateHelper{
     columnarConf.enableColumnarBroadcastJoin
   val enableColumnarBroadcastJoin: Boolean = columnarConf.enableColumnarBroadcastJoin &&
     columnarConf.enableColumnarBroadcastExchange
+  val enableSortMergeJoinFusion: Boolean = columnarConf.enableSortMergeJoinFusion
   val enableColumnarSortMergeJoin: Boolean = columnarConf.enableColumnarSortMergeJoin
   val enableColumnarSort: Boolean = columnarConf.enableColumnarSort
   val enableColumnarWindow: Boolean = columnarConf.enableColumnarWindow
@@ -167,15 +168,29 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] with PredicateHelper{
           }
         case join : ColumnarSortMergeJoinExec =>
           if (plan.projectList.forall(project => OmniExpressionAdaptor.isSimpleProjectForAll(project)) && enableColumnarProjectFusion) {
-            ColumnarSortMergeJoinExec(
-              join.leftKeys,
-              join.rightKeys,
-              join.joinType,
-              join.condition,
-              join.left,
-              join.right,
-              join.isSkewJoin,
-              plan.projectList)
+            if(enableSortMergeJoinFusion && join.left.isInstanceOf[SortExec] && join.right.isInstanceOf[SortExec]) {
+              val left = replaceWithColumnarPlan(join.left.asInstanceOf[SortExec])
+              val right = replaceWithColumnarPlan(join.right.asInstanceOf[SortExec])
+              ColumnarSortMergeJoinFusionExec(
+                join.leftKeys,
+                join.rightKeys,
+                join.joinType,
+                join.condition,
+                left,
+                right,
+                join.isSkewJoin,
+                plan.projectList)
+            } else {
+              ColumnarSortMergeJoinExec(
+                join.leftKeys,
+                join.rightKeys,
+                join.joinType,
+                join.condition,
+                join.left,
+                join.right,
+                join.isSkewJoin,
+                plan.projectList)
+            }
           } else {
             ColumnarProjectExec(plan.projectList, child)
           }
@@ -412,17 +427,29 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] with PredicateHelper{
         right)
     case plan: SortMergeJoinExec if enableColumnarSortMergeJoin =>
       logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
-      val left = replaceWithColumnarPlan(plan.left)
-      val right = replaceWithColumnarPlan(plan.right)
-      logDebug(s"Columnar Processing for ${plan.getClass} is currently supported.")
-      new ColumnarSortMergeJoinExec(
-        plan.leftKeys,
-        plan.rightKeys,
-        plan.joinType,
-        plan.condition,
-        left,
-        right,
-        plan.isSkewJoin)
+      if (enableSortMergeJoinFusion && plan.left.isInstanceOf[SortExec] && plan.right.isInstanceOf[SortExec]) {
+        val left = replaceWithColumnarPlan(plan.left.asInstanceOf[SortExec].child)
+        val right = replaceWithColumnarPlan(plan.right.asInstanceOf[SortExec].child)
+        new ColumnarSortMergeJoinFusionExec(
+          plan.leftKeys,
+          plan.rightKeys,
+          plan.joinType,
+          plan.condition,
+          left,
+          right,
+          plan.isSkewJoin)
+      } else {
+        val left = replaceWithColumnarPlan(plan.left)
+        val right = replaceWithColumnarPlan(plan.right)
+        new ColumnarSortMergeJoinExec(
+          plan.leftKeys,
+          plan.rightKeys,
+          plan.joinType,
+          plan.condition,
+          left,
+          right,
+          plan.isSkewJoin)
+      }
     case plan: SortExec if enableColumnarSort =>
       val child = replaceWithColumnarPlan(plan.child)
       logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")

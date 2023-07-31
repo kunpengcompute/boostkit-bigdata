@@ -116,73 +116,113 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
   }
 
   test("columnar sortMergeJoin Inner Join is equal to native") {
-    val df = left.join(right.hint("mergejoin"), col("q") === col("c"))
-    val leftKeys = Seq(left.col("q").expr)
-    val rightKeys = Seq(right.col("c").expr)
-    checkThatPlansAgreeTemplateForSMJ(df, leftKeys, rightKeys, Inner)
+    val enableFusionArr = Array(false, true)
+    for (item <- enableFusionArr) {
+      spark.conf.set("spark.omni.sql.columnar.sortMergeJoin.fusion", item)
+      val df = left.join(right.hint("mergejoin"), col("q") === col("c"))
+      val leftKeys = Seq(left.col("q").expr)
+      val rightKeys = Seq(right.col("c").expr)
+      checkThatPlansAgreeTemplateForSMJ(df, leftKeys, rightKeys, Inner)
+    }
   }
 
   test("columnar sortMergeJoin Inner Join is equal to native With NULL") {
-    val df = leftWithNull.join(rightWithNull.hint("mergejoin"), col("q") === col("c"))
-    val leftKeys = Seq(leftWithNull.col("q").expr)
-    val rightKeys = Seq(rightWithNull.col("c").expr)
-    checkThatPlansAgreeTemplateForSMJ(df, leftKeys, rightKeys, Inner)
+    val enableFusionArr = Array(false, true)
+    for (item <- enableFusionArr) {
+      spark.conf.set("spark.omni.sql.columnar.sortMergeJoin.fusion", item)
+      val df = leftWithNull.join(rightWithNull.hint("mergejoin"), col("q") === col("c"))
+      val leftKeys = Seq(leftWithNull.col("q").expr)
+      val rightKeys = Seq(rightWithNull.col("c").expr)
+      checkThatPlansAgreeTemplateForSMJ(df, leftKeys, rightKeys, Inner)
+    }
   }
 
   test("columnar sortMergeJoin LeftOuter Join is equal to native") {
-    val df = left.join(right.hint("mergejoin"), col("q") === col("c"))
-    val leftKeys = Seq(left.col("q").expr)
-    val rightKeys = Seq(right.col("c").expr)
-    checkThatPlansAgreeTemplateForSMJ(df, leftKeys, rightKeys, LeftOuter)
+    val enableFusionArr = Array(false, true)
+    for (item <- enableFusionArr) {
+      spark.conf.set("spark.omni.sql.columnar.sortMergeJoin.fusion", item)
+      val df = left.join(right.hint("mergejoin"), col("q") === col("c"))
+      val leftKeys = Seq(left.col("q").expr)
+      val rightKeys = Seq(right.col("c").expr)
+      checkThatPlansAgreeTemplateForSMJ(df, leftKeys, rightKeys, LeftOuter)
+    }
   }
 
   test("columnar sortMergeJoin LeftOuter Join is equal to native With NULL") {
-    val df = leftWithNull.join(rightWithNull.hint("mergejoin"), col("q") === col("c"))
-    val leftKeys = Seq(leftWithNull.col("q").expr)
-    val rightKeys = Seq(rightWithNull.col("c").expr)
-    checkThatPlansAgreeTemplateForSMJ(df, leftKeys, rightKeys, LeftOuter)
+    val enableFusionArr = Array(false, true)
+    for (item <- enableFusionArr) {
+      spark.conf.set("spark.omni.sql.columnar.sortMergeJoin.fusion", item)
+      val df = leftWithNull.join(rightWithNull.hint("mergejoin"), col("q") === col("c"))
+      val leftKeys = Seq(leftWithNull.col("q").expr)
+      val rightKeys = Seq(rightWithNull.col("c").expr)
+      checkThatPlansAgreeTemplateForSMJ(df, leftKeys, rightKeys, LeftOuter)
+    }
   }
 
   test("columnar sortMergeJoin FullOuter Join is equal to native") {
-    val df = left.join(right.hint("mergejoin"), col("q") === col("c"))
-    val leftKeys = Seq(left.col("q").expr)
-    val rightKeys = Seq(right.col("c").expr)
-    checkThatPlansAgreeTemplateForSMJ(df, leftKeys, rightKeys, FullOuter)
+    val enableFusionArr = Array(false, true)
+    for (item <- enableFusionArr) {
+      spark.conf.set("spark.omni.sql.columnar.sortMergeJoin.fusion", item)
+      val df = left.join(right.hint("mergejoin"), col("q") === col("c"))
+      val leftKeys = Seq(left.col("q").expr)
+      val rightKeys = Seq(right.col("c").expr)
+      checkThatPlansAgreeTemplateForSMJ(df, leftKeys, rightKeys, FullOuter)
+    }
   }
 
   test("columnar sortMergeJoin FullOuter Join is equal to native With NULL") {
-    val df = leftWithNull.join(rightWithNull.hint("mergejoin"), col("q") === col("c"))
-    val leftKeys = Seq(leftWithNull.col("q").expr)
-    val rightKeys = Seq(rightWithNull.col("c").expr)
-    checkThatPlansAgreeTemplateForSMJ(df, leftKeys, rightKeys, FullOuter)
+    val enableFusionArr = Array(false, true)
+    for (item <- enableFusionArr) {
+      spark.conf.set("spark.omni.sql.columnar.sortMergeJoin.fusion", item)
+      val df = leftWithNull.join(rightWithNull.hint("mergejoin"), col("q") === col("c"))
+      val leftKeys = Seq(leftWithNull.col("q").expr)
+      val rightKeys = Seq(rightWithNull.col("c").expr)
+      checkThatPlansAgreeTemplateForSMJ(df, leftKeys, rightKeys, FullOuter)
+    }
   }
 
   test("columnar sortMergeJoin LeftSemi Join is equal to native") {
-    val df = left.join(right.hint("mergejoin"), col("q") === col("c"))
-    val leftKeys = Seq(left.col("q").expr)
-    val rightKeys = Seq(right.col("c").expr)
-    checkThatPlansAgreeTemplateForSMJ(df, leftKeys, rightKeys, LeftSemi)
+    val enableFusionArr = Array(false, true)
+    for (item <- enableFusionArr) {
+      spark.conf.set("spark.omni.sql.columnar.sortMergeJoin.fusion", item)
+      val df = left.join(right.hint("mergejoin"), col("q") === col("c"))
+      val leftKeys = Seq(left.col("q").expr)
+      val rightKeys = Seq(right.col("c").expr)
+      checkThatPlansAgreeTemplateForSMJ(df, leftKeys, rightKeys, LeftSemi)
+    }
   }
 
   test("columnar sortMergeJoin LeftSemi Join is equal to native With NULL") {
-    val df = leftWithNull.join(rightWithNull.hint("mergejoin"), col("q") === col("c"))
-    val leftKeys = Seq(leftWithNull.col("q").expr)
-    val rightKeys = Seq(rightWithNull.col("c").expr)
-    checkThatPlansAgreeTemplateForSMJ(df, leftKeys, rightKeys, LeftSemi)
+    val enableFusionArr = Array(false, true)
+    for (item <- enableFusionArr) {
+      spark.conf.set("spark.omni.sql.columnar.sortMergeJoin.fusion", item)
+      val df = leftWithNull.join(rightWithNull.hint("mergejoin"), col("q") === col("c"))
+      val leftKeys = Seq(leftWithNull.col("q").expr)
+      val rightKeys = Seq(rightWithNull.col("c").expr)
+      checkThatPlansAgreeTemplateForSMJ(df, leftKeys, rightKeys, LeftSemi)
+    }
   }
 
   test("columnar sortMergeJoin LeftAnti Join is equal to native") {
-    val df = left.join(right.hint("mergejoin"), col("q") === col("c"))
-    val leftKeys = Seq(left.col("q").expr)
-    val rightKeys = Seq(right.col("c").expr)
-    checkThatPlansAgreeTemplateForSMJ(df, leftKeys, rightKeys, LeftAnti)
+    val enableFusionArr = Array(false, true)
+    for (item <- enableFusionArr) {
+      spark.conf.set("spark.omni.sql.columnar.sortMergeJoin.fusion", item)
+      val df = left.join(right.hint("mergejoin"), col("q") === col("c"))
+      val leftKeys = Seq(left.col("q").expr)
+      val rightKeys = Seq(right.col("c").expr)
+      checkThatPlansAgreeTemplateForSMJ(df, leftKeys, rightKeys, LeftAnti)
+    }
   }
 
   test("columnar sortMergeJoin LeftAnti Join is equal to native With NULL") {
-    val df = leftWithNull.join(rightWithNull.hint("mergejoin"), col("q") === col("c"))
-    val leftKeys = Seq(leftWithNull.col("q").expr)
-    val rightKeys = Seq(rightWithNull.col("c").expr)
-    checkThatPlansAgreeTemplateForSMJ(df, leftKeys, rightKeys, LeftAnti)
+    val enableFusionArr = Array(false, true)
+    for (item <- enableFusionArr) {
+      spark.conf.set("spark.omni.sql.columnar.sortMergeJoin.fusion", item)
+      val df = leftWithNull.join(rightWithNull.hint("mergejoin"), col("q") === col("c"))
+      val leftKeys = Seq(leftWithNull.col("q").expr)
+      val rightKeys = Seq(rightWithNull.col("c").expr)
+      checkThatPlansAgreeTemplateForSMJ(df, leftKeys, rightKeys, LeftAnti)
+    }
   }
 
   test("columnar broadcastHashJoin is equal to native with null") {
@@ -539,6 +579,7 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
   }
 
   test("SortMergeJoin and project fusion test") {
+    spark.conf.set("spark.omni.sql.columnar.sortMergeJoin.fusion", false)
     val omniResult = person_test.join(order_test.hint("MERGEJOIN"), person_test("id_p") === order_test("id_p"), "inner")
       .select(person_test("name"), order_test("order_no"))
     val omniPlan = omniResult.queryExecution.executedPlan
@@ -553,6 +594,7 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
   }
 
   test("SortMergeJoin and project fusion test for duplicate column") {
+    spark.conf.set("spark.omni.sql.columnar.sortMergeJoin.fusion", false)
     val omniResult = person_test.join(order_test.hint("MERGEJOIN"), person_test("id_p") === order_test("id_p"), "inner")
       .select(person_test("name"), order_test("order_no"), order_test("id_p"))
     val omniPlan = omniResult.queryExecution.executedPlan
@@ -567,6 +609,7 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
   }
 
   test("SortMergeJoin and project fusion test for reorder columns") {
+    spark.conf.set("spark.omni.sql.columnar.sortMergeJoin.fusion", false)
     val omniResult = person_test.join(order_test.hint("MERGEJOIN"), person_test("id_p") === order_test("id_p"), "inner")
       .select(order_test("order_no"), person_test("name"), order_test("id_p"))
     val omniPlan = omniResult.queryExecution.executedPlan
@@ -581,6 +624,7 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
   }
 
   test("SortMergeJoin and project are not fused test") {
+    spark.conf.set("spark.omni.sql.columnar.sortMergeJoin.fusion", false)
     val omniResult = person_test.join(order_test.hint("MERGEJOIN"), person_test("id_p") === order_test("id_p"), "inner")
       .select(order_test("order_no").plus(1), person_test("name"))
     val omniPlan = omniResult.queryExecution.executedPlan
@@ -595,6 +639,7 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
   }
 
   test("SortMergeJoin and project fusion test for alias") {
+    spark.conf.set("spark.omni.sql.columnar.sortMergeJoin.fusion", false)
     val omniResult = person_test.join(order_test.hint("MERGEJOIN"), person_test("id_p") === order_test("id_p"), "inner")
       .select(person_test("name").as("name1"), order_test("order_no").as("order_no1"))
     val omniPlan = omniResult.queryExecution.executedPlan

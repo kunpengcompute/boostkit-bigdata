@@ -56,6 +56,7 @@ case class ColumnarGuardRule() extends Rule[SparkPlan] {
     columnarConf.enableColumnarBroadcastJoin
   val enableColumnarBroadcastJoin: Boolean = columnarConf.enableColumnarBroadcastJoin
   val enableColumnarSortMergeJoin: Boolean = columnarConf.enableColumnarSortMergeJoin
+  val enableSortMergeJoinFusion: Boolean = columnarConf.enableSortMergeJoinFusion
   val enableShuffledHashJoin: Boolean = columnarConf.enableShuffledHashJoin
   val enableColumnarFileScan: Boolean = columnarConf.enableColumnarFileScan
   val optimizeLevel: Integer = columnarConf.joinOptimizationThrottle
@@ -161,14 +162,25 @@ case class ColumnarGuardRule() extends Rule[SparkPlan] {
             plan.right).buildCheck()
         case plan: SortMergeJoinExec =>
           if (!enableColumnarSortMergeJoin) return false
-          new ColumnarSortMergeJoinExec(
-            plan.leftKeys,
-            plan.rightKeys,
-            plan.joinType,
-            plan.condition,
-            plan.left,
-            plan.right,
-            plan.isSkewJoin).buildCheck()
+          if (enableSortMergeJoinFusion) {
+            new ColumnarSortMergeJoinFusionExec(
+              plan.leftKeys,
+              plan.rightKeys,
+              plan.joinType,
+              plan.condition,
+              plan.left,
+              plan.right,
+              plan.isSkewJoin).buildCheck()
+          } else {
+            new ColumnarSortMergeJoinExec(
+              plan.leftKeys,
+              plan.rightKeys,
+              plan.joinType,
+              plan.condition,
+              plan.left,
+              plan.right,
+              plan.isSkewJoin).buildCheck()
+          }
         case plan: WindowExec =>
           if (!enableColumnarWindow) return false
           ColumnarWindowExec(plan.windowExpression, plan.partitionSpec,
