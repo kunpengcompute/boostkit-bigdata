@@ -75,6 +75,8 @@ public class OmniOrcColumnarBatchReader extends RecordReader<Void, ColumnarBatch
   // The wrapped ORC column vectors.
   private org.apache.spark.sql.vectorized.ColumnVector[] orcVectorWrappers;
 
+  private org.apache.spark.sql.vectorized.ColumnVector[] templateWrappers;
+
   private Vec[] vecs;
 
   public OmniOrcColumnarBatchReader(int capacity) {
@@ -107,6 +109,12 @@ public class OmniOrcColumnarBatchReader extends RecordReader<Void, ColumnarBatch
     if (recordReader != null) {
       recordReader.close();
       recordReader = null;
+    }
+
+    // Free vecs from templateWrappers.
+    for (int i = 0; i < templateWrappers.length; i++) {
+      OmniColumnVector vector = (OmniColumnVector) templateWrappers[i];
+      vector.close();
     }
   }
 
@@ -164,24 +172,28 @@ public class OmniOrcColumnarBatchReader extends RecordReader<Void, ColumnarBatch
     // Just wrap the ORC column vector instead of copying it to Spark column vector.
     orcVectorWrappers = new org.apache.spark.sql.vectorized.ColumnVector[resultSchema.length()];
 
+    templateWrappers = new org.apache.spark.sql.vectorized.ColumnVector[resultSchema.length()];
+
     for (int i = 0; i < requiredFields.length; i++) {
       DataType dt = requiredFields[i].dataType();
       if (requestedPartitionColIds[i] != -1) {
-        OnHeapColumnVector partitionCol = new OnHeapColumnVector(capacity, dt);
+        OmniColumnVector partitionCol = new OmniColumnVector(capacity, dt, true);
         ColumnVectorUtils.populate(partitionCol, partitionValues, requestedPartitionColIds[i]);
         partitionCol.setIsConstant();
-        orcVectorWrappers[i] = partitionCol;
+        templateWrappers[i] = partitionCol;
+        orcVectorWrappers[i] = new OmniColumnVector(capacity, dt, false);;
       } else {
         int colId = requestedDataColIds[i];
         // Initialize the missing columns once.
         if (colId == -1) {
-          OnHeapColumnVector missingCol = new OnHeapColumnVector(capacity, dt);
+          OmniColumnVector missingCol = new OmniColumnVector(capacity, dt, true);
           missingCol.putNulls(0, capacity);
           missingCol.setIsConstant();
-          orcVectorWrappers[i] = missingCol;
+          templateWrappers[i] = missingCol;
         } else {
-          orcVectorWrappers[i] = new OmniColumnVector(capacity, dt, false);
+          templateWrappers[i] = new OmniColumnVector(capacity, dt, false);
         }
+        orcVectorWrappers[i] = new OmniColumnVector(capacity, dt, false);
       }
     }
     // init batch
@@ -210,6 +222,14 @@ public class OmniOrcColumnarBatchReader extends RecordReader<Void, ColumnarBatch
       if (requestedDataColIds[i] != -1) {
           int colId = requestedDataColIds[i];
         ((OmniColumnVector) orcVectorWrappers[i]).setVec(vecs[colId]);
+      }
+    }
+
+    // Slice other vecs from templateWrap.
+    for (int i = 0; i < templateWrappers.length; i++) {
+      OmniColumnVector vector = (OmniColumnVector) templateWrappers[i];
+      if (vector.isConstant()) {
+        ((OmniColumnVector) orcVectorWrappers[i]).setVec(vector.getVec().slice(0, batchSize));
       }
     }
     return true;

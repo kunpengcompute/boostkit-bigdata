@@ -976,7 +976,7 @@ void Splitter::MergeSpilled() {
         }
     }
 
-    std::fill(std::begin(partition_id_cnt_cache_), std::end(partition_id_cnt_cache_), 0);
+   std::memset(partition_id_cnt_cache_, 0, num_partitions_ * sizeof(uint64_t));
     ReleaseVarcharVector();
     num_row_splited_ = 0;
     cached_vectorbatch_size_ = 0;
@@ -1003,7 +1003,7 @@ void Splitter::WriteSplit() {
         ProtoWritePartition(pid, bufferOutPutStream, bufferOut, sizeOut);
     }
 
-    std::fill(std::begin(partition_id_cnt_cache_), std::end(partition_id_cnt_cache_), 0);
+    std::memset(partition_id_cnt_cache_, 0, num_partitions_ * sizeof(uint64_t));
     ReleaseVarcharVector();
     num_row_splited_ = 0;
     cached_vectorbatch_size_ = 0;
