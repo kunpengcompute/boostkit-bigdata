@@ -17,6 +17,7 @@
 
 package org.apache.spark.sql.execution.adaptive
 
+import com.huawei.boostkit.spark.ColumnarPluginConfig
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{Attribute, Expression}
@@ -25,6 +26,8 @@ import org.apache.spark.sql.catalyst.trees.CurrentOrigin
 import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.exchange.{ReusedExchangeExec, ShuffleExchangeLike}
 import org.apache.spark.sql.execution.metric.{SQLMetric, SQLMetrics}
+import org.apache.spark.sql.execution.util.MergeIterator
+import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.vectorized.ColumnarBatch
 
 import scala.collection.mutable.ArrayBuffer
@@ -204,11 +207,13 @@ case class OmniAQEShuffleReadExec(
     SQLMetrics.postDriverMetricsUpdatedByValue(sparkContext, executionId, driverAccumUpdates.toSeq)
   }
 
-  @transient override lazy val metrics: Map[String, SQLMetric] = {
+  override lazy val metrics: Map[String, SQLMetric] = {
     if (shuffleStage.isDefined) {
-      Map("numPartitions" -> SQLMetrics.createMetric(sparkContext, "number of partitions")) ++ {
-        if (isLocalRead) {
-          // We split the mapper partition evenly when creating local shuffle read, so no
+      Map(
+      "numMergedVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of merged vecBatchs"),
+      "numPartitions" -> SQLMetrics.createMetric(sparkContext, "number of partitions")) ++ {
+        if (isLocalReader) {
+          // We split the mapper partition evenly when creating local shuffle reader, so no
           // data size info is available.
           Map.empty
         } else {
@@ -250,6 +255,18 @@ case class OmniAQEShuffleReadExec(
           partitionSpecs.toArray)
       case _ =>
         throw new IllegalStateException("operating on canonicalized plan")
+    }
+
+    val columnarConf: ColumnarPluginConfig = ColumnarPluginConfig.getSessionConf
+    val enableShuffleBatchMerge: Boolean = columnarConf.enableShuffleBatchMerge
+    if (enableShuffleBatchMerge) {
+      cachedShuffleRDD.mapPartitionsWithIndexInternal { (index, iter) =>
+        new MergeIterator(iter,
+           StructType.fromAttributes(child.output),
+           longMetric("numMergedVecBatchs"))
+      }
+    } else {
+      cachedShuffleRDD
     }
   }
 

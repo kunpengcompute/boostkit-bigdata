@@ -204,6 +204,9 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
   val maxRowCount =
     conf.getConfString("spark.sql.columnar.maxRowCount", "20000").toInt
 
+  val mergedBatchThreshold =
+    conf.getConfString("spark.sql.columnar.mergedBatchThreshold", "100").toInt
+
   val enableColumnarUdf: Boolean = conf.getConfString("spark.omni.sql.columnar.udf", "true").toBoolean
 
   val enableOmniExpCheck : Boolean = conf.getConfString("spark.omni.sql.omniExp.check", "true").toBoolean
