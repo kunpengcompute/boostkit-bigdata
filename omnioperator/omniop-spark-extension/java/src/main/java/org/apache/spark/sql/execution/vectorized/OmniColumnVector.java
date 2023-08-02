@@ -162,24 +162,31 @@ public class OmniColumnVector extends WritableColumnVector {
         super.close();
         if (booleanDataVec != null) {
             booleanDataVec.close();
+            booleanDataVec = null;
         }
         if (shortDataVec != null) {
             shortDataVec.close();
+            shortDataVec = null;
         }
         if (intDataVec != null) {
             intDataVec.close();
+            intDataVec = null;
         }
         if (longDataVec != null) {
             longDataVec.close();
+            longDataVec = null;
         }
         if (doubleDataVec != null) {
             doubleDataVec.close();
+            doubleDataVec = null;
         }
         if (decimal128DataVec != null) {
             decimal128DataVec.close();
+            decimal128DataVec = null;
         }
         if (charsTypeDataVec != null) {
             charsTypeDataVec.close();
+            charsTypeDataVec = null;
         }
         if (dictionaryData != null) {
             dictionaryData.close();
@@ -267,8 +274,8 @@ public class OmniColumnVector extends WritableColumnVector {
 
     @Override
     public void putNulls(int rowId, int count) {
-        boolean[] nullValue = new boolean[count];
-        Arrays.fill(nullValue, true);
+        byte[] nullValue = new byte[count];
+        Arrays.fill(nullValue, (byte) 1);
         if (dictionaryData != null) {
             dictionaryData.setNulls(rowId, nullValue, 0, count);
             return;
@@ -854,5 +861,9 @@ public class OmniColumnVector extends WritableColumnVector {
     @Override
     protected OmniColumnVector reserveNewColumn(int capacity, DataType type) {
         return new OmniColumnVector(capacity, type, true);
+    }
+
+    public boolean isConstant() {
+        return isConstant;
     }
 }
