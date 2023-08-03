@@ -27,6 +27,7 @@ import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor.{checkOmniJson
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil.{getIndexArray, pruneOutput, reorderVecs, transColBatchToOmniVecs}
 import nova.hetu.omniruntime.`type`.DataType
+import nova.hetu.omniruntime.operator.OmniOperator
 import nova.hetu.omniruntime.operator.config.{OperatorConfig, OverflowConfig, SpillConfig}
 import nova.hetu.omniruntime.operator.join.{OmniHashBuilderWithExprOperatorFactory, OmniLookupJoinWithExprOperatorFactory}
 import nova.hetu.omniruntime.vector.VecBatch
@@ -44,8 +45,6 @@ import org.apache.spark.sql.execution.metric.SQLMetrics
 import org.apache.spark.sql.execution.util.{MergeIterator, SparkMemoryUtils}
 import org.apache.spark.sql.execution.vectorized.OmniColumnVector
 import org.apache.spark.sql.vectorized.ColumnarBatch
-
-import scala.collection.mutable.ListBuffer
 
 /**
  * Performs an inner hash join of two child relations.  When the output RDD of this operator is
@@ -288,11 +287,18 @@ case class ColumnarBroadcastHashJoinExec(
       buildTypes(i) = OmniExpressionAdaptor.sparkTypeToOmniType(att.dataType, att.metadata)
     }
 
+    val columnarConf: ColumnarPluginConfig = ColumnarPluginConfig.getSessionConf
+    val enableShareBuildOp: Boolean = columnarConf.enableShareBroadcastJoinHashTable
+    val enableJoinBatchMerge: Boolean = columnarConf.enableJoinBatchMerge
+
+    var canShareBuildOp: Boolean = false
     // {0}, buildKeys: col1#12
     val buildOutputCols: Array[Int] = joinType match {
       case Inner | LeftOuter =>
+        canShareBuildOp = true
         getIndexArray(buildOutput, projectList)
       case LeftExistence(_) =>
+        canShareBuildOp = false
         Array[Int]()
       case x =>
         throw new UnsupportedOperationException(s"ColumnBroadcastHashJoin Join-type[$x] is not supported!")
@@ -321,17 +327,60 @@ case class ColumnarBroadcastHashJoinExec(
     streamedPlan.executeColumnar().mapPartitionsWithIndexInternal { (index, iter) =>
       val filter: Optional[String] = condition match {
         case Some(expr) =>
+          canShareBuildOp = false
           Optional.of(OmniExpressionAdaptor.rewriteToOmniJsonExpressionLiteral(expr,
             OmniExpressionAdaptor.getExprIdMap((streamedOutput ++ buildOutput).map(_.toAttribute))))
-        case _ => Optional.empty()
+        case _ =>
+          canShareBuildOp = true
+          Optional.empty()
       }
-      val startBuildCodegen = System.nanoTime()
-      val buildOpFactory =
-        new OmniHashBuilderWithExprOperatorFactory(buildTypes, buildJoinColsExp, filter, 1,
-        new OperatorConfig(SpillConfig.NONE,
-          new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
-      val buildOp = buildOpFactory.createOperator()
-      buildCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startBuildCodegen)
+
+      def createBuildOpFactoryAndOp(): (OmniHashBuilderWithExprOperatorFactory, OmniOperator) = {
+        val startBuildCodegen = System.nanoTime()
+        val opFactory =
+          new OmniHashBuilderWithExprOperatorFactory(buildTypes, buildJoinColsExp, filter, 1,
+           new OperatorConfig(SpillConfig.NONE,
+             new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
+        val op = opFactory.createOperator()
+        buildCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startBuildCodegen)
+
+        val deserializer = VecBatchSerializerFactory.create()
+        relation.value.buildData.foreach { input =>
+          val startBuildInput = System.nanoTime()
+          op.addInput(deserializer.deserialize(input))
+          buildAddInputTime += NANOSECONDS.toMillis(System.nanoTime() - startBuildInput)
+        }
+        val startBuildGetOp = System.nanoTime()
+        op.getOutput
+        buildGetOutputTime += NANOSECONDS.toMillis(System.nanoTime() - startBuildGetOp)
+        (opFactory, op)
+      }
+
+      var buildOp: OmniOperator = null
+      var buildOpFactory: OmniHashBuilderWithExprOperatorFactory = null
+      if (enableShareBuildOp && canShareBuildOp) {
+        OmniHashBuilderWithExprOperatorFactory.gLock.lock()
+        try {
+          buildOpFactory = OmniHashBuilderWithExprOperatorFactory.getHashBuilderOperatorFactory(buildPlan.id)
+          if (buildOpFactory == null) {
+            val (opFactory, op) = createBuildOpFactoryAndOp()
+            buildOpFactory = opFactory
+            buildOp = op
+            OmniHashBuilderWithExprOperatorFactory.saveHashBuilderOperatorAndFactory(buildPlan.id,
+              buildOpFactory, buildOp)
+          }
+        } catch {
+          case e: Exception => {
+            throw new RuntimeException("hash build failed. errmsg:" + e.getMessage())
+          }
+        } finally {
+          OmniHashBuilderWithExprOperatorFactory.gLock.unlock()
+        }
+      } else {
+        val (opFactory, op) = createBuildOpFactoryAndOp()
+        buildOpFactory = opFactory
+        buildOp = op
+      }
 
       val startLookupCodegen = System.nanoTime()
       val lookupJoinType = OmniExpressionAdaptor.toOmniJoinType(joinType)
@@ -345,20 +394,16 @@ case class ColumnarBroadcastHashJoinExec(
       // close operator
       SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
         lookupOp.close()
-        buildOp.close()
         lookupOpFactory.close()
-        buildOpFactory.close()
+        if (enableShareBuildOp && canShareBuildOp) {
+          OmniHashBuilderWithExprOperatorFactory.gLock.lock()
+          OmniHashBuilderWithExprOperatorFactory.dereferenceHashBuilderOperatorAndFactory(buildPlan.id)
+          OmniHashBuilderWithExprOperatorFactory.gLock.unlock()
+        } else {
+          buildOp.close()
+          buildOpFactory.close()
+        }
       })
-
-      val deserializer = VecBatchSerializerFactory.create()
-      relation.value.buildData.foreach { input =>
-        val startBuildInput = System.nanoTime()
-        buildOp.addInput(deserializer.deserialize(input))
-        buildAddInputTime += NANOSECONDS.toMillis(System.nanoTime() - startBuildInput)
-      }
-      val startBuildGetOp = System.nanoTime()
-      buildOp.getOutput
-      buildGetOutputTime += NANOSECONDS.toMillis(System.nanoTime() - startBuildGetOp)
 
       val streamedPlanOutput = pruneOutput(streamedPlan.output, projectList)
       val prunedOutput = streamedPlanOutput ++ prunedBuildOutput
@@ -375,8 +420,6 @@ case class ColumnarBroadcastHashJoinExec(
         rightLen = streamedPlanOutput.size
       }
 
-      val columnarConf: ColumnarPluginConfig = ColumnarPluginConfig.getSessionConf
-      val enableJoinBatchMerge: Boolean = columnarConf.enableJoinBatchMerge
       val iterBatch = new Iterator[ColumnarBatch] {
         private var results: java.util.Iterator[VecBatch] = _
         var res: Boolean = true
