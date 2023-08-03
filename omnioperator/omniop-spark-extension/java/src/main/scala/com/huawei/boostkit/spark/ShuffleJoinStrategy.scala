@@ -17,6 +17,9 @@
 
 package com.huawei.boostkit.spark
 
+import com.huawei.boostkit.spark.util.LogicalPlanSelector
+
+import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.Strategy
 import org.apache.spark.sql.catalyst.SQLConfHelper
 import org.apache.spark.sql.catalyst.expressions._
@@ -25,7 +28,7 @@ import org.apache.spark.sql.catalyst.planning._
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.execution.{joins, SparkPlan}
 
-object ShuffleJoinStrategy extends Strategy
+case class ShuffleJoinStrategy(session: SparkSession) extends Strategy
   with PredicateHelper
   with JoinSelectionHelper
   with SQLConfHelper {
@@ -33,45 +36,63 @@ object ShuffleJoinStrategy extends Strategy
   private val columnarPreferShuffledHashJoin =
     ColumnarPluginConfig.getConf.columnarPreferShuffledHashJoin
 
-  def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
-    case ExtractEquiJoinKeys(joinType, leftKeys, rightKeys, nonEquiCond, _, left, right, hint)
-      if columnarPreferShuffledHashJoin =>
-      val enable = getBroadcastBuildSide(left, right, joinType, hint, true, conf).isEmpty &&
-        !hintToSortMergeJoin(hint) &&
-        getShuffleHashJoinBuildSide(left, right, joinType, hint, true, conf).isEmpty &&
-        !hintToShuffleReplicateNL(hint) &&
-        getBroadcastBuildSide(left, right, joinType, hint, false, conf).isEmpty
-      if (enable) {
-        var buildLeft = false
-        var buildRight = false
-        var joinCountLeft = 0
-        var joinCountRight = 0
-        left.foreach(x => {
-          if (x.isInstanceOf[Join]) {
-            joinCountLeft = joinCountLeft + 1
+  def apply(plan: LogicalPlan): Seq[SparkPlan] = LogicalPlanSelector.maybeNil(session, plan) {
+    plan match {
+      case ExtractEquiJoinKeys(joinType, leftKeys, rightKeys, nonEquiCond, _, left, right, hint)
+        if columnarPreferShuffledHashJoin =>
+        val enable = getBroadcastBuildSide(left, right, joinType, hint, true, conf).isEmpty &&
+          !hintToSortMergeJoin(hint) &&
+          getShuffleHashJoinBuildSide(left, right, joinType, hint, true, conf).isEmpty &&
+          !hintToShuffleReplicateNL(hint) &&
+          getBroadcastBuildSide(left, right, joinType, hint, false, conf).isEmpty
+        if (enable) {
+          var buildLeft = false
+          var buildRight = false
+          var joinCountLeft = 0
+          var joinCountRight = 0
+          left.foreach(x => {
+            if (x.isInstanceOf[Join]) {
+              joinCountLeft = joinCountLeft + 1
+            }
+          })
+          right.foreach(x => {
+            if (x.isInstanceOf[Join]) {
+              joinCountRight = joinCountRight + 1
+            }
+          })
+          if ((joinCountLeft > 0) && (joinCountRight == 0)) {
+            buildLeft = true
           }
-        })
-        right.foreach(x => {
-          if (x.isInstanceOf[Join]) {
-            joinCountRight = joinCountRight + 1
+          if ((joinCountRight > 0) && (joinCountLeft == 0)) {
+            buildRight = true
           }
-        })
-        if ((joinCountLeft > 0) && (joinCountRight == 0)) {
-          buildLeft = true
-        }
-        if ((joinCountRight > 0) && (joinCountLeft == 0)) {
-          buildRight = true
-        }
 
-        // use cbo statistics to take effect if CBO is enable
-        if (conf.cboEnabled) {
-          getShuffleHashJoinBuildSide(left,
-            right,
-            joinType,
-            hint,
-            false,
-            conf)
-            .map {
+          // use cbo statistics to take effect if CBO is enable
+          if (conf.cboEnabled) {
+            getShuffleHashJoinBuildSide(left,
+              right,
+              joinType,
+              hint,
+              false,
+              conf)
+              .map {
+                buildSide =>
+                  Seq(joins.ShuffledHashJoinExec(
+                    leftKeys,
+                    rightKeys,
+                    joinType,
+                    buildSide,
+                    nonEquiCond,
+                    planLater(left),
+                    planLater(right)))
+              }.getOrElse(Nil)
+          } else {
+            getBuildSide(
+              canBuildShuffledHashJoinLeft(joinType) && buildLeft,
+              canBuildShuffledHashJoinRight(joinType) && buildRight,
+              left,
+              right
+            ).map {
               buildSide =>
                 Seq(joins.ShuffledHashJoinExec(
                   leftKeys,
@@ -82,29 +103,12 @@ object ShuffleJoinStrategy extends Strategy
                   planLater(left),
                   planLater(right)))
             }.getOrElse(Nil)
+          }
         } else {
-          getBuildSide(
-            canBuildShuffledHashJoinLeft(joinType) && buildLeft,
-            canBuildShuffledHashJoinRight(joinType) && buildRight,
-            left,
-            right
-          ).map {
-            buildSide =>
-              Seq(joins.ShuffledHashJoinExec(
-                leftKeys,
-                rightKeys,
-                joinType,
-                buildSide,
-                nonEquiCond,
-                planLater(left),
-                planLater(right)))
-          }.getOrElse(Nil)
+          Nil
         }
-      } else {
-        Nil
-      }
-
-    case _ => Nil
+      case _ => Nil
+    }
   }
 
   private def getBuildSide(

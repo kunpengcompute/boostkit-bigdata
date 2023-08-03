@@ -25,10 +25,10 @@ import org.apache.spark.sql.internal.SQLConf
 
 class ColumnarPluginConfig(conf: SQLConf) extends Logging {
   // enable or disable columnar exchange
-  val columnarShuffleStr:String = conf
+  val columnarShuffleStr: String = conf
     .getConfString("spark.shuffle.manager", "sort")
 
-  val enableColumnarShuffle: Boolean = 
+  val enableColumnarShuffle: Boolean =
     if (!(columnarShuffleStr.equals("sort") || (columnarShuffleStr.equals("tungsten-sort")))) {
       SparkEnv.get.shuffleManager.isInstanceOf[ColumnarShuffleManager]
     } else {
@@ -204,6 +204,9 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
 
 
 object ColumnarPluginConfig {
+
+  val OMNI_ENABLE_KEY: String = "spark.omni.enabled"
+
   var ins: ColumnarPluginConfig = null
 
   def getConf: ColumnarPluginConfig = synchronized {
