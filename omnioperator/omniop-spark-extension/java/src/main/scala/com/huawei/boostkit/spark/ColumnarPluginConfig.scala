@@ -82,6 +82,11 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
     .getConfString("spark.omni.sql.columnar.broadcastJoin", "true")
     .toBoolean
 
+  // enable or disable share columnar BroadcastHashJoin hashtable
+  val enableShareBroadcastJoinHashTable: Boolean = conf
+    .getConfString("spark.omni.sql.columnar.broadcastJoin.sharehashtable", "true")
+    .toBoolean
+
   // enable or disable heuristic join reorder
   val enableHeuristicJoinReorder: Boolean =
     conf.getConfString("spark.sql.heuristicJoinReorder.enabled", "true").toBoolean
