@@ -299,7 +299,7 @@ object OmniExpressionAdaptor extends Logging {
   }
 
   private def unsupportedCastCheck(expr: Expression, cast: Cast): Unit = {
-    def isDecimalOrStringType(dataType: DataType): Boolean = (dataType.isInstanceOf[DecimalType]) || (dataType.isInstanceOf[StringType])
+    def isDecimalOrStringType(dataType: DataType): Boolean = (dataType.isInstanceOf[DecimalType]) || (dataType.isInstanceOf[StringType] || (dataType.isInstanceOf[DateType]))
     // not support Cast(string as !(decimal/string)) and Cast(!(decimal/string) as string)
     if ((cast.dataType.isInstanceOf[StringType] && !isDecimalOrStringType(cast.child.dataType)) ||
       (!isDecimalOrStringType(cast.dataType) && cast.child.dataType.isInstanceOf[StringType])) {
