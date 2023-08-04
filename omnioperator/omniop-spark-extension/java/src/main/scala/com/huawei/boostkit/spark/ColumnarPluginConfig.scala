@@ -89,11 +89,11 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
 
   // enable or disable heuristic join reorder
   val enableHeuristicJoinReorder: Boolean =
-    conf.getConfString("spark.sql.heuristicJoinReorder.enabled", "true").toBoolean
+    conf.getConfString("spark.omni.sql.columnar.heuristicJoinReorder", "true").toBoolean
 
   // enable or disable delay cartesian product
   val enableDelayCartesianProduct: Boolean =
-    conf.getConfString("spark.sql.enableDelayCartesianProduct.enabled", "true").toBoolean
+    conf.getConfString("spark.omni.sql.columnar.delayCartesianProduct", "true").toBoolean
 
   // enable native table scan
   val enableColumnarFileScan: Boolean = conf
