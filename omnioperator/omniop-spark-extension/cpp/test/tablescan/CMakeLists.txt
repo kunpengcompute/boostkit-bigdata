@@ -3,7 +3,7 @@ configure_file(scan_test.h.in ${CMAKE_CURRENT_SOURCE_DIR}/scan_test.h)
 
 aux_source_directory(${CMAKE_CURRENT_LIST_DIR} SCAN_TESTS_LIST)
 set(SCAN_TEST_TARGET tablescantest)
-add_library(${SCAN_TEST_TARGET} STATIC ${SCAN_TESTS_LIST})
+add_library(${SCAN_TEST_TARGET} STATIC ${SCAN_TESTS_LIST} parquet_scan_test.cpp)
 target_compile_options(${SCAN_TEST_TARGET} PUBLIC )
 
 target_include_directories(${SCAN_TEST_TARGET} PUBLIC $ENV{JAVA_HOME}/include)
