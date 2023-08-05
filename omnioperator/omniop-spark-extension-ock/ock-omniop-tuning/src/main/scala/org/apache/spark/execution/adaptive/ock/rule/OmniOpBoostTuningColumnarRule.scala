@@ -8,7 +8,6 @@ import com.huawei.boostkit.spark.ColumnarPluginConfig
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.adaptive.ock.BoostTuningQueryManager
-import org.apache.spark.sql.execution.adaptive.ock.BoostTuningQueryManager._
 import org.apache.spark.sql.execution.adaptive.ock.common.BoostTuningUtil.{getQueryExecutionId, normalizedSparkPlan}
 import org.apache.spark.sql.execution.adaptive.ock.common.StringPrefix.SHUFFLE_PREFIX
 import org.apache.spark.sql.execution.adaptive.ock.exchange._
