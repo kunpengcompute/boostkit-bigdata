@@ -22,7 +22,7 @@ case class ColumnarExecutionModel() extends ExecutionModel {
     } else {
       0
     }
-    val finalMem = ((usableMem * shuffleMemFraction + offHeapMem) / executorCores).toLong
+    val finalMem = (((usableMem + offHeapMem) * shuffleMemFraction) / executorCores).toLong
     TLogDebug(s"ExecutorMemory is $systemMem reserved $reservedMem offHeapMem is $offHeapMem" +
       s" shuffleMemFraction is $shuffleMemFraction, execution memory of executor is $finalMem")
     finalMem

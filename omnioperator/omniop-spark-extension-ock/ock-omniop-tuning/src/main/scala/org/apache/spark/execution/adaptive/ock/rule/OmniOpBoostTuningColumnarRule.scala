@@ -8,8 +8,7 @@ import com.huawei.boostkit.spark.ColumnarPluginConfig
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.adaptive.ock.BoostTuningQueryManager
-import org.apache.spark.sql.execution.adaptive.ock.BoostTuningQueryManager._
-import org.apache.spark.sql.execution.adaptive.ock.common.BoostTuningUtil.normalizedSparkPlan
+import org.apache.spark.sql.execution.adaptive.ock.common.BoostTuningUtil.{getQueryExecutionId, normalizedSparkPlan}
 import org.apache.spark.sql.execution.adaptive.ock.common.StringPrefix.SHUFFLE_PREFIX
 import org.apache.spark.sql.execution.adaptive.ock.exchange._
 import org.apache.spark.sql.execution.adaptive.ock.reader._
@@ -28,7 +27,7 @@ case class OmniOpBoostTuningPreColumnarRule() extends Rule[SparkPlan] {
   val delegate: BoostTuningPreNewQueryStageRule = BoostTuningPreNewQueryStageRule()
 
   override def apply(plan: SparkPlan): SparkPlan = {
-    val query = BoostTuningQueryManager.getOrCreateQueryManager(getExecutionId)
+    val query = BoostTuningQueryManager.getOrCreateQueryManager(getQueryExecutionId)
 
     delegate.prepareQueryExecution(query, plan)
 

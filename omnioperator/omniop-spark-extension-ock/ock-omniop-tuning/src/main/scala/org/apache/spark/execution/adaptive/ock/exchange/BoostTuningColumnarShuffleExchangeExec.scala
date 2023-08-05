@@ -75,7 +75,7 @@ case class BoostTuningColumnarShuffleExchangeExec(
 
   override def getDependency: ShuffleDependency[Int, ColumnarBatch, ColumnarBatch] = boostTuningColumnarShuffleDependency
 
-  override def getUpStreamDataSize: Long = collectUpStreamInputDataSize(this)
+  override def getUpStreamDataSize: Long = collectUpStreamInputDataSize(this.child)
 
   override def getPartitionEstimators: Seq[PartitionEstimator] = estimators
 
