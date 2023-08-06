@@ -54,6 +54,10 @@ case class ColumnarHashAggregateExec(
   extends BaseAggregateExec
     with AliasAwareOutputPartitioning {
 
+  override lazy val allAttributes: AttributeSeq =
+    child.output ++ aggregateBufferAttributes ++ aggregateAttributes ++
+      aggregateExpressions.flatMap(_.aggregateFunction.inputAggBufferAttributes)
+
   override def verboseStringWithOperatorId(): String = {
     s"""
        |$formattedNodeName

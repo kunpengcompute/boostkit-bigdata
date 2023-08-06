@@ -30,9 +30,11 @@ import nova.hetu.omniruntime.operator.OmniExprVerify
 import com.huawei.boostkit.spark.ColumnarPluginConfig
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.expressions._
+import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.aggregate._
 import org.apache.spark.sql.catalyst.plans.{FullOuter, Inner, JoinType, LeftAnti, LeftOuter, LeftSemi, RightOuter}
 import org.apache.spark.sql.catalyst.util.CharVarcharUtils.getRawTypeString
+import org.apache.spark.sql.execution
 import org.apache.spark.sql.hive.HiveUdfAdaptorUtil
 import org.apache.spark.sql.types.{BooleanType, DataType, DateType, Decimal, DecimalType, DoubleType, IntegerType, LongType, Metadata, ShortType, StringType}
 
@@ -40,6 +42,9 @@ import java.util.Locale
 import scala.collection.mutable
 
 object OmniExpressionAdaptor extends Logging {
+  var updateSubquery: Boolean = false;
+
+  def setUpdateSubquery(isUpdate: Boolean): Unit = updateSubquery = isUpdate
 
   def getRealExprId(expr: Expression): ExprId = {
     expr match {
@@ -330,6 +335,18 @@ object OmniExpressionAdaptor extends Logging {
                                          exprsIndexMap: Map[ExprId, Int],
                                          returnDatatype: DataType): String = {
     expr match {
+      case subquery: execution.ScalarSubquery =>
+        var result: Any = null
+        if (updateSubquery) {
+          result = subquery.eval(InternalRow.empty)
+        }
+        if (result == null) {
+          ("{\"exprType\":\"LITERAL\",\"dataType\":%s, \"isNull\":true,\"value\":%s}")
+            .format(sparkTypeToOmniExpJsonType(subquery.dataType), result)
+        } else {
+          val literal = Literal(result, subquery.dataType)
+          toOmniJsonLiteral(literal)
+        }
       case unscaledValue: UnscaledValue =>
         ("{\"exprType\":\"FUNCTION\",\"returnType\":%s," +
           "\"function_name\":\"UnscaledValue\", \"arguments\":[%s]}")
