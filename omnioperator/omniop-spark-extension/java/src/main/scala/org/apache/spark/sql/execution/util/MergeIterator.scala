@@ -38,6 +38,7 @@ class MergeIterator(iter: Iterator[ColumnarBatch], localSchema: StructType,
   val columnarConf: ColumnarPluginConfig = ColumnarPluginConfig.getSessionConf
   private val maxBatchSizeInBytes: Int = columnarConf.maxBatchSizeInBytes
   private val maxRowCount: Int = columnarConf.maxRowCount
+  private val mergedBatchThreshold: Int = columnarConf.mergedBatchThreshold
   private var totalRows = 0
   private var currentBatchSizeInBytes = 0
 
@@ -133,7 +134,12 @@ class MergeIterator(iter: Iterator[ColumnarBatch], localSchema: StructType,
       val batch: ColumnarBatch = iter.next()
       val input: Array[Vec] = transColBatchToOmniVecs(batch)
       val vecBatch = new VecBatch(input, batch.numRows())
-      buffer(vecBatch)
+      if (vecBatch.getRowCount > mergedBatchThreshold) {
+        flush()
+        outputQueue.enqueue(vecBatch)
+      } else {
+        buffer(vecBatch)
+      }
     }
 
     if (outputQueue.isEmpty && bufferedVecBatch.isEmpty) {
