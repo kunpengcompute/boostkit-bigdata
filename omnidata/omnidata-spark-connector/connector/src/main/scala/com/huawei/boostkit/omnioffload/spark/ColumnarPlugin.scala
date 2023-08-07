@@ -30,6 +30,11 @@ import org.apache.spark.sql.execution.aggregate.{HashAggregateExec, SortAggregat
 import org.apache.spark.sql.execution.command.DataWritingCommandExec
 import org.apache.spark.sql.execution.exchange.ShuffleExchangeExec
 import org.apache.spark.sql.execution.joins._
+import org.apache.spark.sql.execution.ndp.NdpConf.getOptimizerPushDownThreshold
+import org.apache.spark.sql.hive.execution.CreateHiveTableAsSelectCommand
+import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.sql.types._
+import org.apache.spark.sql.{SparkSession, SparkSessionExtensions}
 
 import scala.collection.JavaConverters
 
@@ -40,11 +45,57 @@ case class NdpOverrides(sparkSession: SparkSession) extends Rule[SparkPlan] {
   var isSMJ = false
   var isSort = false
   var hasCoalesce = false
+  var hasShuffle = false
   var accurateQueryHd = "153"
   var accurateQuery = "000"
 
   def apply(plan: SparkPlan): SparkPlan = {
-     replaceWithOptimizedPlan(plan)
+    preRuleApply(plan)
+    val ruleList = Seq(CountReplaceRule)
+    val afterPlan = ruleList.foldLeft(plan) { case (sp, rule) =>
+      val result = rule.apply(sp)
+      result
+    }
+    val optimizedPlan = replaceWithOptimizedPlan(afterPlan)
+    val finalPlan = replaceWithScanPlan(optimizedPlan)
+    postRuleApply(finalPlan)
+    finalPlan
+  }
+
+  def preRuleApply(plan: SparkPlan): Unit = {
+    numPartitions = SQLConf.get.getConfString("spark.omni.sql.ndpPlugin.coalesce.numPartitions",
+      NdpConnectorUtils.getNdpNumPartitionsStr("10000")).toInt
+    pushDownTaskCount = NdpConnectorUtils.getPushDownTaskTotal(getOptimizerPushDownThreshold(sparkSession))
+    if (CountReplaceRule.shouldReplaceCountOne(plan)) {
+      pushDownTaskCount = NdpConnectorUtils.getCountTaskTotal(200)
+      SQLConf.get.setConfString(SQLConf.FILES_MAX_PARTITION_BYTES.key,
+        NdpConnectorUtils.getCountMaxPartSize("512MB"))
+    }
+    if (CountReplaceRule.shouldReplaceDistinctCount(plan)) {
+      pushDownTaskCount = NdpConnectorUtils.getCountDistinctTaskTotal(2000)
+    }
+  }
+
+  def postRuleApply(plan: SparkPlan): Unit = {
+    if (isSMJ) {
+      SQLConf.get.setConfString(SQLConf.FILES_MAX_PARTITION_BYTES.key,
+        NdpConnectorUtils.getSMJMaxPartSize("536870912"))
+    }
+  }
+
+  //now set task total number, we can use this number pushDown task in thread
+  def replaceWithScanPlan(plan: SparkPlan): SparkPlan = {
+    val p = plan.transformUp {
+      case scan: FileSourceScanExec =>
+        scan.setRuntimePushDownSum(pushDownTaskCount)
+        if (hasCoalesce && !hasShuffle) {
+          // without shuffle , coalesce num is task num
+          scan.setRuntimePartSum(numPartitions)
+        }
+        scan
+      case p => p
+    }
+    p
   }
 
   def replaceWithOptimizedPlan(plan: SparkPlan): SparkPlan = {
