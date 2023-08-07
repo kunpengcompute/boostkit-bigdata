@@ -26,6 +26,7 @@ import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor.{checkOmniJsonWhiteList, isSimpleColumn, isSimpleColumnForAll}
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil.{getIndexArray, pruneOutput, reorderVecs, transColBatchToOmniVecs}
+import nova.hetu.omniruntime.constants.JoinType._
 import nova.hetu.omniruntime.`type`.DataType
 import nova.hetu.omniruntime.operator.OmniOperator
 import nova.hetu.omniruntime.operator.config.{OperatorConfig, OverflowConfig, SpillConfig}
@@ -291,14 +292,11 @@ case class ColumnarBroadcastHashJoinExec(
     val enableShareBuildOp: Boolean = columnarConf.enableShareBroadcastJoinHashTable
     val enableJoinBatchMerge: Boolean = columnarConf.enableJoinBatchMerge
 
-    var canShareBuildOp: Boolean = false
     // {0}, buildKeys: col1#12
     val buildOutputCols: Array[Int] = joinType match {
       case Inner | LeftOuter =>
-        canShareBuildOp = true
         getIndexArray(buildOutput, projectList)
       case LeftExistence(_) =>
-        canShareBuildOp = false
         Array[Int]()
       case x =>
         throw new UnsupportedOperationException(s"ColumnBroadcastHashJoin Join-type[$x] is not supported!")
@@ -324,21 +322,22 @@ case class ColumnarBroadcastHashJoinExec(
       OmniExpressionAdaptor.rewriteToOmniJsonExpressionLiteral(x,
         OmniExpressionAdaptor.getExprIdMap(streamedOutput.map(_.toAttribute)))
     }.toArray
+
+    val lookupJoinType = OmniExpressionAdaptor.toOmniJoinType(joinType)
+    val canShareBuildOp = (lookupJoinType != OMNI_JOIN_TYPE_RIGHT && lookupJoinType != OMNI_JOIN_TYPE_FULL)
     streamedPlan.executeColumnar().mapPartitionsWithIndexInternal { (index, iter) =>
       val filter: Optional[String] = condition match {
         case Some(expr) =>
-          canShareBuildOp = false
           Optional.of(OmniExpressionAdaptor.rewriteToOmniJsonExpressionLiteral(expr,
             OmniExpressionAdaptor.getExprIdMap((streamedOutput ++ buildOutput).map(_.toAttribute))))
         case _ =>
-          canShareBuildOp = true
           Optional.empty()
       }
 
       def createBuildOpFactoryAndOp(): (OmniHashBuilderWithExprOperatorFactory, OmniOperator) = {
         val startBuildCodegen = System.nanoTime()
         val opFactory =
-          new OmniHashBuilderWithExprOperatorFactory(buildTypes, buildJoinColsExp, filter, 1,
+          new OmniHashBuilderWithExprOperatorFactory(buildTypes, buildJoinColsExp, 1,
            new OperatorConfig(SpillConfig.NONE,
              new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
         val op = opFactory.createOperator()
@@ -383,9 +382,8 @@ case class ColumnarBroadcastHashJoinExec(
       }
 
       val startLookupCodegen = System.nanoTime()
-      val lookupJoinType = OmniExpressionAdaptor.toOmniJoinType(joinType)
       val lookupOpFactory = new OmniLookupJoinWithExprOperatorFactory(probeTypes, probeOutputCols,
-        probeHashColsExp, buildOutputCols, buildOutputTypes, lookupJoinType, buildOpFactory,
+        probeHashColsExp, buildOutputCols, buildOutputTypes, lookupJoinType, buildOpFactory, filter,
         new OperatorConfig(SpillConfig.NONE,
           new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val lookupOp = lookupOpFactory.createOperator()

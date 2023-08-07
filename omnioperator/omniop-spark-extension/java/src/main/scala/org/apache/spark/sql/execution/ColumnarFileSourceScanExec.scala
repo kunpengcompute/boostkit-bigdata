@@ -890,7 +890,7 @@ case class ColumnarMultipleOperatorExec(
       })
 
       val buildOpFactory1 = new OmniHashBuilderWithExprOperatorFactory(buildTypes1,
-        buildJoinColsExp1, if (joinFilter1.nonEmpty) {Optional.of(joinFilter1.get)} else {Optional.empty()}, 1,
+        buildJoinColsExp1, 1,
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val buildOp1 = buildOpFactory1.createOperator()
 
@@ -906,6 +906,7 @@ case class ColumnarMultipleOperatorExec(
       buildOp1.getOutput
       val lookupOpFactory1 = new OmniLookupJoinWithExprOperatorFactory(probeTypes1, probeOutputCols1,
         probeHashColsExp1, buildOutputCols1, buildOutputTypes1, OMNI_JOIN_TYPE_INNER, buildOpFactory1,
+        if (joinFilter1.nonEmpty) {Optional.of(joinFilter1.get)} else {Optional.empty()},
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val lookupOp1 = lookupOpFactory1.createOperator()
       // close operator
@@ -923,7 +924,7 @@ case class ColumnarMultipleOperatorExec(
       })
 
       val buildOpFactory2 = new OmniHashBuilderWithExprOperatorFactory(buildTypes2,
-        buildJoinColsExp2, if (joinFilter2.nonEmpty) {Optional.of(joinFilter2.get)} else {Optional.empty()}, 1,
+        buildJoinColsExp2, 1,
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val buildOp2 = buildOpFactory2.createOperator()
 
@@ -939,6 +940,7 @@ case class ColumnarMultipleOperatorExec(
       buildOp2.getOutput
       val lookupOpFactory2 = new OmniLookupJoinWithExprOperatorFactory(probeTypes2, probeOutputCols2,
         probeHashColsExp2, buildOutputCols2, buildOutputTypes2, OMNI_JOIN_TYPE_INNER, buildOpFactory2,
+        if (joinFilter2.nonEmpty) {Optional.of(joinFilter2.get)} else {Optional.empty()},
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val lookupOp2 = lookupOpFactory2.createOperator()
 
@@ -957,7 +959,7 @@ case class ColumnarMultipleOperatorExec(
       })
 
       val buildOpFactory3 = new OmniHashBuilderWithExprOperatorFactory(buildTypes3,
-        buildJoinColsExp3, if (joinFilter3.nonEmpty) {Optional.of(joinFilter3.get)} else {Optional.empty()}, 1,
+        buildJoinColsExp3, 1,
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val buildOp3 = buildOpFactory3.createOperator()
 
@@ -973,6 +975,7 @@ case class ColumnarMultipleOperatorExec(
       buildOp3.getOutput
       val lookupOpFactory3 = new OmniLookupJoinWithExprOperatorFactory(probeTypes3, probeOutputCols3,
         probeHashColsExp3, buildOutputCols3, buildOutputTypes3, OMNI_JOIN_TYPE_INNER, buildOpFactory3,
+        if (joinFilter3.nonEmpty) {Optional.of(joinFilter3.get)} else {Optional.empty()},
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val lookupOp3 = lookupOpFactory3.createOperator()
 
@@ -991,7 +994,7 @@ case class ColumnarMultipleOperatorExec(
       })
 
       val buildOpFactory4 = new OmniHashBuilderWithExprOperatorFactory(buildTypes4,
-        buildJoinColsExp4, if (joinFilter4.nonEmpty) {Optional.of(joinFilter4.get)} else {Optional.empty()}, 1,
+        buildJoinColsExp4, 1,
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val buildOp4 = buildOpFactory4.createOperator()
 
@@ -1007,6 +1010,7 @@ case class ColumnarMultipleOperatorExec(
       buildOp4.getOutput
       val lookupOpFactory4 = new OmniLookupJoinWithExprOperatorFactory(probeTypes4, probeOutputCols4,
         probeHashColsExp4, buildOutputCols4, buildOutputTypes4, OMNI_JOIN_TYPE_INNER, buildOpFactory4,
+        if (joinFilter4.nonEmpty) {Optional.of(joinFilter4.get)} else {Optional.empty()},
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val lookupOp4 = lookupOpFactory4.createOperator()
 
@@ -1251,7 +1255,7 @@ case class ColumnarMultipleOperatorExec1(
       })
 
       val buildOpFactory1 = new OmniHashBuilderWithExprOperatorFactory(buildTypes1,
-        buildJoinColsExp1, if (joinFilter1.nonEmpty) {Optional.of(joinFilter1.get)} else {Optional.empty()}, 1,
+        buildJoinColsExp1, 1,
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val buildOp1 = buildOpFactory1.createOperator()
 
@@ -1267,6 +1271,7 @@ case class ColumnarMultipleOperatorExec1(
       buildOp1.getOutput
       val lookupOpFactory1 = new OmniLookupJoinWithExprOperatorFactory(probeTypes1, probeOutputCols1,
         probeHashColsExp1, buildOutputCols1, buildOutputTypes1, OMNI_JOIN_TYPE_INNER, buildOpFactory1,
+        if (joinFilter1.nonEmpty) {Optional.of(joinFilter1.get)} else {Optional.empty()},
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val lookupOp1 = lookupOpFactory1.createOperator()
 
@@ -1285,7 +1290,7 @@ case class ColumnarMultipleOperatorExec1(
       })
 
       val buildOpFactory2 = new OmniHashBuilderWithExprOperatorFactory(buildTypes2,
-        buildJoinColsExp2, if (joinFilter2.nonEmpty) {Optional.of(joinFilter2.get)} else {Optional.empty()}, 1,
+        buildJoinColsExp2, 1,
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val buildOp2 = buildOpFactory2.createOperator()
 
@@ -1301,6 +1306,7 @@ case class ColumnarMultipleOperatorExec1(
       buildOp2.getOutput
       val lookupOpFactory2 = new OmniLookupJoinWithExprOperatorFactory(probeTypes2, probeOutputCols2,
         probeHashColsExp2, buildOutputCols2, buildOutputTypes2, OMNI_JOIN_TYPE_INNER, buildOpFactory2,
+        if (joinFilter2.nonEmpty) {Optional.of(joinFilter2.get)} else {Optional.empty()},
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val lookupOp2 = lookupOpFactory2.createOperator()
 
@@ -1319,7 +1325,7 @@ case class ColumnarMultipleOperatorExec1(
       })
 
       val buildOpFactory3 = new OmniHashBuilderWithExprOperatorFactory(buildTypes3,
-        buildJoinColsExp3, if (joinFilter3.nonEmpty) {Optional.of(joinFilter3.get)} else {Optional.empty()}, 1,
+        buildJoinColsExp3, 1,
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val buildOp3 = buildOpFactory3.createOperator()
 
@@ -1335,6 +1341,7 @@ case class ColumnarMultipleOperatorExec1(
       buildOp3.getOutput
       val lookupOpFactory3 = new OmniLookupJoinWithExprOperatorFactory(probeTypes3, probeOutputCols3,
         probeHashColsExp3, buildOutputCols3, buildOutputTypes3, OMNI_JOIN_TYPE_INNER, buildOpFactory3,
+        if (joinFilter3.nonEmpty) {Optional.of(joinFilter3.get)} else {Optional.empty()},
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val lookupOp3 = lookupOpFactory3.createOperator()
 
