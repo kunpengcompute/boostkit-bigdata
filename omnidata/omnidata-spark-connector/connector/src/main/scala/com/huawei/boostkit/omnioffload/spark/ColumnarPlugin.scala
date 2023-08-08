@@ -21,7 +21,6 @@ package com.huawei.boostkit.omnioffload.spark
 import com.huawei.boostkit.omnidata.spark.NdpConnectorUtils
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.{SparkSession, SparkSessionExtensions}
 import org.apache.spark.sql.catalyst.catalog.{CatalogTable, HiveTableRelation}
 import org.apache.spark.sql.catalyst.expressions.aggregate._
 import org.apache.spark.sql.catalyst.expressions._
@@ -34,7 +33,6 @@ import org.apache.spark.sql.execution.command.{CreateDataSourceTableAsSelectComm
 import org.apache.spark.sql.execution.datasources.LogicalRelation
 import org.apache.spark.sql.execution.exchange.ShuffleExchangeExec
 import org.apache.spark.sql.execution.joins._
-import org.apache.spark.sql.execution.ndp.NdpConf
 import org.apache.spark.sql.execution.ndp.NdpConf.getOptimizerPushDownThreshold
 import org.apache.spark.sql.hive.execution.CreateHiveTableAsSelectCommand
 import org.apache.spark.sql.internal.SQLConf
@@ -382,13 +380,13 @@ case class NdpOptimizerRules(session: SparkSession) extends Rule[LogicalPlan] {
 
   val SORT_REPARTITION_SIZE: Int = SQLConf.get.getConfString(
     "spark.omni.sql.ndpPlugin.sort.repartition.size",
-    "104857600").toInt
+    NdpConnectorUtils.getSortRepartitionSizeStr("104857600")).toInt
   val DECIMAL_PRECISION: Int = SQLConf.get.getConfString(
     "spark.omni.sql.ndpPlugin.cast.decimal.precision",
-    "15").toInt
+    NdpConnectorUtils.getCastDecimalPrecisionStr("15")).toInt
   val MAX_PARTITION_BYTES_ENABLE_FACTOR: Int = SQLConf.get.getConfString(
     "spark.omni.sql.ndpPlugin.max.partitionBytesEnable.factor",
-    "2").toInt
+    NdpConnectorUtils.getNdpMaxPtFactorStr("2")).toInt
 
 
   override def apply(plan: LogicalPlan): LogicalPlan = {
@@ -415,10 +413,10 @@ case class NdpOptimizerRules(session: SparkSession) extends Rule[LogicalPlan] {
         var ifCast = false
         if (groupingExpressions.nonEmpty && hasCount(aggregateExpressions)) {
           SQLConf.get.setConfString(SQLConf.FILES_MAX_PARTITION_BYTES.key,
-            "1024MB")
+            NdpConnectorUtils.getCountAggMaxFilePtBytesStr("1024MB"))
         } else if (groupingExpressions.nonEmpty && hasAvg(aggregateExpressions)) {
           SQLConf.get.setConfString(SQLConf.FILES_MAX_PARTITION_BYTES.key,
-            "256MB")
+            NdpConnectorUtils.getAvgAggMaxFilePtBytesStr("256MB"))
           ifCast = true
         }
         if (ifCast) {
@@ -433,7 +431,7 @@ case class NdpOptimizerRules(session: SparkSession) extends Rule[LogicalPlan] {
         // turnOffOperator()
         // 6-x-bhj
         SQLConf.get.setConfString(SQLConf.FILES_MAX_PARTITION_BYTES.key,
-          "512MB")
+          NdpConnectorUtils.getBhjMaxFilePtBytesStr("512MB"))
         j
       case s@Sort(order, _, _) =>
         s.copy(order = order.map(e => e.copy(child = castStringExpressionToBigint(e.child))))
@@ -524,19 +522,19 @@ case class NdpOptimizerRules(session: SparkSession) extends Rule[LogicalPlan] {
     if (isMixSql) {
       if (existAccurate) {
         SQLConf.get.setConfString(SQLConf.SHUFFLE_PARTITIONS.key,
-          "200")
+          NdpConnectorUtils.getAggShufflePartitionsStr("200"))
         SQLConf.get.setConfString(SQLConf.FILES_MAX_PARTITION_BYTES.key,
-          "1024MB")
+          NdpConnectorUtils.getMixSqlAccurateMaxFilePtBytesStr("1024MB"))
       } else {
         if (existLike) {
           SQLConf.get.setConfString(SQLConf.SHUFFLE_PARTITIONS.key,
-            "200")
+            NdpConnectorUtils.getAggShufflePartitionsStr("200"))
         } else {
           SQLConf.get.setConfString(SQLConf.SHUFFLE_PARTITIONS.key,
-            "5000")
+            NdpConnectorUtils.getShufflePartitionsStr("5000"))
         }
         SQLConf.get.setConfString(SQLConf.FILES_MAX_PARTITION_BYTES.key,
-          "128MB")
+          NdpConnectorUtils.getMixSqlBaseMaxFilePtBytesStr("128MB"))
       }
       // base sql agg shuffle partition 200 ,other 5000
     } else {
@@ -544,7 +542,7 @@ case class NdpOptimizerRules(session: SparkSession) extends Rule[LogicalPlan] {
       repartitionHdfsReadForDistinct(fs, tables, plan)
       if (existJoin) {
         SQLConf.get.setConfString(SQLConf.SHUFFLE_PARTITIONS.key,
-          "5000")
+          NdpConnectorUtils.getShufflePartitionsStr("5000"))
       }
     }
   }
@@ -559,7 +557,7 @@ case class NdpOptimizerRules(session: SparkSession) extends Rule[LogicalPlan] {
       && SORT_REPARTITION_PLANS.exists(planContent.contains(_))) {
       val partitions = Math.max(1, fs.getContentSummary(new Path(tables.head)).getLength / SORT_REPARTITION_SIZE)
       SQLConf.get.setConfString(SQLConf.SHUFFLE_PARTITIONS.key,
-        "1000")
+        NdpConnectorUtils.getSortShufflePartitionsStr("1000"))
       turnOffOperator()
     }
   }
@@ -575,7 +573,7 @@ case class NdpOptimizerRules(session: SparkSession) extends Rule[LogicalPlan] {
     plan.foreach {
       case Aggregate(groupingExpressions, aggregateExpressions, _) if groupingExpressions == aggregateExpressions =>
         SQLConf.get.setConfString(SQLConf.FILES_MAX_PARTITION_BYTES.key,
-          "1024MB")
+          NdpConnectorUtils.getGroupMaxFilePtBytesStr("1024MB"))
         return
       case _ =>
     }

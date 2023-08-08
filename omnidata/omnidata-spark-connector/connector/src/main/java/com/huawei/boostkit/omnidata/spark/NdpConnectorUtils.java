@@ -127,62 +127,56 @@ public class NdpConnectorUtils {
     }
 
     public static String getSortRepartitionSizeStr(String sizeStr) {
-        return System.getenv("SORT_REPARTITION_SIZE") != null ?
-                System.getenv("SORT_REPARTITION_SIZE") : sizeStr;
+        return getIntStrSysEnv("SORT_REPARTITION_SIZE", sizeStr);
     }
 
     public static String getCastDecimalPrecisionStr(String numStr) {
-        return System.getenv("CAST_DECIMAL_PRECISION") != null ?
-                System.getenv("CAST_DECIMAL_PRECISION") : numStr;
+        return getIntStrSysEnv("CAST_DECIMAL_PRECISION", numStr);
     }
 
     public static String getNdpMaxPtFactorStr(String numStr) {
-        return System.getenv("NDP_MAX_PART_FACTOR") != null ?
-                System.getenv("NDP_MAX_PART_FACTOR") : numStr;
+        return getIntStrSysEnv("NDP_MAX_PART_FACTOR", numStr);
     }
 
-    public static String getCountAggMaxFilePtBytesStr(String BytesStr) {
+    public static String getCountAggMaxFilePtBytesStr(String bytesStr) {
         return System.getenv("COUNT_AGG_MAX_FILE_BYTES") != null ?
-                System.getenv("COUNT_AGG_MAX_FILE_BYTES") : BytesStr;
+                System.getenv("COUNT_AGG_MAX_FILE_BYTES") : bytesStr;
     }
 
-    public static String getAvgAggMaxFilePtBytesStr(String BytesStr) {
+    public static String getAvgAggMaxFilePtBytesStr(String bytesStr) {
         return System.getenv("AVG_AGG_MAX_FILE_BYTES") != null ?
-                System.getenv("AVG_AGG_MAX_FILE_BYTES") : BytesStr;
+                System.getenv("AVG_AGG_MAX_FILE_BYTES") : bytesStr;
     }
 
-    public static String getBhjMaxFilePtBytesStr(String BytesStr) {
+    public static String getBhjMaxFilePtBytesStr(String bytesStr) {
         return System.getenv("BHJ_MAX_FILE_BYTES") != null ?
-                System.getenv("BHJ_MAX_FILE_BYTES") : BytesStr;
+                System.getenv("BHJ_MAX_FILE_BYTES") : bytesStr;
     }
 
-    public static String getGroupMaxFilePtBytesStr(String BytesStr) {
+    public static String getGroupMaxFilePtBytesStr(String bytesStr) {
         return System.getenv("GROUP_MAX_FILE_BYTES") != null ?
-                System.getenv("GROUP_MAX_FILE_BYTES") : BytesStr;
+                System.getenv("GROUP_MAX_FILE_BYTES") : bytesStr;
     }
 
-    public static String getMixSqlBaseMaxFilePtBytesStr(String BytesStr) {
+    public static String getMixSqlBaseMaxFilePtBytesStr(String bytesStr) {
         return System.getenv("MIX_SQL_BASE_MAX_FILE_BYTES") != null ?
-                System.getenv("MIX_SQL_BASE_MAX_FILE_BYTES") : BytesStr;
+                System.getenv("MIX_SQL_BASE_MAX_FILE_BYTES") : bytesStr;
     }
 
-    public static String getMixSqlAccurateMaxFilePtBytesStr(String BytesStr) {
+    public static String getMixSqlAccurateMaxFilePtBytesStr(String bytesStr) {
         return System.getenv("MIX_SQL_ACCURATE_MAX_FILE_BYTES") != null ?
-                System.getenv("MIX_SQL_ACCURATE_MAX_FILE_BYTES") : BytesStr;
+                System.getenv("MIX_SQL_ACCURATE_MAX_FILE_BYTES") : bytesStr;
     }
 
-    public static String getAggShufflePartitionsStr(String BytesStr) {
-        return System.getenv("AGG_SHUFFLE_PARTITIONS") != null ?
-                System.getenv("AGG_SHUFFLE_PARTITIONS") : BytesStr;
+    public static String getAggShufflePartitionsStr(String byteNumStr) {
+        return getIntStrSysEnv("AGG_SHUFFLE_PARTITIONS", byteNumStr);
     }
 
-    public static String getShufflePartitionsStr(String BytesStr) {
-        return System.getenv("SHUFFLE_PARTITIONS") != null ?
-                System.getenv("SHUFFLE_PARTITIONS") : BytesStr;
+    public static String getShufflePartitionsStr(String byteNumStr) {
+        return getIntStrSysEnv("SHUFFLE_PARTITIONS", byteNumStr);
     }
 
-    public static String getSortShufflePartitionsStr(String BytesStr) {
-        return System.getenv("SORT_SHUFFLE_PARTITIONS") != null ?
-                System.getenv("SORT_SHUFFLE_PARTITIONS") : BytesStr;
+    public static String getSortShufflePartitionsStr(String byteNumStr) {
+        return getIntStrSysEnv("SORT_SHUFFLE_PARTITIONS", byteNumStr);
     }
 }
