@@ -61,18 +61,18 @@ public class NdpConnectorUtils {
 
     private static int getIntSysEnv(String envName, int defaultVal) {
         String val = System.getenv(envName);
-        if (!isNumeric(val) && Integer.parseInt(val) < 0) {
-            return defaultVal;
+        if (isNumeric(val) && Integer.parseInt(val) > 0) {
+            return Integer.parseInt(val);
         }
-        return Integer.parseInt(val);
+        return defaultVal;
     }
 
     private static String getIntStrSysEnv(String envName, String defaultVal) {
         String val = System.getenv(envName);
-        if (!isNumeric(val) && Integer.parseInt(val) < 0) {
-            return defaultVal;
+        if (isNumeric(val) && Integer.parseInt(val) > 0) {
+            return val;
         }
-        return val;
+        return defaultVal;
     }
 
     public static boolean getNdpEnable() {
@@ -127,56 +127,62 @@ public class NdpConnectorUtils {
     }
 
     public static String getSortRepartitionSizeStr(String sizeStr) {
-        return getIntStrSysEnv("SORT_REPARTITION_SIZE", sizeStr);
+        return System.getenv("SORT_REPARTITION_SIZE") != null ?
+                System.getenv("SORT_REPARTITION_SIZE") : sizeStr;
     }
 
     public static String getCastDecimalPrecisionStr(String numStr) {
-        return getIntStrSysEnv("CAST_DECIMAL_PRECISION", numStr);
+        return System.getenv("CAST_DECIMAL_PRECISION") != null ?
+                System.getenv("CAST_DECIMAL_PRECISION") : numStr;
     }
 
     public static String getNdpMaxPtFactorStr(String numStr) {
-        return getIntStrSysEnv("NDP_MAX_PART_FACTOR", numStr);
+        return System.getenv("NDP_MAX_PART_FACTOR") != null ?
+                System.getenv("NDP_MAX_PART_FACTOR") : numStr;
     }
 
-    public static String getCountAggMaxFilePtBytesStr(String bytesStr) {
+    public static String getCountAggMaxFilePtBytesStr(String BytesStr) {
         return System.getenv("COUNT_AGG_MAX_FILE_BYTES") != null ?
-                System.getenv("COUNT_AGG_MAX_FILE_BYTES") : bytesStr;
+                System.getenv("COUNT_AGG_MAX_FILE_BYTES") : BytesStr;
     }
 
-    public static String getAvgAggMaxFilePtBytesStr(String bytesStr) {
+    public static String getAvgAggMaxFilePtBytesStr(String BytesStr) {
         return System.getenv("AVG_AGG_MAX_FILE_BYTES") != null ?
-                System.getenv("AVG_AGG_MAX_FILE_BYTES") : bytesStr;
+                System.getenv("AVG_AGG_MAX_FILE_BYTES") : BytesStr;
     }
 
-    public static String getBhjMaxFilePtBytesStr(String bytesStr) {
+    public static String getBhjMaxFilePtBytesStr(String BytesStr) {
         return System.getenv("BHJ_MAX_FILE_BYTES") != null ?
-                System.getenv("BHJ_MAX_FILE_BYTES") : bytesStr;
+                System.getenv("BHJ_MAX_FILE_BYTES") : BytesStr;
     }
 
-    public static String getGroupMaxFilePtBytesStr(String bytesStr) {
+    public static String getGroupMaxFilePtBytesStr(String BytesStr) {
         return System.getenv("GROUP_MAX_FILE_BYTES") != null ?
-                System.getenv("GROUP_MAX_FILE_BYTES") : bytesStr;
+                System.getenv("GROUP_MAX_FILE_BYTES") : BytesStr;
     }
 
-    public static String getMixSqlBaseMaxFilePtBytesStr(String bytesStr) {
+    public static String getMixSqlBaseMaxFilePtBytesStr(String BytesStr) {
         return System.getenv("MIX_SQL_BASE_MAX_FILE_BYTES") != null ?
-                System.getenv("MIX_SQL_BASE_MAX_FILE_BYTES") : bytesStr;
+                System.getenv("MIX_SQL_BASE_MAX_FILE_BYTES") : BytesStr;
     }
 
-    public static String getMixSqlAccurateMaxFilePtBytesStr(String bytesStr) {
+    public static String getMixSqlAccurateMaxFilePtBytesStr(String BytesStr) {
         return System.getenv("MIX_SQL_ACCURATE_MAX_FILE_BYTES") != null ?
-                System.getenv("MIX_SQL_ACCURATE_MAX_FILE_BYTES") : bytesStr;
+                System.getenv("MIX_SQL_ACCURATE_MAX_FILE_BYTES") : BytesStr;
     }
 
-    public static String getAggShufflePartitionsStr(String byteNumStr) {
-        return getIntStrSysEnv("AGG_SHUFFLE_PARTITIONS", byteNumStr);
+    public static String getAggShufflePartitionsStr(String BytesStr) {
+        return System.getenv("AGG_SHUFFLE_PARTITIONS") != null ?
+                System.getenv("AGG_SHUFFLE_PARTITIONS") : BytesStr;
     }
 
-    public static String getShufflePartitionsStr(String byteNumStr) {
-        return getIntStrSysEnv("SHUFFLE_PARTITIONS", byteNumStr);
+    public static String getShufflePartitionsStr(String BytesStr) {
+        return System.getenv("SHUFFLE_PARTITIONS") != null ?
+                System.getenv("SHUFFLE_PARTITIONS") : BytesStr;
     }
 
-    public static String getSortShufflePartitionsStr(String byteNumStr) {
-        return getIntStrSysEnv("SORT_SHUFFLE_PARTITIONS", byteNumStr);
+    public static String getSortShufflePartitionsStr(String BytesStr) {
+        return System.getenv("SORT_SHUFFLE_PARTITIONS") != null ?
+                System.getenv("SORT_SHUFFLE_PARTITIONS") : BytesStr;
     }
 }
