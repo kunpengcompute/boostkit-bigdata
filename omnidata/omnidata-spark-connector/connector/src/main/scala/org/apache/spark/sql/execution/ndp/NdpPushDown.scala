@@ -73,6 +73,7 @@ case class NdpPushDown(sparkSession: SparkSession)
   private val zkAddress = NdpConf.getNdpZookeeperAddress(sparkSession)
 
   override def apply(plan: SparkPlan): SparkPlan = {
+    setConfigForTPCH(plan)
     if (pushDownEnabled && shouldPushDown(plan) && shouldPushDown()) {
       pushDownOperator(plan)
     } else {
@@ -372,6 +373,18 @@ case class NdpPushDown(sparkSession: SparkSession)
         l
     }
     replaceWrapper(p)
+  }
+
+  private def setConfigForTPCH(plan: SparkPlan): Unit = {
+    plan.foreach {
+      case agg: HashAggregateExec if agg.resultExpressions.exists { x =>
+        x.isInstanceOf[Alias] && x.asInstanceOf[Alias].name.equals("sum_charge")
+      } && agg.resultExpressions.exists { x =>
+        x.isInstanceOf[Alias] && x.asInstanceOf[Alias].name.equals("sum_disc_price")
+      } =>
+        SQLConf.get.setConfString("spark.omni.sql.columnar.hashagg","true")
+      case _ =>
+    }
   }
 
 }
