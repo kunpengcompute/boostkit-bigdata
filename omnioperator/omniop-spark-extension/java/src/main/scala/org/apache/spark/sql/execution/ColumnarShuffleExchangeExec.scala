@@ -159,6 +159,7 @@ class ColumnarShuffleExchangeExec(
 
 object ColumnarShuffleExchangeExec extends Logging {
   val defaultMm3HashSeed: Int = 42;
+  val rollupConst : String = "spark_grouping_id"
 
   def prepareShuffleDependency(
                                 rdd: RDD[ColumnarBatch],
@@ -174,7 +175,7 @@ object ColumnarShuffleExchangeExec extends Logging {
   ShuffleDependency[Int, ColumnarBatch, ColumnarBatch] = {
 
 
-    val rangePartitioner: Option[Partitioner] = newPartitioning match {
+    val part: Option[Partitioner] = newPartitioning match {
       case RangePartitioning(sortingExpressions, numPartitions) =>
         // Extract only fields used for sorting to avoid collecting large fields that does not
         // affect sorting result when deciding partition bounds in RangePartitioner
@@ -214,6 +215,8 @@ object ColumnarShuffleExchangeExec extends Logging {
           ascending = true,
           samplePointsPerPartitionHint = SQLConf.get.rangeExchangeSampleSizePerPartition)
         Some(part)
+      case HashPartitioning(_, n) =>
+        Some(new PartitionIdPassthrough(n))
       case _ => None
     }
 
@@ -245,8 +248,7 @@ object ColumnarShuffleExchangeExec extends Logging {
       (0, new ColumnarBatch(newColumns, cb.numRows))
     }
 
-    // only used for fallback range partitioning
-    def computeAndAddRangePartitionId(
+    def computePartitionId(
                                        cbIter: Iterator[ColumnarBatch],
                                        partitionKeyExtractor: InternalRow => Any): Iterator[(Int, ColumnarBatch)] = {
       val addPid2ColumnBatch = addPidToColumnBatch()
@@ -255,7 +257,7 @@ object ColumnarShuffleExchangeExec extends Logging {
           val pidArr = new Array[Int](cb.numRows)
           (0 until cb.numRows).foreach { i =>
             val row = cb.getRow(i)
-            val pid = rangePartitioner.get.getPartition(partitionKeyExtractor(row))
+            val pid = part.get.getPartition(partitionKeyExtractor(row))
             pidArr(i) = pid
           }
           val pidVec = new IntVec(cb.numRows)
@@ -268,6 +270,13 @@ object ColumnarShuffleExchangeExec extends Logging {
     val isRoundRobin = newPartitioning.isInstanceOf[RoundRobinPartitioning] &&
       newPartitioning.numPartitions > 1
     val isOrderSensitive = isRoundRobin && !SQLConf.get.sortBeforeRepartition
+
+    def containsRollUp(expressions: Seq[Expression]) : Boolean = {
+      expressions.exists{
+        case attr: AttributeReference if rollupConst.equals(attr.name) => true
+        case _ => false
+      }
+    }
 
     val rddWithPartitionId: RDD[Product2[Int, ColumnarBatch]] = newPartitioning match {
       case RoundRobinPartitioning(numPartitions) =>
@@ -288,38 +297,50 @@ object ColumnarShuffleExchangeExec extends Logging {
               UnsafeProjection.create(sortingExpressions.map(_.child), outputAttributes)
             row => projection(row)
           }
-          val newIter = computeAndAddRangePartitionId(cbIter, partitionKeyExtractor)
+          val newIter = computePartitionId(cbIter, partitionKeyExtractor)
           newIter
         }, isOrderSensitive = isOrderSensitive)
-      case HashPartitioning(expressions, numPartitions) =>
-        rdd.mapPartitionsWithIndexInternal((_, cbIter) => {
-          val addPid2ColumnBatch = addPidToColumnBatch()
-          // omni project
-          val genHashExpression = genHashExpr()
-          val omniExpr: String = genHashExpression(expressions, numPartitions, defaultMm3HashSeed, outputAttributes)
-          val factory = new OmniProjectOperatorFactory(Array(omniExpr), inputTypes, 1,
-            new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
-          val op = factory.createOperator()
-          // close operator
-          addLeakSafeTaskCompletionListener[Unit](_ => {
-            op.close()
-          })
-
-          cbIter.map { cb =>
-            val vecs = transColBatchToOmniVecs(cb, true)
-            op.addInput(new VecBatch(vecs, cb.numRows()))
-            val res = op.getOutput
-            if (res.hasNext) {
-              val retBatch = res.next()
-              val pidVec = retBatch.getVectors()(0)
-              // close return VecBatch
-              retBatch.close()
-              addPid2ColumnBatch(pidVec.asInstanceOf[IntVec], cb)
-            } else {
-              throw new Exception("Empty Project Operator Result...")
+      case h@HashPartitioning(expressions, numPartitions) =>
+        if (containsRollUp(expressions)) {
+          rdd.mapPartitionsWithIndexInternal((_, cbIter) => {
+            val partitionKeyExtractor: InternalRow => Any = {
+              val projection =
+                UnsafeProjection.create(h.partitionIdExpression :: Nil, outputAttributes)
+              row => projection(row).getInt(0)
             }
-          }
-        }, isOrderSensitive = isOrderSensitive)
+            val newIter = computePartitionId(cbIter, partitionKeyExtractor)
+            newIter
+          }, isOrderSensitive = isOrderSensitive)
+        } else {
+          rdd.mapPartitionsWithIndexInternal((_, cbIter) => {
+              val addPid2ColumnBatch = addPidToColumnBatch()
+              // omni project
+              val genHashExpression = genHashExpr()
+              val omniExpr: String = genHashExpression(expressions, numPartitions, defaultMm3HashSeed, outputAttributes)
+              val factory = new OmniProjectOperatorFactory(Array(omniExpr), inputTypes, 1,
+                new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
+              val op = factory.createOperator()
+              // close operator
+              addLeakSafeTaskCompletionListener[Unit](_ => {
+                op.close()
+              })
+
+              cbIter.map { cb =>
+                val vecs = transColBatchToOmniVecs(cb, true)
+                op.addInput(new VecBatch(vecs, cb.numRows()))
+                val res = op.getOutput
+                if (res.hasNext) {
+                  val retBatch = res.next()
+                  val pidVec = retBatch.getVectors()(0)
+                  // close return VecBatch
+                  retBatch.close()
+                  addPid2ColumnBatch(pidVec.asInstanceOf[IntVec], cb)
+                } else {
+                  throw new Exception("Empty Project Operator Result...")
+                }
+              }
+          }, isOrderSensitive = isOrderSensitive)
+      }
       case SinglePartition =>
         rdd.mapPartitionsWithIndexInternal((_, cbIter) => {
           cbIter.map { cb => (0, cb) }

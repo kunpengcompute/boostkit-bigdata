@@ -19,7 +19,7 @@ package org.apache.spark.sql.execution.adaptive
 
 import org.apache.log4j.Level
 import org.apache.spark.Partition
-import org.apache.spark.rdd.RDD
+import org.apache.spark.rdd.{MapPartitionsRDD, RDD}
 import org.apache.spark.scheduler.{SparkListener, SparkListenerEvent, SparkListenerJobStart}
 import org.apache.spark.sql.{Dataset, Row, SparkSession, Strategy}
 import org.apache.spark.sql.catalyst.optimizer.{BuildLeft, BuildRight}
@@ -155,7 +155,12 @@ class ColumnarAdaptiveQueryExecSuite extends ColumnarSparkPlanTest
         val columnarCus = r.asInstanceOf[ColumnarCustomShuffleReaderExec]
         val rdd: RDD[ColumnarBatch] = columnarCus.executeColumnar()
         val parts: Array[Partition] = rdd.partitions
-        assert(parts.forall(rdd.preferredLocations(_).nonEmpty))
+        rdd match {
+          case mapPartitionsRDD: MapPartitionsRDD[ColumnarBatch, ColumnarBatch] =>
+            assert(parts.forall(mapPartitionsRDD.prev.preferredLocations(_).nonEmpty))
+          case _ =>
+            assert(parts.forall(rdd.asInstanceOf[ShuffledColumnarRDD].preferredLocations(_).nonEmpty))
+        }
     }
     assert(numShuffles === (numLocalReaders.length + numShufflesWithoutLocalReader))
   }
@@ -201,20 +206,27 @@ class ColumnarAdaptiveQueryExecSuite extends ColumnarSparkPlanTest
         case reader: ColumnarCustomShuffleReaderExec if reader.isLocalReader => reader
       }
       assert(localReaders.length == 2)
-      val localShuffleRDD0 = localReaders(0).executeColumnar().asInstanceOf[ShuffledColumnarRDD]
-      val localShuffleRDD1 = localReaders(1).executeColumnar().asInstanceOf[ShuffledColumnarRDD]
-      // The pre-shuffle partition size is [0, 0, 0, 72, 0]
-      // We exclude the 0-size partitions, so only one partition, advisoryParallelism = 1
-      // the final parallelism is
-      // math.max(1, advisoryParallelism / numMappers): math.max(1, 1/2) = 1
-      // and the partitions length is 1 * numMappers = 2
-      assert(localShuffleRDD0.getPartitions.length == 2)
-      // The pre-shuffle partition size is [0, 72, 0, 72, 126]
-      // We exclude the 0-size partitions, so only 3 partition, advisoryParallelism = 3
-      // the final parallelism is
-      // math.max(1, advisoryParallelism / numMappers): math.max(1, 3/2) = 1
-      // and the partitions length is 1 * numMappers = 2
-      assert(localShuffleRDD1.getPartitions.length == 2)
+
+      val localRDD0 = localReaders(0).executeColumnar()
+      val localRDD1 = localReaders(1).executeColumnar()
+      localRDD0 match {
+        case mapPartitionsRDD: MapPartitionsRDD[ColumnarBatch, ColumnarBatch] =>
+          // The pre-shuffle partition size is [0, 0, 0, 72, 0]
+          // We exclude the 0-size partitions, so only one partition, advisoryParallelism = 1
+          // the final parallelism is
+          // math.max(1, advisoryParallelism / numMappers): math.max(1, 1/2) = 1
+          // and the partitions length is 1 * numMappers = 2
+          assert(localRDD0.asInstanceOf[MapPartitionsRDD[ColumnarBatch, ColumnarBatch]].getPartitions.length == 2)
+          // The pre-shuffle partition size is [0, 72, 0, 72, 126]
+          // We exclude the 0-size partitions, so only 3 partition, advisoryParallelism = 3
+          // the final parallelism is
+          // math.max(1, advisoryParallelism / numMappers): math.max(1, 3/2) = 1
+          // and the partitions length is 1 * numMappers = 2
+          assert(localRDD1.asInstanceOf[MapPartitionsRDD[ColumnarBatch, ColumnarBatch]].getPartitions.length == 2)
+        case _ =>
+          assert(localRDD0.asInstanceOf[ShuffledColumnarRDD].getPartitions.length == 2)
+          assert(localRDD1.asInstanceOf[ShuffledColumnarRDD].getPartitions.length == 2)
+      }
     }
   }
 
@@ -233,14 +245,21 @@ class ColumnarAdaptiveQueryExecSuite extends ColumnarSparkPlanTest
         case reader: ColumnarCustomShuffleReaderExec if reader.isLocalReader => reader
       }
       assert(localReaders.length == 2)
-      val localShuffleRDD0 = localReaders(0).executeColumnar().asInstanceOf[ShuffledColumnarRDD]
-      val localShuffleRDD1 = localReaders(1).executeColumnar().asInstanceOf[ShuffledColumnarRDD]
-      // the final parallelism is math.max(1, numReduces / numMappers): math.max(1, 5/2) = 2
-      // and the partitions length is 2 * numMappers = 4
-      assert(localShuffleRDD0.getPartitions.length == 4)
-      // the final parallelism is math.max(1, numReduces / numMappers): math.max(1, 5/2) = 2
-      // and the partitions length is 2 * numMappers = 4
-      assert(localShuffleRDD1.getPartitions.length == 4)
+
+      val localRDD0 = localReaders(0).executeColumnar()
+      val localRDD1 = localReaders(1).executeColumnar()
+      localRDD0 match {
+        case mapPartitionsRDD: MapPartitionsRDD[ColumnarBatch, ColumnarBatch] =>
+          // the final parallelism is math.max(1, numReduces / numMappers): math.max(1, 5/2) = 2
+          // and the partitions length is 2 * numMappers = 4
+          assert(localRDD0.asInstanceOf[MapPartitionsRDD[ColumnarBatch, ColumnarBatch]].getPartitions.length == 4)
+          // the final parallelism is math.max(1, numReduces / numMappers): math.max(1, 5/2) = 2
+          // and the partitions length is 2 * numMappers = 4
+          assert(localRDD1.asInstanceOf[MapPartitionsRDD[ColumnarBatch, ColumnarBatch]].getPartitions.length == 4)
+        case _ =>
+          assert(localRDD0.asInstanceOf[ShuffledColumnarRDD].getPartitions.length == 4)
+          assert(localRDD1.asInstanceOf[ShuffledColumnarRDD].getPartitions.length == 4)
+      }
     }
   }
 
