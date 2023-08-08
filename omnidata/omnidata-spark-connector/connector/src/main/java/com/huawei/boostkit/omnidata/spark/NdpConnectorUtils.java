@@ -67,6 +67,14 @@ public class NdpConnectorUtils {
         return Integer.parseInt(val);
     }
 
+    private static String getIntStrSysEnv(String envName, String defaultVal) {
+        String val = System.getenv(envName);
+        if (!isNumeric(val) && Integer.parseInt(val) < 0) {
+            return defaultVal;
+        }
+        return val;
+    }
+
     public static boolean getNdpEnable() {
         String isEnable = System.getenv("NDP_PLUGIN_ENABLE");
         return isEnable != null && isEnable.equals("true");
@@ -77,10 +85,8 @@ public class NdpConnectorUtils {
     }
 
     public static String getNdpNumPartitionsStr(String numStr) {
-        return System.getenv("DEFAULT_NDP_NUM_PARTITIONS") != null ?
-                System.getenv("DEFAULT_NDP_NUM_PARTITIONS") : numStr;
+        return getIntStrSysEnv("DEFAULT_NDP_NUM_PARTITIONS", numStr);
     }
-
 
     public static int getCountTaskTotal(int taskTotal) {
         return getIntSysEnv("COUNT_TASK_TOTAL", taskTotal);

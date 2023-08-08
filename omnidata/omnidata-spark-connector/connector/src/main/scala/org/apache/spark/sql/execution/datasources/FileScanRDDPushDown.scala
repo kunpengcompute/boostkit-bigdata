@@ -113,7 +113,7 @@ class FileScanRDDPushDown(
   private val ignoreCorruptFiles = sparkSession.sessionState.conf.ignoreCorruptFiles
   private val ignoreMissingFiles = sparkSession.sessionState.conf.ignoreMissingFiles
 
-  var pushDownIterator : PushDownIterator = null
+  var pushDownIterator : PushDownIterator = _
   var forceOmniDataPushDown : Boolean = false
   var isFirstOptimizerPushDown : Boolean = true
 
@@ -158,13 +158,12 @@ class FileScanRDDPushDown(
                                 sparkLog : org.slf4j.Logger) extends Thread {
     scan.forceOmniDataPushDown = true
     override def run(): Unit = {
-      var i:Int = 0
+      var i: Int = 0
       while  (!context.isCompleted() && sparkThread.isAlive && i < splits.length) {
         val iter: Iterator[Any] = scan.computePushDownRDD(splits(i), context)
         i = i + 1
         while (!context.isCompleted() && sparkThread.isAlive && iter.hasNext) {
           sparkLog.debug(">>>>>>optimizer push down Thread [running]>>>>>")
-          Thread.sleep(200)
           val currentValue =  iter.next()
           currentValue match {
             case batch: ColumnarBatch => batch.close()
@@ -189,12 +188,8 @@ class FileScanRDDPushDown(
     val partID = context.partitionId()
     val taskSizeD = taskTotal.toDouble
     val taskSpace = Math.max(Math.ceil(taskSizeD/pushDownTotal).toInt, 1)
-    log.debug("uniqueID: {}", uniqueID)
-    log.debug("partID: {}", partID)
-    log.info("pushDownTotal: {}", pushDownTotal)
-    log.info("taskTotal: {}", taskTotal)
-    log.debug("taskSpace: {}", taskSpace)
-
+    log.debug("OptimizerPush info uniqueID: " + uniqueID + ",partID: " + partID + ",push" +
+      "DownTotal: " + pushDownTotal + ",taskTotal: " + taskTotal + ",taskSpace: " + taskSpace)
     var pushDownRDDPartition = split
     split match {
       case filePartition: FilePartition =>
@@ -205,12 +200,12 @@ class FileScanRDDPushDown(
     }
 
     loopTimes = loopTimes + 1
-    if(loopTimes < perThreadTask) {
+    if (loopTimes < perThreadTask) {
       log.debug("pushSplits need add")
       return
     }
 
-    if(loopTimes > perThreadTask) {
+    if (loopTimes > perThreadTask) {
       log.debug("pushSplits full")
       return
     }
