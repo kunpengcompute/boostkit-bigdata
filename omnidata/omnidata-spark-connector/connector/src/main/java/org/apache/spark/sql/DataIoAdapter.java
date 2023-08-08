@@ -286,6 +286,13 @@ public class DataIoAdapter {
         return l.iterator();
     }
 
+    public void close() {
+        if (orcDataReader != null) {
+            orcDataReader.close();
+            hasNextPage = false;
+        }
+    }
+
     private Optional<String> getRandomAvailablePushDownHost(String[] pushDownHostArray,
                                                             Map<String, String> fpuHosts) {
         List<String> existingHosts = Arrays.asList(pushDownHostArray);
@@ -967,7 +974,8 @@ public class DataIoAdapter {
             Seq<Attribute> sparkOutPut,
             Seq<Attribute> partitionColumn,
             Seq<Attribute> filterOutPut,
-            PushDownInfo pushDownOperators) {
+            PushDownInfo pushDownOperators,
+            TaskContext context) {
         // initCandidates
         initCandidatesBeforeDomain(filterOutPut);
 
@@ -985,7 +993,7 @@ public class DataIoAdapter {
 
         long startTime = System.currentTimeMillis();
         ImmutableMap.Builder<String, Domain> domains = ImmutableMap.builder();
-        if (filterRowExpression.isPresent() && NdpConf.getNdpDomainGenerateEnable(TaskContext.get())) {
+        if (filterRowExpression.isPresent()  && NdpConf.getNdpDomainGenerateEnable(context)) {
             ConnectorSession session = MetaStore.getConnectorSession();
             RowExpressionDomainTranslator domainTranslator = new RowExpressionDomainTranslator(MetaStore.getMetadata());
             DomainTranslator.ColumnExtractor<InputReferenceExpression> columnExtractor = (expression, domain) -> {

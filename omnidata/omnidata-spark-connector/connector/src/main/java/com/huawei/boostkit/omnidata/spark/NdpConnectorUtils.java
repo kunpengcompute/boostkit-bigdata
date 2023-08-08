@@ -59,17 +59,51 @@ public class NdpConnectorUtils {
         return str != null && str.chars().allMatch(Character::isDigit);
     }
 
+    private static int getIntSysEnv(String envName, int defaultVal) {
+        String val = System.getenv(envName);
+        if (isNumeric(val) && Integer.parseInt(val) > 0) {
+            return Integer.parseInt(val);
+        }
+        return defaultVal;
+    }
+
+    private static String getIntStrSysEnv(String envName, String defaultVal) {
+        String val = System.getenv(envName);
+        if (isNumeric(val) && Integer.parseInt(val) > 0) {
+            return val;
+        }
+        return defaultVal;
+    }
+
     public static boolean getNdpEnable() {
         String isEnable = System.getenv("NDP_PLUGIN_ENABLE");
         return isEnable != null && isEnable.equals("true");
     }
 
-    private static int getIntSysEnv(String envName, int defaultVal) {
-        String val = System.getenv(envName);
-        if (!isNumeric(val) && Integer.parseInt(val) < 0) {
-            return defaultVal;
-        }
-        return Integer.parseInt(val);
+    public static int getPushDownTaskTotal(int taskTotal) {
+        return getIntSysEnv("DEFAULT_PUSHDOWN_TASK", taskTotal);
+    }
+
+    public static String getNdpNumPartitionsStr(String numStr) {
+        return getIntStrSysEnv("DEFAULT_NDP_NUM_PARTITIONS", numStr);
+    }
+
+    public static int getCountTaskTotal(int taskTotal) {
+        return getIntSysEnv("COUNT_TASK_TOTAL", taskTotal);
+    }
+
+    public static String getCountMaxPartSize(String size) {
+        return System.getenv("COUNT_MAX_PART_SIZE") != null ?
+                System.getenv("COUNT_MAX_PART_SIZE") : size;
+    }
+
+    public static int getCountDistinctTaskTotal(int taskTotal) {
+        return getIntSysEnv("COUNT_DISTINCT_TASK_TOTAL", taskTotal);
+    }
+
+    public static String getSMJMaxPartSize(String size) {
+        return System.getenv("SMJ_MAX_PART_SIZE") != null ?
+                System.getenv("SMJ_MAX_PART_SIZE") : size;
     }
 
     public static int getSMJNumPartitions(int numPartitions) {
@@ -92,4 +126,63 @@ public class NdpConnectorUtils {
         return getIntSysEnv("FILTER_TASK_TOTAL", taskTotal);
     }
 
+    public static String getSortRepartitionSizeStr(String sizeStr) {
+        return System.getenv("SORT_REPARTITION_SIZE") != null ?
+                System.getenv("SORT_REPARTITION_SIZE") : sizeStr;
+    }
+
+    public static String getCastDecimalPrecisionStr(String numStr) {
+        return System.getenv("CAST_DECIMAL_PRECISION") != null ?
+                System.getenv("CAST_DECIMAL_PRECISION") : numStr;
+    }
+
+    public static String getNdpMaxPtFactorStr(String numStr) {
+        return System.getenv("NDP_MAX_PART_FACTOR") != null ?
+                System.getenv("NDP_MAX_PART_FACTOR") : numStr;
+    }
+
+    public static String getCountAggMaxFilePtBytesStr(String BytesStr) {
+        return System.getenv("COUNT_AGG_MAX_FILE_BYTES") != null ?
+                System.getenv("COUNT_AGG_MAX_FILE_BYTES") : BytesStr;
+    }
+
+    public static String getAvgAggMaxFilePtBytesStr(String BytesStr) {
+        return System.getenv("AVG_AGG_MAX_FILE_BYTES") != null ?
+                System.getenv("AVG_AGG_MAX_FILE_BYTES") : BytesStr;
+    }
+
+    public static String getBhjMaxFilePtBytesStr(String BytesStr) {
+        return System.getenv("BHJ_MAX_FILE_BYTES") != null ?
+                System.getenv("BHJ_MAX_FILE_BYTES") : BytesStr;
+    }
+
+    public static String getGroupMaxFilePtBytesStr(String BytesStr) {
+        return System.getenv("GROUP_MAX_FILE_BYTES") != null ?
+                System.getenv("GROUP_MAX_FILE_BYTES") : BytesStr;
+    }
+
+    public static String getMixSqlBaseMaxFilePtBytesStr(String BytesStr) {
+        return System.getenv("MIX_SQL_BASE_MAX_FILE_BYTES") != null ?
+                System.getenv("MIX_SQL_BASE_MAX_FILE_BYTES") : BytesStr;
+    }
+
+    public static String getMixSqlAccurateMaxFilePtBytesStr(String BytesStr) {
+        return System.getenv("MIX_SQL_ACCURATE_MAX_FILE_BYTES") != null ?
+                System.getenv("MIX_SQL_ACCURATE_MAX_FILE_BYTES") : BytesStr;
+    }
+
+    public static String getAggShufflePartitionsStr(String BytesStr) {
+        return System.getenv("AGG_SHUFFLE_PARTITIONS") != null ?
+                System.getenv("AGG_SHUFFLE_PARTITIONS") : BytesStr;
+    }
+
+    public static String getShufflePartitionsStr(String BytesStr) {
+        return System.getenv("SHUFFLE_PARTITIONS") != null ?
+                System.getenv("SHUFFLE_PARTITIONS") : BytesStr;
+    }
+
+    public static String getSortShufflePartitionsStr(String BytesStr) {
+        return System.getenv("SORT_SHUFFLE_PARTITIONS") != null ?
+                System.getenv("SORT_SHUFFLE_PARTITIONS") : BytesStr;
+    }
 }

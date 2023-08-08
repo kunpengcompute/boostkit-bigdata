@@ -10,6 +10,7 @@ import org.apache.spark.sql.catalyst.expressions.aggregate._
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.catalyst.util.{ArrayData, GenericArrayData}
 import org.apache.spark.sql.execution.QueryExecution
+import org.apache.spark.sql.functions.countDistinct
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types._
 
@@ -123,7 +124,7 @@ object NdpCommandUtils extends Logging {
 
     // the approximate ndv (num distinct value) should never be larger than the number of rows
     val numNonNulls = if (col.nullable) Count(col) else Count(one)
-    val ndv = Least(Seq(HyperLogLogPlusPlus(col, conf.ndvMaxError), numNonNulls))
+    val ndv = countDistinct(col.name).expr
     val numNulls = Subtract(Count(one), numNonNulls)
     val defaultSize = Literal(col.dataType.defaultSize.toLong, LongType)
     val nullArray = Literal(null, ArrayType(LongType))

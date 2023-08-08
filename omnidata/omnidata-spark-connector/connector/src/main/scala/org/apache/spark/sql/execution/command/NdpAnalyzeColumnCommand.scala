@@ -24,6 +24,7 @@ import org.apache.spark.sql.catalyst.catalog.{CatalogColumnStat, CatalogStatisti
 import org.apache.spark.sql.catalyst.expressions.Attribute
 import org.apache.spark.sql.catalyst.plans.logical.{ColumnStat, LogicalPlan}
 import org.apache.spark.sql.catalyst.util.{DateFormatter, TimestampFormatter}
+import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types._
 
 import java.time.ZoneOffset
@@ -118,10 +119,11 @@ case class NdpAnalyzeColumnCommand(
       val relation = sparkSession.table(tableIdent).logicalPlan
       val columnsToAnalyze = getColumnsToAnalyze(tableIdent, relation, columnNames, allColumns)
 
+      SQLConf.get.setConfString("spark.omni.sql.ndpPlugin.castDecimal.enabled", "false")
       // Compute stats for the computed list of columns.
       val (rowCount, newColStats) =
         NdpCommandUtils.computeColumnStats(sparkSession, relation, columnsToAnalyze)
-
+      SQLConf.get.setConfString("spark.omni.sql.ndpPlugin.castDecimal.enabled", "true")
       val newColCatalogStats = newColStats.map {
         case (attr, columnStat) =>
           attr.name -> toCatalogColumnStat(columnStat, attr.name, attr.dataType)
