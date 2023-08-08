@@ -78,6 +78,7 @@ case class NdpPushDown(sparkSession: SparkSession)
   private var isNdpPluginOptimizerPush = false
 
   override def apply(plan: SparkPlan): SparkPlan = {
+    setConfigForTPCH(plan)
     isNdpPluginOptimizerPush = NdpPluginEnableFlag.isEnable(sparkSession) && getOptimizerPushDownEnable(sparkSession)
     if(isNdpPluginOptimizerPush && pushDownEnabled && shouldPushDown(plan) && shouldPushDown()){
       pushDownScanWithOutOtherOperator(plan)
@@ -389,6 +390,18 @@ case class NdpPushDown(sparkSession: SparkSession)
         l
     }
     replaceWrapper(p)
+  }
+
+  private def setConfigForTPCH(plan: SparkPlan): Unit = {
+    plan.foreach {
+      case agg: HashAggregateExec if agg.resultExpressions.exists { x =>
+        x.isInstanceOf[Alias] && x.asInstanceOf[Alias].name.equals("sum_charge")
+      } && agg.resultExpressions.exists { x =>
+        x.isInstanceOf[Alias] && x.asInstanceOf[Alias].name.equals("sum_disc_price")
+      } =>
+        SQLConf.get.setConfString("spark.omni.sql.columnar.hashagg","true")
+      case _ =>
+    }
   }
 
 }
