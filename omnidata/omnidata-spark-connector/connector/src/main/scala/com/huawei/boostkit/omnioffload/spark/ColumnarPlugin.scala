@@ -33,6 +33,7 @@ import org.apache.spark.sql.execution.command.{CreateDataSourceTableAsSelectComm
 import org.apache.spark.sql.execution.datasources.LogicalRelation
 import org.apache.spark.sql.execution.exchange.ShuffleExchangeExec
 import org.apache.spark.sql.execution.joins._
+import org.apache.spark.sql.execution.ndp.NdpConf
 import org.apache.spark.sql.execution.ndp.NdpConf.getOptimizerPushDownThreshold
 import org.apache.spark.sql.hive.execution.CreateHiveTableAsSelectCommand
 import org.apache.spark.sql.internal.SQLConf
@@ -61,7 +62,12 @@ case class NdpOverrides(sparkSession: SparkSession) extends Rule[SparkPlan] {
       val result = rule.apply(sp)
       result
     }
-    val optimizedPlan = replaceWithOptimizedPlan(afterPlan)
+    val operatorEnable = NdpConf.getNdpOperatorCombineEnabled(sparkSession)
+    val optimizedPlan = if (operatorEnable) {
+      replaceWithOptimizedPlan(afterPlan)
+    } else {
+      replaceWithOptimizedPlanNoOperator(afterPlan)
+    }
     val finalPlan = replaceWithScanPlan(optimizedPlan)
     postRuleApply(finalPlan)
     finalPlan
