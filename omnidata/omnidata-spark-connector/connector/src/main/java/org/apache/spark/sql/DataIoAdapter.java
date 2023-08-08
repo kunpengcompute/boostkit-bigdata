@@ -213,7 +213,7 @@ public class DataIoAdapter {
         this.isOperatorCombineEnabled =
                 pageCandidate.isOperatorCombineEnabled() && NdpUtils.checkOmniOpColumns(omnidataColumns)
                 && isColumnVector;
-        PageDeserializer deserializer = initPageDeserializer();
+        PageDeserializer deserializer = initPageDeserializer(pageCandidate.getFileFormat());
 
         // get available host
                 List<String> pushDownHostList = new ArrayList<>();
@@ -871,15 +871,15 @@ public class DataIoAdapter {
         return argumentValues;
     }
 
-    private PageDeserializer initPageDeserializer() {
+    private PageDeserializer initPageDeserializer(String fileFormat) {
         DecodeType[] columnTypes = columnTypesList.toArray(new DecodeType[0]);
         int[] columnOrders = columnOrdersList.stream().mapToInt(Integer::intValue).toArray();
         DecodeType[] filterTypes = filterTypesList.toArray(new DecodeType[0]);
         int[] filterOrders = filterOrdersList.stream().mapToInt(Integer::intValue).toArray();
         if (columnTypes.length == 0) {
-            return new PageDeserializer(filterTypes, filterOrders, isOperatorCombineEnabled);
+            return new PageDeserializer(filterTypes, filterOrders, isOperatorCombineEnabled, fileFormat);
         } else {
-            return new PageDeserializer(columnTypes, columnOrders, isOperatorCombineEnabled);
+            return new PageDeserializer(columnTypes, columnOrders, isOperatorCombineEnabled, fileFormat);
         }
     }
 

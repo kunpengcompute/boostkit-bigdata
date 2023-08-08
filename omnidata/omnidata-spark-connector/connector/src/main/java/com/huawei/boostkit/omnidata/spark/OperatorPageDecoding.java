@@ -41,6 +41,10 @@ public class OperatorPageDecoding extends PageDecoding {
         SparkMemoryUtils.init();
     }
 
+    public OperatorPageDecoding(String fileFormat) {
+        super(fileFormat);
+    }
+
     @Override
     public Optional<WritableColumnVector> decodeVariableWidth(Optional<DecodeType> type, SliceInput sliceInput) {
         int positionCount = sliceInput.readInt();

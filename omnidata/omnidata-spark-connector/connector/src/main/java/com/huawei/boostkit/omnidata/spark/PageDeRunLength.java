@@ -247,10 +247,10 @@ public class PageDeRunLength {
         int scale = ((DecimalType) writableColumnVector.dataType()).scale();
         Decimal value = writableColumnVector.getDecimal(0, precision, scale);
         WritableColumnVector columnVector = getColumnVector(positionCount, writableColumnVector);
-        for (int rowId = 0; rowId < positionCount; rowId++) {
-            if (writableColumnVector.isNullAt(rowId) || value == null) {
-                columnVector.putNull(rowId);
-            } else {
+        if (writableColumnVector.isNullAt(0)) {
+            columnVector.putNulls(0, positionCount);
+        } else {
+            for (int rowId = 0; rowId < positionCount; rowId++) {
                 columnVector.putDecimal(rowId, value, precision);
             }
         }

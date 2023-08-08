@@ -74,6 +74,12 @@ public class PageDecoding extends AbstractDecoding<Optional<WritableColumnVector
         }
     }
 
+    private String fileFormat;
+
+    public PageDecoding(String fileFormat) {
+        this.fileFormat = fileFormat;
+    }
+
     @Override
     public Optional<WritableColumnVector> decodeArray(Optional<DecodeType> type, SliceInput sliceInput) {
         throw new UnsupportedOperationException("not support array decode");
@@ -369,8 +375,10 @@ public class PageDecoding extends AbstractDecoding<Optional<WritableColumnVector
                 break;
             case "date":
                 int src = sliceInput.readInt();
-                int trans = RebaseDateTime.rebaseJulianToGregorianDays(src);
-                columnVector.putInt(position, trans);
+                if ("ORC".equalsIgnoreCase(fileFormat)) {
+                    src = RebaseDateTime.rebaseJulianToGregorianDays(src);
+                }
+                columnVector.putInt(position, src);
                 break;
             case "short":
                 columnVector.putShort(position, sliceInput.readShort());
