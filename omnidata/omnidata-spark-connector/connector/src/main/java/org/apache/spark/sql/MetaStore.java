@@ -18,8 +18,8 @@
 
 package org.apache.spark.sql;
 
-import avro.shaded.com.google.common.collect.ImmutableSet;
 import com.esotericsoftware.kryo.Kryo;
+import com.google.common.collect.ImmutableSet;
 import io.prestosql.metadata.*;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.security.ConnectorIdentity;
@@ -33,7 +33,9 @@ import java.util.Optional;
 import java.util.TimeZone;
 
 /**
- * MetaStore
+ * Used to initialize some common classes
+ *
+ * @since 2023.04
  */
 public class MetaStore {
     private static final Metadata metadata = initCompiler();
@@ -45,7 +47,21 @@ public class MetaStore {
     private static Metadata initCompiler() {
         FeaturesConfig featuresConfig = new FeaturesConfig();
         TransactionManager transactionManager = new NoOpTransactionManager();
-        return new MetadataManager(new FunctionAndTypeManager(transactionManager, featuresConfig, new HandleResolver(), ImmutableSet.of(), new Kryo()), featuresConfig, new SessionPropertyManager(), new SchemaPropertyManager(), new TablePropertyManager(), new ColumnPropertyManager(), new AnalyzePropertyManager(), transactionManager, null);
+        return new MetadataManager(
+                new FunctionAndTypeManager(
+                        transactionManager,
+                        featuresConfig,
+                        new HandleResolver(),
+                        ImmutableSet.of(),
+                        new Kryo()),
+                featuresConfig,
+                new SessionPropertyManager(),
+                new SchemaPropertyManager(),
+                new TablePropertyManager(),
+                new ColumnPropertyManager(),
+                new AnalyzePropertyManager(),
+                transactionManager,
+                null);
     }
 
     /**
@@ -95,7 +111,7 @@ public class MetaStore {
             }
 
             @Override
-            public <T> T getProperty(String name, Class<T> type) {
+            public <T extends Object> T getProperty(String name, Class<T> cls) {
                 return null;
             }
         };

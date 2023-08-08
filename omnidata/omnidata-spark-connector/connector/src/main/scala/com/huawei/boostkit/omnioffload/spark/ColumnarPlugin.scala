@@ -19,18 +19,27 @@
 package com.huawei.boostkit.omnioffload.spark
 
 import com.huawei.boostkit.omnidata.spark.NdpConnectorUtils
-
+import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.catalyst.expressions.{Alias, Attribute, Contains, EndsWith, Expression, Literal, NamedExpression, StartsWith}
-import org.apache.spark.sql.catalyst.plans.{LeftAnti, LeftOuter}
+import org.apache.spark.sql.{SparkSession, SparkSessionExtensions}
+import org.apache.spark.sql.catalyst.catalog.{CatalogTable, HiveTableRelation}
+import org.apache.spark.sql.catalyst.expressions.aggregate._
+import org.apache.spark.sql.catalyst.expressions._
+import org.apache.spark.sql.catalyst.plans.logical._
+import org.apache.spark.sql.catalyst.plans.{Inner, LeftAnti, LeftOuter}
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.aggregate.{HashAggregateExec, SortAggregateExec}
-import org.apache.spark.sql.execution.command.DataWritingCommandExec
+import org.apache.spark.sql.execution.command.{CreateDataSourceTableAsSelectCommand, DataWritingCommandExec}
+import org.apache.spark.sql.execution.datasources.LogicalRelation
 import org.apache.spark.sql.execution.exchange.ShuffleExchangeExec
 import org.apache.spark.sql.execution.joins._
+import org.apache.spark.sql.execution.ndp.NdpConf
+import org.apache.spark.sql.hive.execution.CreateHiveTableAsSelectCommand
+import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.sql.types.{DataTypes, DoubleType, LongType}
 
+import java.net.URI
 import scala.collection.JavaConverters
 
 case class NdpOverrides(sparkSession: SparkSession) extends Rule[SparkPlan] {
@@ -40,15 +49,32 @@ case class NdpOverrides(sparkSession: SparkSession) extends Rule[SparkPlan] {
   var isSMJ = false
   var isSort = false
   var hasCoalesce = false
-  var accurateQueryHd = "153"
-  var accurateQuery = "000"
+  var hasShuffle = false
+  var ACCURATE_QUERY_HD = "153"
+  var ACCURATE_QUERY = "000"
+  var RADIX_SORT_COLUMN_NUMS = 2
 
   def apply(plan: SparkPlan): SparkPlan = {
-     replaceWithOptimizedPlan(plan)
+    val operatorEnable = NdpConf.getNdpOperatorCombineEnabled(sparkSession)
+    val optimizedPlan = if (operatorEnable) {
+      replaceWithOptimizedPlan(plan)
+    } else {
+      replaceWithOptimizedPlanNoOperator(plan)
+    }
+    optimizedPlan
   }
 
   def replaceWithOptimizedPlan(plan: SparkPlan): SparkPlan = {
     val p = plan.transformUp {
+      case shuffle: ShuffleExchangeExec =>
+        hasShuffle = true
+        shuffle
+      case p@ColumnarSortExec(sortOrder, global, child, testSpillFrequency) if isRadixSortExecEnable(sortOrder) =>
+        isSort = true
+        RadixSortExec(sortOrder, global, child, testSpillFrequency)
+      case p@SortExec(sortOrder, global, child, testSpillFrequency) if isRadixSortExecEnable(sortOrder) =>
+        isSort = true
+        RadixSortExec(sortOrder, global, child, testSpillFrequency)
       case p@DataWritingCommandExec(cmd, child) =>
         if (isSort || isVagueAndAccurateHd(child)) {
           p
@@ -175,6 +201,46 @@ case class NdpOverrides(sparkSession: SparkSession) extends Rule[SparkPlan] {
     p
   }
 
+  def replaceWithOptimizedPlanNoOperator(plan: SparkPlan): SparkPlan = {
+    val p = plan.transformUp {
+      case shuffle: ShuffleExchangeExec =>
+        hasShuffle = true
+        shuffle
+      case p@SortExec(sortOrder, global, child, testSpillFrequency) if isRadixSortExecEnable(sortOrder) =>
+        isSort = true
+        RadixSortExec(sortOrder, global, child, testSpillFrequency)
+      case p@DataWritingCommandExec(cmd, child) =>
+        if (isSort || isVagueAndAccurateHd(child)) {
+          p
+        } else {
+          hasCoalesce = true
+          DataWritingCommandExec(cmd, CoalesceExec(numPartitions, child))
+        }
+      case p@SortMergeJoinExec(_, _, joinType, _, _, _, _)
+        if joinType.equals(LeftOuter) =>
+        isSMJ = true
+        numPartitions = NdpConnectorUtils.getSMJNumPartitions(5000)
+        SortMergeJoinExec(leftKeys = p.leftKeys, rightKeys = p.rightKeys, joinType = LeftAnti, condition = p.condition,
+          left = p.left, right = p.right, isSkewJoin = p.isSkewJoin)
+      case p@BroadcastHashJoinExec(_, _, joinType, _, _, _, _, _) if joinType.equals(LeftOuter) =>
+        BroadcastHashJoinExec(leftKeys = p.leftKeys, rightKeys = p.rightKeys, joinType = LeftAnti,
+          buildSide = p.buildSide, condition = p.condition, left = p.left, right = p.right,
+          isNullAwareAntiJoin = p.isNullAwareAntiJoin)
+      case p@ShuffledHashJoinExec(_, _, joinType, _, _, _, _) if joinType.equals(LeftOuter) =>
+        ShuffledHashJoinExec(p.leftKeys, p.rightKeys, LeftAnti, p.buildSide, p.condition, p.left, p.right)
+      case p@FilterExec(condition, _, _) if isAccurate(condition) =>
+        numPartitions = NdpConnectorUtils.getFilterPartitions(1000)
+        pushDownTaskCount = NdpConnectorUtils.getFilterTaskCount(400)
+        p
+      case p@ProjectExec(projectList, filter: FilterExec)
+        if filter.condition.toString().startsWith("isnull") && (filter.child.isInstanceOf[SortMergeJoinExec]
+            || filter.child.isInstanceOf[BroadcastHashJoinExec] || filter.child.isInstanceOf[ShuffledHashJoinExec]) =>
+        ProjectExec(changeProjectList(projectList), filter.child)
+      case p => p
+    }
+    p
+  }
+
   def isAggPartial(aggAttributes: Seq[Attribute]): Boolean = {
     aggAttributes.exists(x => x.name.equals("max") || x.name.equals("maxxx"))
   }
@@ -195,7 +261,7 @@ case class NdpOverrides(sparkSession: SparkSession) extends Rule[SparkPlan] {
                   result = true
                 }
                 x match {
-                  case literal: Literal if literal.value.toString.startsWith(accurateQueryHd) =>
+                  case literal: Literal if literal.value.toString.startsWith(ACCURATE_QUERY_HD) =>
                     result = true
                   case _ =>
                 }
@@ -211,7 +277,7 @@ case class NdpOverrides(sparkSession: SparkSession) extends Rule[SparkPlan] {
   def isAccurate(condition: Expression): Boolean = {
     var result = false
     condition.foreach {
-      case literal: Literal if literal.value.toString.startsWith(accurateQuery) =>
+      case literal: Literal if literal.value.toString.startsWith(ACCURATE_QUERY) =>
         result = true
       case _ =>
     }
@@ -231,6 +297,13 @@ case class NdpOverrides(sparkSession: SparkSession) extends Rule[SparkPlan] {
     }
     p
   }
+
+  def isRadixSortExecEnable(sortOrder: Seq[SortOrder]): Boolean = {
+    sortOrder.length == RADIX_SORT_COLUMN_NUMS &&
+        sortOrder.head.dataType == LongType &&
+        sortOrder(1).dataType == LongType &&
+        SQLConf.get.getConfString("spark.omni.sql.ndpPlugin.radixSort.enabled", "true").toBoolean
+  }
 }
 
 case class NdpRules(session: SparkSession) extends ColumnarRule with Logging {
@@ -248,6 +321,288 @@ case class NdpRules(session: SparkSession) extends ColumnarRule with Logging {
     } else {
       plan
     }
+  }
+}
+
+case class NdpOptimizerRules(session: SparkSession) extends Rule[LogicalPlan] {
+
+  var ACCURATE_QUERY = "000"
+
+  val SORT_REPARTITION_PLANS: Seq[String] = Seq(
+    "Sort,HiveTableRelation",
+    "Sort,LogicalRelation",
+    "Sort,RepartitionByExpression,HiveTableRelation",
+    "Sort,RepartitionByExpression,LogicalRelation",
+    "Sort,Project,HiveTableRelation",
+    "Sort,Project,LogicalRelation",
+    "Sort,RepartitionByExpression,Project,HiveTableRelation",
+    "Sort,RepartitionByExpression,Project,LogicalRelation"
+  )
+
+  val SORT_REPARTITION_SIZE: Int = SQLConf.get.getConfString(
+    "spark.omni.sql.ndpPlugin.sort.repartition.size",
+    "104857600").toInt
+  val DECIMAL_PRECISION: Int = SQLConf.get.getConfString(
+    "spark.omni.sql.ndpPlugin.cast.decimal.precision",
+    "15").toInt
+  val MAX_PARTITION_BYTES_ENABLE_FACTOR: Int = SQLConf.get.getConfString(
+    "spark.omni.sql.ndpPlugin.max.partitionBytesEnable.factor",
+    "2").toInt
+
+
+  override def apply(plan: LogicalPlan): LogicalPlan = {
+    if (NdpPluginEnableFlag.isEnable(session)) {
+      val res = replaceWithOptimizedPlan(plan)
+      repartition(FileSystem.get(session.sparkContext.hadoopConfiguration), plan)
+      res
+    } else {
+      plan
+    }
+  }
+
+  def replaceWithOptimizedPlan(plan: LogicalPlan): LogicalPlan = {
+    plan.transformUp {
+      case CreateHiveTableAsSelectCommand(tableDesc, query, outputColumnNames, mode)
+        if isParquetEnable(tableDesc)
+          && SQLConf.get.getConfString("spark.omni.sql.ndpPlugin.parquetOutput.enabled", "true")
+          .toBoolean =>
+        CreateDataSourceTableAsSelectCommand(
+          tableDesc.copy(provider = Option("parquet")), mode, query, outputColumnNames)
+      case a@Aggregate(groupingExpressions, aggregateExpressions, _)
+        if SQLConf.get.getConfString("spark.omni.sql.ndpPlugin.castDecimal.enabled", "true")
+          .toBoolean =>
+        var ifCast = false
+        if (groupingExpressions.nonEmpty && hasCount(aggregateExpressions)) {
+          SQLConf.get.setConfString(SQLConf.FILES_MAX_PARTITION_BYTES.key,
+            "1024MB")
+        } else if (groupingExpressions.nonEmpty && hasAvg(aggregateExpressions)) {
+          SQLConf.get.setConfString(SQLConf.FILES_MAX_PARTITION_BYTES.key,
+            "256MB")
+          ifCast = true
+        }
+        if (ifCast) {
+          a.copy(aggregateExpressions = aggregateExpressions
+            .map(castSumAvgToBigInt)
+            .map(_.asInstanceOf[NamedExpression]))
+        }
+        else {
+          a
+        }
+      case j@Join(_, _, Inner, condition, _) =>
+        // turnOffOperator()
+        // 6-x-bhj
+        SQLConf.get.setConfString(SQLConf.FILES_MAX_PARTITION_BYTES.key,
+          "512MB")
+        j
+      case s@Sort(order, _, _) =>
+        s.copy(order = order.map(e => e.copy(child = castStringExpressionToBigint(e.child))))
+      case p => p
+    }
+  }
+
+  def hasCount(aggregateExpressions: Seq[Expression]): Boolean = {
+    aggregateExpressions.exists {
+      case exp: Alias if (exp.child.isInstanceOf[AggregateExpression]
+        && exp.child.asInstanceOf[AggregateExpression].aggregateFunction.isInstanceOf[Count]) => true
+      case _ => false
+    }
+  }
+
+  def hasAvg(aggregateExpressions: Seq[Expression]): Boolean = {
+    aggregateExpressions.exists {
+      case exp: Alias if (exp.child.isInstanceOf[AggregateExpression]
+        && exp.child.asInstanceOf[AggregateExpression].aggregateFunction.isInstanceOf[Average]) => true
+      case _ => false
+    }
+  }
+
+  def isParquetEnable(tableDesc: CatalogTable): Boolean = {
+    if (tableDesc.provider.isEmpty || tableDesc.provider.get.equals("hive")) {
+      if (tableDesc.storage.outputFormat.isEmpty
+        || tableDesc.storage.serde.get.equals("org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe")) {
+        return true
+      }
+    }
+    false
+  }
+
+  def repartition(fs: FileSystem, plan: LogicalPlan): Unit = {
+    var tables = Seq[URI]()
+    var planContents = Seq[String]()
+    var maxPartitionBytesEnable = true
+    var existsProject = false
+    var existsTable = false
+    var existsAgg = false
+    var existAccurate = false
+    var existFilter = false
+    var existJoin = false
+    var existLike = false
+    var isMixSql = false
+
+
+    plan.foreach {
+      case p@HiveTableRelation(tableMeta, _, _, _, _) =>
+        if (tableMeta.storage.locationUri.isDefined) {
+          tables :+= tableMeta.storage.locationUri.get
+        }
+        existsTable = true
+        planContents :+= p.nodeName
+      case p@LogicalRelation(_, _, catalogTable, _) =>
+        if (catalogTable.isDefined && catalogTable.get.storage.locationUri.isDefined) {
+          tables :+= catalogTable.get.storage.locationUri.get
+        }
+        existsTable = true
+        planContents :+= p.nodeName
+      case p: Project =>
+        maxPartitionBytesEnable &= (p.output.length * MAX_PARTITION_BYTES_ENABLE_FACTOR < p.inputSet.size)
+        existsProject = true
+        planContents :+= p.nodeName
+      case p: Aggregate =>
+        maxPartitionBytesEnable = true
+        existsProject = true
+        existsAgg = true
+        planContents :+= p.nodeName
+      case p@Filter(condition, _) =>
+        existAccurate |= isAccurate(condition)
+        existFilter = true
+        existLike |= isLike(condition)
+        planContents :+= p.nodeName
+      case p: Join =>
+        existJoin = true
+        planContents :+= p.nodeName
+      case p =>
+        planContents :+= p.nodeName
+    }
+
+    if(!existsTable){
+      return
+    }
+
+    // mix sql
+    isMixSql = existJoin && existsAgg
+    if (isMixSql) {
+      if (existAccurate) {
+        SQLConf.get.setConfString(SQLConf.SHUFFLE_PARTITIONS.key,
+          "200")
+        SQLConf.get.setConfString(SQLConf.FILES_MAX_PARTITION_BYTES.key,
+          "1024MB")
+      } else {
+        if (existLike) {
+          SQLConf.get.setConfString(SQLConf.SHUFFLE_PARTITIONS.key,
+            "200")
+        } else {
+          SQLConf.get.setConfString(SQLConf.SHUFFLE_PARTITIONS.key,
+            "5000")
+        }
+        SQLConf.get.setConfString(SQLConf.FILES_MAX_PARTITION_BYTES.key,
+          "128MB")
+      }
+      // base sql agg shuffle partition 200 ,other 5000
+    } else {
+      repartitionShuffleForSort(fs, tables, planContents)
+      repartitionHdfsReadForDistinct(fs, tables, plan)
+      if (existJoin) {
+        SQLConf.get.setConfString(SQLConf.SHUFFLE_PARTITIONS.key,
+          "5000")
+      }
+    }
+  }
+
+  def repartitionShuffleForSort(fs: FileSystem, tables: Seq[URI], planContents: Seq[String]): Unit = {
+    if (!SQLConf.get.getConfString("spark.omni.sql.ndpPlugin.radixSort.enabled", "true").toBoolean) {
+      return
+    }
+
+    val planContent = planContents.mkString(",")
+    if (tables.length == 1
+      && SORT_REPARTITION_PLANS.exists(planContent.contains(_))) {
+      val partitions = Math.max(1, fs.getContentSummary(new Path(tables.head)).getLength / SORT_REPARTITION_SIZE)
+      SQLConf.get.setConfString(SQLConf.SHUFFLE_PARTITIONS.key,
+        "1000")
+      turnOffOperator()
+    }
+  }
+
+  def repartitionHdfsReadForDistinct(fs: FileSystem, tables: Seq[URI], plan: LogicalPlan): Unit = {
+    if (!SQLConf.get.getConfString("spark.omni.sql.ndpPlugin.distinct.enabled", "true").toBoolean) {
+      return
+    }
+    if (tables.length != 1) {
+      return
+    }
+
+    plan.foreach {
+      case Aggregate(groupingExpressions, aggregateExpressions, _) if groupingExpressions == aggregateExpressions =>
+        SQLConf.get.setConfString(SQLConf.FILES_MAX_PARTITION_BYTES.key,
+          "1024MB")
+        return
+      case _ =>
+    }
+  }
+
+  def castSumAvgToBigInt(expression: Expression): Expression = {
+    val exp = expression.transform {
+      case agg@Average(cast: Cast) if cast.dataType.isInstanceOf[DoubleType] =>
+        Average(Cast(cast.child, DataTypes.LongType))
+      case agg@Sum(cast: Cast) if cast.dataType.isInstanceOf[DoubleType] =>
+        Sum(Cast(cast.child, DataTypes.LongType))
+      case e =>
+        e
+    }
+    var finalExp = exp
+    exp match {
+      case agg: Alias if agg.child.isInstanceOf[AggregateExpression]
+        && agg.child.asInstanceOf[AggregateExpression].aggregateFunction.isInstanceOf[Sum] =>
+        finalExp = Alias(Cast(agg.child, DataTypes.DoubleType), agg.name)(
+          exprId = agg.exprId,
+          qualifier = agg.qualifier,
+          explicitMetadata = agg.explicitMetadata,
+          nonInheritableMetadataKeys = agg.nonInheritableMetadataKeys
+        )
+      case _ =>
+    }
+    finalExp
+  }
+
+  def castStringExpressionToBigint(expression: Expression): Expression = {
+    expression match {
+      case a@AttributeReference(_, DataTypes.StringType, _, _) =>
+        Cast(a, DataTypes.LongType)
+      case e => e
+    }
+  }
+
+
+  def turnOffOperator(): Unit = {
+    session.sqlContext.setConf("org.apache.spark.sql.columnar.enabled", "false")
+    session.sqlContext.setConf("spark.sql.join.columnar.preferShuffledHashJoin", "false")
+  }
+
+  def isAccurate(condition: Expression): Boolean = {
+    var result = false
+    condition.foreach {
+      case literal: Literal if literal.value.toString.startsWith(ACCURATE_QUERY) =>
+        result = true
+      case _ =>
+    }
+    result
+  }
+
+  def isLike(condition: Expression): Boolean = {
+    var result = false
+    condition.foreach {
+      case _: StartsWith =>
+        result = true
+      case _ =>
+    }
+    result
+  }
+}
+
+class ColumnarPlugin extends (SparkSessionExtensions => Unit) with Logging {
+  override def apply(extensions: SparkSessionExtensions): Unit = {
+    extensions.injectColumnar(session => NdpRules(session))
+    extensions.injectOptimizerRule(session => NdpOptimizerRules(session))
   }
 }
 
