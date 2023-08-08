@@ -59,6 +59,7 @@ case class ColumnarSortMergeJoinFusionExec(
     val numOutputRows = longMetric("numOutputRows")
     val numOutputVecBatchs = longMetric("numOutputVecBatchs")
     val numMergedVecBatchs = longMetric("numMergedVecBatchs")
+    val bypassVecBatchs = longMetric("bypassVecBatchs")
     val streamedAddInputTime = longMetric("streamedAddInputTime")
     val streamedCodegenTime = longMetric("streamedCodegenTime")
     val bufferedAddInputTime = longMetric("bufferedAddInputTime")
@@ -188,7 +189,7 @@ case class ColumnarSortMergeJoinFusionExec(
       }
 
       if (enableSortMergeJoinBatchMerge) {
-        new MergeIterator(iterBatch, resultSchema, numMergedVecBatchs)
+        new MergeIterator(iterBatch, resultSchema, numMergedVecBatchs, bypassVecBatchs)
       } else {
         iterBatch
       }

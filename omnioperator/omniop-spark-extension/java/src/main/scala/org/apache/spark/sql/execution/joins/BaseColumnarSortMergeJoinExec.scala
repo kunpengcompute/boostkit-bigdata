@@ -130,6 +130,7 @@ abstract class BaseColumnarSortMergeJoinExec(
     "numOutputVecBatchs" ->
       SQLMetrics.createMetric(sparkContext, "number of output vecBatchs"),
     "numMergedVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of merged vecBatchs"),
+    "bypassVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of bypass vecBatchs"),
     "numStreamVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of streamed vecBatchs"),
     "numBufferVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of buffered vecBatchs")
   )

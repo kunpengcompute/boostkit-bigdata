@@ -106,7 +106,8 @@ case class ColumnarBroadcastHashJoinExec(
     "buildCodegenTime" ->
       SQLMetrics.createTimingMetric(sparkContext, "time in omni build codegen"),
     "numOutputVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatchs"),
-    "numMergedVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of merged vecBatchs")
+    "numMergedVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of merged vecBatchs"),
+    "bypassVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of bypass vecBatchs")
   )
 
   override def supportsColumnar: Boolean = true
@@ -276,6 +277,7 @@ case class ColumnarBroadcastHashJoinExec(
     val numOutputRows = longMetric("numOutputRows")
     val numOutputVecBatchs = longMetric("numOutputVecBatchs")
     val numMergedVecBatchs = longMetric("numMergedVecBatchs")
+    val bypassVecBatchs = longMetric("bypassVecBatchs")
     val buildAddInputTime = longMetric("buildAddInputTime")
     val buildCodegenTime = longMetric("buildCodegenTime")
     val buildGetOutputTime = longMetric("buildGetOutputTime")
@@ -486,7 +488,7 @@ case class ColumnarBroadcastHashJoinExec(
       }
 
       if (enableJoinBatchMerge) {
-        new MergeIterator(iterBatch, resultSchema, numMergedVecBatchs)
+        new MergeIterator(iterBatch, resultSchema, numMergedVecBatchs, bypassVecBatchs)
       } else {
         iterBatch
       }
