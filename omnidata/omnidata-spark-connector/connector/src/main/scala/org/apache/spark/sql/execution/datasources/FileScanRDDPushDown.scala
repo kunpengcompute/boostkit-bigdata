@@ -38,8 +38,9 @@ import org.apache.spark.sql.execution.vectorized.{OffHeapColumnVector, OnHeapCol
 import org.apache.spark.sql.internal.SQLConf.ORC_IMPLEMENTATION
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.vectorized.ColumnarBatch
+import org.apache.spark.util.NextIterator
 
-import java.io.FileNotFoundException
+import java.io.{FileNotFoundException, IOException}
 import scala.util.Random
 
 
@@ -60,7 +61,11 @@ class FileScanRDDPushDown(
                            partialCondition: Boolean,
                            partialPdRate: Double,
                            zkPdRate: Double,
-                           partialChildOutput: Seq[Attribute])
+                           partialChildOutput: Seq[Attribute],
+                           isOptimizerPushDown: Boolean = false,
+                           pushDownTotal: Int,
+                           taskTotal: Int,
+                           perThreadTask: Int = 1)
   extends RDD[InternalRow](sparkSession.sparkContext, Nil) {
 
   var columnOffset = -1
@@ -105,10 +110,26 @@ class FileScanRDDPushDown(
   private val operatorCombineEnabled = NdpConf.getNdpOperatorCombineEnabled(sparkSession)
   val orcImpl: String = sparkSession.sessionState.conf.getConf(ORC_IMPLEMENTATION)
 
+  private val ignoreCorruptFiles = sparkSession.sessionState.conf.ignoreCorruptFiles
+  private val ignoreMissingFiles = sparkSession.sessionState.conf.ignoreMissingFiles
+
+  var pushDownIterator : PushDownIterator = _
+  var forceOmniDataPushDown : Boolean = false
+  var isFirstOptimizerPushDown : Boolean = true
+
   override def compute(split: RDDPartition, context: TaskContext): Iterator[InternalRow] = {
+    if(isOptimizerPushDown){
+      logDebug("optimizer push down")
+      computeSparkRDDAndOptimizerPushDown(split, context)
+    } else {
+      logDebug("Really push down")
+      computePushDownRDD(split, context)
+    }
+  }
+
+  def computePushDownRDD(split: RDDPartition, context: TaskContext): Iterator[InternalRow] = {
     val pageToColumnarClass = new PageToColumnar(requiredSchema, output)
-    var iterator : PushDownIterator = null
-    if (isPartialPushDown(partialCondition, partialPdRate, zkPdRate)) {
+    if (!forceOmniDataPushDown && isPartialPushDown(partialCondition, partialPdRate, zkPdRate)) {
       logDebug("partial push down task on spark")
       val partialFilterCondition = pushDownOperators.filterExecutions.reduce((a, b) => FilterExeInfo(And(a.filter, b.filter), partialChildOutput))
       var partialFilter : Expression = null
@@ -119,11 +140,226 @@ class FileScanRDDPushDown(
       }
       val predicate = Predicate.create(partialFilter, partialChildOutput)
       predicate.initialize(0)
-      iterator = new PartialPushDownIterator(split, context, pageToColumnarClass, predicate)
+      pushDownIterator = new PartialPushDownIterator(split, context, pageToColumnarClass, predicate)
     } else {
       logDebug("partial push down task on omnidata")
-      iterator = new PushDownIterator(split, context, pageToColumnarClass)
+      pushDownIterator = new PushDownIterator(split, context, pageToColumnarClass)
     }
+    // Register an on-task-completion callback to close the input stream.
+    context.addTaskCompletionListener[Unit](_ => pushDownIterator.close())
+
+    pushDownIterator.asInstanceOf[Iterator[InternalRow]] // This is an erasure hack.
+  }
+
+  class OptimizerPushDownThread(sparkThread: Thread,
+                                splits: Array[RDDPartition],
+                                context: TaskContext,
+                                scan : FileScanRDDPushDown,
+                                sparkLog : org.slf4j.Logger) extends Thread {
+    scan.forceOmniDataPushDown = true
+    override def run(): Unit = {
+      var i: Int = 0
+      while  (!context.isCompleted() && sparkThread.isAlive && i < splits.length) {
+        val iter: Iterator[Any] = scan.computePushDownRDD(splits(i), context)
+        i = i + 1
+        while (!context.isCompleted() && sparkThread.isAlive && iter.hasNext) {
+          sparkLog.debug(">>>>>>optimizer push down Thread [running]>>>>>")
+          val currentValue =  iter.next()
+          currentValue match {
+            case batch: ColumnarBatch => batch.close()
+            case _ =>
+          }
+        }
+      }
+
+      sparkLog.debug(">>>>>>optimizer push down Thread [end]>>>>>")
+      scan.pushDownIterator.close()
+      sparkLog.debug("pushDownIterator close")
+      this.interrupt()
+    }
+  }
+
+  var threadPushDownCount:Int = 0
+  var pushSplits: Array[RDDPartition] = Array()
+  var loopTimes = 0
+
+  def doOptimizerPush(split: RDDPartition, context: TaskContext, scan: FileScanRDDPushDown): Unit = {
+    val uniqueID = context.taskAttemptId()
+    val partID = context.partitionId()
+    val taskSizeD = taskTotal.toDouble
+    val taskSpace = Math.max(Math.ceil(taskSizeD/pushDownTotal).toInt, 1)
+    log.debug("OptimizerPush info uniqueID: " + uniqueID + ",partID: " + partID + ",push" +
+      "DownTotal: " + pushDownTotal + ",taskTotal: " + taskTotal + ",taskSpace: " + taskSpace)
+    var pushDownRDDPartition = split
+    split match {
+      case filePartition: FilePartition =>
+        val files: Array[PartitionedFile] = Array(filePartition.files.head)
+        pushDownRDDPartition = new FilePartition(filePartition.index, files, filePartition.sdi)
+        pushSplits = pushSplits :+ pushDownRDDPartition
+      case _ =>
+    }
+
+    loopTimes = loopTimes + 1
+    if (loopTimes < perThreadTask) {
+      log.debug("pushSplits need add")
+      return
+    }
+
+    if (loopTimes > perThreadTask) {
+      log.debug("pushSplits full")
+      return
+    }
+
+    if (uniqueID % taskSpace == 0) {
+      log.debug("do optimizer push down RDD")
+      val pushDownThread = new OptimizerPushDownThread(Thread.currentThread(), pushSplits, context, scan, log)
+      pushDownThread.start()
+    } else {
+      log.debug("do spark push down RDD")
+    }
+
+  }
+
+  def computeSparkRDDAndOptimizerPushDown(split: RDDPartition, context: TaskContext): Iterator[InternalRow] = {
+    //this code (computeSparkRDDAndOptimizerPushDown) from spark FileScanRDD
+    doOptimizerPush(split, context, this)
+    val iterator = new Iterator[Object] with AutoCloseable {
+      private val inputMetrics = context.taskMetrics().inputMetrics
+      private val existingBytesRead = inputMetrics.bytesRead
+
+      // Find a function that will return the FileSystem bytes read by this thread. Do this before
+      // apply readFunction, because it might read some bytes.
+      private val getBytesReadCallback =
+      SparkHadoopUtil.get.getFSBytesReadOnThreadCallback()
+
+      // We get our input bytes from thread-local Hadoop FileSystem statistics.
+      // If we do a coalesce, however, we are likely to compute multiple partitions in the same
+      // task and in the same thread, in which case we need to avoid override values written by
+      // previous partitions (SPARK-13071).
+      private def incTaskInputMetricsBytesRead(): Unit = {
+        inputMetrics.setBytesRead(existingBytesRead + getBytesReadCallback())
+      }
+
+      private[this] val files = split.asInstanceOf[FilePartition].files.toIterator
+      private[this] var currentFile: PartitionedFile = null
+      private[this] var currentIterator: Iterator[Object] = null
+
+      def hasNext: Boolean = {
+        // Kill the task in case it has been marked as killed. This logic is from
+        // InterruptibleIterator, but we inline it here instead of wrapping the iterator in order
+        // to avoid performance overhead.
+        context.killTaskIfInterrupted()
+        (currentIterator != null && currentIterator.hasNext) || nextIterator()
+      }
+      def next(): Object = {
+        val nextElement = currentIterator.next()
+        // TODO: we should have a better separation of row based and batch based scan, so that we
+        // don't need to run this `if` for every record.
+        val preNumRecordsRead = inputMetrics.recordsRead
+        if (nextElement.isInstanceOf[ColumnarBatch]) {
+          incTaskInputMetricsBytesRead()
+          inputMetrics.incRecordsRead(nextElement.asInstanceOf[ColumnarBatch].numRows())
+        } else {
+          // too costly to update every record
+          if (inputMetrics.recordsRead %
+            SparkHadoopUtil.UPDATE_INPUT_METRICS_INTERVAL_RECORDS == 0) {
+            incTaskInputMetricsBytesRead()
+          }
+          inputMetrics.incRecordsRead(1)
+        }
+        nextElement
+      }
+
+      private def readCurrentFile(): Iterator[InternalRow] = {
+        try {
+          readFunction(currentFile)
+        } catch {
+          case e: FileNotFoundException =>
+            throw new FileNotFoundException(
+              e.getMessage + "\n" +
+                "It is possible the underlying files have been updated. " +
+                "You can explicitly invalidate the cache in Spark by " +
+                "running 'REFRESH TABLE tableName' command in SQL or " +
+                "by recreating the Dataset/DataFrame involved.")
+        }
+      }
+
+      /** Advances to the next file. Returns true if a new non-empty iterator is available. */
+      private def nextIterator(): Boolean = {
+        if (files.hasNext) {
+          currentFile = files.next()
+          logInfo(s"Reading File $currentFile")
+          // Sets InputFileBlockHolder for the file block's information
+          InputFileBlockHolder.set(currentFile.filePath, currentFile.start, currentFile.length)
+
+          if (ignoreMissingFiles || ignoreCorruptFiles) {
+            currentIterator = new NextIterator[Object] {
+              // The readFunction may read some bytes before consuming the iterator, e.g.,
+              // vectorized Parquet reader. Here we use lazy val to delay the creation of
+              // iterator so that we will throw exception in `getNext`.
+              private lazy val internalIter = readCurrentFile()
+
+              override def getNext(): AnyRef = {
+                try {
+                  if (internalIter.hasNext) {
+                    internalIter.next()
+                  } else {
+                    finished = true
+                    null
+                  }
+                } catch {
+                  case e: FileNotFoundException if ignoreMissingFiles =>
+                    logWarning(s"Skipped missing file: $currentFile", e)
+                    finished = true
+                    null
+                  // Throw FileNotFoundException even if `ignoreCorruptFiles` is true
+                  case e: FileNotFoundException if !ignoreMissingFiles => throw e
+                  case e @ (_: RuntimeException | _: IOException) if ignoreCorruptFiles =>
+                    logWarning(
+                      s"Skipped the rest of the content in the corrupted file: $currentFile", e)
+                    finished = true
+                    null
+                }
+              }
+
+              override def close(): Unit = {}
+            }
+          } else {
+            currentIterator = readCurrentFile()
+          }
+
+          try {
+            hasNext
+          } catch {
+            case e: SchemaColumnConvertNotSupportedException =>
+              val message = "Parquet column cannot be converted in " +
+                s"file ${currentFile.filePath}. Column: ${e.getColumn}, " +
+                s"Expected: ${e.getLogicalType}, Found: ${e.getPhysicalType}"
+              throw new QueryExecutionException(message, e)
+            case e: ParquetDecodingException =>
+              if (e.getCause.isInstanceOf[SparkUpgradeException]) {
+                throw e.getCause
+              } else if (e.getMessage.contains("Can not read value at")) {
+                val message = "Encounter error while reading parquet files. " +
+                  "One possible cause: Parquet column cannot be converted in the " +
+                  "corresponding files. Details: "
+                throw new QueryExecutionException(message, e)
+              }
+              throw e
+          }
+        } else {
+          currentFile = null
+          InputFileBlockHolder.unset()
+          false
+        }
+      }
+
+      override def close(): Unit = {
+        incTaskInputMetricsBytesRead()
+        InputFileBlockHolder.unset()
+      }
+    }
+
     // Register an on-task-completion callback to close the input stream.
     context.addTaskCompletionListener[Unit](_ => iterator.close())
 
@@ -140,6 +376,14 @@ class FileScanRDDPushDown(
   }
 
   override protected def getPartitions: Array[RDDPartition] = {
+    if(isOptimizerPushDown) {
+      getSparkPartitions
+    } else {
+      getPushDownPartitions
+    }
+  }
+
+  def getPushDownPartitions: Array[RDDPartition] = {
     filePartitions.map { partitionFile => {
       val retHost = mutable.HashMap.empty[String, Long]
       partitionFile.files.foreach { partitionMap => {
@@ -184,6 +428,8 @@ class FileScanRDDPushDown(
     filePartitions.toArray
   }
 
+  def getSparkPartitions: Array[RDDPartition] = filePartitions.toArray
+
   override protected def getPreferredLocations(split: RDDPartition): Seq[String] = {
     split.asInstanceOf[FilePartition].preferredLocations()
   }
@@ -206,7 +452,8 @@ class FileScanRDDPushDown(
     var currentIterator: Iterator[Object] = null
     val sdiHosts: String = split.asInstanceOf[FilePartition].sdi
     val dataIoClass = new DataIoAdapter()
-    val domains: ImmutableMap[_,_] = dataIoClass.buildDomains(output,partitionColumns, filterOutput, pushDownOperators)
+    val domains: ImmutableMap[_, _] = dataIoClass.buildDomains(output,partitionColumns, filterOutput,
+      pushDownOperators, context)
 
     def hasNext: Boolean = {
       // Kill the task in case it has been marked as killed. This logic is from
@@ -302,6 +549,7 @@ class FileScanRDDPushDown(
     override def close(): Unit = {
       incTaskInputMetricsBytesRead()
       InputFileBlockHolder.unset()
+      dataIoClass.close()
     }
   }
 

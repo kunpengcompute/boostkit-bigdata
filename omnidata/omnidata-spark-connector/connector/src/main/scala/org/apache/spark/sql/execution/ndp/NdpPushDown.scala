@@ -18,6 +18,7 @@
 
 package org.apache.spark.sql.execution.ndp
 
+import com.huawei.boostkit.omnioffload.spark.NdpPluginEnableFlag
 import java.util.{Locale, Properties}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{PushDownData, PushDownManager, SparkSession}
@@ -34,6 +35,8 @@ import org.apache.spark.sql.sources.DataSourceRegister
 import org.apache.spark.sql.hive.HiveSimpleUDF
 import org.apache.hadoop.hive.ql.exec.DefaultUDFMethodResolver
 import org.apache.spark.TaskContext
+import org.apache.spark.sql.execution.ndp.NdpConf.getOptimizerPushDownEnable
+import org.apache.spark.sql.types.{DoubleType, FloatType}
 
 import scala.collection.{JavaConverters, mutable}
 import scala.reflect.runtime.universe
@@ -72,9 +75,14 @@ case class NdpPushDown(sparkSession: SparkSession)
   private val parentPath = NdpConf.getNdpZookeeperPath(sparkSession)
   private val zkAddress = NdpConf.getNdpZookeeperAddress(sparkSession)
 
+  private var isNdpPluginOptimizerPush = false
+
   override def apply(plan: SparkPlan): SparkPlan = {
     setConfigForTPCH(plan)
-    if (pushDownEnabled && shouldPushDown(plan) && shouldPushDown()) {
+    isNdpPluginOptimizerPush = NdpPluginEnableFlag.isEnable(sparkSession) && getOptimizerPushDownEnable(sparkSession)
+    if(isNdpPluginOptimizerPush && pushDownEnabled && shouldPushDown(plan) && shouldPushDown()){
+      pushDownScanWithOutOtherOperator(plan)
+    } else if (!isNdpPluginOptimizerPush && pushDownEnabled && shouldPushDown(plan) && shouldPushDown()) {
       pushDownOperator(plan)
     } else {
       plan
@@ -235,6 +243,9 @@ case class NdpPushDown(sparkSession: SparkSession)
               }
               ndpScan.pushDown(s.scan)
               ndpScan.fpuHosts(fpuHosts)
+              if(isNdpPluginOptimizerPush) {
+                f.fpuHosts(fpuHosts)
+              }
               logInfo(s"Push down with [${ndpScan.ndpOperators}]")
               ndpScan
             case _ => throw new UnsupportedOperationException()
@@ -249,6 +260,12 @@ case class NdpPushDown(sparkSession: SparkSession)
   def pushDownOperator(plan: SparkPlan): SparkPlan = {
     val p = pushDownOperatorInternal(plan)
     replaceWrapper(p)
+  }
+
+  def pushDownScanWithOutOtherOperator(plan: SparkPlan): SparkPlan = {
+    val p = pushDownOperatorInternal(plan)
+    replaceWrapper(p)
+    plan
   }
 
   def isDynamiCpruning(f: FilterExec): Boolean = {
@@ -427,6 +444,9 @@ object NdpConf {
   val NDP_PARTIAL_PUSHDOWN = "spark.sql.ndp.partial.pushdown"
   val NDP_PARTIAL_PUSHDOWN_ENABLE = "spark.sql.ndp.partial.pushdown.enable"
   val NDP_DOMIAN_GENERATE_ENABLE = "spark.sql.ndp.domain.generate.enable"
+  val NDP_OPTIMIZER_PUSH_DOWN_ENABLE="spark.sql.ndp.optimizer.pushdown.enabled"
+  val NDP_OPTIMIZER_PUSH_DOWN_THRESHOLD="spark.sql.ndp.optimizer.pushdown.threshold"
+  val NDP_OPTIMIZER_PUSH_DOWN_PRETHREAD_TASK="spark.sql.ndp.optimizer.pushdown.prethreadtask"
 
   def toBoolean(key: String, value: String, sparkSession: SparkSession): Boolean = {
     try {
@@ -542,6 +562,29 @@ object NdpConf {
   def getNdpDomainGenerateEnable(taskContext: TaskContext): Boolean = {
     taskContext.getLocalProperties.getProperty(NDP_DOMIAN_GENERATE_ENABLE, "true")
         .equalsIgnoreCase("true")
+  }
+
+  def getOptimizerPushDownEnable(sparkSession: SparkSession): Boolean = {
+    toBoolean(NDP_OPTIMIZER_PUSH_DOWN_ENABLE,
+      sparkSession.conf.getOption(NDP_OPTIMIZER_PUSH_DOWN_ENABLE).getOrElse("false"), sparkSession)
+  }
+
+  def getOptimizerPushDownThreshold(sparkSession: SparkSession): Int = {
+    val result = toNumber(NDP_OPTIMIZER_PUSH_DOWN_THRESHOLD,
+      sparkSession.conf.getOption(NDP_OPTIMIZER_PUSH_DOWN_THRESHOLD).getOrElse("1000"),
+      _.toInt, "int", sparkSession)
+    checkLongValue(NDP_OPTIMIZER_PUSH_DOWN_THRESHOLD, result, _ > 0,
+      s"The $NDP_OPTIMIZER_PUSH_DOWN_THRESHOLD value must be positive", sparkSession)
+    result
+  }
+
+  def getOptimizerPushDownPreThreadTask(sparkSession: SparkSession): Int = {
+    val result = toNumber(NDP_OPTIMIZER_PUSH_DOWN_PRETHREAD_TASK,
+      sparkSession.conf.getOption(NDP_OPTIMIZER_PUSH_DOWN_PRETHREAD_TASK).getOrElse("1"),
+      _.toInt, "int", sparkSession)
+    checkLongValue(NDP_OPTIMIZER_PUSH_DOWN_PRETHREAD_TASK, result, _ > 0,
+      s"The $NDP_OPTIMIZER_PUSH_DOWN_PRETHREAD_TASK value must be positive", sparkSession)
+    result
   }
 
   def getNdpUdfWhitelist(sparkSession: SparkSession): Option[String] = {

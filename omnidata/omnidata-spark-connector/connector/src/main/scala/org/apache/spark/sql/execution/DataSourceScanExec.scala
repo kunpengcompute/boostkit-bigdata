@@ -17,8 +17,7 @@
 
 package org.apache.spark.sql.execution
 
-
-
+import com.huawei.boostkit.omnioffload.spark.NdpPluginEnableFlag
 import java.util.concurrent.TimeUnit._
 import scala.collection.mutable.HashMap
 import org.apache.commons.lang3.StringUtils
@@ -33,7 +32,7 @@ import org.apache.spark.sql.catalyst.util.truncatedString
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.parquet.{ParquetFileFormat => ParquetSource}
 import org.apache.spark.sql.execution.metric.{SQLMetric, SQLMetrics}
-import org.apache.spark.sql.execution.ndp.NdpConf.{getNdpPartialPushdown, getNdpPartialPushdownEnable, getTaskTimeout}
+import org.apache.spark.sql.execution.ndp.NdpConf.{getOptimizerPushDownEnable, getOptimizerPushDownPreThreadTask, getOptimizerPushDownThreshold, getNdpPartialPushdown, getNdpPartialPushdownEnable, getTaskTimeout}
 import org.apache.spark.sql.execution.ndp.{NdpConf, NdpSupport}
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.sources.{BaseRelation, Filter}
@@ -172,9 +171,19 @@ abstract class BaseFileSourceScanExec(
     dataFilters: Seq[Expression],
     tableIdentifier: Option[TableIdentifier],
     partitionColumn: Seq[Attribute],
-    disableBucketedScan: Boolean = false
+    disableBucketedScan: Boolean = false,
+    var runtimePartSum: Int = -1,
+    var runtimePushDownSum: Int = -1
     )
   extends DataSourceScanExec with NdpSupport {
+
+  def setRuntimePartSum(runtimePartSum: Int): Unit ={
+    this.runtimePartSum = runtimePartSum
+  }
+
+  def setRuntimePushDownSum(runtimePushDownSum: Int): Unit ={
+    this.runtimePushDownSum = runtimePushDownSum
+  }
 
   // Note that some vals referring the file-based relation are lazy intentionally
   // so that this plan can be canonicalized on executor side too. See SPARK-23731.
@@ -660,8 +669,23 @@ abstract class BaseFileSourceScanExec(
         partialChildOutput = allFilterExecInfo.head.child.output
         logInfo(s"partial push down rate: ${partialPdRate}")
       }
+      def isNdpPluginOptimizerPush: Boolean = getOptimizerPushDownEnable(fsRelation.sparkSession) &&
+        NdpPluginEnableFlag.isEnable(fsRelation.sparkSession)
+      def taskTotal: Int = if(runtimePartSum > 0){
+        runtimePartSum
+      } else {
+        filePartitions.size
+      }
+      val pushDownTotal: Int = if(runtimePushDownSum > 0) {
+        runtimePushDownSum
+      } else {
+        getOptimizerPushDownThreshold(fsRelation.sparkSession)
+      }
+      val preThreadTask: Int = getOptimizerPushDownPreThreadTask(fsRelation.sparkSession)
       new FileScanRDDPushDown(fsRelation.sparkSession, filePartitions, requiredSchema, output,
-        relation.dataSchema, ndpOperators, partitionColumn, supportsColumnar, fsRelation.fileFormat, readFile, partialCondition, partialPdRate, zkRate, partialChildOutput)
+        relation.dataSchema, ndpOperators, partitionColumn, supportsColumnar, fsRelation.fileFormat,
+        readFile, partialCondition, partialPdRate, zkRate, partialChildOutput, isNdpPluginOptimizerPush, pushDownTotal,
+        taskTotal, preThreadTask)
     } else {
       new FileScanRDD(fsRelation.sparkSession, readFile, filePartitions)
     }
