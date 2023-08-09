@@ -21,6 +21,7 @@
 
 package org.apache.spark.sql.execution.adaptive.ock.reader
 
+import com.huawei.boostkit.spark.ColumnarPluginConfig
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{Attribute, Expression}
@@ -30,6 +31,8 @@ import org.apache.spark.sql.execution.adaptive.ShuffleQueryStageExec
 import org.apache.spark.sql.execution.adaptive.ock.exchange.BoostTuningColumnarShuffleExchangeExec
 import org.apache.spark.sql.execution.exchange.{ReusedExchangeExec, ShuffleExchangeLike}
 import org.apache.spark.sql.execution.metric.{SQLMetric, SQLMetrics}
+import org.apache.spark.sql.execution.util.MergeIterator
+import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.vectorized.ColumnarBatch
 
 import scala.collection.mutable.ArrayBuffer
@@ -159,9 +162,12 @@ case class BoostTuningColumnarCustomShuffleReaderExec(
     SQLMetrics.postDriverMetricsUpdatedByValue(sparkContext, executionId, driverAccumUpdates.toSeq)
   }
 
-  @transient override lazy val metrics: Map[String, SQLMetric] = {
+  override lazy val metrics: Map[String, SQLMetric] = {
     if (shuffleStage.isDefined) {
-      Map("numPartitions" -> SQLMetrics.createMetric(sparkContext, "number of partitions")) ++ {
+      Map(
+      "numMergedVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of merged vecBatchs"),
+      "bypassVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of bypass vecBatchs"),
+      "numPartitions" -> SQLMetrics.createMetric(sparkContext, "number of partitions")) ++ {
         if (isLocalReader) {
           // We split the mapper partition evenly when creating local shuffle reader, so no
           // data size info is available.
@@ -203,7 +209,18 @@ case class BoostTuningColumnarCustomShuffleReaderExec(
           throw new IllegalStateException("operating on canonicalized plan")
       }
     }
-    cachedShuffleRDD
+    val columnarConf: ColumnarPluginConfig = ColumnarPluginConfig.getSessionConf
+    val enableShuffleBatchMerge: Boolean = columnarConf.enableShuffleBatchMerge
+    if (enableShuffleBatchMerge) {
+      cachedShuffleRDD.mapPartitionsWithIndexInternal { (index, iter) =>
+        new MergeIterator(iter,
+           StructType.fromAttributes(child.output),
+           longMetric("numMergedVecBatchs"),
+           longMetric("bypassVecBatchs"))
+      }
+    } else {
+      cachedShuffleRDD
+    }
   }
 
   override protected def doExecute(): RDD[InternalRow] = {

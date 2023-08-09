@@ -66,6 +66,7 @@ case class BoostTuningColumnarShuffleExchangeExec(
       .createAverageMetric(sparkContext, "avg read batch num rows"),
     "numInputRows" -> SQLMetrics.createMetric(sparkContext, "number of input rows"),
     "numMergedVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of merged vecBatchs"),
+    "bypassVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of bypass vecBatchs"),
     "numOutputRows" -> SQLMetrics
       .createMetric(sparkContext, "number of output rows")) ++ readMetrics ++ writeMetrics
 
@@ -190,7 +191,8 @@ case class BoostTuningColumnarShuffleExchangeExec(
       cachedShuffleRDD.mapPartitionsWithIndexInternal { (index, iter) =>
         new MergeIterator(iter,
           StructType.fromAttributes(child.output),
-          longMetric("numMergedVecBatchs"))
+          longMetric("numMergedVecBatchs"),
+          longMetric("bypassVecBatchs"))
       }
     } else {
       cachedShuffleRDD

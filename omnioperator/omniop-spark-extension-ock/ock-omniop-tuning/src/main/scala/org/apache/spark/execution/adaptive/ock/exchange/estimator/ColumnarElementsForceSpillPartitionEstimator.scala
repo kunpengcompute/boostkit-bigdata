@@ -14,6 +14,10 @@ case class ColumnarElementsForceSpillPartitionEstimator() extends PartitionEstim
   override def estimatorType: EstimatorType = ElementNumBased
 
   override def apply(exchange: ShuffleExchangeLike): Option[Int] = {
+    if (!sampleEnabled) {
+      return None
+    }
+
     if (!OMNI_SPILL_ROW_ENABLED && numElementsForceSpillThreshold == Integer.MAX_VALUE) {
       return None
     }
@@ -26,7 +30,9 @@ case class ColumnarElementsForceSpillPartitionEstimator() extends PartitionEstim
 
     exchange match {
       case ex: BoostTuningColumnarShuffleExchangeExec =>
-        val rowCount = ex.inputColumnarRDD.first().numRows()
+        val rowCount = ex.inputColumnarRDD
+          .sample(withReplacement = false, sampleRDDFraction)
+          .map(cb => cb.numRows()).first()
         Some((initPartitionRatio * rowCount / spillMinThreshold).toInt)
       case _ =>
         None
