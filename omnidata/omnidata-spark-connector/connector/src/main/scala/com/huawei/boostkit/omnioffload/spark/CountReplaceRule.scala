@@ -25,7 +25,6 @@ import org.apache.spark.sql.execution.command.DataWritingCommandExec
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
 import org.apache.spark.sql.execution.exchange.ShuffleExchangeExec
 import org.apache.spark.sql.execution.{ColumnarToRowExec, FileSourceScanExec, SimpleCountFileScanExec, SparkPlan}
-import org.apache.spark.sql.types.DataTypes
 
 object CountReplaceRule extends Rule[SparkPlan] {
   var columnStat: BigInt = -1
@@ -57,14 +56,14 @@ object CountReplaceRule extends Rule[SparkPlan] {
         if (!headAggExp.aggregateFunction.isInstanceOf[Count]) {
           return false
         }
-        headAggExp.aggregateFunction match {
-          case Seq(Literal(1, DataTypes.IntegerType)) =>
-          case _ => return false
+        val countFunc = headAggExp.aggregateFunction.asInstanceOf[Count]
+        val countChild = countFunc.children
+        if (!countChild.equals(Seq(Literal(1)))) {
+          return false
         }
         if (!scan.relation.fileFormat.isInstanceOf[ParquetFileFormat]) {
           return false
         }
-
         val countTable = scan.tableIdentifier.get
         val stats = plan.sqlContext.sparkSession.sessionState.catalog
           .getTableMetadata(countTable).stats
