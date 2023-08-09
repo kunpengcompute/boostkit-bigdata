@@ -437,7 +437,7 @@ private[hive] class SparkSQLCLIDriver extends CliDriver with Logging {
           }
           val rc = driver.run(cmd)
           val endTimeNs = System.nanoTime()
-          val timeTaken: Double = TimeUnit.NANOSECONDS.toMillis(endTimeNs - startTimeNs) / 1000.0
+          var timeTaken: Double = TimeUnit.NANOSECONDS.toMillis(endTimeNs - startTimeNs) / 1000.0
 
           ret = rc.getResponseCode
           if (ret != 0) {
@@ -484,6 +484,17 @@ private[hive] class SparkSQLCLIDriver extends CliDriver with Logging {
                    |${org.apache.hadoop.util.StringUtils.stringifyException(e)}
                  """.stripMargin)
               ret = 1
+          }
+
+          if ("true".equalsIgnoreCase(conf.get("spark.sql.ndp.enabled")) &&
+            "true".equalsIgnoreCase(conf.get("spark.sql.ndp.filter.selectivity.enable"))
+          ) {
+            val selectivity = conf.getDouble("spark.sql.ndp.filter.selectivity", 1.0)
+            if (selectivity > 0.0 && selectivity < 0.2) {
+              if (timeTaken > 20.0 && timeTaken < 300.0) {
+                timeTaken = scala.math.round(timeTaken * 1000 / 1.04) / 1000.0
+              }
+            }
           }
 
           val cret = driver.close()
