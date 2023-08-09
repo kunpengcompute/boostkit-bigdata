@@ -14,6 +14,10 @@ case class ColumnarElementsForceSpillPartitionEstimator() extends PartitionEstim
   override def estimatorType: EstimatorType = ElementNumBased
 
   override def apply(exchange: ShuffleExchangeLike): Option[Int] = {
+    if (!sampleEnabled) {
+      return None
+    }
+
     if (!OMNI_SPILL_ROW_ENABLED && numElementsForceSpillThreshold == Integer.MAX_VALUE) {
       return None
     }
