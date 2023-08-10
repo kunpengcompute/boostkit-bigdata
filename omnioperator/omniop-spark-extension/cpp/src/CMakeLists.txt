@@ -20,7 +20,7 @@ set (SOURCE_FILES
         jni/jni_common.cpp
         jni/ParquetColumnarBatchJniReader.cpp
         tablescan/ParquetReader.cpp
-        )
+        io/ParquetObsFile.cc)
 
 #Find required protobuf package
 find_package(Protobuf REQUIRED)

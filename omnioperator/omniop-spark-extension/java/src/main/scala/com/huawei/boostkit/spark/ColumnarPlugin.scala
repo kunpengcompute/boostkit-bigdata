@@ -18,6 +18,8 @@
 package com.huawei.boostkit.spark
 
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor
+import com.huawei.boostkit.spark.util.PhysicalPlanSelector
+
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{SparkSession, SparkSessionExtensions}
 import org.apache.spark.sql.catalyst.expressions.{Ascending, DynamicPruningSubquery, SortOrder}
@@ -541,7 +543,9 @@ case class ColumnarOverrideRules(session: SparkSession) extends ColumnarRule wit
     "org.apache.spark.sql.columnar.enabled", "true").trim.toBoolean
 
   def rowGuardOverrides: ColumnarGuardRule = ColumnarGuardRule()
+
   def preOverrides: ColumnarPreOverrides = ColumnarPreOverrides()
+
   def postOverrides: ColumnarPostOverrides = ColumnarPostOverrides()
 
   var isSupportAdaptive: Boolean = true
@@ -561,34 +565,27 @@ case class ColumnarOverrideRules(session: SparkSession) extends ColumnarRule wit
   private def sanityCheck(plan: SparkPlan): Boolean =
     plan.logicalLink.isDefined
 
-  override def preColumnarTransitions: Rule[SparkPlan] = plan => {
-    if (columnarEnabled) {
+  override def preColumnarTransitions: Rule[SparkPlan] = plan => PhysicalPlanSelector.
+    maybe(session, plan) {
       isSupportAdaptive = supportAdaptive(plan)
       val rule = preOverrides
       rule.setAdaptiveSupport(isSupportAdaptive)
       logInfo("Using BoostKit Spark Native Sql Engine Extension ColumnarPreOverrides")
       rule(rowGuardOverrides(plan))
-    } else {
-      plan
     }
-  }
 
-  override def postColumnarTransitions: Rule[SparkPlan] = plan => {
-    if (columnarEnabled) {
+  override def postColumnarTransitions: Rule[SparkPlan] = plan => PhysicalPlanSelector.
+    maybe(session, plan) {
       val rule = postOverrides
       rule.setAdaptiveSupport(isSupportAdaptive)
       logInfo("Using BoostKit Spark Native Sql Engine Extension ColumnarPostOverrides")
       rule(plan)
-    } else {
-      plan
     }
-  }
 }
-
 class ColumnarPlugin extends (SparkSessionExtensions => Unit) with Logging {
   override def apply(extensions: SparkSessionExtensions): Unit = {
     logInfo("Using BoostKit Spark Native Sql Engine Extension to Speed Up Your Queries.")
     extensions.injectColumnar(session => ColumnarOverrideRules(session))
-    extensions.injectPlannerStrategy(_ => ShuffleJoinStrategy)
+    extensions.injectPlannerStrategy(session => ShuffleJoinStrategy(session))
   }
 }

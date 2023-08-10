@@ -25,10 +25,10 @@ import org.apache.spark.sql.internal.SQLConf
 
 class ColumnarPluginConfig(conf: SQLConf) extends Logging {
   // enable or disable columnar exchange
-  val columnarShuffleStr:String = conf
+  val columnarShuffleStr: String = conf
     .getConfString("spark.shuffle.manager", "sort")
 
-  val enableColumnarShuffle: Boolean = 
+  val enableColumnarShuffle: Boolean =
     if (!(columnarShuffleStr.equals("sort") || (columnarShuffleStr.equals("tungsten-sort")))) {
       SparkEnv.get.shuffleManager.isInstanceOf[ColumnarShuffleManager]
     } else {
@@ -78,6 +78,19 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
   val enableColumnarBroadcastJoin: Boolean = conf
     .getConfString("spark.omni.sql.columnar.broadcastJoin", "true")
     .toBoolean
+
+  // enable or disable share columnar BroadcastHashJoin hashtable
+  val enableShareBroadcastJoinHashTable: Boolean = conf
+    .getConfString("spark.omni.sql.columnar.broadcastJoin.sharehashtable", "true")
+    .toBoolean
+
+  // enable or disable heuristic join reorder
+  val enableHeuristicJoinReorder: Boolean =
+    conf.getConfString("spark.sql.heuristicJoinReorder.enabled", "true").toBoolean
+
+  // enable or disable delay cartesian product
+  val enableDelayCartesianProduct: Boolean =
+    conf.getConfString("spark.sql.enableDelayCartesianProduct.enabled", "true").toBoolean
 
   // enable native table scan
   val enableColumnarFileScan: Boolean = conf
@@ -191,6 +204,9 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
   val maxRowCount =
     conf.getConfString("spark.sql.columnar.maxRowCount", "20000").toInt
 
+  val mergedBatchThreshold =
+    conf.getConfString("spark.sql.columnar.mergedBatchThreshold", "100").toInt
+
   val enableColumnarUdf: Boolean = conf.getConfString("spark.omni.sql.columnar.udf", "true").toBoolean
 
   val enableOmniExpCheck : Boolean = conf.getConfString("spark.omni.sql.omniExp.check", "true").toBoolean
@@ -204,6 +220,9 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
 
 
 object ColumnarPluginConfig {
+
+  val OMNI_ENABLE_KEY: String = "spark.omni.enabled"
+
   var ins: ColumnarPluginConfig = null
 
   def getConf: ColumnarPluginConfig = synchronized {

@@ -60,6 +60,10 @@ case class ColumnarHashAggregateExec(
   override protected def withNewChildInternal(newChild: SparkPlan): ColumnarHashAggregateExec =
     copy(child = newChild)
 
+  override lazy val allAttributes: AttributeSeq =
+    child.output ++ aggregateBufferAttributes ++ aggregateAttributes ++
+      aggregateExpressions.flatMap(_.aggregateFunction.inputAggBufferAttributes)
+
   override def verboseStringWithOperatorId(): String = {
     s"""
        |$formattedNodeName

@@ -227,7 +227,7 @@ case class ColumnarShuffledHashJoinExec(
         }
         val startBuildCodegen = System.nanoTime()
         val buildOpFactory = new OmniHashBuilderWithExprOperatorFactory(buildTypes,
-          buildJoinColsExp, filter, 1, new OperatorConfig(SpillConfig.NONE,
+          buildJoinColsExp, 1, new OperatorConfig(SpillConfig.NONE,
             new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
         val buildOp = buildOpFactory.createOperator()
         buildCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startBuildCodegen)
@@ -236,7 +236,7 @@ case class ColumnarShuffledHashJoinExec(
         val lookupJoinType = OmniExpressionAdaptor.toOmniJoinType(joinType)
         val lookupOpFactory = new OmniLookupJoinWithExprOperatorFactory(probeTypes,
           probeOutputCols, probeHashColsExp, buildOutputCols, buildOutputTypes, lookupJoinType,
-          buildOpFactory, new OperatorConfig(SpillConfig.NONE,
+          buildOpFactory, filter, new OperatorConfig(SpillConfig.NONE,
             new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
         val lookupOp = lookupOpFactory.createOperator()
         lookupCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startLookupCodegen)

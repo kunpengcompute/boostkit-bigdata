@@ -159,7 +159,7 @@ public class OrcColumnarBatchJniReader {
         }
 
         // just used for obs
-        job.put("obsInfo", constructObsJSONObject());
+        job.put("obsInfo", ObsConf.constructObsJSONObject());
 
         reader = initializeReader(path, job);
         return reader;
@@ -362,17 +362,6 @@ public class OrcColumnarBatchJniReader {
             LOGGER.debug("\n\n================== tokens-json ==================\n" + tokensJsonItem.toString());
             return tokensJsonItem;
         }
-    }
-
-    public JSONObject constructObsJSONObject() {
-        JSONObject obsJsonItem = new JSONObject();
-        obsJsonItem.put("endpoint", ObsConf.getEndpoint());
-        synchronized (ObsConf.getLock()) {
-            obsJsonItem.put("ak", ObsConf.getAk());
-            obsJsonItem.put("sk", ObsConf.getSk());
-            obsJsonItem.put("token", ObsConf.getToken());
-        }
-        return obsJsonItem;
     }
 
     public static void tokenDebug(String mesg) {
