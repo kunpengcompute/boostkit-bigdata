@@ -32,7 +32,7 @@ class OckColumnarShuffleManager(conf: SparkConf) extends ColumnarShuffleManager 
   var appId = ""
   var listenFlg: Boolean = false
   var isOckBroadcast: Boolean = ockConf.isOckBroadcast
-  var heartBeatFlag = false
+  @volatile var heartBeatFlag: AtomicBoolean = new AtomicBoolean(false)
   val applicationDefaultAttemptId = "1";
 
   if (ockConf.excludeUnavailableNodes && ockConf.appId == "driver") {
@@ -63,8 +63,7 @@ class OckColumnarShuffleManager(conf: SparkConf) extends ColumnarShuffleManager 
       tokenCode = OckColumnarShuffleManager.registerShuffle(shuffleId, dependency.partitioner.numPartitions,
         conf, ockConf)
     }
-    if (!heartBeatFlag && ockConf.appId == "driver") {
-      heartBeatFlag = true
+    if (ockConf.appId == "driver" && !heartBeatFlag.getAndSet(true)) {
       OCKFunctions.tryStartHeartBeat(this, appId)
     }
 
