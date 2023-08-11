@@ -186,7 +186,6 @@ private[spark] object OckColumnarShuffleManager extends Logging {
           logWarning("failed to change externalShuffleServiceEnabled in block manager," +
             " maybe ockd could not be able to recover in shuffle process")
       }
-      conf.set(config.SHUFFLE_SERVICE_ENABLED, true)
     }
     //  generate token code. Need 32bytes.
     OCKFunctions.getToken(ockConf.isIsolated)
