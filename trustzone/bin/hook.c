@@ -241,6 +241,61 @@ int sockatmark (int __fd)
     return old_sockatmark(__fd);
 }
 
+typedef int (*SELECT)(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout);
+#define LOG_POLL(args...) LOG_FUNC("{ nfds: %d }", ##args)
+int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout)
+{
+    static SELECT old_func = NULL;
+
+    LOG_POLL(__func__, nfds);
+    old_func = (SELECT)dlsym(RTLD_NEXT, "select");
+
+    return old_func(nfds, readfds, writefds, exceptfds, timeout);
+}
+
+typedef int (*POLL)(struct pollfd *fds, nfds_t nfds, int timeout);
+int poll(struct pollfd *fds, nfds_t nfds, int timeout)
+{
+    static POLL old_func = NULL;
+
+    LOG_POLL(__func__, nfds);
+    old_func = (POLL)dlsym(RTLD_NEXT, "poll");
+
+    return old_func(fds, nfds, timeout);
+}
+
+typedef int (*EPOLL_CREATE)(int size);
+int epoll_create(int size)
+{
+    static EPOLL_CREATE old_func = NULL;
+
+    LOG_POLL(__func__, size);
+    old_func = (EPOLL_CREATE)dlsym(RTLD_NEXT, "epoll_create");
+
+    return old_func(size);
+}
+
+typedef int (*EPOLL_CTL)(int epfd, int op, int fd, struct epoll_event *event);
+int epoll_ctl(int epfd, int op, int fd, struct epoll_event *event)
+{
+    static EPOLL_CTL old_func = NULL;
+
+    LOG_FUNC("{ epfd %d, op %d, fd %d }", __func__, epfd, op, fd);
+    old_func = (EPOLL_CTL)dlsym(RTLD_NEXT, "epoll_ctl");
+
+    return old_func(epfd, op, fd, event);
+}
+
+typedef int (*EPOLL_WAIT)(int epfd, struct epoll_event *events, int maxevents, int timeout);
+int epoll_wait(int epfd, struct epoll_event *events, int maxevents, int timeout)
+{
+    static EPOLL_WAIT old_func = NULL;
+
+    LOG_FUNC("{ epfd %d, maxevent %d, timeout %d }", __func__, epfd, maxevents, timeout);
+    old_func = (EPOLL_WAIT)dlsym(RTLD_NEXT, "epoll_wait");
+
+    return old_func(epfd, events, maxevents, timeout);
+}
 
 typedef int(*DUP)(int oldfd);
 typedef int(*DUP2)(int oldfd, int newfd);
