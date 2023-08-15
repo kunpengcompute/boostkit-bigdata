@@ -65,7 +65,7 @@ public class PageToColumnar implements Serializable {
     public List<Object> transPageToColumnar(Iterator<WritableColumnVector[]> writableColumnVectors,
                                             boolean isVectorizedReader, boolean isOperatorCombineEnabled, Seq<Attribute> sparkOutput, String orcImpl) {
         if (isOperatorCombineEnabled) {
-            LOG.info("OmniRuntime PushDown column info: OmniColumnVector transform to Columnar");
+            LOG.debug("OmniRuntime PushDown column info: OmniColumnVector transform to Columnar");
         }
         List<Object> internalRowList = new ArrayList<>();
         List<Attribute> outputColumnList = JavaConverters.seqAsJavaList(sparkOutput);

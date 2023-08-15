@@ -35,10 +35,10 @@ import io.prestosql.spi.type.TypeSignature;
 
 import org.apache.spark.sql.catalyst.expressions.Expression;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * NdpFilterUtils
@@ -55,108 +55,53 @@ public class NdpFilterUtils {
     }
 
     public static  RowExpression generateRowExpression(
-            String signatureName, PrestoExpressionInfo expressionInfo,
-            Type prestoType, int filterProjectionId,
-            List<Object> argumentValues,
-            List<RowExpression> multiArguments, String operatorName) {
+            String operatorName,
+            List<RowExpression> arguments,
+            TypeSignature typeSignature) {
         RowExpression rowExpression;
-        List<RowExpression> rowArguments;
-        TypeSignature paramRight = prestoType.getTypeSignature();
-        TypeSignature paramLeft = prestoType.getTypeSignature();
-        Signature signature = new Signature(
-                QualifiedObjectName.valueOfDefaultFunction("$operator$" +
-                        signatureName.toLowerCase(Locale.ENGLISH)),
-                FunctionKind.SCALAR, new TypeSignature("boolean"),
-                paramRight, paramLeft);
         switch (operatorName.toLowerCase(Locale.ENGLISH)) {
             case "is_null":
-                List<RowExpression> notnullArguments = new ArrayList<>();
-                if (expressionInfo.isUDF()) {
-                    notnullArguments.add(expressionInfo.getPrestoRowExpression());
-                } else {
-                    notnullArguments.add(new InputReferenceExpression(filterProjectionId, prestoType));
-                }
-                rowExpression = new SpecialForm(IS_NULL, BOOLEAN, notnullArguments);
+                rowExpression = new SpecialForm(IS_NULL, BOOLEAN, arguments);
                 break;
             case "in":
-                if (expressionInfo.getReturnType() != null) {
-                    rowArguments = getUdfArguments(prestoType,
-                            argumentValues, expressionInfo.getPrestoRowExpression());
-                } else {
-                    rowArguments = getConstantArguments(prestoType,
-                            argumentValues, filterProjectionId);
-                }
-                rowExpression = new SpecialForm(IN, BOOLEAN, rowArguments);
+                rowExpression = new SpecialForm(IN, BOOLEAN, arguments);
                 break;
-            case "multy_columns":
-                Signature signatureMulti = new Signature(
-                        QualifiedObjectName.valueOfDefaultFunction("$operator$"
-                                + signatureName.toLowerCase(Locale.ENGLISH)),
-                        FunctionKind.SCALAR, new TypeSignature("boolean"),
-                        prestoType.getTypeSignature(),
-                        prestoType.getTypeSignature());
-                rowExpression = new CallExpression(signatureName,
-                        new BuiltInFunctionHandle(signatureMulti), BOOLEAN, multiArguments);
+            case "not":
+                Signature notSignature = new Signature(QualifiedObjectName.valueOfDefaultFunction("not"),
+                        FunctionKind.SCALAR, new TypeSignature("boolean"), typeSignature);
+                rowExpression =  new CallExpression(operatorName.toLowerCase(Locale.ENGLISH),
+                        new BuiltInFunctionHandle(notSignature), BOOLEAN, arguments);
                 break;
             case "isempty":
             case "isdeviceidlegal":
             case "ismessycode":
             case "dateudf":
-                rowExpression = expressionInfo.getPrestoRowExpression();
+                rowExpression = arguments.get(0);
                 break;
             default:
-                if (expressionInfo.getReturnType() != null) {
-                    rowArguments = getUdfArguments(prestoType,
-                            argumentValues, expressionInfo.getPrestoRowExpression());
-                } else {
-                    rowArguments = getConstantArguments(prestoType,
-                            argumentValues, filterProjectionId);
-                }
-                rowExpression = new CallExpression(signatureName,
-                        new BuiltInFunctionHandle(signature), BOOLEAN, rowArguments);
+                Signature signature = new Signature(
+                        QualifiedObjectName.valueOfDefaultFunction("$operator$" +
+                                operatorName.toLowerCase(Locale.ENGLISH)),
+                        FunctionKind.SCALAR, new TypeSignature("boolean"), typeSignature, typeSignature);
+                // To adapt to the omniOperator, use uppercase operatorName
+                rowExpression = new CallExpression(operatorName,
+                        new BuiltInFunctionHandle(signature), BOOLEAN, arguments);
                 break;
         }
         return rowExpression;
     }
 
-    public static List<RowExpression> getConstantArguments(Type typeStr,
-                                                           List<Object> argumentValues,
-                                                           int columnId) {
-        List<RowExpression> arguments = new ArrayList<>();
-        arguments.add(new InputReferenceExpression(columnId, typeStr));
-        if (null != argumentValues && argumentValues.size() > 0) {
-            for (Object argumentValue : argumentValues) {
-                arguments.add(NdpUtils
-                        .transConstantExpression(argumentValue.toString(), typeStr));
-            }
-        }
-        return arguments;
-    }
-
     /**
-     * creat RowExpression for in
+     * create RowExpression for column
      *
      * @param columnInfo column info
      * @return RowExpression produced by column info
      */
-    public static RowExpression createRowExpressionForIn(ColumnInfo columnInfo) {
+    public static RowExpression createRowExpressionForColumn(ColumnInfo columnInfo) {
         if (columnInfo.getExpressionInfo().getReturnType() != null) {
             return columnInfo.getExpressionInfo().getPrestoRowExpression();
         } else {
             return new InputReferenceExpression(columnInfo.getFilterProjectionId(), columnInfo.getPrestoType());
         }
-    }
-
-    public static  List<RowExpression> getUdfArguments(Type typeStr, List<Object> argumentValues,
-                                                       RowExpression callExpression) {
-        List<RowExpression> arguments = new ArrayList<>();
-        arguments.add(callExpression);
-        if (null != argumentValues && argumentValues.size() > 0) {
-            for (Object argumentValue : argumentValues) {
-                arguments.add(NdpUtils
-                        .transConstantExpression(argumentValue.toString(), typeStr));
-            }
-        }
-        return arguments;
     }
 }

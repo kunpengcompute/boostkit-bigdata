@@ -20,7 +20,6 @@ package org.apache.spark.sql;
 
 import static io.prestosql.spi.function.FunctionKind.AGGREGATE;
 import static io.prestosql.spi.function.FunctionKind.SCALAR;
-import static io.prestosql.spi.relation.SpecialForm.Form.IN;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
 
@@ -54,6 +53,8 @@ import io.prestosql.spi.relation.SpecialForm;
 import io.prestosql.spi.type.*;
 import io.prestosql.sql.relational.RowExpressionDomainTranslator;
 import org.apache.spark.TaskContext;
+import org.apache.spark.sql.catalyst.expressions.BinaryComparison;
+import org.apache.spark.sql.catalyst.expressions.UnaryExpression;
 import org.apache.spark.sql.execution.ndp.NdpConf;
 import scala.collection.JavaConverters;
 import scala.collection.Seq;
@@ -65,15 +66,8 @@ import org.apache.spark.sql.catalyst.expressions.Attribute;
 import org.apache.spark.sql.catalyst.expressions.AttributeReference;
 import org.apache.spark.sql.catalyst.expressions.BinaryArithmetic;
 import org.apache.spark.sql.catalyst.expressions.Divide;
-import org.apache.spark.sql.catalyst.expressions.EqualTo;
 import org.apache.spark.sql.catalyst.expressions.Expression;
-import org.apache.spark.sql.catalyst.expressions.GreaterThan;
-import org.apache.spark.sql.catalyst.expressions.GreaterThanOrEqual;
 import org.apache.spark.sql.catalyst.expressions.In;
-import org.apache.spark.sql.catalyst.expressions.IsNotNull;
-import org.apache.spark.sql.catalyst.expressions.IsNull;
-import org.apache.spark.sql.catalyst.expressions.LessThan;
-import org.apache.spark.sql.catalyst.expressions.LessThanOrEqual;
 import org.apache.spark.sql.catalyst.expressions.Literal;
 import org.apache.spark.sql.catalyst.expressions.Multiply;
 import org.apache.spark.sql.catalyst.expressions.NamedExpression;
@@ -608,161 +602,112 @@ public class DataIoAdapter {
 
     private RowExpression getExpression(Expression filterExpression) {
         RowExpression resRowExpression = null;
-        List<Expression> rightExpressions = new ArrayList<>();
-        ExpressionOperator expressionOperType =
-                ExpressionOperator.valueOf(filterExpression.getClass().getSimpleName());
-        Expression left;
-        String operatorName;
+        ExpressionOperator expressionOperType = ExpressionOperator.valueOf(filterExpression.getClass().getSimpleName());
         switch (expressionOperType) {
             case Or:
             case And:
                 return reverseExpressionTree(filterExpression);
-            case Not:
-                if (!(filterExpression instanceof Not)) {
-                    return resRowExpression;
-                }
-                if (((Not) filterExpression).child() instanceof EqualTo) {
-                    EqualTo equalToExpression = (EqualTo) ((Not) filterExpression).child();
-                    if (equalToExpression.left() instanceof Literal) {
-                        rightExpressions.add(equalToExpression.left());
-                        left = equalToExpression.right();
-                    } else {
-                        rightExpressions.add(equalToExpression.right());
-                        left = equalToExpression.left();
-                    }
-                    return getRowExpression(left,
-                            "NOT_EQUAL", rightExpressions);
-                }
-                Signature notSignature = new Signature(
-                        QualifiedObjectName.valueOfDefaultFunction("not"),
-                        FunctionKind.SCALAR, new TypeSignature("boolean"),
-                        new TypeSignature("boolean"));
-                RowExpression tempRowExpression = getExpression(((Not) filterExpression).child());
-                List<RowExpression> notArguments = new ArrayList<>();
-                notArguments.add(tempRowExpression);
-                return new CallExpression("not", new BuiltInFunctionHandle(notSignature),
-                        BOOLEAN, notArguments, Optional.empty());
             case EqualTo:
-                if (((EqualTo) filterExpression).left() instanceof Literal) {
-                    rightExpressions.add(((EqualTo) filterExpression).left());
-                    left = ((EqualTo) filterExpression).right();
-                } else {
-                    rightExpressions.add(((EqualTo) filterExpression).right());
-                    left = ((EqualTo) filterExpression).left();
-                }
-                return getRowExpression(left,
-                        "EQUAL", rightExpressions);
-            case IsNotNull:
-                Signature isnullSignature = new Signature(
-                        QualifiedObjectName.valueOfDefaultFunction("not"),
-                        FunctionKind.SCALAR, new TypeSignature("boolean"),
-                        new TypeSignature("boolean"));
-                RowExpression isnullRowExpression =
-                        getRowExpression(((IsNotNull) filterExpression).child(),
-                                "is_null", null);
-                List<RowExpression> isnullArguments = new ArrayList<>();
-                isnullArguments.add(isnullRowExpression);
-                return new CallExpression("not", new BuiltInFunctionHandle(isnullSignature),
-                        BOOLEAN, isnullArguments, Optional.empty());
-            case IsNull:
-                return getRowExpression(((IsNull) filterExpression).child(),
-                        "is_null", null);
+                return getRowExpression(flatBinaryExpression(filterExpression), "EQUAL");
             case LessThan:
-                if (((LessThan) filterExpression).left() instanceof Literal) {
-                    rightExpressions.add(((LessThan) filterExpression).left());
-                    left = ((LessThan) filterExpression).right();
-                    operatorName = "GREATER_THAN";
-                } else {
-                    rightExpressions.add(((LessThan) filterExpression).right());
-                    left = ((LessThan) filterExpression).left();
-                    operatorName = "LESS_THAN";
-                }
-                return getRowExpression(left,
-                        operatorName, rightExpressions);
-            case GreaterThan:
-                if (((GreaterThan) filterExpression).left() instanceof Literal) {
-                    rightExpressions.add(((GreaterThan) filterExpression).left());
-                    left = ((GreaterThan) filterExpression).right();
-                    operatorName = "LESS_THAN";
-                } else {
-                    rightExpressions.add(((GreaterThan) filterExpression).right());
-                    left = ((GreaterThan) filterExpression).left();
-                    operatorName = "GREATER_THAN";
-                }
-                return getRowExpression(left,
-                        operatorName, rightExpressions);
-            case GreaterThanOrEqual:
-                if (((GreaterThanOrEqual) filterExpression).left() instanceof Literal) {
-                    rightExpressions.add(((GreaterThanOrEqual) filterExpression).left());
-                    left = ((GreaterThanOrEqual) filterExpression).right();
-                    operatorName = "LESS_THAN_OR_EQUAL";
-                } else {
-                    rightExpressions.add(((GreaterThanOrEqual) filterExpression).right());
-                    left = ((GreaterThanOrEqual) filterExpression).left();
-                    operatorName = "GREATER_THAN_OR_EQUAL";
-                }
-                return getRowExpression(left,
-                        operatorName, rightExpressions);
+                return getRowExpression(flatBinaryExpression(filterExpression), "LESS_THAN");
             case LessThanOrEqual:
-                if (((LessThanOrEqual) filterExpression).left() instanceof Literal) {
-                    rightExpressions.add(((LessThanOrEqual) filterExpression).left());
-                    left = ((LessThanOrEqual) filterExpression).right();
-                    operatorName = "GREATER_THAN_OR_EQUAL";
+                return getRowExpression(flatBinaryExpression(filterExpression), "LESS_THAN_OR_EQUAL");
+            case GreaterThan:
+                return getRowExpression(flatBinaryExpression(filterExpression), "GREATER_THAN");
+            case GreaterThanOrEqual:
+                return getRowExpression(flatBinaryExpression(filterExpression), "GREATER_THAN_OR_EQUAL");
+            case IsNull:
+                return getRowExpression(flatUnaryExpression(filterExpression), "IS_NULL");
+            case AttributeReference:
+                Type type = NdpUtils.transOlkDataType(filterExpression.dataType(), filterExpression, false);
+                return new InputReferenceExpression(putFilterValue(filterExpression, type), type);
+            case HiveSimpleUDF:
+                if (filterExpression instanceof HiveSimpleUDF) {
+                    return getRowExpression(Arrays.asList(filterExpression), ((HiveSimpleUDF) filterExpression).name());
                 } else {
-                    rightExpressions.add(((LessThanOrEqual) filterExpression).right());
-                    left = ((LessThanOrEqual) filterExpression).left();
-                    operatorName = "LESS_THAN_OR_EQUAL";
-                }
-                return getRowExpression(left,
-                        operatorName, rightExpressions);
-            case In:
-                if (!(filterExpression instanceof In)) {
                     return resRowExpression;
                 }
-                In in = (In) filterExpression;
-                List<Expression> rightExpression =
-                        JavaConverters.seqAsJavaList(in.list());
-                return getRowExpressionForIn(in.value(), rightExpression);
-            case HiveSimpleUDF:
-                return getRowExpression(filterExpression,
-                        ((HiveSimpleUDF) filterExpression).name(), rightExpressions);
-            case AttributeReference:
-                Type type = NdpUtils.transOlkDataType(filterExpression.dataType(), filterExpression,
-                        false);
-                return new InputReferenceExpression(putFilterValue(filterExpression, type), type);
+            case Not:
+            case IsNotNull:
+                // get child RowExpression
+                RowExpression childRowExpression;
+                if (expressionOperType == ExpressionOperator.IsNotNull) {
+                    childRowExpression = getRowExpression(flatUnaryExpression(filterExpression), "IS_NULL");
+                } else {
+                    if (filterExpression instanceof Not) {
+                        childRowExpression = getExpression(((Not) filterExpression).child());
+                    } else {
+                        return resRowExpression;
+                    }
+                }
+                // get not(child) RowExpression
+                List<RowExpression> notArguments = new ArrayList<>();
+                notArguments.add(childRowExpression);
+                return NdpFilterUtils.generateRowExpression("NOT", notArguments, new TypeSignature("boolean"));
+            case In:
+                if (filterExpression instanceof In) {
+                    // flat "in" expression
+                    In in = (In) filterExpression;
+                    List<Expression> rightExpressions = JavaConverters.seqAsJavaList(in.list());
+                    List<Expression> expressions = new ArrayList<>(rightExpressions.size() + 1);
+                    expressions.add(in.value());
+                    expressions.addAll(rightExpressions);
+                    // get RowExpression
+                    return getRowExpression(expressions, "IN");
+                } else {
+                    return resRowExpression;
+                }
             default:
                 return resRowExpression;
         }
     }
 
-    private RowExpression getRowExpression(Expression leftExpression, String operatorName,
-                                           List<Expression> rightExpression) {
-        ColumnInfo columnInfo = getColumnInfo(leftExpression);
-        PrestoExpressionInfo expressionInfo = columnInfo.getExpressionInfo();
-        Type prestoType = columnInfo.getPrestoType();
-        int filterProjectionId = columnInfo.getFilterProjectionId();
-        // deal with right expression
-        List<Object> argumentValues;
-        List<RowExpression> multiArguments = new ArrayList<>();
-        int rightProjectionId;
-        RowExpression rowExpression;
-        if (rightExpression != null && rightExpression.size() > 0 &&
-                rightExpression.get(0) instanceof AttributeReference) {
-            rightProjectionId = putFilterValue(rightExpression.get(0), prestoType);
-            multiArguments.add(new InputReferenceExpression(filterProjectionId, prestoType));
-            multiArguments.add(new InputReferenceExpression(rightProjectionId, prestoType));
-            rowExpression = NdpFilterUtils.generateRowExpression(
-                    operatorName, expressionInfo, prestoType, filterProjectionId,
-                    null, multiArguments, "multy_columns");
+    private List<Expression> flatBinaryExpression(Expression expression) {
+        if (expression instanceof BinaryComparison) {
+            BinaryComparison binaryComparison = (BinaryComparison) expression;
+            return Arrays.asList(binaryComparison.left(), binaryComparison.right());
         } else {
-            // get right value
-            argumentValues = getValue(rightExpression, operatorName,
-                    leftExpression.dataType().toString());
-            rowExpression = NdpFilterUtils.generateRowExpression(
-                    operatorName, expressionInfo, prestoType, filterProjectionId,
-                    argumentValues, null, operatorName);
+            return new ArrayList<>();
         }
-        return rowExpression;
+    }
+
+    private List<Expression> flatUnaryExpression(Expression expression) {
+        if (expression instanceof UnaryExpression) {
+            UnaryExpression unaryExpression = (UnaryExpression) expression;
+            return Arrays.asList(unaryExpression.child());
+        } else {
+            return new ArrayList<>();
+        }
+    }
+
+    private RowExpression getRowExpression(List<Expression> expressions, String operatorName) {
+        RowExpression rowExpression = null;
+        // get filter type
+        Type filterType = null;
+        for (Expression expression : expressions) {
+            if (!(expression instanceof Literal)) {
+                if (expression instanceof AttributeReference) {
+                    filterType = NdpUtils.transOlkDataType(expression.dataType(), expression, false);
+                } else {
+                    filterType = NdpUtils.transOlkDataType(expression.dataType(), true);
+                }
+                break;
+            }
+        }
+        if (filterType == null) {
+            return rowExpression;
+        }
+        // create arguments
+        List<RowExpression> arguments = new ArrayList<>();
+        for (Expression expression : expressions) {
+            if (expression instanceof Literal) {
+                arguments.add(NdpUtils.transConstantExpression(expression.toString(), filterType));
+            } else {
+                arguments.add(NdpFilterUtils.createRowExpressionForColumn(getColumnInfo(expression)));
+            }
+        }
+        return NdpFilterUtils.generateRowExpression(operatorName, arguments, filterType.getTypeSignature());
     }
 
     private ColumnInfo getColumnInfo(Expression expression) {
@@ -795,35 +740,6 @@ public class DataIoAdapter {
         return new ColumnInfo(expressionInfo, prestoType, filterProjectionId);
     }
 
-
-    private RowExpression getRowExpressionForIn(Expression leftExpression, List<Expression> rightExpression) {
-        List<Expression> expressionList = new ArrayList<>(rightExpression.size() + 1);
-        expressionList.add(leftExpression);
-        expressionList.addAll(rightExpression);
-        // get filter type
-        Type filterType = null;
-        for (Expression expression : expressionList) {
-            if (!(expression instanceof Literal)){
-                if (expression instanceof AttributeReference) {
-                    filterType = NdpUtils.transOlkDataType(expression.dataType(), expression, false);
-                } else {
-                    filterType = NdpUtils.transOlkDataType(expression.dataType(), true);
-                }
-                break;
-            }
-        }
-        // create rowArguments
-        List<RowExpression> rowArguments = new ArrayList<>();
-        for (Expression expression : expressionList) {
-            if (expression instanceof Literal) {
-                rowArguments.add(NdpUtils.transConstantExpression(expression.toString(), filterType));
-            } else{
-                rowArguments.add(NdpFilterUtils.createRowExpressionForIn(getColumnInfo(expression)));
-            }
-        }
-        return new SpecialForm(IN, BOOLEAN, rowArguments);
-    }
-
     // column projection
     private int putFilterValue(Expression valueExpression, Type prestoType) {
         // set filter
@@ -850,25 +766,6 @@ public class DataIoAdapter {
             columnNameMap.put(filterColumnName, columnNameMap.size());
         }
         return filterProjectionId;
-    }
-
-    private List<Object> getValue(List<Expression> rightExpression,
-                                  String operatorName,
-                                  String sparkType) {
-        List<Object> argumentValues = new ArrayList<>();
-        if (null == rightExpression || rightExpression.size() == 0) {
-            return argumentValues;
-        }
-        if ("in".equals(operatorName.toLowerCase(Locale.ENGLISH))) {
-            List<Object> inValue = new ArrayList<>();
-            for (Expression rExpression : rightExpression) {
-                inValue.add(rExpression.toString());
-            }
-            argumentValues = inValue;
-        } else {
-            argumentValues.add(rightExpression.get(0).toString());
-        }
-        return argumentValues;
     }
 
     private PageDeserializer initPageDeserializer(String fileFormat) {
