@@ -150,19 +150,19 @@ case class NdpPushDown(sparkSession: SparkSession)
     fpuHosts.nonEmpty
   }
 
-  def shouldPushDown(relation: HadoopFsRelation): Boolean = {
+  def shouldPushDown(s: FileSourceScanExec): Boolean = {
+    val relation = s.relation
     val isSupportFormat = relation.fileFormat match {
       case source: DataSourceRegister =>
         tableFileFormatWhiteList.contains(source.shortName().toLowerCase(Locale.ROOT))
       case _ => false
     }
-    isSupportFormat && relation.sizeInBytes > tableSizeThreshold.toLong
+    s.output.forall(isOutputTypeSupport) && isSupportFormat && relation.sizeInBytes > tableSizeThreshold.toLong
   }
 
   def shouldPushDown(f: FilterExec, scan: NdpSupport): Boolean = {
     scan.filterExeInfos.isEmpty &&
-      f.subqueries.isEmpty &&
-      f.output.forall(isOutputTypeSupport)
+      f.subqueries.isEmpty
   }
 
   private def supportedHiveStringType(attr: Attribute): Boolean = {
@@ -181,9 +181,7 @@ case class NdpPushDown(sparkSession: SparkSession)
 
   def shouldPushDown(agg: BaseAggregateExec, scan: NdpSupport): Boolean = {
     scan.aggExeInfos.isEmpty &&
-      agg.output.forall(x =>
-        attrWhiteList.contains(x.dataType.typeName) ||
-          supportedHiveStringType(x)) &&
+      agg.output.forall(x => !"decimal".equals(getTypeName(x))) &&
       agg.aggregateExpressions.forall(isAggregateExpressionSupport) &&
       agg.groupingExpressions.forall(isSimpleExpression)
   }
@@ -322,7 +320,7 @@ case class NdpPushDown(sparkSession: SparkSession)
     val p = plan.transformUp {
       case a: AdaptiveSparkPlanExec =>
         pushDownOperatorInternal(a.inputPlan)
-      case s: FileSourceScanExec if shouldPushDown(s.relation) =>
+      case s: FileSourceScanExec if shouldPushDown(s) =>
         val filters = s.partitionFilters.filter { x =>
           //TODO maybe need to adapt to the UDF whitelist.
           filterWhiteList.contains(x.prettyName) || udfWhiteList.contains(x.prettyName)
