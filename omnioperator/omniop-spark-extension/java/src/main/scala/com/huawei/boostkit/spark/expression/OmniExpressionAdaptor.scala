@@ -42,10 +42,6 @@ import java.util.Locale
 import scala.collection.mutable
 
 object OmniExpressionAdaptor extends Logging {
-  var updateSubquery: Boolean = false;
-
-  def setUpdateSubquery(isUpdate: Boolean): Unit = updateSubquery = isUpdate
-
   def getRealExprId(expr: Expression): ExprId = {
     expr match {
       case alias: Alias => getRealExprId(alias.child)
@@ -337,8 +333,10 @@ object OmniExpressionAdaptor extends Logging {
     expr match {
       case subquery: execution.ScalarSubquery =>
         var result: Any = null
-        if (updateSubquery) {
+        try {
           result = subquery.eval(InternalRow.empty)
+        } catch {
+          case e: IllegalArgumentException => logDebug(e.getMessage)
         }
         if (result == null) {
           ("{\"exprType\":\"LITERAL\",\"dataType\":%s, \"isNull\":true,\"value\":%s}")

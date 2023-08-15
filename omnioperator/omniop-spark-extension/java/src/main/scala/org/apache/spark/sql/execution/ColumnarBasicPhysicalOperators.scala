@@ -77,10 +77,8 @@ case class ColumnarProjectExec(projectList: Seq[NamedExpression], child: SparkPl
     val omniAttrExpsIdMap = getExprIdMap(child.output)
     val omniInputTypes = child.output.map(
       exp => sparkTypeToOmniType(exp.dataType, exp.metadata)).toArray
-    setUpdateSubquery(true)
     val omniExpressions = projectList.map(
       exp => rewriteToOmniJsonExpressionLiteral(exp, omniAttrExpsIdMap)).toArray
-    setUpdateSubquery(false)
 
     child.executeColumnar().mapPartitionsWithIndexInternal { (index, iter) =>
       dealPartitionData(numOutputRows, numOutputVecBatchs, addInputTime, omniCodegenTime,
@@ -193,9 +191,7 @@ case class ColumnarFilterExec(condition: Expression, child: SparkPlan)
       exp => sparkTypeToOmniType(exp.dataType, exp.metadata)).toArray
     val omniProjectIndices = child.output.map(
       exp => sparkProjectionToOmniJsonProjection(exp, omniAttrExpsIdMap(exp.exprId))).toArray
-    setUpdateSubquery(true)
     val omniExpression = rewriteToOmniJsonExpressionLiteral(condition, omniAttrExpsIdMap)
-    setUpdateSubquery(false)
 
     child.executeColumnar().mapPartitionsWithIndexInternal { (index, iter) =>
       val startCodegen = System.nanoTime()
@@ -292,11 +288,9 @@ case class ColumnarConditionProjectExec(projectList: Seq[NamedExpression],
     val omniAttrExpsIdMap = getExprIdMap(child.output)
     val omniInputTypes = child.output.map(
       exp => sparkTypeToOmniType(exp.dataType, exp.metadata)).toArray
-    setUpdateSubquery(true)
     val omniExpressions = projectList.map(
       exp => rewriteToOmniJsonExpressionLiteral(exp, omniAttrExpsIdMap)).toArray
     val conditionExpression = rewriteToOmniJsonExpressionLiteral(condition, omniAttrExpsIdMap)
-    setUpdateSubquery(false)
 
     child.executeColumnar().mapPartitionsWithIndexInternal { (index, iter) =>
       val startCodegen = System.nanoTime()
