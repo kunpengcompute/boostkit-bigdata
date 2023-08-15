@@ -19,6 +19,7 @@
 package org.apache.spark.sql.execution.ndp
 
 import com.huawei.boostkit.omnioffload.spark.NdpPluginEnableFlag
+
 import java.util.{Locale, Properties}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{PushDownData, PushDownManager, SparkSession}
@@ -35,6 +36,7 @@ import org.apache.spark.sql.sources.DataSourceRegister
 import org.apache.spark.sql.hive.HiveSimpleUDF
 import org.apache.hadoop.hive.ql.exec.DefaultUDFMethodResolver
 import org.apache.spark.TaskContext
+import org.apache.spark.sql.execution.joins.CartesianProductExec
 import org.apache.spark.sql.execution.ndp.NdpConf.getOptimizerPushDownEnable
 import org.apache.spark.sql.types.{DoubleType, FloatType}
 
@@ -78,14 +80,33 @@ case class NdpPushDown(sparkSession: SparkSession)
   private var isNdpPluginOptimizerPush = false
 
   override def apply(plan: SparkPlan): SparkPlan = {
-    setConfigForTPCH(plan)
+    val fixedPlan=fixSpecial(plan)
+    setConfigForTPCH(fixedPlan)
     isNdpPluginOptimizerPush = NdpPluginEnableFlag.isEnable(sparkSession) && getOptimizerPushDownEnable(sparkSession)
-    if(isNdpPluginOptimizerPush && pushDownEnabled && shouldPushDown(plan) && shouldPushDown()){
-      pushDownScanWithOutOtherOperator(plan)
-    } else if (!isNdpPluginOptimizerPush && pushDownEnabled && shouldPushDown(plan) && shouldPushDown()) {
-      pushDownOperator(plan)
+    if(isNdpPluginOptimizerPush && pushDownEnabled && shouldPushDown(fixedPlan) && shouldPushDown()){
+      pushDownScanWithOutOtherOperator(fixedPlan)
+    } else if (!isNdpPluginOptimizerPush && pushDownEnabled && shouldPushDown(fixedPlan) && shouldPushDown()) {
+      pushDownOperator(fixedPlan)
     } else {
       plan
+    }
+  }
+
+  def supplyEmptyProjectForCrossJoin(project: ProjectExec): ProjectExec = {
+    if (project.projectList.isEmpty) {
+      return ProjectExec(project.child.output, project.child)
+    }
+    project
+  }
+
+  def fixSpecial(plan: SparkPlan): SparkPlan = {
+    plan.transformDown {
+      // fix for cross join t and no column select from t will have 0 projectList Project,
+      // then will wrong update Scan output in the latter code
+      case CartesianProductExec(p1: ProjectExec, p2: ProjectExec, condition)
+        if p1.projectList.isEmpty || p2.projectList.isEmpty =>
+        CartesianProductExec(supplyEmptyProjectForCrossJoin(p1), supplyEmptyProjectForCrossJoin(p2), condition)
+      case p => p
     }
   }
 
