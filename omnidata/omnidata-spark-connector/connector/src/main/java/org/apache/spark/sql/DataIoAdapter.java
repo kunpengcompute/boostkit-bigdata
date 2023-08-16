@@ -54,6 +54,7 @@ import io.prestosql.spi.type.*;
 import io.prestosql.sql.relational.RowExpressionDomainTranslator;
 import org.apache.spark.TaskContext;
 import org.apache.spark.sql.catalyst.expressions.BinaryComparison;
+import org.apache.spark.sql.catalyst.expressions.EqualTo;
 import org.apache.spark.sql.catalyst.expressions.UnaryExpression;
 import org.apache.spark.sql.execution.ndp.NdpConf;
 import scala.collection.JavaConverters;
@@ -636,7 +637,12 @@ public class DataIoAdapter {
                     childRowExpression = getRowExpression(flatUnaryExpression(filterExpression), "IS_NULL");
                 } else {
                     if (filterExpression instanceof Not) {
-                        childRowExpression = getExpression(((Not) filterExpression).child());
+                        Expression childExpression = ((Not) filterExpression).child();
+                        // use "NOT_EQUAL" to adapt to omniOperator
+                        if (childExpression instanceof EqualTo) {
+                            return getRowExpression(flatBinaryExpression(childExpression), "NOT_EQUAL");
+                        }
+                        childRowExpression = getExpression(childExpression);
                     } else {
                         return resRowExpression;
                     }
