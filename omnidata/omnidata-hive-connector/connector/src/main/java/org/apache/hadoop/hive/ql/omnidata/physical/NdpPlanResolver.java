@@ -36,12 +36,12 @@ import org.apache.hadoop.hive.ql.exec.vector.VectorFilterOperator;
 import org.apache.hadoop.hive.ql.exec.vector.VectorGroupByOperator;
 import org.apache.hadoop.hive.ql.exec.vector.VectorLimitOperator;
 import org.apache.hadoop.hive.ql.exec.vector.VectorSelectOperator;
-import org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatchCtx;
 import org.apache.hadoop.hive.ql.exec.vector.expressions.VectorExpression;
 import org.apache.hadoop.hive.ql.lib.Dispatcher;
 import org.apache.hadoop.hive.ql.lib.Node;
 import org.apache.hadoop.hive.ql.lib.TaskGraphWalker;
 import org.apache.hadoop.hive.ql.omnidata.config.OmniDataConf;
+import org.apache.hadoop.hive.ql.omnidata.operator.NdpOperatorUtils;
 import org.apache.hadoop.hive.ql.omnidata.operator.aggregation.OmniDataAggregation;
 import org.apache.hadoop.hive.ql.omnidata.operator.filter.NdpFilter;
 import org.apache.hadoop.hive.ql.omnidata.operator.filter.OmniDataFilter;
@@ -84,52 +84,10 @@ public class NdpPlanResolver implements PhysicalPlanResolver {
 
     private ParseContext parseContext;
 
-    private boolean isPushDownFilter = false;
-
-    private boolean isPushDownPartFilter = false;
-
-    private boolean isPushDownSelect = false;
-
-    private boolean isPushDownAgg = false;
-
-    private boolean isPushDownLimit = false;
-
-    /**
-     * Hive filter expression
-     */
-    private ExprNodeGenericFuncDesc filterDesc;
-
-    /**
-     * Hive does not support push-down filter expressions.
-     */
-    private ExprNodeDesc unsupportedFilterDesc;
-
-    /**
-     * Hive select expression
-     */
-    private VectorSelectDesc selectDesc;
-
-    /**
-     * Hive agg && group by expression
-     */
-    private VectorGroupByDesc aggDesc;
-
-    /**
-     * Hive limit expression
-     */
-    private LimitDesc limitDesc;
-
-    /**
-     * Table data format
-     */
-    private String dataFormat = "";
-
     /**
      * If a table in an SQL statement is pushed down, this parameter is set to true.
      */
     private boolean existsTablePushDown = false;
-
-    private NdpVectorizedRowBatchCtx ndpCtx;
 
     @Override
     public PhysicalContext resolve(PhysicalContext pctx) throws SemanticException {
@@ -172,7 +130,7 @@ public class NdpPlanResolver implements PhysicalPlanResolver {
             // use TreeMap, sort by reduce name, for example: Reduce1, Reduce2...
             Map<String, ReduceWork> reduceWorkMap = new TreeMap<>();
             if (currTask.getWork() instanceof TezWork) {
-                NdpStatisticsUtils.generateMapReduceWork((TezWork) currTask.getWork(), mapWorkMap, tableScanOperatorMap,
+                NdpOperatorUtils.generateMapReduceWork((TezWork) currTask.getWork(), mapWorkMap, tableScanOperatorMap,
                         reduceWorkMap);
             } else {
                 // unsupported
@@ -180,60 +138,19 @@ public class NdpPlanResolver implements PhysicalPlanResolver {
             }
             // deal with each TableScanOperator
             tableScanOperatorMap.forEach((workName, tableScanOp) -> {
-                NdpPredicateInfo ndpPredicateInfo = new NdpPredicateInfo(false);
+                BaseWork work = mapWorkMap.get(workName);
                 // set table's selectivity
                 tableScanOp.getConf().setOmniDataSelectivity(NdpStatisticsUtils.getSelectivity(tableScanOp));
-                // check TableScanOp
-                if (checkTableScanOp(tableScanOp, mapWorkMap.get(workName))) {
-                    Optional<RowExpression> filter = Optional.empty();
-                    Optional<AggregationInfo> aggregation = Optional.empty();
-                    OptionalLong limit = OptionalLong.empty();
-                    OmniDataPredicate omniDataPredicate = new OmniDataPredicate(tableScanOp);
-                    omniDataPredicate.setSelectExpressions(selectDesc);
-                    // get OmniData filter expression
-                    if (isPushDownFilter) {
-                        filter = getOmniDataFilter(omniDataPredicate, tableScanOp);
-                        if (!filter.isPresent()) {
-                            isPushDownFilter = false;
-                            isPushDownAgg = false;
-                        }
-                    }
-                    // get OmniData agg expression
-                    if (isPushDownAgg) {
-                        // The output column of the aggregation needs to be processed separately.
-                        aggregation = getOmniDataAggregation(omniDataPredicate);
-                        if (!aggregation.isPresent()) {
-                            isPushDownAgg = false;
-                        }
-                    }
-                    // get OmniData select expression
-                    if (isPushDownSelect && !isPushDownAgg) {
-                        omniDataPredicate = new OmniDataPredicate(tableScanOp);
-                        omniDataPredicate.addProjectionsByTableScan(tableScanOp);
-                    }
-                    // get OmniData limit expression
-                    if (isPushDownLimit) {
-                        limit = getOmniDataLimit();
-                    }
-                    // the decode type must exist
-                    if ((isPushDownFilter || isPushDownAgg) && omniDataPredicate.getDecodeTypes().size() > 0) {
-                        replaceTableScanOp(tableScanOp, mapWorkMap.get(workName));
-                        Predicate predicate = new Predicate(omniDataPredicate.getTypes(),
-                                omniDataPredicate.getColumns(), filter, omniDataPredicate.getProjections(),
-                                ImmutableMap.of(), ImmutableMap.of(), aggregation, limit);
-                        ndpPredicateInfo = new NdpPredicateInfo(true, isPushDownAgg, isPushDownFilter,
-                                omniDataPredicate.getHasPartitionColumns(), predicate,
-                                tableScanOp.getConf().getNeededColumnIDs(), omniDataPredicate.getDecodeTypes(),
-                                omniDataPredicate.getDecodeTypesWithAgg(), ndpCtx, dataFormat);
-                        // print OmniData Hive log information
-                        printPushDownInfo(tableScanOp.getConf().getAlias(), ndpStatusInfoMap);
-                        existsTablePushDown = true;
-                    }
+                NdpTable ndpTable = new NdpTable(tableScanOp, work);
+                NdpPredicateInfo ndpPredicateInfo = ndpTable.getNdpPredicateInfo();
+                if (ndpPredicateInfo.getIsPushDown()) {
+                    // print OmniData Hive log information
+                    ndpTable.printPushDownInfo(tableScanOp.getConf().getAlias(), ndpStatusInfoMap);
+                    existsTablePushDown = true;
                 }
                 // set ndpPredicateInfo after serialization
                 tableScanOp.getConf()
                         .setNdpPredicateInfoStr(NdpSerializationUtils.serializeNdpPredicateInfo(ndpPredicateInfo));
-                initPushDown();
             });
             if (existsTablePushDown) {
                 // set OmniData hosts info to Hive conf
@@ -246,23 +163,128 @@ public class NdpPlanResolver implements PhysicalPlanResolver {
             OmniDataConf.setOmniDataExistsTablePushDown(hiveConf, existsTablePushDown);
             return null;
         }
+    }
 
-        private boolean checkTableScanOp(TableScanOperator tableScanOp, BaseWork work) {
+    private class NdpTable {
+        private boolean isPushDownFilter = false;
+
+        private boolean isPushDownPartFilter = false;
+
+        private boolean isPushDownSelect = false;
+
+        private boolean isPushDownAgg = false;
+
+        private boolean isPushDownLimit = false;
+
+        /**
+         * Hive filter expression
+         */
+        private ExprNodeGenericFuncDesc filterDesc;
+
+        /**
+         * Hive does not support push-down filter expressions.
+         */
+        private ExprNodeDesc unsupportedFilterDesc;
+
+        /**
+         * Hive select expression
+         */
+        private VectorSelectDesc selectDesc;
+
+        /**
+         * Hive agg && group by expression
+         */
+        private VectorGroupByDesc aggDesc;
+
+        /**
+         * Hive limit expression
+         */
+        private LimitDesc limitDesc;
+
+        /**
+         * Table data format
+         */
+        private String dataFormat = "";
+
+        /**
+         * predicate information
+         */
+        private NdpPredicateInfo ndpPredicateInfo;
+
+        /**
+         * NdpTable initialize
+         *
+         * @param tableScanOp TableScanOperator
+         * @param work        Tez Work
+         */
+        public NdpTable(TableScanOperator tableScanOp, BaseWork work) {
+            ndpPredicateInfo = new NdpPredicateInfo(false);
+            // get the data format of the table
             Optional<String> format = NdpPlanChecker.getDataFormat(tableScanOp, work);
             if (format.isPresent()) {
                 dataFormat = format.get();
             } else {
                 LOG.info("Table [{}] failed to push down, only orc and parquet are supported",
                         tableScanOp.getConf().getAlias());
-                return false;
+                return;
             }
+            // Check the basic information about the table and determine whether to push the table down
             if (NdpPlanChecker.checkTableScanNumChild(tableScanOp) && NdpPlanChecker.checkHiveType(tableScanOp)
                     && NdpPlanChecker.checkTableSize(tableScanOp, hiveConf) && NdpPlanChecker.checkSelectivity(tableScanOp,
                     hiveConf)) {
                 // scan operator: select agg filter limit
                 scanTableScanChildOperators(tableScanOp.getChildOperators());
             }
-            return isPushDownAgg || isPushDownFilter;
+            if (!isPushDown()) {
+                return;
+            }
+            transformToOmniData(tableScanOp);
+        }
+
+        private void transformToOmniData(TableScanOperator tableScanOp) {
+            Optional<RowExpression> filter = Optional.empty();
+            Optional<AggregationInfo> aggregation = Optional.empty();
+            OptionalLong limit = OptionalLong.empty();
+            OmniDataPredicate omniDataPredicate = new OmniDataPredicate(tableScanOp);
+            omniDataPredicate.setSelectExpressions(selectDesc);
+            // get OmniData filter expression
+            if (isPushDownFilter) {
+                filter = getOmniDataFilter(omniDataPredicate, tableScanOp);
+                if (!filter.isPresent()) {
+                    isPushDownFilter = false;
+                    isPushDownAgg = false;
+                }
+            }
+            // get OmniData agg expression
+            if (isPushDownAgg) {
+                // The output column of the aggregation needs to be processed separately.
+                aggregation = getOmniDataAggregation(omniDataPredicate);
+                if (!aggregation.isPresent()) {
+                    isPushDownAgg = false;
+                }
+            }
+            // get OmniData select expression
+            if (isPushDownSelect && !isPushDownAgg) {
+                omniDataPredicate = new OmniDataPredicate(tableScanOp);
+                omniDataPredicate.addProjectionsByTableScan(tableScanOp);
+            }
+            // get OmniData limit expression
+            if (isPushDownLimit) {
+                limit = getOmniDataLimit();
+            }
+            // the decode type must exist
+            if (isPushDown() && omniDataPredicate.getDecodeTypes().size() > 0) {
+                // set whether to push down
+                tableScanOp.getConf().setPushDownFilter(isPushDownFilter);
+                tableScanOp.getConf().setPushDownAgg(isPushDownAgg);
+                Predicate predicate = new Predicate(omniDataPredicate.getTypes(),
+                        omniDataPredicate.getColumns(), filter, omniDataPredicate.getProjections(),
+                        ImmutableMap.of(), ImmutableMap.of(), aggregation, limit);
+                ndpPredicateInfo = new NdpPredicateInfo(true, isPushDownAgg, isPushDownFilter, isPushDownPartFilter,
+                        omniDataPredicate.getHasPartitionColumns(), predicate,
+                        tableScanOp.getConf().getNeededColumnIDs(), omniDataPredicate.getDecodeTypes(),
+                        omniDataPredicate.getDecodeTypesWithAgg(), dataFormat);
+            }
         }
 
         /**
@@ -311,6 +333,8 @@ public class NdpPlanResolver implements PhysicalPlanResolver {
                     isPushDownLimit = true;
                 }
                 scanTableScanChildOperators(operator.getChildOperators());
+            } else {
+                LOG.info("OmniData unsupported this child operator class: [{}] ", operators.getClass().getSimpleName());
             }
         }
 
@@ -358,89 +382,21 @@ public class NdpPlanResolver implements PhysicalPlanResolver {
             return OmniDataLimit.getOmniDataLimit(limitDesc.getLimit());
         }
 
-        private void replaceTableScanOp(TableScanOperator tableScanOp, BaseWork work){
-            if (isPushDownFilter) {
-                if (isPushDownPartFilter) {
-                    replaceRawVectorizedRowBatchCtx(tableScanOp, work);
-                } else {
-                    removeTableScanRawFilter(tableScanOp.getChildOperators());
-                }
-                ndpCtx = new NdpVectorizedRowBatchCtx(work.getVectorizedRowBatchCtx());
-                // set rowColumnTypeInfos to TableScanDesc
-                tableScanOp.getConf().setRowColumnTypeInfos(work.getVectorizedRowBatchCtx().getRowColumnTypeInfos());
-            }
-            if (isPushDownAgg) {
-                removeTableScanRawAggregation(tableScanOp.getChildOperators(), work);
-                removeTableScanRawSelect(tableScanOp.getChildOperators());
-            }
-            // set whether to push down
-            tableScanOp.getConf().setPushDownFilter(isPushDownFilter);
-            tableScanOp.getConf().setPushDownAgg(isPushDownAgg);
-        }
-
         /**
-         * The outputColumnId is added to VectorizedRowBatchCtx because a new filter expression is replaced.
+         * Print OmniData Hive log information
          *
-         * @param tableScanOp TableScanOperator
-         * @param work BaseWork
+         * @param tableName        Hive's table name
+         * @param ndpStatusInfoMap status info in Zookeeper
          */
-        private void replaceRawVectorizedRowBatchCtx(TableScanOperator tableScanOp, BaseWork work) {
-            VectorizedRowBatchCtx oldCtx = work.getVectorizedRowBatchCtx();
-            VectorizedRowBatchCtx newCtx = new VectorizedRowBatchCtx(oldCtx.getRowColumnNames(),
-                    oldCtx.getRowColumnTypeInfos(), oldCtx.getRowdataTypePhysicalVariations(), oldCtx.getDataColumnNums(),
-                    oldCtx.getPartitionColumnCount(), oldCtx.getVirtualColumnCount(), oldCtx.getNeededVirtualColumns(),
-                    tableScanOp.getOutputVectorizationContext().getScratchColumnTypeNames(),
-                    tableScanOp.getOutputVectorizationContext().getScratchDataTypePhysicalVariations());
-            work.setVectorizedRowBatchCtx(newCtx);
-        }
-
-        private void removeTableScanRawFilter(List<Operator<? extends OperatorDesc>> operators) {
-            try {
-                for (Operator<? extends OperatorDesc> child : operators) {
-                    if (child instanceof VectorFilterOperator) {
-                        // remove raw VectorFilterOperator
-                        child.getParentOperators().get(0).removeChildAndAdoptItsChildren(child);
-                        return;
-                    }
-                    removeTableScanRawFilter(child.getChildOperators());
-                }
-            } catch (SemanticException e) {
-                LOG.error("Exception when trying to remove partition predicates: fail to find child from parent", e);
-            }
-        }
-
-        private void removeTableScanRawAggregation(List<Operator<? extends OperatorDesc>> operators, BaseWork work) {
-            try {
-                for (Operator<? extends OperatorDesc> child : operators) {
-                    if (child instanceof VectorGroupByOperator) {
-                        // remove raw VectorGroupByOperator
-                        child.getParentOperators().get(0).removeChildAndAdoptItsChildren(child);
-                        return;
-                    }
-                    removeTableScanRawAggregation(child.getChildOperators(), work);
-                }
-            } catch (SemanticException e) {
-                LOG.error("Exception when trying to remove partition predicates: fail to find child from parent", e);
-            }
-        }
-
-        private void removeTableScanRawSelect(List<Operator<? extends OperatorDesc>> operators) {
-            for (Operator<? extends OperatorDesc> child : operators) {
-                if (child instanceof VectorSelectOperator) {
-                    // remove raw VectorExpression
-                    ((VectorSelectOperator) child).setvExpressions(new VectorExpression[] {});
-                    return;
-                }
-                removeTableScanRawSelect(child.getChildOperators());
-            }
-        }
-
-        private void printPushDownInfo(String tableName, Map<String, NdpStatusInfo> ndpStatusInfoMap) {
+        public void printPushDownInfo(String tableName, Map<String, NdpStatusInfo> ndpStatusInfoMap) {
             String pushDownInfo = String.format(
-                    "Table [%s] Push Down Info [ Select:[%s], Filter:[%s], Aggregation:[%s], Group By:[%s], Limit:[%s], Raw Filter:[%s], Host Map:[%s]",
-                    tableName, ((selectDesc != null) && isPushDownAgg) ? Arrays.stream(selectDesc.getSelectExpressions())
+                    "Table [%s] Push Down Info [ Select:[%s], Filter:[%s], Aggregation:[%s], Group By:[%s], "
+                            + "Limit:[%s], Raw Filter:[%s], Host Map:[%s]",
+                    tableName, ((selectDesc != null) && isPushDownAgg)
+                            ? Arrays.stream(selectDesc.getSelectExpressions())
                             .map(VectorExpression::toString)
-                            .collect(Collectors.joining(", ")) : "", isPushDownFilter ? filterDesc.toString() : "",
+                            .collect(Collectors.joining(", ")) : "", isPushDownFilter
+                            ? filterDesc.toString() : "",
                     isPushDownAgg ? Arrays.stream(aggDesc.getVecAggrDescs())
                             .map(VectorAggregationDesc::toString)
                             .collect(Collectors.joining(", ")) : "",
@@ -457,19 +413,12 @@ public class NdpPlanResolver implements PhysicalPlanResolver {
             System.out.println(pushDownInfo);
         }
 
-        private void initPushDown() {
-            isPushDownFilter = false;
-            isPushDownPartFilter = false;
-            isPushDownSelect = false;
-            isPushDownAgg = false;
-            isPushDownLimit = false;
-            filterDesc = null;
-            unsupportedFilterDesc = null;
-            selectDesc = null;
-            aggDesc = null;
-            limitDesc = null;
-            ndpCtx = null;
-            dataFormat = "";
+        private boolean isPushDown() {
+            return isPushDownFilter || isPushDownAgg;
+        }
+
+        public NdpPredicateInfo getNdpPredicateInfo() {
+            return ndpPredicateInfo;
         }
     }
 }

@@ -32,7 +32,20 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
-import com.huawei.boostkit.omnidata.decode.type.*;
+import com.huawei.boostkit.omnidata.decode.type.BooleanDecodeType;
+import com.huawei.boostkit.omnidata.decode.type.ByteDecodeType;
+import com.huawei.boostkit.omnidata.decode.type.DateDecodeType;
+import com.huawei.boostkit.omnidata.decode.type.DecodeType;
+import com.huawei.boostkit.omnidata.decode.type.DoubleDecodeType;
+import com.huawei.boostkit.omnidata.decode.type.FloatDecodeType;
+import com.huawei.boostkit.omnidata.decode.type.IntDecodeType;
+import com.huawei.boostkit.omnidata.decode.type.LongDecodeType;
+import com.huawei.boostkit.omnidata.decode.type.LongToByteDecodeType;
+import com.huawei.boostkit.omnidata.decode.type.LongToFloatDecodeType;
+import com.huawei.boostkit.omnidata.decode.type.LongToIntDecodeType;
+import com.huawei.boostkit.omnidata.decode.type.LongToShortDecodeType;
+import com.huawei.boostkit.omnidata.decode.type.ShortDecodeType;
+import com.huawei.boostkit.omnidata.decode.type.VarcharDecodeType;
 import com.huawei.boostkit.omnidata.model.Column;
 import com.huawei.boostkit.omnidata.model.Predicate;
 
@@ -331,11 +344,13 @@ public class TestOmniDataUtils {
         Predicate oldPredicate = new Predicate(new ArrayList<>(), columns, Optional.empty(), new ArrayList<>(),
                 new HashMap<>(), new HashMap<>(), Optional.empty(), OptionalLong.empty());
 
-        NdpPredicateInfo predicateInfo1 = new NdpPredicateInfo(true, true, true, true, oldPredicate, new ArrayList<>(),
-                new ArrayList<>(), new ArrayList<>(), null, "orc");
+        NdpPredicateInfo predicateInfo1 = new NdpPredicateInfo(true, true, true, true, true, oldPredicate,
+                new ArrayList<>(),
+                new ArrayList<>(), new ArrayList<>(), "orc");
 
-        NdpPredicateInfo predicateInfo2 = new NdpPredicateInfo(true, true, true, true, oldPredicate, new ArrayList<>(),
-                new ArrayList<>(), new ArrayList<>(), null, "orc");
+        NdpPredicateInfo predicateInfo2 = new NdpPredicateInfo(true, true, true, true, true, oldPredicate,
+                new ArrayList<>(),
+                new ArrayList<>(), new ArrayList<>(), "orc");
 
         String path1 = "/test/partition=100";
         String path2 = "/test/partition=default";

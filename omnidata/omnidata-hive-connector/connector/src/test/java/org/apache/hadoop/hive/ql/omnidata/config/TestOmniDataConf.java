@@ -91,7 +91,7 @@ public class TestOmniDataConf {
         int retryInterval = OmniDataConf.getOmniDataZookeeperRetryInterval(conf);
         Assert.assertEquals(retryInterval, 5);
 
-        int omniDataOptimizedThreadNums = OmniDataConf.getOmniDataOptimizedThreadNums(conf);
+        int omniDataOptimizedThreadNums = OmniDataConf.getOmniDataOptimizedThreadNums(conf, 15);
         Assert.assertEquals(omniDataOptimizedThreadNums, 32);
 
         Boolean isNdpAggOptimizedEnabled = OmniDataConf.getOmniDataAggOptimizedEnabled(conf);

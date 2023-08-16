@@ -25,35 +25,74 @@ import com.huawei.boostkit.omnidata.decode.type.DecodeType;
 import io.airlift.slice.SliceInput;
 import io.hetu.core.transport.execution.buffer.SerializedPage;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.ql.exec.vector.ColumnVector;
+import org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatch;
+import org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatchCtx;
+import org.apache.hadoop.hive.ql.metadata.HiveException;
+import org.apache.hadoop.hive.ql.omnidata.operator.predicate.NdpPredicateInfo;
+import org.apache.hadoop.mapred.FileSplit;
 
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Queue;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
 /**
- * PageDeserializer
+ * Hive page deserializer
  */
-public class PageDeserializer implements Deserializer<List<ColumnVector[]>> {
+public class PageDeserializer implements Deserializer<Queue<VectorizedRowBatch>> {
 
     private final PageDecoding decoding;
 
     private final DecodeType[] columnTypes;
 
-    public PageDeserializer(DecodeType[] columnTypes) {
+    private VectorizedRowBatchCtx vCtx;
+
+    private Object[] partitionValues = null;
+
+    private NdpPredicateInfo ndpPredicateInfo;
+
+    /**
+     * Initialize Hive PageDeserializer
+     *
+     * @param columnTypes      DecodeType[]
+     * @param vCtx             VectorizedRowBatchCtx
+     * @param conf             Hive conf
+     * @param fileSplit        FileSplit
+     * @param ndpPredicateInfo OmniData pushdown info
+     * @throws HiveException hive exception
+     */
+    public PageDeserializer(DecodeType[] columnTypes, VectorizedRowBatchCtx vCtx, Configuration conf,
+                            FileSplit fileSplit, NdpPredicateInfo ndpPredicateInfo) throws HiveException {
         this.columnTypes = columnTypes;
         decoding = new PageDecoding();
+        this.vCtx = vCtx;
+        this.ndpPredicateInfo = ndpPredicateInfo;
+        try {
+            int partitionColumnCount = this.vCtx.getPartitionColumnCount();
+            if (partitionColumnCount > 0) {
+                partitionValues = new Object[partitionColumnCount];
+                // set partitionValues
+                VectorizedRowBatchCtx.getPartitionValues(this.vCtx, conf, fileSplit, partitionValues);
+            }
+        } catch (IOException e) {
+            throw new HiveException(e);
+        }
     }
 
     @Override
-    public List<ColumnVector[]> deserialize(SerializedPage page) {
+    public Queue<VectorizedRowBatch> deserialize(SerializedPage page) {
         if (page.isCompressed() || page.isEncrypted()) {
             throw new UnsupportedOperationException(
                     "unsupported HiveDeserializer isMarkerPage or compressed or encrypted page ");
         }
         SliceInput input = page.getSlice().getInput();
+        // Number of columns
         int numberOfBlocks = input.readInt();
         checkArgument(numberOfBlocks >= 0, "decode failed, numberOfBlocks < 0");
         List<ColumnVector[]> columnVectors = new ArrayList<>();
@@ -65,19 +104,46 @@ public class PageDeserializer implements Deserializer<List<ColumnVector[]>> {
             }
             columnVectors.add(result);
         }
-        return transform(columnVectors, numberOfBlocks);
+        return ndpPredicateInfo.getIsPushDownAgg()
+                ? createVectorizedRowBatchWithAgg(columnVectors, numberOfBlocks)
+                : createVectorizedRowBatch(columnVectors, numberOfBlocks);
     }
 
-    private List<ColumnVector[]> transform(List<ColumnVector[]> columnVectors, int numberOfBlocks) {
-        List<ColumnVector[]> newColumnVectors = new ArrayList<>();
+    private Queue<VectorizedRowBatch> createVectorizedRowBatchWithAgg(List<ColumnVector[]> columnVectors,
+                                                                      int channelCount) {
+        Queue<VectorizedRowBatch> rowBatches = new LinkedList<>();
         for (int i = 0; i < columnVectors.get(0).length; i++) {
-            ColumnVector[] result = new ColumnVector[numberOfBlocks];
-            for (int j = 0; j < numberOfBlocks; j++) {
+            ColumnVector[] result = new ColumnVector[channelCount];
+            for (int j = 0; j < channelCount; j++) {
                 result[j] = columnVectors.get(j)[i];
             }
-            newColumnVectors.add(result);
+            int positionCount = columnVectors.get(0)[i].isNull.length;
+            VectorizedRowBatch rowBatch = new VectorizedRowBatch(channelCount, positionCount);
+            // agg: copy columnVectors to rowBatch.cols
+            System.arraycopy(result, 0, rowBatch.cols, 0, channelCount);
+            rowBatches.add(rowBatch);
         }
-        return newColumnVectors;
+        return rowBatches;
+    }
+
+    private Queue<VectorizedRowBatch> createVectorizedRowBatch(List<ColumnVector[]> columnVectors,
+                                                               int channelCount) {
+        Queue<VectorizedRowBatch> rowBatches = new LinkedList<>();
+        for (int i = 0; i < columnVectors.get(0).length; i++) {
+            int positionCount = columnVectors.get(0)[i].isNull.length;
+            // creates a vectorized row batch and the column vectors
+            VectorizedRowBatch rowBatch = vCtx.createVectorizedRowBatch();
+            for (int j = 0; j < channelCount; j++) {
+                int columnId = ndpPredicateInfo.getOutputColumns().get(j);
+                rowBatch.cols[columnId] = columnVectors.get(j)[i];
+            }
+            rowBatch.size = positionCount;
+            if (partitionValues != null) {
+                vCtx.addPartitionColsToBatch(rowBatch, partitionValues);
+            }
+            rowBatches.add(rowBatch);
+        }
+        return rowBatches;
     }
 
 }

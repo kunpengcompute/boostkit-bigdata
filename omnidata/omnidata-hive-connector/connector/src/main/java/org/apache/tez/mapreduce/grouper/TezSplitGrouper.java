@@ -16,6 +16,7 @@ package org.apache.tez.mapreduce.grouper;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.ql.omnidata.config.OmniDataConf;
+import org.apache.hadoop.hive.ql.omnidata.operator.NdpOperatorUtils;
 import org.apache.hadoop.hive.ql.omnidata.physical.NdpStatisticsUtils;
 import org.apache.hadoop.yarn.util.RackResolver;
 import org.apache.tez.common.Preconditions;
@@ -290,6 +291,7 @@ public abstract class TezSplitGrouper {
         long lengthPerGroup = totalLength/desiredNumSplits;
 
         // OmniData optimized
+        NdpOperatorUtils.setOmniDataInfoByConf(conf);
         if (configNumSplits <= 0 && OmniDataConf.getOmniDataExistsTablePushDown(conf)) {
             double newLengthPerGroup = NdpStatisticsUtils.optimizeLengthPerGroup(conf) * (double) lengthPerGroup;
             lengthPerGroup = (long) newLengthPerGroup;

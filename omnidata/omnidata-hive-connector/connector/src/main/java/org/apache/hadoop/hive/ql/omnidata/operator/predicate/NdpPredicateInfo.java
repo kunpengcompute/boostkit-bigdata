@@ -24,8 +24,6 @@ import com.huawei.boostkit.omnidata.model.Predicate;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-import org.apache.hadoop.hive.ql.omnidata.physical.NdpVectorizedRowBatchCtx;
-
 import java.io.Serializable;
 import java.util.List;
 
@@ -44,6 +42,8 @@ public class NdpPredicateInfo implements Serializable {
 
     private boolean isPushDownFilter = false;
 
+    private boolean isPushDownPartFilter = false;
+
     private boolean hasPartitionColumn = false;
 
     private Predicate predicate;
@@ -53,8 +53,6 @@ public class NdpPredicateInfo implements Serializable {
     private List<String> decodeTypes;
 
     private List<Boolean> decodeTypesWithAgg;
-
-    private NdpVectorizedRowBatchCtx ndpVectorizedRowBatchCtx;
 
     private String dataFormat;
 
@@ -69,21 +67,22 @@ public class NdpPredicateInfo implements Serializable {
     public NdpPredicateInfo(@JsonProperty("isPushDown") boolean isPushDown,
                             @JsonProperty("isPushDownAgg") boolean isPushDownAgg,
                             @JsonProperty("isPushDownFilter") boolean isPushDownFilter,
-                            @JsonProperty("hasPartitionColumn") boolean hasPartitionColumn, @JsonProperty("predicate") Predicate predicate,
+                            @JsonProperty("isPushDownPartFilter") boolean isPushDownPartFilter,
+                            @JsonProperty("hasPartitionColumn") boolean hasPartitionColumn,
+                            @JsonProperty("predicate") Predicate predicate,
                             @JsonProperty("outputColumns") List<Integer> outputColumns,
                             @JsonProperty("decodeTypes") List<String> decodeTypes,
                             @JsonProperty("decodeTypesWithAgg") List<Boolean> decodeTypesWithAgg,
-                            @JsonProperty("ndpVectorizedRowBatchCtx") NdpVectorizedRowBatchCtx ndpVectorizedRowBatchCtx,
                             @JsonProperty("dataFormat") String dataFormat) {
         this.isPushDown = isPushDown;
         this.isPushDownAgg = isPushDownAgg;
         this.isPushDownFilter = isPushDownFilter;
+        this.isPushDownPartFilter = isPushDownPartFilter;
         this.hasPartitionColumn = hasPartitionColumn;
         this.predicate = predicate;
         this.outputColumns = outputColumns;
         this.decodeTypes = decodeTypes;
         this.decodeTypesWithAgg = decodeTypesWithAgg;
-        this.ndpVectorizedRowBatchCtx = ndpVectorizedRowBatchCtx;
         this.dataFormat = dataFormat;
     }
 
@@ -100,6 +99,11 @@ public class NdpPredicateInfo implements Serializable {
     @JsonProperty
     public boolean getIsPushDownFilter() {
         return isPushDownFilter;
+    }
+
+    @JsonProperty
+    public boolean getIsPushDownPartFilter() {
+        return isPushDownPartFilter;
     }
 
     @JsonProperty
@@ -128,11 +132,6 @@ public class NdpPredicateInfo implements Serializable {
     }
 
     @JsonProperty
-    public NdpVectorizedRowBatchCtx getNdpVectorizedRowBatchCtx() {
-        return ndpVectorizedRowBatchCtx;
-    }
-
-    @JsonProperty
     public String getDataFormat() {
         return dataFormat;
     }
@@ -151,10 +150,6 @@ public class NdpPredicateInfo implements Serializable {
 
     public void setDecodeTypesWithAgg(List<Boolean> decodeTypesWithAgg) {
         this.decodeTypesWithAgg = decodeTypesWithAgg;
-    }
-
-    public void setNdpVectorizedRowBatchCtx(NdpVectorizedRowBatchCtx ndpVectorizedRowBatchCtx) {
-        this.ndpVectorizedRowBatchCtx = ndpVectorizedRowBatchCtx;
     }
 
     public void setDataFormat(String dataFormat) {

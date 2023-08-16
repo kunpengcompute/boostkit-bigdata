@@ -22,7 +22,6 @@ package org.apache.hadoop.hive.ql.omnidata.config;
 import static com.google.common.base.Preconditions.checkArgument;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hive.ql.exec.tez.MapRecordSource;
 
 /**
  * OmniData hive configuration
@@ -134,9 +133,30 @@ public class OmniDataConf {
     public static final String DFS_REPLICATION = "dfs.replication";
 
     /**
-     *omnidata task.timeout, default:300
+     * OmniData task timeout, default:300
      */
     public static final String OMNIDATA_CLIENT_TASK_TIMEOUT = "omnidata.client.task.timeout";
+
+    /**
+     * Tasks of this proportion are push-down, and other tasks follow the Hive raw process, default:1.0
+     */
+    public static final String OMNIDATA_HIVE_TASK_PUSHDOWN_FACTOR = "omnidata.hive.task.pushdown.factor";
+
+    /**
+     * Whether to enable OmniData reader optimized
+     */
+    public static final String OMNIDATA_HIVE_READER_OPTIMIZED_ENABLED = "omnidata.hive.reader.optimized.enabled";
+
+    /**
+     * OmniData orc raw thread numbers
+     */
+    public static final String OMNIDATA_HIVE_RAW_THREAD_NUMS = "omnidata.hive.raw.thread.nums";
+
+    /**
+     * Temporary parameter
+     */
+    public static final String TMP_OMNIDATA_HIVE_READER_OPTIMIZED_ENABLED = "tmp.omnidata.hive.reader.optimized "
+            + ".enabled";
 
     /**
      * get the value of a parameter: omnidata.hive.enabled
@@ -263,11 +283,12 @@ public class OmniDataConf {
     /**
      * get the value of a parameter: omnidata.hive.optimized.thread.nums
      *
-     * @param conf hive conf
+     * @param conf         hive conf
+     * @param defaultValue default value
      * @return MAX_THREAD_NUMS
      */
-    public static int getOmniDataOptimizedThreadNums(Configuration conf) {
-        return conf.getInt(OMNIDATA_HIVE_OPTIMIZED_THREAD_NUMS, MapRecordSource.MAX_THREAD_NUMS);
+    public static int getOmniDataOptimizedThreadNums(Configuration conf, int defaultValue) {
+        return conf.getInt(OMNIDATA_HIVE_OPTIMIZED_THREAD_NUMS, defaultValue);
     }
 
     /**
@@ -283,7 +304,7 @@ public class OmniDataConf {
     /**
      * set the value of a parameter: omnidata.hive.agg.optimized.enabled
      *
-     * @param conf hive conf
+     * @param conf        hive conf
      * @param isOptimized true or false
      */
     public static void setOmniDataAggOptimizedEnabled(Configuration conf, boolean isOptimized) {
@@ -303,7 +324,7 @@ public class OmniDataConf {
     /**
      * set the value of a parameter: omnidata.hive.filter.optimized.enabled
      *
-     * @param conf hive conf
+     * @param conf        hive conf
      * @param isOptimized true or false
      */
     public static void setOmniDataFilterOptimizedEnabled(Configuration conf, boolean isOptimized) {
@@ -333,7 +354,7 @@ public class OmniDataConf {
     /**
      * set the value of a parameter: omnidata.hive.exists.table.pushdown
      *
-     * @param conf hive conf
+     * @param conf     hive conf
      * @param isExists true or false
      */
     public static void setOmniDataExistsTablePushDown(Configuration conf, boolean isExists) {
@@ -376,7 +397,7 @@ public class OmniDataConf {
     /**
      * set the value of a parameter: omnidata.hive.table.optimized.selectivity
      *
-     * @param conf hive conf
+     * @param conf  hive conf
      * @param value optimized selectivity
      */
     public static void setOmniDataTableOptimizedSelectivity(Configuration conf, double value) {
@@ -403,9 +424,43 @@ public class OmniDataConf {
      * @param conf hive conf
      * @return timeout
      */
-    public static int getOmnidataClientTaskTimeout(Configuration conf) {
+    public static int getOmniDataClientTaskTimeout(Configuration conf) {
         int timeout = conf.getInt(OMNIDATA_CLIENT_TASK_TIMEOUT, 300);
         checkArgument(timeout > 0, String.format("The %s value must be positive", OMNIDATA_CLIENT_TASK_TIMEOUT));
         return timeout;
+    }
+
+    /**
+     * get the value of a parameter: omnidata.hive.task.pushdown.factor
+     *
+     * @param conf hive conf
+     * @return task factor
+     */
+    public static Double getOmniDataTaskPushDownFactor(Configuration conf) {
+        double factor = conf.getDouble(OMNIDATA_HIVE_TASK_PUSHDOWN_FACTOR, 1.0);
+        checkArgument(factor >= 0 && factor <= 1.0,
+                String.format("The %s value must be in [0.0, 1.0].", OMNIDATA_HIVE_TASK_PUSHDOWN_FACTOR));
+        return factor;
+    }
+
+    /**
+     * get the value of a parameter: omnidata.hive.reader.optimized.enabled
+     *
+     * @param conf hive conf
+     * @return true or false
+     */
+    public static Boolean getOmniDataReaderOptimizedEnabled(Configuration conf) {
+        return conf.getBoolean(OMNIDATA_HIVE_READER_OPTIMIZED_ENABLED, false);
+    }
+
+    /**
+     * get the value of a parameter: omnidata.hive.raw.thread.nums
+     *
+     * @param conf         hive conf
+     * @param defaultValue default value
+     * @return thread nums
+     */
+    public static int getOmniDataRawThreadNums(Configuration conf, int defaultValue) {
+        return conf.getInt(OMNIDATA_HIVE_RAW_THREAD_NUMS, defaultValue);
     }
 }

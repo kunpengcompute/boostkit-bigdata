@@ -75,7 +75,6 @@ public class TableScanDesc extends AbstractOperatorDesc implements IStatsGatherD
   private String tmpStatsDir;
 
   private String ndpPredicateInfoStr;
-  private TypeInfo[] rowColumnTypeInfos;
   private boolean isPushDownFilter = false;
   private boolean isPushDownAgg = false;
   private double omniDataSelectivity = 1.0d;
@@ -239,14 +238,6 @@ public class TableScanDesc extends AbstractOperatorDesc implements IStatsGatherD
 
   public void setNdpPredicateInfoStr(String ndpPredicateInfoStr) {
     this.ndpPredicateInfoStr = ndpPredicateInfoStr;
-  }
-
-  public TypeInfo[] getRowColumnTypeInfos() {
-    return rowColumnTypeInfos;
-  }
-
-  public void setRowColumnTypeInfos(TypeInfo[] rowColumnTypeInfos) {
-    this.rowColumnTypeInfos = rowColumnTypeInfos;
   }
 
   public boolean isPushDownFilter() {

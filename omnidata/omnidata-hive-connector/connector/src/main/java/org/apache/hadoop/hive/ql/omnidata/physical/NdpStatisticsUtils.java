@@ -45,14 +45,11 @@ import org.apache.hadoop.hive.ql.parse.ColumnStatsList;
 import org.apache.hadoop.hive.ql.parse.ParseContext;
 import org.apache.hadoop.hive.ql.parse.PrunedPartitionList;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
-import org.apache.hadoop.hive.ql.plan.BaseWork;
 import org.apache.hadoop.hive.ql.plan.ColStatistics;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
-import org.apache.hadoop.hive.ql.plan.MapWork;
 import org.apache.hadoop.hive.ql.plan.OperatorDesc;
 import org.apache.hadoop.hive.ql.plan.ReduceWork;
 import org.apache.hadoop.hive.ql.plan.Statistics;
-import org.apache.hadoop.hive.ql.plan.TezWork;
 import org.apache.hadoop.hive.ql.stats.StatsUtils;
 import org.apache.tez.mapreduce.grouper.TezSplitGrouper;
 import org.slf4j.Logger;
@@ -121,35 +118,10 @@ public class NdpStatisticsUtils {
     }
 
     /**
-     * Through TezWork, get MapWork, ReduceWork and TableScanOperator
-     *
-     * @param tezWork TezWork
-     * @param mapWorkMap MapWork's map
-     * @param tableScanOperatorMap TableScanOperator's map
-     * @param reduceWorkMap ReduceWork's map
-     */
-    public static void generateMapReduceWork(TezWork tezWork, Map<String, MapWork> mapWorkMap,
-                                             Map<String, TableScanOperator> tableScanOperatorMap, Map<String, ReduceWork> reduceWorkMap) {
-        for (BaseWork work : tezWork.getAllWork()) {
-            if (work instanceof MapWork) {
-                MapWork mapWork = (MapWork) work;
-                if (mapWork.getAliasToWork().size() != 1) {
-                    continue;
-                }
-                // support only one operator
-                generateMapWork(mapWork, mapWorkMap, tableScanOperatorMap);
-            }
-            if (work instanceof ReduceWork) {
-                reduceWorkMap.put(work.getName(), (ReduceWork) work);
-            }
-        }
-    }
-
-    /**
      * Analyze the table in advance to collect statistics.
      * Estimate the optimized size based on the selectivity and needed column proportion.
      *
-     * @param tableScanOp tableScanOp
+     * @param tableScanOp  tableScanOp
      * @param parseContext The current parse context.
      * @return optimized size
      */
@@ -170,7 +142,7 @@ public class NdpStatisticsUtils {
     /**
      * get the average length of the needed column
      *
-     * @param tableScanOp tableScanOp
+     * @param tableScanOp  tableScanOp
      * @param parseContext parseContext
      * @return table's average length
      */
@@ -188,6 +160,12 @@ public class NdpStatisticsUtils {
             // Get table level column statistics from metastore for needed columns
             colStats = StatsUtils.getTableColumnStats(tableScanOp.getConf().getTableMetadata(),
                     tableScanOp.getSchema().getSignature(), tableScanOp.getConf().getNeededColumns(), null);
+            if (colStats.size() == 0) {
+                Optional<Statistics> statistics = collectStatistics(parseContext, tableScanOp);
+                if (statistics.isPresent()) {
+                    colStats = statistics.get().getColumnStats();
+                }
+            }
         }
         double totalAvgColLen = 0d;
         // add the avgColLen for each column, colStats's size may be null
@@ -201,7 +179,7 @@ public class NdpStatisticsUtils {
      * Statistics: Describes the output of an operator in terms of size, rows, etc  based on estimates.
      * use ParseContext to collect Table's statistics
      *
-     * @param pctx The current parse context.
+     * @param pctx        The current parse context.
      * @param tableScanOp TableScanOperator
      * @return Statistics
      */
@@ -217,7 +195,8 @@ public class NdpStatisticsUtils {
             List<String> referencedColumns = tableScanOp.getReferencedColumns();
             // gather statistics for the first time and the attach it to table scan operator
             return Optional.of(
-                    StatsUtils.collectStatistics(aspCtx.getConf(), partList, table, schema, neededColumns, colStatsCached,
+                    StatsUtils.collectStatistics(aspCtx.getConf(), partList, table, schema, neededColumns,
+                            colStatsCached,
                             referencedColumns, true));
         } catch (HiveException e) {
             LOG.error("OmniData Hive failed to retrieve stats ", e);
@@ -229,8 +208,8 @@ public class NdpStatisticsUtils {
      * estimate reducer number
      *
      * @param totalInputFileSize total input size
-     * @param bytesPerReducer Size of bytes available for each reduce
-     * @param oldReducers old reduce number
+     * @param bytesPerReducer    Size of bytes available for each reduce
+     * @param oldReducers        old reduce number
      * @return new reduce number
      */
     public static int estimateReducersByFileSize(long totalInputFileSize, long bytesPerReducer, int oldReducers) {
@@ -249,9 +228,9 @@ public class NdpStatisticsUtils {
     /**
      * Update TezEdgeProperty and set reduce tasks in ReduceWork
      *
-     * @param reduceWork ReduceWork
+     * @param reduceWork          ReduceWork
      * @param optimizedNumReduces optimized reduce numbers
-     * @param bytesPerReducer size per reducer
+     * @param bytesPerReducer     size per reducer
      */
     public static void setOptimizedNumReduceTasks(ReduceWork reduceWork, int optimizedNumReduces,
                                                   long bytesPerReducer) {
@@ -289,9 +268,9 @@ public class NdpStatisticsUtils {
      * The ReduceWork entry is optimized
      *
      * @param tableScanOperatorMap TableScanOperator's map
-     * @param reduceWorkMap ReduceWork's map
-     * @param hiveConf hive conf
-     * @param pctx The current parse context.
+     * @param reduceWorkMap        ReduceWork's map
+     * @param hiveConf             hive conf
+     * @param pctx                 The current parse context.
      */
     public static void optimizeReduceWork(Map<String, TableScanOperator> tableScanOperatorMap,
                                           Map<String, ReduceWork> reduceWorkMap, HiveConf hiveConf, ParseContext pctx) {
@@ -319,6 +298,7 @@ public class NdpStatisticsUtils {
      * @return optimized LengthPerGroup
      */
     public static double optimizeLengthPerGroup(Configuration conf) {
+        double factor = OmniDataConf.getOmniDataTaskPushDownFactor(conf);
         double selectivity = OmniDataConf.getOmniDataTableOptimizedSelectivity(conf);
         double coefficient = 1d;
         double configCoefficient = OmniDataConf.getOmniDataGroupOptimizedCoefficient(conf);
@@ -360,7 +340,7 @@ public class NdpStatisticsUtils {
     /**
      * The Filter in TableScanOperator is changed. The Stats of the Filter needs to be updated.
      *
-     * @param pctx The current parse context.
+     * @param pctx        The current parse context.
      * @param tableScanOp TableScanOperator
      * @throws SemanticException Exception from SemanticAnalyzer.
      */
@@ -387,10 +367,10 @@ public class NdpStatisticsUtils {
     /**
      * Evaluate whether the part pushdown selectivity meets the requirements. If yes, update the filter and selectivity.
      *
-     * @param tableScanOp TableScanOperator
-     * @param newExprDesc new Filter ExprNodeDesc
+     * @param tableScanOp  TableScanOperator
+     * @param newExprDesc  new Filter ExprNodeDesc
      * @param parseContext The current parse context.
-     * @param conf hive conf
+     * @param conf         hive conf
      * @return true or false
      */
     public static boolean evaluatePartFilterSelectivity(TableScanOperator tableScanOp, ExprNodeDesc newExprDesc,
@@ -437,18 +417,9 @@ public class NdpStatisticsUtils {
         return false;
     }
 
-    private static void generateMapWork(MapWork mapWork, Map<String, MapWork> mapWorkMap,
-                                        Map<String, TableScanOperator> tableScanOperatorMap) {
-        mapWork.getAliasToWork().values().forEach(operator -> {
-            if (operator instanceof TableScanOperator) {
-                tableScanOperatorMap.put(mapWork.getName(), (TableScanOperator) operator);
-                mapWorkMap.put(mapWork.getName(), mapWork);
-            }
-        });
-    }
-
     private static int estimateNumReducesByInput(ReduceWork reduceWork,
-                                                 Map<String, TableScanOperator> tableScanOperatorMap, Map<String, ReduceWork> reduceWorkMap, ParseContext pctx,
+                                                 Map<String, TableScanOperator> tableScanOperatorMap, Map<String,
+            ReduceWork> reduceWorkMap, ParseContext pctx,
                                                  long bytesPerReducer) {
         boolean isSupported = true;
         long totalOptimizedSize = 0L;
