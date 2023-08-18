@@ -587,5 +587,6 @@ class ColumnarPlugin extends (SparkSessionExtensions => Unit) with Logging {
     logInfo("Using BoostKit Spark Native Sql Engine Extension to Speed Up Your Queries.")
     extensions.injectColumnar(session => ColumnarOverrideRules(session))
     extensions.injectPlannerStrategy(session => ShuffleJoinStrategy(session))
+    extensions.injectOptimizerRule(_ => RewriteSelfJoinInInPredicate)
   }
 }

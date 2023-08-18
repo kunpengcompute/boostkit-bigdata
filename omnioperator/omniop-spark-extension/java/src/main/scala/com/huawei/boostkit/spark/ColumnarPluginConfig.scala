@@ -198,6 +198,11 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
     .getConfString("spark.omni.sql.columnar.forceShuffledHashJoin", "false")
     .toBoolean
 
+  // enable or disable rewrite self join in Predicate to aggregate
+  val enableRewriteSelfJoinInInPredicate: Boolean = conf
+    .getConfString("spark.omni.sql.columnar.RewriteSelfJoinInInPredicate", "false")
+    .toBoolean
+
   val enableFusion: Boolean = conf
     .getConfString("spark.omni.sql.columnar.fusion", "false")
     .toBoolean
