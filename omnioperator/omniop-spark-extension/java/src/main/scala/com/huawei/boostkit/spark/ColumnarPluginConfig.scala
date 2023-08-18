@@ -97,9 +97,14 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
     .getConfString("spark.omni.sql.columnar.nativefilescan", "true")
     .toBoolean
 
-  // enable native table scan
+  // enable orc native table scan
   val enableOrcNativeFileScan: Boolean = conf
     .getConfString("spark.omni.sql.columnar.orcNativefilescan", "true")
+    .toBoolean
+
+  // enable parquet native table scan
+  val enableParquetNativeFileScan: Boolean = conf
+    .getConfString("spark.omni.sql.columnar.ParquetNativefilescan", "false")
     .toBoolean
 
   // enable sync to get obs token

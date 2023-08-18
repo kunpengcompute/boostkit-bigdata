@@ -312,6 +312,7 @@ abstract class BaseColumnarFileSourceScanExec(
 
   val enableColumnarFileScan: Boolean = ColumnarPluginConfig.getSessionConf.enableColumnarFileScan
   val enableOrcNativeFileScan: Boolean = ColumnarPluginConfig.getSessionConf.enableOrcNativeFileScan
+  val enableParquetNativeFileScan: Boolean = ColumnarPluginConfig.getSessionConf.enableParquetNativeFileScan
   lazy val inputRDD: RDD[InternalRow] = {
     val fileFormat: FileFormat = if (enableColumnarFileScan) {
       relation.fileFormat match {
@@ -322,7 +323,11 @@ abstract class BaseColumnarFileSourceScanExec(
             relation.fileFormat
           }
         case parquetFormat: ParquetFileFormat =>
-          new OmniParquetFileFormat()
+          if (enableParquetNativeFileScan) {
+            new OmniParquetFileFormat()
+          } else {
+            relation.fileFormat
+          }
         case _ =>
           throw new UnsupportedOperationException("Unsupported FileFormat!")
       }
