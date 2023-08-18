@@ -193,6 +193,11 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
     .getConfString("spark.omni.sql.columnar.shuffledHashJoin", "true")
     .toBoolean
 
+  // enable or disable force shuffle hash join
+  val forceShuffledHashJoin: Boolean = conf
+    .getConfString("spark.omni.sql.columnar.forceShuffledHashJoin", "false")
+    .toBoolean
+
   val enableFusion: Boolean = conf
     .getConfString("spark.omni.sql.columnar.fusion", "false")
     .toBoolean
