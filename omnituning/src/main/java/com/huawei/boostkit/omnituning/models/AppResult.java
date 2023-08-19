@@ -1,0 +1,75 @@
+/*
+ * Copyright (C) 2020-2023. Huawei Technologies Co., Ltd. All rights reserved.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package com.huawei.boostkit.omnituning.models;
+
+import io.ebean.Finder;
+import io.ebean.Model;
+import io.ebean.annotation.Index;
+
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.Id;
+import javax.persistence.Table;
+
+@Entity
+@Table(name = AppResult.RESULT_TABLE_NAME)
+@Index(name = "yarn_app_result_i1", columnNames = {"application_id"})
+@Index(name = "yarn_app_result_i2", columnNames = {"application_name"})
+public class AppResult extends Model {
+    private static final long serialVersionUID = 1L;
+
+    public static final long FAILED_JOB_DURATION = Long.MAX_VALUE;
+    public static final String RESULT_TABLE_NAME = "yarn_app_result";
+    public static final int FAILED_STATUS = 0;
+    public static final int SUCCEEDED_STATUS = 1;
+    private static final int APPLICATION_ID_LIMIT = 50;
+    private static final int APPLICATION_NAME_LIMIT = 100;
+    private static final int APPLICATION_WORKLOAD_LIMIT = 50;
+    private static final int JOB_TYPE_LIMIT = 50;
+
+    public static final Finder<String, AppResult> FINDER = new Finder<>(AppResult.class);
+
+    @Id
+    @Column(length = APPLICATION_ID_LIMIT, unique = true, nullable = false)
+    public String applicationId;
+
+    @Column(length = APPLICATION_NAME_LIMIT, nullable = false)
+    public String applicationName;
+
+    @Column(length =  APPLICATION_WORKLOAD_LIMIT)
+    public String applicationWorkload;
+
+    @Column()
+    public long startTime;
+
+    @Column()
+    public long finishTIme;
+
+    @Column()
+    public long durationTime;
+
+    @Column(length =  JOB_TYPE_LIMIT)
+    public String jobType;
+
+    @Column(columnDefinition = "TEXT")
+    public String parameters;
+
+    @Column()
+    public int executionStatus;
+
+    @Column(columnDefinition = "TEXT")
+    public String query;
+}
