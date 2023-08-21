@@ -121,11 +121,33 @@ public class OmniDataMapRecordSource extends MapRecordSource {
             rowBatchCompletionService.submit(
                     new OmniDataReader(jconf, fs, ndpPredicateInfo, vCtx, columnTypes));
         }
+        boolean isLimitPush = ndpPredicateInfo.getPredicate().getLimit().isPresent();
+        long limit = isLimitPush ? ndpPredicateInfo.getPredicate().getLimit().getAsLong() : 0;
+        long curProcessed = 0;
         try {
             for (int loop = 0; loop < fileSplits.size(); loop++) {
                 Queue<VectorizedRowBatch> rowBatches = rowBatchCompletionService.take().get();
-                while (!rowBatches.isEmpty()) {
-                    mapOp.process(rowBatches.poll());
+                if (isLimitPush) {
+                    for (VectorizedRowBatch rowBatch : rowBatches) {
+                        mapOp.process(rowBatch);
+                        if (ndpPredicateInfo.getIsPushDownAgg()) {
+                            curProcessed = rowBatch.size;
+                        } else {
+                            curProcessed += rowBatch.size;
+                        }
+                        if (curProcessed >= limit) {
+                            LOG.info("OmniData Limit Push Down Finished");
+                            executorService.shutdownNow();
+                            break;
+                        }
+                    }
+                    if (curProcessed >= limit) {
+                        break;
+                    }
+                } else {
+                    while (!rowBatches.isEmpty()) {
+                        mapOp.process(rowBatches.poll());
+                    }
                 }
             }
         } catch (InterruptedException | ExecutionException e) {

@@ -518,7 +518,7 @@ public final class Preconditions {
      */
     public static void checkState(
             boolean b, @org.checkerframework.checker.nullness.qual.Nullable String errorMessageTemplate,
-            @org.checkerframework.checke r.nullness.qual.Nullable Object p1,
+            @org.checkerframework.checker.nullness.qual.Nullable Object p1,
             @org.checkerframework.checker.nullness.qual.Nullable Object p2) {
         if (!b) {
             throw new IllegalStateException(lenientFormat(errorMessageTemplate, p1, p2));

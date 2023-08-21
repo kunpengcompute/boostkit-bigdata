@@ -39,8 +39,10 @@ import org.apache.hadoop.hive.ql.udf.generic.GenericUDFBridge;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDFIn;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDFOPAnd;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDFOPEqual;
+import org.apache.hadoop.hive.ql.udf.generic.GenericUDFOPFalse;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDFOPNot;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDFOPNotEqual;
+import org.apache.hadoop.hive.ql.udf.generic.GenericUDFOPNull;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDFOPOr;
 import org.junit.Assert;
 import org.junit.Test;
@@ -188,17 +190,20 @@ public class TestNdpFilter {
         ExprNodeGenericFuncDesc andPredicate2 = new ExprNodeGenericFuncDesc(booleanTypeInfo, new GenericUDFOPEqual(),
                 "=", andExprChildren2);
 
-        ExprNodeGenericFuncDesc andPredicate3 = new ExprNodeGenericFuncDesc(booleanTypeInfo, new GenericUDFOPEqual(),
-                "=", andExprChildren3);
+        ExprNodeGenericFuncDesc andPredicate3 = new ExprNodeGenericFuncDesc(booleanTypeInfo, new GenericUDFOPFalse(),
+                "isfalse", andExprChildren3);
+
+        ExprNodeColumnDesc andPredicate4 = new ExprNodeColumnDesc(booleanTypeInfo, "col4", "test", false);
 
         List<ExprNodeDesc> andExprChildren = new ArrayList<>();
         andExprChildren.add(andPredicate1);
         andExprChildren.add(andPredicate2);
         andExprChildren.add(andPredicate3);
+        andExprChildren.add(andPredicate4);
         ExprNodeGenericFuncDesc andPredicate = new ExprNodeGenericFuncDesc(booleanTypeInfo, new GenericUDFOPAnd(),
                 "and", andExprChildren);
         NdpFilter andNdpFilter = new NdpFilter(andPredicate);
-        Assert.assertEquals(NdpFilter.NdpFilterMode.ALL, andNdpFilter.getMode());
+        Assert.assertEquals(NdpFilter.NdpFilterMode.PART, andNdpFilter.getMode());
         andNdpFilter.createNdpFilterBinaryTree(andPredicate);
         Assert.assertEquals(andNdpFilter.getBinaryTreeHead().getNdpOperator(), NdpFilter.NdpOperator.AND);
     }
@@ -390,5 +395,31 @@ public class TestNdpFilter {
         Assert.assertEquals(ndpFilterFunc.getReturnType(), "a1");
         Assert.assertEquals(ndpFilterFunc.getColumnName(), "b2");
         Assert.assertFalse(ndpFilterFunc.getPartitionColumn());
+    }
+
+    @Test
+    public void testIsNullOperator() {
+        List<ExprNodeDesc> isNullExprChildren = new ArrayList<>();
+        isNullExprChildren.add(new ExprNodeColumnDesc(intTypeInfo, "col1", "test", false));
+        isNullExprChildren.add(new ExprNodeConstantDesc(intTypeInfo, 100));
+
+        ExprNodeGenericFuncDesc isNullPredicate = new ExprNodeGenericFuncDesc(booleanTypeInfo, new GenericUDFOPNull(),
+                "isnull", isNullExprChildren);
+        NdpFilter isNullNdpFilter = new NdpFilter(isNullPredicate);
+        Assert.assertEquals(NdpFilter.NdpFilterMode.ALL, isNullNdpFilter.getMode());
+
+        OmniDataPredicate predicate = mock(OmniDataPredicate.class);
+        Map<String, Integer> map = new HashMap<>();
+        map.put("col1", 0);
+        map.put("col2", 1);
+        when(predicate.getColName2ColIndex()).thenReturn(map);
+        OmniDataFilter omniDataFilter = new OmniDataFilter(predicate);
+        RowExpression result = omniDataFilter.getFilterExpression(isNullPredicate, isNullNdpFilter);
+
+        if (result instanceof SpecialForm) {
+            Assert.assertEquals(((SpecialForm) result).getForm(), SpecialForm.Form.IS_NULL);
+        } else {
+            Assert.fail();
+        }
     }
 }

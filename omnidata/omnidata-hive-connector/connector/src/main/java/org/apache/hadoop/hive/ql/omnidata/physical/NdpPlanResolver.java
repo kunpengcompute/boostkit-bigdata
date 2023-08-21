@@ -20,12 +20,24 @@
 package org.apache.hadoop.hive.ql.omnidata.physical;
 
 import com.huawei.boostkit.omnidata.model.AggregationInfo;
+import com.huawei.boostkit.omnidata.model.Column;
 import com.huawei.boostkit.omnidata.model.Predicate;
 
 import com.google.common.collect.ImmutableMap;
 
+import io.prestosql.spi.connector.ConnectorSession;
+import io.prestosql.spi.predicate.Domain;
+import io.prestosql.spi.relation.DomainTranslator;
+import io.prestosql.spi.relation.InputReferenceExpression;
 import io.prestosql.spi.relation.RowExpression;
 
+import io.prestosql.spi.type.ArrayType;
+import io.prestosql.spi.type.DecimalType;
+import io.prestosql.spi.type.MapType;
+import io.prestosql.spi.type.RowType;
+import io.prestosql.spi.type.TimestampType;
+import io.prestosql.spi.type.Type;
+import io.prestosql.sql.relational.RowExpressionDomainTranslator;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.Context;
 import org.apache.hadoop.hive.ql.exec.Operator;
@@ -40,6 +52,7 @@ import org.apache.hadoop.hive.ql.exec.vector.expressions.VectorExpression;
 import org.apache.hadoop.hive.ql.lib.Dispatcher;
 import org.apache.hadoop.hive.ql.lib.Node;
 import org.apache.hadoop.hive.ql.lib.TaskGraphWalker;
+import org.apache.hadoop.hive.ql.omnidata.config.MetaStore;
 import org.apache.hadoop.hive.ql.omnidata.config.OmniDataConf;
 import org.apache.hadoop.hive.ql.omnidata.operator.NdpOperatorUtils;
 import org.apache.hadoop.hive.ql.omnidata.operator.aggregation.OmniDataAggregation;
@@ -71,6 +84,8 @@ import org.slf4j.LoggerFactory;
 import java.io.Serializable;
 import java.util.*;
 import java.util.stream.Collectors;
+
+import static org.apache.hadoop.hive.ql.omnidata.config.OmniDataConf.OMNIDATA_HIVE_GROUP_OPTIMIZED_COEFFICIENT;
 
 /**
  * Ndp Physical plan optimization
@@ -136,6 +151,7 @@ public class NdpPlanResolver implements PhysicalPlanResolver {
                 // unsupported
                 return null;
             }
+            boolean isDpuEnabled = OmniDataConf.getOmniDataServerDpuEnabled(hiveConf);
             // deal with each TableScanOperator
             tableScanOperatorMap.forEach((workName, tableScanOp) -> {
                 BaseWork work = mapWorkMap.get(workName);
@@ -157,12 +173,27 @@ public class NdpPlanResolver implements PhysicalPlanResolver {
                 NdpStatusManager.setOmniDataHostToConf(hiveConf, ndpStatusInfoMap);
                 // OmniData reduce work optimize
                 if (OmniDataConf.getOmniDataReduceOptimizedEnabled(hiveConf)) {
-                    NdpStatisticsUtils.optimizeReduceWork(tableScanOperatorMap, reduceWorkMap, hiveConf, parseContext);
+                    NdpStatisticsUtils.optimizeReduceWork(tableScanOperatorMap, reduceWorkMap, hiveConf,
+                            parseContext);
+                } else if (isDpuEnabled) {
+                    NdpStatisticsUtils.optimizeReduceWorkByDpu(tableScanOperatorMap, reduceWorkMap, hiveConf,
+                            parseContext);
+                    if (checkZeroByDpu(context.getCmd())) {
+                        // Optimized exact SQL
+                        hiveConf.setDouble(OMNIDATA_HIVE_GROUP_OPTIMIZED_COEFFICIENT, 3);
+                    }
                 }
+            } else if (isDpuEnabled) {
+                NdpStatisticsUtils.optimizeReduceWorkByDpu(tableScanOperatorMap, reduceWorkMap, hiveConf,
+                        parseContext);
             }
             OmniDataConf.setOmniDataExistsTablePushDown(hiveConf, existsTablePushDown);
             return null;
         }
+    }
+
+    public static boolean checkZeroByDpu(String cmd) {
+        return cmd.replaceAll("\\s*", "").contains("'00000000000'");
     }
 
     private class NdpTable {
@@ -230,15 +261,14 @@ public class NdpPlanResolver implements PhysicalPlanResolver {
             }
             // Check the basic information about the table and determine whether to push the table down
             if (NdpPlanChecker.checkTableScanNumChild(tableScanOp) && NdpPlanChecker.checkHiveType(tableScanOp)
-                    && NdpPlanChecker.checkTableSize(tableScanOp, hiveConf) && NdpPlanChecker.checkSelectivity(tableScanOp,
-                    hiveConf)) {
+                    && NdpPlanChecker.checkTableSize(tableScanOp, hiveConf) ) {
                 // scan operator: select agg filter limit
                 scanTableScanChildOperators(tableScanOp.getChildOperators());
             }
-            if (!isPushDown()) {
-                return;
+            if ((NdpPlanChecker.checkSelectivity(tableScanOp, hiveConf) || isPushDownAgg || isPushDownLimit) &&
+                    isPushDown()) {
+                transformToOmniData(tableScanOp);
             }
-            transformToOmniData(tableScanOp);
         }
 
         private void transformToOmniData(TableScanOperator tableScanOp) {
@@ -279,12 +309,50 @@ public class NdpPlanResolver implements PhysicalPlanResolver {
                 tableScanOp.getConf().setPushDownAgg(isPushDownAgg);
                 Predicate predicate = new Predicate(omniDataPredicate.getTypes(),
                         omniDataPredicate.getColumns(), filter, omniDataPredicate.getProjections(),
-                        ImmutableMap.of(), ImmutableMap.of(), aggregation, limit);
-                ndpPredicateInfo = new NdpPredicateInfo(true, isPushDownAgg, isPushDownFilter, isPushDownPartFilter,
+                        createDomain(filter, omniDataPredicate.getColumns()), ImmutableMap.of(), aggregation,
+                        limit);
+                ndpPredicateInfo = new NdpPredicateInfo(true, isPushDownAgg, isPushDownFilter,
+                        isPushDownPartFilter,
                         omniDataPredicate.getHasPartitionColumns(), predicate,
                         tableScanOp.getConf().getNeededColumnIDs(), omniDataPredicate.getDecodeTypes(),
                         omniDataPredicate.getDecodeTypesWithAgg(), dataFormat);
             }
+        }
+
+        private ImmutableMap<String, Domain> createDomain(Optional<RowExpression> filter,
+                                                          List<Column> omniDataColumns) {
+            if (!filter.isPresent()) {
+                return ImmutableMap.of();
+            }
+            ImmutableMap.Builder<String, Domain> domains = ImmutableMap.builder();
+            ConnectorSession session = MetaStore.getConnectorSession();
+            RowExpressionDomainTranslator domainTranslator =
+                    new RowExpressionDomainTranslator(MetaStore.getMetadata());
+            DomainTranslator.ColumnExtractor<InputReferenceExpression> columnExtractor = (expression,
+                                                                                          domain) -> {
+                if (expression instanceof InputReferenceExpression) {
+                    return Optional.of((InputReferenceExpression) expression);
+                }
+                return Optional.empty();
+            };
+            DomainTranslator.ExtractionResult<InputReferenceExpression> extractionResult = domainTranslator
+                    .fromPredicate(session, filter.get(), columnExtractor);
+            if (!extractionResult.getTupleDomain().isNone()) {
+                extractionResult.getTupleDomain().getDomains().get().forEach((columnHandle, domain) -> {
+                    Type type = domain.getType();
+                    //  unSupport dataType skip
+                    if (type instanceof MapType ||
+                            type instanceof ArrayType ||
+                            type instanceof RowType ||
+                            type instanceof DecimalType ||
+                            type instanceof TimestampType) {
+                        return;
+                    }
+
+                    domains.put(omniDataColumns.get(columnHandle.getField()).getName(), domain);
+                });
+            }
+            return domains.build();
         }
 
         /**
@@ -319,7 +387,7 @@ public class NdpPlanResolver implements PhysicalPlanResolver {
             } else if (operator instanceof VectorGroupByOperator) {
                 // check agg
                 Optional<VectorGroupByDesc> tmpAggDesc = NdpPlanChecker.checkGroupByOperator(
-                        (VectorGroupByOperator) operator);
+                        (VectorGroupByOperator) operator, hiveConf);
                 if (tmpAggDesc.isPresent()) {
                     aggDesc = tmpAggDesc.get();
                     isPushDownAgg = true;

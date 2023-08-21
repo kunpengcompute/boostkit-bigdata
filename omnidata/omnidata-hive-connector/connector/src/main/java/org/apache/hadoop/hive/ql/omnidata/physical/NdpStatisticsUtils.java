@@ -291,6 +291,37 @@ public class NdpStatisticsUtils {
     }
 
     /**
+     * The ReduceWork entry is optimized with DPU
+     *
+     * @param tableScanOperatorMap TableScanOperator's map
+     * @param reduceWorkMap        ReduceWork's map
+     * @param hiveConf             hive conf
+     * @param pctx                 The current parse context.
+     */
+    public static void optimizeReduceWorkByDpu(Map<String, TableScanOperator> tableScanOperatorMap,
+                                               Map<String, ReduceWork> reduceWorkMap, HiveConf hiveConf,
+                                               ParseContext pctx) {
+        // use 'tez.grouping.max-size' to optimize bytesPerReducer
+        long bytesPerReducer = Math.max(hiveConf.getLongVar(HiveConf.ConfVars.BYTESPERREDUCER),
+                TezSplitGrouper.TEZ_GROUPING_SPLIT_MAX_SIZE_DEFAULT);
+        for (ReduceWork reduceWork : reduceWorkMap.values()) {
+            reduceWork.setAutoReduceParallelism(true);
+            if (reduceWork.getTagToInput().values().size() == 0) {
+                continue;
+            }
+            int optimizedReducers = OmniDataConf.getOmniDataReduceOptimizedDpuNums(hiveConf);
+            reduceWork.setNumReduceTasks(Math.max(optimizedReducers, reduceWork.getNumReduceTasks()));
+            // supported 'isAutoReduceParallelism' is true
+            int optimizedNumReduces = estimateNumReducesByInput(reduceWork, tableScanOperatorMap, reduceWorkMap,
+                    pctx,
+                    bytesPerReducer);
+            if (optimizedNumReduces > 0) {
+                NdpStatisticsUtils.setOptimizedNumReduceTasks(reduceWork, optimizedNumReduces, bytesPerReducer);
+            }
+        }
+    }
+
+    /**
      * The LengthPerGroup is optimized based on the selectivity of Agg or Filter
      * to increase the number of splits processed by a Tez Task.
      *
@@ -298,7 +329,6 @@ public class NdpStatisticsUtils {
      * @return optimized LengthPerGroup
      */
     public static double optimizeLengthPerGroup(Configuration conf) {
-        double factor = OmniDataConf.getOmniDataTaskPushDownFactor(conf);
         double selectivity = OmniDataConf.getOmniDataTableOptimizedSelectivity(conf);
         double coefficient = 1d;
         double configCoefficient = OmniDataConf.getOmniDataGroupOptimizedCoefficient(conf);
@@ -331,7 +361,7 @@ public class NdpStatisticsUtils {
                 double maxCoefficient = 2.5d;
                 // 0.2 / selectivity + 1
                 coefficient = Math.min((new BigDecimal("0.2").divide(new BigDecimal(selectivity), OMNIDATA_SCALE,
-                        BigDecimal.ROUND_HALF_UP)).add(new BigDecimal("1")).doubleValue(), maxCoefficient);
+                        BigDecimal.ROUND_HALF_UP)).add(new BigDecimal("1.0")).doubleValue(), maxCoefficient);
             }
         }
         return coefficient;

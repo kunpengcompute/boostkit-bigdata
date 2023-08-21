@@ -19,7 +19,7 @@ import org.apache.hadoop.hive.ql.omnidata.config.OmniDataConf;
 import org.apache.hadoop.hive.ql.omnidata.operator.NdpOperatorUtils;
 import org.apache.hadoop.hive.ql.omnidata.physical.NdpStatisticsUtils;
 import org.apache.hadoop.yarn.util.RackResolver;
-import org.apache.tez.common.Preconditions;
+import com.google.common.base.Preconditions;
 import org.apache.tez.dag.api.TezUncheckedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -292,7 +292,8 @@ public abstract class TezSplitGrouper {
 
         // OmniData optimized
         NdpOperatorUtils.setOmniDataInfoByConf(conf);
-        if (configNumSplits <= 0 && OmniDataConf.getOmniDataExistsTablePushDown(conf)) {
+        if (configNumSplits <= 0 && (OmniDataConf.getOmniDataExistsTablePushDown(conf)
+                || OmniDataConf.getOmniDataGroupOptimizedEnabled(conf))) {
             double newLengthPerGroup = NdpStatisticsUtils.optimizeLengthPerGroup(conf) * (double) lengthPerGroup;
             lengthPerGroup = (long) newLengthPerGroup;
         }

@@ -37,7 +37,8 @@ public class OmniDataConf {
     /**
      * Whether to enable filter selectivity
      */
-    public static final String OMNIDATA_HIVE_FILTER_SELECTIVITY_ENABLED = "omnidata.hive.filter.selectivity.enabled";
+    public static final String OMNIDATA_HIVE_FILTER_SELECTIVITY_ENABLED = "omnidata.hive.filter.selectivity"
+            + ".enabled";
 
     /**
      * Threshold of table size
@@ -67,7 +68,8 @@ public class OmniDataConf {
     /**
      * Whether to enable Zookeeper security
      */
-    public static final String OMNIDATA_HIVE_ZOOKEEPER_SECURITY_ENABLED = "omnidata.hive.zookeeper.security.enabled";
+    public static final String OMNIDATA_HIVE_ZOOKEEPER_SECURITY_ENABLED = "omnidata.hive.zookeeper.security"
+            + ".enabled";
 
     /**
      * Zookeeper connection timeout interval
@@ -78,12 +80,14 @@ public class OmniDataConf {
     /**
      * Zookeeper session timeout interval
      */
-    public static final String OMNIDATA_HIVE_ZOOKEEPER_SESSION_TIMEOUT_MS = "omnidata.hive.zookeeper.session.timeoutMs";
+    public static final String OMNIDATA_HIVE_ZOOKEEPER_SESSION_TIMEOUT_MS = "omnidata.hive.zookeeper.session"
+            + ".timeoutMs";
 
     /**
      * Zookeeper retry interval
      */
-    public static final String OMNIDATA_HIVE_ZOOKEEPER_RETRY_INTERVAL_MS = "omnidata.hive.zookeeper.retry.intervalMs";
+    public static final String OMNIDATA_HIVE_ZOOKEEPER_RETRY_INTERVAL_MS = "omnidata.hive.zookeeper.retry"
+            + ".intervalMs";
 
     /**
      * OmniData optimized thread numbers
@@ -115,7 +119,8 @@ public class OmniDataConf {
      * If the filter type is string or char, the selectivity is inaccurate.
      * You can manually modify this parameter to optimize the selectivity.
      */
-    public static final String OMNIDATA_HIVE_GROUP_OPTIMIZED_COEFFICIENT = "omnidata.hive.group.optimized.coefficient";
+    public static final String OMNIDATA_HIVE_GROUP_OPTIMIZED_COEFFICIENT = "omnidata.hive.group.optimized"
+            + ".coefficient";
 
     /**
      * Whether to enable OmniData group optimized
@@ -123,9 +128,16 @@ public class OmniDataConf {
     public static final String OMNIDATA_HIVE_GROUP_OPTIMIZED_ENABLED = "omnidata.hive.group.optimized.enabled";
 
     /**
+     * Whether to enable push down OmniData agg groupby
+     */
+    public static final String OMNIDATA_HIVE_AGG_GROUPBY_PUSHDOWN_ENABLED = "omnidata.hive.agg.groupby.pushdown"
+            + ".enabled";
+
+    /**
      * OmniData table optimized selectivity
      */
-    public static final String OMNIDATA_HIVE_TABLE_OPTIMIZED_SELECTIVITY = "omnidata.hive.table.optimized.selectivity";
+    public static final String OMNIDATA_HIVE_TABLE_OPTIMIZED_SELECTIVITY = "omnidata.hive.table.optimized"
+            + ".selectivity";
 
     /**
      * Hdfs's replication, default:3
@@ -151,6 +163,16 @@ public class OmniDataConf {
      * OmniData orc raw thread numbers
      */
     public static final String OMNIDATA_HIVE_RAW_THREAD_NUMS = "omnidata.hive.raw.thread.nums";
+
+    /**
+     * Whether to enable OmniData DPU
+     */
+    public static final String OMNIDATA_HIVE_SERVER_DPU_ENABLED = "omnidata.hive.server.dpu.enabled";
+
+    /**
+     * OmniData optimized reduce nums
+     */
+    public static final String OMNIDATA_HIVE_REDUCE_OPTIMIZED_DPU_NUMS = "omnidata.hive.reduce.optimized.dpu.nums";
 
     /**
      * Temporary parameter
@@ -372,6 +394,16 @@ public class OmniDataConf {
     }
 
     /**
+     * get the value of a parameter: omnidata.hive.agg.groupby.pushdown.enabled
+     *
+     * @param conf hive conf
+     * @return true or false
+     */
+    public static Boolean getOmniDataAggGroupByPushDownEnabled(Configuration conf) {
+        return conf.getBoolean(OMNIDATA_HIVE_AGG_GROUPBY_PUSHDOWN_ENABLED, true);
+    }
+
+    /**
      * get the value of a parameter: omnidata.hive.group.optimized.coefficient
      *
      * @param conf hive conf
@@ -462,5 +494,47 @@ public class OmniDataConf {
      */
     public static int getOmniDataRawThreadNums(Configuration conf, int defaultValue) {
         return conf.getInt(OMNIDATA_HIVE_RAW_THREAD_NUMS, defaultValue);
+    }
+
+    /**
+     * get the value of a parameter: omnidata.hive.server.dpu.enabled
+     *
+     * @param conf hive conf
+     * @return true or false
+     */
+    public static Boolean getOmniDataServerDpuEnabled(Configuration conf) {
+        boolean result = conf.getBoolean(OMNIDATA_HIVE_SERVER_DPU_ENABLED, false);
+        if (!result) {
+            return false;
+        }
+        optimizeConfOnDpu(conf);
+        return true;
+    }
+
+    /**
+     * get the value of a parameter: omnidata.hive.reduce.optimized.dpu.nums
+     *
+     * @param conf hive conf
+     * @return reduce nums
+     */
+    public static int getOmniDataReduceOptimizedDpuNums(Configuration conf) {
+        return conf.getInt(OMNIDATA_HIVE_REDUCE_OPTIMIZED_DPU_NUMS, 1250);
+    }
+
+    /**
+     * optimize OmniData configuration on Dpu
+     *
+     * @param conf hive conf
+     */
+    private static void optimizeConfOnDpu(Configuration conf) {
+        conf.setBoolean(OMNIDATA_HIVE_AGG_GROUPBY_PUSHDOWN_ENABLED, false);
+        conf.setBoolean(OMNIDATA_HIVE_GROUP_OPTIMIZED_ENABLED, true);
+        conf.setInt(OMNIDATA_HIVE_OPTIMIZED_THREAD_NUMS, 2);
+        if (getOmniDataGroupOptimizedCoefficient(conf) < 0) {
+            conf.setDouble(OMNIDATA_HIVE_GROUP_OPTIMIZED_COEFFICIENT, 2);
+        }
+        if (getOmniDataTaskPushDownFactor(conf) >= 1.0) {
+            conf.setDouble(OMNIDATA_HIVE_TASK_PUSHDOWN_FACTOR, 0.125);
+        }
     }
 }

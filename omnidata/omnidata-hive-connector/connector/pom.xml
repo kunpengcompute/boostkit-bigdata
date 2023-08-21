@@ -19,13 +19,12 @@
         <maven.compiler.target>1.8</maven.compiler.target>
         <encoding>UTF-8</encoding>
         <hive.version>3.1.0</hive.version>
-        <hadoop.version>3.2.0</hadoop.version>
+        <hadoop.version>3.1.1</hadoop.version>
         <tez.version>0.10.0</tez.version>
         <dep.curator.version>2.12.0</dep.curator.version>
         <dep.omnidata.stub.version>1.4.0</dep.omnidata.stub.version>
         <dep.hetu.version>1.6.1</dep.hetu.version>
         <junit.version>4.11</junit.version>
-        <mockito-all.version>1.10.19</mockito-all.version>
         <dep.json.version>2.12.4</dep.json.version>
         <dep.guava.version>26.0-jre</dep.guava.version>
     </properties>
@@ -39,12 +38,23 @@
         <dependency>
             <groupId>org.apache.hive</groupId>
             <artifactId>hive-exec</artifactId>
-            <version>${hive.version}</version>
+            <version>3.1.0-hw-ei-312056</version>
+            <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>org.apache.hive</groupId>
             <artifactId>hive-common</artifactId>
             <version>${hive.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.esotericsoftware</groupId>
+            <artifactId>kryo-shaded</artifactId>
+            <version>4.0.2</version>
+        </dependency>
+        <dependency>
+            <groupId>org.checkerframework</groupId>
+            <artifactId>checker-qual</artifactId>
+            <version>3.12.0</version>
         </dependency>
         <dependency>
             <groupId>org.apache.hadoop</groupId>
@@ -95,6 +105,11 @@
         </dependency>
         <dependency>
             <groupId>io.hetu.core</groupId>
+            <artifactId>presto-expressions</artifactId>
+            <version>${dep.hetu.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.hetu.core</groupId>
             <artifactId>presto-spi</artifactId>
             <version>${dep.hetu.version}</version>
         </dependency>
@@ -136,8 +151,20 @@
         </dependency>
         <dependency>
             <groupId>org.mockito</groupId>
-            <artifactId>mockito-all</artifactId>
-            <version>${mockito-all.version}</version>
+            <artifactId>mockito-inline</artifactId>
+            <version>4.6.1</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <version>4.6.1</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-junit-jupiter</artifactId>
+            <version>4.6.1</version>
             <scope>test</scope>
         </dependency>
         <dependency>

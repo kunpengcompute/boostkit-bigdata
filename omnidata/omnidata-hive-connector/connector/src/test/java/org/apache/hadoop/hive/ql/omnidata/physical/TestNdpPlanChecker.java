@@ -121,7 +121,7 @@ public class TestNdpPlanChecker {
     public void testCheckOperator() {
         Assert.assertFalse(NdpPlanChecker.checkFilterOperator(null).isPresent());
         Assert.assertFalse(NdpPlanChecker.checkSelectOperator(null).isPresent());
-        Assert.assertFalse(NdpPlanChecker.checkGroupByOperator(null).isPresent());
+        Assert.assertFalse(NdpPlanChecker.checkGroupByOperator(null, null).isPresent());
         Assert.assertFalse(NdpPlanChecker.checkLimitOperator(null).isPresent());
     }
 

@@ -25,6 +25,7 @@ import static org.apache.hadoop.hive.ql.omnidata.operator.enums.NdpHiveOperatorE
 import com.google.common.collect.ImmutableSet;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.exec.TableScanOperator;
 import org.apache.hadoop.hive.ql.exec.vector.VectorAggregationDesc;
 import org.apache.hadoop.hive.ql.exec.vector.VectorFilterOperator;
@@ -69,14 +70,14 @@ public class NdpPlanChecker {
 
     // unsupported: LIKE
     private static final ImmutableSet<NdpHiveOperatorEnum> SUPPORTED_HIVE_OPERATOR = ImmutableSet.of(AND, BETWEEN,
-            EQUAL, GREATER_THAN, GREATER_THAN_OR_EQUAL, IN, LESS_THAN, LESS_THAN_OR_EQUAL, NOT, NOT_EQUAL, NOT_NULL, NULL,
-            OR);
+            EQUAL, GREATER_THAN, GREATER_THAN_OR_EQUAL, IN, LESS_THAN, LESS_THAN_OR_EQUAL, NOT, NOT_EQUAL,
+            NOT_NULL, NULL, OR, LIKE);
 
     // NdpLeafOperator.LIKE
     private static final ImmutableSet<NdpLeafOperator> SUPPORTED_HIVE_LEAF_OPERATOR = ImmutableSet.of(
             NdpLeafOperator.BETWEEN, NdpLeafOperator.IN, NdpLeafOperator.LESS_THAN, NdpLeafOperator.GREATER_THAN,
             NdpLeafOperator.LESS_THAN_OR_EQUAL, NdpLeafOperator.GREATER_THAN_OR_EQUAL, NdpLeafOperator.EQUAL,
-            NdpLeafOperator.IS_NULL);
+            NdpLeafOperator.IS_NULL, NdpLeafOperator.LIKE);
 
     /**
      * Currently, 'roll up' is not supported.
@@ -112,7 +113,7 @@ public class NdpPlanChecker {
      * Currently, two data formats are supported: Orc and Parquet.
      *
      * @param tableScanOp TableScanOperator
-     * @param work mapWork
+     * @param work        mapWork
      * @return 'orc' and 'parquet'
      */
     public static Optional<String> getDataFormat(TableScanOperator tableScanOp, BaseWork work) {
@@ -270,21 +271,40 @@ public class NdpPlanChecker {
      * @param vectorGroupByOperator VectorGroupByOperator
      * @return true or false
      */
-    public static Optional<VectorGroupByDesc> checkGroupByOperator(VectorGroupByOperator vectorGroupByOperator) {
-        if (vectorGroupByOperator != null && vectorGroupByOperator.getVectorDesc() instanceof VectorGroupByDesc) {
-            VectorGroupByDesc aggVectorsDesc = (VectorGroupByDesc) vectorGroupByOperator.getVectorDesc();
-            // Agg or groupby can be pushed down only when agg or groupby exists.
+    public static Optional<VectorGroupByDesc> checkGroupByOperator(VectorGroupByOperator vectorGroupByOperator,
+                                                                   HiveConf hiveConf) {
+        if (vectorGroupByOperator == null || !(vectorGroupByOperator.getVectorDesc() instanceof VectorGroupByDesc)) {
+            LOG.info("VectorGroupByOperator failed to push down");
+            return Optional.empty();
+        }
+        VectorGroupByDesc aggVectorsDesc = (VectorGroupByDesc) vectorGroupByOperator.getVectorDesc();
+        if (OmniDataConf.getOmniDataAggGroupByPushDownEnabled(hiveConf)) {
+            // Agg or group by can be pushed down only when agg or groupby exists.
             if (aggVectorsDesc.getKeyExpressions().length > 0 || aggVectorsDesc.getVecAggrDescs().length > 0) {
-                for (VectorAggregationDesc agg : aggVectorsDesc.getVecAggrDescs()) {
-                    if (!checkAggregationDesc(agg.getAggrDesc())) {
-                        return Optional.empty();
-                    }
-                }
-                return Optional.of(aggVectorsDesc);
+                return checkGroupByOperator(aggVectorsDesc);
+            }
+        } else {
+            if (aggVectorsDesc.getKeyExpressions().length <= 0 && aggVectorsDesc.getVecAggrDescs().length > 0) {
+                return checkGroupByOperator(aggVectorsDesc);
             }
         }
         LOG.info("VectorGroupByOperator failed to push down");
         return Optional.empty();
+    }
+
+    /**
+     * Check whether the VectorGroupByDesc
+     *
+     * @param aggVectorsDesc agg
+     * @return Optional<VectorGroupByDesc>
+     */
+    public static Optional<VectorGroupByDesc> checkGroupByOperator(VectorGroupByDesc aggVectorsDesc) {
+        for (VectorAggregationDesc agg : aggVectorsDesc.getVecAggrDescs()) {
+            if (!checkAggregationDesc(agg.getAggrDesc())) {
+                return Optional.empty();
+            }
+        }
+        return Optional.of(aggVectorsDesc);
     }
 
     /**
@@ -328,7 +348,8 @@ public class NdpPlanChecker {
 
     public static boolean checkCountFunction(AggregationDesc agg) {
         if (agg.getDistinct()) {
-            LOG.info("Aggregation [{}] failed to push down, since unsupported [distinct]", agg.getGenericUDAFName());
+            LOG.info("Aggregation [{}] failed to push down, since unsupported [distinct]",
+                    agg.getGenericUDAFName());
             return false;
         }
         for (ExprNodeDesc parameter : agg.getParameters()) {
@@ -345,7 +366,8 @@ public class NdpPlanChecker {
 
     public static boolean checkSumFunction(AggregationDesc agg) {
         if (agg.getDistinct()) {
-            LOG.info("Aggregation [{}] failed to push down, since unsupported [distinct]", agg.getGenericUDAFName());
+            LOG.info("Aggregation [{}] failed to push down, since unsupported [distinct]",
+                    agg.getGenericUDAFName());
             return false;
         }
         boolean isConstant = false;
@@ -366,7 +388,8 @@ public class NdpPlanChecker {
 
     public static boolean checkMinFunction(AggregationDesc agg) {
         if (agg.getDistinct()) {
-            LOG.info("Aggregation [{}] failed to push down, since unsupported [distinct]", agg.getGenericUDAFName());
+            LOG.info("Aggregation [{}] failed to push down, since unsupported [distinct]",
+                    agg.getGenericUDAFName());
             return false;
         }
         boolean isConstant = false;
@@ -390,7 +413,7 @@ public class NdpPlanChecker {
      * Check whether the filter selectivity is supported
      *
      * @param tableScanOp TableScanOperator
-     * @param conf OmniDataConf
+     * @param conf        OmniDataConf
      * @return true or false
      */
     public static boolean checkSelectivity(TableScanOperator tableScanOp, Configuration conf) {
@@ -415,7 +438,7 @@ public class NdpPlanChecker {
      * Check whether the table size is supported
      *
      * @param tableScanOp TableScanOperator
-     * @param conf hive conf
+     * @param conf        hive conf
      * @return true or false
      */
     public static boolean checkTableSize(TableScanOperator tableScanOp, Configuration conf) {
@@ -425,7 +448,8 @@ public class NdpPlanChecker {
         long currentTableSize = tableScanOp.getConf().getStatistics().getDataSize();
         if (currentTableSize < OmniDataConf.getOmniDataTablesSizeThreshold(conf)) {
             LOG.info("Table [{}] failed to push down, since table size[{}] < threshold[{}]",
-                    tableScanOp.getConf().getAlias(), currentTableSize, OmniDataConf.getOmniDataTablesSizeThreshold(conf));
+                    tableScanOp.getConf().getAlias(), currentTableSize,
+                    OmniDataConf.getOmniDataTablesSizeThreshold(conf));
             return false;
         }
         return true;
