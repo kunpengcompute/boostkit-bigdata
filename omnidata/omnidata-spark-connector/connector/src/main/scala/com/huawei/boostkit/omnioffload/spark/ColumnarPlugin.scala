@@ -78,12 +78,12 @@ case class NdpOverrides(sparkSession: SparkSession) extends Rule[SparkPlan] {
       NdpConnectorUtils.getNdpNumPartitionsStr("10000")).toInt
     pushDownTaskCount = NdpConnectorUtils.getPushDownTaskTotal(getOptimizerPushDownThreshold(sparkSession))
     if (CountReplaceRule.shouldReplaceCountOne(plan)) {
-      pushDownTaskCount = NdpConnectorUtils.getCountTaskTotal(200)
+      pushDownTaskCount = NdpConnectorUtils.getCountTaskTotal(50)
       SQLConf.get.setConfString(SQLConf.FILES_MAX_PARTITION_BYTES.key,
         NdpConnectorUtils.getCountMaxPartSize("512MB"))
     }
     if (CountReplaceRule.shouldReplaceDistinctCount(plan)) {
-      pushDownTaskCount = NdpConnectorUtils.getCountDistinctTaskTotal(2000)
+      pushDownTaskCount = NdpConnectorUtils.getCountDistinctTaskTotal(50)
     }
   }
 
@@ -174,12 +174,12 @@ case class NdpOverrides(sparkSession: SparkSession) extends Rule[SparkPlan] {
       case c1@OmniColumnarToRowExec(c2@ColumnarFilterExec(condition, c3: FileSourceScanExec)) =>
         numPartitions = NdpConnectorUtils.getOmniColumnarNumPartitions(1000)
         if (isAccurate(condition)) {
-          pushDownTaskCount = NdpConnectorUtils.getOmniColumnarTaskCount(400)
+          pushDownTaskCount = NdpConnectorUtils.getOmniColumnarTaskCount(50)
         }
         FilterExec(condition, ColumnarToRowExec(c3))
       case p@FilterExec(condition, _, _) if isAccurate(condition) =>
         numPartitions = NdpConnectorUtils.getFilterPartitions(1000)
-        pushDownTaskCount = NdpConnectorUtils.getFilterTaskCount(400)
+        pushDownTaskCount = NdpConnectorUtils.getFilterTaskCount(50)
         p
       case p@ColumnarConditionProjectExec(projectList, condition, child)
         if condition.toString().startsWith("isnull") && (child.isInstanceOf[ColumnarSortMergeJoinExec]
@@ -275,7 +275,7 @@ case class NdpOverrides(sparkSession: SparkSession) extends Rule[SparkPlan] {
         ShuffledHashJoinExec(p.leftKeys, p.rightKeys, LeftAnti, p.buildSide, p.condition, p.left, p.right)
       case p@FilterExec(condition, _, _) if isAccurate(condition) =>
         numPartitions = NdpConnectorUtils.getFilterPartitions(1000)
-        pushDownTaskCount = NdpConnectorUtils.getFilterTaskCount(400)
+        pushDownTaskCount = NdpConnectorUtils.getFilterTaskCount(50)
         p
       case p@ProjectExec(projectList, filter: FilterExec)
         if filter.condition.toString().startsWith("isnull") && (filter.child.isInstanceOf[SortMergeJoinExec]

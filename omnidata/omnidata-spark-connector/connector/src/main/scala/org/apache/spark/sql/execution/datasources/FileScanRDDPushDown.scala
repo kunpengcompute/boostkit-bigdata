@@ -19,6 +19,7 @@ package org.apache.spark.sql.execution.datasources
 
 
 import com.google.common.collect.ImmutableMap
+import com.huawei.boostkit.omnidata.exception.OmniDataException
 
 import java.util
 import scala.collection.JavaConverters._
@@ -159,23 +160,29 @@ class FileScanRDDPushDown(
     scan.forceOmniDataPushDown = true
     override def run(): Unit = {
       var i: Int = 0
-      while  (!context.isCompleted() && sparkThread.isAlive && i < splits.length) {
-        val iter: Iterator[Any] = scan.computePushDownRDD(splits(i), context)
-        i = i + 1
-        while (!context.isCompleted() && sparkThread.isAlive && iter.hasNext) {
-          sparkLog.debug(">>>>>>optimizer push down Thread [running]>>>>>")
-          val currentValue =  iter.next()
-          currentValue match {
-            case batch: ColumnarBatch => batch.close()
-            case _ =>
+      try {
+        while (!context.isCompleted() && sparkThread.isAlive && i < splits.length) {
+          val iter: Iterator[Any] = scan.computePushDownRDD(splits(i), context)
+          i = i + 1
+          while (!context.isCompleted() && sparkThread.isAlive && iter.hasNext) {
+            sparkLog.debug(">>>>>>optimizer push down Thread [running]>>>>>")
+            val currentValue = iter.next()
+            currentValue match {
+              case batch: ColumnarBatch => batch.close()
+              case _ =>
+            }
           }
         }
+      } catch {
+        case e: Exception =>
+          sparkLog.debug("Optimizer push down thread has Interrupted:", e)
+      } finally {
+        sparkLog.debug(">>>>>>optimizer push down Thread [end]>>>>>")
+        scan.pushDownIterator.close()
+        scan.pushDownIterator.dataIoClass.close()
+        sparkLog.debug("pushDownIterator close")
+        this.interrupt()
       }
-
-      sparkLog.debug(">>>>>>optimizer push down Thread [end]>>>>>")
-      scan.pushDownIterator.close()
-      sparkLog.debug("pushDownIterator close")
-      this.interrupt()
     }
   }
 
@@ -549,7 +556,6 @@ class FileScanRDDPushDown(
     override def close(): Unit = {
       incTaskInputMetricsBytesRead()
       InputFileBlockHolder.unset()
-      dataIoClass.close()
     }
   }
 
