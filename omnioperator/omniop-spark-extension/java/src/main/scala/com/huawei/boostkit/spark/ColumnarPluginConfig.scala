@@ -104,7 +104,7 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
 
   // enable parquet native table scan
   val enableParquetNativeFileScan: Boolean = conf
-    .getConfString("spark.omni.sql.columnar.ParquetNativefilescan", "false")
+    .getConfString("spark.omni.sql.columnar.parquetNativefilescan", "false")
     .toBoolean
 
   // enable sync to get obs token
@@ -191,6 +191,16 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
   // enable or disable columnar shuffledHashJoin
   val enableShuffledHashJoin: Boolean = conf
     .getConfString("spark.omni.sql.columnar.shuffledHashJoin", "true")
+    .toBoolean
+
+  // enable or disable force shuffle hash join
+  val forceShuffledHashJoin: Boolean = conf
+    .getConfString("spark.omni.sql.columnar.forceShuffledHashJoin", "false")
+    .toBoolean
+
+  // enable or disable rewrite self join in Predicate to aggregate
+  val enableRewriteSelfJoinInInPredicate: Boolean = conf
+    .getConfString("spark.omni.sql.columnar.RewriteSelfJoinInInPredicate", "false")
     .toBoolean
 
   val enableFusion: Boolean = conf

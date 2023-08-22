@@ -99,6 +99,8 @@ case class ColumnarHashAggregateExec(
 
   override def supportsColumnar: Boolean = true
 
+  override def supportCodegen: Boolean = false
+
   override def nodeName: String = "OmniColumnarHashAggregate"
 
   def buildCheck(): Unit = {
