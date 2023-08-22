@@ -29,7 +29,6 @@ private[sql] abstract class ColumnarSparkPlanTest extends SparkPlanTest with Sha
   override def sparkConf: SparkConf = super.sparkConf
     .set(StaticSQLConf.SPARK_SESSION_EXTENSIONS.key, "com.huawei.boostkit.spark.ColumnarPlugin")
     .set(SQLConf.WHOLESTAGE_CODEGEN_ENABLED.key, "false")
-    .set("spark.executorEnv.OMNI_CONNECTED_ENGINE", "Spark")
     .set("spark.shuffle.manager", "org.apache.spark.shuffle.sort.OmniColumnarShuffleManager")
     .set(SQLConf.ADAPTIVE_EXECUTION_ENABLED.key, "false")
 

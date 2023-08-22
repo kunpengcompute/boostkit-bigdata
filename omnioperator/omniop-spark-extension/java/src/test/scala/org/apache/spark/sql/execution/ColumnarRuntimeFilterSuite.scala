@@ -17,6 +17,7 @@
 
 package org.apache.spark.sql.execution
 
+import org.apache.spark.SparkConf
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.catalyst.expressions.{Alias, BloomFilterMightContain, Literal}
 import org.apache.spark.sql.catalyst.expressions.aggregate.{AggregateExpression, BloomFilterAggregate}
@@ -31,6 +32,9 @@ import org.apache.spark.sql.types.{IntegerType, StructType}
 
 class ColumnarRuntimeFilterSuite extends ColumnarSparkPlanTest with SQLTestUtils
   with AdaptiveSparkPlanHelper {
+
+  override def sparkConf: SparkConf = super.sparkConf
+    .set("spark.omni.sql.columnar.nativefilescan", "false")
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
