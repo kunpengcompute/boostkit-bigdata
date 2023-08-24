@@ -204,6 +204,13 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
   val enableOmniExpCheck : Boolean = conf.getConfString("spark.omni.sql.omniExp.check", "true").toBoolean
 
   val enableColumnarProjectFusion : Boolean = conf.getConfString("spark.omni.sql.columnar.projectFusion", "true").toBoolean
+
+  // enable or disable deduplicate the right side of left semi join
+  val enableDedupLeftSemiJoin: Boolean =
+    conf.getConfString("spark.omni.sql.columnar.dedupLeftSemiJoin", "true").toBoolean
+
+  val dedupLeftSemiJoinThreshold: Int =
+    conf.getConfString("spark.omni.sql.columnar.dedupLeftSemiJoinThreshold", "3").toInt
 }
 
 
