@@ -18,10 +18,14 @@
 
 package org.apache.spark.sql.execution
 
+import org.apache.spark.SparkConf
 import org.apache.spark.sql.{DataFrame, Row}
 import org.apache.spark.sql.functions.col
 
 class ColumnarLimitExecSuit extends ColumnarSparkPlanTest {
+
+  override def sparkConf: SparkConf = super.sparkConf
+    .set("spark.omni.sql.columnar.nativefilescan", "false")
 
   import testImplicits.{localSeqToDatasetHolder, newProductEncoder}
 

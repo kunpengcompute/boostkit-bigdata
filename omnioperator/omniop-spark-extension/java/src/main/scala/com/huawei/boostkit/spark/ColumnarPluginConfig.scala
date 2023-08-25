@@ -104,7 +104,7 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
 
   // enable parquet native table scan
   val enableParquetNativeFileScan: Boolean = conf
-    .getConfString("spark.omni.sql.columnar.parquetNativefilescan", "false")
+    .getConfString("spark.omni.sql.columnar.parquetNativefilescan", "true")
     .toBoolean
 
   // enable sync to get obs token
