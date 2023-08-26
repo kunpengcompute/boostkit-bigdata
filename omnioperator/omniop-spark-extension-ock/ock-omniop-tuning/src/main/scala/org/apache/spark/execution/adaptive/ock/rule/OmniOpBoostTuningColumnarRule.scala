@@ -58,6 +58,8 @@ case class OmniOpBoostTuningPostColumnarRule() extends Rule[SparkPlan] {
         b.child match {
           case ColumnarToRowExec(child) =>
             BoostTuningColumnarShuffleExchangeExec(b.outputPartitioning, child, b.shuffleOrigin, b.getContext)
+          case plan if !plan.supportsColumnar =>
+            BoostTuningColumnarShuffleExchangeExec(b.outputPartitioning, RowToOmniColumnarExec(plan), b.shuffleOrigin, b.getContext)
           case _ => b
         }
       case _ => plan
