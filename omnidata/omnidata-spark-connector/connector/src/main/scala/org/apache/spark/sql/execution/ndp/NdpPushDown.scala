@@ -23,12 +23,15 @@ import java.util.{Locale, Properties}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{PushDownData, PushDownManager, SparkSession}
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.{Alias, And, Attribute, AttributeReference, BinaryExpression, Cast, Expression, Literal, NamedExpression, PredicateHelper, UnaryExpression}
+import org.apache.spark.sql.catalyst.expressions.{Alias, And, Attribute, AttributeReference, BinaryExpression, Cast, Expression,
+  Literal, NamedExpression, PredicateHelper, UnaryExpression}
 import org.apache.spark.sql.catalyst.expressions.aggregate.{AggregateExpression, Partial, PartialMerge}
 import org.apache.spark.sql.catalyst.rules.Rule
-import org.apache.spark.sql.execution.{CollectLimitExec, FileSourceScanExec, FilterExec, GlobalLimitExec, LeafExecNode, LocalLimitExec, NdpFileSourceScanExec, ProjectExec, SparkPlan}
+import org.apache.spark.sql.execution.{CollectLimitExec, FileSourceScanExec, FilterExec, GlobalLimitExec, LeafExecNode, LocalLimi
+  tExec, NdpFileSourceScanExec, ProjectExec, SparkPlan}
 import org.apache.spark.sql.execution.adaptive.AdaptiveSparkPlanExec
-import org.apache.spark.sql.execution.aggregate.{BaseAggregateExec, HashAggregateExec, ObjectHashAggregateExec, SortAggregateExec}
+import org.apache.spark.sql.execution.aggregate.{BaseAggregateExec, HashAggregateExec, ObjectHashAggregateExec, SortAggregateExec
+}
 import org.apache.spark.sql.execution.datasources.HadoopFsRelation
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.sources.DataSourceRegister
@@ -181,12 +184,12 @@ case class NdpPushDown(sparkSession: SparkSession)
       !e.isDistinct &&
       e.aggregateFunction.children.forall { g =>
         aggExpressionWhiteList.contains(g.prettyName) &&
-        // aggExpression should not be constant "null"
-        // col1 is stringType, select max(col1 + "s") from test; ==> spark plan will contains max(null)
-        !isConstantNull(g)
+          // aggExpression should not be constant "null"
+          // col1 is stringType, select max(col1 + "s") from test; ==> spark plan will contains max(null)
+          !isConstantNull(g)
       } &&
-    // unsupported Cast in Agg
-    e.find(_.isInstanceOf[Cast]).isEmpty
+      // unsupported Cast in Agg
+      e.find(_.isInstanceOf[Cast]).isEmpty
   }
 
   def isConstantNull(expression: Expression): Boolean = {
@@ -329,10 +332,10 @@ case class NdpPushDown(sparkSession: SparkSession)
             (splitConjunctivePredicates(condition) ++ s.partitionFilters).partition { x =>
               val containsUDFPath = isUDFInWhiteList(x)
               x.find { y =>
-              !filterWhiteList.contains(y.prettyName) &&
-                !udfWhiteList.contains(y.prettyName.toLowerCase) && !containsUDFPath
-            }.isDefined
-          }
+                !filterWhiteList.contains(y.prettyName) &&
+                  !udfWhiteList.contains(y.prettyName.toLowerCase) && !containsUDFPath
+              }.isDefined
+            }
           if (pushDownFilters.nonEmpty) {
             s.scan.pushDownFilter(FilterExeInfo(pushDownFilters.reduce(And), f.output))
           }
@@ -345,32 +348,32 @@ case class NdpPushDown(sparkSession: SparkSession)
         }
       case p @ ProjectExec(projectList, s: NdpScanWrapper) if shouldPushDown(projectList, s) =>
         s.update(p.output)
-      case agg @ HashAggregateExec(_, _, _, _, _, _, s: NdpScanWrapper)
+      case agg@HashAggregateExec(_, _, _, _, _, _, _, _, s: NdpScanWrapper)
         if shouldPushDown(agg, s.scan) =>
         val execution = NdpSupport.toAggExecution(agg)
         s.scan.pushDownAgg(execution)
         s.update(agg.output)
-      case agg @ HashAggregateExec(_, _, _, _, _, _, ProjectExec(projectList, s: NdpScanWrapper))
+      case agg@HashAggregateExec(_, _, _, _, _, _, _, _, ProjectExec(projectList, s: NdpScanWrapper))
         if shouldPushDown(agg, s.scan) && shouldPushDown(projectList, s) =>
         val execution = NdpSupport.toAggExecution(agg)
         s.scan.pushDownAgg(execution)
         s.update(agg.output)
-      case agg @ SortAggregateExec(_, _, _, _, _, _, s: NdpScanWrapper)
+      case agg@SortAggregateExec(_, _, _, _, _, _, _, _, s: NdpScanWrapper)
         if shouldPushDown(agg, s.scan) =>
         val execution = NdpSupport.toAggExecution(agg)
         s.scan.pushDownAgg(execution)
         s.update(agg.output)
-      case agg @ SortAggregateExec(_, _, _, _, _, _, ProjectExec(projectList, s: NdpScanWrapper))
+      case agg@SortAggregateExec(_, _, _, _, _, _, _, _, ProjectExec(projectList, s: NdpScanWrapper))
         if shouldPushDown(agg, s.scan) && shouldPushDown(projectList, s) =>
         val execution = NdpSupport.toAggExecution(agg)
         s.scan.pushDownAgg(execution)
         s.update(agg.output)
-      case agg @ ObjectHashAggregateExec(_, _, _, _, _, _, s: NdpScanWrapper)
+      case agg@ObjectHashAggregateExec(_, _, _, _, _, _, _, _, s: NdpScanWrapper)
         if shouldPushDown(agg, s.scan) =>
         val execution = NdpSupport.toAggExecution(agg)
         s.scan.pushDownAgg(execution)
         s.update(agg.output)
-      case agg @ ObjectHashAggregateExec(_, _, _, _, _, _, ProjectExec(pl, s: NdpScanWrapper))
+      case agg@ObjectHashAggregateExec(_, _, _, _, _, _, _, _, ProjectExec(pl, s: NdpScanWrapper))
         if shouldPushDown(agg, s.scan) && shouldPushDown(pl, s) =>
         val execution = NdpSupport.toAggExecution(agg)
         s.scan.pushDownAgg(execution)
@@ -385,7 +388,7 @@ case class NdpPushDown(sparkSession: SparkSession)
         s.scan.pushDownLimit(LimitExeInfo(limit))
         l
       case l @ CollectLimitExec(limit,
-      agg @ HashAggregateExec(_, _, _, _, _, _, s: NdpScanWrapper)) if shouldPushDown(s.scan) =>
+      agg@HashAggregateExec(_, _, _, _, _, _, _, _, s: NdpScanWrapper)) if shouldPushDown(s.scan) =>
         s.scan.pushDownLimit(LimitExeInfo(limit))
         l
     }
@@ -561,7 +564,7 @@ object NdpConf {
 
   def getNdpDomainGenerateEnable(taskContext: TaskContext): Boolean = {
     taskContext.getLocalProperties.getProperty(NDP_DOMIAN_GENERATE_ENABLE, "true")
-        .equalsIgnoreCase("true")
+      .equalsIgnoreCase("true")
   }
 
   def getOptimizerPushDownEnable(sparkSession: SparkSession): Boolean = {

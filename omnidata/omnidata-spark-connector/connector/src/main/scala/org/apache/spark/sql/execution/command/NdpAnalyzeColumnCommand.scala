@@ -36,9 +36,9 @@ import java.time.ZoneOffset
  * columns of a given table.
  */
 case class NdpAnalyzeColumnCommand(
-                                 tableIdent: TableIdentifier,
-                                 columnNames: Option[Seq[String]],
-                                 allColumns: Boolean) extends RunnableCommand {
+                                    tableIdent: TableIdentifier,
+                                    columnNames: Option[Seq[String]],
+                                    allColumns: Boolean) extends RunnableCommand {
 
   override def run(sparkSession: SparkSession): Seq[Row] = {
     require(columnNames.isDefined ^ allColumns, "Parameter `columnNames` or `allColumns` are " +
@@ -153,7 +153,7 @@ case class NdpAnalyzeColumnCommand(
 
   private def toExternalString(v: Any, colName: String, dataType: DataType): String = {
     val externalValue = dataType match {
-      case DateType => DateFormatter(ZoneOffset.UTC).format(v.asInstanceOf[Int])
+      case DateType => DateFormatter().format(v.asInstanceOf[Int])
       case TimestampType => getTimestampFormatter(isParsing = false).format(v.asInstanceOf[Long])
       case BooleanType | _: IntegralType | FloatType | DoubleType | StringType => v
       case _: DecimalType => v.asInstanceOf[Decimal].toJavaBigDecimal
@@ -182,4 +182,6 @@ case class NdpAnalyzeColumnCommand(
     case BinaryType | StringType => true
     case _ => false
   }
+
+  override protected def withNewChildrenInternal(newChildren: scala.IndexedSeq[_root_.org.apache.spark.sql.catalyst.plans.logical.LogicalPlan]): _root_.org.apache.spark.sql.catalyst.plans.logical.LogicalPlan = ???
 }

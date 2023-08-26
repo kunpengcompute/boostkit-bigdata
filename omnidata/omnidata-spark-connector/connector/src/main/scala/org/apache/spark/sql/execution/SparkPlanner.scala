@@ -34,16 +34,16 @@ class SparkPlanner(val session: SparkSession, val experimentalMethods: Experimen
     experimentalMethods.extraStrategies ++
       extraPlanningStrategies ++ (
       LogicalQueryStageStrategy ::
-      PythonEvals ::
-      new DataSourceV2Strategy(session) ::
-      FileSourceStrategy ::
-      DataSourceStrategy ::
-      SpecialLimits ::
-      Aggregation ::
-      Window ::
-      JoinSelection ::
-      InMemoryScans ::
-      BasicOperators :: Nil)
+        PythonEvals ::
+        new DataSourceV2Strategy(session) ::
+        FileSourceStrategy ::
+        DataSourceStrategy ::
+        SpecialLimits ::
+        Aggregation ::
+        Window ::
+        JoinSelection ::
+        InMemoryScans ::
+        BasicOperators :: Nil)
 
   /**
    * Override to add extra planning strategies to the planner. These strategies are tried after
@@ -77,11 +77,11 @@ class SparkPlanner(val session: SparkSession, val experimentalMethods: Experimen
    * provided `scanBuilder` function so that it can avoid unnecessary column materialization.
    */
   def pruneFilterProject(
-      projectList: Seq[NamedExpression],
-      filterPredicates: Seq[Expression],
-      prunePushedDownFilters: Seq[Expression] => Seq[Expression],
-      scanBuilder: Seq[Attribute] => SparkPlan,
-      selectivity: Option[Double]): SparkPlan = {
+                          projectList: Seq[NamedExpression],
+                          filterPredicates: Seq[Expression],
+                          prunePushedDownFilters: Seq[Expression] => Seq[Expression],
+                          scanBuilder: Seq[Attribute] => SparkPlan,
+                          selectivity: Option[Double]): SparkPlan = {
 
     val projectSet = AttributeSet(projectList.flatMap(_.references))
     val filterSet = AttributeSet(filterPredicates.flatMap(_.references))
@@ -95,7 +95,7 @@ class SparkPlanner(val session: SparkSession, val experimentalMethods: Experimen
     // avoided safely.
 
     if (AttributeSet(projectList.map(_.toAttribute)) == projectSet &&
-        filterSet.subsetOf(projectSet)) {
+      filterSet.subsetOf(projectSet)) {
       // When it is possible to just use column pruning to get the right projection and
       // when the columns of this projection are enough to evaluate all filter conditions,
       // just do a scan followed by a filter, with no extra project.

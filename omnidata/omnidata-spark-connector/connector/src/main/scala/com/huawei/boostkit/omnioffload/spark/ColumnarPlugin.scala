@@ -151,8 +151,8 @@ case class NdpOverrides(sparkSession: SparkSession) extends Rule[SparkPlan] {
         if joinType.equals(LeftOuter) =>
         ColumnarShuffledHashJoinExec(p.leftKeys, p.rightKeys, LeftAnti, p.buildSide, p.condition,
           p.left, p.right, projectList)
-      case p@ShuffledHashJoinExec(_, _, joinType, _, _, _, _) if joinType.equals(LeftOuter) =>
-        ShuffledHashJoinExec(p.leftKeys, p.rightKeys, LeftAnti, p.buildSide, p.condition, p.left, p.right)
+      case p@ShuffledHashJoinExec(_, _, joinType, _, _, _, _, _) if joinType.equals(LeftOuter) =>
+        ShuffledHashJoinExec(p.leftKeys, p.rightKeys, LeftAnti, p.buildSide, p.condition, p.left, p.right, p.isSkewJoin)
       case p@FilterExec(condition, child: OmniColumnarToRowExec, selectivity) =>
         val childPlan = child.transform {
           case p@OmniColumnarToRowExec(child: NdpFileSourceScanExec) =>
@@ -195,6 +195,8 @@ case class NdpOverrides(sparkSession: SparkSession) extends Rule[SparkPlan] {
         val omniColumnarToRow = p.child.asInstanceOf[OmniColumnarToRowExec]
         val omniColumnarSort = omniColumnarToRow.child.asInstanceOf[ColumnarSortExec]
         SortAggregateExec(p.requiredChildDistributionExpressions,
+          p.isStreaming,
+          p.numShufflePartitions,
           p.groupingExpressions,
           p.aggregateExpressions,
           p.aggregateAttributes,
@@ -212,6 +214,8 @@ case class NdpOverrides(sparkSession: SparkSession) extends Rule[SparkPlan] {
         val omniShuffleExchange = omniColumnarSort.child.asInstanceOf[ColumnarShuffleExchangeExec]
         val rowToOmniColumnar = omniShuffleExchange.child.asInstanceOf[RowToOmniColumnarExec]
         SortAggregateExec(p.requiredChildDistributionExpressions,
+          p.isStreaming,
+          p.numShufflePartitions,
           p.groupingExpressions,
           p.aggregateExpressions,
           p.aggregateAttributes,
@@ -227,6 +231,8 @@ case class NdpOverrides(sparkSession: SparkSession) extends Rule[SparkPlan] {
         val omniExchange = agg.child.asInstanceOf[ColumnarShuffleExchangeExec]
         val omniHashAgg = omniExchange.child.asInstanceOf[ColumnarHashAggregateExec]
         HashAggregateExec(agg.requiredChildDistributionExpressions,
+          agg.isStreaming,
+          agg.numShufflePartitions,
           agg.groupingExpressions,
           agg.aggregateExpressions,
           agg.aggregateAttributes,
@@ -234,6 +240,8 @@ case class NdpOverrides(sparkSession: SparkSession) extends Rule[SparkPlan] {
           agg.resultExpressions,
           ShuffleExchangeExec(omniExchange.outputPartitioning,
             HashAggregateExec(omniHashAgg.requiredChildDistributionExpressions,
+              agg.isStreaming,
+              agg.numShufflePartitions,
               omniHashAgg.groupingExpressions,
               omniHashAgg.aggregateExpressions,
               omniHashAgg.aggregateAttributes,
@@ -271,15 +279,15 @@ case class NdpOverrides(sparkSession: SparkSession) extends Rule[SparkPlan] {
         BroadcastHashJoinExec(leftKeys = p.leftKeys, rightKeys = p.rightKeys, joinType = LeftAnti,
           buildSide = p.buildSide, condition = p.condition, left = p.left, right = p.right,
           isNullAwareAntiJoin = p.isNullAwareAntiJoin)
-      case p@ShuffledHashJoinExec(_, _, joinType, _, _, _, _) if joinType.equals(LeftOuter) =>
-        ShuffledHashJoinExec(p.leftKeys, p.rightKeys, LeftAnti, p.buildSide, p.condition, p.left, p.right)
+      case p@ShuffledHashJoinExec(_, _, joinType, _, _, _, _, _) if joinType.equals(LeftOuter) =>
+        ShuffledHashJoinExec(p.leftKeys, p.rightKeys, LeftAnti, p.buildSide, p.condition, p.left, p.right, p.isSkewJoin)
       case p@FilterExec(condition, _, _) if isAccurate(condition) =>
         numPartitions = NdpConnectorUtils.getFilterPartitions(1000)
         pushDownTaskCount = NdpConnectorUtils.getFilterTaskCount(400)
         p
       case p@ProjectExec(projectList, filter: FilterExec)
         if filter.condition.toString().startsWith("isnull") && (filter.child.isInstanceOf[SortMergeJoinExec]
-            || filter.child.isInstanceOf[BroadcastHashJoinExec] || filter.child.isInstanceOf[ShuffledHashJoinExec]) =>
+          || filter.child.isInstanceOf[BroadcastHashJoinExec] || filter.child.isInstanceOf[ShuffledHashJoinExec]) =>
         ProjectExec(changeProjectList(projectList), filter.child)
       case p => p
     }
@@ -345,9 +353,9 @@ case class NdpOverrides(sparkSession: SparkSession) extends Rule[SparkPlan] {
 
   def isRadixSortExecEnable(sortOrder: Seq[SortOrder]): Boolean = {
     sortOrder.length == RADIX_SORT_COLUMN_NUMS &&
-        sortOrder.head.dataType == LongType &&
-        sortOrder(1).dataType == LongType &&
-        SQLConf.get.getConfString("spark.omni.sql.ndpPlugin.radixSort.enabled", "true").toBoolean
+      sortOrder.head.dataType == LongType &&
+      sortOrder(1).dataType == LongType &&
+      SQLConf.get.getConfString("spark.omni.sql.ndpPlugin.radixSort.enabled", "true").toBoolean
   }
 }
 
@@ -360,7 +368,7 @@ case class NdpRules(session: SparkSession) extends ColumnarRule with Logging {
   }
 
   override def postColumnarTransitions: Rule[SparkPlan] = plan => {
-    if (NdpPluginEnableFlag.isEnable(plan.sqlContext.sparkSession)) {
+    if (NdpPluginEnableFlag.isEnable(plan.session)) {
       val rule = ndpOverrides
       rule(plan)
     } else {
@@ -587,10 +595,10 @@ case class NdpOptimizerRules(session: SparkSession) extends Rule[LogicalPlan] {
 
   def castSumAvgToBigInt(expression: Expression): Expression = {
     val exp = expression.transform {
-      case agg@Average(cast: Cast) if cast.dataType.isInstanceOf[DoubleType] =>
-        Average(Cast(cast.child, DataTypes.LongType))
-      case agg@Sum(cast: Cast) if cast.dataType.isInstanceOf[DoubleType] =>
-        Sum(Cast(cast.child, DataTypes.LongType))
+      case agg@Average(cast: Cast, _) if cast.dataType.isInstanceOf[DoubleType] =>
+        Average(Cast(cast.child, DataTypes.LongType), agg.failOnError)
+      case agg@Sum(cast: Cast, _) if cast.dataType.isInstanceOf[DoubleType] =>
+        Sum(Cast(cast.child, DataTypes.LongType), agg.failOnError)
       case e =>
         e
     }
@@ -656,7 +664,7 @@ object NdpPluginEnableFlag {
   val ndpEnabledStr = "spark.omni.sql.ndpPlugin.enabled"
 
   def isMatchedIpAddress: Boolean = {
-    val ipSet = Set("xxx.xxx.xxx.xxx")
+    ·    val ipSet = Set("xxx.xxx.xxx.xxx")
     val hostAddrSet = JavaConverters.asScalaSetConverter(NdpConnectorUtils.getIpAddress).asScala
     val res = ipSet & hostAddrSet
     res.nonEmpty

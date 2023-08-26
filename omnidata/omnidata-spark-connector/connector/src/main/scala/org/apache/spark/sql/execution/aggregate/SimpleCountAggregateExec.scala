@@ -26,8 +26,6 @@ import org.apache.spark.sql.catalyst.expressions.aggregate._
 import org.apache.spark.sql.catalyst.expressions.codegen._
 import org.apache.spark.sql.catalyst.util.truncatedString
 import org.apache.spark.sql.execution._
-import org.apache.spark.sql.execution.command.DataWritingCommandExec
-import org.apache.spark.sql.execution.exchange.ShuffleExchangeExec
 import org.apache.spark.sql.execution.metric.{SQLMetric, SQLMetrics}
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.unsafe.KVIterator
@@ -38,15 +36,17 @@ import java.util.concurrent.TimeUnit._
  * Hash-based aggregate operator that can also fallback to sorting when data exceeds memory size.
  */
 case class SimpleCountAggregateExec(
-                              requiredChildDistributionExpressions: Option[Seq[Expression]],
-                              groupingExpressions: Seq[NamedExpression],
-                              aggregateExpressions: Seq[AggregateExpression],
-                              aggregateAttributes: Seq[Attribute],
-                              initialInputBufferOffset: Int,
-                              resultExpressions: Seq[NamedExpression],
-                              child: SparkPlan,
-                              isDistinctCount: Boolean = false,
-                              var columnStat: BigInt = -1)
+                                     requiredChildDistributionExpressions: Option[Seq[Expression]],
+                                     isStreaming: Boolean,
+                                     numShufflePartitions: Option[Int],
+                                     groupingExpressions: Seq[NamedExpression],
+                                     aggregateExpressions: Seq[AggregateExpression],
+                                     aggregateAttributes: Seq[Attribute],
+                                     initialInputBufferOffset: Int,
+                                     resultExpressions: Seq[NamedExpression],
+                                     child: SparkPlan,
+                                     isDistinctCount: Boolean = false,
+                                     var columnStat: BigInt = -1)
   extends BaseAggregateExec
     with BlockingOperatorWithCodegen {
 
@@ -69,8 +69,9 @@ case class SimpleCountAggregateExec(
   // This is for testing. We force TungstenAggregationIterator to fall back to the unsafe row hash
   // map and/or the sort-based aggregation once it has processed a given number of input rows.
   private val testFallbackStartsAt: Option[(Int, Int)] = {
-    sqlContext.getConf("spark.sql.TungstenAggregate.testFallbackStartsAt", null) match {
-      case null | "" => None
+    Option(session).map { s =>
+      s.conf.get("spark.sql.TungstenAggregate.testFallbackStartsAt", null)
+    }.orNull match {
       case fallbackStartsAt =>
         val splits = fallbackStartsAt.split(",").map(_.trim)
         Some((splits.head.toInt, splits.last.toInt))
@@ -286,4 +287,7 @@ case class SimpleCountAggregateExec(
   }
 
   override protected def doProduce(ctx: CodegenContext): String = ""
+
+  override protected def withNewChildInternal(newChild: SparkPlan): SimpleCountAggregateExec =
+    copy(child = newChild)
 }

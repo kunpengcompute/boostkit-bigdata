@@ -1,12 +1,12 @@
 package org.apache.spark.sql.catalyst.catalog
 
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.AnalysisException
 import org.apache.spark.sql.catalyst.plans.logical.{ColumnStat, Histogram, HistogramSerializer}
 import org.apache.spark.sql.catalyst.util.{DateFormatter, DateTimeUtils, TimestampFormatter}
+import org.apache.spark.sql.errors.QueryCompilationErrors
 import org.apache.spark.sql.types._
-
 import java.time.ZoneOffset
+
 import scala.util.control.NonFatal
 
 case class CatalogColumnStat(
@@ -43,7 +43,11 @@ case class CatalogColumnStat(
     min.foreach { v => map.put(s"${colName}.${CatalogColumnStat.KEY_MIN_VALUE}", v) }
     max.foreach { v => map.put(s"${colName}.${CatalogColumnStat.KEY_MAX_VALUE}", v) }
     histogram.foreach { h =>
-      map.put(s"${colName}.${CatalogColumnStat.KEY_HISTOGRAM}", HistogramSerializer.serialize(h))
+      CatalogTable.splitLargeTableProp(
+        s"$colName.${CatalogColumnStat.KEY_HISTOGRAM}",
+        HistogramSerializer.serialize(h),
+        map.put,
+        4000)
     }
     map.toMap
   }
@@ -91,7 +95,7 @@ object CatalogColumnStat extends Logging {
     dataType match {
       case BooleanType => s.toBoolean
       case DateType if version == 1 => DateTimeUtils.fromJavaDate(java.sql.Date.valueOf(s))
-      case DateType => DateFormatter(ZoneOffset.UTC).parse(s)
+      case DateType => DateFormatter().parse(s)
       case TimestampType if version == 1 =>
         DateTimeUtils.fromJavaTimestamp(java.sql.Timestamp.valueOf(s))
       case TimestampType => getTimestampFormatter(isParsing = true).parse(s)
@@ -106,8 +110,8 @@ object CatalogColumnStat extends Logging {
       // This version of Spark does not use min/max for binary/string types so we ignore it.
       case BinaryType => null
       case _ =>
-        throw new AnalysisException("Column statistics deserialization is not supported for " +
-          s"column $name of data type: $dataType.")
+        throw QueryCompilationErrors.columnStatisticsDeserializationNotSupportedError(
+          name, dataType)
     }
   }
 
@@ -117,14 +121,14 @@ object CatalogColumnStat extends Logging {
    */
   def toExternalString(v: Any, colName: String, dataType: DataType): String = {
     val externalValue = dataType match {
-      case DateType => DateFormatter(ZoneOffset.UTC).format(v.asInstanceOf[Int])
+      case DateType => DateFormatter().format(v.asInstanceOf[Int])
       case TimestampType => getTimestampFormatter(isParsing = false).format(v.asInstanceOf[Long])
       case BooleanType | _: IntegralType | FloatType | DoubleType | StringType => v
       case _: DecimalType => v.asInstanceOf[Decimal].toJavaBigDecimal
       // This version of Spark does not use min/max for binary/string types so we ignore it.
       case _ =>
-        throw new AnalysisException("Column statistics serialization is not supported for " +
-          s"column $colName of data type: $dataType.")
+        throw QueryCompilationErrors.columnStatisticsSerializationNotSupportedError(
+          colName, dataType)
     }
     externalValue.toString
   }
@@ -148,7 +152,8 @@ object CatalogColumnStat extends Logging {
         nullCount = map.get(s"${colName}.${KEY_NULL_COUNT}").map(v => BigInt(v.toLong)),
         avgLen = map.get(s"${colName}.${KEY_AVG_LEN}").map(_.toLong),
         maxLen = map.get(s"${colName}.${KEY_MAX_LEN}").map(_.toLong),
-        histogram = map.get(s"${colName}.${KEY_HISTOGRAM}").map(HistogramSerializer.deserialize),
+        histogram = CatalogTable.readLargeTableProp(map, s"$colName.$KEY_HISTOGRAM")
+          .map(HistogramSerializer.deserialize),
         version = map(s"${colName}.${KEY_VERSION}").toInt
       ))
     } catch {
@@ -158,4 +163,3 @@ object CatalogColumnStat extends Logging {
     }
   }
 }
-
