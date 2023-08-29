@@ -18,21 +18,21 @@ package com.huawei.boostkit.omnituning.security;
 import com.huawei.boostkit.omnituning.exception.OmniTuningException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
 import java.security.PrivilegedAction;
 
 public final class HadoopSecurity {
-    private static final Logger LOG = Logger.getLogger(HadoopSecurity.class);
-    private static HadoopSecurity instance = null;
+    private static final Logger LOG = LoggerFactory.getLogger(HadoopSecurity.class);
 
     private String keytabLocation;
     private String keytabUser;
     private UserGroupInformation loginUser;
 
-    private HadoopSecurity() throws IOException {
+    public HadoopSecurity() throws IOException {
         Configuration conf = new Configuration();
         UserGroupInformation.setConfiguration(conf);
         boolean securityEnabled = UserGroupInformation.isSecurityEnabled();
@@ -65,14 +65,6 @@ public final class HadoopSecurity {
         this.loginUser = getLoginUser();
     }
 
-    public static HadoopSecurity getInstance() throws IOException{
-        if (instance == null) {
-            instance = new HadoopSecurity();
-        }
-
-        return instance;
-    }
-
     public UserGroupInformation getUGI() throws IOException {
         checkLogin();
         return loginUser;
@@ -100,11 +92,10 @@ public final class HadoopSecurity {
         }
     }
 
-    public <T> T doAs(PrivilegedAction<T> action) throws IOException {
+    public <T> void doAs(PrivilegedAction<T> action) throws IOException {
         UserGroupInformation ugi = getUGI();
         if (ugi != null) {
-            return ugi.doAs(action);
+            ugi.doAs(action);
         }
-        return null;
     }
 }

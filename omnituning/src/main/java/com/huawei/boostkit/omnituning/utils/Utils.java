@@ -27,13 +27,15 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
+import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
 public final class Utils {
     private Utils() {}
 
     public static Map<String, String> loadParamsFromConf(String configParamName, Map<String, String> conf) {
-        URL fileURL = requireNonNull(Thread.currentThread().getContextClassLoader().getResource(configParamName));
+        URL fileURL = requireNonNull(Thread.currentThread().getContextClassLoader().getResource(configParamName),
+                format("Tez param config file %s is not found", configParamName));
         Map<String, String> params = new HashMap<>();
         try (BufferedReader br = new BufferedReader(
                 new InputStreamReader(new FileInputStream(fileURL.getPath()), StandardCharsets.UTF_8))) {

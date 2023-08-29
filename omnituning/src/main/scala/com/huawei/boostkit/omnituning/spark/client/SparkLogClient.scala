@@ -21,15 +21,16 @@ import com.huawei.boostkit.omnituning.spark.data.SparkLogAnalyticJob
 import com.huawei.boostkit.omnituning.spark.utils.SparkUtils
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
+import org.apache.spark.SparkApplicationDataExtractor.extractAppResultFromAppStatusStore
 import org.apache.spark.SparkConf
-import org.apache.spark.deploy.history.SparkApplicationDataExtractor.extractAppResultFromAppStatusStore
-import org.apache.spark.deploy.history.SparkDataCollection
+import org.apache.spark.SparkDataCollection
 
-class SparkLogClient(hadoopConfiguration: Configuration, sparkConf: SparkConf, eventLogUri: String, workload: String)
+class SparkLogClient(hadoopConfiguration: Configuration, sparkConf: SparkConf, eventLogUri: String,
+                     workload: String, maxFileSize: Long)
   extends SparkEventClient {
 
   override def fetchAnalyticJobs(startTimeMills: Long, finishedTimeMills: Long): List[AnalyticJob] = {
-    SparkUtils.findApplicationFiles(hadoopConfiguration, eventLogUri, startTimeMills, finishedTimeMills)
+    SparkUtils.findApplicationFiles(hadoopConfiguration, eventLogUri, startTimeMills, finishedTimeMills, maxFileSize)
       .map(file => new SparkLogAnalyticJob(SparkUtils.getApplicationIdFromFile(file), file))
       .filter(job => AppResult.FINDER.byId(job.getApplicationId) == null)
   }
@@ -37,7 +38,7 @@ class SparkLogClient(hadoopConfiguration: Configuration, sparkConf: SparkConf, e
   override def fetchAnalyticResult(job: AnalyticJob): AppResult = {
     require(job.isInstanceOf[SparkLogAnalyticJob], "Require SparkLogAnalyticJob")
     val logJob = job.asInstanceOf[SparkLogAnalyticJob]
-    val path = new Path(logJob.getApplicationId)
+    val path = new Path(logJob.getFilePath)
     val compressCodec = SparkUtils.compressionCodecForLogName(sparkConf, path.getName)
     val dataCollection = new SparkDataCollection
 

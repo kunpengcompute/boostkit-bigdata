@@ -54,7 +54,6 @@ public final class DBConfigure {
 
         dbConfig.setDataSource(DataSourceFactory.create(dbConfig.getName(), dbConfig.getDataSourceConfig()));
 
-        // check whether a result table needs to be created
         LOG.info("Checking whether the result table exists");
         boolean isInit;
         try (Connection conn = dbConfig.getDataSource().getConnection();

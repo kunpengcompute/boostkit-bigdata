@@ -35,8 +35,9 @@ public class ThreadPoolListener extends TimerTask {
 
     @Override
     public void run() {
-        LOG.info("Executor taskCount{}, active count {}, complete count {}",
-                executor.getTaskCount(), executor.getActiveCount(), executor.getCompletedTaskCount());
+        LOG.info("Executor taskCount {}, active count {}, complete count {}, {} left",
+                executor.getTaskCount(), executor.getActiveCount(), executor.getCompletedTaskCount(),
+                executor.getTaskCount() - executor.getCompletedTaskCount());
         if (executor.getActiveCount() == 0) {
             executor.shutdown();
             timer.cancel();

@@ -30,16 +30,16 @@ import scala.tools.jline_embedded.internal.InputStreamReader
 
 
 object SparkUtils {
-
-  def findApplicationFiles(hadoopConfiguration: Configuration, eventLogDir: String,
-                           startTimeMills: Long, finishTimeMills: Long): List[String] = {
+  def findApplicationFiles(hadoopConfiguration: Configuration, eventLogDir: String, startTimeMills: Long,
+                           finishTimeMills: Long, maxFileSize: Long): List[String] = {
     val uri = new URI(eventLogDir)
     val fs = FileSystem.get(uri, hadoopConfiguration)
     val eventLogDirPath: Path = new Path(eventLogDir)
     if (fs.exists(eventLogDirPath) && fs.getFileStatus(eventLogDirPath).isDirectory) {
       fs.listStatus(eventLogDirPath).filter(status => {
-        val modificationTime = status.getModificationTime
-        modificationTime >= startTimeMills && modificationTime <= finishTimeMills
+        val fileSize = status.getLen
+        val accessTime = status.getAccessTime
+        accessTime >= startTimeMills && accessTime <= finishTimeMills && fileSize <= maxFileSize
       }).map { status => status.getPath.toString }.toList
     } else {
       throw new OmniTuningException("eventLog path is not exist or not a Directory")
@@ -47,11 +47,6 @@ object SparkUtils {
   }
 
   private val IN_PROGRESS = ".inprogress"
-  private val DEFAULT_COMPRESSION_CODEC = "lz4"
-
-  private val COMPRESSION_CODECS = Map(
-    "lz4" -> classOf[LZ4CompressionCodec]
-  )
 
   private val compressionCodecClassNamesByShortName = Map(
     "lz4" -> classOf[LZ4CompressionCodec].getName,
@@ -83,7 +78,8 @@ object SparkUtils {
   }
 
   def getApplicationIdFromFile(file: String): String = {
-    val logBaseName = file.stripSuffix(IN_PROGRESS)
+    val fileName = new Path(file).getName
+    val logBaseName = fileName.stripSuffix(IN_PROGRESS)
     logBaseName.split("\\.").apply(0)
   }
 

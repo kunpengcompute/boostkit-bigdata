@@ -15,15 +15,41 @@
 
 package com.huawei.boostkit.omnituning;
 
+import com.huawei.boostkit.omnituning.exception.OmniTuningException;
+import com.huawei.boostkit.omnituning.executor.OmniTuningRunner;
+import org.apache.commons.lang.time.DateUtils;
+
+import java.text.ParseException;
+import java.util.Date;
+
 public final class OmniTuning {
+    private static final int REQUIRED_PARAMS_LENGTH = 2;
+    private static final String[] TIME_PARSE_PATTERNS = {"yyyy-MM-dd HH:mm:ss"};
+
     private OmniTuning() {}
 
     public static void main(String[] args) {
-        long startTimeMills = Long.parseLong(args[0]);
-        long finishedTimeMills = Long.parseLong(args[1]);
+        if (args.length != REQUIRED_PARAMS_LENGTH) {
+            throw new OmniTuningException("The number of parameters is abnormal. Only two parameters are supported.");
+        }
+
+        Date startDate;
+        Date finishDate;
+        try {
+            startDate = DateUtils.parseDate(args[0], TIME_PARSE_PATTERNS);
+            finishDate = DateUtils.parseDate(args[1], TIME_PARSE_PATTERNS);
+        } catch (ParseException e) {
+            throw new OmniTuningException("Unsupported date format. Only the 'yyyy-MM-dd HH:mm:ss' is supported", e);
+        }
+
+        long startTimeMills = startDate.getTime();
+        long finishedTimeMills = finishDate.getTime();
+
+        if (startTimeMills > finishedTimeMills) {
+            throw new OmniTuningException("start time cannot be greater than finish time");
+        }
 
         OmniTuningContext.getInstance();
-
         OmniTuningRunner runner = new OmniTuningRunner(startTimeMills, finishedTimeMills);
         runner.run();
     }

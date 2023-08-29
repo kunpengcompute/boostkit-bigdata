@@ -18,10 +18,8 @@ package com.huawei.boostkit.omnituning.spark.data
 import com.huawei.boostkit.omnituning.analysis.AnalyticJob
 import com.huawei.boostkit.omnituning.fetcher.FetcherType
 
-class SparkRestAnalyticJob (applicationId: String, applicationName: String) extends AnalyticJob {
+class SparkRestAnalyticJob (applicationId: String) extends AnalyticJob {
   override def getApplicationId: String = applicationId
 
   override def getType: FetcherType = FetcherType.SPARK
-
-  def getApplicationName: String = applicationName
 }

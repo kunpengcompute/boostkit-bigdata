@@ -23,7 +23,7 @@ import com.huawei.boostkit.omnituning.models.AppResult
 import com.huawei.boostkit.omnituning.spark.data.SparkRestAnalyticJob
 import com.huawei.boostkit.omnituning.spark.utils.SparkUtils
 import org.apache.spark.SparkConf
-import org.apache.spark.deploy.history.SparkDataCollection
+import org.apache.spark.SparkDataCollection
 import org.apache.spark.status.api.v1.ApplicationInfo
 import org.glassfish.jersey.client.ClientProperties
 import org.slf4j.{Logger, LoggerFactory}
@@ -35,12 +35,13 @@ import java.util.{Calendar, Date, SimpleTimeZone}
 import java.util.zip.ZipInputStream
 import javax.ws.rs.client.{Client, ClientBuilder, WebTarget}
 import javax.ws.rs.core.MediaType
+import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration.{Duration, FiniteDuration, SECONDS}
 import scala.util.control.NonFatal
 
 class SparkRestClient(historyUri: String, timeoutSeconds: Int, sparkConf: SparkConf, workload: String)
   extends SparkEventClient {
-  private val logger: Logger = LoggerFactory.getLogger(classOf[SparkRestClient])
+  private val LOG: Logger = LoggerFactory.getLogger(classOf[SparkRestClient])
 
   private val historyServerUri: URI = {
     val baseUri: URI = {
@@ -81,19 +82,32 @@ class SparkRestClient(historyUri: String, timeoutSeconds: Int, sparkConf: SparkC
     .path(API_V1_MOUNT_PATH)
 
   override def fetchAnalyticJobs(startTimeMills: Long, finishedTimeMills: Long): List[AnalyticJob] = {
-    val minEndDate = sparkRestObjectMapper.getDateFormat.format(new Date(startTimeMills))
-    val maxEndDate = sparkRestObjectMapper.getDateFormat.format(new Date(finishedTimeMills))
-    val appTarget = apiTarget.path("applications").queryParam("status", "completed")
-      .queryParam("minEndDate", minEndDate).queryParam("maxEndDate", maxEndDate)
-    logger.info(s"calling REST API at ${appTarget.getUri}")
+    val minDate = sparkRestObjectMapper.getDateFormat.format(new Date(startTimeMills))
+    val maxDate = sparkRestObjectMapper.getDateFormat.format(new Date(finishedTimeMills))
+    val appTarget = apiTarget.path("applications").queryParam("minDate", minDate).queryParam("maxDate", maxDate)
+
     try {
+      LOG.info(s"calling REST API at ${appTarget.getUri}")
       val applications = getApplications(appTarget, sparkRestObjectMapper.readValue[Seq[ApplicationInfo]])
-      applications.map(appInfo => new SparkRestAnalyticJob(appInfo.id, appInfo.name))
-        .filter(job => AppResult.FINDER.byId(job.getApplicationId) == null).toList
+      val analyticJobs = new ListBuffer[AnalyticJob]()
+      for (appInfo <- applications) {
+        val attempts = appInfo.attempts
+        if (attempts.isEmpty) {
+          LOG.info("application {} attempt is empty, skip it", appInfo.id)
+        } else {
+          val lastAttempt = appInfo.attempts.maxBy{ _.startTime }
+          if (!lastAttempt.completed) {
+            LOG.info("application {} is running, skip it", appInfo.id)
+          } else {
+            analyticJobs += new SparkRestAnalyticJob(appInfo.id)
+          }
+        }
+      }
+      analyticJobs.toList
     } catch {
       case NonFatal(e) =>
-        logger.error(s"error reading jobData ${appTarget.getUri}. Exception Message = ${e.getMessage}")
-        throw e
+        LOG.error(s"error reading jobData ${appTarget.getUri}. Exception Message = ${e}")
+        throw new OmniTuningException(e)
     }
   }
 
@@ -102,7 +116,7 @@ class SparkRestClient(historyUri: String, timeoutSeconds: Int, sparkConf: SparkC
     val sparkJob = job.asInstanceOf[SparkRestAnalyticJob]
     val attemptTarget = getApplicationMetaData(sparkJob.getApplicationId)
     val logTarget = attemptTarget.path("logs")
-    logger.info(s"creating SparkApplication by calling REST API at ${logTarget.getUri} to get eventLogs")
+    LOG.info(s"creating SparkApplication by calling REST API at ${logTarget.getUri} to get eventLogs")
     resource.managed {
       getApplicationLogs(logTarget)
     }.acquireAndGet{ zipInputStream =>
@@ -123,7 +137,7 @@ class SparkRestClient(historyUri: String, timeoutSeconds: Int, sparkConf: SparkC
 
   private def getApplicationMetaData(appId: String): WebTarget = {
     val appTarget = apiTarget.path(s"applications/${appId}")
-    logger.info(s"calling REST API at ${appTarget.getUri}")
+    LOG.info(s"calling REST API at ${appTarget.getUri}")
 
     val applicationInfo = getApplicationInfo(appTarget)
 
@@ -138,7 +152,7 @@ class SparkRestClient(historyUri: String, timeoutSeconds: Int, sparkConf: SparkC
       getApplications(appTarget, sparkRestObjectMapper.readValue[ApplicationInfo])
     } catch {
       case NonFatal(e) =>
-        logger.error(s"error reading applicationInfo ${appTarget.getUri}. Exception Message = ${e.getMessage}")
+        LOG.error(s"error reading applicationInfo ${appTarget.getUri}. Exception Message = ${e.getMessage}")
         throw e
     }
   }
@@ -150,7 +164,7 @@ class SparkRestClient(historyUri: String, timeoutSeconds: Int, sparkConf: SparkC
       new ZipInputStream(new BufferedInputStream(inputStream))
     }catch {
       case NonFatal(e) =>
-        logger.error(s"error reading logs ${logTarget.getUri}. Exception Message = ${e.getMessage}")
+        LOG.error(s"error reading logs ${logTarget.getUri}. Exception Message = ${e.getMessage}")
         throw e
     }
   }
@@ -158,7 +172,7 @@ class SparkRestClient(historyUri: String, timeoutSeconds: Int, sparkConf: SparkC
   private def getLogInputStream(zis: ZipInputStream, attemptTarget: WebTarget): (Option[InputStream], String) = {
     val entry = zis.getNextEntry
     if (entry == null) {
-      logger.warn(s"failed to resolve log for ${attemptTarget.getUri}")
+      LOG.warn(s"failed to resolve log for ${attemptTarget.getUri}")
       (None, "")
     } else {
       val entryName = entry.getName

@@ -21,9 +21,9 @@ import com.huawei.boostkit.omnituning.fetcher.Fetcher;
 import com.huawei.boostkit.omnituning.fetcher.FetcherType;
 import com.huawei.boostkit.omnituning.models.AppResult;
 import com.huawei.boostkit.omnituning.tez.data.TezAnalyticJob;
-import com.huawei.boostkit.omnituning.tez.utils.JsonUtils;
-import com.huawei.boostkit.omnituning.tez.utils.TimelineUtils;
-import com.huawei.boostkit.omnituning.tez.utils.UrlFactory;
+import com.huawei.boostkit.omnituning.tez.data.TezDagIdData;
+import com.huawei.boostkit.omnituning.tez.utils.TezJsonUtils;
+import com.huawei.boostkit.omnituning.tez.utils.TezUrlFactory;
 import com.huawei.boostkit.omnituning.utils.Utils;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
@@ -31,35 +31,40 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import static com.huawei.boostkit.omnituning.models.AppResult.FAILED_JOB_DURATION;
 import static com.huawei.boostkit.omnituning.utils.Utils.loadParamsFromConf;
 
 public class TezFetcher implements Fetcher {
-    private static final Logger logger = LoggerFactory.getLogger(TezFetcher.class);
+    private static final Logger LOG = LoggerFactory.getLogger(TezFetcher.class);
 
     private static final String TEZ_ENABLE_KEY = "tez.enable";
     private static final String TEZ_WORKLOAD_KEY = "tez.workload";
     private static final String TEZ_TIMELINE_URL_KEY = "tez.timeline.url";
+    private static final String TEZ_TIMELINE_TIMEOUT_KEY = "tez.timeline.timeout.ms";
+    private static final String TEZ_TIMELINE_USE_HTTPS_KEY = "tez.timeline.useHttps";
     private static final String DEFAULT_WORKLOAD = "default";
     private static final String DEFAULT_TIMELINE_URL = "http://localhost:8188";
+    private static final boolean DEFAULT_USE_HTTPS = false;
+    private static final int DEFAULT_CONNECTION_TIMEOUT_MS = 6000;
+    private static final String TEZ_PARAMS_CONF_FILE = "TezParams";
 
     private final boolean enable;
     private String workload;
-    private JsonUtils jsonUtils;
+    private TezJsonUtils tezJsonUtils;
 
     public TezFetcher(PropertiesConfiguration configuration) {
         this.enable = configuration.getBoolean(TEZ_ENABLE_KEY, false);
         if (enable) {
             String timelineUrl = configuration.getString(TEZ_TIMELINE_URL_KEY, DEFAULT_TIMELINE_URL);
-            UrlFactory urlFactory = new UrlFactory(timelineUrl);
-            this.jsonUtils = new JsonUtils(urlFactory);
+            TezUrlFactory tezUrlFactory = new TezUrlFactory(timelineUrl);
             this.workload = configuration.getString(TEZ_WORKLOAD_KEY, DEFAULT_WORKLOAD);
+            int timeout = configuration.getInt(TEZ_TIMELINE_TIMEOUT_KEY, DEFAULT_CONNECTION_TIMEOUT_MS);
+            boolean useHttps = configuration.getBoolean(TEZ_TIMELINE_USE_HTTPS_KEY, DEFAULT_USE_HTTPS);
+            this.tezJsonUtils = new TezJsonUtils(tezUrlFactory, useHttps, timeout);
         }
     }
 
@@ -67,10 +72,10 @@ public class TezFetcher implements Fetcher {
     public boolean isEnable() {
         if (enable) {
             try {
-                jsonUtils.verifyTimeLineServer();
+                tezJsonUtils.verifyTimeLineServer();
                 return true;
             } catch (IOException e) {
-                logger.error("Connect to timeline server failed {}, TEZ fetcher is disabled", e.getMessage());
+                LOG.error("Connect to timeline server failed {}, TEZ fetcher is disabled", e.getMessage());
                 return false;
             }
         }
@@ -85,9 +90,9 @@ public class TezFetcher implements Fetcher {
     @Override
     public List<AnalyticJob> fetchAnalyticJobs(long startTimeMills, long finishedTimeMills) {
         try {
-            return jsonUtils.getApplicationJobs(startTimeMills, finishedTimeMills);
+            return tezJsonUtils.getApplicationJobs(startTimeMills, finishedTimeMills);
         } catch (IOException | AuthenticationException e) {
-            logger.error("Fetch applications from timeline server failed.", e);
+            LOG.error("Fetch applications from timeline server failed.", e);
             return Collections.emptyList();
         }
     }
@@ -99,61 +104,50 @@ public class TezFetcher implements Fetcher {
         }
         TezAnalyticJob tezJob = (TezAnalyticJob) job;
 
-        // get dagIds, if datId is empty, skip it
-        List<String> dagIds;
+        List<TezDagIdData> dagIds;
         try {
-            dagIds = jsonUtils.getDAGIds(job.getApplicationId());
-        } catch (IOException | AuthenticationException e) {
-            logger.error("Get dagIds from timeline server failed. {}", e.getMessage());
+            dagIds = tezJsonUtils.getDAGIds(job.getApplicationId());
+        } catch (IOException e) {
+            LOG.error("Get dagIds from timeline server failed.", e);
             return Optional.empty();
         }
 
         if (dagIds.isEmpty()) {
+            LOG.info("There is no dag in application {}, skip it", job.getApplicationId());
             return Optional.empty();
         }
 
-        return extractAppResult(tezJob, dagIds);
+        // If there is more than one dag in application, only analyze the last one
+        TezDagIdData tezDagId = dagIds.stream().max(TezDagIdData::compareTo).get();
+
+        return extractAppResult(tezJob, tezDagId);
     }
 
-    private Optional<AppResult> extractAppResult(AnalyticJob job, List<String> dagIds) {
+    private Optional<AppResult> extractAppResult(TezAnalyticJob tezJob, TezDagIdData dagIdData) {
+        if (!dagIdData.isComplete()) {
+            LOG.info("Application {} is running now, skip it", tezJob.getApplicationId());
+            return Optional.empty();
+        }
+        LOG.info("Analyzing dag {}", dagIdData.getDagId());
         AppResult appResult = new AppResult();
-        appResult.applicationId = tezJob.getApplicationId();
-        appResult.jobType = tezJob.getType().getName();
-        appResult.startTime = tezJob.getStartedTime();
-        appResult.finishTIme = tezJob.getFinishedTime();
-        appResult.applicationWorkload = workload;
-        appResult.executionStatus = tezJob.isSuccess() ? AppResult.SUCCEEDED_STATUS : AppResult.FAILED_STATUS;
-        appResult.durationTime = tezJob.isSuccess() ? (tezJob.getFinishedTime() - tezJob.getStartedTime())
-                : FAILED_JOB_DURATION;
         Map<String, String> jobConf;
-
         try {
-            jobConf = jsonUtils.getConfigure(job.getApplicationId());
-        } catch (IOException | AuthenticationException e) {
-            logger.error(e.getMessage());
+            jobConf = tezJsonUtils.getConfigure(tezJob.getApplicationId());
+            appResult.query = tezJsonUtils.getQueryString(dagIdData.getDagId());
+        } catch (IOException e) {
+            LOG.error("Analyze job failed. ", e);
             return Optional.empty();
         }
 
-        String query = null;
-
-        for (String dagId : dagIds) {
-            try {
-                // get first query string as query
-                if (query == null) {
-                    query = jsonUtils.getQueryString(dagId);
-                }
-            } catch (IOException | AuthenticationException e) {
-                logger.error(e.getMessage());
-            } finally {
-                TimelineUtils.updateAuthToken();
-            }
-        }
-
-        String applicationName = query == null ? "" : TimelineUtils.getSHA256String(query);
-        appResult.applicationWorkload = "default";
-        appResult.applicationName = applicationName;
-        appResult.query = query;
-        appResult.parameters = Utils.parseMapToJsonString(loadParamsFromConf("TEZParam", jobConf));
+        appResult.applicationId = tezJob.getApplicationId();
+        appResult.applicationName = tezJob.getApplicationName();
+        appResult.applicationWorkload = workload;
+        appResult.startTime = dagIdData.getStartTime();
+        appResult.finishTIme = dagIdData.getEndTime();
+        appResult.jobType = tezJob.getType().getName();
+        appResult.parameters = Utils.parseMapToJsonString(loadParamsFromConf(TEZ_PARAMS_CONF_FILE, jobConf));
+        appResult.executionStatus = dagIdData.isSuccess() ? AppResult.SUCCEEDED_STATUS : AppResult.FAILED_STATUS;
+        appResult.durationTime = dagIdData.isSuccess() ? dagIdData.getDuration() : AppResult.FAILED_JOB_DURATION;
 
         return Optional.of(appResult);
     }

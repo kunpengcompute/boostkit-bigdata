@@ -5,23 +5,23 @@
     </formats>
     <fileSets>
         <fileSet>
-            <directory>target</directory>
+            <directory>${basedir}/target</directory>
             <includes>
                 <include>*.jar</include>
             </includes>
-            <outputDirectory>/</outputDirectory>
+            <outputDirectory>./</outputDirectory>
         </fileSet>
         <fileSet>
-            <directory>target/resources/conf</directory>
-            <outputDirectory>/conf</outputDirectory>
+            <directory>${basedir}/target/resources/conf</directory>
+            <outputDirectory>./conf</outputDirectory>
         </fileSet>
         <fileSet>
-            <directory>target/lib</directory>
-            <outputDirectory>/lib</outputDirectory>
+            <directory>${basedir}/target/lib</directory>
+            <outputDirectory>./lib</outputDirectory>
         </fileSet>
         <fileSet>
-            <directory>target/resources/scripts</directory>
-            <outputDirectory>/</outputDirectory>
+            <directory>${basedir}/target/resources/scripts</directory>
+            <outputDirectory>./</outputDirectory>
         </fileSet>
     </fileSets>
 </assembly>

@@ -19,19 +19,12 @@ import com.huawei.boostkit.omnituning.analysis.AnalyticJob;
 import com.huawei.boostkit.omnituning.fetcher.FetcherType;
 
 public class TezAnalyticJob implements AnalyticJob {
-    private String applicationId;
-    private String trackingUrl;
-    private long startedTime;
-    private long finishedTime;
-    private boolean isSuccess;
+    private final String applicationId;
+    private final String applicationName;
 
-    public TezAnalyticJob(String applicationId, String trackingUrl, long startedTime,
-                          long finishedTime, boolean isSuccess) {
+    public TezAnalyticJob(String applicationId, String applicationName) {
         this.applicationId = applicationId;
-        this.trackingUrl = trackingUrl;
-        this.startedTime = startedTime;
-        this.finishedTime = finishedTime;
-        this.isSuccess = isSuccess;
+        this.applicationName = applicationName;
     }
 
     @Override
@@ -44,19 +37,7 @@ public class TezAnalyticJob implements AnalyticJob {
         return FetcherType.TEZ;
     }
 
-    public String getTrackingUrl() {
-        return trackingUrl;
-    }
-
-    public long getStartedTime() {
-        return startedTime;
-    }
-
-    public long getFinishedTime() {
-        return finishedTime;
-    }
-
-    public boolean isSuccess() {
-        return isSuccess;
+    public String getApplicationName() {
+        return applicationName;
     }
 }

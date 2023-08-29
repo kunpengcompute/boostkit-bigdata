@@ -23,6 +23,7 @@ import com.huawei.boostkit.omnituning.spark.client.{SparkEventClient, SparkLogCl
 import com.huawei.boostkit.omnituning.spark.config.SparkFetcherConfigure
 import com.huawei.boostkit.omnituning.spark.utils.SparkUtils
 import org.apache.commons.configuration2.PropertiesConfiguration
+import org.apache.commons.io.FileUtils
 import org.apache.hadoop.conf.Configuration
 import org.apache.spark.SparkConf
 import org.slf4j.{Logger, LoggerFactory}
@@ -37,7 +38,7 @@ import scala.util.{Failure, Success, Try}
 class SparkFetcher (configure: PropertiesConfiguration)
   extends Fetcher
 {
-  private val logger: Logger = LoggerFactory.getLogger(classOf[SparkFetcher])
+  private val LOG: Logger = LoggerFactory.getLogger(classOf[SparkFetcher])
 
   val sparkFetcherConfig = new SparkFetcherConfigure(configure)
 
@@ -57,7 +58,8 @@ class SparkFetcher (configure: PropertiesConfiguration)
       new SparkRestClient(sparkFetcherConfig.restUrl, sparkFetcherConfig.restTimeoutSeconds, sparkConf,
         sparkFetcherConfig.workload)
     } else {
-      new SparkLogClient(hadoopConfigure, sparkConf, sparkFetcherConfig.restUrl, sparkFetcherConfig.workload)
+      new SparkLogClient(hadoopConfigure, sparkConf, sparkFetcherConfig.logDirectory, sparkFetcherConfig.workload,
+        sparkFetcherConfig.maxLogSizeInMB * FileUtils.ONE_MB)
     }
   }
 
@@ -65,16 +67,16 @@ class SparkFetcher (configure: PropertiesConfiguration)
 
   override def analysis(job: AnalyticJob): Optional[AppResult] = {
     val appId = job.getApplicationId
-    logger.info(s"Fetching data for ${appId}")
+    LOG.info(s"Fetching data for ${appId}")
     val result = Try {
       Await.result(doAnalysisApplication(job), Duration(sparkFetcherConfig.restTimeoutSeconds, SECONDS))
     }.transform(
       data => {
-        logger.info(s"Succeed fetching data for ${appId}")
+        LOG.info(s"Succeed fetching data for ${appId}")
         Success(data)
       },
       e => {
-       logger.error(s"Failed fetching data for ${appId}, Exception Message is ${e.getMessage}")
+       LOG.error(s"Failed fetching data for ${appId}, Exception Message is ${e.getMessage}")
         Failure(e)
       })
     result match {

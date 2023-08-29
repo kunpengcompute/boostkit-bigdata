@@ -13,13 +13,13 @@
  * limitations under the License.
  */
 
-package org.apache.spark.deploy.history
+package org.apache.spark
 
+import com.huawei.boostkit.omnituning.exception.OmniTuningException
 import com.huawei.boostkit.omnituning.fetcher.FetcherType
 import com.huawei.boostkit.omnituning.models.AppResult
-import com.huawei.boostkit.omnituning.spark.utils.ScalaUtils.parseMapToJsonString
+import com.huawei.boostkit.omnituning.spark.utils.ScalaUtils.{checkSuccess, parseMapToJsonString}
 import com.nimbusds.jose.util.StandardCharset
-import org.apache.spark.JobExecutionStatus
 import org.apache.spark.status.api.v1._
 import org.slf4j.{Logger, LoggerFactory}
 
@@ -27,16 +27,7 @@ import scala.collection.mutable
 import scala.io.{BufferedSource, Source}
 
 object SparkApplicationDataExtractor {
-
-  val logger: Logger = LoggerFactory.getLogger(SparkApplicationDataExtractor.getClass)
-
-  val DEFAULT_ALLOCATED_MEMORY_WASTE_BUFFER_PERCENTAGE = 0.5D
-
-  val ALLOCATED_MEMORY_WASTE_BUFFER_PERCENTAGE_KEY = "allocated_memory_waste_buffer_percentage"
-  val TRACKING_URL_KEY = "spark.org.apache.hadoop.yarn.server.webproxy.amfilter.AmIoFilter.param.PROXY_URI_BASES"
-
-  val SPARK_EXECUTOR_INSTANCES_KEY = "spark.executor.instances"
-  val SPARK_EXECUTOR_MEMORY_KEY = "spark.executor.memory"
+  val LOG: Logger = LoggerFactory.getLogger(SparkApplicationDataExtractor.getClass)
 
   val SPARK_REQUIRED_PARAMS_FILE = "SparkParams"
 
@@ -49,6 +40,9 @@ object SparkApplicationDataExtractor {
     appResult.applicationName = appInfo.name
     appResult.jobType = FetcherType.SPARK.getName
     val attempt: ApplicationAttemptInfo = lastAttempt(appInfo)
+    if (!attempt.completed) {
+      throw new OmniTuningException(s"application ${appInfo.id} is running")
+    }
     appResult.startTime = attempt.startTime.getTime
     appResult.finishTIme = attempt.endTime.getTime
     appResult.applicationWorkload = workload
@@ -57,18 +51,20 @@ object SparkApplicationDataExtractor {
 
     appResult.parameters = parseMapToJsonString(extractRequiredConfiguration(configurations))
 
-    val query: Option[String] = jobsList.maxBy(job => job.jobId).description
-    appResult.query = query.getOrElse("")
+    if (jobsList.nonEmpty) {
+      val query: Option[String] = jobsList.maxBy(job => job.jobId).description
+      appResult.query = query.getOrElse("")
 
-    appResult.executionStatus = if (jobsList.exists(job => !job.status.equals(JobExecutionStatus.SUCCEEDED))) {
-      AppResult.FAILED_STATUS
+      if (checkSuccess(jobsList)) {
+        appResult.executionStatus = AppResult.SUCCEEDED_STATUS
+        appResult.durationTime = attempt.duration
+      } else {
+        appResult.executionStatus = AppResult.FAILED_STATUS
+        appResult.durationTime = AppResult.FAILED_JOB_DURATION
+      }
     } else {
-      AppResult.SUCCEEDED_STATUS
-    }
-
-    if (appResult.executionStatus == AppResult.SUCCEEDED_STATUS) {
-      appResult.durationTime = attempt.endTime.getTime - attempt.startTime.getTime
-    } else {
+      appResult.query = ""
+      appResult.executionStatus = AppResult.FAILED_STATUS
       appResult.durationTime = AppResult.FAILED_JOB_DURATION
     }
 
