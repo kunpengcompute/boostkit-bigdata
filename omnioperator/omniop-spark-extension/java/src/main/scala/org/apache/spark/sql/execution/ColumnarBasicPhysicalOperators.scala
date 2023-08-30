@@ -18,6 +18,7 @@
 package org.apache.spark.sql.execution
 
 import java.util.concurrent.TimeUnit.NANOSECONDS
+
 import com.huawei.boostkit.spark.Constant.IS_SKIP_VERIFY_EXP
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor._
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil
@@ -103,6 +104,9 @@ case class ColumnarProjectExec(projectList: Seq[NamedExpression], child: SparkPl
        |${ExplainUtils.generateFieldString("Input", child.output)}
        |""".stripMargin
   }
+
+  override protected def withNewChildInternal(newChild: SparkPlan): ColumnarProjectExec =
+    copy(child = newChild)
 }
 
 case class ColumnarFilterExec(condition: Expression, child: SparkPlan)
@@ -111,6 +115,10 @@ case class ColumnarFilterExec(condition: Expression, child: SparkPlan)
   override def supportsColumnar: Boolean = true
   override def nodeName: String = "OmniColumnarFilter"
 
+  override protected def withNewChildInternal(newChild: SparkPlan): ColumnarFilterExec = {
+    copy(this.condition, newChild)
+  }
+
   // Split out all the IsNotNulls from condition.
   private val (notNullPreds, otherPreds) = splitConjunctivePredicates(condition).partition {
     case IsNotNull(a) => isNullIntolerant(a) && a.references.subsetOf(child.outputSet)
@@ -118,7 +126,7 @@ case class ColumnarFilterExec(condition: Expression, child: SparkPlan)
   }
 
   // If one expression and its children are null intolerant, it is null intolerant.
-  private def isNullIntolerant(expr: Expression): Boolean = expr match {
+  override def isNullIntolerant(expr: Expression): Boolean = expr match {
     case e: NullIntolerant => e.children.forall(isNullIntolerant)
     case _ => false
   }
@@ -271,6 +279,9 @@ case class ColumnarConditionProjectExec(projectList: Seq[NamedExpression],
 
   override def output: Seq[Attribute] = projectList.map(_.toAttribute)
 
+  override protected def withNewChildInternal(newChild: SparkPlan): ColumnarConditionProjectExec =
+    copy(child = newChild)
+
   override lazy val metrics = Map(
     "addInputTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni addInput"),
     "numInputVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of input vecBatchs"),
@@ -389,7 +400,7 @@ case class ColumnarUnionExec(children: Seq[SparkPlan]) extends SparkPlan {
     children.map(_.output).transpose.map { attrs =>
       val firstAttr = attrs.head
       val nullable = attrs.exists(_.nullable)
-      val newDt = attrs.map(_.dataType).reduce(StructType.merge)
+      val newDt = attrs.map(_.dataType).reduce(StructType.unionLikeMerge)
       if (firstAttr.dataType == newDt) {
         firstAttr.withNullability(nullable)
       } else {
@@ -397,6 +408,10 @@ case class ColumnarUnionExec(children: Seq[SparkPlan]) extends SparkPlan {
           firstAttr.exprId, firstAttr.qualifier)
       }
     }
+  }
+
+  override protected def withNewChildrenInternal(newChildren: IndexedSeq[SparkPlan]): SparkPlan = {
+    copy(children = newChildren)
   }
 
   def buildCheck(): Unit = {
@@ -426,7 +441,7 @@ class ColumnarRangeExec(range: org.apache.spark.sql.catalyst.plans.logical.Range
   protected override def doExecuteColumnar(): RDD[ColumnarBatch] = {
     val numOutputRows = longMetric("numOutputRows")
 
-    sqlContext
+    session.sqlContext
       .sparkContext
       .parallelize(0 until numSlices, numSlices)
       .mapPartitionsWithIndex { (i, _) =>

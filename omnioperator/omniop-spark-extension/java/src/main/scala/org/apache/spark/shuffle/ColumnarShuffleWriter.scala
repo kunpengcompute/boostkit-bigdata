@@ -71,7 +71,7 @@ class ColumnarShuffleWriter[K, V](
   override def write(records: Iterator[Product2[K, V]]): Unit = {
     if (!records.hasNext) {
       partitionLengths = new Array[Long](dep.partitioner.numPartitions)
-      shuffleBlockResolver.writeIndexFileAndCommit(dep.shuffleId, mapId, partitionLengths, null)
+      shuffleBlockResolver.writeMetadataFileAndCommit(dep.shuffleId, mapId, partitionLengths, Array[Long](), null)
       mapStatus = MapStatus(blockManager.shuffleServerId, partitionLengths, mapId)
       return
     }
@@ -107,7 +107,7 @@ class ColumnarShuffleWriter[K, V](
         jniWrapper.split(nativeSplitter, vb.getNativeVectorBatch)
         dep.splitTime.add(System.nanoTime() - startTime)
         dep.numInputRows.add(cb.numRows)
-        writeMetrics.incRecordsWritten(1)
+        writeMetrics.incRecordsWritten(cb.numRows)
       }
     }
     val startTime = System.nanoTime()
@@ -122,10 +122,11 @@ class ColumnarShuffleWriter[K, V](
 
     partitionLengths = splitResult.getPartitionLengths
     try {
-      shuffleBlockResolver.writeIndexFileAndCommit(
+      shuffleBlockResolver.writeMetadataFileAndCommit(
         dep.shuffleId,
         mapId,
         partitionLengths,
+        Array[Long](),
         dataTmp)
     } finally {
       if (dataTmp.exists() && !dataTmp.delete()) {

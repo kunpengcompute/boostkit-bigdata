@@ -24,6 +24,43 @@ import org.apache.spark.sql.execution.metric.{SQLMetric, SQLShuffleReadMetricsRe
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.vectorized.ColumnarBatch
 
+sealed trait ShufflePartitionSpec
+
+// A partition that reads data of one or more reducers, from `startReducerIndex` (inclusive) to
+// `endReducerIndex` (exclusive).
+case class CoalescedPartitionSpec(
+  startReducerIndex: Int,
+  endReducerIndex: Int,
+  @transient dataSize: Option[Long] = None) extends ShufflePartitionSpec
+
+object CoalescedPartitionSpec {
+  def apply(startReducerIndex: Int,
+            endReducerIndex: Int,
+            dataSize: Long): CoalescedPartitionSpec = {
+    CoalescedPartitionSpec(startReducerIndex, endReducerIndex, Some(dataSize))
+  }
+}
+
+// A partition that reads partial data of one reducer, from `startMapIndex` (inclusive) to
+// `endMapIndex` (exclusive).
+case class PartialReducerPartitionSpec(
+  reducerIndex: Int,
+  startMapIndex: Int,
+  endMapIndex: Int,
+  @transient dataSize: Long) extends ShufflePartitionSpec
+
+// A partition that reads partial data of one mapper, from `startReducerIndex` (inclusive) to
+// `endReducerIndex` (exclusive).
+case class PartialMapperPartitionSpec(
+  mapIndex: Int,
+  startReducerIndex: Int,
+  endReducerIndex: Int) extends ShufflePartitionSpec
+
+case class CoalescedMapperPartitionSpec(
+  startMapIndex: Int,
+  endMapIndex: Int,
+  numReducers: Int) extends ShufflePartitionSpec
+
 /**
  * The [[Partition]] used by [[ShuffledRowRDD]].
  */
@@ -70,7 +107,7 @@ class ShuffledColumnarRDD(
   override def getPreferredLocations(partition: Partition): Seq[String] = {
     val tracker = SparkEnv.get.mapOutputTracker.asInstanceOf[MapOutputTrackerMaster]
     partition.asInstanceOf[ShuffledColumnarRDDPartition].spec match {
-      case CoalescedPartitionSpec(startReducerIndex, endReducerIndex) =>
+      case CoalescedPartitionSpec(startReducerIndex, endReducerIndex, _) =>
         startReducerIndex.until(endReducerIndex).flatMap { reducerIndex =>
           tracker.getPreferredLocationsForShuffle(dependency, reducerIndex)
         }
@@ -80,6 +117,9 @@ class ShuffledColumnarRDD(
 
       case PartialMapperPartitionSpec(mapIndex, _, _) =>
         tracker.getMapLocation(dependency, mapIndex, mapIndex + 1)
+
+      case CoalescedMapperPartitionSpec(startMapIndex, endMapIndex, numReducers) =>
+        tracker.getMapLocation(dependency, startMapIndex, endMapIndex)
     }
   }
 
@@ -89,7 +129,7 @@ class ShuffledColumnarRDD(
     // as well as the `tempMetrics` for basic shuffle metrics.
     val sqlMetricsReporter = new SQLShuffleReadMetricsReporter(tempMetrics, metrics)
     val reader = split.asInstanceOf[ShuffledColumnarRDDPartition].spec match {
-      case CoalescedPartitionSpec(startReducerIndex, endReducerIndex) =>
+      case CoalescedPartitionSpec(startReducerIndex, endReducerIndex, _) =>
         SparkEnv.get.shuffleManager.getReader(
           dependency.shuffleHandle,
           startReducerIndex,
@@ -116,7 +156,22 @@ class ShuffledColumnarRDD(
           endReducerIndex,
           context,
           sqlMetricsReporter)
+
+      case CoalescedMapperPartitionSpec(startMapIndex, endMapIndex, numReducers) =>
+        SparkEnv.get.shuffleManager.getReader(
+          dependency.shuffleHandle,
+          startMapIndex,
+          endMapIndex,
+          0,
+          numReducers,
+          context,
+          sqlMetricsReporter)
     }
     reader.read().asInstanceOf[Iterator[Product2[Int, ColumnarBatch]]].map(_._2)
+  }
+
+  override def clearDependencies(): Unit = {
+    super.clearDependencies()
+    dependency = null
   }
 }

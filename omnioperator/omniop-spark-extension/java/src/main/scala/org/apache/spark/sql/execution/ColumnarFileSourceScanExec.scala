@@ -47,6 +47,7 @@ import org.apache.spark.sql.catalyst.expressions.aggregate._
 import org.apache.spark.sql.catalyst.optimizer.BuildLeft
 import org.apache.spark.sql.catalyst.plans.QueryPlan
 import org.apache.spark.sql.catalyst.plans.physical.{HashPartitioning, Partitioning, UnknownPartitioning}
+import org.apache.spark.sql.errors.QueryExecutionErrors
 import org.apache.spark.sql.execution.aggregate.HashAggregateExec
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.orc.{OmniOrcFileFormat, OrcFileFormat}
@@ -245,21 +246,26 @@ abstract class BaseColumnarFileSourceScanExec(
         "DataFilters" -> seqToString(dataFilters),
         "Location" -> locationDesc)
 
-    // (SPARK-32986): Add bucketed scan info in explain output of FileSourceScanExec
-    if (bucketedScan) {
-      relation.bucketSpec.map { spec =>
+    relation.bucketSpec.map { spec =>
+      val bucketedKey = "Bucketed"
+      if (bucketedScan) {
         val numSelectedBuckets = optionalBucketSet.map { b =>
           b.cardinality()
         } getOrElse {
           spec.numBuckets
         }
-        metadata + ("SelectedBucketsCount" ->
-          (s"$numSelectedBuckets out of ${spec.numBuckets}" +
+        metadata ++ Map(
+          bucketedKey -> "true",
+          "SelectedBucketsCount" -> (s"$numSelectedBuckets out of ${spec.numBuckets}" +
             optionalNumCoalescedBuckets.map { b => s" (Coalesced to $b)" }.getOrElse("")))
-      } getOrElse {
-        metadata
+      } else if (!relation.sparkSession.sessionState.conf.bucketingEnabled) {
+        metadata + (bucketedKey -> "false (disabled by configuration)")
+      } else if (disableBucketedScan) {
+        metadata + (bucketedKey -> "false (disabled by query planner)")
+      } else {
+        metadata + (bucketedKey -> "false (bucket column(s) not read)")
       }
-    } else {
+    } getOrElse {
       metadata
     }
   }
@@ -322,7 +328,7 @@ abstract class BaseColumnarFileSourceScanExec(
       createBucketedReadRDD(relation.bucketSpec.get, readFile, dynamicallySelectedPartitions,
         relation)
     } else {
-      createNonBucketedReadRDD(readFile, dynamicallySelectedPartitions, relation)
+      createReadRDD(readFile, dynamicallySelectedPartitions, relation)
     }
     sendDriverMetrics()
     readRDD
@@ -353,7 +359,7 @@ abstract class BaseColumnarFileSourceScanExec(
       driverMetrics("staticFilesNum") = filesNum
       driverMetrics("staticFilesSize") = filesSize
     }
-    if (relation.partitionSchemaOption.isDefined) {
+    if (relation.partitionSchema.nonEmpty) {
       driverMetrics("numPartitions") = partitions.length
     }
   }
@@ -373,7 +379,7 @@ abstract class BaseColumnarFileSourceScanExec(
       None
     }
   } ++ {
-    if (relation.partitionSchemaOption.isDefined) {
+    if (relation.partitionSchema.nonEmpty) {
       Map(
         "numPartitions" -> SQLMetrics.createMetric(sparkContext, "number of partitions read"),
         "pruningTime" ->
@@ -494,7 +500,7 @@ abstract class BaseColumnarFileSourceScanExec(
    * @param selectedPartitions Hive-style partition that are part of the read.
    * @param fsRelation [[HadoopFsRelation]] associated with the read.
    */
-  private def createNonBucketedReadRDD(
+  private def createReadRDD(
       readFile: (PartitionedFile) => Iterator[InternalRow],
       selectedPartitions: Array[PartitionDirectory],
       fsRelation: HadoopFsRelation): RDD[InternalRow] = {
@@ -504,20 +510,35 @@ abstract class BaseColumnarFileSourceScanExec(
     logInfo(s"Planning scan with bin packing, max size: $maxSplitBytes bytes, " +
       s"open cost is considered as scanning $openCostInBytes bytes.")
 
-    val splitFiles = selectedPartitions.flatMap { partition =>
+    // Filter files with bucket pruning if possible
+    val bucketingEnabled = fsRelation.sparkSession.sessionState.conf.bucketingEnabled
+    val shouldProcess: Path => Boolean = optionalBucketSet match {
+      case Some(bucketSet) if bucketingEnabled =>
+        // Do not prune the file if bucket file name is invalid
+        filePath => BucketingUtils.getBucketId(filePath.getName).forall(bucketSet.get)
+      case _ =>
+        _ => true
+    }
+
+    var splitFiles = selectedPartitions.flatMap { partition =>
       partition.files.flatMap { file =>
         // getPath() is very expensive so we only want to call it once in this block:
         val filePath = file.getPath
-        val isSplitable = relation.fileFormat.isSplitable(
-          relation.sparkSession, relation.options, filePath)
-        PartitionedFileUtil.splitFiles(
-          sparkSession = relation.sparkSession,
-          file = file,
-          filePath = filePath,
-          isSplitable = isSplitable,
-          maxSplitBytes = maxSplitBytes,
-          partitionValues = partition.values
-        )
+
+        if (shouldProcess(filePath)) {
+          val isSplitable = relation.fileFormat.isSplitable(
+            relation.sparkSession, relation.options, filePath)
+          PartitionedFileUtil.splitFiles(
+            sparkSession = relation.sparkSession,
+            file = file,
+            filePath = filePath,
+            isSplitable = isSplitable,
+            maxSplitBytes = maxSplitBytes,
+            partitionValues = partition.values
+          )
+        } else {
+          Seq.empty
+        }
       }
     }.sortBy(_.length)(implicitly[Ordering[Long]].reverse)
 
@@ -564,7 +585,7 @@ abstract class BaseColumnarFileSourceScanExec(
         throw new UnsupportedOperationException(s"Unsupported final aggregate expression in operator fusion, exp: $exp")
       } else if (exp.mode == Partial) {
         exp.aggregateFunction match {
-          case Sum(_) | Min(_) | Average(_) | Max(_) | Count(_) | First(_, _) =>
+          case Sum(_, _) | Min(_) | Average(_, _) | Max(_) | Count(_) | First(_, _) =>
             val aggExp = exp.aggregateFunction.children.head
             omniOutputExressionOrder += {
               exp.aggregateFunction.inputAggBufferAttributes.head.exprId ->
@@ -582,7 +603,7 @@ abstract class BaseColumnarFileSourceScanExec(
         }
       } else if (exp.mode == PartialMerge) {
         exp.aggregateFunction match {
-          case Sum(_) | Min(_) | Average(_) | Max(_) | Count(_) | First(_, _) =>
+          case Sum(_, _) | Min(_) | Average(_, _) | Max(_) | Count(_) | First(_, _) =>
             val aggExp = exp.aggregateFunction.children.head
             omniOutputExressionOrder += {
               exp.aggregateFunction.inputAggBufferAttributes.head.exprId ->
@@ -828,7 +849,7 @@ case class ColumnarMultipleOperatorExec(
       None
     }
   } ++ {
-    if (relation.partitionSchemaOption.isDefined) {
+    if (relation.partitionSchema.nonEmpty) {
       Map(
         "numPartitions" -> SQLMetrics.createMetric(sparkContext, "number of partitions read"),
         "pruningTime" ->
@@ -1180,7 +1201,7 @@ case class ColumnarMultipleOperatorExec1(
       None
     }
   } ++ {
-    if (relation.partitionSchemaOption.isDefined) {
+    if (relation.partitionSchema.nonEmpty) {
       Map(
         "numPartitions" -> SQLMetrics.createMetric(sparkContext, "number of partitions read"),
         "pruningTime" ->

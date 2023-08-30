@@ -49,6 +49,7 @@ case class ColumnarShuffledHashJoinExec(
     condition: Option[Expression],
     left: SparkPlan,
     right: SparkPlan,
+    isSkewJoin: Boolean,
     projectList: Seq[NamedExpression] = Seq.empty)
   extends HashJoin with ShuffledJoin {
 
@@ -103,6 +104,9 @@ case class ColumnarShuffledHashJoinExec(
   }
 
   override def outputPartitioning: Partitioning = super[ShuffledJoin].outputPartitioning
+
+  override protected def withNewChildrenInternal(newLeft: SparkPlan, newRight: SparkPlan):
+    ColumnarShuffledHashJoinExec = copy(left = newLeft, right = newRight)
 
   override def outputOrdering: Seq[SortOrder] = joinType match {
     case FullOuter => Nil

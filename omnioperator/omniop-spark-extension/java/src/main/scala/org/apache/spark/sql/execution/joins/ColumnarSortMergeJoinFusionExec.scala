@@ -55,6 +55,9 @@ case class ColumnarSortMergeJoinFusionExec(
     if (isSkewJoin) "OmniColumnarSortMergeJoinFusion(skew=true)" else "OmniColumnarSortMergeJoinFusion"
   }
 
+  override protected def withNewChildrenInternal(newLeft: SparkPlan, newRight: SparkPlan): ColumnarSortMergeJoinFusionExec =
+    copy(left = newLeft, right = newRight)
+
   override def doExecuteColumnar(): RDD[ColumnarBatch] = {
     val numOutputRows = longMetric("numOutputRows")
     val numOutputVecBatchs = longMetric("numOutputVecBatchs")
@@ -189,7 +192,7 @@ case class ColumnarSortMergeJoinFusionExec(
       }
 
       if (enableSortMergeJoinBatchMerge) {
-        new MergeIterator(iterBatch, resultSchema, numMergedVecBatchs, bypassVecBatchs)
+        new MergeIterator(iterBatch, resultSchema, numMergedVecBatchs)
       } else {
         iterBatch
       }
