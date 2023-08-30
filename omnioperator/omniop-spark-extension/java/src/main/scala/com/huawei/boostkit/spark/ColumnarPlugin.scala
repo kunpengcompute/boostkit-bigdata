@@ -21,18 +21,21 @@ import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{SparkSession, SparkSessionExtensions}
 import org.apache.spark.sql.catalyst.expressions.{Ascending, DynamicPruningSubquery, SortOrder}
-import org.apache.spark.sql.catalyst.expressions.aggregate.Partial
+import org.apache.spark.sql.catalyst.expressions.aggregate.{AggregateExpression, Partial}
 import org.apache.spark.sql.catalyst.optimizer.{DelayCartesianProduct, HeuristicJoinReorder}
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.{RowToOmniColumnarExec, _}
 import org.apache.spark.sql.execution.adaptive.{BroadcastQueryStageExec, ColumnarCustomShuffleReaderExec, CustomShuffleReaderExec, QueryStageExec, ShuffleQueryStageExec}
-import org.apache.spark.sql.execution.aggregate.HashAggregateExec
+import org.apache.spark.sql.execution.aggregate.{DummyLogicalPlan, ExtendedAggUtils, HashAggregateExec}
 import org.apache.spark.sql.execution.exchange.{BroadcastExchangeExec, Exchange, ReusedExchangeExec, ShuffleExchangeExec}
 import org.apache.spark.sql.execution.joins._
 import org.apache.spark.sql.execution.window.WindowExec
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.ColumnarBatchSupportUtil.checkColumnarBatchSupport
 import org.apache.spark.sql.catalyst.expressions._
+import org.apache.spark.sql.catalyst.planning.PhysicalAggregation
+import org.apache.spark.sql.catalyst.plans.LeftSemi
+import org.apache.spark.sql.catalyst.plans.logical.Aggregate
 
 case class ColumnarPreOverrides() extends Rule[SparkPlan] with PredicateHelper{
   val columnarConf: ColumnarPluginConfig = ColumnarPluginConfig.getSessionConf
@@ -59,6 +62,9 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] with PredicateHelper{
   val enableColumnarProjectFusion: Boolean = columnarConf.enableColumnarProjectFusion
   val enableColumnarTopNSort: Boolean = columnarConf.enableColumnarTopNSort
   val topNSortThreshold: Int = columnarConf.topNSortThreshold
+  val enableDedupLeftSemiJoin: Boolean = columnarConf.enableDedupLeftSemiJoin
+  val dedupLeftSemiJoinThreshold: Int = columnarConf.dedupLeftSemiJoinThreshold
+
   def apply(plan: SparkPlan): SparkPlan = {
     replaceWithColumnarPlan(plan)
   }
@@ -425,6 +431,194 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] with PredicateHelper{
         plan.condition,
         left,
         right)
+    // DeduplicateRightSideOfLeftSemiJoin Rule works only for Spark 3.1.
+    case plan: SortMergeJoinExec if enableColumnarSortMergeJoin && enableDedupLeftSemiJoin => {
+      plan.joinType match {
+        case LeftSemi => {
+          if (plan.condition.isEmpty && plan.left.isInstanceOf[SortExec] && plan.right.isInstanceOf[SortExec]
+            && plan.right.asInstanceOf[SortExec].child.isInstanceOf[ShuffleExchangeExec]) {
+            val nextChild = plan.right.asInstanceOf[SortExec].child.asInstanceOf[ShuffleExchangeExec].child
+            if (nextChild.output.size >= dedupLeftSemiJoinThreshold) {
+              nextChild match {
+                case ProjectExec(_, BroadcastHashJoinExec(_, _, _, _, _, _, _, _)) => {
+                  val left = replaceWithColumnarPlan(plan.left)
+                  val val1 = replaceWithColumnarPlan(nextChild.asInstanceOf[ProjectExec])
+                  val partialAgg = PhysicalAggregation.unapply(Aggregate(nextChild.output, nextChild.output,
+                    new DummyLogicalPlan)) match {
+                    case Some((groupingExpressions, aggExpressions, resultExpressions, _))
+                      if aggExpressions.forall(expr => expr.isInstanceOf[AggregateExpression]) =>
+                      ExtendedAggUtils.planPartialAggregateWithoutDistinct(
+                        ExtendedAggUtils.normalizeGroupingExpressions(groupingExpressions),
+                        aggExpressions.map(_.asInstanceOf[AggregateExpression]),
+                        resultExpressions,
+                        val1)
+                  }
+
+                  if (partialAgg.isInstanceOf[HashAggregateExec]) {
+                    val newHashAgg = new ColumnarHashAggregateExec(
+                      partialAgg.asInstanceOf[HashAggregateExec].requiredChildDistributionExpressions,
+                      partialAgg.asInstanceOf[HashAggregateExec].groupingExpressions,
+                      partialAgg.asInstanceOf[HashAggregateExec].aggregateExpressions,
+                      partialAgg.asInstanceOf[HashAggregateExec].aggregateAttributes,
+                      partialAgg.asInstanceOf[HashAggregateExec].initialInputBufferOffset,
+                      partialAgg.asInstanceOf[HashAggregateExec].resultExpressions,
+                      val1)
+
+                    val newShuffle = new ColumnarShuffleExchangeExec(
+                      plan.right.asInstanceOf[SortExec].child.asInstanceOf[ShuffleExchangeExec].outputPartitioning,
+                      newHashAgg,
+                      plan.right.asInstanceOf[SortExec].child.asInstanceOf[ShuffleExchangeExec].shuffleOrigin
+                    )
+                    val newSort = new ColumnarSortExec(
+                      plan.right.asInstanceOf[SortExec].sortOrder,
+                      plan.right.asInstanceOf[SortExec].global,
+                      newShuffle,
+                      plan.right.asInstanceOf[SortExec].testSpillFrequency)
+                    ColumnarSortMergeJoinExec(
+                      plan.leftKeys,
+                      plan.rightKeys,
+                      plan.joinType,
+                      plan.condition,
+                      left,
+                      newSort,
+                      plan.isSkewJoin)
+                  } else {
+                    logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
+                    if (enableSortMergeJoinFusion && plan.left.isInstanceOf[SortExec]
+                      && plan.right.isInstanceOf[SortExec]) {
+                      val left = replaceWithColumnarPlan(plan.left.asInstanceOf[SortExec].child)
+                      val right = replaceWithColumnarPlan(plan.right.asInstanceOf[SortExec].child)
+                      new ColumnarSortMergeJoinFusionExec(
+                        plan.leftKeys,
+                        plan.rightKeys,
+                        plan.joinType,
+                        plan.condition,
+                        left,
+                        right,
+                        plan.isSkewJoin)
+                    } else {
+                      val left = replaceWithColumnarPlan(plan.left)
+                      val right = replaceWithColumnarPlan(plan.right)
+                      new ColumnarSortMergeJoinExec(
+                        plan.leftKeys,
+                        plan.rightKeys,
+                        plan.joinType,
+                        plan.condition,
+                        left,
+                        right,
+                        plan.isSkewJoin)
+                    }
+                  }
+                }
+                case _ => {
+                  logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
+                  if (enableSortMergeJoinFusion && plan.left.isInstanceOf[SortExec]
+                    && plan.right.isInstanceOf[SortExec]) {
+                    val left = replaceWithColumnarPlan(plan.left.asInstanceOf[SortExec].child)
+                    val right = replaceWithColumnarPlan(plan.right.asInstanceOf[SortExec].child)
+                    new ColumnarSortMergeJoinFusionExec(
+                      plan.leftKeys,
+                      plan.rightKeys,
+                      plan.joinType,
+                      plan.condition,
+                      left,
+                      right,
+                      plan.isSkewJoin)
+                  } else {
+                    val left = replaceWithColumnarPlan(plan.left)
+                    val right = replaceWithColumnarPlan(plan.right)
+                    new ColumnarSortMergeJoinExec(
+                      plan.leftKeys,
+                      plan.rightKeys,
+                      plan.joinType,
+                      plan.condition,
+                      left,
+                      right,
+                      plan.isSkewJoin)
+                  }
+                }
+              }
+            } else {
+              logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
+              if (enableSortMergeJoinFusion && plan.left.isInstanceOf[SortExec] && plan.right.isInstanceOf[SortExec]) {
+                val left = replaceWithColumnarPlan(plan.left.asInstanceOf[SortExec].child)
+                val right = replaceWithColumnarPlan(plan.right.asInstanceOf[SortExec].child)
+                new ColumnarSortMergeJoinFusionExec(
+                  plan.leftKeys,
+                  plan.rightKeys,
+                  plan.joinType,
+                  plan.condition,
+                  left,
+                  right,
+                  plan.isSkewJoin)
+              } else {
+                val left = replaceWithColumnarPlan(plan.left)
+                val right = replaceWithColumnarPlan(plan.right)
+                new ColumnarSortMergeJoinExec(
+                  plan.leftKeys,
+                  plan.rightKeys,
+                  plan.joinType,
+                  plan.condition,
+                  left,
+                  right,
+                  plan.isSkewJoin)
+              }
+            }
+          } else {
+            logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
+            if (enableSortMergeJoinFusion && plan.left.isInstanceOf[SortExec] && plan.right.isInstanceOf[SortExec]) {
+              val left = replaceWithColumnarPlan(plan.left.asInstanceOf[SortExec].child)
+              val right = replaceWithColumnarPlan(plan.right.asInstanceOf[SortExec].child)
+              new ColumnarSortMergeJoinFusionExec(
+                plan.leftKeys,
+                plan.rightKeys,
+                plan.joinType,
+                plan.condition,
+                left,
+                right,
+                plan.isSkewJoin)
+            } else {
+              val left = replaceWithColumnarPlan(plan.left)
+              val right = replaceWithColumnarPlan(plan.right)
+              new ColumnarSortMergeJoinExec(
+                plan.leftKeys,
+                plan.rightKeys,
+                plan.joinType,
+                plan.condition,
+                left,
+                right,
+                plan.isSkewJoin)
+            }
+          }
+        }
+        case _ => {
+          logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
+          if (enableSortMergeJoinFusion && plan.left.isInstanceOf[SortExec] && plan.right.isInstanceOf[SortExec]) {
+            val left = replaceWithColumnarPlan(plan.left.asInstanceOf[SortExec].child)
+            val right = replaceWithColumnarPlan(plan.right.asInstanceOf[SortExec].child)
+            new ColumnarSortMergeJoinFusionExec(
+              plan.leftKeys,
+              plan.rightKeys,
+              plan.joinType,
+              plan.condition,
+              left,
+              right,
+              plan.isSkewJoin)
+          } else {
+            val left = replaceWithColumnarPlan(plan.left)
+            val right = replaceWithColumnarPlan(plan.right)
+            new ColumnarSortMergeJoinExec(
+              plan.leftKeys,
+              plan.rightKeys,
+              plan.joinType,
+              plan.condition,
+              left,
+              right,
+              plan.isSkewJoin)
+          }
+        }
+      }
+    }
     case plan: SortMergeJoinExec if enableColumnarSortMergeJoin =>
       logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
       if (enableSortMergeJoinFusion && plan.left.isInstanceOf[SortExec] && plan.right.isInstanceOf[SortExec]) {

@@ -38,7 +38,6 @@ static constexpr int32_t INT128_BYTES = 16;
 static constexpr int32_t INT64_BYTES = 8;
 static constexpr int32_t BYTE_BITS = 8;
 static constexpr int32_t LOCAL_FILE_PREFIX = 5;
-static constexpr int32_t READER_BUFFER_SIZE = 4096 * 4;
 static const std::string LOCAL_FILE = "file:";
 static const std::string HDFS_FILE = "hdfs:";
 
@@ -92,8 +91,6 @@ Status ParquetReader::InitRecordReader(std::string& filePath, int64_t capacity,
 
     // Configure reader settings
     auto reader_properties = parquet::ReaderProperties(pool);
-    reader_properties.set_buffer_size(READER_BUFFER_SIZE);
-    reader_properties.enable_buffered_stream();
 
     // Configure Arrow-specific reader settings
     auto arrow_reader_properties = parquet::ArrowReaderProperties();
