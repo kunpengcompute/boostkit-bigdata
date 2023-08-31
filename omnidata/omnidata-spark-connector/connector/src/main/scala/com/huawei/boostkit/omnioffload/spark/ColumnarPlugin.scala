@@ -664,7 +664,7 @@ object NdpPluginEnableFlag {
   val ndpEnabledStr = "spark.omni.sql.ndpPlugin.enabled"
 
   def isMatchedIpAddress: Boolean = {
-    ·    val ipSet = Set("xxx.xxx.xxx.xxx")
+    val ipSet = Set("xxx.xxx.xxx.xxx")
     val hostAddrSet = JavaConverters.asScalaSetConverter(NdpConnectorUtils.getIpAddress).asScala
     val res = ipSet & hostAddrSet
     res.nonEmpty

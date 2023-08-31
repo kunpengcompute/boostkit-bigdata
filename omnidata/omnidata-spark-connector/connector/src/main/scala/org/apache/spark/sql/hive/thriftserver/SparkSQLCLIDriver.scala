@@ -17,12 +17,13 @@
 
 package org.apache.spark.sql.hive.thriftserver
 
-import com.huawei.boostkit.omnioffload.spark.NdpPluginEnableFlag
-
 import java.io._
 import java.nio.charset.StandardCharsets.UTF_8
 import java.util.{Locale, ArrayList => JArrayList, List => JList}
 import java.util.concurrent.TimeUnit
+
+import com.huawei.boostkit.omnioffload.spark.NdpPluginEnableFlag
+
 import scala.collection.JavaConverters._
 import jline.console.ConsoleReader
 import jline.console.history.FileHistory
@@ -43,6 +44,7 @@ import org.apache.spark.SparkConf
 import org.apache.spark.deploy.SparkHadoopUtil
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.AnalysisException
+import org.apache.spark.sql.errors.QueryExecutionErrors
 import org.apache.spark.sql.hive.HiveUtils
 import org.apache.spark.sql.hive.client.HiveClientImpl
 import org.apache.spark.sql.hive.security.HiveDelegationTokenProvider
@@ -121,9 +123,9 @@ private[hive] object SparkSQLCLIDriver extends Logging {
         }
 
         val offHeapSizeStr = sys.props("spark.memory.offHeap.size")
-            .toLowerCase(Locale.ROOT)
+          .toLowerCase(Locale.ROOT)
         val executorMemorySizeStr = sys.props("spark.executor.memory")
-            .toLowerCase(Locale.ROOT)
+          .toLowerCase(Locale.ROOT)
         val SUPPORT_SIZE_UNIT="g"
         if (!offHeapSizeStr.endsWith(SUPPORT_SIZE_UNIT) || !executorMemorySizeStr.endsWith(SUPPORT_SIZE_UNIT)) {
           return
@@ -189,15 +191,17 @@ private[hive] object SparkSQLCLIDriver extends Logging {
       UserGroupInformation.getCurrentUser.addCredentials(credentials)
     }
 
-    SharedState.resolveWarehousePath(sparkConf, conf)
-    SessionState.start(sessionState)
+    val warehousePath = SharedState.resolveWarehousePath(sparkConf, conf)
+    val qualified = SharedState.qualifyWarehousePath(conf, warehousePath)
+    SharedState.setWarehousePathConf(sparkConf, conf, qualified)
+    SessionState.setCurrentSessionState(sessionState)
 
     // Clean up after we exit
     ShutdownHookManager.addShutdownHook { () => SparkSQLEnv.stop() }
 
     if (isRemoteMode(sessionState)) {
       // Hive 1.2 + not supported in CLI
-      throw new RuntimeException("Remote operations not supported")
+      throw QueryExecutionErrors.remoteOperationsUnsupportedError()
     }
     // Respect the configurations set by --hiveconf from the command line
     // (based on Hive's CliDriver).
@@ -223,10 +227,10 @@ private[hive] object SparkSQLCLIDriver extends Logging {
     }
 
     // The class loader of CliSessionState's conf is current main thread's class loader
-    // used to load jars passed by --jars. One class loader used by AddJarCommand is
+    // used to load jars passed by --jars. One class loader used by AddJarsCommand is
     // sharedState.jarClassLoader which contain jar path passed by --jars in main thread.
     // We set CliSessionState's conf class loader to sharedState.jarClassLoader.
-    // Thus we can load all jars passed by --jars and AddJarCommand.
+    // Thus we can load all jars passed by --jars and AddJarsCommand.
     sessionState.getConf.setClassLoader(SparkSQLEnv.sqlContext.sharedState.jarClassLoader)
 
     // TODO work around for set the log output to console, because the HiveContext
@@ -285,12 +289,12 @@ private[hive] object SparkSQLCLIDriver extends Logging {
         reader.setHistory(new FileHistory(new File(historyFile)))
       } else {
         logWarning("WARNING: Directory for Hive history file: " + historyDirectory +
-            " does not exist.   History will not be available during this session.")
+          " does not exist.   History will not be available during this session.")
       }
     } catch {
       case e: Exception =>
         logWarning("WARNING: Encountered an error while trying to initialize Hive's " +
-            "history file.  History will not be available during this session.")
+          "history file.  History will not be available during this session.")
         logWarning(e.getMessage)
     }
 
@@ -385,7 +389,7 @@ private[hive] class SparkSQLCLIDriver extends CliDriver with Logging {
     }
   } else {
     // Hive 1.2 + not supported in CLI
-    throw new RuntimeException("Remote operations not supported")
+    throw QueryExecutionErrors.remoteOperationsUnsupportedError()
   }
 
   override def setHiveVariables(hiveVariables: java.util.Map[String, String]): Unit = {
@@ -404,12 +408,12 @@ private[hive] class SparkSQLCLIDriver extends CliDriver with Logging {
     val tokens: Array[String] = cmd_trimmed.split("\\s+")
     val cmd_1: String = cmd_trimmed.substring(tokens(0).length()).trim()
     if (cmd_lower.equals("quit") ||
-        cmd_lower.equals("exit")) {
+      cmd_lower.equals("exit")) {
       sessionState.close()
       System.exit(0)
     }
     if (tokens(0).toLowerCase(Locale.ROOT).equals("source") ||
-        cmd_trimmed.startsWith("!") || isRemoteMode) {
+      cmd_trimmed.startsWith("!") || isRemoteMode) {
       val startTimeNs = System.nanoTime()
       super.processCmd(cmd)
       val endTimeNs = System.nanoTime()
@@ -424,8 +428,8 @@ private[hive] class SparkSQLCLIDriver extends CliDriver with Logging {
       if (proc != null) {
         // scalastyle:off println
         if (proc.isInstanceOf[Driver] || proc.isInstanceOf[SetProcessor] ||
-            proc.isInstanceOf[AddResourceProcessor] || proc.isInstanceOf[ListResourceProcessor] ||
-            proc.isInstanceOf[ResetProcessor]) {
+          proc.isInstanceOf[AddResourceProcessor] || proc.isInstanceOf[ListResourceProcessor] ||
+          proc.isInstanceOf[ResetProcessor]) {
           val driver = new SparkSQLDriver
 
           driver.init()
@@ -461,7 +465,8 @@ private[hive] class SparkSQLCLIDriver extends CliDriver with Logging {
 
           val res = new JArrayList[String]()
 
-          if (HiveConf.getBoolVar(conf, HiveConf.ConfVars.HIVE_CLI_PRINT_HEADER)) {
+          if (HiveConf.getBoolVar(conf, HiveConf.ConfVars.HIVE_CLI_PRINT_HEADER) ||
+            SparkSQLEnv.sqlContext.conf.cliPrintHeader) {
             // Print the column names.
             Option(driver.getSchema.getFieldSchemas).foreach { fields =>
               out.println(fields.asScala.map(_.getName).mkString("\t"))
@@ -484,17 +489,6 @@ private[hive] class SparkSQLCLIDriver extends CliDriver with Logging {
                    |${org.apache.hadoop.util.StringUtils.stringifyException(e)}
                  """.stripMargin)
               ret = 1
-          }
-
-          if ("true".equalsIgnoreCase(conf.get("spark.sql.ndp.enabled")) &&
-            "true".equalsIgnoreCase(conf.get("spark.sql.ndp.filter.selectivity.enable"))
-          ) {
-            val selectivity = conf.getDouble("spark.sql.ndp.filter.selectivity", 1.0)
-            if (selectivity > 0.0 && selectivity < 0.2) {
-              if (timeTaken > 20.0 && timeTaken < 300.0) {
-                timeTaken = scala.math.round(timeTaken * 1000 / 1.04) / 1000.0
-              }
-            }
           }
 
           val cret = driver.close()
@@ -607,7 +601,7 @@ private[hive] class SparkSQLCLIDriver extends CliDriver with Logging {
     def insideComment: Boolean = insideSimpleComment || insideBracketedComment
 
     def statementInProgress(index: Int): Boolean = isStatement || (!insideComment &&
-        index > beginIndex && !s"${line.charAt(index)}".trim.isEmpty)
+      index > beginIndex && !s"${line.charAt(index)}".trim.isEmpty)
 
     for (index <- 0 until line.length) {
       // Checks if we need to decrement a bracketed comment level; the last character '/' of
@@ -663,10 +657,10 @@ private[hive] class SparkSQLCLIDriver extends CliDriver with Logging {
         val hasNext = index + 1 < line.length
         if (insideSingleQuote || insideDoubleQuote) {
           // Ignores '/' in any case of quotes
-        } else if (insideBracketedComment && line.charAt(index - 1) == '*') {
+        } else if (insideBracketedComment && line.charAt(index - 1) == '*' ) {
           // Decrements `bracketedCommentLevel` at the beginning of the next loop
           leavingBracketedComment = true
-        } else if (hasNext && !insideBracketedComment && line.charAt(index + 1) == '*') {
+        } else if (hasNext && line.charAt(index + 1) == '*') {
           bracketedCommentLevel += 1
         }
       }

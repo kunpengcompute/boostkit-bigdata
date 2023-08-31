@@ -16,5 +16,7 @@ case class ColumnarConditionProjectExec(projectList: Seq[NamedExpression],
 
   override protected def doExecute(): RDD[InternalRow] = ???
 
+  override protected def withNewChildInternal(newChild: SparkPlan): SparkPlan = ???
+
   override def output: Seq[Attribute] = ???
 }

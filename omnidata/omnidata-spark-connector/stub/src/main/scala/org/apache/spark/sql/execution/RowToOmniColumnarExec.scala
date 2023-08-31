@@ -7,4 +7,6 @@ case class RowToOmniColumnarExec(child: SparkPlan) extends RowToColumnarTransiti
   override protected def doExecute(): RDD[InternalRow] = ???
 
   override def output: Seq[Attribute] = ???
+
+  override protected def withNewChildInternal(newChild: SparkPlan): SparkPlan = ???
 }

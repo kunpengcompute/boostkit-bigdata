@@ -21,16 +21,17 @@ package org.apache.spark.sql.execution.ndp
 import com.huawei.boostkit.omnioffload.spark.NdpPluginEnableFlag
 import java.util.{Locale, Properties}
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.{PushDownData, PushDownManager, SparkSession}
+import org.apache.spark.sql.{PushDownManager, SparkSession}
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.{Alias, And, Attribute, AttributeReference, BinaryExpression, Cast, Expression,
-  Literal, NamedExpression, PredicateHelper, UnaryExpression}
+import org.apache.spark.sql.catalyst.expressions.{Alias, And, Attribute, AttributeReference, BinaryExpression,
+  Cast, Expression, Literal, NamedExpression, PredicateHelper, UnaryExpression}
 import org.apache.spark.sql.catalyst.expressions.aggregate.{AggregateExpression, Partial, PartialMerge}
 import org.apache.spark.sql.catalyst.rules.Rule
-import org.apache.spark.sql.execution.{CollectLimitExec, FileSourceScanExec, FilterExec, GlobalLimitExec, LeafExecNode, LocalLimi
-  tExec, NdpFileSourceScanExec, ProjectExec, SparkPlan}
+import org.apache.spark.sql.execution.{CollectLimitExec, FileSourceScanExec, FilterExec, GlobalLimitExec,
+  LeafExecNode, LocalLimitExec, NdpFileSourceScanExec, ProjectExec, SparkPlan}
 import org.apache.spark.sql.execution.adaptive.AdaptiveSparkPlanExec
-import org.apache.spark.sql.execution.aggregate.{BaseAggregateExec, HashAggregateExec, ObjectHashAggregateExec, SortAggregateExec
+import org.apache.spark.sql.execution.aggregate.{BaseAggregateExec, HashAggregateExec, ObjectHashAggregateExec,
+  SortAggregateExec
 }
 import org.apache.spark.sql.execution.datasources.HadoopFsRelation
 import org.apache.spark.sql.internal.SQLConf
@@ -39,7 +40,6 @@ import org.apache.spark.sql.hive.HiveSimpleUDF
 import org.apache.hadoop.hive.ql.exec.DefaultUDFMethodResolver
 import org.apache.spark.TaskContext
 import org.apache.spark.sql.execution.ndp.NdpConf.getOptimizerPushDownEnable
-import org.apache.spark.sql.types.{DoubleType, FloatType}
 
 import scala.collection.{JavaConverters, mutable}
 import scala.reflect.runtime.universe

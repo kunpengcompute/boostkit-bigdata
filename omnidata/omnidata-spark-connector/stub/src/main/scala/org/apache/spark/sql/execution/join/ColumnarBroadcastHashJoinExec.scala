@@ -25,4 +25,5 @@ case class ColumnarBroadcastHashJoinExec(
 
   override protected def doExecute(): RDD[InternalRow] = ???
 
+  override protected def withNewChildrenInternal(newLeft: SparkPlan, newRight: SparkPlan): SparkPlan = ???
 }

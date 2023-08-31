@@ -27,7 +27,6 @@ import org.apache.spark.sql.catalyst.planning._
 import org.apache.spark.sql.catalyst.plans.logical.{InsertIntoDir, InsertIntoStatement, LogicalPlan, ScriptTransformation, Statistics, Filter => LFilter}
 import org.apache.spark.sql.catalyst.plans.logical.statsEstimation.FilterEstimation
 import org.apache.spark.sql.catalyst.rules.Rule
-import org.apache.spark.sql.connector.catalog.CatalogV2Util.assertNoNullTypeInSchema
 import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.command.{CreateTableCommand, DDLUtils}
 import org.apache.spark.sql.execution.datasources.{CreateTable, DataSourceStrategy}
@@ -35,7 +34,7 @@ import org.apache.spark.sql.execution.ndp.{NdpConf, NdpFilterEstimation}
 import org.apache.spark.sql.execution.ndp.NdpConf.NDP_ENABLED
 import org.apache.spark.sql.hive.execution._
 import org.apache.spark.sql.hive.execution.HiveScriptTransformationExec
-import org.apache.spark.sql.internal.{HiveSerDe, SQLConf}
+import org.apache.spark.sql.internal.HiveSerDe
 
 
 /**
@@ -161,8 +160,8 @@ class DetermineTableStats(session: SparkSession) extends Rule[LogicalPlan] {
 object HiveAnalysis extends Rule[LogicalPlan] {
   override def apply(plan: LogicalPlan): LogicalPlan = plan resolveOperators {
     case InsertIntoStatement(
-        r: HiveTableRelation, partSpec, _, query, overwrite, ifPartitionNotExists)
-        if DDLUtils.isHiveTable(r.tableMeta) =>
+    r: HiveTableRelation, partSpec, _, query, overwrite, ifPartitionNotExists)
+      if DDLUtils.isHiveTable(r.tableMeta) =>
       InsertIntoHiveTable(r.tableMeta, partSpec, query, overwrite,
         ifPartitionNotExists, query.output.map(_.name))
 
@@ -170,11 +169,11 @@ object HiveAnalysis extends Rule[LogicalPlan] {
       CreateTableCommand(tableDesc, ignoreIfExists = mode == SaveMode.Ignore)
 
     case CreateTable(tableDesc, mode, Some(query))
-        if DDLUtils.isHiveTable(tableDesc) && query.resolved =>
+      if DDLUtils.isHiveTable(tableDesc) && query.resolved =>
       CreateHiveTableAsSelectCommand(tableDesc, query, query.output.map(_.name), mode)
 
     case InsertIntoDir(isLocal, storage, provider, child, overwrite)
-        if DDLUtils.isHiveTable(provider) && child.resolved =>
+      if DDLUtils.isHiveTable(provider) && child.resolved =>
       val outputPath = new Path(storage.locationUri.get)
       if (overwrite) DDLUtils.verifyNotReadPath(child, outputPath)
 
@@ -201,22 +200,22 @@ case class RelationConversions(
   }
   private def isConvertible(tableMeta: CatalogTable): Boolean = {
     val serde = tableMeta.storage.serde.getOrElse("").toLowerCase(Locale.ROOT)
-    serde.contains("parquet") && SQLConf.get.getConf(HiveUtils.CONVERT_METASTORE_PARQUET) ||
-      serde.contains("orc") && SQLConf.get.getConf(HiveUtils.CONVERT_METASTORE_ORC)
+    serde.contains("parquet") && conf.getConf(HiveUtils.CONVERT_METASTORE_PARQUET) ||
+      serde.contains("orc") && conf.getConf(HiveUtils.CONVERT_METASTORE_ORC)
   }
 
   private def isRelationConvertible(tableMeta: CatalogTable, isPushDown : Boolean): Boolean = {
     val serde = tableMeta.storage.serde.getOrElse("").toLowerCase(Locale.ROOT)
-    serde.contains("parquet") && (SQLConf.get.getConf(HiveUtils.CONVERT_METASTORE_PARQUET)
+    serde.contains("parquet") && (conf.getConf(HiveUtils.CONVERT_METASTORE_PARQUET)
       || isPushDown) || serde.contains("orc") &&
-      (SQLConf.get.getConf(HiveUtils.CONVERT_METASTORE_ORC) || isPushDown)
+      (conf.getConf(HiveUtils.CONVERT_METASTORE_ORC) || isPushDown)
   }
 
   private def isInsertConvertible(tableMeta: CatalogTable, isPushDown : Boolean): Boolean = {
     val serde = tableMeta.storage.serde.getOrElse("").toLowerCase(Locale.ROOT)
-    serde.contains("parquet") && (SQLConf.get.getConf(HiveUtils.CONVERT_METASTORE_PARQUET)
+    serde.contains("parquet") && (conf.getConf(HiveUtils.CONVERT_METASTORE_PARQUET)
       && !isPushDown) || serde.contains("orc") &&
-      (SQLConf.get.getConf(HiveUtils.CONVERT_METASTORE_ORC) && !isPushDown)
+      (conf.getConf(HiveUtils.CONVERT_METASTORE_ORC) && !isPushDown)
   }
 
   private val metastoreCatalog = sessionCatalog.metastoreCatalog
@@ -227,9 +226,9 @@ case class RelationConversions(
     plan resolveOperators {
       // Write path
       case InsertIntoStatement(
-          r: HiveTableRelation, partition, cols, query, overwrite, ifPartitionNotExists)
+      r: HiveTableRelation, partition, cols, query, overwrite, ifPartitionNotExists)
         if query.resolved && DDLUtils.isHiveTable(r.tableMeta) &&
-          (!r.isPartitioned || SQLConf.get.getConf(HiveUtils.CONVERT_INSERTING_PARTITIONED_TABLE))
+          (!r.isPartitioned || conf.getConf(HiveUtils.CONVERT_INSERTING_PARTITIONED_TABLE))
           && isInsertConvertible(r, isPushDown) =>
         InsertIntoStatement(metastoreCatalog.convert(r), partition, cols,
           query, overwrite, ifPartitionNotExists)
@@ -243,11 +242,9 @@ case class RelationConversions(
       // CTAS
       case CreateTable(tableDesc, mode, Some(query))
         if DDLUtils.isHiveTable(tableDesc) && tableDesc.partitionColumnNames.isEmpty &&
-          isConvertible(tableDesc) && SQLConf.get.getConf(HiveUtils.CONVERT_METASTORE_CTAS) =>
+          isConvertible(tableDesc) && conf.getConf(HiveUtils.CONVERT_METASTORE_CTAS) =>
         // validation is required to be done here before relation conversion.
         DDLUtils.checkDataColNames(tableDesc.copy(schema = query.schema))
-        // This is for CREATE TABLE .. STORED AS PARQUET/ORC AS SELECT null
-        assertNoNullTypeInSchema(query.schema)
         OptimizedCreateHiveTableAsSelectCommand(
           tableDesc, query, query.output.map(_.name), mode)
     }
@@ -262,9 +259,9 @@ private[hive] trait HiveStrategies {
 
   object HiveScripts extends Strategy {
     def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
-      case ScriptTransformation(input, script, output, child, ioschema) =>
+      case ScriptTransformation(script, output, child, ioschema) =>
         val hiveIoSchema = ScriptTransformationIOSchema(ioschema)
-        HiveScriptTransformationExec(input, script, output, planLater(child), hiveIoSchema) :: Nil
+        HiveScriptTransformationExec(script, output, planLater(child), hiveIoSchema) :: Nil
       case _ => Nil
     }
   }

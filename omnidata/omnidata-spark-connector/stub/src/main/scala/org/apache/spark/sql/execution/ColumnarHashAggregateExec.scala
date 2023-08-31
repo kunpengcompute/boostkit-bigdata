@@ -18,4 +18,9 @@ case class ColumnarHashAggregateExec(
     with AliasAwareOutputPartitioning {
   override protected def doExecute(): RDD[InternalRow] = ???
 
+  override protected def withNewChildInternal(newChild: SparkPlan): SparkPlan = ???
+
+  override def isStreaming: Boolean = ???
+
+  override def numShufflePartitions: _root_.scala.Option[Int] = ???
 }

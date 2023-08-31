@@ -32,7 +32,7 @@ import org.apache.hadoop.hive.ql.udf.{UDFType => HiveUDFType}
 import scala.collection.JavaConverters.seqAsJavaListConverter
 
 case class HiveSimpleUDF(
-                                        name: String, funcWrapper: HiveFunctionWrapper, children: Seq[Expression])
+                          name: String, funcWrapper: HiveFunctionWrapper, children: Seq[Expression])
   extends Expression
     with HiveInspectors
     with CodegenFallback
@@ -97,4 +97,7 @@ case class HiveSimpleUDF(
   override def prettyName: String = name
 
   override def sql: String = s"$name(${children.map(_.sql).mkString(", ")})"
+
+  override protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]): Expression =
+    copy(children = newChildren)
 }

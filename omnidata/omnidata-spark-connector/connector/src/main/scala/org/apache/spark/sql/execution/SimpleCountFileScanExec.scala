@@ -64,7 +64,7 @@ case class SimpleCountFileScanExec(
 
   private lazy val needsUnsafeRowConversion: Boolean = {
     if (relation.fileFormat.isInstanceOf[ParquetSource]) {
-      sqlContext.conf.parquetVectorizedReaderEnabled
+      session.sqlContext.conf.parquetVectorizedReaderEnabled
     } else {
       false
     }

@@ -13,4 +13,5 @@ case class ColumnarSortExec(sortOrder: Seq[SortOrder],
 
   override def output: Seq[Attribute] = ???
 
+  override protected def withNewChildInternal(newChild: SparkPlan): SparkPlan = ???
 }

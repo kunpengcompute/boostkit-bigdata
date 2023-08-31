@@ -24,5 +24,7 @@ case class ColumnarShuffleExchangeExec(
 
   override def runtimeStatistics: Statistics = ???
 
+  override protected def withNewChildInternal(newChild: SparkPlan): SparkPlan = ???
+
   override protected def doExecute(): RDD[InternalRow] = ???
 }

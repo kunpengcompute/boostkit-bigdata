@@ -12,6 +12,8 @@ case class ColumnarProjectExec(projectList: Seq[NamedExpression], child: SparkPl
 
   override protected def outputExpressions: Seq[NamedExpression] = ???
 
+  override protected def withNewChildInternal(newChild: SparkPlan): SparkPlan = ???
+
   override protected def doExecute(): RDD[InternalRow] = ???
 
   override def output: Seq[Attribute] = ???
