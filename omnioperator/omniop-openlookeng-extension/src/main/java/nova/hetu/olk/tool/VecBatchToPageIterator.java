@@ -114,7 +114,6 @@ public class VecBatchToPageIterator
                 throw new PrestoException(StandardErrorCode.NOT_SUPPORTED, "Unsupported vector type " + vectors[i]);
             }
         }
-        vecBatch.close();
-        return new Page(positionCount, blocks);
+        return new OmniPage(positionCount, vecBatch, blocks);
     }
 }

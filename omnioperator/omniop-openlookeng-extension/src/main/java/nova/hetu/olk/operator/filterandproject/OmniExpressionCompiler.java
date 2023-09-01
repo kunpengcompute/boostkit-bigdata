@@ -32,8 +32,6 @@ import io.prestosql.sql.gen.ExpressionProfiler;
 import io.prestosql.sql.gen.PageFunctionCompiler;
 import io.prestosql.sql.relational.RowExpressionDeterminismEvaluator;
 import nova.hetu.olk.OmniLocalExecutionPlanner.OmniLocalExecutionPlanContext;
-import nova.hetu.omniruntime.vector.VecAllocator;
-import nova.hetu.omniruntime.vector.VecAllocatorFactory;
 
 import javax.inject.Inject;
 
@@ -124,7 +122,6 @@ public class OmniExpressionCompiler
                                                         List<? extends RowExpression> projections, Optional<String> classNameSuffix, OptionalInt initialBatchSize,
                                                         List<Type> inputTypes, TaskId taskId, OmniLocalExecutionPlanContext context)
     {
-        VecAllocator vecAllocator = VecAllocatorFactory.get(taskId.toString());
         Optional<PageFilter> pageFilter;
         if (filter.isPresent()) {
             OmniPageFilter omniPageFilter = filterCache
@@ -143,8 +140,15 @@ public class OmniExpressionCompiler
             return null;
         }
 
-        return () -> new OmniPageProcessor(vecAllocator, pageFilter, proj, initialBatchSize, new ExpressionProfiler(),
-                context);
+        for (int i = 0; i < inputTypes.size(); i++) {
+            boolean isSupported = FilterAndProjectOmniOperator.FilterAndProjectOmniOperatorFactory
+                    .checkType(inputTypes.get(i));
+            if (!isSupported) {
+                return null;
+            }
+        }
+
+        return () -> new OmniPageProcessor(pageFilter, proj, initialBatchSize, new ExpressionProfiler(), context);
     }
 
     private static final class FilterCacheKey

@@ -41,9 +41,9 @@ import nova.hetu.omniruntime.vector.LongVec;
 import nova.hetu.omniruntime.vector.ShortVec;
 import nova.hetu.omniruntime.vector.VarcharVec;
 import nova.hetu.omniruntime.vector.Vec;
-import nova.hetu.omniruntime.vector.VecAllocator;
 import nova.hetu.omniruntime.vector.VecBatch;
 
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -57,12 +57,14 @@ import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_DECIMAL128;
 import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_DOUBLE;
 import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_INT;
 import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_LONG;
+import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_SHORT;
 import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_VARCHAR;
 import static nova.hetu.omniruntime.vector.VecEncoding.OMNI_VEC_ENCODING_FLAT;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyInt;
 import static org.powermock.api.mockito.PowerMockito.doAnswer;
 import static org.powermock.api.mockito.PowerMockito.mock;
+import static org.powermock.api.mockito.PowerMockito.mockStatic;
 import static org.powermock.api.mockito.PowerMockito.when;
 import static org.powermock.api.mockito.PowerMockito.whenNew;
 
@@ -112,40 +114,39 @@ public class MockUtil
     public static Page mockPage(BlockModel... blockModels)
     {
         Map<Integer, Block<?>> blocks = new HashMap<>();
-        VecAllocator vecAllocator = mock(VecAllocator.class);
         for (int j = 0; j < blockModels.length; j++) {
             BlockModel blockModel = blockModels[j];
             if (blockModel.rowBlock) {
                 for (Object value : blockModel.values) {
                     Page page = mockPage(block(blockModel.lazy, blockModel.dictionary, (Object[]) value));
-                    blocks.put(j, RowOmniBlock.fromFieldBlocks(vecAllocator, page.getPositionCount(), Optional.empty(), page.getBlocks(), null, mockVec(ContainerVec.class, page.getBlocks(), vecAllocator)));
+                    blocks.put(j, RowOmniBlock.fromFieldBlocks(page.getPositionCount(), Optional.empty(), page.getBlocks(), null, mockVec(ContainerVec.class, page.getBlocks())));
                 }
             }
 
             Block block = null;
             Vec vec = null;
             if (blockModel.values instanceof Boolean[]) {
-                vec = mockVec(BooleanVec.class, blockModel.values, vecAllocator);
+                vec = mockVec(BooleanVec.class, blockModel.values);
                 block = new ByteArrayOmniBlock(blockModel.values.length, (BooleanVec) vec);
             }
             if (blockModel.values instanceof Integer[]) {
-                vec = mockVec(IntVec.class, blockModel.values, vecAllocator);
+                vec = mockVec(IntVec.class, blockModel.values);
                 block = new IntArrayOmniBlock(blockModel.values.length, (IntVec) vec);
             }
             if (blockModel.values instanceof Double[]) {
-                vec = mockVec(DoubleVec.class, blockModel.values, vecAllocator);
+                vec = mockVec(DoubleVec.class, blockModel.values);
                 block = new DoubleArrayOmniBlock(blockModel.values.length, (DoubleVec) vec);
             }
             if (blockModel.values instanceof Short[]) {
-                vec = mockVec(ShortVec.class, blockModel.values, vecAllocator);
+                vec = mockVec(ShortVec.class, blockModel.values);
                 block = new ShortArrayOmniBlock(blockModel.values.length, (ShortVec) vec);
             }
             if (blockModel.values instanceof Long[]) {
-                vec = mockVec(LongVec.class, blockModel.values, vecAllocator);
+                vec = mockVec(LongVec.class, blockModel.values);
                 block = new LongArrayOmniBlock(blockModel.values.length, (LongVec) vec);
             }
             if (blockModel.values instanceof Long[][]) {
-                vec = mockVec(Decimal128Vec.class, blockModel.values, vecAllocator);
+                vec = mockVec(Decimal128Vec.class, blockModel.values);
                 doAnswer(invocationOnMock -> {
                     Long[] result = (Long[]) blockModel.values[(int) invocationOnMock.getArguments()[0]];
 
@@ -158,14 +159,13 @@ public class MockUtil
                 block = new Int128ArrayOmniBlock(blockModel.values.length, (Decimal128Vec) vec);
             }
             if (blockModel.values instanceof String[]) {
-                vec = mockVec(VarcharVec.class, blockModel.values, vecAllocator);
+                vec = mockVec(VarcharVec.class, blockModel.values);
                 int[] offsets = new int[blockModel.values.length + 1];
                 int startPosition = 0;
                 for (int i = 0; i < blockModel.values.length; i++) {
                     offsets[i + 1] = startPosition;
                     startPosition += ((String[]) blockModel.values)[i].length();
                 }
-                when(((VarcharVec) vec).getRawValueOffset()).thenReturn(offsets);
                 block = new VariableWidthOmniBlock(blockModel.values.length, (VarcharVec) vec);
             }
 
@@ -180,7 +180,6 @@ public class MockUtil
                     when(dictionaryVec.getSize()).thenReturn(blockModel.values.length);
                     when(dictionaryVec.getDictionary()).thenReturn(vec);
                     when(dictionaryVec.slice(anyInt(), anyInt())).thenReturn(dictionaryVec);
-                    when(dictionaryVec.getAllocator()).thenReturn(vecAllocator);
                     blocks.put(j, new DictionaryOmniBlock(0, blockModel.values.length, dictionaryVec, idIndex, false, randomDictionaryId()));
                 }
                 else {
@@ -188,54 +187,46 @@ public class MockUtil
                 }
             }
         }
-        return blocks.size() == 0 ? null : new Page(blocks.entrySet().stream().map(entry -> {
-            if (blockModels[entry.getKey()].lazy) {
-                LazyBlock lazyBlock = new LazyBlock(entry.getValue().getPositionCount(), instance -> {});
-                lazyBlock.setBlock(entry.getValue());
-                return new LazyOmniBlock(vecAllocator, lazyBlock, null);
-            }
-            else {
-                return entry.getValue();
-            }
-        }).toArray(Block[]::new));
+        return blocks.size() == 0 ? null : new Page(blocks.entrySet().stream().map(entry -> entry.getValue()).toArray(Block[]::new));
     }
 
-    public static Block<?> mockBlock(boolean lazy, boolean dictionary, VecAllocator vecAllocator, Object[] object)
+    public static Block<?> mockBlock(boolean lazy, boolean dictionary, Object[] object)
     {
         Block<?> block = null;
         Vec vec = null;
         DataType dataType = mock(DataType.class);
         if (object instanceof Boolean[]) {
-            vec = mockVec(BooleanVec.class, object, vecAllocator);
+            vec = mockVec(BooleanVec.class, object);
             when(dataType.getId()).thenReturn(OMNI_BOOLEAN);
             when(((BooleanVec) vec).get(anyInt())).thenAnswer(invocationOnMock -> object[(int) invocationOnMock.getArguments()[0]]);
             block = new ByteArrayOmniBlock(object.length, (BooleanVec) vec);
         }
         if (object instanceof Integer[]) {
-            vec = mockVec(IntVec.class, object, vecAllocator);
+            vec = mockVec(IntVec.class, object);
             when(dataType.getId()).thenReturn(OMNI_INT);
             when(((IntVec) vec).get(anyInt())).thenAnswer(invocationOnMock -> object[(int) invocationOnMock.getArguments()[0]]);
             block = new IntArrayOmniBlock(object.length, (IntVec) vec);
         }
         if (object instanceof Double[]) {
-            vec = mockVec(DoubleVec.class, object, vecAllocator);
+            vec = mockVec(DoubleVec.class, object);
             when(dataType.getId()).thenReturn(OMNI_DOUBLE);
             when(((DoubleVec) vec).get(anyInt())).thenAnswer(invocationOnMock -> object[(int) invocationOnMock.getArguments()[0]]);
             block = new DoubleArrayOmniBlock(object.length, (DoubleVec) vec);
         }
         if (object instanceof Short[]) {
-            vec = mockVec(ShortVec.class, object, vecAllocator);
+            vec = mockVec(ShortVec.class, object);
+            when(dataType.getId()).thenReturn(OMNI_SHORT);
             when(((ShortVec) vec).get(anyInt())).thenAnswer(invocationOnMock -> object[(int) invocationOnMock.getArguments()[0]]);
             block = new ShortArrayOmniBlock(object.length, (ShortVec) vec);
         }
         if (object instanceof Long[]) {
-            vec = mockVec(LongVec.class, object, vecAllocator);
+            vec = mockVec(LongVec.class, object);
             when(dataType.getId()).thenReturn(OMNI_LONG);
             when(((LongVec) vec).get(anyInt())).thenAnswer(invocationOnMock -> object[(int) invocationOnMock.getArguments()[0]]);
             block = new LongArrayOmniBlock(object.length, (LongVec) vec);
         }
         if (object instanceof Long[][]) {
-            vec = mockVec(Decimal128Vec.class, object, vecAllocator);
+            vec = mockVec(Decimal128Vec.class, object);
             when(dataType.getId()).thenReturn(OMNI_DECIMAL128);
             doAnswer(invocationOnMock -> {
                 Long[] result = (Long[]) object[(int) invocationOnMock.getArguments()[0]];
@@ -248,7 +239,7 @@ public class MockUtil
             block = new Int128ArrayOmniBlock(object.length, (Decimal128Vec) vec);
         }
         if (object instanceof String[]) {
-            vec = mockVec(VarcharVec.class, object, vecAllocator);
+            vec = mockVec(VarcharVec.class, object);
             when(dataType.getId()).thenReturn(OMNI_VARCHAR);
             int[] offsets = new int[object.length + 1];
             int startPosition = 0;
@@ -256,13 +247,14 @@ public class MockUtil
                 offsets[i + 1] = startPosition;
                 startPosition += ((String[]) object)[i].length();
             }
-            when(((VarcharVec) vec).getRawValueOffset()).thenReturn(offsets);
-            when(((VarcharVec) vec).get(anyInt())).thenAnswer(invocationOnMock -> object[(int) invocationOnMock.getArguments()[0]]);
+            when(((VarcharVec) vec).get(anyInt())).thenAnswer(invocationOnMock ->
+                    String.valueOf(object[(Integer) invocationOnMock.getArguments()[0]]).getBytes(Charset.defaultCharset()));
             block = new VariableWidthOmniBlock(object.length, (VarcharVec) vec);
         }
         if (block != null) {
             if (dictionary) {
                 DictionaryVec dictionaryVec = mock(DictionaryVec.class);
+                mockStatic(DictionaryOmniBlock.class);
                 int[] idIndex = new int[object.length];
                 for (int i = 0; i < object.length; i++) {
                     idIndex[i] = i;
@@ -270,8 +262,9 @@ public class MockUtil
                 when(dictionaryVec.getIds()).thenReturn(idIndex);
                 when(dictionaryVec.getSize()).thenReturn(object.length);
                 when(dictionaryVec.getDictionary()).thenReturn(vec);
+                when(DictionaryOmniBlock.expandDictionary(dictionaryVec)).thenReturn(block);
+                when(DictionaryOmniBlock.getIds(object.length)).thenReturn(idIndex);
                 when(dictionaryVec.slice(anyInt(), anyInt())).thenReturn(dictionaryVec);
-                when(dictionaryVec.getAllocator()).thenReturn(vecAllocator);
                 when(vec.getEncoding()).thenReturn(OMNI_VEC_ENCODING_FLAT);
                 when(vec.getType()).thenReturn(dataType);
                 block = new DictionaryOmniBlock<Block<?>>(dictionaryVec, false, randomDictionaryId());
@@ -279,7 +272,7 @@ public class MockUtil
             if (lazy) {
                 LazyBlock<?> lazyBlock = new LazyBlock<Block<?>>(block.getPositionCount(), instance -> {});
                 lazyBlock.setBlock(block);
-                return new LazyOmniBlock<Block<?>>(vecAllocator, lazyBlock, null);
+                return new LazyOmniBlock<Block<?>>(lazyBlock, null);
             }
             return block;
         }
@@ -299,12 +292,11 @@ public class MockUtil
         return instance;
     }
 
-    public static <T extends Vec> T mockVec(Class<T> vecClass, Object[] values, VecAllocator vecAllocator)
+    public static <T extends Vec> T mockVec(Class<T> vecClass, Object[] values)
     {
         T vec = mock(vecClass);
         when(vec.getSize()).thenReturn(values.length);
         when(vec.slice(anyInt(), anyInt())).thenReturn(vec);
-        when(vec.getAllocator()).thenReturn(vecAllocator);
         when(vec.copyPositions(any(), anyInt(), anyInt())).thenReturn(vec);
         when(vec.slice(anyInt(), anyInt())).thenReturn(vec);
         return vec;
@@ -319,7 +311,6 @@ public class MockUtil
             return 0;
         }).when(omniOperator).addInput(any());
         doAnswer(invocation -> innerVec.listIterator()).when(omniOperator).getOutput();
-        when(omniOperator.getVecAllocator()).thenReturn(mock(VecAllocator.class));
         return omniOperator;
     }
 }

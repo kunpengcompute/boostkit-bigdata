@@ -18,7 +18,6 @@ package nova.hetu.olk.tool;
 import com.google.common.primitives.Ints;
 import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
-import io.airlift.slice.Slices;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.StandardErrorCode;
@@ -28,7 +27,6 @@ import io.prestosql.spi.block.ByteArrayBlock;
 import io.prestosql.spi.block.DictionaryBlock;
 import io.prestosql.spi.block.Int128ArrayBlock;
 import io.prestosql.spi.block.IntArrayBlock;
-import io.prestosql.spi.block.LazyBlock;
 import io.prestosql.spi.block.LongArrayBlock;
 import io.prestosql.spi.block.RowBlock;
 import io.prestosql.spi.block.RunLengthEncodedBlock;
@@ -73,7 +71,6 @@ import nova.hetu.omniruntime.vector.LongVec;
 import nova.hetu.omniruntime.vector.ShortVec;
 import nova.hetu.omniruntime.vector.VarcharVec;
 import nova.hetu.omniruntime.vector.Vec;
-import nova.hetu.omniruntime.vector.VecAllocator;
 import nova.hetu.omniruntime.vector.VecBatch;
 
 import java.util.ArrayList;
@@ -81,12 +78,11 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
-import static com.google.common.base.Preconditions.checkArgument;
 import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static io.prestosql.spi.type.Decimals.MAX_SHORT_PRECISION;
+import static io.prestosql.spi.type.DoubleType.DOUBLE;
 import static java.lang.Double.doubleToLongBits;
 import static java.lang.Double.longBitsToDouble;
-import static javassist.bytecode.StackMap.DOUBLE;
 
 /**
  * The type Operator utils.
@@ -96,7 +92,6 @@ import static javassist.bytecode.StackMap.DOUBLE;
 public final class OperatorUtils
 {
     private static final Logger log = Logger.get(OperatorUtils.class);
-    private static final int VARCHARVEC_INIT_CAPACITY_PER_POSITION = 200;
 
     private OperatorUtils()
     {
@@ -232,12 +227,11 @@ public final class OperatorUtils
     /**
      * Create blank vectors for given size and types.
      *
-     * @param vecAllocator VecAllocator used to create vectors
      * @param dataTypes data types
      * @param totalPositions Size for all the vectors
      * @return List contains blank vectors
      */
-    public static List<Vec> createBlankVectors(VecAllocator vecAllocator, DataType[] dataTypes, int totalPositions)
+    public static List<Vec> createBlankVectors(DataType[] dataTypes, int totalPositions)
     {
         List<Vec> vecsResult = new ArrayList<>();
         for (int i = 0; i < dataTypes.length; i++) {
@@ -245,33 +239,32 @@ public final class OperatorUtils
             switch (type.getId()) {
                 case OMNI_INT:
                 case OMNI_DATE32:
-                    vecsResult.add(new IntVec(vecAllocator, totalPositions));
+                    vecsResult.add(new IntVec(totalPositions));
                     break;
                 case OMNI_SHORT:
-                    vecsResult.add(new ShortVec(vecAllocator, totalPositions));
+                    vecsResult.add(new ShortVec(totalPositions));
                     break;
                 case OMNI_LONG:
                 case OMNI_DECIMAL64:
-                    vecsResult.add(new LongVec(vecAllocator, totalPositions));
+                    vecsResult.add(new LongVec(totalPositions));
                     break;
                 case OMNI_DOUBLE:
-                    vecsResult.add(new DoubleVec(vecAllocator, totalPositions));
+                    vecsResult.add(new DoubleVec(totalPositions));
                     break;
                 case OMNI_BOOLEAN:
-                    vecsResult.add(new BooleanVec(vecAllocator, totalPositions));
+                    vecsResult.add(new BooleanVec(totalPositions));
                     break;
                 case OMNI_VARCHAR:
                 case OMNI_CHAR:
                     // Blank varcharVec uses 200 bytes for initialization in each position,
                     // and it will automatically expand capacity if additional capacity is required.
-                    vecsResult.add(new VarcharVec(vecAllocator, totalPositions * VARCHARVEC_INIT_CAPACITY_PER_POSITION,
-                            totalPositions));
+                    vecsResult.add(new VarcharVec(totalPositions));
                     break;
                 case OMNI_DECIMAL128:
-                    vecsResult.add(new Decimal128Vec(vecAllocator, totalPositions));
+                    vecsResult.add(new Decimal128Vec(totalPositions));
                     break;
                 case OMNI_CONTAINER:
-                    vecsResult.add(createBlankContainerVector(vecAllocator, type, totalPositions));
+                    vecsResult.add(createBlankContainerVector(type, totalPositions));
                     break;
                 default:
                     throw new PrestoException(StandardErrorCode.NOT_SUPPORTED, "Not support data type " + type);
@@ -280,35 +273,32 @@ public final class OperatorUtils
         return vecsResult;
     }
 
-    private static ContainerVec createBlankContainerVector(VecAllocator vecAllocator, DataType type,
-                                                           int totalPositions)
+    private static ContainerVec createBlankContainerVector(DataType type, int totalPositions)
     {
         if (!(type instanceof ContainerDataType)) {
             throw new PrestoException(StandardErrorCode.NOT_SUPPORTED, "type is not container type:" + type);
         }
         ContainerDataType containerDataType = (ContainerDataType) type;
-        List<Vec> fieldVecs = createBlankVectors(vecAllocator, containerDataType.getFieldTypes(), totalPositions);
+        List<Vec> fieldVecs = createBlankVectors(containerDataType.getFieldTypes(), totalPositions);
         long[] nativeVec = new long[fieldVecs.size()];
         for (int i = 0; i < fieldVecs.size(); i++) {
             nativeVec[i] = fieldVecs.get(i).getNativeVector();
         }
-        return new ContainerVec(vecAllocator, containerDataType.size(), totalPositions, nativeVec,
-                containerDataType.getFieldTypes());
+        return new ContainerVec(containerDataType.size(), totalPositions, nativeVec, containerDataType.getFieldTypes());
     }
 
     /**
      * Transfer to off heap pages list.
      *
-     * @param vecAllocator vector allocator
      * @param pages the pages
      * @return the list
      */
-    public static List<Page> transferToOffHeapPages(VecAllocator vecAllocator, List<Page> pages)
+    public static List<Page> transferToOffHeapPages(List<Page> pages)
     {
         List<Page> offHeapInput = new ArrayList<>();
         for (Page page : pages) {
-            Block[] blocks = getOffHeapBlocks(vecAllocator, page.getBlocks(), null);
-            offHeapInput.add(new Page(blocks));
+            Block[] blocks = getOffHeapBlocks(page.getBlocks(), null);
+            offHeapInput.add(new OmniPage(blocks));
         }
         return offHeapInput;
     }
@@ -316,47 +306,45 @@ public final class OperatorUtils
     /**
      * Transfer to off heap pages page.
      *
-     * @param vecAllocator vector allocator
      * @param page the page
      * @return the page
      */
-    public static Page transferToOffHeapPages(VecAllocator vecAllocator, Page page)
+    public static Page transferToOffHeapPages(Page page)
     {
         if (page.getBlocks().length == 0) {
             return page;
         }
-        Block[] blocks = getOffHeapBlocks(vecAllocator, page.getBlocks(), null);
-        return new Page(blocks);
+        Block[] blocks = getOffHeapBlocks(page.getBlocks(), null);
+        return new OmniPage(blocks);
     }
 
     /**
      * Transfer to off heap pages page with types.
      *
-     * @param vecAllocator vector allocator
      * @param page the page
      * @param blockTypes types
      * @return the page
      */
-    public static Page transferToOffHeapPages(VecAllocator vecAllocator, Page page, List<Type> blockTypes)
+    public static Page transferToOffHeapPages(Page page, List<Type> blockTypes)
     {
         if (page.getBlocks().length == 0) {
             return page;
         }
-        Block[] blocks = getOffHeapBlocks(vecAllocator, page.getBlocks(), blockTypes);
-        return new Page(blocks);
+        Block[] blocks = getOffHeapBlocks(page.getBlocks(), blockTypes);
+        return new OmniPage(blocks);
     }
 
-    private static Block[] getOffHeapBlocks(VecAllocator vecAllocator, Block[] blocks, List<Type> blockTypes)
+    private static Block[] getOffHeapBlocks(Block[] blocks, List<Type> blockTypes)
     {
         Block[] res = new Block[blocks.length];
         if (blockTypes == null || blockTypes.isEmpty()) {
             for (int i = 0; i < blocks.length; i++) {
-                res[i] = buildOffHeapBlock(vecAllocator, blocks[i]);
+                res[i] = buildOffHeapBlock(blocks[i]);
             }
         }
         else {
             for (int i = 0; i < blocks.length; i++) {
-                res[i] = buildOffHeapBlock(vecAllocator, blocks[i], blocks[i].getClass().getSimpleName(),
+                res[i] = buildOffHeapBlock(blocks[i], blocks[i].getClass().getSimpleName(),
                         blocks[i].getPositionCount(), blockTypes.get(i));
             }
         }
@@ -366,13 +354,12 @@ public final class OperatorUtils
     /**
      * Gets off heap block.
      *
-     * @param vecAllocator vector allocator
      * @param block the block
      * @return the off heap block
      */
-    public static Block buildOffHeapBlock(VecAllocator vecAllocator, Block block)
+    public static Block buildOffHeapBlock(Block block)
     {
-        return buildOffHeapBlock(vecAllocator, block, block.getClass().getSimpleName(), block.getPositionCount(), null);
+        return buildOffHeapBlock(block, block.getClass().getSimpleName(), block.getPositionCount(), null);
     }
 
     private static double[] transformLongArrayToDoubleArray(long[] values)
@@ -410,8 +397,7 @@ public final class OperatorUtils
         }
     }
 
-    private static Block buildByteArrayOmniBlock(VecAllocator vecAllocator, Block block, int positionCount,
-                                                 boolean isRLE)
+    private static Block buildByteArrayOmniBlock(Block block, int positionCount, boolean isRLE)
     {
         if (isRLE) {
             byte[] valueIsNull = null;
@@ -425,18 +411,17 @@ public final class OperatorUtils
                     Arrays.fill(bytes, (byte) block.get(0));
                 }
             }
-            return new ByteArrayOmniBlock(vecAllocator, 0, positionCount, valueIsNull, bytes);
+            return new ByteArrayOmniBlock(0, positionCount, valueIsNull, bytes);
         }
         else {
             boolean[] valueIsNull = block.getValueNulls();
             int offset = block.getBlockOffset();
             byte[] bytes = ((ByteArrayBlock) block).getValues();
-            return new ByteArrayOmniBlock(vecAllocator, offset, positionCount, transformBooleanToByte(valueIsNull), bytes);
+            return new ByteArrayOmniBlock(offset, positionCount, transformBooleanToByte(valueIsNull), bytes);
         }
     }
 
-    private static Block buildIntArrayOmniBLock(VecAllocator vecAllocator, Block block, int positionCount,
-                                                boolean isRLE)
+    private static Block buildIntArrayOmniBLock(Block block, int positionCount, boolean isRLE)
     {
         if (isRLE) {
             byte[] valueIsNull = null;
@@ -450,18 +435,17 @@ public final class OperatorUtils
                     Arrays.fill(values, (int) block.get(0));
                 }
             }
-            return new IntArrayOmniBlock(vecAllocator, 0, positionCount, valueIsNull, values);
+            return new IntArrayOmniBlock(0, positionCount, valueIsNull, values);
         }
         else {
             boolean[] valueIsNull = block.getValueNulls();
             int offset = block.getBlockOffset();
             int[] values = ((IntArrayBlock) block).getValues();
-            return new IntArrayOmniBlock(vecAllocator, offset, positionCount, transformBooleanToByte(valueIsNull), values);
+            return new IntArrayOmniBlock(offset, positionCount, transformBooleanToByte(valueIsNull), values);
         }
     }
 
-    private static Block buildShortArrayOmniBLock(VecAllocator vecAllocator, Block block, int positionCount,
-                                                  boolean isRLE)
+    private static Block buildShortArrayOmniBLock(Block block, int positionCount, boolean isRLE)
     {
         if (isRLE) {
             byte[] valueIsNull = null;
@@ -475,7 +459,7 @@ public final class OperatorUtils
                     Arrays.fill(values, (short) block.get(0));
                 }
             }
-            return new ShortArrayOmniBlock(vecAllocator, 0, positionCount, valueIsNull, values);
+            return new ShortArrayOmniBlock(0, positionCount, valueIsNull, values);
         }
         else {
             ShortArrayBlock shortArrayBlock = (ShortArrayBlock) block;
@@ -493,15 +477,14 @@ public final class OperatorUtils
                     }
                 }
                 if (hasNull) {
-                    return new ShortArrayOmniBlock(vecAllocator, 0, positionCount, valueIsNull, values);
+                    return new ShortArrayOmniBlock(0, positionCount, valueIsNull, values);
                 }
             }
-            return new ShortArrayOmniBlock(vecAllocator, 0, positionCount, null, values);
+            return new ShortArrayOmniBlock(0, positionCount, null, values);
         }
     }
 
-    private static Block buildLongArrayOmniBLock(VecAllocator vecAllocator, Block block, int positionCount,
-                                                 boolean isRLE)
+    private static Block buildLongArrayOmniBLock(Block block, int positionCount, boolean isRLE)
     {
         if (isRLE) {
             byte[] valueIsNull = null;
@@ -515,18 +498,17 @@ public final class OperatorUtils
                     Arrays.fill(values, (long) block.get(0));
                 }
             }
-            return new LongArrayOmniBlock(vecAllocator, 0, positionCount, valueIsNull, values);
+            return new LongArrayOmniBlock(0, positionCount, valueIsNull, values);
         }
         else {
             boolean[] valueIsNull = block.getValueNulls();
             int offset = block.getBlockOffset();
             long[] values = ((LongArrayBlock) block).getValues();
-            return new LongArrayOmniBlock(vecAllocator, offset, positionCount, transformBooleanToByte(valueIsNull), values);
+            return new LongArrayOmniBlock(offset, positionCount, transformBooleanToByte(valueIsNull), values);
         }
     }
 
-    private static Block buildDoubleArrayOmniBLock(VecAllocator vecAllocator, Block block, int positionCount,
-                                                   boolean isRLE)
+    private static Block buildDoubleArrayOmniBLock(Block block, int positionCount, boolean isRLE)
     {
         if (isRLE) {
             byte[] valueIsNull = null;
@@ -540,19 +522,18 @@ public final class OperatorUtils
                     Arrays.fill(doubles, longBitsToDouble((long) block.get(0)));
                 }
             }
-            return new DoubleArrayOmniBlock(vecAllocator, 0, positionCount, valueIsNull, doubles);
+            return new DoubleArrayOmniBlock(0, positionCount, valueIsNull, doubles);
         }
         else {
             boolean[] valueIsNull = block.getValueNulls();
             int offset = block.getBlockOffset();
             long[] values = ((LongArrayBlock) block).getValues();
             double[] doubles = transformLongArrayToDoubleArray(values);
-            return new DoubleArrayOmniBlock(vecAllocator, offset, positionCount, transformBooleanToByte(valueIsNull), doubles);
+            return new DoubleArrayOmniBlock(offset, positionCount, transformBooleanToByte(valueIsNull), doubles);
         }
     }
 
-    private static Block buildInt128ArrayOmniBlock(VecAllocator vecAllocator, Block block, int positionCount,
-                                                   boolean isRLE)
+    private static Block buildInt128ArrayOmniBlock(Block block, int positionCount, boolean isRLE)
     {
         if (isRLE) {
             byte[] valueIsNull = null;
@@ -567,32 +548,30 @@ public final class OperatorUtils
                     fillLongArray(val, longs);
                 }
             }
-            return new Int128ArrayOmniBlock(vecAllocator, 0, positionCount, valueIsNull, longs);
+            return new Int128ArrayOmniBlock(0, positionCount, valueIsNull, longs);
         }
         else {
             boolean[] valueIsNull = block.getValueNulls();
             int offset = block.getBlockOffset();
             long[] longs = ((Int128ArrayBlock) block).getValues();
-            return new Int128ArrayOmniBlock(vecAllocator, offset, positionCount, transformBooleanToByte(valueIsNull), longs);
+            return new Int128ArrayOmniBlock(offset, positionCount, transformBooleanToByte(valueIsNull), longs);
         }
     }
 
-    private static VariableWidthOmniBlock buildVariableWidthOmniBlock(VecAllocator vecAllocator, Block block, int positionCount,
-                                                                      boolean isRLE)
+    private static VariableWidthOmniBlock buildVariableWidthOmniBlock(Block block, int positionCount, boolean isRLE)
     {
         if (!isRLE) {
             int[] offsets = ((VariableWidthBlock) block).getOffsets();
             int offset = block.getBlockOffset();
             boolean[] valueIsNull = block.getValueNulls();
             Slice slice = ((VariableWidthBlock) block).getRawSlice(0);
-            return new VariableWidthOmniBlock(vecAllocator, offset, positionCount, slice, offsets,
+            return new VariableWidthOmniBlock(offset, positionCount, slice, offsets,
                     transformBooleanToByte(valueIsNull));
         }
         else {
             AbstractVariableWidthBlock variableWidthBlock = (AbstractVariableWidthBlock) ((RunLengthEncodedBlock) block)
                     .getValue();
-            VarcharVec vec = new VarcharVec(vecAllocator, variableWidthBlock.getSliceLength(0) * positionCount,
-                    positionCount);
+            VarcharVec vec = new VarcharVec(positionCount);
             for (int i = 0; i < positionCount; i++) {
                 if (block.isNull(i)) {
                     vec.setNull(i);
@@ -605,11 +584,11 @@ public final class OperatorUtils
         }
     }
 
-    private static Block buildDictionaryOmniBlock(VecAllocator vecAllocator, Block inputBlock, Type blockType)
+    private static Block buildDictionaryOmniBlock(Block inputBlock, Type blockType)
     {
         DictionaryBlock dictionaryBlock = (DictionaryBlock) inputBlock;
         Block block = dictionaryBlock.getDictionary();
-        Block omniDictionary = buildOffHeapBlock(vecAllocator, block, block.getClass().getSimpleName(),
+        Block omniDictionary = buildOffHeapBlock(block, block.getClass().getSimpleName(),
                 block.getPositionCount(), blockType);
         Block dictionaryOmniBlock = new DictionaryOmniBlock(inputBlock.getPositionCount(), (Vec) omniDictionary.getValues(),
                 dictionaryBlock.getIdsArray());
@@ -617,7 +596,7 @@ public final class OperatorUtils
         return dictionaryOmniBlock;
     }
 
-    private static Block buildRowOmniBlock(VecAllocator vecAllocator, Block block, int positionCount, Type blockType)
+    private static Block buildRowOmniBlock(Block block, int positionCount, Type blockType)
     {
         byte[] valueIsNull = new byte[positionCount];
         RowBlock rowBlock = (RowBlock) block;
@@ -626,27 +605,25 @@ public final class OperatorUtils
                 valueIsNull[j] = Vec.NULL;
             }
         }
-        return RowOmniBlock.fromFieldBlocks(vecAllocator, rowBlock.getPositionCount(), Optional.of(valueIsNull),
+        return RowOmniBlock.fromFieldBlocks(rowBlock.getPositionCount(), Optional.of(valueIsNull),
                 rowBlock.getRawFieldBlocks(), blockType, null);
     }
 
     /**
      * Gets off heap block.
      *
-     * @param vecAllocator vector allocator
      * @param block the block
      * @param type the actual block type, e.g. RunLengthEncodedBlock or
      * DictionaryBlock
      * @param positionCount the position count of the block
      * @return the off heap block
      */
-    public static Block buildOffHeapBlock(VecAllocator vecAllocator, Block block, String type, int positionCount,
-                                          Type blockType)
+    public static Block buildOffHeapBlock(Block block, String type, int positionCount, Type blockType)
     {
-        return buildOffHeapBlock(vecAllocator, block, type, positionCount, false, blockType);
+        return buildOffHeapBlock(block, type, positionCount, false, blockType);
     }
 
-    private static Block buildOffHeapBlock(VecAllocator vecAllocator, Block block, String type, int positionCount, boolean isRLE, Type blockType)
+    private static Block buildOffHeapBlock(Block block, String type, int positionCount, boolean isRLE, Type blockType)
     {
         if (block.isExtensionBlock()) {
             return block;
@@ -654,30 +631,28 @@ public final class OperatorUtils
 
         switch (type) {
             case "ByteArrayBlock":
-                return buildByteArrayOmniBlock(vecAllocator, block, positionCount, isRLE);
+                return buildByteArrayOmniBlock(block, positionCount, isRLE);
             case "IntArrayBlock":
-                return buildIntArrayOmniBLock(vecAllocator, block, positionCount, isRLE);
+                return buildIntArrayOmniBLock(block, positionCount, isRLE);
             case "ShortArrayBlock":
-                return buildShortArrayOmniBLock(vecAllocator, block, positionCount, isRLE);
+                return buildShortArrayOmniBLock(block, positionCount, isRLE);
             case "LongArrayBlock":
                 if (blockType != null && blockType.equals(DOUBLE)) {
-                    return buildDoubleArrayOmniBLock(vecAllocator, block, positionCount, isRLE);
+                    return buildDoubleArrayOmniBLock(block, positionCount, isRLE);
                 }
-                return buildLongArrayOmniBLock(vecAllocator, block, positionCount, isRLE);
+                return buildLongArrayOmniBLock(block, positionCount, isRLE);
             case "Int128ArrayBlock":
-                return buildInt128ArrayOmniBlock(vecAllocator, block, positionCount, isRLE);
+                return buildInt128ArrayOmniBlock(block, positionCount, isRLE);
             case "VariableWidthBlock":
-                return buildVariableWidthOmniBlock(vecAllocator, block, positionCount, isRLE);
+                return buildVariableWidthOmniBlock(block, positionCount, isRLE);
             case "DictionaryBlock":
-                return buildDictionaryOmniBlock(vecAllocator, block, blockType);
+                return buildDictionaryOmniBlock(block, blockType);
             case "RunLengthEncodedBlock":
-                return buildOffHeapBlock(vecAllocator, block,
-                        ((RunLengthEncodedBlock) block).getValue().getClass().getSimpleName(), positionCount, true,
-                        blockType);
+                return buildOffHeapBlock(block, ((RunLengthEncodedBlock) block).getValue().getClass().getSimpleName(), positionCount, true, blockType);
             case "LazyBlock":
-                return new LazyOmniBlock(vecAllocator, (LazyBlock) block, blockType);
+                return loadLazyBlock(block, blockType);
             case "RowBlock":
-                return buildRowOmniBlock(vecAllocator, block, positionCount, blockType);
+                return buildRowOmniBlock(block, positionCount, blockType);
             default:
                 throw new PrestoException(StandardErrorCode.NOT_SUPPORTED, "Not support block:" + type);
         }
@@ -686,14 +661,13 @@ public final class OperatorUtils
     /**
      * Build a vector from block.
      *
-     * @param vecAllocator vector allocator.
      * @param block block
      * @return vector instance.
      */
-    public static Vec buildVec(VecAllocator vecAllocator, Block block)
+    public static Vec buildVec(Block block)
     {
         if (!block.isExtensionBlock()) {
-            return (Vec) OperatorUtils.buildOffHeapBlock(vecAllocator, block).getValues();
+            return (Vec) OperatorUtils.buildOffHeapBlock(block).getValues();
         }
         else {
             return (Vec) block.getValues();
@@ -703,18 +677,21 @@ public final class OperatorUtils
     /**
      * Build a vector by {@link Block}
      *
-     * @param vecAllocator VecAllocator to create vectors
      * @param page the page
      * @param object the operator
      * @return the vec batch
      */
-    public static VecBatch buildVecBatch(VecAllocator vecAllocator, Page page, Object object)
+    public static VecBatch buildVecBatch(Page page, Object object)
     {
+        if (page instanceof OmniPage) {
+            return ((OmniPage) page).getVecBatch();
+        }
+
         List<Vec> vecList = new ArrayList<>();
 
         for (int i = 0; i < page.getChannelCount(); i++) {
             Block block = page.getBlock(i);
-            Vec vec = buildVec(vecAllocator, block);
+            Vec vec = buildVec(block);
             vecList.add(vec);
         }
 
@@ -728,7 +705,7 @@ public final class OperatorUtils
      *
      * @param resultVecBatch Stores final resulting vectors
      */
-    public static void merge(VecBatch resultVecBatch, List<Page> pages, VecAllocator vecAllocator)
+    public static void merge(VecBatch resultVecBatch, List<Page> pages)
     {
         for (int channel = 0; channel < resultVecBatch.getVectorCount(); channel++) {
             int offset = 0;
@@ -737,7 +714,7 @@ public final class OperatorUtils
                 Block block = page.getBlock(channel);
                 Vec src;
                 if (!block.isExtensionBlock()) {
-                    block = OperatorUtils.buildOffHeapBlock(vecAllocator, block);
+                    block = OperatorUtils.buildOffHeapBlock(block);
                 }
                 src = (Vec) block.getValues();
                 Vec dest = resultVecBatch.getVector(channel);
@@ -745,6 +722,12 @@ public final class OperatorUtils
 
                 offset += positionCount;
                 src.close();
+            }
+
+            for (Page page : pages) {
+                if (page instanceof OmniPage) {
+                    ((OmniPage) page).close();
+                }
             }
         }
     }
@@ -793,7 +776,7 @@ public final class OperatorUtils
                     break;
                 case OMNI_DECIMAL128:
                     rowBlocks[vecIdx] = new Int128ArrayOmniBlock(positionCount,
-                            new Decimal128Vec(containerVec.getVector(vecIdx), dataType));
+                            new Decimal128Vec(containerVec.getVector(vecIdx)));
                     break;
                 default:
                     throw new PrestoException(GENERIC_INTERNAL_ERROR,
@@ -801,7 +784,7 @@ public final class OperatorUtils
             }
         }
         int[] fieldBlockOffsets = new int[positionCount + 1];
-        byte[] nulls = containerVec.getRawValueNulls();
+        byte[] nulls = transformBooleanToByte(containerVec.getValuesNulls(0, positionCount));
         for (int position = 0; position < positionCount; position++) {
             fieldBlockOffsets[position + 1] = fieldBlockOffsets[position] + (nulls[position] == Vec.NULL ? 0 : 1);
         }
@@ -812,7 +795,7 @@ public final class OperatorUtils
     /**
      * Transfer to on heap pages list.
      *
-     * @param pages the the off heap pages
+     * @param pages the off heap pages
      * @return the on heap page list
      */
     public static List<Page> transferToOnHeapPages(List<Page> pages)
@@ -862,31 +845,34 @@ public final class OperatorUtils
 
     private static Block buildOnHeapBlock(Block block, String type, int positionCount)
     {
-        checkArgument(block.isExtensionBlock(), "block should be omni block!");
-        switch (type) {
-            case "ByteArrayOmniBlock":
-                return buildByteArrayBlock(block, positionCount);
-            case "IntArrayOmniBlock":
-                return buildIntArrayBLock(block, positionCount);
-            case "ShortArrayOmniBlock":
-                return buildShortArrayBLock(block, positionCount);
-            case "LongArrayOmniBlock":
-                return buildLongArrayBLock(block, positionCount);
-            case "DoubleArrayOmniBlock":
-                return buildDoubleArrayBLock(block, positionCount);
-            case "Int128ArrayOmniBlock":
-                return buildInt128ArrayBlock(block, positionCount);
-            case "VariableWidthOmniBlock":
-                return buildVariableWidthBlock(block, positionCount);
-            case "DictionaryOmniBlock":
-                return buildDictionaryBlock(block, positionCount);
-            case "LazyOmniBlock":
-                return buildLazyBlock(block);
-            case "RowOmniBlock":
-                return buildRowBlock(block, positionCount);
-            default:
-                throw new PrestoException(StandardErrorCode.NOT_SUPPORTED, "Not support block:" + type);
+        // normal block is an extension Block, but dictionary block is an olk block.
+        if (block.isExtensionBlock()) {
+            switch (type) {
+                case "ByteArrayOmniBlock":
+                    return buildByteArrayBlock(block, positionCount);
+                case "IntArrayOmniBlock":
+                    return buildIntArrayBLock(block, positionCount);
+                case "ShortArrayOmniBlock":
+                    return buildShortArrayBLock(block, positionCount);
+                case "LongArrayOmniBlock":
+                    return buildLongArrayBLock(block, positionCount);
+                case "DoubleArrayOmniBlock":
+                    return buildDoubleArrayBLock(block, positionCount);
+                case "Int128ArrayOmniBlock":
+                    return buildInt128ArrayBlock(block, positionCount);
+                case "VariableWidthOmniBlock":
+                    return buildVariableWidthBlock(block, positionCount);
+                case "DictionaryOmniBlock":
+                    return buildDictionaryBlock(block, positionCount);
+                case "LazyOmniBlock":
+                    return buildLazyBlock(block);
+                case "RowOmniBlock":
+                    return buildRowBlock(block, positionCount);
+                default:
+                    throw new PrestoException(StandardErrorCode.NOT_SUPPORTED, "Not support block:" + type);
+            }
         }
+        return block;
     }
 
     private static Block buildRowBlock(Block block, int positionCount)
@@ -908,21 +894,21 @@ public final class OperatorUtils
     private static Block buildDictionaryBlock(Block block, int positionCount)
     {
         DictionaryVec dictionaryVec = (DictionaryVec) block.getValues();
-        int[] newIds = dictionaryVec.getIds(positionCount);
         Block dictionary = buildOnHeapBlock(((DictionaryOmniBlock) block).getDictionary());
-        return new DictionaryBlock(dictionary, newIds);
+        return new DictionaryBlock(dictionary, ((DictionaryOmniBlock) block).getIds());
     }
 
     private static Block buildVariableWidthBlock(Block block, int positionCount)
     {
+        VariableWidthOmniBlock offHeapBlock = (VariableWidthOmniBlock) block;
+        Slice slice = offHeapBlock.getRawSlice(0);
+        int[] offsets = new int[positionCount + 1];
+        for (int i = 0; i < positionCount; i++) {
+            offsets[i + 1] = offsets[i] + offHeapBlock.getSliceLength(i);
+        }
         VarcharVec varcharVec = (VarcharVec) block.getValues();
-        int[] offsets = varcharVec.getValueOffset(0, positionCount);
-        int startOffset = varcharVec.getValueOffset(0);
-        int endOffset = varcharVec.getValueOffset(positionCount);
-        byte[] data = varcharVec.getData(startOffset, endOffset - startOffset);
-        Slice slice = Slices.wrappedBuffer(data);
         return new VariableWidthBlock(positionCount, slice, offsets,
-                varcharVec.hasNullValue()
+                varcharVec.hasNull()
                         ? Optional.of(varcharVec.getValuesNulls(0, positionCount))
                         : Optional.empty());
     }
@@ -971,7 +957,14 @@ public final class OperatorUtils
     private static Block buildByteArrayBlock(Block block, int positionCount)
     {
         BooleanVec booleanVec = (BooleanVec) block.getValues();
-        byte[] bytes = booleanVec.getValuesBuf().getBytes(booleanVec.getOffset(), positionCount);
+        byte[] bytes = booleanVec.getValuesBuf().getBytes(0, positionCount);
         return new ByteArrayBlock(positionCount, Optional.of(booleanVec.getValuesNulls(0, positionCount)), bytes);
+    }
+
+    private static Block loadLazyBlock(Block lazyBlock, Type blockType)
+    {
+        Block block = lazyBlock.getLoadedBlock();
+        return buildOffHeapBlock(block, block.getClass().getSimpleName(),
+                block.getPositionCount(), blockType);
     }
 }

@@ -23,7 +23,6 @@ import io.prestosql.spi.type.Type;
 import nova.hetu.olk.operator.benchmark.PageBuilderUtil;
 import nova.hetu.olk.tool.BlockUtils;
 import nova.hetu.olk.tool.OperatorUtils;
-import nova.hetu.omniruntime.vector.VecAllocator;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -124,7 +123,7 @@ public class BenchmarkOmniBlock
                     pages.add(PageBuilderUtil.createSequencePage(typesArray, ROWS_PER_PAGE));
                 }
             }
-            return OperatorUtils.transferToOffHeapPages(VecAllocator.GLOBAL_VECTOR_ALLOCATOR, pages);
+            return OperatorUtils.transferToOffHeapPages(pages);
         }
 
         public List<Page> getPages()

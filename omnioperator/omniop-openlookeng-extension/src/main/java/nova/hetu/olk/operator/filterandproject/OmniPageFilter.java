@@ -26,7 +26,6 @@ import nova.hetu.omniruntime.operator.OmniOperator;
 import nova.hetu.omniruntime.operator.filter.OmniFilterAndProjectOperatorFactory;
 import nova.hetu.omniruntime.type.DataType;
 import nova.hetu.omniruntime.utils.OmniRuntimeException;
-import nova.hetu.omniruntime.vector.VecAllocator;
 import nova.hetu.omniruntime.vector.VecBatch;
 
 import java.util.Iterator;
@@ -110,12 +109,11 @@ public class OmniPageFilter
     /**
      * Gets operator.
      *
-     * @param vecAllocator vector allocator
      * @return the operator
      */
-    public OmniPageFilterOperator getOperator(VecAllocator vecAllocator)
+    public OmniPageFilterOperator getOperator()
     {
-        return new OmniPageFilterOperator(operatorFactory.createOperator(vecAllocator), inputChannels, inputTypes,
+        return new OmniPageFilterOperator(operatorFactory.createOperator(), inputChannels, inputTypes,
                 projects);
     }
 

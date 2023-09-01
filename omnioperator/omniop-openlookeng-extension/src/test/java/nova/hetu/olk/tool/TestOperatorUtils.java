@@ -58,9 +58,7 @@ import nova.hetu.omniruntime.vector.LongVec;
 import nova.hetu.omniruntime.vector.ShortVec;
 import nova.hetu.omniruntime.vector.VarcharVec;
 import nova.hetu.omniruntime.vector.Vec;
-import nova.hetu.omniruntime.vector.VecAllocator;
 import org.junit.runner.RunWith;
-import org.powermock.api.support.membermodification.MemberModifier;
 import org.powermock.core.classloader.annotations.PowerMockIgnore;
 import org.powermock.core.classloader.annotations.PrepareForTest;
 import org.powermock.core.classloader.annotations.SuppressStaticInitializationFor;
@@ -85,6 +83,7 @@ import static io.prestosql.spi.type.SmallintType.SMALLINT;
 import static io.prestosql.spi.type.TimestampType.TIMESTAMP;
 import static io.prestosql.spi.type.VarbinaryType.VARBINARY;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
+import static nova.hetu.olk.mock.MockUtil.mockNewVecWithAnyArguments;
 import static nova.hetu.olk.tool.OperatorUtils.transferToOffHeapPages;
 import static nova.hetu.olk.tool.OperatorUtils.transferToOnHeapPage;
 import static nova.hetu.olk.tool.OperatorUtils.transferToOnHeapPages;
@@ -96,11 +95,12 @@ import static org.powermock.api.mockito.PowerMockito.whenNew;
 import static org.testng.Assert.assertEquals;
 
 @RunWith(PowerMockRunner.class)
-@PrepareForTest({VecAllocator.class,
+@PrepareForTest({
         Vec.class,
-        OperatorUtils.class
+        OperatorUtils.class,
+        OmniPage.class
 })
-@SuppressStaticInitializationFor({"nova.hetu.omniruntime.vector.VecAllocator",
+@SuppressStaticInitializationFor({
         "nova.hetu.omniruntime.vector.Vec",
         "nova.hetu.olk.block.RowOmniBlock"
 })
@@ -125,6 +125,7 @@ public class TestOperatorUtils
     @BeforeMethod
     public void setUp() throws Exception
     {
+        mockNewVecWithAnyArguments(OmniPage.class);
         mockSupports();
     }
 
@@ -133,10 +134,11 @@ public class TestOperatorUtils
     {
         List<Page> pages = buildPages(types, false, 100);
         // transfer on-feap page to off-heap
-        List<Page> offHeapPages = transferToOffHeapPages(VecAllocator.GLOBAL_VECTOR_ALLOCATOR, pages);
+        List<Page> offHeapPages = transferToOffHeapPages(pages);
         // transfer off-heap page to on-heap
-        List<Page> onHeapPages = transferToOnHeapPages(offHeapPages);
-        freeNativeMemory(offHeapPages);
+        List<Page> omniPages = buildOmniPages();
+        List<Page> onHeapPages = transferToOnHeapPages(omniPages);
+        freeNativeMemory(omniPages);
     }
 
     @Test
@@ -144,10 +146,11 @@ public class TestOperatorUtils
     {
         List<Page> pages = buildPages(types, true, 100);
         // transfer on-feap page to off-heap
-        List<Page> offHeapPages = transferToOffHeapPages(VecAllocator.GLOBAL_VECTOR_ALLOCATOR, pages);
+        List<Page> offHeapPages = transferToOffHeapPages(pages);
         // transfer off-heap page to on-heap
-        List<Page> onHeapPages = transferToOnHeapPages(offHeapPages);
-        freeNativeMemory(offHeapPages);
+        List<Page> omniPages = buildOmniPages();
+        List<Page> onHeapPages = transferToOnHeapPages(omniPages);
+        freeNativeMemory(omniPages);
     }
 
     @Test
@@ -156,11 +159,11 @@ public class TestOperatorUtils
         Type type = BIGINT;
         Page page = new Page(buildRowBlockByBuilder(type));
         // transfer on-heap page to off-heap
-        Page offHeapPage = transferToOffHeapPages(VecAllocator.GLOBAL_VECTOR_ALLOCATOR, page,
-                ImmutableList.of(RowType.from(ImmutableList.of(RowType.field(type)))));
+        Page offHeapPage = transferToOffHeapPages(page, ImmutableList.of(RowType.from(ImmutableList.of(RowType.field(type)))));
         // transfer off-heap page to on-heap
-        Page onHeapPage = transferToOnHeapPage(offHeapPage);
-        BlockUtils.freePage(offHeapPage);
+        Page omniPage = buildOmniPage();
+        Page onHeapPage = transferToOnHeapPage(omniPage);
+        BlockUtils.freePage(omniPage);
     }
 
     @Test
@@ -179,18 +182,19 @@ public class TestOperatorUtils
             runLengthEncodedPages.add(new Page(blocks.toArray(new Block[blocks.size()])));
         }
         // transfer on-heap page to off-heap
-        List<Page> offHeapPages = transferToOffHeapPages(VecAllocator.GLOBAL_VECTOR_ALLOCATOR, runLengthEncodedPages);
+        List<Page> offHeapPages = transferToOffHeapPages(runLengthEncodedPages);
         // transfer off-heap page to on-heap
-        List<Page> onHeapPages = transferToOnHeapPages(offHeapPages);
-        freeNativeMemory(offHeapPages);
+        List<Page> omniPages = buildOmniPages();
+        List<Page> onHeapPages = transferToOnHeapPages(omniPages);
+        freeNativeMemory(omniPages);
     }
 
     @Test
     public void testBlockTypeTransfer()
     {
         Page page = buildPages(new ImmutableList.Builder<Type>().add(DOUBLE).build(), false, 1).get(0);
-        Block block = OperatorUtils.buildOffHeapBlock(VecAllocator.GLOBAL_VECTOR_ALLOCATOR, page.getBlock(0), "LongArrayBlock", 1, DOUBLE);
-        OperatorUtils.buildOffHeapBlock(VecAllocator.GLOBAL_VECTOR_ALLOCATOR, new RunLengthEncodedBlock(page.getBlock(0), 1), "RunLengthEncodedBlock", 1, DOUBLE);
+        Block block = OperatorUtils.buildOffHeapBlock(page.getBlock(0), "LongArrayBlock", 1, DOUBLE);
+        OperatorUtils.buildOffHeapBlock(new RunLengthEncodedBlock(page.getBlock(0), 1), "RunLengthEncodedBlock", 1, DOUBLE);
     }
 
     @Test
@@ -236,7 +240,7 @@ public class TestOperatorUtils
         vecs.add(varcharVec);
         vecs.add(decimal128Vec);
         vecs.add(containerVec);
-        assertEquals(vecs, OperatorUtils.createBlankVectors(VecAllocator.GLOBAL_VECTOR_ALLOCATOR, dataTypes, 1));
+        assertEquals(vecs, OperatorUtils.createBlankVectors(dataTypes, 1));
     }
 
     @Test
@@ -266,6 +270,21 @@ public class TestOperatorUtils
         return pages;
     }
 
+    private List<Page> buildOmniPages()
+    {
+        List<Page> pages = new ArrayList<>();
+        Page page = buildOmniPage();
+        pages.add(page);
+        return pages;
+    }
+
+    private Page buildOmniPage()
+    {
+        IntArrayOmniBlock intArrayOmniBlock = new IntArrayOmniBlock(3, intVec);
+        Page page = new Page(intArrayOmniBlock);
+        return page;
+    }
+
     private Block buildRowBlockByBuilder(Type type)
     {
         BlockBuilder rowBlockBuilder = type.createBlockBuilder(null, 4);
@@ -284,17 +303,12 @@ public class TestOperatorUtils
 
     private void mockSupports() throws Exception
     {
-        //mock GLOBAL_VECTOR_ALLOCATOR
-        VecAllocator vecAllocator = mock(VecAllocator.class);
-        MemberModifier.field(VecAllocator.class, "GLOBAL_VECTOR_ALLOCATOR").set(VecAllocator.class, vecAllocator);
-
         ByteArrayOmniBlock byteArrayOmniBlock = mock(ByteArrayOmniBlock.class);
         when(byteArrayOmniBlock.isExtensionBlock()).thenReturn(true);
         when(byteArrayOmniBlock.getPositionCount()).thenReturn(1);
         whenNew(ByteArrayOmniBlock.class).withAnyArguments().thenReturn(byteArrayOmniBlock);
         booleanVec = mock(BooleanVec.class, RETURNS_DEEP_STUBS);
         when(booleanVec.getValuesBuf().getBytes(anyInt(), anyInt())).thenReturn(new byte[]{1});
-        when(booleanVec.getOffset()).thenReturn(0);
         when(booleanVec.getValuesNulls(anyInt(), anyInt())).thenReturn(new boolean[]{true});
         whenNew(BooleanVec.class).withAnyArguments().thenReturn(booleanVec);
         when(byteArrayOmniBlock.getValues()).thenReturn(booleanVec);
@@ -354,11 +368,9 @@ public class TestOperatorUtils
         when(variableWidthOmniBlock.getPositionCount()).thenReturn(1);
         whenNew(VariableWidthOmniBlock.class).withAnyArguments().thenReturn(variableWidthOmniBlock);
         varcharVec = mock(VarcharVec.class);
-        when(varcharVec.hasNullValue()).thenReturn(false);
+        when(varcharVec.hasNull()).thenReturn(false);
         when(varcharVec.getValuesNulls(anyInt(), anyInt())).thenReturn(new boolean[]{true});
-        when(varcharVec.getValueOffset(anyInt())).thenAnswer(n -> n.getArguments()[0]);
-        when(varcharVec.getValueOffset(anyInt(), anyInt())).thenReturn(new int[]{0, 1});
-        when(varcharVec.getData(anyInt(), anyInt())).thenReturn(new byte[]{1});
+        when(varcharVec.get(anyInt(), anyInt())).thenReturn(new byte[]{1});
         whenNew(VarcharVec.class).withAnyArguments().thenReturn(varcharVec);
         when(variableWidthOmniBlock.getValues()).thenReturn(varcharVec);
 
@@ -368,7 +380,7 @@ public class TestOperatorUtils
         when(dictionaryOmniBlock.getDictionary()).thenReturn(byteArrayOmniBlock);
         whenNew(DictionaryOmniBlock.class).withAnyArguments().thenReturn(dictionaryOmniBlock);
         dictionaryVec = mock(DictionaryVec.class);
-        when(dictionaryVec.getIds(anyInt())).thenReturn(new int[]{1});
+        when(dictionaryVec.getIds()).thenReturn(new int[]{1});
         when(dictionaryVec.getValuesNulls(anyInt(), anyInt())).thenReturn(new boolean[]{true});
         whenNew(DictionaryVec.class).withAnyArguments().thenReturn(dictionaryVec);
         when(dictionaryOmniBlock.getValues()).thenReturn(dictionaryVec);

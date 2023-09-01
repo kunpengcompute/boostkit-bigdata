@@ -21,6 +21,10 @@ import io.prestosql.spi.Page;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.type.Type;
 import nova.hetu.olk.operator.BuildOffHeapOmniOperator.BuildOffHeapOmniOperatorFactory;
+import nova.hetu.olk.tool.OmniPage;
+import org.junit.runner.RunWith;
+import org.powermock.core.classloader.annotations.PrepareForTest;
+import org.powermock.modules.junit4.PowerMockRunner;
 import org.testng.annotations.Test;
 
 import java.util.Collections;
@@ -33,6 +37,8 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
+@RunWith(PowerMockRunner.class)
+@PrepareForTest(OmniPage.class)
 public class BuildOffHeapOmniOperatorTest
         extends AbstractOperatorTest
 {
@@ -43,6 +49,12 @@ public class BuildOffHeapOmniOperatorTest
     protected OperatorFactory createOperatorFactory()
     {
         return new BuildOffHeapOmniOperatorFactory(operatorId, planNodeId, inputTypes);
+    }
+
+    @Override
+    protected void setUpMock()
+    {
+        super.setUpMock();
     }
 
     @Test(dataProvider = "pageProvider")

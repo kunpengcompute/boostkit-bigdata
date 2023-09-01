@@ -23,7 +23,6 @@ import io.prestosql.operator.exchange.LocalExchange;
 import io.prestosql.operator.exchange.LocalExchange.LocalExchangeFactory;
 import io.prestosql.operator.exchange.LocalExchangeSource;
 import io.prestosql.spi.Page;
-import io.prestosql.spi.block.LazyBlock;
 import io.prestosql.spi.block.SortOrder;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.type.Type;
@@ -43,8 +42,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import static io.prestosql.operator.Operator.NOT_BLOCKED;
 import static java.util.Arrays.asList;
+import static nova.hetu.olk.mock.MockUtil.block;
+import static nova.hetu.olk.mock.MockUtil.fill;
 import static nova.hetu.olk.mock.MockUtil.mockNewVecWithAnyArguments;
 import static nova.hetu.olk.mock.MockUtil.mockOmniOperator;
+import static nova.hetu.olk.mock.MockUtil.mockPage;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
@@ -108,10 +110,10 @@ public class LocalMergeSourceOmniOperatorTest
         when(localExchange.getBufferCount()).thenReturn(2);
         when(localExchange.getNextSource()).thenReturn(firstLocalExchangeSource, secondLocalExchangeSource);
         when(firstLocalExchangeSource.getPages()).thenAnswer((invocation -> {
-            return firstSourceFinish.get() ? asList(new Page(new LazyBlock(10, block -> {}))) : null;
+            return firstSourceFinish.get() ? asList(mockPage(block(false, false, fill(new Integer[3], index -> new Random().nextInt())))) : null;
         }));
         when(secondLocalExchangeSource.getPages()).thenAnswer((invocation -> {
-            return secondSourceFinish.get() ? asList(new Page(new LazyBlock(10, block -> {}))) : null;
+            return secondSourceFinish.get() ? asList(mockPage(block(false, false, fill(new Integer[3], index -> new Random().nextInt())))) : null;
         }));
         when(firstLocalExchangeSource.waitForReading()).thenReturn(new AbstractFuture()
         {

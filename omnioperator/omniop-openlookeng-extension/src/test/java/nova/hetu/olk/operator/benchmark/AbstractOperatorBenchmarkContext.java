@@ -27,8 +27,6 @@ import io.prestosql.spi.type.Type;
 import io.prestosql.testing.TestingSnapshotUtils;
 import io.prestosql.testing.TestingTaskContext;
 import nova.hetu.olk.tool.BlockUtils;
-import nova.hetu.olk.tool.VecAllocatorHelper;
-import nova.hetu.omniruntime.vector.VecAllocator;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.TearDown;
 
@@ -284,13 +282,10 @@ public abstract class AbstractOperatorBenchmarkContext
     abstract static class AbstractOmniOperatorBenchmarkContext
             extends AbstractOperatorBenchmarkContext
     {
-        private VecAllocator taskLevelAllocator;
-
         @Override
         protected TaskContext createTaskContext()
         {
             TaskContext taskContext = super.createTaskContext();
-            taskLevelAllocator = VecAllocatorHelper.createTaskLevelAllocator(taskContext);
             return taskContext;
         }
 
@@ -301,7 +296,7 @@ public abstract class AbstractOperatorBenchmarkContext
             for (Page page : pages) {
                 slicedPages.add(page.getRegion(0, page.getPositionCount()));
             }
-            return transferToOffHeapPages(taskLevelAllocator, slicedPages);
+            return transferToOffHeapPages(slicedPages);
         }
     }
 

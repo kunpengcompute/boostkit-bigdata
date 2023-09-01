@@ -24,7 +24,6 @@ import nova.hetu.omniruntime.type.ContainerDataType;
 import nova.hetu.omniruntime.type.DataType;
 import nova.hetu.omniruntime.vector.ContainerVec;
 import nova.hetu.omniruntime.vector.Vec;
-import nova.hetu.omniruntime.vector.VecAllocator;
 import org.openjdk.jol.info.ClassLayout;
 
 import javax.annotation.Nullable;
@@ -36,7 +35,6 @@ import static io.airlift.slice.SizeOf.sizeOf;
 import static io.prestosql.spi.block.BlockUtil.checkArrayRange;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
-import static nova.hetu.olk.tool.VecAllocatorHelper.getVecAllocatorFromBlocks;
 
 /**
  * The type Row omni block.
@@ -48,8 +46,6 @@ public class RowOmniBlock<T>
         extends AbstractRowBlock<T>
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(RowOmniBlock.class).instanceSize();
-
-    private final VecAllocator vecAllocator;
 
     private final int startOffset;
 
@@ -80,7 +76,7 @@ public class RowOmniBlock<T>
      * @param fieldBlocks the field blocks
      * @return the block
      */
-    public static <T> Block<T> fromFieldBlocks(VecAllocator vecAllocator, int positionCount, Optional<byte[]> rowIsNull,
+    public static <T> Block<T> fromFieldBlocks(int positionCount, Optional<byte[]> rowIsNull,
                                                Block<T>[] fieldBlocks, Type blockType, ContainerVec containerVec)
     {
         int[] fieldBlockOffsets = new int[positionCount + 1];
@@ -93,8 +89,8 @@ public class RowOmniBlock<T>
         Block[] newOffHeapFieldBlocks = new Block[fieldBlocks.length];
         for (int blockIndex = 0; blockIndex < fieldBlocks.length; ++blockIndex) {
             Block<T> block = fieldBlocks[blockIndex];
-            newOffHeapFieldBlocks[blockIndex] = OperatorUtils.buildOffHeapBlock(vecAllocator, block,
-                    block.getClass().getSimpleName(), block.getPositionCount(),
+            newOffHeapFieldBlocks[blockIndex] = OperatorUtils.buildOffHeapBlock(block, block.getClass().getSimpleName(),
+                    block.getPositionCount(),
                     blockType == null ? null : blockType.getTypeParameters().get(blockIndex));
         }
         return new RowOmniBlock(0, positionCount, rowIsNull.orElse(null), fieldBlockOffsets, newOffHeapFieldBlocks,
@@ -112,7 +108,7 @@ public class RowOmniBlock<T>
      * @param dataType data type of block
      * @return the row omni block
      */
-    static RowOmniBlock createRowBlockInternal(int startOffset, int positionCount, @Nullable byte[] rowIsNull,
+    public static RowOmniBlock createRowBlockInternal(int startOffset, int positionCount, @Nullable byte[] rowIsNull,
                                                int[] fieldBlockOffsets, Block[] fieldBlocks, DataType dataType)
     {
         validateConstructorArguments(startOffset, positionCount, rowIsNull, fieldBlockOffsets, fieldBlocks);
@@ -179,7 +175,7 @@ public class RowOmniBlock<T>
             long nativeVectorAddress = vec.getNativeVector();
             vectorAddresses[i] = nativeVectorAddress;
         }
-        ContainerVec vec = new ContainerVec(vecAllocator, numFields, this.getPositionCount(), vectorAddresses,
+        ContainerVec vec = new ContainerVec(numFields, this.getPositionCount(), vectorAddresses,
                 ((ContainerDataType) dataType).getFieldTypes());
         vec.setNulls(0, this.getRowIsNull(), 0, this.getPositionCount());
         return vec;
@@ -201,7 +197,6 @@ public class RowOmniBlock<T>
                         Block[] fieldBlocks, DataType dataType, ContainerVec containerVec)
     {
         super(fieldBlocks.length);
-        this.vecAllocator = getVecAllocatorFromBlocks(fieldBlocks);
 
         this.startOffset = startOffset;
         this.positionCount = positionCount;

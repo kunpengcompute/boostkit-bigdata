@@ -15,6 +15,7 @@
 
 package nova.hetu.olk.operator.filterandproject;
 
+import com.esotericsoftware.minlog.Log;
 import com.google.common.collect.ImmutableList;
 import io.airlift.units.DataSize;
 import io.prestosql.memory.context.LocalMemoryContext;
@@ -25,10 +26,10 @@ import io.prestosql.operator.OperatorFactory;
 import io.prestosql.operator.project.PageProcessor;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.plan.PlanNodeId;
+import io.prestosql.spi.type.StandardTypes;
 import io.prestosql.spi.type.Type;
+import io.prestosql.spi.type.TypeSignature;
 import nova.hetu.olk.operator.AbstractOmniOperatorFactory;
-import nova.hetu.olk.tool.VecAllocatorHelper;
-import nova.hetu.omniruntime.vector.VecAllocator;
 
 import java.util.List;
 import java.util.function.Supplier;
@@ -144,19 +145,16 @@ public class FilterAndProjectOmniOperator
             this.minOutputPageSize = requireNonNull(minOutputPageSize, "minOutputPageSize is null");
             this.minOutputPageRowCount = minOutputPageRowCount;
             this.sourceTypes = sourceTypes;
-            checkDataTypes(this.sourceTypes);
         }
 
         @Override
         public Operator createOperator(DriverContext driverContext)
         {
             checkState(!closed, "Factory is already closed");
-            VecAllocator vecAllocator = VecAllocatorHelper.createOperatorLevelAllocator(driverContext,
-                    VecAllocator.UNLIMIT, FilterAndProjectOmniOperator.class);
             OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId,
                     FilterAndProjectOmniOperator.class.getSimpleName());
             return new FilterAndProjectOmniOperator(operatorContext, processor.get(),
-                    new OmniMergingPageOutput(types, minOutputPageSize.toBytes(), minOutputPageRowCount, vecAllocator));
+                    new OmniMergingPageOutput(types, minOutputPageSize.toBytes(), minOutputPageRowCount));
         }
 
         @Override
@@ -170,6 +168,28 @@ public class FilterAndProjectOmniOperator
         {
             return new FilterAndProjectOmniOperatorFactory(operatorId, planNodeId, processor, types, minOutputPageSize,
                     minOutputPageRowCount, sourceTypes);
+        }
+
+        public static boolean checkType(Type type)
+        {
+            TypeSignature signature = type.getTypeSignature();
+            String base = signature.getBase();
+
+            switch (base) {
+                case StandardTypes.INTEGER:
+                case StandardTypes.SMALLINT:
+                case StandardTypes.BIGINT:
+                case StandardTypes.DOUBLE:
+                case StandardTypes.BOOLEAN:
+                case StandardTypes.VARCHAR:
+                case StandardTypes.CHAR:
+                case StandardTypes.DECIMAL:
+                case StandardTypes.DATE:
+                    return true;
+                default:
+                    Log.warn("Not support datatype: " + base);
+                    return false;
+            }
         }
     }
 }

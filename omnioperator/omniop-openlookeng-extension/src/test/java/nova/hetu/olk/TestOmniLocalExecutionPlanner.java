@@ -24,7 +24,6 @@ import io.prestosql.operator.TaskContext;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.sql.planner.NodePartitioningManager;
 import io.prestosql.sql.planner.PartitioningScheme;
-import nova.hetu.olk.memory.OpenLooKengAllocatorFactory;
 import nova.hetu.olk.operator.AggregationOmniOperator;
 import nova.hetu.olk.operator.DistinctLimitOmniOperator;
 import nova.hetu.olk.operator.HashAggregationOmniOperator;
@@ -38,7 +37,6 @@ import nova.hetu.olk.operator.TopNOmniOperator;
 import nova.hetu.olk.operator.WindowOmniOperator;
 import nova.hetu.olk.operator.filterandproject.OmniExpressionCompiler;
 import nova.hetu.omniruntime.constants.FunctionType;
-import nova.hetu.omniruntime.vector.VecAllocator;
 import org.powermock.api.support.membermodification.MemberModifier;
 import org.powermock.core.classloader.annotations.PowerMockIgnore;
 import org.powermock.core.classloader.annotations.PrepareForTest;
@@ -58,14 +56,12 @@ import static io.prestosql.SessionTestUtils.TEST_SESSION;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyInt;
 import static org.mockito.Matchers.anyList;
-import static org.mockito.Matchers.anyString;
 import static org.powermock.api.mockito.PowerMockito.mock;
 import static org.powermock.api.mockito.PowerMockito.mockStatic;
 import static org.powermock.api.mockito.PowerMockito.when;
 import static org.powermock.api.mockito.PowerMockito.whenNew;
 
-@PrepareForTest({VecAllocator.class,
-        OpenLooKengAllocatorFactory.class,
+@PrepareForTest({
         OmniLocalQueryRunner.class,
         OmniLocalExecutionPlanner.class,
         AggregationOmniOperator.class,
@@ -76,7 +72,7 @@ import static org.powermock.api.mockito.PowerMockito.whenNew;
         PartitionFunction.class,
         NodePartitioningManager.class
 })
-@SuppressStaticInitializationFor({"nova.hetu.omniruntime.vector.VecAllocator",
+@SuppressStaticInitializationFor({
         "nova.hetu.omniruntime.constants.Constant",
         "nova.hetu.omniruntime.operator.OmniOperatorFactory"
 })
@@ -151,11 +147,6 @@ public class TestOmniLocalExecutionPlanner
 
     private void mockSupports() throws Exception
     {
-        //mock VecAllocator
-        VecAllocator vecAllocator = mock(VecAllocator.class);
-        mockStatic(OpenLooKengAllocatorFactory.class);
-        when(OpenLooKengAllocatorFactory.create(anyString(), any(OpenLooKengAllocatorFactory.CallBack.class))).thenReturn(vecAllocator);
-
         //mock AggOmniOperator
         AggregationOmniOperator aggregationOmniOperator = mock(AggregationOmniOperator.class);
         AggregationOmniOperator.AggregationOmniOperatorFactory aggregationOmniOperatorFactory = mock(AggregationOmniOperator.AggregationOmniOperatorFactory.class);

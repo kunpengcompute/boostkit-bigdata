@@ -50,6 +50,7 @@ import io.prestosql.operator.OutputFactory;
 import io.prestosql.operator.PagesIndex;
 import io.prestosql.operator.PartitionFunction;
 import io.prestosql.operator.PartitionedLookupSourceFactory;
+import io.prestosql.operator.PartitionedOutputOperator;
 import io.prestosql.operator.PipelineExecutionStrategy;
 import io.prestosql.operator.ScanFilterAndProjectOperator;
 import io.prestosql.operator.SourceOperatorFactory;
@@ -125,6 +126,7 @@ import io.prestosql.sql.tree.Expression;
 import io.prestosql.sql.tree.NodeRef;
 import io.prestosql.statestore.StateStoreProvider;
 import io.prestosql.statestore.listener.StateStoreListenerManager;
+import nova.hetu.olk.memory.OpenLooKengMemoryManager;
 import nova.hetu.olk.operator.AbstractOmniOperatorFactory;
 import nova.hetu.olk.operator.AggregationOmniOperator;
 import nova.hetu.olk.operator.BuildOffHeapOmniOperator;
@@ -138,8 +140,6 @@ import nova.hetu.olk.operator.LimitOmniOperator;
 import nova.hetu.olk.operator.LocalMergeSourceOmniOperator;
 import nova.hetu.olk.operator.LookupJoinOmniOperators;
 import nova.hetu.olk.operator.MergeOmniOperator;
-import nova.hetu.olk.operator.PartitionedOutputOmniOperator;
-import nova.hetu.olk.operator.ScanFilterAndProjectOmniOperator;
 import nova.hetu.olk.operator.TopNOmniOperator;
 import nova.hetu.olk.operator.WindowOmniOperator;
 import nova.hetu.olk.operator.filterandproject.FilterAndProjectOmniOperator;
@@ -149,7 +149,6 @@ import nova.hetu.olk.operator.localexchange.LocalExchangeSinkOmniOperator;
 import nova.hetu.olk.operator.localexchange.LocalExchangeSourceOmniOperator;
 import nova.hetu.olk.operator.localexchange.OmniLocalExchange;
 import nova.hetu.olk.tool.OperatorUtils;
-import nova.hetu.olk.tool.VecAllocatorHelper;
 import nova.hetu.omniruntime.constants.FunctionType;
 import nova.hetu.omniruntime.type.DataType;
 
@@ -384,7 +383,7 @@ public class OmniLocalExecutionPlanner
                                    List<PlanNodeId> partitionedSourceOrder, OutputBuffer outputBuffer, Optional<PlanFragmentId> feederCTEId,
                                    Optional<PlanNodeId> feederCTEParentId, Map<String, CommonTableExecutionContext> cteCtx)
     {
-        VecAllocatorHelper.createTaskLevelAllocator(taskContext);
+        OpenLooKengMemoryManager.setGlobalMemoryLimit();
         List<Symbol> outputLayout = partitioningScheme.getOutputLayout();
 
         if (partitioningScheme.getPartitioning().getHandle().equals(FIXED_BROADCAST_DISTRIBUTION)
@@ -440,13 +439,25 @@ public class OmniLocalExecutionPlanner
             nullChannel = OptionalInt.of(outputLayout.indexOf(getOnlyElement(partitioningColumns)));
         }
         boolean isHashPrecomputed = partitioningScheme.getHashColumn().isPresent();
-        return plan(taskContext, stageExecutionDescriptor, plan, outputLayout, types, partitionedSourceOrder,
+        return plan(
+                taskContext,
+                stageExecutionDescriptor,
+                plan,
+                outputLayout,
+                types,
+                partitionedSourceOrder,
                 outputBuffer,
-                new PartitionedOutputOmniOperator.PartitionedOutputOmniFactory(partitionFunction, partitionChannels,
-                        partitionConstants, partitioningScheme.isReplicateNullsAndAny(), nullChannel, outputBuffer,
-                        maxPagePartitioningBufferSize, partitioningScheme.getBucketToPartition().get(),
-                        isHashPrecomputed, partitionChannelTypes),
-                feederCTEId, feederCTEParentId, cteCtx);
+                new PartitionedOutputOperator.PartitionedOutputFactory(
+                        partitionFunction,
+                        partitionChannels,
+                        partitionConstants,
+                        partitioningScheme.isReplicateNullsAndAny(),
+                        nullChannel,
+                        outputBuffer,
+                        maxPagePartitioningBufferSize),
+                feederCTEId,
+                feederCTEParentId,
+                cteCtx);
     }
 
     @Override
@@ -455,7 +466,7 @@ public class OmniLocalExecutionPlanner
                                    OutputBuffer outputBuffer, OutputFactory outputOperatorFactory, Optional<PlanFragmentId> feederCTEId,
                                    Optional<PlanNodeId> feederCTEParentId, Map<String, CommonTableExecutionContext> cteCtx)
     {
-        VecAllocatorHelper.createTaskLevelAllocator(taskContext);
+        OpenLooKengMemoryManager.setGlobalMemoryLimit();
         Session session = taskContext.getSession();
         LocalExecutionPlanContext context = new OmniLocalExecutionPlanContext(taskContext, types, metadata,
                 dynamicFilterCacheManager, feederCTEId, feederCTEParentId, cteCtx);
@@ -803,27 +814,18 @@ public class OmniLocalExecutionPlanner
                 Supplier<CursorProcessor> cursorProcessor = expressionCompiler.compileCursorProcessor(translatedFilter,
                         translatedProjections, sourceNode.getId());
                 SourceOperatorFactory operatorFactory;
-                if (useOmniOperator) {
-                    operatorFactory = new ScanFilterAndProjectOmniOperator.ScanFilterAndProjectOmniOperatorFactory(
-                            context.getSession(), context.getNextOperatorId(), planNodeId, sourceNode,
-                            pageSourceProvider, cursorProcessor, pageProcessor, table, columns, dynamicFilter,
-                            projections.stream().map(expression -> expression.getType()).collect(toImmutableList()),
-                            stateStoreProvider, metadata, dynamicFilterCacheManager,
-                            getFilterAndProjectMinOutputPageSize(session),
-                            getFilterAndProjectMinOutputPageRowCount(session), strategy, reuseTableScanMappingId,
-                            spillEnabled, Optional.of(spillerFactory), spillerThreshold, consumerTableScanNodeCount,
-                            inputTypes, (OmniLocalExecutionPlanContext) context);
-                }
-                else {
-                    operatorFactory = new ScanFilterAndProjectOperator.ScanFilterAndProjectOperatorFactory(
-                            context.getSession(), context.getNextOperatorId(), planNodeId, sourceNode,
-                            pageSourceProvider, cursorProcessor, pageProcessor, table, columns, dynamicFilter,
-                            projections.stream().map(expression -> expression.getType()).collect(toImmutableList()),
-                            stateStoreProvider, metadata, dynamicFilterCacheManager,
-                            getFilterAndProjectMinOutputPageSize(session),
-                            getFilterAndProjectMinOutputPageRowCount(session), strategy, reuseTableScanMappingId,
-                            spillEnabled, Optional.of(spillerFactory), spillerThreshold, consumerTableScanNodeCount);
-                }
+
+                pageProcessor = expressionCompiler.compilePageProcessor(translatedFilter, translatedProjections,
+                        Optional.of(context.getStageId() + "_" + planNodeId));
+                operatorFactory = new ScanFilterAndProjectOperator.ScanFilterAndProjectOperatorFactory(
+                        context.getSession(), context.getNextOperatorId(), planNodeId, sourceNode,
+                        pageSourceProvider, cursorProcessor, pageProcessor, table, columns, dynamicFilter,
+                        projections.stream().map(expression -> expression.getType()).collect(toImmutableList()),
+                        stateStoreProvider, metadata, dynamicFilterCacheManager,
+                        getFilterAndProjectMinOutputPageSize(session),
+                        getFilterAndProjectMinOutputPageRowCount(session), strategy, reuseTableScanMappingId,
+                        spillEnabled, Optional.of(spillerFactory), spillerThreshold, consumerTableScanNodeCount);
+
                 return new PhysicalOperation(operatorFactory, outputMappings, context,
                         stageExecutionDescriptor.isScanGroupedExecution(sourceNode.getId())
                                 ? GROUPED_EXECUTION

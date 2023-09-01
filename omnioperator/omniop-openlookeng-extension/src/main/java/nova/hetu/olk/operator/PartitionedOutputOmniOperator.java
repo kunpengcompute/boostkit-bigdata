@@ -43,13 +43,11 @@ import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeSignature;
 import nova.hetu.olk.tool.BlockUtils;
 import nova.hetu.olk.tool.OperatorUtils;
-import nova.hetu.olk.tool.VecAllocatorHelper;
 import nova.hetu.olk.tool.VecBatchToPageIterator;
 import nova.hetu.omniruntime.operator.OmniOperator;
 import nova.hetu.omniruntime.operator.partitionedoutput.OmniPartitionedOutPutOperatorFactory;
 import nova.hetu.omniruntime.type.DataType;
 import nova.hetu.omniruntime.vector.Vec;
-import nova.hetu.omniruntime.vector.VecAllocator;
 import nova.hetu.omniruntime.vector.VecBatch;
 
 import java.util.ArrayList;
@@ -104,7 +102,7 @@ public class PartitionedOutputOmniOperator
             return;
         }
         page = pagePreprocessor.apply(page);
-        partitionFunction.partitionPage(omniOperator.getVecAllocator(), page);
+        partitionFunction.partitionPage(page);
 
         operatorContext.recordOutput(page.getSizeInBytes(), page.getPositionCount());
 
@@ -252,11 +250,9 @@ public class PartitionedOutputOmniOperator
         @Override
         public Operator createOperator(DriverContext driverContext)
         {
-            VecAllocator vecAllocator = VecAllocatorHelper.createOperatorLevelAllocator(driverContext,
-                    VecAllocator.UNLIMIT, PartitionedOutputOmniOperator.class);
             OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId,
                     PartitionedOutputOmniOperator.class.getSimpleName());
-            OmniOperator omniOperator = omniPartitionedOutPutOperatorFactory.createOperator(vecAllocator);
+            OmniOperator omniOperator = omniPartitionedOutPutOperatorFactory.createOperator();
             String id = operatorContext.getUniqueId();
             outputBuffer.addInputChannel(id);
             return new PartitionedOutputOmniOperator(id, operatorContext, sourceTypes, pagePreprocessor,
@@ -430,14 +426,13 @@ public class PartitionedOutputOmniOperator
         /**
          * partition Page
          *
-         * @param vecAllocator vector allocator
          * @param page page
          */
-        public void partitionPage(VecAllocator vecAllocator, Page page)
+        public void partitionPage(Page page)
         {
             requireNonNull(page, "page is null");
 
-            VecBatch originalVecBatch = buildVecBatch(vecAllocator, page, this);
+            VecBatch originalVecBatch = buildVecBatch(page, this);
             VecBatch originalAndPartitionArgVecBatch = addPartitionFunctionArguments(originalVecBatch);
 
             omniOperator.addInput(originalAndPartitionArgVecBatch);
@@ -453,8 +448,7 @@ public class PartitionedOutputOmniOperator
             for (int i = 0; i < partitionChannels.size(); i++) {
                 Optional<Block> partitionConstant = partitionConstants.get(i);
                 if (partitionConstant.isPresent()) {
-                    Block block = OperatorUtils.buildOffHeapBlock(omniOperator.getVecAllocator(),
-                            partitionConstant.get());
+                    Block block = OperatorUtils.buildOffHeapBlock(partitionConstant.get());
                     // Because there is no vec corresponding to RunLengthEncodedBlock,
                     // the original data is directly constructed.
                     int[] positions = new int[positionCount];

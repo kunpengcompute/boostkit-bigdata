@@ -25,12 +25,10 @@ import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.type.Type;
 import nova.hetu.olk.tool.BlockUtils;
 import nova.hetu.olk.tool.OperatorUtils;
-import nova.hetu.olk.tool.VecAllocatorHelper;
 import nova.hetu.olk.tool.VecBatchToPageIterator;
 import nova.hetu.omniruntime.operator.OmniOperator;
 import nova.hetu.omniruntime.operator.limit.OmniDistinctLimitOperatorFactory;
 import nova.hetu.omniruntime.type.DataType;
-import nova.hetu.omniruntime.vector.VecAllocator;
 import nova.hetu.omniruntime.vector.VecBatch;
 
 import java.util.Iterator;
@@ -106,11 +104,9 @@ public class DistinctLimitOmniOperator
         @Override
         public Operator createOperator(DriverContext driverContext)
         {
-            VecAllocator vecAllocator = VecAllocatorHelper.createOperatorLevelAllocator(driverContext,
-                    VecAllocator.UNLIMIT, DistinctLimitOmniOperator.class);
             OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId,
                     DistinctLimitOmniOperator.class.getSimpleName());
-            OmniOperator omniOperator = omniDistinctLimitOperatorFactory.createOperator(vecAllocator);
+            OmniOperator omniOperator = omniDistinctLimitOperatorFactory.createOperator();
             int[] distinctChannelArray = distinctChannels.stream().mapToInt(Integer::intValue).toArray();
             int hashChannelVal = this.hashChannel.orElse(-1);
 
@@ -227,7 +223,7 @@ public class DistinctLimitOmniOperator
             return;
         }
 
-        VecBatch vecBatch = buildVecBatch(omniOperator.getVecAllocator(), page, getClass().getSimpleName());
+        VecBatch vecBatch = buildVecBatch(page, this);
         omniOperator.addInput(vecBatch);
         pages = new VecBatchToPageIterator(omniOperator.getOutput());
     }

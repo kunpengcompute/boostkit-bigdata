@@ -29,8 +29,6 @@ import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.gen.OrderingCompiler;
 import nova.hetu.olk.operator.localexchange.OmniLocalExchange;
-import nova.hetu.olk.tool.VecAllocatorHelper;
-import nova.hetu.omniruntime.vector.VecAllocator;
 
 import java.io.IOException;
 import java.util.List;
@@ -93,8 +91,6 @@ public class LocalMergeSourceOmniOperator
         public Operator createOperator(DriverContext driverContext)
         {
             checkState(!closed, "Factory is already closed");
-            VecAllocator vecAllocator = VecAllocatorHelper.createOperatorLevelAllocator(driverContext,
-                    VecAllocator.UNLIMIT, LocalMergeSourceOmniOperator.class);
 
             LocalExchange localExchange = localExchangeFactory.getLocalExchange(driverContext.getLifespan());
 
@@ -104,7 +100,7 @@ public class LocalMergeSourceOmniOperator
             List<LocalExchangeSource> sources = IntStream.range(0, localExchange.getBufferCount()).boxed()
                     .map(index -> localExchange.getNextSource()).collect(toImmutableList());
             return new LocalMergeSourceOmniOperator(operatorContext, sources,
-                    orderByOmniOperatorFactory.createOperator(vecAllocator));
+                    orderByOmniOperatorFactory.createOperator());
         }
 
         @Override

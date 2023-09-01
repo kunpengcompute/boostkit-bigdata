@@ -61,9 +61,9 @@ public class ByteArrayOmniBlockTest
     protected Block<?>[] blocksForTest()
     {
         return new Block<?>[]{
-                mockBlock(false, false, getVecAllocator(), fill(new Boolean[1], index -> new Random().nextBoolean())),
-                mockBlock(false, false, getVecAllocator(), fill(new Boolean[2], index -> new Random().nextBoolean())),
-                mockBlock(false, false, getVecAllocator(), fill(new Boolean[3], index -> new Random().nextBoolean())),
+                mockBlock(false, false, fill(new Boolean[1], index -> new Random().nextBoolean())),
+                mockBlock(false, false, fill(new Boolean[2], index -> new Random().nextBoolean())),
+                mockBlock(false, false, fill(new Boolean[3], index -> new Random().nextBoolean())),
         };
     }
 
@@ -71,7 +71,6 @@ public class ByteArrayOmniBlockTest
     public void testFunctionCall(int index)
     {
         Block<?> block = getBlockForTest(index);
-        block.copyRegion(0, block.getPositionCount());
         block.copyPositions(new int[block.getPositionCount()], 0, block.getPositionCount());
         block.retainedBytesForEachPart((offset, position) -> {});
         block.getByte(0, 0);

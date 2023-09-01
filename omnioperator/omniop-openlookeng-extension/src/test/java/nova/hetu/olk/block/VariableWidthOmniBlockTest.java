@@ -49,9 +49,9 @@ public class VariableWidthOmniBlockTest
     protected Block<?>[] blocksForTest()
     {
         return new Block<?>[]{
-                mockBlock(false, false, getVecAllocator(), fill(new String[1], index -> UUID.randomUUID().toString())),
-                mockBlock(false, false, getVecAllocator(), fill(new String[2], index -> UUID.randomUUID().toString())),
-                mockBlock(false, false, getVecAllocator(), fill(new String[3], index -> UUID.randomUUID().toString()))
+                mockBlock(false, false, fill(new String[1], index -> UUID.randomUUID().toString())),
+                mockBlock(false, false, fill(new String[2], index -> UUID.randomUUID().toString())),
+                mockBlock(false, false, fill(new String[3], index -> UUID.randomUUID().toString()))
         };
     }
 
@@ -59,7 +59,6 @@ public class VariableWidthOmniBlockTest
     public void testFunctionCall(int index)
     {
         Block<?> block = getBlockForTest(index);
-        block.copyRegion(0, block.getPositionCount());
         block.copyPositions(new int[block.getPositionCount()], 0, block.getPositionCount());
     }
 

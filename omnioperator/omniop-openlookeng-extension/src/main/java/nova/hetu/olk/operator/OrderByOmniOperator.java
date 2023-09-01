@@ -34,12 +34,10 @@ import io.prestosql.testing.TestingSession;
 import io.prestosql.testing.TestingTaskContext;
 import nova.hetu.olk.tool.BlockUtils;
 import nova.hetu.olk.tool.OperatorUtils;
-import nova.hetu.olk.tool.VecAllocatorHelper;
 import nova.hetu.olk.tool.VecBatchToPageIterator;
 import nova.hetu.omniruntime.operator.OmniOperator;
 import nova.hetu.omniruntime.operator.sort.OmniSortOperatorFactory;
 import nova.hetu.omniruntime.type.DataType;
-import nova.hetu.omniruntime.vector.VecAllocator;
 import nova.hetu.omniruntime.vector.VecBatch;
 
 import java.util.Iterator;
@@ -149,12 +147,10 @@ public class OrderByOmniOperator
         public Operator createOperator(DriverContext driverContext)
         {
             checkState(!closed, "Factory is already closed");
-            VecAllocator vecAllocator = VecAllocatorHelper.createOperatorLevelAllocator(driverContext,
-                    VecAllocator.UNLIMIT, OrderByOmniOperator.class);
 
             OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId,
                     OrderByOmniOperator.class.getSimpleName());
-            OmniOperator omniSortOperator = omniSortOperatorFactory.createOperator(vecAllocator);
+            OmniOperator omniSortOperator = omniSortOperatorFactory.createOperator();
             return new OrderByOmniOperator(operatorContext, omniSortOperator);
         }
 
@@ -163,7 +159,7 @@ public class OrderByOmniOperator
          *
          * @return the operator
          */
-        public Operator createOperator(VecAllocator vecAllocator)
+        public Operator createOperator()
         {
             // all this is prepared for a fake driverContext to avoid change the original
             // pipeline
@@ -181,7 +177,7 @@ public class OrderByOmniOperator
             OperatorContext mockOperatorContext = mockDriverContext.addOperatorContext(1,
                     new PlanNodeId("Fake node for creating the OrderByOmniOperator"), "OrderByOmniOperator type");
 
-            OmniOperator omniSortOperator = omniSortOperatorFactory.createOperator(vecAllocator);
+            OmniOperator omniSortOperator = omniSortOperatorFactory.createOperator();
             return new OrderByOmniOperator(mockOperatorContext, omniSortOperator);
         }
 
@@ -259,7 +255,7 @@ public class OrderByOmniOperator
             return;
         }
 
-        VecBatch vecBatch = buildVecBatch(omniOperator.getVecAllocator(), page, this);
+        VecBatch vecBatch = buildVecBatch(page, this);
         omniOperator.addInput(vecBatch);
     }
 

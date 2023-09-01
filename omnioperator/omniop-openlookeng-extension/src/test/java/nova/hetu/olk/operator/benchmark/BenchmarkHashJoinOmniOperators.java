@@ -39,8 +39,6 @@ import io.prestosql.spi.type.VarcharType;
 import io.prestosql.type.TypeUtils;
 import nova.hetu.olk.operator.HashBuilderOmniOperator.HashBuilderOmniOperatorFactory;
 import nova.hetu.olk.operator.LookupJoinOmniOperators;
-import nova.hetu.olk.tool.VecAllocatorHelper;
-import nova.hetu.omniruntime.vector.VecAllocator;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -158,8 +156,6 @@ public class BenchmarkHashJoinOmniOperators
         protected List<Integer> buildOutputChannels;
         protected List<Integer> buildJoinChannels;
         protected OptionalInt buildHashChannel;
-
-        private VecAllocator buildVecAllocator;
         protected JoinBridgeManager<PartitionedLookupSourceFactory> lookupSourceFactoryManager;
 
         @Override
@@ -196,7 +192,7 @@ public class BenchmarkHashJoinOmniOperators
             for (Page page : pages) {
                 slicedPages.add(page.getRegion(0, page.getPositionCount()));
             }
-            return transferToOffHeapPages(buildVecAllocator, slicedPages);
+            return transferToOffHeapPages(slicedPages);
         }
 
         @Override
@@ -256,7 +252,6 @@ public class BenchmarkHashJoinOmniOperators
         protected TaskContext createTaskContext()
         {
             TaskContext testingTaskContext = createTaskContextBySizeInGigaByte(4);
-            buildVecAllocator = VecAllocatorHelper.createTaskLevelAllocator(testingTaskContext);
             return testingTaskContext;
         }
 
@@ -399,8 +394,6 @@ public class BenchmarkHashJoinOmniOperators
         protected List<Integer> probeOutputChannels;
         protected List<Integer> probeJoinChannels;
         protected OptionalInt probeHashChannel;
-
-        private VecAllocator probeVecAllocator;
         private DriverContext buildDriverContext;
         private Operator buildOperator;
 
@@ -449,7 +442,7 @@ public class BenchmarkHashJoinOmniOperators
             for (Page page : pages) {
                 slicedPages.add(page.getRegion(0, page.getPositionCount()));
             }
-            return transferToOffHeapPages(probeVecAllocator, slicedPages);
+            return transferToOffHeapPages(slicedPages);
         }
 
         public List<Type> getProbeTypes()
@@ -549,7 +542,6 @@ public class BenchmarkHashJoinOmniOperators
         protected TaskContext createTaskContext()
         {
             TaskContext testingTaskContext = createTaskContextBySizeInGigaByte(4);
-            probeVecAllocator = VecAllocatorHelper.createTaskLevelAllocator(testingTaskContext);
             return testingTaskContext;
         }
 

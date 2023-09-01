@@ -38,12 +38,10 @@ import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.type.Type;
 import nova.hetu.olk.tool.BlockUtils;
 import nova.hetu.olk.tool.OperatorUtils;
-import nova.hetu.olk.tool.VecAllocatorHelper;
 import nova.hetu.olk.tool.VecBatchToPageIterator;
 import nova.hetu.omniruntime.operator.OmniOperator;
 import nova.hetu.omniruntime.operator.join.OmniLookupJoinOperatorFactory;
 import nova.hetu.omniruntime.type.DataType;
-import nova.hetu.omniruntime.vector.VecAllocator;
 import nova.hetu.omniruntime.vector.VecBatch;
 
 import java.io.IOException;
@@ -191,7 +189,7 @@ public class LookupJoinOmniOperator
             BlockUtils.freePage(page);
             return;
         }
-        VecBatch vecBatch = buildVecBatch(omniOperator.getVecAllocator(), page, this);
+        VecBatch vecBatch = buildVecBatch(page, this);
         omniOperator.addInput(vecBatch);
         result = new VecBatchToPageIterator(omniOperator.getOutput());
 
@@ -411,9 +409,6 @@ public class LookupJoinOmniOperator
         public Operator createOperator(DriverContext driverContext)
         {
             checkState(!closed, "Factory is already closed");
-            VecAllocator vecAllocator = VecAllocatorHelper.createOperatorLevelAllocator(driverContext,
-                    VecAllocator.UNLIMIT, LookupJoinOmniOperator.class);
-
             LookupSourceFactory lookupSourceFactory = joinBridgeManager.getJoinBridge(driverContext.getLifespan());
 
             OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId,
@@ -422,7 +417,7 @@ public class LookupJoinOmniOperator
             lookupSourceFactory.setTaskContext(driverContext.getPipelineContext().getTaskContext());
 
             joinBridgeManager.probeOperatorCreated(driverContext.getLifespan());
-            OmniOperator omniOperator = omniLookupJoinOperatorFactory.createOperator(vecAllocator);
+            OmniOperator omniOperator = omniLookupJoinOperatorFactory.createOperator();
             return new LookupJoinOmniOperator(operatorContext, sourceTypes, joinType, lookupSourceFactory,
                     () -> joinBridgeManager.probeOperatorClosed(driverContext.getLifespan()), omniOperator);
         }

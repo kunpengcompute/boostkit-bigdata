@@ -21,21 +21,14 @@ import io.prestosql.spi.block.ShortArrayBlockEncoding;
 import io.prestosql.spi.util.BloomFilter;
 import nova.hetu.omniruntime.vector.ShortVec;
 import nova.hetu.omniruntime.vector.Vec;
-import nova.hetu.omniruntime.vector.VecAllocator;
 import org.openjdk.jol.info.ClassLayout;
 
-import javax.annotation.Nullable;
-
-import java.util.Optional;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 
-import static io.airlift.slice.SizeOf.sizeOf;
 import static io.prestosql.spi.block.BlockUtil.checkArrayRange;
 import static io.prestosql.spi.block.BlockUtil.checkValidRegion;
-import static io.prestosql.spi.block.BlockUtil.compactArray;
 import static io.prestosql.spi.block.BlockUtil.countUsedPositions;
-import static nova.hetu.olk.tool.BlockUtils.compactVec;
 
 /**
  * The type Short array omni block.
@@ -47,14 +40,7 @@ public class ShortArrayOmniBlock
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(ShortArrayOmniBlock.class).instanceSize();
 
-    private final VecAllocator vecAllocator;
-
-    private final int arrayOffset;
-
     private final int positionCount;
-
-    @Nullable
-    private final byte[] valueIsNull;
 
     private final ShortVec values;
 
@@ -62,18 +48,7 @@ public class ShortArrayOmniBlock
 
     private final long retainedSizeInBytes;
 
-    /**
-     * Instantiates a new Short array omni block.
-     *
-     * @param vecAllocator the vector allocator
-     * @param positionCount the position count
-     * @param valueIsNull the value is null
-     * @param values the values
-     */
-    public ShortArrayOmniBlock(VecAllocator vecAllocator, int positionCount, Optional<byte[]> valueIsNull, short[] values)
-    {
-        this(vecAllocator, 0, positionCount, valueIsNull.orElse(null), values);
-    }
+    private boolean hasNull;
 
     /**
      * Instantiates a new Short array omni block.
@@ -83,33 +58,23 @@ public class ShortArrayOmniBlock
      */
     public ShortArrayOmniBlock(int positionCount, ShortVec values)
     {
-        this(positionCount, values.hasNullValue() ? Optional.of(values.getRawValueNulls()) : Optional.empty(), values);
+        this.positionCount = positionCount;
+        this.values = values;
+        this.sizeInBytes = (Short.BYTES + Byte.BYTES) * (long) positionCount;
+        this.retainedSizeInBytes = INSTANCE_SIZE + this.values.getCapacityInBytes();
+        this.hasNull = values.hasNull();
     }
 
     /**
      * Instantiates a new Short array omni block.
      *
-     * @param positionCount the position count
-     * @param valueIsNull the value is null
-     * @param values the values
-     */
-    public ShortArrayOmniBlock(int positionCount, Optional<byte[]> valueIsNull, ShortVec values)
-    {
-        this(values.getOffset(), positionCount, valueIsNull.orElse(null), values);
-    }
-
-    /**
-     * Instantiates a new Short array omni block.
-     *
-     * @param vecAllocator the vector allocator
      * @param arrayOffset the array offset
      * @param positionCount the position count
      * @param valueIsNull the value is null
      * @param values the values
      */
-    public ShortArrayOmniBlock(VecAllocator vecAllocator, int arrayOffset, int positionCount, byte[] valueIsNull, short[] values)
+    public ShortArrayOmniBlock(int arrayOffset, int positionCount, byte[] valueIsNull, short[] values)
     {
-        this.vecAllocator = vecAllocator;
         if (arrayOffset < 0) {
             throw new IllegalArgumentException("arrayOffset is negative");
         }
@@ -123,7 +88,7 @@ public class ShortArrayOmniBlock
             throw new IllegalArgumentException("values length is less than positionCount");
         }
 
-        this.values = new ShortVec(vecAllocator, positionCount);
+        this.values = new ShortVec(positionCount);
         this.values.put(values, 0, arrayOffset, positionCount);
 
         if (valueIsNull != null && valueIsNull.length - arrayOffset < positionCount) {
@@ -132,51 +97,11 @@ public class ShortArrayOmniBlock
 
         if (valueIsNull != null) {
             this.values.setNulls(0, valueIsNull, arrayOffset, positionCount);
-            this.valueIsNull = compactArray(valueIsNull, arrayOffset, positionCount);
+            this.hasNull = true;
         }
-        else {
-            this.valueIsNull = null;
-        }
-
-        this.arrayOffset = 0;
 
         sizeInBytes = (Short.BYTES + Byte.BYTES) * (long) positionCount;
-        retainedSizeInBytes = INSTANCE_SIZE + sizeOf(valueIsNull) + this.values.getCapacityInBytes();
-    }
-
-    /**
-     * Instantiates a new Short array omni block.
-     *
-     * @param arrayOffset the array offset
-     * @param positionCount the position count
-     * @param valueIsNull the value is null
-     * @param values the values
-     */
-    ShortArrayOmniBlock(int arrayOffset, int positionCount, byte[] valueIsNull, ShortVec values)
-    {
-        this.vecAllocator = values.getAllocator();
-        if (arrayOffset < 0) {
-            throw new IllegalArgumentException("arrayOffset is negative");
-        }
-        this.arrayOffset = arrayOffset;
-
-        if (positionCount < 0) {
-            throw new IllegalArgumentException("positionCount is negative");
-        }
-        this.positionCount = positionCount;
-
-        if (values.getSize() < positionCount) {
-            throw new IllegalArgumentException("values length is less than positionCount");
-        }
-        this.values = values;
-
-        if (valueIsNull != null && valueIsNull.length - arrayOffset < positionCount) {
-            throw new IllegalArgumentException("isNull length is less than positionCount");
-        }
-        this.valueIsNull = valueIsNull;
-
-        sizeInBytes = (Short.BYTES + Byte.BYTES) * (long) positionCount;
-        retainedSizeInBytes = INSTANCE_SIZE + sizeOf(valueIsNull) + this.values.getCapacityInBytes();
+        retainedSizeInBytes = INSTANCE_SIZE + this.values.getCapacityInBytes();
     }
 
     @Override
@@ -225,9 +150,6 @@ public class ShortArrayOmniBlock
     public void retainedBytesForEachPart(BiConsumer<Object, Long> consumer)
     {
         consumer.accept(values.get(0, positionCount), (long) values.getCapacityInBytes());
-        if (valueIsNull != null) {
-            consumer.accept(valueIsNull, sizeOf(valueIsNull));
-        }
         consumer.accept(this, (long) INSTANCE_SIZE);
     }
 
@@ -262,14 +184,14 @@ public class ShortArrayOmniBlock
     @Override
     public boolean mayHaveNull()
     {
-        return valueIsNull != null;
+        return hasNull;
     }
 
     @Override
     public boolean isNull(int position)
     {
         checkReadablePosition(position);
-        return valueIsNull != null && valueIsNull[position + arrayOffset] == Vec.NULL;
+        return values.isNull(position);
     }
 
     @Override
@@ -284,7 +206,7 @@ public class ShortArrayOmniBlock
     public Block getSingleValueBlock(int position)
     {
         checkReadablePosition(position);
-        return new ShortArrayOmniBlock(vecAllocator, 0, 1, isNull(position) ? new byte[]{Vec.NULL} : null,
+        return new ShortArrayOmniBlock(0, 1, isNull(position) ? new byte[]{Vec.NULL} : null,
                 new short[]{values.get(position)});
     }
 
@@ -292,20 +214,16 @@ public class ShortArrayOmniBlock
     public Block copyPositions(int[] positions, int offset, int length)
     {
         checkArrayRange(positions, offset, length);
-        byte[] newValueIsNull = null;
         ShortVec newValues = values.copyPositions(positions, offset, length);
-        if (valueIsNull != null) {
-            newValueIsNull = newValues.getRawValueNulls();
-        }
-        return new ShortArrayOmniBlock(0, length, newValueIsNull, newValues);
+        return new ShortArrayOmniBlock(length, newValues);
     }
 
     @Override
     public Block getRegion(int positionOffset, int length)
     {
         checkValidRegion(getPositionCount(), positionOffset, length);
-        ShortVec newValues = values.slice(positionOffset, positionOffset + length);
-        return new ShortArrayOmniBlock(newValues.getOffset(), length, valueIsNull, newValues);
+        ShortVec newValues = values.slice(positionOffset, length);
+        return new ShortArrayOmniBlock(length, newValues);
     }
 
     @Override
@@ -313,15 +231,9 @@ public class ShortArrayOmniBlock
     {
         checkValidRegion(getPositionCount(), positionOffset, length);
 
-        ShortVec newValues = compactVec(values, positionOffset, length);
-        byte[] newValueIsNull = valueIsNull == null
-                ? null
-                : compactArray(valueIsNull, positionOffset + arrayOffset, length);
-
-        if (newValueIsNull == valueIsNull && newValues == values) {
-            return this;
-        }
-        return new ShortArrayOmniBlock(0, length, newValueIsNull, newValues);
+        ShortVec newValues = values.slice(positionOffset, length);
+        values.close();
+        return new ShortArrayOmniBlock(length, newValues);
     }
 
     @Override
@@ -360,7 +272,7 @@ public class ShortArrayOmniBlock
     {
         int matchCount = 0;
         for (int i = 0; i < positionCount; i++) {
-            if (valueIsNull != null && valueIsNull[positions[i] + arrayOffset] == Vec.NULL) {
+            if (values.isNull(positions[i])) {
                 if (test.apply(null)) {
                     matchedPositions[matchCount++] = positions[i];
                 }
@@ -376,7 +288,7 @@ public class ShortArrayOmniBlock
     @Override
     public Short get(int position)
     {
-        if (valueIsNull != null && valueIsNull[position + arrayOffset] == Vec.NULL) {
+        if (values.isNull(position)) {
             return null;
         }
 

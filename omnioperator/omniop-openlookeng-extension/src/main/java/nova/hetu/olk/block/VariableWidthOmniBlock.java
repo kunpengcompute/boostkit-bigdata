@@ -20,25 +20,15 @@ import io.airlift.slice.Slices;
 import io.prestosql.spi.block.AbstractVariableWidthBlock;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.util.BloomFilter;
-import nova.hetu.omniruntime.vector.JvmUtils;
 import nova.hetu.omniruntime.vector.VarcharVec;
-import nova.hetu.omniruntime.vector.Vec;
-import nova.hetu.omniruntime.vector.VecAllocator;
 import org.openjdk.jol.info.ClassLayout;
 
-import javax.annotation.Nullable;
-
-import java.nio.ByteBuffer;
-import java.util.Optional;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 
 import static io.airlift.slice.SizeOf.sizeOf;
 import static io.prestosql.spi.block.BlockUtil.checkArrayRange;
 import static io.prestosql.spi.block.BlockUtil.checkValidRegion;
-import static io.prestosql.spi.block.BlockUtil.compactArray;
-import static io.prestosql.spi.block.BlockUtil.compactOffsets;
-import static nova.hetu.olk.tool.BlockUtils.compactVec;
 
 /**
  * The type Variable width omni block.
@@ -50,47 +40,30 @@ public class VariableWidthOmniBlock
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(VariableWidthOmniBlock.class).instanceSize();
 
-    private final int arrayOffset;
-
     private final int positionCount;
 
     private final VarcharVec values;
 
-    private final int[] offsets;
+    private int[] offsets;
 
-    @Nullable
-    private final byte[] valueIsNull;
+    private Slice slice;
 
     private final long retainedSizeInBytes;
 
     private final long sizeInBytes;
 
-    /**
-     * Instantiates a new Variable width omni block.
-     *
-     * @param vecAllocator vector allocator
-     * @param positionCount the position count
-     * @param slice the slice
-     * @param offsets the offsets
-     * @param valueIsNull the value is null
-     */
-    public VariableWidthOmniBlock(VecAllocator vecAllocator, int positionCount, Slice slice, int[] offsets,
-                                  Optional<byte[]> valueIsNull)
-    {
-        this(vecAllocator, 0, positionCount, slice, offsets, valueIsNull.orElse(null));
-    }
+    private boolean hasNull;
 
     /**
      * Instantiates a new Variable width omni block.
      *
-     * @param vecAllocator vector allocator
      * @param arrayOffset the array offset
      * @param positionCount the position count
      * @param slice the slice
      * @param offsets the offsets
      * @param valueIsNull the value is null
      */
-    public VariableWidthOmniBlock(VecAllocator vecAllocator, int arrayOffset, int positionCount, Slice slice, int[] offsets,
+    public VariableWidthOmniBlock(int arrayOffset, int positionCount, Slice slice, int[] offsets,
                                   byte[] valueIsNull)
     {
         if (arrayOffset < 0) {
@@ -107,12 +80,11 @@ public class VariableWidthOmniBlock
         }
 
         int dataLength = offsets[arrayOffset + positionCount] - offsets[arrayOffset];
-        this.values = new VarcharVec(vecAllocator, dataLength, positionCount);
+        this.values = new VarcharVec(dataLength, positionCount);
 
         if (offsets.length - arrayOffset < (positionCount + 1)) {
             throw new IllegalArgumentException("offsets length is less than positionCount");
         }
-        this.offsets = compactOffsets(offsets, arrayOffset, positionCount);
 
         if (slice.hasByteArray()) {
             this.values.put(0, slice.byteArray(), slice.byteArrayOffset(), offsets, arrayOffset, positionCount);
@@ -124,17 +96,12 @@ public class VariableWidthOmniBlock
 
         if (valueIsNull != null) {
             this.values.setNulls(0, valueIsNull, arrayOffset, positionCount);
-            this.valueIsNull = compactArray(valueIsNull, arrayOffset, positionCount);
-        }
-        else {
-            this.valueIsNull = null;
+            this.hasNull = true;
         }
 
-        this.arrayOffset = 0;
-
-        sizeInBytes = offsets[this.arrayOffset + positionCount] - offsets[this.arrayOffset]
+        sizeInBytes = offsets[arrayOffset + positionCount] - offsets[arrayOffset]
                 + ((Integer.BYTES + Byte.BYTES) * (long) positionCount);
-        retainedSizeInBytes = INSTANCE_SIZE + slice.getRetainedSize() + sizeOf(valueIsNull) + sizeOf(offsets);
+        retainedSizeInBytes = INSTANCE_SIZE + slice.getRetainedSize() + sizeOf(valueIsNull);
     }
 
     /**
@@ -145,95 +112,49 @@ public class VariableWidthOmniBlock
      */
     public VariableWidthOmniBlock(int positionCount, VarcharVec values)
     {
-        this(positionCount, values, values.getRawValueOffset(),
-                values.hasNullValue() ? Optional.of(values.getRawValueNulls()) : Optional.empty());
-    }
-
-    /**
-     * Instantiates a new Variable width omni block.
-     *
-     * @param positionCount the position count
-     * @param values the values
-     * @param offsets the offsets
-     * @param valuesIsNull the values is null
-     */
-    public VariableWidthOmniBlock(int positionCount, VarcharVec values, int[] offsets, Optional<byte[]> valuesIsNull)
-    {
-        this(values.getOffset(), positionCount, values, offsets, valuesIsNull.orElse(null));
-    }
-
-    /**
-     * Instantiates a new Variable width omni block.
-     *
-     * @param arrayOffset the array offset
-     * @param positionCount the position count
-     * @param values the values
-     * @param offsets the offsets
-     * @param valueIsNull the value is null
-     */
-    public VariableWidthOmniBlock(int arrayOffset, int positionCount, VarcharVec values, int[] offsets,
-                                  byte[] valueIsNull)
-    {
-        if (arrayOffset < 0) {
-            throw new IllegalArgumentException("arrayOffset is negative");
-        }
-
-        if (positionCount < 0) {
-            throw new IllegalArgumentException("positionCount is negative");
-        }
         this.positionCount = positionCount;
-
-        if (values == null) {
-            throw new IllegalArgumentException("values is null");
-        }
-
         this.values = values;
+        this.sizeInBytes = getPositionOffset(positionCount) + ((Integer.BYTES + Byte.BYTES) * (long) positionCount);
+        this.retainedSizeInBytes = INSTANCE_SIZE + values.getCapacityInBytes();
+        this.hasNull = values.hasNull();
+    }
 
-        if (offsets != null && offsets.length - arrayOffset < (positionCount + 1)) {
-            throw new IllegalArgumentException("offsets length is less than positionCount");
+    private void loadOffset()
+    {
+        if (offsets != null) {
+            return;
         }
 
-        if (offsets == null) {
-            throw new IllegalArgumentException("offsets is null");
+        offsets = new int[positionCount + 1];
+        for (int i = 0; i < positionCount; i++) {
+            offsets[i + 1] = offsets[i] + getSliceLength(i);
         }
-
-        this.offsets = offsets;
-
-        if (valueIsNull != null && valueIsNull.length - arrayOffset < positionCount) {
-            throw new IllegalArgumentException("valueIsNull length is less than positionCount");
-        }
-
-        this.valueIsNull = valueIsNull;
-        this.arrayOffset = arrayOffset;
-
-        sizeInBytes = offsets[arrayOffset + positionCount] - offsets[arrayOffset]
-                + ((Integer.BYTES + Byte.BYTES) * (long) positionCount);
-        retainedSizeInBytes = INSTANCE_SIZE + values.getCapacityInBytes() + sizeOf(valueIsNull) + sizeOf(offsets);
     }
 
     @Override
     protected final int getPositionOffset(int position)
     {
-        return offsets[position + arrayOffset];
+        loadOffset();
+        return offsets[position];
     }
 
     @Override
     public int getSliceLength(int position)
     {
         checkReadablePosition(position);
-        return getPositionOffset(position + 1) - getPositionOffset(position);
+        return values.getDataLength(position);
     }
 
     @Override
     public boolean mayHaveNull()
     {
-        return valueIsNull != null;
+        return hasNull;
     }
 
     @Override
     protected boolean isEntryNull(int position)
     {
-        return valueIsNull != null && valueIsNull[position + arrayOffset] == Vec.NULL;
+        return values.isNull(position);
     }
 
     @Override
@@ -251,8 +172,12 @@ public class VariableWidthOmniBlock
     @Override
     public long getRegionSizeInBytes(int position, int length)
     {
-        return offsets[arrayOffset + position + length] - offsets[arrayOffset + position]
-                + ((Integer.BYTES + Byte.BYTES) * (long) length);
+        int sliceLength = 0;
+        for (int i = 0; i < length; i++) {
+            sliceLength += values.getDataLength(position);
+            position++;
+        }
+        return sliceLength + ((Integer.BYTES + Byte.BYTES) * (long) length);
     }
 
     @Override
@@ -263,7 +188,7 @@ public class VariableWidthOmniBlock
         for (int i = 0; i < positions.length; ++i) {
             if (positions[i]) {
                 usedPositionCount++;
-                sizeInBytes += offsets[arrayOffset + i + 1] - offsets[arrayOffset + i];
+                sizeInBytes += values.getDataLength(i);
             }
         }
         return sizeInBytes + (Integer.BYTES + Byte.BYTES) * (long) usedPositionCount;
@@ -279,10 +204,6 @@ public class VariableWidthOmniBlock
     public void retainedBytesForEachPart(BiConsumer<Object, Long> consumer)
     {
         consumer.accept(getRawSlice(0), (long) values.getCapacityInBytes());
-        consumer.accept(offsets, sizeOf(offsets));
-        if (valueIsNull != null) {
-            consumer.accept(valueIsNull, sizeOf(valueIsNull));
-        }
         consumer.accept(this, (long) INSTANCE_SIZE);
     }
 
@@ -290,51 +211,40 @@ public class VariableWidthOmniBlock
     public Block copyPositions(int[] positions, int offset, int length)
     {
         checkArrayRange(positions, offset, length);
-        byte[] newValueIsNull = null;
         VarcharVec newValues = values.copyPositions(positions, offset, length);
-        if (valueIsNull != null) {
-            newValueIsNull = newValues.getRawValueNulls();
+        return new VariableWidthOmniBlock(length, newValues);
+    }
+
+    private void loadSlice()
+    {
+        if (slice != null) {
+            return;
         }
-        int[] newOffsets = newValues.getRawValueOffset();
-        return new VariableWidthOmniBlock(0, length, newValues, newOffsets, newValueIsNull);
+        slice = Slices.wrappedBuffer(values.get(0, positionCount));
     }
 
     @Override
     public Slice getRawSlice(int position)
     {
-        // use slice wrapped byteBuffer for zero-copy data
-        ByteBuffer valuesBuf = JvmUtils.directBuffer(values.getValuesBuf());
-        valuesBuf.position(0);
-        if (valuesBuf.capacity() != 0) {
-            return Slices.wrappedBuffer(valuesBuf);
-        }
-
-        // empty values
-        return Slices.wrappedBuffer();
+        loadSlice();
+        return slice;
     }
 
     @Override
     public Block getRegion(int positionOffset, int length)
     {
         checkValidRegion(getPositionCount(), positionOffset, length);
-        VarcharVec newValues = values.slice(positionOffset, positionOffset + length);
-        return new VariableWidthOmniBlock(newValues.getOffset(), length, newValues, offsets, valueIsNull);
+        VarcharVec newValues = values.slice(positionOffset, length);
+        return new VariableWidthOmniBlock(length, newValues);
     }
 
     @Override
     public Block copyRegion(int positionOffset, int length)
     {
         checkValidRegion(getPositionCount(), positionOffset, length);
-
-        int[] newOffsets = compactOffsets(offsets, positionOffset + arrayOffset, length);
-        VarcharVec newValues = compactVec(values, positionOffset, length);
-        byte[] newValueIsNull = valueIsNull == null ? null : compactArray(valueIsNull, positionOffset, length);
-
-        if (newOffsets == offsets && newValues == values && newValueIsNull == valueIsNull) {
-            return this;
-        }
-
-        return new VariableWidthOmniBlock(0, length, newValues, offsets, valueIsNull);
+        VarcharVec newValues = values.slice(positionOffset, length);
+        values.close();
+        return new VariableWidthOmniBlock(length, newValues);
     }
 
     @Override
@@ -351,8 +261,7 @@ public class VariableWidthOmniBlock
     public boolean[] filter(BloomFilter filter, boolean[] validPositions)
     {
         for (int i = 0; i < positionCount; i++) {
-            byte[] value = values.getData(offsets[i + arrayOffset],
-                    offsets[i + arrayOffset + 1] - offsets[i + arrayOffset]);
+            byte[] value = values.get(i);
             validPositions[i] = validPositions[i] && filter.test(value);
         }
         return validPositions;
@@ -363,14 +272,13 @@ public class VariableWidthOmniBlock
     {
         int matchCount = 0;
         for (int i = 0; i < positionCount; i++) {
-            if (valueIsNull != null && valueIsNull[positions[i] + arrayOffset] == Vec.NULL) {
+            if (values.isNull(positions[i])) {
                 if (test.apply(null)) {
                     matchedPositions[matchCount++] = positions[i];
                 }
             }
             else {
-                byte[] value = values.getData(offsets[i + arrayOffset],
-                        offsets[i + arrayOffset + 1] - offsets[i + arrayOffset]);
+                byte[] value = values.get(positions[i]);
                 if (test.apply(value)) {
                     matchedPositions[matchCount++] = positions[i];
                 }
@@ -382,10 +290,10 @@ public class VariableWidthOmniBlock
     @Override
     public byte[] get(int position)
     {
-        if (valueIsNull != null && valueIsNull[position + arrayOffset] == Vec.NULL) {
+        if (values.isNull(position)) {
             return null;
         }
-        return values.getData(offsets[position + arrayOffset], offsets[position + arrayOffset + 1] - offsets[position + arrayOffset]);
+        return values.get(position);
     }
 
     @Override

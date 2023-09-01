@@ -25,8 +25,6 @@ import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.type.Type;
 import nova.hetu.olk.tool.BlockUtils;
 import nova.hetu.olk.tool.OperatorUtils;
-import nova.hetu.olk.tool.VecAllocatorHelper;
-import nova.hetu.omniruntime.vector.VecAllocator;
 
 import java.util.List;
 
@@ -39,13 +37,11 @@ import static java.util.Objects.requireNonNull;
 public class EnforceSingleRowOmniOperator
         extends EnforceSingleRowOperator
 {
-    private VecAllocator vecAllocator;
     private Page page;
 
-    public EnforceSingleRowOmniOperator(OperatorContext operatorContext, VecAllocator vecAllocator)
+    public EnforceSingleRowOmniOperator(OperatorContext operatorContext)
     {
         super(operatorContext);
-        this.vecAllocator = vecAllocator;
     }
 
     @Override
@@ -71,7 +67,7 @@ public class EnforceSingleRowOmniOperator
             return null;
         }
         page = null;
-        return OperatorUtils.transferToOffHeapPages(vecAllocator, output);
+        return OperatorUtils.transferToOffHeapPages(output);
     }
 
     @Override
@@ -109,9 +105,7 @@ public class EnforceSingleRowOmniOperator
             checkState(!closed, "Factory is already closed");
             OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId,
                     EnforceSingleRowOmniOperator.class.getSimpleName());
-            VecAllocator vecAllocator = VecAllocatorHelper.createOperatorLevelAllocator(driverContext,
-                    VecAllocator.UNLIMIT, EnforceSingleRowOmniOperator.class);
-            return new EnforceSingleRowOmniOperator(operatorContext, vecAllocator);
+            return new EnforceSingleRowOmniOperator(operatorContext);
         }
 
         @Override

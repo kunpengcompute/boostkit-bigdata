@@ -24,8 +24,6 @@ import io.prestosql.spi.Page;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.type.Type;
 import nova.hetu.olk.tool.BlockUtils;
-import nova.hetu.olk.tool.VecAllocatorHelper;
-import nova.hetu.omniruntime.vector.VecAllocator;
 
 import java.util.List;
 import java.util.Map;
@@ -44,7 +42,6 @@ import static java.util.stream.Collectors.toSet;
 public class DynamicFilterSourceOmniOperator
         extends DynamicFilterSourceOperator
 {
-    private VecAllocator vecAllocator;
     private Page page;
 
     /**
@@ -52,10 +49,9 @@ public class DynamicFilterSourceOmniOperator
      */
     public DynamicFilterSourceOmniOperator(OperatorContext context,
                                            Consumer<Map<Channel, Set>> dynamicPredicateConsumer, List<Channel> channels, PlanNodeId planNodeId,
-                                           int maxFilterPositionsCount, DataSize maxFilterSize, VecAllocator vecAllocator)
+                                           int maxFilterPositionsCount, DataSize maxFilterSize)
     {
         super(context, dynamicPredicateConsumer, channels, planNodeId, maxFilterPositionsCount, maxFilterSize);
-        this.vecAllocator = vecAllocator;
     }
 
     @Override
@@ -113,13 +109,10 @@ public class DynamicFilterSourceOmniOperator
 
         public DynamicFilterSourceOperator createOperator(DriverContext driverContext)
         {
-            VecAllocator vecAllocator = VecAllocatorHelper.createOperatorLevelAllocator(driverContext,
-                    VecAllocator.UNLIMIT, DynamicFilterSourceOmniOperator.class);
             return new DynamicFilterSourceOmniOperator(
                     driverContext.addOperatorContext(operatorId, planNodeId,
                             DynamicFilterSourceOmniOperator.class.getSimpleName()),
-                    dynamicPredicateConsumer, channels, planNodeId, maxFilterPositionsCount, maxFilterSize,
-                    vecAllocator);
+                    dynamicPredicateConsumer, channels, planNodeId, maxFilterPositionsCount, maxFilterSize);
         }
 
         @Override

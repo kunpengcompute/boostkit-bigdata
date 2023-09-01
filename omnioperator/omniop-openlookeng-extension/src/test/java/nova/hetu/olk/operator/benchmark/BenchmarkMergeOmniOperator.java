@@ -46,8 +46,6 @@ import io.prestosql.testing.TestingTaskContext;
 import nova.hetu.olk.operator.MergeOmniOperator;
 import nova.hetu.olk.operator.MergeOmniOperator.MergeOmniOperatorFactory;
 import nova.hetu.olk.tool.BlockUtils;
-import nova.hetu.olk.tool.VecAllocatorHelper;
-import nova.hetu.omniruntime.vector.VecAllocator;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -130,7 +128,6 @@ public class BenchmarkMergeOmniOperator
 
         private MergeOmniOperatorFactory operatorFactory;
         private TaskContext testingTaskContext;
-        private VecAllocator taskLevelAllocator;
         private List<Page> pageTemplate;
 
         @Param({"group1", "group2", "group3", "group4", "group5", "group6", "group7"})
@@ -208,7 +205,6 @@ public class BenchmarkMergeOmniOperator
         {
             TaskContext taskContext = TestingTaskContext.builder(executor, scheduledExecutor, TEST_SESSION)
                     .setQueryMaxMemory(new DataSize(2, GIGABYTE)).setTaskStateMachine(new TaskStateMachine(new TaskId("query", 1, 1), executor)).build();
-            taskLevelAllocator = VecAllocatorHelper.createTaskLevelAllocator(taskContext);
             return taskContext;
         }
 
@@ -218,7 +214,7 @@ public class BenchmarkMergeOmniOperator
             for (Page page : pageTemplate) {
                 slicedPages.add(page.getRegion(0, page.getPositionCount()));
             }
-            return transferToOffHeapPages(taskLevelAllocator, slicedPages);
+            return transferToOffHeapPages(slicedPages);
         }
     }
 

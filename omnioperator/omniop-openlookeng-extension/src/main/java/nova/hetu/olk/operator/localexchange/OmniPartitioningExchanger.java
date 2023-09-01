@@ -33,8 +33,6 @@ import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
 import nova.hetu.olk.operator.filterandproject.OmniMergingPageOutput;
 import nova.hetu.olk.tool.BlockUtils;
-import nova.hetu.olk.tool.VecAllocatorHelper;
-import nova.hetu.omniruntime.vector.VecAllocator;
 
 import java.util.Iterator;
 import java.util.List;
@@ -81,9 +79,8 @@ public class OmniPartitioningExchanger
         for (int i = 0; i < partitionAssignments.length; i++) {
             partitionAssignments[i] = new IntArrayList();
         }
-        VecAllocator allocator = VecAllocatorHelper.createOperatorLevelAllocator(taskContext,
-                VecAllocator.UNLIMIT, VecAllocatorHelper.DEFAULT_RESERVATION, OmniPartitioningExchanger.class);
-        mergingPageOutput = new OmniMergingPageOutput(types, 128000, 256, allocator);
+
+        mergingPageOutput = new OmniMergingPageOutput(types, 128000, 256);
     }
 
     private Iterator<Optional<Page>> createPagesIterator(Page... pages)

@@ -31,7 +31,6 @@ import io.prestosql.spi.sql.expression.Types;
 import io.prestosql.spi.type.Type;
 import nova.hetu.olk.tool.BlockUtils;
 import nova.hetu.olk.tool.OperatorUtils;
-import nova.hetu.olk.tool.VecAllocatorHelper;
 import nova.hetu.olk.tool.VecBatchToPageIterator;
 import nova.hetu.omniruntime.constants.FunctionType;
 import nova.hetu.omniruntime.constants.OmniWindowFrameBoundType;
@@ -39,7 +38,6 @@ import nova.hetu.omniruntime.constants.OmniWindowFrameType;
 import nova.hetu.omniruntime.operator.OmniOperator;
 import nova.hetu.omniruntime.operator.window.OmniWindowOperatorFactory;
 import nova.hetu.omniruntime.type.DataType;
-import nova.hetu.omniruntime.vector.VecAllocator;
 import nova.hetu.omniruntime.vector.VecBatch;
 
 import java.util.Iterator;
@@ -126,7 +124,7 @@ public class WindowOmniOperator
         checkState(!finishing, "Operator is already finishing");
         requireNonNull(page, "page is null");
 
-        VecBatch vecBatch = buildVecBatch(omniOperator.getVecAllocator(), page, this);
+        VecBatch vecBatch = buildVecBatch(page, this);
         omniOperator.addInput(vecBatch);
     }
 
@@ -410,11 +408,9 @@ public class WindowOmniOperator
         @Override
         public Operator createOperator(DriverContext driverContext)
         {
-            VecAllocator vecAllocator = VecAllocatorHelper.createOperatorLevelAllocator(driverContext,
-                    VecAllocator.UNLIMIT, WindowOmniOperator.class);
             OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId,
                     WindowOmniOperator.class.getSimpleName());
-            OmniOperator omniOperator = omniWindowOperatorFactory.createOperator(vecAllocator);
+            OmniOperator omniOperator = omniWindowOperatorFactory.createOperator();
             return new WindowOmniOperator(operatorContext, omniOperator);
         }
 

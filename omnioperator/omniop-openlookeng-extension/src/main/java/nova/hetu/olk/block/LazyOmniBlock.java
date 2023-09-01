@@ -19,10 +19,6 @@ import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
 import io.prestosql.spi.block.LazyBlock;
 import io.prestosql.spi.type.Type;
-import nova.hetu.olk.tool.OperatorUtils;
-import nova.hetu.omniruntime.vector.LazyVec;
-import nova.hetu.omniruntime.vector.Vec;
-import nova.hetu.omniruntime.vector.VecAllocator;
 
 import java.util.function.BiConsumer;
 
@@ -36,28 +32,15 @@ public class LazyOmniBlock<T>
 {
     private LazyBlock lazyBlock;
 
-    private final LazyVec nativeLazyVec;
-
-    public LazyOmniBlock(VecAllocator vecAllocator, LazyBlock lazyBlock, Type blockType)
+    public LazyOmniBlock(LazyBlock lazyBlock, Type blockType)
     {
         this.lazyBlock = lazyBlock;
-        nativeLazyVec = new LazyVec(vecAllocator, lazyBlock.getPositionCount(), () -> {
-            Block block = lazyBlock.getLoadedBlock();
-            return (Vec) OperatorUtils.buildOffHeapBlock(vecAllocator, block, block.getClass().getSimpleName(),
-                    block.getPositionCount(), blockType).getValues();
-        });
     }
 
     @Override
     public boolean isExtensionBlock()
     {
         return true;
-    }
-
-    @Override
-    public Object getValues()
-    {
-        return nativeLazyVec;
     }
 
     @Override
@@ -153,11 +136,5 @@ public class LazyOmniBlock<T>
     public LazyBlock getLazyBlock()
     {
         return lazyBlock;
-    }
-
-    @Override
-    public void close()
-    {
-        nativeLazyVec.close();
     }
 }

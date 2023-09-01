@@ -26,8 +26,6 @@ import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.type.StandardTypes;
 import io.prestosql.spi.type.Type;
 import io.prestosql.spi.type.TypeSignature;
-import nova.hetu.olk.tool.VecAllocatorHelper;
-import nova.hetu.omniruntime.vector.VecAllocator;
 
 import java.util.List;
 
@@ -45,8 +43,6 @@ public class BuildOffHeapOmniOperator
 {
     private final OperatorContext operatorContext;
 
-    private final VecAllocator vecAllocator;
-
     private boolean finishing;
 
     private Page inputPage;
@@ -57,12 +53,10 @@ public class BuildOffHeapOmniOperator
      * Instantiates a new BuildOffHeap Omni Operator.
      *
      * @param operatorContext the operator context
-     * @param vecAllocator the vecAllocator
      */
-    public BuildOffHeapOmniOperator(OperatorContext operatorContext, VecAllocator vecAllocator, List<Type> inputTypes)
+    public BuildOffHeapOmniOperator(OperatorContext operatorContext, List<Type> inputTypes)
     {
         this.operatorContext = requireNonNull(operatorContext, "operatorContext is null");
-        this.vecAllocator = vecAllocator;
         this.inputTypes = inputTypes;
     }
 
@@ -112,7 +106,7 @@ public class BuildOffHeapOmniOperator
 
     private Page processPage()
     {
-        return transferToOffHeapPages(vecAllocator, inputPage, inputTypes);
+        return transferToOffHeapPages(inputPage, inputTypes);
     }
 
     /**
@@ -140,11 +134,9 @@ public class BuildOffHeapOmniOperator
         @Override
         public Operator createOperator(DriverContext driverContext)
         {
-            VecAllocator vecAllocator = VecAllocatorHelper.createOperatorLevelAllocator(driverContext,
-                    VecAllocator.UNLIMIT, VecAllocatorHelper.DEFAULT_RESERVATION, BuildOffHeapOmniOperator.class);
             OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId,
                     BuildOffHeapOmniOperator.class.getSimpleName());
-            return new BuildOffHeapOmniOperator(operatorContext, vecAllocator, sourceTypes);
+            return new BuildOffHeapOmniOperator(operatorContext, sourceTypes);
         }
 
         @Override

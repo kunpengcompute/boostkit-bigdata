@@ -46,7 +46,7 @@ public class RowOmniBlockTest
 {
     private Block<?> rowBlock(Block<?> block, Type dataType)
     {
-        return fromFieldBlocks(getVecAllocator(), block.getPositionCount(), Optional.empty(), new Block[]{block}, dataType, mockVec(ContainerVec.class, new Block[]{block}, getVecAllocator()));
+        return fromFieldBlocks(block.getPositionCount(), Optional.empty(), new Block[]{block}, dataType, mockVec(ContainerVec.class, new Block[]{block}));
     }
 
     @Override
@@ -75,11 +75,11 @@ public class RowOmniBlockTest
     protected Block<?>[] blocksForTest()
     {
         return new Block<?>[]{
-                rowBlock(requireNonNull(mockBlock(false, false, getVecAllocator(), fill(new String[1], index -> UUID.randomUUID().toString()))),
+                rowBlock(requireNonNull(mockBlock(false, false, fill(new String[1], index -> UUID.randomUUID().toString()))),
                         RowType.from(ImmutableList.of(RowType.field(VARCHAR)))),
-                rowBlock(requireNonNull(mockBlock(false, false, getVecAllocator(), fill(new String[2], index -> UUID.randomUUID().toString()))),
+                rowBlock(requireNonNull(mockBlock(false, false, fill(new String[2], index -> UUID.randomUUID().toString()))),
                         RowType.from(ImmutableList.of(RowType.field(VARCHAR)))),
-                rowBlock(requireNonNull(mockBlock(false, false, getVecAllocator(), fill(new String[3], index -> UUID.randomUUID().toString()))),
+                rowBlock(requireNonNull(mockBlock(false, false, fill(new String[3], index -> UUID.randomUUID().toString()))),
                         RowType.from(ImmutableList.of(RowType.field(VARCHAR))))
         };
     }

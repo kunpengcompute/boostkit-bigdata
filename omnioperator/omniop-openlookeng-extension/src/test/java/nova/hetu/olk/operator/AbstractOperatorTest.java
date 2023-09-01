@@ -39,9 +39,9 @@ import io.prestosql.spi.snapshot.MarkerPage;
 import io.prestosql.spi.type.TimeZoneKey;
 import io.prestosql.sql.SqlPath;
 import io.prestosql.transaction.TransactionId;
+import nova.hetu.olk.tool.OmniPage;
 import nova.hetu.omniruntime.vector.BooleanVec;
 import nova.hetu.omniruntime.vector.FixedWidthVec;
-import nova.hetu.omniruntime.vector.LazyVec;
 import nova.hetu.omniruntime.vector.Vec;
 import nova.hetu.omniruntime.vector.VecBatch;
 import org.mockito.Mock;
@@ -76,7 +76,6 @@ import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.when;
 
 @SuppressStaticInitializationFor({
-        "nova.hetu.omniruntime.vector.VecAllocator",
         "nova.hetu.omniruntime.vector.Vec",
         "nova.hetu.omniruntime.constants.Constant",
         "nova.hetu.omniruntime.operator.OmniOperatorFactory"
@@ -180,10 +179,10 @@ public class AbstractOperatorTest
     {
         VecBatch vecBatch = mockNewVecWithAnyArguments(VecBatch.class);
         when(vecBatch.getVectors()).thenReturn(new Vec[0]);
-        mockNewVecWithAnyArguments(LazyVec.class);
         mockNewVecWithAnyArguments(Vec.class);
         mockNewVecWithAnyArguments(BooleanVec.class);
         mockNewVecWithAnyArguments(FixedWidthVec.class);
+        mockNewVecWithAnyArguments(OmniPage.class);
     }
 
     protected OperatorFactory createOperatorFactory()

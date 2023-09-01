@@ -70,8 +70,6 @@ import nova.hetu.olk.OmniLocalExecutionPlanner;
 import nova.hetu.olk.OmniLocalExecutionPlanner.OmniLocalExecutionPlanContext;
 import nova.hetu.olk.operator.filterandproject.OmniMergePages;
 import nova.hetu.olk.operator.filterandproject.OmniPageProcessor;
-import nova.hetu.olk.tool.VecAllocatorHelper;
-import nova.hetu.omniruntime.vector.VecAllocator;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -110,7 +108,6 @@ public class ScanFilterAndProjectOmniOperator
     private long processedBytes;
     private long physicalBytes;
     private long readTimeNanos;
-    private VecAllocator vecAllocator;
     private List<Type> inputTypes;
     private OmniMergePages.OmniMergePagesTransformation omniMergePagesTransformation;
 
@@ -125,14 +122,13 @@ public class ScanFilterAndProjectOmniOperator
                                             DataSize minOutputPageSize, int minOutputPageRowCount, Optional<TableScanNode> tableScanNodeOptional,
                                             Optional<StateStoreProvider> stateStoreProviderOptional, Optional<QueryId> queryIdOptional,
                                             Optional<Metadata> metadataOptional, Optional<DynamicFilterCacheManager> dynamicFilterCacheManagerOptional,
-                                            VecAllocator vecAllocator, List<Type> inputTypes, OmniLocalExecutionPlanContext context)
+                                            List<Type> inputTypes, OmniLocalExecutionPlanContext context)
     {
         pages = splits.flatTransform(new SplitToPages(session, yieldSignal, pageSourceProvider, cursorProcessor,
                 pageProcessor, table, columns, dynamicFilter, types,
                 requireNonNull(memoryTrackingContext, "memoryTrackingContext is null").aggregateSystemMemoryContext(),
                 minOutputPageSize, minOutputPageRowCount, tableScanNodeOptional, stateStoreProviderOptional,
                 queryIdOptional, metadataOptional, dynamicFilterCacheManagerOptional, context));
-        this.vecAllocator = vecAllocator;
         this.inputTypes = inputTypes;
         this.pageProcessor = requireNonNull(pageProcessor, "processor is null");
     }
@@ -409,7 +405,7 @@ public class ScanFilterAndProjectOmniOperator
                 }
                 pageBuilder.reset();
                 outputMemoryContext.setBytes(pageBuilder.getRetainedSizeInBytes());
-                page = transferToOffHeapPages(vecAllocator, page, outputTypes);
+                page = transferToOffHeapPages(page, outputTypes);
                 return ProcessState.ofResult(page);
             }
             else if (finished) {
@@ -516,7 +512,7 @@ public class ScanFilterAndProjectOmniOperator
                     log.error("Filter page error: %s", e.getMessage());
                 }
             }
-            page = transferToOffHeapPages(vecAllocator, page, inputTypes);
+            page = transferToOffHeapPages(page, inputTypes);
             return ProcessState.ofResult(page);
         }
 
@@ -560,8 +556,6 @@ public class ScanFilterAndProjectOmniOperator
         private final Optional<SpillerFactory> spillerFactory;
         private final Integer spillerThreshold;
         private final Integer consumerTableScanNodeCount;
-        private VecAllocator vecAllocator = VecAllocator.GLOBAL_VECTOR_ALLOCATOR;
-
         private OmniLocalExecutionPlanner.OmniLocalExecutionPlanContext context;
 
         public ScanFilterAndProjectOmniOperatorFactory(Session session, int operatorId, PlanNodeId planNodeId,
@@ -654,9 +648,6 @@ public class ScanFilterAndProjectOmniOperator
             checkState(!closed, "Factory is already closed");
             OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId,
                     getOperatorType());
-            VecAllocator vecAllocator = VecAllocatorHelper.createOperatorLevelAllocator(driverContext,
-                    VecAllocator.UNLIMIT, ScanFilterAndProjectOmniOperator.class);
-            this.vecAllocator = vecAllocator != null ? vecAllocator : VecAllocator.GLOBAL_VECTOR_ALLOCATOR;
             return new WorkProcessorSourceOperatorAdapter(operatorContext, this, strategy, reuseTableScanMappingId,
                     spillEnabled, types, spillerFactory, spillerThreshold, consumerTableScanNodeCount);
         }
@@ -668,7 +659,7 @@ public class ScanFilterAndProjectOmniOperator
                     pageSourceProvider, cursorProcessor.get(), pageProcessor.get(), table, columns, dynamicFilter,
                     types, minOutputPageSize, minOutputPageRowCount, this.tableScanNodeOptional,
                     this.stateStoreProviderOptional, queryIdOptional, metadataOptional,
-                    dynamicFilterCacheManagerOptional, vecAllocator, sourceTypes, context);
+                    dynamicFilterCacheManagerOptional, sourceTypes, context);
         }
 
         @Override

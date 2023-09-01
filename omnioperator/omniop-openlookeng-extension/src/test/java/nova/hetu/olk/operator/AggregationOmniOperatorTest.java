@@ -44,7 +44,6 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Matchers.any;
 import static org.powermock.api.mockito.PowerMockito.doReturn;
 
 @PrepareForTest({
@@ -75,7 +74,7 @@ public class AggregationOmniOperatorTest
     protected OperatorFactory createOperatorFactory()
     {
         OmniAggregationOperatorFactory factory = mockNewVecWithAnyArguments(OmniAggregationOperatorFactory.class);
-        doReturn(omniOperator).when(factory).createOperator(any());
+        doReturn(omniOperator).when(factory).createOperator();
         return new AggregationOmniOperatorFactory(operatorId, planNodeId,
                 sourceTypes, aggregatorTypes, aggregationInputChannels, maskChannelList, aggregationOutputTypes, step);
     }

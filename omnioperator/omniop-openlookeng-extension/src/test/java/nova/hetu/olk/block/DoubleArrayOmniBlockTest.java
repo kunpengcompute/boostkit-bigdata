@@ -61,9 +61,9 @@ public class DoubleArrayOmniBlockTest
     protected Block<?>[] blocksForTest()
     {
         return new Block<?>[]{
-                mockBlock(false, false, getVecAllocator(), fill(new Double[1], index -> new Random().nextDouble())),
-                mockBlock(false, false, getVecAllocator(), fill(new Double[2], index -> new Random().nextDouble())),
-                mockBlock(false, false, getVecAllocator(), fill(new Double[3], index -> new Random().nextDouble())),
+                mockBlock(false, false, fill(new Double[1], index -> new Random().nextDouble())),
+                mockBlock(false, false, fill(new Double[2], index -> new Random().nextDouble())),
+                mockBlock(false, false, fill(new Double[3], index -> new Random().nextDouble())),
         };
     }
 
@@ -71,7 +71,6 @@ public class DoubleArrayOmniBlockTest
     public void testFunctionCall(int index)
     {
         Block<?> block = getBlockForTest(index);
-        block.copyRegion(0, block.getPositionCount());
         block.copyPositions(new int[block.getPositionCount()], 0, block.getPositionCount());
         block.retainedBytesForEachPart((offset, position) -> {});
         block.writePositionTo(0, mock(BlockBuilder.class));

@@ -26,7 +26,6 @@ import nova.hetu.olk.OmniLocalExecutionPlanner;
 import nova.hetu.olk.tool.BlockUtils;
 import nova.hetu.olk.tool.VecBatchToPageIterator;
 import nova.hetu.omniruntime.type.DataType;
-import nova.hetu.omniruntime.vector.VecAllocator;
 import nova.hetu.omniruntime.vector.VecBatch;
 import org.glassfish.jersey.internal.guava.Lists;
 
@@ -42,7 +41,6 @@ import static java.util.Objects.requireNonNull;
 import static nova.hetu.olk.tool.OperatorUtils.createBlankVectors;
 import static nova.hetu.olk.tool.OperatorUtils.merge;
 import static nova.hetu.olk.tool.OperatorUtils.toDataTypes;
-import static nova.hetu.olk.tool.VecAllocatorHelper.getVecAllocatorFromBlocks;
 
 /**
  * The type Omni merge pages.
@@ -91,8 +89,6 @@ public class OmniMergePages
         private int totalPositions;
 
         private int maxPageSizeInBytes;
-
-        private VecAllocator vecAllocator;
 
         /**
          * Instantiates a new Omni merge pages.
@@ -199,10 +195,6 @@ public class OmniMergePages
          */
         public void appendPage(Page page)
         {
-            // VecAllocator is only created once
-            if (this.vecAllocator == null) {
-                this.vecAllocator = getVecAllocatorFromBlocks(page.getBlocks());
-            }
             pages.add(page);
             totalPositions += page.getPositionCount();
             currentPageSizeInBytes = currentPageSizeInBytes + page.getSizeInBytes();
@@ -226,9 +218,9 @@ public class OmniMergePages
          */
         public Page flush()
         {
-            VecBatch mergeResult = new VecBatch(createBlankVectors(vecAllocator, dataTypes, totalPositions),
+            VecBatch mergeResult = new VecBatch(createBlankVectors(dataTypes, totalPositions),
                     totalPositions);
-            merge(mergeResult, pages, vecAllocator);
+            merge(mergeResult, pages);
             Page finalPage = new VecBatchToPageIterator(ImmutableList.of(mergeResult).iterator()).next();
             currentPageSizeInBytes = 0;
             retainedSizeInBytes = 0;

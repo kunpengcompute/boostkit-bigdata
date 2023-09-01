@@ -22,7 +22,6 @@ import nova.hetu.omniruntime.vector.BooleanVec;
 import nova.hetu.omniruntime.vector.DoubleVec;
 import nova.hetu.omniruntime.vector.FixedWidthVec;
 import nova.hetu.omniruntime.vector.IntVec;
-import nova.hetu.omniruntime.vector.LazyVec;
 import org.powermock.core.classloader.annotations.PrepareForTest;
 import org.testng.annotations.Test;
 
@@ -49,7 +48,6 @@ public class LazyOmniBlockTest
     protected void setupMock()
     {
         super.setupMock();
-        mockNewVecWithAnyArguments(LazyVec.class);
         mockNewVecWithAnyArguments(BooleanVec.class);
         mockNewVecWithAnyArguments(IntVec.class);
         mockNewVecWithAnyArguments(DoubleVec.class);
@@ -62,7 +60,6 @@ public class LazyOmniBlockTest
         LazyOmniBlock<?> original = (LazyOmniBlock<?>) block;
         LazyBlock<?> lazyBlock = original.getLazyBlock();
         assertTrue(block.isExtensionBlock());
-        assertTrue(block.getValues() instanceof LazyVec);
         for (int i = 0; i < original.getPositionCount(); i++) {
             assertEquals(original.getEncodingName(), lazyBlock.getEncodingName());
         }
@@ -73,9 +70,9 @@ public class LazyOmniBlockTest
     {
         setupMock();
         return new Block<?>[]{
-                mockBlock(true, false, getVecAllocator(), fill(new Boolean[3], index -> new Random().nextBoolean())),
-                mockBlock(true, false, getVecAllocator(), fill(new Integer[3], index -> new Random().nextInt())),
-                mockBlock(true, false, getVecAllocator(), fill(new Double[3], index -> new Random().nextDouble())),
+                mockBlock(true, false, fill(new Boolean[3], index -> new Random().nextBoolean())),
+                mockBlock(true, false, fill(new Integer[3], index -> new Random().nextInt())),
+                mockBlock(true, false, fill(new Double[3], index -> new Random().nextDouble())),
         };
     }
 

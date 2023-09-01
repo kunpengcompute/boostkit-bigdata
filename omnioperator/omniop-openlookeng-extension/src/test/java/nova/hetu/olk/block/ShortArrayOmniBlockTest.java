@@ -51,9 +51,9 @@ public class ShortArrayOmniBlockTest
     protected Block<?>[] blocksForTest()
     {
         return new Block<?>[]{
-                mockBlock(false, false, getVecAllocator(), fill(new Short[1], index -> (short) new Random().nextInt(Short.MAX_VALUE))),
-                mockBlock(false, false, getVecAllocator(), fill(new Short[2], index -> (short) new Random().nextInt(Short.MAX_VALUE))),
-                mockBlock(false, false, getVecAllocator(), fill(new Short[3], index -> (short) new Random().nextInt(Short.MAX_VALUE))),
+                mockBlock(false, false, fill(new Short[1], index -> (short) new Random().nextInt(Short.MAX_VALUE))),
+                mockBlock(false, false, fill(new Short[2], index -> (short) new Random().nextInt(Short.MAX_VALUE))),
+                mockBlock(false, false, fill(new Short[3], index -> (short) new Random().nextInt(Short.MAX_VALUE))),
         };
     }
 
@@ -71,7 +71,6 @@ public class ShortArrayOmniBlockTest
     public void testFunctionCall(int index)
     {
         Block<?> block = getBlockForTest(index);
-        block.copyRegion(0, block.getPositionCount());
         block.copyPositions(new int[block.getPositionCount()], 0, block.getPositionCount());
         block.retainedBytesForEachPart((offset, position) -> {});
         block.writePositionTo(0, mock(BlockBuilder.class));

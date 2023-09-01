@@ -95,9 +95,9 @@ public class DictionaryOmniBlockTest
     protected Block<?>[] blocksForTest()
     {
         return new Block<?>[]{
-                mockBlock(false, true, getVecAllocator(), fill(new Boolean[1], index -> new Random().nextBoolean())),
-                mockBlock(false, true, getVecAllocator(), fill(new Boolean[2], index -> new Random().nextBoolean())),
-                mockBlock(false, true, getVecAllocator(), fill(new Boolean[3], index -> new Random().nextBoolean())),
+                mockBlock(false, true, fill(new Boolean[1], index -> new Random().nextBoolean())),
+                mockBlock(false, true, fill(new Boolean[2], index -> new Random().nextBoolean())),
+                mockBlock(false, true, fill(new Boolean[3], index -> new Random().nextBoolean())),
         };
     }
 

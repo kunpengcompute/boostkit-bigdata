@@ -33,13 +33,11 @@ import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.type.StandardTypes;
 import io.prestosql.spi.type.Type;
 import nova.hetu.olk.tool.BlockUtils;
-import nova.hetu.olk.tool.VecAllocatorHelper;
 import nova.hetu.olk.tool.VecBatchToPageIterator;
 import nova.hetu.omniruntime.constants.FunctionType;
 import nova.hetu.omniruntime.operator.OmniOperator;
 import nova.hetu.omniruntime.operator.aggregator.OmniHashAggregationOperatorFactory;
 import nova.hetu.omniruntime.type.DataType;
-import nova.hetu.omniruntime.vector.VecAllocator;
 import nova.hetu.omniruntime.vector.VecBatch;
 
 import java.util.Arrays;
@@ -133,7 +131,7 @@ public class HashAggregationOmniOperator
     {
         checkState(!finishing, "Operator is already finishing");
         requireNonNull(page, "page is null");
-        VecBatch vecBatch = buildVecBatch(omniOperator.getVecAllocator(), page, this);
+        VecBatch vecBatch = buildVecBatch(page, this);
         omniOperator.addInput(vecBatch);
     }
 
@@ -309,11 +307,9 @@ public class HashAggregationOmniOperator
         @Override
         public Operator createOperator(DriverContext driverContext)
         {
-            VecAllocator vecAllocator = VecAllocatorHelper.createOperatorLevelAllocator(driverContext,
-                    VecAllocator.UNLIMIT, HashAggregationOmniOperator.class);
             OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId,
                     HashAggregationOmniOperator.class.getSimpleName());
-            OmniOperator omniOperator = omniFactory.createOperator(vecAllocator);
+            OmniOperator omniOperator = omniFactory.createOperator();
             return new HashAggregationOmniOperator(operatorContext, omniOperator, step);
         }
 

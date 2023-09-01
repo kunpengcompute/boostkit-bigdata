@@ -23,7 +23,6 @@ import io.prestosql.spi.type.Type;
 import nova.hetu.olk.tool.OperatorUtils;
 import nova.hetu.omniruntime.operator.OmniOperator;
 import nova.hetu.omniruntime.operator.sort.OmniSortOperatorFactory;
-import nova.hetu.omniruntime.vector.VecAllocator;
 import org.powermock.core.classloader.annotations.PrepareForTest;
 import org.testng.annotations.Test;
 
@@ -34,7 +33,6 @@ import java.util.UUID;
 import static nova.hetu.olk.mock.MockUtil.mockOmniOperator;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
-import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -69,7 +67,7 @@ public class OrderByOperatorTest
     {
         OmniSortOperatorFactory omniSortOperatorFactory = mock(OmniSortOperatorFactory.class);
         OmniOperator omniOperator = mockOmniOperator();
-        when(omniSortOperatorFactory.createOperator(any(VecAllocator.class))).thenReturn(omniOperator);
+        when(omniSortOperatorFactory.createOperator()).thenReturn(omniOperator);
         return omniSortOperatorFactory;
     }
 

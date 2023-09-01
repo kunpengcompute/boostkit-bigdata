@@ -28,7 +28,6 @@ import io.prestosql.spi.type.Type;
 import io.prestosql.testing.TestingSnapshotUtils;
 import nova.hetu.olk.operator.EnforceSingleRowOmniOperator;
 import nova.hetu.olk.tool.BlockUtils;
-import nova.hetu.omniruntime.vector.VecAllocator;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -153,7 +152,7 @@ public class BenchmarkEnforceSingleRowOmniOperator
     {
         List<Page> pages = rowPagesBuilder(INPUT_TYPES.get(testGroup)).addSequencePage(1, 1)
                 .addSequencePage(2, 1).build();
-        return transferToOffHeapPages(VecAllocator.GLOBAL_VECTOR_ALLOCATOR, pages);
+        return transferToOffHeapPages(pages);
     }
 
     public static void main(String[] args) throws RunnerException

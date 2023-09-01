@@ -16,8 +16,6 @@
 package nova.hetu.olk.block;
 
 import io.prestosql.spi.block.Block;
-import nova.hetu.olk.mock.MockUtil;
-import nova.hetu.omniruntime.vector.VecAllocator;
 import org.powermock.core.classloader.annotations.PowerMockIgnore;
 import org.powermock.core.classloader.annotations.SuppressStaticInitializationFor;
 import org.powermock.modules.testng.PowerMockTestCase;
@@ -32,21 +30,11 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
-@SuppressStaticInitializationFor({
-        "nova.hetu.omniruntime.vector.VecAllocator",
-        "nova.hetu.omniruntime.vector.Vec"
-})
+@SuppressStaticInitializationFor("nova.hetu.omniruntime.vector.Vec")
 @PowerMockIgnore("javax.management.*")
 public class AbstractBlockTest
         extends PowerMockTestCase
 {
-    private VecAllocator vecAllocator;
-
-    protected final VecAllocator getVecAllocator()
-    {
-        return vecAllocator;
-    }
-
     @DataProvider(name = "blockProvider")
     public Object[][] dataProvider()
     {
@@ -69,7 +57,6 @@ public class AbstractBlockTest
     @BeforeMethod
     public void setUp()
     {
-        vecAllocator = MockUtil.mockNewVecWithAnyArguments(VecAllocator.class);
         this.setupMock();
     }
 

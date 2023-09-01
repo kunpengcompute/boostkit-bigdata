@@ -71,7 +71,7 @@ public class DynamicFilterSourceOmniOperatorTest
     protected Operator createOperator(Operator originalOperator)
     {
         return new DynamicFilterSourceOmniOperator(originalOperator.getOperatorContext(), mapConsumer, channels,
-                planNodeId, maxFilterPositionsCount, maxFilterSize, null);
+                planNodeId, maxFilterPositionsCount, maxFilterSize);
     }
 
     @Test(dataProvider = "pageProvider")

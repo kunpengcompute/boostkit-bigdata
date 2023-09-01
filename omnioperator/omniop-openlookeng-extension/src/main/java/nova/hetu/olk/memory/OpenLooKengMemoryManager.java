@@ -16,19 +16,19 @@
 package nova.hetu.olk.memory;
 
 import io.airlift.log.Logger;
-import nova.hetu.omniruntime.vector.VecAllocator;
+import nova.hetu.omniruntime.memory.MemoryManager;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
-public class OpenLooKengVecAllocator
-        extends VecAllocator
+public class OpenLooKengMemoryManager
+        extends MemoryManager
 {
-    private static final Logger log = Logger.get(OpenLooKengVecAllocator.class);
+    private static final Logger log = Logger.get(OpenLooKengMemoryManager.class);
     private final AtomicBoolean isClosed = new AtomicBoolean(false);
 
-    public OpenLooKengVecAllocator(long nativeAllocator)
+    public OpenLooKengMemoryManager()
     {
-        super(nativeAllocator);
+        super();
     }
 
     @Override
@@ -46,7 +46,6 @@ public class OpenLooKengVecAllocator
     public void close()
     {
         if (isClosed.compareAndSet(false, true)) {
-            log.debug("release allocator scope:" + getScope());
             super.close();
         }
     }

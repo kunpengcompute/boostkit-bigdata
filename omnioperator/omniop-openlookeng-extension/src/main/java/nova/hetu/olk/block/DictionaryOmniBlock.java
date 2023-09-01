@@ -21,8 +21,15 @@ import io.prestosql.spi.PrestoException;
 import io.prestosql.spi.StandardErrorCode;
 import io.prestosql.spi.block.Block;
 import io.prestosql.spi.block.BlockBuilder;
+import io.prestosql.spi.block.ByteArrayBlock;
+import io.prestosql.spi.block.DictionaryBlock;
 import io.prestosql.spi.block.DictionaryBlockEncoding;
 import io.prestosql.spi.block.DictionaryId;
+import io.prestosql.spi.block.Int128ArrayBlock;
+import io.prestosql.spi.block.IntArrayBlock;
+import io.prestosql.spi.block.LongArrayBlock;
+import io.prestosql.spi.block.ShortArrayBlock;
+import io.prestosql.spi.block.VariableWidthBlock;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import nova.hetu.omniruntime.type.DataType;
 import nova.hetu.omniruntime.vector.BooleanVec;
@@ -39,6 +46,7 @@ import nova.hetu.omniruntime.vector.VecEncoding;
 import org.openjdk.jol.info.ClassLayout;
 
 import java.util.Arrays;
+import java.util.Optional;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 
@@ -49,6 +57,7 @@ import static io.prestosql.spi.block.BlockUtil.checkValidPositions;
 import static io.prestosql.spi.block.BlockUtil.checkValidRegion;
 import static io.prestosql.spi.block.BlockUtil.countUsedPositions;
 import static io.prestosql.spi.block.DictionaryId.randomDictionaryId;
+import static java.lang.Double.doubleToLongBits;
 import static java.lang.Math.min;
 import static java.util.Objects.requireNonNull;
 import static nova.hetu.olk.tool.OperatorUtils.buildRowOmniBlock;
@@ -163,7 +172,7 @@ public class DictionaryOmniBlock<T>
 
         this.positionCount = positionCount;
         this.dictionaryVec = new DictionaryVec(dictionary, ids);
-        this.dictionary = buildBlock(dictionaryVec.getDictionary());
+        this.dictionary = createFlatBlock(dictionary.getType().getId(), dictionary);
         this.ids = ids;
         this.dictionarySourceId = requireNonNull(dictionarySourceId, "dictionarySourceId is null");
         this.retainedSizeInBytes = INSTANCE_SIZE + this.dictionary.getRetainedSizeInBytes() + sizeOf(ids);
@@ -184,16 +193,16 @@ public class DictionaryOmniBlock<T>
                                DictionaryId dictionarySourceId)
     {
         this.positionCount = dictionaryVec.getSize();
-        this.idsOffset = dictionaryVec.getOffset();
-        this.dictionary = buildBlock(dictionaryVec.getDictionary());
-        this.ids = dictionaryVec.getIds();
+        this.idsOffset = 0;
+        this.dictionary = expandDictionary(dictionaryVec);
+        this.ids = getIds(positionCount);
         this.dictionarySourceId = requireNonNull(dictionarySourceId, "dictionarySourceId is null");
         this.retainedSizeInBytes = INSTANCE_SIZE + dictionary.getRetainedSizeInBytes() + sizeOf(ids);
         this.dictionaryVec = dictionaryVec;
 
         if (dictionaryIsCompacted) {
             this.sizeInBytes = this.retainedSizeInBytes;
-            this.uniqueIds = dictionary.getPositionCount();
+            this.uniqueIds = dictionaryVec.getSize();
         }
     }
 
@@ -204,7 +213,7 @@ public class DictionaryOmniBlock<T>
         VecEncoding vecEncoding = dictionary.getEncoding();
         switch (vecEncoding) {
             case OMNI_VEC_ENCODING_FLAT:
-                dictionaryBlock = createFlatBlock(dataType.getId(), dictionary);
+                dictionaryBlock = createFlatOmniBlock(dataType.getId(), dictionary);
                 break;
             case OMNI_VEC_ENCODING_DICTIONARY:
                 dictionaryBlock = new DictionaryOmniBlock((DictionaryVec) dictionary, false, randomDictionaryId());
@@ -218,7 +227,7 @@ public class DictionaryOmniBlock<T>
         return dictionaryBlock;
     }
 
-    private static Block createFlatBlock(DataType.DataTypeId dataTypeId, Vec dictionary)
+    private static Block createFlatOmniBlock(DataType.DataTypeId dataTypeId, Vec dictionary)
     {
         Block dictionaryBlock;
         switch (dataTypeId) {
@@ -250,6 +259,123 @@ public class DictionaryOmniBlock<T>
                 throw new PrestoException(StandardErrorCode.NOT_SUPPORTED, "Not support Type " + dataTypeId);
         }
         return dictionaryBlock;
+    }
+
+    private static Block createVariableWidthBlock(Vec vec, int positionCount)
+    {
+        VarcharVec varcharVec = (VarcharVec) vec;
+        Slice slice = Slices.wrappedBuffer(varcharVec.get(0, positionCount));
+        int[] offsets = new int[positionCount + 1];
+        for (int i = 0; i < positionCount; i++) {
+            offsets[i + 1] = offsets[i] + varcharVec.getDataLength(i);
+        }
+
+        return new VariableWidthBlock(positionCount, slice, offsets,
+                varcharVec.hasNull()
+                        ? Optional.of(varcharVec.getValuesNulls(0, positionCount))
+                        : Optional.empty());
+    }
+
+    private static Block createInt128ArrayBlock(Vec vec, int positionCount)
+    {
+        Decimal128Vec decimal128Vec = (Decimal128Vec) vec;
+        return new Int128ArrayBlock(positionCount, Optional.of(decimal128Vec.getValuesNulls(0, positionCount)),
+                decimal128Vec.get(0, positionCount));
+    }
+
+    private static Block createDoubleArrayBlock(Vec vec, int positionCount)
+    {
+        DoubleVec doubleVec = (DoubleVec) vec;
+        boolean[] valuesNulls = doubleVec.getValuesNulls(0, positionCount);
+        long[] values = new long[positionCount];
+        for (int j = 0; j < positionCount; j++) {
+            if (!vec.isNull(j)) {
+                values[j] = doubleToLongBits(doubleVec.get(j));
+            }
+        }
+        return new LongArrayBlock(positionCount, Optional.of(valuesNulls), values);
+    }
+
+    private static Block createShortArrayBlock(Vec vec, int positionCount)
+    {
+        ShortVec shortVec = (ShortVec) vec;
+        return new ShortArrayBlock(positionCount, Optional.of(shortVec.getValuesNulls(0, positionCount)),
+                shortVec.get(0, positionCount));
+    }
+
+    private static Block createLongArrayBlock(Vec vec, int positionCount)
+    {
+        LongVec longVec = (LongVec) vec;
+        return new LongArrayBlock(positionCount, Optional.of(longVec.getValuesNulls(0, positionCount)),
+                longVec.get(0, positionCount));
+    }
+
+    private static Block createIntArrayBlock(Vec vec, int positionCount)
+    {
+        IntVec intVec = (IntVec) vec;
+        return new IntArrayBlock(positionCount, Optional.of(intVec.getValuesNulls(0, positionCount)),
+                intVec.get(0, positionCount));
+    }
+
+    private static Block createByteArrayBlock(Vec vec, int positionCount)
+    {
+        BooleanVec booleanVec = (BooleanVec) vec;
+        byte[] bytes = booleanVec.getValuesBuf().getBytes(0, positionCount);
+        return new ByteArrayBlock(positionCount, Optional.of(booleanVec.getValuesNulls(0, positionCount)),
+                bytes);
+    }
+
+    private static Block createFlatBlock(DataType.DataTypeId dataTypeId, Vec dictionary)
+    {
+        switch (dataTypeId) {
+            case OMNI_BOOLEAN:
+                return createByteArrayBlock(dictionary, dictionary.getSize());
+            case OMNI_INT:
+            case OMNI_DATE32:
+                return createIntArrayBlock(dictionary, dictionary.getSize());
+            case OMNI_SHORT:
+                return createShortArrayBlock(dictionary, dictionary.getSize());
+            case OMNI_LONG:
+            case OMNI_DECIMAL64:
+                return createLongArrayBlock(dictionary, dictionary.getSize());
+            case OMNI_DOUBLE:
+                return createDoubleArrayBlock(dictionary, dictionary.getSize());
+            case OMNI_VARCHAR:
+            case OMNI_CHAR:
+                return createVariableWidthBlock(dictionary, dictionary.getSize());
+            case OMNI_DECIMAL128:
+                return createInt128ArrayBlock(dictionary, dictionary.getSize());
+            default:
+                throw new PrestoException(StandardErrorCode.NOT_SUPPORTED, "Not support Type " + dataTypeId);
+        }
+    }
+
+    public static Block expandDictionary(DictionaryVec dictionaryVec)
+    {
+        Vec vec = expandDictionaryVec(dictionaryVec);
+        DataType dataType = vec.getType();
+        Block dictionaryBlock = createFlatBlock(dataType.getId(), vec);
+        vec.close();
+        return dictionaryBlock;
+    }
+
+    public static int[] getIds(int positionCount)
+    {
+        int[] ids = new int[positionCount];
+        for (int i = 0; i < positionCount; i++) {
+            ids[i] = i;
+        }
+        return ids;
+    }
+
+    /**
+     * DictionaryVec transfer to Vec
+     *
+     * @return vector
+     */
+    public static Vec expandDictionaryVec(DictionaryVec dictionaryVec)
+    {
+        return dictionaryVec.expandDictionary();
     }
 
     @Override
@@ -485,15 +611,14 @@ public class DictionaryOmniBlock<T>
             int position = positions[offset + i];
             newIds[i] = getId(position);
         }
-        return new DictionaryOmniBlock((Vec) dictionary.getValues(), newIds);
+        return new DictionaryBlock(dictionary, newIds);
     }
 
     @Override
     public Block getRegion(int positionOffset, int length)
     {
         checkValidRegion(positionCount, positionOffset, length);
-        return new DictionaryOmniBlock(idsOffset + positionOffset, length, dictionaryVec, ids, false,
-                dictionarySourceId);
+        return new DictionaryBlock(idsOffset + positionOffset, length, dictionary, ids, false, dictionarySourceId);
     }
 
     @Override
@@ -501,7 +626,7 @@ public class DictionaryOmniBlock<T>
     {
         checkValidRegion(positionCount, position, length);
         int[] newIds = Arrays.copyOfRange(ids, idsOffset + position, idsOffset + position + length);
-        DictionaryOmniBlock dictionaryBlock = new DictionaryOmniBlock((Vec) dictionary.getValues(), newIds);
+        DictionaryBlock dictionaryBlock = new DictionaryBlock(dictionary, newIds);
         return dictionaryBlock.compact();
     }
 
@@ -532,8 +657,7 @@ public class DictionaryOmniBlock<T>
         for (int i = 0; i < dictionary.getPositionCount() && isCompact; i++) {
             isCompact &= seen[i];
         }
-        return new DictionaryOmniBlock(newIds.length, (Vec) dictionary.getValues(), newIds, isCompact,
-                getDictionarySourceId());
+        return new DictionaryBlock(newIds.length, dictionary, newIds, isCompact, getDictionarySourceId());
     }
 
     @Override
@@ -553,8 +677,8 @@ public class DictionaryOmniBlock<T>
         if (loadedDictionary == dictionary) {
             return this;
         }
-        return new DictionaryOmniBlock(idsOffset, getPositionCount(), (Vec) loadedDictionary.getValues(), ids, false,
-                randomDictionaryId());
+
+        return new DictionaryBlock(idsOffset, getPositionCount(), loadedDictionary, ids, false, randomDictionaryId());
     }
 
     /**
@@ -572,9 +696,9 @@ public class DictionaryOmniBlock<T>
      *
      * @return the ids
      */
-    Slice getIds()
+    public int[] getIds()
     {
-        return Slices.wrappedIntArray(ids, idsOffset, positionCount);
+        return ids;
     }
 
     /**

@@ -25,7 +25,6 @@ import io.prestosql.spi.type.Type;
 import nova.hetu.olk.block.LazyOmniBlock;
 import nova.hetu.olk.operator.LimitOmniOperator.LimitOmniOperatorFactory;
 import nova.hetu.olk.tool.OperatorUtils;
-import nova.hetu.omniruntime.operator.limit.OmniLimitOperatorFactory;
 import org.powermock.core.classloader.annotations.PrepareForTest;
 import org.testng.annotations.Test;
 
@@ -35,8 +34,6 @@ import java.util.List;
 import java.util.Random;
 import java.util.UUID;
 
-import static nova.hetu.olk.mock.MockUtil.mockNewVecWithAnyArguments;
-import static nova.hetu.olk.mock.MockUtil.mockOmniOperator;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
@@ -58,7 +55,6 @@ public class LimitOmniOperatorTest
     protected void setUpMock()
     {
         super.setUpMock();
-        mockNewVecWithAnyArguments(OmniLimitOperatorFactory.class);
     }
 
     @Override
@@ -70,7 +66,7 @@ public class LimitOmniOperatorTest
     @Override
     protected Operator createOperator(Operator originalOperator)
     {
-        return new LimitOmniOperator(originalOperator.getOperatorContext(), mockOmniOperator(), limit);
+        return new LimitOmniOperator(originalOperator.getOperatorContext(), limit);
     }
 
     @Override

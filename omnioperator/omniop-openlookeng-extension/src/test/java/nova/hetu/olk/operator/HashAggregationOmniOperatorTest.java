@@ -43,7 +43,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
-import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
@@ -75,7 +74,7 @@ public class HashAggregationOmniOperatorTest
         super.setUpMock();
         omniHashAggregationOperatorFactory = mockNewVecWithAnyArguments(OmniHashAggregationOperatorFactory.class);
         omniOperator = mockOmniOperator();
-        when(omniHashAggregationOperatorFactory.createOperator(any())).thenReturn(omniOperator);
+        when(omniHashAggregationOperatorFactory.createOperator()).thenReturn(omniOperator);
     }
 
     @Override

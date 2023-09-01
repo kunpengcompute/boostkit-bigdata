@@ -22,7 +22,6 @@ import nova.hetu.olk.tool.BlockUtils;
 import nova.hetu.olk.tool.OperatorUtils;
 import nova.hetu.olk.tool.VecBatchToPageIterator;
 import nova.hetu.omniruntime.type.DataType;
-import nova.hetu.omniruntime.vector.VecAllocator;
 import nova.hetu.omniruntime.vector.VecBatch;
 import org.openjdk.jol.info.ClassLayout;
 
@@ -40,7 +39,6 @@ import static io.prestosql.spi.block.PageBuilderStatus.DEFAULT_MAX_PAGE_SIZE_IN_
 import static java.util.Objects.requireNonNull;
 import static nova.hetu.olk.tool.OperatorUtils.createBlankVectors;
 import static nova.hetu.olk.tool.OperatorUtils.merge;
-import static nova.hetu.olk.tool.VecAllocatorHelper.getVecAllocatorFromBlocks;
 
 /**
  * This class is intended to be used right after the PageProcessor to ensure
@@ -86,18 +84,10 @@ public class OmniMergingPageOutput
     private int totalPositions;
     private long currentPageSizeInBytes;
     private long retainedSizeInBytes;
-    private VecAllocator vecAllocator;
 
     public OmniMergingPageOutput(Iterable<? extends Type> types, long minPageSizeInBytes, int minRowCount)
     {
         this(types, minPageSizeInBytes, minRowCount, DEFAULT_MAX_PAGE_SIZE_IN_BYTES);
-    }
-
-    public OmniMergingPageOutput(Iterable<? extends Type> types, long minPageSizeInBytes, int minRowCount,
-                                 VecAllocator vecAllocator)
-    {
-        this(types, minPageSizeInBytes, minRowCount, DEFAULT_MAX_PAGE_SIZE_IN_BYTES);
-        this.vecAllocator = vecAllocator;
     }
 
     public OmniMergingPageOutput(Iterable<? extends Type> types, long minPageSizeInBytes, int minRowCount,
@@ -213,10 +203,6 @@ public class OmniMergingPageOutput
 
     private void buffer(Page page)
     {
-        // VecAllocator is only created once
-        if (this.vecAllocator == null) {
-            this.vecAllocator = getVecAllocatorFromBlocks(page.getBlocks());
-        }
         totalPositions += page.getPositionCount();
         bufferedPages.add(page);
         currentPageSizeInBytes = currentPageSizeInBytes + page.getSizeInBytes();
@@ -233,9 +219,9 @@ public class OmniMergingPageOutput
             return;
         }
 
-        VecBatch resultVecBatch = new VecBatch(createBlankVectors(vecAllocator, dataTypes, totalPositions),
+        VecBatch resultVecBatch = new VecBatch(createBlankVectors(dataTypes, totalPositions),
                 totalPositions);
-        merge(resultVecBatch, bufferedPages, vecAllocator);
+        merge(resultVecBatch, bufferedPages);
         outputQueue.add(new VecBatchToPageIterator(ImmutableList.of(resultVecBatch).iterator()).next());
 
         // reset buffers

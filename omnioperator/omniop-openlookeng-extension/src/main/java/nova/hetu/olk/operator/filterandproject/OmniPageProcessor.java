@@ -33,7 +33,6 @@ import nova.hetu.olk.tool.BlockUtils;
 import nova.hetu.olk.tool.VecBatchToPageIterator;
 import nova.hetu.omniruntime.operator.OmniOperator;
 import nova.hetu.omniruntime.utils.OmniRuntimeException;
-import nova.hetu.omniruntime.vector.VecAllocator;
 import nova.hetu.omniruntime.vector.VecBatch;
 
 import javax.annotation.concurrent.NotThreadSafe;
@@ -62,8 +61,6 @@ public class OmniPageProcessor
 {
     private final OmniProjection projection;
 
-    private final VecAllocator vecAllocator;
-
     private final OmniLocalExecutionPlanContext context;
 
     private Optional<OmniPageFilter.OmniPageFilterOperator> omniPageFilterOperator = Optional.empty();
@@ -77,21 +74,20 @@ public class OmniPageProcessor
      * @param initialBatchSize the initial batch size
      * @param expressionProfiler the expression profiler
      */
-    public OmniPageProcessor(VecAllocator vecAllocator, Optional<PageFilter> filter, OmniProjection proj,
+    public OmniPageProcessor(Optional<PageFilter> filter, OmniProjection proj,
                              OptionalInt initialBatchSize, ExpressionProfiler expressionProfiler,
                              OmniLocalExecutionPlanContext context)
     {
         super(filter, Collections.emptyList(), initialBatchSize, expressionProfiler);
-        this.vecAllocator = vecAllocator;
         this.context = context;
         this.projection = requireNonNull(proj, "projection is null");
 
         if (filter.isPresent()) {
             PageFilter pageFilter = filter.get();
-            this.omniPageFilterOperator = Optional.of(((OmniPageFilter) pageFilter).getOperator(vecAllocator));
+            this.omniPageFilterOperator = Optional.of(((OmniPageFilter) pageFilter).getOperator());
         }
         else {
-            this.omniProjectionOperator = Optional.of(projection.getFactory().createOperator(vecAllocator));
+            this.omniProjectionOperator = Optional.of(projection.getFactory().createOperator());
         }
     }
 
@@ -143,7 +139,7 @@ public class OmniPageProcessor
         }
 
         Page preloadPage = preloadNeedFilterLazyBlock(page);
-        VecBatch inputVecBatch = buildVecBatch(vecAllocator, preloadPage, this);
+        VecBatch inputVecBatch = buildVecBatch(preloadPage, this);
         if (omniPageFilterOperator.isPresent()) {
             VecBatch filteredVecBatch = omniPageFilterOperator.get().filterAndProject(inputVecBatch);
             if (filteredVecBatch == null) {
@@ -158,15 +154,13 @@ public class OmniPageProcessor
             }
         }
 
-        return WorkProcessor.create(new OmniProjectSelectedPositions(vecAllocator, session, yieldSignal, memoryContext,
+        return WorkProcessor.create(new OmniProjectSelectedPositions(session, yieldSignal, memoryContext,
                 inputVecBatch, positionsRange(0, inputVecBatch.getRowCount()), omniProjectionOperator.get()));
     }
 
     private class OmniProjectSelectedPositions
             implements WorkProcessor.Process<Page>
     {
-        private final VecAllocator vecAllocator;
-
         private final ConnectorSession session;
 
         private final DriverYieldSignal yieldSignal;
@@ -183,18 +177,16 @@ public class OmniPageProcessor
         /**
          * Instantiates a new Omni project selected positions.
          *
-         * @param vecAllocator vector allocator
          * @param session the session
          * @param yieldSignal the yield signal
          * @param memoryContext the memory context
          * @param vecBatch the page
          * @param selectedPositions the selected positions
          */
-        public OmniProjectSelectedPositions(VecAllocator vecAllocator, ConnectorSession session,
-                                            DriverYieldSignal yieldSignal, LocalMemoryContext memoryContext, VecBatch vecBatch,
+        public OmniProjectSelectedPositions(ConnectorSession session, DriverYieldSignal yieldSignal,
+                                            LocalMemoryContext memoryContext, VecBatch vecBatch,
                                             SelectedPositions selectedPositions, OmniOperator omniProjectionOperator)
         {
-            this.vecAllocator = vecAllocator;
             this.omniProjectionOperator = omniProjectionOperator;
             this.session = session;
             this.yieldSignal = yieldSignal;

@@ -21,22 +21,15 @@ import io.prestosql.spi.block.LongArrayBlockEncoding;
 import io.prestosql.spi.util.BloomFilter;
 import nova.hetu.omniruntime.vector.LongVec;
 import nova.hetu.omniruntime.vector.Vec;
-import nova.hetu.omniruntime.vector.VecAllocator;
 import org.openjdk.jol.info.ClassLayout;
 
-import javax.annotation.Nullable;
-
-import java.util.Optional;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 
-import static io.airlift.slice.SizeOf.sizeOf;
 import static io.prestosql.spi.block.BlockUtil.checkArrayRange;
 import static io.prestosql.spi.block.BlockUtil.checkValidRegion;
-import static io.prestosql.spi.block.BlockUtil.compactArray;
 import static io.prestosql.spi.block.BlockUtil.countUsedPositions;
 import static java.lang.Math.toIntExact;
-import static nova.hetu.olk.tool.BlockUtils.compactVec;
 
 /**
  * The type Long array omni block.
@@ -48,14 +41,7 @@ public class LongArrayOmniBlock
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(LongArrayOmniBlock.class).instanceSize();
 
-    private final VecAllocator vecAllocator;
-
-    private final int arrayOffset;
-
     private final int positionCount;
-
-    @Nullable
-    private final byte[] valueIsNull;
 
     private final LongVec values;
 
@@ -63,19 +49,7 @@ public class LongArrayOmniBlock
 
     private final long retainedSizeInBytes;
 
-    /**
-     * Instantiates a new Long array omni block.
-     *
-     * @param vecAllocator vector allocator
-     * @param positionCount the position count
-     * @param valueIsNull the value is null
-     * @param values the values
-     */
-    public LongArrayOmniBlock(VecAllocator vecAllocator, int positionCount, Optional<byte[]> valueIsNull,
-                              long[] values)
-    {
-        this(vecAllocator, 0, positionCount, valueIsNull.orElse(null), values);
-    }
+    private boolean hasNull;
 
     /**
      * Instantiates a new Long array omni block.
@@ -85,34 +59,24 @@ public class LongArrayOmniBlock
      */
     public LongArrayOmniBlock(int positionCount, LongVec values)
     {
-        this(positionCount, values.hasNullValue() ? Optional.of(values.getRawValueNulls()) : Optional.empty(), values);
+        this.positionCount = positionCount;
+        this.values = values;
+        this.sizeInBytes = (Long.BYTES + Byte.BYTES) * (long) positionCount;
+        this.retainedSizeInBytes = INSTANCE_SIZE + this.values.getCapacityInBytes();
+        this.hasNull = values.hasNull();
     }
 
     /**
      * Instantiates a new Long array omni block.
      *
-     * @param positionCount the position count
-     * @param valueIsNull the value is null
-     * @param values the values
-     */
-    public LongArrayOmniBlock(int positionCount, Optional<byte[]> valueIsNull, LongVec values)
-    {
-        this(values.getOffset(), positionCount, valueIsNull.orElse(null), values);
-    }
-
-    /**
-     * Instantiates a new Long array omni block.
-     *
-     * @param vecAllocator vector allocator
      * @param arrayOffset the array offset
      * @param positionCount the position count
      * @param valueIsNull the value is null
      * @param values the values
      */
-    public LongArrayOmniBlock(VecAllocator vecAllocator, int arrayOffset, int positionCount, byte[] valueIsNull,
+    public LongArrayOmniBlock(int arrayOffset, int positionCount, byte[] valueIsNull,
                               long[] values)
     {
-        this.vecAllocator = vecAllocator;
         if (arrayOffset < 0) {
             throw new IllegalArgumentException("arrayOffset is negative");
         }
@@ -125,7 +89,7 @@ public class LongArrayOmniBlock
             throw new IllegalArgumentException("values length is less than positionCount");
         }
 
-        this.values = new LongVec(vecAllocator, positionCount);
+        this.values = new LongVec(positionCount);
         this.values.put(values, 0, arrayOffset, positionCount);
 
         if (valueIsNull != null && valueIsNull.length - arrayOffset < positionCount) {
@@ -134,51 +98,11 @@ public class LongArrayOmniBlock
 
         if (valueIsNull != null) {
             this.values.setNulls(0, valueIsNull, arrayOffset, positionCount);
-            this.valueIsNull = compactArray(valueIsNull, arrayOffset, positionCount);
+            this.hasNull = true;
         }
-        else {
-            this.valueIsNull = null;
-        }
-
-        this.arrayOffset = 0;
 
         sizeInBytes = (Long.BYTES + Byte.BYTES) * (long) positionCount;
-        retainedSizeInBytes = INSTANCE_SIZE + sizeOf(valueIsNull) + this.values.getCapacityInBytes();
-    }
-
-    /**
-     * Instantiates a new Long array omni block.
-     *
-     * @param arrayOffset the array offset
-     * @param positionCount the position count
-     * @param valueIsNull the value is null
-     * @param values the values
-     */
-    public LongArrayOmniBlock(int arrayOffset, int positionCount, byte[] valueIsNull, LongVec values)
-    {
-        vecAllocator = values.getAllocator();
-        if (arrayOffset < 0) {
-            throw new IllegalArgumentException("arrayOffset is negative");
-        }
-        this.arrayOffset = arrayOffset;
-
-        if (positionCount < 0) {
-            throw new IllegalArgumentException("positionCount is negative");
-        }
-        this.positionCount = positionCount;
-
-        if (values.getSize() < positionCount) {
-            throw new IllegalArgumentException("values length is less than positionCount");
-        }
-        this.values = values;
-
-        if (valueIsNull != null && valueIsNull.length - arrayOffset < positionCount) {
-            throw new IllegalArgumentException("isNull length is less than positionCount");
-        }
-        this.valueIsNull = valueIsNull;
-
-        sizeInBytes = (Long.BYTES + Byte.BYTES) * (long) positionCount;
-        retainedSizeInBytes = INSTANCE_SIZE + sizeOf(valueIsNull) + this.values.getCapacityInBytes();
+        retainedSizeInBytes = INSTANCE_SIZE + this.values.getCapacityInBytes();
     }
 
     @Override
@@ -227,9 +151,6 @@ public class LongArrayOmniBlock
     public void retainedBytesForEachPart(BiConsumer<Object, Long> consumer)
     {
         consumer.accept(values.get(0, positionCount), (long) values.getCapacityInBytes());
-        if (valueIsNull != null) {
-            consumer.accept(valueIsNull, sizeOf(valueIsNull));
-        }
         consumer.accept(this, (long) INSTANCE_SIZE);
     }
 
@@ -263,7 +184,7 @@ public class LongArrayOmniBlock
 
     public Long get(int position)
     {
-        if (valueIsNull != null && valueIsNull[position + arrayOffset] == Vec.NULL) {
+        if (values.isNull(position)) {
             return null;
         }
         return values.get(position);
@@ -284,14 +205,14 @@ public class LongArrayOmniBlock
     @Override
     public boolean mayHaveNull()
     {
-        return valueIsNull != null;
+        return hasNull;
     }
 
     @Override
     public boolean isNull(int position)
     {
         checkReadablePosition(position);
-        return valueIsNull != null && valueIsNull[position + arrayOffset] == Vec.NULL;
+        return values.isNull(position);
     }
 
     @Override
@@ -306,7 +227,7 @@ public class LongArrayOmniBlock
     public Block getSingleValueBlock(int position)
     {
         checkReadablePosition(position);
-        return new LongArrayOmniBlock(vecAllocator, 0, 1, isNull(position) ? new byte[]{Vec.NULL} : null,
+        return new LongArrayOmniBlock(0, 1, isNull(position) ? new byte[]{Vec.NULL} : null,
                 new long[]{values.get(position)});
     }
 
@@ -314,20 +235,16 @@ public class LongArrayOmniBlock
     public Block copyPositions(int[] positions, int offset, int length)
     {
         checkArrayRange(positions, offset, length);
-        byte[] newValueIsNull = null;
         LongVec newValues = values.copyPositions(positions, offset, length);
-        if (valueIsNull != null) {
-            newValueIsNull = newValues.getRawValueNulls();
-        }
-        return new LongArrayOmniBlock(0, length, newValueIsNull, newValues);
+        return new LongArrayOmniBlock(length, newValues);
     }
 
     @Override
     public Block getRegion(int positionOffset, int length)
     {
         checkValidRegion(getPositionCount(), positionOffset, length);
-        LongVec newValues = values.slice(positionOffset, positionOffset + length);
-        return new LongArrayOmniBlock(newValues.getOffset(), length, valueIsNull, newValues);
+        LongVec newValues = values.slice(positionOffset, length);
+        return new LongArrayOmniBlock(length, newValues);
     }
 
     @Override
@@ -335,16 +252,9 @@ public class LongArrayOmniBlock
     {
         checkValidRegion(getPositionCount(), positionOffset, length);
 
-        LongVec newValues = compactVec(values, positionOffset, length);
-        byte[] newValueIsNull = valueIsNull == null
-                ? null
-                : compactArray(valueIsNull, positionOffset + arrayOffset, length);
-
-        if (newValueIsNull == valueIsNull && newValues == values) {
-            return this;
-        }
-
-        return new LongArrayOmniBlock(0, length, newValueIsNull, newValues);
+        LongVec newValues = values.slice(positionOffset, length);
+        values.close();
+        return new LongArrayOmniBlock(length, newValues);
     }
 
     @Override
@@ -384,7 +294,7 @@ public class LongArrayOmniBlock
     {
         int matchCount = 0;
         for (int i = 0; i < positionCount; i++) {
-            if (valueIsNull != null && valueIsNull[positions[i] + arrayOffset] == Vec.NULL) {
+            if (values.isNull(positions[i])) {
                 if (test.apply(null)) {
                     matchedPositions[matchCount++] = positions[i];
                 }

@@ -23,7 +23,7 @@ import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.type.Type;
 import nova.hetu.olk.block.ByteArrayOmniBlock;
 import nova.hetu.olk.operator.EnforceSingleRowOmniOperator.EnforceSingleRowOmniOperatorFactory;
-import nova.hetu.omniruntime.vector.VecAllocator;
+import nova.hetu.olk.tool.OmniPage;
 import org.powermock.core.classloader.annotations.PrepareForTest;
 import org.testng.annotations.Test;
 
@@ -39,11 +39,11 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Mockito.mock;
 
 @PrepareForTest({
         DistinctLimitOmniOperator.class,
-        ByteArrayOmniBlock.class
+        ByteArrayOmniBlock.class,
+        OmniPage.class
 })
 public class EnforceSingleRowOmniOperatorTest
         extends AbstractOperatorTest
@@ -68,7 +68,7 @@ public class EnforceSingleRowOmniOperatorTest
     @Override
     protected Operator createOperator(Operator originalOperator)
     {
-        return new EnforceSingleRowOmniOperator(originalOperator.getOperatorContext(), mock(VecAllocator.class));
+        return new EnforceSingleRowOmniOperator(originalOperator.getOperatorContext());
     }
 
     @Override

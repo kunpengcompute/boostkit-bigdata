@@ -19,7 +19,6 @@ import io.prestosql.operator.Operator;
 import io.prestosql.operator.OperatorFactory;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.PageBuilder;
-import io.prestosql.spi.block.LazyBlock;
 import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.type.Type;
 import nova.hetu.olk.block.LazyOmniBlock;
@@ -95,7 +94,7 @@ public class DistinctLimitOmniOperatorTest
         return new Page[]{
                 mockPage(),
                 PageBuilder.withMaxPageSize(1, asList()).build(),
-                new Page(new LazyBlock(10, block -> {}), new LazyBlock(10, block -> {}))
+                PageBuilder.withMaxPageSize(1, asList()).build()
         };
     }
 

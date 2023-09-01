@@ -56,9 +56,9 @@ public class Int128ArrayOmniBlockTest
     protected Block<?>[] blocksForTest()
     {
         return new Block<?>[]{
-                mockBlock(false, false, getVecAllocator(), fill(new Long[1][], index -> fill(new Long[2], idx -> new Random().nextLong()))),
-                mockBlock(false, false, getVecAllocator(), fill(new Long[2][], index -> fill(new Long[2], idx -> new Random().nextLong()))),
-                mockBlock(false, false, getVecAllocator(), fill(new Long[3][], index -> fill(new Long[2], idx -> new Random().nextLong())))
+                mockBlock(false, false, fill(new Long[1][], index -> fill(new Long[2], idx -> new Random().nextLong()))),
+                mockBlock(false, false, fill(new Long[2][], index -> fill(new Long[2], idx -> new Random().nextLong()))),
+                mockBlock(false, false, fill(new Long[3][], index -> fill(new Long[2], idx -> new Random().nextLong())))
         };
     }
 
@@ -66,7 +66,6 @@ public class Int128ArrayOmniBlockTest
     public void testFunctionCall(int index)
     {
         Block<?> block = getBlockForTest(index);
-        block.copyRegion(0, block.getPositionCount());
         block.copyPositions(new int[block.getPositionCount()], 0, block.getPositionCount());
         block.retainedBytesForEachPart((offset, position) -> {});
         block.getSingleValueBlock(0);

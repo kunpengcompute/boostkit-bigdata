@@ -38,8 +38,6 @@ import io.prestosql.spi.plan.PlanNodeId;
 import io.prestosql.spi.type.Type;
 import io.prestosql.split.RemoteSplit;
 import io.prestosql.sql.gen.OrderingCompiler;
-import nova.hetu.olk.tool.VecAllocatorHelper;
-import nova.hetu.omniruntime.vector.VecAllocator;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -119,14 +117,12 @@ public class MergeOmniOperator
         public SourceOperator createOperator(DriverContext driverContext)
         {
             checkState(!closed, "Factory is already closed");
-            VecAllocator vecAllocator = VecAllocatorHelper.createOperatorLevelAllocator(driverContext,
-                    VecAllocator.UNLIMIT, MergeOmniOperator.class);
 
             OperatorContext operatorContext = driverContext.addOperatorContext(operatorId, planNodeId,
                     MergeOmniOperator.class.getSimpleName());
 
             return new MergeOmniOperator(operatorContext, planNodeId, exchangeClientSupplier,
-                    serdeFactory.createPagesSerde(), orderByOmniOperatorFactory.createOperator(vecAllocator));
+                    serdeFactory.createPagesSerde(), orderByOmniOperatorFactory.createOperator());
         }
 
         @Override
