@@ -69,15 +69,20 @@ std::string spark::reader::GetFileSystemKey(std::string& path, std::string& ugi)
     return result;
 }
 
-Filesystem* spark::reader::GetFileSystemPtr(std::string& path, std::string& ugi)
+Filesystem* spark::reader::GetFileSystemPtr(std::string& path, std::string& ugi, arrow::Status &status)
 {
     auto key = GetFileSystemKey(path, ugi);
 
-    // if not find key, creadte the filesystem ptr
+    // if not find key, create the filesystem ptr
     auto iter = restore_filesysptr.find(key);
     if (iter == restore_filesysptr.end()) {
         Filesystem* fs = new Filesystem();
-        fs->filesys_ptr = std::move(fs::FileSystemFromUriOrPath(path)).ValueUnsafe();
+        auto result = fs::FileSystemFromUriOrPath(path);
+        status = result.status();
+        if (!status.ok()) {
+          return nullptr;
+        }
+        fs->filesys_ptr = std::move(result).ValueUnsafe();
         restore_filesysptr[key] = fs;
     }
 
@@ -97,9 +102,13 @@ Status ParquetReader::InitRecordReader(std::string& filePath, int64_t capacity,
     arrow_reader_properties.set_batch_size(capacity);
 
     // Get the file from filesystem
+    Status result;
     mutex_.lock();
-    Filesystem* fs = GetFileSystemPtr(filePath, ugi);
+    Filesystem* fs = GetFileSystemPtr(filePath, ugi, result);
     mutex_.unlock();
+    if (fs == nullptr || fs->filesys_ptr == nullptr) {
+      return Status::IOError(result);
+    }
     ARROW_ASSIGN_OR_RAISE(auto file, fs->filesys_ptr->OpenInputFile(filePath));
 
     FileReaderBuilder reader_builder;

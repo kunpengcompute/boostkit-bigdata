@@ -62,7 +62,7 @@ namespace spark::reader {
 
     std::string GetFileSystemKey(std::string& path, std::string& ugi);
 
-    Filesystem* GetFileSystemPtr(std::string& path, std::string& ugi);
+    Filesystem* GetFileSystemPtr(std::string& path, std::string& ugi, arrow::Status &status);
 
     int CopyToOmniVec(std::shared_ptr<arrow::DataType> vcType, int &omniTypeId, uint64_t &omniVecId,
         std::shared_ptr<arrow::Array> array);
