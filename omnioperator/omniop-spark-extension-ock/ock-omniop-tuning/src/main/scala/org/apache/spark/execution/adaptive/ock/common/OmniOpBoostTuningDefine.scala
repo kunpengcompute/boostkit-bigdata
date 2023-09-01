@@ -4,6 +4,7 @@
 
 package org.apache.spark.sql.execution.adaptive.ock.common
 
+import com.huawei.boostkit.spark.ColumnarPluginConfig
 import org.apache.spark.SparkEnv
 
 object OmniOpDefine {
@@ -18,6 +19,7 @@ object OmniOCKShuffleDefine {
 }
 
 object OmniRuntimeConfiguration {
+    val enableColumnarShuffle: Boolean = ColumnarPluginConfig.getSessionConf.enableColumnarShuffle
     val OMNI_SPILL_ROWS: Long = SparkEnv.get.conf.getLong(OmniOpDefine.COLUMNAR_SORT_SPILL_ROW_THRESHOLD, Integer.MAX_VALUE)
     val OMNI_SPILL_ROW_ENABLED: Boolean = SparkEnv.get.conf.getBoolean(OmniOpDefine.COLUMNAR_SORT_SPILL_ROW_BASED_ENABLED, defaultValue = true)
 }

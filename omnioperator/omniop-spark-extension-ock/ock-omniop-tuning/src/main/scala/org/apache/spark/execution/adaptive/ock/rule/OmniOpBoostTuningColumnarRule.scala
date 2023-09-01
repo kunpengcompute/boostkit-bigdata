@@ -9,15 +9,23 @@ import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.adaptive.ock.BoostTuningQueryManager
 import org.apache.spark.sql.execution.adaptive.ock.common.BoostTuningUtil.{getQueryExecutionId, normalizedSparkPlan}
+import org.apache.spark.sql.execution.adaptive.ock.common.OmniRuntimeConfiguration.enableColumnarShuffle
 import org.apache.spark.sql.execution.adaptive.ock.common.StringPrefix.SHUFFLE_PREFIX
 import org.apache.spark.sql.execution.adaptive.ock.exchange._
 import org.apache.spark.sql.execution.adaptive.ock.reader._
 import org.apache.spark.sql.execution.adaptive.{CustomShuffleReaderExec, QueryStageExec, ShuffleQueryStageExec}
 import org.apache.spark.sql.execution.exchange.ReusedExchangeExec
 
+import scala.collection.mutable
+
 case class OmniOpBoostTuningColumnarRule(pre: Rule[SparkPlan], post: Rule[SparkPlan]) extends ColumnarRule {
   override def preColumnarTransitions: Rule[SparkPlan] = pre
+
   override def postColumnarTransitions: Rule[SparkPlan] = post
+}
+
+object OmniOpBoostTuningColumnarRule {
+  val rollBackExchangeIdents: mutable.Set[String] = mutable.Set.empty
 }
 
 case class OmniOpBoostTuningPreColumnarRule() extends Rule[SparkPlan] {
@@ -33,7 +41,36 @@ case class OmniOpBoostTuningPreColumnarRule() extends Rule[SparkPlan] {
 
     delegate.reportQueryShuffleMetrics(query, plan)
 
-    replaceOmniQueryExchange(plan)  
+    tryMarkRollBack(plan)
+
+    replaceOmniQueryExchange(plan)
+  }
+
+  private def tryMarkRollBack(plan: SparkPlan): Unit = {
+    plan.foreach {
+      case plan: BoostTuningShuffleExchangeLike =>
+        if (!enableColumnarShuffle) {
+          OmniOpBoostTuningColumnarRule.rollBackExchangeIdents += plan.getContext.ident
+        }
+        try {
+          BoostTuningColumnarShuffleExchangeExec(plan.outputPartitioning, plan.child, plan.shuffleOrigin, null).buildCheck()
+        } catch {
+          case e: UnsupportedOperationException =>
+            logDebug(s"[OPERATOR FALLBACK] ${e} ${plan.getClass} falls back to Spark operator")
+            OmniOpBoostTuningColumnarRule.rollBackExchangeIdents += plan.getContext.ident
+          case l: UnsatisfiedLinkError =>
+            throw l
+          case f: NoClassDefFoundError =>
+            throw f
+          case r: RuntimeException =>
+            logDebug(s"[OPERATOR FALLBACK] ${r} ${plan.getClass} falls back to Spark operator")
+            OmniOpBoostTuningColumnarRule.rollBackExchangeIdents += plan.getContext.ident
+          case t: Throwable =>
+            logDebug(s"[OPERATOR FALLBACK] ${t} ${plan.getClass} falls back to Spark operator")
+            OmniOpBoostTuningColumnarRule.rollBackExchangeIdents += plan.getContext.ident
+        }
+      case _ =>
+    }
   }
 
   def replaceOmniQueryExchange(plan: SparkPlan): SparkPlan = {
@@ -44,17 +81,16 @@ case class OmniOpBoostTuningPreColumnarRule() extends Rule[SparkPlan] {
           PartitionContext(normalizedSparkPlan(ex, SHUFFLE_PREFIX)))
     }
   }
-
 }
 
 case class OmniOpBoostTuningPostColumnarRule() extends Rule[SparkPlan] {
-  
+
   override val ruleName: String = "OmniOpBoostTuningPostColumnarRule"
 
   override def apply(plan: SparkPlan): SparkPlan = {
 
     var newPlan = plan match {
-      case b: BoostTuningShuffleExchangeLike =>
+      case b: BoostTuningShuffleExchangeLike if !OmniOpBoostTuningColumnarRule.rollBackExchangeIdents.contains(b.getContext.ident) =>
         b.child match {
           case ColumnarToRowExec(child) =>
             BoostTuningColumnarShuffleExchangeExec(b.outputPartitioning, child, b.shuffleOrigin, b.getContext)
@@ -96,14 +132,14 @@ case class OmniOpBoostTuningPostColumnarRule() extends Rule[SparkPlan] {
     case r: SparkPlan
       if !r.isInstanceOf[QueryStageExec] && !r.supportsColumnar && r.children.exists(c =>
         c.isInstanceOf[ColumnarToRowExec]) =>
-        val children = r.children.map {
-          case c: ColumnarToRowExec =>
-            val child = additionalReplaceWithColumnarPlan(c.child)
-            OmniColumnarToRowExec(child)
-          case other =>
-            additionalReplaceWithColumnarPlan(other)
-        }
-        r.withNewChildren(children)
+      val children = r.children.map {
+        case c: ColumnarToRowExec =>
+          val child = additionalReplaceWithColumnarPlan(c.child)
+          OmniColumnarToRowExec(child)
+        case other =>
+          additionalReplaceWithColumnarPlan(other)
+      }
+      r.withNewChildren(children)
     case p =>
       val children = p.children.map(additionalReplaceWithColumnarPlan)
       p.withNewChildren(children)
