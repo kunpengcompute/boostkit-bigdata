@@ -56,7 +56,7 @@ public class AppResult extends Model {
     public long startTime;
 
     @Column()
-    public long finishTIme;
+    public long finishTime;
 
     @Column()
     public long durationTime;

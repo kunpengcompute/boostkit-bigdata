@@ -124,15 +124,12 @@ public class TezFetcher implements Fetcher {
     }
 
     private Optional<AppResult> extractAppResult(TezAnalyticJob tezJob, TezDagIdData dagIdData) {
-        if (!dagIdData.isComplete()) {
-            LOG.info("Application {} is running now, skip it", tezJob.getApplicationId());
-            return Optional.empty();
-        }
         LOG.info("Analyzing dag {}", dagIdData.getDagId());
         AppResult appResult = new AppResult();
         Map<String, String> jobConf;
         try {
             jobConf = tezJsonUtils.getConfigure(tezJob.getApplicationId());
+            appResult.parameters = Utils.parseMapToJsonString(loadParamsFromConf(TEZ_PARAMS_CONF_FILE, jobConf));
             appResult.query = tezJsonUtils.getQueryString(dagIdData.getDagId());
         } catch (IOException e) {
             LOG.error("Analyze job failed. ", e);
@@ -142,12 +139,20 @@ public class TezFetcher implements Fetcher {
         appResult.applicationId = tezJob.getApplicationId();
         appResult.applicationName = tezJob.getApplicationName();
         appResult.applicationWorkload = workload;
-        appResult.startTime = dagIdData.getStartTime();
-        appResult.finishTIme = dagIdData.getEndTime();
         appResult.jobType = tezJob.getType().getName();
-        appResult.parameters = Utils.parseMapToJsonString(loadParamsFromConf(TEZ_PARAMS_CONF_FILE, jobConf));
-        appResult.executionStatus = dagIdData.isSuccess() ? AppResult.SUCCEEDED_STATUS : AppResult.FAILED_STATUS;
-        appResult.durationTime = dagIdData.isSuccess() ? dagIdData.getDuration() : AppResult.FAILED_JOB_DURATION;
+
+        if (!dagIdData.isComplete()) {
+            LOG.info("Application {} using input time", tezJob.getApplicationId());
+            appResult.startTime = tezJob.getStartTimeMills();
+            appResult.finishTime = tezJob.getFinishTimeMills();
+            appResult.executionStatus = AppResult.SUCCEEDED_STATUS;
+            appResult.durationTime = appResult.finishTime - appResult.startTime;
+        } else {
+            appResult.startTime = dagIdData.getStartTime();
+            appResult.finishTime = dagIdData.getEndTime();
+            appResult.executionStatus = dagIdData.isSuccess() ? AppResult.SUCCEEDED_STATUS : AppResult.FAILED_STATUS;
+            appResult.durationTime = dagIdData.isSuccess() ? dagIdData.getDuration() : AppResult.FAILED_JOB_DURATION;
+        }
 
         return Optional.of(appResult);
     }

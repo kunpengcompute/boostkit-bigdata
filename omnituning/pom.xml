@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.huawei.boostkit</groupId>
-    <artifactId>omniTuning</artifactId>
+    <artifactId>omnituning</artifactId>
     <version>1.0.0</version>
 
     <organization>
@@ -13,7 +13,7 @@
     </organization>
 
     <properties>
-        <dep.os.arch/>
+        <dep.os.arch>aarcch64</dep.os.arch>
 
         <hadoop.version>3.2.0</hadoop.version>
         <spark.version>3.1.1</spark.version>
@@ -793,7 +793,7 @@
     </dependencies>
 
     <build>
-        <finalName>${artifactId}-${version}${dep.os.arch}</finalName>
+        <finalName>boostkit-${artifactId}-${version}-${dep.os.arch}</finalName>
         <resources>
             <resource>
                 <directory>src/main/resources</directory>

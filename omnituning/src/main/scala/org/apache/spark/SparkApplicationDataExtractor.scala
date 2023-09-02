@@ -44,7 +44,7 @@ object SparkApplicationDataExtractor {
       throw new OmniTuningException(s"application ${appInfo.id} is running")
     }
     appResult.startTime = attempt.startTime.getTime
-    appResult.finishTIme = attempt.endTime.getTime
+    appResult.finishTime = attempt.endTime.getTime
     appResult.applicationWorkload = workload
 
     val configurations: Map[String, String] = extractAppConfigurations(environmentInfo)

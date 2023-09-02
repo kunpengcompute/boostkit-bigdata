@@ -21,10 +21,14 @@ import com.huawei.boostkit.omnituning.fetcher.FetcherType;
 public class TezAnalyticJob implements AnalyticJob {
     private final String applicationId;
     private final String applicationName;
+    private final long startTimeMills;
+    private final long finishTimeMills;
 
-    public TezAnalyticJob(String applicationId, String applicationName) {
+    public TezAnalyticJob(String applicationId, String applicationName, long startTimeMills, long finishTimeMills) {
         this.applicationId = applicationId;
         this.applicationName = applicationName;
+        this.startTimeMills = startTimeMills;
+        this.finishTimeMills = finishTimeMills;
     }
 
     @Override
@@ -39,5 +43,13 @@ public class TezAnalyticJob implements AnalyticJob {
 
     public String getApplicationName() {
         return applicationName;
+    }
+
+    public long getStartTimeMills() {
+        return startTimeMills;
+    }
+
+    public long getFinishTimeMills() {
+        return finishTimeMills;
     }
 }

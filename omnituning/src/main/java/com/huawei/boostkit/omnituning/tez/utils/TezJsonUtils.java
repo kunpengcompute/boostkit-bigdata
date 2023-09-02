@@ -41,6 +41,7 @@ import java.util.Map;
 
 public class TezJsonUtils {
     private static final Logger LOG = LoggerFactory.getLogger(TezJsonUtils.class);
+    private static final String HIVE_APP_NAME_PREFIX = "HIVE-";
 
     private final TezUrlFactory tezUrlFactory;
     private final TimelineClient timelineClient;
@@ -66,12 +67,20 @@ public class TezJsonUtils {
         for (JsonNode app : apps) {
             String appId = app.get(RMWSConsts.APP_ID).getTextValue();
             if (AppResult.FINDER.byId(appId) == null) {
-                String name = app.get("name").getTextValue();
-                TezAnalyticJob tezJob = new TezAnalyticJob(appId, name);
+                String name = getApplicationName(app.get("name").getTextValue());
+                TezAnalyticJob tezJob = new TezAnalyticJob(appId, name, startedTime, finishedTime);
                 analyticJobs.add(tezJob);
             }
         }
         return analyticJobs;
+    }
+
+    private String getApplicationName(String name) {
+        if (name.startsWith(HIVE_APP_NAME_PREFIX)) {
+            return name.substring(HIVE_APP_NAME_PREFIX.length());
+        } else {
+            return name;
+        }
     }
 
     public List<TezDagIdData> getDAGIds(String applicationId) throws MalformedURLException {
