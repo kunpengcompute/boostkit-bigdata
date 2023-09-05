@@ -23,5 +23,7 @@ import com.huawei.boostkit.omnidata.model.datasource.DataSource;
 
 public class TaskSource {
     public TaskSource(DataSource dataSource, Predicate predicate, int maxPageSizeInBytes)  {}
+
+    public TaskSource(DataSource dataSource, Predicate predicate, int maxPageSizeInBytes, String groupId)  {}
 }
 

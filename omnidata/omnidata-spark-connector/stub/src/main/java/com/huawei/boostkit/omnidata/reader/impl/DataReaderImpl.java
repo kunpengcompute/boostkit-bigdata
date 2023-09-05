@@ -39,5 +39,7 @@ public class DataReaderImpl<T> {
     }
 
     public void close() {}
+
+    public void forceClose(String groupId) {}
 }
 

@@ -18,6 +18,7 @@
 package org.apache.spark.sql.execution
 
 import com.huawei.boostkit.omnioffload.spark.NdpPluginEnableFlag
+
 import java.util.concurrent.TimeUnit._
 import scala.collection.mutable.HashMap
 import org.apache.commons.lang3.StringUtils
@@ -32,7 +33,7 @@ import org.apache.spark.sql.catalyst.util.truncatedString
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.parquet.{ParquetFileFormat => ParquetSource}
 import org.apache.spark.sql.execution.metric.{SQLMetric, SQLMetrics}
-import org.apache.spark.sql.execution.ndp.NdpConf.{getOptimizerPushDownEnable, getOptimizerPushDownPreThreadTask, getOptimizerPushDownThreshold, getNdpPartialPushdown, getNdpPartialPushdownEnable, getTaskTimeout}
+import org.apache.spark.sql.execution.ndp.NdpConf.{getNdpPartialPushdown, getNdpPartialPushdownEnable, getOptimizerPushDownEnable, getOptimizerPushDownPreThreadTask, getOptimizerPushDownThreshold, getTaskTimeout}
 import org.apache.spark.sql.execution.ndp.{NdpConf, NdpSupport}
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.sources.{BaseRelation, Filter}
@@ -40,6 +41,8 @@ import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.vectorized.ColumnarBatch
 import org.apache.spark.util.Utils
 import org.apache.spark.util.collection.BitSet
+
+import java.util.UUID
 
 
 
@@ -682,10 +685,13 @@ abstract class BaseFileSourceScanExec(
         getOptimizerPushDownThreshold(fsRelation.sparkSession)
       }
       val preThreadTask: Int = getOptimizerPushDownPreThreadTask(fsRelation.sparkSession)
+
+      val omniGroupId = String.valueOf(UUID.randomUUID);
+
       new FileScanRDDPushDown(fsRelation.sparkSession, filePartitions, requiredSchema, output,
         relation.dataSchema, ndpOperators, partitionColumn, supportsColumnar, fsRelation.fileFormat,
         readFile, partialCondition, partialPdRate, zkRate, partialChildOutput, isNdpPluginOptimizerPush, pushDownTotal,
-        taskTotal, preThreadTask)
+        taskTotal, preThreadTask, omniGroupId)
     } else {
       new FileScanRDD(fsRelation.sparkSession, readFile, filePartitions)
     }

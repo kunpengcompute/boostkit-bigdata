@@ -154,6 +154,17 @@ public class DataIoAdapter {
 
     private boolean isOperatorCombineEnabled;
 
+    private String omniGroupId;
+
+    private final Thread shutdownHook = new Thread() {
+       public void run() {
+           if (orcDataReader != null && omniGroupId != null) {
+               LOG.info("force close task in {}", omniGroupId);
+               orcDataReader.forceClose(omniGroupId);
+           }
+       }
+    };
+
     /**
      * Contact with Omni-Data-Server
      *
@@ -174,7 +185,8 @@ public class DataIoAdapter {
             Seq<Attribute> filterOutPut,
             PushDownInfo pushDownOperators,
             ImmutableMap domains,
-            Boolean isColumnVector) throws TaskExecutionException, UnknownHostException {
+            Boolean isColumnVector,
+            String omniGroupId) throws TaskExecutionException, UnknownHostException {
         // initCandidates
         initCandidates(pageCandidate, filterOutPut);
 
@@ -199,10 +211,11 @@ public class DataIoAdapter {
         // create TaskSource
         DataSource dataSource = initDataSource(pageCandidate);
 
+        this.omniGroupId = omniGroupId;
         Predicate predicate = new Predicate(
                 omnidataTypes, omnidataColumns, filterRowExpression, omnidataProjections,
                 domains, ImmutableMap.of(), aggregations, limitLong);
-        TaskSource taskSource = new TaskSource(dataSource, predicate, MAX_PAGE_SIZE_IN_BYTES);
+        TaskSource taskSource = new TaskSource(dataSource, predicate, MAX_PAGE_SIZE_IN_BYTES, omniGroupId);
 
         // create deserializer
         this.isOperatorCombineEnabled =
@@ -253,6 +266,7 @@ public class DataIoAdapter {
             properties.put("omnidata.client.task.timeout", taskTimeout);
             LOG.info("Push down node info: [hostname :{} ,ip :{}]", pushDownHost, ipAddress);
             try {
+                Runtime.getRuntime().addShutdownHook(shutdownHook);
                 orcDataReader = new DataReaderImpl<>(
                         properties, taskSource, deserializer);
                 hasNextPage = true;
@@ -260,6 +274,7 @@ public class DataIoAdapter {
                 if (orcDataReader.isFinished()) {
                     orcDataReader.close();
                     hasNextPage = false;
+                    Runtime.getRuntime().removeShutdownHook(shutdownHook);
                 }
                 break;
             } catch (Exception e) {
@@ -268,6 +283,7 @@ public class DataIoAdapter {
                 if (orcDataReader != null) {
                     orcDataReader.close();
                     hasNextPage = false;
+                    Runtime.getRuntime().removeShutdownHook(shutdownHook);
                 }
             }
         }
@@ -313,6 +329,7 @@ public class DataIoAdapter {
             if (orcDataReader.isFinished()) {
                 orcDataReader.close();
                 hasNextPage = false;
+                Runtime.getRuntime().removeShutdownHook(shutdownHook);
                 return false;
             }
         } catch (Exception e) {
@@ -320,6 +337,7 @@ public class DataIoAdapter {
             if (orcDataReader != null) {
                 orcDataReader.close();
                 hasNextPage = false;
+                Runtime.getRuntime().removeShutdownHook(shutdownHook);
             }
             throw e;
         }

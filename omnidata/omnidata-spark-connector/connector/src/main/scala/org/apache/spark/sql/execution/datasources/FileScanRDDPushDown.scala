@@ -66,7 +66,8 @@ class FileScanRDDPushDown(
                            isOptimizerPushDown: Boolean = false,
                            pushDownTotal: Int,
                            taskTotal: Int,
-                           perThreadTask: Int = 1)
+                           perThreadTask: Int = 1,
+                           omniGroupId: String)
   extends RDD[InternalRow](sparkSession.sparkContext, Nil) {
 
   var columnOffset = -1
@@ -516,7 +517,7 @@ class FileScanRDDPushDown(
           currentFile.length, columnOffset, sdiHosts,
           fileFormat.toString, maxFailedTimes, taskTimeout,operatorCombineEnabled)
         val dataIoPage = dataIoClass.getPageIterator(pageCandidate, output,
-          partitionColumns, filterOutput, pushDownOperators, domains, isColumnVector)
+          partitionColumns, filterOutput, pushDownOperators, domains, isColumnVector, omniGroupId)
         currentIterator = pageToColumnarClass.transPageToColumnar(dataIoPage,
           isColumnVector, dataIoClass.isOperatorCombineEnabled, output, orcImpl).asScala.iterator
         iteHasNext()
