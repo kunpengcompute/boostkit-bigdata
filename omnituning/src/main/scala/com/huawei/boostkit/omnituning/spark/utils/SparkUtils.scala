@@ -28,7 +28,6 @@ import scala.collection.JavaConverters.asScalaSetConverter
 import scala.collection.mutable
 import scala.tools.jline_embedded.internal.InputStreamReader
 
-
 object SparkUtils {
   def findApplicationFiles(hadoopConfiguration: Configuration, eventLogDir: String, startTimeMills: Long,
                            finishTimeMills: Long, maxFileSize: Long): List[String] = {

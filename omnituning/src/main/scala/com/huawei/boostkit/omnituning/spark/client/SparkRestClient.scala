@@ -84,23 +84,20 @@ class SparkRestClient(historyUri: String, timeoutSeconds: Int, sparkConf: SparkC
   override def fetchAnalyticJobs(startTimeMills: Long, finishedTimeMills: Long): List[AnalyticJob] = {
     val minDate = sparkRestObjectMapper.getDateFormat.format(new Date(startTimeMills))
     val maxDate = sparkRestObjectMapper.getDateFormat.format(new Date(finishedTimeMills))
-    val appTarget = apiTarget.path("applications").queryParam("minDate", minDate).queryParam("maxDate", maxDate)
+    val appTarget = apiTarget.path("applications").queryParam("status", "completed")
+      .queryParam("minDate", minDate).queryParam("maxDate", maxDate)
 
     try {
       LOG.info(s"calling REST API at ${appTarget.getUri}")
       val applications = getApplications(appTarget, sparkRestObjectMapper.readValue[Seq[ApplicationInfo]])
+        .filter(job => AppResult.FINDER.byId(job.id) == null)
       val analyticJobs = new ListBuffer[AnalyticJob]()
       for (appInfo <- applications) {
         val attempts = appInfo.attempts
         if (attempts.isEmpty) {
           LOG.info("application {} attempt is empty, skip it", appInfo.id)
         } else {
-          val lastAttempt = appInfo.attempts.maxBy{ _.startTime }
-          if (!lastAttempt.completed) {
-            LOG.info("application {} is running, skip it", appInfo.id)
-          } else {
-            analyticJobs += new SparkRestAnalyticJob(appInfo.id)
-          }
+          analyticJobs += new SparkRestAnalyticJob(appInfo.id)
         }
       }
       analyticJobs.toList

@@ -15,6 +15,7 @@
 
 package com.huawei.boostkit.omnituning.tez;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.huawei.boostkit.omnituning.analysis.AnalyticJob;
 import com.huawei.boostkit.omnituning.exception.OmniTuningException;
 import com.huawei.boostkit.omnituning.fetcher.Fetcher;
@@ -27,6 +28,7 @@ import com.huawei.boostkit.omnituning.tez.utils.TezUrlFactory;
 import com.huawei.boostkit.omnituning.utils.Utils;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
+import org.apache.hadoop.yarn.api.records.YarnApplicationState;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,10 +47,9 @@ public class TezFetcher implements Fetcher {
     private static final String TEZ_WORKLOAD_KEY = "tez.workload";
     private static final String TEZ_TIMELINE_URL_KEY = "tez.timeline.url";
     private static final String TEZ_TIMELINE_TIMEOUT_KEY = "tez.timeline.timeout.ms";
-    private static final String TEZ_TIMELINE_USE_HTTPS_KEY = "tez.timeline.useHttps";
     private static final String DEFAULT_WORKLOAD = "default";
     private static final String DEFAULT_TIMELINE_URL = "http://localhost:8188";
-    private static final boolean DEFAULT_USE_HTTPS = false;
+    private static final String HTTPS_PREFIX = "https://";
     private static final int DEFAULT_CONNECTION_TIMEOUT_MS = 6000;
     private static final String TEZ_PARAMS_CONF_FILE = "TezParams";
 
@@ -63,7 +64,7 @@ public class TezFetcher implements Fetcher {
             TezUrlFactory tezUrlFactory = new TezUrlFactory(timelineUrl);
             this.workload = configuration.getString(TEZ_WORKLOAD_KEY, DEFAULT_WORKLOAD);
             int timeout = configuration.getInt(TEZ_TIMELINE_TIMEOUT_KEY, DEFAULT_CONNECTION_TIMEOUT_MS);
-            boolean useHttps = configuration.getBoolean(TEZ_TIMELINE_USE_HTTPS_KEY, DEFAULT_USE_HTTPS);
+            boolean useHttps = timelineUrl.startsWith(HTTPS_PREFIX);
             this.tezJsonUtils = new TezJsonUtils(tezUrlFactory, useHttps, timeout);
         }
     }
@@ -141,19 +142,30 @@ public class TezFetcher implements Fetcher {
         appResult.applicationWorkload = workload;
         appResult.jobType = tezJob.getType().getName();
 
-        if (!dagIdData.isComplete()) {
-            LOG.info("Application {} using input time", tezJob.getApplicationId());
-            appResult.startTime = tezJob.getStartTimeMills();
-            appResult.finishTime = tezJob.getFinishTimeMills();
-            appResult.executionStatus = AppResult.SUCCEEDED_STATUS;
-            appResult.durationTime = appResult.finishTime - appResult.startTime;
-        } else {
+        if (dagIdData.isComplete()) {
             appResult.startTime = dagIdData.getStartTime();
             appResult.finishTime = dagIdData.getEndTime();
             appResult.executionStatus = dagIdData.isSuccess() ? AppResult.SUCCEEDED_STATUS : AppResult.FAILED_STATUS;
             appResult.durationTime = dagIdData.isSuccess() ? dagIdData.getDuration() : AppResult.FAILED_JOB_DURATION;
+        } else {
+            appResult.startTime = tezJob.getStartTimeMills();
+            appResult.finishTime = tezJob.getFinishTimeMills();
+            if (tezJob.getState() == YarnApplicationState.KILLED) {
+                LOG.info("Application {} is killed, regarded as a failed task", tezJob.getApplicationId());
+                appResult.executionStatus = AppResult.FAILED_STATUS;
+                appResult.durationTime = AppResult.FAILED_JOB_DURATION;
+            } else {
+                LOG.info("Application {} using input time", tezJob.getApplicationId());
+                appResult.executionStatus = AppResult.SUCCEEDED_STATUS;
+                appResult.durationTime = appResult.finishTime - appResult.startTime;
+            }
         }
 
         return Optional.of(appResult);
+    }
+
+    @VisibleForTesting
+    protected void setTezJsonUtils(TezJsonUtils jsonUtils) {
+        this.tezJsonUtils = jsonUtils;
     }
 }

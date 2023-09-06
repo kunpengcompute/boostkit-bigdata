@@ -16,7 +16,6 @@
 package com.huawei.boostkit.omnituning.spark
 
 import com.huawei.boostkit.omnituning.analysis.AnalyticJob
-import com.huawei.boostkit.omnituning.exception.OmniTuningException
 import com.huawei.boostkit.omnituning.fetcher.{Fetcher, FetcherType}
 import com.huawei.boostkit.omnituning.models.AppResult
 import com.huawei.boostkit.omnituning.spark.client.{SparkEventClient, SparkLogClient, SparkRestClient}
@@ -44,18 +43,18 @@ class SparkFetcher (configure: PropertiesConfiguration)
 
   lazy val hadoopConfigure = new Configuration()
 
-  val sparkConf: SparkConf = {
+  lazy val sparkConf: SparkConf = {
     val sparkConf = new SparkConf()
     SparkUtils.getDefaultPropertiesFile() match {
       case Some(fileName) => sparkConf.setAll(SparkUtils.getPropertiesFromFile(fileName))
-      case None => throw new OmniTuningException("Can't find Spark conf; Please set SPARK_HOME or SPARK_CONF_DIR")
+      case None => LOG.warn("Can't find Spark conf, use default config, Please set SPARK_HOME or SPARK_CONF_DIR")
     }
     sparkConf
   }
 
   lazy val sparkClient: SparkEventClient = {
     if (sparkFetcherConfig.isRestMode) {
-      new SparkRestClient(sparkFetcherConfig.restUrl, sparkFetcherConfig.restTimeoutSeconds, sparkConf,
+      new SparkRestClient(sparkFetcherConfig.restUrl, sparkFetcherConfig.timeoutSeconds, sparkConf,
         sparkFetcherConfig.workload)
     } else {
       new SparkLogClient(hadoopConfigure, sparkConf, sparkFetcherConfig.logDirectory, sparkFetcherConfig.workload,
@@ -69,7 +68,7 @@ class SparkFetcher (configure: PropertiesConfiguration)
     val appId = job.getApplicationId
     LOG.info(s"Fetching data for ${appId}")
     val result = Try {
-      Await.result(doAnalysisApplication(job), Duration(sparkFetcherConfig.restTimeoutSeconds, SECONDS))
+      Await.result(doAnalysisApplication(job), Duration(sparkFetcherConfig.timeoutSeconds, SECONDS))
     }.transform(
       data => {
         LOG.info(s"Succeed fetching data for ${appId}")

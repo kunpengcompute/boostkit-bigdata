@@ -18,6 +18,8 @@ package com.huawei.boostkit.omnituning.utils;
 public final class MathUtils {
     public static final long SECOND_IN_MS = 1000L;
     public static final long MINUTE_IN_MS = 60L * SECOND_IN_MS;
+    public static final long HOUR_IN_MS = 60L * MINUTE_IN_MS;
+    public static final long DAY_IN_MS = 24 * HOUR_IN_MS;
 
     private MathUtils() {}
 }

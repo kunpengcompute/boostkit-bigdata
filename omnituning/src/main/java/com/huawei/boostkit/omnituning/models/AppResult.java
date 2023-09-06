@@ -15,6 +15,7 @@
 
 package com.huawei.boostkit.omnituning.models;
 
+import com.huawei.boostkit.omnituning.utils.MathUtils;
 import io.ebean.Finder;
 import io.ebean.Model;
 import io.ebean.annotation.Index;
@@ -31,7 +32,7 @@ import javax.persistence.Table;
 public class AppResult extends Model {
     private static final long serialVersionUID = 1L;
 
-    public static final long FAILED_JOB_DURATION = Long.MAX_VALUE;
+    public static final long FAILED_JOB_DURATION = MathUtils.DAY_IN_MS;
     public static final String RESULT_TABLE_NAME = "yarn_app_result";
     public static final int FAILED_STATUS = 0;
     public static final int SUCCEEDED_STATUS = 1;

@@ -15,7 +15,6 @@
 
 package org.apache.spark
 
-import com.huawei.boostkit.omnituning.exception.OmniTuningException
 import com.huawei.boostkit.omnituning.fetcher.FetcherType
 import com.huawei.boostkit.omnituning.models.AppResult
 import com.huawei.boostkit.omnituning.spark.utils.ScalaUtils.{checkSuccess, parseMapToJsonString}
@@ -40,9 +39,6 @@ object SparkApplicationDataExtractor {
     appResult.applicationName = appInfo.name
     appResult.jobType = FetcherType.SPARK.getName
     val attempt: ApplicationAttemptInfo = lastAttempt(appInfo)
-    if (!attempt.completed) {
-      throw new OmniTuningException(s"application ${appInfo.id} is running")
-    }
     appResult.startTime = attempt.startTime.getTime
     appResult.finishTime = attempt.endTime.getTime
     appResult.applicationWorkload = workload
@@ -53,14 +49,15 @@ object SparkApplicationDataExtractor {
 
     if (jobsList.nonEmpty) {
       val query: Option[String] = jobsList.maxBy(job => job.jobId).description
-      appResult.query = query.getOrElse("")
 
       if (checkSuccess(jobsList)) {
         appResult.executionStatus = AppResult.SUCCEEDED_STATUS
         appResult.durationTime = attempt.duration
+        appResult.query = query.getOrElse("")
       } else {
         appResult.executionStatus = AppResult.FAILED_STATUS
         appResult.durationTime = AppResult.FAILED_JOB_DURATION
+        appResult.query = ""
       }
     } else {
       appResult.query = ""
@@ -74,9 +71,8 @@ object SparkApplicationDataExtractor {
   private def extractRequiredConfiguration(sparkConfigure: Map[String, String]): Map[String, String] = {
     var sparkParamsFile: BufferedSource = null
     try {
-      sparkParamsFile = Source.fromFile(
-        SparkApplicationDataExtractor.getClass.getClassLoader.getResource(SPARK_REQUIRED_PARAMS_FILE).getPath,
-        StandardCharset.UTF_8.name)
+      sparkParamsFile = Source.fromFile(Thread.currentThread().getContextClassLoader
+        .getResource(SPARK_REQUIRED_PARAMS_FILE).getPath, StandardCharset.UTF_8.name)
       val params: Iterator[String] = sparkParamsFile.getLines()
       val requiredParams = new mutable.HashMap[String, String]()
       for (param <- params) {

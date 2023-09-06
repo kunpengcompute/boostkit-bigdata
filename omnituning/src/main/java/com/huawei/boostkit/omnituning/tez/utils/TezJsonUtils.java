@@ -21,6 +21,7 @@ import com.huawei.boostkit.omnituning.tez.data.TezAnalyticJob;
 import com.huawei.boostkit.omnituning.tez.data.TezDagIdData;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
+import org.apache.hadoop.yarn.api.records.YarnApplicationState;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.RMWSConsts;
 import org.apache.tez.common.ATSConstants;
 import org.apache.tez.dag.app.dag.DAGState;
@@ -68,7 +69,9 @@ public class TezJsonUtils {
             String appId = app.get(RMWSConsts.APP_ID).getTextValue();
             if (AppResult.FINDER.byId(appId) == null) {
                 String name = getApplicationName(app.get("name").getTextValue());
-                TezAnalyticJob tezJob = new TezAnalyticJob(appId, name, startedTime, finishedTime);
+                String state = app.get("appState").getTextValue();
+                TezAnalyticJob tezJob =
+                        new TezAnalyticJob(appId, name, startedTime, finishedTime, YarnApplicationState.valueOf(state));
                 analyticJobs.add(tezJob);
             }
         }
@@ -118,7 +121,7 @@ public class TezJsonUtils {
     }
 
     public String getQueryString(String dagId) throws MalformedURLException {
-        URL dagExtraInfoURL = tezUrlFactory.getDatExtraInfoURL(dagId);
+        URL dagExtraInfoURL = tezUrlFactory.getDagExtraInfoURL(dagId);
         LOG.info("Get query string by calling REST API {}", dagExtraInfoURL);
         JsonNode rootNode = timelineClient.readJsonNode(dagExtraInfoURL);
         return rootNode.path(ATSConstants.OTHER_INFO)

@@ -19,8 +19,6 @@ import org.apache.hadoop.yarn.server.resourcemanager.webapp.RMWSConsts;
 import org.apache.tez.common.ATSConstants;
 import org.apache.tez.dag.history.logging.EntityTypes;
 
-import javax.ws.rs.core.UriBuilder;
-
 import java.net.MalformedURLException;
 import java.net.URL;
 
@@ -30,7 +28,7 @@ public class TezUrlFactory {
     private static final String APPLICATION_TYPE = "TEZ";
     private static final String TEZ_APPLICATION_PREFIX = "tez_";
 
-    private static final String APPLICATION_HISTORY_URL = "%s/ws/v1/applicationhistory/apps";
+    private static final String APPLICATION_HISTORY_URL = "%s/ws/v1/applicationhistory/apps?%s=%s&%s=%s&%s=%s";
     private static final String TIMELINE_BASE_URL = "%s" + ATSConstants.RESOURCE_URI_BASE;
     private static final String TIMELINE_ENTITY_URL = TIMELINE_BASE_URL + "/%s/%s";
     private static final String TIMELINE_ENTITY_WITH_FILTER_URL = TIMELINE_BASE_URL + "/%s?primaryFilter=%s:%s";
@@ -55,15 +53,13 @@ public class TezUrlFactory {
                 ATSConstants.APPLICATION_ID, applicationId));
     }
 
-    public URL getDatExtraInfoURL(String dagId) throws MalformedURLException {
+    public URL getDagExtraInfoURL(String dagId) throws MalformedURLException {
         return new URL(format(TIMELINE_ENTITY_URL, baseUrl, EntityTypes.TEZ_DAG_EXTRA_INFO, dagId));
     }
 
     public URL getApplicationHistoryURL(long startTime, long finishTime) throws MalformedURLException {
-        return UriBuilder.fromUri(format(APPLICATION_HISTORY_URL, baseUrl))
-                .queryParam(RMWSConsts.APPLICATION_TYPES, APPLICATION_TYPE)
-                .queryParam(RMWSConsts.STARTED_TIME_BEGIN, startTime)
-                .queryParam(RMWSConsts.STARTED_TIME_END, finishTime)
-                .build().toURL();
+        return new URL(format(APPLICATION_HISTORY_URL, baseUrl, RMWSConsts.APPLICATION_TYPES, APPLICATION_TYPE,
+                RMWSConsts.STARTED_TIME_BEGIN, startTime, RMWSConsts.STARTED_TIME_END, finishTime));
+
     }
 }

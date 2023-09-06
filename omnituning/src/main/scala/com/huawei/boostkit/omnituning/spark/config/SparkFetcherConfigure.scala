@@ -26,7 +26,7 @@ class SparkFetcherConfigure(propertiesConfiguration: PropertiesConfiguration) {
   val restEventLogMode = "rest"
   val restUrlKey = "spark.rest.url"
   val defaultRestUrl = "http://localhost:18080"
-  val restTimeoutKey = "spark.rest.timeout.seconds"
+  val timeoutKey = "spark.timeout.seconds"
   val logEventLogMode = "log"
   val logDirectoryKey = "spark.log.directory"
   val maxLogFileSizeInMBKey = "spark.log.maxSize.mb"
@@ -37,7 +37,7 @@ class SparkFetcherConfigure(propertiesConfiguration: PropertiesConfiguration) {
   val enable: Boolean = propertiesConfiguration.getBoolean(enableKey, false)
   val mode: String = propertiesConfiguration.getString(eventLogModeKey)
   val restUrl: String = propertiesConfiguration.getString(restUrlKey, defaultRestUrl)
-  val restTimeoutSeconds: Int = propertiesConfiguration.getInt(restTimeoutKey, defaultTimeoutSeconds)
+  val timeoutSeconds: Int = propertiesConfiguration.getInt(timeoutKey, defaultTimeoutSeconds)
   val logDirectory: String = propertiesConfiguration.getString(logDirectoryKey, "")
   val maxLogSizeInMB: Int = propertiesConfiguration.getInt(maxLogFileSizeInMBKey, defaultMaxLogSize)
   val workload: String = propertiesConfiguration.getString(workloadKey, defaultWorkload)

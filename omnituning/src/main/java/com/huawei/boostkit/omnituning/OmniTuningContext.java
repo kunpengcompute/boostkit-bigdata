@@ -15,6 +15,7 @@
 
 package com.huawei.boostkit.omnituning;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.huawei.boostkit.omnituning.configuration.DBConfigure;
 import com.huawei.boostkit.omnituning.configuration.OmniTuningConfigure;
 import com.huawei.boostkit.omnituning.exception.OmniTuningException;
@@ -43,6 +44,17 @@ public final class OmniTuningContext {
         initDataSource(configuration);
         this.omniTuningConfig = loadOmniTuningConfig(configuration);
         this.fetcherFactory = loadFetcherFactory(configuration);
+    }
+
+    private OmniTuningContext(boolean test) {
+        PropertiesConfiguration configuration = loadConfigure();
+        this.omniTuningConfig = loadOmniTuningConfig(configuration);
+        this.fetcherFactory = loadFetcherFactory(configuration);
+    }
+
+    @VisibleForTesting
+    protected static void initTestInstance() {
+        instance = new OmniTuningContext(true);
     }
 
     public static OmniTuningContext getInstance() {
