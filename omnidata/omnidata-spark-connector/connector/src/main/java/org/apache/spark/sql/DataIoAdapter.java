@@ -196,6 +196,9 @@ public class DataIoAdapter {
         // init column info
         if (pushDownOperators.aggExecutions().size() == 0) {
             isPushDownAgg = false;
+            if (sparkOutPut.isEmpty()) {
+                sparkOutPut = filterOutPut;
+            }
             initColumnInfo(sparkOutPut);
         }
 

@@ -80,33 +80,14 @@ case class NdpPushDown(sparkSession: SparkSession)
   private var isNdpPluginOptimizerPush = false
 
   override def apply(plan: SparkPlan): SparkPlan = {
-    val fixedPlan=fixSpecial(plan)
-    setConfigForTPCH(fixedPlan)
+    setConfigForTPCH(plan)
     isNdpPluginOptimizerPush = NdpPluginEnableFlag.isEnable(sparkSession) && getOptimizerPushDownEnable(sparkSession)
-    if(isNdpPluginOptimizerPush && pushDownEnabled && shouldPushDown(fixedPlan) && shouldPushDown()){
-      pushDownScanWithOutOtherOperator(fixedPlan)
-    } else if (!isNdpPluginOptimizerPush && pushDownEnabled && shouldPushDown(fixedPlan) && shouldPushDown()) {
-      pushDownOperator(fixedPlan)
+    if(isNdpPluginOptimizerPush && pushDownEnabled && shouldPushDown(plan) && shouldPushDown()){
+      pushDownScanWithOutOtherOperator(plan)
+    } else if (!isNdpPluginOptimizerPush && pushDownEnabled && shouldPushDown(plan) && shouldPushDown()) {
+      pushDownOperator(plan)
     } else {
       plan
-    }
-  }
-
-  def supplyEmptyProjectForCrossJoin(project: ProjectExec): ProjectExec = {
-    if (project.projectList.isEmpty) {
-      return ProjectExec(project.child.output, project.child)
-    }
-    project
-  }
-
-  def fixSpecial(plan: SparkPlan): SparkPlan = {
-    plan.transformDown {
-      // fix for cross join t and no column select from t will have 0 projectList Project,
-      // then will wrong update Scan output in the latter code
-      case CartesianProductExec(p1: ProjectExec, p2: ProjectExec, condition)
-        if p1.projectList.isEmpty || p2.projectList.isEmpty =>
-        CartesianProductExec(supplyEmptyProjectForCrossJoin(p1), supplyEmptyProjectForCrossJoin(p2), condition)
-      case p => p
     }
   }
 
