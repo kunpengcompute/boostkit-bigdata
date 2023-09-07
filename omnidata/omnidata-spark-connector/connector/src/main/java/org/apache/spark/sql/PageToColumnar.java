@@ -84,7 +84,10 @@ public class PageToColumnar implements Serializable {
                 internalRowList.add(columnarBatch);
             } else {
                 for (int j = 0; j < positionCount; j++) {
-                    procVectorForOrcHive(columnVector, orcImpl, outputColumnList, j);
+                    // when outputColumnList is empty, the output does not need to be processed.
+                    if (!outputColumnList.isEmpty()) {
+                        procVectorForOrcHive(columnVector, orcImpl, outputColumnList, j);
+                    }
                     MutableColumnarRow mutableColumnarRow =
                             new MutableColumnarRow(columnVector);
                     mutableColumnarRow.rowId = j;

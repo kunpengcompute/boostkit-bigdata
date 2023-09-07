@@ -196,6 +196,10 @@ public class DataIoAdapter {
         // init column info
         if (pushDownOperators.aggExecutions().size() == 0) {
             isPushDownAgg = false;
+            // deal with join has a project node with empty output
+            if (sparkOutPut.isEmpty()) {
+                sparkOutPut = filterOutPut;
+            }
             initColumnInfo(sparkOutPut);
         }
 
