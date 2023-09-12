@@ -52,6 +52,9 @@ case class ColumnarSortMergeJoinExec(
     projectList: Seq[NamedExpression] = Seq.empty)
   extends BaseColumnarSortMergeJoinExec(leftKeys, rightKeys, joinType, condition, left, right, isSkewJoin, projectList) {
 
+  override protected def withNewChildrenInternal(newLeft: SparkPlan, newRight: SparkPlan): ColumnarSortMergeJoinExec =
+    copy(left = newLeft, right = newRight)
+
   override def doExecuteColumnar(): RDD[ColumnarBatch] = {
     val numOutputRows = longMetric("numOutputRows")
     val numOutputVecBatchs = longMetric("numOutputVecBatchs")
@@ -285,7 +288,7 @@ case class ColumnarSortMergeJoinExec(
       }
 
       if (enableSortMergeJoinBatchMerge) {
-        new MergeIterator(iterBatch, resultSchema, numMergedVecBatchs, bypassVecBatchs)
+        new MergeIterator(iterBatch, resultSchema, numMergedVecBatchs)
       } else {
         iterBatch
       }

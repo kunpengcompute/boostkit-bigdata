@@ -92,8 +92,8 @@ class OmniOrcFileFormat extends FileFormat with DataSourceRegister with Serializ
         Iterator.empty
       } else {
         // ORC predicate pushdown
-        if (orcFilterPushDown) {
-          OrcUtils.readCatalystSchema(filePath, conf, ignoreCorruptFiles).foreach { 
+        if (orcFilterPushDown && filters.nonEmpty) {
+          OrcUtils.readCatalystSchema(filePath, conf, ignoreCorruptFiles).foreach {
             fileSchema => OrcFilters.createFilter(fileSchema, filters).foreach { f =>
               OrcInputFormat.setSearchArgument(conf, f, fileSchema.fieldNames)
             }
@@ -107,6 +107,8 @@ class OmniOrcFileFormat extends FileFormat with DataSourceRegister with Serializ
           "[BUG] requested column IDs do not match required schema")
         val taskConf = new Configuration(conf)
 
+        val includeColumns = requestedColIds.filter(_ != -1).sorted.mkString(",")
+        taskConf.set(OrcConf.INCLUDE_COLUMNS.getAttribute, includeColumns)
         val fileSplit = new FileSplit(filePath, file.start, file.length, Array.empty)
         val attemptId = new TaskAttemptID(new TaskID(new JobID(), TaskType.MAP, 0), 0)
         val taskAttemptContext = new TaskAttemptContextImpl(taskConf, attemptId)

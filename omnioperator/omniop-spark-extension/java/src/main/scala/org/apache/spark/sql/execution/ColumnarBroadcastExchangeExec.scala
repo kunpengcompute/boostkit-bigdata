@@ -19,7 +19,7 @@ package org.apache.spark.sql.execution
 
 import java.util.concurrent._
 
-import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor.sparkTypeToOmniType
+import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil.transColBatchToOmniVecs
 import nova.hetu.omniruntime.vector.VecBatch
 import nova.hetu.omniruntime.vector.serialize.VecBatchSerializerFactory
@@ -53,6 +53,10 @@ class ColumnarBroadcastExchangeExec(mode: BroadcastMode, child: SparkPlan)
     "collectTime" -> SQLMetrics.createTimingMetric(sparkContext, "time to collect"),
     "broadcastTime" -> SQLMetrics.createTimingMetric(sparkContext, "time to broadcast"))
 
+  def buildCheck(): Unit = {
+    child.output.foreach(attr => OmniExpressionAdaptor.sparkTypeToOmniType(attr.dataType, attr.metadata))
+  }
+
   @transient
   private lazy val promise = Promise[broadcast.Broadcast[Any]]()
 
@@ -63,15 +67,10 @@ class ColumnarBroadcastExchangeExec(mode: BroadcastMode, child: SparkPlan)
   @transient
   private val timeout: Long = SQLConf.get.broadcastTimeout
 
-  def buildCheck(): Unit = {
-    child.output.map(
-      exp => sparkTypeToOmniType(exp.dataType, exp.metadata)).toArray
-  }
-
   @transient
   override lazy val relationFuture: Future[broadcast.Broadcast[Any]] = {
     SQLExecution.withThreadLocalCaptured[broadcast.Broadcast[Any]](
-      sqlContext.sparkSession, ColumnarBroadcastExchangeExec.executionContext) {
+      session.sqlContext.sparkSession, ColumnarBroadcastExchangeExec.executionContext) {
       try {
         // Setup a job group here so later it may get cancelled by groupId if necessary.
         sparkContext.setJobGroup(runId.toString, s"broadcast exchange (runId $runId)",
@@ -164,6 +163,9 @@ class ColumnarBroadcastExchangeExec(mode: BroadcastMode, child: SparkPlan)
       }
     }
   }
+
+  override protected def withNewChildInternal(newChild: SparkPlan): ColumnarBroadcastExchangeExec =
+    new ColumnarBroadcastExchangeExec(this.mode, newChild)
 
   override protected def doPrepare(): Unit = {
     // Materialize the future.

@@ -109,6 +109,8 @@ class OmniParquetFileFormat extends FileFormat with DataSourceRegister with Logg
     val pushDownStringStartWith = sqlConf.parquetFilterPushDownStringStartWith
     val pushDownInFilterThreshold = sqlConf.parquetFilterPushDownInFilterThreshold
     val isCaseSensitive = sqlConf.caseSensitiveAnalysis
+    val parquetOptions = new ParquetOptions(options, sparkSession.sessionState.conf)
+    val datetimeRebaseModeInRead = parquetOptions.datetimeRebaseModeInRead
 
     (file: PartitionedFile) => {
       assert(file.partitionValues.numFields == partitionSchema.size)
@@ -129,6 +131,10 @@ class OmniParquetFileFormat extends FileFormat with DataSourceRegister with Logg
 
       val footerFileMetaData = fileFooter.getFileMetaData
 
+      val datetimeRebaseSpec = DataSourceUtils.datetimeRebaseSpec(
+        footerFileMetaData.getKeyValueMetaData.get,
+        datetimeRebaseModeInRead)
+
       // Try to push down filters when filter push-down is enabled.
       val pushed = if (enableParquetFilterPushDown) {
         val parquetSchema = footerFileMetaData.getSchema
@@ -139,7 +145,8 @@ class OmniParquetFileFormat extends FileFormat with DataSourceRegister with Logg
           pushDownDecimal,
           pushDownStringStartWith,
           pushDownInFilterThreshold,
-          isCaseSensitive)
+          isCaseSensitive,
+          datetimeRebaseSpec)
         filters
           // Collects all converted Parquet filter predicates. Notice that not all predicates can be
           // converted (`ParquetFilters.createFilter` returns an `Option`). That's why a `flatMap`

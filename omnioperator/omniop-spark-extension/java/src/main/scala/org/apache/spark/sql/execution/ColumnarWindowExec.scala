@@ -50,6 +50,9 @@ case class ColumnarWindowExec(windowExpression: Seq[NamedExpression],
 
   override def supportsColumnar: Boolean = true
 
+  override protected def withNewChildInternal(newChild: SparkPlan): ColumnarWindowExec =
+    copy(child = newChild)
+
   override lazy val metrics = Map(
     "addInputTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni addInput"),
     "numInputVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of input vecBatchs"),
