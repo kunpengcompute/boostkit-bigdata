@@ -21,7 +21,7 @@ import org.junit.Test;
 public class TestOmniTuningRunner extends TestConfiguration {
     @Test
     public void testRunOmniTuningRunner() {
-        OmniTuningContext.initTestInstance();
-        OmniTuning.main(new String[] {"2020-09-02 00:00:00", "2020-09-02 00:00:00"});
+        OmniTuningContext.initContext();
+        OmniTuning.main(new String[] {"2020-09-02 00:00:00", "2020-09-02 00:00:00", "user", "pass"});
     }
 }

@@ -42,12 +42,12 @@ public final class DBConfigure {
 
     private DBConfigure() {}
 
-    public static void initDatabase(PropertiesConfiguration configuration) {
+    public static void initDatabase(PropertiesConfiguration configuration, String userName, String passWord) {
         Properties databaseProperties = new Properties();
         databaseProperties.put(DB_DRIVER_KEY, configuration.getString(DB_DRIVER_KEY, DB_DEFAULT_DRIVER));
         databaseProperties.put(DB_URL_KEY, configuration.getString(DB_URL_KEY));
-        databaseProperties.put(DB_USERNAME_KEY, configuration.getString(DB_USERNAME_KEY));
-        databaseProperties.put(DB_PASSWORD_KEY, configuration.getString(DB_PASSWORD_KEY));
+        databaseProperties.put(DB_USERNAME_KEY, userName);
+        databaseProperties.put(DB_PASSWORD_KEY, passWord);
 
         DatabaseConfig dbConfig = new DatabaseConfig();
         dbConfig.loadFromProperties(databaseProperties);

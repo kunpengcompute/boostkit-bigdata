@@ -15,7 +15,6 @@
 
 package com.huawei.boostkit.omnituning;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.huawei.boostkit.omnituning.configuration.DBConfigure;
 import com.huawei.boostkit.omnituning.configuration.OmniTuningConfigure;
 import com.huawei.boostkit.omnituning.exception.OmniTuningException;
@@ -24,6 +23,8 @@ import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.builder.FileBasedConfigurationBuilder;
 import org.apache.commons.configuration2.builder.fluent.Configurations;
 import org.apache.commons.configuration2.ex.ConfigurationException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
@@ -31,6 +32,7 @@ import java.nio.charset.StandardCharsets;
 import static java.lang.String.format;
 
 public final class OmniTuningContext {
+    private static final Logger LOG = LoggerFactory.getLogger(OmniTuningContext.class);
     private static final String CONFIG_FILE_NAME = "omniTuningConf.properties";
     private static final String ENCODING = StandardCharsets.UTF_8.displayName();
 
@@ -40,26 +42,42 @@ public final class OmniTuningContext {
     private final FetcherFactory fetcherFactory;
 
     private OmniTuningContext() {
+        this(false, null, null);
+    }
+
+    private OmniTuningContext(String user, String passwd) {
+        this(true, user, passwd);
+    }
+
+    private OmniTuningContext(boolean initDatabase, String user, String passwd) {
         PropertiesConfiguration configuration = loadConfigure();
-        initDataSource(configuration);
+        if (initDatabase) {
+            initDataSource(configuration, user, passwd);
+        }
         this.omniTuningConfig = loadOmniTuningConfig(configuration);
         this.fetcherFactory = loadFetcherFactory(configuration);
     }
 
-    private OmniTuningContext(boolean test) {
-        PropertiesConfiguration configuration = loadConfigure();
-        this.omniTuningConfig = loadOmniTuningConfig(configuration);
-        this.fetcherFactory = loadFetcherFactory(configuration);
+    public static void initContext(String user, String passwd) {
+        if (instance == null) {
+            instance = new OmniTuningContext(user, passwd);
+        } else {
+            LOG.warn("OmniTuningContext has been instantiated");
+        }
     }
 
-    @VisibleForTesting
-    protected static void initTestInstance() {
-        instance = new OmniTuningContext(true);
+    // only use for unit test
+    public static void initContext() {
+        if (instance == null) {
+            instance = new OmniTuningContext();
+        } else {
+            LOG.warn("OmniTuningContext has been instantiated");
+        }
     }
 
     public static OmniTuningContext getInstance() {
         if (instance == null) {
-            instance = new OmniTuningContext();
+            throw new OmniTuningException("OmniTuningContext has not been instantiated");
         }
         return instance;
     }
@@ -86,8 +104,8 @@ public final class OmniTuningContext {
         }
     }
 
-    private void initDataSource(PropertiesConfiguration configuration) {
-        DBConfigure.initDatabase(configuration);
+    private void initDataSource(PropertiesConfiguration configuration, String user, String passwd) {
+        DBConfigure.initDatabase(configuration, user, passwd);
     }
 
     private OmniTuningConfigure loadOmniTuningConfig(PropertiesConfiguration configuration) {

@@ -61,7 +61,7 @@ public class TezJsonUtils {
     public List<AnalyticJob> getApplicationJobs(long startedTime, long finishedTime)
             throws IOException, AuthenticationException {
         URL historyUrl = tezUrlFactory.getApplicationHistoryURL(startedTime, finishedTime);
-        LOG.info("calling RESAT API AT at {} to get applications", historyUrl.toString());
+        LOG.info("calling REST API at {} to get applications", historyUrl.toString());
         JsonNode rootNode = timelineClient.readJsonNode(historyUrl);
         JsonNode apps = rootNode.path("app");
         List<AnalyticJob> analyticJobs = new ArrayList<>();

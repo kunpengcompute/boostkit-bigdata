@@ -21,6 +21,6 @@ import org.junit.Test;
 public class TestDBConfigure extends TestConfiguration {
     @Test(expected = DataSourceInitialiseException.class)
     public void testDBConfigure() {
-        DBConfigure.initDatabase(testConfiguration);
+        DBConfigure.initDatabase(testConfiguration, "user", "passwd");
     }
 }

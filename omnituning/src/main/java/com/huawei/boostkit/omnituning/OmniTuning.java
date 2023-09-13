@@ -20,24 +20,29 @@ import com.huawei.boostkit.omnituning.executor.OmniTuningRunner;
 import org.apache.commons.lang.time.DateUtils;
 
 import java.text.ParseException;
+import java.util.Arrays;
 import java.util.Date;
+import java.util.List;
+import java.util.stream.Collectors;
 
 public final class OmniTuning {
-    private static final int REQUIRED_PARAMS_LENGTH = 2;
+    private static final int REQUIRED_PARAMS_LENGTH = 4;
     private static final String[] TIME_PARSE_PATTERNS = {"yyyy-MM-dd HH:mm:ss"};
 
     private OmniTuning() {}
 
     public static void main(String[] args) {
-        if (args.length != REQUIRED_PARAMS_LENGTH) {
-            throw new OmniTuningException("The number of parameters is abnormal. Only two parameters are supported.");
+        List<String> params = removeEmptyArgs(args);
+
+        if (params.size() != REQUIRED_PARAMS_LENGTH) {
+            throw new OmniTuningException("The number of parameters is abnormal. Only four parameters are supported.");
         }
 
         Date startDate;
         Date finishDate;
         try {
-            startDate = DateUtils.parseDate(args[0], TIME_PARSE_PATTERNS);
-            finishDate = DateUtils.parseDate(args[1], TIME_PARSE_PATTERNS);
+            startDate = DateUtils.parseDate(params.get(0), TIME_PARSE_PATTERNS);
+            finishDate = DateUtils.parseDate(params.get(1), TIME_PARSE_PATTERNS);
         } catch (ParseException e) {
             throw new OmniTuningException("Unsupported date format. Only the 'yyyy-MM-dd HH:mm:ss' is supported", e);
         }
@@ -49,8 +54,12 @@ public final class OmniTuning {
             throw new OmniTuningException("start time cannot be greater than finish time");
         }
 
-        OmniTuningContext.getInstance();
+        OmniTuningContext.initContext(params.get(2), params.get(3));
         OmniTuningRunner runner = new OmniTuningRunner(startTimeMills, finishedTimeMills);
         runner.run();
+    }
+
+    private static List<String> removeEmptyArgs(String[] args) {
+        return Arrays.stream(args).filter(arg -> !arg.isEmpty()).collect(Collectors.toList());
     }
 }

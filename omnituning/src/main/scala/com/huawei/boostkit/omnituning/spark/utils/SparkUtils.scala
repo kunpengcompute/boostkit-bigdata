@@ -37,8 +37,8 @@ object SparkUtils {
     if (fs.exists(eventLogDirPath) && fs.getFileStatus(eventLogDirPath).isDirectory) {
       fs.listStatus(eventLogDirPath).filter(status => {
         val fileSize = status.getLen
-        val accessTime = status.getAccessTime
-        accessTime >= startTimeMills && accessTime <= finishTimeMills && fileSize <= maxFileSize
+        val modifyTime = status.getModificationTime
+        modifyTime >= startTimeMills && modifyTime <= finishTimeMills && fileSize <= maxFileSize
       }).map { status => status.getPath.toString }.toList
     } else {
       throw new OmniTuningException("eventLog path is not exist or not a Directory")
