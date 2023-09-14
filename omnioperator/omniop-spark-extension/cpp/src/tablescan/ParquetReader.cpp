@@ -38,6 +38,7 @@ static constexpr int32_t INT128_BYTES = 16;
 static constexpr int32_t INT64_BYTES = 8;
 static constexpr int32_t BYTE_BITS = 8;
 static constexpr int32_t LOCAL_FILE_PREFIX = 5;
+static constexpr int32_t LOCAL_FILE_PREFIX_EXT = 7;
 static const std::string LOCAL_FILE = "file:";
 static const std::string HDFS_FILE = "hdfs:";
 
@@ -48,11 +49,9 @@ std::string spark::reader::GetFileSystemKey(std::string& path, std::string& ugi)
 
     // if the hdfs file, only get the ip and port just like the ugi + ip + port as key
     if (path.substr(0, LOCAL_FILE_PREFIX) == HDFS_FILE) {
-        auto mid = path.find(":", LOCAL_FILE_PREFIX);
-        auto end = path.find("/", mid);
-        std::string s1 = path.substr(LOCAL_FILE_PREFIX, mid - LOCAL_FILE_PREFIX);
-        std::string s2 = path.substr(mid + 1, end - (mid + 1));
-        result += s1 + ":" + s2;
+        auto end = path.find("/", LOCAL_FILE_PREFIX_EXT);
+        std::string ip_and_port = path.substr(LOCAL_FILE_PREFIX_EXT, end - LOCAL_FILE_PREFIX_EXT);
+        result += ip_and_port;
         return result;
     }
 
