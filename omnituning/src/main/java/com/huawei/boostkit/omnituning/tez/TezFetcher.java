@@ -25,7 +25,9 @@ import com.huawei.boostkit.omnituning.tez.data.TezAnalyticJob;
 import com.huawei.boostkit.omnituning.tez.data.TezDagIdData;
 import com.huawei.boostkit.omnituning.tez.utils.TezJsonUtils;
 import com.huawei.boostkit.omnituning.tez.utils.TezUrlFactory;
+import com.huawei.boostkit.omnituning.tez.utils.TimelineClient;
 import com.huawei.boostkit.omnituning.utils.Utils;
+import com.sun.jersey.api.client.ClientHandlerException;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.yarn.api.records.YarnApplicationState;
@@ -92,7 +94,7 @@ public class TezFetcher implements Fetcher {
     public List<AnalyticJob> fetchAnalyticJobs(long startTimeMills, long finishedTimeMills) {
         try {
             return tezJsonUtils.getApplicationJobs(startTimeMills, finishedTimeMills);
-        } catch (IOException | AuthenticationException e) {
+        } catch (IOException | AuthenticationException | ClientHandlerException e) {
             LOG.error("Fetch applications from timeline server failed.", e);
             return Collections.emptyList();
         }
@@ -108,7 +110,7 @@ public class TezFetcher implements Fetcher {
         List<TezDagIdData> dagIds;
         try {
             dagIds = tezJsonUtils.getDAGIds(job.getApplicationId());
-        } catch (IOException e) {
+        } catch (IOException | ClientHandlerException e) {
             LOG.error("Get dagIds from timeline server failed.", e);
             return Optional.empty();
         }
@@ -167,5 +169,10 @@ public class TezFetcher implements Fetcher {
     @VisibleForTesting
     protected void setTezJsonUtils(TezJsonUtils jsonUtils) {
         this.tezJsonUtils = jsonUtils;
+    }
+
+    @VisibleForTesting
+    protected void setTimelineClient(TimelineClient timelineClient) {
+        this.tezJsonUtils.setTimelineClient(timelineClient);
     }
 }

@@ -38,31 +38,38 @@ object SparkApplicationDataExtractor {
     appResult.applicationId = appInfo.id
     appResult.applicationName = appInfo.name
     appResult.jobType = FetcherType.SPARK.getName
+    appResult.applicationWorkload = workload
+
     val attempt: ApplicationAttemptInfo = lastAttempt(appInfo)
     appResult.startTime = attempt.startTime.getTime
     appResult.finishTime = attempt.endTime.getTime
-    appResult.applicationWorkload = workload
 
     val configurations: Map[String, String] = extractAppConfigurations(environmentInfo)
-
     appResult.parameters = parseMapToJsonString(extractRequiredConfiguration(configurations))
 
-    if (jobsList.nonEmpty) {
-      val query: Option[String] = jobsList.maxBy(job => job.jobId).description
-
-      if (checkSuccess(jobsList)) {
-        appResult.executionStatus = AppResult.SUCCEEDED_STATUS
-        appResult.durationTime = attempt.duration
-        appResult.query = query.getOrElse("")
-      } else {
-        appResult.executionStatus = AppResult.FAILED_STATUS
-        appResult.durationTime = AppResult.FAILED_JOB_DURATION
-        appResult.query = ""
-      }
-    } else {
-      appResult.query = ""
+    if (!attempt.completed) {
+      // In this case, the task is killed, consider as a failed task
       appResult.executionStatus = AppResult.FAILED_STATUS
       appResult.durationTime = AppResult.FAILED_JOB_DURATION
+      appResult.query = ""
+    } else {
+      if (jobsList.nonEmpty) {
+        val query: Option[String] = jobsList.maxBy(job => job.jobId).description
+
+        if (checkSuccess(jobsList)) {
+          appResult.executionStatus = AppResult.SUCCEEDED_STATUS
+          appResult.durationTime = attempt.duration
+          appResult.query = query.getOrElse("")
+        } else {
+          appResult.executionStatus = AppResult.FAILED_STATUS
+          appResult.durationTime = AppResult.FAILED_JOB_DURATION
+          appResult.query = ""
+        }
+      } else {
+        appResult.query = ""
+        appResult.executionStatus = AppResult.FAILED_STATUS
+        appResult.durationTime = AppResult.FAILED_JOB_DURATION
+      }
     }
 
     appResult

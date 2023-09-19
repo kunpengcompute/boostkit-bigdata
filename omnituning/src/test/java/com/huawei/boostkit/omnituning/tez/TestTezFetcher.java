@@ -18,10 +18,16 @@ package com.huawei.boostkit.omnituning.tez;
 import com.huawei.boostkit.omnituning.analysis.AnalyticJob;
 import com.huawei.boostkit.omnituning.configuration.TestConfiguration;
 import com.huawei.boostkit.omnituning.exception.OmniTuningException;
+import com.huawei.boostkit.omnituning.fetcher.FetcherType;
 import com.huawei.boostkit.omnituning.models.AppResult;
 import com.huawei.boostkit.omnituning.spark.data.SparkRestAnalyticJob;
+import com.huawei.boostkit.omnituning.tez.data.TezAnalyticJob;
+import com.huawei.boostkit.omnituning.tez.utils.TestTezClient;
+import io.ebean.Finder;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
+import org.apache.hadoop.yarn.api.records.YarnApplicationState;
 import org.junit.Test;
+import org.mockito.Mockito;
 
 import java.io.IOException;
 import java.net.MalformedURLException;
@@ -41,9 +47,57 @@ import static com.huawei.boostkit.omnituning.tez.utils.TestTezContext.TIME_14;
 import static com.huawei.boostkit.omnituning.tez.utils.TestTezContext.TIME_18;
 import static com.huawei.boostkit.omnituning.tez.utils.TestTezContext.UNFINISHED_JOB;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.Matchers.any;
+import static org.mockito.Mockito.when;
 
 public class TestTezFetcher extends TestConfiguration {
+    @Test
+    public void testGetApplicationFromTimeline() throws IOException {
+        TezFetcher fetcher = new TezFetcher(testConfiguration);
+        fetcher.setTimelineClient(TestTezClient.getTestTimelineClient());
+        Finder finder = Mockito.mock(Finder.class);
+        when(finder.byId(any())).thenReturn(null);
+        AppResult.FINDER = finder;
+        List<AnalyticJob> job = fetcher.fetchAnalyticJobs(0L, 100L);
+        assertEquals(job.size(), 1);
+    }
+
+    @Test
+    public void testGetType() {
+        TezFetcher fetcher = new TezFetcher(testConfiguration);
+        assertEquals(fetcher.getType(), FetcherType.TEZ);
+    }
+
+    @Test
+    public void tesGetApplicationsWithError() {
+        TezFetcher fetcher = new TezFetcher(testConfiguration);
+        List<AnalyticJob> jobs = fetcher.fetchAnalyticJobs(0L, 100L);
+        assertTrue(jobs.isEmpty());
+    }
+
+    @Test
+    public void testAnalyzeWithError() {
+        TezFetcher fetcher = new TezFetcher(testConfiguration);
+        Optional<AppResult> result = fetcher.analysis(new TezAnalyticJob("id", "name", 0L, 1L, YarnApplicationState.FINISHED));
+        assertFalse(result.isPresent());
+    }
+
+    @Test
+    public void testEnable() {
+        TezFetcher fetcher = new TezFetcher(testConfiguration);
+        assertFalse(fetcher.isEnable());
+    }
+
+    @Test
+    public void testAnalyze() throws IOException {
+        TezFetcher fetcher = new TezFetcher(testConfiguration);
+        fetcher.setTimelineClient(TestTezClient.getTestTimelineClient());
+        AnalyticJob testJob = new TezAnalyticJob("test", "test", 0, 100, YarnApplicationState.FINISHED);
+        fetcher.analysis(testJob);
+    }
+
     @Test
     public void testGetApplications() throws AuthenticationException, IOException {
         TezFetcher fetcher = new TezFetcher(testConfiguration);

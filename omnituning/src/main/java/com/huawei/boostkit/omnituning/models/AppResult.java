@@ -41,7 +41,7 @@ public class AppResult extends Model {
     private static final int APPLICATION_WORKLOAD_LIMIT = 50;
     private static final int JOB_TYPE_LIMIT = 50;
 
-    public static final Finder<String, AppResult> FINDER = new Finder<>(AppResult.class);
+    public static Finder<String, AppResult> FINDER = new Finder<>(AppResult.class);
 
     @Id
     @Column(length = APPLICATION_ID_LIMIT, unique = true, nullable = false)

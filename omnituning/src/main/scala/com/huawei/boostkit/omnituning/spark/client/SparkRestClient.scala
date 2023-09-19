@@ -76,16 +76,19 @@ class SparkRestClient(historyUri: String, timeoutSeconds: Int, sparkConf: SparkC
 
   private val client: Client = ClientBuilder.newClient()
 
-  private val apiTarget: WebTarget = client.property(ClientProperties.CONNECT_TIMEOUT, timeout.toMillis.toInt)
+  private var apiTarget: WebTarget = client.property(ClientProperties.CONNECT_TIMEOUT, timeout.toMillis.toInt)
     .property(ClientProperties.READ_TIMEOUT, timeout.toMillis.toInt)
     .target(historyServerUri)
     .path(API_V1_MOUNT_PATH)
 
+  protected def setApiTarget(apiTarget: WebTarget): Unit = {
+    this.apiTarget = apiTarget
+  }
+
   override def fetchAnalyticJobs(startTimeMills: Long, finishedTimeMills: Long): List[AnalyticJob] = {
     val minDate = sparkRestObjectMapper.getDateFormat.format(new Date(startTimeMills))
     val maxDate = sparkRestObjectMapper.getDateFormat.format(new Date(finishedTimeMills))
-    val appTarget = apiTarget.path("applications").queryParam("status", "completed")
-      .queryParam("minDate", minDate).queryParam("maxDate", maxDate)
+    val appTarget = apiTarget.path("applications").queryParam("minDate", minDate).queryParam("maxDate", maxDate)
 
     try {
       LOG.info(s"calling REST API at ${appTarget.getUri}")

@@ -15,12 +15,56 @@
 
 package com.huawei.boostkit.omnituning.configuration;
 
+import io.ebean.config.DatabaseConfig;
 import io.ebean.datasource.DataSourceInitialiseException;
 import org.junit.Test;
+import org.mockito.Mockito;
+
+import javax.sql.DataSource;
+
+import java.sql.Connection;
+import java.sql.DatabaseMetaData;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+
+import static org.mockito.Matchers.any;
+import static org.mockito.Mockito.when;
 
 public class TestDBConfigure extends TestConfiguration {
     @Test(expected = DataSourceInitialiseException.class)
     public void testDBConfigure() {
         DBConfigure.initDatabase(testConfiguration, "user", "passwd");
+    }
+
+    @Test
+    public void testInitDataBase() throws SQLException {
+        ResultSet resultSet = Mockito.mock(ResultSet.class);
+        DatabaseMetaData metaData = Mockito.mock(DatabaseMetaData.class);
+        Connection connection = Mockito.mock(Connection.class);
+        DataSource dataSource = Mockito.mock(DataSource.class);
+        DatabaseConfig dbConfig = Mockito.mock(DatabaseConfig.class);
+
+        when(resultSet.next()).thenReturn(true);
+        when(metaData.getTables(any(), any(), any(), any())).thenReturn(resultSet);
+        when(connection.getMetaData()).thenReturn(metaData);
+        when(dbConfig.getDataSource()).thenReturn(dataSource);
+        when(dataSource.getConnection()).thenReturn(connection);
+        DBConfigure.checkInit(dbConfig);
+    }
+
+    @Test
+    public void testNotInitDatabase() throws SQLException {
+        ResultSet resultSet = Mockito.mock(ResultSet.class);
+        DatabaseMetaData metaData = Mockito.mock(DatabaseMetaData.class);
+        Connection connection = Mockito.mock(Connection.class);
+        DataSource dataSource = Mockito.mock(DataSource.class);
+        DatabaseConfig dbConfig = Mockito.mock(DatabaseConfig.class);
+
+        when(resultSet.next()).thenReturn(false);
+        when(metaData.getTables(any(), any(), any(), any())).thenReturn(resultSet);
+        when(connection.getMetaData()).thenReturn(metaData);
+        when(dbConfig.getDataSource()).thenReturn(dataSource);
+        when(dataSource.getConnection()).thenReturn(connection);
+        DBConfigure.checkInit(dbConfig);
     }
 }

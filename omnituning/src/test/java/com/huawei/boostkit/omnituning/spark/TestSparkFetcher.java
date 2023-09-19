@@ -15,18 +15,24 @@
 
 package com.huawei.boostkit.omnituning.spark;
 
+import com.huawei.boostkit.omnituning.analysis.AnalyticJob;
+import com.huawei.boostkit.omnituning.fetcher.FetcherType;
 import com.huawei.boostkit.omnituning.models.AppResult;
 import com.huawei.boostkit.omnituning.spark.data.SparkLogAnalyticJob;
+import io.ebean.Finder;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.mockito.Mockito;
 
 import java.net.URL;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.Matchers.any;
+import static org.mockito.Mockito.when;
 
 public class TestSparkFetcher {
     private static String testResourcePath;
@@ -35,15 +41,34 @@ public class TestSparkFetcher {
     @BeforeClass
     public static void setUp() {
         PropertiesConfiguration sparkConfig = Mockito.mock(PropertiesConfiguration.class);
-        Mockito.when(sparkConfig.getBoolean("spark.enable", false)).thenReturn(true);
-        Mockito.when(sparkConfig.getString("spark.workload", "default")).thenReturn("default");
-        Mockito.when(sparkConfig.getString("spark.eventLogs.mode")).thenReturn("log");
-        Mockito.when(sparkConfig.getInt("spark.timeout.seconds", 30)).thenReturn(30);
+        when(sparkConfig.getBoolean("spark.enable", false)).thenReturn(true);
+        when(sparkConfig.getString("spark.workload", "default")).thenReturn("default");
+        when(sparkConfig.getString("spark.eventLogs.mode")).thenReturn("log");
+        when(sparkConfig.getInt("spark.timeout.seconds", 30)).thenReturn(30);
         URL resource = Thread.currentThread().getContextClassLoader().getResource("spark-events");
         testResourcePath = resource.getPath();
-        Mockito.when(sparkConfig.getString("spark.log.directory", "")).thenReturn(resource.getPath());
-        Mockito.when(sparkConfig.getInt("spark.log.maxSize.mb", 500)).thenReturn(500);
+        when(sparkConfig.getString("spark.log.directory", "")).thenReturn(resource.getPath());
+        when(sparkConfig.getInt("spark.log.maxSize.mb", 500)).thenReturn(500);
         sparkFetcher = new SparkFetcher(sparkConfig);
+    }
+
+    @Test
+    public void testEnable() {
+        assertTrue(sparkFetcher.isEnable());
+    }
+
+    @Test
+    public void testFetcherType() {
+        assertEquals(sparkFetcher.getType(), FetcherType.SPARK);
+    }
+
+    @Test
+    public void testGetApplications() {
+        Finder finder = Mockito.mock(Finder.class);
+        when(finder.byId(any())).thenReturn(null);
+        AppResult.FINDER = finder;
+        List<AnalyticJob> jobs = sparkFetcher.fetchAnalyticJobs(0L, Long.MAX_VALUE);
+        assertEquals(jobs.size(), 1);
     }
 
     @Test

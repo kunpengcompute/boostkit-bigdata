@@ -54,7 +54,12 @@ public final class DBConfigure {
 
         dbConfig.setDataSource(DataSourceFactory.create(dbConfig.getName(), dbConfig.getDataSourceConfig()));
 
-        LOG.info("Checking whether the result table exists");
+        checkInit(dbConfig);
+
+        DatabaseFactory.create(dbConfig);
+    }
+
+    public static void checkInit(DatabaseConfig dbConfig) {
         boolean isInit;
         try (Connection conn = dbConfig.getDataSource().getConnection();
              ResultSet rs = conn.getMetaData().getTables(conn.getCatalog(), null, AppResult.RESULT_TABLE_NAME, null)) {
@@ -68,7 +73,5 @@ public final class DBConfigure {
             dbConfig.setDdlGenerate(true);
             dbConfig.setDdlRun(true);
         }
-
-        DatabaseFactory.create(dbConfig);
     }
 }

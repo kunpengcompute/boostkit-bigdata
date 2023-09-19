@@ -17,6 +17,7 @@ package com.huawei.boostkit.omnituning.executor;
 
 import com.huawei.boostkit.omnituning.exception.OmniTuningException;
 import com.huawei.boostkit.omnituning.security.HadoopSecurity;
+import org.apache.hadoop.conf.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,7 +38,8 @@ public class OmniTuningRunner implements Runnable {
     public void run() {
         LOG.info("OmniTuning has started");
         try {
-            HadoopSecurity hadoopSecurity = new HadoopSecurity();
+            Configuration hadoopConf = new Configuration();
+            HadoopSecurity hadoopSecurity = new HadoopSecurity(hadoopConf);
             hadoopSecurity.doAs(new AnalysisAction(hadoopSecurity, startTimeMills, finishTimeMills));
         } catch (IOException e) {
             LOG.error("failed to analyze jobs", e);

@@ -32,8 +32,7 @@ public final class HadoopSecurity {
     private String keytabUser;
     private UserGroupInformation loginUser;
 
-    public HadoopSecurity() throws IOException {
-        Configuration conf = new Configuration();
+    public HadoopSecurity(Configuration conf) throws IOException {
         UserGroupInformation.setConfiguration(conf);
         boolean securityEnabled = UserGroupInformation.isSecurityEnabled();
         if (securityEnabled) {

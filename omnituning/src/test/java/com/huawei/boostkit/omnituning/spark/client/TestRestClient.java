@@ -15,30 +15,138 @@
 
 package com.huawei.boostkit.omnituning.spark.client;
 
-import com.huawei.boostkit.omnituning.exception.OmniTuningException;
+import com.huawei.boostkit.omnituning.analysis.AnalyticJob;
+import com.huawei.boostkit.omnituning.models.AppResult;
 import com.huawei.boostkit.omnituning.spark.data.SparkRestAnalyticJob;
+import io.ebean.Finder;
 import org.apache.spark.SparkConf;
-import org.junit.BeforeClass;
 import org.junit.Test;
+import org.mockito.Mockito;
+import scala.collection.immutable.List;
 
-import javax.ws.rs.ProcessingException;
+import javax.ws.rs.client.Invocation.Builder;
+import javax.ws.rs.client.WebTarget;
+import javax.ws.rs.core.MediaType;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.mockito.Matchers.any;
+import static org.mockito.Mockito.when;
 
 public class TestRestClient {
-    private static SparkRestClient restClient;
+    private static final String TEST_URL = "http://testUri";
+    private static final String TEST_APP_INFO =
+            "{" +
+                "\"id\" : \"test\"," +
+                "\"name\" : \"test\"," +
+                "\"attempts\" : [{" +
+                    "\"startTime\" : \"2023-09-08T03:10:30.194GMT\"," +
+                    "\"endTime\" : \"2023-09-08T03:11:34.864GMT\"," +
+                    "\"lastUpdated\" : \"2023-09-08T03:11:34.970GMT\"," +
+                    "\"duration\" : 62670," +
+                    "\"sparkUser\" : \"root\"," +
+                    "\"completed\" : true," +
+                    "\"appSparkVersion\" : \"3.1.1\"," +
+                    "\"startTimeEpoch\" : 1694142632194," +
+                    "\"lastUpdatedEpoch\" : 1694142694970," +
+                    "\"endTimeEpoch\" : 1694142694864" +
+                "}]" +
+            "}";
 
-    @BeforeClass
-    public static void setUp() {
-        restClient = new SparkRestClient("history-url", 1, new SparkConf(), "default");
+    private static final String TEST_APP_INFO_LIST = "[" + TEST_APP_INFO + "]";
+
+    private static final String TEST_EMPTY_APP_INFO_LIST = "[{\"id\":\"test\",\"name\":\"test\",\"attempts\":[]}]";
+
+    @Test
+    public void testGetApplications() throws URISyntaxException {
+        Finder finder = Mockito.mock(Finder.class);
+        when(finder.byId(any())).thenReturn(null);
+        AppResult.FINDER = finder;
+        SparkRestClient restClient = new SparkRestClient("history-url", 1, new SparkConf(), "default");
+        WebTarget webTarget = Mockito.mock(WebTarget.class);
+        when(webTarget.getUri()).thenReturn(new URI(TEST_URL));
+        when(webTarget.path(any())).thenReturn(webTarget);
+        when(webTarget.queryParam(any(), any())).thenReturn(webTarget);
+        Builder builder = Mockito.mock(Builder.class);
+        when(builder.get(String.class)).thenReturn(TEST_APP_INFO_LIST);
+        when(webTarget.request(MediaType.APPLICATION_JSON)).thenReturn(builder);
+        restClient.setApiTarget(webTarget);
+        List<AnalyticJob> jobList = restClient.fetchAnalyticJobs(0L, 100L);
+        assertEquals(jobList.size(), 1);
     }
 
-    @Test(expected = OmniTuningException.class)
-    public void testGetApplications() {
-        restClient.fetchAnalyticJobs(0L, 100L);
+    @Test
+    public void testGetEmptyApplication() throws URISyntaxException {
+        Finder finder = Mockito.mock(Finder.class);
+        when(finder.byId(any())).thenReturn(null);
+        AppResult.FINDER = finder;
+        SparkRestClient restClient = new SparkRestClient("history-url", 1, new SparkConf(), "default");
+        WebTarget webTarget = Mockito.mock(WebTarget.class);
+        when(webTarget.getUri()).thenReturn(new URI(TEST_URL));
+        when(webTarget.path(any())).thenReturn(webTarget);
+        when(webTarget.queryParam(any(), any())).thenReturn(webTarget);
+        Builder builder = Mockito.mock(Builder.class);
+        when(builder.get(String.class)).thenReturn(TEST_EMPTY_APP_INFO_LIST);
+        when(webTarget.request(MediaType.APPLICATION_JSON)).thenReturn(builder);
+        restClient.setApiTarget(webTarget);
+        List<AnalyticJob> jobList = restClient.fetchAnalyticJobs(0L, 100L);
+        assertEquals(jobList.size(), 0);
     }
 
-    @Test(expected = ProcessingException.class)
-    public void testAnalysis() {
-        SparkRestAnalyticJob restJob = new SparkRestAnalyticJob("appId");
-        restClient.fetchAnalyticResult(restJob);
+    @Test
+    public void testAnalysis() throws IOException, URISyntaxException {
+        // build test file
+        final File workDir = new File(System.getProperty("test.dir", "target"));
+
+        URL filePath = Thread.currentThread().getContextClassLoader()
+                .getResource("spark-events/application_1516285256255_0012");
+        assertNotNull(filePath);
+        File fileToZip = new File(filePath.getPath());
+
+        String outZip = workDir + System.getProperty("file.separator") + "output.zip";
+        File outputFile = new File(outZip);
+
+        try (FileOutputStream fos = new FileOutputStream(outputFile);
+             ZipOutputStream zos = new ZipOutputStream(fos)) {
+
+            ZipEntry zipEntry = new ZipEntry(fileToZip.getName());
+            zos.putNextEntry(zipEntry);
+
+            try (FileInputStream fis = new FileInputStream(fileToZip)) {
+                byte[] buffer = new byte[1024];
+                int len;
+                while ((len = fis.read(buffer)) > 0) {
+                    zos.write(buffer, 0, len);
+                }
+            }
+        }
+
+        // test analyze
+        SparkRestAnalyticJob restJob = new SparkRestAnalyticJob("application_1516285256255_0012");
+        SparkRestClient restClient = new SparkRestClient("history-url", 1, new SparkConf(), "default");
+        WebTarget webTarget = Mockito.mock(WebTarget.class);
+        when(webTarget.getUri()).thenReturn(new URI(TEST_URL));
+        when(webTarget.path(any())).thenReturn(webTarget);
+        when(webTarget.queryParam(any(), any())).thenReturn(webTarget);
+        Builder builder = Mockito.mock(Builder.class);
+        InputStream inputStream = new FileInputStream(outputFile.getAbsoluteFile());
+        when(builder.get(InputStream.class)).thenReturn(inputStream);
+        when(builder.get(String.class)).thenReturn(TEST_APP_INFO);
+        when(webTarget.request(MediaType.APPLICATION_OCTET_STREAM)).thenReturn(builder);
+        when(webTarget.request(MediaType.APPLICATION_JSON)).thenReturn(builder);
+        restClient.setApiTarget(webTarget);
+        AppResult result = restClient.fetchAnalyticResult(restJob);
+        assertEquals(result.applicationId, "application_1516285256255_0012");
     }
 }

@@ -34,7 +34,7 @@ import scala.concurrent.duration.{Duration, SECONDS}
 import scala.concurrent.{Await, Future}
 import scala.util.{Failure, Success, Try}
 
-class SparkFetcher (configure: PropertiesConfiguration)
+class SparkFetcher(configure: PropertiesConfiguration)
   extends Fetcher
 {
   private val LOG: Logger = LoggerFactory.getLogger(classOf[SparkFetcher])

@@ -45,7 +45,7 @@ public class TezJsonUtils {
     private static final String HIVE_APP_NAME_PREFIX = "HIVE-";
 
     private final TezUrlFactory tezUrlFactory;
-    private final TimelineClient timelineClient;
+    private TimelineClient timelineClient;
 
     public TezJsonUtils(TezUrlFactory tezUrlFactory, boolean useHttps, int timeout) {
         this.tezUrlFactory = tezUrlFactory;
@@ -129,5 +129,9 @@ public class TezJsonUtils {
                 .path(DAGUtils.DAG_CONTEXT_KEY)
                 .get(ATSConstants.DESCRIPTION)
                 .getTextValue();
+    }
+
+    public void setTimelineClient(TimelineClient timelineClient) {
+        this.timelineClient = timelineClient;
     }
 }
