@@ -353,6 +353,8 @@ case class NdpOverrides(sparkSession: SparkSession) extends Rule[SparkPlan] {
 
 case class NdpRules(session: SparkSession) extends ColumnarRule with Logging {
 
+  var maxSizeInBytes: BigInt = 0L
+
   def ndpOverrides: NdpOverrides = NdpOverrides(session)
 
   override def preColumnarTransitions: Rule[SparkPlan] = plan => {
@@ -360,12 +362,44 @@ case class NdpRules(session: SparkSession) extends ColumnarRule with Logging {
   }
 
   override def postColumnarTransitions: Rule[SparkPlan] = plan => {
-    if (NdpPluginEnableFlag.isEnable(plan.sqlContext.sparkSession)) {
+    if (NdpPluginEnableFlag.isNdpOptimizedEnable(plan.sqlContext.sparkSession)) {
       val rule = ndpOverrides
       rule(plan)
+    } else if (NdpPluginEnableFlag.isEnable(plan.sqlContext.sparkSession)) {
+      applyOptimizedRules(plan)
     } else {
       plan
     }
+  }
+
+  def applyOptimizedRules(plan: SparkPlan): SparkPlan = {
+    plan.foreach {
+      case s: FileSourceScanExec =>
+        val sTable = s.tableIdentifier.get
+        val stats = plan.sqlContext.sparkSession.sessionState.catalog.getTableMetadata(sTable).stats
+        if (stats.isDefined) {
+          val sizeInBytes = stats.get.sizeInBytes
+          if (sizeInBytes > maxSizeInBytes) {
+            var shufflePartition = "200"
+            var fileMaxBytes = "512MB"
+            if (sizeInBytes <= 100000000L) {
+              fileMaxBytes = NdpConnectorUtils.getMixSqlBaseMaxFilePtBytesStr("200")
+              shufflePartition = NdpConnectorUtils.getShufflePartitionsStr("512MB")
+            } else if (sizeInBytes > 100000000L && sizeInBytes < 10000000000L) {
+              fileMaxBytes = NdpConnectorUtils.getMixSqlBaseMaxFilePtBytesStr("1000")
+              shufflePartition = NdpConnectorUtils.getShufflePartitionsStr("256MB")
+            } else {
+              fileMaxBytes = NdpConnectorUtils.getMixSqlBaseMaxFilePtBytesStr("1000")
+              shufflePartition = NdpConnectorUtils.getShufflePartitionsStr("128MB")
+            }
+            SQLConf.get.setConfString(SQLConf.FILES_MAX_PARTITION_BYTES.key, fileMaxBytes)
+            SQLConf.get.setConfString(SQLConf.SHUFFLE_PARTITIONS.key, shufflePartition)
+            maxSizeInBytes = sizeInBytes
+          }
+        }
+      case _ =>
+    }
+    plan
   }
 }
 
@@ -396,7 +430,7 @@ case class NdpOptimizerRules(session: SparkSession) extends Rule[LogicalPlan] {
 
 
   override def apply(plan: LogicalPlan): LogicalPlan = {
-    if (NdpPluginEnableFlag.isEnable(session)) {
+    if (NdpPluginEnableFlag.isNdpOptimizedEnable(session)) {
       val res = replaceWithOptimizedPlan(plan)
       repartition(FileSystem.get(session.sparkContext.hadoopConfiguration), plan)
       res
@@ -655,6 +689,8 @@ object NdpPluginEnableFlag {
 
   val ndpEnabledStr = "spark.omni.sql.ndpPlugin.enabled"
 
+  val ndpOptimizedEnableStr = "spark.omni.sql.ndpPlugin.optimized.enabled"
+
   def isMatchedIpAddress: Boolean = {
     val ipSet = Set("xxx.xxx.xxx.xxx")
     val hostAddrSet = JavaConverters.asScalaSetConverter(NdpConnectorUtils.getIpAddress).asScala
@@ -672,5 +708,9 @@ object NdpPluginEnableFlag {
     def ndpEnabled: Boolean = sys.props.getOrElse(
       ndpEnabledStr, "true").trim.toBoolean
     ndpEnabled && (isMatchedIpAddress || NdpConnectorUtils.getNdpEnable)
+  }
+
+  def isNdpOptimizedEnable(session: SparkSession): Boolean = {
+    session.sqlContext.getConf(ndpOptimizedEnableStr, "true").trim.toBoolean
   }
 }
