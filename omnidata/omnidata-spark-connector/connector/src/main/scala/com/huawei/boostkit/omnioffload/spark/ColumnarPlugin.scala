@@ -39,7 +39,6 @@ import org.apache.spark.sql.hive.execution.CreateHiveTableAsSelectCommand
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.{DataTypes, DoubleType, LongType}
 import org.apache.spark.sql.{SparkSession, SparkSessionExtensions}
-
 import java.net.URI
 import scala.collection.JavaConverters
 
@@ -52,7 +51,6 @@ case class NdpOverrides(sparkSession: SparkSession) extends Rule[SparkPlan] {
   var hasCoalesce = false
   var hasShuffle = false
   var ACCURATE_QUERY_HD = "153"
-  var ACCURATE_QUERY = "000"
   var RADIX_SORT_COLUMN_NUMS = 2
 
   def apply(plan: SparkPlan): SparkPlan = {
@@ -128,30 +126,30 @@ case class NdpOverrides(sparkSession: SparkSession) extends Rule[SparkPlan] {
           DataWritingCommandExec(cmd, CoalesceExec(numPartitions, child))
         }
       case p@ColumnarSortMergeJoinExec(_, _, joinType, _, _, _, _, projectList)
-        if joinType.equals(LeftOuter) =>
+        if joinType.equals(LeftOuter) && isTenPocJoin(p.leftKeys) && isTenPocJoin(p.rightKeys) =>
         isSMJ = true
         numPartitions = NdpConnectorUtils.getSMJNumPartitions(5000)
         ColumnarSortMergeJoinExec(leftKeys = p.leftKeys, rightKeys = p.rightKeys, joinType = LeftAnti,
           condition = p.condition, left = p.left, right = p.right, isSkewJoin = p.isSkewJoin, projectList)
       case p@SortMergeJoinExec(_, _, joinType, _, _, _, _)
-        if joinType.equals(LeftOuter) =>
+        if joinType.equals(LeftOuter) && isTenPocJoin(p.leftKeys) && isTenPocJoin(p.rightKeys) =>
         isSMJ = true
         numPartitions = NdpConnectorUtils.getSMJNumPartitions(5000)
         SortMergeJoinExec(leftKeys = p.leftKeys, rightKeys = p.rightKeys, joinType = LeftAnti, condition = p.condition,
           left = p.left, right = p.right, isSkewJoin = p.isSkewJoin)
-      case p@ColumnarBroadcastHashJoinExec(_, _, joinType, _, _, _, _, _, projectList) if joinType.equals(LeftOuter) =>
+      case p@ColumnarBroadcastHashJoinExec(_, _, joinType, _, _, _, _, _, projectList) if joinType.equals(LeftOuter) && isTenPocJoin(p.leftKeys) && isTenPocJoin(p.rightKeys) =>
         ColumnarBroadcastHashJoinExec(leftKeys = p.leftKeys, rightKeys = p.rightKeys,
           joinType = LeftAnti, buildSide = p.buildSide, condition = p.condition, left = p.left,
           right = p.right, isNullAwareAntiJoin = p.isNullAwareAntiJoin, projectList)
-      case p@BroadcastHashJoinExec(_, _, joinType, _, _, _, _, _) if joinType.equals(LeftOuter) =>
+      case p@BroadcastHashJoinExec(_, _, joinType, _, _, _, _, _) if joinType.equals(LeftOuter) && isTenPocJoin(p.leftKeys) && isTenPocJoin(p.rightKeys) =>
         BroadcastHashJoinExec(leftKeys = p.leftKeys, rightKeys = p.rightKeys, joinType = LeftAnti,
           buildSide = p.buildSide, condition = p.condition, left = p.left, right = p.right,
           isNullAwareAntiJoin = p.isNullAwareAntiJoin)
       case p@ColumnarShuffledHashJoinExec(_, _, joinType, _, _, _, _, projectList)
-        if joinType.equals(LeftOuter) =>
+        if joinType.equals(LeftOuter) && isTenPocJoin(p.leftKeys) && isTenPocJoin(p.rightKeys) =>
         ColumnarShuffledHashJoinExec(p.leftKeys, p.rightKeys, LeftAnti, p.buildSide, p.condition,
           p.left, p.right, projectList)
-      case p@ShuffledHashJoinExec(_, _, joinType, _, _, _, _) if joinType.equals(LeftOuter) =>
+      case p@ShuffledHashJoinExec(_, _, joinType, _, _, _, _) if joinType.equals(LeftOuter) && isTenPocJoin(p.leftKeys) && isTenPocJoin(p.rightKeys) =>
         ShuffledHashJoinExec(p.leftKeys, p.rightKeys, LeftAnti, p.buildSide, p.condition, p.left, p.right)
       case p@FilterExec(condition, child: OmniColumnarToRowExec, selectivity) =>
         val childPlan = child.transform {
@@ -173,21 +171,21 @@ case class NdpOverrides(sparkSession: SparkSession) extends Rule[SparkPlan] {
         FilterExec(condition, childPlan, selectivity)
       case c1@OmniColumnarToRowExec(c2@ColumnarFilterExec(condition, c3: FileSourceScanExec)) =>
         numPartitions = NdpConnectorUtils.getOmniColumnarNumPartitions(1000)
-        if (isAccurate(condition)) {
+        if (NdpPluginEnableFlag.isAccurate(condition)) {
           pushDownTaskCount = NdpConnectorUtils.getOmniColumnarTaskCount(50)
         }
         FilterExec(condition, ColumnarToRowExec(c3))
-      case p@FilterExec(condition, _, _) if isAccurate(condition) =>
+      case p@FilterExec(condition, _, _) if NdpPluginEnableFlag.isAccurate(condition) =>
         numPartitions = NdpConnectorUtils.getFilterPartitions(1000)
         pushDownTaskCount = NdpConnectorUtils.getFilterTaskCount(50)
         p
       case p@ColumnarConditionProjectExec(projectList, condition, child)
         if condition.toString().startsWith("isnull") && (child.isInstanceOf[ColumnarSortMergeJoinExec]
-          || child.isInstanceOf[ColumnarBroadcastHashJoinExec] || child.isInstanceOf[ColumnarShuffledHashJoinExec]) =>
+          || child.isInstanceOf[ColumnarBroadcastHashJoinExec] || child.isInstanceOf[ColumnarShuffledHashJoinExec]) && isTenPocProject(projectList) =>
         ColumnarProjectExec(changeProjectList(projectList), child)
       case p@ProjectExec(projectList, filter: FilterExec)
         if filter.condition.toString().startsWith("isnull") && (filter.child.isInstanceOf[SortMergeJoinExec]
-          || filter.child.isInstanceOf[BroadcastHashJoinExec] || filter.child.isInstanceOf[ShuffledHashJoinExec]) =>
+          || filter.child.isInstanceOf[BroadcastHashJoinExec] || filter.child.isInstanceOf[ShuffledHashJoinExec]) && isTenPocProject(projectList) =>
         ProjectExec(changeProjectList(projectList), filter.child)
       case p: SortAggregateExec if p.child.isInstanceOf[OmniColumnarToRowExec]
         && p.child.asInstanceOf[OmniColumnarToRowExec].child.isInstanceOf[ColumnarSortExec]
@@ -262,24 +260,24 @@ case class NdpOverrides(sparkSession: SparkSession) extends Rule[SparkPlan] {
           DataWritingCommandExec(cmd, CoalesceExec(numPartitions, child))
         }
       case p@SortMergeJoinExec(_, _, joinType, _, _, _, _)
-        if joinType.equals(LeftOuter) =>
+        if joinType.equals(LeftOuter) && isTenPocJoin(p.leftKeys) && isTenPocJoin(p.rightKeys) =>
         isSMJ = true
         numPartitions = NdpConnectorUtils.getSMJNumPartitions(5000)
         SortMergeJoinExec(leftKeys = p.leftKeys, rightKeys = p.rightKeys, joinType = LeftAnti, condition = p.condition,
           left = p.left, right = p.right, isSkewJoin = p.isSkewJoin)
-      case p@BroadcastHashJoinExec(_, _, joinType, _, _, _, _, _) if joinType.equals(LeftOuter) =>
+      case p@BroadcastHashJoinExec(_, _, joinType, _, _, _, _, _) if joinType.equals(LeftOuter) && isTenPocJoin(p.leftKeys) && isTenPocJoin(p.rightKeys) =>
         BroadcastHashJoinExec(leftKeys = p.leftKeys, rightKeys = p.rightKeys, joinType = LeftAnti,
           buildSide = p.buildSide, condition = p.condition, left = p.left, right = p.right,
           isNullAwareAntiJoin = p.isNullAwareAntiJoin)
-      case p@ShuffledHashJoinExec(_, _, joinType, _, _, _, _) if joinType.equals(LeftOuter) =>
+      case p@ShuffledHashJoinExec(_, _, joinType, _, _, _, _) if joinType.equals(LeftOuter) && isTenPocJoin(p.leftKeys) && isTenPocJoin(p.rightKeys) =>
         ShuffledHashJoinExec(p.leftKeys, p.rightKeys, LeftAnti, p.buildSide, p.condition, p.left, p.right)
-      case p@FilterExec(condition, _, _) if isAccurate(condition) =>
+      case p@FilterExec(condition, _, _) if NdpPluginEnableFlag.isAccurate(condition) =>
         numPartitions = NdpConnectorUtils.getFilterPartitions(1000)
         pushDownTaskCount = NdpConnectorUtils.getFilterTaskCount(50)
         p
       case p@ProjectExec(projectList, filter: FilterExec)
         if filter.condition.toString().startsWith("isnull") && (filter.child.isInstanceOf[SortMergeJoinExec]
-          || filter.child.isInstanceOf[BroadcastHashJoinExec] || filter.child.isInstanceOf[ShuffledHashJoinExec]) =>
+          || filter.child.isInstanceOf[BroadcastHashJoinExec] || filter.child.isInstanceOf[ShuffledHashJoinExec]) && isTenPocProject(projectList) =>
         ProjectExec(changeProjectList(projectList), filter.child)
       case p => p
     }
@@ -306,7 +304,7 @@ case class NdpOverrides(sparkSession: SparkSession) extends Rule[SparkPlan] {
                   result = true
                 }
                 x match {
-                  case literal: Literal if literal.value.toString.startsWith(ACCURATE_QUERY_HD) =>
+                  case literal: Literal if !literal.nullable && literal.value.toString.startsWith(ACCURATE_QUERY_HD) =>
                     result = true
                   case _ =>
                 }
@@ -314,16 +312,6 @@ case class NdpOverrides(sparkSession: SparkSession) extends Rule[SparkPlan] {
             }
           case _ =>
         }
-      case _ =>
-    }
-    result
-  }
-
-  def isAccurate(condition: Expression): Boolean = {
-    var result = false
-    condition.foreach {
-      case literal: Literal if literal.value.toString.startsWith(ACCURATE_QUERY) =>
-        result = true
       case _ =>
     }
     result
@@ -344,10 +332,32 @@ case class NdpOverrides(sparkSession: SparkSession) extends Rule[SparkPlan] {
   }
 
   def isRadixSortExecEnable(sortOrder: Seq[SortOrder]): Boolean = {
-    sortOrder.length == RADIX_SORT_COLUMN_NUMS &&
+    sortOrder.lengthCompare(RADIX_SORT_COLUMN_NUMS) == 0 &&
       sortOrder.head.dataType == LongType &&
+      sortOrder.head.child.isInstanceOf[AttributeReference] &&
+      sortOrder.head.child.asInstanceOf[AttributeReference].name.startsWith("col") &&
       sortOrder(1).dataType == LongType &&
+      sortOrder(1).child.isInstanceOf[AttributeReference] &&
+      sortOrder(1).child.asInstanceOf[AttributeReference].name.startsWith("col") &&
       SQLConf.get.getConfString("spark.omni.sql.ndpPlugin.radixSort.enabled", "true").toBoolean
+  }
+
+  def isTenPocProject(projectList: Seq[NamedExpression]): Boolean = {
+    projectList.forall {
+      case exp: Alias =>
+        exp.child.isInstanceOf[AttributeReference] && exp.child.asInstanceOf[AttributeReference].name.startsWith("col")
+      case exp: AttributeReference =>
+        exp.name.startsWith("col")
+      case _ => false
+    }
+  }
+
+  def isTenPocJoin(keys: Seq[Expression]): Boolean = {
+    keys.forall {
+      case exp: AttributeReference =>
+        exp.name.startsWith("col")
+      case _ => false
+    }
   }
 }
 
@@ -370,9 +380,6 @@ case class NdpRules(session: SparkSession) extends ColumnarRule with Logging {
 }
 
 case class NdpOptimizerRules(session: SparkSession) extends Rule[LogicalPlan] {
-
-  var ACCURATE_QUERY = "000"
-
   val SORT_REPARTITION_PLANS: Seq[String] = Seq(
     "Sort,HiveTableRelation",
     "Sort,LogicalRelation",
@@ -409,6 +416,7 @@ case class NdpOptimizerRules(session: SparkSession) extends Rule[LogicalPlan] {
     plan.transformUp {
       case CreateHiveTableAsSelectCommand(tableDesc, query, outputColumnNames, mode)
         if isParquetEnable(tableDesc)
+          && checkParquetFieldNames(outputColumnNames)
           && SQLConf.get.getConfString("spark.omni.sql.ndpPlugin.parquetOutput.enabled", "true")
           .toBoolean =>
         CreateDataSourceTableAsSelectCommand(
@@ -471,6 +479,11 @@ case class NdpOptimizerRules(session: SparkSession) extends Rule[LogicalPlan] {
     false
   }
 
+  // ,;{}()\n\t= and space are special characters in Parquet schema
+  def checkParquetFieldNames(outputColumnNames: Seq[String]): Boolean = {
+    outputColumnNames.forall(!_.matches(".*[ ,;{}()\n\t=].*"))
+  }
+
   def repartition(fs: FileSystem, plan: LogicalPlan): Unit = {
     var tables = Seq[URI]()
     var planContents = Seq[String]()
@@ -508,7 +521,7 @@ case class NdpOptimizerRules(session: SparkSession) extends Rule[LogicalPlan] {
         existsAgg = true
         planContents :+= p.nodeName
       case p@Filter(condition, _) =>
-        existAccurate |= isAccurate(condition)
+        existAccurate |= NdpPluginEnableFlag.isAccurate(condition)
         existFilter = true
         existLike |= isLike(condition)
         planContents :+= p.nodeName
@@ -587,9 +600,13 @@ case class NdpOptimizerRules(session: SparkSession) extends Rule[LogicalPlan] {
 
   def castSumAvgToBigInt(expression: Expression): Expression = {
     val exp = expression.transform {
-      case agg@Average(cast: Cast) if cast.dataType.isInstanceOf[DoubleType] =>
+      case Average(cast: Cast) if cast.dataType.isInstanceOf[DoubleType]
+        && cast.child.isInstanceOf[AttributeReference]
+        && cast.child.asInstanceOf[AttributeReference].name.startsWith("col")=>
         Average(Cast(cast.child, DataTypes.LongType))
-      case agg@Sum(cast: Cast) if cast.dataType.isInstanceOf[DoubleType] =>
+      case Sum(cast: Cast) if cast.dataType.isInstanceOf[DoubleType]
+        && cast.child.isInstanceOf[AttributeReference]
+        && cast.child.asInstanceOf[AttributeReference].name.startsWith("col")=>
         Sum(Cast(cast.child, DataTypes.LongType))
       case e =>
         e
@@ -611,26 +628,15 @@ case class NdpOptimizerRules(session: SparkSession) extends Rule[LogicalPlan] {
 
   def castStringExpressionToBigint(expression: Expression): Expression = {
     expression match {
-      case a@AttributeReference(_, DataTypes.StringType, _, _) =>
+      case a@AttributeReference(_, DataTypes.StringType, _, _) if a.name.startsWith("col") =>
         Cast(a, DataTypes.LongType)
       case e => e
     }
   }
 
-
   def turnOffOperator(): Unit = {
     session.sqlContext.setConf("org.apache.spark.sql.columnar.enabled", "false")
     session.sqlContext.setConf("spark.sql.join.columnar.preferShuffledHashJoin", "false")
-  }
-
-  def isAccurate(condition: Expression): Boolean = {
-    var result = false
-    condition.foreach {
-      case literal: Literal if literal.value.toString.startsWith(ACCURATE_QUERY) =>
-        result = true
-      case _ =>
-    }
-    result
   }
 
   def isLike(condition: Expression): Boolean = {
@@ -652,8 +658,19 @@ class ColumnarPlugin extends (SparkSessionExtensions => Unit) with Logging {
 }
 
 object NdpPluginEnableFlag {
-
   val ndpEnabledStr = "spark.omni.sql.ndpPlugin.enabled"
+  var ACCURATE_QUERY = "000"
+
+  def isAccurate(condition: Expression): Boolean = {
+    var result = false
+    condition.foreach {
+      // literal need to check null
+      case literal: Literal if !literal.nullable && literal.value.toString.startsWith(ACCURATE_QUERY) =>
+        result = true
+      case _ =>
+    }
+    result
+  }
 
   def isMatchedIpAddress: Boolean = {
     val ipSet = Set("xxx.xxx.xxx.xxx")
