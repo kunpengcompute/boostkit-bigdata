@@ -15,6 +15,7 @@
 
 package com.huawei.boostkit.omnituning.spark.client;
 
+import com.huawei.boostkit.omnituning.OmniTuningContext;
 import com.huawei.boostkit.omnituning.analysis.AnalyticJob;
 import com.huawei.boostkit.omnituning.models.AppResult;
 import com.huawei.boostkit.omnituning.spark.data.SparkRestAnalyticJob;
@@ -70,9 +71,10 @@ public class TestRestClient {
 
     @Test
     public void testGetApplications() throws URISyntaxException {
+        OmniTuningContext.initContext();
         Finder finder = Mockito.mock(Finder.class);
         when(finder.byId(any())).thenReturn(null);
-        AppResult.FINDER = finder;
+        OmniTuningContext.getInstance().setFinder(finder);
         SparkRestClient restClient = new SparkRestClient("history-url", 1, new SparkConf(), "default");
         WebTarget webTarget = Mockito.mock(WebTarget.class);
         when(webTarget.getUri()).thenReturn(new URI(TEST_URL));
@@ -88,9 +90,10 @@ public class TestRestClient {
 
     @Test
     public void testGetEmptyApplication() throws URISyntaxException {
+        OmniTuningContext.initContext();
         Finder finder = Mockito.mock(Finder.class);
         when(finder.byId(any())).thenReturn(null);
-        AppResult.FINDER = finder;
+        OmniTuningContext.getInstance().setFinder(finder);
         SparkRestClient restClient = new SparkRestClient("history-url", 1, new SparkConf(), "default");
         WebTarget webTarget = Mockito.mock(WebTarget.class);
         when(webTarget.getUri()).thenReturn(new URI(TEST_URL));

@@ -16,7 +16,6 @@
 package com.huawei.boostkit.omnituning.fetcher;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.huawei.boostkit.omnituning.exception.OmniTuningException;
 import com.huawei.boostkit.omnituning.spark.SparkFetcher;
 import com.huawei.boostkit.omnituning.tez.TezFetcher;
@@ -24,6 +23,7 @@ import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -35,7 +35,7 @@ public class FetcherFactory {
     private final Map<FetcherType, Fetcher> enabledFetchers;
 
     public FetcherFactory(PropertiesConfiguration configuration) {
-        ImmutableMap.Builder<FetcherType, Fetcher> fetchers = new ImmutableMap.Builder<>();
+        Map<FetcherType, Fetcher> fetchers = new HashMap<>();
 
         // init TEZ fetcher
         Fetcher tezFetcher = new TezFetcher(configuration);
@@ -51,7 +51,7 @@ public class FetcherFactory {
             fetchers.put(FetcherType.SPARK, sparkFetcher);
         }
 
-        this.enabledFetchers = fetchers.build();
+        this.enabledFetchers = fetchers;
     }
 
     public Fetcher getFetcher(FetcherType type) {
@@ -64,5 +64,9 @@ public class FetcherFactory {
 
     public List<Fetcher> getAllFetchers() {
         return ImmutableList.copyOf(enabledFetchers.values());
+    }
+
+    public void addFetcher(FetcherType type, Fetcher fetcher) {
+        enabledFetchers.put(type, fetcher);
     }
 }

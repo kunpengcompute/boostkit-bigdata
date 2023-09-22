@@ -15,6 +15,7 @@
 
 package com.huawei.boostkit.omnituning.tez;
 
+import com.huawei.boostkit.omnituning.OmniTuningContext;
 import com.huawei.boostkit.omnituning.analysis.AnalyticJob;
 import com.huawei.boostkit.omnituning.configuration.TestConfiguration;
 import com.huawei.boostkit.omnituning.exception.OmniTuningException;
@@ -57,9 +58,10 @@ public class TestTezFetcher extends TestConfiguration {
     public void testGetApplicationFromTimeline() throws IOException {
         TezFetcher fetcher = new TezFetcher(testConfiguration);
         fetcher.setTimelineClient(TestTezClient.getTestTimelineClient());
+        OmniTuningContext.initContext();
         Finder finder = Mockito.mock(Finder.class);
         when(finder.byId(any())).thenReturn(null);
-        AppResult.FINDER = finder;
+        OmniTuningContext.getInstance().setFinder(finder);
         List<AnalyticJob> job = fetcher.fetchAnalyticJobs(0L, 100L);
         assertEquals(job.size(), 1);
     }

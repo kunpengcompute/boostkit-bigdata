@@ -19,6 +19,8 @@ import com.huawei.boostkit.omnituning.configuration.DBConfigure;
 import com.huawei.boostkit.omnituning.configuration.OmniTuningConfigure;
 import com.huawei.boostkit.omnituning.exception.OmniTuningException;
 import com.huawei.boostkit.omnituning.fetcher.FetcherFactory;
+import com.huawei.boostkit.omnituning.models.AppResult;
+import io.ebean.Finder;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.builder.FileBasedConfigurationBuilder;
 import org.apache.commons.configuration2.builder.fluent.Configurations;
@@ -40,6 +42,8 @@ public final class OmniTuningContext {
 
     private final OmniTuningConfigure omniTuningConfig;
     private final FetcherFactory fetcherFactory;
+
+    private Finder<String, AppResult> finder = new Finder<>(AppResult.class);
 
     private OmniTuningContext() {
         this(false, null, null);
@@ -88,6 +92,14 @@ public final class OmniTuningContext {
 
     public FetcherFactory getFetcherFactory() {
         return fetcherFactory;
+    }
+
+    public Finder<String, AppResult> getFinder() {
+        return finder;
+    }
+
+    public void setFinder(Finder<String, AppResult> finder) {
+        this.finder = finder;
     }
 
     private PropertiesConfiguration loadConfigure() {

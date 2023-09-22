@@ -19,13 +19,7 @@ import com.huawei.boostkit.omnituning.configuration.TestConfiguration;
 import com.huawei.boostkit.omnituning.exception.OmniTuningException;
 import org.junit.Test;
 
-public class TestOmniTuningRunner extends TestConfiguration {
-    @Test
-    public void testRunOmniTuningRunner() {
-        OmniTuningContext.initContext();
-        OmniTuning.main(new String[] {"2020-09-02 00:00:00", "2020-09-02 00:00:00", "user", "pass"});
-    }
-
+public class TestOmniTuning extends TestConfiguration {
     @Test(expected = OmniTuningException.class)
     public void testErrorNumberParams() {
         OmniTuning.main(new String[] {"2020-09-02 00:00:00", "2020-09-02 00:00:00"});

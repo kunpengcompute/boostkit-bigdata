@@ -15,6 +15,7 @@
 
 package com.huawei.boostkit.omnituning.tez.utils;
 
+import com.huawei.boostkit.omnituning.OmniTuningContext;
 import com.huawei.boostkit.omnituning.analysis.AnalyticJob;
 import com.huawei.boostkit.omnituning.models.AppResult;
 import com.huawei.boostkit.omnituning.tez.data.TezAnalyticJob;
@@ -67,7 +68,7 @@ public class TezJsonUtils {
         List<AnalyticJob> analyticJobs = new ArrayList<>();
         for (JsonNode app : apps) {
             String appId = app.get(RMWSConsts.APP_ID).getTextValue();
-            if (AppResult.FINDER.byId(appId) == null) {
+            if (OmniTuningContext.getInstance().getFinder().byId(appId) == null) {
                 String name = getApplicationName(app.get("name").getTextValue());
                 String state = app.get("appState").getTextValue();
                 TezAnalyticJob tezJob =

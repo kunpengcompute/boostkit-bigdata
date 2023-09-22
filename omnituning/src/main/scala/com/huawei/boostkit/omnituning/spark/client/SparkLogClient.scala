@@ -15,6 +15,7 @@
 
 package com.huawei.boostkit.omnituning.spark.client
 
+import com.huawei.boostkit.omnituning.OmniTuningContext
 import com.huawei.boostkit.omnituning.analysis.AnalyticJob
 import com.huawei.boostkit.omnituning.models.AppResult
 import com.huawei.boostkit.omnituning.spark.data.SparkLogAnalyticJob
@@ -32,7 +33,7 @@ class SparkLogClient(hadoopConfiguration: Configuration, sparkConf: SparkConf, e
   override def fetchAnalyticJobs(startTimeMills: Long, finishedTimeMills: Long): List[AnalyticJob] = {
     SparkUtils.findApplicationFiles(hadoopConfiguration, eventLogUri, startTimeMills, finishedTimeMills, maxFileSize)
       .map(file => new SparkLogAnalyticJob(SparkUtils.getApplicationIdFromFile(file), file))
-      .filter(job => AppResult.FINDER.byId(job.getApplicationId) == null)
+      .filter(job => OmniTuningContext.getInstance().getFinder.byId(job.getApplicationId) == null)
   }
 
   override def fetchAnalyticResult(job: AnalyticJob): AppResult = {

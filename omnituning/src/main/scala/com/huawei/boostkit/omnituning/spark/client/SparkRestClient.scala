@@ -17,6 +17,7 @@ package com.huawei.boostkit.omnituning.spark.client
 
 import com.fasterxml.jackson.databind.{DeserializationFeature, ObjectMapper}
 import com.fasterxml.jackson.module.scala.{DefaultScalaModule, ScalaObjectMapper}
+import com.huawei.boostkit.omnituning.OmniTuningContext
 import com.huawei.boostkit.omnituning.analysis.AnalyticJob
 import com.huawei.boostkit.omnituning.exception.OmniTuningException
 import com.huawei.boostkit.omnituning.models.AppResult
@@ -93,7 +94,7 @@ class SparkRestClient(historyUri: String, timeoutSeconds: Int, sparkConf: SparkC
     try {
       LOG.info(s"calling REST API at ${appTarget.getUri}")
       val applications = getApplications(appTarget, sparkRestObjectMapper.readValue[Seq[ApplicationInfo]])
-        .filter(job => AppResult.FINDER.byId(job.id) == null)
+        .filter(job => OmniTuningContext.getInstance().getFinder.byId(job.id) == null)
       val analyticJobs = new ListBuffer[AnalyticJob]()
       for (appInfo <- applications) {
         val attempts = appInfo.attempts

@@ -15,6 +15,7 @@
 
 package com.huawei.boostkit.omnituning.spark;
 
+import com.huawei.boostkit.omnituning.OmniTuningContext;
 import com.huawei.boostkit.omnituning.analysis.AnalyticJob;
 import com.huawei.boostkit.omnituning.fetcher.FetcherType;
 import com.huawei.boostkit.omnituning.models.AppResult;
@@ -64,9 +65,10 @@ public class TestSparkFetcher {
 
     @Test
     public void testGetApplications() {
+        OmniTuningContext.initContext();
         Finder finder = Mockito.mock(Finder.class);
         when(finder.byId(any())).thenReturn(null);
-        AppResult.FINDER = finder;
+        OmniTuningContext.getInstance().setFinder(finder);
         List<AnalyticJob> jobs = sparkFetcher.fetchAnalyticJobs(0L, Long.MAX_VALUE);
         assertEquals(jobs.size(), 1);
     }
