@@ -80,13 +80,13 @@ public class TestTezClient {
 
     public static TimelineClient getTestTimelineClient() throws IOException {
         TimelineClient testClient = Mockito.mock(TimelineClient.class);
-        when(testClient.readJsonNode(new URL("http://server1:8188/ws/v1/applicationhistory/apps?applicationTypes=TEZ&startedTimeBegin=0&startedTimeEnd=100")))
+        when(testClient.readJsonNode(new URL("http://testUrl:8188/ws/v1/applicationhistory/apps?applicationTypes=TEZ&startedTimeBegin=0&startedTimeEnd=100")))
                 .thenReturn(MAPPER.readTree(TEST_APP_STRING));
-        when(testClient.readJsonNode(new URL("http://server1:8188/ws/v1/timeline/TEZ_APPLICATION/tez_test")))
+        when(testClient.readJsonNode(new URL("http://testUrl:8188/ws/v1/timeline/TEZ_APPLICATION/tez_test")))
                 .thenReturn(MAPPER.readTree(TEST_APP_INFO));
-        when(testClient.readJsonNode(new URL("http://server1:8188/ws/v1/timeline/TEZ_DAG_ID?primaryFilter=applicationId:test")))
+        when(testClient.readJsonNode(new URL("http://testUrl:8188/ws/v1/timeline/TEZ_DAG_ID?primaryFilter=applicationId:test")))
                 .thenReturn(MAPPER.readTree(TEST_DAG_INFO));
-        when((testClient.readJsonNode(new URL("http://server1:8188/ws/v1/timeline/TEZ_DAG_EXTRA_INFO/dag_test_1"))))
+        when((testClient.readJsonNode(new URL("http://testUrl:8188/ws/v1/timeline/TEZ_DAG_EXTRA_INFO/dag_test_1"))))
                 .thenReturn(MAPPER.readTree(TEST_DAG_EXTRA_INFO));
         return testClient;
     }

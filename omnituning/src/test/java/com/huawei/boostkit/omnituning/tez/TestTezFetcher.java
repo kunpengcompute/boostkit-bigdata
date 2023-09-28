@@ -15,20 +15,17 @@
 
 package com.huawei.boostkit.omnituning.tez;
 
-import com.huawei.boostkit.omnituning.OmniTuningContext;
 import com.huawei.boostkit.omnituning.analysis.AnalyticJob;
-import com.huawei.boostkit.omnituning.configuration.TestConfiguration;
+import com.huawei.boostkit.omnituning.configuration.BaseTestConfiguration;
 import com.huawei.boostkit.omnituning.exception.OmniTuningException;
 import com.huawei.boostkit.omnituning.fetcher.FetcherType;
 import com.huawei.boostkit.omnituning.models.AppResult;
 import com.huawei.boostkit.omnituning.spark.data.SparkRestAnalyticJob;
 import com.huawei.boostkit.omnituning.tez.data.TezAnalyticJob;
 import com.huawei.boostkit.omnituning.tez.utils.TestTezClient;
-import io.ebean.Finder;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.yarn.api.records.YarnApplicationState;
 import org.junit.Test;
-import org.mockito.Mockito;
 
 import java.io.IOException;
 import java.net.MalformedURLException;
@@ -50,18 +47,12 @@ import static com.huawei.boostkit.omnituning.tez.utils.TestTezContext.UNFINISHED
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Matchers.any;
-import static org.mockito.Mockito.when;
 
-public class TestTezFetcher extends TestConfiguration {
+public class TestTezFetcher extends BaseTestConfiguration {
     @Test
     public void testGetApplicationFromTimeline() throws IOException {
         TezFetcher fetcher = new TezFetcher(testConfiguration);
         fetcher.setTimelineClient(TestTezClient.getTestTimelineClient());
-        OmniTuningContext.initContext();
-        Finder finder = Mockito.mock(Finder.class);
-        when(finder.byId(any())).thenReturn(null);
-        OmniTuningContext.getInstance().setFinder(finder);
         List<AnalyticJob> job = fetcher.fetchAnalyticJobs(0L, 100L);
         assertEquals(job.size(), 1);
     }
@@ -112,7 +103,7 @@ public class TestTezFetcher extends TestConfiguration {
     public void testAnalyzeJobWithErrorType() {
         SparkRestAnalyticJob sparkRestAnalyticJob = new SparkRestAnalyticJob("sparkRest");
         TezFetcher fetcher = new TezFetcher(testConfiguration);
-        Optional<AppResult> tezJobs = fetcher.analysis(sparkRestAnalyticJob);
+        fetcher.analysis(sparkRestAnalyticJob);
     }
 
     @Test

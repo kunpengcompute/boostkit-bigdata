@@ -15,8 +15,14 @@
 
 package com.huawei.boostkit.omnituning.spark.utils;
 
+import com.huawei.boostkit.omnituning.exception.OmniTuningException;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.spark.SparkConf;
+import org.apache.spark.io.CompressionCodec;
+import org.apache.spark.io.ZStdCompressionCodec;
 import org.junit.Test;
+import scala.Option;
+import scala.collection.Map;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -25,7 +31,14 @@ public class TestSparkUtils {
     @Test
     public void testGetPropertiesFromFile() {
         String filePath = Thread.currentThread().getContextClassLoader().getResource("test-spark.conf").getPath();
-        SparkUtils.getPropertiesFromFile(filePath);
+        Map<String, String> map = SparkUtils.getPropertiesFromFile(filePath);
+        assertEquals(map.size(), 1);
+        assertEquals(map.get("spark.master").get(), "yarn");
+    }
+
+    @Test(expected = OmniTuningException.class)
+    public void testLoadLogFileFromErrorPath() {
+        SparkUtils.findApplicationFiles(new Configuration(), "errorPath", 0L, 100L, 500);
     }
 
     @Test
@@ -37,7 +50,9 @@ public class TestSparkUtils {
     @Test
     public void testLoadCompressionCodec() {
         SparkConf conf = new SparkConf();
-        assertTrue(SparkUtils.compressionCodecForLogName(conf, "app_id.zstd").isDefined());
+        Option<CompressionCodec> codec = SparkUtils.compressionCodecForLogName(conf, "app_id.zstd");
+        assertTrue(codec.isDefined());
+        assertEquals(codec.get().getClass(), ZStdCompressionCodec.class);
     }
 
     @Test(expected = IllegalArgumentException.class)

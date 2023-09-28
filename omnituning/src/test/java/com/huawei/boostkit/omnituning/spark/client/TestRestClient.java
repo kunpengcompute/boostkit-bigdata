@@ -17,6 +17,8 @@ package com.huawei.boostkit.omnituning.spark.client;
 
 import com.huawei.boostkit.omnituning.OmniTuningContext;
 import com.huawei.boostkit.omnituning.analysis.AnalyticJob;
+import com.huawei.boostkit.omnituning.configuration.BaseTestConfiguration;
+import com.huawei.boostkit.omnituning.fetcher.FetcherType;
 import com.huawei.boostkit.omnituning.models.AppResult;
 import com.huawei.boostkit.omnituning.spark.data.SparkRestAnalyticJob;
 import io.ebean.Finder;
@@ -45,7 +47,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.when;
 
-public class TestRestClient {
+public class TestRestClient extends BaseTestConfiguration {
     private static final String TEST_URL = "http://testUri";
     private static final String TEST_APP_INFO =
             "{" +
@@ -71,10 +73,6 @@ public class TestRestClient {
 
     @Test
     public void testGetApplications() throws URISyntaxException {
-        OmniTuningContext.initContext();
-        Finder finder = Mockito.mock(Finder.class);
-        when(finder.byId(any())).thenReturn(null);
-        OmniTuningContext.getInstance().setFinder(finder);
         SparkRestClient restClient = new SparkRestClient("history-url", 1, new SparkConf(), "default");
         WebTarget webTarget = Mockito.mock(WebTarget.class);
         when(webTarget.getUri()).thenReturn(new URI(TEST_URL));
@@ -90,10 +88,6 @@ public class TestRestClient {
 
     @Test
     public void testGetEmptyApplication() throws URISyntaxException {
-        OmniTuningContext.initContext();
-        Finder finder = Mockito.mock(Finder.class);
-        when(finder.byId(any())).thenReturn(null);
-        OmniTuningContext.getInstance().setFinder(finder);
         SparkRestClient restClient = new SparkRestClient("history-url", 1, new SparkConf(), "default");
         WebTarget webTarget = Mockito.mock(WebTarget.class);
         when(webTarget.getUri()).thenReturn(new URI(TEST_URL));
@@ -137,6 +131,7 @@ public class TestRestClient {
 
         // test analyze
         SparkRestAnalyticJob restJob = new SparkRestAnalyticJob("application_1516285256255_0012");
+        assertEquals(restJob.getType(), FetcherType.SPARK);
         SparkRestClient restClient = new SparkRestClient("history-url", 1, new SparkConf(), "default");
         WebTarget webTarget = Mockito.mock(WebTarget.class);
         when(webTarget.getUri()).thenReturn(new URI(TEST_URL));

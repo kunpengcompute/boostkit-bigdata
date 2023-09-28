@@ -19,9 +19,5 @@
             <directory>${basedir}/target/lib</directory>
             <outputDirectory>./lib</outputDirectory>
         </fileSet>
-        <fileSet>
-            <directory>${basedir}/target/resources/scripts</directory>
-            <outputDirectory>./</outputDirectory>
-        </fileSet>
     </fileSets>
 </assembly>

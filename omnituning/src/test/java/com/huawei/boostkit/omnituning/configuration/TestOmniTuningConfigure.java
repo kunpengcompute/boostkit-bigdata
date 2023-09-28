@@ -15,6 +15,7 @@
 
 package com.huawei.boostkit.omnituning.configuration;
 
+import com.huawei.boostkit.omnituning.OmniTuningContext;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -22,7 +23,6 @@ import static org.junit.Assert.assertEquals;
 public class TestOmniTuningConfigure extends TestConfiguration {
     @Test
     public void getOmniTuningConfigure() {
-        OmniTuningConfigure omniTuningConfigure = new OmniTuningConfigure(testConfiguration);
-        assertEquals(omniTuningConfigure.getThreadCount(), 3);
+        assertEquals(OmniTuningContext.getInstance().getOmniTuningConfig().getThreadCount(), 3);
     }
 }

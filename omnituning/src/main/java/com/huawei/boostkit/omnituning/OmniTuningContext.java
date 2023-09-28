@@ -15,6 +15,7 @@
 
 package com.huawei.boostkit.omnituning;
 
+import com.google.common.collect.ImmutableList;
 import com.huawei.boostkit.omnituning.configuration.DBConfigure;
 import com.huawei.boostkit.omnituning.configuration.OmniTuningConfigure;
 import com.huawei.boostkit.omnituning.exception.OmniTuningException;
@@ -25,23 +26,39 @@ import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.builder.FileBasedConfigurationBuilder;
 import org.apache.commons.configuration2.builder.fluent.Configurations;
 import org.apache.commons.configuration2.ex.ConfigurationException;
+import org.apache.hadoop.conf.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.Locale;
 
 import static java.lang.String.format;
 
 public final class OmniTuningContext {
     private static final Logger LOG = LoggerFactory.getLogger(OmniTuningContext.class);
     private static final String CONFIG_FILE_NAME = "omniTuningConf.properties";
-    private static final String ENCODING = StandardCharsets.UTF_8.displayName();
+    private static final List<String> DEFAULT_HADOOP_CONFIG_FILES = ImmutableList.of("hdfs-site.xml", "core-site.xml");
+    private static final String ENCODING = StandardCharsets.UTF_8.displayName(Locale.ENGLISH);
+    private static final Configuration HADOOP_CONF;
 
     private static OmniTuningContext instance = null;
 
     private final OmniTuningConfigure omniTuningConfig;
     private final FetcherFactory fetcherFactory;
+
+    static {
+        HADOOP_CONF = new Configuration();
+        for (String configFileName : DEFAULT_HADOOP_CONFIG_FILES) {
+            URL configFile = Thread.currentThread().getContextClassLoader().getResource(configFileName);
+            if (configFile != null) {
+                LOG.info("Add resource {} to hadoop config", configFile);
+                HADOOP_CONF.addResource(configFile);
+            }
+        }
+    }
 
     private Finder<String, AppResult> finder = new Finder<>(AppResult.class);
 
@@ -84,6 +101,10 @@ public final class OmniTuningContext {
             throw new OmniTuningException("OmniTuningContext has not been instantiated");
         }
         return instance;
+    }
+
+    public static Configuration getHadoopConfig() {
+        return HADOOP_CONF;
     }
 
     public OmniTuningConfigure getOmniTuningConfig() {

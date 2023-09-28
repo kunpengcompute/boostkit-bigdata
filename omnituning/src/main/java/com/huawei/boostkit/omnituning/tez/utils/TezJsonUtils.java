@@ -17,10 +17,8 @@ package com.huawei.boostkit.omnituning.tez.utils;
 
 import com.huawei.boostkit.omnituning.OmniTuningContext;
 import com.huawei.boostkit.omnituning.analysis.AnalyticJob;
-import com.huawei.boostkit.omnituning.models.AppResult;
 import com.huawei.boostkit.omnituning.tez.data.TezAnalyticJob;
 import com.huawei.boostkit.omnituning.tez.data.TezDagIdData;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.yarn.api.records.YarnApplicationState;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.RMWSConsts;
@@ -50,7 +48,7 @@ public class TezJsonUtils {
 
     public TezJsonUtils(TezUrlFactory tezUrlFactory, boolean useHttps, int timeout) {
         this.tezUrlFactory = tezUrlFactory;
-        this.timelineClient = new TimelineClient(new Configuration(), useHttps, timeout);
+        this.timelineClient = new TimelineClient(OmniTuningContext.getHadoopConfig(), useHttps, timeout);
     }
 
     public void verifyTimeLineServer() throws IOException {

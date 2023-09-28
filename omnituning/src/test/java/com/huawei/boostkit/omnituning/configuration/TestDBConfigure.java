@@ -17,6 +17,7 @@ package com.huawei.boostkit.omnituning.configuration;
 
 import io.ebean.config.DatabaseConfig;
 import io.ebean.datasource.DataSourceInitialiseException;
+import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.junit.Test;
 import org.mockito.Mockito;
 
@@ -30,9 +31,13 @@ import java.sql.SQLException;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.when;
 
-public class TestDBConfigure extends TestConfiguration {
+public class TestDBConfigure {
     @Test(expected = DataSourceInitialiseException.class)
-    public void testDBConfigure() {
+    public void testDBConfigureWithErrorUrl() {
+        PropertiesConfiguration testConfiguration = Mockito.mock(PropertiesConfiguration.class);
+        when(testConfiguration.getString("datasource.db.driver", "com.mysql.cj.jdbc.Driver"))
+                .thenReturn("com.mysql.cj.jdbc.Driver");
+        when(testConfiguration.getString("datasource.db.url")).thenReturn("jdbc://mysql:errorUrl");
         DBConfigure.initDatabase(testConfiguration, "user", "passwd");
     }
 

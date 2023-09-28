@@ -15,6 +15,7 @@
 
 package com.huawei.boostkit.omnituning.executor;
 
+import com.huawei.boostkit.omnituning.OmniTuningContext;
 import com.huawei.boostkit.omnituning.exception.OmniTuningException;
 import com.huawei.boostkit.omnituning.security.HadoopSecurity;
 import org.apache.hadoop.conf.Configuration;
@@ -38,7 +39,7 @@ public class OmniTuningRunner implements Runnable {
     public void run() {
         LOG.info("OmniTuning has started");
         try {
-            Configuration hadoopConf = new Configuration();
+            Configuration hadoopConf = OmniTuningContext.getHadoopConfig();
             HadoopSecurity hadoopSecurity = new HadoopSecurity(hadoopConf);
             hadoopSecurity.doAs(new AnalysisAction(hadoopSecurity, startTimeMills, finishTimeMills));
         } catch (IOException e) {

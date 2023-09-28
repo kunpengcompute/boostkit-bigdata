@@ -15,6 +15,7 @@
 
 package com.huawei.boostkit.omnituning.tez.utils;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.huawei.boostkit.omnituning.exception.OmniTuningException;
 import com.sun.jersey.api.client.Client;
 import com.sun.jersey.api.client.ClientResponse;
@@ -37,7 +38,7 @@ import static java.lang.String.format;
 public class TimelineClient implements AutoCloseable {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    private final Client httpClient;
+    private Client httpClient;
 
     public TimelineClient(Configuration conf, boolean useHttps, int connTimeout) {
         try {
@@ -62,6 +63,11 @@ public class TimelineClient implements AutoCloseable {
         } else {
             throw new OmniTuningException(format("Failed to get data from %s", url));
         }
+    }
+
+    @VisibleForTesting
+    protected void setClient(Client client) {
+        this.httpClient = client;
     }
 
     @Override

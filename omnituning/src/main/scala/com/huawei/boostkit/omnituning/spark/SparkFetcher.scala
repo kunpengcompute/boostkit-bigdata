@@ -15,6 +15,7 @@
 
 package com.huawei.boostkit.omnituning.spark
 
+import com.huawei.boostkit.omnituning.OmniTuningContext
 import com.huawei.boostkit.omnituning.analysis.AnalyticJob
 import com.huawei.boostkit.omnituning.fetcher.{Fetcher, FetcherType}
 import com.huawei.boostkit.omnituning.models.AppResult
@@ -41,7 +42,7 @@ class SparkFetcher(configure: PropertiesConfiguration)
 
   val sparkFetcherConfig = new SparkFetcherConfigure(configure)
 
-  lazy val hadoopConfigure = new Configuration()
+  lazy val hadoopConfigure: Configuration = OmniTuningContext.getHadoopConfig
 
   lazy val sparkConf: SparkConf = {
     val sparkConf = new SparkConf()

@@ -15,11 +15,16 @@
 
 package com.huawei.boostkit.omnituning;
 
-import com.huawei.boostkit.omnituning.configuration.TestConfiguration;
+import com.huawei.boostkit.omnituning.configuration.BaseTestConfiguration;
 import com.huawei.boostkit.omnituning.exception.OmniTuningException;
 import org.junit.Test;
 
-public class TestOmniTuning extends TestConfiguration {
+public class TestOmniTuning extends BaseTestConfiguration {
+    @Test
+    public void testOmniTuning() {
+        OmniTuning.main(new String[]{"2020-09-02 00:00:00", "2020-09-02 00:00:00", "user", "passwd"});
+    }
+
     @Test(expected = OmniTuningException.class)
     public void testErrorNumberParams() {
         OmniTuning.main(new String[] {"2020-09-02 00:00:00", "2020-09-02 00:00:00"});

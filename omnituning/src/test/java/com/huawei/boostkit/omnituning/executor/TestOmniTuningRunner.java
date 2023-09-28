@@ -16,20 +16,19 @@
 package com.huawei.boostkit.omnituning.executor;
 
 import com.huawei.boostkit.omnituning.OmniTuningContext;
+import com.huawei.boostkit.omnituning.configuration.BaseTestConfiguration;
 import com.huawei.boostkit.omnituning.fetcher.Fetcher;
 import com.huawei.boostkit.omnituning.fetcher.FetcherType;
 import com.huawei.boostkit.omnituning.spark.SparkFetcher;
-import io.ebean.Finder;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.junit.Test;
 import org.mockito.Mockito;
 
 import java.net.URL;
 
-import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.when;
 
-public class TestOmniTuningRunner {
+public class TestOmniTuningRunner extends BaseTestConfiguration {
     @Test
     public void testOmniTuningRunner() {
         PropertiesConfiguration sparkConfig = Mockito.mock(PropertiesConfiguration.class);
@@ -42,11 +41,7 @@ public class TestOmniTuningRunner {
         when(sparkConfig.getInt("spark.log.maxSize.mb", 500)).thenReturn(500);
         Fetcher sparkFetcher = new SparkFetcher(sparkConfig);
 
-        OmniTuningContext.initContext();
         OmniTuningContext.getInstance().getFetcherFactory().addFetcher(FetcherType.SPARK, sparkFetcher);
-        Finder finder = Mockito.mock(Finder.class);
-        when(finder.byId(any())).thenReturn(null);
-        OmniTuningContext.getInstance().setFinder(finder);
 
         OmniTuningRunner runner = new OmniTuningRunner(0L, Long.MAX_VALUE);
         runner.run();

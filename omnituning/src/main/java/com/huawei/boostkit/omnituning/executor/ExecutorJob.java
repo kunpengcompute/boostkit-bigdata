@@ -59,7 +59,7 @@ class ExecutorJob implements Runnable {
                 LOG.info("Analysis get result {}", appId);
                 try {
                     DB.execute(analyzeResult::save);
-                } catch (Exception e) {
+                } catch (Throwable e) {
                     LOG.error("Error in saving analyze result, {}", e.getMessage());
                 }
             }

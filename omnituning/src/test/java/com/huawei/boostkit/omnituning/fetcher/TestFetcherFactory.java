@@ -15,6 +15,8 @@
 
 package com.huawei.boostkit.omnituning.fetcher;
 
+import com.huawei.boostkit.omnituning.exception.OmniTuningException;
+import com.huawei.boostkit.omnituning.spark.SparkFetcher;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.junit.Test;
 import org.mockito.Mockito;
@@ -43,5 +45,27 @@ public class TestFetcherFactory {
 
         FetcherFactory fetcherFactory = new FetcherFactory(config);
         assertEquals(fetcherFactory.getAllFetchers().size(), 0);
+    }
+
+    @Test
+    public void testGetFetcher() {
+        PropertiesConfiguration config = Mockito.mock(PropertiesConfiguration.class);
+
+        when(config.getBoolean("spark.enable", false)).thenReturn(true);
+        when(config.getBoolean("tez.enable", false)).thenReturn(false);
+
+        FetcherFactory fetcherFactory = new FetcherFactory(config);
+        assertEquals(fetcherFactory.getFetcher(FetcherType.SPARK).getClass(), SparkFetcher.class);
+    }
+
+    @Test(expected = OmniTuningException.class)
+    public void testGetUnknownFetcher() {
+        PropertiesConfiguration config = Mockito.mock(PropertiesConfiguration.class);
+
+        when(config.getBoolean("spark.enable", false)).thenReturn(false);
+        when(config.getBoolean("tez.enable", false)).thenReturn(false);
+
+        FetcherFactory fetcherFactory = new FetcherFactory(config);
+        fetcherFactory.getFetcher(FetcherType.TEZ);
     }
 }
