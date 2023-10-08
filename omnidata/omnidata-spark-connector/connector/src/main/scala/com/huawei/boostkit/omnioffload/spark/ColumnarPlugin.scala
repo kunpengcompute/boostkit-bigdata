@@ -377,9 +377,14 @@ case class NdpRules(session: SparkSession) extends ColumnarRule with Logging {
       plan
     }
   }
+
 }
 
 case class NdpOptimizerRules(session: SparkSession) extends Rule[LogicalPlan] {
+
+  var maxSizeInBytes: BigInt = 0L
+
+  var ACCURATE_QUERY = "000"
   val SORT_REPARTITION_PLANS: Seq[String] = Seq(
     "Sort,HiveTableRelation",
     "Sort,LogicalRelation",
@@ -407,9 +412,41 @@ case class NdpOptimizerRules(session: SparkSession) extends Rule[LogicalPlan] {
       val res = replaceWithOptimizedPlan(plan)
       repartition(FileSystem.get(session.sparkContext.hadoopConfiguration), plan)
       res
+    } else if (NdpPluginEnableFlag.isNdpOptimizedEnable(session)) {
+      applyOptimizedRules(plan)
     } else {
       plan
     }
+  }
+
+  def applyOptimizedRules(plan: LogicalPlan): LogicalPlan = {
+    plan.foreach {
+      case p@LogicalRelation(_, _, catalogTable, _) =>
+        val sTable = catalogTable.get.identifier
+        val stats = session.sessionState.catalog.getTableMetadata(sTable).stats
+        if (stats.isDefined) {
+          val sizeInBytes = stats.get.sizeInBytes
+          if (sizeInBytes > maxSizeInBytes) {
+            var fileMaxBytes = "512MB"
+            var shufflePartition = "200"
+            if (sizeInBytes <= 1073741824L) {
+              fileMaxBytes = NdpConnectorUtils.getMixSqlBaseMaxFilePtBytesStr("256MB")
+              shufflePartition = NdpConnectorUtils.getShufflePartitionsStr("200")
+            } else if (sizeInBytes > 1073741824L && sizeInBytes < 1099511627776L) {
+              fileMaxBytes = NdpConnectorUtils.getMixSqlBaseMaxFilePtBytesStr("256MB")
+              shufflePartition = NdpConnectorUtils.getShufflePartitionsStr("1000")
+            } else {
+              fileMaxBytes = NdpConnectorUtils.getMixSqlBaseMaxFilePtBytesStr("128MB")
+              shufflePartition = NdpConnectorUtils.getShufflePartitionsStr("1000")
+            }
+            SQLConf.get.setConfString(SQLConf.FILES_MAX_PARTITION_BYTES.key, fileMaxBytes)
+            SQLConf.get.setConfString(SQLConf.SHUFFLE_PARTITIONS.key, shufflePartition)
+            maxSizeInBytes = sizeInBytes
+          }
+        }
+      case _ =>
+    }
+    plan
   }
 
   def replaceWithOptimizedPlan(plan: LogicalPlan): LogicalPlan = {
@@ -672,6 +709,8 @@ object NdpPluginEnableFlag {
     result
   }
 
+  val ndpOptimizedEnableStr = "spark.omni.sql.ndpPlugin.optimized.enabled"
+
   def isMatchedIpAddress: Boolean = {
     val ipSet = Set("xxx.xxx.xxx.xxx")
     val hostAddrSet = JavaConverters.asScalaSetConverter(NdpConnectorUtils.getIpAddress).asScala
@@ -681,13 +720,16 @@ object NdpPluginEnableFlag {
 
   def isEnable(session: SparkSession): Boolean = {
     def ndpEnabled: Boolean = session.sqlContext.getConf(
-      ndpEnabledStr, "true").trim.toBoolean
+      ndpEnabledStr, "false").trim.toBoolean
     ndpEnabled && (isMatchedIpAddress || NdpConnectorUtils.getNdpEnable)
   }
 
   def isEnable: Boolean = {
     def ndpEnabled: Boolean = sys.props.getOrElse(
-      ndpEnabledStr, "true").trim.toBoolean
+      ndpEnabledStr, "false").trim.toBoolean
     ndpEnabled && (isMatchedIpAddress || NdpConnectorUtils.getNdpEnable)
+  }
+def isNdpOptimizedEnable(session: SparkSession): Boolean = {
+    session.sqlContext.getConf(ndpOptimizedEnableStr, "true").trim.toBoolean
   }
 }
