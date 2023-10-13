@@ -63,12 +63,12 @@ public class AppResult extends Model {
     @Column(length =  JOB_TYPE_LIMIT)
     public String jobType;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(columnDefinition = "TEXT CHARACTER SET utf8mb4")
     public String parameters;
 
     @Column()
     public int executionStatus;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(columnDefinition = "TEXT CHARACTER SET utf8mb4")
     public String query;
 }
