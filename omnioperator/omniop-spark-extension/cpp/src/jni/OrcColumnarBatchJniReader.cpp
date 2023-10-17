@@ -396,20 +396,14 @@ uint64_t CopyToOmniDecimal128Vec(orc::ColumnVectorBatch *field)
     if (lvb->hasNulls) {
         for (uint i = 0; i < numElements; i++) {
             if (notNulls[i]) {
-                __int128_t dst = values[i].getHighBits();
-                dst <<= 64;
-                dst |= values[i].getLowBits();
-                originalVector->SetValue(i, Decimal128(dst));
+                originalVector->SetValue(i, Decimal128(values[i].getHighBits(), values[i].getLowBits()));
             } else {
                 originalVector->SetNull(i);
             }
         }
     } else {
         for (uint i = 0; i < numElements; i++) {
-            __int128_t dst = values[i].getHighBits();
-            dst <<= 64;
-            dst |= values[i].getLowBits();
-            originalVector->SetValue(i, Decimal128(dst));
+            originalVector->SetValue(i, Decimal128(values[i].getHighBits(), values[i].getLowBits()));
         }
     }
     return (uint64_t)originalVector;

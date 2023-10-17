@@ -128,7 +128,7 @@ public class LookupJoinOmniOperatorTest
             case INNER:
                 operatorFactory = innerJoin(operatorId, planNodeId, lookupSourceFactoryManager, probeTypes,
                         probeJoinChannels, empty, Optional.of(probeOutputChannels), totalOperatorsCount,
-                        hashBuilderOmniOperatorFactory);
+                        hashBuilderOmniOperatorFactory, Optional.empty());
                 break;
             case PROBE_OUTER:
                 operatorFactory = probeOuterJoin(operatorId, planNodeId, lookupSourceFactoryManager, probeTypes,
