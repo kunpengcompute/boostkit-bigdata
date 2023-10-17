@@ -43,14 +43,17 @@ case class ColumnarBloomFilterSubquery(plan: BaseSubqueryExec, exprId: ExprId, s
   override def eval(input: InternalRow): Any = {
     var ret = 0L
     // if eval at driver side, return 0
-    if (SparkEnv.get.executorId != SparkContext.DRIVER_IDENTIFIER) {
+    try {
       result = scalarSubquery.eval(input)
-      if (result != null) {
-        ret = copyToNativeBloomFilter()
-      }
+    } catch {
+      case e: IllegalArgumentException => { return ret; }
+    }
+    if (result != null) {
+      ret = copyToNativeBloomFilter()
     }
     ret
   }
+
   override def withNewPlan(query: BaseSubqueryExec): ColumnarBloomFilterSubquery = copy(plan = scalarSubquery.plan)
   override def doGenCode(ctx: CodegenContext, ev: ExprCode): ExprCode = scalarSubquery.doGenCode(ctx, ev)
   override def updateResult(): Unit = scalarSubquery.updateResult()
@@ -65,6 +68,7 @@ case class ColumnarBloomFilterSubquery(plan: BaseSubqueryExec, exprId: ExprId, s
     // close operator
     addLeakSafeTaskCompletionListener[Unit](_ => {
       bloomFilterOperator.close()
+      bloomFilterOperatorFactory.close()
     })
 
     bloomFilterOperator.addInput(vecBatch)
@@ -72,7 +76,12 @@ case class ColumnarBloomFilterSubquery(plan: BaseSubqueryExec, exprId: ExprId, s
 
     // return BloomFilter off-heap address
     assert(outputs.hasNext, s"Expects bloom filter address value, but got nothing.")
-    bloomFilterNativeAddress = outputs.next().getVector(0).asInstanceOf[LongVec].get(0)
+    val outVecBatch = outputs.next()
+    bloomFilterNativeAddress = outVecBatch.getVector(0).asInstanceOf[LongVec].get(0)
+    // bloomFilterNativeAddress is used, but on one trace outVecBatch
+    outVecBatch.releaseAllVectors
+    outVecBatch.close
+
     bloomFilterNativeAddress
   }
 
