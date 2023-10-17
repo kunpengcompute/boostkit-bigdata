@@ -73,11 +73,11 @@ public class LookupJoinOmniOperators
                                             JoinBridgeManager<? extends LookupSourceFactory> lookupSourceFactory, List<Type> probeTypes,
                                             List<Integer> probeJoinChannel, OptionalInt probeHashChannel, Optional<List<Integer>> probeOutputChannels,
                                             OptionalInt totalOperatorsCount,
-                                            HashBuilderOmniOperator.HashBuilderOmniOperatorFactory hashBuilderOmniOperatorFactory)
+                                            HashBuilderOmniOperator.HashBuilderOmniOperatorFactory hashBuilderOmniOperatorFactory, Optional<String> filter)
     {
         return createOmniJoinOperatorFactory(operatorId, planNodeId, lookupSourceFactory, probeTypes, probeJoinChannel,
                 probeHashChannel, probeOutputChannels.orElse(rangeList(probeTypes.size())),
-                LookupJoinOperators.JoinType.INNER, totalOperatorsCount, hashBuilderOmniOperatorFactory);
+                LookupJoinOperators.JoinType.INNER, totalOperatorsCount, hashBuilderOmniOperatorFactory, filter);
     }
 
     /**
@@ -102,7 +102,7 @@ public class LookupJoinOmniOperators
     {
         return createOmniJoinOperatorFactory(operatorId, planNodeId, lookupSourceFactory, probeTypes, probeJoinChannel,
                 probeHashChannel, probeOutputChannels.orElse(rangeList(probeTypes.size())),
-                LookupJoinOperators.JoinType.PROBE_OUTER, totalOperatorsCount, hashBuilderOmniOperatorFactory);
+                LookupJoinOperators.JoinType.PROBE_OUTER, totalOperatorsCount, hashBuilderOmniOperatorFactory, Optional.empty());
     }
 
     /**
@@ -127,7 +127,7 @@ public class LookupJoinOmniOperators
     {
         return createOmniJoinOperatorFactory(operatorId, planNodeId, lookupSourceFactory, probeTypes, probeJoinChannel,
                 probeHashChannel, probeOutputChannels.orElse(rangeList(probeTypes.size())),
-                LookupJoinOperators.JoinType.LOOKUP_OUTER, totalOperatorsCount, hashBuilderOmniOperatorFactory);
+                LookupJoinOperators.JoinType.LOOKUP_OUTER, totalOperatorsCount, hashBuilderOmniOperatorFactory, Optional.empty());
     }
 
     /**
@@ -152,7 +152,7 @@ public class LookupJoinOmniOperators
     {
         return createOmniJoinOperatorFactory(operatorId, planNodeId, lookupSourceFactory, probeTypes, probeJoinChannel,
                 probeHashChannel, probeOutputChannels.orElse(rangeList(probeTypes.size())),
-                LookupJoinOperators.JoinType.FULL_OUTER, totalOperatorsCount, hashBuilderOmniOperatorFactory);
+                LookupJoinOperators.JoinType.FULL_OUTER, totalOperatorsCount, hashBuilderOmniOperatorFactory, Optional.empty());
     }
 
     private static List<Integer> rangeList(int endExclusive)
@@ -164,13 +164,13 @@ public class LookupJoinOmniOperators
                                                                  JoinBridgeManager<? extends LookupSourceFactory> lookupSourceFactoryManager, List<Type> probeTypes,
                                                                  List<Integer> probeJoinChannel, OptionalInt probeHashChannel, List<Integer> probeOutputChannels,
                                                                  LookupJoinOperators.JoinType joinType, OptionalInt totalOperatorsCount,
-                                                                 HashBuilderOmniOperator.HashBuilderOmniOperatorFactory hashBuilderOmniOperatorFactory)
+                                                                 HashBuilderOmniOperator.HashBuilderOmniOperatorFactory hashBuilderOmniOperatorFactory, Optional<String> filter)
     {
         List<Type> probeOutputChannelTypes = probeOutputChannels.stream().map(probeTypes::get)
                 .collect(toImmutableList());
 
         return new LookupJoinOmniOperator.LookupJoinOmniOperatorFactory(operatorId, planNodeId,
                 lookupSourceFactoryManager, probeTypes, probeOutputChannels, probeOutputChannelTypes, joinType,
-                totalOperatorsCount, probeJoinChannel, probeHashChannel, hashBuilderOmniOperatorFactory);
+                totalOperatorsCount, probeJoinChannel, probeHashChannel, hashBuilderOmniOperatorFactory, filter);
     }
 }

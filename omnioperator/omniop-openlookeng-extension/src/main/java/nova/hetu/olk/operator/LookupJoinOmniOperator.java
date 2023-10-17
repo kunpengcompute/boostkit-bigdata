@@ -332,7 +332,7 @@ public class LookupJoinOmniOperator
                                              JoinBridgeManager<? extends LookupSourceFactory> lookupSourceFactoryManager, List<Type> probeTypes,
                                              List<Integer> probeOutputChannels, List<Type> probeOutputChannelTypes, JoinType joinType,
                                              OptionalInt totalOperatorsCount, List<Integer> probeJoinChannel, OptionalInt probeHashChannel,
-                                             HashBuilderOmniOperator.HashBuilderOmniOperatorFactory hashBuilderOmniOperatorFactory)
+                                             HashBuilderOmniOperator.HashBuilderOmniOperatorFactory hashBuilderOmniOperatorFactory, Optional<String> filter)
         {
             this.operatorId = operatorId;
             this.planNodeId = requireNonNull(planNodeId, "planNodeId is null");
@@ -364,7 +364,7 @@ public class LookupJoinOmniOperator
             this.omniLookupJoinOperatorFactory = new OmniLookupJoinOperatorFactory(types,
                     Ints.toArray(probeOutputChannels), Ints.toArray(probeJoinChannel),
                     Ints.toArray(buildOutputChannels), buildOutputDataTypes, getOmniJoinType(joinType),
-                    hashBuilderOmniOperatorFactory.getOmniHashBuilderOperatorFactory());
+                    hashBuilderOmniOperatorFactory.getOmniHashBuilderOperatorFactory(), filter);
         }
 
         private nova.hetu.omniruntime.constants.JoinType getOmniJoinType(JoinType joinType)

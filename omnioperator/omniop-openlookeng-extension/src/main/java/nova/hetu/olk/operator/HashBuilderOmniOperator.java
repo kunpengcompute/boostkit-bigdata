@@ -124,7 +124,7 @@ public class HashBuilderOmniOperator
             DataType[] omniBuildTypes = OperatorUtils.toDataTypes(buildTypes);
             String[] omniSearchFunctions = searchFunctions.stream().toArray(String[]::new);
             this.omniHashBuilderOperatorFactory = new OmniHashBuilderOperatorFactory(omniBuildTypes,
-                    Ints.toArray(hashChannels), filterFunction, sortChannel, omniSearchFunctions, operatorCount);
+                    Ints.toArray(hashChannels), operatorCount);
         }
 
         @Override

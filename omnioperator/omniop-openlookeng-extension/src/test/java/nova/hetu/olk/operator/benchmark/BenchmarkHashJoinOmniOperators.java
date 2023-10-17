@@ -205,7 +205,7 @@ public class BenchmarkHashJoinOmniOperators
             HashBuilderOmniOperatorFactory hashBuilderOperatorFactory = createBuildOperatorFactory();
             LookupJoinOmniOperators.innerJoin(HASH_JOIN_OPERATOR_ID, TEST_PLAN_NODE_ID, lookupSourceFactoryManager,
                     getBuildTypes(), buildJoinChannels, buildHashChannel,
-                    Optional.of(buildOutputChannels), OptionalInt.of(1), hashBuilderOperatorFactory);
+                    Optional.of(buildOutputChannels), OptionalInt.of(1), hashBuilderOperatorFactory, Optional.empty());
             return hashBuilderOperatorFactory;
         }
 
@@ -560,7 +560,7 @@ public class BenchmarkHashJoinOmniOperators
 
             OperatorFactory operatorFactory = LookupJoinOmniOperators.innerJoin(HASH_JOIN_OPERATOR_ID, TEST_PLAN_NODE_ID, lookupSourceFactoryManager,
                     getProbeTypes(), probeJoinChannels, probeHashChannel,
-                    Optional.of(probeOutputChannels), OptionalInt.of(1), hashBuilderOperatorFactory);
+                    Optional.of(probeOutputChannels), OptionalInt.of(1), hashBuilderOperatorFactory, Optional.empty());
             buildDriverContext = super.createTaskContext().addPipelineContext(0, true, true, false)
                     .addDriverContext();
             buildOperator = hashBuilderOperatorFactory.createOperator(buildDriverContext);

@@ -1354,12 +1354,10 @@ public class OmniLocalExecutionPlanner
         }
 
         public JoinBridgeManager<PartitionedLookupSourceFactory> createLookupSourceFactory(JoinNode node,
-                                                                                           PlanNode buildNode, List<Symbol> buildSymbols, Optional<Symbol> buildHashSymbol,
-                                                                                           PhysicalOperation probeSource, LocalExecutionPlanContext context, boolean spillEnabled)
+                LocalExecutionPlanContext buildContext, PhysicalOperation buildSource, PlanNode buildNode,
+                List<Symbol> buildSymbols, Optional<Symbol> buildHashSymbol, PhysicalOperation probeSource,
+                LocalExecutionPlanContext context, boolean spillEnabled)
         {
-            LocalExecutionPlanContext buildContext = context.createSubContext();
-            PhysicalOperation buildSource = buildNode.accept(this, buildContext);
-
             if (buildSource.getPipelineExecutionStrategy() == GROUPED_EXECUTION) {
                 checkState(probeSource.getPipelineExecutionStrategy() == GROUPED_EXECUTION,
                         "Build execution is GROUPED_EXECUTION. Probe execution is expected be GROUPED_EXECUTION, but is UNGROUPED_EXECUTION.");
@@ -1500,11 +1498,15 @@ public class OmniLocalExecutionPlanner
             // Plan build
             boolean spillEnabled = isSpillEnabled(session)
                     && node.isSpillable().orElseThrow(() -> new IllegalArgumentException("spillable not yet set"));
-            JoinBridgeManager<PartitionedLookupSourceFactory> lookupSourceFactory = createLookupSourceFactory(node,
+            LocalExecutionPlanContext buildContext = context.createSubContext();
+            PhysicalOperation buildSource = buildNode.accept(this, buildContext);
+            JoinBridgeManager<PartitionedLookupSourceFactory> lookupSourceFactory = createLookupSourceFactory(node, buildContext, buildSource,
                     buildNode, buildSymbols, buildHashSymbol, probeSource, context, spillEnabled);
-
+            Optional<String> filterFunction = node.getFilter()
+                    .map(filterExpression -> getTranslatedExpression(context, buildSource, probeSource,
+                            filterExpression));
             OperatorFactory operator = createLookupJoin(node, probeSource, probeSymbols, probeHashSymbol,
-                    lookupSourceFactory, context, spillEnabled);
+                    lookupSourceFactory, context, spillEnabled, filterFunction);
 
             ImmutableMap.Builder<Symbol, Integer> outputMappings = ImmutableMap.builder();
             List<Symbol> outputSymbols = node.getOutputSymbols();
@@ -1518,7 +1520,7 @@ public class OmniLocalExecutionPlanner
 
         public OperatorFactory createLookupJoin(JoinNode node, PhysicalOperation probeSource, List<Symbol> probeSymbols,
                                                 Optional<Symbol> probeHashSymbol, JoinBridgeManager<? extends LookupSourceFactory> lookupSourceFactoryManager,
-                                                LocalExecutionPlanContext context, boolean spillEnabled)
+                                                LocalExecutionPlanContext context, boolean spillEnabled, Optional<String> filter)
         {
             List<Type> probeTypes = probeSource.getTypes();
             List<Symbol> probeOutputSymbols = node.getOutputSymbols().stream()
@@ -1537,7 +1539,7 @@ public class OmniLocalExecutionPlanner
             boolean buildOuter = node.getType() == RIGHT || node.getType() == FULL;
             if (!buildOuter) {
                 return createOmniLookupJoin(node, lookupSourceFactoryManager, context, probeTypes, probeOutputChannels,
-                        probeJoinChannels, probeHashChannel, totalOperatorsCount);
+                        probeJoinChannels, probeHashChannel, totalOperatorsCount, filter);
             }
             return getLookUpJoinOperatorFactory(node, lookupSourceFactoryManager, context, probeTypes,
                     probeOutputChannels, probeJoinChannels, probeHashChannel, totalOperatorsCount);
@@ -1559,19 +1561,19 @@ public class OmniLocalExecutionPlanner
         public OperatorFactory createOmniLookupJoin(JoinNode node,
                                                     JoinBridgeManager<? extends LookupSourceFactory> lookupSourceFactoryManager,
                                                     LocalExecutionPlanContext context, List<Type> probeTypes, List<Integer> probeOutputChannels,
-                                                    List<Integer> probeJoinChannels, OptionalInt probeHashChannel, OptionalInt totalOperatorsCount)
+                                                    List<Integer> probeJoinChannels, OptionalInt probeHashChannel, OptionalInt totalOperatorsCount, Optional<String> filter)
         {
             List<DriverFactory> driverFactories = context.getDriverFactories();
             DriverFactory driverFactory = driverFactories.get(driverFactories.size() - 1);
             List<OperatorFactory> operatorFactories = driverFactory.getOperatorFactories();
             OperatorFactory buildOperatorFactory = operatorFactories.get(operatorFactories.size() - 1);
-
+            System.out.println(node.getType());
             switch (node.getType()) {
                 case INNER:
                     return LookupJoinOmniOperators.innerJoin(context.getNextOperatorId(), node.getId(),
                             lookupSourceFactoryManager, probeTypes, probeJoinChannels, probeHashChannel,
                             Optional.of(probeOutputChannels), totalOperatorsCount,
-                            (HashBuilderOmniOperatorFactory) buildOperatorFactory);
+                            (HashBuilderOmniOperatorFactory) buildOperatorFactory, filter);
                 case LEFT:
                     return LookupJoinOmniOperators.probeOuterJoin(context.getNextOperatorId(), node.getId(),
                             lookupSourceFactoryManager, probeTypes, probeJoinChannels, probeHashChannel,
