@@ -8,6 +8,7 @@ import com.huawei.boostkit.spark.ColumnarPluginConfig
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.adaptive.ock.BoostTuningQueryManager
+import org.apache.spark.sql.execution.adaptive.ock.common.BoostTuningLogger.TLogWarning
 import org.apache.spark.sql.execution.adaptive.ock.common.BoostTuningUtil.{getQueryExecutionId, normalizedSparkPlan}
 import org.apache.spark.sql.execution.adaptive.ock.common.OmniRuntimeConfiguration.enableColumnarShuffle
 import org.apache.spark.sql.execution.adaptive.ock.common.StringPrefix.SHUFFLE_PREFIX
@@ -35,7 +36,13 @@ case class OmniOpBoostTuningPreColumnarRule() extends Rule[SparkPlan] {
   val delegate: BoostTuningPreNewQueryStageRule = BoostTuningPreNewQueryStageRule()
 
   override def apply(plan: SparkPlan): SparkPlan = {
-    val query = BoostTuningQueryManager.getOrCreateQueryManager(getQueryExecutionId)
+    val executionId = getQueryExecutionId(plan)
+    if (executionId < 0) {
+      TLogWarning(s"Skipped to apply BoostTuning new query stage rule for unneeded plan: $plan")
+      return plan
+    }
+
+    val query = BoostTuningQueryManager.getOrCreateQueryManager(executionId)
 
     delegate.prepareQueryExecution(query, plan)
 
