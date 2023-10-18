@@ -138,6 +138,7 @@ case class BoostTuningColumnarShuffleExchangeExec(
   lazy val boostTuningColumnarShuffleDependency: ShuffleDependency[Int, ColumnarBatch, ColumnarBatch] = {
     val partitionInitTime = System.currentTimeMillis()
     val newOutputPartitioning = helper.replacePartitionWithNewNum()
+    val partitionReadyTime = System.currentTimeMillis()
     val dep = ColumnarShuffleExchangeExec.prepareShuffleDependency(
       inputColumnarRDD,
       child.output,
@@ -149,11 +150,12 @@ case class BoostTuningColumnarShuffleExchangeExec(
       longMetric("numInputRows"),
       longMetric("splitTime"),
       longMetric("spillTime"))
-    val partitionReadyTime = System.currentTimeMillis()
+    val dependencyReadyTime = System.currentTimeMillis()
     TLogInfo(s"BoostTuningShuffleExchange $id input partition ${inputColumnarRDD.getNumPartitions}" +
-    s" modify ${if (helper.isAdaptive) "adaptive" else "global"}" + 
-    s" partitionNum ${outputPartitioning.numPartitions} -> ${newOutputPartitioning.numPartitions}" + 
-    s" cost ${partitionReadyTime - partitionInitTime} ms")
+      s" modify ${if (helper.isAdaptive) "adaptive" else "global"}" +
+      s" partitionNum ${outputPartitioning.numPartitions} -> ${newOutputPartitioning.numPartitions}" +
+      s" partition modify cost ${partitionReadyTime - partitionInitTime} ms" +
+      s" dependency prepare cost ${dependencyReadyTime - partitionReadyTime} ms")
     dep
   }
 
@@ -197,5 +199,9 @@ case class BoostTuningColumnarShuffleExchangeExec(
     } else {
       cachedShuffleRDD
     }
+  }
+
+  protected def withNewChildInternal(newChild: SparkPlan): BoostTuningColumnarShuffleExchangeExec = {
+    copy(child = newChild)
   }
 }
