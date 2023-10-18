@@ -153,13 +153,13 @@ public class OrcColumnarBatchJniReader {
 
         // handle delegate token for native orc reader
         OrcColumnarBatchJniReader.tokenDebug("initializeReader");
-        JSONObject tokensJsonObj = constructTokensJSONObject();
+        /*JSONObject tokensJsonObj = constructTokensJSONObject();
         if (null != tokensJsonObj) {
             job.put("tokens", tokensJsonObj);
         }
 
         // just used for obs
-        job.put("obsInfo", ObsConf.constructObsJSONObject());
+        job.put("obsInfo", ObsConf.constructObsJSONObject());*/
 
         reader = initializeReader(path, job);
         return reader;
@@ -208,11 +208,11 @@ public class OrcColumnarBatchJniReader {
         }
         job.put("includedColumns", colToInclu.toArray());
         // handle delegate token for native orc reader
-        OrcColumnarBatchJniReader.tokenDebug("initializeRecordReader");
+        /*OrcColumnarBatchJniReader.tokenDebug("initializeRecordReader");
         JSONObject tokensJsonObj = constructTokensJSONObject();
         if (null != tokensJsonObj) {
             job.put("tokens", tokensJsonObj);
-        }
+        }*/
         recordReader = initializeRecordReader(reader, job);
         return recordReader;
     }
@@ -362,6 +362,17 @@ public class OrcColumnarBatchJniReader {
             LOGGER.debug("\n\n================== tokens-json ==================\n" + tokensJsonItem.toString());
             return tokensJsonItem;
         }
+    }
+
+    public JSONObject constructObsJSONObject() {
+        JSONObject obsJsonItem = new JSONObject();
+        obsJsonItem.put("endpoint", ObsConf.getEndpoint());
+        synchronized (ObsConf.getLock()) {
+            obsJsonItem.put("ak", ObsConf.getAk());
+            obsJsonItem.put("sk", ObsConf.getSk());
+            obsJsonItem.put("token", ObsConf.getToken());
+        }
+        return obsJsonItem;
     }
 
     public static void tokenDebug(String mesg) {

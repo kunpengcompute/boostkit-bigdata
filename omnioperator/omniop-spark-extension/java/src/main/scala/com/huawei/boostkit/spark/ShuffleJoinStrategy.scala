@@ -17,18 +17,16 @@
 
 package com.huawei.boostkit.spark
 
-import com.huawei.boostkit.spark.util.LogicalPlanSelector
-
-import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.Strategy
 import org.apache.spark.sql.catalyst.SQLConfHelper
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.optimizer.{BuildLeft, BuildRight, BuildSide, JoinSelectionHelper}
 import org.apache.spark.sql.catalyst.planning._
+import org.apache.spark.sql.catalyst.plans.{ExistenceJoin, FullOuter, InnerLike, JoinType, LeftAnti, LeftOuter, LeftSemi, RightOuter}
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.execution.{joins, SparkPlan}
 
-case class ShuffleJoinStrategy(session: SparkSession) extends Strategy
+object ShuffleJoinStrategy extends Strategy
   with PredicateHelper
   with JoinSelectionHelper
   with SQLConfHelper {
@@ -39,8 +37,7 @@ case class ShuffleJoinStrategy(session: SparkSession) extends Strategy
   private val columnarForceShuffledHashJoin =
     ColumnarPluginConfig.getConf.forceShuffledHashJoin
 
-  def apply(plan: LogicalPlan): Seq[SparkPlan] = LogicalPlanSelector.maybeNil(session, plan) {
-    plan match {
+  def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
       case ExtractEquiJoinKeys(joinType, leftKeys, rightKeys, nonEquiCond, _, left, right, hint)
         if columnarPreferShuffledHashJoin =>
         val enable = getBroadcastBuildSide(left, right, joinType, hint, true, conf).isEmpty &&
@@ -96,8 +93,8 @@ case class ShuffleJoinStrategy(session: SparkSession) extends Strategy
               leftBuildable = canBuildShuffledHashJoinLeft(joinType)
               rightBuildable = canBuildShuffledHashJoinRight(joinType)
             } else {
-              leftBuildable = canBuildShuffledHashJoinLeft(joinType) && buildLeft
-              rightBuildable = canBuildShuffledHashJoinRight(joinType) && buildRight
+              leftBuildable = canBuildShuffledHashJoinLeft(joinType)
+              rightBuildable = canBuildShuffledHashJoinRight(joinType)
             }
             getBuildSide(
               leftBuildable,
@@ -120,7 +117,6 @@ case class ShuffleJoinStrategy(session: SparkSession) extends Strategy
           Nil
         }
       case _ => Nil
-    }
   }
 
   private def getBuildSide(
@@ -139,5 +135,15 @@ case class ShuffleJoinStrategy(session: SparkSession) extends Strategy
     } else {
       None
     }
+  }
+
+  def supportHashBuildJoinTypeOnLeft: JoinType => Boolean = {
+    case _: InnerLike | RightOuter | FullOuter => true
+    case _ => false
+  }
+
+  def supportHashBuildJoinTypeOnRight: JoinType => Boolean = {
+    case _: InnerLike | LeftOuter | FullOuter | LeftSemi | LeftAnti | _: ExistenceJoin => true
+    case _ => false
   }
 }
