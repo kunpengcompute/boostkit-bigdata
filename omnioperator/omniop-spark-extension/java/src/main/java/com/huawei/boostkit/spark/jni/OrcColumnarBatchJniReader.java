@@ -153,13 +153,6 @@ public class OrcColumnarBatchJniReader {
 
         // handle delegate token for native orc reader
         OrcColumnarBatchJniReader.tokenDebug("initializeReader");
-        /*JSONObject tokensJsonObj = constructTokensJSONObject();
-        if (null != tokensJsonObj) {
-            job.put("tokens", tokensJsonObj);
-        }
-
-        // just used for obs
-        job.put("obsInfo", ObsConf.constructObsJSONObject());*/
 
         reader = initializeReader(path, job);
         return reader;
@@ -207,12 +200,6 @@ public class OrcColumnarBatchJniReader {
             }
         }
         job.put("includedColumns", colToInclu.toArray());
-        // handle delegate token for native orc reader
-        /*OrcColumnarBatchJniReader.tokenDebug("initializeRecordReader");
-        JSONObject tokensJsonObj = constructTokensJSONObject();
-        if (null != tokensJsonObj) {
-            job.put("tokens", tokensJsonObj);
-        }*/
         recordReader = initializeRecordReader(reader, job);
         return recordReader;
     }
