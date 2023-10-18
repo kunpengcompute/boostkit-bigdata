@@ -13,7 +13,7 @@
     </organization>
 
     <properties>
-        <dep.os.arch>aarcch64</dep.os.arch>
+        <dep.os.arch>aarch64</dep.os.arch>
 
         <hadoop.version>3.2.0</hadoop.version>
         <spark.version>3.1.1</spark.version>
@@ -831,7 +831,7 @@
     </dependencies>
 
     <build>
-        <finalName>boostkit-${artifactId}-${version}-${dep.os.arch}</finalName>
+        <finalName>boostkit-log-analyzer-${version}-${dep.os.arch}</finalName>
         <resources>
             <resource>
                 <directory>src/main/resources</directory>
@@ -952,6 +952,9 @@
                 <artifactId>maven-assembly-plugin</artifactId>
                 <version>3.2.0</version>
                 <configuration>
+                    <appendAssemblyId>false</appendAssemblyId>
+                    <outputDirectory>${project.build.directory}</outputDirectory>
+                    <finalName>boostkit-log-analyzer-${project.version}-${dep.os.arch}</finalName>
                     <descriptors>
                         <descriptor>src/main/assembly/assembly.xml</descriptor>
                     </descriptors>
