@@ -195,7 +195,7 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
 
   // enable or disable force shuffle hash join
   val forceShuffledHashJoin: Boolean = conf
-    .getConfString("spark.omni.sql.columnar.forceShuffledHashJoin", "false")
+    .getConfString("spark.omni.sql.columnar.forceShuffledHashJoin", "true")
     .toBoolean
 
   // enable or disable rewrite self join in Predicate to aggregate
@@ -231,6 +231,10 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
   val enableLocalColumnarLimit : Boolean = conf.getConfString("spark.omni.sql.columnar.localLimit", "true").toBoolean
 
   val enableGlobalColumnarLimit : Boolean = conf.getConfString("spark.omni.sql.columnar.globalLimit", "true").toBoolean
+
+  val topNPushDownForWindowThreshold = conf.getConfString("spark.sql.execution.topNPushDownForWindow.threshold", "100").toInt
+
+  val topNPushDownForWindowEnable: Boolean = conf.getConfString("spark.sql.execution.topNPushDownForWindow.enabled", "true").toBoolean
 }
 
 

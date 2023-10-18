@@ -83,9 +83,7 @@ case class ColumnarGuardRule() extends Rule[SparkPlan] {
             plan.optionalNumCoalescedBuckets,
             plan.dataFilters,
             plan.tableIdentifier,
-            plan.needPriv,
-            plan.disableBucketedScan,
-            plan.outputAllAttributes
+            plan.disableBucketedScan
           ).buildCheck()
         case plan: ProjectExec =>
           if (!enableColumnarProject) return false

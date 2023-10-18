@@ -314,7 +314,7 @@ object ColumnarShuffleExchangeExec extends Logging {
           newIter
         }, isOrderSensitive = isOrderSensitive)
       case h@HashPartitioning(expressions, numPartitions) =>
-        if (containsRollUp(expressions)) {
+        if (containsRollUp(expressions) || expressions.length > 6) {
           rdd.mapPartitionsWithIndexInternal((_, cbIter) => {
             val partitionKeyExtractor: InternalRow => Any = {
               val projection =
