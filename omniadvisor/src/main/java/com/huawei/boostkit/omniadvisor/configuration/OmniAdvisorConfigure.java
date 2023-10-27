@@ -20,14 +20,36 @@ import org.apache.commons.configuration2.PropertiesConfiguration;
 public class OmniAdvisorConfigure {
     private static final int DEFAULT_THREAD_COUNT = 3;
     private static final String THREAD_COUNT_CONF_KEY = "log.analyzer.thread.count";
+    private static final String KERBEROS_PRINCIPAL_KEY = "kerberos.principal";
+    private static final String KERBEROS_KEYTAB_FILE_KEY = "kerberos.keytab.file";
 
     private final int threadCount;
+    private String kerberosPrincipal;
+    private String kerberosKeytabFile;
 
     public OmniAdvisorConfigure(PropertiesConfiguration configuration) {
         this.threadCount = configuration.getInt(THREAD_COUNT_CONF_KEY, DEFAULT_THREAD_COUNT);
+        this.kerberosPrincipal = configuration.getString(KERBEROS_PRINCIPAL_KEY, null);
+        this.kerberosKeytabFile = configuration.getString(KERBEROS_KEYTAB_FILE_KEY, null);
     }
 
     public int getThreadCount() {
         return threadCount;
+    }
+
+    public String getKerberosPrincipal() {
+        return kerberosPrincipal;
+    }
+
+    public String getKerberosKeytabFile() {
+        return kerberosKeytabFile;
+    }
+
+    public void setKerberosPrincipal(String kerberosPrincipal) {
+        this.kerberosPrincipal = kerberosPrincipal;
+    }
+
+    public void setKerberosKeytabFile(String kerberosKeytabFile) {
+        this.kerberosKeytabFile = kerberosKeytabFile;
     }
 }

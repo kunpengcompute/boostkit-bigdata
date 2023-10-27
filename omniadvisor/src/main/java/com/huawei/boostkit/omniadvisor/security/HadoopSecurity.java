@@ -15,6 +15,8 @@
 
 package com.huawei.boostkit.omniadvisor.security;
 
+import com.huawei.boostkit.omniadvisor.OmniAdvisorContext;
+import com.huawei.boostkit.omniadvisor.configuration.OmniAdvisorConfigure;
 import com.huawei.boostkit.omniadvisor.exception.OmniAdvisorException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -28,31 +30,32 @@ import java.security.PrivilegedAction;
 public final class HadoopSecurity {
     private static final Logger LOG = LoggerFactory.getLogger(HadoopSecurity.class);
 
-    private String keytabLocation;
-    private String keytabUser;
+    private String keytabFile;
+    private String principal;
     private UserGroupInformation loginUser;
 
-    public HadoopSecurity(Configuration conf) throws IOException {
-        UserGroupInformation.setConfiguration(conf);
+    public HadoopSecurity(Configuration hadoopConf) throws IOException {
+        OmniAdvisorConfigure configure = OmniAdvisorContext.getInstance().getOmniAdvisorConfigure();
+        UserGroupInformation.setConfiguration(hadoopConf);
         boolean securityEnabled = UserGroupInformation.isSecurityEnabled();
         if (securityEnabled) {
             LOG.info("This cluster is Kerberos enabled.");
             boolean login = true;
 
-            keytabUser = System.getProperty("keytab.user");
-            if (keytabUser == null) {
+            principal = configure.getKerberosPrincipal();
+            if (principal == null) {
                 LOG.error("Keytab user not set. Please set keytab_user in the configuration file");
                 login = false;
             }
 
-            keytabLocation = System.getProperty("keytab.location");
-            if (keytabLocation == null) {
+            keytabFile = configure.getKerberosKeytabFile();
+            if (keytabFile == null) {
                 LOG.error("Keytab location not set. Please set keytab_location in the configuration file");
                 login = false;
             }
 
-            if (keytabLocation != null && !new File(keytabLocation).exists()) {
-                LOG.error("The keytab file at location [" + keytabLocation + "] does not exist.");
+            if (keytabFile != null && !new File(keytabFile).exists()) {
+                LOG.error("The keytab file at location [" + keytabFile + "] does not exist.");
                 login = false;
             }
 
@@ -71,8 +74,8 @@ public final class HadoopSecurity {
 
     public UserGroupInformation getLoginUser() throws IOException {
         LOG.info("No login user. Creating login user");
-        LOG.info("Logging with " + keytabUser + " and " + keytabLocation);
-        UserGroupInformation.loginUserFromKeytab(keytabUser, keytabLocation);
+        LOG.info("Logging with " + principal + " and " + keytabFile);
+        UserGroupInformation.loginUserFromKeytab(principal, keytabFile);
         UserGroupInformation user = UserGroupInformation.getLoginUser();
         LOG.info("Logged in with user " + user);
         if (UserGroupInformation.isLoginKeytabBased()) {

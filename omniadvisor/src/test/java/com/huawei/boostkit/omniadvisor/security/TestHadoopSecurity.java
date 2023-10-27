@@ -15,6 +15,8 @@
 
 package com.huawei.boostkit.omniadvisor.security;
 
+import com.huawei.boostkit.omniadvisor.OmniAdvisorContext;
+import com.huawei.boostkit.omniadvisor.configuration.OmniAdvisorConfigure;
 import com.huawei.boostkit.omniadvisor.exception.OmniAdvisorException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
@@ -30,9 +32,6 @@ import java.util.Locale;
 import java.util.Properties;
 
 public class TestHadoopSecurity {
-    private static final String KEYTAB_USER = "keytab.user";
-    private static final String KEYTAB_LOCATION = "keytab.location";
-
     private static Configuration conf;
     private static MiniKdc kdc;
     private static File keytab;
@@ -64,38 +63,42 @@ public class TestHadoopSecurity {
 
     @After
     public void clearProperties() {
-        System.clearProperty(KEYTAB_USER);
-        System.clearProperty(KEYTAB_LOCATION);
+        OmniAdvisorConfigure configure = OmniAdvisorContext.getInstance().getOmniAdvisorConfigure();
+        configure.setKerberosPrincipal(null);
+        configure.setKerberosKeytabFile(null);
     }
 
     @Test
     public void testHadoopSecurity() throws Exception {
-        System.setProperty(KEYTAB_USER, "test");
-        System.setProperty(KEYTAB_LOCATION, keytab.getAbsolutePath());
+        OmniAdvisorConfigure configure = OmniAdvisorContext.getInstance().getOmniAdvisorConfigure();
+        configure.setKerberosPrincipal("test");
+        configure.setKerberosKeytabFile(keytab.getAbsolutePath());
         HadoopSecurity security = new HadoopSecurity(conf);
         security.checkLogin();
     }
 
     @Test(expected = OmniAdvisorException.class)
     public void testHadoopSecurityWithoutKeytabUser() throws Exception {
-        System.setProperty(KEYTAB_LOCATION, keytab.getAbsolutePath());
+        OmniAdvisorConfigure configure = OmniAdvisorContext.getInstance().getOmniAdvisorConfigure();
+        configure.setKerberosKeytabFile(keytab.getAbsolutePath());
         HadoopSecurity security = new HadoopSecurity(conf);
         security.checkLogin();
     }
 
     @Test(expected = OmniAdvisorException.class)
     public void testHadoopSecurityWithoutKeytabLocation() throws Exception {
-        System.setProperty(KEYTAB_USER, "test");
+        OmniAdvisorConfigure configure = OmniAdvisorContext.getInstance().getOmniAdvisorConfigure();
+        configure.setKerberosPrincipal("test");
         HadoopSecurity security = new HadoopSecurity(conf);
         security.checkLogin();
     }
 
     @Test(expected = OmniAdvisorException.class)
     public void testHadoopSecurityWithErrorKeytabFile() throws Exception {
-        System.setProperty(KEYTAB_USER, "test");
-        System.setProperty(KEYTAB_LOCATION, "errorPath");
+        OmniAdvisorConfigure configure = OmniAdvisorContext.getInstance().getOmniAdvisorConfigure();
+        configure.setKerberosPrincipal("test");
+        configure.setKerberosKeytabFile("errorPath");
         HadoopSecurity security = new HadoopSecurity(conf);
         security.checkLogin();
-
     }
 }
