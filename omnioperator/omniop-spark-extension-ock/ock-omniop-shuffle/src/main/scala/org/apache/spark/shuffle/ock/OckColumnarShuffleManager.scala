@@ -39,7 +39,7 @@ class OckColumnarShuffleManager(conf: SparkConf) extends ColumnarShuffleManager 
     OCKScheduler.waitAndBlacklistUnavailableNode(conf)
   }
 
-  OCKFunctions.shuffleInitialize(ockConf, isOckBroadcast)
+  OCKFunctions.shuffleInitialize(ockConf)
   val isShuffleCompress: Boolean = conf.get(config.SHUFFLE_COMPRESS)
   val compressCodec: String = conf.get(IO_COMPRESSION_CODEC);
   OCKFunctions.setShuffleCompress(OckColumnarShuffleManager.isCompress(conf), compressCodec)
