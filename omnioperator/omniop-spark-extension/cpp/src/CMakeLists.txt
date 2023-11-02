@@ -7,7 +7,6 @@ set (SOURCE_FILES
         io/ColumnWriter.cc
         io/Compression.cc
         io/MemoryPool.cc
-        io/OrcObsFile.cc
         io/OutputStream.cc
         io/SparkFile.cc
         io/WriterOptions.cc
@@ -19,8 +18,7 @@ set (SOURCE_FILES
         jni/OrcColumnarBatchJniReader.cpp
         jni/jni_common.cpp
         jni/ParquetColumnarBatchJniReader.cpp
-        tablescan/ParquetReader.cpp
-        io/ParquetObsFile.cc)
+        tablescan/ParquetReader.cpp)
 
 #Find required protobuf package
 find_package(Protobuf REQUIRED)
@@ -56,7 +54,6 @@ target_link_libraries (${PROJ_TARGET} PUBLIC
         snappy
         lz4
         zstd
-        eSDKOBS
         boostkit-omniop-vector-1.3.0-aarch64
         )
 
