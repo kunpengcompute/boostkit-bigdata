@@ -44,8 +44,7 @@ TEST(read, test_parquet_reader)
 
     ParquetReader *reader = new ParquetReader();
     std::string ugi = "root@sample";
-    ObsConfig obsInfo;
-    auto state1 = reader->InitRecordReader(filename, 1024, row_group_indices, column_indices, ugi, obsInfo);
+    auto state1 = reader->InitRecordReader(filename, 1024, row_group_indices, column_indices, ugi);
     ASSERT_EQ(state1, Status::OK());
 
     std::shared_ptr<arrow::RecordBatch> batch;

@@ -35,7 +35,6 @@
 #include <arrow/type_fwd.h>
 #include <arrow/util/checked_cast.h>
 #include <arrow/io/interfaces.h>
-#include <io/ParquetObsFile.hh>
 
 namespace spark::reader {
     class ParquetReader {
@@ -43,8 +42,7 @@ namespace spark::reader {
         ParquetReader() {}
 
         arrow::Status InitRecordReader(std::string& path, int64_t capacity,
-            const std::vector<int>& row_group_indices, const std::vector<int>& column_indices, std::string& ugi,
-            ObsConfig& obsInfo);
+            const std::vector<int>& row_group_indices, const std::vector<int>& column_indices, std::string& ugi);
 
         arrow::Status ReadNextBatch(std::shared_ptr<arrow::RecordBatch> *batch);
 

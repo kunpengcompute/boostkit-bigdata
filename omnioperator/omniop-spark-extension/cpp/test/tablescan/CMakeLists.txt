@@ -6,7 +6,7 @@ set(SCAN_TEST_TARGET tablescantest)
 add_library(${SCAN_TEST_TARGET} STATIC ${SCAN_TESTS_LIST} parquet_scan_test.cpp)
 target_compile_options(${SCAN_TEST_TARGET} PUBLIC )
 
-target_link_libraries(${SCAN_TEST_TARGET} eSDKOBS)
+target_link_libraries(${SCAN_TEST_TARGET})
 
 target_include_directories(${SCAN_TEST_TARGET} PUBLIC $ENV{JAVA_HOME}/include)
 target_include_directories(${SCAN_TEST_TARGET} PUBLIC $ENV{JAVA_HOME}/include/linux)
