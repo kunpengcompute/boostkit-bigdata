@@ -16,7 +16,7 @@
 package com.huawei.boostkit.omniadvisor;
 
 import com.huawei.boostkit.omniadvisor.exception.OmniAdvisorException;
-import com.huawei.boostkit.omniadvisor.executor.OmniTuningRunner;
+import com.huawei.boostkit.omniadvisor.executor.OmniAdvisorRunner;
 import org.apache.commons.lang.time.DateUtils;
 
 import java.text.ParseException;
@@ -55,7 +55,7 @@ public final class OmniAdvisor {
         }
 
         OmniAdvisorContext.initContext(params.get(2), params.get(3));
-        OmniTuningRunner runner = new OmniTuningRunner(startTimeMills, finishedTimeMills);
+        OmniAdvisorRunner runner = new OmniAdvisorRunner(startTimeMills, finishedTimeMills);
         runner.run();
     }
 
