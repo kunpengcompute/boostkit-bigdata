@@ -24,20 +24,20 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
-public class OmniTuningRunner implements Runnable {
-    private static final Logger LOG = LoggerFactory.getLogger(OmniTuningRunner.class);
+public class OmniAdvisorRunner implements Runnable {
+    private static final Logger LOG = LoggerFactory.getLogger(OmniAdvisorRunner.class);
 
     private final long startTimeMills;
     private final long finishTimeMills;
 
-    public OmniTuningRunner(long startTimeMills, long finishTimeMills) {
+    public OmniAdvisorRunner(long startTimeMills, long finishTimeMills) {
         this.startTimeMills = startTimeMills;
         this.finishTimeMills = finishTimeMills;
     }
 
     @Override
     public void run() {
-        LOG.info("OmniTuning has started");
+        LOG.info("OmniAdvisor has started");
         try {
             Configuration hadoopConf = OmniAdvisorContext.getHadoopConfig();
             HadoopSecurity hadoopSecurity = new HadoopSecurity(hadoopConf);

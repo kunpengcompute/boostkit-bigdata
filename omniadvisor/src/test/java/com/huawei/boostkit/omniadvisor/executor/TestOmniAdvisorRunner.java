@@ -43,7 +43,7 @@ public class TestOmniAdvisorRunner extends BaseTestConfiguration {
 
         OmniAdvisorContext.getInstance().getFetcherFactory().addFetcher(FetcherType.SPARK, sparkFetcher);
 
-        OmniTuningRunner runner = new OmniTuningRunner(0L, Long.MAX_VALUE);
+        OmniAdvisorRunner runner = new OmniAdvisorRunner(0L, Long.MAX_VALUE);
         runner.run();
     }
 }
