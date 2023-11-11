@@ -220,6 +220,13 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
   val topNPushDownForWindowThreshold = conf.getConfString("spark.sql.execution.topNPushDownForWindow.threshold", "100").toInt
 
   val topNPushDownForWindowEnable: Boolean = conf.getConfString("spark.sql.execution.topNPushDownForWindow.enabled", "true").toBoolean
+
+  // enable or disable deduplicate the right side of left semi join
+  val enableDedupLeftSemiJoin: Boolean =
+    conf.getConfString("spark.omni.sql.columnar.dedupLeftSemiJoin", "false").toBoolean
+
+  val dedupLeftSemiJoinThreshold: Int =
+    conf.getConfString("spark.omni.sql.columnar.dedupLeftSemiJoinThreshold", "3").toInt
 }
 
 

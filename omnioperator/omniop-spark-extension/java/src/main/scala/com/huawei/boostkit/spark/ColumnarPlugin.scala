@@ -23,17 +23,20 @@ import com.huawei.boostkit.spark.util.PhysicalPlanSelector
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{SparkSession, SparkSessionExtensions}
 import org.apache.spark.sql.catalyst.expressions.{Ascending, DynamicPruningSubquery, SortOrder}
-import org.apache.spark.sql.catalyst.expressions.aggregate.Partial
+import org.apache.spark.sql.catalyst.expressions.aggregate.{AggregateExpression, Partial}
 import org.apache.spark.sql.catalyst.optimizer.{DelayCartesianProduct, HeuristicJoinReorder, RewriteSelfJoinInInPredicate}
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.{RowToOmniColumnarExec, _}
 import org.apache.spark.sql.execution.adaptive.{AQEShuffleReadExec, BroadcastQueryStageExec, OmniAQEShuffleReadExec, QueryStageExec, ShuffleQueryStageExec}
-import org.apache.spark.sql.execution.aggregate.HashAggregateExec
+import org.apache.spark.sql.execution.aggregate.{DummyLogicalPlan, ExtendedAggUtils, HashAggregateExec}
 import org.apache.spark.sql.execution.exchange.{BroadcastExchangeExec, Exchange, ReusedExchangeExec, ShuffleExchangeExec}
 import org.apache.spark.sql.execution.joins._
 import org.apache.spark.sql.execution.window.WindowExec
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.ColumnarBatchSupportUtil.checkColumnarBatchSupport
+import org.apache.spark.sql.catalyst.planning.PhysicalAggregation
+import org.apache.spark.sql.catalyst.plans.LeftSemi
+import org.apache.spark.sql.catalyst.plans.logical.Aggregate
 
 case class ColumnarPreOverrides() extends Rule[SparkPlan] {
   val columnarConf: ColumnarPluginConfig = ColumnarPluginConfig.getSessionConf
@@ -60,6 +63,8 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] {
   val enableColumnarProjectFusion: Boolean = columnarConf.enableColumnarProjectFusion
   val enableLocalColumnarLimit: Boolean = columnarConf.enableLocalColumnarLimit
   val enableGlobalColumnarLimit: Boolean = columnarConf.enableGlobalColumnarLimit
+  val enableDedupLeftSemiJoin: Boolean = columnarConf.enableDedupLeftSemiJoin
+  val dedupLeftSemiJoinThreshold: Int = columnarConf.dedupLeftSemiJoinThreshold
 
   def apply(plan: SparkPlan): SparkPlan = {
     replaceWithColumnarPlan(plan)
@@ -341,6 +346,72 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] {
         plan.condition,
         left,
         right)
+    case plan: ShuffledHashJoinExec if enableShuffledHashJoin && enableDedupLeftSemiJoin => {
+      plan.joinType match {
+        case LeftSemi => {
+          if (plan.condition.isEmpty && plan.right.output.size >= dedupLeftSemiJoinThreshold) {
+            val left = replaceWithColumnarPlan(plan.left)
+            val right = replaceWithColumnarPlan(plan.right)
+            val partialAgg = PhysicalAggregation.unapply(Aggregate(plan.right.output, plan.right.output, new DummyLogicalPlan)) match {
+              case Some((groupingExpressions, aggExpressions, resultExpressions, _))
+                if aggExpressions.forall(expr => expr.isInstanceOf[AggregateExpression]) =>
+                ExtendedAggUtils.planPartialAggregateWithoutDistinct(
+                  ExtendedAggUtils.normalizeGroupingExpressions(groupingExpressions),
+                  aggExpressions.map(_.asInstanceOf[AggregateExpression]),
+                  resultExpressions,
+                  right).asInstanceOf[HashAggregateExec]
+            }
+            val newHashAgg = new ColumnarHashAggregateExec(
+              partialAgg.requiredChildDistributionExpressions,
+              partialAgg.isStreaming,
+              partialAgg.numShufflePartitions,
+              partialAgg.groupingExpressions,
+              partialAgg.aggregateExpressions,
+              partialAgg.aggregateAttributes,
+              partialAgg.initialInputBufferOffset,
+              partialAgg.resultExpressions,
+              right)
+
+            ColumnarShuffledHashJoinExec(
+              plan.leftKeys,
+              plan.rightKeys,
+              plan.joinType,
+              plan.buildSide,
+              plan.condition,
+              left,
+              newHashAgg,
+              plan.isSkewJoin)
+          } else {
+            val left = replaceWithColumnarPlan(plan.left)
+            val right = replaceWithColumnarPlan(plan.right)
+            logDebug(s"Columnar Processing for ${plan.getClass} is currently supported.")
+            ColumnarShuffledHashJoinExec(
+              plan.leftKeys,
+              plan.rightKeys,
+              plan.joinType,
+              plan.buildSide,
+              plan.condition,
+              left,
+              right,
+              plan.isSkewJoin)
+          }
+        }
+        case _ => {
+          val left = replaceWithColumnarPlan(plan.left)
+          val right = replaceWithColumnarPlan(plan.right)
+          logDebug(s"Columnar Processing for ${plan.getClass} is currently supported.")
+          ColumnarShuffledHashJoinExec(
+            plan.leftKeys,
+            plan.rightKeys,
+            plan.joinType,
+            plan.buildSide,
+            plan.condition,
+            left,
+            right,
+            plan.isSkewJoin)
+        }
+      }
+    }
     case plan: ShuffledHashJoinExec if enableShuffledHashJoin =>
       val left = replaceWithColumnarPlan(plan.left)
       val right = replaceWithColumnarPlan(plan.right)
