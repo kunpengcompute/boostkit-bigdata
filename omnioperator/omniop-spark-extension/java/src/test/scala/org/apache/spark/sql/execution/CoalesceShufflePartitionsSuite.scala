@@ -216,7 +216,10 @@ class CoalesceShufflePartitionsSuite extends SparkFunSuite with BeforeAndAfterAl
             shuffleReaders.foreach { reader => {
               // after optimize null validaty, the size of shuffle result is less than before, so after handled,
               // the coalesced partition size is only 2
-                assert(reader.outputPartitioning.numPartitions === 2)
+              // New HashTable changes the order of result, which may affect the compressed size of each partition
+              // (lz4 is affected by the order of data).
+              // Besides, the partitionDataSizes is an estimated value. So the coalesced result varies.
+                assert(reader.outputPartitioning.numPartitions === 3)
               }
             }
         }

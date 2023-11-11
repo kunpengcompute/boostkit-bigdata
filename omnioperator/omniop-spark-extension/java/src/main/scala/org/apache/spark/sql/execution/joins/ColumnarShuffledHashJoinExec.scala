@@ -220,14 +220,14 @@ case class ColumnarShuffledHashJoinExec(
           case _ => Optional.empty()
         }
         val startBuildCodegen = System.nanoTime()
-        val buildOpFactory = new OmniHashBuilderWithExprOperatorFactory(buildTypes,
+        val lookupJoinType = OmniExpressionAdaptor.toOmniJoinType(joinType)
+        val buildOpFactory = new OmniHashBuilderWithExprOperatorFactory(lookupJoinType, buildTypes,
           buildJoinColsExp, 1, new OperatorConfig(SpillConfig.NONE,
             new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
         val buildOp = buildOpFactory.createOperator()
         buildCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startBuildCodegen)
 
         val startLookupCodegen = System.nanoTime()
-        val lookupJoinType = OmniExpressionAdaptor.toOmniJoinType(joinType)
         val lookupOpFactory = new OmniLookupJoinWithExprOperatorFactory(probeTypes,
           probeOutputCols, probeHashColsExp, buildOutputCols, buildOutputTypes, lookupJoinType,
           buildOpFactory, filter, new OperatorConfig(SpillConfig.NONE,
@@ -357,7 +357,9 @@ case class ColumnarShuffledHashJoinExec(
 
             override def hasNext: Boolean = {
               if (output == null) {
+                val startLookupOuterGetOp = System.nanoTime()
                 output = lookupOuterOp.getOutput
+                lookupGetOutputTime += NANOSECONDS.toMillis((System.nanoTime() - startLookupOuterGetOp))
               }
               output.hasNext
             }
