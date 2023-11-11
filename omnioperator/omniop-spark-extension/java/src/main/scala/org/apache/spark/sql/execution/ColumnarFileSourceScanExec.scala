@@ -930,7 +930,7 @@ case class ColumnarMultipleOperatorExec(
         projectOperator1.close()
       })
 
-      val buildOpFactory1 = new OmniHashBuilderWithExprOperatorFactory(buildTypes1,
+      val buildOpFactory1 = new OmniHashBuilderWithExprOperatorFactory(OMNI_JOIN_TYPE_INNER, buildTypes1,
         buildJoinColsExp1, 1,
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val buildOp1 = buildOpFactory1.createOperator()
@@ -964,7 +964,7 @@ case class ColumnarMultipleOperatorExec(
         projectOperator2.close()
       })
 
-      val buildOpFactory2 = new OmniHashBuilderWithExprOperatorFactory(buildTypes2,
+      val buildOpFactory2 = new OmniHashBuilderWithExprOperatorFactory(OMNI_JOIN_TYPE_INNER, buildTypes2,
         buildJoinColsExp2, 1,
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val buildOp2 = buildOpFactory2.createOperator()
@@ -999,7 +999,7 @@ case class ColumnarMultipleOperatorExec(
         projectOperator3.close()
       })
 
-      val buildOpFactory3 = new OmniHashBuilderWithExprOperatorFactory(buildTypes3,
+      val buildOpFactory3 = new OmniHashBuilderWithExprOperatorFactory(OMNI_JOIN_TYPE_INNER, buildTypes3,
         buildJoinColsExp3, 1,
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val buildOp3 = buildOpFactory3.createOperator()
@@ -1034,7 +1034,7 @@ case class ColumnarMultipleOperatorExec(
         projectOperator4.close()
       })
 
-      val buildOpFactory4 = new OmniHashBuilderWithExprOperatorFactory(buildTypes4,
+      val buildOpFactory4 = new OmniHashBuilderWithExprOperatorFactory(OMNI_JOIN_TYPE_INNER, buildTypes4,
         buildJoinColsExp4, 1,
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val buildOp4 = buildOpFactory4.createOperator()
@@ -1295,7 +1295,7 @@ case class ColumnarMultipleOperatorExec1(
         projectOperator1.close()
       })
 
-      val buildOpFactory1 = new OmniHashBuilderWithExprOperatorFactory(buildTypes1,
+      val buildOpFactory1 = new OmniHashBuilderWithExprOperatorFactory(OMNI_JOIN_TYPE_INNER, buildTypes1,
         buildJoinColsExp1, 1,
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val buildOp1 = buildOpFactory1.createOperator()
@@ -1330,7 +1330,7 @@ case class ColumnarMultipleOperatorExec1(
         projectOperator2.close()
       })
 
-      val buildOpFactory2 = new OmniHashBuilderWithExprOperatorFactory(buildTypes2,
+      val buildOpFactory2 = new OmniHashBuilderWithExprOperatorFactory(OMNI_JOIN_TYPE_INNER, buildTypes2,
         buildJoinColsExp2, 1,
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val buildOp2 = buildOpFactory2.createOperator()
@@ -1365,7 +1365,7 @@ case class ColumnarMultipleOperatorExec1(
         projectOperator3.close()
       })
 
-      val buildOpFactory3 = new OmniHashBuilderWithExprOperatorFactory(buildTypes3,
+      val buildOpFactory3 = new OmniHashBuilderWithExprOperatorFactory(OMNI_JOIN_TYPE_INNER, buildTypes3,
         buildJoinColsExp3, 1,
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val buildOp3 = buildOpFactory3.createOperator()
