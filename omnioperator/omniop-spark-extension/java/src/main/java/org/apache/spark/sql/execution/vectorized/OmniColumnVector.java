@@ -773,7 +773,18 @@ public class OmniColumnVector extends WritableColumnVector {
 
     @Override
     public int putByteArray(int rowId, byte[] value, int offset, int length) {
-        throw new UnsupportedOperationException("putByteArray is not supported");
+        if (type instanceof StringType) {
+            putBytes(rowId, length, value, offset);
+            return length;
+        } else if (type instanceof DecimalType && DecimalType.isByteArrayDecimalType(type)) {
+            byte[] array = new byte[length];
+            System.arraycopy(value, offset, array, 0, length);
+            BigInteger bigInteger = new BigInteger(array);
+            decimal128DataVec.setBigInteger(rowId, bigInteger);
+            return length;
+        } else {
+            throw new UnsupportedOperationException("putByteArray is not supported for type" + type);
+        }
     }
 
     /**
