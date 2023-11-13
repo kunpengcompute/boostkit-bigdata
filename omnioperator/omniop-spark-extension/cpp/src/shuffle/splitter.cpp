@@ -314,7 +314,7 @@ int Splitter::SplitFixedWidthValidityBuffer(VectorBatch& vb){
                 if (nullptr == ptr_tmp) {
                     throw std::runtime_error("Allocator for ValidityBuffer Failed! ");
                 }
-                std::shared_ptr<Buffer> validity_buffer (new Buffer((uint8_t *)ptr_tmp, 0, new_size));
+                std::shared_ptr<Buffer> validity_buffer (new Buffer((uint8_t *)ptr_tmp, partition_id_cnt_cur_[pid], new_size));
                 dst_addrs[pid] = const_cast<uint8_t*>(validity_buffer->data_);
                 std::memset(validity_buffer->data_, 0, new_size);
                 partition_fixed_width_buffers_[col][pid][0] = std::move(validity_buffer);
@@ -322,17 +322,19 @@ int Splitter::SplitFixedWidthValidityBuffer(VectorBatch& vb){
             } 
         }
 
-        // 计算并填充数据
-        auto src_addr = const_cast<uint8_t *>((uint8_t *)(
-                reinterpret_cast<int64_t>(omniruntime::vec::unsafe::UnsafeBaseVector::GetNulls(vb.Get(col_idx)))));
-        std::memset(partition_buffer_idx_offset_, 0, num_partitions_ * sizeof(int32_t));
-        const auto num_rows = vb.GetRowCount();
-        for (auto row = 0; row < num_rows; ++row) {
-            auto pid = partition_id_[row];
-            auto dst_offset = partition_buffer_idx_base_[pid] + partition_buffer_idx_offset_[pid];
-            dst_addrs[pid][dst_offset] = src_addr[row];
-            partition_buffer_idx_offset_[pid]++;
-            partition_fixed_width_buffers_[col][pid][0]->size_ += 1;
+        if (vb.Get(col_idx)->HasNull()) {
+            // 计算并填充数据
+            auto src_addr = const_cast<uint8_t *>((uint8_t *)(
+                    reinterpret_cast<int64_t>(omniruntime::vec::unsafe::UnsafeBaseVector::GetNulls(vb.Get(col_idx)))));
+            std::memset(partition_buffer_idx_offset_, 0, num_partitions_ * sizeof(int32_t));
+            const auto num_rows = vb.GetRowCount();
+            for (auto row = 0; row < num_rows; ++row) {
+                auto pid = partition_id_[row];
+                auto dst_offset = partition_buffer_idx_base_[pid] + partition_buffer_idx_offset_[pid];
+                dst_addrs[pid][dst_offset] = src_addr[row];
+                partition_buffer_idx_offset_[pid]++;
+                partition_fixed_width_buffers_[col][pid][0]->size_ += 1;
+            }
         }
     }
     return 0;
