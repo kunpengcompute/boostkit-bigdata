@@ -200,7 +200,7 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
 
   // enable or disable rewrite self join in Predicate to aggregate
   val enableRewriteSelfJoinInInPredicate: Boolean = conf
-    .getConfString("spark.omni.sql.columnar.RewriteSelfJoinInInPredicate", "false")
+    .getConfString("spark.omni.sql.columnar.RewriteSelfJoinInInPredicate", "true")
     .toBoolean
 
   val enableFusion: Boolean = conf
