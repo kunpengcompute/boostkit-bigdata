@@ -18,8 +18,6 @@
 
 package com.huawei.boostkit.spark.jni;
 
-import com.huawei.boostkit.spark.ObsConf;
-
 import nova.hetu.omniruntime.type.DataType;
 import nova.hetu.omniruntime.type.Decimal128DataType;
 import nova.hetu.omniruntime.vector.*;
@@ -349,17 +347,6 @@ public class OrcColumnarBatchJniReader {
             LOGGER.debug("\n\n================== tokens-json ==================\n" + tokensJsonItem.toString());
             return tokensJsonItem;
         }
-    }
-
-    public JSONObject constructObsJSONObject() {
-        JSONObject obsJsonItem = new JSONObject();
-        obsJsonItem.put("endpoint", ObsConf.getEndpoint());
-        synchronized (ObsConf.getLock()) {
-            obsJsonItem.put("ak", ObsConf.getAk());
-            obsJsonItem.put("sk", ObsConf.getSk());
-            obsJsonItem.put("token", ObsConf.getToken());
-        }
-        return obsJsonItem;
     }
 
     public static void tokenDebug(String mesg) {

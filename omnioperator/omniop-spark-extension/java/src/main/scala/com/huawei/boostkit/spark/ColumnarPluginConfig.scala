@@ -107,21 +107,6 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
     .getConfString("spark.omni.sql.columnar.parquetNativefilescan", "true")
     .toBoolean
 
-  // enable sync to get obs token
-  val enableSyncGetObsToken: Boolean = conf
-    .getConfString("spark.omni.sql.columnar.syncGetObsToken", "false")
-    .toBoolean
-
-  // scheduled time to get obs token, the time unit is millisecond
-  val timeGetObsToken: Long = conf
-    .getConfString("spark.omni.sql.columnar.timeGetObsToken", "60000")
-    .toLong
-
-  // retry times to get obs ak/sk/token
-  val retryTimesGetObsToken: Integer = conf
-    .getConfString("spark.omni.sql.columnar.retryTimesGetObsToken", "10")
-    .toInt
-
   val enableColumnarSortMergeJoin: Boolean = conf
     .getConfString("spark.omni.sql.columnar.sortMergeJoin", "true")
     .toBoolean
