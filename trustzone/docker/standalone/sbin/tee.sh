@@ -53,6 +53,9 @@ tee_teleport -c ${SPARK_HOME}/trustzone/sec/spconf.sec
 tee_teleport -n ${SPARK_HOME}/trustzone/sec/jars.sec -t code -i sessionID.txt
 echo "put spark sec success"
 
+#create log dir
+mkdir -p /home/spark/log/
+
 #todo read env from conf
 P_ENV='sep=:;'
 if [ "$P_TYPE" = "master" ]; then
