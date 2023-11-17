@@ -186,11 +186,14 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniRe
     }
 
     std::vector<Token*> tokens;
+    parseTokens(env, jsonObj, tokens);
+
     std::unique_ptr<orc::Reader> reader;
     reader = createReader(orc::readFileRewrite(filePath, tokens), readerOptions);
 
     env->ReleaseStringUTFChars(path, pathPtr);
     orc::Reader *readerNew = reader.release();
+    deleteTokens(tokens);
     return (jlong)(readerNew);
     JNI_FUNC_END(runtimeExceptionClass)
 }
