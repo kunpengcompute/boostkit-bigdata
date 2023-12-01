@@ -731,6 +731,24 @@ object OmniExpressionAdaptor extends Logging {
     }
   }
 
+  def checkFirstParamType(agg: AggregateExpression): Unit = {
+    agg.aggregateFunction.children.map(
+      exp => {
+        exp.dataType match {
+          case ShortType =>
+          case IntegerType =>
+          case LongType =>
+          case DoubleType =>
+          case BooleanType =>
+          case DateType =>
+          case dt: DecimalType =>
+          case _ =>
+            throw new UnsupportedOperationException(s"First_value does not support datatype: $datatype")  
+        }
+      }
+    )
+  }
+
   def toOmniAggFunType(agg: AggregateExpression, isHashAgg: Boolean = false, isMergeCount: Boolean = false): FunctionType = {
     agg.aggregateFunction match {
       case Sum(_, _) => OMNI_AGGREGATION_TYPE_SUM
@@ -744,8 +762,12 @@ object OmniExpressionAdaptor extends Logging {
           OMNI_AGGREGATION_TYPE_COUNT_ALL
         }
       case Count(_) if agg.aggregateFunction.children.size == 1 => OMNI_AGGREGATION_TYPE_COUNT_COLUMN
-      case First(_, true) => OMNI_AGGREGATION_TYPE_FIRST_IGNORENULL
-      case First(_, false) => OMNI_AGGREGATION_TYPE_FIRST_INCLUDENULL
+      case First(_, true) =>
+        checkFirstParamType(agg)
+        OMNI_AGGREGATION_TYPE_FIRST_IGNORENULL
+      case First(_, false) =>
+        checkFirstParamType(agg)
+        OMNI_AGGREGATION_TYPE_FIRST_INCLUDENULL
       case _ => throw new UnsupportedOperationException(s"Unsupported aggregate function: $agg")
     }
   }
