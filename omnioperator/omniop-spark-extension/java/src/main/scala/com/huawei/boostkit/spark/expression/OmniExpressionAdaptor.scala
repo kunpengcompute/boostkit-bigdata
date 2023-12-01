@@ -743,7 +743,7 @@ object OmniExpressionAdaptor extends Logging {
           case DateType =>
           case dt: DecimalType =>
           case _ =>
-            throw new UnsupportedOperationException(s"First_value does not support datatype: $datatype")  
+            throw new UnsupportedOperationException(s"First_value does not support datatype: $exp.dataType")  
         }
       }
     )
