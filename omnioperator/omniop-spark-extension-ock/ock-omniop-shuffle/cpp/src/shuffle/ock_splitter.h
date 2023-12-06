@@ -45,7 +45,7 @@ public:
         const int32_t *colTypeIds, int32_t colNum, uint64_t threadId);
     bool Initialize(const int32_t *colTypeIds);
     bool Split(VectorBatch &vb);
-    void Stop();
+    bool Stop();
 
     inline bool SetShuffleInfo(const std::string &appId, uint32_t shuffleId, uint32_t stageId, uint32_t stageAttemptNum,
         uint32_t mapId, uint32_t taskAttemptId)

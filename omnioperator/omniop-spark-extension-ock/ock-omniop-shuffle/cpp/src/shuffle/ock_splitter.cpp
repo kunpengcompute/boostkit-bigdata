@@ -575,12 +575,12 @@ bool OckSplitter::Split(VectorBatch &vb)
     return true;
 }
 
-void OckSplitter::Stop()
+bool OckSplitter::Stop()
 {
     uint32_t dataSize = 0;
     if (UNLIKELY(!mOckBuffer->Flush(true, dataSize))) {
         LogError("Failed to flush local blob when stop.");
-        return;
+        return false;
     }
 
     if (mOckBuffer->IsCompress()) {
@@ -589,4 +589,5 @@ void OckSplitter::Stop()
 
     LOG_INFO("Time cost preoccupied: %lu write_data: %lu release_resource: %lu", mPreoccupiedTime, mWriteVBTime,
              mReleaseResource);
+    return true;
 }
