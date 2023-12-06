@@ -148,7 +148,7 @@ JNIEXPORT jobject JNICALL Java_com_huawei_ock_spark_jni_OckShuffleJniWriter_stop
     if (!splitter->Stop()) {
         std::string errMsg = "Failed to Stop by splitter id " + std::to_string(splitterId);
         env->ThrowNew(env->FindClass(exceptionClass), errMsg.c_str());
-        return nullptr
+        return nullptr;
     }
 
     const auto &partitionLengths = splitter->PartitionLengths();
