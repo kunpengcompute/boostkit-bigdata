@@ -20,35 +20,6 @@
 
 using namespace omniruntime::vec;
 
-int32_t BytesGen(uint64_t offsetsAddr, uint64_t nullsAddr, uint64_t valuesAddr, VCBatchInfo& vcb)
-{
-    int32_t* offsets = reinterpret_cast<int32_t *>(offsetsAddr);
-    char *nulls = reinterpret_cast<char *>(nullsAddr);
-    char* values = reinterpret_cast<char *>(valuesAddr);
-    std::vector<VCLocation> &lst = vcb.getVcList();
-    int itemsTotalLen = lst.size();
-    int valueTotalLen = 0;
-    for (int i = 0; i < itemsTotalLen; i++) {
-        char* addr = reinterpret_cast<char *>(lst[i].get_vc_addr());
-        int len = lst[i].get_vc_len();
-        if (i == 0) {
-            offsets[0] = 0;
-        } else {
-            offsets[i] = offsets[i -1] + lst[i - 1].get_vc_len();
-        }
-        if (lst[i].get_is_null()) {
-            nulls[i] = 1;
-        } else {
-            nulls[i] = 0;
-        }
-        if (len != 0) {
-            memcpy((char *) (values + offsets[i]), addr, len);
-            valueTotalLen += len;
-        }
-    }
-    offsets[itemsTotalLen] = offsets[itemsTotalLen -1] + lst[itemsTotalLen - 1].get_vc_len();
-    return valueTotalLen;
-}
 
 uint32_t reversebytes_uint32t(uint32_t const value)
 {

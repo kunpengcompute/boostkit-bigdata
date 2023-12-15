@@ -85,8 +85,8 @@ public class DecompressionStream extends InputStream {
             uncompressedLimit = chunkLength;
             return;
         }
-        if (uncompressed == null || UNCOMPRESSED_LENGTH > uncompressed.length) {
-            uncompressed = new byte[UNCOMPRESSED_LENGTH];
+        if (uncompressed == null || compressBlockSize > uncompressed.length) {
+            uncompressed = new byte[compressBlockSize];
         }
 
         int actualUncompressedLength = codec.decompress(compressed, chunkLength, uncompressed);

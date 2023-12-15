@@ -110,7 +110,9 @@ public class ShuffleDataSerializer {
                 throw new IllegalStateException("Unexpected value: " + protoTypeId.getTypeId());
         }
         vec.setValuesBuf(protoVec.getValues().toByteArray());
-        vec.setNullsBuf(protoVec.getNulls().toByteArray());
+        if(protoVec.getNulls().size() != 0) {
+            vec.setNullsBuf(protoVec.getNulls().toByteArray());
+        }
         OmniColumnVector vecTmp = new OmniColumnVector(vecSize, type, false);
         vecTmp.setVec(vec);
         return vecTmp;
