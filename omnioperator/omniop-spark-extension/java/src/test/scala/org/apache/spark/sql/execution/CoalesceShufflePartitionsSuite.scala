@@ -213,8 +213,11 @@ class CoalesceShufflePartitionsSuite extends SparkFunSuite with BeforeAndAfterAl
               assert(reader.outputPartitioning.numPartitions === numPartitions)
             }
           case None =>
-            shuffleReaders.foreach { reader =>
-              assert(reader.outputPartitioning.numPartitions === 3)
+            shuffleReaders.foreach { reader => {
+              // after optimize null validaty, the size of shuffle result is less than before, so after handled,
+              // the coalesced partition size is only 2
+                assert(reader.outputPartitioning.numPartitions === 2)
+              }
             }
         }
       }
