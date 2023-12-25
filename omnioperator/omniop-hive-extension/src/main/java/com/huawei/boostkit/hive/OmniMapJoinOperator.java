@@ -1,6 +1,11 @@
 
 package com.huawei.boostkit.hive;
 
+import static com.huawei.boostkit.hive.JoinUtils.getExprFromExprNode;
+import static com.huawei.boostkit.hive.JoinUtils.getExprNodeColumnEvaluator;
+import static com.huawei.boostkit.hive.JoinUtils.getTypeFromInspectors;
+
+import com.huawei.boostkit.hive.expression.ExpressionUtils;
 import nova.hetu.omniruntime.constants.JoinType;
 import nova.hetu.omniruntime.operator.OmniOperator;
 import nova.hetu.omniruntime.operator.OmniOperatorFactory;
@@ -14,6 +19,7 @@ import nova.hetu.omniruntime.operator.join.OmniLookupOuterJoinWithExprOperatorFa
 import nova.hetu.omniruntime.type.DataType;
 import nova.hetu.omniruntime.vector.Vec;
 import nova.hetu.omniruntime.vector.VecBatch;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.shell.find.BaseExpression;
 import org.apache.hadoop.hive.conf.HiveConf;
@@ -77,10 +83,6 @@ import java.util.Optional;
 import java.util.TreeMap;
 import java.util.concurrent.Future;
 import java.util.stream.Collectors;
-
-import static com.huawei.boostkit.hive.JoinUtils.getExprFromExprNode;
-import static com.huawei.boostkit.hive.JoinUtils.getExprNodeColumnEvaluator;
-import static com.huawei.boostkit.hive.JoinUtils.getTypeFromInspectors;
 
 public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
         implements Serializable, VectorizationContextRegion {
