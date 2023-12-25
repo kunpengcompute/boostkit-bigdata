@@ -30,8 +30,8 @@ import scala.tools.jline_embedded.internal.InputStreamReader
 
 object SparkUtils {
 
-  val SPARK_DEPLOY_MODE_CLIENT = "client";
-  val SPARK_DEPLOY_MODE_CLUSTER = "cluster"
+  private val SPARK_DEPLOY_MODE_CLIENT = "client";
+  private val SPARK_DEPLOY_MODE_CLUSTER = "cluster"
 
   private val CMD_HEADER = "org.apache.spark.deploy.SparkSubmit"
   private val FORMATTED_CMD_HEADER = "spark-submit"

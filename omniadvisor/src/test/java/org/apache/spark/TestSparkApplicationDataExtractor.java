@@ -96,7 +96,7 @@ public class TestSparkApplicationDataExtractor {
     }
 
     @Test
-    public void testExtractDataWithSparkSqlApp() throws IOException, URISyntaxException {
+    public void testExtractDataWithSparkSqlApp() throws IOException {
         ApplicationInfo applicationInfo = new ApplicationInfo("id", "name", Option.empty(), Option.empty(), Option.empty(), Option.empty(), asScalaBuffer(ImmutableList.of(completeAttemptInfo)));
         String sparkSqlCmd = new String(Files.readAllBytes(Paths.get(new Path("file:" + testResourcePath + System.getProperty("file.separator") + "sparkSqlCmd").toUri())));
         String sparkSqlExtractedCmd = new String(Files.readAllBytes(Paths.get(new Path("file:" + testResourcePath + System.getProperty("file.separator") + "sparkSqlExtractedCmd").toUri())));
