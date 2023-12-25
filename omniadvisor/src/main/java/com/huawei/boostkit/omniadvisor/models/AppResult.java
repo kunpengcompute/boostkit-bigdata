@@ -33,12 +33,16 @@ public class AppResult extends Model {
 
     public static final long FAILED_JOB_DURATION = MathUtils.DAY_IN_MS;
     public static final String RESULT_TABLE_NAME = "yarn_app_result";
+    public static final String SPARK_SUBMIT = "spark-submit";
+    public static final String SPARK_SQL = "spark-sql";
     public static final int FAILED_STATUS = 0;
     public static final int SUCCEEDED_STATUS = 1;
     private static final int APPLICATION_ID_LIMIT = 50;
     private static final int APPLICATION_NAME_LIMIT = 100;
     private static final int APPLICATION_WORKLOAD_LIMIT = 50;
     private static final int JOB_TYPE_LIMIT = 50;
+    private static final int SUBMIT_METHOD_LIMIT = 20;
+    private static final int DEPLOY_MODE_LIMIT = 20;
 
     @Id
     @Column(length = APPLICATION_ID_LIMIT, unique = true, nullable = false)
@@ -47,7 +51,7 @@ public class AppResult extends Model {
     @Column(length = APPLICATION_NAME_LIMIT, nullable = false)
     public String applicationName;
 
-    @Column(length =  APPLICATION_WORKLOAD_LIMIT)
+    @Column(length = APPLICATION_WORKLOAD_LIMIT)
     public String applicationWorkload;
 
     @Column()
@@ -59,8 +63,17 @@ public class AppResult extends Model {
     @Column()
     public long durationTime;
 
-    @Column(length =  JOB_TYPE_LIMIT)
+    @Column(length = JOB_TYPE_LIMIT)
     public String jobType;
+
+    @Column(length = SUBMIT_METHOD_LIMIT)
+    public String submit_method;
+
+    @Column(length = DEPLOY_MODE_LIMIT)
+    public String deploy_mode;
+
+    @Column(columnDefinition = "TEXT CHARACTER SET utf8mb4")
+    public String submit_cmd;
 
     @Column(columnDefinition = "TEXT CHARACTER SET utf8mb4")
     public String parameters;
