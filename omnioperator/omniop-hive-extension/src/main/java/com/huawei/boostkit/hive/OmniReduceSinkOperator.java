@@ -1,6 +1,23 @@
 
 package com.huawei.boostkit.hive;
 
+import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_BOOLEAN;
+import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_CHAR;
+import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_DECIMAL128;
+import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_DOUBLE;
+import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_INT;
+import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_LONG;
+import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_SHORT;
+import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_VARCHAR;
+import static org.apache.hadoop.hive.ql.optimizer.SortedDynPartitionOptimizer.BUCKET_NUMBER_COL_NAME;
+import static org.apache.hadoop.hive.ql.plan.ReduceSinkDesc.ReducerTraits.UNIFORM;
+
+import com.huawei.boostkit.hive.expression.BaseExpression;
+import com.huawei.boostkit.hive.expression.ExpressionUtils;
+import com.huawei.boostkit.hive.expression.TypeUtils;
+import com.huawei.boostkit.hive.shuffle.OmniVecBatchSerDe;
+import com.huawei.boostkit.hive.shuffle.VecWrapper;
+
 import nova.hetu.omniruntime.operator.OmniOperator;
 import nova.hetu.omniruntime.operator.config.OperatorConfig;
 import nova.hetu.omniruntime.operator.config.OverflowConfig;
@@ -18,14 +35,17 @@ import nova.hetu.omniruntime.vector.VarcharVec;
 import nova.hetu.omniruntime.vector.VariableWidthVec;
 import nova.hetu.omniruntime.vector.Vec;
 import nova.hetu.omniruntime.vector.VecBatch;
+
 import org.apache.commons.lang.StringUtils;
-import org.apache.hadoop.fs.shell.find.BaseExpression;
+import javax.security.auth.login.Configuration;
 import org.apache.hadoop.hive.common.type.Date;
 import org.apache.hadoop.hive.common.type.HiveDecimal;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.CompilationOpContext;
+import org.apache.hadoop.hive.ql.exec.ExprNodeColumnEvaluator;
 import org.apache.hadoop.hive.ql.exec.ExprNodeEvaluator;
 import org.apache.hadoop.hive.ql.exec.ExprNodeEvaluatorFactory;
+import org.apache.hadoop.hive.ql.exec.Operator;
 import org.apache.hadoop.hive.ql.exec.PTFTopNHash;
 import org.apache.hadoop.hive.ql.exec.TerminalOperator;
 import org.apache.hadoop.hive.ql.exec.TopNHash;
@@ -63,7 +83,6 @@ import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoUtils;
 import org.apache.hadoop.io.BinaryComparable;
 import org.apache.hadoop.io.BooleanWritable;
-import org.apache.hadoop.io.ByteWritable;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.DoubleWritable;
 import org.apache.hadoop.io.IntWritable;
@@ -72,9 +91,8 @@ import org.apache.hadoop.io.ShortWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.mapred.OutputCollector;
-import org.apache.orc.util.Murmur3;
+import org.apache.hive.common.util.Murmur3;
 
-import javax.security.auth.login.Configuration;
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -85,33 +103,21 @@ import java.util.Map;
 import java.util.Random;
 import java.util.function.BiFunction;
 
-import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_BOOLEAN;
-import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_CHAR;
-import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_DECIMAL128;
-import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_DOUBLE;
-import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_INT;
-import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_LONG;
-import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_SHORT;
-import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_VARCHAR;
-import static org.apache.hadoop.hive.ql.optimizer.SortedDynPartitionOptimizer.BUCKET_NUMBER_COL_NAME;
-import static org.apache.hadoop.hive.ql.plan.ReduceSinkDesc.ReducerTraits.UNIFORM;
-
 public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
         implements Serializable, TopNHash.BinaryCollector {
     private static final long serialVersionUID = 1L;
 
     private transient ObjectInspector[] partitionObjectInspectors;
     private transient ObjectInspector[] bucketObjectInspectors;
-    private transient int buckColIdxInkey;
+    private transient int buckColIdxInKey;
 
     /**
      * {@link org.apache.hadoop.hive.ql.optimizer.SortedDynPartitionOptimizer}
      */
-
     private transient int buckColIdxInKeyForSdpo = -1;
     private boolean firstRow;
     private transient int tag;
-    private boolean skipTap = false;
+    private boolean skipTag = false;
     private transient int[] valueIndex; // index for value(+ from keys, - from values)
 
     protected transient OutputCollector out;
@@ -189,21 +195,22 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
     private long[] valueFieldId;
     private transient boolean needProject;
     private transient OmniProjectOperatorFactory projectOperatorFactory;
+
     private transient OmniOperator projectOperator;
     private transient boolean reduceSinkCanReplaceKey;
     private transient VecWrapper[] vecWrappers;
+
     private transient Iterator<VecBatch> output;
 
     /**
      * Kryo ctor.
      */
-
     protected OmniReduceSinkOperator() {
         super();
     }
 
     public OmniReduceSinkOperator(CompilationOpContext ctx) {
-        super();
+        super(ctx);
     }
 
     public OmniReduceSinkOperator(CompilationOpContext ctx, ReduceSinkDesc conf, boolean reduceSinkCanReplaceKey) {
@@ -251,9 +258,9 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
             for (int i = 0; i < valueCols.size(); ++i) {
                 ExprNodeDesc exprNodeDesc = valueCols.get(i);
                 if (exprNodeDesc instanceof ExprNodeColumnDesc) {
-                    StructField structFieldRef = ((StructObjectInspector) inputObjInspectors[0])
+                    StructField structFieldRef = ((StructObjectInspector) this.inputObjInspectors[0])
                             .getStructFieldRef(exprNodeDesc.getExprString());
-                    keyFieldId[i] = structFieldRef.getFieldID();
+                    this.valueFieldId[i] = structFieldRef.getFieldID();
                 }
             }
 
@@ -264,9 +271,9 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
             List<ExprNodeDesc> keys = conf.getKeyCols();
 
             if (LOG.isDebugEnabled()) {
-                LOG.debug("key size is " + keys.size());
+                LOG.debug("keys size is " + keys.size());
                 for (ExprNodeDesc k : keys) {
-                    LOG.debug("key exprNodeDesc " + k.getExprString());
+                    LOG.debug("Key exprNodeDesc " + k.getExprString());
                 }
             }
 
@@ -306,12 +313,12 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
                     bucketEval[i++] = index < 0 ? ExprNodeEvaluatorFactory.get(e) : keyEval[index];
                 }
 
-                buckColIdxInkey = conf.getPartitionCols().size();
+                buckColIdxInKey = conf.getPartitionCols().size();
             }
 
             tag = conf.getTag();
             tagByte[0] = (byte) tag;
-            skipTap = conf.getSkipTag();
+            skipTag = conf.getSkipTag();
             if (LOG.isInfoEnabled()) {
                 LOG.info("Using tag = " + tag);
             }
@@ -319,20 +326,20 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
             TableDesc keyTableDesc = conf.getKeySerializeInfo();
             keySerializer = (Serializer) keyTableDesc.getDeserializerClass().newInstance();
             keySerializer.initialize(null, keyTableDesc.getProperties());
-            keyIsText = keySerializer.getSerializedClass().equals(keyFieldId);
-            ((OmniVecBatchSerde) keySerializer).setFieldId(keyFieldId);
+            keyIsText = keySerializer.getSerializedClass().equals(Text.class);
+            ((OmniVecBatchSerDe) (keySerializer)).setFieldId(keyFieldId);
 
             TableDesc valueTableDesc = conf.getValueSerializeInfo();
             valueSerializer = (Serializer) valueTableDesc.getDeserializerClass().newInstance();
             valueSerializer.initialize(null, valueTableDesc.getProperties());
-            ((OmniVecBatchSerde) (valueSerializer)).setFieldId(valueFieldId);
+            ((OmniVecBatchSerDe) (valueSerializer)).setFieldId(valueFieldId);
 
             int limit = conf.getTopN();
             float memUsage = conf.getTopNMemoryUsage();
 
             if (limit >= 0 && memUsage > 0) {
                 reducerHash = conf.isPTFReduceSink() ? new PTFTopNHash() : new TopNHash();
-                reducerHash.initialize(limit, memUsage, conf.isMapGroupBy(), this.conf, hconf);
+                reducerHash.initialize(limit, memUsage, conf.isMapGroupBy(), this, conf, hconf);
             }
 
             useUniformHash = conf.getReducerTraits().contains(UNIFORM);
@@ -340,7 +347,7 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
             firstRow = true;
             // acidOp flag has to be checked to use JAVA hash which works like
             // identity function for integers, necessary to read RecordIdentifier
-            // incase of ACI updates/deletes.
+            // incase of ACID updates/deletes.
             boolean acidOp = conf.getWriteType() == AcidUtils.Operation.UPDATE
                     || conf.getWriteType() == AcidUtils.Operation.DELETE;
             hashFunc = bucketingVersion == 2 && !acidOp
@@ -364,8 +371,9 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
         List<? extends StructField> neededFields = ((StructObjectInspector) inputObjInspectors[0])
                 .getAllStructFieldRefs();
 
-        DataType[] inputTypes = neededFields.stream().map(field -> TypeUtils
-                .buildInputDataType(((PrimitiveObjectInspector) field.getFieldObjectInspector()).getTypeInfo()))
+        DataType[] inputTypes = neededFields.stream()
+                .map(field -> TypeUtils
+                        .buildInputDataType(((PrimitiveObjectInspector) field.getFieldObjectInspector()).getTypeInfo()))
                 .toArray(DataType[]::new);
         List<ExprNodeDesc> keyValueCols = new ArrayList<>(conf.getKeyCols());
         keyValueCols.addAll(conf.getValueCols());
@@ -376,7 +384,7 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
                 expressions[i] = ExpressionUtils.build((ExprNodeGenericFuncDesc) exprNodeDesc, inputObjInspectors[0])
                         .toString();
             } else {
-                BaseExpression node = ExpressionUtils.CreateNode(exprNodeDesc, inputObjInspectors[0]);
+                BaseExpression node = ExpressionUtils.createNode(exprNodeDesc, inputObjInspectors[0]);
                 if (node != null) {
                     expressions[i] = node.toString();
                 } else {
@@ -394,7 +402,7 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
         for (int i = 0; i < conf.getValueCols().size(); i++) {
             valueFieldId[i] = i + conf.getKeyCols().size();
         }
-        ((OmniVecBatchSerDe) valueSerializer).setFieldId(valueFieldId);
+        ((OmniVecBatchSerDe) (valueSerializer)).setFieldId(valueFieldId);
     }
 
     /**
@@ -406,12 +414,11 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
      * If distinctColIndices is empty, the object inspector is same as
      * {@link Operator#initEvaluatorsAndReturnStruct(ExprNodeEvaluator[], List, ObjectInspector)}
      */
-
     protected static StructObjectInspector initEvaluatorsAndReturnStruct(ExprNodeEvaluator[] evals,
             List<List<Integer>> distinctColIndices, List<String> outputColNames, int length,
             ObjectInspector rowInspector) throws HiveException {
         int inspectorLen = evals.length > length ? length + 1 : evals.length;
-        List<ObjectInspector> sois = new ArrayList<>(inspectorLen);
+        List<ObjectInspector> sois = new ArrayList<ObjectInspector>(inspectorLen);
 
         // keys
         ObjectInspector[] fieldObjectInspectors = initEvaluators(evals, 0, length, rowInspector);
@@ -420,10 +427,10 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
         if (outputColNames.size() > length) {
             // union keys
             assert distinctColIndices != null;
-            List<ObjectInspector> uois = new ArrayList<>();
+            List<ObjectInspector> uois = new ArrayList<ObjectInspector>();
             for (List<Integer> distinctCols : distinctColIndices) {
-                List<String> names = new ArrayList<>();
-                List<ObjectInspector> eois = new ArrayList<>();
+                List<String> names = new ArrayList<String>();
+                List<ObjectInspector> eois = new ArrayList<ObjectInspector>();
                 int numExprs = 0;
                 for (int i : distinctCols) {
                     names.add(HiveConf.getColumnInternalName(numExprs));
@@ -432,14 +439,15 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
                 }
                 uois.add(ObjectInspectorFactory.getStandardStructObjectInspector(names, eois));
             }
-            UnionObjectInspector uoi = ObjectInspectorFactory.getStandardStructObjectInspector(uois);
+            UnionObjectInspector uoi = ObjectInspectorFactory.getStandardUnionObjectInspector(uois);
             sois.add(uoi);
         }
         return ObjectInspectorFactory.getStandardStructObjectInspector(outputColNames, sois);
     }
 
     @Override
-    public void process(Object row, int i) throws HiveException {
+    @SuppressWarnings("unchecked")
+    public void process(Object row, int tag) throws HiveException {
         VecBatch input = (VecBatch) row;
         if (needProject) {
             this.projectOperator.addInput(input);
@@ -456,12 +464,12 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
         Vec[] expand = expandDictionary(vecBatch);
         for (int i = 0; i < expand.length; i++) {
             vecWrappers[i].isNull = expand[i].getRawValueNulls();
-            vecWrappers[i].value = expand[i].getValueNullsBuf().getByte(0, expand[i].getValuesBuf().getCapacity());
+            vecWrappers[i].value = expand[i].getValuesBuf().getBytes(0, expand[i].getValuesBuf().getCapacity());
             if (expand[i] instanceof VariableWidthVec) {
                 vecWrappers[i].offset = ((VariableWidthVec) expand[i]).getRawValueOffset();
             }
         }
-        for (int i = 0; i < vecBatch.getVectorCount(); ++i) {
+        for (int i = 0; i < vecBatch.getRowCount(); ++i) {
             for (int j = 0; j < expand.length; j++) {
                 vecWrappers[j].index = i;
             }
@@ -494,46 +502,46 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
             ObjectInspector rowInspector = inputObjInspectors[tag];
             if (firstRow) {
                 firstRow = false;
-                // TODO: this is fishy - we init object inspectors based on first tag.
-                // we should either init for each tag, or if row Inspector does't really
+                // TODO: this is fishy - we init object inspectors based on first tag. we
+                // should either init for each tag, or if row Inspector does't really
                 // matter, then wen can create this in ctor and get rid of firstRow
-            }
-            List<String> fileNames = new ArrayList<>();
-            List<ObjectInspector> objectInspectors = new ArrayList<>();
-            if (rowInspector instanceof StandardStructObjectInspector) {
-                List<? extends StructField> allStructFiledRefs = ((StandardStructObjectInspector) rowInspector)
-                        .getAllStructFieldRefs();
-                for (StructField structField : allStructFiledRefs) {
-                    fileNames.add(structField.getFieldName());
-                    if (structField.getFieldObjectInspector() instanceof WritableDateObjectInspector) {
-                        PrimitiveTypeInfo primitiveTypeInfo = new PrimitiveTypeInfo();
-                        primitiveTypeInfo.setTypeName("bigint");
-                        ObjectInspector objectInspector = TypeInfoUtils
-                                .getStandardWritableObjectInspectorFromTypeInfo(primitiveTypeInfo);
-                        objectInspectors.add(objectInspector);
-                    } else {
-                        objectInspectors.add(structField.getFieldObjectInspector());
+                List<String> fileNames = new ArrayList<>();
+                List<ObjectInspector> objectInspectors = new ArrayList<>();
+                if (rowInspector instanceof StandardStructObjectInspector) {
+                    List<? extends StructField> allStructFiledRefs = ((StandardStructObjectInspector) rowInspector)
+                            .getAllStructFieldRefs();
+                    for (StructField structField : allStructFiledRefs) {
+                        fileNames.add(structField.getFieldName());
+                        if (structField.getFieldObjectInspector() instanceof WritableDateObjectInspector) {
+                            PrimitiveTypeInfo primitiveTypeInfo = new PrimitiveTypeInfo();
+                            primitiveTypeInfo.setTypeName("bigint");
+                            ObjectInspector objectInspector = TypeInfoUtils
+                                    .getStandardWritableObjectInspectorFromTypeInfo(primitiveTypeInfo);
+                            objectInspectors.add(objectInspector);
+                        } else {
+                            objectInspectors.add(structField.getFieldObjectInspector());
+                        }
                     }
                 }
+                StandardStructObjectInspector standardStructObjectInspector = ObjectInspectorFactory
+                        .getStandardStructObjectInspector(fileNames, objectInspectors);
+                if (LOG.isInfoEnabled()) {
+                    LOG.info("keys are " + conf.getOutputKeyColumnNames() + "num distributions: "
+                            + conf.getNumDistributionKeys());
+                }
+                keyObjectInspector = initEvaluatorsAndReturnStruct(keyEval, distinctColIndices,
+                        conf.getOutputKeyColumnNames(), numDistributionKeys, rowInspector);
+                valueObjectInspector = initEvaluatorsAndReturnStruct(valueEval, conf.getOutputValueColumnNames(),
+                        rowInspector);
+                partitionObjectInspectors = initEvaluators(partitionEval, standardStructObjectInspector);
+                if (bucketEval != null) {
+                    bucketObjectInspectors = initEvaluators(bucketEval, rowInspector);
+                }
+                int numKeys = numDistinctExprs > 0 ? numDistinctExprs : 1;
+                int keyLen = numDistinctExprs > 0 ? numDistributionKeys + 1 : numDistributionKeys;
+                cachedKeys = new Object[numKeys][keyLen];
+                cachedValues = new Object[valueEval.length];
             }
-            StandardStructObjectInspector standardStructObjectInspector = ObjectInspectorFactory
-                    .getStandardStructObjectInspector(fileNames, objectInspectors);
-            if (LOG.isInfoEnabled()) {
-                LOG.info("keys are " + conf.getOutputKeyColumnNames() + "num distributions: "
-                + conf.getNumDistributionKeys());
-            }
-            keyObjectInspector = initEvaluatorsAndReturnStruct(keyEval, distinctColIndices,
-                    conf.getOutputKeyColumnNames(), numDistributionKeys, rowInspector);
-            valueObjectInspector = initEvaluatorsAndReturnStruct(valueEval, conf.getOutputValueColumnNames(),
-                    rowInspector);
-            partitionObjectInspectors = initEvaluators(partitionEval, standardStructObjectInspector);
-            if (bucketEval != null) {
-                bucketObjectInspectors = initEvaluators(bucketEval, rowInspector);
-            }
-            int numKeys = numDistinctExprs > 0 ? numDistinctExprs : 1;
-            int keyLen = numDistinctExprs > 0 ? numDistributionKeys + 1 : numDistributionKeys;
-            cachedKeys = new Object[numKeys][keyLen];
-            cachedValues = new Object[valueEval.length];
 
             // Determine distKeyLength (w/o distincts), and then add the first if present.
             // populateCachedDistributionKeys(row, index);
@@ -542,7 +550,7 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
             int bucketNumber = -1;
             if (bucketEval != null) {
                 bucketNumber = computeBucketNumber(row, conf.getNumBuckets(), index);
-                cachedKeys[0][buckColIdxInkey] = new Text(String.valueOf(bucketNumber))
+                cachedKeys[0][buckColIdxInKey] = new Text(String.valueOf(bucketNumber))
             }
             if (buckColIdxInKeyForSdpo != -1) {
                 cachedKeys[0][buckColIdxInKeyForSdpo] = new Text(String.valueOf(bucketNumber));
@@ -552,7 +560,6 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
             if (numDistinctExprs > 0) {
                 populateCachedDistinctKeys(row, 0);
                 firstKey = toHiveKey(cachedKeys[0], tag, distKeyLength);
-
             }
 
             final int hashCode;
@@ -567,11 +574,11 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
 
             /**
              * in case of TopN for windowing, we need to distinguish between rows with
-             * null partition keys and rows with value 0 for partition keys
+             * null partition keys and rows with value 0 for partition keys.
              */
             boolean partKeyNull = conf.isPTFReduceSink() && partitionKeysAreNull(row, index);
 
-            // try to store the first key.
+            // Try to store the first key.
             // if TopNHashes aren't active, always forward
             // if TopNHashes are active, proceed if not already excluded (i.e order by
             // limit)
@@ -584,12 +591,14 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
             // Compute value and hashcode - we'd either store or forward them.
 
             // each time serialize each row, because of different key.
-            ByteWritable value = (ByteWritable) valueSerializer.serialize(vecWrappers, valueObjectInspector);
+
+            BytesWritable value = (BytesWritable) valueSerializer.serialize(vecWrappers, valueObjectInspector);
 
             if (firstIndex == TopNHash.FORWARD) {
                 collect(firstKey, value);
             } else {
                 // invariant: reducerHash != null
+                assert firstIndex >= 0;
                 reducerHash.storeValue(firstIndex, firstKey.hashCode(), value, false);
             }
 
@@ -604,7 +613,7 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
         } catch (HiveException e) {
             throw e;
         } catch (Exception e) {
-            throw new HiveException();
+            throw new HiveException(e);
         }
     }
 
@@ -640,7 +649,7 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
         }
     }
 
-    private Object getVecValue (Vec vector, int keyFieldId, int index) {
+    private Object getVecValue(Vec vector, int keyFieldId, int index) {
         // index 0 means row 1, currently vecBatch has only one row.
         if (vector.isNull(index)) {
             return null;
@@ -661,6 +670,7 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
         if (type.getId() == OMNI_SHORT) {
             return ((ShortVec) vector).get(index);
         }
+
         if (type.getId() == OMNI_DECIMAL128) {
             Map.Entry<Boolean, byte[]> result = ((Decimal128Vec) vector).getBytes(index);
             StructField structField = ((StandardStructObjectInspector) inputObjInspectors[0]).getAllStructFieldRefs()
@@ -685,13 +695,11 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
         return null;
     }
 
-
     /**
      * Populate distinct keys part of cachedKeys for particular row.
      *
      * @param row the row
      * @param index the cachedKeys index to write to
-     * @throws HiveException
      */
     private void populateCachedDistinctKeys(Object row, int index) throws HiveException {
         StandardUnionObjectInspector.StandardUnion union;
@@ -705,7 +713,7 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
         union.setTag((byte) index);
     }
 
-    protected final int computeMurmurHash (HiveKey firstKey) {
+    protected final int computeMurmurHash(HiveKey firstKey) {
         return Murmur3.hash32(firstKey.getBytes(), firstKey.getDistKeyLength(), 0);
     }
 
@@ -739,7 +747,7 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
             keyHashCode = hashFunc.apply(bucketFieldValues, partitionObjectInspectors);
         }
         int hashCode = buckNum < 0 ? keyHashCode : keyHashCode * 31 + buckNum;
-        if (LOG.isInfoEnabled()) {
+        if (LOG.isTraceEnabled()) {
             LOG.trace("Going to return hash code " + hashCode);
         }
         return hashCode;
@@ -752,12 +760,12 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
             ObjectInspector fieldObjectInspector = ((StandardStructObjectInspector) this.inputObjInspectors[0])
                     .getAllStructFieldRefs().get(indexInVector).getFieldObjectInspector();
             return fieldObjectInspector instanceof AbstractPrimitiveJavaObjectInspector
-                    ? this.getOriginaValue(vector, indexInVector, index)
+                    ? this.getOriginValue(vector, indexInVector, index)
                     : this.getWritableValue(vector, indexInVector, index);
         }
     }
 
-    private Object getOriginaValue(Vec vector, int indexInVector, int index) {
+    private Object getOriginValue(Vec vector, int indexInVector, int index) {
         DataType type = vector.getType();
         if (type.getId() == OMNI_INT) {
             ObjectInspector fieldObjectInspector = ((StandardStructObjectInspector) this.inputObjInspectors[0])
@@ -846,7 +854,7 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
         }
     }
 
-    private boolean partitionKeysAreNull(Object row, int index) throws HiveException{
+    private boolean partitionKeysAreNull(Object row, int index) throws HiveException {
         if (partitionEval.length != 0) {
             for (int i = 0; i < partitionEval.length; i++) {
                 Vec vector = ((Vec[]) row)[(int) keyFieldId[i]];
@@ -864,7 +872,7 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
     protected HiveKey toHiveKey(Object obj, int tag, Integer distLength) throws SerDeException {
         BinaryComparable key = (BinaryComparable) keySerializer.serialize(obj, keyObjectInspector);
         int keyLength = key.getLength();
-        if (tag == -1 || skipTap) {
+        if (tag == -1 || skipTag) {
             keyWritable.set(key.getBytes(), 0, keyLength);
         } else {
             keyWritable.setSize(keyLength);
@@ -877,17 +885,17 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
     @Override
     public void collect(byte[] key, byte[] value, int hash) throws IOException {
         HiveKey keyWritable = new HiveKey(key, hash);
-        ByteWritable valueWritable = new ByteWritable(value);
+        BytesWritable valueWritable = new BytesWritable(value);
         collect(keyWritable, valueWritable);
     }
 
-    protected void collet(BytesWritable keyWritable, Writable valueWritable) throws IOException {
+    protected void collect(BytesWritable keyWritable, Writable valueWritable) throws IOException {
         // Since this is a terminal operator, update counters explicitly -
         // forward is not called
         if (null != out) {
             numRows++;
             runTimeNumRows++;
-            if (LOG.isDebugEnabled()) {
+            if (LOG.isTraceEnabled()) {
                 if (numRows == cntr) {
                     cntr = logEveryNRows == 0 ? cntr * 10 : numRows + logEveryNRows;
                     if (cntr < 0 || numRows < 0) {
@@ -909,9 +917,10 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
             cachedValues[i] = valueEval[i].evaluate(row);
         }
 
-        //Serialize the value
+        // Serialize the value
         return (BytesWritable) valueSerializer.serialize(cachedValues, valueObjectInspector);
     }
+
     @Override
     protected void closeOp(boolean abort) throws HiveException {
         if (!abort && reducerHash != null) {
@@ -930,6 +939,7 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
     /**
      * @return the name of the operator
      */
+    @Override
     public String getName() {
         return getOperatorName();
     }
@@ -948,8 +958,8 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
         return false;
     }
 
-    public void setSkipTap(boolean value) {
-        this.skipTap = value;
+    public void setSkipTag(boolean value) {
+        this.skipTag = value;
     }
 
     public void setValueIndex(int[] valueIndex) {

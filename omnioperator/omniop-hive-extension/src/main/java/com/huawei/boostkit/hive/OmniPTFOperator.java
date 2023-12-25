@@ -1,6 +1,8 @@
 
 package com.huawei.boostkit.hive;
 
+import com.huawei.boostkit.hive.expression.TypeUtils;
+
 import com.google.common.primitives.Ints;
 import nova.hetu.omniruntime.constants.FunctionType;
 import nova.hetu.omniruntime.constants.OmniWindowFrameBoundType;
@@ -40,18 +42,23 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class OmniPTFOperator extends OmniHiveOperator<OmniPTFDesc> implements Serializable {
     private static final long serialVersionUID = 1L;
-    private static final Logger LOG = LoggerFactory.getLogger((OmniPTFOperator.class.getName()));
+    private static final Logger LOG = LoggerFactory.getLogger(OmniPTFOperator.class.getName());
     private transient OmniWindowOperatorFactory omniWindowOperatorFactory;
     private transient OmniOperator omniOperator;
     private transient List<? extends StructField> allStructFieldRefs;
     boolean isMapOperator;
     private transient WindowTableFunctionDef windowTableFunctionDef;
     transient Configuration hiveConf;
-    public OmniPTFOperator{
+    public OmniPTFOperator() {
         super();
+    }
+
+    public OmniPTFOperator(CompilationOpContext ctx) {
+        super(ctx);
     }
 
     public OmniPTFOperator(CompilationOpContext ctx, PTFDesc conf) {
@@ -67,7 +74,7 @@ public class OmniPTFOperator extends OmniHiveOperator<OmniPTFDesc> implements Se
         reconstructQueryDef(hiveConf);
         windowTableFunctionDef = (WindowTableFunctionDef) conf.getFuncDef();
         List<WindowFunctionDef> windowFunctions = windowTableFunctionDef.getWindowFunctions();
-        List<OrderExpressionDef> windowOrderExpressions =windowTableFunctionDef.getOrder().getExpressions();
+        List<OrderExpressionDef> windowOrderExpressions = windowTableFunctionDef.getOrder().getExpressions();
 
         if (isMapOperator) {
             PartitionedTableFunctionDef tDef = conf.getStartOfChain();
@@ -94,14 +101,14 @@ public class OmniPTFOperator extends OmniHiveOperator<OmniPTFDesc> implements Se
         OmniWindowFrameType[] windowFrameTypes = getWindowFrameType(windowFunctions);
         OmniWindowFrameBoundType[] windowFrameStartTypes = getWindowFrameStartTypes(windowFunctions);
         int[] windowFrameStartChannels = {-1};
-        OmniWindowFrameBoundType[] windowFrameEndTyped = getWindowFrameEndTypes(windowFunctions);
+        OmniWindowFrameBoundType[] windowFrameEndTypes = getWindowFrameEndTypes(windowFunctions);
         int[] windowFrameEndChannels = {-1};
         OverflowConfig overflowConfig = new OverflowConfig(OverflowConfig.OverflowConfigId.OVERFLOW_CONFIG_NULL);
         OperatorConfig operatorConfig = new OperatorConfig(overflowConfig);
         this.omniWindowOperatorFactory = new OmniWindowOperatorFactory(sourceTypes, outputChannels, windowFunction,
                 partitionChannels, preGroupedChannels, sortChannels, sortOrder, sortNullFirsts, preSortedChannelPrefix,
                 expectedPositions, argumentKeys, windowFunctionReturnType, windowFrameTypes, windowFrameStartTypes,
-                windowFrameStartChannels, windowFrameEndTyped, windowFrameEndChannels, operatorConfig);
+                windowFrameStartChannels, windowFrameEndTypes, windowFrameEndChannels, operatorConfig);
         this.omniOperator = omniWindowOperatorFactory.createOperator();
     }
 
@@ -109,18 +116,18 @@ public class OmniPTFOperator extends OmniHiveOperator<OmniPTFDesc> implements Se
         return structFields.stream()
                 .map(structField -> TypeUtils.buildInputDataType(
                         ((PrimitiveObjectInspector) structField.getFieldObjectInspector()).getTypeInfo()))
-                .toArray(DataType::new);
+                .toArray(DataType[]::new);
     }
 
     private FunctionType[] getWindowFunctionType(List<WindowFunctionDef> windowFunctionDefs) {
         return windowFunctionDefs.stream()
-                .map(windowFunctionDef -> TypeUtils.getWindwoFunctionType(windowFunctionDef))
+                .map(windowFunctionDef -> TypeUtils.getWindowFunctionType(windowFunctionDef))
                 .toArray(FunctionType[]::new);
     }
 
     private int getFieldIdFromFieldName(String name) {
-        StructField structField = ((StructObjectInspector) inputObjInspectors[0]).getStructFieldRef(name);
-        return structField.getFieldID();
+        StructField structFieldRef = ((StructObjectInspector) inputObjInspectors[0]).getStructFieldRef(name);
+        return structFieldRef.getFieldID();
     }
 
     private int[] getChannels(List<? extends PTFExpressionDef> ptfExpressionDefs) {
@@ -142,7 +149,7 @@ public class OmniPTFOperator extends OmniHiveOperator<OmniPTFDesc> implements Se
     private OmniWindowFrameType[] getWindowFrameType(List<WindowFunctionDef> windowFunctionDefs) {
         return windowFunctionDefs.stream().map(
                 windowFunctionDef -> TypeUtils.getWindowFrameType(windowFunctionDef.getWindowFrame().getWindowType()))
-                .toArray((OmniWindowFrameType[]::new));
+                .toArray(OmniWindowFrameType[]::new);
     }
 
     private OmniWindowFrameBoundType[] getWindowFrameStartTypes(List<WindowFunctionDef> windowFunctionDefs) {
@@ -177,13 +184,13 @@ public class OmniPTFOperator extends OmniHiveOperator<OmniPTFDesc> implements Se
 
     private int[] getSortOrder(List<OrderExpressionDef> orderExpressionDefs) {
         return (orderExpressionDefs.stream()
-                .mapToInt((orderExpressionDef -> TypeUtils.getWindowSortType(orderExpressionDef.getOrder())))).toArray();
+                .mapToInt(orderExpressionDef -> TypeUtils.getWindowSortType(orderExpressionDef.getOrder()))).toArray();
     }
 
     private int[] getSortNullFirsts(List<OrderExpressionDef> orderExpressionDefs) {
         return (orderExpressionDefs.stream()
-                .mapToInt(orderExpressionDef -> TypeUtils.getSortNullFirst(orderExpressionDef.getNullOrder()))
-                .toArray());
+                .mapToInt(orderExpressionDef -> TypeUtils.getSortNullFirst(orderExpressionDef.getNullOrder())))
+                .toArray();
     }
 
     private DataType[] getWindowFunctionReturnType(List<WindowFunctionDef> windowFunctionDefs) {
@@ -194,7 +201,8 @@ public class OmniPTFOperator extends OmniHiveOperator<OmniPTFDesc> implements Se
                 dataTypes.add(TypeUtils.buildInputDataType(((PrimitiveObjectInspector) oi).getTypeInfo()));
             }
             if (oi instanceof StandardListObjectInspector) {
-                dataTypes.add(TypeUtils.buildInputDataType(((WritableIntObjectInspector) (((StandardListObjectInspector) oi)
+                dataTypes.add(
+                        TypeUtils.buildInputDataType(((WritableIntObjectInspector) (((StandardListObjectInspector) oi)
                         .getListElementObjectInspector())).getTypeInfo()));
             }
         }
@@ -208,13 +216,14 @@ public class OmniPTFOperator extends OmniHiveOperator<OmniPTFDesc> implements Se
             if (args == null) {
                 argumentChannels[i] = -1;
             } else if (args.size() == 1) {
-                argumentChannels[i] =Integer.
-                        valueOf(getFieldFromFieldName(((ExprNodeColumnDesc) args.get(0).getExprNode()).getColumn()));
+                argumentChannels[i] = Integer
+                        .valueOf(getFieldIdFromFieldName(((ExprNodeColumnDesc) args.get(0).getExprNode()).getColumn()));
             } else {
                 throw new UnsupportedOperationException(
-                        "Unsupported! WindowFunctionDefinition.getWindowArgumentKeys() bigger than 1: " + args.size());
+                        "Unsupported! WindowFunctionDefinition.getArgumentChannels() bigger than 1: " + args.size());
             }
         }
+        return argumentChannels;
     }
 
     // because omniruntime always puts build table output col int tail
@@ -227,14 +236,14 @@ public class OmniPTFOperator extends OmniHiveOperator<OmniPTFDesc> implements Se
         int inputOISize = ((StandardStructObjectInspector) inputObjInspectors[0]).getAllStructFieldRefs().size();
 
         int srcPos = 0;
-        int desPos = outputOISize - inputOISize;
+        int destPos = outputOISize - inputOISize;
         int len = inputOISize;
-        System.arraycopy(vecBatch.getVectors(), srcPos, newVecs, desPos, len);
+        System.arraycopy(vecBatch.getVectors(), srcPos, newVecs, destPos, len);
 
         srcPos = inputOISize;
-        desPos = 0;
+        destPos = 0;
         len = outputOISize - inputOISize;
-        System.arraycopy(vecBatch.getVectors(), srcPos, newVecs, desPos, len);
+        System.arraycopy(vecBatch.getVectors(), srcPos, newVecs, destPos, len);
 
         return new VecBatch(newVecs, vecBatch.getRowCount());
     }
@@ -242,7 +251,6 @@ public class OmniPTFOperator extends OmniHiveOperator<OmniPTFDesc> implements Se
     /**
      * Initialize the visitor to use QueryDefDeserializer User the order
      * defined in QueryDefWalker to visit the QueryDef
-     *
      *
      * @param hiveConf
      * @throws HiveException

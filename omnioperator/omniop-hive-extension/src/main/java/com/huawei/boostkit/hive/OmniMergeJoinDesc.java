@@ -15,6 +15,7 @@ import java.util.Map;
         Explain.Level.EXTENDED})
 public class OmniMergeJoinDesc extends JoinDesc {
     private Map<Byte, List<ExprNodeDesc>> keys;
+
     public OmniMergeJoinDesc(JoinDesc joinDesc) {
         super(joinDesc);
     }
@@ -37,7 +38,7 @@ public class OmniMergeJoinDesc extends JoinDesc {
     @Override
     @Explain(displayName = "keys", explainLevels = {Explain.Level.USER})
     public Map<Byte, String> getUserLevelExplainKeysString() {
-        Map<Byte, String> keyMap = new LinkedHashMap<>();
+        Map<Byte, String> keyMap = new LinkedHashMap<Byte, String>();
         for (Map.Entry<Byte, List<ExprNodeDesc>> k : keys.entrySet()) {
             keyMap.put(k.getKey(), PlanUtils.getExprListString(k.getValue(), true));
         }
