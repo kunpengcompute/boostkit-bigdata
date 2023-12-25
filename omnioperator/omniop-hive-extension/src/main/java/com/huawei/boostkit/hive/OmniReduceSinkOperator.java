@@ -124,7 +124,7 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
 
     /**
      * The evaluators for the key columns. Key columns decide the sort order on
-     * the reducer side. Key columns are passed to the reducer in the "Key".
+     * the reducer side. Key columns are passed to the reducer in the "key".
      */
     protected transient ExprNodeEvaluator[] keyEval;
 
@@ -137,7 +137,7 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
     /**
      * The evaluators for the partition columns (CLUSTER BY or DISTRIBUTE BY in
      * Hive language).Partition columns decide the reducer that the current row
-     * goes to. Partition columns are not padded to reducer.
+     * goes to. Partition columns are not passed to reducer.
      */
     protected transient ExprNodeEvaluator[] partitionEval;
 
@@ -146,14 +146,14 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
      */
     protected transient ExprNodeEvaluator[] bucketEval = null;
 
-    // TODO: we use MetadataTypedColumnsetSerDe for now, till DynamicSerde is ready
+    // TODO: we use MetadataTypedColumnsetSerDe for now, till DynamicSerDe is ready
     protected transient Serializer keySerializer;
     protected transient boolean keyIsText;
     protected transient Serializer valueSerializer;
     protected transient byte[] tagByte = new byte[1];
     protected transient int numDistributionKeys;
     protected transient int numDistinctExprs;
-    protected transient String[] inputAliases; // input aliases of this Rs for join (used for PPD)
+    protected transient String[] inputAliases; // input aliases of this RS for join (used for PPD)
     protected transient boolean useUniformHash = false;
 
     // picks topN K:V pairs from input.
@@ -168,23 +168,23 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
     protected transient BiFunction<Object[], ObjectInspector[], Integer> hashFunc;
 
     /**
-     * This tow dimensional array holds key data and a corresponding Union object
+     * This two dimensional array holds key data and a corresponding Union object
      * which contains the tag identifying the aggregate expression for distinct
      * columns.
      * <p>
      * If there is no distinct expression, cachedKeys is simply like this.
      * cachedKeys[0] = [col0][col1]
      * <p>
-     * with tow distinct expression, union(tag : key) isattatched for each distinct
+     * with two distict expression, union(tag : key) isattatched for each distinct
      * expression
      * cachedKeys[0] = [col0][col1][0:dist1]
-     * cachedKeys[1] = [col0][col1][0:dist2]
+     * cachedKeys[1] = [col0][col1][1:dist2]
      * <p>
      * in this case, child GBY evaluates distinct values with expression like
      * KEY.col:0.dist1
      * see {@link org.apache.hadoop.hive.ql.exec.ExprNodeColumnEvaluator}
      */
-    // TODO: we only ever use on row of there at a time. Why do we need to cache
+    // TODO: we only ever use one row of these at a time. Why do we need to cache
     // multiple?
     protected transient Object[][] cachedKeys;
 
@@ -502,8 +502,8 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
             ObjectInspector rowInspector = inputObjInspectors[tag];
             if (firstRow) {
                 firstRow = false;
-                // TODO: this is fishy - we init object inspectors based on first tag. we
-                // should either init for each tag, or if row Inspector does't really
+                // TODO: this is fishy - we init object inspectors based on first tag. We
+                // should either init for each tag, or if row Inspector doesn't really
                 // matter, then wen can create this in ctor and get rid of firstRow
                 List<String> fileNames = new ArrayList<>();
                 List<ObjectInspector> objectInspectors = new ArrayList<>();
@@ -696,7 +696,7 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
     }
 
     /**
-     * Populate distinct keys part of cachedKeys for particular row.
+     * Populate distinct keys part of cachedKeys for a particular row.
      *
      * @param row the row
      * @param index the cachedKeys index to write to
@@ -719,8 +719,8 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
 
     /**
      * For Acid Update/Delete case, we expect a single partitionEval of the form
-     * UDFToInteger(ROW_ID) and buckNum == -1 so that the result of this method
-     * is to return the bucketId extracted from ROW_ID unless it optimized by
+     * UDFToInteger(ROW__ID) and buckNum == -1 so that the result of this method
+     * is to return the bucketId extracted from ROW__ID unless it optimized by
      * {@link org.apache.hadoop.hive.ql.optimizer.SortedDynPartitionOptimizer}
      */
     private int computeHashCode(Object row, int buckNum, int index) throws HiveException {
@@ -970,7 +970,7 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
         return valueIndex;
     }
 
-    public void setInputAliases(String[]inputAliases) {
+    public void setInputAliases(String[] inputAliases) {
         this.inputAliases = inputAliases;
     }
 
