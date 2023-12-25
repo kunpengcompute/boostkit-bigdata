@@ -7,9 +7,7 @@ import static org.apache.hadoop.hive.serde.serdeConstants.SERIALIZATION_LIB;
 
 import com.huawei.boostkit.hive.cache.VecBufferCache;
 import com.huawei.boostkit.hive.cache.VectorCache;
-import com.huawei.boostkit.hive.converter.OmniLazyStruct;
 import com.huawei.boostkit.hive.converter.StructConverter;
-import com.huawei.boostkit.hive.converter.VarcharVecConverter;
 import com.huawei.boostkit.hive.converter.VecConverter;
 import com.huawei.boostkit.hive.shuffle.OmniVecBatchSerde;
 import com.huawei.boostkit.hive.shuffle.VecSerdeBody;
@@ -26,8 +24,6 @@ import org.apache.hadoop.hive.ql.exec.tez.TezContext;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.plan.ReduceWork;
 import org.apache.hadoop.hive.ql.plan.api.OperatorType;
-import org.apache.hadoop.hive.serde2.lazy.LazyStruct;
-import org.apache.hadoop.hive.serde2.lazy.objectinspector.LazySimpleStructObjectInspector;
 import org.apache.hadoop.hive.serde2.lazy.objectinspector.primitive.LazyObjectInspectorParameters;
 import org.apache.hadoop.hive.serde2.lazy.objectinspector.primitive.LazyObjectInspextorParametersImpl;
 import org.apache.hadoop.hive.serde2.lazy.objectinspector.primitive.LazyPrimitiveObjectInspectorFactory;
@@ -218,7 +214,6 @@ public class OmniVectorOperator extends OmniHiveOperator<OmniVcetorDesc> {
     }
 
     private void processToVector(Object row, int tag) throws HiveException {
-        OmniLazyStruct lazyStructBinary = null;
         if (isVecBatchSerDe && isKeyValue) {
             List vecSerdeBodies = (List) row;
             VecSerdeBody[] key = (VecSerdeBody[]) vecSerdeBodies.get(0);
@@ -235,15 +230,6 @@ public class OmniVectorOperator extends OmniHiveOperator<OmniVcetorDesc> {
                     for (int j = 0; j < value.length; j++) {
                         vectorCache[tag].dataCache[offset + j][rowCount[tag]] = value[j];
                     }
-                } else if (converters[tag][i] instanceof VarcharVecConverter
-                        && soi[tag] instanceof LazySimpleStructObjectInspector) {
-                    if (lazyStructBinary == null) {
-                        lazyStructBinary = new OmniLazyStruct((LazySimpleStructObjectInspector) soi[tag],
-                                (LazyStruct) row);
-                    }
-                    Object structFieldData = soi[tag].getStructFieldData(lazyStructBinary, fields[tag].get(i));
-                    vectorCache[tag].dataCache[i][rowCount[tag]] = converters[tag][i].calculateValue(structFieldData,
-                            ((PrimitiveObjectInspector) fields[tag].get(i).getFieldObjectInspector()).getTypeInfo());
                 } else {
                     Object structFieldData = soi[tag].getStructFieldData(row, fields[tag].get(i));
                     vectorCache[tag].dataCache[i][rowCount[tag]] = converters[tag][i].calculateValue(structFieldData,
