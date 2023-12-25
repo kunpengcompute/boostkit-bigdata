@@ -113,7 +113,7 @@ public class OmniPTFOperator extends OmniHiveOperator<OmniPTFDesc> implements Se
         this.omniOperator = omniWindowOperatorFactory.createOperator();
     }
 
-    private DataType[] getExprFromStructField(List<? extends  StructField> structFields) {
+    private DataType[] getExprFromStructField(List<? extends StructField> structFields) {
         return structFields.stream()
                 .map(structField -> TypeUtils.buildInputDataType(
                         ((PrimitiveObjectInspector) structField.getFieldObjectInspector()).getTypeInfo()))

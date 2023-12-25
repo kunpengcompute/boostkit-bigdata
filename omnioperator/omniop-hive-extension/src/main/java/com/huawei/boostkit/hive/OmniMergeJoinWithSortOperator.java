@@ -39,7 +39,7 @@ public class OmniMergeJoinWithSortOperator extends OmniMergeJoinOperator {
 
     @Override
     protected void processOmniSmj(int opIndex, int dataIndex, Queue<VecBatch>[] data, OmniOperator[] operators,
-                                  int controlCode, DataType[][] types) throws HiveException{
+                                  int controlCode, DataType[][] types) throws HiveException {
         if (!data[opIndex].isEmpty()) {
             while (flowControlCode[opIndex] == controlCode && resCode[opIndex] == RES_INIT
             && !data[opIndex].isEmpty()) {

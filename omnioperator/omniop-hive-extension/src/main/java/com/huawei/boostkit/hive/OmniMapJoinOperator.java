@@ -228,7 +228,7 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
             this.filterOperator = this.filterAndProjectOperatorFactory.createOperator();
         }
         if (!addedCloseThread) {
-            Runtime.getRuntime().addShutdownHook(new Thread(() ->{
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 try {
                     for (List<VecBatch> vecBatchList : vecBatchNeedClose) {
                         if (vecBatchList != null) {
@@ -439,7 +439,7 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
             TableDesc keyTableDesc = conf.getKeyTblDesc();
             AbstractSerDe keySerializer = (AbstractSerDe) ReflectionUtil
                     .newInstance(keyTableDesc.getDeserializerClass(), null);
-            SerDeUtils.initializeSerDe(keySerializer, null , keyTableDesc.getProperties(), null);
+            SerDeUtils.initializeSerDe(keySerializer, null, keyTableDesc.getProperties(), null);
             MapJoinObjectSerDeContext keyContext = new MapJoinObjectSerDeContext(keySerializer, false);
             for (int pos = 0; pos < conf.getTagOrder().length; pos++) {
                 if (pos == posBigTable) {
