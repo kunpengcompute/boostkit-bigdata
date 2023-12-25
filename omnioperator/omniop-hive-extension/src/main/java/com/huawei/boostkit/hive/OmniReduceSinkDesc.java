@@ -25,8 +25,8 @@ public class OmniReduceSinkDesc extends ReduceSinkDesc{
         this.setMaxMemoryAvailable(reduceSinkDesc.getMaxMemoryAvailable());
         this.setMemoryNeeded(reduceSinkDesc.getMemoryNeeded());
         this.setNullOrder(reduceSinkDesc.getNullOrder());
-        this.setNumDistributionKeys(reduceSinkDesc.getNumDistributionKeys());
         this.setNumBuckets(reduceSinkDesc.getNumBuckets());
+        this.setNumDistributionKeys(reduceSinkDesc.getNumDistributionKeys());
         this.setOpProps(reduceSinkDesc.getOpProps());
         this.setOrder(reduceSinkDesc.getOrder());
         this.setRuntimeStatsTmpDir(reduceSinkDesc.getRuntimeStatsTmpDir());

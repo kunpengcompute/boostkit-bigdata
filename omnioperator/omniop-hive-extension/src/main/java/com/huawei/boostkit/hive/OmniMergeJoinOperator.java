@@ -5,7 +5,7 @@ import nova.hetu.omniruntime.operator.OmniOperator;
 import nova.hetu.omniruntime.type.DataType;
 import nova.hetu.omniruntime.vector.VecBatch;
 
-import javax.security.auth.login.Configuration;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.ql.CompilationOpContext;
 import org.apache.hadoop.hive.ql.exec.MapredContext;
 import org.apache.hadoop.hive.ql.exec.tez.TezContext;

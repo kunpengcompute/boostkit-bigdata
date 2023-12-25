@@ -51,8 +51,10 @@ public class OmniPTFOperator extends OmniHiveOperator<OmniPTFDesc> implements Se
     private transient OmniOperator omniOperator;
     private transient List<? extends StructField> allStructFieldRefs;
     boolean isMapOperator;
+
     private transient WindowTableFunctionDef windowTableFunctionDef;
     transient Configuration hiveConf;
+
     public OmniPTFOperator() {
         super();
     }
@@ -131,7 +133,7 @@ public class OmniPTFOperator extends OmniHiveOperator<OmniPTFDesc> implements Se
     }
 
     private int[] getChannels(List<? extends PTFExpressionDef> ptfExpressionDefs) {
-        List<Integer> channels = new ArrayList<>();
+        List<Integer> channels = new ArrayList();
         for (PTFExpressionDef ptfExpressionDef : ptfExpressionDefs) {
             ExprNodeDesc exprNode = ptfExpressionDef.getExprNode();
             if (exprNode instanceof ExprNodeColumnDesc) {
@@ -226,7 +228,7 @@ public class OmniPTFOperator extends OmniHiveOperator<OmniPTFDesc> implements Se
         return argumentChannels;
     }
 
-    // because omniruntime always puts build table output col int tail
+    // because omniruntime always puts build table output col in the tail
     // but hive is according to inputInspectors' order
     // so need to reorder output col
     private VecBatch reorderVecs(VecBatch vecBatch) {
@@ -249,7 +251,7 @@ public class OmniPTFOperator extends OmniHiveOperator<OmniPTFDesc> implements Se
     }
 
     /**
-     * Initialize the visitor to use QueryDefDeserializer User the order
+     * Initialize the visitor to use the QueryDefDeserializer User the order
      * defined in QueryDefWalker to visit the QueryDef
      *
      * @param hiveConf

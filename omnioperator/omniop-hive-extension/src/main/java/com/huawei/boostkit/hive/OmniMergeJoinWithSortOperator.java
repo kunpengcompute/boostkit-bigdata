@@ -5,14 +5,14 @@ import nova.hetu.omniruntime.operator.OmniOperator;
 import nova.hetu.omniruntime.type.DataType;
 import nova.hetu.omniruntime.vector.VecBatch;
 
-import javax.security.auth.login.Configuration;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.ql.CompilationOpContext;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.plan.CommonMergeJoinDesc;
 
 import java.util.Queue;
 
-public class OmniMergeJoinWithSortOperator extends OmniMergeJoinOperator{
+public class OmniMergeJoinWithSortOperator extends OmniMergeJoinOperator {
     private transient OmniVectorWithSortOperator omniVectorWithSortOperator;
 
     /** Kryo ctor. */
@@ -32,7 +32,7 @@ public class OmniMergeJoinWithSortOperator extends OmniMergeJoinOperator{
     // If mergeJoinOperator has 3 tables, first join table0 and table1, and output
     // all colunmns of table 0 and table1.
     // Then use the output to join table2, and output required columns.
-    protected void initializedOp(Configuration hconf) throws HiveException {
+    protected void initializeOp(Configuration hconf) throws HiveException {
         super.initializeOp(hconf);
         omniVectorWithSortOperator = (OmniVectorWithSortOperator) parentOperators.get(0);
     }

@@ -37,7 +37,7 @@ import nova.hetu.omniruntime.vector.Vec;
 import nova.hetu.omniruntime.vector.VecBatch;
 
 import org.apache.commons.lang.StringUtils;
-import javax.security.auth.login.Configuration;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.common.type.Date;
 import org.apache.hadoop.hive.common.type.HiveDecimal;
 import org.apache.hadoop.hive.conf.HiveConf;
@@ -508,9 +508,9 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
                 List<String> fileNames = new ArrayList<>();
                 List<ObjectInspector> objectInspectors = new ArrayList<>();
                 if (rowInspector instanceof StandardStructObjectInspector) {
-                    List<? extends StructField> allStructFiledRefs = ((StandardStructObjectInspector) rowInspector)
+                    List<? extends StructField> allStructFieldRefs = ((StandardStructObjectInspector) rowInspector)
                             .getAllStructFieldRefs();
-                    for (StructField structField : allStructFiledRefs) {
+                    for (StructField structField : allStructFieldRefs) {
                         fileNames.add(structField.getFieldName());
                         if (structField.getFieldObjectInspector() instanceof WritableDateObjectInspector) {
                             PrimitiveTypeInfo primitiveTypeInfo = new PrimitiveTypeInfo();
@@ -526,7 +526,7 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
                 StandardStructObjectInspector standardStructObjectInspector = ObjectInspectorFactory
                         .getStandardStructObjectInspector(fileNames, objectInspectors);
                 if (LOG.isInfoEnabled()) {
-                    LOG.info("keys are " + conf.getOutputKeyColumnNames() + "num distributions: "
+                    LOG.info("keys are " + conf.getOutputKeyColumnNames() + " num distributions: "
                             + conf.getNumDistributionKeys());
                 }
                 keyObjectInspector = initEvaluatorsAndReturnStruct(keyEval, distinctColIndices,
@@ -550,7 +550,7 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
             int bucketNumber = -1;
             if (bucketEval != null) {
                 bucketNumber = computeBucketNumber(row, conf.getNumBuckets(), index);
-                cachedKeys[0][buckColIdxInKey] = new Text(String.valueOf(bucketNumber))
+                cachedKeys[0][buckColIdxInKey] = new Text(String.valueOf(bucketNumber));
             }
             if (buckColIdxInKeyForSdpo != -1) {
                 cachedKeys[0][buckColIdxInKeyForSdpo] = new Text(String.valueOf(bucketNumber));
