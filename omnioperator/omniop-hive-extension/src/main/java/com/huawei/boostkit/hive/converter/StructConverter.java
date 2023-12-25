@@ -17,7 +17,7 @@ public class StructConverter implements VecConverter {
     List<? extends StructField> fieldsList;
     private transient PrimitiveTypeInfo[] typeInfos;
 
-    public StringVecConverter(StructObjectInspector structObjectInspector) {
+    public StructConverter(StructObjectInspector structObjectInspector) {
         fieldsList = structObjectInspector.getAllStructFieldRefs();
         fields = fieldsList.stream().map(field -> (StructField) field).toArray(StructField[]::new);
         converters = fieldsList.stream()

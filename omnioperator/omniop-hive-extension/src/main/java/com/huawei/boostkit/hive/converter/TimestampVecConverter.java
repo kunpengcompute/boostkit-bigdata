@@ -62,7 +62,7 @@ public class TimestampVecConverter extends LongVecConverter {
             timestampValues[i] = (long) col[i];
         }
         timestampVec.put(timestampValues, 0, 0, columnSize);
-        return timestampVec
+        return timestampVec;
     }
 
     @Override

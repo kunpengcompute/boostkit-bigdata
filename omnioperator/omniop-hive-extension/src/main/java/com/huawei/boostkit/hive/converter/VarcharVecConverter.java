@@ -4,12 +4,12 @@ package com.huawei.boostkit.hive.converter;
 import com.huawei.boostkit.hive.cache.BytesColumnCache;
 import com.huawei.boostkit.hive.cache.ColumnCache;
 import com.huawei.boostkit.hive.cache.VarcharCache;
+import com.huawei.boostkit.hive.expression.TypeUtils;
 
 import nova.hetu.omniruntime.vector.DictionaryVec;
 import nova.hetu.omniruntime.vector.VarcharVec;
 import nova.hetu.omniruntime.vector.Vec;
 
-import org.apache.commons.lang3.reflect.TypeUtils;
 import org.apache.hadoop.hive.common.type.HiveVarchar;
 import org.apache.hadoop.hive.ql.exec.vector.BytesColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.ColumnVector;

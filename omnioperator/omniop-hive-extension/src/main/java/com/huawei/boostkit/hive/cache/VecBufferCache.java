@@ -2,8 +2,9 @@ package com.huawei.boostkit.hive.cache;
 
 import static com.huawei.boostkit.hive.cache.VectorCache.BATCH;
 import static com.huawei.boostkit.hive.shuffle.OmniVecBatchSerDe.TYPE_LEN;
-import static com.huawei.boostkit.hive.shuffle.omniVecBatchSerDe.getEstimateLen;
-import static com.huawei.boostkit.hive.shuffle.VecSerdeBody;
+import static com.huawei.boostkit.hive.shuffle.OmniVecBatchSerDe.getEstimateLen;
+
+import com.huawei.boostkit.hive.shuffle.VecSerdeBody;
 
 import nova.hetu.omniruntime.vector.BooleanVec;
 import nova.hetu.omniruntime.vector.Decimal128Vec;
@@ -40,7 +41,7 @@ public class VecBufferCache {
         }
     }
 
-    public void addVecSerdBody(VecSerdBody[] vecSerdBodies, int rowCount, int offset) {
+    public void addVecSerdBody(VecSerdeBody[] vecSerdBodies, int rowCount, int offset) {
         for (int i = 0; i < vecSerdBodies.length; i++) {
             int cacheIndex = i + offset;
             System.arraycopy(vecSerdBodies[i].value, 0, cache[cacheIndex].byteBuffer, cache[cacheIndex].offset[rowCount], vecSerdBodies[i].length);
@@ -97,7 +98,7 @@ public class VecBufferCache {
             case CHAR:
             case STRING:
                 vec = new VarcharVec(cache[index].offset[rowCount], rowCount);
-                if (rowCount = BATCH) {
+                if (rowCount == BATCH) {
                     ((VarcharVec) vec).setOffsetBuf(cache[index].offset, rowCount);
                 } else {
                     int[] offsets = new int[rowCount + 1];

@@ -55,7 +55,7 @@ public class ShortVecConverter extends LongVecConverter {
             shortValues[i] = (short) col[i];
         }
         shortVec.put(shortValues, 0, 0, columnSize);
-        return shortVec
+        return shortVec;
     }
 
     @Override
