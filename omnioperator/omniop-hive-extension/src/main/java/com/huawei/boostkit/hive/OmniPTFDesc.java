@@ -11,6 +11,6 @@ public class OmniPTFDesc extends PTFDesc {
         setFuncDef(desc.getFuncDef());
         setLlInfo(desc.getLlInfo());
         setMapSide(desc.isMapSide());
-        setCfg(desc.getCfg());
+        setCfg(getCfg());
     }
 }
