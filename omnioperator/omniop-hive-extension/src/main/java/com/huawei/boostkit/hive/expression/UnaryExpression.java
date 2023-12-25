@@ -31,7 +31,7 @@ public class UnaryExpression extends BaseExpression {
         arguments.add(node);
     }
 
-    public List<BaseExpression> getArguments() {
+    protected List<BaseExpression> getArguments() {
         return arguments;
     }
 

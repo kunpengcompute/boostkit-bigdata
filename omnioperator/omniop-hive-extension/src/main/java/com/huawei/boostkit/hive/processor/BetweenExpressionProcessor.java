@@ -6,7 +6,7 @@ import com.huawei.boostkit.hive.expression.ExpressionUtils;
 import com.huawei.boostkit.hive.expression.TypeUtils;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
-import org.apache.hadoop.hive.serde2.objectinsepector.ObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 
 public class BetweenExpressionProcessor implements ExpressionProcessor {
 
@@ -26,16 +26,16 @@ public class BetweenExpressionProcessor implements ExpressionProcessor {
                 TypeUtils.convertHiveTypeToOmniType(node.getTypeInfo()),
                 operator.equals("NOT") ? "GREATER_THAN" : "LESS_THAN_OR_EQUAL"));
         BaseExpression subLeaf;
-        ExprNodeDesc compareNode = node.getChildren().get(1);
+        ExprNodeDesc comparedNode = node.getChildren().get(1);
         if (node.getChildren().get(1) instanceof ExprNodeGenericFuncDesc) {
-            subLeaf = ExpressionUtils.build((ExprNodeGenericFuncDesc) compareNode, inspector);
+            subLeaf = ExpressionUtils.build((ExprNodeGenericFuncDesc) comparedNode, inspector);
         } else {
-            subLeaf = ExpressionUtils.createNode(compareNode, inspector);
+            subLeaf = ExpressionUtils.createNode(comparedNode, inspector);
         }
         leaf.add(subLeaf);
-        leaf.add(createBoundNode(node, compareNode, LOWER_BOUND_INDEX, inspector));
+        leaf.add(createBoundNode(node, comparedNode, LOWER_BOUND_INDEX, inspector));
         leaf.add(subLeaf);
-        leaf.add(createBoundNode(node, compareNode, UPPER_BOUND_INDEX, inspector));
+        leaf.add(createBoundNode(node, comparedNode, UPPER_BOUND_INDEX, inspector));
         return leaf;
     }
 

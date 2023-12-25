@@ -1,5 +1,7 @@
 package com.huawei.boostkit.hive.expression;
 
+import com.google.gson.Gson;
+
 public class CoalesceExpression extends BaseExpression {
     private Integer width;
     private Integer precision;

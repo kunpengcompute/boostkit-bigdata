@@ -90,11 +90,11 @@ public class TypeUtils {
             put(GenericUDFOPEqualOrGreaterThan.class, "GREATER_THAN_OR_EQUAL");
             put(GenericUDFOPEqualOrLessThan.class, "LESS_THAN_OR_EQUAL");
             put(GenericUDFOPNotEqual.class, "NOT_EQUAL");
-            put(GenericUDFOPBetween.class, "AND");
+            put(GenericUDFBetween.class, "AND");
             put(GenericUDFOPNot.class, "NOT");
             put(GenericUDFOPOr.class, "OR");
-            put(GenericUDFOPLikeAny.class, "OR");
-            put(GenericUDFOPLikeAll.class, "AND");
+            put(GenericUDFLikeAny.class, "OR");
+            put(GenericUDFLikeAll.class, "AND");
         }
     };
 

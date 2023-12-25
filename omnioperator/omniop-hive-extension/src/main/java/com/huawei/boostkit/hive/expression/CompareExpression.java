@@ -2,7 +2,7 @@ package com.huawei.boostkit.hive.expression;
 
 import com.google.gson.Gson;
 
-import javax.annotations.Nullable;
+import javax.annotation.Nullable;
 import java.util.HashSet;
 
 public class CompareExpression extends BaseExpression {
@@ -68,11 +68,21 @@ public class CompareExpression extends BaseExpression {
         }
     }
 
+    /**
+     * judge the child tree is full or not
+     *
+     * @return boolean
+     */
     @Override
     public boolean isFull() {
         return left != null && right != null && left.isFull() && right.isFull();
     }
 
+    /**
+     * judge left and right both are null or not
+     *
+     * @return boolean
+     */
     private boolean isFlatFull() {
         return left != null && right != null;
     }
@@ -106,5 +116,4 @@ public class CompareExpression extends BaseExpression {
     public CompareExpression copyBase() {
         return new CompareExpression(this.getExprType(), this.getReturnType(), this.getOperator());
     }
-
 }

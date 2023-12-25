@@ -39,10 +39,11 @@ public class ReferenceFactor extends BaseExpression {
     @Override
     public String toString() {
         if (width == null) {
-            return String.format("{\"exprType\":\"FIELD_REFERENCE\"," + "\"dataType\":%d," + "\"colVal\":%d}", dataType, colVal);
+            return String.format("{\"exprType\":\"FIELD_REFERENCE\"," + "\"dataType\":%d," + "\"colVal\":%d}", dataType,
+                    colVal);
         }
         return String.format(
-                "{\"exprType\":\"FIELD_REFERENCE\"," + "\"dataType\":%d," + "\"colVal\":%d, " + "\"width\":%d}",
+                "{\"exprType\":\"FIELD_REFERENCE\"," + "\"dataType\":%d," + "\"colVal\":%d," + "\"width\":%d}",
                 dataType, colVal, width);
     }
 }

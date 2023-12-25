@@ -64,26 +64,26 @@ public class OmniVecBatchSerDe extends AbstractSerDe {
     @Override
     public void initialize(@Nullable Configuration configuration, Properties properties) throws SerDeException {
         String columnNameProperty = properties.getProperty("columns");
-        final String columnNameDelimiter = properties.containsKey("column.name.delimiter")
+        String columnNameDelimiter = properties.containsKey("column.name.delimiter")
                 ? properties.getProperty("column.name.delimiter")
                 : String.valueOf(',');
-        String columnTypeProperty = properties.getProperty("column.types");
+        String columnTypeProperty = properties.getProperty("columns.types");
         if (columnNameProperty.length() == 0) {
-            columnNames = new ArrayList();
+            this.columnNames = new ArrayList();
         } else {
-            columnNames = Arrays.asList(columnNameProperty.split(columnNameDelimiter));
+            this.columnNames = Arrays.asList(columnNameProperty.split(columnNameDelimiter));
         }
 
         if (columnTypeProperty.length() == 0) {
-            columnTypes = new ArrayList();
+            this.columnTypes = new ArrayList();
         } else {
-            columnTypes = TypeInfoUtils.getTypeInfosFromTypeString(columnTypeProperty);
+            this.columnTypes = TypeInfoUtils.getTypeInfosFromTypeString(columnTypeProperty);
         }
 
         assert this.columnNames.size() == this.columnTypes.size();
         this.rowTypeInfo = TypeInfoFactory.getStructTypeInfo(this.columnNames, this.columnTypes);
         this.cachedObjectInspector = LazyBinaryUtils.getLazyBinaryObjectInspectorFromTypeInfo(this.rowTypeInfo);
-        LOG.debug("LazyBinarySerDe initialized with: columnNames=" + this.columnNames + "columnTypes="
+        LOG.debug("LazyBinarySerDe initialized with: columnNames=" + this.columnNames + " columnTypes="
                 + this.columnTypes);
         this.serializedSize = 0;
         this.stats = new SerDeStats();

@@ -5,7 +5,7 @@ import com.huawei.boostkit.hive.expression.CompareExpression;
 import com.huawei.boostkit.hive.expression.TypeUtils;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
-import org.apache.hadoop.hive.serde2.objectinsepector.ObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 
 import java.util.List;
 

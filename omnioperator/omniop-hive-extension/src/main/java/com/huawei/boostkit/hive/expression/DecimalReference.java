@@ -14,7 +14,7 @@ public class DecimalReference extends ReferenceFactor {
     @Override
     public String toString() {
         return String.format(
-                "{\"exprType\":\"FIELD_REFERENCE\"," + "\"dataType\":%d," + "\"colVal\":%d," + "\"precesion\":%d,"
+                "{\"exprType\":\"FIELD_REFERENCE\"," + "\"dataType\":%d," + "\"colVal\":%d," + "\"precision\":%d,"
                         + "\"scale\":%d}",
                 dataType, colVal, precision, scale);
     }

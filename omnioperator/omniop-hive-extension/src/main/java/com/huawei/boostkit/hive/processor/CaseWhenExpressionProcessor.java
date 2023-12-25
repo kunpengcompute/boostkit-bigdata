@@ -10,19 +10,19 @@ import com.huawei.boostkit.hive.expression.TypeUtils;
 import org.apache.hadoop.hive.ql.plan.ExprNodeConstantDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
-import org.apache.hadoop.hive.serde2.objectinsepector.ObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.typeinfo.DecimalTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 
 import java.util.List;
 import java.util.Queue;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.LinkedBlockingDeque;
 
 public class CaseWhenExpressionProcessor implements ExpressionProcessor {
     @Override
     public BaseExpression process(ExprNodeGenericFuncDesc node, String operator, ObjectInspector inspector) {
         List<ExprNodeDesc> children = node.getChildren();
-        Queue<ExprNodeDesc> queue = new LinkedBlockingQueue<>(children);
+        Queue<ExprNodeDesc> queue = new LinkedBlockingDeque<>(children);
         TypeInfo typeInfo = node.getTypeInfo();
         Integer precision = null;
         Integer scale = null;

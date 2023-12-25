@@ -8,12 +8,12 @@ import com.huawei.boostkit.hive.expression.TypeUtils;
 
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
-import org.apache.hadoop.hive.qi.udf.generic.GenericUDF;
-import org.apache.hadoop.hive.qi.udf.generic.GenericUDFOPDivide;
-import org.apache.hadoop.hive.qi.udf.generic.GenericUDFOPMinus;
-import org.apache.hadoop.hive.qi.udf.generic.GenericUDFOPMod;
-import org.apache.hadoop.hive.qi.udf.generic.GenericUDFOPMultiply;
-import org.apache.hadoop.hive.qi.udf.generic.GenericUDFOPPlus;
+import org.apache.hadoop.hive.ql.udf.generic.GenericUDF;
+import org.apache.hadoop.hive.ql.udf.generic.GenericUDFOPDivide;
+import org.apache.hadoop.hive.ql.udf.generic.GenericUDFOPMinus;
+import org.apache.hadoop.hive.ql.udf.generic.GenericUDFOPMod;
+import org.apache.hadoop.hive.ql.udf.generic.GenericUDFOPMultiply;
+import org.apache.hadoop.hive.ql.udf.generic.GenericUDFOPPlus;
 import org.apache.hadoop.hive.serde2.objectinsepector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.typeinfo.DecimalTypeInfo;
 
@@ -25,8 +25,8 @@ public class ArithmeticExpressionProcessor implements ExpressionProcessor {
         {
             put(GenericUDFOPDivide.class, "DIVIDE");
             put(GenericUDFOPMultiply.class, "MULTIPLY");
-            put(GenericUDFOPMOD.class, "MODULUS");
-            put(GenericUDFOPPLUS.class, "ADD");
+            put(GenericUDFOPMod.class, "MODULUS");
+            put(GenericUDFOPPlus.class, "ADD");
             put(GenericUDFOPMinus.class, "SUBTRACT");
         }
     };
@@ -36,9 +36,9 @@ public class ArithmeticExpressionProcessor implements ExpressionProcessor {
         List<ExprNodeDesc> children = node.getChildren();
         Integer precision = null;
         Integer scale = null;
-        if (typeInfo instanceof DecimalTypeInfo) {
-            precision = ((DecimalTypeInfo) typeInfo).getPrecision();
-            scale = ((DecimalTypeInfo) typeInfo).getScale();
+        if (node.getTypeInfo() instanceof DecimalTypeInfo) {
+            precision = ((DecimalTypeInfo) node.getTypeInfo()).getPrecision();
+            scale = ((DecimalTypeInfo) node.getTypeInfo()).getScale();
         }
 
         int returnType = TypeUtils.convertHiveTypeToOmniType(node.getTypeInfo());

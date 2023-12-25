@@ -4,17 +4,13 @@ import com.google.gson.Gson;
 import com.google.gson.annotations.SerializedName;
 
 public class ConditionExpression extends BaseExpression {
+
     private Integer width;
-
     private Integer precision;
-
     private Integer scale;
-
     private BaseExpression condition;
-
     @SerializedName("if_true")
     private BaseExpression ifTrue;
-
     @SerializedName("if_false")
     private BaseExpression ifFalse;
 

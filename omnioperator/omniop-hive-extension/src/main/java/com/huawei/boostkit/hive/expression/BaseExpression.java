@@ -1,7 +1,5 @@
 package com.huawei.boostkit.hive.expression;
 
-import java.util.List;
-
 public abstract class BaseExpression {
     public enum Located {
         ROOT,

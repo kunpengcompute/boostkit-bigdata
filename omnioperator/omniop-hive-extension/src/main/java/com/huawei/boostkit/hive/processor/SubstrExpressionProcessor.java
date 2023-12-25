@@ -7,13 +7,13 @@ import com.huawei.boostkit.hive.expression.TypeUtils;
 import org.apache.hadoop.hive.ql.plan.ExprNodeConstantDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
-import org.apache.hadoop.hive.serde2.objectinsepector.ObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 
 import java.util.List;
 
 public class SubstrExpressionProcessor implements ExpressionProcessor {
     private static final int LOWER_BOUND_INDEX = 1;
-    private static final int UPPER_BOUND_INDEX = 1;
+    private static final int UPPER_BOUND_INDEX = 2;
 
     @Override
     public BaseExpression process(ExprNodeGenericFuncDesc node, String operator, ObjectInspector inspector) {

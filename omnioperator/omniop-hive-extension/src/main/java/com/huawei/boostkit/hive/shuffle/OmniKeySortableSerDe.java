@@ -28,7 +28,7 @@ import org.apache.hadoop.hive.serde2.objectinspector.ListObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.MapObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
-import org.apache.hadoop.hive.serde2.objectinspector.StandardUnionObjectInspector.StandardUnion;
+import org.apache.hadoop.hive.serde2.objectinspector.StandardUnionObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.StructField;
 import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.UnionObjectInspector;
@@ -70,7 +70,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
-@SerDeSpec(schemaProps = {"columns", "columns.types", "serialization.sort.order", "serialization.sort.order.nulls"})
+@SerDeSpec(schemaProps = {"columns", "columns.types", "serialization.sort.order", "serialization.sort.order.null"})
 public class OmniKeySortableSerDe extends AbstractSerDe {
     public static final Logger LOG = LoggerFactory.getLogger(OmniKeySortableSerDe.class.getName());
 
@@ -78,7 +78,7 @@ public class OmniKeySortableSerDe extends AbstractSerDe {
     public static final byte ONE = (byte) 1;
 
     List<String> columnNames;
-    List<TypeInof> columnTypes;
+    List<TypeInfo> columnTypes;
 
     TypeInfo rowTypeInfo;
     StructObjectInspector rowObjectInspector;
@@ -228,8 +228,7 @@ public class OmniKeySortableSerDe extends AbstractSerDe {
                         return r;
                     }
                     case LONG: {
-                        LongWritable r = reuse == null ? new LongWritable()
-                                : (LongWritable) reuse;
+                        LongWritable r = reuse == null ? new LongWritable() : (LongWritable) reuse;
                         r.set(deserializeLong(buffer, invert));
                         return r;
                     }
@@ -618,7 +617,7 @@ public class OmniKeySortableSerDe extends AbstractSerDe {
         return serializeBytesWritable;
     }
 
-    public static void writeByte(RandomAccessOutput buffer, byte b, boolean invert) {
+    public static void writeByte(ByteStream.RandomAccessOutput buffer, byte b, boolean invert) {
         if (invert) {
             b = (byte) (0xff ^ b);
         }
@@ -800,8 +799,7 @@ public class OmniKeySortableSerDe extends AbstractSerDe {
         writeByte(buffer, (byte) 0, invert);
     }
 
-    public static void serializeBytes(
-            ByteStream.Output buffer, byte[] data, int offset, int length, boolean invert) {
+    public static void serializeBytes(ByteStream.Output buffer, byte[] data, int offset, int length, boolean invert) {
         for (int i = offset; i < offset + length; i++) {
             if (data[i] == 0 || data[i] == 1) {
                 writeByte(buffer, (byte) 1, invert);
@@ -964,8 +962,9 @@ public class OmniKeySortableSerDe extends AbstractSerDe {
     }
 
     // A HiveDecimalWritable version.
-    public boolean[] getSortOrders() {
+    @Override
+    public SerDeStats getSerDeStats() {
         // no support for statistics
-        return columnSortOrderIsDesc;
+        return null;
     }
 }

@@ -8,7 +8,7 @@ import org.apache.hadoop.hive.ql.plan.ExprNodeColumnDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeConstantDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
-import org.apache.hadoop.hive.serde2.objectinsepector.ObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 
 import java.util.LinkedList;
 
@@ -18,7 +18,7 @@ public class LogicExpressionProcessor implements ExpressionProcessor {
         BaseExpression root = new CompareExpression("BINARY",
                 TypeUtils.convertHiveTypeToOmniType(node.getTypeInfo()),
                 operator);
-        LinkedList<ExprNodeDesc> list = new LinkedList<ExprNodeDesc>(node.getChildren());
+        LinkedList<ExprNodeDesc> list = new LinkedList<>(node.getChildren());
         int level = 1;
         int count = 0;
         int originSize = list.size();

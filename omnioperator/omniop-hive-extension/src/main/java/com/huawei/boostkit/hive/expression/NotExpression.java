@@ -1,6 +1,6 @@
 package com.huawei.boostkit.hive.expression;
 
-import nove.hetu.omniruntime.type.BooleanDataType;
+import nova.hetu.omniruntime.type.BooleanDataType;
 
 public class NotExpression extends UnaryExpression {
     private BaseExpression expr;

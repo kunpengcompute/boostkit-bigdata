@@ -39,6 +39,7 @@ public class FixedWidthColumnSerDe implements ColumnSerDe {
         ++offset;
         System.arraycopy(bytes, offset, vecSerdeBody.value, 0, length);
         System.arraycopy(EMPTY, 0, vecSerdeBody.value, length, columnTypeLen - length);
+        offset = offset + length;
         return offset;
     }
 

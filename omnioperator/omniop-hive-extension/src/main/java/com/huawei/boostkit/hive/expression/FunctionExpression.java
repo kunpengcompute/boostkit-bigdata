@@ -1,5 +1,7 @@
 package com.huawei.boostkit.hive.expression;
 
+import com.google.gson.annotations.SerializedName;
+
 public class FunctionExpression extends UnaryExpression {
     @SerializedName("function_name")
     private String functionName;

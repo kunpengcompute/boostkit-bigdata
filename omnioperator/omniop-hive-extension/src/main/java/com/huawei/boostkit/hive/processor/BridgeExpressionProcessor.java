@@ -7,14 +7,14 @@ import com.huawei.boostkit.hive.expression.TypeUtils;
 
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
-import org.apache.hadoop.hive.serde2.objectinsepector.ObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.typeinfo.BaseCharTypeInfo;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public class BrideExpressionProcessor implements ExpressionProcessor {
-    public static List<String> SUPPORT_BRIDGE_UDF = new ArrayList<>() {
+public class BridgeExpressionProcessor implements ExpressionProcessor {
+    public static List<String> SUPPORT_BRIDGE_UDF = new ArrayList<String>() {
         {
             add("UDFToString");
             add("UDFToDouble");
@@ -48,7 +48,7 @@ public class BrideExpressionProcessor implements ExpressionProcessor {
                 || node.getGenericUDF().getUdfName().equals("UDFToString")) {
             leaf = createNode(node.getChildren().get(0), inspector);
             CastFunctionExpression functionExpression = new CastFunctionExpression(
-                    TypeUtils.convertHiveTypeToOmniType(node.getTypeInfo(), null, null, null));
+                    TypeUtils.convertHiveTypeToOmniType(node.getTypeInfo()), null, null, null));
             return ExpressionUtils.optimizeCast(leaf, functionExpression);
         }
         return leaf;

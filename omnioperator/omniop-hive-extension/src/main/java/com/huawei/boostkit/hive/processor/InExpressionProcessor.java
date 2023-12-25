@@ -11,7 +11,7 @@ import org.apache.hadoop.hive.ql.plan.ExprNodeColumnDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeConstantDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
-import org.apache.hadoop.hive.serde2.objectinsepector.ObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 
 import java.util.List;
@@ -27,7 +27,7 @@ public class InExpressionProcessor implements ExpressionProcessor {
             if (child instanceof ExprNodeGenericFuncDesc) {
                 in.add(ExpressionUtils.build((ExprNodeGenericFuncDesc) child, inspector));
             } else if (child instanceof ExprNodeColumnDesc) {
-                in.add(ExpressionUtils.createNode(child, inspector));
+                in.add(ExpressionUtils.createReferenceNode(child, inspector));
             } else if (child instanceof ExprNodeConstantDesc) {
                 if (!child.getTypeInfo().equals(nodeColumnTypeInfo)) {
                     child = new ExprNodeConstantDesc(nodeColumnTypeInfo, ((ExprNodeConstantDesc) child).getValue());

@@ -6,7 +6,7 @@ import com.huawei.boostkit.hive.expression.ExpressionUtils;
 import com.huawei.boostkit.hive.expression.TypeUtils;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
-import org.apache.hadoop.hive.serde2.objectinsepector.ObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.typeinfo.DecimalTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 
@@ -19,9 +19,9 @@ public class CastExpressionProcessor implements ExpressionProcessor {
         TypeInfo typeInfo = node.getTypeInfo();
         Integer precision = null;
         Integer scale = null;
-        if (typeInfo instanceof DecimalTypeInfo) {
-            precision = ((DecimalTypeInfo) typeInfo).getPrecision();
-            scale = ((DecimalTypeInfo) typeInfo).getScale();
+        if (node.getTypeInfo() instanceof DecimalTypeInfo) {
+            precision = ((DecimalTypeInfo) node.getTypeInfo()).getPrecision();
+            scale = ((DecimalTypeInfo) node.getTypeInfo()).getScale();
         }
 
         int width = TypeUtils.getCharWidth(node);
@@ -30,8 +30,7 @@ public class CastExpressionProcessor implements ExpressionProcessor {
                 TypeUtils.convertHiveTypeToOmniType(typeInfo),
                 width,
                 precision,
-                scale
-        );
+                scale);
         for (ExprNodeDesc child : children) {
             if (child instanceof ExprNodeGenericFuncDesc) {
                 castFunctionExpression.add(ExpressionUtils.build((ExprNodeGenericFuncDesc) child, inspector));
