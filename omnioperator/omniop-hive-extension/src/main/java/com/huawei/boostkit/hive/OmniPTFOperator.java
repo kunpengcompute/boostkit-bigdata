@@ -42,7 +42,6 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.stream.Collectors;
 
 public class OmniPTFOperator extends OmniHiveOperator<OmniPTFDesc> implements Serializable {
     private static final long serialVersionUID = 1L;
@@ -251,7 +250,7 @@ public class OmniPTFOperator extends OmniHiveOperator<OmniPTFDesc> implements Se
     }
 
     /**
-     * Initialize the visitor to use the QueryDefDeserializer User the order
+     * Initialize the visitor to use the QueryDefDeserializer Use the order
      * defined in QueryDefWalker to visit the QueryDef
      *
      * @param hiveConf

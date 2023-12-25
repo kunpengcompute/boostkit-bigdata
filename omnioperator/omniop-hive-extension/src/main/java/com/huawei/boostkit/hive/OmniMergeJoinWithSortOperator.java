@@ -30,7 +30,7 @@ public class OmniMergeJoinWithSortOperator extends OmniMergeJoinOperator {
 
     @Override
     // If mergeJoinOperator has 3 tables, first join table0 and table1, and output
-    // all colunmns of table 0 and table1.
+    // all columns of table0 and table1.
     // Then use the output to join table2, and output required columns.
     protected void initializeOp(Configuration hconf) throws HiveException {
         super.initializeOp(hconf);

@@ -525,7 +525,7 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
         for (int i = 0; i < probeOutputfieldsName.size(); i++) {
             probeOutputCols[i] = probekeyColNameToId.get(probeOutputfieldsName.get(i));
         }
-        // if there is exprNodeConstantEvaluator in joinValues
+        // if there is ExprNodeConstantEvaluator in joinValues
         if (probeOutputfieldsName.size() < probeOutputCols.length) {
             probeOutputCols[probeOutputCols.length - 1] = probeInputfields.size() - 1;
         }
@@ -678,7 +678,7 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
     }
 
     private VecBatch reorderVecs(VecBatch vecBatch, int[] order, List<ObjectInspector>[] joinValuesObjectInspectors) {
-        // because omni operator's output order will always be [probeTable buildTable]
+        // because omni operator's output oder will always be [probeTable buildTable]
         // but hive is according to tag' order
         // so need to reorder output col
         // The property order means the current order of output cols of tables

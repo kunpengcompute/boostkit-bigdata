@@ -34,7 +34,7 @@ public class OmniMergeJoinOperator extends OmniJoinOperator {
     }
 
     @Override
-    // If mergeJoinOperator has 3 tables, first join table0 and table1, and output
+    // If mergeJoinOperator has 3 tables, first join table0 and table1 , and output
     // all columns of table0 and table1.
     // Then use the output to join table2, and output required columns.
     protected void initializeOp(Configuration hconf) throws HiveException {

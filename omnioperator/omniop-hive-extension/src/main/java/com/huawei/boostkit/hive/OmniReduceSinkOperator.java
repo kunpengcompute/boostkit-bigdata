@@ -42,7 +42,6 @@ import org.apache.hadoop.hive.common.type.Date;
 import org.apache.hadoop.hive.common.type.HiveDecimal;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.CompilationOpContext;
-import org.apache.hadoop.hive.ql.exec.ExprNodeColumnEvaluator;
 import org.apache.hadoop.hive.ql.exec.ExprNodeEvaluator;
 import org.apache.hadoop.hive.ql.exec.ExprNodeEvaluatorFactory;
 import org.apache.hadoop.hive.ql.exec.Operator;
@@ -129,14 +128,14 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
     protected transient ExprNodeEvaluator[] keyEval;
 
     /**
-     * The evaluators for the value columns. value columns are padded to reducer
-     * int the "value".
+     * The evaluators for the value columns. Value columns are passed to reducer
+     * in the "value".
      */
     protected transient ExprNodeEvaluator[] valueEval;
 
     /**
      * The evaluators for the partition columns (CLUSTER BY or DISTRIBUTE BY in
-     * Hive language).Partition columns decide the reducer that the current row
+     * Hive language). Partition columns decide the reducer that the current row
      * goes to. Partition columns are not passed to reducer.
      */
     protected transient ExprNodeEvaluator[] partitionEval;
@@ -175,13 +174,13 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
      * If there is no distinct expression, cachedKeys is simply like this.
      * cachedKeys[0] = [col0][col1]
      * <p>
-     * with two distict expression, union(tag : key) isattatched for each distinct
+     * with two distict expression, union(tag : key) is attatched for each distinct
      * expression
      * cachedKeys[0] = [col0][col1][0:dist1]
      * cachedKeys[1] = [col0][col1][1:dist2]
      * <p>
-     * in this case, child GBY evaluates distinct values with expression like
-     * KEY.col:0.dist1
+     * in this case, child GBY evaluates distict values with expression like
+     * KEY.col2:0.dist1
      * see {@link org.apache.hadoop.hive.ql.exec.ExprNodeColumnEvaluator}
      */
     // TODO: we only ever use one row of these at a time. Why do we need to cache
@@ -503,8 +502,8 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
             if (firstRow) {
                 firstRow = false;
                 // TODO: this is fishy - we init object inspectors based on first tag. We
-                // should either init for each tag, or if row Inspector doesn't really
-                // matter, then wen can create this in ctor and get rid of firstRow
+                // should either init for each tag, or if rowInspector doesn't really
+                // matter, then we can create this in ctor and get rid of firstRow
                 List<String> fileNames = new ArrayList<>();
                 List<ObjectInspector> objectInspectors = new ArrayList<>();
                 if (rowInspector instanceof StandardStructObjectInspector) {
