@@ -3,7 +3,7 @@ package com.huawei.boostkit.hive.reader;
 
 import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.io.orc.OrcFile;
-import org.apache.hadoop.hive.ql.io.orc.OrcInputForamt;
+import org.apache.hadoop.hive.ql.io.orc.OrcInputFormat;
 import org.apache.hadoop.hive.ql.io.orc.OrcSplit;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapred.FileSplit;
@@ -37,5 +37,4 @@ public class OmniOrcInputFormat implements InputFormat<NullWritable, VecBatchWra
             return new OmniOrcRecordReader(conf, (FileSplit) inputSplit);
         }
     }
-
 }

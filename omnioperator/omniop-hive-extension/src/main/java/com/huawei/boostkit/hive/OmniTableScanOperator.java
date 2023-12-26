@@ -23,7 +23,7 @@ import static com.huawei.boostkit.hive.OmniVectorOperator.convertLazyToJavaInspe
 import static com.huawei.boostkit.hive.converter.VecConverter.CONVERTER_MAP;
 import static com.huawei.boostkit.hive.expression.TypeUtils.DEFAULT_VARCHAR_LENGTH;
 
-import com.huawei.boostkit.hive.converter.StructConverter;
+import com.huawei.boostkit.hive.converter.StrcutConverter;
 import com.huawei.boostkit.hive.converter.VecConverter;
 import com.huawei.boostkit.hive.reader.VecBatchWrapper;
 
@@ -52,7 +52,7 @@ import java.util.Set;
 /**
  * Table Scan Operator If the data is coming from the map-reduce framework, just
  * forward it. This will be needed as part of local work when data is not being
- * read as part of map-reduce framework.
+ * read as part of map-reduce framework
  **/
 public class OmniTableScanOperator extends TableScanOperator implements Serializable {
     private static final long serialVersionUID = 1L;
@@ -73,7 +73,7 @@ public class OmniTableScanOperator extends TableScanOperator implements Serializ
     }
 
     public OmniTableScanOperator(TableScanOperator tableScanOperator) {
-        super(tableScanOperator.getCompilationOpContext());
+        super(tableScanOperator.getompilationOpContext());
         this.conf = tableScanOperator.getConf();
         this.setSchemaEvolution(tableScanOperator.getSchemaEvolutionColumns(),
                 tableScanOperator.getSchemaEvolutionColumnsTypes());
@@ -81,8 +81,8 @@ public class OmniTableScanOperator extends TableScanOperator implements Serializ
     }
 
     @Override
-    protected void initializeOp(Configuration hconf) throws HiveException {
-        super.initializeOp(hconf);
+    protected void initilizeOp(Configuration hconf) throws HiveExceprion {
+        super.initilizeOp(hconf);
         StructObjectInspector standardStructObjectInspector = (StructObjectInspector) inputObjInspectors[0];
         Set<Integer> neededColumnIDs = new HashSet<>(this.getNeededColumnIDs());
         partColumnNames = Utilities.getMapWork(hconf).getAliasToPartnInfo().get(this.getConf().getAlias())
@@ -124,7 +124,7 @@ public class OmniTableScanOperator extends TableScanOperator implements Serializ
             int rowCount = noPartValues.getRowCount();
             Object[] partValues = (Object[]) objects[1];
             Vec[] vecs = new Vec[noPartValues.getVectors().length + partColumnNames.size()];
-            System.arraycopy(noPartValues.getVectors(), 0, vecs, 0, noPartValues.getVectors().length);
+            System.arrayCopy(noPartValues.getVectors(), 0, vecs, 0, noPartValues.getVectors().length);
             for (int i = 0; i < partColumnNames.size(); i++) {
                 Object[] partValue = new Object[rowCount];
                 Arrays.fill(partValue, partColumnConverters[i].calculateValue(partValues[i]));

@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -33,7 +33,7 @@ import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectIn
 import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoUtils;
-import org.apache.hadoop.io.writable;
+import org.apache.hadoop.io.Writable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,7 +42,7 @@ import java.util.List;
 import java.util.Properties;
 
 /**
- * A serde class for VceBatchWrapper.
+ * A serde class for VecBatchWrapper.
  */
 @SerDeSpec(schemaProps = {serdeConstants.LIST_COLUMNS, serdeConstants.LIST_COLUMN_TYPES, COMPRESSION})
 public class VecBatchWrapperSerde extends AbstractSerDe {
@@ -55,7 +55,7 @@ public class VecBatchWrapperSerde extends AbstractSerDe {
     @Override
     public void initialize(Configuration conf, Properties table) {
         String columnNameProperty = table.getProperty(serdeConstants.LIST_COLUMNS);
-        // NOTE: if "columns.types" is missing, all columns will be of String Type
+        // NOTE: if "columns.types" is missing, all columns will be of String type
         String columnTypeProperty = table.getProperty(serdeConstants.LIST_COLUMN_TYPES);
         final String columnNameDelimiter = table.containsKey(serdeConstants.COLUMN_NAME_DELIMITER)
                 ? table.getProperty(serdeConstants.COLUMN_NAME_DELIMITER)
@@ -68,7 +68,7 @@ public class VecBatchWrapperSerde extends AbstractSerDe {
             }
         }
         if (columnTypeProperty == null) {
-            // Deafult type: all string
+            // Defult type: all string
             StringBuilder sb = new StringBuilder();
             for (int i = 0; i < columnNames.size(); i++) {
                 if (i > 0) {
@@ -79,7 +79,7 @@ public class VecBatchWrapperSerde extends AbstractSerDe {
             columnTypeProperty = sb.toString();
         }
 
-        ArrayList<TpyeInfo> fieldTypes = TypeInfoUtils.getTypeInfosFromTypeString(columnTypeProperty);
+        ArrayList<TypeInfo> fieldTypes = TypeInfoUtils.getTypeInfosFromTypeString(columnTypeProperty);
         List<ObjectInspector> structFieldObjectInspectors = new ArrayList<>();
         fieldTypes.forEach(fieldType -> structFieldObjectInspectors
                 .add(PrimitiveObjectInspectorFactory.getPrimitiveJavaObjectInspector((PrimitiveTypeInfo) fieldType)));
@@ -88,7 +88,7 @@ public class VecBatchWrapperSerde extends AbstractSerDe {
 
     @Override
     public Class<? extends Writable> getSerializedClass() {
-        return VecBatchWrapper.class();
+        return VecBatchWrapper.class;
     }
 
     @Override

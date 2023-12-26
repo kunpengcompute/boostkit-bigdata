@@ -50,7 +50,7 @@ public class OmniVectorWithSortOperator extends OmniHiveOperator<OmniVectorDesc>
 
     private transient StructObjectInspector[] soi;
     private transient List<StructField>[] fields;
-    private transient int[] keyFieldNum;
+    private transient int[] keyFiledNum;
 
     private transient OmniSortOperatorFactory[] sortOperatorFactories;
 
@@ -73,14 +73,14 @@ public class OmniVectorWithSortOperator extends OmniHiveOperator<OmniVectorDesc>
     protected void initializeOp(Configuration hconf) throws HiveException {
         super.initializeOp(hconf);
         source = ((TezContext) MapredContext.get()).getRecordSources();
-        vecBufferCaches = new VecBufferCache[inputObjectInspectors.length];
-        flatFields = new List[inputObjectInspectors.length];
-        fetchDone = new boolean[inputObjectInspectors.length];
-        rowCount = new int[inputObjectInspectors.length];
-        soi = new StructObjectInspector[inputObjectInspectors.length];
-        fields = new List[inputObjectInspectors.length];
-        keyFieldNum = new int[inputObjectInspectors.length];
-        outputs = new Iterator[inputObjectInspectors.length];
+        vecBufferCaches = new VecBufferCache[inputObjInspectors.length];
+        flatFields = new List[inputObjInspectors.length];
+        fetchDone = new boolean[inputObjInspectors.length];
+        rowCount = new int[inputObjInspectors.length];
+        soi = new StructObjectInspector[inputObjInspectors.length];
+        fields = new List[inputObjInspectors.length];
+        keyFiledNum = new int[inputObjInspectors.length];
+        outputs = new Iterator[inputObjInspectors.length];
 
         for (int i = 0; i < inputObjectInspectors.length; i++) {
             soi[i] = (StructObjectInspector) inputObjectInspectors[i];
@@ -88,7 +88,7 @@ public class OmniVectorWithSortOperator extends OmniHiveOperator<OmniVectorDesc>
         for (int i = 0; i < soi.length; i++) {
             fields[i] = soi[i].getAllStructFieldRefs().stream().map(field -> (StructField) field)
                     .collect(Collectors.toList());
-            keyFieldNum[i] = ((StructObjectInspector) fields[i].get(0).getFieldObjectInspector())
+            keyFiledNum[i] = ((StructObjectInspector) fields[i].get(0).getFieldObjectInspector())
                     .getAllStructFieldRefs().size();
             flatFields[i] = fields[i].stream.flatMap(
                     field -> ((StructObjectInspector) field.getFieldObjectInspector()).getAllStructFieldRefs().stream())
@@ -99,33 +99,33 @@ public class OmniVectorWithSortOperator extends OmniHiveOperator<OmniVectorDesc>
             vecBufferCaches[i] = new VecBufferCache(flatFields[i].size(), typeInfos);
         }
         List<String> fieldNames = new ArrayList<>();
-        for (int i = 0; i < inputObjectInspectors.length; i++) {
+        for (int i = 0; i < inputObjInspectors.length; i++) {
             fieldNames.add(String.valueOf(i));
         }
-        outputObjectInspector = ObjectInspectorFactory.getStandardStructObjectInspector(fieldNames, Array.asList(soi));
+        outputObjInspector = ObjectInspectorFactory.getStandardStructObjectInspector(fieldNames, Arrays.asList(soi));
         generateSortOperator();
         posBigTable = ((OmniMergeJoinOperator) childOperators.get(0)).getPosBigTable();
         allFetchDone = false;
     }
 
     private void generateSortOperator() {
-        sortOperatorFactories = new OmniSortOperatorFactory[inputObjectInspectors.length];
-        sortOperators = new OmniOperator[inputObjectInspectors.length];
-        for (int i = 0; i < inputObjectInspectors.length; i++) {
+        sortOperatorFactories = new OmniSortOperatorFactory[inputObjInspectors.length];
+        sortOperators = new OmniOperator[inputObjInspectors.length];
+        for (int i = 0; i < inputObjInspectors.length; i++) {
             DataType[] inputTypes = new DataType[flatFields[i].size()];
             int[] outputCols = new int[flatFields[i].size()];
             for (int j = 0; j < flatFields[i].size(); j++) {
                 PrimitiveTypeInfo typeInfo = ((PrimitiveObjectInspector) flatFields[i].get(j).getFieldObjectInspector())
                         .getTypeInfo();
-                inputTypes = TypeUtils.buildInputDataType(typeInfo);
+                inputTypes[j] = TypeUtils.buildInputDataType(typeInfo);
                 outputCols[j] = j;
             }
-            String[] sortColumns = new String[keyFieldNum[i]];
-            for (int j = 0; j < keyFieldNum[i]; j++) {
+            String[] sortColumns = new String[keyFiledNum[i]];
+            for (int j = 0; j < keyFiledNum[i]; j++) {
                 sortColumns[j] = "#" + j;
             }
-            int[] sortAscendings = new int[keyFieldNum[i]];
-            int[] sortNullFirsts = new int[keyFieldNum[i]];
+            int[] sortAscendings = new int[keyFiledNum[i]];
+            int[] sortNullFirsts = new int[keyFiledNum[i]];
             Arrays.fill(sortAscendings, 1);
             Arrays.fill(sortNullFirsts, 1);
             sortOperatorFactories[i] = new OmniSortOperatorFactory(inputTypes, outputCols, sortColumns, sortAscendings,
@@ -152,7 +152,7 @@ public class OmniVectorWithSortOperator extends OmniHiveOperator<OmniVectorDesc>
             if (vecSerdeBodies == null) {
                 continue;
             }
-            vecBufferCaches[tag].addVecSerdeBody(vecSerdeBodies, rowCount[tag], i == 1 ? keyFieldNum[tag] : 0);
+            vecBufferCaches[tag].addVecSerdeBody(vecSerdeBodies, rowCount[tag], i == 1 ? keyFiledNum[tag] : 0);
         }
         rowCount[tag]++;
         if (rowCount[tag] < BATCH) {

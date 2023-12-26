@@ -9,7 +9,7 @@ import com.huawei.boostkit.hive.cache.VecBufferCache;
 import com.huawei.boostkit.hive.cache.VectorCache;
 import com.huawei.boostkit.hive.converter.StructConverter;
 import com.huawei.boostkit.hive.converter.VecConverter;
-import com.huawei.boostkit.hive.shuffle.OmniVecBatchSerde;
+import com.huawei.boostkit.hive.shuffle.OmniVecBatchSerDe;
 import com.huawei.boostkit.hive.shuffle.VecSerdeBody;
 
 import nova.hetu.omniruntime.vector.Vec;
@@ -25,7 +25,7 @@ import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.plan.ReduceWork;
 import org.apache.hadoop.hive.ql.plan.api.OperatorType;
 import org.apache.hadoop.hive.serde2.lazy.objectinspector.primitive.LazyObjectInspectorParameters;
-import org.apache.hadoop.hive.serde2.lazy.objectinspector.primitive.LazyObjectInspextorParametersImpl;
+import org.apache.hadoop.hive.serde2.lazy.objectinspector.primitive.LazyObjectInspectorParametersImpl;
 import org.apache.hadoop.hive.serde2.lazy.objectinspector.primitive.LazyPrimitiveObjectInspectorFactory;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorFactory;
@@ -43,7 +43,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-public class OmniVectorOperator extends OmniHiveOperator<OmniVcetorDesc> {
+public class OmniVectorOperator extends OmniHiveOperator<OmniVectorDesc> {
     private boolean isToVector;
 
     private transient VecConverter[][] converters;
@@ -85,8 +85,8 @@ public class OmniVectorOperator extends OmniHiveOperator<OmniVcetorDesc> {
     }
 
     @Override
-    protected void initilizeOp(Configuration hconf) throws HiveException {
-        super.initilizeOp(hconf);
+    protected void initializeOp(Configuration hconf) throws HiveException {
+        super.initializeOp(hconf);
         if (parentOperators.isEmpty()) {
             isKeyValue = true;
         }
@@ -109,7 +109,7 @@ public class OmniVectorOperator extends OmniHiveOperator<OmniVcetorDesc> {
         }
         ReduceWork reduceWork = Utilities.getReduceWork(hconf);
         if (reduceWork != null && reduceWork.getKeyDesc().getProperties().get(SERIALIZATION_LIB)
-                .euqals(OmniVecBatchSerDe.class.getName())) {
+                .equals(OmniVecBatchSerDe.class.getName())) {
             isVecBatchSerDe = true;
         }
         for (int i = 0; i < soi.length; i++) {
@@ -123,7 +123,7 @@ public class OmniVectorOperator extends OmniHiveOperator<OmniVcetorDesc> {
                 } else {
                     return new StructConverter((StructObjectInspector) field.getFieldObjectInspector());
                 }
-            }).toArray(VecConverterp[]::new);
+            }).toArray(VecConverter[]::new);
             if (isKeyValue) {
                 keyFiledNum[i] = ((StructObjectInspector) fields[i].get(0).getFieldObjectInspector())
                         .getAllStructFieldRefs().size();
@@ -160,7 +160,7 @@ public class OmniVectorOperator extends OmniHiveOperator<OmniVcetorDesc> {
         }
     }
 
-    public static StandardStructObjectInspector convertLazyToJavaInspector (
+    public static StandardStructObjectInspector convertLazyToJavaInspector(
             List<? extends StructField> allStructFieldRefs) {
         List<String> structFieldNames = new ArrayList<>();
         List<ObjectInspector> structFieldObjectInspectors = new ArrayList<>();
@@ -175,16 +175,16 @@ public class OmniVectorOperator extends OmniHiveOperator<OmniVcetorDesc> {
                 case STRING:
                     LazyObjectInspectorParameters lazyParam = new LazyObjectInspectorParametersImpl(false, (byte) 0,
                             false, null, null, null);
-                    structFieldObjectInspectors.add(LazyPrimitiveInspectorFactory.getLazyObjectInspector(
+                    structFieldObjectInspectors.add(LazyPrimitiveObjectInspectorFactory.getLazyObjectInspector(
                             ((PrimitiveObjectInspector) field.getFieldObjectInspector()).getTypeInfo(), lazyParam));
                     break;
                 case DECIMAL:
-                    structFieldObjectInspectors.add(PrimitiveInspectorFactory.getPrimitiveWritableObjectInspector(
-                            ((PrimitiveObjectInspector) field.getFieldObjectInspector()).getTyprInfo()));
+                    structFieldObjectInspectors.add(PrimitiveObjectInspectorFactory.getPrimitiveWritableObjectInspector(
+                            ((PrimitiveObjectInspector) field.getFieldObjectInspector()).getTypeInfo()));
                     break;
                 default:
-                    structFieldObjectInspectors.add(PrimitiveInspectorFactory.getPrimitiveJavaObjectInspector(
-                            ((PrimitiveObjectInspector) field.getFieldObjectInspector()).getTyprInfo()));
+                    structFieldObjectInspectors.add(PrimitiveObjectInspectorFactory.getPrimitiveJavaObjectInspector(
+                            ((PrimitiveObjectInspector) field.getFieldObjectInspector()).getTypeInfo()));
             }
         });
         return ObjectInspectorFactory.getStandardStructObjectInspector(structFieldNames, structFieldObjectInspectors);
@@ -219,7 +219,7 @@ public class OmniVectorOperator extends OmniHiveOperator<OmniVcetorDesc> {
             VecSerdeBody[] key = (VecSerdeBody[]) vecSerdeBodies.get(0);
             VecSerdeBody[] value = (VecSerdeBody[]) vecSerdeBodies.get(1);
             dealVecBatchSerDeData(key, tag, 0);
-            dealVecBatchSerDeData(value, tag, key != null > key.length : 0);
+            dealVecBatchSerDeData(value, tag, key != null ? key.length : 0);
         } else {
             for (int i = 0; i < fields[tag].size(); i++) {
                 if (isKeyValue) {
@@ -265,11 +265,11 @@ public class OmniVectorOperator extends OmniHiveOperator<OmniVcetorDesc> {
             for (int i = 0; i < vecs.length; i++) {
                 ObjectInspector fieldObjectInspector = outputFields.get(i).getFieldObjectInspector();
                 if (fieldObjectInspector instanceof PrimitiveObjectInspector) {
-                    output.add(convertes[tag][i].fromOmniVec(vecs[i], j,
+                    output.add(converters[tag][i].fromOmniVec(vecs[i], j,
                             ((PrimitiveObjectInspector) outputFields.get(i).getFieldObjectInspector())));
                 }
             }
-            forward(output.toArray(). null);
+            forward(output.toArray(), null);
         }
         vecBatchFromRow.releaseAllVectors();
         vecBatchFromRow.close();

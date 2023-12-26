@@ -56,14 +56,14 @@ public class OmniOrcRecordReader implements RecordReader<NullWritable, VecBatchW
         options.schema(requiredSchema);
         options.include(null);
         recordReader = new OrcColumnarBatchJniReader();
-        recordReader.initializeReaderJava(split.toString(), readerOptions);
+        recordReader.initializeReaderJava(split.getPath().toString(), readerOptions);
         recordReader.initializeRecordReaderJava(options);
         recordReader.initBatchJava(BATCH);
         vecs = new Vec[included.size()];
         this.offset = split.getStart();
         this.length = split.getLength();
         this.stats = new SerDeStats();
-        Utilities.getMapWork(conf).getAliasToWork().values.forEach(op -> {
+        Utilities.getMapWork(conf).getAliasToWork().values().forEach(op -> {
             if (op.getType().equals(OperatorType.TABLESCAN)) {
                 this.tableScanOp = op;
             }
@@ -76,18 +76,18 @@ public class OmniOrcRecordReader implements RecordReader<NullWritable, VecBatchW
     }
 
     private org.apache.orc.Reader.Options buildOptions(Configuration conf, long start, long length) {
-        org.apache.orc.Reader.Options options = (new org.apache.orc.Reader.Options(conf)).range(start, length)
+        org.apache.orc.Reader.Options options = new (org.apache.orc.Reader.Options(conf)).range(start, length)
                 .useZeroCopy(OrcConf.USE_ZEROCOPY.getBoolean(conf))
                 .skipCorruptRecords(OrcConf.SKIP_CORRUPT_DATA.getBoolean(conf))
                 .tolerateMissingSchema(OrcConf.TOLERATE_MISSING_SCHEMA.getBoolean(conf));
-        String kryoSarg = OrcConf.KYRO_SARG.getString(conf);
-        String sargColumns = OrcConf.SARG_SOLUMNS.getString(conf);
+        String kryoSarg = OrcConf.KRYO_SARG.getString(conf);
+        String sargColumns = OrcConf.SARG_COLUMNS.getString(conf);
         if (kryoSarg != null && sargColumns != null) {
             byte[] sargBytes = Base64.decodeBase64(kryoSarg);
             SearchArgument sarg = (SearchArgument) (new Kryo()).readObject(new Input(sargBytes),
                     SearchArgumentImpl.class);
             options.searchArgument(sarg, sargColumns.split(","));
-            srag.getExpression().toString();
+            sarg.getExpression().toString();
         }
         return options;
     }

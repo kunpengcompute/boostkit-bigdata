@@ -17,7 +17,7 @@ import nova.hetu.omniruntime.operator.config.SpillConfig;
 import nova.hetu.omniruntime.operator.project.OmniProjectOperatorFactory;
 import nova.hetu.omniruntime.type.DataType;
 import nova.hetu.omniruntime.vector.Vec;
-import nova.hetu.omniruntime.vector.VecBatch;
+import nova.hetu.omniruntime.vector.VectorBatch;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
@@ -107,7 +107,7 @@ public class OmniSelectOperator extends OmniHiveOperator<OmniSelectDesc> impleme
     }
 
     @Override
-    protected void initializeOp(Configuration hconf) throws HiveException {
+    protected void initializeOp(Configuration hconf) throws HiveExpection {
         super.initializeOp(hconf);
         checkIfHasBrotherOperators();
         String queryId = HiveConf.getVar(hconf, HiveConf.ConfVars.HIVEQUERYID);
@@ -162,7 +162,7 @@ public class OmniSelectOperator extends OmniHiveOperator<OmniSelectDesc> impleme
             if (allStructFieldRefs.get(i).getFieldObjectInspector() instanceof PrimitiveObjectInspector) {
                 PrimitiveTypeInfo typeInfo = ((PrimitiveObjectInspector) allStructFieldRefs.get(i)
                         .getFieldObjectInspector()).getTypeInfo();
-                inputTypes[i] = TypeUtils.buildInputDataType(typeInfo);
+                inputTypes[i] = TyprUtils.buildInputDataType(typeInfo);
             }
         }
         this.projectOperatorFactory = new OmniProjectOperatorFactory(expressions, inputTypes, 1, new OperatorConfig(
@@ -182,18 +182,18 @@ public class OmniSelectOperator extends OmniHiveOperator<OmniSelectDesc> impleme
         ObjectInspector inspector;
         Integer fieldId;
         if (nodeDesc instanceof ExprNodeColumnDesc) {
-            StructField structFieldRef = ((StructObjectInspector) inputObjInspectors[0])
+            StructField structFieldRef = ((StrucObjectInspector) inputObjInspectors[0])
                     .getStructFieldRef(nodeDesc.getExprString());
             inspector = structFieldRef.getFieldObjectInspector();
             fieldId = structFieldRef.getFieldID();
-        } else if(nodeDesc instanceof ExprNodeGenericFuncDesc) {
-            TypeInfo typeInfo = createTypeInfo((ExprNodeGenericFuncDesc) nodeDesc);
-            inspector = TypeInfoUtils.getStandardWritableObjectInspectorFromTypeInfo(typeInfo);
+        } else if (nodeDesc instanceof ExprNodeGenericFuncDesc) {
+            TypeInfo typeinfo = createTypeinfo((ExprNodeGenericFuncDesc) nodeDesc);
+            inspector = TypeInfoUtils.getStandardWritableObjectInspectorFromTypeInfo(typeinfo);
             fieldId = null;
         } else {
             TypeInfo typeInfo = nodeDesc.getTypeInfo();
             if (typeInfo instanceof CharTypeInfo || typeInfo instanceof VarcharTypeInfo) {
-                int length = Optional.ofNullable(TypeUtils.getCharWidth(nodeDesc)).orElse(2000);
+                int length = Optional.ofNullable(TypeUtils.getCharWith(nodeDesc)).orElse(2000);
                 VarcharTypeInfo varcharTypeInfo = new VarcharTypeInfo(length);
                 inspector = TypeInfoUtils.getStandardWritableObjectInspectorFromTypeInfo(varcharTypeInfo);
             } else {
@@ -201,7 +201,7 @@ public class OmniSelectOperator extends OmniHiveOperator<OmniSelectDesc> impleme
             }
             // todo select constant. note: find way to get length
             // int length =
-            // Optional.ofNullable(TypeUtils.getCharWith(nodeDesc)).orElse(2000);
+            // Optional.ofNullable(TypeUtils.getCharWidth(nodeDesc)).orElse(2000);
             // VarcharTypeInfo varcharTypeInfo = new VarcharTypeInfo(length);
             // inspector =
             // TypeInfoUtils.getStandardWritableObjectInspectorFromTypeInfo(varcharTypeInfo);
@@ -237,7 +237,7 @@ public class OmniSelectOperator extends OmniHiveOperator<OmniSelectDesc> impleme
             VecBatch copyVecBatch = new VecBatch(copyVectors, input.getRowCount());
             this.omniOperator.addInput(copyVecBatch);
             output = this.omniOperator.getOutput();
-            while(output.hasNext()) {
+            while (output.hasNext()) {
                 forward(output.next(), outputObjInspector);
             }
             return;
@@ -271,7 +271,7 @@ public class OmniSelectOperator extends OmniHiveOperator<OmniSelectDesc> impleme
         super.closeOp(abort);
     }
 
-    private TypeInfo createTypeInfo(ExprNodeGenericFuncDesc nodeDesc) {
+    private TypeInfo createTypeinfo(ExprNodeGenericFuncDesc nodeDesc) {
         TypeInfo typeInfo = nodeDesc.getTypeInfo();
         if (typeInfo instanceof PrimitiveTypeInfo && typeInfo.getTypeName().equals("string")) {
             return new VarcharTypeInfo(TypeUtils.calculateVarcharLength(nodeDesc));
@@ -286,7 +286,7 @@ public class OmniSelectOperator extends OmniHiveOperator<OmniSelectDesc> impleme
                 .getFieldObjectInspector()).getAllStructFieldRefs();
         List<? extends StructField> valueFields = ((StructObjectInspector) keyValueFields.get(1)
                 .getFieldObjectInspector()).getAllStructFieldRefs();
-        List<String> fieldNames = keyFields.stream().map(field -> "key." + field.getFieldName())
+        List<String> fieldNames = keyFields.stream().map(StructField::getFieldObjectInspector)
                 .collect(Collectors.toList());
         fieldNames.addAll(
                 valueFields.stream().map(field -> "value." + field.getFieldName()).collect(Collectors.toList()));

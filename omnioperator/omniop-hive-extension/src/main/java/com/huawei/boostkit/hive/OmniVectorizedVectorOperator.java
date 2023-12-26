@@ -1,7 +1,7 @@
 
 package com.huawei.boostkit.hive;
 
-import static com.huawei.boostkit.hive.OmniExecuteWithHookContext.OMNI_OPERATOR;
+import static com.huawei.boostkit.hive.OmniExceuteWithHookContext.OMNI_OPERATOR;
 import static com.huawei.boostkit.hive.OmniVectorOperator.convertLazyToJavaInspector;
 import static com.huawei.boostkit.hive.cache.VectorCache.BATCH;
 import static com.huawei.boostkit.hive.converter.Decimal64VecConverter.isConvertedDecimal64;
@@ -103,7 +103,7 @@ public class OmniVectorizedVectorOperator extends OmniHiveOperator<OmniVectorDes
 
     @Override
     protected void initializeOp(Configuration hconf) throws HiveException {
-        if (OMNI_OPERATOR.contains(OperatorType.REDUCESINK) && parentOperators.isEmpty()) {
+        if (OMNI_VARCHAR.contains(OperatorType.REDUCESINK) && parentOperators.isEmpty()) {
             rebuildVectoriedInspector();
             ReduceWork reduceWork = Utilities.getReduceWork(hconf);
             if (reduceWork != null && reduceWork.getKeyDesc().getProperties().get(SERIALIZATION_LIB)
@@ -115,15 +115,15 @@ public class OmniVectorizedVectorOperator extends OmniHiveOperator<OmniVectorDes
         if (isToVector && !OMNI_OPERATOR.contains(OperatorType.TABLESCAN) && !parentOperators.isEmpty()
                 && (parentOperators.get(0).getType().equals(OperatorType.TABLESCAN)
                         || parentOperators.get(0).getType().equals(OperatorType.FILTER)
-                                && parentOperators.get(0).getParentOperators.get(0).getType() != null
-                                && parentOperators.get(0).getParentOperators.get(0).getType()
+                                && parentOperators.get(0).getParentOperators().get(0).getType() != null
+                                && parentOperators.get(0).getParentOperators().get(0).getType()
                                         .equals(OperatorType.TABLESCAN))) {
             rebuildTableScanInspector(hconf);
         }
         StructObjectInspector bigTableInspector;
         if (parentOperators.isEmpty() && childOperators.get(0).getType().equals(OperatorType.MAPJOIN)
                 && ((MapJoinDesc) childOperators.get(0).getConf()).isDynamicPartitionHashJoin()) {
-            rebuildMapJoinInspector();
+            rebuildMapjoinInspector();
             int posBigTable = ((MapJoinDesc) childOperators.get(0).getConf()).getPosBigTable();
             bigTableInspector = (StructObjectInspector) inputObjInspectors[posBigTable];
         } else {
@@ -137,13 +137,13 @@ public class OmniVectorizedVectorOperator extends OmniHiveOperator<OmniVectorDes
         projectedColumns = new ArrayList<>();
         rbCtx = getVectorizedRowBatchCtx(hconf);
         vectorizedRowBatch = rbCtx.createVectorizedRowBatch();
-        for (int i = 0; i < vectorizationContext.getProjectionColumnNames().size(); i++) {
-            if (!vectorizationContext.getProjectionColumnNames().get(i).equals("ROW__ID")
-                    && vectorizedRowBatch.cols[vectorizationContext.getProjectedColumns().get(i)] != null) {
-                projectedColumns.add(vectorizationContext.getProjectedColumns().get(i));
+        for (int i = 0; i < vectorizationContext.getProjectionColumns().size(); i++) {
+            if (!vectorizationContext.getProjectionColumns().get(i).equals("ROW__ID")
+                    && vectorizedRowBatch.cols[vectorizationContext.getProjectionColumns().get(i)] != null) {
+                projectedColumns.add(vectorizationContext.getProjectionColumns().get(i));
             }
         }
-        converters = new VecConverter[projectedColumns.size()];
+        converters = new VecConverter[projectedColumns.szie()];
         projectedColumnInspectors = new PrimitiveObjectInspector[projectedColumns.size()];
         vectorizedRowBatch.projectionSize = projectedColumns.size();
         vectorizedRowBatch.projectedColumns = projectedColumns.stream().mapToInt(Integer::valueOf).toArray();
@@ -169,7 +169,7 @@ public class OmniVectorizedVectorOperator extends OmniHiveOperator<OmniVectorDes
         }
     }
 
-    private void rebuildMapJoinInspector() throws HiveException {
+    private void rebuildMapjoinInspector() throws HiveException {
         int posBigTable = ((MapJoinDesc) childOperators.get(0).getConf()).getPosBigTable();
         ObjectInspector fieldObjectInspector = ((StructObjectInspector) inputObjInspectors[posBigTable])
                 .getAllStructFieldRefs().get(0).getFieldObjectInspector();
@@ -195,7 +195,7 @@ public class OmniVectorizedVectorOperator extends OmniHiveOperator<OmniVectorDes
             fieldNames.add(String.valueOf(i));
         }
         outputObjInspector = ObjectInspectorFactory.getStandardStructObjectInspector(fieldNames,
-                Arrays.asList(inputObjInspectors));
+                Array.asList(inputObjInspectors));
     }
 
     private void rebuildTableScanInspector(Configuration hconf) {
@@ -237,7 +237,7 @@ public class OmniVectorizedVectorOperator extends OmniHiveOperator<OmniVectorDes
     }
 
     private Object getColumnCache(StructField field) {
-        PrimitiveTypeInfo primitiveTypeInfo = ((PrimitiveObjectInspector) field.getFieldObjectInspector())
+        PrimitiveTypeInfo primitiveTypeInfo = ((PrimitiveTypeInfo) field.getFieldObjectInspector())
                 .getTypeInfo();
         if (isConvertedDecimal64(field.getFieldName(), vectorizationContext)) {
             return new LongColumnCache();
@@ -297,11 +297,11 @@ public class OmniVectorizedVectorOperator extends OmniHiveOperator<OmniVectorDes
                 }
                 return new VectorizedRowBatchCtx(groupByDesc.getOutputColumnNames().toArray(new String[0]),
                         parentContext.getInitialTypeInfos(), rowDataTypePhysicalVariations, /* dataColumnNums */ null,
-                        /* partitionColumnCount */ 0, /* virtualColumnCount */ 0, /* neededVirtualColumns */null,
+                        /* partitionColumnCount */ 0, /* virtualColumnCount */ 0, /* neededVirtualColumns */ null,
                         parentContext.getScratchColumnTypeNames(),
                         parentContext.getScratchDataTypePhysicalVariations());
             } else if (parent instanceof VectorMapJoinBaseOperator
-                    || (parent instanceof OmniMapJoinOperator && ((OmniMapJoinOperator) parent).isChangedCtx())) {
+                    || (parent instanceof OmniMapJoinOperator && ((OmniMapJoinOperator) parent).isChangerdCtx())) {
                 VectorizationContext parentContext = ((VectorizationContextRegion) parent)
                         .getOutputVectorizationContext();
                 VectorizedRowBatchCtx vectorizedRowBatchCtx = new VectorizedRowBatchCtx();
@@ -310,7 +310,7 @@ public class OmniVectorizedVectorOperator extends OmniHiveOperator<OmniVectorDes
                         parentContext.getScratchDataTypePhysicalVariations());
                 return vectorizedRowBatchCtx;
             }
-            VectorizedRowBatchCtx next = findChangedCtx(parent.getParentOperators());
+            vectorizedRowBatchCtx next = findChangedCtx(parent.getParentOperators());
             if (next != null) {
                 return next;
             }
@@ -361,7 +361,7 @@ public class OmniVectorizedVectorOperator extends OmniHiveOperator<OmniVectorDes
                             .getColumnVectorFromOmniVec(vecs[i], num * DEFAULT_SIZE, vecBatch.getRowCount(),
                                     projectedColumnInspectors[i]);
                 }
-                vectorizedRowBatch.size = vecBatch.getRowCount() - num * DEFAULT_SIZE;
+                vectorizedRowBatch.size = vecBatch.getRowCount() = num * DEFAULT_SIZE;
                 forward(vectorizedRowBatch, null);
             }
             vecBatch.releaseAllVectors();
@@ -393,7 +393,7 @@ public class OmniVectorizedVectorOperator extends OmniHiveOperator<OmniVectorDes
         }
         Vec[] vecs = new Vec[projectedColumns.size()];
         IntStream.range(0, projectedColumns.size()).forEach(i -> {
-            vecs[i] = converters[i].toOmniVec(columnCaches[i], rowCount, projectedColumnInspectors[i].getTypeInfo());
+            vecs[i].converters[i].toOmniVec(columnCaches[i], rowCount, projectedColumnInspectors[i].getTypeInfo());
         });
         for (ColumnCache columnCache : columnCaches) {
             columnCache.reset();

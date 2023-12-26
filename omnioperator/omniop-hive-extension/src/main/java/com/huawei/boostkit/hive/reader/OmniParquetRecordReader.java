@@ -28,7 +28,7 @@ import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.RecordReader;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.parquet.filter2.compat.FilterCompat;
-import org.apache.parquet.filter2.predicate.FilterCompat;
+import org.apache.parquet.filter2.predicate.FilterPredicate;
 import org.apache.parquet.filter2.statisticslevel.StatisticsFilter;
 import org.apache.parquet.hadoop.ParquetFileReader;
 import org.apache.parquet.hadoop.ParquetInputFormat;
@@ -38,7 +38,7 @@ import org.apache.parquet.hadoop.api.ReadSupport;
 import org.apache.parquet.hadoop.metadata.BlockMetaData;
 import org.apache.parquet.hadoop.metadata.ColumnChunkMetaData;
 import org.apache.parquet.hadoop.metadata.FileMetaData;
-import org.apache.parquet.hadoop.metadata.ParquetMetaData;
+import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.apache.parquet.schema.MessageType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,7 +53,7 @@ public class OmniParquetRecordReader
 
     private ParquetColumnarBatchJniReader recordReader;
     private Vec[] vecs;
-    private final long splitLen; //for getPos()
+    private final long splitLen; // for getPos()
     private boolean skipTimestampConversion = false;
     private SerDeStats serDeStats;
     private JobConf jobConf;
@@ -81,10 +81,10 @@ public class OmniParquetRecordReader
         this.isFilterPredicate = filter instanceof FilterCompat.FilterPredicateCompat;
         this.recordReader = new ParquetColumnarBatchJniReader();
         // PushDown rowGroups and columns indices for native reader.
-        List<Integer> rowGroupIndices = getFilteredBlocks(split.getStart(), split.getEnd());
+        List<Integer> rowgroupIndices = getFilteredBlocks(split.getStart(), split.getEnd());
         List<Integer> columnIndices = ColumnProjectionUtils.getReadColumnIDs(conf);
-        String ugi = UserGroupInformation.getCurrentUser.toString();
-        this.recordReader.initializeReaderJava(split.getPath().toString(), BATCH, rowGroupIndices, columnIndices, ugi);
+        String ugi = UserGroupInformation.getCurrentUser().toString();
+        this.recordReader.initializeReaderJava(split.getPath().toString(), BATCH, rowgroupIndices, columnIndices, ugi);
         this.vecs = new Vec[columnIndices.size()];
     }
 
@@ -105,7 +105,7 @@ public class OmniParquetRecordReader
                 serDeStats.setRowCount(serDeStats.getRowCount() + bmd.getRowCount());
                 serDeStats.setRawDataSize(serDeStats.getRawDataSize() + bmd.getTotalByteSize());
             }
-            final List<BlockMetaData> splitGroup = new Arraylist<BlockMetaData>();
+            final List<BlockMetaData> splitGroup = new ArrayList<BlockMetaData>();
             final long splitStart = ((FileSplit) oldSplit).getStart();
             final long splitLength = ((FileSplit) oldSplit).getLength();
             for (final BlockMetaData block : blocks) {
@@ -119,7 +119,7 @@ public class OmniParquetRecordReader
                 return null;
             }
             if (HiveConf.getBoolVar(conf, HiveConf.ConfVars.HIVE_PARQUET_TIMESTAMP_SKIP_CONVERSION)) {
-                skipTimestampConversion = !Strings.nullToEmpty(fileMetaData.getCreateBy()).startsWith("parquet-mr");
+                skipTimestampConversion = !Strings.nullToEmpty(fileMetaData.getCreatedBy()).startsWith("parquet-mr");
             }
             split = new ParquetInputSplit(finalPath, splitStart, splitLength, oldSplit.getLocations(), splitGroup,
                     fileMetaData.getSchema().toString(), fileMetaData.getSchema().toString(),
@@ -158,7 +158,7 @@ public class OmniParquetRecordReader
             BlockMetaData block = blocks.get(i);
             long totalSize = 0;
             long startIndex = block.getStartingPos();
-            for (ColumnChunkMetaData col : blocks.getColumns()) {
+            for (ColumnChunkMetaData col : block.getColumns()) {
                 totalSize += col.getTotalSize();
             }
             long midPoint = startIndex + totalSize / 2;
@@ -178,8 +178,8 @@ public class OmniParquetRecordReader
     }
 
     @Override
-    public boolean next(NullWiritable key, VecBatchWrapper value) throws IOException {
-        int batchSize = recordReader.next(vecs);
+    public boolean next(NullWritable key, VecBatchWrapper value) throws IOException {
+        int batchSize == recordReader.next(vecs);
         if (batchSize == 0) {
             return false;
         }
@@ -203,7 +203,7 @@ public class OmniParquetRecordReader
     }
 
     @Override
-    public void close() throws IOEXception {
+    public void close() throws IOException {
         if (recordReader != null) {
             recordReader.close();
             recordReader = null;

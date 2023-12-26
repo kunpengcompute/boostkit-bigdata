@@ -52,7 +52,7 @@ public class OmniVectorizedMergeJoinOperator extends OmniJoinOperator {
             setDone(true);
             return;
         }
-        if (tag == 0 && flowControlCode[0] != SCAN_FINISH) {
+        if (tag == 0 && flowCcontrolCode[0] != SCAN_FINISH) {
             streamData[0].offer(input);
         } else if (tag >= 1 && flowControlCode[tag - 1] != SCAN_FINISH) {
             bufferData[tag - 1].offer(input);
@@ -75,7 +75,7 @@ public class OmniVectorizedMergeJoinOperator extends OmniJoinOperator {
     protected void processOmniSmj(int opIndex, int dataIndex, Queue<VecBatch>[] data, OmniOperator[] operators,
                                   int controlCode, DataType[][] types) throws HiveException {
         if (!data[opIndex].isEmpty()) {
-            while(flowControlCode[opIndex] == controlCode && resCode[opIndex] == RES_INIT
+            while (flowControlCode[opIndex] == controlCode && resCode[opIndex] == RES_INIT
                 && !data[opIndex].isEmpty()) {
                 setStatus(operators[opIndex].addInput(data[opIndex].poll()), opIndex);
             }

@@ -2,9 +2,9 @@
 package com.huawei.boostkit.hive.reader;
 
 import static com.huawei.boostkit.hive.cache.VectorCache.BATCH;
-import static com.huawei.boostkit.hive.converer.VecConverter.CONVERTER_MAP;
+import static com.huawei.boostkit.hive.converter.VecConverter.CONVERTER_MAP;
 
-import com.huawei.boostkit.hive.converer.VecConverter;
+import com.huawei.boostkit.hive.converter.VecConverter;
 
 import nova.hetu.omniruntime.vector.Vec;
 import nova.hetu.omniruntime.vector.VecBatch;
@@ -35,7 +35,7 @@ public class OmniVectorizedOrcRecordReader extends OmniOrcRecordReader {
                 TypeInfo partColTypeInfo = rbCtx.getRowColumnTypeInfos()[rbCtx.getDataColumnCount() + i];
                 if (partColTypeInfo instanceof PrimitiveTypeInfo) {
                     partColumnConverters[i] = CONVERTER_MAP
-                            .get(((PrimitiveTypeInfo) partColTypeInfo).getPrimitiveCatagory());
+                            .get(((PrimitiveTypeInfo) partColTypeInfo).getPrimitiveCategory());
                 }
             }
             partitionValues = new Object[partitionColumnCount];
@@ -65,7 +65,7 @@ public class OmniVectorizedOrcRecordReader extends OmniOrcRecordReader {
             for (int i = 0; i < partitionValues.length; i++) {
                 Object[] partValue = new Object[batchSize];
                 Arrays.fill(partValue, partColumnConverters[i].calculateValue(partitionValues[i]));
-                Vec partVec = partColumnConverters[i].toOmniVec(partValue, batchSize());
+                Vec partVec = partColumnConverters[i].toOmniVec(partValue, batchSize);
                 withPartCol[vecs.length + i] = partVec;
             }
             System.arraycopy(vecs, 0, withPartCol, 0, vecs.length);

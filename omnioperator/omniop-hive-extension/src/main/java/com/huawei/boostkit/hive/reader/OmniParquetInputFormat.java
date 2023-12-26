@@ -18,7 +18,7 @@ import java.util.List;
 public class OmniParquetInputFormat extends FileInputFormat<NullWritable, VecBatchWrapper>
         implements InputFormatChecker {
     @Override
-    public ReacordReader<NullWritable, VecBatchWrapper> getRecordReader(InputSplit inputSplit, JobConf conf,
+    public RecordReader<NullWritable, VecBatchWrapper> getRecordReader(InputSplit inputSplit, JobConf conf,
             Reporter reporter) throws IOException {
         return new OmniParquetRecordReader(inputSplit, conf);
     }
@@ -29,7 +29,7 @@ public class OmniParquetInputFormat extends FileInputFormat<NullWritable, VecBat
             return false;
         }
         // The simple validity check is to see if the file is of size 0 or not.
-        // Other checks maybe added in trhe future.
+        // Other checks maybe added in the future.
         for (FileStatus file : files) {
             if (file.getLen() == 0) {
                 return false;
