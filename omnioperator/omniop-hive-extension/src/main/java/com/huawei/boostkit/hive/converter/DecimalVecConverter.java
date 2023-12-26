@@ -190,7 +190,6 @@ public class DecimalVecConverter implements VecConverter {
             if (value == null) {
                 decimalColumnVector.isNull[i - start] = true;
                 decimalColumnVector.noNulls = false;
-                continue;
             } else {
                 decimalColumnVector.vector[i - start] = (HiveDecimalWritable) value;
             }

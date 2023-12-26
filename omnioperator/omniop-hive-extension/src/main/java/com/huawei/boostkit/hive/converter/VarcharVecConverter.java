@@ -132,30 +132,29 @@ public class VarcharVecConverter implements VecConverter {
     }
 
     protected byte[] getByteFromLazyPrimitive(Object col, int length) {
-        byte[] resultBytes = null;
         if (col instanceof LazyPrimitive) {
             LazyPrimitive lazyPrimitive = (LazyPrimitive) col;
             Writable writableObject = lazyPrimitive.getWritableObject();
             if (writableObject instanceof HiveBaseCharWritable) {
-                resultBytes = ((HiveBaseCharWritable) writableObject).getTextValue().copyBytes();
+                return ((HiveBaseCharWritable) writableObject).getTextValue().copyBytes();
             }
             if (writableObject instanceof Text) {
-                resultBytes = ((Text) writableObject).copyBytes();
+                return ((Text) writableObject).copyBytes();
             }
             throw new RuntimeException(String.format("doesn't support wriablrObject: %s",
                     writableObject.getClass().getSimpleName()));
         }
         if (col instanceof HiveVarchar) {
-            resultBytes = ((HiveVarchar) col).getValue().getBytes(StandardCharsets.UTF_8);
+            return ((HiveVarchar) col).getValue().getBytes(StandardCharsets.UTF_8);
         }
         if (col instanceof HiveVarcharWritable) {
-            HiveBaseCharWritable hiveBaseCharWritable = (HiveBaseCharWritable) col;
-            resultBytes = hiveBaseCharWritable.getTextValue().copyBytes();
+            HiveVarcharWritable hiveBaseCharWritable = (HiveVarcharWritable) col;
+            return hiveBaseCharWritable.getTextValue().copyBytes();
         }
         if (col instanceof Text) {
-            resultBytes = ((Text) col).copyBytes();
+            return ((Text) col).copyBytes();
         }
-        return resultBytes;
+        return null;
     }
 
     @Override

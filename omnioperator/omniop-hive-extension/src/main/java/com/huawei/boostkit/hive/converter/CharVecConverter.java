@@ -31,30 +31,29 @@ public class CharVecConverter extends VarcharVecConverter {
     }
 
     protected byte[] getByteFromLazyPrimitive(Object col, int length) {
-        byte[] resultBytes = null;
         if (col instanceof LazyPrimitive) {
             LazyPrimitive lazyPrimitive = (LazyPrimitive) col;
             Writable writableObject = lazyPrimitive.getWritableObject();
             if (writableObject instanceof HiveBaseCharWritable) {
-                resultBytes = trimBytes(((HiveBaseCharWritable) writableObject).getTextValue().getBytes());
+                return trimBytes(((HiveBaseCharWritable) writableObject).getTextValue().getBytes());
             }
             if (writableObject instanceof Text) {
-                resultBytes = trimBytes(((Text) writableObject).getBytes());
+                return trimBytes(((Text) writableObject).getBytes());
             }
             throw new RuntimeException(String.format("doesn't support wriablrObject: %s",
                     writableObject.getClass().getSimpleName()));
         }
-        if (col instanceof HiveVarchar) {
-            resultBytes = ((HiveVarchar) col).getValue().getBytes(StandardCharsets.UTF_8);
+        if (col instanceof HiveChar) {
+            return ((HiveChar) col).getStrippedValue().getBytes(StandardCharsets.UTF_8);
         }
-        if (col instanceof HiveVarcharWritable) {
-            HiveBaseCharWritable hiveBaseCharWritable = (HiveBaseCharWritable) col;
-            resultBytes = trimBytes(hiveBaseCharWritable.getTextValue().getBytes());
+        if (col instanceof HiveCharWritable) {
+            HiveCharWritable hiveBaseCharWritable = (HiveCharWritable) col;
+            return trimBytes(hiveBaseCharWritable.getTextValue().getBytes());
         }
         if (col instanceof Text) {
-            resultBytes = trimBytes(((Text) col).getBytes());
+            return trimBytes(((Text) col).getBytes());
         }
-        return resultBytes;
+        return null;
     }
 
     private byte[] trimBytes(byte[] bytes) {
