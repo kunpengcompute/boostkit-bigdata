@@ -3,9 +3,9 @@ package com.huawei.boostkit.hive.converter;
 
 import nova.hetu.omniruntime.vector.Vec;
 
-import org.apache.hadoop.hive.common.type.HiveVarchar;
+import org.apache.hadoop.hive.common.type.HiveChar;
 import org.apache.hadoop.hive.serde2.io.HiveBaseCharWritable;
-import org.apache.hadoop.hive.serde2.io.HiveVarcharWritable;
+import org.apache.hadoop.hive.serde2.io.HiveCharWritable;
 import org.apache.hadoop.hive.serde2.lazy.ByteArrayRef;
 import org.apache.hadoop.hive.serde2.lazy.LazyHiveChar;
 import org.apache.hadoop.hive.serde2.lazy.LazyPrimitive;
