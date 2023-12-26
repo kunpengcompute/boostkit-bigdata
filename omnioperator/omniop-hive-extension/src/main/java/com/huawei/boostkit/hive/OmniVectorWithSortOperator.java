@@ -111,7 +111,7 @@ public class OmniVectorWithSortOperator extends OmniHiveOperator<OmniVectorDesc>
     private void generateSortOperator() {
         sortOperatorFactories = new OmniSortOperatorFactory[inputObjInspectors.length];
         sortOperators = new OmniOperator[inputObjInspectors.length];
-        for (int i = 0; i < inputObjInspectors.length; i++) {
+        for (int i = 0; i < sortOperators.length; i++) {
             DataType[] inputTypes = new DataType[flatFields[i].size()];
             int[] outputCols = new int[flatFields[i].size()];
             for (int j = 0; j < flatFields[i].size(); j++) {

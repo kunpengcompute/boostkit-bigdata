@@ -286,7 +286,7 @@ public class OmniSelectOperator extends OmniHiveOperator<OmniSelectDesc> impleme
                 .getFieldObjectInspector()).getAllStructFieldRefs();
         List<? extends StructField> valueFields = ((StructObjectInspector) keyValueFields.get(1)
                 .getFieldObjectInspector()).getAllStructFieldRefs();
-        List<String> fieldNames = keyFields.stream().map(filed -> "key." + filed.getFieldName())
+        List<String> fieldNames = keyFields.stream().map(field -> "key." + field.getFieldName())
                 .collect(Collectors.toList());
         fieldNames.addAll(
                 valueFields.stream().map(field -> "value." + field.getFieldName()).collect(Collectors.toList()));
