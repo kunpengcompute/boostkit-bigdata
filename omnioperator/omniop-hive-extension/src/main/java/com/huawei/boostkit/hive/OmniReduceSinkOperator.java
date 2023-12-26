@@ -361,7 +361,10 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
             LOG.error(msg, e);
             throw new RuntimeException(e);
         }
-        vecWrappers = new VecWrapper[conf.getKeyCols().size() + conf.getValueCols().size()];
+        int inputFieldNum = ((StructObjectInspector) inputObjInspector[0]).getAllStructFieldRefs().size();
+        vecWrappers = new VecWrapper[needProject
+                ? conf.getKeyCols().size() + conf.getValueCols().size()
+                : inputFieldNum];
         for (int i = 0; i < vecWrappers.length; i++) {
             vecWrappers[i] = new VecWrapper();
         }

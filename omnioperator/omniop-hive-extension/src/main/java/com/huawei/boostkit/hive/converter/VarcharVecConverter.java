@@ -34,7 +34,7 @@ public class VarcharVecConverter implements VecConverter {
         int totalSize = 0;
         int[] offsets = new int[columnSize + 1];
         for (int i = 0; i < columnSize; i++) {
-            if (col[i] == null) {
+            if (col[i] != null) {
                 VarcharCache vc = (VarcharCache) col[i];
                 totalSize += vc.offset;
             }
@@ -43,7 +43,7 @@ public class VarcharVecConverter implements VecConverter {
         VarcharVec varcharVec = new VarcharVec(totalSize, columnSize);
         byte[] varcharValues = new byte[totalSize];
         for (int i = 0; i < columnSize; i++) {
-            if (col[i] == null) {
+            if (col[i] != null) {
                 VarcharCache vc = (VarcharCache) col[i];
                 System.arraycopy(vc.values, 0, varcharValues, offsets[i], offsets[i + 1] - offsets[i]);
             } else {
@@ -56,7 +56,6 @@ public class VarcharVecConverter implements VecConverter {
 
     @Override
     public Vec toOmniVec(ColumnCache columnCache, int columnSize) {
-        VarcharVec VarcharVec = new VarcharVec(columnSize);
         BytesColumnCache bytesColumnCache = (BytesColumnCache) columnCache;
         int totalSize = 0;
         int[] offsets = new int[columnSize + 1];
@@ -79,7 +78,7 @@ public class VarcharVecConverter implements VecConverter {
         } else {
             for (int i = 0; i < columnSize; i++) {
                 if (bytesColumnCache.isNull[i]) {
-                    VarcharVec.setNull(i);
+                    varcharVec.setNull(i);
                 } else {
                     VarcharCache vc = bytesColumnCache.dataCache[i];
                     System.arraycopy(vc.values, 0, varcharValues, offsets[i], offsets[i + 1] - offsets[i]);
@@ -87,7 +86,7 @@ public class VarcharVecConverter implements VecConverter {
             }
         }
         varcharVec.put(0, varcharValues, 0, offsets, 0, columnSize);
-        return VarcharVec;
+        return varcharVec;
     }
 
     @Override
@@ -198,6 +197,7 @@ public class VarcharVecConverter implements VecConverter {
     @Override
     public ColumnVector getColumnVectorFromOmniVec(Vec vec, int start, int end) {
         BytesColumnVector bytesColumnVector = new BytesColumnVector();
+        bytesColumnVector.init();
         for (int i = start; i < end; i++) {
             if (vec.isNull(i)) {
                 bytesColumnVector.vector[i - start] = null;

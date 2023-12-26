@@ -1,5 +1,9 @@
 package com.huawei.boostkit.hive;
 
+import static com.huawei.boostkit.hive.expression.TypeUtils.buildInputDataType;
+import static nova.hetu.omniruntime.constants.FunctionType.OMNI_AGGREGATION_TYPE_COUNT_ALL;
+import static org.apache.hadoop.hive.ql.exec.GroupByOperator.groupingSet2BitSet;
+
 import com.huawei.boostkit.hive.cache.VectorCache;
 import com.huawei.boostkit.hive.expression.ExpressionUtils;
 import com.huawei.boostkit.hive.expression.TypeUtils;
@@ -11,7 +15,17 @@ import nova.hetu.omniruntime.operator.config.OperatorConfig;
 import nova.hetu.omniruntime.operator.config.OverflowConfig;
 import nova.hetu.omniruntime.type.DataType;
 import nova.hetu.omniruntime.type.LongDataType;
-import nova.hetu.omniruntime.vector.*;
+import nova.hetu.omniruntime.vector.BooleanVec;
+import nova.hetu.omniruntime.vector.Decimal128Vec;
+import nova.hetu.omniruntime.vector.DictionaryVec;
+import nova.hetu.omniruntime.vector.DoubleVec;
+import nova.hetu.omniruntime.vector.IntVec;
+import nova.hetu.omniruntime.vector.LongVec;
+import nova.hetu.omniruntime.vector.ShortVec;
+import nova.hetu.omniruntime.vector.VarcharVec;
+import nova.hetu.omniruntime.vector.Vec;
+import nova.hetu.omniruntime.vector.VecBatch;
+import nova.hetu.omniruntime.vector.VecFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.ql.CompilationOpContext;
 import org.apache.hadoop.hive.ql.exec.*;
@@ -28,16 +42,20 @@ import org.apache.hadoop.hive.serde2.objectinspector.*;
 import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoUtils;
 import org.apache.hadoop.io.LongWritable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
-import java.util.*;
-
-import static com.huawei.boostkit.hive.expression.TypeUtils.buildInputDataType;
-import static nova.hetu.omniruntime.constants.FunctionType.OMNI_AGGREGATION_TYPE_COUNT_ALL;
-import static org.apache.hadoop.hive.ql.exec.GroupByOperator.groupingSet2BitSet;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Set;
 
 public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> implements Serializable, VectorizationContextRegion {
-    private static final long serialVeserssionUID = 1L;
+    private static final long serialVersionUID = 1L;
+    private static final Logger LOG = LoggerFactory.getLogger(OmniGroupByOperator.class.getName());
     private transient OmniHashAggregationWithExprOperatorFactory omniHashAggregationWithExprOperatorFactory;
     private transient OmniOperator omniOperator;
     private transient List<ExprNodeEvaluator> keyFields;
@@ -60,6 +78,7 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
     private transient FastBitSet[] groupingSetsBitSet;
     private transient LongWritable[] newKeysGroupingSets;
     private transient int outputKeyLength;
+    private VectorizationContext vectorizationContext;
     private VectorizationContext vOutContext;
     private transient ObjectInspector[] aggOutputObjectInspectors;
     private transient ObjectInspector[] objectInspectors;
@@ -81,6 +100,7 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
     public OmniGroupByOperator(CompilationOpContext ctx, GroupByDesc conf, VectorizationContext vectorizationContext, VectorizationContext vOutContext) {
         super(ctx);
         this.conf = new OmniGroupByDesc(conf);
+        this.vectorizationContext = vectorizationContext;
         this.vOutContext = vOutContext;
     }
 
@@ -99,7 +119,7 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
         aggs = conf.getAggregators();
         int aggSize = aggs.size();
         aggregationParameterFields = new ExprNodeEvaluator[aggSize][];
-        aggregationParameterObjectInspectors = new ObjectInspector[aggSize][];
+        aggregationParameterObjectInspectors = new ObjectInspector[aggs.size()][];
         aggChannelFields = new ArrayList<>();
         for (int i = 0; i < aggSize; i++) {
             AggregationDesc agg = aggs.get(i);
@@ -123,7 +143,8 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
         currentKeyObjectInspectors = new ObjectInspector[numKeys];
         for (int i = 0; i < numKeys; i++) {
             keyObjectInspectors[i] = keyFields.get(i).initialize(rowInspector);
-            currentKeyObjectInspectors[i] = ObjectInspectorUtils.getStandardObjectInspector(keyObjectInspectors[i], ObjectInspectorUtils.ObjectInspectorCopyOption.WRITABLE);
+            currentKeyObjectInspectors[i] = ObjectInspectorUtils.getStandardObjectInspector(keyObjectInspectors[i],
+                    ObjectInspectorUtils.ObjectInspectorCopyOption.WRITABLE);
         }
         int aggSize = aggs.size();
         for (int i = 0; i < aggSize; i++) {
@@ -147,18 +168,21 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
             objectInspectors[i] = currentKeyObjectInspectors[i];
         }
         for (int i = 0; i < aggregationEvaluators.length; i++) {
-            objectInspectors[outputKeyLength + i] = aggregationEvaluators[i].init(conf.getAggregators().get(i).getMode(), aggregationParameterObjectInspectors[i]);
+            objectInspectors[outputKeyLength + i] = aggregationEvaluators[i]
+                    .init(conf.getAggregators().get(i).getMode(), aggregationParameterObjectInspectors[i]);
         }
-        aggOutputObjectInspectors = Arrays.copyOfRange(objectInspectors, outputKeyLength, outputKeyLength + aggregationEvaluators.length);
+        aggOutputObjectInspectors = Arrays.copyOfRange(objectInspectors, outputKeyLength,
+                outputKeyLength + aggregationEvaluators.length);
     }
 
     private void vectorizedInitialize() throws HiveException {
         final int aggregateCount = vecAggrDescs.length;
         objectInspectors = new ObjectInspector[outputKeyLength + aggregateCount];
-        List<ExprNodeDesc> keyDesc = conf.getKeys();
-        for (int i = 0; i < outputKeyLength; i++) {
-            VectorExpressionWriter vew = VectorExpressionWriterFactory.genVectorExpressionWritable(keyDesc.get(i));
-            objectInspectors[i] = vew.getObjectInspector();
+        List<ExprNodeDesc> keysDesc = conf.getKeys();
+        for (int i = 0; i < outputKeyLength; ++i) {
+            VectorExpressionWriter vew = VectorExpressionWriterFactory.genVectorExpressionWritable(keysDesc.get(i));
+            ObjectInspector oi = vew.getObjectInspector();
+            objectInspectors[i] = oi;
         }
         aggOutputObjectInspectors = new ObjectInspector[aggregateCount];
         for (int i = 0; i < aggregateCount; i++) {
@@ -171,7 +195,8 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
     private void createOmniOperator() {
         List<String> aggOutputFieldsNames = outputFieldNames.subList(outputFieldNames.size() - aggs.size(),
                 outputFieldNames.size());
-        StandardStructObjectInspector aggOutputObjInspector = ObjectInspectorFactory.getStandardStructObjectInspector(aggOutputFieldsNames, Arrays.asList(aggOutputObjectInspectors));
+        StandardStructObjectInspector aggOutputObjInspector = ObjectInspectorFactory
+                .getStandardStructObjectInspector(aggOutputFieldsNames, Arrays.asList(aggOutputObjectInspectors));
         List<? extends StructField> aggOutputFields = aggOutputObjInspector.getAllStructFieldRefs();
 
         FunctionType[] aggFunctionTypes = getFunctionTypeFromAggs(aggs);
@@ -197,12 +222,15 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
                 // Create the mapping corresponding to the grouping set
                 newKeysGroupingSets[pos] = new LongWritable(groupingSet);
                 groupingSetsBitSet[pos] = groupingSet2BitSet(groupingSet, groupingSetsPosition);
+                pos++;
             }
         }
 
         if ((allStructFieldRefs.size() == 2) && (allStructFieldRefs.get(0).getFieldName().equals("key"))) {
-            keyStructFieldRefs = ((StandardStructObjectInspector) allStructFieldRefs.get(0).getFieldObjectInspector()).getAllStructFieldRefs();
-            valueStructFieldRefs = ((StandardStructObjectInspector) allStructFieldRefs.get(1).getFieldObjectInspector()).getAllStructFieldRefs();
+            keyStructFieldRefs = ((StandardStructObjectInspector) allStructFieldRefs.get(0).getFieldObjectInspector())
+                    .getAllStructFieldRefs();
+            valueStructFieldRefs = ((StandardStructObjectInspector) allStructFieldRefs.get(1).getFieldObjectInspector())
+                    .getAllStructFieldRefs();
             groupByChanel = getExprFromStructField(keyStructFieldRefs);
             aggChannels = getTwoDimenExprFromStructField(valueStructFieldRefs);
             sourceTypes = getDataTypeFromStructField(keyStructFieldRefs, valueStructFieldRefs);
@@ -212,7 +240,8 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
             sourceTypes = getDataTypeFromStructField(allStructFieldRefs);
         }
         omniHashAggregationWithExprOperatorFactory = new OmniHashAggregationWithExprOperatorFactory(groupByChanel, aggChannels,
-                aggChannelsFilter, sourceTypes, aggFunctionTypes, aggOutputTypes, isInputRaws, isOutputPartials, operatorConfig);
+                aggChannelsFilter, sourceTypes, aggFunctionTypes, aggOutputTypes, isInputRaws, isOutputPartials,
+                operatorConfig);
         omniOperator = omniHashAggregationWithExprOperatorFactory.createOperator();
     }
 
@@ -226,7 +255,8 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
             this.vecAggrDescs = ((VectorGroupByDesc) this.conf.getVectorDesc()).getVecAggrDescs();
             vectorizedInitialize();
         }
-        outputObjInspector = ObjectInspectorFactory.getStandardStructObjectInspector(outputFieldNames, Arrays.asList(objectInspectors));
+        outputObjInspector = ObjectInspectorFactory.getStandardStructObjectInspector(outputFieldNames,
+                Arrays.asList(objectInspectors));
         createOmniOperator();
         firstRow = true;
         constantVec = new Vec[constantColumnIds.size()];
@@ -239,8 +269,8 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
         int size = aggs.size();
         boolean[] isInputRaws = new boolean[size];
         for (int i = 0; i < size; i++) {
-            if (aggs.get(i).getMode() == GenericUDAFEvaluator.Mode.PARTIAL1 ||
-                    aggs.get(i).getMode() == GenericUDAFEvaluator.Mode.COMPLETE) {
+            if (aggs.get(i).getMode() == GenericUDAFEvaluator.Mode.PARTIAL1
+                    || aggs.get(i).getMode() == GenericUDAFEvaluator.Mode.COMPLETE) {
                 isInputRaws[i] = true;
             } else {
                 isInputRaws[i] = false;
@@ -253,8 +283,8 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
         int size = aggs.size();
         boolean[] isOutputPartials = new boolean[size];
         for (int i = 0; i < size; i++) {
-            if (aggs.get(i).getMode() == GenericUDAFEvaluator.Mode.PARTIAL1 ||
-                    aggs.get(i).getMode() == GenericUDAFEvaluator.Mode.PARTIAL2) {
+            if (aggs.get(i).getMode() == GenericUDAFEvaluator.Mode.PARTIAL1
+                    || aggs.get(i).getMode() == GenericUDAFEvaluator.Mode.PARTIAL2) {
                 isOutputPartials[i] = true;
             } else {
                 isOutputPartials[i] = false;
@@ -290,7 +320,8 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
         // TODO Confirming the Multidimensional array processing flow
         for (StructField structField : structFields) {
             List<DataType> dataTypes = new ArrayList<>();
-            PrimitiveTypeInfo typeInfo = ((PrimitiveObjectInspector) structField.getFieldObjectInspector()).getTypeInfo();
+            PrimitiveTypeInfo typeInfo = ((PrimitiveObjectInspector) structField.getFieldObjectInspector())
+                    .getTypeInfo();
             DataType dataType = buildInputDataType(typeInfo);
             dataTypes.add(dataType);
             twoDimenDataTypes.add(dataTypes.toArray(new DataType[0]));
@@ -315,7 +346,8 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
         List<DataType> dataTypes = new ArrayList<>();
         for (int i = 0; i < fieldRefs.size(); i++) {
             if (fieldRefs.get(i).getFieldObjectInspector() instanceof PrimitiveObjectInspector) {
-                PrimitiveTypeInfo typeInfo = ((PrimitiveObjectInspector) fieldRefs.get(i).getFieldObjectInspector()).getTypeInfo();
+                PrimitiveTypeInfo typeInfo = ((PrimitiveObjectInspector) fieldRefs.get(i).getFieldObjectInspector())
+                        .getTypeInfo();
                 dataTypes.add(buildInputDataType(typeInfo));
             }
         }

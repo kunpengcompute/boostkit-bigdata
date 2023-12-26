@@ -66,29 +66,8 @@ public class TimestampVecConverter extends LongVecConverter {
     }
 
     @Override
-    public Vec toOmniVec(ColumnCache columnCache, int columnSize) {
-        LongVec longVec = new LongVec(columnSize);
-        LongColumnCache longColumnCache = (LongColumnCache) columnCache;
-        if (longColumnCache.noNulls) {
-            for (int i = 0; i < columnSize; i++) {
-                longVec.set(i, longColumnCache.dataCache[i]);
-            }
-        } else {
-            for (int i = 0; i < columnSize; i++) {
-                if (longColumnCache.isNull[i]) {
-                    longVec.setNull(i);
-                } else {
-                    longVec.set(i, longColumnCache.dataCache[i]);
-                }
-            }
-        }
-        return longVec;
-    }
-
-    @Override
     public void setValueFromColumnVector(VectorizedRowBatch vectorizedRowBatch, int vectorColIndex,
-                                         ColumnCache columnCache, int colIndex, int rowCount,
-                                         PrimitiveTypeInfo primitiveTypeInfo) {
+                                         ColumnCache columnCache, int colIndex, int rowCount) {
         ColumnVector columnVector = vectorizedRowBatch.cols[vectorColIndex];
         LongColumnCache longColumnCache = (LongColumnCache) columnCache;
         long[] vector = ((TimestampColumnVector) columnVector).time;

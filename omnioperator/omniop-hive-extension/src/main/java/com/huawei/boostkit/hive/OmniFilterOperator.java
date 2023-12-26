@@ -36,6 +36,10 @@ public class OmniFilterOperator extends OmniHiveOperator<FilterDesc> implements 
     private transient OmniOperator omniOperator;
     private transient Iterator<VecBatch> output;
 
+    public OmniFilterOperator(){
+        super();
+    }
+
     public OmniFilterOperator(CompilationOpContext ctx) {
         super(ctx);
     }

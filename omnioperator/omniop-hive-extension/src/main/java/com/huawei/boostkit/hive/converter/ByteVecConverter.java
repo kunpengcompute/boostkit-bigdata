@@ -13,7 +13,7 @@ import org.apache.hadoop.hive.serde2.lazy.LazyByte;
 import org.apache.hadoop.io.ByteWritable;
 
 
-public class ByteVecConverter extends LongVecConverter {
+public class ByteVecConverter implements VecConverter {
     public Object fromOmniVec(Vec vec, int index) {
         if (vec.isNull(index)) {
             return null;

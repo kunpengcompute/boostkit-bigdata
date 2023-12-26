@@ -60,7 +60,7 @@ public class DecimalVecConverter implements VecConverter {
         byte[] highBytes = longToBytes(longs[1]);
         byte[] lowBytes = longToBytes(longs[0]);
         System.arraycopy(highBytes, 0, bytes, 0, 8);
-        System.arraycopy(longs, 0, bytes, 8, 8);
+        System.arraycopy(lowBytes, 0, bytes, 8, 8);
         HiveDecimalWritable hiveDecimalWritable = new HiveDecimalWritable(bytes, scale);
         if (isNegative) {
             hiveDecimalWritable.mutateNegate();
