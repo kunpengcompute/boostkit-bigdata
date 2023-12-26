@@ -4,6 +4,7 @@ package com.huawei.boostkit.hive;
 import static com.huawei.boostkit.hive.JoinUtils.getExprFromExprNode;
 import static com.huawei.boostkit.hive.JoinUtils.getExprNodeColumnEvaluator;
 import static com.huawei.boostkit.hive.JoinUtils.getTypeFromInspectors;
+import static com.huawei.boostkit.hive.OmniExecuteWithHookContext.OMNI_OPERATOR;
 import static com.huawei.boostkit.hive.cache.VectorCache.BATCH;
 import static com.huawei.boostkit.hive.converter.VecConverter.CONVERTER_MAP;
 
@@ -39,6 +40,7 @@ import org.apache.hadoop.hive.ql.exec.MapredContext;
 import org.apache.hadoop.hive.ql.exec.ObjectCache;
 import org.apache.hadoop.hive.ql.exec.ObjectCacheFactory;
 import org.apache.hadoop.hive.ql.exec.Operator;
+import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.exec.mr.ExecMapperContext;
 import org.apache.hadoop.hive.ql.exec.persistence.MapJoinKey;
 import org.apache.hadoop.hive.ql.exec.persistence.MapJoinKeyObject;
@@ -168,6 +170,9 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
             generateNewInputObjInspectors();
         }
         super.initializeOp(hconf);
+        if (conf.isDynamicPartitionHashJoin() && vectorizationContext == null) {
+            rebuildUnvectorizedDynaicJoinInspector();
+        }
         // initialize buildOperator
         buildIndexes = new ArrayList<>();
         buildInspectors = new ArrayList[joinKeysObjectInspectors.length];
@@ -244,6 +249,17 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
                 }
             }));
             addedCloseThread = true;
+        }
+    }
+
+    private void rebuildUnvectorizedDynaicJoinInspector() throws HiveException{
+        for (int i = 0; i < inputObjInspectors.length; i++) {
+            StructObjectInspector structObjectInspector = (StructObjectInspector) inputObjInspectors[i];
+            inputObjInspectors[i] = Utilities.constructVectorizedReduceRowOI(
+                    (StructObjectInspector) structObjectInspector.getAllStructFieldRefs().get(0)
+                            .getFieldObjectInspector(),
+                    (StructObjectInspector) structObjectInspector.getAllStructFieldRefs().get(1)
+                            .getFieldObjectInspector());
         }
     }
 

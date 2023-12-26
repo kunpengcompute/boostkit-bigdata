@@ -113,7 +113,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         if (OMNI_OPERATOR.contains(OperatorType.REDUCESINK)) {
             initReduceSinkOpToWork();
         }
-        traverseTezWorks(queryPlan);
+        traverseTezWorks();
         for (OperatorInfo operatorInfo : replaceableInfo) {
             replaceWithOmniOperator(operatorInfo);
         }
@@ -146,7 +146,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         }
     }
 
-    private void traverseTezWorks(QueryPlan queryPlan) {
+    private void traverseTezWorks() {
         for (BaseWork work : tezWork.getAllWork()) {
             boolean groupNeedSort = getGroupNeedSort(work);
             boolean reduceSinkCanReplace = getReduceSinkCanReplace(work);
@@ -376,7 +376,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
     private boolean getGroupNeedSort(BaseWork work) {
         for (BaseWork child : tezWork.getChildren(work)) {
             TezEdgeProperty.EdgeType edgeType = tezWork.getEdgeType(work, child);
-            if (edgeType == TezEdgeProperty.EdgeType.ONE_TO_ONE_EDGE && !(child instanceof MergeJoinWork)) {
+            if (edgeType == TezEdgeProperty.EdgeType.ONE_TO_ONE_EDGE) {
                 return true;
             }
         }
@@ -576,9 +576,9 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             case FILTER:
                 return new OmniFilterOperator(current.getCompilationOpContext(), (FilterDesc) current.getConf());
             case MAPJOIN:
-                if (current instanceof VectorMapJoinBaseOperator) {
+                if (current instanceof VectorizationContextRegion) {
                     return new OmniMapJoinOperator((MapJoinOperator) current, (MapJoinDesc) current.getConf(), true,
-                            ((VectorMapJoinBaseOperator) current).getOutputVectorizationContext());
+                            ((VectorizationContextRegion) current).getOutputVectorizationContext());
                 } else {
                     return new OmniMapJoinOperator((MapJoinOperator) current, (MapJoinDesc) current.getConf());
                 }
