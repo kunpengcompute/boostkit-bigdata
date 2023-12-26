@@ -24,7 +24,7 @@ public class OmniOrcInputFormat implements InputFormat<NullWritable, VecBatchWra
     }
 
     @Override
-    public RecordReader<NullWritable, VecBatchWrapper> getRecordReader(InputSplit inputSplit, JobConf jobConf,
+    public RecordReader<NullWritable, VecBatchWrapper> getRecordReader(InputSplit inputSplit, JobConf conf,
             Reporter reporter) throws IOException {
         OrcFile.ReaderOptions readerOptions = OrcFile.readerOptions(conf);
         if (inputSplit instanceof OrcSplit) {
