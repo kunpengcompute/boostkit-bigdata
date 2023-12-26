@@ -27,7 +27,7 @@ import java.util.Properties;
 import javax.annotation.Nullable;
 
 public class OmniVecBatchSerDe extends AbstractSerDe {
-    public static final Logger LOG = LoggerFactor.getLogger(OmniVecBatchSerDe.class.getName());
+    public static final Logger LOG = LoggerFactory.getLogger(OmniVecBatchSerDe.class.getName());
     List<String> columnNames;
     List<TypeInfo> columnTypes;
     TypeInfo rowTypeInfo;

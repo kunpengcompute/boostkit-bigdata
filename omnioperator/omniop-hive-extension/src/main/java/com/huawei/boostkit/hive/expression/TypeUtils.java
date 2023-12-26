@@ -187,7 +187,7 @@ public class TypeUtils {
         return buildInputDataType(typeInfo).getId().toValue();
     }
 
-    public static DataType buildINputDataType(TypeInfo typeInfo) {
+    public static DataType buildInputDataType(TypeInfo typeInfo) {
         if (typeInfo instanceof DecimalTypeInfo) {
             return new Decimal128DataType(((DecimalTypeInfo) typeInfo).getPrecision(),
                     ((DecimalTypeInfo) typeInfo).getScale());
@@ -229,8 +229,8 @@ public class TypeUtils {
             long l = ((Timestamp) obj).toEpochMilli();
             return Date.ofEpochMilli(l).toEpochDay();
         } else if (obj instanceof HiveDecimal) {
-            if (((DecimalTypeInfo) type).getPrecision() <= 18) {
-                return ((HiveDeimal) obj).unscaledValue().longValue();
+            if (((DecimalTypeInfo) typeInfo).getPrecision() <= 18) {
+                return ((HiveDecimal) obj).unscaledValue().longValue();
             }
             return ((HiveDecimal) obj).unscaledValue().toString();
         } else if (obj instanceof Date) {
@@ -313,7 +313,7 @@ public class TypeUtils {
     public static boolean checkOmniJsonWhiteList(String filterExpr, String[] projections) {
         // inputTypes will not be checked if parseFormat is json( == 1),
         // only if its parseFormat is String(==0)
-        long returnCode = new OmniExprVerify().exprVerifyNative(DataTypeSerializer.serialize(new Datatype[0]), 0,
+        long returnCode = new OmniExprVerify().exprVerifyNative(DataTypeSerializer.serialize(new DataType[0]), 0,
                 filterExpr, projections, projections.length, 1);
         return returnCode != 0;
     }

@@ -14,7 +14,7 @@ import org.apache.hadoop.hive.ql.udf.generic.GenericUDFOPMinus;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDFOPMod;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDFOPMultiply;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDFOPPlus;
-import org.apache.hadoop.hive.serde2.objectinsepector.ObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.typeinfo.DecimalTypeInfo;
 
 import java.util.HashMap;
