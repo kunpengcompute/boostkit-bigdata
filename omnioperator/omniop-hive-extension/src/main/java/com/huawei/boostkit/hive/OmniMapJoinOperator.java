@@ -4,8 +4,17 @@ package com.huawei.boostkit.hive;
 import static com.huawei.boostkit.hive.JoinUtils.getExprFromExprNode;
 import static com.huawei.boostkit.hive.JoinUtils.getExprNodeColumnEvaluator;
 import static com.huawei.boostkit.hive.JoinUtils.getTypeFromInspectors;
+import static com.huawei.boostkit.hive.cache.VectorCache.BATCH;
+import static com.huawei.boostkit.hive.converter.VecConverter.CONVERTER_MAP;
 
+import com.huawei.boostkit.hive.cache.VecBufferCache;
+import com.huawei.boostkit.hive.converter.VecConverter;
+import com.huawei.boostkit.hive.expression.BaseExpression;
 import com.huawei.boostkit.hive.expression.ExpressionUtils;
+import com.huawei.boostkit.hive.expression.TypeUtils;
+import com.huawei.boostkit.hive.shuffle.OmniVecBatchSerDe;
+import com.huawei.boostkit.hive.shuffle.VecSerdeBody;
+
 import nova.hetu.omniruntime.constants.JoinType;
 import nova.hetu.omniruntime.operator.OmniOperator;
 import nova.hetu.omniruntime.operator.OmniOperatorFactory;
@@ -21,7 +30,6 @@ import nova.hetu.omniruntime.vector.Vec;
 import nova.hetu.omniruntime.vector.VecBatch;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.shell.find.BaseExpression;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.CompilationOpContext;
 import org.apache.hadoop.hive.ql.exec.AbstractMapJoinOperator;
@@ -121,13 +129,9 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
     private transient List<VecBatch>[] buildVecs;
 
     private transient String cacheKey;
-
     private transient MapJoinTableContainerSerDe[] mapJoinTableSerdes;
-
     private transient ObjectCache cache;
-
-    private transient List<List<VecBatch>> vecBatchNeedClose = new ArrayList<>();
-
+    private static List<List<VecBatch>> vecBatchNeedClose = new ArrayList<>();
     private static boolean addedCloseThread;
     private transient Iterator<VecBatch> output;
 
@@ -135,7 +139,9 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
 
     private transient OmniOperator filterOperator;
 
-    public OmniMapJoinOperator() {super();}
+    public OmniMapJoinOperator() {
+        super();
+    }
 
     public OmniMapJoinOperator(CompilationOpContext ctx) {
         super(ctx);
@@ -185,14 +191,15 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
         order = getOrder(posBigTable, joinKeysObjectInspectors.length);
         initKeyPosToValuePos();
         String queryId = HiveConf.getVar(hconf, HiveConf.ConfVars.HIVEQUERYID);
-        cacheKey = "HASH_MAP_" + this.getOperatorId() + "container";
+        cacheKey = "HASH_MAP_" + this.getOperatorId() + "_container";
         cache = ObjectCacheFactory.getCache(hconf, queryId, false);
         final ExecMapperContext mapContext = getExecContext();
         final MapredContext mrContext = MapredContext.get();
         mapJoinTableSerdes = new MapJoinTableContainerSerDe[conf.getTagLength()];
         generateMapMetaData();
         if (!conf.isBucketMapJoin() && !conf.isDynamicPartitionHashJoin()) {
-            Future<List<List<VecBatch>>> future = cache.retrieveAsync(cacheKey, () ->loadBuildVec(mapContext, mrContext));
+            Future<List<List<VecBatch>>> future = cache.retrieveAsync(cacheKey,
+                    () -> loadBuildVec(mapContext, mrContext));
             asyncInitOperations.add(future);
         } else if (!isInputFileChangeSensitive(mapContext)) {
             List<List<VecBatch>> vecBatchList = loadBuildVec(mapContext, mrContext);
@@ -211,10 +218,9 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
                 if (allStructFieldRefs.get(i).getFieldObjectInspector() instanceof PrimitiveObjectInspector) {
                     PrimitiveTypeInfo typeInfo = ((PrimitiveObjectInspector) allStructFieldRefs.get(i)
                             .getFieldObjectInspector()).getTypeInfo();
-                    int omniType = TypeUtils.converHiveTypeToOmniType(typeInfo);
+                    int omniType = TypeUtils.convertHiveTypeToOmniType(typeInfo);
                     inputTypes[i] = TypeUtils.buildInputDataType(typeInfo);
                     projections[i] = TypeUtils.buildExpression(typeInfo, omniType, i);
-
                 }
             }
             this.filterAndProjectOperatorFactory = new OmniFilterAndProjectOperatorFactory(root.toString(), inputTypes,
@@ -222,7 +228,7 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
             this.filterOperator = this.filterAndProjectOperatorFactory.createOperator();
         }
         if (!addedCloseThread) {
-            Runtime.getRuntime().addShutdownHook(new Thread(() ->{
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 try {
                     for (List<VecBatch> vecBatchList : vecBatchNeedClose) {
                         if (vecBatchList != null) {
@@ -234,7 +240,7 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
                     }
                     LOG.info("release vecBatchNeedClose succeed");
                 } catch (Exception e) {
-                    LOG.error("release VecBatchNeedClose failed", e);
+                    LOG.error("release vecBatchNeedClose failed", e);
                 }
             }));
             addedCloseThread = true;
@@ -283,18 +289,18 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
         List<VecBatch> buildVecBatches = new ArrayList<>();
         Object[][] values = new Object[buildInspectors[pos].size()][BATCH];
         VecConverter[] buildConverters = buildInspectors[pos].stream()
-                .map(inspector->CONVERTER_MAP
+                .map(inspector -> CONVERTER_MAP
                         .get(((AbstractPrimitiveWritableObjectInspector) inspector).getPrimitiveCategory()))
                 .toArray(VecConverter[]::new);
         PrimitiveTypeInfo[] buildTypeInfos = buildInspectors[pos].stream()
-                .map(inspector->((AbstractPrimitiveWritableObjectInspector) inspector).getTypeInfo())
+                .map(inspector -> ((AbstractPrimitiveWritableObjectInspector) inspector).getTypeInfo())
                 .toArray(PrimitiveTypeInfo[]::new);
         try {
             TezContext tezContext = (TezContext) mrContext;
             String inputName = parentToInput.get(pos);
             LogicalInput input = tezContext.getInput(inputName);
             input.start();
-            tezContext.getTezProcessorContext().waitForAnyInputReady(Collections.<Input>singleton(input));
+            tezContext.getTezProcessorContext().waitForAnyInputReady(Collections.<Input>singletonList(input));
             Reader kvReader = input.getReader();
             OmniReaderWrapper omniReaderWrapper = new OmniReaderWrapper(kvReader);
             MapJoinObjectSerDeContext keyCtx = mapJoinTableSerdes[pos].getKeyContext();
@@ -303,7 +309,7 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
             AbstractSerDe serde = valCtx.getSerDe();
             int rowLength = ObjectInspectorUtils.getStructSize(serde.getObjectInspector());
             // if output includes key and key doesn't have expression, then the value of
-            // hashMapWrapper will not contain key
+            // hashMapWrapper will not contain key.
             boolean needAddKey = rowLength < joinValuesObjectInspectors[pos].size();
             Object[] valueArray = new Object[rowLength];
             int rowCount = 0;
@@ -326,7 +332,9 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
                     for (Map.Entry<Integer, Integer> keyValueEntry : valuePosToKeyPos[pos].entrySet()) {
                         valueList.add(keyValueEntry.getKey(), key[keyValueEntry.getValue()]);
                     }
-                    System.arraycopy(valueList.toArray(), 0, keyValueArray, key.length, valueArray.length);
+                    System.arraycopy(valueList.toArray(), 0, keyValueArray, key.length, valueList.size());
+                } else {
+                    System.arraycopy(valueArray, 0, keyValueArray, key.length, valueArray.length);
                 }
                 for (int i = 0; i < keyValueArray.length; i++) {
                     values[i][rowCount] = buildConverters[i].calculateValue(keyValueArray[i], buildTypeInfos[i]);
@@ -341,10 +349,10 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
                     rowCount = 0;
                 }
             }
-            if (rowCount > 0 ) {
+            if (rowCount > 0) {
                 List<Vec> vecs = new ArrayList<>();
                 for (int i = 0; i < values.length; i++) {
-                    vecs.add(buildConverters[i].toOmniVEc(values[i], rowCount, buildTypeInfos[i]));
+                    vecs.add(buildConverters[i].toOmniVec(values[i], rowCount, buildTypeInfos[i]));
                 }
                 buildVecBatches.add(new VecBatch(vecs, rowCount));
             }
@@ -364,7 +372,7 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
             String inputName = parentToInput.get(pos);
             LogicalInput input = tezContext.getInput(inputName);
             input.start();
-            tezContext.getTezProcessorContext().waitForAnyInputReady(Collections.<Input>singleton(input));
+            tezContext.getTezProcessorContext().waitForAnyInputReady(Collections.<Input>singletonList(input));
             Reader kvReader = input.getReader();
             OmniReaderWrapper omniReaderWrapper = new OmniReaderWrapper(kvReader);
             MapJoinObjectSerDeContext keyCtx = mapJoinTableSerdes[pos].getKeyContext();
@@ -374,10 +382,10 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
             List<TypeInfo> keyValueType = new ArrayList<>(keySerde.getColumnTypes());
             keyValueType.addAll(valueSerde.getColumnTypes());
             VecBufferCache vecBufferCache = new VecBufferCache(keyValueType.size(), keyValueType);
-            int rowLength = ObjectInspectorUtils.getStructSize(valueSerde.getObjectInspecotr());
+            int rowLength = ObjectInspectorUtils.getStructSize(valueSerde.getObjectInspector());
             // if output includes key and key doesn't have expression, then the value of
             // hashMapWrapper will not contain key.
-            boolean needAddkey = rowLength < joinValuesObjectInspectors[pos].size();
+            boolean needAddKey = rowLength < joinValuesObjectInspectors[pos].size();
             int rowCount = 0;
             VecSerdeBody[] key;
             Writable currentKey;
@@ -385,7 +393,7 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
             while (omniReaderWrapper.next()) {
                 currentKey = (Writable) omniReaderWrapper.getCurrentKey();
                 value = (Writable) omniReaderWrapper.getCurrentValue();
-                key =  (VecSerdeBody[]) keySerde.deserialize(currentKey);
+                key = (VecSerdeBody[]) keySerde.deserialize(currentKey);
                 vecBufferCache.addVecSerdeBody(key, rowCount, 0);
                 if (rowLength > 0) {
                     VecSerdeBody[] vecSerdeBodies = (VecSerdeBody[]) valueSerde.deserialize(value);
@@ -393,16 +401,16 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
                 }
                 rowCount++;
                 if (rowCount == BATCH) {
-                    setBuildVecBatches(pos, buildVecBatches, vecBufferCache, needAddkey, rowCount, keyLength);
+                    setBuildVecBatches(pos, buildVecBatches, vecBufferCache, needAddKey, rowCount, keyLength);
                     rowCount = 0;
                 }
             }
             if (rowCount > 0) {
-                setBuildVecBatches(pos,buildVecBatches, vecBufferCache, needAddkey, rowCount, keyLength);
+                setBuildVecBatches(pos, buildVecBatches, vecBufferCache, needAddKey, rowCount, keyLength);
             }
             return buildVecBatches;
         } catch (Exception e) {
-            throw new HiveException("read vec form map failed", e);
+            throw new HiveException("read vec from map failed", e);
         }
     }
 
@@ -428,9 +436,10 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
 
     public void generateMapMetaData() throws HiveException {
         try {
-            TableDesc keyTableDes = conf.getKeyTableDesc();
-            AbstractSerDe keySerializer = (AbstractSerDe) ReflectionUtil.newInstance(keyTableDes.getDeserializerClass(), null);
-            SerDeUtils.initializeSerDe(keySerializer, null , keyTableDes.getProperties(), null);
+            TableDesc keyTableDesc = conf.getKeyTblDesc();
+            AbstractSerDe keySerializer = (AbstractSerDe) ReflectionUtil
+                    .newInstance(keyTableDesc.getDeserializerClass(), null);
+            SerDeUtils.initializeSerDe(keySerializer, null, keyTableDesc.getProperties(), null);
             MapJoinObjectSerDeContext keyContext = new MapJoinObjectSerDeContext(keySerializer, false);
             for (int pos = 0; pos < conf.getTagOrder().length; pos++) {
                 if (pos == posBigTable) {
@@ -442,7 +451,8 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
                 } else {
                     valueTableDesc = conf.getValueFilteredTblDescs().get(pos);
                 }
-                AbstractSerDe valueSerDe = (AbstractSerDe) ReflectionUtil.newInstance(valueTableDesc.getDeserializerClass(), null);
+                AbstractSerDe valueSerDe = (AbstractSerDe) ReflectionUtil
+                        .newInstance(valueTableDesc.getDeserializerClass(), null);
                 SerDeUtils.initializeSerDe(valueSerDe, null, valueTableDesc.getProperties(), null);
                 MapJoinObjectSerDeContext valueContext = new MapJoinObjectSerDeContext(valueSerDe, hasFilter(pos));
                 mapJoinTableSerdes[pos] = new MapJoinTableContainerSerDe(keyContext, valueContext);
@@ -461,15 +471,16 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
             Map<String, Integer> buildKeyColNameToId = new HashMap<>();
             for (int i = 0; i < joinKeys[buildIndex].size(); i++) {
                 if (joinKeys[buildIndex].get(i) instanceof ExprNodeColumnEvaluator) {
-                    buildKeyColNameToId.put(((ExprNodeColumnEvaluator)joinKeys[buildIndex].get(i)).getExpr().getColumn(), i);
+                    buildKeyColNameToId
+                            .put(((ExprNodeColumnEvaluator) joinKeys[buildIndex].get(i)).getExpr().getColumn(), i);
                 }
             }
-            List<ExprNodeEvaluator> buildValueEvaluators = getExprNodeColumnEvaluator(joinValues[buildIndex]);
-            if (buildValueEvaluators.isEmpty()) {
+            List<ExprNodeEvaluator> buildvalueEvaluators = getExprNodeColumnEvaluator(joinValues[buildIndex]);
+            if (buildvalueEvaluators.isEmpty()) {
                 return;
             }
             for (int i = 0; i < joinValues[buildIndex].size(); i++) {
-                String colName = ((ExprNodeColumnEvaluator) buildValueEvaluators.get(i)).getExpr().getColumn();
+                String colName = ((ExprNodeColumnEvaluator) buildvalueEvaluators.get(i)).getExpr().getColumn();
                 if (buildKeyColNameToId.containsKey(colName)) {
                     valuePosToKeyPos[buildIndex].put(i, buildKeyColNameToId.get(colName));
                 }
@@ -483,7 +494,7 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
         List<ExprNodeEvaluator> buildExprNodeColumnEvaluators = getExprNodeColumnEvaluator(joinKeys[buildIndex]);
         for (int i = 0; i < buildExprNodeColumnEvaluators.size(); i++) {
             buildKeyColNameToId
-                    .put(((ExprNodeColumnEvaluator)buildExprNodeColumnEvaluators.get(i)).getExpr().getColumn(), i);
+                    .put(((ExprNodeColumnEvaluator) buildExprNodeColumnEvaluators.get(i)).getExpr().getColumn(), i);
         }
         String[] buildHashKeys = getExprFromExprNode(buildExprNodeColumnEvaluators, buildKeyColNameToId,
                 inputObjInspectors[buildIndex]);
@@ -497,44 +508,44 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
                 .getAllStructFieldRefs();
         List<String> probeOriginalName = ((StandardStructObjectInspector) inputObjInspectors[probeIndex])
                 .getOriginalColumnNames();
-        List<ObjectInspector> probeInspectors = probeInputfields.stream().map(StructField::getFieldObjectInspector).
-                collect(Collectors.toList());
+        List<ObjectInspector> probeInspectors = probeInputfields.stream().map(StructField::getFieldObjectInspector)
+                .collect(Collectors.toList());
         DataType[] probeTypes = getTypeFromInspectors(probeInspectors);
-        Map<String, Integer> probeKeyColNameToId = new HashMap<>();
-        List<String> probeOutputFieldsName = getExprNodeColumnEvaluator(joinValues[probeIndex]).stream()
+        Map<String, Integer> probekeyColNameToId = new HashMap<>();
+        List<String> probeOutputfieldsName = getExprNodeColumnEvaluator(joinValues[probeIndex]).stream()
                 .map(evaluator -> ((ExprNodeColumnEvaluator) evaluator).getExpr().getColumn())
-                        .collect(Collectors.toList());
+                .collect(Collectors.toList());
         int[] probeOutputCols = new int[joinValuesObjectInspectors[probeIndex].size()];
         for (int i = 0; i < probeInputfields.size(); i++) {
             String fieldName = conf.isDynamicPartitionHashJoin()
                     ? probeOriginalName.get(i)
                     : probeInputfields.get(i).getFieldName();
-            probeKeyColNameToId.put(fieldName, i);
+            probekeyColNameToId.put(fieldName, i);
         }
-        for (int i = 0; i < probeOutputFieldsName.size(); i++) {
-            probeOutputCols[i] = probeKeyColNameToId.get(probeOutputFieldsName.get(i));
+        for (int i = 0; i < probeOutputfieldsName.size(); i++) {
+            probeOutputCols[i] = probekeyColNameToId.get(probeOutputfieldsName.get(i));
         }
-        // if there is exprNodeConstantEvaluator in joinValues
-        if (probeOutputFieldsName.size() < probeOutputCols.length) {
+        // if there is ExprNodeConstantEvaluator in joinValues
+        if (probeOutputfieldsName.size() < probeOutputCols.length) {
             probeOutputCols[probeOutputCols.length - 1] = probeInputfields.size() - 1;
         }
-        String[] probeHashKeys = getExprFromExprNode(joinKeys[probeIndex], probeKeyColNameToId,
+        String[] probeHashKeys = getExprFromExprNode(joinKeys[probeIndex], probekeyColNameToId,
                 inputObjInspectors[probeIndex]);
-        int[] buildOutputCols = new int[buildIndexes.stream().
-                mapToInt(buildIndex -> joinValuesObjectInspectors[buildIndex].size()).sum()];
+        int[] buildOutputCols = new int[buildIndexes.stream()
+                .mapToInt(buildIndex -> joinValuesObjectInspectors[buildIndex].size()).sum()];
         DataType[] buildOutputTypes = new DataType[buildOutputCols.length];
         int start = 0;
         int bias = 0;
         for (int buildIndex : buildIndexes) {
             bias = bias + joinKeysObjectInspectors[buildIndex].size();
-            for (int i = start; i < start + joinKeysObjectInspectors[buildIndex].size(); i++) {
+            for (int i = start; i < start + joinValuesObjectInspectors[buildIndex].size(); i++) {
                 buildOutputCols[i] = i + bias;
                 buildOutputTypes[i] = buildTypes[i + bias];
             }
             start = start + joinValuesObjectInspectors[buildIndex].size();
         }
         JoinType joinType = JOIN_TYPE_MAP.get(condn[buildIndexes.size() - 1].getType());
-        if (joinType == joinType.OMNI_JOIN_TYPE_FULL) {
+        if (joinType == JoinType.OMNI_JOIN_TYPE_FULL) {
             return new OmniLookupOuterJoinWithExprOperatorFactory(probeTypes, probeOutputCols, probeHashKeys,
                     buildOutputCols, buildOutputTypes, omniHashBuilderWithExprOperatorFactory);
         } else {
@@ -544,35 +555,36 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
     }
 
     // get the OmniLookupOperatorFactory of two build tables' join
-    private OmniOperatorFactory getInnerOmniLookUpOperatorFactory(
+    private OmniOperatorFactory getInnerOmniLookupOperatorFactory(
             OmniHashBuilderWithExprOperatorFactory omniHashBuilderWithExprOperatorFactory, int probeIndex,
             List<Integer> buildIndexes, DataType[] buildTypes) {
         List<ObjectInspector> probeInspectors = new ArrayList<>();
         probeInspectors.addAll(joinKeysObjectInspectors[probeIndex]);
         probeInspectors.addAll(joinValuesObjectInspectors[probeIndex]);
         DataType[] probeTypes = getTypeFromInspectors(probeInspectors);
-        Map<String, Integer> probeKeyColNameToId = new HashMap<>();
+        Map<String, Integer> probekeyColNameToId = new HashMap<>();
         List<ExprNodeEvaluator> exprNodeColumnEvaluators = getExprNodeColumnEvaluator(joinKeys[probeIndex]);
         for (int i = 0; i < exprNodeColumnEvaluators.size(); i++) {
-            probeKeyColNameToId.put(((ExprNodeColumnEvaluator) exprNodeColumnEvaluators.get(i)).getExpr().getColumn(),
+            probekeyColNameToId.put(((ExprNodeColumnEvaluator) exprNodeColumnEvaluators.get(i)).getExpr().getColumn(),
                     i);
         }
         int[] probeOutputCols = new int[probeInspectors.size()];
         for (int i = 0; i < probeInspectors.size(); i++) {
             probeOutputCols[i] = i;
         }
-        String[] probeHashKeys = getExprFromExprNode(exprNodeColumnEvaluators, probeKeyColNameToId,
+        String[] probeHashKeys = getExprFromExprNode(exprNodeColumnEvaluators, probekeyColNameToId,
                 inputObjInspectors[probeIndex]);
-        int[] buildOutputCols = new int[buildIndexes.stream().
-                mapToInt(buildIndex -> joinValuesObjectInspectors[buildIndex].size()
-                        + joinKeysObjectInspectors[buildIndex].size()).sum()];
+        int[] buildOutputCols = new int[buildIndexes.stream()
+                .mapToInt(buildIndex -> joinValuesObjectInspectors[buildIndex].size()
+                        + joinKeysObjectInspectors[buildIndex].size())
+                .sum()];
         DataType[] buildOutputTypes = new DataType[buildOutputCols.length];
         for (int i = 0; i < buildOutputCols.length; i++) {
             buildOutputCols[i] = i;
             buildOutputTypes[i] = buildTypes[i];
         }
         JoinType joinType = JOIN_TYPE_MAP.get(condn[buildIndexes.size() - 1].getType());
-        if (joinType == joinType.OMNI_JOIN_TYPE_FULL) {
+        if (joinType == JoinType.OMNI_JOIN_TYPE_FULL) {
             return new OmniLookupOuterJoinWithExprOperatorFactory(probeTypes, probeOutputCols, probeHashKeys,
                     buildOutputCols, buildOutputTypes, omniHashBuilderWithExprOperatorFactory);
         } else {
@@ -582,7 +594,7 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
     }
 
     @Override
-    protected void completeInitializationOp(Object[] os) throws HiveException{
+    protected void completeInitializationOp(Object[] os) throws HiveException {
         if (os.length > 0) {
             List<List<VecBatch>> vecBatchList = (List<List<VecBatch>>) os[0];
             for (int i = 0; i < vecBatchList.size(); i++) {
@@ -590,7 +602,7 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
             }
         }
         if (joinKeysObjectInspectors.length > 2) {
-            // There may be many buildtables, need to join build tables first, and use the
+            // There may be many build tables, need to join build tables first, and use the
             // result as input of buildOperator
             List<Integer> buildList = new ArrayList<>();
             List<VecBatch> probeVec;
@@ -604,7 +616,7 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
                 OmniHashBuilderWithExprOperatorFactory innerBuildFactory = getOmniHashBuilderWithExprOperatorFactory(
                         buildTypes, buildIndexes.get(i + 1));
                 OmniOperator innerBuildOperator = innerBuildFactory.createOperator();
-                OmniOperatorFactory innerJoinOperatorFactory = getInnerOmniLookUpOperatorFactory(innerBuildFactory,
+                OmniOperatorFactory innerJoinOperatorFactory = getInnerOmniLookupOperatorFactory(innerBuildFactory,
                         probeIndex, buildList, buildTypes);
                 OmniOperator innerJoinOperator = innerJoinOperatorFactory.createOperator();
                 if (output != null) {
@@ -626,7 +638,7 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
                     }
                 }
                 innerBuildOperator.close();
-                innerBuildFactory.close();;
+                innerBuildFactory.close();
                 innerJoinOperator.close();
                 innerJoinOperatorFactory.close();
             }
@@ -649,15 +661,15 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
         return buildVecs[index].stream().map(OmniHiveOperator::copyVecBatch).collect(Collectors.toList());
     }
 
-    private int[] getOrder(int posBigtable, int aliasNum) {
-        if (posBigtable == 0) {
+    private int[] getOrder(int posBigTable, int aliasNum) {
+        if (posBigTable == 0) {
             return null;
         }
         int[] order = new int[aliasNum];
-        order[0] = posBigtable;
+        order[0] = posBigTable;
         int index = 1;
         for (int i = 0; i < aliasNum; i++) {
-            if (i == posBigtable) {
+            if (i == posBigTable) {
                 continue;
             }
             order[index++] = i;
@@ -666,7 +678,7 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
     }
 
     private VecBatch reorderVecs(VecBatch vecBatch, int[] order, List<ObjectInspector>[] joinValuesObjectInspectors) {
-        // because omni operator's output order will always be [probeTable buildTable]
+        // because omni operator's output oder will always be [probeTable buildTable]
         // but hive is according to tag' order
         // so need to reorder output col
         // The property order means the current order of output cols of tables
@@ -721,6 +733,7 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
         }
     }
 
+    @Override
     protected void forward(Object row, ObjectInspector rowInspector) throws HiveException {
         VecBatch vecBatch = null;
         VecBatch[] vecBatches = new VecBatch[childOperatorsArray.length];
@@ -750,7 +763,7 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
                 childrenDone++;
             } else {
                 if (vecBatch != null) {
-                    o.process(vecBatches[i], childOperatorsTag[i]);;
+                    o.process(vecBatches[i], childOperatorsTag[i]);
                 } else {
                     o.process(row, childOperatorsTag[i]);
                 }
@@ -815,13 +828,11 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
 
     private static class OmniReaderWrapper {
         private boolean isSingleValue;
-
         private KeyValueReader originValueReader;
-
         private KeyValuesReader originValuesReader;
 
         public OmniReaderWrapper(Reader reader) {
-            if (reader instanceof KeyValuesReader) {
+            if (reader instanceof KeyValueReader) {
                 isSingleValue = true;
                 originValueReader = (KeyValueReader) reader;
             } else {

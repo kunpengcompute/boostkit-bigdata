@@ -6,7 +6,7 @@ import org.apache.hadoop.hive.ql.plan.ReduceSinkDesc;
 
 @Explain(displayName = "Omni ReduceSink", explainLevels = {Explain.Level.USER, Explain.Level.DEFAULT,
         Explain.Level.EXTENDED})
-public class OmniReduceSinkDesc extends ReduceSinkDesc{
+public class OmniReduceSinkDesc extends ReduceSinkDesc {
     public OmniReduceSinkDesc(ReduceSinkDesc reduceSinkDesc) {
         super(reduceSinkDesc.getKeyCols(), reduceSinkDesc.getNumDistributionKeys(), reduceSinkDesc.getValueCols(), reduceSinkDesc.getOutputKeyColumnNames(),
                 reduceSinkDesc.getDistinctColumnIndices(), reduceSinkDesc.getOutputValueColumnNames(), reduceSinkDesc.getTag(), reduceSinkDesc.getPartitionCols(),
@@ -26,6 +26,7 @@ public class OmniReduceSinkDesc extends ReduceSinkDesc{
         this.setMemoryNeeded(reduceSinkDesc.getMemoryNeeded());
         this.setNullOrder(reduceSinkDesc.getNullOrder());
         this.setNumBuckets(reduceSinkDesc.getNumBuckets());
+        this.setNumDistributionKeys(reduceSinkDesc.getNumDistributionKeys());
         this.setOpProps(reduceSinkDesc.getOpProps());
         this.setOrder(reduceSinkDesc.getOrder());
         this.setRuntimeStatsTmpDir(reduceSinkDesc.getRuntimeStatsTmpDir());
