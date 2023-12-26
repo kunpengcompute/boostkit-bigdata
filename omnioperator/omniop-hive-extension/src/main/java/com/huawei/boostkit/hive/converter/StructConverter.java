@@ -2,7 +2,6 @@ package com.huawei.boostkit.hive.converter;
 
 import nova.hetu.omniruntime.vector.Vec;
 
-import org.apache.hadoop.hive.serde2.lazybinary.objectinspector.LazyBinaryStructObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.StructField;
 import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
@@ -40,8 +39,10 @@ public class StructConverter implements VecConverter {
     public Object calculateValue(Object col, StructObjectInspector structObjectInspector) {
         Object[] result = new Object[fields.length];
         for (int i = 0; i < fields.length; i++) {
-            result[i] = converters[i].calculateValue(getStructFieldData(col, fields[i], structObjectInspector), typeInfos[i]);
+            result[i] = converters[i].calculateValue(structObjectInspector.getStructFieldData(col, fields[i]),
+                    typeInfos[i]);
         }
+        return result;
     }
 
     public VecConverter[] getConverters() {
@@ -50,15 +51,6 @@ public class StructConverter implements VecConverter {
 
     public List<? extends StructField> getFields() {
         return fieldsList;
-    }
-
-    public Object getStructFieldData(Object data, StructField fieldRef, StructObjectInspector structObjectInspector) {
-        if (data == null) {
-            return null;
-        }
-        if (!(structObjectInspector instanceof LazyBinaryStructObjectInspector)) {
-            return structObjectInspector.getStructFieldData(data, fieldRef);
-        }
     }
 
     @Override

@@ -1,5 +1,7 @@
 package com.huawei.boostkit.hive.converter;
 
+import static org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatch.DEFAULT_SIZE;
+
 import com.huawei.boostkit.hive.cache.ColumnCache;
 import com.huawei.boostkit.hive.cache.LongColumnCache;
 
@@ -15,8 +17,6 @@ import org.apache.hadoop.hive.serde2.io.TimestampWritable;
 import org.apache.hadoop.hive.serde2.io.TimestampWritableV2;
 import org.apache.hadoop.hive.serde2.lazy.LazyTimestamp;
 import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
-
-import static org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatch.DEFAULT_SIZE;
 
 public class TimestampVecConverter extends LongVecConverter {
     public Object fromOmniVec(Vec vec, int index) {
@@ -45,7 +45,7 @@ public class TimestampVecConverter extends LongVecConverter {
         } else if (col instanceof TimestampWritableV2) {
             timeValue = ((TimestampWritableV2) col).getTimestamp().toEpochMilli();
         } else {
-            timeValue = ((Timestamp) col).toEpochMilli()
+            timeValue = ((Timestamp) col).toEpochMilli();
         }
         return timeValue;
     }

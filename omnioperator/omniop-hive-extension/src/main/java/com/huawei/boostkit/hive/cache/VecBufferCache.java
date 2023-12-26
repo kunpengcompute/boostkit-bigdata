@@ -41,17 +41,17 @@ public class VecBufferCache {
         }
     }
 
-    public void addVecSerdBody(VecSerdeBody[] vecSerdBodies, int rowCount, int offset) {
-        for (int i = 0; i < vecSerdBodies.length; i++) {
+    public void addVecSerdeBody(VecSerdeBody[] vecSerdeBodies, int rowCount, int offset) {
+        for (int i = 0; i < vecSerdeBodies.length; i++) {
             int cacheIndex = i + offset;
-            System.arraycopy(vecSerdBodies[i].value, 0, cache[cacheIndex].byteBuffer, cache[cacheIndex].offset[rowCount], vecSerdBodies[i].length);
+            System.arraycopy(vecSerdeBodies[i].value, 0, cache[cacheIndex].byteBuffer, cache[cacheIndex].offset[rowCount], vecSerdeBodies[i].length);
             if (cache[cacheIndex].isChar) {
-                cache[cacheIndex].offset[rowCount + 1] = cache[cacheIndex].offset[rowCount] + vecSerdBodies[i].length;
+                cache[cacheIndex].offset[rowCount + 1] = cache[cacheIndex].offset[rowCount] + vecSerdeBodies[i].length;
             }
-            if (cache[cacheIndex].noNulls && vecSerdBodies[i].isNull == 1) {
+            if (cache[cacheIndex].noNulls && vecSerdeBodies[i].isNull == 1) {
                 cache[cacheIndex].noNulls = false;
             }
-            cache[cacheIndex].isNull[rowCount] = vecSerdBodies[i].isNull;
+            cache[cacheIndex].isNull[rowCount] = vecSerdeBodies[i].isNull;
         }
     }
 

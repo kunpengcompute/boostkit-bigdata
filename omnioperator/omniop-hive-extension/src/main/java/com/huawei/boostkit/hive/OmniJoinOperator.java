@@ -61,8 +61,8 @@ public class OmniJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc> impl
     private static final long serialVersionUID = 1L;
 
     protected static final int SMJ_NEED_ADD_STREAM_TBL_DATA = 2;
-    protected static final int SMJ_NEED_ADD_BUFFERER_TBL_DATA = 3;
-    protected static final int SCAN_FINSISH = 4;
+    protected static final int SMJ_NEED_ADD_BUFFERED_TBL_DATA = 3;
+    protected static final int SCAN_FINISH = 4;
     protected static final int RES_INIT = 0;
     protected static final int SMJ_FETCH_JOIN_DATA = 5;
 
@@ -72,7 +72,7 @@ public class OmniJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc> impl
     protected transient OmniSmjBufferedTableWithExprOperatorFactory[] bufferFactories;
     protected transient OmniSmjStreamedTableWithExprOperatorFactory[] streamFactories;
     protected transient OmniOperator[] bufferOperators;
-    protected transient OmniOperator[] streamOpeartors;
+    protected transient OmniOperator[] streamOperators;
 
     protected transient int[] resCode;
     protected transient int[] flowControlCode;
@@ -110,7 +110,7 @@ public class OmniJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc> impl
         super.initializeOp(hconf);
         fetchDone = new boolean[sourceNum];
         streamFactories = new OmniSmjStreamedTableWithExprOperatorFactory[sourceNum - 1];
-        streamOpeartors = new OmniOperator[sourceNum - 1];
+        streamOperators = new OmniOperator[sourceNum - 1];
         bufferFactories = new OmniSmjBufferedTableWithExprOperatorFactory[sourceNum - 1];
         bufferOperators = new OmniOperator[sourceNum - 1];
         resCode = new int[sourceNum - 1];
@@ -138,7 +138,7 @@ public class OmniJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc> impl
         }
         streamFactories[opIndex] = (OmniSmjStreamedTableWithExprOperatorFactory) getFactory(streamAliasList, null,
                 getAll, opIndex);
-        streamOpeartors[opIndex] = streamFactories[opIndex].createOperator();
+        streamOperators[opIndex] = streamFactories[opIndex].createOperator();
         bufferFactories[opIndex] = (OmniSmjBufferedTableWithExprOperatorFactory) getFactory(Arrays.asList(bufferIndex),
                 streamFactories[opIndex], getAll, opIndex);
         bufferOperators[opIndex] = bufferFactories[opIndex].createOperator();
@@ -216,7 +216,7 @@ public class OmniJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc> impl
                                 .getAllStructFieldRefs().stream()))
                 .map(field -> field.getFieldObjectInspector()).collect(Collectors.toList());
         Map<String, String> inputColNameToExprName = new HashMap<>();
-        for (Map.Entry<String, ExprNodeDesc> entry : conf.getColumnExprMap.entrySet()) {
+        for (Map.Entry<String, ExprNodeDesc> entry : conf.getColumnExprMap().entrySet()) {
             ExprNodeColumnDesc exprNodeColumnDesc = (ExprNodeColumnDesc) entry.getValue();
             inputColNameToExprName.put(exprNodeColumnDesc.getColumn().replace("VALUE.", "").replace("KEY.", ""), entry.getKey());
         }
@@ -283,13 +283,12 @@ public class OmniJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc> impl
         }
     }
 
-    @Override
     protected void processOmni(int opIndex, int bufferIndex) throws HiveException {
-        if (flowControlCode[opIndex] != SCAN_FINSISH && resCode[opIndex] == RES_INIT){
+        if (flowControlCode[opIndex] != SCAN_FINISH && resCode[opIndex] == RES_INIT) {
             if (flowControlCode[opIndex] == SMJ_NEED_ADD_STREAM_TBL_DATA) {
-                processOmniSmj(opIndex, opIndex, streamData, streamOpeartors, SMJ_NEED_ADD_STREAM_TBL_DATA, streamTypes);
+                processOmniSmj(opIndex, opIndex, streamData, streamOperators, SMJ_NEED_ADD_STREAM_TBL_DATA, streamTypes);
             } else {
-                processOmniSmj(opIndex, bufferIndex, bufferData, bufferOperators, SMJ_NEED_ADD_BUFFERER_TBL_DATA, bufferTypes);
+                processOmniSmj(opIndex, bufferIndex, bufferData, bufferOperators, SMJ_NEED_ADD_BUFFERED_TBL_DATA, bufferTypes);
             }
         }
         if (resCode[opIndex] == SMJ_FETCH_JOIN_DATA) {
@@ -297,7 +296,7 @@ public class OmniJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc> impl
             while (output.hasNext()) {
                 VecBatch vecBatch = output.next();
                 if (streamFactories.length > opIndex + 1) {
-                    if (flowControlCode[opIndex + 1] != SCAN_FINSISH) {
+                    if (flowControlCode[opIndex + 1] != SCAN_FINISH) {
                         streamData[opIndex + 1].offer(vecBatch);
                         processOmni(opIndex + 1, opIndex + 2);
                     } else {
@@ -323,7 +322,6 @@ public class OmniJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc> impl
      * @param types       bufferTypes or streamTypes
      * @throws HiveException HiveException
      */
-    @Override
     protected void processOmniSmj(int opIndex, int dataIndex, Queue<VecBatch>[] data, OmniOperator[] operators,
                                   int controlCode, DataType[][] types) throws HiveException {
         if (data[opIndex].isEmpty() && fetchDone[dataIndex]) {
@@ -364,7 +362,7 @@ public class OmniJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc> impl
         }
         Set<Integer> needDeal = new HashSet<>();
         for (int opIndex = streamFactories.length - 1; opIndex >= 0; opIndex--) {
-            if (flowControlCode[opIndex] == SCAN_FINSISH) {
+            if (flowControlCode[opIndex] == SCAN_FINISH) {
                 break;
             }
             needDeal.add(opIndex);
@@ -373,7 +371,7 @@ public class OmniJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc> impl
             if (!needDeal.contains(opIndex)) {
                 continue;
             }
-            while (flowControlCode[opIndex] !=SCAN_FINSISH && flowControlCode[opIndex] != 0){
+            while (flowControlCode[opIndex] != SCAN_FINISH && flowControlCode[opIndex] != 0) {
                 processOmni(opIndex, opIndex + 1);
             }
         }
@@ -413,6 +411,7 @@ public class OmniJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc> impl
                             dataTypes[i].getClass().getSimpleName(), this.getClass().getSimpleName()));
             }
         }
+        return new VecBatch(vecs, 0);
     }
 
     public boolean[] getFetchDone() {
@@ -447,8 +446,8 @@ public class OmniJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc> impl
 
     @Override
     public void closeOp(boolean abort) throws HiveException {
-        for (int i = 0; i < streamOpeartors.length; i++) {
-            streamOpeartors[i].close();
+        for (int i = 0; i < streamOperators.length; i++) {
+            streamOperators[i].close();
             bufferOperators[i].close();
             streamFactories[i].close();
             bufferFactories[i].close();
@@ -460,8 +459,8 @@ public class OmniJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc> impl
                 vecBatch.releaseAllVectors();
                 vecBatch.close();
             }
-            output = null;
-            super.closeOp(abort);
         }
+        output = null;
+        super.closeOp(abort);
     }
 }
