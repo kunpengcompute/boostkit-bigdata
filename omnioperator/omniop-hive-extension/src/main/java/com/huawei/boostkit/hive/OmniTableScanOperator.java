@@ -23,7 +23,7 @@ import static com.huawei.boostkit.hive.OmniVectorOperator.convertLazyToJavaInspe
 import static com.huawei.boostkit.hive.converter.VecConverter.CONVERTER_MAP;
 import static com.huawei.boostkit.hive.expression.TypeUtils.DEFAULT_VARCHAR_LENGTH;
 
-import com.huawei.boostkit.hive.converter.StrcutConverter;
+import com.huawei.boostkit.hive.converter.StructConverter;
 import com.huawei.boostkit.hive.converter.VecConverter;
 import com.huawei.boostkit.hive.reader.VecBatchWrapper;
 
@@ -73,7 +73,7 @@ public class OmniTableScanOperator extends TableScanOperator implements Serializ
     }
 
     public OmniTableScanOperator(TableScanOperator tableScanOperator) {
-        super(tableScanOperator.getompilationOpContext());
+        super(tableScanOperator.getCompilationOpContext());
         this.conf = tableScanOperator.getConf();
         this.setSchemaEvolution(tableScanOperator.getSchemaEvolutionColumns(),
                 tableScanOperator.getSchemaEvolutionColumnsTypes());
@@ -81,13 +81,13 @@ public class OmniTableScanOperator extends TableScanOperator implements Serializ
     }
 
     @Override
-    protected void initilizeOp(Configuration hconf) throws HiveExceprion {
-        super.initilizeOp(hconf);
+    protected void initializeOp(Configuration hconf) throws HiveException {
+        super.initializeOp(hconf);
         StructObjectInspector standardStructObjectInspector = (StructObjectInspector) inputObjInspectors[0];
         Set<Integer> neededColumnIDs = new HashSet<>(this.getNeededColumnIDs());
         partColumnNames = Utilities.getMapWork(hconf).getAliasToPartnInfo().get(this.getConf().getAlias())
                 .getPartSpec().keySet();
-        List<StructField> neededFields = new Arraylist<>();
+        List<StructField> neededFields = new ArrayList<>();
         List<? extends StructField> allStructFieldRefs = standardStructObjectInspector.getAllStructFieldRefs();
         for (int i = 0; i < allStructFieldRefs.size(); i++) {
             if (neededColumnIDs.contains(i) || partColumnNames.contains(allStructFieldRefs.get(i).getFieldName())) {
@@ -124,7 +124,7 @@ public class OmniTableScanOperator extends TableScanOperator implements Serializ
             int rowCount = noPartValues.getRowCount();
             Object[] partValues = (Object[]) objects[1];
             Vec[] vecs = new Vec[noPartValues.getVectors().length + partColumnNames.size()];
-            System.arrayCopy(noPartValues.getVectors(), 0, vecs, 0, noPartValues.getVectors().length);
+            System.arraycopy(noPartValues.getVectors(), 0, vecs, 0, noPartValues.getVectors().length);
             for (int i = 0; i < partColumnNames.size(); i++) {
                 Object[] partValue = new Object[rowCount];
                 Arrays.fill(partValue, partColumnConverters[i].calculateValue(partValues[i]));

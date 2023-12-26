@@ -57,7 +57,7 @@ public class OmniFilterOperator extends OmniHiveOperator<FilterDesc> implements 
             if (allStructFieldRefs.get(i).getFieldObjectInspector() instanceof PrimitiveObjectInspector) {
                 PrimitiveTypeInfo typeInfo = ((PrimitiveObjectInspector) allStructFieldRefs.get(i).getFieldObjectInspector()).getTypeInfo();
                 int omniType = TypeUtils.convertHiveTypeToOmniType(typeInfo);
-                inputTypes[i] = TypeUtils.buildINputDataType(typeInfo);
+                inputTypes[i] = TypeUtils.buildInputDataType(typeInfo);
                 projections[i] = TypeUtils.buildExpression(typeInfo, omniType, i);
             }
         }

@@ -82,15 +82,15 @@ public class OmniVectorWithSortOperator extends OmniHiveOperator<OmniVectorDesc>
         keyFiledNum = new int[inputObjInspectors.length];
         outputs = new Iterator[inputObjInspectors.length];
 
-        for (int i = 0; i < inputObjectInspectors.length; i++) {
-            soi[i] = (StructObjectInspector) inputObjectInspectors[i];
+        for (int i = 0; i < inputObjInspectors.length; i++) {
+            soi[i] = (StructObjectInspector) inputObjInspectors[i];
         }
         for (int i = 0; i < soi.length; i++) {
             fields[i] = soi[i].getAllStructFieldRefs().stream().map(field -> (StructField) field)
                     .collect(Collectors.toList());
             keyFiledNum[i] = ((StructObjectInspector) fields[i].get(0).getFieldObjectInspector())
                     .getAllStructFieldRefs().size();
-            flatFields[i] = fields[i].stream.flatMap(
+            flatFields[i] = fields[i].stream().flatMap(
                     field -> ((StructObjectInspector) field.getFieldObjectInspector()).getAllStructFieldRefs().stream())
                     .collect(Collectors.toList());
             List<TypeInfo> typeInfos = flatFields[i].stream()

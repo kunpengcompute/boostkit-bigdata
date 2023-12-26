@@ -52,7 +52,7 @@ public class OmniVectorizedMergeJoinOperator extends OmniJoinOperator {
             setDone(true);
             return;
         }
-        if (tag == 0 && flowCcontrolCode[0] != SCAN_FINISH) {
+        if (tag == 0 && flowControlCode[0] != SCAN_FINISH) {
             streamData[0].offer(input);
         } else if (tag >= 1 && flowControlCode[tag - 1] != SCAN_FINISH) {
             bufferData[tag - 1].offer(input);
