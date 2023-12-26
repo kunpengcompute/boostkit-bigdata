@@ -169,7 +169,7 @@ public class OmniJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc> impl
             if (i >= fieldNum[tagIndex]) {
                 ++tagIndex;
             }
-            inputTypes[i] = TypeUtils.buildINputDataType(((AbstractPrimitiveObjectInspector) inputFields.get(i).getFieldObjectInspector()).getTypeInfo());
+            inputTypes[i] = TypeUtils.buildInputDataType(((AbstractPrimitiveObjectInspector) inputFields.get(i).getFieldObjectInspector()).getTypeInfo());
             colNameToId.get(tagIndex).put(inputFields.get(i).getFieldName(), i);
         }
         int[] outputCols;
@@ -285,7 +285,7 @@ public class OmniJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc> impl
 
     @Override
     protected void processOmni(int opIndex, int bufferIndex) throws HiveException {
-        if (flowControlCode[opIndex] != SCAN_FINSISH && resCode[opIndex] == RES_INIT]){
+        if (flowControlCode[opIndex] != SCAN_FINSISH && resCode[opIndex] == RES_INIT){
             if (flowControlCode[opIndex] == SMJ_NEED_ADD_STREAM_TBL_DATA) {
                 processOmniSmj(opIndex, opIndex, streamData, streamOpeartors, SMJ_NEED_ADD_STREAM_TBL_DATA, streamTypes);
             } else {
@@ -422,7 +422,7 @@ public class OmniJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc> impl
     @Override
     protected void forward(Object row, ObjectInspector rowInspector) throws HiveException {
         VecBatch vecBatch = (VecBatch) row;
-        this.runTimeNumRows += vecBatch.getRowCount()；
+        this.runTimeNumRows += vecBatch.getRowCount();
         if (getDone()) {
             vecBatch.releaseAllVectors();
             vecBatch.close();

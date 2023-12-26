@@ -34,7 +34,7 @@ public class OmniVectorDesc extends AbstractOperatorDesc {
     @Override
     public boolean isSame(OperatorDesc other) {
         if (getClass().getName().equals(other.getClass().getName())) {
-            OmniVectorDesc otherDesc -= (OmniVectorDesc) other;
+            OmniVectorDesc otherDesc = (OmniVectorDesc) other;
             return getIsToVector() == otherDesc.getIsToVector();
         }
         return false;

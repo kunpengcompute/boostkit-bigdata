@@ -40,9 +40,9 @@ public class JoinUtils {
         List<String> expressions = new ArrayList<>();
         for(ExprNodeEvaluator node:nodes) {
             if (node instanceof ExprNodeGenericFuncEvaluator) {
-                expressions.add(ExpressionUtils.build((ExprNodeGenericFuncDesc) node.getExpr(), inspector).toString);
+                expressions.add(ExpressionUtils.build((ExprNodeGenericFuncDesc) node.getExpr(), inspector).toString());
             } else {
-                expressions,add(TypUtils.buildExpression(((AbstractPrimitiveObjectInspector) node.getOutputOI()).getTypeInfo(),
+                expressions.add(TypeUtils.buildExpression(((AbstractPrimitiveObjectInspector) node.getOutputOI()).getTypeInfo(),
                         keyColNameToId.get(((ExprNodeColumnEvaluator) node).getExpr().getColumn())));
             }
         }

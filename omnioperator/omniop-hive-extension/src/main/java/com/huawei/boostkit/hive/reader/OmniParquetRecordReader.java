@@ -179,7 +179,7 @@ public class OmniParquetRecordReader
 
     @Override
     public boolean next(NullWiritable key, VecBatchWrapper value) throws IOException {
-        int batchSize == recordReader.next(vecs);
+        int batchSize = recordReader.next(vecs);
         if (batchSize == 0) {
             return false;
         }

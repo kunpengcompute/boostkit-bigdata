@@ -20,7 +20,7 @@
         <dependency>
             <groupId>com.huawei.boostkit</groupId>
             <artifactId>boostkit-omniop-bindings</artifactId>
-            <version>${omniruntime.version}}</version>
+            <version>${omniruntime.version}</version>
             <classifier>aarch64</classifier>
             <exclusions>
                 <exclusion>

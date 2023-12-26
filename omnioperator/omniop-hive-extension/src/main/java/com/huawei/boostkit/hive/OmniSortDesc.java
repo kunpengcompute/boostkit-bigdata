@@ -1,8 +1,7 @@
 
 package com.huawei.boostkit.hive;
 
-import com.huawei.boost.hive.expression.ExpressionUtils;
-
+import com.huawei.boostikt.hive.expression.ExpressionUtils;
 import org.apache.hadoop.hive.ql.plan.AbstractOperatorDesc;
 import org.apache.hadoop.hive.ql.plan.Explain;
 import org.apache.hadoop.hive.ql.plan.ExprNodeColumnDesc;

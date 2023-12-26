@@ -48,7 +48,7 @@ public class BridgeExpressionProcessor implements ExpressionProcessor {
                 || node.getGenericUDF().getUdfName().equals("UDFToString")) {
             leaf = createNode(node.getChildren().get(0), inspector);
             CastFunctionExpression functionExpression = new CastFunctionExpression(
-                    TypeUtils.convertHiveTypeToOmniType(node.getTypeInfo()), null, null, null));
+                    TypeUtils.convertHiveTypeToOmniType(node.getTypeInfo()), null, null, null);
             return ExpressionUtils.optimizeCast(leaf, functionExpression);
         }
         return leaf;

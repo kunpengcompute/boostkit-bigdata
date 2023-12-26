@@ -50,8 +50,8 @@ public class OmniPTFOperator extends OmniHiveOperator<OmniPTFDesc> implements Se
     boolean isMapOperator;
     private transient WindowTableFunctionDef windowTableFunctionDef;
     transient Configuration hiveConf;
-    public OmniPTFOperator{
-        super();
+    public OmniPTFOperator(CompilationOpContext ctx) {
+        super(ctx);
     }
 
     public OmniPTFOperator(CompilationOpContext ctx, PTFDesc conf) {

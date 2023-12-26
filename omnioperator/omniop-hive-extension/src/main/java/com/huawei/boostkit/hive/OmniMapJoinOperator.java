@@ -385,7 +385,7 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
             while (omniReaderWrapper.next()) {
                 currentKey = (Writable) omniReaderWrapper.getCurrentKey();
                 value = (Writable) omniReaderWrapper.getCurrentValue();
-                key (VecSerdeBody[]) keySerde.deserialize(currentKey);
+                key =  (VecSerdeBody[]) keySerde.deserialize(currentKey);
                 vecBufferCache.addVecSerdeBody(key, rowCount, 0);
                 if (rowLength > 0) {
                     VecSerdeBody[] vecSerdeBodies = (VecSerdeBody[]) valueSerde.deserialize(value);

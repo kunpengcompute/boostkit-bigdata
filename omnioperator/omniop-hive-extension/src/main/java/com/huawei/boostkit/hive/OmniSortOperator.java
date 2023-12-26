@@ -23,8 +23,8 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 
-public class OmniSortOperator extends OmniHiveOperatorFactory<OmniSortDesc> implements Serializable {
-    private static final long serialVersionID = 1L;
+public class OmniSortOperator extends OmniHiveOperator<OmniSortDesc> implements Serializable {
+    private static final long serialVersionUID = 1L;
 
     private transient OmniSortOperatorFactory sortOperatorFactory;
 
@@ -44,7 +44,7 @@ public class OmniSortOperator extends OmniHiveOperatorFactory<OmniSortDesc> impl
     }
 
     @Override
-    protected void initializeOp(Configuration hconf) throws HiveExpection {
+    protected void initializeOp(Configuration hconf) throws HiveException {
         super.initializeOp(hconf);
         List<? extends StructField> allStructFieldRefs = ((StructObjectInspector) inputObjInspectors[0])
                 .getAllStructFieldRefs();
@@ -54,7 +54,7 @@ public class OmniSortOperator extends OmniHiveOperatorFactory<OmniSortDesc> impl
             if (allStructFieldRefs.get(i).getFieldObjectInspector() instanceof PrimitiveObjectInspector) {
                 PrimitiveTypeInfo typeInfo = ((PrimitiveObjectInspector) allStructFieldRefs.get(i)
                         .getFieldObjectInspector()).getTypeInfo();
-                inputTypes[i] = TyprUtils.buildInputDataType(typeInfo);
+                inputTypes[i] = TypeUtils.buildInputDataType(typeInfo);
                 outputCols[i] = i;
             }
         }
