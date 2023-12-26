@@ -68,7 +68,7 @@ public class VecBatchWrapperSerde extends AbstractSerDe {
             }
         }
         if (columnTypeProperty == null) {
-            // Defult type: all string
+            // Default type: all string
             StringBuilder sb = new StringBuilder();
             for (int i = 0; i < columnNames.size(); i++) {
                 if (i > 0) {

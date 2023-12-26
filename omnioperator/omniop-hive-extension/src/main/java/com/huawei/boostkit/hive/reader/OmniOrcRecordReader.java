@@ -29,7 +29,7 @@ import org.apache.orc.OrcConf;
 import org.apache.orc.TypeDescription;
 
 import java.io.IOException;
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -76,7 +76,7 @@ public class OmniOrcRecordReader implements RecordReader<NullWritable, VecBatchW
     }
 
     private org.apache.orc.Reader.Options buildOptions(Configuration conf, long start, long length) {
-        org.apache.orc.Reader.Options options = new (org.apache.orc.Reader.Options(conf)).range(start, length)
+        org.apache.orc.Reader.Options options = (new org.apache.orc.Reader.Options(conf)).range(start, length)
                 .useZeroCopy(OrcConf.USE_ZEROCOPY.getBoolean(conf))
                 .skipCorruptRecords(OrcConf.SKIP_CORRUPT_DATA.getBoolean(conf))
                 .tolerateMissingSchema(OrcConf.TOLERATE_MISSING_SCHEMA.getBoolean(conf));
