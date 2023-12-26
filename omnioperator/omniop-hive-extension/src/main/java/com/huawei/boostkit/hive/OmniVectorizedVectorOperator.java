@@ -137,8 +137,8 @@ public class OmniVectorizedVectorOperator extends OmniHiveOperator<OmniVectorDes
         projectedColumns = new ArrayList<>();
         rbCtx = getVectorizedRowBatchCtx(hconf);
         vectorizedRowBatch = rbCtx.createVectorizedRowBatch();
-        for (int i = 0; i < vectorizationContext.getProjectionColumnsNames().size(); i++) {
-            if (!vectorizationContext.getProjectionColumnsNames().get(i).equals("ROW__ID")
+        for (int i = 0; i < vectorizationContext.getProjectionColumnNames().size(); i++) {
+            if (!vectorizationContext.getProjectionColumnNames().get(i).equals("ROW__ID")
                     && vectorizedRowBatch.cols[vectorizationContext.getProjectedColumns().get(i)] != null) {
                 projectedColumns.add(vectorizationContext.getProjectedColumns().get(i));
             }
