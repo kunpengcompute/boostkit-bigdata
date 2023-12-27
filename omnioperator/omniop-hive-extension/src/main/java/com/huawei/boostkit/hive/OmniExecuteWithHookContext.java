@@ -7,13 +7,15 @@ import static org.apache.hadoop.hive.serde.serdeConstants.SERIALIZATION_LIB;
 import com.huawei.boostkit.hive.expression.BaseExpression;
 import com.huawei.boostkit.hive.expression.CastFunctionExpression;
 import com.huawei.boostkit.hive.expression.ExpressionUtils;
+import com.huawei.boostkit.hive.expression.TypeUtils;
 import com.huawei.boostkit.hive.reader.OmniOrcInputFormat;
 import com.huawei.boostkit.hive.reader.OmniParquetInputFormat;
 import com.huawei.boostkit.hive.reader.VecBatchWrapperSerde;
 import com.huawei.boostkit.hive.shuffle.OmniVecBatchSerDe;
+
+import nova.hetu.omniruntime.constants.FunctionType;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.QueryPlan;
-
 import org.apache.hadoop.hive.ql.exec.ExplainTask;
 import org.apache.hadoop.hive.ql.exec.MapJoinOperator;
 import org.apache.hadoop.hive.ql.exec.Operator;
@@ -268,9 +270,20 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                 }
                 List<WindowFunctionDef> windowFunctionDefs = ((WindowTableFunctionDef) conf.getFuncDef()).getWindowFunctions();
                 for (int i = 0; i < windowFunctionDefs.size(); i++) {
-                    List<PTFExpressionDef> args = windowFunctionDefs.get(i).getArgs();
-                    if (args.size() > 1) {
+                    WindowFunctionDef windowFunctionDef = windowFunctionDefs.get(i);
+                    FunctionType windowFunctionType = TypeUtils.getWindowFunctionType(windowFunctionDef);
+                    if (windowFunctionType == null) {
                         return false;
+                    }
+                    List<PTFExpressionDef> args = windowFunctionDefs.get(i).getArgs();
+                    boolean isCountAll = (windowFunctionDef.getName().equals("count") && windowFunctionDef.isStar());
+                    if (args != null) {
+                        if (!isCountAll && args.size() > 1) {
+                            return false;
+                        }
+                        if(!(args.get(0).getExprNode() instanceof ExprNodeColumnDesc)) {
+                            return false;
+                        }
                     }
                 }
                 return true;

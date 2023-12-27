@@ -142,8 +142,9 @@ public class DecimalVecConverter implements VecConverter {
                     decimalColumnCache.isNull[rowCount + i] = true;
                 }
             } else {
+                byte[] decimalBytes = getDecimalBytes(vector[0], decimalTypeInfo);
                 for (int i = 0; i < vectorizedRowBatch.size; i++) {
-                    decimalColumnCache.dataCache[rowCount + i] = getDecimalBytes(vector[0], decimalTypeInfo);
+                    decimalColumnCache.dataCache[rowCount + i] = decimalBytes;
                 }
             }
         } else if (vectorizedRowBatch.selectedInUse) {
