@@ -280,7 +280,8 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                         return false;
                     }
                     for (ExprNodeDesc paramter : aggregator.getParameters()) {
-                        PrimitiveObjectInspector.PrimitiveCategory primitiveCategory = ((PrimitiveTypeInfo) paramter.getTypeInfo()).getPrimitiveCategory();
+                        PrimitiveObjectInspector.PrimitiveCategory primitiveCategory = ((PrimitiveTypeInfo) paramter
+                                .getTypeInfo()).getPrimitiveCategory();
                         if ((primitiveCategory == PrimitiveObjectInspector.PrimitiveCategory.STRING ||
                                 primitiveCategory == PrimitiveObjectInspector.PrimitiveCategory.VARCHAR) &&
                                 aggregator.getGenericUDAFName().equals("sum")) {
@@ -321,25 +322,25 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         try {
             while (!queue.isEmpty()) {
                 ExprNodeDesc current = queue.poll();
-                if (current instanceof ExprNodeGenericFuncDesc) {
-                    if (((ExprNodeGenericFuncDesc) current).getGenericUDF() instanceof GenericUDFConcat) {
-                        return false;
-                    }
-                    boolean supportUDF = ExpressionUtils.isSupportUDF(((ExprNodeGenericFuncDesc) current).getGenericUDF());
-                    if (!supportUDF) {
-                        return false;
-                    }
-                    BaseExpression expr = ExpressionUtils.build((ExprNodeGenericFuncDesc) current.clone(), null);
-                    if (expr instanceof CastFunctionExpression && checkUnsupportedCast((CastFunctionExpression) expr)) {
-                        return false;
-                    }
-                    expressions.add(expr.toString());
-                    current.getChildren().forEach(queue::offer);
-                } else if (current instanceof ExprNodeColumnDesc) {
-                    if (UNSUPPORTED_TYPE.contains(((PrimitiveTypeInfo) current.getTypeInfo()).getPrimitiveCategory())) {
-                        return false;
-                    }
+                if (current instanceof ExprNodeColumnDesc
+                    && NSUPPORTED_TYPE.contains(((PrimitiveTypeInfo) current.getTypeInfo()).getPrimitiveCategory())) {
+                    return false;
+                } else if (!(current instanceof ExprNodeGenericFuncDesc)) {
+                    continue;
                 }
+                if (((ExprNodeGenericFuncDesc) current).getGenericUDF() instanceof GenericUDFConcat) {
+                    return false;
+                }
+                boolean supportUDF = ExpressionUtils.isSupportUDF(((ExprNodeGenericFuncDesc) current).getGenericUDF());
+                if (!supportUDF) {
+                    return false;
+                }
+                BaseExpression expr = ExpressionUtils.build((ExprNodeGenericFuncDesc) current.clone(), null);
+                if (expr instanceof CastFunctionExpression && checkUnsupportedCast((CastFunctionExpression) expr)) {
+                    return false;
+                }
+                expressions.add(expr.toString());
+                current.getChildren().forEach(queue::offer);
             }
         } catch (Exception e) {
             return false;
@@ -386,12 +387,8 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
     private boolean getReduceSinkCanReplace(BaseWork work) {
         boolean reduceSinkCanReplace = false;
         for (BaseWork child : tezWork.getChildren(work)) {
-            TezEdgeProperty.EdgeType edgeType = tezWork.getEdgeType(work, child);
-            if ((edgeType == TezEdgeProperty.EdgeType.ONE_TO_ONE_EDGE
-                    || edgeType == TezEdgeProperty.EdgeType.CUSTOM_SIMPLE_EDGE
-                    || edgeType == TezEdgeProperty.EdgeType.BROADCAST_EDGE
-                    || edgeType == TezEdgeProperty.EdgeType.XPROD_EDGE)
-                    && isReplaceable(child.getAnyRootOperator(), true)) {
+            if (isSupportEdgeType(tezWork.getEdgeType(work, child))
+                && isReplaceable(child.getAnyRootOperator(), true)) {
                 reduceSinkCanReplace = true;
             }
             if (edgeType == TezEdgeProperty.EdgeType.SIMPLE_EDGE && child instanceof ReduceWork) {
@@ -429,6 +426,16 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             }
         }
         return reduceSinkCanReplace;
+    }
+
+    private boolean isSupportEdgeType(TezEdgeProperty.EdgeType edgeType) {
+        if (edgeType == TezEdgeProperty.EdgeType.ONE_TO_ONE_EDGE
+                || edgeType == TezEdgeProperty.EdgeType.CUSTOM_SIMPLE_EDGE
+                || edgeType == TezEdgeProperty.EdgeType.BROADCAST_EDGE
+                || edgeType == TezEdgeProperty.EdgeType.XPROD_EDGE) {
+            return true;
+        }
+        return false;
     }
 
     private void setParentWorkToCurrentWorkEdge(BaseWork work, TezEdgeProperty.EdgeType edgeType) {
@@ -695,7 +702,10 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
 
         @Override
         public boolean equals(Object obj) {
-            return (this.operator == ((OperatorInfo) obj).getOperator());
+            if (obj instanceof OperatorInfo) {
+                return (this.operator == ((OperatorInfo) obj).getOperator());
+            }
+            return false;
         }
 
         @Override

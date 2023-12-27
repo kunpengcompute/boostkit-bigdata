@@ -236,11 +236,12 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 try {
                     for (List<VecBatch> vecBatchList : vecBatchNeedClose) {
-                        if (vecBatchList != null) {
-                            for (VecBatch vecBatch : vecBatchList) {
-                                vecBatch.releaseAllVectors();
-                                vecBatch.close();
-                            }
+                        if (vecBatchList == null) {
+                            continue;
+                        }
+                        for (VecBatch vecBatch : vecBatchList) {
+                            vecBatch.releaseAllVectors();
+                            vecBatch.close();
                         }
                     }
                     LOG.info("release vecBatchNeedClose succeed");

@@ -28,18 +28,15 @@ public abstract class OmniHiveOperator<T extends OperatorDesc> extends Operator<
             vecBatch = (VecBatch) row;
             vecBatches[0] = vecBatch;
             this.runTimeNumRows += vecBatch.getRowCount();
-            if (childOperatorsArray.length > 1) {
-                for (int i = 1; i < vecBatches.length; i++) {
-                    if (!childOperatorsArray[i].getDone()) {
-                        vecBatches[i] = copyVecBatch(vecBatch);
-                    }
+            for (int i = 1; i < childOperatorsArray.length; i++) {
+                if (!childOperatorsArray[i].getDone()) {
+                    vecBatches[i] = copyVecBatch(vecBatch);
                 }
             }
         }
         if (getDone()) {
             if (vecBatch != null) {
                 vecBatch.releaseAllVectors();
-                ;
                 vecBatch.close();
             }
             return;
