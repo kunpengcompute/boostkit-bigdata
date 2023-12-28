@@ -216,6 +216,89 @@ int Splitter::SplitFixedWidthValueBuffer(VectorBatch& vb) {
     return 0;
 }
 
+void HandleNull(VCBatchInfo &vcbInfo, bool isNull) {
+    if(isNull) {
+        vcbInfo.SetNullFlag(isNull);
+    }
+}
+
+template<bool hasNull>
+void Splitter::SplitBinaryVector(BaseVector *varcharVector, int col_schema) {
+    int32_t num_rows = varcharVector->GetSize();
+    bool is_null = false;
+    if (varcharVector->GetEncoding() == OMNI_DICTIONARY) {
+        auto vc = reinterpret_cast<Vector<DictionaryContainer<std::string_view, LargeStringContainer>> *>(
+                varcharVector);
+        for (auto row = 0; row < num_rows; ++row) {
+            auto pid = partition_id_[row];
+            uint8_t *dst = nullptr;
+            uint32_t str_len = 0;
+            if (!vc->IsNull(row)) {
+                std::string_view value = vc->GetValue(row);
+                dst = reinterpret_cast<uint8_t *>(reinterpret_cast<int64_t>(value.data()));
+                str_len = static_cast<uint32_t>(value.length());
+            }
+            if constexpr (hasNull) {
+                is_null = vc->IsNull(row);
+            }
+            cached_vectorbatch_size_ += str_len; // 累计变长部分cache数据
+            VCLocation cl((uint64_t) dst, str_len, is_null);
+            if ((vc_partition_array_buffers_[pid][col_schema].size() != 0) &&
+                (vc_partition_array_buffers_[pid][col_schema].back().getVcList().size() <
+                options_.spill_batch_row_num)) {
+                if constexpr(hasNull) {
+                    HandleNull(vc_partition_array_buffers_[pid][col_schema].back(), is_null);
+                }
+                vc_partition_array_buffers_[pid][col_schema].back().getVcList().push_back(cl);
+                vc_partition_array_buffers_[pid][col_schema].back().vcb_total_len += str_len;
+            } else {
+                VCBatchInfo svc(options_.spill_batch_row_num);
+                svc.getVcList().push_back(cl);
+                svc.vcb_total_len += str_len;
+                if constexpr (hasNull) {
+                    HandleNull(svc, is_null);
+                }
+                vc_partition_array_buffers_[pid][col_schema].push_back(svc);
+            }
+        }
+    } else {
+        auto vc = reinterpret_cast<Vector<LargeStringContainer<std::string_view>> *>(varcharVector);
+        for (auto row = 0; row < num_rows; ++row) {
+            auto pid = partition_id_[row];
+            uint8_t *dst = nullptr;
+            uint32_t str_len = 0;
+            if (!vc->IsNull(row)) {
+                std::string_view value = vc->GetValue(row);
+                dst = reinterpret_cast<uint8_t *>(reinterpret_cast<int64_t>(value.data()));
+                str_len = static_cast<uint32_t>(value.length());
+            }
+
+            if constexpr (hasNull) {
+                is_null = vc->IsNull(row);
+            }
+            cached_vectorbatch_size_ += str_len; // 累计变长部分cache数据
+            VCLocation cl((uint64_t) dst, str_len, is_null);
+            if ((vc_partition_array_buffers_[pid][col_schema].size() != 0) &&
+                (vc_partition_array_buffers_[pid][col_schema].back().getVcList().size() <
+                options_.spill_batch_row_num)) {
+                if constexpr(hasNull) {
+                    HandleNull(vc_partition_array_buffers_[pid][col_schema].back(), is_null);
+                }
+                vc_partition_array_buffers_[pid][col_schema].back().getVcList().push_back(cl);
+                vc_partition_array_buffers_[pid][col_schema].back().vcb_total_len += str_len;
+            } else {
+                VCBatchInfo svc(options_.spill_batch_row_num);
+                svc.getVcList().push_back(cl);
+                if constexpr(hasNull) {
+                    HandleNull(svc, is_null);
+                }
+                svc.vcb_total_len += str_len;
+                vc_partition_array_buffers_[pid][col_schema].push_back(svc);
+            }
+        }
+    }
+}
+
 int Splitter::SplitBinaryArray(VectorBatch& vb)
 {
     const auto num_rows = vb.GetRowCount();
@@ -225,60 +308,12 @@ int Splitter::SplitBinaryArray(VectorBatch& vb)
         switch (column_type_id_[col_schema]) {
             case SHUFFLE_BINARY: {
                 auto col_vb = singlePartitionFlag ? col_schema : col_schema + 1;
-                varcharVectorCache.insert(vb.Get(col_vb));
-                if (vb.Get(col_vb)->GetEncoding() == OMNI_DICTIONARY) {
-                    auto vc = reinterpret_cast<Vector<DictionaryContainer<std::string_view, LargeStringContainer>> *>(
-                            vb.Get(col_vb));
-                    for (auto row = 0; row < num_rows; ++row) {
-                        auto pid = partition_id_[row];
-                        uint8_t *dst = nullptr;
-                        uint32_t str_len = 0;
-                        if (!vc->IsNull(row)) {
-                            std::string_view value = vc->GetValue(row);
-                            dst = reinterpret_cast<uint8_t *>(reinterpret_cast<int64_t>(value.data()));
-                            str_len = static_cast<uint32_t>(value.length());
-                        }
-                        bool is_null = vc->IsNull(row);
-                        cached_vectorbatch_size_ += str_len; // 累计变长部分cache数据
-                        VCLocation cl((uint64_t) dst, str_len, is_null);
-                        if ((vc_partition_array_buffers_[pid][col_schema].size() != 0) &&
-                            (vc_partition_array_buffers_[pid][col_schema].back().getVcList().size() <
-                            options_.spill_batch_row_num)) {
-                            vc_partition_array_buffers_[pid][col_schema].back().getVcList().push_back(cl);
-                            vc_partition_array_buffers_[pid][col_schema].back().vcb_total_len += str_len;
-                        } else {
-                            VCBatchInfo svc(options_.spill_batch_row_num);
-                            svc.getVcList().push_back(cl);
-                            svc.vcb_total_len += str_len;
-                            vc_partition_array_buffers_[pid][col_schema].push_back(svc);
-                        }
-                    }
+                auto *varcharVector = vb.Get(col_vb);
+                varcharVectorCache.insert(varcharVector);
+                if (varcharVector->HasNull()) {
+                    this->template SplitBinaryVector<true>(varcharVector, col_schema);
                 } else {
-                    auto vc = reinterpret_cast<Vector<LargeStringContainer<std::string_view>> *>(vb.Get(col_vb));
-                    for (auto row = 0; row < num_rows; ++row) {
-                        auto pid = partition_id_[row];
-                        uint8_t *dst = nullptr;
-                        uint32_t str_len = 0;
-                        if (!vc->IsNull(row)) {
-                            std::string_view value = vc->GetValue(row);
-                            dst = reinterpret_cast<uint8_t *>(reinterpret_cast<int64_t>(value.data()));
-                            str_len = static_cast<uint32_t>(value.length());
-                        }
-                        bool is_null = vc->IsNull(row);
-                        cached_vectorbatch_size_ += str_len; // 累计变长部分cache数据
-                        VCLocation cl((uint64_t) dst, str_len, is_null);
-                        if ((vc_partition_array_buffers_[pid][col_schema].size() != 0) &&
-                            (vc_partition_array_buffers_[pid][col_schema].back().getVcList().size() <
-                            options_.spill_batch_row_num)) {
-                            vc_partition_array_buffers_[pid][col_schema].back().getVcList().push_back(cl);
-                            vc_partition_array_buffers_[pid][col_schema].back().vcb_total_len += str_len;
-                        } else {
-                            VCBatchInfo svc(options_.spill_batch_row_num);
-                            svc.getVcList().push_back(cl);
-                            svc.vcb_total_len += str_len;
-                            vc_partition_array_buffers_[pid][col_schema].push_back(svc);
-                        }
-                    }
+                    this->template SplitBinaryVector<false>(varcharVector, col_schema);
                 }
                 break;
             }
@@ -297,34 +332,36 @@ int Splitter::SplitFixedWidthValidityBuffer(VectorBatch& vb){
         auto col_idx = fixed_width_array_idx_[col];
         auto& dst_addrs = partition_fixed_width_validity_addrs_[col];
         // 分配内存并初始化
-        for (auto pid = 0; pid < num_partitions_; ++pid) {
-            if (partition_id_cnt_cur_[pid] > 0 && dst_addrs[pid] == nullptr) {
-                // init bitmap if it's null
-                auto new_size = partition_id_cnt_cur_[pid] > options_.buffer_size ? partition_id_cnt_cur_[pid] : options_.buffer_size;
-                auto ptr_tmp = static_cast<uint8_t *>(options_.allocator->Alloc(new_size));
-                if (nullptr == ptr_tmp) {
-                    throw std::runtime_error("Allocator for ValidityBuffer Failed! ");
+        if (vb.Get(col_idx)->HasNull()) {
+            for (auto pid = 0; pid < num_partitions_; ++pid) {
+                if (partition_id_cnt_cur_[pid] > 0 && dst_addrs[pid] == nullptr) {
+                    // init bitmap if it's null
+                    auto new_size = partition_id_cnt_cur_[pid] > options_.buffer_size ? partition_id_cnt_cur_[pid] : options_.buffer_size;
+                    auto ptr_tmp = static_cast<uint8_t *>(options_.allocator->Alloc(new_size));
+                    if (nullptr == ptr_tmp) {
+                        throw std::runtime_error("Allocator for ValidityBuffer Failed! ");
+                    }
+                    std::shared_ptr<Buffer> validity_buffer (
+                        new Buffer((uint8_t *)ptr_tmp, partition_id_cnt_cur_[pid], new_size));
+                    dst_addrs[pid] = const_cast<uint8_t*>(validity_buffer->data_);
+                    std::memset(validity_buffer->data_, 0, new_size);
+                    partition_fixed_width_buffers_[col][pid][0] = std::move(validity_buffer);
+                    fixed_nullBuffer_size_[pid] = new_size;
                 }
-                std::shared_ptr<Buffer> validity_buffer (new Buffer((uint8_t *)ptr_tmp, 0, new_size));
-                dst_addrs[pid] = const_cast<uint8_t*>(validity_buffer->data_);
-                std::memset(validity_buffer->data_, 0, new_size);
-                partition_fixed_width_buffers_[col][pid][0] = std::move(validity_buffer);
-                fixed_nullBuffer_size_[pid] = new_size;
-            } 
-        }
+            }
 
-        // 计算并填充数据
-        auto src_addr = const_cast<uint8_t *>((uint8_t *)(
-                reinterpret_cast<int64_t>(omniruntime::vec::unsafe::UnsafeBaseVector::GetNulls(vb.Get(col_idx)))));
-        std::fill(std::begin(partition_buffer_idx_offset_),
-                std::end(partition_buffer_idx_offset_), 0);
-        const auto num_rows = vb.GetRowCount();
-        for (auto row = 0; row < num_rows; ++row) {
-            auto pid = partition_id_[row];
-            auto dst_offset = partition_buffer_idx_base_[pid] + partition_buffer_idx_offset_[pid];
-            dst_addrs[pid][dst_offset] = src_addr[row];
-            partition_buffer_idx_offset_[pid]++;
-            partition_fixed_width_buffers_[col][pid][0]->size_ += 1;
+            // 计算并填充数据
+            auto src_addr = const_cast<uint8_t *>((uint8_t *)(
+                    reinterpret_cast<int64_t>(omniruntime::vec::unsafe::UnsafeBaseVector::GetNulls(vb.Get(col_idx)))));
+            std::fill(std::begin(partition_buffer_idx_offset_),
+                    std::end(partition_buffer_idx_offset_), 0);
+            const auto num_rows = vb.GetRowCount();
+            for (auto row = 0; row < num_rows; ++row) {
+                auto pid = partition_id_[row];
+                auto dst_offset = partition_buffer_idx_base_[pid] + partition_buffer_idx_offset_[pid];
+                dst_addrs[pid][dst_offset] = src_addr[row];
+                partition_buffer_idx_offset_[pid]++;
+            }
         }
     }
     return 0;
@@ -350,7 +387,9 @@ int Splitter::CacheVectorBatch(int32_t partition_id, bool reset_buffers) {
                 }
                 default: {
                     auto& buffers = partition_fixed_width_buffers_[fixed_width_idx][partition_id];
-                    batch_partition_size += buffers[0]->capacity_; // 累计null数组所占内存大小
+                    if (buffers[0] != nullptr) {
+                        batch_partition_size += buffers[0]->capacity_; // 累计null数组所占内存大小
+                    }
                     batch_partition_size += buffers[1]->capacity_; // 累计value数组所占内存大小
                     if (reset_buffers) {
                         bufferArrayTotal[fixed_width_idx] = std::move(buffers);
@@ -632,17 +671,18 @@ void Splitter::SerializingFixedColumns(int32_t partitionId,
         colIndexTmpSchema = singlePartitionFlag ? fixed_width_array_idx_[fixColIndexTmp] : fixed_width_array_idx_[fixColIndexTmp] - 1;
         auto onceCopyLen = splitRowInfoTmp->onceCopyRow * (1 << column_type_id_[colIndexTmpSchema]);
         // 临时内存，拷贝拼接onceCopyRow批，用完释放
-        void *ptr_value_tmp = static_cast<void *>(options_.allocator->Alloc(onceCopyLen));
-        std::shared_ptr<Buffer> ptr_value (new Buffer((uint8_t*)ptr_value_tmp, 0, onceCopyLen));
-        void *ptr_validity_tmp = static_cast<void *>(options_.allocator->Alloc(splitRowInfoTmp->onceCopyRow));
-        std::shared_ptr<Buffer> ptr_validity (new Buffer((uint8_t*)ptr_validity_tmp, 0, splitRowInfoTmp->onceCopyRow));
-        if (nullptr == ptr_value->data_ || nullptr == ptr_validity->data_) {
-            throw std::runtime_error("Allocator for tmp buffer Failed! ");
-        }
+        std::string valueStr;
+        valueStr.resize(onceCopyLen);
+        std::string nullStr;
+
+        std::shared_ptr<Buffer> ptr_value (new Buffer((uint8_t*)valueStr.data(), 0, onceCopyLen));
+        std::shared_ptr<Buffer> ptr_validity;
+
         // options_.spill_batch_row_num长度切割与拼接
         uint destCopyedLength = 0;
         uint memCopyLen = 0;
         uint cacheBatchSize = 0;
+        bool nullAllocated = false;
         while (destCopyedLength < onceCopyLen) {
             if (splitRowInfoTmp->cacheBatchIndex[fixColIndexTmp] >= partition_cached_vectorbatch_[partitionId].size()) { // 数组越界保护
                 throw std::runtime_error("Columnar shuffle CacheBatchIndex out of bound.");
@@ -656,18 +696,25 @@ void Splitter::SerializingFixedColumns(int32_t partitionId,
                       onceCopyLen,
                       destCopyedLength,
                       splitRowInfoTmp->cacheBatchCopyedLen[fixColIndexTmp]);
+            if (not nullAllocated && partition_cached_vectorbatch_[partitionId][splitRowInfoTmp->cacheBatchIndex[fixColIndexTmp]][fixColIndexTmp][0] != nullptr) {
+                nullStr.resize(splitRowInfoTmp->onceCopyRow);
+                ptr_validity.reset(new Buffer((uint8_t*)nullStr.data(), 0, splitRowInfoTmp->onceCopyRow));
+                nullAllocated = true;
+            }
             if ((onceCopyLen - destCopyedLength) >= (cacheBatchSize - splitRowInfoTmp->cacheBatchCopyedLen[fixColIndexTmp])) {
                 memCopyLen = cacheBatchSize - splitRowInfoTmp->cacheBatchCopyedLen[fixColIndexTmp];
                 memcpy((uint8_t*)(ptr_value->data_) + destCopyedLength,
                        partition_cached_vectorbatch_[partitionId][splitRowInfoTmp->cacheBatchIndex[fixColIndexTmp]][fixColIndexTmp][1]->data_ + splitRowInfoTmp->cacheBatchCopyedLen[fixColIndexTmp],
                        memCopyLen);
                 // (destCopyedLength / (1 << column_type_id_[colIndexTmpSchema])) 等比例计算null数组偏移
-                memcpy((uint8_t*)(ptr_validity->data_) + (destCopyedLength / (1 << column_type_id_[colIndexTmpSchema])),
-                       partition_cached_vectorbatch_[partitionId][splitRowInfoTmp->cacheBatchIndex[fixColIndexTmp]][fixColIndexTmp][0]->data_ + (splitRowInfoTmp->cacheBatchCopyedLen[fixColIndexTmp] / (1 << column_type_id_[colIndexTmpSchema])),
-                       memCopyLen / (1 << column_type_id_[colIndexTmpSchema]));
-                // 释放内存
-                options_.allocator->Free(partition_cached_vectorbatch_[partitionId][splitRowInfoTmp->cacheBatchIndex[fixColIndexTmp]][fixColIndexTmp][0]->data_,
-                                         partition_cached_vectorbatch_[partitionId][splitRowInfoTmp->cacheBatchIndex[fixColIndexTmp]][fixColIndexTmp][0]->capacity_);
+                if (partition_cached_vectorbatch_[partitionId][splitRowInfoTmp->cacheBatchIndex[fixColIndexTmp]][fixColIndexTmp][0] != nullptr) {
+                    memcpy((uint8_t*)(ptr_validity->data_) + (destCopyedLength / (1 << column_type_id_[colIndexTmpSchema])),
+                           partition_cached_vectorbatch_[partitionId][splitRowInfoTmp->cacheBatchIndex[fixColIndexTmp]][fixColIndexTmp][0]->data_ + (splitRowInfoTmp->cacheBatchCopyedLen[fixColIndexTmp] / (1 << column_type_id_[colIndexTmpSchema])),
+                           memCopyLen / (1 << column_type_id_[colIndexTmpSchema]));
+                    // 释放内存
+                    options_.allocator->Free(partition_cached_vectorbatch_[partitionId][splitRowInfoTmp->cacheBatchIndex[fixColIndexTmp]][fixColIndexTmp][0]->data_,
+                                             partition_cached_vectorbatch_[partitionId][splitRowInfoTmp->cacheBatchIndex[fixColIndexTmp]][fixColIndexTmp][0]->capacity_);
+                }
                 options_.allocator->Free(partition_cached_vectorbatch_[partitionId][splitRowInfoTmp->cacheBatchIndex[fixColIndexTmp]][fixColIndexTmp][1]->data_,
                                          partition_cached_vectorbatch_[partitionId][splitRowInfoTmp->cacheBatchIndex[fixColIndexTmp]][fixColIndexTmp][1]->capacity_);
                 destCopyedLength += memCopyLen;
@@ -679,9 +726,12 @@ void Splitter::SerializingFixedColumns(int32_t partitionId,
                     partition_cached_vectorbatch_[partitionId][splitRowInfoTmp->cacheBatchIndex[fixColIndexTmp]][fixColIndexTmp][1]->data_ + splitRowInfoTmp->cacheBatchCopyedLen[fixColIndexTmp],
                     memCopyLen);
                 // (destCopyedLength / (1 << column_type_id_[colIndexTmpSchema])) 等比例计算null数组偏移
-                memcpy((uint8_t*)(ptr_validity->data_) + (destCopyedLength / (1 << column_type_id_[colIndexTmpSchema])),
-                    partition_cached_vectorbatch_[partitionId][splitRowInfoTmp->cacheBatchIndex[fixColIndexTmp]][fixColIndexTmp][0]->data_ + (splitRowInfoTmp->cacheBatchCopyedLen[fixColIndexTmp] / (1 << column_type_id_[colIndexTmpSchema])),
-                    memCopyLen / (1 << column_type_id_[colIndexTmpSchema]));
+
+                if(partition_cached_vectorbatch_[partitionId][splitRowInfoTmp->cacheBatchIndex[fixColIndexTmp]][fixColIndexTmp][0] != nullptr) {
+                    memcpy((uint8_t*)(ptr_validity->data_) + (destCopyedLength / (1 << column_type_id_[colIndexTmpSchema])),
+                                        partition_cached_vectorbatch_[partitionId][splitRowInfoTmp->cacheBatchIndex[fixColIndexTmp]][fixColIndexTmp][0]->data_ + (splitRowInfoTmp->cacheBatchCopyedLen[fixColIndexTmp] / (1 << column_type_id_[colIndexTmpSchema])),
+                                        memCopyLen / (1 << column_type_id_[colIndexTmpSchema]));
+                }
                 destCopyedLength = onceCopyLen; // copy目标完成，结束while循环
                 splitRowInfoTmp->cacheBatchCopyedLen[fixColIndexTmp] += memCopyLen;
             }
@@ -692,11 +742,11 @@ void Splitter::SerializingFixedColumns(int32_t partitionId,
                     fixColIndexTmp,
                     splitRowInfoTmp->cacheBatchCopyedLen[fixColIndexTmp]);
         }
-        vec.set_values(ptr_value->data_, onceCopyLen);
-        vec.set_nulls(ptr_validity->data_, splitRowInfoTmp->onceCopyRow);
+        auto *protoValue = vec.mutable_values();
+        *protoValue = std::move(valueStr);
+        auto *protoNulls = vec.mutable_nulls();
+        *protoNulls = std::move(nullStr);
         // 临时内存，拷贝拼接onceCopyRow批，用完释放
-        options_.allocator->Free(ptr_value->data_, ptr_value->capacity_);
-        options_.allocator->Free(ptr_validity->data_, ptr_validity->capacity_);
     }
     // partition_cached_vectorbatch_[partition_id][cache_index][col][0]代表ByteMap,
     // partition_cached_vectorbatch_[partition_id][cache_index][col][1]代表value
@@ -709,16 +759,27 @@ void Splitter::SerializingBinaryColumns(int32_t partitionId, spark::Vec& vec, in
     int valuesTotalLen = vcb.getVcbTotalLen();
     std::vector<VCLocation> lst = vcb.getVcList();
     int itemsTotalLen = lst.size();
-    auto OffsetsByte(std::make_unique<int32_t[]>(itemsTotalLen + 1));
-    auto nullsByte(std::make_unique<char[]>(itemsTotalLen));
-    auto valuesByte(std::make_unique<char[]>(valuesTotalLen));
-    BytesGen(reinterpret_cast<uint64_t>(OffsetsByte.get()),
-             reinterpret_cast<uint64_t>(nullsByte.get()),
-             reinterpret_cast<uint64_t>(valuesByte.get()), vcb);
-    vec.set_values(valuesByte.get(), valuesTotalLen);
-    // nulls add boolean array; serizelized tobytearray
-    vec.set_nulls((char *)nullsByte.get(), itemsTotalLen);
-    vec.set_offset(OffsetsByte.get(), (itemsTotalLen + 1) * sizeof(int32_t));
+
+    std::string offsetsStr;
+    offsetsStr.resize(sizeof(int32_t) * (itemsTotalLen + 1));
+    std::string nullsStr;
+    std::string valuesStr;
+    valuesStr.resize(valuesTotalLen);
+    if(vcb.hasNull()) {
+        BytesGen<true>(reinterpret_cast<uint64_t>(offsetsStr.data()),
+                 nullsStr,
+                 reinterpret_cast<uint64_t>(valuesStr.data()), vcb);
+    } else {
+        BytesGen<false>(reinterpret_cast<uint64_t>(offsetsStr.data()),
+                         nullsStr,
+                         reinterpret_cast<uint64_t>(valuesStr.data()), vcb);
+    }
+    auto *protoValue = vec.mutable_values();
+    *protoValue = std::move(valuesStr);
+    auto *protoNulls = vec.mutable_nulls();
+    *protoNulls = std::move(nullsStr);
+    auto *protoOffset = vec.mutable_offset();
+    *protoOffset = std::move(offsetsStr);
 }
 
 int32_t Splitter::ProtoWritePartition(int32_t partition_id, std::unique_ptr<BufferedOutputStream> &bufferStream, void *bufferOut, int32_t &sizeOut) {

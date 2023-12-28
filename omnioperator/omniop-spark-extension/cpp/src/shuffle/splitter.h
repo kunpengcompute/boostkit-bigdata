@@ -82,6 +82,9 @@ class Splitter {
 
     int SplitBinaryArray(VectorBatch& vb);
 
+    template<bool HasNull>
+    void SplitBinaryVector(BaseVector *varcharVector, int col_schema);
+
     int CacheVectorBatch(int32_t partition_id, bool reset_buffers);
 
     void ToSplitterTypeId(int num_cols);
