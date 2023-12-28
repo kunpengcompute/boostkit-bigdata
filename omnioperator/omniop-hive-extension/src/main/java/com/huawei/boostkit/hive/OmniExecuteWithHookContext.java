@@ -589,8 +589,12 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             case FILTER:
                 return new OmniFilterOperator(current.getCompilationOpContext(), (FilterDesc) current.getConf());
             case MAPJOIN:
-                if (current instanceof VectorizationContextRegion) {
+                if (current instanceof VectorMapJoinBaseOperator) {
                     return new OmniMapJoinOperator((MapJoinOperator) current, (MapJoinDesc) current.getConf(), true,
+                            ((VectorMapJoinBaseOperator) current).getOutputVectorizationContext());
+                }
+                if (current instanceof VectorizationContextRegion) {
+                    return new OmniMapJoinOperator((MapJoinOperator) current, (MapJoinDesc) current.getConf(), false,
                             ((VectorizationContextRegion) current).getOutputVectorizationContext());
                 } else {
                     return new OmniMapJoinOperator((MapJoinOperator) current, (MapJoinDesc) current.getConf());
