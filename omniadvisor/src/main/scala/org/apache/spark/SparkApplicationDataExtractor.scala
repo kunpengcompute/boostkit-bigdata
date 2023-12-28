@@ -118,7 +118,8 @@ object SparkApplicationDataExtractor {
     val (startTime, finishTime) = extractJobsTime(jobsList)
     appResult.startTime = startTime
     appResult.finishTime = finishTime
-    appResult.durationTime = finishTime - startTime
+    appResult.durationTime = if (finishTime - startTime > 0)
+      finishTime - startTime else AppResult.FAILED_JOB_DURATION
 
     if (appResult.submit_method.equals(AppResult.SPARK_SQL)) {
       appResult.query = extractQuerySQL(sqlExecutionsList)

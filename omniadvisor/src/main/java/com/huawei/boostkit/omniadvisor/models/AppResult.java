@@ -26,13 +26,13 @@ import javax.persistence.Table;
 
 @Entity
 @Table(name = AppResult.RESULT_TABLE_NAME)
-@Index(name = "yarn_app_result_i1", columnNames = {"application_id"})
-@Index(name = "yarn_app_result_i2", columnNames = {"application_name"})
+@Index(name = "history_config_i1", columnNames = {"application_id"})
+@Index(name = "history_config_i2", columnNames = {"application_name"})
 public class AppResult extends Model {
     private static final long serialVersionUID = 1L;
 
     public static final long FAILED_JOB_DURATION = MathUtils.DAY_IN_MS;
-    public static final String RESULT_TABLE_NAME = "yarn_app_result";
+    public static final String RESULT_TABLE_NAME = "history_config";
     public static final String SPARK_SUBMIT = "spark-submit";
     public static final String SPARK_SQL = "spark-sql";
     public static final int FAILED_STATUS = 0;
