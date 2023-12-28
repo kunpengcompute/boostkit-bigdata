@@ -138,11 +138,10 @@ public class OmniVectorWithSortOperator extends OmniHiveOperator<OmniVectorDesc>
     public void process(Object row, int tag) throws HiveException {
         if (tag == posBigTable && !allFetchDone) {
             for (int i = 0; i < source.length; i++) {
-                if (i == posBigTable) {
-                    continue;
-                }
-                while (!fetchDone[i]) {
-                    fetchDone[i] = !source[i].pushRecord();
+                if (i != posBigTable) {
+                    while (!fetchDone[i]) {
+                        fetchDone[i] = !source[i].pushRecord();
+                    }
                 }
             }
             allFetchDone = true;

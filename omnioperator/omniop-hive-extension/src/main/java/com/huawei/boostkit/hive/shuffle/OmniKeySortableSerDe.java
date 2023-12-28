@@ -87,7 +87,7 @@ public class OmniKeySortableSerDe extends AbstractSerDe {
     byte[] columnNullMarker;
     byte[] columnNotNullMarker;
 
-    public static final Charset decimalCharSet = Charset.forName("US-ASCII");
+    public static Charset decimalCharSet = Charset.forName("US-ASCII");
 
     @Override
     public void initialize(Configuration conf, Properties tbl) throws SerDeException {

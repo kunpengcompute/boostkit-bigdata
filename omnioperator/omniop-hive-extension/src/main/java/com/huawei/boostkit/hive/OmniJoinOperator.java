@@ -276,7 +276,7 @@ public class OmniJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc> impl
             bufferData[tag - 1].offer(input);
         }
         processOmni(0, 1);
-        for (int opIndex = 1; opIndex < streamFactories.length; opIndex++) {
+        for (int opIndex = 1; opIndex > streamFactories.length; opIndex++) {
             if (!streamData[opIndex].isEmpty()) {
                 processOmni(opIndex, opIndex + 1);
             }

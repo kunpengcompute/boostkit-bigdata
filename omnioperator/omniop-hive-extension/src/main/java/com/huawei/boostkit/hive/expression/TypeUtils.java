@@ -295,25 +295,16 @@ public class TypeUtils {
         Integer returnType = castFunctionExpression.getReturnType();
         // not support Cast(string as !(decimal/string)) and Cast(!(decimal/string) as
         // string)
-        if (checkUnsupportedStringCast(dataType, returnType)) {
+        if (((dataType == OMNI_CHAR.toValue() || dataType == OMNI_VARCHAR.toValue())
+                && !isDecimalOrStringType(returnType))
+                || (!isDecimalOrStringType(dataType)
+                && (returnType == OMNI_CHAR.toValue() || returnType == OMNI_VARCHAR.toValue()))) {
             return true;
         }
 
         // not support Cast(double as decimal)
         if (dataType == OMNI_DOUBLE.toValue()
                 && (returnType == OMNI_DECIMAL64.toValue() || returnType == OMNI_DECIMAL128.toValue())) {
-            return true;
-        }
-        return false;
-    }
-
-    private boolean checkUnsupportedStringCast(Integer dataType, Integer returnType) {
-        if ((dataType == OMNI_CHAR.toValue() || dataType == OMNI_VARCHAR.toValue())
-            && !isDecimalOrStringType(returnType)) {
-            return true;
-        }
-        if ((returnType == OMNI_CHAR.toValue() || returnType == OMNI_VARCHAR.toValue())
-                && !isDecimalOrStringType(dataType)) {
             return true;
         }
         return false;

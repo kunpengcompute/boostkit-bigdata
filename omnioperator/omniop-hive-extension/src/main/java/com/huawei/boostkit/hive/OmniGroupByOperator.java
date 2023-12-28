@@ -480,12 +480,11 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
     private Set getAggChannels(List<List<ExprNodeEvaluator>> nodes) {
         Set aggChannels = new HashSet();
         for (List<ExprNodeEvaluator> node : nodes) {
-            if (node.isEmpty()) {
-                continue;
-            }
-            for (ExprNodeEvaluator exprNodeEvaluator : node) {
-                if (exprNodeEvaluator instanceof ExprNodeColumnEvaluator) {
-                    aggChannels.add(getFieldIdFromFieldName(((ExprNodeColumnEvaluator) exprNodeEvaluator).getExpr().getColumn()));
+            if (!node.isEmpty()) {
+                for (ExprNodeEvaluator exprNodeEvaluator : node) {
+                    if (exprNodeEvaluator instanceof ExprNodeColumnEvaluator) {
+                        aggChannels.add(getFieldIdFromFieldName(((ExprNodeColumnEvaluator) exprNodeEvaluator).getExpr().getColumn()));
+                    }
                 }
             }
         }
