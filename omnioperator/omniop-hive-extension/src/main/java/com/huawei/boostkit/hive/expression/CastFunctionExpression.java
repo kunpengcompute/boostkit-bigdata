@@ -18,7 +18,7 @@ public class CastFunctionExpression extends FunctionExpression {
     }
 
     public Integer getDataType() {
-        return ((ReferenceFactor) super.getArguments().get(0)).dataType;
+        return  super.getArguments().get(0).getReturnType();
     }
 
     @Override

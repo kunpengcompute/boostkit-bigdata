@@ -37,6 +37,11 @@ public class ReferenceFactor extends BaseExpression {
     }
 
     @Override
+    public Integer getReturnType() {
+        return dataType;
+    }
+
+    @Override
     public String toString() {
         if (width == null) {
             return String.format("{\"exprType\":\"FIELD_REFERENCE\"," + "\"dataType\":%d," + "\"colVal\":%d}", dataType,
