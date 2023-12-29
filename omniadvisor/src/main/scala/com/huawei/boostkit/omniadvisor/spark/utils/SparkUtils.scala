@@ -19,9 +19,9 @@ import com.huawei.boostkit.omniadvisor.exception.OmniAdvisorException
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.SparkConf
-import org.apache.spark.io.{CompressionCodec, LZ4CompressionCodec, LZFCompressionCodec, SnappyCompressionCodec, ZStdCompressionCodec}
+import org.apache.spark.io._
 
-import java.io.{BufferedInputStream, File, FileInputStream, FileNotFoundException, InputStream}
+import java.io._
 import java.net.URI
 import java.util.Properties
 import scala.collection.JavaConverters.asScalaSetConverter
@@ -29,6 +29,13 @@ import scala.collection.mutable
 import scala.tools.jline_embedded.internal.InputStreamReader
 
 object SparkUtils {
+
+  private val SPARK_DEPLOY_MODE_CLIENT = "client";
+  private val SPARK_DEPLOY_MODE_CLUSTER = "cluster"
+
+  private val CMD_HEADER = "org.apache.spark.deploy.SparkSubmit"
+  private val FORMATTED_CMD_HEADER = "spark-submit"
+
   def findApplicationFiles(hadoopConfiguration: Configuration, eventLogDir: String, startTimeMills: Long,
                            finishTimeMills: Long, maxFileSize: Long): List[String] = {
     val uri = new URI(eventLogDir)
@@ -120,5 +127,22 @@ object SparkUtils {
     } finally {
       inReader.close()
     }
+  }
+
+  // Format the command in sun.java.command into a submit-executable form
+  def formatSubmitCmd(submitCmd: String, deployMode: String): String = {
+    deployMode match {
+      case SPARK_DEPLOY_MODE_CLIENT => submitCmd.replace(CMD_HEADER, FORMATTED_CMD_HEADER)
+      case SPARK_DEPLOY_MODE_CLUSTER => getSubmitCmdFromClusterCmd(submitCmd)
+      case _ => submitCmd
+    }
+  }
+
+  private def getSubmitCmdFromClusterCmd(clusterCmd: String): String = {
+    val cmdWithoutJar = clusterCmd.replace("--jar file:", "")
+    val cmdWithoutArg = cmdWithoutJar.replace("--arg ","")
+    val cmdWithRightHeader = cmdWithoutArg.replace("org.apache.spark.deploy.yarn.ApplicationMaster","spark-submit --master yarn --deploy-mode cluster")
+    val cmdFinal = cmdWithRightHeader.split("--properties-file").head.trim
+    cmdFinal
   }
 }

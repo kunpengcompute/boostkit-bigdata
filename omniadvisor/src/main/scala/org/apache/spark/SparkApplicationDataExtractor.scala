@@ -17,8 +17,11 @@ package org.apache.spark
 
 import com.huawei.boostkit.omniadvisor.fetcher.FetcherType
 import com.huawei.boostkit.omniadvisor.models.AppResult
-import com.huawei.boostkit.omniadvisor.spark.utils.ScalaUtils.{checkSuccess, parseMapToJsonString}
+import com.huawei.boostkit.omniadvisor.spark.utils.ScalaUtils.parseMapToJsonString
+import com.huawei.boostkit.omniadvisor.spark.utils.ScalaUtils.checkSuccess
+import com.huawei.boostkit.omniadvisor.spark.utils.SparkUtils
 import com.nimbusds.jose.util.StandardCharset
+import org.apache.spark.sql.execution.ui.SQLExecutionUIData
 import org.apache.spark.status.api.v1._
 import org.slf4j.{Logger, LoggerFactory}
 
@@ -28,48 +31,35 @@ import scala.io.{BufferedSource, Source}
 object SparkApplicationDataExtractor {
   val LOG: Logger = LoggerFactory.getLogger(SparkApplicationDataExtractor.getClass)
 
-  val SPARK_REQUIRED_PARAMS_FILE = "SparkParams"
+  private val SPARK_REQUIRED_PARAMS_FILE = "SparkParams"
+
+  private val SPARK_DEPLOY_MODE = "spark.submit.deployMode"
+  private val SPARK_SUBMIT_CMD = "sun.java.command"
+  private val SPARK_SQL_CLI_DRIVER = "org.apache.spark.sql.hive.thriftserver.SparkSQLCLIDriver"
 
   def extractAppResultFromAppStatusStore(appInfo: ApplicationInfo,
                                          workload: String,
                                          environmentInfo: ApplicationEnvironmentInfo,
-                                         jobsList: Seq[JobData]): AppResult = {
+                                         jobsList: Seq[JobData],
+                                         sqlExecutionsList: Seq[SQLExecutionUIData]): AppResult = {
     val appResult = new AppResult
     appResult.applicationId = appInfo.id
     appResult.applicationName = appInfo.name
     appResult.jobType = FetcherType.SPARK.getName
     appResult.applicationWorkload = workload
 
-    val attempt: ApplicationAttemptInfo = lastAttempt(appInfo)
-    appResult.startTime = attempt.startTime.getTime
-    appResult.finishTime = attempt.endTime.getTime
-
     val configurations: Map[String, String] = extractAppConfigurations(environmentInfo)
     appResult.parameters = parseMapToJsonString(extractRequiredConfiguration(configurations))
+    appResult.deploy_mode = configurations.getOrElse(SPARK_DEPLOY_MODE, "")
+    val (submitMethod, submitCmdFormatted) = extractSubmitInfo(configurations, appResult.deploy_mode)
+    appResult.submit_method = submitMethod
+    appResult.submit_cmd = submitCmdFormatted
 
-    if (!attempt.completed) {
-      // In this case, the task is killed, consider as a failed task
-      appResult.executionStatus = AppResult.FAILED_STATUS
-      appResult.durationTime = AppResult.FAILED_JOB_DURATION
-      appResult.query = ""
+    val attempt: ApplicationAttemptInfo = lastAttempt(appInfo)
+    if (attempt.completed && jobsList.nonEmpty && checkSuccess(jobsList)) {
+      saveSuccessfulStatus(appResult, jobsList, sqlExecutionsList)
     } else {
-      if (jobsList.nonEmpty) {
-        val query: Option[String] = jobsList.maxBy(job => job.jobId).description
-
-        if (checkSuccess(jobsList)) {
-          appResult.executionStatus = AppResult.SUCCEEDED_STATUS
-          appResult.durationTime = attempt.duration
-          appResult.query = query.getOrElse("")
-        } else {
-          appResult.executionStatus = AppResult.FAILED_STATUS
-          appResult.durationTime = AppResult.FAILED_JOB_DURATION
-          appResult.query = ""
-        }
-      } else {
-        appResult.query = ""
-        appResult.executionStatus = AppResult.FAILED_STATUS
-        appResult.durationTime = AppResult.FAILED_JOB_DURATION
-      }
+      saveFailedStatus(appResult, attempt)
     }
 
     appResult
@@ -97,10 +87,78 @@ object SparkApplicationDataExtractor {
   }
 
   private def extractAppConfigurations(environmentInfo: ApplicationEnvironmentInfo): Map[String, String] = {
-    environmentInfo.sparkProperties.toMap
+    val configurations = new mutable.HashMap[String, String]()
+    configurations ++= environmentInfo.sparkProperties.toMap
+    configurations ++= environmentInfo.systemProperties.toMap
+    configurations.toMap
   }
 
-  def lastAttempt(applicationInfo: ApplicationInfo): ApplicationAttemptInfo = {
+  private def extractSubmitInfo(configurations: Map[String, String], deployMode: String): (String, String) = {
+    val submitCmd = configurations.getOrElse(SPARK_SUBMIT_CMD, "")
+    val submitMethod = submitCmd match {
+      case cmd if cmd.contains(SPARK_SQL_CLI_DRIVER) => AppResult.SPARK_SQL
+      case cmd if cmd.nonEmpty => AppResult.SPARK_SUBMIT
+      case _ => ""
+    }
+    val submitCmdFormatted = SparkUtils.formatSubmitCmd(submitCmd, deployMode)
+    (submitMethod, submitCmdFormatted)
+  }
+
+  private def saveFailedStatus(appResult: AppResult, attempt: ApplicationAttemptInfo): Unit = {
+    appResult.executionStatus = AppResult.FAILED_STATUS
+    appResult.startTime = attempt.startTime.getTime
+    appResult.finishTime = attempt.endTime.getTime
+    appResult.durationTime = AppResult.FAILED_JOB_DURATION
+    appResult.query = ""
+  }
+
+  private def saveSuccessfulStatus(appResult: AppResult, jobsList: Seq[JobData], sqlExecutionsList: Seq[SQLExecutionUIData]): Unit = {
+    appResult.executionStatus = AppResult.SUCCEEDED_STATUS
+
+    val (startTime, finishTime) = extractJobsTime(jobsList)
+    appResult.startTime = startTime
+    appResult.finishTime = finishTime
+    appResult.durationTime = if (finishTime - startTime > 0)
+      finishTime - startTime else AppResult.FAILED_JOB_DURATION
+
+    if (appResult.submit_method.equals(AppResult.SPARK_SQL)) {
+      appResult.query = extractQuerySQL(sqlExecutionsList)
+    } else {
+      appResult.query = ""
+    }
+  }
+
+  private def extractJobsTime(jobsList: Seq[JobData]): (Long, Long) = {
+    require(jobsList.nonEmpty)
+    var startTime = Long.MaxValue
+    var finishTime = 0L
+
+    jobsList.foreach(job => {
+      job.submissionTime.flatMap { submissionTime =>
+        if (submissionTime.getTime < startTime) {
+          Some(startTime = submissionTime.getTime)
+        } else {
+          None
+        }
+      }.foreach(_ => ())
+      job.completionTime.flatMap { completionTime =>
+        if (completionTime.getTime > finishTime) {
+          Some(finishTime = completionTime.getTime)
+        } else {
+          None
+        }
+      }.foreach(_ => ())
+    })
+
+    (startTime, finishTime)
+  }
+
+  private def extractQuerySQL(sqlExecutionsList: Seq[SQLExecutionUIData]): String = {
+    require(sqlExecutionsList.nonEmpty)
+    sqlExecutionsList.map(_.description).mkString(";\n")
+  }
+
+  private def lastAttempt(applicationInfo: ApplicationInfo): ApplicationAttemptInfo = {
     require(applicationInfo.attempts.nonEmpty)
     applicationInfo.attempts.last
   }
