@@ -84,6 +84,19 @@ public class Int128ArrayOmniBlock
     public Int128ArrayOmniBlock(int positionOffset, int positionCount, byte[] valueIsNull,
                                 long[] values)
     {
+        this.vecAllocator = vecAllocator;
+        for (int i = positionOffset; i < positionCount; i++) {
+            int first = 2 * i;
+            int second = first + 1;
+            if (values[second] < 0) {
+                values[first] = ~values[first] + 1;
+                values[second] = values[second] ^ 0x7FFFFFFFFFFFFFFFL;
+                if (values[first] == 0) {
+                    values[second] = values[second] + 1;
+                }
+            }
+        }
+
         if (positionOffset < 0) {
             throw new IllegalArgumentException("positionOffset is negative");
         }

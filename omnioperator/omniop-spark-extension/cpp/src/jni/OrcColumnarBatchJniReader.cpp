@@ -386,18 +386,6 @@ uint64_t CopyCharType(orc::ColumnVectorBatch *field)
     return (uint64_t)originalVector;
 }
 
-inline void TransferDecimal128(int64_t &highbits, uint64_t &lowbits)
-{
-    if (highbits < 0) { // int128's 2s' complement code
-        lowbits = ~lowbits + 1; // 2s' complement code
-        highbits = ~highbits; //1s' complement code
-        if (lowbits == 0) {
-            highbits += 1; // carry a number as in adding
-        }
-        highbits ^= ((uint64_t)1 << 63);
-    }
-}
-
 uint64_t CopyToOmniDecimal128Vec(orc::ColumnVectorBatch *field)
 {
     orc::Decimal128VectorBatch *lvb = dynamic_cast<orc::Decimal128VectorBatch *>(field);
@@ -408,22 +396,14 @@ uint64_t CopyToOmniDecimal128Vec(orc::ColumnVectorBatch *field)
     if (lvb->hasNulls) {
         for (uint i = 0; i < numElements; i++) {
             if (notNulls[i]) {
-                auto highbits = values[i].getHighBits();
-                auto lowbits = values[i].getLowBits();
-                TransferDecimal128(highbits, lowbits);
-                Decimal128 d128(highbits, lowbits);
-                originalVector->SetValue(i, d128);
+                originalVector->SetValue(i, Decimal128(values[i].getHighBits(), values[i].getLowBits()));
             } else {
                 originalVector->SetNull(i);
             }
         }
     } else {
         for (uint i = 0; i < numElements; i++) {
-            auto highbits = values[i].getHighBits();
-            auto lowbits = values[i].getLowBits();
-            TransferDecimal128(highbits, lowbits);
-            Decimal128 d128(highbits, lowbits);
-            originalVector->SetValue(i, d128);
+            originalVector->SetValue(i, Decimal128(values[i].getHighBits(), values[i].getLowBits()));
         }
     }
     return (uint64_t)originalVector;

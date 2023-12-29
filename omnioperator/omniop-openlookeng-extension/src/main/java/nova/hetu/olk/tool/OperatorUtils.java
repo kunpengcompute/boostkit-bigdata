@@ -916,8 +916,20 @@ public final class OperatorUtils
     private static Block buildInt128ArrayBlock(Block block, int positionCount)
     {
         Decimal128Vec decimal128Vec = (Decimal128Vec) block.getValues();
+        long[] values = decimal128Vec.get(0, positionCount);
+        for (int i = 0; i < positionCount; i++) {
+            int first = 2 * i;
+            int second = first + 1;
+            if (values[second] < 0) {
+                values[first] = ~values[first] + 1;
+                values[second] = values[second] ^ 0x7FFFFFFFFFFFFFFFL;
+                if (values[first] == 0) {
+                    values[second] = values[second] + 1;
+                }
+            }
+        }
         return new Int128ArrayBlock(positionCount, Optional.of(decimal128Vec.getValuesNulls(0, positionCount)),
-                decimal128Vec.get(0, positionCount));
+                values);
     }
 
     private static Block buildDoubleArrayBLock(Block block, int positionCount)
