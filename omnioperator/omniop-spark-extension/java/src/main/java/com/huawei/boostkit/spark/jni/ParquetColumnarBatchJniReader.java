@@ -18,11 +18,19 @@
 
 package com.huawei.boostkit.spark.jni;
 
-import nova.hetu.omniruntime.type.DataType;
 import nova.hetu.omniruntime.vector.*;
 
-import org.apache.spark.sql.catalyst.util.RebaseDateTime;
-
+import org.apache.parquet.schema.Type;
+import org.apache.spark.sql.types.BooleanType;
+import org.apache.spark.sql.types.ByteType;
+import org.apache.spark.sql.types.DataType;
+import org.apache.spark.sql.types.DateType;
+import org.apache.spark.sql.types.DecimalType;
+import org.apache.spark.sql.types.DoubleType;
+import org.apache.spark.sql.types.IntegerType;
+import org.apache.spark.sql.types.LongType;
+import org.apache.spark.sql.types.ShortType;
+import org.apache.spark.sql.types.StringType;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,56 +58,40 @@ public class ParquetColumnarBatchJniReader {
         return parquetReader;
     }
 
-    public int next(Vec[] vecList) {
+    public int next(Vec[] vecList, List<DataType> types) {
         int vectorCnt = vecList.length;
-        int[] typeIds = new int[vectorCnt];
         long[] vecNativeIds = new long[vectorCnt];
-        long rtn = recordReaderNext(parquetReader, typeIds, vecNativeIds);
+        long rtn = recordReaderNext(parquetReader, vecNativeIds);
         if (rtn == 0) {
             return 0;
         }
-        int nativeGetId = 0;
         for (int i = 0; i < vectorCnt; i++) {
-            switch (DataType.DataTypeId.values()[typeIds[nativeGetId]]) {
-                case OMNI_BOOLEAN: {
-                    vecList[i] = new BooleanVec(vecNativeIds[nativeGetId]);
-                    break;
+            DataType type = types.get(i);
+            if (type instanceof LongType) {
+                vecList[i] = new LongVec(vecNativeIds[i]);
+            } else if (type instanceof BooleanType) {
+                vecList[i] = new BooleanVec(vecNativeIds[i]);
+            } else if (type instanceof ShortType) {
+                vecList[i] = new ShortVec(vecNativeIds[i]);
+            } else if (type instanceof IntegerType) {
+                vecList[i] = new IntVec(vecNativeIds[i]);
+            } else if (type instanceof DecimalType) {
+                if (DecimalType.is64BitDecimalType(type)) {
+                    vecList[i] = new LongVec(vecNativeIds[i]);
+                } else {
+                    vecList[i] = new Decimal128Vec(vecNativeIds[i]);
                 }
-                case OMNI_SHORT: {
-                    vecList[i] = new ShortVec(vecNativeIds[nativeGetId]);
-                    break;
-                }
-                case OMNI_DATE32: {
-                    vecList[i] = new IntVec(vecNativeIds[nativeGetId]);
-                    break;
-                }
-                case OMNI_INT: {
-                    vecList[i] = new IntVec(vecNativeIds[nativeGetId]);
-                    break;
-                }
-                case OMNI_LONG:
-                case OMNI_DECIMAL64: {
-                    vecList[i] = new LongVec(vecNativeIds[nativeGetId]);
-                    break;
-                }
-                case OMNI_DOUBLE: {
-                    vecList[i] = new DoubleVec(vecNativeIds[nativeGetId]);
-                    break;
-                }
-                case OMNI_VARCHAR: {
-                    vecList[i] = new VarcharVec(vecNativeIds[nativeGetId]);
-                    break;
-                }
-                case OMNI_DECIMAL128: {
-                    vecList[i] = new Decimal128Vec(vecNativeIds[nativeGetId]);
-                    break;
-                }
-                default: {
-                    throw new RuntimeException("UnSupport type for ColumnarFileScan:" +
-                            DataType.DataTypeId.values()[typeIds[i]]);
-                }
+            } else if (type instanceof DoubleType) {
+                vecList[i] = new DoubleVec(vecNativeIds[i]);
+            } else if (type instanceof StringType) {
+                vecList[i] = new VarcharVec(vecNativeIds[i]);
+            } else if (type instanceof DateType) {
+                vecList[i] = new IntVec(vecNativeIds[i]);
+            } else if (type instanceof ByteType) {
+                vecList[i] = new VarcharVec(vecNativeIds[i]);
+            } else {
+                throw new RuntimeException("Unsupport type for ColumnarFileScan: " + type.typeName());
             }
-            nativeGetId++;
         }
         return (int)rtn;
     }
@@ -110,7 +102,7 @@ public class ParquetColumnarBatchJniReader {
 
     public native long initializeReader(JSONObject job);
 
-    public native long recordReaderNext(long parquetReader, int[] typeId, long[] vecNativeId);
+    public native long recordReaderNext(long parquetReader, long[] vecNativeId);
 
     public native void recordReaderClose(long parquetReader);
 

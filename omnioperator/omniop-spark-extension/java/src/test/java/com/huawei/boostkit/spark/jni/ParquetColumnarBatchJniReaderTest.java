@@ -20,6 +20,8 @@ package com.huawei.boostkit.spark.jni;
 
 import junit.framework.TestCase;
 import nova.hetu.omniruntime.vector.*;
+import org.apache.spark.sql.types.DataType;
+import org.apache.spark.sql.types.DecimalType;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.FixMethodOrder;
@@ -31,11 +33,15 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import static org.apache.spark.sql.types.DataTypes.*;
+
 @FixMethodOrder(value = MethodSorters.NAME_ASCENDING)
 public class ParquetColumnarBatchJniReaderTest extends TestCase {
     private ParquetColumnarBatchJniReader parquetColumnarBatchJniReader;
 
     private Vec[] vecs;
+
+    private List<DataType> types;
 
     @Before
     public void setUp() throws Exception {
@@ -45,6 +51,9 @@ public class ParquetColumnarBatchJniReaderTest extends TestCase {
         rowGroupIndices.add(0);
         List<Integer> columnIndices = new ArrayList<>();
         Collections.addAll(columnIndices, 0, 1, 3, 6, 7, 8, 9, 10, 12);
+        types = new ArrayList<>();
+        Collections.addAll(types, IntegerType, StringType, LongType, DoubleType, createDecimalType(9, 8),
+                createDecimalType(18, 5), BooleanType, ShortType, DateType);
         File file = new File("../cpp/test/tablescan/resources/parquet_data_all_type");
         String path = file.getAbsolutePath();
         parquetColumnarBatchJniReader.initializeReaderJava(path, 100000, rowGroupIndices, columnIndices, "root@sample");
@@ -61,7 +70,7 @@ public class ParquetColumnarBatchJniReaderTest extends TestCase {
 
     @Test
     public void testRead() {
-        long num = parquetColumnarBatchJniReader.next(vecs);
+        long num = parquetColumnarBatchJniReader.next(vecs, types);
         assertTrue(num == 1);
     }
 }

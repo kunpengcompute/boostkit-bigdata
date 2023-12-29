@@ -17,6 +17,9 @@ set (SOURCE_FILES
         jni/jni_common.cpp
         jni/ParquetColumnarBatchJniReader.cpp
         tablescan/ParquetReader.cpp
+        tablescan/ParquetColumnReader.cpp
+        tablescan/ParquetTypedRecordReader.cpp
+        tablescan/ParquetDecoder.cpp
         )
 
 #Find required protobuf package

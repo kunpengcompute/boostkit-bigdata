@@ -54,6 +54,7 @@ import org.apache.spark.sql.catalyst.InternalRow;
 import org.apache.spark.sql.execution.vectorized.ColumnVectorUtils;
 import org.apache.spark.sql.execution.vectorized.OmniColumnVector;
 import org.apache.spark.sql.execution.vectorized.OnHeapColumnVector;
+import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 import org.apache.spark.sql.types.StructType$;
@@ -86,6 +87,8 @@ public class OmniParquetColumnarBatchReader extends RecordReader<Void, ColumnarB
   // And wrap will slice vecs from templateWrap when calling nextBatch().
   private org.apache.spark.sql.vectorized.ColumnVector[] templateWrap;
   private Vec[] vecs;
+
+  private List<DataType> types = new ArrayList<>();
   private boolean isFilterPredicate = false;
 
   public OmniParquetColumnarBatchReader(int capacity, ParquetMetadata fileFooter) {
@@ -242,6 +245,7 @@ public class OmniParquetColumnarBatchReader extends RecordReader<Void, ColumnarB
     StructType batchSchema = new StructType();
     for (StructField f: sparkSchema.fields()) {
       batchSchema = batchSchema.add(f);
+      types.add(f.dataType());
     }
     if (partitionColumns != null) {
       for (StructField f : partitionColumns.fields()) {
@@ -288,7 +292,7 @@ public class OmniParquetColumnarBatchReader extends RecordReader<Void, ColumnarB
    * Advance to the next batch of rows. Return false if there are no more.
    */
   public boolean nextBatch() throws IOException {
-    int batchSize = reader.next(vecs);
+    int batchSize = reader.next(vecs, types);
     if (batchSize == 0) {
       return false;
     }
