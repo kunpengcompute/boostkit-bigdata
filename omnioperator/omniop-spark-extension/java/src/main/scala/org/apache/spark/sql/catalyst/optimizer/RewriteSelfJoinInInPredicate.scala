@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package com.huawei.boostkit.spark
+package org.apache.spark.sql.catalyst.optimizer
 
 import com.huawei.boostkit.spark.ColumnarPluginConfig
 
