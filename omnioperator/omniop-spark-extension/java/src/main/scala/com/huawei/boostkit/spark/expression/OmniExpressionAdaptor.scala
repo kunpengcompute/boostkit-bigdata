@@ -53,10 +53,15 @@ object OmniExpressionAdaptor extends Logging {
         throw new UnsupportedOperationException(s"Unsupported expression: $expr")
     }
   }
-  def getExprIdMap(inputAttrs: Seq[Attribute]): Map[ExprId, Int] = {
+
+  def getExprIdMap(inputAttrs: Seq[Expression]): Map[ExprId, Int] = {
     var attrMap: Map[ExprId, Int] = Map()
     inputAttrs.zipWithIndex.foreach { case (inputAttr, i) =>
-      attrMap += (inputAttr.exprId -> i)
+      inputAttr match {
+        case attr: AttributeReference =>
+          attrMap += (attr.exprId -> i)
+        case _ =>
+      }
     }
     attrMap
   }
