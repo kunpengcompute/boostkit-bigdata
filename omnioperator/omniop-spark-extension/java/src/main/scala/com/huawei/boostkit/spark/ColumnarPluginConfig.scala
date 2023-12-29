@@ -211,6 +211,11 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
 
   val dedupLeftSemiJoinThreshold: Int =
     conf.getConfString("spark.omni.sql.columnar.dedupLeftSemiJoinThreshold", "3").toInt
+
+  // enable or disable rewrite self join in Predicate to aggregate
+  val enableRewriteSelfJoinInInPredicate: Boolean = conf
+    .getConfString("spark.omni.sql.columnar.RewriteSelfJoinInInPredicate", "false")
+    .toBoolean
 }
 
 
