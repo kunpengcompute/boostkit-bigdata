@@ -16,14 +16,13 @@ import java.util.List;
 public class BridgeExpressionProcessor implements ExpressionProcessor {
     public static List<String> SUPPORT_BRIDGE_UDF = new ArrayList<String>() {
         {
-            add("UDFToString");
             add("UDFToDouble");
             add("UDFToInteger");
             add("UDFToLong");
             add("UDFToShort");
             add("UDFToByte");
             add("UDFToBoolean");
-            add("substr");
+//            add("substr");
         }
     };
 
@@ -44,8 +43,7 @@ public class BridgeExpressionProcessor implements ExpressionProcessor {
                 || node.getGenericUDF().getUdfName().equals("UDFToLong")
                 || node.getGenericUDF().getUdfName().equals("UDFToShort")
                 || node.getGenericUDF().getUdfName().equals("UDFToByte")
-                || node.getGenericUDF().getUdfName().equals("UDFToBoolean")
-                || node.getGenericUDF().getUdfName().equals("UDFToString")) {
+                || node.getGenericUDF().getUdfName().equals("UDFToBoolean")) {
             leaf = createNode(node.getChildren().get(0), inspector);
             CastFunctionExpression functionExpression = new CastFunctionExpression(
                     TypeUtils.convertHiveTypeToOmniType(node.getTypeInfo()), null, null, null);
