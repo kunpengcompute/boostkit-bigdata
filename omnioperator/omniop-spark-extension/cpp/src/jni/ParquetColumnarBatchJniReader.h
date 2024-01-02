@@ -28,12 +28,8 @@
 #include <cstdio>
 #include <jni.h>
 #include <json/json.h>
-#include <ctime>
 #include <vector/vector_common.h>
 #include <util/omni_exception.h>
-#include <arrow/api.h>
-#include <arrow/status.h>
-#include <parquet/arrow/reader.h>
 #include "common/debug.h"
 
 #ifdef __cplusplus
@@ -46,7 +42,7 @@ extern "C" {
  * Signature:   (Ljava/lang/String;Lorg/json/simple/JSONObject;)J
  */
 JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_ParquetColumnarBatchJniReader_initializeReader
-        (JNIEnv* env, jobject jObj, jobject job);
+    (JNIEnv* env, jobject jObj, jobject job);
 
 /*
  * Class:       com_huawei_boostkit_spark_jni_ParquetColumnarBatchJniReader
@@ -54,7 +50,7 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_ParquetColumnarBatchJ
  * Signature:   (J[I[J)J
  */
 JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_ParquetColumnarBatchJniReader_recordReaderNext
-        (JNIEnv *, jobject, jlong, jintArray, jlongArray);
+    (JNIEnv *, jobject, jlong, jlongArray);
 
 /*
  * Class:       com_huawei_boostkit_spark_jni_ParquetColumnarBatchJniReader
@@ -62,7 +58,7 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_ParquetColumnarBatchJ
  * Signature:   (J)F
  */
 JNIEXPORT void JNICALL Java_com_huawei_boostkit_spark_jni_ParquetColumnarBatchJniReader_recordReaderClose
-        (JNIEnv *, jobject, jlong);
+    (JNIEnv *, jobject, jlong);
 
 #ifdef __cplusplus
 }

@@ -20,23 +20,28 @@
 #ifndef SPARK_THESTRAL_PLUGIN_PARQUETREADER_H
 #define SPARK_THESTRAL_PLUGIN_PARQUETREADER_H
 
-#include <map>
-#include <jni.h>
 #include <vector/vector_common.h>
-#include <type/data_type.h>
-#include <arrow/api.h>
-#include <arrow/io/api.h>
-#include <arrow/util/checked_cast.h>
-#include <parquet/arrow/reader.h>
-#include <arrow/record_batch.h>
-#include <arrow/dataset/file_parquet.h>
-#include <arrow/dataset/type_fwd.h>
-#include <arrow/dataset/file_base.h>
-#include <arrow/type_fwd.h>
-#include <arrow/util/checked_cast.h>
-#include <arrow/io/interfaces.h>
+#include <arrow/filesystem/filesystem.h>
+#include "ParquetColumnReader.h"
 
 namespace spark::reader {
+
+    class OmniRecordBatchReader {
+    public:
+        OmniRecordBatchReader(std::function<arrow::Status(std::vector<omniruntime::vec::BaseVector*> &batch, long *batchRowSize)> batches)
+            : batches_(std::move(batches)) {}
+
+        ~OmniRecordBatchReader() {}
+
+        Status ReadNext(std::vector<omniruntime::vec::BaseVector*> &out, long *batchRowSize) {
+            return batches_(out, batchRowSize);
+        }
+
+    private:
+        std::function<arrow::Status(std::vector<omniruntime::vec::BaseVector*> &batch, long *batchRowSize)> batches_;
+    };
+
+
     class ParquetReader {
     public:
         ParquetReader() {}
@@ -44,11 +49,28 @@ namespace spark::reader {
         arrow::Status InitRecordReader(std::string& path, int64_t capacity,
             const std::vector<int>& row_group_indices, const std::vector<int>& column_indices, std::string& ugi);
 
-        arrow::Status ReadNextBatch(std::shared_ptr<arrow::RecordBatch> *batch);
+        arrow::Status ReadNextBatch(std::vector<omniruntime::vec::BaseVector*> &batch, long *batchRowSize);
 
         std::unique_ptr<parquet::arrow::FileReader> arrow_reader;
 
-        std::shared_ptr<arrow::RecordBatchReader> rb_reader;
+        std::unique_ptr<OmniRecordBatchReader> rb_reader;
+
+        std::vector<std::shared_ptr<ParquetColumnReader>> columnReaders;
+
+        arrow::MemoryPool* pool = arrow::default_memory_pool();
+
+    private:
+        arrow::Status GetRecordBatchReader(const std::vector<int> &row_group_indices, const std::vector<int> &column_indices);
+
+        arrow::Status GetFieldReaders(const std::vector<int> &row_group_indices, const std::vector<int> &column_indices,
+            std::vector<std::shared_ptr<ParquetColumnReader>>* out, std::shared_ptr<::arrow::Schema>* out_schema);
+
+        arrow::Status GetFieldReader(int i, const std::shared_ptr<std::unordered_set<int>>& included_leaves,
+            const std::vector<int> &row_group_indices, std::unique_ptr<ParquetColumnReader>* out);
+
+        arrow::Status GetReader(const parquet::arrow::SchemaField &field, const std::shared_ptr<arrow::Field> &arrow_field,
+            const std::shared_ptr<parquet::arrow::ReaderContext> &ctx, std::unique_ptr<ParquetColumnReader>* out);
+
     };
 
     class Filesystem {
@@ -63,11 +85,6 @@ namespace spark::reader {
 
     std::string GetFileSystemKey(std::string& path, std::string& ugi);
 
-    Filesystem* GetFileSystemPtr(std::string& path, std::string& ugi);
-
-    int CopyToOmniVec(std::shared_ptr<arrow::DataType> vcType, int &omniTypeId, uint64_t &omniVecId,
-        std::shared_ptr<arrow::Array> array);
-
-    std::pair<int64_t*, int64_t*> TransferToOmniVecs(std::shared_ptr<arrow::RecordBatch> batch);
+    Filesystem* GetFileSystemPtr(std::string& path, std::string& ugi, arrow::Status &status);
 }
 #endif // SPARK_THESTRAL_PLUGIN_PARQUETREADER_H

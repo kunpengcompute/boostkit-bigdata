@@ -21,11 +21,6 @@
 #include "jni_common.h"
 #include "tablescan/ParquetReader.h"
 
-using namespace omniruntime::vec;
-using namespace omniruntime::type;
-using namespace std;
-using namespace arrow;
-using namespace parquet::arrow;
 using namespace spark::reader;
 
 std::vector<int> GetIndices(JNIEnv *env, jobject jsonObj, const char* name)
@@ -74,36 +69,28 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_ParquetColumnarBatchJ
 }
 
 JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_ParquetColumnarBatchJniReader_recordReaderNext(JNIEnv *env,
-    jobject jObj, jlong reader, jintArray typeId, jlongArray vecNativeId)
+    jobject jObj, jlong reader, jlongArray vecNativeId)
 {
     JNI_FUNC_START
     ParquetReader *pReader = (ParquetReader *)reader;
-    std::shared_ptr<RecordBatch> recordBatchPtr;
-    auto state = pReader->ReadNextBatch(&recordBatchPtr);
+    std::vector<omniruntime::vec::BaseVector*> recordBatch(pReader->columnReaders.size());
+    long batchRowSize = 0;
+    auto state = pReader->ReadNextBatch(recordBatch, &batchRowSize);
     if (state != Status::OK()) {
         env->ThrowNew(runtimeExceptionClass, state.ToString().c_str());
         return 0;
     }
-    int vecCnt = 0;
-    long batchRowSize = 0;
-    if (recordBatchPtr != NULL) {
-        batchRowSize = recordBatchPtr->num_rows();
-        vecCnt = recordBatchPtr->num_columns();
-        std::vector<std::shared_ptr<Field>> fields = recordBatchPtr->schema()->fields();
 
-        for (int colIdx = 0; colIdx < vecCnt; colIdx++) {
-            std::shared_ptr<Array> array = recordBatchPtr->column(colIdx);
-            // One array in current batch
-            std::shared_ptr<ArrayData> data = array->data();
-            int omniTypeId = 0;
-            uint64_t omniVecId = 0;
-            spark::reader::CopyToOmniVec(data->type, omniTypeId, omniVecId, array);
-
-            env->SetIntArrayRegion(typeId, colIdx, 1, &omniTypeId);
-            jlong omniVec = static_cast<jlong>(omniVecId);
-            env->SetLongArrayRegion(vecNativeId, colIdx, 1, &omniVec);
+    for (uint64_t colIdx = 0; colIdx < recordBatch.size(); colIdx++) {
+        auto vector = recordBatch[colIdx];
+        // If vector is not initialized, meaning that all data had been read.
+        if (vector == NULL) {
+            return 0;
         }
+        jlong omniVec = (jlong)(vector);
+        env->SetLongArrayRegion(vecNativeId, colIdx, 1, &omniVec);
     }
+
     return (jlong)batchRowSize;
     JNI_FUNC_END(runtimeExceptionClass)
 }

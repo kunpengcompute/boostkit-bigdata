@@ -17,26 +17,15 @@
  * limitations under the License.
  */
 
-#include <iostream>
-#include <string>
-#include <arrow/filesystem/filesystem.h>
-#include <type/decimal_operations.h>
 #include "jni/jni_common.h"
 #include "ParquetReader.h"
 
-using namespace omniruntime::vec;
-using namespace omniruntime::type;
 using namespace arrow;
 using namespace parquet::arrow;
-using namespace arrow::compute;
 using namespace spark::reader;
 
 static std::mutex mutex_;
 static std::map<std::string, Filesystem*> restore_filesysptr;
-static constexpr int32_t PARQUET_MAX_DECIMAL64_DIGITS = 18;
-static constexpr int32_t INT128_BYTES = 16;
-static constexpr int32_t INT64_BYTES = 8;
-static constexpr int32_t BYTE_BITS = 8;
 static constexpr int32_t LOCAL_FILE_PREFIX = 5;
 static constexpr int32_t LOCAL_FILE_PREFIX_EXT = 7;
 static const std::string LOCAL_FILE = "file:";
@@ -68,15 +57,20 @@ std::string spark::reader::GetFileSystemKey(std::string& path, std::string& ugi)
     return result;
 }
 
-Filesystem* spark::reader::GetFileSystemPtr(std::string& path, std::string& ugi)
+Filesystem* spark::reader::GetFileSystemPtr(std::string& path, std::string& ugi, arrow::Status &status)
 {
     auto key = GetFileSystemKey(path, ugi);
 
-    // if not find key, creadte the filesystem ptr
+    // if not find key, create the filesystem ptr
     auto iter = restore_filesysptr.find(key);
     if (iter == restore_filesysptr.end()) {
         Filesystem* fs = new Filesystem();
-        fs->filesys_ptr = std::move(fs::FileSystemFromUriOrPath(path)).ValueUnsafe();
+        auto result = fs::FileSystemFromUriOrPath(path);
+        status = result.status();
+        if (!status.ok()) {
+          return nullptr;
+        }
+        fs->filesys_ptr = std::move(result).ValueUnsafe();
         restore_filesysptr[key] = fs;
     }
 
@@ -87,8 +81,6 @@ Status ParquetReader::InitRecordReader(std::string& filePath, int64_t capacity,
     const std::vector<int>& row_group_indices, const std::vector<int>& column_indices,
     std::string& ugi)
 {
-    arrow::MemoryPool* pool = default_memory_pool();
-
     // Configure reader settings
     auto reader_properties = parquet::ReaderProperties(pool);
 
@@ -99,9 +91,13 @@ Status ParquetReader::InitRecordReader(std::string& filePath, int64_t capacity,
     std::shared_ptr<arrow::io::RandomAccessFile> file;
 
     // Get the file from filesystem
+    Status result;
     mutex_.lock();
-    Filesystem* fs = GetFileSystemPtr(filePath, ugi);
+    Filesystem* fs = GetFileSystemPtr(filePath, ugi, result);
     mutex_.unlock();
+    if (fs == nullptr || fs->filesys_ptr == nullptr) {
+      return Status::IOError(result);
+    }
     ARROW_ASSIGN_OR_RAISE(file, fs->filesys_ptr->OpenInputFile(filePath));
 
     FileReaderBuilder reader_builder;
@@ -110,182 +106,129 @@ Status ParquetReader::InitRecordReader(std::string& filePath, int64_t capacity,
     reader_builder.properties(arrow_reader_properties);
 
     ARROW_ASSIGN_OR_RAISE(arrow_reader, reader_builder.Build());
-    ARROW_RETURN_NOT_OK(arrow_reader->GetRecordBatchReader(row_group_indices, column_indices, &rb_reader));
+    ARROW_RETURN_NOT_OK(GetRecordBatchReader(row_group_indices, column_indices));
     return arrow::Status::OK();
 }
 
-Status ParquetReader::ReadNextBatch(std::shared_ptr<RecordBatch> *batch)
+Status ParquetReader::ReadNextBatch(std::vector<omniruntime::vec::BaseVector*> &batch, long *batchRowSize)
 {
-    ARROW_RETURN_NOT_OK(rb_reader->ReadNext(batch));
+    ARROW_RETURN_NOT_OK(rb_reader->ReadNext(batch, batchRowSize));
     return arrow::Status::OK();
 }
 
-/**
- * For BooleanType, copy values one by one.
- */
-uint64_t CopyBooleanType(std::shared_ptr<Array> array)
+Status ParquetReader::GetRecordBatchReader(const std::vector<int> &row_group_indices,
+    const std::vector<int> &column_indices)
 {
-    arrow::BooleanArray *lvb = dynamic_cast<arrow::BooleanArray *>(array.get());
-    auto numElements = lvb->length();
-    auto originalVector = new Vector<bool>(numElements);
-    for (int64_t i = 0; i < numElements; i++) {
-        if (lvb->IsNull(i)) {
-            originalVector->SetNull(i);
-        } else {
-            if (lvb->Value(i)) {
-                originalVector->SetValue(i, true);
-            } else {
-                originalVector->SetValue(i, false);
+    std::shared_ptr<::arrow::Schema> batch_schema;
+    RETURN_NOT_OK(GetFieldReaders(row_group_indices, column_indices, &columnReaders, &batch_schema));
+
+    int64_t num_rows = 0;
+    for(int row_group : row_group_indices) {
+        num_rows += arrow_reader->parquet_reader()->metadata()->RowGroup(row_group)->num_rows();
+    }
+    // Use lambda function to generate BaseVectors
+    auto batches = [num_rows, this](std::vector<omniruntime::vec::BaseVector*> &batch,
+        long *batchRowSize) mutable -> Status {
+            int64_t read_size = std::min(arrow_reader->properties().batch_size(), num_rows);
+            num_rows -= read_size;
+            *batchRowSize = read_size;
+
+            if (columnReaders.empty() || read_size <= 0) {
+                return Status::OK();
             }
-        }
-    }
-    return (uint64_t)originalVector;
-}
 
-/**
- * For int16/int32/int64/double type, copy values in batches and skip setNull if there is no nulls.
- */
-template <DataTypeId TYPE_ID, typename PARQUET_TYPE> uint64_t CopyFixedWidth(std::shared_ptr<Array> array)
-{
-    using T = typename NativeType<TYPE_ID>::type;
-    PARQUET_TYPE *lvb  = dynamic_cast<PARQUET_TYPE *>(array.get());
-    auto numElements = lvb->length();
-    auto values = lvb->raw_values();
-    auto originalVector = new Vector<T>(numElements);
-    // Check ColumnVectorBatch has null or not firstly
-    if (lvb->null_count() != 0) {
-        for (int64_t i = 0; i < numElements; i++) {
-            if (lvb->IsNull(i)) {
-                originalVector->SetNull(i);
+            for (uint64_t i = 0; i < columnReaders.size(); ++i) {
+                RETURN_NOT_OK(columnReaders[i]->NextBatch(read_size, &batch[i]));
             }
-        }
-    }
-    originalVector->SetValues(0, values, numElements);
-    return (uint64_t)originalVector;
-}
 
-uint64_t CopyVarWidth(std::shared_ptr<Array> array)
-{
-    auto lvb = dynamic_cast<StringArray *>(array.get());
-    auto numElements = lvb->length();
-    auto originalVector = new Vector<LargeStringContainer<std::string_view>>(numElements);
-    for (int64_t i = 0; i < numElements; i++) {
-        if (lvb->IsValid(i)) {
-            auto data = lvb->GetView(i);
-            originalVector->SetValue(i, data);
-        } else {
-            originalVector->SetNull(i);
-        }
-    }
-    return (uint64_t)originalVector;
-}
-
-uint64_t CopyToOmniDecimal128Vec(std::shared_ptr<Array> array)
-{
-    auto lvb = dynamic_cast<arrow::Decimal128Array *>(array.get());
-    auto numElements = lvb->length();
-    auto originalVector = new Vector<omniruntime::type::Decimal128>(numElements);
-    for (int64_t i = 0; i < numElements; i++) {
-        if (lvb->IsValid(i)) {
-            auto data = lvb->GetValue(i);
-            __int128_t val;
-            memcpy_s(&val, sizeof(val), data, INT128_BYTES);
-            omniruntime::type::Decimal128 d128(val);
-            originalVector->SetValue(i, d128);
-        } else {
-            originalVector->SetNull(i);
-        }
-    }
-    return (uint64_t)originalVector;
-}
-
-uint64_t CopyToOmniDecimal64Vec(std::shared_ptr<Array> array)
-{
-    auto lvb = dynamic_cast<arrow::Decimal128Array *>(array.get());
-    auto numElements = lvb->length();
-    auto originalVector = new Vector<int64_t>(numElements);
-    for (int64_t i = 0; i < numElements; i++) {
-        if (lvb->IsValid(i)) {
-            auto data = lvb->GetValue(i);
-            int64_t val;
-            memcpy_s(&val, sizeof(val), data, INT64_BYTES);
-            originalVector->SetValue(i, val);
-        } else {
-            originalVector->SetNull(i);
-        }
-    }
-    return (uint64_t)originalVector;
-}
-
-int spark::reader::CopyToOmniVec(std::shared_ptr<arrow::DataType> vcType, int &omniTypeId, uint64_t &omniVecId,
-    std::shared_ptr<Array> array)
-{
-    switch (vcType->id()) {
-        case arrow::Type::BOOL:
-            omniTypeId = static_cast<jint>(OMNI_BOOLEAN);
-            omniVecId = CopyBooleanType(array);
-            break;
-        case arrow::Type::INT16:
-            omniTypeId = static_cast<jint>(OMNI_SHORT);
-            omniVecId = CopyFixedWidth<OMNI_SHORT, arrow::Int16Array>(array);
-            break;
-        case arrow::Type::INT32:
-            omniTypeId = static_cast<jint>(OMNI_INT);
-            omniVecId = CopyFixedWidth<OMNI_INT, arrow::Int32Array>(array);
-            break;
-        case arrow::Type::DATE32:
-            omniTypeId = static_cast<jint>(OMNI_DATE32);
-            omniVecId = CopyFixedWidth<OMNI_INT, arrow::Date32Array>(array);
-            break;
-        case arrow::Type::INT64:
-            omniTypeId = static_cast<jint>(OMNI_LONG);
-            omniVecId = CopyFixedWidth<OMNI_LONG, arrow::Int64Array>(array);
-            break;
-        case arrow::Type::DATE64:
-            omniTypeId = static_cast<jint>(OMNI_DATE64);
-            omniVecId = CopyFixedWidth<OMNI_LONG, arrow::Date64Array>(array);
-            break;
-        case arrow::Type::DOUBLE:
-            omniTypeId = static_cast<jint>(OMNI_DOUBLE);
-            omniVecId = CopyFixedWidth<OMNI_DOUBLE, arrow::DoubleArray>(array);
-            break;
-        case arrow::Type::STRING:
-            omniTypeId = static_cast<jint>(OMNI_VARCHAR);
-            omniVecId = CopyVarWidth(array);
-            break;
-        case arrow::Type::DECIMAL128: {
-            auto decimalType = static_cast<arrow::DecimalType *>(vcType.get());
-            if (decimalType->precision() > PARQUET_MAX_DECIMAL64_DIGITS) {
-                omniTypeId = static_cast<int>(OMNI_DECIMAL128);
-                omniVecId = CopyToOmniDecimal128Vec(array);
-            } else {
-                omniTypeId = static_cast<int>(OMNI_DECIMAL64);
-                omniVecId = CopyToOmniDecimal64Vec(array);
+            // Check BaseVector
+            for (const auto& column : batch) {
+                if (column == nullptr) {
+                    return Status::Invalid("BaseVector should not be nullptr after reading");
+                }
             }
-            break;
-        }
-        default: {
-            throw std::runtime_error("Native ColumnarFileScan Not support For This Type: " + vcType->id());
-        }
-    }
-    return 1;
+
+            return Status::OK();
+    };
+
+    rb_reader = std::make_unique<OmniRecordBatchReader>(std::move(batches));
+    return Status::OK();
 }
 
-std::pair<int64_t*, int64_t*> spark::reader::TransferToOmniVecs(std::shared_ptr<RecordBatch> batch)
+std::shared_ptr<std::unordered_set<int>> VectorToSharedSet(const std::vector<int> &values) {
+    std::shared_ptr<std::unordered_set<int>> result(new std::unordered_set<int>());
+    result->insert(values.begin(), values.end());
+    return result;
+}
+
+Status ParquetReader::GetFieldReaders(const std::vector<int> &row_group_indices, const std::vector<int> &column_indices,
+    std::vector<std::shared_ptr<ParquetColumnReader>>* out, std::shared_ptr<::arrow::Schema>* out_schema)
 {
-    int64_t num_columns = batch->num_columns();
-    std::vector<std::shared_ptr<arrow::Field>> fields = batch->schema()->fields();
-    auto vecTypes = new int64_t[num_columns];
-    auto vecs = new int64_t[num_columns];
-    for (int64_t colIdx = 0; colIdx < num_columns; colIdx++) {
-        std::shared_ptr<Array> array = batch->column(colIdx);
-        // One array in current batch
-        std::shared_ptr<ArrayData> data = array->data();
-        int omniTypeId = 0;
-        uint64_t omniVecId = 0;
-        spark::reader::CopyToOmniVec(data->type, omniTypeId, omniVecId, array);
-        vecTypes[colIdx] = omniTypeId;
-        vecs[colIdx] = omniVecId;
+    // We only read schema fields which have columns indicated in the indices vector
+    ARROW_ASSIGN_OR_RAISE(std::vector<int> field_indices, arrow_reader->manifest().GetFieldIndices(column_indices));
+    auto included_leaves = VectorToSharedSet(column_indices);
+    out->resize(field_indices.size());
+    ::arrow::FieldVector out_fields(field_indices.size());
+
+    for (size_t i = 0; i < out->size(); i++) {
+        std::unique_ptr<ParquetColumnReader> reader;
+        RETURN_NOT_OK(GetFieldReader(field_indices[i], included_leaves, row_group_indices, &reader));
+        out_fields[i] = reader->field();
+        out->at(i) = std::move(reader);
     }
-    return std::make_pair(vecTypes, vecs);
+
+    *out_schema = ::arrow::schema(std::move(out_fields), arrow_reader->manifest().schema_metadata);
+    return Status::OK();
+}
+
+FileColumnIteratorFactory SomeRowGroupsFactory(std::vector<int> row_group_indices) {
+    return [row_group_indices] (int i, parquet::ParquetFileReader* reader) {
+        return new FileColumnIterator(i, reader, row_group_indices);
+    };
+}
+
+Status ParquetReader::GetFieldReader(int i, const std::shared_ptr<std::unordered_set<int>>& included_leaves,
+    const std::vector<int> &row_group_indices, std::unique_ptr<ParquetColumnReader>* out)
+{
+    if (ARROW_PREDICT_FALSE(i < 0 || static_cast<size_t>(i) >= arrow_reader->manifest().schema_fields.size())) {
+        return Status::Invalid("Column index out of bounds (got ", i,
+            ", should be between 0 and ", arrow_reader->manifest().schema_fields.size(), ")");
+    }
+    auto ctx = std::make_shared<ReaderContext>();
+    ctx->reader = arrow_reader->parquet_reader();
+    ctx->pool = pool;
+    ctx->iterator_factory = SomeRowGroupsFactory(row_group_indices);
+    ctx->filter_leaves = true;
+    ctx->included_leaves = included_leaves;
+    auto field = arrow_reader->manifest().schema_fields[i];
+    return GetReader(field, field.field, ctx, out);
+}
+
+Status ParquetReader::GetReader(const SchemaField &field, const std::shared_ptr<Field> &arrow_field,
+    const std::shared_ptr<ReaderContext> &ctx, std::unique_ptr<ParquetColumnReader> *out)
+{
+    BEGIN_PARQUET_CATCH_EXCEPTIONS
+
+    auto type_id = arrow_field->type()->id();
+
+    if (type_id == ::arrow::Type::EXTENSION) {
+        return Status::Invalid("Unsupported type: ", arrow_field->ToString());
+    }
+
+    if (field.children.size() == 0) {
+        if (!field.is_leaf()) {
+            return Status::Invalid("Parquet non-leaf node has no children");
+        }
+        if (!ctx->IncludesLeaf(field.column_index)) {
+            *out = nullptr;
+            return Status::OK();
+        }
+        std::unique_ptr<FileColumnIterator> input(ctx->iterator_factory(field.column_index, ctx->reader));
+        *out = std::make_unique<ParquetColumnReader>(ctx, arrow_field, std::move(input), field.level_info);
+    } else {
+        return Status::Invalid("Unsupported type: ", arrow_field->ToString());
+    }
+    return Status::OK();
+
+    END_PARQUET_CATCH_EXCEPTIONS
 }

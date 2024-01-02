@@ -18,7 +18,11 @@ set (SOURCE_FILES
         jni/OrcColumnarBatchJniReader.cpp
         jni/jni_common.cpp
         jni/ParquetColumnarBatchJniReader.cpp
-        tablescan/ParquetReader.cpp)
+        tablescan/ParquetReader.cpp
+        tablescan/ParquetColumnReader.cpp
+        tablescan/ParquetTypedRecordReader.cpp
+        tablescan/ParquetDecoder.cpp
+        )
 
 #Find required protobuf package
 find_package(Protobuf REQUIRED)
