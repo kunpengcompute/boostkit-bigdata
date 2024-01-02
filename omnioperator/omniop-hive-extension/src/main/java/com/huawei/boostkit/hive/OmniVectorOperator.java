@@ -148,7 +148,7 @@ public class OmniVectorOperator extends OmniHiveOperator<OmniVectorDesc> {
             }
         }
         if (!this.childOperators.isEmpty() && childOperators.get(0) instanceof OmniMergeJoinOperator
-                || childOperators.get(0) instanceof OmniMergeJoinOperator && ((OmniMapJoinDesc) childOperators.get(0).getConf()).isDynamicPartitionHashJoin()) {
+                || childOperators.get(0) instanceof OmniMapJoinOperator && ((OmniMapJoinDesc) childOperators.get(0).getConf()).isDynamicPartitionHashJoin()) {
             List<String> fieldNames = new ArrayList<>();
             for (int i = 0; i < inputObjInspectors.length; i++) {
                 fieldNames.add(String.valueOf(i));
