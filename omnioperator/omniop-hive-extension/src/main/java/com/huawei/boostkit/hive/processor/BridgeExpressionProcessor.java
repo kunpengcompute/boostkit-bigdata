@@ -22,9 +22,11 @@ public class BridgeExpressionProcessor implements ExpressionProcessor {
             add("UDFToShort");
             add("UDFToByte");
             add("UDFToBoolean");
-//            add("substr");
+            add("substr");
         }
     };
+
+    private boolean simplify = false;
 
     @Override
     public BaseExpression process(ExprNodeGenericFuncDesc node, String operator, ObjectInspector inspector) {
@@ -36,8 +38,14 @@ public class BridgeExpressionProcessor implements ExpressionProcessor {
             LikeExpressionProcessor likeExpressionProcessor = new LikeExpressionProcessor();
             leaf = likeExpressionProcessor.process(node, operator, inspector);
         } else if (node.getGenericUDF().getUdfName().equals("substr")) {
-            SubstrExpressionProcessor substrExpressionProcessor = new SubstrExpressionProcessor();
-            leaf = substrExpressionProcessor.process(node, operator, inspector);
+            if (simplify) {
+                SimplifySubstrExpressionProcessor simplifySubstrExpressionProcessor =
+                        new SimplifySubstrExpressionProcessor();
+                leaf = simplifySubstrExpressionProcessor.process(node, operator, inspector);
+            } else {
+                SubstrExpressionProcessor substrExpressionProcessor = new SubstrExpressionProcessor();
+                leaf = substrExpressionProcessor.process(node, operator, inspector);
+            }
         } else if (node.getGenericUDF().getUdfName().equals("UDFToDouble")
                 || node.getGenericUDF().getUdfName().equals("UDFToInteger")
                 || node.getGenericUDF().getUdfName().equals("UDFToLong")
@@ -58,5 +66,9 @@ public class BridgeExpressionProcessor implements ExpressionProcessor {
         } else {
             return ExpressionUtils.createNode(nodeDesc, inspector);
         }
+    }
+
+    public void setSimplify(boolean simplify) {
+        this.simplify = simplify;
     }
 }

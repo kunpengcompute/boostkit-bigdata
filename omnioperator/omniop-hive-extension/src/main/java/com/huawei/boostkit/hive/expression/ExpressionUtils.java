@@ -126,6 +126,15 @@ public class ExpressionUtils {
         return root;
     }
 
+    public static BaseExpression buildSimplify(ExprNodeGenericFuncDesc exprNode, ObjectInspector inspector) {
+        BridgeExpressionProcessor expressionProcessor =
+                (BridgeExpressionProcessor) UDF_TO_PROCESSOR.get(GenericUDFBridge.class);
+        expressionProcessor.setSimplify(true);
+        BaseExpression build = build(exprNode, inspector);
+        expressionProcessor.setSimplify(false);
+        return build;
+    }
+
     public static BaseExpression createLiteralNode(ExprNodeDesc next) {
         BaseExpression leaf;
         Object value = ((ExprNodeConstantDesc) next).getValue();

@@ -33,14 +33,4 @@ public class UpperExpressionProcessor implements ExpressionProcessor {
         }
         return functionExpression;
     }
-
-    private BaseExpression wrapNotNullExpression(ReferenceFactor referenceFactor) {
-        UnaryExpression unaryExpression = new UnaryExpression("IS_NULL",
-                referenceFactor.getReturnType(),
-                1);
-        unaryExpression.add(referenceFactor);
-        NotExpression notExpression = new NotExpression();
-        notExpression.setExpr(unaryExpression);
-        return notExpression;
-    }
 }

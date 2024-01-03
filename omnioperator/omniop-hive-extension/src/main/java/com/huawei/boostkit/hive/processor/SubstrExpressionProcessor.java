@@ -15,8 +15,8 @@ import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import java.util.List;
 
 public class SubstrExpressionProcessor implements ExpressionProcessor {
-    private static final int LOWER_BOUND_INDEX = 1;
-    private static final int UPPER_BOUND_INDEX = 2;
+    protected static final int LOWER_BOUND_INDEX = 1;
+    protected static final int UPPER_BOUND_INDEX = 2;
 
     @Override
     public BaseExpression process(ExprNodeGenericFuncDesc node, String operator, ObjectInspector inspector) {
@@ -41,17 +41,7 @@ public class SubstrExpressionProcessor implements ExpressionProcessor {
         return functionExpression;
     }
 
-    private BaseExpression wrapNotNullExpression(ReferenceFactor referenceFactor) {
-        UnaryExpression unaryExpression = new UnaryExpression("IS_NULL",
-                referenceFactor.getReturnType(),
-                1);
-        unaryExpression.add(referenceFactor);
-        NotExpression notExpression = new NotExpression();
-        notExpression.setExpr(unaryExpression);
-        return notExpression;
-    }
-
-    private int calculateLength(ExprNodeConstantDesc right, ExprNodeConstantDesc left) {
+    protected int calculateLength(ExprNodeConstantDesc right, ExprNodeConstantDesc left) {
         int rightLength = (int) right.getValue();
         int leftLength = (int) left.getValue();
         return rightLength - leftLength + 1;
