@@ -2,7 +2,6 @@ package com.huawei.boostkit.hive.shuffle;
 
 public class FixedWidthColumnSerDe implements ColumnSerDe {
     private int columnTypeLen;
-    private int length;
     private static byte[] EMPTY = new byte[16];
 
     public FixedWidthColumnSerDe(int columnTypeLen) {
@@ -35,7 +34,7 @@ public class FixedWidthColumnSerDe implements ColumnSerDe {
             return offset;
         }
         vecSerdeBody.isNull = 0;
-        length = bytes[offset];
+        int length = bytes[offset];
         ++offset;
         System.arraycopy(bytes, offset, vecSerdeBody.value, 0, length);
         System.arraycopy(EMPTY, 0, vecSerdeBody.value, length, columnTypeLen - length);

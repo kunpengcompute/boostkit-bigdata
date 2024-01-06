@@ -67,16 +67,10 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
     private transient ObjectInspector[] currentKeyObjectInspectors;
     private transient ExprNodeEvaluator[][] aggregationParameterFields;
     private transient ObjectInspector[][] aggregationParameterObjectInspectors;
-    private transient GenericUDAFEvaluator[] aggregationEvaluators;
     private transient List<? extends StructField> allStructFieldRefs;
-    private transient List<? extends StructField> keyStructFieldRefs;
     private transient int numKeys;
-    private transient List<? extends StructField> valueStructFieldRefs;
     private transient boolean groupingSetsPresent;
-    private transient int groupingSetsPosition;
     private transient List<Long> groupingSets;
-    private transient FastBitSet[] groupingSetsBitSet;
-    private transient LongWritable[] newKeysGroupingSets;
     private transient int outputKeyLength;
     private VectorizationContext vectorizationContext;
     private VectorizationContext vOutContext;
@@ -156,7 +150,7 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
         }
 
         // build outputDataType
-        aggregationEvaluators = new GenericUDAFEvaluator[conf.getAggregators().size()];
+        GenericUDAFEvaluator[] aggregationEvaluators = new GenericUDAFEvaluator[conf.getAggregators().size()];
         for (int i = 0; i < aggregationEvaluators.length; i++) {
             AggregationDesc agg = conf.getAggregators().get(i);
             aggregationEvaluators[i] = agg.getGenericUDAFEvaluator();
@@ -214,9 +208,9 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
         groupingSetsPresent = conf.isGroupingSetsPresent();
         if (groupingSetsPresent) {
             groupingSets = conf.getListGroupingSets();
-            groupingSetsPosition = conf.getGroupingSetPosition();
-            newKeysGroupingSets = new LongWritable[groupingSets.size()];
-            groupingSetsBitSet = new FastBitSet[groupingSets.size()];
+            int groupingSetsPosition = conf.getGroupingSetPosition();
+            LongWritable[] newKeysGroupingSets = new LongWritable[groupingSets.size()];
+            FastBitSet[] groupingSetsBitSet = new FastBitSet[groupingSets.size()];
             int pos = 0;
             for (Long groupingSet : groupingSets) {
                 // Create the mapping corresponding to the grouping set
@@ -227,9 +221,11 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
         }
 
         if ((allStructFieldRefs.size() == 2) && (allStructFieldRefs.get(0).getFieldName().equals("key"))) {
-            keyStructFieldRefs = ((StandardStructObjectInspector) allStructFieldRefs.get(0).getFieldObjectInspector())
+            List<? extends StructField> keyStructFieldRefs =
+                    ((StandardStructObjectInspector) allStructFieldRefs.get(0).getFieldObjectInspector())
                     .getAllStructFieldRefs();
-            valueStructFieldRefs = ((StandardStructObjectInspector) allStructFieldRefs.get(1).getFieldObjectInspector())
+            List<? extends StructField> valueStructFieldRefs =
+                    ((StandardStructObjectInspector) allStructFieldRefs.get(1).getFieldObjectInspector())
                     .getAllStructFieldRefs();
             groupByChanel = getExprFromStructField(keyStructFieldRefs);
             aggChannels = getTwoDimenExprFromStructField(valueStructFieldRefs);

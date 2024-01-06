@@ -27,10 +27,7 @@ import static org.apache.hadoop.hive.common.type.HiveDecimal.SCRATCH_LONGS_LEN;
 
 
 public class DecimalVecConverter implements VecConverter {
-    private byte[] value;
-    private byte[] isNull;
     private long[] scratchLongs = new long[SCRATCH_LONGS_LEN];
-    private byte[] buffer = new byte[16];
 
     public Object fromOmniVec(Vec vec, int index, PrimitiveObjectInspector primitiveObjectInspector) {
         if (vec.isNull(index)) {
@@ -105,8 +102,8 @@ public class DecimalVecConverter implements VecConverter {
     public Vec toOmniVec(ColumnCache columnCache, int columnSize, PrimitiveTypeInfo primitiveTypeInfo) {
         Decimal128Vec decimal128Vec = new Decimal128Vec(columnSize);
         DecimalColumnCache decimal128ColumnCache = (DecimalColumnCache) columnCache;
-        value = new byte[columnSize * 16];
-        isNull = new byte[columnSize];
+        byte[] value = new byte[columnSize * 16];
+        byte[] isNull = new byte[columnSize];
         if (decimal128ColumnCache.noNulls) {
             for (int i = 0; i < columnSize; i++) {
                 System.arraycopy(decimal128ColumnCache.dataCache[i], 0, value, i * 16, 16);
@@ -200,6 +197,7 @@ public class DecimalVecConverter implements VecConverter {
 
     private byte[] getDecimalBytes(HiveDecimalWritable hiveDecimal, DecimalTypeInfo decimalTypeInfo) {
         boolean isNegative = hiveDecimal.signum() == -1;
+        byte[] buffer = new byte[16];
         hiveDecimal.mutateAbs();
         buffer = hiveDecimal.getHiveDecimal().bigIntegerBytesScaled(decimalTypeInfo.getScale());
         int byteArrayLength = buffer.length;

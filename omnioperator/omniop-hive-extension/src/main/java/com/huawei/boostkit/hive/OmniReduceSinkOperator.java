@@ -116,7 +116,6 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
      */
     private transient int buckColIdxInKeyForSdpo = -1;
     private boolean firstRow;
-    private transient int tag;
     private boolean skipTag = false;
     private transient int[] valueIndex; // index for value(+ from keys, - from values)
 
@@ -194,13 +193,10 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
     private long[] keyFieldId;
     private long[] valueFieldId;
     private transient boolean needProject;
-    private transient OmniProjectOperatorFactory projectOperatorFactory;
 
     private transient OmniOperator projectOperator;
     private transient boolean reduceSinkCanReplaceKey;
     private transient VecWrapper[] vecWrappers;
-
-    private transient Iterator<VecBatch> output;
 
     /**
      * Kryo ctor.
@@ -316,7 +312,7 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
                 buckColIdxInKey = conf.getPartitionCols().size();
             }
 
-            tag = conf.getTag();
+            int tag = conf.getTag();
             tagByte[0] = (byte) tag;
             skipTag = conf.getSkipTag();
             if (LOG.isInfoEnabled()) {
@@ -395,7 +391,7 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
                 }
             }
         }
-        this.projectOperatorFactory = new OmniProjectOperatorFactory(expressions, inputTypes, 1,
+        OmniProjectOperatorFactory projectOperatorFactory = new OmniProjectOperatorFactory(expressions, inputTypes, 1,
                 new OperatorConfig(SpillConfig.NONE, new OverflowConfig(), true));
         this.projectOperator = this.projectOperatorFactory.createOperator();
         for (int i = 0; i < conf.getKeyCols().size(); i++) {
@@ -454,7 +450,7 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
         VecBatch input = (VecBatch) row;
         if (needProject) {
             this.projectOperator.addInput(input);
-            output = this.projectOperator.getOutput();
+            Iterator<VecBatch> output = this.projectOperator.getOutput();
             while (output.hasNext()) {
                 processVecbatch(output.next(), tag);
             }

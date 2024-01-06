@@ -48,10 +48,9 @@ public class OmniPTFOperator extends OmniHiveOperator<OmniPTFDesc> implements Se
     private static final Logger LOG = LoggerFactory.getLogger(OmniPTFOperator.class.getName());
     private transient OmniWindowOperatorFactory omniWindowOperatorFactory;
     private transient OmniOperator omniOperator;
-    private transient List<? extends StructField> allStructFieldRefs;
+
     boolean isMapOperator;
 
-    private transient WindowTableFunctionDef windowTableFunctionDef;
     transient Configuration hiveConf;
 
     public OmniPTFOperator() {
@@ -73,7 +72,7 @@ public class OmniPTFOperator extends OmniHiveOperator<OmniPTFDesc> implements Se
         hiveConf = jobConf;
         isMapOperator = conf.isMapSide();
         reconstructQueryDef(hiveConf);
-        windowTableFunctionDef = (WindowTableFunctionDef) conf.getFuncDef();
+        WindowTableFunctionDef windowTableFunctionDef = (WindowTableFunctionDef) conf.getFuncDef();
         List<WindowFunctionDef> windowFunctions = windowTableFunctionDef.getWindowFunctions();
         List<OrderExpressionDef> windowOrderExpressions = windowTableFunctionDef.getOrder().getExpressions();
 
@@ -84,7 +83,8 @@ public class OmniPTFOperator extends OmniHiveOperator<OmniPTFDesc> implements Se
             outputObjInspector = conf.getFuncDef().getOutputShape().getOI();
         }
 
-        allStructFieldRefs = ((StandardStructObjectInspector) inputObjInspectors[0]).getAllStructFieldRefs();
+        List<? extends StructField> allStructFieldRefs = ((StandardStructObjectInspector) inputObjInspectors[0])
+                .getAllStructFieldRefs();
 
         DataType[] sourceTypes = getExprFromStructField(allStructFieldRefs);
         int[] outputChannels = getOutputChannels((StandardStructObjectInspector) inputObjInspectors[0],

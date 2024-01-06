@@ -52,8 +52,6 @@ public class OmniVectorWithSortOperator extends OmniHiveOperator<OmniVectorDesc>
     private transient List<StructField>[] fields;
     private transient int[] keyFiledNum;
 
-    private transient OmniSortOperatorFactory[] sortOperatorFactories;
-
     private transient OmniOperator[] sortOperators;
 
     public transient Iterator<VecBatch>[] outputs;
@@ -109,7 +107,7 @@ public class OmniVectorWithSortOperator extends OmniHiveOperator<OmniVectorDesc>
     }
 
     private void generateSortOperator() {
-        sortOperatorFactories = new OmniSortOperatorFactory[inputObjInspectors.length];
+        OmniSortOperatorFactory[] sortOperatorFactories = new OmniSortOperatorFactory[inputObjInspectors.length];
         sortOperators = new OmniOperator[inputObjInspectors.length];
         for (int i = 0; i < sortOperators.length; i++) {
             DataType[] inputTypes = new DataType[flatFields[i].size()];
