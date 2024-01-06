@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020-2022. Huawei Technologies Co., Ltd. All rights reserved.
+ * Copyright (C) 2020-2024. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
@@ -231,6 +231,11 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
   val filterMergeEnable: Boolean = conf.getConfString("spark.sql.execution.filterMerge.enabled", "false").toBoolean
 
   val filterMergeThreshold: Double = conf.getConfString("spark.sql.execution.filterMerge.maxCost", "100.0").toDouble
+
+  // enable or disable columnar CoalesceExec
+  val enableColumnarCoalesce: Boolean = conf
+    .getConfString("spark.omni.sql.columnar.coalesce", "true")
+    .toBoolean
 }
 
 
