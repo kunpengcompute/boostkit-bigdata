@@ -44,13 +44,13 @@ public class Decimal64VecConverter extends LongVecConverter {
                 value = dictionaryVec.getDecimal128(i)[0];
             } else {
                 Decimal128Vec decimal128Vec = (Decimal128Vec) vec;
-                Map.Entry<Boolean, byte[]> result = decimal128Vec.getBytes(i);
-                if (result.getValue().length > 8) {
+                byte[] result = decimal128Vec.getBytes(i);
+                if (result.length > 8) {
                     byte[] newBytes = new byte[8];
-                    System.arraycopy(result.getValue(), result.getValue().length - 8, newBytes, 0, 8);
-                    value = Decimal128Vec.bytesToLong(newBytes) * (result.getKey() ? -1 : 1);
+                    System.arraycopy(result, result.length - 8, newBytes, 0, 8);
+                    value = Decimal128Vec.bytesToLong(newBytes);
                 } else {
-                    value = Decimal128Vec.bytesToLong(result.getValue()) * (result.getKey() ? -1 : 1);
+                    value = Decimal128Vec.bytesToLong(result);
                 }
             }
             decimal64ColumnVector.vector[i - start] = value;

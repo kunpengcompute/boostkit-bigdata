@@ -39,19 +39,12 @@ public class DecimalVecConverter implements VecConverter {
             return getDecimalWritableFromLong(dictionaryVec.getDecimal128(index), decimalTypeInfo.getScale());
         }
         Decimal128Vec decimal128Vec = (Decimal128Vec) vec;
-        Map.Entry<Boolean, byte[]> result = decimal128Vec.getBytes(index);
-        HiveDecimalWritable hiveDecimalWritable = new HiveDecimalWritable(result.getValue(), decimalTypeInfo.getScale());
-        if (result.getKey()) {
-            hiveDecimalWritable.mutateNegate();
-        }
+        byte[] result = decimal128Vec.getBytes(index);
+        HiveDecimalWritable hiveDecimalWritable = new HiveDecimalWritable(result, decimalTypeInfo.getScale());
         return hiveDecimalWritable;
     }
 
     private Object getDecimalWritableFromLong(long[] longs, int scale) {
-        boolean isNegative = longs[1] < 0L;
-        if (isNegative) {
-            longs[1] &= 9223372036854775807L;
-        }
 
         byte[] bytes = new byte[16];
         byte[] highBytes = longToBytes(longs[1]);
@@ -59,9 +52,6 @@ public class DecimalVecConverter implements VecConverter {
         System.arraycopy(highBytes, 0, bytes, 0, 8);
         System.arraycopy(lowBytes, 0, bytes, 8, 8);
         HiveDecimalWritable hiveDecimalWritable = new HiveDecimalWritable(bytes, scale);
-        if (isNegative) {
-            hiveDecimalWritable.mutateNegate();
-        }
         return hiveDecimalWritable;
     }
 
@@ -197,34 +187,20 @@ public class DecimalVecConverter implements VecConverter {
 
     private byte[] getDecimalBytes(HiveDecimalWritable hiveDecimal, DecimalTypeInfo decimalTypeInfo) {
         boolean isNegative = hiveDecimal.signum() == -1;
-        byte[] buffer = new byte[16];
-        hiveDecimal.mutateAbs();
-        buffer = hiveDecimal.getHiveDecimal().bigIntegerBytesScaled(decimalTypeInfo.getScale());
+        byte[] buffer = hiveDecimal.getHiveDecimal().bigIntegerBytesScaled(decimalTypeInfo.getScale());
         int byteArrayLength = buffer.length;
         if (byteArrayLength > 2 * Long.BYTES) {
             throw new OmniRuntimeException(OMNI_INNER_ERROR, "Decimal overflow.");
         }
-
-        // the array is big endian
-        byte[] highBytes = new byte[Long.BYTES];
-        byte[] lowBytes = new byte[Long.BYTES];
-        if (byteArrayLength <= Long.BYTES) {
-            System.arraycopy(buffer, 0, lowBytes, Long.BYTES - byteArrayLength, Math.min(byteArrayLength, Long.BYTES));
-        } else {
-            int offset = byteArrayLength - Long.BYTES;
-            System.arraycopy(buffer, 0, highBytes, 2 * Long.BYTES - byteArrayLength, Math.min(offset, Long.BYTES));
-            System.arraycopy(buffer, offset, lowBytes, 0, Long.BYTES);
+        int i;
+        byte[] result = new byte[16];
+        for (i=0; i< byteArrayLength; i++) {
+            result[i] = buffer[byteArrayLength - i -1];
         }
         if (isNegative) {
-            long signBit = bytesToLong(highBytes) | (1L << 63);
-            highBytes = longToBytes(signBit);
-        }
-        byte[] result = new byte[16];
-        for (int i = 0; i < 8; i++) {
-            result[i] = lowBytes[7 - i];
-        }
-        for (int i = 8; i < 16; i++) {
-            result[i] = highBytes[15 - i];
+            for(i = byteArrayLength; i< 16; i++) {
+                result[i] = (byte) -1;
+            }
         }
         return result;
     }

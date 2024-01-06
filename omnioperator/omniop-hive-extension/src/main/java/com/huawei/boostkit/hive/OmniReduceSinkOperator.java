@@ -671,15 +671,13 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
         }
 
         if (type.getId() == OMNI_DECIMAL128) {
-            Map.Entry<Boolean, byte[]> result = ((Decimal128Vec) vector).getBytes(index);
+            byte[] result = ((Decimal128Vec) vector).getBytes(index);
             StructField structField = ((StandardStructObjectInspector) inputObjInspectors[0]).getAllStructFieldRefs()
                     .get(keyFieldId);
             WritableHiveDecimalObjectInspector objectInspector = (WritableHiveDecimalObjectInspector) structField
                     .getFieldObjectInspector();
             DecimalTypeInfo typeInfo = (DecimalTypeInfo) objectInspector.getTypeInfo();
-            return result.getKey()
-                    ? HiveDecimal.createFromBigIntegerBytesAndScale(result.getValue(), typeInfo.getScale()).negate()
-                    : HiveDecimal.createFromBigIntegerBytesAndScale(result.getValue(), typeInfo.getScale());
+            return HiveDecimal.createFromBigIntegerBytesAndScale(result, typeInfo.getScale());
         }
         if (type.getId() == OMNI_VARCHAR) {
             return new Text(((VarcharVec) vector).get(index));
@@ -781,15 +779,13 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
         } else if (type.getId() == OMNI_SHORT) {
             return ((ShortVec) vector).get(index);
         } else if (type.getId() == OMNI_DECIMAL128) {
-            Map.Entry<Boolean, byte[]> result = ((Decimal128Vec) vector).getBytes(index);
+            byte[] result = ((Decimal128Vec) vector).getBytes(index);
             StructField structField = ((StandardStructObjectInspector) this.inputObjInspectors[0])
                     .getAllStructFieldRefs().get(indexInVector);
             WritableHiveDecimalObjectInspector objectInspector = (WritableHiveDecimalObjectInspector) structField
                     .getFieldObjectInspector();
             DecimalTypeInfo typeInfo = (DecimalTypeInfo) objectInspector.getTypeInfo();
-            return result.getKey()
-                    ? HiveDecimal.createFromBigIntegerBytesAndScale(result.getValue(), typeInfo.getScale()).negate()
-                    : HiveDecimal.createFromBigIntegerBytesAndScale(result.getValue(), typeInfo.getScale());
+            return HiveDecimal.createFromBigIntegerBytesAndScale(result, typeInfo.getScale());
         } else if (type.getId() == OMNI_VARCHAR) {
             return new Text(((VarcharVec) vector).get(index));
         } else if (type.getId() == OMNI_CHAR) {
@@ -821,15 +817,13 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
         } else if (type.getId() == OMNI_SHORT) {
             return new ShortWritable(((ShortVec) vector).get(index));
         } else if (type.getId() == OMNI_DECIMAL128) {
-            Map.Entry<Boolean, byte[]> result = ((Decimal128Vec) vector).getBytes(index);
+            byte[] result = ((Decimal128Vec) vector).getBytes(index);
             StructField structField = ((StandardStructObjectInspector) this.inputObjInspectors[0])
                     .getAllStructFieldRefs().get(indexInVector);
             WritableHiveDecimalObjectInspector objectInspector = (WritableHiveDecimalObjectInspector) structField
                     .getFieldObjectInspector();
             DecimalTypeInfo typeInfo = (DecimalTypeInfo) objectInspector.getTypeInfo();
-            return result.getKey()
-                    ? HiveDecimal.createFromBigIntegerBytesAndScale(result.getValue(), typeInfo.getScale()).negate()
-                    : HiveDecimal.createFromBigIntegerBytesAndScale(result.getValue(), typeInfo.getScale());
+            return HiveDecimal.createFromBigIntegerBytesAndScale(result, typeInfo.getScale());
         } else if (type.getId() == OMNI_VARCHAR) {
             fieldObjectInspector = ((StandardStructObjectInspector) this.inputObjInspectors[0]).getAllStructFieldRefs()
                     .get(indexInVector).getFieldObjectInspector();
