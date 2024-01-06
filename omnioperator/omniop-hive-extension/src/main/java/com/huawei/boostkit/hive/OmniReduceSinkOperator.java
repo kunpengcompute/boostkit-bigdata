@@ -393,7 +393,7 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
         }
         OmniProjectOperatorFactory projectOperatorFactory = new OmniProjectOperatorFactory(expressions, inputTypes, 1,
                 new OperatorConfig(SpillConfig.NONE, new OverflowConfig(), true));
-        this.projectOperator = this.projectOperatorFactory.createOperator();
+        this.projectOperator = projectOperatorFactory.createOperator();
         for (int i = 0; i < conf.getKeyCols().size(); i++) {
             keyFieldId[i] = i;
         }
