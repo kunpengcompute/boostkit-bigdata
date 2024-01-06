@@ -392,7 +392,6 @@ public class OmniVectorizedVectorOperator extends OmniHiveOperator<OmniVectorDes
         }
         forwardNext();
         rowCount = 0;
-        return;
     }
 
     protected void forwardNext() throws HiveException {

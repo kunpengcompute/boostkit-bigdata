@@ -102,11 +102,9 @@ public abstract class OmniHiveOperator<T extends OperatorDesc> extends Operator<
 
     @Override
     public void startGroup() throws HiveException {
-        return;
     }
 
     @Override
     public void endGroup() throws HiveException {
-        return;
     }
 }

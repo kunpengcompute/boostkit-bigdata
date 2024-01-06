@@ -111,11 +111,9 @@ public class OmniMergeJoinOperator extends OmniJoinOperator {
 
     @Override
     public void startGroup() throws HiveException {
-        return;
     }
 
     @Override
     public void endGroup() throws HiveException {
-        return;
     }
 }

@@ -834,12 +834,10 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
 
     @Override
     public void startGroup() throws HiveException {
-        return;
     }
 
     @Override
     public void endGroup() throws HiveException {
-        return;
     }
 
     private static class OmniReaderWrapper {

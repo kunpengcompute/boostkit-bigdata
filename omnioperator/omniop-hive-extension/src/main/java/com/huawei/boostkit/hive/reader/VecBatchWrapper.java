@@ -25,10 +25,8 @@ public class VecBatchWrapper extends VectorizedRowBatch {
     }
 
     public void write(DataOutput var1) throws IOException {
-        return;
     }
 
     public void readFields(DataInput var1) throws IOException {
-        return;
     }
 }
