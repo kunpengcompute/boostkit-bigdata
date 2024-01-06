@@ -544,7 +544,7 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
                     break;
                 case OMNI_VARCHAR:
                 case OMNI_CHAR:
-                    ((VarcharVec) newVec).set(i, ((String) exprNodeConstantEvaluator.getExpr().getValue()).getBytes());
+                    ((VarcharVec) newVec).set(i, exprNodeConstantEvaluator.getExpr().getValue().toString().getBytes());
                     break;
                 default:
                     throw new RuntimeException("Not support dataType, dataTypeId: " + dataTypeId);

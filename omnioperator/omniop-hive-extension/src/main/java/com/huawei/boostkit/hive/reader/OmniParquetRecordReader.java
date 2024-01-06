@@ -3,8 +3,6 @@ package com.huawei.boostkit.hive.reader;
 
 import static com.huawei.boostkit.hive.cache.VectorCache.BATCH;
 
-import com.huawei.boostkit.spark.jni.ParquetColumnarBatchJniReader;
-
 import com.google.common.base.Strings;
 
 import nova.hetu.omniruntime.vector.Vec;
@@ -51,7 +49,7 @@ public class OmniParquetRecordReader
         implements RecordReader<NullWritable, VecBatchWrapper>, StatsProvidingRecordReader {
     public static final Logger LOG = LoggerFactory.getLogger(OmniParquetRecordReader.class);
 
-    private ParquetColumnarBatchJniReader recordReader;
+    private ParquetColumnarBatchScanReader recordReader;
     private Vec[] vecs;
     private final long splitLen; // for getPos()
     private boolean skipTimestampConversion = false;
@@ -79,7 +77,7 @@ public class OmniParquetRecordReader
                     skipTimestampConversion);
         }
         this.isFilterPredicate = filter instanceof FilterCompat.FilterPredicateCompat;
-        this.recordReader = new ParquetColumnarBatchJniReader();
+        this.recordReader = new ParquetColumnarBatchScanReader();
         // PushDown rowGroups and columns indices for native reader.
         List<Integer> rowgroupIndices = getFilteredBlocks(split.getStart(), split.getEnd());
         List<Integer> columnIndices = ColumnProjectionUtils.getReadColumnIDs(conf);

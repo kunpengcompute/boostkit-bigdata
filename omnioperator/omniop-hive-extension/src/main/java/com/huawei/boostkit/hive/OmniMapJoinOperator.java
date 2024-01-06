@@ -514,8 +514,7 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
         }
         String[] buildHashKeys = getExprFromExprNode(buildExprNodeColumnEvaluators, buildKeyColNameToId,
                 inputObjInspectors[buildIndex]);
-        JoinType joinType = JOIN_TYPE_MAP.get(condn[buildIndexes.size() - 1].getType());
-        return new OmniHashBuilderWithExprOperatorFactory(joinType, buildTypes, buildHashKeys, 1);
+        return new OmniHashBuilderWithExprOperatorFactory(buildTypes, buildHashKeys, 1);
     }
 
     private OmniOperatorFactory getOmniLookupOperatorFactory(

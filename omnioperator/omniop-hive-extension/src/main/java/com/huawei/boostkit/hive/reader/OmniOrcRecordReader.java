@@ -5,8 +5,6 @@ import static com.huawei.boostkit.hive.cache.VectorCache.BATCH;
 import static org.apache.hadoop.hive.ql.io.orc.OrcInputFormat.getDesiredRowTypeDescr;
 import static org.apache.hadoop.hive.serde2.ColumnProjectionUtils.READ_COLUMN_IDS_CONF_STR;
 
-import com.huawei.boostkit.spark.jni.OrcColumnarBatchJniReader;
-
 import nova.hetu.omniruntime.vector.Vec;
 import nova.hetu.omniruntime.vector.VecBatch;
 
@@ -36,7 +34,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 public class OmniOrcRecordReader implements RecordReader<NullWritable, VecBatchWrapper>, StatsProvidingRecordReader {
-    protected OrcColumnarBatchJniReader recordReader;
+    protected OrcColumnarBatchScanReader recordReader;
     protected Vec[] vecs;
     protected final long offset;
     protected final long length;
@@ -55,7 +53,7 @@ public class OmniOrcRecordReader implements RecordReader<NullWritable, VecBatchW
         TypeDescription requiredSchema = getRequiredSchema(schema);
         options.schema(requiredSchema);
         options.include(null);
-        recordReader = new OrcColumnarBatchJniReader();
+        recordReader = new OrcColumnarBatchScanReader();
         String filePath;
         if (split.getPath().toUri().getScheme().equals("file")) {
             filePath = split.getPath().toUri().getPath();

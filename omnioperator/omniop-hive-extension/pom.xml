@@ -58,8 +58,8 @@
             </exclusions>
         </dependency>
         <dependency>
-            <groupId>com.huawei.kunpeng</groupId>
-            <artifactId>boostkit-omniop-spark</artifactId>
+            <groupId>com.huawei.boostkit</groupId>
+            <artifactId>boostkit-omniop-native-reader</artifactId>
             <version>3.1.1-1.3.0</version>
             <exclusions>
                 <exclusion>
