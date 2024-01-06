@@ -112,12 +112,7 @@ public class OmniVectorizedVectorOperator extends OmniHiveOperator<OmniVectorDes
             }
         }
         super.initializeOp(hconf);
-        if (isToVector && !OMNI_OPERATOR.contains(OperatorType.TABLESCAN) && !parentOperators.isEmpty()
-                && (parentOperators.get(0).getType().equals(OperatorType.TABLESCAN)
-                        || parentOperators.get(0).getType().equals(OperatorType.FILTER)
-                                && parentOperators.get(0).getParentOperators().get(0).getType() != null
-                                && parentOperators.get(0).getParentOperators().get(0).getType()
-                                        .equals(OperatorType.TABLESCAN))) {
+        if (!isToVector && !OMNI_OPERATOR.contains(OperatorType.TABLESCAN) && checkParentTableScan()) {
             rebuildTableScanInspector(hconf);
         }
         StructObjectInspector bigTableInspector;
@@ -167,6 +162,21 @@ public class OmniVectorizedVectorOperator extends OmniHiveOperator<OmniVectorDes
                     .map(inspector -> inspector.getTypeInfo()).collect(Collectors.toList());
             vecBufferCache = new VecBufferCache(columnCaches.length, typeInfos);
         }
+    }
+
+    private boolean checkParentTableScan() {
+        if (parentOperators.isEmpty()) {
+            return false;
+        }
+        if (parentOperators.get(0).getType().equals(OperatorType.TABLESCAN)) {
+            return true;
+        }
+        if (parentOperators.get(0).getType().equals(OperatorType.FILTER)
+                && parentOperators.get(0).getParentOperators().get(0).getType() != null
+                && parentOperators.get(0).getParentOperators().get(0).getType().equals(OperatorType.TABLESCAN)) {
+            return true;
+        }
+        return false;
     }
 
     private void rebuildMapjoinInspector() throws HiveException {

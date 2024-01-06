@@ -295,10 +295,11 @@ public class TypeUtils {
         Integer returnType = castFunctionExpression.getReturnType();
         // not support Cast(string as !(decimal/string)) and Cast(!(decimal/string) as
         // string)
-        if (((dataType == OMNI_CHAR.toValue() || dataType == OMNI_VARCHAR.toValue())
+        if ((dataType == OMNI_CHAR.toValue() || dataType == OMNI_VARCHAR.toValue())
                 && !isDecimalOrStringType(returnType))
-                || (!isDecimalOrStringType(dataType)
-                && (returnType == OMNI_CHAR.toValue() || returnType == OMNI_VARCHAR.toValue()))) {
+            return true;
+        if ((returnType == OMNI_CHAR.toValue() || returnType == OMNI_VARCHAR.toValue())
+                && !isDecimalOrStringType(dataType)) {
             return true;
         }
 

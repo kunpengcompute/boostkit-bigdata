@@ -14,7 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class BridgeExpressionProcessor implements ExpressionProcessor {
-    public static List<String> SUPPORT_BRIDGE_UDF = new ArrayList<String>() {
+    public static final List<String> SUPPORT_BRIDGE_UDF = new ArrayList<String>() {
         {
             add("UDFToDouble");
             add("UDFToInteger");
@@ -31,31 +31,38 @@ public class BridgeExpressionProcessor implements ExpressionProcessor {
     @Override
     public BaseExpression process(ExprNodeGenericFuncDesc node, String operator, ObjectInspector inspector) {
         BaseExpression leaf = null;
-        if (node.getGenericUDF().getUdfName().equals("UDFToString")
-                && node.getChildren().get(0).getTypeInfo() instanceof BaseCharTypeInfo) {
-            leaf = createNode(node.getChildren().get(0), inspector);
-        } else if (node.getGenericUDF().getUdfName().equals("like")) {
-            LikeExpressionProcessor likeExpressionProcessor = new LikeExpressionProcessor();
-            leaf = likeExpressionProcessor.process(node, operator, inspector);
-        } else if (node.getGenericUDF().getUdfName().equals("substr")) {
-            if (simplify) {
-                SimplifySubstrExpressionProcessor simplifySubstrExpressionProcessor =
-                        new SimplifySubstrExpressionProcessor();
-                leaf = simplifySubstrExpressionProcessor.process(node, operator, inspector);
-            } else {
-                SubstrExpressionProcessor substrExpressionProcessor = new SubstrExpressionProcessor();
-                leaf = substrExpressionProcessor.process(node, operator, inspector);
-            }
-        } else if (node.getGenericUDF().getUdfName().equals("UDFToDouble")
-                || node.getGenericUDF().getUdfName().equals("UDFToInteger")
-                || node.getGenericUDF().getUdfName().equals("UDFToLong")
-                || node.getGenericUDF().getUdfName().equals("UDFToShort")
-                || node.getGenericUDF().getUdfName().equals("UDFToByte")
-                || node.getGenericUDF().getUdfName().equals("UDFToBoolean")) {
-            leaf = createNode(node.getChildren().get(0), inspector);
-            CastFunctionExpression functionExpression = new CastFunctionExpression(
-                    TypeUtils.convertHiveTypeToOmniType(node.getTypeInfo()), null, null, null);
-            return ExpressionUtils.optimizeCast(leaf, functionExpression);
+        switch (node.getGenericUDF().getUdfName()) {
+            case "UDFToString":
+                if (node.getChildren().get(0).getTypeInfo() instanceof BaseCharTypeInfo) {
+                    leaf = createNode(node.getChildren().get(0), inspector);
+                }
+                break;
+            case "like":
+                LikeExpressionProcessor likeExpressionProcessor = new LikeExpressionProcessor();
+                leaf = likeExpressionProcessor.process(node, operator, inspector);
+                break;
+            case "substr":
+                if (simplify) {
+                    SimplifySubstrExpressionProcessor simplifySubstrExpressionProcessor =
+                            new SimplifySubstrExpressionProcessor();
+                    leaf = simplifySubstrExpressionProcessor.process(node, operator, inspector);
+                } else {
+                    SubstrExpressionProcessor substrExpressionProcessor = new SubstrExpressionProcessor();
+                    leaf = substrExpressionProcessor.process(node, operator, inspector);
+                }
+                break;
+            case "UDFToDouble":
+            case "UDFToInteger":
+            case "UDFToLong":
+            case "UDFToShort":
+            case "UDFToByte":
+            case "UDFToBoolean":
+                leaf = createNode(node.getChildren().get(0), inspector);
+                CastFunctionExpression functionExpression = new CastFunctionExpression(
+                        TypeUtils.convertHiveTypeToOmniType(node.getTypeInfo()), null, null, null);
+                return ExpressionUtils.optimizeCast(leaf, functionExpression);
+            default:
+                break;
         }
         return leaf;
     }

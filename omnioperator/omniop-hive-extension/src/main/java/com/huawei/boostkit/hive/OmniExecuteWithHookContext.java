@@ -413,11 +413,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         boolean reduceSinkCanReplace = false;
         for (BaseWork child : tezWork.getChildren(work)) {
             TezEdgeProperty.EdgeType edgeType = tezWork.getEdgeType(work, child);
-            if ((edgeType == TezEdgeProperty.EdgeType.ONE_TO_ONE_EDGE
-                    || edgeType == TezEdgeProperty.EdgeType.CUSTOM_SIMPLE_EDGE
-                    || edgeType == TezEdgeProperty.EdgeType.BROADCAST_EDGE
-                    || edgeType == TezEdgeProperty.EdgeType.XPROD_EDGE)
-                    && isReplaceable(child.getAnyRootOperator(), true)) {
+            if (isSupportEdgeType(edgeType) && isReplaceable(child.getAnyRootOperator(), true)) {
                 reduceSinkCanReplace = true;
             }
             if (edgeType == TezEdgeProperty.EdgeType.SIMPLE_EDGE && child instanceof ReduceWork) {
@@ -455,6 +451,16 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             }
         }
         return reduceSinkCanReplace;
+    }
+
+    private boolean isSupportEdgeType(TezEdgeProperty.EdgeType edgeType) {
+        if (edgeType == TezEdgeProperty.EdgeType.ONE_TO_ONE_EDGE
+                || edgeType == TezEdgeProperty.EdgeType.CUSTOM_SIMPLE_EDGE
+                || edgeType == TezEdgeProperty.EdgeType.BROADCAST_EDGE
+                || edgeType == TezEdgeProperty.EdgeType.XPROD_EDGE) {
+            return true;
+        }
+        return false;
     }
 
     private void setParentWorkToCurrentWorkEdge(BaseWork work, TezEdgeProperty.EdgeType edgeType) {
@@ -725,7 +731,10 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
 
         @Override
         public boolean equals(Object obj) {
-            return (this.operator == ((OperatorInfo) obj).getOperator());
+            if (obj instanceof OperatorInfo) {
+                return (this.operator == ((OperatorInfo) obj).getOperator());
+            }
+            return false;
         }
 
         @Override
