@@ -41,8 +41,9 @@ public class AppResult extends Model {
     private static final int APPLICATION_NAME_LIMIT = 100;
     private static final int APPLICATION_WORKLOAD_LIMIT = 50;
     private static final int JOB_TYPE_LIMIT = 50;
-    private static final int SUBMIT_METHOD_LIMIT = 20;
-    private static final int DEPLOY_MODE_LIMIT = 20;
+    private static final int SUBMIT_METHOD_LIMIT = 50;
+    private static final int DEPLOY_MODE_LIMIT = 50;
+    private static final int IDENTIFICATION_LIMIT = 300;
 
     @Id
     @Column(length = APPLICATION_ID_LIMIT, unique = true, nullable = false)
@@ -83,4 +84,7 @@ public class AppResult extends Model {
 
     @Column(columnDefinition = "TEXT CHARACTER SET utf8mb4")
     public String query;
+
+    @Column(length = IDENTIFICATION_LIMIT)
+    public String identification;
 }
