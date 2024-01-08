@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2020-2024. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
@@ -64,7 +65,7 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] with PredicateHelper{
   val topNSortThreshold: Int = columnarConf.topNSortThreshold
   val enableDedupLeftSemiJoin: Boolean = columnarConf.enableDedupLeftSemiJoin
   val dedupLeftSemiJoinThreshold: Int = columnarConf.dedupLeftSemiJoinThreshold
-
+  val enableColumnarCoalesce: Boolean = columnarConf.enableColumnarCoalesce
   def apply(plan: SparkPlan): SparkPlan = {
     replaceWithColumnarPlan(plan)
   }
@@ -690,6 +691,10 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] with PredicateHelper{
         case _ =>
           plan
       }
+    case plan: CoalesceExec if enableColumnarCoalesce =>
+      val child = replaceWithColumnarPlan(plan.child)
+      logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
+      ColumnarCoalesceExec(plan.numPartitions, child)
     case p =>
       val children = plan.children.map(replaceWithColumnarPlan)
       logInfo(s"Columnar Processing for ${p.getClass} is currently not supported.")
