@@ -4,7 +4,6 @@ import com.huawei.boostkit.hive.expression.BaseExpression;
 import com.huawei.boostkit.hive.expression.ExpressionUtils;
 import com.huawei.boostkit.hive.expression.FunctionExpression;
 import com.huawei.boostkit.hive.expression.NotExpression;
-import com.huawei.boostkit.hive.expression.ReferenceFactor;
 import com.huawei.boostkit.hive.expression.TypeUtils;
 import com.huawei.boostkit.hive.expression.UnaryExpression;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
@@ -23,12 +22,7 @@ public class UpperExpressionProcessor implements ExpressionProcessor {
             if (child instanceof ExprNodeGenericFuncDesc) {
                 functionExpression.add(ExpressionUtils.build((ExprNodeGenericFuncDesc) child, inspector));
             } else {
-                BaseExpression node1 = ExpressionUtils.createNode(child, inspector);
-                if (node1 instanceof ReferenceFactor) {
-                    functionExpression.add(wrapNotNullExpression((ReferenceFactor) node1));
-                } else {
-                    functionExpression.add(node1);
-                }
+                functionExpression.add(ExpressionUtils.createNode(child, inspector));
             }
         }
         return functionExpression;
