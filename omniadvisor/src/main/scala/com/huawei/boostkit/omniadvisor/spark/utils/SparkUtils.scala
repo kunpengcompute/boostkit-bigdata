@@ -93,9 +93,10 @@ object SparkUtils {
     resource.managed {
         openEventLog(path, fs)
       }
-      .map { in => codec.map {
-        _.compressedInputStream(in)
-      }.getOrElse(in)
+      .map { in =>
+        codec.map {
+          _.compressedInputStream(in)
+        }.getOrElse(in)
       }
       .acquireAndGet(f)
   }
@@ -147,7 +148,7 @@ object SparkUtils {
   }
 
   private def getSubmitCmdFromClusterCmd(clusterCmd: String): String = {
-    val cmdWithoutArgsAndJar = clusterCmd.replaceAll("\\s*--jar file:\\S+|\\s*--arg \\S+", "").trim
+    val cmdWithoutArgsAndJar = clusterCmd.replace("--jar file:", "").replace("--arg ", "").trim
     val cmdWithRightHeader = cmdWithoutArgsAndJar.replace("org.apache.spark.deploy.yarn.ApplicationMaster", "spark-submit --master yarn --deploy-mode cluster")
     cmdWithRightHeader.split("--properties-file").head.trim
   }
