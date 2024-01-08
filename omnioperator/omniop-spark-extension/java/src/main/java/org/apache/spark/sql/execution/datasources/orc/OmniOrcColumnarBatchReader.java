@@ -134,7 +134,7 @@ public class OmniOrcColumnarBatchReader extends RecordReader<Void, ColumnarBatch
     Reader.Options options =
       OrcColumnarNativeReader.buildOptions(conf, fileSplit.getStart(), fileSplit.getLength());
     recordReader = new OrcColumnarBatchScanReader();
-    recordReader.initializeReaderJava(fileSplit.getPath().toString(), readerOptions);
+    recordReader.initializeReaderJava(fileSplit.getPath().toUri(), readerOptions);
     recordReader.initializeRecordReaderJava(options);
   }
 

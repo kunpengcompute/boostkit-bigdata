@@ -26,7 +26,7 @@ public class OrcColumnarBatchJniReader {
         NativeReaderLoader.getInstance();
     }
 
-    public native long initializeReader(String path, JSONObject job);
+    public native long initializeReader(JSONObject job);
 
     public native long initializeRecordReader(long reader, JSONObject job);
 
