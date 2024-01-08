@@ -73,6 +73,7 @@ case class ColumnarCoalesceExec(numPartitions: Int, child: SparkPlan) extends Un
       rdd.coalesce(numPartitions, shuffle = false)
     }
   }
+}
 
 object ColumnarCoalesceExec {
   /** A simple RDD with no data, but with the given number of partitions. */
