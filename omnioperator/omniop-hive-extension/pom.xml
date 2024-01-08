@@ -40,8 +40,8 @@
             <scope>provided</scope>
             <exclusions>
                 <exclusion>
-                    <groupId>*</groupId>
-                    <artifactId>*</artifactId>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>guava</artifactId>
                 </exclusion>
             </exclusions>
         </dependency>
@@ -85,38 +85,6 @@
             <version>${log.version}</version>
         </dependency>
         <dependency>
-            <groupId>org.mockito</groupId>
-            <artifactId>mockito-core</artifactId>
-            <version>3.5.15</version>
-            <scope>test</scope>
-            <exclusions>
-                <exclusion>
-                    <groupId>org.objenesis</groupId>
-                    <artifactId>objenesis</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>hamcrest-core</groupId>
-                    <artifactId>org.hamcrest</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-        <dependency>
-            <groupId>org.mockito</groupId>
-            <artifactId>mockito-inline</artifactId>
-            <version>3.5.0</version>
-            <scope>test</scope>
-            <exclusions>
-                <exclusion>
-                    <groupId>org.javassist</groupId>
-                    <artifactId>javassist</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>org.objenesis</groupId>
-                    <artifactId>objenesis</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-        <dependency>
             <groupId>org.apache.hive</groupId>
             <artifactId>hive-storage-api</artifactId>
             <version>2.8.1</version>
@@ -133,24 +101,12 @@
             <artifactId>hive-serde</artifactId>
             <version>${hive.version}</version>
             <scope>provided</scope>
-            <exclusions>
-                <exclusion>
-                    <groupId>*</groupId>
-                    <artifactId>*</artifactId>
-                </exclusion>
-            </exclusions>
         </dependency>
         <dependency>
             <groupId>org.apache.hive</groupId>
             <artifactId>hive-exec</artifactId>
             <version>${hive.version}</version>
             <scope>provided</scope>
-            <exclusions>
-                <exclusion>
-                    <groupId>*</groupId>
-                    <artifactId>*</artifactId>
-                </exclusion>
-            </exclusions>
         </dependency>
         <dependency>
             <groupId>org.apache.hive</groupId>
@@ -169,12 +125,6 @@
             <artifactId>hive-standalone-metastore</artifactId>
             <version>${hive.version}</version>
             <scope>provided</scope>
-            <exclusions>
-                <exclusion>
-                    <groupId>*</groupId>
-                    <artifactId>*</artifactId>
-                </exclusion>
-            </exclusions>
         </dependency>
         <dependency>
             <groupId>org.apache.hadoop</groupId>
@@ -193,42 +143,18 @@
             <artifactId>hadoop-common</artifactId>
             <version>${hadoop.version}</version>
             <scope>provided</scope>
-            <exclusions>
-                <exclusion>
-                    <groupId>*</groupId>
-                    <artifactId>*</artifactId>
-                </exclusion>
-            </exclusions>
         </dependency>
         <dependency>
             <groupId>org.apache.hadoop</groupId>
             <artifactId>hadoop-auth</artifactId>
             <version>${hadoop.version}</version>
             <scope>provided</scope>
-            <exclusions>
-                <exclusion>
-                    <groupId>*</groupId>
-                    <artifactId>*</artifactId>
-                </exclusion>
-            </exclusions>
         </dependency>
         <dependency>
             <groupId>org.apache.hadoop</groupId>
             <artifactId>hadoop-mapreduce-client-core</artifactId>
             <version>${hadoop.version}</version>
             <scope>provided</scope>
-            <exclusions>
-                <exclusion>
-                    <groupId>*</groupId>
-                    <artifactId>*</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-        <dependency>
-            <groupId>junit</groupId>
-            <artifactId>junit</artifactId>
-            <version>4.13</version>
-            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.codehaus.woodstox</groupId>
@@ -253,10 +179,59 @@
             <version>3.0.0</version>
             <scope>provided</scope>
         </dependency>
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>4.13.1</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.hive</groupId>
+            <artifactId>hive-cli</artifactId>
+            <version>3.1.0</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.tez</groupId>
+            <artifactId>tez-dag</artifactId>
+            <version>0.9.1</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.tez</groupId>
+            <artifactId>tez-mapreduce</artifactId>
+            <version>0.9.1</version>
+            <scope>test</scope>
+        </dependency>
+
     </dependencies>
 
     <build>
         <plugins>
+           <plugin>
+               <groupId>org.jacoco</groupId>
+               <artifactId>jacoco-maven-plugin</artifactId>
+               <version>0.8.1</version>
+               <executions>
+                   <execution>
+                       <goals>
+                           <goal>prepare-agent</goal>
+                       </goals>
+                   </execution>
+                   <execution>
+                       <id>report</id>
+                       <phase>test</phase>
+                       <goals>
+                           <goal>report</goal>
+                       </goals>
+                   </execution>
+               </executions>
+               <configuration>
+                   <excludes>
+                       <exclude>org/apache/hadoop/hive/ql/parse/**</exclude>
+                   </excludes>
+               </configuration>
+           </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>

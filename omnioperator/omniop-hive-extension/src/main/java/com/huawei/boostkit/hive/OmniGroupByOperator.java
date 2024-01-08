@@ -513,6 +513,8 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
             Arrays.fill(groupingArr, groupingSets.get(i));
             groupingIdVector.put(groupingArr, i * rowCount, 0, rowCount);
         }
+        vecBatch.releaseAllVectors();
+        vecBatch.close();
         vecs[vecCount] = groupingIdVector;
         return new VecBatch(vecs);
     }

@@ -56,7 +56,13 @@ public class OmniOrcRecordReader implements RecordReader<NullWritable, VecBatchW
         options.schema(requiredSchema);
         options.include(null);
         recordReader = new OrcColumnarBatchJniReader();
-        recordReader.initializeReaderJava(split.getPath().toString(), readerOptions);
+        String filePath;
+        if (split.getPath().toUri().getScheme().equals("file")) {
+            filePath = split.getPath().toUri().getPath();
+        } else {
+            filePath = split.getPath().toString();
+        }
+        recordReader.initializeReaderJava(filePath, readerOptions);
         recordReader.initializeRecordReaderJava(options);
         recordReader.initBatchJava(BATCH);
         vecs = new Vec[included.size()];

@@ -91,19 +91,32 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
 
     private final Map<Operator, BaseWork> reduceSinkOpToWork = new HashMap<>();
     private final List<Operator> mergeJoinNeedSort = new ArrayList<>();
-    List<Operator<? extends OperatorDesc>> replaceable;
+    List<Operator<? extends OperatorDesc>> replaceable = new ArrayList<>();
 
-    List<OperatorInfo> replaceableInfo;
+    List<OperatorInfo> replaceableInfo = new ArrayList<>();
 
     private TezWork tezWork;
 
+    private void clearGlobalVar() {
+        taskNameReplacedReduceSink.clear();
+        groupByOperatorNeedSort.clear();
+        reduceSinkOpToWork.clear();
+        mergeJoinNeedSort.clear();
+        replaceable.clear();
+        replaceableInfo.clear();
+        tezWork = null;
+    }
+
     public void run(HookContext hookContext) throws Exception {
+        clearGlobalVar();
         QueryPlan queryPlan = hookContext.getQueryPlan();
         if (queryPlan.getRootTasks().isEmpty()) {
             return;
         }
-        replaceable = new ArrayList<>();
-        replaceableInfo = new ArrayList<>();
+        if ((queryPlan.getQueryProperties() == null || !queryPlan.getQueryProperties().isQuery())
+                && !(queryPlan.getRootTasks().get(0) instanceof ExplainTask)) {
+            return;
+        }
         String engine = HiveConf.getVar(hookContext.getConf(), HiveConf.ConfVars.HIVE_EXECUTION_ENGINE);
         if (engine.equals("mr")) {
             throw new RuntimeException("can't support mr engine");
