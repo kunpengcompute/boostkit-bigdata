@@ -19,10 +19,13 @@
 
 #include "jni/jni_common.h"
 #include "ParquetReader.h"
+#include "io/arrowadapter/FileSystemAdapter.h"
+#include "io/UriInfo.h"
 
 using namespace arrow;
 using namespace parquet::arrow;
 using namespace omniruntime::reader;
+using namespace arrow::internal;
 
 static std::mutex mutex_;
 static std::map<std::string, Filesystem*> restore_filesysptr;
@@ -58,15 +61,16 @@ std::string omniruntime::reader::GetFileSystemKey(std::string& path, std::string
     return result;
 }
 
-Filesystem* omniruntime::reader::GetFileSystemPtr(std::string& path, std::string& ugi, arrow::Status &status)
+Filesystem* omniruntime::reader::GetFileSystemPtr(UriInfo& uri, std::string& ugi, arrow::Status &status)
 {
-    auto key = GetFileSystemKey(path, ugi);
+    std::string fullPath = uri.ToString();
+    auto key = GetFileSystemKey(fullPath, ugi);
 
     // if not find key, create the filesystem ptr
     auto iter = restore_filesysptr.find(key);
     if (iter == restore_filesysptr.end()) {
         Filesystem* fs = new Filesystem();
-        auto result = fs::FileSystemFromUriOrPath(path);
+        auto result = arrow_adapter::FileSystemFromUriOrPath(uri);
         status = result.status();
         if (!status.ok()) {
           return nullptr;
@@ -78,8 +82,9 @@ Filesystem* omniruntime::reader::GetFileSystemPtr(std::string& path, std::string
     return restore_filesysptr[key];
 }
 
-Status ParquetReader::InitRecordReader(std::string& filePath, int64_t capacity,
-    const std::vector<int>& row_group_indices, const std::vector<int>& column_indices, std::string& ugi)
+Status ParquetReader::InitRecordReader(UriInfo &uri, int64_t capacity,
+    const std::vector<int>& row_group_indices, const std::vector<int>& column_indices,
+    std::string& ugi)
 {
     // Configure reader settings
     auto reader_properties = parquet::ReaderProperties(pool);
@@ -91,12 +96,12 @@ Status ParquetReader::InitRecordReader(std::string& filePath, int64_t capacity,
     // Get the file from filesystem
     Status result;
     mutex_.lock();
-    Filesystem* fs = GetFileSystemPtr(filePath, ugi, result);
+    Filesystem* fs = GetFileSystemPtr(uri, ugi, result);
     mutex_.unlock();
     if (fs == nullptr || fs->filesys_ptr == nullptr) {
       return Status::IOError(result);
     }
-    ARROW_ASSIGN_OR_RAISE(auto file, fs->filesys_ptr->OpenInputFile(filePath));
+    ARROW_ASSIGN_OR_RAISE(auto file, fs->filesys_ptr->OpenInputFile(uri.ToString()));
 
     FileReaderBuilder reader_builder;
     ARROW_RETURN_NOT_OK(reader_builder.Open(file, reader_properties));

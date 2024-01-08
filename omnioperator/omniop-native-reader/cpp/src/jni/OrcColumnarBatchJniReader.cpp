@@ -20,6 +20,7 @@
 #include "OrcColumnarBatchJniReader.h"
 #include <boost/algorithm/string.hpp>
 #include "jni_common.h"
+#include "io/UriInfo.h"
 
 using namespace omniruntime::vec;
 using namespace omniruntime::type;
@@ -30,7 +31,7 @@ static constexpr int32_t MAX_DECIMAL64_DIGITS = 18;
 bool isDecimal64Transfor128 = false;
 
 JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniReader_initializeReader(JNIEnv *env,
-    jobject jObj, jstring path, jobject jsonObj)
+    jobject jObj, jobject jsonObj)
 {
     JNI_FUNC_START
 
@@ -40,8 +41,7 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniRea
     jlong tailLocation = env->CallLongMethod(jsonObj, jsonMethodLong, env->NewStringUTF("tailLocation"));
     jstring serTailJstr =
         (jstring)env->CallObjectMethod(jsonObj, jsonMethodString, env->NewStringUTF("serializedTail"));
-    const char *pathPtr = env->GetStringUTFChars(path, nullptr);
-    std::string filePath(pathPtr);
+
     orc::MemoryPool *pool = orc::getDefaultPool();
     orc::ReaderOptions readerOptions;
     readerOptions.setMemoryPool(*pool);
@@ -53,8 +53,27 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniRea
         env->ReleaseStringUTFChars(serTailJstr, ptr);
     }
 
-    std::unique_ptr<orc::Reader> reader = createReader(orc::readFile(filePath), readerOptions);
-    env->ReleaseStringUTFChars(path, pathPtr);
+    jstring schemaJstr = (jstring)env->CallObjectMethod(jsonObj, jsonMethodString, env->NewStringUTF("scheme"));
+    const char *schemaPtr = env->GetStringUTFChars(schemaJstr, nullptr);
+    std::string schemaStr(schemaPtr);
+    env->ReleaseStringUTFChars(schemaJstr, schemaPtr);
+
+    jstring fileJstr = (jstring)env->CallObjectMethod(jsonObj, jsonMethodString, env->NewStringUTF("path"));
+    const char *filePtr = env->GetStringUTFChars(fileJstr, nullptr);
+    std::string fileStr(filePtr);
+    env->ReleaseStringUTFChars(fileJstr, filePtr);
+
+    jstring hostJstr = (jstring)env->CallObjectMethod(jsonObj, jsonMethodString, env->NewStringUTF("host"));
+    const char *hostPtr = env->GetStringUTFChars(hostJstr, nullptr);
+    std::string hostStr(hostPtr);
+    env->ReleaseStringUTFChars(hostJstr, hostPtr);
+
+    jint port = (jint)env->CallIntMethod(jsonObj, jsonMethodInt, env->NewStringUTF("port"));
+    UriInfo uri(schemaStr, fileStr, hostStr, std::to_string(port));
+
+    std::unique_ptr<orc::Reader> reader;
+    reader = createReader(orc::readOmniFile(uri), readerOptions);
+
     orc::Reader *readerNew = reader.release();
     return (jlong)(readerNew);
     JNI_FUNC_END(runtimeExceptionClass)

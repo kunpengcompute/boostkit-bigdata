@@ -42,6 +42,8 @@ import org.junit.Test;
 import org.junit.runners.MethodSorters;
 import org.apache.hadoop.conf.Configuration;
 import java.io.File;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import org.apache.orc.Reader.Options;
 
@@ -92,7 +94,13 @@ public class OrcColumnarBatchJniReaderTest extends TestCase {
         OrcFile.ReaderOptions readerOptions = OrcFile.readerOptions(conf);
         File directory = new File("src/test/java/com/huawei/boostkit/spark/jni/orcsrc/000000_0");
         String path = directory.getAbsolutePath();
-        orcColumnarBatchScanReader.reader = orcColumnarBatchScanReader.initializeReaderJava(path, readerOptions);
+        URI uri = null;
+        try {
+            uri = new URI(path);
+        } catch (URISyntaxException ignore) {
+        }
+        assertTrue(uri != null);
+        orcColumnarBatchScanReader.reader = orcColumnarBatchScanReader.initializeReaderJava(uri, readerOptions);
         assertTrue(orcColumnarBatchScanReader.reader != 0);
     }
 

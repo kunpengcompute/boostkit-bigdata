@@ -6,6 +6,9 @@ add_subdirectory(tablescan)
 set(TP_TEST_TARGET tptest)
 set(MY_LINK
         tablescantest
+        utilstest
+        arrowadaptertest
+        orcfiletest
         )
 
 # find gtest package

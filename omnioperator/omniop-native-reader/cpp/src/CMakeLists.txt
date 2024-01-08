@@ -11,6 +11,13 @@ set (SOURCE_FILES
         parquet/ParquetColumnReader.cpp
         parquet/ParquetTypedRecordReader.cpp
         parquet/ParquetDecoder.cpp
+        io/arrowadapter/FileSystemAdapter.cc
+        io/arrowadapter/UtilInternal.cc
+        io/arrowadapter/HdfsAdapter.cc
+        io/arrowadapter/LocalfsAdapter.cc
+        io/UriInfo.cc
+        io/orcfile/OmniOrcFile.cc
+        io/orcfile/OmniOrcHdfsFile.cc
         )
 
 #Find required protobuf package

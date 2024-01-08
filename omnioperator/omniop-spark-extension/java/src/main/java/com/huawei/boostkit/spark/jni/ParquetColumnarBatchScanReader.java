@@ -21,7 +21,7 @@ import com.huawei.boostkit.scan.jni.ParquetColumnarBatchJniReader;
 
 import nova.hetu.omniruntime.vector.*;
 
-import org.apache.parquet.schema.Type;
+import org.apache.hadoop.fs.Path;
 import org.apache.spark.sql.types.BooleanType;
 import org.apache.spark.sql.types.ByteType;
 import org.apache.spark.sql.types.DataType;
@@ -36,6 +36,7 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.net.URI;
 import java.util.List;
 
 public class ParquetColumnarBatchScanReader {
@@ -48,14 +49,21 @@ public class ParquetColumnarBatchScanReader {
         jniReader = new ParquetColumnarBatchJniReader();
     }
 
-    public long initializeReaderJava(String path, int capacity,
-             List<Integer> rowgroupIndices, List<Integer> columnIndices, String ugi) {
+    public long initializeReaderJava(Path path, int capacity,
+                                     List<Integer> rowgroupIndices, List<Integer> columnIndices, String ugi) {
         JSONObject job = new JSONObject();
-        job.put("filePath", path);
+        URI uri = path.toUri();
+
+        job.put("uri", path.toString());
         job.put("capacity", capacity);
         job.put("rowGroupIndices", rowgroupIndices.stream().mapToInt(Integer::intValue).toArray());
         job.put("columnIndices", columnIndices.stream().mapToInt(Integer::intValue).toArray());
         job.put("ugi", ugi);
+
+        job.put("scheme", uri.getScheme() == null ? "" : uri.getScheme());
+        job.put("host", uri.getHost() == null ? "" : uri.getHost());
+        job.put("port", uri.getPort());
+        job.put("path", uri.getPath() == null ? "" : uri.getPath());
         parquetReader = jniReader.initializeReader(job);
         return parquetReader;
     }

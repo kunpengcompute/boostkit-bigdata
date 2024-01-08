@@ -19,9 +19,9 @@
 package com.huawei.boostkit.spark.jni;
 
 import junit.framework.TestCase;
-import nova.hetu.omniruntime.vector.*;
+import nova.hetu.omniruntime.vector.Vec;
+import org.apache.hadoop.fs.Path;
 import org.apache.spark.sql.types.DataType;
-import org.apache.spark.sql.types.DecimalType;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.FixMethodOrder;
@@ -56,7 +56,7 @@ public class ParquetColumnarBatchJniReaderTest extends TestCase {
                 createDecimalType(18, 5), BooleanType, ShortType, DateType);
         File file = new File("../../omniop-native-reader/cpp/test/tablescan/resources/parquet_data_all_type");
         String path = file.getAbsolutePath();
-        parquetColumnarBatchScanReader.initializeReaderJava(path, 100000, rowGroupIndices, columnIndices, "root@sample");
+        parquetColumnarBatchScanReader.initializeReaderJava(new Path(path), 100000, rowGroupIndices, columnIndices, "root@sample");
         vecs = new Vec[9];
     }
 
