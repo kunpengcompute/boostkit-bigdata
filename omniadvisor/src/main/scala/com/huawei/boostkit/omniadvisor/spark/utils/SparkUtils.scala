@@ -30,7 +30,7 @@ import scala.tools.jline_embedded.internal.InputStreamReader
 
 object SparkUtils {
 
-  private val SPARK_DEPLOY_MODE_CLIENT = "client";
+  private val SPARK_DEPLOY_MODE_CLIENT = "client"
   private val SPARK_DEPLOY_MODE_CLUSTER = "cluster"
 
   private val CMD_HEADER = "org.apache.spark.deploy.SparkSubmit"
@@ -90,8 +90,13 @@ object SparkUtils {
   }
 
   def withEventLog[T](fs: FileSystem, path: Path, codec: Option[CompressionCodec])(f: InputStream => T): T = {
-    resource.managed { openEventLog(path, fs)}
-      .map { in => codec.map { _.compressedInputStream(in) }.getOrElse(in) }
+    resource.managed {
+        openEventLog(path, fs)
+      }
+      .map { in => codec.map {
+        _.compressedInputStream(in)
+      }.getOrElse(in)
+      }
       .acquireAndGet(f)
   }
 
@@ -103,12 +108,11 @@ object SparkUtils {
     new BufferedInputStream(fs.open(logPath))
   }
 
-  def defaultEnv: Map[String, String] = sys.env
+  private def defaultEnv: Map[String, String] = sys.env
 
   def getDefaultPropertiesFile(env: Map[String, String] = defaultEnv): Option[String] = {
-    env.get("SPARK_CONF_DIR").orElse(env.get("SPARK_HOME").map {
-      t => s"$t${File.separator}conf"})
-      .map {t => new File(s"$t${File.separator}spark-defaults.conf")}
+    env.get("SPARK_CONF_DIR").orElse(env.get("SPARK_HOME").map { t => s"$t${File.separator}conf" })
+      .map { t => new File(s"$t${File.separator}spark-defaults.conf") }
       .filter(_.isFile)
       .map(_.getAbsolutePath)
   }
@@ -132,17 +136,19 @@ object SparkUtils {
   // Format the command in sun.java.command into a submit-executable form
   def formatSubmitCmd(submitCmd: String, deployMode: String): String = {
     deployMode match {
-      case SPARK_DEPLOY_MODE_CLIENT => submitCmd.replace(CMD_HEADER, FORMATTED_CMD_HEADER)
+      case SPARK_DEPLOY_MODE_CLIENT => getSubmitCmdFromClientCmd(submitCmd)
       case SPARK_DEPLOY_MODE_CLUSTER => getSubmitCmdFromClusterCmd(submitCmd)
       case _ => submitCmd
     }
   }
 
+  private def getSubmitCmdFromClientCmd(clientCmd: String): String = {
+    clientCmd.replace(CMD_HEADER, FORMATTED_CMD_HEADER).replace("spark-internal ", "")
+  }
+
   private def getSubmitCmdFromClusterCmd(clusterCmd: String): String = {
-    val cmdWithoutJar = clusterCmd.replace("--jar file:", "")
-    val cmdWithoutArg = cmdWithoutJar.replace("--arg ","")
-    val cmdWithRightHeader = cmdWithoutArg.replace("org.apache.spark.deploy.yarn.ApplicationMaster","spark-submit --master yarn --deploy-mode cluster")
-    val cmdFinal = cmdWithRightHeader.split("--properties-file").head.trim
-    cmdFinal
+    val cmdWithoutArgsAndJar = clusterCmd.replaceAll("\\s*--jar file:\\S+|\\s*--arg \\S+", "").trim
+    val cmdWithRightHeader = cmdWithoutArgsAndJar.replace("org.apache.spark.deploy.yarn.ApplicationMaster", "spark-submit --master yarn --deploy-mode cluster")
+    cmdWithRightHeader.split("--properties-file").head.trim
   }
 }

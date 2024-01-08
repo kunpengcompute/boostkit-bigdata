@@ -54,6 +54,6 @@ public class TestJsonUtils {
 
     @Test(expected = ClientHandlerException.class)
     public void testGetQueryString() throws MalformedURLException {
-        testJsonUtils.getQueryString("appId");
+        testJsonUtils.getSingleQueryString("appId");
     }
 }
