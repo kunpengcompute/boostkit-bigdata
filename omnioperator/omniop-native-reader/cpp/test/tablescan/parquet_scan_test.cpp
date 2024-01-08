@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2020-2023. Huawei Technologies Co., Ltd. All rights reserved.
+ * Copyright (C) 2023-2023. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -20,9 +20,9 @@
 #include <type/date32.h>
 #include <gtest/gtest.h>
 #include "scan_test.h"
-#include "tablescan/ParquetReader.h"
+#include "parquet/ParquetReader.h"
 
-using namespace spark::reader;
+using namespace omniruntime::reader;
 using namespace arrow;
 using namespace omniruntime::vec;
 

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2020-2023. Huawei Technologies Co., Ltd. All rights reserved.
+ * Copyright (C) 2023-2023. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -19,9 +19,9 @@
 
 #include "ParquetColumnarBatchJniReader.h"
 #include "jni_common.h"
-#include "tablescan/ParquetReader.h"
+#include "parquet/ParquetReader.h"
 
-using namespace spark::reader;
+using namespace omniruntime::reader;
 
 std::vector<int> GetIndices(JNIEnv *env, jobject jsonObj, const char* name)
 {
@@ -36,7 +36,7 @@ std::vector<int> GetIndices(JNIEnv *env, jobject jsonObj, const char* name)
     return indices;
 }
 
-JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_ParquetColumnarBatchJniReader_initializeReader(JNIEnv *env,
+JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_ParquetColumnarBatchJniReader_initializeReader(JNIEnv *env,
     jobject jObj, jobject jsonObj)
 {
     JNI_FUNC_START
@@ -68,7 +68,7 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_ParquetColumnarBatchJ
     JNI_FUNC_END(runtimeExceptionClass)
 }
 
-JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_ParquetColumnarBatchJniReader_recordReaderNext(JNIEnv *env,
+JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_ParquetColumnarBatchJniReader_recordReaderNext(JNIEnv *env,
     jobject jObj, jlong reader, jlongArray vecNativeId)
 {
     JNI_FUNC_START
@@ -95,7 +95,7 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_ParquetColumnarBatchJ
     JNI_FUNC_END(runtimeExceptionClass)
 }
 
-JNIEXPORT void JNICALL Java_com_huawei_boostkit_spark_jni_ParquetColumnarBatchJniReader_recordReaderClose(JNIEnv *env,
+JNIEXPORT void JNICALL Java_com_huawei_boostkit_scan_jni_ParquetColumnarBatchJniReader_recordReaderClose(JNIEnv *env,
     jobject jObj, jlong reader)
 {
     JNI_FUNC_START

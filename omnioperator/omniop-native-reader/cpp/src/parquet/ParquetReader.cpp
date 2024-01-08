@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2020-2023. Huawei Technologies Co., Ltd. All rights reserved.
+ * Copyright (C) 2023-2023. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -22,7 +22,7 @@
 
 using namespace arrow;
 using namespace parquet::arrow;
-using namespace spark::reader;
+using namespace omniruntime::reader;
 
 static std::mutex mutex_;
 static std::map<std::string, Filesystem*> restore_filesysptr;
@@ -30,7 +30,7 @@ static constexpr int32_t LOCAL_FILE_PREFIX = 5;
 static const std::string LOCAL_FILE = "file:";
 static const std::string HDFS_FILE = "hdfs:";
 
-std::string spark::reader::GetFileSystemKey(std::string& path, std::string& ugi)
+std::string omniruntime::reader::GetFileSystemKey(std::string& path, std::string& ugi)
 {
     // if the local file, all the files are the same key "file:"
     std::string result = ugi;
@@ -58,7 +58,7 @@ std::string spark::reader::GetFileSystemKey(std::string& path, std::string& ugi)
     return result;
 }
 
-Filesystem* spark::reader::GetFileSystemPtr(std::string& path, std::string& ugi, arrow::Status &status)
+Filesystem* omniruntime::reader::GetFileSystemPtr(std::string& path, std::string& ugi, arrow::Status &status)
 {
     auto key = GetFileSystemKey(path, ugi);
 

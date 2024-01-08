@@ -17,8 +17,8 @@
  * limitations under the License.
  */
 
-#ifndef SPARK_PARQUET_ENCODING_H
-#define SPARK_PARQUET_ENCODING_H
+#ifndef OMNI_RUNTIME_ENCODING_H
+#define OMNI_RUNTIME_ENCODING_H
 
 #include <vector/vector_common.h>
 #include <parquet/arrow/reader.h>
@@ -30,7 +30,7 @@
 using namespace omniruntime::vec;
 using namespace arrow;
 
-namespace spark::reader {
+namespace omniruntime::reader {
 
     class ParquetDecoderImpl : virtual public ::parquet::Decoder {
     public:
@@ -648,4 +648,4 @@ namespace spark::reader {
         }
     };
 }
-#endif // SPARK_PARQUET_ENCODING_H
+#endif // OMNI_RUNTIME_ENCODING_H

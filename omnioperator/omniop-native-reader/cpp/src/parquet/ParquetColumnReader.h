@@ -17,14 +17,14 @@
  * limitations under the License.
  */
 
-#ifndef SPARK_PARQUET_COLUMN_READER_H
-#define SPARK_PARQUET_COLUMN_READER_H
+#ifndef OMNI_RUNTIME_COLUMN_READER_H
+#define OMNI_RUNTIME_COLUMN_READER_H
 
 #include "ParquetTypedRecordReader.h"
 #include <parquet/column_reader.h>
 #include <parquet/arrow/reader_internal.h>
 
-namespace spark::reader {
+namespace omniruntime::reader {
     class ParquetColumnReader {
     public:
         ParquetColumnReader(std::shared_ptr<::parquet::arrow::ReaderContext> ctx, std::shared_ptr<::arrow::Field> field,
@@ -56,4 +56,4 @@ namespace spark::reader {
         std::shared_ptr<OmniRecordReader> record_reader_;
     };
 }
-#endif // SPARK_PARQUET_COLUMN_READER_H
+#endif // OMNI_RUNTIME_COLUMN_READER_H

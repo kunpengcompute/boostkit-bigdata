@@ -18,8 +18,8 @@
  */
 
 
-#ifndef SPARK_PARQUET_COLUMN_TYPE_READER_H
-#define SPARK_PARQUET_COLUMN_TYPE_READER_H
+#ifndef OMNI_RUNTIME_COLUMN_TYPE_READER_H
+#define OMNI_RUNTIME_COLUMN_TYPE_READER_H
 
 #include "ParquetDecoder.h"
 #include <parquet/column_page.h>
@@ -29,7 +29,7 @@
 using ResizableBuffer = ::arrow::ResizableBuffer;
 using namespace omniruntime::vec;
 
-namespace spark::reader {
+namespace omniruntime::reader {
     constexpr int64_t kMinLevelBatchSize = 1024;
     static constexpr int32_t PARQUET_MAX_DECIMAL64_DIGITS = 18;
 
@@ -845,4 +845,4 @@ namespace spark::reader {
         ::parquet::internal::LevelInfo leaf_info, ::arrow::MemoryPool* pool,
         const bool read_dictionary, const std::shared_ptr<::arrow::DataType>& type);
 }
-#endif //SPARK_PARQUET_COLUMN_TYPE_READER_H
+#endif //OMNI_RUNTIME_COLUMN_TYPE_READER_H

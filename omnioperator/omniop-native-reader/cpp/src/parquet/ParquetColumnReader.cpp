@@ -21,7 +21,7 @@
 
 using namespace omniruntime::vec;
 
-namespace spark::reader {
+namespace omniruntime::reader {
 
 Status ParquetColumnReader::NextBatch(int64_t batch_size, BaseVector** out)
 {

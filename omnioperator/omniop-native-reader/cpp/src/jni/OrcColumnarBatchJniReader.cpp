@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2020-2022. Huawei Technologies Co., Ltd. All rights reserved.
+ * Copyright (C) 2023-2023. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -27,8 +27,9 @@ using namespace std;
 using namespace orc;
 
 static constexpr int32_t MAX_DECIMAL64_DIGITS = 18;
+bool isDecimal64Transfor128 = false;
 
-JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniReader_initializeReader(JNIEnv *env,
+JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniReader_initializeReader(JNIEnv *env,
     jobject jObj, jstring path, jobject jsonObj)
 {
     JNI_FUNC_START
@@ -217,11 +218,17 @@ int initExpressionTree(JNIEnv *env, SearchArgumentBuilder &builder, jobject &jso
 }
 
 
-JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniReader_initializeRecordReader(JNIEnv *env,
+JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniReader_initializeRecordReader(JNIEnv *env,
     jobject jObj, jlong reader, jobject jsonObj)
 {
     JNI_FUNC_START
     orc::Reader *readerPtr = (orc::Reader *)reader;
+    // Get if the decimal for spark or hive
+    jboolean jni_isDecimal64Transfor128 = env->CallBooleanMethod(jsonObj, jsonMethodHas,
+        env->NewStringUTF("isDecimal64Transfor128"));
+    if (jni_isDecimal64Transfor128) {
+        isDecimal64Transfor128 = true;
+    }
     // get offset from json obj
     jlong offset = env->CallLongMethod(jsonObj, jsonMethodLong, env->NewStringUTF("offset"));
     jlong length = env->CallLongMethod(jsonObj, jsonMethodLong, env->NewStringUTF("length"));
@@ -264,7 +271,7 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniRe
 }
 
 
-JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniReader_initializeBatch(JNIEnv *env,
+JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniReader_initializeBatch(JNIEnv *env,
     jobject jObj, jlong rowReader, jlong batchSize)
 {
     JNI_FUNC_START
@@ -427,7 +434,34 @@ uint64_t CopyToOmniDecimal64Vec(orc::ColumnVectorBatch *field)
     return (uint64_t)originalVector;
 }
 
-int CopyToOmniVec(const orc::Type *type, int &omniTypeId, uint64_t &omniVecId, orc::ColumnVectorBatch *field)
+uint64_t CopyToOmniDecimal128VecFrom64(orc::ColumnVectorBatch *field)
+{
+    orc::Decimal64VectorBatch *lvb = dynamic_cast<orc::Decimal64VectorBatch *>(field);
+    auto numElements = lvb->numElements;
+    auto values = lvb->values.data();
+    auto notNulls = lvb->notNull.data();
+    auto originalVector = new Vector<Decimal128>(numElements);
+    if (lvb->hasNulls) {
+        for (uint i = 0; i < numElements; i++) {
+            if (!notNulls[i]) {
+                originalVector->SetNull(i);
+            } else {
+                Decimal128 d128(values[i]);
+                originalVector->SetValue(i, d128);
+            }
+        }
+    } else {
+        for (uint i = 0; i < numElements; i++) {
+            Decimal128 d128(values[i]);
+            originalVector->SetValue(i, d128);
+        }
+    }
+
+    return (uint64_t)originalVector;
+}
+
+int CopyToOmniVec(const orc::Type *type, int &omniTypeId, uint64_t &omniVecId, orc::ColumnVectorBatch *field,
+    bool isDecimal64Transfor128)
 {
     switch (type->getKind()) {
         case orc::TypeKind::BOOLEAN:
@@ -467,6 +501,9 @@ int CopyToOmniVec(const orc::Type *type, int &omniTypeId, uint64_t &omniVecId, o
             if (type->getPrecision() > MAX_DECIMAL64_DIGITS) {
                 omniTypeId = static_cast<int>(OMNI_DECIMAL128);
                 omniVecId = CopyToOmniDecimal128Vec(field);
+            } else if (isDecimal64Transfor128) {
+                omniTypeId = static_cast<int>(OMNI_DECIMAL128);
+                omniVecId = CopyToOmniDecimal128VecFrom64(field);
             } else {
                 omniTypeId = static_cast<int>(OMNI_DECIMAL64);
                 omniVecId = CopyToOmniDecimal64Vec(field);
@@ -479,7 +516,7 @@ int CopyToOmniVec(const orc::Type *type, int &omniTypeId, uint64_t &omniVecId, o
     return 1;
 }
 
-JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniReader_recordReaderNext(JNIEnv *env,
+JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniReader_recordReaderNext(JNIEnv *env,
     jobject jObj, jlong rowReader, jlong batch, jintArray typeId, jlongArray vecNativeId)
 {
     JNI_FUNC_START
@@ -496,7 +533,7 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniRe
             auto type = baseTp.getSubtype(id);
             int omniTypeId = 0;
             uint64_t omniVecId = 0;
-            CopyToOmniVec(type, omniTypeId, omniVecId, root->fields[id]);
+            CopyToOmniVec(type, omniTypeId, omniVecId, root->fields[id], isDecimal64Transfor128);
             env->SetIntArrayRegion(typeId, id, 1, &omniTypeId);
             jlong omniVec = static_cast<jlong>(omniVecId);
             env->SetLongArrayRegion(vecNativeId, id, 1, &omniVec);
@@ -507,11 +544,11 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniRe
 }
 
 /*
- * Class:     com_huawei_boostkit_spark_jni_OrcColumnarBatchJniReader
+ * Class:     com_huawei_boostkit_scan_jni_OrcColumnarBatchJniReader
  * Method:    recordReaderGetRowNumber
  * Signature: (J)J
  */
-JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniReader_recordReaderGetRowNumber(
+JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniReader_recordReaderGetRowNumber(
     JNIEnv *env, jobject jObj, jlong rowReader)
 {
     JNI_FUNC_START
@@ -522,11 +559,11 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniRe
 }
 
 /*
- * Class:     com_huawei_boostkit_spark_jni_OrcColumnarBatchJniReader
+ * Class:     com_huawei_boostkit_scan_jni_OrcColumnarBatchJniReader
  * Method:    recordReaderGetProgress
  * Signature: (J)F
  */
-JNIEXPORT jfloat JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniReader_recordReaderGetProgress(
+JNIEXPORT jfloat JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniReader_recordReaderGetProgress(
     JNIEnv *env, jobject jObj, jlong rowReader)
 {
     JNI_FUNC_START
@@ -537,11 +574,11 @@ JNIEXPORT jfloat JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniR
 }
 
 /*
- * Class:     com_huawei_boostkit_spark_jni_OrcColumnarBatchJniReader
+ * Class:     com_huawei_boostkit_scan_jni_OrcColumnarBatchJniReader
  * Method:    recordReaderClose
  * Signature: (J)F
  */
-JNIEXPORT void JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniReader_recordReaderClose(JNIEnv *env,
+JNIEXPORT void JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniReader_recordReaderClose(JNIEnv *env,
     jobject jObj, jlong rowReader, jlong reader, jlong batchReader)
 {
     JNI_FUNC_START
@@ -564,11 +601,11 @@ JNIEXPORT void JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniRea
 }
 
 /*
- * Class:     com_huawei_boostkit_spark_jni_OrcColumnarBatchJniReader
+ * Class:     com_huawei_boostkit_scan_jni_OrcColumnarBatchJniReader
  * Method:    recordReaderSeekToRow
  * Signature: (JJ)F
  */
-JNIEXPORT void JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniReader_recordReaderSeekToRow(JNIEnv *env,
+JNIEXPORT void JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniReader_recordReaderSeekToRow(JNIEnv *env,
     jobject jObj, jlong rowReader, jlong rowNumber)
 {
     JNI_FUNC_START
@@ -579,7 +616,7 @@ JNIEXPORT void JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniRea
 
 
 JNIEXPORT jobjectArray JNICALL
-Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniReader_getAllColumnNames(JNIEnv *env, jobject jObj, jlong reader)
+Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniReader_getAllColumnNames(JNIEnv *env, jobject jObj, jlong reader)
 {
     JNI_FUNC_START
     orc::Reader *readerPtr = (orc::Reader *)reader;
@@ -593,7 +630,7 @@ Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniReader_getAllColumnNames(J
     JNI_FUNC_END(runtimeExceptionClass)
 }
 
-JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniReader_getNumberOfRows(JNIEnv *env,
+JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniReader_getNumberOfRows(JNIEnv *env,
     jobject jObj, jlong rowReader, jlong batch)
 {
     JNI_FUNC_START

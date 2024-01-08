@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2020-2023. Huawei Technologies Co., Ltd. All rights reserved.
+ * Copyright (C) 2023-2023. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -17,14 +17,14 @@
  * limitations under the License.
  */
 
-#ifndef SPARK_THESTRAL_PLUGIN_PARQUETREADER_H
-#define SPARK_THESTRAL_PLUGIN_PARQUETREADER_H
+#ifndef OMNI_RUNTIME_PARQUETREADER_H
+#define OMNI_RUNTIME_PARQUETREADER_H
 
 #include <vector/vector_common.h>
 #include <arrow/filesystem/filesystem.h>
 #include "ParquetColumnReader.h"
 
-namespace spark::reader {
+namespace omniruntime::reader {
 
     class OmniRecordBatchReader {
     public:
@@ -87,4 +87,4 @@ namespace spark::reader {
 
     Filesystem* GetFileSystemPtr(std::string& path, std::string& ugi, arrow::Status &status);
 }
-#endif // SPARK_THESTRAL_PLUGIN_PARQUETREADER_H
+#endif // OMNI_RUNTIME_PARQUETREADER_H

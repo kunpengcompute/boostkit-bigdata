@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2020-2023. Huawei Technologies Co., Ltd. All rights reserved.
+ * Copyright (C) 2023-2023. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -17,8 +17,8 @@
  * limitations under the License.
  */
 
-#ifndef SPARK_THESTRAL_PLUGIN_PARQUETCOLUMNARBATCHJNIREADER_H
-#define SPARK_THESTRAL_PLUGIN_PARQUETCOLUMNARBATCHJNIREADER_H
+#ifndef OMNI_RUNTIME_PARQUETCOLUMNARBATCHJNIREADER_H
+#define OMNI_RUNTIME_PARQUETCOLUMNARBATCHJNIREADER_H
 
 #include <getopt.h>
 #include <string>
@@ -37,27 +37,27 @@ extern "C" {
 #endif
 
 /*
- * Class:       com_huawei_boostkit_spark_jni_ParquetColumnarBatchJniReader
+ * Class:       com_huawei_boostkit_scan_jni_ParquetColumnarBatchJniReader
  * Method:      initializeReader
  * Signature:   (Ljava/lang/String;Lorg/json/simple/JSONObject;)J
  */
-JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_ParquetColumnarBatchJniReader_initializeReader
+JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_ParquetColumnarBatchJniReader_initializeReader
     (JNIEnv* env, jobject jObj, jobject job);
 
 /*
- * Class:       com_huawei_boostkit_spark_jni_ParquetColumnarBatchJniReader
+ * Class:       com_huawei_boostkit_scan_jni_ParquetColumnarBatchJniReader
  * Method:      recordReaderNext
  * Signature:   (J[I[J)J
  */
-JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_ParquetColumnarBatchJniReader_recordReaderNext
+JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_ParquetColumnarBatchJniReader_recordReaderNext
     (JNIEnv *, jobject, jlong, jlongArray);
 
 /*
- * Class:       com_huawei_boostkit_spark_jni_ParquetColumnarBatchJniReader
+ * Class:       com_huawei_boostkit_scan_jni_ParquetColumnarBatchJniReader
  * Method:      recordReaderClose
  * Signature:   (J)F
  */
-JNIEXPORT void JNICALL Java_com_huawei_boostkit_spark_jni_ParquetColumnarBatchJniReader_recordReaderClose
+JNIEXPORT void JNICALL Java_com_huawei_boostkit_scan_jni_ParquetColumnarBatchJniReader_recordReaderClose
     (JNIEnv *, jobject, jlong);
 
 #ifdef __cplusplus

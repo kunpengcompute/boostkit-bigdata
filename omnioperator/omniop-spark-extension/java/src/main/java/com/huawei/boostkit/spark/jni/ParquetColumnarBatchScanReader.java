@@ -17,6 +17,7 @@
  */
 
 package com.huawei.boostkit.spark.jni;
+import com.huawei.boostkit.scan.jni.ParquetColumnarBatchJniReader;
 
 import nova.hetu.omniruntime.vector.*;
 
@@ -37,13 +38,14 @@ import org.slf4j.LoggerFactory;
 
 import java.util.List;
 
-public class ParquetColumnarBatchJniReader {
-    private static final Logger LOGGER = LoggerFactory.getLogger(ParquetColumnarBatchJniReader.class);
+public class ParquetColumnarBatchScanReader {
+    private static final Logger LOGGER = LoggerFactory.getLogger(ParquetColumnarBatchScanReader.class);
 
     public long parquetReader;
 
-    public ParquetColumnarBatchJniReader() {
-        NativeLoader.getInstance();
+    public ParquetColumnarBatchJniReader jniReader;
+    public ParquetColumnarBatchScanReader() {
+        jniReader = new ParquetColumnarBatchJniReader();
     }
 
     public long initializeReaderJava(String path, int capacity,
@@ -54,14 +56,14 @@ public class ParquetColumnarBatchJniReader {
         job.put("rowGroupIndices", rowgroupIndices.stream().mapToInt(Integer::intValue).toArray());
         job.put("columnIndices", columnIndices.stream().mapToInt(Integer::intValue).toArray());
         job.put("ugi", ugi);
-        parquetReader = initializeReader(job);
+        parquetReader = jniReader.initializeReader(job);
         return parquetReader;
     }
 
     public int next(Vec[] vecList, List<DataType> types) {
         int vectorCnt = vecList.length;
         long[] vecNativeIds = new long[vectorCnt];
-        long rtn = recordReaderNext(parquetReader, vecNativeIds);
+        long rtn = jniReader.recordReaderNext(parquetReader, vecNativeIds);
         if (rtn == 0) {
             return 0;
         }
@@ -97,13 +99,6 @@ public class ParquetColumnarBatchJniReader {
     }
 
     public void close() {
-        recordReaderClose(parquetReader);
+        jniReader.recordReaderClose(parquetReader);
     }
-
-    public native long initializeReader(JSONObject job);
-
-    public native long recordReaderNext(long parquetReader, long[] vecNativeId);
-
-    public native void recordReaderClose(long parquetReader);
-
 }

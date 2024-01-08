@@ -23,7 +23,7 @@ using namespace parquet::arrow;
 using namespace parquet;
 using namespace omniruntime::vec;
 
-namespace spark::reader {
+namespace omniruntime::reader {
 
     ParquetPlainBooleanDecoder::ParquetPlainBooleanDecoder(const ::parquet::ColumnDescriptor* descr)
         : ParquetDecoderImpl(descr, ::parquet::Encoding::PLAIN) {}

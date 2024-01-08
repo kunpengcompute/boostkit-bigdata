@@ -25,7 +25,7 @@ using namespace parquet::internal;
 using namespace arrow;
 using namespace parquet;
 
-namespace spark::reader {
+namespace omniruntime::reader {
 
 constexpr int32_t DECIMAL64_LEN = 8;
 
@@ -210,7 +210,6 @@ int64_t ParquetColumnReaderBase<DType>::InitializeLevelDecoders(const DataPage& 
     return levels_byte_size;
 }
 
-
 template <typename DType>
 int64_t ParquetColumnReaderBase<DType>::InitializeLevelDecodersV2(const ::parquet::DataPageV2& page) {
     // Read a data page.
@@ -289,7 +288,6 @@ void ParquetColumnReaderBase<DType>::InitializeDataDecoder(const DataPage& page,
             case ::parquet::Encoding::DELTA_BINARY_PACKED:
             case ::parquet::Encoding::DELTA_BYTE_ARRAY:
             case ::parquet::Encoding::DELTA_LENGTH_BYTE_ARRAY:
-
             default:
                 throw ParquetException("Unknown encoding type.");
         }

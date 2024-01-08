@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020-2022. Huawei Technologies Co., Ltd. All rights reserved.
+ * Copyright (C) 2020-2023. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
@@ -17,6 +17,7 @@
  */
 
 package com.huawei.boostkit.spark.jni;
+import com.huawei.boostkit.scan.jni.OrcColumnarBatchJniReader;
 
 import nova.hetu.omniruntime.type.DataType;
 import nova.hetu.omniruntime.vector.*;
@@ -37,8 +38,8 @@ import java.util.Arrays;
 import java.util.List;
 
 
-public class OrcColumnarBatchJniReader {
-    private static final Logger LOGGER = LoggerFactory.getLogger(OrcColumnarBatchJniReader.class);
+public class OrcColumnarBatchScanReader {
+    private static final Logger LOGGER = LoggerFactory.getLogger(OrcColumnarBatchScanReader.class);
 
     public long reader;
     public long recordReader;
@@ -46,8 +47,9 @@ public class OrcColumnarBatchJniReader {
     public int[] colsToGet;
     public int realColsCnt;
 
-    public OrcColumnarBatchJniReader() {
-        NativeLoader.getInstance();
+    public OrcColumnarBatchJniReader jniReader;
+    public OrcColumnarBatchScanReader() {
+        jniReader = new OrcColumnarBatchJniReader();
     }
 
     public JSONObject getSubJson(ExpressionTree etNode) {
@@ -144,7 +146,7 @@ public class OrcColumnarBatchJniReader {
             job.put("serializedTail", options.getOrcTail().getSerializedTail().toString());
         }
         job.put("tailLocation", 9223372036854775807L);
-        reader = initializeReader(path, job);
+        reader = jniReader.initializeReader(path, job);
         return reader;
     }
 
@@ -172,7 +174,7 @@ public class OrcColumnarBatchJniReader {
 
         List<String> allCols;
         if (options.getColumnNames() == null) {
-            allCols = Arrays.asList(getAllColumnNames(reader));
+            allCols = Arrays.asList(jniReader.getAllColumnNames(reader));
         } else {
             allCols = Arrays.asList(options.getColumnNames());
         }
@@ -190,33 +192,33 @@ public class OrcColumnarBatchJniReader {
             }
         }
         job.put("includedColumns", colToInclu.toArray());
-        recordReader = initializeRecordReader(reader, job);
+        recordReader = jniReader.initializeRecordReader(reader, job);
         return recordReader;
     }
 
     public long initBatchJava(long batchSize) {
-        batchReader = initializeBatch(recordReader, batchSize);
+        batchReader = jniReader.initializeBatch(recordReader, batchSize);
         return 0;
     }
 
     public long getNumberOfRowsJava() {
-        return getNumberOfRows(recordReader, batchReader);
+        return jniReader.getNumberOfRows(recordReader, batchReader);
     }
 
     public long getRowNumber() {
-        return recordReaderGetRowNumber(recordReader);
+        return jniReader.recordReaderGetRowNumber(recordReader);
     }
 
     public float getProgress() {
-        return recordReaderGetProgress(recordReader);
+        return jniReader.recordReaderGetProgress(recordReader);
     }
 
     public void close() {
-        recordReaderClose(recordReader, reader, batchReader);
+        jniReader.recordReaderClose(recordReader, reader, batchReader);
     }
 
     public void seekToRow(long rowNumber) {
-        recordReaderSeekToRow(recordReader, rowNumber);
+        jniReader.recordReaderSeekToRow(recordReader, rowNumber);
     }
 
     public void convertJulianToGreGorian(IntVec intVec, long rowNumber) {
@@ -231,7 +233,7 @@ public class OrcColumnarBatchJniReader {
         int vectorCnt = vecList.length;
         int[] typeIds = new int[realColsCnt];
         long[] vecNativeIds = new long[realColsCnt];
-        long rtn = recordReaderNext(recordReader, batchReader, typeIds, vecNativeIds);
+        long rtn = jniReader.recordReaderNext(recordReader, batchReader, typeIds, vecNativeIds);
         if (rtn == 0) {
             return 0;
         }
@@ -284,24 +286,4 @@ public class OrcColumnarBatchJniReader {
         }
         return (int)rtn;
     }
-
-    public native long initializeReader(String path, JSONObject job);
-
-    public native long initializeRecordReader(long reader, JSONObject job);
-
-    public native long initializeBatch(long rowReader, long batchSize);
-
-    public native long recordReaderNext(long rowReader, long batchReader, int[] typeId, long[] vecNativeId);
-
-    public native long recordReaderGetRowNumber(long rowReader);
-
-    public native float recordReaderGetProgress(long rowReader);
-
-    public native void recordReaderClose(long rowReader, long reader, long batchReader);
-
-    public native void recordReaderSeekToRow(long rowReader, long rowNumber);
-
-    public native String[] getAllColumnNames(long reader);
-
-    public native long getNumberOfRows(long rowReader, long batch);
 }

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2020-2022. Huawei Technologies Co., Ltd. All rights reserved.
+ * Copyright (C) 2023-2023. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -161,7 +161,7 @@ TEST_F(ScanTest, test_copy_intVec)
     int omniType = 0;
     uint64_t omniVecId = 0;
     // int type
-    CopyToOmniVec(types->getSubtype(0), omniType, omniVecId, root->fields[0]);
+    CopyToOmniVec(types->getSubtype(0), omniType, omniVecId, root->fields[0], false);
     ASSERT_EQ(omniType, omniruntime::type::OMNI_INT);
     auto *olbInt = (omniruntime::vec::Vector<int32_t> *)(omniVecId);
     ASSERT_EQ(olbInt->GetValue(0), 10);
@@ -173,7 +173,7 @@ TEST_F(ScanTest, test_copy_varCharVec)
     int omniType = 0;
     uint64_t omniVecId = 0;
     // varchar type
-    CopyToOmniVec(types->getSubtype(1), omniType, omniVecId, root->fields[1]);
+    CopyToOmniVec(types->getSubtype(1), omniType, omniVecId, root->fields[1], false);
     ASSERT_EQ(omniType, omniruntime::type::OMNI_VARCHAR);
     auto *olbVc = (omniruntime::vec::Vector<omniruntime::vec::LargeStringContainer<std::string_view>> *)(
             omniVecId);
@@ -187,7 +187,7 @@ TEST_F(ScanTest, test_copy_stringVec)
     int omniType = 0;
     uint64_t omniVecId = 0;
     // string type
-    CopyToOmniVec(types->getSubtype(2), omniType, omniVecId, root->fields[2]);
+    CopyToOmniVec(types->getSubtype(2), omniType, omniVecId, root->fields[2], false);
     ASSERT_EQ(omniType, omniruntime::type::OMNI_VARCHAR);
     auto *olbStr = (omniruntime::vec::Vector<omniruntime::vec::LargeStringContainer<std::string_view>> *)(
             omniVecId);
@@ -201,7 +201,7 @@ TEST_F(ScanTest, test_copy_longVec)
     int omniType = 0;
     uint64_t omniVecId = 0;
     // bigint type
-    CopyToOmniVec(types->getSubtype(3), omniType, omniVecId, root->fields[3]);
+    CopyToOmniVec(types->getSubtype(3), omniType, omniVecId, root->fields[3], false);
     ASSERT_EQ(omniType, omniruntime::type::OMNI_LONG);
     auto *olbLong = (omniruntime::vec::Vector<int64_t> *)(omniVecId);
     ASSERT_EQ(olbLong->GetValue(0), 10000);
@@ -213,7 +213,7 @@ TEST_F(ScanTest, test_copy_charVec)
     int omniType = 0;
     uint64_t omniVecId = 0;
     // char type
-    CopyToOmniVec(types->getSubtype(4), omniType, omniVecId, root->fields[4]);
+    CopyToOmniVec(types->getSubtype(4), omniType, omniVecId, root->fields[4], false);
     ASSERT_EQ(omniType, omniruntime::type::OMNI_VARCHAR);
     auto *olbChar = (omniruntime::vec::Vector<omniruntime::vec::LargeStringContainer<std::string_view>> *)(
             omniVecId);
@@ -227,7 +227,7 @@ TEST_F(ScanTest, test_copy_doubleVec)
     int omniType = 0;
     uint64_t omniVecId = 0;
     // double type
-    CopyToOmniVec(types->getSubtype(6), omniType, omniVecId, root->fields[6]);
+    CopyToOmniVec(types->getSubtype(6), omniType, omniVecId, root->fields[6], false);
     ASSERT_EQ(omniType, omniruntime::type::OMNI_DOUBLE);
     auto *olbDouble = (omniruntime::vec::Vector<double> *)(omniVecId);
     ASSERT_EQ(olbDouble->GetValue(0), 1111.1111);
@@ -239,7 +239,7 @@ TEST_F(ScanTest, test_copy_booleanVec)
     int omniType = 0;
     uint64_t omniVecId = 0;
     // boolean type
-    CopyToOmniVec(types->getSubtype(9), omniType, omniVecId, root->fields[9]);
+    CopyToOmniVec(types->getSubtype(9), omniType, omniVecId, root->fields[9], false);
     ASSERT_EQ(omniType, omniruntime::type::OMNI_BOOLEAN);
     auto *olbBoolean = (omniruntime::vec::Vector<bool> *)(omniVecId);
     ASSERT_EQ(olbBoolean->GetValue(0), true);
@@ -251,7 +251,7 @@ TEST_F(ScanTest, test_copy_shortVec)
     int omniType = 0;
     uint64_t omniVecId = 0;
     // short type
-    CopyToOmniVec(types->getSubtype(10), omniType, omniVecId, root->fields[10]);
+    CopyToOmniVec(types->getSubtype(10), omniType, omniVecId, root->fields[10], false);
     ASSERT_EQ(omniType, omniruntime::type::OMNI_SHORT);
     auto *olbShort = (omniruntime::vec::Vector<short> *)(omniVecId);
     ASSERT_EQ(olbShort->GetValue(0), 11);
