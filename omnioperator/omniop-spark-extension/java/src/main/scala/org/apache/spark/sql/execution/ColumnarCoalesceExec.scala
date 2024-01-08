@@ -74,10 +74,6 @@ case class ColumnarCoalesceExec(numPartitions: Int, child: SparkPlan) extends Un
     }
   }
 
-  override protected def withNewChildInternal(newChild: SparkPlan): ColumnarCoalesceExec =
-    copy(child = newChild)
-}
-
 object ColumnarCoalesceExec {
   /** A simple RDD with no data, but with the given number of partitions. */
   class EmptyRDDWithPartitions(
