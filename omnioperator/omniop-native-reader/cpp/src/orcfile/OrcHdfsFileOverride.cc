@@ -89,6 +89,9 @@ namespace orc {
                 if (last_bytes_read < 0) {
                     throw IOException(Status::IOError("Error reading bytes the file").ToString());
                 }
+                if (last_bytes_read == 0) {
+                   break;
+                }
                 total_bytes_read += last_bytes_read;
                 buf_ptr += last_bytes_read;
             } while (total_bytes_read < length);
