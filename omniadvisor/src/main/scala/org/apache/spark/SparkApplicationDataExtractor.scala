@@ -158,7 +158,7 @@ object SparkApplicationDataExtractor {
     val nonEmptyDescriptions = sqlExecutionsList.flatMap { execution =>
       Option(execution.description).filter(_.nonEmpty)
     }
-    nonEmptyDescriptions.mkString(";\n")
+    nonEmptyDescriptions.mkString(";")
   }
 
   private def lastAttempt(applicationInfo: ApplicationInfo): ApplicationAttemptInfo = {
