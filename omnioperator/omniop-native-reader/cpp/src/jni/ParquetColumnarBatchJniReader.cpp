@@ -67,7 +67,7 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_ParquetColumnarBatchJn
     std::string pathString(ugi);
     env->ReleaseStringUTFChars(pathTmp, path);
 
-    jint port = (jint)env->CallIntMethod(jsonObj, jsonMethodInt, env->NewStringUTF("Port"));
+    jint port = (jint)env->CallIntMethod(jsonObj, jsonMethodInt, env->NewStringUTF("port"));
 
     UriInfo uriInfo(uriString, schemeString, pathString, hostString, std::to_string(port));
 
