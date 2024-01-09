@@ -35,8 +35,12 @@ import nova.hetu.omniruntime.vector.IntVec;
 import nova.hetu.omniruntime.vector.LongVec;
 import nova.hetu.omniruntime.vector.VarcharVec;
 import nova.hetu.omniruntime.vector.Vec;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.orc.OrcFile;
 
 import java.io.File;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.lang.reflect.Array;
 import java.util.ArrayList;
 import org.slf4j.Logger;
@@ -60,14 +64,16 @@ public class OrcColumnarBatchJniReaderPushDownTest extends TestCase {
     }
 
     public void initReaderJava() {
-        JSONObject job = new JSONObject();
-        job.put("serializedTail","");
-        job.put("tailLocation",9223372036854775807L);
         File directory = new File("src/test/java/com/huawei/boostkit/spark/jni/orcsrc/000000_0");
-        job.put("scheme","file");
-        job.put("path",directory.getAbsolutePath());
-        System.out.println(directory.getAbsolutePath());
-        orcColumnarBatchScanReader.reader = orcColumnarBatchScanReader.jniReader.initializeReader(job);
+        String absolutePath = directory.getAbsolutePath();
+        System.out.println(absolutePath);
+        URI uri = null;
+        try {
+            uri = new URI(absolutePath);
+        } catch (URISyntaxException ignore) {
+        }
+        assertTrue(uri != null);
+        orcColumnarBatchScanReader.reader = orcColumnarBatchScanReader.initializeReaderJava(uri, OrcFile.readerOptions(new Configuration()));
         assertTrue(orcColumnarBatchScanReader.reader != 0);
     }
 

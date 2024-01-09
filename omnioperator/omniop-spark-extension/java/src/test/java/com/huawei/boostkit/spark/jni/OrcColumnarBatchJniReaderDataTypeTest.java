@@ -30,9 +30,13 @@ import org.junit.Before;
 import org.junit.FixMethodOrder;
 import org.junit.Test;
 import org.junit.runners.MethodSorters;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.orc.OrcFile;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.net.URI;
+import java.net.URISyntaxException;
 
 import static org.junit.Assert.*;
 
@@ -54,14 +58,16 @@ public class OrcColumnarBatchJniReaderDataTypeTest extends TestCase {
     }
 
     public void initReaderJava() {
-        JSONObject job = new JSONObject();
-        job.put("serializedTail","");
-        job.put("tailLocation",9223372036854775807L);
         File directory = new File("src/test/java/com/huawei/boostkit/spark/jni/orcsrc/000000_0");
-        job.put("scheme","file");
-        job.put("path",directory.getAbsolutePath());
-        System.out.println(directory.getAbsolutePath());
-        orcColumnarBatchScanReader.reader = orcColumnarBatchScanReader.jniReader.initializeReader(job);
+        String absolutePath = directory.getAbsolutePath();
+        System.out.println(absolutePath);
+        URI uri = null;
+        try {
+            uri = new URI(absolutePath);
+        } catch (URISyntaxException ignore) {
+        }
+        assertTrue(uri != null);
+        orcColumnarBatchScanReader.reader = orcColumnarBatchScanReader.initializeReaderJava(uri, OrcFile.readerOptions(new Configuration()));
         assertTrue(orcColumnarBatchScanReader.reader != 0);
     }
 
