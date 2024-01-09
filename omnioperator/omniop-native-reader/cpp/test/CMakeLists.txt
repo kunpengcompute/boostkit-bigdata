@@ -1,11 +1,13 @@
 aux_source_directory(${CMAKE_CURRENT_LIST_DIR} TEST_ROOT_SRCS)
 
 add_subdirectory(tablescan)
+add_subdirectory(filesystem)
 
 # configure
 set(TP_TEST_TARGET tptest)
 set(MY_LINK
         tablescantest
+        filesystemtest
         )
 
 # find gtest package
