@@ -96,7 +96,7 @@ Status HadoopFileSystem::Close() {
 
 Status HadoopFileSystem::Init() {
     struct hdfsBuilder *bld = hdfsNewBuilder();
-    if (!bld) {
+    if (bld == nullptr) {
         return Status::FSError("Fail to create hdfs builder");
     }
     hdfsBuilderSetNameNode(bld, options_.host_.c_str());
