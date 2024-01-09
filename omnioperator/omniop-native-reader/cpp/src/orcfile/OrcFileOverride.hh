@@ -40,7 +40,7 @@ namespace orc {
    * Create a stream to an HDFS file.
    * @param uri the UriInfo of HDFS
    */
-  ORC_UNIQUE_PTR<InputStream> readHdfsFileOverride(const UriInfo &uri);
+  ORC_UNIQUE_PTR<InputStream> createHdfsFileInputStream(const UriInfo &uri);
 }
 
 #endif

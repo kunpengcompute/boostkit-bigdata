@@ -52,19 +52,19 @@ std::string ToString(FileType);
 struct FileInfo{
     /// The full file path in the filesystem
     const std::string& path() const { return path_; }
-    void set_path(std::string path) { path_ = std::move(path); }
+    void setPath(std::string path) { path_ = std::move(path); }
 
     /// The file type
     FileType type() const { return type_; }
-    void set_type(FileType type) { type_ = type; }
+    void setType(FileType type) { type_ = type; }
 
     /// The size in bytes, if available
     int64_t size() const { return size_; }
-    void set_size(int64_t size) { size_ = size; }
+    void setSize(int64_t size) { size_ = size; }
 
     /// The time of last modification, if available
     TimePoint mtime() const { return mtime_; }
-    void set_mtime(TimePoint mtime) { mtime_ = mtime; }
+    void setMtime(TimePoint mtime) { mtime_ = mtime; }
 
     bool IsFile() const { return type_ == FileType::File; }
     bool IsDirectory() const { return type_ == FileType::Directory; }

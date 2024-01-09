@@ -22,36 +22,36 @@
 #include "UriInfo.h"
 
 UriInfo::UriInfo(std::string uriStr, std::string schemeStr, std::string pathStr, std::string hostStr,
-                 std::string portStr): hostStr_(std::move(hostStr)),
-                                       schemeStr_(std::move(schemeStr)),
-                                       portStr_(std::move(portStr)),
-                                       pathStr_(std::move(pathStr)),
-                                       uriStr_(std::move(uriStr)){
+                 std::string portStr) : hostStr_(std::move(hostStr)),
+                                        schemeStr_(std::move(schemeStr)),
+                                        portStr_(std::move(portStr)),
+                                        pathStr_(std::move(pathStr)),
+                                        uriStr_(std::move(uriStr)) {
 }
 
 UriInfo::UriInfo(std::string schemeStr, std::string pathStr, std::string hostStr,
-                 std::string portStr): hostStr_(std::move(hostStr)),
-                                       schemeStr_(std::move(schemeStr)),
-                                       portStr_(std::move(portStr)),
-                                       pathStr_(std::move(pathStr)),
-                                 uriStr_("Not initialize origin uri!"){
+                 std::string portStr) : hostStr_(std::move(hostStr)),
+                                        schemeStr_(std::move(schemeStr)),
+                                        portStr_(std::move(portStr)),
+                                        pathStr_(std::move(pathStr)),
+                                        uriStr_("Not initialize origin uri!") {
 }
 
 UriInfo::~UriInfo() {}
 
-const std::string& UriInfo::Scheme() const {
+const std::string &UriInfo::Scheme() const {
     return schemeStr_;
 }
 
-const std::string& UriInfo::Host() const {
+const std::string &UriInfo::Host() const {
     return hostStr_;
 }
 
-const std::string& UriInfo::Port() const {
+const std::string &UriInfo::Port() const {
     return portStr_;
 }
 
-const std::string& UriInfo::Path() const {
+const std::string &UriInfo::Path() const {
     return pathStr_;
 }
 

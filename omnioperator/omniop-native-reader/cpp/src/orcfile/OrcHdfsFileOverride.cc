@@ -27,7 +27,7 @@ namespace orc {
 
     using namespace fs;
 
-    class OmniHdfsFileInputStream : public InputStream {
+    class HdfsFileInputStreamOverride : public InputStream {
     private:
         std::string filename_;
         std::unique_ptr<fs::ReadableFile> hdfs_file_;
@@ -35,7 +35,7 @@ namespace orc {
         const uint64_t READ_SIZE_ = 1024 * 1024; //1 MB
 
     public:
-        OmniHdfsFileInputStream(const UriInfo& uri) {
+        HdfsFileInputStreamOverride(const UriInfo& uri) {
             this->filename_ = uri.Path();
             std::shared_ptr<HadoopFileSystem> fileSystemPtr = getHdfsFileSystem(uri.Host(), uri.Port());
             this->hdfs_file_ = std::make_unique<HdfsReadableFile>(fileSystemPtr, uri.Path(), 0);
@@ -48,7 +48,7 @@ namespace orc {
             this->total_length_= hdfs_file_->GetFileSize();
         }
 
-        ~OmniHdfsFileInputStream() override {
+        ~HdfsFileInputStreamOverride() override {
         }
 
         /**
@@ -99,7 +99,7 @@ namespace orc {
         }
     };
 
-    std::unique_ptr<InputStream> readHdfsFileOverride(const UriInfo &uri) {
-        return std::unique_ptr<InputStream>(new OmniHdfsFileInputStream(uri));
+    std::unique_ptr<InputStream> createHdfsFileInputStream(const UriInfo &uri) {
+        return std::unique_ptr<InputStream>(new HdfsFileInputStreamOverride(uri));
     }
 }

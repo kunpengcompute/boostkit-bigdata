@@ -43,10 +43,10 @@ class Status {
 
 public:
     // Default constructor
-    Status() noexcept : state_(nullptr) {}
+    Status() noexcept: state_(nullptr) {}
 
     // Constructor with status code and message
-    Status(StatusCode code, const std::string& msg){
+    Status(StatusCode code, const std::string &msg) {
         State *state = new State();
         state->code = code;
         state->msg = msg;
@@ -60,22 +60,22 @@ public:
     }
 
     // Create a status from status code and message
-    static Status FromMsg(StatusCode code, const std::string& msg) {
+    static Status FromMsg(StatusCode code, const std::string &msg) {
         return Status(code, msg);
     }
 
     // Create a file system error status with message
-    static Status FSError(const std::string& msg) {
+    static Status FSError(const std::string &msg) {
         return Status::FromMsg(StatusCode::FSError, msg);
     }
 
     // Create an I/O error status with message
-    static Status IOError(const std::string& msg) {
+    static Status IOError(const std::string &msg) {
         return Status::FromMsg(StatusCode::IOError, msg);
     }
 
     // Create an unknown error status with message
-    static Status UnknownError(const std::string& msg) {
+    static Status UnknownError(const std::string &msg) {
         return Status::FromMsg(StatusCode::UnknownError, msg);
     }
 
@@ -86,7 +86,7 @@ public:
 
     // Check if the status is OK
     constexpr bool IsOk() const {
-        if (state_ == nullptr || state_->code == StatusCode::OK){
+        if (state_ == nullptr || state_->code == StatusCode::OK) {
             return true;
         }
         return false;
@@ -100,7 +100,7 @@ public:
 
 private:
     // Pointer to the status state
-    State* state_;
+    State *state_;
 };
 }
 
