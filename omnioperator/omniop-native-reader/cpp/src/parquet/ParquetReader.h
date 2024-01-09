@@ -89,6 +89,6 @@ namespace omniruntime::reader {
 
     std::string GetFileSystemKey(std::string& path, std::string& ugi);
 
-    Filesystem* GetFileSystemPtr(UriInfo &uri, std::string& ugi, arrow::Status &status);
+    Filesystem* GetFileSystemPtr(UriInfo &uri, std::string &ugi, arrow::Status &status);
 }
 #endif // OMNI_RUNTIME_PARQUETREADER_H
