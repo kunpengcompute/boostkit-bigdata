@@ -56,8 +56,6 @@ public class ParquetColumnarBatchJniReaderTest extends TestCase {
                 createDecimalType(18, 5), BooleanType, ShortType, DateType);
         File file = new File("../../omniop-native-reader/cpp/test/tablescan/resources/parquet_data_all_type");
         String path = file.getAbsolutePath();
-        path = "file:" + path;
-        System.out.println(path);
         parquetColumnarBatchScanReader.initializeReaderJava(new Path(path), 100000, rowGroupIndices, columnIndices, "root@sample");
         vecs = new Vec[9];
     }
