@@ -45,6 +45,7 @@ target_link_libraries (${PROJ_TARGET} PUBLIC
         Parquet::parquet_shared
         orc
         boostkit-omniop-vector-1.3.0-aarch64
+        hdfs
         )
 
 set_target_properties(${PROJ_TARGET} PROPERTIES
