@@ -52,22 +52,22 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_ParquetColumnarBatchJn
     std::string ugiString(ugi);
     env->ReleaseStringUTFChars(ugiTemp, ugi);
 
-    jstring schemeTmp = (jstring)env->CallObjectMethod(jsonObj, jsonMethodString, env->NewStringUTF("scheme"));
+    jstring schemeTmp = (jstring)env->CallObjectMethod(jsonObj, jsonMethodString, env->NewStringUTF("Scheme"));
     const char *scheme = env->GetStringUTFChars(schemeTmp, JNI_FALSE);
     std::string schemeString(scheme);
     env->ReleaseStringUTFChars(schemeTmp, scheme);
 
-    jstring hostTmp = (jstring)env->CallObjectMethod(jsonObj, jsonMethodString, env->NewStringUTF("host"));
+    jstring hostTmp = (jstring)env->CallObjectMethod(jsonObj, jsonMethodString, env->NewStringUTF("Host"));
     const char *host = env->GetStringUTFChars(hostTmp, JNI_FALSE);
     std::string hostString(host);
     env->ReleaseStringUTFChars(hostTmp, host);
 
-    jstring pathTmp = (jstring)env->CallObjectMethod(jsonObj, jsonMethodString, env->NewStringUTF("path"));
+    jstring pathTmp = (jstring)env->CallObjectMethod(jsonObj, jsonMethodString, env->NewStringUTF("Path"));
     const char *path = env->GetStringUTFChars(pathTmp, JNI_FALSE);
     std::string pathString(ugi);
     env->ReleaseStringUTFChars(pathTmp, path);
 
-    jint port = (jint)env->CallIntMethod(jsonObj, jsonMethodInt, env->NewStringUTF("port"));
+    jint port = (jint)env->CallIntMethod(jsonObj, jsonMethodInt, env->NewStringUTF("Port"));
 
     UriInfo uriInfo(uriString, schemeString, pathString, hostString, std::to_string(port));
 

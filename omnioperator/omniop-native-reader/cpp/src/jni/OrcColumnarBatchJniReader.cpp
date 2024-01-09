@@ -53,22 +53,22 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniRea
         env->ReleaseStringUTFChars(serTailJstr, ptr);
     }
 
-    jstring schemaJstr = (jstring)env->CallObjectMethod(jsonObj, jsonMethodString, env->NewStringUTF("scheme"));
+    jstring schemaJstr = (jstring)env->CallObjectMethod(jsonObj, jsonMethodString, env->NewStringUTF("Scheme"));
     const char *schemaPtr = env->GetStringUTFChars(schemaJstr, nullptr);
     std::string schemaStr(schemaPtr);
     env->ReleaseStringUTFChars(schemaJstr, schemaPtr);
 
-    jstring fileJstr = (jstring)env->CallObjectMethod(jsonObj, jsonMethodString, env->NewStringUTF("path"));
+    jstring fileJstr = (jstring)env->CallObjectMethod(jsonObj, jsonMethodString, env->NewStringUTF("Path"));
     const char *filePtr = env->GetStringUTFChars(fileJstr, nullptr);
     std::string fileStr(filePtr);
     env->ReleaseStringUTFChars(fileJstr, filePtr);
 
-    jstring hostJstr = (jstring)env->CallObjectMethod(jsonObj, jsonMethodString, env->NewStringUTF("host"));
+    jstring hostJstr = (jstring)env->CallObjectMethod(jsonObj, jsonMethodString, env->NewStringUTF("Host"));
     const char *hostPtr = env->GetStringUTFChars(hostJstr, nullptr);
     std::string hostStr(hostPtr);
     env->ReleaseStringUTFChars(hostJstr, hostPtr);
 
-    jint port = (jint)env->CallIntMethod(jsonObj, jsonMethodInt, env->NewStringUTF("port"));
+    jint port = (jint)env->CallIntMethod(jsonObj, jsonMethodInt, env->NewStringUTF("Port"));
     UriInfo uri(schemaStr, fileStr, hostStr, std::to_string(port));
 
     std::unique_ptr<orc::Reader> reader;

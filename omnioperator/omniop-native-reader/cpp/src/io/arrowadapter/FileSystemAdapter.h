@@ -39,9 +39,9 @@
 
 namespace arrow_adapter {
 
-using arrow::Result;
+    using arrow::Result;
 
-using arrow::fs::FileSystem;
+    using arrow::fs::FileSystem;
 
 /// \defgroup filesystem-factories Functions for creating FileSystem instances
 
@@ -50,9 +50,11 @@ using arrow::fs::FileSystem;
 /// \brief Create a new FileSystem by URI
 ///
 /// Same as FileSystemFromUriOrPath, but it use uri that constructed by client
-ARROW_EXPORT
-Result<std::shared_ptr<FileSystem>> FileSystemFromUriOrPath(const UriInfo &uri,
-                                                            std::string* out_path  = NULLPTR);
+    ARROW_EXPORT
+            Result<std::shared_ptr < FileSystem>>
+
+    FileSystemFromUriOrPath(const UriInfo &uri,
+                            std::string *out_path = NULLPTR);
 
 
 /// \brief Create a new FileSystem by URI with a custom IO context
@@ -60,7 +62,7 @@ Result<std::shared_ptr<FileSystem>> FileSystemFromUriOrPath(const UriInfo &uri,
 /// Recognized schemes are "file", "mock", "hdfs", "viewfs", "s3",
 /// "gs" and "gcs".
 ///
-/// \param[in] uri a URI-based path, ex: file:///some/local/path
+/// \param[in] uri a URI-based path, ex: file:///some/local/Path
 /// \param[in] io_context an IOContext which will be associated with the filesystem
 /// \param[out] out_path (optional) Path inside the filesystem.
 /// \return out_fs FileSystem instance.
@@ -71,10 +73,12 @@ Result<std::shared_ptr<FileSystem>> FileSystemFromUriOrPath(const UriInfo &uri,
 /// Same as FileSystemFromUri, but in addition also recognize non-URIs
 /// and treat them as local filesystem paths.  Only absolute local filesystem
 /// paths are allowed.
-ARROW_EXPORT
-Result<std::shared_ptr<FileSystem>> FileSystemFromUriOrPath(
-        const UriInfo &uri, const arrow::io::IOContext &io_context,
-        std::string *out_path = NULLPTR);
+    ARROW_EXPORT
+            Result<std::shared_ptr < FileSystem>>
+
+    FileSystemFromUriOrPath(
+            const UriInfo &uri, const arrow::io::IOContext &io_context,
+            std::string *out_path = NULLPTR);
 
 /// @}
 

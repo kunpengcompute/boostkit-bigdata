@@ -21,87 +21,95 @@
 
 #include "FileSystemAdapter.h"
 #include "arrow/filesystem/hdfs.h"
-#include "HdfsAdapter.h"
-#include "LocalfsAdapter.h"
 #include "arrow/filesystem/localfs.h"
 #include "arrow/filesystem/mockfs.h"
 #include "arrow/filesystem/path_util.h"
-#include "UtilInternal.h"
 #include "arrow/io/slow.h"
 #include "arrow/result.h"
 #include "arrow/status.h"
 #include "arrow/util/checked_cast.h"
 #include "arrow/util/macros.h"
 #include "arrow/util/parallel.h"
+#include "HdfsAdapter.h"
+#include "UtilInternal.h"
+#include "LocalfsAdapter.h"
 
 namespace arrow_adapter {
 
-using arrow::internal::Uri;
-using arrow::fs::internal::RemoveLeadingSlash;
-using arrow::fs::internal::ToSlashes;
-using arrow::fs::FileSystem;
-using arrow::fs::HadoopFileSystem;
-using arrow::fs::LocalFileSystem;
-using arrow::fs::internal::MockFileSystem;
-using arrow::Result;
+    using arrow::internal::Uri;
+    using arrow::fs::internal::RemoveLeadingSlash;
+    using arrow::fs::internal::ToSlashes;
+    using arrow::fs::FileSystem;
+    using arrow::fs::HadoopFileSystem;
+    using arrow::fs::LocalFileSystem;
+    using arrow::fs::internal::MockFileSystem;
+    using arrow::Result;
 
-namespace {
+    namespace {
 
-Result<std::shared_ptr<FileSystem>>
-FileSystemFromUriReal(const UriInfo &uri, const arrow::io::IOContext &io_context, std::string *out_path) {
-    const auto scheme = uri.scheme();
+        Result<std::shared_ptr < FileSystem>>
 
-    if (scheme == "file") {
-        std::string path;
-        ARROW_ASSIGN_OR_RAISE(auto options, buildLocalfsOptionsFromUri(uri, &path));
-        if (out_path != nullptr) {
-            *out_path = path;
+        FileSystemFromUriReal(const UriInfo &uri, const arrow::io::IOContext &io_context, std::string *out_path) {
+            const auto scheme = uri.Scheme();
+
+            if (scheme == "file") {
+                std::string path;
+                ARROW_ASSIGN_OR_RAISE(auto
+                options, buildLocalfsOptionsFromUri(uri, &path));
+                if (out_path != nullptr) {
+                    *out_path = path;
+                }
+                return std::make_shared<LocalFileSystem>(options, io_context);
+            }
+
+            if (scheme == "hdfs" || scheme == "viewfs") {
+                ARROW_ASSIGN_OR_RAISE(auto
+                options, buildHdfsOptionsFromUri(uri));
+                if (out_path != nullptr) {
+                    *out_path = uri.Path();
+                }
+                ARROW_ASSIGN_OR_RAISE(auto
+                hdfs, HadoopFileSystem::Make(options, io_context));
+                return hdfs;
+            }
+
+            if (scheme == "mock") {
+                // MockFileSystem does not have an absolute / relative Path distinction,
+                // normalize Path by removing leading slash.
+                if (out_path != nullptr) {
+                    *out_path = std::string(RemoveLeadingSlash(uri.Path()));
+                }
+                return std::make_shared<MockFileSystem>(CurrentTimePoint(),
+                                                        io_context);
+            }
+
+            return arrow::fs::FileSystemFromUri(uri.ToString(), io_context, out_path);
         }
-        return std::make_shared<LocalFileSystem>(options, io_context);
+
+    }  // namespace
+
+
+    Result<std::shared_ptr < FileSystem>>
+
+    FileSystemFromUriOrPath(const UriInfo &uri,
+                            std::string *out_path) {
+        return FileSystemFromUriOrPath(uri, arrow::io::IOContext(), out_path);
     }
 
-    if (scheme == "hdfs" || scheme == "viewfs") {
-        ARROW_ASSIGN_OR_RAISE(auto options, buildHdfsOptionsFromUri(uri));
-        if (out_path != nullptr) {
-            *out_path = uri.path();
+    Result<std::shared_ptr < FileSystem>>
+
+    FileSystemFromUriOrPath(
+            const UriInfo &uri, const arrow::io::IOContext &io_context,
+            std::string *out_path) {
+        const auto &uri_string = uri.ToString();
+        if (arrow::fs::internal::DetectAbsolutePath(uri_string)) {
+            // Normalize Path separators
+            if (out_path != nullptr) {
+                *out_path = ToSlashes(uri_string);
+            }
+            return std::make_shared<LocalFileSystem>();
         }
-        ARROW_ASSIGN_OR_RAISE(auto hdfs, HadoopFileSystem::Make(options, io_context));
-        return hdfs;
+        return FileSystemFromUriReal(uri, io_context, out_path);
     }
-
-    if (scheme == "mock") {
-        // MockFileSystem does not have an absolute / relative path distinction,
-        // normalize path by removing leading slash.
-        if (out_path != nullptr) {
-            *out_path = std::string(RemoveLeadingSlash(uri.path()));
-        }
-        return std::make_shared<MockFileSystem>(CurrentTimePoint(),
-                                                          io_context);
-    }
-
-    return arrow::fs::FileSystemFromUri(uri.ToString(), io_context, out_path);
-}
-
-}  // namespace
-
-
-Result<std::shared_ptr<FileSystem>> FileSystemFromUriOrPath(const UriInfo &uri,
-                                                            std::string *out_path) {
-    return FileSystemFromUriOrPath(uri, arrow::io::IOContext(), out_path);
-}
-
-Result<std::shared_ptr<FileSystem>> FileSystemFromUriOrPath(
-        const UriInfo &uri, const arrow::io::IOContext &io_context,
-        std::string *out_path) {
-    const auto& uri_string = uri.ToString();
-    if (arrow::fs::internal::DetectAbsolutePath(uri_string)) {
-        // Normalize path separators
-        if (out_path != nullptr) {
-            *out_path = ToSlashes(uri_string);
-        }
-        return std::make_shared<LocalFileSystem>();
-    }
-    return FileSystemFromUriReal(uri, io_context, out_path);
-}
 
 }

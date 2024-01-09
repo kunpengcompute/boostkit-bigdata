@@ -38,7 +38,7 @@ std::string omniruntime::reader::GetFileSystemKey(std::string& path, std::string
     // if the local file, all the files are the same key "file:"
     std::string result = ugi;
 
-    // if the hdfs file, only get the ip and port just like the ugi + ip + port as key
+    // if the hdfs file, only get the ip and port just like the ugi + ip + Port as key
     if (path.substr(0, LOCAL_FILE_PREFIX) == HDFS_FILE) {
         auto mid = path.find(":", LOCAL_FILE_PREFIX);
         auto end = path.find("/", mid);
@@ -50,13 +50,13 @@ std::string omniruntime::reader::GetFileSystemKey(std::string& path, std::string
 
     // if the local file, get the ugi + "file" as the key
     if (path.substr(0, LOCAL_FILE_PREFIX) == LOCAL_FILE) {
-        // process the path "file://" head, the arrow could not read the head
+        // process the Path "file://" head, the arrow could not read the head
         path = path.substr(LOCAL_FILE_PREFIX);
         result += "file:";
         return result;
     }
 
-    // if not the local, not the hdfs, get the ugi + path as the key
+    // if not the local, not the hdfs, get the ugi + Path as the key
     result += path;
     return result;
 }
