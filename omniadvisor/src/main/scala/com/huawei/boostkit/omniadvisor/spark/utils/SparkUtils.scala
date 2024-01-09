@@ -19,9 +19,9 @@ import com.huawei.boostkit.omniadvisor.exception.OmniAdvisorException
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.SparkConf
-import org.apache.spark.io.{CompressionCodec, LZ4CompressionCodec, LZFCompressionCodec, SnappyCompressionCodec, ZStdCompressionCodec}
+import org.apache.spark.io._
 
-import java.io.{BufferedInputStream, File, FileInputStream, FileNotFoundException, InputStream}
+import java.io._
 import java.net.URI
 import java.util.Properties
 import scala.collection.JavaConverters.asScalaSetConverter
@@ -29,6 +29,13 @@ import scala.collection.mutable
 import scala.tools.jline_embedded.internal.InputStreamReader
 
 object SparkUtils {
+
+  private val SPARK_DEPLOY_MODE_CLIENT = "client"
+  private val SPARK_DEPLOY_MODE_CLUSTER = "cluster"
+
+  private val CMD_HEADER = "org.apache.spark.deploy.SparkSubmit"
+  private val FORMATTED_CMD_HEADER = "spark-submit"
+
   def findApplicationFiles(hadoopConfiguration: Configuration, eventLogDir: String, startTimeMills: Long,
                            finishTimeMills: Long, maxFileSize: Long): List[String] = {
     val uri = new URI(eventLogDir)
@@ -83,8 +90,14 @@ object SparkUtils {
   }
 
   def withEventLog[T](fs: FileSystem, path: Path, codec: Option[CompressionCodec])(f: InputStream => T): T = {
-    resource.managed { openEventLog(path, fs)}
-      .map { in => codec.map { _.compressedInputStream(in) }.getOrElse(in) }
+    resource.managed {
+        openEventLog(path, fs)
+      }
+      .map { in =>
+        codec.map {
+          _.compressedInputStream(in)
+        }.getOrElse(in)
+      }
       .acquireAndGet(f)
   }
 
@@ -96,12 +109,11 @@ object SparkUtils {
     new BufferedInputStream(fs.open(logPath))
   }
 
-  def defaultEnv: Map[String, String] = sys.env
+  private def defaultEnv: Map[String, String] = sys.env
 
   def getDefaultPropertiesFile(env: Map[String, String] = defaultEnv): Option[String] = {
-    env.get("SPARK_CONF_DIR").orElse(env.get("SPARK_HOME").map {
-      t => s"$t${File.separator}conf"})
-      .map {t => new File(s"$t${File.separator}spark-defaults.conf")}
+    env.get("SPARK_CONF_DIR").orElse(env.get("SPARK_HOME").map { t => s"$t${File.separator}conf" })
+      .map { t => new File(s"$t${File.separator}spark-defaults.conf") }
       .filter(_.isFile)
       .map(_.getAbsolutePath)
   }
@@ -120,5 +132,24 @@ object SparkUtils {
     } finally {
       inReader.close()
     }
+  }
+
+  // Format the command in sun.java.command into a submit-executable form
+  def formatSubmitCmd(submitCmd: String, deployMode: String): String = {
+    deployMode match {
+      case SPARK_DEPLOY_MODE_CLIENT => getSubmitCmdFromClientCmd(submitCmd)
+      case SPARK_DEPLOY_MODE_CLUSTER => getSubmitCmdFromClusterCmd(submitCmd)
+      case _ => submitCmd
+    }
+  }
+
+  private def getSubmitCmdFromClientCmd(clientCmd: String): String = {
+    clientCmd.replace(CMD_HEADER, FORMATTED_CMD_HEADER).replace("spark-internal ", "")
+  }
+
+  private def getSubmitCmdFromClusterCmd(clusterCmd: String): String = {
+    val cmdWithoutArgsAndJar = clusterCmd.replace("--jar file:", "").replace("--arg ", "").trim
+    val cmdWithRightHeader = cmdWithoutArgsAndJar.replace("org.apache.spark.deploy.yarn.ApplicationMaster", "spark-submit --master yarn --deploy-mode cluster")
+    cmdWithRightHeader.split("--properties-file").head.trim
   }
 }
