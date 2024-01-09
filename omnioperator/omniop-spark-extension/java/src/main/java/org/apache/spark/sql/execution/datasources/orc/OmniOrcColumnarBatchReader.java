@@ -19,7 +19,7 @@
 package org.apache.spark.sql.execution.datasources.orc;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.huawei.boostkit.spark.jni.OrcColumnarBatchJniReader;
+import com.huawei.boostkit.spark.jni.OrcColumnarBatchScanReader;
 import nova.hetu.omniruntime.vector.Vec;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.InputSplit;
@@ -64,7 +64,7 @@ public class OmniOrcColumnarBatchReader extends RecordReader<Void, ColumnarBatch
   public int[] requestedDataColIds;
 
   // Native Record reader from ORC row batch.
-  private OrcColumnarBatchJniReader recordReader;
+  private OrcColumnarBatchScanReader recordReader;
 
   private StructField[] requiredFields;
 
@@ -133,7 +133,7 @@ public class OmniOrcColumnarBatchReader extends RecordReader<Void, ColumnarBatch
 //  long reader = OrcColumnarNativeReader.initializeReaderJava(fileSplit.getPath(), readerOptions);
     Reader.Options options =
       OrcColumnarNativeReader.buildOptions(conf, fileSplit.getStart(), fileSplit.getLength());
-    recordReader = new OrcColumnarBatchJniReader();
+    recordReader = new OrcColumnarBatchScanReader();
     recordReader.initializeReaderJava(fileSplit.getPath().toString(), readerOptions);
     recordReader.initializeRecordReaderJava(options);
   }

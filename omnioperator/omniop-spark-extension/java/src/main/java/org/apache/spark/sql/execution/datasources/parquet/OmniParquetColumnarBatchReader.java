@@ -23,7 +23,7 @@ import static org.apache.parquet.format.converter.ParquetMetadataConverter.range
 import static org.apache.parquet.hadoop.ParquetFileReader.readFooter;
 import static org.apache.parquet.hadoop.ParquetInputFormat.getFilter;
 
-import com.huawei.boostkit.spark.jni.ParquetColumnarBatchJniReader;
+import com.huawei.boostkit.spark.jni.ParquetColumnarBatchScanReader;
 import nova.hetu.omniruntime.vector.Vec;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
@@ -66,7 +66,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.util.*;
 
 /**
- * To support parquet file format in native, OmniParquetColumnarBatchReader uses ParquetColumnarBatchJniReader to
+ * To support parquet file format in native, ParquetColumnarBatchScanReader uses ParquetColumnarBatchJniReader to
  * read data and return batch to next operator.
  */
 public class OmniParquetColumnarBatchReader extends RecordReader<Void, ColumnarBatch> {
@@ -80,7 +80,7 @@ public class OmniParquetColumnarBatchReader extends RecordReader<Void, ColumnarB
   private MessageType fileSchema;
   private MessageType requestedSchema;
   private StructType sparkSchema;
-  private ParquetColumnarBatchJniReader reader;
+  private ParquetColumnarBatchScanReader reader;
   private org.apache.spark.sql.vectorized.ColumnVector[] wrap;
 
   // Store the immutable cols, such as partionCols and misingCols, which only init once.
@@ -96,7 +96,7 @@ public class OmniParquetColumnarBatchReader extends RecordReader<Void, ColumnarB
     this.fileFooter = fileFooter;
   }
 
-  public ParquetColumnarBatchJniReader getReader() {
+  public ParquetColumnarBatchScanReader getReader() {
     return this.reader;
   }
 
@@ -153,7 +153,7 @@ public class OmniParquetColumnarBatchReader extends RecordReader<Void, ColumnarB
     this.requestedSchema = readContext.getRequestedSchema();
     String sparkRequestedSchemaString = configuration.get(ParquetReadSupport$.MODULE$.SPARK_ROW_REQUESTED_SCHEMA());
     this.sparkSchema = StructType$.MODULE$.fromString(sparkRequestedSchemaString);
-    this.reader = new ParquetColumnarBatchJniReader();
+    this.reader = new ParquetColumnarBatchScanReader();
     // PushDown rowGroups and columns indices for native reader.
     List<Integer> rowgroupIndices = getFilteredBlocks(split.getStart(), split.getEnd());
     List<Integer> columnIndices = getColumnIndices(requestedSchema.getColumns(), fileSchema.getColumns());
