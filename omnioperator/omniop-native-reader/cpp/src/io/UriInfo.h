@@ -50,6 +50,8 @@ private:
     std::string portString;
     std::string pathString;
     std::string uriString;
+
+    void normalize();
 };
 
 #endif
