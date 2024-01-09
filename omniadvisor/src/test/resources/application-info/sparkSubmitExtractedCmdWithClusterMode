@@ -1,0 +1,1 @@
+spark-submit --master yarn --deploy-mode cluster --class org.apache.spark.sql.hive.my.MySparkSQLCLIDriver /home/test_spark/MySQLAPP-1.0-SNAPSHOT/spark-sql-cluster-mode-1.0-SNAPSHOT.jar --database tpcds_bin_partitioned_decimal_orc_100 -f /home/test_spark/q10_q11.sql

@@ -48,10 +48,6 @@ class SparkLogClient(hadoopConfiguration: Configuration, sparkConf: SparkConf, e
       dataCollection.replayEventLogs(in, path.toString)
     }
 
-    val appInfo = dataCollection.appInfo
-    val jobData = dataCollection.jobData
-    val environmentInfo = dataCollection.environmentInfo
-
-    extractAppResultFromAppStatusStore(appInfo, workload, environmentInfo, jobData)
+    dataCollection.getAppResult(workload)
   }
 }
