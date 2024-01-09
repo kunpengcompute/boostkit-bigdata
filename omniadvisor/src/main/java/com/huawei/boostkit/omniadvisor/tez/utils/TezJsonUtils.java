@@ -33,11 +33,7 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class TezJsonUtils {
     private static final Logger LOG = LoggerFactory.getLogger(TezJsonUtils.class);
@@ -119,9 +115,18 @@ public class TezJsonUtils {
         return params;
     }
 
-    public String getQueryString(String dagId) throws MalformedURLException {
+    public String getQueryString(List<TezDagIdData> dagIds) throws MalformedURLException {
+        StringJoiner joiner = new StringJoiner(";\n");
+        for (TezDagIdData dagIdData : dagIds) {
+            String singleQueryString = getSingleQueryString(dagIdData.getDagId());
+            joiner.add(singleQueryString);
+        }
+        return joiner.toString();
+    }
+
+    public String getSingleQueryString(String dagId) throws MalformedURLException {
         URL dagExtraInfoURL = tezUrlFactory.getDagExtraInfoURL(dagId);
-        LOG.info("Get query string by calling REST API {}", dagExtraInfoURL);
+        LOG.info("Get query string for Dag {} by calling REST API {}", dagId, dagExtraInfoURL);
         JsonNode rootNode = timelineClient.readJsonNode(dagExtraInfoURL);
         return rootNode.path(ATSConstants.OTHER_INFO)
                 .path(ATSConstants.DAG_PLAN)
