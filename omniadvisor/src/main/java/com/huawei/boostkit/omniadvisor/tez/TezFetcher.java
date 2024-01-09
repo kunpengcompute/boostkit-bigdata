@@ -35,10 +35,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 import static com.huawei.boostkit.omniadvisor.utils.Utils.loadParamsFromConf;
 
@@ -120,20 +117,17 @@ public class TezFetcher implements Fetcher {
             return Optional.empty();
         }
 
-        // If there is more than one dag in application, only analyze the last one
-        TezDagIdData tezDagId = dagIds.stream().max(TezDagIdData::compareTo).get();
-
-        return extractAppResult(tezJob, tezDagId);
+        return extractAppResult(tezJob, dagIds);
     }
 
-    private Optional<AppResult> extractAppResult(TezAnalyticJob tezJob, TezDagIdData dagIdData) {
-        LOG.info("Analyzing dag {}", dagIdData.getDagId());
+    private Optional<AppResult> extractAppResult(TezAnalyticJob tezJob, List<TezDagIdData> dagIds) {
+        LOG.info("Analyzing tez application {}", tezJob.getApplicationId());
         AppResult appResult = new AppResult();
         Map<String, String> jobConf;
         try {
             jobConf = tezJsonUtils.getConfigure(tezJob.getApplicationId());
             appResult.parameters = Utils.parseMapToJsonString(loadParamsFromConf(TEZ_PARAMS_CONF_FILE, jobConf));
-            appResult.query = tezJsonUtils.getQueryString(dagIdData.getDagId());
+            appResult.query = tezJsonUtils.getQueryString(dagIds);
         } catch (IOException e) {
             LOG.error("Analyze job failed. ", e);
             return Optional.empty();
@@ -144,11 +138,13 @@ public class TezFetcher implements Fetcher {
         appResult.applicationWorkload = workload;
         appResult.jobType = tezJob.getType().getName();
 
-        if (dagIdData.isComplete()) {
-            appResult.startTime = dagIdData.getStartTime();
-            appResult.finishTime = dagIdData.getEndTime();
-            appResult.executionStatus = dagIdData.isSuccess() ? AppResult.SUCCEEDED_STATUS : AppResult.FAILED_STATUS;
-            appResult.durationTime = dagIdData.isSuccess() ? dagIdData.getDuration() : AppResult.FAILED_JOB_DURATION;
+        if (isCompleteForDagIds(dagIds)) {
+            OptionalLong minStartTime = dagIds.stream().mapToLong(TezDagIdData::getStartTime).min();
+            OptionalLong maxEndTime = dagIds.stream().mapToLong(TezDagIdData::getEndTime).max();
+            appResult.startTime = isValidTime(minStartTime, maxEndTime) ? minStartTime.getAsLong() : tezJob.getStartTimeMills();
+            appResult.finishTime = isValidTime(minStartTime, maxEndTime) ? maxEndTime.getAsLong() : tezJob.getFinishTimeMills();
+            appResult.executionStatus = isSuccessfulForDagIds(dagIds) ? AppResult.SUCCEEDED_STATUS : AppResult.FAILED_STATUS;
+            appResult.durationTime = isSuccessfulForDagIds(dagIds) && isValidTime(minStartTime, maxEndTime) ? (appResult.finishTime - appResult.startTime) : AppResult.FAILED_JOB_DURATION;
         } else {
             appResult.startTime = tezJob.getStartTimeMills();
             appResult.finishTime = tezJob.getFinishTimeMills();
@@ -164,6 +160,18 @@ public class TezFetcher implements Fetcher {
         }
 
         return Optional.of(appResult);
+    }
+
+    private boolean isCompleteForDagIds(List<TezDagIdData> dagIds) {
+        return dagIds.stream().allMatch(TezDagIdData::isComplete);
+    }
+
+    private boolean isSuccessfulForDagIds(List<TezDagIdData> dagIds) {
+        return dagIds.stream().allMatch(TezDagIdData::isSuccess);
+    }
+
+    private boolean isValidTime(OptionalLong startTime, OptionalLong endTime) {
+        return (startTime.isPresent() && endTime.isPresent() && (endTime.getAsLong() - startTime.getAsLong() > 0));
     }
 
     @VisibleForTesting

@@ -37,7 +37,7 @@ import static org.apache.spark.sql.types.DataTypes.*;
 
 @FixMethodOrder(value = MethodSorters.NAME_ASCENDING)
 public class ParquetColumnarBatchJniReaderTest extends TestCase {
-    private ParquetColumnarBatchJniReader parquetColumnarBatchJniReader;
+    private ParquetColumnarBatchScanReader parquetColumnarBatchScanReader;
 
     private Vec[] vecs;
 
@@ -45,7 +45,7 @@ public class ParquetColumnarBatchJniReaderTest extends TestCase {
 
     @Before
     public void setUp() throws Exception {
-        parquetColumnarBatchJniReader = new ParquetColumnarBatchJniReader();
+        parquetColumnarBatchScanReader = new ParquetColumnarBatchScanReader();
 
         List<Integer> rowGroupIndices = new ArrayList<>();
         rowGroupIndices.add(0);
@@ -54,15 +54,15 @@ public class ParquetColumnarBatchJniReaderTest extends TestCase {
         types = new ArrayList<>();
         Collections.addAll(types, IntegerType, StringType, LongType, DoubleType, createDecimalType(9, 8),
                 createDecimalType(18, 5), BooleanType, ShortType, DateType);
-        File file = new File("../cpp/test/tablescan/resources/parquet_data_all_type");
+        File file = new File("../../omniop-native-reader/cpp/test/tablescan/resources/parquet_data_all_type");
         String path = file.getAbsolutePath();
-        parquetColumnarBatchJniReader.initializeReaderJava(path, 100000, rowGroupIndices, columnIndices, "root@sample");
+        parquetColumnarBatchScanReader.initializeReaderJava(path, 100000, rowGroupIndices, columnIndices, "root@sample");
         vecs = new Vec[9];
     }
 
     @After
     public void tearDown() throws Exception {
-        parquetColumnarBatchJniReader.close();
+        parquetColumnarBatchScanReader.close();
         for (Vec vec : vecs) {
             vec.close();
         }
@@ -70,7 +70,7 @@ public class ParquetColumnarBatchJniReaderTest extends TestCase {
 
     @Test
     public void testRead() {
-        long num = parquetColumnarBatchJniReader.next(vecs, types);
+        long num = parquetColumnarBatchScanReader.next(vecs, types);
         assertTrue(num == 1);
     }
 }

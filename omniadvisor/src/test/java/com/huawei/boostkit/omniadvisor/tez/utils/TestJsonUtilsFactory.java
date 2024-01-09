@@ -47,7 +47,7 @@ public class TestJsonUtilsFactory {
         TezJsonUtils successJsonUtils = Mockito.mock(TezJsonUtils.class);
         Mockito.when(successJsonUtils.getDAGIds(SUCCESS)).thenReturn(ImmutableList.of(SUCCESS_DAG));
         Mockito.when(successJsonUtils.getConfigure(SUCCESS)).thenReturn(TEST_TEZ_CONFIGURE);
-        Mockito.when(successJsonUtils.getQueryString(SUCCESS)).thenReturn(TEST_TEZ_QUERY);
+        Mockito.when(successJsonUtils.getSingleQueryString(SUCCESS)).thenReturn(TEST_TEZ_QUERY);
         return successJsonUtils;
     }
 
@@ -55,7 +55,7 @@ public class TestJsonUtilsFactory {
         TezJsonUtils failedJsonUtils = Mockito.mock(TezJsonUtils.class);
         Mockito.when(failedJsonUtils.getDAGIds(FAILED)).thenReturn(ImmutableList.of(FAILED_DAG));
         Mockito.when(failedJsonUtils.getConfigure(FAILED)).thenReturn(TEST_TEZ_CONFIGURE);
-        Mockito.when(failedJsonUtils.getQueryString(FAILED)).thenReturn(TEST_TEZ_QUERY);
+        Mockito.when(failedJsonUtils.getSingleQueryString(FAILED)).thenReturn(TEST_TEZ_QUERY);
         return failedJsonUtils;
     }
 
@@ -63,7 +63,7 @@ public class TestJsonUtilsFactory {
         TezJsonUtils killedJsonUtils = Mockito.mock(TezJsonUtils.class);
         Mockito.when(killedJsonUtils.getDAGIds(KILLED)).thenReturn(ImmutableList.of(KILLED_DAG));
         Mockito.when(killedJsonUtils.getConfigure(KILLED)).thenReturn(TEST_TEZ_CONFIGURE);
-        Mockito.when(killedJsonUtils.getQueryString(KILLED)).thenReturn(TEST_TEZ_QUERY);
+        Mockito.when(killedJsonUtils.getSingleQueryString(KILLED)).thenReturn(TEST_TEZ_QUERY);
         return killedJsonUtils;
     }
 
@@ -71,7 +71,7 @@ public class TestJsonUtilsFactory {
         TezJsonUtils unFinishedJsonUtils = Mockito.mock(TezJsonUtils.class);
         Mockito.when(unFinishedJsonUtils.getDAGIds(UNFINISHED)).thenReturn(ImmutableList.of(UNFINISHED_DAG));
         Mockito.when(unFinishedJsonUtils.getConfigure(UNFINISHED)).thenReturn(TEST_TEZ_CONFIGURE);
-        Mockito.when(unFinishedJsonUtils.getQueryString(UNFINISHED)).thenReturn(TEST_TEZ_QUERY);
+        Mockito.when(unFinishedJsonUtils.getSingleQueryString(UNFINISHED)).thenReturn(TEST_TEZ_QUERY);
         return unFinishedJsonUtils;
     }
 }

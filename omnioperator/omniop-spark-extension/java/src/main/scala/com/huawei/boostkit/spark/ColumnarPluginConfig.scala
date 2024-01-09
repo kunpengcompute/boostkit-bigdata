@@ -28,7 +28,7 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
   val columnarShuffleStr:String = conf
     .getConfString("spark.shuffle.manager", "sort")
 
-  val enableColumnarShuffle: Boolean = 
+  val enableColumnarShuffle: Boolean =
     if (!(columnarShuffleStr.equals("sort") || (columnarShuffleStr.equals("tungsten-sort")))) {
       SparkEnv.get.shuffleManager.isInstanceOf[ColumnarShuffleManager]
     } else {
@@ -108,7 +108,7 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
   val enableSortMergeJoinFusion: Boolean = conf
     .getConfString("spark.omni.sql.columnar.sortMergeJoin.fusion", "false")
     .toBoolean
-      
+
   val enableColumnarSortMergeJoin: Boolean = conf
     .getConfString("spark.omni.sql.columnar.sortMergeJoin", "true")
     .toBoolean
@@ -221,6 +221,8 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
   val enableColumnarCoalesce: Boolean = conf
     .getConfString("spark.omni.sql.columnar.coalesce", "true")
     .toBoolean
+
+  val enableRollupOptimization: Boolean = conf.getConfString("spark.omni.sql.columnar.rollupOptimization.enabled", "true").toBoolean
 }
 
 

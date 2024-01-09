@@ -57,10 +57,10 @@ class SparkRestClient(historyUri: String, timeoutSeconds: Int, sparkConf: SparkC
   }
 
   val timeout: FiniteDuration = Duration(timeoutSeconds, SECONDS)
-  val API_V1_MOUNT_PATH = "api/v1"
+  private val API_V1_MOUNT_PATH = "api/v1"
   val IN_PROGRESS = ".inprogress"
 
-  val sparkRestObjectMapper: ObjectMapper with ScalaObjectMapper = {
+  private val sparkRestObjectMapper: ObjectMapper with ScalaObjectMapper = {
     val dateFormat = {
       val formatter = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'GMT'")
       val cal = Calendar.getInstance(new SimpleTimeZone(0, "GMT"))
@@ -120,7 +120,7 @@ class SparkRestClient(historyUri: String, timeoutSeconds: Int, sparkConf: SparkC
     LOG.info(s"creating SparkApplication by calling REST API at ${logTarget.getUri} to get eventLogs")
     resource.managed {
       getApplicationLogs(logTarget)
-    }.acquireAndGet{ zipInputStream =>
+    }.acquireAndGet { zipInputStream =>
       getLogInputStream(zipInputStream, logTarget) match {
         case (None, _) =>
           throw new OmniAdvisorException(s"Failed to read log for application ${sparkJob.getApplicationId}")
@@ -132,7 +132,7 @@ class SparkRestClient(historyUri: String, timeoutSeconds: Int, sparkConf: SparkC
     }
   }
 
-  def getApplications[T](webTarget: WebTarget, converter: String => T): T = {
+  private def getApplications[T](webTarget: WebTarget, converter: String => T): T = {
     converter(webTarget.request(MediaType.APPLICATION_JSON).get(classOf[String]))
   }
 
@@ -142,7 +142,7 @@ class SparkRestClient(historyUri: String, timeoutSeconds: Int, sparkConf: SparkC
 
     val applicationInfo = getApplicationInfo(appTarget)
 
-    val lastAttemptId = applicationInfo.attempts.maxBy{
+    val lastAttemptId = applicationInfo.attempts.maxBy {
       _.startTime
     }.attemptId
     lastAttemptId.map(appTarget.path).getOrElse(appTarget)
@@ -163,7 +163,7 @@ class SparkRestClient(historyUri: String, timeoutSeconds: Int, sparkConf: SparkC
       val inputStream = logTarget.request(MediaType.APPLICATION_OCTET_STREAM)
         .get(classOf[java.io.InputStream])
       new ZipInputStream(new BufferedInputStream(inputStream))
-    }catch {
+    } catch {
       case NonFatal(e) =>
         LOG.error(s"error reading logs ${logTarget.getUri}. Exception Message = ${e.getMessage}")
         throw e
@@ -181,7 +181,7 @@ class SparkRestClient(historyUri: String, timeoutSeconds: Int, sparkConf: SparkC
         throw new OmniAdvisorException(s"Application for the log ${entryName} has not finished yes.")
       }
       val codec = SparkUtils.compressionCodecForLogName(sparkConf, entryName)
-      (Some(codec.map{
+      (Some(codec.map {
         _.compressedInputStream(zis)
       }.getOrElse(zis)), entryName)
     }
