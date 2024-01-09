@@ -36,7 +36,7 @@ public:
     virtual Status OpenFile() = 0;
 
     // Read data from the specified offset into the buffer with the given length
-    virtual int64_t ReadAt(void* buffer, int32_t length, int64_t offset) = 0;
+    virtual int64_t ReadAt(void *buffer, int32_t length, int64_t offset) = 0;
 
     // Get the size of the file
     virtual int64_t GetFileSize() = 0;
@@ -45,7 +45,7 @@ public:
     virtual Status Seek(int64_t position) = 0;
 
     // Read data from the current position into the buffer with the given length
-    virtual int64_t Read(void* buffer, int32_t length) = 0;
+    virtual int64_t Read(void *buffer, int32_t length) = 0;
 };
 
 }

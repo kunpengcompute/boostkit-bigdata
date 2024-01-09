@@ -26,12 +26,16 @@ namespace fs {
 
 class IOException : public std::runtime_error {
 public:
-    explicit IOException(const std::string& arg);
-    explicit IOException(const char* arg);
+    explicit IOException(const std::string &arg);
+
+    explicit IOException(const char *arg);
+
     virtual ~IOException() noexcept;
-    IOException(const IOException&);
+
+    IOException(const IOException &);
+
 private:
-    IOException& operator=(const IOException&);
+    IOException &operator=(const IOException &);
 };
 
 }

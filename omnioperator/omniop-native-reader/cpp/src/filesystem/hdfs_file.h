@@ -25,10 +25,11 @@
 
 namespace fs {
 
-class HdfsReadableFile : public ReadableFile{
+class HdfsReadableFile : public ReadableFile {
 
 public:
-    HdfsReadableFile(std::shared_ptr<HadoopFileSystem> fileSystemPtr, const std::string& path, int64_t bufferSize = 0);
+    HdfsReadableFile(std::shared_ptr<HadoopFileSystem> fileSystemPtr, const std::string &path,
+                     int64_t bufferSize = 0);
 
     ~HdfsReadableFile();
 
@@ -36,20 +37,20 @@ public:
 
     Status OpenFile() override;
 
-    int64_t ReadAt(void* buffer, int32_t length, int64_t offset) override;
+    int64_t ReadAt(void *buffer, int32_t length, int64_t offset) override;
 
     int64_t GetFileSize() override;
 
     Status Seek(int64_t position) override;
 
-    int64_t Read(void* buffer, int32_t length) override;
+    int64_t Read(void *buffer, int32_t length) override;
 
 private:
     Status TryClose();
 
     std::shared_ptr<HadoopFileSystem> fileSystem_;
 
-    const std::string& path_;
+    const std::string &path_;
 
     int64_t bufferSize_;
 

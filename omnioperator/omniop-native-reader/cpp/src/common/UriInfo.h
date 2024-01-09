@@ -20,7 +20,7 @@
 #define URI_INFO_H
 
 /// \brief A parsed URI
-class  UriInfo {
+class UriInfo {
 public:
     UriInfo(std::string uriStr, std::string schemeStr, std::string pathStr, std::string hostStr, std::string portStr);
 
@@ -28,18 +28,18 @@ public:
 
     ~UriInfo();
 
-    const std::string& Scheme() const;
+    const std::string &Scheme() const;
 
     /// The URI host name, such as "localhost", "127.0.0.1" or "::1", or the empty
     /// string is the URI does not have a host component.
-    const std::string& Host() const;
+    const std::string &Host() const;
 
     /// The URI path component.
-    const std::string& Path() const;
+    const std::string &Path() const;
 
     /// The URI port number, as a string such as "80", or the empty string is the URI
     /// does not have a port number component.
-    const std::string& Port() const;
+    const std::string &Port() const;
 
     /// Get the string representation of this URI.
     const std::string &ToString() const;
