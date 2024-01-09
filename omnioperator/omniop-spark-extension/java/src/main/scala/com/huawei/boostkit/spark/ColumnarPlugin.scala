@@ -21,7 +21,7 @@ import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{SparkSession, SparkSessionExtensions}
 import org.apache.spark.sql.catalyst.expressions.{Ascending, DynamicPruningSubquery, SortOrder}
-import org.apache.spark.sql.catalyst.expressions.aggregate.{AggregateExpression, Partial}
+import org.apache.spark.sql.catalyst.expressions.aggregate.{AggregateExpression, Partial, PartialMerge}
 import org.apache.spark.sql.catalyst.optimizer.{DelayCartesianProduct, HeuristicJoinReorder, RewriteSelfJoinInInPredicate}
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.{RowToOmniColumnarExec, _}
@@ -64,6 +64,7 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] with PredicateHelper{
   val topNSortThreshold: Int = columnarConf.topNSortThreshold
   val enableDedupLeftSemiJoin: Boolean = columnarConf.enableDedupLeftSemiJoin
   val dedupLeftSemiJoinThreshold: Int = columnarConf.dedupLeftSemiJoinThreshold
+  val enableRollupOptimization: Boolean = columnarConf.enableRollupOptimization
 
   def apply(plan: SparkPlan): SparkPlan = {
     replaceWithColumnarPlan(plan)
@@ -384,14 +385,74 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] with PredicateHelper{
             child)
         }
       } else {
-        new ColumnarHashAggregateExec(
-          plan.requiredChildDistributionExpressions,
-          plan.groupingExpressions,
-          plan.aggregateExpressions,
-          plan.aggregateAttributes,
-          plan.initialInputBufferOffset,
-          plan.resultExpressions,
-          child)
+        if (child.isInstanceOf[ColumnarExpandExec]) {
+          var columnarExpandExec = child.asInstanceOf[ColumnarExpandExec]
+          val matchRollupOptimization: Boolean = columnarExpandExec.matchRollupOptimization()
+          if (matchRollupOptimization && enableRollupOptimization) {
+            // The sparkPlan: ColumnarExpandExec -> ColumnarHashAggExec => ColumnarExpandExec -> ColumnarHashAggExec -> ColumnarOptRollupExec.
+            // ColumnarHashAggExec handles the first combination by Partial mode, i.e. projections[0].
+            // ColumnarOptRollupExec handles the residual combinations by PartialMerge mode, i.e. projections[1]~projections[n].
+            val projections = columnarExpandExec.projections
+            val headProjections = projections.slice(0, 1)
+            var residualProjections = projections.slice(1, projections.length)
+            // replace parameters
+            columnarExpandExec = columnarExpandExec.replace(headProjections)
+
+            // partial
+            val partialHashAggExec = new ColumnarHashAggregateExec(
+              plan.requiredChildDistributionExpressions,
+              plan.groupingExpressions,
+              plan.aggregateExpressions,
+              plan.aggregateAttributes,
+              plan.initialInputBufferOffset,
+              plan.resultExpressions,
+              columnarExpandExec)
+
+
+            // If the aggregator has an expression, more than one column in the projection is used
+            // for expression calculation. Therefore, we need to calculate the start offset of the
+            // group column first.
+            val projection = residualProjections.head
+            val offset = projection.length - (partialHashAggExec.output.length - partialHashAggExec.aggregateAttributes.length)
+            val input = projection.slice(offset, projection.length) ++ partialHashAggExec.aggregateAttributes
+            residualProjections = residualProjections.map(projection => {
+              projection.slice(offset, projection.length) ++ partialHashAggExec.aggregateAttributes
+            })
+
+            // partial merge
+            val aggregateExpressions = plan.aggregateExpressions.map(expr => {
+              expr.copy(expr.aggregateFunction, PartialMerge, expr.isDistinct, expr.filter, expr.resultId)
+            })
+
+            // need ExpandExec parameters and HashAggExec parameters
+            new ColumnarOptRollupExec(
+              residualProjections,
+              input,
+              plan.output,
+              plan.groupingExpressions,
+              aggregateExpressions,
+              plan.aggregateAttributes,
+              partialHashAggExec)
+          } else {
+            new ColumnarHashAggregateExec(
+              plan.requiredChildDistributionExpressions,
+              plan.groupingExpressions,
+              plan.aggregateExpressions,
+              plan.aggregateAttributes,
+              plan.initialInputBufferOffset,
+              plan.resultExpressions,
+              child)
+          }
+        } else {
+          new ColumnarHashAggregateExec(
+            plan.requiredChildDistributionExpressions,
+            plan.groupingExpressions,
+            plan.aggregateExpressions,
+            plan.aggregateAttributes,
+            plan.initialInputBufferOffset,
+            plan.resultExpressions,
+            child)
+        }
       }
 
     case plan: TakeOrderedAndProjectExec if enableTakeOrderedAndProject =>
