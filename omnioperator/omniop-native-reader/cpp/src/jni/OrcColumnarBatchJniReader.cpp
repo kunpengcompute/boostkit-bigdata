@@ -30,140 +30,8 @@ using namespace hdfs;
 static constexpr int32_t MAX_DECIMAL64_DIGITS = 18;
 bool isDecimal64Transfor128 = false;
 
-bool isLegalHex(const char c) {
-    if ((c >= '0') && (c <= '9')) {
-        return true;
-    }
-
-    if ((c >= 'a') && (c <= 'f')) {
-        return true;
-    }
-
-    if ((c >= 'A') && (c <= 'F')) {
-        return true;
-    }
-
-    return false;
-}
-
-uint8_t hexStrToValue(const char c) {
-    if ((c >= '0') && (c <= '9')) {
-        return c - '0';
-    }
-
-    if ((c >= 'A') && (c <= 'F')) {
-        return c - 'A' + 10;
-    }
-
-    return c - 'a' + 10;
-}
-
-void transHexToByte(const std::string &origin, std::string &result) {
-    const uint32_t strLenPerByte = 2;
-    const char* srcStr = origin.c_str();
-    char first;
-    char second;
-
-    if (origin.size() % strLenPerByte) {
-        LogsError("Input string(%s) length(%u) must be multiple of 2.", srcStr, origin.size());
-        return;
-    }
-
-    result.resize(origin.size() / strLenPerByte);
-    for (uint32_t i = 0; i < origin.size(); i += strLenPerByte) {
-        first = srcStr[i];
-        second = srcStr[i + 1];
-        if (!isLegalHex(first) || !isLegalHex(second)) {
-            LogsError("Input string(%s) is not legal at about index=%d.", srcStr, i);
-            result.resize(0);
-            return;
-        }
-
-        result[i / strLenPerByte] = ((hexStrToValue(first) & 0x0F) << 4) + (hexStrToValue(second) & 0x0F);
-    }
-
-    return;
-}
-
-void parseTokens(JNIEnv* env, jobject jsonObj, std::vector<Token*>& tokenVector) {
-    const char* strTokens = "tokens";
-    const char* strToken = "token";
-    const char* strIdentifier = "identifier";
-    const char* strPassword = "password";
-    const char* strService = "service";
-    const char* strTokenKind = "kind";
-
-    jboolean hasTokens = env->CallBooleanMethod(jsonObj, jsonMethodHas, env->NewStringUTF(strTokens));
-    if (!hasTokens) {
-        return;
-    }
-
-    jobject tokensObj = env->CallObjectMethod(jsonObj, jsonMethodObj, env->NewStringUTF(strTokens));
-    if (tokensObj == NULL) {
-        return;
-    }
-
-    jobjectArray tokenJsonArray = (jobjectArray)env->CallObjectMethod(tokensObj, jsonMethodObj, env->NewStringUTF(strToken));
-    if (tokenJsonArray == NULL) {
-        return;
-    }
-
-    uint32_t count = env->GetArrayLength(tokenJsonArray);
-    for (uint32_t i = 0; i < count; i++) {
-        jobject child = env->GetObjectArrayElement(tokenJsonArray, i);
-
-        jstring jIdentifier = (jstring)env->CallObjectMethod(child, jsonMethodString, env->NewStringUTF(strIdentifier));
-        jstring jPassword = (jstring)env->CallObjectMethod(child, jsonMethodString, env->NewStringUTF(strPassword));
-        jstring jService = (jstring)env->CallObjectMethod(child, jsonMethodString, env->NewStringUTF(strService));
-        jstring jKind = (jstring)env->CallObjectMethod(child, jsonMethodString, env->NewStringUTF(strTokenKind));
-
-        auto identifierStr = env->GetStringUTFChars(jIdentifier, nullptr);
-        std::string inIdentifier(identifierStr);
-        env->ReleaseStringUTFChars(jIdentifier, identifierStr);
-        transform(inIdentifier.begin(), inIdentifier.end(), inIdentifier.begin(), ::tolower);
-        std::string identifier;
-        transHexToByte(inIdentifier, identifier);
-
-        auto passwordStr = env->GetStringUTFChars(jPassword, nullptr);
-        std::string inPassword(passwordStr);
-        env->ReleaseStringUTFChars(jPassword, passwordStr);
-        transform(inPassword.begin(), inPassword.end(), inPassword.begin(), ::tolower);
-        std::string password;
-        transHexToByte(inPassword, password);
-
-        auto kindStr = env->GetStringUTFChars(jKind, nullptr);
-        std::string kind(kindStr);
-        env->ReleaseStringUTFChars(jKind, kindStr);
-
-        auto serviceStr = env->GetStringUTFChars(jService, nullptr);
-        std::string service(serviceStr);
-        env->ReleaseStringUTFChars(jService, serviceStr);
-
-        transform(kind.begin(), kind.end(), kind.begin(), ::tolower);
-        if (kind != "hdfs_delegation_token") {
-            continue; // only hdfs delegation token is useful for liborc
-        }
-
-        Token* token = new Token();
-        token->setIdentifier(identifier);
-        token->setPassword(password);
-        token->setService(service);
-        token->setKind(kind);
-
-        tokenVector.push_back(token);
-    }
-}
-
-void deleteTokens(std::vector<Token*>& tokenVector) {
-    for (auto token : tokenVector) {
-        delete token;
-    }
-
-    tokenVector.clear();
-}
-
 JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniReader_initializeReader(JNIEnv *env,
-    jobject jObj, jstring path, jobject jsonObj)
+    jobject jObj, jobject jsonObj)
 {
     JNI_FUNC_START
 
@@ -173,8 +41,6 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniRea
     jlong tailLocation = env->CallLongMethod(jsonObj, jsonMethodLong, env->NewStringUTF("tailLocation"));
     jstring serTailJstr =
         (jstring)env->CallObjectMethod(jsonObj, jsonMethodString, env->NewStringUTF("serializedTail"));
-    const char *pathPtr = env->GetStringUTFChars(path, nullptr);
-    std::string filePath(pathPtr);
     orc::MemoryPool *pool = orc::getDefaultPool();
     orc::ReaderOptions readerOptions;
     readerOptions.setMemoryPool(*pool);
@@ -186,15 +52,32 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniRea
         env->ReleaseStringUTFChars(serTailJstr, ptr);
     }
 
-    std::vector<Token*> tokens;
-    parseTokens(env, jsonObj, tokens);
+    jstring schemaJstr = (jstring)env->CallObjectMethod(jsonObj, jsonMethodString, env->NewStringUTF("scheme"));
+    const char *schemaPtr = env->GetStringUTFChars(schemaJstr, nullptr);
+    std::string schemaStr(schemaPtr);
+    env->ReleaseStringUTFChars(schemaJstr, schemaPtr);
+
+    jstring fileJstr = (jstring)env->CallObjectMethod(jsonObj, jsonMethodString, env->NewStringUTF("path"));
+    const char *filePtr = env->GetStringUTFChars(fileJstr, nullptr);
+    std::string fileStr(filePtr);
+    env->ReleaseStringUTFChars(fileJstr, filePtr);
+
+    jstring hostJstr = (jstring)env->CallObjectMethod(jsonObj, jsonMethodString, env->NewStringUTF("host"));
+    const char *hostPtr = env->GetStringUTFChars(hostJstr, nullptr);
+    std::string hostStr(hostPtr);
+    env->ReleaseStringUTFChars(hostJstr, hostPtr);
+
+    jstring portJstr = (jstring)env->CallObjectMethod(jsonObj, jsonMethodString, env->NewStringUTF("port"));
+    const char *portPtr = env->GetStringUTFChars(portJstr, nullptr);
+    std::string portStr(portPtr);
+    env->ReleaseStringUTFChars(portJstr, portPtr);
 
     std::unique_ptr<orc::Reader> reader;
-    reader = createReader(orc::readFileRewrite(filePath, tokens), readerOptions);
+    UriInfo uri{schemaStr, fileStr, hostStr, portStr};
+    reader = createReader(orc::readFileOverride(uri), readerOptions);
 
-    env->ReleaseStringUTFChars(path, pathPtr);
+
     orc::Reader *readerNew = reader.release();
-    deleteTokens(tokens);
     return (jlong)(readerNew);
     JNI_FUNC_END(runtimeExceptionClass)
 }

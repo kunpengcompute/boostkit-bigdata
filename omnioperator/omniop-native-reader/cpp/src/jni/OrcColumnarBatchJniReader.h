@@ -36,7 +36,7 @@
 #include <orc/MemoryPool.hh>
 #include <orc/sargs/SearchArgument.hh>
 #include <orc/sargs/Literal.hh>
-#include "orcfile/OrcFileRewrite.hh"
+#include "orcfile/OrcFileOverride.hh"
 #include "hdfspp/options.h"
 #include <getopt.h>
 #include <jni.h>
@@ -70,7 +70,7 @@ enum class PredicateOperatorType {
  * Signature:   (Ljava/lang/String;Lorg/json/simple/JSONObject;)J
  */
 JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniReader_initializeReader
-        (JNIEnv* env, jobject jObj, jstring path, jobject job);
+        (JNIEnv* env, jobject jObj, jobject job);
 
 /*
  * Class:       com_huawei_boostkit_scan_jni_OrcColumnarBatchJniReader

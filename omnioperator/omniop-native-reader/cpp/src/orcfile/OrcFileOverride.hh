@@ -16,35 +16,31 @@
  * limitations under the License.
  */
 
-#include "OrcFileRewrite.hh"
-#include "orc/Exceptions.hh"
-#include "Adaptor.hh"
+#ifndef ORC_FILE_REWRITE_HH
+#define ORC_FILE_REWRITE_HH
 
-#include <errno.h>
-#include <fcntl.h>
-#include <stdio.h>
-#include <sys/stat.h>
-#include <string.h>
+#include <string>
 
-#ifdef _MSC_VER
-#include <io.h>
-#define S_IRUSR _S_IREAD
-#define S_IWUSR _S_IWRITE
-#define stat _stat64
-#define fstat _fstat64
-#else
-#include <unistd.h>
-#define O_BINARY 0
-#endif
+#include "orc/OrcFile.hh"
+#include "common/UriInfo.h"
+
+/** /file orc/OrcFile.hh
+    @brief The top level interface to ORC.
+*/
 
 namespace orc {
-  std::unique_ptr<InputStream> readFileRewrite(const std::string& path, std::vector<hdfs::Token*>& tokens) {
-    if (strncmp(path.c_str(), "hdfs://", 7) == 0) {
-      return orc::readHdfsFileRewrite(std::string(path), tokens);
-    } else if (strncmp(path.c_str(), "file:", 5) == 0) {
-      return orc::readLocalFile(std::string(path.substr(5)));
-    } else {
-      return orc::readLocalFile(std::string(path));
-    }
-  }
+
+  /**
+   * Create a stream to a local file or HDFS file if path begins with "hdfs://"
+   * @param uri the UriInfo of HDFS
+   */
+  ORC_UNIQUE_PTR<InputStream> readFileOverride(const UriInfo &uri);
+
+  /**
+   * Create a stream to an HDFS file.
+   * @param uri the UriInfo of HDFS
+   */
+  ORC_UNIQUE_PTR<InputStream> readHdfsFileOverride(const UriInfo &uri);
 }
+
+#endif

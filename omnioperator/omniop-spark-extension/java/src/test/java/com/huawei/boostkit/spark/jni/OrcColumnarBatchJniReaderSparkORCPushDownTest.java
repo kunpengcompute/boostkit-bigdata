@@ -58,8 +58,10 @@ public class OrcColumnarBatchJniReaderSparkORCPushDownTest extends TestCase {
         job.put("serializedTail","");
         job.put("tailLocation",9223372036854775807L);
         File directory = new File("src/test/java/com/huawei/boostkit/spark/jni/orcsrc/part-00000-2d6ca713-08b0-4b40-828c-f7ee0c81bb9a-c000.snappy.orc");
+        job.put("scheme","file");
+        job.put("path",directory.getAbsolutePath());
         System.out.println(directory.getAbsolutePath());
-        orcColumnarBatchScanReader.reader = orcColumnarBatchScanReader.jniReader.initializeReader(directory.getAbsolutePath(), job);
+        orcColumnarBatchScanReader.reader = orcColumnarBatchScanReader.jniReader.initializeReader(job);
         assertTrue(orcColumnarBatchScanReader.reader != 0);
     }
 

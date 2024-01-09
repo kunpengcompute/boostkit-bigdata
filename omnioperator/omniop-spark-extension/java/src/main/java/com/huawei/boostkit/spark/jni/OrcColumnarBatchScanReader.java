@@ -36,6 +36,7 @@ import org.slf4j.LoggerFactory;
 import org.apache.orc.TypeDescription;
 
 import java.io.IOException;
+import java.net.URI;
 import java.sql.Date;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -139,10 +140,10 @@ public class OrcColumnarBatchScanReader {
     /**
      * Init Orc reader.
      *
-     * @param path split file path
+     * @param uri split file path
      * @param options split file options
      */
-    public long initializeReaderJava(String path, ReaderOptions options) {
+    public long initializeReaderJava(URI uri, ReaderOptions options) {
         JSONObject job = new JSONObject();
         if (options.getOrcTail() == null) {
             job.put("serializedTail", "");
@@ -158,7 +159,12 @@ public class OrcColumnarBatchScanReader {
             job.put("tokens", tokenJsonObj);
         }
 
-        reader = jniReader.initializeReader(path, job);
+        job.put("scheme", uri.getScheme() == null ? "" : uri.getScheme());
+        job.put("host", uri.getHost() == null ? "" : uri.getHost());
+        job.put("port", uri.getPort() == -1 ? "" : String.valueOf(uri.getPort()));
+        job.put("path", uri.getPath() == null ? "" : uri.getPath());
+
+        reader = jniReader.initializeReader(job);
         return reader;
     }
 
