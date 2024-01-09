@@ -61,7 +61,7 @@ std::string omniruntime::reader::GetFileSystemKey(std::string& path, std::string
     return result;
 }
 
-Filesystem* omniruntime::reader::GetFileSystemPtr(UriInfo& uri, std::string& ugi, arrow::Status &status)
+Filesystem* omniruntime::reader::GetFileSystemPtr(UriInfo &uri, std::string &ugi, arrow::Status &status)
 {
     std::string fullPath = uri.ToString();
     auto key = GetFileSystemKey(fullPath, ugi);

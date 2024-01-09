@@ -62,8 +62,9 @@ public class OrcColumnarBatchJniReaderSparkORCPushDownTest extends TestCase {
         try {
             uri = new URI(absolutePath);
         } catch (URISyntaxException ignore) {
+            // if URISyntaxException thrown, next line assertNotNull will interrupt the test
         }
-        assertTrue(uri != null);
+        assertNotNull(uri);
         orcColumnarBatchScanReader.reader = orcColumnarBatchScanReader.initializeReaderJava(uri, OrcFile.readerOptions(new Configuration()));
         assertTrue(orcColumnarBatchScanReader.reader != 0);
     }

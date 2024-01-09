@@ -98,8 +98,9 @@ public class OrcColumnarBatchJniReaderTest extends TestCase {
         try {
             uri = new URI(path);
         } catch (URISyntaxException ignore) {
+            // if URISyntaxException thrown, next line assertNotNull will interrupt the test
         }
-        assertTrue(uri != null);
+        assertNotNull(uri);
         orcColumnarBatchScanReader.reader = orcColumnarBatchScanReader.initializeReaderJava(uri, readerOptions);
         assertTrue(orcColumnarBatchScanReader.reader != 0);
     }
