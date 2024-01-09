@@ -236,6 +236,7 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
   val enableColumnarCoalesce: Boolean = conf
     .getConfString("spark.omni.sql.columnar.coalesce", "true")
     .toBoolean
+  val enableRollupOptimization: Boolean = conf.getConfString("spark.omni.sql.columnar.rollupOptimization.enabled", "true").toBoolean
 }
 
 

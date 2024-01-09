@@ -2,14 +2,12 @@ aux_source_directory(${CMAKE_CURRENT_LIST_DIR} TEST_ROOT_SRCS)
 
 add_subdirectory(shuffle)
 add_subdirectory(utils)
-add_subdirectory(tablescan)
 
 # configure
 set(TP_TEST_TARGET tptest)
 set(MY_LINK
         shuffletest
         utilstest
-        tablescantest
         )
 
 # find gtest package
