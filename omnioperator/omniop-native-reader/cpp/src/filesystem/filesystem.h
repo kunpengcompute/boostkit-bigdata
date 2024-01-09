@@ -25,7 +25,7 @@
 #include <chrono>
 #include "status.h"
 
-namespace fs{
+namespace fs {
 
 using TimePoint =
         std::chrono::time_point<std::chrono::system_clock, std::chrono::nanoseconds>;
@@ -49,30 +49,36 @@ enum class FileType : int8_t {
 
 std::string ToString(FileType);
 
-struct FileInfo{
+struct FileInfo {
     /// The full file path in the filesystem
-    const std::string& path() const { return path_; }
+    const std::string &path() const { return path_; }
+
     void set_path(std::string path) { path_ = std::move(path); }
 
     /// The file type
     FileType type() const { return type_; }
+
     void set_type(FileType type) { type_ = type; }
 
     /// The size in bytes, if available
     int64_t size() const { return size_; }
+
     void set_size(int64_t size) { size_ = size; }
 
     /// The time of last modification, if available
     TimePoint mtime() const { return mtime_; }
+
     void set_mtime(TimePoint mtime) { mtime_ = mtime; }
 
     bool IsFile() const { return type_ == FileType::File; }
+
     bool IsDirectory() const { return type_ == FileType::Directory; }
 
-    bool Equals(const FileInfo& other) const {
+    bool Equals(const FileInfo &other) const {
         return type() == other.type() && path() == other.path() && size() == other.size() &&
                mtime() == other.mtime();
     }
+
 protected:
     std::string path_;
     FileType type_ = FileType::Unknown;
@@ -97,19 +103,19 @@ public:
      * Get information about the file at the specified path
      * @param path the file path
      */
-    virtual FileInfo GetFileInfo(const std::string& path) = 0;
+    virtual FileInfo GetFileInfo(const std::string &path) = 0;
 
     /**
      * Check if this file system is equal to another file system
      * @param other the other filesystem
      */
-    virtual bool Equals(const FileSystem& other) const = 0;
+    virtual bool Equals(const FileSystem &other) const = 0;
 
     /**
      * Check if this file system is equal to a shared pointer to another file system
      * @param other the other filesystem pointer
      */
-    virtual bool Equals(const std::shared_ptr<FileSystem>& other) const {
+    virtual bool Equals(const std::shared_ptr <FileSystem> &other) const {
         return Equals(*other);
     }
 

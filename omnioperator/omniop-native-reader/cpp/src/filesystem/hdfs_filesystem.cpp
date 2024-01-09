@@ -26,7 +26,12 @@
 
 namespace fs {
 
-void HdfsOptions::ConfigureHost(const std::string& host) {
+// the cache of hdfs filesystem
+static std::map <std::string, std::shared_ptr<HadoopFileSystem>> fsMap_;
+static std::mutex mutex_;
+
+
+void HdfsOptions::ConfigureHost(const std::string &host) {
     this->host_ = host;
 }
 
@@ -38,7 +43,7 @@ bool HdfsOptions::Equals(const HdfsOptions &other) const {
     return (this->host_ == other.host_ && this->port_ == other.port_);
 }
 
-HadoopFileSystem::HadoopFileSystem(HdfsOptions& options) {
+HadoopFileSystem::HadoopFileSystem(HdfsOptions &options) {
     this->options_ = options;
     Status st = this->Init();
     if (!st.IsOk()) {
@@ -48,7 +53,7 @@ HadoopFileSystem::HadoopFileSystem(HdfsOptions& options) {
 
 HadoopFileSystem::~HadoopFileSystem() = default;
 
-hdfsFS HadoopFileSystem::getFileSystem(){
+hdfsFS HadoopFileSystem::getFileSystem() {
     return this->fs_;
 }
 
@@ -63,14 +68,13 @@ bool HadoopFileSystem::Equals(const FileSystem &other) const {
     if (other.type_name() != type_name()) {
         return false;
     }
-    // todo reinterpret_cast 能不能转换类型，多态场景
     const auto &hdfs = reinterpret_cast<const HadoopFileSystem &>(other);
     return getOptions().Equals(hdfs.getOptions());
 }
 
 FileInfo HadoopFileSystem::GetFileInfo(const std::string &path) {
     hdfsFileInfo *fileInfo = hdfsGetPathInfo(fs_, path.c_str());
-    if (fileInfo == nullptr){
+    if (fileInfo == nullptr) {
         throw IOException(Status::FSError("Fail to get file info").ToString());
     }
     FileInfo info;
@@ -96,7 +100,7 @@ Status HadoopFileSystem::Close() {
 
 Status HadoopFileSystem::Init() {
     struct hdfsBuilder *bld = hdfsNewBuilder();
-    if (!bld) {
+    if (bld == nullptr) {
         return Status::FSError("Fail to create hdfs builder");
     }
     hdfsBuilderSetNameNode(bld, options_.host_.c_str());
@@ -110,17 +114,13 @@ Status HadoopFileSystem::Init() {
     return Status::OK();
 }
 
-// the cache of hdfs filesystem
-static std::map<std::string, std::shared_ptr<HadoopFileSystem>> fsMap_;
-static std::mutex mutex_;
-
-std::shared_ptr<HadoopFileSystem> getHdfsFileSystem(const std::string& host, const std::string& port) {
-    std::shared_ptr<HadoopFileSystem> fileSystemPtr;
+std::shared_ptr <HadoopFileSystem> getHdfsFileSystem(const std::string &host, const std::string &port) {
+    std::shared_ptr <HadoopFileSystem> fileSystemPtr;
 
     mutex_.lock();
     std::string key = host + ":" + port;
     auto iter = fsMap_.find(key);
-    if (iter != fsMap_.end()){
+    if (iter != fsMap_.end()) {
         fileSystemPtr = fsMap_[key];
         mutex_.unlock();
         return fileSystemPtr;
@@ -128,11 +128,11 @@ std::shared_ptr<HadoopFileSystem> getHdfsFileSystem(const std::string& host, con
 
     HdfsOptions options;
     options.ConfigureHost(host);
-    if (!port.empty()){
+    if (!port.empty()) {
         options.ConfigurePort(std::stoi(port));
     }
     std::cout << "create hdfs filesystem, host is " << options.host_ << ", port is " << options.port_ << std::endl;
-    std::shared_ptr<HadoopFileSystem> fs (new HadoopFileSystem(options));
+    std::shared_ptr <HadoopFileSystem> fs(new HadoopFileSystem(options));
     fileSystemPtr = fs;
     fsMap_[key] = fs;
     mutex_.unlock();

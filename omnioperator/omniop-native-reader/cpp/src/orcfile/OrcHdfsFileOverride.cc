@@ -27,17 +27,17 @@ namespace orc {
 
     using namespace fs;
 
-    class OmniHdfsFileInputStream : public InputStream {
+    class HdfsFileInputStreamOverride : public InputStream {
     private:
         std::string filename_;
-        std::unique_ptr<fs::ReadableFile> hdfs_file_;
+        std::unique_ptr <fs::ReadableFile> hdfs_file_;
         uint64_t total_length_;
         const uint64_t READ_SIZE_ = 1024 * 1024; //1 MB
 
     public:
-        OmniHdfsFileInputStream(const UriInfo& uri) {
+        HdfsFileInputStreamOverride(const UriInfo &uri) {
             this->filename_ = uri.Path();
-            std::shared_ptr<HadoopFileSystem> fileSystemPtr = getHdfsFileSystem(uri.Host(), uri.Port());
+            std::shared_ptr <HadoopFileSystem> fileSystemPtr = getHdfsFileSystem(uri.Host(), uri.Port());
             this->hdfs_file_ = std::make_unique<HdfsReadableFile>(fileSystemPtr, uri.Path(), 0);
 
             Status openFileSt = hdfs_file_->OpenFile();
@@ -45,10 +45,10 @@ namespace orc {
                 throw IOException(openFileSt.ToString());
             }
 
-            this->total_length_= hdfs_file_->GetFileSize();
+            this->total_length_ = hdfs_file_->GetFileSize();
         }
 
-        ~OmniHdfsFileInputStream() override {
+        ~HdfsFileInputStreamOverride() override {
         }
 
         /**
@@ -81,13 +81,16 @@ namespace orc {
             }
 
             char *buf_ptr = reinterpret_cast<char *>(buf);
-            int64_t total_bytes_read = 0;
-            int64_t last_bytes_read = 0;
+            uint64_t total_bytes_read = 0;
+            uint64_t last_bytes_read = 0;
 
             do {
-                last_bytes_read = hdfs_file_->ReadAt(buf_ptr, length - total_bytes_read,offset + total_bytes_read);
+                last_bytes_read = hdfs_file_->ReadAt(buf_ptr, length - total_bytes_read, offset + total_bytes_read);
                 if (last_bytes_read < 0) {
                     throw IOException(Status::IOError("Error reading bytes the file").ToString());
+                }
+                if (last_bytes_read == 0) {
+                    break;
                 }
                 total_bytes_read += last_bytes_read;
                 buf_ptr += last_bytes_read;
@@ -99,7 +102,7 @@ namespace orc {
         }
     };
 
-    std::unique_ptr<InputStream> readHdfsFileOverride(const UriInfo &uri) {
-        return std::unique_ptr<InputStream>(new OmniHdfsFileInputStream(uri));
+    std::unique_ptr <InputStream> createHdfsFileInputStream(const UriInfo &uri) {
+        return std::unique_ptr<InputStream>(new HdfsFileInputStreamOverride(uri));
     }
 }

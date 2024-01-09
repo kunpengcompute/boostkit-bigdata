@@ -22,26 +22,25 @@
 
 namespace fs {
 
-HdfsReadableFile::HdfsReadableFile(std::shared_ptr<HadoopFileSystem> fileSystemPtr,
-                                   const std::string& path, int64_t bufferSize)
-: fileSystem_(fileSystemPtr), path_(path), bufferSize_(bufferSize) {
+HdfsReadableFile::HdfsReadableFile(std::shared_ptr <HadoopFileSystem> fileSystemPtr,
+                                   const std::string &path, int64_t bufferSize)
+        : fileSystem_(fileSystemPtr), path_(path), bufferSize_(bufferSize) {
 }
 
-HdfsReadableFile::~HdfsReadableFile(){
+HdfsReadableFile::~HdfsReadableFile() {
     this->TryClose();
 }
 
-Status HdfsReadableFile::Close(){
+Status HdfsReadableFile::Close() {
     return TryClose();
 }
 
-Status HdfsReadableFile::TryClose(){
-    if (!isOpen_){
+Status HdfsReadableFile::TryClose() {
+    if (!isOpen_) {
         return Status::OK();
     }
-//    std::cout << "close hdfs file, file_ is " << file_ << std::endl;
     int st = hdfsCloseFile(fileSystem_->getFileSystem(), file_);
-    if (st == -1){
+    if (st == -1) {
         return Status::IOError("Fail to close hdfs file, path is " + path_);
     }
     this->isOpen_ = false;
@@ -49,11 +48,11 @@ Status HdfsReadableFile::TryClose(){
 }
 
 Status HdfsReadableFile::OpenFile() {
-    if (isOpen_){
+    if (isOpen_) {
         return Status::OK();
     }
     hdfsFile handle = hdfsOpenFile(fileSystem_->getFileSystem(), path_.c_str(), O_RDONLY, bufferSize_, 0, 0);
-    if (handle == nullptr){
+    if (handle == nullptr) {
         return Status::IOError("Fail to open hdfs file, path is " + path_);
     }
 
@@ -62,16 +61,16 @@ Status HdfsReadableFile::OpenFile() {
     return Status::OK();
 }
 
-int64_t HdfsReadableFile::ReadAt(void* buffer, int32_t length, int64_t offset){
-    if (!OpenFile().IsOk()){
+int64_t HdfsReadableFile::ReadAt(void *buffer, int32_t length, int64_t offset) {
+    if (!OpenFile().IsOk()) {
         return -1;
     }
 
     return hdfsPread(fileSystem_->getFileSystem(), file_, offset, buffer, length);
 }
 
-int64_t HdfsReadableFile::GetFileSize(){
-    if (!OpenFile().IsOk()){
+int64_t HdfsReadableFile::GetFileSize() {
+    if (!OpenFile().IsOk()) {
         return -1;
     }
 
@@ -79,19 +78,19 @@ int64_t HdfsReadableFile::GetFileSize(){
     return fileInfo.size();
 }
 
-Status HdfsReadableFile::Seek(int64_t position){
-    if (!OpenFile().IsOk()){
+Status HdfsReadableFile::Seek(int64_t position) {
+    if (!OpenFile().IsOk()) {
         return Status::IOError("Fail to open and seek hdfs file, path is " + path_);
     }
     int st = hdfsSeek(fileSystem_->getFileSystem(), file_, position);
-    if (st == -1){
+    if (st == -1) {
         return Status::IOError("Fail to seek hdfs file, path is " + path_);
     }
     return Status::OK();
 }
 
-int64_t HdfsReadableFile::Read(void* buffer, int32_t length){
-    if (!OpenFile().IsOk()){
+int64_t HdfsReadableFile::Read(void *buffer, int32_t length) {
+    if (!OpenFile().IsOk()) {
         return -1;
     }
 

@@ -21,11 +21,13 @@
 #define O_BINARY 0
 
 namespace orc {
-    std::unique_ptr<InputStream> readFileOverride(const UriInfo &uri) {
-        if (uri.Scheme() == "hdfs") {
-            return orc::readHdfsFileOverride(uri);
-        } else {
-            return orc::readLocalFile(std::string(uri.Path()));
-        }
+
+std::unique_ptr <InputStream> readFileOverride(const UriInfo &uri) {
+    if (uri.Scheme() == "hdfs") {
+        return orc::createHdfsFileInputStream(uri);
+    } else {
+        return orc::readLocalFile(std::string(uri.Path()));
     }
+}
+
 }

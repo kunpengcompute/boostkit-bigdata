@@ -30,17 +30,17 @@
 
 namespace orc {
 
-  /**
-   * Create a stream to a local file or HDFS file if path begins with "hdfs://"
-   * @param uri the UriInfo of HDFS
-   */
-  ORC_UNIQUE_PTR<InputStream> readFileOverride(const UriInfo &uri);
+    /**
+     * Create a stream to a local file or HDFS file if path begins with "hdfs://"
+     * @param uri the UriInfo of HDFS
+     */
+    ORC_UNIQUE_PTR <InputStream> readFileOverride(const UriInfo &uri);
 
-  /**
-   * Create a stream to an HDFS file.
-   * @param uri the UriInfo of HDFS
-   */
-  ORC_UNIQUE_PTR<InputStream> readHdfsFileOverride(const UriInfo &uri);
+    /**
+     * Create a stream to an HDFS file.
+     * @param uri the UriInfo of HDFS
+     */
+    ORC_UNIQUE_PTR <InputStream> createHdfsFileInputStream(const UriInfo &uri);
 }
 
 #endif
