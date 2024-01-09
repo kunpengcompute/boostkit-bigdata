@@ -63,6 +63,7 @@ public class ParquetColumnarBatchScanReader {
         job.put("host", uri.getHost() == null ? "" : uri.getHost());
         job.put("port", uri.getPort());
         job.put("path", uri.getPath() == null ? "" : uri.getPath());
+        System.out.println("======dzc=====" + job);
         parquetReader = jniReader.initializeReader(job);
         return parquetReader;
     }

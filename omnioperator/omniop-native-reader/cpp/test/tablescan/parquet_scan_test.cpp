@@ -113,7 +113,8 @@ TEST(read, test_varchar)
     const std::vector<int> column_indices = {23, 24, 25, 26, 27};
     ParquetReader *reader = new ParquetReader();
     std::string ugi = "root@sample";
-    auto state1 = reader->InitRecordReader(filename, 4096, row_group_indices, column_indices, ugi);
+    UriInfo uriInfo(filename, "", "", "-1");
+    auto state1 = reader->InitRecordReader(uriInfo, 4096, row_group_indices, column_indices, ugi);
     ASSERT_EQ(state1, Status::OK());
     int total_nums = 0;
     int iter = 0;

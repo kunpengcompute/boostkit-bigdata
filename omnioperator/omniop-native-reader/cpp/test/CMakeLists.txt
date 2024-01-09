@@ -1,12 +1,13 @@
 aux_source_directory(${CMAKE_CURRENT_LIST_DIR} TEST_ROOT_SRCS)
 
 add_subdirectory(tablescan)
+add_subdirectory(io/arrowadapter)
+add_subdirectory(io/orcfile)
 
 # configure
 set(TP_TEST_TARGET tptest)
 set(MY_LINK
         tablescantest
-        utilstest
         arrowadaptertest
         orcfiletest
         )
@@ -30,7 +31,7 @@ target_link_libraries(${TP_TEST_TARGET}
         dl
         boostkit-omniop-vector-1.3.0-aarch64
         securec
-        spark_columnar_plugin)
+        native_reader)
 
 target_compile_options(${TP_TEST_TARGET} PUBLIC -g -O2 -fPIC)
 

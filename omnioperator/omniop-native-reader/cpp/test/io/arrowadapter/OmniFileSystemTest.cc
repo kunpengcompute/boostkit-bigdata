@@ -188,6 +188,10 @@ TYPED_TEST(TestLocalFs, FileSystemFromUriFile){
     path = "/some path/%中文魑魅魍魉";
     UriInfo uri4("file", path, "", "-1");
     this->TestLocalUri(uri4, path);
+
+    path = "/foo/bar";
+    UriInfo uri5("file:" + path, "file" , path, "", "-1");
+    this->TestLocalUri(uri5, path);
 }
 
 TYPED_TEST(TestLocalFs, FileSystemFromUriNoScheme){
