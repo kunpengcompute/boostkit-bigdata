@@ -155,7 +155,10 @@ object SparkApplicationDataExtractor {
 
   private def extractQuerySQL(sqlExecutionsList: Seq[SQLExecutionUIData]): String = {
     require(sqlExecutionsList.nonEmpty)
-    sqlExecutionsList.map(_.description).mkString(";\n")
+    val nonEmptyDescriptions = sqlExecutionsList.flatMap { execution =>
+      Option(execution.description).filter(_.nonEmpty)
+    }
+    nonEmptyDescriptions.mkString(";\n")
   }
 
   private def lastAttempt(applicationInfo: ApplicationInfo): ApplicationAttemptInfo = {

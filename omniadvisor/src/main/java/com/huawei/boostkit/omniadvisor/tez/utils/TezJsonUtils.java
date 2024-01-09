@@ -119,7 +119,9 @@ public class TezJsonUtils {
         StringJoiner joiner = new StringJoiner(";\n");
         for (TezDagIdData dagIdData : dagIds) {
             String singleQueryString = getSingleQueryString(dagIdData.getDagId());
-            joiner.add(singleQueryString);
+            if (singleQueryString != null && !singleQueryString.isEmpty()) {
+                joiner.add(singleQueryString);
+            }
         }
         return joiner.toString();
     }

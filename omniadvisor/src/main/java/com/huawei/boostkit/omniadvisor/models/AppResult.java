@@ -37,9 +37,9 @@ public class AppResult extends Model {
     public static final String SPARK_SQL = "spark-sql";
     public static final int FAILED_STATUS = 0;
     public static final int SUCCEEDED_STATUS = 1;
-    private static final int APPLICATION_ID_LIMIT = 50;
-    private static final int APPLICATION_NAME_LIMIT = 100;
-    private static final int APPLICATION_WORKLOAD_LIMIT = 50;
+    private static final int APPLICATION_ID_LIMIT = 100;
+    private static final int APPLICATION_NAME_LIMIT = 200;
+    private static final int APPLICATION_WORKLOAD_LIMIT = 100;
     private static final int JOB_TYPE_LIMIT = 50;
     private static final int SUBMIT_METHOD_LIMIT = 50;
     private static final int DEPLOY_MODE_LIMIT = 50;
