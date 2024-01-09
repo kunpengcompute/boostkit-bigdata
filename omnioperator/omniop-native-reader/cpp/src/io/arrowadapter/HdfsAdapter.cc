@@ -25,28 +25,28 @@
 
 namespace arrow_adapter {
 
-using arrow::internal::ParseValue;
+    using arrow::internal::ParseValue;
 
-using arrow::Result;
-using arrow::fs::HdfsOptions;
+    using arrow::Result;
+    using arrow::fs::HdfsOptions;
 
-Result<HdfsOptions> buildHdfsOptionsFromUri(const UriInfo &uri){
-    HdfsOptions options;
+    Result<HdfsOptions> buildHdfsOptionsFromUri(const UriInfo &uri) {
+        HdfsOptions options;
 
-    std::string host;
-    host = uri.Scheme() + "://" + uri.Host();
+        std::string host;
+        host = uri.Scheme() + "://" + uri.Host();
 
-    // configure endpoint
-    int32_t port;
-    if (uri.Port().empty() || (port = atoi(uri.Port().c_str())) == -1) {
-        // default Port will be determined by hdfs FileSystem impl
-        options.ConfigureEndPoint(host, 0);
-    } else {
-        options.ConfigureEndPoint(host, port);
+        // configure endpoint
+        int32_t port;
+        if (uri.Port().empty() || (port = atoi(uri.Port().c_str())) == -1) {
+            // default Port will be determined by hdfs FileSystem impl
+            options.ConfigureEndPoint(host, 0);
+        } else {
+            options.ConfigureEndPoint(host, port);
+        }
+
+        return options;
     }
-
-    return options;
-}
 
 }
 // namespace arrow

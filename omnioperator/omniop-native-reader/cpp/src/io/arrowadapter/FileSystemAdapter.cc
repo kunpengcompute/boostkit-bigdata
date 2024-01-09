@@ -47,7 +47,7 @@ namespace arrow_adapter {
 
     namespace {
 
-        Result<std::shared_ptr < FileSystem>>
+        Result<std::shared_ptr<FileSystem>>
 
         FileSystemFromUriReal(const UriInfo &uri, const arrow::io::IOContext &io_context, std::string *out_path) {
             const auto scheme = uri.Scheme();
@@ -55,7 +55,7 @@ namespace arrow_adapter {
             if (scheme == "file") {
                 std::string path;
                 ARROW_ASSIGN_OR_RAISE(auto
-                options, buildLocalfsOptionsFromUri(uri, &path));
+                                              options, buildLocalfsOptionsFromUri(uri, &path));
                 if (out_path != nullptr) {
                     *out_path = path;
                 }
@@ -64,12 +64,12 @@ namespace arrow_adapter {
 
             if (scheme == "hdfs" || scheme == "viewfs") {
                 ARROW_ASSIGN_OR_RAISE(auto
-                options, buildHdfsOptionsFromUri(uri));
+                                              options, buildHdfsOptionsFromUri(uri));
                 if (out_path != nullptr) {
                     *out_path = uri.Path();
                 }
                 ARROW_ASSIGN_OR_RAISE(auto
-                hdfs, HadoopFileSystem::Make(options, io_context));
+                                              hdfs, HadoopFileSystem::Make(options, io_context));
                 return hdfs;
             }
 
@@ -89,14 +89,14 @@ namespace arrow_adapter {
     }  // namespace
 
 
-    Result<std::shared_ptr < FileSystem>>
+    Result<std::shared_ptr<FileSystem>>
 
     FileSystemFromUriOrPath(const UriInfo &uri,
                             std::string *out_path) {
         return FileSystemFromUriOrPath(uri, arrow::io::IOContext(), out_path);
     }
 
-    Result<std::shared_ptr < FileSystem>>
+    Result<std::shared_ptr<FileSystem>>
 
     FileSystemFromUriOrPath(
             const UriInfo &uri, const arrow::io::IOContext &io_context,

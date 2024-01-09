@@ -51,7 +51,7 @@ namespace arrow_adapter {
 ///
 /// Same as FileSystemFromUriOrPath, but it use uri that constructed by client
     ARROW_EXPORT
-            Result<std::shared_ptr < FileSystem>>
+    Result<std::shared_ptr<FileSystem>>
 
     FileSystemFromUriOrPath(const UriInfo &uri,
                             std::string *out_path = NULLPTR);
@@ -74,7 +74,7 @@ namespace arrow_adapter {
 /// and treat them as local filesystem paths.  Only absolute local filesystem
 /// paths are allowed.
     ARROW_EXPORT
-            Result<std::shared_ptr < FileSystem>>
+    Result<std::shared_ptr<FileSystem>>
 
     FileSystemFromUriOrPath(
             const UriInfo &uri, const arrow::io::IOContext &io_context,

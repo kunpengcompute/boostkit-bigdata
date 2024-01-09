@@ -28,11 +28,11 @@
 
 namespace arrow_adapter {
 
-using arrow::Result;
-using arrow::fs::HdfsOptions;
+    using arrow::Result;
+    using arrow::fs::HdfsOptions;
 
-ARROW_EXPORT
-Result<HdfsOptions> buildHdfsOptionsFromUri(const UriInfo &uri);
+    ARROW_EXPORT
+    Result<HdfsOptions> buildHdfsOptionsFromUri(const UriInfo &uri);
 
 }
 // namespace arrow

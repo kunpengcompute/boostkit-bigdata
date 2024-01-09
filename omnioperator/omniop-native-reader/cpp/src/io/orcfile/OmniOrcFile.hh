@@ -31,8 +31,6 @@
 
 namespace orc {
 
-
-
   /**
    * Create a stream to a local file or HDFS file if Path begins with "hdfs://"
    * @param path the name of the file in the local file system or HDFS
