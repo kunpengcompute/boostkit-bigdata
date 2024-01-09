@@ -33,7 +33,6 @@
 #include <orc/Type.hh>
 #include <orc/Vector.hh>
 #include <orc/Reader.hh>
-#include <io/orcfile/OmniOrcFile.hh>
 #include <orc/MemoryPool.hh>
 #include <orc/sargs/SearchArgument.hh>
 #include <orc/sargs/Literal.hh>
@@ -43,6 +42,7 @@
 #include <vector/vector_common.h>
 #include <util/omni_exception.h>
 #include "common/debug.h"
+#include <io/orcfile/OmniOrcFile.hh>
 
 #ifdef __cplusplus
 extern "C" {

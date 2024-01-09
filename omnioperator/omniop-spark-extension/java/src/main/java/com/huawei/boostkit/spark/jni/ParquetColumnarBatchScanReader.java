@@ -49,8 +49,7 @@ public class ParquetColumnarBatchScanReader {
         jniReader = new ParquetColumnarBatchJniReader();
     }
 
-    public long initializeReaderJava(Path path, int capacity,
-                                     List<Integer> rowgroupIndices, List<Integer> columnIndices, String ugi) {
+    public long initializeReaderJava(Path path, int capacity, List<Integer> rowgroupIndices, List<Integer> columnIndices, String ugi) {
         JSONObject job = new JSONObject();
         URI uri = path.toUri();
 

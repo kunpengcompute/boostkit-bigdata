@@ -71,8 +71,7 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniRea
     jint port = (jint)env->CallIntMethod(jsonObj, jsonMethodInt, env->NewStringUTF("Port"));
     UriInfo uri(schemaStr, fileStr, hostStr, std::to_string(port));
 
-    std::unique_ptr<orc::Reader> reader;
-    reader = createReader(orc::readOmniFile(uri), readerOptions);
+    std::unique_ptr<orc::Reader> reader = createReader(orc::readOmniFile(uri), readerOptions);
 
     orc::Reader *readerNew = reader.release();
     return (jlong)(readerNew);

@@ -17,8 +17,8 @@
  * limitations under the License.
  */
 
-#ifndef SPARK_THESTRAL_PLUGIN_TEST_UTILS_H
-#define SPARK_THESTRAL_PLUGIN_TEST_UTILS_H
+#ifndef NATIVE_READER_TEST_UTILS_H
+#define NATIVE_READER_TEST_UTILS_H
 
 #include <vector>
 #include <stdlib.h>
@@ -33,10 +33,20 @@ using arrow::fs::FileSystem;
 using arrow::fs::FileInfo;
 using arrow::fs::FileType;
 
-void CreateFile(FileSystem* fs, const std::string& path, const std::string& data);
+void CreateFile(FileSystem *fs, const std::string &path, const std::string &data) {
+    ASSERT_OK_AND_ASSIGN(auto stream, fs->OpenOutputStream(path));
+    ASSERT_OK(stream->Write(data));
+    ASSERT_OK(stream->Close());
+}
 
-void AssertFileInfo(const FileInfo& info, const std::string& path, FileType type);
+void AssertFileInfo(const FileInfo &info, const std::string &path, FileType type) {
+    ASSERT_EQ(info.path(), path);
+    ASSERT_EQ(info.type(), type) << "For path '" << info.path() << "'";
+}
 
-void AssertFileInfo(FileSystem* fs, const std::string& path, FileType type);
+void AssertFileInfo(FileSystem *fs, const std::string &path, FileType type) {
+    ASSERT_OK_AND_ASSIGN(FileInfo info, fs->GetFileInfo(path));
+    AssertFileInfo(info, path, type);
+}
 
-#endif //SPARK_THESTRAL_PLUGIN_TEST_UTILS_H
+#endif //NATIVE_READER_TEST_UTILS_H
