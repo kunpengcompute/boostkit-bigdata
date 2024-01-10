@@ -38,7 +38,7 @@ namespace orc {
         HdfsFileInputStreamOverride(const UriInfo &uri) {
             this->filename_ = uri.Path();
             std::shared_ptr <HadoopFileSystem> fileSystemPtr = getHdfsFileSystem(uri.Host(), uri.Port());
-            this->hdfs_file_ = std::make_unique<HdfsReadableFile>(fileSystemPtr, uri.Path(), 0);
+            this->hdfs_file_ = std::make_unique<HdfsReadableFile>(fileSystemPtr, this->filename_, 0);
 
             Status openFileSt = hdfs_file_->OpenFile();
             if (!openFileSt.IsOk()) {
