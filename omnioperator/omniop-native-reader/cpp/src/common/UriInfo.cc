@@ -29,6 +29,10 @@ UriInfo::UriInfo(std::string _uri, std::string _scheme, std::string _path, std::
                                       portString(std::move(_port)),
                                       pathString(std::move(_path)),
                                       uriString(std::move(_uri)) {
+    // when local file, transfer to absolute path
+    if(schemeString == LOCAL_FILE){
+        uriString = pathString;
+    }
 }
 
 UriInfo::UriInfo(std::string _scheme, std::string _path, std::string _host,

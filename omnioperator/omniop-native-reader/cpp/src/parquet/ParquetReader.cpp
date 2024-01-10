@@ -101,7 +101,8 @@ Status ParquetReader::InitRecordReader(UriInfo &uri, int64_t capacity,
     if (fs == nullptr || fs->filesys_ptr == nullptr) {
       return Status::IOError(result);
     }
-    ARROW_ASSIGN_OR_RAISE(auto file, fs->filesys_ptr->OpenInputFile(uri.ToString()));
+    std::string path = uri.ToString();
+    ARROW_ASSIGN_OR_RAISE(auto file, fs->filesys_ptr->OpenInputFile(path));
 
     FileReaderBuilder reader_builder;
     ARROW_RETURN_NOT_OK(reader_builder.Open(file, reader_properties));
