@@ -75,7 +75,7 @@ namespace arrow_adapter {
 
             if (scheme == "mock") {
                 // MockFileSystem does not have an absolute / relative Path distinction,
-                // normalize Path by removing leading slash.
+                // transformToAbsolutePath Path by removing leading slash.
                 if (out_path != nullptr) {
                     *out_path = std::string(RemoveLeadingSlash(uri.Path()));
                 }

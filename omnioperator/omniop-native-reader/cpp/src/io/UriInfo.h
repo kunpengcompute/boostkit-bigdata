@@ -51,7 +51,7 @@ private:
     std::string pathString;
     std::string uriString;
 
-    void normalize();
+    void transformToAbsolutePath();
 };
 
 #endif
