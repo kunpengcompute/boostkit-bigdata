@@ -237,6 +237,13 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
     .getConfString("spark.omni.sql.columnar.coalesce", "true")
     .toBoolean
   val enableRollupOptimization: Boolean = conf.getConfString("spark.omni.sql.columnar.rollupOptimization.enabled", "true").toBoolean
+
+    // enable or disable radix sort
+  val enableRadixSort: Boolean =
+    conf.getConfString("spark.omni.sql.columnar.radixSort.enabled", "true").toBoolean
+
+  val radixSortThreshold: Int =
+    conf.getConfString("spark.omni.sql.columnar.radixSortThreshold", "1000000").toInt
 }
 
 
