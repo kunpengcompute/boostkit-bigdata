@@ -120,8 +120,12 @@ case class ColumnarSortExec(
       val sparkSpillConf = new SparkSpillConfig(sortSpillEnable, spillPathDir,
         sortSpillDirDiskReserveSize, sortSpillRowThreshold, sortSpillMemPctThreshold)
       val startCodegen = System.nanoTime()
+
+      val radixSortEnable = columnarConf.enableRadixSort
+      val radixSortRowCountThreshold = if(radixSortEnable) {columnarConf.radixSortThreshold} else {-1}
+
       val sortOperatorFactory = new OmniSortWithExprOperatorFactory(sourceTypes, outputCols, sortColsExp, ascendings, nullFirsts,
-        new OperatorConfig(sparkSpillConf, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
+        new OperatorConfig(sparkSpillConf, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP, radixSortRowCountThreshold))
       val sortOperator = sortOperatorFactory.createOperator
       omniCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startCodegen)
       SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {

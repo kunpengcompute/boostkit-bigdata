@@ -108,7 +108,7 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
   val enableSortMergeJoinFusion: Boolean = conf
     .getConfString("spark.omni.sql.columnar.sortMergeJoin.fusion", "false")
     .toBoolean
-
+      
   val enableColumnarSortMergeJoin: Boolean = conf
     .getConfString("spark.omni.sql.columnar.sortMergeJoin", "true")
     .toBoolean
@@ -223,6 +223,13 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
     .toBoolean
 
   val enableRollupOptimization: Boolean = conf.getConfString("spark.omni.sql.columnar.rollupOptimization.enabled", "true").toBoolean
+
+    // enable or disable radix sort
+  val enableRadixSort: Boolean =
+    conf.getConfString("spark.omni.sql.columnar.radixSort.enabled", "false").toBoolean
+
+  val radixSortThreshold: Int =
+    conf.getConfString("spark.omni.sql.columnar.radixSortThreshold", "1000000").toInt
 }
 
 
