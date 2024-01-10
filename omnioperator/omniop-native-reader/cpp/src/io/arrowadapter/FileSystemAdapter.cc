@@ -48,7 +48,6 @@ namespace arrow_adapter {
     namespace {
 
         Result<std::shared_ptr<FileSystem>>
-
         FileSystemFromUriReal(const UriInfo &uri, const arrow::io::IOContext &io_context, std::string *out_path) {
             const auto scheme = uri.Scheme();
 
@@ -89,18 +88,13 @@ namespace arrow_adapter {
     }  // namespace
 
 
-    Result<std::shared_ptr<FileSystem>>
-
-    FileSystemFromUriOrPath(const UriInfo &uri,
-                            std::string *out_path) {
+    Result<std::shared_ptr<FileSystem>> FileSystemFromUriOrPath(const UriInfo &uri,
+                                                                std::string *out_path) {
         return FileSystemFromUriOrPath(uri, arrow::io::IOContext(), out_path);
     }
 
-    Result<std::shared_ptr<FileSystem>>
-
-    FileSystemFromUriOrPath(
-            const UriInfo &uri, const arrow::io::IOContext &io_context,
-            std::string *out_path) {
+    Result<std::shared_ptr<FileSystem>> FileSystemFromUriOrPath(const UriInfo &uri, const arrow::io::IOContext &io_context,
+                            std::string *out_path) {
         const auto &uri_string = uri.ToString();
         if (arrow::fs::internal::DetectAbsolutePath(uri_string)) {
             // Normalize Path separators

@@ -74,9 +74,7 @@ namespace arrow_adapter {
 /// and treat them as local filesystem paths.  Only absolute local filesystem
 /// paths are allowed.
     ARROW_EXPORT
-    Result<std::shared_ptr<FileSystem>>
-
-    FileSystemFromUriOrPath(
+    Result<std::shared_ptr<FileSystem>> FileSystemFromUriOrPath(
             const UriInfo &uri, const arrow::io::IOContext &io_context,
             std::string *out_path = NULLPTR);
 
