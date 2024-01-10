@@ -64,7 +64,7 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_ParquetColumnarBatchJn
 
     jstring pathTmp = (jstring)env->CallObjectMethod(jsonObj, jsonMethodString, env->NewStringUTF("path"));
     const char *path = env->GetStringUTFChars(pathTmp, JNI_FALSE);
-    std::string pathString(ugi);
+    std::string pathString(path);
     env->ReleaseStringUTFChars(pathTmp, path);
 
     jint port = (jint)env->CallIntMethod(jsonObj, jsonMethodInt, env->NewStringUTF("port"));
