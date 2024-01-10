@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020-2022. Huawei Technologies Co., Ltd. All rights reserved.
+ * Copyright (C) 2020-2024. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
@@ -28,7 +28,7 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
   val columnarShuffleStr:String = conf
     .getConfString("spark.shuffle.manager", "sort")
 
-  val enableColumnarShuffle: Boolean = 
+  val enableColumnarShuffle: Boolean =
     if (!(columnarShuffleStr.equals("sort") || (columnarShuffleStr.equals("tungsten-sort")))) {
       SparkEnv.get.shuffleManager.isInstanceOf[ColumnarShuffleManager]
     } else {
@@ -108,7 +108,7 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
   val enableSortMergeJoinFusion: Boolean = conf
     .getConfString("spark.omni.sql.columnar.sortMergeJoin.fusion", "false")
     .toBoolean
-      
+
   val enableColumnarSortMergeJoin: Boolean = conf
     .getConfString("spark.omni.sql.columnar.sortMergeJoin", "true")
     .toBoolean
@@ -216,6 +216,13 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
   val enableRewriteSelfJoinInInPredicate: Boolean = conf
     .getConfString("spark.omni.sql.columnar.RewriteSelfJoinInInPredicate", "false")
     .toBoolean
+
+  // enable or disable columnar CoalesceExec
+  val enableColumnarCoalesce: Boolean = conf
+    .getConfString("spark.omni.sql.columnar.coalesce", "true")
+    .toBoolean
+
+  val enableRollupOptimization: Boolean = conf.getConfString("spark.omni.sql.columnar.rollupOptimization.enabled", "true").toBoolean
 }
 
 

@@ -11,13 +11,17 @@ set (SOURCE_FILES
         parquet/ParquetColumnReader.cpp
         parquet/ParquetTypedRecordReader.cpp
         parquet/ParquetDecoder.cpp
+        orcfile/OrcFileOverride.cc
+        orcfile/OrcHdfsFileOverride.cc
+        common/UriInfo.cc
+        filesystem/hdfs_file.cpp
+        filesystem/hdfs_filesystem.cpp
+        filesystem/io_exception.cpp
+        filesystem/status.cpp
         io/arrowadapter/FileSystemAdapter.cc
         io/arrowadapter/UtilInternal.cc
         io/arrowadapter/HdfsAdapter.cc
         io/arrowadapter/LocalfsAdapter.cc
-        io/UriInfo.cc
-        io/orcfile/OmniOrcFile.cc
-        io/orcfile/OmniOrcHdfsFile.cc
         )
 
 #Find required protobuf package
@@ -45,6 +49,7 @@ target_link_libraries (${PROJ_TARGET} PUBLIC
         Parquet::parquet_shared
         orc
         boostkit-omniop-vector-1.3.0-aarch64
+        hdfs
         )
 
 set_target_properties(${PROJ_TARGET} PROPERTIES

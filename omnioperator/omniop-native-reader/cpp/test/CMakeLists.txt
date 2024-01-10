@@ -3,6 +3,7 @@ aux_source_directory(${CMAKE_CURRENT_LIST_DIR} TEST_ROOT_SRCS)
 add_subdirectory(tablescan)
 add_subdirectory(io/arrowadapter)
 add_subdirectory(io/orcfile)
+add_subdirectory(filesystem)
 
 # configure
 set(TP_TEST_TARGET tptest)
@@ -10,6 +11,7 @@ set(MY_LINK
         tablescantest
         arrowadaptertest
         orcfiletest
+        filesystemtest
         )
 
 # find gtest package

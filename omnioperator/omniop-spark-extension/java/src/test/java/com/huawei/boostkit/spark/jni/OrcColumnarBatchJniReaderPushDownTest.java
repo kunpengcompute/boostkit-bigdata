@@ -29,10 +29,20 @@ import org.junit.Before;
 import org.junit.FixMethodOrder;
 import org.junit.Test;
 import org.junit.runners.MethodSorters;
+import nova.hetu.omniruntime.type.DataType;
+import nova.hetu.omniruntime.vector.IntVec;
+import nova.hetu.omniruntime.vector.LongVec;
+import nova.hetu.omniruntime.vector.VarcharVec;
+import nova.hetu.omniruntime.vector.Vec;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.orc.OrcFile;
 
 import java.io.File;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 
 @FixMethodOrder(value = MethodSorters.NAME_ASCENDING )

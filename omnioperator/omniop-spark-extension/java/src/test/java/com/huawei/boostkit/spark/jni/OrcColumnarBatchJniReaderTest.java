@@ -90,7 +90,7 @@ public class OrcColumnarBatchJniReaderTest extends TestCase {
         System.out.println("orcColumnarBatchJniReader test finished");
     }
 
-    public void initReaderJava() {
+    public void initReaderJava() throws URISyntaxException {
         OrcFile.ReaderOptions readerOptions = OrcFile.readerOptions(conf);
         File directory = new File("src/test/java/com/huawei/boostkit/spark/jni/orcsrc/000000_0");
         String path = directory.getAbsolutePath();

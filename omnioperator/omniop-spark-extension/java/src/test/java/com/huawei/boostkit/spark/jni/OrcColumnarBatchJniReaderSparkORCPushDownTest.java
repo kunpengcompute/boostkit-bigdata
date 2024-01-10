@@ -30,11 +30,15 @@ import org.junit.Before;
 import org.junit.FixMethodOrder;
 import org.junit.Test;
 import org.junit.runners.MethodSorters;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.orc.OrcFile;
 
 import java.io.File;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
+import java.net.URI;
+import java.net.URISyntaxException;
 
 @FixMethodOrder(value = MethodSorters.NAME_ASCENDING )
 public class OrcColumnarBatchJniReaderSparkORCPushDownTest extends TestCase {

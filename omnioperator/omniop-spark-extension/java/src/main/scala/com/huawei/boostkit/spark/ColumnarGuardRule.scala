@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2020-2024. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
@@ -60,6 +61,7 @@ case class ColumnarGuardRule() extends Rule[SparkPlan] {
   val enableShuffledHashJoin: Boolean = columnarConf.enableShuffledHashJoin
   val enableColumnarFileScan: Boolean = columnarConf.enableColumnarFileScan
   val optimizeLevel: Integer = columnarConf.joinOptimizationThrottle
+  val enableColumnarCoalesce: Boolean = columnarConf.enableColumnarCoalesce
 
   private def tryConvertToColumnar(plan: SparkPlan): Boolean = {
     try {
@@ -196,6 +198,9 @@ case class ColumnarGuardRule() extends Rule[SparkPlan] {
             plan.left,
             plan.right).buildCheck()
         case plan: BroadcastNestedLoopJoinExec => return false
+        case plan: CoalesceExec =>
+          if (!enableColumnarCoalesce) return false
+          ColumnarCoalesceExec(plan.numPartitions, plan.child).buildCheck()
         case p =>
           p
       }

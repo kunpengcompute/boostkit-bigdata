@@ -20,7 +20,7 @@
 #include "OrcColumnarBatchJniReader.h"
 #include <boost/algorithm/string.hpp>
 #include "jni_common.h"
-#include "io/UriInfo.h"
+#include "common/UriInfo.h"
 
 using namespace omniruntime::vec;
 using namespace omniruntime::type;
@@ -69,9 +69,10 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniRea
     env->ReleaseStringUTFChars(hostJstr, hostPtr);
 
     jint port = (jint)env->CallIntMethod(jsonObj, jsonMethodInt, env->NewStringUTF("port"));
-    UriInfo uri(schemaStr, fileStr, hostStr, std::to_string(port));
 
-    std::unique_ptr<orc::Reader> reader = createReader(orc::readOmniFile(uri), readerOptions);
+    std::unique_ptr<orc::Reader> reader;
+    UriInfo uri{schemaStr, fileStr, hostStr, std::to_string(port)};
+    reader = createReader(orc::readFileOverride(uri), readerOptions);
 
     orc::Reader *readerNew = reader.release();
     return (jlong)(readerNew);

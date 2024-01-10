@@ -34,6 +34,7 @@ import org.apache.orc.TypeDescription;
 
 import java.net.URI;
 import java.sql.Date;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;

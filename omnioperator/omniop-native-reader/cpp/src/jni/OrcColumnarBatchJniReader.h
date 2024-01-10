@@ -36,6 +36,7 @@
 #include <orc/MemoryPool.hh>
 #include <orc/sargs/SearchArgument.hh>
 #include <orc/sargs/Literal.hh>
+#include "orcfile/OrcFileOverride.hh"
 #include <getopt.h>
 #include <jni.h>
 #include <json/json.h>

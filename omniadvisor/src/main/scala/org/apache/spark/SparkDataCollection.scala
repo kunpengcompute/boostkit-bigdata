@@ -21,6 +21,7 @@ import org.apache.spark.util.kvstore.{InMemoryStore, KVStore}
 import org.apache.spark.internal.config.Status.ASYNC_TRACKING_ENABLED
 import org.apache.spark.scheduler.ReplayListenerBus
 import org.apache.spark.status.{AppStatusListener, AppStatusStore, ElementTrackingStore}
+import org.apache.spark.sql.execution.ui.{SQLAppStatusListener, SQLAppStatusStore, SQLExecutionUIData}
 import org.apache.spark.util.Utils
 import org.slf4j.{Logger, LoggerFactory}
 
@@ -32,16 +33,20 @@ class SparkDataCollection {
   private val conf = new SparkConf
 
   var environmentInfo: v1.ApplicationEnvironmentInfo = _
-  var jobData: Seq[v1.JobData] = _
+  var jobsList: Seq[v1.JobData] = _
   var appInfo: v1.ApplicationInfo = _
+  var sqlExecutionsList: Seq[SQLExecutionUIData] = _
 
   def replayEventLogs(in: InputStream, sourceName: String): Unit = {
+
     val store: KVStore = createInMemoryStore()
     val replayConf: SparkConf = conf.clone().set(ASYNC_TRACKING_ENABLED, false)
     val trackingStore: ElementTrackingStore = new ElementTrackingStore(store, replayConf)
     val replayBus: ReplayListenerBus = new ReplayListenerBus()
     val listener = new AppStatusListener(trackingStore, replayConf, false)
+    val sqlListener = new SQLAppStatusListener(replayConf, trackingStore, false)
     replayBus.addListener(listener)
+    replayBus.addListener(sqlListener)
 
     try {
       replayBus.replay(in, sourceName, maybeTruncated = true)
@@ -57,12 +62,16 @@ class SparkDataCollection {
     val appStatusStore: AppStatusStore = new AppStatusStore(store)
     appInfo = appStatusStore.applicationInfo()
     environmentInfo = appStatusStore.environmentInfo()
-    jobData = appStatusStore.jobsList(null)
+    jobsList = appStatusStore.jobsList(null)
+
+    val sqlAppStatusStore: SQLAppStatusStore = new SQLAppStatusStore(store)
+    sqlExecutionsList = sqlAppStatusStore.executionsList()
+
     appStatusStore.close()
   }
 
   def getAppResult(workload: String): AppResult = {
-    SparkApplicationDataExtractor.extractAppResultFromAppStatusStore(appInfo, workload, environmentInfo, jobData)
+    SparkApplicationDataExtractor.extractAppResultFromAppStatusStore(appInfo, workload, environmentInfo, jobsList, sqlExecutionsList)
   }
 
   private def createInMemoryStore(): KVStore = {

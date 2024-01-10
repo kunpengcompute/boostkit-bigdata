@@ -34,6 +34,8 @@ import java.io.File;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
+import java.net.URI;
+import java.net.URISyntaxException;
 
 @FixMethodOrder(value = MethodSorters.NAME_ASCENDING )
 public class OrcColumnarBatchJniReaderNotPushDownTest extends TestCase {
