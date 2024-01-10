@@ -43,7 +43,6 @@
 #include <vector/vector_common.h>
 #include <util/omni_exception.h>
 #include "common/debug.h"
-#include <io/orcfile/OmniOrcFile.hh>
 
 #ifdef __cplusplus
 extern "C" {

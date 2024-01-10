@@ -19,8 +19,8 @@
 
 #include "jni/jni_common.h"
 #include "ParquetReader.h"
-#include "io/arrowadapter/FileSystemAdapter.h"
-#include "io/UriInfo.h"
+#include "arrowadapter/FileSystemAdapter.h"
+#include "common/UriInfo.h"
 
 using namespace arrow;
 using namespace parquet::arrow;

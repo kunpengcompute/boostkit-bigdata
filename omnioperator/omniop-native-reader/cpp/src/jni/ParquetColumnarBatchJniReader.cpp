@@ -20,7 +20,7 @@
 #include "ParquetColumnarBatchJniReader.h"
 #include "jni_common.h"
 #include "parquet/ParquetReader.h"
-#include "io/UriInfo.h"
+#include "common/UriInfo.h"
 
 using namespace omniruntime::reader;
 
