@@ -19,6 +19,7 @@
 package com.huawei.boostkit.hive;
 
 import nova.hetu.omniruntime.operator.OmniOperator;
+import nova.hetu.omniruntime.operator.sort.OmniSortOperatorFactory;
 import nova.hetu.omniruntime.type.DataType;
 import nova.hetu.omniruntime.vector.VecBatch;
 
@@ -82,5 +83,16 @@ public class OmniMergeJoinWithSortOperator extends OmniMergeJoinOperator {
         } else if (!omniVectorWithSortOperator.outputs[dataIndex].hasNext()) {
             setStatus(operators[opIndex].addInput(createEofVecBatch(types[opIndex])), opIndex);
         }
+    }
+
+    @Override
+    public void closeOp(boolean abort) throws HiveException {
+        for (OmniOperator sortOperator : omniVectorWithSortOperator.getSortOperators()) {
+            sortOperator.close();
+        }
+        for (OmniSortOperatorFactory sortOperatorFactory : omniVectorWithSortOperator.getSortOperatorFactories()) {
+            sortOperatorFactory.close();
+        }
+        super.closeOp(abort);
     }
 }

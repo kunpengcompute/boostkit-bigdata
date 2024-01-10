@@ -197,12 +197,6 @@ public class OmniVectorWithSortOperator extends OmniHiveOperator<OmniVectorDesc>
             return;
         }
         forward(outputs[posBigTable].next(), posBigTable);
-        for (OmniSortOperatorFactory sortOperatorFactory : sortOperatorFactories) {
-            sortOperatorFactory.close();
-        }
-        for (OmniOperator sortOperator : sortOperators) {
-            sortOperator.close();
-        }
         super.close(abort);
     }
 
@@ -222,5 +216,13 @@ public class OmniVectorWithSortOperator extends OmniHiveOperator<OmniVectorDesc>
     @Override
     public OperatorType getType() {
         return null;
+    }
+
+    public OmniOperator[] getSortOperators() {
+        return sortOperators;
+    }
+
+    public OmniSortOperatorFactory[] getSortOperatorFactories() {
+        return sortOperatorFactories;
     }
 }
