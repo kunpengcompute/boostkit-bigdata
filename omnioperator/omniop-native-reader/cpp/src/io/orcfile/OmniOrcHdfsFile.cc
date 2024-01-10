@@ -51,10 +51,10 @@ namespace orc {
             if (!parser.get_options(options)) {
                 throw ParseError("Could not load Options object. ");
             }
-            std::shared_ptr<hdfs::IoService> ioService(hdfs::IoService::New());
+            hdfs::IoService * io_service = hdfs::IoService::New();
             // Wrapping file_system into a unique pointer to guarantee deletion
             file_system = std::unique_ptr<hdfs::FileSystem>(
-                    hdfs::FileSystem::New(ioService, "", options));
+                    hdfs::FileSystem::New(io_service, "", options));
             if (file_system == nullptr) {
                 throw ParseError("Can't create FileSystem object. ");
             }
