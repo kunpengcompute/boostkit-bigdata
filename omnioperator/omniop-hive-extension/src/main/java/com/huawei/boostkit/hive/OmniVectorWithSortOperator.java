@@ -53,6 +53,7 @@ public class OmniVectorWithSortOperator extends OmniHiveOperator<OmniVectorDesc>
     private transient int[] keyFiledNum;
 
     private transient OmniSortOperatorFactory[] sortOperatorFactories;
+
     private transient OmniOperator[] sortOperators;
 
     public transient Iterator<VecBatch>[] outputs;
@@ -179,6 +180,12 @@ public class OmniVectorWithSortOperator extends OmniHiveOperator<OmniVectorDesc>
             return;
         }
         forward(outputs[posBigTable].next(), posBigTable);
+        for (OmniSortOperatorFactory sortOperatorFactory : sortOperatorFactories) {
+            sortOperatorFactory.close();
+        }
+        for (OmniOperator sortOperator : sortOperators) {
+            sortOperator.close();
+        }
         super.close(abort);
     }
 
