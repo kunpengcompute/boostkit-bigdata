@@ -128,9 +128,14 @@ std::shared_ptr<HadoopFileSystem> getHdfsFileSystem(const std::string &host, con
 
     HdfsOptions options;
     options.ConfigureHost(host);
+    int portInt = 0;
     if (!port.empty()) {
-        options.ConfigurePort(std::stoi(port));
+        portInt = std::stoi(port);
     }
+    if (portInt > 0) {
+        options.ConfigurePort(portInt);
+    }
+
     std::cout << "create hdfs filesystem, host is " << options.host_ << ", port is " << options.port_ << std::endl;
     std::shared_ptr<HadoopFileSystem> fs(new HadoopFileSystem(options));
     fileSystemPtr = fs;

@@ -161,7 +161,7 @@ public class OrcColumnarBatchScanReader {
 
         job.put("scheme", uri.getScheme() == null ? "" : uri.getScheme());
         job.put("host", uri.getHost() == null ? "" : uri.getHost());
-        job.put("port", uri.getPort() == -1 ? "" : String.valueOf(uri.getPort()));
+        job.put("port", uri.getPort());
         job.put("path", uri.getPath() == null ? "" : uri.getPath());
 
         reader = jniReader.initializeReader(job);
