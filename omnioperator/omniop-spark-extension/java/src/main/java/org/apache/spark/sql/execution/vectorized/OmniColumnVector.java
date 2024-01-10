@@ -97,7 +97,7 @@ public class OmniColumnVector extends WritableColumnVector {
 
         if (type instanceof LongType) {
             return longDataVec;
-        } else if (type instanceof BooleanType) {
+        } else if (type instanceof BooleanType || type instanceof NullType) {
             return booleanDataVec;
         } else if (type instanceof ShortType) {
             return shortDataVec;
@@ -138,7 +138,7 @@ public class OmniColumnVector extends WritableColumnVector {
             } else {
                 this.decimal128DataVec = (Decimal128Vec) vec;
             }
-        } else if (type instanceof BooleanType) {
+        } else if (type instanceof BooleanType || type instanceof NullType) {
             this.booleanDataVec = (BooleanVec) vec;
         } else if (type instanceof ShortType) {
             this.shortDataVec = (ShortVec) vec;
@@ -203,7 +203,7 @@ public class OmniColumnVector extends WritableColumnVector {
         if (dictionaryData != null) {
             return dictionaryData.hasNull();
         }
-        if (type instanceof BooleanType) {
+        if (type instanceof BooleanType || type instanceof NullType) {
             return booleanDataVec.hasNull();
         } else if (type instanceof ByteType) {
             return charsTypeDataVec.hasNull();
@@ -245,7 +245,7 @@ public class OmniColumnVector extends WritableColumnVector {
             dictionaryData.setNull(rowId);
             return;
         }
-        if (type instanceof BooleanType) {
+        if (type instanceof BooleanType || type instanceof NullType) {
             booleanDataVec.setNull(rowId);
         } else if (type instanceof ByteType) {
             charsTypeDataVec.setNull(rowId);
@@ -280,7 +280,7 @@ public class OmniColumnVector extends WritableColumnVector {
             dictionaryData.setNulls(rowId, nullValue, 0, count);
             return;
         }
-        if (type instanceof BooleanType) {
+        if (type instanceof BooleanType || type instanceof NullType) {
             booleanDataVec.setNulls(rowId, nullValue, 0, count);
         } else if (type instanceof ByteType) {
             charsTypeDataVec.setNulls(rowId, nullValue, 0, count);
@@ -315,7 +315,7 @@ public class OmniColumnVector extends WritableColumnVector {
         if (dictionaryData != null) {
             return dictionaryData.isNull(rowId);
         }
-        if (type instanceof BooleanType) {
+        if (type instanceof BooleanType || type instanceof NullType) {
             return booleanDataVec.isNull(rowId);
         } else if (type instanceof ByteType) {
             return charsTypeDataVec.isNull(rowId);
@@ -821,7 +821,7 @@ public class OmniColumnVector extends WritableColumnVector {
     // Spilt this function out since it is the slow path.
     @Override
     protected void reserveInternal(int newCapacity) {
-        if (type instanceof BooleanType) {
+        if (type instanceof BooleanType || type instanceof NullType) {
             booleanDataVec = new BooleanVec(newCapacity);
         } else if (type instanceof ByteType) {
             charsTypeDataVec = new VarcharVec(newCapacity);

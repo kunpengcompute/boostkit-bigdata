@@ -32,11 +32,12 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.aggregate._
+import org.apache.spark.sql.catalyst.optimizer.NormalizeNaNAndZero
 import org.apache.spark.sql.catalyst.plans.{FullOuter, Inner, JoinType, LeftAnti, LeftOuter, LeftSemi, RightOuter}
 import org.apache.spark.sql.catalyst.util.CharVarcharUtils.getRawTypeString
 import org.apache.spark.sql.execution
 import org.apache.spark.sql.hive.HiveUdfAdaptorUtil
-import org.apache.spark.sql.types.{BooleanType, DataType, DateType, Decimal, DecimalType, DoubleType, IntegerType, LongType, Metadata, ShortType, StringType}
+import org.apache.spark.sql.types.{BooleanType, DataType, DateType, Decimal, DecimalType, DoubleType, IntegerType, LongType, Metadata, NullType, ShortType, StringType, TimestampType}
 
 import java.util.Locale
 import scala.collection.mutable
@@ -305,10 +306,31 @@ object OmniExpressionAdaptor extends Logging {
   }
 
   private def unsupportedCastCheck(expr: Expression, cast: Cast): Unit = {
-    def isDecimalOrStringType(dataType: DataType): Boolean = (dataType.isInstanceOf[DecimalType]) || (dataType.isInstanceOf[StringType] || (dataType.isInstanceOf[DateType]))
-    // not support Cast(string as !(decimal/string)) and Cast(!(decimal/string) as string)
-    if ((cast.dataType.isInstanceOf[StringType] && !isDecimalOrStringType(cast.child.dataType)) ||
-      (!isDecimalOrStringType(cast.dataType) && cast.child.dataType.isInstanceOf[StringType])) {
+    def doSupportCastToString(dataType: DataType): Boolean = {
+      if (dataType.isInstanceOf[DecimalType] || dataType.isInstanceOf[StringType] || dataType.isInstanceOf[IntegerType]
+        || dataType.isInstanceOf[LongType]) {
+        true
+      } else {
+        false
+      }
+    }
+
+    def doSupportCastFromString(dataType: DataType): Boolean = {
+      if (dataType.isInstanceOf[DecimalType] || dataType.isInstanceOf[StringType] || dataType.isInstanceOf[DateType]
+        || dataType.isInstanceOf[IntegerType] || dataType.isInstanceOf[LongType] || dataType.isInstanceOf[DoubleType]) {
+        true
+      } else {
+        false
+      }
+    }
+
+    // support cast(decimal/string/int/long/double as string)
+    if (cast.dataType.isInstanceOf[StringType] && !doSupportCastToString(cast.child.dataType)) {
+      throw new UnsupportedOperationException(s"Unsupported expression: $expr")
+    }
+
+    // support cast(string as decimal/string/date/int/long/double)
+    if (!doSupportCastFromString(cast.dataType) && cast.child.dataType.isInstanceOf[StringType]) {
       throw new UnsupportedOperationException(s"Unsupported expression: $expr")
     }
 
@@ -325,6 +347,15 @@ object OmniExpressionAdaptor extends Logging {
       case StringType => s"\'${literal.toString}\':${omniType}"
       case _ => literal.toString + s":${omniType}"
     }
+  }
+
+  def toOmniTimeFormat(format: String): String = {
+    format.replace("yyyy", "%Y")
+      .replace("MM", "%m")
+      .replace("dd", "%d")
+      .replace("HH", "%H")
+      .replace("mm", "%M")
+      .replace("ss", "%S")
   }
 
   def rewriteToOmniJsonExpressionLiteral(expr: Expression,
@@ -477,7 +508,10 @@ object OmniExpressionAdaptor extends Logging {
               sparkTypeToOmniExpJsonType(equal.dataType),
               rewriteToOmniJsonExpressionLiteral(equal.left, exprsIndexMap),
               rewriteToOmniJsonExpressionLiteral(equal.right, exprsIndexMap))
-          case _ => throw new UnsupportedOperationException(s"Unsupported expression: $expr")
+          case _ =>
+            "{\"exprType\":\"UNARY\",\"returnType\":%s,\"operator\":\"not\",\"expr\":%s}".format(
+              sparkTypeToOmniExpJsonType(BooleanType),
+              rewriteToOmniJsonExpressionLiteral(not.child, exprsIndexMap))    
         }
       case isnotnull: IsNotNull =>
         ("{\"exprType\":\"UNARY\",\"returnType\":%s, \"operator\":\"not\","
@@ -584,6 +618,55 @@ object OmniExpressionAdaptor extends Logging {
             rewriteToOmniJsonExpressionLiteral(round.child, exprsIndexMap),
             rewriteToOmniJsonExpressionLiteral(round.scale, exprsIndexMap))
       case attr: Attribute => toOmniJsonAttribute(attr, exprsIndexMap(attr.exprId))
+      
+      case inStr: StringInstr =>
+        ("{\"exprType\":\"FUNCTION\",\"returnType\":%s,\"function_name\":\"instr\", \"arguments\":[%s,%s]}")
+          .format(sparkTypeToOmniExpJsonType(inStr.dataType),
+            rewriteToOmniJsonExpressionLiteral(inStr.str, exprsIndexMap),
+            rewriteToOmniJsonExpressionLiteral(inStr.substr, exprsIndexMap))
+
+      // for floating numbers normalize
+      case normalizeNaNAndZero: NormalizeNaNAndZero =>
+        ("{\"exprType\":\"FUNCTION\",\"returnType\":%s,\"function_name\":\"NormalizeNaNAndZero\", \"arguments\":[%s]}")
+          .format(sparkTypeToOmniExpJsonType(normalizeNaNAndZero.dataType),
+            rewriteToOmniJsonExpressionLiteral(normalizeNaNAndZero.child, exprsIndexMap))
+      case knownFloatingPointNormalized: KnownFloatingPointNormalized =>
+         rewriteToOmniJsonExpressionLiteral(knownFloatingPointNormalized.child, exprsIndexMap)
+
+      // for date time functions
+      case unixTimestamp: UnixTimestamp =>
+        ("{\"exprType\":\"FUNCTION\",\"returnType\":%s,\"function_name\":\"unix_timestamp\", \"arguments\":[%s,%s]}")
+          .format(sparkTypeToOmniExpJsonType(unixTimestamp.dataType),
+            rewriteToOmniJsonExpressionLiteral(unixTimestamp.timeExp, exprsIndexMap),
+            toOmniTimeFormat(rewriteToOmniJsonExpressionLiteral(unixTimestamp.format, exprsIndexMap)))
+      case fromUnixTime: FromUnixTime =>
+        ("{\"exprType\":\"FUNCTION\",\"returnType\":%s,\"function_name\":\"from_unixtime\", \"arguments\":[%s,%s]}")
+          .format(sparkTypeToOmniExpJsonType(fromUnixTime.dataType),
+            rewriteToOmniJsonExpressionLiteral(fromUnixTime.sec, exprsIndexMap),
+            toOmniTimeFormat(rewriteToOmniJsonExpressionLiteral(fromUnixTime.format, exprsIndexMap)))
+
+      // for like
+      case startsWith: StartsWith =>
+        startsWith.right match {
+          case literal: Literal =>
+            ("{\"exprType\":\"FUNCTION\",\"returnType\":%s,\"function_name\":\"StartsWith\", \"arguments\":[%s,%s]}")
+              .format(sparkTypeToOmniExpJsonType(startsWith.dataType),
+                rewriteToOmniJsonExpressionLiteral(startsWith.left, exprsIndexMap),
+                rewriteToOmniJsonExpressionLiteral(startsWith.right, exprsIndexMap))
+          case _ =>
+            throw new UnsupportedOperationException(s"Unsupported right expression in like expression: $startsWith")
+        }
+      case endsWith: EndsWith =>
+        endsWith.right match {
+          case literal: Literal =>
+            ("{\"exprType\":\"FUNCTION\",\"returnType\":%s,\"function_name\":\"EndsWith\", \"arguments\":[%s,%s]}")
+              .format(sparkTypeToOmniExpJsonType(endsWith.dataType),
+                rewriteToOmniJsonExpressionLiteral(endsWith.left, exprsIndexMap),
+                rewriteToOmniJsonExpressionLiteral(endsWith.right, exprsIndexMap))
+          case _ =>
+            throw new UnsupportedOperationException(s"Unsupported right expression in like expression: $endsWith")
+        }
+
       case _ =>
         if (HiveUdfAdaptorUtil.isHiveUdf(expr) && ColumnarPluginConfig.getSessionConf.enableColumnarUdf) {
           val hiveUdf = HiveUdfAdaptorUtil.asHiveSimpleUDF(expr)
@@ -686,6 +769,27 @@ object OmniExpressionAdaptor extends Logging {
     }
   }
 
+
+  def checkFirstParamType(agg: AggregateExpression): Unit = {
+    agg.aggregateFunction.children.map(
+      exp => {
+        val exprDataType = exp.dataType
+        exprDataType match {
+          case ShortType =>
+          case IntegerType =>
+          case LongType =>
+          case DoubleType =>
+          case BooleanType =>
+          case DateType =>
+          case dt: DecimalType =>
+          case StringType =>
+          case _ =>
+            throw new UnsupportedOperationException(s"First_value does not support datatype: $exprDataType")
+        }
+      }
+    )
+  }
+
   def toOmniAggFunType(agg: AggregateExpression, isHashAgg: Boolean = false, isMergeCount: Boolean = false): FunctionType = {
     agg.aggregateFunction match {
       case Sum(_) => OMNI_AGGREGATION_TYPE_SUM
@@ -699,8 +803,12 @@ object OmniExpressionAdaptor extends Logging {
           OMNI_AGGREGATION_TYPE_COUNT_ALL
         }
       case Count(_) if agg.aggregateFunction.children.size == 1 => OMNI_AGGREGATION_TYPE_COUNT_COLUMN
-      case First(_, true) => OMNI_AGGREGATION_TYPE_FIRST_IGNORENULL
-      case First(_, false) => OMNI_AGGREGATION_TYPE_FIRST_INCLUDENULL
+      case First(_, true) =>
+        checkFirstParamType(agg)
+        OMNI_AGGREGATION_TYPE_FIRST_IGNORENULL
+      case First(_, false) =>
+        checkFirstParamType(agg)
+        OMNI_AGGREGATION_TYPE_FIRST_INCLUDENULL      
       case _ => throw new UnsupportedOperationException(s"Unsupported aggregate function: $agg")
     }
   }
@@ -744,6 +852,7 @@ object OmniExpressionAdaptor extends Logging {
         } else {
           OMNI_DECIMAL128_TYPE
         }
+      case NullType => OMNI_BOOLEAN_TYPE
       case _ =>
         throw new UnsupportedOperationException(s"Unsupported datatype: $datatype")
     }
