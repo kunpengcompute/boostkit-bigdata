@@ -35,7 +35,7 @@
 #include "arrow/util/type_fwd.h"
 #include "arrow/util/visibility.h"
 #include "arrow/util/windows_fixup.h"
-#include "io/UriInfo.h"
+#include "common/UriInfo.h"
 
 namespace arrow_adapter {
 

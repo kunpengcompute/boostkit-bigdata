@@ -16,37 +16,23 @@
  * limitations under the License.
  */
 
-#include <unordered_map>
-#include <io/UriInfo.h>
+#pragma once
 
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "arrow/filesystem/filesystem.h"
 #include "arrow/filesystem/hdfs.h"
-#include "arrow/util/value_parsing.h"
-#include "HdfsAdapter.h"
+#include "common/UriInfo.h"
 
 namespace arrow_adapter {
-
-    using arrow::internal::ParseValue;
 
     using arrow::Result;
     using arrow::fs::HdfsOptions;
 
-    Result<HdfsOptions> buildHdfsOptionsFromUri(const UriInfo &uri) {
-        HdfsOptions options;
-
-        std::string host;
-        host = uri.Scheme() + "://" + uri.Host();
-
-        // configure endpoint
-        int32_t port;
-        if (uri.Port().empty() || (port = atoi(uri.Port().c_str())) == -1) {
-            // default Port will be determined by hdfs FileSystem impl
-            options.ConfigureEndPoint(host, 0);
-        } else {
-            options.ConfigureEndPoint(host, port);
-        }
-
-        return options;
-    }
+    ARROW_EXPORT
+    Result<HdfsOptions> buildHdfsOptionsFromUri(const UriInfo &uri);
 
 }
 // namespace arrow

@@ -23,7 +23,7 @@
 #include <vector/vector_common.h>
 #include <arrow/filesystem/filesystem.h>
 #include "ParquetColumnReader.h"
-#include "io/UriInfo.h"
+#include "common/UriInfo.h"
 
 using namespace arrow::internal;
 

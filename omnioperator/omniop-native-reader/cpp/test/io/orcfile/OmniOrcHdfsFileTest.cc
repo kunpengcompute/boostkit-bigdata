@@ -18,7 +18,7 @@
  */
 
 #include "gtest/gtest.h"
-#include "io/orcfile/OmniOrcFile.hh"
+#include "orcfile/OmniOrcFile.hh"
 #include "orcfile_test.h"
 
 TEST(OrcReader, createLocalFileReader) {

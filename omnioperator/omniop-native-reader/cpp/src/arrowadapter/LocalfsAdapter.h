@@ -24,7 +24,7 @@
 
 #include "arrow/filesystem/filesystem.h"
 #include "arrow/filesystem/localfs.h"
-#include "io/UriInfo.h"
+#include "common/UriInfo.h"
 
 namespace arrow_adapter {
 

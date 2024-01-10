@@ -16,34 +16,36 @@
  * limitations under the License.
  */
 
-#include <memory>
-#include <sstream>
-#include <io/UriInfo.h>
-#include "arrow/filesystem/localfs.h"
-#include "arrow/util/io_util.h"
-#include "LocalfsAdapter.h"
-#include "arrow/result.h"
+#include <unordered_map>
+#include <common/UriInfo.h>
+
+#include "arrow/filesystem/hdfs.h"
+#include "arrow/util/value_parsing.h"
+#include "HdfsAdapter.h"
 
 namespace arrow_adapter {
 
-    using ::arrow::internal::IOErrorFromErrno;
-    using ::arrow::internal::NativePathString;
-    using ::arrow::internal::PlatformFilename;
-    using arrow::Result;
-    using arrow::fs::LocalFileSystemOptions;
-    using arrow::Status;
+    using arrow::internal::ParseValue;
 
-    Result<LocalFileSystemOptions> buildLocalfsOptionsFromUri(const UriInfo &uri, std::string *out_path) {
-        std::string path;
-        const auto host = uri.Host();
-        if (!host.empty()) {
-            return Status::Invalid("Unsupported hostname in non-Windows local URI: '",
-                                   uri.ToString(), "'");
+    using arrow::Result;
+    using arrow::fs::HdfsOptions;
+
+    Result<HdfsOptions> buildHdfsOptionsFromUri(const UriInfo &uri) {
+        HdfsOptions options;
+
+        std::string host;
+        host = uri.Scheme() + "://" + uri.Host();
+
+        // configure endpoint
+        int32_t port;
+        if (uri.Port().empty() || (port = atoi(uri.Port().c_str())) == -1) {
+            // default Port will be determined by hdfs FileSystem impl
+            options.ConfigureEndPoint(host, 0);
         } else {
-            *out_path = uri.Path();
+            options.ConfigureEndPoint(host, port);
         }
 
-        return LocalFileSystemOptions();
+        return options;
     }
 
 }

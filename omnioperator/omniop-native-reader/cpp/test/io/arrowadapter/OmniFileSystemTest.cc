@@ -20,7 +20,7 @@
 
 #include <arrow/filesystem/hdfs.h>
 #include "gtest/gtest.h"
-#include "io/arrowadapter/FileSystemAdapter.h"
+#include "arrowadapter/FileSystemAdapter.h"
 #include "arrow/filesystem/filesystem.h"
 #include "arrow/filesystem/mockfs.h"
 #include "arrow/util/checked_cast.h"

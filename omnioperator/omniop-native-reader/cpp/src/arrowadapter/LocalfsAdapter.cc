@@ -16,23 +16,35 @@
  * limitations under the License.
  */
 
-#pragma once
-
 #include <memory>
-#include <string>
-#include <vector>
-
-#include "arrow/filesystem/filesystem.h"
-#include "arrow/filesystem/hdfs.h"
-#include "io/UriInfo.h"
+#include <sstream>
+#include <common/UriInfo.h>
+#include "arrow/filesystem/localfs.h"
+#include "arrow/util/io_util.h"
+#include "LocalfsAdapter.h"
+#include "arrow/result.h"
 
 namespace arrow_adapter {
 
+    using ::arrow::internal::IOErrorFromErrno;
+    using ::arrow::internal::NativePathString;
+    using ::arrow::internal::PlatformFilename;
     using arrow::Result;
-    using arrow::fs::HdfsOptions;
+    using arrow::fs::LocalFileSystemOptions;
+    using arrow::Status;
 
-    ARROW_EXPORT
-    Result<HdfsOptions> buildHdfsOptionsFromUri(const UriInfo &uri);
+    Result<LocalFileSystemOptions> buildLocalfsOptionsFromUri(const UriInfo &uri, std::string *out_path) {
+        std::string path;
+        const auto host = uri.Host();
+        if (!host.empty()) {
+            return Status::Invalid("Unsupported hostname in non-Windows local URI: '",
+                                   uri.ToString(), "'");
+        } else {
+            *out_path = uri.Path();
+        }
+
+        return LocalFileSystemOptions();
+    }
 
 }
 // namespace arrow
