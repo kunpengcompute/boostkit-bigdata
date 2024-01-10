@@ -19,26 +19,21 @@
 package com.huawei.boostkit.spark.jni;
 
 import junit.framework.TestCase;
-import nova.hetu.omniruntime.type.DataType;
-import nova.hetu.omniruntime.vector.IntVec;
 import nova.hetu.omniruntime.vector.LongVec;
 import nova.hetu.omniruntime.vector.VarcharVec;
-import nova.hetu.omniruntime.vector.Vec;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.orc.OrcFile;
 import org.json.JSONObject;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.FixMethodOrder;
 import org.junit.Test;
 import org.junit.runners.MethodSorters;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.orc.OrcFile;
 
 import java.io.File;
-import java.util.ArrayList;
 import java.net.URI;
 import java.net.URISyntaxException;
-
-import static org.junit.Assert.*;
+import java.util.ArrayList;
 
 @FixMethodOrder(value = MethodSorters.NAME_ASCENDING )
 public class OrcColumnarBatchJniReaderNotPushDownTest extends TestCase {
@@ -65,8 +60,9 @@ public class OrcColumnarBatchJniReaderNotPushDownTest extends TestCase {
         try {
             uri = new URI(absolutePath);
         } catch (URISyntaxException ignore) {
+            // if URISyntaxException thrown, next line assertNotNull will interrupt the test
         }
-        assertTrue(uri != null);
+        assertNotNull(uri);
         orcColumnarBatchScanReader.reader = orcColumnarBatchScanReader.initializeReaderJava(uri, OrcFile.readerOptions(new Configuration()));
         assertTrue(orcColumnarBatchScanReader.reader != 0);
     }
