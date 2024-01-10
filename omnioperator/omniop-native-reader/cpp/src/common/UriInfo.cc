@@ -29,7 +29,6 @@ UriInfo::UriInfo(std::string _uri, std::string _scheme, std::string _path, std::
                                       portString(std::move(_port)),
                                       pathString(std::move(_path)),
                                       uriString(std::move(_uri)) {
-    transformToAbsolutePath();
 }
 
 UriInfo::UriInfo(std::string _scheme, std::string _path, std::string _host,
@@ -38,14 +37,6 @@ UriInfo::UriInfo(std::string _scheme, std::string _path, std::string _host,
                                       portString(std::move(_port)),
                                       pathString(std::move(_path)),
                                       uriString("Not initialize origin uri!") {
-    transformToAbsolutePath();
-}
-
-void UriInfo::transformToAbsolutePath() {
-    if(schemeString == LOCAL_FILE){
-        schemeString = "";
-        uriString = pathString;
-    }
 }
 
 UriInfo::~UriInfo() {}
