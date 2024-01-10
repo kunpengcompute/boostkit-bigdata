@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2021-2023. Huawei Technologies Co., Ltd. All rights reserved.
+ * Copyright (C) 2023-2024. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
@@ -17,6 +17,7 @@
  */
 
 package com.huawei.boostkit.hive.reader;
+
 import com.huawei.boostkit.scan.jni.ParquetColumnarBatchJniReader;
 
 import nova.hetu.omniruntime.vector.Vec;
@@ -33,12 +34,13 @@ public class ParquetColumnarBatchScanReader {
     public long parquetReader;
 
     public ParquetColumnarBatchJniReader jniReader;
+
     public ParquetColumnarBatchScanReader() {
         jniReader = new ParquetColumnarBatchJniReader();
     }
 
     public long initializeReaderJava(String path, int capacity,
-             List<Integer> rowgroupIndices, List<Integer> columnIndices, String ugi) {
+                                     List<Integer> rowgroupIndices, List<Integer> columnIndices, String ugi) {
         JSONObject job = new JSONObject();
         job.put("filePath", path);
         job.put("capacity", capacity);

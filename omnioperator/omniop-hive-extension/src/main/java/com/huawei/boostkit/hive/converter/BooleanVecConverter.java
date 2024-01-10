@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2023-2023. Huawei Technologies Co., Ltd. All rights reserved.
+ */
+
 package com.huawei.boostkit.hive.converter;
 
 import com.huawei.boostkit.hive.cache.ColumnCache;
@@ -64,14 +68,14 @@ public class BooleanVecConverter extends LongVecConverter {
         LongColumnCache longColumnCache = (LongColumnCache) columnCache;
         if (longColumnCache.noNulls) {
             for (int i = 0; i < columnSize; i++) {
-                booleanVec.set(i, longColumnCache.dataCache[i] ==1L);
+                booleanVec.set(i, longColumnCache.dataCache[i] == 1L);
             }
         } else {
             for (int i = 0; i < columnSize; i++) {
                 if (longColumnCache.isNull[i]) {
                     booleanVec.setNull(i);
                 } else {
-                    booleanVec.set(i, longColumnCache.dataCache[i]==1L);
+                    booleanVec.set(i, longColumnCache.dataCache[i] == 1L);
                 }
             }
         }
@@ -82,13 +86,13 @@ public class BooleanVecConverter extends LongVecConverter {
     public ColumnVector getColumnVectorFromOmniVec(Vec vec, int start, int end) {
         LongColumnVector longColumnVector = new LongColumnVector();
         for (int i = start; i < end; i++) {
-            Object value=fromOmniVec(vec,i);
-            if (value==null) {
+            Object value = fromOmniVec(vec, i);
+            if (value == null) {
                 longColumnVector.vector[i - start] = 1L;
                 longColumnVector.isNull[i - start] = true;
                 longColumnVector.noNulls = false;
-            }else{
-                longColumnVector.vector[i-start]=((boolean) value) ? 1L:0L;
+            } else {
+                longColumnVector.vector[i - start] = ((boolean) value) ? 1L : 0L;
             }
         }
         return longColumnVector;

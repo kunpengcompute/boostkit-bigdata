@@ -1,6 +1,29 @@
+/*
+ * Copyright (C) 2023-2024. Huawei Technologies Co., Ltd. All rights reserved.
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.huawei.boostkit.hive.expression;
 
-import static nova.hetu.omniruntime.constants.FunctionType.*;
+import static nova.hetu.omniruntime.constants.FunctionType.OMNI_AGGREGATION_TYPE_AVG;
+import static nova.hetu.omniruntime.constants.FunctionType.OMNI_AGGREGATION_TYPE_COUNT_ALL;
+import static nova.hetu.omniruntime.constants.FunctionType.OMNI_AGGREGATION_TYPE_COUNT_COLUMN;
+import static nova.hetu.omniruntime.constants.FunctionType.OMNI_AGGREGATION_TYPE_MAX;
+import static nova.hetu.omniruntime.constants.FunctionType.OMNI_AGGREGATION_TYPE_MIN;
+import static nova.hetu.omniruntime.constants.FunctionType.OMNI_AGGREGATION_TYPE_SUM;
 import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_CHAR;
 import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_DATE32;
 import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_DATE64;
@@ -31,7 +54,7 @@ import org.apache.hadoop.hive.common.type.HiveVarchar;
 import org.apache.hadoop.hive.common.type.Timestamp;
 import org.apache.hadoop.hive.ql.parse.PTFInvocationSpec;
 import org.apache.hadoop.hive.ql.parse.WindowingSpec;
-import org.apache.hadoop.hive.ql.plan.*;
+import org.apache.hadoop.hive.ql.plan.AggregationDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeColumnDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeConstantDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
@@ -101,11 +124,11 @@ public class TypeUtils {
     public static final int DEFAULT_VARCHAR_LENGTH = 2000;
     private static final Map<String, FunctionType> HIVE_TO_OMNI_WINDOW_FUNCTION = new HashMap<String, FunctionType>() {
         {
-            put("sum", FunctionType.OMNI_AGGREGATION_TYPE_SUM);
-            put("count", FunctionType.OMNI_AGGREGATION_TYPE_COUNT_COLUMN);
-            put("min", FunctionType.OMNI_AGGREGATION_TYPE_MIN);
-            put("max", FunctionType.OMNI_AGGREGATION_TYPE_MAX);
-            put("avg", FunctionType.OMNI_AGGREGATION_TYPE_AVG);
+            put("sum", OMNI_AGGREGATION_TYPE_SUM);
+            put("count", OMNI_AGGREGATION_TYPE_COUNT_COLUMN);
+            put("min", OMNI_AGGREGATION_TYPE_MIN);
+            put("max", OMNI_AGGREGATION_TYPE_MAX);
+            put("avg", OMNI_AGGREGATION_TYPE_AVG);
             put("rank", FunctionType.OMNI_WINDOW_TYPE_RANK);
             put("row_number", FunctionType.OMNI_WINDOW_TYPE_ROW_NUMBER);
         }

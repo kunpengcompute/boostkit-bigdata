@@ -1,3 +1,21 @@
+/*
+ * Copyright (C) 2023-2024. Huawei Technologies Co., Ltd. All rights reserved.
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.huawei.boostkit.hive;
 
 import static com.huawei.boostkit.hive.expression.TypeUtils.checkOmniJsonWhiteList;
@@ -65,6 +83,8 @@ import org.apache.hadoop.hive.ql.plan.ptf.WindowTableFunctionDef;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDFConcat;
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
 import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -78,6 +98,7 @@ import java.util.Set;
 import java.util.concurrent.LinkedBlockingQueue;
 
 public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
+    private static final Logger LOG = LoggerFactory.getLogger(OmniExecuteWithHookContext.class.getName());
     public static final Set<OperatorType> OMNI_OPERATOR = new HashSet<>(Arrays.asList(OperatorType.JOIN,
             OperatorType.MAPJOIN, OperatorType.MERGEJOIN, OperatorType.GROUPBY, OperatorType.SELECT,
             OperatorType.FILTER, OperatorType.PTF, OperatorType.TABLESCAN, OperatorType.REDUCESINK));
@@ -218,7 +239,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             return true;
         }
         if (operator.getType() != null && operator.getType().equals(OperatorType.MAPJOIN)) {
-            if (checkNapJoinInput(operator) && currentReplaceable(operator, reduceSinkCanReplace)) {
+            if (checkMapJoinInput(operator) && currentReplaceable(operator, reduceSinkCanReplace)) {
                 return true;
             }
         }
@@ -294,7 +315,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                         if (!isCountAll && args.size() > 1) {
                             return false;
                         }
-                        if(!(args.get(0).getExprNode() instanceof ExprNodeColumnDesc)) {
+                        if (!(args.get(0).getExprNode() instanceof ExprNodeColumnDesc)) {
                             return false;
                         }
                     }
@@ -368,13 +389,14 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                 }
             }
         } catch (Exception e) {
+            LOG.error("generate omni expressions error", e);
             return false;
         }
         return checkOmniJsonWhiteList("", expressions.toArray(new String[0]));
     }
 
 
-    private boolean checkNapJoinInput(Operator<? extends OperatorDesc> operator) {
+    private boolean checkMapJoinInput(Operator<? extends OperatorDesc> operator) {
         MapJoinDesc mapJoinDesc = (MapJoinDesc) operator.getConf();
         Map<Integer, String> parentToInput = mapJoinDesc.getParentToInput();
         for (String inputWorkName : parentToInput.values()) {

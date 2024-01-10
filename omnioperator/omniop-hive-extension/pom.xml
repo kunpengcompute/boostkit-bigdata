@@ -12,9 +12,9 @@
     </properties>
 
     <groupId>com.huawei.boostkit</groupId>
-    <artifactId>hive-adapter</artifactId>
+    <artifactId>boostkit-omniop-hive-extendsion</artifactId>
 	<packaging>jar</packaging>
-    <version>3.1.0</version>
+    <version>${hive.version}-${omniruntime.version}</version>
 
     <dependencies>
         <dependency>

@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2023-2023. Huawei Technologies Co., Ltd. All rights reserved.
+ */
+
 package com.huawei.boostkit.hive.cache;
 
 import static com.huawei.boostkit.hive.cache.VectorCache.BATCH;

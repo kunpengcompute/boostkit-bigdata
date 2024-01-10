@@ -1,10 +1,26 @@
+/*
+ * Copyright (C) 2023-2024. Huawei Technologies Co., Ltd. All rights reserved.
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 package com.huawei.boostkit.hive;
 
 import static com.huawei.boostkit.hive.JoinUtils.getExprFromExprNode;
 import static com.huawei.boostkit.hive.JoinUtils.getExprNodeColumnEvaluator;
 import static com.huawei.boostkit.hive.JoinUtils.getTypeFromInspectors;
-import static com.huawei.boostkit.hive.OmniExecuteWithHookContext.OMNI_OPERATOR;
 import static com.huawei.boostkit.hive.cache.VectorCache.BATCH;
 import static com.huawei.boostkit.hive.converter.VecConverter.CONVERTER_MAP;
 
@@ -252,7 +268,7 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
         }
     }
 
-    private void rebuildUnvectorizedDynaicJoinInspector() throws HiveException{
+    private void rebuildUnvectorizedDynaicJoinInspector() throws HiveException {
         for (int i = 0; i < inputObjInspectors.length; i++) {
             StructObjectInspector structObjectInspector = (StructObjectInspector) inputObjInspectors[i];
             inputObjInspectors[i] = Utilities.constructVectorizedReduceRowOI(
@@ -300,7 +316,7 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
     }
 
     private List<VecBatch> getVectorFromMapLazyBinaryValue(int pos, ExecMapperContext mapContext,
-                                                           MapredContext mrContext) throws HiveException{
+                                                           MapredContext mrContext) throws HiveException {
         Map<Integer, String> parentToInput = this.getConf().getParentToInput();
         List<VecBatch> buildVecBatches = new ArrayList<>();
         Object[][] values = new Object[buildInspectors[pos].size()][BATCH];
@@ -379,7 +395,7 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
     }
 
     private List<VecBatch> getVectorFromMapVecBatchValue(int pos, ExecMapperContext mapContext, MapredContext mrContext)
-        throws HiveException {
+            throws HiveException {
         Map<Integer, String> parentToInput = this.getConf().getParentToInput();
         List<VecBatch> buildVecBatches = new ArrayList<>();
         int keyLength = joinKeysObjectInspectors[pos].size();

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020-2023. Huawei Technologies Co., Ltd. All rights reserved.
+ * Copyright (C) 2023-2024. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
@@ -17,11 +17,19 @@
  */
 
 package com.huawei.boostkit.hive.reader;
+
 import com.huawei.boostkit.scan.jni.OrcColumnarBatchJniReader;
 
 import nova.hetu.omniruntime.type.DataType;
-import nova.hetu.omniruntime.vector.*;
 
+import nova.hetu.omniruntime.vector.BooleanVec;
+import nova.hetu.omniruntime.vector.Decimal128Vec;
+import nova.hetu.omniruntime.vector.DoubleVec;
+import nova.hetu.omniruntime.vector.IntVec;
+import nova.hetu.omniruntime.vector.LongVec;
+import nova.hetu.omniruntime.vector.ShortVec;
+import nova.hetu.omniruntime.vector.VarcharVec;
+import nova.hetu.omniruntime.vector.Vec;
 import org.apache.hadoop.hive.ql.io.sarg.ExpressionTree;
 import org.apache.hadoop.hive.ql.io.sarg.PredicateLeaf;
 import org.apache.orc.OrcFile.ReaderOptions;
@@ -59,6 +67,7 @@ public class OrcColumnarBatchScanReader {
     public int realColsCnt;
 
     public OrcColumnarBatchJniReader jniReader;
+
     public OrcColumnarBatchScanReader() {
         jniReader = new OrcColumnarBatchJniReader();
     }
@@ -79,7 +88,7 @@ public class OrcColumnarBatchScanReader {
         return jsonObject;
     }
 
-    public String padZeroForDecimals(String [] decimalStrArray, int decimalScale) {
+    public String padZeroForDecimals(String[] decimalStrArray, int decimalScale) {
         String decimalVal = ""; // Integer without decimals, eg: 12345
         if (decimalStrArray.length == 2) { // Integer with decimals, eg: 12345.6
             decimalVal = decimalStrArray[1];
@@ -98,7 +107,7 @@ public class OrcColumnarBatchScanReader {
             jsonObject.put("type", pl.getType().ordinal());
             if (pl.getLiteral() != null) {
                 if (pl.getType() == PredicateLeaf.Type.DATE) {
-                    jsonObject.put("literal", ((int)Math.ceil(((Date)pl.getLiteral()).getTime()* 1.0/3600/24/1000)) + "");
+                    jsonObject.put("literal", ((int) Math.ceil(((Date) pl.getLiteral()).getTime() * 1.0 / 3600 / 24 / 1000)) + "");
                 } else if (pl.getType() == PredicateLeaf.Type.DECIMAL) {
                     int decimalP = schema.findSubtype(pl.getColumnName()).getPrecision();
                     int decimalS = schema.findSubtype(pl.getColumnName()).getScale();
@@ -115,12 +124,12 @@ public class OrcColumnarBatchScanReader {
             } else {
                 jsonObject.put("literal", "");
             }
-            if ((pl.getLiteralList() != null) && (pl.getLiteralList().size() != 0)){
+            if ((pl.getLiteralList() != null) && (pl.getLiteralList().size() != 0)) {
                 List<String> lst = new ArrayList<String>();
                 for (Object ob : pl.getLiteralList()) {
                     if (pl.getType() == PredicateLeaf.Type.DECIMAL) {
-                        int decimalP =  schema.findSubtype(pl.getColumnName()).getPrecision();
-                        int decimalS =  schema.findSubtype(pl.getColumnName()).getScale();
+                        int decimalP = schema.findSubtype(pl.getColumnName()).getPrecision();
+                        int decimalS = schema.findSubtype(pl.getColumnName()).getScale();
                         String[] spiltValues = ob.toString().split("\\.");
                         if (decimalS == 0) {
                             lst.add(spiltValues[0] + " " + decimalP + " " + decimalS);
@@ -129,7 +138,7 @@ public class OrcColumnarBatchScanReader {
                             lst.add(spiltValues[0] + "." + scalePadZeroStr + " " + decimalP + " " + decimalS);
                         }
                     } else if (pl.getType() == PredicateLeaf.Type.DATE) {
-                        lst.add(((int)Math.ceil(((Date)ob).getTime()* 1.0/3600/24/1000)) + "");
+                        lst.add(((int) Math.ceil(((Date) ob).getTime() * 1.0 / 3600 / 24 / 1000)) + "");
                     } else {
                         lst.add(ob.toString());
                     }
@@ -146,7 +155,7 @@ public class OrcColumnarBatchScanReader {
     /**
      * Init Orc reader.
      *
-     * @param path split file path
+     * @param path    split file path
      * @param options split file options
      */
     public long initializeReaderJava(String path, ReaderOptions options) {
@@ -246,12 +255,12 @@ public class OrcColumnarBatchScanReader {
             Calendar utcCal = new Calendar.Builder().setCalendarType("gregory").setTimeZone(TimeZone.getTimeZone("UTC"))
                     .setInstant(Math.multiplyExact(days, 86400000L)).build();
             LocalDate localDate = LocalDate.of(utcCal.get(YEAR), utcCal.get(MONTH) + 1, 1)
-                    .with(ChronoField.ERA, utcCal.get(ERA)).plusDays(utcCal.get(DAY_OF_MONTH) -1);
+                    .with(ChronoField.ERA, utcCal.get(ERA)).plusDays(utcCal.get(DAY_OF_MONTH) - 1);
             return Math.toIntExact(localDate.toEpochDay());
         } else {
             int i = julianGregDiffSwitchDay.length;
             do {
-                i-=1;
+                i -= 1;
             } while (i > 0 && days < julianGregDiffSwitchDay[i]);
             return days + julianGregDiffs[i];
         }
@@ -281,7 +290,7 @@ public class OrcColumnarBatchScanReader {
                 }
                 case OMNI_DATE32: {
                     vecList[i] = new IntVec(vecNativeIds[nativeGetId]);
-                    convertJulianToGreGorian((IntVec)(vecList[i]), rtn);
+                    convertJulianToGreGorian((IntVec) (vecList[i]), rtn);
                     break;
                 }
                 case OMNI_INT: {
@@ -312,6 +321,6 @@ public class OrcColumnarBatchScanReader {
             }
             nativeGetId++;
         }
-        return (int)rtn;
+        return (int) rtn;
     }
 }
