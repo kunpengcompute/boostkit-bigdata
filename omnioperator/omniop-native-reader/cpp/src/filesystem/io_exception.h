@@ -1,4 +1,5 @@
 /**
+ * Copyright (C) 2022-2023. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -16,35 +17,28 @@
  * limitations under the License.
  */
 
-#include "OrcFileRewrite.hh"
-#include "orc/Exceptions.hh"
-#include "Adaptor.hh"
+#ifndef SPARK_THESTRAL_PLUGIN_IO_EXCEPTION_H
+#define SPARK_THESTRAL_PLUGIN_IO_EXCEPTION_H
 
-#include <errno.h>
-#include <fcntl.h>
-#include <stdio.h>
-#include <sys/stat.h>
-#include <string.h>
+#include "stdexcept"
 
-#ifdef _MSC_VER
-#include <io.h>
-#define S_IRUSR _S_IREAD
-#define S_IWUSR _S_IWRITE
-#define stat _stat64
-#define fstat _fstat64
-#else
-#include <unistd.h>
-#define O_BINARY 0
-#endif
+namespace fs {
 
-namespace orc {
-  std::unique_ptr<InputStream> readFileRewrite(const std::string& path, std::vector<hdfs::Token*>& tokens) {
-    if (strncmp(path.c_str(), "hdfs://", 7) == 0) {
-      return orc::readHdfsFileRewrite(std::string(path), tokens);
-    } else if (strncmp(path.c_str(), "file:", 5) == 0) {
-      return orc::readLocalFile(std::string(path.substr(5)));
-    } else {
-      return orc::readLocalFile(std::string(path));
-    }
-  }
+class IOException : public std::runtime_error {
+public:
+    explicit IOException(const std::string &arg);
+
+    explicit IOException(const char *arg);
+
+    virtual ~IOException() noexcept;
+
+    IOException(const IOException &);
+
+private:
+    IOException &operator=(const IOException &);
+};
+
 }
+
+
+#endif //SPARK_THESTRAL_PLUGIN_IO_EXCEPTION_H
