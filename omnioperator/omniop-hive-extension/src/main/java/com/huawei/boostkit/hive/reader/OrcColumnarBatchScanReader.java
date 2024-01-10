@@ -255,7 +255,7 @@ public class OrcColumnarBatchScanReader {
             Calendar utcCal = new Calendar.Builder().setCalendarType("gregory").setTimeZone(TimeZone.getTimeZone("UTC"))
                     .setInstant(Math.multiplyExact(days, 86400000L)).build();
             LocalDate localDate = LocalDate.of(utcCal.get(YEAR), utcCal.get(MONTH) + 1, 1)
-                    .with(ChronoField.ERA, utcCal.get(ERA)).plusDays(utcCal.get(DAY_OF_MONTH) - 1);
+                    .with(ChronoField.ERA, utcCal.get(ERA)).plusDays((long) utcCal.get(DAY_OF_MONTH) - 1);
             return Math.toIntExact(localDate.toEpochDay());
         } else {
             int i = julianGregDiffSwitchDay.length;
