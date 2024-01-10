@@ -454,13 +454,10 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
     }
 
     private boolean isSupportEdgeType(TezEdgeProperty.EdgeType edgeType) {
-        if (edgeType == TezEdgeProperty.EdgeType.ONE_TO_ONE_EDGE
+        return edgeType == TezEdgeProperty.EdgeType.ONE_TO_ONE_EDGE
                 || edgeType == TezEdgeProperty.EdgeType.CUSTOM_SIMPLE_EDGE
                 || edgeType == TezEdgeProperty.EdgeType.BROADCAST_EDGE
-                || edgeType == TezEdgeProperty.EdgeType.XPROD_EDGE) {
-            return true;
-        }
-        return false;
+                || edgeType == TezEdgeProperty.EdgeType.XPROD_EDGE;
     }
 
     private void setParentWorkToCurrentWorkEdge(BaseWork work, TezEdgeProperty.EdgeType edgeType) {
