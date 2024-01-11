@@ -339,7 +339,7 @@ case class ColumnarBroadcastHashJoinExec(
       def createBuildOpFactoryAndOp(): (OmniHashBuilderWithExprOperatorFactory, OmniOperator) = {
         val startBuildCodegen = System.nanoTime()
         val opFactory =
-          new OmniHashBuilderWithExprOperatorFactory(buildTypes, buildJoinColsExp, 1,
+          new OmniHashBuilderWithExprOperatorFactory(lookupJoinType, buildTypes, buildJoinColsExp, 1,
            new OperatorConfig(SpillConfig.NONE,
              new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
         val op = opFactory.createOperator()
