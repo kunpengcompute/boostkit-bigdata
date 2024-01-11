@@ -203,7 +203,6 @@ case class ColumnarExpandExec(
  *
  * @param projections The group and aggregation of expressions, all of the group expressions should
  *                    output the same schema specified bye the parameter `output`
- * @param input       The input Schema
  * @param output      The output Schema
  * @param groupingExpressions       The group of expressions
  * @param aggregateExpressions      The aggregation of expressions
@@ -212,7 +211,6 @@ case class ColumnarExpandExec(
  */
 case class ColumnarOptRollupExec(
                                projections: Seq[Seq[Expression]],
-                               input: Seq[Expression],
                                output: Seq[Attribute],
                                groupingExpressions: Seq[NamedExpression],
                                aggregateExpressions: Seq[AggregateExpression],
@@ -248,7 +246,7 @@ case class ColumnarOptRollupExec(
     val getOutputTimeMetric = longMetric("getOutputTime")
 
     // handle expand logic
-    val projectAttrExpsIdMap = getExprIdMap(input)
+    val projectAttrExpsIdMap = getExprIdMap(child.output)
     val omniInputTypes = child.output.map(exp => sparkTypeToOmniType(exp.dataType, exp.metadata)).toArray
     val omniExpressions = projections.map(exps => exps.map(
       exp => rewriteToOmniJsonExpressionLiteral(exp, projectAttrExpsIdMap)
