@@ -158,7 +158,7 @@ public class OmniParquetColumnarBatchReader extends RecordReader<Void, ColumnarB
     List<Integer> rowgroupIndices = getFilteredBlocks(split.getStart(), split.getEnd());
     List<Integer> columnIndices = getColumnIndices(requestedSchema.getColumns(), fileSchema.getColumns());
     String ugi = UserGroupInformation.getCurrentUser().toString();
-    reader.initializeReaderJava(split.getPath().toString(), capacity, rowgroupIndices, columnIndices, ugi);
+    reader.initializeReaderJava(split.getPath(), capacity, rowgroupIndices, columnIndices, ugi);
     // Add missing Cols flags.
     initializeInternal();
   }

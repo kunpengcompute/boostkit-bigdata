@@ -21,40 +21,53 @@
 
 #include "UriInfo.h"
 
-UriInfo::UriInfo(std::string uriStr, std::string schemeStr, std::string pathStr, std::string hostStr,
-                 std::string portStr) : hostStr_(std::move(hostStr)),
-                                        schemeStr_(std::move(schemeStr)),
-                                        portStr_(std::move(portStr)),
-                                        pathStr_(std::move(pathStr)),
-                                        uriStr_(std::move(uriStr)) {
+static const std::string LOCAL_FILE = "file";
+
+UriInfo::UriInfo(std::string _uri, std::string _scheme, std::string _path, std::string _host,
+                 std::string _port) : hostString(std::move(_host)),
+                                      schemeString(std::move(_scheme)),
+                                      portString(std::move(_port)),
+                                      pathString(std::move(_path)),
+                                      uriString(std::move(_uri))
+{
+    // when local file, transfer to absolute path
+    if (schemeString == LOCAL_FILE) {
+        uriString = pathString;
+    }
 }
 
-UriInfo::UriInfo(std::string schemeStr, std::string pathStr, std::string hostStr,
-                 std::string portStr) : hostStr_(std::move(hostStr)),
-                                        schemeStr_(std::move(schemeStr)),
-                                        portStr_(std::move(portStr)),
-                                        pathStr_(std::move(pathStr)),
-                                        uriStr_("Not initialize origin uri!") {
+UriInfo::UriInfo(std::string _scheme, std::string _path, std::string _host,
+                 std::string _port) : hostString(std::move(_host)),
+                                      schemeString(std::move(_scheme)),
+                                      portString(std::move(_port)),
+                                      pathString(std::move(_path)),
+                                      uriString("Not initialize origin uri!")
+{
 }
 
 UriInfo::~UriInfo() {}
 
-const std::string &UriInfo::Scheme() const {
-    return schemeStr_;
+const std::string UriInfo::Scheme() const
+{
+    return schemeString;
 }
 
-const std::string &UriInfo::Host() const {
-    return hostStr_;
+const std::string UriInfo::Host() const
+{
+    return hostString;
 }
 
-const std::string &UriInfo::Port() const {
-    return portStr_;
+const std::string UriInfo::Port() const
+{
+    return portString;
 }
 
-const std::string &UriInfo::Path() const {
-    return pathStr_;
+const std::string UriInfo::Path() const
+{
+    return pathString;
 }
 
-const std::string &UriInfo::ToString() const {
-    return uriStr_;
+const std::string UriInfo::ToString() const
+{
+    return uriString;
 }

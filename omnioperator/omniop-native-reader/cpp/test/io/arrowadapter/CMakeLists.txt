@@ -1,0 +1,7 @@
+aux_source_directory(${CMAKE_CURRENT_LIST_DIR} ARROW_ADAPTER_TESTS_LIST)
+set(ARROW_ADAPTER_TARGET arrowadaptertest)
+add_library(${ARROW_ADAPTER_TARGET} STATIC ${ARROW_ADAPTER_TESTS_LIST})
+target_compile_options(${ARROW_ADAPTER_TARGET} PUBLIC )
+target_include_directories(${ARROW_ADAPTER_TARGET} PUBLIC ${CMAKE_BINARY_DIR}/src)
+target_include_directories(${ARROW_ADAPTER_TARGET} PUBLIC $ENV{JAVA_HOME}/include)
+target_include_directories(${ARROW_ADAPTER_TARGET} PUBLIC $ENV{JAVA_HOME}/include/linux)

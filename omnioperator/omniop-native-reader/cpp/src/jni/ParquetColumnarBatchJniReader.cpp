@@ -20,6 +20,7 @@
 #include "ParquetColumnarBatchJniReader.h"
 #include "jni_common.h"
 #include "parquet/ParquetReader.h"
+#include "common/UriInfo.h"
 
 using namespace omniruntime::reader;
 
@@ -40,16 +41,35 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_ParquetColumnarBatchJn
     jobject jObj, jobject jsonObj)
 {
     JNI_FUNC_START
-    // Get filePath
-    jstring path = (jstring)env->CallObjectMethod(jsonObj, jsonMethodString, env->NewStringUTF("filePath"));
-    const char *filePath = env->GetStringUTFChars(path, JNI_FALSE);
-    std::string file(filePath);
-    env->ReleaseStringUTFChars(path, filePath);
+    // Get uriStr
+    jstring uri = (jstring)env->CallObjectMethod(jsonObj, jsonMethodString, env->NewStringUTF("uri"));
+    const char *uriStr = env->GetStringUTFChars(uri, JNI_FALSE);
+    std::string uriString(uriStr);
+    env->ReleaseStringUTFChars(uri, uriStr);
 
     jstring ugiTemp = (jstring)env->CallObjectMethod(jsonObj, jsonMethodString, env->NewStringUTF("ugi"));
     const char *ugi = env->GetStringUTFChars(ugiTemp, JNI_FALSE);
     std::string ugiString(ugi);
     env->ReleaseStringUTFChars(ugiTemp, ugi);
+
+    jstring schemeTmp = (jstring)env->CallObjectMethod(jsonObj, jsonMethodString, env->NewStringUTF("scheme"));
+    const char *scheme = env->GetStringUTFChars(schemeTmp, JNI_FALSE);
+    std::string schemeString(scheme);
+    env->ReleaseStringUTFChars(schemeTmp, scheme);
+
+    jstring hostTmp = (jstring)env->CallObjectMethod(jsonObj, jsonMethodString, env->NewStringUTF("host"));
+    const char *host = env->GetStringUTFChars(hostTmp, JNI_FALSE);
+    std::string hostString(host);
+    env->ReleaseStringUTFChars(hostTmp, host);
+
+    jstring pathTmp = (jstring)env->CallObjectMethod(jsonObj, jsonMethodString, env->NewStringUTF("path"));
+    const char *path = env->GetStringUTFChars(pathTmp, JNI_FALSE);
+    std::string pathString(path);
+    env->ReleaseStringUTFChars(pathTmp, path);
+
+    jint port = (jint)env->CallIntMethod(jsonObj, jsonMethodInt, env->NewStringUTF("port"));
+
+    UriInfo uriInfo(uriString, schemeString, pathString, hostString, std::to_string(port));
 
     // Get capacity for each record batch
     int64_t capacity = (int64_t)env->CallLongMethod(jsonObj, jsonMethodLong, env->NewStringUTF("capacity"));
@@ -59,7 +79,7 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_ParquetColumnarBatchJn
     auto column_indices = GetIndices(env, jsonObj, "columnIndices");
 
     ParquetReader *pReader = new ParquetReader();
-    auto state = pReader->InitRecordReader(file, capacity, row_group_indices, column_indices, ugiString);
+    auto state = pReader->InitRecordReader(uriInfo, capacity, row_group_indices, column_indices, ugiString);
     if (state != Status::OK()) {
         env->ThrowNew(runtimeExceptionClass, state.ToString().c_str());
         return 0;
