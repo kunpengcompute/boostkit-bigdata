@@ -19,11 +19,8 @@
 package com.huawei.boostkit.spark.jni;
 
 import junit.framework.TestCase;
-import nova.hetu.omniruntime.type.DataType;
-import nova.hetu.omniruntime.vector.IntVec;
 import nova.hetu.omniruntime.vector.LongVec;
 import nova.hetu.omniruntime.vector.VarcharVec;
-import nova.hetu.omniruntime.vector.Vec;
 import org.json.JSONObject;
 import org.junit.After;
 import org.junit.Before;
@@ -34,11 +31,11 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.orc.OrcFile;
 
 import java.io.File;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.net.URI;
 import java.net.URISyntaxException;
-
-import static org.junit.Assert.*;
 
 @FixMethodOrder(value = MethodSorters.NAME_ASCENDING )
 public class OrcColumnarBatchJniReaderNotPushDownTest extends TestCase {
@@ -59,14 +56,16 @@ public class OrcColumnarBatchJniReaderNotPushDownTest extends TestCase {
 
     public void initReaderJava() {
         File directory = new File("src/test/java/com/huawei/boostkit/spark/jni/orcsrc/000000_0");
+        System.out.println(directory.getAbsolutePath());
         String absolutePath = directory.getAbsolutePath();
         System.out.println(absolutePath);
         URI uri = null;
         try {
             uri = new URI(absolutePath);
         } catch (URISyntaxException ignore) {
+            // if URISyntaxException thrown, next line assertNotNull will interrupt the test
         }
-        assertTrue(uri != null);
+        assertNotNull(uri);
         orcColumnarBatchScanReader.reader = orcColumnarBatchScanReader.initializeReaderJava(uri, OrcFile.readerOptions(new Configuration()));
         assertTrue(orcColumnarBatchScanReader.reader != 0);
     }

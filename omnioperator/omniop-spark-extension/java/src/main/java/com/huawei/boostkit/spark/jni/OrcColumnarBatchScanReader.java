@@ -17,23 +17,22 @@
  */
 
 package com.huawei.boostkit.spark.jni;
-import com.huawei.boostkit.scan.jni.OrcColumnarBatchJniReader;
 
+import com.huawei.boostkit.scan.jni.OrcColumnarBatchJniReader;
 import nova.hetu.omniruntime.type.DataType;
 import nova.hetu.omniruntime.vector.*;
-
-import org.apache.spark.sql.catalyst.util.RebaseDateTime;
 import org.apache.hadoop.hive.ql.io.sarg.ExpressionTree;
 import org.apache.hadoop.hive.ql.io.sarg.PredicateLeaf;
 import org.apache.orc.OrcFile.ReaderOptions;
 import org.apache.orc.Reader.Options;
+import org.apache.orc.TypeDescription;
+import org.apache.spark.sql.catalyst.util.RebaseDateTime;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.orc.TypeDescription;
 
-import java.sql.Date;
 import java.net.URI;
+import java.sql.Date;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -136,7 +135,7 @@ public class OrcColumnarBatchScanReader {
     /**
      * Init Orc reader.
      *
-     * @param path split file path
+     * @param uri     split file path
      * @param options split file options
      */
     public long initializeReaderJava(URI uri, ReaderOptions options) {
@@ -150,8 +149,8 @@ public class OrcColumnarBatchScanReader {
 
         job.put("scheme", uri.getScheme() == null ? "" : uri.getScheme());
         job.put("host", uri.getHost() == null ? "" : uri.getHost());
-        job.put("port", uri.getPort());
         job.put("path", uri.getPath() == null ? "" : uri.getPath());
+        job.put("port", uri.getPort() == -1 ? "" : String.valueOf(uri.getPort()));
 
         reader = jniReader.initializeReader(job);
         return reader;

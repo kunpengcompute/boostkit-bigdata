@@ -23,6 +23,9 @@
 #include <vector/vector_common.h>
 #include <arrow/filesystem/filesystem.h>
 #include "ParquetColumnReader.h"
+#include "common/UriInfo.h"
+
+using namespace arrow::internal;
 
 namespace omniruntime::reader {
 
@@ -46,8 +49,9 @@ namespace omniruntime::reader {
     public:
         ParquetReader() {}
 
-        arrow::Status InitRecordReader(std::string& path, int64_t capacity,
-            const std::vector<int>& row_group_indices, const std::vector<int>& column_indices, std::string& ugi);
+        arrow::Status InitRecordReader(UriInfo &uri, int64_t capacity,
+                                       const std::vector<int>& row_group_indices,
+                                       const std::vector<int>& column_indices, std::string& ugi);
 
         arrow::Status ReadNextBatch(std::vector<omniruntime::vec::BaseVector*> &batch, long *batchRowSize);
 
@@ -85,6 +89,6 @@ namespace omniruntime::reader {
 
     std::string GetFileSystemKey(std::string& path, std::string& ugi);
 
-    Filesystem* GetFileSystemPtr(std::string& path, std::string& ugi, arrow::Status &status);
+    Filesystem* GetFileSystemPtr(UriInfo &uri, std::string &ugi, arrow::Status &status);
 }
 #endif // OMNI_RUNTIME_PARQUETREADER_H

@@ -20,6 +20,7 @@
 #include "OrcColumnarBatchJniReader.h"
 #include <boost/algorithm/string.hpp>
 #include "jni_common.h"
+#include "common/UriInfo.h"
 
 using namespace omniruntime::vec;
 using namespace omniruntime::type;
@@ -40,6 +41,7 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniRea
     jlong tailLocation = env->CallLongMethod(jsonObj, jsonMethodLong, env->NewStringUTF("tailLocation"));
     jstring serTailJstr =
         (jstring)env->CallObjectMethod(jsonObj, jsonMethodString, env->NewStringUTF("serializedTail"));
+
     orc::MemoryPool *pool = orc::getDefaultPool();
     orc::ReaderOptions readerOptions;
     readerOptions.setMemoryPool(*pool);
@@ -66,10 +68,13 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniRea
     std::string hostStr(hostPtr);
     env->ReleaseStringUTFChars(hostJstr, hostPtr);
 
-    jint port = (jint)env->CallIntMethod(jsonObj, jsonMethodInt, env->NewStringUTF("port"));
+    jstring portJstr = (jstring)env->CallObjectMethod(jsonObj, jsonMethodString, env->NewStringUTF("port"));
+    const char *portPtr = env->GetStringUTFChars(portJstr, nullptr);
+    std::string portStr(portPtr);
+    env->ReleaseStringUTFChars(portJstr, portPtr);
 
     std::unique_ptr<orc::Reader> reader;
-    UriInfo uri{schemaStr, fileStr, hostStr, std::to_string(port)};
+    UriInfo uri{schemaStr, fileStr, hostStr, portStr};
     reader = createReader(orc::readFileOverride(uri), readerOptions);
 
     orc::Reader *readerNew = reader.release();

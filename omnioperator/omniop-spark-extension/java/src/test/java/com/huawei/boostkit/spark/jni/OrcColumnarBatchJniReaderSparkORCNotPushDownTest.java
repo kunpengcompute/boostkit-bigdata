@@ -22,6 +22,8 @@ import junit.framework.TestCase;
 import nova.hetu.omniruntime.vector.IntVec;
 import nova.hetu.omniruntime.vector.LongVec;
 import nova.hetu.omniruntime.vector.VarcharVec;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.orc.OrcFile;
 import org.json.JSONObject;
 import org.junit.After;
 import org.junit.Before;
@@ -32,11 +34,11 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.orc.OrcFile;
 
 import java.io.File;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.net.URI;
 import java.net.URISyntaxException;
-
-import static org.junit.Assert.*;
 
 @FixMethodOrder(value = MethodSorters.NAME_ASCENDING )
 public class OrcColumnarBatchJniReaderSparkORCNotPushDownTest extends TestCase {
@@ -56,15 +58,17 @@ public class OrcColumnarBatchJniReaderSparkORCNotPushDownTest extends TestCase {
     }
 
     public void initReaderJava() {
-        File directory = new File("src/test/java/com/huawei/boostkit/spark/jni/orcsrc/000000_0");
+        File directory = new File("src/test/java/com/huawei/boostkit/spark/jni/orcsrc/part-00000-2d6ca713-08b0-4b40-828c-f7ee0c81bb9a-c000.snappy.orc");
+        System.out.println(directory.getAbsolutePath());
         String absolutePath = directory.getAbsolutePath();
         System.out.println(absolutePath);
         URI uri = null;
         try {
             uri = new URI(absolutePath);
         } catch (URISyntaxException ignore) {
+            // if URISyntaxException thrown, next line assertNotNull will interrupt the test
         }
-        assertTrue(uri != null);
+        assertNotNull(uri);
         orcColumnarBatchScanReader.reader = orcColumnarBatchScanReader.initializeReaderJava(uri, OrcFile.readerOptions(new Configuration()));
         assertTrue(orcColumnarBatchScanReader.reader != 0);
     }

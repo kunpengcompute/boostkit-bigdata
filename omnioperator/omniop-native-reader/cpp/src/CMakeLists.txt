@@ -18,6 +18,10 @@ set (SOURCE_FILES
         filesystem/hdfs_filesystem.cpp
         filesystem/io_exception.cpp
         filesystem/status.cpp
+        arrowadapter/FileSystemAdapter.cc
+        arrowadapter/UtilInternal.cc
+        arrowadapter/HdfsAdapter.cc
+        arrowadapter/LocalfsAdapter.cc
         )
 
 #Find required protobuf package

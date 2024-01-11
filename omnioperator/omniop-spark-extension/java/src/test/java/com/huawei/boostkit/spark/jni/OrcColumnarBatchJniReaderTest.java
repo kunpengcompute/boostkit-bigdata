@@ -94,7 +94,13 @@ public class OrcColumnarBatchJniReaderTest extends TestCase {
         OrcFile.ReaderOptions readerOptions = OrcFile.readerOptions(conf);
         File directory = new File("src/test/java/com/huawei/boostkit/spark/jni/orcsrc/000000_0");
         String path = directory.getAbsolutePath();
-        URI uri = new URI(path);
+        URI uri = null;
+        try {
+            uri = new URI(path);
+        } catch (URISyntaxException ignore) {
+            // if URISyntaxException thrown, next line assertNotNull will interrupt the test
+        }
+        assertNotNull(uri);
         orcColumnarBatchScanReader.reader = orcColumnarBatchScanReader.initializeReaderJava(uri, readerOptions);
         assertTrue(orcColumnarBatchScanReader.reader != 0);
     }
