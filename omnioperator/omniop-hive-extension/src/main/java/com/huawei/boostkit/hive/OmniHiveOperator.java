@@ -22,10 +22,14 @@ import nova.hetu.omniruntime.vector.Vec;
 import nova.hetu.omniruntime.vector.VecBatch;
 
 import org.apache.hadoop.hive.ql.CompilationOpContext;
+import org.apache.hadoop.hive.ql.QueryPlan;
 import org.apache.hadoop.hive.ql.exec.Operator;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.plan.OperatorDesc;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
+
+import java.util.LinkedList;
+import java.util.Queue;
 
 public abstract class OmniHiveOperator<T extends OperatorDesc> extends Operator<T> {
     private static String currentWork;
@@ -104,9 +108,35 @@ public abstract class OmniHiveOperator<T extends OperatorDesc> extends Operator<
         // if all children are done, this operator is also done
         if (childrenDone != 0 && childrenDone == childOperatorsArray.length) {
             setDone(true);
+            setAllParentsDone();
             vecBatch.releaseAllVectors();
             vecBatch.close();
         }
+    }
+
+    private void setAllParentsDone() {
+        Queue<Operator> parents = new LinkedList<>(this.getParentOperators());
+        while (!parents.isEmpty()) {
+            Operator current = parents.poll();
+            for (Object child : current.getChildOperators()) {
+                if (!((Operator) child).getDone()) {
+                    return;
+                }
+            }
+            if (current instanceof OmniHiveOperator) {
+                ((OmniHiveOperator) current).publicSetDone(true);
+            } else if (current instanceof OmniMergeJoinOperator) {
+                ((OmniMergeJoinOperator) current).publicSetDone(true);
+            } else if (current instanceof OmniMapJoinOperator) {
+                ((OmniMapJoinOperator) current).publicSetDone(true);
+            } else {
+                return;
+            }
+            for (Object parent : current.getParentOperators()) {
+                parents.offer((Operator) parent);
+            }
+        }
+
     }
 
     public static VecBatch copyVecBatch(VecBatch vecBatch) {
@@ -124,5 +154,9 @@ public abstract class OmniHiveOperator<T extends OperatorDesc> extends Operator<
 
     @Override
     public void endGroup() throws HiveException {
+    }
+
+    public void publicSetDone(boolean done) {
+        this.done = done;
     }
 }

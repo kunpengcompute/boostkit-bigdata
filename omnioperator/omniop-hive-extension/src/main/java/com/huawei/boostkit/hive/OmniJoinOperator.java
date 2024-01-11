@@ -311,7 +311,7 @@ public class OmniJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc> impl
         }
         if (resCode[opIndex] == SMJ_FETCH_JOIN_DATA) {
             output = bufferOperators[opIndex].getOutput();
-            while (output.hasNext()) {
+            while (!getDone() && output.hasNext()) {
                 VecBatch vecBatch = output.next();
                 if (streamFactories.length > opIndex + 1) {
                     if (flowControlCode[opIndex + 1] != SCAN_FINISH) {
@@ -389,7 +389,7 @@ public class OmniJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc> impl
             if (!needDeal.contains(opIndex)) {
                 continue;
             }
-            while (flowControlCode[opIndex] != SCAN_FINISH && flowControlCode[opIndex] != 0) {
+            while (!getDone() && flowControlCode[opIndex] != SCAN_FINISH && flowControlCode[opIndex] != 0) {
                 processOmni(opIndex, opIndex + 1);
             }
         }
