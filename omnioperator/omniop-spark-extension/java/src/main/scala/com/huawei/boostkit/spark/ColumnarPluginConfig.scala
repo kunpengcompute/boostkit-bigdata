@@ -207,7 +207,7 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
 
   // enable or disable deduplicate the right side of left semi join
   val enableDedupLeftSemiJoin: Boolean =
-    conf.getConfString("spark.omni.sql.columnar.dedupLeftSemiJoin", "true").toBoolean
+    conf.getConfString("spark.omni.sql.columnar.dedupLeftSemiJoin", "false").toBoolean
 
   val dedupLeftSemiJoinThreshold: Int =
     conf.getConfString("spark.omni.sql.columnar.dedupLeftSemiJoinThreshold", "3").toInt
