@@ -30,7 +30,8 @@ using arrow::internal::ParseValue;
 using arrow::Result;
 using arrow::fs::HdfsOptions;
 
-Result<HdfsOptions> buildHdfsOptionsFromUri(const UriInfo &uri){
+Result<HdfsOptions> buildHdfsOptionsFromUri(const UriInfo &uri)
+{
     HdfsOptions options;
 
     std::string host;

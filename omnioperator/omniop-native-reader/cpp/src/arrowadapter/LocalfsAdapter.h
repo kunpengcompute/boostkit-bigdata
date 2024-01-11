@@ -33,7 +33,7 @@ using arrow::fs::LocalFileSystemOptions;
 using arrow::Status;
 
 ARROW_EXPORT
-Result<LocalFileSystemOptions> buildLocalfsOptionsFromUri(const UriInfo &uri, std::string* out_path);
+Result<LocalFileSystemOptions> buildLocalfsOptionsFromUri(const UriInfo &uri, std::string *out_path);
 
 }
 // namespace arrow

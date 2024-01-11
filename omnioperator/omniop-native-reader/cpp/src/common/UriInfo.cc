@@ -28,9 +28,10 @@ UriInfo::UriInfo(std::string _uri, std::string _scheme, std::string _path, std::
                                       schemeString(std::move(_scheme)),
                                       portString(std::move(_port)),
                                       pathString(std::move(_path)),
-                                      uriString(std::move(_uri)) {
+                                      uriString(std::move(_uri))
+{
     // when local file, transfer to absolute path
-    if(schemeString == LOCAL_FILE){
+    if (schemeString == LOCAL_FILE) {
         uriString = pathString;
     }
 }
@@ -40,27 +41,33 @@ UriInfo::UriInfo(std::string _scheme, std::string _path, std::string _host,
                                       schemeString(std::move(_scheme)),
                                       portString(std::move(_port)),
                                       pathString(std::move(_path)),
-                                      uriString("Not initialize origin uri!") {
+                                      uriString("Not initialize origin uri!")
+{
 }
 
 UriInfo::~UriInfo() {}
 
-const std::string UriInfo::Scheme() const {
+const std::string UriInfo::Scheme() const
+{
     return schemeString;
 }
 
-const std::string UriInfo::Host() const {
+const std::string UriInfo::Host() const
+{
     return hostString;
 }
 
-const std::string UriInfo::Port() const {
+const std::string UriInfo::Port() const
+{
     return portString;
 }
 
-const std::string UriInfo::Path() const {
+const std::string UriInfo::Path() const
+{
     return pathString;
 }
 
-const std::string UriInfo::ToString() const {
+const std::string UriInfo::ToString() const
+{
     return uriString;
 }

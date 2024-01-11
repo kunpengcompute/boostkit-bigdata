@@ -22,7 +22,8 @@ namespace arrow_adapter {
 
 using arrow::fs::TimePoint;
 
-TimePoint CurrentTimePoint() {
+TimePoint CurrentTimePoint()
+{
     auto now = std::chrono::system_clock::now();
     return TimePoint(
             std::chrono::duration_cast<TimePoint::duration>(now.time_since_epoch()));

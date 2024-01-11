@@ -21,18 +21,18 @@
 
 #include "FileSystemAdapter.h"
 #include "arrow/filesystem/hdfs.h"
-#include "HdfsAdapter.h"
-#include "LocalfsAdapter.h"
 #include "arrow/filesystem/localfs.h"
 #include "arrow/filesystem/mockfs.h"
 #include "arrow/filesystem/path_util.h"
-#include "UtilInternal.h"
 #include "arrow/io/slow.h"
 #include "arrow/result.h"
 #include "arrow/status.h"
 #include "arrow/util/checked_cast.h"
 #include "arrow/util/macros.h"
 #include "arrow/util/parallel.h"
+#include "HdfsAdapter.h"
+#include "LocalfsAdapter.h"
+#include "UtilInternal.h"
 
 namespace arrow_adapter {
 
@@ -48,7 +48,8 @@ using arrow::Result;
 namespace {
 
 Result<std::shared_ptr<FileSystem>>
-FileSystemFromUriReal(const UriInfo &uri, const arrow::io::IOContext &io_context, std::string *out_path) {
+FileSystemFromUriReal(const UriInfo &uri, const arrow::io::IOContext &io_context, std::string *out_path)
+{
     const auto scheme = uri.Scheme();
 
     if (scheme == "file") {
@@ -76,7 +77,7 @@ FileSystemFromUriReal(const UriInfo &uri, const arrow::io::IOContext &io_context
             *out_path = std::string(RemoveLeadingSlash(uri.Path()));
         }
         return std::make_shared<MockFileSystem>(CurrentTimePoint(),
-                                                          io_context);
+                                                io_context);
     }
 
     return arrow::fs::FileSystemFromUri(uri.ToString(), io_context, out_path);
@@ -86,14 +87,16 @@ FileSystemFromUriReal(const UriInfo &uri, const arrow::io::IOContext &io_context
 
 
 Result<std::shared_ptr<FileSystem>> FileSystemFromUriOrPath(const UriInfo &uri,
-                                                            std::string *out_path) {
+                                                            std::string *out_path)
+{
     return FileSystemFromUriOrPath(uri, arrow::io::IOContext(), out_path);
 }
 
 Result<std::shared_ptr<FileSystem>> FileSystemFromUriOrPath(
         const UriInfo &uri, const arrow::io::IOContext &io_context,
-        std::string *out_path) {
-    const auto& uri_string = uri.ToString();
+        std::string *out_path)
+{
+    const auto &uri_string = uri.ToString();
     if (arrow::fs::internal::DetectAbsolutePath(uri_string)) {
         // Normalize path separators
         if (out_path != nullptr) {

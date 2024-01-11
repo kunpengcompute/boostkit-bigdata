@@ -52,7 +52,7 @@ using arrow::fs::FileSystem;
 /// Same as FileSystemFromUriOrPath, but it use uri that constructed by client
 ARROW_EXPORT
 Result<std::shared_ptr<FileSystem>> FileSystemFromUriOrPath(const UriInfo &uri,
-                                                            std::string* out_path  = NULLPTR);
+                                                            std::string *out_path = NULLPTR);
 
 
 /// \brief Create a new FileSystem by URI with a custom IO context

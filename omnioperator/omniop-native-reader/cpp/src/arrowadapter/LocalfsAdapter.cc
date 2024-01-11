@@ -33,7 +33,8 @@ using arrow::Result;
 using arrow::fs::LocalFileSystemOptions;
 using arrow::Status;
 
-Result<LocalFileSystemOptions> buildLocalfsOptionsFromUri(const UriInfo &uri, std::string* out_path){
+Result<LocalFileSystemOptions> buildLocalfsOptionsFromUri(const UriInfo &uri, std::string *out_path)
+{
     std::string path;
     const auto host = uri.Host();
     if (!host.empty()) {
