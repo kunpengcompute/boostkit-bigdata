@@ -154,13 +154,7 @@ public class OmniVectorWithSortOperator extends OmniHiveOperator<OmniVectorDesc>
     @Override
     public void process(Object row, int tag) throws HiveException {
         if (tag == posBigTable && !allFetchDone) {
-            for (int i = 0; i < source.length; i++) {
-                if (i != posBigTable) {
-                    while (!fetchDone[i]) {
-                        fetchDone[i] = !source[i].pushRecord();
-                    }
-                }
-            }
+            dealSource();
             allFetchDone = true;
         }
         for (int i = 0; i < fields[tag].size(); i++) {
@@ -180,8 +174,22 @@ public class OmniVectorWithSortOperator extends OmniHiveOperator<OmniVectorDesc>
         rowCount[tag] = 0;
     }
 
+    private void dealSource() throws HiveException {
+        for (int i = 0; i < source.length; i++) {
+            if (i != posBigTable) {
+                while (!fetchDone[i]) {
+                    fetchDone[i] = !source[i].pushRecord();
+                }
+            }
+        }
+    }
+
     @Override
     public void close(boolean abort) throws HiveException {
+        if (!allFetchDone) {
+            dealSource();
+            allFetchDone = true;
+        }
         for (int i = 0; i < rowCount.length; i++) {
             if (rowCount[i] > 0) {
                 this.sortOperators[i]
@@ -193,10 +201,9 @@ public class OmniVectorWithSortOperator extends OmniHiveOperator<OmniVectorDesc>
             outputs[i] = sortOperators[i].getOutput();
         }
         VecBatch vecBatch = outputs[posBigTable].next();
-        if (vecBatch == null) {
-            return;
+        if (vecBatch != null) {
+            forward(outputs[posBigTable].next(), posBigTable);
         }
-        forward(outputs[posBigTable].next(), posBigTable);
         super.close(abort);
     }
 

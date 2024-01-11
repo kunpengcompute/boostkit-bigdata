@@ -652,7 +652,11 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
             if (i == pos && pos < outputKeyLength) {
                 ((LongVec) vecs[i]).set(0, (1L << pos) - 1);
             } else {
-                vecs[i].setNull(0);
+                if (aggs.get(i).getGenericUDAFName().equals("count")) {
+                    ((LongVec) vecs[i]).set(0, 0);
+                } else {
+                    vecs[i].setNull(0);
+                }
             }
         }
         return new VecBatch(vecs, 1);
