@@ -156,7 +156,6 @@ public class OrcColumnarBatchScanReader {
     /**
      * Init Orc reader.
      *
-     * @param path    split file path
      * @param options split file options
      */
     public long initializeReaderJava(URI uri, ReaderOptions options) {
@@ -171,7 +170,6 @@ public class OrcColumnarBatchScanReader {
         job.put("host", uri.getHost() == null ? "" : uri.getHost());
         job.put("path", uri.getPath() == null ? "" : uri.getPath());
         job.put("port", uri.getPort() == -1 ? "" : String.valueOf(uri.getPort()));
-
         reader = jniReader.initializeReader(job);
         return reader;
     }
