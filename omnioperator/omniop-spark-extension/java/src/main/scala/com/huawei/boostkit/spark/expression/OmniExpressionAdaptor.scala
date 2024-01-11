@@ -633,18 +633,6 @@ object OmniExpressionAdaptor extends Logging {
       case knownFloatingPointNormalized: KnownFloatingPointNormalized =>
          rewriteToOmniJsonExpressionLiteral(knownFloatingPointNormalized.child, exprsIndexMap)
 
-      // for date time functions
-      case unixTimestamp: UnixTimestamp =>
-        ("{\"exprType\":\"FUNCTION\",\"returnType\":%s,\"function_name\":\"unix_timestamp\", \"arguments\":[%s,%s]}")
-          .format(sparkTypeToOmniExpJsonType(unixTimestamp.dataType),
-            rewriteToOmniJsonExpressionLiteral(unixTimestamp.timeExp, exprsIndexMap),
-            toOmniTimeFormat(rewriteToOmniJsonExpressionLiteral(unixTimestamp.format, exprsIndexMap)))
-      case fromUnixTime: FromUnixTime =>
-        ("{\"exprType\":\"FUNCTION\",\"returnType\":%s,\"function_name\":\"from_unixtime\", \"arguments\":[%s,%s]}")
-          .format(sparkTypeToOmniExpJsonType(fromUnixTime.dataType),
-            rewriteToOmniJsonExpressionLiteral(fromUnixTime.sec, exprsIndexMap),
-            toOmniTimeFormat(rewriteToOmniJsonExpressionLiteral(fromUnixTime.format, exprsIndexMap)))
-
       // for like
       case startsWith: StartsWith =>
         startsWith.right match {
