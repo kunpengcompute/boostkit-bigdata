@@ -66,6 +66,8 @@ import org.apache.hadoop.hive.ql.exec.tez.TezContext;
 import org.apache.hadoop.hive.ql.exec.vector.VectorizationContext;
 import org.apache.hadoop.hive.ql.exec.vector.VectorizationContextRegion;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
+import org.apache.hadoop.hive.ql.plan.ExprNodeColumnDesc;
+import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
 import org.apache.hadoop.hive.ql.plan.JoinDesc;
 import org.apache.hadoop.hive.ql.plan.MapJoinDesc;
@@ -77,6 +79,7 @@ import org.apache.hadoop.hive.serde2.ByteStream;
 import org.apache.hadoop.hive.serde2.SerDeException;
 import org.apache.hadoop.hive.serde2.SerDeUtils;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorFactory;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorUtils;
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.StandardStructObjectInspector;
@@ -153,10 +156,6 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
     private static boolean addedCloseThread;
     private transient Iterator<VecBatch> output;
 
-    private transient OmniFilterAndProjectOperatorFactory filterAndProjectOperatorFactory;
-
-    private transient OmniOperator filterOperator;
-
     public OmniMapJoinOperator() {
         super();
     }
@@ -228,26 +227,6 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
             for (int i = 0; i < vecBatchList.size(); i++) {
                 buildVecs[buildIndexes.get(i)] = vecBatchList.get(i);
             }
-        }
-        if (conf.getResidualFilterExprs() != null && !conf.getResidualFilterExprs().isEmpty()) {
-            BaseExpression root = ExpressionUtils.build((ExprNodeGenericFuncDesc) conf.getResidualFilterExprs().get(0),
-                    outputObjInspector);
-            List<? extends StructField> allStructFieldRefs = ((StructObjectInspector) outputObjInspector)
-                    .getAllStructFieldRefs();
-            DataType[] inputTypes = new DataType[allStructFieldRefs.size()];
-            String[] projections = new String[allStructFieldRefs.size()];
-            for (int i = 0; i < allStructFieldRefs.size(); i++) {
-                if (allStructFieldRefs.get(i).getFieldObjectInspector() instanceof PrimitiveObjectInspector) {
-                    PrimitiveTypeInfo typeInfo = ((PrimitiveObjectInspector) allStructFieldRefs.get(i)
-                            .getFieldObjectInspector()).getTypeInfo();
-                    int omniType = TypeUtils.convertHiveTypeToOmniType(typeInfo);
-                    inputTypes[i] = TypeUtils.buildInputDataType(typeInfo);
-                    projections[i] = TypeUtils.buildExpression(typeInfo, omniType, i);
-                }
-            }
-            this.filterAndProjectOperatorFactory = new OmniFilterAndProjectOperatorFactory(root.toString(), inputTypes,
-                    Arrays.asList(projections), 1, new OperatorConfig(SpillConfig.NONE, new OverflowConfig(), true));
-            this.filterOperator = this.filterAndProjectOperatorFactory.createOperator();
         }
         if (!addedCloseThread) {
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
@@ -583,7 +562,7 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
                     buildOutputCols, buildOutputTypes, omniHashBuilderWithExprOperatorFactory);
         } else {
             return new OmniLookupJoinWithExprOperatorFactory(probeTypes, probeOutputCols, probeHashKeys,
-                    buildOutputCols, buildOutputTypes, joinType, omniHashBuilderWithExprOperatorFactory);
+                    buildOutputCols, buildOutputTypes, joinType, omniHashBuilderWithExprOperatorFactory, generateResidualFilter());
         }
     }
 
@@ -737,8 +716,22 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
         if (conf.getResidualFilterExprs() == null || conf.getResidualFilterExprs().isEmpty()) {
             return Optional.empty();
         }
+        Map<String, String> inputColNameToExprName = new HashMap<>();
+        for (Map.Entry<String, ExprNodeDesc> entry : conf.getColumnExprMap().entrySet()) {
+            ExprNodeColumnDesc exprNodeColumnDesc = (ExprNodeColumnDesc) entry.getValue();
+            inputColNameToExprName.put(exprNodeColumnDesc.getColumn(), entry.getKey());
+        }
+        List<? extends StructField> fields = ((StructObjectInspector) inputObjInspectors[posBigTable]).getAllStructFieldRefs();
+        List<String> fieldNames = fields.stream().map(StructField::getFieldName).collect(Collectors.toList());
+        List<ObjectInspector> inspectors = fields.stream().map(StructField::getFieldObjectInspector).collect(Collectors.toList());
+        for (int buildIndex : buildIndexes) {
+            fields = ((StructObjectInspector) inputObjInspectors[buildIndex]).getAllStructFieldRefs();
+            fieldNames.addAll(fields.stream().map(field -> inputColNameToExprName.getOrDefault(field.getFieldName(), field.getFieldName())).collect(Collectors.toList()));
+            inspectors.addAll(fields.stream().map(StructField::getFieldObjectInspector).collect(Collectors.toList()));
+        }
+        StructObjectInspector exprObjInspector = ObjectInspectorFactory.getStandardStructObjectInspector(fieldNames, inspectors);
         ExprNodeGenericFuncDesc predicate = (ExprNodeGenericFuncDesc) conf.getResidualFilterExprs().get(0);
-        return Optional.of(ExpressionUtils.build(predicate, outputObjInspector).toString());
+        return Optional.of(ExpressionUtils.build(predicate, exprObjInspector).toString());
     }
 
     @Override
@@ -751,19 +744,7 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
             if (order != null) {
                 vecBatch = reorderVecs(vecBatch, order, joinValuesObjectInspectors);
             }
-            if (filterOperator != null) {
-                filterAndForward(vecBatch);
-            } else {
-                forward(vecBatch, outputObjInspector);
-            }
-        }
-    }
-
-    private void filterAndForward(VecBatch vecBatch) throws HiveException {
-        filterOperator.addInput(vecBatch);
-        output = this.filterOperator.getOutput();
-        while (output.hasNext()) {
-            forward(output.next(), outputObjInspector);
+            forward(vecBatch, outputObjInspector);
         }
     }
 
@@ -843,10 +824,6 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
         omniLookupJoinWithExprOperatorFactory.close();
         omniHashBuilderWithExprOperatorFactory.close();
         output = null;
-        if (filterOperator != null) {
-            filterOperator.close();
-            filterAndProjectOperatorFactory.close();
-        }
         super.closeOp(abort);
     }
 
