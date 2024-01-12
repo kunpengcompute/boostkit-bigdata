@@ -136,7 +136,6 @@ std::shared_ptr <HadoopFileSystem> getHdfsFileSystem(const std::string &host, co
         options.ConfigurePort(portInt);
     }
 
-    std::cout << "create hdfs filesystem, host is " << options.host_ << ", port is " << options.port_ << std::endl;
     std::shared_ptr <HadoopFileSystem> fs(new HadoopFileSystem(options));
     fileSystemPtr = fs;
     fsMap_[key] = fs;
