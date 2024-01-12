@@ -55,6 +55,7 @@ import org.apache.hadoop.hive.ql.hooks.HookContext;
 import org.apache.hadoop.hive.ql.io.orc.OrcInputFormat;
 import org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat;
 
+import org.apache.hadoop.hive.ql.metadata.Table;
 import org.apache.hadoop.hive.ql.plan.AggregationDesc;
 import org.apache.hadoop.hive.ql.plan.BaseWork;
 import org.apache.hadoop.hive.ql.plan.CommonMergeJoinDesc;
@@ -501,7 +502,8 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         if (tableScanDesc.getNeededColumns().isEmpty()) {
             return false;
         }
-        if (!tableScanDesc.getTableMetadata().getInputFormatClass().equals(OrcInputFormat.class)) {
+        Table tableMetadata = tableScanDesc.getTableMetadata();
+        if (tableMetadata != null && !tableMetadata.getInputFormatClass().equals(OrcInputFormat.class)) {
             return false;
         }
         for (String field : tableScanDesc.getNeededColumns()) {
