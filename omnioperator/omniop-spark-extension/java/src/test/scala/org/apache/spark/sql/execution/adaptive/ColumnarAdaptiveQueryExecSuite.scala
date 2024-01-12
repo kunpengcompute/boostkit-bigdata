@@ -438,7 +438,8 @@ class ColumnarAdaptiveQueryExecSuite extends ColumnarSparkPlanTest
       val smj = findTopLevelSortMergeJoin(plan)
       assert(smj.size == 3)
       val bhj = findTopLevelColumnarBroadcastHashJoin(adaptivePlan)
-      assert(bhj.size == 3)
+      assert(bhj.size == 3,
+        s"not match ColumnarLocalLimitExec, real plan: ${adaptivePlan}")
 
       // A possible resulting query plan:
       // BroadcastHashJoin
