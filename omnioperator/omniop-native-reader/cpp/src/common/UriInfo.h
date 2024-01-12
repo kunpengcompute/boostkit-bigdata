@@ -19,6 +19,9 @@
 #ifndef URI_INFO_H
 #define URI_INFO_H
 
+#include <iostream>
+#include <cstring>
+
 /// \brief A parsed URI
 class UriInfo {
 public:
