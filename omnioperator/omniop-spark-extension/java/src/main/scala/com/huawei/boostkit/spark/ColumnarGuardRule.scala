@@ -62,6 +62,8 @@ case class ColumnarGuardRule() extends Rule[SparkPlan] {
   val enableColumnarFileScan: Boolean = columnarConf.enableColumnarFileScan
   val optimizeLevel: Integer = columnarConf.joinOptimizationThrottle
   val enableColumnarCoalesce: Boolean = columnarConf.enableColumnarCoalesce
+  val enableLocalColumnarLimit: Boolean = columnarConf.enableLocalColumnarLimit
+  val enableGlobalColumnarLimit: Boolean = columnarConf.enableGlobalColumnarLimit
 
   private def tryConvertToColumnar(plan: SparkPlan): Boolean = {
     try {
@@ -197,6 +199,12 @@ case class ColumnarGuardRule() extends Rule[SparkPlan] {
             plan.condition,
             plan.left,
             plan.right).buildCheck()
+        case plan: LocalLimitExec =>
+          if (!enableLocalColumnarLimit) return false
+          ColumnarLocalLimitExec(plan.limit, plan.child).buildCheck()
+        case plan: GlobalLimitExec =>
+          if (!enableGlobalColumnarLimit) return false
+          ColumnarGlobalLimitExec(plan.limit, plan.child).buildCheck()
         case plan: BroadcastNestedLoopJoinExec => return false
         case plan: CoalesceExec =>
           if (!enableColumnarCoalesce) return false

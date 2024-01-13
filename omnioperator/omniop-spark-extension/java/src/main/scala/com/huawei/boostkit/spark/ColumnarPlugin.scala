@@ -67,6 +67,8 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] with PredicateHelper{
   val dedupLeftSemiJoinThreshold: Int = columnarConf.dedupLeftSemiJoinThreshold
   val enableColumnarCoalesce: Boolean = columnarConf.enableColumnarCoalesce
   val enableRollupOptimization: Boolean = columnarConf.enableRollupOptimization
+  val enableLocalColumnarLimit: Boolean = columnarConf.enableLocalColumnarLimit
+  val enableGlobalColumnarLimit: Boolean = columnarConf.enableGlobalColumnarLimit
 
   def apply(plan: SparkPlan): SparkPlan = {
     replaceWithColumnarPlan(plan)
@@ -765,6 +767,14 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] with PredicateHelper{
         case _ =>
           plan
       }
+    case plan: LocalLimitExec if enableLocalColumnarLimit =>
+      val child = replaceWithColumnarPlan(plan.child)
+      logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
+      ColumnarLocalLimitExec(plan.limit, child)
+    case plan: GlobalLimitExec if enableGlobalColumnarLimit =>
+      val child = replaceWithColumnarPlan(plan.child)
+      logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
+      ColumnarGlobalLimitExec(plan.limit, child)
     case plan: CoalesceExec if enableColumnarCoalesce =>
       val child = replaceWithColumnarPlan(plan.child)
       logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")

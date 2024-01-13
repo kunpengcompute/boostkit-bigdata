@@ -230,6 +230,13 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
 
   val radixSortThreshold: Int =
     conf.getConfString("spark.omni.sql.columnar.radixSortThreshold", "1000000").toInt
+    
+    
+  val enableLocalColumnarLimit : Boolean = 
+    conf.getConfString("spark.omni.sql.columnar.localLimit", "true").toBoolean
+
+  val enableGlobalColumnarLimit : Boolean = 
+    conf.getConfString("spark.omni.sql.columnar.globalLimit", "true").toBoolean
 }
 
 

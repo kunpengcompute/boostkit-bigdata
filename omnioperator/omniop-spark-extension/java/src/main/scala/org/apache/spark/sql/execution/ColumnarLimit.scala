@@ -17,37 +17,152 @@
 
 package org.apache.spark.sql.execution
 
-import java.util.concurrent.TimeUnit.NANOSECONDS
 import com.huawei.boostkit.spark.Constant.IS_SKIP_VERIFY_EXP
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor.{checkOmniJsonWhiteList, getExprIdMap, isSimpleColumnForAll, rewriteToOmniJsonExpressionLiteral, sparkTypeToOmniType}
 import com.huawei.boostkit.spark.serialize.ColumnarBatchSerializer
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil
-import com.huawei.boostkit.spark.util.OmniAdaptorUtil.{addAllAndGetIterator, genSortParam}
+import com.huawei.boostkit.spark.util.OmniAdaptorUtil.{addAllAndGetIterator, genSortParam, transColBatchToOmniVecs}
 import nova.hetu.omniruntime.`type`.DataType
 import nova.hetu.omniruntime.operator.config.{OperatorConfig, OverflowConfig, SpillConfig}
+import nova.hetu.omniruntime.operator.limit.OmniLimitOperatorFactory
 import nova.hetu.omniruntime.operator.topn.OmniTopNWithExprOperatorFactory
-import org.apache.spark.rdd.RDD
+import nova.hetu.omniruntime.vector.VecBatch
+
+import org.apache.spark.rdd.{ParallelCollectionRDD, RDD}
 import org.apache.spark.serializer.Serializer
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.catalyst.plans.physical.{Partitioning, SinglePartition}
+import org.apache.spark.sql.catalyst.expressions.{Attribute, NamedExpression, SortOrder}
+import org.apache.spark.sql.catalyst.plans.physical.{AllTuples, Distribution, Partitioning, SinglePartition}
 import org.apache.spark.sql.catalyst.util.truncatedString
 import org.apache.spark.sql.execution.ColumnarProjection.dealPartitionData
-import org.apache.spark.sql.execution.metric._
+import org.apache.spark.sql.execution.metric.{SQLMetric, SQLMetrics, SQLShuffleReadMetricsReporter, SQLShuffleWriteMetricsReporter}
 import org.apache.spark.sql.execution.util.SparkMemoryUtils
+import org.apache.spark.sql.execution.vectorized.OmniColumnVector
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.vectorized.ColumnarBatch
 
+import java.util.concurrent.TimeUnit.NANOSECONDS
+
+trait ColumnarBaseLimitExec extends LimitExec {
+
+  override def outputOrdering: Seq[SortOrder] = child.outputOrdering
+
+  override def outputPartitioning: Partitioning = child.outputPartitioning
+
+  override def supportsColumnar: Boolean = true
+
+  override def output: Seq[Attribute] = child.output
+
+  override lazy val metrics = Map(
+    "addInputTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni addInput"),
+    "omniCodegenTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni codegen"),
+    "getOutputTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni getOutput"),
+    "numOutputRows" -> SQLMetrics.createMetric(sparkContext, "number of output rows"),
+    "numOutputVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatchs"))
+
+  protected override def doExecuteColumnar(): RDD[ColumnarBatch] = {
+    val addInputTime = longMetric("addInputTime")
+    val omniCodegenTime = longMetric("omniCodegenTime")
+    val getOutputTime = longMetric("getOutputTime")
+    val numOutputRows = longMetric("numOutputRows")
+    val numOutputVecBatchs = longMetric("numOutputVecBatchs")
+
+    child.executeColumnar().mapPartitions { iter =>
+
+      val startCodegen = System.nanoTime()
+      val limitOperatorFactory = new OmniLimitOperatorFactory(limit)
+      val limitOperator = limitOperatorFactory.createOperator
+      omniCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startCodegen)
+
+      // close operator
+      SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
+        limitOperator.close()
+      })
+
+      val localSchema = this.schema
+      new Iterator[ColumnarBatch] {
+        private var results: java.util.Iterator[VecBatch] = _
+
+        override def hasNext: Boolean = {
+          while ((results == null || !results.hasNext) && iter.hasNext) {
+            val batch = iter.next()
+            val input = transColBatchToOmniVecs(batch)
+            val vecBatch = new VecBatch(input, batch.numRows())
+            val startInput = System.nanoTime()
+            limitOperator.addInput(vecBatch)
+            addInputTime += NANOSECONDS.toMillis(System.nanoTime() - startInput)
+
+            val startGetOp = System.nanoTime()
+            results = limitOperator.getOutput
+            getOutputTime += NANOSECONDS.toMillis(System.nanoTime() - startGetOp)
+          }
+          if (results == null) {
+            false
+          } else {
+            val startGetOp: Long = System.nanoTime()
+            val hasNext = results.hasNext
+            getOutputTime += NANOSECONDS.toMillis(System.nanoTime() - startGetOp)
+            hasNext
+          }
+        }
+
+        override def next(): ColumnarBatch = {
+          val startGetOp = System.nanoTime()
+          val vecBatch = results.next()
+          getOutputTime += NANOSECONDS.toMillis(System.nanoTime() - startGetOp)
+          val vectors: Seq[OmniColumnVector] = OmniColumnVector.allocateColumns(
+            vecBatch.getRowCount, localSchema, false)
+          vectors.zipWithIndex.foreach { case (vector, i) =>
+            vector.reset()
+            vector.setVec(vecBatch.getVectors()(i))
+          }
+          numOutputRows += vecBatch.getRowCount
+          numOutputVecBatchs += 1
+          vecBatch.close()
+          new ColumnarBatch(vectors.toArray, vecBatch.getRowCount)
+        }
+      }
+    }
+  }
+
+  protected override def doExecute() = {
+    throw new UnsupportedOperationException("This operator doesn't support doExecute()")
+  }
+}
+
+case class ColumnarLocalLimitExec(limit: Int, child: SparkPlan)
+  extends ColumnarBaseLimitExec{
+
+  override def nodeName: String = "OmniColumnarLocalLimit"
+
+  def buildCheck(): Unit = {
+    child.output.foreach(attr => sparkTypeToOmniType(attr.dataType, attr.metadata))
+  }
+}
+
+case class ColumnarGlobalLimitExec(limit: Int, child: SparkPlan)
+  extends ColumnarBaseLimitExec{
+
+  override def requiredChildDistribution: List[Distribution] = AllTuples :: Nil
+
+  override def nodeName: String = "OmniColumnarGlobalLimit"
+
+  def buildCheck(): Unit = {
+    child.output.foreach(attr => sparkTypeToOmniType(attr.dataType, attr.metadata))
+  }
+}
+
 case class ColumnarTakeOrderedAndProjectExec(
-    limit: Int,
-    sortOrder: Seq[SortOrder],
-    projectList: Seq[NamedExpression],
-    child: SparkPlan)
+                                              limit: Int,
+                                              sortOrder: Seq[SortOrder],
+                                              projectList: Seq[NamedExpression],
+                                              child: SparkPlan)
   extends UnaryExecNode {
 
   override def supportsColumnar: Boolean = true
 
   override def nodeName: String = "OmniColumnarTakeOrderedAndProject"
+
 
   val serializer: Serializer = new ColumnarBatchSerializer(
     longMetric("avgReadBatchNumRows"),
@@ -114,7 +229,7 @@ case class ColumnarTakeOrderedAndProjectExec(
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val topNOperator = topNOperatorFactory.createOperator
       longMetric("omniCodegenTime") += NANOSECONDS.toMillis(System.nanoTime() - startCodegen)
-      SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit]( _ => {
+      SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
         topNOperator.close()
       })
       addAllAndGetIterator(topNOperator, iter, schema,
