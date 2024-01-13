@@ -85,7 +85,9 @@ import org.apache.hadoop.hive.ql.plan.ptf.PTFExpressionDef;
 import org.apache.hadoop.hive.ql.plan.ptf.WindowFunctionDef;
 import org.apache.hadoop.hive.ql.plan.ptf.WindowTableFunctionDef;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDFConcat;
+import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
+import org.apache.hadoop.hive.serde2.typeinfo.DecimalTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -310,7 +312,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                 for (int i = 0; i < windowFunctionDefs.size(); i++) {
                     WindowFunctionDef windowFunctionDef = windowFunctionDefs.get(i);
                     FunctionType windowFunctionType = TypeUtils.getWindowFunctionType(windowFunctionDef);
-                    if (windowFunctionType == null || windowFunctionType == OMNI_AGGREGATION_TYPE_AVG) {
+                    if (windowFunctionType == null || windowFunctionType == OMNI_AGGREGATION_TYPE_AVG && isAvgUnsupported(windowFunctionDef.getArgs())) {
                         return false;
                     }
                     List<PTFExpressionDef> args = windowFunctionDefs.get(i).getArgs();
@@ -363,6 +365,21 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             default:
                 return true;
         }
+    }
+
+    private boolean isAvgUnsupported(List<PTFExpressionDef> expressions) {
+        for (PTFExpressionDef expression : expressions) {
+            ObjectInspector oi = expression.getOI();
+            if (!(oi instanceof PrimitiveObjectInspector)) {
+                continue;
+            }
+            PrimitiveTypeInfo primitiveTypeInfo = ((PrimitiveObjectInspector) oi).getTypeInfo();
+            if (primitiveTypeInfo.getPrimitiveCategory().equals(PrimitiveObjectInspector.PrimitiveCategory.DECIMAL)
+                    && ((DecimalTypeInfo) primitiveTypeInfo).getPrecision() > 19) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean isUDFSupport(List<ExprNodeDesc> colList) {

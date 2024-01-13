@@ -83,6 +83,7 @@ import org.apache.hadoop.hive.serde2.typeinfo.DecimalTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.VarcharTypeInfo;
+import org.apache.parquet.format.DecimalType;
 
 import java.util.HashMap;
 import java.util.List;
@@ -330,15 +331,22 @@ public class TypeUtils {
         }
 
         // not support Cast(double/decimal as decimal)
-        if ((dataType == OMNI_DOUBLE.toValue() || dataType == OMNI_DECIMAL64.toValue()
-                || dataType == OMNI_DECIMAL128.toValue())
+        if ((dataType == OMNI_DOUBLE.toValue() || dataType == OMNI_DECIMAL64.toValue())
                 && (returnType == OMNI_DECIMAL64.toValue() || returnType == OMNI_DECIMAL128.toValue())) {
             return true;
         }
-
+        if (dataType == OMNI_DECIMAL128.toValue() && returnType == OMNI_DECIMAL128.toValue()) {
+            BaseExpression child = castFunctionExpression.getArguments().get(0);
+            if (!(child instanceof DecimalReference)) {
+                return false;
+            }
+            if (!((DecimalReference) child).getPrecision().equals(castFunctionExpression.getPrecision())) {
+                return true;
+            }
+        }
         // not support Cast(decimal as short/int/long)
         if ((dataType == OMNI_DECIMAL64.toValue() || dataType == OMNI_DECIMAL128.toValue())
-                && (returnType ==OMNI_SHORT.toValue() || returnType == OMNI_INT.toValue()
+                && (returnType == OMNI_SHORT.toValue() || returnType == OMNI_INT.toValue()
                 || returnType == OMNI_LONG.toValue())) {
             return true;
         }
@@ -348,7 +356,8 @@ public class TypeUtils {
     public static boolean checkUnsupportedArithmetic(ExprNodeGenericFuncDesc node) {
         List<ExprNodeDesc> children = node.getChildren();
         String functionName = node.getGenericUDF().getClass().getSimpleName();
-        boolean anyDecimal = children.stream().anyMatch((child -> child.getTypeInfo() instanceof DecimalTypeInfo));
+        boolean anyDecimal = children.stream().anyMatch(child -> child.getTypeInfo() instanceof DecimalTypeInfo
+                && ((DecimalTypeInfo) child.getTypeInfo()).getPrecision() > 19);
         if ((functionName.equals("GenericUDFOPMultiply") || functionName.equals("GenericUDFOPDivide")
                 || functionName.equals("GenericUDFOPMod")) && anyDecimal) {
             return true;

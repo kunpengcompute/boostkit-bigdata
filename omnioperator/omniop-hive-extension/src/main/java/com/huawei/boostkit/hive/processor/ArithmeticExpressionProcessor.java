@@ -54,13 +54,25 @@ public class ArithmeticExpressionProcessor implements ExpressionProcessor {
         List<ExprNodeDesc> children = node.getChildren();
         Integer precision = null;
         Integer scale = null;
+        String functionName = node.getGenericUDF().getClass().getSimpleName();
+        boolean needUpscale = functionName.equals("GenericUDFOPMultiply") || functionName.equals("GenericUDFOPDivide")
+                || functionName.equals("GenericUDFOPMod");
+        int maxScale = 0;
         if (node.getTypeInfo() instanceof DecimalTypeInfo) {
             precision = ((DecimalTypeInfo) node.getTypeInfo()).getPrecision();
             scale = ((DecimalTypeInfo) node.getTypeInfo()).getScale();
+            maxScale = scale;
+            for(ExprNodeDesc child : children) {
+                if (child.getTypeInfo() instanceof DecimalTypeInfo) {
+                    DecimalTypeInfo childTypeInfo = (DecimalTypeInfo) child.getTypeInfo();
+                    int childScale = childTypeInfo.getScale();
+                    if (childScale >= maxScale) {
+                        maxScale = childScale;
+                    }
+                }
+            }
         }
-
         int returnType = TypeUtils.convertHiveTypeToOmniType(node.getTypeInfo());
-
         DivideExpression compareExpression = new DivideExpression(returnType,
                 OPERATOR.get(node.getGenericUDF().getClass()), precision, scale);
         for (ExprNodeDesc child : children) {
@@ -71,15 +83,26 @@ public class ArithmeticExpressionProcessor implements ExpressionProcessor {
                 childNode = ExpressionUtils.createNode(child, inspector);
             }
             if (!child.getTypeInfo().equals(node.getTypeInfo())) {
+                Integer childPrecision = null;
+                Integer childScale = null;
                 if (child.getTypeInfo() instanceof DecimalTypeInfo) {
-                    if (precision == ((DecimalTypeInfo) child.getTypeInfo()).getPrecision()
-                            && scale == ((DecimalTypeInfo) child.getTypeInfo()).getScale()) {
-                        compareExpression.add(childNode);
-                        continue;
+                    if (needUpscale) {
+                        childScale = ((DecimalTypeInfo) child.getTypeInfo()).getScale();
+                        childPrecision = ((DecimalTypeInfo) child.getTypeInfo()).getPrecision();
+                        if (maxScale == childScale) {
+                            compareExpression.add(childNode);
+                            continue;
+                        } else {
+                            childPrecision = Math.max(childPrecision + maxScale - childScale, precision);
+                            childScale = maxScale;
+                        }
+                    } else {
+                        childPrecision = precision;
+                        childScale = scale;
                     }
                 }
                 CastFunctionExpression functionExpression = new CastFunctionExpression(returnType,
-                        TypeUtils.getCharWidth(node), precision, scale);
+                        TypeUtils.getCharWidth(node), childPrecision, childScale);
                 compareExpression.add(ExpressionUtils.optimizeCast(childNode, functionExpression));
             } else {
                 compareExpression.add(childNode);

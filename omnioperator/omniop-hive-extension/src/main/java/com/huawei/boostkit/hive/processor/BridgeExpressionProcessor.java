@@ -34,6 +34,7 @@ import java.util.List;
 public class BridgeExpressionProcessor implements ExpressionProcessor {
     public static final List<String> SUPPORT_BRIDGE_UDF = new ArrayList<String>() {
         {
+            add("UDFToString");
             add("UDFToDouble");
             add("UDFToInteger");
             add("UDFToLong");
