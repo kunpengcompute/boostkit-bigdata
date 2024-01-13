@@ -530,6 +530,51 @@ class ColumnarExpandExecSuite extends ColumnarSparkPlanTest {
     checkExpandExecAndColumnarExpandExecAgree(sql)
   }
 
+  // test distinct + rollup
+  test("ColumnarExpandExec and ExpandExec return the same result when use Rollup clause") {
+    val result = spark.sql("SELECT city, car_model, sum(DISTINCT id) AS sum, count(DISTINCT quantity) AS count FROM dealer " +
+      "GROUP BY city, car_model WITH ROLLUP ORDER BY city, car_model;")
+    val plan = result.queryExecution.executedPlan
+    assert(plan.find(_.isInstanceOf[ColumnarExpandExec]).isDefined)
+    assert(plan.find(_.isInstanceOf[ColumnarOptRollupExec]).isEmpty)
+  }
+
+  test("ColumnarExpandExec and ExpandExec return the same result when use Rollup clause") {
+    val sql = "SELECT city, car_model, count(DISTINCT quantity) AS count FROM dealer " +
+      "GROUP BY city, car_model WITH ROLLUP ORDER BY city, car_model;"
+    checkExpandExecAndColumnarExpandExecAgree(sql)
+  }
+
+  test("ColumnarExpandExec and ExpandExec return the same result when use Rollup clause") {
+    val sql = "SELECT city, car_model, count(DISTINCT quantity) AS count, sum(id) AS sum FROM dealer " +
+      "GROUP BY city, car_model WITH ROLLUP ORDER BY city, car_model;"
+    checkExpandExecAndColumnarExpandExecAgree(sql)
+  }
+
+  test("ColumnarExpandExec and ExpandExec return the same result when use Rollup clause") {
+    val sql = "SELECT city, car_model, sum(id) AS sum, count(DISTINCT quantity) AS count FROM dealer " +
+      "GROUP BY city, car_model WITH ROLLUP ORDER BY city, car_model;"
+    checkExpandExecAndColumnarExpandExecAgree(sql)
+  }
+
+  test("ColumnarExpandExec and ExpandExec return the same result when use Rollup clause") {
+    val sql = "SELECT city, car_model, sum(DISTINCT coalesce(id * quantity, 0)) AS sum FROM dealer " +
+      "GROUP BY city, car_model WITH ROLLUP ORDER BY city, car_model;"
+    checkExpandExecAndColumnarExpandExecAgree(sql)
+  }
+
+  test("ColumnarExpandExec and ExpandExec return the same result when use Rollup clause") {
+    val sql = "SELECT city, car_model, sum(coalesce(id * quantity, 0)) AS sum, count(DISTINCT quantity) AS count FROM dealer " +
+      "GROUP BY city, car_model WITH ROLLUP ORDER BY city, car_model;"
+    checkExpandExecAndColumnarExpandExecAgree(sql)
+  }
+
+  test("ColumnarExpandExec and ExpandExec return the same result when use Rollup clause") {
+    val sql = "SELECT city, count(car_model) AS count1, count(DISTINCT quantity) AS count2, sum(id) AS sum FROM dealer " +
+      "GROUP BY city, car_model WITH ROLLUP ORDER BY city, car_model;"
+    checkExpandExecAndColumnarExpandExecAgree(sql)
+  }
+
   // check ExpandExec and ColumnarExpandExec return the same result
   def checkExpandExecAndColumnarExpandExecAgree(sql: String): Unit = {
     spark.conf.set("spark.omni.sql.columnar.expand", true)
