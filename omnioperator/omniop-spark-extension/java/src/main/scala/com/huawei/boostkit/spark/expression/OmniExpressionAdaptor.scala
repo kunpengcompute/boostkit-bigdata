@@ -55,14 +55,10 @@ object OmniExpressionAdaptor extends Logging {
     }
   }
 
-  def getExprIdMap(inputAttrs: Seq[Expression]): Map[ExprId, Int] = {
+  def getExprIdMap(inputAttrs: Seq[Attribute]): Map[ExprId, Int] = {
     var attrMap: Map[ExprId, Int] = Map()
     inputAttrs.zipWithIndex.foreach { case (inputAttr, i) =>
-      inputAttr match {
-        case attr: AttributeReference =>
-          attrMap += (attr.exprId -> i)
-        case _ =>
-      }
+      attrMap += (inputAttr.exprId -> i)
     }
     attrMap
   }

@@ -20,10 +20,9 @@ package com.huawei.boostkit.spark
 
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor
 import com.huawei.boostkit.spark.util.PhysicalPlanSelector
-
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{SparkSession, SparkSessionExtensions}
-import org.apache.spark.sql.catalyst.expressions.{Ascending, DynamicPruningSubquery, SortOrder}
+import org.apache.spark.sql.catalyst.expressions.{Ascending, DynamicPruningSubquery, Expression, Literal, SortOrder}
 import org.apache.spark.sql.catalyst.expressions.aggregate.{AggregateExpression, Partial, PartialMerge}
 import org.apache.spark.sql.catalyst.optimizer.{DelayCartesianProduct, HeuristicJoinReorder, MergeSubqueryFilters, RewriteSelfJoinInInPredicate}
 import org.apache.spark.sql.catalyst.rules.Rule
@@ -339,16 +338,29 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] {
 
 
             // If the aggregator has an expression, more than one column in the projection is used
-            // for expression calculation. Therefore, we need to calculate the start offset of the
-            // group column first.
-            val projection = residualProjections.head
-            val offset = projection.length - (partialHashAggExec.output.length - partialHashAggExec.aggregateAttributes.length)
-            val input = projection.slice(offset, projection.length) ++ partialHashAggExec.aggregateAttributes
+            // for expression calculation. Meanwhile, If the single distinct syntax exists, the
+            // sequence of group columns is disordered. Therefore, we need to calculate the sequence
+            // of expandSeq first to ensure the project operator correctly processes the columns.
+            val expectSeq = plan.resultExpressions
+            val expandSeq = columnarExpandExec.output
+            // the processing sequences of expandSeq
             residualProjections = residualProjections.map(projection => {
-              projection.slice(offset, projection.length) ++ partialHashAggExec.aggregateAttributes
+              val indexSeq: Seq[Expression] = expectSeq.map(expectExpr => {
+                val index = expandSeq.indexWhere(expandExpr => expectExpr.exprId.equals(expandExpr.exprId))
+                if (index != -1) {
+                  projection.apply(index) match {
+                    case literal: Literal => literal
+                    case _ => expectExpr
+                  }
+                } else {
+                  expectExpr
+                }
+              })
+              indexSeq
             })
 
             // partial merge
+            val groupingExpressions = plan.resultExpressions.slice(0, plan.groupingExpressions.length)
             val aggregateExpressions = plan.aggregateExpressions.map(expr => {
               expr.copy(expr.aggregateFunction, PartialMerge, expr.isDistinct, expr.filter, expr.resultId)
             })
@@ -356,9 +368,8 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] {
             // need ExpandExec parameters and HashAggExec parameters
             new ColumnarOptRollupExec(
               residualProjections,
-              input,
               plan.output,
-              plan.groupingExpressions,
+              groupingExpressions,
               aggregateExpressions,
               plan.aggregateAttributes,
               partialHashAggExec)
