@@ -14,7 +14,7 @@ import org.apache.spark.sql.execution.adaptive.ock.common.OmniRuntimeConfigurati
 import org.apache.spark.sql.execution.adaptive.ock.common.StringPrefix.SHUFFLE_PREFIX
 import org.apache.spark.sql.execution.adaptive.ock.exchange._
 import org.apache.spark.sql.execution.adaptive.ock.reader._
-import org.apache.spark.sql.execution.adaptive.{CustomShuffleReaderExec, QueryStageExec, ShuffleQueryStageExec}
+import org.apache.spark.sql.execution.adaptive.{AQEShuffleReadExec, QueryStageExec, ShuffleQueryStageExec}
 import org.apache.spark.sql.execution.exchange.ReusedExchangeExec
 
 import scala.collection.mutable
@@ -111,19 +111,19 @@ case class OmniOpBoostTuningPostColumnarRule() extends Rule[SparkPlan] {
     newPlan = additionalReplaceWithColumnarPlan(newPlan)
 
     newPlan.transformUp {
-      case c: CustomShuffleReaderExec if ColumnarPluginConfig.getConf.enableColumnarShuffle =>
+      case c: AQEShuffleReadExec if ColumnarPluginConfig.getConf.enableColumnarShuffle =>
         c.child match {
           case shuffle: BoostTuningColumnarShuffleExchangeExec =>
             logDebug(s"Columnar Processing for ${c.getClass} is currently supported.")
-            BoostTuningColumnarCustomShuffleReaderExec(c.child, c.partitionSpecs)
-          case ShuffleQueryStageExec(_, shuffle: BoostTuningColumnarShuffleExchangeExec) =>
+            BoostTuningOmniAQEShuffleReadExec(c.child, c.partitionSpecs)
+          case ShuffleQueryStageExec(_, shuffle: BoostTuningColumnarShuffleExchangeExec, _) =>
             logDebug(s"Columnar Processing for ${c.getClass} is currently supported.")
-            BoostTuningColumnarCustomShuffleReaderExec(c.child, c.partitionSpecs)
-          case ShuffleQueryStageExec(_, reused: ReusedExchangeExec) =>
+            BoostTuningOmniAQEShuffleReadExec(c.child, c.partitionSpecs)
+          case ShuffleQueryStageExec(_, reused: ReusedExchangeExec, _) =>
             reused match {
               case ReusedExchangeExec(_, shuffle: BoostTuningColumnarShuffleExchangeExec) =>
                 logDebug(s"Columnar Processing for ${c.getClass} is currently supported.")
-                BoostTuningColumnarCustomShuffleReaderExec(c.child, c.partitionSpecs)
+                BoostTuningOmniAQEShuffleReadExec(c.child, c.partitionSpecs)
               case _ =>
                 c
             }

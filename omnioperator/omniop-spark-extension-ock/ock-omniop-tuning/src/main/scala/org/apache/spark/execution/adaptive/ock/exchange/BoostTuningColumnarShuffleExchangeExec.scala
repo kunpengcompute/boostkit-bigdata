@@ -193,8 +193,7 @@ case class BoostTuningColumnarShuffleExchangeExec(
       cachedShuffleRDD.mapPartitionsWithIndexInternal { (index, iter) =>
         new MergeIterator(iter,
           StructType.fromAttributes(child.output),
-          longMetric("numMergedVecBatchs"),
-          longMetric("bypassVecBatchs"))
+          longMetric("numMergedVecBatchs"))
       }
     } else {
       cachedShuffleRDD

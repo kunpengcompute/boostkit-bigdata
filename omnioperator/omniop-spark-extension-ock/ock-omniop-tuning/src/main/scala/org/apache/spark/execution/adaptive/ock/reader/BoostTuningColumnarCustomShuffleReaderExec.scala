@@ -27,7 +27,7 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{Attribute, Expression}
 import org.apache.spark.sql.catalyst.plans.physical.{Partitioning, UnknownPartitioning}
 import org.apache.spark.sql.execution._
-import org.apache.spark.sql.execution.adaptive.ShuffleQueryStageExec
+import org.apache.spark.sql.execution.adaptive. ShuffleQueryStageExec
 import org.apache.spark.sql.execution.adaptive.ock.exchange.BoostTuningColumnarShuffleExchangeExec
 import org.apache.spark.sql.execution.exchange.{ReusedExchangeExec, ShuffleExchangeLike}
 import org.apache.spark.sql.execution.metric.{SQLMetric, SQLMetrics}
@@ -45,7 +45,7 @@ import scala.collection.mutable.ArrayBuffer
  *                        node during canonicalization.
  * @param partitionSpecs  The partition specs that defines the arrangement.
  */
-case class BoostTuningColumnarCustomShuffleReaderExec(
+case class BoostTuningOmniAQEShuffleReadeExec (
       child: SparkPlan,
       partitionSpecs: Seq[ShufflePartitionSpec])
   extends UnaryExecNode {
@@ -55,7 +55,7 @@ case class BoostTuningColumnarCustomShuffleReaderExec(
     assert(partitionSpecs.forall(_.isInstanceOf[PartialMapperPartitionSpec]))
   }
 
-  override def nodeName: String = "BoostTuningOmniColumnarCustomShuffleReaderExec"
+  override def nodeName: String = "BoostTuningOmniAQEShuffleReadeExec"
 
   override def supportsColumnar: Boolean = true
 
@@ -68,9 +68,9 @@ case class BoostTuningColumnarCustomShuffleReaderExec(
       partitionSpecs.map(_.asInstanceOf[PartialMapperPartitionSpec].mapIndex).toSet.size ==
         partitionSpecs.length) {
       child match {
-        case ShuffleQueryStageExec(_, s: ShuffleExchangeLike) =>
+        case ShuffleQueryStageExec(_, s: ShuffleExchangeLike, _) =>
           s.child.outputPartitioning
-        case ShuffleQueryStageExec(_, r @ ReusedExchangeExec(_, s: ShuffleExchangeLike)) =>
+        case ShuffleQueryStageExec(_, r @ ReusedExchangeExec(_, s: ShuffleExchangeLike), _) =>
           s.child.outputPartitioning match {
             case e: Expression => r.updateAttr(e).asInstanceOf[Partitioning]
             case other => other
@@ -116,7 +116,7 @@ case class BoostTuningColumnarCustomShuffleReaderExec(
     if (partitionSpecs.nonEmpty && !isLocalReader && shuffleStage.get.mapStats.isDefined) {
       val bytesByPartitionId = shuffleStage.get.mapStats.get.bytesByPartitionId
       Some(partitionSpecs.map {
-        case CoalescedPartitionSpec(startReducerIndex, endReducerIndex) =>
+        case CoalescedPartitionSpec(startReducerIndex, endReducerIndex, _) =>
           startReducerIndex.until(endReducerIndex).map(bytesByPartitionId).sum
         case p: PartialReducerPartitionSpec => p.dataSize
         case p => throw new IllegalStateException("unexpected " + p)
@@ -215,8 +215,7 @@ case class BoostTuningColumnarCustomShuffleReaderExec(
       cachedShuffleRDD.mapPartitionsWithIndexInternal { (index, iter) =>
         new MergeIterator(iter,
            StructType.fromAttributes(child.output),
-           longMetric("numMergedVecBatchs"),
-           longMetric("bypassVecBatchs"))
+           longMetric("numMergedVecBatchs"))
       }
     } else {
       cachedShuffleRDD
@@ -229,5 +228,9 @@ case class BoostTuningColumnarCustomShuffleReaderExec(
 
   override protected def doExecuteColumnar(): RDD[ColumnarBatch] = {
     shuffleRDD.asInstanceOf[RDD[ColumnarBatch]]
+  }
+
+  override protected def withNewChildInternal(newChild: SparkPlan): SparkPlan = {
+    new BoostTuningOmniAQEShuffleReadeExec(newChild, this.partitionSpecs)
   }
 }

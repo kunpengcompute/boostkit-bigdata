@@ -154,4 +154,8 @@ class OckColumnarShuffleWriter[K, V](
       }
     }
   }
+
+  override def getPartitionLengths(): Array[Long] = {
+    partitionLengths
+  }
 }

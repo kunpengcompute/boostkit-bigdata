@@ -9,7 +9,8 @@ import org.apache.spark._
 import org.apache.spark.executor.TempShuffleReadMetrics
 import org.apache.spark.internal.Logging
 import org.apache.spark.network.buffer.ManagedBuffer
-import org.apache.spark.shuffle.{FetchFailedException, ShuffleBlockResolver}
+import org.apache.spark.network.shuffle.MergedBlockMeta
+import org.apache.spark.shuffle.{FetchFailedException, ShuffleBlockResolver, ShuffleMergedBlockId}
 import org.apache.spark.storage.{BlockId, BlockManagerId}
 import org.apache.spark.util.{OCKConf, OCKFunctions}
 
@@ -27,6 +28,14 @@ class OckColumnarShuffleBlockResolver(conf: SparkConf, ockConf: OCKConf)
   }
 
   override def stop(): Unit = {}
+
+  override def getMergedBlockData(blockId: ShuffleMergedBlockId, dirs: Option[Array[String]]): Seq[ManagedBuffer] = {
+    null
+  }
+
+  override def getMergedBlockMeta(blockId: ShuffleMergedBlockId, dirs: Option[Array[String]]): MergedBlockMeta = {
+    null
+  }
 }
 
 object OckColumnarShuffleBlockResolver extends Logging {
