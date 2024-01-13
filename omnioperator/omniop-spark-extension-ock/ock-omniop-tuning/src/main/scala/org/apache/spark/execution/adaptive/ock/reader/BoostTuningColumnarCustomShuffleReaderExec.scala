@@ -45,7 +45,7 @@ import scala.collection.mutable.ArrayBuffer
  *                        node during canonicalization.
  * @param partitionSpecs  The partition specs that defines the arrangement.
  */
-case class BoostTuningOmniAQEShuffleReadeExec (
+case class BoostTuningOmniAQEShuffleReadExec (
       child: SparkPlan,
       partitionSpecs: Seq[ShufflePartitionSpec])
   extends UnaryExecNode {
@@ -231,6 +231,6 @@ case class BoostTuningOmniAQEShuffleReadeExec (
   }
 
   override protected def withNewChildInternal(newChild: SparkPlan): SparkPlan = {
-    new BoostTuningOmniAQEShuffleReadeExec(newChild, this.partitionSpecs)
+    new BoostTuningOmniAQEShuffleReadExec(newChild, this.partitionSpecs)
   }
 }
