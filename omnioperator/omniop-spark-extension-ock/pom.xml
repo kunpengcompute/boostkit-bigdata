@@ -17,7 +17,7 @@
      <scalaTest.version>3.2.3</scalaTest.version>
      <mockito.version>3.4.6</mockito.version>
      <spark.groupId>org.apache.spark</spark.groupId>
-     <input.version>spark-3.1</input.version>
+     <input.version>spark-3.3</input.version>
      <scala.plugin.version>3.2.0</scala.plugin.version>
      <maven.plugin.version>3.1.1</maven.plugin.version>
      <global.version>23.0.0</global.version>
