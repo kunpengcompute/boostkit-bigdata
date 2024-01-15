@@ -48,7 +48,7 @@ import java.util.List;
 
 import static nova.hetu.omniruntime.operator.config.OverflowConfig.OverflowConfigId.OVERFLOW_CONFIG_NULL;
 
-public class OmniFilterOperator extends OmniHiveOperator<FilterDesc> implements Serializable {
+public class OmniFilterOperator extends OmniHiveOperator<OmniFilterDesc> implements Serializable {
     private transient OmniFilterAndProjectOperatorFactory filterAndProjectOperatorFactory;
 
     private transient OmniOperator omniOperator;
@@ -64,7 +64,7 @@ public class OmniFilterOperator extends OmniHiveOperator<FilterDesc> implements 
 
     public OmniFilterOperator(CompilationOpContext ctx, FilterDesc conf) {
         super(ctx);
-        this.conf = conf;
+        this.conf = new OmniFilterDesc(conf);
     }
 
     @Override

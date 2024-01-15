@@ -115,6 +115,10 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
     private final Set<Operator> groupByOperatorNeedSort = new HashSet<>();
 
     private final Map<Operator, BaseWork> reduceSinkOpToWork = new HashMap<>();
+    // indicate reduce sink operators which can not replace.
+    private final Set<Operator> reduceSinkOpCannotReplace = new HashSet<>();
+    // indicate the task name which contains map join operators which can not replace
+    private final Set<String> parentOfMapJoinOpCannotReplace = new HashSet<>();
     private final List<Operator> mergeJoinNeedSort = new ArrayList<>();
     List<Operator<? extends OperatorDesc>> replaceable = new ArrayList<>();
 
@@ -129,6 +133,8 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         mergeJoinNeedSort.clear();
         replaceable.clear();
         replaceableInfo.clear();
+        reduceSinkOpCannotReplace.clear();
+        parentOfMapJoinOpCannotReplace.clear();
         tezWork = null;
     }
 
@@ -152,6 +158,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         }
         if (OMNI_OPERATOR.contains(OperatorType.REDUCESINK)) {
             initReduceSinkOpToWork();
+            initMapJoinOpToWork();
         }
         traverseTezWorks();
         for (OperatorInfo operatorInfo : replaceableInfo) {
@@ -170,6 +177,23 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             tezWork = (TezWork) ((ExplainTask) rootTask).getWork().getRootTasks().get(0).getWork();
         } else if (rootTask instanceof TezTask) {
             tezWork = (TezWork) rootTask.getWork();
+        }
+    }
+
+    private void initMapJoinOpToWork() {
+        for (BaseWork work : tezWork.getAllWork()) {
+            if (work instanceof UnionWork) {
+                continue;
+            }
+            for (Operator<? extends OperatorDesc> op : work.getAllOperators()) {
+                if (op.getType().equals(OperatorType.MAPJOIN)) {
+                    if (!isReplaceable(op, true)) {
+                        MapJoinDesc conf = (MapJoinDesc) op.getConf();
+                        Map<Integer, String> parentToInput = conf.getParentToInput();
+                        parentOfMapJoinOpCannotReplace.addAll(parentToInput.values());
+                    }
+                }
+            }
         }
     }
 
@@ -225,8 +249,11 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             if (op.getType() != null && op.getType().equals(OperatorType.GROUPBY) && groupNeedSort) {
                 groupByOperatorNeedSort.add(op);
             }
-            replaceableInfo.add(new OperatorInfo(op, work.getVectorMode(), vectorizedRowBatchCtx, reduceSinkCanReplace));
             if (op.getType() != null && op.getType().equals(OperatorType.REDUCESINK)) {
+                if (parentOfMapJoinOpCannotReplace.contains(work.getName())) {
+                    reduceSinkOpCannotReplace.add(op);
+                    return;
+                }
                 taskNameReplacedReduceSink.add(work.getName());
                 for (BaseWork parent : tezWork.getParents(work)) {
                     if (tezWork.getEdgeType(parent, work) == TezEdgeProperty.EdgeType.CONTAINS) {
@@ -234,6 +261,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                     }
                 }
             }
+            replaceableInfo.add(new OperatorInfo(op, work.getVectorMode(), vectorizedRowBatchCtx, reduceSinkCanReplace));
             replaceable.add(op);
         }
     }
@@ -247,6 +275,12 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                 return true;
             }
         }
+        if (operator.getType() != null && operator.getType().equals(OperatorType.REDUCESINK)) {
+            if (reduceSinkOpCannotReplace.contains(operator)) {
+                return false;
+            }
+        }
+
         return currentReplaceable(operator, reduceSinkCanReplace);
     }
 
@@ -259,6 +293,11 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         }
         switch (operator.getType()) {
             case MAPJOIN:
+                MapJoinDesc mapJoinDesc = (MapJoinDesc) operator.getConf();
+                // currently, only support size of join table less than 4.
+                if (mapJoinDesc.getKeys().size() > 3) {
+                    return false;
+                }
                 return SUPPORTED_JOIN.contains(((JoinDesc) operator.getConf()).getConds()[0].getType());
             case MERGEJOIN:
                 JoinDesc joinDesc = (JoinDesc) operator.getConf();
@@ -440,6 +479,9 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
 
     private boolean getReduceSinkCanReplace(BaseWork work) {
         boolean reduceSinkCanReplace = false;
+        if (parentOfMapJoinOpCannotReplace.contains(child.getName())) {
+            return false;
+        }
         for (BaseWork child : tezWork.getChildren(work)) {
             TezEdgeProperty.EdgeType edgeType = tezWork.getEdgeType(work, child);
             if (isSupportEdgeType(edgeType) && isReplaceable(child.getAnyRootOperator(), true)) {
