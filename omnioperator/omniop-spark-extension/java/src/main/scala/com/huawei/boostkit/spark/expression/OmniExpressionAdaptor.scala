@@ -320,7 +320,7 @@ object OmniExpressionAdaptor extends Logging {
       }
     }
 
-    // support cast(decimal/string/int/long/double as string)
+    // support cast(decimal/string/int/long as string)
     if (cast.dataType.isInstanceOf[StringType] && !doSupportCastToString(cast.child.dataType)) {
       throw new UnsupportedOperationException(s"Unsupported expression: $expr")
     }
