@@ -105,9 +105,10 @@ public class OrcColumnarBatchScanReader {
                 jsonObject.put("literal", "");
             }
             if ((pl.getLiteralList() != null) && (pl.getLiteralList().size() != 0)){
-                List<String> lst = new ArrayList<String>();
+                List<String> lst = new ArrayList<>();
                 for (Object ob : pl.getLiteralList()) {
                     if(ob == null){
+                        lst.add("");
                         continue;
                     }
                     if (pl.getType() == PredicateLeaf.Type.DECIMAL) {
