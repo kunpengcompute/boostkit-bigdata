@@ -651,6 +651,8 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
             vecs[i] = VecFactory.createFlatVec(1, buildInputDataType(((PrimitiveObjectInspector) fieldObjectInspector).getTypeInfo()));
             if (i == pos && pos < outputKeyLength) {
                 ((LongVec) vecs[i]).set(0, (1L << pos) - 1);
+            } else if (i >= numKeys && aggs.get(i - numKeys).getGenericUDAFName().equals("count")) {
+                ((LongVec) vecs[i]).set(0, 0);
             } else {
                 vecs[i].setNull(0);
             }

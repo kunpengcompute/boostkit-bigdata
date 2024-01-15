@@ -856,6 +856,10 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
     public void endGroup() throws HiveException {
     }
 
+    public void publicSetDone(boolean done) {
+        this.done = done;
+    }
+
     private static class OmniReaderWrapper {
         private boolean isSingleValue;
         private KeyValueReader originValueReader;

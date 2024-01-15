@@ -135,4 +135,8 @@ public class OmniMergeJoinOperator extends OmniJoinOperator {
     @Override
     public void endGroup() throws HiveException {
     }
+
+    public void publicSetDone(boolean done) {
+        this.done = done;
+    }
 }

@@ -30,6 +30,9 @@ import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_DATE64;
 import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_DECIMAL128;
 import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_DECIMAL64;
 import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_DOUBLE;
+import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_INT;
+import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_LONG;
+import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_SHORT;
 import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_VARCHAR;
 
 import nova.hetu.omniruntime.constants.FunctionType;
@@ -326,9 +329,28 @@ public class TypeUtils {
             return true;
         }
 
-        // not support Cast(double as decimal)
-        if (dataType == OMNI_DOUBLE.toValue()
+        // not support Cast(double/decimal as decimal)
+        if ((dataType == OMNI_DOUBLE.toValue() || dataType == OMNI_DECIMAL64.toValue()
+                || dataType == OMNI_DECIMAL128.toValue())
                 && (returnType == OMNI_DECIMAL64.toValue() || returnType == OMNI_DECIMAL128.toValue())) {
+            return true;
+        }
+
+        // not support Cast(decimal as short/int/long)
+        if ((dataType == OMNI_DECIMAL64.toValue() || dataType == OMNI_DECIMAL128.toValue())
+                && (returnType ==OMNI_SHORT.toValue() || returnType == OMNI_INT.toValue()
+                || returnType == OMNI_LONG.toValue())) {
+            return true;
+        }
+        return false;
+    }
+
+    public static boolean checkUnsupportedArithmetic(ExprNodeGenericFuncDesc node) {
+        List<ExprNodeDesc> children = node.getChildren();
+        String functionName = node.getGenericUDF().getClass().getSimpleName();
+        boolean anyDecimal = children.stream().anyMatch((child -> child.getTypeInfo() instanceof DecimalTypeInfo));
+        if ((functionName.equals("GenericUDFOPMultiply") || functionName.equals("GenericUDFOPDivide")
+                || functionName.equals("GenericUDFOPMod")) && anyDecimal) {
             return true;
         }
         return false;

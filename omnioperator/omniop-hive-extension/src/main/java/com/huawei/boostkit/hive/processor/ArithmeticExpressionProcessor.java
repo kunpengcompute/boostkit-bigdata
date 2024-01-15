@@ -72,8 +72,6 @@ public class ArithmeticExpressionProcessor implements ExpressionProcessor {
             }
             if (!child.getTypeInfo().equals(node.getTypeInfo())) {
                 if (child.getTypeInfo() instanceof DecimalTypeInfo) {
-                    precision = Math.max(((DecimalTypeInfo) child.getTypeInfo()).getPrecision(), precision);
-                    scale = Math.max(((DecimalTypeInfo) child.getTypeInfo()).getScale(), scale);
                     if (precision == ((DecimalTypeInfo) child.getTypeInfo()).getPrecision()
                             && scale == ((DecimalTypeInfo) child.getTypeInfo()).getScale()) {
                         compareExpression.add(childNode);

@@ -19,7 +19,9 @@
 package com.huawei.boostkit.hive;
 
 import static com.huawei.boostkit.hive.expression.TypeUtils.checkOmniJsonWhiteList;
+import static com.huawei.boostkit.hive.expression.TypeUtils.checkUnsupportedArithmetic;
 import static com.huawei.boostkit.hive.expression.TypeUtils.checkUnsupportedCast;
+import static nova.hetu.omniruntime.constants.FunctionType.OMNI_AGGREGATION_TYPE_AVG;
 import static org.apache.hadoop.hive.serde.serdeConstants.SERIALIZATION_LIB;
 
 import com.huawei.boostkit.hive.expression.BaseExpression;
@@ -32,6 +34,7 @@ import com.huawei.boostkit.hive.reader.VecBatchWrapperSerde;
 import com.huawei.boostkit.hive.shuffle.OmniVecBatchSerDe;
 
 import nova.hetu.omniruntime.constants.FunctionType;
+
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.QueryPlan;
 import org.apache.hadoop.hive.ql.exec.ExplainTask;
@@ -52,6 +55,7 @@ import org.apache.hadoop.hive.ql.hooks.HookContext;
 import org.apache.hadoop.hive.ql.io.orc.OrcInputFormat;
 import org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat;
 
+import org.apache.hadoop.hive.ql.metadata.Table;
 import org.apache.hadoop.hive.ql.plan.AggregationDesc;
 import org.apache.hadoop.hive.ql.plan.BaseWork;
 import org.apache.hadoop.hive.ql.plan.CommonMergeJoinDesc;
@@ -306,7 +310,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                 for (int i = 0; i < windowFunctionDefs.size(); i++) {
                     WindowFunctionDef windowFunctionDef = windowFunctionDefs.get(i);
                     FunctionType windowFunctionType = TypeUtils.getWindowFunctionType(windowFunctionDef);
-                    if (windowFunctionType == null) {
+                    if (windowFunctionType == null || windowFunctionType == OMNI_AGGREGATION_TYPE_AVG) {
                         return false;
                     }
                     List<PTFExpressionDef> args = windowFunctionDefs.get(i).getArgs();
@@ -374,6 +378,9 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                     }
                     boolean supportUDF = ExpressionUtils.isSupportUDF(((ExprNodeGenericFuncDesc) current).getGenericUDF());
                     if (!supportUDF) {
+                        return false;
+                    }
+                    if (checkUnsupportedArithmetic((ExprNodeGenericFuncDesc) current)) {
                         return false;
                     }
                     BaseExpression expr = ExpressionUtils.build((ExprNodeGenericFuncDesc) current.clone(), null);
@@ -493,6 +500,10 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         RowSchema rowSchema = op.getSchema();
         TableScanDesc tableScanDesc = (TableScanDesc) op.getConf();
         if (tableScanDesc.getNeededColumns().isEmpty()) {
+            return false;
+        }
+        Table tableMetadata = tableScanDesc.getTableMetadata();
+        if (tableMetadata != null && !tableMetadata.getInputFormatClass().equals(OrcInputFormat.class)) {
             return false;
         }
         for (String field : tableScanDesc.getNeededColumns()) {
