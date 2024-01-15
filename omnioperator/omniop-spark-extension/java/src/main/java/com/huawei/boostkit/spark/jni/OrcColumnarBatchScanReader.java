@@ -113,6 +113,7 @@ public class OrcColumnarBatchScanReader {
                 List<String> lst = new ArrayList<>();
                 for (Object ob : pl.getLiteralList()) {
                     if (ob == null) {
+                        lst.add("");
                         continue;
                     }
                     if (pl.getType() == PredicateLeaf.Type.DECIMAL) {
