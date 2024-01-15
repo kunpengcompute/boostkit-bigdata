@@ -473,19 +473,24 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                     reduceSinkCanReplace = true;
                 }
             }
-            if (edgeType == TezEdgeProperty.EdgeType.SIMPLE_EDGE && child instanceof MergeJoinWork) {
+            if (child instanceof MergeJoinWork) {
                 Operator reducer = ((MergeJoinWork) child).getMainWork().getAnyRootOperator();
                 if (reducer.getType() == null) {
                     reducer = (Operator) reducer.getChildOperators().get(0);
                 }
-                if (isReplaceable(reducer, true)) {
+                if (isReplaceable(reducer, false)) {
                     // replace all edge of merge join into CUSTOM_SIMPLE_EDGE
-                    setParentWorkToCurrentWorkEdge(child, TezEdgeProperty.EdgeType.CUSTOM_SIMPLE_EDGE);
                     mergeJoinNeedSort.add(reducer);
                     reduceSinkCanReplace = true;
-                } else {
-                    // replace all edge of merge join into SIMPLE_EDGE
-                    setParentWorkToCurrentWorkEdge(child, TezEdgeProperty.EdgeType.SIMPLE_EDGE);
+                }
+                if (edgeType == TezEdgeProperty.EdgeType.SIMPLE_EDGE) {
+                    if (reduceSinkCanReplace) {
+                        // replace all edge of merge join into CUSTOM_SIMPLE_EDGE
+                        setParentWorkToCurrentWorkEdge(child, TezEdgeProperty.EdgeType.CUSTOM_SIMPLE_EDGE);
+                    } else {
+                        // replace all edge of merge join into SIMPLE_EDGE
+                        setParentWorkToCurrentWorkEdge(child, TezEdgeProperty.EdgeType.SIMPLE_EDGE);
+                    }
                 }
             }
         }
