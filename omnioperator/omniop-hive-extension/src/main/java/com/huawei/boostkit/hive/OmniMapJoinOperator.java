@@ -201,9 +201,10 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
             buildInspectors[buildIndex] = new ArrayList<>(joinKeysObjectInspectors[buildIndex]);
             buildInspectors[buildIndex].addAll(joinValuesObjectInspectors[buildIndex]);
         }
+        JoinType joinType = JOIN_TYPE_MAP.get(condn[buildIndexes.size() - 1].getType());
         DataType[] buildTypes = getTypeFromInspectors(Arrays.stream(buildInspectors).filter(Objects::nonNull)
                 .flatMap(List::stream).collect(Collectors.toList()));
-        omniHashBuilderWithExprOperatorFactory = getOmniHashBuilderWithExprOperatorFactory(buildTypes,
+        omniHashBuilderWithExprOperatorFactory = getOmniHashBuilderWithExprOperatorFactory(joinType, buildTypes,
                 buildIndexes.get(buildIndexes.size() - 1));
         buildOperator = omniHashBuilderWithExprOperatorFactory.createOperator();
         omniLookupJoinWithExprOperatorFactory = getOmniLookupOperatorFactory(omniHashBuilderWithExprOperatorFactory,
@@ -520,8 +521,8 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
         }
     }
 
-    private OmniHashBuilderWithExprOperatorFactory getOmniHashBuilderWithExprOperatorFactory(DataType[] buildTypes,
-                                                                                             int buildIndex) {
+    private OmniHashBuilderWithExprOperatorFactory getOmniHashBuilderWithExprOperatorFactory(
+            JoinType joinType, DataType[] buildTypes, int buildIndex) {
         Map<String, Integer> buildKeyColNameToId = new HashMap<>();
         List<ExprNodeEvaluator> buildExprNodeColumnEvaluators = getExprNodeColumnEvaluator(joinKeys[buildIndex]);
         for (int i = 0; i < buildExprNodeColumnEvaluators.size(); i++) {
@@ -530,7 +531,7 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
         }
         String[] buildHashKeys = getExprFromExprNode(buildExprNodeColumnEvaluators, buildKeyColNameToId,
                 inputObjInspectors[buildIndex]);
-        return new OmniHashBuilderWithExprOperatorFactory(buildTypes, buildHashKeys, 1);
+        return new OmniHashBuilderWithExprOperatorFactory(joinType, buildTypes, buildHashKeys, 1);
     }
 
     private OmniOperatorFactory getOmniLookupOperatorFactory(
@@ -643,10 +644,11 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
                 buildList.add(buildIndexes.get(i + 1));
                 int probeIndex = buildIndexes.get(i);
                 probeVec = getVectorFromCache(probeIndex);
+                JoinType joinType = JOIN_TYPE_MAP.get(condn[i + 1].getType());
                 DataType[] buildTypes = getTypeFromInspectors(buildList.stream()
                         .flatMap(index -> buildInspectors[index].stream()).collect(Collectors.toList()));
                 OmniHashBuilderWithExprOperatorFactory innerBuildFactory = getOmniHashBuilderWithExprOperatorFactory(
-                        buildTypes, buildIndexes.get(i + 1));
+                        joinType, buildTypes, buildIndexes.get(i + 1));
                 OmniOperator innerBuildOperator = innerBuildFactory.createOperator();
                 OmniOperatorFactory innerJoinOperatorFactory = getInnerOmniLookupOperatorFactory(innerBuildFactory,
                         probeIndex, buildList, buildTypes);

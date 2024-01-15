@@ -52,17 +52,17 @@ public class OmniGroupByOperatorTest extends CommonTest {
         utRunSqlOnDriver("insert into group_by_roll_up values(1, 'Tom')");
         utRunSqlOnDriver("insert into group_by_roll_up values(2, 'Jerry')");
 
-        utRunSqlOnDriver("select id, name, count(*) from group_by_roll_up group by rollup(id, name)");
+        utRunSqlOnDriver("select id, name, count(*) from group_by_roll_up group by rollup(id, name) order by id, name");
         List<String> rs = new ArrayList<>();
         driver.getResults(rs);
         utRunSqlOnDriver("drop table if exists group_by_roll_up");
         Assert.assertEquals(5, rs.size());
         List<String> exceptedResult = new ArrayList<>();
         exceptedResult.add("NULL\tNULL\t2");
+        exceptedResult.add("1\tNULL\t1");
         exceptedResult.add("1\tTom\t1");
         exceptedResult.add("2\tNULL\t1");
         exceptedResult.add("2\tJerry\t1");
-        exceptedResult.add("1\tNULL\t1");
         Assert.assertEquals(exceptedResult, rs);
     }
 
