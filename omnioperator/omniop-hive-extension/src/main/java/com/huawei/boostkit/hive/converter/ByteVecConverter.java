@@ -40,8 +40,8 @@ public class ByteVecConverter extends ShortVecConverter {
             DictionaryVec dictionaryVec = (DictionaryVec) vec;
             return (byte) dictionaryVec.getShort(index);
         }
-        ShortVec ShortVec = (ShortVec) vec;
-        return ShortVec.get(index);
+        ShortVec byteVec = (ShortVec) vec;
+        return (byte) byteVec.get(index);
     }
 
     @Override
