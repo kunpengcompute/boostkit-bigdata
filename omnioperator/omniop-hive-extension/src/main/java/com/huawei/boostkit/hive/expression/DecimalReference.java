@@ -36,4 +36,12 @@ public class DecimalReference extends ReferenceFactor {
                         + "\"scale\":%d}",
                 dataType, colVal, precision, scale);
     }
+
+    public Integer getScale() {
+        return scale;
+    }
+
+    public Integer getPrecision() {
+        return precision;
+    }
 }

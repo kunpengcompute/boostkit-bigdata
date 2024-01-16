@@ -329,7 +329,10 @@ public class TypeUtils {
                 && !isDecimalOrStringType(dataType)) {
             return true;
         }
+        return checkUnsupportedDecimal(dataType, returnType, castFunctionExpression);
+    }
 
+    private static boolean checkUnsupportedDecimal(Integer dataType, Integer returnType, CastFunctionExpression castFunctionExpression) {
         // not support Cast(double/decimal as decimal)
         if ((dataType == OMNI_DOUBLE.toValue() || dataType == OMNI_DECIMAL64.toValue())
                 && (returnType == OMNI_DECIMAL64.toValue() || returnType == OMNI_DECIMAL128.toValue())) {

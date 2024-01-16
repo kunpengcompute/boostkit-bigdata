@@ -113,6 +113,8 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
     private static final Set<PrimitiveObjectInspector.PrimitiveCategory> UNSUPPORTED_TYPE = new HashSet<>(Arrays.asList(PrimitiveObjectInspector.PrimitiveCategory.BYTE,
             PrimitiveObjectInspector.PrimitiveCategory.FLOAT));
 
+    private static final int DECIMAL64_MAX_PRECISION = 19;
+
     private final Set<String> taskNameReplacedReduceSink = new HashSet<>();
     private final Set<Operator> groupByOperatorNeedSort = new HashSet<>();
 
@@ -375,7 +377,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             }
             PrimitiveTypeInfo primitiveTypeInfo = ((PrimitiveObjectInspector) oi).getTypeInfo();
             if (primitiveTypeInfo.getPrimitiveCategory().equals(PrimitiveObjectInspector.PrimitiveCategory.DECIMAL)
-                    && ((DecimalTypeInfo) primitiveTypeInfo).getPrecision() > 19) {
+                    && ((DecimalTypeInfo) primitiveTypeInfo).getPrecision() > DECIMAL64_MAX_PRECISION) {
                 return true;
             }
         }
@@ -483,15 +485,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                     mergeJoinNeedSort.add(reducer);
                     reduceSinkCanReplace = true;
                 }
-                if (edgeType == TezEdgeProperty.EdgeType.SIMPLE_EDGE) {
-                    if (reduceSinkCanReplace) {
-                        // replace all edge of merge join into CUSTOM_SIMPLE_EDGE
-                        setParentWorkToCurrentWorkEdge(child, TezEdgeProperty.EdgeType.CUSTOM_SIMPLE_EDGE);
-                    } else {
-                        // replace all edge of merge join into SIMPLE_EDGE
-                        setParentWorkToCurrentWorkEdge(child, TezEdgeProperty.EdgeType.SIMPLE_EDGE);
-                    }
-                }
+                replaceSimpleEdge(reduceSinkCanReplace, child, edgeType);
             }
         }
         // deal with Union work
@@ -502,6 +496,18 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             }
         }
         return reduceSinkCanReplace;
+    }
+
+    private void replaceSimpleEdge(boolean reduceSinkCanReplace, BaseWork child, TezEdgeProperty.EdgeType edgeType) {
+        if (edgeType == TezEdgeProperty.EdgeType.SIMPLE_EDGE) {
+            if (reduceSinkCanReplace) {
+                // replace all edge of merge join into CUSTOM_SIMPLE_EDGE
+                setParentWorkToCurrentWorkEdge(child, TezEdgeProperty.EdgeType.CUSTOM_SIMPLE_EDGE);
+            } else {
+                // replace all edge of merge join into SIMPLE_EDGE
+                setParentWorkToCurrentWorkEdge(child, TezEdgeProperty.EdgeType.SIMPLE_EDGE);
+            }
+        }
     }
 
     private boolean isSupportEdgeType(TezEdgeProperty.EdgeType edgeType) {
