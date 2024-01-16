@@ -112,7 +112,7 @@ public class OrcColumnarBatchScanReader {
             if ((pl.getLiteralList() != null) && (pl.getLiteralList().size() != 0)){
                 List<String> lst = new ArrayList<>();
                 for (Object ob : pl.getLiteralList()) {
-                    if(ob == null){
+                    if (ob == null) {
                         lst.add(null);
                         continue;
                     }

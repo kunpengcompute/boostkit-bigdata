@@ -160,7 +160,7 @@ int BuildLeaves(PredicateOperatorType leafOp, vector<Literal> &litList, Literal 
             if(litList.empty()){
                 // build.in方法第一个参数给定空值，即会认为该predictLeaf的TruthValue为YES_NO_NULL（不过滤数据）
                 // 即与java orc in中存在null的行为保持一致
-                std::string  emptyString;
+                std::string emptyString;
                 builder.in(emptyString, leafType, litList);
             }else{
                 builder.in(leafNameString, leafType, litList);
@@ -206,7 +206,9 @@ int initLeaves(JNIEnv *env, SearchArgumentBuilder &builder, jobject &jsonExp, jo
                 litList.clear();
                 break;
             } else {
-                std::string childString(env->GetStringUTFChars(child, nullptr));
+                auto chars = env->GetStringUTFChars(child, nullptr);
+                std::string childString(chars);
+                env->ReleaseStringUTFChars(child, chars);
                 GetLiteral(lit, leafType, childString);
                 litList.push_back(lit);
             }
