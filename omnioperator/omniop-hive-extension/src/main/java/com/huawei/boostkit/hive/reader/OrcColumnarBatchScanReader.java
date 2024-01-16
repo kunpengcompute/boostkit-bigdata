@@ -58,9 +58,6 @@ import static java.util.Calendar.YEAR;
 public class OrcColumnarBatchScanReader {
     private static final Logger LOGGER = LoggerFactory.getLogger(OrcColumnarBatchScanReader.class);
 
-    private static final int[] julianGregDiffs = new int[]{2, 1, 0, -1, -2, -3, -4, -5, -6, -7, -8, -9, -10, 0};
-    private static final int[] julianGregDiffSwitchDay = new int[]{-719164, -682945, -646420, -609895, -536845, -500320, -463795, -390745, -354220, -317695, -244645, -208120, -171595, -141427};
-
     public long reader;
     public long recordReader;
     public long batchReader;
@@ -248,30 +245,6 @@ public class OrcColumnarBatchScanReader {
         jniReader.recordReaderSeekToRow(recordReader, rowNumber);
     }
 
-    public void convertJulianToGreGorian(IntVec intVec, long rowNumber) {
-        int gregorianValue;
-        for (int rowIndex = 0; rowIndex < rowNumber; rowIndex++) {
-            gregorianValue = rebaseJulianToGregorianDays(intVec.get(rowIndex));
-            intVec.set(rowIndex, gregorianValue);
-        }
-    }
-
-    private int rebaseJulianToGregorianDays(int days) {
-        if (days < julianGregDiffSwitchDay[0]) {
-            Calendar utcCal = new Calendar.Builder().setCalendarType("gregory").setTimeZone(TimeZone.getTimeZone("UTC"))
-                    .setInstant(Math.multiplyExact(days, 86400000L)).build();
-            LocalDate localDate = LocalDate.of(utcCal.get(YEAR), utcCal.get(MONTH) + 1, 1)
-                    .with(ChronoField.ERA, utcCal.get(ERA)).plusDays((long) utcCal.get(DAY_OF_MONTH) - 1);
-            return Math.toIntExact(localDate.toEpochDay());
-        } else {
-            int i = julianGregDiffSwitchDay.length;
-            do {
-                i -= 1;
-            } while (i > 0 && days < julianGregDiffSwitchDay[i]);
-            return days + julianGregDiffs[i];
-        }
-    }
-
     public int next(Vec[] vecList) {
         int vectorCnt = vecList.length;
         int[] typeIds = new int[realColsCnt];
@@ -294,11 +267,7 @@ public class OrcColumnarBatchScanReader {
                     vecList[i] = new ShortVec(vecNativeIds[nativeGetId]);
                     break;
                 }
-                case OMNI_DATE32: {
-                    vecList[i] = new IntVec(vecNativeIds[nativeGetId]);
-                    convertJulianToGreGorian((IntVec) (vecList[i]), rtn);
-                    break;
-                }
+                case OMNI_DATE32:
                 case OMNI_INT: {
                     vecList[i] = new IntVec(vecNativeIds[nativeGetId]);
                     break;

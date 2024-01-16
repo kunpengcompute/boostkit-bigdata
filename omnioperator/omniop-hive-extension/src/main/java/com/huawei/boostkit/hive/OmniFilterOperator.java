@@ -33,6 +33,7 @@ import nova.hetu.omniruntime.vector.VecBatch;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.ql.CompilationOpContext;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
+import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
 import org.apache.hadoop.hive.ql.plan.FilterDesc;
 import org.apache.hadoop.hive.ql.plan.api.OperatorType;
@@ -48,7 +49,7 @@ import java.util.List;
 
 import static nova.hetu.omniruntime.operator.config.OverflowConfig.OverflowConfigId.OVERFLOW_CONFIG_NULL;
 
-public class OmniFilterOperator extends OmniHiveOperator<FilterDesc> implements Serializable {
+public class OmniFilterOperator extends OmniHiveOperator<OmniFilterDesc> implements Serializable {
     private transient OmniFilterAndProjectOperatorFactory filterAndProjectOperatorFactory;
 
     private transient OmniOperator omniOperator;
@@ -64,14 +65,19 @@ public class OmniFilterOperator extends OmniHiveOperator<FilterDesc> implements 
 
     public OmniFilterOperator(CompilationOpContext ctx, FilterDesc conf) {
         super(ctx);
-        this.conf = conf;
+        this.conf = new OmniFilterDesc(conf);
     }
 
     @Override
     protected void initializeOp(Configuration hconf) throws HiveException {
         super.initializeOp(hconf);
-        ExprNodeGenericFuncDesc predicate = (ExprNodeGenericFuncDesc) conf.getPredicate();
-        BaseExpression root = ExpressionUtils.build(predicate, inputObjInspectors[0]);
+        ExprNodeDesc predicate = conf.getPredicate();
+        BaseExpression root;
+        if (predicate instanceof ExprNodeGenericFuncDesc) {
+            root = ExpressionUtils.build((ExprNodeGenericFuncDesc) predicate, inputObjInspectors[0]);
+        } else {
+            root = ExpressionUtils.createNode(predicate, inputObjInspectors[0]);
+        }
         List<? extends StructField> allStructFieldRefs = ((StructObjectInspector) inputObjInspectors[0]).getAllStructFieldRefs();
         DataType[] inputTypes = new DataType[allStructFieldRefs.size()];
         String[] projections = new String[allStructFieldRefs.size()];
