@@ -107,7 +107,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             OperatorType.MAPJOIN, OperatorType.MERGEJOIN, OperatorType.GROUPBY, OperatorType.SELECT,
             OperatorType.FILTER, OperatorType.PTF, OperatorType.TABLESCAN, OperatorType.REDUCESINK));
     public static final Set<Integer> SUPPORTED_JOIN = new HashSet<>(Arrays.asList(JoinDesc.INNER_JOIN,
-            JoinDesc.LEFT_OUTER_JOIN, JoinDesc.FULL_OUTER_JOIN, JoinDesc.LEFT_SEMI_JOIN, JoinDesc.RIGHT_OUTER_JOIN));
+            JoinDesc.LEFT_OUTER_JOIN, JoinDesc.FULL_OUTER_JOIN, JoinDesc.LEFT_SEMI_JOIN));
     private static final Set<PrimitiveObjectInspector.PrimitiveCategory> UNSUPPORTED_TYPE = new HashSet<>(Arrays.asList(PrimitiveObjectInspector.PrimitiveCategory.BYTE,
             PrimitiveObjectInspector.PrimitiveCategory.FLOAT));
 
@@ -117,7 +117,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
     private final Map<Operator, BaseWork> reduceSinkOpToWork = new HashMap<>();
     // indicate reduce sink operators which can not replace.
     private final Set<Operator> reduceSinkOpCannotReplace = new HashSet<>();
-    // indicate the task name which contains map join operators which can not replace
+    // indicate the parents task name of map join operators which can not replace
     private final Set<String> parentOfMapJoinOpCannotReplace = new HashSet<>();
     private final List<Operator> mergeJoinNeedSort = new ArrayList<>();
     List<Operator<? extends OperatorDesc>> replaceable = new ArrayList<>();
@@ -186,12 +186,10 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                 continue;
             }
             for (Operator<? extends OperatorDesc> op : work.getAllOperators()) {
-                if (op.getType().equals(OperatorType.MAPJOIN)) {
-                    if (!isReplaceable(op, true)) {
-                        MapJoinDesc conf = (MapJoinDesc) op.getConf();
-                        Map<Integer, String> parentToInput = conf.getParentToInput();
-                        parentOfMapJoinOpCannotReplace.addAll(parentToInput.values());
-                    }
+                if (op.getType().equals(OperatorType.MAPJOIN) && !isReplaceable(op, true)) {
+                    MapJoinDesc conf = (MapJoinDesc) op.getConf();
+                    Map<Integer, String> parentToInput = conf.getParentToInput();
+                    parentOfMapJoinOpCannotReplace.addAll(parentToInput.values());
                 }
             }
         }
@@ -270,6 +268,11 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         if (replaceable.contains(operator)) {
             return true;
         }
+
+        return reCheckReplaceable(operator, reduceSinkCanReplace);
+    }
+
+    private boolean reCheckReplaceable(Operator<? extends OperatorDesc> operator, boolean reduceSinkCanReplace) {
         if (operator.getType() != null && operator.getType().equals(OperatorType.MAPJOIN)) {
             if (checkMapJoinInput(operator) && currentReplaceable(operator, reduceSinkCanReplace)) {
                 return true;
@@ -293,11 +296,6 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         }
         switch (operator.getType()) {
             case MAPJOIN:
-                MapJoinDesc mapJoinDesc = (MapJoinDesc) operator.getConf();
-                // currently, only support size of join table less than 4.
-                if (mapJoinDesc.getKeys().size() > 3) {
-                    return false;
-                }
                 return SUPPORTED_JOIN.contains(((JoinDesc) operator.getConf()).getConds()[0].getType());
             case MERGEJOIN:
                 JoinDesc joinDesc = (JoinDesc) operator.getConf();
@@ -479,7 +477,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
 
     private boolean getReduceSinkCanReplace(BaseWork work) {
         boolean reduceSinkCanReplace = false;
-        if (parentOfMapJoinOpCannotReplace.contains(child.getName())) {
+        if (parentOfMapJoinOpCannotReplace.contains(work.getName())) {
             return false;
         }
         for (BaseWork child : tezWork.getChildren(work)) {
