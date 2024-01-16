@@ -85,21 +85,20 @@ public class ArithmeticExpressionProcessor implements ExpressionProcessor {
     private void addCast(ExprNodeGenericFuncDesc node, Integer precision, Integer scale, boolean needUpscale, int maxScale, int returnType, DivideExpression compareExpression, ExprNodeDesc child, BaseExpression childNode) {
         Integer childPrecision = null;
         Integer childScale = null;
-        if (child.getTypeInfo() instanceof DecimalTypeInfo) {
-            if (needUpscale) {
-                childScale = ((DecimalTypeInfo) child.getTypeInfo()).getScale();
-                childPrecision = ((DecimalTypeInfo) child.getTypeInfo()).getPrecision();
-                if (maxScale == childScale) {
-                    compareExpression.add(childNode);
-                    return;
-                } else {
-                    childPrecision = Math.max(childPrecision + maxScale - childScale, precision);
-                    childScale = maxScale;
-                }
+        if (child.getTypeInfo() instanceof DecimalTypeInfo && needUpscale) {
+
+            childScale = ((DecimalTypeInfo) child.getTypeInfo()).getScale();
+            childPrecision = ((DecimalTypeInfo) child.getTypeInfo()).getPrecision();
+            if (maxScale == childScale) {
+                compareExpression.add(childNode);
+                return;
             } else {
-                childPrecision = precision;
-                childScale = scale;
+                childPrecision = Math.max(childPrecision + maxScale - childScale, precision);
+                childScale = maxScale;
             }
+        } else {
+            childPrecision = precision;
+            childScale = scale;
         }
         CastFunctionExpression functionExpression = new CastFunctionExpression(returnType,
                 TypeUtils.getCharWidth(node), childPrecision, childScale);
@@ -107,7 +106,7 @@ public class ArithmeticExpressionProcessor implements ExpressionProcessor {
     }
 
     private int getMaxScale(List<ExprNodeDesc> children, int maxScale) {
-        for(ExprNodeDesc child : children) {
+        for (ExprNodeDesc child : children) {
             if (!(child.getTypeInfo() instanceof DecimalTypeInfo)) {
                 continue;
             }
