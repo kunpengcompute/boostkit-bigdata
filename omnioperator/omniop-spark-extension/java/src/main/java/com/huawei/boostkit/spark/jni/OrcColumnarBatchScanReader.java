@@ -110,8 +110,12 @@ public class OrcColumnarBatchScanReader {
                 jsonObject.put("literal", "");
             }
             if ((pl.getLiteralList() != null) && (pl.getLiteralList().size() != 0)){
-                List<String> lst = new ArrayList<String>();
+                List<String> lst = new ArrayList<>();
                 for (Object ob : pl.getLiteralList()) {
+                    if (ob == null) {
+                        lst.add(null);
+                        continue;
+                    }
                     if (pl.getType() == PredicateLeaf.Type.DECIMAL) {
                         int decimalP =  schema.findSubtype(pl.getColumnName()).getPrecision();
                         int decimalS =  schema.findSubtype(pl.getColumnName()).getScale();
