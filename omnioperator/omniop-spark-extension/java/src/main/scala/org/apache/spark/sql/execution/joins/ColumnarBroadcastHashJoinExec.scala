@@ -385,7 +385,7 @@ case class ColumnarBroadcastHashJoinExec(
 
       val startLookupCodegen = System.nanoTime()
       val lookupOpFactory = new OmniLookupJoinWithExprOperatorFactory(probeTypes, probeOutputCols,
-        probeHashColsExp, buildOutputCols, buildOutputTypes, lookupJoinType, buildOpFactory, filter,
+        probeHashColsExp, buildOutputCols, buildOutputTypes, buildOpFactory, filter,
         new OperatorConfig(SpillConfig.NONE,
           new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val lookupOp = lookupOpFactory.createOperator()
