@@ -85,7 +85,9 @@ import org.apache.hadoop.hive.ql.plan.ptf.PTFExpressionDef;
 import org.apache.hadoop.hive.ql.plan.ptf.WindowFunctionDef;
 import org.apache.hadoop.hive.ql.plan.ptf.WindowTableFunctionDef;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDFConcat;
+import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
+import org.apache.hadoop.hive.serde2.typeinfo.DecimalTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -110,6 +112,8 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             JoinDesc.LEFT_OUTER_JOIN, JoinDesc.FULL_OUTER_JOIN, JoinDesc.LEFT_SEMI_JOIN));
     private static final Set<PrimitiveObjectInspector.PrimitiveCategory> UNSUPPORTED_TYPE = new HashSet<>(Arrays.asList(PrimitiveObjectInspector.PrimitiveCategory.BYTE,
             PrimitiveObjectInspector.PrimitiveCategory.FLOAT));
+
+    private static final int DECIMAL64_MAX_PRECISION = 19;
 
     private final Set<String> taskNameReplacedReduceSink = new HashSet<>();
     private final Set<Operator> groupByOperatorNeedSort = new HashSet<>();
@@ -347,7 +351,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                 for (int i = 0; i < windowFunctionDefs.size(); i++) {
                     WindowFunctionDef windowFunctionDef = windowFunctionDefs.get(i);
                     FunctionType windowFunctionType = TypeUtils.getWindowFunctionType(windowFunctionDef);
-                    if (windowFunctionType == null || windowFunctionType == OMNI_AGGREGATION_TYPE_AVG) {
+                    if (windowFunctionType == null || windowFunctionType == OMNI_AGGREGATION_TYPE_AVG && isAvgUnsupported(windowFunctionDef.getArgs())) {
                         return false;
                     }
                     List<PTFExpressionDef> args = windowFunctionDefs.get(i).getArgs();
@@ -400,6 +404,21 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             default:
                 return true;
         }
+    }
+
+    private boolean isAvgUnsupported(List<PTFExpressionDef> expressions) {
+        for (PTFExpressionDef expression : expressions) {
+            ObjectInspector oi = expression.getOI();
+            if (!(oi instanceof PrimitiveObjectInspector)) {
+                continue;
+            }
+            PrimitiveTypeInfo primitiveTypeInfo = ((PrimitiveObjectInspector) oi).getTypeInfo();
+            if (primitiveTypeInfo.getPrimitiveCategory().equals(PrimitiveObjectInspector.PrimitiveCategory.DECIMAL)
+                    && ((DecimalTypeInfo) primitiveTypeInfo).getPrecision() > DECIMAL64_MAX_PRECISION) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean isUDFSupport(List<ExprNodeDesc> colList) {
@@ -496,20 +515,17 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                     reduceSinkCanReplace = true;
                 }
             }
-            if (edgeType == TezEdgeProperty.EdgeType.SIMPLE_EDGE && child instanceof MergeJoinWork) {
+            if (child instanceof MergeJoinWork) {
                 Operator reducer = ((MergeJoinWork) child).getMainWork().getAnyRootOperator();
                 if (reducer.getType() == null) {
                     reducer = (Operator) reducer.getChildOperators().get(0);
                 }
-                if (isReplaceable(reducer, true)) {
+                if (isReplaceable(reducer, false)) {
                     // replace all edge of merge join into CUSTOM_SIMPLE_EDGE
-                    setParentWorkToCurrentWorkEdge(child, TezEdgeProperty.EdgeType.CUSTOM_SIMPLE_EDGE);
                     mergeJoinNeedSort.add(reducer);
                     reduceSinkCanReplace = true;
-                } else {
-                    // replace all edge of merge join into SIMPLE_EDGE
-                    setParentWorkToCurrentWorkEdge(child, TezEdgeProperty.EdgeType.SIMPLE_EDGE);
                 }
+                replaceSimpleEdge(reduceSinkCanReplace, child, edgeType);
             }
         }
         // deal with Union work
@@ -520,6 +536,18 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             }
         }
         return reduceSinkCanReplace;
+    }
+
+    private void replaceSimpleEdge(boolean reduceSinkCanReplace, BaseWork child, TezEdgeProperty.EdgeType edgeType) {
+        if (edgeType == TezEdgeProperty.EdgeType.SIMPLE_EDGE) {
+            if (reduceSinkCanReplace) {
+                // replace all edge of merge join into CUSTOM_SIMPLE_EDGE
+                setParentWorkToCurrentWorkEdge(child, TezEdgeProperty.EdgeType.CUSTOM_SIMPLE_EDGE);
+            } else {
+                // replace all edge of merge join into SIMPLE_EDGE
+                setParentWorkToCurrentWorkEdge(child, TezEdgeProperty.EdgeType.SIMPLE_EDGE);
+            }
+        }
     }
 
     private boolean isSupportEdgeType(TezEdgeProperty.EdgeType edgeType) {
