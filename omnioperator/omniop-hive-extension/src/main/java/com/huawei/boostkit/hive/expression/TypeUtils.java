@@ -340,20 +340,18 @@ public class TypeUtils {
         }
         if (dataType == OMNI_DECIMAL128.toValue() && returnType == OMNI_DECIMAL128.toValue()) {
             BaseExpression child = castFunctionExpression.getArguments().get(0);
-            if (!(child instanceof DecimalReference)) {
-                return false;
-            }
-            if (!((DecimalReference) child).getPrecision().equals(castFunctionExpression.getPrecision())) {
+            if (child instanceof DecimalReference && !((DecimalReference) child).getPrecision().equals(castFunctionExpression.getPrecision())) {
                 return true;
             }
         }
         // not support Cast(decimal as short/int/long)
-        if ((dataType == OMNI_DECIMAL64.toValue() || dataType == OMNI_DECIMAL128.toValue())
-                && (returnType == OMNI_SHORT.toValue() || returnType == OMNI_INT.toValue()
-                || returnType == OMNI_LONG.toValue())) {
-            return true;
-        }
-        return false;
+        return (dataType == OMNI_DECIMAL64.toValue() || dataType == OMNI_DECIMAL128.toValue())
+                && isUnsupportedReturnType(returnType);
+    }
+
+    private static boolean isUnsupportedReturnType(Integer returnType) {
+        return returnType == OMNI_SHORT.toValue() || returnType == OMNI_INT.toValue()
+                || returnType == OMNI_LONG.toValue();
     }
 
     public static boolean checkUnsupportedArithmetic(ExprNodeGenericFuncDesc node) {

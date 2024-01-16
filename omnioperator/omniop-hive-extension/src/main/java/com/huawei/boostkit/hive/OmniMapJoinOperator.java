@@ -26,19 +26,13 @@ import static com.huawei.boostkit.hive.converter.VecConverter.CONVERTER_MAP;
 
 import com.huawei.boostkit.hive.cache.VecBufferCache;
 import com.huawei.boostkit.hive.converter.VecConverter;
-import com.huawei.boostkit.hive.expression.BaseExpression;
 import com.huawei.boostkit.hive.expression.ExpressionUtils;
-import com.huawei.boostkit.hive.expression.TypeUtils;
 import com.huawei.boostkit.hive.shuffle.OmniVecBatchSerDe;
 import com.huawei.boostkit.hive.shuffle.VecSerdeBody;
 
 import nova.hetu.omniruntime.constants.JoinType;
 import nova.hetu.omniruntime.operator.OmniOperator;
 import nova.hetu.omniruntime.operator.OmniOperatorFactory;
-import nova.hetu.omniruntime.operator.config.OperatorConfig;
-import nova.hetu.omniruntime.operator.config.OverflowConfig;
-import nova.hetu.omniruntime.operator.config.SpillConfig;
-import nova.hetu.omniruntime.operator.filter.OmniFilterAndProjectOperatorFactory;
 import nova.hetu.omniruntime.operator.join.OmniHashBuilderWithExprOperatorFactory;
 import nova.hetu.omniruntime.operator.join.OmniLookupJoinWithExprOperatorFactory;
 import nova.hetu.omniruntime.operator.join.OmniLookupOuterJoinWithExprOperatorFactory;
@@ -81,7 +75,6 @@ import org.apache.hadoop.hive.serde2.SerDeUtils;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorFactory;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorUtils;
-import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.StandardStructObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.StructField;
 import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
@@ -618,43 +611,46 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
             // result as input of buildOperator
             List<Integer> buildList = new ArrayList<>();
             List<VecBatch> probeVec;
-            Iterator<VecBatch> output = null;
+            OmniHashBuilderWithExprOperatorFactory[] innerBuildFactories = new OmniHashBuilderWithExprOperatorFactory[buildIndexes.size() - 1];
+            OmniOperatorFactory[] innerJoinOperatorFactories = new OmniOperatorFactory[buildIndexes.size() - 1];
+            OmniOperator[] innerBuildOperators = new OmniOperator[buildIndexes.size() - 1];
+            OmniOperator[] innerJoinOperators = new OmniOperator[buildIndexes.size() - 1];
             for (int i = buildIndexes.size() - 2; i >= 0; i--) {
-                buildList.add(buildIndexes.get(i + 1));
+                buildList.add(0, buildIndexes.get(i + 1));
                 int probeIndex = buildIndexes.get(i);
-                probeVec = getVectorFromCache(probeIndex);
-                JoinType joinType = JOIN_TYPE_MAP.get(condn[i + 1].getType());
                 DataType[] buildTypes = getTypeFromInspectors(buildList.stream()
                         .flatMap(index -> buildInspectors[index].stream()).collect(Collectors.toList()));
-                OmniHashBuilderWithExprOperatorFactory innerBuildFactory = getOmniHashBuilderWithExprOperatorFactory(
-                        joinType, buildTypes, buildIndexes.get(i + 1));
-                OmniOperator innerBuildOperator = innerBuildFactory.createOperator();
-                OmniOperatorFactory innerJoinOperatorFactory = getInnerOmniLookupOperatorFactory(innerBuildFactory,
+                JoinType joinType = JOIN_TYPE_MAP.get(condn[i + 1].getType());
+                innerBuildFactories[i] = getOmniHashBuilderWithExprOperatorFactory(
+                        joinType, buildTypes, buildList.get(0));
+                innerBuildOperators[i] = innerBuildFactories[i].createOperator();
+                innerJoinOperatorFactories[i] = getInnerOmniLookupOperatorFactory(innerBuildFactories[i],
                         probeIndex, buildList, buildTypes);
-                OmniOperator innerJoinOperator = innerJoinOperatorFactory.createOperator();
-                if (output != null) {
-                    while (output.hasNext()) {
-                        innerBuildOperator.addInput(output.next());
-                    }
-                } else {
+                innerJoinOperators[i] = innerJoinOperatorFactories[i].createOperator();
+            }
+            for (int i = innerBuildFactories.length - 1; i >= 0; i--) {
+                int probeIndex = buildIndexes.get(i);
+                probeVec = getVectorFromCache(probeIndex);
+                if (i == innerBuildFactories.length - 1) {
                     List<VecBatch> buildVec = getVectorFromCache(buildIndexes.get(buildIndexes.size() - 1));
                     for (VecBatch vecBatch : buildVec) {
-                        innerBuildOperator.addInput(vecBatch);
+                        innerBuildOperators[i].addInput(vecBatch);
                     }
                 }
-                innerBuildOperator.getOutput();
+                innerBuildOperators[i].getOutput();
                 for (VecBatch vecBatch : probeVec) {
-                    innerJoinOperator.addInput(vecBatch);
-                    output = innerJoinOperator.getOutput();
+                    innerJoinOperators[i].addInput(vecBatch);
+                    output = innerJoinOperators[i].getOutput();
                     while (output.hasNext()) {
-                        buildOperator.addInput(output.next());
+                        if (i == 0) {
+                            buildOperator.addInput(output.next());
+                        } else {
+                            innerBuildOperators[i - 1].addInput(output.next());
+                        }
                     }
                 }
-                innerBuildOperator.close();
-                innerBuildFactory.close();
-                innerJoinOperator.close();
-                innerJoinOperatorFactory.close();
             }
+            closeInnerOperators(innerBuildOperators, innerJoinOperators, innerBuildFactories, innerJoinOperatorFactories);
             buildOperator.getOutput();
         } else {
             List<VecBatch> vecBatches = getVectorFromCache(1 - posBigTable);
@@ -664,6 +660,22 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
                 }
             }
             buildOperator.getOutput();
+        }
+    }
+
+    private void closeInnerOperators(OmniOperator[] innerBuildOperators, OmniOperator[] innerJoinOperators,
+                                     OmniHashBuilderWithExprOperatorFactory[] innerBuildFactories, OmniOperatorFactory[] innerJoinOperatorFactories) {
+        for (OmniOperator operator : innerBuildOperators) {
+            operator.close();
+        }
+        for (OmniOperator operator : innerJoinOperators) {
+            operator.close();
+        }
+        for (OmniOperatorFactory factory : innerBuildFactories) {
+            factory.close();
+        }
+        for (OmniOperatorFactory factory : innerJoinOperatorFactories) {
+            factory.close();
         }
     }
 
