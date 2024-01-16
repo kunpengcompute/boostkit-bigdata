@@ -161,12 +161,12 @@ int BuildLeaves(PredicateOperatorType leafOp, vector<Literal> &litList, Literal 
             break;
         }
         case PredicateOperatorType::IN: {
-            if(litList.empty()){
+            if (litList.empty()) {
                 // build.in方法第一个参数给定空值，即会认为该predictLeaf的TruthValue为YES_NO_NULL（不过滤数据）
                 // 即与java orc in中存在null的行为保持一致
                 std::string emptyString;
                 builder.in(emptyString, leafType, litList);
-            }else{
+            } else {
                 builder.in(leafNameString, leafType, litList);
             }
             break;
