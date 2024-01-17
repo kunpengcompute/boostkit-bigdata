@@ -85,6 +85,13 @@ public class TimestampVecConverter extends LongVecConverter {
 
     @Override
     public void setValueFromColumnVector(VectorizedRowBatch vectorizedRowBatch, int vectorColIndex,
+                                         ColumnCache columnCache, int colIndex, int rowCount,
+                                         PrimitiveTypeInfo primitiveTypeInfo) {
+        setValueFromColumnVector(vectorizedRowBatch, vectorColIndex, columnCache, colIndex, rowCount);
+    }
+
+    @Override
+    public void setValueFromColumnVector(VectorizedRowBatch vectorizedRowBatch, int vectorColIndex,
                                          ColumnCache columnCache, int colIndex, int rowCount) {
         ColumnVector columnVector = vectorizedRowBatch.cols[vectorColIndex];
         LongColumnCache longColumnCache = (LongColumnCache) columnCache;
@@ -134,7 +141,8 @@ public class TimestampVecConverter extends LongVecConverter {
                 timestampColumnVector.isNull[i - start] = true;
                 timestampColumnVector.noNulls = false;
             } else {
-                timestampColumnVector.timestampUpdate(new java.sql.Timestamp((long) value), DEFAULT_SIZE);
+                java.sql.Timestamp timestamp = new java.sql.Timestamp(((Timestamp) value).toEpochMilli());
+                timestampColumnVector.set(i - start, timestamp);
             }
         }
         return timestampColumnVector;
