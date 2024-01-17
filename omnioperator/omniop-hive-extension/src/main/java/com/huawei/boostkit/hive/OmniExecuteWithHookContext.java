@@ -521,8 +521,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                     reducer = (Operator) reducer.getChildOperators().get(0);
                 }
                 if (isReplaceable(reducer, false)) {
-                    // replace all edge of merge join into CUSTOM_SIMPLE_EDGE
-                    mergeJoinNeedSort.add(reducer);
+                    addMergeJoinNeedSort(edgeType, reducer);
                     reduceSinkCanReplace = true;
                 }
                 replaceSimpleEdge(reduceSinkCanReplace, child, edgeType);
@@ -536,6 +535,12 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             }
         }
         return reduceSinkCanReplace;
+    }
+
+    private void addMergeJoinNeedSort(TezEdgeProperty.EdgeType edgeType, Operator reducer) {
+        if (edgeType == TezEdgeProperty.EdgeType.SIMPLE_EDGE || edgeType == TezEdgeProperty.EdgeType.ONE_TO_ONE_EDGE) {
+            mergeJoinNeedSort.add(reducer);
+        }
     }
 
     private void replaceSimpleEdge(boolean reduceSinkCanReplace, BaseWork child, TezEdgeProperty.EdgeType edgeType) {
