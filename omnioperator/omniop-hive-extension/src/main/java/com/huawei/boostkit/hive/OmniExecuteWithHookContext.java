@@ -576,7 +576,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             return false;
         }
         Table tableMetadata = tableScanDesc.getTableMetadata();
-        if (tableMetadata != null && !tableMetadata.getInputFormatClass().equals(OrcInputFormat.class)) {
+        if (tableMetadata == null || !tableMetadata.getInputFormatClass().equals(OrcInputFormat.class)) {
             return false;
         }
         for (String field : tableScanDesc.getNeededColumns()) {
