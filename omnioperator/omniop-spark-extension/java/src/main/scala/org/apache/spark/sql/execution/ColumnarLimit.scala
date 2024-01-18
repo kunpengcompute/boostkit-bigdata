@@ -58,14 +58,14 @@ trait ColumnarBaseLimitExec extends LimitExec {
     "omniCodegenTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni codegen"),
     "getOutputTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni getOutput"),
     "numOutputRows" -> SQLMetrics.createMetric(sparkContext, "number of output rows"),
-    "numOutputVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatchs"))
+    "numOutputVecBatches" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatches"))
 
   protected override def doExecuteColumnar(): RDD[ColumnarBatch] = {
     val addInputTime = longMetric("addInputTime")
     val omniCodegenTime = longMetric("omniCodegenTime")
     val getOutputTime = longMetric("getOutputTime")
     val numOutputRows = longMetric("numOutputRows")
-    val numOutputVecBatchs = longMetric("numOutputVecBatchs")
+    val numOutputVecBatches = longMetric("numOutputVecBatches")
 
     child.executeColumnar().mapPartitions { iter =>
 
@@ -117,7 +117,7 @@ trait ColumnarBaseLimitExec extends LimitExec {
             vector.setVec(vecBatch.getVectors()(i))
           }
           numOutputRows += vecBatch.getRowCount
-          numOutputVecBatchs += 1
+          numOutputVecBatches += 1
           vecBatch.close()
           new ColumnarBatch(vectors.toArray, vecBatch.getRowCount)
         }
@@ -187,8 +187,8 @@ case class ColumnarTakeOrderedAndProjectExec(
     "addInputTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni addInput"),
     "getOutputTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni getOutput"),
     "omniCodegenTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni codegen"),
-    "numInputVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of input vecBatchs"),
-    "numOutputVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatchs"),
+    "numInputVecBatches" -> SQLMetrics.createMetric(sparkContext, "number of input vecBatches"),
+    "numOutputVecBatches" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatches"),
     "addInputTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni addInput")
   ) ++ readMetrics ++ writeMetrics
 
@@ -221,11 +221,11 @@ case class ColumnarTakeOrderedAndProjectExec(
   }
 
   override def doExecuteColumnar(): RDD[ColumnarBatch] = {
-    val (sourceTypes, ascendings, nullFirsts, sortColsExp) = genSortParam(child.output, sortOrder)
+    val (sourceTypes, ascending, nullFirsts, sortColsExp) = genSortParam(child.output, sortOrder)
 
     def computeTopN(iter: Iterator[ColumnarBatch], schema: StructType): Iterator[ColumnarBatch] = {
       val startCodegen = System.nanoTime()
-      val topNOperatorFactory = new OmniTopNWithExprOperatorFactory(sourceTypes, limit, sortColsExp, ascendings, nullFirsts,
+      val topNOperatorFactory = new OmniTopNWithExprOperatorFactory(sourceTypes, limit, sortColsExp, ascending, nullFirsts,
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val topNOperator = topNOperatorFactory.createOperator
       longMetric("omniCodegenTime") += NANOSECONDS.toMillis(System.nanoTime() - startCodegen)
@@ -233,8 +233,8 @@ case class ColumnarTakeOrderedAndProjectExec(
         topNOperator.close()
       })
       addAllAndGetIterator(topNOperator, iter, schema,
-        longMetric("addInputTime"), longMetric("numInputVecBatchs"), longMetric("numInputRows"),
-        longMetric("getOutputTime"), longMetric("numOutputVecBatchs"), longMetric("numOutputRows"),
+        longMetric("addInputTime"), longMetric("numInputVecBatches"), longMetric("numInputRows"),
+        longMetric("getOutputTime"), longMetric("numOutputVecBatches"), longMetric("numOutputRows"),
         longMetric("outputDataSize"))
     }
 

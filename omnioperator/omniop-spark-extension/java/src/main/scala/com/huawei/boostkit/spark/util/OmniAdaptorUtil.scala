@@ -182,7 +182,7 @@ object OmniAdaptorUtil {
       (Array[nova.hetu.omniruntime.`type`.DataType], Array[Int], Array[Int], Array[String]) = {
     val inputColSize: Int = output.size
     val sourceTypes = new Array[nova.hetu.omniruntime.`type`.DataType](inputColSize)
-    val ascendings = new Array[Int](sortOrder.size)
+    val ascending = new Array[Int](sortOrder.size)
     val nullFirsts = new Array[Int](sortOrder.size)
     val sortColsExp = new Array[String](sortOrder.size)
     val omniAttrExpsIdMap: Map[ExprId, Int] = getExprIdMap(output)
@@ -192,7 +192,7 @@ object OmniAdaptorUtil {
     }
     sortOrder.zipWithIndex.foreach { case (sortAttr, i) =>
       sortColsExp(i) = rewriteToOmniJsonExpressionLiteral(sortAttr.child, omniAttrExpsIdMap)
-      ascendings(i) = if (sortAttr.isAscending) {
+      ascending(i) = if (sortAttr.isAscending) {
         1
       } else {
         0
@@ -205,18 +205,18 @@ object OmniAdaptorUtil {
     if (!isSimpleColumnForAll(sortColsExp)) {
       checkOmniJsonWhiteList("", sortColsExp.asInstanceOf[Array[AnyRef]])
     }
-    (sourceTypes, ascendings, nullFirsts, sortColsExp)
+    (sourceTypes, ascending, nullFirsts, sortColsExp)
   }
 
   def addAllAndGetIterator(operator: OmniOperator,
                            inputIter: Iterator[ColumnarBatch], schema: StructType,
-                           addInputTime: SQLMetric, numInputVecBatchs: SQLMetric,
+                           addInputTime: SQLMetric, numInputVecBatches: SQLMetric,
                            numInputRows: SQLMetric, getOutputTime: SQLMetric,
-                           numOutputVecBatchs: SQLMetric, numOutputRows: SQLMetric,
+                           numOutputVecBatches: SQLMetric, numOutputRows: SQLMetric,
                            outputDataSize: SQLMetric): Iterator[ColumnarBatch] = {
     while (inputIter.hasNext) {
       val batch: ColumnarBatch = inputIter.next()
-      numInputVecBatchs += 1
+      numInputVecBatches += 1
       val input: Array[Vec] = transColBatchToOmniVecs(batch)
       val vecBatch = new VecBatch(input, batch.numRows())
       val startInput: Long = System.nanoTime()
@@ -259,7 +259,7 @@ object OmniAdaptorUtil {
         // metrics
         val rowCnt: Int = vecBatch.getRowCount
         numOutputRows += rowCnt
-        numOutputVecBatchs += 1
+        numOutputVecBatches += 1
         // close omni vecbetch
         vecBatch.close()
         new ColumnarBatch(vectors.toArray, rowCnt)

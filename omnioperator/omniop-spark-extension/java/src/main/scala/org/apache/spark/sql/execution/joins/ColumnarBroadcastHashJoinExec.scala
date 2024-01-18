@@ -105,9 +105,9 @@ case class ColumnarBroadcastHashJoinExec(
       SQLMetrics.createTimingMetric(sparkContext, "time in omni build getOutput"),
     "buildCodegenTime" ->
       SQLMetrics.createTimingMetric(sparkContext, "time in omni build codegen"),
-    "numOutputVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatchs"),
-    "numMergedVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of merged vecBatchs"),
-    "bypassVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of bypass vecBatchs")
+    "numOutputVecBatches" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatches"),
+    "numMergedVecBatches" -> SQLMetrics.createMetric(sparkContext, "number of merged vecBatches"),
+    "bypassVecBatches" -> SQLMetrics.createMetric(sparkContext, "number of bypass vecBatches")
   )
 
   override def supportsColumnar: Boolean = true
@@ -275,9 +275,9 @@ case class ColumnarBroadcastHashJoinExec(
   override def doExecuteColumnar(): RDD[ColumnarBatch] = {
     // input/output: {col1#10,col2#11,col1#12,col2#13}
     val numOutputRows = longMetric("numOutputRows")
-    val numOutputVecBatchs = longMetric("numOutputVecBatchs")
-    val numMergedVecBatchs = longMetric("numMergedVecBatchs")
-    val bypassVecBatchs = longMetric("bypassVecBatchs")
+    val numOutputVecBatches = longMetric("numOutputVecBatches")
+    val numMergedVecBatches = longMetric("numMergedVecBatches")
+    val bypassVecBatches = longMetric("bypassVecBatches")
     val buildAddInputTime = longMetric("buildAddInputTime")
     val buildCodegenTime = longMetric("buildCodegenTime")
     val buildGetOutputTime = longMetric("buildGetOutputTime")
@@ -481,14 +481,14 @@ case class ColumnarBroadcastHashJoinExec(
           }
           val rowCnt: Int = result.getRowCount
           numOutputRows += rowCnt
-          numOutputVecBatchs += 1
+          numOutputVecBatches += 1
           result.close()
           new ColumnarBatch(vecs.toArray, rowCnt)
         }
       }
 
       if (enableJoinBatchMerge) {
-        new MergeIterator(iterBatch, resultSchema, numMergedVecBatchs, bypassVecBatchs)
+        new MergeIterator(iterBatch, resultSchema, numMergedVecBatches, bypassVecBatches)
       } else {
         iterBatch
       }

@@ -811,12 +811,12 @@ case class ColumnarPostOverrides() extends Rule[SparkPlan] {
   var isSupportAdaptive: Boolean = true
 
   def apply(plan: SparkPlan): SparkPlan = {
-    handleColumnarToRowParitalFetch(replaceWithColumnarPlan(plan))
+    handleColumnarToRowPartialFetch(replaceWithColumnarPlan(plan))
   }
 
-  private def handleColumnarToRowParitalFetch(plan: SparkPlan): SparkPlan = {
+  private def handleColumnarToRowPartialFetch(plan: SparkPlan): SparkPlan = {
     // simple check plan tree have OmniColumnarToRow and no LimitExec and TakeOrderedAndProjectExec plan
-    val noParitalFetch = if (plan.find(_.isInstanceOf[OmniColumnarToRowExec]).isDefined) {
+    val noPartialFetch = if (plan.find(_.isInstanceOf[OmniColumnarToRowExec]).isDefined) {
         (!plan.find(node =>
             node.isInstanceOf[LimitExec] || node.isInstanceOf[TakeOrderedAndProjectExec] ||
             node.isInstanceOf[SortMergeJoinExec]).isDefined)
@@ -824,7 +824,7 @@ case class ColumnarPostOverrides() extends Rule[SparkPlan] {
       false
     }
     val newPlan = plan.transformUp {
-      case c: OmniColumnarToRowExec if noParitalFetch =>
+      case c: OmniColumnarToRowExec if noPartialFetch =>
         c.copy(c.child, false)
     }
     newPlan

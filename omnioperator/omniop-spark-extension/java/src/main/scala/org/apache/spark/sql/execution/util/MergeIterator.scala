@@ -31,7 +31,7 @@ import org.apache.spark.sql.types.{BooleanType, DateType, DecimalType, DoubleTyp
 import org.apache.spark.sql.vectorized.ColumnarBatch
 
 class MergeIterator(iter: Iterator[ColumnarBatch], localSchema: StructType,
-                    numMergedVecBatchs: SQLMetric, bypassVecBatchs: SQLMetric) extends Iterator[ColumnarBatch] {
+                    numMergedVecBatches: SQLMetric, bypassVecBatches: SQLMetric) extends Iterator[ColumnarBatch] {
 
   private val outputQueue = new mutable.Queue[VecBatch]
   private val bufferedVecBatch = new ListBuffer[VecBatch]()
@@ -110,7 +110,7 @@ class MergeIterator(iter: Iterator[ColumnarBatch], localSchema: StructType,
     val resultBatch: VecBatch = new VecBatch(createOmniVectors(localSchema, totalRows), totalRows)
     merge(resultBatch, bufferedVecBatch)
     outputQueue.enqueue(resultBatch)
-    numMergedVecBatchs += 1
+    numMergedVecBatches += 1
 
     bufferedVecBatch.clear()
     currentBatchSizeInBytes = 0
@@ -137,7 +137,7 @@ class MergeIterator(iter: Iterator[ColumnarBatch], localSchema: StructType,
       if (vecBatch.getRowCount > mergedBatchThreshold) {
         flush()
         outputQueue.enqueue(vecBatch)
-        bypassVecBatchs += 1
+        bypassVecBatches += 1
       } else {
         buffer(vecBatch)
       }

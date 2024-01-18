@@ -157,8 +157,8 @@ case class ColumnarCustomShuffleReaderExec(
   override lazy val metrics: Map[String, SQLMetric] = {
     if (shuffleStage.isDefined) {
       Map(
-      "numMergedVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of merged vecBatchs"),
-      "bypassVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of bypass vecBatchs"),
+      "numMergedVecBatches" -> SQLMetrics.createMetric(sparkContext, "number of merged vecBatches"),
+      "bypassVecBatches" -> SQLMetrics.createMetric(sparkContext, "number of bypass vecBatches"),
       "numPartitions" -> SQLMetrics.createMetric(sparkContext, "number of partitions")) ++ {
         if (isLocalReader) {
           // We split the mapper partition evenly when creating local shuffle reader, so no
@@ -207,8 +207,8 @@ case class ColumnarCustomShuffleReaderExec(
       cachedShuffleRDD.mapPartitionsWithIndexInternal { (index, iter) =>
         new MergeIterator(iter,
            StructType.fromAttributes(child.output),
-           longMetric("numMergedVecBatchs"),
-           longMetric("bypassVecBatchs"))
+           longMetric("numMergedVecBatches"),
+           longMetric("bypassVecBatches"))
       }
     } else {
       cachedShuffleRDD

@@ -54,16 +54,16 @@ case class ColumnarSortMergeJoinExec(
 
   override def doExecuteColumnar(): RDD[ColumnarBatch] = {
     val numOutputRows = longMetric("numOutputRows")
-    val numOutputVecBatchs = longMetric("numOutputVecBatchs")
-    val numMergedVecBatchs = longMetric("numMergedVecBatchs")
-    val bypassVecBatchs = longMetric("bypassVecBatchs")
+    val numOutputVecBatches = longMetric("numOutputVecBatches")
+    val numMergedVecBatches = longMetric("numMergedVecBatches")
+    val bypassVecBatches = longMetric("bypassVecBatches")
     val streamedAddInputTime = longMetric("streamedAddInputTime")
     val streamedCodegenTime = longMetric("streamedCodegenTime")
     val bufferedAddInputTime = longMetric("bufferedAddInputTime")
     val bufferedCodegenTime = longMetric("bufferedCodegenTime")
     val getOutputTime = longMetric("getOutputTime")
-    val streamVecBatchs = longMetric("numStreamVecBatchs")
-    val bufferVecBatchs = longMetric("numBufferVecBatchs")
+    val streamVecBatches = longMetric("numStreamVecBatches")
+    val bufferVecBatches = longMetric("numBufferVecBatches")
 
     val streamedTypes = new Array[DataType](left.output.size)
     left.output.zipWithIndex.foreach { case (attr, i) =>
@@ -151,11 +151,11 @@ case class ColumnarSortMergeJoinExec(
 
         def checkAndClose() : Unit = {
           while (streamedIter.hasNext) {
-            streamVecBatchs += 1
+            streamVecBatches += 1
             streamedIter.next().close()
           }
           while(bufferedIter.hasNext) {
-            bufferVecBatchs += 1
+            bufferVecBatches += 1
             bufferedIter.next().close()
           }
         }
@@ -189,7 +189,7 @@ case class ColumnarSortMergeJoinExec(
               val startBuildStreamedInput = System.nanoTime()
               if (!isStreamedFinished && streamedIter.hasNext) {
                 val batch = streamedIter.next()
-                streamVecBatchs += 1
+                streamVecBatches += 1
                 val inputVecBatch = transColBatchToVecBatch(batch)
                 decodeOpStatus(streamedOp.addInput(inputVecBatch))
               } else {
@@ -202,7 +202,7 @@ case class ColumnarSortMergeJoinExec(
               val startBuildBufferedInput = System.nanoTime()
               if (!isBufferedFinished && bufferedIter.hasNext) {
                 val batch = bufferedIter.next()
-                bufferVecBatchs += 1
+                bufferVecBatches += 1
                 val inputVecBatch = transColBatchToVecBatch(batch)
                 decodeOpStatus(bufferedOp.addInput(inputVecBatch))
               } else {
@@ -246,7 +246,7 @@ case class ColumnarSortMergeJoinExec(
               v.setVec(resultVecs(index))
             }
           }
-          numOutputVecBatchs += 1
+          numOutputVecBatches += 1
           numOutputRows += result.getRowCount
           result.close()
           new ColumnarBatch(vecs.toArray, result.getRowCount)
@@ -285,7 +285,7 @@ case class ColumnarSortMergeJoinExec(
       }
 
       if (enableSortMergeJoinBatchMerge) {
-        new MergeIterator(iterBatch, resultSchema, numMergedVecBatchs, bypassVecBatchs)
+        new MergeIterator(iterBatch, resultSchema, numMergedVecBatches, bypassVecBatches)
       } else {
         iterBatch
       }
