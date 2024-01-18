@@ -235,7 +235,7 @@ object ColumnarShuffleExchangeExec extends Logging {
         val pidArr = new Array[Int](columnarBatch.numRows())
         for (i <- 0 until columnarBatch.numRows()) {
           val position = new Random(TaskContext.get().partitionId()).nextInt(numPartitions)
-          pidArr(i) = position + 1
+          pidArr(i) = position
         }
         val vec = new IntVec(columnarBatch.numRows())
         vec.put(pidArr, 0, 0, pidArr.length)
