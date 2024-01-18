@@ -41,6 +41,7 @@ import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.StructField;
 import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
+import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
 
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -64,6 +65,8 @@ public class OmniTableScanOperator extends TableScanOperator implements Serializ
     protected transient VecBatch[] vecBatches;
 
     protected transient int childrenDone = 0;
+
+    protected transient PrimitiveTypeInfo[] partColTypeInfos;
 
     /**
      * Kryo ctor.
@@ -95,6 +98,10 @@ public class OmniTableScanOperator extends TableScanOperator implements Serializ
             }
         }
         outputObjInspector = convertLazyToJavaInspector(neededFields);
+        partColTypeInfos = standardStructObjectInspector.getAllStructFieldRefs().stream()
+                .filter(filed -> partColumnNames.contains(filed.getFieldName())).map(field ->
+                        ((PrimitiveObjectInspector) field.getFieldObjectInspector()).getTypeInfo()
+                ).toArray(PrimitiveTypeInfo[]::new);
         partColumnConverters = standardStructObjectInspector.getAllStructFieldRefs().stream()
                 .filter(filed -> partColumnNames.contains(filed.getFieldName())).map(field -> {
                     if (field.getFieldObjectInspector() instanceof PrimitiveObjectInspector) {
@@ -127,8 +134,8 @@ public class OmniTableScanOperator extends TableScanOperator implements Serializ
             System.arraycopy(noPartValues.getVectors(), 0, vecs, 0, noPartValues.getVectors().length);
             for (int i = 0; i < partColumnNames.size(); i++) {
                 Object[] partValue = new Object[rowCount];
-                Arrays.fill(partValue, partColumnConverters[i].calculateValue(partValues[i]));
-                Vec partVec = partColumnConverters[i].toOmniVec(partValue, rowCount);
+                Arrays.fill(partValue, partColumnConverters[i].calculateValue(partValues[i], partColTypeInfos[i]));
+                Vec partVec = partColumnConverters[i].toOmniVec(partValue, rowCount, partColTypeInfos[i]);
                 vecs[vecs.length - partColumnNames.size() + i] = partVec;
             }
             noPartValues.close();
