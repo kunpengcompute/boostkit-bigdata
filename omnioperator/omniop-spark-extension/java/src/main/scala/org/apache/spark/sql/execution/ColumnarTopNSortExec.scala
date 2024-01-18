@@ -61,13 +61,13 @@ case class ColumnarTopNSortExec(
   override lazy val metrics = Map(
 
     "addInputTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni addInput"),
-    "numInputVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of input vecBatchs"),
+    "numInputVecBatches" -> SQLMetrics.createMetric(sparkContext, "number of input vecBatches"),
     "numInputRows" -> SQLMetrics.createMetric(sparkContext, "number of input rows"),
     "omniCodegenTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni codegen"),
     "getOutputTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni getOutput"),
     "numOutputRows" -> SQLMetrics.createMetric(sparkContext, "number of output rows"),
     "outputDataSize" -> SQLMetrics.createSizeMetric(sparkContext, "output data size"),
-    "numOutputVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatchs"))
+    "numOutputVecBatches" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatches"))
 
   def buildCheck(): Unit = {
     val omniAttrExpsIdMap = getExprIdMap(child.output)
@@ -82,12 +82,12 @@ case class ColumnarTopNSortExec(
     val omniAttrExpsIdMap = getExprIdMap(child.output)
     val omniPartitionChanels = partitionSpec.map(
       exp => rewriteToOmniJsonExpressionLiteral(exp, omniAttrExpsIdMap)).toArray
-    val (sourceTypes, ascendings, nullFirsts, sortColsExp) = genSortParam(child.output, sortOrder)
+    val (sourceTypes, ascending, nullFirsts, sortColsExp) = genSortParam(child.output, sortOrder)
 
     child.executeColumnar().mapPartitionsWithIndexInternal { (_, iter) =>
       val startCodegen = System.nanoTime()
       val topNSortOperatorFactory = new OmniTopNSortWithExprOperatorFactory(sourceTypes, n,
-        strictTopN, omniPartitionChanels, sortColsExp, ascendings, nullFirsts,
+        strictTopN, omniPartitionChanels, sortColsExp, ascending, nullFirsts,
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val topNSortOperator = topNSortOperatorFactory.createOperator
       omniCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startCodegen)
@@ -95,8 +95,8 @@ case class ColumnarTopNSortExec(
         topNSortOperator.close()
       })
       addAllAndGetIterator(topNSortOperator, iter, this.schema,
-        longMetric("addInputTime"), longMetric("numInputVecBatchs"), longMetric("numInputRows"),
-        longMetric("getOutputTime"), longMetric("numOutputVecBatchs"), longMetric("numOutputRows"),
+        longMetric("addInputTime"), longMetric("numInputVecBatches"), longMetric("numInputRows"),
+        longMetric("getOutputTime"), longMetric("numOutputVecBatches"), longMetric("numOutputRows"),
         longMetric("outputDataSize"))
     }
   }

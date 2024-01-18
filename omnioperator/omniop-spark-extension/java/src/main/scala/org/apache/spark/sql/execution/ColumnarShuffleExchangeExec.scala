@@ -73,7 +73,7 @@ case class ColumnarShuffleExchangeExec(
     "avgReadBatchNumRows" -> SQLMetrics
       .createAverageMetric(sparkContext, "avg read batch num rows"),
     "numInputRows" -> SQLMetrics.createMetric(sparkContext, "number of input rows"),
-    "numMergedVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of merged vecBatchs"),
+    "numMergedVecBatches" -> SQLMetrics.createMetric(sparkContext, "number of merged vecBatches"),
     "numOutputRows" -> SQLMetrics
       .createMetric(sparkContext, "number of output rows")) ++ readMetrics ++ writeMetrics
 
@@ -159,7 +159,7 @@ case class ColumnarShuffleExchangeExec(
       cachedShuffleRDD.mapPartitionsWithIndexInternal { (index, iter) =>
         new MergeIterator(iter,
           StructType.fromAttributes(child.output),
-          longMetric("numMergedVecBatchs"))
+          longMetric("numMergedVecBatches"))
       }
     } else {
       cachedShuffleRDD

@@ -81,11 +81,11 @@ case class ColumnarHashAggregateExec(
   override lazy val metrics = Map(
     "addInputTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni addInput"),
     "numInputRows" -> SQLMetrics.createMetric(sparkContext, "number of input rows"),
-    "numInputVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of input vecBatchs"),
+    "numInputVecBatches" -> SQLMetrics.createMetric(sparkContext, "number of input vecBatches"),
     "omniCodegenTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni codegen"),
     "getOutputTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni getOutput"),
     "numOutputRows" -> SQLMetrics.createMetric(sparkContext, "number of output rows"),
-    "numOutputVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatchs"))
+    "numOutputVecBatches" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatches"))
 
   protected override def needHashTable: Boolean = true
 
@@ -202,11 +202,11 @@ case class ColumnarHashAggregateExec(
   override def doExecuteColumnar(): RDD[ColumnarBatch] = {
     val addInputTime = longMetric("addInputTime")
     val numInputRows = longMetric("numInputRows")
-    val numInputVecBatchs = longMetric("numInputVecBatchs")
+    val numInputVecBatches= longMetric("numInputVecBatches")
     val omniCodegenTime = longMetric("omniCodegenTime")
     val getOutputTime = longMetric("getOutputTime")
     val numOutputRows = longMetric("numOutputRows")
-    val numOutputVecBatchs = longMetric("numOutputVecBatchs")
+    val numOutputVecBatches= longMetric("numOutputVecBatches")
 
     val attrExpsIdMap = getExprIdMap(child.output)
     val omniGroupByChanel = groupingExpressions.map(
@@ -305,7 +305,7 @@ case class ColumnarHashAggregateExec(
         val vecBatch = new VecBatch(input, batch.numRows())
         operator.addInput(vecBatch)
         addInputTime += NANOSECONDS.toMillis(System.nanoTime() - startInput)
-        numInputVecBatchs += 1
+        numInputVecBatches+= 1
         numInputRows += batch.numRows()
       }
       val startGetOp = System.nanoTime()
@@ -339,7 +339,7 @@ case class ColumnarHashAggregateExec(
           }
 
           numOutputRows += vecBatch.getRowCount
-          numOutputVecBatchs += 1
+          numOutputVecBatches+= 1
 
           vecBatch.close()
           new ColumnarBatch(vectors.toArray, vecBatch.getRowCount)
