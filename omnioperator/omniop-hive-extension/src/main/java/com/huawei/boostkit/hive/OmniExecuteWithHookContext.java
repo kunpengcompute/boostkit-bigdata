@@ -82,6 +82,7 @@ import org.apache.hadoop.hive.ql.plan.TezWork;
 import org.apache.hadoop.hive.ql.plan.UnionWork;
 import org.apache.hadoop.hive.ql.plan.api.OperatorType;
 import org.apache.hadoop.hive.ql.plan.ptf.PTFExpressionDef;
+import org.apache.hadoop.hive.ql.plan.ptf.PartitionedTableFunctionDef;
 import org.apache.hadoop.hive.ql.plan.ptf.WindowFunctionDef;
 import org.apache.hadoop.hive.ql.plan.ptf.WindowTableFunctionDef;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDFConcat;
@@ -346,6 +347,9 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                     if (expression.getExprNode() instanceof ExprNodeGenericFuncDesc) {
                         return false;
                     }
+                }
+                if (conf.getFuncDef() instanceof PartitionedTableFunctionDef) {
+                    return false;
                 }
                 List<WindowFunctionDef> windowFunctionDefs = ((WindowTableFunctionDef) conf.getFuncDef()).getWindowFunctions();
                 for (int i = 0; i < windowFunctionDefs.size(); i++) {

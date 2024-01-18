@@ -253,7 +253,8 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
             }
         }
 
-        if ((allStructFieldRefs.size() == 2) && (allStructFieldRefs.get(0).getFieldName().equals("key"))) {
+        if ((allStructFieldRefs.size() == 2) &&
+                allStructFieldRefs.get(0).getFieldObjectInspector() instanceof StandardStructObjectInspector) {
             List<? extends StructField> keyStructFieldRefs =
                     ((StandardStructObjectInspector) allStructFieldRefs.get(0).getFieldObjectInspector())
                             .getAllStructFieldRefs();
