@@ -111,7 +111,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
     public static final Set<Integer> SUPPORTED_JOIN = new HashSet<>(Arrays.asList(JoinDesc.INNER_JOIN,
             JoinDesc.LEFT_OUTER_JOIN, JoinDesc.FULL_OUTER_JOIN, JoinDesc.LEFT_SEMI_JOIN));
     private static final Set<PrimitiveObjectInspector.PrimitiveCategory> UNSUPPORTED_TYPE = new HashSet<>(Arrays.asList(PrimitiveObjectInspector.PrimitiveCategory.BYTE,
-            PrimitiveObjectInspector.PrimitiveCategory.FLOAT));
+            PrimitiveObjectInspector.PrimitiveCategory.FLOAT, PrimitiveObjectInspector.PrimitiveCategory.BINARY));
 
     private static final int DECIMAL64_MAX_PRECISION = 19;
 
@@ -142,14 +142,20 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         tezWork = null;
     }
 
+    private boolean isSupportSqlType(QueryPlan queryPlan) {
+        if (queryPlan.getQueryProperties() != null && queryPlan.getQueryProperties().isQuery() && queryPlan.getOperationName().equals("QUERY")) {
+            return true;
+        }
+        return queryPlan.getRootTasks().get(0) instanceof ExplainTask;
+    }
+
     public void run(HookContext hookContext) throws Exception {
         clearGlobalVar();
         QueryPlan queryPlan = hookContext.getQueryPlan();
         if (queryPlan.getRootTasks().isEmpty()) {
             return;
         }
-        if ((queryPlan.getQueryProperties() == null || !queryPlan.getQueryProperties().isQuery())
-                && !(queryPlan.getRootTasks().get(0) instanceof ExplainTask)) {
+        if (!isSupportSqlType(queryPlan)) {
             return;
         }
         String engine = HiveConf.getVar(hookContext.getConf(), HiveConf.ConfVars.HIVE_EXECUTION_ENGINE);
@@ -367,8 +373,18 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                 }
                 return true;
             case GROUPBY:
-                for (AggregationDesc aggregator : ((GroupByDesc) operator.getConf()).getAggregators()) {
+                GroupByDesc groupByDesc = (GroupByDesc) operator.getConf();
+                if (!isUDFSupport(groupByDesc.getKeys())) {
+                    return false;
+                }
+                for (AggregationDesc aggregator : groupByDesc.getAggregators()) {
                     if (aggregator.getDistinct()) {
+                        return false;
+                    }
+                    if (TypeUtils.getAggFunctionTypeFromName(aggregator) == null) {
+                        return false;
+                    }
+                    if (!isUDFSupport(aggregator.getParameters())) {
                         return false;
                     }
                     for (ExprNodeDesc paramter : aggregator.getParameters()) {
@@ -392,6 +408,9 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                 ReduceSinkDesc reduceSinkDesc = (ReduceSinkDesc) operator.getConf();
                 if (!reduceSinkCanReplace) {
                     reduceSinkOpToWork.remove(operator);
+                    return false;
+                }
+                if (reduceSinkDesc.getKeyCols().isEmpty() && reduceSinkDesc.getValueCols().isEmpty()) {
                     return false;
                 }
                 if (!isUDFSupport(reduceSinkDesc.getKeyCols()) || !isUDFSupport(reduceSinkDesc.getValueCols())
