@@ -42,15 +42,19 @@ public class OmniVectorizedOrcRecordReader extends OmniOrcRecordReader {
     private final Vec[] withPartCol;
     private final Object[] partitionValues;
 
+    private final PrimitiveTypeInfo[] partColTypeInfos;
+
     public OmniVectorizedOrcRecordReader(Configuration conf, FileSplit split) throws IOException {
         super(conf, split);
         VectorizedRowBatchCtx rbCtx = Utilities.getVectorizedRowBatchCtx(conf);
         int partitionColumnCount = rbCtx.getPartitionColumnCount();
+        partColTypeInfos = new PrimitiveTypeInfo[partitionColumnCount];
         if (partitionColumnCount > 0) {
             partColumnConverters = new VecConverter[partitionColumnCount];
             for (int i = 0; i < rbCtx.getPartitionColumnCount(); i++) {
                 TypeInfo partColTypeInfo = rbCtx.getRowColumnTypeInfos()[rbCtx.getDataColumnCount() + i];
                 if (partColTypeInfo instanceof PrimitiveTypeInfo) {
+                    partColTypeInfos[i] = (PrimitiveTypeInfo) partColTypeInfo;
                     partColumnConverters[i] = CONVERTER_MAP
                             .get(((PrimitiveTypeInfo) partColTypeInfo).getPrimitiveCategory());
                 }
@@ -81,8 +85,8 @@ public class OmniVectorizedOrcRecordReader extends OmniOrcRecordReader {
         if (partitionValues != null) {
             for (int i = 0; i < partitionValues.length; i++) {
                 Object[] partValue = new Object[batchSize];
-                Arrays.fill(partValue, partColumnConverters[i].calculateValue(partitionValues[i]));
-                Vec partVec = partColumnConverters[i].toOmniVec(partValue, batchSize);
+                Arrays.fill(partValue, partColumnConverters[i].calculateValue(partitionValues[i], partColTypeInfos[i]));
+                Vec partVec = partColumnConverters[i].toOmniVec(partValue, batchSize, partColTypeInfos[i]);
                 withPartCol[vecs.length + i] = partVec;
             }
             System.arraycopy(vecs, 0, withPartCol, 0, vecs.length);

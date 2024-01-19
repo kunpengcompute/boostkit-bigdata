@@ -117,10 +117,10 @@ public class TezJsonUtils {
 
     public String getQueryString(List<TezDagIdData> dagIds) throws MalformedURLException {
         StringJoiner joiner = new StringJoiner(";\n");
-        for (TezDagIdData dagIdData : dagIds) {
-            String singleQueryString = getSingleQueryString(dagIdData.getDagId());
+        for (int i = dagIds.size() - 1; i >= 0; i--) {
+            String singleQueryString = getSingleQueryString(dagIds.get(i).getDagId());
             if (singleQueryString != null && !singleQueryString.isEmpty()) {
-                joiner.add(singleQueryString);
+                joiner.add(singleQueryString.trim());
             }
         }
         return joiner.toString();

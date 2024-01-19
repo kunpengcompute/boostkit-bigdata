@@ -18,6 +18,9 @@
 
 package com.huawei.boostkit.hive;
 
+import com.huawei.boostkit.hive.expression.BaseExpression;
+import com.huawei.boostkit.hive.expression.CastFunctionExpression;
+import com.huawei.boostkit.hive.expression.DecimalReference;
 import com.huawei.boostkit.hive.expression.ExpressionUtils;
 import com.huawei.boostkit.hive.expression.TypeUtils;
 
@@ -27,7 +30,11 @@ import org.apache.hadoop.hive.ql.exec.ExprNodeEvaluator;
 import org.apache.hadoop.hive.ql.exec.ExprNodeGenericFuncEvaluator;
 import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.AbstractPrimitiveObjectInspector;
+import org.apache.hadoop.hive.serde2.typeinfo.DecimalTypeInfo;
+import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -59,10 +66,24 @@ public class JoinUtils {
         for (ExprNodeEvaluator node : nodes) {
             if (node instanceof ExprNodeGenericFuncEvaluator) {
                 expressions.add(ExpressionUtils.buildSimplify((ExprNodeGenericFuncDesc) node.getExpr(), inspector).toString());
-            } else {
+                continue;
+            }
+            PrimitiveTypeInfo keyType = (PrimitiveTypeInfo) node.getExpr().getTypeInfo();
+            PrimitiveTypeInfo inputType = ((AbstractPrimitiveObjectInspector) node.getOutputOI()).getTypeInfo();
+            if (!keyType.getPrimitiveCategory().equals(PrimitiveObjectInspector.PrimitiveCategory.DECIMAL) || keyType.equals(inputType)) {
                 expressions.add(TypeUtils.buildExpression(((AbstractPrimitiveObjectInspector) node.getOutputOI()).getTypeInfo(),
                         keyColNameToId.get(((ExprNodeColumnEvaluator) node).getExpr().getColumn())));
+                continue;
             }
+            int returnType = TypeUtils.convertHiveTypeToOmniType(keyType);
+            CastFunctionExpression cast = new CastFunctionExpression(returnType, TypeUtils.getCharWidth(node.getExpr()),
+                    ((DecimalTypeInfo) keyType).getPrecision(), ((DecimalTypeInfo) keyType).getScale());
+            int fieldID = ((StructObjectInspector) inspector).getStructFieldRef(node.getExpr().getExprString()).getFieldID();
+            int omniType = TypeUtils.convertHiveTypeToOmniType(inputType);
+            BaseExpression decimalReference = new DecimalReference(fieldID, omniType, ((DecimalTypeInfo) inputType).getPrecision(),
+                    ((DecimalTypeInfo) inputType).getScale());
+            cast.add(decimalReference);
+            expressions.add(cast.toString());
         }
         return expressions.toArray(new String[0]);
     }
