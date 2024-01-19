@@ -240,7 +240,7 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
 
     // enable or disable radix sort
   val enableRadixSort: Boolean =
-    conf.getConfString("spark.omni.sql.columnar.radixSort.enabled", "true").toBoolean
+    conf.getConfString("spark.omni.sql.columnar.radixSort.enabled", "false").toBoolean
 
   val radixSortThreshold: Int =
     conf.getConfString("spark.omni.sql.columnar.radixSortThreshold", "1000000").toInt
