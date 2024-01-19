@@ -84,7 +84,7 @@ public class Decimal64VecConverter extends LongVecConverter {
                 decimal128Vec.setNull(i);
             } else {
                 long value = (long) col[i];
-                decimal128Vec.setBigInteger(i, Decimal128Vec.longToBytes(Math.abs(value)), value < 0L);
+                decimal128Vec.setBigInteger(i, Decimal128Vec.longToBytes(value), value < 0L);
             }
         }
         return decimal128Vec;
@@ -97,7 +97,7 @@ public class Decimal64VecConverter extends LongVecConverter {
         if (longColumnCache.noNulls) {
             for (int i = 0; i < columnSize; i++) {
                 long value = longColumnCache.dataCache[i];
-                decimal128Vec.setBigInteger(i, Decimal128Vec.longToBytes(Math.abs(value)), value < 0L);
+                decimal128Vec.setBigInteger(i, Decimal128Vec.longToBytes(value), value < 0L);
             }
         } else {
             for (int i = 0; i < columnSize; i++) {
@@ -105,7 +105,7 @@ public class Decimal64VecConverter extends LongVecConverter {
                     decimal128Vec.setNull(i);
                 } else {
                     long value = longColumnCache.dataCache[i];
-                    decimal128Vec.setBigInteger(i, Decimal128Vec.longToBytes(Math.abs(value)), value < 0L);
+                    decimal128Vec.setBigInteger(i, Decimal128Vec.longToBytes(value), value < 0L);
                 }
             }
         }
