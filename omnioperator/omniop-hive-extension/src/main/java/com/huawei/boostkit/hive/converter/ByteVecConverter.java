@@ -70,7 +70,12 @@ public class ByteVecConverter extends ShortVecConverter {
                 tinyVec.setNull(i);
                 continue;
             }
-            values[i] = (short) col[i];
+            if (col[i] instanceof Byte) {
+                Number number = (Number) col[i];
+                values[i] = number.shortValue();
+            } else {
+                values[i] = (short) col[i];
+            }
         }
         tinyVec.put(values, 0, 0, columnSize);
         return tinyVec;
