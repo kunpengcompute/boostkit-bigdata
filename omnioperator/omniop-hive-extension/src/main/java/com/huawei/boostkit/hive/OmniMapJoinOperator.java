@@ -725,7 +725,8 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
     }
 
     private Optional<String> generateResidualFilter() {
-        if (conf.getResidualFilterExprs() == null || conf.getResidualFilterExprs().isEmpty()) {
+        ExprNodeGenericFuncDesc joinFilter = getJoinFilter();
+        if ((conf.getResidualFilterExprs() == null || conf.getResidualFilterExprs().isEmpty()) && joinFilter == null) {
             return Optional.empty();
         }
         Map<String, String> inputColNameToExprName = new HashMap<>();
@@ -742,8 +743,22 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
             inspectors.addAll(fields.stream().map(StructField::getFieldObjectInspector).collect(Collectors.toList()));
         }
         StructObjectInspector exprObjInspector = ObjectInspectorFactory.getStandardStructObjectInspector(fieldNames, inspectors);
-        ExprNodeGenericFuncDesc predicate = (ExprNodeGenericFuncDesc) conf.getResidualFilterExprs().get(0);
+        ExprNodeGenericFuncDesc predicate;
+        if (joinFilter == null) {
+            predicate = (ExprNodeGenericFuncDesc) conf.getResidualFilterExprs().get(0);
+        } else {
+            predicate = joinFilter;
+        }
         return Optional.of(ExpressionUtils.build(predicate, exprObjInspector).toString());
+    }
+
+    private ExprNodeGenericFuncDesc getJoinFilter() {
+        for (List<ExprNodeEvaluator> filters : joinFilters) {
+            if (!filters.isEmpty()) {
+                return (ExprNodeGenericFuncDesc) filters.get(0).getExpr();
+            }
+        }
+        return null;
     }
 
     @Override
