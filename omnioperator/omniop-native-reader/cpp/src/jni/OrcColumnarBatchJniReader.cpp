@@ -192,8 +192,10 @@ int initLeaves(JNIEnv *env, SearchArgumentBuilder &builder, jobject &jsonExp, jo
     Literal lit(0L);
     jstring leafValue = (jstring)env->CallObjectMethod(leafJsonObj, jsonMethodString, env->NewStringUTF("literal"));
     if (leafValue != nullptr) {
-        std::string leafValueString(env->GetStringUTFChars(leafValue, nullptr));
-        if (leafValueString.size() != 0) {
+        const char *leafChars = env->GetStringUTFChars(leafValue, nullptr);
+        std::string leafValueString(leafChars);
+        env->ReleaseStringUTFChars(leafValue, leafChars);
+        if (leafValueString.size() != 0 || (leafValueString.size() == 0 && (orc::PredicateDataType)leafType == orc::PredicateDataType::STRING)) {
             GetLiteral(lit, leafType, leafValueString);
         }
     }
