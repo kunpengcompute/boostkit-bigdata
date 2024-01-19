@@ -120,11 +120,6 @@ public class VarcharVecConverter implements VecConverter {
     }
 
     @Override
-    public Object calculateValue(Object col) {
-        return calculateValue(col, null);
-    }
-
-    @Override
     public Object calculateValue(Object col, PrimitiveTypeInfo primitiveTypeInfo) {
         if (col == null) {
             return null;
