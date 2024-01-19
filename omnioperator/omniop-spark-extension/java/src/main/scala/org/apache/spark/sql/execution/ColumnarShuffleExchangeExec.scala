@@ -119,11 +119,7 @@ class ColumnarShuffleExchangeExec(
   var cachedShuffleRDD: ShuffledColumnarRDD = _
 
   override def doExecute(): RDD[InternalRow] = {
-    if(supportsColumnar){
-      OmniColumnarToRowExec(this).doExecute()
-    }else{
       throw new UnsupportedOperationException()
-    }
   }
 
   def buildCheck(): Unit = {
