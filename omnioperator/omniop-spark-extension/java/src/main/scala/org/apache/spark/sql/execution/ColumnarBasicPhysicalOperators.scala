@@ -56,7 +56,7 @@ case class ColumnarProjectExec(projectList: Seq[NamedExpression], child: SparkPl
     "omniCodegenTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni codegen"),
     "getOutputTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni getOutput"),
     "numOutputRows" -> SQLMetrics.createMetric(sparkContext, "number of output rows"),
-    "numOutputVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatchs"))
+    "numOutputVecBatches" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatches"))
 
   def buildCheck(): Unit = {
     val omniAttrExpsIdMap = getExprIdMap(child.output)
@@ -69,7 +69,7 @@ case class ColumnarProjectExec(projectList: Seq[NamedExpression], child: SparkPl
 
   override def doExecuteColumnar(): RDD[ColumnarBatch] = {
     val numOutputRows = longMetric("numOutputRows")
-    val numOutputVecBatchs = longMetric("numOutputVecBatchs")
+    val numOutputVecBatches = longMetric("numOutputVecBatches")
     val addInputTime = longMetric("addInputTime")
     val omniCodegenTime = longMetric("omniCodegenTime")
     val getOutputTime = longMetric("getOutputTime")
@@ -81,7 +81,7 @@ case class ColumnarProjectExec(projectList: Seq[NamedExpression], child: SparkPl
       exp => rewriteToOmniJsonExpressionLiteral(exp, omniAttrExpsIdMap)).toArray
 
     child.executeColumnar().mapPartitionsWithIndexInternal { (index, iter) =>
-      dealPartitionData(numOutputRows, numOutputVecBatchs, addInputTime, omniCodegenTime,
+      dealPartitionData(numOutputRows, numOutputVecBatches, addInputTime, omniCodegenTime,
         getOutputTime, omniInputTypes, omniExpressions, iter, this.schema)
     }
   }
@@ -136,12 +136,12 @@ case class ColumnarFilterExec(condition: Expression, child: SparkPlan)
 
   override lazy val metrics = Map(
     "addInputTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni addInput"),
-    "numInputVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of input vecBatchs"),
+    "numInputVecBatches" -> SQLMetrics.createMetric(sparkContext, "number of input vecBatches"),
     "numInputRows" -> SQLMetrics.createMetric(sparkContext, "number of input rows"),
     "omniCodegenTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni codegen"),
     "getOutputTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni getOutput"),
     "numOutputRows" -> SQLMetrics.createMetric(sparkContext, "number of output rows"),
-    "numOutputVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatchs"))
+    "numOutputVecBatches" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatches"))
 
 
   protected override def doExecute(): RDD[InternalRow] = {
@@ -179,9 +179,9 @@ case class ColumnarFilterExec(condition: Expression, child: SparkPlan)
 
   protected override def doExecuteColumnar(): RDD[ColumnarBatch] = {
     val numInputRows = longMetric("numInputRows")
-    val numInputVecBatchs = longMetric("numInputVecBatchs")
+    val numInputVecBatches = longMetric("numInputVecBatches")
     val numOutputRows = longMetric("numOutputRows")
-    val numOutputVecBatchs = longMetric("numOutputVecBatchs")
+    val numOutputVecBatches = longMetric("numOutputVecBatches")
     val addInputTime = longMetric("addInputTime")
     val omniCodegenTime = longMetric("omniCodegenTime")
     val getOutputTime = longMetric("getOutputTime")
@@ -217,7 +217,7 @@ case class ColumnarFilterExec(condition: Expression, child: SparkPlan)
             val startInput = System.nanoTime()
             filterOperator.addInput(vecBatch)
             addInputTime += NANOSECONDS.toMillis(System.nanoTime() - startInput)
-            numInputVecBatchs += 1
+            numInputVecBatches += 1
             numInputRows += batch.numRows()
 
             val startGetOp = System.nanoTime()
@@ -245,7 +245,7 @@ case class ColumnarFilterExec(condition: Expression, child: SparkPlan)
             vector.setVec(vecBatch.getVectors()(i))
           }
           numOutputRows += vecBatch.getRowCount
-          numOutputVecBatchs += 1
+          numOutputVecBatches += 1
           vecBatch.close()
           new ColumnarBatch(vectors.toArray, vecBatch.getRowCount)
         }
@@ -269,18 +269,18 @@ case class ColumnarConditionProjectExec(projectList: Seq[NamedExpression],
 
   override lazy val metrics = Map(
     "addInputTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni addInput"),
-    "numInputVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of input vecBatchs"),
+    "numInputVecBatches" -> SQLMetrics.createMetric(sparkContext, "number of input vecBatches"),
     "numInputRows" -> SQLMetrics.createMetric(sparkContext, "number of input rows"),
     "omniCodegenTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni codegen"),
     "getOutputTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni getOutput"),
     "numOutputRows" -> SQLMetrics.createMetric(sparkContext, "number of output rows"),
-    "numOutputVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatchs"))
+    "numOutputVecBatches" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatches"))
 
   override def doExecuteColumnar(): RDD[ColumnarBatch] = {
     val numInputRows = longMetric("numInputRows")
-    val numInputVecBatchs = longMetric("numInputVecBatchs")
+    val numInputVecBatches = longMetric("numInputVecBatches")
     val numOutputRows = longMetric("numOutputRows")
-    val numOutputVecBatchs = longMetric("numOutputVecBatchs")
+    val numOutputVecBatches = longMetric("numOutputVecBatches")
     val addInputTime = longMetric("addInputTime")
     val omniCodegenTime = longMetric("omniCodegenTime")
     val getOutputTime = longMetric("getOutputTime")
@@ -315,7 +315,7 @@ case class ColumnarConditionProjectExec(projectList: Seq[NamedExpression],
             val startInput = System.nanoTime()
             operator.addInput(vecBatch)
             addInputTime += NANOSECONDS.toMillis(System.nanoTime() - startInput)
-            numInputVecBatchs += 1
+            numInputVecBatches += 1
             numInputRows += batch.numRows()
 
             val startGetOp = System.nanoTime()
@@ -343,7 +343,7 @@ case class ColumnarConditionProjectExec(projectList: Seq[NamedExpression],
             vector.setVec(vecBatch.getVectors()(i))
           }
           numOutputRows += vecBatch.getRowCount
-          numOutputVecBatchs += 1
+          numOutputVecBatches += 1
           vecBatch.close()
           new ColumnarBatch(vectors.toArray, vecBatch.getRowCount)
         }

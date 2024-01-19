@@ -363,7 +363,7 @@ abstract class BaseColumnarFileSourceScanExec(
     "numFiles" -> SQLMetrics.createMetric(sparkContext, "number of files read"),
     "metadataTime" -> SQLMetrics.createTimingMetric(sparkContext, "metadata time"),
     "filesSize" -> SQLMetrics.createSizeMetric(sparkContext, "size of files read"),
-    "numOutputVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatchs")
+    "numOutputVecBatches" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatches")
   ) ++ {
     // Tracking scan time has overhead, we can't afford to do it for each row, and can only do
     // it for each batch.
@@ -397,7 +397,7 @@ abstract class BaseColumnarFileSourceScanExec(
   protected override def doExecuteColumnar(): RDD[ColumnarBatch] = {
     val numOutputRows = longMetric("numOutputRows")
     val scanTime = longMetric("scanTime")
-    val numOutputVecBatchs = longMetric("numOutputVecBatchs")
+    val numOutputVecBatches = longMetric("numOutputVecBatches")
     val localSchema = this.schema
     inputRDD.asInstanceOf[RDD[ColumnarBatch]].mapPartitionsInternal { batches =>
       new Iterator[ColumnarBatch] {
@@ -420,7 +420,7 @@ abstract class BaseColumnarFileSourceScanExec(
             vector.setVec(input(i))
           }
           numOutputRows += batch.numRows
-          numOutputVecBatchs += 1
+          numOutputVecBatches += 1
           new ColumnarBatch(vectors.toArray, batch.numRows)
         }
       }
@@ -547,17 +547,17 @@ abstract class BaseColumnarFileSourceScanExec(
     aggIndexOffset += agg.groupingExpressions.size
 
     val omniAggInputRaws = new Array[Boolean](agg.aggregateExpressions.size)
-    val omniAggOutputPartials =new Array[Boolean](agg.aggregateExpressions.size)
+    val omniPartialAggOutput =new Array[Boolean](agg.aggregateExpressions.size)
     val omniAggTypes = new Array[DataType](agg.aggregateExpressions.size)
     val omniAggFunctionTypes = new Array[FunctionType](agg.aggregateExpressions.size)
     val omniAggOutputTypes = new Array[Array[DataType]](agg.aggregateExpressions.size)
     val omniAggChannels = new Array[Array[String]](agg.aggregateExpressions.size)
     val omniAggChannelsFilter = new Array[String](agg.aggregateExpressions.size)
 
-    var omniAggindex = 0
+    var omniAggIndex = 0
     for (exp <- agg.aggregateExpressions) {
       if (exp.filter.isDefined) {
-        omniAggChannelsFilter(omniAggindex) =
+        omniAggChannelsFilter(omniAggIndex) =
           rewriteToOmniJsonExpressionLiteral(exp.filter.get, attrAggExpsIdMap)
       }
       if (exp.mode == Final) {
@@ -568,16 +568,16 @@ abstract class BaseColumnarFileSourceScanExec(
             val aggExp = exp.aggregateFunction.children.head
             omniOutputExressionOrder += {
               exp.aggregateFunction.inputAggBufferAttributes.head.exprId ->
-                (omniAggindex + aggIndexOffset)
+                (omniAggIndex + aggIndexOffset)
             }
-            omniAggTypes(omniAggindex) = sparkTypeToOmniType(aggExp.dataType)
-            omniAggFunctionTypes(omniAggindex) = toOmniAggFunType(exp, true)
-            omniAggOutputTypes(omniAggindex) =
+            omniAggTypes(omniAggIndex) = sparkTypeToOmniType(aggExp.dataType)
+            omniAggFunctionTypes(omniAggIndex) = toOmniAggFunType(exp, true)
+            omniAggOutputTypes(omniAggIndex) =
               toOmniAggInOutType(exp.aggregateFunction.inputAggBufferAttributes)
-            omniAggChannels(omniAggindex) =
+            omniAggChannels(omniAggIndex) =
               toOmniAggInOutJSonExp(exp.aggregateFunction.children, attrAggExpsIdMap)
-            omniAggInputRaws(omniAggindex) = true
-            omniAggOutputPartials(omniAggindex) = true
+            omniAggInputRaws(omniAggIndex) = true
+            omniPartialAggOutput(omniAggIndex) = true
           case _ => throw new UnsupportedOperationException(s"Unsupported aggregate aggregateFunction: $exp")
         }
       } else if (exp.mode == PartialMerge) {
@@ -586,22 +586,22 @@ abstract class BaseColumnarFileSourceScanExec(
             val aggExp = exp.aggregateFunction.children.head
             omniOutputExressionOrder += {
               exp.aggregateFunction.inputAggBufferAttributes.head.exprId ->
-                (omniAggindex + aggIndexOffset)
+                (omniAggIndex + aggIndexOffset)
             }
-            omniAggTypes(omniAggindex) = sparkTypeToOmniType(aggExp.dataType)
-            omniAggFunctionTypes(omniAggindex) = toOmniAggFunType(exp, true)
-            omniAggOutputTypes(omniAggindex) =
+            omniAggTypes(omniAggIndex) = sparkTypeToOmniType(aggExp.dataType)
+            omniAggFunctionTypes(omniAggIndex) = toOmniAggFunType(exp, true)
+            omniAggOutputTypes(omniAggIndex) =
               toOmniAggInOutType(exp.aggregateFunction.inputAggBufferAttributes)
-            omniAggChannels(omniAggindex) =
+            omniAggChannels(omniAggIndex) =
               toOmniAggInOutJSonExp(exp.aggregateFunction.inputAggBufferAttributes, attrAggExpsIdMap)
-            omniAggInputRaws(omniAggindex) = false
-            omniAggOutputPartials(omniAggindex) = true
+            omniAggInputRaws(omniAggIndex) = false
+            omniPartialAggOutput(omniAggIndex) = true
           case _ => throw new UnsupportedOperationException(s"Unsupported aggregate aggregateFunction: $exp")
         }
       } else {
         throw new UnsupportedOperationException(s"Unsupported aggregate mode: $exp.mode")
       }
-      omniAggindex += 1
+      omniAggIndex += 1
     }
 
     var resultIdxToOmniResultIdxMap: Map[Int, Int] = Map()
@@ -618,7 +618,7 @@ abstract class BaseColumnarFileSourceScanExec(
         omniAggSourceTypes(i) = sparkTypeToOmniType(attr.dataType, attr.metadata)
     }
     (omniGroupByChanel, omniAggChannels, omniAggChannelsFilter, omniAggSourceTypes, omniAggFunctionTypes,
-      omniAggOutputTypes, omniAggInputRaws, omniAggOutputPartials, resultIdxToOmniResultIdxMap)
+      omniAggOutputTypes, omniAggInputRaws, omniPartialAggOutput, resultIdxToOmniResultIdxMap)
   }
 
   def genProjectOutput(project: ColumnarProjectExec) = {
@@ -818,7 +818,7 @@ case class ColumnarMultipleOperatorExec(
     "addInputTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni addInput"),
     "outputTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni getOutput"),
     "omniJitTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni codegen"),
-    "numOutputVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatchs")
+    "numOutputVecBatches" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatches")
   ) ++ {
     // Tracking scan time has overhead, we can't afford to do it for each row, and can only do
     // it for each batch.
@@ -842,7 +842,7 @@ case class ColumnarMultipleOperatorExec(
     val numOutputRows = longMetric("numOutputRows")
     val scanTime = longMetric("scanTime")
     val numInputRows = longMetric("numInputRows")
-    val numOutputVecBatchs = longMetric("numOutputVecBatchs")
+    val numOutputVecBatches = longMetric("numOutputVecBatches")
     val addInputTime = longMetric("addInputTime")
     val omniCodegenTime = longMetric("omniJitTime")
     val getOutputTime = longMetric("outputTime")
@@ -1106,7 +1106,7 @@ case class ColumnarMultipleOperatorExec(
             vector.setVec(vecBatch.getVectors()(resultIdxToOmniResultIdxMap(i)))
           }
           numOutputRows += vecBatch.getRowCount
-          numOutputVecBatchs += 1
+          numOutputVecBatches += 1
           getOutputTime += NANOSECONDS.toMillis(System.nanoTime() - startGetOp)
           vecBatch.close()
           new ColumnarBatch(vectors.toArray, vecBatch.getRowCount)
@@ -1167,8 +1167,8 @@ case class ColumnarMultipleOperatorExec1(
     "addInputTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni addInput"),
     "outputTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni getOutput"),
     "omniJitTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni codegen"),
-    "numOutputVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatchs"),
-    //operator metric
+    "numOutputVecBatches" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatches"),
+    // operator metric
     "lookupAddInputTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni lookup addInput"),
     //
   ) ++ {
@@ -1194,7 +1194,7 @@ case class ColumnarMultipleOperatorExec1(
     val numOutputRows = longMetric("numOutputRows")
     val scanTime = longMetric("scanTime")
     val numInputRows = longMetric("numInputRows")
-    val numOutputVecBatchs = longMetric("numOutputVecBatchs")
+    val numOutputVecBatches = longMetric("numOutputVecBatches")
     val addInputTime = longMetric("addInputTime")
     val omniCodegenTime = longMetric("omniJitTime")
     val getOutputTime = longMetric("outputTime")
@@ -1439,7 +1439,7 @@ case class ColumnarMultipleOperatorExec1(
             vector.setVec(vecBatch.getVectors()(resultIdxToOmniResultIdxMap(i)))
           }
           numOutputRows += vecBatch.getRowCount
-          numOutputVecBatchs += 1
+          numOutputVecBatches += 1
           getOutputTime += NANOSECONDS.toMillis(System.nanoTime() - startGetOp)
           vecBatch.close()
           new ColumnarBatch(vectors.toArray, vecBatch.getRowCount)

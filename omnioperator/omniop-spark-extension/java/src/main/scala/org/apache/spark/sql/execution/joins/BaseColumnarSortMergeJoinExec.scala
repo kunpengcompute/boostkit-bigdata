@@ -127,12 +127,12 @@ abstract class BaseColumnarSortMergeJoinExec(
       SQLMetrics.createTimingMetric(sparkContext, "time in omni buffered codegen"),
     "getOutputTime" ->
       SQLMetrics.createTimingMetric(sparkContext, "time in omni buffered getOutput"),
-    "numOutputVecBatchs" ->
-      SQLMetrics.createMetric(sparkContext, "number of output vecBatchs"),
-    "numMergedVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of merged vecBatchs"),
-    "bypassVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of bypass vecBatchs"),
-    "numStreamVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of streamed vecBatchs"),
-    "numBufferVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of buffered vecBatchs")
+    "numOutputVecBatches" ->
+      SQLMetrics.createMetric(sparkContext, "number of output vecBatches"),
+    "numMergedVecBatches" -> SQLMetrics.createMetric(sparkContext, "number of merged vecBatches"),
+    "bypassVecBatches" -> SQLMetrics.createMetric(sparkContext, "number of bypass vecBatches"),
+    "numStreamVecBatches" -> SQLMetrics.createMetric(sparkContext, "number of streamed vecBatches"),
+    "numBufferVecBatches" -> SQLMetrics.createMetric(sparkContext, "number of buffered vecBatches")
   )
 
   override def verboseStringWithOperatorId(): String = {

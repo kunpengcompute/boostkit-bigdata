@@ -57,16 +57,16 @@ case class ColumnarSortMergeJoinFusionExec(
 
   override def doExecuteColumnar(): RDD[ColumnarBatch] = {
     val numOutputRows = longMetric("numOutputRows")
-    val numOutputVecBatchs = longMetric("numOutputVecBatchs")
-    val numMergedVecBatchs = longMetric("numMergedVecBatchs")
-    val bypassVecBatchs = longMetric("bypassVecBatchs")
+    val numOutputVecBatches = longMetric("numOutputVecBatches")
+    val numMergedVecBatches = longMetric("numMergedVecBatches")
+    val bypassVecBatches = longMetric("bypassVecBatches")
     val streamedAddInputTime = longMetric("streamedAddInputTime")
     val streamedCodegenTime = longMetric("streamedCodegenTime")
     val bufferedAddInputTime = longMetric("bufferedAddInputTime")
     val bufferedCodegenTime = longMetric("bufferedCodegenTime")
     val getOutputTime = longMetric("getOutputTime")
-    val streamVecBatchs = longMetric("numStreamVecBatchs")
-    val bufferVecBatchs = longMetric("numBufferVecBatchs")
+    val streamVecBatches = longMetric("numStreamVecBatches")
+    val bufferVecBatches = longMetric("numBufferVecBatches")
 
     val streamedTypes = new Array[DataType](left.output.size)
     left.output.zipWithIndex.foreach { case (attr, i) =>
@@ -181,7 +181,7 @@ case class ColumnarSortMergeJoinFusionExec(
                     v.setVec(resultVecs(index))
                 }
             }
-            numOutputVecBatchs += 1
+            numOutputVecBatches += 1
             numOutputRows += result.getRowCount
             result.close()
             new ColumnarBatch(vecs.toArray, result.getRowCount)
@@ -189,7 +189,7 @@ case class ColumnarSortMergeJoinFusionExec(
       }
 
       if (enableSortMergeJoinBatchMerge) {
-        new MergeIterator(iterBatch, resultSchema, numMergedVecBatchs, bypassVecBatchs)
+        new MergeIterator(iterBatch, resultSchema, numMergedVecBatches, bypassVecBatches)
       } else {
         iterBatch
       }
