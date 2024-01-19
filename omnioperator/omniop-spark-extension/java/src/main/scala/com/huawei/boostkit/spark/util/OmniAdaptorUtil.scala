@@ -36,6 +36,7 @@ import org.apache.spark.sql.vectorized.{ColumnVector, ColumnarBatch}
 
 import scala.collection.mutable.ListBuffer
 import java.util
+import scala.util.control.Breaks.{break, breakable}
 
 object OmniAdaptorUtil {
   def transColBatchToOmniVecs(cb: ColumnarBatch): Array[Vec] = {
@@ -344,14 +345,19 @@ object OmniAdaptorUtil {
   }
 
   def reorderVecs(prunedOutput: Seq[Attribute], projectList: Seq[NamedExpression], resultVecs: Array[nova.hetu.omniruntime.vector.Vec], vecs: Array[OmniColumnVector]) = {
+    val used = new Array[Boolean](resultVecs.length)
     for (index <- projectList.indices) {
       val project = projectList(index)
-      for (i <- prunedOutput.indices) {
-        val col = prunedOutput(i)
-        if (col.exprId.equals(getProjectAliasExprId(project))) {
-          val v = vecs(index)
-          v.reset()
-          v.setVec(resultVecs(i))
+      breakable {
+        for (i <- prunedOutput.indices) {
+          val col = prunedOutput(i)
+          if (!used(i) && col.exprId.equals(getProjectAliasExprId(project))) {
+            val v = vecs(index)
+            v.reset()
+            v.setVec(resultVecs(i))
+            used(i) = true;
+            break
+          }
         }
       }
     }
