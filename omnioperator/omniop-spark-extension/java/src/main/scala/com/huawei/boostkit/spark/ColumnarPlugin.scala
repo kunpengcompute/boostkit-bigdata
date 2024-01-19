@@ -811,20 +811,7 @@ case class ColumnarPostOverrides() extends Rule[SparkPlan] {
   var isSupportAdaptive: Boolean = true
 
   def apply(plan: SparkPlan): SparkPlan = {
-    val columnarPlan = replaceWithColumnarPlan(plan)
-    val handledPartialFetchedPlan = handleColumnarToRowPartialFetch(columnarPlan)
-    handleColumnarShuffleOnTopPlan(handledPartialFetchedPlan)
-  }
-
-  private def handleColumnarShuffleOnTopPlan(plan: SparkPlan): SparkPlan = {
-    plan match {
-      case child: ColumnarShuffleExchangeExec =>
-        if (conf.getConfString("spark.omni.sql.columnar.columnarToRow", "true").toBoolean) {
-          OmniColumnarToRowExec(child)
-        } else {
-          ColumnarToRowExec(child)
-        }
-    }
+    handleColumnarToRowPartialFetch(replaceWithColumnarPlan(plan))
   }
 
   private def handleColumnarToRowPartialFetch(plan: SparkPlan): SparkPlan = {
