@@ -65,13 +65,13 @@ case class ColumnarSortExec(
   override lazy val metrics = Map(
 
     "addInputTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni addInput"),
-    "numInputVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of input vecBatchs"),
+    "numInputVecBatches" -> SQLMetrics.createMetric(sparkContext, "number of input vecBatches"),
     "numInputRows" -> SQLMetrics.createMetric(sparkContext, "number of input rows"),
     "omniCodegenTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni codegen"),
     "getOutputTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni getOutput"),
     "numOutputRows" -> SQLMetrics.createMetric(sparkContext, "number of output rows"),
     "outputDataSize" -> SQLMetrics.createSizeMetric(sparkContext, "output data size"),
-    "numOutputVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatchs"))
+    "numOutputVecBatches" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatches"))
 
   def buildCheck(): Unit = {
     genSortParam(child.output, sortOrder)
@@ -107,7 +107,7 @@ case class ColumnarSortExec(
   override def doExecuteColumnar(): RDD[ColumnarBatch] = {
     val omniCodegenTime = longMetric("omniCodegenTime")
 
-    val (sourceTypes, ascendings, nullFirsts, sortColsExp) = genSortParam(child.output, sortOrder)
+    val (sourceTypes, ascending, nullFirsts, sortColsExp) = genSortParam(child.output, sortOrder)
     val outputCols = output.indices.toArray
 
     child.executeColumnar().mapPartitionsWithIndexInternal { (_, iter) =>
@@ -116,10 +116,10 @@ case class ColumnarSortExec(
       val sortSpillMemPctThreshold = columnarConf.columnarSortSpillMemPctThreshold
       val sortSpillDirDiskReserveSize = columnarConf.columnarSortSpillDirDiskReserveSize
       val sortSpillEnable = columnarConf.enableSortSpill
-      val sortlocalDirs: Array[File] = generateLocalDirs(sparkConfTmp)
+      val sortLocalDirs: Array[File] = generateLocalDirs(sparkConfTmp)
       val hash = Utils.nonNegativeHash(SparkEnv.get.executorId)
-      val dirId = hash % sortlocalDirs.length
-      val spillPathDir = sortlocalDirs(dirId).getCanonicalPath
+      val dirId = hash % sortLocalDirs.length
+      val spillPathDir = sortLocalDirs(dirId).getCanonicalPath
       val sparkSpillConf = new SparkSpillConfig(sortSpillEnable, spillPathDir,
         sortSpillDirDiskReserveSize, sortSpillRowThreshold, sortSpillMemPctThreshold)
       val startCodegen = System.nanoTime()
@@ -127,7 +127,7 @@ case class ColumnarSortExec(
       val radixSortEnable = columnarConf.enableRadixSort
       val radixSortRowCountThreshold = if(radixSortEnable) {columnarConf.radixSortThreshold} else {-1}
 
-      val sortOperatorFactory = new OmniSortWithExprOperatorFactory(sourceTypes, outputCols, sortColsExp, ascendings, nullFirsts,
+      val sortOperatorFactory = new OmniSortWithExprOperatorFactory(sourceTypes, outputCols, sortColsExp, ascending, nullFirsts,
         new OperatorConfig(sparkSpillConf, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP, radixSortRowCountThreshold.asInstanceOf[Int]))
       val sortOperator = sortOperatorFactory.createOperator
       omniCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startCodegen)
@@ -135,8 +135,8 @@ case class ColumnarSortExec(
         sortOperator.close()
       })
       addAllAndGetIterator(sortOperator, iter, this.schema,
-        longMetric("addInputTime"), longMetric("numInputVecBatchs"), longMetric("numInputRows"),
-        longMetric("getOutputTime"), longMetric("numOutputVecBatchs"), longMetric("numOutputRows"),
+        longMetric("addInputTime"), longMetric("numInputVecBatches"), longMetric("numInputRows"),
+        longMetric("getOutputTime"), longMetric("numOutputVecBatches"), longMetric("numOutputRows"),
         longMetric("outputDataSize"))
     }
   }

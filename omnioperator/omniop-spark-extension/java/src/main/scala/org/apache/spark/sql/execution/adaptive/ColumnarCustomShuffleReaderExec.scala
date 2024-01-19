@@ -210,7 +210,7 @@ case class OmniAQEShuffleReadExec(
 
   override lazy val metrics: Map[String, SQLMetric] = {
     if (shuffleStage.isDefined) {
-      Map("numMergedVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of merged vecBatchs"),
+      Map("numMergedVecBatches" -> SQLMetrics.createMetric(sparkContext, "number of merged vecBatches"),
         "numPartitions" -> SQLMetrics.createMetric(sparkContext, "number of partitions")) ++ {
         if (isLocalRead) {
           // We split the mapper partition evenly when creating local shuffle read, so no
@@ -258,7 +258,7 @@ case class OmniAQEShuffleReadExec(
           partitionSpecs.toArray).mapPartitionsWithIndexInternal { (index,iter) =>
           new MergeIterator(iter,
             StructType.fromAttributes(child.output),
-            longMetric("numMergedVecBatchs"))
+            longMetric("numMergedVecBatches"))
         }
 
         } else {

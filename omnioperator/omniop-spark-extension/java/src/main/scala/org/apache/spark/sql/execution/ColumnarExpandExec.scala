@@ -65,7 +65,7 @@ case class ColumnarExpandExec(
     "omniCodegenTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni codegen"),
     "getOutputTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni getOutput"),
     "numOutputRows" -> SQLMetrics.createMetric(sparkContext, "number of output rows"),
-    "numOutputVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatchs"),
+    "numOutputVecBatches" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatches"),
   )
 
   // The GroupExpressions can output data with arbitrary partitioning, so set it
@@ -118,7 +118,7 @@ case class ColumnarExpandExec(
 
   override def doExecuteColumnar(): RDD[ColumnarBatch] = {
     val numOutputRowsMetric = longMetric("numOutputRows")
-    val numOutputVecBatchsMetric = longMetric("numOutputVecBatchs")
+    val numOutputVecBatchesMetric = longMetric("numOutputVecBatches")
     val addInputTimeMetric = longMetric("addInputTime")
     val omniCodegenTimeMetric = longMetric("omniCodegenTime")
     val getOutputTimeMetric = longMetric("getOutputTime")
@@ -200,7 +200,7 @@ case class ColumnarExpandExec(
 
           val rowCount = result.getRowCount
           numOutputRowsMetric += rowCount
-          numOutputVecBatchsMetric += 1
+          numOutputVecBatchesMetric += 1
           result.close()
           new ColumnarBatch(vectors.toArray, rowCount)
         }
@@ -246,7 +246,7 @@ case class ColumnarOptRollupExec(
     "omniCodegenTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni codegen"),
     "getOutputTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni getOutput"),
     "numOutputRows" -> SQLMetrics.createMetric(sparkContext, "number of output rows"),
-    "numOutputVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatchs"),
+    "numOutputVecBatches" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatches"),
   )
 
   // The GroupExpressions can output data with arbitrary partitioning, so set it
@@ -259,7 +259,7 @@ case class ColumnarOptRollupExec(
 
   override def doExecuteColumnar(): RDD[ColumnarBatch] = {
     val numOutputRowsMetric = longMetric("numOutputRows")
-    val numOutputVecBatchsMetric = longMetric("numOutputVecBatchs")
+    val numOutputVecBatchesMetric = longMetric("numOutputVecBatches")
     val addInputTimeMetric = longMetric("addInputTime")
     val omniCodegenTimeMetric = longMetric("omniCodegenTime")
     val getOutputTimeMetric = longMetric("getOutputTime")
@@ -434,7 +434,7 @@ case class ColumnarOptRollupExec(
 
           val rowCount = vecBatch.getRowCount
           numOutputRowsMetric += rowCount
-          numOutputVecBatchsMetric += 1
+          numOutputVecBatchesMetric += 1
           vecBatch.close()
           new ColumnarBatch(vectors.toArray, rowCount)
         }

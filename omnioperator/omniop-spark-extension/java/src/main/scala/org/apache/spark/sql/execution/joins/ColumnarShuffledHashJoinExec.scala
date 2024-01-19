@@ -87,7 +87,7 @@ case class ColumnarShuffledHashJoinExec(
       "time in omni build getOutput"),
     "buildCodegenTime" -> SQLMetrics.createTimingMetric(sparkContext,
       "time in omni build codegen"),
-    "numOutputVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatchs"),
+    "numOutputVecBatches" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatches"),
     "buildDataSize" -> SQLMetrics.createSizeMetric(sparkContext, "build side input data size")
   )
 
@@ -172,7 +172,7 @@ case class ColumnarShuffledHashJoinExec(
    */
   override def doExecuteColumnar(): RDD[ColumnarBatch] = {
     val numOutputRows = longMetric("numOutputRows")
-    val numOutputVecBatchs = longMetric("numOutputVecBatchs")
+    val numOutputVecBatches= longMetric("numOutputVecBatches")
     val buildAddInputTime = longMetric("buildAddInputTime")
     val buildCodegenTime = longMetric("buildCodegenTime")
     val buildGetOutputTime = longMetric("buildGetOutputTime")
@@ -339,7 +339,7 @@ case class ColumnarShuffledHashJoinExec(
             }
             val rowCnt: Int = result.getRowCount
             numOutputRows += rowCnt
-            numOutputVecBatchs += 1
+            numOutputVecBatches+= 1
             result.close()
             new ColumnarBatch(vecs.toArray, rowCnt)
           }
@@ -393,7 +393,7 @@ case class ColumnarShuffledHashJoinExec(
                 }
               }
               numOutputRows += result.getRowCount
-              numOutputVecBatchs += 1
+              numOutputVecBatches+= 1
               new ColumnarBatch(vecs.toArray, result.getRowCount)
 
             }
