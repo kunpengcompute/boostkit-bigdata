@@ -133,6 +133,19 @@ case class ColumnarWindowExec(windowExpression: Seq[NamedExpression],
     val windowFrameEndTypes = new Array[OmniWindowFrameBoundType](winExpressions.size)
     val windowFrameEndChannels = new Array[Int](winExpressions.size)
     var attrMap: Map[String, Int] = Map()
+    
+    for (sortAttr <- orderSpec) {
+      if (!sortAttr.child.isInstanceOf[AttributeReference]) {
+        throw new UnsupportedOperationException(s"Unsupported sort col : ${sortAttr.child.nodeName}")
+      }
+    }
+
+    for (partitionAttr <- partitionSpec) {
+      if (!partitionAttr.isInstanceOf[AttributeReference]) {
+        throw new UnsupportedOperationException(s"Unsupported partition col : ${partitionAttr.nodeName}")
+      }
+    }
+    
     child.output.zipWithIndex.foreach {
       case (inputIter, i) =>
         sourceTypes(i) = sparkTypeToOmniType(inputIter.dataType, inputIter.metadata)
@@ -212,7 +225,7 @@ case class ColumnarWindowExec(windowExpression: Seq[NamedExpression],
 
     val sourceTypes = new Array[DataType](child.output.size)
     val sortCols = new Array[Int](orderSpec.size)
-    val ascending = new Array[Int](orderSpec.size)
+    val ascendings = new Array[Int](orderSpec.size)
     val nullFirsts = new Array[Int](orderSpec.size)
     val winExpressions: Seq[Expression] = windowFrameExpressionFactoryPairs.flatMap(_._1)
     val windowFunType = new Array[FunctionType](winExpressions.size)
@@ -233,24 +246,30 @@ case class ColumnarWindowExec(windowExpression: Seq[NamedExpression],
         sourceTypes(i) = sparkTypeToOmniType(inputIter.dataType, inputIter.metadata)
         attrMap += (inputIter.name -> i)
     }
-    // partition column parameters
 
     // sort column parameters
     var i = 0
     for (sortAttr <- orderSpec) {
-      if (attrMap.contains(sortAttr.child.asInstanceOf[AttributeReference].name)) {
-        sortCols(i) = attrMap(sortAttr.child.asInstanceOf[AttributeReference].name)
-        ascending(i) = sortAttr.isAscending match {
-          case true => 1
-          case _ => 0
-        }
-        nullFirsts(i) = sortAttr.nullOrdering.sql match {
-          case "NULLS LAST" => 0
-          case _ => 1
-        }
-      } else {
-        throw new UnsupportedOperationException(s"Unsupported sort col not in inputset: ${sortAttr.nodeName}")
+      val sortExpr = sortAttr.child
+      sortExpr match {
+        case attr: AttributeReference =>
+          if (attrMap.contains(attr.name)) {
+            sortCols(i) = attrMap(attr.name)
+          } else {
+            throw new UnsupportedOperationException(s"Unsupported sort col not in inputset: ${sortAttr.nodeName}")
+          }
+        case _ =>
+          throw new UnsupportedOperationException(s"Unsupported sort col : ${sortExpr}")
       }
+      ascendings(i) = sortAttr.isAscending match {
+        case true => 1
+        case _ => 0
+      }
+      nullFirsts(i) = sortAttr.nullOrdering.sql match {
+        case "NULLS LAST" => 0
+        case _ => 1
+      }
+
       i += 1
     }
 
@@ -266,14 +285,20 @@ case class ColumnarWindowExec(windowExpression: Seq[NamedExpression],
       i += 1
     }
 
-    //   partitionSpec: Seq[Expression]
+    // partition column parameters
     i = 0
     for (partitionAttr <- partitionSpec) {
-      if (attrMap.contains(partitionAttr.asInstanceOf[AttributeReference].name)) {
-        omminPartitionChannels(i) = attrMap(partitionAttr.asInstanceOf[AttributeReference].name)
-      } else {
-        throw new UnsupportedOperationException(s"output col not in input cols: ${partitionAttr}")
+      partitionAttr match {
+        case attr: AttributeReference =>
+          if (attrMap.contains(attr.name)) {
+            omminPartitionChannels(i) = attrMap(attr.name)
+          } else {
+            throw new UnsupportedOperationException(s"Partition col not in input cols: ${partitionAttr}")
+          }
+        case _ =>
+          throw new UnsupportedOperationException(s"Unsupported partition col : ${partitionAttr}")
       }
+
       i += 1
     }
 
@@ -328,7 +353,7 @@ case class ColumnarWindowExec(windowExpression: Seq[NamedExpression],
     child.executeColumnar().mapPartitionsWithIndexInternal { (index, iter) =>
       val startCodegen = System.nanoTime()
       val windowOperatorFactory = new OmniWindowWithExprOperatorFactory(sourceTypes, outputCols,
-        windowFunType, omminPartitionChannels, preGroupedChannels, sortCols, ascending,
+        windowFunType, omminPartitionChannels, preGroupedChannels, sortCols, ascendings,
         nullFirsts, 0, 10000, windowArgKeys, windowFunRetType, windowFrameTypes, windowFrameStartTypes,
         windowFrameStartChannels, windowFrameEndTypes, windowFrameEndChannels,
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
