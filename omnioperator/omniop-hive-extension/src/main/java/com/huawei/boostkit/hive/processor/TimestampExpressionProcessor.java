@@ -19,7 +19,11 @@
 package com.huawei.boostkit.hive.processor;
 
 import com.huawei.boostkit.hive.expression.BaseExpression;
+import com.huawei.boostkit.hive.expression.CastFunctionExpression;
 import com.huawei.boostkit.hive.expression.ExpressionUtils;
+import com.huawei.boostkit.hive.expression.TypeUtils;
+import com.sun.jdi.LongType;
+import nova.hetu.omniruntime.type.LongDataType;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
@@ -28,10 +32,13 @@ public class TimestampExpressionProcessor implements ExpressionProcessor {
     @Override
     public BaseExpression process(ExprNodeGenericFuncDesc node, String operator, ObjectInspector inspector) {
         ExprNodeDesc exprNodeDesc = node.getChildren().get(0);
+        CastFunctionExpression cast = new CastFunctionExpression(LongDataType.LONG.getId().toValue(),
+                TypeUtils.getCharWidth(node), null, null);
         if (exprNodeDesc instanceof ExprNodeGenericFuncDesc) {
-            return ExpressionUtils.build((ExprNodeGenericFuncDesc) exprNodeDesc, inspector);
+            cast.add(ExpressionUtils.build((ExprNodeGenericFuncDesc) exprNodeDesc, inspector));
         } else {
-            return ExpressionUtils.createNode(exprNodeDesc, inspector);
+            cast.add(ExpressionUtils.createNode(exprNodeDesc, inspector));
         }
+        return cast;
     }
 }

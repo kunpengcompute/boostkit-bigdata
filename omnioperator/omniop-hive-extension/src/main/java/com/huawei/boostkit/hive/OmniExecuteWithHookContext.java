@@ -234,7 +234,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         if (!currentReplaceable(op, reduceSinkCanReplace)) {
             return;
         }
-        if (work instanceof MapWork && op.getType().equals(OperatorType.TABLESCAN) && isReplaceable(op, false)) {
+        if (work instanceof MapWork && op.getType().equals(OperatorType.TABLESCAN) && inputFormatReplaceable((MapWork) work) && isReplaceable(op, false)) {
             replaceInputFormat(work);
             MapWork mapWork = (MapWork) work;
             for (Map.Entry<String, Operator<? extends OperatorDesc>> entry : mapWork.getAliasToWork().entrySet()) {
@@ -493,6 +493,17 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         return false;
     }
 
+    private boolean inputFormatReplaceable(MapWork work) {
+        for (PartitionDesc partitionDesc : work.getPathToPartitionInfo().values()) {
+            if (partitionDesc.getInputFileFormatClassName().equals(OrcInputFormat.class.getName())) {
+                return true;
+            } else if (partitionDesc.getInputFileFormatClassName().equals(MapredParquetInputFormat.class.getName())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private void replaceInputFormat(BaseWork work) {
         if (work instanceof MapWork) {
             for (PartitionDesc partitionDesc : ((MapWork) work).getPathToPartitionInfo().values()) {
@@ -599,7 +610,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             return false;
         }
         Table tableMetadata = tableScanDesc.getTableMetadata();
-        if (tableMetadata == null || !tableMetadata.getInputFormatClass().equals(OrcInputFormat.class) || tableMetadata.getParameters().getOrDefault("transactional", "").equals("true")) {
+        if (tableMetadata != null && (!tableMetadata.getInputFormatClass().equals(OrcInputFormat.class) || tableMetadata.getParameters().getOrDefault("transactional", "").equals("true"))) {
             return false;
         }
         for (String field : tableScanDesc.getNeededColumns()) {
