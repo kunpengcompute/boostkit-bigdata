@@ -91,6 +91,8 @@ import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
 import org.apache.hadoop.hive.serde2.typeinfo.DecimalTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
+import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
+import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -113,7 +115,8 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
     public static final Set<Integer> SUPPORTED_JOIN = new HashSet<>(Arrays.asList(JoinDesc.INNER_JOIN,
             JoinDesc.LEFT_OUTER_JOIN, JoinDesc.FULL_OUTER_JOIN, JoinDesc.LEFT_SEMI_JOIN));
     private static final Set<PrimitiveObjectInspector.PrimitiveCategory> UNSUPPORTED_TYPE = new HashSet<>(Arrays.asList(PrimitiveObjectInspector.PrimitiveCategory.BYTE,
-            PrimitiveObjectInspector.PrimitiveCategory.FLOAT, PrimitiveObjectInspector.PrimitiveCategory.BINARY));
+            PrimitiveObjectInspector.PrimitiveCategory.FLOAT, PrimitiveObjectInspector.PrimitiveCategory.BINARY, PrimitiveObjectInspector.PrimitiveCategory.INTERVAL_DAY_TIME,
+            PrimitiveObjectInspector.PrimitiveCategory.INTERVAL_YEAR_MONTH, PrimitiveObjectInspector.PrimitiveCategory.VOID));
 
     private static final int DECIMAL64_MAX_PRECISION = 19;
 
@@ -222,6 +225,11 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
 
     private void traverseTezWorks() {
         for (BaseWork work : tezWork.getAllWork()) {
+            if (hasUnsupportedDataType(work)) {
+                return;
+            }
+        }
+        for (BaseWork work : tezWork.getAllWork()) {
             boolean groupNeedSort = getGroupNeedSort(work);
             boolean reduceSinkCanReplace = getReduceSinkCanReplace(work);
             VectorizedRowBatchCtx vectorizedRowBatchCtx = work.getVectorizedRowBatchCtx();
@@ -229,6 +237,49 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                 traverseTezOperator(op, work, groupNeedSort, reduceSinkCanReplace, vectorizedRowBatchCtx);
             }
         }
+    }
+
+    private boolean hasUnsupportedDataType(BaseWork work) {
+        if (work instanceof MapWork) {
+            MapWork mapWork = (MapWork) work;
+            for (Operator op: mapWork.getAliasToWork().values()) {
+                if (!op.getType().equals(OperatorType.TABLESCAN)) {
+                    continue;
+                }
+                RowSchema rowSchema = op.getSchema();
+                TableScanDesc tableScanDesc = (TableScanDesc) op.getConf();
+                if (tableScanDesc.getNeededColumns().isEmpty()) {
+                    return false;
+                }
+                for (String field : tableScanDesc.getNeededColumns()) {
+                    TypeInfo typeInfo = rowSchema.getColumnInfo(field).getType();
+                    if (!(typeInfo instanceof PrimitiveTypeInfo)) {
+                        return true;
+                    }
+                    PrimitiveTypeInfo primitiveTypeInfo = (PrimitiveTypeInfo) typeInfo;
+                    if (UNSUPPORTED_TYPE.contains(primitiveTypeInfo.getPrimitiveCategory())) {
+                        return true;
+                    }
+                }
+            }
+        }
+        // If project generates new type ,also need to check
+        for (Operator op: work.getAllOperators()) {
+            if (!op.getType().equals(OperatorType.SELECT)) {
+                continue;
+            }
+            for (ExprNodeDesc exprNodeDesc: ((SelectDesc) op.getConf()).getColList()) {
+                TypeInfo typeInfo = exprNodeDesc.getTypeInfo();
+                if (!(typeInfo instanceof PrimitiveTypeInfo)) {
+                    return true;
+                }
+                PrimitiveTypeInfo primitiveTypeInfo = (PrimitiveTypeInfo) typeInfo;
+                if (UNSUPPORTED_TYPE.contains(primitiveTypeInfo.getPrimitiveCategory())) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private void traverseTezOperator(Operator op, BaseWork work, boolean groupNeedSort, boolean reduceSinkCanReplace, VectorizedRowBatchCtx vectorizedRowBatchCtx) {
@@ -615,7 +666,6 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
 
 
     private boolean tableScanSupport(Operator<? extends OperatorDesc> op) {
-        RowSchema rowSchema = op.getSchema();
         TableScanDesc tableScanDesc = (TableScanDesc) op.getConf();
         if (tableScanDesc.getNeededColumns().isEmpty()) {
             return false;
@@ -623,12 +673,6 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         Table tableMetadata = tableScanDesc.getTableMetadata();
         if (tableMetadata != null && (!tableMetadata.getInputFormatClass().equals(OrcInputFormat.class) || tableMetadata.getParameters().getOrDefault("transactional", "").equals("true"))) {
             return false;
-        }
-        for (String field : tableScanDesc.getNeededColumns()) {
-            PrimitiveTypeInfo primitiveTypeInfo = (PrimitiveTypeInfo) rowSchema.getColumnInfo(field).getType();
-            if (UNSUPPORTED_TYPE.contains(primitiveTypeInfo.getPrimitiveCategory())) {
-                return false;
-            }
         }
         return true;
     }
