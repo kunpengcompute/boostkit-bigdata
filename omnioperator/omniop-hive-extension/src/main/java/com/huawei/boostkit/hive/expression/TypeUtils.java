@@ -343,7 +343,7 @@ public class TypeUtils {
         }
         if (dataType == OMNI_DECIMAL128.toValue() && returnType == OMNI_DECIMAL128.toValue()) {
             BaseExpression child = castFunctionExpression.getArguments().get(0);
-            if (child instanceof DecimalReference && !((DecimalReference) child).getPrecision().equals(castFunctionExpression.getPrecision())) {
+            if (child instanceof DecimalReference && !((DecimalReference) child).getScale().equals(castFunctionExpression.getScale())) {
                 return true;
             }
         }
