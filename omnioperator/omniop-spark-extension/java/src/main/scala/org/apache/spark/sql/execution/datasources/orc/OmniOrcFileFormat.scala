@@ -26,6 +26,7 @@ import org.apache.hadoop.mapreduce._
 import org.apache.hadoop.mapreduce.lib.input.FileSplit
 import org.apache.hadoop.mapreduce.task.TaskAttemptContextImpl
 import org.apache.orc.{OrcConf, OrcFile, TypeDescription}
+import org.apache.orc.TypeDescription.Category._
 import org.apache.orc.mapreduce.OrcInputFormat
 
 import org.apache.spark.TaskContext
@@ -33,7 +34,7 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.util.SparkMemoryUtils
-import org.apache.spark.sql.sources.{DataSourceRegister, Filter}
+import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.util.{SerializableConfiguration, Utils}
 
@@ -52,6 +53,44 @@ class OmniOrcFileFormat extends FileFormat with DataSourceRegister with Serializ
       options: Map[String, String],
       files: Seq[FileStatus]): Option[StructType] = {
     OrcUtils.inferSchema(sparkSession, files, options)
+  }
+
+  private def isPPDSafe(filters: Seq[Filter], dataSchema: TypeDescription): Seq[Boolean] = {
+    def convertibleFiltersHelper(filter: Filter,
+      dataSchema: TypeDescription): Boolean = filter match {
+      case And(left, right) =>
+        convertibleFiltersHelper(left, dataSchema) && convertibleFiltersHelper(right, dataSchema)
+      case Or(left, right) =>
+        convertibleFiltersHelper(left, dataSchema) && convertibleFiltersHelper(right, dataSchema)
+      case Not(pred) =>
+        convertibleFiltersHelper(pred, dataSchema)
+      case other =>
+        other match {
+          case EqualTo(name, _) =>
+            dataSchema.findSubtype(name).getCategory != CHAR
+          case EqualNullSafe(name, _) =>
+            dataSchema.findSubtype(name).getCategory != CHAR
+          case LessThan(name, _) =>
+            dataSchema.findSubtype(name).getCategory != CHAR
+          case LessThanOrEqual(name, _) =>
+            dataSchema.findSubtype(name).getCategory != CHAR
+          case GreaterThan(name, _) =>
+            dataSchema.findSubtype(name).getCategory != CHAR
+          case GreaterThanOrEqual(name, _) =>
+            dataSchema.findSubtype(name).getCategory != CHAR
+          case IsNull(name) =>
+            dataSchema.findSubtype(name).getCategory != CHAR
+          case IsNotNull(name) =>
+            dataSchema.findSubtype(name).getCategory != CHAR
+          case In(name, _) =>
+            dataSchema.findSubtype(name).getCategory != CHAR
+          case _ => false
+        }
+    }
+
+    filters.map { filter =>
+      convertibleFiltersHelper(filter, dataSchema)
+    }
   }
 
   override def buildReaderWithPartitionValues(
@@ -88,12 +127,17 @@ class OmniOrcFileFormat extends FileFormat with DataSourceRegister with Serializ
             isCaseSensitive, dataSchema, requiredSchema, reader, conf)
         }
 
+      val isPPDSafeValue =
+        Utils.tryWithResource(OrcFile.createReader(filePath, readerOptions)) { reader =>
+        isPPDSafe(filters, reader.getSchema).reduceOption(_ && _)
+      }
+
       if (resultedColPruneInfo.isEmpty) {
         Iterator.empty
       } else {
         // ORC predicate pushdown
-        if (orcFilterPushDown) {
-          OrcUtils.readCatalystSchema(filePath, conf, ignoreCorruptFiles).foreach { 
+        if (orcFilterPushDown && isPPDSafeValue.getOrElse(false)) {
+          OrcUtils.readCatalystSchema(filePath, conf, ignoreCorruptFiles).foreach {
             fileSchema => OrcFilters.createFilter(fileSchema, filters).foreach { f =>
               OrcInputFormat.setSearchArgument(conf, f, fileSchema.fieldNames)
             }
