@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022-2022. Huawei Technologies Co., Ltd. All rights reserved.
+ * Copyright (C) 2022-2024. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
@@ -36,7 +36,7 @@ import org.apache.spark.sql.vectorized.ColumnarBatch
  * @since 2022/3/5
  */
 object ColumnarProjection {
-  def dealPartitionData(numOutputRows: SQLMetric, numOutputVecBatchs: SQLMetric,
+  def dealPartitionData(numOutputRows: SQLMetric, numOutputVecBatches: SQLMetric,
                         addInputTime: SQLMetric,
                         omniCodegenTime: SQLMetric,
                         getOutputTime: SQLMetric, omniInputTypes: Array[DataType],
@@ -92,8 +92,8 @@ object ColumnarProjection {
         if(numOutputRows != null) {
           numOutputRows += result.getRowCount
         }
-        if (numOutputVecBatchs != null) {
-          numOutputVecBatchs += 1
+        if (numOutputVecBatches != null) {
+          numOutputVecBatches += 1
         }
         result.close()
         new ColumnarBatch(vectors.toArray, result.getRowCount)

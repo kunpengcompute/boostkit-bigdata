@@ -36,6 +36,7 @@ import org.apache.spark.sql.vectorized.{ColumnVector, ColumnarBatch}
 
 import scala.collection.mutable.ListBuffer
 import java.util
+import scala.util.control.Breaks.{break, breakable}
 
 object OmniAdaptorUtil {
   def transColBatchToOmniVecs(cb: ColumnarBatch): Array[Vec] = {
@@ -182,7 +183,7 @@ object OmniAdaptorUtil {
       (Array[nova.hetu.omniruntime.`type`.DataType], Array[Int], Array[Int], Array[String]) = {
     val inputColSize: Int = output.size
     val sourceTypes = new Array[nova.hetu.omniruntime.`type`.DataType](inputColSize)
-    val ascendings = new Array[Int](sortOrder.size)
+    val ascending = new Array[Int](sortOrder.size)
     val nullFirsts = new Array[Int](sortOrder.size)
     val sortColsExp = new Array[String](sortOrder.size)
     val omniAttrExpsIdMap: Map[ExprId, Int] = getExprIdMap(output)
@@ -192,7 +193,7 @@ object OmniAdaptorUtil {
     }
     sortOrder.zipWithIndex.foreach { case (sortAttr, i) =>
       sortColsExp(i) = rewriteToOmniJsonExpressionLiteral(sortAttr.child, omniAttrExpsIdMap)
-      ascendings(i) = if (sortAttr.isAscending) {
+      ascending(i) = if (sortAttr.isAscending) {
         1
       } else {
         0
@@ -205,18 +206,18 @@ object OmniAdaptorUtil {
     if (!isSimpleColumnForAll(sortColsExp)) {
       checkOmniJsonWhiteList("", sortColsExp.asInstanceOf[Array[AnyRef]])
     }
-    (sourceTypes, ascendings, nullFirsts, sortColsExp)
+    (sourceTypes, ascending, nullFirsts, sortColsExp)
   }
 
   def addAllAndGetIterator(operator: OmniOperator,
                            inputIter: Iterator[ColumnarBatch], schema: StructType,
-                           addInputTime: SQLMetric, numInputVecBatchs: SQLMetric,
+                           addInputTime: SQLMetric, numInputVecBatches: SQLMetric,
                            numInputRows: SQLMetric, getOutputTime: SQLMetric,
-                           numOutputVecBatchs: SQLMetric, numOutputRows: SQLMetric,
+                           numOutputVecBatches: SQLMetric, numOutputRows: SQLMetric,
                            outputDataSize: SQLMetric): Iterator[ColumnarBatch] = {
     while (inputIter.hasNext) {
       val batch: ColumnarBatch = inputIter.next()
-      numInputVecBatchs += 1
+      numInputVecBatches += 1
       val input: Array[Vec] = transColBatchToOmniVecs(batch)
       val vecBatch = new VecBatch(input, batch.numRows())
       val startInput: Long = System.nanoTime()
@@ -259,7 +260,7 @@ object OmniAdaptorUtil {
         // metrics
         val rowCnt: Int = vecBatch.getRowCount
         numOutputRows += rowCnt
-        numOutputVecBatchs += 1
+        numOutputVecBatches += 1
         // close omni vecbetch
         vecBatch.close()
         new ColumnarBatch(vectors.toArray, rowCnt)
@@ -344,14 +345,19 @@ object OmniAdaptorUtil {
   }
 
   def reorderVecs(prunedOutput: Seq[Attribute], projectList: Seq[NamedExpression], resultVecs: Array[nova.hetu.omniruntime.vector.Vec], vecs: Array[OmniColumnVector]) = {
+    val used = new Array[Boolean](resultVecs.length)
     for (index <- projectList.indices) {
       val project = projectList(index)
-      for (i <- prunedOutput.indices) {
-        val col = prunedOutput(i)
-        if (col.exprId.equals(getProjectAliasExprId(project))) {
-          val v = vecs(index)
-          v.reset()
-          v.setVec(resultVecs(i))
+      breakable {
+        for (i <- prunedOutput.indices) {
+          val col = prunedOutput(i)
+          if (!used(i) && col.exprId.equals(getProjectAliasExprId(project))) {
+            val v = vecs(index)
+            v.reset()
+            v.setVec(resultVecs(i))
+            used(i) = true;
+            break
+          }
         }
       }
     }

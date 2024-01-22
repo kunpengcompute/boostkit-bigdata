@@ -84,6 +84,8 @@ import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.VarcharTypeInfo;
 import org.apache.parquet.format.DecimalType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
 import java.util.List;
@@ -92,6 +94,7 @@ import java.util.Optional;
 
 
 public class TypeUtils {
+    private static final Logger LOG = LoggerFactory.getLogger(TypeUtils.class.getName());
     private static final Map<PrimitiveObjectInspector.PrimitiveCategory, DataType> HIVE_TO_OMNI_TYPE = new HashMap<PrimitiveObjectInspector.PrimitiveCategory, DataType>() {
         {
             put(PrimitiveObjectInspector.PrimitiveCategory.SHORT, ShortDataType.SHORT);
@@ -340,7 +343,7 @@ public class TypeUtils {
         }
         if (dataType == OMNI_DECIMAL128.toValue() && returnType == OMNI_DECIMAL128.toValue()) {
             BaseExpression child = castFunctionExpression.getArguments().get(0);
-            if (child instanceof DecimalReference && !((DecimalReference) child).getPrecision().equals(castFunctionExpression.getPrecision())) {
+            if (child instanceof DecimalReference && !((DecimalReference) child).getScale().equals(castFunctionExpression.getScale())) {
                 return true;
             }
         }
@@ -369,8 +372,13 @@ public class TypeUtils {
     public static boolean checkOmniJsonWhiteList(String filterExpr, String[] projections) {
         // inputTypes will not be checked if parseFormat is json( == 1),
         // only if its parseFormat is String(==0)
-        long returnCode = new OmniExprVerify().exprVerifyNative(DataTypeSerializer.serialize(new DataType[0]), 0,
-                filterExpr, projections, projections.length, 1);
-        return returnCode != 0;
+        try {
+            long returnCode = new OmniExprVerify().exprVerifyNative(DataTypeSerializer.serialize(new DataType[0]), 0,
+                    filterExpr, projections, projections.length, 1);
+            return returnCode != 0;
+        } catch (Exception e) {
+            LOG.info("verify expression error! " + e);
+            return false;
+        }
     }
 }
