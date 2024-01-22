@@ -129,7 +129,6 @@ public class OmniOrcColumnarBatchReader extends RecordReader<Void, ColumnarBatch
     OrcFile.ReaderOptions readerOptions = OrcFile.readerOptions(conf)
             .maxLength(OrcConf.MAX_FILE_LENGTH.getLong(conf))
             .filesystem(fileSplit.getPath().getFileSystem(conf));
-//  long reader = OrcColumnarNativeReader.initializeReaderJava(fileSplit.getPath(), readerOptions);
     Reader.Options options =
             OrcColumnarNativeReader.buildOptions(conf, fileSplit.getStart(), fileSplit.getLength());
     recordReader = new OrcColumnarBatchScanReader();
@@ -153,10 +152,9 @@ public class OmniOrcColumnarBatchReader extends RecordReader<Void, ColumnarBatch
           int[] requestedDataColIds,
           int[] requestedPartitionColIds,
           InternalRow partitionValues) {
-    // wrap = new OrcShimUtils.VectorizedRowBatchWrap(orcSchema.createRowBatch(capacity));
-    // assert(!wrap.batch().selectedInUse); // `selectedInUse` should be initialized with `false`.
-    assert(resultFields.length == requestedDataColIds.length);
-    assert(resultFields.length == requestedPartitionColIds.length);
+    if (resultFields.length != requestedDataColIds.length || resultFields.length != requestedPartitionColIds.length){
+      throw new UnsupportedOperationException("This operator doesn't support orc initBatch.");
+    }
     // If a required column is also partition column, use partition value and don't read from file.
     for (int i = 0; i < resultFields.length; i++) {
       if (requestedPartitionColIds[i] != -1) {
