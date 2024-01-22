@@ -240,7 +240,6 @@ public class OrcColumnarBatchScanReader {
     }
 
     public int next(Vec[] vecList) {
-        int vectorCnt = vecList.length;
         int[] typeIds = new int[realColsCnt];
         long[] vecNativeIds = new long[realColsCnt];
         long rtn = jniReader.recordReaderNext(recordReader, batchReader, typeIds, vecNativeIds);
@@ -248,7 +247,7 @@ public class OrcColumnarBatchScanReader {
             return 0;
         }
         int nativeGetId = 0;
-        for (int i = 0; i < vectorCnt; i++) {
+        for (int i = 0; i < realColsCnt; i++) {
             if (colsToGet[i] != 0) {
                 continue;
             }
