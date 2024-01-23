@@ -124,7 +124,7 @@ class OmniOrcFileFormat extends FileFormat with DataSourceRegister with Serializ
         SparkMemoryUtils.init()
           batchReader.initialize(fileSplit, taskAttemptContext)
           batchReader.initBatch(
-            TypeDescription.fromString(resultSchemaString),
+            requiredSchema.fields,
             resultSchema.fields,
             requestedDataColIds,
             requestedPartitionColIds,
