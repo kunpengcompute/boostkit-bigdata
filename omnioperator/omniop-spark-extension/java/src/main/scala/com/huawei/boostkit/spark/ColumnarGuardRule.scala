@@ -172,7 +172,8 @@ case class ColumnarGuardRule() extends Rule[SparkPlan] {
             plan.buildSide,
             plan.condition,
             plan.left,
-            plan.right).buildCheck()
+            plan.right,
+            plan.isNullAwareAntiJoin).buildCheck()
         case plan: SortMergeJoinExec =>
           if (!enableColumnarSortMergeJoin) return false
           new ColumnarSortMergeJoinExec(

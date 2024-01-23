@@ -221,8 +221,12 @@ case class ColumnarBroadcastHashJoinExec(
   }
 
   def buildCheck(): Unit = {
+    if (isNullAwareAntiJoin) {
+      throw new UnsupportedOperationException(s"isNullAwareAntiJoin is not supported " +
+        s"in ${this.nodeName}")
+    }
     joinType match {
-      case LeftOuter | Inner | LeftSemi =>
+      case LeftOuter | Inner | LeftSemi | LeftAnti | RightOuter =>
       case _ =>
         throw new UnsupportedOperationException(s"Join-type[${joinType}] is not supported " +
           s"in ${this.nodeName}")
@@ -297,7 +301,7 @@ case class ColumnarBroadcastHashJoinExec(
 
     // {0}, buildKeys: col1#12
     val buildOutputCols: Array[Int] = joinType match {
-      case Inner | LeftOuter =>
+      case Inner | LeftOuter | RightOuter =>
         getIndexArray(buildOutput, projectList)
       case LeftExistence(_) =>
         Array[Int]()

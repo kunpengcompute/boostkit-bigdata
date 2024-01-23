@@ -35,7 +35,7 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{Attribute, Expression, NamedExpression, SortOrder}
 import org.apache.spark.sql.catalyst.expressions.codegen.CodegenContext
 import org.apache.spark.sql.catalyst.optimizer.{BuildLeft, BuildSide}
-import org.apache.spark.sql.catalyst.plans.{FullOuter, Inner, JoinType, LeftAnti, LeftExistence, LeftOuter, LeftSemi}
+import org.apache.spark.sql.catalyst.plans.{FullOuter, Inner, JoinType, LeftAnti, LeftExistence, LeftOuter, LeftSemi, RightOuter}
 import org.apache.spark.sql.catalyst.plans.physical.Partitioning
 import org.apache.spark.sql.execution.{ExplainUtils, SparkPlan}
 import org.apache.spark.sql.execution.metric.SQLMetrics
@@ -121,7 +121,7 @@ case class ColumnarShuffledHashJoinExec(
 
   def buildCheck(): Unit = {
     joinType match {
-      case FullOuter | Inner | LeftAnti | LeftOuter | LeftSemi =>
+      case FullOuter | Inner | LeftAnti | LeftOuter | LeftSemi | RightOuter =>
       case _ =>
         throw new UnsupportedOperationException(s"Join-type[${joinType}] is not supported " +
         s"in ${this.nodeName}")
@@ -187,7 +187,7 @@ case class ColumnarShuffledHashJoinExec(
     }
 
     val buildOutputCols: Array[Int] = joinType match {
-      case Inner | FullOuter | LeftOuter =>
+      case Inner | FullOuter | LeftOuter | RightOuter =>
         getIndexArray(buildOutput, projectList)
       case LeftExistence(_) =>
         Array[Int]()
