@@ -40,6 +40,7 @@ import org.apache.hadoop.hive.ql.QueryPlan;
 import org.apache.hadoop.hive.ql.exec.ExplainTask;
 import org.apache.hadoop.hive.ql.exec.MapJoinOperator;
 import org.apache.hadoop.hive.ql.exec.Operator;
+import org.apache.hadoop.hive.ql.exec.PTFOperator;
 import org.apache.hadoop.hive.ql.exec.RowSchema;
 import org.apache.hadoop.hive.ql.exec.TableScanOperator;
 import org.apache.hadoop.hive.ql.exec.Task;
@@ -354,7 +355,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                         return false;
                     }
                 }
-                if (conf.getFuncDef() instanceof PartitionedTableFunctionDef) {
+                if (!(conf.getFuncDef() instanceof WindowTableFunctionDef)) {
                     return false;
                 }
                 List<WindowFunctionDef> windowFunctionDefs = ((WindowTableFunctionDef) conf.getFuncDef()).getWindowFunctions();
@@ -380,6 +381,11 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                 GroupByDesc groupByDesc = (GroupByDesc) operator.getConf();
                 if (!isUDFSupport(groupByDesc.getKeys())) {
                     return false;
+                }
+                for (Operator<? extends OperatorDesc> childOperator : operator.getChildOperators()) {
+                    if (childOperator instanceof PTFOperator && !currentReplaceable(childOperator, reduceSinkCanReplace)) {
+                        return false;
+                    }
                 }
                 for (AggregationDesc aggregator : groupByDesc.getAggregators()) {
                     if (aggregator.getDistinct()) {
@@ -417,8 +423,13 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                 if (reduceSinkDesc.getKeyCols().isEmpty() && reduceSinkDesc.getValueCols().isEmpty()) {
                     return false;
                 }
-                if (!isUDFSupport(reduceSinkDesc.getKeyCols()) || !isUDFSupport(reduceSinkDesc.getValueCols())
-                        || reduceSinkDesc.getTopN() != -1 || !reduceSinkDesc.getDistinctColumnIndices().isEmpty()) {
+                if (!isUDFSupport(reduceSinkDesc.getKeyCols()) ||
+                        !isUDFSupport(reduceSinkDesc.getValueCols()) ||
+                        !isUDFSupport(reduceSinkDesc.getPartitionCols())) {
+                    return false;
+                }
+
+                if (reduceSinkDesc.getTopN() != -1 || !reduceSinkDesc.getDistinctColumnIndices().isEmpty()) {
                     return false;
                 }
                 return true;
