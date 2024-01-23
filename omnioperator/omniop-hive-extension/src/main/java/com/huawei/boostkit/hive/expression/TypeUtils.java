@@ -277,6 +277,9 @@ public class TypeUtils {
         if (typeInfo instanceof PrimitiveTypeInfo) {
             String typeName = typeInfo.getTypeName();
             if (typeName.equals("string") && node instanceof ExprNodeConstantDesc) {
+                if (((ExprNodeConstantDesc) node).getValue() == null) {
+                    return 0;
+                }
                 return ((String) ((ExprNodeConstantDesc) node).getValue()).length();
             }
         }

@@ -60,6 +60,7 @@ import org.apache.hadoop.hive.ql.plan.AggregationDesc;
 import org.apache.hadoop.hive.ql.plan.BaseWork;
 import org.apache.hadoop.hive.ql.plan.CommonMergeJoinDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeColumnDesc;
+import org.apache.hadoop.hive.ql.plan.ExprNodeConstantDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
 import org.apache.hadoop.hive.ql.plan.FilterDesc;
@@ -392,6 +393,9 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                         return false;
                     }
                     for (ExprNodeDesc paramter : aggregator.getParameters()) {
+                        if (paramter instanceof ExprNodeConstantDesc) {
+                            return false;
+                        }
                         PrimitiveObjectInspector.PrimitiveCategory primitiveCategory = ((PrimitiveTypeInfo) paramter.getTypeInfo()).getPrimitiveCategory();
                         if ((primitiveCategory == PrimitiveObjectInspector.PrimitiveCategory.STRING ||
                                 primitiveCategory == PrimitiveObjectInspector.PrimitiveCategory.VARCHAR) &&
