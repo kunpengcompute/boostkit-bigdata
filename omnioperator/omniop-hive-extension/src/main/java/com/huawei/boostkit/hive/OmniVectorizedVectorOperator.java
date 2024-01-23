@@ -72,6 +72,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -92,6 +93,8 @@ public class OmniVectorizedVectorOperator extends OmniHiveOperator<OmniVectorDes
     private transient PrimitiveObjectInspector[] projectedColumnInspectors;
 
     private transient List<Integer> projectedColumns;
+
+    private transient List<String> projectColumnNames;
 
     private transient ColumnCache[] columnCaches;
 
@@ -147,12 +150,14 @@ public class OmniVectorizedVectorOperator extends OmniHiveOperator<OmniVectorDes
         }
         rowCount = 0;
         projectedColumns = new ArrayList<>();
+        projectColumnNames = new ArrayList<>();
         rbCtx = getVectorizedRowBatchCtx(hconf);
         vectorizedRowBatch = rbCtx.createVectorizedRowBatch();
         for (int i = 0; i < vectorizationContext.getProjectionColumnNames().size(); i++) {
             if (!vectorizationContext.getProjectionColumnNames().get(i).equals("ROW__ID")
                     && vectorizedRowBatch.cols[vectorizationContext.getProjectedColumns().get(i)] != null) {
                 projectedColumns.add(vectorizationContext.getProjectedColumns().get(i));
+                projectColumnNames.add(vectorizationContext.getProjectionColumnNames().get(i).toLowerCase(Locale.ROOT));
             }
         }
         converters = new VecConverter[projectedColumns.size()];
@@ -161,7 +166,7 @@ public class OmniVectorizedVectorOperator extends OmniHiveOperator<OmniVectorDes
         vectorizedRowBatch.projectedColumns = projectedColumns.stream().mapToInt(Integer::valueOf).toArray();
         List<ObjectInspector> inspectors = new ArrayList<>();
         converters = bigTableInspector.getAllStructFieldRefs().stream()
-                .filter(field -> !field.getFieldName().equals("row__id")).map(field -> {
+                .filter(field -> projectColumnNames.contains(field.getFieldName())).map(field -> {
                     PrimitiveTypeInfo primitiveTypeInfo = ((PrimitiveObjectInspector) field.getFieldObjectInspector())
                             .getTypeInfo();
                     inspectors.add(field.getFieldObjectInspector());
@@ -172,7 +177,7 @@ public class OmniVectorizedVectorOperator extends OmniHiveOperator<OmniVectorDes
                 }).toArray(VecConverter[]::new);
         projectedColumnInspectors = inspectors.toArray(new PrimitiveObjectInspector[0]);
         columnCaches = bigTableInspector.getAllStructFieldRefs().stream()
-                .filter(field -> !field.getFieldName().equals("row__id")).map(field -> getColumnCache(field))
+                .filter(field -> projectColumnNames.contains(field.getFieldName())).map(field -> getColumnCache(field))
                 .toArray(ColumnCache[]::new);
         if (isVecBatchSerDe) {
             List<TypeInfo> typeInfos = Arrays.stream(projectedColumnInspectors)
