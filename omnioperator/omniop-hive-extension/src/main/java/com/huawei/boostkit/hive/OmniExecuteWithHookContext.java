@@ -241,6 +241,37 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
     }
 
     private boolean hasUnsupportedDataType(BaseWork work) {
+        boolean hasUnsupported = scanHasUnsupported(work);
+        if (hasUnsupported) {
+            return true;
+        }
+        // If project generates new type ,also need to check
+        hasUnsupported = selectHasUnsupported(work);
+        return hasUnsupported;
+    }
+
+    private boolean selectHasUnsupported(BaseWork work) {
+        boolean hasUnsupported = false;
+        for (Operator op : work.getAllOperators()) {
+            if (!op.getType().equals(OperatorType.SELECT)) {
+                continue;
+            }
+            for (ExprNodeDesc exprNodeDesc : ((SelectDesc) op.getConf()).getColList()) {
+                TypeInfo typeInfo = exprNodeDesc.getTypeInfo();
+                if (!(typeInfo instanceof PrimitiveTypeInfo)) {
+                    hasUnsupported =  true;
+                }
+                PrimitiveTypeInfo primitiveTypeInfo = (PrimitiveTypeInfo) typeInfo;
+                if (UNSUPPORTED_TYPE.contains(primitiveTypeInfo.getPrimitiveCategory())) {
+                    hasUnsupported = true;
+                }
+            }
+        }
+        return hasUnsupported;
+    }
+
+    private boolean scanHasUnsupported(BaseWork work) {
+        boolean hasUnsupported = false;
         if (work instanceof MapWork) {
             MapWork mapWork = (MapWork) work;
             for (Operator op : mapWork.getAliasToWork().values()) {
@@ -250,37 +281,21 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                 RowSchema rowSchema = op.getSchema();
                 TableScanDesc tableScanDesc = (TableScanDesc) op.getConf();
                 if (tableScanDesc.getNeededColumns().isEmpty()) {
-                    return false;
+                    continue;
                 }
                 for (String field : tableScanDesc.getNeededColumns()) {
                     TypeInfo typeInfo = rowSchema.getColumnInfo(field).getType();
                     if (!(typeInfo instanceof PrimitiveTypeInfo)) {
-                        return true;
+                        hasUnsupported =  true;
                     }
                     PrimitiveTypeInfo primitiveTypeInfo = (PrimitiveTypeInfo) typeInfo;
                     if (UNSUPPORTED_TYPE.contains(primitiveTypeInfo.getPrimitiveCategory())) {
-                        return true;
+                        hasUnsupported =  true;
                     }
                 }
             }
         }
-        // If project generates new type ,also need to check
-        for (Operator op : work.getAllOperators()) {
-            if (!op.getType().equals(OperatorType.SELECT)) {
-                continue;
-            }
-            for (ExprNodeDesc exprNodeDesc : ((SelectDesc) op.getConf()).getColList()) {
-                TypeInfo typeInfo = exprNodeDesc.getTypeInfo();
-                if (!(typeInfo instanceof PrimitiveTypeInfo)) {
-                    return true;
-                }
-                PrimitiveTypeInfo primitiveTypeInfo = (PrimitiveTypeInfo) typeInfo;
-                if (UNSUPPORTED_TYPE.contains(primitiveTypeInfo.getPrimitiveCategory())) {
-                    return true;
-                }
-            }
-        }
-        return false;
+        return hasUnsupported;
     }
 
     private void traverseTezOperator(Operator op, BaseWork work, boolean groupNeedSort, boolean reduceSinkCanReplace, VectorizedRowBatchCtx vectorizedRowBatchCtx) {
@@ -362,19 +377,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             case MAPJOIN:
                 return SUPPORTED_JOIN.contains(((JoinDesc) operator.getConf()).getConds()[0].getType());
             case MERGEJOIN:
-                JoinDesc joinDesc = (JoinDesc) operator.getConf();
-                JoinCondDesc[] joinCondDescs = joinDesc.getConds();
-                if (joinDesc.getConds()[0].getType() == JoinDesc.FULL_OUTER_JOIN && joinDesc.getKeysString().get(0) == null) {
-                    return false;
-                }
-                if (joinCondDescs.length >= 2) {
-                    for (int i = 0; i < joinCondDescs.length; i++) {
-                        if (joinCondDescs[i].getType() != JoinDesc.INNER_JOIN) {
-                            return false;
-                        }
-                    }
-                }
-                return SUPPORTED_JOIN.contains(joinCondDescs[0].getType());
+                return mergeJoinReplaceable(operator);
             case SELECT:
                 if (!isUDFSupport(((SelectDesc) operator.getConf()).getColList())) {
                     return false;
@@ -497,6 +500,22 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             default:
                 return true;
         }
+    }
+
+    private boolean mergeJoinReplaceable(Operator<? extends OperatorDesc> operator) {
+        JoinDesc joinDesc = (JoinDesc) operator.getConf();
+        JoinCondDesc[] joinCondDescs = joinDesc.getConds();
+        if (joinDesc.getConds()[0].getType() == JoinDesc.FULL_OUTER_JOIN && joinDesc.getKeysString().get(0) == null) {
+            return false;
+        }
+        if (joinCondDescs.length >= 2) {
+            for (int i = 0; i < joinCondDescs.length; i++) {
+                if (joinCondDescs[i].getType() != JoinDesc.INNER_JOIN) {
+                    return false;
+                }
+            }
+        }
+        return SUPPORTED_JOIN.contains(joinCondDescs[0].getType());
     }
 
     private boolean isAvgUnsupported(List<PTFExpressionDef> expressions) {

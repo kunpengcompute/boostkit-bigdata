@@ -474,25 +474,29 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
             valuePosToKeyPos[i] = new TreeMap<>();
         }
         for (int buildIndex : buildIndexes) {
-            Map<String, Integer> buildKeyColNameToId = new HashMap<>();
-            for (int i = 0; i < joinKeys[buildIndex].size(); i++) {
-                if (joinKeys[buildIndex].get(i) instanceof ExprNodeColumnEvaluator) {
-                    buildKeyColNameToId
-                            .put(((ExprNodeColumnEvaluator) joinKeys[buildIndex].get(i)).getExpr().getColumn(), i);
-                }
+            initEachBuildTable(buildIndex);
+        }
+    }
+
+    private void initEachBuildTable(int buildIndex) {
+        Map<String, Integer> buildKeyColNameToId = new HashMap<>();
+        for (int i = 0; i < joinKeys[buildIndex].size(); i++) {
+            if (joinKeys[buildIndex].get(i) instanceof ExprNodeColumnEvaluator) {
+                buildKeyColNameToId
+                        .put(((ExprNodeColumnEvaluator) joinKeys[buildIndex].get(i)).getExpr().getColumn(), i);
             }
-            List<ExprNodeEvaluator> buildvalueEvaluators = getExprNodeColumnEvaluator(joinValues[buildIndex], true);
-            if (buildvalueEvaluators.isEmpty()) {
-                return;
+        }
+        List<ExprNodeEvaluator> buildvalueEvaluators = getExprNodeColumnEvaluator(joinValues[buildIndex], true);
+        if (buildvalueEvaluators.isEmpty()) {
+            return;
+        }
+        for (int i = 0; i < joinValues[buildIndex].size(); i++) {
+            if (buildvalueEvaluators.get(i) instanceof ExprNodeConstantEvaluator) {
+                continue;
             }
-            for (int i = 0; i < joinValues[buildIndex].size(); i++) {
-                if (buildvalueEvaluators.get(i) instanceof ExprNodeConstantEvaluator) {
-                    continue;
-                }
-                String colName = ((ExprNodeColumnEvaluator) buildvalueEvaluators.get(i)).getExpr().getColumn();
-                if (buildKeyColNameToId.containsKey(colName)) {
-                    valuePosToKeyPos[buildIndex].put(i, buildKeyColNameToId.get(colName));
-                }
+            String colName = ((ExprNodeColumnEvaluator) buildvalueEvaluators.get(i)).getExpr().getColumn();
+            if (buildKeyColNameToId.containsKey(colName)) {
+                valuePosToKeyPos[buildIndex].put(i, buildKeyColNameToId.get(colName));
             }
         }
     }

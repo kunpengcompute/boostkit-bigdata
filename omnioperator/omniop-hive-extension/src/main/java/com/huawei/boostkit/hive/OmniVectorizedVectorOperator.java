@@ -94,8 +94,6 @@ public class OmniVectorizedVectorOperator extends OmniHiveOperator<OmniVectorDes
 
     private transient List<Integer> projectedColumns;
 
-    private transient List<String> projectColumnNames;
-
     private transient ColumnCache[] columnCaches;
 
     private transient VecBufferCache vecBufferCache;
@@ -150,7 +148,7 @@ public class OmniVectorizedVectorOperator extends OmniHiveOperator<OmniVectorDes
         }
         rowCount = 0;
         projectedColumns = new ArrayList<>();
-        projectColumnNames = new ArrayList<>();
+        List<String> projectColumnNames = new ArrayList<>();
         rbCtx = getVectorizedRowBatchCtx(hconf);
         vectorizedRowBatch = rbCtx.createVectorizedRowBatch();
         for (int i = 0; i < vectorizationContext.getProjectionColumnNames().size(); i++) {
