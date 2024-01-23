@@ -131,7 +131,10 @@ class ColumnarShuffleExchangeExec(
     val buffer = sparkContext.collectionAccumulator[InternalRow]("array buffer")
     executeColumnar().foreachPartition {
       batches => {
-        ColumnarBatchToInternalRow.convert(localOutput, batches, numOutputRows, numInputBatches, omniColumnarToRowTime).foreach(buffer.add)
+        val rows = ColumnarBatchToInternalRow.convert(localOutput, batches, numOutputRows, numInputBatches, omniColumnarToRowTime)
+        while(rows.hasNext){
+          buffer.add(rows.next().copy())
+        }
       }
     }
     buffer.value.toArray(Array[InternalRow]())
