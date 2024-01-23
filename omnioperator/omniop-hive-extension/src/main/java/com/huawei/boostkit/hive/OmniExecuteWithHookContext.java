@@ -61,6 +61,7 @@ import org.apache.hadoop.hive.ql.plan.AggregationDesc;
 import org.apache.hadoop.hive.ql.plan.BaseWork;
 import org.apache.hadoop.hive.ql.plan.CommonMergeJoinDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeColumnDesc;
+import org.apache.hadoop.hive.ql.plan.ExprNodeConstantDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
 import org.apache.hadoop.hive.ql.plan.FilterDesc;
@@ -242,7 +243,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
     private boolean hasUnsupportedDataType(BaseWork work) {
         if (work instanceof MapWork) {
             MapWork mapWork = (MapWork) work;
-            for (Operator op: mapWork.getAliasToWork().values()) {
+            for (Operator op : mapWork.getAliasToWork().values()) {
                 if (!op.getType().equals(OperatorType.TABLESCAN)) {
                     continue;
                 }
@@ -264,11 +265,11 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             }
         }
         // If project generates new type ,also need to check
-        for (Operator op: work.getAllOperators()) {
+        for (Operator op : work.getAllOperators()) {
             if (!op.getType().equals(OperatorType.SELECT)) {
                 continue;
             }
-            for (ExprNodeDesc exprNodeDesc: ((SelectDesc) op.getConf()).getColList()) {
+            for (ExprNodeDesc exprNodeDesc : ((SelectDesc) op.getConf()).getColList()) {
                 TypeInfo typeInfo = exprNodeDesc.getTypeInfo();
                 if (!(typeInfo instanceof PrimitiveTypeInfo)) {
                     return true;
@@ -460,10 +461,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                 }
                 return true;
             case REDUCESINK:
-                if (reduceSinkOpToWork.isEmpty()) {
-                    return false;
-                }
-                if (!reduceSinkOpToWork.containsKey(operator)) {
+                if (reduceSinkOpToWork.isEmpty() || !reduceSinkOpToWork.containsKey(operator)) {
                     return false;
                 }
                 ReduceSinkDesc reduceSinkDesc = (ReduceSinkDesc) operator.getConf();
@@ -471,7 +469,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                     reduceSinkOpToWork.remove(operator);
                     return false;
                 }
-                if (reduceSinkDesc.getKeyCols().isEmpty() && reduceSinkDesc.getValueCols().isEmpty()) {
+                if (reduceSinkDesc.getKeyCols().isEmpty() && !reduceSinkDesc.getReducerTraits().contains(ReduceSinkDesc.ReducerTraits.UNIFORM)) {
                     return false;
                 }
                 if (!isUDFSupport(reduceSinkDesc.getKeyCols()) ||
@@ -482,6 +480,11 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
 
                 if (reduceSinkDesc.getTopN() != -1 || !reduceSinkDesc.getDistinctColumnIndices().isEmpty()) {
                     return false;
+                }
+                for (ExprNodeDesc exprNodeDesc : reduceSinkDesc.getPartitionCols()) {
+                    if (exprNodeDesc instanceof ExprNodeConstantDesc) {
+                        return false;
+                    }
                 }
                 return true;
             case TABLESCAN:
@@ -597,6 +600,10 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         }
         for (BaseWork child : tezWork.getChildren(work)) {
             TezEdgeProperty.EdgeType edgeType = tezWork.getEdgeType(work, child);
+            if (edgeType == TezEdgeProperty.EdgeType.CONTAINS) {
+                continue;
+            }
+            reduceSinkCanReplace = false;
             if (isSupportEdgeType(edgeType) && isReplaceable(child.getAnyRootOperator(), true)) {
                 reduceSinkCanReplace = true;
             }
