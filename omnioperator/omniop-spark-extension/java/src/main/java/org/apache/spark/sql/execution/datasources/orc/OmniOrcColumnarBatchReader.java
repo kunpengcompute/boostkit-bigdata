@@ -31,7 +31,7 @@ import org.apache.orc.OrcFile;
 import org.apache.orc.Reader;
 
 import org.apache.spark.sql.catalyst.InternalRow;
-import org.apache.spark.sql.execution.vectorized.ColumnVectorUtils;
+import org.apache.spark.sql.execution.vectorized.OmniColumnVectorUtils;
 import org.apache.spark.sql.execution.vectorized.OmniColumnVector;
 import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.StructField;
@@ -177,7 +177,7 @@ public class OmniOrcColumnarBatchReader extends RecordReader<Void, ColumnarBatch
       DataType dt = resultFields[i].dataType();
       if (requestedPartitionColIds[i] != -1) {
         OmniColumnVector partitionCol = new OmniColumnVector(capacity, dt, true);
-        ColumnVectorUtils.populate(partitionCol, partitionValues, requestedPartitionColIds[i]);
+        OmniColumnVectorUtils.populate(partitionCol, partitionValues, requestedPartitionColIds[i]);
         partitionCol.setIsConstant();
         templateWrappers[i] = partitionCol;
         orcVectorWrappers[i] = new OmniColumnVector(capacity, dt, false);;

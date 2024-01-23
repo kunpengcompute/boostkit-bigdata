@@ -51,7 +51,7 @@ import org.apache.parquet.io.ParquetDecodingException;
 import org.apache.parquet.schema.MessageType;
 import org.apache.parquet.schema.Type;
 import org.apache.spark.sql.catalyst.InternalRow;
-import org.apache.spark.sql.execution.vectorized.ColumnVectorUtils;
+import org.apache.spark.sql.execution.vectorized.OmniColumnVectorUtils;
 import org.apache.spark.sql.execution.vectorized.OmniColumnVector;
 import org.apache.spark.sql.execution.vectorized.OnHeapColumnVector;
 import org.apache.spark.sql.types.DataType;
@@ -261,7 +261,7 @@ public class OmniParquetColumnarBatchReader extends RecordReader<Void, ColumnarB
       int partitionIdx = sparkSchema.fields().length;
       for (int i = 0; i < partitionColumns.fields().length; i++) {
         OmniColumnVector partitionCol = new OmniColumnVector(capacity, partitionColumns.fields()[i].dataType(), true);
-        ColumnVectorUtils.populate(partitionCol, partitionValues, i);
+        OmniColumnVectorUtils.populate(partitionCol, partitionValues, i);
         partitionCol.setIsConstant();
         // templateWrap always stores partitionCol
         templateWrap[i + partitionIdx] = partitionCol;
