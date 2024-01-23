@@ -1390,7 +1390,8 @@ class ColumnarAdaptiveQueryExecSuite extends ColumnarSparkPlanTest
         val plan = dfRepartition.queryExecution.executedPlan
         // The top shuffle from repartition is optimized out.
         assert(!hasRepartitionShuffle(plan))
-        val bhj = findTopLevelBroadcastHashJoin(plan)
+        // omni have supported right outer join.
+        val bhj = findTopLevelColumnarBroadcastHashJoin(plan)
         assert(bhj.length == 1)
         checkNumLocalShuffleReaders(plan, 1)
         // Probe side is coalesced.
@@ -1404,7 +1405,7 @@ class ColumnarAdaptiveQueryExecSuite extends ColumnarSparkPlanTest
         val planWithNum = dfRepartitionWithNum.queryExecution.executedPlan
         // The top shuffle from repartition is optimized out.
         assert(!hasRepartitionShuffle(planWithNum))
-        val bhjWithNum = findTopLevelBroadcastHashJoin(planWithNum)
+        val bhjWithNum = findTopLevelColumnarBroadcastHashJoin(planWithNum)
         assert(bhjWithNum.length == 1)
         checkNumLocalShuffleReaders(planWithNum, 1)
         // Probe side is not coalesced.
@@ -1417,7 +1418,7 @@ class ColumnarAdaptiveQueryExecSuite extends ColumnarSparkPlanTest
         // The top shuffle from repartition is not optimized out, and this is the only shuffle that
         // does not have local shuffle reader.
         assert(hasRepartitionShuffle(planWithNum2))
-        val bhjWithNum2 = findTopLevelBroadcastHashJoin(planWithNum2)
+        val bhjWithNum2 = findTopLevelColumnarBroadcastHashJoin(planWithNum2)
         assert(bhjWithNum2.length == 1)
         checkNumLocalShuffleReaders(planWithNum2, 1)
         val customReader2 = bhjWithNum2.head.right

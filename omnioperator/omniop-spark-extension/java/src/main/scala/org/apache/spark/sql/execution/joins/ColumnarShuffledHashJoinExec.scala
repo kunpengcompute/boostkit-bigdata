@@ -115,7 +115,7 @@ case class ColumnarShuffledHashJoinExec(
 
   def buildCheck(): Unit = {
     joinType match {
-      case FullOuter | Inner | LeftAnti | LeftOuter | LeftSemi =>
+      case FullOuter | Inner | LeftAnti | LeftOuter | LeftSemi | RightOuter =>
       case _ =>
         throw new UnsupportedOperationException(s"Join-type[${joinType}] is not supported " +
         s"in ${this.nodeName}")
@@ -181,7 +181,7 @@ case class ColumnarShuffledHashJoinExec(
     }
 
     val buildOutputCols: Array[Int] = joinType match {
-      case Inner | FullOuter | LeftOuter =>
+      case Inner | FullOuter | LeftOuter | RightOuter =>
         getIndexArray(buildOutput, projectList)
       case LeftExistence(_) =>
         Array[Int]()
