@@ -127,11 +127,14 @@ class ColumnarShuffleExchangeExec(
     val numOutputRows = longMetric("numOutputRows")
     val numInputBatches = longMetric("numInputBatches")
     val omniColumnarToRowTime = longMetric("omniColumnarToRowTime")
-    executeColumnar().mapPartitionsInternal {
+    val localOutput = this.output
+    val buffer = sparkContext.collectionAccumulator[InternalRow]("array buffer")
+    executeColumnar().foreachPartition {
       batches => {
-        ColumnarBatchToInternalRow.convert(this.output, batches, numOutputRows, numInputBatches, omniColumnarToRowTime)
+        ColumnarBatchToInternalRow.convert(localOutput, batches, numOutputRows, numInputBatches, omniColumnarToRowTime).foreach(buffer.add)
       }
-    }.collect()
+    }
+    buffer.value.toArray(Array[InternalRow]())
   }
 
   def buildCheck(): Unit = {
