@@ -364,9 +364,14 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             case MERGEJOIN:
                 JoinDesc joinDesc = (JoinDesc) operator.getConf();
                 JoinCondDesc[] joinCondDescs = joinDesc.getConds();
-                for (int i = 1; i < joinCondDescs.length; i++) {
-                    if (joinCondDescs[i - 1].getType() != joinCondDescs[i].getType()) {
-                        return false;
+                if (joinDesc.getConds()[0].getType() == JoinDesc.FULL_OUTER_JOIN && joinDesc.getKeysString().get(0) == null) {
+                    return false;
+                }
+                if (joinCondDescs.length >= 2) {
+                    for (int i = 0; i < joinCondDescs.length; i++) {
+                        if (joinCondDescs[i].getType() != JoinDesc.INNER_JOIN) {
+                            return false;
+                        }
                     }
                 }
                 return SUPPORTED_JOIN.contains(joinCondDescs[0].getType());
@@ -594,11 +599,11 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
     }
 
     private boolean getReduceSinkCanReplace(BaseWork work) {
-        boolean reduceSinkCanReplace = false;
         if (parentOfMapJoinOpCannotReplace.contains(work.getName())) {
             return false;
         }
         for (BaseWork child : tezWork.getChildren(work)) {
+            boolean reduceSinkCanReplace = false;
             TezEdgeProperty.EdgeType edgeType = tezWork.getEdgeType(work, child);
             if (edgeType == TezEdgeProperty.EdgeType.CONTAINS) {
                 continue;
@@ -629,8 +634,12 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                 }
                 replaceSimpleEdge(reduceSinkCanReplace, child, edgeType);
             }
+            if (!reduceSinkCanReplace) {
+                return false;
+            }
         }
         // deal with Union work
+        boolean reduceSinkCanReplace = false;
         for (BaseWork parent : tezWork.getParents(work)) {
             TezEdgeProperty.EdgeType edgeType = tezWork.getEdgeType(parent, work);
             if (edgeType == TezEdgeProperty.EdgeType.CONTAINS && getReduceSinkCanReplace(parent)) {
