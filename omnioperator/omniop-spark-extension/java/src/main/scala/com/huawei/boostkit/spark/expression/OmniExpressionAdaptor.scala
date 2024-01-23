@@ -313,7 +313,7 @@ object OmniExpressionAdaptor extends Logging {
 
     def doSupportCastFromString(dataType: DataType): Boolean = {
       if (dataType.isInstanceOf[DecimalType] || dataType.isInstanceOf[StringType] || dataType.isInstanceOf[DateType]
-        || dataType.isInstanceOf[IntegerType] || dataType.isInstanceOf[LongType] || dataType.isInstanceOf[DoubleType]) {
+        || dataType.isInstanceOf[IntegerType] || dataType.isInstanceOf[LongType]) {
         true
       } else {
         false
