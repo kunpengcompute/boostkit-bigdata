@@ -260,7 +260,6 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
     }
 
     private boolean selectHasUnsupported(BaseWork work) {
-        boolean hasUnsupported = false;
         for (Operator op : work.getAllOperators()) {
             if (!op.getType().equals(OperatorType.SELECT)) {
                 continue;
@@ -268,43 +267,43 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             for (ExprNodeDesc exprNodeDesc : ((SelectDesc) op.getConf()).getColList()) {
                 TypeInfo typeInfo = exprNodeDesc.getTypeInfo();
                 if (!(typeInfo instanceof PrimitiveTypeInfo)) {
-                    hasUnsupported = true;
+                    return true;
                 }
                 PrimitiveTypeInfo primitiveTypeInfo = (PrimitiveTypeInfo) typeInfo;
                 if (UNSUPPORTED_TYPE.contains(primitiveTypeInfo.getPrimitiveCategory())) {
-                    hasUnsupported = true;
+                    return true;
                 }
             }
         }
-        return hasUnsupported;
+        return false;
     }
 
     private boolean scanHasUnsupported(BaseWork work) {
-        boolean hasUnsupported = false;
-        if (work instanceof MapWork) {
-            MapWork mapWork = (MapWork) work;
-            for (Operator op : mapWork.getAliasToWork().values()) {
-                if (!op.getType().equals(OperatorType.TABLESCAN)) {
-                    continue;
+        if (!(work instanceof MapWork)) {
+            return false;
+        }
+        MapWork mapWork = (MapWork) work;
+        for (Operator op : mapWork.getAliasToWork().values()) {
+            if (!op.getType().equals(OperatorType.TABLESCAN)) {
+                continue;
+            }
+            RowSchema rowSchema = op.getSchema();
+            TableScanDesc tableScanDesc = (TableScanDesc) op.getConf();
+            if (tableScanDesc.getNeededColumns().isEmpty()) {
+                continue;
+            }
+            for (String field : tableScanDesc.getNeededColumns()) {
+                TypeInfo typeInfo = rowSchema.getColumnInfo(field).getType();
+                if (!(typeInfo instanceof PrimitiveTypeInfo)) {
+                    return true;
                 }
-                RowSchema rowSchema = op.getSchema();
-                TableScanDesc tableScanDesc = (TableScanDesc) op.getConf();
-                if (tableScanDesc.getNeededColumns().isEmpty()) {
-                    continue;
-                }
-                for (String field : tableScanDesc.getNeededColumns()) {
-                    TypeInfo typeInfo = rowSchema.getColumnInfo(field).getType();
-                    if (!(typeInfo instanceof PrimitiveTypeInfo)) {
-                        hasUnsupported = true;
-                    }
-                    PrimitiveTypeInfo primitiveTypeInfo = (PrimitiveTypeInfo) typeInfo;
-                    if (UNSUPPORTED_TYPE.contains(primitiveTypeInfo.getPrimitiveCategory())) {
-                        hasUnsupported = true;
-                    }
+                PrimitiveTypeInfo primitiveTypeInfo = (PrimitiveTypeInfo) typeInfo;
+                if (UNSUPPORTED_TYPE.contains(primitiveTypeInfo.getPrimitiveCategory())) {
+                    return true;
                 }
             }
         }
-        return hasUnsupported;
+        return false;
     }
 
     private void traverseTezOperator(Operator op, BaseWork work, boolean groupNeedSort, boolean reduceSinkCanReplace, VectorizedRowBatchCtx vectorizedRowBatchCtx) {
