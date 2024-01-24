@@ -618,11 +618,11 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
     }
 
     private boolean getReduceSinkCanReplace(BaseWork work) {
+        boolean reduceSinkCanReplace = false;
         if (parentOfMapJoinOpCannotReplace.contains(work.getName())) {
             return false;
         }
         for (BaseWork child : tezWork.getChildren(work)) {
-            boolean reduceSinkCanReplace = false;
             TezEdgeProperty.EdgeType edgeType = tezWork.getEdgeType(work, child);
             if (edgeType == TezEdgeProperty.EdgeType.CONTAINS) {
                 continue;
@@ -658,7 +658,6 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             }
         }
         // deal with Union work
-        boolean reduceSinkCanReplace = false;
         for (BaseWork parent : tezWork.getParents(work)) {
             TezEdgeProperty.EdgeType edgeType = tezWork.getEdgeType(parent, work);
             if (edgeType == TezEdgeProperty.EdgeType.CONTAINS && getReduceSinkCanReplace(parent)) {
