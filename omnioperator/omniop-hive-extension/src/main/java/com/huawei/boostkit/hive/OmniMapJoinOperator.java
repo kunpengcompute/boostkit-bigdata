@@ -555,7 +555,7 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
                     buildOutputCols, buildOutputTypes, omniHashBuilderWithExprOperatorFactory);
         } else {
             return new OmniLookupJoinWithExprOperatorFactory(probeTypes, probeOutputCols, probeHashKeys,
-                    buildOutputCols, buildOutputTypes, joinType, omniHashBuilderWithExprOperatorFactory, generateResidualFilter());
+                    buildOutputCols, buildOutputTypes, omniHashBuilderWithExprOperatorFactory, generateResidualFilter());
         }
     }
 
@@ -594,7 +594,7 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
                     buildOutputCols, buildOutputTypes, omniHashBuilderWithExprOperatorFactory);
         } else {
             return new OmniLookupJoinWithExprOperatorFactory(probeTypes, probeOutputCols, probeHashKeys,
-                    buildOutputCols, buildOutputTypes, joinType, omniHashBuilderWithExprOperatorFactory);
+                    buildOutputCols, buildOutputTypes, omniHashBuilderWithExprOperatorFactory);
         }
     }
 
