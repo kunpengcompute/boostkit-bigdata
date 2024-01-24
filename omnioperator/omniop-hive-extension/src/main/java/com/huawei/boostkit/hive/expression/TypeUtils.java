@@ -256,8 +256,7 @@ public class TypeUtils {
         } else if (obj instanceof HiveVarchar) {
             return ((HiveVarchar) obj).getValue();
         } else if (obj instanceof Timestamp) {
-            long l = ((Timestamp) obj).toEpochMilli();
-            return Date.ofEpochMilli(l).toEpochDay();
+            return ((Timestamp) obj).toEpochMilli();
         } else if (obj instanceof HiveDecimal) {
             if (((DecimalTypeInfo) typeInfo).getPrecision() <= 18) {
                 return ((HiveDecimal) obj).unscaledValue().longValue();
