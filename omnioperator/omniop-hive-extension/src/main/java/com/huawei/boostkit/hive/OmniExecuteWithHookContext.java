@@ -231,6 +231,9 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             }
         }
         for (BaseWork work : tezWork.getAllWork()) {
+            if (work instanceof MapWork && !inputFormatReplaceable((MapWork) work)) {
+                continue;
+            }
             if (work instanceof MergeJoinWork) {
                 BaseWork mainWork = ((MergeJoinWork) work).getMainWork();
                 if (!(mainWork instanceof ReduceWork)) {
@@ -310,7 +313,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         if (!currentReplaceable(op, reduceSinkCanReplace)) {
             return;
         }
-        if (work instanceof MapWork && op.getType().equals(OperatorType.TABLESCAN) && inputFormatReplaceable((MapWork) work) && isReplaceable(op, false)) {
+        if (work instanceof MapWork && op.getType().equals(OperatorType.TABLESCAN) && isReplaceable(op, false)) {
             replaceInputFormat(work);
             MapWork mapWork = (MapWork) work;
             for (Map.Entry<String, Operator<? extends OperatorDesc>> entry : mapWork.getAliasToWork().entrySet()) {
@@ -592,9 +595,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
 
     private boolean inputFormatReplaceable(MapWork work) {
         for (PartitionDesc partitionDesc : work.getPathToPartitionInfo().values()) {
-            if (partitionDesc.getInputFileFormatClassName().equals(OrcInputFormat.class.getName())) {
-                return true;
-            } else if (partitionDesc.getInputFileFormatClassName().equals(MapredParquetInputFormat.class.getName())) {
+            if (!partitionDesc.getInputFileFormatClassName().equals(OrcInputFormat.class.getName())) {
                 return false;
             }
         }
