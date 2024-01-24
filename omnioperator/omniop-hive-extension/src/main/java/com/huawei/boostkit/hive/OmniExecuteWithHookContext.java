@@ -231,6 +231,15 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             }
         }
         for (BaseWork work : tezWork.getAllWork()) {
+            if (work instanceof MergeJoinWork) {
+                BaseWork mainWork = ((MergeJoinWork) work).getMainWork();
+                if (!(mainWork instanceof ReduceWork)) {
+                    continue;
+                }
+                if (((ReduceWork) ((MergeJoinWork) work).getMainWork()).getReducer().getType() != OperatorType.MERGEJOIN) {
+                    continue;
+                }
+            }
             boolean groupNeedSort = getGroupNeedSort(work);
             boolean reduceSinkCanReplace = getReduceSinkCanReplace(work);
             VectorizedRowBatchCtx vectorizedRowBatchCtx = work.getVectorizedRowBatchCtx();
@@ -259,7 +268,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             for (ExprNodeDesc exprNodeDesc : ((SelectDesc) op.getConf()).getColList()) {
                 TypeInfo typeInfo = exprNodeDesc.getTypeInfo();
                 if (!(typeInfo instanceof PrimitiveTypeInfo)) {
-                    hasUnsupported =  true;
+                    hasUnsupported = true;
                 }
                 PrimitiveTypeInfo primitiveTypeInfo = (PrimitiveTypeInfo) typeInfo;
                 if (UNSUPPORTED_TYPE.contains(primitiveTypeInfo.getPrimitiveCategory())) {
@@ -286,11 +295,11 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                 for (String field : tableScanDesc.getNeededColumns()) {
                     TypeInfo typeInfo = rowSchema.getColumnInfo(field).getType();
                     if (!(typeInfo instanceof PrimitiveTypeInfo)) {
-                        hasUnsupported =  true;
+                        hasUnsupported = true;
                     }
                     PrimitiveTypeInfo primitiveTypeInfo = (PrimitiveTypeInfo) typeInfo;
                     if (UNSUPPORTED_TYPE.contains(primitiveTypeInfo.getPrimitiveCategory())) {
-                        hasUnsupported =  true;
+                        hasUnsupported = true;
                     }
                 }
             }
@@ -646,6 +655,9 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                 Operator reducer = ((MergeJoinWork) child).getMainWork().getAnyRootOperator();
                 if (reducer.getType() == null) {
                     reducer = (Operator) reducer.getChildOperators().get(0);
+                }
+                if (reducer.getType() != OperatorType.MERGEJOIN) {
+                    return false;
                 }
                 if (isReplaceable(reducer, false)) {
                     addMergeJoinNeedSort(edgeType, reducer);
