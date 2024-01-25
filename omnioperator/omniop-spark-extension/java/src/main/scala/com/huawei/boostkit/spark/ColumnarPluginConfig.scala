@@ -156,22 +156,37 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
   val columnarShuffleNativeBufferSize =
     conf.getConfString("spark.sql.execution.columnar.maxRecordsPerBatch", "4096").toInt
 
+  // columnar spill threshold - Percentage of memory usage, associate with the "spark.memory.offHeap" together
+  val columnarSpillMemPctThreshold: Integer =
+    conf.getConfString("spark.omni.sql.columnar.spill.memFraction", "90").toInt
+
+  // columnar spill dir disk reserve Size, default 10GB
+  val columnarSpillDirDiskReserveSize:Long =
+    conf.getConfString("spark.omni.sql.columnar.spill.dirDiskReserveSize", "10737418240").toLong
+
+  // enable or disable columnar sort spill
+  val enableSortSpill: Boolean = conf
+    .getConfString("spark.omni.sql.columnar.sortSpill.enabled", "true").toBoolean
+
   // columnar sort spill threshold
   val columnarSortSpillRowThreshold: Integer =
-    conf.getConfString("spark.omni.sql.columnar.sortSpill.rowThreshold", Integer.MAX_VALUE.toString).toInt
+    conf.getConfString("spark.omni.sql.columnar.sortSpill.rowThreshold", Integer.MAX_VALUE.toString).toInt  
 
-  // columnar sort spill threshold - Percentage of memory usage, associate with the "spark.memory.offHeap" together
-  val columnarSortSpillMemPctThreshold: Integer =
-    conf.getConfString("spark.omni.sql.columnar.sortSpill.memFraction", "90").toInt
+  // enable or disable columnar window spill
+  val enableWindowSpill: Boolean = conf
+    .getConfString("spark.omni.sql.columnar.windowSpill.enabled", "true").toBoolean
 
-  // columnar sort spill dir disk reserve Size, default 10GB
-  val columnarSortSpillDirDiskReserveSize:Long =
-    conf.getConfString("spark.omni.sql.columnar.sortSpill.dirDiskReserveSize", "10737418240").toLong
+  // columnar window spill threshold
+  val columnarWindowSpillRowThreshold: Integer =
+    conf.getConfString("spark.omni.sql.columnar.windowSpill.rowThreshold", Integer.MAX_VALUE.toString).toInt
 
-  // enable or disable columnar sortSpill
-  val enableSortSpill: Boolean = conf
-    .getConfString("spark.omni.sql.columnar.sortSpill.enabled", "false")
-    .toBoolean
+  // enable or disable columnar hash aggregate spill
+  val enableHashAggSpill: Boolean = conf
+    .getConfString("spark.omni.sql.columnar.hashAggSpill.enabled", "true").toBoolean
+
+  // columnar hash aggregate spill threshold
+  val columnarHashAggSpillRowThreshold: Integer =
+    conf.getConfString("spark.omni.sql.columnar.hashAggSpill.rowThreshold", Integer.MAX_VALUE.toString).toInt  
 
   // enable or disable columnar shuffledHashJoin
   val enableShuffledHashJoin: Boolean = conf
