@@ -224,17 +224,14 @@ case class ColumnarHashAggregateExec(
           case _ => throw new UnsupportedOperationException(s"Unsupported aggregate aggregateFunction: ${exp}")
         }
       } else if (exp.mode == PartialMerge) {
-        exp.aggregateFunction match {
-          case Sum(_) | Min(_) | Max(_) | Count(_) | Average(_) | First(_,_)  =>
-            omniAggFunctionTypes(index) = toOmniAggFunType(exp, true, true)
-            omniAggOutputTypes(index) =
-              toOmniAggInOutType(exp.aggregateFunction.inputAggBufferAttributes)
-            omniAggChannels(index) =
-              toOmniAggInOutJSonExp(exp.aggregateFunction.inputAggBufferAttributes, attrExpsIdMap)
-            omniInputRaws(index) = false
-            omniOutputPartials(index) = true
-          case _ => throw new UnsupportedOperationException(s"Unsupported aggregate aggregateFunction: ${exp}")
-        }
+        ColumnarHashAggregateExec.AssignOmniInfoWhenPartialMergeStage(exp,
+          attrExpsIdMap,
+          index,
+          omniInputRaws,
+          omniOutputPartials,
+          omniAggFunctionTypes,
+          omniAggOutputTypes,
+          omniAggChannels)
       } else if (exp.mode == Partial) {
         exp.aggregateFunction match {
           case Sum(_) | Min(_) | Max(_) | Count(_) | Average(_) | First(_,_)  =>
@@ -352,5 +349,27 @@ object ColumnarHashAggregateExec {
   def supportsAggregate(aggregateBufferAttributes: Seq[Attribute]): Boolean = {
     val aggregationBufferSchema = StructType.fromAttributes(aggregateBufferAttributes)
     UnsafeFixedWidthAggregationMap.supportsAggregationBufferSchema(aggregationBufferSchema)
+  }
+
+  def AssignOmniInfoWhenPartialMergeStage(
+                                           exp:AggregateExpression,
+                                           exprsIdMap: Map[ExprId, Int],
+                                           index: Int,
+                                           omniInputRaws : Array[Boolean],
+                                           omniOutputPartials : Array[Boolean],
+                                           omniAggFunctionTypes : Array[FunctionType],
+                                           omniAggOutputTypes : Array[Array[DataType]],
+                                           omniAggChannels : Array[Array[String]]): Unit ={
+    exp.aggregateFunction match {
+      case Sum(_) | Min(_) | Max(_) | Count(_) | Average(_) | First(_,_)  =>
+        omniAggFunctionTypes(index) = toOmniAggFunType(exp, true, true)
+        omniAggOutputTypes(index) =
+          toOmniAggInOutType(exp.aggregateFunction.inputAggBufferAttributes)
+        omniAggChannels(index) =
+          toOmniAggInOutJSonExp(exp.aggregateFunction.inputAggBufferAttributes, exprsIdMap)
+        omniInputRaws(index) = false
+        omniOutputPartials(index) = true
+      case _ => throw new UnsupportedOperationException(s"Unsupported aggregate aggregateFunction: ${exp}")
+    }
   }
 }
