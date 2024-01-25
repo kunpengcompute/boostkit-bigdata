@@ -290,47 +290,17 @@ case class ColumnarOptRollupExec(
         omniAggChannelsFilter(index) =
           rewriteToOmniJsonExpressionLiteral(exp.filter.get, hashaggAttrExpsIdMap)
       }
-      if (exp.mode == Final) {
-        exp.aggregateFunction match {
-          case Sum(_, _) | Min(_) | Max(_) | Count(_) | Average(_, _) | First(_, _) =>
-            omniAggFunctionTypes(index) = toOmniAggFunType(exp, true, true)
-            omniAggOutputTypes(index) =
-              toOmniAggInOutType(exp.aggregateFunction.dataType)
-            omniAggChannels(index) =
-              toOmniAggInOutJSonExp(exp.aggregateFunction.inputAggBufferAttributes, hashaggAttrExpsIdMap)
-            omniInputRaws(index) = false
-            omniOutputPartials(index) = false
-          case _ => throw new UnsupportedOperationException(s"Unsupported aggregate aggregateFunction: ${exp}")
-        }
-      } else if (exp.mode == PartialMerge) {
-        exp.aggregateFunction match {
-          case Sum(_, _) | Min(_) | Max(_) | Count(_) | Average(_, _) | First(_, _) =>
-            omniAggFunctionTypes(index) = toOmniAggFunType(exp, true)
-            omniAggOutputTypes(index) =
-              toOmniAggInOutType(exp.aggregateFunction.inputAggBufferAttributes)
-            omniAggChannels(index) =
-              toOmniAggInOutJSonExp(exp.aggregateFunction.inputAggBufferAttributes, hashaggAttrExpsIdMap)
-            omniInputRaws(index) = false
-            omniOutputPartials(index) = true
-            if (omniAggFunctionTypes(index) == OMNI_AGGREGATION_TYPE_COUNT_ALL) {
-              omniAggChannels(index) = null
-            }
-          case _ => throw new UnsupportedOperationException(s"Unsupported aggregate aggregateFunction: ${exp}")
-        }
-      } else if (exp.mode == Partial) {
-        exp.aggregateFunction match {
-          case Sum(_, _) | Min(_) | Max(_) | Count(_) | Average(_, _) | First(_, _) =>
-            omniAggFunctionTypes(index) = toOmniAggFunType(exp, true, true)
-            omniAggOutputTypes(index) =
-              toOmniAggInOutType(exp.aggregateFunction.inputAggBufferAttributes)
-            omniAggChannels(index) =
-              toOmniAggInOutJSonExp(exp.aggregateFunction.children, hashaggAttrExpsIdMap)
-            omniInputRaws(index) = true
-            omniOutputPartials(index) = true
-          case _ => throw new UnsupportedOperationException(s"Unsupported aggregate aggregateFunction: ${exp}")
-        }
+      if (exp.mode == PartialMerge) {
+        ColumnarHashAggregateExec.AssignOmniInfoWhenPartialMergeStage(exp,
+          hashaggAttrExpsIdMap,
+          index,
+          omniInputRaws,
+          omniOutputPartials,
+          omniAggFunctionTypes,
+          omniAggOutputTypes,
+          omniAggChannels)
       } else {
-        throw new UnsupportedOperationException(s"Unsupported aggregate mode: ${exp.mode}")
+        throw new UnsupportedOperationException(s"Unsupported aggregate mode: ${exp.mode} in ColumnarOptRollupExec")
       }
       index += 1
     }
