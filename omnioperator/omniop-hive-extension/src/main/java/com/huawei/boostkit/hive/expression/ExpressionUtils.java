@@ -268,4 +268,13 @@ public class ExpressionUtils {
         castFunctionExpression.add(expression);
         return castFunctionExpression;
     }
+
+    public static BaseExpression wrapNotNullExpression(ReferenceFactor referenceFactor) {
+        UnaryExpression unaryExpression = new UnaryExpression("IS_NULL",
+                referenceFactor.getReturnType(), 1);
+        unaryExpression.add(referenceFactor);
+        NotExpression notExpression = new NotExpression();
+        notExpression.setExpr(unaryExpression);
+        return notExpression;
+    }
 }
