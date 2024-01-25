@@ -18,12 +18,7 @@
 package org.apache.spark.sql.execution
 
 import com.huawei.boostkit.spark.ColumnarPluginConfig
-
-import java.util.Random
 import com.huawei.boostkit.spark.Constant.IS_SKIP_VERIFY_EXP
-
-import scala.collection.JavaConverters._
-import scala.concurrent.Future
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor._
 import com.huawei.boostkit.spark.serialize.ColumnarBatchSerializer
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil
@@ -42,10 +37,9 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.codegen.LazilyGeneratedOrdering
 import org.apache.spark.sql.catalyst.plans.physical._
-import org.apache.spark.sql.execution.exchange.{ENSURE_REQUIREMENTS, ShuffleExchangeExec, ShuffleExchangeLike, ShuffleOrigin}
 import org.apache.spark.sql.execution.exchange.ShuffleExchangeExec.createShuffleWriteProcessor
+import org.apache.spark.sql.execution.exchange.{ENSURE_REQUIREMENTS, ShuffleExchangeExec, ShuffleExchangeLike, ShuffleOrigin}
 import org.apache.spark.sql.execution.metric._
-import org.apache.spark.sql.execution.metric.{SQLMetric, SQLShuffleWriteMetricsReporter}
 import org.apache.spark.sql.execution.util.MergeIterator
 import org.apache.spark.sql.execution.util.SparkMemoryUtils.addLeakSafeTaskCompletionListener
 import org.apache.spark.sql.execution.vectorized.OmniColumnVector
@@ -53,6 +47,10 @@ import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.{IntegerType, StructType}
 import org.apache.spark.sql.vectorized.ColumnarBatch
 import org.apache.spark.util.MutablePair
+
+import java.util.Random
+import scala.collection.JavaConverters._
+import scala.concurrent.Future
 
 class ColumnarShuffleExchangeExec(
                                    override val outputPartitioning: Partitioning,
@@ -76,7 +74,10 @@ class ColumnarShuffleExchangeExec(
     "numMergedVecBatches" -> SQLMetrics.createMetric(sparkContext, "number of merged vecBatches"),
     "bypassVecBatches" -> SQLMetrics.createMetric(sparkContext, "number of bypass vecBatches"),
     "numOutputRows" -> SQLMetrics
-      .createMetric(sparkContext, "number of output rows")) ++ readMetrics ++ writeMetrics
+      .createMetric(sparkContext, "number of output rows"),
+    "numInputBatches" -> SQLMetrics.createMetric(sparkContext, "number of input batches"),
+    "omniColumnarToRowTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omniColumnar to row")
+  ) ++ readMetrics ++ writeMetrics
 
   override def nodeName: String = "OmniColumnarShuffleExchange"
 
@@ -120,6 +121,23 @@ class ColumnarShuffleExchangeExec(
 
   override def doExecute(): RDD[InternalRow] = {
     throw new UnsupportedOperationException()
+  }
+
+  override def executeCollect(): Array[InternalRow] = {
+    val numOutputRows = longMetric("numOutputRows")
+    val numInputBatches = longMetric("numInputBatches")
+    val omniColumnarToRowTime = longMetric("omniColumnarToRowTime")
+    val localOutput = this.output
+    val buffer = sparkContext.collectionAccumulator[InternalRow]("array buffer")
+    executeColumnar().foreachPartition {
+      batches => {
+        val rows = ColumnarBatchToInternalRow.convert(localOutput, batches, numOutputRows, numInputBatches, omniColumnarToRowTime)
+        while(rows.hasNext){
+          buffer.add(rows.next().copy())
+        }
+      }
+    }
+    buffer.value.toArray(Array[InternalRow]())
   }
 
   def buildCheck(): Unit = {

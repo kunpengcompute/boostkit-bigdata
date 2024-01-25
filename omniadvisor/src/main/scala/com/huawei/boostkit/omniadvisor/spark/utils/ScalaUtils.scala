@@ -29,6 +29,6 @@ object ScalaUtils {
   }
 
   def checkSuccess(jobs: Seq[JobData]): Boolean = {
-    !jobs.exists(_.status.equals(JobExecutionStatus.FAILED))
+    jobs.forall(_.status.equals(JobExecutionStatus.SUCCEEDED))
   }
 }

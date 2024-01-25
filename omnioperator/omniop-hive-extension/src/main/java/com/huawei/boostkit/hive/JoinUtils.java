@@ -26,8 +26,10 @@ import com.huawei.boostkit.hive.expression.TypeUtils;
 
 import nova.hetu.omniruntime.type.DataType;
 import org.apache.hadoop.hive.ql.exec.ExprNodeColumnEvaluator;
+import org.apache.hadoop.hive.ql.exec.ExprNodeConstantEvaluator;
 import org.apache.hadoop.hive.ql.exec.ExprNodeEvaluator;
 import org.apache.hadoop.hive.ql.exec.ExprNodeGenericFuncEvaluator;
+import org.apache.hadoop.hive.ql.plan.ExprNodeConstantDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
@@ -43,8 +45,15 @@ import java.util.Map;
 
 public class JoinUtils {
     public static List<ExprNodeEvaluator> getExprNodeColumnEvaluator(List<ExprNodeEvaluator> joinKeys) {
+        return getExprNodeColumnEvaluator(joinKeys, false);
+    }
+
+    public static List<ExprNodeEvaluator> getExprNodeColumnEvaluator(List<ExprNodeEvaluator> joinKeys, boolean includeConstant) {
         List<ExprNodeEvaluator> exprNodeColumnEvaluators = new ArrayList<>();
         for (ExprNodeEvaluator joinKey : joinKeys) {
+            if (includeConstant && joinKey instanceof ExprNodeConstantEvaluator) {
+                exprNodeColumnEvaluators.add(joinKey);
+            }
             dealChildren(joinKey, exprNodeColumnEvaluators);
         }
         return exprNodeColumnEvaluators;
@@ -66,6 +75,9 @@ public class JoinUtils {
         for (ExprNodeEvaluator node : nodes) {
             if (node instanceof ExprNodeGenericFuncEvaluator) {
                 expressions.add(ExpressionUtils.buildSimplify((ExprNodeGenericFuncDesc) node.getExpr(), inspector).toString());
+                continue;
+            } else if (node instanceof ExprNodeConstantEvaluator) {
+                expressions.add(ExpressionUtils.createLiteralNode(node.getExpr()).toString());
                 continue;
             }
             PrimitiveTypeInfo keyType = (PrimitiveTypeInfo) node.getExpr().getTypeInfo();
