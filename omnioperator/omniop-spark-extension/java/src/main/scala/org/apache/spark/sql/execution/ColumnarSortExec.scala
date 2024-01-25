@@ -110,15 +110,15 @@ case class ColumnarSortExec(
     child.executeColumnar().mapPartitionsWithIndexInternal { (_, iter) =>
       val columnarConf = ColumnarPluginConfig.getSessionConf
       val sortSpillRowThreshold = columnarConf.columnarSortSpillRowThreshold
-      val sortSpillMemPctThreshold = columnarConf.columnarSortSpillMemPctThreshold
-      val sortSpillDirDiskReserveSize = columnarConf.columnarSortSpillDirDiskReserveSize
+      val spillMemPctThreshold = columnarConf.columnarSpillMemPctThreshold
+      val spillDirDiskReserveSize = columnarConf.columnarSpillDirDiskReserveSize
       val sortSpillEnable = columnarConf.enableSortSpill
       val sortLocalDirs: Array[File] = generateLocalDirs(sparkConfTmp)
       val hash = Utils.nonNegativeHash(SparkEnv.get.executorId)
       val dirId = hash % sortLocalDirs.length
       val spillPathDir = sortLocalDirs(dirId).getCanonicalPath
       val sparkSpillConf = new SparkSpillConfig(sortSpillEnable, spillPathDir,
-        sortSpillDirDiskReserveSize, sortSpillRowThreshold, sortSpillMemPctThreshold)
+        spillDirDiskReserveSize, sortSpillRowThreshold, spillMemPctThreshold)
       val startCodegen = System.nanoTime()
 
       val radixSortEnable = columnarConf.enableRadixSort
