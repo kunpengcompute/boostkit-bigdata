@@ -45,6 +45,7 @@ import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.CompilationOpContext;
 import org.apache.hadoop.hive.ql.exec.AbstractMapJoinOperator;
 import org.apache.hadoop.hive.ql.exec.ExprNodeColumnEvaluator;
+import org.apache.hadoop.hive.ql.exec.ExprNodeConstantEvaluator;
 import org.apache.hadoop.hive.ql.exec.ExprNodeEvaluator;
 import org.apache.hadoop.hive.ql.exec.MapredContext;
 import org.apache.hadoop.hive.ql.exec.ObjectCache;
@@ -473,22 +474,29 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
             valuePosToKeyPos[i] = new TreeMap<>();
         }
         for (int buildIndex : buildIndexes) {
-            Map<String, Integer> buildKeyColNameToId = new HashMap<>();
-            for (int i = 0; i < joinKeys[buildIndex].size(); i++) {
-                if (joinKeys[buildIndex].get(i) instanceof ExprNodeColumnEvaluator) {
-                    buildKeyColNameToId
-                            .put(((ExprNodeColumnEvaluator) joinKeys[buildIndex].get(i)).getExpr().getColumn(), i);
-                }
+            initEachBuildTable(buildIndex);
+        }
+    }
+
+    private void initEachBuildTable(int buildIndex) {
+        Map<String, Integer> buildKeyColNameToId = new HashMap<>();
+        for (int i = 0; i < joinKeys[buildIndex].size(); i++) {
+            if (joinKeys[buildIndex].get(i) instanceof ExprNodeColumnEvaluator) {
+                buildKeyColNameToId
+                        .put(((ExprNodeColumnEvaluator) joinKeys[buildIndex].get(i)).getExpr().getColumn(), i);
             }
-            List<ExprNodeEvaluator> buildvalueEvaluators = getExprNodeColumnEvaluator(joinValues[buildIndex]);
-            if (buildvalueEvaluators.isEmpty()) {
-                return;
+        }
+        List<ExprNodeEvaluator> buildvalueEvaluators = getExprNodeColumnEvaluator(joinValues[buildIndex], true);
+        if (buildvalueEvaluators.isEmpty()) {
+            return;
+        }
+        for (int i = 0; i < joinValues[buildIndex].size(); i++) {
+            if (buildvalueEvaluators.get(i) instanceof ExprNodeConstantEvaluator) {
+                continue;
             }
-            for (int i = 0; i < joinValues[buildIndex].size(); i++) {
-                String colName = ((ExprNodeColumnEvaluator) buildvalueEvaluators.get(i)).getExpr().getColumn();
-                if (buildKeyColNameToId.containsKey(colName)) {
-                    valuePosToKeyPos[buildIndex].put(i, buildKeyColNameToId.get(colName));
-                }
+            String colName = ((ExprNodeColumnEvaluator) buildvalueEvaluators.get(i)).getExpr().getColumn();
+            if (buildKeyColNameToId.containsKey(colName)) {
+                valuePosToKeyPos[buildIndex].put(i, buildKeyColNameToId.get(colName));
             }
         }
     }
@@ -496,10 +504,12 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
     private OmniHashBuilderWithExprOperatorFactory getOmniHashBuilderWithExprOperatorFactory(
             JoinType joinType, DataType[] buildTypes, int buildIndex) {
         Map<String, Integer> buildKeyColNameToId = new HashMap<>();
-        List<ExprNodeEvaluator> buildExprNodeColumnEvaluators = getExprNodeColumnEvaluator(joinKeys[buildIndex]);
+        List<ExprNodeEvaluator> buildExprNodeColumnEvaluators = getExprNodeColumnEvaluator(joinKeys[buildIndex], true);
         for (int i = 0; i < buildExprNodeColumnEvaluators.size(); i++) {
-            buildKeyColNameToId
-                    .put(((ExprNodeColumnEvaluator) buildExprNodeColumnEvaluators.get(i)).getExpr().getColumn(), i);
+            if (buildExprNodeColumnEvaluators.get(i) instanceof ExprNodeColumnEvaluator) {
+                buildKeyColNameToId
+                        .put(((ExprNodeColumnEvaluator) buildExprNodeColumnEvaluators.get(i)).getExpr().getColumn(), i);
+            }
         }
         String[] buildHashKeys = getExprFromExprNode(buildExprNodeColumnEvaluators, buildKeyColNameToId,
                 inputObjInspectors[buildIndex]);

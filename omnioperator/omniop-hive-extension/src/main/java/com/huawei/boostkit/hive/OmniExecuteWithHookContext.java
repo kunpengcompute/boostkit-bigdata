@@ -23,6 +23,17 @@ import static com.huawei.boostkit.hive.expression.TypeUtils.checkUnsupportedArit
 import static com.huawei.boostkit.hive.expression.TypeUtils.checkUnsupportedCast;
 import static nova.hetu.omniruntime.constants.FunctionType.OMNI_AGGREGATION_TYPE_AVG;
 import static org.apache.hadoop.hive.serde.serdeConstants.SERIALIZATION_LIB;
+import static org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.PrimitiveCategory.BOOLEAN;
+import static org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.PrimitiveCategory.CHAR;
+import static org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.PrimitiveCategory.DATE;
+import static org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.PrimitiveCategory.DECIMAL;
+import static org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.PrimitiveCategory.DOUBLE;
+import static org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.PrimitiveCategory.INT;
+import static org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.PrimitiveCategory.LONG;
+import static org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.PrimitiveCategory.SHORT;
+import static org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.PrimitiveCategory.STRING;
+import static org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.PrimitiveCategory.TIMESTAMP;
+import static org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.PrimitiveCategory.VARCHAR;
 
 import com.huawei.boostkit.hive.expression.BaseExpression;
 import com.huawei.boostkit.hive.expression.CastFunctionExpression;
@@ -37,6 +48,7 @@ import nova.hetu.omniruntime.constants.FunctionType;
 
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.QueryPlan;
+import org.apache.hadoop.hive.ql.exec.ColumnInfo;
 import org.apache.hadoop.hive.ql.exec.ExplainTask;
 import org.apache.hadoop.hive.ql.exec.MapJoinOperator;
 import org.apache.hadoop.hive.ql.exec.Operator;
@@ -62,6 +74,7 @@ import org.apache.hadoop.hive.ql.plan.AggregationDesc;
 import org.apache.hadoop.hive.ql.plan.BaseWork;
 import org.apache.hadoop.hive.ql.plan.CommonMergeJoinDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeColumnDesc;
+import org.apache.hadoop.hive.ql.plan.ExprNodeConstantDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
 import org.apache.hadoop.hive.ql.plan.FilterDesc;
@@ -84,7 +97,6 @@ import org.apache.hadoop.hive.ql.plan.TezWork;
 import org.apache.hadoop.hive.ql.plan.UnionWork;
 import org.apache.hadoop.hive.ql.plan.api.OperatorType;
 import org.apache.hadoop.hive.ql.plan.ptf.PTFExpressionDef;
-import org.apache.hadoop.hive.ql.plan.ptf.PartitionedTableFunctionDef;
 import org.apache.hadoop.hive.ql.plan.ptf.WindowFunctionDef;
 import org.apache.hadoop.hive.ql.plan.ptf.WindowTableFunctionDef;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDFConcat;
@@ -92,6 +104,7 @@ import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
 import org.apache.hadoop.hive.serde2.typeinfo.DecimalTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
+import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -113,8 +126,8 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             OperatorType.FILTER, OperatorType.PTF, OperatorType.TABLESCAN, OperatorType.REDUCESINK));
     public static final Set<Integer> SUPPORTED_JOIN = new HashSet<>(Arrays.asList(JoinDesc.INNER_JOIN,
             JoinDesc.LEFT_OUTER_JOIN, JoinDesc.FULL_OUTER_JOIN, JoinDesc.LEFT_SEMI_JOIN));
-    private static final Set<PrimitiveObjectInspector.PrimitiveCategory> UNSUPPORTED_TYPE = new HashSet<>(Arrays.asList(PrimitiveObjectInspector.PrimitiveCategory.BYTE,
-            PrimitiveObjectInspector.PrimitiveCategory.FLOAT, PrimitiveObjectInspector.PrimitiveCategory.BINARY));
+    private static final Set<PrimitiveObjectInspector.PrimitiveCategory> SUPPORTED_TYPE = new HashSet<>(Arrays.asList(BOOLEAN,
+            SHORT, INT, LONG, DOUBLE, STRING, DATE, TIMESTAMP, DECIMAL, VARCHAR, CHAR));
 
     private static final int DECIMAL64_MAX_PRECISION = 19;
 
@@ -226,7 +239,22 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
     }
 
     private void traverseTezWorks() {
+        if (checkDataType()) {
+            return;
+        }
         for (BaseWork work : tezWork.getAllWork()) {
+            if (work instanceof MapWork && !inputFormatReplaceable((MapWork) work)) {
+                continue;
+            }
+            if (work instanceof MergeJoinWork) {
+                BaseWork mainWork = ((MergeJoinWork) work).getMainWork();
+                if (!(mainWork instanceof ReduceWork)) {
+                    continue;
+                }
+                if (((ReduceWork) ((MergeJoinWork) work).getMainWork()).getReducer().getType() != OperatorType.MERGEJOIN) {
+                    continue;
+                }
+            }
             boolean groupNeedSort = getGroupNeedSort(work);
             boolean reduceSinkCanReplace = getReduceSinkCanReplace(work);
             VectorizedRowBatchCtx vectorizedRowBatchCtx = work.getVectorizedRowBatchCtx();
@@ -236,11 +264,82 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         }
     }
 
+    private boolean checkDataType() {
+        for (BaseWork work : tezWork.getAllWork()) {
+            if (hasUnsupportedDataType(work)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasUnsupportedDataType(BaseWork work) {
+        boolean hasUnsupported = false;
+        if (work instanceof MapWork) {
+            hasUnsupported = scanHasUnsupported(work);
+        }
+        if (hasUnsupported) {
+            return true;
+        }
+        // If project generates new type ,also need to check
+        hasUnsupported = selectHasUnsupported(work);
+        return hasUnsupported;
+    }
+
+    private boolean selectHasUnsupported(BaseWork work) {
+        for (Operator op : work.getAllOperators()) {
+            if (!op.getType().equals(OperatorType.SELECT)) {
+                continue;
+            }
+            for (ExprNodeDesc exprNodeDesc : ((SelectDesc) op.getConf()).getColList()) {
+                if (fieldTypeUnsupported(exprNodeDesc.getTypeInfo())) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private boolean scanHasUnsupported(BaseWork work) {
+        MapWork mapWork = (MapWork) work;
+        for (Operator op : mapWork.getAliasToWork().values()) {
+            if (!op.getType().equals(OperatorType.TABLESCAN)) {
+                continue;
+            }
+            if (!tableScanSupport(op)) {
+                return true;
+            }
+            RowSchema rowSchema = op.getSchema();
+            TableScanDesc tableScanDesc = (TableScanDesc) op.getConf();
+            if (tableScanDesc.getNeededColumns().isEmpty()) {
+                continue;
+            }
+            for (ColumnInfo columnInfo : rowSchema.getSignature()) {
+                if (fieldTypeUnsupported(columnInfo.getType())) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private boolean fieldTypeUnsupported(TypeInfo rowSchema) {
+        TypeInfo typeInfo = rowSchema;
+        if (!(typeInfo instanceof PrimitiveTypeInfo)) {
+            return true;
+        }
+        PrimitiveTypeInfo primitiveTypeInfo = (PrimitiveTypeInfo) typeInfo;
+        if (!SUPPORTED_TYPE.contains(primitiveTypeInfo.getPrimitiveCategory())) {
+            return true;
+        }
+        return false;
+    }
+
     private void traverseTezOperator(Operator op, BaseWork work, boolean groupNeedSort, boolean reduceSinkCanReplace, VectorizedRowBatchCtx vectorizedRowBatchCtx) {
         if (!currentReplaceable(op, reduceSinkCanReplace)) {
             return;
         }
-        if (work instanceof MapWork && op.getType().equals(OperatorType.TABLESCAN) && inputFormatReplaceable((MapWork) work) && isReplaceable(op, false)) {
+        if (work instanceof MapWork && op.getType().equals(OperatorType.TABLESCAN) && isReplaceable(op, false)) {
             replaceInputFormat(work);
             MapWork mapWork = (MapWork) work;
             for (Map.Entry<String, Operator<? extends OperatorDesc>> entry : mapWork.getAliasToWork().entrySet()) {
@@ -322,14 +421,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                 }
                 return SUPPORTED_JOIN.contains(mapJoinDesc.getConds()[0].getType());
             case MERGEJOIN:
-                JoinDesc joinDesc = (JoinDesc) operator.getConf();
-                JoinCondDesc[] joinCondDescs = joinDesc.getConds();
-                for (int i = 1; i < joinCondDescs.length; i++) {
-                    if (joinCondDescs[i - 1].getType() != joinCondDescs[i].getType()) {
-                        return false;
-                    }
-                }
-                return SUPPORTED_JOIN.contains(joinCondDescs[0].getType());
+                return mergeJoinReplaceable(operator);
             case SELECT:
                 if (!isUDFSupport(((SelectDesc) operator.getConf()).getColList())) {
                     return false;
@@ -390,41 +482,9 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                 }
                 return true;
             case GROUPBY:
-                GroupByDesc groupByDesc = (GroupByDesc) operator.getConf();
-                if (!isUDFSupport(groupByDesc.getKeys())) {
-                    return false;
-                }
-                for (Operator<? extends OperatorDesc> childOperator : operator.getChildOperators()) {
-                    if (childOperator instanceof PTFOperator && !currentReplaceable(childOperator, reduceSinkCanReplace)) {
-                        return false;
-                    }
-                }
-                for (AggregationDesc aggregator : groupByDesc.getAggregators()) {
-                    if (aggregator.getDistinct()) {
-                        return false;
-                    }
-                    if (TypeUtils.getAggFunctionTypeFromName(aggregator) == null) {
-                        return false;
-                    }
-                    if (!isUDFSupport(aggregator.getParameters())) {
-                        return false;
-                    }
-                    for (ExprNodeDesc paramter : aggregator.getParameters()) {
-                        PrimitiveObjectInspector.PrimitiveCategory primitiveCategory = ((PrimitiveTypeInfo) paramter.getTypeInfo()).getPrimitiveCategory();
-                        if ((primitiveCategory == PrimitiveObjectInspector.PrimitiveCategory.STRING ||
-                                primitiveCategory == PrimitiveObjectInspector.PrimitiveCategory.VARCHAR) &&
-                                aggregator.getGenericUDAFName().equals("sum")) {
-                            return false;
-                        }
-
-                    }
-                }
-                return true;
+                return groupByReplaceable(operator, reduceSinkCanReplace);
             case REDUCESINK:
-                if (reduceSinkOpToWork.isEmpty()) {
-                    return false;
-                }
-                if (!reduceSinkOpToWork.containsKey(operator)) {
+                if (reduceSinkOpToWork.isEmpty() || !reduceSinkOpToWork.containsKey(operator)) {
                     return false;
                 }
                 ReduceSinkDesc reduceSinkDesc = (ReduceSinkDesc) operator.getConf();
@@ -432,7 +492,8 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                     reduceSinkOpToWork.remove(operator);
                     return false;
                 }
-                if (reduceSinkDesc.getKeyCols().isEmpty() && reduceSinkDesc.getValueCols().isEmpty()) {
+                if (reduceSinkDesc.getKeyCols().isEmpty() && !reduceSinkDesc.getReducerTraits().contains(ReduceSinkDesc.ReducerTraits.UNIFORM)
+                        && reduceSinkDesc.getPartitionCols().size() > 0) {
                     return false;
                 }
                 if (!isUDFSupport(reduceSinkDesc.getKeyCols()) ||
@@ -444,12 +505,66 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                 if (reduceSinkDesc.getTopN() != -1 || !reduceSinkDesc.getDistinctColumnIndices().isEmpty()) {
                     return false;
                 }
+                for (ExprNodeDesc exprNodeDesc : reduceSinkDesc.getPartitionCols()) {
+                    if (exprNodeDesc instanceof ExprNodeConstantDesc) {
+                        return false;
+                    }
+                }
                 return true;
             case TABLESCAN:
                 return tableScanSupport(operator);
             default:
                 return true;
         }
+    }
+
+    private boolean groupByReplaceable(Operator<? extends OperatorDesc> operator, boolean reduceSinkCanReplace) {
+        GroupByDesc groupByDesc = (GroupByDesc) operator.getConf();
+        if (!isUDFSupport(groupByDesc.getKeys())) {
+            return false;
+        }
+        for (Operator<? extends OperatorDesc> childOperator : operator.getChildOperators()) {
+            if (childOperator instanceof PTFOperator && !currentReplaceable(childOperator, reduceSinkCanReplace)) {
+                return false;
+            }
+        }
+        for (AggregationDesc aggregator : groupByDesc.getAggregators()) {
+            if (aggregator.getDistinct()) {
+                return false;
+            }
+            if (TypeUtils.getAggFunctionTypeFromName(aggregator) == null) {
+                return false;
+            }
+            if (!isUDFSupport(aggregator.getParameters())) {
+                return false;
+            }
+            for (ExprNodeDesc paramter : aggregator.getParameters()) {
+                PrimitiveObjectInspector.PrimitiveCategory primitiveCategory = ((PrimitiveTypeInfo) paramter.getTypeInfo()).getPrimitiveCategory();
+                if ((primitiveCategory == STRING ||
+                        primitiveCategory == VARCHAR) &&
+                        aggregator.getGenericUDAFName().equals("sum")) {
+                    return false;
+                }
+
+            }
+        }
+        return true;
+    }
+
+    private boolean mergeJoinReplaceable(Operator<? extends OperatorDesc> operator) {
+        JoinDesc joinDesc = (JoinDesc) operator.getConf();
+        JoinCondDesc[] joinCondDescs = joinDesc.getConds();
+        if (joinDesc.getConds()[0].getType() == JoinDesc.FULL_OUTER_JOIN && joinDesc.getKeysString().get(0) == null) {
+            return false;
+        }
+        if (joinCondDescs.length >= 2) {
+            for (int i = 0; i < joinCondDescs.length; i++) {
+                if (joinCondDescs[i].getType() != JoinDesc.INNER_JOIN) {
+                    return false;
+                }
+            }
+        }
+        return SUPPORTED_JOIN.contains(joinCondDescs[0].getType());
     }
 
     private boolean isAvgUnsupported(List<PTFExpressionDef> expressions) {
@@ -459,7 +574,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                 continue;
             }
             PrimitiveTypeInfo primitiveTypeInfo = ((PrimitiveObjectInspector) oi).getTypeInfo();
-            if (primitiveTypeInfo.getPrimitiveCategory().equals(PrimitiveObjectInspector.PrimitiveCategory.DECIMAL)
+            if (primitiveTypeInfo.getPrimitiveCategory().equals(DECIMAL)
                     && ((DecimalTypeInfo) primitiveTypeInfo).getPrecision() > DECIMAL64_MAX_PRECISION) {
                 return true;
             }
@@ -491,10 +606,8 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                     }
                     expressions.add(expr.toString());
                     current.getChildren().forEach(queue::offer);
-                } else if (current instanceof ExprNodeColumnDesc) {
-                    if (UNSUPPORTED_TYPE.contains(((PrimitiveTypeInfo) current.getTypeInfo()).getPrimitiveCategory())) {
-                        return false;
-                    }
+                } else if (current instanceof ExprNodeColumnDesc && !SUPPORTED_TYPE.contains(((PrimitiveTypeInfo) current.getTypeInfo()).getPrimitiveCategory())) {
+                    return false;
                 }
             }
         } catch (Exception e) {
@@ -518,9 +631,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
 
     private boolean inputFormatReplaceable(MapWork work) {
         for (PartitionDesc partitionDesc : work.getPathToPartitionInfo().values()) {
-            if (partitionDesc.getInputFileFormatClassName().equals(OrcInputFormat.class.getName())) {
-                return true;
-            } else if (partitionDesc.getInputFileFormatClassName().equals(MapredParquetInputFormat.class.getName())) {
+            if (!partitionDesc.getInputFileFormatClassName().equals(OrcInputFormat.class.getName())) {
                 return false;
             }
         }
@@ -558,6 +669,10 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         }
         for (BaseWork child : tezWork.getChildren(work)) {
             TezEdgeProperty.EdgeType edgeType = tezWork.getEdgeType(work, child);
+            if (edgeType == TezEdgeProperty.EdgeType.CONTAINS) {
+                continue;
+            }
+            reduceSinkCanReplace = false;
             if (isSupportEdgeType(edgeType) && isReplaceable(child.getAnyRootOperator(), true)) {
                 reduceSinkCanReplace = true;
             }
@@ -577,11 +692,14 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                 if (reducer.getType() == null) {
                     reducer = (Operator) reducer.getChildOperators().get(0);
                 }
-                if (isReplaceable(reducer, false)) {
+                if (reducer.getType() == OperatorType.MERGEJOIN && isReplaceable(reducer, false)) {
                     addMergeJoinNeedSort(edgeType, reducer);
                     reduceSinkCanReplace = true;
                 }
                 replaceSimpleEdge(reduceSinkCanReplace, child, edgeType);
+            }
+            if (!reduceSinkCanReplace) {
+                return false;
             }
         }
         // deal with Union work
@@ -627,7 +745,6 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
 
 
     private boolean tableScanSupport(Operator<? extends OperatorDesc> op) {
-        RowSchema rowSchema = op.getSchema();
         TableScanDesc tableScanDesc = (TableScanDesc) op.getConf();
         if (tableScanDesc.getNeededColumns().isEmpty()) {
             return false;
@@ -635,12 +752,6 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         Table tableMetadata = tableScanDesc.getTableMetadata();
         if (tableMetadata != null && (!tableMetadata.getInputFormatClass().equals(OrcInputFormat.class) || tableMetadata.getParameters().getOrDefault("transactional", "").equals("true"))) {
             return false;
-        }
-        for (String field : tableScanDesc.getNeededColumns()) {
-            PrimitiveTypeInfo primitiveTypeInfo = (PrimitiveTypeInfo) rowSchema.getColumnInfo(field).getType();
-            if (UNSUPPORTED_TYPE.contains(primitiveTypeInfo.getPrimitiveCategory())) {
-                return false;
-            }
         }
         return true;
     }
