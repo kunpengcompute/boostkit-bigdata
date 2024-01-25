@@ -921,6 +921,9 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                 if (work instanceof MergeJoinWork) {
                     work = ((MergeJoinWork) work).getMainWork();
                 }
+                if (work instanceof MapWork) {
+                    continue;
+                }
                 List<Integer> toReplace = new ArrayList<>();
                 Map<Integer, String> tagToInput = ((ReduceWork) work).getTagToInput();
                 for (Map.Entry<Integer, String> entry : tagToInput.entrySet()) {

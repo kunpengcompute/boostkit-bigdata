@@ -20,6 +20,7 @@ package com.huawei.boostkit.hive;
 
 import com.huawei.boostkit.hive.expression.BaseExpression;
 import com.huawei.boostkit.hive.expression.ExpressionUtils;
+import com.huawei.boostkit.hive.expression.ReferenceFactor;
 import com.huawei.boostkit.hive.expression.TypeUtils;
 
 import nova.hetu.omniruntime.operator.OmniOperator;
@@ -33,6 +34,7 @@ import nova.hetu.omniruntime.vector.VecBatch;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.ql.CompilationOpContext;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
+import org.apache.hadoop.hive.ql.plan.ExprNodeColumnDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
 import org.apache.hadoop.hive.ql.plan.FilterDesc;
@@ -75,8 +77,10 @@ public class OmniFilterOperator extends OmniHiveOperator<OmniFilterDesc> impleme
         BaseExpression root;
         if (predicate instanceof ExprNodeGenericFuncDesc) {
             root = ExpressionUtils.build((ExprNodeGenericFuncDesc) predicate, inputObjInspectors[0]);
+        } else if (predicate instanceof  ExprNodeColumnDesc) {
+            root = ExpressionUtils.wrapNotNullExpression((ReferenceFactor) ExpressionUtils.createReferenceNode(predicate, inputObjInspectors[0]));
         } else {
-            root = ExpressionUtils.createNode(predicate, inputObjInspectors[0]);
+            root = ExpressionUtils.createLiteralNode(predicate);
         }
         List<? extends StructField> allStructFieldRefs = ((StructObjectInspector) inputObjInspectors[0]).getAllStructFieldRefs();
         DataType[] inputTypes = new DataType[allStructFieldRefs.size()];
