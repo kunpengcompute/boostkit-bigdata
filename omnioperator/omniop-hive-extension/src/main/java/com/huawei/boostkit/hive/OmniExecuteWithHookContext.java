@@ -56,6 +56,7 @@ import org.apache.hadoop.hive.ql.hooks.HookContext;
 import org.apache.hadoop.hive.ql.io.orc.OrcInputFormat;
 import org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat;
 
+import org.apache.hadoop.hive.ql.metadata.Hive;
 import org.apache.hadoop.hive.ql.metadata.Table;
 import org.apache.hadoop.hive.ql.plan.AggregationDesc;
 import org.apache.hadoop.hive.ql.plan.BaseWork;
@@ -163,6 +164,10 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         String engine = HiveConf.getVar(hookContext.getConf(), HiveConf.ConfVars.HIVE_EXECUTION_ENGINE);
         if (engine.equals("mr")) {
             throw new RuntimeException("can't support mr engine");
+        }
+        boolean cboEnable = HiveConf.getBoolVar(hookContext.getConf(), HiveConf.ConfVars.HIVE_CBO_ENABLED);
+        if (!cboEnable) {
+            return;
         }
         setTezWork(queryPlan);
         if (tezWork == null) {
@@ -308,7 +313,14 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         }
         switch (operator.getType()) {
             case MAPJOIN:
-                return SUPPORTED_JOIN.contains(((JoinDesc) operator.getConf()).getConds()[0].getType());
+                MapJoinDesc mapJoinDesc = (MapJoinDesc) operator.getConf();
+                Map<Byte, List<ExprNodeDesc>> keys = mapJoinDesc.getKeys();
+                for (List<ExprNodeDesc> exprNodeDescs : keys.values()) {
+                    if (!isUDFSupport(exprNodeDescs)) {
+                        return false;
+                    }
+                }
+                return SUPPORTED_JOIN.contains(mapJoinDesc.getConds()[0].getType());
             case MERGEJOIN:
                 JoinDesc joinDesc = (JoinDesc) operator.getConf();
                 JoinCondDesc[] joinCondDescs = joinDesc.getConds();
