@@ -45,6 +45,7 @@ import nova.hetu.omniruntime.vector.Vec;
 import nova.hetu.omniruntime.vector.VecBatch;
 import nova.hetu.omniruntime.vector.VecFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hive.common.type.HiveDecimal;
 import org.apache.hadoop.hive.ql.CompilationOpContext;
 import org.apache.hadoop.hive.ql.exec.ExprNodeColumnEvaluator;
 import org.apache.hadoop.hive.ql.exec.ExprNodeConstantEvaluator;
@@ -72,6 +73,7 @@ import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.StandardStructObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.StructField;
 import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
+import org.apache.hadoop.hive.serde2.typeinfo.DecimalTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoUtils;
 import org.apache.hadoop.hive.common.type.Timestamp;
@@ -580,7 +582,9 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
                     ((ShortVec) newVec).set(i, (short) exprNodeConstantEvaluator.getExpr().getValue());
                     break;
                 case OMNI_DECIMAL128:
-                    ((Decimal128Vec) newVec).set(i, (long[]) exprNodeConstantEvaluator.getExpr().getValue());
+                    HiveDecimal hiveDecimal = (HiveDecimal) exprNodeConstantEvaluator.getExpr().getValue();
+                    DecimalTypeInfo decimalTypeInfo = (DecimalTypeInfo) exprNodeConstantEvaluator.getExpr().getTypeInfo();
+                    ((Decimal128Vec) newVec).setBigInteger(i, hiveDecimal.bigIntegerBytesScaled(decimalTypeInfo.getScale()), hiveDecimal.signum() == -1);
                     break;
                 case OMNI_VARCHAR:
                 case OMNI_CHAR:

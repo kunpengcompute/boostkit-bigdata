@@ -99,7 +99,7 @@ public class DecimalVecConverter implements VecConverter {
                 decimal128Vec.setNull(i);
             } else {
                 HiveDecimal hiveDecimal = (HiveDecimal) col[i];
-                decimal128Vec.setBigInteger(i, hiveDecimal.abs().bigIntegerBytesScaled(decimalTypeInfo.getScale()),
+                decimal128Vec.setBigInteger(i, hiveDecimal.bigIntegerBytesScaled(decimalTypeInfo.getScale()),
                         hiveDecimal.signum() == -1);
             }
         }
