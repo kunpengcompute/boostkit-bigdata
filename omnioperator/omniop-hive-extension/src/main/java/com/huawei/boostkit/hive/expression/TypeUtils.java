@@ -256,8 +256,7 @@ public class TypeUtils {
         } else if (obj instanceof HiveVarchar) {
             return ((HiveVarchar) obj).getValue();
         } else if (obj instanceof Timestamp) {
-            long l = ((Timestamp) obj).toEpochMilli();
-            return Date.ofEpochMilli(l).toEpochDay();
+            return ((Timestamp) obj).toEpochMilli();
         } else if (obj instanceof HiveDecimal) {
             if (((DecimalTypeInfo) typeInfo).getPrecision() <= 18) {
                 return ((HiveDecimal) obj).unscaledValue().longValue();
@@ -277,6 +276,9 @@ public class TypeUtils {
         if (typeInfo instanceof PrimitiveTypeInfo) {
             String typeName = typeInfo.getTypeName();
             if (typeName.equals("string") && node instanceof ExprNodeConstantDesc) {
+                if (((ExprNodeConstantDesc) node).getValue() == null) {
+                    return 0;
+                }
                 return ((String) ((ExprNodeConstantDesc) node).getValue()).length();
             }
         }

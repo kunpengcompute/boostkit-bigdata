@@ -74,6 +74,7 @@ import org.apache.hadoop.hive.serde2.objectinspector.StructField;
 import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
 import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoUtils;
+import org.apache.hadoop.hive.common.type.Timestamp;
 import org.apache.hadoop.io.LongWritable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -562,7 +563,12 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
                 case OMNI_LONG:
                 case OMNI_DATE64:
                 case OMNI_DECIMAL64:
-                    ((LongVec) newVec).set(i, (long) exprNodeConstantEvaluator.getExpr().getValue());
+                    Object exprValue = exprNodeConstantEvaluator.getExpr().getValue();
+                    if (exprValue instanceof Timestamp) {
+                        ((LongVec) newVec).set(i, ((Timestamp) exprValue).toEpochMilli());
+                    } else {
+                        ((LongVec) newVec).set(i, (long) exprNodeConstantEvaluator.getExpr().getValue());
+                    }
                     break;
                 case OMNI_DOUBLE:
                     ((DoubleVec) newVec).set(i, (double) exprNodeConstantEvaluator.getExpr().getValue());
