@@ -45,6 +45,7 @@ import nova.hetu.omniruntime.vector.Vec;
 import nova.hetu.omniruntime.vector.VecBatch;
 import nova.hetu.omniruntime.vector.VecFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hive.common.type.HiveDecimal;
 import org.apache.hadoop.hive.ql.CompilationOpContext;
 import org.apache.hadoop.hive.ql.exec.ExprNodeColumnEvaluator;
 import org.apache.hadoop.hive.ql.exec.ExprNodeConstantEvaluator;
@@ -72,6 +73,7 @@ import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.StandardStructObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.StructField;
 import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
+import org.apache.hadoop.hive.serde2.typeinfo.DecimalTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoUtils;
 import org.apache.hadoop.hive.common.type.Timestamp;
@@ -84,7 +86,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Queue;
 import java.util.Set;
 
 public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> implements Serializable, VectorizationContextRegion {
@@ -113,9 +117,10 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
     private transient ArrayList<AggregationDesc> aggs;
     private transient VectorAggregationDesc[] vecAggrDescs;
     private transient List<String> outputFieldNames;
-    private transient List<Integer> constantColumnIds;
+    private transient List<Integer> recordConstantColIds;
     private transient List<ExprNodeConstantEvaluator> constantEvaluators;
     private transient Vec[] constantVec;
+    private transient Queue<Integer> constantColIds;
 
     public OmniGroupByOperator() {
         super();
@@ -136,7 +141,7 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
         allStructFieldRefs = ((StructObjectInspector) inputObjInspectors[0]).getAllStructFieldRefs();
         numKeys = conf.getKeys().size();
         keyFields = new ArrayList<>();
-        constantColumnIds = new ArrayList<>();
+        constantColIds = new LinkedList<>();
         constantEvaluators = new ArrayList<>();
         keyObjectInspectors = new ObjectInspector[numKeys];
         currentKeyObjectInspectors = new ObjectInspector[numKeys];
@@ -262,13 +267,13 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
             List<? extends StructField> valueStructFieldRefs =
                     ((StandardStructObjectInspector) allStructFieldRefs.get(1).getFieldObjectInspector())
                             .getAllStructFieldRefs();
+            sourceTypes = getDataTypeFromStructField(keyStructFieldRefs, valueStructFieldRefs);
             groupByChanel = getExprFromStructField(keyStructFieldRefs);
             aggChannels = getTwoDimenExprFromStructField(valueStructFieldRefs);
-            sourceTypes = getDataTypeFromStructField(keyStructFieldRefs, valueStructFieldRefs);
         } else {
-            groupByChanel = getExprFromExprNode(keyFields, false);
-            aggChannels = getTwoDimenExprFromExprNode(aggChannelFields);
             sourceTypes = getDataTypeFromStructField(allStructFieldRefs);
+            groupByChanel = getExprFromExprNode(keyFields);
+            aggChannels = getTwoDimenExprFromExprNode(aggChannelFields);
         }
         omniHashAggregationWithExprOperatorFactory = new OmniHashAggregationWithExprOperatorFactory(groupByChanel, aggChannels,
                 aggChannelsFilter, sourceTypes, aggFunctionTypes, aggOutputTypes, isInputRaws, isOutputPartials,
@@ -290,7 +295,7 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
                 Arrays.asList(objectInspectors));
         createOmniOperator();
         firstRow = true;
-        constantVec = new Vec[constantColumnIds.size()];
+        constantVec = new Vec[recordConstantColIds.size()];
         for (int i = 0; i < constantVec.length; i++) {
             constantVec[i] = createConstantVec(constantEvaluators.get(i), VectorCache.BATCH);
         }
@@ -387,22 +392,25 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
 
     private DataType[] getDataTypeFromStructField(List<? extends StructField> fieldRefs) {
         List<DataType> dataTypes = new ArrayList<>();
+        dataTypes.addAll(getListDataTypeFromStructField(fieldRefs));
         for (ExprNodeEvaluator keyField : keyFields) {
             if (keyField instanceof ExprNodeConstantEvaluator && !groupingSetsPresent) {
+                constantColIds.offer(dataTypes.size());
                 dataTypes.add(buildInputDataType(keyField.getExpr().getTypeInfo()));
             }
         }
-        dataTypes.addAll(getListDataTypeFromStructField(fieldRefs));
         if (groupingSetsPresent) {
             dataTypes.add(LongDataType.LONG);
         }
         for (List<ExprNodeEvaluator> aggChannelField : aggChannelFields) {
             for (ExprNodeEvaluator aggField : aggChannelField) {
                 if (aggField instanceof ExprNodeConstantEvaluator) {
+                    constantColIds.offer(dataTypes.size());
                     dataTypes.add(buildInputDataType(aggField.getExpr().getTypeInfo()));
                 }
             }
         }
+        recordConstantColIds = new ArrayList<>(constantColIds);
         return dataTypes.toArray(new DataType[0]);
     }
 
@@ -410,28 +418,24 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
         List<DataType> dataTypes = new ArrayList<>();
         dataTypes.addAll(getListDataTypeFromStructField(keyStructFieldRefs));
         dataTypes.addAll(getListDataTypeFromStructField(valueStructFieldRefs));
+        recordConstantColIds = new ArrayList<>();
         return dataTypes.toArray(new DataType[0]);
     }
 
-    private String[] getExprFromExprNode(List<ExprNodeEvaluator> nodes, boolean isAggChannel) {
-        int columnOffset = 0;
-        if (isAggChannel && !constantColumnIds.isEmpty()) {
-            columnOffset = numKeys;
-        }
+    private String[] getExprFromExprNode(List<ExprNodeEvaluator> nodes) {
         List<String> expressions = new ArrayList<>();
         for (int i = 0; i < nodes.size(); i++) {
             if (nodes.get(i) instanceof ExprNodeGenericFuncEvaluator) {
                 expressions.add(ExpressionUtils.build((ExprNodeGenericFuncDesc) nodes.get(i).getExpr(), inputObjInspectors[0]).toString());
             } else if (nodes.get(i) instanceof ExprNodeColumnEvaluator) {
-                expressions.add(TypeUtils.buildExpression(nodes.get(i).getExpr().getTypeInfo(), columnOffset +
+                expressions.add(TypeUtils.buildExpression(nodes.get(i).getExpr().getTypeInfo(),
                         getFieldIdFromFieldName(((ExprNodeColumnEvaluator) nodes.get(i)).getExpr().getColumn())));
             } else if (nodes.get(i) instanceof ExprNodeConstantEvaluator) {
                 if (groupingSetsPresent) {
                     expressions.add(TypeUtils.buildExpression(nodes.get(i).getExpr().getTypeInfo(), allStructFieldRefs.size()));
                 } else {
-                    int columnId = i + columnOffset;
-                    expressions.add(TypeUtils.buildExpression(nodes.get(i).getExpr().getTypeInfo(), columnId));
-                    constantColumnIds.add(columnId);
+                    Integer colId = constantColIds.poll();
+                    expressions.add(TypeUtils.buildExpression(nodes.get(i).getExpr().getTypeInfo(), colId));
                     constantEvaluators.add((ExprNodeConstantEvaluator) nodes.get(i));
                 }
             } else {
@@ -445,7 +449,7 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
         List<String[]> expressions = new ArrayList<>();
         for (int i = 0; i < nodes.size(); i++) {
             if (!nodes.get(i).isEmpty()) {
-                expressions.add(getExprFromExprNode(nodes.get(i), true));
+                expressions.add(getExprFromExprNode(nodes.get(i)));
             }
         }
         return expressions.toArray(new String[0][0]);
@@ -580,7 +584,9 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
                     ((ShortVec) newVec).set(i, (short) exprNodeConstantEvaluator.getExpr().getValue());
                     break;
                 case OMNI_DECIMAL128:
-                    ((Decimal128Vec) newVec).set(i, (long[]) exprNodeConstantEvaluator.getExpr().getValue());
+                    HiveDecimal hiveDecimal = (HiveDecimal) exprNodeConstantEvaluator.getExpr().getValue();
+                    DecimalTypeInfo decimalTypeInfo = (DecimalTypeInfo) exprNodeConstantEvaluator.getExpr().getTypeInfo();
+                    ((Decimal128Vec) newVec).setBigInteger(i, hiveDecimal.bigIntegerBytesScaled(decimalTypeInfo.getScale()), hiveDecimal.signum() == -1);
                     break;
                 case OMNI_VARCHAR:
                 case OMNI_CHAR:
@@ -594,13 +600,15 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
     }
 
     private VecBatch createConstVecBatch(VecBatch vecBatch) {
-        int newVecBatchCount = vecBatch.getVectorCount() + constantColumnIds.size();
+        int newVecBatchCount = vecBatch.getVectorCount() + recordConstantColIds.size();
         Vec[] vecs = new Vec[newVecBatchCount];
         int constantColumnIndex = 0;
         for (int i = 0; i < newVecBatchCount; i++) {
-            if (constantColumnIds.contains(i)) {
+            if (recordConstantColIds.contains(i)) {
                 vecs[i] = constantVec[constantColumnIndex].slice(0, vecBatch.getRowCount());
                 constantColumnIndex++;
+            } else if (i < numKeys) {
+                vecs[i] = vecBatch.getVector(i);
             } else {
                 vecs[i] = vecBatch.getVector(i - numKeys);
             }
@@ -615,7 +623,7 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
         if (groupingSetsPresent) {
             input = expandVecBatch(input);
         }
-        if (!constantColumnIds.isEmpty()) {
+        if (!recordConstantColIds.isEmpty()) {
             input = createConstVecBatch(input);
         }
         this.omniOperator.addInput(input);

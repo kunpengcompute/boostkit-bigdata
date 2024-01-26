@@ -606,7 +606,8 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                     }
                     expressions.add(expr.toString());
                     current.getChildren().forEach(queue::offer);
-                } else if (current instanceof ExprNodeColumnDesc && !SUPPORTED_TYPE.contains(((PrimitiveTypeInfo) current.getTypeInfo()).getPrimitiveCategory())) {
+                } else if ((current instanceof ExprNodeColumnDesc || current instanceof ExprNodeConstantDesc)
+                        && !SUPPORTED_TYPE.contains(((PrimitiveTypeInfo) current.getTypeInfo()).getPrimitiveCategory())) {
                     return false;
                 }
             }
