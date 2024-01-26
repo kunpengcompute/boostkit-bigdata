@@ -727,6 +727,9 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] with PredicateHelper{
       ColumnarSortExec(plan.sortOrder, plan.global, child, plan.testSpillFrequency)
     case plan: WindowExec if enableColumnarWindow =>
       val child = replaceWithColumnarPlan(plan.child)
+      if (child.output.isEmpty) {
+        return plan
+      }
       logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
       child match {
         case ColumnarSortExec(sortOrder, _, sortChild, _) =>
@@ -744,8 +747,12 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] with PredicateHelper{
       ColumnarUnionExec(children)
     case plan: ShuffleExchangeExec if enableColumnarShuffle =>
       val child = replaceWithColumnarPlan(plan.child)
-      logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
-      new ColumnarShuffleExchangeExec(plan.outputPartitioning, child, plan.shuffleOrigin)
+      if (child.output.nonEmpty) {
+        logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
+        new ColumnarShuffleExchangeExec(plan.outputPartitioning, child, plan.shuffleOrigin)
+      } else {
+        plan
+      }
     case plan: CustomShuffleReaderExec if columnarConf.enableColumnarShuffle =>
       plan.child match {
         case shuffle: ColumnarShuffleExchangeExec =>
