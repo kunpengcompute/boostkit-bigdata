@@ -29,6 +29,7 @@ import org.apache.hadoop.hive.serde2.SerDeStats;
 import org.apache.hadoop.hive.serde2.SerDeUtils;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorFactory;
+import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory;
 import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
@@ -81,8 +82,15 @@ public class VecBatchWrapperSerde extends AbstractSerDe {
 
         ArrayList<TypeInfo> fieldTypes = TypeInfoUtils.getTypeInfosFromTypeString(columnTypeProperty);
         List<ObjectInspector> structFieldObjectInspectors = new ArrayList<>();
-        fieldTypes.forEach(fieldType -> structFieldObjectInspectors
-                .add(PrimitiveObjectInspectorFactory.getPrimitiveJavaObjectInspector((PrimitiveTypeInfo) fieldType)));
+        fieldTypes.forEach(fieldType -> {
+            PrimitiveObjectInspector primitiveObjectInspector;
+            if (fieldType instanceof PrimitiveTypeInfo) {
+                primitiveObjectInspector = PrimitiveObjectInspectorFactory.getPrimitiveJavaObjectInspector((PrimitiveTypeInfo) fieldType);
+            } else {
+                primitiveObjectInspector = PrimitiveObjectInspectorFactory.getPrimitiveJavaObjectInspector(PrimitiveObjectInspector.PrimitiveCategory.VOID);
+            }
+            structFieldObjectInspectors.add(primitiveObjectInspector);
+        });
         inspector = ObjectInspectorFactory.getStandardStructObjectInspector(columnNames, structFieldObjectInspectors);
     }
 

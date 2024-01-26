@@ -48,7 +48,6 @@ import nova.hetu.omniruntime.constants.FunctionType;
 
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.QueryPlan;
-import org.apache.hadoop.hive.ql.exec.ColumnInfo;
 import org.apache.hadoop.hive.ql.exec.ExplainTask;
 import org.apache.hadoop.hive.ql.exec.MapJoinOperator;
 import org.apache.hadoop.hive.ql.exec.Operator;
@@ -68,7 +67,6 @@ import org.apache.hadoop.hive.ql.hooks.HookContext;
 import org.apache.hadoop.hive.ql.io.orc.OrcInputFormat;
 import org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat;
 
-import org.apache.hadoop.hive.ql.metadata.Hive;
 import org.apache.hadoop.hive.ql.metadata.Table;
 import org.apache.hadoop.hive.ql.plan.AggregationDesc;
 import org.apache.hadoop.hive.ql.plan.BaseWork;
@@ -243,7 +241,8 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             return;
         }
         for (BaseWork work : tezWork.getAllWork()) {
-            if (work instanceof MapWork && !inputFormatReplaceable((MapWork) work)) {
+            if (work instanceof MapWork && !tableScanReplaceable((MapWork) work)) {
+                reduceSinkOpToWork.clear();
                 continue;
             }
             if (work instanceof MergeJoinWork) {
@@ -306,16 +305,14 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             if (!op.getType().equals(OperatorType.TABLESCAN)) {
                 continue;
             }
-            if (!tableScanSupport(op)) {
-                return true;
-            }
             RowSchema rowSchema = op.getSchema();
             TableScanDesc tableScanDesc = (TableScanDesc) op.getConf();
             if (tableScanDesc.getNeededColumns().isEmpty()) {
                 continue;
             }
-            for (ColumnInfo columnInfo : rowSchema.getSignature()) {
-                if (fieldTypeUnsupported(columnInfo.getType())) {
+            for (String field : tableScanDesc.getNeededColumns()) {
+                TypeInfo typeInfo = rowSchema.getColumnInfo(field).getType();
+                if (fieldTypeUnsupported(typeInfo)) {
                     return true;
                 }
             }
@@ -333,6 +330,33 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             return true;
         }
         return false;
+    }
+
+    private boolean tableScanReplaceable(MapWork work) {
+        for (PartitionDesc partitionDesc : work.getPathToPartitionInfo().values()) {
+            if (!partitionDesc.getInputFileFormatClassName().equals(OrcInputFormat.class.getName())) {
+                return false;
+            }
+        }
+        for (Operator<? extends OperatorDesc> op : work.getAliasToWork().values()) {
+            if (!op.getType().equals(OperatorType.TABLESCAN)) {
+                continue;
+            }
+            return tableScanSupport(op);
+        }
+        return true;
+    }
+
+    private boolean tableScanSupport(Operator<? extends OperatorDesc> op) {
+        TableScanDesc tableScanDesc = (TableScanDesc) op.getConf();
+        if (tableScanDesc.getNeededColumns().isEmpty()) {
+            return false;
+        }
+        Table tableMetadata = tableScanDesc.getTableMetadata();
+        if (tableMetadata != null && (!tableMetadata.getInputFormatClass().equals(OrcInputFormat.class) || tableMetadata.getParameters().getOrDefault("transactional", "").equals("true"))) {
+            return false;
+        }
+        return true;
     }
 
     private void traverseTezOperator(Operator op, BaseWork work, boolean groupNeedSort, boolean reduceSinkCanReplace, VectorizedRowBatchCtx vectorizedRowBatchCtx) {
@@ -629,15 +653,6 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         return false;
     }
 
-    private boolean inputFormatReplaceable(MapWork work) {
-        for (PartitionDesc partitionDesc : work.getPathToPartitionInfo().values()) {
-            if (!partitionDesc.getInputFileFormatClassName().equals(OrcInputFormat.class.getName())) {
-                return false;
-            }
-        }
-        return true;
-    }
-
     private void replaceInputFormat(BaseWork work) {
         if (work instanceof MapWork) {
             for (PartitionDesc partitionDesc : ((MapWork) work).getPathToPartitionInfo().values()) {
@@ -742,20 +757,6 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             tezWork.getEdgeProperty(parent, work).setEdgeType(edgeType);
         }
     }
-
-
-    private boolean tableScanSupport(Operator<? extends OperatorDesc> op) {
-        TableScanDesc tableScanDesc = (TableScanDesc) op.getConf();
-        if (tableScanDesc.getNeededColumns().isEmpty()) {
-            return false;
-        }
-        Table tableMetadata = tableScanDesc.getTableMetadata();
-        if (tableMetadata != null && (!tableMetadata.getInputFormatClass().equals(OrcInputFormat.class) || tableMetadata.getParameters().getOrDefault("transactional", "").equals("true"))) {
-            return false;
-        }
-        return true;
-    }
-
 
     private Operator<? extends OperatorDesc> replaceWithOmniOperator(OperatorInfo operatorInfo) {
         return replaceWithOmniOperator(operatorInfo, 0);
