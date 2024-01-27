@@ -484,7 +484,12 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                 List<PTFExpressionDef> expressions = new ArrayList<>(conf.getFuncDef().getPartition().getExpressions());
                 expressions.addAll(conf.getFuncDef().getOrder().getExpressions());
                 for (PTFExpressionDef expression : expressions) {
-                    if (expression.getExprNode() instanceof ExprNodeGenericFuncDesc) {
+                    ExprNodeDesc exprNode = expression.getExprNode();
+                    if (exprNode instanceof ExprNodeGenericFuncDesc) {
+                        return false;
+                    }
+                    if (exprNode instanceof ExprNodeColumnDesc && !SUPPORTED_TYPE
+                            .contains(((PrimitiveTypeInfo) exprNode.getTypeInfo()).getPrimitiveCategory())) {
                         return false;
                     }
                 }
