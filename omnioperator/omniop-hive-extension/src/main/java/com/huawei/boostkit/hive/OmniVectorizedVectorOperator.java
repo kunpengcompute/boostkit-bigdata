@@ -130,7 +130,7 @@ public class OmniVectorizedVectorOperator extends OmniHiveOperator<OmniVectorDes
             }
         }
         super.initializeOp(hconf);
-        if (isToVector && !OMNI_OPERATOR.contains(OperatorType.TABLESCAN) && checkParentTableScan()) {
+        if (isToVector && checkParentTableScan()) {
             rebuildTableScanInspector(hconf);
         }
         StructObjectInspector bigTableInspector;
