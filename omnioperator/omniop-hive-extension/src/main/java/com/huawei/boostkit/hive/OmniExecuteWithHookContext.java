@@ -94,6 +94,7 @@ import org.apache.hadoop.hive.ql.plan.TezEdgeProperty;
 import org.apache.hadoop.hive.ql.plan.TezWork;
 import org.apache.hadoop.hive.ql.plan.UnionWork;
 import org.apache.hadoop.hive.ql.plan.api.OperatorType;
+import org.apache.hadoop.hive.ql.plan.ptf.BoundaryDef;
 import org.apache.hadoop.hive.ql.plan.ptf.PTFExpressionDef;
 import org.apache.hadoop.hive.ql.plan.ptf.WindowFunctionDef;
 import org.apache.hadoop.hive.ql.plan.ptf.WindowTableFunctionDef;
@@ -494,6 +495,11 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                 List<WindowFunctionDef> windowFunctionDefs = ((WindowTableFunctionDef) conf.getFuncDef()).getWindowFunctions();
                 for (int i = 0; i < windowFunctionDefs.size(); i++) {
                     WindowFunctionDef windowFunctionDef = windowFunctionDefs.get(i);
+                    BoundaryDef start = windowFunctionDef.getWindowFrame().getStart();
+                    BoundaryDef end = windowFunctionDef.getWindowFrame().getEnd();
+                    if (start.getAmt() != Integer.MAX_VALUE && end.getAmt() != Integer.MAX_VALUE) {
+                        return false;
+                    }
                     FunctionType windowFunctionType = TypeUtils.getWindowFunctionType(windowFunctionDef);
                     if (windowFunctionType == null || windowFunctionType == OMNI_AGGREGATION_TYPE_AVG && isAvgUnsupported(windowFunctionDef.getArgs())) {
                         return false;
