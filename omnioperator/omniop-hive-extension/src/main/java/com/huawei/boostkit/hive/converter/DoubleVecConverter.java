@@ -159,7 +159,13 @@ public class DoubleVecConverter implements VecConverter {
                 DoubleVec doubleVec = (DoubleVec) vec;
                 value = doubleVec.get(i);
             }
-            doubleColumnVector.vector[i - start] = value;
+            if (Double.isInfinite(value) || Double.isNaN(value)) {
+                doubleColumnVector.vector[i - start] = 0.00;
+                doubleColumnVector.isNull[i - start] = true;
+                doubleColumnVector.noNulls = false;
+            } else {
+                doubleColumnVector.vector[i - start] = value;
+            }
         }
         return doubleColumnVector;
     }

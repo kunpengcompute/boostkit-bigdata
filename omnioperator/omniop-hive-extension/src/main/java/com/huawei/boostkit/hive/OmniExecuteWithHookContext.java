@@ -127,7 +127,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
     public static final Set<Integer> SUPPORTED_JOIN = new HashSet<>(Arrays.asList(JoinDesc.INNER_JOIN,
             JoinDesc.LEFT_OUTER_JOIN, JoinDesc.FULL_OUTER_JOIN, JoinDesc.LEFT_SEMI_JOIN));
     private static final Set<PrimitiveObjectInspector.PrimitiveCategory> SUPPORTED_TYPE = new HashSet<>(Arrays.asList(BOOLEAN,
-            SHORT, INT, LONG, DOUBLE, STRING, DATE, TIMESTAMP, DECIMAL, VARCHAR, CHAR));
+            SHORT, INT, LONG, DOUBLE, STRING, DATE, DECIMAL, VARCHAR, CHAR));
 
     private static final int DECIMAL64_MAX_PRECISION = 19;
 
@@ -416,6 +416,11 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                 Map<Byte, List<ExprNodeDesc>> keys = mapJoinDesc.getKeys();
                 for (List<ExprNodeDesc> exprNodeDescs : keys.values()) {
                     if (!isUDFSupport(exprNodeDescs)) {
+                        return false;
+                    }
+                }
+                for (List<ExprNodeDesc> value : mapJoinDesc.getFilters().values()) {
+                    if (!isUDFSupport(value)) {
                         return false;
                     }
                 }
