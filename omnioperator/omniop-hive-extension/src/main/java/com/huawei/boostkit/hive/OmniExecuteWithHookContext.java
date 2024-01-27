@@ -241,6 +241,9 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             return;
         }
         for (BaseWork work : tezWork.getAllWork()) {
+            if (work instanceof UnionWork) {
+                continue;
+            }
             if (work instanceof MapWork && !tableScanReplaceable((MapWork) work)) {
                 reduceSinkOpToWork.clear();
                 continue;
@@ -437,6 +440,11 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         switch (operator.getType()) {
             case MAPJOIN:
                 MapJoinDesc mapJoinDesc = (MapJoinDesc) operator.getConf();
+                for (boolean nullsafe: mapJoinDesc.getNullSafes()) {
+                    if (nullsafe) {
+                        return false;
+                    }
+                }
                 Map<Byte, List<ExprNodeDesc>> keys = mapJoinDesc.getKeys();
                 for (List<ExprNodeDesc> exprNodeDescs : keys.values()) {
                     if (!isUDFSupport(exprNodeDescs)) {
@@ -448,9 +456,9 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                         return false;
                     }
                 }
-                return SUPPORTED_JOIN.contains(mapJoinDesc.getConds()[0].getType());
+                return joinReplaceable(operator);
             case MERGEJOIN:
-                return mergeJoinReplaceable(operator);
+                return joinReplaceable(operator);
             case SELECT:
                 if (!isUDFSupport(((SelectDesc) operator.getConf()).getColList())) {
                     return false;
@@ -585,7 +593,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         return true;
     }
 
-    private boolean mergeJoinReplaceable(Operator<? extends OperatorDesc> operator) {
+    private boolean joinReplaceable(Operator<? extends OperatorDesc> operator) {
         JoinDesc joinDesc = (JoinDesc) operator.getConf();
         JoinCondDesc[] joinCondDescs = joinDesc.getConds();
         if (joinDesc.getConds()[0].getType() == JoinDesc.FULL_OUTER_JOIN && joinDesc.getKeysString().get(0) == null) {
@@ -691,6 +699,9 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
     private boolean getReduceSinkCanReplace(BaseWork work) {
         boolean reduceSinkCanReplace = false;
         if (parentOfMapJoinOpCannotReplace.contains(work.getName())) {
+            return false;
+        }
+        if (reduceSinkOpToWork.isEmpty()) {
             return false;
         }
         for (BaseWork child : tezWork.getChildren(work)) {

@@ -171,6 +171,9 @@ public class VarcharVecConverter implements VecConverter {
         if (col instanceof Text) {
             return ((Text) col).copyBytes();
         }
+        if (col instanceof String) {
+            return ((String) col).getBytes(StandardCharsets.UTF_8);
+        }
         return null;
     }
 

@@ -70,6 +70,9 @@ public class CharVecConverter extends VarcharVecConverter {
         if (col instanceof Text) {
             return trimBytes(((Text) col).getBytes());
         }
+        if (col instanceof String) {
+            return ((String) col).getBytes(StandardCharsets.UTF_8);
+        }
         return null;
     }
 
