@@ -51,6 +51,7 @@ import org.apache.hadoop.hive.ql.exec.MapredContext;
 import org.apache.hadoop.hive.ql.exec.ObjectCache;
 import org.apache.hadoop.hive.ql.exec.ObjectCacheFactory;
 import org.apache.hadoop.hive.ql.exec.Operator;
+import org.apache.hadoop.hive.ql.exec.UDFArgumentException;
 import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.exec.mr.ExecMapperContext;
 import org.apache.hadoop.hive.ql.exec.persistence.MapJoinKey;
@@ -69,6 +70,8 @@ import org.apache.hadoop.hive.ql.plan.MapJoinDesc;
 import org.apache.hadoop.hive.ql.plan.OperatorDesc;
 import org.apache.hadoop.hive.ql.plan.TableDesc;
 import org.apache.hadoop.hive.ql.plan.api.OperatorType;
+import org.apache.hadoop.hive.ql.udf.generic.GenericUDFAbs;
+import org.apache.hadoop.hive.ql.udf.generic.GenericUDFOPAnd;
 import org.apache.hadoop.hive.serde2.AbstractSerDe;
 import org.apache.hadoop.hive.serde2.ByteStream;
 import org.apache.hadoop.hive.serde2.SerDeException;
@@ -96,6 +99,7 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -763,12 +767,18 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
     }
 
     private ExprNodeGenericFuncDesc getJoinFilter() {
-        for (List<ExprNodeEvaluator> filters : joinFilters) {
-            if (!filters.isEmpty()) {
-                return (ExprNodeGenericFuncDesc) filters.get(0).getExpr();
-            }
+        List<ExprNodeDesc> filters = Arrays.stream(joinFilters).flatMap(Collection::stream).map(ExprNodeEvaluator::getExpr).collect(Collectors.toList());
+        if (filters.isEmpty()) {
+            return null;
         }
-        return null;
+        if (filters.size() == 1) {
+            return (ExprNodeGenericFuncDesc) filters.get(0);
+        }
+        try {
+            return ExprNodeGenericFuncDesc.newInstance(new GenericUDFOPAnd(), filters);
+        } catch (UDFArgumentException e) {
+            throw new RuntimeException("wrong UDF", e);
+        }
     }
 
     @Override

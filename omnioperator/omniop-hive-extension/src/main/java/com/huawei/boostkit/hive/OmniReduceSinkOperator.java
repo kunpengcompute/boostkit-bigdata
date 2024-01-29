@@ -81,8 +81,10 @@ import org.apache.hadoop.hive.serde2.SerDeException;
 import org.apache.hadoop.hive.serde2.Serializer;
 import org.apache.hadoop.hive.serde2.lazy.ByteArrayRef;
 import org.apache.hadoop.hive.serde2.lazy.LazyHiveChar;
+import org.apache.hadoop.hive.serde2.lazy.LazyString;
 import org.apache.hadoop.hive.serde2.lazy.objectinspector.primitive.AbstractPrimitiveLazyObjectInspector;
 import org.apache.hadoop.hive.serde2.lazy.objectinspector.primitive.LazyHiveCharObjectInspector;
+import org.apache.hadoop.hive.serde2.lazy.objectinspector.primitive.LazyStringObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorFactory;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorUtils;
@@ -844,12 +846,18 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
         } else if (type.getId() == OMNI_VARCHAR) {
             fieldObjectInspector = ((StandardStructObjectInspector) this.inputObjInspectors[0]).getAllStructFieldRefs()
                     .get(indexInVector).getFieldObjectInspector();
-            if (fieldObjectInspector instanceof AbstractPrimitiveLazyObjectInspector) {
+            if (fieldObjectInspector instanceof LazyHiveCharObjectInspector) {
                 LazyHiveChar lazyHiveChar = new LazyHiveChar((LazyHiveCharObjectInspector) fieldObjectInspector);
                 ByteArrayRef byteArrayRef = new ByteArrayRef();
                 byteArrayRef.setData(((VarcharVec) vector).get(index));
                 lazyHiveChar.init(byteArrayRef, 0, ((VarcharVec) vector).get(index).length);
                 return lazyHiveChar;
+            } else if (fieldObjectInspector instanceof LazyStringObjectInspector) {
+                LazyString lazyString = new LazyString((LazyStringObjectInspector) fieldObjectInspector);
+                ByteArrayRef byteArrayRef = new ByteArrayRef();
+                byteArrayRef.setData(((VarcharVec) vector).get(index));
+                lazyString.init(byteArrayRef, 0, ((VarcharVec) vector).get(index).length);
+                return lazyString;
             } else {
                 return new Text(((VarcharVec) vector).get(index));
             }
