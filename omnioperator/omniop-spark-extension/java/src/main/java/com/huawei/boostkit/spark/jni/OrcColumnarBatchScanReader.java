@@ -52,15 +52,15 @@ public class OrcColumnarBatchScanReader {
         jniReader = new OrcColumnarBatchJniReader();
     }
 
-    public JSONObject getSubJson(ExpressionTree etNode) {
+    public JSONObject getSubJson(ExpressionTree node) {
         JSONObject jsonObject = new JSONObject();
-        jsonObject.put("op", etNode.getOperator().ordinal());
-        if (etNode.getOperator().toString().equals("LEAF")) {
-            jsonObject.put("leaf", etNode.toString());
+        jsonObject.put("op", node.getOperator().ordinal());
+        if (node.getOperator().toString().equals("LEAF")) {
+            jsonObject.put("leaf", node.toString());
             return jsonObject;
         }
         ArrayList<JSONObject> child = new ArrayList<JSONObject>();
-        for (ExpressionTree childNode : etNode.getChildren()) {
+        for (ExpressionTree childNode : node.getChildren()) {
             JSONObject rtnJson = getSubJson(childNode);
             child.add(rtnJson);
         }
@@ -69,8 +69,8 @@ public class OrcColumnarBatchScanReader {
     }
 
     public String padZeroForDecimals(String [] decimalStrArray, int decimalScale) {
-        String decimalVal = ""; // Integer without decimals, eg: 12345
-        if (decimalStrArray.length == 2) { // Integer with decimals, eg: 12345.6
+        String decimalVal = "";
+        if (decimalStrArray.length == 2) {
             decimalVal = decimalStrArray[1];
         }
         // If the length of the formatted number string is insufficient, pad '0's.

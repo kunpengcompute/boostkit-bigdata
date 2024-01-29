@@ -331,22 +331,22 @@ template <DataTypeId TYPE_ID, typename ORC_TYPE> uint64_t CopyFixedWidth(orc::Co
     auto numElements = lvb->numElements;
     auto values = lvb->data.data();
     auto notNulls = lvb->notNull.data();
-    auto originalVector = new Vector<T>(numElements);
+    auto newVector = new Vector<T>(numElements);
     // Check ColumnVectorBatch has null or not firstly
     if (lvb->hasNulls) {
         for (uint i = 0; i < numElements; i++) {
             if (notNulls[i]) {
-                originalVector->SetValue(i, (T)(values[i]));
+                newVector->SetValue(i, (T)(values[i]));
             } else {
-                originalVector->SetNull(i);
+                newVector->SetNull(i);
             }
         }
     } else {
         for (uint i = 0; i < numElements; i++) {
-            originalVector->SetValue(i, (T)(values[i]));
+            newVector->SetValue(i, (T)(values[i]));
         }
     }
-    return (uint64_t)originalVector;
+    return (uint64_t)newVector;
 }
 
 template <DataTypeId TYPE_ID, typename ORC_TYPE> uint64_t CopyOptimizedForInt64(orc::ColumnVectorBatch *field)
@@ -356,17 +356,17 @@ template <DataTypeId TYPE_ID, typename ORC_TYPE> uint64_t CopyOptimizedForInt64(
     auto numElements = lvb->numElements;
     auto values = lvb->data.data();
     auto notNulls = lvb->notNull.data();
-    auto originalVector = new Vector<T>(numElements);
+    auto newVector = new Vector<T>(numElements);
     // Check ColumnVectorBatch has null or not firstly
     if (lvb->hasNulls) {
         for (uint i = 0; i < numElements; i++) {
             if (!notNulls[i]) {
-                originalVector->SetNull(i);
+                newVector->SetNull(i);
             }
         }
     }
-    originalVector->SetValues(0, values, numElements);
-    return (uint64_t)originalVector;
+    newVector->SetValues(0, values, numElements);
+    return (uint64_t)newVector;
 }
 
 uint64_t CopyVarWidth(orc::ColumnVectorBatch *field)
@@ -376,23 +376,23 @@ uint64_t CopyVarWidth(orc::ColumnVectorBatch *field)
     auto values = lvb->data.data();
     auto notNulls = lvb->notNull.data();
     auto lens = lvb->length.data();
-    auto originalVector = new Vector<LargeStringContainer<std::string_view>>(numElements);
+    auto newVector = new Vector<LargeStringContainer<std::string_view>>(numElements);
     if (lvb->hasNulls) {
         for (uint i = 0; i < numElements; i++) {
             if (notNulls[i]) {
                 auto data = std::string_view(reinterpret_cast<const char *>(values[i]), lens[i]);
-                originalVector->SetValue(i, data);
+                newVector->SetValue(i, data);
             } else {
-                originalVector->SetNull(i);
+                newVector->SetNull(i);
             }
         }
     } else {
         for (uint i = 0; i < numElements; i++) {
             auto data = std::string_view(reinterpret_cast<const char *>(values[i]), lens[i]);
-            originalVector->SetValue(i, data);
+            newVector->SetValue(i, data);
         }
     }
-    return (uint64_t)originalVector;
+    return (uint64_t)newVector;
 }
 
 inline void FindLastNotEmpty(const char *chars, long &len)
@@ -409,7 +409,7 @@ uint64_t CopyCharType(orc::ColumnVectorBatch *field)
     auto values = lvb->data.data();
     auto notNulls = lvb->notNull.data();
     auto lens = lvb->length.data();
-    auto originalVector = new Vector<LargeStringContainer<std::string_view>>(numElements);
+    auto newVector = new Vector<LargeStringContainer<std::string_view>>(numElements);
     if (lvb->hasNulls) {
         for (uint i = 0; i < numElements; i++) {
             if (notNulls[i]) {
@@ -417,9 +417,9 @@ uint64_t CopyCharType(orc::ColumnVectorBatch *field)
                 auto len = lens[i];
                 FindLastNotEmpty(chars, len);
                 auto data = std::string_view(chars, len);
-                originalVector->SetValue(i, data);
+                newVector->SetValue(i, data);
             } else {
-                originalVector->SetNull(i);
+                newVector->SetNull(i);
             }
         }
     } else {
@@ -428,10 +428,10 @@ uint64_t CopyCharType(orc::ColumnVectorBatch *field)
             auto len = lens[i];
             FindLastNotEmpty(chars, len);
             auto data = std::string_view(chars, len);
-            originalVector->SetValue(i, data);
+            newVector->SetValue(i, data);
         }
     }
-    return (uint64_t)originalVector;
+    return (uint64_t)newVector;
 }
 
 uint64_t CopyToOmniDecimal128Vec(orc::ColumnVectorBatch *field)
@@ -440,21 +440,21 @@ uint64_t CopyToOmniDecimal128Vec(orc::ColumnVectorBatch *field)
     auto numElements = lvb->numElements;
     auto values = lvb->values.data();
     auto notNulls = lvb->notNull.data();
-    auto originalVector = new Vector<Decimal128>(numElements);
+    auto newVector = new Vector<Decimal128>(numElements);
     if (lvb->hasNulls) {
         for (uint i = 0; i < numElements; i++) {
             if (notNulls[i]) {
-                originalVector->SetValue(i, Decimal128(values[i].getHighBits(), values[i].getLowBits()));
+                newVector->SetValue(i, Decimal128(values[i].getHighBits(), values[i].getLowBits()));
             } else {
-                originalVector->SetNull(i);
+                newVector->SetNull(i);
             }
         }
     } else {
         for (uint i = 0; i < numElements; i++) {
-            originalVector->SetValue(i, Decimal128(values[i].getHighBits(), values[i].getLowBits()));
+            newVector->SetValue(i, Decimal128(values[i].getHighBits(), values[i].getLowBits()));
         }
     }
-    return (uint64_t)originalVector;
+    return (uint64_t)newVector;
 }
 
 uint64_t CopyToOmniDecimal64Vec(orc::ColumnVectorBatch *field)
@@ -463,16 +463,16 @@ uint64_t CopyToOmniDecimal64Vec(orc::ColumnVectorBatch *field)
     auto numElements = lvb->numElements;
     auto values = lvb->values.data();
     auto notNulls = lvb->notNull.data();
-    auto originalVector = new Vector<int64_t>(numElements);
+    auto newVector = new Vector<int64_t>(numElements);
     if (lvb->hasNulls) {
         for (uint i = 0; i < numElements; i++) {
             if (!notNulls[i]) {
-                originalVector->SetNull(i);
+                newVector->SetNull(i);
             }
         }
     }
-    originalVector->SetValues(0, values, numElements);
-    return (uint64_t)originalVector;
+    newVector->SetValues(0, values, numElements);
+    return (uint64_t)newVector;
 }
 
 uint64_t CopyToOmniDecimal128VecFrom64(orc::ColumnVectorBatch *field)
@@ -481,24 +481,24 @@ uint64_t CopyToOmniDecimal128VecFrom64(orc::ColumnVectorBatch *field)
     auto numElements = lvb->numElements;
     auto values = lvb->values.data();
     auto notNulls = lvb->notNull.data();
-    auto originalVector = new Vector<Decimal128>(numElements);
+    auto newVector = new Vector<Decimal128>(numElements);
     if (lvb->hasNulls) {
         for (uint i = 0; i < numElements; i++) {
             if (!notNulls[i]) {
-                originalVector->SetNull(i);
+                newVector->SetNull(i);
             } else {
                 Decimal128 d128(values[i]);
-                originalVector->SetValue(i, d128);
+                newVector->SetValue(i, d128);
             }
         }
     } else {
         for (uint i = 0; i < numElements; i++) {
             Decimal128 d128(values[i]);
-            originalVector->SetValue(i, d128);
+            newVector->SetValue(i, d128);
         }
     }
 
-    return (uint64_t)originalVector;
+    return (uint64_t)newVector;
 }
 
 int CopyToOmniVec(const orc::Type *type, int &omniTypeId, uint64_t &omniVecId, orc::ColumnVectorBatch *field,

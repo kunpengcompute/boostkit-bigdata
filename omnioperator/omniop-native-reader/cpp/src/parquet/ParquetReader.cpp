@@ -17,6 +17,7 @@
  * limitations under the License.
  */
 
+#include <unordered_map>
 #include "jni/jni_common.h"
 #include "ParquetReader.h"
 #include "arrowadapter/FileSystemAdapter.h"
@@ -28,11 +29,12 @@ using namespace omniruntime::reader;
 using namespace arrow::internal;
 
 static std::mutex mutex_;
-static std::map<std::string, Filesystem*> restore_filesysptr;
+static std::unordered_map<std::string, Filesystem*> restore_filesysptr;
 static constexpr int32_t LOCAL_FILE_PREFIX = 5;
 static const std::string LOCAL_FILE = "file:";
 static const std::string HDFS_FILE = "hdfs:";
 
+// the ugi is UserGroupInformation
 std::string omniruntime::reader::GetFileSystemKey(std::string& path, std::string& ugi)
 {
     // if the local file, all the files are the same key "file:"
@@ -141,7 +143,7 @@ Status ParquetReader::GetRecordBatchReader(const std::vector<int> &row_group_ind
                 return Status::OK();
             }
 
-            for (uint64_t i = 0; i < columnReaders.size(); ++i) {
+            for (uint64_t i = 0; i < columnReaders.size(); i++) {
                 RETURN_NOT_OK(columnReaders[i]->NextBatch(read_size, &batch[i]));
             }
 

@@ -183,12 +183,12 @@ abstract class BaseColumnarFileSourceScanExec(
       // If sort columns are (col0, col1), then sort ordering would be considered as (col0)
       // If sort columns are (col1, col0), then sort ordering would be empty as per rule #2
       // above
-      val spec = relation.bucketSpec.get
-      val bucketColumns = spec.bucketColumnNames.flatMap(n => toAttribute(n))
-      val numPartitions = optionalNumCoalescedBuckets.getOrElse(spec.numBuckets)
+      val bucketSpec = relation.bucketSpec.get
+      val bucketColumns = bucketSpec.bucketColumnNames.flatMap(n => toAttribute(n))
+      val numPartitions = optionalNumCoalescedBuckets.getOrElse(bucketSpec.numBuckets)
       val partitioning = HashPartitioning(bucketColumns, numPartitions)
       val sortColumns =
-        spec.sortColumnNames.map(x => toAttribute(x)).takeWhile(x => x.isDefined).map(_.get)
+        bucketSpec.sortColumnNames.map(x => toAttribute(x)).takeWhile(x => x.isDefined).map(_.get)
       val shouldCalculateSortOrder =
         conf.getConf(SQLConf.LEGACY_BUCKETED_TABLE_SCAN_OUTPUT_ORDERING) &&
           sortColumns.nonEmpty &&

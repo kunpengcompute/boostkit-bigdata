@@ -155,7 +155,6 @@ public class OmniOrcColumnarBatchReader extends RecordReader<Void, ColumnarBatch
     if (resultFields.length != requestedDataColIds.length || resultFields.length != requestedPartitionColIds.length){
       throw new UnsupportedOperationException("This operator doesn't support orc initBatch.");
     }
-    // If a required column is also partition column, use partition value and don't read from file.
     for (int i = 0; i < resultFields.length; i++) {
       if (requestedPartitionColIds[i] != -1) {
         requestedDataColIds[i] = -1;
