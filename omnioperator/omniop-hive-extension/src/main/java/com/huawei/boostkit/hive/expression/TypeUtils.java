@@ -362,6 +362,15 @@ public class TypeUtils {
     public static boolean checkUnsupportedArithmetic(ExprNodeGenericFuncDesc node) {
         List<ExprNodeDesc> children = node.getChildren();
         String functionName = node.getGenericUDF().getClass().getSimpleName();
+        if (functionName.equals("GenericUDFRound")) {
+            if (children.get(0).getTypeInfo() instanceof DecimalTypeInfo) {
+                return true;
+            }
+            ExprNodeConstantDesc exprNodeConstantDesc = (ExprNodeConstantDesc) children.get(1);
+            if ((Integer) (exprNodeConstantDesc.getValue()) < 0) {
+                return true;
+            }
+        }
         boolean anyDecimal = children.stream().anyMatch(child -> child.getTypeInfo() instanceof DecimalTypeInfo
                 && ((DecimalTypeInfo) child.getTypeInfo()).getPrecision() > 19);
         if ((functionName.equals("GenericUDFOPMultiply") || functionName.equals("GenericUDFOPDivide")
