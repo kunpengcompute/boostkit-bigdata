@@ -82,7 +82,7 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniRea
 
 /*
  * Class:       com_huawei_boostkit_scan_jni_OrcColumnarBatchJniReader
- * Method:      initializeRecordReader
+ * Method:      initializeBatch
  * Signature:   (JLorg/json/simple/JSONObject;)J
  */
 JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniReader_initializeBatch
@@ -116,7 +116,7 @@ JNIEXPORT jfloat JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniRe
 /*
  * Class:       com_huawei_boostkit_scan_jni_OrcColumnarBatchJniReader
  * Method:      recordReaderClose
- * Signature:   (J)F
+ * Signature:   (JJJ)F
  */
 JNIEXPORT void JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniReader_recordReaderClose
         (JNIEnv *, jobject, jlong, jlong, jlong);
