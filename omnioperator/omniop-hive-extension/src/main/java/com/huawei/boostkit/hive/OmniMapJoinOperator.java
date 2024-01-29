@@ -777,7 +777,7 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
         try {
             return ExprNodeGenericFuncDesc.newInstance(new GenericUDFOPAnd(), filters);
         } catch (UDFArgumentException e) {
-            throw new RuntimeException("wrong undf", e);
+            throw new RuntimeException("wrong UDF", e);
         }
     }
 

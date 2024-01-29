@@ -208,6 +208,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         }
     }
 
+
     private void initMapJoinOpToWork() {
         for (BaseWork work : tezWork.getAllWork()) {
             if (work instanceof UnionWork) {
@@ -241,28 +242,29 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             return;
         }
         for (BaseWork work : tezWork.getAllWork()) {
-            if (work instanceof UnionWork) {
-                continue;
+            traverseEachWork(work);
+        }
+    }
+
+    private void traverseEachWork(BaseWork work) {
+        if (work instanceof UnionWork) {
+            return;
+        }
+        if (work instanceof MapWork && !tableScanReplaceable((MapWork) work)) {
+            reduceSinkOpToWork.clear();
+            return;
+        }
+        if (work instanceof MergeJoinWork) {
+            BaseWork mainWork = ((MergeJoinWork) work).getMainWork();
+            if (!(mainWork instanceof ReduceWork) || ((ReduceWork) ((MergeJoinWork) work).getMainWork()).getReducer().getType() != OperatorType.MERGEJOIN) {
+                return;
             }
-            if (work instanceof MapWork && !tableScanReplaceable((MapWork) work)) {
-                reduceSinkOpToWork.clear();
-                continue;
-            }
-            if (work instanceof MergeJoinWork) {
-                BaseWork mainWork = ((MergeJoinWork) work).getMainWork();
-                if (!(mainWork instanceof ReduceWork)) {
-                    continue;
-                }
-                if (((ReduceWork) ((MergeJoinWork) work).getMainWork()).getReducer().getType() != OperatorType.MERGEJOIN) {
-                    continue;
-                }
-            }
-            boolean groupNeedSort = getGroupNeedSort(work);
-            boolean reduceSinkCanReplace = getReduceSinkCanReplace(work);
-            VectorizedRowBatchCtx vectorizedRowBatchCtx = work.getVectorizedRowBatchCtx();
-            for (Operator<? extends OperatorDesc> op : work.getAllOperators()) {
-                traverseTezOperator(op, work, groupNeedSort, reduceSinkCanReplace, vectorizedRowBatchCtx);
-            }
+        }
+        boolean groupNeedSort = getGroupNeedSort(work);
+        boolean reduceSinkCanReplace = getReduceSinkCanReplace(work);
+        VectorizedRowBatchCtx vectorizedRowBatchCtx = work.getVectorizedRowBatchCtx();
+        for (Operator<? extends OperatorDesc> op : work.getAllOperators()) {
+            traverseTezOperator(op, work, groupNeedSort, reduceSinkCanReplace, vectorizedRowBatchCtx);
         }
     }
 
@@ -698,10 +700,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
 
     private boolean getReduceSinkCanReplace(BaseWork work) {
         boolean reduceSinkCanReplace = false;
-        if (parentOfMapJoinOpCannotReplace.contains(work.getName())) {
-            return false;
-        }
-        if (reduceSinkOpToWork.isEmpty()) {
+        if (parentOfMapJoinOpCannotReplace.contains(work.getName()) || reduceSinkOpToWork.isEmpty()) {
             return false;
         }
         for (BaseWork child : tezWork.getChildren(work)) {
