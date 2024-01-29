@@ -102,7 +102,7 @@ public class TypeUtils {
             put(PrimitiveObjectInspector.PrimitiveCategory.LONG, LongDataType.LONG);
             put(PrimitiveObjectInspector.PrimitiveCategory.BOOLEAN, BooleanDataType.BOOLEAN);
             put(PrimitiveObjectInspector.PrimitiveCategory.DOUBLE, DoubleDataType.DOUBLE);
-            put(PrimitiveObjectInspector.PrimitiveCategory.STRING, VarcharDataType.VARCHAR);
+            put(PrimitiveObjectInspector.PrimitiveCategory.STRING, new VarcharDataType(DEFAULT_VARCHAR_LENGTH));
             put(PrimitiveObjectInspector.PrimitiveCategory.TIMESTAMP, LongDataType.LONG);
             put(PrimitiveObjectInspector.PrimitiveCategory.DATE, IntDataType.INTEGER);
             put(PrimitiveObjectInspector.PrimitiveCategory.INTERVAL_DAY_TIME, LongDataType.LONG);
