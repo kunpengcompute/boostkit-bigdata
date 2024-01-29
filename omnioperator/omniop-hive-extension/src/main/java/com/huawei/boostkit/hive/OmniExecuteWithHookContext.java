@@ -667,6 +667,9 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
 
     private boolean groupByReplaceable(Operator<? extends OperatorDesc> operator, boolean reduceSinkCanReplace) {
         GroupByDesc groupByDesc = (GroupByDesc) operator.getConf();
+        if (groupByDesc.isGroupingSetsPresent() && groupByDesc.getMode() == GroupByDesc.Mode.PARTIALS) {
+            return false;
+        }
         if (!isUDFSupport(groupByDesc.getKeys())) {
             return false;
         }
