@@ -507,16 +507,8 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
 
     private OmniHashBuilderWithExprOperatorFactory getOmniHashBuilderWithExprOperatorFactory(
             JoinType joinType, DataType[] buildTypes, int buildIndex) {
-        Map<String, Integer> buildKeyColNameToId = new HashMap<>();
-        List<ExprNodeEvaluator> buildExprNodeColumnEvaluators = getExprNodeColumnEvaluator(joinKeys[buildIndex], true);
-        for (int i = 0; i < buildExprNodeColumnEvaluators.size(); i++) {
-            if (buildExprNodeColumnEvaluators.get(i) instanceof ExprNodeColumnEvaluator) {
-                buildKeyColNameToId
-                        .put(((ExprNodeColumnEvaluator) buildExprNodeColumnEvaluators.get(i)).getExpr().getColumn(), i);
-            }
-        }
-        String[] buildHashKeys = getExprFromExprNode(buildExprNodeColumnEvaluators, buildKeyColNameToId,
-                inputObjInspectors[buildIndex]);
+        String[] buildHashKeys = getExprFromExprNode(joinKeys[buildIndex], null,
+                inputObjInspectors[buildIndex], true);
         return new OmniHashBuilderWithExprOperatorFactory(joinType, buildTypes, buildHashKeys, 1);
     }
 
@@ -549,7 +541,7 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
             probeOutputCols[probeOutputCols.length - 1] = probeInputfields.size() - 1;
         }
         String[] probeHashKeys = getExprFromExprNode(joinKeys[probeIndex], probekeyColNameToId,
-                inputObjInspectors[probeIndex]);
+                inputObjInspectors[probeIndex], false);
         int[] buildOutputCols = new int[buildIndexes.stream()
                 .mapToInt(buildIndex -> joinValuesObjectInspectors[buildIndex].size()).sum()];
         DataType[] buildOutputTypes = new DataType[buildOutputCols.length];
@@ -581,18 +573,12 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
         probeInspectors.addAll(joinKeysObjectInspectors[probeIndex]);
         probeInspectors.addAll(joinValuesObjectInspectors[probeIndex]);
         DataType[] probeTypes = getTypeFromInspectors(probeInspectors);
-        Map<String, Integer> probekeyColNameToId = new HashMap<>();
-        List<ExprNodeEvaluator> exprNodeColumnEvaluators = getExprNodeColumnEvaluator(joinKeys[probeIndex]);
-        for (int i = 0; i < exprNodeColumnEvaluators.size(); i++) {
-            probekeyColNameToId.put(((ExprNodeColumnEvaluator) exprNodeColumnEvaluators.get(i)).getExpr().getColumn(),
-                    i);
-        }
         int[] probeOutputCols = new int[probeInspectors.size()];
         for (int i = 0; i < probeInspectors.size(); i++) {
             probeOutputCols[i] = i;
         }
-        String[] probeHashKeys = getExprFromExprNode(exprNodeColumnEvaluators, probekeyColNameToId,
-                inputObjInspectors[probeIndex]);
+        String[] probeHashKeys = getExprFromExprNode(joinKeys[probeIndex], null,
+                inputObjInspectors[probeIndex], true);
         int[] buildOutputCols = new int[buildIndexes.stream()
                 .mapToInt(buildIndex -> joinValuesObjectInspectors[buildIndex].size()
                         + joinKeysObjectInspectors[buildIndex].size())
