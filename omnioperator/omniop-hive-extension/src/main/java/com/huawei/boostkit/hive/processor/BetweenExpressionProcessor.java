@@ -22,6 +22,7 @@ import com.huawei.boostkit.hive.expression.BaseExpression;
 import com.huawei.boostkit.hive.expression.CompareExpression;
 import com.huawei.boostkit.hive.expression.ExpressionUtils;
 import com.huawei.boostkit.hive.expression.TypeUtils;
+import org.apache.hadoop.hive.ql.plan.ExprNodeConstantDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
@@ -34,15 +35,18 @@ public class BetweenExpressionProcessor implements ExpressionProcessor {
     @Override
     public BaseExpression process(ExprNodeGenericFuncDesc node, String operator, ObjectInspector inspector) {
 
+        ExprNodeConstantDesc exprNodeDesc = (ExprNodeConstantDesc) node.getChildren().get(0);
+        boolean not = (boolean) exprNodeDesc.getValue();
+
         CompareExpression leaf = new CompareExpression("BINARY",
                 TypeUtils.convertHiveTypeToOmniType(node.getTypeInfo()),
-                operator.equals("NOT") ? "OR" : "AND");
+                not ? "OR" : "AND");
         leaf.add(new CompareExpression("BINARY",
                 TypeUtils.convertHiveTypeToOmniType(node.getTypeInfo()),
-                operator.equals("NOT") ? "LESS_THAN" : "GREATER_THAN_OR_EQUAL"));
+                not ? "LESS_THAN" : "GREATER_THAN_OR_EQUAL"));
         leaf.add(new CompareExpression("BINARY",
                 TypeUtils.convertHiveTypeToOmniType(node.getTypeInfo()),
-                operator.equals("NOT") ? "GREATER_THAN" : "LESS_THAN_OR_EQUAL"));
+                not ? "GREATER_THAN" : "LESS_THAN_OR_EQUAL"));
         BaseExpression subLeaf;
         ExprNodeDesc comparedNode = node.getChildren().get(1);
         if (node.getChildren().get(1) instanceof ExprNodeGenericFuncDesc) {
