@@ -277,15 +277,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             reduceSinkReplaceable = true;
         }
         if (edgeType == TezEdgeProperty.EdgeType.SIMPLE_EDGE && child instanceof ReduceWork) {
-            Operator reducer = ((ReduceWork) child).getReducer();
-            if (reducer.getType() == null) {
-                // is VectorOperator
-                reducer = (Operator) reducer.getChildOperators().get(0);
-            }
-            if (reducer.getType().equals(OperatorType.GROUPBY) && isReplaceable(reducer, true)) {
-                tezWork.getEdgeProperty(work, child).setEdgeType(TezEdgeProperty.EdgeType.CUSTOM_SIMPLE_EDGE);
-                reduceSinkReplaceable = true;
-            }
+            reduceSinkReplaceable = groupByEdgeReplaceable(work, child);
         }
         if (child instanceof MergeJoinWork) {
             Operator reducer = ((MergeJoinWork) child).getMainWork().getAnyRootOperator();
@@ -299,6 +291,19 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             replaceSimpleEdge(reduceSinkReplaceable, child, edgeType);
         }
         return reduceSinkReplaceable;
+    }
+
+    private boolean groupByEdgeReplaceable(BaseWork work, BaseWork child) {
+        Operator reducer = ((ReduceWork) child).getReducer();
+        if (reducer.getType() == null) {
+            // is VectorOperator
+            reducer = (Operator) reducer.getChildOperators().get(0);
+        }
+        if (reducer.getType().equals(OperatorType.GROUPBY) && isReplaceable(reducer, true)) {
+            tezWork.getEdgeProperty(work, child).setEdgeType(TezEdgeProperty.EdgeType.CUSTOM_SIMPLE_EDGE);
+            return true;
+        }
+        return false;
     }
 
     private boolean allInputsReplaceable(MergeJoinWork mergeJoinWork) {
@@ -484,7 +489,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
 
     private boolean tableScanSupport(Operator<? extends OperatorDesc> op) {
         TableScanDesc tableScanDesc = (TableScanDesc) op.getConf();
-        if (tableScanDesc.getNeededColumns().isEmpty()) {
+        if (tableScanDesc.getNeededColumns().isEmpty() || tableScanDesc.getAcidOperationalProperties()!=null) {
             return false;
         }
         Table tableMetadata = tableScanDesc.getTableMetadata();
@@ -641,15 +646,15 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             }
         }
         Map<Byte, List<ExprNodeDesc>> keys = mapJoinDesc.getKeys();
+        List<ExprNodeDesc> exprNodeDescList = new ArrayList<>();
         for (List<ExprNodeDesc> exprNodeDescs : keys.values()) {
-            if (!isUDFSupport(exprNodeDescs)) {
-                return false;
-            }
+            exprNodeDescList.addAll(exprNodeDescs);
         }
         for (List<ExprNodeDesc> value : mapJoinDesc.getFilters().values()) {
-            if (!isUDFSupport(value)) {
-                return false;
-            }
+            exprNodeDescList.addAll(value);
+        }
+        if (!isUDFSupport(exprNodeDescList)) {
+            return false;
         }
         return joinReplaceable(operator);
     }
@@ -690,7 +695,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
     private boolean joinReplaceable(Operator<? extends OperatorDesc> operator) {
         JoinDesc joinDesc = (JoinDesc) operator.getConf();
         JoinCondDesc[] joinCondDescs = joinDesc.getConds();
-        if (joinDesc.getConds()[0].getType() == JoinDesc.FULL_OUTER_JOIN && joinDesc.getKeysString().get(0) == null) {
+        if (joinDesc.getConds()[0].getType() == JoinDesc.FULL_OUTER_JOIN && joinDesc.getKeysString().get(0) == null || !SUPPORTED_JOIN.contains(joinCondDescs[0].getType())) {
             return false;
         }
         if (joinCondDescs.length >= 2) {
@@ -700,7 +705,14 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                 }
             }
         }
-        return SUPPORTED_JOIN.contains(joinCondDescs[0].getType());
+        return checkResidulFilter(joinDesc);
+    }
+
+    private boolean checkResidulFilter(JoinDesc joinDesc) {
+        if (joinDesc.getResidualFilterExprs() == null) {
+            return true;
+        }
+        return isUDFSupport(joinDesc.getResidualFilterExprs());
     }
 
     private boolean isAvgUnsupported(List<PTFExpressionDef> expressions) {
