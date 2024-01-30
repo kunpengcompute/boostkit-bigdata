@@ -229,7 +229,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             if (work instanceof UnionWork) {
                 continue;
             }
-            if (getReduceSinkCanReplace(work)) {
+            if (getReduceSinkReplaceable(work)) {
                 reduceSinkReplaceableWork.add(work);
             } else {
                 inputUnReplaceableWork.addAll(tezWork.getChildren(work));
@@ -241,45 +241,17 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         reduceSinkReplaceableWorkName = reduceSinkReplaceableWork.stream().map(BaseWork::getName).collect(Collectors.toSet());
     }
 
-    private boolean getReduceSinkCanReplace(BaseWork work) {
+    private boolean getReduceSinkReplaceable(BaseWork work) {
         boolean reduceSinkCanReplace = false;
         if (parentOfMapJoinOpCannotReplace.contains(work.getName()) || !reduceSinkOperatorReplaceable(work)) {
             return false;
         }
         for (BaseWork child : tezWork.getChildren(work)) {
-            if (inputUnReplaceableWork.contains(child)) {
-                return false;
-            }
             TezEdgeProperty.EdgeType edgeType = tezWork.getEdgeType(work, child);
             if (edgeType == TezEdgeProperty.EdgeType.CONTAINS) {
                 continue;
             }
-            reduceSinkCanReplace = false;
-            if (isSupportEdgeType(edgeType) && isReplaceable(child.getAnyRootOperator(), true)) {
-                reduceSinkCanReplace = true;
-            }
-            if (edgeType == TezEdgeProperty.EdgeType.SIMPLE_EDGE && child instanceof ReduceWork) {
-                Operator reducer = ((ReduceWork) child).getReducer();
-                if (reducer.getType() == null) {
-                    // is VectorOperator
-                    reducer = (Operator) reducer.getChildOperators().get(0);
-                }
-                if (reducer.getType().equals(OperatorType.GROUPBY) && isReplaceable(reducer, true)) {
-                    tezWork.getEdgeProperty(work, child).setEdgeType(TezEdgeProperty.EdgeType.CUSTOM_SIMPLE_EDGE);
-                    reduceSinkCanReplace = true;
-                }
-            }
-            if (child instanceof MergeJoinWork) {
-                Operator reducer = ((MergeJoinWork) child).getMainWork().getAnyRootOperator();
-                if (reducer.getType() == null) {
-                    reducer = (Operator) reducer.getChildOperators().get(0);
-                }
-                if (reducer.getType() == OperatorType.MERGEJOIN && isReplaceable(reducer, false) && allInputsReplaceable((MergeJoinWork) child)) {
-                    addMergeJoinNeedSort(edgeType, reducer);
-                    reduceSinkCanReplace = true;
-                }
-                replaceSimpleEdge(reduceSinkCanReplace, child, edgeType);
-            }
+            reduceSinkCanReplace = replaceableForChild(work, child);
             if (!reduceSinkCanReplace) {
                 return false;
             }
@@ -287,12 +259,46 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         // deal with Union work
         for (BaseWork parent : tezWork.getParents(work)) {
             TezEdgeProperty.EdgeType edgeType = tezWork.getEdgeType(parent, work);
-            if (edgeType == TezEdgeProperty.EdgeType.CONTAINS && getReduceSinkCanReplace(parent)) {
+            if (edgeType == TezEdgeProperty.EdgeType.CONTAINS && !inputUnReplaceableWork.contains(parent) && getReduceSinkReplaceable(parent)) {
                 reduceSinkCanReplace = true;
                 reduceSinkReplaceableWork.add(parent);
             }
         }
         return reduceSinkCanReplace;
+    }
+
+    private boolean replaceableForChild(BaseWork work, BaseWork child) {
+        if (inputUnReplaceableWork.contains(child)) {
+            return false;
+        }
+        TezEdgeProperty.EdgeType edgeType = tezWork.getEdgeType(work, child);
+        boolean reduceSinkReplaceable = false;
+        if (isSupportEdgeType(edgeType) && isReplaceable(child.getAnyRootOperator(), true)) {
+            reduceSinkReplaceable = true;
+        }
+        if (edgeType == TezEdgeProperty.EdgeType.SIMPLE_EDGE && child instanceof ReduceWork) {
+            Operator reducer = ((ReduceWork) child).getReducer();
+            if (reducer.getType() == null) {
+                // is VectorOperator
+                reducer = (Operator) reducer.getChildOperators().get(0);
+            }
+            if (reducer.getType().equals(OperatorType.GROUPBY) && isReplaceable(reducer, true)) {
+                tezWork.getEdgeProperty(work, child).setEdgeType(TezEdgeProperty.EdgeType.CUSTOM_SIMPLE_EDGE);
+                reduceSinkReplaceable = true;
+            }
+        }
+        if (child instanceof MergeJoinWork) {
+            Operator reducer = ((MergeJoinWork) child).getMainWork().getAnyRootOperator();
+            if (reducer.getType() == null) {
+                reducer = (Operator) reducer.getChildOperators().get(0);
+            }
+            if (reducer.getType() == OperatorType.MERGEJOIN && isReplaceable(reducer, false) && allInputsReplaceable((MergeJoinWork) child)) {
+                addMergeJoinNeedSort(edgeType, reducer);
+                reduceSinkReplaceable = true;
+            }
+            replaceSimpleEdge(reduceSinkReplaceable, child, edgeType);
+        }
+        return reduceSinkReplaceable;
     }
 
     private boolean allInputsReplaceable(MergeJoinWork mergeJoinWork) {
@@ -310,40 +316,55 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
     }
 
     private boolean reduceSinkOperatorReplaceable(BaseWork work) {
-        if (work instanceof MapWork && !tableScanReplaceable((MapWork) work)) {
+        if (workUnReplaceable(work)) {
             return false;
-        }
-        if (work instanceof MergeJoinWork) {
-            BaseWork mainWork = ((MergeJoinWork) work).getMainWork();
-            if (!(mainWork instanceof ReduceWork) || ((ReduceWork) ((MergeJoinWork) work).getMainWork()).getReducer().getType() != OperatorType.MERGEJOIN) {
-                return false;
-            }
         }
         for (Operator<? extends OperatorDesc> operator : work.getAllOperators()) {
             if (!operator.getType().equals(OperatorType.REDUCESINK)) {
                 continue;
             }
             ReduceSinkDesc reduceSinkDesc = (ReduceSinkDesc) operator.getConf();
-            if (reduceSinkDesc.getKeyCols().isEmpty() && !reduceSinkDesc.getReducerTraits().contains(ReduceSinkDesc.ReducerTraits.UNIFORM)
-                    && reduceSinkDesc.getPartitionCols().size() > 0) {
+            if (reduceSinkDescUnReplaceable(reduceSinkDesc)) {
                 return false;
-            }
-            if (!isUDFSupport(reduceSinkDesc.getKeyCols()) ||
-                    !isUDFSupport(reduceSinkDesc.getValueCols()) ||
-                    !isUDFSupport(reduceSinkDesc.getPartitionCols())) {
-                return false;
-            }
-
-            if (reduceSinkDesc.getTopN() != -1 || !reduceSinkDesc.getDistinctColumnIndices().isEmpty()) {
-                return false;
-            }
-            for (ExprNodeDesc exprNodeDesc : reduceSinkDesc.getPartitionCols()) {
-                if (exprNodeDesc instanceof ExprNodeConstantDesc) {
-                    return false;
-                }
             }
         }
         return true;
+    }
+
+    private boolean workUnReplaceable(BaseWork work) {
+        if (work instanceof MapWork && !tableScanReplaceable((MapWork) work)) {
+            return true;
+        }
+        if (work instanceof MergeJoinWork) {
+            BaseWork mainWork = ((MergeJoinWork) work).getMainWork();
+            if (!(mainWork instanceof ReduceWork) || ((ReduceWork) ((MergeJoinWork) work).getMainWork()).getReducer().getType() != OperatorType.MERGEJOIN) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean reduceSinkDescUnReplaceable(ReduceSinkDesc reduceSinkDesc) {
+        boolean unReplaceable = false;
+        if (reduceSinkDesc.getKeyCols().isEmpty() && !reduceSinkDesc.getReducerTraits().contains(ReduceSinkDesc.ReducerTraits.UNIFORM)
+                && reduceSinkDesc.getPartitionCols().size() > 0) {
+            unReplaceable = true;
+        }
+        if (!isUDFSupport(reduceSinkDesc.getKeyCols()) ||
+                !isUDFSupport(reduceSinkDesc.getValueCols()) ||
+                !isUDFSupport(reduceSinkDesc.getPartitionCols())) {
+            unReplaceable = true;
+        }
+
+        if (reduceSinkDesc.getTopN() != -1 || !reduceSinkDesc.getDistinctColumnIndices().isEmpty()) {
+            unReplaceable = true;
+        }
+        for (ExprNodeDesc exprNodeDesc : reduceSinkDesc.getPartitionCols()) {
+            if (exprNodeDesc instanceof ExprNodeConstantDesc) {
+                unReplaceable = true;
+            }
+        }
+        return unReplaceable;
     }
 
 
@@ -532,26 +553,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         }
         switch (operator.getType()) {
             case MAPJOIN:
-                MapJoinDesc mapJoinDesc = (MapJoinDesc) operator.getConf();
-                if (mapJoinDesc.getNullSafes() != null) {
-                    for (boolean nullsafe : mapJoinDesc.getNullSafes()) {
-                        if (nullsafe) {
-                            return false;
-                        }
-                    }
-                }
-                Map<Byte, List<ExprNodeDesc>> keys = mapJoinDesc.getKeys();
-                for (List<ExprNodeDesc> exprNodeDescs : keys.values()) {
-                    if (!isUDFSupport(exprNodeDescs)) {
-                        return false;
-                    }
-                }
-                for (List<ExprNodeDesc> value : mapJoinDesc.getFilters().values()) {
-                    if (!isUDFSupport(value)) {
-                        return false;
-                    }
-                }
-                return joinReplaceable(operator);
+                return mapJoinReplaceable(operator);
             case MERGEJOIN:
                 return joinReplaceable(operator);
             case SELECT:
@@ -627,6 +629,29 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             default:
                 return true;
         }
+    }
+
+    private boolean mapJoinReplaceable(Operator<? extends OperatorDesc> operator) {
+        MapJoinDesc mapJoinDesc = (MapJoinDesc) operator.getConf();
+        if (mapJoinDesc.getNullSafes() != null) {
+            for (boolean nullsafe : mapJoinDesc.getNullSafes()) {
+                if (nullsafe) {
+                    return false;
+                }
+            }
+        }
+        Map<Byte, List<ExprNodeDesc>> keys = mapJoinDesc.getKeys();
+        for (List<ExprNodeDesc> exprNodeDescs : keys.values()) {
+            if (!isUDFSupport(exprNodeDescs)) {
+                return false;
+            }
+        }
+        for (List<ExprNodeDesc> value : mapJoinDesc.getFilters().values()) {
+            if (!isUDFSupport(value)) {
+                return false;
+            }
+        }
+        return joinReplaceable(operator);
     }
 
     private boolean groupByReplaceable(Operator<? extends OperatorDesc> operator, boolean reduceSinkCanReplace) {
@@ -956,26 +981,27 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
 
     private void replaceSerializationLib() {
         for (BaseWork work : tezWork.getAllWork()) {
-            if (work instanceof ReduceWork || work instanceof MergeJoinWork) {
-                if (work instanceof MergeJoinWork) {
-                    work = ((MergeJoinWork) work).getMainWork();
+            if (!(work instanceof ReduceWork || work instanceof MergeJoinWork)) {
+                continue;
+            }
+            if (work instanceof MergeJoinWork) {
+                work = ((MergeJoinWork) work).getMainWork();
+            }
+            if (work instanceof MapWork) {
+                continue;
+            }
+            List<Integer> toReplace = new ArrayList<>();
+            Map<Integer, String> tagToInput = ((ReduceWork) work).getTagToInput();
+            for (Map.Entry<Integer, String> entry : tagToInput.entrySet()) {
+                if (reduceSinkReplaceableWorkName.contains(entry.getValue())) {
+                    toReplace.add(entry.getKey());
                 }
-                if (work instanceof MapWork) {
-                    continue;
-                }
-                List<Integer> toReplace = new ArrayList<>();
-                Map<Integer, String> tagToInput = ((ReduceWork) work).getTagToInput();
-                for (Map.Entry<Integer, String> entry : tagToInput.entrySet()) {
-                    if (reduceSinkReplaceableWorkName.contains(entry.getValue())) {
-                        toReplace.add(entry.getKey());
-                    }
-                }
-                List<TableDesc> tagToValueDesc = ((ReduceWork) work).getTagToValueDesc();
-                for (Integer tag : toReplace) {
-                    TableDesc keyDesc = ((ReduceWork) work).getKeyDesc();
-                    keyDesc.getProperties().setProperty(SERIALIZATION_LIB, OmniVecBatchSerDe.class.getName());
-                    tagToValueDesc.get(tag).getProperties().setProperty(SERIALIZATION_LIB, OmniVecBatchSerDe.class.getName());
-                }
+            }
+            List<TableDesc> tagToValueDesc = ((ReduceWork) work).getTagToValueDesc();
+            for (Integer tag : toReplace) {
+                TableDesc keyDesc = ((ReduceWork) work).getKeyDesc();
+                keyDesc.getProperties().setProperty(SERIALIZATION_LIB, OmniVecBatchSerDe.class.getName());
+                tagToValueDesc.get(tag).getProperties().setProperty(SERIALIZATION_LIB, OmniVecBatchSerDe.class.getName());
             }
         }
     }
