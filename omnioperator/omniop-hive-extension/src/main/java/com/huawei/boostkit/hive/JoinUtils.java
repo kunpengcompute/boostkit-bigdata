@@ -70,11 +70,15 @@ public class JoinUtils {
         Arrays.stream(joinKey.getChildren()).forEach(child -> dealChildren(child, exprNodeColumnEvaluators));
     }
 
-    public static String[] getExprFromExprNode(List<ExprNodeEvaluator> nodes, Map<String, Integer> keyColNameToId, ObjectInspector inspector) {
+    public static String[] getExprFromExprNode(List<ExprNodeEvaluator> nodes, Map<String, Integer> keyColNameToId, ObjectInspector inspector, boolean isBuildTable) {
         List<String> expressions = new ArrayList<>();
         for (ExprNodeEvaluator node : nodes) {
             if (node instanceof ExprNodeGenericFuncEvaluator) {
-                expressions.add(ExpressionUtils.buildSimplify((ExprNodeGenericFuncDesc) node.getExpr(), inspector).toString());
+                if (isBuildTable) {
+                    expressions.add(TypeUtils.buildExpression(node.getExpr().getTypeInfo(), nodes.indexOf(node)));
+                } else {
+                    expressions.add(ExpressionUtils.buildSimplify((ExprNodeGenericFuncDesc) node.getExpr(), inspector).toString());
+                }
                 continue;
             } else if (node instanceof ExprNodeConstantEvaluator) {
                 expressions.add(ExpressionUtils.createLiteralNode(node.getExpr()).toString());
@@ -84,7 +88,7 @@ public class JoinUtils {
             PrimitiveTypeInfo inputType = ((AbstractPrimitiveObjectInspector) node.getOutputOI()).getTypeInfo();
             if (!keyType.getPrimitiveCategory().equals(PrimitiveObjectInspector.PrimitiveCategory.DECIMAL) || keyType.equals(inputType)) {
                 expressions.add(TypeUtils.buildExpression(((AbstractPrimitiveObjectInspector) node.getOutputOI()).getTypeInfo(),
-                        keyColNameToId.get(((ExprNodeColumnEvaluator) node).getExpr().getColumn())));
+                        isBuildTable? nodes.indexOf(node): keyColNameToId.get(((ExprNodeColumnEvaluator) node).getExpr().getColumn())));
                 continue;
             }
             int returnType = TypeUtils.convertHiveTypeToOmniType(keyType);
