@@ -22,6 +22,7 @@ import static com.huawei.boostkit.hive.expression.TypeUtils.checkOmniJsonWhiteLi
 import static com.huawei.boostkit.hive.expression.TypeUtils.checkUnsupportedArithmetic;
 import static com.huawei.boostkit.hive.expression.TypeUtils.checkUnsupportedCast;
 import static nova.hetu.omniruntime.constants.FunctionType.OMNI_AGGREGATION_TYPE_AVG;
+import static nova.hetu.omniruntime.constants.FunctionType.OMNI_AGGREGATION_TYPE_SUM;
 import static org.apache.hadoop.hive.serde.serdeConstants.SERIALIZATION_LIB;
 import static org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.PrimitiveCategory.BOOLEAN;
 import static org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.PrimitiveCategory.CHAR;
@@ -591,46 +592,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                 }
                 return result;
             case PTF:
-                PTFDesc conf = (PTFDesc) operator.getConf();
-                List<PTFExpressionDef> expressions = new ArrayList<>(conf.getFuncDef().getPartition().getExpressions());
-                expressions.addAll(conf.getFuncDef().getOrder().getExpressions());
-                for (PTFExpressionDef expression : expressions) {
-                    ExprNodeDesc exprNode = expression.getExprNode();
-                    if (exprNode instanceof ExprNodeGenericFuncDesc) {
-                        return false;
-                    }
-                    if (exprNode instanceof ExprNodeColumnDesc && !SUPPORTED_TYPE
-                            .contains(((PrimitiveTypeInfo) exprNode.getTypeInfo()).getPrimitiveCategory())) {
-                        return false;
-                    }
-                }
-                if (!(conf.getFuncDef() instanceof WindowTableFunctionDef)) {
-                    return false;
-                }
-                List<WindowFunctionDef> windowFunctionDefs = ((WindowTableFunctionDef) conf.getFuncDef()).getWindowFunctions();
-                for (int i = 0; i < windowFunctionDefs.size(); i++) {
-                    WindowFunctionDef windowFunctionDef = windowFunctionDefs.get(i);
-                    BoundaryDef start = windowFunctionDef.getWindowFrame().getStart();
-                    BoundaryDef end = windowFunctionDef.getWindowFrame().getEnd();
-                    if (start.getAmt() != Integer.MAX_VALUE && end.getAmt() != Integer.MAX_VALUE) {
-                        return false;
-                    }
-                    FunctionType windowFunctionType = TypeUtils.getWindowFunctionType(windowFunctionDef);
-                    if (windowFunctionType == null || windowFunctionType == OMNI_AGGREGATION_TYPE_AVG && isAvgUnsupported(windowFunctionDef.getArgs())) {
-                        return false;
-                    }
-                    List<PTFExpressionDef> args = windowFunctionDefs.get(i).getArgs();
-                    boolean isCountAll = (windowFunctionDef.getName().equals("count") && windowFunctionDef.isStar());
-                    if (args != null) {
-                        if (!isCountAll && args.size() > 1) {
-                            return false;
-                        }
-                        if (!(args.get(0).getExprNode() instanceof ExprNodeColumnDesc)) {
-                            return false;
-                        }
-                    }
-                }
-                return true;
+                return PTFReplaceable(operator);
             case GROUPBY:
                 return groupByReplaceable(operator, reduceSinkCanReplace);
             case REDUCESINK:
@@ -640,6 +602,64 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             default:
                 return true;
         }
+    }
+
+    private boolean PTFSupportedExpression(List<PTFExpressionDef> expressions) {
+        for (PTFExpressionDef expression : expressions) {
+            ExprNodeDesc exprNode = expression.getExprNode();
+            if (exprNode instanceof ExprNodeGenericFuncDesc) {
+                return false;
+            }
+            if (exprNode instanceof ExprNodeColumnDesc && !SUPPORTED_TYPE
+                    .contains(((PrimitiveTypeInfo) exprNode.getTypeInfo()).getPrimitiveCategory())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean PTFSupportedAgg(List<WindowFunctionDef> windowFunctionDefs) {
+        for (int i = 0; i < windowFunctionDefs.size(); i++) {
+            WindowFunctionDef windowFunctionDef = windowFunctionDefs.get(i);
+            BoundaryDef start = windowFunctionDef.getWindowFrame().getStart();
+            BoundaryDef end = windowFunctionDef.getWindowFrame().getEnd();
+            if (start.getAmt() != Integer.MAX_VALUE && end.getAmt() != Integer.MAX_VALUE) {
+                return false;
+            }
+            FunctionType windowFunctionType = TypeUtils.getWindowFunctionType(windowFunctionDef);
+            List<PTFExpressionDef> args = windowFunctionDefs.get(i).getArgs();
+            boolean isCountAll = (windowFunctionDef.getName().equals("count") && windowFunctionDef.isStar());
+            if (!PTFSupportedFunction(windowFunctionType, args, isCountAll)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean PTFSupportedFunction(FunctionType windowFunctionType, List<PTFExpressionDef> args, boolean isCountAll) {
+        if (args != null ) {
+            if (windowFunctionType == null || isPTFAggUnsupported(windowFunctionType, args)) {
+                return false;
+            }
+            if ((!isCountAll && args.size() > 1) || (!(args.get(0).getExprNode() instanceof ExprNodeColumnDesc))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean PTFReplaceable(Operator<? extends OperatorDesc> operator) {
+        PTFDesc conf = (PTFDesc) operator.getConf();
+        List<PTFExpressionDef> expressions = new ArrayList<>(conf.getFuncDef().getPartition().getExpressions());
+        expressions.addAll(conf.getFuncDef().getOrder().getExpressions());
+        if ((!PTFSupportedExpression(expressions)) || (!(conf.getFuncDef() instanceof WindowTableFunctionDef))) {
+            return false;
+        }
+        List<WindowFunctionDef> windowFunctionDefs = ((WindowTableFunctionDef) conf.getFuncDef()).getWindowFunctions();
+        if (!PTFSupportedAgg(windowFunctionDefs)) {
+            return false;
+        }
+        return true;
     }
 
     private boolean mapJoinReplaceable(Operator<? extends OperatorDesc> operator) {
@@ -667,6 +687,9 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
 
     private boolean groupByReplaceable(Operator<? extends OperatorDesc> operator, boolean reduceSinkCanReplace) {
         GroupByDesc groupByDesc = (GroupByDesc) operator.getConf();
+        if (groupByDesc.isGroupingSetsPresent() && groupByDesc.getMode() == GroupByDesc.Mode.PARTIALS) {
+            return false;
+        }
         if (!isUDFSupport(groupByDesc.getKeys())) {
             return false;
         }
@@ -721,15 +744,19 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         return isUDFSupport(joinDesc.getResidualFilterExprs());
     }
 
-    private boolean isAvgUnsupported(List<PTFExpressionDef> expressions) {
+    private boolean isPTFAggUnsupported(FunctionType windowFunctionType, List<PTFExpressionDef> expressions) {
         for (PTFExpressionDef expression : expressions) {
             ObjectInspector oi = expression.getOI();
             if (!(oi instanceof PrimitiveObjectInspector)) {
                 continue;
             }
             PrimitiveTypeInfo primitiveTypeInfo = ((PrimitiveObjectInspector) oi).getTypeInfo();
-            if (primitiveTypeInfo.getPrimitiveCategory().equals(DECIMAL)
+            if (windowFunctionType == OMNI_AGGREGATION_TYPE_AVG && primitiveTypeInfo.getPrimitiveCategory().equals(DECIMAL)
                     && ((DecimalTypeInfo) primitiveTypeInfo).getPrecision() > DECIMAL64_MAX_PRECISION) {
+                return true;
+            }
+            if ((windowFunctionType == OMNI_AGGREGATION_TYPE_AVG || windowFunctionType == OMNI_AGGREGATION_TYPE_SUM)
+                    && primitiveTypeInfo.getPrimitiveCategory().equals(STRING)) {
                 return true;
             }
         }
