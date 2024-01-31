@@ -55,8 +55,6 @@ case class ColumnarWindowExec(windowExpression: Seq[NamedExpression],
 
   override def supportsColumnar: Boolean = true
 
-  private val MAX_DIR_CREATION_ATTEMPTS: Int = 10
-
   override lazy val metrics = Map(
     "addInputTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni addInput"),
     "numInputVecBatches" -> SQLMetrics.createMetric(sparkContext, "number of input vecBatches"),
@@ -65,7 +63,7 @@ case class ColumnarWindowExec(windowExpression: Seq[NamedExpression],
     "getOutputTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni getOutput"),
     "numOutputRows" -> SQLMetrics.createMetric(sparkContext, "number of output rows"),
     "numOutputVecBatches" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatches"),
-    "bytesSpilled" -> SQLMetrics.createSizeMetric(sparkContext, "window bytes spilled"))
+    "spillSize" -> SQLMetrics.createSizeMetric(sparkContext, "spill size"))
 
   override def output: Seq[Attribute] =
     child.output ++ windowExpression.map(_.toAttribute)
@@ -92,29 +90,11 @@ case class ColumnarWindowExec(windowExpression: Seq[NamedExpression],
 
   val sparkConfTmp: SparkConf = sparkContext.conf
 
-  private def generateLocalDirs(conf: SparkConf): Array[File] = {
-    Utils.getConfiguredLocalDirs(conf).flatMap { rootDir =>
-      val localDir = generateDirs(rootDir, "columnarWindowSpill")
-      Some(localDir)
-    }
-  }
-
-  def generateDirs(root: String, namePrefix: String = "spark"): File = {
-    var attempts = 0
-    val maxAttempts = MAX_DIR_CREATION_ATTEMPTS
-    var dir: File = null
-    while (dir == null) {
-      attempts += 1
-      if (attempts > maxAttempts) {
-        throw new IOException("Directory conflict: failed to generate a temp directory for" +
-          "columnarWindowSpill (under " + root + ") after " + maxAttempts + " attempts!")
-      }
-      dir = new File(root, namePrefix + "-" + UUID.randomUUID.toString)
-      if (dir.exists()) {
-        dir = null
-      }
-    }
-    dir.getCanonicalFile
+  def generateSpillDirs(): String = {
+    val blockManager = SparkEnv.get.blockManager
+    val spillFileInfo = blockManager.diskBlockManager.createTempLocalBlock
+    val spillFile = spillFileInfo._2
+    spillFile.getParentFile.getCanonicalPath
   }
 
   def getWindowFrameParam(frame: SpecifiedWindowFrame): (OmniWindowFrameType,
@@ -257,7 +237,7 @@ case class ColumnarWindowExec(windowExpression: Seq[NamedExpression],
     val numOutputRows = longMetric("numOutputRows")
     val numOutputVecBatches = longMetric("numOutputVecBatches")
     val getOutputTime = longMetric("getOutputTime")
-    val bytesSpilled = longMetric("bytesSpilled")
+    val spillSize = longMetric("spillSize")
 
     val sourceTypes = new Array[DataType](child.output.size)
     val sortCols = new Array[Int](orderSpec.size)
@@ -389,13 +369,10 @@ case class ColumnarWindowExec(windowExpression: Seq[NamedExpression],
     child.executeColumnar().mapPartitionsWithIndexInternal { (index, iter) =>
       val columnarConf = ColumnarPluginConfig.getSessionConf
       val windowSpillEnable = columnarConf.enableWindowSpill
-      val windowLocalDirs: Array[File] = generateLocalDirs(sparkConfTmp)
-      val hash = Utils.nonNegativeHash(SparkEnv.get.executorId)
-      val dirId = hash % windowLocalDirs.length
-      val spillPathDir = windowLocalDirs(dirId).getCanonicalPath
       val spillDirDiskReserveSize = columnarConf.columnarSpillDirDiskReserveSize
       val windowSpillRowThreshold = columnarConf.columnarWindowSpillRowThreshold
       val spillMemPctThreshold = columnarConf.columnarSpillMemPctThreshold
+      val spillPathDir = generateSpillDirs
       val sparkSpillConfig = new SparkSpillConfig(windowSpillEnable, spillPathDir,
         spillDirDiskReserveSize, windowSpillRowThreshold, spillMemPctThreshold)
 
@@ -427,7 +404,7 @@ case class ColumnarWindowExec(windowExpression: Seq[NamedExpression],
       val startGetOp = System.nanoTime()
       val results = windowOperator.getOutput
       getOutputTime += NANOSECONDS.toMillis(System.nanoTime() - startGetOp)
-      bytesSpilled += windowOperator.getSpilledBytes
+      spillSize += windowOperator.getSpilledBytes
 
       var windowResultSchema = this.schema
       if (windowExpressionWithProjectConstant) {

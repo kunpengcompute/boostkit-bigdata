@@ -283,7 +283,8 @@ object OmniAdaptorUtil {
                      omniAggFunctionTypes: Array[FunctionType],
                      omniAggOutputTypes: Array[Array[nova.hetu.omniruntime.`type`.DataType]],
                      omniInputRaws: Array[Boolean],
-                     omniOutputPartials: Array[Boolean]): OmniOperator = {
+                     omniOutputPartials: Array[Boolean],
+                     sparkSpillConf: SpillConfig = SpillConfig.NONE): OmniOperator = {
     var operator: OmniOperator = null
     if (groupingExpressions.nonEmpty) {
       operator = new OmniHashAggregationWithExprOperatorFactory(
@@ -295,7 +296,8 @@ object OmniAdaptorUtil {
         omniAggOutputTypes,
         omniInputRaws,
         omniOutputPartials,
-        new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP)).createOperator
+        new OperatorConfig(sparkSpillConf, new OverflowConfig(OmniAdaptorUtil.overflowConf()),
+          IS_SKIP_VERIFY_EXP)).createOperator
     } else {
       operator = new OmniAggregationWithExprOperatorFactory(
         omniGroupByChanel,
