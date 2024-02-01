@@ -43,9 +43,6 @@ case class ColumnarSortExec(
     child: SparkPlan,
     testSpillFrequency: Int = 0)
   extends UnaryExecNode {
-
-  private val MAX_DIR_CREATION_ATTEMPTS: Int = 10
-
   override def supportsColumnar: Boolean = true
 
   override def nodeName: String = "OmniColumnarSort"
@@ -60,7 +57,6 @@ case class ColumnarSortExec(
     if (global) OrderedDistribution(sortOrder) :: Nil else UnspecifiedDistribution :: Nil
 
   override lazy val metrics = Map(
-
     "addInputTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni addInput"),
     "numInputVecBatches" -> SQLMetrics.createMetric(sparkContext, "number of input vecBatches"),
     "numInputRows" -> SQLMetrics.createMetric(sparkContext, "number of input rows"),
@@ -68,41 +64,23 @@ case class ColumnarSortExec(
     "getOutputTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni getOutput"),
     "numOutputRows" -> SQLMetrics.createMetric(sparkContext, "number of output rows"),
     "outputDataSize" -> SQLMetrics.createSizeMetric(sparkContext, "output data size"),
-    "numOutputVecBatches" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatches"))
+    "numOutputVecBatches" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatches"),
+    "spillSize" -> SQLMetrics.createSizeMetric(sparkContext, "spill size"))
 
   def buildCheck(): Unit = {
     genSortParam(child.output, sortOrder)
   }
 
-  val sparkConfTmp = sparkContext.conf
-
-  private def generateLocalDirs(conf: SparkConf): Array[File] = {
-    Utils.getConfiguredLocalDirs(conf).flatMap { rootDir =>
-      val localDir = generateDirs(rootDir, "columnarSortSpill")
-      Some(localDir)
-    }
-  }
-
-  def generateDirs(root: String, namePrefix: String = "spark"):File = {
-    var attempts = 0
-    val maxAttempts = MAX_DIR_CREATION_ATTEMPTS
-    var dir: File = null
-    while (dir == null) {
-      attempts += 1
-      if (attempts > maxAttempts) {
-        throw new IOException("Directory conflict: failed to generate a temp directory for columnarSortSpill " +
-          "(under " + root + ") after " + maxAttempts + " attempts!")
-      }
-      dir = new File(root, namePrefix + "-" + UUID.randomUUID.toString)
-      if (dir.exists()) {
-        dir = null
-      }
-    }
-    dir.getCanonicalFile
+  def generateSpillDirs(): String = {
+    val blockManager = SparkEnv.get.blockManager
+    val spillFileInfo = blockManager.diskBlockManager.createTempLocalBlock
+    val spillFile = spillFileInfo._2
+    spillFile.getParentFile.getCanonicalPath
   }
 
   override def doExecuteColumnar(): RDD[ColumnarBatch] = {
     val omniCodegenTime = longMetric("omniCodegenTime")
+    val spillSize = longMetric("spillSize")
 
     val (sourceTypes, ascending, nullFirsts, sortColsExp) = genSortParam(child.output, sortOrder)
     val outputCols = output.indices.toArray
@@ -113,12 +91,9 @@ case class ColumnarSortExec(
       val spillMemPctThreshold = columnarConf.columnarSpillMemPctThreshold
       val spillDirDiskReserveSize = columnarConf.columnarSpillDirDiskReserveSize
       val sortSpillEnable = columnarConf.enableSortSpill
-      val sortLocalDirs: Array[File] = generateLocalDirs(sparkConfTmp)
-      val hash = Utils.nonNegativeHash(SparkEnv.get.executorId)
-      val dirId = hash % sortLocalDirs.length
-      val spillPathDir = sortLocalDirs(dirId).getCanonicalPath
-      val sparkSpillConf = new SparkSpillConfig(sortSpillEnable, spillPathDir,
-        spillDirDiskReserveSize, sortSpillRowThreshold, spillMemPctThreshold)
+      val spillDirectory = generateSpillDirs
+      val sparkSpillConf = new SparkSpillConfig(sortSpillEnable, spillDirectory, spillDirDiskReserveSize,
+        sortSpillRowThreshold, spillMemPctThreshold)
       val startCodegen = System.nanoTime()
 
       val radixSortEnable = columnarConf.enableRadixSort
@@ -129,6 +104,7 @@ case class ColumnarSortExec(
       val sortOperator = sortOperatorFactory.createOperator
       omniCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startCodegen)
       SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
+        spillSize += sortOperator.getSpilledBytes()
         sortOperator.close()
       })
       addAllAndGetIterator(sortOperator, iter, this.schema,
