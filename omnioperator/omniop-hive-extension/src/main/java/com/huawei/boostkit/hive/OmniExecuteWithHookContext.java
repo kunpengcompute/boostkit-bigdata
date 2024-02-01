@@ -238,9 +238,25 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                 for (BaseWork child : tezWork.getChildren(work)) {
                     reduceSinkReplaceableWork.removeAll(tezWork.getParents(child));
                 }
+                dealUnionWork(work);
             }
         }
         reduceSinkReplaceableWorkName = reduceSinkReplaceableWork.stream().map(BaseWork::getName).collect(Collectors.toSet());
+    }
+
+    private void dealUnionWork(BaseWork work) {
+        for (BaseWork parent : tezWork.getParents(work)) {
+            if (!(tezWork.getEdgeType(parent, work) == TezEdgeProperty.EdgeType.CONTAINS)) {
+                continue;
+            }
+            inputUnReplaceableWork.add(parent);
+            reduceSinkReplaceableWork.remove(parent);
+            for (BaseWork parentChild : tezWork.getChildren(parent)) {
+                if (tezWork.getEdgeType(parent, parentChild) == TezEdgeProperty.EdgeType.CONTAINS) {
+                    reduceSinkReplaceableWork.remove(parentChild);
+                }
+            }
+        }
     }
 
     private boolean getReduceSinkReplaceable(BaseWork work) {
@@ -377,6 +393,8 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
 
     private void traverseTezWorks() {
         if (checkDataType()) {
+            reduceSinkReplaceableWork.clear();
+            reduceSinkReplaceableWorkName.clear();
             return;
         }
         for (BaseWork work : tezWork.getAllWork()) {
@@ -491,7 +509,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
 
     private boolean tableScanSupport(Operator<? extends OperatorDesc> op) {
         TableScanDesc tableScanDesc = (TableScanDesc) op.getConf();
-        if (tableScanDesc.getNeededColumns().isEmpty() || tableScanDesc.getAcidOperationalProperties()!=null) {
+        if (tableScanDesc.getNeededColumns().isEmpty() || tableScanDesc.getAcidOperationalProperties() != null) {
             return false;
         }
         Table tableMetadata = tableScanDesc.getTableMetadata();
@@ -637,7 +655,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
     }
 
     private boolean PTFSupportedFunction(FunctionType windowFunctionType, List<PTFExpressionDef> args, boolean isCountAll) {
-        if (args != null ) {
+        if (args != null) {
             if (windowFunctionType == null || isPTFAggUnsupported(windowFunctionType, args)) {
                 return false;
             }
