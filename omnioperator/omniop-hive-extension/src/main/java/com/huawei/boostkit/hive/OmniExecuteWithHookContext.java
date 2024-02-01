@@ -21,6 +21,7 @@ package com.huawei.boostkit.hive;
 import static com.huawei.boostkit.hive.expression.TypeUtils.checkOmniJsonWhiteList;
 import static com.huawei.boostkit.hive.expression.TypeUtils.checkUnsupportedArithmetic;
 import static com.huawei.boostkit.hive.expression.TypeUtils.checkUnsupportedCast;
+import static com.huawei.boostkit.hive.expression.TypeUtils.convertHiveTypeToOmniType;
 import static nova.hetu.omniruntime.constants.FunctionType.OMNI_AGGREGATION_TYPE_AVG;
 import static nova.hetu.omniruntime.constants.FunctionType.OMNI_AGGREGATION_TYPE_SUM;
 import static org.apache.hadoop.hive.serde.serdeConstants.SERIALIZATION_LIB;
@@ -33,6 +34,7 @@ import static org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspe
 import static org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.PrimitiveCategory.LONG;
 import static org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.PrimitiveCategory.SHORT;
 import static org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.PrimitiveCategory.STRING;
+import static org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.PrimitiveCategory.TIMESTAMP;
 import static org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.PrimitiveCategory.VARCHAR;
 
 import com.huawei.boostkit.hive.expression.BaseExpression;
@@ -189,6 +191,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         if (OMNI_OPERATOR.contains(OperatorType.REDUCESINK)) {
             initMapJoinOpToWork();
             initReduceSinkReplaceable();
+            initMergeJoinNeedSort();
         }
         traverseTezWorks();
         for (OperatorInfo operatorInfo : replaceableInfo) {
@@ -302,11 +305,9 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             if (reducer.getType() == null) {
                 reducer = (Operator) reducer.getChildOperators().get(0);
             }
-            if (reducer.getType() == OperatorType.MERGEJOIN && isReplaceable(reducer, false) && allInputsReplaceable((MergeJoinWork) child)) {
-                addMergeJoinNeedSort(edgeType, reducer);
+            if (reducer.getType() == OperatorType.MERGEJOIN && isReplaceable(reducer, false)) {
                 reduceSinkReplaceable = true;
             }
-            replaceSimpleEdge(reduceSinkReplaceable, child, edgeType);
         }
         return reduceSinkReplaceable;
     }
@@ -322,20 +323,6 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             return true;
         }
         return false;
-    }
-
-    private boolean allInputsReplaceable(MergeJoinWork mergeJoinWork) {
-        BaseWork mainWork = mergeJoinWork.getMainWork();
-        if (mainWork instanceof MapWork) {
-            return false;
-        }
-        Map<Integer, String> tagToInput = ((ReduceWork) mainWork).getTagToInput();
-        for (String workName : tagToInput.values()) {
-            if (!reduceSinkReplaceableWorkName.contains(workName)) {
-                return false;
-            }
-        }
-        return true;
     }
 
     private boolean reduceSinkOperatorReplaceable(BaseWork work) {
@@ -390,6 +377,25 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         return unReplaceable;
     }
 
+    private void initMergeJoinNeedSort() {
+        for (BaseWork work: tezWork.getAllWork()) {
+            if (!(work instanceof MergeJoinWork)) {
+                continue;
+            }
+            Operator reducer = ((MergeJoinWork) work).getMainWork().getAnyRootOperator();
+            if (reducer.getType()!= OperatorType.MERGEJOIN) {
+                continue;
+            }
+            for (BaseWork parent: tezWork.getParents(work)) {
+                TezEdgeProperty.EdgeType edgeType = tezWork.getEdgeType(parent, work);
+                boolean needSort = reduceSinkReplaceableWork.contains(parent);
+                if (reduceSinkReplaceableWork.contains(parent)) {
+                    addMergeJoinNeedSort(edgeType, reducer);
+                }
+                replaceSimpleEdge(needSort, work, edgeType);
+            }
+        }
+    }
 
     private void traverseTezWorks() {
         if (checkDataType()) {
