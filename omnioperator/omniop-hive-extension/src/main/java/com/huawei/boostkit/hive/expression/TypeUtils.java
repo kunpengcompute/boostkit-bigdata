@@ -193,7 +193,7 @@ public class TypeUtils {
         if (name.equals("count") && windowFunctionDef.getArgs() == null) {
             return OMNI_AGGREGATION_TYPE_COUNT_ALL;
         }
-        return HIVE_TO_OMNI_WINDOW_FUNCTION.get(name);
+        return HIVE_TO_OMNI_WINDOW_FUNCTION.get(name.toLowerCase());
     }
 
 

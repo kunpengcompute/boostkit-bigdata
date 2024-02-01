@@ -708,17 +708,21 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             if (!isUDFSupport(aggregator.getParameters())) {
                 return false;
             }
-            for (ExprNodeDesc paramter : aggregator.getParameters()) {
-                PrimitiveObjectInspector.PrimitiveCategory primitiveCategory = ((PrimitiveTypeInfo) paramter.getTypeInfo()).getPrimitiveCategory();
-                if ((primitiveCategory == STRING ||
-                        primitiveCategory == VARCHAR) &&
-                        aggregator.getGenericUDAFName().equals("sum")) {
+            for (ExprNodeDesc parameter : aggregator.getParameters()) {
+                if (aggParameterNotSupport(aggregator, parameter)) {
                     return false;
                 }
-
             }
         }
         return true;
+    }
+
+    private boolean aggParameterNotSupport(AggregationDesc aggregator, ExprNodeDesc parameter) {
+        if (aggregator.getGenericUDAFName().equals("sum") || aggregator.getGenericUDAFName().equals("avg")) {
+            PrimitiveObjectInspector.PrimitiveCategory primitiveCategory = ((PrimitiveTypeInfo) parameter.getTypeInfo()).getPrimitiveCategory();
+            return primitiveCategory == STRING || primitiveCategory == VARCHAR;
+        }
+        return false;
     }
 
     private boolean joinReplaceable(Operator<? extends OperatorDesc> operator) {
