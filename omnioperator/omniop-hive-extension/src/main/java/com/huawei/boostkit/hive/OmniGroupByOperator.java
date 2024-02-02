@@ -600,17 +600,14 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
     }
 
     private VecBatch createConstVecBatch(VecBatch vecBatch) {
-        int newVecBatchCount = vecBatch.getVectorCount() + recordConstantColIds.size();
+        int inputVecCount = vecBatch.getVectorCount();
+        int newVecBatchCount = inputVecCount + recordConstantColIds.size();
         Vec[] vecs = new Vec[newVecBatchCount];
-        int constantColumnIndex = 0;
         for (int i = 0; i < newVecBatchCount; i++) {
-            if (recordConstantColIds.contains(i)) {
-                vecs[i] = constantVec[constantColumnIndex].slice(0, vecBatch.getRowCount());
-                constantColumnIndex++;
-            } else if (i < numKeys) {
+            if (i < inputVecCount) {
                 vecs[i] = vecBatch.getVector(i);
             } else {
-                vecs[i] = vecBatch.getVector(i - numKeys);
+                vecs[i] = constantVec[i - inputVecCount].slice(0, vecBatch.getRowCount());
             }
         }
         return new VecBatch(vecs);
