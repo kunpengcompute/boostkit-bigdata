@@ -233,7 +233,22 @@ public class OmniJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc> impl
                         .stream().flatMap(keyValue -> ((StructObjectInspector) keyValue.getFieldObjectInspector())
                                 .getAllStructFieldRefs().stream()))
                 .map(field -> field.getFieldObjectInspector()).collect(Collectors.toList());
-        List<String> fieldNames = new ArrayList<>(conf.getColumnExprMap().keySet());
+        Map<String, String> inputColNameToExprName = new HashMap<>();
+        for (Map.Entry<String, ExprNodeDesc> entry : conf.getColumnExprMap().entrySet()) {
+            ExprNodeColumnDesc exprNodeColumnDesc = (ExprNodeColumnDesc) entry.getValue();
+            inputColNameToExprName.put(exprNodeColumnDesc.getColumn().replace("VALUE.", "").replace("KEY.", ""), entry.getKey());
+        }
+        List<String> fieldNames = IntStream.range(0, bufferIndex + 1).boxed()
+                .flatMap(tableIndex -> ((StructObjectInspector) inputObjInspectors[tableIndex]).getAllStructFieldRefs()
+                        .stream().flatMap(keyValue -> ((StructObjectInspector) keyValue.getFieldObjectInspector())
+                                .getAllStructFieldRefs().stream().map(field -> {
+                                    String fieldName = field.getFieldName();
+                                    if (inputColNameToExprName.containsKey(fieldName)) {
+                                        return inputColNameToExprName.get(fieldName);
+                                    } else {
+                                        return fieldName;
+                                    }
+                                }))).collect(Collectors.toList());
         StructObjectInspector exprObjInspector = ObjectInspectorFactory.getStandardStructObjectInspector(fieldNames,
                 inspectors);
         BaseExpression root = ExpressionUtils.build((ExprNodeGenericFuncDesc) residualJoinFilters.get(opIndex).getExpr(), exprObjInspector);
