@@ -693,10 +693,8 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         if (!isUDFSupport(groupByDesc.getKeys())) {
             return false;
         }
-        for (Operator<? extends OperatorDesc> childOperator : operator.getChildOperators()) {
-            if (childOperator instanceof PTFOperator && !currentReplaceable(childOperator, reduceSinkCanReplace)) {
-                return false;
-            }
+        if (isChildPTFOperatorUnReplaceable(operator, reduceSinkCanReplace)) {
+            return false;
         }
         for (AggregationDesc aggregator : groupByDesc.getAggregators()) {
             if (aggregator.getDistinct()) {
@@ -715,6 +713,18 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             }
         }
         return true;
+    }
+
+    private boolean isChildPTFOperatorUnReplaceable(Operator<? extends OperatorDesc> operator, boolean reduceSinkCanReplace) {
+        Queue<Operator<? extends OperatorDesc>> operators = new LinkedBlockingQueue<>(operator.getChildOperators());
+        while (!operators.isEmpty()) {
+            Operator<? extends OperatorDesc> op = operators.poll();
+            if (op instanceof PTFOperator && !currentReplaceable(op, reduceSinkCanReplace)) {
+                return true;
+            }
+            operators.addAll(op.getChildOperators());
+        }
+        return false;
     }
 
     private boolean aggParameterNotSupport(AggregationDesc aggregator, ExprNodeDesc parameter) {
