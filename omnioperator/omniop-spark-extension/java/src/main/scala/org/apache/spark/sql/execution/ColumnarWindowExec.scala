@@ -17,17 +17,21 @@
 
 package org.apache.spark.sql.execution
 
+import java.io.{File, IOException}
+import java.util.UUID
 import java.util.concurrent.TimeUnit.NANOSECONDS
 
+import com.huawei.boostkit.spark.ColumnarPluginConfig
 import com.huawei.boostkit.spark.Constant.IS_SKIP_VERIFY_EXP
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor._
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil.transColBatchToOmniVecs
 import nova.hetu.omniruntime.`type`.DataType
 import nova.hetu.omniruntime.constants.{FunctionType, OmniWindowFrameBoundType, OmniWindowFrameType}
-import nova.hetu.omniruntime.operator.config.{OperatorConfig, OverflowConfig, SpillConfig}
+import nova.hetu.omniruntime.operator.config.{OperatorConfig, OverflowConfig, SparkSpillConfig}
 import nova.hetu.omniruntime.operator.window.OmniWindowWithExprOperatorFactory
 import nova.hetu.omniruntime.vector.VecBatch
+import org.apache.spark.{SparkConf, SparkEnv}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
@@ -40,6 +44,7 @@ import org.apache.spark.sql.execution.vectorized.OmniColumnVector
 import org.apache.spark.sql.execution.window.WindowExecBase
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.vectorized.ColumnarBatch
+import org.apache.spark.util.Utils
 
 case class ColumnarWindowExec(windowExpression: Seq[NamedExpression],
                               partitionSpec: Seq[Expression],
@@ -49,6 +54,8 @@ case class ColumnarWindowExec(windowExpression: Seq[NamedExpression],
   override def nodeName: String = "OmniColumnarWindow"
 
   override def supportsColumnar: Boolean = true
+
+  private val MAX_DIR_CREATION_ATTEMPTS: Int = 10
 
   override protected def withNewChildInternal(newChild: SparkPlan): ColumnarWindowExec =
     copy(child = newChild)
@@ -60,10 +67,38 @@ case class ColumnarWindowExec(windowExpression: Seq[NamedExpression],
     "omniCodegenTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni codegen"),
     "getOutputTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni getOutput"),
     "numOutputRows" -> SQLMetrics.createMetric(sparkContext, "number of output rows"),
-    "numOutputVecBatches" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatches"))
+    "numOutputVecBatches" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatches"),
+    "bytesSpilled" -> SQLMetrics.createSizeMetric(sparkContext, "window bytes spilled"))
 
   override protected def doExecute(): RDD[InternalRow] = {
     throw new UnsupportedOperationException(s"This operator doesn't support doExecute().")
+  }
+
+  val sparkConfTmp: SparkConf = sparkContext.conf
+
+  private def generateLocalDirs(conf: SparkConf): Array[File] = {
+    Utils.getConfiguredLocalDirs(conf).flatMap { rootDir =>
+      val localDir = generateDirs(rootDir, "columnarWindowSpill")
+      Some(localDir)
+    }
+  }
+
+  def generateDirs(root: String, namePrefix: String = "spark"): File = {
+    var attempts = 0
+    val maxAttempts = MAX_DIR_CREATION_ATTEMPTS
+    var dir: File = null
+    while (dir == null) {
+      attempts += 1
+      if (attempts > maxAttempts) {
+        throw new IOException("Directory conflict: failed to generate a temp directory for" +
+          "columnarWindowSpill (under " + root + ") after " + maxAttempts + " attempts!")
+      }
+      dir = new File(root, namePrefix + "-" + UUID.randomUUID.toString)
+      if (dir.exists()) {
+        dir = null
+      }
+    }
+    dir.getCanonicalFile
   }
 
   def getWindowFrameParam(frame: SpecifiedWindowFrame): (OmniWindowFrameType,
@@ -209,6 +244,7 @@ case class ColumnarWindowExec(windowExpression: Seq[NamedExpression],
     val numOutputRows = longMetric("numOutputRows")
     val numOutputVecBatches= longMetric("numOutputVecBatches")
     val getOutputTime = longMetric("getOutputTime")
+    val bytesSpilled = longMetric("bytesSpilled")
 
     val sourceTypes = new Array[DataType](child.output.size)
     val sortCols = new Array[Int](orderSpec.size)
@@ -338,12 +374,24 @@ case class ColumnarWindowExec(windowExpression: Seq[NamedExpression],
 
     val windowExpressionWithProjectConstant = windowExpressionWithProject
     child.executeColumnar().mapPartitionsWithIndexInternal { (index, iter) =>
+      val columnarConf = ColumnarPluginConfig.getSessionConf
+      val windowSpillEnable = columnarConf.enableWindowSpill
+      val windowLocalDirs: Array[File] = generateLocalDirs(sparkConfTmp)
+      val hash = Utils.nonNegativeHash(SparkEnv.get.executorId)
+      val dirId = hash % windowLocalDirs.length
+      val spillPathDir = windowLocalDirs(dirId).getCanonicalPath
+      val spillDirDiskReserveSize = columnarConf.columnarSpillDirDiskReserveSize
+      val windowSpillRowThreshold = columnarConf.columnarWindowSpillRowThreshold
+      val spillMemPctThreshold = columnarConf.columnarSpillMemPctThreshold
+      val sparkSpillConfig = new SparkSpillConfig(windowSpillEnable, spillPathDir,
+        spillDirDiskReserveSize, windowSpillRowThreshold, spillMemPctThreshold)
+
       val startCodegen = System.nanoTime()
       val windowOperatorFactory = new OmniWindowWithExprOperatorFactory(sourceTypes, outputCols,
         windowFunType, omminPartitionChannels, preGroupedChannels, sortCols, ascendings,
         nullFirsts, 0, 10000, windowArgKeys, windowFunRetType, windowFrameTypes, windowFrameStartTypes,
         windowFrameStartChannels, windowFrameEndTypes, windowFrameEndChannels,
-        new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
+        new OperatorConfig(sparkSpillConfig, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val windowOperator = windowOperatorFactory.createOperator
       omniCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startCodegen)
 
@@ -366,6 +414,7 @@ case class ColumnarWindowExec(windowExpression: Seq[NamedExpression],
       val startGetOp = System.nanoTime()
       val results = windowOperator.getOutput
       getOutputTime += NANOSECONDS.toMillis(System.nanoTime() - startGetOp)
+      bytesSpilled += windowOperator.getSpilledBytes
 
       var windowResultSchema = this.schema
       if (windowExpressionWithProjectConstant) {
