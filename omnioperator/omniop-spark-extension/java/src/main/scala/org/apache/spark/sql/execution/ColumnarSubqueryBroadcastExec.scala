@@ -30,16 +30,30 @@ import org.apache.spark.util.ThreadUtils
 import scala.concurrent.{Future,ExecutionContext}
 import scala.concurrent.duration.Duration
 
-case class ColumnarSubqueryBroadcastExec(
+case class SubqueryBroadcastExec(
     name: String,
     index: Int,
     buildKeys: Seq[Expression],
     child: SparkPlan)
   extends BaseSubqueryExec with UnaryExecNode {
 
-  override def nodeName: String = "ColumnarSubqueryBroadcastExec"
+  override def nodeName: String = {
+    val exchangeChild = child match {
+      case exec: ReusedExchangeExec =>
+        exec.child
+      case _ =>
+        child
+    }
+    if (exchangeChild.isInstanceOf[ColumnarBroadcastExchangeExec] ||
+      (exchangeChild.isInstanceOf[AdaptiveSparkPlanExec]
+        && exchangeChild.asInstanceOf[AdaptiveSparkPlanExec].supportsColumnar)) {
+      "ColumnarSubqueryBroadcastExec"
+    } else {
+      "SubqueryBroadcastExec"
+    }
+  }
 
-  // `ColumnarSubqueryBroadcastExec` is only used with `InSubqueryExec`.
+  // `SubqueryBroadcastExec` is only used with `InSubqueryExec`.
   // No one would reference this output,
   // so the exprId doesn't matter here. But it's important to correctly report the output length, so
   // that `InSubqueryExec` can know it's the single-column execution mode, not multi-column.
@@ -60,7 +74,7 @@ case class ColumnarSubqueryBroadcastExec(
 
   override def doCanonicalize(): SparkPlan = {
     val keys = buildKeys.map(k => QueryPlan.normalizeExpressions(k, child.output))
-    copy(name = "omni-dpp", buildKeys = keys, child = child.canonicalized)
+    copy(name = "dpp", buildKeys = keys, child = child.canonicalized)
   }
 
   @transient
@@ -107,7 +121,7 @@ case class ColumnarSubqueryBroadcastExec(
         SQLMetrics.postDriverMetricUpdates(sparkContext, executionId, metrics.values.toSeq)
         rows
       }
-    }(ColumnarSubqueryBroadcastExec.executionContext)
+    }(SubqueryBroadcastExec.executionContext)
   }
 
   override protected def doPrepare(): Unit = {
@@ -116,7 +130,7 @@ case class ColumnarSubqueryBroadcastExec(
 
   override protected def doExecute(): RDD[InternalRow] = {
     throw new UnsupportedOperationException(
-      "ColumnarSubqueryBroadcastExec does not support the execute() code path.")
+      "does not support the execute() code path.")
   }
 
   override def executeCollect(): Array[InternalRow] = {
@@ -125,11 +139,11 @@ case class ColumnarSubqueryBroadcastExec(
 
   override def stringArgs: Iterator[Any] = super.stringArgs ++ Iterator(s"[id=#$id]")
 
-  protected def withNewChildInternal(newChild: SparkPlan): ColumnarSubqueryBroadcastExec =
+  protected def withNewChildInternal(newChild: SparkPlan): SubqueryBroadcastExec =
     copy(child = newChild)
 }
 
-object ColumnarSubqueryBroadcastExec {
+object SubqueryBroadcastExec {
   private[execution] val executionContext = ExecutionContext.fromExecutorService(
     ThreadUtils.newDaemonCachedThreadPool("dynamicpruning", 16))
 }

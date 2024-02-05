@@ -186,7 +186,7 @@ class DynamicPartitionPruningSuite
       case _ => false
     }
     val subqueryBroadcast = dpExprs.collect {
-      case InSubqueryExec(_, b: ColumnarSubqueryBroadcastExec, _, _, _, _) => b
+      case InSubqueryExec(_, b: SubqueryBroadcastExec, _, _, _, _) => b
     }
 
     val hasFilter = if (withSubquery) "Should" else "Shouldn't"
@@ -239,7 +239,7 @@ class DynamicPartitionPruningSuite
     df.collect()
 
     val buf = collectDynamicPruningExpressions(df.queryExecution.executedPlan).collect {
-      case InSubqueryExec(_, b: ColumnarSubqueryBroadcastExec, _, _, _, _) =>
+      case InSubqueryExec(_, b: SubqueryBroadcastExec, _, _, _, _) =>
         b.index
     }
     assert(buf.distinct.size == n)

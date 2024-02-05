@@ -114,14 +114,11 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] {
     case plan: FileSourceScanExec
       if enableColumnarFileScan && checkColumnarBatchSupport(conf, plan) =>
       logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
-      // replace PPD filter expession's subqueryBroadcast to support columnar form
-      val columnarPartionFilters = OmniExpressionAdaptor
-        .convertSubqueryBroadcastToColumnarForm(plan.partitionFilters)
       ColumnarFileSourceScanExec(
         plan.relation,
         plan.output,
         plan.requiredSchema,
-        columnarPartionFilters,
+        plan.partitionFilters,
         plan.optionalBucketSet,
         plan.optionalNumCoalescedBuckets,
         plan.dataFilters,
