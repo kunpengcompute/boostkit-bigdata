@@ -47,7 +47,7 @@ case class SubqueryBroadcastExec(
     if (exchangeChild.isInstanceOf[ColumnarBroadcastExchangeExec] ||
       (exchangeChild.isInstanceOf[AdaptiveSparkPlanExec]
         && exchangeChild.asInstanceOf[AdaptiveSparkPlanExec].supportsColumnar)) {
-      "ColumnarSubqueryBroadcastExec"
+      "OmniColumnarSubqueryBroadcastExec"
     } else {
       "SubqueryBroadcastExec"
     }
