@@ -17,6 +17,8 @@
 
 package org.apache.spark.sql.execution
 
+import com.huawei.boostkit.spark.ColumnarPluginConfig
+
 import java.util.concurrent.TimeUnit.NANOSECONDS
 
 import com.huawei.boostkit.spark.Constant.IS_SKIP_VERIFY_EXP
@@ -27,8 +29,9 @@ import nova.hetu.omniruntime.`type`.DataType
 import nova.hetu.omniruntime.constants.FunctionType
 import nova.hetu.omniruntime.constants.FunctionType.OMNI_AGGREGATION_TYPE_COUNT_ALL
 import nova.hetu.omniruntime.operator.aggregator.OmniHashAggregationWithExprOperatorFactory
-import nova.hetu.omniruntime.operator.config.{OperatorConfig, OverflowConfig, SpillConfig}
+import nova.hetu.omniruntime.operator.config.{OperatorConfig, OverflowConfig, SparkSpillConfig}
 import nova.hetu.omniruntime.vector.VecBatch
+import org.apache.spark.{SparkConf, SparkEnv}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
@@ -41,6 +44,9 @@ import org.apache.spark.sql.execution.util.SparkMemoryUtils
 import org.apache.spark.sql.execution.vectorized.OmniColumnVector
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.vectorized.ColumnarBatch
+import org.apache.spark.util.Utils
+
+import java.io.File
 
 /**
  * Hash-based aggregate operator that can also fallback to sorting when data exceeds memory size.
@@ -85,7 +91,8 @@ case class ColumnarHashAggregateExec(
     "omniCodegenTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni codegen"),
     "getOutputTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni getOutput"),
     "numOutputRows" -> SQLMetrics.createMetric(sparkContext, "number of output rows"),
-    "numOutputVecBatches" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatches"))
+    "numOutputVecBatches" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatches"),
+    "spillSize" -> SQLMetrics.createSizeMetric(sparkContext, "spill size"))
 
   protected override def needHashTable: Boolean = true
 
@@ -102,6 +109,8 @@ case class ColumnarHashAggregateExec(
   override def supportCodegen: Boolean = false
 
   override def nodeName: String = "OmniColumnarHashAggregate"
+
+  val sparkConfTmp = sparkContext.conf
 
   def buildCheck(): Unit = {
     val attrExpsIdMap = getExprIdMap(child.output)
@@ -199,6 +208,13 @@ case class ColumnarHashAggregateExec(
     }
   }
 
+  def generateSpillDirs(): String = {
+    val blockManager = SparkEnv.get.blockManager
+    val spillFileInfo = blockManager.diskBlockManager.createTempLocalBlock
+    val spillFile = spillFileInfo._2
+    spillFile.getParentFile.getCanonicalPath
+  }
+
   override def doExecuteColumnar(): RDD[ColumnarBatch] = {
     val addInputTime = longMetric("addInputTime")
     val numInputRows = longMetric("numInputRows")
@@ -207,6 +223,7 @@ case class ColumnarHashAggregateExec(
     val getOutputTime = longMetric("getOutputTime")
     val numOutputRows = longMetric("numOutputRows")
     val numOutputVecBatches= longMetric("numOutputVecBatches")
+    val spillSize = longMetric("spillSize")
 
     val attrExpsIdMap = getExprIdMap(child.output)
     val omniGroupByChanel = groupingExpressions.map(
@@ -278,6 +295,15 @@ case class ColumnarHashAggregateExec(
     }
 
     child.executeColumnar().mapPartitionsWithIndex { (index, iter) =>
+      val columnarConf = ColumnarPluginConfig.getSessionConf
+      val hashAggSpillRowThreshold = columnarConf.columnarHashAggSpillRowThreshold
+      val spillMemPctThreshold = columnarConf.columnarSpillMemPctThreshold
+      val spillDirDiskReserveSize = columnarConf.columnarSpillDirDiskReserveSize
+      val hashAggSpillEnable = columnarConf.enableHashAggSpill
+      val spillPathDir = generateSpillDirs
+      val sparkSpillConf = new SparkSpillConfig(hashAggSpillEnable, spillPathDir,
+        spillDirDiskReserveSize, hashAggSpillRowThreshold, spillMemPctThreshold)
+
       val startCodegen = System.nanoTime()
       val operator = OmniAdaptorUtil.getAggOperator(groupingExpressions,
         omniGroupByChanel,
@@ -287,11 +313,13 @@ case class ColumnarHashAggregateExec(
         omniAggFunctionTypes,
         omniAggOutputTypes,
         omniInputRaws,
-        omniOutputPartials)
+        omniOutputPartials,
+        sparkSpillConf)
       omniCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startCodegen)
 
       // close operator
       SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
+        spillSize += operator.getSpilledBytes()
         operator.close()
       })
 
