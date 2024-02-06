@@ -186,7 +186,10 @@ public class OrcColumnarBatchScanReader {
         }
         job.put("offset", options.getOffset());
         job.put("length", options.getLength());
-        if (options.getSearchArgument() != null) {
+        // When the number of pushedFilters > hive.CNF_COMBINATIONS_THRESHOLD, the expression is rewritten to
+        // 'YES_NO_NULL'. Under the circumstances, filter push down will be skipped.
+        if (options.getSearchArgument() != null
+                && !options.getSearchArgument().toString().contains("YES_NO_NULL")) {
             LOGGER.debug("SearchArgument: {}", options.getSearchArgument().toString());
             JSONObject jsonexpressionTree = getSubJson(options.getSearchArgument().getExpression());
             job.put("expressionTree", jsonexpressionTree);
