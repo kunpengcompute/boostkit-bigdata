@@ -38,6 +38,7 @@ import org.apache.spark.sql.catalyst.util.CharVarcharUtils.getRawTypeString
 import org.apache.spark.sql.execution
 import org.apache.spark.sql.hive.HiveUdfAdaptorUtil
 import org.apache.spark.sql.types.{BooleanType, DataType, DateType, Decimal, DecimalType, DoubleType, IntegerType, LongType, Metadata, NullType, ShortType, StringType, TimestampType}
+import org.json.JSONObject
 
 import java.util.Locale
 import scala.collection.mutable
@@ -728,28 +729,39 @@ object OmniExpressionAdaptor extends Logging {
     val omniType = sparkTypeToOmniExpType(literal.dataType)
     val value = literal.value
     if (value == null) {
-      return "{\"exprType\":\"LITERAL\",\"dataType\":%s,\"isNull\":%b}".format(sparkTypeToOmniExpJsonType(literal.dataType), true)
+      new JSONObject().put("exprType", "LITERAL")
+        .put("dataType", sparkTypeToOmniExpJsonType(literal.dataType).toLong)
+        .put("isNull", true).toString
     }
     literal.dataType match {
       case StringType =>
-        ("{\"exprType\":\"LITERAL\",\"dataType\":%s," +
-          "\"isNull\":%b, \"value\":\"%s\",\"width\":%d}")
-          .format(omniType, false, value.toString, value.toString.length)
+       new JSONObject().put("exprType", "LITERAL")
+          .put("dataType",omniType.toLong)
+          .put("isNull",false)
+          .put("value", value.toString)
+          .put("width", value.toString.length).toString
       case dt: DecimalType =>
         if (DecimalType.is64BitDecimalType(dt)) {
-          ("{\"exprType\":\"LITERAL\",\"dataType\":%s," +
-            "\"isNull\":%b,\"value\":%s,\"precision\":%s, \"scale\":%s}").format(omniType,
-            false, value.asInstanceOf[Decimal].toUnscaledLong, dt.precision, dt.scale)
+          new JSONObject().put("exprType", "LITERAL")
+            .put("dataType", omniType.toLong)
+            .put("isNull", false)
+            .put("value", value.asInstanceOf[Decimal].toUnscaledLong)
+            .put("precision", dt.precision)
+            .put("scale", dt.scale).toString
         } else {
           // NOTES: decimal128 literal value need use string format
-          ("{\"exprType\":\"LITERAL\",\"dataType\":%s," +
-            "\"isNull\":%b, \"value\":\"%s\", \"precision\":%s, \"scale\":%s}").format(omniType,
-            false, value.asInstanceOf[Decimal].toJavaBigDecimal.unscaledValue().toString(),
-            dt.precision, dt.scale)
+          new JSONObject().put("exprType", "LITERAL")
+            .put("dataType", omniType.toLong)
+            .put("isNull", false)
+            .put("value", value.asInstanceOf[Decimal].toJavaBigDecimal.unscaledValue().toString())
+            .put("precision", dt.precision)
+            .put("scale", dt.scale).toString
         }
       case _ =>
-        "{\"exprType\":\"LITERAL\",\"dataType\":%s, \"isNull\":%b, \"value\":%s}"
-          .format(omniType, false, value)
+        new JSONObject().put("exprType", "LITERAL")
+          .put("dataType", omniType.toLong)
+          .put("isNull", false)
+          .put("value", value).toString()
     }
   }
 
