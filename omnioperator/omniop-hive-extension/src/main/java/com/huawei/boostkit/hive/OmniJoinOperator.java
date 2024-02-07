@@ -45,7 +45,9 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.ql.CompilationOpContext;
 import org.apache.hadoop.hive.ql.exec.CommonJoinOperator;
 import org.apache.hadoop.hive.ql.exec.ExprNodeColumnEvaluator;
+import org.apache.hadoop.hive.ql.exec.ExprNodeEvaluator;
 import org.apache.hadoop.hive.ql.exec.Operator;
+import org.apache.hadoop.hive.ql.exec.UDFArgumentException;
 import org.apache.hadoop.hive.ql.exec.tez.RecordSource;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.plan.ExprNodeColumnDesc;
@@ -54,6 +56,7 @@ import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
 import org.apache.hadoop.hive.ql.plan.JoinDesc;
 import org.apache.hadoop.hive.ql.plan.OperatorDesc;
 import org.apache.hadoop.hive.ql.plan.api.OperatorType;
+import org.apache.hadoop.hive.ql.udf.generic.GenericUDFOPAnd;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorFactory;
 import org.apache.hadoop.hive.serde2.objectinspector.StructField;
@@ -63,6 +66,7 @@ import org.apache.hadoop.hive.serde2.objectinspector.primitive.AbstractPrimitive
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -231,28 +235,30 @@ public class OmniJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc> impl
         List<ObjectInspector> inspectors = IntStream.range(0, bufferIndex + 1).boxed()
                 .flatMap(tableIndex -> ((StructObjectInspector) inputObjInspectors[tableIndex]).getAllStructFieldRefs()
                         .stream().flatMap(keyValue -> ((StructObjectInspector) keyValue.getFieldObjectInspector())
-                                .getAllStructFieldRefs().stream()))
+                                .getAllStructFieldRefs().stream())).sorted(Comparator.comparing(StructField::getFieldName))
                 .map(field -> field.getFieldObjectInspector()).collect(Collectors.toList());
         Map<String, String> inputColNameToExprName = new HashMap<>();
         for (Map.Entry<String, ExprNodeDesc> entry : conf.getColumnExprMap().entrySet()) {
             ExprNodeColumnDesc exprNodeColumnDesc = (ExprNodeColumnDesc) entry.getValue();
             inputColNameToExprName.put(exprNodeColumnDesc.getColumn().replace("VALUE.", "").replace("KEY.", ""), entry.getKey());
         }
-        List<String> fieldNames = IntStream.range(0, bufferIndex + 1).boxed()
-                .flatMap(tableIndex -> ((StructObjectInspector) inputObjInspectors[tableIndex]).getAllStructFieldRefs()
-                        .stream().flatMap(keyValue -> ((StructObjectInspector) keyValue.getFieldObjectInspector())
-                                .getAllStructFieldRefs().stream().map(field -> {
-                                    String fieldName = field.getFieldName();
-                                    if (inputColNameToExprName.containsKey(fieldName)) {
-                                        return inputColNameToExprName.get(fieldName);
-                                    } else {
-                                        return fieldName;
-                                    }
-                                }))).collect(Collectors.toList());
+        List<String> fieldNames = conf.getColumnExprMap().keySet().stream().sorted().collect(Collectors.toList());
         StructObjectInspector exprObjInspector = ObjectInspectorFactory.getStandardStructObjectInspector(fieldNames,
                 inspectors);
-        BaseExpression root = ExpressionUtils.build((ExprNodeGenericFuncDesc) residualJoinFilters.get(opIndex).getExpr(), exprObjInspector);
+        BaseExpression root = ExpressionUtils.build(getResidualFilter(), exprObjInspector);
         return Optional.of(root.toString());
+    }
+
+    private ExprNodeGenericFuncDesc getResidualFilter() {
+        List<ExprNodeDesc> filters = residualJoinFilters.stream().map(ExprNodeEvaluator::getExpr).collect(Collectors.toList());
+        if (filters.size() ==1) {
+            return (ExprNodeGenericFuncDesc) filters.get(0);
+        }
+        try {
+            return ExprNodeGenericFuncDesc.newInstance(new GenericUDFOPAnd(), filters);
+        } catch (UDFArgumentException e) {
+            throw new RuntimeException("wrong udf", e);
+        }
     }
 
     private String[] getHashKey(List<Integer> aliasList, OmniSmjStreamedTableWithExprOperatorFactory streamFactory,
