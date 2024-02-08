@@ -876,6 +876,9 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
 
     private void setParentWorkToCurrentWorkEdge(BaseWork work, TezEdgeProperty.EdgeType edgeType) {
         for (BaseWork parent : tezWork.getParents(work)) {
+            if (parent instanceof UnionWork) {
+                continue;
+            }
             tezWork.getEdgeProperty(parent, work).setEdgeType(edgeType);
         }
     }
