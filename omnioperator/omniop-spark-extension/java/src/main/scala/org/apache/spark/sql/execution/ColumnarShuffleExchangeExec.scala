@@ -74,8 +74,9 @@ case class ColumnarShuffleExchangeExec(
       .createAverageMetric(sparkContext, "avg read batch num rows"),
     "numInputRows" -> SQLMetrics.createMetric(sparkContext, "number of input rows"),
     "numMergedVecBatches" -> SQLMetrics.createMetric(sparkContext, "number of merged vecBatches"),
-    "numOutputRows" -> SQLMetrics
-      .createMetric(sparkContext, "number of output rows")) ++ readMetrics ++ writeMetrics
+    "numOutputRows" -> SQLMetrics.createMetric(sparkContext, "number of output rows"),
+    "numPartitions" -> SQLMetrics.createMetric(sparkContext, "number of partitions")
+  ) ++ readMetrics ++ writeMetrics
 
   override def nodeName: String = "OmniColumnarShuffleExchange"
 
@@ -123,9 +124,15 @@ case class ColumnarShuffleExchangeExec(
       longMetric("numInputRows"),
       longMetric("splitTime"),
       longMetric("spillTime"))
+    metrics("numPartitions").set(dep.partitioner.numPartitions)
+    val executionId = sparkContext.getLocalProperty(SQLExecution.EXECUTION_ID_KEY)
+    SQLMetrics.postDriverMetricUpdates(sparkContext, executionId, metrics("numPartitions") :: Nil)
     dep
   }
-  var cachedShuffleRDD: ShuffledColumnarRDD = _
+
+  private var cachedShuffleRDD: ShuffledColumnarRDD = null
+
+  private val enableShuffleBatchMerge: Boolean = ColumnarPluginConfig.getSessionConf.enableShuffleBatchMerge
 
   override def doExecute(): RDD[InternalRow] = {
     throw new UnsupportedOperationException()
@@ -153,8 +160,7 @@ case class ColumnarShuffleExchangeExec(
     if (cachedShuffleRDD == null) {
       cachedShuffleRDD = new ShuffledColumnarRDD(columnarShuffleDependency, readMetrics)
     }
-    val columnarConf: ColumnarPluginConfig = ColumnarPluginConfig.getSessionConf
-    val enableShuffleBatchMerge: Boolean = columnarConf.enableShuffleBatchMerge
+    
     if (enableShuffleBatchMerge) {
       cachedShuffleRDD.mapPartitionsWithIndexInternal { (index, iter) =>
         new MergeIterator(iter,
@@ -165,6 +171,7 @@ case class ColumnarShuffleExchangeExec(
       cachedShuffleRDD
     }
   }
+
   override protected def withNewChildInternal(newChild: SparkPlan): ColumnarShuffleExchangeExec =
     copy(child = newChild)
 }
@@ -194,10 +201,10 @@ object ColumnarShuffleExchangeExec extends Logging {
         val rddForSampling = rdd.mapPartitionsInternal { iter =>
           // Internally, RangePartitioner runs a job on the RDD that samples keys to compute
           // partition bounds. To get accurate samples, we need to copy the mutable keys.
+          val projection =
+              UnsafeProjection.create(sortingExpressions.map(_.child), outputAttributes)
           iter.flatMap(batch => {
             val rows: Iterator[InternalRow] = batch.rowIterator.asScala
-            val projection =
-              UnsafeProjection.create(sortingExpressions.map(_.child), outputAttributes)
             val mutablePair = new MutablePair[InternalRow, Null]()
             new Iterator[MutablePair[InternalRow, Null]] {
               var closed = false
@@ -261,9 +268,8 @@ object ColumnarShuffleExchangeExec extends Logging {
       (0, new ColumnarBatch(newColumns, cb.numRows))
     }
 
-    def computePartitionId(
-                                       cbIter: Iterator[ColumnarBatch],
-                                       partitionKeyExtractor: InternalRow => Any): Iterator[(Int, ColumnarBatch)] = {
+    def computePartitionId(cbIter: Iterator[ColumnarBatch],
+                           partitionKeyExtractor: InternalRow => Any): Iterator[(Int, ColumnarBatch)] = {
       val addPid2ColumnBatch = addPidToColumnBatch()
       cbIter.filter(cb => cb.numRows != 0 && cb.numCols != 0).map {
         cb =>
