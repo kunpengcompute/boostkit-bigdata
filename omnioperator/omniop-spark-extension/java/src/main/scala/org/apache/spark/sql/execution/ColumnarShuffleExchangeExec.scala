@@ -117,7 +117,9 @@ class ColumnarShuffleExchangeExec(
       longMetric("spillTime"))
   }
 
-  var cachedShuffleRDD: ShuffledColumnarRDD = _
+  private var cachedShuffleRDD: ShuffledColumnarRDD = null
+
+  private val enableShuffleBatchMerge: Boolean = ColumnarPluginConfig.getSessionConf.enableShuffleBatchMerge
 
   override def doExecute(): RDD[InternalRow] = {
     throw new UnsupportedOperationException()
@@ -162,8 +164,7 @@ class ColumnarShuffleExchangeExec(
     if (cachedShuffleRDD == null) {
       cachedShuffleRDD = new ShuffledColumnarRDD(columnarShuffleDependency, readMetrics)
     }
-    val columnarConf: ColumnarPluginConfig = ColumnarPluginConfig.getSessionConf
-    val enableShuffleBatchMerge: Boolean = columnarConf.enableShuffleBatchMerge
+
     if (enableShuffleBatchMerge) {
       cachedShuffleRDD.mapPartitionsWithIndexInternal { (index, iter) =>
         new MergeIterator(iter,
@@ -202,10 +203,10 @@ object ColumnarShuffleExchangeExec extends Logging {
         val rddForSampling = rdd.mapPartitionsInternal { iter =>
           // Internally, RangePartitioner runs a job on the RDD that samples keys to compute
           // partition bounds. To get accurate samples, we need to copy the mutable keys.
+          val projection =
+              UnsafeProjection.create(sortingExpressions.map(_.child), outputAttributes)
           iter.flatMap(batch => {
             val rows: Iterator[InternalRow] = batch.rowIterator.asScala
-            val projection =
-              UnsafeProjection.create(sortingExpressions.map(_.child), outputAttributes)
             val mutablePair = new MutablePair[InternalRow, Null]()
             new Iterator[MutablePair[InternalRow, Null]] {
               var closed = false
@@ -268,9 +269,8 @@ object ColumnarShuffleExchangeExec extends Logging {
       (0, new ColumnarBatch(newColumns, cb.numRows))
     }
 
-    def computePartitionId(
-                                       cbIter: Iterator[ColumnarBatch],
-                                       partitionKeyExtractor: InternalRow => Any): Iterator[(Int, ColumnarBatch)] = {
+    def computePartitionId(cbIter: Iterator[ColumnarBatch],
+                           partitionKeyExtractor: InternalRow => Any): Iterator[(Int, ColumnarBatch)] = {
       val addPid2ColumnBatch = addPidToColumnBatch()
       cbIter.filter(cb => cb.numRows != 0 && cb.numCols != 0).map {
         cb =>

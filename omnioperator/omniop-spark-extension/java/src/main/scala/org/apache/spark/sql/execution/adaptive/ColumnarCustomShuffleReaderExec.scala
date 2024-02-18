@@ -52,6 +52,7 @@ case class ColumnarCustomShuffleReaderExec(
   override def supportsColumnar: Boolean = true
 
   override def output: Seq[Attribute] = child.output
+
   override lazy val outputPartitioning: Partitioning = {
     // If it is a local shuffle reader with one mapper per task, then the output partitioning is
     // the same as the plan before shuffle.
@@ -186,6 +187,8 @@ case class ColumnarCustomShuffleReaderExec(
 
   private var cachedShuffleRDD: RDD[ColumnarBatch] = null
 
+  private val enableShuffleBatchMerge: Boolean = ColumnarPluginConfig.getSessionConf.enableShuffleBatchMerge
+
   private lazy val shuffleRDD: RDD[_] = {
     sendDriverMetrics()
     if (cachedShuffleRDD == null) {
@@ -201,8 +204,7 @@ case class ColumnarCustomShuffleReaderExec(
           throw new IllegalStateException("operating on canonicalized plan")
       }
     }
-    val columnarConf: ColumnarPluginConfig = ColumnarPluginConfig.getSessionConf
-    val enableShuffleBatchMerge: Boolean = columnarConf.enableShuffleBatchMerge
+
     if (enableShuffleBatchMerge) {
       cachedShuffleRDD.mapPartitionsWithIndexInternal { (index, iter) =>
         new MergeIterator(iter,
