@@ -35,7 +35,7 @@ import org.apache.spark.sql.catalyst.optimizer.NormalizeNaNAndZero
 import org.apache.spark.sql.catalyst.plans.logical.Subquery
 import org.apache.spark.sql.catalyst.plans.{FullOuter, Inner, JoinType, LeftAnti, LeftOuter, LeftSemi, RightOuter}
 import org.apache.spark.sql.catalyst.util.CharVarcharUtils.getRawTypeString
-import org.apache.spark.sql.execution.{ColumnarBloomFilterSubquery, ColumnarSubqueryBroadcastExec, InSubqueryExec, SubqueryBroadcastExec}
+import org.apache.spark.sql.execution.ColumnarBloomFilterSubquery
 import org.apache.spark.sql.expression.ColumnarExpressionConverter
 import org.apache.spark.sql.hive.HiveUdfAdaptorUtil
 import org.apache.spark.sql.types.{BooleanType, DataType, DateType, Decimal, DecimalType, DoubleType, IntegerType, LongType, Metadata, NullType, ShortType, StringType, TimestampType}
@@ -1172,22 +1172,6 @@ object OmniExpressionAdaptor extends Logging {
         alias.child.isInstanceOf[AttributeReference]
       case _ =>
         false
-    }
-  }
-
-  def convertSubqueryBroadcastToColumnarForm(partitionFilters: Seq[Expression]): Seq[Expression] = {
-    // only hanlde SubqueryBroadcastExec
-    partitionFilters.map {
-      case dpe: DynamicPruningExpression =>
-        dpe.transform {
-          // replace SubqueryBroadcastExec to ColumnarSubqueryBroadcastExec
-          case InSubqueryExec(value, subqueryBroadcast: SubqueryBroadcastExec,
-                   exprId, shouldBroadcast, resultBroadcast, result) =>
-            InSubqueryExec(value, ColumnarSubqueryBroadcastExec(subqueryBroadcast.name,
-                subqueryBroadcast.index, subqueryBroadcast.buildKeys, subqueryBroadcast.child),
-                exprId, shouldBroadcast, resultBroadcast, result)
-        }
-      case e: Expression => e
     }
   }
 }
