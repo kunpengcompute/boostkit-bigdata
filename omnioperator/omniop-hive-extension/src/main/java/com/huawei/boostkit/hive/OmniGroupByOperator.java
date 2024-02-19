@@ -269,7 +269,11 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
                             .getAllStructFieldRefs();
             sourceTypes = getDataTypeFromStructField(keyStructFieldRefs, valueStructFieldRefs);
             groupByChanel = getExprFromStructField(keyStructFieldRefs);
-            aggChannels = getTwoDimenExprFromStructField(valueStructFieldRefs);
+            if (valueStructFieldRefs.isEmpty()) {
+                aggChannels = getTwoDimenExprFromStructField(keyStructFieldRefs, 0);
+            } else {
+                aggChannels = getTwoDimenExprFromStructField(valueStructFieldRefs, numKeys);
+            }
         } else {
             sourceTypes = getDataTypeFromStructField(allStructFieldRefs);
             groupByChanel = getExprFromExprNode(keyFields);
@@ -339,13 +343,13 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
         return expressions.toArray(new String[0]);
     }
 
-    private String[][] getTwoDimenExprFromStructField(List<? extends StructField> structFields) {
+    private String[][] getTwoDimenExprFromStructField(List<? extends StructField> structFields, int offset) {
         List<String[]> expressions = new ArrayList<>();
         for (StructField structField : structFields) {
             List<String> expr = new ArrayList<>();
             expr.add(TypeUtils.buildExpression(
                     ((PrimitiveObjectInspector) structField.getFieldObjectInspector()).getTypeInfo(),
-                    structField.getFieldID() + numKeys));
+                    structField.getFieldID() + offset));
             expressions.add(expr.toArray(new String[0]));
         }
         return expressions.toArray(new String[0][0]);
