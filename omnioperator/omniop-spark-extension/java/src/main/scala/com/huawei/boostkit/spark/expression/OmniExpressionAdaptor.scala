@@ -361,11 +361,12 @@ object OmniExpressionAdaptor extends Logging {
 
       // coming from In expression with optimizerInSetConversionThreshold
       case inSet: InSet =>
-        new JSONObject().put("exprType", "IN")
+        val jSONObject = new JSONObject().put("exprType", "IN")
           .addOmniExpJsonType("returnType", inSet.dataType)
-          .put("arguments", new JSONArray(inSet.set.map(child =>
-              toOmniJsonLiteral(Literal(child, inSet.child.dataType))).toArray)
-            .put(rewriteToOmniJsonExpressionLiteralJsonObject(inSet.child, exprsIndexMap)))
+        val jsonArray = new JSONArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(inSet.child, exprsIndexMap))
+        inSet.set.foreach(child => jsonArray.put(toOmniJsonLiteral(Literal(child, inSet.child.dataType))))
+        jSONObject.put("arguments", jsonArray)
+        jSONObject
 
       case ifExp: If =>
         new JSONObject().put("exprType", "IF")
@@ -457,7 +458,7 @@ object OmniExpressionAdaptor extends Logging {
   private def getJsonExprArgumentsByChildren(children: Seq[Expression],
                                              exprsIndexMap: Map[ExprId, Int]): JSONArray = {
     val size = children.size
-    val jsonArray = new JSONArray
+    val jsonArray = new JSONArray()
     if (size == 0) {
       return jsonArray
     }
