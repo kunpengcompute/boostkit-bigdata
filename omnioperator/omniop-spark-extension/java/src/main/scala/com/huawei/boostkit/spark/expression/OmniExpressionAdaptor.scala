@@ -445,7 +445,7 @@ object OmniExpressionAdaptor extends Logging {
           val hiveUdf = HiveUdfAdaptorUtil.asHiveSimpleUDF(expr)
           val nameSplit = hiveUdf.name.split("\\.")
           val udfName = if (nameSplit.size == 1) nameSplit(0).toLowerCase(Locale.ROOT) else nameSplit(1).toLowerCase(Locale.ROOT)
-          new JSONObject().put("exprType", "FUNCTION")
+          return new JSONObject().put("exprType", "FUNCTION")
             .addOmniExpJsonType("returnType", hiveUdf.dataType)
             .put("function_name", udfName)
             .put("arguments", getJsonExprArgumentsByChildren(hiveUdf.children, exprsIndexMap))
