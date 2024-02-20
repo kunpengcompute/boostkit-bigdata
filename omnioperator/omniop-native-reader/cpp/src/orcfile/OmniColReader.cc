@@ -129,8 +129,8 @@ namespace omniruntime::reader {
             case orc::DECIMAL:
                     // Is this a Hive 0.11 or 0.12 file?
                     if (type.getPrecision() == 0) {
-                        throw omniruntime::exception::OmniException("EXPRESSION_NOT_SUPPORT", "DecimalHive11ColumnReader not support!!!");
-                        return nullptr;
+                    	return std::unique_ptr<ColumnReader>
+                    		(new OmniDecimalHive11ColumnReader(type, stripe));
                     } else if (type.getPrecision() <=
                                 OmniDecimal64ColumnReader::MAX_PRECISION_64) {
                         return std::unique_ptr<ColumnReader>
@@ -150,7 +150,7 @@ namespace omniruntime::reader {
         }
     }
 
-    void readNulls(ColumnReader* colReader, uint64_t numValues, char* incomingMask, char* nulls, bool& hasNull) {
+    inline void readNulls(ColumnReader* colReader, uint64_t numValues, char* incomingMask, char* nulls, bool& hasNull) {
         ByteRleDecoder* decoder = colReader->notNullDecoder.get();
         // TO do 需要将char*转换为bool*数组， 可以优化
         if (decoder) {
@@ -753,6 +753,63 @@ namespace omniruntime::reader {
         omnivec = newVector.release();
     }
 
+	void OmniDecimalHive11ColumnReader::next(void*&vec, uint64_t numValues, char* notNull,
+												const orc::Type& baseTp, int* omniTypeId) {
+        auto newVector = std::make_unique<omniruntime::vec::Vector<omniruntime::type::Decimal128>>(numValues);
+        bool HasNull = false;
+        char nulls[numValues];
+        readNulls(this, numValues, notNull, nulls, HasNull);
+        notNull = HasNull ? nulls : nullptr;
+        // read the next group of scales
+        int64_t scaleBuffer[numValues];
+
+        scaleDecoder->next(scaleBuffer, numValues, notNull);
+
+       	if (notNull) {
+       		for (size_t i = 0; i < numValues; ++i) {
+       			if (notNull[i]) {
+       				orc::Int128 value = 0;
+       				if (!readInt128(value, static_cast<int32_t>(scaleBuffer[i]))) {
+       					if (throwOnOverflow) {
+       						throw orc::ParseError("Hive 0.11 decimal was more than 38 digits.");
+       					} else {
+       						*errorStream << "Warning: "
+       									 << "Hive 0.11 decimal with more than 38 digits "
+       									 << "replaced by NULL. \n";
+       						newVector->SetNull(i);
+       					}
+       				} else {
+						__int128_t dst = value.getHighBits();
+						dst <<= 64;
+						dst |= value.getLowBits();
+						newVector->SetValue(i, omniruntime::type::Decimal128(dst));
+       				}
+       			} else {
+				  	newVector->SetNull(i);
+				}
+       		}
+       	} else {
+       		for (size_t i = 0; i < numValues; ++i) {
+       			orc::Int128 value = 0;
+       			if (!readInt128(value, static_cast<int32_t>(scaleBuffer[i]))) {
+					if (throwOnOverflow) {
+						throw orc::ParseError("Hive 0.11 decimal was more than 38 digits.");
+					} else {
+						*errorStream << "Warning: "
+									 << "Hive 0.11 decimal with more than 38 digits "
+									 << "replaced by NULL. \n";
+						newVector->SetNull(i);
+					}
+       			} else {
+					__int128_t dst = value.getHighBits();
+					dst <<= 64;
+					dst |= value.getLowBits();
+					newVector->SetValue(i, omniruntime::type::Decimal128(dst));
+       			}
+       		}
+       	}
+	}
+
     OmniIntegerColumnReader::OmniIntegerColumnReader(const Type& type,
                                             StripeStreams& stripe): ColumnReader(type, stripe) {
         RleVersion vers = omniConvertRleVersion(stripe.getEncoding(columnId).kind());
@@ -877,6 +934,50 @@ namespace omniruntime::reader {
         scaleInt128(value, static_cast<uint32_t>(scale),
                     static_cast<uint32_t>(currentScale));
     }
+
+    OmniDecimalHive11ColumnReader::OmniDecimalHive11ColumnReader(const Type& type, StripeStreams& stripe)
+    	: OmniDecimal64ColumnReader(type, stripe) {
+    	scale = stripe.getForcedScaleOnHive11Decimal();
+    	throwOnOverflow = stripe.getThrowOnHive11DecimalOverflow();
+    	errorStream = stripe.getErrorStream();
+    }
+
+    OmniDecimalHive11ColumnReader::~OmniDecimalHive11ColumnReader() {
+    	// PASS
+    }
+
+	bool OmniDecimalHive11ColumnReader::readInt128(orc::Int128& value, int32_t currentScale) {
+		// -/+ 99999999999999999999999999999999999999
+		static const orc::Int128 MIN_VALUE(-0x4b3b4ca85a86c47b, 0xf675ddc000000001);
+		static const orc::Int128 MAX_VALUE( 0x4b3b4ca85a86c47a, 0x098a223fffffffff);
+
+		value = 0;
+		orc::Int128 work;
+		uint32_t offset = 0;
+		bool result = true;
+		while (true) {
+			readBuffer();
+			unsigned char ch = static_cast<unsigned char>(*(buffer++));
+			work = ch & 0x7f;
+			if (offset > 128 || (offset == 126 && work > 3)) {
+				result = false;
+			}
+			work <<= offset;
+			value |= work;
+			offset += 7;
+			if (!(ch & 0x80)) {
+				break;
+			}
+		}
+
+		if (!result) {
+			return result;
+		}
+		omniUnZigZagInt128(value);
+		scaleInt128(value, static_cast<uint32_t>(scale),
+					static_cast<uint32_t>(currentScale));
+		return value >= MIN_VALUE && value <= MAX_VALUE;
+	}
 
     OmniTimestampColumnReader::OmniTimestampColumnReader(const Type& type,
                                                          StripeStreams& stripe,

@@ -336,6 +336,21 @@ namespace omniruntime::reader {
         void readInt128(orc::Int128& value, int32_t currentScale);
     };
 
+    class OmniDecimalHive11ColumnReader : public OmniDecimal64ColumnReader {
+    private:
+    	bool throwOnOverflow;
+    	std::ostream* errorStream;
+
+    	bool readInt128(orc::Int128& value, int32_t currentScale);
+
+    public:
+    	OmniDecimalHive11ColumnReader(const orc::Type& type, orc::StripeStreams& stipe);
+    	~OmniDecimalHive11ColumnReader() override;
+
+    	void next(void*&vec, uint64_t numValues, char* notNull,
+                          const orc::Type& baseTp, int* omniTypeId) override;
+    };
+
     std::unique_ptr<orc::ColumnReader> omniBuildReader(const orc::Type& type,
                                                   orc::StripeStreams& stripe);
 
