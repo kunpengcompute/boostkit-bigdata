@@ -21,6 +21,7 @@ package com.huawei.boostkit.hive;
 import com.huawei.boostkit.hive.expression.TypeUtils;
 
 import com.google.common.primitives.Ints;
+import jdk.incubator.vector.VectorOperators;
 import nova.hetu.omniruntime.constants.FunctionType;
 import nova.hetu.omniruntime.constants.OmniWindowFrameBoundType;
 import nova.hetu.omniruntime.constants.OmniWindowFrameType;
@@ -33,6 +34,7 @@ import nova.hetu.omniruntime.vector.Vec;
 import nova.hetu.omniruntime.vector.VecBatch;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.ql.CompilationOpContext;
+import org.apache.hadoop.hive.ql.Operator;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.plan.ExprNodeColumnDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeConstantDesc;
@@ -86,6 +88,10 @@ public class OmniPTFOperator extends OmniHiveOperator<OmniPTFDesc> implements Se
     @Override
     protected void initializeOp(Configuration jobConf) throws HiveException {
         super.initializeOp(jobConf);
+        Operator parent = parentOperators.get(0);
+        if (parent instanceof OmniVectorOperator && ((OmniVectorOperator) parent).isKeyValue()) {
+            inputObjInspectors[0] = OperatorUtils.expandInspector(inputObjInspectors[0]);
+        }
         hiveConf = jobConf;
         isMapOperator = conf.isMapSide();
         reconstructQueryDef(hiveConf);
