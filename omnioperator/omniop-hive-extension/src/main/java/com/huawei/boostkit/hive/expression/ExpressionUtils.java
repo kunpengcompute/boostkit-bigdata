@@ -45,6 +45,7 @@ import org.apache.hadoop.hive.common.type.HiveDecimal;
 import org.apache.hadoop.hive.ql.plan.ExprNodeColumnDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeConstantDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
+import org.apache.hadoop.hive.ql.plan.ExprNodeFieldDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDF;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDFAbs;
@@ -200,12 +201,15 @@ public class ExpressionUtils {
     }
 
     public static BaseExpression createNode(ExprNodeDesc exprNodeDesc, ObjectInspector inspector) {
+        BaseExpression baseExpression = null;
         if (exprNodeDesc instanceof ExprNodeColumnDesc) {
-            return ExpressionUtils.createReferenceNode(exprNodeDesc, inspector);
+            baseExpression = ExpressionUtils.createReferenceNode(exprNodeDesc, inspector);
         } else if (exprNodeDesc instanceof ExprNodeConstantDesc) {
-            return ExpressionUtils.createLiteralNode(exprNodeDesc);
+            baseExpression = ExpressionUtils.createLiteralNode(exprNodeDesc);
+        } else if (exprNodeDesc instanceof ExprNodeFieldDesc) {
+            baseExpression = ExpressionUtils.createReferenceNode(((ExprNodeFieldDesc)exprNodeDesc).getDesc(), inspector);
         }
-        return null;
+        return baseExpression;
     }
 
     public static BaseExpression preCast(BaseExpression castExpression, ExprNodeDesc castNodeDesc,
