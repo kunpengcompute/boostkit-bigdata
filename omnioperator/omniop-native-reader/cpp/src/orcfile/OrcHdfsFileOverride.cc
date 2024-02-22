@@ -35,9 +35,9 @@ namespace orc {
         const uint64_t READ_SIZE_ = 1024 * 1024; //1 MB
 
     public:
-        HdfsFileInputStreamOverride(const UriInfo &uri) {
+        HdfsFileInputStreamOverride(const UriInfo &uri, bool notNeedFSCache) {
             this->filename_ = uri.Path();
-            std::shared_ptr <HadoopFileSystem> fileSystemPtr = getHdfsFileSystem(uri.Host(), uri.Port());
+            std::shared_ptr <HadoopFileSystem> fileSystemPtr = getHdfsFileSystem(uri.Host(), uri.Port(), notNeedFSCache);
             this->hdfs_file_ = std::make_unique<HdfsReadableFile>(fileSystemPtr, this->filename_, 0);
 
             Status openFileSt = hdfs_file_->OpenFile();
@@ -102,7 +102,7 @@ namespace orc {
         }
     };
 
-    std::unique_ptr <InputStream> createHdfsFileInputStream(const UriInfo &uri) {
-        return std::unique_ptr<InputStream>(new HdfsFileInputStreamOverride(uri));
+    std::unique_ptr <InputStream> createHdfsFileInputStream(const UriInfo &uri, bool notNeedFSCache) {
+        return std::unique_ptr<InputStream>(new HdfsFileInputStreamOverride(uri, notNeedFSCache));
     }
 }
