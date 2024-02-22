@@ -252,6 +252,11 @@ public class OmniOrcColumnarBatchReader extends RecordReader<Void, ColumnarBatch
     recordReader.initBatchJava(capacity);
     vecs = new Vec[orcVectorWrappers.length];
     columnarBatch = new ColumnarBatch(orcVectorWrappers);
+
+    vecTypeIds = new int[orcVectorWrappers.length];
+    for (int i = 0; i < vecTypeIds.length; i++) {
+      vecTypeIds[i] = OmniExpressionAdaptor.sparkTypeToOmniType(resultSchema.fields()[i].dataType());
+    }
   }
 
   /**
