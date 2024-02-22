@@ -69,7 +69,7 @@ enum class PredicateOperatorType {
  * Signature:   (Ljava/lang/String;Lorg/json/simple/JSONObject;)J
  */
 JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniReader_initializeReader
-        (JNIEnv* env, jobject jObj, jobject job);
+        (JNIEnv* env, jobject jObj, jobject job, jobject vecFildsNames);
 
 /*
  * Class:       com_huawei_boostkit_scan_jni_OrcColumnarBatchJniReader

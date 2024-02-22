@@ -45,6 +45,8 @@ import java.io.File;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
+import java.util.List;
+import java.util.Arrays;
 import org.apache.orc.Reader.Options;
 
 import static org.junit.Assert.*;
@@ -81,8 +83,40 @@ public class OrcColumnarBatchJniReaderTest extends TestCase {
 
         orcColumnarBatchScanReader = new OrcColumnarBatchScanReader();
         initReaderJava();
+        initDataColIds(options, orcColumnarBatchScanReader);
         initRecordReaderJava(options);
         initBatch(options);
+    }
+
+    public void initDataColIds(
+            Options options, OrcColumnarBatchScanReader orcColumnarBatchScanReader) {
+        List<String> allCols;
+        allCols = Arrays.asList(options.getColumnNames());
+        orcColumnarBatchScanReader.colToInclu = new ArrayList<String>();
+        List<String> optionField = options.getSchema().getFieldNames();
+        orcColumnarBatchScanReader.colsToGet = new int[optionField.size()];
+        orcColumnarBatchScanReader.realColsCnt = 0;
+        for (int i = 0; i < optionField.size(); i++) {
+            if (allCols.contains(optionField.get(i))) {
+                orcColumnarBatchScanReader.colToInclu.add(optionField.get(i));
+                orcColumnarBatchScanReader.colsToGet[i] = 0;
+                orcColumnarBatchScanReader.realColsCnt++;
+            } else {
+                orcColumnarBatchScanReader.colsToGet[i] = -1;
+            }
+        }
+
+        orcColumnarBatchScanReader.requiredfieldNames = new String[optionField.size()];
+        TypeDescription schema = options.getSchema();
+        int[] precisionArray = new int[optionField.size()];
+        int[] scaleArray = new int[optionField.size()];
+        for (int i = 0; i < optionField.size(); i++) {
+            precisionArray[i] = schema.findSubtype(optionField.get(i)).getPrecision();
+            scaleArray[i] =  schema.findSubtype(optionField.get(i)).getScale();
+            orcColumnarBatchScanReader.requiredfieldNames[i] = optionField.get(i);
+        }
+        orcColumnarBatchScanReader.precisionArray = precisionArray;
+        orcColumnarBatchScanReader.scaleArray = scaleArray;
     }
 
     @After

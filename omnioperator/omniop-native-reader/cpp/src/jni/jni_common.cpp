@@ -33,6 +33,7 @@ jmethodID jsonMethodHas;
 jmethodID jsonMethodString;
 jmethodID jsonMethodJsonObj;
 jmethodID arrayListGet;
+jmethodID arrayListAdd;
 jmethodID arrayListSize;
 jmethodID jsonMethodObj;
 jmethodID currentThread;
@@ -73,6 +74,7 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved)
     arrayListClass = CreateGlobalClassReference(env, "java/util/ArrayList");
     arrayListGet = env->GetMethodID(arrayListClass, "get", "(I)Ljava/lang/Object;");
     arrayListSize = env->GetMethodID(arrayListClass, "size", "()I");
+    arrayListAdd = env->GetMethodID(arrayListClass, "add", "(Ljava/lang/Object;)Z");
 
     threadClass = CreateGlobalClassReference(env, "java/lang/Thread");
     currentThread = env->GetStaticMethodID(threadClass, "currentThread", "()Ljava/lang/Thread;");
