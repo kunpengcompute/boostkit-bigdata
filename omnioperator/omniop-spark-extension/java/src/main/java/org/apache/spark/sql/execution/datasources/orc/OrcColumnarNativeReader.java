@@ -37,20 +37,11 @@ public class OrcColumnarNativeReader {
     private static final Logger LOGGER = LoggerFactory.getLogger(OrcColumnarNativeReader.class);
 
     public static Options buildOptions(Configuration conf, long start, long length) {
-        TypeDescription schema =
-            TypeDescription.fromString(OrcConf.MAPRED_INPUT_SCHEMA.getString(conf));
         Options options = new Options(conf)
         .range(start, length)
         .useZeroCopy(OrcConf.USE_ZEROCOPY.getBoolean(conf))
         .skipCorruptRecords(OrcConf.SKIP_CORRUPT_DATA.getBoolean(conf))
         .tolerateMissingSchema(OrcConf.TOLERATE_MISSING_SCHEMA.getBoolean(conf));
-        if (schema != null) {
-            options.schema(schema);
-        } else {
-            LOGGER.error("null schema should support");
-        }
-        options.include(OrcInputFormat.parseInclude(schema,
-            OrcConf.INCLUDE_COLUMNS.getString(conf)));
         String kryoSarg = OrcConf.KRYO_SARG.getString(conf);
         String sargColumns = OrcConf.SARG_COLUMNS.getString(conf);
         if (kryoSarg != null && sargColumns != null) {

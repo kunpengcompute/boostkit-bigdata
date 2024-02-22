@@ -18,6 +18,7 @@
 
 package com.huawei.boostkit.scan.jni;
 import org.json.JSONObject;
+import java.util.ArrayList;
 
 
 public class OrcColumnarBatchJniReader {
@@ -26,7 +27,7 @@ public class OrcColumnarBatchJniReader {
         NativeReaderLoader.getInstance();
     }
 
-    public native long initializeReader(JSONObject job);
+    public native long initializeReader(JSONObject job, ArrayList<String> vecFildsNames);
 
     public native long initializeRecordReader(long reader, JSONObject job);
 

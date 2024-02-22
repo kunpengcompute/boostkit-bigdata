@@ -56,6 +56,7 @@ extern jmethodID jsonMethodHas;
 extern jmethodID jsonMethodString;
 extern jmethodID jsonMethodJsonObj;
 extern jmethodID arrayListGet;
+extern jmethodID arrayListAdd;
 extern jmethodID arrayListSize;
 extern jmethodID jsonMethodObj;
 extern jmethodID currentThread;

@@ -42,7 +42,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-
 public class OrcColumnarBatchScanReader {
     private static final Logger LOGGER = LoggerFactory.getLogger(OrcColumnarBatchScanReader.class);
 
@@ -52,9 +51,20 @@ public class OrcColumnarBatchScanReader {
     public int[] colsToGet;
     public int realColsCnt;
 
+    public ArrayList<String> fildsNames;
+
+    public ArrayList<String> colToInclu;
+
+    public String[] requiredfieldNames;
+
+    public int[] precisionArray;
+
+    public int[] scaleArray;
+
     public OrcColumnarBatchJniReader jniReader;
     public OrcColumnarBatchScanReader() {
         jniReader = new OrcColumnarBatchJniReader();
+        fildsNames = new ArrayList<String>();
     }
 
     public JSONObject getSubJson(ExpressionTree node) {
@@ -82,7 +92,27 @@ public class OrcColumnarBatchScanReader {
         return String.format("%1$-" + decimalScale + "s", decimalVal).replace(' ', '0');
     }
 
-    public JSONObject getLeavesJson(List<PredicateLeaf> leaves, TypeDescription schema) {
+    public int getPrecision(String colname) {
+        for (int i = 0; i < requiredfieldNames.length; i++) {
+            if (colname.equals(requiredfieldNames[i])) {
+                return precisionArray[i];
+            }
+        }
+
+        return -1;
+    }
+
+    public int getScale(String colname) {
+        for (int i = 0; i < requiredfieldNames.length; i++) {
+            if (colname.equals(requiredfieldNames[i])) {
+                return scaleArray[i];
+            }
+        }
+
+        return -1;
+    }
+
+    public JSONObject getLeavesJson(List<PredicateLeaf> leaves) {
         JSONObject jsonObjectList = new JSONObject();
         for (int i = 0; i < leaves.size(); i++) {
             PredicateLeaf pl = leaves.get(i);
@@ -94,8 +124,8 @@ public class OrcColumnarBatchScanReader {
                 if (pl.getType() == PredicateLeaf.Type.DATE) {
                     jsonObject.put("literal", ((int)Math.ceil(((Date)pl.getLiteral()).getTime()* 1.0/3600/24/1000)) + "");
                 } else if (pl.getType() == PredicateLeaf.Type.DECIMAL) {
-                    int decimalP = schema.findSubtype(pl.getColumnName()).getPrecision();
-                    int decimalS = schema.findSubtype(pl.getColumnName()).getScale();
+                    int decimalP = getPrecision(pl.getColumnName());
+                    int decimalS = getScale(pl.getColumnName());
                     String[] spiltValues = pl.getLiteral().toString().split("\\.");
                     if (decimalS == 0) {
                         jsonObject.put("literal", spiltValues[0] + " " + decimalP + " " + decimalS);
@@ -117,8 +147,8 @@ public class OrcColumnarBatchScanReader {
                         continue;
                     }
                     if (pl.getType() == PredicateLeaf.Type.DECIMAL) {
-                        int decimalP =  schema.findSubtype(pl.getColumnName()).getPrecision();
-                        int decimalS =  schema.findSubtype(pl.getColumnName()).getScale();
+                        int decimalP = getPrecision(pl.getColumnName());
+                        int decimalS = getScale(pl.getColumnName());
                         String[] spiltValues = ob.toString().split("\\.");
                         if (decimalS == 0) {
                             lst.add(spiltValues[0] + " " + decimalP + " " + decimalS);
@@ -168,7 +198,7 @@ public class OrcColumnarBatchScanReader {
         job.put("port", uri.getPort());
         job.put("path", uri.getPath() == null ? "" : uri.getPath());
 
-        reader = jniReader.initializeReader(job);
+        reader = jniReader.initializeReader(job, fildsNames);
         return reader;
     }
 
@@ -193,29 +223,10 @@ public class OrcColumnarBatchScanReader {
             LOGGER.debug("SearchArgument: {}", options.getSearchArgument().toString());
             JSONObject jsonexpressionTree = getSubJson(options.getSearchArgument().getExpression());
             job.put("expressionTree", jsonexpressionTree);
-            JSONObject jsonleaves = getLeavesJson(options.getSearchArgument().getLeaves(), options.getSchema());
+            JSONObject jsonleaves = getLeavesJson(options.getSearchArgument().getLeaves());
             job.put("leaves", jsonleaves);
         }
 
-        List<String> allCols;
-        if (options.getColumnNames() == null) {
-            allCols = Arrays.asList(jniReader.getAllColumnNames(reader));
-        } else {
-            allCols = Arrays.asList(options.getColumnNames());
-        }
-        ArrayList<String> colToInclu = new ArrayList<String>();
-        List<String> optionField = options.getSchema().getFieldNames();
-        colsToGet = new int[optionField.size()];
-        realColsCnt = 0;
-        for (int i = 0; i < optionField.size(); i++) {
-            if (allCols.contains(optionField.get(i))) {
-                colToInclu.add(optionField.get(i));
-                colsToGet[i] = 0;
-                realColsCnt++;
-            } else {
-                colsToGet[i] = -1;
-            }
-        }
         job.put("includedColumns", colToInclu.toArray());
         // handle delegate token for native orc reader
         OrcColumnarBatchScanReader.tokenDebug("initializeRecordReader");

@@ -30,8 +30,9 @@ using namespace hdfs;
 static constexpr int32_t MAX_DECIMAL64_DIGITS = 18;
 bool isDecimal64Transfor128 = false;
 
+// vecFildsNames存储文件每列的列名，从orc reader c++侧获取，回传到java侧使用
 JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniReader_initializeReader(JNIEnv *env,
-    jobject jObj, jobject jsonObj)
+    jobject jObj, jobject jsonObj, jobject vecFildsNames)
 {
     JNI_FUNC_START
 
@@ -72,6 +73,13 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniRea
     std::unique_ptr<orc::Reader> reader;
     UriInfo uri{schemaStr, fileStr, hostStr, std::to_string(port)};
     reader = createReader(orc::readFileOverride(uri), readerOptions);
+    std::vector<std::string> orcColumnNames = reader->getAllFiedsName();
+    for (int i = 0; i < orcColumnNames.size(); i++) {
+        jstring fildname = env->NewStringUTF(orcColumnNames[i].c_str());
+        // use ArrayList and function
+        env->CallBooleanMethod(vecFildsNames, arrayListAdd, fildname);
+        env->DeleteLocalRef(fildname);
+    }
 
     orc::Reader *readerNew = reader.release();
     return (jlong)(readerNew);
