@@ -18,11 +18,10 @@
 
 package com.huawei.boostkit.spark.expression
 
-import com.fasterxml.jackson.databind.{MapperFeature, ObjectMapper, SerializationFeature}
+import com.fasterxml.jackson.databind.{ObjectMapper, SerializationFeature}
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor.{getExprIdMap, procCaseWhenExpression, rewriteToOmniJsonExpressionLiteral}
 import org.apache.spark.SparkFunSuite
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.catalyst.expressions.aggregate.{Average, Max, Min, Sum}
 import org.apache.spark.sql.types.{BooleanType, IntegerType, LongType, StringType}
 
 /**
@@ -204,13 +203,13 @@ class OmniExpressionAdaptorSuite extends SparkFunSuite {
     val cnAttribute = Seq(AttributeReference("char_1", StringType)(), AttributeReference("char_20", StringType)(),
       AttributeReference("varchar_1", StringType)(), AttributeReference("varchar_20", StringType)())
 
-    val t1 = new Tuple2(Not(EqualTo(cnAttribute(0), Literal("新"))), Not(EqualTo(cnAttribute(1), Literal("官方爸爸"))))
+    val t1 = new Tuple2(Not(EqualTo(cnAttribute(0), Literal("新"))), Not(EqualTo(cnAttribute(1), Literal("\"\\\\t/\\b\\f\\n\\r\\t234"))))
     val t2 = new Tuple2(Not(EqualTo(cnAttribute(2), Literal("爱你三千遍"))), Not(EqualTo(cnAttribute(2), Literal("新"))))
     val branch = Seq(t1, t2)
     val elseValue = Some(Not(EqualTo(cnAttribute(3), Literal("啊水水水水"))))
     val caseWhen = CaseWhen(branch, elseValue);
     val caseWhenResult = rewriteToOmniJsonExpressionLiteral(caseWhen, getExprIdMap(cnAttribute))
-    val caseWhenExp = "{\"exprType\":\"IF\",\"returnType\":4,\"condition\":{\"exprType\":\"BINARY\",\"returnType\":4,\"operator\":\"NOT_EQUAL\",\"left\":{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":15,\"colVal\":0,\"width\":50},\"right\":{\"exprType\":\"LITERAL\",\"dataType\":15,\"isNull\":false,\"value\":\"新\",\"width\":1}},\"if_true\":{\"exprType\":\"BINARY\",\"returnType\":4,\"operator\":\"NOT_EQUAL\",\"left\":{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":15,\"colVal\":1,\"width\":50},\"right\":{\"exprType\":\"LITERAL\",\"dataType\":15,\"isNull\":false,\"value\":\"官方爸爸\",\"width\":4}},\"if_false\":{\"exprType\":\"IF\",\"returnType\":4,\"condition\":{\"exprType\":\"BINARY\",\"returnType\":4,\"operator\":\"NOT_EQUAL\",\"left\":{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":15,\"colVal\":2,\"width\":50},\"right\":{\"exprType\":\"LITERAL\",\"dataType\":15,\"isNull\":false,\"value\":\"爱你三千遍\",\"width\":5}},\"if_true\":{\"exprType\":\"BINARY\",\"returnType\":4,\"operator\":\"NOT_EQUAL\",\"left\":{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":15,\"colVal\":2,\"width\":50},\"right\":{\"exprType\":\"LITERAL\",\"dataType\":15,\"isNull\":false,\"value\":\"新\",\"width\":1}},\"if_false\":{\"exprType\":\"BINARY\",\"returnType\":4,\"operator\":\"NOT_EQUAL\",\"left\":{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":15,\"colVal\":3,\"width\":50},\"right\":{\"exprType\":\"LITERAL\",\"dataType\":15,\"isNull\":false,\"value\":\"啊水水水水\",\"width\":5}}}}"
+    val caseWhenExp = "{\"exprType\":\"IF\",\"returnType\":4,\"condition\":{\"exprType\":\"BINARY\",\"returnType\":4,\"operator\":\"NOT_EQUAL\",\"left\":{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":15,\"colVal\":0,\"width\":50},\"right\":{\"exprType\":\"LITERAL\",\"dataType\":15,\"isNull\":false,\"value\":\"新\",\"width\":1}},\"if_true\":{\"exprType\":\"BINARY\",\"returnType\":4,\"operator\":\"NOT_EQUAL\",\"left\":{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":15,\"colVal\":1,\"width\":50},\"right\":{\"exprType\":\"LITERAL\",\"dataType\":15,\"isNull\":false,\"value\":\"\"\\\\t/\\b\\f\\n\\r\\t234\",\"width\":4}},\"if_false\":{\"exprType\":\"IF\",\"returnType\":4,\"condition\":{\"exprType\":\"BINARY\",\"returnType\":4,\"operator\":\"NOT_EQUAL\",\"left\":{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":15,\"colVal\":2,\"width\":50},\"right\":{\"exprType\":\"LITERAL\",\"dataType\":15,\"isNull\":false,\"value\":\"爱你三千遍\",\"width\":5}},\"if_true\":{\"exprType\":\"BINARY\",\"returnType\":4,\"operator\":\"NOT_EQUAL\",\"left\":{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":15,\"colVal\":2,\"width\":50},\"right\":{\"exprType\":\"LITERAL\",\"dataType\":15,\"isNull\":false,\"value\":\"新\",\"width\":1}},\"if_false\":{\"exprType\":\"BINARY\",\"returnType\":4,\"operator\":\"NOT_EQUAL\",\"left\":{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":15,\"colVal\":3,\"width\":50},\"right\":{\"exprType\":\"LITERAL\",\"dataType\":15,\"isNull\":false,\"value\":\"啊水水水水\",\"width\":5}}}}"
 
     checkJsonKeyValueIgnoreKeySequence(caseWhenExp, caseWhenResult, caseWhen)
 
@@ -273,6 +272,45 @@ class OmniExpressionAdaptorSuite extends SparkFunSuite {
     val noneFilterExp = "{\"exprType\":\"IF\",\"returnType\":4,\"condition\":{\"exprType\":\"BINARY\",\"returnType\":4,\"operator\":\"NOT_EQUAL\",\"left\":{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":1,\"colVal\":4},\"right\":{\"exprType\":\"LITERAL\",\"dataType\":1,\"isNull\":false,\"value\":5}},\"if_true\":{\"exprType\":\"BINARY\",\"returnType\":4,\"operator\":\"NOT_EQUAL\",\"left\":{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":1,\"colVal\":5},\"right\":{\"exprType\":\"LITERAL\",\"dataType\":1,\"isNull\":false,\"value\":10}},\"if_false\":{\"exprType\":\"IF\",\"returnType\":4,\"condition\":{\"exprType\":\"BINARY\",\"returnType\":4,\"operator\":\"LESS_THAN\",\"left\":{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":1,\"colVal\":4},\"right\":{\"exprType\":\"LITERAL\",\"dataType\":1,\"isNull\":false,\"value\":15}},\"if_true\":{\"exprType\":\"BINARY\",\"returnType\":4,\"operator\":\"GREATER_THAN\",\"left\":{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":1,\"colVal\":5},\"right\":{\"exprType\":\"LITERAL\",\"dataType\":1,\"isNull\":false,\"value\":20}},\"if_false\":{\"exprType\":\"LITERAL\",\"dataType\":4,\"isNull\":true}}}"
 
     checkJsonKeyValueIgnoreKeySequence(noneFilterExp, noneResult, noneExpression)
+
+    val t7 = Tuple2(Not(EqualTo(caseWhenAttribute(0), Literal("\"\\\\t/\\b\\f\\n\\r\\t123"))), Not(EqualTo(caseWhenAttribute(1), Literal("\"\\\\t/\\b\\f\\n\\r\\t234"))))
+    val t8 = Tuple2(Not(EqualTo(caseWhenAttribute(2), Literal("\"\\\\t/\\b\\f\\n\\r\\t345"))), Not(EqualTo(caseWhenAttribute(2), Literal("\"\\\\t/\\b\\f\\n\\r\\t123"))))
+    val branch4 = Seq(t7, t8)
+    val elseValue4 = Some(Not(EqualTo(caseWhenAttribute(3), Literal("\"\\\\t/\\b\\f\\n\\r\\t456"))))
+    val specialCharacterExpression = CaseWhen(branch4, elseValue4);
+    val specialCharacterRunResult = procCaseWhenExpression(specialCharacterExpression, getExprIdMap(caseWhenAttribute)).toString()
+    val specialCharacterFilterExp = "{\"exprType\":\"IF\",\"returnType\":4,\"condition\":{\"exprType\":\"BINARY\",\"returnType\":4,\"operator\":\"NOT_EQUAL\",\"left\":{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":15,\"colVal\":0,\"width\":50},\"right\":{\"exprType\":\"LITERAL\",\"dataType\":15,\"isNull\":false,\"value\":\"\"\\\\t/\\b\\f\\n\\r\\t123\",\"width\":1}},\"if_true\":{\"exprType\":\"BINARY\",\"returnType\":4,\"operator\":\"NOT_EQUAL\",\"left\":{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":15,\"colVal\":1,\"width\":50},\"right\":{\"exprType\":\"LITERAL\",\"dataType\":15,\"isNull\":false,\"value\":\"\"\\\\t/\\b\\f\\n\\r\\t234\",\"width\":4}},\"if_false\":{\"exprType\":\"IF\",\"returnType\":4,\"condition\":{\"exprType\":\"BINARY\",\"returnType\":4,\"operator\":\"NOT_EQUAL\",\"left\":{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":15,\"colVal\":2,\"width\":50},\"right\":{\"exprType\":\"LITERAL\",\"dataType\":15,\"isNull\":false,\"value\":\"\"\\\\t/\\b\\f\\n\\r\\t345\",\"width\":5}},\"if_true\":{\"exprType\":\"BINARY\",\"returnType\":4,\"operator\":\"NOT_EQUAL\",\"left\":{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":15,\"colVal\":2,\"width\":50},\"right\":{\"exprType\":\"LITERAL\",\"dataType\":15,\"isNull\":false,\"value\":\"\"\\\\t/\\b\\f\\n\\r\\t123\",\"width\":1}},\"if_false\":{\"exprType\":\"BINARY\",\"returnType\":4,\"operator\":\"NOT_EQUAL\",\"left\":{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":15,\"colVal\":3,\"width\":50},\"right\":{\"exprType\":\"LITERAL\",\"dataType\":15,\"isNull\":false,\"value\":\"\"\\\\t/\\b\\f\\n\\r\\t456\",\"width\":5}}}}"
+
+    checkJsonKeyValueIgnoreKeySequence(specialCharacterFilterExp, specialCharacterRunResult, specialCharacterExpression)
+
+  }
+
+  test("test special character rewrite") {
+    val cnAttribute = Seq(AttributeReference("char_1", StringType)(), AttributeReference("char_20", StringType)(),
+      AttributeReference("varchar_1", StringType)(), AttributeReference("varchar_20", StringType)())
+
+    val t1 = new Tuple2(Not(EqualTo(cnAttribute(0), Literal("\"\\\\t/\\b\\f\\n\\r\\t123"))), Not(EqualTo(cnAttribute(1), Literal("\"\\\\t/\\b\\f\\n\\r\\t234"))))
+    val t2 = new Tuple2(Not(EqualTo(cnAttribute(2), Literal("\"\\\\t/\\b\\f\\n\\r\\t345"))), Not(EqualTo(cnAttribute(2), Literal("\"\\\\t/\\b\\f\\n\\r\\t456"))))
+    val branch = Seq(t1, t2)
+    val elseValue = Some(Not(EqualTo(cnAttribute(3), Literal("\"\\\\t/\\b\\f\\n\\r\\t456"))))
+    val caseWhen = CaseWhen(branch, elseValue);
+    val caseWhenResult = rewriteToOmniJsonExpressionLiteral(caseWhen, getExprIdMap(cnAttribute))
+    val caseWhenExp = "{\"exprType\":\"IF\",\"returnType\":4,\"condition\":{\"exprType\":\"BINARY\",\"returnType\":4,\"operator\":\"NOT_EQUAL\",\"left\":{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":15,\"colVal\":0,\"width\":50},\"right\":{\"exprType\":\"LITERAL\",\"dataType\":15,\"isNull\":false,\"value\":\"\"\\\\t/\\b\\f\\n\\r\\t456\",\"width\":1}},\"if_true\":{\"exprType\":\"BINARY\",\"returnType\":4,\"operator\":\"NOT_EQUAL\",\"left\":{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":15,\"colVal\":1,\"width\":50},\"right\":{\"exprType\":\"LITERAL\",\"dataType\":15,\"isNull\":false,\"value\":\"\"\\\\t/\\b\\f\\n\\r\\t234\",\"width\":4}},\"if_false\":{\"exprType\":\"IF\",\"returnType\":4,\"condition\":{\"exprType\":\"BINARY\",\"returnType\":4,\"operator\":\"NOT_EQUAL\",\"left\":{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":15,\"colVal\":2,\"width\":50},\"right\":{\"exprType\":\"LITERAL\",\"dataType\":15,\"isNull\":false,\"value\":\"\"\\\\t/\\b\\f\\n\\r\\t345\",\"width\":5}},\"if_true\":{\"exprType\":\"BINARY\",\"returnType\":4,\"operator\":\"NOT_EQUAL\",\"left\":{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":15,\"colVal\":2,\"width\":50},\"right\":{\"exprType\":\"LITERAL\",\"dataType\":15,\"isNull\":false,\"value\":\"\"\\\\t/\\b\\f\\n\\r\\t456\",\"width\":1}},\"if_false\":{\"exprType\":\"BINARY\",\"returnType\":4,\"operator\":\"NOT_EQUAL\",\"left\":{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":15,\"colVal\":3,\"width\":50},\"right\":{\"exprType\":\"LITERAL\",\"dataType\":15,\"isNull\":false,\"value\":\"\"\\\\t/\\b\\f\\n\\r\\t345\",\"width\":5}}}}"
+
+    checkJsonKeyValueIgnoreKeySequence(caseWhenExp, caseWhenResult, caseWhen)
+
+    val isNull = IsNull(cnAttribute(0));
+    val isNullResult = rewriteToOmniJsonExpressionLiteral(isNull, getExprIdMap(cnAttribute))
+    val isNullExp = "{\"exprType\":\"IS_NULL\",\"returnType\":4,\"arguments\":[{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":15,\"colVal\":0,\"width\":50}]}"
+
+    checkJsonKeyValueIgnoreKeySequence(isNullExp, isNullResult, isNull)
+
+    val children = Seq(cnAttribute(0), cnAttribute(1))
+    val coalesce = Coalesce(children);
+    val coalesceResult = rewriteToOmniJsonExpressionLiteral(coalesce, getExprIdMap(cnAttribute))
+    val coalesceExp = "{\"exprType\":\"COALESCE\",\"returnType\":15,\"width\":50,\"value1\":{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":15,\"colVal\":0,\"width\":50},\"value2\":{\"exprType\":\"FIELD_REFERENCE\",\"dataType\":15,\"colVal\":1,\"width\":50}}"
+
+    checkJsonKeyValueIgnoreKeySequence(coalesceExp, coalesceResult, coalesce)
   }
 
 
