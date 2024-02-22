@@ -19,7 +19,11 @@ package com.huawei.boostkit.spark.util
 
 import com.huawei.boostkit.spark.Constant.IS_SKIP_VERIFY_EXP
 
+import java.io.{File, IOException}
+import java.util
+import java.util.UUID
 import java.util.concurrent.TimeUnit.NANOSECONDS
+
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor._
 import nova.hetu.omniruntime.constants.FunctionType
 import nova.hetu.omniruntime.operator.OmniOperator
@@ -33,9 +37,9 @@ import org.apache.spark.sql.execution.vectorized.{OmniColumnVector, OnHeapColumn
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.vectorized.{ColumnVector, ColumnarBatch}
+import org.apache.spark.util.Utils
 
 import scala.collection.mutable.ListBuffer
-import java.util
 import scala.util.control.Breaks.{break, breakable}
 
 object OmniAdaptorUtil {
@@ -373,5 +377,31 @@ object OmniAdaptorUtil {
       case _ =>
         project.exprId
     }
+  }
+
+  private def generateDir(root: String, namePrefix: String = "spark"): File = {
+    var attempts = 0
+    val maxAttempts = 10
+    var dir: File = null
+    while (dir == null) {
+      attempts += 1
+      if (attempts > maxAttempts) {
+        throw new IOException("Directory conflict: failed to generate a temp directory for " + namePrefix +
+          " (under " + root + ") after " + maxAttempts + " attempts!")
+      }
+      dir = new File(root, namePrefix + "-" + UUID.randomUUID.toString)
+      if (dir.exists()) {
+        dir = null
+      }
+    }
+    dir.getCanonicalFile
+  }
+
+  def generateSpillDirs(localSpillDirs: Array[String], namePrefix: String): Array[File] = {
+    val localDirs = localSpillDirs.flatMap { rootDir =>
+      val localDir = generateDir(rootDir, namePrefix)
+      Some(localDir)
+    }
+    localDirs
   }
 }

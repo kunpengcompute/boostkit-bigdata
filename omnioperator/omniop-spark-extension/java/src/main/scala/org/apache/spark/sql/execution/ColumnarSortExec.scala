@@ -17,7 +17,7 @@
 
 package org.apache.spark.sql.execution
 
-import java.io.{File, IOException}
+import java.io.File
 import java.util.UUID
 import java.util.concurrent.TimeUnit.NANOSECONDS
 
@@ -74,11 +74,14 @@ case class ColumnarSortExec(
     genSortParam(child.output, sortOrder)
   }
 
-  def generateSpillDirs(): String = {
-    val blockManager = SparkEnv.get.blockManager
-    val spillFileInfo = blockManager.diskBlockManager.createTempLocalBlock
-    val spillFile = spillFileInfo._2
-    spillFile.getParentFile.getCanonicalPath
+  private val sortLocalDirs: Array[String] = Utils.getConfiguredLocalDirs(sparkContext.conf)
+
+  def generateSpillDir(): File = {
+    val localDirs = OmniAdaptorUtil.generateSpillDirs(sortLocalDirs, "columnarSortSpill")
+    val name: String = "temp_local_" + UUID.randomUUID
+    val hash = Utils.nonNegativeHash(name)
+    val dirId = hash % localDirs.length
+    localDirs(dirId)
   }
 
   override def doExecuteColumnar(): RDD[ColumnarBatch] = {
@@ -94,7 +97,8 @@ case class ColumnarSortExec(
       val spillMemPctThreshold = columnarConf.columnarSpillMemPctThreshold
       val spillDirDiskReserveSize = columnarConf.columnarSpillDirDiskReserveSize
       val sortSpillEnable = columnarConf.enableSortSpill
-      val spillDirectory = generateSpillDirs
+      val spillFile = generateSpillDir()
+      val spillDirectory = spillFile.getCanonicalPath
       val sparkSpillConf = new SparkSpillConfig(sortSpillEnable, spillDirectory, spillDirDiskReserveSize,
         sortSpillRowThreshold, spillMemPctThreshold)
       val startCodegen = System.nanoTime()
@@ -109,6 +113,7 @@ case class ColumnarSortExec(
       SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
         spillSize += sortOperator.getSpilledBytes()
         sortOperator.close()
+        spillFile.delete()
       })
       addAllAndGetIterator(sortOperator, iter, this.schema,
         longMetric("addInputTime"), longMetric("numInputVecBatches"), longMetric("numInputRows"),

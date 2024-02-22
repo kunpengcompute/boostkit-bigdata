@@ -17,7 +17,7 @@
 
 package org.apache.spark.sql.execution
 
-import java.io.{File, IOException}
+import java.io.File
 import java.util.UUID
 import java.util.concurrent.TimeUnit.NANOSECONDS
 
@@ -72,13 +72,14 @@ case class ColumnarWindowExec(windowExpression: Seq[NamedExpression],
     throw new UnsupportedOperationException(s"This operator doesn't support doExecute().")
   }
 
-  val sparkConfTmp: SparkConf = sparkContext.conf
+  private val windowLocalDirs: Array[String] = Utils.getConfiguredLocalDirs(sparkContext.conf)
 
-  def generateSpillDirs(): String = {
-    val blockManager = SparkEnv.get.blockManager
-    val spillFileInfo = blockManager.diskBlockManager.createTempLocalBlock
-    val spillFile = spillFileInfo._2
-    spillFile.getParentFile.getCanonicalPath
+  def generateSpillDir(): File = {
+    val localDirs = OmniAdaptorUtil.generateSpillDirs(windowLocalDirs, "columnarWindowSpill")
+    val name: String = "temp_local_" + UUID.randomUUID
+    val hash = Utils.nonNegativeHash(name)
+    val dirId = hash % localDirs.length
+    localDirs(dirId)
   }
 
   def getWindowFrameParam(frame: SpecifiedWindowFrame): (OmniWindowFrameType,
@@ -359,8 +360,9 @@ case class ColumnarWindowExec(windowExpression: Seq[NamedExpression],
       val spillDirDiskReserveSize = columnarConf.columnarSpillDirDiskReserveSize
       val windowSpillRowThreshold = columnarConf.columnarWindowSpillRowThreshold
       val spillMemPctThreshold = columnarConf.columnarSpillMemPctThreshold
-      val spillPathDir = generateSpillDirs
-      val sparkSpillConfig = new SparkSpillConfig(windowSpillEnable, spillPathDir,
+      val spillFile = generateSpillDir()
+      val spillDirectory = spillFile.getCanonicalPath
+      val sparkSpillConfig = new SparkSpillConfig(windowSpillEnable, spillDirectory,
         spillDirDiskReserveSize, windowSpillRowThreshold, spillMemPctThreshold)
 
       val startCodegen = System.nanoTime()
@@ -374,7 +376,9 @@ case class ColumnarWindowExec(windowExpression: Seq[NamedExpression],
 
       // close operator
       SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
+        spillSize += windowOperator.getSpilledBytes
         windowOperator.close()
+        spillFile.delete()
       })
 
       while (iter.hasNext) {
@@ -391,7 +395,6 @@ case class ColumnarWindowExec(windowExpression: Seq[NamedExpression],
       val startGetOp = System.nanoTime()
       val results = windowOperator.getOutput
       getOutputTime += NANOSECONDS.toMillis(System.nanoTime() - startGetOp)
-      spillSize += windowOperator.getSpilledBytes
 
       var windowResultSchema = this.schema
       if (windowExpressionWithProjectConstant) {
