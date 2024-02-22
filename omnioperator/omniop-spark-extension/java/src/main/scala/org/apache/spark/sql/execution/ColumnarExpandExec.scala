@@ -19,7 +19,7 @@
 package org.apache.spark.sql.execution
 
 import com.huawei.boostkit.spark.Constant.IS_SKIP_VERIFY_EXP
-import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor.{checkOmniJsonWhiteList, getExprIdMap, rewriteToOmniExpressionLiteral, rewriteToOmniJsonExpressionLiteral, sparkTypeToOmniType, toOmniAggFunType, toOmniAggInOutJSonExp, toOmniAggInOutType}
+import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor.{checkOmniJsonWhiteList, getExprIdMap, rewriteToOmniJsonExpressionLiteral, sparkTypeToOmniType, toOmniAggFunType, toOmniAggInOutJSonExp, toOmniAggInOutType}
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil.transColBatchToOmniVecs
 import nova.hetu.omniruntime.`type`.DataType
