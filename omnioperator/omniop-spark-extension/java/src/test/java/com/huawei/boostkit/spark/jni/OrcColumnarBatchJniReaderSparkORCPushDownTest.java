@@ -40,6 +40,10 @@ import java.util.ArrayList;
 import java.net.URI;
 import java.net.URISyntaxException;
 
+import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_LONG;
+import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_VARCHAR;
+import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_INT;
+
 @FixMethodOrder(value = MethodSorters.NAME_ASCENDING )
 public class OrcColumnarBatchJniReaderSparkORCPushDownTest extends TestCase {
     public OrcColumnarBatchScanReader orcColumnarBatchScanReader;
@@ -147,7 +151,7 @@ public class OrcColumnarBatchJniReaderSparkORCPushDownTest extends TestCase {
 
     @Test
     public void testNext() {
-        int[] typeId = new int[4];
+        int[] typeId = new int[] {OMNI_LONG.ordinal(), OMNI_VARCHAR.ordinal(), OMNI_VARCHAR.ordinal(), OMNI_INT.ordinal()};
         long[] vecNativeId = new long[4];
         long rtn = orcColumnarBatchScanReader.jniReader.recordReaderNext(orcColumnarBatchScanReader.recordReader, orcColumnarBatchScanReader.batchReader, typeId, vecNativeId);
         assertTrue(rtn == 4096);
