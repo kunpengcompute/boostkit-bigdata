@@ -141,8 +141,7 @@ int BuildLeaves(PredicateOperatorType leafOp, std::vector<orc::Literal> &litList
 
 bool StringToBool(const std::string &boolStr);
 
-int CopyToOmniVec(const orc::Type *type, int &omniTypeId, uint64_t &omniVecId, orc::ColumnVectorBatch *field,
-    bool isDecimal64Transfor128);
+std::unique_ptr<omniruntime::vec::BaseVector> CopyToOmniVec(const orc::Type *type, int omniTypeId, orc::ColumnVectorBatch *field);
 
 #ifdef __cplusplus
 }

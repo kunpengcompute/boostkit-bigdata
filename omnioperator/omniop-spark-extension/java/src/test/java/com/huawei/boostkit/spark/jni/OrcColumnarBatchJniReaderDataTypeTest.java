@@ -36,6 +36,10 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 
+import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_LONG;
+import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_VARCHAR;
+import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_INT;
+
 @FixMethodOrder(value = MethodSorters.NAME_ASCENDING )
 public class OrcColumnarBatchJniReaderDataTypeTest extends TestCase {
     public OrcColumnarBatchScanReader orcColumnarBatchScanReader;
@@ -96,7 +100,7 @@ public class OrcColumnarBatchJniReaderDataTypeTest extends TestCase {
 
     @Test
     public void testNext() {
-        int[] typeId = new int[4];
+        int[] typeId = new int[] {OMNI_LONG.ordinal(), OMNI_VARCHAR.ordinal(), OMNI_VARCHAR.ordinal(), OMNI_INT.ordinal()};
         long[] vecNativeId = new long[4];
         long rtn = orcColumnarBatchScanReader.jniReader.recordReaderNext(orcColumnarBatchScanReader.recordReader, orcColumnarBatchScanReader.batchReader, typeId, vecNativeId);
         assertTrue(rtn == 4096);
@@ -104,6 +108,29 @@ public class OrcColumnarBatchJniReaderDataTypeTest extends TestCase {
         VarcharVec vec2 = new VarcharVec(vecNativeId[1]);
         VarcharVec vec3 = new VarcharVec(vecNativeId[2]);
         IntVec vec4 = new IntVec(vecNativeId[3]);
+        assertTrue(vec1.get(10) == 11);
+        String tmp1 = new String(vec2.get(4080));
+        assertTrue(tmp1.equals("AAAAAAAABPPAAAAA"));
+        String tmp2 = new String(vec3.get(4070));
+        assertTrue(tmp2.equals("Particular, arab cases shall like less current, different names. Computers start for the changes. Scottish, trying exercises operate marks; long, supreme miners may ro"));
+        assertTrue(0 == vec4.get(1000));
+        vec1.close();
+        vec2.close();
+        vec3.close();
+        vec4.close();
+    }
+
+    // Here we test OMNI_LONG type instead of OMNI_INT in 4th field.
+    @Test
+    public void testNextIfSchemaChange() {
+        int[] typeId = new int[] {OMNI_LONG.ordinal(), OMNI_VARCHAR.ordinal(), OMNI_VARCHAR.ordinal(), OMNI_LONG.ordinal()};
+        long[] vecNativeId = new long[4];
+        long rtn = orcColumnarBatchScanReader.jniReader.recordReaderNext(orcColumnarBatchScanReader.recordReader, orcColumnarBatchScanReader.batchReader, typeId, vecNativeId);
+        assertTrue(rtn == 4096);
+        LongVec vec1 = new LongVec(vecNativeId[0]);
+        VarcharVec vec2 = new VarcharVec(vecNativeId[1]);
+        VarcharVec vec3 = new VarcharVec(vecNativeId[2]);
+        LongVec vec4 = new LongVec(vecNativeId[3]);
         assertTrue(vec1.get(10) == 11);
         String tmp1 = new String(vec2.get(4080));
         assertTrue(tmp1.equals("AAAAAAAABPPAAAAA"));

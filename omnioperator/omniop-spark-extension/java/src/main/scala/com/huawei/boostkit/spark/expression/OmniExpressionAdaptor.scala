@@ -723,6 +723,10 @@ object OmniExpressionAdaptor extends Logging {
     }
   }
 
+  def sparkTypeToOmniType(dataType: DataType): Int = {
+    sparkTypeToOmniType(dataType, Metadata.empty).getId.ordinal()
+  }
+
   def sparkTypeToOmniType(dataType: DataType, metadata: Metadata = Metadata.empty):
   nova.hetu.omniruntime.`type`.DataType = {
     dataType match {

@@ -19,6 +19,7 @@
 package org.apache.spark.sql.execution.datasources.orc;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor;
 import com.huawei.boostkit.spark.jni.OrcColumnarBatchScanReader;
 import nova.hetu.omniruntime.vector.Vec;
 import org.apache.hadoop.conf.Configuration;
@@ -78,6 +79,8 @@ public class OmniOrcColumnarBatchReader extends RecordReader<Void, ColumnarBatch
   private org.apache.spark.sql.vectorized.ColumnVector[] templateWrappers;
 
   private Vec[] vecs;
+
+  private int[] vecTypeIds;
 
   private Reader.Options options;
 
@@ -153,6 +156,8 @@ public class OmniOrcColumnarBatchReader extends RecordReader<Void, ColumnarBatch
     recordReader.realColsCnt = 0;
     // save valid cols fieldsNames
     recordReader.colToInclu = new ArrayList<String>();
+    // collect read cols types
+    ArrayList<Integer> typeBuilder = new ArrayList<>();
     for (int i = 0; i < requiredfieldNames.length; i++) {
       String target = requiredfieldNames[i];
       boolean is_find = false;
@@ -163,6 +168,7 @@ public class OmniOrcColumnarBatchReader extends RecordReader<Void, ColumnarBatch
           recordReader.colsToGet[i] = 0;
           recordReader.colToInclu.add(requiredfieldNames[i]);
           recordReader.realColsCnt++;
+          typeBuilder.add(OmniExpressionAdaptor.sparkTypeToOmniType(requiredSchema.fields()[i].dataType()));
           is_find = true;
         }
       }
@@ -172,6 +178,8 @@ public class OmniOrcColumnarBatchReader extends RecordReader<Void, ColumnarBatch
         recordReader.colsToGet[i] = -1;
       }
     }
+
+    vecTypeIds = typeBuilder.stream().mapToInt(Integer::intValue).toArray();
 
     for (int i = 0; i < resultFields.length; i++) {
       if (requestedPartitionColIds[i] != -1) {
@@ -255,7 +263,7 @@ public class OmniOrcColumnarBatchReader extends RecordReader<Void, ColumnarBatch
     if ((resultFields.length == 1 && requestedDataColIds[0] == -1) || resultFields.length == 0 || requiredFields.length == 0) {
       batchSize = (int) recordReader.getNumberOfRowsJava();
     } else {
-      batchSize = recordReader.next(vecs);
+      batchSize = recordReader.next(vecs, vecTypeIds);
     }
     if (batchSize == 0) {
       return false;
