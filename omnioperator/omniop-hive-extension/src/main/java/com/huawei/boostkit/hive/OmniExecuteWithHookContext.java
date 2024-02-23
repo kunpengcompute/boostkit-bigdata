@@ -181,7 +181,11 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             throw new RuntimeException("can't support mr engine");
         }
         boolean cboEnable = HiveConf.getBoolVar(hookContext.getConf(), HiveConf.ConfVars.HIVE_CBO_ENABLED);
+        boolean cboRetPath = HiveConf.getBoolVar(hookContext.getConf(), HiveConf.ConfVars.HIVE_CBO_RETPATH_HIVEOP);
         if (!cboEnable) {
+            return;
+        }
+        if (cboRetPath) {
             return;
         }
         setTezWork(queryPlan);
