@@ -47,7 +47,6 @@ public class ParquetColumnarBatchScanReader {
         URI uri = path.toUri();
 
         job.put("uri", path.toString());
-        job.put("filePath", path);
         job.put("capacity", capacity);
         job.put("rowGroupIndices", rowgroupIndices.stream().mapToInt(Integer::intValue).toArray());
         job.put("columnIndices", columnIndices.stream().mapToInt(Integer::intValue).toArray());
