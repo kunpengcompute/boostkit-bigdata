@@ -522,6 +522,12 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         if (tableMetadata != null && (!tableMetadata.getInputFormatClass().equals(OrcInputFormat.class) || tableMetadata.getParameters().getOrDefault("transactional", "").equals("true"))) {
             return false;
         }
+        List<Operator<? extends OperatorDesc>> childOperators = op.getChildOperators();
+        for (Operator childOperator : childOperators) {
+            if (childOperator.getType().equals(OperatorType.REDUCESINK) && reduceSinkDescUnReplaceable((ReduceSinkDesc) childOperator.getConf())) {
+                return false;
+            }
+        }
         return true;
     }
 
