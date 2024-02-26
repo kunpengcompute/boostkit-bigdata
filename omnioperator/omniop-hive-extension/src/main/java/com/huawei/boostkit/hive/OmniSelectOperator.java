@@ -129,7 +129,7 @@ public class OmniSelectOperator extends OmniHiveOperator<OmniSelectDesc> impleme
         String cacheKey = queryId + "SELECT_" + this.getOperatorId() + "_container";
         Operator parent = parentOperators.get(0);
         if (parent instanceof OmniVectorOperator && ((OmniVectorOperator) parent).isKeyValue()) {
-            inputObjInspectors[0] = expandInspector(inputObjInspectors[0]);
+            inputObjInspectors[0] = OperatorUtils.expandInspector(inputObjInspectors[0]);
         }
         List<ExprNodeDesc> colList = conf.getColList();
 
@@ -292,23 +292,5 @@ public class OmniSelectOperator extends OmniHiveOperator<OmniSelectDesc> impleme
             return new VarcharTypeInfo(TypeUtils.calculateVarcharLength(nodeDesc));
         }
         return typeInfo;
-    }
-
-    private ObjectInspector expandInspector(ObjectInspector inspector) {
-        List<StructField> fields = new ArrayList<>();
-        List<? extends StructField> keyValueFields = ((StructObjectInspector) inspector).getAllStructFieldRefs();
-        List<? extends StructField> keyFields = ((StructObjectInspector) keyValueFields.get(0)
-                .getFieldObjectInspector()).getAllStructFieldRefs();
-        List<? extends StructField> valueFields = ((StructObjectInspector) keyValueFields.get(1)
-                .getFieldObjectInspector()).getAllStructFieldRefs();
-        List<String> fieldNames = keyFields.stream().map(field -> "key." + field.getFieldName())
-                .collect(Collectors.toList());
-        fieldNames.addAll(
-                valueFields.stream().map(field -> "value." + field.getFieldName()).collect(Collectors.toList()));
-        fields.addAll(keyFields);
-        fields.addAll(valueFields);
-        List<ObjectInspector> fieldInspectors = fields.stream().map(StructField::getFieldObjectInspector)
-                .collect(Collectors.toList());
-        return ObjectInspectorFactory.getStandardStructObjectInspector(fieldNames, fieldInspectors);
     }
 }

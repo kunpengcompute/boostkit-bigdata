@@ -33,6 +33,7 @@ import nova.hetu.omniruntime.vector.Vec;
 import nova.hetu.omniruntime.vector.VecBatch;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.ql.CompilationOpContext;
+import org.apache.hadoop.hive.ql.exec.Operator;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.plan.ExprNodeColumnDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeConstantDesc;
@@ -86,6 +87,10 @@ public class OmniPTFOperator extends OmniHiveOperator<OmniPTFDesc> implements Se
     @Override
     protected void initializeOp(Configuration jobConf) throws HiveException {
         super.initializeOp(jobConf);
+        Operator parent = parentOperators.get(0);
+        if (parent instanceof OmniVectorOperator && ((OmniVectorOperator) parent).isKeyValue()) {
+            inputObjInspectors[0] = OperatorUtils.expandInspector(inputObjInspectors[0]);
+        }
         hiveConf = jobConf;
         isMapOperator = conf.isMapSide();
         reconstructQueryDef(hiveConf);

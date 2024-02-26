@@ -274,6 +274,9 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
             } else {
                 aggChannels = getTwoDimenExprFromStructField(valueStructFieldRefs, numKeys);
             }
+            if (numKeys != keyStructFieldRefs.size()) {
+                numKeys = keyStructFieldRefs.size();
+            }
         } else {
             sourceTypes = getDataTypeFromStructField(allStructFieldRefs);
             groupByChanel = getExprFromExprNode(keyFields);

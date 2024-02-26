@@ -34,6 +34,7 @@ import nova.hetu.omniruntime.vector.VecBatch;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.ql.CompilationOpContext;
+import org.apache.hadoop.hive.ql.exec.LimitOperator;
 import org.apache.hadoop.hive.ql.exec.MapredContext;
 import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.exec.tez.RecordSource;
@@ -104,7 +105,7 @@ public class OmniVectorOperator extends OmniHiveOperator<OmniVectorDesc> {
     @Override
     protected void initializeOp(Configuration hconf) throws HiveException {
         super.initializeOp(hconf);
-        if (parentOperators.isEmpty()) {
+        if (parentOperators.isEmpty() || parentOperators.get(0) instanceof LimitOperator) {
             isKeyValue = true;
         }
         converters = new VecConverter[inputObjInspectors.length][];
