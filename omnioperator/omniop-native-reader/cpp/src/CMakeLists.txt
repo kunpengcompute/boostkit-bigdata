@@ -11,9 +11,11 @@ set (SOURCE_FILES
         parquet/ParquetColumnReader.cpp
         parquet/ParquetTypedRecordReader.cpp
         parquet/ParquetDecoder.cpp
+        parquet/ParquetObsFile.cc
         common/UriInfo.cc
         orcfile/OrcFileOverride.cc
         orcfile/OrcHdfsFileOverride.cc
+        orcfile/OrcObsFile.cc
         filesystem/hdfs_file.cpp
         filesystem/hdfs_filesystem.cpp
         filesystem/io_exception.cpp
@@ -48,6 +50,7 @@ target_link_libraries (${PROJ_TARGET} PUBLIC
         Arrow::arrow_shared
         Parquet::parquet_shared
         orc
+        eSDKOBS
         boostkit-omniop-vector-1.4.0-aarch64
         hdfs
         )

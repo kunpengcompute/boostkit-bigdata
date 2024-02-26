@@ -30,6 +30,39 @@ using namespace hdfs;
 static constexpr int32_t MAX_DECIMAL64_DIGITS = 18;
 bool isDecimal64Transfor128 = false;
 
+void parseObs(JNIEnv* env, jobject jsonObj, ObsConfig &obsInfo) {
+    jobject obsObject = env->CallObjectMethod(jsonObj, jsonMethodObj, env->NewStringUTF("obsInfo"));
+    if (obsObject == NULL) {
+    LogsWarn("get obs info failed, obs info is null.");
+    return;
+    }
+
+    jstring jEndpoint = (jstring)env->CallObjectMethod(obsObject, jsonMethodString, env->NewStringUTF("endpoint"));
+    auto endpointCharPtr = env->GetStringUTFChars(jEndpoint, JNI_FALSE);
+    std::string endpoint = endpointCharPtr;
+    obsInfo.hostLen = endpoint.length() + 1;
+    strcpy_s(obsInfo.hostName, obsInfo.hostLen, endpoint.c_str());
+    env->ReleaseStringUTFChars(jEndpoint, endpointCharPtr);
+
+    jstring jAk = (jstring)env->CallObjectMethod(obsObject, jsonMethodString, env->NewStringUTF("ak"));
+    auto akCharPtr = env->GetStringUTFChars(jAk, JNI_FALSE);
+    std::string ak = akCharPtr;
+    strcpy_s(obsInfo.accessKey, ak.length() + 1, ak.c_str());
+    env->ReleaseStringUTFChars(jAk, akCharPtr);
+
+    jstring jSk = (jstring)env->CallObjectMethod(obsObject, jsonMethodString, env->NewStringUTF("sk"));
+    auto skCharPtr = env->GetStringUTFChars(jSk, JNI_FALSE);
+    std::string sk = skCharPtr;
+    strcpy_s(obsInfo.secretKey, sk.length() + 1, sk.c_str());
+    env->ReleaseStringUTFChars(jSk, skCharPtr);
+
+    jstring jToken = (jstring)env->CallObjectMethod(obsObject, jsonMethodString, env->NewStringUTF("token"));
+    auto tokenCharPtr = env->GetStringUTFChars(jToken, JNI_FALSE);
+    std::string token = tokenCharPtr;
+    strcpy_s(obsInfo.token, token.length() + 1, token.c_str());
+    env->ReleaseStringUTFChars(jToken, tokenCharPtr);
+}
+
 // vecFildsNames存储文件每列的列名，从orc reader c++侧获取，回传到java侧使用
 JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniReader_initializeReader(JNIEnv *env,
     jobject jObj, jobject jsonObj, jobject vecFildsNames)
@@ -70,9 +103,21 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniRea
 
     jint port = (jint)env->CallIntMethod(jsonObj, jsonMethodInt, env->NewStringUTF("port"));
 
+    jstring uriJstr = (jstring)env->CallObjectMethod(jsonObj, jsonMethodString, env->NewStringUTF("uri"));
+    const char *uriPtr = env->GetStringUTFChars(uriJstr, nullptr);
+    std::string uriStr(uriPtr);
+    env->ReleaseStringUTFChars(uriJstr, uriPtr);
+
     std::unique_ptr<orc::Reader> reader;
-    UriInfo uri{schemaStr, fileStr, hostStr, std::to_string(port)};
-    reader = createReader(orc::readFileOverride(uri), readerOptions);
+    if (0 == strncmp(uriStr.c_str(), "obs://", OBS_PROTOCOL_SIZE)) {
+        ObsConfig obsInfo;
+        parseObs(env, jsonObj, obsInfo);
+        reader = createReader(orc::readObsFile(uriStr, &obsInfo), readerOptions);
+    } else {
+        UriInfo uri{schemaStr, fileStr, hostStr, std::to_string(port)};
+        reader = createReader(orc::readFileOverride(uri), readerOptions);
+    }
+
     std::vector<std::string> orcColumnNames = reader->getAllFiedsName();
     for (int i = 0; i < orcColumnNames.size(); i++) {
         jstring fildname = env->NewStringUTF(orcColumnNames[i].c_str());

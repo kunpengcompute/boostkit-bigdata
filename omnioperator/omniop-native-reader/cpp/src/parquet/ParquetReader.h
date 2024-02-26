@@ -24,6 +24,7 @@
 #include <arrow/filesystem/filesystem.h>
 #include "ParquetColumnReader.h"
 #include "common/UriInfo.h"
+#include "ParquetObsFile.hh"
 
 using namespace arrow::internal;
 
@@ -50,7 +51,7 @@ namespace omniruntime::reader {
         ParquetReader() {}
 
         arrow::Status InitRecordReader(UriInfo &uri, int64_t capacity,
-                                               const std::vector<int>& row_group_indices, const std::vector<int>& column_indices, std::string& ugi);
+                                               const std::vector<int>& row_group_indices, const std::vector<int>& column_indices, std::string& ugi, ObsConfig& obsInfo);
 
         arrow::Status ReadNextBatch(std::vector<omniruntime::vec::BaseVector*> &batch, long *batchRowSize);
 

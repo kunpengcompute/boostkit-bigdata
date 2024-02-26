@@ -85,7 +85,7 @@ Filesystem* omniruntime::reader::GetFileSystemPtr(UriInfo &uri, std::string& ugi
 
 Status ParquetReader::InitRecordReader(UriInfo &uri, int64_t capacity,
                                        const std::vector<int>& row_group_indices, const std::vector<int>& column_indices,
-                                       std::string& ugi)
+                                       std::string& ugi, ObsConfig& obsInfo)
 {
     // Configure reader settings
     auto reader_properties = parquet::ReaderProperties(pool);
@@ -95,17 +95,20 @@ Status ParquetReader::InitRecordReader(UriInfo &uri, int64_t capacity,
     arrow_reader_properties.set_batch_size(capacity);
 
     std::shared_ptr<arrow::io::RandomAccessFile> file;
-
-    // Get the file from filesystem
-    Status result;
-    mutex_.lock();
-    Filesystem* fs = GetFileSystemPtr(uri, ugi, result);
-    mutex_.unlock();
-    if (fs == nullptr || fs->filesys_ptr == nullptr) {
-        return Status::IOError(result);
-    }
     std::string path = uri.ToString();
-    ARROW_ASSIGN_OR_RAISE(file, fs->filesys_ptr->OpenInputFile(path));
+    if (0 == strncmp(path.c_str(), "obs://", OBS_PROTOCOL_SIZE)) {
+        file = readObsFile(path, &obsInfo);
+    } else {
+        // Get the file from filesystem
+        Status result;
+        mutex_.lock();
+        Filesystem* fs = GetFileSystemPtr(uri, ugi, result);
+        mutex_.unlock();
+        if (fs == nullptr || fs->filesys_ptr == nullptr) {
+            return Status::IOError(result);
+        }
+        ARROW_ASSIGN_OR_RAISE(file, fs->filesys_ptr->OpenInputFile(path));
+    }
 
     FileReaderBuilder reader_builder;
     ARROW_RETURN_NOT_OK(reader_builder.Open(file, reader_properties));

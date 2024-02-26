@@ -37,6 +37,39 @@ std::vector<int> GetIndices(JNIEnv *env, jobject jsonObj, const char* name)
     return indices;
 }
 
+void parseObs(JNIEnv* env, jobject jsonObj, ObsConfig &obsInfo) {
+    jobject obsObject = env->CallObjectMethod(jsonObj, jsonMethodObj, env->NewStringUTF("obsInfo"));
+    if (obsObject == NULL) {
+    LogsWarn("get obs info failed, obs info is null.");
+    return;
+    }
+
+    jstring jEndpoint = (jstring)env->CallObjectMethod(obsObject, jsonMethodString, env->NewStringUTF("endpoint"));
+    auto endpointCharPtr = env->GetStringUTFChars(jEndpoint, JNI_FALSE);
+    std::string endpoint = endpointCharPtr;
+    obsInfo.hostLen = endpoint.length() + 1;
+    strcpy_s(obsInfo.hostName, obsInfo.hostLen, endpoint.c_str());
+    env->ReleaseStringUTFChars(jEndpoint, endpointCharPtr);
+
+    jstring jAk = (jstring)env->CallObjectMethod(obsObject, jsonMethodString, env->NewStringUTF("ak"));
+    auto akCharPtr = env->GetStringUTFChars(jAk, JNI_FALSE);
+    std::string ak = akCharPtr;
+    strcpy_s(obsInfo.accessKey, ak.length() + 1, ak.c_str());
+    env->ReleaseStringUTFChars(jAk, akCharPtr);
+
+    jstring jSk = (jstring)env->CallObjectMethod(obsObject, jsonMethodString, env->NewStringUTF("sk"));
+    auto skCharPtr = env->GetStringUTFChars(jSk, JNI_FALSE);
+    std::string sk = skCharPtr;
+    strcpy_s(obsInfo.secretKey, sk.length() + 1, sk.c_str());
+    env->ReleaseStringUTFChars(jSk, skCharPtr);
+
+    jstring jToken = (jstring)env->CallObjectMethod(obsObject, jsonMethodString, env->NewStringUTF("token"));
+    auto tokenCharPtr = env->GetStringUTFChars(jToken, JNI_FALSE);
+    std::string token = tokenCharPtr;
+    strcpy_s(obsInfo.token, token.length() + 1, token.c_str());
+    env->ReleaseStringUTFChars(jToken, tokenCharPtr);
+}
+
 JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_ParquetColumnarBatchJniReader_initializeReader(JNIEnv *env,
     jobject jObj, jobject jsonObj)
 {
@@ -78,8 +111,11 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_ParquetColumnarBatchJn
     auto row_group_indices = GetIndices(env, jsonObj, "rowGroupIndices");
     auto column_indices = GetIndices(env, jsonObj, "columnIndices");
 
+    ObsConfig obsInfo;
+    parseObs(env, jsonObj, obsInfo);
+
     ParquetReader *pReader = new ParquetReader();
-    auto state = pReader->InitRecordReader(uriInfo, capacity, row_group_indices, column_indices, ugiString);
+    auto state = pReader->InitRecordReader(uriInfo, capacity, row_group_indices, column_indices, ugiString, obsInfo);
     if (state != Status::OK()) {
         env->ThrowNew(runtimeExceptionClass, state.ToString().c_str());
         return 0;

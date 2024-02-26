@@ -37,6 +37,7 @@
 #include <orc/sargs/SearchArgument.hh>
 #include <orc/sargs/Literal.hh>
 #include "orcfile/OrcFileOverride.hh"
+#include "orcfile/OrcObsFile.hh"
 #include "hdfspp/options.h"
 #include <getopt.h>
 #include <jni.h>
