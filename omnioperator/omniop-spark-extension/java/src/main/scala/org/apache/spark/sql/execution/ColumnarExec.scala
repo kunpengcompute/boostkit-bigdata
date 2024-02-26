@@ -350,7 +350,7 @@ object ColumnarBatchToInternalRow {
 
       // toClosedVecs closed case:
       // 1) all rows of batch fetched and closed
-      // 2) only fetch parital rows(eg: top-n, limit-n), closed at task CompletionListener callback
+      // 2) only fetch Partial rows(eg: top-n, limit-n), closed at task CompletionListener callback
       val toClosedVecs = new ListBuffer[Vec]
       for (i <- 0 until batch.numCols()) {
         batch.column(i) match {

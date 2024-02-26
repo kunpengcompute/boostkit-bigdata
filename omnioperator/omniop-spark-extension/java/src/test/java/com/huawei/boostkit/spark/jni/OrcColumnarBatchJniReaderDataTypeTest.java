@@ -19,11 +19,11 @@
 package com.huawei.boostkit.spark.jni;
 
 import junit.framework.TestCase;
-import nova.hetu.omniruntime.type.DataType;
 import nova.hetu.omniruntime.vector.IntVec;
 import nova.hetu.omniruntime.vector.LongVec;
 import nova.hetu.omniruntime.vector.VarcharVec;
-import nova.hetu.omniruntime.vector.Vec;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.orc.OrcFile;
 import org.json.JSONObject;
 import org.junit.After;
 import org.junit.Before;
@@ -32,17 +32,17 @@ import org.junit.Test;
 import org.junit.runners.MethodSorters;
 
 import java.io.File;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
-
-import static org.junit.Assert.*;
 
 @FixMethodOrder(value = MethodSorters.NAME_ASCENDING )
 public class OrcColumnarBatchJniReaderDataTypeTest extends TestCase {
-    public OrcColumnarBatchJniReader orcColumnarBatchJniReader;
+    public OrcColumnarBatchScanReader orcColumnarBatchScanReader;
 
     @Before
     public void setUp() throws Exception {
-        orcColumnarBatchJniReader = new OrcColumnarBatchJniReader();
+        orcColumnarBatchScanReader = new OrcColumnarBatchScanReader();
         initReaderJava();
         initRecordReaderJava();
         initBatch();
@@ -50,17 +50,22 @@ public class OrcColumnarBatchJniReaderDataTypeTest extends TestCase {
 
     @After
     public void tearDown() throws Exception {
-        System.out.println("orcColumnarBatchJniReader test finished");
+        System.out.println("orcColumnarBatchScanReader test finished");
     }
 
     public void initReaderJava() {
-        JSONObject job = new JSONObject();
-        job.put("serializedTail","");
-        job.put("tailLocation",9223372036854775807L);
         File directory = new File("src/test/java/com/huawei/boostkit/spark/jni/orcsrc/000000_0");
-        System.out.println(directory.getAbsolutePath());
-        orcColumnarBatchJniReader.reader = orcColumnarBatchJniReader.initializeReader(directory.getAbsolutePath(), job);
-        assertTrue(orcColumnarBatchJniReader.reader != 0);
+        String absolutePath = directory.getAbsolutePath();
+        System.out.println(absolutePath);
+        URI uri = null;
+        try {
+            uri = new URI(absolutePath);
+        } catch (URISyntaxException ignore) {
+            // if URISyntaxException thrown, next line assertNotNull will interrupt the test
+        }
+        assertNotNull(uri);
+        orcColumnarBatchScanReader.reader = orcColumnarBatchScanReader.initializeReaderJava(uri, OrcFile.readerOptions(new Configuration()));
+        assertTrue(orcColumnarBatchScanReader.reader != 0);
     }
 
     public void initRecordReaderJava() {
@@ -80,20 +85,20 @@ public class OrcColumnarBatchJniReaderDataTypeTest extends TestCase {
         includedColumns.add("i_current_price");
         job.put("includedColumns", includedColumns.toArray());
 
-        orcColumnarBatchJniReader.recordReader = orcColumnarBatchJniReader.initializeRecordReader(orcColumnarBatchJniReader.reader, job);
-        assertTrue(orcColumnarBatchJniReader.recordReader != 0);
+        orcColumnarBatchScanReader.recordReader = orcColumnarBatchScanReader.jniReader.initializeRecordReader(orcColumnarBatchScanReader.reader, job);
+        assertTrue(orcColumnarBatchScanReader.recordReader != 0);
     }
 
     public void initBatch() {
-        orcColumnarBatchJniReader.batchReader = orcColumnarBatchJniReader.initializeBatch(orcColumnarBatchJniReader.recordReader, 4096);
-        assertTrue(orcColumnarBatchJniReader.batchReader != 0);
+        orcColumnarBatchScanReader.batchReader = orcColumnarBatchScanReader.jniReader.initializeBatch(orcColumnarBatchScanReader.recordReader, 4096);
+        assertTrue(orcColumnarBatchScanReader.batchReader != 0);
     }
 
     @Test
     public void testNext() {
         int[] typeId = new int[4];
         long[] vecNativeId = new long[4];
-        long rtn = orcColumnarBatchJniReader.recordReaderNext(orcColumnarBatchJniReader.recordReader, orcColumnarBatchJniReader.batchReader, typeId, vecNativeId);
+        long rtn = orcColumnarBatchScanReader.jniReader.recordReaderNext(orcColumnarBatchScanReader.recordReader, orcColumnarBatchScanReader.batchReader, typeId, vecNativeId);
         assertTrue(rtn == 4096);
         LongVec vec1 = new LongVec(vecNativeId[0]);
         VarcharVec vec2 = new VarcharVec(vecNativeId[1]);

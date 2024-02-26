@@ -44,6 +44,7 @@ public class NativeLoader {
             synchronized (NativeLoader.class) {
                 if (INSTANCE == null) {
                     INSTANCE = new NativeLoader();
+		    NativeLog.getInstance();
                 }
             }
         }
@@ -63,7 +64,6 @@ public class NativeLoader {
                     fos.write(buf, 0, i);
                 }
                 System.load(tempFile.getCanonicalPath());
-                NativeLog.getInstance();
             }
         } catch (IOException e) {
             LOG.warn("fail to load library from Jar!errmsg:{}", e.getMessage());

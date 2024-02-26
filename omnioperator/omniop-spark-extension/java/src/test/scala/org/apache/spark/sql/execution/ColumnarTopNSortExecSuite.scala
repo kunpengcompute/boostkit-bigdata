@@ -48,14 +48,14 @@ class ColumnarTopNSortExecSuite extends ColumnarSparkPlanTest {
   }
 
   test("Test topNSort") {
-    val sql1 ="select * from (SELECT city, rank() OVER (ORDER BY sales) AS rk FROM dealer) where rk < 4 order by rk;"
+    val sql1 = "select * from (SELECT city, rank() OVER (ORDER BY sales) AS rk FROM dealer) where rk < 4 order by rk;"
     assertColumnarTopNSortExecAndSparkResultEqual(sql1, true)
 
     val sql2 = "select * from (SELECT city, row_number() OVER (ORDER BY sales) AS rn FROM dealer) where rn < 4 order by rn;"
     assertColumnarTopNSortExecAndSparkResultEqual(sql2, false)
 
     val sql3 = "select * from (SELECT city, rank() OVER (PARTITION BY city ORDER BY sales) AS rk FROM dealer) where rk < 4 order by rk;"
-    assertColumnarTopNSortExecAndSparkResultEqual(sql3, false)
+    assertColumnarTopNSortExecAndSparkResultEqual(sql3, true)
   }
 
   private def assertColumnarTopNSortExecAndSparkResultEqual(sql: String, hasColumnarTopNSortExec: Boolean = true): Unit = {
@@ -63,20 +63,23 @@ class ColumnarTopNSortExecSuite extends ColumnarSparkPlanTest {
     spark.conf.set("spark.omni.sql.columnar.topNSort", true)
     spark.conf.set("spark.sql.execution.topNPushDownForWindow.enabled", true)
     spark.conf.set("spark.sql.execution.topNPushDownForWindow.threshold", 100)
+    spark.conf.set("spark.sql.adaptive.enabled", true)
     val omniResult = spark.sql(sql)
-    val omniPlan = omniResult.queryExecution.executedPlan
+    omniResult.collect()
+    val omniPlan = omniResult.queryExecution.executedPlan.toString()
     if (hasColumnarTopNSortExec) {
-      assert(omniPlan.find(_.isInstanceOf[ColumnarTopNSortExec]).isDefined,
+      assert(omniPlan.contains("ColumnarTopNSort"),
         s"SQL:${sql}\n@OmniEnv no ColumnarTopNSortExec, omniPlan:${omniPlan}")
     }
 
     // run TopNSortExec config
     spark.conf.set("spark.omni.sql.columnar.topNSort", false)
     val sparkResult = spark.sql(sql)
-    val sparkPlan = sparkResult.queryExecution.executedPlan
-    assert(sparkPlan.find(_.isInstanceOf[ColumnarTopNSortExec]).isEmpty,
+    sparkResult.collect()
+    val sparkPlan = sparkResult.queryExecution.executedPlan.toString()
+    assert(!sparkPlan.contains("ColumnarTopNSort"),
       s"SQL:${sql}\n@SparkEnv have ColumnarTopNSortExec, sparkPlan:${sparkPlan}")
-    assert(sparkPlan.find(_.isInstanceOf[TopNSortExec]).isDefined,
+    assert(sparkPlan.contains("TopNSort"),
       s"SQL:${sql}\n@SparkEnv no TopNSortExec, sparkPlan:${sparkPlan}")
     // DataFrame do not support comparing with equals method, use DataFrame.except instead
     // DataFrame.except can do equal for rows misorder(with and without order by are same)

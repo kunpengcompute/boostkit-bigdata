@@ -35,7 +35,7 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{Attribute, Expression, NamedExpression, SortOrder}
 import org.apache.spark.sql.catalyst.expressions.codegen.CodegenContext
 import org.apache.spark.sql.catalyst.optimizer.{BuildLeft, BuildSide}
-import org.apache.spark.sql.catalyst.plans.{FullOuter, Inner, JoinType, LeftAnti, LeftExistence, LeftOuter, LeftSemi}
+import org.apache.spark.sql.catalyst.plans.{FullOuter, Inner, JoinType, LeftAnti, LeftExistence, LeftOuter, LeftSemi, RightOuter}
 import org.apache.spark.sql.catalyst.plans.physical.Partitioning
 import org.apache.spark.sql.execution.{ExplainUtils, SparkPlan}
 import org.apache.spark.sql.execution.metric.SQLMetrics
@@ -87,7 +87,7 @@ case class ColumnarShuffledHashJoinExec(
       "time in omni build getOutput"),
     "buildCodegenTime" -> SQLMetrics.createTimingMetric(sparkContext,
       "time in omni build codegen"),
-    "numOutputVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatchs"),
+    "numOutputVecBatches" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatches"),
     "buildDataSize" -> SQLMetrics.createSizeMetric(sparkContext, "build side input data size")
   )
 
@@ -121,7 +121,7 @@ case class ColumnarShuffledHashJoinExec(
 
   def buildCheck(): Unit = {
     joinType match {
-      case FullOuter | Inner | LeftAnti | LeftOuter | LeftSemi =>
+      case FullOuter | Inner | LeftAnti | LeftOuter | LeftSemi | RightOuter =>
       case _ =>
         throw new UnsupportedOperationException(s"Join-type[${joinType}] is not supported " +
         s"in ${this.nodeName}")
@@ -172,7 +172,7 @@ case class ColumnarShuffledHashJoinExec(
    */
   override def doExecuteColumnar(): RDD[ColumnarBatch] = {
     val numOutputRows = longMetric("numOutputRows")
-    val numOutputVecBatchs = longMetric("numOutputVecBatchs")
+    val numOutputVecBatches= longMetric("numOutputVecBatches")
     val buildAddInputTime = longMetric("buildAddInputTime")
     val buildCodegenTime = longMetric("buildCodegenTime")
     val buildGetOutputTime = longMetric("buildGetOutputTime")
@@ -187,7 +187,7 @@ case class ColumnarShuffledHashJoinExec(
     }
 
     val buildOutputCols: Array[Int] = joinType match {
-      case Inner | FullOuter | LeftOuter =>
+      case Inner | FullOuter | LeftOuter | RightOuter =>
         getIndexArray(buildOutput, projectList)
       case LeftExistence(_) =>
         Array[Int]()
@@ -226,17 +226,16 @@ case class ColumnarShuffledHashJoinExec(
           case _ => Optional.empty()
         }
         val startBuildCodegen = System.nanoTime()
-        val buildOpFactory = new OmniHashBuilderWithExprOperatorFactory(buildTypes,
+        val lookupJoinType = OmniExpressionAdaptor.toOmniJoinType(joinType)
+        val buildOpFactory = new OmniHashBuilderWithExprOperatorFactory(lookupJoinType, buildTypes,
           buildJoinColsExp, 1, new OperatorConfig(SpillConfig.NONE,
             new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
         val buildOp = buildOpFactory.createOperator()
         buildCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startBuildCodegen)
 
         val startLookupCodegen = System.nanoTime()
-        val lookupJoinType = OmniExpressionAdaptor.toOmniJoinType(joinType)
-        val lookupOpFactory = new OmniLookupJoinWithExprOperatorFactory(probeTypes,
-          probeOutputCols, probeHashColsExp, buildOutputCols, buildOutputTypes, lookupJoinType,
-          buildOpFactory, filter, new OperatorConfig(SpillConfig.NONE,
+        val lookupOpFactory = new OmniLookupJoinWithExprOperatorFactory(probeTypes, probeOutputCols, probeHashColsExp,
+          buildOutputCols, buildOutputTypes, buildOpFactory, filter, new OperatorConfig(SpillConfig.NONE,
             new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
         val lookupOp = lookupOpFactory.createOperator()
         lookupCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startLookupCodegen)
@@ -339,7 +338,7 @@ case class ColumnarShuffledHashJoinExec(
             }
             val rowCnt: Int = result.getRowCount
             numOutputRows += rowCnt
-            numOutputVecBatchs += 1
+            numOutputVecBatches+= 1
             result.close()
             new ColumnarBatch(vecs.toArray, rowCnt)
           }
@@ -363,7 +362,9 @@ case class ColumnarShuffledHashJoinExec(
 
             override def hasNext: Boolean = {
               if (output == null) {
+                val startLookupOuterGetOp = System.nanoTime()
                 output = lookupOuterOp.getOutput
+                lookupGetOutputTime += NANOSECONDS.toMillis((System.nanoTime() - startLookupOuterGetOp))
               }
               output.hasNext
             }
@@ -391,7 +392,7 @@ case class ColumnarShuffledHashJoinExec(
                 }
               }
               numOutputRows += result.getRowCount
-              numOutputVecBatchs += 1
+              numOutputVecBatches+= 1
               new ColumnarBatch(vecs.toArray, result.getRowCount)
 
             }

@@ -251,16 +251,17 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
     val df = leftWithNull.join(rightWithNull.hint("broadcast"),
       col("q").isNotNull === col("c").isNotNull, "leftouter")
     checkAnswer(df, _ => df.queryExecution.executedPlan, Seq(
-      Row("abc", null, 4, 2.0, " add", null, 1, null),
-      Row("abc", null, 4, 2.0, "", "Hello", 2, 2.0),
       Row("abc", null, 4, 2.0, "abc", "", 4, 1.0),
+      Row("abc", null, 4, 2.0, "", "Hello", 2, 2.0),
+      Row("abc", null, 4, 2.0, " add", null, 1, null),
       Row("", "Hello", null, 1.0, " yeah  ", null, null, 4.0),
-      Row(" add", "World", 8, 3.0, " add", null, 1, null),
-      Row(" add", "World", 8, 3.0, "", "Hello", 2, 2.0),
       Row(" add", "World", 8, 3.0, "abc", "", 4, 1.0),
-      Row(" yeah  ", "yeah", 10, 8.0, " add", null, 1, null),
+      Row(" add", "World", 8, 3.0, "", "Hello", 2, 2.0),
+      Row(" add", "World", 8, 3.0, " add", null, 1, null),
+      Row(" yeah  ", "yeah", 10, 8.0, "abc", "", 4, 1.0),
       Row(" yeah  ", "yeah", 10, 8.0, "", "Hello", 2, 2.0),
-      Row(" yeah  ", "yeah", 10, 8.0, "abc", "", 4, 1.0)
+      Row(" yeah  ", "yeah", 10, 8.0, " add", null, 1, null)
+
     ), false)
   }
 
@@ -289,15 +290,15 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
       col("q").isNotNull === col("c").isNotNull, "fullouter")
     checkAnswer(df, _ => df.queryExecution.executedPlan, Seq(
       Row("", "Hello", null, 1.0, " yeah  ", null, null, 4.0),
-      Row("abc", null, 4, 2.0, " add", null, 1, null),
-      Row("abc", null, 4, 2.0, "", "Hello", 2, 2.0),
       Row("abc", null, 4, 2.0, "abc", "", 4, 1.0),
-      Row(" add", "World", 8, 3.0, " add", null, 1, null),
-      Row(" add", "World", 8, 3.0, "", "Hello", 2, 2.0),
+      Row("abc", null, 4, 2.0, "", "Hello", 2, 2.0),
+      Row("abc", null, 4, 2.0, " add", null, 1, null),
       Row(" add", "World", 8, 3.0, "abc", "", 4, 1.0),
-      Row(" yeah  ", "yeah", 10, 8.0, " add", null, 1, null),
+      Row(" add", "World", 8, 3.0, "", "Hello", 2, 2.0),
+      Row(" add", "World", 8, 3.0, " add", null, 1, null),
+      Row(" yeah  ", "yeah", 10, 8.0, "abc", "", 4, 1.0),
       Row(" yeah  ", "yeah", 10, 8.0, "", "Hello", 2, 2.0),
-      Row(" yeah  ", "yeah", 10, 8.0, "abc", "", 4, 1.0)
+      Row(" yeah  ", "yeah", 10, 8.0, " add", null, 1, null)
     ), false)
   }
 
@@ -382,10 +383,10 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
     assert(omniPlan.find(_.isInstanceOf[ColumnarProjectExec]).isEmpty,
       s"SQL:\n@OmniEnv no ColumnarProjectExec,omniPlan:${omniPlan}")
     checkAnswer(omniResult, _ => omniPlan, Seq(
-      Row("Carter", 44678),
       Row("Carter", 77895),
-      Row("Adams", 22456),
+      Row("Carter", 44678),
       Row("Adams", 24562),
+      Row("Adams", 22456),
       Row("Bush", null)
     ), false)
   }
@@ -397,10 +398,10 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
     assert(omniPlan.find(_.isInstanceOf[ColumnarProjectExec]).isEmpty,
       s"SQL:\n@OmniEnv no ColumnarProjectExec,omniPlan:${omniPlan}")
     checkAnswer(omniResult, _ => omniPlan, Seq(
-      Row("Carter", 44678, 3),
       Row("Carter", 77895, 3),
-      Row("Adams", 22456, 1),
+      Row("Carter", 44678, 3),
       Row("Adams", 24562, 1),
+      Row("Adams", 22456, 1),
       Row("Bush", null, null)
     ), false)
   }
@@ -412,10 +413,10 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
     assert(omniPlan.find(_.isInstanceOf[ColumnarProjectExec]).isEmpty,
       s"SQL:\n@OmniEnv no ColumnarProjectExec,omniPlan:${omniPlan}")
     checkAnswer(omniResult, _ => omniPlan, Seq(
-      Row(44678, "Carter", 3),
       Row(77895, "Carter", 3),
-      Row(22456, "Adams", 1),
+      Row(44678, "Carter", 3),
       Row(24562, "Adams", 1),
+      Row(22456, "Adams", 1),
       Row(null, "Bush", null)
     ), false)
   }
@@ -427,10 +428,10 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
     assert(omniPlan.find(_.isInstanceOf[ColumnarProjectExec]).isDefined,
       s"SQL:\n@OmniEnv have ColumnarProjectExec,omniPlan:${omniPlan}")
     checkAnswer(omniResult, _ => omniPlan, Seq(
-      Row(44679, "Carter"),
       Row(77896, "Carter"),
-      Row(22457, "Adams"),
+      Row(44679, "Carter"),
       Row(24563, "Adams"),
+      Row(22457, "Adams"),
       Row(null, "Bush")
     ), false)
   }
@@ -442,10 +443,10 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
     assert(omniPlan.find(_.isInstanceOf[ColumnarProjectExec]).isEmpty,
       s"SQL:\n@OmniEnv no ColumnarProjectExec,omniPlan:${omniPlan}")
     checkAnswer(omniResult, _ => omniPlan, Seq(
-      Row("Carter", 44678),
       Row("Carter", 77895),
-      Row("Adams", 22456),
+      Row("Carter", 44678),
       Row("Adams", 24562),
+      Row("Adams", 22456),
       Row("Bush", null)
     ), false)
   }
@@ -476,6 +477,47 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
     ), false)
   }
 
+  test("columnar ShuffledHashJoin right outer join is equal to native") {
+    val df = left.join(right.hint("SHUFFLE_HASH"), col("q") === col("c"), "rightouter")
+    checkAnswer(df, _ => df.queryExecution.executedPlan, Seq(
+      Row("abc", "", 4, 2.0, "abc", "", 4, 1.0),
+      Row(null, null, null, null, "", "Hello", 2, 2.0),
+      Row("", "Hello", 1, 1.0, " add", "World", 1, 3.0),
+      Row(null, null, null, null, " yeah  ", "yeah", 0, 4.0)
+    ), false)
+  }
+
+  test("columnar ShuffledHashJoin right outer join is equal to native with null") {
+    val df = leftWithNull.join(rightWithNull.hint("SHUFFLE_HASH"),
+      col("q") === col("c"), "rightouter")
+    checkAnswer(df, _ => df.queryExecution.executedPlan, Seq(
+      Row("abc", null, 4, 2.0, "abc", "", 4, 1.0),
+      Row(null, null, null, null, "", "Hello", 2, 2.0),
+      Row(null, null, null, null, " add", null, 1, null),
+      Row(null, null, null, null, " yeah  ", null, null, 4.0)
+    ), false)
+  }
+
+  test("columnar BroadcastHashJoin right outer join is equal to native") {
+    val df = left.join(right.hint("broadcast"), col("q") === col("c"), "rightouter")
+    checkAnswer(df, _ => df.queryExecution.executedPlan, Seq(
+      Row("abc", "", 4, 2.0, "abc", "", 4, 1.0),
+      Row(null, null, null, null, "", "Hello", 2, 2.0),
+      Row("", "Hello", 1, 1.0, " add", "World", 1, 3.0),
+      Row(null, null, null, null, " yeah  ", "yeah", 0, 4.0)
+    ), false)
+  }
+
+  test("columnar BroadcastHashJoin right outer join is equal to native with null") {
+    val df = leftWithNull.join(rightWithNull.hint("broadcast"), col("q") === col("c"), "rightouter")
+    checkAnswer(df, _ => df.queryExecution.executedPlan, Seq(
+      Row("abc", null, 4, 2.0, "abc", "", 4, 1.0),
+      Row(null, null, null, null, "", "Hello", 2, 2.0),
+      Row(null, null, null, null, " add", null, 1, null),
+      Row(null, null, null, null, " yeah  ", null, null, 4.0)
+    ), false)
+  }
+
   test("shuffledHashJoin and project funsion test") {
     val omniResult = person_test.join(order_test.hint("SHUFFLE_HASH"), person_test("id_p") === order_test("id_p"), "inner")
       .select(person_test("name"), order_test("order_no"))
@@ -483,10 +525,10 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
     assert(omniPlan.find(_.isInstanceOf[ColumnarProjectExec]).isEmpty,
       s"SQL:\n@OmniEnv no ColumnarProjectExec,omniPlan:${omniPlan}")
     checkAnswer(omniResult, _ => omniPlan, Seq(
-      Row("Carter", 44678),
       Row("Carter", 77895),
-      Row("Adams", 22456),
-      Row("Adams", 24562)
+      Row("Carter", 44678),
+      Row("Adams", 24562),
+      Row("Adams", 22456)
     ), false)
   }
 
@@ -497,10 +539,10 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
     assert(omniPlan.find(_.isInstanceOf[ColumnarProjectExec]).isEmpty,
       s"SQL:\n@OmniEnv no ColumnarProjectExec,omniPlan:${omniPlan}")
     checkAnswer(omniResult, _ => omniPlan, Seq(
-      Row("Carter", 44678, 3),
       Row("Carter", 77895, 3),
-      Row("Adams", 22456, 1),
-      Row("Adams", 24562, 1)
+      Row("Carter", 44678, 3),
+      Row("Adams", 24562, 1),
+      Row("Adams", 22456, 1)
     ), false)
   }
 
@@ -511,10 +553,10 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
     assert(omniPlan.find(_.isInstanceOf[ColumnarProjectExec]).isEmpty,
       s"SQL:\n@OmniEnv no ColumnarProjectExec,omniPlan:${omniPlan}")
     checkAnswer(omniResult, _ => omniPlan, Seq(
-      Row(44678, "Carter", 3),
       Row(77895, "Carter", 3),
-      Row(22456, "Adams", 1),
-      Row(24562, "Adams", 1)
+      Row(44678, "Carter", 3),
+      Row(24562, "Adams", 1),
+      Row(22456, "Adams", 1)
     ), false)
   }
 
@@ -525,10 +567,10 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
     assert(omniPlan.find(_.isInstanceOf[ColumnarProjectExec]).isDefined,
       s"SQL:\n@OmniEnv have ColumnarProjectExec,omniPlan:${omniPlan}")
     checkAnswer(omniResult, _ => omniPlan, Seq(
-      Row(44679, "Carter"),
       Row(77896, "Carter"),
-      Row(22457, "Adams"),
-      Row(24563, "Adams")
+      Row(44679, "Carter"),
+      Row(24563, "Adams"),
+      Row(22457, "Adams")
     ), false)
   }
 
@@ -539,10 +581,10 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
     assert(omniPlan.find(_.isInstanceOf[ColumnarProjectExec]).isEmpty,
       s"SQL:\n@OmniEnv no ColumnarProjectExec,omniPlan:${omniPlan}")
     checkAnswer(omniResult, _ => omniPlan, Seq(
-      Row("Carter", 44678),
       Row("Carter", 77895),
-      Row("Adams", 22456),
-      Row("Adams", 24562)
+      Row("Carter", 44678),
+      Row("Adams", 24562),
+      Row("Adams", 22456)
     ), false)
   }
 

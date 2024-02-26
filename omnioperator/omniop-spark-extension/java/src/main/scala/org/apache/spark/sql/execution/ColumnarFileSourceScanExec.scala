@@ -72,9 +72,7 @@ abstract class BaseColumnarFileSourceScanExec(
     optionalNumCoalescedBuckets: Option[Int],
     dataFilters: Seq[Expression],
     tableIdentifier: Option[TableIdentifier],
-    needPriv: Boolean = false,
-    disableBucketedScan: Boolean = false,
-    outputAllAttributes: Seq[Attribute] = Seq.empty[Attribute])
+    disableBucketedScan: Boolean = false)
   extends DataSourceScanExec {
 
   lazy val metadataColumns: Seq[AttributeReference] =
@@ -193,12 +191,12 @@ abstract class BaseColumnarFileSourceScanExec(
       // If sort columns are (col0, col1), then sort ordering would be considered as (col0)
       // If sort columns are (col1, col0), then sort ordering would be empty as per rule #2
       // above
-      val spec = relation.bucketSpec.get
-      val bucketColumns = spec.bucketColumnNames.flatMap(n => toAttribute(n))
-      val numPartitions = optionalNumCoalescedBuckets.getOrElse(spec.numBuckets)
+      val bucketSpec = relation.bucketSpec.get
+      val bucketColumns = bucketSpec.bucketColumnNames.flatMap(n => toAttribute(n))
+      val numPartitions = optionalNumCoalescedBuckets.getOrElse(bucketSpec.numBuckets)
       val partitioning = HashPartitioning(bucketColumns, numPartitions)
       val sortColumns =
-        spec.sortColumnNames.map(x => toAttribute(x)).takeWhile(x => x.isDefined).map(_.get)
+        bucketSpec.sortColumnNames.map(x => toAttribute(x)).takeWhile(x => x.isDefined).map(_.get)
       val shouldCalculateSortOrder =
         conf.getConf(SQLConf.LEGACY_BUCKETED_TABLE_SCAN_OUTPUT_ORDERING) &&
           sortColumns.nonEmpty &&
@@ -335,17 +333,6 @@ abstract class BaseColumnarFileSourceScanExec(
       relation.fileFormat
     }
 
-    // Prepare conf for persist bad records
-    val userBadRecordsPath = BadRecordsWriterUtils.getUserBadRecordsPath(relation.sparkSession)
-    val options = if (userBadRecordsPath.isDefined) {
-      val badRecordsPathWithTableIdentifier = BadRecordsWriterUtils.addTableIdentifierToPath(
-        userBadRecordsPath.get, tableIdentifier)
-      relation.options ++ Map(
-        "badRecordsPath" -> badRecordsPathWithTableIdentifier)
-    } else {
-      relation.options
-    }
-
     val readFile: (PartitionedFile) => Iterator[InternalRow] =
       fileFormat.buildReaderWithPartitionValues(
         sparkSession = relation.sparkSession,
@@ -353,8 +340,8 @@ abstract class BaseColumnarFileSourceScanExec(
         partitionSchema = relation.partitionSchema,
         requiredSchema = requiredSchema,
         filters = pushedDownFilters,
-        options = options,
-        hadoopConf = relation.sparkSession.sessionState.newHadoopConfWithOptions(options))
+        options = relation.options,
+        hadoopConf = relation.sparkSession.sessionState.newHadoopConfWithOptions(relation.options))
 
     val readRDD = if (bucketedScan) {
       createBucketedReadRDD(relation.bucketSpec.get, readFile, dynamicallySelectedPartitions,
@@ -401,7 +388,7 @@ abstract class BaseColumnarFileSourceScanExec(
     "numFiles" -> SQLMetrics.createMetric(sparkContext, "number of files read"),
     "metadataTime" -> SQLMetrics.createTimingMetric(sparkContext, "metadata time"),
     "filesSize" -> SQLMetrics.createSizeMetric(sparkContext, "size of files read"),
-    "numOutputVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatchs")
+    "numOutputVecBatches" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatches")
   ) ++ {
     // Tracking scan time has overhead, we can't afford to do it for each row, and can only do
     // it for each batch.
@@ -435,7 +422,7 @@ abstract class BaseColumnarFileSourceScanExec(
   protected override def doExecuteColumnar(): RDD[ColumnarBatch] = {
     val numOutputRows = longMetric("numOutputRows")
     val scanTime = longMetric("scanTime")
-    val numOutputVecBatchs = longMetric("numOutputVecBatchs")
+    val numOutputVecBatches= longMetric("numOutputVecBatches")
     val localSchema = this.schema
     inputRDD.asInstanceOf[RDD[ColumnarBatch]].mapPartitionsInternal { batches =>
       new Iterator[ColumnarBatch] {
@@ -458,7 +445,7 @@ abstract class BaseColumnarFileSourceScanExec(
             vector.setVec(input(i))
           }
           numOutputRows += batch.numRows
-          numOutputVecBatchs += 1
+          numOutputVecBatches+= 1
           new ColumnarBatch(vectors.toArray, batch.numRows)
         }
       }
@@ -552,7 +539,7 @@ abstract class BaseColumnarFileSourceScanExec(
         _ => true
     }
 
-    var splitFiles = selectedPartitions.flatMap { partition =>
+    val splitFiles = selectedPartitions.flatMap { partition =>
       partition.files.flatMap { file =>
         // getPath() is very expensive so we only want to call it once in this block:
         val filePath = file.getPath
@@ -572,13 +559,7 @@ abstract class BaseColumnarFileSourceScanExec(
           Seq.empty
         }
       }
-    }
-
-    if (fsRelation.sparkSession.sessionState.conf.fileListSortBy == "length") {
-      splitFiles = splitFiles.sortBy(_.length)(implicitly[Ordering[Long]].reverse)
-    } else {
-      splitFiles = splitFiles.sortBy(_.filePath)
-    }
+    }.sortBy(_.length)(implicitly[Ordering[Long]].reverse)
 
     val partitions =
       FilePartition.getFilePartitions(relation.sparkSession, splitFiles, maxSplitBytes)
@@ -607,17 +588,17 @@ abstract class BaseColumnarFileSourceScanExec(
     aggIndexOffset += agg.groupingExpressions.size
 
     val omniAggInputRaws = new Array[Boolean](agg.aggregateExpressions.size)
-    val omniAggOutputPartials =new Array[Boolean](agg.aggregateExpressions.size)
+    val omniPartialsAggOutput =new Array[Boolean](agg.aggregateExpressions.size)
     val omniAggTypes = new Array[DataType](agg.aggregateExpressions.size)
     val omniAggFunctionTypes = new Array[FunctionType](agg.aggregateExpressions.size)
     val omniAggOutputTypes = new Array[Array[DataType]](agg.aggregateExpressions.size)
     val omniAggChannels = new Array[Array[String]](agg.aggregateExpressions.size)
     val omniAggChannelsFilter = new Array[String](agg.aggregateExpressions.size)
 
-    var omniAggindex = 0
+    var omniAggIndex = 0
     for (exp <- agg.aggregateExpressions) {
       if (exp.filter.isDefined) {
-        omniAggChannelsFilter(omniAggindex) =
+        omniAggChannelsFilter(omniAggIndex) =
           rewriteToOmniJsonExpressionLiteral(exp.filter.get, attrAggExpsIdMap)
       }
       if (exp.mode == Final) {
@@ -628,16 +609,16 @@ abstract class BaseColumnarFileSourceScanExec(
             val aggExp = exp.aggregateFunction.children.head
             omniOutputExressionOrder += {
               exp.aggregateFunction.inputAggBufferAttributes.head.exprId ->
-                (omniAggindex + aggIndexOffset)
+                (omniAggIndex + aggIndexOffset)
             }
-            omniAggTypes(omniAggindex) = sparkTypeToOmniType(aggExp.dataType)
-            omniAggFunctionTypes(omniAggindex) = toOmniAggFunType(exp, true)
-            omniAggOutputTypes(omniAggindex) =
+            omniAggTypes(omniAggIndex) = sparkTypeToOmniType(aggExp.dataType)
+            omniAggFunctionTypes(omniAggIndex) = toOmniAggFunType(exp, true)
+            omniAggOutputTypes(omniAggIndex) =
               toOmniAggInOutType(exp.aggregateFunction.inputAggBufferAttributes)
-            omniAggChannels(omniAggindex) =
+            omniAggChannels(omniAggIndex) =
               toOmniAggInOutJSonExp(exp.aggregateFunction.children, attrAggExpsIdMap)
-            omniAggInputRaws(omniAggindex) = true
-            omniAggOutputPartials(omniAggindex) = true
+            omniAggInputRaws(omniAggIndex) = true
+            omniPartialsAggOutput(omniAggIndex) = true
           case _ => throw new UnsupportedOperationException(s"Unsupported aggregate aggregateFunction: $exp")
         }
       } else if (exp.mode == PartialMerge) {
@@ -646,22 +627,22 @@ abstract class BaseColumnarFileSourceScanExec(
             val aggExp = exp.aggregateFunction.children.head
             omniOutputExressionOrder += {
               exp.aggregateFunction.inputAggBufferAttributes.head.exprId ->
-                (omniAggindex + aggIndexOffset)
+                (omniAggIndex + aggIndexOffset)
             }
-            omniAggTypes(omniAggindex) = sparkTypeToOmniType(aggExp.dataType)
-            omniAggFunctionTypes(omniAggindex) = toOmniAggFunType(exp, true)
-            omniAggOutputTypes(omniAggindex) =
+            omniAggTypes(omniAggIndex) = sparkTypeToOmniType(aggExp.dataType)
+            omniAggFunctionTypes(omniAggIndex) = toOmniAggFunType(exp, true)
+            omniAggOutputTypes(omniAggIndex) =
               toOmniAggInOutType(exp.aggregateFunction.inputAggBufferAttributes)
-            omniAggChannels(omniAggindex) =
+            omniAggChannels(omniAggIndex) =
               toOmniAggInOutJSonExp(exp.aggregateFunction.inputAggBufferAttributes, attrAggExpsIdMap)
-            omniAggInputRaws(omniAggindex) = false
-            omniAggOutputPartials(omniAggindex) = true
+            omniAggInputRaws(omniAggIndex) = false
+            omniPartialsAggOutput(omniAggIndex) = true
           case _ => throw new UnsupportedOperationException(s"Unsupported aggregate aggregateFunction: $exp")
         }
       } else {
         throw new UnsupportedOperationException(s"Unsupported aggregate mode: $exp.mode")
       }
-      omniAggindex += 1
+      omniAggIndex += 1
     }
 
     var resultIdxToOmniResultIdxMap: Map[Int, Int] = Map()
@@ -678,7 +659,7 @@ abstract class BaseColumnarFileSourceScanExec(
         omniAggSourceTypes(i) = sparkTypeToOmniType(attr.dataType, attr.metadata)
     }
     (omniGroupByChanel, omniAggChannels, omniAggChannelsFilter, omniAggSourceTypes, omniAggFunctionTypes,
-      omniAggOutputTypes, omniAggInputRaws, omniAggOutputPartials, resultIdxToOmniResultIdxMap)
+      omniAggOutputTypes, omniAggInputRaws, omniPartialsAggOutput, resultIdxToOmniResultIdxMap)
   }
 
   def genProjectOutput(project: ColumnarProjectExec) = {
@@ -792,9 +773,7 @@ case class ColumnarFileSourceScanExec(
     optionalNumCoalescedBuckets: Option[Int],
     dataFilters: Seq[Expression],
     tableIdentifier: Option[TableIdentifier],
-    needPriv: Boolean = false,
-    disableBucketedScan: Boolean = false,
-    outputAllAttributes: Seq[Attribute] = Seq.empty[Attribute])
+    disableBucketedScan: Boolean = false)
   extends BaseColumnarFileSourceScanExec(
     relation,
     output,
@@ -804,9 +783,7 @@ case class ColumnarFileSourceScanExec(
     optionalNumCoalescedBuckets,
     dataFilters,
     tableIdentifier,
-    needPriv,
-    disableBucketedScan,
-    outputAllAttributes) {
+    disableBucketedScan) {
   override def doCanonicalize(): ColumnarFileSourceScanExec = {
     ColumnarFileSourceScanExec(
       relation,
@@ -818,7 +795,6 @@ case class ColumnarFileSourceScanExec(
       optionalNumCoalescedBuckets,
       QueryPlan.normalizePredicates(dataFilters, output),
       None,
-      needPriv,
       disableBucketedScan)
   }
 }
@@ -883,7 +859,7 @@ case class ColumnarMultipleOperatorExec(
     "addInputTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni addInput"),
     "outputTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni getOutput"),
     "omniJitTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni codegen"),
-    "numOutputVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatchs")
+    "numOutputVecBatches" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatches")
   ) ++ {
     // Tracking scan time has overhead, we can't afford to do it for each row, and can only do
     // it for each batch.
@@ -907,7 +883,7 @@ case class ColumnarMultipleOperatorExec(
     val numOutputRows = longMetric("numOutputRows")
     val scanTime = longMetric("scanTime")
     val numInputRows = longMetric("numInputRows")
-    val numOutputVecBatchs = longMetric("numOutputVecBatchs")
+    val numOutputVecBatches= longMetric("numOutputVecBatches")
     val addInputTime = longMetric("addInputTime")
     val omniCodegenTime = longMetric("omniJitTime")
     val getOutputTime = longMetric("outputTime")
@@ -954,7 +930,7 @@ case class ColumnarMultipleOperatorExec(
         projectOperator1.close()
       })
 
-      val buildOpFactory1 = new OmniHashBuilderWithExprOperatorFactory(buildTypes1,
+      val buildOpFactory1 = new OmniHashBuilderWithExprOperatorFactory(OMNI_JOIN_TYPE_INNER, buildTypes1,
         buildJoinColsExp1, 1,
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val buildOp1 = buildOpFactory1.createOperator()
@@ -970,7 +946,7 @@ case class ColumnarMultipleOperatorExec(
       }
       buildOp1.getOutput
       val lookupOpFactory1 = new OmniLookupJoinWithExprOperatorFactory(probeTypes1, probeOutputCols1,
-        probeHashColsExp1, buildOutputCols1, buildOutputTypes1, OMNI_JOIN_TYPE_INNER, buildOpFactory1,
+        probeHashColsExp1, buildOutputCols1, buildOutputTypes1, buildOpFactory1,
         if (joinFilter1.nonEmpty) {Optional.of(joinFilter1.get)} else {Optional.empty()},
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val lookupOp1 = lookupOpFactory1.createOperator()
@@ -988,7 +964,7 @@ case class ColumnarMultipleOperatorExec(
         projectOperator2.close()
       })
 
-      val buildOpFactory2 = new OmniHashBuilderWithExprOperatorFactory(buildTypes2,
+      val buildOpFactory2 = new OmniHashBuilderWithExprOperatorFactory(OMNI_JOIN_TYPE_INNER, buildTypes2,
         buildJoinColsExp2, 1,
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val buildOp2 = buildOpFactory2.createOperator()
@@ -1004,7 +980,7 @@ case class ColumnarMultipleOperatorExec(
       }
       buildOp2.getOutput
       val lookupOpFactory2 = new OmniLookupJoinWithExprOperatorFactory(probeTypes2, probeOutputCols2,
-        probeHashColsExp2, buildOutputCols2, buildOutputTypes2, OMNI_JOIN_TYPE_INNER, buildOpFactory2,
+        probeHashColsExp2, buildOutputCols2, buildOutputTypes2, buildOpFactory2,
         if (joinFilter2.nonEmpty) {Optional.of(joinFilter2.get)} else {Optional.empty()},
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val lookupOp2 = lookupOpFactory2.createOperator()
@@ -1023,7 +999,7 @@ case class ColumnarMultipleOperatorExec(
         projectOperator3.close()
       })
 
-      val buildOpFactory3 = new OmniHashBuilderWithExprOperatorFactory(buildTypes3,
+      val buildOpFactory3 = new OmniHashBuilderWithExprOperatorFactory(OMNI_JOIN_TYPE_INNER, buildTypes3,
         buildJoinColsExp3, 1,
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val buildOp3 = buildOpFactory3.createOperator()
@@ -1039,7 +1015,7 @@ case class ColumnarMultipleOperatorExec(
       }
       buildOp3.getOutput
       val lookupOpFactory3 = new OmniLookupJoinWithExprOperatorFactory(probeTypes3, probeOutputCols3,
-        probeHashColsExp3, buildOutputCols3, buildOutputTypes3, OMNI_JOIN_TYPE_INNER, buildOpFactory3,
+        probeHashColsExp3, buildOutputCols3, buildOutputTypes3, buildOpFactory3,
         if (joinFilter3.nonEmpty) {Optional.of(joinFilter3.get)} else {Optional.empty()},
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val lookupOp3 = lookupOpFactory3.createOperator()
@@ -1058,7 +1034,7 @@ case class ColumnarMultipleOperatorExec(
         projectOperator4.close()
       })
 
-      val buildOpFactory4 = new OmniHashBuilderWithExprOperatorFactory(buildTypes4,
+      val buildOpFactory4 = new OmniHashBuilderWithExprOperatorFactory(OMNI_JOIN_TYPE_INNER, buildTypes4,
         buildJoinColsExp4, 1,
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val buildOp4 = buildOpFactory4.createOperator()
@@ -1074,7 +1050,7 @@ case class ColumnarMultipleOperatorExec(
       }
       buildOp4.getOutput
       val lookupOpFactory4 = new OmniLookupJoinWithExprOperatorFactory(probeTypes4, probeOutputCols4,
-        probeHashColsExp4, buildOutputCols4, buildOutputTypes4, OMNI_JOIN_TYPE_INNER, buildOpFactory4,
+        probeHashColsExp4, buildOutputCols4, buildOutputTypes4, buildOpFactory4,
         if (joinFilter4.nonEmpty) {Optional.of(joinFilter4.get)} else {Optional.empty()},
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val lookupOp4 = lookupOpFactory4.createOperator()
@@ -1171,7 +1147,7 @@ case class ColumnarMultipleOperatorExec(
             vector.setVec(vecBatch.getVectors()(resultIdxToOmniResultIdxMap(i)))
           }
           numOutputRows += vecBatch.getRowCount
-          numOutputVecBatchs += 1
+          numOutputVecBatches+= 1
           getOutputTime += NANOSECONDS.toMillis(System.nanoTime() - startGetOp)
           vecBatch.close()
           new ColumnarBatch(vectors.toArray, vecBatch.getRowCount)
@@ -1232,7 +1208,7 @@ case class ColumnarMultipleOperatorExec1(
     "addInputTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni addInput"),
     "outputTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni getOutput"),
     "omniJitTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni codegen"),
-    "numOutputVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatchs"),
+    "numOutputVecBatches" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatches"),
     //operator metric
     "lookupAddInputTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni lookup addInput"),
     //
@@ -1259,7 +1235,7 @@ case class ColumnarMultipleOperatorExec1(
     val numOutputRows = longMetric("numOutputRows")
     val scanTime = longMetric("scanTime")
     val numInputRows = longMetric("numInputRows")
-    val numOutputVecBatchs = longMetric("numOutputVecBatchs")
+    val numOutputVecBatches= longMetric("numOutputVecBatches")
     val addInputTime = longMetric("addInputTime")
     val omniCodegenTime = longMetric("omniJitTime")
     val getOutputTime = longMetric("outputTime")
@@ -1319,7 +1295,7 @@ case class ColumnarMultipleOperatorExec1(
         projectOperator1.close()
       })
 
-      val buildOpFactory1 = new OmniHashBuilderWithExprOperatorFactory(buildTypes1,
+      val buildOpFactory1 = new OmniHashBuilderWithExprOperatorFactory(OMNI_JOIN_TYPE_INNER, buildTypes1,
         buildJoinColsExp1, 1,
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val buildOp1 = buildOpFactory1.createOperator()
@@ -1335,7 +1311,7 @@ case class ColumnarMultipleOperatorExec1(
       }
       buildOp1.getOutput
       val lookupOpFactory1 = new OmniLookupJoinWithExprOperatorFactory(probeTypes1, probeOutputCols1,
-        probeHashColsExp1, buildOutputCols1, buildOutputTypes1, OMNI_JOIN_TYPE_INNER, buildOpFactory1,
+        probeHashColsExp1, buildOutputCols1, buildOutputTypes1, buildOpFactory1,
         if (joinFilter1.nonEmpty) {Optional.of(joinFilter1.get)} else {Optional.empty()},
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val lookupOp1 = lookupOpFactory1.createOperator()
@@ -1354,7 +1330,7 @@ case class ColumnarMultipleOperatorExec1(
         projectOperator2.close()
       })
 
-      val buildOpFactory2 = new OmniHashBuilderWithExprOperatorFactory(buildTypes2,
+      val buildOpFactory2 = new OmniHashBuilderWithExprOperatorFactory(OMNI_JOIN_TYPE_INNER, buildTypes2,
         buildJoinColsExp2, 1,
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val buildOp2 = buildOpFactory2.createOperator()
@@ -1370,7 +1346,7 @@ case class ColumnarMultipleOperatorExec1(
       }
       buildOp2.getOutput
       val lookupOpFactory2 = new OmniLookupJoinWithExprOperatorFactory(probeTypes2, probeOutputCols2,
-        probeHashColsExp2, buildOutputCols2, buildOutputTypes2, OMNI_JOIN_TYPE_INNER, buildOpFactory2,
+        probeHashColsExp2, buildOutputCols2, buildOutputTypes2, buildOpFactory2,
         if (joinFilter2.nonEmpty) {Optional.of(joinFilter2.get)} else {Optional.empty()},
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val lookupOp2 = lookupOpFactory2.createOperator()
@@ -1389,7 +1365,7 @@ case class ColumnarMultipleOperatorExec1(
         projectOperator3.close()
       })
 
-      val buildOpFactory3 = new OmniHashBuilderWithExprOperatorFactory(buildTypes3,
+      val buildOpFactory3 = new OmniHashBuilderWithExprOperatorFactory(OMNI_JOIN_TYPE_INNER, buildTypes3,
         buildJoinColsExp3, 1,
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val buildOp3 = buildOpFactory3.createOperator()
@@ -1405,7 +1381,7 @@ case class ColumnarMultipleOperatorExec1(
       }
       buildOp3.getOutput
       val lookupOpFactory3 = new OmniLookupJoinWithExprOperatorFactory(probeTypes3, probeOutputCols3,
-        probeHashColsExp3, buildOutputCols3, buildOutputTypes3, OMNI_JOIN_TYPE_INNER, buildOpFactory3,
+        probeHashColsExp3, buildOutputCols3, buildOutputTypes3, buildOpFactory3,
         if (joinFilter3.nonEmpty) {Optional.of(joinFilter3.get)} else {Optional.empty()},
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val lookupOp3 = lookupOpFactory3.createOperator()
@@ -1504,7 +1480,7 @@ case class ColumnarMultipleOperatorExec1(
             vector.setVec(vecBatch.getVectors()(resultIdxToOmniResultIdxMap(i)))
           }
           numOutputRows += vecBatch.getRowCount
-          numOutputVecBatchs += 1
+          numOutputVecBatches+= 1
           getOutputTime += NANOSECONDS.toMillis(System.nanoTime() - startGetOp)
           vecBatch.close()
           new ColumnarBatch(vectors.toArray, vecBatch.getRowCount)

@@ -7,20 +7,14 @@ set (SOURCE_FILES
         io/ColumnWriter.cc
         io/Compression.cc
         io/MemoryPool.cc
-        io/OrcObsFile.cc
         io/OutputStream.cc
         io/SparkFile.cc
         io/WriterOptions.cc
-        io/orcfile/OrcFileRewrite.cc
-        io/orcfile/OrcHdfsFileRewrite.cc
         shuffle/splitter.cpp
         common/common.cpp
         jni/SparkJniWrapper.cpp
-        jni/OrcColumnarBatchJniReader.cpp
         jni/jni_common.cpp
-        jni/ParquetColumnarBatchJniReader.cpp
-        tablescan/ParquetReader.cpp
-        io/ParquetObsFile.cc)
+        )
 
 #Find required protobuf package
 find_package(Protobuf REQUIRED)
@@ -35,20 +29,12 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR})
 protobuf_generate_cpp(PROTO_SRCS_VB PROTO_HDRS_VB proto/vec_data.proto)
 add_library (${PROJ_TARGET} SHARED ${SOURCE_FILES} ${PROTO_SRCS} ${PROTO_HDRS} ${PROTO_SRCS_VB} ${PROTO_HDRS_VB})
 
-find_package(Arrow REQUIRED)
-find_package(ArrowDataset REQUIRED)
-find_package(Parquet REQUIRED)
-
 #JNI
 target_include_directories(${PROJ_TARGET} PUBLIC $ENV{JAVA_HOME}/include)
 target_include_directories(${PROJ_TARGET} PUBLIC $ENV{JAVA_HOME}/include/linux)
 target_include_directories(${PROJ_TARGET} PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
 
 target_link_libraries (${PROJ_TARGET} PUBLIC
-        Arrow::arrow_shared
-        ArrowDataset::arrow_dataset_shared
-        Parquet::parquet_shared
-        orc
         crypto
         sasl2
         protobuf
@@ -56,8 +42,7 @@ target_link_libraries (${PROJ_TARGET} PUBLIC
         snappy
         lz4
         zstd
-        eSDKOBS
-        boostkit-omniop-vector-1.3.0-aarch64
+        boostkit-omniop-vector-1.4.0-aarch64
         )
 
 set_target_properties(${PROJ_TARGET} PROPERTIES

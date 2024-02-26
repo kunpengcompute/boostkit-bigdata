@@ -23,7 +23,7 @@ import static org.apache.parquet.format.converter.ParquetMetadataConverter.range
 import static org.apache.parquet.hadoop.ParquetFileReader.readFooter;
 import static org.apache.parquet.hadoop.ParquetInputFormat.getFilter;
 
-import com.huawei.boostkit.spark.jni.ParquetColumnarBatchJniReader;
+import com.huawei.boostkit.spark.jni.ParquetColumnarBatchScanReader;
 import nova.hetu.omniruntime.vector.Vec;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
@@ -51,9 +51,10 @@ import org.apache.parquet.io.ParquetDecodingException;
 import org.apache.parquet.schema.MessageType;
 import org.apache.parquet.schema.Type;
 import org.apache.spark.sql.catalyst.InternalRow;
-import org.apache.spark.sql.execution.vectorized.ColumnVectorUtils;
+import org.apache.spark.sql.execution.vectorized.OmniColumnVectorUtils;
 import org.apache.spark.sql.execution.vectorized.OmniColumnVector;
 import org.apache.spark.sql.execution.vectorized.OnHeapColumnVector;
+import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 import org.apache.spark.sql.types.StructType$;
@@ -65,7 +66,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.util.*;
 
 /**
- * To support parquet file format in native, OmniParquetColumnarBatchReader uses ParquetColumnarBatchJniReader to
+ * To support parquet file format in native, ParquetColumnarBatchScanReader uses ParquetColumnarBatchJniReader to
  * read data and return batch to next operator.
  */
 public class OmniParquetColumnarBatchReader extends RecordReader<Void, ColumnarBatch> {
@@ -79,13 +80,15 @@ public class OmniParquetColumnarBatchReader extends RecordReader<Void, ColumnarB
   private MessageType fileSchema;
   private MessageType requestedSchema;
   private StructType sparkSchema;
-  private ParquetColumnarBatchJniReader reader;
+  private ParquetColumnarBatchScanReader reader;
   private org.apache.spark.sql.vectorized.ColumnVector[] wrap;
 
   // Store the immutable cols, such as partionCols and misingCols, which only init once.
   // And wrap will slice vecs from templateWrap when calling nextBatch().
   private org.apache.spark.sql.vectorized.ColumnVector[] templateWrap;
   private Vec[] vecs;
+
+  private List<DataType> types = new ArrayList<>();
   private boolean isFilterPredicate = false;
 
   public OmniParquetColumnarBatchReader(int capacity, ParquetMetadata fileFooter) {
@@ -93,7 +96,7 @@ public class OmniParquetColumnarBatchReader extends RecordReader<Void, ColumnarB
     this.fileFooter = fileFooter;
   }
 
-  public ParquetColumnarBatchJniReader getReader() {
+  public ParquetColumnarBatchScanReader getReader() {
     return this.reader;
   }
 
@@ -150,12 +153,12 @@ public class OmniParquetColumnarBatchReader extends RecordReader<Void, ColumnarB
     this.requestedSchema = readContext.getRequestedSchema();
     String sparkRequestedSchemaString = configuration.get(ParquetReadSupport$.MODULE$.SPARK_ROW_REQUESTED_SCHEMA());
     this.sparkSchema = StructType$.MODULE$.fromString(sparkRequestedSchemaString);
-    this.reader = new ParquetColumnarBatchJniReader();
+    this.reader = new ParquetColumnarBatchScanReader();
     // PushDown rowGroups and columns indices for native reader.
     List<Integer> rowgroupIndices = getFilteredBlocks(split.getStart(), split.getEnd());
     List<Integer> columnIndices = getColumnIndices(requestedSchema.getColumns(), fileSchema.getColumns());
     String ugi = UserGroupInformation.getCurrentUser().toString();
-    reader.initializeReaderJava(split.getPath().toString(), capacity, rowgroupIndices, columnIndices, ugi);
+    reader.initializeReaderJava(split.getPath(), capacity, rowgroupIndices, columnIndices, ugi);
     // Add missing Cols flags.
     initializeInternal();
   }
@@ -242,6 +245,7 @@ public class OmniParquetColumnarBatchReader extends RecordReader<Void, ColumnarB
     StructType batchSchema = new StructType();
     for (StructField f: sparkSchema.fields()) {
       batchSchema = batchSchema.add(f);
+      types.add(f.dataType());
     }
     if (partitionColumns != null) {
       for (StructField f : partitionColumns.fields()) {
@@ -257,7 +261,7 @@ public class OmniParquetColumnarBatchReader extends RecordReader<Void, ColumnarB
       int partitionIdx = sparkSchema.fields().length;
       for (int i = 0; i < partitionColumns.fields().length; i++) {
         OmniColumnVector partitionCol = new OmniColumnVector(capacity, partitionColumns.fields()[i].dataType(), true);
-        ColumnVectorUtils.populate(partitionCol, partitionValues, i);
+        OmniColumnVectorUtils.populate(partitionCol, partitionValues, i);
         partitionCol.setIsConstant();
         // templateWrap always stores partitionCol
         templateWrap[i + partitionIdx] = partitionCol;
@@ -288,7 +292,7 @@ public class OmniParquetColumnarBatchReader extends RecordReader<Void, ColumnarB
    * Advance to the next batch of rows. Return false if there are no more.
    */
   public boolean nextBatch() throws IOException {
-    int batchSize = reader.next(vecs);
+    int batchSize = reader.next(vecs, types);
     if (batchSize == 0) {
       return false;
     }

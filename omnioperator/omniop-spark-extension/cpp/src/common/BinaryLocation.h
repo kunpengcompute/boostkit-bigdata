@@ -67,11 +67,19 @@ public:
         return vc_list;
     }
 
+    bool hasNull() const {
+        return hasNullFlag;
+    }
+
+    void SetNullFlag(bool hasNull) {
+        hasNullFlag = hasNull;
+    }
+
 public:
     uint32_t vcb_capacity;
     uint32_t vcb_total_len;
     std::vector<VCLocation> vc_list;
-
+    bool hasNullFlag = false;
 
 };
 #endif //SPARK_THESTRAL_PLUGIN_BINARYLOCATION_H

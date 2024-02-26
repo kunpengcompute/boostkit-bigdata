@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2020-2024. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
@@ -19,20 +20,23 @@ package com.huawei.boostkit.spark
 
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor
 import com.huawei.boostkit.spark.util.PhysicalPlanSelector
-
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{SparkSession, SparkSessionExtensions}
-import org.apache.spark.sql.catalyst.expressions.{Ascending, DynamicPruningSubquery, SortOrder}
-import org.apache.spark.sql.catalyst.expressions.aggregate.Partial
+import org.apache.spark.sql.catalyst.expressions.{Ascending, DynamicPruningSubquery, Expression, Literal, SortOrder}
+import org.apache.spark.sql.catalyst.expressions.aggregate.{AggregateExpression, Partial, PartialMerge}
+import org.apache.spark.sql.catalyst.optimizer.{DelayCartesianProduct, HeuristicJoinReorder, MergeSubqueryFilters, RewriteSelfJoinInInPredicate}
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.{RowToOmniColumnarExec, _}
-import org.apache.spark.sql.execution.adaptive.{BroadcastQueryStageExec, OmniAQEShuffleReadExec, AQEShuffleReadExec, QueryStageExec, ShuffleQueryStageExec}
-import org.apache.spark.sql.execution.aggregate.HashAggregateExec
+import org.apache.spark.sql.execution.adaptive.{AQEShuffleReadExec, BroadcastQueryStageExec, OmniAQEShuffleReadExec, QueryStageExec, ShuffleQueryStageExec}
+import org.apache.spark.sql.execution.aggregate.{DummyLogicalPlan, ExtendedAggUtils, HashAggregateExec}
 import org.apache.spark.sql.execution.exchange.{BroadcastExchangeExec, Exchange, ReusedExchangeExec, ShuffleExchangeExec}
 import org.apache.spark.sql.execution.joins._
 import org.apache.spark.sql.execution.window.WindowExec
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.ColumnarBatchSupportUtil.checkColumnarBatchSupport
+import org.apache.spark.sql.catalyst.planning.PhysicalAggregation
+import org.apache.spark.sql.catalyst.plans.LeftSemi
+import org.apache.spark.sql.catalyst.plans.logical.Aggregate
 
 case class ColumnarPreOverrides() extends Rule[SparkPlan] {
   val columnarConf: ColumnarPluginConfig = ColumnarPluginConfig.getSessionConf
@@ -59,6 +63,10 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] {
   val enableColumnarProjectFusion: Boolean = columnarConf.enableColumnarProjectFusion
   val enableLocalColumnarLimit: Boolean = columnarConf.enableLocalColumnarLimit
   val enableGlobalColumnarLimit: Boolean = columnarConf.enableGlobalColumnarLimit
+  val enableDedupLeftSemiJoin: Boolean = columnarConf.enableDedupLeftSemiJoin
+  val dedupLeftSemiJoinThreshold: Int = columnarConf.dedupLeftSemiJoinThreshold
+  val enableColumnarCoalesce: Boolean = columnarConf.enableColumnarCoalesce
+  val enableRollupOptimization: Boolean = columnarConf.enableRollupOptimization
 
   def apply(plan: SparkPlan): SparkPlan = {
     replaceWithColumnarPlan(plan)
@@ -115,9 +123,7 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] {
         plan.optionalNumCoalescedBuckets,
         plan.dataFilters,
         plan.tableIdentifier,
-        plan.needPriv,
-        plan.disableBucketedScan,
-        plan.outputAllAttributes
+        plan.disableBucketedScan
       )
     case range: RangeExec =>
       new ColumnarRangeExec(range.range)
@@ -197,7 +203,7 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] {
             proj4 @ ColumnarProjectExec(_,
             join4 @ ColumnarBroadcastHashJoinExec(_, _, _, _, _,
             filter @ ColumnarFilterExec(_,
-            scan @ ColumnarFileSourceScanExec(_, _, _, _, _, _, _, _, _, _, _)
+            scan @ ColumnarFileSourceScanExec(_, _, _, _, _, _, _, _, _)
             ), _, _, _)), _, _, _)), _, _, _)), _, _, _))
               if checkBhjRightChild(
                 child.asInstanceOf[ColumnarProjectExec].child.children(1)
@@ -229,7 +235,7 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] {
             proj3 @ ColumnarProjectExec(_,
             join3 @ ColumnarBroadcastHashJoinExec(_, _, _, _, _, _,
             filter @ ColumnarFilterExec(_,
-            scan @ ColumnarFileSourceScanExec(_, _, _, _, _, _, _, _, _, _, _)), _, _)) , _, _, _)), _, _, _))
+            scan @ ColumnarFileSourceScanExec(_, _, _, _, _, _, _, _, _)), _, _)) , _, _, _)), _, _, _))
               if checkBhjRightChild(
                 child.asInstanceOf[ColumnarProjectExec].child.children(1)
                   .asInstanceOf[ColumnarBroadcastExchangeExec].child) =>
@@ -258,7 +264,7 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] {
             proj3 @ ColumnarProjectExec(_,
             join3 @ ColumnarBroadcastHashJoinExec(_, _, _, _, _,
             filter @ ColumnarFilterExec(_,
-            scan @ ColumnarFileSourceScanExec(_, _, _, _, _, _, _, _, _, _, _)), _, _, _)) , _, _, _)), _, _, _))
+            scan @ ColumnarFileSourceScanExec(_, _, _, _, _, _, _, _, _)), _, _, _)) , _, _, _)), _, _, _))
               if checkBhjRightChild(
                 child.asInstanceOf[ColumnarProjectExec].child.children(1)
                   .asInstanceOf[ColumnarBroadcastExchangeExec].child) =>
@@ -305,16 +311,92 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] {
             child)
         }
       } else {
-        new ColumnarHashAggregateExec(
-          plan.requiredChildDistributionExpressions,
-          plan.isStreaming,
-          plan.numShufflePartitions,
-          plan.groupingExpressions,
-          plan.aggregateExpressions,
-          plan.aggregateAttributes,
-          plan.initialInputBufferOffset,
-          plan.resultExpressions,
-          child)
+        if (child.isInstanceOf[ColumnarExpandExec]) {
+          var columnarExpandExec = child.asInstanceOf[ColumnarExpandExec]
+          val matchRollupOptimization: Boolean = columnarExpandExec.matchRollupOptimization()
+          if (matchRollupOptimization && enableRollupOptimization) {
+            // The sparkPlan: ColumnarExpandExec -> ColumnarHashAggExec => ColumnarExpandExec -> ColumnarHashAggExec -> ColumnarOptRollupExec.
+            // ColumnarHashAggExec handles the first combination by Partial mode, i.e. projections[0].
+            // ColumnarOptRollupExec handles the residual combinations by PartialMerge mode, i.e. projections[1]~projections[n].
+            val projections = columnarExpandExec.projections
+            val headProjections = projections.slice(0, 1)
+            var residualProjections = projections.slice(1, projections.length)
+            // replace parameters
+            columnarExpandExec = columnarExpandExec.replace(headProjections)
+
+            // partial
+            val partialHashAggExec = new ColumnarHashAggregateExec(
+              plan.requiredChildDistributionExpressions,
+              plan.isStreaming,
+              plan.numShufflePartitions,
+              plan.groupingExpressions,
+              plan.aggregateExpressions,
+              plan.aggregateAttributes,
+              plan.initialInputBufferOffset,
+              plan.resultExpressions,
+              columnarExpandExec)
+
+
+            // If the aggregator has an expression, more than one column in the projection is used
+            // for expression calculation. Meanwhile, If the single distinct syntax exists, the
+            // sequence of group columns is disordered. Therefore, we need to calculate the sequence
+            // of expandSeq first to ensure the project operator correctly processes the columns.
+            val expectSeq = plan.resultExpressions
+            val expandSeq = columnarExpandExec.output
+            // the processing sequences of expandSeq
+            residualProjections = residualProjections.map(projection => {
+              val indexSeq: Seq[Expression] = expectSeq.map(expectExpr => {
+                val index = expandSeq.indexWhere(expandExpr => expectExpr.exprId.equals(expandExpr.exprId))
+                if (index != -1) {
+                  projection.apply(index) match {
+                    case literal: Literal => literal
+                    case _ => expectExpr
+                  }
+                } else {
+                  expectExpr
+                }
+              })
+              indexSeq
+            })
+
+            // partial merge
+            val groupingExpressions = plan.resultExpressions.slice(0, plan.groupingExpressions.length)
+            val aggregateExpressions = plan.aggregateExpressions.map(expr => {
+              expr.copy(expr.aggregateFunction, PartialMerge, expr.isDistinct, expr.filter, expr.resultId)
+            })
+
+            // need ExpandExec parameters and HashAggExec parameters
+            new ColumnarOptRollupExec(
+              residualProjections,
+              plan.output,
+              groupingExpressions,
+              aggregateExpressions,
+              plan.aggregateAttributes,
+              partialHashAggExec)
+          } else {
+            new ColumnarHashAggregateExec(
+              plan.requiredChildDistributionExpressions,
+              plan.isStreaming,
+              plan.numShufflePartitions,
+              plan.groupingExpressions,
+              plan.aggregateExpressions,
+              plan.aggregateAttributes,
+              plan.initialInputBufferOffset,
+              plan.resultExpressions,
+              child)
+          }
+        } else {
+          new ColumnarHashAggregateExec(
+            plan.requiredChildDistributionExpressions,
+            plan.isStreaming,
+            plan.numShufflePartitions,
+            plan.groupingExpressions,
+            plan.aggregateExpressions,
+            plan.aggregateAttributes,
+            plan.initialInputBufferOffset,
+            plan.resultExpressions,
+            child)
+        }
       }
 
     case plan: TakeOrderedAndProjectExec if enableTakeOrderedAndProject =>
@@ -342,6 +424,72 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] {
         plan.condition,
         left,
         right)
+    case plan: ShuffledHashJoinExec if enableShuffledHashJoin && enableDedupLeftSemiJoin => {
+      plan.joinType match {
+        case LeftSemi => {
+          if (plan.condition.isEmpty && plan.right.output.size >= dedupLeftSemiJoinThreshold) {
+            val left = replaceWithColumnarPlan(plan.left)
+            val right = replaceWithColumnarPlan(plan.right)
+            val partialAgg = PhysicalAggregation.unapply(Aggregate(plan.right.output, plan.right.output, new DummyLogicalPlan)) match {
+              case Some((groupingExpressions, aggExpressions, resultExpressions, _))
+                if aggExpressions.forall(expr => expr.isInstanceOf[AggregateExpression]) =>
+                ExtendedAggUtils.planPartialAggregateWithoutDistinct(
+                  ExtendedAggUtils.normalizeGroupingExpressions(groupingExpressions),
+                  aggExpressions.map(_.asInstanceOf[AggregateExpression]),
+                  resultExpressions,
+                  right).asInstanceOf[HashAggregateExec]
+            }
+            val newHashAgg = new ColumnarHashAggregateExec(
+              partialAgg.requiredChildDistributionExpressions,
+              partialAgg.isStreaming,
+              partialAgg.numShufflePartitions,
+              partialAgg.groupingExpressions,
+              partialAgg.aggregateExpressions,
+              partialAgg.aggregateAttributes,
+              partialAgg.initialInputBufferOffset,
+              partialAgg.resultExpressions,
+              right)
+
+            ColumnarShuffledHashJoinExec(
+              plan.leftKeys,
+              plan.rightKeys,
+              plan.joinType,
+              plan.buildSide,
+              plan.condition,
+              left,
+              newHashAgg,
+              plan.isSkewJoin)
+          } else {
+            val left = replaceWithColumnarPlan(plan.left)
+            val right = replaceWithColumnarPlan(plan.right)
+            logDebug(s"Columnar Processing for ${plan.getClass} is currently supported.")
+            ColumnarShuffledHashJoinExec(
+              plan.leftKeys,
+              plan.rightKeys,
+              plan.joinType,
+              plan.buildSide,
+              plan.condition,
+              left,
+              right,
+              plan.isSkewJoin)
+          }
+        }
+        case _ => {
+          val left = replaceWithColumnarPlan(plan.left)
+          val right = replaceWithColumnarPlan(plan.right)
+          logDebug(s"Columnar Processing for ${plan.getClass} is currently supported.")
+          ColumnarShuffledHashJoinExec(
+            plan.leftKeys,
+            plan.rightKeys,
+            plan.joinType,
+            plan.buildSide,
+            plan.condition,
+            left,
+            right,
+            plan.isSkewJoin)
+        }
+      }
+    }
     case plan: ShuffledHashJoinExec if enableShuffledHashJoin =>
       val left = replaceWithColumnarPlan(plan.left)
       val right = replaceWithColumnarPlan(plan.right)
@@ -378,6 +526,9 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] {
       ColumnarSortExec(plan.sortOrder, plan.global, child, plan.testSpillFrequency)
     case plan: WindowExec if enableColumnarWindow =>
       val child = replaceWithColumnarPlan(plan.child)
+      if (child.output.isEmpty) {
+        return plan
+      }
       logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
       child match {
         case ColumnarSortExec(sortOrder, _, sortChild, _) =>
@@ -395,8 +546,12 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] {
       ColumnarUnionExec(children)
     case plan: ShuffleExchangeExec if enableColumnarShuffle =>
       val child = replaceWithColumnarPlan(plan.child)
-      logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
-      new ColumnarShuffleExchangeExec(plan.outputPartitioning, child, plan.shuffleOrigin)
+      if (child.output.nonEmpty) {
+        logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
+        new ColumnarShuffleExchangeExec(plan.outputPartitioning, child, plan.shuffleOrigin)
+      } else {
+        plan
+      }
     case plan: AQEShuffleReadExec if columnarConf.enableColumnarShuffle =>
       plan.child match {
         case shuffle: ColumnarShuffleExchangeExec =>
@@ -426,6 +581,10 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] {
       val child = replaceWithColumnarPlan(plan.child)
       logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
       ColumnarGlobalLimitExec(plan.limit, child)
+    case plan: CoalesceExec if enableColumnarCoalesce =>
+      val child = replaceWithColumnarPlan(plan.child)
+      logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
+      ColumnarCoalesceExec(plan.numPartitions, child)
     case p =>
       val children = plan.children.map(replaceWithColumnarPlan)
       logInfo(s"Columnar Processing for ${p.getClass} is currently not supported.")
@@ -460,12 +619,12 @@ case class ColumnarPostOverrides() extends Rule[SparkPlan] {
   var isSupportAdaptive: Boolean = true
 
   def apply(plan: SparkPlan): SparkPlan = {
-    handleColumnarToRowParitalFetch(replaceWithColumnarPlan(plan))
+    handleColumnarToRowPartialFetch(replaceWithColumnarPlan(plan))
   }
 
-  private def handleColumnarToRowParitalFetch(plan: SparkPlan): SparkPlan = {
+  private def handleColumnarToRowPartialFetch(plan: SparkPlan): SparkPlan = {
     // simple check plan tree have OmniColumnarToRow and no LimitExec and TakeOrderedAndProjectExec plan
-    val noParitalFetch = if (plan.find(_.isInstanceOf[OmniColumnarToRowExec]).isDefined) {
+    val noPartialFetch = if (plan.find(_.isInstanceOf[OmniColumnarToRowExec]).isDefined) {
         (!plan.find(node =>
             node.isInstanceOf[LimitExec] || node.isInstanceOf[TakeOrderedAndProjectExec] ||
             node.isInstanceOf[SortMergeJoinExec]).isDefined)
@@ -473,7 +632,7 @@ case class ColumnarPostOverrides() extends Rule[SparkPlan] {
       false
     }
     val newPlan = plan.transformUp {
-      case c: OmniColumnarToRowExec if noParitalFetch =>
+      case c: OmniColumnarToRowExec if noPartialFetch =>
         c.copy(c.child, false)
     }
     newPlan
@@ -582,11 +741,15 @@ case class ColumnarOverrideRules(session: SparkSession) extends ColumnarRule wit
       rule(plan)
     }
 }
+
 class ColumnarPlugin extends (SparkSessionExtensions => Unit) with Logging {
   override def apply(extensions: SparkSessionExtensions): Unit = {
     logInfo("Using BoostKit Spark Native Sql Engine Extension to Speed Up Your Queries.")
     extensions.injectColumnar(session => ColumnarOverrideRules(session))
-    extensions.injectPlannerStrategy(session => ShuffleJoinStrategy(session))
+    extensions.injectPlannerStrategy(_ => ShuffleJoinStrategy)
     extensions.injectOptimizerRule(_ => RewriteSelfJoinInInPredicate)
+    extensions.injectOptimizerRule(_ => DelayCartesianProduct)
+    extensions.injectOptimizerRule(_ => HeuristicJoinReorder)
+    extensions.injectOptimizerRule(_ => MergeSubqueryFilters)
   }
 }

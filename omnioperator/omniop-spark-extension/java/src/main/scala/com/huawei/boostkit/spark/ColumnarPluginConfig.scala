@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020-2022. Huawei Technologies Co., Ltd. All rights reserved.
+ * Copyright (C) 2020-2024. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
@@ -107,21 +107,6 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
     .getConfString("spark.omni.sql.columnar.parquetNativefilescan", "true")
     .toBoolean
 
-  // enable sync to get obs token
-  val enableSyncGetObsToken: Boolean = conf
-    .getConfString("spark.omni.sql.columnar.syncGetObsToken", "false")
-    .toBoolean
-
-  // scheduled time to get obs token, the time unit is millisecond
-  val timeGetObsToken: Long = conf
-    .getConfString("spark.omni.sql.columnar.timeGetObsToken", "60000")
-    .toLong
-
-  // retry times to get obs ak/sk/token
-  val retryTimesGetObsToken: Integer = conf
-    .getConfString("spark.omni.sql.columnar.retryTimesGetObsToken", "10")
-    .toInt
-
   val enableColumnarSortMergeJoin: Boolean = conf
     .getConfString("spark.omni.sql.columnar.sortMergeJoin", "true")
     .toBoolean
@@ -171,22 +156,37 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
   val columnarShuffleNativeBufferSize =
     conf.getConfString("spark.sql.execution.columnar.maxRecordsPerBatch", "4096").toInt
 
+  // columnar spill threshold - Percentage of memory usage, associate with the "spark.memory.offHeap" together
+  val columnarSpillMemPctThreshold: Integer =
+    conf.getConfString("spark.omni.sql.columnar.spill.memFraction", "90").toInt
+
+  // columnar spill dir disk reserve Size, default 10GB
+  val columnarSpillDirDiskReserveSize:Long =
+    conf.getConfString("spark.omni.sql.columnar.spill.dirDiskReserveSize", "10737418240").toLong
+
+  // enable or disable columnar sort spill
+  val enableSortSpill: Boolean = conf
+    .getConfString("spark.omni.sql.columnar.sortSpill.enabled", "true").toBoolean
+
   // columnar sort spill threshold
   val columnarSortSpillRowThreshold: Integer =
-    conf.getConfString("spark.omni.sql.columnar.sortSpill.rowThreshold", Integer.MAX_VALUE.toString).toInt
+    conf.getConfString("spark.omni.sql.columnar.sortSpill.rowThreshold", Integer.MAX_VALUE.toString).toInt  
 
-  // columnar sort spill threshold - Percentage of memory usage, associate with the "spark.memory.offHeap" together
-  val columnarSortSpillMemPctThreshold: Integer =
-    conf.getConfString("spark.omni.sql.columnar.sortSpill.memFraction", "90").toInt
+  // enable or disable columnar window spill
+  val enableWindowSpill: Boolean = conf
+    .getConfString("spark.omni.sql.columnar.windowSpill.enabled", "true").toBoolean
 
-  // columnar sort spill dir disk reserve Size, default 10GB
-  val columnarSortSpillDirDiskReserveSize:Long =
-    conf.getConfString("spark.omni.sql.columnar.sortSpill.dirDiskReserveSize", "10737418240").toLong
+  // columnar window spill threshold
+  val columnarWindowSpillRowThreshold: Integer =
+    conf.getConfString("spark.omni.sql.columnar.windowSpill.rowThreshold", Integer.MAX_VALUE.toString).toInt
 
-  // enable or disable columnar sortSpill
-  val enableSortSpill: Boolean = conf
-    .getConfString("spark.omni.sql.columnar.sortSpill.enabled", "false")
-    .toBoolean
+  // enable or disable columnar hash aggregate spill
+  val enableHashAggSpill: Boolean = conf
+    .getConfString("spark.omni.sql.columnar.hashAggSpill.enabled", "true").toBoolean
+
+  // columnar hash aggregate spill threshold
+  val columnarHashAggSpillRowThreshold: Integer =
+    conf.getConfString("spark.omni.sql.columnar.hashAggSpill.rowThreshold", Integer.MAX_VALUE.toString).toInt  
 
   // enable or disable columnar shuffledHashJoin
   val enableShuffledHashJoin: Boolean = conf
@@ -195,7 +195,7 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
 
   // enable or disable force shuffle hash join
   val forceShuffledHashJoin: Boolean = conf
-    .getConfString("spark.omni.sql.columnar.forceShuffledHashJoin", "false")
+    .getConfString("spark.omni.sql.columnar.forceShuffledHashJoin", "true")
     .toBoolean
 
   // enable or disable rewrite self join in Predicate to aggregate
@@ -231,6 +231,34 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
   val enableLocalColumnarLimit : Boolean = conf.getConfString("spark.omni.sql.columnar.localLimit", "true").toBoolean
 
   val enableGlobalColumnarLimit : Boolean = conf.getConfString("spark.omni.sql.columnar.globalLimit", "true").toBoolean
+
+  val topNPushDownForWindowThreshold = conf.getConfString("spark.sql.execution.topNPushDownForWindow.threshold", "100").toInt
+
+  val topNPushDownForWindowEnable: Boolean = conf.getConfString("spark.sql.execution.topNPushDownForWindow.enabled", "true").toBoolean
+
+  // enable or disable deduplicate the right side of left semi join
+  val enableDedupLeftSemiJoin: Boolean =
+    conf.getConfString("spark.omni.sql.columnar.dedupLeftSemiJoin", "false").toBoolean
+
+  val dedupLeftSemiJoinThreshold: Int =
+    conf.getConfString("spark.omni.sql.columnar.dedupLeftSemiJoinThreshold", "3").toInt
+
+  val filterMergeEnable: Boolean = conf.getConfString("spark.sql.execution.filterMerge.enabled", "false").toBoolean
+
+  val filterMergeThreshold: Double = conf.getConfString("spark.sql.execution.filterMerge.maxCost", "100.0").toDouble
+
+  // enable or disable columnar CoalesceExec
+  val enableColumnarCoalesce: Boolean = conf
+    .getConfString("spark.omni.sql.columnar.coalesce", "true")
+    .toBoolean
+  val enableRollupOptimization: Boolean = conf.getConfString("spark.omni.sql.columnar.rollupOptimization.enabled", "true").toBoolean
+
+    // enable or disable radix sort
+  val enableRadixSort: Boolean =
+    conf.getConfString("spark.omni.sql.columnar.radixSort.enabled", "false").toBoolean
+
+  val radixSortThreshold: Int =
+    conf.getConfString("spark.omni.sql.columnar.radixSortThreshold", "1000000").toInt
 }
 
 

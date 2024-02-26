@@ -18,24 +18,31 @@
 package org.apache.spark.sql.execution
 
 import java.util.concurrent._
-
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil.transColBatchToOmniVecs
+
 import nova.hetu.omniruntime.vector.VecBatch
 import nova.hetu.omniruntime.vector.serialize.VecBatchSerializerFactory
 
+import scala.collection.mutable.ArrayBuffer
+import scala.collection.JavaConverters.asScalaIteratorConverter
 import scala.concurrent.{ExecutionContext, Promise}
 import scala.concurrent.duration.NANOSECONDS
 import scala.util.control.NonFatal
-import org.apache.spark.{broadcast, SparkException}
+
+import org.apache.spark.{SparkException, broadcast}
 import org.apache.spark.launcher.SparkLauncher
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference, BoundReference, Expression, UnsafeProjection}
 import org.apache.spark.sql.catalyst.plans.physical.BroadcastMode
 import org.apache.spark.sql.execution.exchange.{BroadcastExchangeExec, BroadcastExchangeLike}
 import org.apache.spark.sql.execution.joins.{EmptyHashedRelation, HashedRelationBroadcastMode, HashedRelationWithAllNullKeys}
 import org.apache.spark.sql.execution.metric.SQLMetrics
+import org.apache.spark.sql.execution.vectorized.OmniColumnVector
 import org.apache.spark.sql.internal.{SQLConf, StaticSQLConf}
+import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.vectorized.ColumnarBatch
 import org.apache.spark.unsafe.map.BytesToBytesMap
 import org.apache.spark.util.{SparkFatalException, ThreadUtils}
 
@@ -207,6 +214,67 @@ class ColumnarHashedRelation extends Serializable {
       relation = HashedRelationWithAllNullKeys
     }
     buildData = array
+  }
+
+  def transform(key: Expression, output: Seq[Attribute]): Array[InternalRow] = {
+    if (relation == EmptyHashedRelation) {
+      Iterator.empty.toArray
+    } else {
+      val deserializer = VecBatchSerializerFactory.create()
+      val columnNames = key.flatMap {
+        case expression: AttributeReference => Some(expression)
+        case _ => None
+      }
+      if (columnNames.isEmpty) {
+        throw new IllegalArgumentException(s"Key column not found in expression: $key")
+      }
+      if (columnNames.size != 1) {
+        throw new IllegalArgumentException(s"Multiple key columns found in expression: $key")
+      }
+      val columnExpr = columnNames.head
+      val oneColumnWithSameName = output.count(_.name == columnExpr.name) == 1
+      val columnInOutput = output.zipWithIndex.filter {
+        p: (Attribute, Int) =>
+          if (oneColumnWithSameName) {
+            // The comparison of exprId can be ignored when
+            // only one attribute name match is found.
+            p._1.name == columnExpr.name
+          } else {
+            // A case where output has multiple columns with same name
+            p._1.name == columnExpr.name && p._1.exprId == columnExpr.exprId
+          }
+      }
+      if (columnInOutput.isEmpty) {
+        throw new IllegalStateException(
+          s"Key $key not found from build side relation output: $output")
+      }
+      if (columnInOutput.size != 1) {
+        throw new IllegalStateException(
+          s"More than one key $key found from build side relation output: $output")
+      }
+      val replacement =
+        BoundReference(columnInOutput.head._2, columnExpr.dataType, columnExpr.nullable)
+
+      val projExpr = key.transformDown {
+        case _: AttributeReference =>
+          replacement
+      }
+
+      val proj = UnsafeProjection.create(projExpr)
+
+      val retRows = new ArrayBuffer[InternalRow]()
+      buildData.foreach { input =>
+        val vecBatch: VecBatch = deserializer.deserialize(input)
+        val vectors: Seq[OmniColumnVector] = OmniColumnVector.allocateColumns(
+          vecBatch.getRowCount, StructType.fromAttributes(output), false)
+        vectors.zipWithIndex.foreach { case (vector, i) =>
+          vector.reset()
+          vector.setVec(vecBatch.getVectors()(i))}
+        new ColumnarBatch(vectors.toArray, vecBatch.getRowCount)
+          .rowIterator().asScala.map(proj).foreach(retRows.append(_))
+      }
+      retRows.toArray
+    }
   }
 }
 
