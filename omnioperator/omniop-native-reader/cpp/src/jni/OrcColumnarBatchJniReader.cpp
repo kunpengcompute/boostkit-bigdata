@@ -76,7 +76,9 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniRea
 
     std::unique_ptr<orc::Reader> reader;
     UriInfo uri{schemaStr, fileStr, hostStr, portStr};
-    reader = createReader(orc::readFileOverride(uri), readerOptions);
+    jboolean notNeedFSCache = env->CallBooleanMethod(jsonObj, jsonMethodHas,
+            env->NewStringUTF("notNeedFSCache"));
+    reader = createReader(orc::readFileOverride(uri, notNeedFSCache), readerOptions);
     std::vector<std::string> orcColumnNames = reader->getAllFiedsName();
     for (int i = 0; i < orcColumnNames.size(); i++) {
         jstring fildname = env->NewStringUTF(orcColumnNames[i].c_str());

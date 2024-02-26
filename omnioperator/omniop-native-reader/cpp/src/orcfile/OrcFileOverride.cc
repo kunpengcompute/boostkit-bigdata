@@ -22,9 +22,9 @@
 
 namespace orc {
 
-std::unique_ptr <InputStream> readFileOverride(const UriInfo &uri) {
+std::unique_ptr <InputStream> readFileOverride(const UriInfo &uri, bool notNeedFSCache) {
     if (uri.Scheme() == "hdfs") {
-        return orc::createHdfsFileInputStream(uri);
+        return orc::createHdfsFileInputStream(uri, notNeedFSCache);
     } else {
         return orc::readLocalFile(std::string(uri.Path()));
     }

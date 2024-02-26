@@ -43,9 +43,9 @@ bool HdfsOptions::Equals(const HdfsOptions &other) const {
     return (this->host_ == other.host_ && this->port_ == other.port_);
 }
 
-HadoopFileSystem::HadoopFileSystem(HdfsOptions &options) {
+HadoopFileSystem::HadoopFileSystem(HdfsOptions &options, bool forNewInstance) {
     this->options_ = options;
-    Status st = this->Init();
+    Status st = this->Init(forNewInstance);
     if (!st.IsOk()) {
         throw IOException(st.ToString());
     }
@@ -98,14 +98,16 @@ Status HadoopFileSystem::Close() {
     return Status::FSError("Fail to close hdfs filesystem");
 }
 
-Status HadoopFileSystem::Init() {
+Status HadoopFileSystem::Init(bool forNewInstance) {
     struct hdfsBuilder *bld = hdfsNewBuilder();
     if (bld == nullptr) {
         return Status::FSError("Fail to create hdfs builder");
     }
     hdfsBuilderSetNameNode(bld, options_.host_.c_str());
     hdfsBuilderSetNameNodePort(bld, options_.port_);
-    hdfsBuilderSetForceNewInstance(bld);
+    if (forNewInstance) {
+        hdfsBuilderSetForceNewInstance(bld);
+    }
     hdfsFS fileSystem = hdfsBuilderConnect(bld);
     if (fileSystem == nullptr) {
         return Status::FSError("Fail to connect hdfs filesystem");
@@ -114,7 +116,24 @@ Status HadoopFileSystem::Init() {
     return Status::OK();
 }
 
-std::shared_ptr <HadoopFileSystem> getHdfsFileSystem(const std::string &host, const std::string &port) {
+std::shared_ptr <HadoopFileSystem> getHiveHdfsFileSystem(const std::string &host, const std::string &port) {
+    HdfsOptions options;
+    options.ConfigureHost(host);
+    int portInt = 0;
+    if (!port.empty()) {
+        portInt = std::stoi(port);
+    }
+    if (portInt > 0) {
+        options.ConfigurePort(portInt);
+    }
+    std::shared_ptr <HadoopFileSystem> fs(new HadoopFileSystem(options, false));
+    return fs;
+}
+
+std::shared_ptr <HadoopFileSystem> getHdfsFileSystem(const std::string &host, const std::string &port, bool notNeedFSCache) {
+    if (notNeedFSCache) {
+        return getHiveHdfsFileSystem(host, port);
+    }
     std::shared_ptr <HadoopFileSystem> fileSystemPtr;
 
     mutex_.lock();
@@ -136,7 +155,7 @@ std::shared_ptr <HadoopFileSystem> getHdfsFileSystem(const std::string &host, co
         options.ConfigurePort(portInt);
     }
 
-    std::shared_ptr <HadoopFileSystem> fs(new HadoopFileSystem(options));
+    std::shared_ptr <HadoopFileSystem> fs(new HadoopFileSystem(options, true));
     fileSystemPtr = fs;
     fsMap_[key] = fs;
     mutex_.unlock();

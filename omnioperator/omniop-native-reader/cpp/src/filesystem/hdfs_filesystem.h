@@ -50,7 +50,7 @@ private:
 
 public:
     // Constructor with Hadoop options
-    HadoopFileSystem(HdfsOptions &options);
+    HadoopFileSystem(HdfsOptions &options, bool forNewInstance);
 
     // Destructor
     ~HadoopFileSystem();
@@ -81,7 +81,7 @@ public:
 
 private:
     // Initialize the Hadoop file system
-    Status Init();
+    Status Init(bool forNewInstance);
 };
 
 /**
@@ -89,7 +89,7 @@ private:
 * @param host the host of hdfs filesystem
 * @param port the port of hdfs filesystem
 */
-std::shared_ptr <HadoopFileSystem> getHdfsFileSystem(const std::string &host, const std::string &port);
+std::shared_ptr <HadoopFileSystem> getHdfsFileSystem(const std::string &host, const std::string &port, bool notNeedFSCache);
 
 }
 

@@ -167,6 +167,7 @@ public class OrcColumnarBatchScanReader {
         job.put("host", uri.getHost() == null ? "" : uri.getHost());
         job.put("path", uri.getPath() == null ? "" : uri.getPath());
         job.put("port", uri.getPort() == -1 ? "" : String.valueOf(uri.getPort()));
+        job.put("notNeedFSCache", true);
         // 新增获取每列列名接口，可以传递到c++侧进行填充
         ArrayList<String> fildsNames = new ArrayList<String>();
         reader = jniReader.initializeReader(job, fildsNames);
