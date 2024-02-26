@@ -107,6 +107,21 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
     .getConfString("spark.omni.sql.columnar.parquetNativefilescan", "true")
     .toBoolean
 
+  // enable sync to get obs token
+  val enableSyncGetObsToken: Boolean = conf
+    .getConfString("spark.omni.sql.columnar.syncGetObsToken", "false")
+    .toBoolean
+
+  // scheduled time to get obs token, the time unit is millisecond
+  val timeGetObsToken: Long = conf
+    .getConfString("spark.omni.sql.columnar.timeGetObsToken", "60000")
+    .toLong
+
+  // retry times to get obs ak/sk/token
+  val retryTimesGetObsToken: Integer = conf
+    .getConfString("spark.omni.sql.columnar.retryTimesGetObsToken", "10")
+    .toInt
+
   val enableColumnarSortMergeJoin: Boolean = conf
     .getConfString("spark.omni.sql.columnar.sortMergeJoin", "true")
     .toBoolean
@@ -170,7 +185,7 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
 
   // columnar sort spill threshold
   val columnarSortSpillRowThreshold: Integer =
-    conf.getConfString("spark.omni.sql.columnar.sortSpill.rowThreshold", Integer.MAX_VALUE.toString).toInt  
+    conf.getConfString("spark.omni.sql.columnar.sortSpill.rowThreshold", Integer.MAX_VALUE.toString).toInt
 
   // enable or disable columnar window spill
   val enableWindowSpill: Boolean = conf
@@ -186,7 +201,7 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
 
   // columnar hash aggregate spill threshold
   val columnarHashAggSpillRowThreshold: Integer =
-    conf.getConfString("spark.omni.sql.columnar.hashAggSpill.rowThreshold", Integer.MAX_VALUE.toString).toInt  
+    conf.getConfString("spark.omni.sql.columnar.hashAggSpill.rowThreshold", Integer.MAX_VALUE.toString).toInt
 
   // enable or disable columnar shuffledHashJoin
   val enableShuffledHashJoin: Boolean = conf
@@ -211,7 +226,7 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
   // bigger than the other side join count, and `spark.sql.join.columnar.preferShuffledHashJoin`
   // is true.
   val columnarPreferShuffledHashJoin =
-    conf.getConfString("spark.sql.join.columnar.preferShuffledHashJoin", "false").toBoolean
+  conf.getConfString("spark.sql.join.columnar.preferShuffledHashJoin", "false").toBoolean
 
   val maxBatchSizeInBytes =
     conf.getConfString("spark.sql.columnar.maxBatchSizeInBytes", "2097152").toInt
@@ -253,7 +268,7 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
     .toBoolean
   val enableRollupOptimization: Boolean = conf.getConfString("spark.omni.sql.columnar.rollupOptimization.enabled", "true").toBoolean
 
-    // enable or disable radix sort
+  // enable or disable radix sort
   val enableRadixSort: Boolean =
     conf.getConfString("spark.omni.sql.columnar.radixSort.enabled", "false").toBoolean
 

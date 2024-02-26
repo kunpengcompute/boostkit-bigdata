@@ -19,6 +19,7 @@
 package com.huawei.boostkit.spark.jni;
 
 import com.huawei.boostkit.scan.jni.ParquetColumnarBatchJniReader;
+import com.huawei.boostkit.spark.ObsConf;
 import nova.hetu.omniruntime.vector.*;
 import org.apache.hadoop.fs.Path;
 import org.apache.spark.sql.types.*;
@@ -51,6 +52,9 @@ public class ParquetColumnarBatchScanReader {
         job.put("rowGroupIndices", rowgroupIndices.stream().mapToInt(Integer::intValue).toArray());
         job.put("columnIndices", columnIndices.stream().mapToInt(Integer::intValue).toArray());
         job.put("ugi", ugi);
+
+        // just used for obs
+        job.put("obsInfo", ObsConf.constructObsJSONObject());
 
         job.put("host", uri.getHost() == null ? "" : uri.getHost());
         job.put("scheme", uri.getScheme() == null ? "" : uri.getScheme());

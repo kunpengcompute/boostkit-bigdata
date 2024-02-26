@@ -19,8 +19,8 @@
 package com.huawei.boostkit.spark.jni;
 import com.huawei.boostkit.scan.jni.OrcColumnarBatchJniReader;
 
+import com.huawei.boostkit.spark.ObsConf;
 import nova.hetu.omniruntime.type.DataType;
-import nova.hetu.omniruntime.type.Decimal128DataType;
 import nova.hetu.omniruntime.vector.*;
 
 import org.apache.hadoop.security.UserGroupInformation;
@@ -33,7 +33,6 @@ import org.apache.orc.Reader.Options;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.orc.TypeDescription;
 
 import java.io.IOException;
 import java.net.URI;
@@ -193,10 +192,14 @@ public class OrcColumnarBatchScanReader {
             job.put("tokens", tokenJsonObj);
         }
 
+        // just used for obs
+        job.put("obsInfo", ObsConf.constructObsJSONObject());
+
         job.put("scheme", uri.getScheme() == null ? "" : uri.getScheme());
         job.put("host", uri.getHost() == null ? "" : uri.getHost());
         job.put("port", uri.getPort());
         job.put("path", uri.getPath() == null ? "" : uri.getPath());
+        job.put("uri", uri.toString());
 
         reader = jniReader.initializeReader(job, fildsNames);
         return reader;
@@ -363,6 +366,18 @@ public class OrcColumnarBatchScanReader {
             return tokensJsonItem;
         }
     }
+
+    public JSONObject constructObsJSONObject() {
+        JSONObject obsJsonItem = new JSONObject();
+        obsJsonItem.put("endpoint", ObsConf.getEndpoint());
+        synchronized (ObsConf.getLock()) {
+            obsJsonItem.put("ak", ObsConf.getAk());
+            obsJsonItem.put("sk", ObsConf.getSk());
+            obsJsonItem.put("token", ObsConf.getToken());
+        }
+        return obsJsonItem;
+    }
+
 
     public static void tokenDebug(String mesg) {
         try {
