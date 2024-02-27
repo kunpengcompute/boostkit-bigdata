@@ -105,7 +105,7 @@ public class OmniVectorOperator extends OmniHiveOperator<OmniVectorDesc> {
     @Override
     protected void initializeOp(Configuration hconf) throws HiveException {
         super.initializeOp(hconf);
-        if (parentOperators.isEmpty() || parentOperators.get(0) instanceof LimitOperator) {
+        if (parentOperators.isEmpty() || (parentOperators.get(0) instanceof LimitOperator && parentOperators.get(0).getParentOperators().isEmpty())) {
             isKeyValue = true;
         }
         converters = new VecConverter[inputObjInspectors.length][];
