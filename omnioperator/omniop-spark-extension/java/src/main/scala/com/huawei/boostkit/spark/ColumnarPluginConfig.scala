@@ -84,14 +84,6 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
     .getConfString("spark.omni.sql.columnar.broadcastJoin.sharehashtable", "true")
     .toBoolean
 
-  // enable or disable heuristic join reorder
-  val enableHeuristicJoinReorder: Boolean =
-    conf.getConfString("spark.sql.heuristicJoinReorder.enabled", "true").toBoolean
-
-  // enable or disable delay cartesian product
-  val enableDelayCartesianProduct: Boolean =
-    conf.getConfString("spark.sql.enableDelayCartesianProduct.enabled", "true").toBoolean
-
   // enable native table scan
   val enableColumnarFileScan: Boolean = conf
     .getConfString("spark.omni.sql.columnar.nativefilescan", "true")
@@ -246,10 +238,6 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
   val enableLocalColumnarLimit : Boolean = conf.getConfString("spark.omni.sql.columnar.localLimit", "true").toBoolean
 
   val enableGlobalColumnarLimit : Boolean = conf.getConfString("spark.omni.sql.columnar.globalLimit", "true").toBoolean
-
-  val topNPushDownForWindowThreshold = conf.getConfString("spark.sql.execution.topNPushDownForWindow.threshold", "100").toInt
-
-  val topNPushDownForWindowEnable: Boolean = conf.getConfString("spark.sql.execution.topNPushDownForWindow.enabled", "true").toBoolean
 
   // enable or disable deduplicate the right side of left semi join
   val enableDedupLeftSemiJoin: Boolean =

@@ -24,7 +24,7 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{SparkSession, SparkSessionExtensions}
 import org.apache.spark.sql.catalyst.expressions.{Ascending, DynamicPruningSubquery, Expression, Literal, SortOrder}
 import org.apache.spark.sql.catalyst.expressions.aggregate.{AggregateExpression, Partial, PartialMerge}
-import org.apache.spark.sql.catalyst.optimizer.{DelayCartesianProduct, HeuristicJoinReorder, MergeSubqueryFilters, RewriteSelfJoinInInPredicate}
+import org.apache.spark.sql.catalyst.optimizer.{MergeSubqueryFilters, RewriteSelfJoinInInPredicate}
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.{RowToOmniColumnarExec, _}
 import org.apache.spark.sql.execution.adaptive.{AQEShuffleReadExec, BroadcastQueryStageExec, OmniAQEShuffleReadExec, QueryStageExec, ShuffleQueryStageExec}
@@ -746,10 +746,8 @@ class ColumnarPlugin extends (SparkSessionExtensions => Unit) with Logging {
   override def apply(extensions: SparkSessionExtensions): Unit = {
     logInfo("Using BoostKit Spark Native Sql Engine Extension to Speed Up Your Queries.")
     extensions.injectColumnar(session => ColumnarOverrideRules(session))
-    extensions.injectPlannerStrategy(_ => ShuffleJoinStrategy)
+    extensions.injectPlannerStrategy(session => ShuffleJoinStrategy(session))
     extensions.injectOptimizerRule(_ => RewriteSelfJoinInInPredicate)
-    extensions.injectOptimizerRule(_ => DelayCartesianProduct)
-    extensions.injectOptimizerRule(_ => HeuristicJoinReorder)
     extensions.injectOptimizerRule(_ => MergeSubqueryFilters)
   }
 }

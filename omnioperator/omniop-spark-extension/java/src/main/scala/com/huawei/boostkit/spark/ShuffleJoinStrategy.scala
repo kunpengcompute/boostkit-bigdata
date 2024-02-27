@@ -17,16 +17,17 @@
 
 package com.huawei.boostkit.spark
 
-import org.apache.spark.sql.Strategy
+import com.huawei.boostkit.spark.util.LogicalPlanSelector
+import org.apache.spark.sql.{SparkSession, Strategy}
 import org.apache.spark.sql.catalyst.SQLConfHelper
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.optimizer.{BuildLeft, BuildRight, BuildSide, JoinSelectionHelper}
 import org.apache.spark.sql.catalyst.planning._
-import org.apache.spark.sql.catalyst.plans.{ExistenceJoin, FullOuter, InnerLike, JoinType, LeftAnti, LeftOuter, LeftSemi, RightOuter}
 import org.apache.spark.sql.catalyst.plans.logical._
-import org.apache.spark.sql.execution.{joins, SparkPlan}
+import org.apache.spark.sql.catalyst.plans._
+import org.apache.spark.sql.execution.{SparkPlan, joins}
 
-object ShuffleJoinStrategy extends Strategy
+case class ShuffleJoinStrategy(session: SparkSession) extends Strategy
   with PredicateHelper
   with JoinSelectionHelper
   with SQLConfHelper {
@@ -37,7 +38,8 @@ object ShuffleJoinStrategy extends Strategy
   private val columnarForceShuffledHashJoin =
     ColumnarPluginConfig.getConf.forceShuffledHashJoin
 
-  def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
+  def apply(plan: LogicalPlan): Seq[SparkPlan] = LogicalPlanSelector.maybeNil(session, plan) {
+    plan match {
       case ExtractEquiJoinKeys(joinType, leftKeys, rightKeys, nonEquiCond, _, left, right, hint)
         if columnarPreferShuffledHashJoin =>
         val enable = getBroadcastBuildSide(left, right, joinType, hint, true, conf).isEmpty &&
@@ -93,8 +95,8 @@ object ShuffleJoinStrategy extends Strategy
               leftBuildable = canBuildShuffledHashJoinLeft(joinType)
               rightBuildable = canBuildShuffledHashJoinRight(joinType)
             } else {
-              leftBuildable = canBuildShuffledHashJoinLeft(joinType)
-              rightBuildable = canBuildShuffledHashJoinRight(joinType)
+              leftBuildable = canBuildShuffledHashJoinLeft(joinType) && buildLeft
+              rightBuildable = canBuildShuffledHashJoinRight(joinType) && buildRight
             }
             getBuildSide(
               leftBuildable,
@@ -117,13 +119,14 @@ object ShuffleJoinStrategy extends Strategy
           Nil
         }
       case _ => Nil
+    }
   }
 
   private def getBuildSide(
-    canBuildLeft: Boolean,
-    canBuildRight: Boolean,
-    left: LogicalPlan,
-    right: LogicalPlan): Option[BuildSide] = {
+                            canBuildLeft: Boolean,
+                            canBuildRight: Boolean,
+                            left: LogicalPlan,
+                            right: LogicalPlan): Option[BuildSide] = {
     if (canBuildLeft && canBuildRight) {
       // returns the smaller side base on its estimated physical size, if we want to build the
       // both sides.
@@ -137,13 +140,4 @@ object ShuffleJoinStrategy extends Strategy
     }
   }
 
-  def supportHashBuildJoinTypeOnLeft: JoinType => Boolean = {
-    case _: InnerLike | RightOuter | FullOuter => true
-    case _ => false
-  }
-
-  def supportHashBuildJoinTypeOnRight: JoinType => Boolean = {
-    case _: InnerLike | LeftOuter | FullOuter | LeftSemi | LeftAnti | _: ExistenceJoin => true
-    case _ => false
-  }
 }
