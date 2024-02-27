@@ -25,7 +25,6 @@ using namespace omniruntime::vec;
 using namespace omniruntime::type;
 using namespace std;
 using namespace orc;
-using namespace hdfs;
 
 static constexpr int32_t MAX_DECIMAL64_DIGITS = 18;
 bool isDecimal64Transfor128 = false;
