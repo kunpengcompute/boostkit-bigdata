@@ -77,7 +77,7 @@ public class OmniVectorizedOrcRecordReader extends OmniOrcRecordReader {
         if (included.size() == 0) {
             batchSize = (int) recordReader.getNumberOfRowsJava();
         } else {
-            batchSize = recordReader.next(vecs);
+            batchSize = recordReader.next(vecs, typeIds);
         }
         if (batchSize == 0) {
             return false;
