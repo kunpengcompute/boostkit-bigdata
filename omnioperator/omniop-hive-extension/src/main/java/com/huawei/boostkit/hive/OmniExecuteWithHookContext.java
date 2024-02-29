@@ -477,10 +477,13 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             }
             RowSchema rowSchema = op.getSchema();
             TableScanDesc tableScanDesc = (TableScanDesc) op.getConf();
-            if (tableScanDesc.getNeededColumns().isEmpty()) {
+            List<String> fieldNames = new ArrayList<>();
+            fieldNames.addAll(tableScanDesc.getNeededColumns());
+            fieldNames.addAll(mapWork.getAliasToPartnInfo().get(tableScanDesc.getAlias()).getPartSpec().keySet());
+            if (fieldNames.isEmpty()) {
                 continue;
             }
-            for (String field : tableScanDesc.getNeededColumns()) {
+            for (String field : fieldNames) {
                 TypeInfo typeInfo = rowSchema.getColumnInfo(field).getType();
                 if (fieldTypeUnsupported(typeInfo)) {
                     return true;
