@@ -379,7 +379,7 @@ object OmniAdaptorUtil {
     }
   }
 
-  private def generateDir(root: String, namePrefix: String = "spark"): File = {
+  def generateSpillDir(root: String, namePrefix: String = "spark"): File = {
     var attempts = 0
     val maxAttempts = 10
     var dir: File = null
@@ -394,14 +394,6 @@ object OmniAdaptorUtil {
         dir = null
       }
     }
-    dir.getCanonicalFile
-  }
-
-  def generateSpillDirs(localSpillDirs: Array[String], namePrefix: String): Array[File] = {
-    val localDirs = localSpillDirs.flatMap { rootDir =>
-      val localDir = generateDir(rootDir, namePrefix)
-      Some(localDir)
-    }
-    localDirs
+    dir
   }
 }
