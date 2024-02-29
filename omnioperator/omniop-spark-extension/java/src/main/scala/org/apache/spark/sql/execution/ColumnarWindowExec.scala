@@ -88,14 +88,13 @@ case class ColumnarWindowExec(windowExpression: Seq[NamedExpression],
     throw new UnsupportedOperationException(s"This operator doesn't support doExecute().")
   }
 
-  private val windowLocalDirs: Array[String] = Utils.getConfiguredLocalDirs(sparkContext.conf)
+  val tmpSparkConf = sparkContext.conf
 
-  def generateSpillDir(): File = {
-    val localDirs = OmniAdaptorUtil.generateSpillDirs(windowLocalDirs, "columnarWindowSpill")
-    val name: String = "temp_local_" + UUID.randomUUID
-    val hash = Utils.nonNegativeHash(name)
-    val dirId = hash % localDirs.length
-    localDirs(dirId)
+  def generateSpillDir(conf: SparkConf): File = {
+    val localDirs: Array[String] = Utils.getConfiguredLocalDirs(conf)
+    val hash = Utils.nonNegativeHash(UUID.randomUUID.toString)
+    val root = localDirs(hash % localDirs.length)
+    OmniAdaptorUtil.generateSpillDir(root, "columnarWindowSpill")
   }
 
   def getWindowFrameParam(frame: SpecifiedWindowFrame): (OmniWindowFrameType,
@@ -373,7 +372,7 @@ case class ColumnarWindowExec(windowExpression: Seq[NamedExpression],
       val spillDirDiskReserveSize = columnarConf.columnarSpillDirDiskReserveSize
       val windowSpillRowThreshold = columnarConf.columnarWindowSpillRowThreshold
       val spillMemPctThreshold = columnarConf.columnarSpillMemPctThreshold
-      val spillFile = generateSpillDir()
+      val spillFile = generateSpillDir(tmpSparkConf)
       val spillDirectory = spillFile.getCanonicalPath
       val sparkSpillConfig = new SparkSpillConfig(windowSpillEnable, spillDirectory,
         spillDirDiskReserveSize, windowSpillRowThreshold, spillMemPctThreshold)

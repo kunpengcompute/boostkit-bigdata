@@ -71,14 +71,13 @@ case class ColumnarSortExec(
     genSortParam(child.output, sortOrder)
   }
 
-  private val sortLocalDirs: Array[String] = Utils.getConfiguredLocalDirs(sparkContext.conf)
+  val tmpSparkConf = sparkContext.conf
 
-  def generateSpillDir(): File = {
-    val localDirs = OmniAdaptorUtil.generateSpillDirs(sortLocalDirs, "columnarSortSpill")
-    val name: String = "temp_local_" + UUID.randomUUID
-    val hash = Utils.nonNegativeHash(name)
-    val dirId = hash % localDirs.length
-    localDirs(dirId)
+  def generateSpillDir(conf: SparkConf): File = {
+    val localDirs: Array[String] = Utils.getConfiguredLocalDirs(conf)
+    val hash = Utils.nonNegativeHash(UUID.randomUUID.toString)
+    val root = localDirs(hash % localDirs.length)
+    OmniAdaptorUtil.generateSpillDir(root, "columnarSortSpill")
   }
 
   override def doExecuteColumnar(): RDD[ColumnarBatch] = {
@@ -94,7 +93,7 @@ case class ColumnarSortExec(
       val spillMemPctThreshold = columnarConf.columnarSpillMemPctThreshold
       val spillDirDiskReserveSize = columnarConf.columnarSpillDirDiskReserveSize
       val sortSpillEnable = columnarConf.enableSortSpill
-      val spillFile = generateSpillDir()
+      val spillFile = generateSpillDir(tmpSparkConf)
       val spillDirectory = spillFile.getCanonicalPath
       val sparkSpillConf = new SparkSpillConfig(sortSpillEnable, spillDirectory, spillDirDiskReserveSize,
         sortSpillRowThreshold, spillMemPctThreshold)
