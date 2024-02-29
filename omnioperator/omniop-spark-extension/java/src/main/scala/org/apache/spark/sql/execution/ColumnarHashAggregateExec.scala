@@ -188,14 +188,13 @@ case class ColumnarHashAggregateExec(
     }
   }
 
-  private val hashAggLocalDirs: Array[String] = Utils.getConfiguredLocalDirs(sparkContext.conf)
+  val tmpSparkConf = sparkContext.conf
 
-  def generateSpillDir(): File = {
-    val localDirs = OmniAdaptorUtil.generateSpillDirs(hashAggLocalDirs, "columnarHashAggSpill")
-    val name: String = "temp_local_" + UUID.randomUUID
-    val hash = Utils.nonNegativeHash(name)
-    val dirId = hash % localDirs.length
-    localDirs(dirId)
+  def generateSpillDir(conf: SparkConf): File = {
+    val localDirs: Array[String] = Utils.getConfiguredLocalDirs(conf)
+    val hash = Utils.nonNegativeHash(UUID.randomUUID.toString)
+    val root = localDirs(hash % localDirs.length)
+    OmniAdaptorUtil.generateSpillDir(root, "columnarHashAggSpill")
   }
 
   override def doExecuteColumnar(): RDD[ColumnarBatch] = {
@@ -283,7 +282,7 @@ case class ColumnarHashAggregateExec(
       val spillMemPctThreshold = columnarConf.columnarSpillMemPctThreshold
       val spillDirDiskReserveSize = columnarConf.columnarSpillDirDiskReserveSize
       val hashAggSpillEnable = columnarConf.enableHashAggSpill
-      val spillFile = generateSpillDir()
+      val spillFile = generateSpillDir(tmpSparkConf)
       val spillDirectory = spillFile.getCanonicalPath
       val sparkSpillConf = new SparkSpillConfig(hashAggSpillEnable, spillDirectory,
         spillDirDiskReserveSize, hashAggSpillRowThreshold, spillMemPctThreshold)
