@@ -76,11 +76,12 @@ case class ColumnarSortExec(
 
   val tmpSparkConf = sparkContext.conf
 
-  def generateSpillDir(conf: SparkConf): File = {
+  def generateSpillDir(conf: SparkConf, subDir: String): String = {
     val localDirs: Array[String] = Utils.getConfiguredLocalDirs(conf)
     val hash = Utils.nonNegativeHash(UUID.randomUUID.toString)
     val root = localDirs(hash % localDirs.length)
-    OmniAdaptorUtil.generateSpillDir(root, "columnarSortSpill")
+    val dir = new File(root, subDir)
+    dir.getCanonicalPath
   }
 
   override def doExecuteColumnar(): RDD[ColumnarBatch] = {
@@ -96,8 +97,7 @@ case class ColumnarSortExec(
       val spillMemPctThreshold = columnarConf.columnarSpillMemPctThreshold
       val spillDirDiskReserveSize = columnarConf.columnarSpillDirDiskReserveSize
       val sortSpillEnable = columnarConf.enableSortSpill
-      val spillFile = generateSpillDir(tmpSparkConf)
-      val spillDirectory = spillFile.getCanonicalPath
+      val spillDirectory = generateSpillDir(tmpSparkConf, "columnarSortSpill")
       val sparkSpillConf = new SparkSpillConfig(sortSpillEnable, spillDirectory, spillDirDiskReserveSize,
         sortSpillRowThreshold, spillMemPctThreshold)
       val startCodegen = System.nanoTime()
@@ -112,7 +112,6 @@ case class ColumnarSortExec(
       SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
         spillSize += sortOperator.getSpilledBytes()
         sortOperator.close()
-        spillFile.delete()
       })
       addAllAndGetIterator(sortOperator, iter, this.schema,
         longMetric("addInputTime"), longMetric("numInputVecBatches"), longMetric("numInputRows"),
