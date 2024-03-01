@@ -23,8 +23,6 @@ import com.huawei.boostkit.spark.ObsConf;
 import nova.hetu.omniruntime.type.DataType;
 import nova.hetu.omniruntime.vector.*;
 
-import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.token.Token;
 import org.apache.spark.sql.catalyst.util.RebaseDateTime;
 import org.apache.hadoop.hive.ql.io.sarg.ExpressionTree;
 import org.apache.hadoop.hive.ql.io.sarg.PredicateLeaf;
@@ -34,11 +32,9 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.net.URI;
 import java.sql.Date;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 public class OrcColumnarBatchScanReader {
@@ -185,15 +181,10 @@ public class OrcColumnarBatchScanReader {
         }
         job.put("tailLocation", 9223372036854775807L);
 
-        // handle delegate token for native orc reader
-        OrcColumnarBatchScanReader.tokenDebug("initializeReader");
-        JSONObject tokenJsonObj = constructTokensJSONObject();
-        if (null != tokenJsonObj) {
-            job.put("tokens", tokenJsonObj);
-        }
-
         // just used for obs
-        job.put("obsInfo", ObsConf.constructObsJSONObject());
+        if (uri.getScheme() != null && "obs".equalsIgnoreCase(uri.getScheme())) {
+            job.put("obsInfo", ObsConf.constructObsJSONObject());
+        }
 
         job.put("scheme", uri.getScheme() == null ? "" : uri.getScheme());
         job.put("host", uri.getHost() == null ? "" : uri.getHost());
@@ -231,12 +222,6 @@ public class OrcColumnarBatchScanReader {
         }
 
         job.put("includedColumns", colToInclu.toArray());
-        // handle delegate token for native orc reader
-        OrcColumnarBatchScanReader.tokenDebug("initializeRecordReader");
-        JSONObject tokensJsonObj = constructTokensJSONObject();
-        if (null != tokensJsonObj) {
-            job.put("tokens", tokensJsonObj);
-        }
         recordReader = jniReader.initializeRecordReader(reader, job);
         return recordReader;
     }
@@ -331,65 +316,4 @@ public class OrcColumnarBatchScanReader {
         return (int)rtn;
     }
 
-    private static String bytesToHexString(byte[] bytes) {
-        if (bytes == null || bytes.length < 1) {
-            throw new IllegalArgumentException("this bytes must not be null or empty");
-        }
-
-        final StringBuilder hexString = new StringBuilder();
-        for (int i = 0; i < bytes.length; i++) {
-            if ((bytes[i] & 0xff) < 0x10)
-                hexString.append("0");
-            hexString.append(Integer.toHexString(bytes[i] & 0xff));
-        }
-
-        return hexString.toString().toLowerCase();
-    }
-
-    public static JSONObject constructTokensJSONObject() {
-        JSONObject tokensJsonItem = new JSONObject();
-        try {
-            ArrayList<JSONObject> child = new ArrayList<JSONObject>();
-            for (Token<?> token : UserGroupInformation.getCurrentUser().getTokens()) {
-                JSONObject tokenJsonItem = new JSONObject();
-                tokenJsonItem.put("identifier", bytesToHexString(token.getIdentifier()));
-                tokenJsonItem.put("password", bytesToHexString(token.getPassword()));
-                tokenJsonItem.put("kind", token.getKind().toString());
-                tokenJsonItem.put("service", token.getService().toString());
-                child.add(tokenJsonItem);
-            }
-            tokensJsonItem.put("token", child.toArray());
-        } catch (IOException e) {
-            tokensJsonItem = null;
-        } finally {
-            LOGGER.debug("\n\n================== tokens-json ==================\n" + tokensJsonItem.toString());
-            return tokensJsonItem;
-        }
-    }
-
-    public JSONObject constructObsJSONObject() {
-        JSONObject obsJsonItem = new JSONObject();
-        obsJsonItem.put("endpoint", ObsConf.getEndpoint());
-        synchronized (ObsConf.getLock()) {
-            obsJsonItem.put("ak", ObsConf.getAk());
-            obsJsonItem.put("sk", ObsConf.getSk());
-            obsJsonItem.put("token", ObsConf.getToken());
-        }
-        return obsJsonItem;
-    }
-
-
-    public static void tokenDebug(String mesg) {
-        try {
-            LOGGER.debug("\n\n=============" + mesg + "=============\n" + UserGroupInformation.getCurrentUser().toString());
-            for (Token<?> token : UserGroupInformation.getCurrentUser().getTokens()) {
-                LOGGER.debug("\n\ntoken identifier:" + bytesToHexString(token.getIdentifier()));
-                LOGGER.debug("\ntoken password:" + bytesToHexString(token.getPassword()));
-                LOGGER.debug("\ntoken kind:" + token.getKind());
-                LOGGER.debug("\ntoken service:" + token.getService());
-            }
-        } catch (IOException e) {
-            LOGGER.debug("\n\n**********" + mesg + " exception **********\n");
-        }
-    }
 }
