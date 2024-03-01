@@ -21,7 +21,6 @@ import com.huawei.boostkit.spark.Constant.IS_SKIP_VERIFY_EXP
 
 import java.io.{File, IOException}
 import java.util
-import java.util.UUID
 import java.util.concurrent.TimeUnit.NANOSECONDS
 
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor._
@@ -377,23 +376,5 @@ object OmniAdaptorUtil {
       case _ =>
         project.exprId
     }
-  }
-
-  def generateSpillDir(root: String, namePrefix: String = "spark"): File = {
-    var attempts = 0
-    val maxAttempts = 10
-    var dir: File = null
-    while (dir == null) {
-      attempts += 1
-      if (attempts > maxAttempts) {
-        throw new IOException("Directory conflict: failed to generate a temp directory for " + namePrefix +
-          " (under " + root + ") after " + maxAttempts + " attempts!")
-      }
-      dir = new File(root, namePrefix + "-" + UUID.randomUUID.toString)
-      if (dir.exists()) {
-        dir = null
-      }
-    }
-    dir
   }
 }
