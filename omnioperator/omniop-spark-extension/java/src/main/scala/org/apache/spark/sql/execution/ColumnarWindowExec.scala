@@ -90,11 +90,12 @@ case class ColumnarWindowExec(windowExpression: Seq[NamedExpression],
 
   val tmpSparkConf = sparkContext.conf
 
-  def generateSpillDir(conf: SparkConf): File = {
+  def generateSpillDir(conf: SparkConf, subDir: String): String = {
     val localDirs: Array[String] = Utils.getConfiguredLocalDirs(conf)
     val hash = Utils.nonNegativeHash(UUID.randomUUID.toString)
     val root = localDirs(hash % localDirs.length)
-    OmniAdaptorUtil.generateSpillDir(root, "columnarWindowSpill")
+    val dir = new File(root, subDir)
+    dir.getCanonicalPath
   }
 
   def getWindowFrameParam(frame: SpecifiedWindowFrame): (OmniWindowFrameType,
@@ -372,8 +373,7 @@ case class ColumnarWindowExec(windowExpression: Seq[NamedExpression],
       val spillDirDiskReserveSize = columnarConf.columnarSpillDirDiskReserveSize
       val windowSpillRowThreshold = columnarConf.columnarWindowSpillRowThreshold
       val spillMemPctThreshold = columnarConf.columnarSpillMemPctThreshold
-      val spillFile = generateSpillDir(tmpSparkConf)
-      val spillDirectory = spillFile.getCanonicalPath
+      val spillDirectory = generateSpillDir(tmpSparkConf, "columnarWindowSpill")
       val sparkSpillConfig = new SparkSpillConfig(windowSpillEnable, spillDirectory,
         spillDirDiskReserveSize, windowSpillRowThreshold, spillMemPctThreshold)
 
@@ -390,7 +390,6 @@ case class ColumnarWindowExec(windowExpression: Seq[NamedExpression],
       SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
         spillSize += windowOperator.getSpilledBytes
         windowOperator.close()
-        spillFile.delete()
       })
 
       while (iter.hasNext) {
