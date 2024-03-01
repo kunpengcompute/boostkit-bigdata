@@ -208,11 +208,12 @@ case class ColumnarHashAggregateExec(
 
   val tmpSparkConf = sparkContext.conf
 
-  def generateSpillDir(conf: SparkConf): File = {
+  def generateSpillDir(conf: SparkConf, subDir: String): String = {
     val localDirs: Array[String] = Utils.getConfiguredLocalDirs(conf)
     val hash = Utils.nonNegativeHash(UUID.randomUUID.toString)
     val root = localDirs(hash % localDirs.length)
-    OmniAdaptorUtil.generateSpillDir(root, "columnarHashAggSpill")
+    val dir = new File(root, subDir)
+    dir.getCanonicalPath
   }
 
   override def doExecuteColumnar(): RDD[ColumnarBatch] = {
@@ -300,8 +301,7 @@ case class ColumnarHashAggregateExec(
       val spillMemPctThreshold = columnarConf.columnarSpillMemPctThreshold
       val spillDirDiskReserveSize = columnarConf.columnarSpillDirDiskReserveSize
       val hashAggSpillEnable = columnarConf.enableHashAggSpill
-      val spillFile = generateSpillDir(tmpSparkConf)
-      val spillDirectory = spillFile.getCanonicalPath
+      val spillDirectory = generateSpillDir(tmpSparkConf, "columnarHashAggSpill")
       val sparkSpillConf = new SparkSpillConfig(hashAggSpillEnable, spillDirectory,
         spillDirDiskReserveSize, hashAggSpillRowThreshold, spillMemPctThreshold)
 
@@ -322,7 +322,6 @@ case class ColumnarHashAggregateExec(
       SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
         spillSize += operator.getSpilledBytes()
         operator.close()
-        spillFile.delete()
       })
 
       while (iter.hasNext) {
