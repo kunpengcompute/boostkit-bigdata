@@ -327,9 +327,9 @@ public class TypeUtils {
         Integer returnType = castFunctionExpression.getReturnType();
         // not support Cast(string as !(decimal/string)) and Cast(!(decimal/string) as
         // string)
-        if ((dataType == OMNI_CHAR.toValue() || dataType == OMNI_VARCHAR.toValue())
-                && !isDecimalOrStringType(returnType))
+        if (dataType == OMNI_CHAR.toValue() || dataType == OMNI_VARCHAR.toValue()) {
             return true;
+        }
         if ((returnType == OMNI_CHAR.toValue() || returnType == OMNI_VARCHAR.toValue())
                 && !isDecimalOrStringType(dataType)) {
             return true;
@@ -371,10 +371,10 @@ public class TypeUtils {
                 return true;
             }
         }
-        boolean anyDecimal = children.stream().anyMatch(child -> child.getTypeInfo() instanceof DecimalTypeInfo
-                && ((DecimalTypeInfo) child.getTypeInfo()).getPrecision() > 19);
+        boolean anyDecimal128 = children.stream().anyMatch(child -> child.getTypeInfo() instanceof DecimalTypeInfo
+                && ((DecimalTypeInfo) child.getTypeInfo()).getPrecision() > 18);
         if ((functionName.equals("GenericUDFOPMultiply") || functionName.equals("GenericUDFOPDivide")
-                || functionName.equals("GenericUDFOPMod")) && anyDecimal) {
+                || functionName.equals("GenericUDFOPMod")) && anyDecimal128) {
             return true;
         }
         return false;
