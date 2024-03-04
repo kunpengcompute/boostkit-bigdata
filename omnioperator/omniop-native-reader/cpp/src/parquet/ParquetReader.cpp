@@ -147,8 +147,12 @@ Status ParquetReader::GetRecordBatchReader(const std::vector<int> &row_group_ind
                 return Status::OK();
             }
 
-            for (uint64_t i = 0; i < columnReaders.size(); i++) {
-                RETURN_NOT_OK(columnReaders[i]->NextBatch(read_size, &batch[i]));
+            try {
+                for (uint64_t i = 0; i < columnReaders.size(); i++) {
+                    RETURN_NOT_OK(columnReaders[i]->NextBatch(read_size, &batch[i]));
+                }
+            } catch (const std::exception &e) {
+                return Status::Invalid(e.what());
             }
 
             // Check BaseVector

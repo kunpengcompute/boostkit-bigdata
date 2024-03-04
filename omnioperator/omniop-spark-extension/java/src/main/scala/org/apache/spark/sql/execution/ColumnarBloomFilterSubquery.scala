@@ -68,7 +68,6 @@ case class ColumnarBloomFilterSubquery(plan: BaseSubqueryExec, exprId: ExprId, s
     // close operator
     addLeakSafeTaskCompletionListener[Unit](_ => {
       bloomFilterOperator.close()
-      bloomFilterOperatorFactory.close()
     })
 
     bloomFilterOperator.addInput(vecBatch)
