@@ -164,4 +164,15 @@ class MergeIterator(iter: Iterator[ColumnarBatch], localSchema: StructType,
   def isFull(): Boolean = {
     totalRows > maxRowCount || currentBatchSizeInBytes >= maxBatchSizeInBytes
   }
+
+  def close(): Unit = {
+    for (elem <- bufferedVecBatch) {
+      elem.releaseAllVectors()
+      elem.close()
+    }
+    for (elem <- outputQueue) {
+      elem.releaseAllVectors()
+      elem.close()
+    }
+  }
 }

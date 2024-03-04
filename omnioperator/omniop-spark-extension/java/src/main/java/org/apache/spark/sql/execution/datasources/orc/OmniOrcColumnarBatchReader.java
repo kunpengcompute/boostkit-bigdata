@@ -115,8 +115,10 @@ public class OmniOrcColumnarBatchReader extends RecordReader<Void, ColumnarBatch
 
     // Free vecs from templateWrappers.
     for (int i = 0; i < templateWrappers.length; i++) {
-      OmniColumnVector vector = (OmniColumnVector) templateWrappers[i];
-      vector.close();
+      org.apache.spark.sql.vectorized.ColumnVector vector = templateWrappers[i];
+      if (vector != null) {
+        ((OmniColumnVector) vector).close();
+      }
     }
   }
 
@@ -267,13 +269,30 @@ public class OmniOrcColumnarBatchReader extends RecordReader<Void, ColumnarBatch
       }
     }
 
-    // Slice other vecs from templateWrap.
-    for (int i = 0; i < templateWrappers.length; i++) {
-      OmniColumnVector vector = (OmniColumnVector) templateWrappers[i];
-      if (vector.isConstant()) {
-        ((OmniColumnVector) orcVectorWrappers[i]).setVec(vector.getVec().slice(0, batchSize));
+    try {
+      // Slice other vecs from templateWrap.
+      for (int i = 0; i < templateWrappers.length; i++) {
+        OmniColumnVector vector = (OmniColumnVector) templateWrappers[i];
+        if (vector.isConstant()) {
+          ((OmniColumnVector) orcVectorWrappers[i]).setVec(vector.getVec().slice(0, batchSize));
+        }
       }
+    } catch (Exception e) {
+      for (Vec vec : vecs) {
+        vec.close();
+      }
+
+      for (int i = 0; i < templateWrappers.length; i++) {
+        org.apache.spark.sql.vectorized.ColumnVector vector = templateWrappers[i];
+        if (vector != null) {
+          ((OmniColumnVector) vector).close();
+          templateWrappers[i] = null;
+        }
+      }
+
+      throw new RuntimeException(e);
     }
+
     return true;
   }
 }
