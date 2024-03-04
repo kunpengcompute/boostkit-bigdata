@@ -93,7 +93,7 @@ public class ArithmeticExpressionProcessor implements ExpressionProcessor {
                 compareExpression.add(childNode);
                 return;
             } else {
-                childPrecision = Math.max(childPrecision + maxScale - childScale, precision);
+                childPrecision = Math.min(Math.max(childPrecision + maxScale - childScale, precision), 38);
                 childScale = maxScale;
             }
         } else {

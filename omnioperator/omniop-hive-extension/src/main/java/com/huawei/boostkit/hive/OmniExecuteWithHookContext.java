@@ -189,7 +189,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             return;
         }
         setTezWork(queryPlan);
-        if (tezWork == null) {
+        if (tezWork == null || checkDataType()) {
             return;
         }
         if (OMNI_OPERATOR.contains(OperatorType.REDUCESINK)) {
@@ -402,11 +402,6 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
     }
 
     private void traverseTezWorks() {
-        if (checkDataType()) {
-            reduceSinkReplaceableWork.clear();
-            reduceSinkReplaceableWorkName.clear();
-            return;
-        }
         for (BaseWork work : tezWork.getAllWork()) {
             traverseEachWork(work);
         }
