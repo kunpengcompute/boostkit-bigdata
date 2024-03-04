@@ -601,6 +601,9 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                 if (!isUDFSupport(((SelectDesc) operator.getConf()).getColList())) {
                     return false;
                 }
+                if (OmniSelectOperator.isInvalidSelectColumn(((SelectDesc) operator.getConf()).getColList())) {
+                    return false;
+                }
                 boolean replaceable = true;
                 for (Operator parent : operator.getParentOperators()) {
                     replaceable = replaceable && currentReplaceable(parent, reduceSinkCanReplace);
