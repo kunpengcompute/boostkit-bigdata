@@ -762,7 +762,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
     private boolean aggParameterNotSupport(AggregationDesc aggregator, ExprNodeDesc parameter) {
         if (aggregator.getGenericUDAFName().equals("sum") || aggregator.getGenericUDAFName().equals("avg")) {
             PrimitiveObjectInspector.PrimitiveCategory primitiveCategory = ((PrimitiveTypeInfo) parameter.getTypeInfo()).getPrimitiveCategory();
-            return primitiveCategory == STRING || primitiveCategory == VARCHAR;
+            return primitiveCategory == STRING || primitiveCategory == CHAR || primitiveCategory == VARCHAR;
         }
         return false;
     }
@@ -801,8 +801,9 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                     && ((DecimalTypeInfo) primitiveTypeInfo).getPrecision() > DECIMAL64_MAX_PRECISION) {
                 return true;
             }
+            PrimitiveObjectInspector.PrimitiveCategory primitiveCategory = primitiveTypeInfo.getPrimitiveCategory();
             if ((windowFunctionType == OMNI_AGGREGATION_TYPE_AVG || windowFunctionType == OMNI_AGGREGATION_TYPE_SUM)
-                    && primitiveTypeInfo.getPrimitiveCategory().equals(STRING)) {
+                    && (primitiveCategory == STRING || primitiveCategory == CHAR || primitiveCategory == VARCHAR)) {
                 return true;
             }
         }
