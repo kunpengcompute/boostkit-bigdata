@@ -21,6 +21,7 @@ package com.huawei.boostkit.hive;
 import static com.huawei.boostkit.hive.expression.TypeUtils.buildInputDataType;
 import static nova.hetu.omniruntime.constants.FunctionType.OMNI_AGGREGATION_TYPE_COUNT_ALL;
 import static org.apache.hadoop.hive.ql.exec.GroupByOperator.groupingSet2BitSet;
+import static org.apache.hadoop.hive.ql.exec.GroupByOperator.shouldEmitSummaryRow;
 
 import com.huawei.boostkit.hive.cache.VectorCache;
 import com.huawei.boostkit.hive.expression.ExpressionUtils;
@@ -53,6 +54,8 @@ import org.apache.hadoop.hive.ql.exec.ExprNodeEvaluator;
 import org.apache.hadoop.hive.ql.exec.ExprNodeEvaluatorFactory;
 import org.apache.hadoop.hive.ql.exec.ExprNodeGenericFuncEvaluator;
 import org.apache.hadoop.hive.ql.exec.GroupByOperator;
+import org.apache.hadoop.hive.ql.exec.IConfigureJobConf;
+import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.exec.vector.VectorAggregationDesc;
 import org.apache.hadoop.hive.ql.exec.vector.VectorizationContext;
 import org.apache.hadoop.hive.ql.exec.vector.VectorizationContextRegion;
@@ -78,6 +81,7 @@ import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoUtils;
 import org.apache.hadoop.hive.common.type.Timestamp;
 import org.apache.hadoop.io.LongWritable;
+import org.apache.hadoop.mapred.JobConf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -91,7 +95,7 @@ import java.util.List;
 import java.util.Queue;
 import java.util.Set;
 
-public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> implements Serializable, VectorizationContextRegion {
+public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> implements Serializable, VectorizationContextRegion, IConfigureJobConf {
     private static final long serialVersionUID = 1L;
     private static final Logger LOG = LoggerFactory.getLogger(OmniGroupByOperator.class.getName());
     private transient OmniHashAggregationWithExprOperatorFactory omniHashAggregationWithExprOperatorFactory;
@@ -711,5 +715,13 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
         omniHashAggregationWithExprOperatorFactory.close();
         omniOperator.close();
         super.closeOp(abort);
+    }
+
+    @Override
+    public void configureJobConf(JobConf job) {
+        // only needed when grouping sets are present
+        if (conf.getGroupingSetPosition() > 0 && shouldEmitSummaryRow(conf)) {
+            job.setBoolean(Utilities.ENSURE_OPERATORS_EXECUTED, true);
+        }
     }
 }
