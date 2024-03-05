@@ -48,6 +48,7 @@ import com.huawei.boostkit.hive.shuffle.OmniVecBatchSerDe;
 
 import nova.hetu.omniruntime.constants.FunctionType;
 
+import org.apache.hadoop.hive.common.type.HiveDecimal;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.QueryPlan;
 import org.apache.hadoop.hive.ql.exec.ExplainTask;
@@ -609,7 +610,8 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                 }
                 return replaceable;
             case FILTER:
-                if (!isUDFSupport(Collections.singletonList(((FilterDesc) operator.getConf()).getPredicate()))) {
+                List<ExprNodeDesc> colList = Collections.singletonList(((FilterDesc) operator.getConf()).getPredicate());
+                if (!isUDFSupport(colList) || !isLegalDeciConstant(colList)) {
                     return false;
                 }
                 boolean result = true;
@@ -619,7 +621,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                 for (Operator child : operator.getChildOperators()) {
                     if (child.getType() != null && child.getType().equals(OperatorType.SELECT)) {
                         SelectDesc conf = (SelectDesc) child.getConf();
-                        result = result && isUDFSupport(conf.getColList());
+                        result = result && isUDFSupport(conf.getColList()) && isLegalDeciConstant(conf.getColList());
                     }
                 }
                 return result;
@@ -846,6 +848,47 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         return checkOmniJsonWhiteList("", expressions.toArray(new String[0]));
     }
 
+    private boolean isLegalDeciConstant(List<ExprNodeDesc> colList) {
+        for (ExprNodeDesc desc : colList) {
+            if (!checkDecimalConstant(desc)) {
+                return false;
+            }
+        }
+        if (colList.size() > 0 && colList.get(0).getChildren() != null) {
+            List<ExprNodeDesc> childList = colList.get(0).getChildren();
+            for (ExprNodeDesc desc : childList) {
+                if (!checkDecimalConstant(desc)) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    private boolean checkDecimalConstant(ExprNodeDesc desc) {
+        if (desc instanceof ExprNodeGenericFuncDesc && desc.getChildren() != null && desc.getChildren().size() == 2) {
+            List<ExprNodeDesc> child = desc.getChildren();
+            if (child.get(0) instanceof ExprNodeConstantDesc && child.get(1) instanceof ExprNodeColumnDesc) {
+                Collections.swap(child, 0, 1);
+            }
+            if (child.get(0) instanceof ExprNodeColumnDesc && child.get(1) instanceof ExprNodeConstantDesc) {
+                TypeInfo deciInfo = child.get(0).getTypeInfo();
+                TypeInfo constInfo = child.get(1).getTypeInfo();
+                if (!(deciInfo instanceof DecimalTypeInfo && constInfo instanceof DecimalTypeInfo)) {
+                    return true;
+                }
+                int deciPrecision = ((DecimalTypeInfo) deciInfo).getPrecision();
+                int deciScale = ((DecimalTypeInfo) deciInfo).getScale();
+                int constScale = ((DecimalTypeInfo) constInfo).getScale();
+                HiveDecimal deciRange = HiveDecimal.create(BigDecimal.TEN.pow(deciPrecision - deciScale));
+                HiveDecimal constValue = (HiveDecimal) ((ExprNodeConstantDesc) child.get(1)).getValue();
+                if (deciRange.compareTo(constValue.abs()) <= 0 || constScale > deciScale) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
 
     private boolean checkMapJoinInput(Operator<? extends OperatorDesc> operator) {
         MapJoinDesc mapJoinDesc = (MapJoinDesc) operator.getConf();
