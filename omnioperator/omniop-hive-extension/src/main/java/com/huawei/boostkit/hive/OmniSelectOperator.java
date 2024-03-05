@@ -40,6 +40,7 @@ import org.apache.hadoop.hive.ql.CompilationOpContext;
 import org.apache.hadoop.hive.ql.exec.Operator;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.plan.ExprNodeColumnDesc;
+import org.apache.hadoop.hive.ql.plan.ExprNodeConstantDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
 import org.apache.hadoop.hive.ql.plan.OperatorDesc;
@@ -293,4 +294,14 @@ public class OmniSelectOperator extends OmniHiveOperator<OmniSelectDesc> impleme
         }
         return typeInfo;
     }
+
+    public static boolean isInvalidSelectColumn(List<ExprNodeDesc> colList) {
+        for (ExprNodeDesc exprNodeDesc: colList) {
+            if (exprNodeDesc instanceof ExprNodeConstantDesc && exprNodeDesc.getTypeInfo().getTypeName().equals("smallint")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
 }
