@@ -110,7 +110,6 @@ import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -887,10 +886,9 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                 }
                 int deciPrecision = ((DecimalTypeInfo) deciInfo).getPrecision();
                 int deciScale = ((DecimalTypeInfo) deciInfo).getScale();
+                int constPrecision = ((DecimalTypeInfo) constInfo).getPrecision();
                 int constScale = ((DecimalTypeInfo) constInfo).getScale();
-                HiveDecimal deciRange = HiveDecimal.create(BigDecimal.TEN.pow(deciPrecision - deciScale));
-                HiveDecimal constValue = (HiveDecimal) ((ExprNodeConstantDesc) child.get(1)).getValue();
-                if (deciRange.compareTo(constValue.abs()) <= 0 || constScale > deciScale) {
+                if (constPrecision - constScale > deciPrecision - deciScale || constScale > deciScale) {
                     return false;
                 }
             }
