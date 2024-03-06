@@ -113,6 +113,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
@@ -479,7 +480,10 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             TableScanDesc tableScanDesc = (TableScanDesc) op.getConf();
             List<String> fieldNames = new ArrayList<>();
             fieldNames.addAll(tableScanDesc.getNeededColumns());
-            fieldNames.addAll(mapWork.getAliasToPartnInfo().get(tableScanDesc.getAlias()).getPartSpec().keySet());
+            LinkedHashMap<String, String> partSpec = mapWork.getAliasToPartnInfo().get(tableScanDesc.getAlias()).getPartSpec();
+            if (partSpec != null) {
+                fieldNames.addAll(partSpec.keySet());
+            }
             if (fieldNames.isEmpty()) {
                 continue;
             }
