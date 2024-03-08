@@ -100,6 +100,7 @@ import org.apache.hadoop.hive.ql.plan.ptf.BoundaryDef;
 import org.apache.hadoop.hive.ql.plan.ptf.PTFExpressionDef;
 import org.apache.hadoop.hive.ql.plan.ptf.WindowFunctionDef;
 import org.apache.hadoop.hive.ql.plan.ptf.WindowTableFunctionDef;
+import org.apache.hadoop.hive.ql.udf.generic.GenericUDAFEvaluator;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDFConcat;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
@@ -733,6 +734,9 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                 return false;
             }
             if (!isUDFSupport(aggregator.getParameters())) {
+                return false;
+            }
+            if (aggregator.getGenericUDAFName().equals("avg") && aggregator.getMode() == GenericUDAFEvaluator.Mode.PARTIAL1) {
                 return false;
             }
             for (ExprNodeDesc parameter : aggregator.getParameters()) {
