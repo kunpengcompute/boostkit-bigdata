@@ -397,8 +397,8 @@ object OmniExpressionAdaptor extends Logging {
       case columnarBloomFilterSubquery: ColumnarBloomFilterSubquery =>
         val bfAddress: Long = columnarBloomFilterSubquery.eval().asInstanceOf[Long]
         new JSONObject().put("exprType", "LITERAL")
-          .put("isNull", false)
-          .put("dataType", bfAddress == 0L)
+          .put("isNull", bfAddress == 0L)
+          .put("dataType", 2)
           .put("value", bfAddress)
 
       case hash: Murmur3Hash =>
