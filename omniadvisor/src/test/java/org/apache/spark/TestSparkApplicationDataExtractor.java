@@ -113,7 +113,7 @@ public class TestSparkApplicationDataExtractor {
         sqlExecutionList.add(new SQLExecutionUIData(1, sqlQ10, "", "", asScalaBuffer(ImmutableList.of()), 0, Option.apply(new Date()), new HashMap<>(), new HashSet<>(), new HashMap<>()));
         sqlExecutionList.add(new SQLExecutionUIData(2, sqlQ11, "", "", asScalaBuffer(ImmutableList.of()), 0, Option.apply(new Date()), new HashMap<>(), new HashSet<>(), new HashMap<>()));
 
-        AppResult result = SparkApplicationDataExtractor.extractAppResultFromAppStatusStore(applicationInfo, TEST_WORK_LOAD, environmentInfo, asScalaBuffer(jobsList), asScalaBuffer(sqlExecutionList));
+        AppResult result = SparkApplicationDataExtractor.extractAppResultFromAppStatusStore(applicationInfo, TEST_WORK_LOAD, environmentInfo, asScalaBuffer(jobsList), asScalaBuffer(sqlExecutionList), null);
         assertEquals(result.applicationId, "id");
         assertEquals(result.durationTime, 15 * 60 * 1000L);
         assertEquals(result.submit_method, "spark-sql");
@@ -134,7 +134,7 @@ public class TestSparkApplicationDataExtractor {
         when(environmentInfo.sparkProperties()).thenReturn(asScalaBuffer(clientSparkProperties));
         when(environmentInfo.systemProperties()).thenReturn(asScalaBuffer(systemProperties));
 
-        AppResult result = SparkApplicationDataExtractor.extractAppResultFromAppStatusStore(applicationInfo, TEST_WORK_LOAD, environmentInfo, asScalaBuffer(jobsList), asScalaBuffer(ImmutableList.of()));
+        AppResult result = SparkApplicationDataExtractor.extractAppResultFromAppStatusStore(applicationInfo, TEST_WORK_LOAD, environmentInfo, asScalaBuffer(jobsList), asScalaBuffer(ImmutableList.of()), null);
         assertEquals(result.applicationId, "id");
         assertEquals(result.durationTime, 15 * 60 * 1000L);
         assertEquals(result.submit_method, "spark-submit");
@@ -154,7 +154,7 @@ public class TestSparkApplicationDataExtractor {
         when(environmentInfo.sparkProperties()).thenReturn(asScalaBuffer(clusterSparkProperties));
         when(environmentInfo.systemProperties()).thenReturn(asScalaBuffer(systemProperties));
 
-        AppResult result = SparkApplicationDataExtractor.extractAppResultFromAppStatusStore(applicationInfo, TEST_WORK_LOAD, environmentInfo, asScalaBuffer(jobsList), asScalaBuffer(ImmutableList.of()));
+        AppResult result = SparkApplicationDataExtractor.extractAppResultFromAppStatusStore(applicationInfo, TEST_WORK_LOAD, environmentInfo, asScalaBuffer(jobsList), asScalaBuffer(ImmutableList.of()), null);
         assertEquals(result.applicationId, "id");
         assertEquals(result.durationTime, 15 * 60 * 1000L);
         assertEquals(result.submit_method, "spark-submit");
@@ -169,7 +169,7 @@ public class TestSparkApplicationDataExtractor {
         ApplicationEnvironmentInfo environmentInfo = Mockito.mock(ApplicationEnvironmentInfo.class);
         when(environmentInfo.sparkProperties()).thenReturn(asScalaBuffer(ImmutableList.of()));
         when(environmentInfo.systemProperties()).thenReturn(asScalaBuffer(ImmutableList.of()));
-        AppResult result = SparkApplicationDataExtractor.extractAppResultFromAppStatusStore(applicationInfo, TEST_WORK_LOAD, environmentInfo, asScalaBuffer(ImmutableList.of(runningData)), asScalaBuffer(ImmutableList.of()));
+        AppResult result = SparkApplicationDataExtractor.extractAppResultFromAppStatusStore(applicationInfo, TEST_WORK_LOAD, environmentInfo, asScalaBuffer(ImmutableList.of(runningData)), asScalaBuffer(ImmutableList.of()), null);
         assertEquals(result.applicationId, "id");
         assertEquals(result.executionStatus, AppResult.FAILED_STATUS);
         assertEquals(result.durationTime, AppResult.FAILED_JOB_DURATION);
@@ -181,7 +181,7 @@ public class TestSparkApplicationDataExtractor {
         ApplicationEnvironmentInfo environmentInfo = Mockito.mock(ApplicationEnvironmentInfo.class);
         when(environmentInfo.sparkProperties()).thenReturn(asScalaBuffer(ImmutableList.of()));
         when(environmentInfo.systemProperties()).thenReturn(asScalaBuffer(ImmutableList.of()));
-        AppResult result = SparkApplicationDataExtractor.extractAppResultFromAppStatusStore(applicationInfo, TEST_WORK_LOAD, environmentInfo, asScalaBuffer(ImmutableList.of(failedData)), asScalaBuffer(ImmutableList.of()));
+        AppResult result = SparkApplicationDataExtractor.extractAppResultFromAppStatusStore(applicationInfo, TEST_WORK_LOAD, environmentInfo, asScalaBuffer(ImmutableList.of(failedData)), asScalaBuffer(ImmutableList.of()), null);
         assertEquals(result.applicationId, "id");
         assertEquals(result.executionStatus, AppResult.FAILED_STATUS);
         assertEquals(result.durationTime, AppResult.FAILED_JOB_DURATION);
@@ -193,7 +193,7 @@ public class TestSparkApplicationDataExtractor {
         ApplicationEnvironmentInfo environmentInfo = Mockito.mock(ApplicationEnvironmentInfo.class);
         when(environmentInfo.sparkProperties()).thenReturn(asScalaBuffer(ImmutableList.of()));
         when(environmentInfo.systemProperties()).thenReturn(asScalaBuffer(ImmutableList.of()));
-        AppResult result = SparkApplicationDataExtractor.extractAppResultFromAppStatusStore(applicationInfo, TEST_WORK_LOAD, environmentInfo, asScalaBuffer(ImmutableList.of()), asScalaBuffer(ImmutableList.of()));
+        AppResult result = SparkApplicationDataExtractor.extractAppResultFromAppStatusStore(applicationInfo, TEST_WORK_LOAD, environmentInfo, asScalaBuffer(ImmutableList.of()), asScalaBuffer(ImmutableList.of()), null);
         assertEquals(result.applicationId, "id");
         assertEquals(result.executionStatus, AppResult.FAILED_STATUS);
         assertEquals(result.durationTime, AppResult.FAILED_JOB_DURATION);
@@ -205,6 +205,6 @@ public class TestSparkApplicationDataExtractor {
         ApplicationEnvironmentInfo environmentInfo = Mockito.mock(ApplicationEnvironmentInfo.class);
         when(environmentInfo.sparkProperties()).thenReturn(asScalaBuffer(ImmutableList.of()));
         when(environmentInfo.systemProperties()).thenReturn(asScalaBuffer(ImmutableList.of()));
-        SparkApplicationDataExtractor.extractAppResultFromAppStatusStore(applicationInfo, TEST_WORK_LOAD, environmentInfo, asScalaBuffer(ImmutableList.of()), asScalaBuffer(ImmutableList.of()));
+        SparkApplicationDataExtractor.extractAppResultFromAppStatusStore(applicationInfo, TEST_WORK_LOAD, environmentInfo, asScalaBuffer(ImmutableList.of()), asScalaBuffer(ImmutableList.of()), null);
     }
 }
