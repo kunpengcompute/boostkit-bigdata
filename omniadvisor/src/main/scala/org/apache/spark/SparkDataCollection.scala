@@ -16,16 +16,17 @@
 package org.apache.spark
 
 import com.huawei.boostkit.omniadvisor.models.AppResult
-import org.apache.spark.status.api.v1
-import org.apache.spark.util.kvstore.{InMemoryStore, KVStore}
 import org.apache.spark.internal.config.Status.ASYNC_TRACKING_ENABLED
 import org.apache.spark.scheduler.ReplayListenerBus
+import org.apache.spark.sql.execution.ui.{SQLAppStatusListener, SQLAppStatusStore, SQLExecutionUIData, SparkPlanGraph}
+import org.apache.spark.status.api.v1
 import org.apache.spark.status.{AppStatusListener, AppStatusStore, ElementTrackingStore}
-import org.apache.spark.sql.execution.ui.{SQLAppStatusListener, SQLAppStatusStore, SQLExecutionUIData}
 import org.apache.spark.util.Utils
+import org.apache.spark.util.kvstore.{InMemoryStore, KVStore}
 import org.slf4j.{Logger, LoggerFactory}
 
 import java.io.InputStream
+import scala.collection.mutable
 
 class SparkDataCollection {
   val LOG: Logger = LoggerFactory.getLogger(classOf[SparkDataCollection])
@@ -36,6 +37,7 @@ class SparkDataCollection {
   var jobsList: Seq[v1.JobData] = _
   var appInfo: v1.ApplicationInfo = _
   var sqlExecutionsList: Seq[SQLExecutionUIData] = _
+  var sqlGraphMap: mutable.Map[Long, SparkPlanGraph] = _
 
   def replayEventLogs(in: InputStream, sourceName: String): Unit = {
 
@@ -66,12 +68,16 @@ class SparkDataCollection {
 
     val sqlAppStatusStore: SQLAppStatusStore = new SQLAppStatusStore(store)
     sqlExecutionsList = sqlAppStatusStore.executionsList()
+    sqlGraphMap = mutable.HashMap.empty[Long, SparkPlanGraph]
+    sqlExecutionsList.foreach { sqlExecution =>
+      sqlGraphMap.put(sqlExecution.executionId, sqlAppStatusStore.planGraph(sqlExecution.executionId))
+    }
 
     appStatusStore.close()
   }
 
   def getAppResult(workload: String): AppResult = {
-    SparkApplicationDataExtractor.extractAppResultFromAppStatusStore(appInfo, workload, environmentInfo, jobsList, sqlExecutionsList)
+    SparkApplicationDataExtractor.extractAppResultFromAppStatusStore(appInfo, workload, environmentInfo, jobsList, sqlExecutionsList, sqlGraphMap)
   }
 
   private def createInMemoryStore(): KVStore = {
