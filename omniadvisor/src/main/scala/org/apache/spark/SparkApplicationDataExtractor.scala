@@ -17,11 +17,10 @@ package org.apache.spark
 
 import com.huawei.boostkit.omniadvisor.fetcher.FetcherType
 import com.huawei.boostkit.omniadvisor.models.AppResult
-import com.huawei.boostkit.omniadvisor.spark.utils.ScalaUtils.parseMapToJsonString
-import com.huawei.boostkit.omniadvisor.spark.utils.ScalaUtils.checkSuccess
+import com.huawei.boostkit.omniadvisor.spark.utils.ScalaUtils.{checkSuccess, parseMapToJsonString}
 import com.huawei.boostkit.omniadvisor.spark.utils.SparkUtils
 import com.nimbusds.jose.util.StandardCharset
-import org.apache.spark.sql.execution.ui.SQLExecutionUIData
+import org.apache.spark.sql.execution.ui.{SQLExecutionUIData, SparkPlanGraph}
 import org.apache.spark.status.api.v1._
 import org.slf4j.{Logger, LoggerFactory}
 
@@ -41,7 +40,8 @@ object SparkApplicationDataExtractor {
                                          workload: String,
                                          environmentInfo: ApplicationEnvironmentInfo,
                                          jobsList: Seq[JobData],
-                                         sqlExecutionsList: Seq[SQLExecutionUIData]): AppResult = {
+                                         sqlExecutionsList: Seq[SQLExecutionUIData],
+                                         sqlGraphMap: mutable.Map[Long, SparkPlanGraph]): AppResult = {
     val appResult = new AppResult
     appResult.applicationId = appInfo.id
     appResult.applicationName = appInfo.name
@@ -57,7 +57,7 @@ object SparkApplicationDataExtractor {
 
     val attempt: ApplicationAttemptInfo = lastAttempt(appInfo)
     if (attempt.completed && jobsList.nonEmpty && checkSuccess(jobsList)) {
-      saveSuccessfulStatus(appResult, jobsList, sqlExecutionsList)
+      saveSuccessfulStatus(appResult, jobsList, sqlExecutionsList, sqlGraphMap)
     } else {
       saveFailedStatus(appResult, attempt)
     }
@@ -112,7 +112,7 @@ object SparkApplicationDataExtractor {
     appResult.query = ""
   }
 
-  private def saveSuccessfulStatus(appResult: AppResult, jobsList: Seq[JobData], sqlExecutionsList: Seq[SQLExecutionUIData]): Unit = {
+  private def saveSuccessfulStatus(appResult: AppResult, jobsList: Seq[JobData], sqlExecutionsList: Seq[SQLExecutionUIData], sqlGraphMap: mutable.Map[Long, SparkPlanGraph]): Unit = {
     appResult.executionStatus = AppResult.SUCCEEDED_STATUS
 
     val (startTime, finishTime) = extractJobsTime(jobsList)
@@ -122,7 +122,7 @@ object SparkApplicationDataExtractor {
       finishTime - startTime else AppResult.FAILED_JOB_DURATION
 
     if (appResult.submit_method.equals(AppResult.SPARK_SQL)) {
-      appResult.query = extractQuerySQL(sqlExecutionsList)
+      appResult.query = extractQuerySQL(sqlExecutionsList, sqlGraphMap)
     } else {
       appResult.query = ""
     }
@@ -153,16 +153,32 @@ object SparkApplicationDataExtractor {
     (startTime, finishTime)
   }
 
-  private def extractQuerySQL(sqlExecutionsList: Seq[SQLExecutionUIData]): String = {
+  private def extractQuerySQL(sqlExecutionsList: Seq[SQLExecutionUIData], sqlGraphMap: mutable.Map[Long, SparkPlanGraph]): String = {
     require(sqlExecutionsList.nonEmpty)
-    val nonEmptyDescriptions = sqlExecutionsList.flatMap { execution =>
-      Option(execution.description).filter(_.nonEmpty)
+    val descriptions: mutable.ArrayBuffer[String] = mutable.ArrayBuffer.empty[String]
+    var previousExecutionDesc: Option[String] = None
+    for ((execution, index) <- sqlExecutionsList.zipWithIndex) {
+      if (index > 0) {
+        val sqlGraph = sqlGraphMap(execution.executionId)
+        if (execution.description.nonEmpty && !isDuplicatedQuery(execution, previousExecutionDesc, sqlGraph)) {
+          descriptions += execution.description.trim
+        }
+      } else {
+        if (execution.description.nonEmpty) {
+          descriptions += execution.description.trim
+        }
+      }
+      previousExecutionDesc = Some(execution.description)
     }
-    nonEmptyDescriptions.mkString(";")
+    descriptions.mkString(";\n")
   }
 
   private def lastAttempt(applicationInfo: ApplicationInfo): ApplicationAttemptInfo = {
     require(applicationInfo.attempts.nonEmpty)
     applicationInfo.attempts.last
+  }
+
+  private def isDuplicatedQuery(execution: SQLExecutionUIData, previousExecutionDesc: Option[String], sqlGraph: SparkPlanGraph): Boolean = {
+    execution.description.equals(previousExecutionDesc.getOrElse("")) && sqlGraph.allNodes.size == 1 && sqlGraph.allNodes.head.name.equals("LocalTableScan")
   }
 }
