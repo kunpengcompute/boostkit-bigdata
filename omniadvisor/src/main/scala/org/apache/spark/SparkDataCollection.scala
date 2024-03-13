@@ -70,7 +70,13 @@ class SparkDataCollection {
     sqlExecutionsList = sqlAppStatusStore.executionsList()
     sqlGraphMap = mutable.HashMap.empty[Long, SparkPlanGraph]
     sqlExecutionsList.foreach { sqlExecution =>
-      sqlGraphMap.put(sqlExecution.executionId, sqlAppStatusStore.planGraph(sqlExecution.executionId))
+      try {
+        val planGraph = sqlAppStatusStore.planGraph(sqlExecution.executionId)
+        sqlGraphMap.put(sqlExecution.executionId, planGraph)
+      } catch {
+        case e: Exception =>
+          LOG.warn(s"Get PlanGraph for SQLExecution [${sqlExecution.executionId}] in ${appInfo.id} failed")
+      }
     }
 
     appStatusStore.close()
