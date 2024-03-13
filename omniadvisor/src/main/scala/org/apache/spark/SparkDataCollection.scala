@@ -77,7 +77,6 @@ class SparkDataCollection {
         case e: Exception =>
           LOG.warn(s"Get PlanGraph for SQLExecution [${sqlExecution.executionId}] in ${appInfo.id}")
       }
-      sqlGraphMap.put(sqlExecution.executionId, sqlAppStatusStore.planGraph(sqlExecution.executionId))
     }
 
     appStatusStore.close()
