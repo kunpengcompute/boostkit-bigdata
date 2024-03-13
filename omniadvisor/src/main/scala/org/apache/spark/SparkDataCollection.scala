@@ -75,7 +75,7 @@ class SparkDataCollection {
         sqlGraphMap.put(sqlExecution.executionId, planGraph)
       } catch {
         case e: Exception =>
-          LOG.warn(s"Get PlanGraph for SQLExecution [${sqlExecution.executionId}] in ${appInfo.id}")
+          LOG.warn(s"Get PlanGraph for SQLExecution [${sqlExecution.executionId}] in ${appInfo.id} failed")
       }
     }
 
