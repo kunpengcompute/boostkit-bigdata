@@ -285,7 +285,7 @@ case class ColumnarSortMergeJoinExec(
       }
 
       if (enableSortMergeJoinBatchMerge) {
-        val mergeIterator = new MergeIterator(iterBatch, resultSchema, numMergedVecBatches)
+        val mergeIterator = new MergeIterator(iterBatch, resultSchema, numMergedVecBatches, bypassVecBatches)
         SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
           mergeIterator.close()
         })

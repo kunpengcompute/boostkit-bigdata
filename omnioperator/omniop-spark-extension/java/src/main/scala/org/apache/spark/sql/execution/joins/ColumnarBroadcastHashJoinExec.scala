@@ -506,7 +506,7 @@ case class ColumnarBroadcastHashJoinExec(
       }
 
       if (enableJoinBatchMerge) {
-        val mergeIterator = new MergeIterator(iterBatch, resultSchema, numMergedVecBatches)
+        val mergeIterator = new MergeIterator(iterBatch, resultSchema, numMergedVecBatches, bypassVecBatches)
         SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
           mergeIterator.close()
         })
