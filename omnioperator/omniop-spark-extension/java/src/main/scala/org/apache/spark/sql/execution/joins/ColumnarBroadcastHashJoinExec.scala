@@ -340,7 +340,7 @@ case class ColumnarBroadcastHashJoinExec(
           Optional.empty()
       }
 
-      def createBuildOpFactoryAndOp(): (OmniHashBuilderWithExprOperatorFactory, OmniOperator) = {
+      def createBuildOpFactoryAndOp(isShared: Boolean): (OmniHashBuilderWithExprOperatorFactory, OmniOperator) = {
         val startBuildCodegen = System.nanoTime()
         val opFactory =
           new OmniHashBuilderWithExprOperatorFactory(lookupJoinType, buildTypes, buildJoinColsExp, 1,
@@ -349,6 +349,10 @@ case class ColumnarBroadcastHashJoinExec(
         val op = opFactory.createOperator()
         buildCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startBuildCodegen)
 
+        if (isShared) {
+          OmniHashBuilderWithExprOperatorFactory.saveHashBuilderOperatorAndFactory(buildPlan.id,
+            opFactory, op)
+        }
         val deserializer = VecBatchSerializerFactory.create()
         relation.value.buildData.foreach { input =>
           val startBuildInput = System.nanoTime()
@@ -356,7 +360,19 @@ case class ColumnarBroadcastHashJoinExec(
           buildAddInputTime += NANOSECONDS.toMillis(System.nanoTime() - startBuildInput)
         }
         val startBuildGetOp = System.nanoTime()
-        op.getOutput
+        try {
+          op.getOutput
+        } catch {
+          case e: Exception => {
+            if (isShared) {
+              OmniHashBuilderWithExprOperatorFactory.dereferenceHashBuilderOperatorAndFactory(buildPlan.id)
+            } else {
+              op.close()
+              opFactory.close()
+            }
+            throw new RuntimeException("HashBuilder getOutput failed")
+          }
+        }
         buildGetOutputTime += NANOSECONDS.toMillis(System.nanoTime() - startBuildGetOp)
         (opFactory, op)
       }
@@ -368,11 +384,9 @@ case class ColumnarBroadcastHashJoinExec(
         try {
           buildOpFactory = OmniHashBuilderWithExprOperatorFactory.getHashBuilderOperatorFactory(buildPlan.id)
           if (buildOpFactory == null) {
-            val (opFactory, op) = createBuildOpFactoryAndOp()
+            val (opFactory, op) = createBuildOpFactoryAndOp(true)
             buildOpFactory = opFactory
             buildOp = op
-            OmniHashBuilderWithExprOperatorFactory.saveHashBuilderOperatorAndFactory(buildPlan.id,
-              buildOpFactory, buildOp)
           }
         } catch {
           case e: Exception => {
@@ -382,7 +396,7 @@ case class ColumnarBroadcastHashJoinExec(
           OmniHashBuilderWithExprOperatorFactory.gLock.unlock()
         }
       } else {
-        val (opFactory, op) = createBuildOpFactoryAndOp()
+        val (opFactory, op) = createBuildOpFactoryAndOp(false)
         buildOpFactory = opFactory
         buildOp = op
       }
@@ -492,7 +506,11 @@ case class ColumnarBroadcastHashJoinExec(
       }
 
       if (enableJoinBatchMerge) {
-        new MergeIterator(iterBatch, resultSchema, numMergedVecBatches, bypassVecBatches)
+        val mergeIterator = new MergeIterator(iterBatch, resultSchema, numMergedVecBatches)
+        SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
+          mergeIterator.close()
+        })
+        mergeIterator
       } else {
         iterBatch
       }

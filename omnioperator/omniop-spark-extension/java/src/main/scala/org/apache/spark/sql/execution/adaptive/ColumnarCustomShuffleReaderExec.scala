@@ -25,7 +25,7 @@ import org.apache.spark.sql.catalyst.plans.physical.{Partitioning, UnknownPartit
 import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.exchange.{ReusedExchangeExec, ShuffleExchangeLike}
 import org.apache.spark.sql.execution.metric.{SQLMetric, SQLMetrics}
-import org.apache.spark.sql.execution.util.MergeIterator
+import org.apache.spark.sql.execution.util.{MergeIterator, SparkMemoryUtils}
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.vectorized.ColumnarBatch
 
@@ -207,10 +207,14 @@ case class ColumnarCustomShuffleReaderExec(
 
     if (enableShuffleBatchMerge) {
       cachedShuffleRDD.mapPartitionsWithIndexInternal { (index, iter) =>
-        new MergeIterator(iter,
+        val mergeIterator = new MergeIterator(iter,
            StructType.fromAttributes(child.output),
            longMetric("numMergedVecBatches"),
            longMetric("bypassVecBatches"))
+        SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
+          mergeIterator.close()
+        })
+        mergeIterator
       }
     } else {
       cachedShuffleRDD

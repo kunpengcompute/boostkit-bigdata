@@ -40,7 +40,7 @@ import org.apache.spark.sql.catalyst.plans.physical._
 import org.apache.spark.sql.execution.exchange.ShuffleExchangeExec.createShuffleWriteProcessor
 import org.apache.spark.sql.execution.exchange.{ENSURE_REQUIREMENTS, ShuffleExchangeExec, ShuffleExchangeLike, ShuffleOrigin}
 import org.apache.spark.sql.execution.metric._
-import org.apache.spark.sql.execution.util.MergeIterator
+import org.apache.spark.sql.execution.util.{MergeIterator, SparkMemoryUtils}
 import org.apache.spark.sql.execution.util.SparkMemoryUtils.addLeakSafeTaskCompletionListener
 import org.apache.spark.sql.execution.vectorized.OmniColumnVector
 import org.apache.spark.sql.internal.SQLConf
@@ -167,10 +167,13 @@ class ColumnarShuffleExchangeExec(
 
     if (enableShuffleBatchMerge) {
       cachedShuffleRDD.mapPartitionsWithIndexInternal { (index, iter) =>
-        new MergeIterator(iter,
+        val mergeIterator = new MergeIterator(iter,
           StructType.fromAttributes(child.output),
-          longMetric("numMergedVecBatches"),
-          longMetric("bypassVecBatches"))
+          longMetric("numMergedVecBatches"))
+        SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
+          mergeIterator.close()
+        })
+        mergeIterator
       }
     } else {
       cachedShuffleRDD

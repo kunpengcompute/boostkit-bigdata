@@ -312,7 +312,7 @@ object ColumnarBatchToInternalRow {
 
     val batchIter = batches.flatMap { batch =>
 
-      // toClosedVecs closed case:
+      // toClosedVecs closed case: [Deprcated]
       // 1) all rows of batch fetched and closed
       // 2) only fetch parital rows(eg: top-n, limit-n), closed at task CompletionListener callback
       val toClosedVecs = new ListBuffer[Vec]
@@ -330,27 +330,22 @@ object ColumnarBatchToInternalRow {
 
       new Iterator[InternalRow] {
         val numOutputRowsMetric: SQLMetric = numOutputRows
-        var closed = false
 
-        // only invoke if fetch partial rows of batch
-        if (mayPartialFetch) {
-          SparkMemoryUtils.addLeakSafeTaskCompletionListener { _ =>
-            if (!closed) {
-              toClosedVecs.foreach {vec =>
-                vec.close()
-              }
+
+        SparkMemoryUtils.addLeakSafeTaskCompletionListener { _ =>
+            toClosedVecs.foreach {vec =>
+              vec.close()
             }
-          }
         }
 
         override  def hasNext: Boolean = {
           val has = iter.hasNext
-          // fetch all rows and closed
-          if (!has && !closed) {
+          // fetch all rows
+          if (!has) {
             toClosedVecs.foreach {vec =>
               vec.close()
+              toClosedVecs.remove(toClosedVecs.indexOf(vec))
             }
-            closed = true
           }
           has
         }
