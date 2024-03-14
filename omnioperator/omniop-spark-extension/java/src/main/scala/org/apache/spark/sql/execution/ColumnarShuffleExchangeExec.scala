@@ -169,7 +169,8 @@ class ColumnarShuffleExchangeExec(
       cachedShuffleRDD.mapPartitionsWithIndexInternal { (index, iter) =>
         val mergeIterator = new MergeIterator(iter,
           StructType.fromAttributes(child.output),
-          longMetric("numMergedVecBatches"))
+          longMetric("numMergedVecBatches"),
+          longMetric("bypassVecBatches"))
         SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
           mergeIterator.close()
         })
