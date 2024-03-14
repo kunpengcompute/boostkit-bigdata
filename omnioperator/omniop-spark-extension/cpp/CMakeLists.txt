@@ -1,8 +1,8 @@
-# project name
-project(spark-thestral-plugin)
-
 # required cmake version
 cmake_minimum_required(VERSION 3.10)
+
+# project name
+project(spark-thestral-plugin)
 
 # configure cmake
 set(CMAKE_CXX_STANDARD 17)
