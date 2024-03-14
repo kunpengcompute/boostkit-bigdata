@@ -19,6 +19,7 @@
 
 #include "OrcColumnarBatchJniReader.h"
 #include <boost/algorithm/string.hpp>
+#include <memory>
 #include "jni_common.h"
 
 using namespace omniruntime::vec;
@@ -327,75 +328,80 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniRea
     JNI_FUNC_END(runtimeExceptionClass)
 }
 
-template <DataTypeId TYPE_ID, typename ORC_TYPE> uint64_t CopyFixedWidth(orc::ColumnVectorBatch *field)
+template <DataTypeId TYPE_ID, typename ORC_TYPE>
+std::unique_ptr<BaseVector> CopyFixedWidth(orc::ColumnVectorBatch *field)
 {
     using T = typename NativeType<TYPE_ID>::type;
     ORC_TYPE *lvb = dynamic_cast<ORC_TYPE *>(field);
     auto numElements = lvb->numElements;
     auto values = lvb->data.data();
     auto notNulls = lvb->notNull.data();
-    auto newVector = new Vector<T>(numElements);
+    auto newVector = std::make_unique<Vector<T>>(numElements);
+    auto newVectorPtr = newVector.get();
     // Check ColumnVectorBatch has null or not firstly
     if (lvb->hasNulls) {
         for (uint i = 0; i < numElements; i++) {
             if (notNulls[i]) {
-                newVector->SetValue(i, (T)(values[i]));
+                newVectorPtr->SetValue(i, (T)(values[i]));
             } else {
-                newVector->SetNull(i);
+                newVectorPtr->SetNull(i);
             }
         }
     } else {
         for (uint i = 0; i < numElements; i++) {
-            newVector->SetValue(i, (T)(values[i]));
+            newVectorPtr->SetValue(i, (T)(values[i]));
         }
     }
-    return (uint64_t)newVector;
+    return newVector;
 }
 
-template <DataTypeId TYPE_ID, typename ORC_TYPE> uint64_t CopyOptimizedForInt64(orc::ColumnVectorBatch *field)
+template <DataTypeId TYPE_ID, typename ORC_TYPE>
+std::unique_ptr<BaseVector> CopyOptimizedForInt64(orc::ColumnVectorBatch *field)
 {
     using T = typename NativeType<TYPE_ID>::type;
     ORC_TYPE *lvb = dynamic_cast<ORC_TYPE *>(field);
     auto numElements = lvb->numElements;
     auto values = lvb->data.data();
     auto notNulls = lvb->notNull.data();
-    auto newVector = new Vector<T>(numElements);
+    auto newVector = std::make_unique<Vector<T>>(numElements);
+    auto newVectorPtr = newVector.get();
     // Check ColumnVectorBatch has null or not firstly
     if (lvb->hasNulls) {
         for (uint i = 0; i < numElements; i++) {
             if (!notNulls[i]) {
-                newVector->SetNull(i);
+                newVectorPtr->SetNull(i);
             }
         }
     }
-    newVector->SetValues(0, values, numElements);
-    return (uint64_t)newVector;
+    newVectorPtr->SetValues(0, values, numElements);
+    return newVector;
 }
 
-uint64_t CopyVarWidth(orc::ColumnVectorBatch *field)
+std::unique_ptr<BaseVector> CopyVarWidth(orc::ColumnVectorBatch *field)
 {
     orc::StringVectorBatch *lvb = dynamic_cast<orc::StringVectorBatch *>(field);
     auto numElements = lvb->numElements;
     auto values = lvb->data.data();
     auto notNulls = lvb->notNull.data();
     auto lens = lvb->length.data();
-    auto newVector = new Vector<LargeStringContainer<std::string_view>>(numElements);
+    auto newVector = std::make_unique<Vector<LargeStringContainer<std::string_view>>>(numElements);
+    auto newVectorPtr = newVector.get();
     if (lvb->hasNulls) {
         for (uint i = 0; i < numElements; i++) {
             if (notNulls[i]) {
                 auto data = std::string_view(reinterpret_cast<const char *>(values[i]), lens[i]);
-                newVector->SetValue(i, data);
+                newVectorPtr->SetValue(i, data);
             } else {
-                newVector->SetNull(i);
+                newVectorPtr->SetNull(i);
             }
         }
     } else {
         for (uint i = 0; i < numElements; i++) {
             auto data = std::string_view(reinterpret_cast<const char *>(values[i]), lens[i]);
-            newVector->SetValue(i, data);
+            newVectorPtr->SetValue(i, data);
         }
     }
-    return (uint64_t)newVector;
+    return newVector;
 }
 
 inline void FindLastNotEmpty(const char *chars, long &len)
@@ -405,14 +411,15 @@ inline void FindLastNotEmpty(const char *chars, long &len)
     }
 }
 
-uint64_t CopyCharType(orc::ColumnVectorBatch *field)
+std::unique_ptr<BaseVector> CopyCharType(orc::ColumnVectorBatch *field)
 {
     orc::StringVectorBatch *lvb = dynamic_cast<orc::StringVectorBatch *>(field);
     auto numElements = lvb->numElements;
     auto values = lvb->data.data();
     auto notNulls = lvb->notNull.data();
     auto lens = lvb->length.data();
-    auto newVector = new Vector<LargeStringContainer<std::string_view>>(numElements);
+    auto newVector = std::make_unique<Vector<LargeStringContainer<std::string_view>>>(numElements);
+    auto newVectorPtr = newVector.get();
     if (lvb->hasNulls) {
         for (uint i = 0; i < numElements; i++) {
             if (notNulls[i]) {
@@ -420,9 +427,9 @@ uint64_t CopyCharType(orc::ColumnVectorBatch *field)
                 auto len = lens[i];
                 FindLastNotEmpty(chars, len);
                 auto data = std::string_view(chars, len);
-                newVector->SetValue(i, data);
+                newVectorPtr->SetValue(i, data);
             } else {
-                newVector->SetNull(i);
+                newVectorPtr->SetNull(i);
             }
         }
     } else {
@@ -431,28 +438,29 @@ uint64_t CopyCharType(orc::ColumnVectorBatch *field)
             auto len = lens[i];
             FindLastNotEmpty(chars, len);
             auto data = std::string_view(chars, len);
-            newVector->SetValue(i, data);
+            newVectorPtr->SetValue(i, data);
         }
     }
-    return (uint64_t)newVector;
+    return newVector;
 }
 
-uint64_t CopyToOmniDecimal128Vec(orc::ColumnVectorBatch *field)
+std::unique_ptr<BaseVector> CopyToOmniDecimal128Vec(orc::ColumnVectorBatch *field)
 {
     orc::Decimal128VectorBatch *lvb = dynamic_cast<orc::Decimal128VectorBatch *>(field);
     auto numElements = lvb->numElements;
     auto values = lvb->values.data();
     auto notNulls = lvb->notNull.data();
-    auto newVector = new Vector<Decimal128>(numElements);
+    auto newVector = std::make_unique<Vector<Decimal128>>(numElements);
+    auto newVectorPtr = newVector.get();
     if (lvb->hasNulls) {
         for (uint i = 0; i < numElements; i++) {
             if (notNulls[i]) {
                 __int128_t dst = values[i].getHighBits();
                 dst <<= 64;
                 dst |= values[i].getLowBits();
-                newVector->SetValue(i, Decimal128(dst));
+                newVectorPtr->SetValue(i, Decimal128(dst));
             } else {
-                newVector->SetNull(i);
+                newVectorPtr->SetNull(i);
             }
         }
     } else {
@@ -460,137 +468,129 @@ uint64_t CopyToOmniDecimal128Vec(orc::ColumnVectorBatch *field)
             __int128_t dst = values[i].getHighBits();
             dst <<= 64;
             dst |= values[i].getLowBits();
-            newVector->SetValue(i, Decimal128(dst));
+            newVectorPtr->SetValue(i, Decimal128(dst));
         }
     }
-    return (uint64_t)newVector;
+    return newVector;
 }
 
-uint64_t CopyToOmniDecimal64Vec(orc::ColumnVectorBatch *field)
+std::unique_ptr<BaseVector> CopyToOmniDecimal64Vec(orc::ColumnVectorBatch *field)
 {
     orc::Decimal64VectorBatch *lvb = dynamic_cast<orc::Decimal64VectorBatch *>(field);
     auto numElements = lvb->numElements;
     auto values = lvb->values.data();
     auto notNulls = lvb->notNull.data();
-    auto newVector = new Vector<int64_t>(numElements);
+    auto newVector = std::make_unique<Vector<int64_t>>(numElements);
+    auto newVectorPtr = newVector.get();
     if (lvb->hasNulls) {
         for (uint i = 0; i < numElements; i++) {
             if (!notNulls[i]) {
-                newVector->SetNull(i);
+                newVectorPtr->SetNull(i);
             }
         }
     }
-    newVector->SetValues(0, values, numElements);
-    return (uint64_t)newVector;
+    newVectorPtr->SetValues(0, values, numElements);
+    return newVector;
 }
 
-uint64_t CopyToOmniDecimal128VecFrom64(orc::ColumnVectorBatch *field)
+std::unique_ptr<BaseVector> CopyToOmniDecimal128VecFrom64(orc::ColumnVectorBatch *field)
 {
     orc::Decimal64VectorBatch *lvb = dynamic_cast<orc::Decimal64VectorBatch *>(field);
     auto numElements = lvb->numElements;
     auto values = lvb->values.data();
     auto notNulls = lvb->notNull.data();
-    auto newVector = new Vector<Decimal128>(numElements);
+    auto newVector = std::make_unique<Vector<Decimal128>>(numElements);
+    auto newVectorPtr = newVector.get();
     if (lvb->hasNulls) {
         for (uint i = 0; i < numElements; i++) {
             if (!notNulls[i]) {
-                newVector->SetNull(i);
+                newVectorPtr->SetNull(i);
             } else {
                 Decimal128 d128(values[i]);
-                newVector->SetValue(i, d128);
+                newVectorPtr->SetValue(i, d128);
             }
         }
     } else {
         for (uint i = 0; i < numElements; i++) {
             Decimal128 d128(values[i]);
-            newVector->SetValue(i, d128);
+            newVectorPtr->SetValue(i, d128);
         }
     }
 
-    return (uint64_t)newVector;
+    return newVector;
 }
 
-int CopyToOmniVec(const orc::Type *type, int &omniTypeId, uint64_t &omniVecId, orc::ColumnVectorBatch *field,
+std::unique_ptr<BaseVector> CopyToOmniVec(const orc::Type *type, int &omniTypeId, orc::ColumnVectorBatch *field,
     bool isDecimal64Transfor128)
 {
     switch (type->getKind()) {
         case orc::TypeKind::BOOLEAN:
             omniTypeId = static_cast<jint>(OMNI_BOOLEAN);
-            omniVecId = CopyFixedWidth<OMNI_BOOLEAN, orc::LongVectorBatch>(field);
-            break;
+            return CopyFixedWidth<OMNI_BOOLEAN, orc::LongVectorBatch>(field);
         case orc::TypeKind::SHORT:
             omniTypeId = static_cast<jint>(OMNI_SHORT);
-            omniVecId = CopyFixedWidth<OMNI_SHORT, orc::LongVectorBatch>(field);
-            break;
+            return CopyFixedWidth<OMNI_SHORT, orc::LongVectorBatch>(field);
         case orc::TypeKind::DATE:
             omniTypeId = static_cast<jint>(OMNI_DATE32);
-            omniVecId = CopyFixedWidth<OMNI_INT, orc::LongVectorBatch>(field);
-            break;
+            return CopyFixedWidth<OMNI_INT, orc::LongVectorBatch>(field);
         case orc::TypeKind::INT:
             omniTypeId = static_cast<jint>(OMNI_INT);
-            omniVecId = CopyFixedWidth<OMNI_INT, orc::LongVectorBatch>(field);
-            break;
+            return CopyFixedWidth<OMNI_INT, orc::LongVectorBatch>(field);
         case orc::TypeKind::LONG:
             omniTypeId = static_cast<int>(OMNI_LONG);
-            omniVecId = CopyOptimizedForInt64<OMNI_LONG, orc::LongVectorBatch>(field);
-            break;
+            return CopyOptimizedForInt64<OMNI_LONG, orc::LongVectorBatch>(field);
         case orc::TypeKind::DOUBLE:
             omniTypeId = static_cast<int>(OMNI_DOUBLE);
-            omniVecId = CopyOptimizedForInt64<OMNI_DOUBLE, orc::DoubleVectorBatch>(field);
-            break;
+            return CopyOptimizedForInt64<OMNI_DOUBLE, orc::DoubleVectorBatch>(field);
         case orc::TypeKind::CHAR:
             omniTypeId = static_cast<int>(OMNI_VARCHAR);
-            omniVecId = CopyCharType(field);
-            break;
+            return CopyCharType(field);
         case orc::TypeKind::STRING:
         case orc::TypeKind::VARCHAR:
             omniTypeId = static_cast<int>(OMNI_VARCHAR);
-            omniVecId = CopyVarWidth(field);
-            break;
+            return CopyVarWidth(field);
         case orc::TypeKind::DECIMAL:
             if (type->getPrecision() > MAX_DECIMAL64_DIGITS) {
                 omniTypeId = static_cast<int>(OMNI_DECIMAL128);
-                omniVecId = CopyToOmniDecimal128Vec(field);
+                return CopyToOmniDecimal128Vec(field);
             } else if (isDecimal64Transfor128) {
                 omniTypeId = static_cast<int>(OMNI_DECIMAL128);
-                omniVecId = CopyToOmniDecimal128VecFrom64(field);
+                return CopyToOmniDecimal128VecFrom64(field);
             } else {
                 omniTypeId = static_cast<int>(OMNI_DECIMAL64);
-                omniVecId = CopyToOmniDecimal64Vec(field);
+                return CopyToOmniDecimal64Vec(field);
             }
-            break;
         default: {
             throw std::runtime_error("Native ColumnarFileScan Not support For This Type: " + type->getKind());
         }
     }
-    return 1;
 }
 
 JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniReader_recordReaderNext(JNIEnv *env,
     jobject jObj, jlong rowReader, jlong batch, jintArray typeId, jlongArray vecNativeId)
 {
-    JNI_FUNC_START
     orc::RowReader *rowReaderPtr = (orc::RowReader *)rowReader;
     orc::ColumnVectorBatch *columnVectorBatch = (orc::ColumnVectorBatch *)batch;
+    std::vector<std::unique_ptr<BaseVector>> omniVecs;
+
     const orc::Type &baseTp = rowReaderPtr->getSelectedType();
-    int vecCnt = 0;
-    long batchRowSize = 0;
+    uint64_t batchRowSize = 0;
     if (rowReaderPtr->next(*columnVectorBatch)) {
         orc::StructVectorBatch *root = dynamic_cast<orc::StructVectorBatch *>(columnVectorBatch);
-        vecCnt = root->fields.size();
         batchRowSize = root->fields[0]->numElements;
-        for (int id = 0; id < vecCnt; id++) {
+        int32_t vecCnt = root->fields.size();
+        std::vector<int32_t> omniTypeIds(vecCnt, 0);
+        for (int32_t id = 0; id < vecCnt; id++) {
             auto type = baseTp.getSubtype(id);
-            int omniTypeId = 0;
-            uint64_t omniVecId = 0;
-            CopyToOmniVec(type, omniTypeId, omniVecId, root->fields[id], isDecimal64Transfor128);
-            env->SetIntArrayRegion(typeId, id, 1, &omniTypeId);
-            jlong omniVec = static_cast<jlong>(omniVecId);
+            omniVecs.emplace_back(CopyToOmniVec(type, omniTypeIds[id], root->fields[id], isDecimal64Transfor128));
+        }
+        for (int32_t id = 0; id < vecCnt; id++) {
+            env->SetIntArrayRegion(typeId, id, 1, omniTypeIds.data() + id);
+            jlong omniVec = reinterpret_cast<jlong>(omniVecs[id].release());
             env->SetLongArrayRegion(vecNativeId, id, 1, &omniVec);
         }
     }
-    return (jlong)batchRowSize;
-    JNI_FUNC_END(runtimeExceptionClass)
+    return (jlong) batchRowSize;
 }
 
 /*

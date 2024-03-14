@@ -53,10 +53,22 @@ public class OmniColumnVector extends WritableColumnVector {
      */
     public static OmniColumnVector[] allocateColumns(int capacity, StructField[] fields, boolean initVec) {
         OmniColumnVector[] vectors = new OmniColumnVector[fields.length];
-        for (int i = 0; i < fields.length; i++) {
-            vectors[i] = new OmniColumnVector(capacity, fields[i].dataType(), initVec);
+        try {
+            for (int i = 0; i < fields.length; i++) {
+                vectors[i] = new OmniColumnVector(capacity, fields[i].dataType(), initVec);
+            }
+            return vectors;
+        } catch (Exception e) {
+            if (initVec) {
+                for (int i = 0; i < fields.length; i++) {
+                    OmniColumnVector vec = vectors[i];
+                    if (vec != null) {
+                        vec.close();
+                    }
+                }
+            }
+            throw new RuntimeException("allocate columns failed. errmsg:" + e.getMessage());
         }
-        return vectors;
     }
 
     // The data stored in these arrays need to maintain binary compatible. We can

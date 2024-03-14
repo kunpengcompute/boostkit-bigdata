@@ -48,20 +48,34 @@ object OmniAdaptorUtil {
 
   def transColBatchToOmniVecs(cb: ColumnarBatch, isSlice: Boolean): Array[Vec] = {
     val input = new Array[Vec](cb.numCols())
-    for (i <- 0 until cb.numCols()) {
-      val omniVec: Vec = cb.column(i) match {
-        case vector: OmniColumnVector =>
-          if (!isSlice) {
-            vector.getVec
-          } else {
-            vector.getVec.slice(0, cb.numRows())
-          }
-        case vector: ColumnVector =>
-          transColumnVector(vector, cb.numRows())
-        case _ =>
-          throw new UnsupportedOperationException("unsupport column vector!")
+    try {
+      for (i <- 0 until cb.numCols()) {
+        val omniVec: Vec = cb.column(i) match {
+          case vector: OmniColumnVector =>
+            if (!isSlice) {
+              vector.getVec
+            } else {
+              vector.getVec.slice(0, cb.numRows())
+            }
+          case vector: ColumnVector =>
+            transColumnVector(vector, cb.numRows())
+          case _ =>
+            throw new UnsupportedOperationException("unsupport column vector!")
+        }
+        input(i) = omniVec
       }
-      input(i) = omniVec
+    } catch {
+      case e: Exception => {
+        for (j <- 0 until cb.numCols()) {
+          val vec = input(j)
+          if (vec != null) vec.close
+          cb.column(j) match {
+            case vector: OmniColumnVector =>
+              vector.close()
+          }
+        }
+        throw new RuntimeException("allocate memory failed!")
+      }
     }
     input
   }

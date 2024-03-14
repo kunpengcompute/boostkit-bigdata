@@ -486,11 +486,10 @@ namespace omniruntime::reader {
 
         virtual void InitVec(int64_t capacity) {
             vec_ = new Vector<V>(capacity);
+            auto capacity_bytes = capacity * byte_width_;
             if (parquet_vec_ != nullptr) {
-                auto capacity_bytes = capacity * byte_width_;
                 memset(parquet_vec_, 0, capacity_bytes);
             } else {
-                auto capacity_bytes = capacity * byte_width_;
                 parquet_vec_ = new uint8_t[capacity_bytes];
             }
             // Init nulls

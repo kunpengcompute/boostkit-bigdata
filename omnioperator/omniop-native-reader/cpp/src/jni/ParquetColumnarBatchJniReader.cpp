@@ -93,10 +93,14 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_ParquetColumnarBatchJn
 {
     JNI_FUNC_START
     ParquetReader *pReader = (ParquetReader *)reader;
-    std::vector<omniruntime::vec::BaseVector*> recordBatch(pReader->columnReaders.size());
+    std::vector<omniruntime::vec::BaseVector*> recordBatch(pReader->columnReaders.size(), 0);
     long batchRowSize = 0;
     auto state = pReader->ReadNextBatch(recordBatch, &batchRowSize);
     if (state != Status::OK()) {
+        for (auto vec : recordBatch) {
+            delete vec;
+        }
+        recordBatch.clear();
         env->ThrowNew(runtimeExceptionClass, state.ToString().c_str());
         return 0;
     }

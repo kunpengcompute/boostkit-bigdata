@@ -331,14 +331,19 @@ case class ColumnarOptRollupExec(
       omniOutputPartials)
 
       omniCodegenTimeMetric += NANOSECONDS.toMillis(System.nanoTime() - startCodegen)
+
+      val results = new ListBuffer[VecBatch]()
+      var hashaggResults: java.util.Iterator[VecBatch] = null
+
       // close operator
       addLeakSafeTaskCompletionListener[Unit](_ => {
         projectOperators.foreach(operator => operator.close())
         hashaggOperator.close()
+        results.foreach(vecBatch => {
+          vecBatch.releaseAllVectors()
+          vecBatch.close()
+        })
       })
-
-      val results = new ListBuffer[VecBatch]()
-      var hashaggResults: java.util.Iterator[VecBatch] = null
 
       while (iter.hasNext) {
         val batch = iter.next()
@@ -346,9 +351,7 @@ case class ColumnarOptRollupExec(
         val vecBatch = new VecBatch(input, batch.numRows())
         results.append(vecBatch)
         projectOperators.foreach(projectOperator => {
-          val vecs = vecBatch.getVectors.map(vec => {
-            vec.slice(0, vecBatch.getRowCount)
-          })
+          val vecs = transColBatchToOmniVecs(batch, true)
 
           val projectInput = new VecBatch(vecs, vecBatch.getRowCount)
           var startInput = System.nanoTime()
