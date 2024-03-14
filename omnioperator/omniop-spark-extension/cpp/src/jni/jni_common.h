@@ -48,6 +48,15 @@ jmethodID GetMethodID(JNIEnv* env, jclass this_class, const char* name, const ch
         return;                                     \
     }                                               \
 
+#define JNI_FUNC_END_WITH_VECBATCH(exceptionClass, toDeleteVecBatch) \
+    }                                                                \
+    catch (const std::exception &e)                                  \
+    {                                                                \
+        VectorHelper::FreeVecBatch(toDeleteVecBatch);                \
+        env->ThrowNew(exceptionClass, e.what());          \
+        return 0;                                         \
+    }
+
 extern jclass runtimeExceptionClass;
 extern jclass splitResultClass;
 extern jclass jsonClass;

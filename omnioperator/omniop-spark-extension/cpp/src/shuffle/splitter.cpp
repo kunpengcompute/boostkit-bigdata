@@ -450,6 +450,7 @@ int Splitter::DoSplit(VectorBatch& vb) {
     num_row_splited_ += vb.GetRowCount();
     // release the fixed width vector and release vectorBatch at the same time
     ReleaseVectorBatch(&vb);
+    this->ResetInputVecBatch();
 
     // 阈值检查，是否溢写
     if (num_row_splited_ >= SHUFFLE_SPILL_NUM_ELEMENTS_FORCE_SPILL_THRESHOLD) {
@@ -693,7 +694,7 @@ void Splitter::SerializingFixedColumns(int32_t partitionId,
         valueStr.resize(onceCopyLen);
         std::string nullStr;
 
-        std::shared_ptr<Buffer> ptr_value (new Buffer((uint8_t*)valueStr.data(), 0, onceCopyLen));
+        std::shared_ptr<Buffer> ptr_value (new Buffer((uint8_t*)valueStr.data(), 0, onceCopyLen, false));
         std::shared_ptr<Buffer> ptr_validity;
 
         // options_.spill_batch_row_num长度切割与拼接
@@ -716,7 +717,7 @@ void Splitter::SerializingFixedColumns(int32_t partitionId,
                       splitRowInfoTmp->cacheBatchCopyedLen[fixColIndexTmp]);
             if (not nullAllocated && partition_cached_vectorbatch_[partitionId][splitRowInfoTmp->cacheBatchIndex[fixColIndexTmp]][fixColIndexTmp][0] != nullptr) {
                 nullStr.resize(splitRowInfoTmp->onceCopyRow);
-                ptr_validity.reset(new Buffer((uint8_t*)nullStr.data(), 0, splitRowInfoTmp->onceCopyRow));
+                ptr_validity.reset(new Buffer((uint8_t*)nullStr.data(), 0, splitRowInfoTmp->onceCopyRow, false));
                 nullAllocated = true;
             }
             if ((onceCopyLen - destCopyedLength) >= (cacheBatchSize - splitRowInfoTmp->cacheBatchCopyedLen[fixColIndexTmp])) {
@@ -732,9 +733,11 @@ void Splitter::SerializingFixedColumns(int32_t partitionId,
                     // 释放内存
                     options_.allocator->Free(partition_cached_vectorbatch_[partitionId][splitRowInfoTmp->cacheBatchIndex[fixColIndexTmp]][fixColIndexTmp][0]->data_,
                                              partition_cached_vectorbatch_[partitionId][splitRowInfoTmp->cacheBatchIndex[fixColIndexTmp]][fixColIndexTmp][0]->capacity_);
+                    partition_cached_vectorbatch_[partitionId][splitRowInfoTmp->cacheBatchIndex[fixColIndexTmp]][fixColIndexTmp][0]->SetReleaseFlag();
                 }
                 options_.allocator->Free(partition_cached_vectorbatch_[partitionId][splitRowInfoTmp->cacheBatchIndex[fixColIndexTmp]][fixColIndexTmp][1]->data_,
                                          partition_cached_vectorbatch_[partitionId][splitRowInfoTmp->cacheBatchIndex[fixColIndexTmp]][fixColIndexTmp][1]->capacity_);
+                partition_cached_vectorbatch_[partitionId][splitRowInfoTmp->cacheBatchIndex[fixColIndexTmp]][fixColIndexTmp][1]->SetReleaseFlag();
                 destCopyedLength += memCopyLen;
                 splitRowInfoTmp->cacheBatchIndex[fixColIndexTmp] += 1; // cacheBatchIndex下标后移
                 splitRowInfoTmp->cacheBatchCopyedLen[fixColIndexTmp] = 0; // 初始化下一个cacheBatch的起始偏移
@@ -1037,7 +1040,7 @@ void Splitter::MergeSpilled() {
         }
     }
 
-   std::memset(partition_id_cnt_cache_, 0, num_partitions_ * sizeof(uint64_t));
+    std::memset(partition_id_cnt_cache_, 0, num_partitions_ * sizeof(uint64_t));
     ReleaseVarcharVector();
     num_row_splited_ = 0;
     cached_vectorbatch_size_ = 0;
@@ -1076,6 +1079,7 @@ int Splitter::DeleteSpilledTmpFile() {
         auto tmpDataFilePath = pair.first + ".data";
         // 释放存储有各个临时文件的偏移数据内存
         options_.allocator->Free(pair.second->data_, pair.second->capacity_);
+        pair.second->SetReleaseFlag();
         if (IsFileExist(tmpDataFilePath)) {
             remove(tmpDataFilePath.c_str());
         }
