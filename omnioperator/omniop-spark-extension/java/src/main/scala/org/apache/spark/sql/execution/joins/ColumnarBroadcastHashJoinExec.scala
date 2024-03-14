@@ -350,7 +350,7 @@ case class ColumnarBroadcastHashJoinExec(
         buildCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startBuildCodegen)
 
         if (isShared) {
-          OmniHashBuilderWithExprOperatorFactory.saveHashBuilderOperatorAndFactory(buildPlan.id,
+          OmniHashBuilderWithExprOperatorFactory.saveHashBuilderOperatorAndFactory(buildPlan.id, index,
             opFactory, op)
         }
         val deserializer = VecBatchSerializerFactory.create()
@@ -365,7 +365,7 @@ case class ColumnarBroadcastHashJoinExec(
         } catch {
           case e: Exception => {
             if (isShared) {
-              OmniHashBuilderWithExprOperatorFactory.dereferenceHashBuilderOperatorAndFactory(buildPlan.id)
+              OmniHashBuilderWithExprOperatorFactory.removeHashBuilderOperatorAndFactory(buildPlan.id)
             } else {
               op.close()
               opFactory.close()
@@ -414,9 +414,12 @@ case class ColumnarBroadcastHashJoinExec(
         lookupOp.close()
         lookupOpFactory.close()
         if (enableShareBuildOp && canShareBuildOp) {
-          OmniHashBuilderWithExprOperatorFactory.gLock.lock()
-          OmniHashBuilderWithExprOperatorFactory.dereferenceHashBuilderOperatorAndFactory(buildPlan.id)
-          OmniHashBuilderWithExprOperatorFactory.gLock.unlock()
+          val partitionId = OmniHashBuilderWithExprOperatorFactory.getPartitionId(buildPlan.id)
+          if (partitionId == index) {
+            buildOpFactory.tryCloseOperatorAndFactory(buildPlan.id)
+          } else {
+            buildOpFactory.tryDereferenceOperatorAndFactory(buildPlan.id)
+          }
         } else {
           buildOp.close()
           buildOpFactory.close()
