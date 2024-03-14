@@ -165,6 +165,7 @@ private:
             }
         }
         vectorAddress.clear();
+        vb->ClearVectors();
         delete vb;
     }
 
