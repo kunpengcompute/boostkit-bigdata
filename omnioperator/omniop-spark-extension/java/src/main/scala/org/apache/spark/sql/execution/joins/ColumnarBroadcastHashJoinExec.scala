@@ -332,6 +332,7 @@ case class ColumnarBroadcastHashJoinExec(
 
     val lookupJoinType = OmniExpressionAdaptor.toOmniJoinType(joinType)
     val canShareBuildOp = (lookupJoinType != OMNI_JOIN_TYPE_RIGHT && lookupJoinType != OMNI_JOIN_TYPE_FULL)
+
     streamedPlan.executeColumnar().mapPartitionsWithIndexInternal { (index, iter) =>
       val filter: Optional[String] = condition match {
         case Some(expr) =>
@@ -341,7 +342,7 @@ case class ColumnarBroadcastHashJoinExec(
           Optional.empty()
       }
 
-      def createBuildOpFactoryAndOp(): (OmniHashBuilderWithExprOperatorFactory, OmniOperator) = {
+      def createBuildOpFactoryAndOp(isShared: Boolean): (OmniHashBuilderWithExprOperatorFactory, OmniOperator) = {
         val startBuildCodegen = System.nanoTime()
         val opFactory =
           new OmniHashBuilderWithExprOperatorFactory(lookupJoinType, buildTypes, buildJoinColsExp, 1,
@@ -350,6 +351,10 @@ case class ColumnarBroadcastHashJoinExec(
         val op = opFactory.createOperator()
         buildCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startBuildCodegen)
 
+        if (isShared) {
+          OmniHashBuilderWithExprOperatorFactory.saveHashBuilderOperatorAndFactory(buildPlan.id, index,
+            opFactory, op)
+        }
         val deserializer = VecBatchSerializerFactory.create()
         relation.value.buildData.foreach { input =>
           val startBuildInput = System.nanoTime()
@@ -357,7 +362,19 @@ case class ColumnarBroadcastHashJoinExec(
           buildAddInputTime += NANOSECONDS.toMillis(System.nanoTime() - startBuildInput)
         }
         val startBuildGetOp = System.nanoTime()
-        op.getOutput
+        try {
+          op.getOutput
+        } catch {
+          case e: Exception => {
+            if (isShared) {
+              OmniHashBuilderWithExprOperatorFactory.removeHashBuilderOperatorAndFactory(buildPlan.id)
+            } else {
+              op.close()
+              opFactory.close()
+            }
+            throw new RuntimeException("HashBuilder getOutput failed")
+          }
+        }
         buildGetOutputTime += NANOSECONDS.toMillis(System.nanoTime() - startBuildGetOp)
         (opFactory, op)
       }
@@ -369,11 +386,9 @@ case class ColumnarBroadcastHashJoinExec(
         try {
           buildOpFactory = OmniHashBuilderWithExprOperatorFactory.getHashBuilderOperatorFactory(buildPlan.id)
           if (buildOpFactory == null) {
-            val (opFactory, op) = createBuildOpFactoryAndOp()
+            val (opFactory, op) = createBuildOpFactoryAndOp(true)
             buildOpFactory = opFactory
             buildOp = op
-            OmniHashBuilderWithExprOperatorFactory.saveHashBuilderOperatorAndFactory(buildPlan.id,
-              buildOpFactory, buildOp)
           }
         } catch {
           case e: Exception => {
@@ -383,7 +398,7 @@ case class ColumnarBroadcastHashJoinExec(
           OmniHashBuilderWithExprOperatorFactory.gLock.unlock()
         }
       } else {
-        val (opFactory, op) = createBuildOpFactoryAndOp()
+        val (opFactory, op) = createBuildOpFactoryAndOp(false)
         buildOpFactory = opFactory
         buildOp = op
       }
@@ -401,9 +416,12 @@ case class ColumnarBroadcastHashJoinExec(
         lookupOp.close()
         lookupOpFactory.close()
         if (enableShareBuildOp && canShareBuildOp) {
-          OmniHashBuilderWithExprOperatorFactory.gLock.lock()
-          OmniHashBuilderWithExprOperatorFactory.dereferenceHashBuilderOperatorAndFactory(buildPlan.id)
-          OmniHashBuilderWithExprOperatorFactory.gLock.unlock()
+          val partitionId = OmniHashBuilderWithExprOperatorFactory.getPartitionId(buildPlan.id)
+          if (partitionId == index) {
+            buildOpFactory.tryCloseOperatorAndFactory(buildPlan.id)
+          } else {
+            buildOpFactory.tryDereferenceOperatorAndFactory(buildPlan.id)
+          }
         } else {
           buildOp.close()
           buildOpFactory.close()

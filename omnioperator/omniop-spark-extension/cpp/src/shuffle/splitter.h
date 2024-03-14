@@ -51,7 +51,6 @@ struct SplitRowInfo {
 };
 
 class Splitter {
-
     virtual int DoSplit(VectorBatch& vb);
 
     int WriteDataFileProto();
