@@ -44,8 +44,8 @@ class MergeIterator(iter: Iterator[ColumnarBatch], localSchema: StructType,
 
   private def createOmniVectors(schema: StructType, columnSize: Int): Array[Vec] = {
     val vecs = new Array[Vec](schema.fields.length)
-    schema.fields.zipWithIndex.foreach { case (field, index) =>
-      try {
+    try {
+      schema.fields.zipWithIndex.foreach { case (field, index) =>
         field.dataType match {
           case LongType =>
             vecs(index) = new LongVec(columnSize)
@@ -69,11 +69,15 @@ class MergeIterator(iter: Iterator[ColumnarBatch], localSchema: StructType,
           case _ =>
             throw new UnsupportedOperationException("Fail to create omni vector, unsupported fields")
         }
-      } catch {
-        case e: UnsupportedOperationException => throw e
-        case _ =>
-          vecs(index).close()
-          throw new RuntimeException("allocate memory failed!")
+      }
+    } catch {
+      case e: Exception => {
+        for (vec <- vecs) {
+          if (vec != null) {
+            vec.close()
+          }
+        }
+        throw new RuntimeException("allocate memory failed!")
       }
     }
     vecs
