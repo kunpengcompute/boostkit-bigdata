@@ -26,6 +26,7 @@ import org.apache.hadoop.hive.serde2.lazybinary.LazyBinaryUtils;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
 import org.apache.hadoop.hive.serde2.typeinfo.BaseCharTypeInfo;
+import org.apache.hadoop.hive.serde2.typeinfo.DecimalTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory;
@@ -113,19 +114,7 @@ public class OmniVecBatchSerDe extends AbstractSerDe {
     private void initialSerializeParam() {
         columnTypeLen = new int[columnTypes.size()];
         columnSerDes = new ColumnSerDe[columnTypes.size()];
-        int writeLen = 0;
-        for (int i = 0; i < columnTypes.size(); i++) {
-            PrimitiveObjectInspector.PrimitiveCategory primitiveCategory = ((PrimitiveTypeInfo) columnTypes.get(i))
-                    .getPrimitiveCategory();
-            columnTypeLen[i] = TYPE_LEN.getOrDefault(primitiveCategory, 0);
-            if (columnTypeLen[i] == 0) {
-                writeLen = writeLen + getEstimateLen((PrimitiveTypeInfo) columnTypes.get(i)) + 4;
-                columnSerDes[i] = new VariableWidthColumnSerDe();
-            } else {
-                writeLen = writeLen + columnTypeLen[i] + 1;
-                columnSerDes[i] = new FixedWidthColumnSerDe(columnTypeLen[i]);
-            }
-        }
+        int writeLen = getWriteLen();
         deserializeResult = new VecSerdeBody[columnTypes.size()];
         for (int i = 0; i < deserializeResult.length; i++) {
             if (columnTypeLen[i] == 0) {
@@ -143,6 +132,28 @@ public class OmniVecBatchSerDe extends AbstractSerDe {
         } else {
             serializeBytesWritable.setCapacity(writeLen);
         }
+    }
+
+    private int getWriteLen() {
+        int writeLen = 0;
+        for (int i = 0; i < columnTypes.size(); i++) {
+            PrimitiveObjectInspector.PrimitiveCategory primitiveCategory = ((PrimitiveTypeInfo) columnTypes.get(i))
+                    .getPrimitiveCategory();
+            if (primitiveCategory == PrimitiveObjectInspector.PrimitiveCategory.DECIMAL) {
+                DecimalTypeInfo decimalTypeInfo = (DecimalTypeInfo) columnTypes.get(i);
+                columnTypeLen[i] = decimalTypeInfo.getPrecision() > 18 ? 16 : 8;
+            } else {
+                columnTypeLen[i] = TYPE_LEN.getOrDefault(primitiveCategory, 0);
+            }
+            if (columnTypeLen[i] == 0) {
+                writeLen = writeLen + getEstimateLen((PrimitiveTypeInfo) columnTypes.get(i)) + 4;
+                columnSerDes[i] = new VariableWidthColumnSerDe();
+            } else {
+                writeLen = writeLen + columnTypeLen[i] + 1;
+                columnSerDes[i] = new FixedWidthColumnSerDe(columnTypeLen[i]);
+            }
+        }
+        return writeLen;
     }
 
     public static int getEstimateLen(PrimitiveTypeInfo primitiveTypeInfo) {

@@ -90,7 +90,7 @@ public class CaseWhenExpressionProcessor implements ExpressionProcessor {
                         TypeUtils.convertHiveTypeToOmniType(root.getTypeInfo()));
             }
             if (root.getTypeInfo() instanceof DecimalTypeInfo && ((ExprNodeConstantDesc) nodeDesc).getValue().equals(0)) {
-                return new DecimalLiteral("0", TypeUtils.convertHiveTypeToOmniType(root.getTypeInfo()),
+                return new DecimalLiteral(((DecimalTypeInfo) root.getTypeInfo()).getPrecision() > 18 ? "0" : 0L, TypeUtils.convertHiveTypeToOmniType(root.getTypeInfo()),
                         ((DecimalTypeInfo) root.getTypeInfo()).getPrecision(),
                         ((DecimalTypeInfo) root.getTypeInfo()).getScale());
             }

@@ -19,13 +19,17 @@
 package com.huawei.boostkit.hive.processor;
 
 import com.huawei.boostkit.hive.expression.BaseExpression;
+import com.huawei.boostkit.hive.expression.CastFunctionExpression;
 import com.huawei.boostkit.hive.expression.CompareExpression;
 import com.huawei.boostkit.hive.expression.ExpressionUtils;
 import com.huawei.boostkit.hive.expression.TypeUtils;
+import nova.hetu.omniruntime.type.Decimal128DataType;
+import nova.hetu.omniruntime.type.Decimal64DataType;
 import org.apache.hadoop.hive.ql.plan.ExprNodeConstantDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
+import org.apache.hadoop.hive.serde2.typeinfo.DecimalTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 
 import java.util.List;
@@ -34,16 +38,31 @@ public class ComputeExpressionProcessor implements ExpressionProcessor {
     @Override
     public BaseExpression process(ExprNodeGenericFuncDesc node, String operator, ObjectInspector inspector) {
         List<ExprNodeDesc> children = node.getChildren();
+        boolean hasDecimal128 = false;
+        for (ExprNodeDesc child : children) {
+            if (child.getTypeInfo() instanceof DecimalTypeInfo && ((DecimalTypeInfo) child.getTypeInfo()).getPrecision() > 18) {
+                hasDecimal128 = true;
+            }
+        }
         conjureNodeType(children);
         CompareExpression compareExpression = new CompareExpression("BINARY",
                 TypeUtils.convertHiveTypeToOmniType(node.getTypeInfo()),
                 operator);
         for (ExprNodeDesc child : children) {
+            BaseExpression baseExpression;
             if (child instanceof ExprNodeGenericFuncDesc) {
-                compareExpression.add(ExpressionUtils.build((ExprNodeGenericFuncDesc) child, inspector));
+                baseExpression = ExpressionUtils.build((ExprNodeGenericFuncDesc) child, inspector);
             } else {
-                compareExpression.add(ExpressionUtils.createNode(child, inspector));
+                baseExpression = ExpressionUtils.createNode(child, inspector);
             }
+            if (baseExpression.getReturnType() == Decimal64DataType.DECIMAL64.getId().toValue() && hasDecimal128) {
+                DecimalTypeInfo decimalTypeInfo = (DecimalTypeInfo) child.getTypeInfo();
+                CastFunctionExpression castFunctionExpression = new CastFunctionExpression(Decimal128DataType.DECIMAL128.getId().toValue(),
+                        TypeUtils.getCharWidth(child), decimalTypeInfo.getPrecision(), decimalTypeInfo.getScale());
+                castFunctionExpression.add(baseExpression);
+                baseExpression = castFunctionExpression;
+            }
+            compareExpression.add(baseExpression);
         }
         return compareExpression;
     }

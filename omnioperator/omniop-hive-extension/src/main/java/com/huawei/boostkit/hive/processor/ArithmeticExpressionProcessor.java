@@ -26,6 +26,8 @@ import com.huawei.boostkit.hive.expression.DivideExpression;
 import com.huawei.boostkit.hive.expression.ExpressionUtils;
 import com.huawei.boostkit.hive.expression.TypeUtils;
 
+import nova.hetu.omniruntime.type.Decimal128DataType;
+import org.apache.hadoop.hive.common.type.Decimal128;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDF;
@@ -60,12 +62,18 @@ public class ArithmeticExpressionProcessor implements ExpressionProcessor {
         boolean needUpscale = functionName.equals("GenericUDFOPMultiply") || functionName.equals("GenericUDFOPDivide")
                 || functionName.equals("GenericUDFOPMod");
         int maxScale = 0;
+        boolean hasDecimal128 = false;
         if (node.getTypeInfo() instanceof DecimalTypeInfo) {
             precision = ((DecimalTypeInfo) node.getTypeInfo()).getPrecision();
             scale = ((DecimalTypeInfo) node.getTypeInfo()).getScale();
             maxScale = getMaxScale(children, scale);
+            for (ExprNodeDesc child : children) {
+                if (child.getTypeInfo() instanceof DecimalTypeInfo && ((DecimalTypeInfo) child.getTypeInfo()).getPrecision() > 18) {
+                    hasDecimal128 = true;
+                }
+            }
         }
-        int returnType = TypeUtils.convertHiveTypeToOmniType(node.getTypeInfo());
+        int returnType = hasDecimal128 ? Decimal128DataType.DECIMAL128.getId().toValue() : TypeUtils.convertHiveTypeToOmniType(node.getTypeInfo());
         DivideExpression compareExpression = new DivideExpression(returnType,
                 OPERATOR.get(node.getGenericUDF().getClass()), precision, scale);
         for (ExprNodeDesc child : children) {

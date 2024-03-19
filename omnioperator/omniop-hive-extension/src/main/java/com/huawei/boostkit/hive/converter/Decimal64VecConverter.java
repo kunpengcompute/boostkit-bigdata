@@ -17,12 +17,8 @@
  */
 
 package com.huawei.boostkit.hive.converter;
-
-import com.huawei.boostkit.hive.cache.ColumnCache;
-import com.huawei.boostkit.hive.cache.LongColumnCache;
-
-import nova.hetu.omniruntime.vector.Decimal128Vec;
 import nova.hetu.omniruntime.vector.DictionaryVec;
+import nova.hetu.omniruntime.vector.LongVec;
 import nova.hetu.omniruntime.vector.Vec;
 
 import org.apache.hadoop.hive.common.type.DataTypePhysicalVariation;
@@ -33,11 +29,8 @@ import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDAFLastValue;
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
 import org.apache.hadoop.hive.serde2.typeinfo.DecimalTypeInfo;
-import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.Map;
 
 
 public class Decimal64VecConverter extends LongVecConverter {
@@ -59,57 +52,14 @@ public class Decimal64VecConverter extends LongVecConverter {
             long value;
             if (vec instanceof DictionaryVec) {
                 DictionaryVec dictionaryVec = (DictionaryVec) vec;
-                value = dictionaryVec.getDecimal128(i)[0];
+                value = dictionaryVec.getLong(i);
             } else {
-                Decimal128Vec decimal128Vec = (Decimal128Vec) vec;
-                byte[] result = decimal128Vec.getBytes(i);
-                if (result.length > 8) {
-                    byte[] newBytes = new byte[8];
-                    System.arraycopy(result, result.length - 8, newBytes, 0, 8);
-                    value = Decimal128Vec.bytesToLong(newBytes);
-                } else {
-                    value = Decimal128Vec.bytesToLong(result);
-                }
+                LongVec longVec = (LongVec) vec;
+                value = longVec.get(i);
             }
             decimal64ColumnVector.vector[i - start] = value;
         }
         return decimal64ColumnVector;
-    }
-
-    @Override
-    public Vec toOmniVec(Object[] col, int columnSize, PrimitiveTypeInfo primitiveTypeInfo) {
-        Decimal128Vec decimal128Vec = new Decimal128Vec(columnSize);
-        for (int i = 0; i < columnSize; i++) {
-            if (col[i] == null) {
-                decimal128Vec.setNull(i);
-            } else {
-                long value = (long) col[i];
-                decimal128Vec.setBigInteger(i, Decimal128Vec.longToBytes(value), value < 0L);
-            }
-        }
-        return decimal128Vec;
-    }
-
-    @Override
-    public Vec toOmniVec(ColumnCache columnCache, int columnSize) {
-        Decimal128Vec decimal128Vec = new Decimal128Vec(columnSize);
-        LongColumnCache longColumnCache = (LongColumnCache) columnCache;
-        if (longColumnCache.noNulls) {
-            for (int i = 0; i < columnSize; i++) {
-                long value = longColumnCache.dataCache[i];
-                decimal128Vec.setBigInteger(i, Decimal128Vec.longToBytes(value), value < 0L);
-            }
-        } else {
-            for (int i = 0; i < columnSize; i++) {
-                if (longColumnCache.isNull[i]) {
-                    decimal128Vec.setNull(i);
-                } else {
-                    long value = longColumnCache.dataCache[i];
-                    decimal128Vec.setBigInteger(i, Decimal128Vec.longToBytes(value), value < 0L);
-                }
-            }
-        }
-        return decimal128Vec;
     }
 
     public static boolean isConvertedDecimal64(String fieldName, VectorizationContext vectorizationContext) {

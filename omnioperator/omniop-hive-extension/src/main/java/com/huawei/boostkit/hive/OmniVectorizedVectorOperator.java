@@ -65,6 +65,7 @@ import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.StandardStructObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.StructField;
 import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
+import org.apache.hadoop.hive.serde2.typeinfo.DecimalTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 
@@ -282,6 +283,10 @@ public class OmniVectorizedVectorOperator extends OmniHiveOperator<OmniVectorDes
             case BOOLEAN:
                 return new LongColumnCache();
             case DECIMAL:
+                DecimalTypeInfo decimalTypeInfo = (DecimalTypeInfo) primitiveTypeInfo;
+                if (decimalTypeInfo.getPrecision() <=18) {
+                    return new LongColumnCache();
+                }
                 return new DecimalColumnCache();
             case VARCHAR:
             case CHAR:
