@@ -18,10 +18,7 @@
 
 package com.huawei.boostkit.hive;
 
-import static com.huawei.boostkit.hive.expression.TypeUtils.checkOmniJsonWhiteList;
-import static com.huawei.boostkit.hive.expression.TypeUtils.checkUnsupportedArithmetic;
-import static com.huawei.boostkit.hive.expression.TypeUtils.checkUnsupportedCast;
-import static com.huawei.boostkit.hive.expression.TypeUtils.convertHiveTypeToOmniType;
+import static com.huawei.boostkit.hive.expression.TypeUtils.*;
 import static nova.hetu.omniruntime.constants.FunctionType.OMNI_AGGREGATION_TYPE_AVG;
 import static nova.hetu.omniruntime.constants.FunctionType.OMNI_AGGREGATION_TYPE_SUM;
 import static org.apache.hadoop.hive.serde.serdeConstants.SERIALIZATION_LIB;
@@ -619,7 +616,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                 return replaceable;
             case FILTER:
                 List<ExprNodeDesc> colList = Collections.singletonList(((FilterDesc) operator.getConf()).getPredicate());
-                if (!isUDFSupport(colList) || !isLegalDeciConstant(colList)) {
+                if (!isUDFSupport(colList) || !isLegalDeci(colList)) {
                     return false;
                 }
                 boolean result = true;
@@ -629,7 +626,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                 for (Operator child : operator.getChildOperators()) {
                     if (child.getType() != null && child.getType().equals(OperatorType.SELECT)) {
                         SelectDesc conf = (SelectDesc) child.getConf();
-                        result = result && isUDFSupport(conf.getColList()) && isLegalDeciConstant(conf.getColList());
+                        result = result && isUDFSupport(conf.getColList()) && isLegalDeci(conf.getColList());
                     }
                 }
                 return result;
@@ -859,40 +856,16 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         return checkOmniJsonWhiteList("", expressions.toArray(new String[0]));
     }
 
-    private boolean isLegalDeciConstant(List<ExprNodeDesc> colList) {
+    private boolean isLegalDeci(List<ExprNodeDesc> colList) {
         for (ExprNodeDesc desc : colList) {
-            if (!checkDecimalConstant(desc)) {
+            if (!isValidConversion(desc)) {
                 return false;
             }
         }
         if (colList.size() > 0 && colList.get(0).getChildren() != null) {
             List<ExprNodeDesc> childList = colList.get(0).getChildren();
             for (ExprNodeDesc desc : childList) {
-                if (!checkDecimalConstant(desc)) {
-                    return false;
-                }
-            }
-        }
-        return true;
-    }
-
-    private boolean checkDecimalConstant(ExprNodeDesc desc) {
-        if (desc instanceof ExprNodeGenericFuncDesc && desc.getChildren() != null && desc.getChildren().size() == 2) {
-            List<ExprNodeDesc> child = desc.getChildren();
-            if (child.get(0) instanceof ExprNodeConstantDesc && child.get(1) instanceof ExprNodeColumnDesc) {
-                Collections.swap(child, 0, 1);
-            }
-            if (child.get(0) instanceof ExprNodeColumnDesc && child.get(1) instanceof ExprNodeConstantDesc) {
-                TypeInfo deciInfo = child.get(0).getTypeInfo();
-                TypeInfo constInfo = child.get(1).getTypeInfo();
-                if (!(deciInfo instanceof DecimalTypeInfo && constInfo instanceof DecimalTypeInfo)) {
-                    return true;
-                }
-                int deciPrecision = ((DecimalTypeInfo) deciInfo).getPrecision();
-                int deciScale = ((DecimalTypeInfo) deciInfo).getScale();
-                int constPrecision = ((DecimalTypeInfo) constInfo).getPrecision();
-                int constScale = ((DecimalTypeInfo) constInfo).getScale();
-                if (constPrecision - constScale > deciPrecision - deciScale || constScale > deciScale) {
+                if (!isValidConversion(desc)) {
                     return false;
                 }
             }

@@ -87,10 +87,7 @@ import org.apache.parquet.format.DecimalType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 
 public class TypeUtils {
@@ -371,13 +368,58 @@ public class TypeUtils {
                 return true;
             }
         }
-        boolean anyDecimal128 = children.stream().anyMatch(child -> child.getTypeInfo() instanceof DecimalTypeInfo
-                && ((DecimalTypeInfo) child.getTypeInfo()).getPrecision() > 18);
-        if ((functionName.equals("GenericUDFOPMultiply") || functionName.equals("GenericUDFOPDivide")
-                || functionName.equals("GenericUDFOPMod")) && anyDecimal128) {
-            return true;
+
+        if (functionName.equals("GenericUDFOPMultiply") || functionName.equals("GenericUDFOPDivide")
+                || functionName.equals("GenericUDFOPMod")) {
+            return !isValidConversion(node);
         }
         return false;
+    }
+
+    public static boolean isValidConversion(ExprNodeDesc node) {
+        if (node instanceof ExprNodeGenericFuncDesc && node.getChildren() != null && node.getChildren().size() == 2) {
+            List<ExprNodeDesc> children = node.getChildren();
+            int precision = 0;
+            int scale = 0;
+            int maxScale = 0;
+            if (node.getTypeInfo() instanceof DecimalTypeInfo) {
+                precision = ((DecimalTypeInfo) node.getTypeInfo()).getPrecision();
+                scale = ((DecimalTypeInfo) node.getTypeInfo()).getScale();
+                maxScale = getMaxScale(children, scale);
+            }
+
+            int targetChildPrecision = 0;
+            int targetChildScale = 0;
+            for (ExprNodeDesc child : children) {
+                if (child.getTypeInfo() instanceof DecimalTypeInfo) {
+                    int childScale = ((DecimalTypeInfo) child.getTypeInfo()).getScale();
+                    int childPrecision = ((DecimalTypeInfo) child.getTypeInfo()).getPrecision();
+                    if (maxScale != childScale) {
+                        targetChildPrecision = Math.min(Math.max(childPrecision + maxScale - childScale, precision), 38);
+                        targetChildScale = maxScale;
+                        if (childPrecision - childScale > targetChildPrecision - targetChildScale || childScale > targetChildScale) {
+                            return false;
+                        }
+                    }
+                }
+            }
+            return true;
+        }
+        return true;
+    }
+
+    public static int getMaxScale(List<ExprNodeDesc> children, int maxScale) {
+        for (ExprNodeDesc child : children) {
+            if (!(child.getTypeInfo() instanceof DecimalTypeInfo)) {
+                continue;
+            }
+            DecimalTypeInfo childTypeInfo = (DecimalTypeInfo) child.getTypeInfo();
+            int childScale = childTypeInfo.getScale();
+            if (childScale >= maxScale) {
+                maxScale = childScale;
+            }
+        }
+        return maxScale;
     }
 
     public static boolean checkOmniJsonWhiteList(String filterExpr, String[] projections) {
