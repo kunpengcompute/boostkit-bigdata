@@ -385,8 +385,8 @@ public class TypeUtils {
             if (node.getTypeInfo() instanceof DecimalTypeInfo) {
                 precision = ((DecimalTypeInfo) node.getTypeInfo()).getPrecision();
                 scale = ((DecimalTypeInfo) node.getTypeInfo()).getScale();
-                maxScale = getMaxScale(children, scale);
             }
+            maxScale = getMaxScale(children, scale);
 
             int targetChildPrecision = 0;
             int targetChildScale = 0;
