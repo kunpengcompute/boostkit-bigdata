@@ -87,7 +87,11 @@ import org.apache.parquet.format.DecimalType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.*;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 
 public class TypeUtils {
@@ -386,7 +390,17 @@ public class TypeUtils {
                 precision = ((DecimalTypeInfo) node.getTypeInfo()).getPrecision();
                 scale = ((DecimalTypeInfo) node.getTypeInfo()).getScale();
             }
-            maxScale = getMaxScale(children, scale);
+            if (children.get(0) instanceof ExprNodeConstantDesc && children.get(1) instanceof ExprNodeColumnDesc) {
+                Collections.swap(children, 0, 1);
+            }
+            if (children.get(0) instanceof ExprNodeColumnDesc && children.get(1) instanceof ExprNodeConstantDesc) {
+                ExprNodeDesc exprNodeDesc = children.get(0);
+                if (exprNodeDesc.getTypeInfo() instanceof DecimalTypeInfo) {
+                    maxScale = ((DecimalTypeInfo) exprNodeDesc.getTypeInfo()).getScale();
+                }
+            } else {
+                maxScale = getMaxScale(children, scale);
+            }
 
             int targetChildPrecision = 0;
             int targetChildScale = 0;
