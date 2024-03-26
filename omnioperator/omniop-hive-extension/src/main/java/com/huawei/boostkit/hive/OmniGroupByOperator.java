@@ -29,6 +29,8 @@ import com.huawei.boostkit.hive.expression.TypeUtils;
 import javolution.util.FastBitSet;
 import nova.hetu.omniruntime.constants.FunctionType;
 import nova.hetu.omniruntime.operator.OmniOperator;
+import nova.hetu.omniruntime.operator.OmniOperatorFactory;
+import nova.hetu.omniruntime.operator.aggregator.OmniAggregationWithExprOperatorFactory;
 import nova.hetu.omniruntime.operator.aggregator.OmniHashAggregationWithExprOperatorFactory;
 import nova.hetu.omniruntime.operator.config.OperatorConfig;
 import nova.hetu.omniruntime.operator.config.OverflowConfig;
@@ -101,7 +103,7 @@ import java.util.regex.Pattern;
 public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> implements Serializable, VectorizationContextRegion, IConfigureJobConf {
     private static final long serialVersionUID = 1L;
     private static final Logger LOG = LoggerFactory.getLogger(OmniGroupByOperator.class.getName());
-    private transient OmniHashAggregationWithExprOperatorFactory omniHashAggregationWithExprOperatorFactory;
+    private transient OmniOperatorFactory omniOperatorFactory;
     private transient OmniOperator omniOperator;
     private transient List<ExprNodeEvaluator> keyFields;
     private transient boolean firstRow;
@@ -285,10 +287,16 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
             groupByChanel = getExprFromExprNode(keyFields);
             aggChannels = getTwoDimenExprFromExprNode(aggChannelFields);
         }
-        omniHashAggregationWithExprOperatorFactory = new OmniHashAggregationWithExprOperatorFactory(groupByChanel, aggChannels,
-                aggChannelsFilter, sourceTypes, aggFunctionTypes, aggOutputTypes, isInputRaws, isOutputPartials,
-                operatorConfig);
-        omniOperator = omniHashAggregationWithExprOperatorFactory.createOperator();
+        if (numKeys == 0) {
+            omniOperatorFactory = new OmniAggregationWithExprOperatorFactory(groupByChanel, aggChannels,
+                    aggChannelsFilter, sourceTypes, aggFunctionTypes, aggOutputTypes, isInputRaws, isOutputPartials,
+                    operatorConfig);
+        } else {
+            omniOperatorFactory = new OmniHashAggregationWithExprOperatorFactory(groupByChanel, aggChannels,
+                    aggChannelsFilter, sourceTypes, aggFunctionTypes, aggOutputTypes, isInputRaws, isOutputPartials,
+                    operatorConfig);
+        }
+        omniOperator = omniOperatorFactory.createOperator();
     }
 
     @Override
@@ -750,7 +758,7 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
         for (Vec vec : constantVec) {
             vec.close();
         }
-        omniHashAggregationWithExprOperatorFactory.close();
+        omniOperatorFactory.close();
         omniOperator.close();
         super.closeOp(abort);
     }
