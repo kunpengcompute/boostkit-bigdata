@@ -751,10 +751,20 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         for (List<ExprNodeDesc> value : mapJoinDesc.getFilters().values()) {
             exprNodeDescList.addAll(value);
         }
-        if (!isUDFSupport(exprNodeDescList)) {
+        if (!isUDFSupport(exprNodeDescList) || joinCondUnsupported(mapJoinDesc)) {
             return false;
         }
         return joinReplaceable(operator);
+    }
+
+    private boolean joinCondUnsupported(MapJoinDesc mapJoinDesc) {
+        JoinCondDesc[] joinCondDescs = mapJoinDesc.getConds();
+        if (joinCondDescs.length >= 2) {
+            if (joinCondDescs[0].getType() == JoinDesc.LEFT_OUTER_JOIN && joinCondDescs[1].getType() == JoinDesc.LEFT_SEMI_JOIN) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean groupByReplaceable(Operator<? extends OperatorDesc> operator, boolean reduceSinkCanReplace) {
@@ -813,12 +823,14 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
     private boolean joinReplaceable(Operator<? extends OperatorDesc> operator) {
         JoinDesc joinDesc = (JoinDesc) operator.getConf();
         JoinCondDesc[] joinCondDescs = joinDesc.getConds();
-        if (joinDesc.getConds()[0].getType() == JoinDesc.FULL_OUTER_JOIN && joinDesc.getKeysString().get(0) == null || !SUPPORTED_JOIN.contains(joinCondDescs[0].getType())) {
-            return false;
+        for (JoinCondDesc joinCondDesc: joinCondDescs) {
+            if (joinCondDesc.getType() == JoinDesc.FULL_OUTER_JOIN && joinDesc.getKeysString().get("0") == null || !SUPPORTED_JOIN.contains(joinCondDesc.getType())) {
+                return false;
+            }
         }
         if (joinCondDescs.length >= 2) {
-            for (int i = 0; i < joinCondDescs.length; i++) {
-                if (joinCondDescs[i].getType() != JoinDesc.INNER_JOIN) {
+            for (List<ExprNodeDesc> filters: joinDesc.getFilters().values()) {
+                if (!filters.isEmpty()) {
                     return false;
                 }
             }

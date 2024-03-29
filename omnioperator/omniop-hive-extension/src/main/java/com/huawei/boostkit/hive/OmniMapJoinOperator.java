@@ -198,7 +198,7 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
             buildInspectors[buildIndex] = new ArrayList<>(joinKeysObjectInspectors[buildIndex]);
             buildInspectors[buildIndex].addAll(joinValuesObjectInspectors[buildIndex]);
         }
-        JoinType joinType = JOIN_TYPE_MAP.get(condn[buildIndexes.size() - 1].getType());
+        JoinType joinType = JOIN_TYPE_MAP.get(condn[Math.min(posBigTable, condn.length -1)].getType());
         DataType[] buildTypes = getTypeFromInspectors(Arrays.stream(buildInspectors).filter(Objects::nonNull)
                 .flatMap(List::stream).collect(Collectors.toList()));
         omniHashBuilderWithExprOperatorFactory = getOmniHashBuilderWithExprOperatorFactory(joinType, buildTypes,
@@ -729,19 +729,30 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
         if ((conf.getResidualFilterExprs() == null || conf.getResidualFilterExprs().isEmpty()) && joinFilter == null) {
             return Optional.empty();
         }
-        Map<String, String> inputColNameToExprName = new HashMap<>();
-        for (Map.Entry<String, ExprNodeDesc> entry : conf.getColumnExprMap().entrySet()) {
-            ExprNodeColumnDesc exprNodeColumnDesc = (ExprNodeColumnDesc) entry.getValue();
-            inputColNameToExprName.put(exprNodeColumnDesc.getColumn(), entry.getKey());
-        }
+        Map<String, List<String>> inputColNameToExprName = getInputColNameToExprName();
         List<? extends StructField> fields = ((StructObjectInspector) inputObjInspectors[posBigTable]).getAllStructFieldRefs();
-        List<String> fieldNames = fields.stream().map(field -> field.getFieldName().replace("value.", "").replace("key.", "")).collect(Collectors.toList());
+        List<String> fieldNames = fields.stream().map(field -> {
+                    String key = field.getFieldName().replace("value.", "VALUE.").replace("key.", "KEY.");
+                    if (inputColNameToExprName.containsKey(key)) {
+                        List<String> exprNames = inputColNameToExprName.get(key);
+                        return exprNames.get(Math.min(exprNames.size() - 1, posBigTable)).replace("value.", "").replace("key.", "");
+                    } else {
+                        return field.getFieldName().replace("value.", "").replace("key.", "");
+                    }
+                }
+        ).collect(Collectors.toList());
         List<ObjectInspector> inspectors = fields.stream().map(StructField::getFieldObjectInspector).collect(Collectors.toList());
         for (int buildIndex : buildIndexes) {
             fields = ((StructObjectInspector) inputObjInspectors[buildIndex]).getAllStructFieldRefs();
-            fieldNames.addAll(fields.stream().map(field -> inputColNameToExprName.getOrDefault(
-                    field.getFieldName().replace("value.", "VALUE.").replace("key.", "KEY."),
-                    field.getFieldName()).replace("value.", "").replace("key.", "")
+            fieldNames.addAll(fields.stream().map(field -> {
+                        String key = field.getFieldName().replace("value.", "VALUE.").replace("key.", "KEY.");
+                        if (inputColNameToExprName.containsKey(key)) {
+                            List<String> exprNames = inputColNameToExprName.get(key);
+                            return exprNames.get(Math.min(exprNames.size() - 1, buildIndex)).replace("value.", "").replace("key.", "");
+                        } else {
+                            return field.getFieldName().replace("value.", "").replace("key.", "");
+                        }
+                    }
             ).collect(Collectors.toList()));
             inspectors.addAll(fields.stream().map(StructField::getFieldObjectInspector).collect(Collectors.toList()));
         }
@@ -753,6 +764,18 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
             predicate = joinFilter;
         }
         return Optional.of(ExpressionUtils.build(predicate, exprObjInspector).toString());
+    }
+
+    private Map<String, List<String>> getInputColNameToExprName() {
+        Map<String, List<String>> inputColNameToExprName = new HashMap<>();
+        for (Map.Entry<String, ExprNodeDesc> entry : conf.getColumnExprMap().entrySet()) {
+            ExprNodeColumnDesc exprNodeColumnDesc = (ExprNodeColumnDesc) entry.getValue();
+            if (!inputColNameToExprName.containsKey(exprNodeColumnDesc.getColumn())) {
+                inputColNameToExprName.put(exprNodeColumnDesc.getColumn(), new ArrayList<>());
+            }
+            inputColNameToExprName.get(exprNodeColumnDesc.getColumn()).add(entry.getKey());
+        }
+        return inputColNameToExprName;
     }
 
     private ExprNodeGenericFuncDesc getJoinFilter() {
