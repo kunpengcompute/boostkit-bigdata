@@ -30,7 +30,7 @@ namespace orc {
     class HdfsFileInputStreamOverride : public InputStream {
     private:
         std::string filename_;
-        std::unique_ptr<fs::ReadableFile> hdfs_file_;
+        std::unique_ptr<ReadableFile> hdfs_file_;
         uint64_t total_length_;
         const uint64_t READ_SIZE_ = 1024 * 1024; //1 MB
 
