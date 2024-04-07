@@ -20,7 +20,8 @@
 #include "hdfs_file.h"
 #include "iostream"
 
-namespace omniruntime::fs {
+namespace omniruntime {
+namespace fs {
 
 HdfsReadableFile::HdfsReadableFile(std::shared_ptr<HadoopFileSystem> fileSystemPtr,
                                    const std::string &path, int64_t bufferSize)
@@ -98,4 +99,5 @@ int64_t HdfsReadableFile::Read(void *buffer, int32_t length) {
 }
 
 
+}
 }

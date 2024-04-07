@@ -22,7 +22,8 @@
 
 #include <string>
 
-namespace omniruntime::fs {
+namespace omniruntime {
+namespace fs {
 
 // Enum to represent different status codes
 enum class StatusCode : char {
@@ -102,6 +103,7 @@ private:
     // Pointer to the status state
     State *state_;
 };
+}
 }
 
 #endif //SPARK_THESTRAL_PLUGIN_STATUS_H

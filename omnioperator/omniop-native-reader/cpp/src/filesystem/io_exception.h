@@ -22,7 +22,8 @@
 
 #include "stdexcept"
 
-namespace omniruntime::fs {
+namespace omniruntime {
+namespace fs {
 
 class IOException : public std::runtime_error {
 public:
@@ -38,6 +39,7 @@ private:
     IOException &operator=(const IOException &);
 };
 
+}
 }
 
 

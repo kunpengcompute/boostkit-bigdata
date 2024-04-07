@@ -23,7 +23,8 @@
 #include "file_interface.h"
 #include "hdfs_filesystem.h"
 
-namespace omniruntime::fs {
+namespace omniruntime {
+namespace fs {
 
 class HdfsReadableFile : public ReadableFile {
 
@@ -59,6 +60,7 @@ private:
     hdfsFile file_;
 };
 
+}
 }
 
 

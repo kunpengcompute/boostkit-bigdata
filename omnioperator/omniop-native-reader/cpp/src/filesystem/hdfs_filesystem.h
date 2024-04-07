@@ -24,7 +24,8 @@
 #include "hdfs.h"
 #include "status.h"
 
-namespace omniruntime::fs {
+namespace omniruntime {
+namespace fs {
 
 struct HdfsOptions {
     HdfsOptions() = default;
@@ -91,6 +92,7 @@ private:
 */
 std::shared_ptr<HadoopFileSystem> getHdfsFileSystem(const std::string &host, const std::string &port);
 
+}
 }
 
 #endif //SPARK_THESTRAL_PLUGIN_HDFS_FILESYSTEM_H

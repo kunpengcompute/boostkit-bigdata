@@ -19,7 +19,8 @@
 
 #include "status.h"
 
-namespace omniruntime::fs {
+namespace omniruntime {
+namespace fs {
 
 std::string Status::ToString() const {
     std::string result(CodeAsString(state_->code));
@@ -48,4 +49,5 @@ std::string Status::CodeAsString(StatusCode code) {
 }
 
 
+}
 }

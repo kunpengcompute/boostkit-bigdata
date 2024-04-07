@@ -22,7 +22,8 @@
 
 #include "status.h"
 
-namespace omniruntime::fs {
+namespace omniruntime {
+namespace fs {
 
 class ReadableFile {
 public:
@@ -48,6 +49,7 @@ public:
     virtual int64_t Read(void *buffer, int32_t length) = 0;
 };
 
+}
 }
 
 

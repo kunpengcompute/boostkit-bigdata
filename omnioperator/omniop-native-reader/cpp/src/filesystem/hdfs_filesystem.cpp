@@ -24,7 +24,8 @@
 #include "hdfs_filesystem.h"
 #include "io_exception.h"
 
-namespace omniruntime::fs {
+namespace omniruntime {
+namespace fs {
 
 void HdfsOptions::ConfigureHost(const std::string &host) {
     this->host_ = host;
@@ -144,4 +145,5 @@ std::shared_ptr<HadoopFileSystem> getHdfsFileSystem(const std::string &host, con
     return fileSystemPtr;
 }
 
+}
 }
