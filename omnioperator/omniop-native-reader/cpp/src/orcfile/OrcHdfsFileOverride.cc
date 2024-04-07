@@ -25,7 +25,7 @@
 
 namespace orc {
 
-    using namespace fs;
+    using namespace omniruntime::fs;
 
     class HdfsFileInputStreamOverride : public InputStream {
     private:

@@ -24,7 +24,7 @@
 #include "hdfs.h"
 #include "status.h"
 
-namespace fs {
+namespace omniruntime::fs {
 
 struct HdfsOptions {
     HdfsOptions() = default;

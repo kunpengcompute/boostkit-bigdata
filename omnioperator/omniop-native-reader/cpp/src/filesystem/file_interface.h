@@ -22,7 +22,7 @@
 
 #include "status.h"
 
-namespace fs {
+namespace omniruntime::fs {
 
 class ReadableFile {
 public:

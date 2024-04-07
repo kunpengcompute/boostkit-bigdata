@@ -24,7 +24,7 @@
 #include "hdfs_filesystem.h"
 #include "io_exception.h"
 
-namespace fs {
+namespace omniruntime::fs {
 
 void HdfsOptions::ConfigureHost(const std::string &host) {
     this->host_ = host;

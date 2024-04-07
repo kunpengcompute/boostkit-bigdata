@@ -22,7 +22,7 @@
 
 #include "stdexcept"
 
-namespace fs {
+namespace omniruntime::fs {
 
 class IOException : public std::runtime_error {
 public:

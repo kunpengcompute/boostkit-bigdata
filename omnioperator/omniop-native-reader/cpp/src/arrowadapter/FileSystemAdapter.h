@@ -78,6 +78,6 @@ Result<std::shared_ptr<FileSystem>> FileSystemFromUriOrPath(
 
 /// @}
 
-// namespace fs
+// namespace omniruntime::fs
 }
 // namespace arrow

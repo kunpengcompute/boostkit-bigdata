@@ -25,7 +25,7 @@
 #include <chrono>
 #include "status.h"
 
-namespace fs {
+namespace omniruntime::fs {
 
 using TimePoint =
         std::chrono::time_point<std::chrono::system_clock, std::chrono::nanoseconds>;
@@ -89,7 +89,7 @@ protected:
 
 }
 
-namespace fs {
+namespace omniruntime::fs {
 
 class FileSystem {
 public:

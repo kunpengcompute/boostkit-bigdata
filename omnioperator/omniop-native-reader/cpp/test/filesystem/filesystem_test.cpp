@@ -21,7 +21,7 @@
 #include "filesystem/hdfs_filesystem.h"
 #include "filesystem/hdfs_file.h"
 
-namespace fs {
+namespace omniruntime::fs {
 
 // Test HdfsOptions
 class HdfsOptionsTest : public ::testing::Test {

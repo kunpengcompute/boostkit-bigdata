@@ -19,7 +19,7 @@
 
 #include "io_exception.h"
 
-namespace fs {
+namespace omniruntime::fs {
 
 IOException::IOException(const std::string &arg
 ) : runtime_error(arg) {}

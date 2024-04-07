@@ -22,7 +22,7 @@
 
 #include <string>
 
-namespace fs {
+namespace omniruntime::fs {
 
 // Enum to represent different status codes
 enum class StatusCode : char {
