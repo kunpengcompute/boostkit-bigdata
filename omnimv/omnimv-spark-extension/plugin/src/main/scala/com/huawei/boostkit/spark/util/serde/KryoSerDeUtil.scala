@@ -169,10 +169,8 @@ object KryoSerDeUtil {
           e.udfDeterministic)
     }
     newPlan.transform {
-      case p: With =>
-        With(wrap(p.child), p.cteRelations.map {
-          case (r, s) => (r, SubqueryAlias(s.alias, wrap(s.child)))
-        })
+      case p: WithCTE =>
+        WithCTE(wrap(p.plan), p.cteDefs.map(c => CTERelationDef(wrap(c.child),c.id)))
       case p: Intersect =>
         IntersectWrapper(wrap(p.left), wrap(p.right), p.isAll)
       case p: Except =>
@@ -212,10 +210,8 @@ object KryoSerDeUtil {
   def unwrap(spark: SparkSession, plan: LogicalPlan): LogicalPlan = {
     RewriteTime.withTimeStat("unwrap.C") {
       val newPlan = plan.transform {
-        case p: With =>
-          With(unwrap(spark, p.child), p.cteRelations.map {
-            case (r, s) => (r, SubqueryAlias(s.alias, unwrap(spark, s.child)))
-          })
+        case p: WithCTE =>
+          WithCTE(wrap(p.plan), p.cteDefs.map(c => CTERelationDef(wrap(c.child), c.id)))
         case p: IntersectWrapper =>
           Intersect(unwrap(spark, p.left), unwrap(spark, p.right), p.isAll)
         case p: ExceptWrapper =>

@@ -884,7 +884,7 @@ case class ExpressionEqual(expression: Expression) {
   def extractRealExpr(expression: Expression): Expression = {
     expression.transform {
       case Alias(child, _) => child
-      case Cast(child, _, _) => child
+      case Cast(child, _, _, _) => child
       case other => other
     }
   }

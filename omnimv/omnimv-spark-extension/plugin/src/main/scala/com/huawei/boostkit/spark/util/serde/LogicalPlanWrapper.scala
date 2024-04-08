@@ -47,6 +47,8 @@ abstract class SubqueryExpressionWrapper
   override def nullable: Boolean = throw new UnsupportedOperationException()
 
   override def dataType: DataType = throw new UnsupportedOperationException()
+
+  override protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]): Expression = this
 }
 
 case class ScalarSubqueryWrapper(plan: LogicalPlan, children: Seq[Expression], exprId: ExprId)
@@ -67,6 +69,8 @@ case class InSubqueryWrapper(values: Seq[Expression], query: ListQueryWrapper)
   override def children: Seq[Expression] = values :+ query
 
   override def nullable: Boolean = throw new UnsupportedOperationException()
+
+  override protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]): Expression = this
 }
 
 case class ExistsWrapper(plan: LogicalPlan, children: Seq[Expression], exprId: ExprId)
@@ -83,7 +87,10 @@ case class ScalaUDFWrapper(
     udfName: Option[String] = None,
     nullable: Boolean = true,
     udfDeterministic: Boolean = true)
-    extends Expression with Unevaluable with NoDefaultConstructor
+    extends Expression with Unevaluable with NoDefaultConstructor{
+
+  override protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]): Expression = this
+}
 
 case class IntersectWrapper(
     left: LogicalPlan,
@@ -95,6 +102,8 @@ case class IntersectWrapper(
     left.output.zip(right.output).map { case (leftAttr, rightAttr) =>
       leftAttr.withNullability(leftAttr.nullable && rightAttr.nullable)
     }
+
+  override protected def withNewChildrenInternal(newLeft: LogicalPlan, newRight: LogicalPlan): LogicalPlan = this
 }
 
 case class ExceptWrapper(
@@ -104,6 +113,8 @@ case class ExceptWrapper(
     extends BinaryNode with NoDefaultConstructor {
 
   override def output: Seq[Attribute] = left.output
+
+  override protected def withNewChildrenInternal(newLeft: LogicalPlan, newRight: LogicalPlan): LogicalPlan = this
 }
 
 case class InMemoryFileIndexWrapper(rootPathsSpecified: Seq[String])

@@ -22,7 +22,7 @@
         <scala.version>2.12.10</scala.version>
         <scala.binary.version>2.12</scala.binary.version>
         <java.version>1.8</java.version>
-        <spark.version>3.1.1</spark.version>
+        <spark.version>3.2.0</spark.version>
         <antlr4.version>4.8-1</antlr4.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>

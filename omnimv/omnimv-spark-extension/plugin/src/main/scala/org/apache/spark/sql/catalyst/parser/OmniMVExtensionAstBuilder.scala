@@ -137,7 +137,7 @@ class OmniMVExtensionAstBuilder(spark: SparkSession, delegate: ParserInterface)
           .collect {
             case FileSourceScanExec(relation, _, _, _, _, _, _, _, _)
             => relation.location
-            case RowDataSourceScanExec(_, _, _, _, _, relation: HadoopFsRelation, _)
+            case RowDataSourceScanExec(_, _, _, _, _, _, relation: HadoopFsRelation, _)
             => relation.location
           }
       // disable plugin
