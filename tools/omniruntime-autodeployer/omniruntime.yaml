@@ -1,6 +1,6 @@
 env:
   username: root
-  password: Huawei12#$
+  password: 123456
   port: 22 # 需要各个节点ssh登录端口一致
   jumper_host: "server1" # 通过jumper传送软件包到其他节点上
   server_hosts: # server节点ip，支持server1这种hostname形式、192.168.1.1的ip格式、192.168.1.10-210网段形式
@@ -14,5 +14,5 @@ omnioperator:
   omni_version: 1.4.0
   spark_version: 3.3.1
   os_type: "openeuler"
-  omni_home: "C:\\Users\\Administrator\\Documents\\omni-operator" # 部署omnioperator的目录，通常固定为/opt/omni-operator
-  deploy_home: "C:\\Users\\Administrator\\Documents\\omniop" # 存放部署安装包和部署脚本的目录
+  omni_home: "/opt/omni-operator" # 部署omnioperator的目录，通常固定为/opt/omni-operator
+  deploy_home: "/home/omniop" # 存放部署安装包和部署脚本的目录

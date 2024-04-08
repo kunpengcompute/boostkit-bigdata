@@ -37,6 +37,7 @@ class OmniOperatorDeployer(object):
         self.omni_conf = OmniRuntimeConf()
         # 解析omniruntime.yaml配置文件
         self.omni_conf.parse("omniruntime.yaml")
+        print('parse omniruntime.yaml done!')
         self.operator_dir = f"{self.omni_conf.omnioperator.deploy_home}/omni-operator"
 
         self.omniop_pkg = f"BoostKit-omniop_{self.omni_conf.omnioperator.omni_version}.zip"
@@ -87,7 +88,6 @@ class OmniOperatorDeployer(object):
         new_ssh = SSH()
         new_ssh.open(host, self.omni_conf.env.port, self.omni_conf.env.username, self.omni_conf.env.password)
         # 部署软件包
-        new_ssh.send_shell_cmd(f"rm -rf {self.omni_conf.omnioperator.deploy_home}")
         transport = paramiko.Transport(host, self.omni_conf.env.port)
         transport.connect(username=self.omni_conf.env.username, password=self.omni_conf.env.password)
         sftp = paramiko.SFTPClient.from_transport(transport)
@@ -108,8 +108,13 @@ class OmniOperatorDeployer(object):
     def trans2all(self):
         # scp前先把软件包打包好
         shutil.make_archive(self.operator_dir, "gztar", self.omni_conf.omnioperator.deploy_home, "omni-operator")
+        print('make archive omni-operator.tar.gz done!')
         for host in self.omni_conf.env.server_hosts:
             self.trans2node(host)
+            print(f'deploy {host} done!')
 
         for host in self.omni_conf.env.agent_hosts:
             self.trans2node(host)
+            print(f'deploy {host} done!')
+
+        print(f'deploy {len(self.omni_conf.env.server_hosts) + len(self.omni_conf.env.agent_hosts)}')
