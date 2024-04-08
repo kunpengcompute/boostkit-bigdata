@@ -16,7 +16,7 @@ class OmniRuntimeConf(object):
 
     # 解析yaml配置文件
     def parse(self, conf_file):
-        with open(conf_file, 'r') as f:
+        with open(conf_file, 'r', encoding="UTF-8") as f:
             conf = yaml.load(f, Loader=yaml.FullLoader)
         # 解析env环境信息
         self.env.username = conf['env']['username']
@@ -38,7 +38,7 @@ class OmniRuntimeConf(object):
         # 解析omnioperator相关信息
         self.omnioperator.omni_version = conf['omnioperator']['omni_version']
         self.omnioperator.spark_version = conf['omnioperator']['spark_version']
-        self.omnioperator.os_version = conf['omnioperator']['os_version']
+        self.omnioperator.os_type = conf['omnioperator']['os_type']
         self.omnioperator.omni_home = conf['omnioperator']['omni_home']
         self.omnioperator.deploy_home = conf['omnioperator']['deploy_home']
 
