@@ -109,6 +109,7 @@ public class TypeUtils {
             put(PrimitiveObjectInspector.PrimitiveCategory.INTERVAL_DAY_TIME, LongDataType.LONG);
             put(PrimitiveObjectInspector.PrimitiveCategory.BYTE, ShortDataType.SHORT);
             put(PrimitiveObjectInspector.PrimitiveCategory.FLOAT, DoubleDataType.DOUBLE);
+            put(PrimitiveObjectInspector.PrimitiveCategory.VOID, BooleanDataType.BOOLEAN);
         }
     };
 
@@ -376,6 +377,24 @@ public class TypeUtils {
         if (functionName.equals("GenericUDFOPMultiply") || functionName.equals("GenericUDFOPDivide")
                 || functionName.equals("GenericUDFOPMod")) {
             return !isValidConversion(node);
+        }
+        return false;
+    }
+
+    public static boolean checkUnsupportedTimestamp(ExprNodeDesc desc) {
+        TypeInfo typeInfo = desc.getTypeInfo();
+        if (typeInfo instanceof PrimitiveTypeInfo) {
+            if (typeInfo.getTypeName() != "timestamp") {
+                return true;
+            }
+            if (desc instanceof ExprNodeConstantDesc) {
+                Timestamp timeValue = (Timestamp) ((ExprNodeConstantDesc) desc).getValue();
+                if (timeValue.getNanos() % 1000000 != 0) {
+                    return true;
+                }
+            } else {
+                return true;
+            }
         }
         return false;
     }

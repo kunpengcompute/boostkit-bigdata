@@ -107,6 +107,7 @@ public class VecBufferCache {
                 vec = new ShortVec(rowCount);
                 break;
             case BOOLEAN:
+            case VOID:
                 vec = new BooleanVec(rowCount);
                 break;
             case DOUBLE:

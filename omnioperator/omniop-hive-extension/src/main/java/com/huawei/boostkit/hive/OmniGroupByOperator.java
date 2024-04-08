@@ -46,6 +46,7 @@ import nova.hetu.omniruntime.vector.Vec;
 import nova.hetu.omniruntime.vector.VecBatch;
 import nova.hetu.omniruntime.vector.VecFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hive.common.type.Date;
 import org.apache.hadoop.hive.common.type.HiveDecimal;
 import org.apache.hadoop.hive.ql.CompilationOpContext;
 import org.apache.hadoop.hive.ql.exec.ExprNodeColumnEvaluator;
@@ -570,38 +571,48 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
         Vec newVec = VecFactory.createFlatVec(rowCount, dataType);
         DataType.DataTypeId dataTypeId = dataType.getId();
         for (int i = 0; i < rowCount; i++) {
+            Object exprValue = exprNodeConstantEvaluator.getExpr().getValue();
+            if (exprValue == null) {
+                newVec.setNull(i);
+                continue;
+            }
             switch (dataTypeId) {
                 case OMNI_INT:
                 case OMNI_DATE32:
-                    ((IntVec) newVec).set(i, (int) exprNodeConstantEvaluator.getExpr().getValue());
+                    if (exprValue instanceof Date) {
+                        ((IntVec) newVec).set(i, ((Date) exprValue).toEpochDay());
+                    } else {
+                        ((IntVec) newVec).set(i, (int) exprValue);
+                    }
                     break;
                 case OMNI_LONG:
                 case OMNI_DATE64:
                 case OMNI_DECIMAL64:
-                    Object exprValue = exprNodeConstantEvaluator.getExpr().getValue();
                     if (exprValue instanceof Timestamp) {
                         ((LongVec) newVec).set(i, ((Timestamp) exprValue).toEpochMilli());
+                    } else if (exprValue instanceof Date) {
+                        ((LongVec) newVec).set(i, ((Date) exprValue).toEpochDay());
                     } else {
-                        ((LongVec) newVec).set(i, (long) exprNodeConstantEvaluator.getExpr().getValue());
+                        ((LongVec) newVec).set(i, (long) exprValue);
                     }
                     break;
                 case OMNI_DOUBLE:
-                    ((DoubleVec) newVec).set(i, (double) exprNodeConstantEvaluator.getExpr().getValue());
+                    ((DoubleVec) newVec).set(i, (double) exprValue);
                     break;
                 case OMNI_BOOLEAN:
-                    ((BooleanVec) newVec).set(i, (boolean) exprNodeConstantEvaluator.getExpr().getValue());
+                    ((BooleanVec) newVec).set(i, (boolean) exprValue);
                     break;
                 case OMNI_SHORT:
-                    ((ShortVec) newVec).set(i, (short) exprNodeConstantEvaluator.getExpr().getValue());
+                    ((ShortVec) newVec).set(i, (short) exprValue);
                     break;
                 case OMNI_DECIMAL128:
-                    HiveDecimal hiveDecimal = (HiveDecimal) exprNodeConstantEvaluator.getExpr().getValue();
+                    HiveDecimal hiveDecimal = (HiveDecimal) exprValue;
                     DecimalTypeInfo decimalTypeInfo = (DecimalTypeInfo) exprNodeConstantEvaluator.getExpr().getTypeInfo();
                     ((Decimal128Vec) newVec).setBigInteger(i, hiveDecimal.bigIntegerBytesScaled(decimalTypeInfo.getScale()), hiveDecimal.signum() == -1);
                     break;
                 case OMNI_VARCHAR:
                 case OMNI_CHAR:
-                    ((VarcharVec) newVec).set(i, exprNodeConstantEvaluator.getExpr().getValue().toString().getBytes());
+                    ((VarcharVec) newVec).set(i, exprValue.toString().getBytes());
                     break;
                 default:
                     throw new RuntimeException("Not support dataType, dataTypeId: " + dataTypeId);
