@@ -52,5 +52,19 @@ Dependency_library_{os_type}.zip # 从Dependency_library.zip上解压出来
 # 4 特性部署
 进入{omnioperator.deploy_home}/omniruntime-autodeployer目录，执行如下命令：
 ```shell
-python main.py
+python main.py all|omniop|deps|extension|conf
+```
+其中，
+- **all**表示部署三个软件包+omni.conf,
+- **omniop**表示部署BoostKit-omniop_{omni_version}.zip
+- **deps**表示部署Dependency_library_{os_type}.zip
+- **extension**表示部署boostkit-omniop-spark-{spark_version}-{omni_version}-aarch64.zip
+- **conf**表示部署omni.conf
+
+可通过 | 对部署包进行组合：
+```shell
+# 部署所有包时执行
+python main.py all
+# 部署BoostKit_omniop_{omni_version}.zip和omni.conf时，执行
+python main.py omniop|conf
 ```

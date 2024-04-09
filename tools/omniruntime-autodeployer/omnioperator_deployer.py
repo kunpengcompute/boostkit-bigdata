@@ -56,7 +56,7 @@ class OmniOperatorDeployer(object):
 
 
 
-    # 部署黄区软件包和依赖包
+    # 部署黄区软件包
     def omniop_deploy(self):
         # 创建部署目录{deploy_home}/omni-operator
         if not os.path.exists(self.operator_dir):
@@ -67,6 +67,9 @@ class OmniOperatorDeployer(object):
         # 解压tar包至{deploy_home}/omni-operator/lib目录下
         shutil.unpack_archive(f"{self.omni_conf.omnioperator.deploy_home}/{self.omniop_inner_pkg}", f"{self.omni_conf.omnioperator.deploy_home}")
         utils.copy_files(f"{self.omni_conf.omnioperator.deploy_home}/{self.omniop_inner_dir}", f"{self.operator_dir}/lib")
+
+    # 部署依赖包
+    def dependencies_lib_deploy(self):
         # 解压Dependency_library_{os_type}.zip到{deploy_home}/omni-operator/lib目录下
         shutil.unpack_archive(f"{self.omni_conf.omnioperator.deploy_home}/{self.dependency_pkg}",f"{self.operator_dir}/lib")
 
