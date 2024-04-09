@@ -58,7 +58,7 @@ class SimplifyAndOrSuite extends RewriteSuite {
     // set unknownAsFalse = true
     val simplify = ExprSimplifier(unknownAsFalse = true, pulledUpPredicates)
     val res = simplify.simplify(targetCondition)
-    assert("(spark_catalog.default.t1.`ID` = 5)".equals(res.sql))
+    assert("(spark_catalog.default.t1.ID = 5)".equals(res.sql))
   }
 
   test("simplify_AndOr_02") {
@@ -75,8 +75,8 @@ class SimplifyAndOrSuite extends RewriteSuite {
     // set unknownAsFalse = true
     val simplify = ExprSimplifier(unknownAsFalse = true, pulledUpPredicates)
     val res = simplify.simplify(targetCondition)
-    assert(("((spark_catalog.default.t1.`ID` = 6) " +
-        "AND (NOT (spark_catalog.default.t1.`ID` = 5)))").equals(res.sql))
+    assert(("((spark_catalog.default.t1.ID = 6) " +
+        "AND (NOT (spark_catalog.default.t1.ID = 5)))").equals(res.sql))
   }
 
   test("simplify_AndOr_03") {

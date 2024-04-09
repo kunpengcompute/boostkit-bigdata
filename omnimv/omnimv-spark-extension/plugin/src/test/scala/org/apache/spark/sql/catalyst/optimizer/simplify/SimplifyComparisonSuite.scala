@@ -66,7 +66,7 @@ class SimplifyComparisonSuite extends RewriteSuite {
         .asInstanceOf[Project].child.asInstanceOf[Filter].condition)
     val res2 = simplify.simplify(targetCondition2
         .asInstanceOf[Project].child.asInstanceOf[Filter].condition)
-    assert("(spark_catalog.default.t1.`ID` IS NOT NULL)".equals(res.sql))
+    assert("(spark_catalog.default.t1.ID IS NOT NULL)".equals(res.sql))
     assert("false".equals(res2.sql))
   }
 
@@ -155,7 +155,7 @@ class SimplifyComparisonSuite extends RewriteSuite {
     val simplify = ExprSimplifier(unknownAsFalse = true, pulledUpPredicates01)
     val res = simplify.simplify(targetCondition
         .asInstanceOf[Project].child.asInstanceOf[Filter].condition)
-    assert(res.sql.equals("(spark_catalog.default.t1.`ID` > 10)"))
+    assert(res.sql.equals("(spark_catalog.default.t1.ID > 10)"))
   }
 
   /**
@@ -199,7 +199,7 @@ class SimplifyComparisonSuite extends RewriteSuite {
     val simplify = ExprSimplifier(unknownAsFalse = true, pulledUpPredicates01)
     val res = simplify.simplify(targetCondition
         .asInstanceOf[Project].child.asInstanceOf[Filter].condition)
-    assert(res.sql.equals("(spark_catalog.default.t1.`ID` = 10)"))
+    assert(res.sql.equals("(spark_catalog.default.t1.ID = 10)"))
   }
 
   /**
@@ -222,7 +222,7 @@ class SimplifyComparisonSuite extends RewriteSuite {
     val res = simplify.simplify(targetCondition
         .asInstanceOf[Project].child.asInstanceOf[Filter].condition)
     // range has been reduced but it's not worth simplifying
-    assert(res.sql.equals("(spark_catalog.default.t1.`ID` < 10)"))
+    assert(res.sql.equals("(spark_catalog.default.t1.ID < 10)"))
   }
 
   test("clean env") {

@@ -71,7 +71,7 @@ class SimplifyCaseSuite extends RewriteSuite {
     val res = simplify.simplify(targetCondition
         .asInstanceOf[Project].projectList(3).children.head)
     assert(("CASE " +
-        "WHEN (spark_catalog.default.t1.`ID` = 3) THEN 'I am 3.' " +
+        "WHEN (spark_catalog.default.t1.ID = 3) THEN 'I am 3.' " +
         "ELSE 'I am 4.' END").equals(res.sql))
   }
 
@@ -104,8 +104,8 @@ class SimplifyCaseSuite extends RewriteSuite {
     val res = simplify.simplify(targetCondition
         .asInstanceOf[Project].projectList(3).children.head)
     assert(("CASE " +
-        "WHEN (spark_catalog.default.t1.`ID` = 3) THEN 'I am 3.' " +
-        "WHEN (spark_catalog.default.t1.`ID` = 6) THEN 'I am 6.' " +
+        "WHEN (spark_catalog.default.t1.ID = 3) THEN 'I am 3.' " +
+        "WHEN (spark_catalog.default.t1.ID = 6) THEN 'I am 6.' " +
         "ELSE 'other' END").equals(res.sql))
   }
 
@@ -187,9 +187,9 @@ class SimplifyCaseSuite extends RewriteSuite {
     val simplify = ExprSimplifier(unknownAsFalse = true, pulledUpPredicates)
     val res = simplify.simplify(targetCondition
         .asInstanceOf[Project].projectList(3).children.head)
-    assert(("(((spark_catalog.default.t1.`ID` = 3) " +
-        "OR (spark_catalog.default.t1.`ID` = 4)) " +
-        "OR (spark_catalog.default.t1.`ID` = 5))").equals(res.sql))
+    assert(("(((spark_catalog.default.t1.ID = 3) " +
+        "OR (spark_catalog.default.t1.ID = 4)) " +
+        "OR (spark_catalog.default.t1.ID = 5))").equals(res.sql))
   }
 
   /**
