@@ -77,7 +77,7 @@ int Splitter::AllocatePartitionBuffers(int32_t partition_id, int32_t new_size) {
             case SHUFFLE_DECIMAL128:
             default: {
                 void *ptr_tmp = static_cast<void *>(options_.allocator->Alloc(new_size * (1 << column_type_id_[i])));
-                fixed_valueBuffer_size_[partition_id] = new_size * (1 << column_type_id_[i]);
+                fixed_valueBuffer_size_[partition_id] += new_size * (1 << column_type_id_[i]);
                 if (nullptr == ptr_tmp) {
                     throw std::runtime_error("Allocator for AllocatePartitionBuffers Failed! ");
                 }
@@ -346,7 +346,7 @@ int Splitter::SplitFixedWidthValidityBuffer(VectorBatch& vb){
                     dst_addrs[pid] = const_cast<uint8_t*>(validity_buffer->data_);
                     std::memset(validity_buffer->data_, 0, new_size);
                     partition_fixed_width_buffers_[col][pid][0] = std::move(validity_buffer);
-                    fixed_nullBuffer_size_[pid] = new_size;
+                    fixed_nullBuffer_size_[pid] += new_size;
                 }
             }
 
