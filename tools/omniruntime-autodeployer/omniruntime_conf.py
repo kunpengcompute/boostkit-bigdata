@@ -23,18 +23,20 @@ class OmniRuntimeConf(object):
         self.env.password = conf['env']['password']
         self.env.port = conf['env']['port']
         self.env.jumper_host = conf['env']['jumper_host']
-        for host in conf['env']['server_hosts']:
-            if OmniRuntimeConf.IPV4_RANGE_PATTERN.match(host):
-                ips = self.expand_ip_range(host)
-                self.env.server_hosts.append(ips)
-            else:
-                self.env.server_hosts.append(host)
-        for host in conf['env']['agent_hosts']:
-            if OmniRuntimeConf.IPV4_RANGE_PATTERN.match(host):
-                ips = self.expand_ip_range(host)
-                self.env.agent_hosts.append(ips)
-            else:
-                self.env.agent_hosts.append(host)
+        if conf['env']['server_hosts'] is not None:
+            for host in conf['env']['server_hosts']:
+                if OmniRuntimeConf.IPV4_RANGE_PATTERN.match(host):
+                    ips = self.expand_ip_range(host)
+                    self.env.server_hosts.append(ips)
+                else:
+                    self.env.server_hosts.append(host)
+        if conf['env']['agent_hosts'] is not None:
+            for host in conf['env']['agent_hosts']:
+                if OmniRuntimeConf.IPV4_RANGE_PATTERN.match(host):
+                    ips = self.expand_ip_range(host)
+                    self.env.agent_hosts.append(ips)
+                else:
+                    self.env.agent_hosts.append(host)
         # 解析omnioperator相关信息
         self.omnioperator.omni_version = conf['omnioperator']['omni_version']
         self.omnioperator.spark_version = conf['omnioperator']['spark_version']

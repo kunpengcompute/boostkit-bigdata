@@ -5,13 +5,13 @@ valid_params = {"all", "omniop", "deps", "extension", "conf"}
 
 if __name__ == '__main__':
     if len(sys.argv) != 2:
-        print('Usage: python main.py all|omniop|deps|extension|conf')
+        print('Usage: python main.py all,omniop,deps,extension,conf')
         sys.exit(1)
-    argvs = sys.argv[1].split("|")
+    argvs = sys.argv[1].split(",")
     params = set()
     for argv in argvs:
         if argv not in valid_params:
-            print('Usage: python main.py all|omniop|deps|extension|conf')
+            print('Usage: python main.py all,omniop,deps,extension,conf')
             sys.exit(1)
         params.add(argv)
     omniop_deployer = OmniOperatorDeployer()

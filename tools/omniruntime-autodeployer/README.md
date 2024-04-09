@@ -18,7 +18,7 @@ pip3 install paramiko
 ```yaml
 env: # 环境配置
   username: root # ssh登录用户名
-  password: 123456 # ssh登录密码
+  password: "123456" # ssh登录密码
   port: 22 # 需要各个节点ssh登录端口一致
   jumper_host: "192.168.2.1" # 通过jumper传送软件包到其他节点上
   server_hosts: # server节点ip，支持server1这种hostname形式、192.168.1.1的ip格式、192.168.1.10-210网段形式
@@ -52,7 +52,7 @@ Dependency_library_{os_type}.zip # 从Dependency_library.zip上解压出来
 # 4 特性部署
 进入{omnioperator.deploy_home}/omniruntime-autodeployer目录，执行如下命令：
 ```shell
-python main.py all|omniop|deps|extension|conf
+python main.py all,omniop,deps,extension,conf
 ```
 其中，
 - **all**表示部署三个软件包+omni.conf,
@@ -61,10 +61,10 @@ python main.py all|omniop|deps|extension|conf
 - **extension**表示部署boostkit-omniop-spark-{spark_version}-{omni_version}-aarch64.zip
 - **conf**表示部署omni.conf
 
-可通过 | 对部署包进行组合：
+可通过 , 对部署包进行组合：
 ```shell
 # 部署所有包时执行
 python main.py all
 # 部署BoostKit_omniop_{omni_version}.zip和omni.conf时，执行
-python main.py omniop|conf
+python main.py omniop,conf
 ```
