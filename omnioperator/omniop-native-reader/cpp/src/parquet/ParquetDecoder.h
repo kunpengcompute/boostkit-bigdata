@@ -346,6 +346,7 @@ namespace omniruntime::reader {
                     vec->SetValue(i + offset, value);
                 }
                 values_decoded += num_indices;
+                offset += num_indices;
             }
             *out_num_values = values_decoded;
             return Status::OK();

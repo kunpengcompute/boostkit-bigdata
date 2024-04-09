@@ -381,7 +381,7 @@ void Test_Shuffle_Compression(std::string compStr, int32_t numPartition, int32_t
     inputDataTypes.inputDataPrecisions = new uint32_t[colNumber];
     inputDataTypes.inputDataScales = new uint32_t[colNumber];
     int partitionNum = numPartition;
-    int splitterId = Test_splitter_nativeMake("hash",
+    long splitterId = Test_splitter_nativeMake("hash",
                                               partitionNum,
                                               inputDataTypes,
                                               colNumber,
@@ -424,31 +424,31 @@ long Test_splitter_nativeMake(std::string partitioning_name,
     splitOptions.compression_type = compression_type_result;
     splitOptions.data_file = data_file_jstr;
     auto splitter = Splitter::Make(partitioning_name, inputDataTypes, numCols, num_partitions, std::move(splitOptions));
-    return testShuffleSplitterHolder.Insert(std::shared_ptr<Splitter>(splitter));
+    return reinterpret_cast<intptr_t>(static_cast<void *>(splitter));
 }
 
-void Test_splitter_split(long splitter_id, VectorBatch* vb) {
-    auto splitter = testShuffleSplitterHolder.Lookup(splitter_id);
+void Test_splitter_split(long splitter_addr, VectorBatch* vb) {
+    auto splitter = reinterpret_cast<Splitter *>(splitter_addr);
     // Initialize split global variables
     splitter->Split(*vb);
 }
 
-void Test_splitter_stop(long splitter_id) {
-    auto splitter = testShuffleSplitterHolder.Lookup(splitter_id);
+void Test_splitter_stop(long splitter_addr) {
+    auto splitter = reinterpret_cast<Splitter *>(splitter_addr);
     if (!splitter) {
-        std::string error_message = "Invalid splitter id " + std::to_string(splitter_id);
+        std::string error_message = "Invalid splitter id " + std::to_string(splitter_addr);
         throw std::runtime_error("Test no splitter.");
     }
     splitter->Stop();
 }
 
-void Test_splitter_close(long splitter_id) {
-    auto splitter = testShuffleSplitterHolder.Lookup(splitter_id);
+void Test_splitter_close(long splitter_addr) {
+    auto splitter = reinterpret_cast<Splitter *>(splitter_addr);
     if (!splitter) {
-        std::string error_message = "Invalid splitter id " + std::to_string(splitter_id);
+        std::string error_message = "Invalid splitter id " + std::to_string(splitter_addr);
         throw std::runtime_error("Test no splitter.");
     }
-    testShuffleSplitterHolder.Erase(splitter_id);
+    delete splitter;
 }
 
 void GetFilePath(const char *path, const char *filename, char *filepath) {
