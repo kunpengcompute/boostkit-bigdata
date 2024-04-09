@@ -18,15 +18,14 @@
 package com.huawei.boostkit.spark
 
 import com.huawei.boostkit.spark.util.LogicalPlanSelector
-
-import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.Strategy
+import org.apache.spark.sql.{SparkSession, Strategy}
 import org.apache.spark.sql.catalyst.SQLConfHelper
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.optimizer.{BuildLeft, BuildRight, BuildSide, JoinSelectionHelper}
 import org.apache.spark.sql.catalyst.planning._
 import org.apache.spark.sql.catalyst.plans.logical._
-import org.apache.spark.sql.execution.{joins, SparkPlan}
+import org.apache.spark.sql.catalyst.plans._
+import org.apache.spark.sql.execution.{SparkPlan, joins}
 
 case class ShuffleJoinStrategy(session: SparkSession) extends Strategy
   with PredicateHelper
@@ -124,10 +123,10 @@ case class ShuffleJoinStrategy(session: SparkSession) extends Strategy
   }
 
   private def getBuildSide(
-    canBuildLeft: Boolean,
-    canBuildRight: Boolean,
-    left: LogicalPlan,
-    right: LogicalPlan): Option[BuildSide] = {
+                            canBuildLeft: Boolean,
+                            canBuildRight: Boolean,
+                            left: LogicalPlan,
+                            right: LogicalPlan): Option[BuildSide] = {
     if (canBuildLeft && canBuildRight) {
       // returns the smaller side base on its estimated physical size, if we want to build the
       // both sides.
@@ -140,4 +139,5 @@ case class ShuffleJoinStrategy(session: SparkSession) extends Strategy
       None
     }
   }
+
 }

@@ -69,11 +69,41 @@ class ColumnarExpandExecSuite extends ColumnarSparkPlanTest {
 
   }
 
-  test("use ColumnarExpandExec in Grouping Sets clause when default") {
+  test("use ColumnarExpandExec in Grouping Sets clause when default, case1 can't match rollup optimization") {
     val result = spark.sql("SELECT city, car_model, sum(quantity) AS sum FROM dealer " +
       "GROUP BY GROUPING SETS ((city, car_model), (city), (car_model), ()) ORDER BY city, car_model;")
     val plan = result.queryExecution.executedPlan
     assert(plan.find(_.isInstanceOf[ColumnarExpandExec]).isDefined)
+    // GROUP BY GROUPING SETS ((city, car_model), (city), (car_model), ()) is equal to CUBE (city, car_model)
+    assert(plan.find(_.isInstanceOf[ColumnarOptRollupExec]).isEmpty)
+    assert(plan.find(_.isInstanceOf[ExpandExec]).isEmpty)
+  }
+
+  test("use ColumnarExpandExec in Grouping Sets clause when default, case2 can't match rollup optimization") {
+    val result = spark.sql("SELECT city, car_model, sum(quantity) AS sum FROM dealer " +
+      "GROUP BY GROUPING SETS ((city, car_model), ()) ORDER BY city, car_model;")
+    val plan = result.queryExecution.executedPlan
+    assert(plan.find(_.isInstanceOf[ColumnarExpandExec]).isDefined)
+    assert(plan.find(_.isInstanceOf[ColumnarOptRollupExec]).isEmpty)
+    assert(plan.find(_.isInstanceOf[ExpandExec]).isEmpty)
+  }
+
+  test("use ColumnarExpandExec in Grouping Sets clause when default, case3 matches rollup optimization") {
+    val result = spark.sql("SELECT city, car_model, sum(quantity) AS sum FROM dealer " +
+      "GROUP BY GROUPING SETS ((city, car_model), (city), ()) ORDER BY city, car_model;")
+    val plan = result.queryExecution.executedPlan
+    assert(plan.find(_.isInstanceOf[ColumnarExpandExec]).isDefined)
+    // GROUP BY GROUPING SETS ((city, car_model), (city), (car_model), ()) is equal to ROLLUP (city, car_model)
+    assert(plan.find(_.isInstanceOf[ColumnarOptRollupExec]).isDefined)
+    assert(plan.find(_.isInstanceOf[ExpandExec]).isEmpty)
+  }
+
+  test("use ColumnarExpandExec in Grouping Sets clause when default, case4 matches rollup optimization") {
+    val result = spark.sql("SELECT city, car_model, sum(quantity) AS sum FROM dealer " +
+      "GROUP BY GROUPING SETS ((city, car_model), (city)) ORDER BY city, car_model;")
+    val plan = result.queryExecution.executedPlan
+    assert(plan.find(_.isInstanceOf[ColumnarExpandExec]).isDefined)
+    assert(plan.find(_.isInstanceOf[ColumnarOptRollupExec]).isDefined)
     assert(plan.find(_.isInstanceOf[ExpandExec]).isEmpty)
   }
 
@@ -82,6 +112,7 @@ class ColumnarExpandExecSuite extends ColumnarSparkPlanTest {
       "GROUP BY GROUPING SETS ((city, car_model), (city), (car_model), ()) ORDER BY city, car_model;")
     val plan = result.queryExecution.executedPlan
     assert(plan.find(_.isInstanceOf[ColumnarExpandExec]).isEmpty)
+    assert(plan.find(_.isInstanceOf[ColumnarOptRollupExec]).isEmpty)
     assert(plan.find(_.isInstanceOf[ExpandExec]).isDefined)
   }
 
@@ -91,16 +122,29 @@ class ColumnarExpandExecSuite extends ColumnarSparkPlanTest {
       "GROUP BY GROUPING SETS ((city, car_model), (city), (car_model), ()) ORDER BY city, car_model;")
     val plan = result.queryExecution.executedPlan
     assert(plan.find(_.isInstanceOf[ColumnarExpandExec]).isEmpty)
+    assert(plan.find(_.isInstanceOf[ColumnarOptRollupExec]).isEmpty)
     assert(plan.find(_.isInstanceOf[ExpandExec]).isDefined)
     spark.conf.set("spark.omni.sql.columnar.expand", true)
   }
 
-  test("use ColumnarExpandExec in Rollup clause when default") {
+  test("use ColumnarExpandExec in Rollup clause when default, default use rollup optimization") {
     val result = spark.sql("SELECT city, car_model, sum(quantity) AS sum FROM dealer " +
       "GROUP BY ROLLUP(city, car_model) ORDER BY city, car_model;")
     val plan = result.queryExecution.executedPlan
     assert(plan.find(_.isInstanceOf[ColumnarExpandExec]).isDefined)
+    assert(plan.find(_.isInstanceOf[ColumnarOptRollupExec]).isDefined)
     assert(plan.find(_.isInstanceOf[ExpandExec]).isEmpty)
+  }
+
+  test("use ColumnarExpandExec in Rollup clause when default, not use rollup optimization") {
+    val result = spark.sql("SELECT city, car_model, sum(quantity) AS sum FROM dealer " +
+      "GROUP BY ROLLUP(city, car_model) ORDER BY city, car_model;")
+    spark.conf.set("spark.omni.sql.columnar.rollupOptimization.enabled", false)
+    val plan = result.queryExecution.executedPlan
+    assert(plan.find(_.isInstanceOf[ColumnarExpandExec]).isDefined)
+    assert(plan.find(_.isInstanceOf[ColumnarOptRollupExec]).isEmpty)
+    assert(plan.find(_.isInstanceOf[ExpandExec]).isEmpty)
+    spark.conf.set("spark.omni.sql.columnar.rollupOptimization.enabled", true)
   }
 
   test("use ExpandExec in Rollup clause when SparkExtension rollback") {
@@ -108,6 +152,7 @@ class ColumnarExpandExecSuite extends ColumnarSparkPlanTest {
       "GROUP BY ROLLUP(city, car_model) ORDER BY city, car_model;")
     val plan = result.queryExecution.executedPlan
     assert(plan.find(_.isInstanceOf[ColumnarExpandExec]).isEmpty)
+    assert(plan.find(_.isInstanceOf[ColumnarOptRollupExec]).isEmpty)
     assert(plan.find(_.isInstanceOf[ExpandExec]).isDefined)
   }
 
@@ -117,6 +162,7 @@ class ColumnarExpandExecSuite extends ColumnarSparkPlanTest {
       "GROUP BY ROLLUP(city, car_model) ORDER BY city, car_model;")
     val plan = result.queryExecution.executedPlan
     assert(plan.find(_.isInstanceOf[ColumnarExpandExec]).isEmpty)
+    assert(plan.find(_.isInstanceOf[ColumnarOptRollupExec]).isEmpty)
     assert(plan.find(_.isInstanceOf[ExpandExec]).isDefined)
     spark.conf.set("spark.omni.sql.columnar.expand", true)
   }
@@ -126,6 +172,7 @@ class ColumnarExpandExecSuite extends ColumnarSparkPlanTest {
       "GROUP BY CUBE(city, car_model) ORDER BY city, car_model;")
     val plan = result.queryExecution.executedPlan
     assert(plan.find(_.isInstanceOf[ColumnarExpandExec]).isDefined)
+    assert(plan.find(_.isInstanceOf[ColumnarOptRollupExec]).isEmpty)
     assert(plan.find(_.isInstanceOf[ExpandExec]).isEmpty)
   }
 
@@ -134,6 +181,7 @@ class ColumnarExpandExecSuite extends ColumnarSparkPlanTest {
       "GROUP BY CUBE(city, car_model) ORDER BY city, car_model;")
     val plan = result.queryExecution.executedPlan
     assert(plan.find(_.isInstanceOf[ColumnarExpandExec]).isEmpty)
+    assert(plan.find(_.isInstanceOf[ColumnarOptRollupExec]).isEmpty)
     assert(plan.find(_.isInstanceOf[ExpandExec]).isDefined)
   }
 
@@ -143,15 +191,17 @@ class ColumnarExpandExecSuite extends ColumnarSparkPlanTest {
       "GROUP BY CUBE(city, car_model) ORDER BY city, car_model;")
     val plan = result.queryExecution.executedPlan
     assert(plan.find(_.isInstanceOf[ColumnarExpandExec]).isEmpty)
+    assert(plan.find(_.isInstanceOf[ColumnarOptRollupExec]).isEmpty)
     assert(plan.find(_.isInstanceOf[ExpandExec]).isDefined)
     spark.conf.set("spark.omni.sql.columnar.expand", true)
   }
 
-  test("ColumnarExpandExec exec correctly in Grouping Sets clause") {
+  test("ColumnarExpandExec exec correctly in Grouping Sets clause, case1 can't match rollup optimization") {
     val result = spark.sql("SELECT city, car_model, sum(quantity) AS sum FROM dealer " +
       "GROUP BY GROUPING SETS ((city, car_model), (city), (car_model), ()) ORDER BY city, car_model;")
     val plan = result.queryExecution.executedPlan
     assert(plan.find(_.isInstanceOf[ColumnarExpandExec]).isDefined)
+    assert(plan.find(_.isInstanceOf[ColumnarOptRollupExec]).isEmpty)
 
     val expect = Seq(
       Row(null, null, 78),
@@ -173,11 +223,35 @@ class ColumnarExpandExecSuite extends ColumnarSparkPlanTest {
     checkAnswer(result, expect)
   }
 
-  test("ColumnarExpandExec exec correctly in Rollup clause") {
+  test("ColumnarExpandExec exec correctly in Grouping Sets clause, case2 matches rollup optimization") {
+    val result = spark.sql("SELECT city, car_model, sum(quantity) AS sum FROM dealer " +
+      "GROUP BY GROUPING SETS ((city, car_model), (city)) ORDER BY city, car_model;")
+    val plan = result.queryExecution.executedPlan
+    assert(plan.find(_.isInstanceOf[ColumnarExpandExec]).isDefined)
+    assert(plan.find(_.isInstanceOf[ColumnarOptRollupExec]).isDefined)
+
+    val expect = Seq(
+      Row("Dublin", null, 33),
+      Row("Dublin", "Honda Accord", 10),
+      Row("Dublin", "Honda CRV", 3),
+      Row("Dublin", "Honda Civic", 20),
+      Row("Fremont", null, 32),
+      Row("Fremont", "Honda Accord", 15),
+      Row("Fremont", "Honda CRV", 7),
+      Row("Fremont", "Honda Civic", 10),
+      Row("San Jose", null, 13),
+      Row("San Jose", "Honda Accord", 8),
+      Row("San Jose", "Honda Civic", 5),
+    )
+    checkAnswer(result, expect)
+  }
+
+  test("ColumnarExpandExec exec correctly in Rollup clause, default use rollup optimization") {
     val result = spark.sql("SELECT city, car_model, sum(quantity) AS sum FROM dealer " +
       "GROUP BY ROLLUP (city, car_model) ORDER BY city, car_model;")
     val plan = result.queryExecution.executedPlan
     assert(plan.find(_.isInstanceOf[ColumnarExpandExec]).isDefined)
+    assert(plan.find(_.isInstanceOf[ColumnarOptRollupExec]).isDefined)
 
     val expect = Seq(
       Row(null, null, 78),
@@ -194,6 +268,32 @@ class ColumnarExpandExecSuite extends ColumnarSparkPlanTest {
       Row("San Jose", "Honda Civic", 5),
     )
     checkAnswer(result, expect)
+  }
+
+  test("ColumnarExpandExec exec correctly in Rollup clause, not use rollup optimization") {
+    val result = spark.sql("SELECT city, car_model, sum(quantity) AS sum FROM dealer " +
+      "GROUP BY ROLLUP (city, car_model) ORDER BY city, car_model;")
+    spark.conf.set("spark.omni.sql.columnar.rollupOptimization.enabled", false)
+    val plan = result.queryExecution.executedPlan
+    assert(plan.find(_.isInstanceOf[ColumnarExpandExec]).isDefined)
+    assert(plan.find(_.isInstanceOf[ColumnarOptRollupExec]).isEmpty)
+
+    val expect = Seq(
+      Row(null, null, 78),
+      Row("Dublin", null, 33),
+      Row("Dublin", "Honda Accord", 10),
+      Row("Dublin", "Honda CRV", 3),
+      Row("Dublin", "Honda Civic", 20),
+      Row("Fremont", null, 32),
+      Row("Fremont", "Honda Accord", 15),
+      Row("Fremont", "Honda CRV", 7),
+      Row("Fremont", "Honda Civic", 10),
+      Row("San Jose", null, 13),
+      Row("San Jose", "Honda Accord", 8),
+      Row("San Jose", "Honda Civic", 5),
+    )
+    checkAnswer(result, expect)
+    spark.conf.set("spark.omni.sql.columnar.rollupOptimization.enabled", true)
   }
 
   test("ColumnarExpandExec exec correctly in Cube clause") {
@@ -201,6 +301,7 @@ class ColumnarExpandExecSuite extends ColumnarSparkPlanTest {
       "GROUP BY CUBE (city, car_model) ORDER BY city, car_model;")
     val plan = result.queryExecution.executedPlan
     assert(plan.find(_.isInstanceOf[ColumnarExpandExec]).isDefined)
+    assert(plan.find(_.isInstanceOf[ColumnarOptRollupExec]).isEmpty)
 
     val expect = Seq(
       Row(null, null, 78),
@@ -222,11 +323,12 @@ class ColumnarExpandExecSuite extends ColumnarSparkPlanTest {
     checkAnswer(result, expect)
   }
 
-  test("ColumnarExpandExec exec correctly in Grouping Sets clause with GROUPING__ID column") {
+  test("ColumnarExpandExec exec correctly in Grouping Sets clause with GROUPING__ID column, case1 can't match rollup optimization") {
     val result = spark.sql("SELECT city, car_model, sum(quantity) AS sum, GROUPING__ID FROM dealer " +
       "GROUP BY GROUPING SETS ((city, car_model), (city), (car_model), ()) ORDER BY city, car_model;")
     val plan = result.queryExecution.executedPlan
     assert(plan.find(_.isInstanceOf[ColumnarExpandExec]).isDefined)
+    assert(plan.find(_.isInstanceOf[ColumnarOptRollupExec]).isEmpty)
 
     val expect = Seq(
       Row(null, null, 78, 3),
@@ -248,11 +350,35 @@ class ColumnarExpandExecSuite extends ColumnarSparkPlanTest {
     checkAnswer(result, expect)
   }
 
-  test("ColumnarExpandExec exec correctly in Rollup clause with GROUPING__ID column") {
+  test("ColumnarExpandExec exec correctly in Grouping Sets clause with GROUPING__ID column, case2 matches rollup optimization") {
+    val result = spark.sql("SELECT city, car_model, sum(quantity) AS sum, GROUPING__ID FROM dealer " +
+      "GROUP BY GROUPING SETS ((city, car_model), (city)) ORDER BY city, car_model;")
+    val plan = result.queryExecution.executedPlan
+    assert(plan.find(_.isInstanceOf[ColumnarExpandExec]).isDefined)
+    assert(plan.find(_.isInstanceOf[ColumnarOptRollupExec]).isDefined)
+
+    val expect = Seq(
+      Row("Dublin", null, 33, 1),
+      Row("Dublin", "Honda Accord", 10, 0),
+      Row("Dublin", "Honda CRV", 3, 0),
+      Row("Dublin", "Honda Civic", 20, 0),
+      Row("Fremont", null, 32, 1),
+      Row("Fremont", "Honda Accord", 15, 0),
+      Row("Fremont", "Honda CRV", 7, 0),
+      Row("Fremont", "Honda Civic", 10, 0),
+      Row("San Jose", null, 13, 1),
+      Row("San Jose", "Honda Accord", 8, 0),
+      Row("San Jose", "Honda Civic", 5, 0),
+    )
+    checkAnswer(result, expect)
+  }
+
+  test("ColumnarExpandExec exec correctly in Rollup clause with GROUPING__ID column, default use rollup optimization") {
     val result = spark.sql("SELECT city, car_model, sum(quantity) AS sum, GROUPING__ID FROM dealer " +
       "GROUP BY ROLLUP (city, car_model) ORDER BY city, car_model;")
     val plan = result.queryExecution.executedPlan
     assert(plan.find(_.isInstanceOf[ColumnarExpandExec]).isDefined)
+    assert(plan.find(_.isInstanceOf[ColumnarOptRollupExec]).isDefined)
 
     val expect = Seq(
       Row(null, null, 78, 3),
@@ -269,6 +395,32 @@ class ColumnarExpandExecSuite extends ColumnarSparkPlanTest {
       Row("San Jose", "Honda Civic", 5, 0),
     )
     checkAnswer(result, expect)
+  }
+
+  test("ColumnarExpandExec exec correctly in Rollup clause with GROUPING__ID column, not use rollup optimization") {
+    val result = spark.sql("SELECT city, car_model, sum(quantity) AS sum, GROUPING__ID FROM dealer " +
+      "GROUP BY ROLLUP (city, car_model) ORDER BY city, car_model;")
+    spark.conf.set("spark.omni.sql.columnar.rollupOptimization.enabled", false)
+    val plan = result.queryExecution.executedPlan
+    assert(plan.find(_.isInstanceOf[ColumnarExpandExec]).isDefined)
+    assert(plan.find(_.isInstanceOf[ColumnarOptRollupExec]).isEmpty)
+
+    val expect = Seq(
+      Row(null, null, 78, 3),
+      Row("Dublin", null, 33, 1),
+      Row("Dublin", "Honda Accord", 10, 0),
+      Row("Dublin", "Honda CRV", 3, 0),
+      Row("Dublin", "Honda Civic", 20, 0),
+      Row("Fremont", null, 32, 1),
+      Row("Fremont", "Honda Accord", 15, 0),
+      Row("Fremont", "Honda CRV", 7, 0),
+      Row("Fremont", "Honda Civic", 10, 0),
+      Row("San Jose", null, 13, 1),
+      Row("San Jose", "Honda Accord", 8, 0),
+      Row("San Jose", "Honda Civic", 5, 0),
+    )
+    checkAnswer(result, expect)
+    spark.conf.set("spark.omni.sql.columnar.rollupOptimization.enabled", true)
   }
 
   test("ColumnarExpandExec exec correctly in Cube clause with GROUPING__ID column") {
@@ -276,6 +428,7 @@ class ColumnarExpandExecSuite extends ColumnarSparkPlanTest {
       "GROUP BY CUBE (city, car_model) ORDER BY city, car_model;")
     val plan = result.queryExecution.executedPlan
     assert(plan.find(_.isInstanceOf[ColumnarExpandExec]).isDefined)
+    assert(plan.find(_.isInstanceOf[ColumnarOptRollupExec]).isEmpty)
 
     val expect = Seq(
       Row(null, null, 78, 3),
@@ -298,16 +451,30 @@ class ColumnarExpandExecSuite extends ColumnarSparkPlanTest {
   }
 
 
-  test("ColumnarExpandExec and ExpandExec return the same result when use Grouping Sets clause") {
+  test("ColumnarExpandExec and ExpandExec return the same result when use Grouping Sets clause, case1 can't match rollup optimization") {
     val sql = "SELECT city, car_model, sum(quantity) AS sum FROM dealer " +
       "GROUP BY GROUPING SETS ((city, car_model), (city), (car_model), ()) ORDER BY city, car_model;"
     checkExpandExecAndColumnarExpandExecAgree(sql)
   }
 
-  test("ColumnarExpandExec and ExpandExec return the same result when use Rollup clause") {
+  test("ColumnarExpandExec and ExpandExec return the same result when use Grouping Sets clause, case2 matches rollup optimization") {
+    val sql = "SELECT city, car_model, sum(quantity) AS sum FROM dealer " +
+      "GROUP BY GROUPING SETS ((city, car_model), (city)) ORDER BY city, car_model;"
+    checkExpandExecAndColumnarExpandExecAgree(sql)
+  }
+
+  test("ColumnarExpandExec and ExpandExec return the same result when use Rollup clause, default use rollup optimization") {
     val sql = "SELECT city, car_model, sum(quantity) AS sum FROM dealer " +
       "GROUP BY ROLLUP(city, car_model) ORDER BY city, car_model;"
     checkExpandExecAndColumnarExpandExecAgree(sql)
+  }
+
+  test("ColumnarExpandExec and ExpandExec return the same result when use Rollup clause, not use rollup optimization") {
+    val sql = "SELECT city, car_model, sum(quantity) AS sum FROM dealer " +
+      "GROUP BY ROLLUP(city, car_model) ORDER BY city, car_model;"
+    spark.conf.set("spark.omni.sql.columnar.rollupOptimization.enabled", false)
+    checkExpandExecAndColumnarExpandExecAgree(sql)
+    spark.conf.set("spark.omni.sql.columnar.rollupOptimization.enabled", true)
   }
 
   test("ColumnarExpandExec and ExpandExec return the same result when use Cube clause") {
@@ -316,16 +483,30 @@ class ColumnarExpandExecSuite extends ColumnarSparkPlanTest {
     checkExpandExecAndColumnarExpandExecAgree(sql)
   }
 
-  test("ColumnarExpandExec and ExpandExec return the same result when use Grouping Sets clause with null value") {
+  test("ColumnarExpandExec and ExpandExec return the same result when use Grouping Sets clause with null value, case1 can't match rollup optimization") {
     val sql = "SELECT city, car_model, sum(quantity) AS sum FROM null_dealer " +
       "GROUP BY GROUPING SETS ((city, car_model), (city), (car_model), ()) ORDER BY city, car_model;"
     checkExpandExecAndColumnarExpandExecAgree(sql)
   }
 
-  test("ColumnarExpandExec and ExpandExec return the same result when use Rollup clause with null value") {
+  test("ColumnarExpandExec and ExpandExec return the same result when use Grouping Sets clause with null value, case2 matches rollup optimization") {
+    val sql = "SELECT city, car_model, sum(quantity) AS sum FROM null_dealer " +
+      "GROUP BY GROUPING SETS ((city, car_model), (city)) ORDER BY city, car_model;"
+    checkExpandExecAndColumnarExpandExecAgree(sql)
+  }
+
+  test("ColumnarExpandExec and ExpandExec return the same result when use Rollup clause with null value, default use rollup optimization") {
     val sql = "SELECT city, car_model, sum(quantity) AS sum FROM null_dealer " +
       "GROUP BY ROLLUP(city, car_model) ORDER BY city, car_model;"
     checkExpandExecAndColumnarExpandExecAgree(sql)
+  }
+
+  test("ColumnarExpandExec and ExpandExec return the same result when use Rollup clause with null value, not use rollup optimization") {
+    val sql = "SELECT city, car_model, sum(quantity) AS sum FROM null_dealer " +
+      "GROUP BY ROLLUP(city, car_model) ORDER BY city, car_model;"
+    spark.conf.set("spark.omni.sql.columnar.rollupOptimization.enabled", false)
+    checkExpandExecAndColumnarExpandExecAgree(sql)
+    spark.conf.set("spark.omni.sql.columnar.rollupOptimization.enabled", true)
   }
 
   test("ColumnarExpandExec and ExpandExec return the same result when use Cube clause with null value") {
@@ -334,20 +515,80 @@ class ColumnarExpandExecSuite extends ColumnarSparkPlanTest {
     checkExpandExecAndColumnarExpandExecAgree(sql)
   }
 
-  test("ColumnarExpandExec and ExpandExec return the same result when use Grouping Sets clause with GROUPING__ID column") {
+  test("ColumnarExpandExec and ExpandExec return the same result when use Grouping Sets clause with GROUPING__ID column, case1 can't match rollup optimization") {
     val sql = "SELECT city, car_model, sum(quantity) AS sum, GROUPING__ID FROM dealer " +
       "GROUP BY GROUPING SETS ((city, car_model), (city), (car_model), ()) ORDER BY city, car_model;"
     checkExpandExecAndColumnarExpandExecAgree(sql)
   }
 
-  test("ColumnarExpandExec and ExpandExec return the same result when use Rollup clause with GROUPING__ID column") {
+  test("ColumnarExpandExec and ExpandExec return the same result when use Grouping Sets clause with GROUPING__ID column, case2 matches rollup optimization") {
+    val sql = "SELECT city, car_model, sum(quantity) AS sum, GROUPING__ID FROM dealer " +
+      "GROUP BY GROUPING SETS ((city, car_model), (city)) ORDER BY city, car_model;"
+    checkExpandExecAndColumnarExpandExecAgree(sql)
+  }
+
+  test("ColumnarExpandExec and ExpandExec return the same result when use Rollup clause with GROUPING__ID column, default use rollup optimization") {
     val sql = "SELECT city, car_model, sum(quantity) AS sum, GROUPING__ID FROM dealer " +
       "GROUP BY ROLLUP(city, car_model) ORDER BY city, car_model;"
     checkExpandExecAndColumnarExpandExecAgree(sql)
   }
+
+  test("ColumnarExpandExec and ExpandExec return the same result when use Rollup clause with GROUPING__ID column, not use rollup optimization") {
+    val sql = "SELECT city, car_model, sum(quantity) AS sum, GROUPING__ID FROM dealer " +
+      "GROUP BY ROLLUP(city, car_model) ORDER BY city, car_model;"
+    spark.conf.set("spark.omni.sql.columnar.rollupOptimization.enabled", false)
+    checkExpandExecAndColumnarExpandExecAgree(sql)
+    spark.conf.set("spark.omni.sql.columnar.rollupOptimization.enabled", true)
+  }
+
   test("ColumnarExpandExec and ExpandExec return the same result when use Cube clause with GROUPING__ID column") {
     val sql = "SELECT city, car_model, sum(quantity) AS sum, GROUPING__ID FROM dealer " +
       "GROUP BY CUBE (city, car_model) ORDER BY city, car_model;"
+    checkExpandExecAndColumnarExpandExecAgree(sql)
+  }
+
+  // test distinct + rollup
+  test("ColumnarExpandExec and ExpandExec return the same result when use distinct + Rollup clause, case1") {
+    val result = spark.sql("SELECT city, car_model, sum(DISTINCT id) AS sum, count(DISTINCT quantity) AS count FROM dealer " +
+      "GROUP BY city, car_model WITH ROLLUP ORDER BY city, car_model;")
+    val plan = result.queryExecution.executedPlan
+    assert(plan.find(_.isInstanceOf[ColumnarExpandExec]).isDefined)
+    assert(plan.find(_.isInstanceOf[ColumnarOptRollupExec]).isEmpty)
+  }
+
+  test("ColumnarExpandExec and ExpandExec return the same result when use distinct + Rollup clause, case2") {
+    val sql = "SELECT city, car_model, count(DISTINCT quantity) AS count FROM dealer " +
+      "GROUP BY city, car_model WITH ROLLUP ORDER BY city, car_model;"
+    checkExpandExecAndColumnarExpandExecAgree(sql)
+  }
+
+  test("ColumnarExpandExec and ExpandExec return the same result when use distinct + Rollup clause, case3") {
+    val sql = "SELECT city, car_model, count(DISTINCT quantity) AS count, sum(id) AS sum FROM dealer " +
+      "GROUP BY city, car_model WITH ROLLUP ORDER BY city, car_model;"
+    checkExpandExecAndColumnarExpandExecAgree(sql)
+  }
+
+  test("ColumnarExpandExec and ExpandExec return the same result when use distinct + Rollup clause, case4") {
+    val sql = "SELECT city, car_model, sum(id) AS sum, count(DISTINCT quantity) AS count FROM dealer " +
+      "GROUP BY city, car_model WITH ROLLUP ORDER BY city, car_model;"
+    checkExpandExecAndColumnarExpandExecAgree(sql)
+  }
+
+  test("ColumnarExpandExec and ExpandExec return the same result when use distinct + Rollup clause, case5") {
+    val sql = "SELECT city, car_model, sum(DISTINCT coalesce(id * quantity, 0)) AS sum FROM dealer " +
+      "GROUP BY city, car_model WITH ROLLUP ORDER BY city, car_model;"
+    checkExpandExecAndColumnarExpandExecAgree(sql)
+  }
+
+  test("ColumnarExpandExec and ExpandExec return the same result when use distinct + Rollup clause, case6") {
+    val sql = "SELECT city, car_model, sum(coalesce(id * quantity, 0)) AS sum, count(DISTINCT quantity) AS count FROM dealer " +
+      "GROUP BY city, car_model WITH ROLLUP ORDER BY city, car_model;"
+    checkExpandExecAndColumnarExpandExecAgree(sql)
+  }
+
+  test("ColumnarExpandExec and ExpandExec return the same result when use distinct + Rollup clause, case7") {
+    val sql = "SELECT city, count(car_model) AS count1, count(DISTINCT quantity) AS count2, sum(id) AS sum FROM dealer " +
+      "GROUP BY city WITH ROLLUP ORDER BY city;"
     checkExpandExecAndColumnarExpandExecAgree(sql)
   }
 

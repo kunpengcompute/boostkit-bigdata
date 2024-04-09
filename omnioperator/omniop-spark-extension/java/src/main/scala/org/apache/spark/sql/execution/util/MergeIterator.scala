@@ -31,7 +31,7 @@ import org.apache.spark.sql.types.{BooleanType, DateType, DecimalType, DoubleTyp
 import org.apache.spark.sql.vectorized.ColumnarBatch
 
 class MergeIterator(iter: Iterator[ColumnarBatch], localSchema: StructType,
-                    numMergedVecBatchs: SQLMetric) extends Iterator[ColumnarBatch] {
+                    numMergedVecBatches: SQLMetric) extends Iterator[ColumnarBatch] {
 
   private val outputQueue = new mutable.Queue[VecBatch]
   private val bufferedVecBatch = new ListBuffer[VecBatch]()
@@ -44,29 +44,40 @@ class MergeIterator(iter: Iterator[ColumnarBatch], localSchema: StructType,
 
   private def createOmniVectors(schema: StructType, columnSize: Int): Array[Vec] = {
     val vecs = new Array[Vec](schema.fields.length)
-    schema.fields.zipWithIndex.foreach { case (field, index) =>
-      field.dataType match {
-        case LongType =>
-          vecs(index) = new LongVec(columnSize)
-        case DateType | IntegerType =>
-          vecs(index) = new IntVec(columnSize)
-        case ShortType =>
-          vecs(index) = new ShortVec(columnSize)
-        case DoubleType =>
-          vecs(index) = new DoubleVec(columnSize)
-        case BooleanType =>
-          vecs(index) = new BooleanVec(columnSize)
-        case StringType =>
-          val vecType: DataType = sparkTypeToOmniType(field.dataType, field.metadata)
-          vecs(index) = new VarcharVec(columnSize)
-        case dt: DecimalType =>
-          if (DecimalType.is64BitDecimalType(dt)) {
+    try {
+      schema.fields.zipWithIndex.foreach { case (field, index) =>
+        field.dataType match {
+          case LongType =>
             vecs(index) = new LongVec(columnSize)
-          } else {
-            vecs(index) = new Decimal128Vec(columnSize)
+          case DateType | IntegerType =>
+            vecs(index) = new IntVec(columnSize)
+          case ShortType =>
+            vecs(index) = new ShortVec(columnSize)
+          case DoubleType =>
+            vecs(index) = new DoubleVec(columnSize)
+          case BooleanType =>
+            vecs(index) = new BooleanVec(columnSize)
+          case StringType =>
+            val vecType: DataType = sparkTypeToOmniType(field.dataType, field.metadata)
+            vecs(index) = new VarcharVec(columnSize)
+          case dt: DecimalType =>
+            if (DecimalType.is64BitDecimalType(dt)) {
+              vecs(index) = new LongVec(columnSize)
+            } else {
+              vecs(index) = new Decimal128Vec(columnSize)
+            }
+          case _ =>
+            throw new UnsupportedOperationException("Fail to create omni vector, unsupported fields")
+        }
+      }
+    } catch {
+      case e: Exception => {
+        for (vec <- vecs) {
+          if (vec != null) {
+            vec.close()
           }
-        case _ =>
-          throw new UnsupportedOperationException("Fail to create omni vector, unsupported fields")
+        }
+        throw new RuntimeException("allocate memory failed!")
       }
     }
     vecs
@@ -110,7 +121,7 @@ class MergeIterator(iter: Iterator[ColumnarBatch], localSchema: StructType,
     val resultBatch: VecBatch = new VecBatch(createOmniVectors(localSchema, totalRows), totalRows)
     merge(resultBatch, bufferedVecBatch)
     outputQueue.enqueue(resultBatch)
-    numMergedVecBatchs += 1
+    numMergedVecBatches += 1
 
     bufferedVecBatch.clear()
     currentBatchSizeInBytes = 0
@@ -122,8 +133,8 @@ class MergeIterator(iter: Iterator[ColumnarBatch], localSchema: StructType,
     val vectors: Seq[OmniColumnVector] = OmniColumnVector.allocateColumns(
       vecBatch.getRowCount, localSchema, false)
     vectors.zipWithIndex.foreach { case (vector, i) =>
-        vector.reset()
-        vector.setVec(vecBatch.getVectors()(i))
+      vector.reset()
+      vector.setVec(vecBatch.getVectors()(i))
     }
     vecBatch.close()
     new ColumnarBatch(vectors.toArray, vecBatch.getRowCount)
@@ -163,5 +174,16 @@ class MergeIterator(iter: Iterator[ColumnarBatch], localSchema: StructType,
 
   def isFull(): Boolean = {
     totalRows > maxRowCount || currentBatchSizeInBytes >= maxBatchSizeInBytes
+  }
+
+  def close(): Unit = {
+    for (elem <- bufferedVecBatch) {
+      elem.releaseAllVectors()
+      elem.close()
+    }
+    for (elem <- outputQueue) {
+      elem.releaseAllVectors()
+      elem.close()
+    }
   }
 }

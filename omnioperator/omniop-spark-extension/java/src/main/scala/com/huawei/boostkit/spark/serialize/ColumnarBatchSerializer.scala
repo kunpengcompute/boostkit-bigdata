@@ -40,13 +40,13 @@ private class ColumnarBatchSerializerInstance(
     readBatchNumRows: SQLMetric,
     numOutputRows: SQLMetric)
   extends SerializerInstance with Logging {
+  private val columnarConf = ColumnarPluginConfig.getSessionConf
+  private val shuffleCompressBlockSize = columnarConf.columnarShuffleCompressBlockSize
+  private val enableShuffleCompress = columnarConf.enableShuffleCompress
+  private var shuffleCompressionCodec = columnarConf.columnarShuffleCompressionCodec
+
   override def deserializeStream(in: InputStream): DeserializationStream = {
     new DeserializationStream {
-      val columnarConf = ColumnarPluginConfig.getSessionConf
-      val shuffleCompressBlockSize = columnarConf.columnarShuffleCompressBlockSize
-      val enableShuffleCompress = columnarConf.enableShuffleCompress
-      var shuffleCompressionCodec = columnarConf.columnarShuffleCompressionCodec
-
       if (!enableShuffleCompress) {
         shuffleCompressionCodec = "uncompressed"
       }

@@ -42,7 +42,11 @@ import org.junit.Test;
 import org.junit.runners.MethodSorters;
 import org.apache.hadoop.conf.Configuration;
 import java.io.File;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
+import java.util.List;
+import java.util.Arrays;
 import org.apache.orc.Reader.Options;
 
 import static org.junit.Assert.*;
@@ -50,7 +54,7 @@ import static org.junit.Assert.*;
 @FixMethodOrder(value = MethodSorters.NAME_ASCENDING )
 public class OrcColumnarBatchJniReaderTest extends TestCase {
     public Configuration conf = new Configuration();
-    public OrcColumnarBatchJniReader orcColumnarBatchJniReader;
+    public OrcColumnarBatchScanReader orcColumnarBatchScanReader;
     public int batchSize = 4096;
 
     @Before
@@ -77,10 +81,42 @@ public class OrcColumnarBatchJniReaderTest extends TestCase {
             sarg.getExpression().toString();
         }
 
-        orcColumnarBatchJniReader = new OrcColumnarBatchJniReader();
+        orcColumnarBatchScanReader = new OrcColumnarBatchScanReader();
         initReaderJava();
+        initDataColIds(options, orcColumnarBatchScanReader);
         initRecordReaderJava(options);
         initBatch(options);
+    }
+
+    public void initDataColIds(
+            Options options, OrcColumnarBatchScanReader orcColumnarBatchScanReader) {
+        List<String> allCols;
+        allCols = Arrays.asList(options.getColumnNames());
+        orcColumnarBatchScanReader.colToInclu = new ArrayList<String>();
+        List<String> optionField = options.getSchema().getFieldNames();
+        orcColumnarBatchScanReader.colsToGet = new int[optionField.size()];
+        orcColumnarBatchScanReader.realColsCnt = 0;
+        for (int i = 0; i < optionField.size(); i++) {
+            if (allCols.contains(optionField.get(i))) {
+                orcColumnarBatchScanReader.colToInclu.add(optionField.get(i));
+                orcColumnarBatchScanReader.colsToGet[i] = 0;
+                orcColumnarBatchScanReader.realColsCnt++;
+            } else {
+                orcColumnarBatchScanReader.colsToGet[i] = -1;
+            }
+        }
+
+        orcColumnarBatchScanReader.requiredfieldNames = new String[optionField.size()];
+        TypeDescription schema = options.getSchema();
+        int[] precisionArray = new int[optionField.size()];
+        int[] scaleArray = new int[optionField.size()];
+        for (int i = 0; i < optionField.size(); i++) {
+            precisionArray[i] = schema.findSubtype(optionField.get(i)).getPrecision();
+            scaleArray[i] =  schema.findSubtype(optionField.get(i)).getScale();
+            orcColumnarBatchScanReader.requiredfieldNames[i] = optionField.get(i);
+        }
+        orcColumnarBatchScanReader.precisionArray = precisionArray;
+        orcColumnarBatchScanReader.scaleArray = scaleArray;
     }
 
     @After
@@ -88,28 +124,35 @@ public class OrcColumnarBatchJniReaderTest extends TestCase {
         System.out.println("orcColumnarBatchJniReader test finished");
     }
 
-    public void initReaderJava() {
+    public void initReaderJava() throws URISyntaxException {
         OrcFile.ReaderOptions readerOptions = OrcFile.readerOptions(conf);
         File directory = new File("src/test/java/com/huawei/boostkit/spark/jni/orcsrc/000000_0");
         String path = directory.getAbsolutePath();
-        orcColumnarBatchJniReader.reader = orcColumnarBatchJniReader.initializeReaderJava(path, readerOptions);
-        assertTrue(orcColumnarBatchJniReader.reader != 0);
+        URI uri = null;
+        try {
+            uri = new URI(path);
+        } catch (URISyntaxException ignore) {
+            // if URISyntaxException thrown, next line assertNotNull will interrupt the test
+        }
+        assertNotNull(uri);
+        orcColumnarBatchScanReader.reader = orcColumnarBatchScanReader.initializeReaderJava(uri, readerOptions);
+        assertTrue(orcColumnarBatchScanReader.reader != 0);
     }
 
     public void initRecordReaderJava(Options options) {
-        orcColumnarBatchJniReader.recordReader = orcColumnarBatchJniReader.initializeRecordReaderJava(options);
-        assertTrue(orcColumnarBatchJniReader.recordReader != 0);
+        orcColumnarBatchScanReader.recordReader = orcColumnarBatchScanReader.initializeRecordReaderJava(options);
+        assertTrue(orcColumnarBatchScanReader.recordReader != 0);
     }
 
     public void initBatch(Options options) {
-        orcColumnarBatchJniReader.initBatchJava(batchSize);
-        assertTrue(orcColumnarBatchJniReader.batchReader != 0);
+        orcColumnarBatchScanReader.initBatchJava(batchSize);
+        assertTrue(orcColumnarBatchScanReader.batchReader != 0);
     }
 
     @Test
     public void testNext() {
         Vec[] vecs = new Vec[2];
-        long rtn = orcColumnarBatchJniReader.next(vecs);
+        long rtn = orcColumnarBatchScanReader.next(vecs);
         assertTrue(rtn == 4096);
         assertTrue(((LongVec) vecs[0]).get(0) == 1);
         String str = new String(((VarcharVec) vecs[1]).get(0));
@@ -122,7 +165,7 @@ public class OrcColumnarBatchJniReaderTest extends TestCase {
     public void testGetProgress() {
         String tmp = "";
         try {
-            double progressValue = orcColumnarBatchJniReader.getProgress();
+            double progressValue = orcColumnarBatchScanReader.getProgress();
         } catch (Exception e) {
             tmp = e.getMessage();
         } finally {

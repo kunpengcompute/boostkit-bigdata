@@ -131,7 +131,6 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_SparkJniWrapper_nativ
 JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_SparkJniWrapper_split(
     JNIEnv *env, jobject jObj, jlong splitter_id, jlong jVecBatchAddress)
 {
-    JNI_FUNC_START
     auto splitter = g_shuffleSplitterHolder.Lookup(splitter_id);
     if (!splitter) {
         std::string error_message = "Invalid splitter id " + std::to_string(splitter_id);
@@ -140,10 +139,11 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_SparkJniWrapper_split
     }
 
     auto vecBatch = (VectorBatch *) jVecBatchAddress;
-
+    splitter->SetInputVecBatch(vecBatch);
+    JNI_FUNC_START
     splitter->Split(*vecBatch);
     return 0L;
-    JNI_FUNC_END(runtimeExceptionClass)
+    JNI_FUNC_END_WITH_VECBATCH(runtimeExceptionClass, splitter->GetInputVecBatch())
 }
 
 JNIEXPORT jobject JNICALL Java_com_huawei_boostkit_spark_jni_SparkJniWrapper_stop(

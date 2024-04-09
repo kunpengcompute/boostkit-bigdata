@@ -47,7 +47,7 @@ class ColumnarExecSuite extends ColumnarSparkPlanTest {
 
   test("spark limit with columnarToRow as child") {
 
-    // fetch parital
+    // fetch Partial
     val sql1 = "select * from (select a, b+2 from dealer order by a, b+2) limit 2"
     assertColumnarToRowOmniAndSparkResultEqual(sql1, false)
 
@@ -59,7 +59,7 @@ class ColumnarExecSuite extends ColumnarSparkPlanTest {
     val sql3 = "select a, b+2 from dealer limit 10"
     assertColumnarToRowOmniAndSparkResultEqual(sql3, true)
 
-    // fetch parital
+    // fetch Partial
     val sql4 = "select a, b+2 from dealer order by a limit 2"
     assertColumnarToRowOmniAndSparkResultEqual(sql4, false)
 

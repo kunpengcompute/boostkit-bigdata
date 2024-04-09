@@ -82,6 +82,9 @@ class Splitter {
 
     int SplitBinaryArray(VectorBatch& vb);
 
+    template<bool HasNull>
+    void SplitBinaryVector(BaseVector *varcharVector, int col_schema);
+
     int CacheVectorBatch(int32_t partition_id, bool reset_buffers);
 
     void ToSplitterTypeId(int num_cols);
@@ -160,6 +163,7 @@ private:
             }
         }
         vectorAddress.clear();
+        vb->ClearVectors();
         delete vb;
     }
 
@@ -167,7 +171,7 @@ private:
     std::vector<DataTypeId> vector_batch_col_types_;
     InputDataTypes input_col_types;
     std::vector<int32_t> binary_array_empirical_size_;
-
+    omniruntime::vec::VectorBatch *inputVecBatch = nullptr;
 public:
     bool singlePartitionFlag = false;
     int32_t num_partitions_;
@@ -215,6 +219,22 @@ public:
     int64_t TotalComputePidTime() const { return total_compute_pid_time_; }
 
     const std::vector<int64_t>& PartitionLengths() const { return partition_lengths_; }
+
+    omniruntime::vec::VectorBatch *GetInputVecBatch()
+    {
+        return inputVecBatch;
+    }
+
+    void SetInputVecBatch(omniruntime::vec::VectorBatch *inVecBatch)
+    {
+        inputVecBatch = inVecBatch;
+    }
+
+    // no need to clear memory when exception, so we have to reset
+    void ResetInputVecBatch()
+    {
+        inputVecBatch = nullptr;
+    }
 };
 
 

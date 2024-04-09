@@ -20,6 +20,7 @@ package com.huawei.boostkit.spark.serialize;
 
 
 import com.google.protobuf.InvalidProtocolBufferException;
+import nova.hetu.omniruntime.utils.OmniRuntimeException;
 import nova.hetu.omniruntime.vector.BooleanVec;
 import nova.hetu.omniruntime.vector.Decimal128Vec;
 import nova.hetu.omniruntime.vector.DoubleVec;
@@ -35,20 +36,30 @@ import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.vectorized.ColumnVector;
 import org.apache.spark.sql.vectorized.ColumnarBatch;
 
-
 public class ShuffleDataSerializer {
 
     public static ColumnarBatch deserialize(byte[] bytes) {
+        ColumnVector[] vecs = null;
         try {
             VecData.VecBatch vecBatch = VecData.VecBatch.parseFrom(bytes);
             int vecCount = vecBatch.getVecCnt();
             int rowCount = vecBatch.getRowCnt();
-            ColumnVector[] vecs = new ColumnVector[vecCount];
+            vecs = new ColumnVector[vecCount];
             for (int i = 0; i < vecCount; i++) {
                 vecs[i] = buildVec(vecBatch.getVecs(i), rowCount);
             }
             return new ColumnarBatch(vecs, rowCount);
         } catch (InvalidProtocolBufferException e) {
+            throw new RuntimeException("deserialize failed. errmsg:" + e.getMessage());
+        } catch (OmniRuntimeException e) {
+            if (vecs != null) {
+                for (int i = 0; i < vecs.length; i++) {
+                    ColumnVector vec = vecs[i];
+                    if (vec != null) {
+                        vec.close();
+                    }
+                }
+            }
             throw new RuntimeException("deserialize failed. errmsg:" + e.getMessage());
         }
     }
@@ -110,7 +121,9 @@ public class ShuffleDataSerializer {
                 throw new IllegalStateException("Unexpected value: " + protoTypeId.getTypeId());
         }
         vec.setValuesBuf(protoVec.getValues().toByteArray());
-        vec.setNullsBuf(protoVec.getNulls().toByteArray());
+        if(protoVec.getNulls().size() != 0) {
+            vec.setNullsBuf(protoVec.getNulls().toByteArray());
+        }
         OmniColumnVector vecTmp = new OmniColumnVector(vecSize, type, false);
         vecTmp.setVec(vec);
         return vecTmp;

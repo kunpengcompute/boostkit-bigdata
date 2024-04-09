@@ -27,7 +27,7 @@ import org.apache.spark.sql.catalyst.trees.CurrentOrigin
 import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.exchange.{ReusedExchangeExec, ShuffleExchangeLike}
 import org.apache.spark.sql.execution.metric.{SQLMetric, SQLMetrics}
-import org.apache.spark.sql.execution.util.MergeIterator
+import org.apache.spark.sql.execution.util.{MergeIterator, SparkMemoryUtils}
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.vectorized.ColumnarBatch
 
@@ -54,6 +54,7 @@ case class OmniAQEShuffleReadExec(
   override def supportsColumnar: Boolean = true
 
   override def output: Seq[Attribute] = child.output
+
   override lazy val outputPartitioning: Partitioning = {
     // If it is a local shuffle reader with one mapper per task, then the output partitioning is
     // the same as the plan before shuffle.
@@ -210,7 +211,7 @@ case class OmniAQEShuffleReadExec(
 
   override lazy val metrics: Map[String, SQLMetric] = {
     if (shuffleStage.isDefined) {
-      Map("numMergedVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of merged vecBatchs"),
+      Map("numMergedVecBatches" -> SQLMetrics.createMetric(sparkContext, "number of merged vecBatches"),
         "numPartitions" -> SQLMetrics.createMetric(sparkContext, "number of partitions")) ++ {
         if (isLocalRead) {
           // We split the mapper partition evenly when creating local shuffle read, so no
@@ -243,31 +244,25 @@ case class OmniAQEShuffleReadExec(
     }
   }
 
+  private val enableShuffleBatchMerge: Boolean = ColumnarPluginConfig.getSessionConf.enableShuffleBatchMerge
+
   private lazy val shuffleRDD: RDD[_] = {
     shuffleStage match {
       case Some(stage) =>
         sendDriverMetrics()
-        val columnarConf: ColumnarPluginConfig = ColumnarPluginConfig.getSessionConf
-        val enableShuffleBatchMerge: Boolean = columnarConf.enableShuffleBatchMerge
+        val rdd = stage.shuffle.asInstanceOf[ColumnarShuffleExchangeExec].getShuffleRDD(partitionSpecs.toArray)
         if (enableShuffleBatchMerge) {
-        new ShuffledColumnarRDD(
-          stage.shuffle
-            .asInstanceOf[ColumnarShuffleExchangeExec]
-            .columnarShuffleDependency,
-          stage.shuffle.asInstanceOf[ColumnarShuffleExchangeExec].readMetrics,
-          partitionSpecs.toArray).mapPartitionsWithIndexInternal { (index,iter) =>
-          new MergeIterator(iter,
-            StructType.fromAttributes(child.output),
-            longMetric("numMergedVecBatchs"))
-        }
-
+          rdd.mapPartitionsWithIndexInternal { (index,iter) =>
+            val mergeIterator = new MergeIterator(iter,
+              StructType.fromAttributes(child.output),
+              longMetric("numMergedVecBatches"))
+            SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
+              mergeIterator.close()
+            })
+            mergeIterator
+          }
         } else {
-          new ShuffledColumnarRDD(
-            stage.shuffle
-              .asInstanceOf[ColumnarShuffleExchangeExec]
-              .columnarShuffleDependency,
-            stage.shuffle.asInstanceOf[ColumnarShuffleExchangeExec].readMetrics,
-            partitionSpecs.toArray)
+          rdd
         }
       case _ =>
         throw new IllegalStateException("operating on canonicalized plan")
@@ -283,5 +278,5 @@ case class OmniAQEShuffleReadExec(
   }
 
   override protected def withNewChildInternal(newChild: SparkPlan): OmniAQEShuffleReadExec =
-    new OmniAQEShuffleReadExec(newChild, this.partitionSpecs)
+    copy(child = newChild)
 }

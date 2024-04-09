@@ -16,29 +16,42 @@
  * limitations under the License.
  */
 
- #ifndef CPP_BUFFER_H
- #define CPP_BUFFER_H
+#ifndef CPP_BUFFER_H
+#define CPP_BUFFER_H
 
- #include <cstring>
- #include <vector>
- #include <chrono>
- #include <memory>
- #include <list>
- 
- class Buffer {
- public:
-        Buffer(uint8_t* data, int64_t size, int64_t capacity)
-                : data_(data),
-                size_(size),
-                capacity_(capacity) {
+#include <cstring>
+#include <vector>
+#include <chrono>
+#include <memory>
+#include <list>
+#include <vector/vector_common.h>
+
+class Buffer {
+public:
+    Buffer(uint8_t* data, int64_t size, int64_t capacity, bool isOmniAllocated = true)
+            : data_(data),
+            size_(size),
+            capacity_(capacity),
+            allocatedByOmni(isOmniAllocated) {
+    }
+
+    ~Buffer() {
+        if (allocatedByOmni && not releaseFlag) {
+            auto *allocator = omniruntime::mem::Allocator::GetAllocator();
+            allocator->Free(data_, capacity_);
         }
+    }
 
-        ~Buffer() {}
+    void SetReleaseFlag() {
+        releaseFlag = true;
+    }
 
- public:
-        uint8_t * data_;
-        int64_t size_;
-        int64_t capacity_;
- };
+public:
+    uint8_t * data_;
+    int64_t size_;
+    int64_t capacity_;
+    bool allocatedByOmni = true;
+    bool releaseFlag = false;
+};
 
- #endif //CPP_BUFFER_H
+#endif //CPP_BUFFER_H

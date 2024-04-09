@@ -17,6 +17,10 @@
 
 package org.apache.spark.sql.execution
 
+import com.huawei.boostkit.spark.ColumnarPluginConfig
+
+import java.io.File
+import java.util.UUID
 import java.util.concurrent.TimeUnit.NANOSECONDS
 
 import com.huawei.boostkit.spark.Constant.IS_SKIP_VERIFY_EXP
@@ -27,8 +31,9 @@ import nova.hetu.omniruntime.`type`.DataType
 import nova.hetu.omniruntime.constants.FunctionType
 import nova.hetu.omniruntime.constants.FunctionType.OMNI_AGGREGATION_TYPE_COUNT_ALL
 import nova.hetu.omniruntime.operator.aggregator.OmniHashAggregationWithExprOperatorFactory
-import nova.hetu.omniruntime.operator.config.{OperatorConfig, OverflowConfig, SpillConfig}
+import nova.hetu.omniruntime.operator.config.{OperatorConfig, OverflowConfig, SparkSpillConfig}
 import nova.hetu.omniruntime.vector.VecBatch
+import org.apache.spark.{SparkConf, SparkEnv}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
@@ -41,6 +46,7 @@ import org.apache.spark.sql.execution.util.SparkMemoryUtils
 import org.apache.spark.sql.execution.vectorized.OmniColumnVector
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.vectorized.ColumnarBatch
+import org.apache.spark.util.Utils
 
 /**
  * Hash-based aggregate operator that can also fallback to sorting when data exceeds memory size.
@@ -81,11 +87,12 @@ case class ColumnarHashAggregateExec(
   override lazy val metrics = Map(
     "addInputTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni addInput"),
     "numInputRows" -> SQLMetrics.createMetric(sparkContext, "number of input rows"),
-    "numInputVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of input vecBatchs"),
+    "numInputVecBatches" -> SQLMetrics.createMetric(sparkContext, "number of input vecBatches"),
     "omniCodegenTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni codegen"),
     "getOutputTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni getOutput"),
     "numOutputRows" -> SQLMetrics.createMetric(sparkContext, "number of output rows"),
-    "numOutputVecBatchs" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatchs"))
+    "numOutputVecBatches" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatches"),
+    "spillSize" -> SQLMetrics.createSizeMetric(sparkContext, "spill size"))
 
   protected override def needHashTable: Boolean = true
 
@@ -199,14 +206,25 @@ case class ColumnarHashAggregateExec(
     }
   }
 
+  val tmpSparkConf = sparkContext.conf
+
+  def generateSpillDir(conf: SparkConf, subDir: String): String = {
+    val localDirs: Array[String] = Utils.getConfiguredLocalDirs(conf)
+    val hash = Utils.nonNegativeHash(UUID.randomUUID.toString)
+    val root = localDirs(hash % localDirs.length)
+    val dir = new File(root, subDir)
+    dir.getCanonicalPath
+  }
+
   override def doExecuteColumnar(): RDD[ColumnarBatch] = {
     val addInputTime = longMetric("addInputTime")
     val numInputRows = longMetric("numInputRows")
-    val numInputVecBatchs = longMetric("numInputVecBatchs")
+    val numInputVecBatches= longMetric("numInputVecBatches")
     val omniCodegenTime = longMetric("omniCodegenTime")
     val getOutputTime = longMetric("getOutputTime")
     val numOutputRows = longMetric("numOutputRows")
-    val numOutputVecBatchs = longMetric("numOutputVecBatchs")
+    val numOutputVecBatches= longMetric("numOutputVecBatches")
+    val spillSize = longMetric("spillSize")
 
     val attrExpsIdMap = getExprIdMap(child.output)
     val omniGroupByChanel = groupingExpressions.map(
@@ -241,20 +259,14 @@ case class ColumnarHashAggregateExec(
           case _ => throw new UnsupportedOperationException(s"Unsupported aggregate aggregateFunction: ${exp}")
         }
       } else if (exp.mode == PartialMerge) {
-        exp.aggregateFunction match {
-          case Sum(_, _) | Min(_) | Max(_) | Count(_) | Average(_, _) | First(_, _) =>
-            omniAggFunctionTypes(index) = toOmniAggFunType(exp, true)
-            omniAggOutputTypes(index) =
-              toOmniAggInOutType(exp.aggregateFunction.inputAggBufferAttributes)
-            omniAggChannels(index) =
-              toOmniAggInOutJSonExp(exp.aggregateFunction.inputAggBufferAttributes, attrExpsIdMap)
-            omniInputRaws(index) = false
-            omniOutputPartials(index) = true
-            if (omniAggFunctionTypes(index) == OMNI_AGGREGATION_TYPE_COUNT_ALL) {
-              omniAggChannels(index) = null
-            }
-          case _ => throw new UnsupportedOperationException(s"Unsupported aggregate aggregateFunction: ${exp}")
-        }
+        ColumnarHashAggregateExec.AssignOmniInfoWhenPartialMergeStage(exp,
+          attrExpsIdMap,
+          index,
+          omniInputRaws,
+          omniOutputPartials,
+          omniAggFunctionTypes,
+          omniAggOutputTypes,
+          omniAggChannels)
       } else if (exp.mode == Partial) {
         exp.aggregateFunction match {
           case Sum(_, _) | Min(_) | Max(_) | Count(_) | Average(_, _) | First(_, _) =>
@@ -265,6 +277,9 @@ case class ColumnarHashAggregateExec(
               toOmniAggInOutJSonExp(exp.aggregateFunction.children, attrExpsIdMap)
             omniInputRaws(index) = true
             omniOutputPartials(index) = true
+            if (omniAggFunctionTypes(index) == OMNI_AGGREGATION_TYPE_COUNT_ALL) {
+              omniAggChannels(index) = null
+            }
           case _ => throw new UnsupportedOperationException(s"Unsupported aggregate aggregateFunction: ${exp}")
         }
       } else {
@@ -281,6 +296,15 @@ case class ColumnarHashAggregateExec(
     }
 
     child.executeColumnar().mapPartitionsWithIndex { (index, iter) =>
+      val columnarConf = ColumnarPluginConfig.getSessionConf
+      val hashAggSpillRowThreshold = columnarConf.columnarHashAggSpillRowThreshold
+      val spillMemPctThreshold = columnarConf.columnarSpillMemPctThreshold
+      val spillDirDiskReserveSize = columnarConf.columnarSpillDirDiskReserveSize
+      val hashAggSpillEnable = columnarConf.enableHashAggSpill
+      val spillDirectory = generateSpillDir(tmpSparkConf, "columnarHashAggSpill")
+      val sparkSpillConf = new SparkSpillConfig(hashAggSpillEnable, spillDirectory,
+        spillDirDiskReserveSize, hashAggSpillRowThreshold, spillMemPctThreshold)
+
       val startCodegen = System.nanoTime()
       val operator = OmniAdaptorUtil.getAggOperator(groupingExpressions,
         omniGroupByChanel,
@@ -290,11 +314,13 @@ case class ColumnarHashAggregateExec(
         omniAggFunctionTypes,
         omniAggOutputTypes,
         omniInputRaws,
-        omniOutputPartials)
+        omniOutputPartials,
+        sparkSpillConf)
       omniCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startCodegen)
 
       // close operator
       SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
+        spillSize += operator.getSpilledBytes()
         operator.close()
       })
 
@@ -305,7 +331,7 @@ case class ColumnarHashAggregateExec(
         val vecBatch = new VecBatch(input, batch.numRows())
         operator.addInput(vecBatch)
         addInputTime += NANOSECONDS.toMillis(System.nanoTime() - startInput)
-        numInputVecBatchs += 1
+        numInputVecBatches+= 1
         numInputRows += batch.numRows()
       }
       val startGetOp = System.nanoTime()
@@ -339,7 +365,7 @@ case class ColumnarHashAggregateExec(
           }
 
           numOutputRows += vecBatch.getRowCount
-          numOutputVecBatchs += 1
+          numOutputVecBatches+= 1
 
           vecBatch.close()
           new ColumnarBatch(vectors.toArray, vecBatch.getRowCount)
@@ -362,5 +388,29 @@ case class ColumnarHashAggregateExec(
 
   override protected def doExecute(): RDD[InternalRow] = {
     throw new UnsupportedOperationException("This operator doesn't support doExecute().")
+  }
+}
+
+object ColumnarHashAggregateExec {
+  def AssignOmniInfoWhenPartialMergeStage(
+                                           exp:AggregateExpression,
+                                           exprsIdMap: Map[ExprId, Int],
+                                           index: Int,
+                                           omniInputRaws : Array[Boolean],
+                                           omniOutputPartials : Array[Boolean],
+                                           omniAggFunctionTypes : Array[FunctionType],
+                                           omniAggOutputTypes : Array[Array[DataType]],
+                                           omniAggChannels : Array[Array[String]]): Unit ={
+    exp.aggregateFunction match {
+      case Sum(_, _) | Min(_) | Max(_) | Count(_) | Average(_, _) | First(_, _) =>
+        omniAggFunctionTypes(index) = toOmniAggFunType(exp, true)
+        omniAggOutputTypes(index) =
+          toOmniAggInOutType(exp.aggregateFunction.inputAggBufferAttributes)
+        omniAggChannels(index) =
+          toOmniAggInOutJSonExp(exp.aggregateFunction.inputAggBufferAttributes, exprsIdMap)
+        omniInputRaws(index) = false
+        omniOutputPartials(index) = true
+      case _ => throw new UnsupportedOperationException(s"Unsupported aggregate aggregateFunction: ${exp}")
+    }
   }
 }

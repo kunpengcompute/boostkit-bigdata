@@ -37,29 +37,6 @@ import org.apache.spark.util.Utils
 
 import nova.hetu.omniruntime.vector.Vec
 
-/**
- * Holds a user defined rule that can be used to inject columnar implementations of various
- * operators in the plan. The [[preColumnarTransitions]] [[Rule]] can be used to replace
- * [[SparkPlan]] instances with versions that support a columnar implementation. After this
- * Spark will insert any transitions necessary. This includes transitions from row to columnar
- * [[RowToColumnarExec]] and from columnar to row [[ColumnarToRowExec]]. At this point the
- * [[postColumnarTransitions]] [[Rule]] is called to allow replacing any of the implementations
- * of the transitions or doing cleanup of the plan, like inserting stages to build larger batches
- * for more efficient processing, or stages that transition the data to/from an accelerator's
- * memory.
- */
-class ColumnarRule {
-  def preColumnarTransitions: Rule[SparkPlan] = plan => plan
-  def postColumnarTransitions: Rule[SparkPlan] = plan => plan
-}
-
-/**
- * A trait that is used as a tag to indicate a transition from columns to rows. This allows plugins
- * to replace the current [[ColumnarToRowExec]] with an optimized version and still have operations
- * that walk a spark plan looking for this type of transition properly match it.
- */
-trait ColumnarToRowTransition extends UnaryExecNode
-
 
 /**
  * Provides an optimized set of APIs to append row based data to an array of
@@ -348,9 +325,9 @@ object ColumnarBatchToInternalRow {
 
     val batchIter = batches.flatMap { batch =>
 
-      // toClosedVecs closed case:
+      // toClosedVecs closed case: [Deprcated]
       // 1) all rows of batch fetched and closed
-      // 2) only fetch parital rows(eg: top-n, limit-n), closed at task CompletionListener callback
+      // 2) only fetch Partial rows(eg: top-n, limit-n), closed at task CompletionListener callback
       val toClosedVecs = new ListBuffer[Vec]
       for (i <- 0 until batch.numCols()) {
         batch.column(i) match {
@@ -366,27 +343,22 @@ object ColumnarBatchToInternalRow {
 
       new Iterator[InternalRow] {
         val numOutputRowsMetric: SQLMetric = numOutputRows
-        var closed = false
 
-        // only invoke if fetch partial rows of batch
-        if (mayPartialFetch) {
-          SparkMemoryUtils.addLeakSafeTaskCompletionListener { _ =>
-            if (!closed) {
-              toClosedVecs.foreach {vec =>
-                vec.close()
-              }
+
+        SparkMemoryUtils.addLeakSafeTaskCompletionListener { _ =>
+            toClosedVecs.foreach {vec =>
+              vec.close()
             }
-          }
         }
 
         override  def hasNext: Boolean = {
           val has = iter.hasNext
-          // fetch all rows and closed
-          if (!has && !closed) {
+          // fetch all rows
+          if (!has) {
             toClosedVecs.foreach {vec =>
               vec.close()
+              toClosedVecs.remove(toClosedVecs.indexOf(vec))
             }
-            closed = true
           }
           has
         }
