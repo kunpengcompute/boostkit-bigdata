@@ -48,6 +48,7 @@ public interface VecConverter {
                     put(PrimitiveObjectInspector.PrimitiveCategory.TIMESTAMP, new TimestampVecConverter());
                     put(PrimitiveObjectInspector.PrimitiveCategory.DATE, new DateVecConverter());
                     put(PrimitiveObjectInspector.PrimitiveCategory.DECIMAL, new DecimalVecConverter());
+                    put(PrimitiveObjectInspector.PrimitiveCategory.VOID, new BooleanVecConverter());
                 }
             };
 

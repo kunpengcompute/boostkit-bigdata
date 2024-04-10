@@ -23,6 +23,9 @@ import com.huawei.boostkit.hive.expression.ExpressionUtils;
 import com.huawei.boostkit.hive.expression.ReferenceFactor;
 import com.huawei.boostkit.hive.expression.TypeUtils;
 
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
+
 import nova.hetu.omniruntime.operator.OmniOperator;
 import nova.hetu.omniruntime.operator.config.OperatorConfig;
 import nova.hetu.omniruntime.operator.config.OverflowConfig;
@@ -32,7 +35,9 @@ import nova.hetu.omniruntime.type.DataType;
 import nova.hetu.omniruntime.vector.VecBatch;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.CompilationOpContext;
+import org.apache.hadoop.hive.ql.metadata.Hive;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.plan.ExprNodeColumnDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
@@ -57,6 +62,13 @@ public class OmniFilterOperator extends OmniHiveOperator<OmniFilterDesc> impleme
     private transient OmniOperator omniOperator;
     private transient Iterator<VecBatch> output;
 
+    private static Cache<Object, Object> cache= CacheBuilder.newBuilder().concurrencyLevel(8).initialCapacity(10)
+            .maximumSize(100).recordStats().removalListener(notification ->{
+                ((OmniFilterAndProjectOperatorFactory) notification.getValue()).close();
+            }).build();
+
+    private static boolean addCloseThread = false;
+
     public OmniFilterOperator() {
         super();
     }
@@ -74,6 +86,16 @@ public class OmniFilterOperator extends OmniHiveOperator<OmniFilterDesc> impleme
     protected void initializeOp(Configuration hconf) throws HiveException {
         super.initializeOp(hconf);
         ExprNodeDesc predicate = conf.getPredicate();
+        String queryId = HiveConf.getVar(hconf, HiveConf.ConfVars.HIVEQUERYID);
+        String cacheKey = queryId + "FILTER_" + this.getOperatorId() + "_container";
+
+        OmniFilterAndProjectOperatorFactory omniFilterAndProjectOperatorFactory = (OmniFilterAndProjectOperatorFactory) cache
+                .getIfPresent(cacheKey);
+        if (omniFilterAndProjectOperatorFactory != null) {
+            this.filterAndProjectOperatorFactory = omniFilterAndProjectOperatorFactory;
+            this.omniOperator = this.filterAndProjectOperatorFactory.createOperator();
+            return;
+        }
         BaseExpression root;
         if (predicate instanceof ExprNodeGenericFuncDesc) {
             root = ExpressionUtils.build((ExprNodeGenericFuncDesc) predicate, inputObjInspectors[0]);
@@ -97,6 +119,12 @@ public class OmniFilterOperator extends OmniHiveOperator<OmniFilterDesc> impleme
                 Arrays.asList(projections), 1, new OperatorConfig(SpillConfig.NONE,
                 new OverflowConfig(OVERFLOW_CONFIG_NULL), true));
         this.omniOperator = this.filterAndProjectOperatorFactory.createOperator();
+
+        cache.put(cacheKey, this.filterAndProjectOperatorFactory);
+        if (!addCloseThread) {
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> cache.invalidateAll()));
+            addCloseThread = true;
+        }
     }
 
     @Override
@@ -121,8 +149,12 @@ public class OmniFilterOperator extends OmniHiveOperator<OmniFilterDesc> impleme
 
     @Override
     protected void closeOp(boolean abort) throws HiveException {
-        filterAndProjectOperatorFactory.close();
-        omniOperator.close();
+        if (filterAndProjectOperatorFactory != null) {
+            filterAndProjectOperatorFactory.close();
+        }
+        if (omniOperator != null) {
+            omniOperator.close();
+        }
         output = null;
         super.closeOp(abort);
     }

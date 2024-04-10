@@ -246,17 +246,19 @@ public class OrcColumnarBatchScanReader {
         jniReader.recordReaderSeekToRow(recordReader, rowNumber);
     }
 
-    public int next(Vec[] vecList) {
+    public int next(Vec[] vecList, int[] typeIds) {
         int vectorCnt = vecList.length;
-        int[] typeIds = new int[realColsCnt];
-        long[] vecNativeIds = new long[realColsCnt];
+        long[] vecNativeIds = new long[typeIds.length];
         long rtn = jniReader.recordReaderNext(recordReader, batchReader, typeIds, vecNativeIds);
         if (rtn == 0) {
             return 0;
         }
         int nativeGetId = 0;
+        int rowCount = 0;
         for (int i = 0; i < vectorCnt; i++) {
             if (colsToGet[i] != 0) {
+                vecList[i] = getNullVec(DataType.DataTypeId.values()[typeIds[nativeGetId]], rowCount);
+                nativeGetId++;
                 continue;
             }
             switch (DataType.DataTypeId.values()[typeIds[nativeGetId]]) {
@@ -296,7 +298,51 @@ public class OrcColumnarBatchScanReader {
                 }
             }
             nativeGetId++;
+            rowCount = vecList[i].getSize();
         }
         return (int) rtn;
+    }
+
+    private Vec getNullVec(DataType.DataTypeId value, int rowCount) {
+        Vec vec;
+        switch (value) {
+            case OMNI_BOOLEAN: {
+                vec = new BooleanVec(rowCount);
+                break;
+            }
+            case OMNI_SHORT: {
+                vec = new ShortVec(rowCount);
+                break;
+            }
+            case OMNI_DATE32:
+            case OMNI_INT: {
+                vec = new IntVec(rowCount);
+                break;
+            }
+            case OMNI_LONG:
+            case OMNI_DECIMAL64: {
+                vec = new LongVec(rowCount);
+                break;
+            }
+            case OMNI_DOUBLE: {
+                vec = new DoubleVec(rowCount);
+                break;
+            }
+            case OMNI_VARCHAR: {
+                vec = new VarcharVec(rowCount);
+                break;
+            }
+            case OMNI_DECIMAL128: {
+                vec = new Decimal128Vec(rowCount);
+                break;
+            }
+            default: {
+                throw new RuntimeException("UnSupport type for ColumnarFileScan:" + value);
+            }
+        }
+        byte[] nullsBuf = new byte[rowCount];
+        Arrays.fill(nullsBuf, (byte) 1);
+        vec.setNullsBuf(nullsBuf);
+        return vec;
     }
 }

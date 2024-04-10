@@ -18,10 +18,12 @@
 
 package com.huawei.boostkit.hive;
 
+import static com.huawei.boostkit.hive.expression.TypeUtils.checkUnsupportedTimestamp;
 import static com.huawei.boostkit.hive.expression.TypeUtils.checkOmniJsonWhiteList;
 import static com.huawei.boostkit.hive.expression.TypeUtils.checkUnsupportedArithmetic;
 import static com.huawei.boostkit.hive.expression.TypeUtils.checkUnsupportedCast;
 import static com.huawei.boostkit.hive.expression.TypeUtils.convertHiveTypeToOmniType;
+import static com.huawei.boostkit.hive.expression.TypeUtils.isValidConversion;
 import static nova.hetu.omniruntime.constants.FunctionType.OMNI_AGGREGATION_TYPE_AVG;
 import static nova.hetu.omniruntime.constants.FunctionType.OMNI_AGGREGATION_TYPE_SUM;
 import static org.apache.hadoop.hive.serde.serdeConstants.SERIALIZATION_LIB;
@@ -36,6 +38,7 @@ import static org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspe
 import static org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.PrimitiveCategory.STRING;
 import static org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.PrimitiveCategory.TIMESTAMP;
 import static org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.PrimitiveCategory.VARCHAR;
+import static org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.PrimitiveCategory.VOID;
 
 import com.huawei.boostkit.hive.expression.BaseExpression;
 import com.huawei.boostkit.hive.expression.CastFunctionExpression;
@@ -50,6 +53,7 @@ import nova.hetu.omniruntime.constants.FunctionType;
 
 import org.apache.hadoop.hive.common.type.HiveDecimal;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.ql.QueryPlan;
 import org.apache.hadoop.hive.ql.exec.ExplainTask;
 import org.apache.hadoop.hive.ql.exec.MapJoinOperator;
@@ -93,6 +97,7 @@ import org.apache.hadoop.hive.ql.plan.ReduceWork;
 import org.apache.hadoop.hive.ql.plan.SelectDesc;
 import org.apache.hadoop.hive.ql.plan.TableDesc;
 import org.apache.hadoop.hive.ql.plan.TableScanDesc;
+import org.apache.hadoop.hive.ql.plan.VectorTableScanDesc;
 import org.apache.hadoop.hive.ql.plan.TezEdgeProperty;
 import org.apache.hadoop.hive.ql.plan.TezWork;
 import org.apache.hadoop.hive.ql.plan.UnionWork;
@@ -131,7 +136,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
     public static final Set<Integer> SUPPORTED_JOIN = new HashSet<>(Arrays.asList(JoinDesc.INNER_JOIN,
             JoinDesc.LEFT_OUTER_JOIN, JoinDesc.FULL_OUTER_JOIN, JoinDesc.LEFT_SEMI_JOIN));
     private static final Set<PrimitiveObjectInspector.PrimitiveCategory> SUPPORTED_TYPE = new HashSet<>(Arrays.asList(BOOLEAN,
-            SHORT, INT, LONG, DOUBLE, STRING, DATE, DECIMAL, VARCHAR, CHAR));
+            SHORT, INT, LONG, DOUBLE, STRING, DATE, DECIMAL, VARCHAR, CHAR, VOID));
 
     private static final int DECIMAL64_MAX_PRECISION = 19;
 
@@ -530,6 +535,21 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         if (tableMetadata != null && (!tableMetadata.getInputFormatClass().equals(OrcInputFormat.class) || tableMetadata.getParameters().getOrDefault("transactional", "").equals("true"))) {
             return false;
         }
+        if (tableScanDesc.isVectorized()) {
+            TypeInfo[] columnTypeInfos = ((VectorTableScanDesc) tableScanDesc.getVectorDesc()).getProjectedColumnTypeInfos();
+            for (int id : tableScanDesc.getNeededColumnIDs()) {
+                if (columnTypeInfos[id].getTypeName() == "timestamp") {
+                    return false;
+                }
+            }
+        } else if (tableMetadata != null && tableMetadata.getCols() != null) {
+            List<FieldSchema> colList = tableMetadata.getCols();
+            for (int id : tableScanDesc.getNeededColumnIDs()) {
+                if (colList.get(id).getType() == "timestamp") {
+                    return false;
+                }
+            }
+        }
         List<Operator<? extends OperatorDesc>> childOperators = op.getChildOperators();
         for (Operator childOperator : childOperators) {
             if (childOperator.getType().equals(OperatorType.REDUCESINK) && reduceSinkDescUnReplaceable((ReduceSinkDesc) childOperator.getConf())) {
@@ -619,7 +639,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                 return replaceable;
             case FILTER:
                 List<ExprNodeDesc> colList = Collections.singletonList(((FilterDesc) operator.getConf()).getPredicate());
-                if (!isUDFSupport(colList) || !isLegalDeciConstant(colList)) {
+                if ((!isUDFSupport(colList) && !isLegalTimestamp(colList)) || !isLegalDeci(colList)) {
                     return false;
                 }
                 boolean result = true;
@@ -629,7 +649,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                 for (Operator child : operator.getChildOperators()) {
                     if (child.getType() != null && child.getType().equals(OperatorType.SELECT)) {
                         SelectDesc conf = (SelectDesc) child.getConf();
-                        result = result && isUDFSupport(conf.getColList()) && isLegalDeciConstant(conf.getColList());
+                        result = result && isUDFSupport(conf.getColList()) && isLegalDeci(conf.getColList());
                     }
                 }
                 return result;
@@ -698,6 +718,16 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             return false;
         }
         List<WindowFunctionDef> windowFunctionDefs = ((WindowTableFunctionDef) conf.getFuncDef()).getWindowFunctions();
+        for (WindowFunctionDef functionDef : windowFunctionDefs) {
+            if (functionDef.getArgs() == null) {
+                continue;
+            }
+            for (PTFExpressionDef expressionDef : functionDef.getArgs()) {
+                if (expressionDef.getExprNode() != null && expressionDef.getExprNode().getTypeInfo().getTypeName() == "timestamp") {
+                    return false;
+                }
+            }
+        }
         if (!PTFSupportedAgg(windowFunctionDefs)) {
             return false;
         }
@@ -859,16 +889,16 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         return checkOmniJsonWhiteList("", expressions.toArray(new String[0]));
     }
 
-    private boolean isLegalDeciConstant(List<ExprNodeDesc> colList) {
+    private boolean isLegalDeci(List<ExprNodeDesc> colList) {
         for (ExprNodeDesc desc : colList) {
-            if (!checkDecimalConstant(desc)) {
+            if (!isValidConversion(desc)) {
                 return false;
             }
         }
         if (colList.size() > 0 && colList.get(0).getChildren() != null) {
             List<ExprNodeDesc> childList = colList.get(0).getChildren();
             for (ExprNodeDesc desc : childList) {
-                if (!checkDecimalConstant(desc)) {
+                if (!isValidConversion(desc)) {
                     return false;
                 }
             }
@@ -876,23 +906,16 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         return true;
     }
 
-    private boolean checkDecimalConstant(ExprNodeDesc desc) {
-        if (desc instanceof ExprNodeGenericFuncDesc && desc.getChildren() != null && desc.getChildren().size() == 2) {
-            List<ExprNodeDesc> child = desc.getChildren();
-            if (child.get(0) instanceof ExprNodeConstantDesc && child.get(1) instanceof ExprNodeColumnDesc) {
-                Collections.swap(child, 0, 1);
+    private boolean isLegalTimestamp(List<ExprNodeDesc> colList) {
+        for (ExprNodeDesc desc : colList) {
+            if (checkUnsupportedTimestamp(desc)) {
+                return false;
             }
-            if (child.get(0) instanceof ExprNodeColumnDesc && child.get(1) instanceof ExprNodeConstantDesc) {
-                TypeInfo deciInfo = child.get(0).getTypeInfo();
-                TypeInfo constInfo = child.get(1).getTypeInfo();
-                if (!(deciInfo instanceof DecimalTypeInfo && constInfo instanceof DecimalTypeInfo)) {
-                    return true;
-                }
-                int deciPrecision = ((DecimalTypeInfo) deciInfo).getPrecision();
-                int deciScale = ((DecimalTypeInfo) deciInfo).getScale();
-                int constPrecision = ((DecimalTypeInfo) constInfo).getPrecision();
-                int constScale = ((DecimalTypeInfo) constInfo).getScale();
-                if (constPrecision - constScale > deciPrecision - deciScale || constScale > deciScale) {
+        }
+        if (colList.size() > 0 && colList.get(0).getChildren() != null) {
+            List<ExprNodeDesc> childList = colList.get(0).getChildren();
+            for (ExprNodeDesc desc : childList) {
+                if (checkUnsupportedTimestamp(desc)) {
                     return false;
                 }
             }

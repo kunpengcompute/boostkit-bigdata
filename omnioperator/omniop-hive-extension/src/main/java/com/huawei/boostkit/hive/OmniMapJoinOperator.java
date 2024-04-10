@@ -735,11 +735,14 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
             inputColNameToExprName.put(exprNodeColumnDesc.getColumn(), entry.getKey());
         }
         List<? extends StructField> fields = ((StructObjectInspector) inputObjInspectors[posBigTable]).getAllStructFieldRefs();
-        List<String> fieldNames = fields.stream().map(StructField::getFieldName).collect(Collectors.toList());
+        List<String> fieldNames = fields.stream().map(field -> field.getFieldName().replace("value.", "").replace("key.", "")).collect(Collectors.toList());
         List<ObjectInspector> inspectors = fields.stream().map(StructField::getFieldObjectInspector).collect(Collectors.toList());
         for (int buildIndex : buildIndexes) {
             fields = ((StructObjectInspector) inputObjInspectors[buildIndex]).getAllStructFieldRefs();
-            fieldNames.addAll(fields.stream().map(field -> inputColNameToExprName.getOrDefault(field.getFieldName(), field.getFieldName())).collect(Collectors.toList()));
+            fieldNames.addAll(fields.stream().map(field -> inputColNameToExprName.getOrDefault(
+                    field.getFieldName().replace("value.", "VALUE.").replace("key.", "KEY."),
+                    field.getFieldName()).replace("value.", "").replace("key.", "")
+            ).collect(Collectors.toList()));
             inspectors.addAll(fields.stream().map(StructField::getFieldObjectInspector).collect(Collectors.toList()));
         }
         StructObjectInspector exprObjInspector = ObjectInspectorFactory.getStandardStructObjectInspector(fieldNames, inspectors);

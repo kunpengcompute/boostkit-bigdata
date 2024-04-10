@@ -19,9 +19,19 @@
 package com.huawei.boostkit.hive.reader;
 
 import static com.huawei.boostkit.hive.cache.VectorCache.BATCH;
+import static com.huawei.boostkit.hive.expression.TypeUtils.DEFAULT_VARCHAR_LENGTH;
 import static org.apache.hadoop.hive.ql.io.orc.OrcInputFormat.getDesiredRowTypeDescr;
 import static org.apache.hadoop.hive.serde2.ColumnProjectionUtils.READ_COLUMN_IDS_CONF_STR;
 
+import nova.hetu.omniruntime.type.BooleanDataType;
+import nova.hetu.omniruntime.type.DataType;
+import nova.hetu.omniruntime.type.Decimal128DataType;
+import nova.hetu.omniruntime.type.DoubleDataType;
+import nova.hetu.omniruntime.type.IntDataType;
+import nova.hetu.omniruntime.type.LongDataType;
+import nova.hetu.omniruntime.type.ShortDataType;
+import nova.hetu.omniruntime.type.VarcharDataType;
+import nova.hetu.omniruntime.vector.Decimal128Vec;
 import nova.hetu.omniruntime.vector.Vec;
 import nova.hetu.omniruntime.vector.VecBatch;
 
@@ -35,6 +45,7 @@ import org.apache.hadoop.hive.ql.io.sarg.SearchArgument;
 import org.apache.hadoop.hive.ql.io.sarg.SearchArgumentImpl;
 import org.apache.hadoop.hive.ql.plan.api.OperatorType;
 import org.apache.hadoop.hive.serde2.SerDeStats;
+import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapred.FileSplit;
 import org.apache.hadoop.mapred.RecordReader;
@@ -45,12 +56,31 @@ import org.apache.orc.TypeDescription;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 public class OmniOrcRecordReader implements RecordReader<NullWritable, VecBatchWrapper>, StatsProvidingRecordReader {
+    private static final Map<TypeDescription.Category, DataType> CATEGORY_TO_OMNI_TYPE = new HashMap<TypeDescription.Category, DataType>() {
+        {
+            put(TypeDescription.Category.SHORT, ShortDataType.SHORT);
+            put(TypeDescription.Category.INT, IntDataType.INTEGER);
+            put(TypeDescription.Category.LONG, LongDataType.LONG);
+            put(TypeDescription.Category.BOOLEAN, BooleanDataType.BOOLEAN);
+            put(TypeDescription.Category.DOUBLE, DoubleDataType.DOUBLE);
+            put(TypeDescription.Category.STRING, new VarcharDataType(DEFAULT_VARCHAR_LENGTH));
+            put(TypeDescription.Category.TIMESTAMP, LongDataType.LONG);
+            put(TypeDescription.Category.DATE, IntDataType.INTEGER);
+            put(TypeDescription.Category.BYTE, ShortDataType.SHORT);
+            put(TypeDescription.Category.FLOAT, DoubleDataType.DOUBLE);
+            put(TypeDescription.Category.DECIMAL, Decimal128DataType.DECIMAL128);
+            put(TypeDescription.Category.CHAR, VarcharDataType.VARCHAR);
+            put(TypeDescription.Category.VARCHAR, VarcharDataType.VARCHAR);
+        }
+    };
     protected OrcColumnarBatchScanReader recordReader;
     protected Vec[] vecs;
     protected final long offset;
@@ -59,6 +89,7 @@ public class OmniOrcRecordReader implements RecordReader<NullWritable, VecBatchW
     protected final SerDeStats stats;
     protected List<Integer> included;
     protected Operator tableScanOp;
+    protected int[] typeIds;
 
     OmniOrcRecordReader(Configuration conf, FileSplit split) throws IOException {
         TypeDescription schema = getDesiredRowTypeDescr(conf, false, Integer.MAX_VALUE);
@@ -70,6 +101,10 @@ public class OmniOrcRecordReader implements RecordReader<NullWritable, VecBatchW
         TypeDescription requiredSchema = getRequiredSchema(schema);
         options.schema(requiredSchema);
         options.include(null);
+        typeIds = new int[included.size()];
+        for (int i=0; i< requiredSchema.getChildren().size(); i++) {
+            typeIds[i] = CATEGORY_TO_OMNI_TYPE.get(requiredSchema.getChildren().get(i).getCategory()).getId().toValue();
+        }
         recordReader = new OrcColumnarBatchScanReader();
         recordReader.initializeReaderJava(split.getPath().toUri(), readerOptions);
         recordReader.initializeRecordReaderJava(options);
@@ -127,7 +162,7 @@ public class OmniOrcRecordReader implements RecordReader<NullWritable, VecBatchW
         if (included.size() == 0) {
             batchSize = (int) recordReader.getNumberOfRowsJava();
         } else {
-            batchSize = recordReader.next(vecs);
+            batchSize = recordReader.next(vecs, typeIds);
         }
         if (batchSize == 0) {
             return false;

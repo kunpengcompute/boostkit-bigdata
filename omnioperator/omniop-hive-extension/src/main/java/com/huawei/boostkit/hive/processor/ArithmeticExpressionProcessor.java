@@ -18,6 +18,8 @@
 
 package com.huawei.boostkit.hive.processor;
 
+import static com.huawei.boostkit.hive.expression.TypeUtils.getMaxScale;
+
 import com.huawei.boostkit.hive.expression.BaseExpression;
 import com.huawei.boostkit.hive.expression.CastFunctionExpression;
 import com.huawei.boostkit.hive.expression.DivideExpression;
@@ -103,19 +105,5 @@ public class ArithmeticExpressionProcessor implements ExpressionProcessor {
         CastFunctionExpression functionExpression = new CastFunctionExpression(returnType,
                 TypeUtils.getCharWidth(node), childPrecision, childScale);
         compareExpression.add(ExpressionUtils.optimizeCast(childNode, functionExpression));
-    }
-
-    private int getMaxScale(List<ExprNodeDesc> children, int maxScale) {
-        for (ExprNodeDesc child : children) {
-            if (!(child.getTypeInfo() instanceof DecimalTypeInfo)) {
-                continue;
-            }
-            DecimalTypeInfo childTypeInfo = (DecimalTypeInfo) child.getTypeInfo();
-            int childScale = childTypeInfo.getScale();
-            if (childScale >= maxScale) {
-                maxScale = childScale;
-            }
-        }
-        return maxScale;
     }
 }

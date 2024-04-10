@@ -148,6 +148,9 @@ public class OmniVecBatchSerDe extends AbstractSerDe {
     public static int getEstimateLen(PrimitiveTypeInfo primitiveTypeInfo) {
         if (primitiveTypeInfo.getPrimitiveCategory().equals(PrimitiveObjectInspector.PrimitiveCategory.STRING)) {
             return 512;
+        } else if (primitiveTypeInfo.getPrimitiveCategory().equals(PrimitiveObjectInspector.PrimitiveCategory.VOID)) {
+            // void to boolean, boolean use one byte
+            return 1;
         } else {
             // one chinese char uses 3 bytes in UTF8
             return ((BaseCharTypeInfo) primitiveTypeInfo).getLength() * 3;
