@@ -518,7 +518,7 @@ std::unique_ptr<BaseVector> CopyToOmniDecimal128VecFrom64(orc::ColumnVectorBatch
     return newVector;
 }
 
-std::unique_ptr<BaseVector> dealLongVectorBatch(DataTypeId id, orc::ColumnVectorBatch *field) {
+std::unique_ptr<BaseVector> DealLongVectorBatch(DataTypeId id, orc::ColumnVectorBatch *field) {
     switch (id) {
         case omniruntime::type::OMNI_BOOLEAN:
             return CopyFixedWidth<OMNI_BOOLEAN, orc::LongVectorBatch>(field);
@@ -533,39 +533,39 @@ std::unique_ptr<BaseVector> dealLongVectorBatch(DataTypeId id, orc::ColumnVector
         case omniruntime::type::OMNI_DATE64:
             return CopyOptimizedForInt64<OMNI_DATE64, orc::LongVectorBatch>(field);
         default: {
-            throw std::runtime_error("dealLongVectorBatch not support for type: " + id);
+            throw std::runtime_error("DealLongVectorBatch not support for type: " + id);
         }
     }
 }
 
-std::unique_ptr<BaseVector> dealDoubleVectorBatch(DataTypeId id, orc::ColumnVectorBatch *field) {
+std::unique_ptr<BaseVector> DealDoubleVectorBatch(DataTypeId id, orc::ColumnVectorBatch *field) {
     switch (id) {
         case omniruntime::type::OMNI_DOUBLE:
             return CopyOptimizedForInt64<OMNI_DOUBLE, orc::DoubleVectorBatch>(field);
         default: {
-            throw std::runtime_error("dealDoubleVectorBatch not support for type: " + id);
+            throw std::runtime_error("DealDoubleVectorBatch not support for type: " + id);
         }
     }
 }
 
-std::unique_ptr<BaseVector> dealDecimal64VectorBatch(DataTypeId id, orc::ColumnVectorBatch *field) {
+std::unique_ptr<BaseVector> DealDecimal64VectorBatch(DataTypeId id, orc::ColumnVectorBatch *field) {
     switch (id) {
         case omniruntime::type::OMNI_DECIMAL64:
             return CopyToOmniDecimal64Vec(field);
         case omniruntime::type::OMNI_DECIMAL128:
             return CopyToOmniDecimal128VecFrom64(field);
         default: {
-            throw std::runtime_error("dealDecimal64VectorBatch not support for type: " + id);
+            throw std::runtime_error("DealDecimal64VectorBatch not support for type: " + id);
         }
     }
 }
 
-std::unique_ptr<BaseVector> dealDecimal128VectorBatch(DataTypeId id, orc::ColumnVectorBatch *field) {
+std::unique_ptr<BaseVector> DealDecimal128VectorBatch(DataTypeId id, orc::ColumnVectorBatch *field) {
     switch (id) {
         case omniruntime::type::OMNI_DECIMAL128:
             return CopyToOmniDecimal128Vec(field);
         default: {
-            throw std::runtime_error("dealDecimal128VectorBatch not support for type: " + id);
+            throw std::runtime_error("DealDecimal128VectorBatch not support for type: " + id);
         }
     }
 }
@@ -579,9 +579,9 @@ std::unique_ptr<BaseVector> CopyToOmniVec(const orc::Type *type, int omniTypeId,
         case orc::TypeKind::DATE:
         case orc::TypeKind::INT:
         case orc::TypeKind::LONG:
-            return dealLongVectorBatch(dataTypeId, field);
+            return DealLongVectorBatch(dataTypeId, field);
         case orc::TypeKind::DOUBLE:
-            return dealDoubleVectorBatch(dataTypeId, field);
+            return DealDoubleVectorBatch(dataTypeId, field);
         case orc::TypeKind::CHAR:
             if (dataTypeId != OMNI_VARCHAR) {
                 throw std::runtime_error("Cannot transfer to other OMNI_TYPE but VARCHAR for orc char");
@@ -595,9 +595,9 @@ std::unique_ptr<BaseVector> CopyToOmniVec(const orc::Type *type, int omniTypeId,
             return CopyVarWidth(field);
         case orc::TypeKind::DECIMAL:
             if (type->getPrecision() > MAX_DECIMAL64_DIGITS) {
-                return dealDecimal128VectorBatch(dataTypeId, field);
+                return DealDecimal128VectorBatch(dataTypeId, field);
             } else {
-                return dealDecimal64VectorBatch(dataTypeId, field);
+                return DealDecimal64VectorBatch(dataTypeId, field);
             }
         default: {
             throw std::runtime_error("Native ColumnarFileScan Not support For This Type: " + type->getKind());
