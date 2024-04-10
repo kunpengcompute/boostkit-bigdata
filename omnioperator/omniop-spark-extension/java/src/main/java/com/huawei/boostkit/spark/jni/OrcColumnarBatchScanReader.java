@@ -39,7 +39,6 @@ import java.io.IOException;
 import java.net.URI;
 import java.sql.Date;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 public class OrcColumnarBatchScanReader {
@@ -271,8 +270,7 @@ public class OrcColumnarBatchScanReader {
         }
     }
 
-    public int next(Vec[] vecList) {
-        int[] typeIds = new int[realColsCnt];
+    public int next(Vec[] vecList, int[] typeIds) {
         long[] vecNativeIds = new long[realColsCnt];
         long rtn = jniReader.recordReaderNext(recordReader, batchReader, typeIds, vecNativeIds);
         if (rtn == 0) {
