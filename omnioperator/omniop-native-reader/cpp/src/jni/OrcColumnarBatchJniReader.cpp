@@ -29,7 +29,6 @@ using namespace std;
 using namespace orc;
 
 static constexpr int32_t MAX_DECIMAL64_DIGITS = 18;
-bool isDecimal64Transfor128 = false;
 
 // vecFildsNames存储文件每列的列名，从orc reader c++侧获取，回传到java侧使用
 JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniReader_initializeReader(JNIEnv *env,
@@ -81,7 +80,7 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniRea
             env->NewStringUTF("notNeedFSCache"));
     reader = createReader(orc::readFileOverride(uri, notNeedFSCache), readerOptions);
     std::vector<std::string> orcColumnNames = reader->getAllFiedsName();
-    for (int i = 0; i < orcColumnNames.size(); i++) {
+    for (uint32_t i = 0; i < orcColumnNames.size(); i++) {
         jstring fildname = env->NewStringUTF(orcColumnNames[i].c_str());
         // use ArrayList and function
         env->CallBooleanMethod(vecFildsNames, arrayListAdd, fildname);
@@ -275,12 +274,7 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniRea
 {
     JNI_FUNC_START
     orc::Reader *readerPtr = (orc::Reader *)reader;
-    // Get if the decimal for spark or hive
-    jboolean jni_isDecimal64Transfor128 = env->CallBooleanMethod(jsonObj, jsonMethodHas,
-        env->NewStringUTF("isDecimal64Transfor128"));
-    if (jni_isDecimal64Transfor128) {
-        isDecimal64Transfor128 = true;
-    }
+
     // get offset from json obj
     jlong offset = env->CallLongMethod(jsonObj, jsonMethodLong, env->NewStringUTF("offset"));
     jlong length = env->CallLongMethod(jsonObj, jsonMethodLong, env->NewStringUTF("length"));
@@ -524,45 +518,86 @@ std::unique_ptr<BaseVector> CopyToOmniDecimal128VecFrom64(orc::ColumnVectorBatch
     return newVector;
 }
 
-std::unique_ptr<BaseVector> CopyToOmniVec(const orc::Type *type, int &omniTypeId, orc::ColumnVectorBatch *field,
-    bool isDecimal64Transfor128)
+std::unique_ptr<BaseVector> DealLongVectorBatch(DataTypeId id, orc::ColumnVectorBatch *field) {
+    switch (id) {
+        case omniruntime::type::OMNI_BOOLEAN:
+            return CopyFixedWidth<OMNI_BOOLEAN, orc::LongVectorBatch>(field);
+        case omniruntime::type::OMNI_SHORT:
+            return CopyFixedWidth<OMNI_SHORT, orc::LongVectorBatch>(field);
+        case omniruntime::type::OMNI_INT:
+            return CopyFixedWidth<OMNI_INT, orc::LongVectorBatch>(field);
+        case omniruntime::type::OMNI_LONG:
+            return CopyOptimizedForInt64<OMNI_LONG, orc::LongVectorBatch>(field);
+        case omniruntime::type::OMNI_DATE32:
+            return CopyFixedWidth<OMNI_DATE32, orc::LongVectorBatch>(field);
+        case omniruntime::type::OMNI_DATE64:
+            return CopyOptimizedForInt64<OMNI_DATE64, orc::LongVectorBatch>(field);
+        default: {
+            throw std::runtime_error("DealLongVectorBatch not support for type: " + id);
+        }
+    }
+}
+
+std::unique_ptr<BaseVector> DealDoubleVectorBatch(DataTypeId id, orc::ColumnVectorBatch *field) {
+    switch (id) {
+        case omniruntime::type::OMNI_DOUBLE:
+            return CopyOptimizedForInt64<OMNI_DOUBLE, orc::DoubleVectorBatch>(field);
+        default: {
+            throw std::runtime_error("DealDoubleVectorBatch not support for type: " + id);
+        }
+    }
+}
+
+std::unique_ptr<BaseVector> DealDecimal64VectorBatch(DataTypeId id, orc::ColumnVectorBatch *field) {
+    switch (id) {
+        case omniruntime::type::OMNI_DECIMAL64:
+            return CopyToOmniDecimal64Vec(field);
+        case omniruntime::type::OMNI_DECIMAL128:
+            return CopyToOmniDecimal128VecFrom64(field);
+        default: {
+            throw std::runtime_error("DealDecimal64VectorBatch not support for type: " + id);
+        }
+    }
+}
+
+std::unique_ptr<BaseVector> DealDecimal128VectorBatch(DataTypeId id, orc::ColumnVectorBatch *field) {
+    switch (id) {
+        case omniruntime::type::OMNI_DECIMAL128:
+            return CopyToOmniDecimal128Vec(field);
+        default: {
+            throw std::runtime_error("DealDecimal128VectorBatch not support for type: " + id);
+        }
+    }
+}
+
+std::unique_ptr<BaseVector> CopyToOmniVec(const orc::Type *type, int omniTypeId, orc::ColumnVectorBatch *field)
 {
+    DataTypeId dataTypeId = static_cast<DataTypeId>(omniTypeId);
     switch (type->getKind()) {
         case orc::TypeKind::BOOLEAN:
-            omniTypeId = static_cast<jint>(OMNI_BOOLEAN);
-            return CopyFixedWidth<OMNI_BOOLEAN, orc::LongVectorBatch>(field);
         case orc::TypeKind::SHORT:
-            omniTypeId = static_cast<jint>(OMNI_SHORT);
-            return CopyFixedWidth<OMNI_SHORT, orc::LongVectorBatch>(field);
         case orc::TypeKind::DATE:
-            omniTypeId = static_cast<jint>(OMNI_DATE32);
-            return CopyFixedWidth<OMNI_INT, orc::LongVectorBatch>(field);
         case orc::TypeKind::INT:
-            omniTypeId = static_cast<jint>(OMNI_INT);
-            return CopyFixedWidth<OMNI_INT, orc::LongVectorBatch>(field);
         case orc::TypeKind::LONG:
-            omniTypeId = static_cast<int>(OMNI_LONG);
-            return CopyOptimizedForInt64<OMNI_LONG, orc::LongVectorBatch>(field);
+            return DealLongVectorBatch(dataTypeId, field);
         case orc::TypeKind::DOUBLE:
-            omniTypeId = static_cast<int>(OMNI_DOUBLE);
-            return CopyOptimizedForInt64<OMNI_DOUBLE, orc::DoubleVectorBatch>(field);
+            return DealDoubleVectorBatch(dataTypeId, field);
         case orc::TypeKind::CHAR:
-            omniTypeId = static_cast<int>(OMNI_VARCHAR);
+            if (dataTypeId != OMNI_VARCHAR) {
+                throw std::runtime_error("Cannot transfer to other OMNI_TYPE but VARCHAR for orc char");
+            }
             return CopyCharType(field);
         case orc::TypeKind::STRING:
         case orc::TypeKind::VARCHAR:
-            omniTypeId = static_cast<int>(OMNI_VARCHAR);
+            if (dataTypeId != OMNI_VARCHAR) {
+                throw std::runtime_error("Cannot transfer to other OMNI_TYPE but VARCHAR for orc string/varchar");
+            }
             return CopyVarWidth(field);
         case orc::TypeKind::DECIMAL:
             if (type->getPrecision() > MAX_DECIMAL64_DIGITS) {
-                omniTypeId = static_cast<int>(OMNI_DECIMAL128);
-                return CopyToOmniDecimal128Vec(field);
-            } else if (isDecimal64Transfor128) {
-                omniTypeId = static_cast<int>(OMNI_DECIMAL128);
-                return CopyToOmniDecimal128VecFrom64(field);
+                return DealDecimal128VectorBatch(dataTypeId, field);
             } else {
-                omniTypeId = static_cast<int>(OMNI_DECIMAL64);
-                return CopyToOmniDecimal64Vec(field);
+                return DealDecimal64VectorBatch(dataTypeId, field);
             }
         default: {
             throw std::runtime_error("Native ColumnarFileScan Not support For This Type: " + type->getKind());
@@ -573,28 +608,37 @@ std::unique_ptr<BaseVector> CopyToOmniVec(const orc::Type *type, int &omniTypeId
 JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniReader_recordReaderNext(JNIEnv *env,
     jobject jObj, jlong rowReader, jlong batch, jintArray typeId, jlongArray vecNativeId)
 {
+    JNI_FUNC_START
     orc::RowReader *rowReaderPtr = (orc::RowReader *)rowReader;
     orc::ColumnVectorBatch *columnVectorBatch = (orc::ColumnVectorBatch *)batch;
     std::vector<std::unique_ptr<BaseVector>> omniVecs;
 
     const orc::Type &baseTp = rowReaderPtr->getSelectedType();
     uint64_t batchRowSize = 0;
+    auto ptr = env->GetIntArrayElements(typeId, JNI_FALSE);
+    if (ptr == NULL) {
+        throw std::runtime_error("Types should not be null");
+    }
+    int32_t arrLen = (int32_t) env->GetArrayLength(typeId);
     if (rowReaderPtr->next(*columnVectorBatch)) {
         orc::StructVectorBatch *root = dynamic_cast<orc::StructVectorBatch *>(columnVectorBatch);
         batchRowSize = root->fields[0]->numElements;
         int32_t vecCnt = root->fields.size();
-        std::vector<int32_t> omniTypeIds(vecCnt, 0);
-        for (int32_t id = 0; id < vecCnt; id++) {
-            auto type = baseTp.getSubtype(id);
-            omniVecs.emplace_back(CopyToOmniVec(type, omniTypeIds[id], root->fields[id], isDecimal64Transfor128));
+        if (vecCnt != arrLen) {
+            throw std::runtime_error("Types should align to root fields");
         }
         for (int32_t id = 0; id < vecCnt; id++) {
-            env->SetIntArrayRegion(typeId, id, 1, omniTypeIds.data() + id);
+            auto type = baseTp.getSubtype(id);
+            int omniTypeId = ptr[id];
+            omniVecs.emplace_back(CopyToOmniVec(type, omniTypeId, root->fields[id]));
+        }
+        for (int32_t id = 0; id < vecCnt; id++) {
             jlong omniVec = reinterpret_cast<jlong>(omniVecs[id].release());
             env->SetLongArrayRegion(vecNativeId, id, 1, &omniVec);
         }
     }
     return (jlong) batchRowSize;
+    JNI_FUNC_END(runtimeExceptionClass)
 }
 
 /*

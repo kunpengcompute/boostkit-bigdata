@@ -21,20 +21,15 @@ package com.huawei.boostkit.spark.jni;
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.io.Input;
 import junit.framework.TestCase;
-import nova.hetu.omniruntime.type.DataType;
-import nova.hetu.omniruntime.vector.IntVec;
 import nova.hetu.omniruntime.vector.LongVec;
 import nova.hetu.omniruntime.vector.VarcharVec;
 import nova.hetu.omniruntime.vector.Vec;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.hadoop.hive.ql.io.sarg.SearchArgument;
 import org.apache.hadoop.hive.ql.io.sarg.SearchArgumentImpl;
-import org.apache.orc.OrcConf;
 import org.apache.orc.OrcFile;
-import org.apache.orc.Reader;
 import org.apache.orc.TypeDescription;
 import org.apache.orc.mapred.OrcInputFormat;
-import org.json.JSONObject;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.FixMethodOrder;
@@ -50,6 +45,9 @@ import java.util.Arrays;
 import org.apache.orc.Reader.Options;
 
 import static org.junit.Assert.*;
+
+import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_LONG;
+import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_VARCHAR;
 
 @FixMethodOrder(value = MethodSorters.NAME_ASCENDING )
 public class OrcColumnarBatchJniReaderTest extends TestCase {
@@ -152,7 +150,8 @@ public class OrcColumnarBatchJniReaderTest extends TestCase {
     @Test
     public void testNext() {
         Vec[] vecs = new Vec[2];
-        long rtn = orcColumnarBatchScanReader.next(vecs);
+        int[] typeId = new int[] {OMNI_LONG.ordinal(), OMNI_VARCHAR.ordinal()};
+        long rtn = orcColumnarBatchScanReader.next(vecs, typeId);
         assertTrue(rtn == 4096);
         assertTrue(((LongVec) vecs[0]).get(0) == 1);
         String str = new String(((VarcharVec) vecs[1]).get(0));
