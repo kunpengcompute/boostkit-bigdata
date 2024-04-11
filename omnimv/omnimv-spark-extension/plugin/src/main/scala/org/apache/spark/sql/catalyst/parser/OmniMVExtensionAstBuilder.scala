@@ -73,7 +73,7 @@ class OmniMVExtensionAstBuilder(spark: SparkSession, delegate: ParserInterface)
         OmniMVPluginConfig.getConf.defaultDataSource
       RewriteHelper.disableCachePlugin()
       val qe = spark.sql(query).queryExecution
-      val logicalPlan = qe.optimizedPlan
+      val logicalPlan = qe.commandExecuted
       if (RewriteHelper.containsMV(qe.analyzed)) {
         throw new RuntimeException("not support create mv from mv")
       }
@@ -142,7 +142,7 @@ class OmniMVExtensionAstBuilder(spark: SparkSession, delegate: ParserInterface)
           }
       // disable plugin
       RewriteHelper.disableCachePlugin()
-      val data = spark.sql(queryStr.get).queryExecution.optimizedPlan
+      val data = spark.sql(queryStr.get).queryExecution.commandExecuted
 
       val hadoopRelation = spark.table(catalogTable.identifier).logicalPlan match {
         case SubqueryAlias(_, LogicalRelation(t: HadoopFsRelation, _, _, _)) => t
