@@ -158,15 +158,17 @@ public class ExpressionUtils {
         BaseExpression leaf;
         Object value = ((ExprNodeConstantDesc) next).getValue();
         int omniType = TypeUtils.convertHiveTypeToOmniType(next.getTypeInfo());
-        if (omniType == Decimal128DataType.DECIMAL128.getId().toValue()) {
+        if (omniType == Decimal128DataType.DECIMAL128.getId().toValue() || omniType == Decimal64DataType.DECIMAL64.getId().toValue()) {
             int scale = ((DecimalTypeInfo) next.getTypeInfo()).getScale();
-            String realValue;
+            Object realValue;
             if (value == null) {
                 realValue = null;
-            } else {
+            } else if (omniType == Decimal128DataType.DECIMAL128.getId().toValue()) {
                 realValue = new BigInteger(((HiveDecimal) value).bigIntegerBytesScaled(scale)).toString();
+            } else {
+                realValue = ((HiveDecimal) value).scaleByPowerOfTen(scale).longValue();
             }
-            leaf = new DecimalLiteral(realValue, Decimal128DataType.DECIMAL128.getId().toValue(),
+            leaf = new DecimalLiteral(realValue, omniType,
                     ((DecimalTypeInfo) next.getTypeInfo()).getPrecision(), scale);
         } else {
             leaf = new LiteralFactor<>("LITERAL", null, null, TypeUtils.getLiteralValue(value, next.getTypeInfo()),
@@ -215,9 +217,12 @@ public class ExpressionUtils {
     public static BaseExpression preCast(BaseExpression castExpression, ExprNodeDesc castNodeDesc,
                                          ExprNodeDesc comparedNode) {
         TypeInfo baseTypeInfo = comparedNode.getTypeInfo();
-        if (castNodeDesc instanceof ExprNodeConstantDesc) {
-            if (baseTypeInfo instanceof DecimalTypeInfo && ((ExprNodeConstantDesc) castNodeDesc).getValue().equals(0)) {
+        if (castNodeDesc instanceof ExprNodeConstantDesc && baseTypeInfo instanceof DecimalTypeInfo && ((ExprNodeConstantDesc) castNodeDesc).getValue().equals(0)) {
+            if (((DecimalTypeInfo) baseTypeInfo).getPrecision() >18) {
                 return new DecimalLiteral("0", TypeUtils.convertHiveTypeToOmniType(baseTypeInfo),
+                        ((DecimalTypeInfo) baseTypeInfo).getPrecision(), ((DecimalTypeInfo) baseTypeInfo).getScale());
+            } else {
+                return new DecimalLiteral(0L, TypeUtils.convertHiveTypeToOmniType(baseTypeInfo),
                         ((DecimalTypeInfo) baseTypeInfo).getPrecision(), ((DecimalTypeInfo) baseTypeInfo).getScale());
             }
         }
@@ -258,15 +263,21 @@ public class ExpressionUtils {
             Integer toCastPrecision = castFunctionExpression.getPrecision();
             Integer toCastScale = castFunctionExpression.getScale();
             Integer scale = ((DecimalLiteral) expression).getScale();
+            ((DecimalLiteral) expression).setDataType(castFunctionExpression.getReturnType());
             if (scale >= toCastScale) {
                 return expression;
             }
-            String value = (String) ((DecimalLiteral) expression).getValue();
+            Object value = ((DecimalLiteral) expression).getValue();
             ((DecimalLiteral) expression).setPrecision(toCastPrecision);
             ((DecimalLiteral) expression).setScale(toCastScale);
-            BigDecimal decimalValue = new BigDecimal(value);
-            BigDecimal newValue = decimalValue.multiply(BigDecimal.TEN.pow(toCastScale - scale));
-            ((DecimalLiteral) expression).setValue(newValue.toString());
+            if (value instanceof Long) {
+                long newValue = ((long) Math.pow(10, toCastScale - scale)) * (long) value;
+                ((DecimalLiteral) expression).setValue(newValue);
+            } else {
+                BigDecimal decimalValue = new BigDecimal((String) value);
+                BigDecimal newValue = decimalValue.multiply(BigDecimal.TEN.pow(toCastScale - scale));
+                ((DecimalLiteral) expression).setValue(newValue.toString());
+            }
             return expression;
         }
         castFunctionExpression.add(expression);

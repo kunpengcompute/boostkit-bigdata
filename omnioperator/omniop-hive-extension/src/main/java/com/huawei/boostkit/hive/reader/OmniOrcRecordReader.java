@@ -26,12 +26,12 @@ import static org.apache.hadoop.hive.serde2.ColumnProjectionUtils.READ_COLUMN_ID
 import nova.hetu.omniruntime.type.BooleanDataType;
 import nova.hetu.omniruntime.type.DataType;
 import nova.hetu.omniruntime.type.Decimal128DataType;
+import nova.hetu.omniruntime.type.Decimal64DataType;
 import nova.hetu.omniruntime.type.DoubleDataType;
 import nova.hetu.omniruntime.type.IntDataType;
 import nova.hetu.omniruntime.type.LongDataType;
 import nova.hetu.omniruntime.type.ShortDataType;
 import nova.hetu.omniruntime.type.VarcharDataType;
-import nova.hetu.omniruntime.vector.Decimal128Vec;
 import nova.hetu.omniruntime.vector.Vec;
 import nova.hetu.omniruntime.vector.VecBatch;
 
@@ -41,23 +41,27 @@ import org.apache.hadoop.hive.ql.exec.Operator;
 import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.io.StatsProvidingRecordReader;
 import org.apache.hadoop.hive.ql.io.orc.OrcFile;
+import org.apache.hadoop.hive.ql.io.sarg.ConvertAstToSearchArg;
 import org.apache.hadoop.hive.ql.io.sarg.SearchArgument;
 import org.apache.hadoop.hive.ql.io.sarg.SearchArgumentImpl;
 import org.apache.hadoop.hive.ql.plan.api.OperatorType;
+import org.apache.hadoop.hive.serde2.ColumnProjectionUtils;
 import org.apache.hadoop.hive.serde2.SerDeStats;
-import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapred.FileSplit;
 import org.apache.hadoop.mapred.RecordReader;
 import org.apache.hive.com.esotericsoftware.kryo.Kryo;
 import org.apache.hive.com.esotericsoftware.kryo.io.Input;
 import org.apache.orc.OrcConf;
+import org.apache.orc.OrcProto;
+import org.apache.orc.OrcUtils;
 import org.apache.orc.TypeDescription;
 
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -96,14 +100,23 @@ public class OmniOrcRecordReader implements RecordReader<NullWritable, VecBatchW
         OrcConf.MAPRED_INPUT_SCHEMA.setString(conf, schema.toString());
         OrcFile.ReaderOptions readerOptions = OrcFile.readerOptions(conf)
                 .maxLength(OrcConf.MAX_FILE_LENGTH.getLong(conf)).filesystem(split.getPath().getFileSystem(conf));
-        org.apache.orc.Reader.Options options = buildOptions(conf, split.getStart(), split.getLength());
+        org.apache.orc.Reader.Options options = buildOptions(conf, split.getStart(), split.getLength(), schema);
         included = getReadColumnIDs(conf);
         TypeDescription requiredSchema = getRequiredSchema(schema);
         options.schema(requiredSchema);
         options.include(null);
         typeIds = new int[included.size()];
         for (int i=0; i< requiredSchema.getChildren().size(); i++) {
-            typeIds[i] = CATEGORY_TO_OMNI_TYPE.get(requiredSchema.getChildren().get(i).getCategory()).getId().toValue();
+            TypeDescription typeDescription = requiredSchema.getChildren().get(i);
+            if (typeDescription.getCategory() == TypeDescription.Category.DECIMAL) {
+                if (typeDescription.getPrecision() >18) {
+                    typeIds[i] = Decimal128DataType.DECIMAL128.getId().toValue();
+                } else {
+                    typeIds[i] = Decimal64DataType.DECIMAL64.getId().toValue();
+                }
+            } else {
+                typeIds[i] = CATEGORY_TO_OMNI_TYPE.get(requiredSchema.getChildren().get(i).getCategory()).getId().toValue();
+            }
         }
         recordReader = new OrcColumnarBatchScanReader();
         recordReader.initializeReaderJava(split.getPath().toUri(), readerOptions);
@@ -125,21 +138,46 @@ public class OmniOrcRecordReader implements RecordReader<NullWritable, VecBatchW
         return Arrays.stream(skips.split(",")).map(Integer::parseInt).distinct().collect(Collectors.toList());
     }
 
-    private org.apache.orc.Reader.Options buildOptions(Configuration conf, long start, long length) {
+    private org.apache.orc.Reader.Options buildOptions(Configuration conf, long start, long length, TypeDescription schema) {
         org.apache.orc.Reader.Options options = (new org.apache.orc.Reader.Options(conf)).range(start, length)
                 .useZeroCopy(OrcConf.USE_ZEROCOPY.getBoolean(conf))
                 .skipCorruptRecords(OrcConf.SKIP_CORRUPT_DATA.getBoolean(conf))
                 .tolerateMissingSchema(OrcConf.TOLERATE_MISSING_SCHEMA.getBoolean(conf));
-        String kryoSarg = OrcConf.KRYO_SARG.getString(conf);
-        String sargColumns = OrcConf.SARG_COLUMNS.getString(conf);
-        if (kryoSarg != null && sargColumns != null) {
-            byte[] sargBytes = Base64.decodeBase64(kryoSarg);
-            SearchArgument sarg = (SearchArgument) (new Kryo()).readObject(new Input(sargBytes),
-                    SearchArgumentImpl.class);
-            options.searchArgument(sarg, sargColumns.split(","));
-            sarg.getExpression().toString();
+        String neededColumnNames = conf.get(ColumnProjectionUtils.READ_COLUMN_NAMES_CONF_STR);
+        if (neededColumnNames == null) {
+            options.searchArgument(null, null);
+        } else {
+            SearchArgument sarg = ConvertAstToSearchArg.createFromConf(conf);
+            if (sarg == null) {
+                options.searchArgument(null, null);
+            } else {
+                List<OrcProto.Type> types = OrcUtils.getOrcTypes(schema);
+                options.searchArgument(sarg, getSargColumnNames(neededColumnNames.split(","), types, options.getInclude()));
+            }
         }
         return options;
+    }
+
+    private static String[] getSargColumnNames(String[] originalColumnNames,
+                                               List<OrcProto.Type> types, boolean[] includedColumns) {
+        int rootColumn = 0;
+        String[] columnNames = new String[types.size() - rootColumn];
+        int i = 0;
+        // The way this works is as such. originalColumnNames is the equivalent on getNeededColumns
+        // from TSOP. They are assumed to be in the same order as the columns in ORC file, AND they are
+        // assumed to be equivalent to the columns in includedColumns (because it was generated from
+        // the same column list at some point in the past), minus the subtype columns. Therefore, when
+        // we go thru all the top level ORC file columns that are included, in order, they match
+        // originalColumnNames. This way, we do not depend on names stored inside ORC for SARG leaf
+        // column name resolution (see mapSargColumns method).
+        for(int columnId: types.get(rootColumn).getSubtypesList()) {
+            if (includedColumns == null || includedColumns[columnId - rootColumn]) {
+                // this is guaranteed to be positive because types only have children
+                // ids greater than their own id.
+                columnNames[columnId - rootColumn] = originalColumnNames[i++];
+            }
+        }
+        return columnNames;
     }
 
     private TypeDescription getRequiredSchema(TypeDescription schema) {

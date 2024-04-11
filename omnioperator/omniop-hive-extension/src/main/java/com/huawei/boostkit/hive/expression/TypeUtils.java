@@ -43,6 +43,7 @@ import nova.hetu.omniruntime.type.BooleanDataType;
 import nova.hetu.omniruntime.type.DataType;
 import nova.hetu.omniruntime.type.DataTypeSerializer;
 import nova.hetu.omniruntime.type.Decimal128DataType;
+import nova.hetu.omniruntime.type.Decimal64DataType;
 import nova.hetu.omniruntime.type.DoubleDataType;
 import nova.hetu.omniruntime.type.IntDataType;
 import nova.hetu.omniruntime.type.LongDataType;
@@ -221,8 +222,9 @@ public class TypeUtils {
 
     public static DataType buildInputDataType(TypeInfo typeInfo) {
         if (typeInfo instanceof DecimalTypeInfo) {
-            return new Decimal128DataType(((DecimalTypeInfo) typeInfo).getPrecision(),
-                    ((DecimalTypeInfo) typeInfo).getScale());
+            return ((DecimalTypeInfo) typeInfo).getPrecision() > 18?
+                        new Decimal128DataType(((DecimalTypeInfo) typeInfo).getPrecision(), ((DecimalTypeInfo) typeInfo).getScale())
+                        : new Decimal64DataType(((DecimalTypeInfo) typeInfo).getPrecision(), ((DecimalTypeInfo) typeInfo).getScale());
         } else if (typeInfo instanceof BaseCharTypeInfo) {
             return new VarcharDataType(((BaseCharTypeInfo) typeInfo).getLength());
         }
@@ -341,11 +343,10 @@ public class TypeUtils {
 
     private static boolean checkUnsupportedDecimal(Integer dataType, Integer returnType, CastFunctionExpression castFunctionExpression) {
         // not support Cast(double/decimal as decimal)
-        if ((dataType == OMNI_DOUBLE.toValue() || dataType == OMNI_DECIMAL64.toValue())
-                && (returnType == OMNI_DECIMAL64.toValue() || returnType == OMNI_DECIMAL128.toValue())) {
+        if (dataType == OMNI_DOUBLE.toValue() && (returnType == OMNI_DECIMAL64.toValue() || returnType == OMNI_DECIMAL128.toValue())) {
             return true;
         }
-        if (dataType == OMNI_DECIMAL128.toValue() && returnType == OMNI_DECIMAL128.toValue()) {
+        if ((dataType == OMNI_DECIMAL128.toValue() || dataType == OMNI_DECIMAL64.toValue()) && (returnType == OMNI_DECIMAL128.toValue() || dataType == OMNI_DECIMAL64.toValue())) {
             BaseExpression child = castFunctionExpression.getArguments().get(0);
             if (child instanceof DecimalReference && !((DecimalReference) child).getScale().equals(castFunctionExpression.getScale())) {
                 return true;

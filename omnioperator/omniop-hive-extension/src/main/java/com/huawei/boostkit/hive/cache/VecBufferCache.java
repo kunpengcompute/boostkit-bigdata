@@ -34,6 +34,7 @@ import nova.hetu.omniruntime.vector.VarcharVec;
 import nova.hetu.omniruntime.vector.Vec;
 
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
+import org.apache.hadoop.hive.serde2.typeinfo.DecimalTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 
@@ -50,7 +51,12 @@ public class VecBufferCache {
         columnTypeLen = new int[this.categories.length];
         cache = new VecBuffer[colNum];
         for (int i = 0; i < this.categories.length; i++) {
-            columnTypeLen[i] = TYPE_LEN.getOrDefault(this.categories[i], 0);
+            if (this.categories[i] == PrimitiveObjectInspector.PrimitiveCategory.DECIMAL) {
+                DecimalTypeInfo decimalTypeInfo = (DecimalTypeInfo) typeInfos.get(i);
+                columnTypeLen[i] = decimalTypeInfo.getPrecision() > 18 ? 16 : 8;
+            } else {
+                columnTypeLen[i] = TYPE_LEN.getOrDefault(this.categories[i], 0);
+            }
             if (columnTypeLen[i] == 0) {
                 cache[i] = new VecBuffer(getEstimateLen((PrimitiveTypeInfo) typeInfos.get(i)), true);
             } else {
@@ -126,7 +132,11 @@ public class VecBufferCache {
                 }
                 break;
             case DECIMAL:
-                vec = new Decimal128Vec(rowCount);
+                if (columnTypeLen[index] == 8) {
+                    vec = new LongVec(rowCount);
+                } else {
+                    vec = new Decimal128Vec(rowCount);
+                }
                 break;
             default:
                 throw new IllegalStateException("Unexpected value: " + categories[index]);

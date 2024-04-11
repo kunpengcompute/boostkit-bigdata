@@ -216,7 +216,6 @@ public class OrcColumnarBatchScanReader {
             }
         }
         job.put("includedColumns", colToInclu.toArray());
-        job.put("isDecimal64Transfor128", true);
         recordReader = jniReader.initializeRecordReader(reader, job);
         return recordReader;
     }

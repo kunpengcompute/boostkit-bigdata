@@ -47,6 +47,11 @@ public class LiteralFactor<T> extends BaseExpression {
     }
 
     @Override
+    public Integer getReturnType() {
+        return dataType;
+    }
+
+    @Override
     public boolean isFull() {
         return true;
     }
@@ -67,8 +72,8 @@ public class LiteralFactor<T> extends BaseExpression {
         return gson.toJson(this);
     }
 
-    public Integer getDataType() {
-        return dataType;
+    public void setDataType(Integer dataType) {
+        this.dataType= dataType;
     }
 
     public T getValue() {

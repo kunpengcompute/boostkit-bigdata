@@ -592,6 +592,8 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
                         ((LongVec) newVec).set(i, ((Timestamp) exprValue).toEpochMilli());
                     } else if (exprValue instanceof Date) {
                         ((LongVec) newVec).set(i, ((Date) exprValue).toEpochDay());
+                    } else if (exprValue instanceof HiveDecimal) {
+                        ((LongVec) newVec).set(i, ((HiveDecimal) exprValue).unscaledValue().longValue());
                     } else {
                         ((LongVec) newVec).set(i, (long) exprValue);
                     }
