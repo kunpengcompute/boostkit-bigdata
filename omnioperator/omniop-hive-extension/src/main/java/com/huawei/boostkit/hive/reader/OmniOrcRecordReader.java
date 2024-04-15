@@ -100,7 +100,7 @@ public class OmniOrcRecordReader implements RecordReader<NullWritable, VecBatchW
         OrcConf.MAPRED_INPUT_SCHEMA.setString(conf, schema.toString());
         OrcFile.ReaderOptions readerOptions = OrcFile.readerOptions(conf)
                 .maxLength(OrcConf.MAX_FILE_LENGTH.getLong(conf)).filesystem(split.getPath().getFileSystem(conf));
-        org.apache.orc.Reader.Options options = buildOptions(conf, split.getStart(), split.getLength(), schema);
+        org.apache.orc.Reader.Options options = buildOptions(conf, split.getStart(), split.getLength());
         included = getReadColumnIDs(conf);
         TypeDescription requiredSchema = getRequiredSchema(schema);
         options.schema(requiredSchema);
@@ -138,46 +138,21 @@ public class OmniOrcRecordReader implements RecordReader<NullWritable, VecBatchW
         return Arrays.stream(skips.split(",")).map(Integer::parseInt).distinct().collect(Collectors.toList());
     }
 
-    private org.apache.orc.Reader.Options buildOptions(Configuration conf, long start, long length, TypeDescription schema) {
+    private org.apache.orc.Reader.Options buildOptions(Configuration conf, long start, long length) {
         org.apache.orc.Reader.Options options = (new org.apache.orc.Reader.Options(conf)).range(start, length)
                 .useZeroCopy(OrcConf.USE_ZEROCOPY.getBoolean(conf))
                 .skipCorruptRecords(OrcConf.SKIP_CORRUPT_DATA.getBoolean(conf))
                 .tolerateMissingSchema(OrcConf.TOLERATE_MISSING_SCHEMA.getBoolean(conf));
-        String neededColumnNames = conf.get(ColumnProjectionUtils.READ_COLUMN_NAMES_CONF_STR);
-        if (neededColumnNames == null) {
-            options.searchArgument(null, null);
-        } else {
-            SearchArgument sarg = ConvertAstToSearchArg.createFromConf(conf);
-            if (sarg == null) {
-                options.searchArgument(null, null);
-            } else {
-                List<OrcProto.Type> types = OrcUtils.getOrcTypes(schema);
-                options.searchArgument(sarg, getSargColumnNames(neededColumnNames.split(","), types, options.getInclude()));
-            }
+        String kryoSarg = OrcConf.KRYO_SARG.getString(conf);
+        String sargColumns = OrcConf.SARG_COLUMNS.getString(conf);
+        if (kryoSarg != null && sargColumns != null) {
+            byte[] sargBytes = Base64.decodeBase64(kryoSarg);
+            SearchArgument sarg = (SearchArgument) (new Kryo()).readObject(new Input(sargBytes),
+                    SearchArgumentImpl.class);
+            options.searchArgument(sarg, sargColumns.split(","));
+            sarg.getExpression().toString();
         }
         return options;
-    }
-
-    private static String[] getSargColumnNames(String[] originalColumnNames,
-                                               List<OrcProto.Type> types, boolean[] includedColumns) {
-        int rootColumn = 0;
-        String[] columnNames = new String[types.size() - rootColumn];
-        int i = 0;
-        // The way this works is as such. originalColumnNames is the equivalent on getNeededColumns
-        // from TSOP. They are assumed to be in the same order as the columns in ORC file, AND they are
-        // assumed to be equivalent to the columns in includedColumns (because it was generated from
-        // the same column list at some point in the past), minus the subtype columns. Therefore, when
-        // we go thru all the top level ORC file columns that are included, in order, they match
-        // originalColumnNames. This way, we do not depend on names stored inside ORC for SARG leaf
-        // column name resolution (see mapSargColumns method).
-        for(int columnId: types.get(rootColumn).getSubtypesList()) {
-            if (includedColumns == null || includedColumns[columnId - rootColumn]) {
-                // this is guaranteed to be positive because types only have children
-                // ids greater than their own id.
-                columnNames[columnId - rootColumn] = originalColumnNames[i++];
-            }
-        }
-        return columnNames;
     }
 
     private TypeDescription getRequiredSchema(TypeDescription schema) {
