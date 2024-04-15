@@ -67,10 +67,10 @@ public class Decimal64VecConverter extends LongVecConverter {
         try {
             if (vectorizationContext != null) {
                 convertedDecimal64 = vectorizationContext.getDataTypePhysicalVariation(
-                        vectorizationContext.getInputColumnIndex(fieldName)) == DataTypePhysicalVariation.DECIMAL_64;
+                        vectorizationContext.getInputColumnIndex(fieldName.replace("key.","KEY.").replace("value.","VALUE."))) == DataTypePhysicalVariation.DECIMAL_64;
             }
         } catch (HiveException e) {
-            LOG.error("error occurs when finding field from vectorizationContext");
+            throw new RuntimeException("error occurs when finding field from vectorizationContext", e);
         }
         return convertedDecimal64;
     }

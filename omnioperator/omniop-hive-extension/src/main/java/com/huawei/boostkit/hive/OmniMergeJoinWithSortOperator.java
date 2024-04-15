@@ -80,7 +80,7 @@ public class OmniMergeJoinWithSortOperator extends OmniMergeJoinOperator {
                     setStatus(operators[opIndex].addInput(data[opIndex].poll()), opIndex);
                 }
             }
-        } else if (!omniVectorWithSortOperator.outputs[dataIndex].hasNext()) {
+        } else {
             setStatus(operators[opIndex].addInput(createEofVecBatch(types[opIndex])), opIndex);
         }
     }
