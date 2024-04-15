@@ -71,4 +71,59 @@ public class OmniSelectOperatorTest extends CommonTest {
         Assert.assertEquals("2\tBob\t0.91", rs.get(2));
         Assert.assertEquals("2\tLi\t0.99", rs.get(3));
     }
+
+    @Test
+    public void testSelectSwitch() throws IOException {
+        utRunSqlOnDriver("use ut_database");
+
+        utRunSqlOnDriver("drop table if exists select_expression");
+        utRunSqlOnDriver("create table if not exists select_expression (class_id int, name string, score int) " +
+                "stored as orc");
+        utRunSqlOnDriver("insert into select_expression values(1, 'Tom', 100)");
+        utRunSqlOnDriver("insert into select_expression values(1, 'Jerry', 90)");
+        utRunSqlOnDriver("insert into select_expression values(2, 'Bob', 91)");
+        utRunSqlOnDriver("insert into select_expression values(2, 'Li', 99)");
+
+        String sql = "select class_id, name, (score / 100) from select_expression";
+        String confStr = "omni.hive.select.enabled";
+        driver.getConf().set(confStr, "true");
+        utRunSqlOnDriver("explain " + sql);
+        List<String> rs_explain_true = new ArrayList<>();
+        driver.getResults(rs_explain_true);
+        utRunSqlOnDriver(sql);
+        List<String> rs_true = new ArrayList<>();
+        driver.getResults(rs_true);
+        driver.getConf().set(confStr, "false");
+        utRunSqlOnDriver("explain " + sql);
+        List<String> rs_explain_false = new ArrayList<>();
+        driver.getResults(rs_explain_false);
+        utRunSqlOnDriver(sql);
+        List<String> rs_false = new ArrayList<>();
+        driver.getResults(rs_false);
+
+        utRunSqlOnDriver("drop table if exists select_expression");
+
+        String str = "Omni Select Operator";
+        boolean flag1 = false;
+        for (String s : rs_explain_true) {
+            if (s.contains(str)) {
+                flag1 = true;
+                break;
+            }
+        }
+        boolean flag2 = true;
+        for (String s : rs_explain_false) {
+            if (s.contains(str)) {
+                flag2 = false;
+                break;
+            }
+        }
+        assert flag1 : "[" + confStr + "=true] is invalid";
+        assert flag2 : "[" + confStr + "=false] is invalid";
+        Assert.assertEquals(rs_true.size(),rs_false.size());
+        for (int i = 0; i < rs_true.size(); i++) {
+            Assert.assertEquals(rs_true.get(i), rs_false.get(i));
+        }
+    }
+
 }

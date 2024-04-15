@@ -81,4 +81,63 @@ public class OmniMapJoinOperatorTest extends CommonTest {
         Assert.assertEquals("1\tTom\t100\t15", rs.get(0));
         Assert.assertEquals("2\tJerry\t90\t16", rs.get(1));
     }
+
+    @Test
+    public void testMapJoinSwitch() throws IOException {
+        utRunSqlOnDriver("use ut_database");
+
+        utRunSqlOnDriver("drop table if exists map_join_table1");
+        utRunSqlOnDriver("create table if not exists map_join_table1 (id int, score int) stored as orc");
+        utRunSqlOnDriver("insert into map_join_table1 values(1, 100)");
+        utRunSqlOnDriver("insert into map_join_table1 values(2, 90)");
+
+        utRunSqlOnDriver("drop table if exists map_join_table2");
+        utRunSqlOnDriver("create table if not exists map_join_table2 (id int, name string) stored as orc");
+        utRunSqlOnDriver("insert into map_join_table2 values(1, 'Tom')");
+        utRunSqlOnDriver("insert into map_join_table2 values(2, 'Jerry')");
+
+        String sql = "select t1.id, t2.name, t1.score from map_join_table1 t1, map_join_table2 t2 "
+                + "where t1.id = t2.id order by t1.id";
+        String confStr = "omni.hive.mapjoin.enabled";
+        driver.getConf().set(confStr, "true");
+        utRunSqlOnDriver("explain " + sql);
+        List<String> rs_explain_true = new ArrayList<>();
+        driver.getResults(rs_explain_true);
+        utRunSqlOnDriver(sql);
+        List<String> rs_true = new ArrayList<>();
+        driver.getResults(rs_true);
+        driver.getConf().set(confStr, "false");
+        utRunSqlOnDriver("explain " + sql);
+        List<String> rs_explain_false = new ArrayList<>();
+        driver.getResults(rs_explain_false);
+        utRunSqlOnDriver(sql);
+        List<String> rs_false = new ArrayList<>();
+        driver.getResults(rs_false);
+
+        utRunSqlOnDriver("drop table if exists map_join_table1");
+        utRunSqlOnDriver("drop table if exists map_join_table2");
+
+        String str = "Omni Map Join Operator";
+        boolean flag1 = false;
+        for (String s : rs_explain_true) {
+            if (s.contains(str)) {
+                flag1 = true;
+                break;
+            }
+        }
+        boolean flag2 = true;
+        for (String s : rs_explain_false) {
+            if (s.contains(str)) {
+                flag2 = false;
+                break;
+            }
+        }
+        assert flag1 : "[" + confStr + "=true] is invalid";
+        assert flag2 : "[" + confStr + "=false] is invalid";
+        Assert.assertEquals(rs_true.size(),rs_false.size());
+        for (int i = 0; i < rs_true.size(); i++) {
+            Assert.assertEquals(rs_true.get(i), rs_false.get(i));
+        }
+    }
+
 }
