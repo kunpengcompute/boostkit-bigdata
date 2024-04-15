@@ -138,7 +138,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
     private static final Set<PrimitiveObjectInspector.PrimitiveCategory> SUPPORTED_TYPE = new HashSet<>(Arrays.asList(BOOLEAN,
             SHORT, INT, LONG, DOUBLE, STRING, DATE, DECIMAL, VARCHAR, CHAR, VOID));
 
-    private static final int DECIMAL64_MAX_PRECISION = 19;
+    private static final int DECIMAL64_MAX_PRECISION = 18;
 
     private final Set<Operator> groupByOperatorNeedSort = new HashSet<>();
 

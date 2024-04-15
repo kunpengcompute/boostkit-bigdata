@@ -624,7 +624,7 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniRea
         orc::StructVectorBatch *root = dynamic_cast<orc::StructVectorBatch *>(columnVectorBatch);
         batchRowSize = root->fields[0]->numElements;
         int32_t vecCnt = root->fields.size();
-        if (vecCnt != arrLen) {
+        if (vecCnt > arrLen) {
             throw std::runtime_error("Types should align to root fields");
         }
         for (int32_t id = 0; id < vecCnt; id++) {
