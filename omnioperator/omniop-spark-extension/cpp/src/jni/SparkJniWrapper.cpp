@@ -124,16 +124,16 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_SparkJniWrapper_nativ
 
     auto splitter = Splitter::Make(partitioning_name, inputDataTypesTmp, jNumCols, num_partitions,
         std::move(splitOptions));
-    return g_shuffleSplitterHolder.Insert(std::shared_ptr<Splitter>(splitter));
+    return reinterpret_cast<intptr_t>(static_cast<void *>(splitter));
     JNI_FUNC_END(runtimeExceptionClass)
 }
 
 JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_SparkJniWrapper_split(
-    JNIEnv *env, jobject jObj, jlong splitter_id, jlong jVecBatchAddress)
+    JNIEnv *env, jobject jObj, jlong splitter_addr, jlong jVecBatchAddress)
 {
-    auto splitter = g_shuffleSplitterHolder.Lookup(splitter_id);
+    auto splitter = reinterpret_cast<Splitter *>(splitter_addr);
     if (!splitter) {
-        std::string error_message = "Invalid splitter id " + std::to_string(splitter_id);
+        std::string error_message = "Invalid splitter id " + std::to_string(splitter_addr);
         env->ThrowNew(runtimeExceptionClass, error_message.c_str());
         return -1;
     }
@@ -147,12 +147,12 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_SparkJniWrapper_split
 }
 
 JNIEXPORT jobject JNICALL Java_com_huawei_boostkit_spark_jni_SparkJniWrapper_stop(
-    JNIEnv* env, jobject, jlong splitter_id)
+    JNIEnv* env, jobject, jlong splitter_addr)
 {
     JNI_FUNC_START
-    auto splitter = g_shuffleSplitterHolder.Lookup(splitter_id);
+    auto splitter = reinterpret_cast<Splitter *>(splitter_addr);
     if (!splitter) {
-        std::string error_message = "Invalid splitter id " + std::to_string(splitter_id);
+        std::string error_message = "Invalid splitter id " + std::to_string(splitter_addr);
         env->ThrowNew(runtimeExceptionClass, error_message.c_str());
     }
     splitter->Stop();
@@ -171,14 +171,14 @@ JNIEXPORT jobject JNICALL Java_com_huawei_boostkit_spark_jni_SparkJniWrapper_sto
 }
 
 JNIEXPORT void JNICALL Java_com_huawei_boostkit_spark_jni_SparkJniWrapper_close(
-    JNIEnv* env, jobject, jlong splitter_id)
+    JNIEnv* env, jobject, jlong splitter_addr)
 {
     JNI_FUNC_START
-    auto splitter = g_shuffleSplitterHolder.Lookup(splitter_id);
+    auto splitter = reinterpret_cast<Splitter *>(splitter_addr);
     if (!splitter) {
-        std::string error_message = "Invalid splitter id " + std::to_string(splitter_id);
+        std::string error_message = "Invalid splitter id " + std::to_string(splitter_addr);
         env->ThrowNew(runtimeExceptionClass, error_message.c_str());
     }
-    g_shuffleSplitterHolder.Erase(splitter_id);
+    delete splitter;
     JNI_FUNC_END_VOID(runtimeExceptionClass)
 }

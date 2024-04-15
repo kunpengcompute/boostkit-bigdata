@@ -26,9 +26,6 @@
 #include <dirent.h>
 #include <type/data_types.h>
 #include "shuffle/splitter.h"
-#include "jni/concurrent_map.h"
-
-static ConcurrentMap<std::shared_ptr<Splitter>> testShuffleSplitterHolder;
 
 static std::string s_shuffle_tests_dir = "/tmp/shuffleTests";
 

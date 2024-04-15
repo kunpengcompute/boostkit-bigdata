@@ -197,7 +197,7 @@ public:
              SplitOptions options,
              bool flag);
 
-    static std::shared_ptr<Splitter> Make(
+    static Splitter *Make(
             const std::string &short_name,
             InputDataTypes inputDataTypes,
             int32_t num_cols,
@@ -219,6 +219,19 @@ public:
     int64_t TotalComputePidTime() const { return total_compute_pid_time_; }
 
     const std::vector<int64_t>& PartitionLengths() const { return partition_lengths_; }
+
+    ~Splitter()
+    {
+        delete vecBatchProto; //free protobuf vecBatch memory
+        delete partition_id_cnt_cur_;
+        delete partition_id_cnt_cache_;
+        delete fixed_valueBuffer_size_;
+        delete fixed_nullBuffer_size_;
+        delete partition_buffer_size_;
+        delete partition_buffer_idx_base_;
+        delete partition_buffer_idx_offset_;
+        delete partition_serialization_size_;
+    }
 
     omniruntime::vec::VectorBatch *GetInputVecBatch()
     {

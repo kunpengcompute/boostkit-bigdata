@@ -39,7 +39,6 @@ protected:
         if (IsFileExist(tmpTestingDir)) {
             DeletePathAll(tmpTestingDir.c_str());
         }
-        testShuffleSplitterHolder.Clear();
     }
 
     // run before each case...
@@ -63,7 +62,7 @@ TEST_F (ShuffleTest, Split_SingleVarChar) {
     inputDataTypes.inputVecTypeIds = inputVecTypeIds;
     inputDataTypes.inputDataPrecisions = new uint32_t[colNumber];
     inputDataTypes.inputDataScales = new uint32_t[colNumber];
-    int splitterId = Test_splitter_nativeMake("hash",
+    long splitterAddr = Test_splitter_nativeMake("hash",
                                               4,
                                               inputDataTypes,
                                               colNumber,
@@ -73,21 +72,21 @@ TEST_F (ShuffleTest, Split_SingleVarChar) {
                                               0,
                                               tmpTestingDir);
     VectorBatch* vb1 = CreateVectorBatch_1row_varchar_withPid(3, "N");
-    Test_splitter_split(splitterId, vb1);
+    Test_splitter_split(splitterAddr, vb1);
     VectorBatch* vb2 = CreateVectorBatch_1row_varchar_withPid(2, "F");
-    Test_splitter_split(splitterId, vb2);
+    Test_splitter_split(splitterAddr, vb2);
     VectorBatch* vb3 = CreateVectorBatch_1row_varchar_withPid(3, "N");
-    Test_splitter_split(splitterId, vb3);
+    Test_splitter_split(splitterAddr, vb3);
     VectorBatch* vb4 = CreateVectorBatch_1row_varchar_withPid(2, "F");
-    Test_splitter_split(splitterId, vb4);
+    Test_splitter_split(splitterAddr, vb4);
     VectorBatch* vb5 = CreateVectorBatch_1row_varchar_withPid(2, "F");
-    Test_splitter_split(splitterId, vb5);
+    Test_splitter_split(splitterAddr, vb5);
     VectorBatch* vb6 = CreateVectorBatch_1row_varchar_withPid(1, "R");
-    Test_splitter_split(splitterId, vb6);
+    Test_splitter_split(splitterAddr, vb6);
     VectorBatch* vb7 = CreateVectorBatch_1row_varchar_withPid(3, "N");
-    Test_splitter_split(splitterId, vb7);
-    Test_splitter_stop(splitterId);
-    Test_splitter_close(splitterId);
+    Test_splitter_split(splitterAddr, vb7);
+    Test_splitter_stop(splitterAddr);
+    Test_splitter_close(splitterAddr);
     delete[] inputDataTypes.inputDataPrecisions;
     delete[] inputDataTypes.inputDataScales;
 }
@@ -101,7 +100,7 @@ TEST_F (ShuffleTest, Split_Fixed_Cols) {
     inputDataTypes.inputDataPrecisions = new uint32_t[colNumber];
     inputDataTypes.inputDataScales = new uint32_t[colNumber];
     int partitionNum = 4;
-    int splitterId = Test_splitter_nativeMake("hash",
+    long splitterAddr = Test_splitter_nativeMake("hash",
                                               partitionNum,
                                               inputDataTypes,
                                               colNumber,
@@ -112,10 +111,10 @@ TEST_F (ShuffleTest, Split_Fixed_Cols) {
                                               tmpTestingDir);
     for (uint64_t j = 0; j < 1; j++) {
         VectorBatch* vb = CreateVectorBatch_5fixedCols_withPid(partitionNum, 999);
-        Test_splitter_split(splitterId, vb);
+        Test_splitter_split(splitterAddr, vb);
     }
-    Test_splitter_stop(splitterId);
-    Test_splitter_close(splitterId);
+    Test_splitter_stop(splitterAddr);
+    Test_splitter_close(splitterAddr);
     delete[] inputDataTypes.inputDataPrecisions;
     delete[] inputDataTypes.inputDataScales;
 }
@@ -129,7 +128,7 @@ TEST_F (ShuffleTest, Split_Fixed_SinglePartition_SomeNullRow) {
     inputDataTypes.inputDataPrecisions = new uint32_t[colNumber];
     inputDataTypes.inputDataScales = new uint32_t[colNumber];
     int partitionNum = 1;
-    int splitterId = Test_splitter_nativeMake("single",
+    long splitterAddr = Test_splitter_nativeMake("single",
                                               partitionNum,
                                               inputDataTypes,
                                               colNumber,
@@ -140,10 +139,10 @@ TEST_F (ShuffleTest, Split_Fixed_SinglePartition_SomeNullRow) {
                                               tmpTestingDir);
     for (uint64_t j = 0; j < 100; j++) {
         VectorBatch* vb = CreateVectorBatch_someNullRow_vectorBatch();
-        Test_splitter_split(splitterId, vb);
+        Test_splitter_split(splitterAddr, vb);
     }
-    Test_splitter_stop(splitterId);
-    Test_splitter_close(splitterId);
+    Test_splitter_stop(splitterAddr);
+    Test_splitter_close(splitterAddr);
     delete[] inputDataTypes.inputDataPrecisions;
     delete[] inputDataTypes.inputDataScales;
 }
@@ -157,7 +156,7 @@ TEST_F (ShuffleTest, Split_Fixed_SinglePartition_SomeNullCol) {
     inputDataTypes.inputDataPrecisions = new uint32_t[colNumber];
     inputDataTypes.inputDataScales = new uint32_t[colNumber];
     int partitionNum = 1;
-    int splitterId = Test_splitter_nativeMake("single",
+    long splitterAddr = Test_splitter_nativeMake("single",
                                               partitionNum,
                                               inputDataTypes,
                                               colNumber,
@@ -168,10 +167,10 @@ TEST_F (ShuffleTest, Split_Fixed_SinglePartition_SomeNullCol) {
                                               tmpTestingDir);
     for (uint64_t j = 0; j < 100; j++) {
         VectorBatch* vb = CreateVectorBatch_someNullCol_vectorBatch();
-        Test_splitter_split(splitterId, vb);
+        Test_splitter_split(splitterAddr, vb);
     }
-    Test_splitter_stop(splitterId);
-    Test_splitter_close(splitterId);
+    Test_splitter_stop(splitterAddr);
+    Test_splitter_close(splitterAddr);
     delete[] inputDataTypes.inputDataPrecisions;
     delete[] inputDataTypes.inputDataScales;
 }
@@ -205,7 +204,7 @@ TEST_F (ShuffleTest, Split_Mix_LargeSize) {
     inputDataTypes.inputDataPrecisions = new uint32_t[colNumber];
     inputDataTypes.inputDataScales = new uint32_t[colNumber];
     int partitionNum = 4;
-    int splitterId = Test_splitter_nativeMake("hash",
+    long splitterAddr = Test_splitter_nativeMake("hash",
                                               partitionNum,
                                               inputDataTypes,
                                               colNumber,
@@ -216,10 +215,10 @@ TEST_F (ShuffleTest, Split_Mix_LargeSize) {
                                               tmpTestingDir);
     for (uint64_t j = 0; j < 999; j++) {
         VectorBatch* vb = CreateVectorBatch_4col_withPid(partitionNum, 999);
-        Test_splitter_split(splitterId, vb);
+        Test_splitter_split(splitterAddr, vb);
     }
-    Test_splitter_stop(splitterId);
-    Test_splitter_close(splitterId);
+    Test_splitter_stop(splitterAddr);
+    Test_splitter_close(splitterAddr);
     delete[] inputDataTypes.inputDataPrecisions;
     delete[] inputDataTypes.inputDataScales;
 }
@@ -233,7 +232,7 @@ TEST_F (ShuffleTest, Split_Short_10WRows) {
     inputDataTypes.inputDataPrecisions = new uint32_t[colNumber];
     inputDataTypes.inputDataScales = new uint32_t[colNumber];
     int partitionNum = 10;
-    int splitterId = Test_splitter_nativeMake("hash",
+    long splitterAddr = Test_splitter_nativeMake("hash",
                                               partitionNum,
                                               inputDataTypes,
                                               colNumber,
@@ -244,10 +243,10 @@ TEST_F (ShuffleTest, Split_Short_10WRows) {
                                               tmpTestingDir);
     for (uint64_t j = 0; j < 100; j++) {
         VectorBatch* vb = CreateVectorBatch_1FixCol_withPid(partitionNum, 1000, ShortType());
-        Test_splitter_split(splitterId, vb);
+        Test_splitter_split(splitterAddr, vb);
     }
-    Test_splitter_stop(splitterId);
-    Test_splitter_close(splitterId);
+    Test_splitter_stop(splitterAddr);
+    Test_splitter_close(splitterAddr);
     delete[] inputDataTypes.inputDataPrecisions;
     delete[] inputDataTypes.inputDataScales;
 }
@@ -261,7 +260,7 @@ TEST_F (ShuffleTest, Split_Boolean_10WRows) {
     inputDataTypes.inputDataPrecisions = new uint32_t[colNumber];
     inputDataTypes.inputDataScales = new uint32_t[colNumber];
     int partitionNum = 10;
-    int splitterId = Test_splitter_nativeMake("hash",
+    long splitterAddr = Test_splitter_nativeMake("hash",
                                               partitionNum,
                                               inputDataTypes,
                                               colNumber,
@@ -272,10 +271,10 @@ TEST_F (ShuffleTest, Split_Boolean_10WRows) {
                                               tmpTestingDir);
     for (uint64_t j = 0; j < 100; j++) {
         VectorBatch* vb = CreateVectorBatch_1FixCol_withPid(partitionNum, 1000, BooleanType());
-        Test_splitter_split(splitterId, vb);
+        Test_splitter_split(splitterAddr, vb);
     }
-    Test_splitter_stop(splitterId);
-    Test_splitter_close(splitterId);
+    Test_splitter_stop(splitterAddr);
+    Test_splitter_close(splitterAddr);
     delete[] inputDataTypes.inputDataPrecisions;
     delete[] inputDataTypes.inputDataScales;
 }
@@ -289,7 +288,7 @@ TEST_F (ShuffleTest, Split_Long_100WRows) {
     inputDataTypes.inputDataPrecisions = new uint32_t[colNumber];
     inputDataTypes.inputDataScales = new uint32_t[colNumber];
     int partitionNum = 10;
-    int splitterId = Test_splitter_nativeMake("hash",
+    long splitterAddr = Test_splitter_nativeMake("hash",
                                               partitionNum,
                                               inputDataTypes,
                                               colNumber,
@@ -300,10 +299,10 @@ TEST_F (ShuffleTest, Split_Long_100WRows) {
                                               tmpTestingDir);
     for (uint64_t j = 0; j < 100; j++) {
         VectorBatch* vb = CreateVectorBatch_1FixCol_withPid(partitionNum, 10000, LongType());
-        Test_splitter_split(splitterId, vb);
+        Test_splitter_split(splitterAddr, vb);
     }
-    Test_splitter_stop(splitterId);
-    Test_splitter_close(splitterId);
+    Test_splitter_stop(splitterAddr);
+    Test_splitter_close(splitterAddr);
     delete[] inputDataTypes.inputDataPrecisions;
     delete[] inputDataTypes.inputDataScales;
 }
@@ -317,7 +316,7 @@ TEST_F (ShuffleTest, Split_VarChar_LargeSize) {
     inputDataTypes.inputDataPrecisions = new uint32_t[colNumber];
     inputDataTypes.inputDataScales = new uint32_t[colNumber];
     int partitionNum = 4;
-    int splitterId = Test_splitter_nativeMake("hash",
+    long splitterAddr = Test_splitter_nativeMake("hash",
                                               partitionNum,
                                               inputDataTypes,
                                               colNumber,
@@ -328,10 +327,10 @@ TEST_F (ShuffleTest, Split_VarChar_LargeSize) {
                                               tmpTestingDir);
     for (uint64_t j = 0; j < 99; j++) {
         VectorBatch* vb = CreateVectorBatch_4varcharCols_withPid(partitionNum, 99);
-        Test_splitter_split(splitterId, vb);
+        Test_splitter_split(splitterAddr, vb);
     }
-    Test_splitter_stop(splitterId);
-    Test_splitter_close(splitterId);
+    Test_splitter_stop(splitterAddr);
+    Test_splitter_close(splitterAddr);
     delete[] inputDataTypes.inputDataPrecisions;
     delete[] inputDataTypes.inputDataScales;
 }
@@ -345,7 +344,7 @@ TEST_F (ShuffleTest, Split_VarChar_First) {
     inputDataTypes.inputDataPrecisions = new uint32_t[colNumber];
     inputDataTypes.inputDataScales = new uint32_t[colNumber];
     int partitionNum = 4;
-    int splitterId = Test_splitter_nativeMake("hash",
+    long splitterAddr = Test_splitter_nativeMake("hash",
                                               partitionNum,
                                               inputDataTypes,
                                               colNumber,
@@ -355,27 +354,27 @@ TEST_F (ShuffleTest, Split_VarChar_First) {
                                               0,
                                               tmpTestingDir);
     VectorBatch* vb0 = CreateVectorBatch_2column_1row_withPid(0, "corpbrand #4", 1);
-    Test_splitter_split(splitterId, vb0);
+    Test_splitter_split(splitterAddr, vb0);
     VectorBatch* vb1 = CreateVectorBatch_2column_1row_withPid(3, "brandmaxi #4", 1);
-    Test_splitter_split(splitterId, vb1);
+    Test_splitter_split(splitterAddr, vb1);
     VectorBatch* vb2 = CreateVectorBatch_2column_1row_withPid(1, "edu packnameless #9", 1);
-    Test_splitter_split(splitterId, vb2);
+    Test_splitter_split(splitterAddr, vb2);
     VectorBatch* vb3 = CreateVectorBatch_2column_1row_withPid(1, "amalgunivamalg #11", 1);
-    Test_splitter_split(splitterId, vb3);
+    Test_splitter_split(splitterAddr, vb3);
     VectorBatch* vb4 = CreateVectorBatch_2column_1row_withPid(0, "brandcorp #2", 1);
-    Test_splitter_split(splitterId, vb4);
+    Test_splitter_split(splitterAddr, vb4);
     VectorBatch* vb5 = CreateVectorBatch_2column_1row_withPid(0, "scholarbrand #2", 1);
-    Test_splitter_split(splitterId, vb5);
+    Test_splitter_split(splitterAddr, vb5);
     VectorBatch* vb6 = CreateVectorBatch_2column_1row_withPid(2, "edu packcorp #6", 1);
-    Test_splitter_split(splitterId, vb6);
+    Test_splitter_split(splitterAddr, vb6);
     VectorBatch* vb7 = CreateVectorBatch_2column_1row_withPid(2, "edu packamalg #1", 1);
-    Test_splitter_split(splitterId, vb7);
+    Test_splitter_split(splitterAddr, vb7);
     VectorBatch* vb8 = CreateVectorBatch_2column_1row_withPid(0, "brandnameless #8", 1);
-    Test_splitter_split(splitterId, vb8);
+    Test_splitter_split(splitterAddr, vb8);
     VectorBatch* vb9 = CreateVectorBatch_2column_1row_withPid(2, "univmaxi #2", 1);
-    Test_splitter_split(splitterId, vb9);
-    Test_splitter_stop(splitterId);
-    Test_splitter_close(splitterId);
+    Test_splitter_split(splitterAddr, vb9);
+    Test_splitter_stop(splitterAddr);
+    Test_splitter_close(splitterAddr);
     delete[] inputDataTypes.inputDataPrecisions;
     delete[] inputDataTypes.inputDataScales;
 }
@@ -389,7 +388,7 @@ TEST_F (ShuffleTest, Split_Dictionary) {
     inputDataTypes.inputDataPrecisions = new uint32_t[colNumber];
     inputDataTypes.inputDataScales = new uint32_t[colNumber];
     int partitionNum = 4;
-    int splitterId = Test_splitter_nativeMake("hash",
+    long splitterAddr = Test_splitter_nativeMake("hash",
                                               partitionNum,
                                               inputDataTypes,
                                               colNumber,
@@ -400,10 +399,10 @@ TEST_F (ShuffleTest, Split_Dictionary) {
                                               tmpTestingDir);
     for (uint64_t j = 0; j < 2; j++) {
         VectorBatch* vb = CreateVectorBatch_2dictionaryCols_withPid(partitionNum);
-        Test_splitter_split(splitterId, vb);
+        Test_splitter_split(splitterAddr, vb);
     }
-    Test_splitter_stop(splitterId);
-    Test_splitter_close(splitterId);
+    Test_splitter_stop(splitterAddr);
+    Test_splitter_close(splitterAddr);
     delete[] inputDataTypes.inputDataPrecisions;
     delete[] inputDataTypes.inputDataScales;
 }
@@ -417,7 +416,7 @@ TEST_F (ShuffleTest, Split_Char) {
     inputDataTypes.inputDataPrecisions = new uint32_t[colNumber];
     inputDataTypes.inputDataScales = new uint32_t[colNumber];
     int partitionNum = 4;
-    int splitterId = Test_splitter_nativeMake("hash",
+    long splitterAddr = Test_splitter_nativeMake("hash",
                                               partitionNum,
                                               inputDataTypes,
                                               colNumber,
@@ -428,10 +427,10 @@ TEST_F (ShuffleTest, Split_Char) {
                                               tmpTestingDir);
     for (uint64_t j = 0; j < 99; j++) {
         VectorBatch* vb = CreateVectorBatch_4charCols_withPid(partitionNum, 99);
-        Test_splitter_split(splitterId, vb);
+        Test_splitter_split(splitterAddr, vb);
     }
-    Test_splitter_stop(splitterId);
-    Test_splitter_close(splitterId);
+    Test_splitter_stop(splitterAddr);
+    Test_splitter_close(splitterAddr);
     delete[] inputDataTypes.inputDataPrecisions;
     delete[] inputDataTypes.inputDataScales;
 }
@@ -445,7 +444,7 @@ TEST_F (ShuffleTest, Split_Decimal128) {
     inputDataTypes.inputDataPrecisions = new uint32_t[colNumber];
     inputDataTypes.inputDataScales = new uint32_t[colNumber];
     int partitionNum = 4;
-    int splitterId = Test_splitter_nativeMake("hash",
+    long splitterAddr = Test_splitter_nativeMake("hash",
                                               partitionNum,
                                               inputDataTypes,
                                               colNumber,
@@ -456,10 +455,10 @@ TEST_F (ShuffleTest, Split_Decimal128) {
                                               tmpTestingDir);
     for (uint64_t j = 0; j < 999; j++) {
         VectorBatch* vb = CreateVectorBatch_1decimal128Col_withPid(partitionNum, 999);
-        Test_splitter_split(splitterId, vb);
+        Test_splitter_split(splitterAddr, vb);
     }
-    Test_splitter_stop(splitterId);
-    Test_splitter_close(splitterId);
+    Test_splitter_stop(splitterAddr);
+    Test_splitter_close(splitterAddr);
     delete[] inputDataTypes.inputDataPrecisions;
     delete[] inputDataTypes.inputDataScales;
 }
@@ -473,7 +472,7 @@ TEST_F (ShuffleTest, Split_Decimal64) {
     inputDataTypes.inputDataPrecisions = new uint32_t[colNumber];
     inputDataTypes.inputDataScales = new uint32_t[colNumber];
     int partitionNum = 4;
-    int splitterId = Test_splitter_nativeMake("hash",
+    long splitterAddr = Test_splitter_nativeMake("hash",
                                               partitionNum,
                                               inputDataTypes,
                                               colNumber,
@@ -484,10 +483,10 @@ TEST_F (ShuffleTest, Split_Decimal64) {
                                               tmpTestingDir);
     for (uint64_t j = 0; j < 999; j++) {
         VectorBatch* vb = CreateVectorBatch_1decimal64Col_withPid(partitionNum, 999);
-        Test_splitter_split(splitterId, vb);
+        Test_splitter_split(splitterAddr, vb);
     }
-    Test_splitter_stop(splitterId);
-    Test_splitter_close(splitterId);
+    Test_splitter_stop(splitterAddr);
+    Test_splitter_close(splitterAddr);
     delete[] inputDataTypes.inputDataPrecisions;
     delete[] inputDataTypes.inputDataScales;
 }
@@ -501,7 +500,7 @@ TEST_F (ShuffleTest, Split_Decimal64_128) {
     inputDataTypes.inputDataPrecisions = new uint32_t[colNumber];
     inputDataTypes.inputDataScales = new uint32_t[colNumber];
     int partitionNum = 4;
-    int splitterId = Test_splitter_nativeMake("hash",
+    long splitterAddr = Test_splitter_nativeMake("hash",
                                               partitionNum,
                                               inputDataTypes,
                                               colNumber,
@@ -512,10 +511,10 @@ TEST_F (ShuffleTest, Split_Decimal64_128) {
                                               tmpTestingDir);
     for (uint64_t j = 0; j < 999; j++) {
         VectorBatch* vb = CreateVectorBatch_2decimalCol_withPid(partitionNum, 999);
-        Test_splitter_split(splitterId, vb);
+        Test_splitter_split(splitterAddr, vb);
     }
-    Test_splitter_stop(splitterId);
-    Test_splitter_close(splitterId);
+    Test_splitter_stop(splitterAddr);
+    Test_splitter_close(splitterAddr);
     delete[] inputDataTypes.inputDataPrecisions;
     delete[] inputDataTypes.inputDataScales;
 }
