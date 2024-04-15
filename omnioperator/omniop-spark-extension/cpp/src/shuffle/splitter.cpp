@@ -1098,23 +1098,18 @@ Splitter::Splitter(InputDataTypes inputDataTypes, int32_t num_cols, int32_t num_
     ToSplitterTypeId(num_cols);
 }
 
-std::shared_ptr<Splitter> Create(InputDataTypes inputDataTypes,
+Splitter *Create(InputDataTypes inputDataTypes,
                                  int32_t num_cols,
                                  int32_t num_partitions,
                                  SplitOptions options,
                                  bool flag)
 {
-    std::shared_ptr<Splitter> res(
-            new Splitter(inputDataTypes,
-                      num_cols,
-                      num_partitions,
-                      std::move(options),
-                      flag));
+    auto res = new Splitter(inputDataTypes, num_cols, num_partitions, std::move(options), flag);
     res->Split_Init();
     return res;
 }
 
-std::shared_ptr<Splitter> Splitter::Make(
+Splitter *Splitter::Make(
          const std::string& short_name,
          InputDataTypes inputDataTypes,
          int32_t num_cols,
@@ -1150,6 +1145,5 @@ int Splitter::Stop() {
     if (nullptr == vecBatchProto) {
         throw std::runtime_error("delete nullptr error for free protobuf vecBatch memory");
     }
-    delete vecBatchProto; //free protobuf vecBatch memory
     return 0;
 }
