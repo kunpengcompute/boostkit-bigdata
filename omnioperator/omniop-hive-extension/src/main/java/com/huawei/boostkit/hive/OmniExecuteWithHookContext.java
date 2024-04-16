@@ -116,6 +116,7 @@ import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.HashMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -156,6 +157,8 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
 
     private TezWork tezWork;
 
+    private OmniHiveConf omniHiveConf;
+
     private void clearGlobalVar() {
         groupByOperatorNeedSort.clear();
         mergeJoinNeedSort.clear();
@@ -176,6 +179,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
     }
 
     public void run(HookContext hookContext) throws Exception {
+        omniHiveConf = new OmniHiveConf(hookContext.getConf());
         clearGlobalVar();
         QueryPlan queryPlan = hookContext.getQueryPlan();
         if (queryPlan.getRootTasks().isEmpty()) {
@@ -390,15 +394,15 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
     }
 
     private void initMergeJoinNeedSort() {
-        for (BaseWork work: tezWork.getAllWork()) {
+        for (BaseWork work : tezWork.getAllWork()) {
             if (!(work instanceof MergeJoinWork)) {
                 continue;
             }
             Operator reducer = ((MergeJoinWork) work).getMainWork().getAnyRootOperator();
-            if (reducer.getType()!= OperatorType.MERGEJOIN) {
+            if (reducer.getType() != OperatorType.MERGEJOIN) {
                 continue;
             }
-            for (BaseWork parent: tezWork.getParents(work)) {
+            for (BaseWork parent : tezWork.getParents(work)) {
                 TezEdgeProperty.EdgeType edgeType = tezWork.getEdgeType(parent, work);
                 boolean needSort = reduceSinkReplaceableWork.contains(parent);
                 if (reduceSinkReplaceableWork.contains(parent)) {
@@ -552,7 +556,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         }
         List<Operator<? extends OperatorDesc>> childOperators = op.getChildOperators();
         for (Operator childOperator : childOperators) {
-            if (childOperator.getType()!=null && childOperator.getType().equals(OperatorType.REDUCESINK) && reduceSinkDescUnReplaceable((ReduceSinkDesc) childOperator.getConf())) {
+            if (childOperator.getType() != null && childOperator.getType().equals(OperatorType.REDUCESINK) && reduceSinkDescUnReplaceable((ReduceSinkDesc) childOperator.getConf())) {
                 return false;
             }
         }
@@ -614,6 +618,9 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             return true;
         }
         if (!OMNI_OPERATOR.contains(operator.getType())) {
+            return false;
+        }
+        if (!omniHiveConf.isEnableOperator(operator.getType())) {
             return false;
         }
         switch (operator.getType()) {

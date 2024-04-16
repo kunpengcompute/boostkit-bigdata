@@ -70,4 +70,65 @@ public class OmniMergeJoinWithSortOperatorTest extends CommonTest {
         SessionState.start(conf);
         driver = new Driver(conf);
     }
+
+    @Test
+    public void testMergeJoinSwitch() throws IOException {
+        utRunSqlOnDriver("use ut_database");
+
+        utRunSqlOnDriver("drop table if exists merge_join_table1");
+        utRunSqlOnDriver("create table if not exists merge_join_table1 (id int, score int) stored as orc");
+        utRunSqlOnDriver("insert into merge_join_table1 values(1,  100)");
+        utRunSqlOnDriver("insert into merge_join_table1 values(2,  90)");
+
+        utRunSqlOnDriver("drop table if exists merge_join_table2");
+        utRunSqlOnDriver("create table if not exists merge_join_table2 (id int, name string) stored as orc");
+        utRunSqlOnDriver("insert into merge_join_table2 values(1,  'Tom')");
+        utRunSqlOnDriver("insert into merge_join_table2 values(2,  'Jerry')");
+
+        String sql = "select t1.id, t2.name, t1.score from merge_join_table1 t1, merge_join_table2 t2 "
+                + "where t1.id = t2.id order by t1.id";
+        String confStr = "omni.hive.mergejoin.enabled";
+        driver.getConf().set("hive.auto.convert.join", "false");
+        driver.getConf().set(confStr, "true");
+        utRunSqlOnDriver("explain " + sql);
+        List<String> rsExplainTrue = new ArrayList<>();
+        driver.getResults(rsExplainTrue);
+        utRunSqlOnDriver(sql);
+        List<String> rsTrue = new ArrayList<>();
+        driver.getResults(rsTrue);
+        driver.getConf().set("hive.auto.convert.join", "true");
+        driver.getConf().set(confStr, "false");
+        utRunSqlOnDriver("explain " + sql);
+        List<String> rsExplainFalse = new ArrayList<>();
+        driver.getResults(rsExplainFalse);
+        utRunSqlOnDriver(sql);
+        List<String> rsFalse = new ArrayList<>();
+        driver.getResults(rsFalse);
+        driver.getConf().set(confStr, "true");
+        utRunSqlOnDriver("drop table if exists merge_join_table1");
+        utRunSqlOnDriver("drop table if exists merge_join_table2");
+
+        String str = "Omni Merge Join Operator";
+        boolean flag1 = false;
+        for (String s : rsExplainTrue) {
+            if (s.contains(str)) {
+                flag1 = true;
+                break;
+            }
+        }
+        boolean flag2 = true;
+        for (String s : rsExplainFalse) {
+            if (s.contains(str)) {
+                flag2 = false;
+                break;
+            }
+        }
+        assert flag1 : "[" + confStr + "=true] is invalid";
+        assert flag2 : "[" + confStr + "=false] is invalid";
+        Assert.assertEquals(rsTrue.size(), rsFalse.size());
+        for (int i = 0; i < rsTrue.size(); i++) {
+            Assert.assertEquals(rsTrue.get(i), rsFalse.get(i));
+        }
+    }
+
 }
