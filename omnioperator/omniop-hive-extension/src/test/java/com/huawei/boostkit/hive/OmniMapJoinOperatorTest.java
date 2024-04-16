@@ -97,7 +97,7 @@ public class OmniMapJoinOperatorTest extends CommonTest {
         utRunSqlOnDriver("insert into map_join_table2 values(2, 'Jerry')");
 
         String sql = "select t1.id, t2.name, t1.score from map_join_table1 t1, map_join_table2 t2 "
-                + "where t1.id = t2.id order by t1.id";
+                + "where t1.id = t2.id order by t2.id";
         String confStr = "omni.hive.mapjoin.enabled";
         driver.getConf().set(confStr, "true");
         utRunSqlOnDriver("explain " + sql);
@@ -113,7 +113,7 @@ public class OmniMapJoinOperatorTest extends CommonTest {
         utRunSqlOnDriver(sql);
         List<String> rsFalse = new ArrayList<>();
         driver.getResults(rsFalse);
-
+        driver.getConf().set(confStr, "true");
         utRunSqlOnDriver("drop table if exists map_join_table1");
         utRunSqlOnDriver("drop table if exists map_join_table2");
 

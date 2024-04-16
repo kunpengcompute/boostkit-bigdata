@@ -77,7 +77,7 @@ public class OmniPTFOperatorTest extends CommonTest {
         utRunSqlOnDriver(sql);
         List<String> rsFalse = new ArrayList<>();
         driver.getResults(rsFalse);
-
+        driver.getConf().set(confStr, "true");
         utRunSqlOnDriver("drop table if exists ptf_rank");
 
         String str = "Omni PTF Operator";

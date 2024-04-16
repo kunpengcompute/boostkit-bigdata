@@ -104,7 +104,7 @@ public class OmniMergeJoinWithSortOperatorTest extends CommonTest {
         utRunSqlOnDriver(sql);
         List<String> rsFalse = new ArrayList<>();
         driver.getResults(rsFalse);
-
+        driver.getConf().set(confStr, "true");
         utRunSqlOnDriver("drop table if exists merge_join_table1");
         utRunSqlOnDriver("drop table if exists merge_join_table2");
 

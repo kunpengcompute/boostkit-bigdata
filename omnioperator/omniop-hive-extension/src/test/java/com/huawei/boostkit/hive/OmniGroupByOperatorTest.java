@@ -146,7 +146,7 @@ public class OmniGroupByOperatorTest extends CommonTest {
         utRunSqlOnDriver(sql);
         List<String> rsFalse = new ArrayList<>();
         driver.getResults(rsFalse);
-
+        driver.getConf().set(confStr, "true");
         utRunSqlOnDriver("drop table if exists group_by_sum");
 
         String str = "Omni Group By Operator";

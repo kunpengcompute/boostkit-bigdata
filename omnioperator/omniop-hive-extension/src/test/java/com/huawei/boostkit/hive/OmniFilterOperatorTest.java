@@ -75,7 +75,7 @@ public class OmniFilterOperatorTest extends CommonTest {
         utRunSqlOnDriver(sql);
         List<String> rsFalse = new ArrayList<>();
         driver.getResults(rsFalse);
-
+        driver.getConf().set(confStr, "true");
         utRunSqlOnDriver("drop table if exists test_filter");
 
         String str = "Omni Filter Operator";
