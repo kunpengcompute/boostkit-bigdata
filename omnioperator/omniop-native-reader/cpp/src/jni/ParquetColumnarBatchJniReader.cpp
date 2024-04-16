@@ -69,6 +69,8 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_ParquetColumnarBatchJn
 
     jint port = (jint)env->CallIntMethod(jsonObj, jsonMethodInt, env->NewStringUTF("port"));
 
+    jboolean notNeedFSCache = env->CallBooleanMethod(jsonObj, jsonMethodHas, env->NewStringUTF("notNeedFSCache"));
+
     UriInfo uriInfo(uriString, schemeString, pathString, hostString, std::to_string(port));
 
     // Get capacity for each record batch
@@ -79,7 +81,7 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_ParquetColumnarBatchJn
     auto column_indices = GetIndices(env, jsonObj, "columnIndices");
 
     ParquetReader *pReader = new ParquetReader();
-    auto state = pReader->InitRecordReader(uriInfo, capacity, row_group_indices, column_indices, ugiString);
+    auto state = pReader->InitRecordReader(uriInfo, capacity, row_group_indices, column_indices, ugiString, notNeedFSCache);
     if (state != Status::OK()) {
         env->ThrowNew(runtimeExceptionClass, state.ToString().c_str());
         return 0;

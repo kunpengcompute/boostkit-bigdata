@@ -53,6 +53,10 @@ namespace omniruntime::reader {
                                        const std::vector<int>& row_group_indices,
                                        const std::vector<int>& column_indices, std::string& ugi);
 
+        arrow::Status InitRecordReader(UriInfo &uri, int64_t capacity,
+                                       const std::vector<int>& row_group_indices,
+                                       const std::vector<int>& column_indices, std::string& ugi, bool notNeedFSCache);
+
         arrow::Status ReadNextBatch(std::vector<omniruntime::vec::BaseVector*> &batch, long *batchRowSize);
 
         std::unique_ptr<parquet::arrow::FileReader> arrow_reader;
@@ -89,6 +93,8 @@ namespace omniruntime::reader {
 
     std::string GetFileSystemKey(std::string& path, std::string& ugi);
 
-    Filesystem* GetFileSystemPtr(UriInfo &uri, std::string &ugi, arrow::Status &status);
+    Filesystem* GetHiveFileSystemPtr(UriInfo &uri, std::string &ugi, arrow::Status &status);
+
+    Filesystem* GetFileSystemPtr(UriInfo &uri, std::string &ugi, arrow::Status &status, bool notNeedFSCache);
 }
 #endif // OMNI_RUNTIME_PARQUETREADER_H

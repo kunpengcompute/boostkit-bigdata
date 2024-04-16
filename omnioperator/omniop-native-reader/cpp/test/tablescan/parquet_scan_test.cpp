@@ -44,7 +44,7 @@ TEST(read, test_parquet_reader)
     ParquetReader *reader = new ParquetReader();
     std::string ugi = "root@sample";
     UriInfo uri(filename, "", "", "", "-1");
-    auto state1 = reader->InitRecordReader(uri, 1024, row_group_indices, column_indices, ugi);
+    auto state1 = reader->InitRecordReader(uri, 1024, row_group_indices, column_indices, ugi, false);
     ASSERT_EQ(state1, Status::OK());
 
     std::vector<omniruntime::vec::BaseVector*> recordBatch(column_indices.size());
@@ -114,7 +114,7 @@ TEST(read, test_varchar)
     ParquetReader *reader = new ParquetReader();
     std::string ugi = "root@sample";
     UriInfo uriInfo(filename, "", "", "-1");
-    auto state1 = reader->InitRecordReader(uriInfo, 4096, row_group_indices, column_indices, ugi);
+    auto state1 = reader->InitRecordReader(uriInfo, 4096, row_group_indices, column_indices, ugi, false);
     ASSERT_EQ(state1, Status::OK());
     int total_nums = 0;
     int iter = 0;

@@ -63,22 +63,29 @@ std::string omniruntime::reader::GetFileSystemKey(std::string& path, std::string
     return result;
 }
 
-Filesystem* omniruntime::reader::GetFileSystemPtr(UriInfo &uri, std::string &ugi, arrow::Status &status)
+Filesystem* omniruntime::reader::GetHiveFileSystemPtr(UriInfo &uri, std::string &ugi, arrow::Status &status) {
+    Filesystem* fs = new Filesystem();
+    auto result = arrow_adapter::FileSystemFromUriOrPath(uri);
+    status = result.status();
+    if (!status.ok()) {
+        return nullptr;
+    }
+    fs->filesys_ptr = std::move(result).ValueUnsafe();
+    return fs;
+}
+
+Filesystem* omniruntime::reader::GetFileSystemPtr(UriInfo &uri, std::string &ugi, arrow::Status &status, bool notNeedFSCache)
 {
+    if (notNeedFSCache) {
+        return GetHiveFileSystemPtr(uri, ugi, status);
+    }
     std::string fullPath = uri.ToString();
     auto key = GetFileSystemKey(fullPath, ugi);
 
     // if not find key, create the filesystem ptr
     auto iter = restore_filesysptr.find(key);
     if (iter == restore_filesysptr.end()) {
-        Filesystem* fs = new Filesystem();
-        auto result = arrow_adapter::FileSystemFromUriOrPath(uri);
-        status = result.status();
-        if (!status.ok()) {
-          return nullptr;
-        }
-        fs->filesys_ptr = std::move(result).ValueUnsafe();
-        restore_filesysptr[key] = fs;
+        restore_filesysptr[key] = GetHiveFileSystemPtr(uri, ugi, status);
     }
 
     return restore_filesysptr[key];
@@ -86,7 +93,7 @@ Filesystem* omniruntime::reader::GetFileSystemPtr(UriInfo &uri, std::string &ugi
 
 Status ParquetReader::InitRecordReader(UriInfo &uri, int64_t capacity,
     const std::vector<int>& row_group_indices, const std::vector<int>& column_indices,
-    std::string& ugi)
+    std::string& ugi, bool notNeedFSCache)
 {
     // Configure reader settings
     auto reader_properties = parquet::ReaderProperties(pool);
@@ -98,7 +105,7 @@ Status ParquetReader::InitRecordReader(UriInfo &uri, int64_t capacity,
     // Get the file from filesystem
     Status result;
     mutex_.lock();
-    Filesystem* fs = GetFileSystemPtr(uri, ugi, result);
+    Filesystem* fs = GetFileSystemPtr(uri, ugi, result, notNeedFSCache);
     mutex_.unlock();
     if (fs == nullptr || fs->filesys_ptr == nullptr) {
       return Status::IOError(result);
