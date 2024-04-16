@@ -824,7 +824,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         JoinDesc joinDesc = (JoinDesc) operator.getConf();
         JoinCondDesc[] joinCondDescs = joinDesc.getConds();
         for (JoinCondDesc joinCondDesc: joinCondDescs) {
-            if (joinCondDesc.getType() == JoinDesc.FULL_OUTER_JOIN && joinDesc.getKeysString().get("0") == null || !SUPPORTED_JOIN.contains(joinCondDesc.getType())) {
+            if (!SUPPORTED_JOIN.contains(joinCondDesc.getType()) || joinCondDesc.getType() == JoinDesc.FULL_OUTER_JOIN && fullJoinUnReplaceable(joinDesc)) {
                 return false;
             }
         }
@@ -836,6 +836,19 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             }
         }
         return checkResidulFilter(joinDesc);
+    }
+
+    private boolean fullJoinUnReplaceable(JoinDesc joinDesc) {
+        if (joinDesc.getKeysString().get("0") == null || joinDesc.getResidualFilterExprs() != null) {
+            return true;
+        }
+        int filterNum = 0;
+        for (List<ExprNodeDesc> filters: joinDesc.getFilters().values()) {
+            if (!filters.isEmpty()) {
+                ++filterNum;
+            }
+        }
+        return filterNum >=2;
     }
 
     private boolean checkResidulFilter(JoinDesc joinDesc) {
