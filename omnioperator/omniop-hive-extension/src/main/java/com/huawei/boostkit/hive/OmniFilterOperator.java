@@ -86,16 +86,6 @@ public class OmniFilterOperator extends OmniHiveOperator<OmniFilterDesc> impleme
     protected void initializeOp(Configuration hconf) throws HiveException {
         super.initializeOp(hconf);
         ExprNodeDesc predicate = conf.getPredicate();
-        String queryId = HiveConf.getVar(hconf, HiveConf.ConfVars.HIVEQUERYID);
-        String cacheKey = queryId + "FILTER_" + this.getOperatorId() + "_container";
-
-        OmniFilterAndProjectOperatorFactory omniFilterAndProjectOperatorFactory = (OmniFilterAndProjectOperatorFactory) cache
-                .getIfPresent(cacheKey);
-        if (omniFilterAndProjectOperatorFactory != null) {
-            this.filterAndProjectOperatorFactory = omniFilterAndProjectOperatorFactory;
-            this.omniOperator = this.filterAndProjectOperatorFactory.createOperator();
-            return;
-        }
         BaseExpression root;
         if (predicate instanceof ExprNodeGenericFuncDesc) {
             root = ExpressionUtils.build((ExprNodeGenericFuncDesc) predicate, inputObjInspectors[0]);
@@ -114,6 +104,15 @@ public class OmniFilterOperator extends OmniHiveOperator<OmniFilterDesc> impleme
                 inputTypes[i] = TypeUtils.buildInputDataType(typeInfo);
                 projections[i] = TypeUtils.buildExpression(typeInfo, omniType, i);
             }
+        }
+
+        String cacheKey = root.toString() + Arrays.toString(inputTypes) + Arrays.toString(projections);
+        OmniFilterAndProjectOperatorFactory omniFilterAndProjectOperatorFactory = (OmniFilterAndProjectOperatorFactory) cache
+                .getIfPresent(cacheKey);
+        if (omniFilterAndProjectOperatorFactory != null) {
+            this.filterAndProjectOperatorFactory = omniFilterAndProjectOperatorFactory;
+            this.omniOperator = this.filterAndProjectOperatorFactory.createOperator();
+            return;
         }
         this.filterAndProjectOperatorFactory = new OmniFilterAndProjectOperatorFactory(root.toString(), inputTypes,
                 Arrays.asList(projections), 1, new OperatorConfig(SpillConfig.NONE,

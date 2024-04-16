@@ -61,6 +61,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
@@ -126,8 +127,6 @@ public class OmniSelectOperator extends OmniHiveOperator<OmniSelectDesc> impleme
     protected void initializeOp(Configuration hconf) throws HiveException {
         super.initializeOp(hconf);
         checkIfHasBrotherOperators();
-        String queryId = HiveConf.getVar(hconf, HiveConf.ConfVars.HIVEQUERYID);
-        String cacheKey = queryId + "SELECT_" + this.getOperatorId() + "_container";
         Operator parent = parentOperators.get(0);
         if (parent instanceof OmniVectorOperator && ((OmniVectorOperator) parent).isKeyValue()) {
             inputObjInspectors[0] = OperatorUtils.expandInspector(inputObjInspectors[0]);
@@ -144,13 +143,6 @@ public class OmniSelectOperator extends OmniHiveOperator<OmniSelectDesc> impleme
         }
         this.outputObjInspector = ObjectInspectorFactory
                 .getStandardStructObjectInspector(this.conf.getOutputColumnNames(), colInspector);
-        OmniProjectOperatorFactory omniProjectOperatorFactory = (OmniProjectOperatorFactory) cache
-                .getIfPresent(cacheKey);
-        if (omniProjectOperatorFactory != null) {
-            this.projectOperatorFactory = omniProjectOperatorFactory;
-            this.omniOperator = this.projectOperatorFactory.createOperator();
-            return;
-        }
         if (checkNoCompute()) {
             isSelectStarNoCompute = true;
             return;
@@ -180,6 +172,14 @@ public class OmniSelectOperator extends OmniHiveOperator<OmniSelectDesc> impleme
                         .getFieldObjectInspector()).getTypeInfo();
                 inputTypes[i] = TypeUtils.buildInputDataType(typeInfo);
             }
+        }
+        String cacheKey = Arrays.toString(expressions) + Arrays.toString(inputTypes);
+        OmniProjectOperatorFactory omniProjectOperatorFactory = (OmniProjectOperatorFactory) cache
+                .getIfPresent(cacheKey);
+        if (omniProjectOperatorFactory != null) {
+            this.projectOperatorFactory = omniProjectOperatorFactory;
+            this.omniOperator = this.projectOperatorFactory.createOperator();
+            return;
         }
         this.projectOperatorFactory = new OmniProjectOperatorFactory(expressions, inputTypes, 1, new OperatorConfig(
                 SpillConfig.NONE, new OverflowConfig(OverflowConfig.OverflowConfigId.OVERFLOW_CONFIG_NULL), true));
