@@ -116,7 +116,16 @@ import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Queue;
+import java.util.Set;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.stream.Collectors;
 
@@ -388,15 +397,15 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
     }
 
     private void initMergeJoinNeedSort() {
-        for (BaseWork work: tezWork.getAllWork()) {
+        for (BaseWork work : tezWork.getAllWork()) {
             if (!(work instanceof MergeJoinWork)) {
                 continue;
             }
             Operator reducer = ((MergeJoinWork) work).getMainWork().getAnyRootOperator();
-            if (reducer.getType()!= OperatorType.MERGEJOIN) {
+            if (reducer.getType() != OperatorType.MERGEJOIN) {
                 continue;
             }
-            for (BaseWork parent: tezWork.getParents(work)) {
+            for (BaseWork parent : tezWork.getParents(work)) {
                 TezEdgeProperty.EdgeType edgeType = tezWork.getEdgeType(parent, work);
                 boolean needSort = reduceSinkReplaceableWork.contains(parent);
                 if (reduceSinkReplaceableWork.contains(parent)) {
@@ -550,7 +559,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         }
         List<Operator<? extends OperatorDesc>> childOperators = op.getChildOperators();
         for (Operator childOperator : childOperators) {
-            if (childOperator.getType()!=null && childOperator.getType().equals(OperatorType.REDUCESINK) && reduceSinkDescUnReplaceable((ReduceSinkDesc) childOperator.getConf())) {
+            if (childOperator.getType() != null && childOperator.getType().equals(OperatorType.REDUCESINK) && reduceSinkDescUnReplaceable((ReduceSinkDesc) childOperator.getConf())) {
                 return false;
             }
         }
@@ -614,7 +623,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         if (!OMNI_OPERATOR.contains(operator.getType())) {
             return false;
         }
-        if(!omniHiveConf.operatorEnableMap.get(operator.getType())) {
+        if (!omniHiveConf.operatorEnableMap.get(operator.getType())) {
             return false;
         }
         switch (operator.getType()) {
@@ -1261,25 +1270,25 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
 
     private class OmniHiveConf {
         private final HiveConf conf = hookContext.getConf();
-        public boolean enableOperatorJoin = conf.getBoolean("omni.hive.join.enabled",true);
-        public boolean enableOperatorMapJoin = conf.getBoolean("omni.hive.mapjoin.enabled",true);
-        public boolean enableOperatorMergejoin = conf.getBoolean("omni.hive.mergejoin.enabled",true);
-        public boolean enableOperatorGroupby = conf.getBoolean("omni.hive.groupby.enabled",true);
-        public boolean enableOperatorSelect = conf.getBoolean("omni.hive.select.enabled",true);
-        public boolean enableOperatorFilter = conf.getBoolean("omni.hive.filter.enabled",true);
-        public boolean enableOperatorPtf = conf.getBoolean("omni.hive.ptf.enabled",true);
-        public boolean enableOperatorTablescan = conf.getBoolean("omni.hive.tablescan.enabled",true);
-        public boolean enableOperatorReducesink = conf.getBoolean("omni.hive.reducesink.enabled",true);
-        public HashMap<OperatorType,Boolean> operatorEnableMap = new HashMap<OperatorType,Boolean>(){{
-            put(OperatorType.JOIN,enableOperatorJoin);
-            put(OperatorType.MAPJOIN,enableOperatorMapJoin);
-            put(OperatorType.MERGEJOIN,enableOperatorMergejoin);
-            put(OperatorType.GROUPBY,enableOperatorGroupby);
-            put(OperatorType.SELECT,enableOperatorSelect);
-            put(OperatorType.FILTER,enableOperatorFilter);
-            put(OperatorType.PTF,enableOperatorPtf);
-            put(OperatorType.TABLESCAN,enableOperatorTablescan);
-            put(OperatorType.REDUCESINK,enableOperatorReducesink);
+        public boolean enableOperatorJoin = conf.getBoolean("omni.hive.join.enabled", true);
+        public boolean enableOperatorMapJoin = conf.getBoolean("omni.hive.mapjoin.enabled", true);
+        public boolean enableOperatorMergejoin = conf.getBoolean("omni.hive.mergejoin.enabled", true);
+        public boolean enableOperatorGroupby = conf.getBoolean("omni.hive.groupby.enabled", true);
+        public boolean enableOperatorSelect = conf.getBoolean("omni.hive.select.enabled", true);
+        public boolean enableOperatorFilter = conf.getBoolean("omni.hive.filter.enabled", true);
+        public boolean enableOperatorPtf = conf.getBoolean("omni.hive.ptf.enabled", true);
+        public boolean enableOperatorTablescan = conf.getBoolean("omni.hive.tablescan.enabled", true);
+        public boolean enableOperatorReducesink = conf.getBoolean("omni.hive.reducesink.enabled", true);
+        public HashMap<OperatorType, Boolean> operatorEnableMap = new HashMap<OperatorType, Boolean>() {{
+            put(OperatorType.JOIN, enableOperatorJoin);
+            put(OperatorType.MAPJOIN, enableOperatorMapJoin);
+            put(OperatorType.MERGEJOIN, enableOperatorMergejoin);
+            put(OperatorType.GROUPBY, enableOperatorGroupby);
+            put(OperatorType.SELECT, enableOperatorSelect);
+            put(OperatorType.FILTER, enableOperatorFilter);
+            put(OperatorType.PTF, enableOperatorPtf);
+            put(OperatorType.TABLESCAN, enableOperatorTablescan);
+            put(OperatorType.REDUCESINK, enableOperatorReducesink);
         }};
     }
 

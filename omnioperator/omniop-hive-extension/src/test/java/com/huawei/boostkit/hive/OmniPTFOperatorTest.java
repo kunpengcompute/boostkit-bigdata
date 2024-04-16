@@ -65,31 +65,31 @@ public class OmniPTFOperatorTest extends CommonTest {
         String confStr = "omni.hive.ptf.enabled";
         driver.getConf().set(confStr, "true");
         utRunSqlOnDriver("explain " + sql);
-        List<String> rs_explain_true = new ArrayList<>();
-        driver.getResults(rs_explain_true);
+        List<String> rsExplainTrue = new ArrayList<>();
+        driver.getResults(rsExplainTrue);
         utRunSqlOnDriver(sql);
-        List<String> rs_true = new ArrayList<>();
-        driver.getResults(rs_true);
+        List<String> rsTrue = new ArrayList<>();
+        driver.getResults(rsTrue);
         driver.getConf().set(confStr, "false");
         utRunSqlOnDriver("explain " + sql);
-        List<String> rs_explain_false = new ArrayList<>();
-        driver.getResults(rs_explain_false);
+        List<String> rsExplainFalse = new ArrayList<>();
+        driver.getResults(rsExplainFalse);
         utRunSqlOnDriver(sql);
-        List<String> rs_false = new ArrayList<>();
-        driver.getResults(rs_false);
+        List<String> rsFalse = new ArrayList<>();
+        driver.getResults(rsFalse);
 
         utRunSqlOnDriver("drop table if exists ptf_rank");
 
         String str = "Omni PTF Operator";
         boolean flag1 = false;
-        for (String s : rs_explain_true) {
+        for (String s : rsExplainTrue) {
             if (s.contains(str)) {
                 flag1 = true;
                 break;
             }
         }
         boolean flag2 = true;
-        for (String s : rs_explain_false) {
+        for (String s : rsExplainFalse) {
             if (s.contains(str)) {
                 flag2 = false;
                 break;
@@ -97,9 +97,9 @@ public class OmniPTFOperatorTest extends CommonTest {
         }
         assert flag1 : "[" + confStr + "=true] is invalid";
         assert flag2 : "[" + confStr + "=false] is invalid";
-        Assert.assertEquals(rs_true.size(),rs_false.size());
-        for (int i = 0; i < rs_true.size(); i++) {
-            Assert.assertEquals(rs_true.get(i), rs_false.get(i));
+        Assert.assertEquals(rsTrue.size(), rsFalse.size());
+        for (int i = 0; i < rsTrue.size(); i++) {
+            Assert.assertEquals(rsTrue.get(i), rsFalse.get(i));
         }
     }
 
