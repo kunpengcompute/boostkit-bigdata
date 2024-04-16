@@ -849,6 +849,13 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         if (joinDesc.getKeysString().get("0") == null || joinDesc.getResidualFilterExprs() != null) {
             return true;
         }
+        if (joinDesc.getNullSafes() != null) {
+            for (boolean nullsafe : joinDesc.getNullSafes()) {
+                if (nullsafe) {
+                    return true;
+                }
+            }
+        }
         int filterNum = 0;
         for (List<ExprNodeDesc> filters: joinDesc.getFilters().values()) {
             if (!filters.isEmpty()) {
