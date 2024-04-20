@@ -17,6 +17,7 @@ package com.huawei.boostkit.omniadvisor.spark;
 
 import com.huawei.boostkit.omniadvisor.OmniAdvisorContext;
 import com.huawei.boostkit.omniadvisor.analysis.AnalyticJob;
+import com.huawei.boostkit.omniadvisor.dto.ApplicationResult;
 import com.huawei.boostkit.omniadvisor.fetcher.FetcherType;
 import com.huawei.boostkit.omniadvisor.models.AppResult;
 import com.huawei.boostkit.omniadvisor.spark.data.SparkLogAnalyticJob;
@@ -69,7 +70,7 @@ public class TestSparkFetcher {
         Finder finder = Mockito.mock(Finder.class);
         when(finder.byId(any())).thenReturn(null);
         OmniAdvisorContext.getInstance().setFinder(finder);
-        List<AnalyticJob> jobs = sparkFetcher.fetchAnalyticJobs(0L, Long.MAX_VALUE);
+        List<AnalyticJob> jobs = sparkFetcher.fetchAnalyticJobs(0L, Long.MAX_VALUE, null);
         assertEquals(jobs.size(), 1);
     }
 
@@ -77,17 +78,17 @@ public class TestSparkFetcher {
     public void testAnalysis() {
         SparkLogAnalyticJob logJob = new SparkLogAnalyticJob("appId",
                 testResourcePath + System.getProperty("file.separator") + "application_1516285256255_0012");
-        Optional<AppResult> result = sparkFetcher.analysis(logJob);
+        Optional<ApplicationResult> result = sparkFetcher.analysis(logJob);
         assertTrue(result.isPresent());
-        AppResult appResult = result.get();
-        assertEquals(appResult.applicationId, "application_1516285256255_0012");
-        assertEquals(appResult.applicationName, "Spark shell");
-        assertEquals(appResult.applicationWorkload, "default");
-        assertEquals(appResult.startTime, 1516300235119L);
-        assertEquals(appResult.finishTime, 1516300707938L);
-        assertEquals(appResult.durationTime, 472819L);
-        assertEquals(appResult.jobType, "SPARK");
-        assertEquals(appResult.parameters, "{\"spark.executor.memory\":\"2G\",\"spark.executor.cores\":\"\",\"spark.executor.instances\":\"8\"}");
-        assertEquals(appResult.query, "");
+        ApplicationResult appResult = result.get();
+        assertEquals(appResult.getApplicationId(), "application_1516285256255_0012");
+        assertEquals(appResult.getApplicationName(), "Spark shell");
+        assertEquals(appResult.getApplicationWorkload(), "default");
+        assertEquals(appResult.getStartTime(), 1516300235119L);
+        assertEquals(appResult.getFinishTime(), 1516300707938L);
+        assertEquals(appResult.getDurationTime(), 472819L);
+        assertEquals(appResult.getJobType(), "SPARK");
+        assertEquals(appResult.getParameters(), "{\"spark.executor.memory\":\"2G\",\"spark.executor.cores\":\"\",\"spark.executor.instances\":\"8\"}");
+        assertEquals(appResult.getQuery(), "");
     }
 }

@@ -23,16 +23,19 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.List;
 
 public class OmniAdvisorRunner implements Runnable {
     private static final Logger LOG = LoggerFactory.getLogger(OmniAdvisorRunner.class);
 
     private final long startTimeMills;
     private final long finishTimeMills;
+    private final List<String> analyzedList;
 
-    public OmniAdvisorRunner(long startTimeMills, long finishTimeMills) {
+    public OmniAdvisorRunner(long startTimeMills, long finishTimeMills, List<String> analyzedList) {
         this.startTimeMills = startTimeMills;
         this.finishTimeMills = finishTimeMills;
+        this.analyzedList = analyzedList;
     }
 
     @Override
@@ -41,7 +44,7 @@ public class OmniAdvisorRunner implements Runnable {
         try {
             Configuration hadoopConf = OmniAdvisorContext.getHadoopConfig();
             HadoopSecurity hadoopSecurity = new HadoopSecurity(hadoopConf);
-            hadoopSecurity.doAs(new AnalysisAction(hadoopSecurity, startTimeMills, finishTimeMills));
+            hadoopSecurity.doAs(new AnalysisAction(hadoopSecurity, startTimeMills, finishTimeMills, analyzedList));
         } catch (IOException e) {
             LOG.error("failed to analyze jobs", e);
             throw new OmniAdvisorException(e);

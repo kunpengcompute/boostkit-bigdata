@@ -15,7 +15,7 @@
 
 package org.apache.spark
 
-import com.huawei.boostkit.omniadvisor.models.AppResult
+import com.huawei.boostkit.omniadvisor.dto.ApplicationResult
 import org.apache.spark.internal.config.Status.ASYNC_TRACKING_ENABLED
 import org.apache.spark.scheduler.ReplayListenerBus
 import org.apache.spark.sql.execution.ui.{SQLAppStatusListener, SQLAppStatusStore, SQLExecutionUIData, SparkPlanGraph}
@@ -82,7 +82,7 @@ class SparkDataCollection {
     appStatusStore.close()
   }
 
-  def getAppResult(workload: String): AppResult = {
+  def getAppResult(workload: String): ApplicationResult = {
     SparkApplicationDataExtractor.extractAppResultFromAppStatusStore(appInfo, workload, environmentInfo, jobsList, sqlExecutionsList, sqlGraphMap)
   }
 

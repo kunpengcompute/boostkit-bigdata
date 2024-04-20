@@ -18,10 +18,10 @@ package com.huawei.boostkit.omniadvisor.spark
 import com.huawei.boostkit.omniadvisor.OmniAdvisorContext
 import com.huawei.boostkit.omniadvisor.analysis.AnalyticJob
 import com.huawei.boostkit.omniadvisor.fetcher.{Fetcher, FetcherType}
-import com.huawei.boostkit.omniadvisor.models.AppResult
 import com.huawei.boostkit.omniadvisor.spark.client.{SparkEventClient, SparkLogClient, SparkRestClient}
 import com.huawei.boostkit.omniadvisor.spark.config.SparkFetcherConfigure
 import com.huawei.boostkit.omniadvisor.spark.utils.SparkUtils
+import com.huawei.boostkit.omniadvisor.dto.ApplicationResult
 import org.apache.commons.configuration2.PropertiesConfiguration
 import org.apache.commons.io.FileUtils
 import org.apache.hadoop.conf.Configuration
@@ -65,7 +65,7 @@ class SparkFetcher(configure: PropertiesConfiguration)
 
   override def isEnable: Boolean = sparkFetcherConfig.enable
 
-  override def analysis(job: AnalyticJob): Optional[AppResult] = {
+  override def analysis(job: AnalyticJob): Optional[ApplicationResult] = {
     val appId = job.getApplicationId
     LOG.info(s"Fetching data for ${appId}")
     val result = Try {
@@ -76,7 +76,7 @@ class SparkFetcher(configure: PropertiesConfiguration)
         Success(data)
       },
       e => {
-       LOG.error(s"Failed fetching data for ${appId}, Exception Message is ${e.getMessage}")
+        LOG.error(s"Failed fetching data for ${appId}, Exception Message is ${e.getMessage}")
         Failure(e)
       })
     result match {
@@ -85,7 +85,7 @@ class SparkFetcher(configure: PropertiesConfiguration)
     }
   }
 
-  private def doAnalysisApplication(job: AnalyticJob): Future[AppResult] = {
+  private def doAnalysisApplication(job: AnalyticJob): Future[ApplicationResult] = {
     Future {
       sparkClient.fetchAnalyticResult(job)
     }
@@ -93,9 +93,9 @@ class SparkFetcher(configure: PropertiesConfiguration)
 
   override def getType: FetcherType = FetcherType.SPARK
 
-  override def fetchAnalyticJobs(startTimeMills: Long, finishedTimeMills: Long): util.List[AnalyticJob] = {
+  override def fetchAnalyticJobs(startTimeMills: Long, finishedTimeMills: Long, analyzedList: util.List[String]): util.List[AnalyticJob] = {
     val jobs: util.List[AnalyticJob] = new util.ArrayList[AnalyticJob]()
-    sparkClient.fetchAnalyticJobs(startTimeMills, finishedTimeMills).foreach(job => jobs.add(job))
+    sparkClient.fetchAnalyticJobs(startTimeMills, finishedTimeMills, analyzedList).foreach(job => jobs.add(job))
     jobs
   }
 }

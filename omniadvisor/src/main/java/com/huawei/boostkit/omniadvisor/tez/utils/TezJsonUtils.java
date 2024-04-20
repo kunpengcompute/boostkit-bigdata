@@ -53,7 +53,7 @@ public class TezJsonUtils {
         connection.connect();
     }
 
-    public List<AnalyticJob> getApplicationJobs(long startedTime, long finishedTime)
+    public List<AnalyticJob> getApplicationJobs(long startedTime, long finishedTime, List<String> analyzedList)
             throws IOException, AuthenticationException {
         URL historyUrl = tezUrlFactory.getApplicationHistoryURL(startedTime, finishedTime);
         LOG.info("calling REST API at {} to get applications", historyUrl.toString());
@@ -62,7 +62,7 @@ public class TezJsonUtils {
         List<AnalyticJob> analyticJobs = new ArrayList<>();
         for (JsonNode app : apps) {
             String appId = app.get(RMWSConsts.APP_ID).getTextValue();
-            if (OmniAdvisorContext.getInstance().getFinder().byId(appId) == null) {
+            if (!analyzedList.contains(appId)) {
                 String name = getApplicationName(app.get("name").getTextValue());
                 String state = app.get("appState").getTextValue();
                 TezAnalyticJob tezJob =

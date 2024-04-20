@@ -15,6 +15,7 @@
 package com.huawei.boostkit.omniadvisor.fetcher;
 
 import com.huawei.boostkit.omniadvisor.analysis.AnalyticJob;
+import com.huawei.boostkit.omniadvisor.dto.ApplicationResult;
 import com.huawei.boostkit.omniadvisor.models.AppResult;
 
 import java.util.List;
@@ -25,7 +26,7 @@ public interface Fetcher {
 
     FetcherType getType();
 
-    List<AnalyticJob> fetchAnalyticJobs(long startTimeMills, long finishedTimeMills);
+    List<AnalyticJob> fetchAnalyticJobs(long startTimeMills, long finishedTimeMills, List<String> analyzedList);
 
-    Optional<AppResult> analysis(AnalyticJob job);
+    Optional<ApplicationResult> analysis(AnalyticJob job);
 }

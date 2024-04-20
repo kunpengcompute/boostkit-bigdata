@@ -17,6 +17,7 @@ package com.huawei.boostkit.omniadvisor.tez;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.huawei.boostkit.omniadvisor.analysis.AnalyticJob;
+import com.huawei.boostkit.omniadvisor.dto.ApplicationResult;
 import com.huawei.boostkit.omniadvisor.exception.OmniAdvisorException;
 import com.huawei.boostkit.omniadvisor.fetcher.Fetcher;
 import com.huawei.boostkit.omniadvisor.fetcher.FetcherType;
@@ -88,9 +89,9 @@ public class TezFetcher implements Fetcher {
     }
 
     @Override
-    public List<AnalyticJob> fetchAnalyticJobs(long startTimeMills, long finishedTimeMills) {
+    public List<AnalyticJob> fetchAnalyticJobs(long startTimeMills, long finishedTimeMills, List<String> analyzedList) {
         try {
-            return tezJsonUtils.getApplicationJobs(startTimeMills, finishedTimeMills);
+            return tezJsonUtils.getApplicationJobs(startTimeMills, finishedTimeMills, analyzedList);
         } catch (IOException | AuthenticationException | ClientHandlerException e) {
             LOG.error("Fetch applications from timeline server failed.", e);
             return Collections.emptyList();
@@ -98,7 +99,7 @@ public class TezFetcher implements Fetcher {
     }
 
     @Override
-    public Optional<AppResult> analysis(AnalyticJob job) {
+    public Optional<ApplicationResult> analysis(AnalyticJob job) {
         if (!(job instanceof TezAnalyticJob)) {
             throw new OmniAdvisorException("TezFetcher only support TezAnalyticJob");
         }
@@ -120,42 +121,42 @@ public class TezFetcher implements Fetcher {
         return extractAppResult(tezJob, dagIds);
     }
 
-    private Optional<AppResult> extractAppResult(TezAnalyticJob tezJob, List<TezDagIdData> dagIds) {
+    private Optional<ApplicationResult> extractAppResult(TezAnalyticJob tezJob, List<TezDagIdData> dagIds) {
         LOG.info("Analyzing tez application {}", tezJob.getApplicationId());
-        AppResult appResult = new AppResult();
+        ApplicationResult appResult = new ApplicationResult();
         Map<String, String> jobConf;
         try {
             jobConf = tezJsonUtils.getConfigure(tezJob.getApplicationId());
-            appResult.parameters = Utils.parseMapToJsonString(loadParamsFromConf(TEZ_PARAMS_CONF_FILE, jobConf));
-            appResult.query = tezJsonUtils.getQueryString(dagIds);
+            appResult.setParameters(Utils.parseMapToJsonString(loadParamsFromConf(TEZ_PARAMS_CONF_FILE, jobConf)));
+            appResult.setQuery(tezJsonUtils.getQueryString(dagIds));
         } catch (IOException e) {
             LOG.error("Analyze job failed. ", e);
             return Optional.empty();
         }
 
-        appResult.applicationId = tezJob.getApplicationId();
-        appResult.applicationName = tezJob.getApplicationName();
-        appResult.applicationWorkload = workload;
-        appResult.jobType = tezJob.getType().getName();
+        appResult.setApplicationId(tezJob.getApplicationId());
+        appResult.setApplicationName(tezJob.getApplicationName());
+        appResult.setApplicationWorkload(workload);
+        appResult.setJobType(tezJob.getType().getName());
 
         if (isCompleteForDagIds(dagIds)) {
             OptionalLong minStartTime = dagIds.stream().mapToLong(TezDagIdData::getStartTime).min();
             OptionalLong maxEndTime = dagIds.stream().mapToLong(TezDagIdData::getEndTime).max();
-            appResult.startTime = isValidTime(minStartTime, maxEndTime) ? minStartTime.getAsLong() : tezJob.getStartTimeMills();
-            appResult.finishTime = isValidTime(minStartTime, maxEndTime) ? maxEndTime.getAsLong() : tezJob.getFinishTimeMills();
-            appResult.executionStatus = isSuccessfulForDagIds(dagIds) ? AppResult.SUCCEEDED_STATUS : AppResult.FAILED_STATUS;
-            appResult.durationTime = isSuccessfulForDagIds(dagIds) && isValidTime(minStartTime, maxEndTime) ? (appResult.finishTime - appResult.startTime) : AppResult.FAILED_JOB_DURATION;
+            appResult.setStartTime(isValidTime(minStartTime, maxEndTime) ? minStartTime.getAsLong() : tezJob.getStartTimeMills());
+            appResult.setFinishTime(isValidTime(minStartTime, maxEndTime) ? maxEndTime.getAsLong() : tezJob.getFinishTimeMills());
+            appResult.setExecutionStatus(isSuccessfulForDagIds(dagIds) ? AppResult.SUCCEEDED_STATUS : AppResult.FAILED_STATUS);
+            appResult.setDurationTime(isSuccessfulForDagIds(dagIds) && isValidTime(minStartTime, maxEndTime) ? (appResult.getFinishTime() - appResult.getStartTime()) : AppResult.FAILED_JOB_DURATION);
         } else {
-            appResult.startTime = tezJob.getStartTimeMills();
-            appResult.finishTime = tezJob.getFinishTimeMills();
+            appResult.setStartTime(tezJob.getStartTimeMills());
+            appResult.setFinishTime(tezJob.getFinishTimeMills());
             if (tezJob.getState() == YarnApplicationState.KILLED) {
                 LOG.info("Application {} is killed, regarded as a failed task", tezJob.getApplicationId());
-                appResult.executionStatus = AppResult.FAILED_STATUS;
-                appResult.durationTime = AppResult.FAILED_JOB_DURATION;
+                appResult.setExecutionStatus(AppResult.FAILED_STATUS);
+                appResult.setDurationTime(AppResult.FAILED_JOB_DURATION);
             } else {
                 LOG.info("Application {} using input time", tezJob.getApplicationId());
-                appResult.executionStatus = AppResult.SUCCEEDED_STATUS;
-                appResult.durationTime = appResult.finishTime - appResult.startTime;
+                appResult.setExecutionStatus(AppResult.SUCCEEDED_STATUS);
+                appResult.setDurationTime(appResult.getFinishTime() - appResult.getStartTime());
             }
         }
 

@@ -15,28 +15,27 @@
 
 package com.huawei.boostkit.omniadvisor.spark.client
 
-import com.huawei.boostkit.omniadvisor.OmniAdvisorContext
 import com.huawei.boostkit.omniadvisor.analysis.AnalyticJob
-import com.huawei.boostkit.omniadvisor.models.AppResult
 import com.huawei.boostkit.omniadvisor.spark.data.SparkLogAnalyticJob
 import com.huawei.boostkit.omniadvisor.spark.utils.SparkUtils
+import com.huawei.boostkit.omniadvisor.dto.ApplicationResult
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
-import org.apache.spark.SparkApplicationDataExtractor.extractAppResultFromAppStatusStore
-import org.apache.spark.SparkConf
-import org.apache.spark.SparkDataCollection
+import org.apache.spark.{SparkConf, SparkDataCollection}
+
+import java.util
 
 class SparkLogClient(hadoopConfiguration: Configuration, sparkConf: SparkConf, eventLogUri: String,
                      workload: String, maxFileSize: Long)
   extends SparkEventClient {
 
-  override def fetchAnalyticJobs(startTimeMills: Long, finishedTimeMills: Long): List[AnalyticJob] = {
+  override def fetchAnalyticJobs(startTimeMills: Long, finishedTimeMills: Long, analyzedList: util.List[String]): List[AnalyticJob] = {
     SparkUtils.findApplicationFiles(hadoopConfiguration, eventLogUri, startTimeMills, finishedTimeMills, maxFileSize)
       .map(file => new SparkLogAnalyticJob(SparkUtils.getApplicationIdFromFile(file), file))
-      .filter(job => OmniAdvisorContext.getInstance().getFinder.byId(job.getApplicationId) == null)
+      .filter(job => !analyzedList.contains(job.getApplicationId))
   }
 
-  override def fetchAnalyticResult(job: AnalyticJob): AppResult = {
+  override def fetchAnalyticResult(job: AnalyticJob): ApplicationResult = {
     require(job.isInstanceOf[SparkLogAnalyticJob], "Require SparkLogAnalyticJob")
     val logJob = job.asInstanceOf[SparkLogAnalyticJob]
     val path = new Path(logJob.getFilePath)

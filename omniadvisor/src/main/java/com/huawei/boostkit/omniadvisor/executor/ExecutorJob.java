@@ -15,7 +15,9 @@
 
 package com.huawei.boostkit.omniadvisor.executor;
 
+import com.huawei.boostkit.omniadvisor.OmniAdvisorContext;
 import com.huawei.boostkit.omniadvisor.analysis.AnalyticJob;
+import com.huawei.boostkit.omniadvisor.dto.ApplicationResult;
 import com.huawei.boostkit.omniadvisor.fetcher.Fetcher;
 import com.huawei.boostkit.omniadvisor.fetcher.FetcherFactory;
 import com.huawei.boostkit.omniadvisor.fetcher.FetcherType;
@@ -24,6 +26,7 @@ import io.ebean.DB;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Map;
 import java.util.Optional;
 
 import static com.huawei.boostkit.omniadvisor.utils.MathUtils.SECOND_IN_MS;
@@ -43,6 +46,7 @@ class ExecutorJob implements Runnable {
 
     @Override
     public void run() {
+        OmniAdvisorContext context = OmniAdvisorContext.getInstance();
         FetcherType type = analyticJob.getType();
         String appId = analyticJob.getApplicationId();
 
@@ -52,13 +56,14 @@ class ExecutorJob implements Runnable {
 
         Fetcher fetcher = fetcherFactory.getFetcher(type);
 
-        final Optional<AppResult> result = fetcher.analysis(analyticJob);
+        final Optional<ApplicationResult> result = fetcher.analysis(analyticJob);
         if (result.isPresent()) {
             synchronized (appsLock) {
-                AppResult analyzeResult = result.get();
+                ApplicationResult analyzeResult = result.get();
                 LOG.info("Analysis get result {}", appId);
+                Map<String, ApplicationResult> applicationResultMap = context.getApplicationResultMap();
                 try {
-                    DB.execute(analyzeResult::save);
+                    applicationResultMap.put(analyzeResult.getApplicationId(), analyzeResult);
                 } catch (Throwable e) {
                     LOG.error("Error in saving analyze result, {}", e.getMessage());
                 }
