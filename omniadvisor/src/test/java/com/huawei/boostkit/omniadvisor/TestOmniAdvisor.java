@@ -16,8 +16,12 @@
 package com.huawei.boostkit.omniadvisor;
 
 import com.huawei.boostkit.omniadvisor.configuration.BaseTestConfiguration;
+import com.huawei.boostkit.omniadvisor.dto.ApplicationResult;
 import com.huawei.boostkit.omniadvisor.exception.OmniAdvisorException;
+import org.junit.Assert;
 import org.junit.Test;
+
+import java.util.Map;
 
 public class TestOmniAdvisor extends BaseTestConfiguration {
     @Test
@@ -27,16 +31,25 @@ public class TestOmniAdvisor extends BaseTestConfiguration {
 
     @Test(expected = OmniAdvisorException.class)
     public void testErrorNumberParams() {
-        OmniAdvisor.main(new String[] {"2020-09-02 00:00:00", "2020-09-02 00:00:00"});
+        OmniAdvisor.main(new String[]{"2020-09-02 00:00:00", "2020-09-02 00:00:00"});
     }
 
     @Test(expected = OmniAdvisorException.class)
     public void testErrorTimeParser() {
-        OmniAdvisor.main(new String[] {"2020-09-02 00-00-00", "2020-09-02 00-00-00", "user", "pass"});
+        OmniAdvisor.main(new String[]{"2020-09-02 00-00-00", "2020-09-02 00-00-00", "user", "pass"});
     }
 
     @Test(expected = OmniAdvisorException.class)
     public void testErrorTimeOrder() {
-        OmniAdvisor.main(new String[] {"2020-09-02 20:00:00", "2020:09:02 00-00-00", "user", "pass"});
+        OmniAdvisor.main(new String[]{"2020-09-02 20:00:00", "2020:09:02 00-00-00", "user", "pass"});
+    }
+
+    @Test
+    public void testAnalysisLog() {
+        OmniAdvisor advisor = new OmniAdvisor();
+        String startTime = "2024-04-17 10:35:40";
+        String finishedTime = "2024-04-17 10:45:00";
+        Map<String, ApplicationResult> applicationResultMap = advisor.analysisLog(null, startTime, finishedTime);
+        Assert.assertNotNull(applicationResultMap);
     }
 }

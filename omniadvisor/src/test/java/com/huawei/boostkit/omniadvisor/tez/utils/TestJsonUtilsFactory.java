@@ -39,7 +39,7 @@ import static com.huawei.boostkit.omniadvisor.tez.utils.TestTezContext.UNFINISHE
 public class TestJsonUtilsFactory {
     public static TezJsonUtils getAppListJsonUtils() throws AuthenticationException, IOException {
         TezJsonUtils tezJsonUtils = Mockito.mock(TezJsonUtils.class);
-        Mockito.when(tezJsonUtils.getApplicationJobs(TIME_14, TIME_18)).thenReturn(TEST_APP_LIST);
+        Mockito.when(tezJsonUtils.getApplicationJobs(TIME_14, TIME_18, null)).thenReturn(TEST_APP_LIST);
         return tezJsonUtils;
     }
 

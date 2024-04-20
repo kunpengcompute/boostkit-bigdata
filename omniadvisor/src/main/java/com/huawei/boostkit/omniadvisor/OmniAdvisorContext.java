@@ -16,8 +16,8 @@
 package com.huawei.boostkit.omniadvisor;
 
 import com.google.common.collect.ImmutableList;
-import com.huawei.boostkit.omniadvisor.configuration.DBConfigure;
 import com.huawei.boostkit.omniadvisor.configuration.OmniAdvisorConfigure;
+import com.huawei.boostkit.omniadvisor.dto.ApplicationResult;
 import com.huawei.boostkit.omniadvisor.exception.OmniAdvisorException;
 import com.huawei.boostkit.omniadvisor.fetcher.FetcherFactory;
 import com.huawei.boostkit.omniadvisor.models.AppResult;
@@ -34,6 +34,8 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static java.lang.String.format;
 
@@ -43,6 +45,8 @@ public final class OmniAdvisorContext {
     private static final List<String> DEFAULT_HADOOP_CONFIG_FILES = ImmutableList.of("hdfs-site.xml", "core-site.xml");
     private static final String ENCODING = StandardCharsets.UTF_8.displayName(Locale.ENGLISH);
     private static final Configuration HADOOP_CONF;
+
+    private final Map<String, ApplicationResult> applicationResultMap;
 
     private static OmniAdvisorContext instance = null;
 
@@ -63,31 +67,12 @@ public final class OmniAdvisorContext {
     private Finder<String, AppResult> finder = new Finder<>(AppResult.class);
 
     private OmniAdvisorContext() {
-        this(false, null, null);
-    }
-
-    private OmniAdvisorContext(String user, String passwd) {
-        this(true, user, passwd);
-    }
-
-    private OmniAdvisorContext(boolean initDatabase, String user, String passwd) {
         PropertiesConfiguration configuration = loadConfigure();
-        if (initDatabase) {
-            initDataSource(configuration, user, passwd);
-        }
-        this.omniAdvisorConfigure = loadOmniTuningConfig(configuration);
+        this.omniAdvisorConfigure = loadOmniAdvisorConfig(configuration);
         this.fetcherFactory = loadFetcherFactory(configuration);
+        this.applicationResultMap = new ConcurrentHashMap<>();
     }
 
-    public static void initContext(String user, String passwd) {
-        if (instance == null) {
-            instance = new OmniAdvisorContext(user, passwd);
-        } else {
-            LOG.warn("OmniTuningContext has been instantiated");
-        }
-    }
-
-    // only use for unit test
     public static void initContext() {
         if (instance == null) {
             instance = new OmniAdvisorContext();
@@ -105,6 +90,10 @@ public final class OmniAdvisorContext {
 
     public static Configuration getHadoopConfig() {
         return HADOOP_CONF;
+    }
+
+    public Map<String, ApplicationResult> getApplicationResultMap() {
+        return applicationResultMap;
     }
 
     public OmniAdvisorConfigure getOmniAdvisorConfigure() {
@@ -137,11 +126,7 @@ public final class OmniAdvisorContext {
         }
     }
 
-    private void initDataSource(PropertiesConfiguration configuration, String user, String passwd) {
-        DBConfigure.initDatabase(configuration, user, passwd);
-    }
-
-    private OmniAdvisorConfigure loadOmniTuningConfig(PropertiesConfiguration configuration) {
+    private OmniAdvisorConfigure loadOmniAdvisorConfig(PropertiesConfiguration configuration) {
         return new OmniAdvisorConfigure(configuration);
     }
 

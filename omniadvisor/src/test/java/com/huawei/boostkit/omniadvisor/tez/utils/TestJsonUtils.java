@@ -39,7 +39,7 @@ public class TestJsonUtils {
 
     @Test(expected = ClientHandlerException.class)
     public void testGetApplicationJobs() throws AuthenticationException, IOException {
-        testJsonUtils.getApplicationJobs(0L, 1000L);
+        testJsonUtils.getApplicationJobs(0L, 1000L, null);
     }
 
     @Test(expected = ClientHandlerException.class)

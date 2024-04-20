@@ -17,6 +17,7 @@ package com.huawei.boostkit.omniadvisor.spark.client;
 
 import com.huawei.boostkit.omniadvisor.analysis.AnalyticJob;
 import com.huawei.boostkit.omniadvisor.configuration.BaseTestConfiguration;
+import com.huawei.boostkit.omniadvisor.dto.ApplicationResult;
 import com.huawei.boostkit.omniadvisor.fetcher.FetcherType;
 import com.huawei.boostkit.omniadvisor.models.AppResult;
 import com.huawei.boostkit.omniadvisor.spark.data.SparkRestAnalyticJob;
@@ -49,9 +50,9 @@ public class TestRestClient extends BaseTestConfiguration {
     private static final String TEST_URL = "http://testUri";
     private static final String TEST_APP_INFO =
             "{" +
-                "\"id\" : \"test\"," +
-                "\"name\" : \"test\"," +
-                "\"attempts\" : [{" +
+                    "\"id\" : \"test\"," +
+                    "\"name\" : \"test\"," +
+                    "\"attempts\" : [{" +
                     "\"startTime\" : \"2023-09-08T03:10:30.194GMT\"," +
                     "\"endTime\" : \"2023-09-08T03:11:34.864GMT\"," +
                     "\"lastUpdated\" : \"2023-09-08T03:11:34.970GMT\"," +
@@ -62,8 +63,8 @@ public class TestRestClient extends BaseTestConfiguration {
                     "\"startTimeEpoch\" : 1694142632194," +
                     "\"lastUpdatedEpoch\" : 1694142694970," +
                     "\"endTimeEpoch\" : 1694142694864" +
-                "}]" +
-            "}";
+                    "}]" +
+                    "}";
 
     private static final String TEST_APP_INFO_LIST = "[" + TEST_APP_INFO + "]";
 
@@ -80,7 +81,7 @@ public class TestRestClient extends BaseTestConfiguration {
         when(builder.get(String.class)).thenReturn(TEST_APP_INFO_LIST);
         when(webTarget.request(MediaType.APPLICATION_JSON)).thenReturn(builder);
         restClient.setApiTarget(webTarget);
-        List<AnalyticJob> jobList = restClient.fetchAnalyticJobs(0L, 100L);
+        List<AnalyticJob> jobList = restClient.fetchAnalyticJobs(0L, 100L, null);
         assertEquals(jobList.size(), 1);
     }
 
@@ -95,7 +96,7 @@ public class TestRestClient extends BaseTestConfiguration {
         when(builder.get(String.class)).thenReturn(TEST_EMPTY_APP_INFO_LIST);
         when(webTarget.request(MediaType.APPLICATION_JSON)).thenReturn(builder);
         restClient.setApiTarget(webTarget);
-        List<AnalyticJob> jobList = restClient.fetchAnalyticJobs(0L, 100L);
+        List<AnalyticJob> jobList = restClient.fetchAnalyticJobs(0L, 100L, null);
         assertEquals(jobList.size(), 0);
     }
 
@@ -142,7 +143,7 @@ public class TestRestClient extends BaseTestConfiguration {
         when(webTarget.request(MediaType.APPLICATION_OCTET_STREAM)).thenReturn(builder);
         when(webTarget.request(MediaType.APPLICATION_JSON)).thenReturn(builder);
         restClient.setApiTarget(webTarget);
-        AppResult result = restClient.fetchAnalyticResult(restJob);
-        assertEquals(result.applicationId, "application_1516285256255_0012");
+        ApplicationResult result = restClient.fetchAnalyticResult(restJob);
+        assertEquals(result.getApplicationId(), "application_1516285256255_0012");
     }
 }

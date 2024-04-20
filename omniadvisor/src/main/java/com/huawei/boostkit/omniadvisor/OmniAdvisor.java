@@ -15,27 +15,30 @@
 
 package com.huawei.boostkit.omniadvisor;
 
+import com.huawei.boostkit.omniadvisor.dto.ApplicationResult;
 import com.huawei.boostkit.omniadvisor.exception.OmniAdvisorException;
 import com.huawei.boostkit.omniadvisor.executor.OmniAdvisorRunner;
 import org.apache.commons.lang.time.DateUtils;
 
 import java.text.ParseException;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 public final class OmniAdvisor {
-    private static final int REQUIRED_PARAMS_LENGTH = 4;
+    private static final int REQUIRED_PARAMS_LENGTH = 2;
     private static final String[] TIME_PARSE_PATTERNS = {"yyyy-MM-dd HH:mm:ss"};
 
-    private OmniAdvisor() {}
+    public OmniAdvisor() {}
 
     public static void main(String[] args) {
         List<String> params = removeEmptyArgs(args);
 
         if (params.size() != REQUIRED_PARAMS_LENGTH) {
-            throw new OmniAdvisorException("The number of parameters is abnormal. Only four parameters are supported.");
+            throw new OmniAdvisorException("The number of parameters is abnormal. Only two parameters are supported.");
         }
 
         Date startDate;
@@ -54,9 +57,34 @@ public final class OmniAdvisor {
             throw new OmniAdvisorException("start time cannot be greater than finish time");
         }
 
-        OmniAdvisorContext.initContext(params.get(2), params.get(3));
-        OmniAdvisorRunner runner = new OmniAdvisorRunner(startTimeMills, finishedTimeMills);
+        OmniAdvisorContext.initContext();
+        OmniAdvisorRunner runner = new OmniAdvisorRunner(startTimeMills, finishedTimeMills, null);
         runner.run();
+    }
+
+    public Map<String, ApplicationResult> analysisLog(List<String> analyzedAppList, String startTime, String finishedTime) {
+        Date startDate;
+        Date finishDate;
+        try {
+            startDate = DateUtils.parseDate(startTime, TIME_PARSE_PATTERNS);
+            finishDate = DateUtils.parseDate(finishedTime, TIME_PARSE_PATTERNS);
+        } catch (ParseException e) {
+            throw new OmniAdvisorException("Unsupported date format. Only the 'yyyy-MM-dd HH:mm:ss' is supported", e);
+        }
+        long startTimeMills = startDate.getTime();
+        long finishedTimeMills = finishDate.getTime();
+
+        if (startTimeMills > finishedTimeMills) {
+            throw new OmniAdvisorException("start time cannot be greater than finish time");
+        }
+
+        if (analyzedAppList == null) {
+            analyzedAppList = Collections.emptyList();
+        }
+        OmniAdvisorContext.initContext();
+        OmniAdvisorRunner runner = new OmniAdvisorRunner(startTimeMills, finishedTimeMills, analyzedAppList);
+        runner.run();
+        return OmniAdvisorContext.getInstance().getApplicationResultMap();
     }
 
     private static List<String> removeEmptyArgs(String[] args) {

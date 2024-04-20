@@ -16,10 +16,12 @@
 package com.huawei.boostkit.omniadvisor.spark.client
 
 import com.huawei.boostkit.omniadvisor.analysis.AnalyticJob
-import com.huawei.boostkit.omniadvisor.models.AppResult
+import com.huawei.boostkit.omniadvisor.dto.ApplicationResult
+import java.util
 
 trait SparkEventClient {
-  def fetchAnalyticJobs(startTimeMills: Long, finishedTimeMills: Long): List[AnalyticJob]
 
-  def fetchAnalyticResult(job: AnalyticJob): AppResult
+  def fetchAnalyticJobs(startTimeMills: Long, finishedTimeMills: Long, analyzedList: util.List[String]): List[AnalyticJob]
+
+  def fetchAnalyticResult(job: AnalyticJob): ApplicationResult
 }

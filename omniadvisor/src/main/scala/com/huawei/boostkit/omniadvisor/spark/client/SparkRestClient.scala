@@ -17,14 +17,12 @@ package com.huawei.boostkit.omniadvisor.spark.client
 
 import com.fasterxml.jackson.databind.{DeserializationFeature, ObjectMapper}
 import com.fasterxml.jackson.module.scala.{DefaultScalaModule, ScalaObjectMapper}
-import com.huawei.boostkit.omniadvisor.OmniAdvisorContext
 import com.huawei.boostkit.omniadvisor.analysis.AnalyticJob
 import com.huawei.boostkit.omniadvisor.exception.OmniAdvisorException
-import com.huawei.boostkit.omniadvisor.models.AppResult
+import com.huawei.boostkit.omniadvisor.dto.ApplicationResult
 import com.huawei.boostkit.omniadvisor.spark.data.SparkRestAnalyticJob
 import com.huawei.boostkit.omniadvisor.spark.utils.SparkUtils
-import org.apache.spark.SparkConf
-import org.apache.spark.SparkDataCollection
+import org.apache.spark.{SparkConf, SparkDataCollection}
 import org.apache.spark.status.api.v1.ApplicationInfo
 import org.glassfish.jersey.client.ClientProperties
 import org.slf4j.{Logger, LoggerFactory}
@@ -32,8 +30,9 @@ import org.slf4j.{Logger, LoggerFactory}
 import java.io.{BufferedInputStream, InputStream}
 import java.net.URI
 import java.text.SimpleDateFormat
-import java.util.{Calendar, Date, SimpleTimeZone}
+import java.util
 import java.util.zip.ZipInputStream
+import java.util.{Calendar, Date, SimpleTimeZone}
 import javax.ws.rs.client.{Client, ClientBuilder, WebTarget}
 import javax.ws.rs.core.MediaType
 import scala.collection.mutable.ListBuffer
@@ -86,7 +85,7 @@ class SparkRestClient(historyUri: String, timeoutSeconds: Int, sparkConf: SparkC
     this.apiTarget = apiTarget
   }
 
-  override def fetchAnalyticJobs(startTimeMills: Long, finishedTimeMills: Long): List[AnalyticJob] = {
+  override def fetchAnalyticJobs(startTimeMills: Long, finishedTimeMills: Long, analyzedList: util.List[String]): List[AnalyticJob] = {
     val minDate = sparkRestObjectMapper.getDateFormat.format(new Date(startTimeMills))
     val maxDate = sparkRestObjectMapper.getDateFormat.format(new Date(finishedTimeMills))
     val appTarget = apiTarget.path("applications").queryParam("minDate", minDate).queryParam("maxDate", maxDate)
@@ -94,7 +93,7 @@ class SparkRestClient(historyUri: String, timeoutSeconds: Int, sparkConf: SparkC
     try {
       LOG.info(s"calling REST API at ${appTarget.getUri}")
       val applications = getApplications(appTarget, sparkRestObjectMapper.readValue[Seq[ApplicationInfo]])
-        .filter(job => OmniAdvisorContext.getInstance().getFinder.byId(job.id) == null)
+        .filter(job => !analyzedList.contains(job.id))
       val analyticJobs = new ListBuffer[AnalyticJob]()
       for (appInfo <- applications) {
         val attempts = appInfo.attempts
@@ -112,7 +111,7 @@ class SparkRestClient(historyUri: String, timeoutSeconds: Int, sparkConf: SparkC
     }
   }
 
-  override def fetchAnalyticResult(job: AnalyticJob): AppResult = {
+  override def fetchAnalyticResult(job: AnalyticJob): ApplicationResult = {
     require(job.isInstanceOf[SparkRestAnalyticJob], "Require SparkRestAnalyticJob")
     val sparkJob = job.asInstanceOf[SparkRestAnalyticJob]
     val attemptTarget = getApplicationMetaData(sparkJob.getApplicationId)

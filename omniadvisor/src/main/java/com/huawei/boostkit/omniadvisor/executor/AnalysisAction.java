@@ -44,14 +44,16 @@ public class AnalysisAction implements PrivilegedAction<Void> {
     private final HadoopSecurity hadoopSecurity;
     private final long startTimeMills;
     private final long finishTimeMills;
+    private final List<String> analyzedList;
 
     private final Object appsLock;
 
-    public AnalysisAction(HadoopSecurity hadoopSecurity,long startTimeMills, long finishTImeMills) {
+    public AnalysisAction(HadoopSecurity hadoopSecurity, long startTimeMills, long finishTImeMills, List<String> analyzedList) {
         this.appsLock = new Object();
         this.hadoopSecurity = hadoopSecurity;
         this.startTimeMills = startTimeMills;
         this.finishTimeMills = finishTImeMills;
+        this.analyzedList = analyzedList;
     }
 
     @Override
@@ -73,7 +75,7 @@ public class AnalysisAction implements PrivilegedAction<Void> {
         List<AnalyticJob> analyticJobs = new ArrayList<>();
         for (Fetcher fetcher : fetcherFactory.getAllFetchers()) {
             LOG.info("Fetching jobs from {}", fetcher.getType().getName());
-            List<AnalyticJob> fetchedJobs = fetcher.fetchAnalyticJobs(startTimeMills, finishTimeMills);
+            List<AnalyticJob> fetchedJobs = fetcher.fetchAnalyticJobs(startTimeMills, finishTimeMills, analyzedList);
             LOG.info("Fetched {} jobs from {}", fetchedJobs.size(), fetcher.getType().getName());
             analyticJobs.addAll(fetchedJobs);
         }
@@ -81,7 +83,7 @@ public class AnalysisAction implements PrivilegedAction<Void> {
         LOG.info("Fetchers get total {} Jobs", analyticJobs.size());
 
         if (!analyticJobs.isEmpty()) {
-            ThreadFactory factory = new ThreadFactoryBuilder().setNameFormat("omni-tuning-thread-%d").build();
+            ThreadFactory factory = new ThreadFactoryBuilder().setNameFormat("omni-advisor-thread-%d").build();
             int executorNum = Integer.min(analyticJobs.size(), omniAdvisorConfigure.getThreadCount());
             int queueSize = Integer.max(analyticJobs.size(), executorNum);
             ThreadPoolExecutor threadPoolExecutor = new ThreadPoolExecutor(executorNum, executorNum, 0L,
@@ -91,8 +93,21 @@ public class AnalysisAction implements PrivilegedAction<Void> {
                     threadPoolExecutor.submit(new ExecutorJob(analyticJob, fetcherFactory, appsLock));
                 }
             }
+
             Timer timer = new Timer();
             timer.schedule(new ThreadPoolListener(timer, threadPoolExecutor), WAIT_INTERVAL, WAIT_INTERVAL);
+
+            // 等待所有已提交的任务完成，或者等待超时（此处设置为5分钟）
+            try {
+                if (!threadPoolExecutor.awaitTermination(10, TimeUnit.MINUTES)) {
+                    LOG.error("Timeout");
+                }
+            } catch (InterruptedException e) {
+                // 当前线程被中断，处理中断逻辑
+                threadPoolExecutor.shutdownNow(); // 强制停止所有正在执行的任务
+                Thread.currentThread().interrupt(); // 重置中断状态
+                throw new RuntimeException("主线程被中断", e);
+            }
         }
         return null;
     }

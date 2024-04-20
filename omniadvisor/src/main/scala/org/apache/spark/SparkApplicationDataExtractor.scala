@@ -16,7 +16,7 @@
 package org.apache.spark
 
 import com.huawei.boostkit.omniadvisor.fetcher.FetcherType
-import com.huawei.boostkit.omniadvisor.models.AppResult
+import com.huawei.boostkit.omniadvisor.dto.ApplicationResult
 import com.huawei.boostkit.omniadvisor.spark.utils.ScalaUtils.{checkSuccess, parseMapToJsonString}
 import com.huawei.boostkit.omniadvisor.spark.utils.SparkUtils
 import com.nimbusds.jose.util.StandardCharset
@@ -41,19 +41,19 @@ object SparkApplicationDataExtractor {
                                          environmentInfo: ApplicationEnvironmentInfo,
                                          jobsList: Seq[JobData],
                                          sqlExecutionsList: Seq[SQLExecutionUIData],
-                                         sqlGraphMap: mutable.Map[Long, SparkPlanGraph]): AppResult = {
-    val appResult = new AppResult
-    appResult.applicationId = appInfo.id
-    appResult.applicationName = appInfo.name
-    appResult.jobType = FetcherType.SPARK.getName
-    appResult.applicationWorkload = workload
+                                         sqlGraphMap: mutable.Map[Long, SparkPlanGraph]): ApplicationResult = {
+    val appResult = new ApplicationResult()
+    appResult.setApplicationId(appInfo.id)
+    appResult.setApplicationName(appInfo.name)
+    appResult.setJobType(FetcherType.SPARK.getName)
+    appResult.setApplicationWorkload(workload)
 
     val configurations: Map[String, String] = extractAppConfigurations(environmentInfo)
-    appResult.parameters = parseMapToJsonString(extractRequiredConfiguration(configurations))
-    appResult.deploy_mode = configurations.getOrElse(SPARK_DEPLOY_MODE, "")
-    val (submitMethod, submitCmdFormatted) = extractSubmitInfo(configurations, appResult.deploy_mode)
-    appResult.submit_method = submitMethod
-    appResult.submit_cmd = submitCmdFormatted
+    appResult.setParameters(parseMapToJsonString(extractRequiredConfiguration(configurations)))
+    appResult.setDeploy_mode(configurations.getOrElse(SPARK_DEPLOY_MODE, ""))
+    val (submitMethod, submitCmdFormatted) = extractSubmitInfo(configurations, appResult.getDeploy_mode)
+    appResult.setSubmit_method(submitMethod)
+    appResult.setSubmit_cmd(submitCmdFormatted)
 
     val attempt: ApplicationAttemptInfo = lastAttempt(appInfo)
     if (attempt.completed && jobsList.nonEmpty && checkSuccess(jobsList)) {
@@ -96,35 +96,35 @@ object SparkApplicationDataExtractor {
   private def extractSubmitInfo(configurations: Map[String, String], deployMode: String): (String, String) = {
     val submitCmd = configurations.getOrElse(SPARK_SUBMIT_CMD, "")
     val submitMethod = submitCmd match {
-      case cmd if cmd.contains(SPARK_SQL_CLI_DRIVER) => AppResult.SPARK_SQL
-      case cmd if cmd.nonEmpty => AppResult.SPARK_SUBMIT
+      case cmd if cmd.contains(SPARK_SQL_CLI_DRIVER) => ApplicationResult.SPARK_SQL
+      case cmd if cmd.nonEmpty => ApplicationResult.SPARK_SUBMIT
       case _ => ""
     }
     val submitCmdFormatted = SparkUtils.formatSubmitCmd(submitCmd, deployMode)
     (submitMethod, submitCmdFormatted)
   }
 
-  private def saveFailedStatus(appResult: AppResult, attempt: ApplicationAttemptInfo): Unit = {
-    appResult.executionStatus = AppResult.FAILED_STATUS
-    appResult.startTime = attempt.startTime.getTime
-    appResult.finishTime = attempt.endTime.getTime
-    appResult.durationTime = AppResult.FAILED_JOB_DURATION
-    appResult.query = ""
+  private def saveFailedStatus(applicationResult: ApplicationResult, attempt: ApplicationAttemptInfo): Unit = {
+    applicationResult.setExecutionStatus(ApplicationResult.FAILED_STATUS)
+    applicationResult.setStartTime(attempt.startTime.getTime)
+    applicationResult.setFinishTime(attempt.endTime.getTime)
+    applicationResult.setDurationTime(ApplicationResult.FAILED_JOB_DURATION)
+    applicationResult.setQuery("")
   }
 
-  private def saveSuccessfulStatus(appResult: AppResult, jobsList: Seq[JobData], sqlExecutionsList: Seq[SQLExecutionUIData], sqlGraphMap: mutable.Map[Long, SparkPlanGraph]): Unit = {
-    appResult.executionStatus = AppResult.SUCCEEDED_STATUS
+  private def saveSuccessfulStatus(applicationResult: ApplicationResult, jobsList: Seq[JobData], sqlExecutionsList: Seq[SQLExecutionUIData], sqlGraphMap: mutable.Map[Long, SparkPlanGraph]): Unit = {
+    applicationResult.setExecutionStatus(ApplicationResult.SUCCEEDED_STATUS)
 
     val (startTime, finishTime) = extractJobsTime(jobsList)
-    appResult.startTime = startTime
-    appResult.finishTime = finishTime
-    appResult.durationTime = if (finishTime - startTime > 0)
-      finishTime - startTime else AppResult.FAILED_JOB_DURATION
+    applicationResult.setStartTime(startTime)
+    applicationResult.setFinishTime(finishTime)
+    applicationResult.setDurationTime(if (finishTime - startTime > 0)
+      finishTime - startTime else ApplicationResult.FAILED_JOB_DURATION)
 
-    if (appResult.submit_method.equals(AppResult.SPARK_SQL)) {
-      appResult.query = extractQuerySQL(sqlExecutionsList, sqlGraphMap)
+    if (applicationResult.getSubmit_method.equals(ApplicationResult.SPARK_SQL)) {
+      applicationResult.setQuery(extractQuerySQL(sqlExecutionsList, sqlGraphMap))
     } else {
-      appResult.query = ""
+      applicationResult.setQuery("")
     }
   }
 

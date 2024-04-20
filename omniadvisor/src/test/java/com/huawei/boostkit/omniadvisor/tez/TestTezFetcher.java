@@ -17,6 +17,7 @@ package com.huawei.boostkit.omniadvisor.tez;
 
 import com.huawei.boostkit.omniadvisor.analysis.AnalyticJob;
 import com.huawei.boostkit.omniadvisor.configuration.BaseTestConfiguration;
+import com.huawei.boostkit.omniadvisor.dto.ApplicationResult;
 import com.huawei.boostkit.omniadvisor.exception.OmniAdvisorException;
 import com.huawei.boostkit.omniadvisor.fetcher.FetcherType;
 import com.huawei.boostkit.omniadvisor.models.AppResult;
@@ -53,7 +54,7 @@ public class TestTezFetcher extends BaseTestConfiguration {
     public void testGetApplicationFromTimeline() throws IOException {
         TezFetcher fetcher = new TezFetcher(testConfiguration);
         fetcher.setTimelineClient(TestTezClient.getTestTimelineClient());
-        List<AnalyticJob> job = fetcher.fetchAnalyticJobs(0L, 100L);
+        List<AnalyticJob> job = fetcher.fetchAnalyticJobs(0L, 100L, null);
         assertEquals(job.size(), 1);
     }
 
@@ -66,14 +67,14 @@ public class TestTezFetcher extends BaseTestConfiguration {
     @Test
     public void tesGetApplicationsWithError() {
         TezFetcher fetcher = new TezFetcher(testConfiguration);
-        List<AnalyticJob> jobs = fetcher.fetchAnalyticJobs(0L, 100L);
+        List<AnalyticJob> jobs = fetcher.fetchAnalyticJobs(0L, 100L, null);
         assertTrue(jobs.isEmpty());
     }
 
     @Test
     public void testAnalyzeWithError() {
         TezFetcher fetcher = new TezFetcher(testConfiguration);
-        Optional<AppResult> result = fetcher.analysis(new TezAnalyticJob("id", "name", 0L, 1L, YarnApplicationState.FINISHED));
+        Optional<ApplicationResult> result = fetcher.analysis(new TezAnalyticJob("id", "name", 0L, 1L, YarnApplicationState.FINISHED));
         assertFalse(result.isPresent());
     }
 
@@ -95,7 +96,7 @@ public class TestTezFetcher extends BaseTestConfiguration {
     public void testGetApplications() throws AuthenticationException, IOException {
         TezFetcher fetcher = new TezFetcher(testConfiguration);
         fetcher.setTezJsonUtils(getAppListJsonUtils());
-        List<AnalyticJob> tezJobs = fetcher.fetchAnalyticJobs(TIME_14, TIME_18);
+        List<AnalyticJob> tezJobs = fetcher.fetchAnalyticJobs(TIME_14, TIME_18, null);
         assertEquals(tezJobs.size(), 4);
     }
 
@@ -110,16 +111,16 @@ public class TestTezFetcher extends BaseTestConfiguration {
     public void testAnalyzeJobWithSuccessJob() throws MalformedURLException {
         TezFetcher fetcher = new TezFetcher(testConfiguration);
         fetcher.setTezJsonUtils(getSuccessJsonUtils());
-        Optional<AppResult> successJob = fetcher.analysis(SUCCESS_JOB);
+        Optional<ApplicationResult> successJob = fetcher.analysis(SUCCESS_JOB);
         assertTrue(successJob.isPresent());
-        assertEquals(successJob.get().applicationId, SUCCESS);
+        assertEquals(successJob.get().getApplicationId(), SUCCESS);
     }
 
     @Test
     public void testAnalyzeJobWithFailedJob() throws MalformedURLException {
         TezFetcher fetcher = new TezFetcher(testConfiguration);
         fetcher.setTezJsonUtils(getFailedJsonUtils());
-        Optional<AppResult> failedJob = fetcher.analysis(FAILED_JOB);
+        Optional<ApplicationResult> failedJob = fetcher.analysis(FAILED_JOB);
         assertTrue(failedJob.isPresent());
     }
 
@@ -127,7 +128,7 @@ public class TestTezFetcher extends BaseTestConfiguration {
     public void testAnalyzeJobWithKilledJob() throws MalformedURLException {
         TezFetcher fetcher = new TezFetcher(testConfiguration);
         fetcher.setTezJsonUtils(getKilledJsonUtils());
-        Optional<AppResult> killedJob = fetcher.analysis(KILLED_JOB);
+        Optional<ApplicationResult> killedJob = fetcher.analysis(KILLED_JOB);
         assertTrue(killedJob.isPresent());
     }
 
@@ -135,7 +136,7 @@ public class TestTezFetcher extends BaseTestConfiguration {
     public void testAnalyzeJobWithUnFinishedJob() throws MalformedURLException {
         TezFetcher fetcher = new TezFetcher(testConfiguration);
         fetcher.setTezJsonUtils(getUnFinishedJsonUtils());
-        Optional<AppResult> unFinishedJob = fetcher.analysis(UNFINISHED_JOB);
+        Optional<ApplicationResult> unFinishedJob = fetcher.analysis(UNFINISHED_JOB);
         assertTrue(unFinishedJob.isPresent());
     }
 }
