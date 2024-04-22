@@ -866,37 +866,49 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         return false;
     }
 
+    private boolean isSupportUDFInQueue(Queue<ExprNodeDesc> queue, List<String> expressions) {
+        while (!queue.isEmpty()) {
+            ExprNodeDesc current = queue.poll();
+            if (current instanceof ExprNodeGenericFuncDesc) {
+                BaseExpression expr = getBaseExpression(current);
+                if (expr == null) return false;
+                expressions.add(expr.toString());
+                current.getChildren().forEach(queue::offer);
+            } else if ((current instanceof ExprNodeColumnDesc || current instanceof ExprNodeConstantDesc)
+                    && !SUPPORTED_TYPE.contains(((PrimitiveTypeInfo) current.getTypeInfo()).getPrimitiveCategory())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private BaseExpression getBaseExpression(ExprNodeDesc current) {
+        if (((ExprNodeGenericFuncDesc) current).getGenericUDF() instanceof GenericUDFConcat ||
+            ((ExprNodeGenericFuncDesc) current).getGenericUDF() instanceof GenericUDFCoalesce && current.getChildren().size() >= 3) {
+            return null;
+        }
+        boolean supportUDF = ExpressionUtils.isSupportUDF(((ExprNodeGenericFuncDesc) current).getGenericUDF());
+        if (!supportUDF || checkUnsupportedArithmetic((ExprNodeGenericFuncDesc) current)) {
+            return null;
+        }
+        return getExpression(current);
+    }
+
+    private BaseExpression getExpression(ExprNodeDesc current) {
+        BaseExpression expr = ExpressionUtils.build((ExprNodeGenericFuncDesc) current.clone(), null);
+        if (expr instanceof CastFunctionExpression && checkUnsupportedCast((CastFunctionExpression) expr)) {
+            return null;
+        }
+        return expr;
+    }
+
     private boolean isUDFSupport(List<ExprNodeDesc> colList) {
         Queue<ExprNodeDesc> queue = new LinkedBlockingQueue<>();
         colList.forEach(queue::offer);
         List<String> expressions = new ArrayList<>();
         try {
-            while (!queue.isEmpty()) {
-                ExprNodeDesc current = queue.poll();
-                if (current instanceof ExprNodeGenericFuncDesc) {
-                    if (((ExprNodeGenericFuncDesc) current).getGenericUDF() instanceof GenericUDFConcat) {
-                        return false;
-                    }
-                    if (((ExprNodeGenericFuncDesc) current).getGenericUDF() instanceof GenericUDFCoalesce && current.getChildren().size() >= 3) {
-                        return false;
-                    }
-                    boolean supportUDF = ExpressionUtils.isSupportUDF(((ExprNodeGenericFuncDesc) current).getGenericUDF());
-                    if (!supportUDF) {
-                        return false;
-                    }
-                    if (checkUnsupportedArithmetic((ExprNodeGenericFuncDesc) current)) {
-                        return false;
-                    }
-                    BaseExpression expr = ExpressionUtils.build((ExprNodeGenericFuncDesc) current.clone(), null);
-                    if (expr instanceof CastFunctionExpression && checkUnsupportedCast((CastFunctionExpression) expr)) {
-                        return false;
-                    }
-                    expressions.add(expr.toString());
-                    current.getChildren().forEach(queue::offer);
-                } else if ((current instanceof ExprNodeColumnDesc || current instanceof ExprNodeConstantDesc)
-                        && !SUPPORTED_TYPE.contains(((PrimitiveTypeInfo) current.getTypeInfo()).getPrimitiveCategory())) {
-                    return false;
-                }
+            if (!isSupportUDFInQueue(queue, expressions)) {
+                return false;
             }
         } catch (Exception e) {
             LOG.error("generate omni expressions error", e);
