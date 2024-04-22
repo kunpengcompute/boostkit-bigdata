@@ -79,11 +79,11 @@ import org.apache.hadoop.hive.ql.plan.TableDesc;
 import org.apache.hadoop.hive.ql.plan.api.OperatorType;
 import org.apache.hadoop.hive.serde2.SerDeException;
 import org.apache.hadoop.hive.serde2.Serializer;
+import org.apache.hadoop.hive.serde2.io.HiveDecimalWritable;
 import org.apache.hadoop.hive.serde2.io.ShortWritable;
 import org.apache.hadoop.hive.serde2.lazy.ByteArrayRef;
 import org.apache.hadoop.hive.serde2.lazy.LazyHiveChar;
 import org.apache.hadoop.hive.serde2.lazy.LazyString;
-import org.apache.hadoop.hive.serde2.lazy.objectinspector.primitive.AbstractPrimitiveLazyObjectInspector;
 import org.apache.hadoop.hive.serde2.lazy.objectinspector.primitive.LazyHiveCharObjectInspector;
 import org.apache.hadoop.hive.serde2.lazy.objectinspector.primitive.LazyStringObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
@@ -118,7 +118,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Random;
 import java.util.function.BiFunction;
 
@@ -776,99 +775,103 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
             ObjectInspector fieldObjectInspector = ((StandardStructObjectInspector) this.inputObjInspectors[0])
                     .getAllStructFieldRefs().get(indexInVector).getFieldObjectInspector();
             return fieldObjectInspector instanceof AbstractPrimitiveJavaObjectInspector
-                    ? this.getOriginValue(vector, indexInVector, index)
-                    : this.getWritableValue(vector, indexInVector, index);
+                    ? this.getOriginValue(vector, index, fieldObjectInspector)
+                    : this.getWritableValue(vector, index, fieldObjectInspector);
         }
     }
 
-    private Object getOriginValue(Vec vector, int indexInVector, int index) {
+    private Object getOriginValue(Vec vector, int index, ObjectInspector fieldObjectInspector) {
+        PrimitiveObjectInspector.PrimitiveCategory primitiveCategory = ((PrimitiveObjectInspector) fieldObjectInspector).getPrimitiveCategory();
         DataType type = vector.getType();
-        if (type.getId() == OMNI_INT) {
-            ObjectInspector fieldObjectInspector = ((StandardStructObjectInspector) this.inputObjInspectors[0])
-                    .getAllStructFieldRefs().get(indexInVector).getFieldObjectInspector();
-            return fieldObjectInspector.getTypeName().equals("date")
-                    ? Date.ofEpochDay(((IntVec) vector).get(index))
-                    : ((IntVec) vector).get(index);
-        } else if (type.getId() == OMNI_LONG) {
-            return ((LongVec) vector).get(index);
-        } else if (type.getId() == OMNI_DOUBLE) {
-            return ((DoubleVec) vector).get(index);
-        } else if (type.getId() == OMNI_BOOLEAN) {
-            return ((BooleanVec) vector).get(index);
-        } else if (type.getId() == OMNI_SHORT) {
-            return ((ShortVec) vector).get(index);
-        } else if (type.getId() == OMNI_DECIMAL128) {
-            byte[] result = ((Decimal128Vec) vector).getBytes(index);
-            StructField structField = ((StandardStructObjectInspector) this.inputObjInspectors[0])
-                    .getAllStructFieldRefs().get(indexInVector);
-            WritableHiveDecimalObjectInspector objectInspector = (WritableHiveDecimalObjectInspector) structField
-                    .getFieldObjectInspector();
-            DecimalTypeInfo typeInfo = (DecimalTypeInfo) objectInspector.getTypeInfo();
-            return HiveDecimal.createFromBigIntegerBytesAndScale(result, typeInfo.getScale());
-        } else if (type.getId() == OMNI_VARCHAR) {
-            return new Text(((VarcharVec) vector).get(index));
-        } else if (type.getId() == OMNI_CHAR) {
-            Text text = new Text(((VarcharVec) vector).get(index));
-            String s = text.toString();
-            StringUtils.stripEnd(s, " ");
-            text.set(s);
-            return text;
-        } else {
-            return null;
-        }
-    }
-
-    private Object getWritableValue(Vec vector, int indexInVector, int index) {
-        DataType type = vector.getType();
-        ObjectInspector fieldObjectInspector;
-        if (type.getId() == OMNI_INT) {
-            fieldObjectInspector = ((StandardStructObjectInspector) this.inputObjInspectors[0]).getAllStructFieldRefs()
-                    .get(indexInVector).getFieldObjectInspector();
-            return fieldObjectInspector.getTypeName().equals("date")
-                    ? new LongWritable(((IntVec) vector).get(index))
-                    : new IntWritable(((IntVec) vector).get(index));
-        } else if (type.getId() == OMNI_LONG) {
-            return new LongWritable(((LongVec) vector).get(index));
-        } else if (type.getId() == OMNI_DOUBLE) {
-            return new DoubleWritable(((DoubleVec) vector).get(index));
-        } else if (type.getId() == OMNI_BOOLEAN) {
-            return new BooleanWritable(((BooleanVec) vector).get(index));
-        } else if (type.getId() == OMNI_SHORT) {
-            return new ShortWritable(((ShortVec) vector).get(index));
-        } else if (type.getId() == OMNI_DECIMAL128) {
-            byte[] result = ((Decimal128Vec) vector).getBytes(index);
-            StructField structField = ((StandardStructObjectInspector) this.inputObjInspectors[0])
-                    .getAllStructFieldRefs().get(indexInVector);
-            WritableHiveDecimalObjectInspector objectInspector = (WritableHiveDecimalObjectInspector) structField
-                    .getFieldObjectInspector();
-            DecimalTypeInfo typeInfo = (DecimalTypeInfo) objectInspector.getTypeInfo();
-            return HiveDecimal.createFromBigIntegerBytesAndScale(result, typeInfo.getScale());
-        } else if (type.getId() == OMNI_VARCHAR) {
-            fieldObjectInspector = ((StandardStructObjectInspector) this.inputObjInspectors[0]).getAllStructFieldRefs()
-                    .get(indexInVector).getFieldObjectInspector();
-            if (fieldObjectInspector instanceof LazyHiveCharObjectInspector) {
-                LazyHiveChar lazyHiveChar = new LazyHiveChar((LazyHiveCharObjectInspector) fieldObjectInspector);
-                ByteArrayRef byteArrayRef = new ByteArrayRef();
-                byteArrayRef.setData(((VarcharVec) vector).get(index));
-                lazyHiveChar.init(byteArrayRef, 0, ((VarcharVec) vector).get(index).length);
-                return lazyHiveChar;
-            } else if (fieldObjectInspector instanceof LazyStringObjectInspector) {
-                LazyString lazyString = new LazyString((LazyStringObjectInspector) fieldObjectInspector);
-                ByteArrayRef byteArrayRef = new ByteArrayRef();
-                byteArrayRef.setData(((VarcharVec) vector).get(index));
-                lazyString.init(byteArrayRef, 0, ((VarcharVec) vector).get(index).length);
-                return lazyString;
-            } else {
-                return new Text(((VarcharVec) vector).get(index));
+        switch (primitiveCategory) {
+            case INT:
+                return fieldObjectInspector.getTypeName().equals("date")
+                        ? Date.ofEpochDay(((IntVec) vector).get(index))
+                        : ((IntVec) vector).get(index);
+            case LONG:
+                return ((LongVec) vector).get(index);
+            case DOUBLE:
+                return ((DoubleVec) vector).get(index);
+            case BOOLEAN:
+                return ((BooleanVec) vector).get(index);
+            case SHORT:
+                return ((ShortVec) vector).get(index);
+            case DECIMAL: {
+                DecimalTypeInfo typeInfo = (DecimalTypeInfo) ((WritableHiveDecimalObjectInspector) fieldObjectInspector).getTypeInfo();
+                if (type.getId() == OMNI_LONG) {
+                    long value = ((LongVec) vector).get(index);
+                    return HiveDecimal.create(value, typeInfo.getScale());
+                }
+                byte[] result = ((Decimal128Vec) vector).getBytes(index);
+                return HiveDecimal.createFromBigIntegerBytesAndScale(result, typeInfo.getScale());
             }
-        } else if (type.getId() == OMNI_CHAR) {
-            Text text = new Text(((VarcharVec) vector).get(index));
-            String s = text.toString();
-            StringUtils.stripEnd(s, " ");
-            text.set(s);
-            return text;
-        } else {
-            return null;
+            case VARCHAR:
+                return new Text(((VarcharVec) vector).get(index));
+            case CHAR: {
+                Text text = new Text(((VarcharVec) vector).get(index));
+                String s = text.toString();
+                StringUtils.stripEnd(s, " ");
+                text.set(s);
+                return text;
+            }
+            default:
+                return null;
+        }
+    }
+
+    private Object getWritableValue(Vec vector, int index, ObjectInspector fieldObjectInspector) {
+        PrimitiveObjectInspector.PrimitiveCategory primitiveCategory = ((PrimitiveObjectInspector) fieldObjectInspector).getPrimitiveCategory();
+        DataType type = vector.getType();
+        switch (primitiveCategory) {
+            case INT:
+                return fieldObjectInspector.getTypeName().equals("date")
+                        ? new LongWritable(((IntVec) vector).get(index))
+                        : new IntWritable(((IntVec) vector).get(index));
+            case LONG:
+                return new LongWritable(((LongVec) vector).get(index));
+            case DOUBLE:
+                return new DoubleWritable(((DoubleVec) vector).get(index));
+            case BOOLEAN:
+                return new BooleanWritable(((BooleanVec) vector).get(index));
+            case SHORT:
+                return new ShortWritable(((ShortVec) vector).get(index));
+            case DECIMAL: {
+                DecimalTypeInfo typeInfo = (DecimalTypeInfo) ((WritableHiveDecimalObjectInspector) fieldObjectInspector).getTypeInfo();
+                if (type.getId() == OMNI_LONG) {
+                    long value = ((LongVec) vector).get(index);
+                    HiveDecimalWritable hiveDecimalWritable = new HiveDecimalWritable();
+                    hiveDecimalWritable.setFromLongAndScale(value, typeInfo.getScale());
+                    return hiveDecimalWritable;
+                }
+                byte[] result = ((Decimal128Vec) vector).getBytes(index);
+                return new HiveDecimalWritable(result, typeInfo.getScale());
+            }
+            case VARCHAR: {
+                if (fieldObjectInspector instanceof LazyHiveCharObjectInspector) {
+                    LazyHiveChar lazyHiveChar = new LazyHiveChar((LazyHiveCharObjectInspector) fieldObjectInspector);
+                    ByteArrayRef byteArrayRef = new ByteArrayRef();
+                    byteArrayRef.setData(((VarcharVec) vector).get(index));
+                    lazyHiveChar.init(byteArrayRef, 0, ((VarcharVec) vector).get(index).length);
+                    return lazyHiveChar;
+                } else if (fieldObjectInspector instanceof LazyStringObjectInspector) {
+                    LazyString lazyString = new LazyString((LazyStringObjectInspector) fieldObjectInspector);
+                    ByteArrayRef byteArrayRef = new ByteArrayRef();
+                    byteArrayRef.setData(((VarcharVec) vector).get(index));
+                    lazyString.init(byteArrayRef, 0, ((VarcharVec) vector).get(index).length);
+                    return lazyString;
+                } else {
+                    return new Text(((VarcharVec) vector).get(index));
+                }
+            }
+            case CHAR: {
+                Text text = new Text(((VarcharVec) vector).get(index));
+                String s = text.toString();
+                StringUtils.stripEnd(s, " ");
+                text.set(s);
+                return text;
+            }
+            default:
+                return null;
         }
     }
 

@@ -410,11 +410,13 @@ public class TypeUtils {
                 precision = ((DecimalTypeInfo) node.getTypeInfo()).getPrecision();
                 scale = ((DecimalTypeInfo) node.getTypeInfo()).getScale();
             }
-            if (children.get(0) instanceof ExprNodeConstantDesc && children.get(1) instanceof ExprNodeColumnDesc) {
-                Collections.swap(children, 0, 1);
-            }
             if (children.get(0) instanceof ExprNodeColumnDesc && children.get(1) instanceof ExprNodeConstantDesc) {
                 ExprNodeDesc exprNodeDesc = children.get(0);
+                if (exprNodeDesc.getTypeInfo() instanceof DecimalTypeInfo) {
+                    maxScale = ((DecimalTypeInfo) exprNodeDesc.getTypeInfo()).getScale();
+                }
+            } else if (children.get(0) instanceof ExprNodeConstantDesc && children.get(1) instanceof ExprNodeColumnDesc) {
+                ExprNodeDesc exprNodeDesc = children.get(1);
                 if (exprNodeDesc.getTypeInfo() instanceof DecimalTypeInfo) {
                     maxScale = ((DecimalTypeInfo) exprNodeDesc.getTypeInfo()).getScale();
                 }
