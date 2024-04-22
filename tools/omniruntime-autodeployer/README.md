@@ -10,14 +10,14 @@ pip3 install paramiko
 ```
 3、server和agent用于ssh登录的端口、用户名、密码都需要保持一致
 
-4、当前只支持OmniOperator 1.4.0以上版本部署
+4、当前只支持OmniOperator 1.4.0（Kunpeng BoostKit 24.0.RC1）以上版本部署
 
 # 2 部署前配置
 ## 2.1 omniruntime.yaml配置
 根据以下配置说明完成omniruntime.yaml配置
 ```yaml
 env: # 环境配置
-  username: root # ssh登录用户名
+  username: "root" # ssh登录用户名
   password: "123456" # ssh登录密码
   port: 22 # 需要各个节点ssh登录端口一致
   jumper_host: "192.168.2.1" # 通过jumper传送软件包到其他节点上
@@ -29,8 +29,8 @@ env: # 环境配置
       - "192.168.2.4-10"
 
 omnioperator:
-  omni_version: 1.4.0 # omnioperator版本，在闭源软件包名中可找到，BoostKit_omniop_1.4.0.zip
-  spark_version: 3.3.1 # Spark版本，当前支持3.1.1和3.3.1两个版本
+  omni_version: "1.4.0" # omnioperator版本，在闭源软件包名中可找到，BoostKit_omniop_1.4.0.zip
+  spark_version: "3.3.1" # Spark版本，当前支持3.1.1和3.3.1两个版本
   os_type: "centos" # 操作系统版本，当前支持openeuler和centos两个版本
   omni_home: "/opt/omni-operator" # 部署omnioperator的目录，通常固定为/opt/omni-operator
   deploy_home: "/home/omniop" # 存放部署安装包和部署脚本的目录
