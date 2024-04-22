@@ -743,6 +743,9 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
 
     private boolean mapJoinReplaceable(Operator<? extends OperatorDesc> operator) {
         MapJoinDesc mapJoinDesc = (MapJoinDesc) operator.getConf();
+        if (mapJoinDesc.isBucketMapJoin()) {
+            return false;
+        }
         if (mapJoinDesc.getNullSafes() != null) {
             for (boolean nullsafe : mapJoinDesc.getNullSafes()) {
                 if (nullsafe) {
