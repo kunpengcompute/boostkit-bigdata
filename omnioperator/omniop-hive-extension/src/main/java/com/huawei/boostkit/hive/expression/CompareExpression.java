@@ -38,6 +38,7 @@ public class CompareExpression extends BaseExpression {
                 add(FunctionExpression.class);
                 add(NotExpression.class);
                 add(ConditionExpression.class);
+                add(UnaryExpression.class);
             }};
 
     public CompareExpression(String exprType, Integer returnType, String operator) {
