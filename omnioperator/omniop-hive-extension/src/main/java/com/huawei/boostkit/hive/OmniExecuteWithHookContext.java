@@ -107,6 +107,7 @@ import org.apache.hadoop.hive.ql.plan.ptf.PTFExpressionDef;
 import org.apache.hadoop.hive.ql.plan.ptf.WindowFunctionDef;
 import org.apache.hadoop.hive.ql.plan.ptf.WindowTableFunctionDef;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDAFEvaluator;
+import org.apache.hadoop.hive.ql.udf.generic.GenericUDFCoalesce;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDFConcat;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
@@ -874,6 +875,9 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                 ExprNodeDesc current = queue.poll();
                 if (current instanceof ExprNodeGenericFuncDesc) {
                     if (((ExprNodeGenericFuncDesc) current).getGenericUDF() instanceof GenericUDFConcat) {
+                        return false;
+                    }
+                    if (((ExprNodeGenericFuncDesc) current).getGenericUDF() instanceof GenericUDFCoalesce && current.getChildren().size() >= 3) {
                         return false;
                     }
                     boolean supportUDF = ExpressionUtils.isSupportUDF(((ExprNodeGenericFuncDesc) current).getGenericUDF());
