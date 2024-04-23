@@ -74,7 +74,7 @@ object OmniExpressionAdaptor extends Logging {
     }
   }
 
-  private def unsupportedCastCheck(expr: Expression, cast: Cast): Unit = {
+  private def unsupportedCastCheck(expr: Expression, cast: CastBase): Unit = {
     def doSupportCastToString(dataType: DataType): Boolean = {
       if (dataType.isInstanceOf[DecimalType] || dataType.isInstanceOf[StringType] || dataType.isInstanceOf[IntegerType]
         || dataType.isInstanceOf[LongType]) {
@@ -242,6 +242,7 @@ object OmniExpressionAdaptor extends Logging {
 
       case alias: Alias => rewriteToOmniJsonExpressionLiteralJsonObject(alias.child, exprsIndexMap)
       case literal: Literal => toOmniJsonLiteral(literal)
+
       case not: Not =>
         not.child match {
           case isnull: IsNull =>
@@ -263,6 +264,7 @@ object OmniExpressionAdaptor extends Logging {
               .put("operator", "not")
               .put("expr", rewriteToOmniJsonExpressionLiteralJsonObject(not.child, exprsIndexMap))
         }
+
       case isnotnull: IsNotNull =>
         new JSONObject().put("exprType", "UNARY")
           .addOmniExpJsonType("returnType", BooleanType)
@@ -287,7 +289,7 @@ object OmniExpressionAdaptor extends Logging {
             .put(rewriteToOmniJsonExpressionLiteralJsonObject(subString.len, exprsIndexMap)))
 
       // Cast
-      case cast: Cast =>
+      case cast: CastBase =>
         unsupportedCastCheck(expr, cast)
         cast.dataType match {
           case StringType =>
@@ -302,8 +304,8 @@ object OmniExpressionAdaptor extends Logging {
               .addOmniExpJsonType("returnType", cast.dataType)
               .put("function_name", "CAST")
               .put("arguments", new JSONArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(cast.child, exprsIndexMap)))
-
         }
+
       // Abs
       case abs: Abs =>
         new JSONObject().put("exprType", "FUNCTION")

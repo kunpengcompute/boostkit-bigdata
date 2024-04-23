@@ -220,17 +220,21 @@ public:
 
     const std::vector<int64_t>& PartitionLengths() const { return partition_lengths_; }
 
-    ~Splitter()
+    virtual ~Splitter()
     {
-        delete vecBatchProto; //free protobuf vecBatch memory
-        delete partition_id_cnt_cur_;
-        delete partition_id_cnt_cache_;
-        delete fixed_valueBuffer_size_;
-        delete fixed_nullBuffer_size_;
-        delete partition_buffer_size_;
-        delete partition_buffer_idx_base_;
-        delete partition_buffer_idx_offset_;
-        delete partition_serialization_size_;
+	delete vecBatchProto; //free protobuf vecBatch memory
+	delete[] partition_id_cnt_cur_;
+	delete[] partition_id_cnt_cache_;
+	delete[] partition_buffer_size_;
+	delete[] partition_buffer_idx_base_;
+	delete[] partition_buffer_idx_offset_;
+	delete[] partition_serialization_size_;
+	delete[] fixed_valueBuffer_size_;
+	delete[] fixed_nullBuffer_size_;
+	partition_fixed_width_buffers_.clear();
+	partition_binary_builders_.clear();
+	partition_cached_vectorbatch_.clear();
+	spilled_tmp_files_info_.clear();
     }
 
     omniruntime::vec::VectorBatch *GetInputVecBatch()

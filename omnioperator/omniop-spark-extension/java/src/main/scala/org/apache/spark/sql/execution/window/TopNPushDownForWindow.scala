@@ -81,7 +81,7 @@ object TopNPushDownForWindow extends Rule[SparkPlan] with PredicateHelper {
   private def isTopNExpression(e: Expression): Boolean = e match {
     case Alias(child, _) => isTopNExpression(child)
     case WindowExpression(windowFunction, _)
-      if windowFunction.isInstanceOf[Rank] || windowFunction.isInstanceOf[RowNumber] => true
+      if windowFunction.isInstanceOf[Rank] => true
     case _ => false
   }
 

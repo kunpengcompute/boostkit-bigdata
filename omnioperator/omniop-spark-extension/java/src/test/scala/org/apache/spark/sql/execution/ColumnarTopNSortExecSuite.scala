@@ -49,16 +49,17 @@ class ColumnarTopNSortExecSuite extends ColumnarSparkPlanTest {
 
   test("Test topNSort") {
     val sql1 = "select * from (SELECT city, rank() OVER (ORDER BY sales) AS rk FROM dealer) where rk < 4 order by rk;"
-    assertColumnarTopNSortExecAndSparkResultEqual(sql1, true)
+    assertColumnarTopNSortExecAndSparkResultEqual(sql1, true, true)
 
     val sql2 = "select * from (SELECT city, row_number() OVER (ORDER BY sales) AS rn FROM dealer) where rn < 4 order by rn;"
-    assertColumnarTopNSortExecAndSparkResultEqual(sql2, false)
+    assertColumnarTopNSortExecAndSparkResultEqual(sql2, false, false)
 
     val sql3 = "select * from (SELECT city, rank() OVER (PARTITION BY city ORDER BY sales) AS rk FROM dealer) where rk < 4 order by rk;"
-    assertColumnarTopNSortExecAndSparkResultEqual(sql3, true)
+    assertColumnarTopNSortExecAndSparkResultEqual(sql3, true, true)
   }
 
-  private def assertColumnarTopNSortExecAndSparkResultEqual(sql: String, hasColumnarTopNSortExec: Boolean = true): Unit = {
+  private def assertColumnarTopNSortExecAndSparkResultEqual(sql: String, hasColumnarTopNSortExec: Boolean = true,
+    hasTopNSortExec: Boolean = false): Unit = {
     // run ColumnarTopNSortExec config
     spark.conf.set("spark.omni.sql.columnar.topNSort", true)
     spark.conf.set("spark.sql.execution.topNPushDownForWindow.enabled", true)
@@ -79,8 +80,10 @@ class ColumnarTopNSortExecSuite extends ColumnarSparkPlanTest {
     val sparkPlan = sparkResult.queryExecution.executedPlan.toString()
     assert(!sparkPlan.contains("ColumnarTopNSort"),
       s"SQL:${sql}\n@SparkEnv have ColumnarTopNSortExec, sparkPlan:${sparkPlan}")
-    assert(sparkPlan.contains("TopNSort"),
-      s"SQL:${sql}\n@SparkEnv no TopNSortExec, sparkPlan:${sparkPlan}")
+    if (hasTopNSortExec) {
+      assert(sparkPlan.contains("TopNSort"),
+        s"SQL:${sql}\n@SparkEnv no TopNSortExec, sparkPlan:${sparkPlan}")
+    }
     // DataFrame do not support comparing with equals method, use DataFrame.except instead
     // DataFrame.except can do equal for rows misorder(with and without order by are same)
     assert(omniResult.except(sparkResult).isEmpty,
