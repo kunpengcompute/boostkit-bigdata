@@ -223,9 +223,13 @@ public:
 
     const std::vector<int64_t>& PartitionLengths() const { return partition_lengths_; }
 
-    ~Splitter()
+    virtual ~Splitter()
     {
         delete vecBatchProto; //free protobuf vecBatch memory
+	partition_fixed_width_buffers_.clear();
+	partition_binary_builders_.clear();
+	partition_cached_vectorbatch_.clear();
+	spilled_tmp_files_info_.clear();
     }
 
     omniruntime::vec::VectorBatch *GetInputVecBatch()

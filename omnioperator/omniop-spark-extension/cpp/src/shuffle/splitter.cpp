@@ -229,7 +229,8 @@ void Splitter::SplitBinaryVector(BaseVector *varcharVector, int col_schema) {
     if (varcharVector->GetEncoding() == OMNI_DICTIONARY) {
         auto vc = reinterpret_cast<Vector<DictionaryContainer<std::string_view, LargeStringContainer>> *>(
                 varcharVector);
-        for (auto row = 0; row < num_rows; ++row) {
+	cached_vectorbatch_size_ += num_rows * (sizeof(bool) + sizeof(int32_t));
+	for (auto row = 0; row < num_rows; ++row) {
             auto pid = partition_id_[row];
             uint8_t *dst = nullptr;
             uint32_t str_len = 0;
@@ -263,7 +264,8 @@ void Splitter::SplitBinaryVector(BaseVector *varcharVector, int col_schema) {
         }
     } else {
         auto vc = reinterpret_cast<Vector<LargeStringContainer<std::string_view>> *>(varcharVector);
-        for (auto row = 0; row < num_rows; ++row) {
+	cached_vectorbatch_size_ += num_rows * (sizeof(bool) + sizeof(int32_t)) + sizeof(int32_t);
+	for (auto row = 0; row < num_rows; ++row) {
             auto pid = partition_id_[row];
             uint8_t *dst = nullptr;
             uint32_t str_len = 0;
@@ -301,7 +303,6 @@ void Splitter::SplitBinaryVector(BaseVector *varcharVector, int col_schema) {
 
 int Splitter::SplitBinaryArray(VectorBatch& vb)
 {
-    const auto num_rows = vb.GetRowCount();
     auto vec_cnt_vb = vb.GetVectorCount();
     auto vec_cnt_schema = singlePartitionFlag ? vec_cnt_vb : vec_cnt_vb - 1;
     for (auto col_schema = 0; col_schema < vec_cnt_schema; ++col_schema) {
@@ -404,9 +405,11 @@ int Splitter::CacheVectorBatch(int32_t partition_id, bool reset_buffers) {
                 }
             }
         }
-        cached_vectorbatch_size_ += batch_partition_size;
-        partition_cached_vectorbatch_[partition_id].push_back(std::move(bufferArrayTotal));
-        partition_buffer_idx_base_[partition_id] = 0;
+	cached_vectorbatch_size_ += batch_partition_size;
+	partition_cached_vectorbatch_[partition_id].push_back(std::move(bufferArrayTotal));
+	fixed_valueBuffer_size_[partition_id] = 0;
+	fixed_nullBuffer_size_[partition_id] = 0;
+	partition_buffer_idx_base_[partition_id] = 0;
     }
     return 0;
 }
