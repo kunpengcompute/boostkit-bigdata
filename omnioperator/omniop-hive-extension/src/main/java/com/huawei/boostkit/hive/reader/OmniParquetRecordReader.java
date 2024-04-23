@@ -151,20 +151,7 @@ public class OmniParquetRecordReader
         this.typeIds = new ArrayList<DataType>();
         for (int i = 0; i < columns.size(); i++) {
             PrimitiveType type = columns.get(i).getPrimitiveType();
-            if (type.getOriginalType() != null) {
-                if (type.getOriginalType().name().equals("DECIMAL")) {
-                    // max presicion for decimal64 is 18
-                    if (type.getDecimalMetadata().getPrecision() > 18) {
-                        typeIds.add(Decimal128DataType.DECIMAL128);
-                    } else {
-                        typeIds.add(Decimal64DataType.DECIMAL64);
-                    }
-                } else {
-                    typeIds.add(PARQUET_TO_OMNI_TYPE.get(type.getOriginalType()));
-                }
-            } else {
-                typeIds.add(NULL_ORIGINAL_TO_OMNI_TYPE.get(type.getPrimitiveTypeName()));
-            }
+            addTypeId(type);
         }
         this.split = getSplit(oldSplit, jobConf);
         // create a TaskInputOutputContext
@@ -189,6 +176,23 @@ public class OmniParquetRecordReader
                 this.tableScanOp = op;
             }
         });
+    }
+
+    private void addTypeId(PrimitiveType type) {
+        if (type.getOriginalType() != null) {
+            if (type.getOriginalType().name().equals("DECIMAL")) {
+                // max presicion for decimal64 is 18
+                if (type.getDecimalMetadata().getPrecision() > 18) {
+                    typeIds.add(Decimal128DataType.DECIMAL128);
+                } else {
+                    typeIds.add(Decimal64DataType.DECIMAL64);
+                }
+            } else {
+                typeIds.add(PARQUET_TO_OMNI_TYPE.get(type.getOriginalType()));
+            }
+        } else {
+            typeIds.add(NULL_ORIGINAL_TO_OMNI_TYPE.get(type.getPrimitiveTypeName()));
+        }
     }
 
     private MessageType getRequriedSchema(MessageType schema) {
