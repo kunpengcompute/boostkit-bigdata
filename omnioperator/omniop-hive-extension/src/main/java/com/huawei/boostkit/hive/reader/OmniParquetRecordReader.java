@@ -24,16 +24,28 @@ import com.google.common.base.Strings;
 
 import nova.hetu.omniruntime.vector.Vec;
 import nova.hetu.omniruntime.vector.VecBatch;
+import nova.hetu.omniruntime.type.BooleanDataType;
+import nova.hetu.omniruntime.type.DataType;
+import nova.hetu.omniruntime.type.Decimal64DataType;
+import nova.hetu.omniruntime.type.Decimal128DataType;
+import nova.hetu.omniruntime.type.DoubleDataType;
+import nova.hetu.omniruntime.type.IntDataType;
+import nova.hetu.omniruntime.type.ShortDataType;
+import nova.hetu.omniruntime.type.LongDataType;
+import nova.hetu.omniruntime.type.VarcharDataType;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.ql.exec.Operator;
+import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.io.StatsProvidingRecordReader;
 import org.apache.hadoop.hive.ql.io.parquet.ProjectionPusher;
 import org.apache.hadoop.hive.ql.io.parquet.read.DataWritableReadSupport;
 import org.apache.hadoop.hive.ql.io.parquet.read.ParquetFilterPredicateConverter;
 import org.apache.hadoop.hive.ql.io.sarg.ConvertAstToSearchArg;
 import org.apache.hadoop.hive.ql.io.sarg.SearchArgument;
+import org.apache.hadoop.hive.ql.plan.api.OperatorType;
 import org.apache.hadoop.hive.serde2.ColumnProjectionUtils;
 import org.apache.hadoop.hive.serde2.SerDeStats;
 import org.apache.hadoop.io.NullWritable;
@@ -42,6 +54,13 @@ import org.apache.hadoop.mapred.InputSplit;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.RecordReader;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.parquet.HadoopReadOptions;
+import org.apache.parquet.column.ColumnDescriptor;
+import org.apache.parquet.schema.OriginalType;
+import org.apache.parquet.schema.Type;
+import org.apache.parquet.schema.PrimitiveType;
+import org.apache.parquet.schema.MessageType;
+import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName;
 import org.apache.parquet.filter2.compat.FilterCompat;
 import org.apache.parquet.filter2.predicate.FilterPredicate;
 import org.apache.parquet.filter2.statisticslevel.StatisticsFilter;
@@ -60,33 +79,82 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 
 public class OmniParquetRecordReader
         implements RecordReader<NullWritable, VecBatchWrapper>, StatsProvidingRecordReader {
     public static final Logger LOG = LoggerFactory.getLogger(OmniParquetRecordReader.class);
 
-    private ParquetColumnarBatchScanReader recordReader;
-    private Vec[] vecs;
-    private final long splitLen; // for getPos()
-    private boolean skipTimestampConversion = false;
-    private SerDeStats serDeStats;
-    private JobConf jobConf;
-    private ProjectionPusher projectionPusher;
+    private static final Map<OriginalType, DataType> PARQUET_TO_OMNI_TYPE = new HashMap<OriginalType, DataType>() {
+        {
+            put(OriginalType.DATE, IntDataType.INTEGER);
+            put(OriginalType.INT_8, ShortDataType.SHORT);
+            put(OriginalType.INT_16, ShortDataType.SHORT);
+            put(OriginalType.INT_32, IntDataType.INTEGER);
+            put(OriginalType.INT_64, LongDataType.LONG);
+            put(OriginalType.UINT_8, ShortDataType.SHORT);
+            put(OriginalType.UINT_16, ShortDataType.SHORT);
+            put(OriginalType.UINT_32, IntDataType.INTEGER);
+            put(OriginalType.UINT_64, LongDataType.LONG);
+            put(OriginalType.UTF8, VarcharDataType.VARCHAR);
+        }
+    };
 
-    private FilterCompat.Filter filter;
-    private boolean isFilterPredicate = false;
-    private ParquetMetadata fileFooter;
+    private static final Map<PrimitiveTypeName, DataType> NULL_ORIGINAL_TO_OMNI_TYPE = new HashMap<PrimitiveTypeName, DataType>() {
+        {
+            put(PrimitiveTypeName.INT32, IntDataType.INTEGER);
+            put(PrimitiveTypeName.INT64, LongDataType.LONG);
+            put(PrimitiveTypeName.DOUBLE, DoubleDataType.DOUBLE);
+            put(PrimitiveTypeName.BOOLEAN, BooleanDataType.BOOLEAN);
+            put(PrimitiveTypeName.BINARY, VarcharDataType.VARCHAR);
+            put(PrimitiveTypeName.FLOAT, DoubleDataType.DOUBLE);
+        }
+    };
+
+    protected ParquetColumnarBatchScanReader recordReader;
+    protected Vec[] vecs;
+    protected float progress = 0.0f;
+    protected long splitLen; // for getPos()
+    protected boolean skipTimestampConversion = false;
+    protected SerDeStats serDeStats;
+    protected JobConf jobConf;
+    protected ProjectionPusher projectionPusher;
+
+    protected FilterCompat.Filter filter;
+    protected boolean isFilterPredicate = false;
+    protected ParquetMetadata fileFooter;
+
+    protected Operator tableScanOp;
+    protected List<DataType> typeIds;
+    protected MessageType fileSchema;
+    protected List<Integer> included;
+    protected ParquetInputSplit split;
+    protected Configuration conf;
 
     OmniParquetRecordReader(InputSplit oldSplit, JobConf oldJobConf) throws IOException {
         this.splitLen = oldSplit.getLength();
         this.serDeStats = new SerDeStats();
         this.projectionPusher = new ProjectionPusher();
         jobConf = oldJobConf;
+        this.conf = jobConf;
         this.fileFooter = ParquetFileReader.readFooter(oldJobConf, ((FileSplit) oldSplit).getPath());
-        ParquetInputSplit split = getSplit(oldSplit, jobConf);
+        this.fileSchema = fileFooter.getFileMetaData().getSchema();
+        this.included = ColumnProjectionUtils.getReadColumnIDs(conf);
+        Map<String, String> fileMatadata = fileFooter.getFileMetaData().getKeyValueMetaData();
+        MessageType schema = getRequriedSchema(this.fileSchema);
+        List<ColumnDescriptor> columns = schema.getColumns();
+        this.typeIds = new ArrayList<DataType>();
+        for (int i = 0; i < columns.size(); i++) {
+            PrimitiveType type = columns.get(i).getPrimitiveType();
+            addTypeId(type);
+        }
+        this.split = getSplit(oldSplit, jobConf);
         // create a TaskInputOutputContext
-        Configuration conf = jobConf;
         if (skipTimestampConversion
                 ^ HiveConf.getBoolVar(conf, HiveConf.ConfVars.HIVE_PARQUET_TIMESTAMP_SKIP_CONVERSION)) {
             conf = new JobConf(oldJobConf);
@@ -97,10 +165,45 @@ public class OmniParquetRecordReader
         this.recordReader = new ParquetColumnarBatchScanReader();
         // PushDown rowGroups and columns indices for native reader.
         List<Integer> rowgroupIndices = getFilteredBlocks(split.getStart(), split.getEnd());
-        List<Integer> columnIndices = ColumnProjectionUtils.getReadColumnIDs(conf);
         String ugi = UserGroupInformation.getCurrentUser().toString();
-        this.recordReader.initializeReaderJava(split.getPath().toString(), BATCH, rowgroupIndices, columnIndices, ugi);
-        this.vecs = new Vec[columnIndices.size()];
+        Collections.sort(included);
+        this.recordReader = new ParquetColumnarBatchScanReader();
+        this.recordReader.initializeReaderJava(split.getPath(), BATCH, rowgroupIndices, included, ugi);
+        this.vecs = new Vec[included.size()];
+        this.serDeStats = new SerDeStats();
+        Utilities.getMapWork(conf).getAliasToWork().values().forEach(op -> {
+            if (op.getType().equals(OperatorType.TABLESCAN)) {
+                this.tableScanOp = op;
+            }
+        });
+    }
+
+    private void addTypeId(PrimitiveType type) {
+        if (type.getOriginalType() != null) {
+            if (type.getOriginalType().name().equals("DECIMAL")) {
+                // max presicion for decimal64 is 18
+                if (type.getDecimalMetadata().getPrecision() > 18) {
+                    typeIds.add(Decimal128DataType.DECIMAL128);
+                } else {
+                    typeIds.add(Decimal64DataType.DECIMAL64);
+                }
+            } else {
+                typeIds.add(PARQUET_TO_OMNI_TYPE.get(type.getOriginalType()));
+            }
+        } else {
+            typeIds.add(NULL_ORIGINAL_TO_OMNI_TYPE.get(type.getPrimitiveTypeName()));
+        }
+    }
+
+    private MessageType getRequriedSchema(MessageType schema) {
+        Set<Integer> requiredIds = new HashSet<>(this.included);
+        List<Type> typeList = new ArrayList<Type>();
+        for (int i = 0; i < schema.getFields().size(); i++) {
+            if (requiredIds.contains(i)) {
+                typeList.add(schema.getFields().get(i));
+            }
+        }
+        return new MessageType(schema.getName(), typeList);
     }
 
     protected ParquetInputSplit getSplit(final org.apache.hadoop.mapred.InputSplit oldSplit, final JobConf conf)
@@ -194,7 +297,11 @@ public class OmniParquetRecordReader
 
     @Override
     public boolean next(NullWritable key, VecBatchWrapper value) throws IOException {
-        int batchSize = recordReader.next(vecs);
+        int batchSize = BATCH;
+        if (tableScanOp != null && tableScanOp.getDone()) {
+            return false;
+        }
+        batchSize = recordReader.next(vecs, typeIds);
         if (batchSize == 0) {
             return false;
         }
@@ -227,7 +334,7 @@ public class OmniParquetRecordReader
 
     @Override
     public float getProgress() throws IOException {
-        return 0.0f;
+        return progress;
     }
 
     @Override

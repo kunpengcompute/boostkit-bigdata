@@ -518,7 +518,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
 
     private boolean tableScanReplaceable(MapWork work) {
         for (PartitionDesc partitionDesc : work.getPathToPartitionInfo().values()) {
-            if (!partitionDesc.getInputFileFormatClassName().equals(OrcInputFormat.class.getName())) {
+            if (!checkInputFormat(partitionDesc.getInputFileFormatClassName())) {
                 return false;
             }
         }
@@ -537,7 +537,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             return false;
         }
         Table tableMetadata = tableScanDesc.getTableMetadata();
-        if (tableMetadata != null && (!tableMetadata.getInputFormatClass().equals(OrcInputFormat.class) || tableMetadata.getParameters().getOrDefault("transactional", "").equals("true"))) {
+        if (tableMetadata != null && (!checkInputFormat(tableMetadata.getInputFormatClass().getName()) || tableMetadata.getParameters().getOrDefault("transactional", "").equals("true"))) {
             return false;
         }
         if (tableScanDesc.isVectorized()) {
@@ -562,6 +562,13 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             }
         }
         return true;
+    }
+
+    private boolean checkInputFormat(String format) {
+        if (format.equals(OrcInputFormat.class.getName()) || format.equals(MapredParquetInputFormat.class.getName())) {
+            return true;
+        }
+        return false;
     }
 
     private void traverseTezOperator(Operator op, BaseWork work, boolean groupNeedSort, boolean reduceSinkCanReplace, VectorizedRowBatchCtx vectorizedRowBatchCtx) {

@@ -21,9 +21,11 @@ package com.huawei.boostkit.hive.reader;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.io.InputFormatChecker;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapred.FileInputFormat;
+import org.apache.hadoop.mapred.FileSplit;
 import org.apache.hadoop.mapred.InputSplit;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.RecordReader;
@@ -37,7 +39,11 @@ public class OmniParquetInputFormat extends FileInputFormat<NullWritable, VecBat
     @Override
     public RecordReader<NullWritable, VecBatchWrapper> getRecordReader(InputSplit inputSplit, JobConf conf,
                                                                        Reporter reporter) throws IOException {
-        return new OmniParquetRecordReader(inputSplit, conf);
+        if (Utilities.getIsVectorized(conf)) {
+            return new OmniVectorizedParquetRecordReader(inputSplit, conf);
+        } else {
+            return new OmniParquetRecordReader(inputSplit, conf);
+        }
     }
 
     @Override
