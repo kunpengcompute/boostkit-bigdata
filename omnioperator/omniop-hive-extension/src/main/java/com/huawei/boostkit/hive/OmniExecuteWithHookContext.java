@@ -377,9 +377,9 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                 && reduceSinkDesc.getPartitionCols().size() > 0) {
             unReplaceable = true;
         }
-        if (!isUDFSupport(reduceSinkDesc.getKeyCols()) ||
-                !isUDFSupport(reduceSinkDesc.getValueCols()) ||
-                !isUDFSupport(reduceSinkDesc.getPartitionCols())) {
+        if (!isUDFSupport(reduceSinkDesc.getKeyCols(), false) ||
+                !isUDFSupport(reduceSinkDesc.getValueCols(), false) ||
+                !isUDFSupport(reduceSinkDesc.getPartitionCols(), false)) {
             unReplaceable = true;
         }
 
@@ -637,7 +637,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             case MERGEJOIN:
                 return joinReplaceable(operator);
             case SELECT:
-                if (!isUDFSupport(((SelectDesc) operator.getConf()).getColList())) {
+                if (!isUDFSupport(((SelectDesc) operator.getConf()).getColList(), false)) {
                     return false;
                 }
                 if (OmniSelectOperator.isInvalidSelectColumn(((SelectDesc) operator.getConf()).getColList())) {
@@ -654,7 +654,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                 return replaceable;
             case FILTER:
                 List<ExprNodeDesc> colList = Collections.singletonList(((FilterDesc) operator.getConf()).getPredicate());
-                if ((!isUDFSupport(colList) && !isLegalTimestamp(colList)) || !isLegalDeci(colList)) {
+                if ((!isUDFSupport(colList, true) && !isLegalTimestamp(colList)) || !isLegalDeci(colList)) {
                     return false;
                 }
                 boolean result = true;
@@ -664,7 +664,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                 for (Operator child : operator.getChildOperators()) {
                     if (child.getType() != null && child.getType().equals(OperatorType.SELECT)) {
                         SelectDesc conf = (SelectDesc) child.getConf();
-                        result = result && isUDFSupport(conf.getColList()) && isLegalDeci(conf.getColList());
+                        result = result && isUDFSupport(conf.getColList(), false) && isLegalDeci(conf.getColList());
                     }
                 }
                 return result;
@@ -769,7 +769,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         for (List<ExprNodeDesc> value : mapJoinDesc.getFilters().values()) {
             exprNodeDescList.addAll(value);
         }
-        if (!isUDFSupport(exprNodeDescList) || joinCondUnsupported(mapJoinDesc)) {
+        if (!isUDFSupport(exprNodeDescList, false) || joinCondUnsupported(mapJoinDesc)) {
             return false;
         }
         return joinReplaceable(operator);
@@ -790,7 +790,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         if (groupByDesc.isGroupingSetsPresent() && groupByDesc.getMode() == GroupByDesc.Mode.PARTIALS) {
             return false;
         }
-        if (!isUDFSupport(groupByDesc.getKeys())) {
+        if (!isUDFSupport(groupByDesc.getKeys(), false)) {
             return false;
         }
         if (isChildPTFOperatorUnReplaceable(operator, reduceSinkCanReplace)) {
@@ -803,7 +803,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             if (TypeUtils.getAggFunctionTypeFromName(aggregator) == null) {
                 return false;
             }
-            if (!isUDFSupport(aggregator.getParameters())) {
+            if (!isUDFSupport(aggregator.getParameters(), false)) {
                 return false;
             }
             if (aggregator.getGenericUDAFName().equals("avg") && aggregator.getMode() == GenericUDAFEvaluator.Mode.PARTIAL1) {
@@ -841,13 +841,13 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
     private boolean joinReplaceable(Operator<? extends OperatorDesc> operator) {
         JoinDesc joinDesc = (JoinDesc) operator.getConf();
         JoinCondDesc[] joinCondDescs = joinDesc.getConds();
-        for (JoinCondDesc joinCondDesc: joinCondDescs) {
+        for (JoinCondDesc joinCondDesc : joinCondDescs) {
             if (!SUPPORTED_JOIN.contains(joinCondDesc.getType()) || joinCondDesc.getType() == JoinDesc.FULL_OUTER_JOIN && fullJoinUnReplaceable(joinDesc)) {
                 return false;
             }
         }
         if (joinCondDescs.length >= 2) {
-            for (List<ExprNodeDesc> filters: joinDesc.getFilters().values()) {
+            for (List<ExprNodeDesc> filters : joinDesc.getFilters().values()) {
                 if (!filters.isEmpty()) {
                     return false;
                 }
@@ -868,19 +868,19 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             }
         }
         int filterNum = 0;
-        for (List<ExprNodeDesc> filters: joinDesc.getFilters().values()) {
+        for (List<ExprNodeDesc> filters : joinDesc.getFilters().values()) {
             if (!filters.isEmpty()) {
                 ++filterNum;
             }
         }
-        return filterNum >=2;
+        return filterNum >= 2;
     }
 
     private boolean checkResidulFilter(JoinDesc joinDesc) {
         if (joinDesc.getResidualFilterExprs() == null) {
             return true;
         }
-        return isUDFSupport(joinDesc.getResidualFilterExprs());
+        return isUDFSupport(joinDesc.getResidualFilterExprs(), false);
     }
 
     private boolean isPTFAggUnsupported(FunctionType windowFunctionType, List<PTFExpressionDef> expressions) {
@@ -921,7 +921,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
 
     private BaseExpression getBaseExpression(ExprNodeDesc current) {
         if (((ExprNodeGenericFuncDesc) current).getGenericUDF() instanceof GenericUDFConcat ||
-            ((ExprNodeGenericFuncDesc) current).getGenericUDF() instanceof GenericUDFCoalesce && current.getChildren().size() >= 3) {
+                ((ExprNodeGenericFuncDesc) current).getGenericUDF() instanceof GenericUDFCoalesce && current.getChildren().size() >= 3) {
             return null;
         }
         boolean supportUDF = ExpressionUtils.isSupportUDF(((ExprNodeGenericFuncDesc) current).getGenericUDF());
@@ -939,7 +939,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         return expr;
     }
 
-    private boolean isUDFSupport(List<ExprNodeDesc> colList) {
+    private boolean isUDFSupport(List<ExprNodeDesc> colList, boolean isFilterOperator) {
         Queue<ExprNodeDesc> queue = new LinkedBlockingQueue<>();
         colList.forEach(queue::offer);
         List<String> expressions = new ArrayList<>();
@@ -950,6 +950,14 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         } catch (Exception e) {
             LOG.error("generate omni expressions error", e);
             return false;
+        }
+        if (isFilterOperator) {
+            for (String filterExpr : expressions) {
+                if (!checkOmniJsonWhiteList(filterExpr, new String[0])) {
+                    return false;
+                }
+            }
+            return true;
         }
         return checkOmniJsonWhiteList("", expressions.toArray(new String[0]));
     }
