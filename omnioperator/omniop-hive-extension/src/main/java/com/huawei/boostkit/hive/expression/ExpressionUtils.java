@@ -168,8 +168,10 @@ public class ExpressionUtils {
             } else {
                 realValue = ((HiveDecimal) value).scaleByPowerOfTen(scale).longValue();
             }
-            leaf = new DecimalLiteral(realValue, omniType,
-                    ((DecimalTypeInfo) next.getTypeInfo()).getPrecision(), scale);
+            if (realValue != null) {
+                realValue = realValue.toString();
+            }
+            leaf = new DecimalLiteral(realValue, omniType, ((DecimalTypeInfo) next.getTypeInfo()).getPrecision(), scale);
         } else {
             leaf = new LiteralFactor<>("LITERAL", null, null, TypeUtils.getLiteralValue(value, next.getTypeInfo()),
                     TypeUtils.getCharWidth(next), omniType);
@@ -209,7 +211,7 @@ public class ExpressionUtils {
         } else if (exprNodeDesc instanceof ExprNodeConstantDesc) {
             baseExpression = ExpressionUtils.createLiteralNode(exprNodeDesc);
         } else if (exprNodeDesc instanceof ExprNodeFieldDesc) {
-            baseExpression = ExpressionUtils.createReferenceNode(((ExprNodeFieldDesc)exprNodeDesc).getDesc(), inspector);
+            baseExpression = ExpressionUtils.createReferenceNode(((ExprNodeFieldDesc) exprNodeDesc).getDesc(), inspector);
         }
         return baseExpression;
     }
@@ -218,7 +220,7 @@ public class ExpressionUtils {
                                          ExprNodeDesc comparedNode) {
         TypeInfo baseTypeInfo = comparedNode.getTypeInfo();
         if (castNodeDesc instanceof ExprNodeConstantDesc && baseTypeInfo instanceof DecimalTypeInfo && ((ExprNodeConstantDesc) castNodeDesc).getValue().equals(0)) {
-            if (((DecimalTypeInfo) baseTypeInfo).getPrecision() >18) {
+            if (((DecimalTypeInfo) baseTypeInfo).getPrecision() > 18) {
                 return new DecimalLiteral("0", TypeUtils.convertHiveTypeToOmniType(baseTypeInfo),
                         ((DecimalTypeInfo) baseTypeInfo).getPrecision(), ((DecimalTypeInfo) baseTypeInfo).getScale());
             } else {
