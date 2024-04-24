@@ -32,16 +32,20 @@ import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.typeinfo.DecimalTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 public class ComputeExpressionProcessor implements ExpressionProcessor {
     @Override
     public BaseExpression process(ExprNodeGenericFuncDesc node, String operator, ObjectInspector inspector) {
         List<ExprNodeDesc> children = node.getChildren();
+        List<ExprNodeDesc> allNode = getAllNode(node);
         boolean hasDecimal128 = false;
-        for (ExprNodeDesc child : children) {
-            if (child.getTypeInfo() instanceof DecimalTypeInfo && ((DecimalTypeInfo) child.getTypeInfo()).getPrecision() > 18) {
+        for (ExprNodeDesc item : allNode) {
+            if (item.getTypeInfo() instanceof DecimalTypeInfo && ((DecimalTypeInfo) item.getTypeInfo()).getPrecision() > 18) {
                 hasDecimal128 = true;
+                break;
             }
         }
         conjureNodeType(children);
@@ -53,7 +57,7 @@ public class ComputeExpressionProcessor implements ExpressionProcessor {
             if (child instanceof ExprNodeGenericFuncDesc) {
                 baseExpression = ExpressionUtils.build((ExprNodeGenericFuncDesc) child, inspector);
             } else {
-                baseExpression = ExpressionUtils.createNode(child, inspector);
+                baseExpression = ExpressionUtils.createNode(hasDecimal128, child, inspector);
             }
             if (baseExpression.getReturnType() == Decimal64DataType.DECIMAL64.getId().toValue() && hasDecimal128) {
                 DecimalTypeInfo decimalTypeInfo = (DecimalTypeInfo) child.getTypeInfo();
@@ -65,6 +69,21 @@ public class ComputeExpressionProcessor implements ExpressionProcessor {
             compareExpression.add(baseExpression);
         }
         return compareExpression;
+    }
+
+    private List<ExprNodeDesc> getAllNode(ExprNodeGenericFuncDesc node) {
+        List<ExprNodeDesc> children = node.getChildren();
+        if (children.isEmpty()) {
+            return Collections.singletonList(node);
+        }
+        List<ExprNodeDesc> allNode = new ArrayList<>();
+        for (ExprNodeDesc child : children) {
+            if (child instanceof ExprNodeGenericFuncDesc) {
+                allNode.addAll(getAllNode((ExprNodeGenericFuncDesc) child));
+            }
+            allNode.add(child);
+        }
+        return allNode;
     }
 
     private void conjureNodeType(List<ExprNodeDesc> nodes) {
