@@ -155,9 +155,13 @@ public class ExpressionUtils {
     }
 
     public static BaseExpression createLiteralNode(ExprNodeDesc next) {
+        return createLiteralNode(false, next);
+    }
+
+    public static BaseExpression createLiteralNode(boolean hashDecimal128, ExprNodeDesc next) {
         BaseExpression leaf;
         Object value = ((ExprNodeConstantDesc) next).getValue();
-        int omniType = TypeUtils.convertHiveTypeToOmniType(next.getTypeInfo());
+        int omniType = hashDecimal128 ? Decimal128DataType.DECIMAL128.getId().toValue(): TypeUtils.convertHiveTypeToOmniType(next.getTypeInfo());
         if (omniType == Decimal128DataType.DECIMAL128.getId().toValue() || omniType == Decimal64DataType.DECIMAL64.getId().toValue()) {
             int scale = ((DecimalTypeInfo) next.getTypeInfo()).getScale();
             Object realValue;
@@ -205,11 +209,15 @@ public class ExpressionUtils {
     }
 
     public static BaseExpression createNode(ExprNodeDesc exprNodeDesc, ObjectInspector inspector) {
+        return createNode(false, exprNodeDesc, inspector);
+    }
+
+    public static BaseExpression createNode(boolean hasDecimal128, ExprNodeDesc exprNodeDesc, ObjectInspector inspector) {
         BaseExpression baseExpression = null;
         if (exprNodeDesc instanceof ExprNodeColumnDesc) {
             baseExpression = ExpressionUtils.createReferenceNode(exprNodeDesc, inspector);
         } else if (exprNodeDesc instanceof ExprNodeConstantDesc) {
-            baseExpression = ExpressionUtils.createLiteralNode(exprNodeDesc);
+            baseExpression = ExpressionUtils.createLiteralNode(hasDecimal128, exprNodeDesc);
         } else if (exprNodeDesc instanceof ExprNodeFieldDesc) {
             baseExpression = ExpressionUtils.createReferenceNode(((ExprNodeFieldDesc) exprNodeDesc).getDesc(), inspector);
         }
