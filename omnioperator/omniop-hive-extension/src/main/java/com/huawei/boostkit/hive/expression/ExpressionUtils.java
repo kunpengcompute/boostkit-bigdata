@@ -172,9 +172,6 @@ public class ExpressionUtils {
             } else {
                 realValue = ((HiveDecimal) value).scaleByPowerOfTen(scale).longValue();
             }
-            if (realValue != null) {
-                realValue = realValue.toString();
-            }
             leaf = new DecimalLiteral(realValue, omniType, ((DecimalTypeInfo) next.getTypeInfo()).getPrecision(), scale);
         } else {
             leaf = new LiteralFactor<>("LITERAL", null, null, TypeUtils.getLiteralValue(value, next.getTypeInfo()),
