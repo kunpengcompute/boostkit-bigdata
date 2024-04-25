@@ -161,8 +161,11 @@ public class ExpressionUtils {
     public static BaseExpression createLiteralNode(boolean hashDecimal128, ExprNodeDesc next) {
         BaseExpression leaf;
         Object value = ((ExprNodeConstantDesc) next).getValue();
-        int omniType = hashDecimal128 ? Decimal128DataType.DECIMAL128.getId().toValue(): TypeUtils.convertHiveTypeToOmniType(next.getTypeInfo());
+        int omniType = TypeUtils.convertHiveTypeToOmniType(next.getTypeInfo());
         if (omniType == Decimal128DataType.DECIMAL128.getId().toValue() || omniType == Decimal64DataType.DECIMAL64.getId().toValue()) {
+            if (hashDecimal128) {
+                omniType = Decimal128DataType.DECIMAL128.getId().toValue();
+            }
             int scale = ((DecimalTypeInfo) next.getTypeInfo()).getScale();
             Object realValue;
             if (value == null) {
