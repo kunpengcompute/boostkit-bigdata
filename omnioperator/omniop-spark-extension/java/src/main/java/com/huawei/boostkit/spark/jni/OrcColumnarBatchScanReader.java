@@ -20,11 +20,8 @@ package com.huawei.boostkit.spark.jni;
 import com.huawei.boostkit.scan.jni.OrcColumnarBatchJniReader;
 
 import nova.hetu.omniruntime.type.DataType;
-import nova.hetu.omniruntime.type.Decimal128DataType;
 import nova.hetu.omniruntime.vector.*;
 
-import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.token.Token;
 import org.apache.spark.sql.catalyst.util.RebaseDateTime;
 import org.apache.hadoop.hive.ql.io.sarg.ExpressionTree;
 import org.apache.hadoop.hive.ql.io.sarg.PredicateLeaf;
@@ -33,9 +30,7 @@ import org.apache.orc.Reader.Options;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.orc.TypeDescription;
 
-import java.io.IOException;
 import java.net.URI;
 import java.sql.Date;
 import java.util.ArrayList;
@@ -185,13 +180,6 @@ public class OrcColumnarBatchScanReader {
         }
         job.put("tailLocation", 9223372036854775807L);
 
-        // handle delegate token for native orc reader
-        OrcColumnarBatchScanReader.tokenDebug("initializeReader");
-        JSONObject tokenJsonObj = constructTokensJSONObject();
-        if (null != tokenJsonObj) {
-            job.put("tokens", tokenJsonObj);
-        }
-
         job.put("scheme", uri.getScheme() == null ? "" : uri.getScheme());
         job.put("host", uri.getHost() == null ? "" : uri.getHost());
         job.put("port", uri.getPort());
@@ -227,12 +215,7 @@ public class OrcColumnarBatchScanReader {
         }
 
         job.put("includedColumns", colToInclu.toArray());
-        // handle delegate token for native orc reader
-        OrcColumnarBatchScanReader.tokenDebug("initializeRecordReader");
-        JSONObject tokensJsonObj = constructTokensJSONObject();
-        if (null != tokensJsonObj) {
-            job.put("tokens", tokensJsonObj);
-        }
+
         recordReader = jniReader.initializeRecordReader(reader, job);
         return recordReader;
     }
@@ -339,40 +322,5 @@ public class OrcColumnarBatchScanReader {
         }
 
         return hexString.toString().toLowerCase();
-    }
-
-    public static JSONObject constructTokensJSONObject() {
-        JSONObject tokensJsonItem = new JSONObject();
-        try {
-            ArrayList<JSONObject> child = new ArrayList<JSONObject>();
-            for (Token<?> token : UserGroupInformation.getCurrentUser().getTokens()) {
-                JSONObject tokenJsonItem = new JSONObject();
-                tokenJsonItem.put("identifier", bytesToHexString(token.getIdentifier()));
-                tokenJsonItem.put("password", bytesToHexString(token.getPassword()));
-                tokenJsonItem.put("kind", token.getKind().toString());
-                tokenJsonItem.put("service", token.getService().toString());
-                child.add(tokenJsonItem);
-            }
-            tokensJsonItem.put("token", child.toArray());
-        } catch (IOException e) {
-            tokensJsonItem = null;
-        } finally {
-            LOGGER.debug("\n\n================== tokens-json ==================\n" + tokensJsonItem.toString());
-            return tokensJsonItem;
-        }
-    }
-
-    public static void tokenDebug(String mesg) {
-        try {
-            LOGGER.debug("\n\n=============" + mesg + "=============\n" + UserGroupInformation.getCurrentUser().toString());
-            for (Token<?> token : UserGroupInformation.getCurrentUser().getTokens()) {
-                LOGGER.debug("\n\ntoken identifier:" + bytesToHexString(token.getIdentifier()));
-                LOGGER.debug("\ntoken password:" + bytesToHexString(token.getPassword()));
-                LOGGER.debug("\ntoken kind:" + token.getKind());
-                LOGGER.debug("\ntoken service:" + token.getService());
-            }
-        } catch (IOException e) {
-            LOGGER.debug("\n\n**********" + mesg + " exception **********\n");
-        }
     }
 }
