@@ -841,6 +841,21 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
     private boolean joinReplaceable(Operator<? extends OperatorDesc> operator) {
         JoinDesc joinDesc = (JoinDesc) operator.getConf();
         JoinCondDesc[] joinCondDescs = joinDesc.getConds();
+        Map<Byte, List<ExprNodeDesc>> keys;
+        if (joinDesc instanceof CommonMergeJoinDesc) {
+            keys = ((CommonMergeJoinDesc) joinDesc).getKeys();
+        } else if (joinDesc instanceof MapJoinDesc) {
+            keys = ((MapJoinDesc) joinDesc).getKeys();
+        } else {
+            return joinDesc instanceof OmniMergeJoinDesc;
+        }
+        List<ExprNodeDesc> exprNodeDescList = new ArrayList<>();
+        for (List<ExprNodeDesc> exprNodeDescs : keys.values()) {
+            exprNodeDescList.addAll(exprNodeDescs);
+        }
+        if (!isUDFSupport(exprNodeDescList, false)) {
+            return false;
+        }
         for (JoinCondDesc joinCondDesc : joinCondDescs) {
             if (!SUPPORTED_JOIN.contains(joinCondDesc.getType()) || joinCondDesc.getType() == JoinDesc.FULL_OUTER_JOIN && fullJoinUnReplaceable(joinDesc)) {
                 return false;
