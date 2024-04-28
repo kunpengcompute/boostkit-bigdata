@@ -24,6 +24,7 @@ import static com.huawei.boostkit.hive.expression.TypeUtils.checkUnsupportedArit
 import static com.huawei.boostkit.hive.expression.TypeUtils.checkUnsupportedCast;
 import static com.huawei.boostkit.hive.expression.TypeUtils.convertHiveTypeToOmniType;
 import static com.huawei.boostkit.hive.expression.TypeUtils.isValidConversion;
+import static com.huawei.boostkit.hive.expression.TypeUtils.isValidFilterExpression;
 import static nova.hetu.omniruntime.constants.FunctionType.OMNI_AGGREGATION_TYPE_AVG;
 import static nova.hetu.omniruntime.constants.FunctionType.OMNI_AGGREGATION_TYPE_SUM;
 import static org.apache.hadoop.hive.serde.serdeConstants.SERIALIZATION_LIB;
@@ -654,7 +655,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                 return replaceable;
             case FILTER:
                 List<ExprNodeDesc> colList = Collections.singletonList(((FilterDesc) operator.getConf()).getPredicate());
-                if ((!isUDFSupport(colList, true) && !isLegalTimestamp(colList)) || !isLegalDeci(colList)) {
+                if ((!isUDFSupport(colList, true) && !isLegalTimestamp(colList)) || !isLegalFilter(colList)) {
                     return false;
                 }
                 boolean result = true;
@@ -664,7 +665,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                 for (Operator child : operator.getChildOperators()) {
                     if (child.getType() != null && child.getType().equals(OperatorType.SELECT)) {
                         SelectDesc conf = (SelectDesc) child.getConf();
-                        result = result && isUDFSupport(conf.getColList(), false) && isLegalDeci(conf.getColList());
+                        result = result && isUDFSupport(conf.getColList(), false) && isLegalFilter(conf.getColList());
                     }
                 }
                 return result;
@@ -977,16 +978,16 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         return checkOmniJsonWhiteList("", expressions.toArray(new String[0]));
     }
 
-    private boolean isLegalDeci(List<ExprNodeDesc> colList) {
+    private boolean isLegalFilter(List<ExprNodeDesc> colList) {
         for (ExprNodeDesc desc : colList) {
-            if (!isValidConversion(desc)) {
+            if (!isValidConversion(desc) || !isValidFilterExpression(desc)) {
                 return false;
             }
         }
         if (colList.size() > 0 && colList.get(0).getChildren() != null) {
             List<ExprNodeDesc> childList = colList.get(0).getChildren();
             for (ExprNodeDesc desc : childList) {
-                if (!isValidConversion(desc)) {
+                if (!isValidConversion(desc) || !isValidFilterExpression(desc)) {
                     return false;
                 }
             }
