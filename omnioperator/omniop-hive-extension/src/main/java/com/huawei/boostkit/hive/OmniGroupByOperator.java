@@ -276,15 +276,7 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
                             .getAllStructFieldRefs();
             sourceTypes = getDataTypeFromStructField(keyStructFieldRefs, valueStructFieldRefs);
             groupByChanel = getExprFromStructField(keyStructFieldRefs);
-            if (valueStructFieldRefs.isEmpty()) {
-                if (aggChannelFields.size() != keyStructFieldRefs.size()) {
-                    aggChannels = getTwoDimenExprFromExprNode(true, aggChannelFields);
-                } else {
-                    aggChannels = getTwoDimenExprFromStructField(keyStructFieldRefs, 0);
-                }
-            } else {
-                aggChannels = getTwoDimenExprFromStructField(valueStructFieldRefs, numKeys);
-            }
+            aggChannels = getTwoDimenExprFromExprNode(true, aggChannelFields);
             if (numKeys != keyStructFieldRefs.size()) {
                 numKeys = keyStructFieldRefs.size();
             }
@@ -482,11 +474,19 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
     }
 
     private int getFieldIdFromExprStr(String name) {
-        Pattern pattern = Pattern.compile("._col(\\d+)");
-        Matcher matcher = pattern.matcher(name);
-        if (matcher.find()) {
-            String numberStr = matcher.group(1);
-            return Integer.parseInt(numberStr);
+        int offset;
+        Pattern patternValue = Pattern.compile("^VALUE");
+        Matcher matcherValue = patternValue.matcher(name);
+        if (matcherValue.find()) {
+            offset = numKeys;
+        } else {
+            offset = 0;
+        }
+        Pattern patternCol = Pattern.compile("._col(\\d+)");
+        Matcher matcherCol = patternCol.matcher(name);
+        if (matcherCol.find()) {
+            String numberStr = matcherCol.group(1);
+            return Integer.parseInt(numberStr) + offset;
         } else {
             return getFieldIdFromFieldName(name);
         }
