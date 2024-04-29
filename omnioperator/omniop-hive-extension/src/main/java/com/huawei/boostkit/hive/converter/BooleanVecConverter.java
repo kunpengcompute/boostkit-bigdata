@@ -24,7 +24,7 @@ public class BooleanVecConverter extends LongVecConverter {
         }
         if (vec instanceof DictionaryVec) {
             DictionaryVec dictionaryVec = (DictionaryVec) vec;
-            return dictionaryVec.getBoolean(index);
+            return dictionaryVec.getLong(index);
         }
         BooleanVec booleanVec = (BooleanVec) vec;
         return booleanVec.get(index);
