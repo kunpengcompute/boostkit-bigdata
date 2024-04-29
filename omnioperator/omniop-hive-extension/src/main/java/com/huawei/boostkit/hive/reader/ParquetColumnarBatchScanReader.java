@@ -64,7 +64,7 @@ public class ParquetColumnarBatchScanReader {
                                      List<Integer> rowgroupIndices, List<Integer> columnIndices, String ugi) {
         JSONObject job = new JSONObject();
         URI uri = path.toUri();
-        job.put("uri", uri.toString());
+        job.put("uri", path.toString());
         job.put("filePath", path);
         job.put("capacity", capacity);
         job.put("rowGroupIndices", rowgroupIndices.stream().mapToInt(Integer::intValue).toArray());

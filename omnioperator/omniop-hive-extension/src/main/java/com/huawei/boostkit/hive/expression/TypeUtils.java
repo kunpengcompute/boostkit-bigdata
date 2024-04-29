@@ -400,6 +400,26 @@ public class TypeUtils {
         return false;
     }
 
+    public static boolean isValidFilterExpression(ExprNodeDesc node) {
+        boolean hasDateColumn = false;
+        boolean hasStringConst = false;
+        if (node.getChildren() != null) {
+            List<ExprNodeDesc> children = node.getChildren();
+            for (int i = 0; i < children.size(); i++) {
+                ExprNodeDesc childNode = children.get(i);
+                if (childNode instanceof ExprNodeColumnDesc && childNode.getTypeString().equals("date")) {
+                    hasDateColumn = true;
+                } else if(childNode instanceof ExprNodeConstantDesc && childNode.getTypeString().equals("string")) {
+                    hasStringConst = true;
+                }
+            }
+        }
+        if (hasDateColumn && hasStringConst) {
+            return false;
+        }
+        return true;
+    }
+
     public static boolean isValidConversion(ExprNodeDesc node) {
         if (node instanceof ExprNodeGenericFuncDesc && node.getChildren() != null && node.getChildren().size() == 2) {
             List<ExprNodeDesc> children = node.getChildren();
