@@ -622,6 +622,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
     }
 
     private boolean currentReplaceable(Operator<? extends OperatorDesc> operator, boolean reduceSinkCanReplace) {
+        if (operator.getName().contains("OMNI")) return true;
         if (replaceable.contains(operator) || operator.getType() == null) {
             return true;
         }
@@ -844,10 +845,8 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         Map<Byte, List<ExprNodeDesc>> keys;
         if (joinDesc instanceof CommonMergeJoinDesc) {
             keys = ((CommonMergeJoinDesc) joinDesc).getKeys();
-        } else if (joinDesc instanceof MapJoinDesc) {
+        } else  {
             keys = ((MapJoinDesc) joinDesc).getKeys();
-        } else {
-            return joinDesc instanceof OmniMergeJoinDesc;
         }
         List<ExprNodeDesc> exprNodeDescList = new ArrayList<>();
         for (List<ExprNodeDesc> exprNodeDescs : keys.values()) {

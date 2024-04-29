@@ -96,7 +96,7 @@ public class OmniSortOperator extends OmniHiveOperator<OmniSortDesc> implements 
 
     @Override
     public String getName() {
-        return "OmniSortOperator";
+        return "OMNI_SORT";
     }
 
     @Override

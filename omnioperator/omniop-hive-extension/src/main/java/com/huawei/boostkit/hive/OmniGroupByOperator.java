@@ -652,7 +652,7 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
 
     @Override
     public String getName() {
-        return "OMNI-GROUPBY";
+        return "OMNI_GBY";
     }
 
     @Override

@@ -855,11 +855,7 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
 
     @Override
     public String getName() {
-        return OmniMapJoinOperator.getOperatorName();
-    }
-
-    public static String getOperatorName() {
-        return "OMNI-MAPJOIN";
+        return "OMNI_MAPJOIN";
     }
 
     @Override

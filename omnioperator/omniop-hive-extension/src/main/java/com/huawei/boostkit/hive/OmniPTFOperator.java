@@ -291,7 +291,7 @@ public class OmniPTFOperator extends OmniHiveOperator<OmniPTFDesc> implements Se
 
     @Override
     public String getName() {
-        return "OMNI-PTF";
+        return "OMNI_PTF";
     }
 
     @Override

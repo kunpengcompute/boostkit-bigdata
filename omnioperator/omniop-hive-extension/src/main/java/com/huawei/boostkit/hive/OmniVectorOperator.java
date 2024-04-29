@@ -323,7 +323,7 @@ public class OmniVectorOperator extends OmniHiveOperator<OmniVectorDesc> {
     }
 
     public static String getOperatorName() {
-        return "OMNI-VEC";
+        return "OMNI_VEC";
     }
 
     @Override
