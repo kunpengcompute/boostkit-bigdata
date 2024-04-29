@@ -409,13 +409,13 @@ public class TypeUtils {
             List<ExprNodeDesc> children = node.getChildren();
             for (int i = 0; i < children.size(); i++) {
                 ExprNodeDesc childNode = children.get(i);
-                if (childNode instanceof ExprNodeColumnDesc && childNode.getTypeString().equals("date")) {
+                if (childNode instanceof ExprNodeColumnDesc && childNode.getTypeString().contains("date")) {
                     hasDateColumn = true;
-                } else if(childNode instanceof ExprNodeColumnDesc && childNode.getTypeString().equals("decimal")) {
+                } else if(childNode instanceof ExprNodeColumnDesc && childNode.getTypeString().contains("decimal")) {
                     hasDecimalColumn = true;
-                } else if(childNode instanceof ExprNodeConstantDesc && childNode.getTypeString().equals("string")) {
+                } else if(childNode instanceof ExprNodeConstantDesc && childNode.getTypeString().contains("string")) {
                     hasStringConst = true;
-                } else if(childNode instanceof ExprNodeConstantDesc && childNode.getTypeString().equals("int")) {
+                } else if(childNode instanceof ExprNodeConstantDesc && childNode.getTypeString().contains("int")) {
                     hasIntConst = true;
                 }
             }
