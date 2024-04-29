@@ -95,8 +95,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> implements Serializable, VectorizationContextRegion, IConfigureJobConf {
     private static final long serialVersionUID = 1L;
@@ -277,11 +275,7 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
             sourceTypes = getDataTypeFromStructField(keyStructFieldRefs, valueStructFieldRefs);
             groupByChanel = getExprFromStructField(keyStructFieldRefs);
             if (valueStructFieldRefs.isEmpty()) {
-                if (aggChannelFields.size() != keyStructFieldRefs.size()) {
-                    aggChannels = getTwoDimenExprFromExprNode(true, aggChannelFields);
-                } else {
-                    aggChannels = getTwoDimenExprFromStructField(keyStructFieldRefs, 0);
-                }
+                aggChannels = getTwoDimenExprFromStructField(keyStructFieldRefs, 0);
             } else {
                 aggChannels = getTwoDimenExprFromStructField(valueStructFieldRefs, numKeys);
             }
@@ -441,17 +435,13 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
     }
 
     private String[] getExprFromExprNode(List<ExprNodeEvaluator> nodes) {
-        return getExprFromExprNode(false, nodes);
-    }
-    private String[] getExprFromExprNode(boolean isColumnIdFromExprStr, List<ExprNodeEvaluator> nodes) {
         List<String> expressions = new ArrayList<>();
         for (int i = 0; i < nodes.size(); i++) {
             if (nodes.get(i) instanceof ExprNodeGenericFuncEvaluator) {
                 expressions.add(ExpressionUtils.build((ExprNodeGenericFuncDesc) nodes.get(i).getExpr(), inputObjInspectors[0]).toString());
             } else if (nodes.get(i) instanceof ExprNodeColumnEvaluator) {
-                String exprStr = ((ExprNodeColumnEvaluator) nodes.get(i)).getExpr().getColumn();
-                int columnId = isColumnIdFromExprStr ? getFieldIdFromExprStr(exprStr) : getFieldIdFromFieldName(exprStr);
-                expressions.add(TypeUtils.buildExpression(nodes.get(i).getExpr().getTypeInfo(), columnId));
+                expressions.add(TypeUtils.buildExpression(nodes.get(i).getExpr().getTypeInfo(),
+                        getFieldIdFromFieldName(((ExprNodeColumnEvaluator) nodes.get(i)).getExpr().getColumn())));
             } else if (nodes.get(i) instanceof ExprNodeConstantEvaluator) {
                 if (groupingSetsPresent) {
                     expressions.add(TypeUtils.buildExpression(nodes.get(i).getExpr().getTypeInfo(), allStructFieldRefs.size()));
@@ -468,28 +458,13 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
     }
 
     private String[][] getTwoDimenExprFromExprNode(List<List<ExprNodeEvaluator>> nodes) {
-        return getTwoDimenExprFromExprNode(false, nodes);
-    }
-
-    private String[][] getTwoDimenExprFromExprNode(boolean isColumnIdFromExprStr, List<List<ExprNodeEvaluator>> nodes) {
         List<String[]> expressions = new ArrayList<>();
         for (int i = 0; i < nodes.size(); i++) {
             if (!nodes.get(i).isEmpty()) {
-                expressions.add(getExprFromExprNode(isColumnIdFromExprStr, nodes.get(i)));
+                expressions.add(getExprFromExprNode(nodes.get(i)));
             }
         }
         return expressions.toArray(new String[0][0]);
-    }
-
-    private int getFieldIdFromExprStr(String name) {
-        Pattern pattern = Pattern.compile("._col(\\d+)");
-        Matcher matcher = pattern.matcher(name);
-        if (matcher.find()) {
-            String numberStr = matcher.group(1);
-            return Integer.parseInt(numberStr);
-        } else {
-            return getFieldIdFromFieldName(name);
-        }
     }
 
     private int getFieldIdFromFieldName(String name) {
