@@ -403,18 +403,26 @@ public class TypeUtils {
     public static boolean isValidFilterExpression(ExprNodeDesc node) {
         boolean hasDateColumn = false;
         boolean hasStringConst = false;
+        boolean hasDecimalColumn = false;
+        boolean hasIntConst = false;
         if (node.getChildren() != null) {
             List<ExprNodeDesc> children = node.getChildren();
             for (int i = 0; i < children.size(); i++) {
                 ExprNodeDesc childNode = children.get(i);
-                if (childNode instanceof ExprNodeColumnDesc && childNode.getTypeString().equals("date")) {
+                if (childNode instanceof ExprNodeColumnDesc && childNode.getTypeString().contains("date")) {
                     hasDateColumn = true;
-                } else if(childNode instanceof ExprNodeConstantDesc && childNode.getTypeString().equals("string")) {
+                } else if(childNode instanceof ExprNodeColumnDesc && childNode.getTypeString().contains("decimal")) {
+                    hasDecimalColumn = true;
+                } else if(childNode instanceof ExprNodeConstantDesc && childNode.getTypeString().contains("string")) {
                     hasStringConst = true;
+                } else if(childNode instanceof ExprNodeConstantDesc && childNode.getTypeString().contains("int")) {
+                    hasIntConst = true;
                 }
             }
         }
         if (hasDateColumn && hasStringConst) {
+            return false;
+        } else if (hasDecimalColumn && (hasIntConst || hasStringConst)) {
             return false;
         }
         return true;
