@@ -149,7 +149,11 @@ case class ColumnarWindowExec(windowExpression: Seq[NamedExpression],
     val windowFrameEndTypes = new Array[OmniWindowFrameBoundType](winExpressions.size)
     val windowFrameEndChannels = new Array[Int](winExpressions.size)
     var attrMap: Map[String, Int] = Map()
-    
+
+    if (winExpressions.isEmpty) {
+      throw new UnsupportedOperationException(s"Unsupported empty winExpressions")
+    }
+
     for (sortAttr <- orderSpec) {
       if (!sortAttr.child.isInstanceOf[AttributeReference]) {
         throw new UnsupportedOperationException(s"Unsupported sort col : ${sortAttr.child.nodeName}")
