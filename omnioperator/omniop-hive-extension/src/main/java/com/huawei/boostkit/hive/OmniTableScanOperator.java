@@ -84,6 +84,11 @@ public class OmniTableScanOperator extends TableScanOperator implements Serializ
     }
 
     @Override
+    public String getName() {
+        return "OMNI_TS";
+    }
+
+    @Override
     protected void initializeOp(Configuration hconf) throws HiveException {
         super.initializeOp(hconf);
         StructObjectInspector standardStructObjectInspector = (StructObjectInspector) inputObjInspectors[0];

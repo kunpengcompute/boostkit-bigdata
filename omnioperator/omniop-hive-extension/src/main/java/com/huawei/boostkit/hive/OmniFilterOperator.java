@@ -138,7 +138,7 @@ public class OmniFilterOperator extends OmniHiveOperator<OmniFilterDesc> impleme
 
     @Override
     public String getName() {
-        return "OmniFilterOperator";
+        return "OMNI_FIL";
     }
 
     @Override

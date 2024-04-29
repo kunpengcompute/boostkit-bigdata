@@ -163,7 +163,7 @@ public class OmniMergeJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc>
         }
     }
 
-    private void generateOmniOperator(int bufferIndex, boolean getAll) throws HiveException{
+    private void generateOmniOperator(int bufferIndex, boolean getAll) throws HiveException {
         int opIndex = bufferIndex - 1;
         List<Integer> streamAliasList = new ArrayList<>();
         for (int i = 0; i < bufferIndex; i++) {
@@ -179,7 +179,7 @@ public class OmniMergeJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc>
 
     private OmniOperatorFactory getFactory(List<Integer> aliasList,
                                            OmniSmjStreamedTableWithExprOperatorFactory streamFactory,
-                                           boolean getAll, int opIndex) throws HiveException{
+                                           boolean getAll, int opIndex) throws HiveException {
         List<? extends StructField> inputFields = aliasList.stream()
                 .flatMap(alias -> ((StructObjectInspector) inputObjInspectors[alias]).getAllStructFieldRefs().stream()
                         .flatMap(keyValue -> ((StructObjectInspector) keyValue.getFieldObjectInspector())
@@ -238,7 +238,7 @@ public class OmniMergeJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc>
 
     // sql like cs1.cs_warehouse_sk <> cs2.cs_warehouse_sk will have
     // residualJoinFilters
-    private Optional<String> generateFilter(int opIndex) throws HiveException{
+    private Optional<String> generateFilter(int opIndex) throws HiveException {
         ExprNodeGenericFuncDesc joinFilter = getJoinFilter(opIndex);
         if ((residualJoinFilters == null || residualJoinFilters.get(opIndex) == null) && joinFilter == null) {
             return Optional.empty();
@@ -289,7 +289,7 @@ public class OmniMergeJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc>
 
     private ExprNodeGenericFuncDesc getResidualFilter() {
         List<ExprNodeDesc> filters = residualJoinFilters.stream().map(ExprNodeEvaluator::getExpr).collect(Collectors.toList());
-        if (filters.size() ==1) {
+        if (filters.size() == 1) {
             return (ExprNodeGenericFuncDesc) filters.get(0);
         }
         try {
@@ -433,11 +433,7 @@ public class OmniMergeJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc>
 
     @Override
     public String getName() {
-        return getOperatorName();
-    }
-
-    public static String getOperatorName() {
-        return "MERGEJOIN_OMNI";
+        return "OMNI_MERGEJOIN";
     }
 
     @Override

@@ -267,7 +267,7 @@ public class OmniSelectOperator extends OmniHiveOperator<OmniSelectDesc> impleme
 
     @Override
     public String getName() {
-        return "OmniSelectOperator";
+        return "OMNI_SEL";
     }
 
     @Override

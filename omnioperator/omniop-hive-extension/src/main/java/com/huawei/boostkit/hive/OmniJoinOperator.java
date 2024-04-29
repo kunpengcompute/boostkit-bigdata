@@ -368,7 +368,7 @@ public class OmniJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc> impl
     }
 
     public static String getOperatorName() {
-        return "MERGEJOIN_OMNI";
+        return "OMNI_MERGEJOIN";
     }
 
     @Override
