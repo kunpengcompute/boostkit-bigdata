@@ -281,6 +281,9 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
     }
 
     private boolean getReduceSinkReplaceable(BaseWork work) {
+        if (!omniHiveConf.isEnableOperator(OperatorType.REDUCESINK)) {
+            return false;
+        }
         boolean reduceSinkCanReplace = false;
         if (parentOfMapJoinOpCannotReplace.contains(work.getName()) || !reduceSinkOperatorReplaceable(work)) {
             return false;
