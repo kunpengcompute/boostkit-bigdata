@@ -38,7 +38,9 @@ class OmniOperatorDeployer(object):
         # 解析omniruntime.yaml配置文件
         self.omni_conf.parse("omniruntime.yaml")
         print('parse omniruntime.yaml done!')
-        self.operator_dir = f"{self.omni_conf.omnioperator.deploy_home}/omni-operator"
+        # 在deploy_home上用于打包部署包的目录，比如deploy_home为/home/omniop，omni_home为/opt/omni-operator，
+        # 那么operator_dir就是/home/omniop/omni-operator
+        self.operator_dir = f"{self.omni_conf.omnioperator.deploy_home}/{os.path.basename(self.omni_conf.omnioperator.omni_home)}"
 
         self.omniop_pkg = f"BoostKit-omniop_{self.omni_conf.omnioperator.omni_version}.zip"
         self.omniop_inner_pkg = (f"boostkit-omniop-operator-{self.omni_conf.omnioperator.omni_version}-aarch64-"
@@ -53,6 +55,9 @@ class OmniOperatorDeployer(object):
         self.spark_extension_jar = (f"boostkit-omniop-spark-{self.omni_conf.omnioperator.spark_version}-"
                                     f"{self.omni_conf.omnioperator.omni_version}-aarch64.jar")
         self.spark_dependency_pkg = (f"dependencies.tar.gz")
+
+        self.trans_pkg = f"{os.path.basename(self.omni_conf.omnioperator.omni_home)}.tar.gz"
+        self.omni_home_parent = os.path.dirname(self.omni_conf.omnioperator.omni_home)
 
 
 
@@ -90,28 +95,25 @@ class OmniOperatorDeployer(object):
     def trans2node(self, host):
         new_ssh = SSH()
         new_ssh.open(host, self.omni_conf.env.port, self.omni_conf.env.username, self.omni_conf.env.password)
-        # 部署软件包
-        transport = paramiko.Transport(host, self.omni_conf.env.port)
-        transport.connect(username=self.omni_conf.env.username, password=self.omni_conf.env.password)
-        sftp = paramiko.SFTPClient.from_transport(transport)
-        sftp.put(f"{self.omni_conf.omnioperator.deploy_home}/omni-operator.tar.gz", f"/opt/omni-operator.tar.gz")
-        new_ssh.send_shell_cmd(f"tar -zxPf /opt/omni-operator.tar.gz -C /opt --touch && rm /opt/omni-operator.tar.gz -rf")
-        transport.close()
+        # scp到对端节点的OMNI_HOME父目录上
+        new_ssh.scp_to(f"{self.omni_conf.omnioperator.deploy_home}/{self.trans_pkg}", f"{self.omni_home_parent}/")
+        new_ssh.remote_exec_cmd(f"tar -zxPf {self.omni_home_parent}/{self.trans_pkg} -C /opt --touch && rm {self.omni_home_parent}/{self.trans_pkg} -rf")
+
         # 文件权限修改
-        new_ssh.send_shell_cmd(f"chmod -R 550 {self.omni_conf.omnioperator.omni_home}/lib/*")
-        new_ssh.send_shell_cmd(f"chmod 640 {self.omni_conf.omnioperator.omni_home}/conf/omni.conf")
+        new_ssh.remote_exec_cmd(f"chmod -R 550 {self.omni_conf.omnioperator.omni_home}/lib/*")
+        new_ssh.remote_exec_cmd(f"chmod 640 {self.omni_conf.omnioperator.omni_home}/conf/omni.conf")
         # omni环境变量清理
-        new_ssh.send_shell_cmd(f"sed -i '/$LD_LIBRARY_PATH:\/opt\/omni-operator\/lib/d' ~/.bashrc;")
-        new_ssh.send_shell_cmd(f"sed -i '/export OMNI_HOME/d' ~/.bashrc;")
+        new_ssh.remote_exec_cmd(f"sed -i '/$LD_LIBRARY_PATH:\/opt\/omni-operator\/lib/d' ~/.bashrc;")
+        new_ssh.remote_exec_cmd(f"sed -i '/export OMNI_HOME/d' ~/.bashrc;")
         # omni环境变量配置
-        new_ssh.send_shell_cmd(f"sed -i '$a export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:{self.omni_conf.omnioperator.omni_home}' ~/.bashrc;")
-        new_ssh.send_shell_cmd(f"sed -i '$a export OMNI_HOME={self.omni_conf.omnioperator.omni_home}' ~/.bashrc;")
+        new_ssh.remote_exec_cmd(f"sed -i '$a export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:{self.omni_conf.omnioperator.omni_home}' ~/.bashrc;")
+        new_ssh.remote_exec_cmd(f"sed -i '$a export OMNI_HOME={self.omni_conf.omnioperator.omni_home}' ~/.bashrc;")
         new_ssh.close()
 
     def trans2all(self):
         # scp前先把软件包打包好
-        shutil.make_archive(self.operator_dir, "gztar", self.omni_conf.omnioperator.deploy_home, "omni-operator")
-        print('make archive omni-operator.tar.gz done!')
+        shutil.make_archive(self.operator_dir, "gztar", self.omni_conf.omnioperator.deploy_home, f"{os.path.basename(self.omni_conf.omnioperator.omni_home)}")
+        print('make archive {} done!'.format(self.trans_pkg))
         for host in self.omni_conf.env.server_hosts:
             self.trans2node(host)
             print(f'deploy {host} done!')

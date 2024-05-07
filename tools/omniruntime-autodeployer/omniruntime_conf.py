@@ -3,6 +3,8 @@ import re
 
 import yaml
 
+import utils
+
 
 class OmniRuntimeConf(object):
     # 192.168.1.2单个ip的模式
@@ -41,8 +43,8 @@ class OmniRuntimeConf(object):
         self.omnioperator.omni_version = conf['omnioperator']['omni_version']
         self.omnioperator.spark_version = conf['omnioperator']['spark_version']
         self.omnioperator.os_type = conf['omnioperator']['os_type']
-        self.omnioperator.omni_home = conf['omnioperator']['omni_home']
-        self.omnioperator.deploy_home = conf['omnioperator']['deploy_home']
+        self.omnioperator.omni_home = utils.trim_dir(conf['omnioperator']['omni_home'])
+        self.omnioperator.deploy_home = utils.trim_dir(conf['omnioperator']['deploy_home'])
 
 
     # 将ip网段解析成ip列表

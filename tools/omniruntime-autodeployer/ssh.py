@@ -1,6 +1,6 @@
 import paramiko
-import os
 import time
+import utils
 
 SCP_CMD = r'''#!/bin/bash
 expect -c
@@ -11,10 +11,36 @@ expect {{
 }}
 expect eof"'''
 
+SCP_TO_CMD = r'''
+expect <<EOF
+    set timeout 100
+    spawn scp -r {src_file} {username}@{host}:{dest_file}
+    expect {
+        "yes/no" { send "yes\r"; exp_continue }
+        "password" { send "{password}\r"; exp_continue }
+    }
+EOF
+'''
+
+REMOTE_EXEC_CMD = r'''
+expect <<EOF
+    set timeout 100
+    spawn ssh {username}@{host} "{cmd}"
+    expect {
+        "yes/no" { send "yes\r"; exp_continue }
+        "password" { send "{password}\r"; exp_continue }
+    }
+EOF
+'''
 
 class SSH:
     # 创建ssh连接
     def open(self, host, port, username, password):
+        self.host = host
+        self.port = port
+        self.username = username
+        self.password = password
+
         self.ssh = paramiko.SSHClient()
         know_host = paramiko.AutoAddPolicy()
         self.ssh.set_missing_host_key_policy(know_host)
@@ -23,6 +49,23 @@ class SSH:
     # 关闭连接
     def close(self):
         self.ssh.close()
+
+    def scp_to(self, src_file, dest_file):
+        cmd = SCP_TO_CMD.format(src_file=src_file, dest_file=dest_file, username=self.username, password=self.password, host=self.host)
+        ret = utils.exec_shell_cmd(cmd)
+        if ret != 0:
+            print('scp {} to {}:{} failed.'.format(src_file, self.host, dest_file))
+            exit(ret)
+        print('scp {} to {}:{} success.'.format(src_file, self.host, dest_file))
+
+    def remote_exec_cmd(self, cmd):
+        remote_cmd = REMOTE_EXEC_CMD.format(username=self.username, password=self.password, host=self.host, cmd=cmd)
+        ret = utils.exec_shell_cmd(remote_cmd)
+        if ret != 0:
+            print('exec remote cmd {} failed.'.format(remote_cmd))
+            exit(ret)
+        print('exec remote cmd {} success.'.format(remote_cmd))
+
 
     # 远程执行命令
     def send_cmd(self, cmd):
@@ -65,18 +108,6 @@ class SSH:
         scp_cmd = SCP_CMD.format(username=remote['username'], host=remote['host'], source_file=src_file,
                                  target_file=dest_file, password=remote['password'])
         self._exec_expect(scp_cmd, 'expect_script.sh')
-
-    # 从远端服务器目录获取文件
-    def get_file_from_remote(self, remote, remote_file, local_file):
-        local_dir = local_file.rsplit('/', 1)[0]
-        if not os.path.exists(local_dir):
-            os.makedirs(local_dir)
-
-        transport = paramiko.Transport((remote['host'], remote['port']))
-        transport.connect(username=remote['username'], password=remote['password'])
-        sftp = paramiko.SFTPClient.from_transport(transport)
-        sftp.get(remote_file, local_file)
-        transport.close()
 
     def is_exists(self, filename, query_cmd='ls'):
         is_exists = self.send_cmd(query_cmd + ' ' + filename + ' > /dev/null 2>&1; echo &?')
