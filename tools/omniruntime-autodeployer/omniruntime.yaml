@@ -1,0 +1,18 @@
+env:
+  username: "root" # ssh登录用户名
+  password: "123456" # ssh登录密码
+  port: 22 # 需要各个节点ssh登录端口一致
+  jumper_host: "server1" # 通过jumper传送软件包到其他节点上
+  server_hosts: # server节点ip，支持server1这种hostname形式、192.168.1.1的ip格式、192.168.1.10-210网段形式
+      - "server1"
+  agent_hosts: # agent节点ip，支持agent1这种hostname形式、192.168.1.1的ip格式、192.168.1.10-210网段形式
+      - "agent1"
+      - "agent2"
+      - "agent3"
+
+omnioperator:
+  omni_version: "1.4.0" # omnioperator版本，在闭源软件包名中可找到，BoostKit_omniop_1.4.0.zip
+  spark_version: "3.3.1" # Spark版本，当前支持3.1.1和3.3.1两个版本
+  os_type: "openeuler" # 操作系统版本，当前支持openeuler和centos两个版本
+  omni_home: "/opt/omni-operator" # 部署omnioperator的目录，通常固定为/opt/omni-operator
+  deploy_home: "/home/omniop" # 存放部署安装包和部署脚本的目录
