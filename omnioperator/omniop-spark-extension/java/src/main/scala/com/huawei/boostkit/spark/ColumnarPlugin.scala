@@ -20,6 +20,8 @@ package com.huawei.boostkit.spark
 
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor
 import com.huawei.boostkit.spark.util.PhysicalPlanSelector
+import nova.hetu.omniruntime.memory.MemoryManager
+import org.apache.spark.api.plugin.{DriverPlugin, ExecutorPlugin, SparkPlugin}
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{SparkSession, SparkSessionExtensions}
 import org.apache.spark.sql.catalyst.expressions.{Ascending, DynamicPruningSubquery, Expression, Literal, SortOrder}
@@ -37,6 +39,7 @@ import org.apache.spark.sql.types.ColumnarBatchSupportUtil.checkColumnarBatchSup
 import org.apache.spark.sql.catalyst.planning.PhysicalAggregation
 import org.apache.spark.sql.catalyst.plans.LeftSemi
 import org.apache.spark.sql.catalyst.plans.logical.Aggregate
+import org.apache.spark.sql.execution.util.SparkMemoryUtils.addLeakSafeTaskCompletionListener
 
 case class ColumnarPreOverrides() extends Rule[SparkPlan] {
   val columnarConf: ColumnarPluginConfig = ColumnarPluginConfig.getSessionConf
@@ -751,5 +754,23 @@ class ColumnarPlugin extends (SparkSessionExtensions => Unit) with Logging {
     extensions.injectOptimizerRule(_ => DelayCartesianProduct)
     extensions.injectOptimizerRule(_ => HeuristicJoinReorder)
     extensions.injectOptimizerRule(_ => MergeSubqueryFilters)
+  }
+}
+
+private class OmniTaskStartExecutorPlugin extends ExecutorPlugin {
+  override def onTaskStart(): Unit = {
+    addLeakSafeTaskCompletionListener[Unit](_ => {
+      MemoryManager.clearMemory()
+    })
+  }
+}
+
+class OmniSparkPlugin extends SparkPlugin {
+  override def executorPlugin(): ExecutorPlugin = {
+    new OmniTaskStartExecutorPlugin()
+  }
+
+  override def driverPlugin(): DriverPlugin = {
+    null
   }
 }
