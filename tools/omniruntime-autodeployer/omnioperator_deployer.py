@@ -1,8 +1,6 @@
 import os
 import shutil
 
-import paramiko
-
 import utils
 
 from omniruntime_conf import OmniRuntimeConf
@@ -63,10 +61,12 @@ class OmniOperatorDeployer(object):
 
     # 部署黄区软件包
     def omniop_deploy(self):
-        # 创建部署目录{deploy_home}/omni-operator
-        if not os.path.exists(self.operator_dir):
-            os.mkdir(self.operator_dir)
-            os.mkdir(f"{self.operator_dir}/lib")
+        # 创建部署目录{deploy_home}/omni-operator, 如果存在则先删除
+        if os.path.exists(self.operator_dir):
+            shutil.rmtree(self.operator_dir)
+        os.mkdir(self.operator_dir)
+        os.mkdir(f"{self.operator_dir}/lib")
+
         # 解压BoostKit-omniop_{omniop_version}-.zip到{deploy_home}目录，得到tar包
         shutil.unpack_archive(f"{self.omni_conf.omnioperator.deploy_home}/{self.omniop_pkg}", self.omni_conf.omnioperator.deploy_home)
         # 解压tar包至{deploy_home}/omni-operator/lib目录下
@@ -102,13 +102,6 @@ class OmniOperatorDeployer(object):
         # 文件权限修改
         new_ssh.remote_exec_cmd(f"chmod -R 550 {self.omni_conf.omnioperator.omni_home}/lib/*")
         new_ssh.remote_exec_cmd(f"chmod 640 {self.omni_conf.omnioperator.omni_home}/conf/omni.conf")
-        # omni环境变量清理
-        new_ssh.remote_exec_cmd(f"sed -i '/$LD_LIBRARY_PATH:\/opt\/omni-operator\/lib/d' ~/.bashrc;")
-        new_ssh.remote_exec_cmd(f"sed -i '/export OMNI_HOME/d' ~/.bashrc;")
-        # omni环境变量配置
-        new_ssh.remote_exec_cmd(f"sed -i '$a export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:{self.omni_conf.omnioperator.omni_home}' ~/.bashrc;")
-        new_ssh.remote_exec_cmd(f"sed -i '$a export OMNI_HOME={self.omni_conf.omnioperator.omni_home}' ~/.bashrc;")
-        new_ssh.close()
 
     def trans2all(self):
         # scp前先把软件包打包好

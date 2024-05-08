@@ -17,8 +17,6 @@ def copy_files(src_dir, dest_dir):
 def exec_shell_cmd(cmd, timeout_s=600):
     try:
         result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
-        print("exec cmd [{}] success.".format(cmd))
-        print("output: {}".format(result.stdout))
         return result.returncode
     except subprocess.TimeoutExpired as e:
         print("exec cmd [{}] timeout after {} seconds.".format(cmd, timeout_s))
