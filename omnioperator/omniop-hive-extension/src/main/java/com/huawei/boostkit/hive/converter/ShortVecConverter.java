@@ -22,6 +22,8 @@ import com.huawei.boostkit.hive.cache.ColumnCache;
 import com.huawei.boostkit.hive.cache.LongColumnCache;
 
 import nova.hetu.omniruntime.vector.DictionaryVec;
+import nova.hetu.omniruntime.vector.IntVec;
+import nova.hetu.omniruntime.vector.LongVec;
 import nova.hetu.omniruntime.vector.ShortVec;
 import nova.hetu.omniruntime.vector.Vec;
 
@@ -40,8 +42,25 @@ public class ShortVecConverter extends LongVecConverter {
             DictionaryVec dictionaryVec = (DictionaryVec) vec;
             return dictionaryVec.getShort(index);
         }
-        ShortVec shortVec = (ShortVec) vec;
-        return shortVec.get(index);
+        Object value;
+        if (vec instanceof LongVec) {
+            long longValue = ((LongVec) vec).get(index);
+            if (longValue > Short.MAX_VALUE || longValue < Short.MIN_VALUE) {
+                value = null;
+            } else {
+                value = (short) longValue;
+            }
+        } else if (vec instanceof IntVec) {
+            int intValue = ((IntVec) vec).get(index);
+            if (intValue > Short.MAX_VALUE || intValue < Short.MIN_VALUE) {
+                value = null;
+            } else {
+                value = (short) intValue;
+            }
+        } else {
+            value = ((ShortVec) vec).get(index);
+        }
+        return value;
     }
 
     @Override

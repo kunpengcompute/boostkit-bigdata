@@ -322,6 +322,9 @@ std::shared_ptr<OmniRecordReader> MakeRecordReader(const ColumnDescriptor* descr
         case ::arrow::Type::INT16: {
             return std::make_shared<ParquetShortRecordReader>(descr, leaf_info, pool);
         }
+        case ::arrow::Type::UINT8:
+        case ::arrow::Type::UINT16:
+        case ::arrow::Type::UINT32:
         case ::arrow::Type::INT32: {
             return std::make_shared<ParquetTypedRecordReader<OMNI_INT, ::parquet::Int32Type>>(descr, leaf_info, pool);
         }
@@ -329,6 +332,7 @@ std::shared_ptr<OmniRecordReader> MakeRecordReader(const ColumnDescriptor* descr
             return std::make_shared<ParquetTypedRecordReader<OMNI_DATE32, ::parquet::Int32Type>>(descr,
                 leaf_info, pool);
         }
+        case ::arrow::Type::UINT64:
         case ::arrow::Type::INT64: {
             return std::make_shared<ParquetTypedRecordReader<OMNI_LONG, ::parquet::Int64Type>>(descr, leaf_info, pool);
         }

@@ -23,6 +23,7 @@ import com.huawei.boostkit.hive.cache.LongColumnCache;
 
 import nova.hetu.omniruntime.vector.DictionaryVec;
 import nova.hetu.omniruntime.vector.IntVec;
+import nova.hetu.omniruntime.vector.LongVec;
 import nova.hetu.omniruntime.vector.Vec;
 
 import org.apache.hadoop.hive.ql.exec.vector.ColumnVector;
@@ -40,8 +41,18 @@ public class IntVecConverter extends LongVecConverter {
             DictionaryVec dictionaryVec = (DictionaryVec) vec;
             return dictionaryVec.getInt(index);
         }
-        IntVec intVec = (IntVec) vec;
-        return intVec.get(index);
+        Object value;
+        if (vec instanceof LongVec) {
+            long longValue = ((LongVec) vec).get(index);
+            if (longValue > Integer.MAX_VALUE || longValue < Integer.MIN_VALUE) {
+                value = null;
+            } else {
+                value = (int) longValue;
+            }
+        } else {
+            value = ((IntVec) vec).get(index);
+        }
+        return value;
     }
 
     @Override
@@ -110,9 +121,16 @@ public class IntVecConverter extends LongVecConverter {
             if (vec instanceof DictionaryVec) {
                 DictionaryVec dictionaryVec = (DictionaryVec) vec;
                 value = dictionaryVec.getInt(i);
+            } else if (vec instanceof LongVec) {
+                value = (int) ((LongVec) vec).get(i);
+                if (value < 0) {
+                    longColumnVector.vector[i - start] = 1L;
+                    longColumnVector.isNull[i - start] = true;
+                    longColumnVector.noNulls = false;
+                    continue;
+                }
             } else {
-                IntVec intVec = (IntVec) vec;
-                value = intVec.get(i);
+                value = ((IntVec) vec).get(i);
             }
             longColumnVector.vector[i - start] = value;
         }

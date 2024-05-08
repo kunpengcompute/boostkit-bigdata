@@ -23,6 +23,8 @@ import com.huawei.boostkit.hive.cache.DoubleColumnCache;
 
 import nova.hetu.omniruntime.vector.DictionaryVec;
 import nova.hetu.omniruntime.vector.DoubleVec;
+import nova.hetu.omniruntime.vector.IntVec;
+import nova.hetu.omniruntime.vector.LongVec;
 import nova.hetu.omniruntime.vector.Vec;
 
 import org.apache.hadoop.hive.ql.exec.vector.ColumnVector;
@@ -41,8 +43,15 @@ public class DoubleVecConverter implements VecConverter {
             DictionaryVec dictionaryVec = (DictionaryVec) vec;
             return dictionaryVec.getDouble(index);
         }
-        DoubleVec DoubleVec = (DoubleVec) vec;
-        return DoubleVec.get(index);
+        Object value;
+        if (vec instanceof IntVec) {
+            value = (double) ((IntVec) vec).get(index);
+        } else if (vec instanceof LongVec) {
+            value = (double) ((LongVec) vec).get(index);
+        } else {
+            value = ((DoubleVec) vec).get(index);
+        }
+        return value;
     }
 
     @Override
@@ -155,9 +164,12 @@ public class DoubleVecConverter implements VecConverter {
             if (vec instanceof DictionaryVec) {
                 DictionaryVec dictionaryVec = (DictionaryVec) vec;
                 value = dictionaryVec.getDouble(i);
+            } else if (vec instanceof IntVec) {
+                value = ((IntVec) vec).get(i);
+            } else if (vec instanceof LongVec) {
+                value = ((LongVec) vec).get(i);
             } else {
-                DoubleVec doubleVec = (DoubleVec) vec;
-                value = doubleVec.get(i);
+                value = ((DoubleVec) vec).get(i);
             }
             doubleColumnVector.vector[i - start] = value;
         }

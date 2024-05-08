@@ -23,24 +23,35 @@ import static com.huawei.boostkit.hive.converter.VecConverter.CONVERTER_MAP;
 
 import com.huawei.boostkit.hive.converter.VecConverter;
 
+import nova.hetu.omniruntime.vector.Decimal128Vec;
+import nova.hetu.omniruntime.vector.IntVec;
+import nova.hetu.omniruntime.vector.LongVec;
+import nova.hetu.omniruntime.vector.ShortVec;
 import nova.hetu.omniruntime.vector.Vec;
 import nova.hetu.omniruntime.vector.VecBatch;
 
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.ql.io.HiveFileFormatUtils;
 import org.apache.hadoop.hive.ql.io.IOPrepareCache;
+import org.apache.hadoop.hive.ql.plan.TableScanDesc;
+import org.apache.hadoop.hive.ql.plan.VectorTableScanDesc;
 import org.apache.hadoop.hive.ql.plan.PartitionDesc;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatchCtx;
+import org.apache.hadoop.hive.serde2.typeinfo.DecimalTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 import org.apache.hadoop.mapred.InputSplit;
 import org.apache.hadoop.mapred.JobConf;
+import org.apache.parquet.schema.PrimitiveType;
+import org.apache.parquet.schema.Type;
 
 import java.io.IOException;
+import java.math.BigInteger;
 import java.util.Arrays;
 import java.util.Map;
+import java.util.List;
 
 public class OmniVectorizedParquetRecordReader extends OmniParquetRecordReader {
 
@@ -77,12 +88,43 @@ public class OmniVectorizedParquetRecordReader extends OmniParquetRecordReader {
         }
     }
 
+    public void processUnIntData() {
+        List<Type> types = this.fileSchema.getFields();
+        TableScanDesc desc = (TableScanDesc) this.tableScanOp.getConf();
+        VectorTableScanDesc tableDesc = (VectorTableScanDesc) desc.getVectorDesc();
+        TypeInfo[] info = tableDesc.getProjectedColumnTypeInfos();
+        for (int i = 0; i < types.size(); i++) {
+            Type type = types.get(i);
+            if (!(type instanceof PrimitiveType) || ((PrimitiveType) type).getOriginalType() == null
+                    || ((PrimitiveType) type).getOriginalType().name().contains("UINT")) {
+                continue;
+            }
+            String decimalScale = "1";
+            boolean isDecimal = false;
+            if (info[i] instanceof DecimalTypeInfo) {
+                int scale = ((DecimalTypeInfo) info[i]).getScale();
+                for (int j = 0; j < scale; j++) {
+                    decimalScale += "0";
+                }
+                isDecimal = true;
+            }
+            if (vecs[i] instanceof IntVec) {
+                IntVec vec = (IntVec) vecs[i];
+                vecs[i] = convertUnsignedInt(vec, isDecimal, decimalScale);
+            } else if (vecs[i] instanceof LongVec) {
+                LongVec vec = (LongVec) vecs[i];
+                vecs[i] = convertUnsignedLong(vec, isDecimal, decimalScale);
+            }
+        }
+    }
+
     public boolean next(NullWritable key, VecBatchWrapper value) throws IOException {
         int batchSize = BATCH;
         batchSize = recordReader.next(vecs, typeIds);
         if (batchSize == 0) {
             return false;
         }
+        processUnIntData();
         if (partitionValues != null) {
             for (int i = 0; i < partitionValues.length; i++) {
                 Object[] partValue = new Object[batchSize];

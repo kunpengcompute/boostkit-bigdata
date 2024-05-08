@@ -22,6 +22,9 @@ import static com.huawei.boostkit.hive.cache.VectorCache.BATCH;
 
 import com.google.common.base.Strings;
 
+import nova.hetu.omniruntime.vector.IntVec;
+import nova.hetu.omniruntime.vector.LongVec;
+import nova.hetu.omniruntime.vector.Decimal128Vec;
 import nova.hetu.omniruntime.vector.Vec;
 import nova.hetu.omniruntime.vector.VecBatch;
 import nova.hetu.omniruntime.type.BooleanDataType;
@@ -37,6 +40,7 @@ import nova.hetu.omniruntime.type.VarcharDataType;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.ql.exec.ColumnInfo;
 import org.apache.hadoop.hive.ql.exec.Operator;
 import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.io.StatsProvidingRecordReader;
@@ -45,9 +49,15 @@ import org.apache.hadoop.hive.ql.io.parquet.read.DataWritableReadSupport;
 import org.apache.hadoop.hive.ql.io.parquet.read.ParquetFilterPredicateConverter;
 import org.apache.hadoop.hive.ql.io.sarg.ConvertAstToSearchArg;
 import org.apache.hadoop.hive.ql.io.sarg.SearchArgument;
+import org.apache.hadoop.hive.ql.plan.TableScanDesc;
+import org.apache.hadoop.hive.ql.plan.VectorTableScanDesc;
 import org.apache.hadoop.hive.ql.plan.api.OperatorType;
 import org.apache.hadoop.hive.serde2.ColumnProjectionUtils;
 import org.apache.hadoop.hive.serde2.SerDeStats;
+import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
+import org.apache.hadoop.hive.serde2.typeinfo.DecimalTypeInfo;
+import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapred.FileSplit;
 import org.apache.hadoop.mapred.InputSplit;
@@ -78,6 +88,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -93,12 +104,12 @@ public class OmniParquetRecordReader
     private static final Map<OriginalType, DataType> PARQUET_TO_OMNI_TYPE = new HashMap<OriginalType, DataType>() {
         {
             put(OriginalType.DATE, IntDataType.INTEGER);
-            put(OriginalType.INT_8, ShortDataType.SHORT);
-            put(OriginalType.INT_16, ShortDataType.SHORT);
+            put(OriginalType.INT_8, IntDataType.INTEGER);
+            put(OriginalType.INT_16, IntDataType.INTEGER);
             put(OriginalType.INT_32, IntDataType.INTEGER);
             put(OriginalType.INT_64, LongDataType.LONG);
-            put(OriginalType.UINT_8, ShortDataType.SHORT);
-            put(OriginalType.UINT_16, ShortDataType.SHORT);
+            put(OriginalType.UINT_8, IntDataType.INTEGER);
+            put(OriginalType.UINT_16, IntDataType.INTEGER);
             put(OriginalType.UINT_32, IntDataType.INTEGER);
             put(OriginalType.UINT_64, LongDataType.LONG);
             put(OriginalType.UTF8, VarcharDataType.VARCHAR);
@@ -295,6 +306,121 @@ public class OmniParquetRecordReader
         return res;
     }
 
+    public Integer getSignedIntValue(String str) {
+        try {
+            return Integer.parseInt(str);
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    public Long getSignedLongValue(String str) {
+        try {
+            return Long.parseLong(str);
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    public Vec convertUnsignedInt(IntVec vec, boolean isDecimal, String decimalScale) {
+        if (isDecimal) {
+            Decimal128Vec deciVec = new Decimal128Vec(vec.getSize());
+            BigInteger scaleValue = new BigInteger(decimalScale);
+            for (int j = 0; j < vec.getSize(); j++) {
+                if (vec.isNull(j) || getSignedIntValue(Integer.toUnsignedString(vec.get(j))) == null) {
+                    deciVec.setNull(j);
+                    continue;
+                }
+                BigInteger trueValue = new BigInteger(getSignedIntValue(Integer.toUnsignedString(vec.get(j))).toString());
+                trueValue = trueValue.multiply(scaleValue);
+                if (trueValue == null || trueValue.compareTo(BigInteger.ZERO) < 0) {
+                    deciVec.setNull(j);
+                } else {
+                    deciVec.setBigInteger(j, trueValue);
+                }
+            }
+            return deciVec;
+        } else {
+            for (int j = 0; j < vec.getSize(); j++) {
+                if (vec.isNull(j)) {
+                    continue;
+                }
+                Integer trueValue = getSignedIntValue(Integer.toUnsignedString(vec.get(j)));
+                if (trueValue == null || trueValue < 0) {
+                    vec.setNull(j);
+                } else {
+                    vec.set(j, trueValue);
+                }
+            }
+            return vec;
+        }
+    }
+
+    public Vec convertUnsignedLong(LongVec vec, boolean isDecimal, String decimalScale) {
+        if (isDecimal) {
+            Decimal128Vec deciVec = new Decimal128Vec(vec.getSize());
+            BigInteger scaleValue = new BigInteger(decimalScale);
+            for (int j = 0; j < vec.getSize(); j++) {
+                if (vec.isNull(j) || getSignedLongValue(Long.toUnsignedString(vec.get(j))) == null) {
+                    deciVec.setNull(j);
+                    continue;
+                }
+                BigInteger trueValue = new BigInteger(getSignedLongValue(Long.toUnsignedString(vec.get(j))).toString());
+                trueValue = trueValue.multiply(scaleValue);
+                if (trueValue == null || trueValue.compareTo(BigInteger.ZERO) < 0) {
+                    deciVec.setNull(j);
+                } else {
+                    deciVec.setBigInteger(j, trueValue);
+                }
+            }
+            return deciVec;
+        } else {
+            for (int j = 0; j < vec.getSize(); j++) {
+                if (vec.isNull(j)) {
+                    continue;
+                }
+                Long trueValue = getSignedLongValue(Long.toUnsignedString(vec.get(j)));
+                if (trueValue == null || trueValue < 0) {
+                    vec.setNull(j);
+                } else {
+                    vec.set(j, trueValue);
+                }
+            }
+            return vec;
+        }
+    }
+
+    public void processUnIntData() {
+        List<Type> types = this.fileSchema.getFields();
+        TableScanDesc desc = (TableScanDesc) this.tableScanOp.getConf();
+        ArrayList<ColumnInfo> infoList = this.tableScanOp.getSchema().getSignature();
+        for (int i = 0; i < types.size(); i++) {
+            Type type = types.get(i);
+            if (!(type instanceof PrimitiveType) || ((PrimitiveType) type).getOriginalType() == null
+                    || ((PrimitiveType) type).getOriginalType().name().contains("UINT")) {
+                continue;
+            }
+            String decimalScale = "1";
+            boolean isDecimal = false;
+            ObjectInspector inspector = infoList.get(i).getObjectInspector();
+            if (inspector.getTypeName().contains("decimal")) {
+                DecimalTypeInfo info = (DecimalTypeInfo) ((PrimitiveObjectInspector) inspector).getTypeInfo();
+                int scale = info.getScale();
+                for (int j = 0; j < scale; j++) {
+                    decimalScale += "0";
+                }
+                isDecimal = true;
+            }
+            if (vecs[i] instanceof IntVec) {
+                IntVec vec = (IntVec) vecs[i];
+                vecs[i] = convertUnsignedInt(vec, isDecimal, decimalScale);
+            } else if (vecs[i] instanceof LongVec) {
+                LongVec vec = (LongVec) vecs[i];
+                vecs[i] = convertUnsignedLong(vec, isDecimal, decimalScale);
+            }
+        }
+    }
+
     @Override
     public boolean next(NullWritable key, VecBatchWrapper value) throws IOException {
         int batchSize = BATCH;
@@ -305,6 +431,7 @@ public class OmniParquetRecordReader
         if (batchSize == 0) {
             return false;
         }
+        processUnIntData();
         value.setVecBatch(new VecBatch(vecs, batchSize));
         return true;
     }
