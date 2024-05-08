@@ -54,6 +54,8 @@ import org.apache.spark.sql.vectorized.ColumnarBatch
 import org.apache.spark.util.MutablePair
 import org.apache.spark.util.random.XORShiftRandom
 
+import nova.hetu.omniruntime.vector.IntVec
+
 case class ColumnarShuffleExchangeExec(
   override val outputPartitioning: Partitioning,
   child: SparkPlan,
@@ -277,16 +279,25 @@ object ColumnarShuffleExchangeExec extends Logging {
       val addPid2ColumnBatch = addPidToColumnBatch()
       cbIter.filter(cb => cb.numRows != 0 && cb.numCols != 0).map {
         cb =>
-          val pidArr = new Array[Int](cb.numRows)
-          (0 until cb.numRows).foreach { i =>
-            val row = cb.getRow(i)
-            val pid = part.get.getPartition(partitionKeyExtractor(row))
-            pidArr(i) = pid
-          }
-          val pidVec = new IntVec(cb.numRows)
-          pidVec.put(pidArr, 0, 0, cb.numRows)
+          var pidVec: IntVec = null
+          try {
+            val pidArr = new Array[Int](cb.numRows)
+            (0 until cb.numRows).foreach { i =>
+              val row = cb.getRow(i)
+              val pid = part.get.getPartition(partitionKeyExtractor(row))
+              pidArr(i) = pid
+            }
+            pidVec = new IntVec(cb.numRows)
+            pidVec.put(pidArr, 0, 0, cb.numRows)
 
-          addPid2ColumnBatch(pidVec, cb)
+            addPid2ColumnBatch(pidVec, cb)
+          } catch {
+            case e: Exception =>
+              if (pidVec != null) {
+                pidVec.close()
+              }
+              throw e
+          }
       }
     }
 
@@ -308,8 +319,17 @@ object ColumnarShuffleExchangeExec extends Logging {
           val getRoundRobinPid = getRoundRobinPartitionKey
           val addPid2ColumnBatch = addPidToColumnBatch()
           cbIter.map { cb =>
-            val pidVec = getRoundRobinPid(cb, numPartitions)
-            addPid2ColumnBatch(pidVec, cb)
+            var pidVec: IntVec = null
+            try {
+              pidVec = getRoundRobinPid(cb, numPartitions)
+              addPid2ColumnBatch(pidVec, cb)
+            } catch {
+              case e: Exception =>
+                if (pidVec != null) {
+                  pidVec.close()
+                }
+                throw e
+            }
           }
         }, isOrderSensitive = isOrderSensitive)
       case RangePartitioning(sortingExpressions, _) =>
@@ -349,17 +369,26 @@ object ColumnarShuffleExchangeExec extends Logging {
               })
 
               cbIter.map { cb =>
-                val vecs = transColBatchToOmniVecs(cb, true)
-                op.addInput(new VecBatch(vecs, cb.numRows()))
-                val res = op.getOutput
-                if (res.hasNext) {
-                  val retBatch = res.next()
-                  val pidVec = retBatch.getVectors()(0)
-                  // close return VecBatch
-                  retBatch.close()
-                  addPid2ColumnBatch(pidVec.asInstanceOf[IntVec], cb)
-                } else {
-                  throw new Exception("Empty Project Operator Result...")
+                var pidVec: IntVec = null
+                try {
+                  val vecs = transColBatchToOmniVecs(cb, true)
+                  op.addInput(new VecBatch(vecs, cb.numRows()))
+                  val res = op.getOutput
+                  if (res.hasNext) {
+                    val retBatch = res.next()
+                    pidVec = retBatch.getVectors()(0).asInstanceOf[IntVec]
+                    // close return VecBatch
+                    retBatch.close()
+                    addPid2ColumnBatch(pidVec, cb)
+                  } else {
+                    throw new Exception("Empty Project Operator Result...")
+                  }
+                } catch {
+                  case e: Exception =>
+                    if (pidVec != null) {
+                      pidVec.close()
+                    }
+                    throw e
                 }
               }
           }, isOrderSensitive = isOrderSensitive)
