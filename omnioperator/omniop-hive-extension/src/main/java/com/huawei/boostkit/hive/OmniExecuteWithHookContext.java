@@ -774,7 +774,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         for (List<ExprNodeDesc> value : mapJoinDesc.getFilters().values()) {
             exprNodeDescList.addAll(value);
         }
-        if (!isUDFSupport(exprNodeDescList, false) || joinCondUnsupported(mapJoinDesc)) {
+        if (exprNodeDescList.isEmpty() || !isUDFSupport(exprNodeDescList, false) || joinCondUnsupported(mapJoinDesc)) {
             return false;
         }
         return joinReplaceable(operator);
