@@ -40,9 +40,9 @@ class SSH:
 
     def remote_exec_cmd(self, cmd):
         remote_cmd = REMOTE_EXEC_CMD.format(username=self.username, password=self.password, host=self.host, cmd=cmd)
-        ret = utils.exec_shell_cmd(cmd)
+        ret = utils.exec_shell_cmd(remote_cmd)
         if ret != 0:
             print('exec {} remote cmd {} failed.'.format(self.host, remote_cmd))
             exit(ret)
-        print('exec {} remote cmd {} success.'.format(self.host, remote_cmd))
+        print('exec {} remote cmd {} success.'.format(self.host, cmd))
 
