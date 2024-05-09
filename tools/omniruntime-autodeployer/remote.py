@@ -5,8 +5,8 @@ expect <<EOF
     set timeout 100
     spawn scp -r {src_file} {username}@{host}:{dest_file}
     expect {{
-        "yes/no" {{ send "yes\r"; exp_continue }}
-        "password" {{ send "{password}\r"; exp_continue }}
+        "*yes/no*" {{ send "yes\r"; exp_continue }}
+        "*ssword*" {{ send "{password}\r" }}
     }}
 EOF
 '''
@@ -16,8 +16,8 @@ expect <<EOF
     set timeout 100
     spawn ssh {username}@{host} "{cmd}"
     expect {{
-        "yes/no" {{ send "yes\r"; exp_continue }}
-        "password" {{ send "{password}\r"; exp_continue }}
+        "*yes/no*" {{ send "yes\r"; exp_continue }}
+        "*ssword*" {{ send "{password}\r" }}
     }}
 EOF
 '''
@@ -32,6 +32,7 @@ class SSH:
 
     def scp_to(self, src_file, dest_file):
         cmd = SCP_TO_CMD.format(src_file=src_file, dest_file=dest_file, username=self.username, password=self.password, host=self.host)
+        print('start to exec {}'.format(cmd))
         ret = utils.exec_shell_cmd(cmd)
         if ret != 0:
             print('scp {} to {}:{} failed.'.format(src_file, self.host, dest_file))
@@ -40,9 +41,10 @@ class SSH:
 
     def remote_exec_cmd(self, cmd):
         remote_cmd = REMOTE_EXEC_CMD.format(username=self.username, password=self.password, host=self.host, cmd=cmd)
+        print('start to exec {}'.format(remote_cmd))
         ret = utils.exec_shell_cmd(remote_cmd)
         if ret != 0:
-            print('exec {} remote cmd {} failed.'.format(self.host, remote_cmd))
+            print('exec {} remote cmd {} failed.'.format(self.host, cmd))
             exit(ret)
         print('exec {} remote cmd {} success.'.format(self.host, cmd))
 

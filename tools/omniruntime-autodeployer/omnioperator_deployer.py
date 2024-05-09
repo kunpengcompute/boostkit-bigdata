@@ -4,7 +4,7 @@ import shutil
 import utils
 
 from omniruntime_conf import OmniRuntimeConf
-from ssh import SSH
+from remote import SSH
 
 class OmniOperatorDeployer(object):
     """
