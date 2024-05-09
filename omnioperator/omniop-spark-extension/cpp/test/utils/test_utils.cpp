@@ -47,7 +47,9 @@ BaseVector *CreateDictionaryVector(DataType &dataType, int32_t rowCount, int32_t
     va_start(args, idsCount);
     BaseVector *dictionary = CreateVector(dataType, rowCount, args);
     va_end(args);
-    return DYNAMIC_TYPE_DISPATCH(CreateDictionary, dataType.GetId(), dictionary, ids, idsCount);
+    BaseVector *dictVector = DYNAMIC_TYPE_DISPATCH(CreateDictionary, dataType.GetId(), dictionary, ids, idsCount);
+    delete dictionary;
+    return dictVector;
 }
 
 /**
