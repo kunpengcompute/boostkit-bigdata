@@ -15,5 +15,5 @@ omnioperator:
   spark_version: "3.3.1" # Spark版本，当前支持3.1.1和3.3.1两个版本
   os_type: "openeuler" # 操作系统版本，当前支持openeuler和centos两个版本
   omni_home: "/opt/omni-operator" # 部署omnioperator的目录，通常固定为/opt/omni-operator
-  deploy_home: "/home/omniop" # 存放部署安装包和部署脚本的目录
+  deploy_home: "/home/omniop" # 存放部署安装包和部署脚本的目录，其中安装包需要再deploy_home上新建一个pkgs目录存放
   is_need_sudo: true # 部署到omni_home是否需要sudo权限，true/false，如果为true，需要提前将username配置到/etc/sudoers文件上
