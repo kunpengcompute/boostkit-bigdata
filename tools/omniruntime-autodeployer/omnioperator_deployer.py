@@ -123,7 +123,7 @@ class OmniOperatorDeployer(object):
             new_ssh.remote_exec_cmd(f"chmod -R 550 {self.omni_conf.omnioperator.omni_home}/lib/*")
             new_ssh.remote_exec_cmd(f"chmod 640 {self.omni_conf.omnioperator.omni_home}/conf/omni.conf")
         # 删除压缩包
-        new_ssh.remote_exec_cmd(f"rm {self.omni_home_parent}/{self.trans_pkg} -rf")
+        new_ssh.remote_exec_cmd(f"rm {self.omni_conf.omnioperator.deploy_home}/{self.trans_pkg} -rf")
 
     def trans2all(self):
         # scp前先把软件包打包好
@@ -139,3 +139,8 @@ class OmniOperatorDeployer(object):
             print(f'deploy {host} done!')
 
         print(f'deploy {len(self.omni_conf.env.server_hosts) + len(self.omni_conf.env.agent_hosts)}')
+
+    # 清除冗余文件
+    def clean(self):
+        shutil.rmtree(self.operator_dir)
+        shutil.rmtree(self.deploy_pkgs_dir)
