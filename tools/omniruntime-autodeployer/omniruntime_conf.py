@@ -33,6 +33,7 @@ class OmniRuntimeConf(object):
         # 解析env环境信息
         self.env.username = conf['env']['username']
         self.env.password = conf['env']['password']
+        self.env.sudo_password = conf['env']['sudo_password']
         self.env.port = conf['env']['port']
         self.env.jumper_host = conf['env']['jumper_host']
         if conf['env']['server_hosts'] is not None:
@@ -57,6 +58,7 @@ class OmniRuntimeConf(object):
         self.omnioperator.os_type = conf['omnioperator']['os_type']
         self.omnioperator.omni_home = utils.trim_dir(conf['omnioperator']['omni_home'])
         self.omnioperator.deploy_home = utils.trim_dir(conf['omnioperator']['deploy_home'])
+        self.omnioperator.is_need_sudo = conf['omnioperator']['is_need_sudo']
 
     # 将ip网段解析成ip列表
 
@@ -64,6 +66,7 @@ class OmniRuntimeConf(object):
         def __init__(self):
             self.username = ''
             self.password = ''
+            self.sudo_password = ''
             self.port = 0
             self.jumper_host = ''
             self.server_hosts = []
@@ -76,3 +79,4 @@ class OmniRuntimeConf(object):
             self.os_type = ''
             self.omni_home = ''
             self.deploy_home = ''
+            self.is_need_sudo = False

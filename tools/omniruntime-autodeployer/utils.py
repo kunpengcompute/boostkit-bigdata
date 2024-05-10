@@ -26,6 +26,7 @@ def exec_shell_cmd(cmd, timeout_s=600):
         print("return code: {}, cause: {}".format(e.returncode, e.stderr))
         return e.returncode
 
+
 # 如果目录以/结尾，则去除/
 def trim_dir(dir):
     if dir.endswith('/'):
