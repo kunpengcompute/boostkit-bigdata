@@ -59,7 +59,7 @@ class OmniOperatorDeployer(object):
         self.trans_pkg = f"{os.path.basename(self.omni_conf.omnioperator.omni_home)}.tar.gz"
         self.omni_home_parent = os.path.dirname(self.omni_conf.omnioperator.omni_home)
         # 存放安装包的目录
-        self.deploy_pkgs_dir = f"{self.omni_conf.omnioperator.deploy_home}/pkgs"
+        self.deploy_pkgs_dir = f"{self.omni_conf.omnioperator.deploy_home}/packages"
 
     # 部署黄区软件包
     def omniop_deploy(self):
