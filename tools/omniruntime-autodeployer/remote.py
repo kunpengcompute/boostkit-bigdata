@@ -63,9 +63,9 @@ class SSH:
             exit(ret)
         print('exec {} remote cmd {} success.'.format(self.host, cmd))
 
-    def remote_exec_sudo_cmd(self, cmd, sudo_password):
+    def remote_exec_sudo_cmd(self, cmd):
         remote_sudo_cmd = REMOTE_EXEC_SUDO_CMD.format(username=self.username, password=self.password, host=self.host,
-                                                      cmd=cmd, sudo_password=sudo_password)
+                                                      cmd=cmd, sudo_password=self.password)
         print('start to exec {}'.format(remote_sudo_cmd))
         ret = utils.exec_shell_cmd(remote_sudo_cmd)
         if ret != 0:

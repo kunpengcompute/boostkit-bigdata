@@ -33,7 +33,6 @@ class OmniRuntimeConf(object):
         # 解析env环境信息
         self.env.username = conf['env']['username']
         self.env.password = conf['env']['password']
-        self.env.sudo_password = conf['env']['sudo_password']
         self.env.port = conf['env']['port']
         self.env.jumper_host = conf['env']['jumper_host']
         if conf['env']['server_hosts'] is not None:

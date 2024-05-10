@@ -110,10 +110,10 @@ class OmniOperatorDeployer(object):
         # 解压到OMNI_HOME父目录，如果需要sudo权限，则执行sudo命令
         if self.omni_conf.omnioperator.is_need_sudo:
             new_ssh.remote_exec_sudo_cmd(
-                f"tar -zxPf {self.omni_conf.omnioperator.deploy_home}/{self.trans_pkg} -C {self.omni_home_parent} --touch", self.omni_conf.env.sudo_password)
+                f"tar -zxPf {self.omni_conf.omnioperator.deploy_home}/{self.trans_pkg} -C {self.omni_home_parent} --touch")
             # 文件权限修改
-            new_ssh.remote_exec_sudo_cmd(f"chmod -R 550 {self.omni_conf.omnioperator.omni_home}/lib/*", self.omni_conf.env.sudo_password)
-            new_ssh.remote_exec_sudo_cmd(f"chmod 640 {self.omni_conf.omnioperator.omni_home}/conf/omni.conf", self.omni_conf.env.sudo_password)
+            new_ssh.remote_exec_sudo_cmd(f"chmod -R 550 {self.omni_conf.omnioperator.omni_home}/lib/*")
+            new_ssh.remote_exec_sudo_cmd(f"chmod 640 {self.omni_conf.omnioperator.omni_home}/conf/omni.conf")
         else:
             new_ssh.remote_exec_cmd(
                 f"tar -zxPf {self.omni_home_parent}/{self.trans_pkg} -C {self.omni_home_parent} --touch")
