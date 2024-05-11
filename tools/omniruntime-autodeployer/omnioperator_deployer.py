@@ -122,25 +122,25 @@ class OmniOperatorDeployer(object):
             # 文件权限修改
             new_ssh.remote_exec_cmd(f"chmod -R 550 {self.omni_conf.omnioperator.omni_home}/lib/*")
             new_ssh.remote_exec_cmd(f"chmod 640 {self.omni_conf.omnioperator.omni_home}/conf/omni.conf")
-        # 删除压缩包
-        new_ssh.remote_exec_cmd(f"rm {self.omni_conf.omnioperator.deploy_home}/{self.trans_pkg} -rf")
 
     def trans2all(self):
         # scp前先把软件包打包好
         shutil.make_archive(self.operator_dir, "gztar", self.omni_conf.omnioperator.deploy_home,
                             f"{os.path.basename(self.omni_conf.omnioperator.omni_home)}")
         print('make archive {} done!'.format(self.trans_pkg))
-        for host in self.omni_conf.env.server_hosts:
+        for host in (self.omni_conf.env.server_hosts + self.omni_conf.env.agent_hosts):
             self.trans2node(host)
             print(f'deploy {host} done!')
-
-        for host in self.omni_conf.env.agent_hosts:
-            self.trans2node(host)
-            print(f'deploy {host} done!')
-
         print(f'deploy {len(self.omni_conf.env.server_hosts) + len(self.omni_conf.env.agent_hosts)}')
 
     # 清除冗余文件
     def clean(self):
         shutil.rmtree(self.operator_dir)
         shutil.rmtree(self.deploy_pkgs_dir)
+        # 清理个节点的压缩包
+        for host in (self.omni_conf.env.server_hosts + self.omni_conf.env.agent_hosts):
+            new_ssh = SSH()
+            new_ssh.open(host, self.omni_conf.env.port, self.omni_conf.env.username, self.omni_conf.env.password)
+            # 删除压缩包
+            new_ssh.remote_exec_cmd(f"rm {self.omni_conf.omnioperator.deploy_home}/{self.trans_pkg} -rf")
+            print(f'clean {host} done!')
