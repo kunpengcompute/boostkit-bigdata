@@ -58,8 +58,8 @@ class OmniOperatorDeployer(object):
 
         self.trans_pkg = f"{os.path.basename(self.omni_conf.omnioperator.omni_home)}.tar.gz"
         self.omni_home_parent = os.path.dirname(self.omni_conf.omnioperator.omni_home)
-        # 存放安装包的目录
-        self.deploy_pkgs_dir = f"{self.omni_conf.omnioperator.deploy_home}/packages"
+        # 存放临时解压目录的目录
+        self.deploy_tmp_dir = f"{self.omni_conf.omnioperator.deploy_home}/tmp"
 
     # 部署黄区软件包
     def omniop_deploy(self):
@@ -69,30 +69,30 @@ class OmniOperatorDeployer(object):
         os.mkdir(self.operator_dir)
         os.mkdir(f"{self.operator_dir}/lib")
 
-        # 解压BoostKit-omniop_{omniop_version}-.zip到{deploy_home}目录，得到tar包
-        shutil.unpack_archive(f"{self.deploy_pkgs_dir}/{self.omniop_pkg}",
-                              self.deploy_pkgs_dir)
-        # 解压tar包至{deploy_home}/omni-operator/lib目录下
-        shutil.unpack_archive(f"{self.deploy_pkgs_dir}/{self.omniop_inner_pkg}",
-                              f"{self.deploy_pkgs_dir}")
-        utils.copy_files(f"{self.deploy_pkgs_dir}/{self.omniop_inner_dir}",
+        # 解压BoostKit-omniop_{omniop_version}-.zip到临时目录，得到tar包
+        shutil.unpack_archive(f"{self.omni_conf.omnioperator.deploy_home}/{self.omniop_pkg}",
+                              self.deploy_tmp_dir)
+        # 解压tar包至临时目录，再复制到{deploy_home}/omni-operator/lib目录下
+        shutil.unpack_archive(f"{self.omni_conf.omnioperator.deploy_home}/{self.omniop_inner_pkg}",
+                              f"{self.deploy_tmp_dir}")
+        utils.copy_files(f"{self.omni_conf.omnioperator.deploy_home}/{self.omniop_inner_dir}",
                          f"{self.operator_dir}/lib")
 
     # 部署依赖包
     def dependencies_lib_deploy(self):
         # 解压Dependency_library_{os_type}.zip到{deploy_home}/omni-operator/lib目录下
-        shutil.unpack_archive(f"{self.deploy_pkgs_dir}/{self.dependency_pkg}",
+        shutil.unpack_archive(f"{self.omni_conf.omnioperator.deploy_home}/{self.dependency_pkg}",
                               f"{self.operator_dir}/lib")
 
     # 部署spark-extension蓝区软件包
     def spark_extension_deploy(self):
-        shutil.unpack_archive(f"{self.deploy_pkgs_dir}/{self.spark_extension_pkg}",
-                              self.deploy_pkgs_dir)
-        shutil.unpack_archive(f"{self.deploy_pkgs_dir}/{self.spark_extension_inner_pkg}",
-                              self.deploy_pkgs_dir)
-        shutil.copy2(f"{self.deploy_pkgs_dir}/{self.spark_extension_jar}",
+        shutil.unpack_archive(f"{self.omni_conf.omnioperator.deploy_home}/{self.spark_extension_pkg}",
+                              self.deploy_tmp_dir)
+        shutil.unpack_archive(f"{self.omni_conf.omnioperator.deploy_home}/{self.spark_extension_inner_pkg}",
+                              self.deploy_tmp_dir)
+        shutil.copy2(f"{self.deploy_tmp_dir}/{self.spark_extension_jar}",
                      f"{self.operator_dir}/lib")
-        shutil.unpack_archive(f"{self.deploy_pkgs_dir}/{self.spark_dependency_pkg}",
+        shutil.unpack_archive(f"{self.omni_conf.omnioperator.deploy_home}/{self.spark_dependency_pkg}",
                               f"{self.operator_dir}/lib")
 
     # 部署omni.conf文件
@@ -136,7 +136,7 @@ class OmniOperatorDeployer(object):
     # 清除冗余文件
     def clean(self):
         shutil.rmtree(self.operator_dir)
-        shutil.rmtree(self.deploy_pkgs_dir)
+        shutil.rmtree(self.deploy_tmp_dir)
         # 清理个节点的压缩包
         for host in (self.omni_conf.env.server_hosts + self.omni_conf.env.agent_hosts):
             new_ssh = SSH()

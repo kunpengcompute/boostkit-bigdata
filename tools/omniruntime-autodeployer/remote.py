@@ -63,6 +63,7 @@ class SSH:
             exit(ret)
         print('exec {} remote cmd {} success.'.format(self.host, cmd))
 
+    # 远程执行sudo命令，用于无法直接使用root用户的场景
     def remote_exec_sudo_cmd(self, cmd):
         remote_sudo_cmd = REMOTE_EXEC_SUDO_CMD.format(username=self.username, password=self.password, host=self.host,
                                                       cmd=cmd, sudo_password=self.password)
