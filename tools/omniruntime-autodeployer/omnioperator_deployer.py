@@ -73,9 +73,9 @@ class OmniOperatorDeployer(object):
         shutil.unpack_archive(f"{self.omni_conf.omnioperator.deploy_home}/{self.omniop_pkg}",
                               self.deploy_tmp_dir)
         # 解压tar包至临时目录，再复制到{deploy_home}/omni-operator/lib目录下
-        shutil.unpack_archive(f"{self.omni_conf.omnioperator.deploy_home}/{self.omniop_inner_pkg}",
+        shutil.unpack_archive(f"{self.deploy_tmp_dir}/{self.omniop_inner_pkg}",
                               f"{self.deploy_tmp_dir}")
-        utils.copy_files(f"{self.omni_conf.omnioperator.deploy_home}/{self.omniop_inner_dir}",
+        utils.copy_files(f"{self.deploy_tmp_dir}/{self.omniop_inner_dir}",
                          f"{self.operator_dir}/lib")
 
     # 部署依赖包
@@ -92,7 +92,7 @@ class OmniOperatorDeployer(object):
                               self.deploy_tmp_dir)
         shutil.copy2(f"{self.deploy_tmp_dir}/{self.spark_extension_jar}",
                      f"{self.operator_dir}/lib")
-        shutil.unpack_archive(f"{self.omni_conf.omnioperator.deploy_home}/{self.spark_dependency_pkg}",
+        shutil.unpack_archive(f"{self.deploy_tmp_dir}/{self.spark_dependency_pkg}",
                               f"{self.operator_dir}/lib")
 
     # 部署omni.conf文件
