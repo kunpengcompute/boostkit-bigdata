@@ -88,7 +88,7 @@ class OmniOperatorDeployer(object):
     def spark_extension_deploy(self):
         shutil.unpack_archive(f"{self.omni_conf.omnioperator.deploy_home}/{self.spark_extension_pkg}",
                               self.deploy_tmp_dir)
-        shutil.unpack_archive(f"{self.omni_conf.omnioperator.deploy_home}/{self.spark_extension_inner_pkg}",
+        shutil.unpack_archive(f"{self.deploy_tmp_dir}/{self.spark_extension_inner_pkg}",
                               self.deploy_tmp_dir)
         shutil.copy2(f"{self.deploy_tmp_dir}/{self.spark_extension_jar}",
                      f"{self.operator_dir}/lib")
