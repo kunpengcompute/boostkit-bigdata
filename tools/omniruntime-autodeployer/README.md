@@ -1,7 +1,7 @@
 # 1 前置条件
 需要一台跳转jumper节点，用于将omnioperator的软件包传送到各个server/agent节点上进行部署，该jumper节点需要具备如下条件：
 
-1、jumper节点与server/agent节点网络相同，可以用server节点作为jumper节点。
+1、jumper节点与server/agent节点网络相通，可以用server节点作为jumper节点。
 
 2、jumper节点需要安装python 3.5以上版本，且安装了yaml库。如果没有安装，需要执行一下命令进行安装：
 ```shell

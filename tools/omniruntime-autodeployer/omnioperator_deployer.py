@@ -61,14 +61,14 @@ class OmniOperatorDeployer(object):
         # 存放临时解压目录的目录
         self.deploy_tmp_dir = f"{self.omni_conf.omnioperator.deploy_home}/tmp"
 
-    # 部署黄区软件包
-    def omniop_deploy(self):
         # 创建部署目录{deploy_home}/omni-operator, 如果存在则先删除
         if os.path.exists(self.operator_dir):
             shutil.rmtree(self.operator_dir)
         os.mkdir(self.operator_dir)
         os.mkdir(f"{self.operator_dir}/lib")
 
+    # 部署黄区软件包
+    def omniop_deploy(self):
         # 解压BoostKit-omniop_{omniop_version}-.zip到临时目录，得到tar包
         shutil.unpack_archive(f"{self.omni_conf.omnioperator.deploy_home}/{self.omniop_pkg}",
                               self.deploy_tmp_dir)
