@@ -580,6 +580,9 @@ std::unique_ptr<BaseVector> CopyToOmniVec(const orc::Type *type, int omniTypeId,
         case orc::TypeKind::INT:
         case orc::TypeKind::LONG:
             return DealLongVectorBatch(dataTypeId, field);
+        // float data type is not supported
+        // orc::TypeKind::FLOAT is added for the case where the schema changes
+        case orc::TypeKind::FLOAT:
         case orc::TypeKind::DOUBLE:
             return DealDoubleVectorBatch(dataTypeId, field);
         case orc::TypeKind::CHAR:
