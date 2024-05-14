@@ -24,3 +24,4 @@ if __name__ == '__main__':
     if "all" in params or "conf" in params:
         omniop_deployer.omni_conf_deploy()
     omniop_deployer.trans2all()
+    omniop_deployer.clean()
