@@ -19,6 +19,7 @@
 package com.huawei.boostkit.hive.converter;
 import nova.hetu.omniruntime.vector.DictionaryVec;
 import nova.hetu.omniruntime.vector.LongVec;
+import nova.hetu.omniruntime.vector.IntVec;
 import nova.hetu.omniruntime.vector.Vec;
 
 import org.apache.hadoop.hive.common.type.DataTypePhysicalVariation;
@@ -53,6 +54,8 @@ public class Decimal64VecConverter extends LongVecConverter {
             if (vec instanceof DictionaryVec) {
                 DictionaryVec dictionaryVec = (DictionaryVec) vec;
                 value = dictionaryVec.getLong(i);
+            } else if (vec instanceof IntVec) {
+                value = ((IntVec) vec).get(i);
             } else {
                 LongVec longVec = (LongVec) vec;
                 value = longVec.get(i);

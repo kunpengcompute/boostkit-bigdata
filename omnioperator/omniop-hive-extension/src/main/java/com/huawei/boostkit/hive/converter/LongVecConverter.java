@@ -23,6 +23,7 @@ import com.huawei.boostkit.hive.cache.LongColumnCache;
 
 import nova.hetu.omniruntime.vector.DictionaryVec;
 import nova.hetu.omniruntime.vector.LongVec;
+import nova.hetu.omniruntime.vector.IntVec;
 import nova.hetu.omniruntime.vector.Vec;
 
 import org.apache.hadoop.hive.ql.exec.vector.ColumnVector;
@@ -42,8 +43,13 @@ public class LongVecConverter implements VecConverter {
             DictionaryVec dictionaryVec = (DictionaryVec) vec;
             return dictionaryVec.getLong(index);
         }
-        LongVec longVec = (LongVec) vec;
-        return longVec.get(index);
+        Object value;
+        if (vec instanceof IntVec) {
+            value = (long) ((IntVec) vec).get(index);
+        } else {
+            value = ((LongVec) vec).get(index);
+        }
+        return value;
     }
 
     @Override
@@ -156,9 +162,10 @@ public class LongVecConverter implements VecConverter {
             if (vec instanceof DictionaryVec) {
                 DictionaryVec dictionaryVec = (DictionaryVec) vec;
                 value = dictionaryVec.getLong(i);
+            } else if (vec instanceof IntVec) {
+                value = ((IntVec) vec).get(i);
             } else {
-                LongVec longVec = (LongVec) vec;
-                value = longVec.get(i);
+                value = ((LongVec) vec).get(i);
             }
             longColumnVector.vector[i - start] = value;
         }

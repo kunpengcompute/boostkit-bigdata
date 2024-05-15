@@ -27,6 +27,7 @@ import nova.hetu.omniruntime.utils.OmniRuntimeException;
 import nova.hetu.omniruntime.vector.Decimal128Vec;
 import nova.hetu.omniruntime.vector.DictionaryVec;
 import nova.hetu.omniruntime.vector.LongVec;
+import nova.hetu.omniruntime.vector.IntVec;
 import nova.hetu.omniruntime.vector.Vec;
 
 import org.apache.hadoop.hive.common.type.HiveDecimal;
@@ -67,6 +68,9 @@ public class DecimalVecConverter implements VecConverter {
         } else if (vec instanceof LongVec) {
             hiveDecimalWritable = new HiveDecimalWritable();
             hiveDecimalWritable.setFromLongAndScale(((LongVec) vec).get(index), decimalTypeInfo.getScale());
+        } else if (vec instanceof IntVec) {
+            hiveDecimalWritable = new HiveDecimalWritable();
+            hiveDecimalWritable.setFromLongAndScale(((IntVec) vec).get(index), decimalTypeInfo.getScale());
         } else {
             Decimal128Vec decimal128Vec = (Decimal128Vec) vec;
             byte[] result = decimal128Vec.getBytes(index);
