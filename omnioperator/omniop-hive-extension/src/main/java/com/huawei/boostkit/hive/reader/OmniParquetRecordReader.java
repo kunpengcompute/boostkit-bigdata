@@ -322,17 +322,16 @@ public class OmniParquetRecordReader
         }
     }
 
-    public Vec convertUnsignedInt(IntVec vec, boolean isDecimal, String decimalScale) {
+    public Vec convertUnsignedInt(IntVec vec, boolean isDecimal, BigInteger decimalScale) {
         if (isDecimal) {
             Decimal128Vec deciVec = new Decimal128Vec(vec.getSize());
-            BigInteger scaleValue = new BigInteger(decimalScale);
             for (int j = 0; j < vec.getSize(); j++) {
                 if (vec.isNull(j) || getSignedIntValue(Integer.toUnsignedString(vec.get(j))) == null) {
                     deciVec.setNull(j);
                     continue;
                 }
                 BigInteger trueValue = new BigInteger(getSignedIntValue(Integer.toUnsignedString(vec.get(j))).toString());
-                trueValue = trueValue.multiply(scaleValue);
+                trueValue = trueValue.multiply(decimalScale);
                 if (trueValue == null || trueValue.compareTo(BigInteger.ZERO) < 0) {
                     deciVec.setNull(j);
                 } else {
@@ -356,17 +355,16 @@ public class OmniParquetRecordReader
         }
     }
 
-    public Vec convertUnsignedLong(LongVec vec, boolean isDecimal, String decimalScale) {
+    public Vec convertUnsignedLong(LongVec vec, boolean isDecimal, BigInteger decimalScale) {
         if (isDecimal) {
             Decimal128Vec deciVec = new Decimal128Vec(vec.getSize());
-            BigInteger scaleValue = new BigInteger(decimalScale);
             for (int j = 0; j < vec.getSize(); j++) {
                 if (vec.isNull(j) || getSignedLongValue(Long.toUnsignedString(vec.get(j))) == null) {
                     deciVec.setNull(j);
                     continue;
                 }
                 BigInteger trueValue = new BigInteger(getSignedLongValue(Long.toUnsignedString(vec.get(j))).toString());
-                trueValue = trueValue.multiply(scaleValue);
+                trueValue = trueValue.multiply(decimalScale);
                 if (trueValue == null || trueValue.compareTo(BigInteger.ZERO) < 0) {
                     deciVec.setNull(j);
                 } else {
@@ -397,20 +395,18 @@ public class OmniParquetRecordReader
         for (int i = 0; i < types.size(); i++) {
             Type type = types.get(i);
             if (!(type instanceof PrimitiveType) || ((PrimitiveType) type).getOriginalType() == null
-                    || ((PrimitiveType) type).getOriginalType().name().contains("UINT")) {
+                    || !((PrimitiveType) type).getOriginalType().name().contains("UINT")) {
                 continue;
             }
-            String decimalScale = "1";
+            int scale = 0;
             boolean isDecimal = false;
             ObjectInspector inspector = infoList.get(i).getObjectInspector();
             if (inspector.getTypeName().contains("decimal")) {
                 DecimalTypeInfo info = (DecimalTypeInfo) ((PrimitiveObjectInspector) inspector).getTypeInfo();
-                int scale = info.getScale();
-                for (int j = 0; j < scale; j++) {
-                    decimalScale += "0";
-                }
+                scale = info.getScale();
                 isDecimal = true;
             }
+            BigInteger decimalScale = BigInteger.TEN.pow(scale);
             if (vecs[i] instanceof IntVec) {
                 IntVec vec = (IntVec) vecs[i];
                 vecs[i] = convertUnsignedInt(vec, isDecimal, decimalScale);

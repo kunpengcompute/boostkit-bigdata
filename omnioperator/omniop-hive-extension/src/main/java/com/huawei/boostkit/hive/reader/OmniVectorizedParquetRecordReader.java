@@ -96,18 +96,16 @@ public class OmniVectorizedParquetRecordReader extends OmniParquetRecordReader {
         for (int i = 0; i < types.size(); i++) {
             Type type = types.get(i);
             if (!(type instanceof PrimitiveType) || ((PrimitiveType) type).getOriginalType() == null
-                    || ((PrimitiveType) type).getOriginalType().name().contains("UINT")) {
+                    || !((PrimitiveType) type).getOriginalType().name().contains("UINT")) {
                 continue;
             }
-            String decimalScale = "1";
+            int scale = 0;
             boolean isDecimal = false;
             if (info[i] instanceof DecimalTypeInfo) {
-                int scale = ((DecimalTypeInfo) info[i]).getScale();
-                for (int j = 0; j < scale; j++) {
-                    decimalScale += "0";
-                }
+                scale = ((DecimalTypeInfo) info[i]).getScale();
                 isDecimal = true;
             }
+            BigInteger decimalScale = BigInteger.TEN.pow(scale);
             if (vecs[i] instanceof IntVec) {
                 IntVec vec = (IntVec) vecs[i];
                 vecs[i] = convertUnsignedInt(vec, isDecimal, decimalScale);
