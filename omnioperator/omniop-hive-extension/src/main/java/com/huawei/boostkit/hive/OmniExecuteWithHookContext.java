@@ -543,6 +543,11 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         if (tableMetadata != null && (!checkInputFormat(tableMetadata.getInputFormatClass().getName()) || tableMetadata.getParameters().getOrDefault("transactional", "").equals("true"))) {
             return false;
         }
+        for (String name : tableScanDesc.getNeededColumns()) {
+            if (name.contains(",")) {
+                return false;
+            }
+        }
         if (tableScanDesc.isVectorized()) {
             TypeInfo[] columnTypeInfos = ((VectorTableScanDesc) tableScanDesc.getVectorDesc()).getProjectedColumnTypeInfos();
             for (int id : tableScanDesc.getNeededColumnIDs()) {
