@@ -20,6 +20,8 @@ package com.huawei.boostkit.hive;
 
 import static com.huawei.boostkit.hive.expression.TypeUtils.buildInputDataType;
 import static nova.hetu.omniruntime.constants.FunctionType.OMNI_AGGREGATION_TYPE_COUNT_ALL;
+import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_CHAR;
+import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_VARCHAR;
 import static org.apache.hadoop.hive.ql.exec.GroupByOperator.groupingSet2BitSet;
 import static org.apache.hadoop.hive.ql.exec.GroupByOperator.shouldEmitSummaryRow;
 
@@ -509,14 +511,13 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
         int rowCount = vec.getSize();
         int groupingSetSize = groupingSets.size();
         Vec newVec = VecFactory.createFlatVec(rowCount * groupingSetSize, vec.getType());
-        Vec flatVec = vec;
-        if (vec instanceof DictionaryVec) {
-            flatVec = ((DictionaryVec) vec).expandDictionary();
-        }
+        Vec flatVec = (vec instanceof DictionaryVec) ? ((DictionaryVec) vec).expandDictionary() : vec;
+        byte[] rawValueNulls = vec.getRawValueNulls();
+        DataType.DataTypeId dataTypeId = vec.getType().getId();
+        int[] rawValueOffset = (dataTypeId == OMNI_VARCHAR || dataTypeId == OMNI_CHAR) ? ((VarcharVec) flatVec).getRawValueOffset() : new int[0];
         for (int i = 0; i < groupingSetSize; i++) {
+            newVec.setNulls(i * rowCount, rawValueNulls, 0, rowCount);
             if ((groupingSets.get(i) & mask) == 0) {
-                DataType.DataTypeId dataTypeId = vec.getType().getId();
-                newVec.setNulls(i * rowCount, vec.getValuesNulls(0, rowCount), 0, rowCount);
                 switch (dataTypeId) {
                     case OMNI_INT:
                     case OMNI_DATE32:
@@ -543,14 +544,14 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
                     case OMNI_VARCHAR:
                     case OMNI_CHAR:
                         ((VarcharVec) newVec).put(i * rowCount, ((VarcharVec) flatVec).get(0, rowCount), 0,
-                                ((VarcharVec) flatVec).getValueOffset(0, rowCount), 0, rowCount);
+                                rawValueOffset, 0, rowCount);
                         break;
                     default:
                         throw new RuntimeException("Not support dataType, dataTypeId: " + dataTypeId);
                 }
             } else {
-                boolean[] nulls = new boolean[rowCount];
-                Arrays.fill(nulls, true);
+                byte[] nulls = new byte[rowCount];
+                Arrays.fill(nulls, (byte) 1);
                 newVec.setNulls(i * rowCount, nulls, 0, rowCount);
             }
         }
