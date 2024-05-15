@@ -48,8 +48,6 @@ import org.apache.hadoop.hive.ql.exec.ExprNodeColumnEvaluator;
 import org.apache.hadoop.hive.ql.exec.ExprNodeConstantEvaluator;
 import org.apache.hadoop.hive.ql.exec.ExprNodeEvaluator;
 import org.apache.hadoop.hive.ql.exec.MapredContext;
-import org.apache.hadoop.hive.ql.exec.ObjectCache;
-import org.apache.hadoop.hive.ql.exec.ObjectCacheFactory;
 import org.apache.hadoop.hive.ql.exec.Operator;
 import org.apache.hadoop.hive.ql.exec.UDFArgumentException;
 import org.apache.hadoop.hive.ql.exec.Utilities;
@@ -70,7 +68,6 @@ import org.apache.hadoop.hive.ql.plan.MapJoinDesc;
 import org.apache.hadoop.hive.ql.plan.OperatorDesc;
 import org.apache.hadoop.hive.ql.plan.TableDesc;
 import org.apache.hadoop.hive.ql.plan.api.OperatorType;
-import org.apache.hadoop.hive.ql.udf.generic.GenericUDFAbs;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDFOPAnd;
 import org.apache.hadoop.hive.serde2.AbstractSerDe;
 import org.apache.hadoop.hive.serde2.ByteStream;
@@ -108,7 +105,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.TreeMap;
-import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 
 public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
@@ -147,12 +143,11 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
 
     private transient List<VecBatch>[] buildVecs;
 
-    private transient String cacheKey;
     private transient MapJoinTableContainerSerDe[] mapJoinTableSerdes;
-    private transient ObjectCache cache;
-    private static List<List<VecBatch>> vecBatchNeedClose = new ArrayList<>();
     private static boolean addedCloseThread;
     private transient Iterator<VecBatch> output;
+    private static int buildNodeId;
+    private static Map<Integer, Integer> countShareBuildIds = new HashMap<>();
 
     public OmniMapJoinOperator() {
         super();
@@ -198,48 +193,68 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
             buildInspectors[buildIndex] = new ArrayList<>(joinKeysObjectInspectors[buildIndex]);
             buildInspectors[buildIndex].addAll(joinValuesObjectInspectors[buildIndex]);
         }
-        JoinType joinType = JOIN_TYPE_MAP.get(condn[Math.min(posBigTable, condn.length -1)].getType());
+        JoinType joinType = JOIN_TYPE_MAP.get(condn[Math.min(posBigTable, condn.length - 1)].getType());
         DataType[] buildTypes = getTypeFromInspectors(Arrays.stream(buildInspectors).filter(Objects::nonNull)
                 .flatMap(List::stream).collect(Collectors.toList()));
-        omniHashBuilderWithExprOperatorFactory = getOmniHashBuilderWithExprOperatorFactory(joinType, buildTypes,
-                buildIndexes.get(buildIndexes.size() - 1));
-        buildOperator = omniHashBuilderWithExprOperatorFactory.createOperator();
+        String queryId = HiveConf.getVar(hconf, HiveConf.ConfVars.HIVEQUERYID);
+        buildNodeId = Math.abs((queryId + this.getOperatorId()).hashCode());
+        boolean hasCache = false;
+        if (!conf.isDynamicPartitionHashJoin()) {
+            OmniHashBuilderWithExprOperatorFactory.gLock.lock();
+            try {
+                omniHashBuilderWithExprOperatorFactory = OmniHashBuilderWithExprOperatorFactory.getHashBuilderOperatorFactory(buildNodeId);
+                Integer countShareBuildId = countShareBuildIds.getOrDefault(buildNodeId, 0);
+                countShareBuildIds.put(buildNodeId, ++countShareBuildId);
+                if (omniHashBuilderWithExprOperatorFactory == null) {
+                    omniHashBuilderWithExprOperatorFactory = getOmniHashBuilderWithExprOperatorFactory(joinType, buildTypes,
+                            buildIndexes.get(buildIndexes.size() - 1));
+                    buildOperator = omniHashBuilderWithExprOperatorFactory.createOperator();
+                    OmniHashBuilderWithExprOperatorFactory.saveHashBuilderOperatorAndFactory(buildNodeId,
+                            OmniHashBuilderWithExprOperatorFactory.getPartitionId(buildNodeId),
+                            omniHashBuilderWithExprOperatorFactory, buildOperator);
+                } else {
+                    hasCache = true;
+                }
+            } catch (Exception e) {
+                throw new RuntimeException("hash build failed. errmsg: " + e.getMessage());
+            } finally {
+                OmniHashBuilderWithExprOperatorFactory.gLock.unlock();
+            }
+        } else {
+            omniHashBuilderWithExprOperatorFactory = getOmniHashBuilderWithExprOperatorFactory(joinType, buildTypes,
+                    buildIndexes.get(buildIndexes.size() - 1));
+            buildOperator = omniHashBuilderWithExprOperatorFactory.createOperator();
+        }
         omniLookupJoinWithExprOperatorFactory = getOmniLookupOperatorFactory(omniHashBuilderWithExprOperatorFactory,
                 posBigTable, buildIndexes, buildTypes);
         joinOperator = omniLookupJoinWithExprOperatorFactory.createOperator();
         order = getOrder(posBigTable, joinKeysObjectInspectors.length);
         initKeyPosToValuePos();
-        String queryId = HiveConf.getVar(hconf, HiveConf.ConfVars.HIVEQUERYID);
-        cacheKey = "HASH_MAP_" + this.getOperatorId() + "_container";
-        cache = ObjectCacheFactory.getCache(hconf, queryId, false);
         final ExecMapperContext mapContext = getExecContext();
         final MapredContext mrContext = MapredContext.get();
         mapJoinTableSerdes = new MapJoinTableContainerSerDe[conf.getTagLength()];
         generateMapMetaData();
-        if (!conf.isBucketMapJoin() && !conf.isDynamicPartitionHashJoin()) {
-            Future<List<List<VecBatch>>> future = cache.retrieveAsync(cacheKey,
-                    () -> loadBuildVec(mapContext, mrContext));
-            asyncInitOperations.add(future);
-        } else if (!isInputFileChangeSensitive(mapContext)) {
-            List<List<VecBatch>> vecBatchList = loadBuildVec(mapContext, mrContext);
-            for (int i = 0; i < vecBatchList.size(); i++) {
-                buildVecs[buildIndexes.get(i)] = vecBatchList.get(i);
-            }
+
+        boolean canLoadCache = !conf.isBucketMapJoin() && !conf.isDynamicPartitionHashJoin() && hasCache;
+        if (!canLoadCache && !isInputFileChangeSensitive(mapContext)) {
+            loadBuildVec(mapContext, mrContext);
         }
         if (!addedCloseThread) {
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 try {
-                    for (List<VecBatch> vecBatchList : vecBatchNeedClose) {
-                        if (vecBatchList != null) {
-                            for (VecBatch vecBatch : vecBatchList) {
-                                vecBatch.releaseAllVectors();
-                                vecBatch.close();
-                            }
+                    for (Map.Entry<Integer, Integer> entry : countShareBuildIds.entrySet()) {
+                        Integer value = entry.getValue();
+                        for (int i = 0; i < value; i++) {
+                            OmniHashBuilderWithExprOperatorFactory.dereferenceHashBuilderOperatorAndFactory(entry.getKey());
+                        }
+                        if (OmniHashBuilderWithExprOperatorFactory.getHashBuilderOperatorFactory(entry.getKey()) == null) {
+                            LOG.info("release operatorFactor of buildNodeId = " + entry.getKey() + " succeed");
+                        } else {
+                            LOG.error("release operatorFactor of buildNodeId = " + entry.getKey() + " failed");
                         }
                     }
-                    LOG.info("release vecBatchNeedClose succeed");
                 } catch (Exception e) {
-                    LOG.error("release vecBatchNeedClose failed", e);
+                    LOG.error("release operatorFactor failed", e);
                 }
             }));
             addedCloseThread = true;
@@ -266,22 +281,77 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
         inputObjInspectors = newInputObjInspectors;
     }
 
-    private List<List<VecBatch>> loadBuildVec(ExecMapperContext mapContext, MapredContext mrContext)
+    private void loadBuildVec(ExecMapperContext mapContext, MapredContext mrContext)
             throws HiveException {
         List<List<VecBatch>> vecBatches = new ArrayList<>();
         for (int index : buildIndexes) {
             vecBatches.add(getVectorFromMap(index, mapContext, mrContext));
         }
-        if (!conf.isDynamicPartitionHashJoin()) {
-            LOG.info("add vecBatchNeedClose succeed");
-            vecBatchNeedClose.addAll(vecBatches);
+
+        for (int i = 0; i < vecBatches.size(); i++) {
+            buildVecs[buildIndexes.get(i)] = vecBatches.get(i);
         }
-        return vecBatches;
+
+        if (joinKeysObjectInspectors.length > 2) {
+            // There may be many build tables, need to join build tables first, and use the
+            // result as input of buildOperator
+            List<Integer> buildList = new ArrayList<>();
+            List<VecBatch> probeVec;
+            OmniHashBuilderWithExprOperatorFactory[] innerBuildFactories = new OmniHashBuilderWithExprOperatorFactory[buildIndexes.size() - 1];
+            OmniOperatorFactory[] innerJoinOperatorFactories = new OmniOperatorFactory[buildIndexes.size() - 1];
+            OmniOperator[] innerBuildOperators = new OmniOperator[buildIndexes.size() - 1];
+            OmniOperator[] innerJoinOperators = new OmniOperator[buildIndexes.size() - 1];
+            for (int i = buildIndexes.size() - 2; i >= 0; i--) {
+                buildList.add(0, buildIndexes.get(i + 1));
+                int probeIndex = buildIndexes.get(i);
+                DataType[] buildTypes = getTypeFromInspectors(buildList.stream()
+                        .flatMap(index -> buildInspectors[index].stream()).collect(Collectors.toList()));
+                JoinType joinType = JOIN_TYPE_MAP.get(condn[i + 1].getType());
+                innerBuildFactories[i] = getOmniHashBuilderWithExprOperatorFactory(
+                        joinType, buildTypes, buildList.get(0));
+                innerBuildOperators[i] = innerBuildFactories[i].createOperator();
+                innerJoinOperatorFactories[i] = getInnerOmniLookupOperatorFactory(innerBuildFactories[i],
+                        probeIndex, buildList, buildTypes);
+                innerJoinOperators[i] = innerJoinOperatorFactories[i].createOperator();
+            }
+            for (int i = innerBuildFactories.length - 1; i >= 0; i--) {
+                int probeIndex = buildIndexes.get(i);
+                probeVec = getVectorFromCache(probeIndex);
+                if (i == innerBuildFactories.length - 1) {
+                    List<VecBatch> buildVec = getVectorFromCache(buildIndexes.get(buildIndexes.size() - 1));
+                    for (VecBatch vecBatch : buildVec) {
+                        innerBuildOperators[i].addInput(vecBatch);
+                    }
+                }
+                innerBuildOperators[i].getOutput();
+                for (VecBatch vecBatch : probeVec) {
+                    innerJoinOperators[i].addInput(vecBatch);
+                    output = innerJoinOperators[i].getOutput();
+                    while (output.hasNext()) {
+                        if (i == 0) {
+                            buildOperator.addInput(output.next());
+                        } else {
+                            innerBuildOperators[i - 1].addInput(output.next());
+                        }
+                    }
+                }
+            }
+            closeInnerOperators(innerBuildOperators, innerJoinOperators, innerBuildFactories, innerJoinOperatorFactories);
+            buildOperator.getOutput();
+        } else {
+            List<VecBatch> cacheVecBatches = getVectorFromCache(1 - posBigTable);
+            for (VecBatch vecBatch : cacheVecBatches) {
+                if (vecBatch.getVectorCount() > 0) {
+                    buildOperator.addInput(vecBatch);
+                }
+            }
+            buildOperator.getOutput();
+        }
     }
 
     private boolean isInputFileChangeSensitive(ExecMapperContext mapContext) {
         return !(mapContext == null || mapContext.getLocalWork() == null
-                || mapContext.getLocalWork().getInputFileChangeSensitive() == false);
+                || !mapContext.getLocalWork().getInputFileChangeSensitive());
     }
 
     private List<VecBatch> getVectorFromMap(int pos, ExecMapperContext mapContext, MapredContext mrContext)
@@ -598,71 +668,6 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
         }
     }
 
-    @Override
-    protected void completeInitializationOp(Object[] os) throws HiveException {
-        if (os.length > 0) {
-            List<List<VecBatch>> vecBatchList = (List<List<VecBatch>>) os[0];
-            for (int i = 0; i < vecBatchList.size(); i++) {
-                buildVecs[buildIndexes.get(i)] = vecBatchList.get(i);
-            }
-        }
-        if (joinKeysObjectInspectors.length > 2) {
-            // There may be many build tables, need to join build tables first, and use the
-            // result as input of buildOperator
-            List<Integer> buildList = new ArrayList<>();
-            List<VecBatch> probeVec;
-            OmniHashBuilderWithExprOperatorFactory[] innerBuildFactories = new OmniHashBuilderWithExprOperatorFactory[buildIndexes.size() - 1];
-            OmniOperatorFactory[] innerJoinOperatorFactories = new OmniOperatorFactory[buildIndexes.size() - 1];
-            OmniOperator[] innerBuildOperators = new OmniOperator[buildIndexes.size() - 1];
-            OmniOperator[] innerJoinOperators = new OmniOperator[buildIndexes.size() - 1];
-            for (int i = buildIndexes.size() - 2; i >= 0; i--) {
-                buildList.add(0, buildIndexes.get(i + 1));
-                int probeIndex = buildIndexes.get(i);
-                DataType[] buildTypes = getTypeFromInspectors(buildList.stream()
-                        .flatMap(index -> buildInspectors[index].stream()).collect(Collectors.toList()));
-                JoinType joinType = JOIN_TYPE_MAP.get(condn[i + 1].getType());
-                innerBuildFactories[i] = getOmniHashBuilderWithExprOperatorFactory(
-                        joinType, buildTypes, buildList.get(0));
-                innerBuildOperators[i] = innerBuildFactories[i].createOperator();
-                innerJoinOperatorFactories[i] = getInnerOmniLookupOperatorFactory(innerBuildFactories[i],
-                        probeIndex, buildList, buildTypes);
-                innerJoinOperators[i] = innerJoinOperatorFactories[i].createOperator();
-            }
-            for (int i = innerBuildFactories.length - 1; i >= 0; i--) {
-                int probeIndex = buildIndexes.get(i);
-                probeVec = getVectorFromCache(probeIndex);
-                if (i == innerBuildFactories.length - 1) {
-                    List<VecBatch> buildVec = getVectorFromCache(buildIndexes.get(buildIndexes.size() - 1));
-                    for (VecBatch vecBatch : buildVec) {
-                        innerBuildOperators[i].addInput(vecBatch);
-                    }
-                }
-                innerBuildOperators[i].getOutput();
-                for (VecBatch vecBatch : probeVec) {
-                    innerJoinOperators[i].addInput(vecBatch);
-                    output = innerJoinOperators[i].getOutput();
-                    while (output.hasNext()) {
-                        if (i == 0) {
-                            buildOperator.addInput(output.next());
-                        } else {
-                            innerBuildOperators[i - 1].addInput(output.next());
-                        }
-                    }
-                }
-            }
-            closeInnerOperators(innerBuildOperators, innerJoinOperators, innerBuildFactories, innerJoinOperatorFactories);
-            buildOperator.getOutput();
-        } else {
-            List<VecBatch> vecBatches = getVectorFromCache(1 - posBigTable);
-            for (VecBatch vecBatch : vecBatches) {
-                if (vecBatch.getVectorCount() > 0) {
-                    buildOperator.addInput(vecBatch);
-                }
-            }
-            buildOperator.getOutput();
-        }
-    }
-
     private void closeInnerOperators(OmniOperator[] innerBuildOperators, OmniOperator[] innerJoinOperators,
                                      OmniHashBuilderWithExprOperatorFactory[] innerBuildFactories, OmniOperatorFactory[] innerJoinOperatorFactories) {
         for (OmniOperator operator : innerBuildOperators) {
@@ -680,10 +685,7 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
     }
 
     private List<VecBatch> getVectorFromCache(int index) {
-        if (conf.isDynamicPartitionHashJoin()) {
-            return buildVecs[index];
-        }
-        return buildVecs[index].stream().map(OmniHiveOperator::copyVecBatch).collect(Collectors.toList());
+        return buildVecs[index];
     }
 
     private int[] getOrder(int posBigTable, int aliasNum) {
@@ -875,9 +877,11 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
     @Override
     public void closeOp(boolean abort) throws HiveException {
         joinOperator.close();
-        buildOperator.close();
         omniLookupJoinWithExprOperatorFactory.close();
-        omniHashBuilderWithExprOperatorFactory.close();
+        if (conf.isDynamicPartitionHashJoin()) {
+            buildOperator.close();
+            omniHashBuilderWithExprOperatorFactory.close();
+        }
         output = null;
         super.closeOp(abort);
     }
