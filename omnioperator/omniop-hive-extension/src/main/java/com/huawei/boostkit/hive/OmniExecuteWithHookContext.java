@@ -159,6 +159,8 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
 
     private TezWork tezWork;
 
+    private HookContext hookContext;
+
     private OmniHiveConf omniHiveConf;
 
     private void clearGlobalVar() {
@@ -181,6 +183,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
     }
 
     public void run(HookContext hookContext) throws Exception {
+        this.hookContext = hookContext;
         omniHiveConf = new OmniHiveConf(hookContext.getConf());
         clearGlobalVar();
         QueryPlan queryPlan = hookContext.getQueryPlan();
@@ -195,11 +198,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             throw new RuntimeException("can't support mr engine");
         }
         boolean cboEnable = HiveConf.getBoolVar(hookContext.getConf(), HiveConf.ConfVars.HIVE_CBO_ENABLED);
-        boolean cboRetPath = HiveConf.getBoolVar(hookContext.getConf(), HiveConf.ConfVars.HIVE_CBO_RETPATH_HIVEOP);
         if (!cboEnable) {
-            return;
-        }
-        if (cboRetPath) {
             return;
         }
         setTezWork(queryPlan);
@@ -537,7 +536,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
 
     private boolean tableScanSupport(Operator<? extends OperatorDesc> op) {
         TableScanDesc tableScanDesc = (TableScanDesc) op.getConf();
-        if (tableScanDesc.getNeededColumns().isEmpty() || tableScanDesc.getAcidOperationalProperties() != null) {
+        if (tableScanDesc.getNeededColumns().isEmpty() || !tableScanDesc.getVirtualCols().isEmpty() || tableScanDesc.getAcidOperationalProperties() != null) {
             return false;
         }
         Table tableMetadata = tableScanDesc.getTableMetadata();
@@ -636,6 +635,8 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         if (!omniHiveConf.isEnableOperator(operator.getType())) {
             return false;
         }
+        boolean cboEnable = HiveConf.getBoolVar(hookContext.getConf(), HiveConf.ConfVars.HIVE_CBO_ENABLED);
+        boolean cboRetPath = HiveConf.getBoolVar(hookContext.getConf(), HiveConf.ConfVars.HIVE_CBO_RETPATH_HIVEOP);
         switch (operator.getType()) {
             case MAPJOIN:
                 return mapJoinReplaceable(operator);
@@ -676,6 +677,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             case PTF:
                 return PTFReplaceable(operator);
             case GROUPBY:
+                if (cboEnable && cboRetPath) return false;
                 return groupByReplaceable(operator, reduceSinkCanReplace);
             case REDUCESINK:
                 return reduceSinkCanReplace;
@@ -774,7 +776,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         for (List<ExprNodeDesc> value : mapJoinDesc.getFilters().values()) {
             exprNodeDescList.addAll(value);
         }
-        if (!isUDFSupport(exprNodeDescList, false) || joinCondUnsupported(mapJoinDesc)) {
+        if (exprNodeDescList.isEmpty() || !isUDFSupport(exprNodeDescList, false) || joinCondUnsupported(mapJoinDesc)) {
             return false;
         }
         return joinReplaceable(operator);
