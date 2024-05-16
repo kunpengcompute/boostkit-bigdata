@@ -20,8 +20,10 @@ package com.huawei.boostkit.hive.processor;
 
 import com.huawei.boostkit.hive.expression.BaseExpression;
 import com.huawei.boostkit.hive.expression.BetweenExpression;
+import com.huawei.boostkit.hive.expression.CompareExpression;
 import com.huawei.boostkit.hive.expression.ExpressionUtils;
 import com.huawei.boostkit.hive.expression.TypeUtils;
+import org.apache.hadoop.hive.ql.plan.ExprNodeConstantDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
@@ -35,14 +37,30 @@ public class BetweenExpressionProcessor implements ExpressionProcessor {
     public BaseExpression process(ExprNodeGenericFuncDesc node, String operator, ObjectInspector inspector) {
         BaseExpression subLeaf;
         ExprNodeDesc comparedNode = node.getChildren().get(1);
-        if (node.getChildren().get(1) instanceof ExprNodeGenericFuncDesc) {
+        if (comparedNode instanceof ExprNodeGenericFuncDesc) {
             subLeaf = ExpressionUtils.build((ExprNodeGenericFuncDesc) comparedNode, inspector);
         } else {
             subLeaf = ExpressionUtils.createNode(comparedNode, inspector);
         }
-        return new BetweenExpression("BETWEEN", TypeUtils.convertHiveTypeToOmniType(node.getTypeInfo()),
-                null, createBoundNode(node, comparedNode, LOWER_BOUND_INDEX, inspector),
-                createBoundNode(node, comparedNode, UPPER_BOUND_INDEX, inspector), subLeaf);
+        BaseExpression lowerBoundNode = createBoundNode(node, comparedNode, LOWER_BOUND_INDEX, inspector);
+        BaseExpression upperBoundNode = createBoundNode(node, comparedNode, UPPER_BOUND_INDEX, inspector);
+        boolean not = (boolean) ((ExprNodeConstantDesc) node.getChildren().get(0)).getValue();
+        if (not) {
+            CompareExpression leaf = new CompareExpression("BINARY",
+                    TypeUtils.convertHiveTypeToOmniType(node.getTypeInfo()), "OR");
+            leaf.add(new CompareExpression("BINARY",
+                    TypeUtils.convertHiveTypeToOmniType(node.getTypeInfo()), "LESS_THAN"));
+            leaf.add(new CompareExpression("BINARY",
+                    TypeUtils.convertHiveTypeToOmniType(node.getTypeInfo()), "GREATER_THAN"));
+            leaf.add(subLeaf);
+            leaf.add(lowerBoundNode);
+            leaf.add(subLeaf);
+            leaf.add(upperBoundNode);
+            return leaf;
+        } else {
+            return new BetweenExpression("BETWEEN", TypeUtils.convertHiveTypeToOmniType(node.getTypeInfo()),
+                    null, lowerBoundNode, upperBoundNode, subLeaf);
+        }
     }
 
     private BaseExpression createBoundNode(ExprNodeGenericFuncDesc rootNode,
