@@ -104,8 +104,8 @@ public class OmniParquetRecordReader
     private static final Map<OriginalType, DataType> PARQUET_TO_OMNI_TYPE = new HashMap<OriginalType, DataType>() {
         {
             put(OriginalType.DATE, IntDataType.INTEGER);
-            put(OriginalType.INT_8, IntDataType.INTEGER);
-            put(OriginalType.INT_16, IntDataType.INTEGER);
+            put(OriginalType.INT_8, ShortDataType.SHORT);
+            put(OriginalType.INT_16, ShortDataType.SHORT);
             put(OriginalType.INT_32, IntDataType.INTEGER);
             put(OriginalType.INT_64, LongDataType.LONG);
             put(OriginalType.UINT_8, IntDataType.INTEGER);
