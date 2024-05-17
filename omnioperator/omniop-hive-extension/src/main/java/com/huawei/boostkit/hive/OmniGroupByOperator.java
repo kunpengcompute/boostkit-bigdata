@@ -544,7 +544,7 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
                     case OMNI_VARCHAR:
                     case OMNI_CHAR:
                         ((VarcharVec) newVec).put(i * rowCount, ((VarcharVec) flatVec).get(0, rowCount), 0,
-                                rawValueOffset, 0, rowCount);
+                                ((VarcharVec) flatVec).getValueOffset(0, rowCount), 0, rowCount);
                         break;
                     default:
                         throw new RuntimeException("Not support dataType, dataTypeId: " + dataTypeId);
