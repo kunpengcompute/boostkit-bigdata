@@ -38,17 +38,17 @@ public class ReplaceExpressionTest extends CommonTest {
         utRunSqlOnDriver("insert into replace_expression values(1, 'Replace-Tom')");
         utRunSqlOnDriver("insert into replace_expression values(2, 'Replace-Jerry')");
 
-        utRunSqlOnDriver("select id, name, replace(name,'-','_') from length_expression");
+        utRunSqlOnDriver("select id, name, replace(name,'-','_') from replace_expression order by id");
         List<String> rs = new ArrayList<>();
         driver.getResults(rs);
-        utRunSqlOnDriver("select id, name from length_expression where name = replace('Replace_Tom','_','-')");
+        utRunSqlOnDriver("select id, name from replace_expression where name = replace('Replace_Tom','_','-')");
         List<String> rs1 = new ArrayList<>();
         driver.getResults(rs1);
 
-        utRunSqlOnDriver("drop table if exists length_expression");
+        utRunSqlOnDriver("drop table if exists replace_expression");
         Assert.assertEquals(2, rs.size());
         Assert.assertEquals("1\tReplace-Tom\tReplace_Tom", rs.get(0));
-        Assert.assertEquals("2\tReplace-Tom\tReplace_Tom", rs.get(1));
+        Assert.assertEquals("2\tReplace-Jerry\tReplace_Jerry", rs.get(1));
         Assert.assertEquals(1, rs1.size());
         Assert.assertEquals("1\tReplace-Tom", rs1.get(0));
     }

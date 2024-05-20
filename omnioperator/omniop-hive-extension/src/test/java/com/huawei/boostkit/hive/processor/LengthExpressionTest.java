@@ -38,7 +38,7 @@ public class LengthExpressionTest extends CommonTest {
         utRunSqlOnDriver("insert into length_expression values(1, 'Tom')");
         utRunSqlOnDriver("insert into length_expression values(2, 'Jerry')");
 
-        utRunSqlOnDriver("select id, name, length(name) from length_expression");
+        utRunSqlOnDriver("select id, name, length(name) from length_expression order by id");
         List<String> rs = new ArrayList<>();
         driver.getResults(rs);
         utRunSqlOnDriver("select id, name from length_expression where length(name) > 3");
