@@ -19,8 +19,9 @@
 package com.huawei.boostkit.hive.shuffle;
 
 public class FixedWidthColumnSerDe implements ColumnSerDe {
-    private int columnTypeLen;
-    private static byte[] EMPTY = new byte[16];
+    protected int columnTypeLen;
+    protected static byte[] EMPTY = new byte[16];
+    protected transient byte columnNullMarker;
 
     public FixedWidthColumnSerDe(int columnTypeLen) {
         this.columnTypeLen = columnTypeLen;

@@ -26,6 +26,7 @@ import com.huawei.boostkit.hive.cache.VecBufferCache;
 import com.huawei.boostkit.hive.cache.VectorCache;
 import com.huawei.boostkit.hive.converter.StructConverter;
 import com.huawei.boostkit.hive.converter.VecConverter;
+import com.huawei.boostkit.hive.shuffle.OmniVecBatchOrderSerDe;
 import com.huawei.boostkit.hive.shuffle.OmniVecBatchSerDe;
 import com.huawei.boostkit.hive.shuffle.VecSerdeBody;
 
@@ -126,8 +127,9 @@ public class OmniVectorOperator extends OmniHiveOperator<OmniVectorDesc> {
             source = ((TezContext) MapredContext.get()).getRecordSources();
         }
         ReduceWork reduceWork = Utilities.getReduceWork(hconf);
-        if (reduceWork != null && reduceWork.getKeyDesc().getProperties().get(SERIALIZATION_LIB)
-                .equals(OmniVecBatchSerDe.class.getName())) {
+        if (reduceWork != null && (reduceWork.getKeyDesc().getProperties().get(SERIALIZATION_LIB)
+                .equals(OmniVecBatchSerDe.class.getName()) || reduceWork.getKeyDesc().getProperties().get(SERIALIZATION_LIB)
+                .equals(OmniVecBatchOrderSerDe.class.getName()))) {
             isVecBatchSerDe = true;
         }
         for (int i = 0; i < soi.length; i++) {

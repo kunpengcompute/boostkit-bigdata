@@ -962,7 +962,7 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
      */
     @Override
     public String getName() {
-        return "OMNI_RS";
+        return "RS_OMNI";
     }
 
     @Override

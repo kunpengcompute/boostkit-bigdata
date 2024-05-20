@@ -34,6 +34,7 @@ import com.huawei.boostkit.hive.cache.LongColumnCache;
 import com.huawei.boostkit.hive.cache.VecBufferCache;
 import com.huawei.boostkit.hive.converter.Decimal64VecConverter;
 import com.huawei.boostkit.hive.converter.VecConverter;
+import com.huawei.boostkit.hive.shuffle.OmniVecBatchOrderSerDe;
 import com.huawei.boostkit.hive.shuffle.OmniVecBatchSerDe;
 import com.huawei.boostkit.hive.shuffle.VecSerdeBody;
 
@@ -125,8 +126,9 @@ public class OmniVectorizedVectorOperator extends OmniHiveOperator<OmniVectorDes
         if (OMNI_OPERATOR.contains(OperatorType.REDUCESINK) && parentOperators.isEmpty()) {
             rebuildVectoriedInspector();
             ReduceWork reduceWork = Utilities.getReduceWork(hconf);
-            if (reduceWork != null && reduceWork.getKeyDesc().getProperties().get(SERIALIZATION_LIB)
-                    .equals(OmniVecBatchSerDe.class.getName())) {
+            if (reduceWork != null && (reduceWork.getKeyDesc().getProperties().get(SERIALIZATION_LIB)
+                    .equals(OmniVecBatchSerDe.class.getName()) || reduceWork.getKeyDesc().getProperties().get(SERIALIZATION_LIB)
+                    .equals(OmniVecBatchOrderSerDe.class.getName()))) {
                 isVecBatchSerDe = true;
             }
         }

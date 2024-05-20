@@ -48,6 +48,7 @@ import com.huawei.boostkit.hive.expression.TypeUtils;
 import com.huawei.boostkit.hive.reader.OmniOrcInputFormat;
 import com.huawei.boostkit.hive.reader.OmniParquetInputFormat;
 import com.huawei.boostkit.hive.reader.VecBatchWrapperSerde;
+import com.huawei.boostkit.hive.shuffle.OmniVecBatchOrderSerDe;
 import com.huawei.boostkit.hive.shuffle.OmniVecBatchSerDe;
 
 import nova.hetu.omniruntime.constants.FunctionType;
@@ -163,6 +164,8 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
 
     private OmniHiveConf omniHiveConf;
 
+    private final Set<String> needSortSerdeReduceSinkName = new HashSet<>();
+
     private void clearGlobalVar() {
         groupByOperatorNeedSort.clear();
         mergeJoinNeedSort.clear();
@@ -172,6 +175,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         reduceSinkReplaceableWork.clear();
         reduceSinkReplaceableWorkName.clear();
         inputUnReplaceableWork.clear();
+        needSortSerdeReduceSinkName.clear();
         tezWork = null;
     }
 
@@ -338,7 +342,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             // is VectorOperator
             reducer = (Operator) reducer.getChildOperators().get(0);
         }
-        if (reducer.getType().equals(OperatorType.GROUPBY) && isReplaceable(reducer, true)) {
+        if (isReplaceable(reducer, true) && reducer.getType().equals(OperatorType.GROUPBY)) {
             tezWork.getEdgeProperty(work, child).setEdgeType(TezEdgeProperty.EdgeType.CUSTOM_SIMPLE_EDGE);
             return true;
         }
@@ -386,7 +390,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             unReplaceable = true;
         }
 
-        if (reduceSinkDesc.getTopN() != -1 || !reduceSinkDesc.getDistinctColumnIndices().isEmpty()) {
+        if (!reduceSinkDesc.getDistinctColumnIndices().isEmpty()) {
             unReplaceable = true;
         }
         for (ExprNodeDesc exprNodeDesc : reduceSinkDesc.getPartitionCols()) {
@@ -1230,8 +1234,15 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                 return new OmniPTFOperator(current.getCompilationOpContext(), (PTFDesc) current.getConf());
             case REDUCESINK:
                 OmniReduceSinkOperator omniReduceSinkOperator = new OmniReduceSinkOperator(current.getCompilationOpContext(), (ReduceSinkDesc) current.getConf(), reduceSinkCanReplace);
-                omniReduceSinkOperator.getConf().getKeySerializeInfo().getProperties().setProperty(SERIALIZATION_LIB, OmniVecBatchSerDe.class.getName());
-                omniReduceSinkOperator.getConf().getValueSerializeInfo().getProperties().setProperty(SERIALIZATION_LIB, OmniVecBatchSerDe.class.getName());
+                ReduceSinkDesc conf = (ReduceSinkDesc) current.getConf();
+                if (conf.getTopN() == -1) {
+                    omniReduceSinkOperator.getConf().getKeySerializeInfo().getProperties().setProperty(SERIALIZATION_LIB, OmniVecBatchSerDe.class.getName());
+                    omniReduceSinkOperator.getConf().getValueSerializeInfo().getProperties().setProperty(SERIALIZATION_LIB, OmniVecBatchSerDe.class.getName());
+                } else {
+                    needSortSerdeReduceSinkName.add(conf.getOutputName());
+                    omniReduceSinkOperator.getConf().getKeySerializeInfo().getProperties().setProperty(SERIALIZATION_LIB, OmniVecBatchOrderSerDe.class.getName());
+                    omniReduceSinkOperator.getConf().getValueSerializeInfo().getProperties().setProperty(SERIALIZATION_LIB, OmniVecBatchOrderSerDe.class.getName());
+                }
                 return omniReduceSinkOperator;
             case TABLESCAN:
                 if (vectorized) {
@@ -1264,8 +1275,13 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             List<TableDesc> tagToValueDesc = ((ReduceWork) work).getTagToValueDesc();
             for (Integer tag : toReplace) {
                 TableDesc keyDesc = ((ReduceWork) work).getKeyDesc();
-                keyDesc.getProperties().setProperty(SERIALIZATION_LIB, OmniVecBatchSerDe.class.getName());
-                tagToValueDesc.get(tag).getProperties().setProperty(SERIALIZATION_LIB, OmniVecBatchSerDe.class.getName());
+                if (needSortSerdeReduceSinkName.contains(work.getName())) {
+                    keyDesc.getProperties().setProperty(SERIALIZATION_LIB, OmniVecBatchOrderSerDe.class.getName());
+                    tagToValueDesc.get(tag).getProperties().setProperty(SERIALIZATION_LIB, OmniVecBatchOrderSerDe.class.getName());
+                } else {
+                    keyDesc.getProperties().setProperty(SERIALIZATION_LIB, OmniVecBatchSerDe.class.getName());
+                    tagToValueDesc.get(tag).getProperties().setProperty(SERIALIZATION_LIB, OmniVecBatchSerDe.class.getName());
+                }
             }
         }
     }
