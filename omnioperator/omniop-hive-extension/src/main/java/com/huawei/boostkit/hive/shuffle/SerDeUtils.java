@@ -23,6 +23,9 @@ import nova.hetu.omniruntime.type.DataType;
 public class SerDeUtils {
     public static void getSerializeByte(byte[] originalByte, int startOriginal, byte[] resultByte, int startResult, DataType.DataTypeId typeId, boolean invert) {
         switch (typeId) {
+            case OMNI_BOOLEAN:
+                getBooleanSerializeByte(originalByte, startOriginal, resultByte, startResult, invert);
+                break;
             case OMNI_INT:
                 getIntSerializeByte(originalByte, startOriginal, resultByte, startResult, invert);
                 break;
@@ -46,6 +49,9 @@ public class SerDeUtils {
 
     public static void getDeserializeByte(byte[] originalByte, int startOriginal, byte[] resultByte, int startResult, DataType.DataTypeId typeId, boolean invert) {
         switch (typeId) {
+            case OMNI_BOOLEAN:
+                getBooleanDeserializeByte(originalByte, startOriginal, resultByte, startResult, invert);
+                break;
             case OMNI_INT:
                 getIntDeserializeByte(originalByte, startOriginal, resultByte, startResult, invert);
                 break;
@@ -65,6 +71,14 @@ public class SerDeUtils {
             default:
                 throw new RuntimeException("unSupport data type: " + typeId);
         }
+    }
+
+    public static void getBooleanSerializeByte(byte[] originalByte, int startOriginal, byte[] resultByte, int startResult, boolean invert) {
+        resultByte[startResult] = dealByte(originalByte[startOriginal], invert);
+    }
+
+    public static void getBooleanDeserializeByte(byte[] originalByte, int startOriginal, byte[] resultByte, int startResult, boolean invert) {
+        resultByte[startResult] = dealByte(originalByte[startOriginal], invert);
     }
 
     public static void getIntSerializeByte(byte[] originalByte, int startOriginal, byte[] resultByte, int startResult, boolean invert) {
