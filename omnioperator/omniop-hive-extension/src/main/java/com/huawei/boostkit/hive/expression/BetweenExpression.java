@@ -56,7 +56,7 @@ public class BetweenExpression extends BaseExpression{
 
     @Override
     public boolean isFull() {
-        return false;
+        return lower_bound != null && lower_bound.isFull() && upper_bound != null && upper_bound.isFull() && value != null && value.isFull();
     }
 
     @Override
