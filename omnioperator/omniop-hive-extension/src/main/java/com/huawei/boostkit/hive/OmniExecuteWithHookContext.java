@@ -564,7 +564,8 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         }
         List<Operator<? extends OperatorDesc>> childOperators = op.getChildOperators();
         for (Operator childOperator : childOperators) {
-            if (childOperator.getType() != null && childOperator.getType().equals(OperatorType.REDUCESINK) && reduceSinkDescUnReplaceable((ReduceSinkDesc) childOperator.getConf())) {
+            ReduceSinkDesc conf = (ReduceSinkDesc) childOperator.getConf();
+            if ((childOperator.getType() != null && childOperator.getType().equals(OperatorType.REDUCESINK)) && (reduceSinkDescUnReplaceable(conf) || conf.getTopN() != -1)) {
                 return false;
             }
         }
