@@ -42,6 +42,7 @@ public class BridgeExpressionProcessor implements ExpressionProcessor {
             add("UDFToByte");
             add("UDFToBoolean");
             add("substr");
+            add("replace");
         }
     };
 
@@ -69,6 +70,10 @@ public class BridgeExpressionProcessor implements ExpressionProcessor {
                     SubstrExpressionProcessor substrExpressionProcessor = new SubstrExpressionProcessor();
                     leaf = substrExpressionProcessor.process(node, operator, inspector);
                 }
+                break;
+            case "replace":
+                ReplaceExpressionProcessor replaceExpressionProcessor = new ReplaceExpressionProcessor();
+                leaf = replaceExpressionProcessor.process(node, operator, inspector);
                 break;
             case "UDFToDouble":
             case "UDFToInteger":
