@@ -33,7 +33,7 @@ import org.apache.spark.sql.execution.adaptive.{AQEShuffleReadExec, BroadcastQue
 import org.apache.spark.sql.execution.aggregate.{DummyLogicalPlan, ExtendedAggUtils, HashAggregateExec}
 import org.apache.spark.sql.execution.exchange.{BroadcastExchangeExec, Exchange, ReusedExchangeExec, ShuffleExchangeExec}
 import org.apache.spark.sql.execution.joins._
-import org.apache.spark.sql.execution.window.WindowExec
+import org.apache.spark.sql.execution.window.{WindowExec, TopNPushDownForWindow}
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.ColumnarBatchSupportUtil.checkColumnarBatchSupport
 import org.apache.spark.sql.catalyst.planning.PhysicalAggregation
@@ -754,6 +754,7 @@ class ColumnarPlugin extends (SparkSessionExtensions => Unit) with Logging {
     extensions.injectOptimizerRule(_ => DelayCartesianProduct)
     extensions.injectOptimizerRule(_ => HeuristicJoinReorder)
     extensions.injectOptimizerRule(_ => MergeSubqueryFilters)
+    extensions.injectQueryStagePrepRule(_ => TopNPushDownForWindow)
   }
 }
 
