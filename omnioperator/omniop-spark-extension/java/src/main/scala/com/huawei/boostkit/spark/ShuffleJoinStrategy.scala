@@ -33,6 +33,9 @@ object ShuffleJoinStrategy extends Strategy
   private val columnarPreferShuffledHashJoin =
     ColumnarPluginConfig.getConf.columnarPreferShuffledHashJoin
 
+  private val columnarForceShuffledHashJoin =
+    ColumnarPluginConfig.getConf.columnarForceShuffledHashJoin
+
   def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
     case ExtractEquiJoinKeys(joinType, leftKeys, rightKeys, nonEquiCond, left, right, hint)
       if columnarPreferShuffledHashJoin =>
@@ -83,9 +86,18 @@ object ShuffleJoinStrategy extends Strategy
                   planLater(right)))
             }.getOrElse(Nil)
         } else {
+          var leftBuildable: Boolean = false
+          var rightBuildable: Boolean = false
+          if (columnarForceShuffledHashJoin) {
+            leftBuildable = canBuildShuffledHashJoinLeft(joinType)
+            rightBuildable = canBuildShuffledHashJoinRight(joinType)
+          } else {
+            leftBuildable = canBuildShuffledHashJoinLeft(joinType) && buildLeft
+            rightBuildable = canBuildShuffledHashJoinRight(joinType) && buildRight
+          }
           getBuildSide(
-            canBuildShuffledHashJoinLeft(joinType) && buildLeft,
-            canBuildShuffledHashJoinRight(joinType) && buildRight,
+            leftBuildable,
+            rightBuildable,
             left,
             right
           ).map {
