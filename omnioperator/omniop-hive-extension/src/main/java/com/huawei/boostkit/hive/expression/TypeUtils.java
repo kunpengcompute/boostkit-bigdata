@@ -97,7 +97,7 @@ import java.util.Optional;
 
 public class TypeUtils {
     private static final Logger LOG = LoggerFactory.getLogger(TypeUtils.class.getName());
-    private static final Map<PrimitiveObjectInspector.PrimitiveCategory, DataType> HIVE_TO_OMNI_TYPE = new HashMap<PrimitiveObjectInspector.PrimitiveCategory, DataType>() {
+    public static final Map<PrimitiveObjectInspector.PrimitiveCategory, DataType> HIVE_TO_OMNI_TYPE = new HashMap<PrimitiveObjectInspector.PrimitiveCategory, DataType>() {
         {
             put(PrimitiveObjectInspector.PrimitiveCategory.SHORT, ShortDataType.SHORT);
             put(PrimitiveObjectInspector.PrimitiveCategory.INT, IntDataType.INTEGER);

@@ -18,7 +18,10 @@
 
 package com.huawei.boostkit.hive.shuffle;
 
+import nova.hetu.omniruntime.type.DataType;
+import nova.hetu.omniruntime.type.ShortDataType;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.hive.serde2.AbstractSerDe;
 import org.apache.hadoop.hive.serde2.SerDeException;
 import org.apache.hadoop.hive.serde2.SerDeStats;
@@ -45,6 +48,8 @@ import java.util.Properties;
 
 import javax.annotation.Nullable;
 
+import static com.huawei.boostkit.hive.expression.TypeUtils.HIVE_TO_OMNI_TYPE;
+
 public class OmniVecBatchSerDe extends AbstractSerDe {
     public static final Logger LOG = LoggerFactory.getLogger(OmniVecBatchSerDe.class.getName());
     List<String> columnNames;
@@ -62,6 +67,12 @@ public class OmniVecBatchSerDe extends AbstractSerDe {
     private transient int[] columnTypeLen;
 
     private transient ColumnSerDe[] columnSerDes;
+
+    private transient boolean[] columnSortOrderIsDesc;
+    private transient byte[] columnNullMarker;
+    protected transient boolean isTopN = false;
+    public static final byte ZERO = (byte) 0;
+    public static final byte ONE = (byte) 1;
 
     public static final Map<PrimitiveObjectInspector.PrimitiveCategory, Integer> TYPE_LEN = new HashMap<PrimitiveObjectInspector.PrimitiveCategory, Integer>() {
         {
@@ -108,6 +119,37 @@ public class OmniVecBatchSerDe extends AbstractSerDe {
         this.stats = new SerDeStats();
         this.lastOperationSerialize = false;
         this.lastOperationDeserialize = false;
+
+        // Get the sort order
+        String columnSortOrder = properties.getProperty(serdeConstants.SERIALIZATION_SORT_ORDER);
+        columnSortOrderIsDesc = new boolean[columnNames.size()];
+        for (int i = 0; i < columnSortOrderIsDesc.length; i++) {
+            columnSortOrderIsDesc[i] = (columnSortOrder != null && columnSortOrder.charAt(i) == '-');
+        }
+
+        // NULL first/last
+        String columnNullOrder = properties.getProperty(serdeConstants.SERIALIZATION_NULL_SORT_ORDER);
+        columnNullMarker = new byte[columnNames.size()];
+        for (int i = 0; i < columnSortOrderIsDesc.length; i++) {
+            if (columnSortOrderIsDesc[i]) {
+                // Descending
+                if (columnNullOrder != null && columnNullOrder.charAt(i) == 'a') {
+                    // Null first
+                    columnNullMarker[i] = ONE;
+                } else {
+                    columnNullMarker[i] = ZERO;
+                }
+            } else {
+                // Ascending
+                if (columnNullOrder != null && columnNullOrder.charAt(i) != 'z') {
+                    // Null last
+                    columnNullMarker[i] = ONE;
+                } else {
+                    // NUll first
+                    columnNullMarker[i] = ZERO;
+                }
+            }
+        }
         initialSerializeParam();
     }
 
@@ -136,21 +178,36 @@ public class OmniVecBatchSerDe extends AbstractSerDe {
 
     private int getWriteLen() {
         int writeLen = 0;
+        DataType.DataTypeId dataTypeId;
         for (int i = 0; i < columnTypes.size(); i++) {
             PrimitiveObjectInspector.PrimitiveCategory primitiveCategory = ((PrimitiveTypeInfo) columnTypes.get(i))
                     .getPrimitiveCategory();
             if (primitiveCategory == PrimitiveObjectInspector.PrimitiveCategory.DECIMAL) {
                 DecimalTypeInfo decimalTypeInfo = (DecimalTypeInfo) columnTypes.get(i);
                 columnTypeLen[i] = decimalTypeInfo.getPrecision() > 18 ? 16 : 8;
+                dataTypeId = decimalTypeInfo.getPrecision() > 18 ? DataType.DataTypeId.OMNI_DECIMAL128 : DataType.DataTypeId.OMNI_DECIMAL64;
             } else {
                 columnTypeLen[i] = TYPE_LEN.getOrDefault(primitiveCategory, 0);
+                dataTypeId = HIVE_TO_OMNI_TYPE.getOrDefault(primitiveCategory, ShortDataType.SHORT).getId();
             }
             if (columnTypeLen[i] == 0) {
                 writeLen = writeLen + getEstimateLen((PrimitiveTypeInfo) columnTypes.get(i)) + 4;
-                columnSerDes[i] = new VariableWidthColumnSerDe();
+                if (isTopN) {
+                    if (columnSortOrderIsDesc[i]) {
+                        columnSerDes[i] = new VariableWidthColumnDescSerDe(columnNullMarker[i]);
+                    } else {
+                        columnSerDes[i] = new VariableWidthColumnAscSerDe(columnNullMarker[i]);
+                    }
+                } else {
+                    columnSerDes[i] = new VariableWidthColumnSerDe();
+                }
             } else {
                 writeLen = writeLen + columnTypeLen[i] + 1;
-                columnSerDes[i] = new FixedWidthColumnSerDe(columnTypeLen[i]);
+                if (isTopN) {
+                    columnSerDes[i] = new FixedWidthColumnSortSerDe(columnTypeLen[i], columnNullMarker[i], dataTypeId, columnSortOrderIsDesc[i]);
+                } else {
+                    columnSerDes[i] = new FixedWidthColumnSerDe(columnTypeLen[i]);
+                }
             }
         }
         return writeLen;
