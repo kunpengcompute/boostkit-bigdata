@@ -39,6 +39,7 @@ public class CompareExpression extends BaseExpression {
                 add(NotExpression.class);
                 add(ConditionExpression.class);
                 add(UnaryExpression.class);
+                add(BetweenExpression.class);
             }};
 
     public CompareExpression(String exprType, Integer returnType, String operator) {

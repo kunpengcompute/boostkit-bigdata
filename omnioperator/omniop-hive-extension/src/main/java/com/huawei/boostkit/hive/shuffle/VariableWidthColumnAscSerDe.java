@@ -49,7 +49,11 @@ public class VariableWidthColumnAscSerDe implements ColumnSerDe{
     public int deserialize(VecSerdeBody vecSerdeBody, byte[] bytes, int offset) {
         offset++;
         if (bytes[offset] == 0) {
-            vecSerdeBody.isNull = 1;
+            if (bytes[offset - 1] == 0x8) {
+                vecSerdeBody.isNull = 0;
+            } else {
+                vecSerdeBody.isNull = 1;
+            }
             vecSerdeBody.length = 0;
             ++offset;
             return offset;
