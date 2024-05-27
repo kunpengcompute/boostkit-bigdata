@@ -46,6 +46,14 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_ParquetColumnarBatchJn
 
 /*
  * Class:       com_huawei_boostkit_scan_jni_ParquetColumnarBatchJniReader
+ * Method:      initializeReaderV2
+ * Signature:   (Ljava/lang/String;Lorg/json/simple/JSONObject;)J
+ */
+JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_ParquetColumnarBatchJniReader_initializeReaderV2
+    (JNIEnv* env, jobject jObj, jobject job);
+
+/*
+ * Class:       com_huawei_boostkit_scan_jni_ParquetColumnarBatchJniReader
  * Method:      recordReaderNext
  * Signature:   (J[I[J)J
  */
