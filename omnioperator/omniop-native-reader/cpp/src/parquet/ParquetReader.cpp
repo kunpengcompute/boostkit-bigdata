@@ -22,6 +22,7 @@
 #include "ParquetReader.h"
 #include "common/UriInfo.h"
 #include "arrowadapter/FileSystemAdapter.h"
+#include "arrow/dataset/file_parquet.h"
 
 using namespace arrow;
 using namespace arrow::internal;
@@ -83,9 +84,8 @@ Filesystem* omniruntime::reader::GetFileSystemPtr(UriInfo &uri, std::string& ugi
     return restore_filesysptr[key];
 }
 
-Status ParquetReader::InitRecordReader(UriInfo &uri, int64_t capacity,
-                                       const std::vector<int>& row_group_indices, const std::vector<int>& column_indices,
-                                       std::string& ugi)
+Status ParquetReader::InitRecordReader(UriInfo &uri, int64_t start, int64_t end, int64_t capacity, bool hasExpressionTree,
+    Expression pushedFilterArray, const std::vector<std::string>& fieldNames, std::string& ugi)
 {
     // Configure reader settings
     auto reader_properties = parquet::ReaderProperties(pool);
@@ -113,8 +113,54 @@ Status ParquetReader::InitRecordReader(UriInfo &uri, int64_t capacity,
     reader_builder.properties(arrow_reader_properties);
 
     ARROW_ASSIGN_OR_RAISE(arrow_reader, reader_builder.Build());
+    std::vector<int> row_group_indices;
+    auto filesource = std::make_shared<dataset::FileSource>(file);
+    ARROW_RETURN_NOT_OK(GetRowGroupIndices(*filesource, start, end, hasExpressionTree, pushedFilterArray, row_group_indices));
+    std::vector<int> column_indices;
+    ARROW_RETURN_NOT_OK(GetColumnIndices(fieldNames, column_indices));
     ARROW_RETURN_NOT_OK(GetRecordBatchReader(row_group_indices, column_indices));
     return arrow::Status::OK();
+}
+
+Status ParquetReader::GetRowGroupIndices(dataset::FileSource filesource, int64_t start, int64_t end,
+    bool hasExpressionTree, Expression pushedFilterArray, std::vector<int> &out)
+{
+    auto metadata = arrow_reader->parquet_reader()->metadata();
+    std::vector<int> groups;
+    for (int i = 0; i < metadata->num_row_groups(); i++) {
+        auto startIndex = metadata->RowGroup(i)->file_offset();
+        if (startIndex >= start && startIndex < end) {
+            groups.push_back(i);
+        }
+    }
+    if (!hasExpressionTree) {
+        out = groups;
+        return arrow::Status::OK();
+    }
+    auto parquet_format = std::make_shared<arrow::dataset::ParquetFileFormat>();
+    std::shared_ptr<Schema> schema;
+    ARROW_RETURN_NOT_OK(arrow_reader->GetSchema(&schema));
+    ARROW_ASSIGN_OR_RAISE(auto parquetFileFragment, parquet_format->MakeFragment(filesource, literal(true), schema, groups));
+    ARROW_ASSIGN_OR_RAISE(auto finalExpr, pushedFilterArray.Bind(*schema));
+    ARROW_RETURN_NOT_OK(parquetFileFragment->EnsureCompleteMetadata(arrow_reader.get()));
+    ARROW_ASSIGN_OR_RAISE(auto readFragment, parquetFileFragment->Subset(finalExpr));
+    auto result = static_cast<arrow::dataset::ParquetFileFragment*>(readFragment.get())->row_groups();
+    out = result;
+    return Status::OK();
+}
+
+Status ParquetReader::GetColumnIndices(const std::vector<std::string>& fieldNames, std::vector<int> &out)
+{
+    auto schema = arrow_reader->parquet_reader()->metadata()->schema();
+    for (auto name : fieldNames) {
+        int index = schema->ColumnIndex(name);
+        if (index == -1) {
+            return Status::Invalid("No field named as " + name);
+        } else {
+            out.push_back(index);
+        }
+    }
+    return Status::OK();
 }
 
 Status ParquetReader::ReadNextBatch(std::vector<omniruntime::vec::BaseVector*> &batch, long *batchRowSize)

@@ -22,8 +22,10 @@
 
 #include <vector/vector_common.h>
 #include <arrow/filesystem/filesystem.h>
+#include <arrow/dataset/file_base.h>
 #include "ParquetColumnReader.h"
 #include "common/UriInfo.h"
+#include "ParquetExpression.h"
 
 using namespace arrow::internal;
 
@@ -49,8 +51,8 @@ namespace omniruntime::reader {
     public:
         ParquetReader() {}
 
-        arrow::Status InitRecordReader(UriInfo &uri, int64_t capacity,
-                                               const std::vector<int>& row_group_indices, const std::vector<int>& column_indices, std::string& ugi);
+        arrow::Status InitRecordReader(UriInfo &uri, int64_t start, int64_t end, int64_t capacity, bool hasExpressionTree,
+            Expression pushedFilterArray, const std::vector<std::string>& fieldNames, std::string& ugi);
 
         arrow::Status ReadNextBatch(std::vector<omniruntime::vec::BaseVector*> &batch, long *batchRowSize);
 
@@ -63,6 +65,11 @@ namespace omniruntime::reader {
         arrow::MemoryPool* pool = arrow::default_memory_pool();
 
     private:
+        arrow::Status GetRowGroupIndices(arrow::dataset::FileSource filesource, int64_t start, int64_t end,
+            bool hasExpressionTree, Expression pushedFilterArray, std::vector<int>& out);
+
+        arrow::Status GetColumnIndices(const std::vector<std::string>& vector, std::vector<int>& out);
+
         arrow::Status GetRecordBatchReader(const std::vector<int> &row_group_indices, const std::vector<int> &column_indices);
 
         arrow::Status GetFieldReaders(const std::vector<int> &row_group_indices, const std::vector<int> &column_indices,
