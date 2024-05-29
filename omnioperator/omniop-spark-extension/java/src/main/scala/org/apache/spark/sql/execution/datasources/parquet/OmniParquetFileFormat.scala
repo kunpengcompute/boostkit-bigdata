@@ -18,21 +18,16 @@
 
 package org.apache.spark.sql.execution.datasources.parquet
 
-import com.huawei.boostkit.spark.ColumnarPluginConfig
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, Path}
 import org.apache.hadoop.mapreduce._
 import org.apache.hadoop.mapreduce.task.TaskAttemptContextImpl
-import org.apache.parquet.filter2.predicate.FilterApi
-import org.apache.parquet.format.converter.ParquetMetadataConverter.NO_FILTER
-import org.apache.parquet.hadoop._
 import org.apache.spark.TaskContext
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.util.SparkMemoryUtils
-import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types._
 import org.apache.spark.util.SerializableConfiguration
@@ -72,28 +67,6 @@ class OmniParquetFileFormat extends FileFormat with DataSourceRegister with Logg
       filters: Seq[Filter],
       options: Map[String, String],
       hadoopConf: Configuration): (PartitionedFile) => Iterator[InternalRow] = {
-    // Prepare hadoopConf
-    hadoopConf.set(ParquetInputFormat.READ_SUPPORT_CLASS, classOf[ParquetReadSupport].getName)
-    hadoopConf.set(
-      ParquetReadSupport.SPARK_ROW_REQUESTED_SCHEMA,
-      requiredSchema.json)
-    hadoopConf.set(
-      SQLConf.SESSION_LOCAL_TIMEZONE.key,
-      sparkSession.sessionState.conf.sessionLocalTimeZone)
-    hadoopConf.setBoolean(
-      SQLConf.NESTED_SCHEMA_PRUNING_ENABLED.key,
-      sparkSession.sessionState.conf.nestedSchemaPruningEnabled)
-    hadoopConf.setBoolean(
-      SQLConf.CASE_SENSITIVE.key,
-      sparkSession.sessionState.conf.caseSensitiveAnalysis)
-
-    // Sets flags for `ParquetToSparkSchemaConverter`
-    hadoopConf.setBoolean(
-      SQLConf.PARQUET_BINARY_AS_STRING.key,
-      sparkSession.sessionState.conf.isParquetBinaryAsString)
-    hadoopConf.setBoolean(
-      SQLConf.PARQUET_INT96_AS_TIMESTAMP.key,
-      sparkSession.sessionState.conf.isParquetINT96AsTimestamp)
 
     val broadcastedHadoopConf =
       sparkSession.sparkContext.broadcast(new SerializableConfiguration(hadoopConf))
@@ -103,14 +76,6 @@ class OmniParquetFileFormat extends FileFormat with DataSourceRegister with Logg
     val capacity = sqlConf.parquetVectorizedReaderBatchSize
 
     val enableParquetFilterPushDown: Boolean = sqlConf.parquetFilterPushDown
-    val pushDownDate = sqlConf.parquetFilterPushDownDate
-    val pushDownTimestamp = sqlConf.parquetFilterPushDownTimestamp
-    val pushDownDecimal = sqlConf.parquetFilterPushDownDecimal
-    val pushDownStringStartWith = sqlConf.parquetFilterPushDownStringStartWith
-    val pushDownInFilterThreshold = sqlConf.parquetFilterPushDownInFilterThreshold
-    val isCaseSensitive = sqlConf.caseSensitiveAnalysis
-    val parquetOptions = new ParquetOptions(options, sparkSession.sessionState.conf)
-    val datetimeRebaseModeInRead = parquetOptions.datetimeRebaseModeInRead
 
     (file: PartitionedFile) => {
       assert(file.partitionValues.numFields == partitionSchema.size)
@@ -125,34 +90,10 @@ class OmniParquetFileFormat extends FileFormat with DataSourceRegister with Logg
           Array.empty,
           null)
 
-      val sharedConf = broadcastedHadoopConf.value.value
-
-      val fileFooter = ParquetFooterReader.readFooter(sharedConf, filePath, NO_FILTER)
-
-      val footerFileMetaData = fileFooter.getFileMetaData
-
-      val datetimeRebaseSpec = DataSourceUtils.datetimeRebaseSpec(
-        footerFileMetaData.getKeyValueMetaData.get,
-        datetimeRebaseModeInRead)
 
       // Try to push down filters when filter push-down is enabled.
       val pushed = if (enableParquetFilterPushDown) {
-        val parquetSchema = footerFileMetaData.getSchema
-        val parquetFilters = new ParquetFilters(
-          parquetSchema,
-          pushDownDate,
-          pushDownTimestamp,
-          pushDownDecimal,
-          pushDownStringStartWith,
-          pushDownInFilterThreshold,
-          isCaseSensitive,
-          datetimeRebaseSpec)
-        filters
-          // Collects all converted Parquet filter predicates. Notice that not all predicates can be
-          // converted (`ParquetFilters.createFilter` returns an `Option`). That's why a `flatMap`
-          // is used here.
-          .flatMap(parquetFilters.createFilter(_))
-          .reduceOption(FilterApi.and)
+        filters.reduceOption(And(_, _))
       } else {
         None
       }
@@ -161,13 +102,7 @@ class OmniParquetFileFormat extends FileFormat with DataSourceRegister with Logg
       val hadoopAttemptContext =
         new TaskAttemptContextImpl(broadcastedHadoopConf.value.value, attemptId)
 
-      // Try to push down filters when filter push-down is enabled.
-      // Notice: This push-down is RowGroups level, not individual records.
-      if (pushed.isDefined) {
-        ParquetInputFormat.setFilterPredicate(hadoopAttemptContext.getConfiguration, pushed.get)
-      }
-
-      val batchReader = new OmniParquetColumnarBatchReader(capacity, fileFooter)
+      val batchReader = new OmniParquetColumnarBatchReader(capacity, requiredSchema, pushed.orNull)
 
       val iter = new RecordReaderIterator(batchReader)
       Option(TaskContext.get()).foreach(_.addTaskCompletionListener[Unit](_ => iter.close()))
