@@ -35,6 +35,7 @@
 #include "../common/common.h"
 #include "vec_data.pb.h"
 #include "google/protobuf/io/zero_copy_stream_impl.h"
+#include "vector/omni_row.h"
 
 using namespace std;
 using namespace spark;
@@ -55,6 +56,8 @@ class Splitter {
 
     int WriteDataFileProto();
 
+    int WriteDataFileProtoByRow();
+
     std::shared_ptr<Buffer> CaculateSpilledTmpFilePartitionOffsets();
 
     void SerializingFixedColumns(int32_t partitionId,
@@ -69,7 +72,11 @@ class Splitter {
 
     int protoSpillPartition(int32_t partition_id, std::unique_ptr<BufferedOutputStream> &bufferStream);
 
+    int protoSpillPartitionByRow(int32_t partition_id, std::unique_ptr<BufferedOutputStream> &bufferStream);
+
     int32_t ProtoWritePartition(int32_t partition_id, std::unique_ptr<BufferedOutputStream> &bufferStream, void *bufferOut, int32_t &sizeOut);
+
+    int32_t ProtoWritePartitionByRow(int32_t partition_id, std::unique_ptr<BufferedOutputStream> &bufferStream, void *bufferOut, int32_t &sizeOut);
 
     int ComputeAndCountPartitionId(VectorBatch& vb);
 
@@ -92,9 +99,28 @@ class Splitter {
 
     void MergeSpilled();
 
+    void MergeSpilledByRow();
+
     void WriteSplit();
 
+    void WriteSplitByRow();
+
+    // Common structures for row formats and col formats
     bool isSpill = false;
+    int64_t total_bytes_written_ = 0;
+    int64_t total_bytes_spilled_ = 0;
+    int64_t total_write_time_ = 0;
+    int64_t total_spill_time_ = 0;
+    int64_t total_spill_row_num_ = 0;
+
+    // configured local dirs for spilled file
+    int32_t dir_selection_ = 0;
+    std::vector<int32_t> sub_dir_selection_;
+    std::vector<std::string> configured_dirs_;
+
+    // Data structures required to handle col formats
+    int64_t total_compute_pid_time_ = 0;
+    std::vector<int64_t> partition_lengths_;
     std::vector<int32_t> partition_id_; // 记录当前vb每一行的pid
     int32_t *partition_id_cnt_cur_; // 统计不同partition记录的行数(当前处理中的vb)
     uint64_t *partition_id_cnt_cache_; // 统计不同partition记录的行数，cache住的
@@ -116,12 +142,6 @@ class Splitter {
     int32_t *partition_buffer_idx_base_; //当前已缓存的各partition行数据记录，用于定位缓冲buffer当前可用位置
     int32_t *partition_buffer_idx_offset_; //split定长列时用于统计offset的临时变量
     uint32_t *partition_serialization_size_; // 记录序列化后的各partition大小，用于stop返回partition偏移 in bytes
-
-    // configured local dirs for spilled file
-    int32_t dir_selection_ = 0;
-    std::vector<int32_t> sub_dir_selection_;
-    std::vector<std::string> configured_dirs_;
-
     std::vector<std::vector<std::vector<std::vector<std::shared_ptr<Buffer>>>>> partition_cached_vectorbatch_;
     /*
      * varchar buffers:
@@ -129,14 +149,12 @@ class Splitter {
      * 
      */
     std::vector<std::vector<std::vector<VCBatchInfo>>> vc_partition_array_buffers_;
+    spark::VecBatch *vecBatchProto = new VecBatch(); // protobuf 序列化对象结构
 
-    int64_t total_bytes_written_ = 0;
-    int64_t total_bytes_spilled_ = 0;
-    int64_t total_write_time_ = 0;
-    int64_t total_spill_time_ = 0;
-    int64_t total_compute_pid_time_ = 0;
-    int64_t total_spill_row_num_ = 0;
-    std::vector<int64_t> partition_lengths_;
+    // Data structures required to handle row formats
+    std::vector<std::vector<RowInfo *>> partition_rows; // pid : std::vector<row>
+    uint64_t total_input_size = 0; // total row size in bytes
+    spark::ProtoRowBatch *protoRowBatch = new ProtoRowBatch();
 
 private:
     void ReleaseVarcharVector()
@@ -166,29 +184,33 @@ private:
         delete vb;
     }
 
+    // Data structures required to handle col formats
     std::set<BaseVector *> varcharVectorCache;
-    std::vector<DataTypeId> vector_batch_col_types_;
-    InputDataTypes input_col_types;
-    std::vector<int32_t> binary_array_empirical_size_;
-    omniruntime::vec::VectorBatch *inputVecBatch = nullptr;
 public:
+    // Common structures for row formats and col formats
     bool singlePartitionFlag = false;
     int32_t num_partitions_;
     SplitOptions options_;
     // 分区数
     int32_t num_fields_;
-
+    InputDataTypes input_col_types;
+    std::vector<DataTypeId> col_types_;
+    omniruntime::vec::VectorBatch *inputVecBatch = nullptr;
     std::map<std::string, std::shared_ptr<Buffer>> spilled_tmp_files_info_;
-
-    spark::VecBatch *vecBatchProto = new VecBatch(); // protobuf 序列化对象结构
 
     virtual int Split_Init();
 
     virtual int Split(VectorBatch& vb);
 
+    virtual int SplitByRow(VectorBatch* vb);
+
     int Stop();
 
+    int StopByRow();
+
     int SpillToTmpFile();
+
+    int SpillToTmpFileByRow();
 
     Splitter(InputDataTypes inputDataTypes,
              int32_t num_cols,
@@ -222,6 +244,7 @@ public:
     virtual ~Splitter()
     {
 	delete vecBatchProto; //free protobuf vecBatch memory
+	delete protoRowBatch; //free protobuf rowBatch memory
 	delete[] partition_id_cnt_cur_;
 	delete[] partition_id_cnt_cache_;
 	delete[] partition_buffer_size_;

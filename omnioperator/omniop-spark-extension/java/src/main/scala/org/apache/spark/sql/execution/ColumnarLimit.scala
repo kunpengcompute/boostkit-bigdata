@@ -267,6 +267,7 @@ case class ColumnarTakeOrderedAndProjectExec(
             child.output,
             SinglePartition,
             serializer,
+            handleRow = false,
             writeMetrics,
             longMetric("dataSize"),
             longMetric("bytesSpilled"),

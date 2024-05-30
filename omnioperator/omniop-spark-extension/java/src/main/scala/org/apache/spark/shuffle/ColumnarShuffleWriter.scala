@@ -104,14 +104,22 @@ class ColumnarShuffleWriter[K, V](
           dep.dataSize += input(col).getRealOffsetBufCapacityInBytes
         }
         val vb = new VecBatch(input, cb.numRows())
-        jniWrapper.split(nativeSplitter, vb.getNativeVectorBatch)
+        if (!dep.handleRow) {
+          jniWrapper.split(nativeSplitter, vb.getNativeVectorBatch)
+        } else {
+          jniWrapper.rowSplit(nativeSplitter, vb.getNativeVectorBatch)
+        }
         dep.splitTime.add(System.nanoTime() - startTime)
         dep.numInputRows.add(cb.numRows)
         writeMetrics.incRecordsWritten(cb.numRows)
       }
     }
     val startTime = System.nanoTime()
-    splitResult = jniWrapper.stop(nativeSplitter)
+    if (!dep.handleRow) {
+      splitResult = jniWrapper.stop(nativeSplitter)
+    } else {
+      splitResult = jniWrapper.rowStop(nativeSplitter)
+    }
 
     dep.splitTime.add(System.nanoTime() - startTime - splitResult.getTotalSpillTime -
       splitResult.getTotalWriteTime - splitResult.getTotalComputePidTime)

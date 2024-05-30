@@ -76,6 +76,16 @@ public class SparkJniWrapper {
     public native void split(long splitterId, long nativeVectorBatch);
 
     /**
+     * Split one record batch represented by bufAddrs and bufSizes into several batches. The batch is converted to row
+     * formats for split according to the first column as partition id. During splitting, the data in native
+     * buffers will be written to disk when the buffers are full.
+     *
+     * @param splitterId Addresses of splitter
+     * @param nativeVectorBatch Addresses of nativeVectorBatch
+     */
+    public native void rowSplit(long splitterId, long nativeVectorBatch);
+
+    /**
      * Write the data remained in the buffers hold by native splitter to each partition's temporary
      * file. And stop processing splitting
      *
@@ -83,6 +93,15 @@ public class SparkJniWrapper {
      * @return SplitResult
      */
     public native SplitResult stop(long splitterId);
+
+    /**
+     * Write the data remained in the row buffers hold by native splitter to each partition's temporary
+     * file. And stop processing splitting
+     *
+     * @param splitterId splitter instance id
+     * @return SplitResult
+     */
+    public native SplitResult rowStop(long splitterId);
 
     /**
      * Release resources associated with designated splitter instance.

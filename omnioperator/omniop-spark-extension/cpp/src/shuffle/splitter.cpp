@@ -524,7 +524,7 @@ void Splitter::ToSplitterTypeId(int num_cols)
 
 void Splitter::CastOmniToShuffleType(DataTypeId omniType, ShuffleTypeId shuffleType)
 {
-    vector_batch_col_types_.push_back(omniType);
+    col_types_.push_back(omniType);
     column_type_id_.push_back(shuffleType);
 }
 
@@ -590,6 +590,8 @@ int Splitter::Split_Init(){
     for (auto i = 0; i < num_partitions_; ++i) {
         vc_partition_array_buffers_[i].resize(column_type_id_.size());
     }
+
+    partition_rows.resize(num_partitions_);
     return 0;
 }
 
@@ -600,6 +602,47 @@ int Splitter::Split(VectorBatch& vb )
     TIME_NANO_OR_RAISE(total_compute_pid_time_, ComputeAndCountPartitionId(vb));
     //执行分区动作
     DoSplit(vb);
+    return 0;
+}
+
+int Splitter::SplitByRow(VectorBatch *vecBatch) {
+    int32_t rowCount = vecBatch->GetRowCount();
+    for (int pid = 0; pid < num_partitions_; ++pid) {
+        partition_rows[pid].reserve(partition_rows[pid].size() + rowCount);
+    }
+
+    if (singlePartitionFlag) {
+        RowBatch *rowBatch = VectorHelper::TransRowBatchFromVectorBatch(vecBatch);
+        for (int i = 0; i < rowCount; ++i) {
+            RowInfo *rowInfo = rowBatch->Get(i);
+            partition_rows[0].emplace_back(rowInfo);
+            total_input_size += rowInfo->length;
+        }
+        delete vecBatch;
+    } else {
+        auto pidVec =reinterpret_cast<Vector<int32_t> *>(vecBatch->Get(0));
+        auto tmpVectorBatch = new VectorBatch(rowCount);
+        for (int i = 1; i < vecBatch->GetVectorCount(); ++i) {
+            tmpVectorBatch->Append(vecBatch->Get(i));
+        }
+        vecBatch->ResizeVectorCount(1);
+        RowBatch *rowBatch = VectorHelper::TransRowBatchFromVectorBatch(tmpVectorBatch);
+        for (int i = 0; i < rowCount; ++i) {
+            auto pid = pidVec->GetValue(i);
+            RowInfo *rowInfo = rowBatch->Get(i);
+            partition_rows[pid].emplace_back(rowInfo);
+            total_input_size += rowInfo->length;
+        }
+        delete vecBatch;
+        delete tmpVectorBatch;
+    }
+
+    // spill
+    if (total_input_size > options_.spill_mem_threshold) {
+        TIME_NANO_OR_RAISE(total_spill_time_, SpillToTmpFileByRow());
+        total_input_size = 0;
+        isSpill = true;
+    }
     return 0;
 }
 
@@ -831,7 +874,7 @@ int32_t Splitter::ProtoWritePartition(int32_t partition_id, std::unique_ptr<Buff
                 }
             }
             spark::VecType *vt = vec->mutable_vectype();
-            vt->set_typeid_(CastShuffleTypeIdToVecType(vector_batch_col_types_[indexSchema]));
+            vt->set_typeid_(CastShuffleTypeIdToVecType(col_types_[indexSchema]));
             LogsDebug("precision[indexSchema %d]: %d , scale[indexSchema %d]: %d ",
                       indexSchema, input_col_types.inputDataPrecisions[indexSchema],
                       indexSchema, input_col_types.inputDataScales[indexSchema]);
@@ -871,7 +914,66 @@ int32_t Splitter::ProtoWritePartition(int32_t partition_id, std::unique_ptr<Buff
     }
 
     return 0;
+}
 
+int32_t Splitter::ProtoWritePartitionByRow(int32_t partition_id, std::unique_ptr<BufferedOutputStream> &bufferStream, void *bufferOut, int32_t &sizeOut) {
+    uint64_t rowCount = partition_rows[partition_id].size();
+    uint64_t onceCopyRow = 0;
+    uint32_t batchCount = 0;
+    while (0 < rowCount) {
+        if (options_.spill_batch_row_num < rowCount) {
+            onceCopyRow = options_.spill_batch_row_num;
+        } else {
+            onceCopyRow = rowCount;
+        }
+
+        protoRowBatch->set_rowcnt(onceCopyRow);
+        protoRowBatch->set_veccnt(col_types_.size());
+        for (int i = 0; i < col_types_.size(); ++i) {
+            spark::VecType *vt = protoRowBatch->add_vectypes();
+            vt->set_typeid_(CastShuffleTypeIdToVecType(col_types_[i]));
+            LogsDebug("precision[indexSchema %d]: %d , scale[indexSchema %d]: %d ",
+                      i, input_col_types.inputDataPrecisions[i],
+                      i, input_col_types.inputDataScales[i]);
+            if(vt->typeid_() == spark::VecType::VEC_TYPE_DECIMAL128 || vt->typeid_() == spark::VecType::VEC_TYPE_DECIMAL64){
+                vt->set_precision(input_col_types.inputDataPrecisions[i]);
+                vt->set_scale(input_col_types.inputDataScales[i]);
+            }
+        }
+
+        int64_t offset = batchCount * options_.spill_batch_row_num;
+        for (int i = 0; i < onceCopyRow; ++i) {
+            RowInfo *rowInfo = partition_rows[partition_id][offset + i];
+            spark::ProtoRow *protoRow = protoRowBatch->add_rows();
+            protoRow->set_data(rowInfo->row, rowInfo->length);
+            protoRow->set_length(rowInfo->length);
+            //free row memory
+            delete rowInfo;
+        }
+
+        if (protoRowBatch->ByteSizeLong() > UINT32_MAX) {
+            throw std::runtime_error("Unsafe static_cast long to uint_32t.");
+        }
+        uint32_t protoRowBatchSize = reversebytes_uint32t(static_cast<uint32_t>(protoRowBatch->ByteSizeLong()));
+        if (bufferStream->Next(&bufferOut, &sizeOut)) {
+            std::memcpy(bufferOut, &protoRowBatchSize, sizeof(protoRowBatchSize));
+            if (sizeof(protoRowBatchSize) < sizeOut) {
+                bufferStream->BackUp(sizeOut - sizeof(protoRowBatchSize));
+            }
+        }
+
+        protoRowBatch->SerializeToZeroCopyStream(bufferStream.get());
+        rowCount -= onceCopyRow;
+        batchCount++;
+        protoRowBatch->Clear();
+    }
+
+    uint64_t partitionBatchSize = bufferStream->flush();
+    total_bytes_written_ += partitionBatchSize;
+    partition_lengths_[partition_id] += partitionBatchSize;
+    partition_rows[partition_id].clear();
+    LogsDebug(" partitionBatch write length: %lu", partitionBatchSize);
+    return 0;
 }
 
 int Splitter::protoSpillPartition(int32_t partition_id, std::unique_ptr<BufferedOutputStream> &bufferStream) {
@@ -917,7 +1019,7 @@ int Splitter::protoSpillPartition(int32_t partition_id, std::unique_ptr<Buffered
                 }
             }
             spark::VecType *vt = vec->mutable_vectype();
-            vt->set_typeid_(CastShuffleTypeIdToVecType(vector_batch_col_types_[indexSchema]));
+            vt->set_typeid_(CastShuffleTypeIdToVecType(col_types_[indexSchema]));
             LogsDebug("precision[indexSchema %d]: %d , scale[indexSchema %d]: %d ", 
                       indexSchema, input_col_types.inputDataPrecisions[indexSchema],
                       indexSchema, input_col_types.inputDataScales[indexSchema]);
@@ -963,6 +1065,70 @@ int Splitter::protoSpillPartition(int32_t partition_id, std::unique_ptr<Buffered
     return 0;
 }
 
+int Splitter::protoSpillPartitionByRow(int32_t partition_id, std::unique_ptr<BufferedOutputStream> &bufferStream) {
+    uint64_t rowCount = partition_rows[partition_id].size();
+    total_spill_row_num_ += rowCount;
+
+    uint64_t onceCopyRow = 0;
+    uint32_t batchCount = 0;
+    while (0 < rowCount) {
+        if (options_.spill_batch_row_num < rowCount) {
+            onceCopyRow = options_.spill_batch_row_num;
+        } else {
+            onceCopyRow = rowCount;
+        }
+
+        protoRowBatch->set_rowcnt(onceCopyRow);
+        protoRowBatch->set_veccnt(col_types_.size());
+        for (int i = 0; i < col_types_.size(); ++i) {
+            spark::VecType *vt = protoRowBatch->add_vectypes();
+            vt->set_typeid_(CastShuffleTypeIdToVecType(col_types_[i]));
+            LogsDebug("precision[indexSchema %d]: %d , scale[indexSchema %d]: %d ",
+                      i, input_col_types.inputDataPrecisions[i],
+                      i, input_col_types.inputDataScales[i]);
+            if(vt->typeid_() == spark::VecType::VEC_TYPE_DECIMAL128 || vt->typeid_() == spark::VecType::VEC_TYPE_DECIMAL64){
+                vt->set_precision(input_col_types.inputDataPrecisions[i]);
+                vt->set_scale(input_col_types.inputDataScales[i]);
+            }
+        }
+
+        int64_t offset = batchCount * options_.spill_batch_row_num;
+        for (int i = 0; i < onceCopyRow; ++i) {
+            RowInfo *rowInfo = partition_rows[partition_id][offset + i];
+            spark::ProtoRow *protoRow = protoRowBatch->add_rows();
+            protoRow->set_data(rowInfo->row, rowInfo->length);
+            protoRow->set_length(rowInfo->length);
+            //free row memory
+            delete rowInfo;
+        }
+
+        if (protoRowBatch->ByteSizeLong() > UINT32_MAX) {
+            throw std::runtime_error("Unsafe static_cast long to uint_32t.");
+        }
+        uint32_t protoRowBatchSize = reversebytes_uint32t(static_cast<uint32_t>(protoRowBatch->ByteSizeLong()));
+        void *buffer = nullptr;
+        if (!bufferStream->NextNBytes(&buffer, sizeof(protoRowBatchSize))) {
+            LogsError("Allocate Memory Failed: Flush Spilled Data, Next failed.");
+            throw std::runtime_error("Allocate Memory Failed: Flush Spilled Data, Next failed.");
+        }
+        // set serizalized bytes to stream
+        memcpy(buffer, &protoRowBatchSize, sizeof(protoRowBatchSize));
+        LogsDebug(" A Slice Of vecBatchProtoSize: %d ", reversebytes_uint32t(protoRowBatchSize));
+
+        protoRowBatch->SerializeToZeroCopyStream(bufferStream.get());
+        rowCount -= onceCopyRow;
+        batchCount++;
+        protoRowBatch->Clear();
+    }
+
+    uint64_t partitionBatchSize = bufferStream->flush();
+    total_bytes_spilled_ += partitionBatchSize;
+    partition_serialization_size_[partition_id] = partitionBatchSize;
+    partition_rows[partition_id].clear();
+    LogsDebug(" partitionBatch write length: %lu", partitionBatchSize);
+    return 0;
+}
+
 int Splitter::WriteDataFileProto() {
     LogsDebug(" spill DataFile: %s ", (options_.next_spilled_file_dir + ".data").c_str());
     std::unique_ptr<OutputStream> outStream = writeLocalFile(options_.next_spilled_file_dir + ".data");
@@ -976,6 +1142,22 @@ int Splitter::WriteDataFileProto() {
         protoSpillPartition(pid, bufferStream);
     }
     std::memset(partition_id_cnt_cache_, 0, num_partitions_ * sizeof(uint64_t));
+    outStream->close();
+    return 0;
+}
+
+int Splitter::WriteDataFileProtoByRow() {
+    LogsDebug(" spill DataFile: %s ", (options_.next_spilled_file_dir + ".data").c_str());
+    std::unique_ptr<OutputStream> outStream = writeLocalFile(options_.next_spilled_file_dir + ".data");
+    WriterOptions options;
+    // tmp spilled file no need compression
+    options.setCompression(CompressionKind_NONE);
+    std::unique_ptr<StreamsFactory> streamsFactory = createStreamsFactory(options, outStream.get());
+    std::unique_ptr<BufferedOutputStream> bufferStream = streamsFactory->createStream();
+    // 顺序写入每个partition的offset
+    for (auto pid = 0; pid < num_partitions_; ++pid) {
+        protoSpillPartitionByRow(pid, bufferStream);
+    }
     outStream->close();
     return 0;
 }
@@ -1036,6 +1218,52 @@ void Splitter::MergeSpilled() {
     outStream->close();
 }
 
+void Splitter::MergeSpilledByRow() {
+    std::unique_ptr<OutputStream> outStream = writeLocalFile(options_.data_file);
+    LogsDebug(" Merge Spilled Tmp File: %s ", options_.data_file.c_str());
+    WriterOptions options;
+    options.setCompression(options_.compression_type);
+    options.setCompressionBlockSize(options_.compress_block_size);
+    options.setCompressionStrategy(CompressionStrategy_COMPRESSION);
+    std::unique_ptr<StreamsFactory> streamsFactory = createStreamsFactory(options, outStream.get());
+    std::unique_ptr<BufferedOutputStream> bufferOutPutStream =  streamsFactory->createStream();
+
+    void* bufferOut = nullptr;
+    int sizeOut = 0;
+    for (int pid = 0; pid < num_partitions_; pid++) {
+        ProtoWritePartitionByRow(pid, bufferOutPutStream, bufferOut, sizeOut);
+        LogsDebug(" MergeSplled traversal partition( %d ) ",pid);
+        for (auto &pair : spilled_tmp_files_info_) {
+            auto tmpDataFilePath = pair.first + ".data";
+            auto tmpPartitionOffset = reinterpret_cast<uint64_t *>(pair.second->data_)[pid];
+            auto tmpPartitionSize = reinterpret_cast<uint64_t *>(pair.second->data_)[pid + 1] - reinterpret_cast<uint64_t *>(pair.second->data_)[pid];
+            LogsDebug(" get Partition Stream...tmpPartitionOffset %d tmpPartitionSize %d path %s",
+                      tmpPartitionOffset, tmpPartitionSize, tmpDataFilePath.c_str());
+            std::unique_ptr<InputStream> inputStream = readLocalFile(tmpDataFilePath);
+            uint64_t targetLen = tmpPartitionSize;
+            uint64_t seekPosit = tmpPartitionOffset;
+            uint64_t onceReadLen = 0;
+            while ((targetLen > 0) && bufferOutPutStream->Next(&bufferOut, &sizeOut)) {
+                onceReadLen = targetLen > sizeOut ? sizeOut : targetLen;
+                inputStream->read(bufferOut, onceReadLen, seekPosit);
+                targetLen -= onceReadLen;
+                seekPosit += onceReadLen;
+                if (onceReadLen < sizeOut) {
+                    // Reached END.
+                    bufferOutPutStream->BackUp(sizeOut - onceReadLen);
+                    break;
+                }
+            }
+
+            uint64_t flushSize = bufferOutPutStream->flush();
+            total_bytes_written_ += flushSize;
+            LogsDebug(" Merge Flush Partition[%d] flushSize: %ld ", pid, flushSize);
+            partition_lengths_[pid] += flushSize;
+        }
+    }
+    outStream->close();
+}
+
 void Splitter::WriteSplit() {
     for (auto pid = 0; pid < num_partitions_; ++pid) {
         CacheVectorBatch(pid, true);
@@ -1060,6 +1288,23 @@ void Splitter::WriteSplit() {
     ReleaseVarcharVector();
     num_row_splited_ = 0;
     cached_vectorbatch_size_ = 0;
+    outStream->close();
+}
+
+void Splitter::WriteSplitByRow() {
+    std::unique_ptr<OutputStream> outStream = writeLocalFile(options_.data_file);
+    WriterOptions options;
+    options.setCompression(options_.compression_type);
+    options.setCompressionBlockSize(options_.compress_block_size);
+    options.setCompressionStrategy(CompressionStrategy_COMPRESSION);
+    std::unique_ptr<StreamsFactory> streamsFactory = createStreamsFactory(options, outStream.get());
+    std::unique_ptr<BufferedOutputStream> bufferOutPutStream =  streamsFactory->createStream();
+
+    void* bufferOut = nullptr;
+    int32_t sizeOut = 0;
+    for (auto pid = 0; pid < num_partitions_; ++ pid) {
+        ProtoWritePartitionByRow(pid, bufferOutPutStream, bufferOut, sizeOut);
+    }
     outStream->close();
 }
 
@@ -1091,6 +1336,14 @@ int Splitter::SpillToTmpFile() {
     ReleaseVarcharVector();
     num_row_splited_ = 0;
     cached_vectorbatch_size_ = 0;
+    return 0;
+}
+
+int Splitter::SpillToTmpFileByRow() {
+    options_.next_spilled_file_dir = CreateTempShuffleFile(NextSpilledFileDir());
+    WriteDataFileProtoByRow();
+    std::shared_ptr<Buffer> ptrTmp = CaculateSpilledTmpFilePartitionOffsets();
+    spilled_tmp_files_info_[options_.next_spilled_file_dir] = ptrTmp;
     return 0;
 }
 
@@ -1151,6 +1404,20 @@ int Splitter::Stop() {
     }
     if (nullptr == vecBatchProto) {
         throw std::runtime_error("delete nullptr error for free protobuf vecBatch memory");
+    }
+    return 0;
+}
+
+int Splitter::StopByRow() {
+    if (isSpill) {
+        TIME_NANO_OR_RAISE(total_write_time_, MergeSpilledByRow());
+        TIME_NANO_OR_RAISE(total_write_time_, DeleteSpilledTmpFile());
+        LogsDebug(" Spill For Splitter Stopped. total_spill_row_num_: %ld ", total_spill_row_num_);
+    } else {
+        TIME_NANO_OR_RAISE(total_write_time_, WriteSplitByRow());
+    }
+    if (nullptr == protoRowBatch) {
+        throw std::runtime_error("delete nullptr error for free protobuf rowBatch memory");
     }
     return 0;
 }

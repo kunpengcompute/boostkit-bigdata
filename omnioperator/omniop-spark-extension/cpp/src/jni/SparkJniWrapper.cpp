@@ -146,6 +146,24 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_SparkJniWrapper_split
     JNI_FUNC_END_WITH_VECBATCH(runtimeExceptionClass, splitter->GetInputVecBatch())
 }
 
+JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_SparkJniWrapper_rowSplit(
+    JNIEnv *env, jobject jObj, jlong splitter_addr, jlong jVecBatchAddress)
+{
+    auto splitter = reinterpret_cast<Splitter *>(splitter_addr);
+    if (!splitter) {
+        std::string error_message = "Invalid splitter id " + std::to_string(splitter_addr);
+        env->ThrowNew(runtimeExceptionClass, error_message.c_str());
+        return -1;
+    }
+
+    auto vecBatch = (VectorBatch *) jVecBatchAddress;
+    splitter->SetInputVecBatch(vecBatch);
+    JNI_FUNC_START
+    splitter->SplitByRow(vecBatch);
+    return 0L;
+    JNI_FUNC_END_WITH_VECBATCH(runtimeExceptionClass, splitter->GetInputVecBatch())
+}
+
 JNIEXPORT jobject JNICALL Java_com_huawei_boostkit_spark_jni_SparkJniWrapper_stop(
     JNIEnv* env, jobject, jlong splitter_addr)
 {
@@ -156,6 +174,30 @@ JNIEXPORT jobject JNICALL Java_com_huawei_boostkit_spark_jni_SparkJniWrapper_sto
         env->ThrowNew(runtimeExceptionClass, error_message.c_str());
     }
     splitter->Stop();
+
+    const auto& partition_length = splitter->PartitionLengths();
+    auto partition_length_arr = env->NewLongArray(partition_length.size());
+    auto src = reinterpret_cast<const jlong*>(partition_length.data());
+    env->SetLongArrayRegion(partition_length_arr, 0, partition_length.size(), src);
+    jobject split_result = env->NewObject(
+        splitResultClass, splitResultConstructor, splitter->TotalComputePidTime(),
+        splitter->TotalWriteTime(),  splitter->TotalSpillTime(),
+        splitter->TotalBytesWritten(),  splitter->TotalBytesSpilled(), partition_length_arr);
+
+    return split_result;
+    JNI_FUNC_END(runtimeExceptionClass)
+}
+
+JNIEXPORT jobject JNICALL Java_com_huawei_boostkit_spark_jni_SparkJniWrapper_rowStop(
+    JNIEnv* env, jobject, jlong splitter_addr)
+{
+    JNI_FUNC_START
+    auto splitter = reinterpret_cast<Splitter *>(splitter_addr);
+    if (!splitter) {
+        std::string error_message = "Invalid splitter id " + std::to_string(splitter_addr);
+        env->ThrowNew(runtimeExceptionClass, error_message.c_str());
+    }
+    splitter->StopByRow();
 
     const auto& partition_length = splitter->PartitionLengths();
     auto partition_length_arr = env->NewLongArray(partition_length.size());

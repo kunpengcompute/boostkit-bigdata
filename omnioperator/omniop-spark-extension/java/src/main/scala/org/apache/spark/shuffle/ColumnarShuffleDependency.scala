@@ -48,6 +48,7 @@ class ColumnarShuffleDependency[K: ClassTag, V: ClassTag, C: ClassTag](
     override val aggregator: Option[Aggregator[K, V, C]] = None,
     override val mapSideCombine: Boolean = false,
     override val shuffleWriterProcessor: ShuffleWriteProcessor = new ShuffleWriteProcessor,
+    val handleRow: Boolean,
     val partitionInfo: PartitionInfo,
     val dataSize: SQLMetric,
     val bytesSpilled: SQLMetric,

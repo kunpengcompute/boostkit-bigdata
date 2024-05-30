@@ -262,6 +262,13 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
 
   val radixSortThreshold: Int =
     conf.getConfString("spark.omni.sql.columnar.radixSortThreshold", "1000000").toInt
+
+  // enable or disable row shuffle
+  val enableRowShuffle: Boolean =
+    conf.getConfString("spark.omni.sql.columnar.rowShuffle.enabled", "true").toBoolean
+
+  val ColumnsThreshold: Int =
+    conf.getConfString("spark.omni.sql.columnar.ColumnsThreshold", "10").toInt
 }
 
 

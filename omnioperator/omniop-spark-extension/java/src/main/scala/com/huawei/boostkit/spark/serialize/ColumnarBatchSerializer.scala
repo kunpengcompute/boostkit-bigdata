@@ -28,15 +28,18 @@ import org.apache.spark.serializer.{DeserializationStream, SerializationStream, 
 import org.apache.spark.sql.execution.metric.SQLMetric
 import org.apache.spark.sql.vectorized.ColumnarBatch
 
-class ColumnarBatchSerializer(readBatchNumRows: SQLMetric, numOutputRows: SQLMetric)
+class ColumnarBatchSerializer(readBatchNumRows: SQLMetric,
+                              numOutputRows: SQLMetric,
+                              isRowShuffle: Boolean = false)
   extends Serializer
     with Serializable {
   /** Creates a new [[SerializerInstance]]. */
   override def newInstance(): SerializerInstance =
-    new ColumnarBatchSerializerInstance(readBatchNumRows, numOutputRows)
+    new ColumnarBatchSerializerInstance(isRowShuffle, readBatchNumRows, numOutputRows)
 }
 
 private class ColumnarBatchSerializerInstance(
+    isRowShuffle: Boolean,
     readBatchNumRows: SQLMetric,
     numOutputRows: SQLMetric)
   extends SerializerInstance with Logging {
@@ -85,7 +88,7 @@ private class ColumnarBatchSerializerInstance(
             }
             ByteStreams.readFully(dIn, columnarBuffer, 0, dataSize)
             // protobuf serialize
-            val columnarBatch: ColumnarBatch = ShuffleDataSerializer.deserialize(columnarBuffer.slice(0, dataSize))
+            val columnarBatch: ColumnarBatch = ShuffleDataSerializer.deserialize(isRowShuffle, columnarBuffer.slice(0, dataSize))
             dataSize = readSize()
             if (dataSize == EOF) {
               dIn.close()
@@ -114,7 +117,7 @@ private class ColumnarBatchSerializerInstance(
         }
         ByteStreams.readFully(dIn, columnarBuffer, 0, dataSize)
         // protobuf serialize
-        val columnarBatch: ColumnarBatch = ShuffleDataSerializer.deserialize(columnarBuffer.slice(0, dataSize))
+        val columnarBatch: ColumnarBatch = ShuffleDataSerializer.deserialize(isRowShuffle, columnarBuffer.slice(0, dataSize))
         numBatchesTotal += 1
         numRowsTotal += columnarBatch.numRows()
         columnarBatch.asInstanceOf[T]

@@ -25,7 +25,7 @@
 #include <stdio.h>
 #include <dirent.h>
 #include <type/data_types.h>
-#include "shuffle/splitter.h"
+#include "../../src/shuffle/splitter.h"
 
 static std::string s_shuffle_tests_dir = "/tmp/shuffleTests";
 
@@ -127,5 +127,72 @@ void Test_splitter_close(long splitter_id);
 void GetFilePath(const char *path, const char *filename, char *filepath);
 
 void DeletePathAll(const char* path);
+
+class Timer {
+public:
+    Timer() : wallElapsed(0), cpuElapsed(0) {}
+
+    ~Timer() {}
+
+    void SetStart() {
+        clock_gettime(CLOCK_REALTIME, &wallStart);
+        clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &cpuStart);
+    }
+
+    void CalculateElapse() {
+        clock_gettime(CLOCK_REALTIME, &wallEnd);
+        clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &cpuEnd);
+        long secondsWall = wallEnd.tv_sec - wallStart.tv_sec;
+        long secondsCpu = cpuEnd.tv_sec - cpuEnd.tv_sec;
+        long nsWall = wallEnd.tv_nsec - wallStart.tv_nsec;
+        long nsCpu = cpuEnd.tv_nsec - cpuEnd.tv_nsec;
+        wallElapsed = secondsWall + nsWall * 1e-9;
+        cpuElapsed = secondsCpu + nsCpu * 1e-9;
+    }
+
+    void Start(const char *TestTitle) {
+        wallElapsed = 0;
+        cpuElapsed = 0;
+        clock_gettime(CLOCK_REALTIME, &wallStart);
+        clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &cpuStart);
+        this->title = TestTitle;
+    }
+
+    void End() {
+        clock_gettime(CLOCK_REALTIME, &wallEnd);
+        clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &cpuEnd);
+        long secondsWall = wallEnd.tv_sec - wallStart.tv_sec;
+        long secondsCpu = cpuEnd.tv_sec - cpuEnd.tv_sec;
+        long nsWall = wallEnd.tv_nsec - wallStart.tv_nsec;
+        long nsCpu = cpuEnd.tv_nsec - cpuEnd.tv_nsec;
+        wallElapsed = secondsWall + nsWall * 1e-9;
+        cpuElapsed = secondsCpu + nsCpu * 1e-9;
+        std::cout << title << "\t: wall " << wallElapsed << " \tcpu " << cpuElapsed << std::endl;
+    }
+
+    double GetWallElapse() {
+        return wallElapsed;
+    }
+
+    double GetCpuElapse() {
+        return  cpuElapsed;
+    }
+
+    void Reset() {
+        wallElapsed = 0;
+        cpuElapsed = 0;
+        clock_gettime(CLOCK_REALTIME, &wallStart);
+        clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &cpuStart);
+    }
+
+private:
+    double wallElapsed;
+    double cpuElapsed;
+    struct timespec cpuStart;
+    struct timespec wallStart;
+    struct timespec cpuEnd;
+    struct timespec wallEnd;
+    const char *title;
+};
 
 #endif //SPARK_THESTRAL_PLUGIN_TEST_UTILS_H

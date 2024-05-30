@@ -1,0 +1,8 @@
+aux_source_directory(${CMAKE_CURRENT_LIST_DIR} BENCHMARK_LIST)
+set(BENCHMARK_TEST_TARGET benchmark_test)
+add_library(${BENCHMARK_TEST_TARGET} STATIC ${BENCHMARK_LIST})
+target_compile_options(${BENCHMARK_TEST_TARGET} PUBLIC )
+target_link_libraries(${BENCHMARK_TEST_TARGET} utilstest)
+target_include_directories(${BENCHMARK_TEST_TARGET} PUBLIC ${CMAKE_BINARY_DIR}/src)
+target_include_directories(${BENCHMARK_TEST_TARGET} PUBLIC $ENV{JAVA_HOME}/include)
+target_include_directories(${BENCHMARK_TEST_TARGET} PUBLIC $ENV{JAVA_HOME}/include/linux)
