@@ -34,7 +34,7 @@ public class VariableWidthColumnDescSerDe implements ColumnSerDe{
             } else {
                 writeBytes[offset++] = (byte) 0x9;
             }
-            writeBytes[offset++] = (byte) 0;
+            writeBytes[offset++] = (byte) 0xff;
             return offset;
         }
         int valueLen = vecWrapper.offset[index + 1] - vecWrapper.offset[index];
@@ -42,14 +42,14 @@ public class VariableWidthColumnDescSerDe implements ColumnSerDe{
         for (int i = 0; i < valueLen; i++) {
             offset = writeByte(offset, writeBytes, vecWrapper.value[vecWrapper.offset[index] + i]);
         }
-        writeBytes[offset++] = 0;
+        writeBytes[offset++] = (byte) 0xff;
         return offset;
     }
 
     @Override
     public int deserialize(VecSerdeBody vecSerdeBody, byte[] bytes, int offset) {
         offset++;
-        if (bytes[offset] == 0) {
+        if (bytes[offset] == (byte) 0xff) {
             if (bytes[offset - 1] == 0x8) {
                 vecSerdeBody.isNull = 0;
             } else {
@@ -62,7 +62,7 @@ public class VariableWidthColumnDescSerDe implements ColumnSerDe{
         vecSerdeBody.isNull = 0;
         int vecSerdeBodyValueIndex = 0;
         int escapeCharNum = 0;
-        for (int i = offset; i < bytes.length && bytes[i] != 0; i++) {
+        for (int i = offset; i < bytes.length && bytes[i] != (byte) 0xff; i++) {
             if ((bytes[i] ^ 0xff) == 1) {
                 vecSerdeBody.value[vecSerdeBodyValueIndex++] = (byte) ((0xff ^ bytes[++i]) - 1);
                 escapeCharNum++;
@@ -75,7 +75,7 @@ public class VariableWidthColumnDescSerDe implements ColumnSerDe{
     }
 
     public int writeByte(int offset, byte[] writeBytes, byte byteValue) {
-        if (byteValue == 0 || byteValue == 1) {
+        if (byteValue == (byte) 0xff || byteValue == 1) {
             writeBytes[offset++] = (byte) (0xff ^ 1);
             writeBytes[offset++] = (byte) (0xff ^ (byteValue + 1));
         } else {
