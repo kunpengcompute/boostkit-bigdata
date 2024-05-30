@@ -360,13 +360,14 @@ case class ColumnarWindowExec(windowExpression: Seq[NamedExpression],
     val windowExpressionWithProjectConstant = windowExpressionWithProject
     child.executeColumnar().mapPartitionsWithIndexInternal { (index, iter) =>
       val columnarConf = ColumnarPluginConfig.getSessionConf
-      val windowSpillEnable = columnarConf.enableWindowSpill
-      val spillDirDiskReserveSize = columnarConf.columnarSpillDirDiskReserveSize
-      val windowSpillRowThreshold = columnarConf.columnarWindowSpillRowThreshold
+      val spillWriteBufferSize = columnarConf.columnarSpillWriteBufferSize
       val spillMemPctThreshold = columnarConf.columnarSpillMemPctThreshold
+      val spillDirDiskReserveSize = columnarConf.columnarSpillDirDiskReserveSize
+      val windowSpillEnable = columnarConf.enableWindowSpill
+      val windowSpillRowThreshold = columnarConf.columnarWindowSpillRowThreshold
       val spillDirectory = generateSpillDir(tmpSparkConf, "columnarWindowSpill")
       val sparkSpillConfig = new SparkSpillConfig(windowSpillEnable, spillDirectory,
-        spillDirDiskReserveSize, windowSpillRowThreshold, spillMemPctThreshold)
+        spillDirDiskReserveSize, windowSpillRowThreshold, spillMemPctThreshold, spillWriteBufferSize)
 
       val startCodegen = System.nanoTime()
       val windowOperatorFactory = new OmniWindowWithExprOperatorFactory(sourceTypes, outputCols,
