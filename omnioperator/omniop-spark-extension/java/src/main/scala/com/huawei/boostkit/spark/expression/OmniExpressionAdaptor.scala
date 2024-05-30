@@ -416,6 +416,13 @@ object OmniExpressionAdaptor extends Logging {
           .put("arguments", new JSONArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(inStr.str, exprsIndexMap))
             .put(rewriteToOmniJsonExpressionLiteralJsonObject(inStr.substr, exprsIndexMap)))
 
+      case rlike: RLike =>
+        new JSONObject().put("exprType", "FUNCTION")
+          .addOmniExpJsonType("returnType", rlike.dataType)
+          .put("function_name", "RLike")
+          .put("arguments", new JSONArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(rlike.left, exprsIndexMap))
+            .put(rewriteToOmniJsonExpressionLiteralJsonObject(rlike.right, exprsIndexMap)))
+
       // for floating numbers normalize
       case normalizeNaNAndZero: NormalizeNaNAndZero =>
         new JSONObject().put("exprType", "FUNCTION")
