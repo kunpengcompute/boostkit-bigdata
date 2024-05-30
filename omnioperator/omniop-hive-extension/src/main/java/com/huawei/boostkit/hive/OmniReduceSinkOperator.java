@@ -100,6 +100,7 @@ import org.apache.hadoop.hive.serde2.objectinspector.primitive.WritableDateObjec
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.WritableHiveDecimalObjectInspector;
 import org.apache.hadoop.hive.serde2.typeinfo.DecimalTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
+import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoUtils;
 import org.apache.hadoop.io.BinaryComparable;
 import org.apache.hadoop.io.BooleanWritable;
@@ -116,9 +117,11 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
+import java.util.Set;
 import java.util.function.BiFunction;
 
 public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
@@ -136,6 +139,7 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
     private boolean firstRow;
     private boolean skipTag = false;
     private transient int[] valueIndex; // index for value(+ from keys, - from values)
+    private transient Set<Integer> decimal128ConvertDecimal64Cols = new HashSet<>();
 
     protected transient OutputCollector out;
 
@@ -370,6 +374,7 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
             if (needProject) {
                 generatorProject();
             }
+            getDecimal128ConvertDecimal64Cols();
         } catch (Exception e) {
             String msg = "Error initializing ReduceSinkOperator: " + e.getMessage();
             LOG.error(msg, e);
@@ -381,6 +386,24 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
                 : inputFieldNum];
         for (int i = 0; i < vecWrappers.length; i++) {
             vecWrappers[i] = new VecWrapper();
+        }
+    }
+
+    private void getDecimal128ConvertDecimal64Cols() {
+        ArrayList<ExprNodeDesc> allCols = new ArrayList<>(conf.getKeyCols());
+        allCols.addAll(conf.getValueCols());
+        List<? extends StructField> allStructFieldRefs = ((StructObjectInspector) inputObjInspectors[0]).getAllStructFieldRefs();
+        if (allStructFieldRefs.size() != allCols.size()) {
+            return;
+        }
+        for (int i = 0; i < allStructFieldRefs.size(); i++) {
+            ObjectInspector fieldObjectInspector = allStructFieldRefs.get(i).getFieldObjectInspector();
+            TypeInfo typeInfo = allCols.get(i).getTypeInfo();
+            if (fieldObjectInspector instanceof WritableHiveDecimalObjectInspector &&
+                    ((DecimalTypeInfo) ((WritableHiveDecimalObjectInspector) fieldObjectInspector).getTypeInfo()).getPrecision() > 18 &&
+                    (typeInfo instanceof DecimalTypeInfo) && ((DecimalTypeInfo) typeInfo).getPrecision() <= 18) {
+                decimal128ConvertDecimal64Cols.add(i);
+            }
         }
     }
 
@@ -462,10 +485,32 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
         return ObjectInspectorFactory.getStandardStructObjectInspector(outputColNames, sois);
     }
 
+    private LongVec decimal128VecConvertDecimal64Vec(Decimal128Vec decimal128Vec) {
+        int size = decimal128Vec.getSize();
+        LongVec longVec = new LongVec(size);
+        for (int i = 0; i < size; i++) {
+            longVec.set(i, decimal128Vec.getBigInteger(i).longValue());
+        }
+        return longVec;
+    }
+
+    private VecBatch convertVec(VecBatch vecBatch) {
+        Vec[] vectors = vecBatch.getVectors();
+        for (int i : decimal128ConvertDecimal64Cols) {
+            if (vectors[i] instanceof Decimal128Vec) {
+                vectors[i] = decimal128VecConvertDecimal64Vec((Decimal128Vec) vectors[i]);
+            }
+        }
+        return new VecBatch(vectors);
+    }
+
     @Override
     @SuppressWarnings("unchecked")
     public void process(Object row, int tag) throws HiveException {
         VecBatch input = (VecBatch) row;
+        if (!decimal128ConvertDecimal64Cols.isEmpty()) {
+            input = convertVec(input);
+        }
         if (needProject) {
             this.projectOperator.addInput(input);
             Iterator<VecBatch> output = this.projectOperator.getOutput();
