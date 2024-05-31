@@ -93,13 +93,14 @@ case class ColumnarSortExec(
 
     child.executeColumnar().mapPartitionsWithIndexInternal { (_, iter) =>
       val columnarConf = ColumnarPluginConfig.getSessionConf
-      val sortSpillRowThreshold = columnarConf.columnarSortSpillRowThreshold
+      val spillWriteBufferSize = columnarConf.columnarSpillWriteBufferSize
       val spillMemPctThreshold = columnarConf.columnarSpillMemPctThreshold
       val spillDirDiskReserveSize = columnarConf.columnarSpillDirDiskReserveSize
       val sortSpillEnable = columnarConf.enableSortSpill
+      val sortSpillRowThreshold = columnarConf.columnarSortSpillRowThreshold
       val spillDirectory = generateSpillDir(tmpSparkConf, "columnarSortSpill")
       val sparkSpillConf = new SparkSpillConfig(sortSpillEnable, spillDirectory, spillDirDiskReserveSize,
-        sortSpillRowThreshold, spillMemPctThreshold)
+        sortSpillRowThreshold, spillMemPctThreshold, spillWriteBufferSize)
       val startCodegen = System.nanoTime()
 
       val radixSortEnable = columnarConf.enableRadixSort

@@ -156,12 +156,15 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
   val columnarShuffleNativeBufferSize =
     conf.getConfString("spark.sql.execution.columnar.maxRecordsPerBatch", "4096").toInt
 
+  val columnarSpillWriteBufferSize: Long =
+    conf.getConfString("spark.omni.sql.columnar.spill.writeBufferSize", "4121440").toLong
+
   // columnar spill threshold - Percentage of memory usage, associate with the "spark.memory.offHeap" together
   val columnarSpillMemPctThreshold: Integer =
     conf.getConfString("spark.omni.sql.columnar.spill.memFraction", "90").toInt
 
   // columnar spill dir disk reserve Size, default 10GB
-  val columnarSpillDirDiskReserveSize:Long =
+  val columnarSpillDirDiskReserveSize: Long =
     conf.getConfString("spark.omni.sql.columnar.spill.dirDiskReserveSize", "10737418240").toLong
 
   // enable or disable columnar sort spill
