@@ -243,16 +243,10 @@ public class OmniParquetRecordReader
                     splitGroup.add(block);
                 }
             }
-            if (splitGroup.isEmpty()) {
-                LOG.warn("Skipping split, could not find row group in: " + oldSplit);
-                return null;
-            }
             if (HiveConf.getBoolVar(conf, HiveConf.ConfVars.HIVE_PARQUET_TIMESTAMP_SKIP_CONVERSION)) {
                 skipTimestampConversion = !Strings.nullToEmpty(fileMetaData.getCreatedBy()).startsWith("parquet-mr");
             }
-            split = new ParquetInputSplit(finalPath, splitStart, splitLength, oldSplit.getLocations(), splitGroup,
-                    fileMetaData.getSchema().toString(), fileMetaData.getSchema().toString(),
-                    fileMetaData.getKeyValueMetaData(), readContext.getReadSupportMetadata());
+            split = new ParquetInputSplit(finalPath, splitStart, splitStart + splitLength, splitLength, null, null);
             return split;
         } else {
             throw new IllegalArgumentException("Unknown split type: " + oldSplit);
