@@ -23,8 +23,8 @@ import org.apache.spark.{SparkEnv, TaskContext}
 
 object SparkMemoryUtils {
 
-  private val max: Long = SparkEnv.get.conf.getSizeAsBytes("spark.memory.offHeap.size", "1g")
-  MemoryManager.setGlobalMemoryLimit(max)
+  val offHeapSize: Long = SparkEnv.get.conf.getSizeAsBytes("spark.memory.offHeap.size", "1g")
+  MemoryManager.setGlobalMemoryLimit(offHeapSize)
 
   def init(): Unit = {}
 

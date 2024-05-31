@@ -135,9 +135,9 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
   val columnarShuffleSpillBatchRowNum =
     conf.getConfString("spark.shuffle.columnar.shuffleSpillBatchRowNum", "10000").toInt
 
-  // columnar shuffle spill memory threshold
-  val columnarShuffleSpillMemoryThreshold =
-    conf.getConfString("spark.shuffle.columnar.shuffleSpillMemoryThreshold",
+  // columnar shuffle spill memory threshold in task level
+  val columnarShuffleTaskSpillMemoryThreshold =
+    conf.getConfString("spark.shuffle.columnar.shuffleTaskSpillMemoryThreshold",
       "2147483648").toLong
 
   // columnar shuffle compress block size

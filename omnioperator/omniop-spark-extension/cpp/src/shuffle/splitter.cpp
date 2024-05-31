@@ -461,7 +461,7 @@ int Splitter::DoSplit(VectorBatch& vb) {
         TIME_NANO_OR_RAISE(total_spill_time_, SpillToTmpFile());
         isSpill = true;
     }
-    if (cached_vectorbatch_size_ + current_fixed_alloc_buffer_size_ >= options_.spill_mem_threshold) {
+    if (cached_vectorbatch_size_ + current_fixed_alloc_buffer_size_ >= options_.task_spill_mem_threshold) {
         LogsDebug(" Spill For Memory Size Threshold.");
         TIME_NANO_OR_RAISE(total_spill_time_, SpillToTmpFile());
         isSpill = true;
@@ -638,7 +638,16 @@ int Splitter::SplitByRow(VectorBatch *vecBatch) {
     }
 
     // spill
-    if (total_input_size > options_.spill_mem_threshold) {
+    // process level: If the memory usage of the current executor exceeds the threshold, spill is triggered.
+    auto usedMemorySize = omniruntime::mem::MemoryManager::GetGlobalAccountedMemory();
+    if (usedMemorySize > options_.executor_spill_mem_threshold) {
+        TIME_NANO_OR_RAISE(total_spill_time_, SpillToTmpFileByRow());
+        total_input_size = 0;
+        isSpill = true;
+    }
+
+    // task level: If the memory usage of the current task exceeds the threshold, spill is triggered.
+    if (total_input_size > options_.task_spill_mem_threshold) {
         TIME_NANO_OR_RAISE(total_spill_time_, SpillToTmpFileByRow());
         total_input_size = 0;
         isSpill = true;

@@ -38,7 +38,7 @@ Java_com_huawei_boostkit_spark_jni_SparkJniWrapper_nativeMake(
     jstring jInputType, jint jNumCols, jint buffer_size,
     jstring compression_type_jstr, jstring data_file_jstr, jint num_sub_dirs,
     jstring local_dirs_jstr, jlong compress_block_size,
-    jint spill_batch_row, jlong spill_memory_threshold);
+    jint spill_batch_row, jlong task_spill_memory_threshold, jlong executor_spill_memory_threshold);
 
 JNIEXPORT jlong JNICALL
 Java_com_huawei_boostkit_spark_jni_SparkJniWrapper_split(

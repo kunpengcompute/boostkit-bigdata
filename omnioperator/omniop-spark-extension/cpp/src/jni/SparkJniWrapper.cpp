@@ -34,7 +34,7 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_SparkJniWrapper_nativ
     jstring jInputType, jint jNumCols, jint buffer_size,
     jstring compression_type_jstr, jstring data_file_jstr, jint num_sub_dirs,
     jstring local_dirs_jstr, jlong compress_block_size,
-    jint spill_batch_row, jlong spill_memory_threshold)
+    jint spill_batch_row, jlong task_spill_memory_threshold, jlong executor_spill_memory_threshold)
 {
     JNI_FUNC_START
     if (partitioning_name_jstr == nullptr) {
@@ -107,8 +107,11 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_SparkJniWrapper_nativ
     if (spill_batch_row > 0) {
         splitOptions.spill_batch_row_num = spill_batch_row;
     }
-    if (spill_memory_threshold > 0) {
-        splitOptions.spill_mem_threshold = spill_memory_threshold;
+    if (task_spill_memory_threshold > 0) {
+        splitOptions.task_spill_mem_threshold = task_spill_memory_threshold;
+    }
+    if (executor_spill_memory_threshold > 0) {
+        splitOptions.executor_spill_mem_threshold = executor_spill_memory_threshold;
     }
     if (compress_block_size > 0) {
         splitOptions.compress_block_size = compress_block_size;

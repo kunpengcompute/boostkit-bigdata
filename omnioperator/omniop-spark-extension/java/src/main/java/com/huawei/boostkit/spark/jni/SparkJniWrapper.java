@@ -35,7 +35,8 @@ public class SparkJniWrapper {
                      String localDirs,
                      long shuffleCompressBlockSize,
                      int shuffleSpillBatchRowNum,
-                     long shuffleSpillMemoryThreshold) {
+                     long shuffleTaskSpillMemoryThreshold,
+                     long shuffleExecutorSpillMemoryThreshold) {
         return nativeMake(
                 part.getPartitionName(),
                 part.getPartitionNum(),
@@ -48,7 +49,8 @@ public class SparkJniWrapper {
                 localDirs,
                 shuffleCompressBlockSize,
                 shuffleSpillBatchRowNum,
-                shuffleSpillMemoryThreshold);
+                shuffleTaskSpillMemoryThreshold,
+                shuffleExecutorSpillMemoryThreshold);
     }
 
     public native long nativeMake(
@@ -63,7 +65,8 @@ public class SparkJniWrapper {
             String localDirs,
             long shuffleCompressBlockSize,
             int shuffleSpillBatchRowNum,
-            long shuffleSpillMemoryThreshold
+            long shuffleTaskSpillMemoryThreshold,
+            long shuffleExecutorSpillMemoryThreshold
     );
 
     /**
