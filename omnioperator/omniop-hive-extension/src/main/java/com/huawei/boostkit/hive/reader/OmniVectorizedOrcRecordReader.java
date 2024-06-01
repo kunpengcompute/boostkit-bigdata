@@ -39,6 +39,7 @@ import java.util.Arrays;
 
 public class OmniVectorizedOrcRecordReader extends OmniOrcRecordReader {
     private VecConverter[] partColumnConverters;
+    private Vec[] partVecs;
     private final Vec[] withPartCol;
     private final Object[] partitionValues;
 
@@ -61,7 +62,13 @@ public class OmniVectorizedOrcRecordReader extends OmniOrcRecordReader {
             }
             partitionValues = new Object[partitionColumnCount];
             withPartCol = new Vec[vecs.length + partitionColumnCount];
+            partVecs = new Vec[partitionColumnCount];
             VectorizedRowBatchCtx.getPartitionValues(rbCtx, conf, split, partitionValues);
+            for (int i = 0; i < partitionValues.length; i++) {
+                Object[] partValue = new Object[BATCH];
+                Arrays.fill(partValue, partColumnConverters[i].calculateValue(partitionValues[i], partColTypeInfos[i]));
+                partVecs[i] = partColumnConverters[i].toOmniVec(partValue, BATCH, partColTypeInfos[i]);
+            }
         } else {
             partitionValues = null;
             withPartCol = null;
@@ -83,13 +90,13 @@ public class OmniVectorizedOrcRecordReader extends OmniOrcRecordReader {
             return false;
         }
         if (partitionValues != null) {
-            for (int i = 0; i < partitionValues.length; i++) {
-                Object[] partValue = new Object[batchSize];
-                Arrays.fill(partValue, partColumnConverters[i].calculateValue(partitionValues[i], partColTypeInfos[i]));
-                Vec partVec = partColumnConverters[i].toOmniVec(partValue, batchSize, partColTypeInfos[i]);
-                withPartCol[vecs.length + i] = partVec;
+            int partVecLen = partVecs.length;
+            Vec[] sliceVecs = new Vec[partVecLen];
+            for (int i = 0; i < partVecLen; i++) {
+                sliceVecs[i] = partVecs[i].slice(0, batchSize);
             }
             System.arraycopy(vecs, 0, withPartCol, 0, vecs.length);
+            System.arraycopy(sliceVecs, 0, withPartCol, vecs.length, partVecLen);
             value.setVecBatch(new VecBatch(withPartCol, batchSize));
             return true;
         }
