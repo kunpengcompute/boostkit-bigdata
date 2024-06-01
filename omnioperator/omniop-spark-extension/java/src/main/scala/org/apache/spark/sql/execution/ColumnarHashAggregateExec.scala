@@ -180,8 +180,9 @@ case class ColumnarHashAggregateExec(
       val finalOut = groupingExpressions.map(_.toAttribute) ++ aggregateAttributes
       finalOut.map(
         exp => sparkTypeToOmniType(exp.dataType, exp.metadata)).toArray
+      val finalAttrExprsIdMap = getExprIdMap(finalOut)
       val projectExpressions: Array[AnyRef] = resultExpressions.map(
-        exp => rewriteToOmniJsonExpressionLiteral(exp, getExprIdMap(finalOut))).toArray
+        exp => rewriteToOmniJsonExpressionLiteral(exp, finalAttrExprsIdMap)).toArray
       if (!isSimpleColumnForAll(projectExpressions.map(expr => expr.toString))) {
         checkOmniJsonWhiteList("", projectExpressions)
       }
@@ -279,13 +280,14 @@ case class ColumnarHashAggregateExec(
 
     child.executeColumnar().mapPartitionsWithIndex { (index, iter) =>
       val columnarConf = ColumnarPluginConfig.getSessionConf
-      val hashAggSpillRowThreshold = columnarConf.columnarHashAggSpillRowThreshold
+      val spillWriteBufferSize = columnarConf.columnarSpillWriteBufferSize
       val spillMemPctThreshold = columnarConf.columnarSpillMemPctThreshold
       val spillDirDiskReserveSize = columnarConf.columnarSpillDirDiskReserveSize
       val hashAggSpillEnable = columnarConf.enableHashAggSpill
+      val hashAggSpillRowThreshold = columnarConf.columnarHashAggSpillRowThreshold
       val spillDirectory = generateSpillDir(tmpSparkConf, "columnarHashAggSpill")
       val sparkSpillConf = new SparkSpillConfig(hashAggSpillEnable, spillDirectory,
-        spillDirDiskReserveSize, hashAggSpillRowThreshold, spillMemPctThreshold)
+        spillDirDiskReserveSize, hashAggSpillRowThreshold, spillMemPctThreshold, spillWriteBufferSize)
 
       val startCodegen = System.nanoTime()
       val operator = OmniAdaptorUtil.getAggOperator(groupingExpressions,
@@ -355,10 +357,11 @@ case class ColumnarHashAggregateExec(
       }
       if (finalStep) {
         val finalOut = groupingExpressions.map(_.toAttribute) ++ aggregateAttributes
+        val finalAttrExprsIdMap = getExprIdMap(finalOut)
         val projectInputTypes = finalOut.map(
           exp => sparkTypeToOmniType(exp.dataType, exp.metadata)).toArray
         val projectExpressions = resultExpressions.map(
-          exp => rewriteToOmniJsonExpressionLiteral(exp, getExprIdMap(finalOut))).toArray
+          exp => rewriteToOmniJsonExpressionLiteral(exp, finalAttrExprsIdMap)).toArray
 
         dealPartitionData(null, null, addInputTime, omniCodegenTime,
           getOutputTime, projectInputTypes, projectExpressions, hashAggIter, this.schema)

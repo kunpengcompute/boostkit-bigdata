@@ -25,7 +25,7 @@ import com.huawei.boostkit.spark.Constant.IS_SKIP_VERIFY_EXP
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor.{checkOmniJsonWhiteList, isSimpleColumn, isSimpleColumnForAll}
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil
-import com.huawei.boostkit.spark.util.OmniAdaptorUtil.{getIndexArray, pruneOutput, reorderVecs, transColBatchToOmniVecs}
+import com.huawei.boostkit.spark.util.OmniAdaptorUtil.{getExprIdForProjectList, getIndexArray, getProjectListIndex,pruneOutput, reorderOutputVecs, transColBatchToOmniVecs}
 import nova.hetu.omniruntime.constants.JoinType._
 import nova.hetu.omniruntime.`type`.DataType
 import nova.hetu.omniruntime.operator.OmniOperator
@@ -72,8 +72,8 @@ case class ColumnarBroadcastHashJoinExec(
     s"""
        |$formattedNodeName
        |$simpleStringWithNodeId
-       |${ExplainUtils.generateFieldString("buildOutput", buildOutput ++ buildOutput.map(_.dataType))}
-       |${ExplainUtils.generateFieldString("streamedOutput", streamedOutput ++ streamedOutput.map(_.dataType))}
+       |${ExplainUtils.generateFieldString("buildInput", buildOutput ++ buildOutput.map(_.dataType))}
+       |${ExplainUtils.generateFieldString("streamedInput", streamedOutput ++ streamedOutput.map(_.dataType))}
        |${ExplainUtils.generateFieldString("leftKeys", leftKeys ++ leftKeys.map(_.dataType))}
        |${ExplainUtils.generateFieldString("rightKeys", rightKeys ++ rightKeys.map(_.dataType))}
        |${ExplainUtils.generateFieldString("condition", joinCondStr)}
@@ -298,22 +298,24 @@ case class ColumnarBroadcastHashJoinExec(
     val enableShareBuildOp: Boolean = columnarConf.enableShareBroadcastJoinHashTable
     val enableJoinBatchMerge: Boolean = columnarConf.enableJoinBatchMerge
 
+    val projectExprIdList = getExprIdForProjectList(projectList)
     // {0}, buildKeys: col1#12
     val buildOutputCols: Array[Int] = joinType match {
       case Inner | LeftOuter | RightOuter =>
-        getIndexArray(buildOutput, projectList)
+        getIndexArray(buildOutput, projectExprIdList)
       case LeftExistence(_) =>
         Array[Int]()
       case x =>
         throw new UnsupportedOperationException(s"ColumnBroadcastHashJoin Join-type[$x] is not supported!")
     }
+
+    val buildOutputExprIdMap = OmniExpressionAdaptor.getExprIdMap(buildOutput.map(_.toAttribute))
     val buildJoinColsExp = buildKeys.map { x =>
-      OmniExpressionAdaptor.rewriteToOmniJsonExpressionLiteral(x,
-        OmniExpressionAdaptor.getExprIdMap(buildOutput.map(_.toAttribute)))
+      OmniExpressionAdaptor.rewriteToOmniJsonExpressionLiteral(x, buildOutputExprIdMap)
     }.toArray
     val relation = buildPlan.executeBroadcast[ColumnarHashedRelation]()
 
-    val prunedBuildOutput = pruneOutput(buildOutput, projectList)
+    val prunedBuildOutput = pruneOutput(buildOutput, projectExprIdList)
     val buildOutputTypes = new Array[DataType](prunedBuildOutput.size) // {2,2}, buildOutput:col1#12,col2#13
     prunedBuildOutput.zipWithIndex.foreach { case (att, i) =>
       buildOutputTypes(i) = OmniExpressionAdaptor.sparkTypeToOmniType(att.dataType, att.metadata)
@@ -323,12 +325,14 @@ case class ColumnarBroadcastHashJoinExec(
     streamedOutput.zipWithIndex.foreach { case (attr, i) =>
       probeTypes(i) = OmniExpressionAdaptor.sparkTypeToOmniType(attr.dataType, attr.metadata)
     }
-    val probeOutputCols = getIndexArray(streamedOutput, projectList) // {0,1}
+    val probeOutputCols = getIndexArray(streamedOutput, projectExprIdList) // {0,1}
+    val probeOutputExprIdMap = OmniExpressionAdaptor.getExprIdMap(streamedOutput.map(_.toAttribute))
     val probeHashColsExp = streamedKeys.map { x =>
-      OmniExpressionAdaptor.rewriteToOmniJsonExpressionLiteral(x,
-        OmniExpressionAdaptor.getExprIdMap(streamedOutput.map(_.toAttribute)))
+      OmniExpressionAdaptor.rewriteToOmniJsonExpressionLiteral(x, probeOutputExprIdMap)
     }.toArray
+    val prunedStreamedOutput = pruneOutput(streamedOutput, projectExprIdList)
 
+    val projectListIndex = getProjectListIndex(projectExprIdList, prunedStreamedOutput, prunedBuildOutput)
     val lookupJoinType = OmniExpressionAdaptor.toOmniJoinType(joinType)
     val canShareBuildOp = (lookupJoinType != OMNI_JOIN_TYPE_RIGHT && lookupJoinType != OMNI_JOIN_TYPE_FULL)
     streamedPlan.executeColumnar().mapPartitionsWithIndexInternal { (index, iter) =>
@@ -426,19 +430,17 @@ case class ColumnarBroadcastHashJoinExec(
         }
       })
 
-      val streamedPlanOutput = pruneOutput(streamedPlan.output, projectList)
-      val prunedOutput = streamedPlanOutput ++ prunedBuildOutput
       val resultSchema = this.schema
       val reverse = buildSide == BuildLeft
       var left = 0
-      var leftLen = streamedPlanOutput.size
-      var right = streamedPlanOutput.size
+      var leftLen = prunedStreamedOutput.size
+      var right = prunedStreamedOutput.size
       var rightLen = output.size
       if (reverse) {
-        left = streamedPlanOutput.size
+        left = prunedStreamedOutput.size
         leftLen = output.size
         right = 0
-        rightLen = streamedPlanOutput.size
+        rightLen = prunedStreamedOutput.size
       }
 
       val iterBatch = new Iterator[ColumnarBatch] {
@@ -484,7 +486,7 @@ case class ColumnarBroadcastHashJoinExec(
           val vecs = OmniColumnVector
             .allocateColumns(result.getRowCount, resultSchema, false)
           if (projectList.nonEmpty) {
-            reorderVecs(prunedOutput, projectList, resultVecs, vecs)
+            reorderOutputVecs(projectListIndex, resultVecs, vecs)
           } else {
             var index = 0
             for (i <- left until leftLen) {

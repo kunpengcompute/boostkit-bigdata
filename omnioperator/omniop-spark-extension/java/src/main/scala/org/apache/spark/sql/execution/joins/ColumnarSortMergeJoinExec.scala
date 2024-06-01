@@ -25,7 +25,7 @@ import com.huawei.boostkit.spark.Constant.IS_SKIP_VERIFY_EXP
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor.{checkOmniJsonWhiteList, isSimpleColumn, isSimpleColumnForAll}
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil
-import com.huawei.boostkit.spark.util.OmniAdaptorUtil.{getIndexArray, pruneOutput, reorderVecs, transColBatchToOmniVecs}
+import com.huawei.boostkit.spark.util.OmniAdaptorUtil.{getExprIdForProjectList, getIndexArray, getProjectListIndex,pruneOutput, reorderOutputVecs, transColBatchToOmniVecs}
 import nova.hetu.omniruntime.`type`.DataType
 import nova.hetu.omniruntime.operator.config.{OperatorConfig, OverflowConfig, SpillConfig}
 import nova.hetu.omniruntime.operator.join.{OmniSmjBufferedTableWithExprOperatorFactory, OmniSmjStreamedTableWithExprOperatorFactory}
@@ -69,23 +69,25 @@ case class ColumnarSortMergeJoinExec(
     left.output.zipWithIndex.foreach { case (attr, i) =>
       streamedTypes(i) = OmniExpressionAdaptor.sparkTypeToOmniType(attr.dataType, attr.metadata)
     }
+    val streamOutputExprIdMap = OmniExpressionAdaptor.getExprIdMap(left.output.map(_.toAttribute))
     val streamedKeyColsExp = leftKeys.map { x =>
-      OmniExpressionAdaptor.rewriteToOmniJsonExpressionLiteral(x,
-        OmniExpressionAdaptor.getExprIdMap(left.output.map(_.toAttribute)))
+      OmniExpressionAdaptor.rewriteToOmniJsonExpressionLiteral(x, streamOutputExprIdMap)
     }.toArray
-    val streamedOutputChannel = getIndexArray(left.output, projectList)
+    val projectExprIdList = getExprIdForProjectList(projectList)
+    val streamedOutputChannel = getIndexArray(left.output, projectExprIdList)
 
     val bufferedTypes = new Array[DataType](right.output.size)
     right.output.zipWithIndex.foreach { case (attr, i) =>
       bufferedTypes(i) = OmniExpressionAdaptor.sparkTypeToOmniType(attr.dataType, attr.metadata)
     }
+
+    val bufferOutputExprIdMap = OmniExpressionAdaptor.getExprIdMap(right.output.map(_.toAttribute))
     val bufferedKeyColsExp = rightKeys.map { x =>
-      OmniExpressionAdaptor.rewriteToOmniJsonExpressionLiteral(x,
-        OmniExpressionAdaptor.getExprIdMap(right.output.map(_.toAttribute)))
+      OmniExpressionAdaptor.rewriteToOmniJsonExpressionLiteral(x, bufferOutputExprIdMap)
     }.toArray
     val bufferedOutputChannel: Array[Int] = joinType match {
       case Inner | LeftOuter | FullOuter =>
-        getIndexArray(right.output, projectList)
+        getIndexArray(right.output, projectExprIdList)
       case LeftExistence(_) =>
         Array[Int]()
       case x =>
@@ -98,6 +100,9 @@ case class ColumnarSortMergeJoinExec(
           OmniExpressionAdaptor.getExprIdMap((left.output ++ right.output).map(_.toAttribute)))
       case _ => null
     }
+    val prunedStreamOutput = pruneOutput(left.output, projectExprIdList)
+    val prunedBufferOutput = pruneOutput(right.output, projectExprIdList)
+    val projectListIndex = getProjectListIndex(projectExprIdList, prunedStreamOutput, prunedBufferOutput)
 
     left.executeColumnar().zipPartitions(right.executeColumnar()) { (streamedIter, bufferedIter) =>
       val filter: Optional[String] = Optional.ofNullable(filterString)
@@ -127,9 +132,6 @@ case class ColumnarSortMergeJoinExec(
         streamedOpFactory.close()
       })
 
-      val prunedStreamOutput = pruneOutput(left.output, projectList)
-      val prunedBufferOutput = pruneOutput(right.output, projectList)
-      val prunedOutput = prunedStreamOutput ++ prunedBufferOutput
       val resultSchema = this.schema
       val columnarConf: ColumnarPluginConfig = ColumnarPluginConfig.getSessionConf
       val enableSortMergeJoinBatchMerge: Boolean = columnarConf.enableSortMergeJoinBatchMerge
@@ -238,7 +240,7 @@ case class ColumnarSortMergeJoinExec(
           val resultVecs = result.getVectors
           val vecs = OmniColumnVector.allocateColumns(result.getRowCount, resultSchema, false)
           if (projectList.nonEmpty) {
-            reorderVecs(prunedOutput, projectList, resultVecs, vecs)
+            reorderOutputVecs(projectListIndex, resultVecs, vecs)
           } else {
             for (index <- output.indices) {
               val v = vecs(index)

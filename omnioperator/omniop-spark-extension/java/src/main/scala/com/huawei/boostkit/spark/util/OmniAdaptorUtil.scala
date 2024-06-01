@@ -330,12 +330,12 @@ object OmniAdaptorUtil {
     operator
   }
 
-  def pruneOutput(output: Seq[Attribute], projectList: Seq[NamedExpression]): Seq[Attribute] = {
-    if (projectList.nonEmpty) {
+  def pruneOutput(output: Seq[Attribute], projectExprIdList: Seq[ExprId]): Seq[Attribute] = {
+    if (projectExprIdList.nonEmpty) {
       val projectOutput = ListBuffer[Attribute]()
-      for (project <- projectList) {
+      for (index <- projectExprIdList.indices) {
         for (col <- output) {
-          if (col.exprId.equals(getProjectAliasExprId(project))) {
+          if (col.exprId.equals(projectExprIdList(index))) {
             projectOutput += col
           }
         }
@@ -346,13 +346,13 @@ object OmniAdaptorUtil {
     }
   }
 
-  def getIndexArray(output: Seq[Attribute], projectList: Seq[NamedExpression]): Array[Int] = {
-    if (projectList.nonEmpty) {
+  def getIndexArray(output: Seq[Attribute], projectExprIdList: Seq[ExprId]): Array[Int] = {
+    if (projectExprIdList.nonEmpty) {
       val indexList = ListBuffer[Int]()
-      for (project <- projectList) {
+      for (index <- projectExprIdList.indices) {
         for (i <- output.indices) {
           val col = output(i)
-          if (col.exprId.equals(getProjectAliasExprId(project))) {
+          if (col.exprId.equals(projectExprIdList(index))) {
             indexList += i
           }
         }
@@ -363,23 +363,48 @@ object OmniAdaptorUtil {
     }
   }
 
-  def reorderVecs(prunedOutput: Seq[Attribute], projectList: Seq[NamedExpression], resultVecs: Array[nova.hetu.omniruntime.vector.Vec], vecs: Array[OmniColumnVector]) = {
-    val used = new Array[Boolean](resultVecs.length)
-    for (index <- projectList.indices) {
-      val project = projectList(index)
+  def reorderOutputVecs(projectListIndex: Array[Int], omniVecs: Array[nova.hetu.omniruntime.vector.Vec],
+    outputVecs: Array[OmniColumnVector]) = {
+    for (index <- projectListIndex.indices) {
+      val outputVec = outputVecs(index)
+      outputVec.reset()
+      val projectIndex = projectListIndex(index)
+      outputVec.setVec(omniVecs(projectIndex))
+    }
+  }
+
+  def getProjectListIndex(projectExprIdList: Seq[ExprId], probeOutput: Seq[Attribute],
+    buildOutput: Seq[Attribute]): Array[Int] = {
+    val projectListIndex = ListBuffer[Int]()
+    var probeIndex = 0
+    var buildIndex = probeOutput.size
+    for (index <- projectExprIdList.indices) {
       breakable {
-        for (i <- prunedOutput.indices) {
-          val col = prunedOutput(i)
-          if (!used(i) && col.exprId.equals(getProjectAliasExprId(project))) {
-            val v = vecs(index)
-            v.reset()
-            v.setVec(resultVecs(i))
-            used(i) = true;
+        for (probeAttr <- probeOutput) {
+          if (probeAttr.exprId.equals(projectExprIdList(index))) {
+            projectListIndex += probeIndex
+            probeIndex += 1
+            break
+          }
+        }
+        for (buildAttr <- buildOutput) {
+          if (buildAttr.exprId.equals(projectExprIdList(index))) {
+            projectListIndex += buildIndex
+            buildIndex += 1
             break
           }
         }
       }
     }
+    projectListIndex.toArray
+  }
+
+  def getExprIdForProjectList(projectList: Seq[NamedExpression]): Seq[ExprId] = {
+    val exprIdList = ListBuffer[ExprId]()
+    for (project <- projectList) {
+      exprIdList += getProjectAliasExprId(project)
+    }
+    exprIdList
   }
 
   def getProjectAliasExprId(project: NamedExpression): ExprId = {
