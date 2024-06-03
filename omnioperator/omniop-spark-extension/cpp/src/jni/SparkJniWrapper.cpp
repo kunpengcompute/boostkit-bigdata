@@ -175,6 +175,7 @@ JNIEXPORT jobject JNICALL Java_com_huawei_boostkit_spark_jni_SparkJniWrapper_sto
     if (!splitter) {
         std::string error_message = "Invalid splitter id " + std::to_string(splitter_addr);
         env->ThrowNew(runtimeExceptionClass, error_message.c_str());
+        return nullptr;
     }
     splitter->Stop();
 
@@ -199,6 +200,7 @@ JNIEXPORT jobject JNICALL Java_com_huawei_boostkit_spark_jni_SparkJniWrapper_row
     if (!splitter) {
         std::string error_message = "Invalid splitter id " + std::to_string(splitter_addr);
         env->ThrowNew(runtimeExceptionClass, error_message.c_str());
+        return nullptr;
     }
     splitter->StopByRow();
 

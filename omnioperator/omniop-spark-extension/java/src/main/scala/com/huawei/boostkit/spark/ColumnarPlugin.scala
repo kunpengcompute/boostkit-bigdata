@@ -71,7 +71,7 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] {
   val enableColumnarCoalesce: Boolean = columnarConf.enableColumnarCoalesce
   val enableRollupOptimization: Boolean = columnarConf.enableRollupOptimization
   val enableRowShuffle: Boolean = columnarConf.enableRowShuffle
-  val ColumnsThreshold: Int = columnarConf.ColumnsThreshold
+  val columnsThreshold: Int = columnarConf.columnsThreshold
 
   def apply(plan: SparkPlan): SparkPlan = {
     replaceWithColumnarPlan(plan)
@@ -553,7 +553,7 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] {
       val child = replaceWithColumnarPlan(plan.child)
       if (child.output.nonEmpty) {
         logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
-        if (child.isInstanceOf[ColumnarHashAggregateExec] && child.output.size > ColumnsThreshold
+        if (child.isInstanceOf[ColumnarHashAggregateExec] && child.output.size > columnsThreshold
             && enableRowShuffle) {
           new ColumnarShuffleExchangeExec(plan.outputPartitioning, child, plan.shuffleOrigin, true)
         } else if (enableColumnarShuffle) {

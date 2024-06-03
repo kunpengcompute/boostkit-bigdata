@@ -60,6 +60,8 @@ class Splitter {
 
     std::shared_ptr<Buffer> CaculateSpilledTmpFilePartitionOffsets();
 
+    spark::VecType::VecTypeId CastOmniTypeIdToProtoVecType(int32_t omniType);
+
     void SerializingFixedColumns(int32_t partitionId,
                                 spark::Vec& vec,
                                 int fixColIndexTmp,
@@ -154,6 +156,7 @@ class Splitter {
     // Data structures required to handle row formats
     std::vector<std::vector<RowInfo *>> partition_rows; // pid : std::vector<row>
     uint64_t total_input_size = 0; // total row size in bytes
+    uint32_t expansion = 2; // expansion coefficient
     spark::ProtoRowBatch *protoRowBatch = new ProtoRowBatch();
 
 private:
@@ -194,7 +197,7 @@ public:
     // 分区数
     int32_t num_fields_;
     InputDataTypes input_col_types;
-    std::vector<DataTypeId> col_types_;
+    std::vector<spark::VecType::VecTypeId> proto_col_types_; // Avoid repeated type conversion during the split process.
     omniruntime::vec::VectorBatch *inputVecBatch = nullptr;
     std::map<std::string, std::shared_ptr<Buffer>> spilled_tmp_files_info_;
 

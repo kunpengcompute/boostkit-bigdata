@@ -81,7 +81,7 @@ case class ColumnarShuffleExchangeExec(
     "numPartitions" -> SQLMetrics.createMetric(sparkContext, "number of partitions")
   ) ++ readMetrics ++ writeMetrics
 
-  override def nodeName: String = "OmniColumnarShuffleExchange"
+  override def nodeName: String = if (!handleRow) "OmniColumnarShuffleExchange" else "OmniRowShuffleExchange"
 
   override def supportsColumnar: Boolean = true
 

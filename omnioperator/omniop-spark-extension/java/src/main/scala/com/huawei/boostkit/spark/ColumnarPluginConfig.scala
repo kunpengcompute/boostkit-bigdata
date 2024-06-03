@@ -267,8 +267,8 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
   val enableRowShuffle: Boolean =
     conf.getConfString("spark.omni.sql.columnar.rowShuffle.enabled", "true").toBoolean
 
-  val ColumnsThreshold: Int =
-    conf.getConfString("spark.omni.sql.columnar.ColumnsThreshold", "10").toInt
+  val columnsThreshold: Int =
+    conf.getConfString("spark.omni.sql.columnar.columnsThreshold", "10").toInt
 }
 
 

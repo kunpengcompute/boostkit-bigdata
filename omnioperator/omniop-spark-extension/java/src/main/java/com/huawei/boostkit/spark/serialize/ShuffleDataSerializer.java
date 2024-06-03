@@ -46,51 +46,59 @@ public class ShuffleDataSerializer {
 
     public static ColumnarBatch deserialize(boolean isRowShuffle, byte[] bytes) {
         if (!isRowShuffle) {
-            ColumnVector[] vecs = null;
-            try {
-                VecData.VecBatch vecBatch = VecData.VecBatch.parseFrom(bytes);
-                int vecCount = vecBatch.getVecCnt();
-                int rowCount = vecBatch.getRowCnt();
-                vecs = new ColumnVector[vecCount];
-                for (int i = 0; i < vecCount; i++) {
-                    vecs[i] = buildVec(vecBatch.getVecs(i), rowCount);
-                }
-                return new ColumnarBatch(vecs, rowCount);
-            } catch (InvalidProtocolBufferException e) {
-                throw new RuntimeException("deserialize failed. errmsg:" + e.getMessage());
-            } catch (OmniRuntimeException e) {
-                if (vecs != null) {
-                    for (int i = 0; i < vecs.length; i++) {
-                        ColumnVector vec = vecs[i];
-                        if (vec != null) {
-                            vec.close();
-                        }
+            return deserializeByColumn(bytes);
+        } else {
+            return deserializeByRow(bytes);
+        }
+    }
+
+    public static ColumnarBatch deserializeByColumn(byte[] bytes) {
+        ColumnVector[] vecs = null;
+        try {
+            VecData.VecBatch vecBatch = VecData.VecBatch.parseFrom(bytes);
+            int vecCount = vecBatch.getVecCnt();
+            int rowCount = vecBatch.getRowCnt();
+            vecs = new ColumnVector[vecCount];
+            for (int i = 0; i < vecCount; i++) {
+                vecs[i] = buildVec(vecBatch.getVecs(i), rowCount);
+            }
+            return new ColumnarBatch(vecs, rowCount);
+        } catch (InvalidProtocolBufferException e) {
+            throw new RuntimeException("deserialize failed. errmsg:" + e.getMessage());
+        } catch (OmniRuntimeException e) {
+            if (vecs != null) {
+                for (int i = 0; i < vecs.length; i++) {
+                    ColumnVector vec = vecs[i];
+                    if (vec != null) {
+                        vec.close();
                     }
                 }
-                throw new RuntimeException("deserialize failed. errmsg:" + e.getMessage());
             }
-        } else {
-            try {
-                VecData.ProtoRowBatch rowBatch = VecData.ProtoRowBatch.parseFrom(bytes);
-                int vecCount = rowBatch.getVecCnt();
-                int rowCount = rowBatch.getRowCnt();
-                OmniColumnVector[] columnarVecs = new OmniColumnVector[vecCount];
-                long[] omniVecs = new long[vecCount];
-                int[] omniTypes = new int[vecCount];
-                createEmptyVec(rowBatch, omniTypes, omniVecs, columnarVecs, vecCount, rowCount);
-                OmniRowDeserializer deserializer = new OmniRowDeserializer(omniTypes);
+            throw new RuntimeException("deserialize failed. errmsg:" + e.getMessage());
+        }
+    }
 
-                for (int rowIdx = 0; rowIdx < rowCount; rowIdx++) {
-                    VecData.ProtoRow protoRow = rowBatch.getRows(rowIdx);
-                    byte[] array = protoRow.getData().toByteArray();
-                    deserializer.parse(array, omniVecs, rowIdx);
-                }
+    public static ColumnarBatch deserializeByRow(byte[] bytes) {
+        try {
+            VecData.ProtoRowBatch rowBatch = VecData.ProtoRowBatch.parseFrom(bytes);
+            int vecCount = rowBatch.getVecCnt();
+            int rowCount = rowBatch.getRowCnt();
+            OmniColumnVector[] columnarVecs = new OmniColumnVector[vecCount];
+            long[] omniVecs = new long[vecCount];
+            int[] omniTypes = new int[vecCount];
+            createEmptyVec(rowBatch, omniTypes, omniVecs, columnarVecs, vecCount, rowCount);
+            OmniRowDeserializer deserializer = new OmniRowDeserializer(omniTypes);
 
-                deserializer.close();
-                return new ColumnarBatch(columnarVecs, rowCount);
-            } catch (InvalidProtocolBufferException e) {
-                throw new RuntimeException("deserialize failed. errmsg:" + e.getMessage());
+            for (int rowIdx = 0; rowIdx < rowCount; rowIdx++) {
+                VecData.ProtoRow protoRow = rowBatch.getRows(rowIdx);
+                byte[] array = protoRow.getData().toByteArray();
+                deserializer.parse(array, omniVecs, rowIdx);
             }
+
+            deserializer.close();
+            return new ColumnarBatch(columnarVecs, rowCount);
+        } catch (InvalidProtocolBufferException e) {
+            throw new RuntimeException("deserialize failed. errmsg:" + e.getMessage());
         }
     }
 

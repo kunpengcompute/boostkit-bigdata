@@ -65,7 +65,6 @@ private class ColumnarBatchSerializerInstance(
         new DataInputStream(new BufferedInputStream(in))
       }
       private[this] var columnarBuffer: Array[Byte] = new Array[Byte](1024)
-      val ibuffer: ByteBuffer = ByteBuffer.allocateDirect(4)
 
       private[this] val EOF: Int = -1
 
