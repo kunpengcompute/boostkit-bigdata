@@ -135,9 +135,9 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
   val columnarShuffleSpillBatchRowNum =
     conf.getConfString("spark.shuffle.columnar.shuffleSpillBatchRowNum", "10000").toInt
 
-  // columnar shuffle spill memory threshold
-  val columnarShuffleSpillMemoryThreshold =
-    conf.getConfString("spark.shuffle.columnar.shuffleSpillMemoryThreshold",
+  // columnar shuffle spill memory threshold in task level
+  val columnarShuffleTaskSpillMemoryThreshold =
+    conf.getConfString("spark.shuffle.columnar.shuffleTaskSpillMemoryThreshold",
       "2147483648").toLong
 
   // columnar shuffle compress block size
@@ -262,6 +262,13 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
 
   val radixSortThreshold: Int =
     conf.getConfString("spark.omni.sql.columnar.radixSortThreshold", "1000000").toInt
+
+  // enable or disable row shuffle
+  val enableRowShuffle: Boolean =
+    conf.getConfString("spark.omni.sql.columnar.rowShuffle.enabled", "true").toBoolean
+
+  val columnsThreshold: Int =
+    conf.getConfString("spark.omni.sql.columnar.columnsThreshold", "10").toInt
 }
 
 

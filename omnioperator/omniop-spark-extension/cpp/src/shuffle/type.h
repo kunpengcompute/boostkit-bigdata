@@ -43,7 +43,8 @@ struct SplitOptions {
     Allocator *allocator = Allocator::GetAllocator();
 
     uint64_t spill_batch_row_num = 4096; // default value
-    uint64_t spill_mem_threshold = 1024 * 1024 * 1024; // default value
+    uint64_t task_spill_mem_threshold = 1024 * 1024 * 1024; // default value
+    uint64_t executor_spill_mem_threshold = UINT64_MAX; // default value
     uint64_t compress_block_size = 64 * 1024; // default value
 
     static SplitOptions Defaults();

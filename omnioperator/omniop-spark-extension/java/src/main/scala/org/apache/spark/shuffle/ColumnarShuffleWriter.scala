@@ -25,6 +25,7 @@ import nova.hetu.omniruntime.vector.VecBatch
 import org.apache.spark.SparkEnv
 import org.apache.spark.internal.Logging
 import org.apache.spark.scheduler.MapStatus
+import org.apache.spark.sql.execution.util.SparkMemoryUtils
 import org.apache.spark.sql.vectorized.ColumnarBatch
 import org.apache.spark.util.Utils
 
@@ -49,7 +50,8 @@ class ColumnarShuffleWriter[K, V](
 
   val columnarConf = ColumnarPluginConfig.getSessionConf
   val shuffleSpillBatchRowNum = columnarConf.columnarShuffleSpillBatchRowNum
-  val shuffleSpillMemoryThreshold = columnarConf.columnarShuffleSpillMemoryThreshold
+  val shuffleTaskSpillMemoryThreshold = columnarConf.columnarShuffleTaskSpillMemoryThreshold
+  val shuffleExecutorSpillMemoryThreshold = columnarConf.columnarSpillMemPctThreshold * SparkMemoryUtils.offHeapSize
   val shuffleCompressBlockSize = columnarConf.columnarShuffleCompressBlockSize
   val shuffleNativeBufferSize = columnarConf.columnarShuffleNativeBufferSize
   val enableShuffleCompress = columnarConf.enableShuffleCompress
@@ -87,7 +89,8 @@ class ColumnarShuffleWriter[K, V](
         localDirs,
         shuffleCompressBlockSize,
         shuffleSpillBatchRowNum,
-        shuffleSpillMemoryThreshold)
+        shuffleTaskSpillMemoryThreshold,
+        shuffleExecutorSpillMemoryThreshold)
     }
 
 
@@ -104,14 +107,22 @@ class ColumnarShuffleWriter[K, V](
           dep.dataSize += input(col).getRealOffsetBufCapacityInBytes
         }
         val vb = new VecBatch(input, cb.numRows())
-        jniWrapper.split(nativeSplitter, vb.getNativeVectorBatch)
+        if (!dep.handleRow) {
+          jniWrapper.split(nativeSplitter, vb.getNativeVectorBatch)
+        } else {
+          jniWrapper.rowSplit(nativeSplitter, vb.getNativeVectorBatch)
+        }
         dep.splitTime.add(System.nanoTime() - startTime)
         dep.numInputRows.add(cb.numRows)
         writeMetrics.incRecordsWritten(cb.numRows)
       }
     }
     val startTime = System.nanoTime()
-    splitResult = jniWrapper.stop(nativeSplitter)
+    if (!dep.handleRow) {
+      splitResult = jniWrapper.stop(nativeSplitter)
+    } else {
+      splitResult = jniWrapper.rowStop(nativeSplitter)
+    }
 
     dep.splitTime.add(System.nanoTime() - startTime - splitResult.getTotalSpillTime -
       splitResult.getTotalWriteTime - splitResult.getTotalComputePidTime)

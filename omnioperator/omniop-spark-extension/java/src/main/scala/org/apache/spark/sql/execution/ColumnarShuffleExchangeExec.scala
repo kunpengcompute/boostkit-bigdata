@@ -59,7 +59,8 @@ import nova.hetu.omniruntime.vector.IntVec
 case class ColumnarShuffleExchangeExec(
   override val outputPartitioning: Partitioning,
   child: SparkPlan,
-  shuffleOrigin: ShuffleOrigin = ENSURE_REQUIREMENTS)
+  shuffleOrigin: ShuffleOrigin = ENSURE_REQUIREMENTS,
+  handleRow: Boolean = false)
   extends ShuffleExchangeLike {
 
   private lazy val writeMetrics =
@@ -80,13 +81,14 @@ case class ColumnarShuffleExchangeExec(
     "numPartitions" -> SQLMetrics.createMetric(sparkContext, "number of partitions")
   ) ++ readMetrics ++ writeMetrics
 
-  override def nodeName: String = "OmniColumnarShuffleExchange"
+  override def nodeName: String = if (!handleRow) "OmniColumnarShuffleExchange" else "OmniRowShuffleExchange"
 
   override def supportsColumnar: Boolean = true
 
   val serializer: Serializer = new ColumnarBatchSerializer(
     longMetric("avgReadBatchNumRows"),
-    longMetric("numOutputRows"))
+    longMetric("numOutputRows"),
+    handleRow)
 
   @transient lazy val inputColumnarRDD: RDD[ColumnarBatch] = child.executeColumnar()
 
@@ -120,6 +122,7 @@ case class ColumnarShuffleExchangeExec(
       child.output,
       outputPartitioning,
       serializer,
+      handleRow,
       writeMetrics,
       longMetric("dataSize"),
       longMetric("bytesSpilled"),
@@ -191,6 +194,7 @@ object ColumnarShuffleExchangeExec extends Logging {
                                 outputAttributes: Seq[Attribute],
                                 newPartitioning: Partitioning,
                                 serializer: Serializer,
+                                handleRow: Boolean,
                                 writeMetrics: Map[String, SQLMetric],
                                 dataSize: SQLMetric,
                                 bytesSpilled: SQLMetric,
@@ -422,6 +426,7 @@ object ColumnarShuffleExchangeExec extends Logging {
       rddWithPartitionId,
       new PartitionIdPassthrough(newPartitioning.numPartitions),
       serializer,
+      handleRow = handleRow,
       shuffleWriterProcessor = createShuffleWriteProcessor(writeMetrics),
       partitionInfo = partitionInfo,
       dataSize = dataSize,
