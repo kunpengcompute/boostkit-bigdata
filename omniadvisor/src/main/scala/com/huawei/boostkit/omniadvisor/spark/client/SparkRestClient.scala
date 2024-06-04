@@ -46,7 +46,7 @@ class SparkRestClient(historyUri: String, timeoutSeconds: Int, sparkConf: SparkC
 
   private val historyServerUri: URI = {
     val baseUri: URI = {
-      if (historyUri.contains("http://")) {
+      if (historyUri.startsWith("http://") || historyUri.startsWith("https://")) {
         new URI(historyUri)
       } else {
         new URI(s"http://${historyUri}")
