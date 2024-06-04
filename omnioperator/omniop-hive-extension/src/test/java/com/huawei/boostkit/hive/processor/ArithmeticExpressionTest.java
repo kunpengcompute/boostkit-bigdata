@@ -45,4 +45,21 @@ public class ArithmeticExpressionTest extends CommonTest {
         Assert.assertEquals("4\tJerry", rs.get(0));
         Assert.assertEquals("2\tTom", rs.get(1));
     }
+
+    @Test
+    public void testDecimalArithmeticExpression() throws IOException {
+        utRunSqlOnDriver("use ut_database");
+        utRunSqlOnDriver("drop table if exists decimal_arithmetic_expression");
+        utRunSqlOnDriver("create table if not exists decimal_arithmetic_expression (d1 decimal(18,8), d2 decimal(18,8)) " +
+                "stored as orc");
+        utRunSqlOnDriver("insert into decimal_arithmetic_expression values(1, 1)");
+        utRunSqlOnDriver("insert into decimal_arithmetic_expression values(2, 2)");
+        utRunSqlOnDriver("select d1 * 2, d2 + d1 from decimal_arithmetic_expression order by d1");
+        List<String> rs = new ArrayList<>();
+        driver.getResults(rs);
+        utRunSqlOnDriver("drop table if exists decimal_arithmetic_expression");
+        Assert.assertEquals(2, rs.size());
+        Assert.assertEquals("2.00000000\t2.00000000", rs.get(0));
+        Assert.assertEquals("4.00000000\t4.00000000", rs.get(1));
+    }
 }
