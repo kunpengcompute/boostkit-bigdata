@@ -391,16 +391,18 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
         }
     }
 
+    private String extractNumberPart(ExprNodeColumnDesc col) {
+        String columnName = col.getColumn();
+        return columnName.replaceAll("\\D+", "");
+    }
+
     private void getDecimal128ConvertDecimal64Cols() {
         ArrayList<ExprNodeDesc> allCols = new ArrayList<>(conf.getKeyCols());
         allCols.addAll(conf.getValueCols());
         List<? extends StructField> allStructFieldRefs = ((StructObjectInspector) inputObjInspectors[0]).getAllStructFieldRefs();
         List<ExprNodeDesc> sortedAllCols = allCols.stream().filter(col -> col instanceof ExprNodeColumnDesc).
-                sorted(Comparator.comparingInt(col -> {
-                    String columnName = ((ExprNodeColumnDesc) col).getColumn();
-                    String numberPart = columnName.replaceAll("\\D+", "");
-                    return Integer.parseInt(numberPart);
-                })).collect(Collectors.toList());
+                filter(col -> !extractNumberPart((ExprNodeColumnDesc) col).isEmpty()).
+                sorted(Comparator.comparingInt(col -> Integer.parseInt(extractNumberPart((ExprNodeColumnDesc) col)))).collect(Collectors.toList());
         if (allStructFieldRefs.size() != sortedAllCols.size()) {
             return;
         }
