@@ -472,6 +472,12 @@ object OmniExpressionAdaptor extends Logging {
           case _ =>
             throw new UnsupportedOperationException(s"Unsupported right expression in like expression: $endsWith")
         }
+      case contains: Contains =>
+        new JSONObject().put("exprType", "FUNCTION")
+          .addOmniExpJsonType("returnType", contains.dataType)
+          .put("function_name", "Contains")
+          .put("arguments", new JSONArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(contains.left, exprsIndexMap))
+            .put(rewriteToOmniJsonExpressionLiteralJsonObject(contains.right, exprsIndexMap)))
 
       case truncDate: TruncDate =>
         new JSONObject().put("exprType", "FUNCTION")
