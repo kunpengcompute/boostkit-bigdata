@@ -35,7 +35,7 @@ import org.apache.spark.sql.catalyst.plans.{FullOuter, Inner, JoinType, LeftAnti
 import org.apache.spark.sql.catalyst.util.CharVarcharUtils.getRawTypeString
 import org.apache.spark.sql.execution
 import org.apache.spark.sql.hive.HiveUdfAdaptorUtil
-import org.apache.spark.sql.types.{BooleanType, DataType, DateType, Decimal, DecimalType, DoubleType, IntegerType, LongType, Metadata, NullType, ShortType, StringType, TimestampType}
+import org.apache.spark.sql.types.{BinaryType, BooleanType, DataType, DateType, Decimal, DecimalType, DoubleType, IntegerType, LongType, Metadata, NullType, ShortType, StringType, TimestampType}
 import org.json.{JSONArray, JSONObject}
 
 import java.util.Locale
@@ -77,7 +77,7 @@ object OmniExpressionAdaptor extends Logging {
   private def unsupportedCastCheck(expr: Expression, cast: CastBase): Unit = {
     def doSupportCastToString(dataType: DataType): Boolean = {
       if (dataType.isInstanceOf[DecimalType] || dataType.isInstanceOf[StringType] || dataType.isInstanceOf[IntegerType]
-        || dataType.isInstanceOf[LongType]) {
+        || dataType.isInstanceOf[LongType] || dataType.isInstanceOf[DateType] || dataType.isInstanceOf[DoubleType]) {
         true
       } else {
         false
@@ -86,7 +86,7 @@ object OmniExpressionAdaptor extends Logging {
 
     def doSupportCastFromString(dataType: DataType): Boolean = {
       if (dataType.isInstanceOf[DecimalType] || dataType.isInstanceOf[StringType] || dataType.isInstanceOf[DateType]
-        || dataType.isInstanceOf[IntegerType] || dataType.isInstanceOf[LongType]) {
+        || dataType.isInstanceOf[IntegerType] || dataType.isInstanceOf[LongType] || dataType.isInstanceOf[DoubleType]) {
         true
       } else {
         false
@@ -103,10 +103,6 @@ object OmniExpressionAdaptor extends Logging {
       throw new UnsupportedOperationException(s"Unsupported expression: $expr")
     }
 
-    // not support Cast(double as decimal)
-    if (cast.dataType.isInstanceOf[DecimalType] && cast.child.dataType.isInstanceOf[DoubleType]) {
-      throw new UnsupportedOperationException(s"Unsupported expression: $expr")
-    }
   }
 
   def rewriteToOmniJsonExpressionLiteral(expr: Expression,
@@ -440,6 +436,25 @@ object OmniExpressionAdaptor extends Logging {
 
           case _ =>
             throw new UnsupportedOperationException(s"Unsupported right expression in like expression: $endsWith")
+        }
+
+      case truncDate: TruncDate =>
+        new JSONObject().put("exprType", "FUNCTION")
+          .addOmniExpJsonType("returnType", truncDate.dataType)
+          .put("function_name", "trunc_date")
+          .put("arguments", new JSONArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(truncDate.left, exprsIndexMap))
+            .put(rewriteToOmniJsonExpressionLiteralJsonObject(truncDate.right, exprsIndexMap)))
+
+      case md5: Md5 =>
+        md5.child match {
+          case Cast(inputExpression, outputType, _, _) if outputType == BinaryType =>
+            inputExpression match {
+              case AttributeReference(_, dataType, _, _) if dataType == StringType =>
+                new JSONObject().put("exprType", "FUNCTION")
+                  .addOmniExpJsonType("returnType", md5.dataType)
+                  .put("function_name", "Md5")
+                  .put("arguments", new JSONArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(inputExpression, exprsIndexMap)))
+            }
         }
 
       case _ =>
