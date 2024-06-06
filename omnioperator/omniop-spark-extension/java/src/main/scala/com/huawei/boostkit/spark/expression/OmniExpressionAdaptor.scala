@@ -447,7 +447,7 @@ object OmniExpressionAdaptor extends Logging {
 
       case md5: Md5 =>
         md5.child match {
-          case Cast(inputExpression, outputType, _, _) if outputType == BinaryType =>
+          case Cast(inputExpression, outputType, _) if outputType == BinaryType =>
             inputExpression match {
               case AttributeReference(_, dataType, _, _) if dataType == StringType =>
                 new JSONObject().put("exprType", "FUNCTION")
