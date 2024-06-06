@@ -39,6 +39,8 @@ constexpr int32_t DECIMAL64_LEN = 8;
                 return new ParquetPlainDecoder<::parquet::Int32Type>(descr);
             case ::parquet::Type::INT64:
                 return new ParquetPlainDecoder<::parquet::Int64Type>(descr);
+            case ::parquet::Type::FLOAT:
+                return new ParquetPlainDecoder<::parquet::FloatType>(descr);
             case ::parquet::Type::DOUBLE:
                 return new ParquetPlainDecoder<::parquet::DoubleType>(descr);
             case ::parquet::Type::BYTE_ARRAY:
@@ -70,6 +72,8 @@ constexpr int32_t DECIMAL64_LEN = 8;
             return new ParquetDictDecoderImpl<::parquet::Int32Type>(descr, pool);
         case ::parquet::Type::INT64:
             return new ParquetDictDecoderImpl<::parquet::Int64Type>(descr, pool);
+        case ::parquet::Type::FLOAT:
+            return new ParquetDictDecoderImpl<::parquet::FloatType>(descr, pool);
         case ::parquet::Type::DOUBLE:
             return new ParquetDictDecoderImpl<::parquet::DoubleType>(descr, pool);
         case ::parquet::Type::BYTE_ARRAY:
@@ -340,10 +344,15 @@ std::shared_ptr<OmniRecordReader> MakeRecordReader(const ColumnDescriptor* descr
             return std::make_shared<ParquetTypedRecordReader<OMNI_DATE64, ::parquet::Int64Type>>(descr,
                 leaf_info, pool);
         }
+        case ::arrow::Type::FLOAT: {
+            return std::make_shared<ParquetTypedRecordReader<OMNI_DOUBLE, ::parquet::FloatType>>(descr,
+                leaf_info, pool);
+        }
         case ::arrow::Type::DOUBLE: {
             return std::make_shared<ParquetTypedRecordReader<OMNI_DOUBLE, ::parquet::DoubleType>>(descr,
                 leaf_info, pool);
         }
+        case ::arrow::Type::BINARY:
         case ::arrow::Type::STRING: {
             return MakeByteArrayRecordReader(descr, leaf_info, pool, read_dictionary);
         }
@@ -353,6 +362,7 @@ std::shared_ptr<OmniRecordReader> MakeRecordReader(const ColumnDescriptor* descr
                     return std::make_shared<ParquetIntDecimal64RecordReader>(descr, leaf_info, pool);
                 case ::parquet::Type::INT64:
                     return std::make_shared<ParquetTypedRecordReader<OMNI_LONG, ::parquet::Int64Type>>(descr, leaf_info, pool);
+                case ::parquet::Type::BYTE_ARRAY:
                 case ::parquet::Type::FIXED_LEN_BYTE_ARRAY: {
                     int32_t precision = ::arrow::internal::checked_cast<const ::arrow::DecimalType&>(*type).precision();
                     if (precision > PARQUET_MAX_DECIMAL64_DIGITS) {

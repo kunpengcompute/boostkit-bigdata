@@ -117,12 +117,14 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 import java.util.Set;
 import java.util.function.BiFunction;
+import java.util.stream.Collectors;
 
 public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
         implements Serializable, TopNHash.BinaryCollector {
@@ -389,16 +391,24 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
         }
     }
 
+    private String extractNumberPart(ExprNodeColumnDesc col) {
+        String columnName = col.getColumn();
+        return columnName.replaceAll("\\D+", "");
+    }
+
     private void getDecimal128ConvertDecimal64Cols() {
         ArrayList<ExprNodeDesc> allCols = new ArrayList<>(conf.getKeyCols());
         allCols.addAll(conf.getValueCols());
         List<? extends StructField> allStructFieldRefs = ((StructObjectInspector) inputObjInspectors[0]).getAllStructFieldRefs();
-        if (allStructFieldRefs.size() != allCols.size()) {
+        List<ExprNodeDesc> sortedAllCols = allCols.stream().filter(col -> col instanceof ExprNodeColumnDesc).
+                filter(col -> !extractNumberPart((ExprNodeColumnDesc) col).isEmpty()).
+                sorted(Comparator.comparingInt(col -> Integer.parseInt(extractNumberPart((ExprNodeColumnDesc) col)))).collect(Collectors.toList());
+        if (allStructFieldRefs.size() != sortedAllCols.size()) {
             return;
         }
         for (int i = 0; i < allStructFieldRefs.size(); i++) {
             ObjectInspector fieldObjectInspector = allStructFieldRefs.get(i).getFieldObjectInspector();
-            TypeInfo typeInfo = allCols.get(i).getTypeInfo();
+            TypeInfo typeInfo = sortedAllCols.get(i).getTypeInfo();
             if (fieldObjectInspector instanceof WritableHiveDecimalObjectInspector &&
                     ((DecimalTypeInfo) ((WritableHiveDecimalObjectInspector) fieldObjectInspector).getTypeInfo()).getPrecision() > 18 &&
                     (typeInfo instanceof DecimalTypeInfo) && ((DecimalTypeInfo) typeInfo).getPrecision() <= 18) {
