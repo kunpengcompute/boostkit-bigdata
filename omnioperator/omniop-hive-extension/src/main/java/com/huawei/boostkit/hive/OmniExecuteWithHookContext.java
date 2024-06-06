@@ -294,7 +294,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             return false;
         }
         for (Operator<? extends OperatorDesc> op : work.getAllOperators()) {
-            if (stringLength > 1024 && op.getType() == OperatorType.REDUCESINK) {
+            if (stringLength > 1024 && op.getType() == OperatorType.REDUCESINK && op.getColumnExprMap() != null) {
                 List<String> typeInfos = op.getColumnExprMap().values().stream().
                         map(value -> value.getTypeInfo().getTypeName()).collect(Collectors.toList());
                 if (typeInfos.contains("string")) {
