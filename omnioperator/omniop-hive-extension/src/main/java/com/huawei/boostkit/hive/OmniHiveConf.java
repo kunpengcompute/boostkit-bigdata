@@ -33,6 +33,7 @@ class OmniHiveConf {
     public boolean enableOperatorPtf;
     public boolean enableOperatorTablescan;
     public boolean enableOperatorReducesink;
+    public int stringLength;
     private HashMap<OperatorType, Boolean> operatorEnableMap;
 
     public OmniHiveConf(HiveConf hiveConf) {
@@ -56,6 +57,7 @@ class OmniHiveConf {
             put(OperatorType.TABLESCAN, enableOperatorTablescan);
             put(OperatorType.REDUCESINK, enableOperatorReducesink);
         }};
+        stringLength = hiveConf.getInt("omni.hive.string.length", 1024);
     }
 
     public boolean isEnableOperator(OperatorType operatorType) {

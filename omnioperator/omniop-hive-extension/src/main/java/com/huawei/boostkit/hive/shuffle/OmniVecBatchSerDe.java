@@ -18,6 +18,7 @@
 
 package com.huawei.boostkit.hive.shuffle;
 
+import com.huawei.boostkit.hive.OmniExecuteWithHookContext;
 import nova.hetu.omniruntime.type.DataType;
 import nova.hetu.omniruntime.type.ShortDataType;
 import org.apache.hadoop.conf.Configuration;
@@ -215,7 +216,7 @@ public class OmniVecBatchSerDe extends AbstractSerDe {
 
     public static int getEstimateLen(PrimitiveTypeInfo primitiveTypeInfo) {
         if (primitiveTypeInfo.getPrimitiveCategory().equals(PrimitiveObjectInspector.PrimitiveCategory.STRING)) {
-            return 512;
+            return OmniExecuteWithHookContext.stringLength;
         } else if (primitiveTypeInfo.getPrimitiveCategory().equals(PrimitiveObjectInspector.PrimitiveCategory.VOID)) {
             // void to boolean, boolean use one byte
             return 1;
