@@ -386,6 +386,9 @@ object OmniExpressionAdaptor extends Logging {
 
       case concat: Concat =>
         getConcatJsonStr(concat, exprsIndexMap)
+      case greatest: Greatest =>
+        getGreatestJsonStr(greatest, exprsIndexMap)
+
       case round: Round =>
         new JSONObject().put("exprType", "FUNCTION")
           .addOmniExpJsonType("returnType", round.dataType)
@@ -511,6 +514,32 @@ object OmniExpressionAdaptor extends Logging {
         .put(rewriteToOmniJsonExpressionLiteralJsonObject(children(i), exprsIndexMap)))
     }
     res
+  }
+
+  private def getGreatestJsonStr(greatest: Greatest, exprsIndexMap: Map[ExprId, Int]): JSONObject = {
+    if (greatest.children.length != 2) {
+      throw new UnsupportedOperationException(s"Number of parameters is ${greatest.children.length}. " +
+        "Greatest only supports up to 2 parameters")
+    }
+
+    val children: Seq[Expression] = greatest.children
+    children.map(_.dataType).foreach {
+      case _: StringType =>
+      case _: ShortType =>
+      case _: IntegerType =>
+      case _: DoubleType =>
+      case _: LongType =>
+      case _: BooleanType =>
+      case _: DecimalType =>
+      case dataType =>
+        throw new UnsupportedOperationException(s"Invalid input dataType:$dataType for greatest")
+    }
+
+    new JSONObject().put("exprType", "FUNCTION")
+      .addOmniExpJsonType("returnType", greatest.dataType)
+      .put("function_name", "Greatest")
+      .put("arguments", new JSONArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(children.head, exprsIndexMap))
+        .put(rewriteToOmniJsonExpressionLiteralJsonObject(children(1), exprsIndexMap)))
   }
 
   def toOmniJsonAttribute(attr: Attribute, colVal: Int): JSONObject = {
