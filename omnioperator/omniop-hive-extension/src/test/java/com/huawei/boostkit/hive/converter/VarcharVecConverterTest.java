@@ -31,21 +31,38 @@ public class VarcharVecConverterTest extends CommonTest {
     public void testVarcharVecConverter() throws IOException {
         utRunSqlOnDriver("use ut_database");
 
-        utRunSqlOnDriver("drop table if exists test_converter");
-        utRunSqlOnDriver("create table if not exists test_converter (class_id int, flag varchar(20)) " +
+        utRunSqlOnDriver("drop table if exists test_varchar_vec_converter");
+        utRunSqlOnDriver("create table if not exists test_varchar_vec_converter (class_id int, flag varchar(20)) " +
                 "stored as orc");
-        utRunSqlOnDriver("insert into test_converter values(1, 'aaaa')");
-        utRunSqlOnDriver("insert into test_converter values(2, 'bbbb')");
-        utRunSqlOnDriver("insert into test_converter values(3, 'cccc')");
-        utRunSqlOnDriver("insert into test_converter values(4, 'dddd')");
-        utRunSqlOnDriver("select class_id, flag from test_converter order by flag");
-        List<String> rs = new ArrayList<>();
-        driver.getResults(rs);
-        utRunSqlOnDriver("drop table if exists test_converter");
-        Assert.assertEquals(4, rs.size());
-        Assert.assertEquals("1\taaaa", rs.get(0));
-        Assert.assertEquals("2\tbbbb", rs.get(1));
-        Assert.assertEquals("3\tcccc", rs.get(2));
-        Assert.assertEquals("4\tdddd", rs.get(3));
+        utRunSqlOnDriver("insert into test_varchar_vec_converter values(1, 'aaaa')");
+        utRunSqlOnDriver("insert into test_varchar_vec_converter values(2, 'bbbb')");
+        utRunSqlOnDriver("insert into test_varchar_vec_converter values(3, 'cccc')");
+        utRunSqlOnDriver("insert into test_varchar_vec_converter values(4, 'dddd')");
+        utRunSqlOnDriver("insert into test_varchar_vec_converter values(5, null)");
+
+        createNonVectorizedDriver();
+        utRunSqlOnDriver("use ut_database");
+        utRunSqlOnDriver("select class_id, flag from test_varchar_vec_converter order by class_id");
+        List<String> rsNonVectorized = new ArrayList<>();
+        driver.getResults(rsNonVectorized);
+        createVectorizedDriver();
+        utRunSqlOnDriver("use ut_database");
+        utRunSqlOnDriver("select class_id, flag from test_varchar_vec_converter order by class_id");
+        List<String> rsVectorized = new ArrayList<>();
+        driver.getResults(rsVectorized);
+
+        utRunSqlOnDriver("drop table if exists test_varchar_vec_converter");
+        Assert.assertEquals(5, rsNonVectorized.size());
+        Assert.assertEquals("1\taaaa", rsNonVectorized.get(0));
+        Assert.assertEquals("2\tbbbb", rsNonVectorized.get(1));
+        Assert.assertEquals("3\tcccc", rsNonVectorized.get(2));
+        Assert.assertEquals("4\tdddd", rsNonVectorized.get(3));
+        Assert.assertEquals("5\tNULL", rsNonVectorized.get(4));
+        Assert.assertEquals(5, rsVectorized.size());
+        Assert.assertEquals("1\taaaa", rsVectorized.get(0));
+        Assert.assertEquals("2\tbbbb", rsVectorized.get(1));
+        Assert.assertEquals("3\tcccc", rsVectorized.get(2));
+        Assert.assertEquals("4\tdddd", rsVectorized.get(3));
+        Assert.assertEquals("5\tNULL", rsVectorized.get(4));
     }
 }

@@ -31,21 +31,38 @@ public class BooleanVecConverterTest extends CommonTest {
     public void testBooleanVecConverter() throws IOException {
         utRunSqlOnDriver("use ut_database");
 
-        utRunSqlOnDriver("drop table if exists test_converter");
-        utRunSqlOnDriver("create table if not exists test_converter (class_id int, flag boolean) " +
+        utRunSqlOnDriver("drop table if exists test_boolean_vec_converter");
+        utRunSqlOnDriver("create table if not exists test_boolean_vec_converter (class_id int, flag boolean) " +
                 "stored as orc");
-        utRunSqlOnDriver("insert into test_converter values(1, true)");
-        utRunSqlOnDriver("insert into test_converter values(2, false)");
-        utRunSqlOnDriver("insert into test_converter values(3, true)");
-        utRunSqlOnDriver("insert into test_converter values(4, false)");
-        utRunSqlOnDriver("select class_id, flag from test_converter order by flag");
-        List<String> rs = new ArrayList<>();
-        driver.getResults(rs);
-        utRunSqlOnDriver("drop table if exists test_converter");
-        Assert.assertEquals(4, rs.size());
-        Assert.assertEquals("2\tfalse", rs.get(0));
-        Assert.assertEquals("4\tfalse", rs.get(1));
-        Assert.assertEquals("1\ttrue", rs.get(2));
-        Assert.assertEquals("3\ttrue", rs.get(3));
+        utRunSqlOnDriver("insert into test_boolean_vec_converter values(1, true)");
+        utRunSqlOnDriver("insert into test_boolean_vec_converter values(2, false)");
+        utRunSqlOnDriver("insert into test_boolean_vec_converter values(3, true)");
+        utRunSqlOnDriver("insert into test_boolean_vec_converter values(4, false)");
+        utRunSqlOnDriver("insert into test_boolean_vec_converter values(5, null)");
+
+        createNonVectorizedDriver();
+        utRunSqlOnDriver("use ut_database");
+        utRunSqlOnDriver("select class_id, flag from test_boolean_vec_converter order by class_id");
+        List<String> rsNonVectorized = new ArrayList<>();
+        driver.getResults(rsNonVectorized);
+        createVectorizedDriver();
+        utRunSqlOnDriver("use ut_database");
+        utRunSqlOnDriver("select class_id, flag from test_boolean_vec_converter order by class_id");
+        List<String> rsVectorized = new ArrayList<>();
+        driver.getResults(rsVectorized);
+
+        utRunSqlOnDriver("drop table if exists test_boolean_vec_converter");
+        Assert.assertEquals(5, rsNonVectorized.size());
+        Assert.assertEquals("1\ttrue", rsNonVectorized.get(0));
+        Assert.assertEquals("2\tfalse", rsNonVectorized.get(1));
+        Assert.assertEquals("3\ttrue", rsNonVectorized.get(2));
+        Assert.assertEquals("4\tfalse", rsNonVectorized.get(3));
+        Assert.assertEquals("5\tNULL", rsNonVectorized.get(4));
+        Assert.assertEquals(5, rsVectorized.size());
+        Assert.assertEquals("1\ttrue", rsVectorized.get(0));
+        Assert.assertEquals("2\tfalse", rsVectorized.get(1));
+        Assert.assertEquals("3\ttrue", rsVectorized.get(2));
+        Assert.assertEquals("4\tfalse", rsVectorized.get(3));
+        Assert.assertEquals("5\tNULL", rsVectorized.get(4));
     }
 }
