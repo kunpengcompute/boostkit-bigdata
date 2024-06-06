@@ -139,6 +139,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             OperatorType.FILTER, OperatorType.PTF, OperatorType.TABLESCAN, OperatorType.REDUCESINK));
     public static final Set<Integer> SUPPORTED_JOIN = new HashSet<>(Arrays.asList(JoinDesc.INNER_JOIN,
             JoinDesc.LEFT_OUTER_JOIN, JoinDesc.FULL_OUTER_JOIN, JoinDesc.LEFT_SEMI_JOIN));
+    public static int stringLength;
     private static final Set<PrimitiveObjectInspector.PrimitiveCategory> SUPPORTED_TYPE = new HashSet<>(Arrays.asList(BOOLEAN,
             SHORT, INT, LONG, DOUBLE, STRING, DATE, DECIMAL, VARCHAR, CHAR, VOID));
 
@@ -189,6 +190,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
     public void run(HookContext hookContext) throws Exception {
         this.hookContext = hookContext;
         omniHiveConf = new OmniHiveConf(hookContext.getConf());
+        stringLength = omniHiveConf.stringLength;
         clearGlobalVar();
         QueryPlan queryPlan = hookContext.getQueryPlan();
         if (queryPlan.getRootTasks().isEmpty()) {
@@ -290,6 +292,15 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         boolean reduceSinkCanReplace = false;
         if (parentOfMapJoinOpCannotReplace.contains(work.getName()) || !reduceSinkOperatorReplaceable(work)) {
             return false;
+        }
+        for (Operator<? extends OperatorDesc> op : work.getAllOperators()) {
+            if (stringLength > 1024 && op.getType() == OperatorType.REDUCESINK) {
+                List<String> typeInfos = op.getColumnExprMap().values().stream().
+                        map(value -> value.getTypeInfo().getTypeName()).collect(Collectors.toList());
+                if (typeInfos.contains("string")) {
+                    return false;
+                }
+            }
         }
         for (BaseWork child : tezWork.getChildren(work)) {
             TezEdgeProperty.EdgeType edgeType = tezWork.getEdgeType(work, child);
@@ -863,7 +874,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         Map<Byte, List<ExprNodeDesc>> keys;
         if (joinDesc instanceof CommonMergeJoinDesc) {
             keys = ((CommonMergeJoinDesc) joinDesc).getKeys();
-        } else  {
+        } else {
             keys = ((MapJoinDesc) joinDesc).getKeys();
         }
         List<ExprNodeDesc> exprNodeDescList = new ArrayList<>();
