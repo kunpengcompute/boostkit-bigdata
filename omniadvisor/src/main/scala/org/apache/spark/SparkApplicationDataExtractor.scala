@@ -170,7 +170,8 @@ object SparkApplicationDataExtractor {
       }
       previousExecutionDesc = Some(execution.description)
     }
-    descriptions.mkString(";\n")
+    val queryStr = descriptions.mkString(";\n")
+    queryStr + (if (queryStr.endsWith(";")) "" else ";")
   }
 
   private def lastAttempt(applicationInfo: ApplicationInfo): ApplicationAttemptInfo = {
@@ -179,6 +180,7 @@ object SparkApplicationDataExtractor {
   }
 
   private def isDuplicatedQuery(execution: SQLExecutionUIData, previousExecutionDesc: Option[String], sqlGraph: SparkPlanGraph): Boolean = {
-    execution.description.equals(previousExecutionDesc.getOrElse("")) && sqlGraph.allNodes.size == 1 && sqlGraph.allNodes.head.name.equals("LocalTableScan")
+    execution.description.equals(previousExecutionDesc.getOrElse("")) && sqlGraph.allNodes.size == 1 &&
+      (sqlGraph.allNodes.head.name.equals("LocalTableScan") || sqlGraph.allNodes.head.name.equals("CommandResult"))
   }
 }
