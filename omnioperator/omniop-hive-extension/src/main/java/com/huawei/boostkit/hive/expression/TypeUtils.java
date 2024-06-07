@@ -35,7 +35,6 @@ import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_LONG;
 import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_SHORT;
 import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_VARCHAR;
 
-import com.huawei.boostkit.hive.OmniExecuteWithHookContext;
 import nova.hetu.omniruntime.constants.FunctionType;
 import nova.hetu.omniruntime.constants.OmniWindowFrameBoundType;
 import nova.hetu.omniruntime.constants.OmniWindowFrameType;
@@ -132,7 +131,7 @@ public class TypeUtils {
         }
     };
 
-    public static final int DEFAULT_VARCHAR_LENGTH = OmniExecuteWithHookContext.stringLength;
+    public static final int DEFAULT_VARCHAR_LENGTH = 1024;
     private static final Map<String, FunctionType> HIVE_TO_OMNI_WINDOW_FUNCTION = new HashMap<String, FunctionType>() {
         {
             put("sum", OMNI_AGGREGATION_TYPE_SUM);
