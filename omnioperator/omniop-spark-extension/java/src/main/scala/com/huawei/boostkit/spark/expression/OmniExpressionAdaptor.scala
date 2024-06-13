@@ -76,21 +76,14 @@ object OmniExpressionAdaptor extends Logging {
 
   private def unsupportedCastCheck(expr: Expression, cast: CastBase): Unit = {
     def doSupportCastToString(dataType: DataType): Boolean = {
-      if (dataType.isInstanceOf[DecimalType] || dataType.isInstanceOf[StringType] || dataType.isInstanceOf[IntegerType]
-        || dataType.isInstanceOf[LongType] || dataType.isInstanceOf[DateType] || dataType.isInstanceOf[DoubleType]) {
-        true
-      } else {
-        false
-      }
+      dataType.isInstanceOf[DecimalType] || dataType.isInstanceOf[StringType] || dataType.isInstanceOf[IntegerType] ||
+        dataType.isInstanceOf[LongType] || dataType.isInstanceOf[DateType] || dataType.isInstanceOf[DoubleType] ||
+        dataType.isInstanceOf[NullType]
     }
 
     def doSupportCastFromString(dataType: DataType): Boolean = {
-      if (dataType.isInstanceOf[DecimalType] || dataType.isInstanceOf[StringType] || dataType.isInstanceOf[DateType]
-        || dataType.isInstanceOf[IntegerType] || dataType.isInstanceOf[LongType] || dataType.isInstanceOf[DoubleType]) {
-        true
-      } else {
-        false
-      }
+      dataType.isInstanceOf[DecimalType] || dataType.isInstanceOf[StringType] || dataType.isInstanceOf[DateType] ||
+        dataType.isInstanceOf[IntegerType] || dataType.isInstanceOf[LongType] || dataType.isInstanceOf[DoubleType]
     }
 
     // support cast(decimal/string/int/long as string)
@@ -302,19 +295,26 @@ object OmniExpressionAdaptor extends Logging {
       // Cast
       case cast: CastBase =>
         unsupportedCastCheck(expr, cast)
-        cast.dataType match {
-          case StringType =>
-            new JSONObject().put("exprType", "FUNCTION")
-              .addOmniExpJsonType("returnType", cast.dataType)
-              .put("width", 50)
-              .put("function_name", "CAST")
-              .put("arguments", new JSONArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(cast.child, exprsIndexMap)))
-
+        cast.child.dataType match {
+          case NullType =>
+            new JSONObject().put("exprType", "LITERAL")
+              .addOmniExpJsonType("dataType", cast.dataType)
+              .put("isNull", true)
           case _ =>
-            new JSONObject().put("exprType", "FUNCTION")
-              .addOmniExpJsonType("returnType", cast.dataType)
-              .put("function_name", "CAST")
-              .put("arguments", new JSONArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(cast.child, exprsIndexMap)))
+            cast.dataType match {
+              case StringType =>
+                new JSONObject().put("exprType", "FUNCTION")
+                  .addOmniExpJsonType("returnType", cast.dataType)
+                  .put("width", 50)
+                  .put("function_name", "CAST")
+                  .put("arguments", new JSONArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(cast.child, exprsIndexMap)))
+
+              case _ =>
+                new JSONObject().put("exprType", "FUNCTION")
+                  .addOmniExpJsonType("returnType", cast.dataType)
+                  .put("function_name", "CAST")
+                  .put("arguments", new JSONArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(cast.child, exprsIndexMap)))
+            }
         }
 
       // Abs
