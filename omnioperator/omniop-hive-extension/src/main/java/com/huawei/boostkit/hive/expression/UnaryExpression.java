@@ -24,7 +24,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class UnaryExpression extends BaseExpression {
-
     private List<BaseExpression> arguments;
 
     private final transient int size;

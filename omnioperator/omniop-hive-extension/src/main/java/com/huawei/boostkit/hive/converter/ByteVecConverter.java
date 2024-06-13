@@ -30,7 +30,6 @@ import org.apache.hadoop.hive.ql.exec.vector.LongColumnVector;
 import org.apache.hadoop.hive.serde2.lazy.LazyByte;
 import org.apache.hadoop.io.ByteWritable;
 
-
 public class ByteVecConverter extends ShortVecConverter {
     public Object fromOmniVec(Vec vec, int index) {
         if (vec.isNull(index)) {

@@ -16,7 +16,6 @@ import org.apache.hadoop.hive.ql.exec.vector.LongColumnVector;
 import org.apache.hadoop.hive.serde2.lazy.LazyBoolean;
 import org.apache.hadoop.io.BooleanWritable;
 
-
 public class BooleanVecConverter extends LongVecConverter {
     public Object fromOmniVec(Vec vec, int index) {
         if (vec.isNull(index)) {

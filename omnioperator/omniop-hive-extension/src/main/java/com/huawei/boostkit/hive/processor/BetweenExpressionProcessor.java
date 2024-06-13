@@ -23,13 +23,13 @@ import com.huawei.boostkit.hive.expression.BetweenExpression;
 import com.huawei.boostkit.hive.expression.CompareExpression;
 import com.huawei.boostkit.hive.expression.ExpressionUtils;
 import com.huawei.boostkit.hive.expression.TypeUtils;
+
 import org.apache.hadoop.hive.ql.plan.ExprNodeConstantDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 
 public class BetweenExpressionProcessor implements ExpressionProcessor {
-
     private static final int LOWER_BOUND_INDEX = 2;
     private static final int UPPER_BOUND_INDEX = 3;
 

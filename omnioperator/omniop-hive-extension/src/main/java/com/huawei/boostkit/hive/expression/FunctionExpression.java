@@ -36,7 +36,8 @@ public class FunctionExpression extends UnaryExpression {
         this.width = width;
     }
 
-    public FunctionExpression(Integer returnType, String functionName, int size, Integer width, Integer precision, Integer scale) {
+    public FunctionExpression(Integer returnType, String functionName, int size, Integer width, Integer precision,
+                              Integer scale) {
         this(returnType, functionName, size, width);
         this.precision = precision;
         this.scale = scale;

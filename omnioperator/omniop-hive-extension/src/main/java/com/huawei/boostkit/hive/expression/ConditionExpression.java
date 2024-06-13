@@ -22,7 +22,6 @@ import com.google.gson.Gson;
 import com.google.gson.annotations.SerializedName;
 
 public class ConditionExpression extends BaseExpression {
-
     private Integer width;
     private Integer precision;
     private Integer scale;
@@ -76,5 +75,4 @@ public class ConditionExpression extends BaseExpression {
     public ConditionExpression copyBase() {
         return new ConditionExpression(this.getReturnType(), this.width, this.precision, this.scale);
     }
-
 }

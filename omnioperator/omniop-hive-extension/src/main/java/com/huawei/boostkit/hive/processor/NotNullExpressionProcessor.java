@@ -23,7 +23,7 @@ import com.huawei.boostkit.hive.expression.ExpressionUtils;
 import com.huawei.boostkit.hive.expression.NotExpression;
 import com.huawei.boostkit.hive.expression.TypeUtils;
 import com.huawei.boostkit.hive.expression.UnaryExpression;
-import org.apache.hadoop.hive.ql.plan.ExprNodeColumnDesc;
+
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDFOPNotNull;
