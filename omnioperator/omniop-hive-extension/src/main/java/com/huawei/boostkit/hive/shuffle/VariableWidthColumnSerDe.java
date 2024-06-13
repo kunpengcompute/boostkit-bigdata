@@ -24,39 +24,40 @@ public class VariableWidthColumnSerDe implements ColumnSerDe {
     private byte[] lengthBytes = new byte[4];
     private LazyBinaryUtils.VInt vInt = new LazyBinaryUtils.VInt();
 
-
     @Override
     public int serialize(byte[] writeBytes, VecWrapper vecWrapper, int offset) {
+        int totalLen = offset;
         int index = vecWrapper.index;
         if (vecWrapper.isNull[index] == 1) {
-            writeBytes[offset] = -1;
-            ++offset;
-            return offset;
+            writeBytes[totalLen] = -1;
+            ++totalLen;
+            return totalLen;
         }
         // write length
         int valueLen = vecWrapper.offset[index + 1] - vecWrapper.offset[index];
         int len = LazyBinaryUtils.writeVLongToByteArray(lengthBytes, valueLen);
-        System.arraycopy(lengthBytes, 0, writeBytes, offset, len);
-        offset = offset + len;
+        System.arraycopy(lengthBytes, 0, writeBytes, totalLen, len);
+        totalLen = totalLen + len;
         // write value array
-        System.arraycopy(vecWrapper.value, vecWrapper.offset[index], writeBytes, offset, valueLen);
-        offset = offset + valueLen;
-        return offset;
+        System.arraycopy(vecWrapper.value, vecWrapper.offset[index], writeBytes, totalLen, valueLen);
+        totalLen = totalLen + valueLen;
+        return totalLen;
     }
 
     @Override
     public int deserialize(VecSerdeBody vecSerdeBody, byte[] bytes, int offset) {
-        if (bytes[offset] == -1) {
+        int totalLen = offset;
+        if (bytes[totalLen] == -1) {
             vecSerdeBody.isNull = 1;
             vecSerdeBody.length = 0;
-            ++offset;
-            return offset;
+            ++totalLen;
+            return totalLen;
         }
         vecSerdeBody.isNull = 0;
-        LazyBinaryUtils.readVInt(bytes, offset, vInt);
+        LazyBinaryUtils.readVInt(bytes, totalLen, vInt);
         vecSerdeBody.length = vInt.value;
-        System.arraycopy(bytes, offset + vInt.length, vecSerdeBody.value, 0, vInt.value);
-        offset = offset + vInt.length + vInt.value;
-        return offset;
+        System.arraycopy(bytes, totalLen + vInt.length, vecSerdeBody.value, 0, vInt.value);
+        totalLen = totalLen + vInt.length + vInt.value;
+        return totalLen;
     }
 }

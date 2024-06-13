@@ -25,11 +25,11 @@ import com.huawei.boostkit.hive.expression.ExpressionUtils;
 import com.huawei.boostkit.hive.expression.TypeUtils;
 
 import nova.hetu.omniruntime.type.DataType;
+
 import org.apache.hadoop.hive.ql.exec.ExprNodeColumnEvaluator;
 import org.apache.hadoop.hive.ql.exec.ExprNodeConstantEvaluator;
 import org.apache.hadoop.hive.ql.exec.ExprNodeEvaluator;
 import org.apache.hadoop.hive.ql.exec.ExprNodeGenericFuncEvaluator;
-import org.apache.hadoop.hive.ql.plan.ExprNodeConstantDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
@@ -48,10 +48,11 @@ public class JoinUtils {
         return getExprNodeColumnEvaluator(joinKeys, false);
     }
 
-    public static List<ExprNodeEvaluator> getExprNodeColumnEvaluator(List<ExprNodeEvaluator> joinKeys, boolean includeConstant) {
+    public static List<ExprNodeEvaluator> getExprNodeColumnEvaluator(List<ExprNodeEvaluator> joinKeys,
+            boolean isIncludedConstant) {
         List<ExprNodeEvaluator> exprNodeColumnEvaluators = new ArrayList<>();
         for (ExprNodeEvaluator joinKey : joinKeys) {
-            if (includeConstant && joinKey instanceof ExprNodeConstantEvaluator) {
+            if (isIncludedConstant && joinKey instanceof ExprNodeConstantEvaluator) {
                 exprNodeColumnEvaluators.add(joinKey);
             }
             dealChildren(joinKey, exprNodeColumnEvaluators);
@@ -70,34 +71,40 @@ public class JoinUtils {
         Arrays.stream(joinKey.getChildren()).forEach(child -> dealChildren(child, exprNodeColumnEvaluators));
     }
 
-    public static String[] getExprFromExprNode(List<ExprNodeEvaluator> nodes, Map<String, Integer> keyColNameToId, ObjectInspector inspector, boolean isBuildTable) {
+    public static String[] getExprFromExprNode(List<ExprNodeEvaluator> nodes, Map<String, Integer> keyColNameToId,
+            ObjectInspector inspector, boolean isBuildTable) {
         List<String> expressions = new ArrayList<>();
         for (ExprNodeEvaluator node : nodes) {
             if (node instanceof ExprNodeGenericFuncEvaluator) {
                 if (isBuildTable) {
                     expressions.add(TypeUtils.buildExpression(node.getExpr().getTypeInfo(), nodes.indexOf(node)));
                 } else {
-                    expressions.add(ExpressionUtils.buildSimplify((ExprNodeGenericFuncDesc) node.getExpr(), inspector).toString());
+                    expressions.add(ExpressionUtils.buildSimplify((ExprNodeGenericFuncDesc) node.getExpr(), inspector)
+                        .toString());
                 }
                 continue;
-            } else if (node instanceof ExprNodeConstantEvaluator) {
+            }
+            if (node instanceof ExprNodeConstantEvaluator) {
                 expressions.add(ExpressionUtils.createLiteralNode(node.getExpr()).toString());
                 continue;
             }
             PrimitiveTypeInfo keyType = (PrimitiveTypeInfo) node.getExpr().getTypeInfo();
             PrimitiveTypeInfo inputType = ((AbstractPrimitiveObjectInspector) node.getOutputOI()).getTypeInfo();
-            if (!keyType.getPrimitiveCategory().equals(PrimitiveObjectInspector.PrimitiveCategory.DECIMAL) || keyType.equals(inputType)) {
-                expressions.add(TypeUtils.buildExpression(((AbstractPrimitiveObjectInspector) node.getOutputOI()).getTypeInfo(),
-                        isBuildTable? nodes.indexOf(node): keyColNameToId.get(((ExprNodeColumnEvaluator) node).getExpr().getColumn())));
+            if (!keyType.getPrimitiveCategory().equals(PrimitiveObjectInspector.PrimitiveCategory.DECIMAL)
+                || keyType.equals(inputType)) {
+                expressions.add(TypeUtils.buildExpression(((AbstractPrimitiveObjectInspector) node.getOutputOI())
+                    .getTypeInfo(), isBuildTable ? nodes.indexOf(node)
+                    : keyColNameToId.get(((ExprNodeColumnEvaluator) node).getExpr().getColumn())));
                 continue;
             }
             int returnType = TypeUtils.convertHiveTypeToOmniType(keyType);
             CastFunctionExpression cast = new CastFunctionExpression(returnType, TypeUtils.getCharWidth(node.getExpr()),
                     ((DecimalTypeInfo) keyType).getPrecision(), ((DecimalTypeInfo) keyType).getScale());
-            int fieldID = ((StructObjectInspector) inspector).getStructFieldRef(node.getExpr().getExprString()).getFieldID();
+            int fieldID = ((StructObjectInspector) inspector).getStructFieldRef(node.getExpr().getExprString())
+                .getFieldID();
             int omniType = TypeUtils.convertHiveTypeToOmniType(inputType);
-            BaseExpression decimalReference = new DecimalReference(fieldID, omniType, ((DecimalTypeInfo) inputType).getPrecision(),
-                    ((DecimalTypeInfo) inputType).getScale());
+            BaseExpression decimalReference = new DecimalReference(fieldID, omniType, ((DecimalTypeInfo) inputType)
+                .getPrecision(), ((DecimalTypeInfo) inputType).getScale());
             cast.add(decimalReference);
             expressions.add(cast.toString());
         }
@@ -105,8 +112,7 @@ public class JoinUtils {
     }
 
     public static DataType[] getTypeFromInspectors(List<ObjectInspector> inspectors) {
-        return inspectors.stream().map(
-                        inspector -> TypeUtils.buildInputDataType(((AbstractPrimitiveObjectInspector) inspector).getTypeInfo()))
-                .toArray(DataType[]::new);
+        return inspectors.stream().map(inspector -> TypeUtils.buildInputDataType(
+                ((AbstractPrimitiveObjectInspector) inspector).getTypeInfo())).toArray(DataType[]::new);
     }
 }

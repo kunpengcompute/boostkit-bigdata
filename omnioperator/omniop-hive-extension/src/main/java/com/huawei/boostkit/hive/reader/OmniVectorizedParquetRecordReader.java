@@ -23,25 +23,23 @@ import static com.huawei.boostkit.hive.converter.VecConverter.CONVERTER_MAP;
 
 import com.huawei.boostkit.hive.converter.VecConverter;
 
-import nova.hetu.omniruntime.vector.Decimal128Vec;
 import nova.hetu.omniruntime.vector.IntVec;
 import nova.hetu.omniruntime.vector.LongVec;
-import nova.hetu.omniruntime.vector.ShortVec;
 import nova.hetu.omniruntime.vector.Vec;
 import nova.hetu.omniruntime.vector.VecBatch;
 
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hive.ql.io.HiveFileFormatUtils;
-import org.apache.hadoop.hive.ql.io.IOPrepareCache;
-import org.apache.hadoop.hive.ql.plan.TableScanDesc;
-import org.apache.hadoop.hive.ql.plan.VectorTableScanDesc;
-import org.apache.hadoop.hive.ql.plan.PartitionDesc;
-import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatchCtx;
+import org.apache.hadoop.hive.ql.io.HiveFileFormatUtils;
+import org.apache.hadoop.hive.ql.io.IOPrepareCache;
+import org.apache.hadoop.hive.ql.plan.PartitionDesc;
+import org.apache.hadoop.hive.ql.plan.TableScanDesc;
+import org.apache.hadoop.hive.ql.plan.VectorTableScanDesc;
 import org.apache.hadoop.hive.serde2.typeinfo.DecimalTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
+import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapred.InputSplit;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.parquet.schema.PrimitiveType;
@@ -50,11 +48,10 @@ import org.apache.parquet.schema.Type;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.util.Arrays;
-import java.util.Map;
 import java.util.List;
+import java.util.Map;
 
 public class OmniVectorizedParquetRecordReader extends OmniParquetRecordReader {
-
     private VecConverter[] partColumnConverters;
     private final Vec[] withPartCol;
     private final Object[] partitionValues;
@@ -88,7 +85,12 @@ public class OmniVectorizedParquetRecordReader extends OmniParquetRecordReader {
         }
     }
 
-    public void processUnIntData() {
+    /**
+     * processUnsignedData
+     * resolve problems: 1. when reading unsignedInt/unsignedLong data from Parquet file
+     * 2. when the real type stored in Parquet file is different with the type specified by talbe structure
+     */
+    public void processUnsignedData() {
         List<Type> types = this.fileSchema.getFields();
         TableScanDesc desc = (TableScanDesc) this.tableScanOp.getConf();
         VectorTableScanDesc tableDesc = (VectorTableScanDesc) desc.getVectorDesc();
@@ -122,7 +124,7 @@ public class OmniVectorizedParquetRecordReader extends OmniParquetRecordReader {
         if (batchSize == 0) {
             return false;
         }
-        processUnIntData();
+        processUnsignedData();
         if (partitionValues != null) {
             for (int i = 0; i < partitionValues.length; i++) {
                 Object[] partValue = new Object[batchSize];

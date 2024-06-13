@@ -19,8 +19,9 @@
 package com.huawei.boostkit.hive.shuffle;
 
 public class FixedWidthColumnSerDe implements ColumnSerDe {
-    protected int columnTypeLen;
     protected static byte[] EMPTY = new byte[16];
+
+    protected int columnTypeLen;
     protected transient byte columnNullMarker;
 
     public FixedWidthColumnSerDe(int columnTypeLen) {
@@ -30,35 +31,37 @@ public class FixedWidthColumnSerDe implements ColumnSerDe {
     @Override
     public int serialize(byte[] writeBytes, VecWrapper vecWrapper, int offset) {
         int index = vecWrapper.index;
+        int totalLen = offset;
         if (vecWrapper.isNull[index] == 1) {
-            writeBytes[offset] = -1;
-            ++offset;
-            return offset;
+            writeBytes[totalLen] = -1;
+            ++totalLen;
+            return totalLen;
         }
         int valueLen = trimBytes(vecWrapper.value, index * columnTypeLen, columnTypeLen);
-        writeBytes[offset] = (byte) valueLen;
-        ++offset;
+        writeBytes[totalLen] = (byte) valueLen;
+        ++totalLen;
         // write value array
-        System.arraycopy(vecWrapper.value, index * columnTypeLen, writeBytes, offset, valueLen);
-        offset = offset + valueLen;
-        return offset;
+        System.arraycopy(vecWrapper.value, index * columnTypeLen, writeBytes, totalLen, valueLen);
+        totalLen = totalLen + valueLen;
+        return totalLen;
     }
 
     @Override
     public int deserialize(VecSerdeBody vecSerdeBody, byte[] bytes, int offset) {
-        if (bytes[offset] == -1) {
+        int totalLen = offset;
+        if (bytes[totalLen] == -1) {
             vecSerdeBody.isNull = 1;
-            ++offset;
+            ++totalLen;
             System.arraycopy(EMPTY, 0, vecSerdeBody.value, 0, columnTypeLen);
-            return offset;
+            return totalLen;
         }
         vecSerdeBody.isNull = 0;
-        int length = bytes[offset];
-        ++offset;
-        System.arraycopy(bytes, offset, vecSerdeBody.value, 0, length);
+        int length = bytes[totalLen];
+        ++totalLen;
+        System.arraycopy(bytes, totalLen, vecSerdeBody.value, 0, length);
         System.arraycopy(EMPTY, 0, vecSerdeBody.value, length, columnTypeLen - length);
-        offset = offset + length;
-        return offset;
+        totalLen = totalLen + length;
+        return totalLen;
     }
 
     private int trimBytes(byte[] bytes, int start, int length) {

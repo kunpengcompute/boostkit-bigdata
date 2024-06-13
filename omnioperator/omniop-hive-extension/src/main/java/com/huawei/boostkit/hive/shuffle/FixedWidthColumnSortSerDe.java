@@ -24,7 +24,8 @@ public class FixedWidthColumnSortSerDe extends FixedWidthColumnSerDe {
     private final DataType.DataTypeId dataTypeId;
     private final boolean invert;
 
-    public FixedWidthColumnSortSerDe(int columnTypeLen, byte columnNullMarker, DataType.DataTypeId dataTypeId, boolean invert) {
+    public FixedWidthColumnSortSerDe(int columnTypeLen, byte columnNullMarker,
+            DataType.DataTypeId dataTypeId, boolean invert) {
         super(columnTypeLen);
         this.columnNullMarker = columnNullMarker;
         this.dataTypeId = dataTypeId;
@@ -33,33 +34,35 @@ public class FixedWidthColumnSortSerDe extends FixedWidthColumnSerDe {
 
     @Override
     public int serialize(byte[] writeBytes, VecWrapper vecWrapper, int offset) {
+        int totalLen = offset;
         int index = vecWrapper.index;
         if (vecWrapper.isNull[index] == 1) {
             if (columnNullMarker == 1) {
-                writeBytes[offset++] = (byte) (columnTypeLen - 1);
+                writeBytes[totalLen++] = (byte) (columnTypeLen - 1);
             } else {
-                writeBytes[offset++] = (byte) (columnTypeLen + 1);
+                writeBytes[totalLen++] = (byte) (columnTypeLen + 1);
             }
-            return offset;
+            return totalLen;
         }
-        writeBytes[offset++] = (byte) columnTypeLen;
-        SerDeUtils.getSerializeByte(vecWrapper.value, index * columnTypeLen, writeBytes, offset, dataTypeId, invert);
-        offset = offset + columnTypeLen;
-        return offset;
+        writeBytes[totalLen++] = (byte) columnTypeLen;
+        SerDeUtils.getSerializeByte(vecWrapper.value, index * columnTypeLen, writeBytes, totalLen, dataTypeId, invert);
+        totalLen = totalLen + columnTypeLen;
+        return totalLen;
     }
 
     @Override
     public int deserialize(VecSerdeBody vecSerdeBody, byte[] bytes, int offset) {
-        if (bytes[offset] == columnTypeLen + 1 || bytes[offset] == columnTypeLen - 1) {
+        int totalLen = offset;
+        if (bytes[totalLen] == columnTypeLen + 1 || bytes[totalLen] == columnTypeLen - 1) {
             vecSerdeBody.isNull = 1;
-            ++offset;
+            ++totalLen;
             System.arraycopy(EMPTY, 0, vecSerdeBody.value, 0, columnTypeLen);
-            return offset;
+            return totalLen;
         }
         vecSerdeBody.isNull = 0;
-        offset++;
-        SerDeUtils.getDeserializeByte(bytes, offset, vecSerdeBody.value, 0, dataTypeId, invert);
-        offset = offset + columnTypeLen;
-        return offset;
+        totalLen++;
+        SerDeUtils.getDeserializeByte(bytes, totalLen, vecSerdeBody.value, 0, dataTypeId, invert);
+        totalLen = totalLen + columnTypeLen;
+        return totalLen;
     }
 }
