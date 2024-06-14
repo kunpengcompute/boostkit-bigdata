@@ -42,6 +42,16 @@ import scala.collection.mutable.ListBuffer
 import scala.util.control.Breaks.{break, breakable}
 
 object OmniAdaptorUtil {
+  def copyVecBatch(vb: VecBatch): VecBatch = {
+    val vecCount = vb.getVectorCount
+    val rowCount = vb.getRowCount
+    val vecs = new Array[Vec](vecCount)
+    for (index <- 0 until vecCount) {
+      vecs(index) = vb.getVector(index).slice(0, rowCount)
+    }
+    new VecBatch(vecs, rowCount)
+  }
+
   def transColBatchToOmniVecs(cb: ColumnarBatch): Array[Vec] = {
     transColBatchToOmniVecs(cb, false)
   }
