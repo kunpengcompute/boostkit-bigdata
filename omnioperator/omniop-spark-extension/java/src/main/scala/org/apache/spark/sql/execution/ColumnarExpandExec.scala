@@ -21,10 +21,11 @@ package org.apache.spark.sql.execution
 import com.huawei.boostkit.spark.Constant.IS_SKIP_VERIFY_EXP
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor.{checkOmniJsonWhiteList, getExprIdMap, rewriteToOmniJsonExpressionLiteral, sparkTypeToOmniType, toOmniAggFunType, toOmniAggInOutJSonExp, toOmniAggInOutType}
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil
-import com.huawei.boostkit.spark.util.OmniAdaptorUtil.transColBatchToOmniVecs
+import com.huawei.boostkit.spark.util.OmniAdaptorUtil.{copyVecBatch, transColBatchToOmniVecs}
 import nova.hetu.omniruntime.`type`.DataType
 import nova.hetu.omniruntime.constants.FunctionType
 import nova.hetu.omniruntime.constants.FunctionType.OMNI_AGGREGATION_TYPE_COUNT_ALL
+import nova.hetu.omniruntime.operator.OmniOperator
 import nova.hetu.omniruntime.operator.config.{OperatorConfig, OverflowConfig, SpillConfig}
 import nova.hetu.omniruntime.operator.project.OmniProjectOperatorFactory
 import nova.hetu.omniruntime.vector.{LongVec, Vec, VecBatch}
@@ -244,6 +245,7 @@ case class ColumnarOptRollupExec(
     "addInputTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni addInput"),
     "omniCodegenTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni codegen"),
     "getOutputTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni getOutput"),
+    "numInputRows" -> SQLMetrics.createMetric(sparkContext, "number of input rows"),
     "numOutputRows" -> SQLMetrics.createMetric(sparkContext, "number of output rows"),
     "numOutputVecBatches" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatches"),
   )
@@ -257,6 +259,7 @@ case class ColumnarOptRollupExec(
     AttributeSet(projections.flatten.flatMap(_.references))
 
   override def doExecuteColumnar(): RDD[ColumnarBatch] = {
+    val numInputRowsMetric = longMetric("numInputRows")
     val numOutputRowsMetric = longMetric("numOutputRows")
     val numOutputVecBatchesMetric = longMetric("numOutputVecBatches")
     val addInputTimeMetric = longMetric("addInputTime")
@@ -319,7 +322,7 @@ case class ColumnarOptRollupExec(
         factory.createOperator
       })
 
-      val hashaggOperator = OmniAdaptorUtil.getAggOperator(groupingExpressions,
+      var hashaggOperator: OmniOperator = OmniAdaptorUtil.getAggOperator(groupingExpressions,
       omniGroupByChannel,
       omniAggChannels,
       omniAggChannelsFilter,
@@ -344,39 +347,86 @@ case class ColumnarOptRollupExec(
         })
       })
 
-      while (iter.hasNext) {
-        val batch = iter.next()
-        val input = transColBatchToOmniVecs(batch)
-        val vecBatch = new VecBatch(input, batch.numRows())
-        results.append(vecBatch)
-        projectOperators.foreach(projectOperator => {
-          val vecs = transColBatchToOmniVecs(batch, true)
+      for (index <- projectOperators.indices) {
+        if (index == 0) {
+          while (iter.hasNext) {
+            val batch = iter.next()
+            val input = transColBatchToOmniVecs(batch)
+            val rowCount = batch.numRows()
+            val vecBatch = new VecBatch(input, rowCount)
+            results.append(vecBatch)
+            numInputRowsMetric += rowCount
 
-          val projectInput = new VecBatch(vecs, vecBatch.getRowCount)
-          var startInput = System.nanoTime()
-          projectOperator.addInput(projectInput)
-          addInputTimeMetric += NANOSECONDS.toMillis(System.nanoTime() - startInput)
+            val vecs = transColBatchToOmniVecs(batch, true)
+            val projectInput = new VecBatch(vecs, rowCount)
+            var startInput = System.nanoTime()
+            projectOperators(index).addInput(projectInput)
+            addInputTimeMetric += NANOSECONDS.toMillis(System.nanoTime() - startInput)
 
-          val startGetOutput = System.nanoTime()
-          val projectResults = projectOperator.getOutput
-          getOutputTimeMetric += NANOSECONDS.toMillis(System.nanoTime() - startGetOutput)
+            val startGetOutput = System.nanoTime()
+            val projectResults = projectOperators(index).getOutput
+            getOutputTimeMetric += NANOSECONDS.toMillis(System.nanoTime() - startGetOutput)
 
-          if (!projectResults.hasNext) {
-            throw new RuntimeException("project operator failed!")
+            if (!projectResults.hasNext) {
+              throw new RuntimeException("project operator failed!")
+            }
+
+            val hashaggInput = projectResults.next()
+
+            startInput = System.nanoTime()
+            hashaggOperator.addInput(hashaggInput)
+            addInputTimeMetric += NANOSECONDS.toMillis(System.nanoTime() - startInput)
           }
+        } else {
+          val newHashaggOperator: OmniOperator = OmniAdaptorUtil.getAggOperator(groupingExpressions,
+            omniGroupByChannel,
+            omniAggChannels,
+            omniAggChannelsFilter,
+            omniSourceTypes,
+            omniAggFunctionTypes,
+            omniAggOutputTypes,
+            omniInputRaws,
+            omniOutputPartials)
 
-          val hashaggInput = projectResults.next()
+          while (results.nonEmpty && hashaggResults.hasNext) {
+            val vecBatch = hashaggResults.next()
+            results.append(vecBatch)
+            val rowCount = vecBatch.getRowCount
+            // The vecBatch is the output data of the previous round of combination
+            // and the input data of the next round of combination
+            numInputRowsMetric += rowCount
+            numOutputRowsMetric += rowCount
 
-          startInput = System.nanoTime()
-          hashaggOperator.addInput(hashaggInput)
-          addInputTimeMetric += NANOSECONDS.toMillis(System.nanoTime() - startInput)
-        })
-      }
+            val projectInput = copyVecBatch(vecBatch)
+            var startInput = System.nanoTime()
+            projectOperators(index).addInput(projectInput)
+            addInputTimeMetric += NANOSECONDS.toMillis(System.nanoTime() - startInput)
 
-      if (results.nonEmpty) {
-        val startGetOutput = System.nanoTime()
-        hashaggResults = hashaggOperator.getOutput
-        getOutputTimeMetric += NANOSECONDS.toMillis(System.nanoTime() - startGetOutput)
+            val startGetOutput = System.nanoTime()
+            val projectResults = projectOperators(index).getOutput
+            getOutputTimeMetric += NANOSECONDS.toMillis(System.nanoTime() - startGetOutput)
+
+            if (!projectResults.hasNext) {
+              throw new RuntimeException("project operator failed!")
+            }
+
+            val hashaggInput = projectResults.next()
+
+            startInput = System.nanoTime()
+            newHashaggOperator.addInput(hashaggInput)
+            addInputTimeMetric += NANOSECONDS.toMillis(System.nanoTime() - startInput)
+          }
+          // The iterator of the hashagg operator has been iterated.
+          if (results.nonEmpty) {
+            hashaggOperator.close()
+            hashaggOperator = newHashaggOperator
+          }
+        }
+        if (results.nonEmpty) {
+          val startGetOutput = System.nanoTime()
+          hashaggResults = hashaggOperator.getOutput
+          getOutputTimeMetric += NANOSECONDS.toMillis(System.nanoTime() - startGetOutput)
+        }
       }
 
       new Iterator[ColumnarBatch] {
@@ -395,6 +445,8 @@ case class ColumnarOptRollupExec(
             val startGetOutput = System.nanoTime()
             vecBatch = hashaggResults.next()
             getOutputTimeMetric += NANOSECONDS.toMillis(System.nanoTime() - startGetOutput)
+            val rowCount = vecBatch.getRowCount
+            numOutputRowsMetric += rowCount
           }
 
           val vectors: Seq[OmniColumnVector] = OmniColumnVector.allocateColumns(
@@ -405,7 +457,6 @@ case class ColumnarOptRollupExec(
           }
 
           val rowCount = vecBatch.getRowCount
-          numOutputRowsMetric += rowCount
           numOutputVecBatchesMetric += 1
           vecBatch.close()
           new ColumnarBatch(vectors.toArray, rowCount)
