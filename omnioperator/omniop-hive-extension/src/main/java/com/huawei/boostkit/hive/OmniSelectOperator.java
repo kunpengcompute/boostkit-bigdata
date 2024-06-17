@@ -35,7 +35,6 @@ import nova.hetu.omniruntime.vector.Vec;
 import nova.hetu.omniruntime.vector.VecBatch;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.CompilationOpContext;
 import org.apache.hadoop.hive.ql.exec.Operator;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
@@ -65,28 +64,31 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
+/**
+ * OmniSelectOperator
+ *
+ * @since 2024-01-10
+ */
 public class OmniSelectOperator extends OmniHiveOperator<OmniSelectDesc> implements Serializable {
     private static final long serialVersionUID = 1L;
-    private final transient Logger LOG = LoggerFactory.getLogger(getClass().getName());
+    private static Cache<Object, Object> cache = CacheBuilder.newBuilder().concurrencyLevel(8).initialCapacity(10)
+            .maximumSize(100).recordStats().removalListener(notification -> {
+                ((OmniProjectOperatorFactory) notification.getValue()).close();
+            }).build();
 
+    private static boolean isAddedCloseThread;
+
+    private final transient Logger LOG = LoggerFactory.getLogger(getClass().getName());
     private transient OmniProjectOperatorFactory projectOperatorFactory;
 
     private transient OmniOperator omniOperator;
 
     private transient boolean isSelectStarNoCompute = false;
 
-    private transient boolean needSliceVector = false;
+    private transient boolean isNeedSliceVector = false;
 
     private transient Iterator<VecBatch> output;
-
-    private static Cache<Object, Object> cache = CacheBuilder.newBuilder().concurrencyLevel(8).initialCapacity(10)
-            .maximumSize(100).recordStats().removalListener(notification -> {
-                ((OmniProjectOperatorFactory) notification.getValue()).close();
-            }).build();
-
-    private static boolean addedCloseThread;
 
     public OmniSelectOperator() {
         super();
@@ -96,6 +98,12 @@ public class OmniSelectOperator extends OmniHiveOperator<OmniSelectDesc> impleme
         super(ctx);
     }
 
+    /**
+     * OmniSelectOperator
+     *
+     * @param ctx  ctx
+     * @param conf conf
+     */
     public OmniSelectOperator(CompilationOpContext ctx, SelectDesc conf) {
         super(ctx);
         this.conf = new OmniSelectDesc(conf);
@@ -185,11 +193,11 @@ public class OmniSelectOperator extends OmniHiveOperator<OmniSelectDesc> impleme
                 SpillConfig.NONE, new OverflowConfig(OverflowConfig.OverflowConfigId.OVERFLOW_CONFIG_NULL), true));
         this.omniOperator = this.projectOperatorFactory.createOperator();
         cache.put(cacheKey, this.projectOperatorFactory);
-        if (!addedCloseThread) {
+        if (!isAddedCloseThread) {
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 cache.invalidateAll();
             }));
-            addedCloseThread = true;
+            isAddedCloseThread = true;
         }
     }
 
@@ -233,7 +241,7 @@ public class OmniSelectOperator extends OmniHiveOperator<OmniSelectDesc> impleme
         List<Operator<? extends OperatorDesc>> parentOperators = this.getParentOperators();
         List<Operator<? extends OperatorDesc>> childOperators = parentOperators.get(0).getChildOperators();
         if (childOperators.get(childOperators.size() - 1) != this) {
-            needSliceVector = true;
+            isNeedSliceVector = true;
         }
     }
 
@@ -244,7 +252,7 @@ public class OmniSelectOperator extends OmniHiveOperator<OmniSelectDesc> impleme
             return;
         }
         VecBatch input = (VecBatch) row;
-        if (needSliceVector) {
+        if (isNeedSliceVector) {
             Vec[] vectors = input.getVectors();
             Vec[] copyVectors = new Vec[vectors.length];
             for (int i = 0; i < vectors.length; i++) {
@@ -276,7 +284,7 @@ public class OmniSelectOperator extends OmniHiveOperator<OmniSelectDesc> impleme
     }
 
     @Override
-    protected void closeOp(boolean abort) throws HiveException {
+    protected void closeOp(boolean isAbort) throws HiveException {
         if (projectOperatorFactory != null) {
             projectOperatorFactory.close();
         }
@@ -284,7 +292,7 @@ public class OmniSelectOperator extends OmniHiveOperator<OmniSelectDesc> impleme
             omniOperator.close();
         }
         output = null;
-        super.closeOp(abort);
+        super.closeOp(isAbort);
     }
 
     private TypeInfo createTypeinfo(ExprNodeGenericFuncDesc nodeDesc) {
@@ -295,13 +303,19 @@ public class OmniSelectOperator extends OmniHiveOperator<OmniSelectDesc> impleme
         return typeInfo;
     }
 
+    /**
+     * isInvalidSelectColumn
+     *
+     * @param colList colList
+     * @return boolean
+     */
     public static boolean isInvalidSelectColumn(List<ExprNodeDesc> colList) {
-        for (ExprNodeDesc exprNodeDesc: colList) {
-            if (exprNodeDesc instanceof ExprNodeConstantDesc && exprNodeDesc.getTypeInfo().getTypeName().equals("smallint")) {
+        for (ExprNodeDesc exprNodeDesc : colList) {
+            if (exprNodeDesc instanceof ExprNodeConstantDesc
+                    && exprNodeDesc.getTypeInfo().getTypeName().equals("smallint")) {
                 return true;
             }
         }
         return false;
     }
-
 }

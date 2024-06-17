@@ -126,23 +126,18 @@ import java.util.Set;
 import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 
+/**
+ * OmniReduceSinkOperator
+ *
+ * @since 2024-01-10
+ */
 public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
         implements Serializable, TopNHash.BinaryCollector {
     private static final long serialVersionUID = 1L;
 
-    private transient ObjectInspector[] partitionObjectInspectors;
-    private transient ObjectInspector[] bucketObjectInspectors;
-    private transient int buckColIdxInKey;
-
     /**
-     * {@link org.apache.hadoop.hive.ql.optimizer.SortedDynPartitionOptimizer}
+     * OutPutCollector
      */
-    private transient int buckColIdxInKeyForSdpo = -1;
-    private boolean firstRow;
-    private boolean skipTag = false;
-    private transient int[] valueIndex; // index for value(+ from keys, - from values)
-    private transient Set<Integer> decimal128ConvertDecimal64Cols = new HashSet<>();
-
     protected transient OutputCollector out;
 
     /**
@@ -177,7 +172,7 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
     protected transient int numDistributionKeys;
     protected transient int numDistinctExprs;
     protected transient String[] inputAliases; // input aliases of this RS for join (used for PPD)
-    protected transient boolean useUniformHash = false;
+    protected transient boolean isUseUniformHash = false;
 
     // picks topN K:V pairs from input.
     protected transient TopNHash reducerHash;
@@ -211,16 +206,33 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
     // multiple?
     protected transient Object[][] cachedKeys;
 
-    protected transient long cntr = 1;
-    protected transient long logEveryNRows = 0;
+    protected transient long cntr = 1L;
+    protected transient long logEveryNRows = 0L;
+
+    private transient ObjectInspector[] partitionObjectInspectors;
+    private transient ObjectInspector[] bucketObjectInspectors;
+    private transient int buckColIdxInKey;
+
+    /**
+     * {@link org.apache.hadoop.hive.ql.optimizer.SortedDynPartitionOptimizer}
+     */
+    private transient int buckColIdxInKeyForSdpo = -1;
+    private boolean isFirstRow;
+    private boolean isSkipTag = false;
+    private transient int[] valueIndex; // index for value(+ from keys, - from values)
+    private transient Set<Integer> decimal128ConvertDecimal64Cols = new HashSet<>();
 
     private long[] keyFieldId;
     private long[] valueFieldId;
-    private transient boolean needProject;
+    private transient boolean isNeedProject;
 
     private transient OmniOperator projectOperator;
-    private transient boolean reduceSinkCanReplaceKey;
+    private transient boolean isReduceSinkCanReplaceKey;
     private transient VecWrapper[] vecWrappers;
+
+    public OmniReduceSinkOperator(CompilationOpContext ctx) {
+        super(ctx);
+    }
 
     /**
      * Kryo ctor.
@@ -229,14 +241,17 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
         super();
     }
 
-    public OmniReduceSinkOperator(CompilationOpContext ctx) {
-        super(ctx);
-    }
-
-    public OmniReduceSinkOperator(CompilationOpContext ctx, ReduceSinkDesc conf, boolean reduceSinkCanReplaceKey) {
+    /**
+     * OmniReduceSinkOperator
+     *
+     * @param ctx ctx
+     * @param conf conf
+     * @param isReduceSinkCanReplaceKey isReduceSinkCanReplaceKey
+     */
+    public OmniReduceSinkOperator(CompilationOpContext ctx, ReduceSinkDesc conf, boolean isReduceSinkCanReplaceKey) {
         super(ctx);
         this.conf = conf;
-        this.reduceSinkCanReplaceKey = reduceSinkCanReplaceKey;
+        this.isReduceSinkCanReplaceKey = isReduceSinkCanReplaceKey;
     }
 
     @Override
@@ -249,7 +264,7 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
             ArrayList<ExprNodeDesc> keyCols = conf.getKeyCols();
             for (ExprNodeDesc valueCol : keyCols) {
                 if (valueCol instanceof ExprNodeGenericFuncDesc || valueCol instanceof ExprNodeConstantDesc) {
-                    needProject = true;
+                    isNeedProject = true;
                 }
             }
             keyFieldId = new long[keyCols.size()];
@@ -270,7 +285,7 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
             ArrayList<ExprNodeDesc> valueCols = this.conf.getValueCols();
             for (ExprNodeDesc keyCol : valueCols) {
                 if (keyCol instanceof ExprNodeGenericFuncDesc || keyCol instanceof ExprNodeConstantDesc) {
-                    needProject = true;
+                    isNeedProject = true;
                 }
             }
             this.valueFieldId = new long[valueCols.size()];
@@ -338,7 +353,7 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
 
             int tag = conf.getTag();
             tagByte[0] = (byte) tag;
-            skipTag = conf.getSkipTag();
+            isSkipTag = conf.getSkipTag();
             if (LOG.isInfoEnabled()) {
                 LOG.info("Using tag = " + tag);
             }
@@ -362,18 +377,18 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
                 reducerHash.initialize(limit, memUsage, conf.isMapGroupBy(), this, conf, hconf);
             }
 
-            useUniformHash = conf.getReducerTraits().contains(UNIFORM);
+            isUseUniformHash = conf.getReducerTraits().contains(UNIFORM);
 
-            firstRow = true;
-            // acidOp flag has to be checked to use JAVA hash which works like
+            isFirstRow = true;
+            // isAcidOp flag has to be checked to use JAVA hash which works like
             // identity function for integers, necessary to read RecordIdentifier
             // incase of ACID updates/deletes.
-            boolean acidOp = conf.getWriteType() == AcidUtils.Operation.UPDATE
+            boolean isAcidOp = conf.getWriteType() == AcidUtils.Operation.UPDATE
                     || conf.getWriteType() == AcidUtils.Operation.DELETE;
-            hashFunc = bucketingVersion == 2 && !acidOp
+            hashFunc = bucketingVersion == 2 && !isAcidOp
                     ? ObjectInspectorUtils::getBucketHashCode
                     : ObjectInspectorUtils::getBucketHashCodeOld;
-            if (needProject) {
+            if (isNeedProject) {
                 generatorProject();
             }
             getDecimal128ConvertDecimal64Cols();
@@ -383,7 +398,7 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
             throw new RuntimeException(e);
         }
         int inputFieldNum = ((StructObjectInspector) inputObjInspectors[0]).getAllStructFieldRefs().size();
-        vecWrappers = new VecWrapper[needProject
+        vecWrappers = new VecWrapper[isNeedProject
                 ? conf.getKeyCols().size() + conf.getValueCols().size()
                 : inputFieldNum];
         for (int i = 0; i < vecWrappers.length; i++) {
@@ -399,19 +414,21 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
     private void getDecimal128ConvertDecimal64Cols() {
         ArrayList<ExprNodeDesc> allCols = new ArrayList<>(conf.getKeyCols());
         allCols.addAll(conf.getValueCols());
-        List<? extends StructField> allStructFieldRefs = ((StructObjectInspector) inputObjInspectors[0]).getAllStructFieldRefs();
-        List<ExprNodeDesc> sortedAllCols = allCols.stream().filter(col -> col instanceof ExprNodeColumnDesc).
-                filter(col -> !extractNumberPart((ExprNodeColumnDesc) col).isEmpty()).
-                sorted(Comparator.comparingInt(col -> Integer.parseInt(extractNumberPart((ExprNodeColumnDesc) col)))).collect(Collectors.toList());
+        List<? extends StructField> allStructFieldRefs =
+                ((StructObjectInspector) inputObjInspectors[0]).getAllStructFieldRefs();
+        List<ExprNodeDesc> sortedAllCols = allCols.stream().filter(col -> col instanceof ExprNodeColumnDesc)
+                .filter(col -> !extractNumberPart((ExprNodeColumnDesc) col).isEmpty())
+                .sorted(Comparator.comparingInt(col -> Integer.parseInt(extractNumberPart((ExprNodeColumnDesc) col))))
+                .collect(Collectors.toList());
         if (allStructFieldRefs.size() != sortedAllCols.size()) {
             return;
         }
         for (int i = 0; i < allStructFieldRefs.size(); i++) {
             ObjectInspector fieldObjectInspector = allStructFieldRefs.get(i).getFieldObjectInspector();
             TypeInfo typeInfo = sortedAllCols.get(i).getTypeInfo();
-            if (fieldObjectInspector instanceof WritableHiveDecimalObjectInspector &&
-                    ((DecimalTypeInfo) ((WritableHiveDecimalObjectInspector) fieldObjectInspector).getTypeInfo()).getPrecision() > 18 &&
-                    (typeInfo instanceof DecimalTypeInfo) && ((DecimalTypeInfo) typeInfo).getPrecision() <= 18) {
+            if (fieldObjectInspector instanceof WritableHiveDecimalObjectInspector
+                    && ((DecimalTypeInfo) ((WritableHiveDecimalObjectInspector) fieldObjectInspector).getTypeInfo()).getPrecision() > 18
+                    && (typeInfo instanceof DecimalTypeInfo) && ((DecimalTypeInfo) typeInfo).getPrecision() <= 18) {
                 decimal128ConvertDecimal64Cols.add(i);
             }
         }
@@ -463,9 +480,18 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
      * <p>
      * If distinctColIndices is empty, the object inspector is same as
      * {@link Operator#initEvaluatorsAndReturnStruct(ExprNodeEvaluator[], List, ObjectInspector)}
+     *
+     * @param evals evals
+     * @param distinctColIndices distinctColIndices
+     * @param outputColNames outputColNames
+     * @param length length
+     * @param rowInspector rowInspector
+     * @return StructObjectInspector
+     * @throws HiveException HiveException
      */
     protected static StructObjectInspector initEvaluatorsAndReturnStruct(ExprNodeEvaluator[] evals,
-                                                                         List<List<Integer>> distinctColIndices, List<String> outputColNames, int length,
+                                                                         List<List<Integer>> distinctColIndices,
+                                                                         List<String> outputColNames, int length,
                                                                          ObjectInspector rowInspector) throws HiveException {
         int inspectorLen = evals.length > length ? length + 1 : evals.length;
         List<ObjectInspector> sois = new ArrayList<ObjectInspector>(inspectorLen);
@@ -521,7 +547,7 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
         if (!decimal128ConvertDecimal64Cols.isEmpty()) {
             input = convertVec(input);
         }
-        if (needProject) {
+        if (isNeedProject) {
             this.projectOperator.addInput(input);
             Iterator<VecBatch> output = this.projectOperator.getOutput();
             while (output.hasNext()) {
@@ -572,8 +598,8 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
     private void perProcess(Vec[] row, int tag, int index) throws HiveException {
         try {
             ObjectInspector rowInspector = inputObjInspectors[tag];
-            if (firstRow) {
-                firstRow = false;
+            if (isFirstRow) {
+                isFirstRow = false;
                 // TODO: this is fishy - we init object inspectors based on first tag. We
                 // should either init for each tag, or if rowInspector doesn't really
                 // matter, then we can create this in ctor and get rid of firstRow.
@@ -637,7 +663,7 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
             final int hashCode;
 
             // distKeyLength doesn't include tag, but includes buckNum in cachedKeys[0]
-            if (useUniformHash && partitionEval.length > 0) {
+            if (isUseUniformHash && partitionEval.length > 0) {
                 hashCode = computeMurmurHash(firstKey);
             } else {
                 hashCode = computeHashCode(row, bucketNumber, index);
@@ -648,14 +674,13 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
              * in case of TopN for windowing, we need to distinguish between rows with
              * null partition keys and rows with value 0 for partition keys.
              */
-            boolean partKeyNull = conf.isPTFReduceSink() && partitionKeysAreNull(row, index);
+            boolean isPartKeyNull = conf.isPTFReduceSink() && partitionKeysAreNull(row, index);
 
             // Try to store the first key.
             // if TopNHashes aren't active, always forward
-            // if TopNHashes are active, proceed if not already excluded (i.e order by
-            // limit)
+            // if TopNHashes are active, proceed if not already excluded (i.e order by limit)
             final int firstIndex = (reducerHash != null)
-                    ? reducerHash.tryStoreKey(firstKey, partKeyNull)
+                    ? reducerHash.tryStoreKey(firstKey, isPartKeyNull)
                     : TopNHash.FORWARD;
             if (firstIndex == TopNHash.EXCLUDE) {
                 return; // Nothing to do.
@@ -770,6 +795,7 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
      *
      * @param row   the row
      * @param index the cachedKeys index to write to
+     * @throws HiveException HiveException
      */
     private void populateCachedDistinctKeys(Object row, int index) throws HiveException {
         StandardUnionObjectInspector.StandardUnion union;
@@ -792,6 +818,12 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
      * UDFToInteger(ROW__ID) and buckNum == -1 so that the result of this method
      * is to return the bucketId extracted from ROW__ID unless it optimized by
      * {@link org.apache.hadoop.hive.ql.optimizer.SortedDynPartitionOptimizer}
+     *
+     * @param row row
+     * @param buckNum buckNum
+     * @param index index
+     * @return int
+     * @throws HiveException HiveException
      */
     private int computeHashCode(Object row, int buckNum, int index) throws HiveException {
         // Evaluate the HashCode
@@ -836,7 +868,8 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
     }
 
     private Object getOriginValue(Vec vector, int index, ObjectInspector fieldObjectInspector) {
-        PrimitiveObjectInspector.PrimitiveCategory primitiveCategory = ((PrimitiveObjectInspector) fieldObjectInspector).getPrimitiveCategory();
+        PrimitiveObjectInspector.PrimitiveCategory primitiveCategory =
+                ((PrimitiveObjectInspector) fieldObjectInspector).getPrimitiveCategory();
         DataType type = vector.getType();
         switch (primitiveCategory) {
             case INT:
@@ -852,7 +885,8 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
             case SHORT:
                 return ((ShortVec) vector).get(index);
             case DECIMAL: {
-                DecimalTypeInfo typeInfo = (DecimalTypeInfo) ((WritableHiveDecimalObjectInspector) fieldObjectInspector).getTypeInfo();
+                DecimalTypeInfo typeInfo =
+                        (DecimalTypeInfo) ((WritableHiveDecimalObjectInspector) fieldObjectInspector).getTypeInfo();
                 if (type.getId() == OMNI_LONG) {
                     long value = ((LongVec) vector).get(index);
                     return HiveDecimal.create(value, typeInfo.getScale());
@@ -875,7 +909,8 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
     }
 
     private Object getWritableValue(Vec vector, int index, ObjectInspector fieldObjectInspector) {
-        PrimitiveObjectInspector.PrimitiveCategory primitiveCategory = ((PrimitiveObjectInspector) fieldObjectInspector).getPrimitiveCategory();
+        PrimitiveObjectInspector.PrimitiveCategory primitiveCategory =
+                ((PrimitiveObjectInspector) fieldObjectInspector).getPrimitiveCategory();
         DataType type = vector.getType();
         switch (primitiveCategory) {
             case INT:
@@ -891,7 +926,8 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
             case SHORT:
                 return new ShortWritable(((ShortVec) vector).get(index));
             case DECIMAL: {
-                DecimalTypeInfo typeInfo = (DecimalTypeInfo) ((WritableHiveDecimalObjectInspector) fieldObjectInspector).getTypeInfo();
+                DecimalTypeInfo typeInfo =
+                        (DecimalTypeInfo) ((WritableHiveDecimalObjectInspector) fieldObjectInspector).getTypeInfo();
                 if (type.getId() == OMNI_LONG) {
                     long value = ((LongVec) vector).get(index);
                     HiveDecimalWritable hiveDecimalWritable = new HiveDecimalWritable();
@@ -944,11 +980,19 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
         return false;
     }
 
-    // Serialize the keys and append the tag
+    /**
+     * Serialize the keys and append the tag
+     *
+     * @param obj obj
+     * @param tag tag
+     * @param distLength distLength
+     * @return HiveKey
+     * @throws SerDeException SerDeException
+     */
     protected HiveKey toHiveKey(Object obj, int tag, Integer distLength) throws SerDeException {
         BinaryComparable key = (BinaryComparable) keySerializer.serialize(obj, keyObjectInspector);
         int keyLength = key.getLength();
-        if (tag == -1 || skipTag) {
+        if (tag == -1 || isSkipTag) {
             keyWritable.set(key.getBytes(), 0, keyLength);
         } else {
             keyWritable.setSize(keyLength);
@@ -965,10 +1009,17 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
         collect(keyWritable, valueWritable);
     }
 
+    /**
+     * collect
+     *
+     * @param keyWritable keyWritable
+     * @param valueWritable valueWritable
+     * @throws IOException IOException
+     */
     protected void collect(BytesWritable keyWritable, Writable valueWritable) throws IOException {
         // Since this is a terminal operator, update counters explicitly -
         // forward is not called
-        if (null != out) {
+        if (out != null) {
             numRows++;
             runTimeNumRows++;
             if (LOG.isTraceEnabled()) {
@@ -998,12 +1049,12 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
     }
 
     @Override
-    protected void closeOp(boolean abort) throws HiveException {
-        if (!abort && reducerHash != null) {
+    protected void closeOp(boolean isAbort) throws HiveException {
+        if (!isAbort && reducerHash != null) {
             reducerHash.flush();
         }
         runTimeNumRows = numRows;
-        super.closeOp(abort);
+        super.closeOp(isAbort);
         out = null;
         random = null;
         reducerHash = null;
@@ -1013,6 +1064,8 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
     }
 
     /**
+     * getName
+     *
      * @return the name of the operator
      */
     @Override
@@ -1030,8 +1083,8 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
         return false;
     }
 
-    public void setSkipTag(boolean value) {
-        this.skipTag = value;
+    public void setSkipTag(boolean isSkipTag) {
+        this.isSkipTag = isSkipTag;
     }
 
     public void setValueIndex(int[] valueIndex) {
@@ -1061,10 +1114,15 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
     }
 
     @Override
-    public void setOutputCollector(OutputCollector _out) {
-        this.out = _out;
+    public void setOutputCollector(OutputCollector out) {
+        this.out = out;
     }
 
+    /**
+     * getConf
+     *
+     * @return ReduceSinkDesc
+     */
     public ReduceSinkDesc getConf() {
         return new OmniReduceSinkDesc(this.conf);
     }
