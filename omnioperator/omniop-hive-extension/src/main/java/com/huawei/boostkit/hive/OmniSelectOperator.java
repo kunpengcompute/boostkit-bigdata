@@ -65,11 +65,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
 
-/**
- * OmniSelectOperator
- *
- * @since 2024-01-10
- */
 public class OmniSelectOperator extends OmniHiveOperator<OmniSelectDesc> implements Serializable {
     private static final long serialVersionUID = 1L;
     private static Cache<Object, Object> cache = CacheBuilder.newBuilder().concurrencyLevel(8).initialCapacity(10)
@@ -98,12 +93,6 @@ public class OmniSelectOperator extends OmniHiveOperator<OmniSelectDesc> impleme
         super(ctx);
     }
 
-    /**
-     * OmniSelectOperator
-     *
-     * @param ctx  ctx
-     * @param conf conf
-     */
     public OmniSelectOperator(CompilationOpContext ctx, SelectDesc conf) {
         super(ctx);
         this.conf = new OmniSelectDesc(conf);
@@ -303,12 +292,6 @@ public class OmniSelectOperator extends OmniHiveOperator<OmniSelectDesc> impleme
         return typeInfo;
     }
 
-    /**
-     * isInvalidSelectColumn
-     *
-     * @param colList colList
-     * @return boolean
-     */
     public static boolean isInvalidSelectColumn(List<ExprNodeDesc> colList) {
         for (ExprNodeDesc exprNodeDesc : colList) {
             if (exprNodeDesc instanceof ExprNodeConstantDesc

@@ -62,11 +62,6 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-/**
- * OmniVectorOperator
- *
- * @since 2024-01-10
- */
 public class OmniVectorOperator extends OmniHiveOperator<OmniVectorDesc> {
     public transient VectorCache[] vectorCache;
 
@@ -102,12 +97,6 @@ public class OmniVectorOperator extends OmniHiveOperator<OmniVectorDesc> {
         super(ctx);
     }
 
-    /**
-     * OmniVectorOperator
-     *
-     * @param ctx ctx
-     * @param conf conf
-     */
     public OmniVectorOperator(CompilationOpContext ctx, OmniVectorDesc conf) {
         super(ctx);
         this.conf = conf;
@@ -196,12 +185,6 @@ public class OmniVectorOperator extends OmniHiveOperator<OmniVectorDesc> {
         }
     }
 
-    /**
-     * convertLazyToJavaInspector
-     *
-     * @param allStructFieldRefs allStructFieldRefs
-     * @return StandardStructObjectInspector
-     */
     public static StandardStructObjectInspector convertLazyToJavaInspector(
             List<? extends StructField> allStructFieldRefs) {
         List<String> structFieldNames = new ArrayList<>();
@@ -385,12 +368,6 @@ public class OmniVectorOperator extends OmniHiveOperator<OmniVectorDesc> {
         super.close(isAbort);
     }
 
-    /**
-     * pushRestData
-     *
-     * @param tag tag
-     * @throws HiveException HiveException
-     */
     public void pushRestData(int tag) throws HiveException {
         if (rowCount[tag] > 0) {
             forwardNext(tag);

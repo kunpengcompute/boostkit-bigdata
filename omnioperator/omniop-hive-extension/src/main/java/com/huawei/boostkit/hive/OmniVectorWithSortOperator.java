@@ -50,11 +50,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.stream.Collectors;
 
-/**
- * OmniVectorWithSortOperator
- *
- * @since 2024-01-10
- */
 public class OmniVectorWithSortOperator extends OmniHiveOperator<OmniVectorDesc> {
     public transient VectorCache[] vectorCache;
 
@@ -86,12 +81,6 @@ public class OmniVectorWithSortOperator extends OmniHiveOperator<OmniVectorDesc>
         super();
     }
 
-    /**
-     * OmniVectorWithSortOperator
-     *
-     * @param ctx ctx
-     * @param conf conf
-     */
     public OmniVectorWithSortOperator(CompilationOpContext ctx, OmniVectorDesc conf) {
         super(ctx);
         this.conf = conf;
@@ -218,12 +207,6 @@ public class OmniVectorWithSortOperator extends OmniHiveOperator<OmniVectorDesc>
         super.close(isAbort);
     }
 
-    /**
-     * pushRecord
-     *
-     * @param tag tag
-     * @throws HiveException HiveException
-     */
     public void pushRecord(int tag) throws HiveException {
         forward(outputs[tag].next(), tag);
     }

@@ -26,11 +26,6 @@ import org.apache.hadoop.hive.ql.exec.TableScanOperator;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 
-/**
- * OmniVectorizedTableScanOperator
- *
- * @since 2024-01-10
- */
 public class OmniVectorizedTableScanOperator extends OmniTableScanOperator {
     private static final long serialVersionUID = 1L;
 

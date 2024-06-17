@@ -40,11 +40,6 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 
-/**
- * OmniSortOperator
- *
- * @since 2024-01-10
- */
 public class OmniSortOperator extends OmniHiveOperator<OmniSortDesc> implements Serializable {
     private static final long serialVersionUID = 1L;
 
@@ -60,12 +55,6 @@ public class OmniSortOperator extends OmniHiveOperator<OmniSortDesc> implements 
         super(ctx);
     }
 
-    /**
-     * OmniSortOperator
-     *
-     * @param ctx ctx
-     * @param groupByDesc groupByDesc
-     */
     public OmniSortOperator(CompilationOpContext ctx, GroupByDesc groupByDesc) {
         super(ctx);
         this.conf = new OmniSortDesc(groupByDesc);

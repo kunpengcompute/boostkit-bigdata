@@ -63,11 +63,6 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
-/**
- * OmniPTFOperator
- *
- * @since 2024-01-10
- */
 public class OmniPTFOperator extends OmniHiveOperator<OmniPTFDesc> implements Serializable {
     private static final long serialVersionUID = 1L;
     private static final Logger LOG = LoggerFactory.getLogger(OmniPTFOperator.class.getName());
@@ -86,12 +81,6 @@ public class OmniPTFOperator extends OmniHiveOperator<OmniPTFDesc> implements Se
         super(ctx);
     }
 
-    /**
-     * OmniPTFOperator
-     *
-     * @param ctx ctx
-     * @param conf conf
-     */
     public OmniPTFOperator(CompilationOpContext ctx, PTFDesc conf) {
         super(ctx);
         this.conf = new OmniPTFDesc(conf);
@@ -288,9 +277,6 @@ public class OmniPTFOperator extends OmniHiveOperator<OmniPTFDesc> implements Se
     /**
      * Initialize the visitor to use the QueryDefDeserializer Use the order
      * defined in QueryDefWalker to visit the QueryDef
-     *
-     * @param hiveConf hiveConf
-     * @throws HiveException HiveException
      */
     protected void reconstructQueryDef(Configuration hiveConf) throws HiveException {
         PTFDeserializer ds = new PTFDeserializer(conf, (StructObjectInspector) inputObjInspectors[0], hiveConf);

@@ -27,18 +27,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
-/**
- * OperatorUtils
- *
- * @since 2024-01-10
- */
 public class OperatorUtils {
-    /**
-     * expandInspector
-     *
-     * @param inspector inspector
-     * @return ObjectInspector
-     */
     public static ObjectInspector expandInspector(ObjectInspector inspector) {
         List<StructField> fields = new ArrayList<>();
         List<? extends StructField> keyValueFields = ((StructObjectInspector) inspector).getAllStructFieldRefs();

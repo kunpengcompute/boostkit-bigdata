@@ -79,11 +79,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-/**
- * OmniVectorizedVectorOperator
- *
- * @since 2024-01-10
- */
 public class OmniVectorizedVectorOperator extends OmniHiveOperator<OmniVectorDesc> {
     private boolean isToVector;
 
@@ -117,14 +112,6 @@ public class OmniVectorizedVectorOperator extends OmniHiveOperator<OmniVectorDes
         super(ctx);
     }
 
-    /**
-     * OmniVectorizedVectorOperator
-     *
-     * @param ctx ctx
-     * @param conf conf
-     * @param vectorizationContext vectorizationContext
-     * @param rbCtx rbCtx
-     */
     public OmniVectorizedVectorOperator(CompilationOpContext ctx, OmniVectorDesc conf,
                                         VectorizationContext vectorizationContext, VectorizedRowBatchCtx rbCtx) {
         super(ctx);
@@ -435,11 +422,6 @@ public class OmniVectorizedVectorOperator extends OmniHiveOperator<OmniVectorDes
         rowCount = 0;
     }
 
-    /**
-     * forwardNext
-     *
-     * @throws HiveException HiveException
-     */
     protected void forwardNext() throws HiveException {
         if (vecBufferCache != null) {
             Vec[] valueVecBatchCache = vecBufferCache.getValueVecBatchCache(rowCount);

@@ -30,11 +30,6 @@ import org.apache.hadoop.hive.ql.plan.CommonMergeJoinDesc;
 
 import java.util.Queue;
 
-/**
- * OmniMergeJoinWithSortOperator
- *
- * @since 2024-01-10
- */
 public class OmniMergeJoinWithSortOperator extends OmniMergeJoinOperator {
     private transient OmniVectorWithSortOperator omniVectorWithSortOperator;
 

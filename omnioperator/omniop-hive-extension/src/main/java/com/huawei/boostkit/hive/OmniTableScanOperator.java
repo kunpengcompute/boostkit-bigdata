@@ -54,8 +54,6 @@ import java.util.Set;
  * Table Scan Operator If the data is coming from the map-reduce framework, just
  * forward it. This will be needed as part of local work when data is not being
  * read as part of map-reduce framework
- *
- * @since 2024-01-10
  **/
 public class OmniTableScanOperator extends TableScanOperator implements Serializable {
     private static final long serialVersionUID = 1L;
@@ -70,11 +68,6 @@ public class OmniTableScanOperator extends TableScanOperator implements Serializ
 
     protected transient PrimitiveTypeInfo[] partColTypeInfos;
 
-    /**
-     * OmniTableScanOperator
-     *
-     * @param tableScanOperator tableScanOperator
-     */
     public OmniTableScanOperator(TableScanOperator tableScanOperator) {
         super(tableScanOperator.getCompilationOpContext());
         this.conf = tableScanOperator.getConf();
@@ -156,12 +149,6 @@ public class OmniTableScanOperator extends TableScanOperator implements Serializ
         forward(vecBatch);
     }
 
-    /**
-     * forward
-     *
-     * @param vecBatch vecBatch
-     * @throws HiveException HiveException
-     */
     protected void forward(VecBatch vecBatch) throws HiveException {
         vecBatches[0] = vecBatch;
         this.runTimeNumRows += vecBatch.getRowCount();

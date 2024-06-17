@@ -126,18 +126,10 @@ import java.util.Set;
 import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 
-/**
- * OmniReduceSinkOperator
- *
- * @since 2024-01-10
- */
 public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
         implements Serializable, TopNHash.BinaryCollector {
     private static final long serialVersionUID = 1L;
 
-    /**
-     * OutPutCollector
-     */
     protected transient OutputCollector out;
 
     /**
@@ -241,13 +233,6 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
         super();
     }
 
-    /**
-     * OmniReduceSinkOperator
-     *
-     * @param ctx ctx
-     * @param conf conf
-     * @param isReduceSinkCanReplaceKey isReduceSinkCanReplaceKey
-     */
     public OmniReduceSinkOperator(CompilationOpContext ctx, ReduceSinkDesc conf, boolean isReduceSinkCanReplaceKey) {
         super(ctx);
         this.conf = conf;
@@ -480,14 +465,6 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
      * <p>
      * If distinctColIndices is empty, the object inspector is same as
      * {@link Operator#initEvaluatorsAndReturnStruct(ExprNodeEvaluator[], List, ObjectInspector)}
-     *
-     * @param evals evals
-     * @param distinctColIndices distinctColIndices
-     * @param outputColNames outputColNames
-     * @param length length
-     * @param rowInspector rowInspector
-     * @return StructObjectInspector
-     * @throws HiveException HiveException
      */
     protected static StructObjectInspector initEvaluatorsAndReturnStruct(ExprNodeEvaluator[] evals,
                                                                          List<List<Integer>> distinctColIndices,
@@ -792,10 +769,6 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
 
     /**
      * Populate distinct keys part of cachedKeys for a particular row.
-     *
-     * @param row   the row
-     * @param index the cachedKeys index to write to
-     * @throws HiveException HiveException
      */
     private void populateCachedDistinctKeys(Object row, int index) throws HiveException {
         StandardUnionObjectInspector.StandardUnion union;
@@ -818,12 +791,6 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
      * UDFToInteger(ROW__ID) and buckNum == -1 so that the result of this method
      * is to return the bucketId extracted from ROW__ID unless it optimized by
      * {@link org.apache.hadoop.hive.ql.optimizer.SortedDynPartitionOptimizer}
-     *
-     * @param row row
-     * @param buckNum buckNum
-     * @param index index
-     * @return int
-     * @throws HiveException HiveException
      */
     private int computeHashCode(Object row, int buckNum, int index) throws HiveException {
         // Evaluate the HashCode
@@ -982,12 +949,6 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
 
     /**
      * Serialize the keys and append the tag
-     *
-     * @param obj obj
-     * @param tag tag
-     * @param distLength distLength
-     * @return HiveKey
-     * @throws SerDeException SerDeException
      */
     protected HiveKey toHiveKey(Object obj, int tag, Integer distLength) throws SerDeException {
         BinaryComparable key = (BinaryComparable) keySerializer.serialize(obj, keyObjectInspector);
@@ -1009,13 +970,6 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
         collect(keyWritable, valueWritable);
     }
 
-    /**
-     * collect
-     *
-     * @param keyWritable keyWritable
-     * @param valueWritable valueWritable
-     * @throws IOException IOException
-     */
     protected void collect(BytesWritable keyWritable, Writable valueWritable) throws IOException {
         // Since this is a terminal operator, update counters explicitly -
         // forward is not called
@@ -1064,8 +1018,6 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
     }
 
     /**
-     * getName
-     *
      * @return the name of the operator
      */
     @Override
@@ -1118,11 +1070,6 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
         this.out = out;
     }
 
-    /**
-     * getConf
-     *
-     * @return ReduceSinkDesc
-     */
     public ReduceSinkDesc getConf() {
         return new OmniReduceSinkDesc(this.conf);
     }

@@ -107,16 +107,8 @@ import java.util.Optional;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
 
-/**
- * OmniMapJoinOperator
- *
- * @since 2024-01-10
- */
 public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
         implements Serializable, VectorizationContextRegion {
-    /**
-     * JOIN_TYPE_MAP
-     */
     public static final Map<Integer, JoinType> JOIN_TYPE_MAP = new HashMap<Integer, JoinType>() {
         {
             put(JoinDesc.INNER_JOIN, JoinType.OMNI_JOIN_TYPE_INNER);
@@ -166,12 +158,6 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
         super(ctx);
     }
 
-    /**
-     * OmniMapJoinOperator
-     *
-     * @param mjop mjop
-     * @param mapJoinDesc mapJoinDesc
-     */
     public OmniMapJoinOperator(AbstractMapJoinOperator<? extends MapJoinDesc> mjop, MapJoinDesc mapJoinDesc) {
         super(mjop);
         this.conf = new OmniMapJoinDesc(mapJoinDesc);
@@ -179,14 +165,6 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
         this.vectorizationContext = null;
     }
 
-    /**
-     * OmniMapJoinOperator
-     *
-     * @param mjop mjop
-     * @param mapJoinDesc mapJoinDesc
-     * @param changedCtx changedCtx
-     * @param vectorizationContext vectorizationContext
-     */
     public OmniMapJoinOperator(AbstractMapJoinOperator<? extends MapJoinDesc> mjop, MapJoinDesc mapJoinDesc,
                                boolean changedCtx, VectorizationContext vectorizationContext) {
         super(mjop);
@@ -543,11 +521,6 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
         valueVecs = null;
     }
 
-    /**
-     * generateMapMetaData
-     *
-     * @throws HiveException HiveException
-     */
     public void generateMapMetaData() throws HiveException {
         try {
             TableDesc keyTableDesc = conf.getKeyTblDesc();
@@ -949,11 +922,6 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
         private KeyValueReader originValueReader;
         private KeyValuesReader originValuesReader;
 
-        /**
-         * OmniReaderWrapper
-         *
-         * @param reader reader
-         */
         public OmniReaderWrapper(Reader reader) {
             if (reader instanceof KeyValueReader) {
                 isSingleValue = true;
@@ -963,12 +931,6 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
             }
         }
 
-        /**
-         * next
-         *
-         * @return boolean
-         * @throws IOException IOException
-         */
         public boolean next() throws IOException {
             if (isSingleValue) {
                 return originValueReader.next();
@@ -979,12 +941,6 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
             return originValuesReader.next();
         }
 
-        /**
-         * hasNextValue
-         *
-         * @return boolean
-         * @throws IOException IOException
-         */
         public boolean hasNextValue() throws IOException {
             if (isSingleValue) {
                 return false;
@@ -992,12 +948,6 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
             return originValuesReader.getCurrentValues().iterator().hasNext();
         }
 
-        /**
-         * getCurrentKey
-         *
-         * @return Object
-         * @throws IOException IOException
-         */
         public Object getCurrentKey() throws IOException {
             if (isSingleValue) {
                 return originValueReader.getCurrentKey();
@@ -1005,12 +955,6 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
             return originValuesReader.getCurrentKey();
         }
 
-        /**
-         * getCurrentValue
-         *
-         * @return Object
-         * @throws IOException IOException
-         */
         public Object getCurrentValue() throws IOException {
             if (isSingleValue) {
                 return originValueReader.getCurrentValue();

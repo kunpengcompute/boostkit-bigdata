@@ -80,11 +80,6 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/**
- * OmniMergeJoinOperator
- *
- * @since 2024-01-10
- */
 public class OmniMergeJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc> implements Serializable {
     protected static final int SMJ_NEED_ADD_STREAM_TBL_DATA = 2;
     protected static final int SMJ_NEED_ADD_BUFFERED_TBL_DATA = 3;
@@ -115,12 +110,6 @@ public class OmniMergeJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc>
         super(ctx);
     }
 
-    /**
-     * OmniMergeJoinOperator
-     *
-     * @param ctx ctx
-     * @param commonMergeJoinDesc commonMergeJoinDesc
-     */
     public OmniMergeJoinOperator(CompilationOpContext ctx, CommonMergeJoinDesc commonMergeJoinDesc) {
         super(ctx);
         this.conf = new OmniMergeJoinDesc(commonMergeJoinDesc);
@@ -397,13 +386,6 @@ public class OmniMergeJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc>
         }
     }
 
-    /**
-     * processOmni
-     *
-     * @param opIndex opIndex
-     * @param bufferIndex bufferIndex
-     * @throws HiveException HiveException
-     */
     protected void processOmni(int opIndex, int bufferIndex) throws HiveException {
         if (flowControlCode[opIndex] != SCAN_FINISH && resCode[opIndex] == RES_INIT) {
             if (flowControlCode[opIndex] == SMJ_NEED_ADD_STREAM_TBL_DATA) {
@@ -440,17 +422,6 @@ public class OmniMergeJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc>
         resCode[opIndex] = RES_INIT;
     }
 
-    /**
-     * processOmniSmj
-     *
-     * @param opIndex opIndex
-     * @param dataIndex dataIndex
-     * @param data data
-     * @param operators operators
-     * @param controlCode controlCode
-     * @param types types
-     * @throws HiveException HiveException
-     */
     protected void processOmniSmj(int opIndex, int dataIndex, Queue<VecBatch>[] data, OmniOperator[] operators,
                                   int controlCode, DataType[][] types) throws HiveException {
         if (!data[opIndex].isEmpty()) {
@@ -539,12 +510,6 @@ public class OmniMergeJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc>
         super.close(isAbort);
     }
 
-    /**
-     * createEofVecBatch
-     *
-     * @param dataTypes dataTypes
-     * @return VecBatch VecBatch
-     */
     protected VecBatch createEofVecBatch(DataType[] dataTypes) {
         Vec[] vecs = new Vec[dataTypes.length];
         for (int i = 0; i < dataTypes.length; i++) {
