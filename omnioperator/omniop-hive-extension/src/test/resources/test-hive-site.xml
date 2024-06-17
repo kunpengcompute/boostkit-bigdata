@@ -83,4 +83,9 @@
         <name>hive.fetch.task.conversion</name>
         <value>none</value>
     </property>
+
+    <property>
+        <name>hive.tez.container.size</name>
+        <value>4096</value>
+    </property>
 </configuration>
