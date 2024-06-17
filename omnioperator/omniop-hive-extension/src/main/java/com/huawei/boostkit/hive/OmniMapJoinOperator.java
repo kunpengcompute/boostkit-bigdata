@@ -130,6 +130,7 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
     private static final Logger LOG = LoggerFactory.getLogger(OmniMapJoinOperator.class.getName());
     private static boolean isAddedCloseThread;
     private static Map<Integer, Integer> countShareBuildIds = new HashMap<>();
+    private static int buildNodeId;
 
     private transient OmniOperatorFactory omniLookupJoinWithExprOperatorFactory;
 
@@ -154,10 +155,8 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
     private transient List<VecBatch>[] buildVecs;
 
     private transient MapJoinTableContainerSerDe[] mapJoinTableSerdes;
-    private static boolean addedCloseThread;
     private transient Iterator<VecBatch> output;
-    private static int buildNodeId;
-    private static Map<Integer, Integer> countShareBuildIds = new HashMap<>();
+
 
     public OmniMapJoinOperator() {
         super();
