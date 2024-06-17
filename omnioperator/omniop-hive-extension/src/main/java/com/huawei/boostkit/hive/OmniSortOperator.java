@@ -40,6 +40,11 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 
+/**
+ * OmniSortOperator
+ *
+ * @since 2024-01-10
+ */
 public class OmniSortOperator extends OmniHiveOperator<OmniSortDesc> implements Serializable {
     private static final long serialVersionUID = 1L;
 
@@ -55,6 +60,12 @@ public class OmniSortOperator extends OmniHiveOperator<OmniSortDesc> implements 
         super(ctx);
     }
 
+    /**
+     * OmniSortOperator
+     *
+     * @param ctx ctx
+     * @param groupByDesc groupByDesc
+     */
     public OmniSortOperator(CompilationOpContext ctx, GroupByDesc groupByDesc) {
         super(ctx);
         this.conf = new OmniSortDesc(groupByDesc);
@@ -105,7 +116,7 @@ public class OmniSortOperator extends OmniHiveOperator<OmniSortDesc> implements 
     }
 
     @Override
-    protected void closeOp(boolean abort) throws HiveException {
+    protected void closeOp(boolean isAbort) throws HiveException {
         Iterator<VecBatch> output = this.omniOperator.getOutput();
         while (output.hasNext()) {
             forward(output.next(), outputObjInspector);
@@ -116,6 +127,6 @@ public class OmniSortOperator extends OmniHiveOperator<OmniSortDesc> implements 
         if (omniOperator != null) {
             omniOperator.close();
         }
-        super.closeOp(abort);
+        super.closeOp(isAbort);
     }
 }

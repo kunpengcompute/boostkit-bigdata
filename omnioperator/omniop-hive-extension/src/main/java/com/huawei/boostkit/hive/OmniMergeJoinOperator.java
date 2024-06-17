@@ -18,9 +18,13 @@
 
 package com.huawei.boostkit.hive;
 
+import static com.huawei.boostkit.hive.JoinUtils.getExprNodeColumnEvaluator;
+import static com.huawei.boostkit.hive.OmniMapJoinOperator.JOIN_TYPE_MAP;
+
 import com.huawei.boostkit.hive.expression.BaseExpression;
 import com.huawei.boostkit.hive.expression.ExpressionUtils;
 import com.huawei.boostkit.hive.expression.TypeUtils;
+
 import nova.hetu.omniruntime.constants.JoinType;
 import nova.hetu.omniruntime.operator.OmniOperator;
 import nova.hetu.omniruntime.operator.OmniOperatorFactory;
@@ -65,7 +69,6 @@ import org.apache.hadoop.hive.serde2.objectinspector.primitive.AbstractPrimitive
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -76,19 +79,20 @@ import java.util.Optional;
 import java.util.Queue;
 import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
-import static com.huawei.boostkit.hive.JoinUtils.getExprNodeColumnEvaluator;
-import static com.huawei.boostkit.hive.OmniMapJoinOperator.JOIN_TYPE_MAP;
-
+/**
+ * OmniMergeJoinOperator
+ *
+ * @since 2024-01-10
+ */
 public class OmniMergeJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc> implements Serializable {
-    private static final long serialVersionUID = 1L;
-
     protected static final int SMJ_NEED_ADD_STREAM_TBL_DATA = 2;
     protected static final int SMJ_NEED_ADD_BUFFERED_TBL_DATA = 3;
     protected static final int SCAN_FINISH = 4;
     protected static final int RES_INIT = 0;
     protected static final int SMJ_FETCH_JOIN_DATA = 5;
+
+    private static final long serialVersionUID = 1L;
 
     protected transient RecordSource[] sources;
     protected transient boolean[] fetchDone;
@@ -107,21 +111,27 @@ public class OmniMergeJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc>
     protected int posBigTable;
     private OmniVectorOperator omniVectorOperator;
 
+    public OmniMergeJoinOperator(CompilationOpContext ctx) {
+        super(ctx);
+    }
+
+    /**
+     * OmniMergeJoinOperator
+     *
+     * @param ctx ctx
+     * @param commonMergeJoinDesc commonMergeJoinDesc
+     */
+    public OmniMergeJoinOperator(CompilationOpContext ctx, CommonMergeJoinDesc commonMergeJoinDesc) {
+        super(ctx);
+        this.conf = new OmniMergeJoinDesc(commonMergeJoinDesc);
+        this.posBigTable = commonMergeJoinDesc.getPosBigTable();
+    }
+
     /**
      * Kryo ctor.
      */
     protected OmniMergeJoinOperator() {
         super();
-    }
-
-    public OmniMergeJoinOperator(CompilationOpContext ctx) {
-        super(ctx);
-    }
-
-    public OmniMergeJoinOperator(CompilationOpContext ctx, CommonMergeJoinDesc commonMergeJoinDesc) {
-        super(ctx);
-        this.conf = new OmniMergeJoinDesc(commonMergeJoinDesc);
-        this.posBigTable = commonMergeJoinDesc.getPosBigTable();
     }
 
     @Override
@@ -163,23 +173,24 @@ public class OmniMergeJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc>
         }
     }
 
-    private void generateOmniOperator(int bufferIndex, boolean getAll) throws HiveException {
+    private void generateOmniOperator(int bufferIndex, boolean isGetAll) throws HiveException {
         int opIndex = bufferIndex - 1;
         List<Integer> streamAliasList = new ArrayList<>();
         for (int i = 0; i < bufferIndex; i++) {
             streamAliasList.add(i);
         }
-        streamFactories[opIndex] = (OmniSmjStreamedTableWithExprOperatorFactory) getFactory(streamAliasList, null,
-                getAll, opIndex);
+        streamFactories[opIndex] =
+                (OmniSmjStreamedTableWithExprOperatorFactory) getFactory(streamAliasList, null,
+                isGetAll, opIndex);
         streamOperators[opIndex] = streamFactories[opIndex].createOperator();
         bufferFactories[opIndex] = (OmniSmjBufferedTableWithExprOperatorFactory) getFactory(Arrays.asList(bufferIndex),
-                streamFactories[opIndex], getAll, opIndex);
+                streamFactories[opIndex], isGetAll, opIndex);
         bufferOperators[opIndex] = bufferFactories[opIndex].createOperator();
     }
 
     private OmniOperatorFactory getFactory(List<Integer> aliasList,
                                            OmniSmjStreamedTableWithExprOperatorFactory streamFactory,
-                                           boolean getAll, int opIndex) throws HiveException {
+                                           boolean isGetAll, int opIndex) throws HiveException {
         List<? extends StructField> inputFields = aliasList.stream()
                 .flatMap(alias -> ((StructObjectInspector) inputObjInspectors[alias]).getAllStructFieldRefs().stream()
                         .flatMap(keyValue -> ((StructObjectInspector) keyValue.getFieldObjectInspector())
@@ -202,11 +213,12 @@ public class OmniMergeJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc>
             if (i >= fieldNum[tagIndex]) {
                 ++tagIndex;
             }
-            inputTypes[i] = TypeUtils.buildInputDataType(((AbstractPrimitiveObjectInspector) inputFields.get(i).getFieldObjectInspector()).getTypeInfo());
+            inputTypes[i] = TypeUtils.buildInputDataType(((AbstractPrimitiveObjectInspector) inputFields.get(i)
+                    .getFieldObjectInspector()).getTypeInfo());
             colNameToId.get(tagIndex).put(inputFields.get(i).getFieldName(), i);
         }
         int[] outputCols;
-        if (getAll) {
+        if (isGetAll) {
             outputCols = new int[inputTypes.length];
             for (int i = 0; i < inputTypes.length; i++) {
                 outputCols[i] = i;
@@ -249,30 +261,36 @@ public class OmniMergeJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc>
             List<? extends StructField> fields = Utilities.constructVectorizedReduceRowOI((StructObjectInspector) ((StructObjectInspector) inputObjInspectors[opIndex]).getAllStructFieldRefs().get(0).getFieldObjectInspector(),
                     (StructObjectInspector) ((StructObjectInspector) inputObjInspectors[opIndex]).getAllStructFieldRefs().get(1).getFieldObjectInspector()).getAllStructFieldRefs();
             List<String> fieldNames = fields.stream().map(field -> {
-                        String key = field.getFieldName().replace("value.", "VALUE.").replace("key.", "KEY.");
+                        String key = field.getFieldName()
+                                .replace("value.", "VALUE.").replace("key.", "KEY.");
                         if (inputColNameToExprName.containsKey(key)) {
                             List<String> exprNames = inputColNameToExprName.get(key);
-                            return exprNames.get(Math.min(exprNames.size() - 1, opIndex)).replace("value.", "").replace("key.", "");
+                            return exprNames.get(Math.min(exprNames.size() - 1, opIndex))
+                                    .replace("value.", "").replace("key.", "");
                         } else {
-                            return field.getFieldName().replace("value.", "").replace("key.", "");
+                            return field.getFieldName()
+                                    .replace("value.", "").replace("key.", "");
                         }
                     }
             ).collect(Collectors.toList());
-            List<ObjectInspector> inspectors = fields.stream().map(StructField::getFieldObjectInspector).collect(Collectors.toList());
-
             int bufferIndex = opIndex + 1;
             fields = Utilities.constructVectorizedReduceRowOI((StructObjectInspector) ((StructObjectInspector) inputObjInspectors[bufferIndex]).getAllStructFieldRefs().get(0).getFieldObjectInspector(),
                     (StructObjectInspector) ((StructObjectInspector) inputObjInspectors[bufferIndex]).getAllStructFieldRefs().get(1).getFieldObjectInspector()).getAllStructFieldRefs();
             fieldNames.addAll(fields.stream().map(field -> {
-                        String key = field.getFieldName().replace("value.", "VALUE.").replace("key.", "KEY.");
+                        String key = field.getFieldName()
+                                .replace("value.", "VALUE.").replace("key.", "KEY.");
                         if (inputColNameToExprName.containsKey(key)) {
                             List<String> exprNames = inputColNameToExprName.get(key);
-                            return exprNames.get(Math.min(exprNames.size() - 1, bufferIndex)).replace("value.", "").replace("key.", "");
+                            return exprNames.get(Math.min(exprNames.size() - 1, bufferIndex))
+                                    .replace("value.", "").replace("key.", "");
                         } else {
-                            return field.getFieldName().replace("value.", "").replace("key.", "");
+                            return field.getFieldName()
+                                    .replace("value.", "").replace("key.", "");
                         }
                     }
             ).collect(Collectors.toList()));
+            List<ObjectInspector> inspectors =
+                    fields.stream().map(StructField::getFieldObjectInspector).collect(Collectors.toList());
             inspectors.addAll(fields.stream().map(StructField::getFieldObjectInspector).collect(Collectors.toList()));
 
             StructObjectInspector exprObjInspector = ObjectInspectorFactory.getStandardStructObjectInspector(fieldNames,
@@ -281,10 +299,12 @@ public class OmniMergeJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc>
         } else {
             StructObjectInspector flattenInspector = Utilities.constructVectorizedReduceRowOI((StructObjectInspector) ((StructObjectInspector) inputObjInspectors[opIndex]).getAllStructFieldRefs().get(0).getFieldObjectInspector(),
                     (StructObjectInspector) ((StructObjectInspector) inputObjInspectors[opIndex]).getAllStructFieldRefs().get(1).getFieldObjectInspector());
-            List<ObjectInspector> inspectors = flattenInspector.getAllStructFieldRefs().stream().map(field -> field.getFieldObjectInspector()).collect(Collectors.toList());
-            List<String> fieldNames = flattenInspector.getAllStructFieldRefs().stream().map(field -> field.getFieldName()).collect(Collectors.toList());
-            StructObjectInspector exprObjInspector = ObjectInspectorFactory.getStandardStructObjectInspector(fieldNames,
-                    inspectors);
+            List<ObjectInspector> inspectors = flattenInspector.getAllStructFieldRefs()
+                    .stream().map(field -> field.getFieldObjectInspector()).collect(Collectors.toList());
+            List<String> fieldNames = flattenInspector.getAllStructFieldRefs()
+                    .stream().map(field -> field.getFieldName()).collect(Collectors.toList());
+            StructObjectInspector exprObjInspector = ObjectInspectorFactory
+                    .getStandardStructObjectInspector(fieldNames, inspectors);
             root = ExpressionUtils.build(joinFilter, exprObjInspector);
         }
         return Optional.of(root.toString());
@@ -303,7 +323,8 @@ public class OmniMergeJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc>
     }
 
     private ExprNodeGenericFuncDesc getJoinFilter(int opIndex) {
-        List<ExprNodeDesc> filters = joinFilters[opIndex].stream().map(ExprNodeEvaluator::getExpr).collect(Collectors.toList());
+        List<ExprNodeDesc> filters =
+                joinFilters[opIndex].stream().map(ExprNodeEvaluator::getExpr).collect(Collectors.toList());
         if (filters.isEmpty()) {
             return null;
         }
@@ -318,7 +339,8 @@ public class OmniMergeJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc>
     }
 
     private ExprNodeGenericFuncDesc getResidualFilter() {
-        List<ExprNodeDesc> filters = residualJoinFilters.stream().map(ExprNodeEvaluator::getExpr).collect(Collectors.toList());
+        List<ExprNodeDesc> filters =
+                residualJoinFilters.stream().map(ExprNodeEvaluator::getExpr).collect(Collectors.toList());
         if (filters.size() == 1) {
             return (ExprNodeGenericFuncDesc) filters.get(0);
         }
@@ -375,12 +397,21 @@ public class OmniMergeJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc>
         }
     }
 
+    /**
+     * processOmni
+     *
+     * @param opIndex opIndex
+     * @param bufferIndex bufferIndex
+     * @throws HiveException HiveException
+     */
     protected void processOmni(int opIndex, int bufferIndex) throws HiveException {
         if (flowControlCode[opIndex] != SCAN_FINISH && resCode[opIndex] == RES_INIT) {
             if (flowControlCode[opIndex] == SMJ_NEED_ADD_STREAM_TBL_DATA) {
-                processOmniSmj(opIndex, opIndex, streamData, streamOperators, SMJ_NEED_ADD_STREAM_TBL_DATA, streamTypes);
+                processOmniSmj(opIndex, opIndex, streamData,
+                        streamOperators, SMJ_NEED_ADD_STREAM_TBL_DATA, streamTypes);
             } else {
-                processOmniSmj(opIndex, bufferIndex, bufferData, bufferOperators, SMJ_NEED_ADD_BUFFERED_TBL_DATA, bufferTypes);
+                processOmniSmj(opIndex, bufferIndex, bufferData,
+                        bufferOperators, SMJ_NEED_ADD_BUFFERED_TBL_DATA, bufferTypes);
             }
         }
         if (resCode[opIndex] == SMJ_FETCH_JOIN_DATA) {
@@ -409,6 +440,17 @@ public class OmniMergeJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc>
         resCode[opIndex] = RES_INIT;
     }
 
+    /**
+     * processOmniSmj
+     *
+     * @param opIndex opIndex
+     * @param dataIndex dataIndex
+     * @param data data
+     * @param operators operators
+     * @param controlCode controlCode
+     * @param types types
+     * @throws HiveException HiveException
+     */
     protected void processOmniSmj(int opIndex, int dataIndex, Queue<VecBatch>[] data, OmniOperator[] operators,
                                   int controlCode, DataType[][] types) throws HiveException {
         if (!data[opIndex].isEmpty()) {
@@ -457,8 +499,8 @@ public class OmniMergeJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc>
     public void endGroup() throws HiveException {
     }
 
-    public void publicSetDone(boolean done) {
-        this.done = done;
+    public void publicSetDone(boolean isDone) {
+        this.done = isDone;
     }
 
     @Override
@@ -472,7 +514,7 @@ public class OmniMergeJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc>
     }
 
     @Override
-    public void close(boolean abort) throws HiveException {
+    public void close(boolean isAbort) throws HiveException {
         if (!allInitializedParentsAreClosed()) {
             return;
         }
@@ -494,9 +536,15 @@ public class OmniMergeJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc>
                 processOmni(opIndex, opIndex + 1);
             }
         }
-        super.close(abort);
+        super.close(isAbort);
     }
 
+    /**
+     * createEofVecBatch
+     *
+     * @param dataTypes dataTypes
+     * @return VecBatch VecBatch
+     */
     protected VecBatch createEofVecBatch(DataType[] dataTypes) {
         Vec[] vecs = new Vec[dataTypes.length];
         for (int i = 0; i < dataTypes.length; i++) {
@@ -564,7 +612,7 @@ public class OmniMergeJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc>
     }
 
     @Override
-    public void closeOp(boolean abort) throws HiveException {
+    public void closeOp(boolean isAbort) throws HiveException {
         for (int i = 0; i < streamOperators.length; i++) {
             streamOperators[i].close();
             bufferOperators[i].close();
@@ -579,6 +627,6 @@ public class OmniMergeJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc>
                 vecBatch.close();
             }
         }
-        super.closeOp(abort);
+        super.closeOp(isAbort);
     }
 }

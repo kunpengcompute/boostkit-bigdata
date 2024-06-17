@@ -79,6 +79,11 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+/**
+ * OmniVectorizedVectorOperator
+ *
+ * @since 2024-01-10
+ */
 public class OmniVectorizedVectorOperator extends OmniHiveOperator<OmniVectorDesc> {
     private boolean isToVector;
 
@@ -112,6 +117,14 @@ public class OmniVectorizedVectorOperator extends OmniHiveOperator<OmniVectorDes
         super(ctx);
     }
 
+    /**
+     * OmniVectorizedVectorOperator
+     *
+     * @param ctx ctx
+     * @param conf conf
+     * @param vectorizationContext vectorizationContext
+     * @param rbCtx rbCtx
+     */
     public OmniVectorizedVectorOperator(CompilationOpContext ctx, OmniVectorDesc conf,
                                         VectorizationContext vectorizationContext, VectorizedRowBatchCtx rbCtx) {
         super(ctx);
@@ -127,7 +140,8 @@ public class OmniVectorizedVectorOperator extends OmniHiveOperator<OmniVectorDes
             rebuildVectoriedInspector();
             ReduceWork reduceWork = Utilities.getReduceWork(hconf);
             if (reduceWork != null && (reduceWork.getKeyDesc().getProperties().get(SERIALIZATION_LIB)
-                    .equals(OmniVecBatchSerDe.class.getName()) || reduceWork.getKeyDesc().getProperties().get(SERIALIZATION_LIB)
+                    .equals(OmniVecBatchSerDe.class.getName())
+                    || reduceWork.getKeyDesc().getProperties().get(SERIALIZATION_LIB)
                     .equals(OmniVecBatchOrderSerDe.class.getName()))) {
                 isVecBatchSerDe = true;
             }
@@ -286,7 +300,7 @@ public class OmniVectorizedVectorOperator extends OmniHiveOperator<OmniVectorDes
                 return new LongColumnCache();
             case DECIMAL:
                 DecimalTypeInfo decimalTypeInfo = (DecimalTypeInfo) primitiveTypeInfo;
-                if (decimalTypeInfo.getPrecision() <=18) {
+                if (decimalTypeInfo.getPrecision() <= 18) {
                     return new LongColumnCache();
                 }
                 return new DecimalColumnCache();
@@ -421,6 +435,11 @@ public class OmniVectorizedVectorOperator extends OmniHiveOperator<OmniVectorDes
         rowCount = 0;
     }
 
+    /**
+     * forwardNext
+     *
+     * @throws HiveException HiveException
+     */
     protected void forwardNext() throws HiveException {
         if (vecBufferCache != null) {
             Vec[] valueVecBatchCache = vecBufferCache.getValueVecBatchCache(rowCount);
@@ -449,12 +468,12 @@ public class OmniVectorizedVectorOperator extends OmniHiveOperator<OmniVectorDes
     }
 
     @Override
-    public void close(boolean abort) throws HiveException {
+    public void close(boolean isAbort) throws HiveException {
         // here to process the remaining data in the cache
         if (rowCount > 0) {
             forwardNext();
             rowCount = 0;
         }
-        super.close(abort);
+        super.close(isAbort);
     }
 }
