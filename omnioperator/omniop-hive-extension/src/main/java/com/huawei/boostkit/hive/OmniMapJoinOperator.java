@@ -248,11 +248,9 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
                     for (Map.Entry<Integer, Integer> entry : countShareBuildIds.entrySet()) {
                         Integer value = entry.getValue();
                         for (int i = 0; i < value; i++) {
-                            OmniHashBuilderWithExprOperatorFactory
-                                    .dereferenceHashBuilderOperatorAndFactory(entry.getKey());
+                            OmniHashBuilderWithExprOperatorFactory.dereferenceHashBuilderOperatorAndFactory(entry.getKey());
                         }
-                        if (OmniHashBuilderWithExprOperatorFactory
-                                .getHashBuilderOperatorFactory(entry.getKey()) == null) {
+                        if (OmniHashBuilderWithExprOperatorFactory.getHashBuilderOperatorFactory(entry.getKey()) == null) {
                             LOG.info("release operatorFactor of buildNodeId = " + entry.getKey() + " succeed");
                         } else {
                             LOG.error("release operatorFactor of buildNodeId = " + entry.getKey() + " failed");
