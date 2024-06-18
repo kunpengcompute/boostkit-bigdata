@@ -210,7 +210,6 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
                             buildIndexes.get(buildIndexes.size() - 1));
                     buildOperator = omniHashBuilderWithExprOperatorFactory.createOperator();
                     OmniHashBuilderWithExprOperatorFactory.saveHashBuilderOperatorAndFactory(buildNodeId,
-                            OmniHashBuilderWithExprOperatorFactory.getPartitionId(buildNodeId),
                             omniHashBuilderWithExprOperatorFactory, buildOperator);
                 } else {
                     hasCache = true;
@@ -248,13 +247,13 @@ public class OmniMapJoinOperator extends AbstractMapJoinOperator<MapJoinDesc>
                             OmniHashBuilderWithExprOperatorFactory.dereferenceHashBuilderOperatorAndFactory(entry.getKey());
                         }
                         if (OmniHashBuilderWithExprOperatorFactory.getHashBuilderOperatorFactory(entry.getKey()) == null) {
-                            LOG.info("release operatorFactor of buildNodeId = " + entry.getKey() + " succeed");
+                            LOG.info("release operatorFactory of buildNodeId = " + entry.getKey() + " succeed");
                         } else {
-                            LOG.error("release operatorFactor of buildNodeId = " + entry.getKey() + " failed");
+                            LOG.error("release operatorFactory of buildNodeId = " + entry.getKey() + " failed");
                         }
                     }
                 } catch (Exception e) {
-                    LOG.error("release operatorFactor failed", e);
+                    LOG.error("release operatorFactory failed", e);
                 }
             }));
             addedCloseThread = true;
