@@ -71,27 +71,54 @@ class ShieldEncryptCompressor(conf: Configuration)
   override def compress(b: Array[Byte], off: Int, len: Int): Int = {
     // lazy encrypt, in order to doFinal in the right time.
     if (tryFinished) {
-      val (cipherResult, hmac) = shieldEncryptor.doFinal(this.buf, this.offset, this.length)
+      val (cipherResult, hmac) = if (shortLine) {
+        shieldEncryptor.doFinal()
+      } else {
+        shieldEncryptor.doFinal(this.buf, this.offset, this.length)
+      }
       isFinished = true
       cipherResult.copyToArray(b, 0)
       hmac.copyToArray(b, cipherResult.length)
       cipherResult.length + hmac.length
     } else {
-      val header = if (!hasHeader) {
-        hasHeader = true
-        shieldEncryptor.generateHeader()
-      } else {
-        null
-      }
-      var compressedPart = shieldEncryptor.update(this.buf, this.offset, this.length)
+      val header = getHeaderBytes
+      val compressedPart = getDataBytes
       bytesRead += this.length
       this.length = 0
-      if (header != null) {
-        compressedPart = header ++ compressedPart
+      val resCompressedPart: Array[Byte] = (header, compressedPart) match {
+        case (None, None) => null
+        case (Some(a1), None) => a1
+        case (None, Some(a2)) => a2
+        case (Some(a1), Some(a2)) => a1 ++ a2
       }
-      compressedPart.copyToArray(b, 0)
-      bytesWritten += compressedPart.length
-      compressedPart.length
+      if (resCompressedPart != null) {
+        resCompressedPart.copyToArray(b, 0)
+        bytesWritten += resCompressedPart.length
+        resCompressedPart.length
+      } else {
+        0
+      }
+    }
+  }
+
+  def getHeaderBytes: Option[Array[Byte]] = {
+    if (!hasHeader) {
+      hasHeader = true
+      Option(shieldEncryptor.generateHeader())
+    } else {
+      None
+    }
+  }
+
+  var shortLine = false
+
+  def getDataBytes: Option[Array[Byte]] = {
+    val res = shieldEncryptor.update(this.buf, this.offset, this.length)
+    if (res == null) {
+      shortLine = true
+      None
+    } else {
+      Option(res)
     }
   }
 
@@ -107,7 +134,7 @@ class ShieldEncryptCompressor(conf: Configuration)
   }
 
   override def end(): Unit = {
-    invalidOperationError(condition = true,"Unsupported operation end.")
+    invalidOperationError(condition = true, "Unsupported operation end.")
   }
 
   override def reinit(conf: Configuration): Unit = {

@@ -57,10 +57,10 @@ class ShieldCrypto(conf: Configuration) extends Crypto {
   /**
    * Init this crypto with give params.
    *
-   * @param mode              en/decrypt mode, one of ENCRYPT or DECRYPT.
-   * @param dataKeyPlaintext  signing key and data key.
-   * @param conf              conf
-   * @param iv                iv
+   * @param mode             en/decrypt mode, one of ENCRYPT or DECRYPT.
+   * @param dataKeyPlaintext signing key and data key.
+   * @param conf             conf
+   * @param iv               iv
    */
   def init(mode: OperationMode, dataKeyPlaintext: String, conf: Configuration, iv: Array[Byte]): Unit = {
     this.cryptoMode = AlgorithmMode.parse(conf.get("shield.cryptoMode"))
@@ -76,7 +76,7 @@ class ShieldCrypto(conf: Configuration) extends Crypto {
     encryptionKeySpec = new SecretKeySpec(encryptKey, cryptoMode.secretKeyAlgorithm)
     clearSensitiveInformation(encryptKey)
     Security.addProvider(new BouncyCastleProvider)
-    cipher = Cipher.getInstance("AES/GCM/NoPadding" , BouncyCastleProvider.PROVIDER_NAME)
+    cipher = Cipher.getInstance("AES/GCM/NoPadding", BouncyCastleProvider.PROVIDER_NAME)
     cipher.init(mode.opmode, encryptionKeySpec, algorithmParameterSpec)
     mac = Mac.getInstance(cryptoMode.signingAlgorithm)
     signingKeySpec = new SecretKeySpec(signingKey, cryptoMode.signingAlgorithm)
@@ -87,7 +87,7 @@ class ShieldCrypto(conf: Configuration) extends Crypto {
   /**
    * create the corresponding AlgorithmParameterSpec based on cryptoMode.
    *
-   * @param cryptoMode cryptoMode to en/decrypt data, such as AES_GCM_NOPADDING.
+   * @param cryptoMode           cryptoMode to en/decrypt data, such as AES_GCM_NOPADDING.
    * @param initializationVector the IV source buffer.
    * @return AlgorithmParameterSpec
    */
@@ -102,6 +102,12 @@ class ShieldCrypto(conf: Configuration) extends Crypto {
     val cipherResult: Array[Byte] = cipher.update(content)
     mac.update(cipherResult)
     cipherResult
+  }
+
+  def doFinal(): (Array[Byte], Array[Byte]) = {
+    val cipherResult: Array[Byte] = cipher.doFinal()
+    val hmac: Array[Byte] = mac.doFinal(cipherResult)
+    (cipherResult, hmac)
   }
 
   override def update(content: Array[Byte], offset: Int, length: Int): Array[Byte] = {
@@ -127,7 +133,7 @@ class ShieldCrypto(conf: Configuration) extends Crypto {
    *
    * @param info given sensitive information bytes
    */
-  def clearSensitiveInformation(info: Array[Byte]) : Unit = {
+  def clearSensitiveInformation(info: Array[Byte]): Unit = {
     util.Arrays.fill(info, 0x00.toByte)
   }
 }
