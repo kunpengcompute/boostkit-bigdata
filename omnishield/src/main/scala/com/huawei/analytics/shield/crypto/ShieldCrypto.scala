@@ -64,7 +64,6 @@ class ShieldCrypto(conf: Configuration) extends Crypto {
    */
   def init(mode: OperationMode, dataKeyPlaintext: String, conf: Configuration, iv: Array[Byte]): Unit = {
     this.cryptoMode = AlgorithmMode.parse(conf.get("shield.cryptoMode"))
-    //    opMode = mode
     val secret = Base64.getDecoder.decode(dataKeyPlaintext)
     val signingKey = util.Arrays.copyOfRange(secret, 0, SIGNING_KEY_BYTE_LENGTH)
     val encryptKey =
