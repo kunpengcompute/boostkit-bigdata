@@ -161,17 +161,27 @@ object SparkApplicationDataExtractor {
       if (index > 0) {
         val sqlGraph = sqlGraphMap(execution.executionId)
         if (execution.description.nonEmpty && !isDuplicatedQuery(execution, previousExecutionDesc, sqlGraph)) {
-          descriptions += execution.description.trim
+          descriptions += removeComment(execution.description).trim
         }
       } else {
         if (execution.description.nonEmpty) {
-          descriptions += execution.description.trim
+          descriptions += removeComment(execution.description).trim
         }
       }
       previousExecutionDesc = Some(execution.description)
     }
     val queryStr = descriptions.mkString(";\n")
     queryStr + (if (queryStr.endsWith(";")) "" else ";")
+  }
+
+  private def removeComment(query: String): String = {
+    val queryLines = query.split("\n")
+    val processedQuery = queryLines.map { queryLine =>
+      if (queryLine.startsWith("--")) ""
+      else if (queryLine.contains("--")) queryLine.split("--").head
+      else queryLine
+    }.filterNot(_ == "")
+    processedQuery.mkString("\n")
   }
 
   private def lastAttempt(applicationInfo: ApplicationInfo): ApplicationAttemptInfo = {
