@@ -553,8 +553,7 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] {
       val child = replaceWithColumnarPlan(plan.child)
       if (child.output.nonEmpty) {
         logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
-        if (child.isInstanceOf[ColumnarHashAggregateExec] && child.output.size > columnsThreshold
-            && enableRowShuffle) {
+        if (child.output.size > columnsThreshold && enableRowShuffle) {
           new ColumnarShuffleExchangeExec(plan.outputPartitioning, child, plan.shuffleOrigin, true)
         } else if (enableColumnarShuffle) {
           new ColumnarShuffleExchangeExec(plan.outputPartitioning, child, plan.shuffleOrigin, false)
@@ -770,7 +769,7 @@ class ColumnarPlugin extends (SparkSessionExtensions => Unit) with Logging {
 private class OmniTaskStartExecutorPlugin extends ExecutorPlugin {
   override def onTaskStart(): Unit = {
     addLeakSafeTaskCompletionListener[Unit](_ => {
-      MemoryManager.clearMemory()
+      MemoryManager.reclaimMemory()
     })
   }
 }

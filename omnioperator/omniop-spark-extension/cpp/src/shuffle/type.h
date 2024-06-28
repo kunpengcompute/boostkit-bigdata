@@ -28,6 +28,8 @@ using namespace omniruntime::mem;
 
 static constexpr int32_t kDefaultSplitterBufferSize = 4096;
 static constexpr int32_t kDefaultNumSubDirs = 64;
+static constexpr double spillThreshold = 0.9;
+static int64_t offHeapSize = MemoryManager::GetGlobalMemoryLimit();
 
 struct SplitOptions {
     int32_t buffer_size = kDefaultSplitterBufferSize;
@@ -42,9 +44,9 @@ struct SplitOptions {
 
     Allocator *allocator = Allocator::GetAllocator();
 
-    uint64_t spill_batch_row_num = 4096; // default value
-    uint64_t task_spill_mem_threshold = 1024 * 1024 * 1024; // default value
-    uint64_t executor_spill_mem_threshold = UINT64_MAX; // default value
+    uint64_t spill_batch_row_num = 10000; // default value
+    uint64_t task_spill_mem_threshold = 2L * 1024 * 1024 * 1024; // default value
+    uint64_t executor_spill_mem_threshold = spillThreshold * offHeapSize; // default value
     uint64_t compress_block_size = 64 * 1024; // default value
 
     static SplitOptions Defaults();

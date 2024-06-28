@@ -20,8 +20,6 @@
 #include "splitter.h"
 #include "utils.h"
 
-uint64_t SHUFFLE_SPILL_NUM_ELEMENTS_FORCE_SPILL_THRESHOLD = UINT64_MAX;
-
 SplitOptions SplitOptions::Defaults() { return SplitOptions(); }
 
 // 计算分区id,每个batch初始化
@@ -455,14 +453,18 @@ int Splitter::DoSplit(VectorBatch& vb) {
     ReleaseVectorBatch(&vb);
     this->ResetInputVecBatch();
 
-    // 阈值检查，是否溢写
-    if (num_row_splited_ >= SHUFFLE_SPILL_NUM_ELEMENTS_FORCE_SPILL_THRESHOLD) {
-        LogsDebug(" Spill For Row Num Threshold.");
+    // spill
+    // process level: If the memory usage of the current executor exceeds the threshold, spill is triggered.
+    uint64_t usedMemorySize = omniruntime::mem::MemoryManager::GetGlobalAccountedMemory();
+    if (usedMemorySize > options_.executor_spill_mem_threshold) {
+        LogsDebug(" Spill For Executor Memory Size Threshold.");
         TIME_NANO_OR_RAISE(total_spill_time_, SpillToTmpFile());
         isSpill = true;
     }
+
+    // task level: If the memory usage of the current task exceeds the threshold, spill is triggered.
     if (cached_vectorbatch_size_ + current_fixed_alloc_buffer_size_ >= options_.task_spill_mem_threshold) {
-        LogsDebug(" Spill For Memory Size Threshold.");
+        LogsDebug(" Spill For Task Memory Size Threshold.");
         TIME_NANO_OR_RAISE(total_spill_time_, SpillToTmpFile());
         isSpill = true;
     }
@@ -644,7 +646,7 @@ int Splitter::SplitByRow(VectorBatch *vecBatch) {
 
     // spill
     // process level: If the memory usage of the current executor exceeds the threshold, spill is triggered.
-    auto usedMemorySize = omniruntime::mem::MemoryManager::GetGlobalAccountedMemory();
+    uint64_t usedMemorySize = omniruntime::mem::MemoryManager::GetGlobalAccountedMemory();
     if (usedMemorySize > options_.executor_spill_mem_threshold) {
         TIME_NANO_OR_RAISE(total_spill_time_, SpillToTmpFileByRow());
         total_input_size = 0;
@@ -905,7 +907,7 @@ int32_t Splitter::ProtoWritePartition(int32_t partition_id, std::unique_ptr<Buff
         uint32_t vecBatchProtoSize = reversebytes_uint32t(static_cast<uint32_t>(vecBatchProto->ByteSizeLong()));
         if (bufferStream->Next(&bufferOut, &sizeOut)) {
             std::memcpy(bufferOut, &vecBatchProtoSize, sizeof(vecBatchProtoSize));
-            if (sizeof(vecBatchProtoSize) < sizeOut) {
+            if (sizeof(vecBatchProtoSize) < static_cast<uint32_t>(sizeOut)) {
                 bufferStream->BackUp(sizeOut - sizeof(vecBatchProtoSize));
             }
         }
@@ -943,7 +945,7 @@ int32_t Splitter::ProtoWritePartitionByRow(int32_t partition_id, std::unique_ptr
 
         protoRowBatch->set_rowcnt(onceCopyRow);
         protoRowBatch->set_veccnt(proto_col_types_.size());
-        for (int i = 0; i < proto_col_types_.size(); ++i) {
+        for (uint32_t i = 0; i < proto_col_types_.size(); ++i) {
             spark::VecType *vt = protoRowBatch->add_vectypes();
             vt->set_typeid_(proto_col_types_[i]);
             if(vt->typeid_() == spark::VecType::VEC_TYPE_DECIMAL128 || vt->typeid_() == spark::VecType::VEC_TYPE_DECIMAL64){
@@ -957,7 +959,7 @@ int32_t Splitter::ProtoWritePartitionByRow(int32_t partition_id, std::unique_ptr
 
         int64_t offset = batchCount * options_.spill_batch_row_num;
         auto rowInfoPtr = partition_rows[partition_id].data() + offset;
-        for (int i = 0; i < onceCopyRow; ++i) {
+        for (uint64_t i = 0; i < onceCopyRow; ++i) {
             RowInfo *rowInfo = rowInfoPtr[i];
             spark::ProtoRow *protoRow = protoRowBatch->add_rows();
             protoRow->set_data(rowInfo->row, rowInfo->length);
@@ -972,7 +974,7 @@ int32_t Splitter::ProtoWritePartitionByRow(int32_t partition_id, std::unique_ptr
         uint32_t protoRowBatchSize = reversebytes_uint32t(static_cast<uint32_t>(protoRowBatch->ByteSizeLong()));
         if (bufferStream->Next(&bufferOut, &sizeOut)) {
             std::memcpy(bufferOut, &protoRowBatchSize, sizeof(protoRowBatchSize));
-            if (sizeof(protoRowBatchSize) < sizeOut) {
+            if (sizeof(protoRowBatchSize) < static_cast<uint32_t>(sizeOut)) {
                 bufferStream->BackUp(sizeOut - sizeof(protoRowBatchSize));
             }
         }
@@ -1095,7 +1097,7 @@ int Splitter::protoSpillPartitionByRow(int32_t partition_id, std::unique_ptr<Buf
 
         protoRowBatch->set_rowcnt(onceCopyRow);
         protoRowBatch->set_veccnt(proto_col_types_.size());
-        for (int i = 0; i < proto_col_types_.size(); ++i) {
+        for (uint32_t i = 0; i < proto_col_types_.size(); ++i) {
             spark::VecType *vt = protoRowBatch->add_vectypes();
             vt->set_typeid_(proto_col_types_[i]);
             if(vt->typeid_() == spark::VecType::VEC_TYPE_DECIMAL128 || vt->typeid_() == spark::VecType::VEC_TYPE_DECIMAL64){
@@ -1109,7 +1111,7 @@ int Splitter::protoSpillPartitionByRow(int32_t partition_id, std::unique_ptr<Buf
 
         int64_t offset = batchCount * options_.spill_batch_row_num;
         auto rowInfoPtr = partition_rows[partition_id].data() + offset;
-        for (int i = 0; i < onceCopyRow; ++i) {
+        for (uint64_t i = 0; i < onceCopyRow; ++i) {
             RowInfo *rowInfo = rowInfoPtr[i];
             spark::ProtoRow *protoRow = protoRowBatch->add_rows();
             protoRow->set_data(rowInfo->row, rowInfo->length);
@@ -1208,11 +1210,11 @@ void Splitter::MergeSpilled() {
             uint64_t seekPosit = tmpPartitionOffset;
             uint64_t onceReadLen = 0;
             while ((targetLen > 0) && bufferOutPutStream->Next(&bufferOut, &sizeOut)) {
-                onceReadLen = targetLen > sizeOut ? sizeOut : targetLen;
+                onceReadLen = targetLen > static_cast<uint64_t>(sizeOut) ? sizeOut : targetLen;
                 inputStream->read(bufferOut, onceReadLen, seekPosit);
                 targetLen -= onceReadLen;
                 seekPosit += onceReadLen;
-                if (onceReadLen < sizeOut) {
+                if (onceReadLen < static_cast<uint64_t>(sizeOut)) {
                     // Reached END.
                     bufferOutPutStream->BackUp(sizeOut - onceReadLen);
                     break;
@@ -1259,11 +1261,11 @@ void Splitter::MergeSpilledByRow() {
             uint64_t seekPosit = tmpPartitionOffset;
             uint64_t onceReadLen = 0;
             while ((targetLen > 0) && bufferOutPutStream->Next(&bufferOut, &sizeOut)) {
-                onceReadLen = targetLen > sizeOut ? sizeOut : targetLen;
+                onceReadLen = targetLen > static_cast<uint64_t>(sizeOut) ? sizeOut : targetLen;
                 inputStream->read(bufferOut, onceReadLen, seekPosit);
                 targetLen -= onceReadLen;
                 seekPosit += onceReadLen;
-                if (onceReadLen < sizeOut) {
+                if (onceReadLen < static_cast<uint64_t>(sizeOut)) {
                     // Reached END.
                     bufferOutPutStream->BackUp(sizeOut - onceReadLen);
                     break;
@@ -1363,11 +1365,11 @@ int Splitter::SpillToTmpFileByRow() {
 }
 
 Splitter::Splitter(InputDataTypes inputDataTypes, int32_t num_cols, int32_t num_partitions, SplitOptions options, bool flag)
-        : input_col_types(inputDataTypes),
-          singlePartitionFlag(flag),
+        : singlePartitionFlag(flag),
           num_partitions_(num_partitions),
           options_(std::move(options)),
-          num_fields_(num_cols)
+          num_fields_(num_cols),
+          input_col_types(inputDataTypes)
 {
     LogsDebug("Input Schema colNum: %d", num_cols);
     ToSplitterTypeId(num_cols);
