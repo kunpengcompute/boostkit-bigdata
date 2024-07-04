@@ -37,7 +37,9 @@ import com.huawei.boostkit.hive.processor.NotNullExpressionProcessor;
 import com.huawei.boostkit.hive.processor.RoundExpressionProcessor;
 import com.huawei.boostkit.hive.processor.TimestampExpressionProcessor;
 import com.huawei.boostkit.hive.processor.UpperExpressionProcessor;
+import com.huawei.boostkit.hive.processor.LowerExpressionProcessor;
 import com.huawei.boostkit.hive.processor.LengthExpressionProcessor;
+import com.huawei.boostkit.hive.processor.InstrExpressionProcessor;
 
 import nova.hetu.omniruntime.type.Decimal128DataType;
 import nova.hetu.omniruntime.type.Decimal64DataType;
@@ -77,8 +79,10 @@ import org.apache.hadoop.hive.ql.udf.generic.GenericUDFRound;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDFTimestamp;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDFToDecimal;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDFUpper;
+import org.apache.hadoop.hive.ql.udf.generic.GenericUDFLower;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDFWhen;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDFLength;
+import org.apache.hadoop.hive.ql.udf.generic.GenericUDFInstr;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
 import org.apache.hadoop.hive.serde2.typeinfo.DecimalTypeInfo;
@@ -126,6 +130,8 @@ public class ExpressionUtils {
             put(GenericUDFTimestamp.class, new TimestampExpressionProcessor());
             put(GenericUDFUpper.class, new UpperExpressionProcessor());
             put(GenericUDFLength.class, new LengthExpressionProcessor());
+            put(GenericUDFLower.class, new LowerExpressionProcessor());
+            put(GenericUDFInstr.class, new InstrExpressionProcessor());
         }
     };
 
