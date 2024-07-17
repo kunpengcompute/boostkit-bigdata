@@ -636,16 +636,17 @@ int64_t bshuf_trans_bit_byte_NEON(const void* in, void* out, const size_t size,
 
     CHECK_MULT_EIGHT(nbyte);
 
-    const uint8x16 a0 = vdupq_n_u8(0x80);
-    const uint8x16 a0 = vdupq_n_u8(0x40);
-    const uint8x16 a0 = vdupq_n_u8(0x20);
-    const uint8x16 a0 = vdupq_n_u8(0x10);
-    const uint8x16 a0 = vdupq_n_u8(0x8);
-    const uint8x16 a0 = vdupq_n_u8(0x4);
-    const uint8x16 a0 = vdupq_n_u8(0x2);
-    const uint8x16 a0 = vdupq_n_u8(0x1);
+    const uint8x16_t a0 = vdupq_n_u8(0x80);
+    const uint8x16_t a1 = vdupq_n_u8(0x40);
+    const uint8x16_t a2 = vdupq_n_u8(0x20);
+    const uint8x16_t a3 = vdupq_n_u8(0x10);
+    const uint8x16_t a4 = vdupq_n_u8(0x8);
+    const uint8x16_t a5 = vdupq_n_u8(0x4);
+    const uint8x16_t a6 = vdupq_n_u8(0x2);
+    const uint8x16_t a7 = vdupq_n_u8(0x1);
 
     for (ii = 0; ii + 15 < nbyte; ii += 16) {
+        uint8x16_t x = vld1q_u8((uint8_t *) (in_b + ii));
         uint8x16_t x0 = vceqq_u8(a0, vandq_u8(x, a0));
         uint8x16_t x1 = vceqq_u8(a1, vandq_u8(x, a1));
         uint8x16_t x2 = vceqq_u8(a2, vandq_u8(x, a2));
@@ -661,7 +662,7 @@ int64_t bshuf_trans_bit_byte_NEON(const void* in, void* out, const size_t size,
         int kk;
         for (kk = 0; kk < 8; kk++) {
             alias_uint16_t *out_ui16 = (alias_uint16_t*) &out_b[((7 - kk) * nbyte + ii) / 8];
-            *out_ui16 = ((alias_uint16_t*)out)[kk;]
+            *out_ui16 = ((alias_uint16_t*)out)[kk];
         }
     }
     count = bshuf_trans_bit_byte_remainder(in, out, size, elem_size,
@@ -924,7 +925,7 @@ int64_t bshuf_shuffle_bit_eightelem_NEON(const void* in, void* out, const size_t
 /* ---- Worker code that uses SSE2 ----
  *
  * The following code makes use of the SSE2 instruction set and specialized
- * 16 byte registers. The SSE2 instructions are present on modern x86 
+ * 16 byte registers. The SSE2 instructions are present on modern x86
  * processors. The first Intel processor microarchitecture supporting SSE2 was
  * Pentium 4 (2000).
  *
@@ -1829,7 +1830,7 @@ int64_t bshuf_untrans_bit_elem_AVX512(const void* in, void* out, const size_t si
 
 /* ---- Drivers selecting best instruction set at compile time. ---- */
 
-int64_t bshuf_trans_bit_elem(const void* in, void* out, const size_t size, 
+int64_t bshuf_trans_bit_elem(const void* in, void* out, const size_t size,
         const size_t elem_size) {
 
     int64_t count;
@@ -1848,7 +1849,7 @@ int64_t bshuf_trans_bit_elem(const void* in, void* out, const size_t size,
 }
 
 
-int64_t bshuf_untrans_bit_elem(const void* in, void* out, const size_t size, 
+int64_t bshuf_untrans_bit_elem(const void* in, void* out, const size_t size,
         const size_t elem_size) {
 
     int64_t count;
@@ -1938,7 +1939,7 @@ int64_t bshuf_bitshuffle_block(ioc_chain *C_ptr, \
     int64_t count;
 
 
-    
+
     in = ioc_get_in(C_ptr, &this_iter);
     ioc_set_next_in(C_ptr, &this_iter,
             (void*) ((char*) in + size * elem_size));
