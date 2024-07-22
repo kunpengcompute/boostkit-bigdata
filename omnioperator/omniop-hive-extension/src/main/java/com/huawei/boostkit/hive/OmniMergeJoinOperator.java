@@ -554,6 +554,15 @@ public class OmniMergeJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc>
     protected void forward(Object row, ObjectInspector rowInspector) throws HiveException {
         VecBatch vecBatch = (VecBatch) row;
         this.runTimeNumRows += vecBatch.getRowCount();
+        VecBatch[] vecBatches = new VecBatch[childOperatorsArray.length];
+        vecBatches[0] = vecBatch;
+        if (childOperatorsArray.length > 1) {
+            for (int i = 1; i < vecBatches.length; i++) {
+                if (!childOperatorsArray[i].getDone()) {
+                    vecBatches[i] = OmniHiveOperator.copyVecBatch(vecBatch);
+                }
+            }
+        }
         if (getDone()) {
             vecBatch.releaseAllVectors();
             vecBatch.close();
@@ -565,7 +574,7 @@ public class OmniMergeJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc>
             if (o.getDone()) {
                 childrenDone++;
             } else {
-                o.process(row, childOperatorsTag[i]);
+                o.process(vecBatches[i], childOperatorsTag[i]);
             }
         }
 

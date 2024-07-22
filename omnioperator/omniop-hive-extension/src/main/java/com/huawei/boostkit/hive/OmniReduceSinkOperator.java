@@ -83,8 +83,10 @@ import org.apache.hadoop.hive.serde2.io.HiveDecimalWritable;
 import org.apache.hadoop.hive.serde2.io.ShortWritable;
 import org.apache.hadoop.hive.serde2.lazy.ByteArrayRef;
 import org.apache.hadoop.hive.serde2.lazy.LazyHiveChar;
+import org.apache.hadoop.hive.serde2.lazy.LazyHiveVarchar;
 import org.apache.hadoop.hive.serde2.lazy.LazyString;
 import org.apache.hadoop.hive.serde2.lazy.objectinspector.primitive.LazyHiveCharObjectInspector;
+import org.apache.hadoop.hive.serde2.lazy.objectinspector.primitive.LazyHiveVarcharObjectInspector;
 import org.apache.hadoop.hive.serde2.lazy.objectinspector.primitive.LazyStringObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorFactory;
@@ -905,6 +907,24 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
                 return new HiveDecimalWritable(result, typeInfo.getScale());
             }
             case VARCHAR: {
+                if (fieldObjectInspector instanceof LazyHiveVarcharObjectInspector) {
+                    LazyHiveVarchar lazyHiveVarchar
+                            = new LazyHiveVarchar((LazyHiveVarcharObjectInspector) fieldObjectInspector);
+                    ByteArrayRef byteArrayRef = new ByteArrayRef();
+                    byteArrayRef.setData(((VarcharVec) vector).get(index));
+                    lazyHiveVarchar.init(byteArrayRef, 0, ((VarcharVec) vector).get(index).length);
+                    return lazyHiveVarchar;
+                } else if (fieldObjectInspector instanceof LazyStringObjectInspector) {
+                    LazyString lazyString = new LazyString((LazyStringObjectInspector) fieldObjectInspector);
+                    ByteArrayRef byteArrayRef = new ByteArrayRef();
+                    byteArrayRef.setData(((VarcharVec) vector).get(index));
+                    lazyString.init(byteArrayRef, 0, ((VarcharVec) vector).get(index).length);
+                    return lazyString;
+                } else {
+                    return new Text(((VarcharVec) vector).get(index));
+                }
+            }
+            case CHAR: {
                 if (fieldObjectInspector instanceof LazyHiveCharObjectInspector) {
                     LazyHiveChar lazyHiveChar = new LazyHiveChar((LazyHiveCharObjectInspector) fieldObjectInspector);
                     ByteArrayRef byteArrayRef = new ByteArrayRef();
@@ -918,15 +938,12 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
                     lazyString.init(byteArrayRef, 0, ((VarcharVec) vector).get(index).length);
                     return lazyString;
                 } else {
-                    return new Text(((VarcharVec) vector).get(index));
+                    Text text = new Text(((VarcharVec) vector).get(index));
+                    String s = text.toString();
+                    StringUtils.stripEnd(s, " ");
+                    text.set(s);
+                    return text;
                 }
-            }
-            case CHAR: {
-                Text text = new Text(((VarcharVec) vector).get(index));
-                String s = text.toString();
-                StringUtils.stripEnd(s, " ");
-                text.set(s);
-                return text;
             }
             default:
                 return null;
