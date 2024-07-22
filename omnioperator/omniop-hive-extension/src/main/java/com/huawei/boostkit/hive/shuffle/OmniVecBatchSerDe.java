@@ -18,8 +18,11 @@
 
 package com.huawei.boostkit.hive.shuffle;
 
+import static com.huawei.boostkit.hive.expression.TypeUtils.HIVE_TO_OMNI_TYPE;
+
 import nova.hetu.omniruntime.type.DataType;
 import nova.hetu.omniruntime.type.ShortDataType;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.hive.serde2.AbstractSerDe;
@@ -48,33 +51,14 @@ import java.util.Properties;
 
 import javax.annotation.Nullable;
 
-import static com.huawei.boostkit.hive.expression.TypeUtils.HIVE_TO_OMNI_TYPE;
-
 public class OmniVecBatchSerDe extends AbstractSerDe {
-    public static final Logger LOG = LoggerFactory.getLogger(OmniVecBatchSerDe.class.getName());
-    List<String> columnNames;
-    List<TypeInfo> columnTypes;
-    TypeInfo rowTypeInfo;
-    ObjectInspector cachedObjectInspector;
-    int serializedSize;
-    int deserializedSize;
-    SerDeStats stats;
-    boolean lastOperationSerialize;
-    boolean lastOperationDeserialize;
-    BytesWritable serializeBytesWritable = new BytesWritable();
-    private transient VecSerdeBody[] deserializeResult;
+    private static final Logger LOG = LoggerFactory.getLogger(OmniVecBatchSerDe.class.getName());
 
-    private transient int[] columnTypeLen;
-
-    private transient ColumnSerDe[] columnSerDes;
-
-    private transient boolean[] columnSortOrderIsDesc;
-    private transient byte[] columnNullMarker;
-    protected transient boolean isTopN = false;
     public static final byte ZERO = (byte) 0;
     public static final byte ONE = (byte) 1;
 
-    public static final Map<PrimitiveObjectInspector.PrimitiveCategory, Integer> TYPE_LEN = new HashMap<PrimitiveObjectInspector.PrimitiveCategory, Integer>() {
+    public static final Map<PrimitiveObjectInspector.PrimitiveCategory, Integer> TYPE_LEN =
+            new HashMap<PrimitiveObjectInspector.PrimitiveCategory, Integer>() {
         {
             put(PrimitiveObjectInspector.PrimitiveCategory.BYTE, 1);
             put(PrimitiveObjectInspector.PrimitiveCategory.SHORT, 2);
@@ -87,6 +71,26 @@ public class OmniVecBatchSerDe extends AbstractSerDe {
             put(PrimitiveObjectInspector.PrimitiveCategory.DECIMAL, 16);
         }
     };
+
+    protected transient boolean isTopN = false;
+
+    List<String> columnNames;
+    List<TypeInfo> columnTypes;
+    TypeInfo rowTypeInfo;
+    ObjectInspector cachedObjectInspector;
+    int serializedSize;
+    int deserializedSize;
+    SerDeStats stats;
+    boolean lastOperationSerialize;
+    boolean lastOperationDeserialize;
+    BytesWritable serializeBytesWritable = new BytesWritable();
+
+    private transient VecSerdeBody[] deserializeResult;
+    private transient int[] columnTypeLen;
+    private transient ColumnSerDe[] columnSerDes;
+    private transient boolean[] columnSortOrderIsDesc;
+    private transient byte[] columnNullMarker;
+    private long[] fieldId;
 
     public OmniVecBatchSerDe() throws SerDeException {
     }
@@ -113,8 +117,10 @@ public class OmniVecBatchSerDe extends AbstractSerDe {
         assert this.columnNames.size() == this.columnTypes.size();
         this.rowTypeInfo = TypeInfoFactory.getStructTypeInfo(this.columnNames, this.columnTypes);
         this.cachedObjectInspector = LazyBinaryUtils.getLazyBinaryObjectInspectorFromTypeInfo(this.rowTypeInfo);
-        LOG.debug("LazyBinarySerDe initialized with: columnNames=" + this.columnNames + " columnTypes="
-                + this.columnTypes);
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("LazyBinarySerDe initialized with: columnNames=" + this.columnNames + " columnTypes="
+                    + this.columnTypes);
+        }
         this.serializedSize = 0;
         this.stats = new SerDeStats();
         this.lastOperationSerialize = false;
@@ -185,7 +191,8 @@ public class OmniVecBatchSerDe extends AbstractSerDe {
             if (primitiveCategory == PrimitiveObjectInspector.PrimitiveCategory.DECIMAL) {
                 DecimalTypeInfo decimalTypeInfo = (DecimalTypeInfo) columnTypes.get(i);
                 columnTypeLen[i] = decimalTypeInfo.getPrecision() > 18 ? 16 : 8;
-                dataTypeId = decimalTypeInfo.getPrecision() > 18 ? DataType.DataTypeId.OMNI_DECIMAL128 : DataType.DataTypeId.OMNI_DECIMAL64;
+                dataTypeId = decimalTypeInfo.getPrecision() > 18
+                        ? DataType.DataTypeId.OMNI_DECIMAL128 : DataType.DataTypeId.OMNI_DECIMAL64;
             } else {
                 columnTypeLen[i] = TYPE_LEN.getOrDefault(primitiveCategory, 0);
                 dataTypeId = HIVE_TO_OMNI_TYPE.getOrDefault(primitiveCategory, ShortDataType.SHORT).getId();
@@ -204,7 +211,8 @@ public class OmniVecBatchSerDe extends AbstractSerDe {
             } else {
                 writeLen = writeLen + columnTypeLen[i] + 1;
                 if (isTopN) {
-                    columnSerDes[i] = new FixedWidthColumnSortSerDe(columnTypeLen[i], columnNullMarker[i], dataTypeId, columnSortOrderIsDesc[i]);
+                    columnSerDes[i] = new FixedWidthColumnSortSerDe(columnTypeLen[i],
+                            columnNullMarker[i], dataTypeId, columnSortOrderIsDesc[i]);
                 } else {
                     columnSerDes[i] = new FixedWidthColumnSerDe(columnTypeLen[i]);
                 }
@@ -229,12 +237,18 @@ public class OmniVecBatchSerDe extends AbstractSerDe {
         return BytesWritable.class;
     }
 
-    private long[] fieldId;
-
     public void setFieldId(long[] fieldId) {
         this.fieldId = fieldId;
     }
 
+    /**
+     * serialize
+     *
+     * @param obj obj
+     * @param objectInspector objectInspector
+     * @return Writable
+     * @throws SerDeException SerDeException
+     */
     public Writable serialize(Object obj, ObjectInspector objectInspector) throws SerDeException {
         if (fieldId.length == 0) {
             return this.serializeBytesWritable;
@@ -252,6 +266,11 @@ public class OmniVecBatchSerDe extends AbstractSerDe {
         return this.serializeBytesWritable;
     }
 
+    /**
+     * getSerDeStats
+     *
+     * @return SerDeStats
+     */
     public SerDeStats getSerDeStats() {
         assert this.lastOperationSerialize != this.lastOperationDeserialize;
 
@@ -264,6 +283,12 @@ public class OmniVecBatchSerDe extends AbstractSerDe {
         return this.stats;
     }
 
+    /**
+     * deserialize
+     *
+     * @param field field
+     * @return Object
+     */
     public Object deserialize(Writable field) {
         BytesWritable b = (BytesWritable) field;
         this.deserializedSize = b.getLength();

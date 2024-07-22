@@ -41,11 +41,9 @@ import org.apache.hadoop.hive.ql.exec.Operator;
 import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.io.StatsProvidingRecordReader;
 import org.apache.hadoop.hive.ql.io.orc.OrcFile;
-import org.apache.hadoop.hive.ql.io.sarg.ConvertAstToSearchArg;
 import org.apache.hadoop.hive.ql.io.sarg.SearchArgument;
 import org.apache.hadoop.hive.ql.io.sarg.SearchArgumentImpl;
 import org.apache.hadoop.hive.ql.plan.api.OperatorType;
-import org.apache.hadoop.hive.serde2.ColumnProjectionUtils;
 import org.apache.hadoop.hive.serde2.SerDeStats;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapred.FileSplit;
@@ -53,22 +51,20 @@ import org.apache.hadoop.mapred.RecordReader;
 import org.apache.hive.com.esotericsoftware.kryo.Kryo;
 import org.apache.hive.com.esotericsoftware.kryo.io.Input;
 import org.apache.orc.OrcConf;
-import org.apache.orc.OrcProto;
-import org.apache.orc.OrcUtils;
 import org.apache.orc.TypeDescription;
 
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 public class OmniOrcRecordReader implements RecordReader<NullWritable, VecBatchWrapper>, StatsProvidingRecordReader {
-    private static final Map<TypeDescription.Category, DataType> CATEGORY_TO_OMNI_TYPE = new HashMap<TypeDescription.Category, DataType>() {
+    private static final Map<TypeDescription.Category, DataType> CATEGORY_TO_OMNI_TYPE =
+            new HashMap<TypeDescription.Category, DataType>() {
         {
             put(TypeDescription.Category.SHORT, ShortDataType.SHORT);
             put(TypeDescription.Category.INT, IntDataType.INTEGER);
@@ -85,6 +81,7 @@ public class OmniOrcRecordReader implements RecordReader<NullWritable, VecBatchW
             put(TypeDescription.Category.VARCHAR, VarcharDataType.VARCHAR);
         }
     };
+
     protected OrcColumnarBatchScanReader recordReader;
     protected Vec[] vecs;
     protected final long offset;
@@ -98,26 +95,27 @@ public class OmniOrcRecordReader implements RecordReader<NullWritable, VecBatchW
     OmniOrcRecordReader(Configuration conf, FileSplit split) throws IOException {
         TypeDescription schema = getDesiredRowTypeDescr(conf, false, Integer.MAX_VALUE);
         OrcConf.MAPRED_INPUT_SCHEMA.setString(conf, schema.toString());
-        OrcFile.ReaderOptions readerOptions = OrcFile.readerOptions(conf)
-                .maxLength(OrcConf.MAX_FILE_LENGTH.getLong(conf)).filesystem(split.getPath().getFileSystem(conf));
         org.apache.orc.Reader.Options options = buildOptions(conf, split.getStart(), split.getLength());
         included = getReadColumnIDs(conf);
         TypeDescription requiredSchema = getRequiredSchema(schema);
         options.schema(requiredSchema);
         options.include(null);
         typeIds = new int[included.size()];
-        for (int i=0; i< requiredSchema.getChildren().size(); i++) {
+        for (int i = 0; i < requiredSchema.getChildren().size(); i++) {
             TypeDescription typeDescription = requiredSchema.getChildren().get(i);
             if (typeDescription.getCategory() == TypeDescription.Category.DECIMAL) {
-                if (typeDescription.getPrecision() >18) {
+                if (typeDescription.getPrecision() > 18) {
                     typeIds[i] = Decimal128DataType.DECIMAL128.getId().toValue();
                 } else {
                     typeIds[i] = Decimal64DataType.DECIMAL64.getId().toValue();
                 }
             } else {
-                typeIds[i] = CATEGORY_TO_OMNI_TYPE.get(requiredSchema.getChildren().get(i).getCategory()).getId().toValue();
+                typeIds[i] = CATEGORY_TO_OMNI_TYPE.get(requiredSchema.getChildren()
+                        .get(i).getCategory()).getId().toValue();
             }
         }
+        OrcFile.ReaderOptions readerOptions = OrcFile.readerOptions(conf)
+                .maxLength(OrcConf.MAX_FILE_LENGTH.getLong(conf)).filesystem(split.getPath().getFileSystem(conf));
         recordReader = new OrcColumnarBatchScanReader();
         recordReader.initializeReaderJava(split.getPath().toUri(), readerOptions);
         recordReader.initializeRecordReaderJava(options);

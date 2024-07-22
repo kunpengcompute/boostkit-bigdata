@@ -42,16 +42,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 
-/**
- * A serde class for VecBatchWrapper.
- */
 @SerDeSpec(schemaProps = {serdeConstants.LIST_COLUMNS, serdeConstants.LIST_COLUMN_TYPES, COMPRESSION})
 public class VecBatchWrapperSerde extends AbstractSerDe {
+    public static final String COMPRESSION = "";
+
     private static final Logger LOG = LoggerFactory.getLogger(VecBatchWrapperSerde.class);
 
     private ObjectInspector inspector;
-
-    public static final String COMPRESSION = "";
 
     @Override
     public void initialize(Configuration conf, Properties table) {
@@ -85,9 +82,11 @@ public class VecBatchWrapperSerde extends AbstractSerDe {
         fieldTypes.forEach(fieldType -> {
             PrimitiveObjectInspector primitiveObjectInspector;
             if (fieldType instanceof PrimitiveTypeInfo) {
-                primitiveObjectInspector = PrimitiveObjectInspectorFactory.getPrimitiveJavaObjectInspector((PrimitiveTypeInfo) fieldType);
+                primitiveObjectInspector = PrimitiveObjectInspectorFactory
+                        .getPrimitiveJavaObjectInspector((PrimitiveTypeInfo) fieldType);
             } else {
-                primitiveObjectInspector = PrimitiveObjectInspectorFactory.getPrimitiveJavaObjectInspector(PrimitiveObjectInspector.PrimitiveCategory.VOID);
+                primitiveObjectInspector = PrimitiveObjectInspectorFactory
+                        .getPrimitiveJavaObjectInspector(PrimitiveObjectInspector.PrimitiveCategory.VOID);
             }
             structFieldObjectInspectors.add(primitiveObjectInspector);
         });
