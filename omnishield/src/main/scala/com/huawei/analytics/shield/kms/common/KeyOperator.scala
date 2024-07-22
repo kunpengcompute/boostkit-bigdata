@@ -19,10 +19,8 @@ import com.huawei.analytics.shield.kms.KeyManagementService
 
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.hadoop.conf.Configuration
-import org.apache.spark.internal.Logging
 import org.apache.spark.sql.SparkSession
 
-import java.io.Serializable
 import java.net.URI
 import java.util.Base64
 
@@ -43,6 +41,10 @@ class KeyOperator(primaryKeyName: String = "",
     } else {
       new Configuration()
     }
+
+  def getDataKeyLength:Int = {
+    dataKeyLength
+  }
 
   /**
    * Convert Array[Byte] to String by base64
@@ -80,21 +82,31 @@ class KeyOperator(primaryKeyName: String = "",
     (dataKeyPlainText, encryptedDataKey)
   }
 
+  def getMetaPath(outputPath: String): String = {
+    outputPath + "/" + META_FILE_NAME
+  }
+
   /**
    * write encryptedDataKey to meta after spark df has been written
    *
    * @param fileDirPath filepath
    */
   def writeEncryptedDataKeyToMeta(fileDirPath: String): Unit = {
-    val metaPath = new Path(fileDirPath + "/" + META_FILE_NAME).toString
+    val metaPath = new Path(getMetaPath(fileDirPath)).toString
     val encryptedDataKeyStr = Base64.getEncoder.encodeToString(encryptedDataKey)
-    val jsonStr = KmsMetaFormatSerializer(new KmsMetaFormat(encryptedDataKeyStr))
+    val jsonStr = KmsMetaFormatSerializer(KmsMetaFormat(encryptedDataKeyStr))
     val keyReaderWriter = new FileMetaHandler
     keyReaderWriter.writeKeyToFile(metaPath, jsonStr, hadoopConfig)
   }
 
+  /**
+   * read base64 string from meta file
+   *
+   * @param fileDirPath path
+   * @return encryptKey(base64)
+   */
   def readEncryptedDataKeyFromMeta(fileDirPath: String): String = {
-    val metaPath = new Path(fileDirPath + "/" + META_FILE_NAME).toString
+    val metaPath = new Path(getMetaPath(fileDirPath)).toString
     val fs: FileSystem = FileSystem.get(new URI(metaPath), hadoopConfig)
     val inStream = fs.open(new Path(metaPath))
     val jsonStr = scala.io.Source.fromInputStream(inStream).takeWhile(_ != null).mkString
@@ -121,6 +133,4 @@ class FileMetaHandler {
     val content = scala.io.Source.fromInputStream(inStream).getLines().next()
     content
   }
-
 }
-

@@ -56,8 +56,16 @@ object Encrypt {
         val df = plainTextReader.csv(arguments.inputPath).repartition(arguments.nPartition)
         val encryptWriter = sc.getDataFrameWriter(df, arguments.algorithm).addHeaderParam(arguments.withHeader)
         encryptWriter.csv(arguments.outputPath)
+      case "json" =>
+        val df = plainTextReader.json(arguments.inputPath)
+        val encryptWriter = sc.getDataFrameWriter(df, arguments.algorithm)
+        encryptWriter.json(arguments.outputPath)
+      case "txt" =>
+        val df = plainTextReader.text(arguments.inputPath)
+        val encryptWriter = sc.getDataFrameWriter(df, arguments.algorithm)
+        encryptWriter.text(arguments.outputPath)
       case _ =>
-        invalidArgumentError("wrong file type, only CSV files are supported.")
+        invalidArgumentError("wrong file type, only CSV/JSON/TXT files are supported.")
     }
   }
 
@@ -68,8 +76,16 @@ object Encrypt {
         val df = encryptDataReader.csv(arguments.inputPath)
         val plainTextWriter = sc.getDataFrameWriter(df, PLAIN_TEXT).addHeaderParam(arguments.withHeader)
         plainTextWriter.csv(arguments.outputPath)
+      case "json" =>
+        val df = encryptDataReader.json(arguments.inputPath)
+        val plainTextWriter = sc.getDataFrameWriter(df, PLAIN_TEXT)
+        plainTextWriter.json(arguments.outputPath)
+      case "txt" =>
+        val df = encryptDataReader.text(arguments.inputPath)
+        val plainTextWriter = sc.getDataFrameWriter(df, PLAIN_TEXT)
+        plainTextWriter.text(arguments.outputPath)
       case _ =>
-        invalidArgumentError("wrong file type, only CSV files are supported.")
+        invalidArgumentError("wrong file type, only CSV/JSON/TXT files are supported.")
     }
   }
 
@@ -143,7 +159,7 @@ object Encrypt {
         "  -o PATH,       --outputPath PATH       output path e.g. file://... or hdfs://...\n" +
         "  -a ALGORITHM,  --Algorithm ALGORITHM   algorithm mode, aes/gcm/nopadding \n" +
         "  -e OPERATE,    --operate OPERATE       encrypt or decrypt , default is encrypt\n" +
-        "  -t FILETYPE,   --filetype FILETYPE     file type e.g. csv \n")
+        "  -t FILETYPE,   --filetype FILETYPE     file type e.g. csv,json,txt\n")
     System.exit(1)
   }
 }

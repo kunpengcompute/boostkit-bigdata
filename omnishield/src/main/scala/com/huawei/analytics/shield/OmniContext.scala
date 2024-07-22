@@ -15,12 +15,15 @@
 
 package com.huawei.analytics.shield
 
+import com.huawei.analytics.shield.OmniContext.{getDatKeyLength, getKmsType, getPrimaryKeyNames, loadKmsService}
 import com.huawei.analytics.shield.crypto.dataframe.{ShieldDataFrameReader, ShieldDataFrameWriter}
 import com.huawei.analytics.shield.crypto.AlgorithmMode
-import com.huawei.analytics.shield.kms.common.KeyOperator
+import com.huawei.analytics.shield.kms.common.{KeyOperator, KeyOperatorManager}
 import com.huawei.analytics.shield.kms._
 import com.huawei.analytics.shield.utils.LogError.invalidArgumentError
-
+import com.huawei.analytics.shield.utils.ShieldConfParam.{DATA_KEY_LENGTH, PRIMARY_KEY_NAME, SPARK_IO_CODECS, genKmsTypeConf}
+import com.huawei.analytics.shield.utils.ValueConf.{DATA_KEY_LENGTH_128, DEFAULT_DATA_KEY_LENGTH}
+import org.apache.hadoop.conf.Configuration
 import org.apache.spark.SparkConf
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
@@ -30,9 +33,8 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
  * write functions to save DataFrame to encrypted data files.
  */
 class OmniContext {
-  protected var keyOperator = new KeyOperator
   protected var sparkSession: Option[SparkSession] = None
-  protected var primaryKeyName: String = ""
+  protected var keyOperatorManger: KeyOperatorManager = new KeyOperatorManager
 
 
   /**
@@ -42,9 +44,8 @@ class OmniContext {
    * @return a EncryptedDataFrameReader
    */
   def getDataFrameReader(cryptoMode: AlgorithmMode): ShieldDataFrameReader = {
-    new ShieldDataFrameReader(sparkSession.get, cryptoMode,
-      primaryKeyName, keyOperator)
-
+    val keyOperator = loadSingleKeyOperator()
+    new ShieldDataFrameReader(sparkSession.get, cryptoMode, keyOperator)
   }
 
   /**
@@ -52,13 +53,12 @@ class OmniContext {
    *
    * @param dataFrame  dataframe to save.
    * @param cryptoMode crypto mode, such as PLAIN_TEXT or AES_XXX
-   * @param pkName     primaryKeyName
    * @return a DataFrameWriter[Row]
    */
   def getDataFrameWriter(dataFrame: DataFrame,
                          cryptoMode: AlgorithmMode): ShieldDataFrameWriter = {
-    new ShieldDataFrameWriter(sparkSession.get, dataFrame, cryptoMode,
-      primaryKeyName, keyOperator)
+    val keyOperator = loadSingleKeyOperator()
+    new ShieldDataFrameWriter(sparkSession.get, dataFrame, cryptoMode, keyOperator)
   }
 
   /**
@@ -70,6 +70,33 @@ class OmniContext {
     sparkSession.get
   }
 
+  def getSparkConf: SparkConf = {
+    sparkSession.get.sparkContext.getConf
+  }
+
+  def getHadoopConf: Configuration = {
+    sparkSession.get.sparkContext.hadoopConfiguration
+  }
+
+  def loadSingleKeyOperator(): KeyOperator = {
+    val conf = getSparkConf
+    val pk = getPrimaryKeyNames(conf)
+    val keyLength = getDatKeyLength(conf)
+    val kmsType = getKmsType(conf, pk)
+    loadKeyOperator(pk, kmsType, keyLength)
+  }
+
+  def loadKeyOperator(keyName: String, kmsType: String, keyLength: Int): KeyOperator = {
+    val kms = loadKmsService(kmsType)
+    val mapKey = keyOperatorManger.genOperatorKey(keyName, kms.getClass.getSimpleName)
+    if (keyOperatorManger.containKey(mapKey)) {
+      keyOperatorManger.getOperator(mapKey)
+    } else {
+      val keyOperator = new KeyOperator(keyName, kms, keyLength)
+      keyOperatorManger.putKeyOperator(mapKey, keyOperator)
+      keyOperator
+    }
+  }
 }
 
 
@@ -88,10 +115,9 @@ object OmniContext {
   def initOmniContext(sparkConf: SparkConf, appName: String): OmniContext = {
     val conf = createSparkConf(sparkConf)
     conf.setAppName(appName)
-    conf.set("spark.hadoop.io.compression.codecs", "com.huawei.analytics.shield.crypto.CryptoCodec")
+    conf.set(SPARK_IO_CODECS, "com.huawei.analytics.shield.crypto.CryptoCodec")
     val sparkSession: SparkSession = SparkSession.builder().config(conf).getOrCreate()
-    val context = loadOmniContext(sparkSession)
-    context
+    loadOmniContext(sparkSession)
   }
 
   /**
@@ -103,17 +129,16 @@ object OmniContext {
   def initOmniContext(sparkSession: SparkSession): OmniContext = {
     val conf = sparkSession.sparkContext.getConf
     invalidArgumentError("spark.hadoop.io.compression.codecs not found!",
-      !conf.contains("spark.hadoop.io.compression.codecs"))
+      !conf.contains(SPARK_IO_CODECS))
     invalidArgumentError("spark.hadoop.io.compression.codecs property must be " +
       "set to com.huawei.analytics.shield.crypto.CryptoCodec",
-      conf.get("spark.hadoop.io.compression.codecs") != "com.huawei.analytics." +
+      conf.get(SPARK_IO_CODECS) != "com.huawei.analytics." +
         "shield.crypto.CryptoCodec")
-    val omniContext = loadOmniContext(sparkSession)
-    omniContext
+    loadOmniContext(sparkSession)
   }
 
   /**
-   * load omni context
+   * load key from kms and set key into KeyOperator
    *
    * @param sparkSession a SparkSession
    * @return a OmniContext
@@ -121,44 +146,39 @@ object OmniContext {
   def loadOmniContext(sparkSession: SparkSession): OmniContext = {
     val omniContext = new OmniContext
     omniContext.sparkSession = Some(sparkSession)
-    val conf = sparkSession.sparkContext.getConf
-    val pk = getPrimaryKeyNames(conf)
-    val keyLength = getDatKeyLength(conf)
-    val kms = getKmsType(conf, pk)
-    omniContext.primaryKeyName = pk
-    omniContext.keyOperator = new KeyOperator(pk, kms, keyLength)
     omniContext
   }
 
-  def getPrimaryKeyNames(conf: SparkConf): String = {
+  private def getPrimaryKeyNames(conf: SparkConf): String = {
     invalidArgumentError("spark.shield.primaryKey.name not found!",
-      !conf.contains(s"spark.shield.primaryKey.name"))
-    val name = conf.get(s"spark.shield.primaryKey.name")
-    name
+      !conf.contains(PRIMARY_KEY_NAME))
+   conf.get(PRIMARY_KEY_NAME)
   }
 
-  def getDatKeyLength(conf: SparkConf): Int = {
-    val dataKeyLength = conf.getInt(s"spark.shield.dataKey.length", 256)
+  private def getDatKeyLength(conf: SparkConf): Int = {
+    val dataKeyLength = conf.getInt(DATA_KEY_LENGTH, DEFAULT_DATA_KEY_LENGTH)
     invalidArgumentError("The value of dataKeyLength can only be 128 or 256.",
-      dataKeyLength != 128 && dataKeyLength != 256)
+      dataKeyLength != DATA_KEY_LENGTH_128 && dataKeyLength != DEFAULT_DATA_KEY_LENGTH)
     dataKeyLength
   }
 
-  def getKmsType(conf: SparkConf, primaryKeyName: String): KeyManagementService = {
-    invalidArgumentError("kms type not found!",
-      !conf.contains(s"spark.shield.primaryKey.$primaryKeyName.kms.type"))
-    val kmsType = conf.get(s"spark.shield.primaryKey.$primaryKeyName.kms.type")
-    val clz = Class.forName(kmsType).newInstance()
+  private def getKmsType(conf: SparkConf, primaryKeyName: String): String = {
+    val kmsType = genKmsTypeConf(primaryKeyName)
+    invalidArgumentError("kms type not found!", !conf.contains(kmsType))
+    conf.get(kmsType)
+  }
+
+  private def loadKmsService(className: String): KeyManagementService = {
+    val clz = Class.forName(className).newInstance()
     val kms = clz.asInstanceOf[KeyManagementService]
     kms
   }
 
-  def createSparkConf(existingConf: SparkConf = null): SparkConf = {
+  private def createSparkConf(existingConf: SparkConf = null): SparkConf = {
     var _conf = existingConf
     if (_conf == null) {
       _conf = new SparkConf()
     }
     _conf
   }
-
 }
