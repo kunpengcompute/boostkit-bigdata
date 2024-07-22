@@ -87,4 +87,3 @@ class CryptoCodec
     ".gcm"
   }
 }
-

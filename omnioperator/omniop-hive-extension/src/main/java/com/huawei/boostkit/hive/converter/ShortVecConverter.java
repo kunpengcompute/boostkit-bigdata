@@ -32,7 +32,6 @@ import org.apache.hadoop.hive.ql.exec.vector.LongColumnVector;
 import org.apache.hadoop.hive.serde2.io.ShortWritable;
 import org.apache.hadoop.hive.serde2.lazy.LazyShort;
 
-
 public class ShortVecConverter extends LongVecConverter {
     public Object fromOmniVec(Vec vec, int index) {
         if (vec.isNull(index)) {

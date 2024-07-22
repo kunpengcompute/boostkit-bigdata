@@ -22,9 +22,10 @@ import javax.annotation.Nullable;
 
 public class ReferenceFactor extends BaseExpression {
     protected Integer colVal;
+    protected Integer dataType;
+
     @Nullable
     private final Integer width;
-    protected Integer dataType;
 
     public ReferenceFactor(String exprType, Integer returnType,
                            String operator, Integer colVal, @Nullable Integer width, Integer dataType) {

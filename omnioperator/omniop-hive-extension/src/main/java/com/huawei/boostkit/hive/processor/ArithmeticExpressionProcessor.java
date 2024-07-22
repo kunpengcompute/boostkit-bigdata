@@ -27,7 +27,7 @@ import com.huawei.boostkit.hive.expression.ExpressionUtils;
 import com.huawei.boostkit.hive.expression.TypeUtils;
 
 import nova.hetu.omniruntime.type.Decimal128DataType;
-import org.apache.hadoop.hive.common.type.Decimal128;
+
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDF;
@@ -43,39 +43,45 @@ import java.util.HashMap;
 import java.util.List;
 
 public class ArithmeticExpressionProcessor implements ExpressionProcessor {
-    private final HashMap<Class<? extends GenericUDF>, String> OPERATOR = new HashMap<Class<? extends GenericUDF>, String>() {
-        {
-            put(GenericUDFOPDivide.class, "DIVIDE");
-            put(GenericUDFOPMultiply.class, "MULTIPLY");
-            put(GenericUDFOPMod.class, "MODULUS");
-            put(GenericUDFOPPlus.class, "ADD");
-            put(GenericUDFOPMinus.class, "SUBTRACT");
-        }
-    };
+    private final HashMap<Class<? extends GenericUDF>, String> OPERATOR =
+        new HashMap<Class<? extends GenericUDF>, String>() {
+            {
+                put(GenericUDFOPDivide.class, "DIVIDE");
+                put(GenericUDFOPMultiply.class, "MULTIPLY");
+                put(GenericUDFOPMod.class, "MODULUS");
+                put(GenericUDFOPPlus.class, "ADD");
+                put(GenericUDFOPMinus.class, "SUBTRACT");
+            }
+        };
 
     @Override
     public BaseExpression process(ExprNodeGenericFuncDesc node, String operator, ObjectInspector inspector) {
         List<ExprNodeDesc> children = node.getChildren();
         Integer precision = null;
         Integer scale = null;
-        String functionName = node.getGenericUDF().getClass().getSimpleName();
-        boolean needUpscale = functionName.equals("GenericUDFOPMultiply") || functionName.equals("GenericUDFOPDivide")
-                || functionName.equals("GenericUDFOPMod");
         int maxScale = 0;
         boolean hasDecimal128 = false;
+
         if (node.getTypeInfo() instanceof DecimalTypeInfo) {
             precision = ((DecimalTypeInfo) node.getTypeInfo()).getPrecision();
             scale = ((DecimalTypeInfo) node.getTypeInfo()).getScale();
             maxScale = getMaxScale(children, scale);
             for (ExprNodeDesc child : children) {
-                if (child.getTypeInfo() instanceof DecimalTypeInfo && ((DecimalTypeInfo) child.getTypeInfo()).getPrecision() > 18) {
+                if (child.getTypeInfo() instanceof DecimalTypeInfo
+                        && ((DecimalTypeInfo) child.getTypeInfo()).getPrecision() > 18) {
                     hasDecimal128 = true;
                 }
             }
         }
-        int returnType = hasDecimal128 ? Decimal128DataType.DECIMAL128.getId().toValue() : TypeUtils.convertHiveTypeToOmniType(node.getTypeInfo());
+
+        int returnType = hasDecimal128 ? Decimal128DataType.DECIMAL128.getId().toValue()
+                : TypeUtils.convertHiveTypeToOmniType(node.getTypeInfo());
         DivideExpression compareExpression = new DivideExpression(returnType,
                 OPERATOR.get(node.getGenericUDF().getClass()), precision, scale);
+        String functionName = node.getGenericUDF().getClass().getSimpleName();
+        boolean shouldUpscale = functionName.equals("GenericUDFOPMultiply") || functionName.equals("GenericUDFOPDivide")
+                || functionName.equals("GenericUDFOPMod");
+
         for (ExprNodeDesc child : children) {
             BaseExpression childNode;
             if (child instanceof ExprNodeGenericFuncDesc) {
@@ -84,7 +90,8 @@ public class ArithmeticExpressionProcessor implements ExpressionProcessor {
                 childNode = ExpressionUtils.createNode(child, inspector);
             }
             if (!child.getTypeInfo().equals(node.getTypeInfo())) {
-                addCast(node, precision, scale, needUpscale, maxScale, returnType, compareExpression, child, childNode);
+                addCast(node, precision, scale, shouldUpscale, maxScale, returnType, compareExpression, child,
+                        childNode);
             } else {
                 compareExpression.add(childNode);
             }
@@ -92,11 +99,12 @@ public class ArithmeticExpressionProcessor implements ExpressionProcessor {
         return compareExpression;
     }
 
-    private void addCast(ExprNodeGenericFuncDesc node, Integer precision, Integer scale, boolean needUpscale, int maxScale, int returnType, DivideExpression compareExpression, ExprNodeDesc child, BaseExpression childNode) {
+    private void addCast(ExprNodeGenericFuncDesc node, Integer precision, Integer scale, boolean shouldUpscale,
+                         int maxScale, int returnType, DivideExpression compareExpression, ExprNodeDesc child,
+                         BaseExpression childNode) {
         Integer childPrecision = null;
         Integer childScale = null;
-        if (child.getTypeInfo() instanceof DecimalTypeInfo && needUpscale) {
-
+        if (child.getTypeInfo() instanceof DecimalTypeInfo && shouldUpscale) {
             childScale = ((DecimalTypeInfo) child.getTypeInfo()).getScale();
             childPrecision = ((DecimalTypeInfo) child.getTypeInfo()).getPrecision();
             if (maxScale == childScale) {

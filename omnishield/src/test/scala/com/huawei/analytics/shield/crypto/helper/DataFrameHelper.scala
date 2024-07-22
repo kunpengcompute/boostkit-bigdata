@@ -31,12 +31,24 @@ class DataFrameHelper extends ShieldSpecHelper {
     StructField("age", StringType),
     StructField("job", StringType)
   ))
+  val singleSchema: StructType = StructType(List(
+    StructField("name", StringType)
+  ))
   val repeatedNum = 100000
 
   def generateKeys(): (String, String) = {
     val appid: String = "123456789012"
     val apikey: String = "210987654321"
     (appid, apikey)
+  }
+
+  def generateSingleColumnDF(spark: SparkSession): DataFrame = {
+    val rdd = spark.sparkContext.parallelize(Seq(
+      Row("gdni"),
+      Row("pglyal"),
+      Row("yvomq")
+    ))
+    spark.createDataFrame(rdd, singleSchema).sort("name")
   }
 
   def generateDF(spark: SparkSession): DataFrame = {
@@ -64,3 +76,5 @@ class DataFrameHelper extends ShieldSpecHelper {
   }
 
 }
+
+

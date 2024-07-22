@@ -17,7 +17,6 @@ package com.huawei.analytics.shield.kms.common
 
 import com.fasterxml.jackson.databind.{DeserializationFeature, MapperFeature, ObjectMapper, SerializationFeature}
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
-import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
 
 case class KmsMetaFormat(encryptedDataKey: String)
 

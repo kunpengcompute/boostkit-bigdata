@@ -18,7 +18,7 @@ package com.huawei.analytics.shield.crypto.dataframe
 import com.huawei.analytics.shield.crypto.{AES_GCM_NOPADDING, AlgorithmMode, PLAIN_TEXT}
 import com.huawei.analytics.shield.kms.common.KeyOperator
 import com.huawei.analytics.shield.utils.LogError.invalidArgumentError
-
+import com.huawei.analytics.shield.utils.ShieldConfParam.{genDataKeyLengthConf, genShieldCryptoModeConf, genShieldReadDataKeyConf}
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, DataFrameReader, SparkSession}
 
@@ -27,13 +27,11 @@ import org.apache.spark.sql.{DataFrame, DataFrameReader, SparkSession}
  *
  * @param sparkSession   sparkSession
  * @param encryptMode    encryptMode
- * @param primaryKeyName primaryKeyName
  * @param keyOperator    keyOperator
  */
 class ShieldDataFrameReader(
                              sparkSession: SparkSession,
                              encryptMode: AlgorithmMode,
-                             primaryKeyName: String,
                              keyOperator: KeyOperator) {
   protected val extraOptions = new scala.collection.mutable.HashMap[String, String]
   protected var dataFrameReader: DataFrameReader = sparkSession.read
@@ -60,9 +58,11 @@ class ShieldDataFrameReader(
         val encryptedDataKeyStr = keyOperator.readEncryptedDataKeyFromMeta(path)
         val dataKeyPlainKeyStr = keyOperator.encoderWithBas64(keyOperator.getDataKeyPlainText(encryptedDataKeyStr))
         sparkSession.sparkContext.hadoopConfiguration
-          .set(s"shield.read.dataKey.$encryptedDataKeyStr.plainText", dataKeyPlainKeyStr)
+          .set(genShieldReadDataKeyConf(encryptedDataKeyStr), dataKeyPlainKeyStr)
         sparkSession.sparkContext.hadoopConfiguration
-          .set("shield.cryptoMode", encryptMode.encryptionAlgorithm)
+          .set(genShieldCryptoModeConf(encryptedDataKeyStr), encryptMode.encryptionAlgorithm)
+        sparkSession.sparkContext.hadoopConfiguration
+          .set(genDataKeyLengthConf(encryptedDataKeyStr), keyOperator.getDataKeyLength.toString)
       case _ =>
         invalidArgumentError("unknown EncryptMode " + AlgorithmMode.toString)
     }
@@ -73,4 +73,13 @@ class ShieldDataFrameReader(
     dataFrameReader.options(extraOptions).csv(path)
   }
 
+  def json(path: String): DataFrame = {
+    setContext(path)
+    dataFrameReader.options(extraOptions).json(path)
+  }
+
+  def text(path: String): DataFrame = {
+    setContext(path)
+    dataFrameReader.options(extraOptions).text(path)
+  }
 }

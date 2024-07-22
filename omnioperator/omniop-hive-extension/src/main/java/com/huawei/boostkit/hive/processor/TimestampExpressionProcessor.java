@@ -24,12 +24,12 @@ import com.huawei.boostkit.hive.expression.DivideExpression;
 import com.huawei.boostkit.hive.expression.ExpressionUtils;
 import com.huawei.boostkit.hive.expression.LiteralFactor;
 import com.huawei.boostkit.hive.expression.TypeUtils;
-import com.sun.jdi.LongType;
+
 import nova.hetu.omniruntime.type.DoubleDataType;
 import nova.hetu.omniruntime.type.Decimal128DataType;
 import nova.hetu.omniruntime.type.Decimal64DataType;
 import nova.hetu.omniruntime.type.LongDataType;
-import org.apache.hadoop.hive.common.type.Decimal128;
+
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
@@ -47,9 +47,11 @@ public class TimestampExpressionProcessor implements ExpressionProcessor {
         }
         LiteralFactor<Long> longLiteralFactorDay = new LiteralFactor<>("LITERAL", null, null,
                 86400000L, null, LongDataType.LONG.getId().toValue());
-        DivideExpression divideExpression = new DivideExpression(LongDataType.LONG.getId().toValue(), "MULTIPLY", null, null);
-        if (dataType == Decimal128DataType.DECIMAL128.getId().toValue() || dataType == DoubleDataType.DOUBLE.getId().toValue()
-            || dataType == Decimal64DataType.DECIMAL64.getId().toValue()) {
+        DivideExpression divideExpression = new DivideExpression(LongDataType.LONG.getId().toValue(),
+                "MULTIPLY", null, null);
+        if (dataType == Decimal128DataType.DECIMAL128.getId().toValue()
+                || dataType == DoubleDataType.DOUBLE.getId().toValue()
+                || dataType == Decimal64DataType.DECIMAL64.getId().toValue()) {
             DivideExpression secondExpression = new DivideExpression(dataType, "MULTIPLY", null, null);
             secondExpression.add(baseExpression);
             LiteralFactor<Long> longLiteralFactorSecond = new LiteralFactor<>("LITERAL", null, null,

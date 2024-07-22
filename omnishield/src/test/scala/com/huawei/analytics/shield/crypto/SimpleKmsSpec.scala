@@ -166,4 +166,39 @@ class SimpleKmsSpec extends DataFrameHelper {
     }
   }
 
+  "encrypt/decrypt json file with simple kms" should "work" in {
+    val jsonParam = Map(
+      "spark.shield.primaryKey.name" -> "1234567812345678",
+      "spark.shield.primaryKey.1234567812345678.kms.type" -> "com.huawei.analytics.shield.kms.example.SimpleKeyManagementService",
+      "spark.shield.dataKey.length" -> "128"
+    )
+    val sc: OmniContext = OmniContext.initOmniContext(sparkConf, "json", jsonParam)
+    val df: DataFrame = generateDF(sc.getSparkSession)
+    sc.getDataFrameWriter(df, AES_GCM_NOPADDING).json(tmp + "/json")
+    val d1 = df.schema.map(_.name).mkString(",") + "\n" +
+      df.collect().map(v => s"${v.get(0)},${v.get(1)},${v.get(2)}").mkString("\n")
+    val decryptDF = sc.getDataFrameReader(AES_GCM_NOPADDING).schema(df.schema)
+      .json(tmp + "/json").sort("name")
+    val d2 = decryptDF.schema.map(_.name).mkString(",") + "\n" +
+      decryptDF.collect().map(v => s"${v.get(0)},${v.get(1)},${v.get(2)}").mkString("\n")
+    d2 should be(d1)
+  }
+
+  "encrypt/decrypt text file with simple kms" should "work" in {
+    val jsonParam = Map(
+      "spark.shield.primaryKey.name" -> "1234567812345678",
+      "spark.shield.primaryKey.1234567812345678.kms.type" -> "com.huawei.analytics.shield.kms.example.SimpleKeyManagementService",
+      "spark.shield.dataKey.length" -> "128"
+    )
+    val sc: OmniContext = OmniContext.initOmniContext(sparkConf, "text", jsonParam)
+    val df: DataFrame = generateSingleColumnDF(sc.getSparkSession)
+    sc.getDataFrameWriter(df, AES_GCM_NOPADDING).text(tmp + "/text")
+    val d1 = df.schema.map(_.name).mkString(",") + "\n" +
+      df.collect().map(v => s"${v.get(0)}").mkString("\n")
+    val decryptDF = sc.getDataFrameReader(AES_GCM_NOPADDING).schema(df.schema)
+      .text(tmp + "/text").sort("name")
+    val d2 = decryptDF.schema.map(_.name).mkString(",") + "\n" +
+      decryptDF.collect().map(v => s"${v.get(0)}").mkString("\n")
+    d2 should be(d1)
+  }
 }

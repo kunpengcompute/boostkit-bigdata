@@ -35,11 +35,11 @@ class ShieldDecryptor(conf: Configuration) extends ShieldCrypto(conf: Configurat
   /**
    * init a decryptor
    *
-   * @param dataKeyPlaintext dataKeyPlaintext
+   * @param dataKeyPlaintext     dataKeyPlaintext
    * @param initializationVector initializationVector
    */
-  def init(dataKeyPlaintext: String, initializationVector: Array[Byte]): Unit = {
-    init(DECRYPT, dataKeyPlaintext, conf, initializationVector)
+  def init(dataKeyPlaintext: String, algorithmMode: AlgorithmMode, keyLength: Int, initializationVector: Array[Byte]): Unit = {
+    init(DECRYPT, algorithmMode, keyLength, dataKeyPlaintext, initializationVector)
   }
 
   /**
@@ -78,8 +78,8 @@ class ShieldDecryptor(conf: Configuration) extends ShieldCrypto(conf: Configurat
   /**
    * partially decrypt the content
    *
-   * @param in InputStream
-   * @param buffer  array which stores the content from in
+   * @param in     InputStream
+   * @param buffer array which stores the content from in
    * @return decrypted content
    */
   def decrypt(in: InputStream, buffer: Array[Byte]): Array[Byte] = {
@@ -118,7 +118,6 @@ class ShieldDecryptor(conf: Configuration) extends ShieldCrypto(conf: Configurat
 }
 
 object ShieldDecryptor {
-
   /**
    * Create encrypter by type string
    */
@@ -126,3 +125,5 @@ object ShieldDecryptor {
     new ShieldDecryptor(conf)
   }
 }
+
+

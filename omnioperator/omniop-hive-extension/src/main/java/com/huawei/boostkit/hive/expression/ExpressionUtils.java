@@ -98,42 +98,43 @@ import java.util.Map;
 import javax.annotation.Nonnull;
 
 public class ExpressionUtils {
-    public static final Map<Class<? extends GenericUDF>, ExpressionProcessor> UDF_TO_PROCESSOR = new HashMap<Class<? extends GenericUDF>, ExpressionProcessor>() {
-        {
-            put(GenericUDFBetween.class, new BetweenExpressionProcessor());
-            put(GenericUDFBridge.class, new BridgeExpressionProcessor());
-            put(GenericUDFIn.class, new InExpressionProcessor());
-            put(GenericUDFLikeAll.class, new LikeAllExpressionProcessor());
-            put(GenericUDFLikeAny.class, new LikeAnyExpressionProcessor());
-            put(GenericUDFOPNot.class, new NotExpressionProcessor());
-            put(GenericUDFOPNotNull.class, new NotNullExpressionProcessor());
-            put(GenericUDFOPNull.class, new NotNullExpressionProcessor());
-            put(GenericUDFConcat.class, new ConcatExpressionProcessor());
-            put(GenericUDFOPMinus.class, new ArithmeticExpressionProcessor());
-            put(GenericUDFOPPlus.class, new ArithmeticExpressionProcessor());
-            put(GenericUDFOPMultiply.class, new ArithmeticExpressionProcessor());
-            put(GenericUDFOPDivide.class, new ArithmeticExpressionProcessor());
-            put(GenericUDFOPMod.class, new ArithmeticExpressionProcessor());
-            put(GenericUDFWhen.class, new CaseWhenExpressionProcessor());
-            put(GenericUDFAbs.class, new AbsExpressionProcessor());
-            put(GenericUDFOPEqual.class, new ComputeExpressionProcessor());
-            put(GenericUDFOPEqualOrLessThan.class, new ComputeExpressionProcessor());
-            put(GenericUDFOPEqualOrGreaterThan.class, new ComputeExpressionProcessor());
-            put(GenericUDFOPGreaterThan.class, new ComputeExpressionProcessor());
-            put(GenericUDFOPLessThan.class, new ComputeExpressionProcessor());
-            put(GenericUDFOPNotEqual.class, new ComputeExpressionProcessor());
-            put(GenericUDFCoalesce.class, new CoalesceExpressionProcessor());
-            put(GenericUDFToDecimal.class, new CastExpressionProcessor());
-            put(GenericUDFRound.class, new RoundExpressionProcessor());
-            put(GenericUDFOPAnd.class, new LogicExpressionProcessor());
-            put(GenericUDFOPOr.class, new LogicExpressionProcessor());
-            put(GenericUDFTimestamp.class, new TimestampExpressionProcessor());
-            put(GenericUDFUpper.class, new UpperExpressionProcessor());
-            put(GenericUDFLength.class, new LengthExpressionProcessor());
-            put(GenericUDFLower.class, new LowerExpressionProcessor());
-            put(GenericUDFInstr.class, new InstrExpressionProcessor());
-        }
-    };
+    public static final Map<Class<? extends GenericUDF>, ExpressionProcessor> UDF_TO_PROCESSOR =
+        new HashMap<Class<? extends GenericUDF>, ExpressionProcessor>() {
+            {
+                put(GenericUDFBetween.class, new BetweenExpressionProcessor());
+                put(GenericUDFBridge.class, new BridgeExpressionProcessor());
+                put(GenericUDFIn.class, new InExpressionProcessor());
+                put(GenericUDFLikeAll.class, new LikeAllExpressionProcessor());
+                put(GenericUDFLikeAny.class, new LikeAnyExpressionProcessor());
+                put(GenericUDFOPNot.class, new NotExpressionProcessor());
+                put(GenericUDFOPNotNull.class, new NotNullExpressionProcessor());
+                put(GenericUDFOPNull.class, new NotNullExpressionProcessor());
+                put(GenericUDFConcat.class, new ConcatExpressionProcessor());
+                put(GenericUDFOPMinus.class, new ArithmeticExpressionProcessor());
+                put(GenericUDFOPPlus.class, new ArithmeticExpressionProcessor());
+                put(GenericUDFOPMultiply.class, new ArithmeticExpressionProcessor());
+                put(GenericUDFOPDivide.class, new ArithmeticExpressionProcessor());
+                put(GenericUDFOPMod.class, new ArithmeticExpressionProcessor());
+                put(GenericUDFWhen.class, new CaseWhenExpressionProcessor());
+                put(GenericUDFAbs.class, new AbsExpressionProcessor());
+                put(GenericUDFOPEqual.class, new ComputeExpressionProcessor());
+                put(GenericUDFOPEqualOrLessThan.class, new ComputeExpressionProcessor());
+                put(GenericUDFOPEqualOrGreaterThan.class, new ComputeExpressionProcessor());
+                put(GenericUDFOPGreaterThan.class, new ComputeExpressionProcessor());
+                put(GenericUDFOPLessThan.class, new ComputeExpressionProcessor());
+                put(GenericUDFOPNotEqual.class, new ComputeExpressionProcessor());
+                put(GenericUDFCoalesce.class, new CoalesceExpressionProcessor());
+                put(GenericUDFToDecimal.class, new CastExpressionProcessor());
+                put(GenericUDFRound.class, new RoundExpressionProcessor());
+                put(GenericUDFOPAnd.class, new LogicExpressionProcessor());
+                put(GenericUDFOPOr.class, new LogicExpressionProcessor());
+                put(GenericUDFTimestamp.class, new TimestampExpressionProcessor());
+                put(GenericUDFUpper.class, new UpperExpressionProcessor());
+                put(GenericUDFLength.class, new LengthExpressionProcessor());
+                put(GenericUDFLower.class, new LowerExpressionProcessor());
+                put(GenericUDFInstr.class, new InstrExpressionProcessor());
+            }
+        };
 
     public static boolean isSupportUDF(GenericUDF udf) {
         if (udf instanceof GenericUDFBridge) {
@@ -167,12 +168,13 @@ public class ExpressionUtils {
         return createLiteralNode(false, next);
     }
 
-    public static BaseExpression createLiteralNode(boolean hashDecimal128, ExprNodeDesc next) {
+    public static BaseExpression createLiteralNode(boolean hasDecimal128, ExprNodeDesc next) {
         BaseExpression leaf;
         Object value = ((ExprNodeConstantDesc) next).getValue();
         int omniType = TypeUtils.convertHiveTypeToOmniType(next.getTypeInfo());
-        if (omniType == Decimal128DataType.DECIMAL128.getId().toValue() || omniType == Decimal64DataType.DECIMAL64.getId().toValue()) {
-            if (hashDecimal128) {
+        if (omniType == Decimal128DataType.DECIMAL128.getId().toValue()
+                || omniType == Decimal64DataType.DECIMAL64.getId().toValue()) {
+            if (hasDecimal128) {
                 omniType = Decimal128DataType.DECIMAL128.getId().toValue();
             }
             int scale = ((DecimalTypeInfo) next.getTypeInfo()).getScale();
@@ -184,7 +186,8 @@ public class ExpressionUtils {
             } else {
                 realValue = ((HiveDecimal) value).scaleByPowerOfTen(scale).longValue();
             }
-            leaf = new DecimalLiteral(realValue, omniType, ((DecimalTypeInfo) next.getTypeInfo()).getPrecision(), scale);
+            leaf = new DecimalLiteral(realValue, omniType, ((DecimalTypeInfo) next.getTypeInfo()).getPrecision(),
+                    scale);
         } else {
             leaf = new LiteralFactor<>("LITERAL", null, null, TypeUtils.getLiteralValue(value, next.getTypeInfo()),
                     TypeUtils.getCharWidth(next), omniType);
@@ -221,14 +224,16 @@ public class ExpressionUtils {
         return createNode(false, exprNodeDesc, inspector);
     }
 
-    public static BaseExpression createNode(boolean hasDecimal128, ExprNodeDesc exprNodeDesc, ObjectInspector inspector) {
+    public static BaseExpression createNode(boolean hasDecimal128, ExprNodeDesc exprNodeDesc,
+                                            ObjectInspector inspector) {
         BaseExpression baseExpression = null;
         if (exprNodeDesc instanceof ExprNodeColumnDesc) {
             baseExpression = ExpressionUtils.createReferenceNode(exprNodeDesc, inspector);
         } else if (exprNodeDesc instanceof ExprNodeConstantDesc) {
             baseExpression = ExpressionUtils.createLiteralNode(hasDecimal128, exprNodeDesc);
         } else if (exprNodeDesc instanceof ExprNodeFieldDesc) {
-            baseExpression = ExpressionUtils.createReferenceNode(((ExprNodeFieldDesc) exprNodeDesc).getDesc(), inspector);
+            baseExpression = ExpressionUtils.createReferenceNode(((ExprNodeFieldDesc) exprNodeDesc).getDesc(),
+                    inspector);
         }
         return baseExpression;
     }
@@ -236,7 +241,8 @@ public class ExpressionUtils {
     public static BaseExpression preCast(BaseExpression castExpression, ExprNodeDesc castNodeDesc,
                                          ExprNodeDesc comparedNode) {
         TypeInfo baseTypeInfo = comparedNode.getTypeInfo();
-        if (castNodeDesc instanceof ExprNodeConstantDesc && baseTypeInfo instanceof DecimalTypeInfo && ((ExprNodeConstantDesc) castNodeDesc).getValue().equals(0)) {
+        if (castNodeDesc instanceof ExprNodeConstantDesc && baseTypeInfo instanceof DecimalTypeInfo
+                && ((ExprNodeConstantDesc) castNodeDesc).getValue().equals(0)) {
             if (((DecimalTypeInfo) baseTypeInfo).getPrecision() > 18) {
                 return new DecimalLiteral("0", TypeUtils.convertHiveTypeToOmniType(baseTypeInfo),
                         ((DecimalTypeInfo) baseTypeInfo).getPrecision(), ((DecimalTypeInfo) baseTypeInfo).getScale());

@@ -188,4 +188,3 @@ object PLAIN_TEXT extends AlgorithmMode {
    */
   override def secretKeyAlgorithm: String = ""
 }
-

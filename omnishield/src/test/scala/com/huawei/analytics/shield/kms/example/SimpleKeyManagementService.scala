@@ -55,5 +55,4 @@ class SimpleKeyManagementService protected() extends KeyManagementService{
       }
       dataKeyPlaintext.getBytes()
   }
-
 }

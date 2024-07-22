@@ -31,7 +31,6 @@ import org.apache.hadoop.hive.ql.exec.vector.LongColumnVector;
 import org.apache.hadoop.hive.serde2.lazy.LazyInteger;
 import org.apache.hadoop.io.IntWritable;
 
-
 public class IntVecConverter extends LongVecConverter {
     public Object fromOmniVec(Vec vec, int index) {
         if (vec.isNull(index)) {

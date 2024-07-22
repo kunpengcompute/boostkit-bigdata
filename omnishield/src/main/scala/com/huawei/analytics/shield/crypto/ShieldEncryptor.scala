@@ -16,7 +16,8 @@
 package com.huawei.analytics.shield.crypto
 
 import com.huawei.analytics.shield.utils.LogError.invalidOperationError
-
+import com.huawei.analytics.shield.utils.ShieldConfParam.{WRITE_DATA_KEY_CIPHER_TEXT, genDataKeyLengthConf, genShieldCryptoModeConf}
+import com.huawei.analytics.shield.utils.ValueConf.DEFAULT_DATA_KEY_LENGTH
 import org.apache.hadoop.conf.Configuration
 
 import java.nio.ByteBuffer
@@ -37,8 +38,10 @@ class ShieldEncryptor(conf: Configuration) extends ShieldCrypto(conf: Configurat
    * @param conf conf
    */
   def init(conf: Configuration): Unit = {
-    encryptedDataKey = conf.get("shield.write.dataKey.cipherText")
-    init(ENCRYPT, conf.get("shield.write.dataKey.plainText"), conf)
+    encryptedDataKey = conf.get(WRITE_DATA_KEY_CIPHER_TEXT)
+    val cryptoMode = AlgorithmMode.parse(conf.get(genShieldCryptoModeConf(encryptedDataKey)))
+    val keyLength = conf.getInt(genDataKeyLengthConf(encryptedDataKey), DEFAULT_DATA_KEY_LENGTH)
+    init(ENCRYPT, cryptoMode, keyLength, conf.get("shield.write.dataKey.plainText"))
   }
 
   /**

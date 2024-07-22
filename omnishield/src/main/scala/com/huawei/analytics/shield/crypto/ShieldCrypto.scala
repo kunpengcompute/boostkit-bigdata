@@ -38,20 +38,20 @@ class ShieldCrypto(conf: Configuration) extends Crypto {
   protected var signingKeySpec: SecretKeySpec = null
   protected var initializationVector: Array[Byte] = null
   protected var SIGNING_KEY_BYTE_LENGTH = 16
-  protected var encryptKeyLength = conf.getInt(s"spark.shield.dataKey.length", 256) / 8
   protected var cryptoMode: AlgorithmMode = null
   protected val HEAD_LENGTH = 400
   protected val FIX_LENGTH = 8
+
+  Security.addProvider(new BouncyCastleProvider)
 
   /**
    * Init this crypto with give params.
    *
    * @param mode             en/decrypt mode, one of ENCRYPT or DECRYPT.
    * @param dataKeyPlaintext signing key and data key.
-   * @param conf             conf
    */
-  def init(mode: OperationMode, dataKeyPlaintext: String, conf: Configuration): Unit = {
-    init(mode, dataKeyPlaintext, conf, null)
+  def init(mode: OperationMode, algorithmMode: AlgorithmMode, dataKeyLength: Int, dataKeyPlaintext: String): Unit = {
+    init(mode, algorithmMode, dataKeyLength, dataKeyPlaintext, null)
   }
 
   /**
@@ -59,24 +59,26 @@ class ShieldCrypto(conf: Configuration) extends Crypto {
    *
    * @param mode             en/decrypt mode, one of ENCRYPT or DECRYPT.
    * @param dataKeyPlaintext signing key and data key.
-   * @param conf             conf
    * @param iv               iv
    */
-  def init(mode: OperationMode, dataKeyPlaintext: String, conf: Configuration, iv: Array[Byte]): Unit = {
-    this.cryptoMode = AlgorithmMode.parse(conf.get("shield.cryptoMode"))
+  def init(mode: OperationMode, algorithmMode: AlgorithmMode, dataKeyLength: Int, dataKeyPlaintext: String, iv: Array[Byte]): Unit = {
+    // get final key (signingKey + dataKey)
     val secret = Base64.getDecoder.decode(dataKeyPlaintext)
     val signingKey = util.Arrays.copyOfRange(secret, 0, SIGNING_KEY_BYTE_LENGTH)
     val encryptKey =
-      util.Arrays.copyOfRange(secret, SIGNING_KEY_BYTE_LENGTH, SIGNING_KEY_BYTE_LENGTH + encryptKeyLength)
+      util.Arrays.copyOfRange(secret, SIGNING_KEY_BYTE_LENGTH, SIGNING_KEY_BYTE_LENGTH + dataKeyLength / 8)
     clearSensitiveInformation(secret)
     val r = new SecureRandom()
     val initializationVector = if (iv == null) Array.tabulate(16)(_ => (r.nextInt(256) - 128).toByte) else iv
-    algorithmParameterSpec = createParameterSpec(cryptoMode, initializationVector)
+    // Instance cipher
+    this.cryptoMode = algorithmMode
+    cipher = Cipher.getInstance(cryptoMode.encryptionAlgorithm, BouncyCastleProvider.PROVIDER_NAME)
+    // init cipher by mode
     encryptionKeySpec = new SecretKeySpec(encryptKey, cryptoMode.secretKeyAlgorithm)
-    clearSensitiveInformation(encryptKey)
-    Security.addProvider(new BouncyCastleProvider)
-    cipher = Cipher.getInstance("AES/GCM/NoPadding", BouncyCastleProvider.PROVIDER_NAME)
+    algorithmParameterSpec = createParameterSpec(cryptoMode, initializationVector)
     cipher.init(mode.opmode, encryptionKeySpec, algorithmParameterSpec)
+    clearSensitiveInformation(encryptKey)
+    // init mac
     mac = Mac.getInstance(cryptoMode.signingAlgorithm)
     signingKeySpec = new SecretKeySpec(signingKey, cryptoMode.signingAlgorithm)
     clearSensitiveInformation(signingKey)
