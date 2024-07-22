@@ -63,13 +63,13 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 public class OmniVectorOperator extends OmniHiveOperator<OmniVectorDesc> {
-    private boolean isToVector;
-
-    private transient VecConverter[][] converters;
-
     public transient VectorCache[] vectorCache;
 
     public transient VecBufferCache[] vecBufferCaches;
+
+    private boolean isToVector;
+
+    private transient VecConverter[][] converters;
 
     private transient boolean isKeyValue;
 
@@ -106,7 +106,9 @@ public class OmniVectorOperator extends OmniHiveOperator<OmniVectorDesc> {
     @Override
     protected void initializeOp(Configuration hconf) throws HiveException {
         super.initializeOp(hconf);
-        if (parentOperators.isEmpty() || (parentOperators.get(0) instanceof LimitOperator && parentOperators.get(0).getParentOperators().isEmpty())) {
+        if (parentOperators.isEmpty()
+                || (parentOperators.get(0) instanceof LimitOperator
+                && parentOperators.get(0).getParentOperators().isEmpty())) {
             isKeyValue = true;
         }
         converters = new VecConverter[inputObjInspectors.length][];
@@ -128,7 +130,8 @@ public class OmniVectorOperator extends OmniHiveOperator<OmniVectorDesc> {
         }
         ReduceWork reduceWork = Utilities.getReduceWork(hconf);
         if (reduceWork != null && (reduceWork.getKeyDesc().getProperties().get(SERIALIZATION_LIB)
-                .equals(OmniVecBatchSerDe.class.getName()) || reduceWork.getKeyDesc().getProperties().get(SERIALIZATION_LIB)
+                .equals(OmniVecBatchSerDe.class.getName())
+                || reduceWork.getKeyDesc().getProperties().get(SERIALIZATION_LIB)
                 .equals(OmniVecBatchOrderSerDe.class.getName()))) {
             isVecBatchSerDe = true;
         }
@@ -168,7 +171,8 @@ public class OmniVectorOperator extends OmniHiveOperator<OmniVectorDesc> {
             }
         }
         if (!this.childOperators.isEmpty() && childOperators.get(0) instanceof OmniMergeJoinOperator
-                || childOperators.get(0) instanceof OmniMapJoinOperator && ((OmniMapJoinDesc) childOperators.get(0).getConf()).isDynamicPartitionHashJoin()) {
+                || childOperators.get(0) instanceof OmniMapJoinOperator
+                && ((OmniMapJoinDesc) childOperators.get(0).getConf()).isDynamicPartitionHashJoin()) {
             List<String> fieldNames = new ArrayList<>();
             for (int i = 0; i < inputObjInspectors.length; i++) {
                 fieldNames.add(String.valueOf(i));
@@ -194,8 +198,8 @@ public class OmniVectorOperator extends OmniHiveOperator<OmniVectorDesc> {
                 case VARCHAR:
                 case CHAR:
                 case STRING:
-                    LazyObjectInspectorParameters lazyParam = new LazyObjectInspectorParametersImpl(false, (byte) 0,
-                            false, null, null, null);
+                    LazyObjectInspectorParameters lazyParam = new LazyObjectInspectorParametersImpl(false,
+                            (byte) 0, false, null, null, null);
                     structFieldObjectInspectors.add(LazyPrimitiveObjectInspectorFactory.getLazyObjectInspector(
                             ((PrimitiveObjectInspector) field.getFieldObjectInspector()).getTypeInfo(), lazyParam));
                     break;
@@ -342,7 +346,7 @@ public class OmniVectorOperator extends OmniHiveOperator<OmniVectorDesc> {
     }
 
     @Override
-    public void close(boolean abort) throws HiveException {
+    public void close(boolean isAbort) throws HiveException {
         // here to process the remaining data in the cache
         if (source != null) {
             for (int i = 0; i < source.length; i++) {
@@ -361,7 +365,7 @@ public class OmniVectorOperator extends OmniHiveOperator<OmniVectorDesc> {
                 rowCount[i] = 0;
             }
         }
-        super.close(abort);
+        super.close(isAbort);
     }
 
     public void pushRestData(int tag) throws HiveException {

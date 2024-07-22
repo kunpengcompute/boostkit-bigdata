@@ -33,15 +33,15 @@ import java.util.Queue;
 public class OmniMergeJoinWithSortOperator extends OmniMergeJoinOperator {
     private transient OmniVectorWithSortOperator omniVectorWithSortOperator;
 
+    public OmniMergeJoinWithSortOperator(CompilationOpContext ctx) {
+        super(ctx);
+    }
+
     /**
      * Kryo ctor.
      */
     protected OmniMergeJoinWithSortOperator() {
         super();
-    }
-
-    public OmniMergeJoinWithSortOperator(CompilationOpContext ctx) {
-        super(ctx);
     }
 
     public OmniMergeJoinWithSortOperator(CompilationOpContext ctx, CommonMergeJoinDesc commonMergeJoinDesc) {
@@ -86,13 +86,13 @@ public class OmniMergeJoinWithSortOperator extends OmniMergeJoinOperator {
     }
 
     @Override
-    public void closeOp(boolean abort) throws HiveException {
+    public void closeOp(boolean isAbort) throws HiveException {
         for (OmniOperator sortOperator : omniVectorWithSortOperator.getSortOperators()) {
             sortOperator.close();
         }
         for (OmniSortOperatorFactory sortOperatorFactory : omniVectorWithSortOperator.getSortOperatorFactories()) {
             sortOperatorFactory.close();
         }
-        super.closeOp(abort);
+        super.closeOp(isAbort);
     }
 }
