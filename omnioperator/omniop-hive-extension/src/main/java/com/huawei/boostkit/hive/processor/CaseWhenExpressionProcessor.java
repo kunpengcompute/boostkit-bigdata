@@ -18,13 +18,13 @@
 
 package com.huawei.boostkit.hive.processor;
 
-
 import com.huawei.boostkit.hive.expression.BaseExpression;
 import com.huawei.boostkit.hive.expression.ConditionExpression;
 import com.huawei.boostkit.hive.expression.DecimalLiteral;
 import com.huawei.boostkit.hive.expression.ExpressionUtils;
 import com.huawei.boostkit.hive.expression.LiteralFactor;
 import com.huawei.boostkit.hive.expression.TypeUtils;
+
 import org.apache.hadoop.hive.ql.plan.ExprNodeConstantDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
@@ -39,11 +39,10 @@ import java.util.concurrent.LinkedBlockingDeque;
 public class CaseWhenExpressionProcessor implements ExpressionProcessor {
     @Override
     public BaseExpression process(ExprNodeGenericFuncDesc node, String operator, ObjectInspector inspector) {
-        List<ExprNodeDesc> children = node.getChildren();
-        Queue<ExprNodeDesc> queue = new LinkedBlockingDeque<>(children);
         TypeInfo typeInfo = node.getTypeInfo();
         Integer precision = null;
         Integer scale = null;
+
         if (typeInfo instanceof DecimalTypeInfo) {
             precision = ((DecimalTypeInfo) typeInfo).getPrecision();
             scale = ((DecimalTypeInfo) typeInfo).getScale();
@@ -55,6 +54,8 @@ public class CaseWhenExpressionProcessor implements ExpressionProcessor {
                 precision,
                 scale);
 
+        List<ExprNodeDesc> children = node.getChildren();
+        Queue<ExprNodeDesc> queue = new LinkedBlockingDeque<>(children);
         while (!queue.isEmpty()) {
             ExprNodeDesc poll = queue.poll();
             conditionExpression.add(createConditionExpression(node, poll, inspector));
@@ -75,7 +76,8 @@ public class CaseWhenExpressionProcessor implements ExpressionProcessor {
         return conditionExpression;
     }
 
-    private BaseExpression createConditionExpression(ExprNodeGenericFuncDesc root, ExprNodeDesc nodeDesc, ObjectInspector inspector) {
+    private BaseExpression createConditionExpression(ExprNodeGenericFuncDesc root, ExprNodeDesc nodeDesc,
+                                                     ObjectInspector inspector) {
         if (nodeDesc instanceof ExprNodeGenericFuncDesc) {
             return ExpressionUtils.build((ExprNodeGenericFuncDesc) nodeDesc, inspector);
         } else if (nodeDesc instanceof ExprNodeConstantDesc) {
@@ -89,8 +91,10 @@ public class CaseWhenExpressionProcessor implements ExpressionProcessor {
                         null, null, null, TypeUtils.calculateVarcharLength(root),
                         TypeUtils.convertHiveTypeToOmniType(root.getTypeInfo()));
             }
-            if (root.getTypeInfo() instanceof DecimalTypeInfo && ((ExprNodeConstantDesc) nodeDesc).getValue().equals(0)) {
-                return new DecimalLiteral(((DecimalTypeInfo) root.getTypeInfo()).getPrecision() > 18 ? "0" : 0L, TypeUtils.convertHiveTypeToOmniType(root.getTypeInfo()),
+            if (root.getTypeInfo() instanceof DecimalTypeInfo
+                    && ((ExprNodeConstantDesc) nodeDesc).getValue().equals(0)) {
+                return new DecimalLiteral(((DecimalTypeInfo) root.getTypeInfo()).getPrecision() > 18
+                        ? "0" : 0L, TypeUtils.convertHiveTypeToOmniType(root.getTypeInfo()),
                         ((DecimalTypeInfo) root.getTypeInfo()).getPrecision(),
                         ((DecimalTypeInfo) root.getTypeInfo()).getScale());
             }

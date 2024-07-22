@@ -33,24 +33,24 @@ import java.util.Map;
 
 public interface VecConverter {
     Map<PrimitiveObjectInspector.PrimitiveCategory, VecConverter> CONVERTER_MAP =
-            new HashMap<PrimitiveObjectInspector.PrimitiveCategory, VecConverter>() {
-                {
-                    put(PrimitiveObjectInspector.PrimitiveCategory.BYTE, new ByteVecConverter());
-                    put(PrimitiveObjectInspector.PrimitiveCategory.SHORT, new ShortVecConverter());
-                    put(PrimitiveObjectInspector.PrimitiveCategory.INT, new IntVecConverter());
-                    put(PrimitiveObjectInspector.PrimitiveCategory.LONG, new LongVecConverter());
-                    put(PrimitiveObjectInspector.PrimitiveCategory.BOOLEAN, new BooleanVecConverter());
-                    put(PrimitiveObjectInspector.PrimitiveCategory.FLOAT, new DoubleVecConverter());
-                    put(PrimitiveObjectInspector.PrimitiveCategory.DOUBLE, new DoubleVecConverter());
-                    put(PrimitiveObjectInspector.PrimitiveCategory.STRING, new StringVecConverter());
-                    put(PrimitiveObjectInspector.PrimitiveCategory.CHAR, new CharVecConverter());
-                    put(PrimitiveObjectInspector.PrimitiveCategory.VARCHAR, new VarcharVecConverter());
-                    put(PrimitiveObjectInspector.PrimitiveCategory.TIMESTAMP, new TimestampVecConverter());
-                    put(PrimitiveObjectInspector.PrimitiveCategory.DATE, new DateVecConverter());
-                    put(PrimitiveObjectInspector.PrimitiveCategory.DECIMAL, new DecimalVecConverter());
-                    put(PrimitiveObjectInspector.PrimitiveCategory.VOID, new BooleanVecConverter());
-                }
-            };
+        new HashMap<PrimitiveObjectInspector.PrimitiveCategory, VecConverter>() {
+            {
+                put(PrimitiveObjectInspector.PrimitiveCategory.BYTE, new ByteVecConverter());
+                put(PrimitiveObjectInspector.PrimitiveCategory.SHORT, new ShortVecConverter());
+                put(PrimitiveObjectInspector.PrimitiveCategory.INT, new IntVecConverter());
+                put(PrimitiveObjectInspector.PrimitiveCategory.LONG, new LongVecConverter());
+                put(PrimitiveObjectInspector.PrimitiveCategory.BOOLEAN, new BooleanVecConverter());
+                put(PrimitiveObjectInspector.PrimitiveCategory.FLOAT, new DoubleVecConverter());
+                put(PrimitiveObjectInspector.PrimitiveCategory.DOUBLE, new DoubleVecConverter());
+                put(PrimitiveObjectInspector.PrimitiveCategory.STRING, new StringVecConverter());
+                put(PrimitiveObjectInspector.PrimitiveCategory.CHAR, new CharVecConverter());
+                put(PrimitiveObjectInspector.PrimitiveCategory.VARCHAR, new VarcharVecConverter());
+                put(PrimitiveObjectInspector.PrimitiveCategory.TIMESTAMP, new TimestampVecConverter());
+                put(PrimitiveObjectInspector.PrimitiveCategory.DATE, new DateVecConverter());
+                put(PrimitiveObjectInspector.PrimitiveCategory.DECIMAL, new DecimalVecConverter());
+                put(PrimitiveObjectInspector.PrimitiveCategory.VOID, new BooleanVecConverter());
+            }
+        };
 
     /**
      * convert vec to java type data
@@ -125,8 +125,8 @@ public interface VecConverter {
 
     default void setValueFromColumnVector(VectorizedRowBatch vectorizedRowBatch, int vectorColIndex,
                                           VectorCache vectorCache, int colIndex, int rowCount) {
-        throw new RuntimeException(String.format("%s doesn't support setValueFromColumnVector(VectorizedRowBatch " +
-                        "vectorizedRowBatch, int vectorColIndex, VectorCache vectorCache,int colIndex,int rowCount)",
+        throw new RuntimeException(String.format("%s doesn't support setValueFromColumnVector(VectorizedRowBatch "
+                        + "vectorizedRowBatch, int vectorColIndex, VectorCache vectorCache,int colIndex,int rowCount)",
                 this.getClass().getSimpleName()));
     }
 
@@ -147,8 +147,8 @@ public interface VecConverter {
     }
 
     default ColumnVector getColumnVectorFromOmniVec(Vec vec, int start, int end) {
-        throw new RuntimeException(String.format("%s doesn't support getColumnVectorFromOmniVec(Vec vec, int start, " +
-                "int end)", this.getClass().getSimpleName()));
+        throw new RuntimeException(String.format("%s doesn't support getColumnVectorFromOmniVec(Vec vec, int start, "
+                + "int end)", this.getClass().getSimpleName()));
     }
 
     default ColumnVector getColumnVectorFromOmniVec(Vec vec, int start, int end,

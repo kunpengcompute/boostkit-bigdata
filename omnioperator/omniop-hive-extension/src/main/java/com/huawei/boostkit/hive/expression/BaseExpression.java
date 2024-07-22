@@ -19,17 +19,18 @@
 package com.huawei.boostkit.hive.expression;
 
 public abstract class BaseExpression {
-    public enum Located {
-        ROOT,
-        LEFT,
-        RIGHT
-    }
+    protected transient BaseExpression parent;
 
     private String exprType;
     private Integer returnType;
     private String operator;
     private transient int level = 0;
-    protected transient BaseExpression parent;
+
+    public enum Located {
+        ROOT,
+        LEFT,
+        RIGHT
+    }
 
     public BaseExpression(String exprType, Integer returnType, String operator) {
         this.exprType = exprType;

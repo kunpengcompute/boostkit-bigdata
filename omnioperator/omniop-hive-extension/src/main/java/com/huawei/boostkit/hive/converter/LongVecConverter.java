@@ -33,7 +33,6 @@ import org.apache.hadoop.hive.serde2.lazy.LazyLong;
 import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
 import org.apache.hadoop.io.LongWritable;
 
-
 public class LongVecConverter implements VecConverter {
     public Object fromOmniVec(Vec vec, int index) {
         if (vec.isNull(index)) {

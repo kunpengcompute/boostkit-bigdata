@@ -24,6 +24,15 @@ import javax.annotation.Nullable;
 import java.util.HashSet;
 
 public class CompareExpression extends BaseExpression {
+    private static final HashSet<Class<? extends BaseExpression>> specialNode =
+        new HashSet<Class<? extends BaseExpression>>() {{
+            add(CompareExpression.class);
+            add(FunctionExpression.class);
+            add(NotExpression.class);
+            add(ConditionExpression.class);
+            add(UnaryExpression.class);
+            add(BetweenExpression.class);
+        }};
 
     @Nullable
     private BaseExpression left;
@@ -31,16 +40,6 @@ public class CompareExpression extends BaseExpression {
     private BaseExpression right;
 
     private transient Located located = Located.ROOT;
-
-    private static final HashSet<Class<? extends BaseExpression>> specialNode =
-            new HashSet<Class<? extends BaseExpression>>() {{
-                add(CompareExpression.class);
-                add(FunctionExpression.class);
-                add(NotExpression.class);
-                add(ConditionExpression.class);
-                add(UnaryExpression.class);
-                add(BetweenExpression.class);
-            }};
 
     public CompareExpression(String exprType, Integer returnType, String operator) {
         super(exprType, returnType, operator);

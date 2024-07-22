@@ -33,7 +33,6 @@ import org.apache.hadoop.io.Writable;
 
 import java.nio.charset.StandardCharsets;
 
-
 public class CharVecConverter extends VarcharVecConverter {
     public Object fromOmniVec(Vec vec, int index, PrimitiveObjectInspector primitiveObjectInspector) {
         if (vec.isNull(index)) {
