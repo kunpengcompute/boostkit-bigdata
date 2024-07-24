@@ -262,6 +262,9 @@ public class OmniMergeJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc>
                         }
                     }
             ).collect(Collectors.toList());
+            List<ObjectInspector> inspectors =
+                    fields.stream().map(StructField::getFieldObjectInspector).collect(Collectors.toList());
+
             int bufferIndex = opIndex + 1;
             fields = Utilities.constructVectorizedReduceRowOI((StructObjectInspector) ((StructObjectInspector) inputObjInspectors[bufferIndex]).getAllStructFieldRefs().get(0).getFieldObjectInspector(),
                     (StructObjectInspector) ((StructObjectInspector) inputObjInspectors[bufferIndex]).getAllStructFieldRefs().get(1).getFieldObjectInspector()).getAllStructFieldRefs();
@@ -278,8 +281,6 @@ public class OmniMergeJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc>
                         }
                     }
             ).collect(Collectors.toList()));
-            List<ObjectInspector> inspectors =
-                    fields.stream().map(StructField::getFieldObjectInspector).collect(Collectors.toList());
             inspectors.addAll(fields.stream().map(StructField::getFieldObjectInspector).collect(Collectors.toList()));
 
             StructObjectInspector exprObjInspector = ObjectInspectorFactory.getStandardStructObjectInspector(fieldNames,
