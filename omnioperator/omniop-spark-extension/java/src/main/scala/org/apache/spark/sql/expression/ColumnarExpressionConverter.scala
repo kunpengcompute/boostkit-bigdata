@@ -28,6 +28,13 @@ object ColumnarExpressionConverter extends Logging {
     expr match {
       case s: org.apache.spark.sql.execution.ScalarSubquery =>
         ColumnarBloomFilterSubquery(s.plan, s.exprId, s)
+      case r: RuntimeFilterExpression =>
+        r.child match {
+          case child: org.apache.spark.sql.execution.ScalarSubquery =>
+            ColumnarBloomFilterSubquery(child.plan, child.exprId, child)
+          case _ =>
+            r
+        }
       case p =>
         p
     }

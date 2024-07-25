@@ -269,6 +269,10 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
 
   val columnsThreshold: Int =
     conf.getConfString("spark.omni.sql.columnar.columnsThreshold", "10").toInt
+
+  // enable or disable bloomfilter subquery reuse
+  val enableBloomfilterSubqueryReuse: Boolean =
+    conf.getConfString("spark.omni.sql.columnar.bloomfilterSubqueryReuse", "false").toBoolean
 }
 
 

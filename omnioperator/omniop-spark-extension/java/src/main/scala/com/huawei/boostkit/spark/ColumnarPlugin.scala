@@ -28,7 +28,7 @@ import org.apache.spark.sql.catalyst.expressions.{Ascending, DynamicPruningSubqu
 import org.apache.spark.sql.catalyst.expressions.aggregate.{AggregateExpression, Partial, PartialMerge}
 import org.apache.spark.sql.catalyst.optimizer.{DelayCartesianProduct, HeuristicJoinReorder, MergeSubqueryFilters, RewriteSelfJoinInInPredicate}
 import org.apache.spark.sql.catalyst.rules.Rule
-import org.apache.spark.sql.execution.{RowToOmniColumnarExec, _}
+import org.apache.spark.sql.execution.{RowToOmniColumnarExec, BroadcastExchangeExecProxy, _}
 import org.apache.spark.sql.execution.adaptive.{AQEShuffleReadExec, BroadcastQueryStageExec, OmniAQEShuffleReadExec, QueryStageExec, ShuffleQueryStageExec}
 import org.apache.spark.sql.execution.aggregate.{DummyLogicalPlan, ExtendedAggUtils, HashAggregateExec}
 import org.apache.spark.sql.execution.exchange.{BroadcastExchangeExec, Exchange, ReusedExchangeExec, ShuffleExchangeExec}
@@ -674,6 +674,14 @@ case class ColumnarPostOverrides() extends Rule[SparkPlan] {
         case _ =>
           replaceColumnarToRow(plan, conf)
       }
+    case plan: BroadcastExchangeExecProxy =>
+      val children = plan.children.map {
+        case c: ColumnarToRowExec =>
+          replaceWithColumnarPlan(c.child)
+        case other =>
+          replaceWithColumnarPlan(other)
+      }
+      plan.withNewChildren(children)
     case r: SparkPlan
       if !r.isInstanceOf[QueryStageExec] && !r.supportsColumnar && r.children.exists(c =>
         c.isInstanceOf[ColumnarToRowExec]) =>
