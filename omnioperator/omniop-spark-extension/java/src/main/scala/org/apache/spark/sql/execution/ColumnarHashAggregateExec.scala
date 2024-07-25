@@ -308,7 +308,7 @@ case class ColumnarHashAggregateExec(
         spillDirDiskReserveSize, hashAggSpillRowThreshold, spillMemPctThreshold, spillWriteBufferSize)
 
       val startCodegen = System.nanoTime()
-      val operator = OmniAdaptorUtil.getAggOperator(groupingExpressions,
+      val (operator, hashAggregationWithExprOperatorFactory, aggregationWithExprOperatorFactory)  = OmniAdaptorUtil.getAggOperator(groupingExpressions,
         omniGroupByChanel,
         omniAggChannels,
         omniAggChannelsFilter,
@@ -324,6 +324,12 @@ case class ColumnarHashAggregateExec(
       SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
         spillSize += operator.getSpilledBytes()
         operator.close()
+        if (hashAggregationWithExprOperatorFactory != null) {
+          hashAggregationWithExprOperatorFactory.close()
+        }
+        if (aggregationWithExprOperatorFactory != null) {
+          aggregationWithExprOperatorFactory.close()
+        }
       })
 
       while (iter.hasNext) {

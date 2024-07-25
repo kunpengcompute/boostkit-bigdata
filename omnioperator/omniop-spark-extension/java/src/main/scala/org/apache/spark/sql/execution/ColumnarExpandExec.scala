@@ -314,13 +314,14 @@ case class ColumnarOptRollupExec(
 
     child.executeColumnar().mapPartitionsWithIndexInternal { (index, iter) =>
       val startCodegen = System.nanoTime()
+      var factory : OmniProjectOperatorFactory = null;
       val projectOperators = omniExpressions.map(exps => {
-        val factory = new OmniProjectOperatorFactory(exps, omniInputTypes, 1,
+        factory = new OmniProjectOperatorFactory(exps, omniInputTypes, 1,
           new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
         factory.createOperator
       })
 
-      val hashaggOperator = OmniAdaptorUtil.getAggOperator(groupingExpressions,
+      val (hashaggOperator, hashAggregationWithExprOperatorFactory, aggregationWithExprOperatorFactory) = OmniAdaptorUtil.getAggOperator(groupingExpressions,
       omniGroupByChannel,
       omniAggChannels,
       omniAggChannelsFilter,
@@ -338,7 +339,14 @@ case class ColumnarOptRollupExec(
       // close operator
       addLeakSafeTaskCompletionListener[Unit](_ => {
         projectOperators.foreach(operator => operator.close())
+        factory.close()
         hashaggOperator.close()
+        if (hashAggregationWithExprOperatorFactory != null) {
+          hashAggregationWithExprOperatorFactory.close()
+        }
+        if (aggregationWithExprOperatorFactory != null) {
+          aggregationWithExprOperatorFactory.close()
+        }
         results.foreach(vecBatch => {
           vecBatch.releaseAllVectors()
           vecBatch.close()

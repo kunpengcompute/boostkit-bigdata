@@ -50,6 +50,7 @@ object ColumnarProjection {
     // close operator
     addLeakSafeTaskCompletionListener[Unit](_ => {
       projectOperator.close()
+      projectOperatorFactory.close()
     })
 
     new Iterator[ColumnarBatch] {

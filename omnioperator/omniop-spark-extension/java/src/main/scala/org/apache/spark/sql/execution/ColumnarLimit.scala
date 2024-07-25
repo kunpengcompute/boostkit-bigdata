@@ -77,6 +77,7 @@ trait ColumnarBaseLimitExec extends LimitExec {
       // close operator
       SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
         limitOperator.close()
+        limitOperatorFactory.close()
       })
 
       val localSchema = this.schema

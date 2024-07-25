@@ -93,6 +93,7 @@ case class ColumnarTopNSortExec(
       omniCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startCodegen)
       SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
         topNSortOperator.close()
+        topNSortOperatorFactory.close()
       })
       addAllAndGetIterator(topNSortOperator, iter, this.schema,
         longMetric("addInputTime"), longMetric("numInputVecBatches"), longMetric("numInputRows"),

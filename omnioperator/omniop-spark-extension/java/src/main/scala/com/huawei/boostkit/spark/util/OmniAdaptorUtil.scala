@@ -301,10 +301,13 @@ object OmniAdaptorUtil {
                      omniAggOutputTypes: Array[Array[nova.hetu.omniruntime.`type`.DataType]],
                      omniInputRaws: Array[Boolean],
                      omniOutputPartials: Array[Boolean],
-                     sparkSpillConf: SpillConfig = SpillConfig.NONE): OmniOperator = {
+                     sparkSpillConf: SpillConfig = SpillConfig.NONE):
+  (OmniOperator, OmniHashAggregationWithExprOperatorFactory, OmniAggregationWithExprOperatorFactory) = {
+    var hashAggregationWithExprOperatorFactory: OmniHashAggregationWithExprOperatorFactory = null
+    var aggregationWithExprOperatorFactory : OmniAggregationWithExprOperatorFactory = null
     var operator: OmniOperator = null
     if (groupingExpressions.nonEmpty) {
-      operator = new OmniHashAggregationWithExprOperatorFactory(
+      hashAggregationWithExprOperatorFactory = new OmniHashAggregationWithExprOperatorFactory(
         omniGroupByChanel,
         omniAggChannels,
         omniAggChannelsFilter,
@@ -314,9 +317,10 @@ object OmniAdaptorUtil {
         omniInputRaws,
         omniOutputPartials,
         new OperatorConfig(sparkSpillConf, new OverflowConfig(OmniAdaptorUtil.overflowConf()),
-          IS_SKIP_VERIFY_EXP)).createOperator
+          IS_SKIP_VERIFY_EXP))
+      operator = hashAggregationWithExprOperatorFactory.createOperator
     } else {
-      operator = new OmniAggregationWithExprOperatorFactory(
+      aggregationWithExprOperatorFactory = new OmniAggregationWithExprOperatorFactory(
         omniGroupByChanel,
         omniAggChannels,
         omniAggChannelsFilter,
@@ -325,9 +329,10 @@ object OmniAdaptorUtil {
         omniAggOutputTypes,
         omniInputRaws,
         omniOutputPartials,
-        new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP)).createOperator
+        new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
+      operator = aggregationWithExprOperatorFactory.createOperator
     }
-    operator
+    (operator, hashAggregationWithExprOperatorFactory, aggregationWithExprOperatorFactory)
   }
 
   def pruneOutput(output: Seq[Attribute], projectExprIdList: Seq[ExprId]): Seq[Attribute] = {

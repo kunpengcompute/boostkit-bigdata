@@ -382,6 +382,7 @@ case class ColumnarWindowExec(windowExpression: Seq[NamedExpression],
       SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
         spillSize += windowOperator.getSpilledBytes
         windowOperator.close()
+        windowOperatorFactory.close()
       })
 
       while (iter.hasNext) {

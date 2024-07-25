@@ -113,6 +113,7 @@ case class ColumnarSortExec(
       SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
         spillSize += sortOperator.getSpilledBytes()
         sortOperator.close()
+        sortOperatorFactory.close()
       })
       addAllAndGetIterator(sortOperator, iter, this.schema,
         longMetric("addInputTime"), longMetric("numInputVecBatches"), longMetric("numInputRows"),

@@ -908,7 +908,7 @@ case class ColumnarMultipleOperatorExec(
       // for join
       val deserializer = VecBatchSerializerFactory.create()
       val startCodegen = System.nanoTime()
-      val aggOperator = OmniAdaptorUtil.getAggOperator(aggregate.groupingExpressions,
+      val (aggOperator, hashAggregationWithExprOperatorFactory, aggregationWithExprOperatorFactory) = OmniAdaptorUtil.getAggOperator(aggregate.groupingExpressions,
         omniGroupByChanel,
         omniAggChannels,
         omniAggChannelsFilter,
@@ -920,6 +920,12 @@ case class ColumnarMultipleOperatorExec(
       omniCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startCodegen)
       SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
         aggOperator.close()
+        if (hashAggregationWithExprOperatorFactory != null) {
+          hashAggregationWithExprOperatorFactory.close()
+        }
+        if (aggregationWithExprOperatorFactory != null) {
+          aggregationWithExprOperatorFactory.close()
+        }
       })
 
       val projectOperatorFactory1 = new OmniProjectOperatorFactory(proj1OmniExpressions, proj1OmniInputTypes, 1,
@@ -928,6 +934,7 @@ case class ColumnarMultipleOperatorExec(
       // close operator
       addLeakSafeTaskCompletionListener[Unit](_ => {
         projectOperator1.close()
+        projectOperatorFactory1.close()
       })
 
       val buildOpFactory1 = new OmniHashBuilderWithExprOperatorFactory(OMNI_JOIN_TYPE_INNER, buildTypes1,
@@ -962,6 +969,7 @@ case class ColumnarMultipleOperatorExec(
       // close operator
       addLeakSafeTaskCompletionListener[Unit](_ => {
         projectOperator2.close()
+        projectOperatorFactory2.close()
       })
 
       val buildOpFactory2 = new OmniHashBuilderWithExprOperatorFactory(OMNI_JOIN_TYPE_INNER, buildTypes2,
@@ -997,6 +1005,7 @@ case class ColumnarMultipleOperatorExec(
       // close operator
       addLeakSafeTaskCompletionListener[Unit](_ => {
         projectOperator3.close()
+        projectOperatorFactory3.close()
       })
 
       val buildOpFactory3 = new OmniHashBuilderWithExprOperatorFactory(OMNI_JOIN_TYPE_INNER, buildTypes3,
@@ -1032,6 +1041,7 @@ case class ColumnarMultipleOperatorExec(
       // close operator
       addLeakSafeTaskCompletionListener[Unit](_ => {
         projectOperator4.close()
+        projectOperatorFactory4.close()
       })
 
       val buildOpFactory4 = new OmniHashBuilderWithExprOperatorFactory(OMNI_JOIN_TYPE_INNER, buildTypes4,
@@ -1069,6 +1079,7 @@ case class ColumnarMultipleOperatorExec(
       // close operator
       SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
         condOperator.close()
+        condOperatorFactory.close()
       })
 
       while (batches.hasNext) {
@@ -1273,7 +1284,7 @@ case class ColumnarMultipleOperatorExec1(
       // for join
       val deserializer = VecBatchSerializerFactory.create()
       val startCodegen = System.nanoTime()
-      val aggOperator = OmniAdaptorUtil.getAggOperator(aggregate.groupingExpressions,
+      val (aggOperator, hashAggregationWithExprOperatorFactory, aggregationWithExprOperatorFactory) = OmniAdaptorUtil.getAggOperator(aggregate.groupingExpressions,
         omniGroupByChanel,
         omniAggChannels,
         omniAggChannelsFilter,
@@ -1285,6 +1296,12 @@ case class ColumnarMultipleOperatorExec1(
       omniCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startCodegen)
       SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
         aggOperator.close()
+        if (hashAggregationWithExprOperatorFactory != null) {
+          hashAggregationWithExprOperatorFactory.close()
+        }
+        if (aggregationWithExprOperatorFactory != null) {
+          aggregationWithExprOperatorFactory.close()
+        }
       })
 
       val projectOperatorFactory1 = new OmniProjectOperatorFactory(proj1OmniExpressions, proj1OmniInputTypes, 1,
@@ -1293,6 +1310,7 @@ case class ColumnarMultipleOperatorExec1(
       // close operator
       addLeakSafeTaskCompletionListener[Unit](_ => {
         projectOperator1.close()
+        projectOperatorFactory1.close()
       })
 
       val buildOpFactory1 = new OmniHashBuilderWithExprOperatorFactory(OMNI_JOIN_TYPE_INNER, buildTypes1,
@@ -1328,6 +1346,7 @@ case class ColumnarMultipleOperatorExec1(
       // close operator
       addLeakSafeTaskCompletionListener[Unit](_ => {
         projectOperator2.close()
+        projectOperatorFactory2.close()
       })
 
       val buildOpFactory2 = new OmniHashBuilderWithExprOperatorFactory(OMNI_JOIN_TYPE_INNER, buildTypes2,
@@ -1363,6 +1382,7 @@ case class ColumnarMultipleOperatorExec1(
       // close operator
       addLeakSafeTaskCompletionListener[Unit](_ => {
         projectOperator3.close()
+        projectOperatorFactory3.close()
       })
 
       val buildOpFactory3 = new OmniHashBuilderWithExprOperatorFactory(OMNI_JOIN_TYPE_INNER, buildTypes3,
@@ -1400,6 +1420,7 @@ case class ColumnarMultipleOperatorExec1(
       // close operator
       SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
         condOperator.close()
+        condOperatorFactory.close()
       })
 
       while (batches.hasNext) {
