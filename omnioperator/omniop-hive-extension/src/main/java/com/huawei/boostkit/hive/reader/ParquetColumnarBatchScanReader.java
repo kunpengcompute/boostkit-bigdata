@@ -21,23 +21,23 @@ package com.huawei.boostkit.hive.reader;
 import com.huawei.boostkit.scan.jni.ParquetColumnarBatchJniReader;
 
 import nova.hetu.omniruntime.type.BooleanDataType;
-import nova.hetu.omniruntime.type.IntDataType;
-import nova.hetu.omniruntime.type.DoubleDataType;
+import nova.hetu.omniruntime.type.CharDataType;
+import nova.hetu.omniruntime.type.DataType;
 import nova.hetu.omniruntime.type.Date32DataType;
 import nova.hetu.omniruntime.type.Decimal128DataType;
 import nova.hetu.omniruntime.type.Decimal64DataType;
+import nova.hetu.omniruntime.type.DoubleDataType;
+import nova.hetu.omniruntime.type.IntDataType;
 import nova.hetu.omniruntime.type.LongDataType;
 import nova.hetu.omniruntime.type.ShortDataType;
-import nova.hetu.omniruntime.type.CharDataType;
 import nova.hetu.omniruntime.type.VarcharDataType;
-import nova.hetu.omniruntime.type.DataType;
 import nova.hetu.omniruntime.vector.BooleanVec;
-import nova.hetu.omniruntime.vector.IntVec;
 import nova.hetu.omniruntime.vector.Decimal128Vec;
+import nova.hetu.omniruntime.vector.DoubleVec;
+import nova.hetu.omniruntime.vector.IntVec;
 import nova.hetu.omniruntime.vector.LongVec;
 import nova.hetu.omniruntime.vector.ShortVec;
 import nova.hetu.omniruntime.vector.VarcharVec;
-import nova.hetu.omniruntime.vector.DoubleVec;
 import nova.hetu.omniruntime.vector.Vec;
 
 import org.apache.hadoop.fs.Path;
@@ -45,9 +45,8 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.List;
-import java.util.ArrayList;
 import java.net.URI;
+import java.util.List;
 
 public class ParquetColumnarBatchScanReader {
     private static final Logger LOGGER = LoggerFactory.getLogger(ParquetColumnarBatchScanReader.class);
@@ -61,7 +60,7 @@ public class ParquetColumnarBatchScanReader {
     }
 
     public long initializeReaderJava(Path path, int capacity,
-                                     List<Integer> rowgroupIndices, List<Integer> columnIndices, String ugi) {
+            List<Integer> rowgroupIndices, List<Integer> columnIndices, String ugi) {
         JSONObject job = new JSONObject();
         URI uri = path.toUri();
         job.put("uri", path.toString());
@@ -73,7 +72,7 @@ public class ParquetColumnarBatchScanReader {
 
         job.put("scheme", uri.getScheme() == null ? "" : uri.getScheme());
         job.put("host", uri.getHost() == null ? "" : uri.getHost());
-        job.put("port", uri.getPort() == -1 ? "" : String.valueOf(uri.getPort()));
+        job.put("port", String.valueOf(uri.getPort()));
         job.put("path", uri.getPath() == null ? "" : uri.getPath());
         job.put("notNeedFSCache", true);
         parquetReader = jniReader.initializeReader(job);
@@ -110,10 +109,10 @@ public class ParquetColumnarBatchScanReader {
             } else if (type instanceof Date32DataType) {
                 vecList[i] = new IntVec(vecNativeIds[i]);
             } else {
-                throw new RuntimeException("Unsupport type for ColumnarFileScan: " +type.getId());
+                throw new RuntimeException("Unsupport type for ColumnarFileScan: " + type.getId());
             }
         }
-        return (int)rtn;
+        return (int) rtn;
     }
 
     public void close() {

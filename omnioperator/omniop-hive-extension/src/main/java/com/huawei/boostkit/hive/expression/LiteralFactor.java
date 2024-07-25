@@ -73,7 +73,7 @@ public class LiteralFactor<T> extends BaseExpression {
     }
 
     public void setDataType(Integer dataType) {
-        this.dataType= dataType;
+        this.dataType = dataType;
     }
 
     public T getValue() {

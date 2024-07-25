@@ -22,7 +22,6 @@ import nova.hetu.omniruntime.vector.Vec;
 import nova.hetu.omniruntime.vector.VecBatch;
 
 import org.apache.hadoop.hive.ql.CompilationOpContext;
-import org.apache.hadoop.hive.ql.QueryPlan;
 import org.apache.hadoop.hive.ql.exec.Operator;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.plan.OperatorDesc;
@@ -136,7 +135,6 @@ public abstract class OmniHiveOperator<T extends OperatorDesc> extends Operator<
                 parents.offer((Operator) parent);
             }
         }
-
     }
 
     public static VecBatch copyVecBatch(VecBatch vecBatch) {

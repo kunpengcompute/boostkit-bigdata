@@ -55,13 +55,15 @@ public class OmniVectorWithSortOperator extends OmniHiveOperator<OmniVectorDesc>
 
     public transient VecBufferCache[] vecBufferCaches;
 
+    public transient Iterator<VecBatch>[] outputs;
+
     private transient List<StructField>[] flatFields;
 
     private transient RecordSource[] source;
 
     private transient boolean[] fetchDone;
 
-    private transient boolean allFetchDone;
+    private transient boolean isAllFetchDone;
 
     private int[] rowCount;
 
@@ -72,8 +74,6 @@ public class OmniVectorWithSortOperator extends OmniHiveOperator<OmniVectorDesc>
     private transient OmniSortOperatorFactory[] sortOperatorFactories;
 
     private transient OmniOperator[] sortOperators;
-
-    public transient Iterator<VecBatch>[] outputs;
 
     private int posBigTable;
 
@@ -122,7 +122,7 @@ public class OmniVectorWithSortOperator extends OmniHiveOperator<OmniVectorDesc>
         outputObjInspector = ObjectInspectorFactory.getStandardStructObjectInspector(fieldNames, Arrays.asList(soi));
         generateSortOperator();
         posBigTable = ((OmniMergeJoinOperator) childOperators.get(0)).getPosBigTable();
-        allFetchDone = false;
+        isAllFetchDone = false;
     }
 
     private void generateSortOperator() {
@@ -153,9 +153,9 @@ public class OmniVectorWithSortOperator extends OmniHiveOperator<OmniVectorDesc>
 
     @Override
     public void process(Object row, int tag) throws HiveException {
-        if (tag == posBigTable && !allFetchDone) {
+        if (tag == posBigTable && !isAllFetchDone) {
             dealSource();
-            allFetchDone = true;
+            isAllFetchDone = true;
         }
         for (int i = 0; i < fields[tag].size(); i++) {
             Object structFieldData = soi[tag].getStructFieldData(row, fields[tag].get(i));
@@ -185,10 +185,10 @@ public class OmniVectorWithSortOperator extends OmniHiveOperator<OmniVectorDesc>
     }
 
     @Override
-    public void close(boolean abort) throws HiveException {
-        if (!allFetchDone) {
+    public void close(boolean isAbort) throws HiveException {
+        if (!isAllFetchDone) {
             dealSource();
-            allFetchDone = true;
+            isAllFetchDone = true;
         }
         for (int i = 0; i < rowCount.length; i++) {
             if (rowCount[i] > 0) {
@@ -204,7 +204,7 @@ public class OmniVectorWithSortOperator extends OmniHiveOperator<OmniVectorDesc>
         if (vecBatch != null) {
             forward(outputs[posBigTable].next(), posBigTable);
         }
-        super.close(abort);
+        super.close(isAbort);
     }
 
     public void pushRecord(int tag) throws HiveException {

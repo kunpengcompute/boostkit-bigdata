@@ -21,7 +21,6 @@ package com.huawei.boostkit.hive.reader;
 import com.huawei.boostkit.scan.jni.OrcColumnarBatchJniReader;
 
 import nova.hetu.omniruntime.type.DataType;
-
 import nova.hetu.omniruntime.vector.BooleanVec;
 import nova.hetu.omniruntime.vector.Decimal128Vec;
 import nova.hetu.omniruntime.vector.DoubleVec;
@@ -30,30 +29,21 @@ import nova.hetu.omniruntime.vector.LongVec;
 import nova.hetu.omniruntime.vector.ShortVec;
 import nova.hetu.omniruntime.vector.VarcharVec;
 import nova.hetu.omniruntime.vector.Vec;
+
 import org.apache.hadoop.hive.ql.io.sarg.ExpressionTree;
 import org.apache.hadoop.hive.ql.io.sarg.PredicateLeaf;
 import org.apache.orc.OrcFile.ReaderOptions;
 import org.apache.orc.Reader.Options;
+import org.apache.orc.TypeDescription;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.orc.TypeDescription;
 
 import java.net.URI;
 import java.sql.Date;
-import java.time.LocalDate;
-import java.time.temporal.ChronoField;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Calendar;
 import java.util.List;
-import java.util.TimeZone;
-
-import static java.util.Calendar.DAY_OF_MONTH;
-import static java.util.Calendar.ERA;
-import static java.util.Calendar.MONTH;
-import static java.util.Calendar.YEAR;
-
 
 public class OrcColumnarBatchScanReader {
     private static final Logger LOGGER = LoggerFactory.getLogger(OrcColumnarBatchScanReader.class);
@@ -105,7 +95,8 @@ public class OrcColumnarBatchScanReader {
             jsonObject.put("type", pl.getType().ordinal());
             if (pl.getLiteral() != null) {
                 if (pl.getType() == PredicateLeaf.Type.DATE) {
-                    jsonObject.put("literal", ((int) Math.ceil(((Date) pl.getLiteral()).getTime() * 1.0 / 3600 / 24 / 1000)) + "");
+                    jsonObject.put("literal",
+                            ((int) Math.ceil(((Date) pl.getLiteral()).getTime() * 1.0 / 3600 / 24 / 1000)) + "");
                 } else if (pl.getType() == PredicateLeaf.Type.DECIMAL) {
                     int decimalP = schema.findSubtype(pl.getColumnName()).getPrecision();
                     int decimalS = schema.findSubtype(pl.getColumnName()).getScale();
@@ -114,7 +105,8 @@ public class OrcColumnarBatchScanReader {
                         jsonObject.put("literal", spiltValues[0] + " " + decimalP + " " + decimalS);
                     } else {
                         String scalePadZeroStr = padZeroForDecimals(spiltValues, decimalS);
-                        jsonObject.put("literal", spiltValues[0] + "." + scalePadZeroStr + " " + decimalP + " " + decimalS);
+                        jsonObject.put("literal",
+                                spiltValues[0] + "." + scalePadZeroStr + " " + decimalP + " " + decimalS);
                     }
                 } else {
                     jsonObject.put("literal", pl.getLiteral().toString());
@@ -153,7 +145,9 @@ public class OrcColumnarBatchScanReader {
     /**
      * Init Orc reader.
      *
+     * @param uri uri
      * @param options split file options
+     * @return long
      */
     public long initializeReaderJava(URI uri, ReaderOptions options) {
         JSONObject job = new JSONObject();
@@ -178,6 +172,7 @@ public class OrcColumnarBatchScanReader {
      * Init Orc RecordReader.
      *
      * @param options split file options
+     * @return long
      */
     public long initializeRecordReaderJava(Options options) {
         JSONObject job = new JSONObject();
@@ -292,8 +287,8 @@ public class OrcColumnarBatchScanReader {
                     break;
                 }
                 default: {
-                    throw new RuntimeException("UnSupport type for ColumnarFileScan:" +
-                            DataType.DataTypeId.values()[typeIds[i]]);
+                    throw new RuntimeException("UnSupport type for ColumnarFileScan:"
+                            + DataType.DataTypeId.values()[typeIds[i]]);
                 }
             }
             nativeGetId++;

@@ -47,7 +47,8 @@ public class VecBufferCache {
     private int[] columnTypeLen;
 
     public VecBufferCache(int colNum, List<TypeInfo> typeInfos) {
-        this.categories = typeInfos.stream().map(typeInfo -> ((PrimitiveTypeInfo) typeInfo).getPrimitiveCategory()).toArray(PrimitiveObjectInspector.PrimitiveCategory[]::new);
+        this.categories = typeInfos.stream().map(typeInfo -> ((PrimitiveTypeInfo) typeInfo).getPrimitiveCategory())
+                .toArray(PrimitiveObjectInspector.PrimitiveCategory[]::new);
         columnTypeLen = new int[this.categories.length];
         cache = new VecBuffer[colNum];
         for (int i = 0; i < this.categories.length; i++) {
@@ -68,7 +69,8 @@ public class VecBufferCache {
     public void addVecSerdeBody(VecSerdeBody[] vecSerdeBodies, int rowCount, int offset) {
         for (int i = 0; i < vecSerdeBodies.length; i++) {
             int cacheIndex = i + offset;
-            System.arraycopy(vecSerdeBodies[i].value, 0, cache[cacheIndex].byteBuffer, cache[cacheIndex].offset[rowCount], vecSerdeBodies[i].length);
+            System.arraycopy(vecSerdeBodies[i].value, 0, cache[cacheIndex].byteBuffer,
+                    cache[cacheIndex].offset[rowCount], vecSerdeBodies[i].length);
             if (cache[cacheIndex].isChar) {
                 cache[cacheIndex].offset[rowCount + 1] = cache[cacheIndex].offset[rowCount] + vecSerdeBodies[i].length;
             }

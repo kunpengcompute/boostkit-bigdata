@@ -21,6 +21,7 @@ package com.huawei.boostkit.hive;
 import com.huawei.boostkit.hive.expression.TypeUtils;
 
 import com.google.common.primitives.Ints;
+
 import nova.hetu.omniruntime.constants.FunctionType;
 import nova.hetu.omniruntime.constants.OmniWindowFrameBoundType;
 import nova.hetu.omniruntime.constants.OmniWindowFrameType;
@@ -31,6 +32,7 @@ import nova.hetu.omniruntime.operator.window.OmniWindowOperatorFactory;
 import nova.hetu.omniruntime.type.DataType;
 import nova.hetu.omniruntime.vector.Vec;
 import nova.hetu.omniruntime.vector.VecBatch;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.ql.CompilationOpContext;
 import org.apache.hadoop.hive.ql.exec.Operator;
@@ -64,12 +66,12 @@ import java.util.List;
 public class OmniPTFOperator extends OmniHiveOperator<OmniPTFDesc> implements Serializable {
     private static final long serialVersionUID = 1L;
     private static final Logger LOG = LoggerFactory.getLogger(OmniPTFOperator.class.getName());
-    private transient OmniWindowOperatorFactory omniWindowOperatorFactory;
-    private transient OmniOperator omniOperator;
 
     boolean isMapOperator;
-
     transient Configuration hiveConf;
+
+    private transient OmniWindowOperatorFactory omniWindowOperatorFactory;
+    private transient OmniOperator omniOperator;
 
     public OmniPTFOperator() {
         super();
@@ -171,7 +173,8 @@ public class OmniPTFOperator extends OmniHiveOperator<OmniPTFDesc> implements Se
 
     private OmniWindowFrameType[] getWindowFrameType(List<WindowFunctionDef> windowFunctionDefs) {
         return windowFunctionDefs.stream().map(
-                        windowFunctionDef -> TypeUtils.getWindowFrameType(windowFunctionDef.getWindowFrame().getWindowType()))
+                        windowFunctionDef ->
+                                TypeUtils.getWindowFrameType(windowFunctionDef.getWindowFrame().getWindowType()))
                 .toArray(OmniWindowFrameType[]::new);
     }
 
@@ -274,9 +277,6 @@ public class OmniPTFOperator extends OmniHiveOperator<OmniPTFDesc> implements Se
     /**
      * Initialize the visitor to use the QueryDefDeserializer Use the order
      * defined in QueryDefWalker to visit the QueryDef
-     *
-     * @param hiveConf
-     * @throws HiveException
      */
     protected void reconstructQueryDef(Configuration hiveConf) throws HiveException {
         PTFDeserializer ds = new PTFDeserializer(conf, (StructObjectInspector) inputObjInspectors[0], hiveConf);
@@ -300,8 +300,8 @@ public class OmniPTFOperator extends OmniHiveOperator<OmniPTFDesc> implements Se
     }
 
     @Override
-    protected void closeOp(boolean abort) throws HiveException {
-        super.closeOp(abort);
+    protected void closeOp(boolean isAbort) throws HiveException {
+        super.closeOp(isAbort);
         Iterator<VecBatch> output = this.omniOperator.getOutput();
         while (output.hasNext()) {
             VecBatch next = output.next();

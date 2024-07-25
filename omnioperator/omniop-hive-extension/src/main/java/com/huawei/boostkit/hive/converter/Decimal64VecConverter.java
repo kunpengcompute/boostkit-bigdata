@@ -17,6 +17,7 @@
  */
 
 package com.huawei.boostkit.hive.converter;
+
 import nova.hetu.omniruntime.vector.DictionaryVec;
 import nova.hetu.omniruntime.vector.LongVec;
 import nova.hetu.omniruntime.vector.IntVec;
@@ -33,9 +34,8 @@ import org.apache.hadoop.hive.serde2.typeinfo.DecimalTypeInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
 public class Decimal64VecConverter extends LongVecConverter {
-    static final Logger LOG = LoggerFactory.getLogger(GenericUDAFLastValue.class.getName());
+    private static final Logger LOG = LoggerFactory.getLogger(GenericUDAFLastValue.class.getName());
 
     @Override
     public ColumnVector getColumnVectorFromOmniVec(Vec vec, int start, int end,
@@ -70,7 +70,8 @@ public class Decimal64VecConverter extends LongVecConverter {
         try {
             if (vectorizationContext != null) {
                 convertedDecimal64 = vectorizationContext.getDataTypePhysicalVariation(
-                        vectorizationContext.getInputColumnIndex(fieldName.replace("key.","KEY.").replace("value.","VALUE."))) == DataTypePhysicalVariation.DECIMAL_64;
+                        vectorizationContext.getInputColumnIndex(fieldName.replace("key.", "KEY.")
+                                .replace("value.", "VALUE."))) == DataTypePhysicalVariation.DECIMAL_64;
             }
         } catch (HiveException e) {
             throw new RuntimeException("error occurs when finding field from vectorizationContext", e);

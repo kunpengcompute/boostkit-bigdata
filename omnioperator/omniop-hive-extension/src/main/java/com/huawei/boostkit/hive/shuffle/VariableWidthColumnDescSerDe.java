@@ -16,10 +16,9 @@
  * limitations under the License.
  */
 
-
 package com.huawei.boostkit.hive.shuffle;
 
-public class VariableWidthColumnDescSerDe implements ColumnSerDe{
+public class VariableWidthColumnDescSerDe implements ColumnSerDe {
     private transient byte columnNullMarker;
 
     public VariableWidthColumnDescSerDe(byte columnNullMarker) {
@@ -27,42 +26,44 @@ public class VariableWidthColumnDescSerDe implements ColumnSerDe{
     }
     @Override
     public int serialize(byte[] writeBytes, VecWrapper vecWrapper, int offset) {
+        int totalLen = offset;
         int index = vecWrapper.index;
         if (vecWrapper.isNull[index] == 1) {
             if (columnNullMarker == 1) {
-                writeBytes[offset++] = (byte) 0x7;
+                writeBytes[totalLen++] = (byte) 0x7;
             } else {
-                writeBytes[offset++] = (byte) 0x9;
+                writeBytes[totalLen++] = (byte) 0x9;
             }
-            writeBytes[offset++] = (byte) 0xff;
-            return offset;
+            writeBytes[totalLen++] = (byte) 0xff;
+            return totalLen;
         }
         int valueLen = vecWrapper.offset[index + 1] - vecWrapper.offset[index];
-        writeBytes[offset++] = (byte) 0x8;
+        writeBytes[totalLen++] = (byte) 0x8;
         for (int i = 0; i < valueLen; i++) {
-            offset = writeByte(offset, writeBytes, vecWrapper.value[vecWrapper.offset[index] + i]);
+            totalLen = writeByte(totalLen, writeBytes, vecWrapper.value[vecWrapper.offset[index] + i]);
         }
-        writeBytes[offset++] = (byte) 0xff;
-        return offset;
+        writeBytes[totalLen++] = (byte) 0xff;
+        return totalLen;
     }
 
     @Override
     public int deserialize(VecSerdeBody vecSerdeBody, byte[] bytes, int offset) {
-        offset++;
-        if (bytes[offset] == (byte) 0xff) {
-            if (bytes[offset - 1] == 0x8) {
+        int totalLen = offset;
+        totalLen++;
+        if (bytes[totalLen] == (byte) 0xff) {
+            if (bytes[totalLen - 1] == 0x8) {
                 vecSerdeBody.isNull = 0;
             } else {
                 vecSerdeBody.isNull = 1;
             }
             vecSerdeBody.length = 0;
-            ++offset;
-            return offset;
+            ++totalLen;
+            return totalLen;
         }
         vecSerdeBody.isNull = 0;
         int vecSerdeBodyValueIndex = 0;
         int escapeCharNum = 0;
-        for (int i = offset; i < bytes.length && bytes[i] != (byte) 0xff; i++) {
+        for (int i = totalLen; i < bytes.length && bytes[i] != (byte) 0xff; i++) {
             if ((bytes[i] ^ 0xff) == 1) {
                 vecSerdeBody.value[vecSerdeBodyValueIndex++] = (byte) ((0xff ^ bytes[++i]) - 1);
                 escapeCharNum++;
@@ -71,16 +72,17 @@ public class VariableWidthColumnDescSerDe implements ColumnSerDe{
             }
         }
         vecSerdeBody.length = vecSerdeBodyValueIndex;
-        return (offset + vecSerdeBodyValueIndex + escapeCharNum + 1);
+        return (totalLen + vecSerdeBodyValueIndex + escapeCharNum + 1);
     }
 
     public int writeByte(int offset, byte[] writeBytes, byte byteValue) {
+        int totalLen = offset;
         if (byteValue == (byte) 0xff || byteValue == 1) {
-            writeBytes[offset++] = (byte) (0xff ^ 1);
-            writeBytes[offset++] = (byte) (0xff ^ (byteValue + 1));
+            writeBytes[totalLen++] = (byte) (0xff ^ 1);
+            writeBytes[totalLen++] = (byte) (0xff ^ (byteValue + 1));
         } else {
-            writeBytes[offset++] = (byte) (0xff ^ byteValue);
+            writeBytes[totalLen++] = (byte) (0xff ^ byteValue);
         }
-        return offset;
+        return totalLen;
     }
 }

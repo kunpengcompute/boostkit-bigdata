@@ -21,10 +21,11 @@ package com.huawei.boostkit.hive.shuffle;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.serde2.SerDeException;
 
-import javax.annotation.Nullable;
 import java.util.Properties;
 
-public class OmniVecBatchOrderSerDe extends OmniVecBatchSerDe{
+import javax.annotation.Nullable;
+
+public class OmniVecBatchOrderSerDe extends OmniVecBatchSerDe {
     public OmniVecBatchOrderSerDe() throws SerDeException {
     }
     public void initialize(@Nullable Configuration configuration, Properties properties) throws SerDeException {

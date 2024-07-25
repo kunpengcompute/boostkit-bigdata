@@ -28,10 +28,10 @@ import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
 import java.util.List;
 
 public class StructConverter implements VecConverter {
+    List<? extends StructField> fieldsList;
+
     private VecConverter[] converters;
     private StructField[] fields;
-
-    List<? extends StructField> fieldsList;
     private transient PrimitiveTypeInfo[] typeInfos;
 
     public StructConverter(StructObjectInspector structObjectInspector) {

@@ -18,10 +18,10 @@
 
 package com.huawei.boostkit.hive;
 
-import static com.huawei.boostkit.hive.expression.TypeUtils.checkUnsupportedTimestamp;
 import static com.huawei.boostkit.hive.expression.TypeUtils.checkOmniJsonWhiteList;
 import static com.huawei.boostkit.hive.expression.TypeUtils.checkUnsupportedArithmetic;
 import static com.huawei.boostkit.hive.expression.TypeUtils.checkUnsupportedCast;
+import static com.huawei.boostkit.hive.expression.TypeUtils.checkUnsupportedTimestamp;
 import static com.huawei.boostkit.hive.expression.TypeUtils.convertHiveTypeToOmniType;
 import static com.huawei.boostkit.hive.expression.TypeUtils.isValidConversion;
 import static com.huawei.boostkit.hive.expression.TypeUtils.isValidFilterExpression;
@@ -53,7 +53,6 @@ import com.huawei.boostkit.hive.shuffle.OmniVecBatchSerDe;
 
 import nova.hetu.omniruntime.constants.FunctionType;
 
-import org.apache.hadoop.hive.common.type.HiveDecimal;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.ql.QueryPlan;
@@ -75,7 +74,6 @@ import org.apache.hadoop.hive.ql.hooks.ExecuteWithHookContext;
 import org.apache.hadoop.hive.ql.hooks.HookContext;
 import org.apache.hadoop.hive.ql.io.orc.OrcInputFormat;
 import org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat;
-
 import org.apache.hadoop.hive.ql.metadata.Table;
 import org.apache.hadoop.hive.ql.plan.AggregationDesc;
 import org.apache.hadoop.hive.ql.plan.BaseWork;
@@ -99,10 +97,10 @@ import org.apache.hadoop.hive.ql.plan.ReduceWork;
 import org.apache.hadoop.hive.ql.plan.SelectDesc;
 import org.apache.hadoop.hive.ql.plan.TableDesc;
 import org.apache.hadoop.hive.ql.plan.TableScanDesc;
-import org.apache.hadoop.hive.ql.plan.VectorTableScanDesc;
 import org.apache.hadoop.hive.ql.plan.TezEdgeProperty;
 import org.apache.hadoop.hive.ql.plan.TezWork;
 import org.apache.hadoop.hive.ql.plan.UnionWork;
+import org.apache.hadoop.hive.ql.plan.VectorTableScanDesc;
 import org.apache.hadoop.hive.ql.plan.api.OperatorType;
 import org.apache.hadoop.hive.ql.plan.ptf.BoundaryDef;
 import org.apache.hadoop.hive.ql.plan.ptf.PTFExpressionDef;
@@ -119,7 +117,6 @@ import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.HashMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -133,15 +130,16 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.stream.Collectors;
 
 public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
-    private static final Logger LOG = LoggerFactory.getLogger(OmniExecuteWithHookContext.class.getName());
     public static final Set<OperatorType> OMNI_OPERATOR = new HashSet<>(Arrays.asList(OperatorType.JOIN,
             OperatorType.MAPJOIN, OperatorType.MERGEJOIN, OperatorType.GROUPBY, OperatorType.SELECT,
             OperatorType.FILTER, OperatorType.PTF, OperatorType.TABLESCAN, OperatorType.REDUCESINK));
     public static final Set<Integer> SUPPORTED_JOIN = new HashSet<>(Arrays.asList(JoinDesc.INNER_JOIN,
             JoinDesc.LEFT_OUTER_JOIN, JoinDesc.FULL_OUTER_JOIN, JoinDesc.LEFT_SEMI_JOIN));
     public static int stringLength = 1024;
-    private static final Set<PrimitiveObjectInspector.PrimitiveCategory> SUPPORTED_TYPE = new HashSet<>(Arrays.asList(BOOLEAN,
-            SHORT, INT, LONG, DOUBLE, STRING, DATE, DECIMAL, VARCHAR, CHAR, VOID));
+
+    private static final Logger LOG = LoggerFactory.getLogger(OmniExecuteWithHookContext.class.getName());
+    private static final Set<PrimitiveObjectInspector.PrimitiveCategory> SUPPORTED_TYPE = new HashSet<>
+        (Arrays.asList(BOOLEAN, SHORT, INT, LONG, DOUBLE, STRING, DATE, DECIMAL, VARCHAR, CHAR, VOID));
 
     private static final int DECIMAL64_MAX_PRECISION = 18;
 
@@ -181,7 +179,8 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
     }
 
     private boolean isSupportSqlType(QueryPlan queryPlan) {
-        if (queryPlan.getQueryProperties() != null && queryPlan.getQueryProperties().isQuery() && queryPlan.getOperationName().equals("QUERY")) {
+        if (queryPlan.getQueryProperties() != null && queryPlan.getQueryProperties().isQuery()
+            && queryPlan.getOperationName().equals("QUERY")) {
             return true;
         }
         return queryPlan.getRootTasks().get(0) instanceof ExplainTask;
@@ -203,8 +202,8 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         if (engine.equals("mr")) {
             throw new RuntimeException("can't support mr engine");
         }
-        boolean cboEnable = HiveConf.getBoolVar(hookContext.getConf(), HiveConf.ConfVars.HIVE_CBO_ENABLED);
-        if (!cboEnable) {
+        boolean isCboEnabled = HiveConf.getBoolVar(hookContext.getConf(), HiveConf.ConfVars.HIVE_CBO_ENABLED);
+        if (!isCboEnabled) {
             return;
         }
         setTezWork(queryPlan);
@@ -243,7 +242,8 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                 continue;
             }
             for (Operator<? extends OperatorDesc> op : work.getAllOperators()) {
-                if (op.getType().equals(OperatorType.MAPJOIN) && !isReplaceable(op, true)) {
+                if (op.getType().equals(OperatorType.MAPJOIN) && !isReplaceable(op, true)
+                        && op.getConf() instanceof MapJoinDesc) {
                     MapJoinDesc conf = (MapJoinDesc) op.getConf();
                     Map<Integer, String> parentToInput = conf.getParentToInput();
                     parentOfMapJoinOpCannotReplace.addAll(parentToInput.values());
@@ -267,7 +267,8 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                 dealUnionWork(work);
             }
         }
-        reduceSinkReplaceableWorkName = reduceSinkReplaceableWork.stream().map(BaseWork::getName).collect(Collectors.toSet());
+        reduceSinkReplaceableWorkName = reduceSinkReplaceableWork.stream().map(BaseWork::getName)
+            .collect(Collectors.toSet());
     }
 
     private void dealUnionWork(BaseWork work) {
@@ -289,38 +290,39 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         if (!omniHiveConf.isEnableOperator(OperatorType.REDUCESINK)) {
             return false;
         }
-        boolean reduceSinkCanReplace = false;
         if (parentOfMapJoinOpCannotReplace.contains(work.getName()) || !reduceSinkOperatorReplaceable(work)) {
             return false;
         }
         for (Operator<? extends OperatorDesc> op : work.getAllOperators()) {
             if (stringLength > 1024 && op.getType() == OperatorType.REDUCESINK && op.getColumnExprMap() != null) {
-                List<String> typeInfos = op.getColumnExprMap().values().stream().
-                        map(value -> value.getTypeInfo().getTypeName()).collect(Collectors.toList());
+                List<String> typeInfos = op.getColumnExprMap().values().stream()
+                    .map(value -> value.getTypeInfo().getTypeName()).collect(Collectors.toList());
                 if (typeInfos.contains("string")) {
                     return false;
                 }
             }
         }
+        boolean isReduceSinkReplaceable = false;
         for (BaseWork child : tezWork.getChildren(work)) {
             TezEdgeProperty.EdgeType edgeType = tezWork.getEdgeType(work, child);
             if (edgeType == TezEdgeProperty.EdgeType.CONTAINS) {
                 continue;
             }
-            reduceSinkCanReplace = replaceableForChild(work, child);
-            if (!reduceSinkCanReplace) {
+            isReduceSinkReplaceable = replaceableForChild(work, child);
+            if (!isReduceSinkReplaceable) {
                 return false;
             }
         }
         // deal with Union work
         for (BaseWork parent : tezWork.getParents(work)) {
             TezEdgeProperty.EdgeType edgeType = tezWork.getEdgeType(parent, work);
-            if (edgeType == TezEdgeProperty.EdgeType.CONTAINS && !inputUnReplaceableWork.contains(parent) && getReduceSinkReplaceable(parent)) {
-                reduceSinkCanReplace = true;
+            if (edgeType == TezEdgeProperty.EdgeType.CONTAINS && !inputUnReplaceableWork.contains(parent)
+                    && getReduceSinkReplaceable(parent)) {
+                isReduceSinkReplaceable = true;
                 reduceSinkReplaceableWork.add(parent);
             }
         }
-        return reduceSinkCanReplace;
+        return isReduceSinkReplaceable;
     }
 
     private boolean replaceableForChild(BaseWork work, BaseWork child) {
@@ -328,12 +330,12 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             return false;
         }
         TezEdgeProperty.EdgeType edgeType = tezWork.getEdgeType(work, child);
-        boolean reduceSinkReplaceable = false;
+        boolean isReduceSinkReplaceable = false;
         if (isSupportEdgeType(edgeType) && isReplaceable(child.getAnyRootOperator(), true)) {
-            reduceSinkReplaceable = true;
+            isReduceSinkReplaceable = true;
         }
         if (edgeType == TezEdgeProperty.EdgeType.SIMPLE_EDGE && child instanceof ReduceWork) {
-            reduceSinkReplaceable = groupByEdgeReplaceable(work, child);
+            isReduceSinkReplaceable = groupByEdgeReplaceable(work, child);
         }
         if (child instanceof MergeJoinWork) {
             Operator reducer = ((MergeJoinWork) child).getMainWork().getAnyRootOperator();
@@ -341,10 +343,10 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                 reducer = (Operator) reducer.getChildOperators().get(0);
             }
             if (reducer.getType() == OperatorType.MERGEJOIN && isReplaceable(reducer, false)) {
-                reduceSinkReplaceable = true;
+                isReduceSinkReplaceable = true;
             }
         }
-        return reduceSinkReplaceable;
+        return isReduceSinkReplaceable;
     }
 
     private boolean groupByEdgeReplaceable(BaseWork work, BaseWork child) {
@@ -382,7 +384,8 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         }
         if (work instanceof MergeJoinWork) {
             BaseWork mainWork = ((MergeJoinWork) work).getMainWork();
-            if (!(mainWork instanceof ReduceWork) || ((ReduceWork) ((MergeJoinWork) work).getMainWork()).getReducer().getType() != OperatorType.MERGEJOIN) {
+            if (!(mainWork instanceof ReduceWork) || ((ReduceWork) ((MergeJoinWork) work)
+                    .getMainWork()).getReducer().getType() != OperatorType.MERGEJOIN) {
                 return true;
             }
         }
@@ -390,26 +393,26 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
     }
 
     private boolean reduceSinkDescUnReplaceable(ReduceSinkDesc reduceSinkDesc) {
-        boolean unReplaceable = false;
-        if (reduceSinkDesc.getKeyCols().isEmpty() && !reduceSinkDesc.getReducerTraits().contains(ReduceSinkDesc.ReducerTraits.UNIFORM)
-                && reduceSinkDesc.getPartitionCols().size() > 0) {
-            unReplaceable = true;
+        boolean isUnReplaceable = false;
+        if (reduceSinkDesc.getKeyCols().isEmpty() && !reduceSinkDesc.getReducerTraits()
+                .contains(ReduceSinkDesc.ReducerTraits.UNIFORM) && reduceSinkDesc.getPartitionCols().size() > 0) {
+            isUnReplaceable = true;
         }
-        if (!isUDFSupport(reduceSinkDesc.getKeyCols(), false) ||
-                !isUDFSupport(reduceSinkDesc.getValueCols(), false) ||
-                !isUDFSupport(reduceSinkDesc.getPartitionCols(), false)) {
-            unReplaceable = true;
+        if (!isUDFSupport(reduceSinkDesc.getKeyCols(), false)
+                || !isUDFSupport(reduceSinkDesc.getValueCols(), false)
+                || !isUDFSupport(reduceSinkDesc.getPartitionCols(), false)) {
+            isUnReplaceable = true;
         }
 
         if (!reduceSinkDesc.getDistinctColumnIndices().isEmpty()) {
-            unReplaceable = true;
+            isUnReplaceable = true;
         }
         for (ExprNodeDesc exprNodeDesc : reduceSinkDesc.getPartitionCols()) {
             if (exprNodeDesc instanceof ExprNodeConstantDesc) {
-                unReplaceable = true;
+                isUnReplaceable = true;
             }
         }
-        return unReplaceable;
+        return isUnReplaceable;
     }
 
     private void initMergeJoinNeedSort() {
@@ -423,11 +426,11 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             }
             for (BaseWork parent : tezWork.getParents(work)) {
                 TezEdgeProperty.EdgeType edgeType = tezWork.getEdgeType(parent, work);
-                boolean needSort = reduceSinkReplaceableWork.contains(parent);
+                boolean isNeedSort = reduceSinkReplaceableWork.contains(parent);
                 if (reduceSinkReplaceableWork.contains(parent)) {
                     addMergeJoinNeedSort(edgeType, reducer);
                 }
-                replaceSimpleEdge(needSort, work, edgeType);
+                replaceSimpleEdge(isNeedSort, work, edgeType);
             }
         }
     }
@@ -447,15 +450,16 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         }
         if (work instanceof MergeJoinWork) {
             BaseWork mainWork = ((MergeJoinWork) work).getMainWork();
-            if (!(mainWork instanceof ReduceWork) || ((ReduceWork) ((MergeJoinWork) work).getMainWork()).getReducer().getType() != OperatorType.MERGEJOIN) {
+            if (!(mainWork instanceof ReduceWork) || ((ReduceWork) ((MergeJoinWork) work).getMainWork())
+                    .getReducer().getType() != OperatorType.MERGEJOIN) {
                 return;
             }
         }
-        boolean groupNeedSort = getGroupNeedSort(work);
-        boolean reduceSinkCanReplace = reduceSinkReplaceableWork.contains(work);
+        boolean isGroupNeedSort = getGroupNeedSort(work);
+        boolean isReduceSinkReplaceable = reduceSinkReplaceableWork.contains(work);
         VectorizedRowBatchCtx vectorizedRowBatchCtx = work.getVectorizedRowBatchCtx();
         for (Operator<? extends OperatorDesc> op : work.getAllOperators()) {
-            traverseTezOperator(op, work, groupNeedSort, reduceSinkCanReplace, vectorizedRowBatchCtx);
+            traverseTezOperator(op, work, isGroupNeedSort, isReduceSinkReplaceable, vectorizedRowBatchCtx);
         }
     }
 
@@ -476,7 +480,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         if (hasUnsupported) {
             return true;
         }
-        // If project generates new type ,also need to check
+        // If project generates new type, also need to check
         hasUnsupported = selectHasUnsupported(work);
         return hasUnsupported;
     }
@@ -501,17 +505,18 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             if (!op.getType().equals(OperatorType.TABLESCAN)) {
                 continue;
             }
-            RowSchema rowSchema = op.getSchema();
             TableScanDesc tableScanDesc = (TableScanDesc) op.getConf();
             List<String> fieldNames = new ArrayList<>();
             fieldNames.addAll(tableScanDesc.getNeededColumns());
-            LinkedHashMap<String, String> partSpec = mapWork.getAliasToPartnInfo().get(tableScanDesc.getAlias()).getPartSpec();
+            LinkedHashMap<String, String> partSpec = mapWork.getAliasToPartnInfo().get(tableScanDesc.getAlias())
+                .getPartSpec();
             if (partSpec != null) {
                 fieldNames.addAll(partSpec.keySet());
             }
             if (fieldNames.isEmpty()) {
                 continue;
             }
+            RowSchema rowSchema = op.getSchema();
             for (String field : fieldNames) {
                 TypeInfo typeInfo = rowSchema.getColumnInfo(field).getType();
                 if (fieldTypeUnsupported(typeInfo)) {
@@ -551,11 +556,13 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
 
     private boolean tableScanSupport(Operator<? extends OperatorDesc> op) {
         TableScanDesc tableScanDesc = (TableScanDesc) op.getConf();
-        if (tableScanDesc.getNeededColumns().isEmpty() || !tableScanDesc.getVirtualCols().isEmpty() || tableScanDesc.getAcidOperationalProperties() != null) {
+        if (tableScanDesc.getNeededColumns().isEmpty() || !tableScanDesc.getVirtualCols().isEmpty()
+                || tableScanDesc.getAcidOperationalProperties() != null) {
             return false;
         }
         Table tableMetadata = tableScanDesc.getTableMetadata();
-        if (tableMetadata != null && (!checkInputFormat(tableMetadata.getInputFormatClass().getName()) || tableMetadata.getParameters().getOrDefault("transactional", "").equals("true"))) {
+        if (tableMetadata != null && (!checkInputFormat(tableMetadata.getInputFormatClass().getName())
+                || tableMetadata.getParameters().getOrDefault("transactional", "").equals("true"))) {
             return false;
         }
         for (String name : tableScanDesc.getNeededColumns()) {
@@ -564,16 +571,17 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             }
         }
         if (tableScanDesc.isVectorized()) {
-            TypeInfo[] columnTypeInfos = ((VectorTableScanDesc) tableScanDesc.getVectorDesc()).getProjectedColumnTypeInfos();
+            TypeInfo[] columnTypeInfos = ((VectorTableScanDesc) tableScanDesc.getVectorDesc())
+                .getProjectedColumnTypeInfos();
             for (int id : tableScanDesc.getNeededColumnIDs()) {
-                if (columnTypeInfos[id].getTypeName() == "timestamp") {
+                if (columnTypeInfos[id].getTypeName().equals("timestamp")) {
                     return false;
                 }
             }
         } else if (tableMetadata != null && tableMetadata.getCols() != null) {
             List<FieldSchema> colList = tableMetadata.getCols();
             for (int id : tableScanDesc.getNeededColumnIDs()) {
-                if (colList.get(id).getType() == "timestamp") {
+                if (colList.get(id).getType().equals("timestamp")) {
                     return false;
                 }
             }
@@ -597,8 +605,9 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         return false;
     }
 
-    private void traverseTezOperator(Operator op, BaseWork work, boolean groupNeedSort, boolean reduceSinkCanReplace, VectorizedRowBatchCtx vectorizedRowBatchCtx) {
-        if (!currentReplaceable(op, reduceSinkCanReplace)) {
+    private void traverseTezOperator(Operator op, BaseWork work, boolean isGroupNeedSort,
+        boolean isReduceSinkReplaceable, VectorizedRowBatchCtx vectorizedRowBatchCtx) {
+        if (!currentReplaceable(op, isReduceSinkReplaceable)) {
             return;
         }
         if (work instanceof MapWork && op.getType().equals(OperatorType.TABLESCAN) && isReplaceable(op, false)) {
@@ -606,109 +615,120 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             MapWork mapWork = (MapWork) work;
             for (Map.Entry<String, Operator<? extends OperatorDesc>> entry : mapWork.getAliasToWork().entrySet()) {
                 if (entry.getValue().equals(op)) {
-                    mapWork.getAliasToWork().put(entry.getKey(), replaceWithOmniOperator(new OperatorInfo(op, work.getVectorMode(), vectorizedRowBatchCtx, reduceSinkCanReplace), 0));
+                    mapWork.getAliasToWork().put(entry.getKey(), replaceWithOmniOperator(
+                        new OperatorInfo(op, work.getVectorMode(), vectorizedRowBatchCtx, isReduceSinkReplaceable), 0));
                     replaceable.add(op);
                 }
             }
         } else if (work instanceof ReduceWork && ((ReduceWork) work).getReducer() == op) {
-            if (op.getType() != null && op.getType().equals(OperatorType.GROUPBY) && groupNeedSort) {
+            if (op.getType() != null && op.getType().equals(OperatorType.GROUPBY) && isGroupNeedSort) {
                 groupByOperatorNeedSort.add(op);
             }
             ReduceWork reduceWork = (ReduceWork) work;
-            reduceWork.setReducer(replaceWithOmniOperator(new OperatorInfo(op, work.getVectorMode(), vectorizedRowBatchCtx, reduceSinkCanReplace), reduceWork.getTagToInput().size()));
+            reduceWork.setReducer(replaceWithOmniOperator(new OperatorInfo(op, work.getVectorMode(),
+                vectorizedRowBatchCtx, isReduceSinkReplaceable), reduceWork.getTagToInput().size()));
             replaceable.add(op);
-        } else if (work instanceof MergeJoinWork && ((ReduceWork) ((MergeJoinWork) work).getMainWork()).getReducer() == op) {
+        } else if (work instanceof MergeJoinWork
+                && ((ReduceWork) ((MergeJoinWork) work).getMainWork()).getReducer() == op) {
             ReduceWork reduceWork = (ReduceWork) ((MergeJoinWork) work).getMainWork();
-            reduceWork.setReducer(replaceWithOmniOperator(new OperatorInfo(op, work.getVectorMode(), vectorizedRowBatchCtx, reduceSinkCanReplace), reduceWork.getTagToInput().size()));
+            reduceWork.setReducer(replaceWithOmniOperator(new OperatorInfo(op, work.getVectorMode(),
+                vectorizedRowBatchCtx, isReduceSinkReplaceable), reduceWork.getTagToInput().size()));
             replaceable.add(op);
-        } else if (isReplaceable(op, reduceSinkCanReplace)) {
-            if (op.getType() != null && op.getType().equals(OperatorType.GROUPBY) && groupNeedSort) {
+        } else if (isReplaceable(op, isReduceSinkReplaceable)) {
+            if (op.getType() != null && op.getType().equals(OperatorType.GROUPBY) && isGroupNeedSort) {
                 groupByOperatorNeedSort.add(op);
             }
-            replaceableInfo.add(new OperatorInfo(op, work.getVectorMode(), vectorizedRowBatchCtx, reduceSinkCanReplace));
+            replaceableInfo.add(new OperatorInfo(op, work.getVectorMode(), vectorizedRowBatchCtx,
+                isReduceSinkReplaceable));
             replaceable.add(op);
         }
     }
 
-    private boolean isReplaceable(Operator<? extends OperatorDesc> operator, boolean reduceSinkCanReplace) {
+    private boolean isReplaceable(Operator<? extends OperatorDesc> operator, boolean isReduceSinkReplaceable) {
         if (replaceable.contains(operator)) {
             return true;
         }
-
-        return reCheckReplaceable(operator, reduceSinkCanReplace);
+        return reCheckReplaceable(operator, isReduceSinkReplaceable);
     }
 
-    private boolean reCheckReplaceable(Operator<? extends OperatorDesc> operator, boolean reduceSinkCanReplace) {
+    private boolean reCheckReplaceable(Operator<? extends OperatorDesc> operator, boolean isReduceSinkReplaceable) {
         if (operator.getType() != null && operator.getType().equals(OperatorType.MAPJOIN)) {
-            if (checkMapJoinInput(operator) && currentReplaceable(operator, reduceSinkCanReplace)) {
+            if (checkMapJoinInput(operator) && currentReplaceable(operator, isReduceSinkReplaceable)) {
                 return true;
             }
         }
-        return currentReplaceable(operator, reduceSinkCanReplace);
+        return currentReplaceable(operator, isReduceSinkReplaceable);
     }
 
-    private boolean currentReplaceable(Operator<? extends OperatorDesc> operator, boolean reduceSinkCanReplace) {
-        if (operator.getName().contains("OMNI")) return true;
-        if (replaceable.contains(operator) || operator.getType() == null) {
+    private boolean currentReplaceable(Operator<? extends OperatorDesc> operator, boolean isReduceSinkReplaceable) {
+        if (operator.getName().contains("OMNI") || replaceable.contains(operator) || operator.getType() == null) {
             return true;
         }
-        if (!OMNI_OPERATOR.contains(operator.getType())) {
+        if (!OMNI_OPERATOR.contains(operator.getType()) || !omniHiveConf.isEnableOperator(operator.getType())) {
             return false;
         }
-        if (!omniHiveConf.isEnableOperator(operator.getType())) {
-            return false;
-        }
-        boolean cboEnable = HiveConf.getBoolVar(hookContext.getConf(), HiveConf.ConfVars.HIVE_CBO_ENABLED);
-        boolean cboRetPath = HiveConf.getBoolVar(hookContext.getConf(), HiveConf.ConfVars.HIVE_CBO_RETPATH_HIVEOP);
+        boolean isCboEnable = HiveConf.getBoolVar(hookContext.getConf(), HiveConf.ConfVars.HIVE_CBO_ENABLED);
+        boolean isCboRetPath = HiveConf.getBoolVar(hookContext.getConf(), HiveConf.ConfVars.HIVE_CBO_RETPATH_HIVEOP);
         switch (operator.getType()) {
             case MAPJOIN:
                 return mapJoinReplaceable(operator);
             case MERGEJOIN:
                 return joinReplaceable(operator);
             case SELECT:
-                if (!isUDFSupport(((SelectDesc) operator.getConf()).getColList(), false)) {
-                    return false;
-                }
-                if (OmniSelectOperator.isInvalidSelectColumn(((SelectDesc) operator.getConf()).getColList())) {
-                    return false;
-                }
-                boolean replaceable = true;
-                for (Operator parent : operator.getParentOperators()) {
-                    replaceable = replaceable && currentReplaceable(parent, reduceSinkCanReplace);
-                }
-                if (!operator.getChildOperators().isEmpty() && operator.getChildOperators().get(0).getType().equals(OperatorType.PTF)
-                        && !currentReplaceable(operator.getChildOperators().get(0), false)) {
-                    replaceable = false;
-                }
-                return replaceable;
+                return selectReplaceable(operator, isReduceSinkReplaceable);
             case FILTER:
-                List<ExprNodeDesc> colList = Collections.singletonList(((FilterDesc) operator.getConf()).getPredicate());
-                if ((!isUDFSupport(colList, true) && !isLegalTimestamp(colList)) || !isLegalFilter(colList)) {
-                    return false;
-                }
-                boolean result = true;
-                for (Operator parent : operator.getParentOperators()) {
-                    result = result && currentReplaceable(parent, reduceSinkCanReplace);
-                }
-                for (Operator child : operator.getChildOperators()) {
-                    if (child.getType() != null && child.getType().equals(OperatorType.SELECT)) {
-                        SelectDesc conf = (SelectDesc) child.getConf();
-                        result = result && isUDFSupport(conf.getColList(), false) && isLegalFilter(conf.getColList());
-                    }
-                }
-                return result;
+                return filterReplaceable(operator, isReduceSinkReplaceable);
             case PTF:
                 return PTFReplaceable(operator);
             case GROUPBY:
-                if (cboEnable && cboRetPath) return false;
-                return groupByReplaceable(operator, reduceSinkCanReplace);
+                if (isCboEnable && isCboRetPath) {
+                    return false;
+                }
+                return groupByReplaceable(operator, isReduceSinkReplaceable);
             case REDUCESINK:
-                return reduceSinkCanReplace;
+                return isReduceSinkReplaceable;
             case TABLESCAN:
                 return tableScanSupport(operator);
             default:
                 return true;
         }
+    }
+
+    private boolean selectReplaceable(Operator<? extends OperatorDesc> op, boolean isReduceSinkReplaceable) {
+        if (!isUDFSupport(((SelectDesc) op.getConf()).getColList(), false)) {
+            return false;
+        }
+        if (OmniSelectOperator.isInvalidSelectColumn(((SelectDesc) op.getConf()).getColList())) {
+            return false;
+        }
+        boolean isReplaceable = true;
+        for (Operator parent : op.getParentOperators()) {
+            isReplaceable = isReplaceable && currentReplaceable(parent, isReduceSinkReplaceable);
+        }
+        if (!op.getChildOperators().isEmpty() && op.getChildOperators().get(0).getType().equals(OperatorType.PTF)
+                && !currentReplaceable(op.getChildOperators().get(0), false)) {
+            isReplaceable = false;
+        }
+        return isReplaceable;
+    }
+
+    private boolean filterReplaceable(Operator<? extends OperatorDesc> op, boolean isReduceSinkReplaceable) {
+        List<ExprNodeDesc> colList = Collections.singletonList(((FilterDesc) op.getConf()).getPredicate());
+        if ((!isUDFSupport(colList, true) && !isLegalTimestamp(colList)) || !isLegalFilter(colList)) {
+            return false;
+        }
+        boolean isReplaceable = true;
+        for (Operator parent : op.getParentOperators()) {
+            isReplaceable = isReplaceable && currentReplaceable(parent, isReduceSinkReplaceable);
+        }
+        for (Operator child : op.getChildOperators()) {
+            if (child.getType() != null && child.getType().equals(OperatorType.SELECT)) {
+                SelectDesc conf = (SelectDesc) child.getConf();
+                isReplaceable = isReplaceable && isUDFSupport(conf.getColList(), false)
+                    && isLegalFilter(conf.getColList());
+            }
+        }
+        return isReplaceable;
     }
 
     private boolean PTFSupportedExpression(List<PTFExpressionDef> expressions) {
@@ -743,7 +763,8 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         return true;
     }
 
-    private boolean PTFSupportedFunction(FunctionType windowFunctionType, List<PTFExpressionDef> args, boolean isCountAll) {
+    private boolean PTFSupportedFunction(FunctionType windowFunctionType, List<PTFExpressionDef> args,
+        boolean isCountAll) {
         if (args != null) {
             if (windowFunctionType == null || isPTFAggUnsupported(windowFunctionType, args)) {
                 return false;
@@ -768,7 +789,8 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                 continue;
             }
             for (PTFExpressionDef expressionDef : functionDef.getArgs()) {
-                if (expressionDef.getExprNode() != null && expressionDef.getExprNode().getTypeInfo().getTypeName() == "timestamp") {
+                if (expressionDef.getExprNode() != null
+                        && expressionDef.getExprNode().getTypeInfo().getTypeName().equals("timestamp")) {
                     return false;
                 }
             }
@@ -785,8 +807,8 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             return false;
         }
         if (mapJoinDesc.getNullSafes() != null) {
-            for (boolean nullsafe : mapJoinDesc.getNullSafes()) {
-                if (nullsafe) {
+            for (boolean isSafeNull : mapJoinDesc.getNullSafes()) {
+                if (isSafeNull) {
                     return false;
                 }
             }
@@ -808,22 +830,27 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
     private boolean joinCondUnsupported(MapJoinDesc mapJoinDesc) {
         JoinCondDesc[] joinCondDescs = mapJoinDesc.getConds();
         if (joinCondDescs.length >= 2) {
-            if (joinCondDescs[0].getType() == JoinDesc.LEFT_OUTER_JOIN && joinCondDescs[1].getType() == JoinDesc.LEFT_SEMI_JOIN) {
+            if (joinCondDescs[0].getType() == JoinDesc.LEFT_OUTER_JOIN
+                    && joinCondDescs[1].getType() == JoinDesc.LEFT_SEMI_JOIN) {
                 return true;
             }
         }
         return false;
     }
 
-    private boolean groupByReplaceable(Operator<? extends OperatorDesc> operator, boolean reduceSinkCanReplace) {
+    private boolean groupByReplaceable(Operator<? extends OperatorDesc> operator, boolean isReduceSinkReplaceable) {
         GroupByDesc groupByDesc = (GroupByDesc) operator.getConf();
+        if (groupByDesc.getKeys().stream().map(ExprNodeDesc::getExprString).collect(Collectors.toSet()).size()
+                != groupByDesc.getKeys().size()) {
+            return false;
+        }
         if (groupByDesc.isGroupingSetsPresent() && groupByDesc.getMode() == GroupByDesc.Mode.PARTIALS) {
             return false;
         }
         if (!isUDFSupport(groupByDesc.getKeys(), false)) {
             return false;
         }
-        if (isChildPTFOperatorUnReplaceable(operator, reduceSinkCanReplace)) {
+        if (isChildPTFOperatorUnReplaceable(operator, isReduceSinkReplaceable)) {
             return false;
         }
         for (AggregationDesc aggregator : groupByDesc.getAggregators()) {
@@ -836,7 +863,8 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             if (!isUDFSupport(aggregator.getParameters(), false)) {
                 return false;
             }
-            if (aggregator.getGenericUDAFName().equals("avg") && aggregator.getMode() == GenericUDAFEvaluator.Mode.PARTIAL1) {
+            if (aggregator.getGenericUDAFName().equals("avg")
+                && aggregator.getMode() == GenericUDAFEvaluator.Mode.PARTIAL1) {
                 return false;
             }
             for (ExprNodeDesc parameter : aggregator.getParameters()) {
@@ -848,11 +876,12 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         return true;
     }
 
-    private boolean isChildPTFOperatorUnReplaceable(Operator<? extends OperatorDesc> operator, boolean reduceSinkCanReplace) {
+    private boolean isChildPTFOperatorUnReplaceable(Operator<? extends OperatorDesc> operator,
+        boolean isReduceSinkReplaceable) {
         Queue<Operator<? extends OperatorDesc>> operators = new LinkedBlockingQueue<>(operator.getChildOperators());
         while (!operators.isEmpty()) {
             Operator<? extends OperatorDesc> op = operators.poll();
-            if (op instanceof PTFOperator && !currentReplaceable(op, reduceSinkCanReplace)) {
+            if (op instanceof PTFOperator && !currentReplaceable(op, isReduceSinkReplaceable)) {
                 return true;
             }
             operators.addAll(op.getChildOperators());
@@ -862,7 +891,8 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
 
     private boolean aggParameterNotSupport(AggregationDesc aggregator, ExprNodeDesc parameter) {
         if (aggregator.getGenericUDAFName().equals("sum") || aggregator.getGenericUDAFName().equals("avg")) {
-            PrimitiveObjectInspector.PrimitiveCategory primitiveCategory = ((PrimitiveTypeInfo) parameter.getTypeInfo()).getPrimitiveCategory();
+            PrimitiveObjectInspector.PrimitiveCategory primitiveCategory =
+                ((PrimitiveTypeInfo) parameter.getTypeInfo()).getPrimitiveCategory();
             return primitiveCategory == STRING || primitiveCategory == CHAR || primitiveCategory == VARCHAR;
         }
         return false;
@@ -870,7 +900,6 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
 
     private boolean joinReplaceable(Operator<? extends OperatorDesc> operator) {
         JoinDesc joinDesc = (JoinDesc) operator.getConf();
-        JoinCondDesc[] joinCondDescs = joinDesc.getConds();
         Map<Byte, List<ExprNodeDesc>> keys;
         if (joinDesc instanceof CommonMergeJoinDesc) {
             keys = ((CommonMergeJoinDesc) joinDesc).getKeys();
@@ -884,8 +913,10 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         if (!isUDFSupport(exprNodeDescList, false)) {
             return false;
         }
+        JoinCondDesc[] joinCondDescs = joinDesc.getConds();
         for (JoinCondDesc joinCondDesc : joinCondDescs) {
-            if (!SUPPORTED_JOIN.contains(joinCondDesc.getType()) || joinCondDesc.getType() == JoinDesc.FULL_OUTER_JOIN && fullJoinUnReplaceable(joinDesc)) {
+            if (!SUPPORTED_JOIN.contains(joinCondDesc.getType()) || joinCondDesc.getType() == JoinDesc.FULL_OUTER_JOIN
+                    && fullJoinUnReplaceable(joinDesc)) {
                 return false;
             }
         }
@@ -904,8 +935,8 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             return true;
         }
         if (joinDesc.getNullSafes() != null) {
-            for (boolean nullsafe : joinDesc.getNullSafes()) {
-                if (nullsafe) {
+            for (boolean isSafeNull : joinDesc.getNullSafes()) {
+                if (isSafeNull) {
                     return true;
                 }
             }
@@ -933,7 +964,8 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                 continue;
             }
             PrimitiveTypeInfo primitiveTypeInfo = ((PrimitiveObjectInspector) oi).getTypeInfo();
-            if (windowFunctionType == OMNI_AGGREGATION_TYPE_AVG && primitiveTypeInfo.getPrimitiveCategory().equals(DECIMAL)
+            if (windowFunctionType == OMNI_AGGREGATION_TYPE_AVG
+                    && primitiveTypeInfo.getPrimitiveCategory().equals(DECIMAL)
                     && ((DecimalTypeInfo) primitiveTypeInfo).getPrecision() > DECIMAL64_MAX_PRECISION) {
                 return true;
             }
@@ -951,7 +983,9 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             ExprNodeDesc current = queue.poll();
             if (current instanceof ExprNodeGenericFuncDesc) {
                 BaseExpression expr = getBaseExpression(current);
-                if (expr == null) return false;
+                if (expr == null) {
+                    return false;
+                }
                 expressions.add(expr.toString());
                 current.getChildren().forEach(queue::offer);
             } else if ((current instanceof ExprNodeColumnDesc || current instanceof ExprNodeConstantDesc)
@@ -963,12 +997,13 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
     }
 
     private BaseExpression getBaseExpression(ExprNodeDesc current) {
-        if (((ExprNodeGenericFuncDesc) current).getGenericUDF() instanceof GenericUDFConcat ||
-                ((ExprNodeGenericFuncDesc) current).getGenericUDF() instanceof GenericUDFCoalesce && current.getChildren().size() >= 3) {
+        if (((ExprNodeGenericFuncDesc) current).getGenericUDF() instanceof GenericUDFConcat
+                || ((ExprNodeGenericFuncDesc) current).getGenericUDF() instanceof GenericUDFCoalesce
+                && current.getChildren().size() >= 3) {
             return null;
         }
-        boolean supportUDF = ExpressionUtils.isSupportUDF(((ExprNodeGenericFuncDesc) current).getGenericUDF());
-        if (!supportUDF || checkUnsupportedArithmetic((ExprNodeGenericFuncDesc) current)) {
+        boolean isSupportedUDF = ExpressionUtils.isSupportUDF(((ExprNodeGenericFuncDesc) current).getGenericUDF());
+        if (!isSupportedUDF || checkUnsupportedArithmetic((ExprNodeGenericFuncDesc) current)) {
             return null;
         }
         return getExpression(current);
@@ -1055,11 +1090,13 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             for (PartitionDesc partitionDesc : ((MapWork) work).getPathToPartitionInfo().values()) {
                 if (partitionDesc.getInputFileFormatClassName().equals(OrcInputFormat.class.getName())) {
                     partitionDesc.setInputFileFormatClass(OmniOrcInputFormat.class);
-                } else if (partitionDesc.getInputFileFormatClassName().equals(MapredParquetInputFormat.class.getName())) {
+                } else if (partitionDesc.getInputFileFormatClassName()
+                        .equals(MapredParquetInputFormat.class.getName())) {
                     partitionDesc.setInputFileFormatClass(OmniParquetInputFormat.class);
                 }
                 partitionDesc.getProperties().setProperty(SERIALIZATION_LIB, VecBatchWrapperSerde.class.getName());
-                partitionDesc.getTableDesc().getProperties().setProperty(SERIALIZATION_LIB, VecBatchWrapperSerde.class.getName());
+                partitionDesc.getTableDesc().getProperties().setProperty(SERIALIZATION_LIB,
+                        VecBatchWrapperSerde.class.getName());
             }
         }
     }
@@ -1080,9 +1117,9 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         }
     }
 
-    private void replaceSimpleEdge(boolean reduceSinkCanReplace, BaseWork child, TezEdgeProperty.EdgeType edgeType) {
+    private void replaceSimpleEdge(boolean isReduceSinkReplaceable, BaseWork child, TezEdgeProperty.EdgeType edgeType) {
         if (edgeType == TezEdgeProperty.EdgeType.SIMPLE_EDGE) {
-            if (reduceSinkCanReplace) {
+            if (isReduceSinkReplaceable) {
                 // replace all edge of merge join into CUSTOM_SIMPLE_EDGE
                 setParentWorkToCurrentWorkEdge(child, TezEdgeProperty.EdgeType.CUSTOM_SIMPLE_EDGE);
             } else {
@@ -1101,7 +1138,8 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
 
     private void setParentWorkToCurrentWorkEdge(BaseWork work, TezEdgeProperty.EdgeType edgeType) {
         for (BaseWork parent : tezWork.getParents(work)) {
-            if (tezWork.getEdgeType(parent, work) == TezEdgeProperty.EdgeType.BROADCAST_EDGE || parent instanceof UnionWork) {
+            if (parentOfMapJoinOpCannotReplace.contains(parent.getName()) || parent instanceof UnionWork
+                    || tezWork.getEdgeType(parent, work) == TezEdgeProperty.EdgeType.BROADCAST_EDGE) {
                 continue;
             }
             tezWork.getEdgeProperty(parent, work).setEdgeType(edgeType);
@@ -1112,28 +1150,30 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         return replaceWithOmniOperator(operatorInfo, 0);
     }
 
-    private Operator<? extends OperatorDesc> replaceWithOmniOperator(OperatorInfo operatorInfo, int originalParentsNum) {
-        boolean reduceSinkCanReplace = operatorInfo.isReduceSinkCanReplace();
+    private Operator<? extends OperatorDesc> replaceWithOmniOperator(OperatorInfo operatorInfo,
+            int originalParentsNum) {
+        boolean isReduceSinkReplaceable = operatorInfo.isReduceSinkCanReplace();
         Operator current = operatorInfo.getOperator();
-        boolean vectorized = operatorInfo.isVectorized();
+        boolean isVectorized = operatorInfo.isVectorized();
         VectorizedRowBatchCtx vectorizedRowBatchCtx = operatorInfo.getVectorizedRowBatchCtx();
-        List<Operator<? extends OperatorDesc>> parents = current.getParentOperators();
         List<Operator<? extends OperatorDesc>> childs = current.getChildOperators();
         List<Operator<? extends OperatorDesc>> replacedChilds = new ArrayList<>();
-        Operator<? extends OperatorDesc> omniOperator = createOmniOperator(current, vectorized, reduceSinkCanReplace);
+        Operator<? extends OperatorDesc> omniOperator = createOmniOperator(current,
+                isVectorized, isReduceSinkReplaceable);
         VectorizationContext outputVectorizationContext = null;
-        if (vectorized) {
+        if (isVectorized) {
             outputVectorizationContext = getOutputVectorizationContext(current);
         }
-        Operator<? extends OperatorDesc> vectorToRowOperator = vectorized ? new OmniVectorizedVectorOperator(current.getCompilationOpContext(), new OmniVectorDesc(false),
-                outputVectorizationContext, vectorizedRowBatchCtx)
+        Operator<? extends OperatorDesc> vectorToRowOperator = isVectorized
+                ? new OmniVectorizedVectorOperator(current.getCompilationOpContext(), new OmniVectorDesc(false),
+                    outputVectorizationContext, vectorizedRowBatchCtx)
                 : new OmniVectorOperator(current.getCompilationOpContext(), new OmniVectorDesc(false));
         if (childs.size() == 0 && !current.getType().equals(OperatorType.REDUCESINK)) {
             vectorToRowOperator.setParentOperators(Arrays.asList(omniOperator));
             replacedChilds.add(vectorToRowOperator);
         }
         for (Operator<? extends OperatorDesc> child : childs) {
-            if (isReplaceable(child, reduceSinkCanReplace)) {
+            if (isReplaceable(child, isReduceSinkReplaceable)) {
                 replacedChilds.add(child);
                 replaceOperatorList(child.getParentOperators(), current, omniOperator);
             } else {
@@ -1151,17 +1191,19 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         }
         List<Operator<? extends OperatorDesc>> replacedParents = new ArrayList<>();
         VectorizationContext inputVectorizationContext = null;
-        if (vectorized) {
-            inputVectorizationContext = current instanceof VectorizationOperator ?
-                    ((VectorizationOperator) current).getInputVectorizationContext() : null;
+        if (isVectorized) {
+            inputVectorizationContext = current instanceof VectorizationOperator
+                    ? ((VectorizationOperator) current).getInputVectorizationContext() : null;
         }
+        List<Operator<? extends OperatorDesc>> parents = current.getParentOperators();
         for (Operator<? extends OperatorDesc> parent : parents) {
-            if (isReplaceable(parent, reduceSinkCanReplace)) {
+            if (isReplaceable(parent, isReduceSinkReplaceable)) {
                 replacedParents.add(parent);
                 replaceOperatorList(parent.getChildOperators(), current, omniOperator);
             } else {
-                Operator<? extends OperatorDesc> rowToVectorOperator = vectorized ? new OmniVectorizedVectorOperator(current.getCompilationOpContext(), new OmniVectorDesc(true),
-                        inputVectorizationContext, vectorizedRowBatchCtx)
+                Operator<? extends OperatorDesc> rowToVectorOperator = isVectorized
+                        ? new OmniVectorizedVectorOperator(current.getCompilationOpContext(), new OmniVectorDesc(true),
+                            inputVectorizationContext, vectorizedRowBatchCtx)
                         : new OmniVectorOperator(parent.getCompilationOpContext(), new OmniVectorDesc(true));
                 rowToVectorOperator.setChildOperators(Arrays.asList(omniOperator));
                 rowToVectorOperator.setParentOperators(Arrays.asList(parent));
@@ -1170,11 +1212,13 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             }
         }
         if (parents.isEmpty() && originalParentsNum > 0) {
-            Operator<? extends OperatorDesc> rowToVectorOperator = vectorized ? new OmniVectorizedVectorOperator(current.getCompilationOpContext(), new OmniVectorDesc(true),
-                    inputVectorizationContext, vectorizedRowBatchCtx)
+            Operator<? extends OperatorDesc> rowToVectorOperator = isVectorized
+                    ? new OmniVectorizedVectorOperator(current.getCompilationOpContext(), new OmniVectorDesc(true),
+                        inputVectorizationContext, vectorizedRowBatchCtx)
                     : new OmniVectorOperator(current.getCompilationOpContext(), new OmniVectorDesc(true));
             if (mergeJoinNeedSort.contains(current)) {
-                rowToVectorOperator = new OmniVectorWithSortOperator(current.getCompilationOpContext(), new OmniVectorDesc(true));
+                rowToVectorOperator = new OmniVectorWithSortOperator(current.getCompilationOpContext(),
+                    new OmniVectorDesc(true));
             }
             rowToVectorOperator.setChildOperators(Arrays.asList(omniOperator));
             replacedParents.add(rowToVectorOperator);
@@ -1186,7 +1230,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
     }
 
     private void replaceOperatorList(List<Operator<? extends OperatorDesc>> operatorList,
-                                     Operator<? extends OperatorDesc> current, Operator<? extends OperatorDesc> replaced) {
+            Operator<? extends OperatorDesc> current, Operator<? extends OperatorDesc> replaced) {
         for (int i = 0; i < operatorList.size(); i++) {
             if (operatorList.get(i) == current) {
                 operatorList.set(i, replaced);
@@ -1211,20 +1255,22 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         if (current instanceof TableScanOperator) {
             return ((VectorizationOperator) current.getChildOperators().get(0)).getInputVectorizationContext();
         } else {
-            return current instanceof VectorizationContextRegion ?
-                    ((VectorizationContextRegion) current).getOutputVectorizationContext()
+            return current instanceof VectorizationContextRegion
+                    ? ((VectorizationContextRegion) current).getOutputVectorizationContext()
                     : ((VectorizationOperator) current).getInputVectorizationContext();
         }
     }
 
-    private Operator<? extends OperatorDesc> createOmniOperator(Operator current, boolean vectorized, boolean reduceSinkCanReplace) {
+    private Operator<? extends OperatorDesc> createOmniOperator(Operator current, boolean isVectorized,
+            boolean isReduceSinkReplaceable) {
         VectorizationContext vectorizationContext = null;
-        if (vectorized && current instanceof VectorizationOperator) {
+        if (isVectorized && current instanceof VectorizationOperator) {
             vectorizationContext = ((VectorizationOperator) current).getInputVectorizationContext();
         }
         switch (current.getType()) {
             case SELECT:
-                OmniSelectOperator omniSelectOperator = new OmniSelectOperator(current.getCompilationOpContext(), (SelectDesc) current.getConf());
+                OmniSelectOperator omniSelectOperator = new OmniSelectOperator(current.getCompilationOpContext(),
+                        (SelectDesc) current.getConf());
                 omniSelectOperator.setSchema(current.getSchema());
                 return omniSelectOperator;
             case FILTER:
@@ -1242,29 +1288,38 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                 }
             case MERGEJOIN:
                 if (mergeJoinNeedSort.contains(current)) {
-                    return new OmniMergeJoinWithSortOperator(current.getCompilationOpContext(), (CommonMergeJoinDesc) current.getConf());
+                    return new OmniMergeJoinWithSortOperator(current.getCompilationOpContext(),
+                            (CommonMergeJoinDesc) current.getConf());
                 } else {
-                    return new OmniMergeJoinOperator(current.getCompilationOpContext(), (CommonMergeJoinDesc) current.getConf());
+                    return new OmniMergeJoinOperator(current.getCompilationOpContext(),
+                            (CommonMergeJoinDesc) current.getConf());
                 }
             case GROUPBY:
-                return new OmniGroupByOperator(current.getCompilationOpContext(), (GroupByDesc) current.getConf(), vectorizationContext,
-                        vectorized ? ((VectorGroupByOperator) current).getOutputVectorizationContext() : null);
+                return new OmniGroupByOperator(current.getCompilationOpContext(),
+                        (GroupByDesc) current.getConf(), vectorizationContext,
+                        isVectorized ? ((VectorGroupByOperator) current).getOutputVectorizationContext() : null);
             case PTF:
                 return new OmniPTFOperator(current.getCompilationOpContext(), (PTFDesc) current.getConf());
             case REDUCESINK:
-                OmniReduceSinkOperator omniReduceSinkOperator = new OmniReduceSinkOperator(current.getCompilationOpContext(), (ReduceSinkDesc) current.getConf(), reduceSinkCanReplace);
+                OmniReduceSinkOperator omniReduceSinkOperator = new OmniReduceSinkOperator(
+                        current.getCompilationOpContext(),
+                        (ReduceSinkDesc) current.getConf(), isReduceSinkReplaceable);
                 ReduceSinkDesc conf = (ReduceSinkDesc) current.getConf();
                 if (conf.getTopN() == -1) {
-                    omniReduceSinkOperator.getConf().getKeySerializeInfo().getProperties().setProperty(SERIALIZATION_LIB, OmniVecBatchSerDe.class.getName());
-                    omniReduceSinkOperator.getConf().getValueSerializeInfo().getProperties().setProperty(SERIALIZATION_LIB, OmniVecBatchSerDe.class.getName());
+                    omniReduceSinkOperator.getConf().getKeySerializeInfo().getProperties().setProperty(
+                            SERIALIZATION_LIB, OmniVecBatchSerDe.class.getName());
+                    omniReduceSinkOperator.getConf().getValueSerializeInfo().getProperties().setProperty(
+                            SERIALIZATION_LIB, OmniVecBatchSerDe.class.getName());
                 } else {
                     needSortSerdeReduceSinkName.add(conf.getOutputName());
-                    omniReduceSinkOperator.getConf().getKeySerializeInfo().getProperties().setProperty(SERIALIZATION_LIB, OmniVecBatchOrderSerDe.class.getName());
-                    omniReduceSinkOperator.getConf().getValueSerializeInfo().getProperties().setProperty(SERIALIZATION_LIB, OmniVecBatchOrderSerDe.class.getName());
+                    omniReduceSinkOperator.getConf().getKeySerializeInfo().getProperties().setProperty(
+                            SERIALIZATION_LIB, OmniVecBatchOrderSerDe.class.getName());
+                    omniReduceSinkOperator.getConf().getValueSerializeInfo().getProperties().setProperty(
+                            SERIALIZATION_LIB, OmniVecBatchOrderSerDe.class.getName());
                 }
                 return omniReduceSinkOperator;
             case TABLESCAN:
-                if (vectorized) {
+                if (isVectorized) {
                     return new OmniVectorizedTableScanOperator((TableScanOperator) current);
                 } else {
                     return new OmniTableScanOperator((TableScanOperator) current);
@@ -1296,10 +1351,12 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                 TableDesc keyDesc = ((ReduceWork) work).getKeyDesc();
                 if (needSortSerdeReduceSinkName.contains(work.getName())) {
                     keyDesc.getProperties().setProperty(SERIALIZATION_LIB, OmniVecBatchOrderSerDe.class.getName());
-                    tagToValueDesc.get(tag).getProperties().setProperty(SERIALIZATION_LIB, OmniVecBatchOrderSerDe.class.getName());
+                    tagToValueDesc.get(tag).getProperties().setProperty(
+                            SERIALIZATION_LIB, OmniVecBatchOrderSerDe.class.getName());
                 } else {
                     keyDesc.getProperties().setProperty(SERIALIZATION_LIB, OmniVecBatchSerDe.class.getName());
-                    tagToValueDesc.get(tag).getProperties().setProperty(SERIALIZATION_LIB, OmniVecBatchSerDe.class.getName());
+                    tagToValueDesc.get(tag).getProperties().setProperty(
+                            SERIALIZATION_LIB, OmniVecBatchSerDe.class.getName());
                 }
             }
         }
@@ -1329,10 +1386,12 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                             keyDesc.getProperties().setProperty(SERIALIZATION_LIB, OmniVecBatchSerDe.class.getName());
                             if (conf.getNoOuterJoin()) {
                                 List<TableDesc> valueDesc = conf.getValueTblDescs();
-                                valueDesc.get(entry.getKey()).getProperties().setProperty(SERIALIZATION_LIB, OmniVecBatchSerDe.class.getName());
+                                valueDesc.get(entry.getKey()).getProperties().setProperty(
+                                        SERIALIZATION_LIB, OmniVecBatchSerDe.class.getName());
                             } else {
                                 List<TableDesc> valueDesc = conf.getValueFilteredTblDescs();
-                                valueDesc.get(entry.getKey()).getProperties().setProperty(SERIALIZATION_LIB, OmniVecBatchSerDe.class.getName());
+                                valueDesc.get(entry.getKey()).getProperties().setProperty(
+                                        SERIALIZATION_LIB, OmniVecBatchSerDe.class.getName());
                             }
                         }
                     }
@@ -1341,19 +1400,19 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         }
     }
 
-
     private class OperatorInfo {
         private Operator operator;
 
-        private boolean vectorized;
+        private boolean isVectorized;
         private VectorizedRowBatchCtx vectorizedRowBatchCtx;
-        private boolean reduceSinkCanReplace;
+        private boolean isReduceSinkReplaceable;
 
-        public OperatorInfo(Operator operator, boolean vectorized, VectorizedRowBatchCtx vectorizedRowBatchCtx, boolean reduceSinkCanReplace) {
+        public OperatorInfo(Operator operator, boolean isVectorized, VectorizedRowBatchCtx vectorizedRowBatchCtx,
+                boolean isReduceSinkReplaceable) {
             this.operator = operator;
-            this.vectorized = vectorized;
+            this.isVectorized = isVectorized;
             this.vectorizedRowBatchCtx = vectorizedRowBatchCtx;
-            this.reduceSinkCanReplace = reduceSinkCanReplace;
+            this.isReduceSinkReplaceable = isReduceSinkReplaceable;
         }
 
         @Override
@@ -1374,7 +1433,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         }
 
         public boolean isVectorized() {
-            return vectorized;
+            return isVectorized;
         }
 
         public VectorizedRowBatchCtx getVectorizedRowBatchCtx() {
@@ -1382,8 +1441,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         }
 
         public boolean isReduceSinkCanReplace() {
-            return reduceSinkCanReplace;
+            return isReduceSinkReplaceable;
         }
     }
-
 }

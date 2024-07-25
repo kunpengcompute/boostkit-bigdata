@@ -68,19 +68,19 @@ public class OmniTableScanOperator extends TableScanOperator implements Serializ
 
     protected transient PrimitiveTypeInfo[] partColTypeInfos;
 
-    /**
-     * Kryo ctor.
-     */
-    protected OmniTableScanOperator() {
-        super();
-    }
-
     public OmniTableScanOperator(TableScanOperator tableScanOperator) {
         super(tableScanOperator.getCompilationOpContext());
         this.conf = tableScanOperator.getConf();
         this.setSchemaEvolution(tableScanOperator.getSchemaEvolutionColumns(),
                 tableScanOperator.getSchemaEvolutionColumnsTypes());
         this.setSchema(tableScanOperator.getSchema());
+    }
+
+    /**
+     * Kryo ctor.
+     */
+    protected OmniTableScanOperator() {
+        super();
     }
 
     @Override
@@ -183,7 +183,7 @@ public class OmniTableScanOperator extends TableScanOperator implements Serializ
     }
 
     @Override
-    public void closeOp(boolean abort) throws HiveException {
-        super.closeOp(abort);
+    public void closeOp(boolean isAbort) throws HiveException {
+        super.closeOp(isAbort);
     }
 }

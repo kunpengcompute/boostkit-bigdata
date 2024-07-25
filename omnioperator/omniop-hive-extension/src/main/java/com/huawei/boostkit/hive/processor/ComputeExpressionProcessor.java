@@ -23,8 +23,10 @@ import com.huawei.boostkit.hive.expression.CastFunctionExpression;
 import com.huawei.boostkit.hive.expression.CompareExpression;
 import com.huawei.boostkit.hive.expression.ExpressionUtils;
 import com.huawei.boostkit.hive.expression.TypeUtils;
+
 import nova.hetu.omniruntime.type.Decimal128DataType;
 import nova.hetu.omniruntime.type.Decimal64DataType;
+
 import org.apache.hadoop.hive.ql.plan.ExprNodeConstantDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
@@ -43,7 +45,8 @@ public class ComputeExpressionProcessor implements ExpressionProcessor {
         List<ExprNodeDesc> allNode = getAllNode(node);
         boolean hasDecimal128 = false;
         for (ExprNodeDesc item : allNode) {
-            if (item.getTypeInfo() instanceof DecimalTypeInfo && ((DecimalTypeInfo) item.getTypeInfo()).getPrecision() > 18) {
+            if (item.getTypeInfo() instanceof DecimalTypeInfo
+                    && ((DecimalTypeInfo) item.getTypeInfo()).getPrecision() > 18) {
                 hasDecimal128 = true;
                 break;
             }
@@ -61,7 +64,8 @@ public class ComputeExpressionProcessor implements ExpressionProcessor {
             }
             if (baseExpression.getReturnType() == Decimal64DataType.DECIMAL64.getId().toValue() && hasDecimal128) {
                 DecimalTypeInfo decimalTypeInfo = (DecimalTypeInfo) child.getTypeInfo();
-                CastFunctionExpression castFunctionExpression = new CastFunctionExpression(Decimal128DataType.DECIMAL128.getId().toValue(),
+                CastFunctionExpression castFunctionExpression =
+                        new CastFunctionExpression(Decimal128DataType.DECIMAL128.getId().toValue(),
                         TypeUtils.getCharWidth(child), decimalTypeInfo.getPrecision(), decimalTypeInfo.getScale());
                 castFunctionExpression.add(baseExpression);
                 baseExpression = castFunctionExpression;

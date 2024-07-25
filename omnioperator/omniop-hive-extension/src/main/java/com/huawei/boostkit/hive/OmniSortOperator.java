@@ -105,7 +105,7 @@ public class OmniSortOperator extends OmniHiveOperator<OmniSortDesc> implements 
     }
 
     @Override
-    protected void closeOp(boolean abort) throws HiveException {
+    protected void closeOp(boolean isAbort) throws HiveException {
         Iterator<VecBatch> output = this.omniOperator.getOutput();
         while (output.hasNext()) {
             forward(output.next(), outputObjInspector);
@@ -116,6 +116,6 @@ public class OmniSortOperator extends OmniHiveOperator<OmniSortDesc> implements 
         if (omniOperator != null) {
             omniOperator.close();
         }
-        super.closeOp(abort);
+        super.closeOp(isAbort);
     }
 }

@@ -18,10 +18,14 @@
 
 package com.huawei.boostkit.hive.converter;
 
+import static nova.hetu.omniruntime.utils.OmniErrorType.OMNI_INNER_ERROR;
+import static nova.hetu.omniruntime.vector.Decimal128Vec.longToBytes;
+import static org.apache.hadoop.hive.common.type.HiveDecimal.SCRATCH_LONGS_LEN;
+
 import com.huawei.boostkit.hive.cache.ColumnCache;
 import com.huawei.boostkit.hive.cache.DecimalColumnCache;
-
 import com.huawei.boostkit.hive.cache.LongColumnCache;
+
 import nova.hetu.omniruntime.type.LongDataType;
 import nova.hetu.omniruntime.utils.OmniRuntimeException;
 import nova.hetu.omniruntime.vector.Decimal128Vec;
@@ -40,14 +44,6 @@ import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
 import org.apache.hadoop.hive.serde2.typeinfo.DecimalTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
 
-import java.util.Map;
-
-import static nova.hetu.omniruntime.utils.OmniErrorType.OMNI_INNER_ERROR;
-import static nova.hetu.omniruntime.vector.Decimal128Vec.bytesToLong;
-import static nova.hetu.omniruntime.vector.Decimal128Vec.longToBytes;
-import static org.apache.hadoop.hive.common.type.HiveDecimal.SCRATCH_LONGS_LEN;
-
-
 public class DecimalVecConverter implements VecConverter {
     private long[] scratchLongs = new long[SCRATCH_LONGS_LEN];
 
@@ -63,7 +59,8 @@ public class DecimalVecConverter implements VecConverter {
                 hiveDecimalWritable = new HiveDecimalWritable();
                 hiveDecimalWritable.setFromLongAndScale(dictionaryVec.getLong(index), decimalTypeInfo.getScale());
             } else {
-                hiveDecimalWritable = getDecimalWritableFromLong(dictionaryVec.getDecimal128(index), decimalTypeInfo.getScale());
+                hiveDecimalWritable = getDecimalWritableFromLong(dictionaryVec.getDecimal128(index),
+                        decimalTypeInfo.getScale());
             }
         } else if (vec instanceof LongVec) {
             hiveDecimalWritable = new HiveDecimalWritable();
@@ -85,8 +82,7 @@ public class DecimalVecConverter implements VecConverter {
         byte[] lowBytes = longToBytes(longs[0]);
         System.arraycopy(highBytes, 0, bytes, 0, 8);
         System.arraycopy(lowBytes, 0, bytes, 8, 8);
-        HiveDecimalWritable hiveDecimalWritable = new HiveDecimalWritable(bytes, scale);
-        return hiveDecimalWritable;
+        return new HiveDecimalWritable(bytes, scale);
     }
 
     @Override
@@ -109,7 +105,7 @@ public class DecimalVecConverter implements VecConverter {
     @Override
     public Vec toOmniVec(Object[] col, int columnSize, PrimitiveTypeInfo primitiveTypeInfo) {
         DecimalTypeInfo decimalTypeInfo = (DecimalTypeInfo) primitiveTypeInfo;
-        if (decimalTypeInfo.getPrecision() <=18) {
+        if (decimalTypeInfo.getPrecision() <= 18) {
             return toOmniLongVec(col, columnSize, decimalTypeInfo);
         }
         Decimal128Vec decimal128Vec = new Decimal128Vec(columnSize);
@@ -197,7 +193,8 @@ public class DecimalVecConverter implements VecConverter {
                                          ColumnCache columnCache, int colIndex, int rowCount,
                                          PrimitiveTypeInfo primitiveTypeInfo) {
         if (columnCache instanceof LongColumnCache) {
-            setValueFromColumnVectorLong(vectorizedRowBatch, vectorColIndex, columnCache, colIndex, rowCount, primitiveTypeInfo);
+            setValueFromColumnVectorLong(vectorizedRowBatch, vectorColIndex, columnCache, colIndex, rowCount,
+                    primitiveTypeInfo);
             return;
         }
         ColumnVector columnVector = vectorizedRowBatch.cols[vectorColIndex];
@@ -251,7 +248,9 @@ public class DecimalVecConverter implements VecConverter {
         }
     }
 
-    private void setValueFromColumnVectorLong(VectorizedRowBatch vectorizedRowBatch, int vectorColIndex, ColumnCache columnCache, int colIndex, int rowCount, PrimitiveTypeInfo primitiveTypeInfo) {
+    private void setValueFromColumnVectorLong(VectorizedRowBatch vectorizedRowBatch, int vectorColIndex,
+                                              ColumnCache columnCache, int colIndex, int rowCount,
+                                              PrimitiveTypeInfo primitiveTypeInfo) {
         ColumnVector columnVector = vectorizedRowBatch.cols[vectorColIndex];
         LongColumnCache longColumnCache = (LongColumnCache) columnCache;
         DecimalTypeInfo decimalTypeInfo = (DecimalTypeInfo) primitiveTypeInfo;
@@ -266,21 +265,25 @@ public class DecimalVecConverter implements VecConverter {
                 }
             } else {
                 for (int i = 0; i < vectorizedRowBatch.size; i++) {
-                    longColumnCache.dataCache[rowCount + i] = getLongFromHiveDecimal(vector[0].getHiveDecimal(), decimalTypeInfo);
+                    longColumnCache.dataCache[rowCount + i] = getLongFromHiveDecimal(vector[0].getHiveDecimal(),
+                            decimalTypeInfo);
                 }
             }
         } else if (vectorizedRowBatch.selectedInUse) {
-            setSelecedInUseDataCache(vectorizedRowBatch, rowCount, columnVector, longColumnCache, decimalTypeInfo, vector);
+            setSelecedInUseDataCache(vectorizedRowBatch, rowCount, columnVector, longColumnCache, decimalTypeInfo,
+                    vector);
         } else {
             setDataCache(vectorizedRowBatch, rowCount, columnVector, longColumnCache, decimalTypeInfo, vector);
         }
     }
 
-    private void setSelecedInUseDataCache(VectorizedRowBatch vectorizedRowBatch, int rowCount, ColumnVector columnVector, LongColumnCache longColumnCache, DecimalTypeInfo decimalTypeInfo, HiveDecimalWritable[] vector) {
+    private void setSelecedInUseDataCache(VectorizedRowBatch vectorizedRowBatch, int rowCount,
+                                          ColumnVector columnVector, LongColumnCache longColumnCache,
+                                          DecimalTypeInfo decimalTypeInfo, HiveDecimalWritable[] vector) {
         if (columnVector.noNulls) {
             for (int i = 0; i < vectorizedRowBatch.size; i++) {
-                longColumnCache.dataCache[rowCount + i] = getLongFromHiveDecimal(vector[vectorizedRowBatch.selected[i]].getHiveDecimal(),
-                        decimalTypeInfo);
+                longColumnCache.dataCache[rowCount + i] = getLongFromHiveDecimal(vector[vectorizedRowBatch.selected[i]]
+                                .getHiveDecimal(), decimalTypeInfo);
             }
         } else {
             for (int i = 0; i < vectorizedRowBatch.size; i++) {
@@ -294,17 +297,21 @@ public class DecimalVecConverter implements VecConverter {
         }
     }
 
-    private void setDataCache(VectorizedRowBatch vectorizedRowBatch, int rowCount, ColumnVector columnVector, LongColumnCache longColumnCache, DecimalTypeInfo decimalTypeInfo, HiveDecimalWritable[] vector) {
+    private void setDataCache(VectorizedRowBatch vectorizedRowBatch, int rowCount, ColumnVector columnVector,
+                              LongColumnCache longColumnCache, DecimalTypeInfo decimalTypeInfo,
+                              HiveDecimalWritable[] vector) {
         if (columnVector.noNulls) {
             for (int i = 0; i < vectorizedRowBatch.size; i++) {
-                longColumnCache.dataCache[rowCount + i] = getLongFromHiveDecimal(vector[i].getHiveDecimal(), decimalTypeInfo);
+                longColumnCache.dataCache[rowCount + i] = getLongFromHiveDecimal(vector[i].getHiveDecimal(),
+                        decimalTypeInfo);
             }
         } else {
             for (int i = 0; i < vectorizedRowBatch.size; i++) {
                 if (columnVector.isNull[i]) {
                     longColumnCache.isNull[rowCount + i] = true;
                 } else {
-                    longColumnCache.dataCache[rowCount + i] = getLongFromHiveDecimal(vector[i].getHiveDecimal(), decimalTypeInfo);
+                    longColumnCache.dataCache[rowCount + i] = getLongFromHiveDecimal(vector[i].getHiveDecimal(),
+                            decimalTypeInfo);
                 }
             }
         }

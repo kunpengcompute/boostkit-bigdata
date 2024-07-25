@@ -22,8 +22,7 @@ import com.google.gson.Gson;
 
 import javax.annotation.Nullable;
 
-public class BetweenExpression extends BaseExpression{
-
+public class BetweenExpression extends BaseExpression {
     @Nullable
     private BaseExpression lower_bound;
     @Nullable
@@ -36,7 +35,7 @@ public class BetweenExpression extends BaseExpression{
     }
 
     public BetweenExpression(String exprType, Integer returnType, String operator, BaseExpression lower_bound,
-        BaseExpression upper_bound, BaseExpression value) {
+                             BaseExpression upper_bound, BaseExpression value) {
         super(exprType, returnType, operator);
         this.lower_bound = lower_bound;
         this.upper_bound = upper_bound;
@@ -56,7 +55,8 @@ public class BetweenExpression extends BaseExpression{
 
     @Override
     public boolean isFull() {
-        return lower_bound != null && lower_bound.isFull() && upper_bound != null && upper_bound.isFull() && value != null && value.isFull();
+        return lower_bound != null && lower_bound.isFull() && upper_bound != null && upper_bound.isFull()
+                && value != null && value.isFull();
     }
 
     @Override

@@ -22,20 +22,20 @@ import static com.huawei.boostkit.hive.cache.VectorCache.BATCH;
 
 import com.google.common.base.Strings;
 
-import nova.hetu.omniruntime.vector.IntVec;
-import nova.hetu.omniruntime.vector.LongVec;
-import nova.hetu.omniruntime.vector.Decimal128Vec;
-import nova.hetu.omniruntime.vector.Vec;
-import nova.hetu.omniruntime.vector.VecBatch;
 import nova.hetu.omniruntime.type.BooleanDataType;
 import nova.hetu.omniruntime.type.DataType;
-import nova.hetu.omniruntime.type.Decimal64DataType;
 import nova.hetu.omniruntime.type.Decimal128DataType;
+import nova.hetu.omniruntime.type.Decimal64DataType;
 import nova.hetu.omniruntime.type.DoubleDataType;
 import nova.hetu.omniruntime.type.IntDataType;
-import nova.hetu.omniruntime.type.ShortDataType;
 import nova.hetu.omniruntime.type.LongDataType;
+import nova.hetu.omniruntime.type.ShortDataType;
 import nova.hetu.omniruntime.type.VarcharDataType;
+import nova.hetu.omniruntime.vector.LongVec;
+import nova.hetu.omniruntime.vector.Decimal128Vec;
+import nova.hetu.omniruntime.vector.IntVec;
+import nova.hetu.omniruntime.vector.Vec;
+import nova.hetu.omniruntime.vector.VecBatch;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
@@ -66,11 +66,6 @@ import org.apache.hadoop.mapred.RecordReader;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.parquet.HadoopReadOptions;
 import org.apache.parquet.column.ColumnDescriptor;
-import org.apache.parquet.schema.OriginalType;
-import org.apache.parquet.schema.Type;
-import org.apache.parquet.schema.PrimitiveType;
-import org.apache.parquet.schema.MessageType;
-import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName;
 import org.apache.parquet.filter2.compat.FilterCompat;
 import org.apache.parquet.filter2.predicate.FilterPredicate;
 import org.apache.parquet.filter2.statisticslevel.StatisticsFilter;
@@ -84,6 +79,10 @@ import org.apache.parquet.hadoop.metadata.ColumnChunkMetaData;
 import org.apache.parquet.hadoop.metadata.FileMetaData;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.apache.parquet.schema.MessageType;
+import org.apache.parquet.schema.OriginalType;
+import org.apache.parquet.schema.PrimitiveType;
+import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName;
+import org.apache.parquet.schema.Type;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -91,15 +90,15 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.List;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 public class OmniParquetRecordReader
         implements RecordReader<NullWritable, VecBatchWrapper>, StatsProvidingRecordReader {
-    public static final Logger LOG = LoggerFactory.getLogger(OmniParquetRecordReader.class);
+    private static final Logger LOG = LoggerFactory.getLogger(OmniParquetRecordReader.class);
 
     private static final Map<OriginalType, DataType> PARQUET_TO_OMNI_TYPE = new HashMap<OriginalType, DataType>() {
         {
@@ -116,7 +115,8 @@ public class OmniParquetRecordReader
         }
     };
 
-    private static final Map<PrimitiveTypeName, DataType> NULL_ORIGINAL_TO_OMNI_TYPE = new HashMap<PrimitiveTypeName, DataType>() {
+    private static final Map<PrimitiveTypeName, DataType> NULL_ORIGINAL_TO_OMNI_TYPE =
+            new HashMap<PrimitiveTypeName, DataType>() {
         {
             put(PrimitiveTypeName.INT32, IntDataType.INTEGER);
             put(PrimitiveTypeName.INT64, LongDataType.LONG);
@@ -131,7 +131,7 @@ public class OmniParquetRecordReader
     protected Vec[] vecs;
     protected float progress = 0.0f;
     protected long splitLen; // for getPos()
-    protected boolean skipTimestampConversion = false;
+    protected boolean shouldSkipTimestampConversion = false;
     protected SerDeStats serDeStats;
     protected JobConf jobConf;
     protected ProjectionPusher projectionPusher;
@@ -166,11 +166,11 @@ public class OmniParquetRecordReader
         }
         this.split = getSplit(oldSplit, jobConf);
         // create a TaskInputOutputContext
-        if (skipTimestampConversion
+        if (shouldSkipTimestampConversion
                 ^ HiveConf.getBoolVar(conf, HiveConf.ConfVars.HIVE_PARQUET_TIMESTAMP_SKIP_CONVERSION)) {
             conf = new JobConf(oldJobConf);
             HiveConf.setBoolVar(conf, HiveConf.ConfVars.HIVE_PARQUET_TIMESTAMP_SKIP_CONVERSION,
-                    skipTimestampConversion);
+                    shouldSkipTimestampConversion);
         }
         this.isFilterPredicate = filter instanceof FilterCompat.FilterPredicateCompat;
         this.recordReader = new ParquetColumnarBatchScanReader();
@@ -221,7 +221,6 @@ public class OmniParquetRecordReader
             throws IOException {
         ParquetInputSplit split;
         if (oldSplit instanceof FileSplit) {
-            final Path finalPath = ((FileSplit) oldSplit).getPath();
             final List<BlockMetaData> blocks = fileFooter.getBlocks();
             final FileMetaData fileMetaData = fileFooter.getFileMetaData();
 
@@ -244,8 +243,10 @@ public class OmniParquetRecordReader
                 }
             }
             if (HiveConf.getBoolVar(conf, HiveConf.ConfVars.HIVE_PARQUET_TIMESTAMP_SKIP_CONVERSION)) {
-                skipTimestampConversion = !Strings.nullToEmpty(fileMetaData.getCreatedBy()).startsWith("parquet-mr");
+                shouldSkipTimestampConversion = !Strings.nullToEmpty(
+                        fileMetaData.getCreatedBy()).startsWith("parquet-mr");
             }
+            final Path finalPath = ((FileSplit) oldSplit).getPath();
             split = new ParquetInputSplit(finalPath, splitStart, splitStart + splitLength, splitLength, null, null);
             return split;
         } else {
@@ -279,7 +280,7 @@ public class OmniParquetRecordReader
         List<BlockMetaData> blocks = fileFooter.getBlocks();
         for (int i = 0; i < blocks.size(); i++) {
             BlockMetaData block = blocks.get(i);
-            long totalSize = 0;
+            long totalSize = 0L;
             long startIndex = block.getStartingPos();
             for (ColumnChunkMetaData col : block.getColumns()) {
                 totalSize += col.getTotalSize();
@@ -287,9 +288,9 @@ public class OmniParquetRecordReader
             long midPoint = startIndex + totalSize / 2;
             if (midPoint >= start && midPoint < end) {
                 if (isFilterPredicate) {
-                    boolean drop = StatisticsFilter.canDrop(
+                    boolean canDrop = StatisticsFilter.canDrop(
                             ((FilterCompat.FilterPredicateCompat) filter).getFilterPredicate(), block.getColumns());
-                    if (!drop) {
+                    if (!canDrop) {
                         res.add(i);
                     }
                 } else {
@@ -300,6 +301,12 @@ public class OmniParquetRecordReader
         return res;
     }
 
+    /**
+     * getSignedIntValue
+     *
+     * @param str      value in string format
+     * @return Integer value in int format
+     */
     public Integer getSignedIntValue(String str) {
         try {
             return Integer.parseInt(str);
@@ -308,6 +315,12 @@ public class OmniParquetRecordReader
         }
     }
 
+    /**
+     * getSignedLongValue
+     *
+     * @param str   value in string format
+     * @return Long value in Long format
+     */
     public Long getSignedLongValue(String str) {
         try {
             return Long.parseLong(str);
@@ -316,6 +329,14 @@ public class OmniParquetRecordReader
         }
     }
 
+    /**
+     * convertUnsignedInt
+     *
+     * @param vec           unsigned int data is stored in IntVec
+     * @param isDecimal     if table structure is decimal
+     * @param decimalScale  pow of 10, which is used to obtain the true value of decimal
+     * @return Vec          vector of the true data type
+     */
     public Vec convertUnsignedInt(IntVec vec, boolean isDecimal, BigInteger decimalScale) {
         if (isDecimal) {
             Decimal128Vec deciVec = new Decimal128Vec(vec.getSize());
@@ -324,7 +345,8 @@ public class OmniParquetRecordReader
                     deciVec.setNull(j);
                     continue;
                 }
-                BigInteger trueValue = new BigInteger(getSignedIntValue(Integer.toUnsignedString(vec.get(j))).toString());
+                BigInteger trueValue = new BigInteger(getSignedIntValue(Integer.toUnsignedString(vec.get(j)))
+                        .toString());
                 trueValue = trueValue.multiply(decimalScale);
                 if (trueValue == null || trueValue.compareTo(BigInteger.ZERO) < 0) {
                     deciVec.setNull(j);
@@ -349,6 +371,14 @@ public class OmniParquetRecordReader
         }
     }
 
+    /**
+     * convertUnsignedLong
+     *
+     * @param vec           unsigned long data is stored in LongVec
+     * @param isDecimal     if table structure is decimal
+     * @param decimalScale  pow of 10, which is used to obtain the true value of decimal
+     * @return Vec          vector of the true data type
+     */
     public Vec convertUnsignedLong(LongVec vec, boolean isDecimal, BigInteger decimalScale) {
         if (isDecimal) {
             Decimal128Vec deciVec = new Decimal128Vec(vec.getSize());
@@ -357,7 +387,8 @@ public class OmniParquetRecordReader
                     deciVec.setNull(j);
                     continue;
                 }
-                BigInteger trueValue = new BigInteger(getSignedLongValue(Long.toUnsignedString(vec.get(j))).toString());
+                BigInteger trueValue = new BigInteger(getSignedLongValue(Long.toUnsignedString(vec.get(j)))
+                        .toString());
                 trueValue = trueValue.multiply(decimalScale);
                 if (trueValue == null || trueValue.compareTo(BigInteger.ZERO) < 0) {
                     deciVec.setNull(j);
@@ -382,7 +413,12 @@ public class OmniParquetRecordReader
         }
     }
 
-    public void processUnIntData() {
+    /**
+     * processUnsignedData
+     * resolve problems: 1. when reading unsignedInt/unsignedLong data from Parquet file
+     * 2. when the real type stored in Parquet file is different with the type specified by talbe structure
+     */
+    public void processUnsignedData() {
         List<Type> types = this.fileSchema.getFields();
         TableScanDesc desc = (TableScanDesc) this.tableScanOp.getConf();
         ArrayList<ColumnInfo> infoList = this.tableScanOp.getSchema().getSignature();
@@ -421,7 +457,7 @@ public class OmniParquetRecordReader
         if (batchSize == 0) {
             return false;
         }
-        processUnIntData();
+        processUnsignedData();
         value.setVecBatch(new VecBatch(vecs, batchSize));
         return true;
     }

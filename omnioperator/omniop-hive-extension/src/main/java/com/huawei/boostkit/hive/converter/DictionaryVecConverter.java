@@ -68,7 +68,8 @@ public class DictionaryVecConverter implements VecConverter {
             }
             case VARCHAR: {
                 byte[] bytes = dictionaryVec.getBytes(index);
-                LazyHiveVarchar lazyHiveVarchar = new LazyHiveVarchar((LazyHiveVarcharObjectInspector) primitiveObjectInspector);
+                LazyHiveVarchar lazyHiveVarchar = new LazyHiveVarchar(
+                        (LazyHiveVarcharObjectInspector) primitiveObjectInspector);
                 ByteArrayRef byteArrayRefVarchar = new ByteArrayRef();
                 byteArrayRefVarchar.setData(bytes);
                 lazyHiveVarchar.init(byteArrayRefVarchar, 0, bytes.length);
@@ -88,7 +89,8 @@ public class DictionaryVecConverter implements VecConverter {
                 return Date.ofEpochMilli(dictionaryVec.getLong(index));
             case DECIMAL: {
                 DecimalTypeInfo decimalTypeInfo = (DecimalTypeInfo) primitiveTypeInfo;
-                return HiveDecimal.create(Decimal128Vec.getDecimal(dictionaryVec.getDecimal128(index)), decimalTypeInfo.getScale());
+                return HiveDecimal.create(Decimal128Vec.getDecimal(dictionaryVec.getDecimal128(index)),
+                        decimalTypeInfo.getScale());
             }
             default:
                 return null;

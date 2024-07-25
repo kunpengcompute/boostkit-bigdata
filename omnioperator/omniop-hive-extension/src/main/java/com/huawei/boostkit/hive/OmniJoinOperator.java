@@ -80,7 +80,12 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 public class OmniJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc> implements Serializable {
+    public OmniJoinOperator(CompilationOpContext ctx) {
+        super((ctx));
+    }
+
     private static final long serialVersionUID = 1L;
+    private transient Iterator<VecBatch> output;
 
     protected static final int SMJ_NEED_ADD_STREAM_TBL_DATA = 2;
     protected static final int SMJ_NEED_ADD_BUFFERED_TBL_DATA = 3;
@@ -102,14 +107,9 @@ public class OmniJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc> impl
     protected transient Queue<VecBatch>[] bufferData;
     protected transient DataType[][] streamTypes;
     protected transient DataType[][] bufferTypes;
-    private transient Iterator<VecBatch> output;
 
     protected OmniJoinOperator() {
         super();
-    }
-
-    public OmniJoinOperator(CompilationOpContext ctx) {
-        super((ctx));
     }
 
     public OmniJoinOperator(CompilationOpContext ctx, JoinDesc joinDesc) {
@@ -173,7 +173,6 @@ public class OmniJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc> impl
                 .flatMap(alias -> ((StructObjectInspector) inputObjInspectors[alias]).getAllStructFieldRefs().stream()
                         .flatMap(keyValue -> ((StructObjectInspector) keyValue.getFieldObjectInspector())
                                 .getAllStructFieldRefs().stream())).collect(Collectors.toList());
-        DataType[] inputTypes = new DataType[inputFields.size()];
         List<Map<String, Integer>> colNameToId = new ArrayList<>();
         aliasList.forEach(a -> colNameToId.add(new HashMap<>()));
         int[] fieldNum = new int[aliasList.size()];
@@ -187,11 +186,13 @@ public class OmniJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc> impl
                             .getAllStructFieldRefs().size()).sum();
         }
         int tagIndex = 0;
+        DataType[] inputTypes = new DataType[inputFields.size()];
         for (int i = 0; i < inputFields.size(); i++) {
             if (i >= fieldNum[tagIndex]) {
                 ++tagIndex;
             }
-            inputTypes[i] = TypeUtils.buildInputDataType(((AbstractPrimitiveObjectInspector) inputFields.get(i).getFieldObjectInspector()).getTypeInfo());
+            inputTypes[i] = TypeUtils.buildInputDataType(((AbstractPrimitiveObjectInspector) inputFields.get(i)
+                    .getFieldObjectInspector()).getTypeInfo());
             colNameToId.get(tagIndex).put(inputFields.get(i).getFieldName(), i);
         }
         int[] outputCols;
@@ -235,12 +236,13 @@ public class OmniJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc> impl
         List<ObjectInspector> inspectors = IntStream.range(0, bufferIndex + 1).boxed()
                 .flatMap(tableIndex -> ((StructObjectInspector) inputObjInspectors[tableIndex]).getAllStructFieldRefs()
                         .stream().flatMap(keyValue -> ((StructObjectInspector) keyValue.getFieldObjectInspector())
-                                .getAllStructFieldRefs().stream())).sorted(Comparator.comparing(StructField::getFieldName))
+                        .getAllStructFieldRefs().stream())).sorted(Comparator.comparing(StructField::getFieldName))
                 .map(field -> field.getFieldObjectInspector()).collect(Collectors.toList());
         Map<String, String> inputColNameToExprName = new HashMap<>();
         for (Map.Entry<String, ExprNodeDesc> entry : conf.getColumnExprMap().entrySet()) {
             ExprNodeColumnDesc exprNodeColumnDesc = (ExprNodeColumnDesc) entry.getValue();
-            inputColNameToExprName.put(exprNodeColumnDesc.getColumn().replace("VALUE.", "").replace("KEY.", ""), entry.getKey());
+            inputColNameToExprName.put(exprNodeColumnDesc.getColumn()
+                    .replace("VALUE.", "").replace("KEY.", ""), entry.getKey());
         }
         List<String> fieldNames = conf.getColumnExprMap().keySet().stream().sorted().collect(Collectors.toList());
         StructObjectInspector exprObjInspector = ObjectInspectorFactory.getStandardStructObjectInspector(fieldNames,
@@ -250,8 +252,9 @@ public class OmniJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc> impl
     }
 
     private ExprNodeGenericFuncDesc getResidualFilter() {
-        List<ExprNodeDesc> filters = residualJoinFilters.stream().map(ExprNodeEvaluator::getExpr).collect(Collectors.toList());
-        if (filters.size() ==1) {
+        List<ExprNodeDesc> filters = residualJoinFilters.stream()
+                .map(ExprNodeEvaluator::getExpr).collect(Collectors.toList());
+        if (filters.size() == 1) {
             return (ExprNodeGenericFuncDesc) filters.get(0);
         }
         try {
@@ -310,9 +313,11 @@ public class OmniJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc> impl
     protected void processOmni(int opIndex, int bufferIndex) throws HiveException {
         if (flowControlCode[opIndex] != SCAN_FINISH && resCode[opIndex] == RES_INIT) {
             if (flowControlCode[opIndex] == SMJ_NEED_ADD_STREAM_TBL_DATA) {
-                processOmniSmj(opIndex, opIndex, streamData, streamOperators, SMJ_NEED_ADD_STREAM_TBL_DATA, streamTypes);
+                processOmniSmj(opIndex, opIndex, streamData, streamOperators,
+                        SMJ_NEED_ADD_STREAM_TBL_DATA, streamTypes);
             } else {
-                processOmniSmj(opIndex, bufferIndex, bufferData, bufferOperators, SMJ_NEED_ADD_BUFFERED_TBL_DATA, bufferTypes);
+                processOmniSmj(opIndex, bufferIndex, bufferData, bufferOperators,
+                        SMJ_NEED_ADD_BUFFERED_TBL_DATA, bufferTypes);
             }
         }
         if (resCode[opIndex] == SMJ_FETCH_JOIN_DATA) {
@@ -351,7 +356,8 @@ public class OmniJoinOperator extends CommonJoinOperator<OmniMergeJoinDesc> impl
         if (data[opIndex].isEmpty() && fetchDone[dataIndex]) {
             setStatus(operators[opIndex].addInput(createEofVecBatch(types[opIndex])), opIndex);
         } else {
-            while (flowControlCode[opIndex] == controlCode && resCode[opIndex] == RES_INIT && !data[opIndex].isEmpty()) {
+            while (flowControlCode[opIndex] == controlCode
+                    && resCode[opIndex] == RES_INIT && !data[opIndex].isEmpty()) {
                 setStatus(operators[opIndex].addInput(data[opIndex].poll()), opIndex);
             }
         }

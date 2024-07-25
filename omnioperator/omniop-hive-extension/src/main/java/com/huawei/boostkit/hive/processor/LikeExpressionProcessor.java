@@ -23,6 +23,7 @@ import com.huawei.boostkit.hive.expression.ExpressionUtils;
 import com.huawei.boostkit.hive.expression.FunctionExpression;
 import com.huawei.boostkit.hive.expression.NotExpression;
 import com.huawei.boostkit.hive.expression.TypeUtils;
+
 import org.apache.hadoop.hive.ql.plan.ExprNodeConstantDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
@@ -53,7 +54,8 @@ public class LikeExpressionProcessor implements ExpressionProcessor {
 
         for (int i = 0; i < likePattern.length(); ++i) {
             char n = likePattern.charAt(i);
-            if (n == '\\' && i + 1 < likePattern.length() && (likePattern.charAt(i + 1) == '_' || likePattern.charAt(i + 1) == '%')) {
+            if (n == '\\' && i + 1 < likePattern.length()
+                    && (likePattern.charAt(i + 1) == '_' || likePattern.charAt(i + 1) == '%')) {
                 sb.append(likePattern.charAt(i + 1));
                 ++i;
             } else if (n == '_') {

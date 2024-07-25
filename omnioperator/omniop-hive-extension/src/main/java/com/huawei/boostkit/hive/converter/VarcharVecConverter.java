@@ -112,7 +112,8 @@ public class VarcharVecConverter implements VecConverter {
             return null;
         }
         byte[] bytes = getBytes(vec, index);
-        LazyHiveVarchar lazyHiveVarchar = new LazyHiveVarchar((LazyHiveVarcharObjectInspector) primitiveObjectInspector);
+        LazyHiveVarchar lazyHiveVarchar = new LazyHiveVarchar(
+                (LazyHiveVarcharObjectInspector) primitiveObjectInspector);
         ByteArrayRef byteArrayRef = new ByteArrayRef();
         byteArrayRef.setData(bytes);
         lazyHiveVarchar.init(byteArrayRef, 0, bytes.length);
@@ -200,7 +201,8 @@ public class VarcharVecConverter implements VecConverter {
         }
     }
 
-    private void setVectorCache(int rowIndex, BytesColumnCache bytesColumnCache, int rowCount, BytesColumnVector columnVector) {
+    private void setVectorCache(int rowIndex, BytesColumnCache bytesColumnCache, int rowCount,
+                                BytesColumnVector columnVector) {
         if (columnVector.isNull[rowIndex]) {
             bytesColumnCache.isNull[rowCount] = true;
             return;
@@ -208,7 +210,8 @@ public class VarcharVecConverter implements VecConverter {
         VarcharCache vc = new VarcharCache();
         vc.offset = columnVector.length[rowIndex];
         byte[] result = new byte[columnVector.length[rowIndex]];
-        System.arraycopy(columnVector.vector[rowIndex], columnVector.start[rowIndex], result, 0, columnVector.length[rowIndex]);
+        System.arraycopy(columnVector.vector[rowIndex], columnVector.start[rowIndex], result, 0,
+                columnVector.length[rowIndex]);
         vc.values = result;
         bytesColumnCache.dataCache[rowCount] = vc;
     }
