@@ -95,7 +95,7 @@ namespace omniruntime::reader {
             case orc::TypeKind::BOOLEAN:
             case orc::TypeKind::SHORT:
             case orc::TypeKind::DATE:
-            case orc::TYpeKind::INT:
+            case orc::TypeKind::INT:
             case orc::TypeKind::LONG:
                 return makeFixLenthVector(numValues, dataTypeId, is_row, rVec, rowVecColumns);
             case orc::TypeKind::DOUBLE:
@@ -115,7 +115,7 @@ namespace omniruntime::reader {
 
     void OmniRleDecoderV2::next(omniruntime::vec::BaseVector*& omnivec, uint64_t numValues, char* notNull,
                                 const orc::Type* baseTp, int omniTypeId, bool is_row, std::shared_ptr<void>& rVec,
-                                std::vector<int32_t>& rowVecCOlumns) {
+                                std::vector<int32_t>& rowVecColumns) {
         uint64_t nRead = 0;
 
         auto dataTypeId = static_cast<omniruntime::type::DataTypeId>(omniTypeId);
@@ -125,7 +125,7 @@ namespace omniruntime::reader {
 
         while (nRead < numValues) {
             // SKip any nulls before attempting to read first byte.
-            while (notNUll && !notNull[nRead]) {
+            while (notNull && !notNull[nRead]) {
                 tempOmnivec->SetNull(nRead);
                 if (++nRead == numValues) {
                     omnivec = tempOmnivec.release();
@@ -152,7 +152,7 @@ namespace omniruntime::reader {
                     nRead += nextPatchedByType(pushOmniVec, offset, length, notNull, dataTypeId, is_row);
                     break;
                 case orc::DELTA:
-                    nRead += nextDeltaByType(pushOmniVec, offset, length, notNUll, dataTypeId, is_row);
+                    nRead += nextDeltaByType(pushOmniVec, offset, length, notNull, dataTypeId, is_row);
                     break;
                 default:
                     throw orc::ParseError("unknown encoding");
@@ -177,11 +177,11 @@ namespace omniruntime::reader {
             runLength += 1;
             runRead = 0;
 
-            readLongsByType(OmniVec, 0, runLength, offset , numValues, bitSize, dataTYpeId, notNull);
+            readLongsByType(OmniVec, 0, runLength, offset , numValues, bitSize, dataTypeId, notNull);
 
             if (isSigned) {
                 for (uint64_t i = 0; i < runLength; ++i) {
-                    literals[i] = orc::unZigZAG(static_cast<uint64_t>(literals[i]));
+                    literals[i] = orc::unZigZag(static_cast<uint64_t>(literals[i]));
                 }
             }
         }
@@ -189,7 +189,7 @@ namespace omniruntime::reader {
         return copyDataFromBufferByType(OmniVec, offset, numValues, notNull, dataTypeId, is_row);
     }
 
-    uint64_t OmniRleDecoderV2::nextSHortRepeatsByType(omniruntime::vec::BaseVector*& OmniVec,
+    uint64_t OmniRleDecoderV2::nextShortRepeatsByType(omniruntime::vec::BaseVector*& OmniVec,
                                           uint64_t offset, uint64_t numValues, const char* const notNull,
                                           omniruntime::type::DataTypeId dataTypeId, bool is_row) {
         switch (dataTypeId) {
@@ -235,7 +235,7 @@ namespace omniruntime::reader {
         if (is_row) {
             return nextShortRepeatsRowVec<TYPE_ID>(OmniVec, offset, numValues, notNull);
         } else {
-            return nextShortRepeatsNOrVec<Type_ID>(OmniVec, offset, numValues, notNull);
+            return nextShortRepeatsNorVec<TYPE_ID>(OmniVec, offset, numValues, notNull);
         }
     }
 
@@ -244,7 +244,7 @@ namespace omniruntime::reader {
                                           uint64_t offset, uint64_t numValues, const char* const notNull) {
         using namespace omniruntime::type;
         using T = typename NativeType<TYPE_ID>::type;
-        auto vec = dynamic_cast<omniruntime::vec::TVector<TYPE_ID, omniruntime::vec::OMNI_ROW>*>(OmniVec);
+        auto vec = reinterpret_cast<omniruntime::vec::TVector<TYPE_ID, omniruntime::vec::OMNI_ROW>*>(OmniVec);
 
         if (runRead == runLength) {
             // extract the number of fixed bytes
@@ -290,7 +290,7 @@ namespace omniruntime::reader {
                                           uint64_t offset, uint64_t numValues, const char* const notNull) {
         using namespace omniruntime::type;
         using T = typename NativeType<TYPE_ID>::type;
-        auto vec = dynamic_cast<omniruntime::vec::TVector<TYPE_ID>*>(OmniVec);
+        auto vec = reinterpret_cast<omniruntime::vec::TVector<TYPE_ID>*>(OmniVec);
 
         if (runRead == runLength) {
             // extract the number of fixed bytes
@@ -372,14 +372,14 @@ namespace omniruntime::reader {
         return 0;
     }
 
-    template <omniruntime::type::DataTypeID TYPE_ID>
+    template <omniruntime::type::DataTypeId TYPE_ID>
     uint64_t OmniRleDecoderV2::nextPatched(omniruntime::vec::BaseVector*& OmniVec, uint64_t offset,
                                            uint64_t numValues, const char* const notNull,
                                            omniruntime::type::DataTypeId dataTypeId, bool is_row) {
         if (is_row) {
             return nextPatchedRowVec<TYPE_ID>(OmniVec, offset, numValues, notNull, dataTypeId);
         } else {
-            return nextPatchedNorVec<TYPE_Id>(OmniVec, offset, numValues, notNull, dataTypeId);
+            return nextPatchedNorVec<TYPE_ID>(OmniVec, offset, numValues, notNull, dataTypeId);
         }
     }
 
@@ -407,7 +407,7 @@ namespace omniruntime::reader {
 
             // extract patch width
             uint32_t pwo = thirdByte & 0x1f;
-            uint32_t patchBitSIze = orc::decodeBitWidth(pwo);
+            uint32_t patchBitSize = orc::decodeBitWidth(pwo);
 
             // read fourth byte and extract patch gap width
             uint64_t fourthByte = readByte();
@@ -538,11 +538,11 @@ namespace omniruntime::reader {
             unpackedPatch.resize(pl);
             // TODO: Skip corrupt?
             //    if ((patchBitSize + pgw) > 64 && !skipCorrupt) {
-            if ((patchBitSIze + pgw) > 64) {
+            if ((patchBitSize + pgw) > 64) {
                 throw orc::ParseError("Corrupt PATCHED_BASE encoded data "
                                  "(patchBitSize + pgw > 64)!");
             }
-            uint32_t cfb = orc::getClosestFixedBits(patchBitSIze + pgw);
+            uint32_t cfb = orc::getClosestFixedBits(patchBitSize + pgw);
             orc::RleDecoderV2::readLongs(unpackedPatch.data(), 0, pl, cfb);
             // any remaining bits are thrown out
             resetReadLongs();
@@ -623,10 +623,10 @@ namespace omniruntime::reader {
         return 0;
     }
 
-    template <omniruntime::type::DataTYpeId TYPE_ID>
+    template <omniruntime::type::DataTypeId TYPE_ID>
     uint64_t OmniRleDecoderV2::nextDeltaRowVec(omniruntime::vec::BaseVector*& OmniVec,
                                                 uint64_t offset, uint64_t numValues, const char* const notNull,
-                                                omniruntime::type::DataTYpeId dataTypeId) {
+                                                omniruntime::type::DataTypeId dataTypeId) {
         if (runRead == runLength) {
             // extract the number of fixed bits
             unsigned char fbo = (firstByte >> 1) & 0x1f;
@@ -645,7 +645,7 @@ namespace omniruntime::reader {
 
             int64_t prevValue;
             // read the first value stored as vint
-            if (isSIgned) {
+            if (isSigned) {
                 prevValue = readVslong();
             } else {
                 prevValue = static_cast<int64_t>(readVulong());
@@ -697,7 +697,7 @@ namespace omniruntime::reader {
         if (is_row) {
             return nextDeltaRowVec<TYPE_ID>(OmniVec, offset, numValues, notNull, dataTypeId);
         } else {
-            return nextDeltaNorVec<TYPE_ID>(OmniVec, offset, numValues, notNull, dataTYpeId);
+            return nextDeltaNorVec<TYPE_ID>(OmniVec, offset, numValues, notNull, dataTypeId);
         }
     }
 
@@ -837,7 +837,7 @@ namespace omniruntime::reader {
         }
     }
 
-    template <omniruntime::type::DataTYpeId TYPE_ID>
+    template <omniruntime::type::DataTypeId TYPE_ID>
     void OmniRleDecoderV2::plainUnpackLongs(omniruntime::vec::BaseVector*& OmniVec, int64_t* data, uint64_t offset,
                                        uint64_t len, uint64_t omniOffset, uint64_t omniNumValues,
                                        const char* const notNull, uint64_t fbs) {
@@ -865,7 +865,7 @@ namespace omniruntime::reader {
         return;
     }
 
-    template <omniruntime::type::DataTYpeId TYPE_ID>
+    template <omniruntime::type::DataTypeId TYPE_ID>
     void OmniRleDecoderV2::unrolledUnpack64(omniruntime::vec::BaseVector*& OmniVec, int64_t* data, uint64_t offset,
                                        uint64_t len, uint64_t omniOffset, uint64_t omniNumValues,
                                        const char* const notNull) {
@@ -907,7 +907,7 @@ namespace omniruntime::reader {
         return;
     }
 
-    template <omniruntime::type::DataTYpeId TYPE_ID>
+    template <omniruntime::type::DataTypeId TYPE_ID>
     void OmniRleDecoderV2::unrolledUnpack56(omniruntime::vec::BaseVector*& OmniVec, int64_t* data, uint64_t offset,
                                        uint64_t len, uint64_t omniOffset, uint64_t omniNumValues,
                                        const char* const notNull) {
@@ -947,7 +947,7 @@ namespace omniruntime::reader {
         return;
     }
 
-    template <omniruntime::type::DataTYpeId TYPE_ID>
+    template <omniruntime::type::DataTypeId TYPE_ID>
     void OmniRleDecoderV2::unrolledUnpack48(omniruntime::vec::BaseVector*& OmniVec, int64_t* data, uint64_t offset,
                                        uint64_t len, uint64_t omniOffset, uint64_t omniNumValues,
                                        const char* const notNull) {
@@ -985,7 +985,7 @@ namespace omniruntime::reader {
         return;
     }
 
-    template <omniruntime::type::DataTYpeId TYPE_ID>
+    template <omniruntime::type::DataTypeId TYPE_ID>
     void OmniRleDecoderV2::unrolledUnpack40(omniruntime::vec::BaseVector*& OmniVec, int64_t* data, uint64_t offset,
                                        uint64_t len, uint64_t omniOffset, uint64_t omniNumValues,
                                        const char* const notNull) {
@@ -1021,7 +1021,7 @@ namespace omniruntime::reader {
         return;
     }
 
-    template <omniruntime::type::DataTYpeId TYPE_ID>
+    template <omniruntime::type::DataTypeId TYPE_ID>
     void OmniRleDecoderV2::unrolledUnpack32(omniruntime::vec::BaseVector*& OmniVec, int64_t* data, uint64_t offset,
                                        uint64_t len, uint64_t omniOffset, uint64_t omniNumValues,
                                        const char* const notNull) {
@@ -1056,7 +1056,7 @@ namespace omniruntime::reader {
         return;
     }
 
-    template <omniruntime::type::DataTYpeId TYPE_ID>
+    template <omniruntime::type::DataTypeId TYPE_ID>
     void OmniRleDecoderV2::unrolledUnpack24(omniruntime::vec::BaseVector*& OmniVec, int64_t* data, uint64_t offset,
                                        uint64_t len, uint64_t omniOffset, uint64_t omniNumValues,
                                        const char* const notNull) {
@@ -1089,7 +1089,7 @@ namespace omniruntime::reader {
         return;
     }
 
-    template <omniruntime::type::DataTYpeId TYPE_ID>
+    template <omniruntime::type::DataTypeId TYPE_ID>
     void OmniRleDecoderV2::unrolledUnpack16(omniruntime::vec::BaseVector*& OmniVec, int64_t* data, uint64_t offset,
                                        uint64_t len, uint64_t omniOffset, uint64_t omniNumValues,
                                        const char* const notNull) {
@@ -1120,7 +1120,7 @@ namespace omniruntime::reader {
         return;
     }
 
-    template <omniruntime::type::DataTYpeId TYPE_ID>
+    template <omniruntime::type::DataTypeId TYPE_ID>
     void OmniRleDecoderV2::unrolledUnpack8(omniruntime::vec::BaseVector*& OmniVec, int64_t* data, uint64_t offset,
                                        uint64_t len, uint64_t omniOffset, uint64_t omniNumValues,
                                        const char* const notNull) {
@@ -1143,7 +1143,7 @@ namespace omniruntime::reader {
         return;
     }
 
-    template <omniruntime::type::DataTYpeId TYPE_ID>
+    template <omniruntime::type::DataTypeId TYPE_ID>
     void OmniRleDecoderV2::unrolledUnpack4(omniruntime::vec::BaseVector*& OmniVec, int64_t* data, uint64_t offset,
                                        uint64_t len, uint64_t omniOffset, uint64_t omniNumValues,
                                        const char* const notNull) {
@@ -1184,19 +1184,19 @@ namespace omniruntime::reader {
                                                    omniruntime::type::DataTypeId dataTypeId, bool is_row) {
         switch (dataTypeId) {
             case omniruntime::type::OMNI_BOOLEAN:
-                return copyDataFromBuffer<omniruntime::type::OMNI_BOOLEAN>(tempOmniVec, offset, numValues, notNull, is_row);
+                return copyDataFromBuffer<omniruntime::type::OMNI_BOOLEAN>(tempOmnivec, offset, numValues, notNull, is_row);
             case omniruntime::type::OMNI_SHORT:
-                return copyDataFromBuffer<omniruntime::type::OMNI_SHORT>(tempOmniVec, offset, numValues, notNull, is_row);
+                return copyDataFromBuffer<omniruntime::type::OMNI_SHORT>(tempOmnivec, offset, numValues, notNull, is_row);
             case omniruntime::type::OMNI_INT:
-                return copyDataFromBuffer<omniruntime::type::OMNI_INT>(tempOmniVec, offset, numValues, notNull, is_row);
+                return copyDataFromBuffer<omniruntime::type::OMNI_INT>(tempOmnivec, offset, numValues, notNull, is_row);
             case omniruntime::type::OMNI_LONG:
-                return copyDataFromBufferTo64bit<omniruntime::type::OMNI_LONG>(tempOmniVec, offset, numValues, notNull, is_row);
+                return copyDataFromBufferTo64bit<omniruntime::type::OMNI_LONG>(tempOmnivec, offset, numValues, notNull, is_row);
             case omniruntime::type::OMNI_DATE32:
-                return copyDataFromBuffer<omniruntime::type::OMNI_DATE32>(tempOmniVec, offset, numValues, notNull, is_row);
+                return copyDataFromBuffer<omniruntime::type::OMNI_DATE32>(tempOmnivec, offset, numValues, notNull, is_row);
             case omniruntime::type::OMNI_DATE64:
-                return copyDataFromBufferTo64bit<omniruntime::type::OMNI_DATE64>(tempOmniVec, offset, numValues, notNull, is_row);
+                return copyDataFromBufferTo64bit<omniruntime::type::OMNI_DATE64>(tempOmnivec, offset, numValues, notNull, is_row);
             case omniruntime::type::OMNI_DOUBLE:
-                return copyDataFromBuffer<omniruntime::type::OMNI_DOUBLE>(tempOmniVec, offset, numValues, notNull, is_row);
+                return copyDataFromBuffer<omniruntime::type::OMNI_DOUBLE>(tempOmnivec, offset, numValues, notNull, is_row);
             case omniruntime::type::OMNI_CHAR:
                 throw std::runtime_error("copyDataFromBuffer_type CHAR not finished!!!");
             case omniruntime::type::OMNI_VARCHAR:
@@ -1222,8 +1222,8 @@ namespace omniruntime::reader {
         }
     }
 
-    template <omniruntime::type::DataTYpeId TYPE_ID>
-    uint64_t OmniRleDecoderV2::copyDataFromBufferTo64bit(omniruntime::vec::baseVector*& OmniVec, uint64_t offset,
+    template <omniruntime::type::DataTypeId TYPE_ID>
+    uint64_t OmniRleDecoderV2::copyDataFromBufferTo64bit(omniruntime::vec::BaseVector*& OmniVec, uint64_t offset,
                                               uint64_t numValues, const char* notNull, bool is_row) {
         if (is_row) {
             return copyDataFromBufferTo64bitRowVec<TYPE_ID>(OmniVec, offset, numValues, notNull);
@@ -1237,7 +1237,7 @@ namespace omniruntime::reader {
                                               uint64_t numValues, const char* notNull) {
         using namespace omniruntime::type;
         using T = typename NativeType<TYPE_ID>::type;
-        auto vec = dynamic_cast<omniruntime::vec::TVector<TYPE_ID, omniruntime::vec::OMNI_ROW>*>(OmniVec);
+        auto vec = reinterpret_cast<omniruntime::vec::TVector<TYPE_ID, omniruntime::vec::OMNI_ROW>*>(OmniVec);
         uint64_t nRead = std::min(runLength - runRead, numValues);
         if (notNull) {
             for (uint64_t i = offset; i < (offset + nRead); ++i) {
@@ -1260,7 +1260,7 @@ namespace omniruntime::reader {
                                               uint64_t numValues, const char* notNull) {
         using namespace omniruntime::type;
         using T = typename NativeType<TYPE_ID>::type;
-        auto vec = dynamic_cast<omniruntime::vec::TVector<TYPE_ID>*>(OmniVec);
+        auto vec = reinterpret_cast<omniruntime::vec::TVector<TYPE_ID>*>(OmniVec);
         uint64_t nRead = std::min(runLength - runRead, numValues);
         if (notNull) {
             for (uint64_t i = offset; i < (offset + nRead); ++i) {
@@ -1283,7 +1283,7 @@ namespace omniruntime::reader {
                                                   uint64_t numValues, const char* notNull) {
         using namespace omniruntime::type;
         using T = typename NativeType<TYPE_ID>::type;
-        auto vec = dynamic_cast<omniruntime::vec::TVector<TYPE_ID, omniruntime::vec::OMNI_ROW>*>(OmniVec);
+        auto vec = reinterpret_cast<omniruntime::vec::TVector<TYPE_ID, omniruntime::vec::OMNI_ROW>*>(OmniVec);
         uint64_t nRead = std::min(runLength - runRead, numValues);
         if (notNull) {
             for (uint64_t i = offset; i < (offset + nRead); ++i) {
@@ -1305,7 +1305,7 @@ namespace omniruntime::reader {
                                                   uint64_t numValues, const char* notNull) {
         using namespace omniruntime::type;
         using T = typename NativeType<TYPE_ID>::type;
-        auto vec = dynamic_cast<omniruntime::vec::TVector<TYPE_ID>*>(OmniVec);
+        auto vec = reinterpret_cast<omniruntime::vec::TVector<TYPE_ID>*>(OmniVec);
         uint64_t nRead = std::min(runLength - runRead, numValues);
         if (notNull) {
             for (uint64_t i = offset; i < (offset + nRead); ++i) {

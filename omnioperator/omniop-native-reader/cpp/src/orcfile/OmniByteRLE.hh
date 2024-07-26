@@ -22,11 +22,11 @@
 #include <vector/vector_common.h>
 
 namespace omniruntime::reader {
-    class OmniByteRLEDecoder: public orc::ByteRleDecoder {
+    class OmniByteRLeDecoder: public orc::ByteRleDecoder {
     public:
-        OmniByteRLEDecoder(std::unique_ptr<orc::SeekableInpputStream> input);
+        OmniByteRLeDecoder(std::unique_ptr<orc::SeekableInputStream> input);
 
-        virtual ~OmniByteRLEDecoder();
+        virtual ~OmniByteRLeDecoder();
 
         /**
         * Seek to a particular spot.
@@ -64,7 +64,7 @@ namespace omniruntime::reader {
             inline signed char readByte();
             inline void readHeader();
 
-            std::unique_ptr<orc::SeekableInpputStream> inputStream;
+            std::unique_ptr<orc::SeekableInputStream> inputStream;
             size_t remainingValues;
             char value;
             const char* bufferStart;
@@ -72,11 +72,11 @@ namespace omniruntime::reader {
             bool repeating;
     };
 
-    class OmniBooleanRleDecoder: public OmniByteRLEDecoder {
+    class OmniBooleanRleDecoder: public OmniByteRLeDecoder {
     public:
-        OmniBooleanRleDecoder(std::unique_ptr<orc::SeekableInpputStream> input);
+        OmniBooleanRleDecoder(std::unique_ptr<orc::SeekableInputStream> input);
 
-        virtual ~OmniByteRLEDecoder();
+        virtual ~OmniBooleanRleDecoder();
 
         /**
         * Seek to a particular spot.
@@ -98,7 +98,7 @@ namespace omniruntime::reader {
 
         template <omniruntime::type::DataTypeId TYPE_ID>
         void nextByType(omniruntime::vec::BaseVector*& omnivec, uint64_t numValues, char* notNull,
-                    const orc::Type* baseTp, bool is_row, std::shared_ptr<void>& rVec, std::vector<int32_t>& rowVecColumns);
+                    const orc::Type* baseTp, int omniTypeId, bool is_row, std::shared_ptr<void>& rVec, std::vector<int32_t>& rowVecColumns);
 
         template <omniruntime::type::DataTypeId TYPE_ID>
         void nextByTypeNorVec(omniruntime::vec::BaseVector*& omnivec, uint64_t numValues, char* notNull,

@@ -17,7 +17,7 @@
  */
 
 #include "OmniRLEv2.hh"
-#include "OmniCloReader.hh"
+#include "OmniColReader.hh"
 #include "vector/vector_helper.h"
 
 namespace omniruntime::reader {
@@ -46,7 +46,7 @@ namespace omniruntime::reader {
             uint64_t bytesSkipped = numValues / 8;
             OmniByteRleDecoder::skip(bytesSkipped);
             if (numValues % 8 != 0) {
-                OmniBooleanRleDecoder::next(&lastByte, 1, nullptr);
+                OmniByteRleDecoder::next(&lastByte, 1, nullptr);
                 remainingBits = 8 - (numValues % 8);
             } else {
                 remainingBits = 0;
@@ -54,7 +54,7 @@ namespace omniruntime::reader {
         }
     }
 
-    void OmniBooleanRleDecoder::next(omniruntime::vec::BaseVector*& omnivec, uint64_t nameValues, char* notNull,
+    void OmniBooleanRleDecoder::next(omniruntime::vec::BaseVector*& omnivec, uint64_t numValues, char* notNull,
         const orc::Type* baseTp, int omniTypeId, bool is_row, std::shared_ptr<void>& rVec,
         std::vector<int32_t>& rowVecColumns) {
         auto dataTypeId = static_cast<omniruntime::type::DataTypeId>(omniTypeId);
@@ -94,13 +94,13 @@ namespace omniruntime::reader {
     }
 
     template <omniruntime::type::DataTypeId TYPE_ID>
-    void OmniBooleanRleDecoder::nextByTypeRowVec(omniruntime::vec::BaseVector*& omnivec, uint64_t numValus, char* notNull,
+    void OmniBooleanRleDecoder::nextByTypeRowVec(omniruntime::vec::BaseVector*& omnivec, uint64_t numValues, char* notNull,
         const orc::Type* baseTp, int omniTypeId, std::shared_ptr<void>& rVec,
-        std::vector<int32_t>& rVec) {
+        std::vector<int32_t>& rowVecColumns) {
         using namespace omniruntime::type;
-        using T typename NativeType<TYPE_ID>::type;
-        auto row_vec std::make_unique<omniruntime::vec::TRowVector>(rVec);
-        auto vec = std::make_unique<omniruntime::vec::TRowVector<TYPE_ID, omniruntime::vec::OMNI_ROW>>(row_vec);
+        using T = typename NativeType<TYPE_ID>::type;
+        auto row_vec = std::static_pointer_cast<omniruntime::vec::TRowVector>(rVec);
+        auto vec = std::make_unique<omniruntime::vec::TVector<TYPE_ID, omniruntime::vec::OMNI_ROW>>(row_vec);
 
         // next spot to fill in
         uint64_t position = 0;
@@ -126,7 +126,7 @@ namespace omniruntime::reader {
         }
 
         //count the number of nonNulls remaining
-        uint64_t nonNulls numValues - position;
+        uint64_t nonNulls = numValues - position;
         if (notNull) {
             for(uint64_t i =position; i < numValues; ++i) {
                 if (!notNull[i]) {
@@ -138,13 +138,13 @@ namespace omniruntime::reader {
         //fill in the remaining values
         if (nonNulls == 0) {
             while (position < numValues) {
-                vec->SetNull(static_cast<int>(position));
+                vec->SetNull(static_cast<int>(position++));
             }
         } else if (position < numValues) {
             // read the new bytes into th array
             uint64_t bytesRead = (nonNulls + 7) / 8;
             auto *values = reinterpret_cast<char *>(omniruntime::vec::VectorHelper::UnsafeGetValues(vec.get()));
-            OmniBooleanRleDecoder::next(values + position, bytesRead, nullptr);
+            OmniByteRleDecoder::next(values + position, bytesRead, nullptr);
             lastByte = static_cast<char>(vec->GetValue(position + bytesRead -1));
             remainingBits = bytesRead * 8 - nonNulls;
             // expand the array backwards so that we don't clobber the data
@@ -153,7 +153,7 @@ namespace omniruntime::reader {
                 for(int64_t i = static_cast<int64_t>(numValues) - 1;
                     i >= static_cast<int64_t>(position); --i) {
                     if (notNull[i]) {
-                        uint64_t shiftPosn - (-bitsLeft) % 8;
+                        uint64_t shiftPosn = (-bitsLeft) % 8;
                         auto value = static_cast<uint64_t>(vec->GetValue(position + (bitsLeft - 1) / 8)) >> shiftPosn;
                         vec->SetValue(static_cast<int>(i), static_cast<T>(value & 0x1));
                         bitsLeft -= 1;
@@ -175,8 +175,8 @@ namespace omniruntime::reader {
     }
 
     template <omniruntime::type::DataTypeId TYPE_ID>
-    void OmniBooleanRleDecoder::nextByType(omniruntime:vec::BaseVector*& omnivec, uint64_t nameValues, char* notNull,
-                                            const orc::Type* baseTp, int omniTypeId, std::shared_ptr<void>& rVec,
+    void OmniBooleanRleDecoder::nextByType(omniruntime:vec::BaseVector*& omnivec, uint64_t numValues, char* notNull,
+                                            const orc::Type* baseTp, int omniTypeId, bool is_row, std::shared_ptr<void>& rVec,
                                             std::vector<int32_t>& rowVecColumns) {
         if (is_row) {
             return nextByTypeRowVec<TYPE_ID>(omnivec, numValues, notNull, baseTp, omniTypeId, rVec, rowVecColumns);
@@ -186,11 +186,11 @@ namespace omniruntime::reader {
     }
 
     template <omniruntime::type::DataTypeId TYPE_ID>
-    void OmniBooleanRleDecoder::nextByTypeNorVec(omniruntime:vec::BaseVector*& omnivec, uint64_t nameValues, char* notNull,
+    void OmniBooleanRleDecoder::nextByTypeNorVec(omniruntime:vec::BaseVector*& omnivec, uint64_t numValues, char* notNull,
                                                 const orc::Type* baseTp, int omniTypeId, std::shared_ptr<void>& rVec,
                                                 std::vector<int32_t>& rowVecColumns) {
         using namespace omniruntime::type;
-        using T typename NativeType<TYPE_ID>::type;
+        using T = typename NativeType<TYPE_ID>::type;
         auto vec = std::make_unique<omniruntime::vec::TVector<TYPE_ID>>(static_cast<omniruntime::vec::v_size_t>(numValues), TYPE_ID);
 
         // next spot to fill in
@@ -204,7 +204,7 @@ namespace omniruntime::reader {
                     vec->SetValue(static_cast<int>(position), static_cast<T>((static_cast<unsigned char>(lastByte) >>
                                     remainingBits) & 0x1));
                 } else {
-                    vec->SetNull(static_cast<int> position);
+                    vec->SetNull(static_cast<int>(position));
                 }
                 position += 1;
             }
@@ -235,7 +235,7 @@ namespace omniruntime::reader {
             // read the new bytes into the array
             uint64_t bytesRead = (nonNulls + 7) / 8;
             auto *values = reinterpret_cast<char *>(omniruntime::vec::VectorHelper::UnsafeGetValues(vec.get()));
-            OmniByteRleDecoder::next(values + position. bytesRead, nullptr);
+            OmniByteRleDecoder::next(values + position, bytesRead, nullptr);
             lastByte = static_cast<char>(vec->GetValue(position + bytesRead - 1));
             remainingBits = bytesRead * 8 - nonNulls;
             // expand the array backwards so that we don't clobber the data
@@ -253,7 +253,7 @@ namespace omniruntime::reader {
                     }
                 }
             } else {
-                for(int64_t i = static_cast<int64_t i =static_cast<int64_t>(numValues) - 1;
+                for(int64_t i = static_cast<int64_t>(numValues) - 1;
                     i >= static_cast<int64_t>(position); --i, --bitsLeft) {
                     uint64_t shiftPosn = (-bitsLeft) % 8;
                     auto value = static_cast<uint64_t>(vec->GetValue(position + (bitsLeft - 1) / 8)) >> shiftPosn;
@@ -265,7 +265,7 @@ namespace omniruntime::reader {
         omnivec = vec.release();
     }
 
-    OmniBooleanRleDecoder::OmniByteRleDecoder
+    OmniBooleanRleDecoder::OmniBooleanRleDecoder
                                 (std::unique_ptr<orc::SeekableInputStream> input
                                 ): OmniByteRleDecoder(std::move(input)) {
         remainingBits = 0;
@@ -280,7 +280,7 @@ namespace omniruntime::reader {
     void OmniByteRleDecoder::nextBuffer() {
         int bufferLength;
         const void* bufferPointer;
-        bool result = inputStream->next(&bufferPointer, &bufferLength);
+        bool result = inputStream->Next(&bufferPointer, &bufferLength);
         if (!result) {
             throw orc::ParseError("bad read in nextBuffer");
         }
@@ -506,7 +506,7 @@ namespace omniruntime::reader {
                 if (notNull) {
                     for(uint64_t i=0; i < count; ++i) {
                         if (notNull[position + i]) {
-                            vec->SetValue)(static_cast<int>(position + i), static_cast<T>(readByte()));
+                            vec->SetValue(static_cast<int>(position + i), static_cast<T>(readByte()));
                             consumed += 1;
                         } else {
                             vec->SetNull(static_cast<int>(position + i));

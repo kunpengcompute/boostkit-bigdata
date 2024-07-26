@@ -42,7 +42,7 @@ namespace omniruntime::reader {
         /**
         * direct read VectorBatch in next
         * @param omnivec the BaseVector to push
-        * @param numValues the numValue to push
+        * @param numValues the numValues to push
         * @param notNull the nullarrays to push
         * @param baseTp the orcType to push
         * @param omniTypeId the int* of omniType to push
@@ -55,7 +55,7 @@ namespace omniruntime::reader {
         }
 
         uint64_t nextDirect(omniruntime::vec::BaseVector*& OmniVec, uint64_t offset, uint64_t numValues,
-                            const char* const notNull, omniruntime::type::DataTypeId, bool is_row);
+                            const char* const notNull, omniruntime::type::DataTypeId dataTypeId, bool is_row);
 
         uint64_t nextShortRepeatsByType(omniruntime::vec::BaseVector*& OmniVec, uint64_t offset, uint64_t numValues,
                                         const char* const notNull, omniruntime::type::DataTypeId dataTypeId, bool is_row);
@@ -137,7 +137,7 @@ namespace omniruntime::reader {
         uint64_t copyDataFromBufferNorVec(omniruntime::vec::BaseVector*& OmniVec, uint64_t offset,
                                                 uint64_t numValues, const char* notNull);
 
-        void readLongsByType(omniruntime:vec::BaseVector*& OmniVec, uint64_t offset,
+        void readLongsByType(omniruntime::vec::BaseVector*& OmniVec, uint64_t offset,
                                                 uint64_t len, uint64_t omniOffset, uint64_t numValues, uint64_t fbs,
                                                 omniruntime::type::DataTypeId dataTypeId, const char* const notNull);
 
@@ -197,3 +197,5 @@ namespace omniruntime::reader {
                                      const char* const notNull, uint64_t fbs);
     };
 }
+
+#endif

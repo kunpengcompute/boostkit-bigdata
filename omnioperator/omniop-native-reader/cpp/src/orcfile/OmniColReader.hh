@@ -164,16 +164,16 @@ namespace omniruntime::reader {
                 std::unordered_map<uint64_t, orc::PositionProvider>& positions) override;
     };
 
-    class OmniDoubleCOlumnReader: public orc::ColumnReader {
+    class OmniDoubleColumnReader: public orc::ColumnReader {
     public:
-        OmniDoubleCOlumnReader(const orc::Type& type, orc::StripeStreams& stripe);
-        ~OmniDoubleCOlumnReader() override;
+        OmniDoubleColumnReader(const orc::Type& type, orc::StripeStreams& stripe);
+        ~OmniDoubleColumnReader() override;
 
         uint64_t skip(uint64_t numValues) override;
 
         void next(void*& vec, uint64_t numValues, char* notNull,
                   const orc::Type& baseTp, int* omniTypeId, bool is_row,
-                  std::shared_ptr<void>& rVec,std::vector<int32_t>& rowVecCOlumns) override;
+                  std::shared_ptr<void>& rVec,std::vector<int32_t>& rowVecColumns) override;
 
         template <omniruntime::type::DataTypeId TYPE_ID>
         void nextByType(void*& omnivec, uint64_t numValues, char* notNull,
@@ -204,7 +204,7 @@ namespace omniruntime::reader {
                 int length;
                 if (!inputStream->Next
                     (reinterpret_cast<const void**>(&bufferPointer), &length)) {
-                        throw orc::ParseError("bad read in DoubleCOlumnReader::next()");
+                        throw orc::ParseError("bad read in DoubleColumnReader::next()");
                 }
                 bufferEnd = bufferPointer + length;
             }
@@ -235,7 +235,7 @@ namespace omniruntime::reader {
     public:
         void next(void*& vec, uint64_t  numValues, char* notNull,
                   const orc::Type& baseTp, int* omniTypeId, bool is_row,
-                  std::shared_ptr<void>& rVec, std::vector<int32_t>& rowVecCOlumns) override;
+                  std::shared_ptr<void>& rVec, std::vector<int32_t>& rowVecColumns) override;
         
         void nextNorVec(void*& omnivec, uint64_t numValues, char* notNull,
                                            const orc::Type& baseTp, int* omniTypeId, std::shared_ptr<void>& rVec,
@@ -259,11 +259,11 @@ namespace omniruntime::reader {
                     std::unordered_map<uint64_t, orc::PositionProvider>& positions) override;
     };
 
-    class OmniStringDirectColumnReader: public orc::COlumnReader {
+    class OmniStringDirectColumnReader: public orc::ColumnReader {
     public:
         void next(void*& vec, uint64_t numValues, char* notNull,
                   const orc::Type& baseTp, int* omniTypeId, bool is_row,
-                  std::shared_ptr<void>& rVec, std::vector<int32_t>& rowVecCOlumns) override;
+                  std::shared_ptr<void>& rVec, std::vector<int32_t>& rowVecColumns) override;
 
         void nextRowVec(void*& omnivec, uint64_t numValues, char* notNull,
                                            const orc::Type& baseTp, int* omniTypeId, std::shared_ptr<void>& rVec,
@@ -301,7 +301,7 @@ namespace omniruntime::reader {
 
     class OmniDecimal64ColumnReader: public orc::ColumnReader {
     public:
-        void next(void*&vec, uint64_t numValues, char* not null,
+        void next(void*&vec, uint64_t numValues, char* notNull,
                   const orc::Type& baseTp, int* omniTypeId, bool is_row,
                   std::shared_ptr<void>& rVec, std::vector<int32_t>& rowVecColumns) override;
 
@@ -377,7 +377,7 @@ namespace omniruntime::reader {
 
     class OmniDecimal128ColumnReader : public OmniDecimal64ColumnReader {
     public:
-        void next(void*&vec, uint64_t numValues, char* not null,
+        void next(void*&vec, uint64_t numValues, char* notNull,
                   const orc::Type& baseTp, int* omniTypeId, bool is_row,
                   std::shared_ptr<void>& rVec, std::vector<int32_t>& rowVecColumns) override;
 
@@ -397,7 +397,7 @@ namespace omniruntime::reader {
         void readInt128(orc::Int128& value, int32_t currentScale);
     };
 
-    std::unique_ptr<orc::COlumnReader> omniBuildReader(const orc::Type& type,
+    std::unique_ptr<orc::ColumnReader> omniBuildReader(const orc::Type& type,
                                                   orc::StripeStreams& stripe);
 
     void scaleInt128(orc::Int128& value, uint32_t scale, uint32_t currentScale);

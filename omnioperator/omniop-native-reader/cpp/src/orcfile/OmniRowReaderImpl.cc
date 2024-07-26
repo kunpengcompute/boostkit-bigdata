@@ -39,7 +39,7 @@ namespace omniruntime::reader {
                                         const ReaderOptions& options) {
         std::shared_ptr<FileContents> contents = std::shared_ptr<FileContents>(new FileContents());
         contents->pool = options.getMemoryPool();
-        contents->errorStream - options.getErrorStream();
+        contents->errorStream = options.getErrorStream();
         std::string serializedFooter = options.getSerializedFileTail();
         uint64_t fileLength;
         uint64_t postscriptLength;
@@ -55,22 +55,22 @@ namespace omniruntime::reader {
             postscriptLength = tail.postscriptlength();
         } else {
             // figure out the size of the file using the option or filesystem
-            fileLength = std::min(option.getTailLocation(),
+            fileLength = std::min(options.getTailLocation(),
                                   static_cast<uint64_t>(stream->getLength()));
 
             // read last bytes into buffer to get PostScript
             uint64_t readSize = std::min(fileLength, orc::DIRECTORY_SIZE_GUESS);
             if (readSize < 4) {
-                throw omniruntime::exception::OmniException("EXPRESSION_NOT_SUPPORT", "file size too small")
+                throw omniruntime::exception::OmniException("EXPRESSION_NOT_SUPPORT", "File size too small");
             }
-            std::unique_ptr<DataBuffer<char>> buffer( new DataBuffer<char>(*contents->pool, , readSize) );
+            std::unique_ptr<DataBuffer<char>> buffer( new DataBuffer<char>(*contents->pool, readSize) );
             stream->read(buffer->data(), readSize, fileLength - readSize);
 
             postscriptLength = buffer->data()[readSize - 1] & 0xff;
-            contents->postscript - REDUNDANT_MOVE(readPostscript(stream.get(),
-                                                                 buffer.get(), PostscriptLength));
+            contents->postscript = REDUNDANT_MOVE(readPostscript(stream.get(),
+                                                                 buffer.get(), postscriptLength));
             uint64_t footerSize = contents->postscript->footerlength();
-            uint64_t tailSize = 1 + postscriptLength + footerSize();
+            uint64_t tailSize = 1 + postscriptLength + footerSize;
             if (tailSize >= fileLength) {
                 std::string msg = "Invalid ORC tailSize=" + std::to_string(tailSize) + ", fileLength=" + std::to_string(fileLength);
                 throw omniruntime::exception::OmniException("EXPRESSION_NOT_SUPPORT", msg);
@@ -79,7 +79,7 @@ namespace omniruntime::reader {
 
             if (tailSize > readSize) {
                 buffer->resize(footerSize);
-                stream->read(buffer->data(), footerSize, fileLength - tailSize());
+                stream->read(buffer->data(), footerSize, fileLength - tailSize);
                 footerOffset = 0;
             } else {
                 footerOffset = readSize - tailSize;
@@ -102,7 +102,7 @@ namespace omniruntime::reader {
 
     std::unique_ptr<RowReader> OmniReaderImpl::createRowReader(
             const RowReaderOptions& opts) const {
-        return std::unique_ptr<RowReader>(new OmniRowReaderImpl(contents. opts));
+        return std::unique_ptr<RowReader>(new OmniRowReaderImpl(contents, opts));
     }
 
     void OmniRowReaderImpl::startNextStripe() {
@@ -111,14 +111,14 @@ namespace omniruntime::reader {
         bloomFilterIndex.clear();
 
         do {
-            currentStripeInfo = footer->stripe(static_cast<int>(currentStripe));
+            currentStripeInfo = footer->stripes(static_cast<int>(currentStripe));
             uint64_t fileLength = contents->stream->getLength();
             if (currentStripeInfo.offset() + currentStripeInfo.indexlength() +
                 currentStripeInfo.datalength() + currentStripeInfo.footerlength() >= fileLength) {
-                std:stringstream msg;
+                std::stringstream msg;
                 msg << "Malformed StripeInformation at stripe index " << currentStripe << ": fileLength="
-                    << fileLength << ", StripeInfo=(offset=" << currentStripeInfo.offset() < ", indexLength="
-                    << currentStripeInfo.indexLength() << ", dataLength=" << currentStripeInfo.datalength()
+                    << fileLength << ", StripeInfo=(offset=" << currentStripeInfo.offset() << ", indexLength="
+                    << currentStripeInfo.indexlength() << ", dataLength=" << currentStripeInfo.datalength()
                     << ", footerLength=" << currentStripeInfo.footerlength() << ")";
                 throw orc::ParseError(msg.str());
             }
@@ -150,13 +150,13 @@ namespace omniruntime::reader {
                     currentStripeFooter.has_writertimezone() ?
                     orc::getTimezoneByName(currentStripeFooter.writertimezone()) :
                     localTimezone;
-            orc::StripeStreamImpl stripeStreams(*this, currentStripe, currentStripeInfo,
+            orc::StripeStreamsImpl stripeStreams(*this, currentStripe, currentStripeInfo,
                                             currentStripeFooter,
                                             currentStripeInfo.offset(),
                                             *contents->stream,
                                             writerTimezone,
                                             readerTimezone);
-            reader = omniBuilderReader(*contents->schema, stripeStreams);
+            reader = omniBuildReader(*contents->schema, stripeStreams);
 
             if (sargsApplier) {
                 // move to the 1st selected row group when PPD is enabled.
@@ -178,7 +178,7 @@ namespace omniruntime::reader {
             omniVecBatch->Resize(0);
             if (lastStripe > 0) {
                 previousRow = firstRowOfStripe[lastStripe - 1] +
-                              footer->stripes(static_cast<int>(lastStripe - 1)), numberofrows();
+                              footer->stripes(static_cast<int>(lastStripe - 1)).numberofrows();
             } else {
                 previousRow = 0;
             }

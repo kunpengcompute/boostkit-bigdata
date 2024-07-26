@@ -94,7 +94,7 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniRea
  * Signature:   (J[I[J)J
  */
 JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniReader_recordReaderNext
-    (JNIEnv *, jobject, jlong, jlong, jintArray, jlongArray);
+    (JNIEnv *, jobject, jlong, jlong, jintArray, jlongArray, jintArray);
 
 /*
  * Class:       com_huawei_boostkit_scan_jni_OrcColumnarBatchJniReader
@@ -145,7 +145,7 @@ bool StringToBool(const std::string &boolStr);
 std::unique_ptr<omniruntime::vec::BaseVector> CopyToOmniVec(const orc::Type *type, int omniTypeId, orc::ColumnVectorBatch *field);
 
 std::unique_ptr<omniruntime::vec::BaseVector> CopyToOmniRowVec(const orc::Type *type, int omniTypeId, orc::ColumnVectorBatch *field,
-    const std::shared_ptr<omniruntime::vec::TRowVector) &spRowVecc);
+    const std::shared_ptr<omniruntime::vec::TRowVector> &spRowVecc);
 
 #ifdef __cplusplus
 }

@@ -26,7 +26,7 @@ namespace omniruntime::reader {
     class OmniReaderImpl : public orc::ReaderImpl {
     public:
     OmniReaderImpl(std::shared_ptr<orc::FileContents> _contents, const orc::ReaderOptions& opts,
-                   uint64_t fileLength, uint64_t postscriptLength)
+                   uint64_t _fileLength, uint64_t _postscriptLength)
                    : orc::ReaderImpl(_contents, opts, _fileLength, _postscriptLength) {}
 
     std::unique_ptr<orc::RowReader> createRowReader() const override;
@@ -45,7 +45,7 @@ namespace omniruntime::reader {
         bool next(omniruntime::vec::VectorBatch*& omniVecBatch, int* omniTypeId, bool is_row, std::shared_ptr<void>& rVec,
             std::vector<int32_t>& rowVecColumns);
 
-        void startNextStripes() override;
+        void startNextStripe() override;
     };
 
     std::unique_ptr<orc::Reader> omniCreateReader(std::unique_ptr<orc::InputStream> stream,
