@@ -46,7 +46,7 @@ namespace omniruntime::reader {
          * @param omniTypeId the omniTypeId to push
          */
         void next(void*& omniVecBatch, uint64_t numValues, char *notNull, const orc::Type& baseTp,
-                  int* omniTypeId, bool is_row, std::shared_ptr<void>& rVec, std::vector<int32_t>& rowVecColumns) override;
+                  int* omniTypeId) override;
 
         void nextEncoded(orc::ColumnVectorBatch& rowBatch,
                                                  uint64_t numValues,
@@ -66,7 +66,7 @@ namespace omniruntime::reader {
          */
         template<bool encoded>
         void nextInternal(omniruntime::vec::VectorBatch*& omniVecBatch, uint64_t numValues, char *notNull,
-                          const orc::Type& baseTp, int* omniTypeId, std::vector<int32_t>& rowVecColumns);
+                          const orc::Type& baseTp, int* omniTypeId);
 
         omniruntime::type::DataTypeId getOmniTypeByOrcType(const orc::Type* type);
     };
@@ -82,8 +82,7 @@ namespace omniruntime::reader {
         uint64_t skip(uint64_t numValues) override;
 
         void next(void*& vec, uint64_t numValues, char *notNull,
-                  const orc::Type& baseTp, int* omniTypeId, bool is_row, std::shared_ptr<void>& rVec,
-                  std::vector<int32_t>& rowVecColumns) override;
+                  const orc::Type& baseTp, int* omniTypeId) override;
 
         void seekToRowGroup(std::unordered_map<uint64_t, orc::PositionProvider>& positions) override;
     };
@@ -99,8 +98,7 @@ namespace omniruntime::reader {
         uint64_t skip(uint64_t numValues) override;
 
         void next(void*& vec, uint64_t numValues, char *notNull,
-                  const orc::Type& baseTp, int* omniTypeId, bool is_row, std::shared_ptr<void>& rVec,
-                  std::vector<int32_t>& rowVecColumns) override;
+                  const orc::Type& baseTp, int* omniTypeId) override;
 
         void seekToRowGroup(
           std::unordered_map<uint64_t, orc::PositionProvider>& positions) override;
@@ -117,8 +115,7 @@ namespace omniruntime::reader {
         uint64_t skip(uint64_t numValues) override;
 
         void next(void*& vec, uint64_t numValues, char *notNull,
-                  const orc::Type& baseTp, int* omniTypeId, bool is_row, std::shared_ptr<void>& rVec,
-                  std::vector<int32_t>& rowVecColumns) override;
+                  const orc::Type& baseTp, int* omniTypeId) override;
 
         void seekToRowGroup(
           std::unordered_map<uint64_t, orc::PositionProvider>& positions) override;
@@ -127,22 +124,10 @@ namespace omniruntime::reader {
     class OmniTimestampColumnReader: public orc::ColumnReader {
     public:
         void next(void*& vec, uint64_t numValues, char* notNull,
-                  const orc::Type& baseTp, int* omniTypeId, bool is_row, std::shared_ptr<void>& rVec,
-                  std::vector<int32_t>& rowVecColumns) override;
+                  const orc::Type& baseTp, int* omniTypeId) override;
 
         template <omniruntime::type::DataTypeId TYPE_ID>
-        void nextByType(void*& omnivec, uint64_t numValues, char* notNull, const orc::Type& baseTp, int* omniTypeId,
-                 bool is_row, std::shared_ptr<void>& rVec, std::vector<int32_t>& rowVecColumns);
-
-        template <omniruntime::type::DataTypeId TYPE_ID>
-        void nextByTypeNorVec(void*& omnivec, uint64_t numValues, char* notNull,
-                                           const orc::Type& baseTp, int* omniTypeId, std::shared_ptr<void>& rVec,
-                                           std::vector<int32_t>& rowVecColumns);
-
-        template <omniruntime::type::DataTypeId TYPE_ID>
-        void nextByTypeRowVec(void*& omnivec, uint64_t numValues, char* notNull,
-                                           const orc::Type& baseTp, int* omniTypeId, std::shared_ptr<void>& rVec,
-                                           std::vector<int32_t>& rowVecColumns);
+        void nextByType(void*& omnivec, uint64_t numValues, char* notNull, const orc::Type& baseTp, int* omniTypeId);
 
     private:
         std::unique_ptr<OmniRleDecoderV2> secondsRle;
@@ -172,22 +157,11 @@ namespace omniruntime::reader {
         uint64_t skip(uint64_t numValues) override;
 
         void next(void*& vec, uint64_t numValues, char* notNull,
-                  const orc::Type& baseTp, int* omniTypeId, bool is_row,
-                  std::shared_ptr<void>& rVec,std::vector<int32_t>& rowVecColumns) override;
+                  const orc::Type& baseTp, int* omniTypeId) override;
 
         template <omniruntime::type::DataTypeId TYPE_ID>
         void nextByType(void*& omnivec, uint64_t numValues, char* notNull,
-                        const orc::Type& baseTp, bool is_row, std::shared_ptr<void>& rVec, std::vector<int32_t>& rowVecColumns);
-
-        template <omniruntime::type::DataTypeId TYPE_ID>
-        void nextByTypeNorVec(void*& omnivec, uint64_t numValues, char* notNull,
-                                           const orc::Type& baseTp, std::shared_ptr<void>& rVec,
-                                           std::vector<int32_t>& rowVecColumns);
-
-        template <omniruntime::type::DataTypeId TYPE_ID>
-        void nextByTypeRowVec(void*& omnivec, uint64_t numValues, char* notNull,
-                                           const orc::Type& baseTp, std::shared_ptr<void>& rVec,
-                                           std::vector<int32_t>& rowVecColumns);
+                        const orc::Type& baseTp);
 
         void seekToRowGroup(
             std::unordered_map<uint64_t, orc::PositionProvider>& positions) override;
@@ -234,16 +208,7 @@ namespace omniruntime::reader {
     class OmniStringDictionaryColumnReader: public orc::ColumnReader {
     public:
         void next(void*& vec, uint64_t  numValues, char* notNull,
-                  const orc::Type& baseTp, int* omniTypeId, bool is_row,
-                  std::shared_ptr<void>& rVec, std::vector<int32_t>& rowVecColumns) override;
-        
-        void nextNorVec(void*& omnivec, uint64_t numValues, char* notNull,
-                                           const orc::Type& baseTp, int* omniTypeId, std::shared_ptr<void>& rVec,
-                                           std::vector<int32_t>& rowVecColumns);
-
-        void nextRowVec(void*& omnivec, uint64_t numValues, char* notNull,
-                                           const orc::Type& baseTp, int* omniTypeId, std::shared_ptr<void>& rVec,
-                                           std::vector<int32_t>& rowVecColumns);
+                  const orc::Type& baseTp, int* omniTypeId) override;
         
         private:
             std::shared_ptr<orc::StringDictionary> dictionary;
@@ -262,16 +227,7 @@ namespace omniruntime::reader {
     class OmniStringDirectColumnReader: public orc::ColumnReader {
     public:
         void next(void*& vec, uint64_t numValues, char* notNull,
-                  const orc::Type& baseTp, int* omniTypeId, bool is_row,
-                  std::shared_ptr<void>& rVec, std::vector<int32_t>& rowVecColumns) override;
-
-        void nextRowVec(void*& omnivec, uint64_t numValues, char* notNull,
-                                           const orc::Type& baseTp, int* omniTypeId, std::shared_ptr<void>& rVec,
-                                           std::vector<int32_t>& rowVecColumns);
-
-        void nextNorVec(void*& omnivec, uint64_t numValues, char* notNull,
-                                           const orc::Type& baseTp, int* omniTypeId, std::shared_ptr<void>& rVec,
-                                           std::vector<int32_t>& rowVecColumns);
+                  const orc::Type& baseTp, int* omniTypeId) override;
 
     private:
         std::unique_ptr<OmniRleDecoderV2> lengthRle;
@@ -302,15 +258,7 @@ namespace omniruntime::reader {
     class OmniDecimal64ColumnReader: public orc::ColumnReader {
     public:
         void next(void*&vec, uint64_t numValues, char* notNull,
-                  const orc::Type& baseTp, int* omniTypeId, bool is_row,
-                  std::shared_ptr<void>& rVec, std::vector<int32_t>& rowVecColumns) override;
-
-        void nextRowVec(void*& omnivec, uint64_t numValues, char* notNull,
-                                           const orc::Type& baseTp, int* omniTypeId, std::shared_ptr<void>& rVec,
-                                           std::vector<int32_t>& rowVecColumns);
-        void nextNorVec(void*& omnivec, uint64_t numValues, char* notNull,
-                                           const orc::Type& baseTp, int* omniTypeId, std::shared_ptr<void>& rVec,
-                                           std::vector<int32_t>& rowVecColumns);
+                  const orc::Type& baseTp, int* omniTypeId) override;
 
         public:
             static const uint32_t MAX_PRECISION_64 = 18;
@@ -378,16 +326,7 @@ namespace omniruntime::reader {
     class OmniDecimal128ColumnReader : public OmniDecimal64ColumnReader {
     public:
         void next(void*&vec, uint64_t numValues, char* notNull,
-                  const orc::Type& baseTp, int* omniTypeId, bool is_row,
-                  std::shared_ptr<void>& rVec, std::vector<int32_t>& rowVecColumns) override;
-
-        void nextNorVec(void*& omnivec, uint64_t numValues, char* notNull,
-                                           const orc::Type& baseTp, int* omniTypeId, std::shared_ptr<void>& rVec,
-                                           std::vector<int32_t>& rowVecColumns);
-
-        void nextRowVec(void*& omnivec, uint64_t numValues, char* notNull,
-                                           const orc::Type& baseTp, int* omniTypeId, std::shared_ptr<void>& rVec,
-                                           std::vector<int32_t>& rowVecColumns);
+                  const orc::Type& baseTp, int* omniTypeId) override;
 
     public:
         OmniDecimal128ColumnReader(const orc::Type& type, orc::StripeStreams& stipe);

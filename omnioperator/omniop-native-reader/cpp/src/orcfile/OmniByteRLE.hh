@@ -22,11 +22,11 @@
 #include <vector/vector_common.h>
 
 namespace omniruntime::reader {
-    class OmniByteRLeDecoder: public orc::ByteRleDecoder {
+    class OmniByteRleDecoder: public orc::ByteRleDecoder {
     public:
-        OmniByteRLeDecoder(std::unique_ptr<orc::SeekableInputStream> input);
+        OmniByteRleDecoder(std::unique_ptr<orc::SeekableInputStream> input);
 
-        virtual ~OmniByteRLeDecoder();
+        virtual ~OmniByteRleDecoder();
 
         /**
         * Seek to a particular spot.
@@ -44,20 +44,11 @@ namespace omniruntime::reader {
         virtual void next(char* data, uint64_t numValues, char* notNull);
 
         virtual void next(omniruntime::vec::BaseVector*& omnivec, uint64_t numValues, char* notNull,
-                        const orc::Type* baseTp, int omniTypeId, bool is_row, std::shared_ptr<void>& rVec,
-                        std::vector<int32_t>& rowVecColumns);
+                        const orc::Type* baseTp, int omniTypeId);
 
         template <omniruntime::type::DataTypeId TYPE_ID>
         void nextByType(omniruntime::vec::BaseVector*& omnivec, uint64_t numValues, char* notNull,
-                    const orc::Type* baseTp, bool is_row, std::shared_ptr<void>& rVec, std::vector<int32_t>& rowVecColumns);
-
-        template <omniruntime::type::DataTypeId TYPE_ID>
-        void nextByTypeNorVec(omniruntime::vec::BaseVector*& omnivec, uint64_t numValues, char* notNull,
-                        const orc::Type* baseTp, std::shared_ptr<void>& rVec, std::vector<int32_t>& rowVecColumns);
-
-        template <omniruntime::type::DataTypeId TYPE_ID>
-        void nextByTypeRowVec(omniruntime::vec::BaseVector*& omnivec,uint64_t numValues, char* notNull,
-                        const orc::Type* baseTp, std::shared_ptr<void>& rVec, std::vector<int32_t>& rowVecColumns);
+                    const orc::Type* baseTp);
 
         protected:
             inline void nextBuffer();
@@ -72,7 +63,7 @@ namespace omniruntime::reader {
             bool repeating;
     };
 
-    class OmniBooleanRleDecoder: public OmniByteRLeDecoder {
+    class OmniBooleanRleDecoder: public OmniByteRleDecoder {
     public:
         OmniBooleanRleDecoder(std::unique_ptr<orc::SeekableInputStream> input);
 
@@ -93,22 +84,12 @@ namespace omniruntime::reader {
         */
 
         virtual void next(omniruntime::vec::BaseVector*& omnivec, uint64_t numValues, char* notNull,
-                        const orc::Type* baseTp, int omniTypeId, bool is_row, std::shared_ptr<void>& rVec,
-                        std::vector<int32_t>& rowVecColumns);
+                        const orc::Type* baseTp, int omniTypeId);
 
         template <omniruntime::type::DataTypeId TYPE_ID>
         void nextByType(omniruntime::vec::BaseVector*& omnivec, uint64_t numValues, char* notNull,
-                    const orc::Type* baseTp, int omniTypeId, bool is_row, std::shared_ptr<void>& rVec, std::vector<int32_t>& rowVecColumns);
+                    const orc::Type* baseTp, int omniTypeId);
 
-        template <omniruntime::type::DataTypeId TYPE_ID>
-        void nextByTypeNorVec(omniruntime::vec::BaseVector*& omnivec, uint64_t numValues, char* notNull,
-                        const orc::Type* baseTp, int omniTypeId, std::shared_ptr<void>& rVec,
-                        std::vector<int32_t>& rowVecColumns);
-
-        template <omniruntime::type::DataTypeId TYPE_ID>
-        void nextByTypeRowVec(omniruntime::vec::BaseVector*& omnivec,uint64_t numValues, char* notNull,
-                        const orc::Type* baseTp, int omniTypeId, std::shared_ptr<void>& rVec,
-                        std::vector<int32_t>& rowVecColumns);
         protected:
             size_t remainingBits;
             char lastByte;

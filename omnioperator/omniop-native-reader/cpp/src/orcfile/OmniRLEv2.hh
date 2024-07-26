@@ -26,13 +26,13 @@
 namespace omniruntime::reader {
 
     std::unique_ptr<omniruntime::vec::BaseVector> makeFixLenthVector(uint64_t numValues,
-        omniruntime::type::DataTypeId dataTypeId, bool is_row, std::shared_ptr<void>& rVec, std::vector<int32_t>& rowVecColumns);
+        omniruntime::type::DataTypeId dataTypeId);
 
     std::unique_ptr<omniruntime::vec::BaseVector> makeDoubleVector(uint64_t numValues,
-        omniruntime::type::DataTypeId dataTypeId, bool is_row, std::shared_ptr<void>& rVec, std::vector<int32_t>& rowVecColumns);
+        omniruntime::type::DataTypeId dataTypeId);
 
     std::unique_ptr<omniruntime::vec::BaseVector> makeNewVector(uint64_t numValues, const orc::Type* baseTp,
-          omniruntime::type::DataTypeId dataTypeId, bool is_row, std::shared_ptr<void>& rVec, std::vector<int32_t>& rowVecColumns);
+          omniruntime::type::DataTypeId dataTypeId);
 
     class OmniRleDecoderV2 : public orc::RleDecoderV2 {
     public:
@@ -48,93 +48,48 @@ namespace omniruntime::reader {
         * @param omniTypeId the int* of omniType to push
         */
         void next(omniruntime::vec::BaseVector*& omnivec, uint64_t numValues, char* notNull,
-                  const orc::Type* baseTp, int omniTypeId, bool is_row, std::shared_ptr<void>& rVec, std::vector<int32_t>& rowVecColumns);
+                  const orc::Type* baseTp, int omniTypeId);
 
         void next(int64_t* data, uint64_t numValues, const char* notNull) {
             orc::RleDecoderV2::next(data, numValues, notNull);
         }
 
         uint64_t nextDirect(omniruntime::vec::BaseVector*& OmniVec, uint64_t offset, uint64_t numValues,
-                            const char* const notNull, omniruntime::type::DataTypeId dataTypeId, bool is_row);
+                            const char* const notNull, omniruntime::type::DataTypeId dataTypeId);
 
         uint64_t nextShortRepeatsByType(omniruntime::vec::BaseVector*& OmniVec, uint64_t offset, uint64_t numValues,
-                                        const char* const notNull, omniruntime::type::DataTypeId dataTypeId, bool is_row);
-
-
-        template <omniruntime::type::DataTypeId TYPE_ID>
-        uint64_t nextShortRepeatsRowVec(omniruntime::vec::BaseVector*& OmniVec,
-                                            uint64_t offset, uint64_t numValues, const char* const notNull);
-
-        template <omniruntime::type::DataTypeId TYPE_ID>
-        uint64_t nextShortRepeatsNorVec(omniruntime::vec::BaseVector*& OmniVec,
-                                            uint64_t offset, uint64_t numValues, const char* const notNull);
+                                        const char* const notNull, omniruntime::type::DataTypeId dataTypeId);
 
         template <omniruntime::type::DataTypeId TYPE_ID>
         uint64_t nextShortRepeats(omniruntime::vec::BaseVector*& omnivec, uint64_t offset, uint64_t numValues,
-                                  const char* notNull, bool is_row);
+                                  const char* notNull);
 
 
         uint64_t nextPatchedByType(omniruntime::vec::BaseVector*& OmniVec, uint64_t offset, uint64_t numValues,
-                                        const char* const notNull, omniruntime::type::DataTypeId dataTypeId, bool is_row);
-
-        template <omniruntime::type::DataTypeId TYPE_ID>
-        uint64_t nextPatchedNorVec(omniruntime::vec::BaseVector*& OmniVec, uint64_t offset,
-                                            uint64_t numValues, const char* const notNull,
-                                            omniruntime::type::DataTypeId dataTypeId);
-
-        template <omniruntime::type::DataTypeId TYPE_ID>
-        uint64_t nextPatchedRowVec(omniruntime::vec::BaseVector*& OmniVec, uint64_t offset,
-                                            uint64_t numValues, const char* const notNull,
-                                            omniruntime::type::DataTypeId dataTypeId);
+                                        const char* const notNull, omniruntime::type::DataTypeId dataTypeId);
 
         template <omniruntime::type::DataTypeId TYPE_ID>
         uint64_t nextPatched(omniruntime::vec::BaseVector*& omnivec, uint64_t offset, uint64_t numValues,
-                             const char* notNull, omniruntime::type::DataTypeId dataTypeId, bool is_row);
+                             const char* notNull, omniruntime::type::DataTypeId dataTypeId);
 
         template <omniruntime::type::DataTypeId TYPE_ID>
         uint64_t nextDelta(omniruntime::vec::BaseVector*& omnivec, uint64_t offset, uint64_t numValues,
-                           const char* notNull, omniruntime::type::DataTypeId dataTypeId, bool is_row);
+                           const char* notNull, omniruntime::type::DataTypeId dataTypeId);
 
         uint64_t nextDeltaByType(omniruntime::vec::BaseVector*& OmniVec,
                                                    uint64_t offset, uint64_t numValues, const char* const notNull,
-                                                   omniruntime::type::DataTypeId dataTypeId, bool is_row);
+                                                   omniruntime::type::DataTypeId dataTypeId);
 
-        template <omniruntime::type::DataTypeId TYPE_ID>
-        uint64_t nextDeltaRowVec(omniruntime::vec::BaseVector*& OmniVec,
-                                                  uint64_t offset, uint64_t numValues, const char* const notNull,
-                                                  omniruntime::type::DataTypeId dataTypeId);
-
-        template <omniruntime::type::DataTypeId TYPE_ID>
-        uint64_t nextDeltaNorVec(omniruntime::vec::BaseVector*& OmniVec,
-                                                  uint64_t offset, uint64_t numValues, const char* const notNull,
-                                                  omniruntime::type::DataTypeId dataTypeId);
-
-        uint64_t copyDataFromBufferByType(omniruntime::vec::BaseVector*& tempOmniVec, uint64_t offset,
+        uint64_t copyDataFromBufferByType(omniruntime::vec::BaseVector*& tempOmnivec, uint64_t offset,
                                                     uint64_t numValues, const char* notNull,
-                                                    omniruntime::type::DataTypeId dataTypeId, bool is_row);
+                                                    omniruntime::type::DataTypeId dataTypeId);
 
         template <omniruntime::type::DataTypeId TYPE_ID>
-        uint64_t copyDataFromBufferTo64Bit(omniruntime::vec::BaseVector*& OmniVec, uint64_t offset,
-                                            uint64_t numValues, const char* notNull, bool is_row);
-
-        template <omniruntime::type::DataTypeId TYPE_ID>
-        uint64_t copyDataFromBufferTo64BitRowVec(omniruntime::vec::BaseVector*& OmniVec, uint64_t offset,
-                                                    uint64_t numValues, const char* notNull);
-
-        template <omniruntime::type::DataTypeId TYPE_ID>
-        uint64_t copyDataFromBufferTo64BitNorVec(omniruntime::vec::BaseVector*& OmniVec, uint64_t offset,
-                                                    uint64_t numValues, const char* notNull);
+        uint64_t copyDataFromBufferTo64bit(omniruntime::vec::BaseVector*& OmniVec, uint64_t offset,
+                                            uint64_t numValues, const char* notNull);
 
         template <omniruntime::type::DataTypeId TYPE_ID>
         uint64_t copyDataFromBuffer(omniruntime::vec::BaseVector*& OmniVec, uint64_t offset,
-                                                uint64_t numValues, const char* notNull, bool is_row);
-
-        template <omniruntime::type::DataTypeId TYPE_ID>
-        uint64_t copyDataFromBufferRowVec(omniruntime::vec::BaseVector*& OmniVec, uint64_t offset,
-                                                uint64_t numValues, const char* notNull);
-
-        template <omniruntime::type::DataTypeId TYPE_ID>
-        uint64_t copyDataFromBufferNorVec(omniruntime::vec::BaseVector*& OmniVec, uint64_t offset,
                                                 uint64_t numValues, const char* notNull);
 
         void readLongsByType(omniruntime::vec::BaseVector*& OmniVec, uint64_t offset,

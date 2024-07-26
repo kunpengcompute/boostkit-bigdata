@@ -172,8 +172,7 @@ namespace omniruntime::reader {
         }
     }
 
-    bool OmniRowReaderImpl::next(VectorBatch*& omniVecBatch, int* omniTypeId, bool is_row, std::shared_ptr<void>& rVec,
-        std::vector<int32_t>& rowVecColumns) {
+    bool OmniRowReaderImpl::next(VectorBatch*& omniVecBatch, int* omniTypeId) {
         if (currentStripe >= lastStripe) {
             omniVecBatch->Resize(0);
             if (lastStripe > 0) {
@@ -209,8 +208,7 @@ namespace omniruntime::reader {
         }
         else {
             const orc::Type & baseTp = this->getSelectedType();
-            reader->next(reinterpret_cast<void*&>(omniVecBatch), rowsToRead, nullptr, baseTp, omniTypeId, is_row, rVec,
-                rowVecColumns);
+            reader->next(reinterpret_cast<void*&>(omniVecBatch), rowsToRead, nullptr, baseTp, omniTypeId);
         }
         // update row number
         previousRow = firstRowOfStripe[currentStripe] + currentRowInStripe;

@@ -42,8 +42,7 @@ namespace omniruntime::reader {
         * @param omniVecBatch the VectorBatch to push
         * @param omniTypeId the omniTypeId to push
         */
-        bool next(omniruntime::vec::VectorBatch*& omniVecBatch, int* omniTypeId, bool is_row, std::shared_ptr<void>& rVec,
-            std::vector<int32_t>& rowVecColumns);
+        bool next(omniruntime::vec::VectorBatch*& omniVecBatch, int* omniTypeId);
 
         void startNextStripe() override;
     };

@@ -262,11 +262,9 @@ namespace omniruntime::reader {
     }
 
     void OmniStructColumnReader::next(void*& omniVecBatch, uint64_t numValues, char *notNull,
-                                      const orc::Type& baseTp, int* omniTypeId, bool is_row, std::shared_ptr<void>& rVec,
-                                      std::vector<int32_t>& rowVecColumns) {
+                                      const orc::Type& baseTp, int* omniTypeId) {
         auto vecBatch = reinterpret_cast<omniruntime::vec::VectorBatch*>(omniVecBatch);
-        // is_row, rVec is no used, just drop them
-        nextInternal<false>(vecBatch, numValues, notNull, baseTp, omniTypeId, rowVecColumns);
+        nextInternal<false>(vecBatch, numValues, notNull, baseTp, omniTypeId);
     }
 
     void OmniStructColumnReader::nextEncoded(orc::ColumnVectorBatch& rowBatch, uint64_t numValues, char *notNull) {
@@ -283,22 +281,10 @@ namespace omniruntime::reader {
 
     template<bool encoded>
     void OmniStructColumnReader::nextInternal(omniruntime::vec::VectorBatch*& omniVecBatch, uint64_t numValues,
-                                              char *notNull, const orc::Type& baseTp, int* omniTypeId,
-                                              std::vector<int32_t>& rowVecColumns) {
+                                              char *notNull, const orc::Type& baseTp, int* omniTypeId) {
         bool hasNull = false;
         char nulls[numValues];
         readNulls(this, numValues, notNull, nulls, hasNull);
-
-        // row vector
-        auto numRowVecCols = rowVecColumns.size();
-        std::vector<omniruntime::type::DataTypeId> batchTypes(numRowVecCols);
-        for (size_t index = 0; index < numRowVecCols; index++) {
-            auto id = rowVecColumns[index];
-            auto omniType = getOmniTypeByOrcType(baseTp.getSubtype(id));
-            batchTypes[index] = omniType;
-        }
-        auto rVec = std::make_shared<omniruntime::vec::TRowVector>(batchTypes, static_cast<uint32_t>(numValues));
-        auto temprVec = std::static_pointer_cast<void>(rVec);
 
         uint64_t i=0;
         notNull = hasNull ? nulls : nullptr;
@@ -309,20 +295,12 @@ namespace omniruntime::reader {
             } else {
                 omniruntime::vec::BaseVector* tempVec = nullptr;
                 const Type* type = baseTp.getSubtype(i);
-
-                bool is_this_row = false;
-                if(std::find(rowVecColumns.begin(), rowVecColumns.end(), i) != rowVecColumns.end()) {
-                    is_this_row = true;
-                }
-
                 if (omniTypeId == nullptr) {
                     int tempOmniTypeId = getOmniTypeByOrcType(type);
-                    (*iter)->next(reinterpret_cast<void*&>(tempVec), numValues, notNull, *type, &tempOmniTypeId,
-                            is_this_row, temprVec, rowVecColumns);
+                    (*iter)->next(reinterpret_cast<void*&>(tempVec), numValues, notNull, *type, &tempOmniTypeId);
                     omniVecBatch->Append(tempVec);
                 } else {
-                    (*iter)->next(reinterpret_cast<void*&>(tempVec), numValues, notNull, *type, &omniTypeId[i],
-                        is_this_row, temprVec, rowVecColumns);
+                    (*iter)->next(reinterpret_cast<void*&>(tempVec), numValues, notNull, *type, &omniTypeId[i]);
                     omniVecBatch->Append(tempVec);
                 }
             }
@@ -368,46 +346,40 @@ namespace omniruntime::reader {
     * all next funcs
     */
     void OmniIntegerColumnReader::next(void*& vec, uint64_t numValues, char *notNull,
-                                       const orc::Type& baseTp, int* omniTypeId, bool is_row, std::shared_ptr<void>& rVec,
-                                       std::vector<int32_t>& rowVecColumns) {
+                                       const orc::Type& baseTp, int* omniTypeId) {
         bool HasNull = false;
         char nulls[numValues];
         readNulls(this, numValues, notNull, nulls, HasNull);
         rle->next(reinterpret_cast<omniruntime::vec::BaseVector*&>(vec), numValues, HasNull ? nulls : nullptr, &baseTp,
-            *omniTypeId, is_row, rVec, rowVecColumns);
+            *omniTypeId);
     }
 
     void OmniBooleanColumnReader::next(void*& vec, uint64_t numValues, char *notNull,
-                                       const orc::Type& baseTp, int* omniTypeId, bool is_row, std::shared_ptr<void>& rVec,
-                                       std::vector<int32_t>& rowVecColumns) {
+                                       const orc::Type& baseTp, int* omniTypeId) {
         bool HasNull = false;
         char nulls[numValues];
         readNulls(this, numValues, notNull, nulls, HasNull);
         rle->next(reinterpret_cast<omniruntime::vec::BaseVector*&>(vec), numValues, HasNull ? nulls : nullptr, &baseTp,
-            *omniTypeId, is_row, rVec, rowVecColumns);
+            *omniTypeId);
     }
 
     void OmniByteColumnReader::next(void*& vec, uint64_t numValues, char *notNull,
-                                    const orc::Type& baseTp, int* omniTypeId, bool is_row, std::shared_ptr<void>& rVec,
-                                    std::vector<int32_t>& rowVecColumns) {
+                                    const orc::Type& baseTp, int* omniTypeId) {
         bool HasNull = false;
         char nulls[numValues];
         readNulls(this, numValues, notNull, nulls, HasNull);
         rle->next(reinterpret_cast<omniruntime::vec::BaseVector*&>(vec), numValues, HasNull ? nulls : nullptr, &baseTp,
-            *omniTypeId, is_row, rVec, rowVecColumns);
+            *omniTypeId);
     }
 
     void OmniTimestampColumnReader::next(void*& omnivec, uint64_t numValues, char *notNull,
-                                         const orc::Type& baseTp, int* omniTypeId, bool is_row, std::shared_ptr<void>& rVec,
-                                         std::vector<int32_t>& rowVecColumns) {
+                                         const orc::Type& baseTp, int* omniTypeId) {
         auto dataTypeId = static_cast<omniruntime::type::DataTypeId>(*omniTypeId);
         switch (dataTypeId) {
             case omniruntime::type::OMNI_DATE32:
-                return nextByType<omniruntime::type::OMNI_DATE32>(omnivec, numValues, notNull, baseTp, omniTypeId,
-                    is_row, rVec, rowVecColumns);
+                return nextByType<omniruntime::type::OMNI_DATE32>(omnivec, numValues, notNull, baseTp, omniTypeId);
             case omniruntime::type::OMNI_DATE64:
-                return nextByType<omniruntime::type::OMNI_DATE64>(omnivec, numValues, notNull, baseTp, omniTypeId,
-                    is_row, rVec, rowVecColumns);
+                return nextByType<omniruntime::type::OMNI_DATE64>(omnivec, numValues, notNull, baseTp, omniTypeId);
             default:
                 throw omniruntime::exception::OmniException("EXPRESSION_NOT_SUPPORT",
                                                             "OmniTimestampColumnReader type not support!!!");
@@ -415,78 +387,11 @@ namespace omniruntime::reader {
     }
 
     template <omniruntime::type::DataTypeId TYPE_ID>
-    void OmniTimestampColumnReader::nextByTypeRowVec(void*& omnivec, uint64_t numValues, char* notNull,
-                                        const orc::Type& baseTp, int* omniTypeId, std::shared_ptr<void>& rVec,
-                                        std::vector<int32_t>& rowVecColumns) {
-        using namespace omniruntime::type;
-        using T = typename NativeType<TYPE_ID>::type;
-        auto row_vec = std::static_pointer_cast<omniruntime::vec::TRowVector>(rVec);
-        auto vec = std::make_unique<omniruntime::vec::TVector<TYPE_ID, omniruntime::vec::OMNI_ROW>>(row_vec);
-
-        bool HasNull = false;
-        char nulls[numValues];
-        readNulls(this, numValues, notNull, nulls, HasNull);
-        notNull = HasNull ? nulls : nullptr;
-        int64_t secsBuffer[numValues];
-        secondsRle->next(secsBuffer, numValues, notNull);
-        int64_t nanoBuffer[numValues];
-        nanoRle->next(nanoBuffer, numValues, notNull);
-
-        // Construct the values
-        for(uint64_t i=0; i < numValues; i++) {
-            if (notNull == nullptr || notNull[i]) {
-                uint64_t zeros = nanoBuffer[i] & 0x7;
-                nanoBuffer[i] >>= 3;
-                if (zeros != 0) {
-                    for(uint64_t j = 0; j <= zeros; ++j) {
-                        nanoBuffer[i] *= 10;
-                    }
-                }
-                int64_t writerTime = secsBuffer[i] + epochOffset;
-                if (!sameTimezone) {
-                    // adjust timestamp value to same wall clock time if writer and reader
-                    // time zones have different rules, which is required for Apache Orc.
-                    const auto& wv = writerTimezone.getVariant(writerTime);
-                    const auto& rv = readerTimezone.getVariant(writerTime);
-                    if (!wv.hasSameTzRule(rv)) {
-                        // If the timezone adjustment moves the millis across a DST boundary,
-                        // we need to reevaluate the offsets.
-                        int64_t adjustedTime = writerTime + wv.gmtOffset - rv.gmtOffset;
-                        const auto& adjustedReader = readerTimezone.getVariant(adjustedTime);
-                        writerTime = writerTime + wv.gmtOffset - adjustedReader.gmtOffset;
-                    }
-                }
-                secsBuffer[i] = writerTime;
-                if (secsBuffer[i] < 0 && nanoBuffer[i] > 999999) {
-                    secsBuffer[i] -= 1;
-                }
-                vec->SetValue(static_cast<int>(i), static_cast<T>(secsBuffer[i]));
-            } else {
-                vec->SetNull(static_cast<int>(i));
-            }
-        }
-
-        omnivec = vec.release();
-    }
-
-    template <omniruntime::type::DataTypeId TYPE_ID>
     void OmniTimestampColumnReader::nextByType(void*& omnivec, uint64_t numValues, char* notNull,
-                                      const orc::Type& baseTp, int* omniTypeId, bool is_row, std::shared_ptr<void>& rVec,
-                                      std::vector<int32_t>& rowVecColumns) {
-        if (is_row) {
-            return nextByTypeRowVec<TYPE_ID>(omnivec, numValues, notNull, baseTp, omniTypeId, rVec, rowVecColumns);
-        } else {
-            return nextByTypeNorVec<TYPE_ID>(omnivec, numValues, notNull, baseTp, omniTypeId, rVec, rowVecColumns);
-        }
-    }
-
-    template <omniruntime::type::DataTypeId TYPE_ID>
-    void OmniTimestampColumnReader::nextByTypeNorVec(void*& omnivec, uint64_t numValues, char* notNull,
-                                                     const orc::Type& baseTp, int* omniTypeId, std::shared_ptr<void>& rVec,
-                                                     std::vector<int32_t>& rowVecColumns) {
+                                      const orc::Type& baseTp, int* omniTypeId) {
         using namespace omniruntime::type;
         using T = typename NativeType<TYPE_ID>::type;
-        auto vec = std::make_unique<omniruntime::vec::TVector<TYPE_ID>>(static_cast<omniruntime::vec::v_size_t>(numValues), TYPE_ID);
+        auto vec = std::make_unique<omniruntime::vec::Vector<T>>(static_cast<int>(numValues));
 
         bool HasNull = false;
         char nulls[numValues];
@@ -535,37 +440,38 @@ namespace omniruntime::reader {
     }
 
     void OmniDoubleColumnReader::next(void*& omnivec, uint64_t numValues, char* notNull,
-                                      const orc::Type& baseTp, int* omniTypeId, bool is_row, std::shared_ptr<void>& rVec,
-                                      std::vector<int32_t>& rowVecColumns) {
+                                      const orc::Type& baseTp, int* omniTypeId) {
         auto dataTypeId = static_cast<omniruntime::type::DataTypeId>(*omniTypeId);
+        std::unique_ptr<omniruntime::vec::BaseVector> tempOmnivec = makeNewVector(numValues, &baseTp, dataTypeId);
+        auto pushOmniVec = tempOmnivec.get();
         switch (dataTypeId) {
             case omniruntime::type::OMNI_BOOLEAN:
                 nextByType<omniruntime::type::OMNI_BOOLEAN>
-                        (omnivec, numValues, notNull, baseTp, is_row, rVec, rowVecColumns);
+                        (pushOmniVec, numValues, notNull, baseTp);
                 break;
             case omniruntime::type::OMNI_SHORT:
                 nextByType<omniruntime::type::OMNI_SHORT>
-                        (omnivec, numValues, notNull, baseTp, is_row, rVec, rowVecColumns);
+                        (pushOmniVec, numValues, notNull, baseTp);
                 break;
             case omniruntime::type::OMNI_INT:
                 nextByType<omniruntime::type::OMNI_INT>
-                        (omnivec, numValues, notNull, baseTp, is_row, rVec, rowVecColumns);
+                        (pushOmniVec, numValues, notNull, baseTp);
                 break;
             case omniruntime::type::OMNI_LONG:
                 nextByType<omniruntime::type::OMNI_LONG>
-                        (omnivec, numValues, notNull, baseTp, is_row, rVec, rowVecColumns);
+                        (pushOmniVec, numValues, notNull, baseTp);
                 break;
             case omniruntime::type::OMNI_DATE32:
                 nextByType<omniruntime::type::OMNI_DATE32>
-                        (omnivec, numValues, notNull, baseTp, is_row, rVec, rowVecColumns);
+                        (pushOmniVec, numValues, notNull, baseTp);
                 break;
             case omniruntime::type::OMNI_DATE64:
                 nextByType<omniruntime::type::OMNI_DATE64>
-                        (omnivec, numValues, notNull, baseTp, is_row, rVec, rowVecColumns);
+                        (pushOmniVec, numValues, notNull, baseTp);
                 break;
             case omniruntime::type::OMNI_DOUBLE:
                 nextByType<omniruntime::type::OMNI_DOUBLE>
-                        (omnivec, numValues, notNull, baseTp, is_row, rVec, rowVecColumns);
+                        (pushOmniVec, numValues, notNull, baseTp);
                 break;
             case omniruntime::type::OMNI_CHAR:
                 throw std::runtime_error("OmniDoubleColumnReader_type CHAR not finished!!!");
@@ -578,72 +484,13 @@ namespace omniruntime::reader {
             default:
                 printf("OmniDoubleColumnReader_type swtich no process!!!")
         }
-    }
 
-    template <omniruntime::type::DataTypeId TYPE_ID>
-    void OmniDoubleColumnReader::nextByTypeRowVec(void*& omnivec, uint64_t numValues, char* notNull,
-                                                  const orc::Type& baseTp, std::shared_ptr<void>& rVec,
-                                                  std::vector<int32_t>& rowVecColumns) {
-        bool HasNull = false;
-        char nulls[numValues];
-        readNulls(this, numValues, notNull, nulls, HasNull);
-        // update the notNull from the parent class
-        notNull = HasNull ? nulls : nullptr;
-
-        using namespace omniruntime::type;
-        using T = typename NativeType<TYPE_ID>::type;
-
-        auto row_vec = std::static_pointer_cast<omniruntime::vec::TRowVector>(rVec);
-        auto vec = std::make_unique<omniruntime::vec::TVector<TYPE_ID, omniruntime::vec::OMNI_ROW>>(row_vec);
-
-        if (columnKind == orc::FLOAT) {
-            if (notNull) {
-                for(size_t i=0; i < numValues; ++i) {
-                    if (notNull[i]) {
-                        vec->SetValue(static_cast<int>(i), static_cast<T>(readFloat()));
-                    } else {
-                        vec->SetNull(i);
-                    }
-                }
-            } else {
-                for(size_t i=0; i < numValues; ++i) {
-                    vec->SetValue(static_cast<int>(i), static_cast<T>(readFloat()));
-                }
-            }
-        } else {
-            if (notNull) {
-                for(size_t i=0; i < numValues; ++i) {
-                    if (notNull[i]) {
-                        vec->SetValue(static_cast<int>(i), static_cast<T>(readDouble()));
-                    } else {
-                        vec->SetNull(i);
-                    }
-                }
-            } else {
-                for(size_t i=0; i < numValues; ++i) {
-                    vec->SetValue(static_cast<int>(i), static_cast<T>(readDouble()));
-                }
-            }
-        }
-
-        omnivec = vec.release();
+        omnivec = tempOmnivec.release();
     }
 
     template <omniruntime::type::DataTypeId TYPE_ID>
     void OmniDoubleColumnReader::nextByType(void*& omnivec, uint64_t numValues, char* notNull,
-                                            const orc::Type& baseTp, bool is_row, std::shared_ptr<void>& rVec,
-                                            std::vector<int32_t>& rowVecColumns) {
-        if (is_row) {
-            return nextByTypeRowVec<TYPE_ID>(omnivec, numValues, notNull, baseTp, rVec, rowVecColumns);
-        } else {
-            return nextByTypeNorVec<TYPE_ID>(omnivec, numValues, notNull, baseTp, rVec, rowVecColumns);
-        }
-    }
-
-    template <omniruntime::type::DataTypeId TYPE_ID>
-    void OmniDoubleColumnReader::nextByTypeNorVec(void*& omnivec, uint64_t numValues, char* notNull,
-                                                  const orc::Type& baseTp, std::shared_ptr<void>& rVec,
-                                                  std::vector<int32_t>& rowVecColumns) {
+                                            const orc::Type& baseTp) {
         bool HasNull = false;
         char nulls[numValues];
         readNulls(this, numValues, notNull, nulls, HasNull);
@@ -653,7 +500,7 @@ namespace omniruntime::reader {
         using namespace omniruntime::type;
         using T = typename NativeType<TYPE_ID>::type;
 
-        auto vec = std::make_unique<omniruntime::vec::TVector<TYPE_ID>>(static_cast<omniruntime::vec::v_size_t>(numValues), TYPE_ID);
+        auto vec = reinterpret_cast<omniruntime::vec::Vector<T>*>(omnivec);
 
         if (columnKind == orc::FLOAT) {
             if(notNull) {
@@ -684,82 +531,13 @@ namespace omniruntime::reader {
                 }
             }
         }
-
-        omnivec = vec.release();
     }
 
-    void OmniStringDictionaryColumnReader::nextRowVec(void*& omnivec, uint64_t numValues, char* notNull,
-                                                const orc::Type& baseTp, int* omniTypeId, std::shared_ptr<void>& rVec,
-                                                std::vector<int32_t>& rowVecColumns) {
+    void OmniStringDictionaryColumnReader::next(void*& omnivec, uint64_t numValues, char* notNull,
+                                                const orc::Type& baseTp, int* omniTypeId) {
         bool HasNull = false;
-        auto row_vec = std::static_pointer_cast<omniruntime::vec::TRowVector>(rVec);
-        auto newVector = std::make_unique<omniruntime::vec::TVector<omniruntime::type::OMNI_VARCHAR, omniruntime::vec::OMNI_ROW>>(row_vec);
-
-        char nulls[numValues];
-        readNulls(this, numValues, notNull, nulls, HasNull);
-        // update the notNull from the parent class
-        notNull = HasNull ? nulls : nullptr;
-
-
-        bool is_char = false;
-        if (baseTp.getKind() == orc::TypeKind::CHAR) {
-            is_char = true;
-        }
-
-        char *blob = dictionary->dictionaryBlob.data();
-        int64_t *dictionaryOffsets = dictionary->dictionaryOffset.data();
-
-        int64_t outputLengths[numValues];
-        rle->next(outputLengths, numValues, notNull);
-        uint64_t dictionaryCount = dictionary->dictionaryOffset.size() - 1;
-        if(notNull) {
-            for(uint64_t i=0; i < numValues; ++i) {
-                if (notNull[i]) {
-                    int64_t entry = outputLengths[i];
-                    if (entry < 0 || static_cast<uint64_t>(entry) >= dictionaryCount) {
-                        throw orc::ParseError("Entry index out of range in StringDictionaryColumn");
-                    }
-
-                    //求出长度，如果为char，则需要去除最后的空格
-                    auto len = dictionaryOffsets[entry+1] -
-                               dictionaryOffsets[entry];
-                    char* ptr = blob + dictionaryOffsets[entry];
-                    if (is_char) {
-                        FindLastNotEmpty(ptr, len);
-                    }
-                    auto data = std::string_view(ptr, len);
-                    newVector->SetValue(i, data);
-                } else {
-                    newVector->SetNull(i);
-                }
-            }
-        } else {
-            for(uint64_t i=0; i < numValues; ++i) {
-                int64_t entry = outputLengths[i];
-                if (entry < 0 || static_cast<uint64_t>(entry) >= dictionaryCount) {
-                    throw orc::ParseError("Entry index out of range in StringDictionaryColumn");
-                }
-
-                //求出长度，如果为char，则需要去除最后的空格
-                auto len = dictionaryOffsets[entry+1] -
-                           dictionaryOffsets[entry];
-                char* ptr = blob + dictionaryOffsets[entry];
-                if (is_char) {
-                    FindLastNotEmpty(ptr, len);
-                }
-                auto data = std::string_view(ptr, len);
-                newVector->SetValue(i, data);
-            }
-        }
-
-        omnivec = newVector.release();
-    }
-
-    void OmniStringDictionaryColumnReader::nextNorVec(void*& omnivec, uint64_t numValues, char* notNull,
-                                                  const orc::Type& baseTp, int* omniTypeId, std::shared_ptr<void>& rVec,
-                                                  std::vector<int32_t>& rowVecColumns) {
-        bool HasNull = false;
-        auto newVector = std::make_unique<omniruntime::vec::TVector<omniruntime::type::OMNI_VARCHAR>>(static_cast<omniruntime::vec::v_size_t>(numValues), omniruntime::type::OMNI_VARCHAR);
+        auto newVector = std::make_unique<omniruntime::vec::Vector<
+        				 	omniruntime::vec::LargeStringContainer<std::string_view>>>(numValues);
 
         char nulls[numValues];
         readNulls(this, numValues, notNull, nulls, HasNull);
@@ -821,32 +599,11 @@ namespace omniruntime::reader {
         omnivec = newVector.release();
     }
 
-    void OmniStringDictionaryColumnReader::next(void*& omnivec, uint64_t numValues, char* notNull,
-                                                const orc::Type& baseTp, int* omniTypeId, bool is_row, std::shared_ptr<void>& rVec,
-                                                std::vector<int32_t>& rowVecColumns) {
-        if (is_row) {
-            return nextRowVec(omnivec, numValues, notNull, baseTp, omniTypeId, rVec, rowVecColumns);
-        } else {
-            return nextNorVec(omnivec, numValues, notNull, baseTp, omniTypeId, rVec, rowVecColumns);
-        }
-    }
-
     void OmniStringDirectColumnReader::next(void*& omnivec, uint64_t numValues, char* notNull,
-                                        const orc::Type& baseTp, int* omniTypeId, bool is_row, std::shared_ptr<void>& rVec,
-                                        std::vector<int32_t>& rowVecColumns) {
-        if (is_row) {
-            return nextRowVec(omnivec, numValues, notNull, baseTp, omniTypeId, rVec, rowVecColumns);
-        } else {
-            return nextNorVec(omnivec, numValues, notNull, baseTp, omniTypeId, rVec, rowVecColumns);
-        }
-    }
-
-    void OmniStringDirectColumnReader::nextRowVec(void*& omnivec, uint64_t numValues, char* notNull,
-                                              const orc::Type& baseTp, int* omniTypeId, std::shared_ptr<void>& rVec,
-                                              std::vector<int32_t>& rowVecColumns) {
+                                        const orc::Type& baseTp, int* omniTypeId) {
         bool HasNull = false;
-        auto row_vec = std::static_pointer_cast<omniruntime::vec::TRowVector>(rVec);
-        auto newVector = std::make_unique<omniruntime::vec::TVector<omniruntime::type::OMNI_VARCHAR, omniruntime::vec::OMNI_ROW>>(row_vec);
+        auto newVector = std::make_unique<omniruntime::vec::Vector<
+                         	omniruntime::vec::LargeStringContainer<std::string_view>>>(numValues);
         char nulls[numValues];
         readNulls(this, numValues, notNull, nulls, HasNull);
         // update the notNull from the parent class
@@ -919,123 +676,6 @@ namespace omniruntime::reader {
 
                 tempPtr += lengthPtr[filledSlots];
                 filledSlots += 1;
-            }
-        }
-
-        omnivec = newVector.release();
-    }
-
-    void OmniStringDirectColumnReader::nextNorVec(void*& omnivec, uint64_t numValues, char* notNull,
-                                              const orc::Type& baseTp, int* omniTypeId, std::shared_ptr<void>& rVec,
-                                              std::vector<int32_t>& rowVecColumns) {
-        bool HasNull = false;
-        auto newVector = std::make_unique<omniruntime::vec::TVector<omniruntime::type::OMNI_VARCHAR>>(static_cast<omniruntime::vec::v_size_t>(numValues), omniruntime::type::OMNI_VARCHAR);
-        char nulls[numValues];
-        readNulls(this, numValues, notNull, nulls, HasNull);
-        // update the notNull from the parent class
-        notNull = HasNull ? nulls : nullptr;
-
-        int64_t lengthPtr[numValues];
-
-        bool is_char = false;
-        if (baseTp.getKind() == orc::TypeKind::CHAR) {
-            is_char = true;
-        }
-
-        // read the length vector
-        lengthRle->next(lengthPtr, numValues, notNull);
-
-        // figure out the total length of data we need from the blob stream
-        const size_t totalLength = computeSize(lengthPtr, notNull, numValues);
-
-        // Load data from the blob stream into our buffer until we have enough
-        // to get the rest directly out of the stream's buffer.
-        size_t bytesBuffered = 0;
-        char ptr[totalLength];
-        while (bytesBuffered + lastBufferLength < totalLength) {
-            memcpy(ptr + bytesBuffered, lastBuffer, lastBufferLength);
-            bytesBuffered += lastBufferLength;
-            const void* readBuffer;
-            int readLength;
-            if (!blobStream->Next(&readBuffer, &readLength)) {
-                throw orc::ParseError("failed to read in OmniStringDirectColumnReader.next");
-            }
-            lastBuffer = static_cast<const char*>(readBuffer);
-            lastBufferLength = static_cast<size_t>(readLength);
-        }
-
-        if (bytesBuffered < totalLength) {
-            size_t moreBytes = totalLength - bytesBuffered;
-            memcpy(ptr + bytesBuffered, lastBuffer, moreBytes);
-            lastBuffer += moreBytes;
-            lastBufferLength -= moreBytes;
-        }
-
-        size_t filledSlots = 0;
-        char* tempPtr = ptr;
-        if (notNull) {
-            while (filledSlots < numValues) {
-                if (notNull[filledSlots]) {
-                    //求出长度，如果为char，则需要去除最后的空格
-                    auto len = lengthPtr[filledSlots];
-                    if (is_char) {
-                        FindLastNotEmpty(tempPtr, len);
-                    }
-                    auto data = std::string_view(tempPtr, len);
-                    newVector->SetValue(filledSlots, data);
-
-                    tempPtr += lengthPtr[filledSlots];
-                } else {
-                    newVector->SetNull(filledSlots);
-                }
-                filledSlots += 1;
-            }
-        } else {
-            while (filledSlots < numValues) {
-                //求出长度，如果为char，则需要去除最后的空格
-                auto len = lengthPtr[filledSlots];
-                if (is_char) {
-                    FindLastNotEmpty(tempPtr, len);
-                }
-                auto data = std::string_view(tempPtr, len);
-                newVector->SetValue(filledSlots, data);
-
-                tempPtr += lengthPtr[filledSlots];
-                filledSlots += 1;
-            }
-        }
-
-        omnivec = newVector.release();
-    }
-
-    void OmniDecimal64ColumnReader::nextNorVec(void*& omnivec, uint64_t numValues, char* notNull,
-                                         const orc::Type& baseTp, int* omniTypeId, std::shared_ptr<void>& rVec,
-                                         std::vector<int32_t>& rowVecColumns) {
-        auto newVector = std::make_unique<omniruntime::vec::TVector<omniruntime::type::OMNI_DECIMAL64>>(static_cast<omniruntime::vec::v_size_t>(numValues), omniruntime::type::OMNI_DECIMAL64);
-        bool HasNull = false;
-        char nulls[numValues];
-        readNulls(this, numValues, notNull, nulls, HasNull);
-        notNull = HasNull ? nulls : nullptr;
-        // read the next group of scales
-        int64_t scaleBuffer[numValues];
-        scaleDecoder->next(scaleBuffer, numValues, notNull);
-
-
-        if (notNull) {
-            for(size_t i=0; i < numValues; ++i) {
-                if (notNull[i]) {
-                    int64_t value = 0;
-                    readInt64(value, static_cast<int32_t>(scaleBuffer[i]));
-                    newVector->SetValue(static_cast<int>(i), static_cast<int64_t>(value));
-                } else {
-                    newVector->SetNull(static_cast<int>(i));
-                }
-            }
-        } else {
-            for(size_t i=0; i < numValues; ++i) {
-                int64_t value = 0;
-                readInt64(value, static_cast<int32_t>(scaleBuffer[i]));
-                newVector->SetValue(static_cast<int>(i), static_cast<int64_t>(value));
             }
         }
 
@@ -1043,20 +683,8 @@ namespace omniruntime::reader {
     }
 
     void OmniDecimal64ColumnReader::next(void*& omnivec, uint64_t numValues, char* notNull,
-                                         const orc::Type& baseTp, int* omniTypeId, bool is_row, std::shared_ptr<void>& rVec,
-                                         std::vector<int32_t>& rowVecColumns) {
-        if (is_row) {
-            return nextRowVec(omnivec, numValues, notNull, baseTp, omniTypeId, rVec, rowVecColumns);
-        } else {
-            return nextNorVec(omnivec, numValues, notNull, baseTp, omniTypeId, rVec, rowVecColumns);
-        }
-    }
-
-    void OmniDecimal64ColumnReader::nextRowVec(void*& omnivec, uint64_t numValues, char* notNull,
-                                        const orc::Type& baseTp, int* omniTypeId, std::shared_ptr<void>& rVec,
-                                        std::vector<int32_t>& rowVecColumns) {
-        auto row_vec = std::static_pointer_cast<omniruntime::vec::TRowVector>(rVec);
-        auto newVector = std::make_unique<omniruntime::vec::TVector<omniruntime::type::OMNI_DECIMAL64, omniruntime::vec::OMNI_ROW>>(row_vec);
+                                         const orc::Type& baseTp, int* omniTypeId) {
+        auto newVector = std::make_unique<omniruntime::vec::Vector<int64_t>>(numValues);
         bool HasNull = false;
         char nulls[numValues];
         readNulls(this, numValues, notNull, nulls, HasNull);
@@ -1087,60 +715,9 @@ namespace omniruntime::reader {
         omnivec = newVector.release();
     }
 
-    void OmniDecimal128ColumnReader::nextNorVec(void*& omnivec, uint64_t numValues, char* notNull,
-                                        const orc::Type& baseTp, int* omniTypeId, std::shared_ptr<void>& rVec,
-                                        std::vector<int32_t>& rowVecColumns) {
-        auto newVector = std::make_unique<omniruntime::vec::TVector<omniruntime::type::OMNI_DECIMAL128>>(static_cast<omniruntime::vec::v_size_t>(numValues), omniruntime::type::OMNI_DECIMAL128);
-        bool HasNull = false;
-        char nulls[numValues];
-        readNulls(this, numValues, notNull, nulls, HasNull);
-        notNull = HasNull ? nulls : nullptr;
-        // read the next group of scales
-        int64_t scaleBuffer[numValues];
-
-        scaleDecoder->next(scaleBuffer, numValues, notNull);
-        if (notNull) {
-            for(size_t i=0; i < numValues; ++i) {
-                if (notNull[i]) {
-                    orc::Int128 value = 0;
-                    readInt128(value, static_cast<int32_t>(scaleBuffer[i]));
-                    _int128_t dst = value.getHighBits();
-                    dst <<= 64;
-                    dst |= value.getLowBits();
-                    newVector->SetValue(i, omniruntime::type::Decimal128(dst));
-                } else {
-                    newVector->SetNull(i);
-                }
-            }
-        } else {
-            for(size_t i=0; i < numValues; ++i) {
-                orc::Int128 value = 0;
-                readInt128(value, static_cast<int32_t>(scaleBuffer[i]));
-                __int128_t dst = value.getHighBits();
-                dst <<= 64;
-                dst |= value.getLowBits();
-                newVector->SetValue(i, omniruntime::type::Decimal128(dst));
-            }
-        }
-
-        omnivec = newVector.release();
-    }
-
     void OmniDecimal128ColumnReader::next(void*& omnivec, uint64_t numValues, char* notNull,
-                                   const orc::Type& baseTp, int* omniTypeId, bool is_row, std::shared_ptr<void>& rVec,
-                                   std::vector<int32_t>& rowVecColumns) {
-        if (is_row) {
-            return nextRowVec(omnivec, numValues, notNull, baseTp, omniTypeId, rVec, rowVecColumns);
-        } else {
-            return nextNorVec(omnivec, numValues, notNull, baseTp, omniTypeId, rVec, rowVecColumns);
-        }
-    }
-
-    void OmniDecimal128ColumnReader::nextRowVec(void*& omnivec, uint64_t numValues, char* notNull,
-                                       const orc::Type& baseTp, int* omniTypeId, std::shared_ptr<void>& rVec,
-                                       std::vector<int32_t>& rowVecColumns) {
-        auto row_vec = std::static_pointer_cast<omniruntime::vec::TRowVector>(rVec);
-        auto newVector = std::make_unique<omniruntime::vec::TVector<omniruntime::type::OMNI_DECIMAL128, omniruntime::vec::OMNI_ROW>>(row_vec);
+                                   const orc::Type& baseTp, int* omniTypeId) {
+        auto newVector = std::make_unique<omniruntime::vec::Vector<omniruntime::type::Decimal128>>(numValues);
         bool HasNull = false;
         char nulls[numValues];
         readNulls(this, numValues, notNull, nulls, HasNull);
