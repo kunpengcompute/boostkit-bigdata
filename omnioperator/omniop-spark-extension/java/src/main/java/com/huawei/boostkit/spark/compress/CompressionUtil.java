@@ -17,7 +17,6 @@
 
 package com.huawei.boostkit.spark.compress;
 
-import io.airlift.compress.lz4.Lz4Decompressor;
 import io.airlift.compress.lzo.LzoDecompressor;
 
 public class CompressionUtil {
@@ -30,7 +29,7 @@ public class CompressionUtil {
             case "lzo":
                 return new AircompressorCodec(new LzoDecompressor());
             case "lz4":
-                return new AircompressorCodec(new Lz4Decompressor());
+                return new Lz4Codec();
             default:
                 throw new IllegalArgumentException("Unknown compression codec: " +
                         compressionCodec);
