@@ -20,7 +20,7 @@ import org.apache.commons.configuration2.PropertiesConfiguration
 
 class SparkFetcherConfigure(propertiesConfiguration: PropertiesConfiguration) {
   val enableKey = "spark.enable"
-  val eventLogModeKey = "spark.eventLogs.mode"
+  val eventLogModeKey = "spark.eventlogs.mode"
   val workloadKey = "spark.workload"
   val defaultWorkload = "default"
   val restEventLogMode = "rest"
@@ -29,7 +29,7 @@ class SparkFetcherConfigure(propertiesConfiguration: PropertiesConfiguration) {
   val timeoutKey = "spark.timeout.seconds"
   val logEventLogMode = "log"
   val logDirectoryKey = "spark.log.directory"
-  val maxLogFileSizeInMBKey = "spark.log.maxSize.mb"
+  val maxLogFileSizeInMBKey = "spark.log.maxsize.mb"
 
   val defaultTimeoutSeconds = 30
   val defaultMaxLogSize = 500
