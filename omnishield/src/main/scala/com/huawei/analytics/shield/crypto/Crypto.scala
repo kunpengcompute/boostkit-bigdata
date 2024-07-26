@@ -135,6 +135,19 @@ object AlgorithmMode {
     s.toLowerCase(Locale.ROOT) match {
       case "aes/gcm/nopadding" =>
         AES_GCM_NOPADDING
+      case "sm4/gcm/nopadding" =>
+        SM4_GCM_NOPADDING
+      case _ =>
+        LogError.invalidArgumentError(s"wrong encrypt algorithm: $s, only AES/GCM/NOPadding ," +
+          s" SM4/GCM/NOPADDING are supported.")
+        null
+    }
+  }
+
+  def parseDataFrame(s: String): AlgorithmMode = {
+    s.toLowerCase(Locale.ROOT) match {
+      case "aes/gcm/nopadding" =>
+        AES_GCM_NOPADDING
       case _ =>
         LogError.invalidArgumentError(s"wrong encrypt algorithm: $s, only AES/GCM/NOPadding are supported.")
         null
@@ -165,6 +178,17 @@ object AES_GCM_NOPADDING extends AlgorithmMode {
   override def secretKeyAlgorithm: String = "AES"
 }
 
+/**
+ * AlgorithmMode SM4_GCM_NOPADDING.
+ */
+object SM4_GCM_NOPADDING extends AlgorithmMode {
+
+  override def encryptionAlgorithm: String = "SM4/GCM/NoPadding"
+
+  override def signingAlgorithm: String = "HmacSHA256"
+
+  override def secretKeyAlgorithm: String = "SM4"
+}
 
 /**
  * AlgorithmMode PLAIN_TEXT.

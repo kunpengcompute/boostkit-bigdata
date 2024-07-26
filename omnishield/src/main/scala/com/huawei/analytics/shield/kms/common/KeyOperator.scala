@@ -52,7 +52,7 @@ class KeyOperator(primaryKeyName: String = "",
    * @param input input
    * @return
    */
-  def encoderWithBas64(input: Array[Byte]): String = {
+  def encoderWithBase64(input: Array[Byte]): String = {
     Base64.getEncoder.encodeToString(input)
   }
 
@@ -134,3 +134,4 @@ class FileMetaHandler {
     content
   }
 }
+

@@ -118,7 +118,7 @@ object Encrypt {
       parse(tail, encryptArguments)
 
     case ("-a" | "--Algorithm") :: value :: tail =>
-      encryptArguments.algorithm = AlgorithmMode.parse(value)
+      encryptArguments.algorithm = AlgorithmMode.parseDataFrame(value)
       parse(tail, encryptArguments)
 
     case ("-t" | "--filetype") :: value :: tail =>
@@ -172,3 +172,4 @@ class EncryptArguments(var inputPath: String = "input_data_path",
                        var withHeader: String = "false",
                        var nPartition: Int = 0
                       )
+

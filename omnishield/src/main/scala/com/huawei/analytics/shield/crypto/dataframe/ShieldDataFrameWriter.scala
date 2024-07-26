@@ -69,10 +69,10 @@ class ShieldDataFrameWriter(
       case AES_GCM_NOPADDING =>
         option("compression", "com.huawei.analytics.shield.crypto.CryptoCodec")
         val (dataKeyPlainBytes, dataKeyCipherBytes) = keyOperator.getDataKeyPair
-        val dataKeyPlainTextStr = keyOperator.encoderWithBas64(dataKeyPlainBytes)
+        val dataKeyPlainTextStr = keyOperator.encoderWithBase64(dataKeyPlainBytes)
         sparkSession.sparkContext.hadoopConfiguration
           .set(WRITE_DATA_KEY_PLAIN_TEXT, dataKeyPlainTextStr)
-        val dataKeyCipherTextStr = keyOperator.encoderWithBas64(dataKeyCipherBytes)
+        val dataKeyCipherTextStr = keyOperator.encoderWithBase64(dataKeyCipherBytes)
         sparkSession.sparkContext.hadoopConfiguration
           .set(WRITE_DATA_KEY_CIPHER_TEXT, dataKeyCipherTextStr)
         sparkSession.sparkContext.hadoopConfiguration
@@ -114,4 +114,3 @@ class ShieldDataFrameWriter(
     }
   }
 }
-

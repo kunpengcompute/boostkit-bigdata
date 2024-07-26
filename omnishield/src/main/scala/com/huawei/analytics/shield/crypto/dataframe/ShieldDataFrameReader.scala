@@ -56,7 +56,7 @@ class ShieldDataFrameReader(
       case PLAIN_TEXT =>
       case AES_GCM_NOPADDING =>
         val encryptedDataKeyStr = keyOperator.readEncryptedDataKeyFromMeta(path)
-        val dataKeyPlainKeyStr = keyOperator.encoderWithBas64(keyOperator.getDataKeyPlainText(encryptedDataKeyStr))
+        val dataKeyPlainKeyStr = keyOperator.encoderWithBase64(keyOperator.getDataKeyPlainText(encryptedDataKeyStr))
         sparkSession.sparkContext.hadoopConfiguration
           .set(genShieldReadDataKeyConf(encryptedDataKeyStr), dataKeyPlainKeyStr)
         sparkSession.sparkContext.hadoopConfiguration
@@ -83,3 +83,4 @@ class ShieldDataFrameReader(
     dataFrameReader.options(extraOptions).text(path)
   }
 }
+
