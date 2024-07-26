@@ -46,11 +46,16 @@ elif [ "$action" = 'ut' ]; then
 </configuration>' >core-site.xml
 
   echo "gen keystore"
+  rm -rf ~/kms.jks
   keytool -genkey -alias 'build' -keystore ~/kms.jks -dname "CN=localhost, OU=localhost, O=localhost, L=SH, ST=SH, C=CN" -keypass 123456 -storepass 123456 -validity 180
   cd ${HADOOP_HOME}/etc/hadoop
   echo "123456" >kms.keystore.password
 
   echo "start kms"
+  kmsid=$(ps aux | grep -v grep | grep KMSWebServer | grep "java" | awk '{print $2}')
+  if [ -n "${kmsid}" ];then
+    kill -9 ${kmsid}
+  fi
   cd ${HADOOP_HOME}
   hadoop --daemon start kms
 
