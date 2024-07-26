@@ -160,7 +160,7 @@ namespace omniruntime::reader {
                   const orc::Type& baseTp, int* omniTypeId) override;
 
         template <omniruntime::type::DataTypeId TYPE_ID>
-        void nextByType(void*& omnivec, uint64_t numValues, char* notNull,
+        void nextByType(omniruntime::vec::BaseVector*& omnivec, uint64_t numValues, char* notNull,
                         const orc::Type& baseTp);
 
         void seekToRowGroup(

@@ -482,14 +482,14 @@ namespace omniruntime::reader {
             case omniruntime::type::OMNI_DECIMAL128:
                 throw std::runtime_error("OmniDoubleColumnReader_type DECIMAL64 not finished!!!");
             default:
-                printf("OmniDoubleColumnReader_type swtich no process!!!")
+                printf("OmniDoubleColumnReader_type swtich no process!!!");
         }
 
         omnivec = tempOmnivec.release();
     }
 
     template <omniruntime::type::DataTypeId TYPE_ID>
-    void OmniDoubleColumnReader::nextByType(void*& omnivec, uint64_t numValues, char* notNull,
+    void OmniDoubleColumnReader::nextByType(omniruntime::vec::BaseVector*& omnivec, uint64_t numValues, char* notNull,
                                             const orc::Type& baseTp) {
         bool HasNull = false;
         char nulls[numValues];
