@@ -308,8 +308,8 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] with PredicateHelper{
             case _ =>
               new ColumnarHashAggregateExec(
                 plan.requiredChildDistributionExpressions,
-                plan.isStreaming,
-                plan.numShufflePartitions,
+                compatibleGetWrapper(plan.isStreaming),
+                compatibleGetWrapper(plan.numShufflePartitions),
                 plan.groupingExpressions,
                 plan.aggregateExpressions,
                 plan.aggregateAttributes,
@@ -320,8 +320,8 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] with PredicateHelper{
         } else {
           new ColumnarHashAggregateExec(
             plan.requiredChildDistributionExpressions,
-            plan.isStreaming,
-            plan.numShufflePartitions,
+            compatibleGetWrapper(plan.isStreaming),
+            compatibleGetWrapper(plan.numShufflePartitions),
             plan.groupingExpressions,
             plan.aggregateExpressions,
             plan.aggregateAttributes,
@@ -332,8 +332,8 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] with PredicateHelper{
       } else {
         new ColumnarHashAggregateExec(
           plan.requiredChildDistributionExpressions,
-          plan.isStreaming,
-          plan.numShufflePartitions,
+          compatibleGetWrapper(plan.isStreaming),
+          compatibleGetWrapper(plan.numShufflePartitions),
           plan.groupingExpressions,
           plan.aggregateExpressions,
           plan.aggregateAttributes,
@@ -455,6 +455,15 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] with PredicateHelper{
       val children = plan.children.map(replaceWithColumnarPlan)
       logInfo(s"Columnar Processing for ${p.getClass} is currently not supported.")
       p.withNewChildren(children)
+  }
+
+  private def compatibleGetWrapper[T](value: => T): T = {
+    try {
+      value
+    } catch {
+      case _: NoSuchMethodError =>
+        null.asInstanceOf[T]
+    }
   }
 
   def fallBackBroadcastQueryStage(curPlan: BroadcastQueryStageExec): BroadcastQueryStageExec = {
