@@ -164,13 +164,13 @@ namespace omniruntime::reader {
                 return nextShortRepeats<omniruntime::type::OMNI_INT>
                         (OmniVec, offset, numValues, notNull);
             case omniruntime::type::OMNI_LONG:
-                return nextShortRepeats<omniruntime::type::OMNI_LONG>
+                return nextShortRepeatsLongType<omniruntime::type::OMNI_LONG>
                         (OmniVec, offset, numValues, notNull);
             case omniruntime::type::OMNI_DATE32:
                 return nextShortRepeats<omniruntime::type::OMNI_DATE32>
                         (OmniVec, offset, numValues, notNull);
             case omniruntime::type::OMNI_DATE64:
-                return nextShortRepeats<omniruntime::type::OMNI_DATE64>
+                return nextShortRepeatsLongType<omniruntime::type::OMNI_DATE64>
                         (OmniVec, offset, numValues, notNull);
             case omniruntime::type::OMNI_DOUBLE:
                 return nextShortRepeats<omniruntime::type::OMNI_DOUBLE>
@@ -235,6 +235,52 @@ namespace omniruntime::reader {
 
         return nRead;
     }
+
+	template <omniruntime::type::DataTypeId TYPE_ID>
+	uint64_t OmniRleDecoderV2::nextShortRepeatsLongType(omniruntime::vec::BaseVector*& OmniVec,
+										  uint64_t offset, uint64_t numValues, const char* const notNull) {
+		using namespace omniruntime::type;
+		using T = typename NativeType<TYPE_ID>::type;
+		auto vec = reinterpret_cast<omniruntime::vec::Vector<T>*>(OmniVec);
+
+		if (runRead == runLength) {
+			// extract the number of fixed bytes
+			uint64_t byteSize = (firstByte >> 3) & 0x07;
+			byteSize += 1;
+
+			runLength = firstByte & 0x07;
+			// run lengths values are stored only after MIN_REPEAT value is met
+			runLength += MIN_REPEAT;
+			runRead = 0;
+
+			// read the repeated value which is store using fixed bytes
+			literals[0] = readLongBE(byteSize);
+
+			if (isSigned) {
+				literals[0] = orc::unZigZag(static_cast<uint64_t>(literals[0]));
+			}
+		}
+
+		uint64_t nRead = std::min(runLength - runRead, numValues);
+
+		if (notNull) {
+			for(uint64_t pos = offset; pos < offset + nRead; ++pos) {
+				if (notNull[pos]) {
+					vec->SetValue(pos, static_cast<T>(literals[0]));
+					++runRead;
+				} else {
+					vec->SetNull(pos);
+				}
+			}
+		} else {
+			int64_t values[nRead];
+			std::fill(values, values + nRead, literals[0])
+			vec->SetValues(offset, values, nRead);
+			runRead += nRead;
+		}
+
+		return nRead;
+	}
 
 
     uint64_t OmniRleDecoderV2::nextPatchedByType(omniruntime::vec::BaseVector*& OmniVec,

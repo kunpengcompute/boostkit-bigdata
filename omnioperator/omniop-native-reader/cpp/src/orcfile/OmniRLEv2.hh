@@ -64,6 +64,10 @@ namespace omniruntime::reader {
         uint64_t nextShortRepeats(omniruntime::vec::BaseVector*& omnivec, uint64_t offset, uint64_t numValues,
                                   const char* notNull);
 
+		template <omniruntime::type::DataTypeId TYPE_ID>
+		uint64_t nextShortRepeatsLongType(omniruntime::vec::BaseVector*& OmniVec,
+											  uint64_t offset, uint64_t numValues, const char* const notNull);
+
 
         uint64_t nextPatchedByType(omniruntime::vec::BaseVector*& OmniVec, uint64_t offset, uint64_t numValues,
                                         const char* const notNull, omniruntime::type::DataTypeId dataTypeId);
