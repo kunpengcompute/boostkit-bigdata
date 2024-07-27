@@ -317,7 +317,7 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniRea
 {
     JNI_FUNC_START
     batchLen = (uint64_t)batchSize;
-    return (jlong)0;
+    return (jlong)0xffff;
     JNI_FUNC_END(runtimeExceptionClass)
 }
 
