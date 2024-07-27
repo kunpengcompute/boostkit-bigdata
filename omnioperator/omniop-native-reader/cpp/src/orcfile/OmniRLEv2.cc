@@ -274,7 +274,7 @@ namespace omniruntime::reader {
 			}
 		} else {
 			int64_t values[nRead];
-			std::fill(values, values + nRead, literals[0])
+			std::fill(values, values + nRead, literals[0]);
 			vec->SetValues(offset, values, nRead);
 			runRead += nRead;
 		}
