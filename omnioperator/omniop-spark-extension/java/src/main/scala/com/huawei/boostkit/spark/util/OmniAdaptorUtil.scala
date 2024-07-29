@@ -209,6 +209,9 @@ object OmniAdaptorUtil {
   def genSortParam(output: Seq[Attribute], sortOrder: Seq[SortOrder]):
       (Array[nova.hetu.omniruntime.`type`.DataType], Array[Int], Array[Int], Array[String]) = {
     val inputColSize: Int = output.size
+    if (inputColSize == 0) {
+      throw new UnsupportedOperationException("input column size should not be 0!")
+    }
     val sourceTypes = new Array[nova.hetu.omniruntime.`type`.DataType](inputColSize)
     val ascending = new Array[Int](sortOrder.size)
     val nullFirsts = new Array[Int](sortOrder.size)
