@@ -192,11 +192,11 @@ public class ParquetColumnarBatchScanReader {
             json.put("type", 0);
         } else {
             putType(json, field);
-            List<String> literals = new ArrayList<>();
-            for (Object value: values) {
-                literals.add(getValue(value));
+            String[] literals = new String[values.length];
+            for (int i = 0; i < values.length; i++) {
+                literals[i] = getValue(values[i]);
             }
-            json.put("literal", literals.toArray());
+            json.put("literal", literals);
         }
     }
 
@@ -243,16 +243,19 @@ public class ParquetColumnarBatchScanReader {
         if (value == null) {
             return null;
         }
-        String simpleName = value.getClass().getSimpleName();
-        switch (simpleName) {
-            case "Integer":
-            case "Long":
-            case "String":
-            case "LocalDate":
-            case "BigDecimal":
-                return value.toString();
-            default:
-                throw new ParquetDecodingException("Unsupported parquet push down filter date type: " + simpleName);
+        if (value instanceof Integer) {
+            return value.toString();
+        } else if (value instanceof Long) {
+            return value.toString();
+        } else if (value instanceof String) {
+            return (String) value;
+        } else if (value instanceof LocalDate) {
+            return value.toString();
+        } else if (value instanceof BigDecimal) {
+            return value.toString();
+        } else {
+            String simpleName = value.getClass().getSimpleName();
+            throw new ParquetDecodingException("Unsupported parquet push down filter date type: " + simpleName);
         }
     }
 
