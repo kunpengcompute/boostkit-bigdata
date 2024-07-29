@@ -27,6 +27,8 @@ public class ParquetColumnarBatchJniReader {
 
     public native long initializeReader(JSONObject job);
 
+    public native long initializeReaderV2(JSONObject job);
+
     public native long recordReaderNext(long parquetReader, long[] vecNativeId);
 
     public native void recordReaderClose(long parquetReader);
