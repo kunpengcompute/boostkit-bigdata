@@ -22,6 +22,8 @@ import junit.framework.TestCase;
 import nova.hetu.omniruntime.vector.Vec;
 import org.apache.hadoop.fs.Path;
 import org.apache.spark.sql.types.DataType;
+import org.apache.spark.sql.types.StructField;
+import org.apache.spark.sql.types.StructType;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.FixMethodOrder;
@@ -30,7 +32,6 @@ import org.junit.runners.MethodSorters;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 import static org.apache.spark.sql.types.DataTypes.*;
@@ -41,24 +42,39 @@ public class ParquetColumnarBatchJniReaderTest extends TestCase {
 
     private Vec[] vecs;
 
+    private StructType schema;
     private List<DataType> types;
 
     @Before
     public void setUp() throws Exception {
-        parquetColumnarBatchScanReader = new ParquetColumnarBatchScanReader();
+        constructSchema();
+        parquetColumnarBatchScanReader = new ParquetColumnarBatchScanReader(schema);
 
-        List<Integer> rowGroupIndices = new ArrayList<>();
-        rowGroupIndices.add(0);
-        List<Integer> columnIndices = new ArrayList<>();
-        Collections.addAll(columnIndices, 0, 1, 3, 6, 7, 8, 9, 10, 12);
-        types = new ArrayList<>();
-        Collections.addAll(types, IntegerType, StringType, LongType, DoubleType, createDecimalType(9, 8),
-                createDecimalType(18, 5), BooleanType, ShortType, DateType);
         File file = new File("../../omniop-native-reader/cpp/test/tablescan/resources/parquet_data_all_type");
         String path = file.getAbsolutePath();
-        parquetColumnarBatchScanReader.initializeReaderJava(new Path(path), 100000, rowGroupIndices, columnIndices, "root@sample");
+        parquetColumnarBatchScanReader.initializeReaderJava(new Path(path), 0, 100000,
+                4096, null);
         vecs = new Vec[9];
     }
+
+    private void constructSchema() {
+        schema = new StructType()
+            .add("c1", IntegerType)
+            .add("c2", StringType)
+            .add("c4", LongType)
+            .add("c7", DoubleType)
+            .add("c8", createDecimalType(9, 8))
+            .add("c9", createDecimalType(18, 5))
+            .add("c10", BooleanType)
+            .add("c11", ShortType)
+            .add("c13", DateType);
+
+        types = new ArrayList<>();
+        for (StructField f: schema.fields()) {
+            types.add(f.dataType());
+        }
+    }
+
 
     @After
     public void tearDown() throws Exception {

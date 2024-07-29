@@ -11,6 +11,7 @@ set (SOURCE_FILES
         parquet/ParquetColumnReader.cpp
         parquet/ParquetTypedRecordReader.cpp
         parquet/ParquetDecoder.cpp
+        parquet/ParquetExpression.cpp
         common/UriInfo.cc
         orcfile/OrcFileOverride.cc
         orcfile/OrcHdfsFileOverride.cc
@@ -42,6 +43,7 @@ add_library (${PROJ_TARGET} SHARED ${SOURCE_FILES} ${PROTO_SRCS} ${PROTO_HDRS} $
 
 find_package(Arrow REQUIRED)
 find_package(Parquet REQUIRED)
+find_package(ArrowDataset REQUIRED)
 
 #JNI
 target_include_directories(${PROJ_TARGET} PUBLIC $ENV{JAVA_HOME}/include)
@@ -50,6 +52,7 @@ target_include_directories(${PROJ_TARGET} PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
 
 target_link_libraries (${PROJ_TARGET} PUBLIC
         Arrow::arrow_shared
+        ArrowDataset::arrow_dataset_shared
         Parquet::parquet_shared
         orc
         boostkit-omniop-vector-1.5.0-aarch64

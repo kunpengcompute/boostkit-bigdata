@@ -20,20 +20,22 @@
 #include "ParquetColumnarBatchJniReader.h"
 #include "jni_common.h"
 #include "parquet/ParquetReader.h"
+#include "parquet/ParquetExpression.h"
 #include "common/UriInfo.h"
 
 using namespace omniruntime::reader;
 
-std::vector<int> GetIndices(JNIEnv *env, jobject jsonObj, const char* name)
+std::vector<std::string> GetFieldNames(JNIEnv *env, jobject jsonObj)
 {
-    jintArray indicesArray = (jintArray)env->CallObjectMethod(jsonObj, jsonMethodObj, env->NewStringUTF(name));
-    auto length = static_cast<int32_t>(env->GetArrayLength(indicesArray));
-    auto ptr = env->GetIntArrayElements(indicesArray, JNI_FALSE);
-    std::vector<int> indices;
+    jobjectArray strArray = (jobjectArray)env->CallObjectMethod(jsonObj, jsonMethodObj, env->NewStringUTF("fieldNames"));
+    auto length = static_cast<int32_t>(env->GetArrayLength(strArray));
+    std::vector<std::string> indices;
     for (int32_t i = 0; i < length; i++) {
-        indices.push_back(ptr[i]);
+        jstring str = (jstring) env->GetObjectArrayElement(strArray, i);
+        const char *cstr = env->GetStringUTFChars(str, JNI_FALSE);
+        indices.push_back(cstr);
+        env->ReleaseStringUTFChars(str, cstr);
     }
-    env->ReleaseIntArrayElements(indicesArray, ptr, 0);
     return indices;
 }
 
@@ -74,12 +76,27 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_ParquetColumnarBatchJn
     // Get capacity for each record batch
     int64_t capacity = (int64_t)env->CallLongMethod(jsonObj, jsonMethodLong, env->NewStringUTF("capacity"));
 
-    // Get RowGroups and Columns indices
-    auto row_group_indices = GetIndices(env, jsonObj, "rowGroupIndices");
-    auto column_indices = GetIndices(env, jsonObj, "columnIndices");
+    int64_t start = (int64_t)env->CallLongMethod(jsonObj, jsonMethodLong, env->NewStringUTF("start"));
+    int64_t end = (int64_t)env->CallLongMethod(jsonObj, jsonMethodLong, env->NewStringUTF("end"));
+
+    // Get Filter Expression
+    bool hasExpressionTree = static_cast<bool>(env->CallBooleanMethod(jsonObj, jsonMethodHas, env->NewStringUTF("expressionTree")));
+    Expression pushedFilterArray;
+    if (hasExpressionTree) {
+        jobject expressionTree = env->CallObjectMethod(jsonObj, jsonMethodJsonObj, env->NewStringUTF("expressionTree"));
+        auto result = omniruntime::reader::ParseToArrowExpression(env, expressionTree);
+        if (!result.ok()) {
+            env->ThrowNew(runtimeExceptionClass, result.status().ToString().c_str());
+            return 0;
+        }
+        pushedFilterArray = result.MoveValueUnsafe();
+    }
+
+    auto fieldNames = GetFieldNames(env, jsonObj);
 
     ParquetReader *pReader = new ParquetReader();
-    auto state = pReader->InitRecordReader(uriInfo, capacity, row_group_indices, column_indices, ugiString);
+    auto state = pReader->InitRecordReader(uriInfo, start, end, capacity, hasExpressionTree, pushedFilterArray,
+        fieldNames, ugiString);
     if (state != Status::OK()) {
         env->ThrowNew(runtimeExceptionClass, state.ToString().c_str());
         return 0;
