@@ -107,6 +107,7 @@ public class ParquetColumnarBatchScanReader {
         return;
     }
 
+    // more complex filters not supported yet
     enum ParquetPredicateOperator {
         And,
         Or,
@@ -121,68 +122,60 @@ public class ParquetColumnarBatchScanReader {
         In
     }
 
+    // only pushdown spark extension supported types
     enum ParquetPredicateDataType {
         Null,
         Integer,
         Long,
         String,
         Date32,
-        Decimal
+        Decimal,
+        Bool,
+        Short,
+        Double
     }
 
     private JSONObject getSubJson(Filter filterPredicate) {
         JSONObject jsonObject = new JSONObject();
-        String simpleName = filterPredicate.getClass().getSimpleName();
-        switch (simpleName) {
-            case "And":
-                And and  = (And) filterPredicate;
-                putBinaryOp(jsonObject, ParquetPredicateOperator.And, and.left(), and.right());
-                break;
-            case "Or":
-                Or or  = (Or) filterPredicate;
-                putBinaryOp(jsonObject, ParquetPredicateOperator.Or, or.left(), or.right());
-                break;
-            case "Not":
-                jsonObject.put("op", ParquetPredicateOperator.Not.ordinal());
-                jsonObject.put("predicate", getSubJson(((Not) filterPredicate).child()));
-                break;
-            case "EqualTo":
-                EqualTo eq = (EqualTo) filterPredicate;
-                putCompareOp(jsonObject, ParquetPredicateOperator.Eq, eq.attribute(), eq.value());
-                break;
-            case "GreaterThan":
-                GreaterThan gt = (GreaterThan) filterPredicate;
-                putCompareOp(jsonObject, ParquetPredicateOperator.Gt, gt.attribute(), gt.value());
-                break;
-            case "GreaterThanOrEqual":
-                GreaterThanOrEqual gtEq = (GreaterThanOrEqual) filterPredicate;
-                putCompareOp(jsonObject, ParquetPredicateOperator.GtEq, gtEq.attribute(), gtEq.value());
-                break;
-            case "LessThan":
-                LessThan lt = (LessThan) filterPredicate;
-                putCompareOp(jsonObject, ParquetPredicateOperator.Gt, lt.attribute(), lt.value());
-                break;
-            case "LessThanOrEqual":
-                LessThanOrEqual ltEq = (LessThanOrEqual) filterPredicate;
-                putCompareOp(jsonObject, ParquetPredicateOperator.GtEq, ltEq.attribute(), ltEq.value());
-                break;
-            case "IsNotNull":
-                IsNotNull isNotNull = (IsNotNull) filterPredicate;
-                jsonObject.put("op", ParquetPredicateOperator.IsNotNull.ordinal());
-                jsonObject.put("field", isNotNull.attribute());
-                break;
-            case "IsNull":
-                IsNull isNull = (IsNull) filterPredicate;
-                jsonObject.put("op", ParquetPredicateOperator.IsNull.ordinal());
-                jsonObject.put("field", isNull.attribute());
-                break;
-            case "In":
-                In in = (In) filterPredicate;
-                jsonObject.put("op", ParquetPredicateOperator.In.ordinal());
-                putInOp(jsonObject, in.attribute(), Arrays.stream(in.values()).toArray());
-                break;
-            default:
-                throw new ParquetDecodingException("Unsupported parquet push down filter operation: " + simpleName);
+        if (filterPredicate instanceof And) {
+            And and  = (And) filterPredicate;
+            putBinaryOp(jsonObject, ParquetPredicateOperator.And, and.left(), and.right());
+        } else if (filterPredicate instanceof Or) {
+            Or or  = (Or) filterPredicate;
+            putBinaryOp(jsonObject, ParquetPredicateOperator.Or, or.left(), or.right());
+        } else if (filterPredicate instanceof Not) {
+            jsonObject.put("op", ParquetPredicateOperator.Not.ordinal());
+            jsonObject.put("predicate", getSubJson(((Not) filterPredicate).child()));
+        } else if (filterPredicate instanceof EqualTo) {
+            EqualTo eq = (EqualTo) filterPredicate;
+            putCompareOp(jsonObject, ParquetPredicateOperator.Eq, eq.attribute(), eq.value());
+        } else if (filterPredicate instanceof GreaterThan) {
+            GreaterThan gt = (GreaterThan) filterPredicate;
+            putCompareOp(jsonObject, ParquetPredicateOperator.Gt, gt.attribute(), gt.value());
+        } else if (filterPredicate instanceof GreaterThanOrEqual) {
+            GreaterThanOrEqual gtEq = (GreaterThanOrEqual) filterPredicate;
+            putCompareOp(jsonObject, ParquetPredicateOperator.GtEq, gtEq.attribute(), gtEq.value());
+        } else if (filterPredicate instanceof LessThan) {
+            LessThan lt = (LessThan) filterPredicate;
+            putCompareOp(jsonObject, ParquetPredicateOperator.Lt, lt.attribute(), lt.value());
+        } else if (filterPredicate instanceof LessThanOrEqual) {
+            LessThanOrEqual ltEq = (LessThanOrEqual) filterPredicate;
+            putCompareOp(jsonObject, ParquetPredicateOperator.LtEq, ltEq.attribute(), ltEq.value());
+        } else if (filterPredicate instanceof IsNotNull) {
+            IsNotNull isNotNull = (IsNotNull) filterPredicate;
+            jsonObject.put("op", ParquetPredicateOperator.IsNotNull.ordinal());
+            jsonObject.put("field", isNotNull.attribute());
+        } else if (filterPredicate instanceof IsNull) {
+            IsNull isNull = (IsNull) filterPredicate;
+            jsonObject.put("op", ParquetPredicateOperator.IsNull.ordinal());
+            jsonObject.put("field", isNull.attribute());
+        } else if (filterPredicate instanceof In) {
+            In in = (In) filterPredicate;
+            jsonObject.put("op", ParquetPredicateOperator.In.ordinal());
+            putInOp(jsonObject, in.attribute(), Arrays.stream(in.values()).toArray());
+        } else {
+            String simpleName = filterPredicate.getClass().getSimpleName();
+            throw new ParquetDecodingException("Unsupported parquet push down filter operation: " + simpleName);
         }
         return jsonObject;
     }
@@ -222,21 +215,26 @@ public class ParquetColumnarBatchScanReader {
         }
     }
 
-    private int getParquetPredicateDataType(Object value) {
-        String simpleName = value.getClass().getSimpleName();
-        switch (simpleName) {
-            case "IntegerType$":
-                return ParquetPredicateDataType.Integer.ordinal();
-            case "LongType$":
-                return ParquetPredicateDataType.Long.ordinal();
-            case "StringType$":
-                return ParquetPredicateDataType.String.ordinal();
-            case "DateType$":
-                return ParquetPredicateDataType.Date32.ordinal();
-            case "DecimalType":
-                return ParquetPredicateDataType.Decimal.ordinal();
-            default:
-                throw new ParquetDecodingException("Unsupported parquet push down filter date type: " + simpleName);
+    private int getParquetPredicateDataType(DataType value) {
+        if (value instanceof IntegerType) {
+            return ParquetPredicateDataType.Integer.ordinal();
+        } else if (value instanceof LongType) {
+            return ParquetPredicateDataType.Long.ordinal();
+        } else if (value instanceof StringType) {
+            return ParquetPredicateDataType.String.ordinal();
+        } else if (value instanceof DateType) {
+            return ParquetPredicateDataType.Date32.ordinal();
+        } else if (value instanceof DecimalType) {
+            return ParquetPredicateDataType.Decimal.ordinal();
+        } else if (value instanceof BooleanType) {
+            return ParquetPredicateDataType.Bool.ordinal();
+        } else if (value instanceof ShortType) {
+            return ParquetPredicateDataType.Short.ordinal();
+        } else if (value instanceof DoubleType) {
+            return ParquetPredicateDataType.Double.ordinal();
+        } else {
+            String simpleName = value.getClass().getSimpleName();
+            throw new ParquetDecodingException("Unsupported parquet push down filter date type: " + simpleName);
         }
     }
 
@@ -253,6 +251,12 @@ public class ParquetColumnarBatchScanReader {
         } else if (value instanceof LocalDate) {
             return value.toString();
         } else if (value instanceof BigDecimal) {
+            return value.toString();
+        } else if (value instanceof Boolean) {
+            return value.toString();
+        } else if (value instanceof Short) {
+            return value.toString();
+        } else if (value instanceof Double) {
             return value.toString();
         } else {
             String simpleName = value.getClass().getSimpleName();
