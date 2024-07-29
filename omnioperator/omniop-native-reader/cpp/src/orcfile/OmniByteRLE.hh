@@ -50,7 +50,7 @@ namespace omniruntime::reader {
         void nextByType(omniruntime::vec::BaseVector*& omnivec, uint64_t numValues, char* notNull,
                     const orc::Type* baseTp);
 
-        protected:
+    protected:
             inline void nextBuffer();
             inline signed char readByte();
             inline void readHeader();
@@ -90,7 +90,7 @@ namespace omniruntime::reader {
         void nextByType(omniruntime::vec::BaseVector*& omnivec, uint64_t numValues, char* notNull,
                     const orc::Type* baseTp, int omniTypeId);
 
-        protected:
+    protected:
             size_t remainingBits;
             char lastByte;
     };
