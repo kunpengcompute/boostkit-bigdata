@@ -27,11 +27,13 @@ import nova.hetu.omniruntime.constants.JoinType._
 import nova.hetu.omniruntime.operator.OmniExprVerify
 import com.huawei.boostkit.spark.ColumnarPluginConfig
 import org.apache.spark.internal.Logging
+import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate._
 import org.apache.spark.sql.catalyst.optimizer.NormalizeNaNAndZero
 import org.apache.spark.sql.catalyst.plans.{FullOuter, Inner, JoinType, LeftAnti, LeftOuter, LeftSemi, RightOuter}
 import org.apache.spark.sql.catalyst.util.CharVarcharUtils.getRawTypeString
+import org.apache.spark.sql.execution
 import org.apache.spark.sql.execution.ColumnarBloomFilterSubquery
 import org.apache.spark.sql.expression.ColumnarExpressionConverter
 import org.apache.spark.sql.hive.HiveUdfAdaptorUtil
@@ -125,6 +127,22 @@ object OmniExpressionAdaptor extends Logging {
                                                            exprsIndexMap: Map[ExprId, Int],
                                                            returnDatatype: DataType): JSONObject = {
     expr match {
+      case subquery: execution.ScalarSubquery =>
+        var result: Any = null
+        try {
+          result = subquery.eval(InternalRow.empty)
+        } catch {
+          case e: IllegalArgumentException => logDebug(e.getMessage)
+        }
+        if (result == null) {
+          new JSONObject().put("exprType", "LITERAL")
+            .addOmniExpJsonType("dataType", subquery.dataType)
+            .put("isNull", true)
+            .put("value", result)
+        } else {
+          val literal = Literal(result, subquery.dataType)
+          toOmniJsonLiteral(literal)
+        }
       case unscaledValue: UnscaledValue =>
         new JSONObject().put("exprType", "FUNCTION")
           .addOmniExpJsonType("returnType", unscaledValue.dataType)
