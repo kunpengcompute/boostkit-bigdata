@@ -64,22 +64,22 @@ namespace omniruntime::reader {
                 nextByType<omniruntime::type::OMNI_BOOLEAN>(pushOmniVec, numValues, notNull, baseTp, omniTypeId);
                 break;
             case omniruntime::type::OMNI_SHORT:
-                throw std::runtime_error("OmniBooleanRleDecoder CHAR not finished!!!");
+                throw std::runtime_error("OmniBooleanRleDecoder SHORT not finished!!!");
                 break;
             case omniruntime::type::OMNI_INT:
-                throw std::runtime_error("OmniBooleanRleDecoder CHAR not finished!!!");
+                throw std::runtime_error("OmniBooleanRleDecoder INT not finished!!!");
                 break;
             case omniruntime::type::OMNI_LONG:
-                throw std::runtime_error("OmniBooleanRleDecoder CHAR not finished!!!");
+                throw std::runtime_error("OmniBooleanRleDecoder LONG not finished!!!");
                 break;
             case omniruntime::type::OMNI_DATE32:
-                throw std::runtime_error("OmniBooleanRleDecoder CHAR not finished!!!");
+                throw std::runtime_error("OmniBooleanRleDecoder DATE32 not finished!!!");
                 break;
             case omniruntime::type::OMNI_DATE64:
-                throw std::runtime_error("OmniBooleanRleDecoder CHAR not finished!!!");
+                throw std::runtime_error("OmniBooleanRleDecoder DATE64 not finished!!!");
                 break;
             case omniruntime::type::OMNI_DOUBLE:
-                throw std::runtime_error("OmniBooleanRleDecoder CHAR not finished!!!");
+                throw std::runtime_error("OmniBooleanRleDecoder DOUBLE not finished!!!");
                 break;
             case omniruntime::type::OMNI_CHAR:
                 throw std::runtime_error("OmniBooleanRleDecoder CHAR not finished!!!");
