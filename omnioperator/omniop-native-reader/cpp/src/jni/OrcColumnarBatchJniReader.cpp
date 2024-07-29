@@ -346,7 +346,7 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniRea
     int32_t arrLen = (int32_t) env->GetArrayLength(typeId);
     VectorBatch* omniVecBatch = new VectorBatch(batchLen);
 
-    if (rowReaderPtr->next(omniVecBatch, nullptr)) {
+    if (rowReaderPtr->next(omniVecBatch, ptr)) {
         batchRowSize = omniVecBatch->GetRowCount();
         int32_t vecCnt = omniVecBatch->GetVectorCount();
         if (vecCnt != arrLen) {
