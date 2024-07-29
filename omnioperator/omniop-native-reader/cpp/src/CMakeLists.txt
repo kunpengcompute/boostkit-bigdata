@@ -14,6 +14,10 @@ set (SOURCE_FILES
         common/UriInfo.cc
         orcfile/OrcFileOverride.cc
         orcfile/OrcHdfsFileOverride.cc
+        orcfile/OmniRowReaderImpl.cc
+        orcfile/OmniRLEv2.cc
+        orcfile/OmniColReader.cc
+        orcfile/OmniByteRLE.cc
         filesystem/hdfs_file.cpp
         filesystem/hdfs_filesystem.cpp
         filesystem/io_exception.cpp
