@@ -116,7 +116,9 @@ long Test_splitter_nativeMake(std::string partitioning_name,
                               const char* compression_type_jstr,
                               std::string data_file_jstr,
                               int num_sub_dirs,
-                              std::string local_dirs_jstr);
+                              std::string local_dirs_jstr,
+                              uint64_t task_spill_mem_threshold = 2L * 1024 * 1024 * 1024,
+                              uint64_t executor_spill_mem_threshold = UINT64_MAX);
 
 void Test_splitter_split(long splitter_id, VectorBatch* vb);
 

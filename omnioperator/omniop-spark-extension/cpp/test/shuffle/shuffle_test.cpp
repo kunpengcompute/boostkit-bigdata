@@ -223,6 +223,67 @@ TEST_F (ShuffleTest, Split_Mix_LargeSize) {
     delete[] inputDataTypes.inputDataScales;
 }
 
+TEST_F (ShuffleTest, Split_Mix_LargeSize_WithTaskSpill) {
+    tmpShuffleFilePath = tmpTestingDir + "/shuffle_split_mix_largeSize_withTaskSpill";
+    int32_t inputVecTypeIds[] = {OMNI_INT, OMNI_LONG, OMNI_DOUBLE, OMNI_VARCHAR};
+    int colNumber = sizeof(inputVecTypeIds) / sizeof(inputVecTypeIds[0]);
+    InputDataTypes inputDataTypes;
+    inputDataTypes.inputVecTypeIds = inputVecTypeIds;
+    inputDataTypes.inputDataPrecisions = new uint32_t[colNumber];
+    inputDataTypes.inputDataScales = new uint32_t[colNumber];
+    int partitionNum = 4;
+    long splitterAddr = Test_splitter_nativeMake("hash",
+                                              partitionNum,
+                                              inputDataTypes,
+                                              colNumber,
+                                              4096,
+                                              "lz4",
+                                              tmpShuffleFilePath,
+                                              0,
+                                              tmpTestingDir,
+                                              1024 * 1024,
+                                              UINT64_MAX);
+    for (uint64_t j = 0; j < 999; j++) {
+        VectorBatch* vb = CreateVectorBatch_4col_withPid(partitionNum, 1000);
+        Test_splitter_split(splitterAddr, vb);
+    }
+    Test_splitter_stop(splitterAddr);
+    Test_splitter_close(splitterAddr);
+    delete[] inputDataTypes.inputDataPrecisions;
+    delete[] inputDataTypes.inputDataScales;
+}
+
+TEST_F (ShuffleTest, Split_Mix_LargeSize_WithExecutorSpill) {
+    tmpShuffleFilePath = tmpTestingDir + "/shuffle_split_mix_largeSize_withExecutorSpill";
+    int32_t inputVecTypeIds[] = {OMNI_INT, OMNI_LONG, OMNI_DOUBLE, OMNI_VARCHAR};
+    int colNumber = sizeof(inputVecTypeIds) / sizeof(inputVecTypeIds[0]);
+    InputDataTypes inputDataTypes;
+    inputDataTypes.inputVecTypeIds = inputVecTypeIds;
+    inputDataTypes.inputDataPrecisions = new uint32_t[colNumber];
+    inputDataTypes.inputDataScales = new uint32_t[colNumber];
+    int partitionNum = 4;
+    uint64_t limit = 1024 * 1024; // 1MB
+    long splitterAddr = Test_splitter_nativeMake("hash",
+                                              partitionNum,
+                                              inputDataTypes,
+                                              colNumber,
+                                              4096,
+                                              "lz4",
+                                              tmpShuffleFilePath,
+                                              0,
+                                              tmpTestingDir,
+                                              UINT64_MAX,
+                                              0.9 * limit);
+    for (uint64_t j = 0; j < 999; j++) {
+        VectorBatch* vb = CreateVectorBatch_4col_withPid(partitionNum, 1000);
+        Test_splitter_split(splitterAddr, vb);
+    }
+    Test_splitter_stop(splitterAddr);
+    Test_splitter_close(splitterAddr);
+    delete[] inputDataTypes.inputDataPrecisions;
+    delete[] inputDataTypes.inputDataScales;
+}
+
 TEST_F (ShuffleTest, Split_Short_10WRows) {
     tmpShuffleFilePath = tmpTestingDir + "/shuffle_split_short_10WRows";
     int32_t inputVecTypeIds[] = {OMNI_SHORT};

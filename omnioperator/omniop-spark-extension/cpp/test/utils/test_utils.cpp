@@ -411,7 +411,9 @@ long Test_splitter_nativeMake(std::string partitioning_name,
                               const char* compression_type_jstr,
                               std::string data_file_jstr,
                               int num_sub_dirs,
-                              std::string local_dirs_jstr) {
+                              std::string local_dirs_jstr,
+                              uint64_t task_spill_mem_threshold,
+                              uint64_t executor_spill_mem_threshold) {
     auto splitOptions = SplitOptions::Defaults();
     if (buffer_size > 0) {
         splitOptions.buffer_size = buffer_size;
@@ -423,6 +425,8 @@ long Test_splitter_nativeMake(std::string partitioning_name,
     auto compression_type_result = GetCompressionType(compression_type_jstr);
     splitOptions.compression_type = compression_type_result;
     splitOptions.data_file = data_file_jstr;
+    splitOptions.task_spill_mem_threshold = task_spill_mem_threshold;
+    splitOptions.executor_spill_mem_threshold = executor_spill_mem_threshold;
     auto splitter = Splitter::Make(partitioning_name, inputDataTypes, numCols, num_partitions, std::move(splitOptions));
     return reinterpret_cast<intptr_t>(static_cast<void *>(splitter));
 }

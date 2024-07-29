@@ -89,7 +89,7 @@ static std::vector<VectorBatch *> generateData(int rows, int cols, int* inputTyp
         auto pidVec = constructPidVec(rows);
         vecBatch->Append(pidVec);
         auto vecs = constructVecs(rows, cols, inputTypeIds, nullProbability);
-        for (int j = 0; j < vecs.size(); ++j) {
+        for (uint32_t j = 0; j < vecs.size(); ++j) {
             vecBatch->Append(vecs[j]);
         }
         vecBatches[i] = vecBatch;
@@ -104,7 +104,7 @@ static std::vector<VectorBatch *> copyData(const std::vector<VectorBatch *>& ori
         auto originBatch = origin[i];
         auto vecBatch = new VectorBatch(originBatch->GetRowCount());
 
-        for (int j = 0; j < originBatch->GetVectorCount(); ++j) {
+        for (uint32_t j = 0; j < originBatch->GetVectorCount(); ++j) {
             BaseVector *vec = originBatch->Get(j);
             BaseVector *sliceVec = VectorHelper::SliceVector(vec, 0, originBatch->GetRowCount());
             vecBatch->Append(sliceVec);
@@ -128,7 +128,7 @@ static void bm_row_handle(const std::vector<VectorBatch *>& vecBatches, int *inp
     splitOptions.compression_type = compression_type_result;
     auto splitter = Splitter::Make("hash", inputDataTypes, cols, PARTITION_SIZE, std::move(splitOptions));
 
-    for ( int i = 0; i < vecBatches.size(); ++i) {
+    for (uint32_t i = 0; i < vecBatches.size(); ++i) {
         VectorBatch *vb = vecBatches[i];
         splitter->SplitByRow(vb);
     }
@@ -156,7 +156,7 @@ static void bm_col_handle(const std::vector<VectorBatch *>& vecBatches, int *inp
     splitOptions.compression_type = compression_type_result;
     auto splitter = Splitter::Make("hash", inputDataTypes, cols, PARTITION_SIZE, std::move(splitOptions));
 
-    for ( int i = 0; i < vecBatches.size(); ++i) {
+    for (uint32_t i = 0; i < vecBatches.size(); ++i) {
         VectorBatch *vb = vecBatches[i];
         splitter->Split(*vb);
     }
