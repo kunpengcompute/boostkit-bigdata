@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2023-2024. Huawei Technologies Co., Ltd. All rights reserved.
+ * Copyright (C) 2024-2024. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -41,8 +41,14 @@ Result<std::shared_ptr<DataType>> GetLiteralDataType(JNIEnv *env, jobject &expre
             int32_t scale = (int32_t)env->CallIntMethod(expressionTree, jsonMethodInt, env->NewStringUTF("scale"));
             return arrow::decimal(precision, scale);
         }
+        case PredicateDataType::Bool:
+            return arrow::boolean();
+        case PredicateDataType::Short:
+            return arrow::int16();
+        case PredicateDataType::Double:
+            return arrow::float64();
         default:
-            return Status::Invalid("Unsupported literal data type");
+            return Status::Invalid("Unsupported literal data type " + type);
     }
 }
 
@@ -166,7 +172,7 @@ arrow::Result<Expression> ParseToArrowExpression(JNIEnv *env, jobject &expressio
             return arrow::compute::call("is_in", {fieldExpr}, compute::SetLookupOptions{set});
         }
         default:
-            return Status::Invalid("ParquetPredicateOperator is not supported");
+            return Status::Invalid("ParquetPredicateOperator is not supported: " + op);
     }
 }
 
