@@ -13,6 +13,10 @@ set (SOURCE_FILES
         parquet/ParquetDecoder.cpp
         orcfile/OrcFileOverride.cc
         orcfile/OrcHdfsFileOverride.cc
+        orcfile/OmniRowReaderImpl.cc
+        orcfile/OmniRLEv2.cc
+        orcfile/OmniColReader.cc
+        orcfile/OmniByteRLE.cc
         common/UriInfo.cc
         filesystem/hdfs_file.cpp
         filesystem/hdfs_filesystem.cpp
