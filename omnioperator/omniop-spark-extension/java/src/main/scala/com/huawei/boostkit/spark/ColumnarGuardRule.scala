@@ -94,10 +94,23 @@ case class ColumnarGuardRule() extends Rule[SparkPlan] {
           ColumnarExpandExec(plan.projections, plan.output, plan.child).buildCheck()
         case plan: HashAggregateExec =>
           if (!enableColumnarHashAgg) return false
+          // Compatible with version 3.2.0
+          val isStreaming = try {
+             plan.isStreaming
+          } catch {
+            case _: NoSuchMethodError =>
+              false
+          }
+          val numShufflePartitions = try {
+            plan.numShufflePartitions
+          } catch {
+            case _: NoSuchMethodError =>
+              null
+          }
           new ColumnarHashAggregateExec(
             plan.requiredChildDistributionExpressions,
-            plan.isStreaming,
-            plan.numShufflePartitions,
+            isStreaming = isStreaming,
+            numShufflePartitions,
             plan.groupingExpressions,
             plan.aggregateExpressions,
             plan.aggregateAttributes,
