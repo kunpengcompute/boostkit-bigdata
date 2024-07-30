@@ -460,9 +460,6 @@ public class OutStream extends PositionedOutputStream {
       compressed.flip();
       outputBuffer(compressed);
     }
-    if (cipher != null) {
-      finishEncryption();
-    }
     compressed = null;
     uncompressedBytes = 0;
     compressedBytes = 0;

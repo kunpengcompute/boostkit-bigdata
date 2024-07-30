@@ -234,11 +234,11 @@ public class HadoopShimsPre2_7 implements HadoopShims {
    */
   static EncryptionAlgorithm findAlgorithm(KeyProviderCryptoExtension.Metadata meta) {
     String cipher = meta.getCipher();
-    if (cipher.startsWith("SM4/")) {
+    if (cipher.startsWith("SM4/GCM/NoPadding")) {
       return EncryptionAlgorithm.SM4_GCM_128;
     }
-    throw new IllegalArgumentException("ORC column encryption only supports" +
-        " AES and not " + cipher);
+    throw new IllegalArgumentException("OmniShield ORC column encryption only supports" +
+            " SM4/GCM/NoPadding and not " + cipher);
   }
 
   @Override
