@@ -118,6 +118,8 @@ case class ColumnarGuardRule() extends Rule[SparkPlan] {
             plan.child, plan.testSpillFrequency).buildCheck()
         case plan: BroadcastExchangeExec =>
           if (!enableColumnarBroadcastExchange) return false
+          // check plan whether tagged
+          if (TransformHints.isNotTransformable(plan)) return false
           new ColumnarBroadcastExchangeExec(plan.mode, plan.child).buildCheck()
         case plan: TakeOrderedAndProjectExec =>
           if (!enableTakeOrderedAndProject) return false
@@ -137,6 +139,8 @@ case class ColumnarGuardRule() extends Rule[SparkPlan] {
           // We need to check if BroadcastExchangeExec can be converted to columnar-based.
           // If not, BHJ should also be row-based.
           if (!enableColumnarBroadcastJoin) return false
+          // check plan whether tagged
+          if (TransformHints.isNotTransformable(plan)) return false
           val left = plan.left
           left match {
             case exec: BroadcastExchangeExec =>

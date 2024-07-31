@@ -665,17 +665,9 @@ case class ColumnarPostOverrides() extends Rule[SparkPlan] {
         case child: BroadcastQueryStageExec =>
           child.plan match {
             case originalBroadcastPlan: ColumnarBroadcastExchangeExec =>
-              BroadcastQueryStageExec(
-                child.id,
-                BroadcastExchangeExec(
-                  originalBroadcastPlan.mode,
-                  ColumnarBroadcastExchangeAdaptorExec(originalBroadcastPlan, 1)), child._canonicalized)
+              child
             case ReusedExchangeExec(_, originalBroadcastPlan: ColumnarBroadcastExchangeExec) =>
-              BroadcastQueryStageExec(
-                child.id,
-                BroadcastExchangeExec(
-                  originalBroadcastPlan.mode,
-                  ColumnarBroadcastExchangeAdaptorExec(child.plan, 1)), child._canonicalized)
+              child
             case _ =>
               replaceColumnarToRow(plan, conf)
           }
@@ -762,6 +754,7 @@ class ColumnarPlugin extends (SparkSessionExtensions => Unit) with Logging {
     extensions.injectOptimizerRule(_ => DelayCartesianProduct)
     extensions.injectOptimizerRule(_ => HeuristicJoinReorder)
     extensions.injectOptimizerRule(_ => MergeSubqueryFilters)
+    extensions.injectQueryStagePrepRule(session => FallbackBroadcastExchange(session))
     extensions.injectQueryStagePrepRule(_ => TopNPushDownForWindow)
   }
 }

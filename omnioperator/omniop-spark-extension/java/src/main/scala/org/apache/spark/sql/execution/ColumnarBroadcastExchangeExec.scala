@@ -271,7 +271,7 @@ class ColumnarHashedRelation extends Serializable {
           vector.reset()
           vector.setVec(vecBatch.getVectors()(i))}
         new ColumnarBatch(vectors.toArray, vecBatch.getRowCount)
-          .rowIterator().asScala.map(proj).foreach(retRows.append(_))
+          .rowIterator().asScala.map(proj).map(_.copy()).foreach(retRows.append(_))
       }
       retRows.toArray
     }
