@@ -171,7 +171,7 @@ object SparkApplicationDataExtractor {
       previousExecutionDesc = Some(execution.description)
     }
     val queryStr = descriptions.mkString(";\n")
-    queryStr + (if (queryStr.endsWith(";")) "" else ";")
+    removeReplacementChars(queryStr + (if (queryStr.endsWith(";")) "" else ";"))
   }
 
   private def removeComment(query: String): String = {
@@ -182,6 +182,10 @@ object SparkApplicationDataExtractor {
       else queryLine
     }.filterNot(_ == "")
     processedQuery.mkString("\n")
+  }
+
+  private def removeReplacementChars(s: String): String = {
+    s.replaceAll("\uFFFD", "")
   }
 
   private def lastAttempt(applicationInfo: ApplicationInfo): ApplicationAttemptInfo = {
