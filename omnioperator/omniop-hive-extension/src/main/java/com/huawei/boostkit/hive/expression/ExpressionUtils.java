@@ -297,11 +297,19 @@ public class ExpressionUtils {
             ((DecimalLiteral) expression).setScale(toCastScale);
             if (value instanceof Long) {
                 long newValue = ((long) Math.pow(10, toCastScale - scale)) * (long) value;
-                ((DecimalLiteral) expression).setValue(newValue);
+                if (toCastPrecision <= 18) {
+                    ((DecimalLiteral) expression).setValue(newValue);
+                } else {
+                    ((DecimalLiteral) expression).setValue(String.valueOf(newValue));
+                }
             } else {
                 BigDecimal decimalValue = new BigDecimal((String) value);
                 BigDecimal newValue = decimalValue.multiply(BigDecimal.TEN.pow(toCastScale - scale));
-                ((DecimalLiteral) expression).setValue(newValue.toString());
+                if (toCastPrecision <= 18) {
+                    ((DecimalLiteral) expression).setValue(Long.valueOf(newValue.toString()));
+                } else {
+                    ((DecimalLiteral) expression).setValue(newValue.toString());
+                }
             }
             return expression;
         }
