@@ -300,6 +300,7 @@ object OmniExpressionAdaptor extends Logging {
         unsupportedCastCheck(expr, cast)
         cast.child.dataType match {
           case NullType =>
+            // cast(null as xx)的情况，转化为对应的类型的literal下推到omni进行运算
             new JSONObject().put("exprType", "LITERAL")
               .addOmniExpJsonType("dataType", cast.dataType)
               .put("isNull", true)
@@ -475,6 +476,11 @@ object OmniExpressionAdaptor extends Logging {
             throw new UnsupportedOperationException(s"Unsupported right expression in like expression: $endsWith")
         }
       case contains: Contains =>
+        contains.children.map(_.dataType).foreach {
+          case _: StringType =>
+          case dataType =>
+            throw new UnsupportedOperationException(s"Invalid input dataType:$dataType for contains")
+        }
         new JSONObject().put("exprType", "FUNCTION")
           .addOmniExpJsonType("returnType", contains.dataType)
           .put("function_name", "Contains")
@@ -571,15 +577,32 @@ object OmniExpressionAdaptor extends Logging {
       case _: LongType =>
       case _: BooleanType =>
       case _: DecimalType =>
+      case _: NullType =>
       case dataType =>
         throw new UnsupportedOperationException(s"Invalid input dataType:$dataType for greatest")
     }
-
-    new JSONObject().put("exprType", "FUNCTION")
-      .addOmniExpJsonType("returnType", greatest.dataType)
-      .put("function_name", "Greatest")
-      .put("arguments", new JSONArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(children.head, exprsIndexMap))
-        .put(rewriteToOmniJsonExpressionLiteralJsonObject(children(1), exprsIndexMap)))
+    children.head.dataType match {
+      case _: NullType =>
+        rewriteToOmniJsonExpressionLiteralJsonObject(children(1), exprsIndexMap)
+      case _ => if (children(1).dataType.isInstanceOf[NullType]) {
+        rewriteToOmniJsonExpressionLiteralJsonObject(children.head, exprsIndexMap)
+      } else {
+        children.head match {
+          case base: CastBase if base.child.dataType.isInstanceOf[NullType] =>
+            rewriteToOmniJsonExpressionLiteralJsonObject(children(1), exprsIndexMap)
+          case _ => children(1) match {
+            case base: CastBase if base.child.dataType.isInstanceOf[NullType] =>
+              rewriteToOmniJsonExpressionLiteralJsonObject(children.head, exprsIndexMap)
+            case _ =>
+              new JSONObject().put("exprType", "FUNCTION")
+                .addOmniExpJsonType("returnType", greatest.dataType)
+                .put("function_name", "Greatest")
+                .put("arguments", new JSONArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(children.head, exprsIndexMap))
+                  .put(rewriteToOmniJsonExpressionLiteralJsonObject(children(1), exprsIndexMap)))
+          }
+        }
+      }
+    }
   }
 
   // gen murmur3hash partition expression
