@@ -257,7 +257,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             if (work instanceof UnionWork) {
                 continue;
             }
-            if (getReduceSinkReplaceable(work)) {
+            if (!inputUnReplaceableWork.contains(work) && getReduceSinkReplaceable(work)) {
                 reduceSinkReplaceableWork.add(work);
             } else {
                 inputUnReplaceableWork.addAll(tezWork.getChildren(work));
