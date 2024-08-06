@@ -17,17 +17,19 @@
 package org.apache.spark.sql.execution
 
 
+import com.huawei.boostkit.spark.ColumnarPluginConfig
+import com.huawei.boostkit.spark.TransformHints.isNotTransformable
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans.QueryPlan
 import org.apache.spark.sql.execution.adaptive.AdaptiveSparkPlanExec
 import org.apache.spark.sql.execution.exchange.ReusedExchangeExec
-import org.apache.spark.sql.execution.joins.{HashedRelation, HashJoin, LongHashedRelation}
+import org.apache.spark.sql.execution.joins.{HashJoin, HashedRelation, LongHashedRelation}
 import org.apache.spark.sql.execution.metric.SQLMetrics
 import org.apache.spark.util.ThreadUtils
 
-import scala.concurrent.{Future,ExecutionContext}
+import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.Duration
 
 case class SubqueryBroadcastExec(
@@ -37,6 +39,8 @@ case class SubqueryBroadcastExec(
     child: SparkPlan)
   extends BaseSubqueryExec with UnaryExecNode {
 
+  val omniEnabled = session.conf.get(ColumnarPluginConfig.OMNI_ENABLE_KEY, "true").toBoolean
+
   override def nodeName: String = {
     val exchangeChild = child match {
       case exec: ReusedExchangeExec =>
@@ -44,9 +48,9 @@ case class SubqueryBroadcastExec(
       case _ =>
         child
     }
-    if (exchangeChild.isInstanceOf[ColumnarBroadcastExchangeExec] ||
+    if (omniEnabled && (exchangeChild.isInstanceOf[ColumnarBroadcastExchangeExec] ||
       (exchangeChild.isInstanceOf[AdaptiveSparkPlanExec]
-        && exchangeChild.asInstanceOf[AdaptiveSparkPlanExec].supportsColumnar)) {
+        && !isNotTransformable(exchangeChild.asInstanceOf[AdaptiveSparkPlanExec].initialPlan)))) {
       "OmniColumnarSubqueryBroadcastExec"
     } else {
       "SubqueryBroadcastExec"
@@ -92,9 +96,9 @@ case class SubqueryBroadcastExec(
           case _ =>
             child
         }
-        val rows = if (exchangeChild.isInstanceOf[ColumnarBroadcastExchangeExec] ||
+        val rows = if (omniEnabled && (exchangeChild.isInstanceOf[ColumnarBroadcastExchangeExec] ||
           (exchangeChild.isInstanceOf[AdaptiveSparkPlanExec]
-            && exchangeChild.asInstanceOf[AdaptiveSparkPlanExec].supportsColumnar)) {
+            && !isNotTransformable(exchangeChild.asInstanceOf[AdaptiveSparkPlanExec].initialPlan)))) {
           // transform broadcasted columnar value to Array[InternalRow] by key
           exchangeChild
             .executeBroadcast[ColumnarHashedRelation]
