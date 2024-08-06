@@ -76,21 +76,14 @@ object OmniExpressionAdaptor extends Logging {
 
   private def unsupportedCastCheck(expr: Expression, cast: CastBase): Unit = {
     def doSupportCastToString(dataType: DataType): Boolean = {
-      if (dataType.isInstanceOf[DecimalType] || dataType.isInstanceOf[StringType] || dataType.isInstanceOf[IntegerType]
-        || dataType.isInstanceOf[LongType] || dataType.isInstanceOf[DateType] || dataType.isInstanceOf[DoubleType]) {
-        true
-      } else {
-        false
-      }
+      dataType.isInstanceOf[DecimalType] || dataType.isInstanceOf[StringType] || dataType.isInstanceOf[IntegerType] ||
+        dataType.isInstanceOf[LongType] || dataType.isInstanceOf[DateType] || dataType.isInstanceOf[DoubleType] ||
+        dataType.isInstanceOf[NullType]
     }
 
     def doSupportCastFromString(dataType: DataType): Boolean = {
-      if (dataType.isInstanceOf[DecimalType] || dataType.isInstanceOf[StringType] || dataType.isInstanceOf[DateType]
-        || dataType.isInstanceOf[IntegerType] || dataType.isInstanceOf[LongType] || dataType.isInstanceOf[DoubleType]) {
-        true
-      } else {
-        false
-      }
+      dataType.isInstanceOf[DecimalType] || dataType.isInstanceOf[StringType] || dataType.isInstanceOf[DateType] ||
+        dataType.isInstanceOf[IntegerType] || dataType.isInstanceOf[LongType] || dataType.isInstanceOf[DoubleType]
     }
 
     // support cast(decimal/string/int/long as string)
@@ -302,19 +295,27 @@ object OmniExpressionAdaptor extends Logging {
       // Cast
       case cast: CastBase =>
         unsupportedCastCheck(expr, cast)
-        cast.dataType match {
-          case StringType =>
-            new JSONObject().put("exprType", "FUNCTION")
-              .addOmniExpJsonType("returnType", cast.dataType)
-              .put("width", 50)
-              .put("function_name", "CAST")
-              .put("arguments", new JSONArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(cast.child, exprsIndexMap)))
-
+        cast.child.dataType match {
+          case NullType =>
+            // cast(null as xx)的情况，转化为对应的类型的literal下推到omni进行运算
+            new JSONObject().put("exprType", "LITERAL")
+              .addOmniExpJsonType("dataType", cast.dataType)
+              .put("isNull", true)
           case _ =>
-            new JSONObject().put("exprType", "FUNCTION")
-              .addOmniExpJsonType("returnType", cast.dataType)
-              .put("function_name", "CAST")
-              .put("arguments", new JSONArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(cast.child, exprsIndexMap)))
+            cast.dataType match {
+              case StringType =>
+                new JSONObject().put("exprType", "FUNCTION")
+                  .addOmniExpJsonType("returnType", cast.dataType)
+                  .put("width", 50)
+                  .put("function_name", "CAST")
+                  .put("arguments", new JSONArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(cast.child, exprsIndexMap)))
+
+              case _ =>
+                new JSONObject().put("exprType", "FUNCTION")
+                  .addOmniExpJsonType("returnType", cast.dataType)
+                  .put("function_name", "CAST")
+                  .put("arguments", new JSONArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(cast.child, exprsIndexMap)))
+            }
         }
 
       // Abs
@@ -386,6 +387,9 @@ object OmniExpressionAdaptor extends Logging {
 
       case concat: Concat =>
         getConcatJsonStr(concat, exprsIndexMap)
+      case greatest: Greatest =>
+        getGreatestJsonStr(greatest, exprsIndexMap)
+
       case round: Round =>
         new JSONObject().put("exprType", "FUNCTION")
           .addOmniExpJsonType("returnType", round.dataType)
@@ -511,6 +515,49 @@ object OmniExpressionAdaptor extends Logging {
         .put(rewriteToOmniJsonExpressionLiteralJsonObject(children(i), exprsIndexMap)))
     }
     res
+  }
+
+  private def getGreatestJsonStr(greatest: Greatest, exprsIndexMap: Map[ExprId, Int]): JSONObject = {
+    if (greatest.children.length != 2) {
+      throw new UnsupportedOperationException(s"Number of parameters is ${greatest.children.length}. " +
+        "Greatest only supports up to 2 parameters")
+    }
+
+    val children: Seq[Expression] = greatest.children
+    children.map(_.dataType).foreach {
+      case _: StringType =>
+      case _: ShortType =>
+      case _: IntegerType =>
+      case _: DoubleType =>
+      case _: LongType =>
+      case _: BooleanType =>
+      case _: DecimalType =>
+      case _: NullType =>
+      case dataType =>
+        throw new UnsupportedOperationException(s"Invalid input dataType:$dataType for greatest")
+    }
+    children.head.dataType match {
+      case _: NullType =>
+        rewriteToOmniJsonExpressionLiteralJsonObject(children(1), exprsIndexMap)
+      case _ => if (children(1).dataType.isInstanceOf[NullType]) {
+        rewriteToOmniJsonExpressionLiteralJsonObject(children.head, exprsIndexMap)
+      } else {
+        children.head match {
+          case base: CastBase if base.child.dataType.isInstanceOf[NullType] =>
+            rewriteToOmniJsonExpressionLiteralJsonObject(children(1), exprsIndexMap)
+          case _ => children(1) match {
+            case base: CastBase if base.child.dataType.isInstanceOf[NullType] =>
+              rewriteToOmniJsonExpressionLiteralJsonObject(children.head, exprsIndexMap)
+            case _ =>
+              new JSONObject().put("exprType", "FUNCTION")
+                .addOmniExpJsonType("returnType", greatest.dataType)
+                .put("function_name", "Greatest")
+                .put("arguments", new JSONArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(children.head, exprsIndexMap))
+                  .put(rewriteToOmniJsonExpressionLiteralJsonObject(children(1), exprsIndexMap)))
+          }
+        }
+      }
+    }
   }
 
   def toOmniJsonAttribute(attr: Attribute, colVal: Int): JSONObject = {
