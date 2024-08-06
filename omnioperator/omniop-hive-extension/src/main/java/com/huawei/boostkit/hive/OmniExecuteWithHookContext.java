@@ -22,7 +22,6 @@ import static com.huawei.boostkit.hive.expression.TypeUtils.checkOmniJsonWhiteLi
 import static com.huawei.boostkit.hive.expression.TypeUtils.checkUnsupportedArithmetic;
 import static com.huawei.boostkit.hive.expression.TypeUtils.checkUnsupportedCast;
 import static com.huawei.boostkit.hive.expression.TypeUtils.checkUnsupportedTimestamp;
-import static com.huawei.boostkit.hive.expression.TypeUtils.convertHiveTypeToOmniType;
 import static com.huawei.boostkit.hive.expression.TypeUtils.isValidConversion;
 import static com.huawei.boostkit.hive.expression.TypeUtils.isValidFilterExpression;
 import static nova.hetu.omniruntime.constants.FunctionType.OMNI_AGGREGATION_TYPE_AVG;
@@ -37,7 +36,6 @@ import static org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspe
 import static org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.PrimitiveCategory.LONG;
 import static org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.PrimitiveCategory.SHORT;
 import static org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.PrimitiveCategory.STRING;
-import static org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.PrimitiveCategory.TIMESTAMP;
 import static org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.PrimitiveCategory.VARCHAR;
 import static org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.PrimitiveCategory.VOID;
 
@@ -153,6 +151,8 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
 
     private final Set<BaseWork> reduceSinkReplaceableWork = new HashSet<>();
 
+    private final Set<BaseWork> reduceSinkUnReplaceableWork = new HashSet<>();
+
     private Set<String> reduceSinkReplaceableWorkName = new HashSet<>();
 
     private final Set<BaseWork> inputUnReplaceableWork = new HashSet<>();
@@ -254,32 +254,62 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
 
     private void initReduceSinkReplaceable() {
         for (BaseWork work : tezWork.getAllWork()) {
-            if (work instanceof UnionWork) {
+            if (work instanceof UnionWork || reduceSinkUnReplaceableWork.contains(work)) {
                 continue;
             }
-            if (!inputUnReplaceableWork.contains(work) && getReduceSinkReplaceable(work)) {
+            if (getReduceSinkReplaceable(work)) {
                 reduceSinkReplaceableWork.add(work);
             } else {
-                inputUnReplaceableWork.addAll(tezWork.getChildren(work));
-                for (BaseWork child : tezWork.getChildren(work)) {
-                    reduceSinkReplaceableWork.removeAll(tezWork.getParents(child));
+                reduceSinkUnReplaceableWork.add(work);
+                Set<BaseWork> brotherWorks = getBrotherWorks(work);
+                Set<BaseWork> otherBrotherWorks = new HashSet<>();
+                int size = 0;
+
+                // loop through the brotherWorks until the size of brotherWorks doesn't change anymore
+                while (brotherWorks.size() != size) {
+                    size = brotherWorks.size();
+                    for (BaseWork brotherWork : brotherWorks) {
+                        otherBrotherWorks.addAll(getBrotherWorks(brotherWork).stream()
+                                .filter(item -> !brotherWorks.contains(item)).collect(Collectors.toSet()));
+                    }
+                    brotherWorks.addAll(otherBrotherWorks);
+                    otherBrotherWorks.clear();
                 }
+                reduceSinkUnReplaceableWork.addAll(brotherWorks);
+                reduceSinkReplaceableWork.removeAll(brotherWorks);
                 dealUnionWork(work);
             }
+        }
+        if (reduceSinkReplaceableWork.size() + reduceSinkUnReplaceableWork.size() != tezWork.getAllWork().size()) {
+            throw new RuntimeException("reduceSinkReplaceableWork's size: " + reduceSinkReplaceableWork.size()
+                    + ", reduceSinkUnReplaceableWork's size: " + reduceSinkUnReplaceableWork.size()
+                    + ", the sum of them is not equals to the size of allWorks: " + tezWork.getAllWork().size());
         }
         reduceSinkReplaceableWorkName = reduceSinkReplaceableWork.stream().map(BaseWork::getName)
             .collect(Collectors.toSet());
     }
 
+    private Set<BaseWork> getBrotherWorks(BaseWork work) {
+        Set<BaseWork> brotherWorks = new HashSet<>();
+        List<BaseWork> children = tezWork.getChildren(work);
+        inputUnReplaceableWork.addAll(children);
+        for (BaseWork child : children) {
+            brotherWorks.addAll(tezWork.getParents(child));
+        }
+        return brotherWorks;
+    }
+
     private void dealUnionWork(BaseWork work) {
         for (BaseWork parent : tezWork.getParents(work)) {
-            if (!(tezWork.getEdgeType(parent, work) == TezEdgeProperty.EdgeType.CONTAINS)) {
+            if (tezWork.getEdgeType(parent, work) != TezEdgeProperty.EdgeType.CONTAINS) {
                 continue;
             }
             inputUnReplaceableWork.add(parent);
+            reduceSinkUnReplaceableWork.add(parent);
             reduceSinkReplaceableWork.remove(parent);
             for (BaseWork parentChild : tezWork.getChildren(parent)) {
                 if (tezWork.getEdgeType(parent, parentChild) == TezEdgeProperty.EdgeType.CONTAINS) {
+                    reduceSinkUnReplaceableWork.add(parentChild);
                     reduceSinkReplaceableWork.remove(parentChild);
                 }
             }
