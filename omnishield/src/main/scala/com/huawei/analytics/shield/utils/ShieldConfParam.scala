@@ -16,9 +16,7 @@
 package com.huawei.analytics.shield.utils
 
 object ShieldConfParam {
-  val WRITE_DATA_KEY_PLAIN_TEXT = "shield.write.dataKey.plainText"
   val WRITE_DATA_KEY_CIPHER_TEXT = "shield.write.dataKey.cipherText"
-
   val PRIMARY_KEY_NAME = "spark.shield.primaryKey.name"
   val DATA_KEY_LENGTH = "spark.shield.dataKey.length"
   val SPARK_IO_CODECS ="spark.hadoop.io.compression.codecs"
@@ -35,8 +33,8 @@ object ShieldConfParam {
     s"shield.${dataKeyCipherTextStr}.cryptoMode"
   }
 
-  def genShieldReadDataKeyConf(dataKeyCipherTextStr: String): String = {
-    s"shield.read.dataKey.$dataKeyCipherTextStr.plainText"
+  def genShieldReadPrimaryKeyConf(dataKeyCipherTextStr: String): String = {
+    s"shield.read.dataKey.$dataKeyCipherTextStr.keyName"
   }
 }
 

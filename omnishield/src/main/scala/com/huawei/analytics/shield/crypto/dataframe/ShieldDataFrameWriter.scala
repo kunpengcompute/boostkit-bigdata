@@ -15,27 +15,28 @@
 
 package com.huawei.analytics.shield.crypto.dataframe
 
+import com.huawei.analytics.shield.OmniContext
 import com.huawei.analytics.shield.crypto.{AES_GCM_NOPADDING, AlgorithmMode, PLAIN_TEXT}
 import com.huawei.analytics.shield.kms.common.KeyOperator
 import com.huawei.analytics.shield.utils.LogError.invalidArgumentError
-import com.huawei.analytics.shield.utils.ShieldConfParam.{WRITE_DATA_KEY_CIPHER_TEXT, WRITE_DATA_KEY_PLAIN_TEXT, genDataKeyLengthConf, genShieldCryptoModeConf}
-import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
+
+import com.huawei.analytics.shield.utils.ShieldConfParam.WRITE_DATA_KEY_CIPHER_TEXT
+import org.apache.spark.sql.{DataFrame, SaveMode}
 
 import java.util.Locale
 
 /**
  * EncryptedDataFrameWriter
  *
- * @param sparkSession  sparkSession
+ * @param omniContext  OmniContext
  * @param df            DataFrame
  * @param algorithmMode algorithmMode
  * @param keyOperator   keyOperator
  */
-class ShieldDataFrameWriter(
-                             sparkSession: SparkSession,
-                             df: DataFrame,
-                             algorithmMode: AlgorithmMode,
-                             keyOperator: KeyOperator) {
+class ShieldDataFrameWriter(omniContext: OmniContext,
+                            df: DataFrame,
+                            algorithmMode: AlgorithmMode,
+                            keyOperator: KeyOperator) {
   protected val extraOptions = new scala.collection.mutable.HashMap[String, String]
 
   def option(key: String, value: String): this.type = {
@@ -68,17 +69,11 @@ class ShieldDataFrameWriter(
       case PLAIN_TEXT =>
       case AES_GCM_NOPADDING =>
         option("compression", "com.huawei.analytics.shield.crypto.CryptoCodec")
-        val (dataKeyPlainBytes, dataKeyCipherBytes) = keyOperator.getDataKeyPair
-        val dataKeyPlainTextStr = keyOperator.encoderWithBase64(dataKeyPlainBytes)
-        sparkSession.sparkContext.hadoopConfiguration
-          .set(WRITE_DATA_KEY_PLAIN_TEXT, dataKeyPlainTextStr)
+        val dataKeyCipherBytes = keyOperator.getDataKeyCipherText
         val dataKeyCipherTextStr = keyOperator.encoderWithBase64(dataKeyCipherBytes)
-        sparkSession.sparkContext.hadoopConfiguration
+        omniContext.getSparkSession.sparkContext.hadoopConfiguration
           .set(WRITE_DATA_KEY_CIPHER_TEXT, dataKeyCipherTextStr)
-        sparkSession.sparkContext.hadoopConfiguration
-          .set(genShieldCryptoModeConf(dataKeyCipherTextStr), algorithmMode.encryptionAlgorithm)
-        sparkSession.sparkContext.hadoopConfiguration
-          .set(genDataKeyLengthConf(dataKeyCipherTextStr), keyOperator.getDataKeyLength.toString)
+        omniContext.setCommonConfig(algorithmMode.encryptionAlgorithm, dataKeyCipherTextStr, keyOperator)
       case _ =>
         invalidArgumentError("unknown or wrong encryptMode " + AlgorithmMode.toString)
     }

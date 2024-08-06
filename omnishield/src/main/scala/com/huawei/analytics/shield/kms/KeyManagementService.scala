@@ -22,13 +22,6 @@ import org.apache.hadoop.conf.Configuration
  */
 trait KeyManagementService {
 
-  /**
-   * set dataKey length, 128 bit or 256 bit
-   *
-   * @param length length
-   */
-  def setDataKeyLength(length: Int): Unit
-
   /** This func should generate a {@link length} bit dataKey (plaintext) and
    *  encrypt this dataKey by kms with primaryKey
    *
@@ -36,7 +29,7 @@ trait KeyManagementService {
    * @param config         config
    * @return EncryptDataKey
    */
-  def getEncryptDataKey(primaryKeyName: String, config: Configuration = null): Array[Byte]
+  def getEncryptDataKey(primaryKeyName: String, keyLength: Int, config: Configuration = null): Array[Byte]
 
   /** This func should decrypt encryptedDataKey by kms with primaryKey and return DataKeyPlainText bytes
    *

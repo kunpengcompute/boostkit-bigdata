@@ -15,14 +15,14 @@
 
 package com.huawei.analytics.shield
 
-import com.huawei.analytics.shield.OmniContext.{getDatKeyLength, getKmsType, getPrimaryKeyNames, loadKmsService}
+import com.huawei.analytics.shield.OmniContext.{getDatKeyLength, getKmsType, getPrimaryKeyNames}
 import com.huawei.analytics.shield.crypto.dataframe.{ShieldDataFrameReader, ShieldDataFrameWriter}
 import com.huawei.analytics.shield.crypto.AlgorithmMode
 import com.huawei.analytics.shield.kms.common.{KeyOperator, KeyOperatorManager}
-import com.huawei.analytics.shield.kms._
 import com.huawei.analytics.shield.utils.LogError.invalidArgumentError
-import com.huawei.analytics.shield.utils.ShieldConfParam.{DATA_KEY_LENGTH, PRIMARY_KEY_NAME, SPARK_IO_CODECS, genKmsTypeConf}
+import com.huawei.analytics.shield.utils.ShieldConfParam.{DATA_KEY_LENGTH, PRIMARY_KEY_NAME, SPARK_IO_CODECS, genDataKeyLengthConf, genKmsTypeConf, genShieldCryptoModeConf, genShieldReadPrimaryKeyConf}
 import com.huawei.analytics.shield.utils.ValueConf.{DATA_KEY_LENGTH_128, DEFAULT_DATA_KEY_LENGTH}
+
 import org.apache.hadoop.conf.Configuration
 import org.apache.spark.SparkConf
 import org.apache.spark.sql.{DataFrame, SparkSession}
@@ -44,8 +44,8 @@ class OmniContext {
    * @return a EncryptedDataFrameReader
    */
   def getDataFrameReader(cryptoMode: AlgorithmMode): ShieldDataFrameReader = {
-    val keyOperator = loadSingleKeyOperator()
-    new ShieldDataFrameReader(sparkSession.get, cryptoMode, keyOperator)
+    val keyOperator = loadSingleKeyOperator(cryptoMode)
+    new ShieldDataFrameReader(this, cryptoMode, keyOperator)
   }
 
   /**
@@ -57,8 +57,8 @@ class OmniContext {
    */
   def getDataFrameWriter(dataFrame: DataFrame,
                          cryptoMode: AlgorithmMode): ShieldDataFrameWriter = {
-    val keyOperator = loadSingleKeyOperator()
-    new ShieldDataFrameWriter(sparkSession.get, dataFrame, cryptoMode, keyOperator)
+    val keyOperator = loadSingleKeyOperator(cryptoMode)
+    new ShieldDataFrameWriter(this, dataFrame, cryptoMode, keyOperator)
   }
 
   /**
@@ -78,24 +78,36 @@ class OmniContext {
     sparkSession.get.sparkContext.hadoopConfiguration
   }
 
-  def loadSingleKeyOperator(): KeyOperator = {
+  def loadSingleKeyOperator(cryptoMode: AlgorithmMode): KeyOperator = {
     val conf = getSparkConf
     val pk = getPrimaryKeyNames(conf)
     val keyLength = getDatKeyLength(conf)
     val kmsType = getKmsType(conf, pk)
-    loadKeyOperator(pk, kmsType, keyLength)
+    loadKeyOperator(pk, kmsType, keyLength, cryptoMode)
   }
 
-  def loadKeyOperator(keyName: String, kmsType: String, keyLength: Int): KeyOperator = {
-    val kms = loadKmsService(kmsType)
-    val mapKey = keyOperatorManger.genOperatorKey(keyName, kms.getClass.getSimpleName)
+  def loadKeyOperator(keyName: String, kmsType: String, keyLength: Int, cryptoMode: AlgorithmMode): KeyOperator = {
+    val mapKey = keyOperatorManger.genOperatorKey(keyName, kmsType)
     if (keyOperatorManger.containKey(mapKey)) {
       keyOperatorManger.getOperator(mapKey)
     } else {
-      val keyOperator = new KeyOperator(keyName, kms, keyLength)
+      val hadoopConfig: Configuration =
+        if (SparkSession.builder().getOrCreate().sparkContext.hadoopConfiguration != null) {
+          SparkSession.builder().getOrCreate().sparkContext.hadoopConfiguration
+        } else {
+          new Configuration()
+        }
+      val keyOperator = new KeyOperator
+      keyOperator.init(keyName, kmsType, keyLength, cryptoMode, hadoopConfig)
       keyOperatorManger.putKeyOperator(mapKey, keyOperator)
       keyOperator
     }
+  }
+
+  def setCommonConfig(mode: String, dataKeyCipherStr: String, keyOperator: KeyOperator): Unit = {
+    getHadoopConf.set(genShieldReadPrimaryKeyConf(dataKeyCipherStr), keyOperator.getPrimaryKeyName)
+    getHadoopConf.set(genShieldCryptoModeConf(dataKeyCipherStr), mode)
+    getHadoopConf.set(genDataKeyLengthConf(dataKeyCipherStr), keyOperator.getDataKeyLength.toString)
   }
 }
 
@@ -166,12 +178,6 @@ object OmniContext {
     val kmsType = genKmsTypeConf(primaryKeyName)
     invalidArgumentError("kms type not found!", !conf.contains(kmsType))
     conf.get(kmsType)
-  }
-
-  private def loadKmsService(className: String): KeyManagementService = {
-    val clz = Class.forName(className).newInstance()
-    val kms = clz.asInstanceOf[KeyManagementService]
-    kms
   }
 
   private def createSparkConf(existingConf: SparkConf = null): SparkConf = {
