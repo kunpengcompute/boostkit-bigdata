@@ -296,14 +296,13 @@ public class ExpressionUtils {
             ((DecimalLiteral) expression).setPrecision(toCastPrecision);
             ((DecimalLiteral) expression).setScale(toCastScale);
             if (value instanceof Long) {
-                double newValue = Math.pow(10, toCastScale - scale) * (long) value;
-                if (newValue > Long.MAX_VALUE) {
-                    return null;
-                }
                 if (toCastPrecision <= 18) {
-                    ((DecimalLiteral) expression).setValue((long) newValue);
+                    long newValue = ((long) Math.pow(10, toCastScale - scale)) * (long) value;
+                    ((DecimalLiteral) expression).setValue(newValue);
                 } else {
-                    ((DecimalLiteral) expression).setValue(String.valueOf((long) newValue));
+                    BigDecimal decimalValue = new BigDecimal(String.valueOf(value));
+                    BigDecimal newValue = decimalValue.multiply(BigDecimal.TEN.pow(toCastScale - scale));
+                    ((DecimalLiteral) expression).setValue(newValue.toString());
                 }
             } else {
                 BigDecimal decimalValue = new BigDecimal((String) value);

@@ -90,11 +90,8 @@ public class ArithmeticExpressionProcessor implements ExpressionProcessor {
                 childNode = ExpressionUtils.createNode(child, inspector);
             }
             if (!child.getTypeInfo().equals(node.getTypeInfo())) {
-                compareExpression = addCast(node, precision, scale, shouldUpscale, maxScale, returnType,
-                        compareExpression, child, childNode);
-                if (compareExpression == null) {
-                    return null;
-                }
+                addCast(node, precision, scale, shouldUpscale, maxScale, returnType, compareExpression, child,
+                        childNode);
             } else {
                 compareExpression.add(childNode);
             }
@@ -102,7 +99,7 @@ public class ArithmeticExpressionProcessor implements ExpressionProcessor {
         return compareExpression;
     }
 
-    private DivideExpression addCast(ExprNodeGenericFuncDesc node, Integer precision, Integer scale, boolean shouldUpscale,
+    private void addCast(ExprNodeGenericFuncDesc node, Integer precision, Integer scale, boolean shouldUpscale,
                          int maxScale, int returnType, DivideExpression compareExpression, ExprNodeDesc child,
                          BaseExpression childNode) {
         Integer childPrecision = null;
@@ -112,7 +109,7 @@ public class ArithmeticExpressionProcessor implements ExpressionProcessor {
             childPrecision = ((DecimalTypeInfo) child.getTypeInfo()).getPrecision();
             if (maxScale == childScale) {
                 compareExpression.add(childNode);
-                return compareExpression;
+                return;
             } else {
                 childPrecision = Math.min(Math.max(childPrecision + maxScale - childScale, precision), 38);
                 childScale = maxScale;
@@ -123,11 +120,6 @@ public class ArithmeticExpressionProcessor implements ExpressionProcessor {
         }
         CastFunctionExpression functionExpression = new CastFunctionExpression(returnType,
                 TypeUtils.getCharWidth(node), childPrecision, childScale);
-        BaseExpression optimizedCastExpr = ExpressionUtils.optimizeCast(childNode, functionExpression);
-        if (optimizedCastExpr == null) {
-            return null;
-        }
-        compareExpression.add(optimizedCastExpr);
-        return compareExpression;
+        compareExpression.add(ExpressionUtils.optimizeCast(childNode, functionExpression));
     }
 }
