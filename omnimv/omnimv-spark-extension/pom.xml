@@ -18,7 +18,7 @@
     <name>BoostKit Spark MaterializedView Sql Engine Extension Parent Pom</name>
 
     <properties>
-        <omnimv.version>3.1.1-1.1.0</omnimv.version>
+        <omnimv.version>3.2.0-1.1.0</omnimv.version>
         <scala.version>2.12.10</scala.version>
         <scala.binary.version>2.12</scala.binary.version>
         <java.version>1.8</java.version>
