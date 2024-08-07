@@ -15,8 +15,8 @@
 
 package com.huawei.analytics.shield.crypto
 
-import com.huawei.analytics.shield.utils.ShieldConfParam.{genDataKeyLengthConf, genShieldCryptoModeConf, genShieldReadDataKeyConf}
-import com.huawei.analytics.shield.utils.ValueConf.DEFAULT_DATA_KEY_LENGTH
+import com.huawei.analytics.shield.kms.common.KeyOperator
+
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.io.compress.DecompressorStream
 
@@ -43,10 +43,11 @@ class ShieldCryptoDecompressStream(in: InputStream,
     // init the decryptor in the first time
     if (!isDecryptorInit) {
       val (encryptedDataKey, initializationVector) = shieldDecryptor.getHeader(in)
-      val dataKeyPlainStr = conf.get(genShieldReadDataKeyConf(encryptedDataKey))
-      val cryptoMode = AlgorithmMode.parse(conf.get(genShieldCryptoModeConf(encryptedDataKey)))
-      val keyLength = conf.getInt(genDataKeyLengthConf(encryptedDataKey), DEFAULT_DATA_KEY_LENGTH)
-      shieldDecryptor.init(dataKeyPlainStr, cryptoMode, keyLength, initializationVector)
+      val keyOperator = new KeyOperator
+      keyOperator.init(encryptedDataKey, conf)
+      val dataKeyPlainStr = keyOperator.encoderWithBase64(keyOperator.getDataKeyPlainText(encryptedDataKey))
+      shieldDecryptor.init(dataKeyPlainStr, keyOperator.getAlgorithmMode,
+        keyOperator.getDataKeyLength, initializationVector)
       isDecryptorInit = true
     }
     val decompressBytes = shieldDecryptor.decrypt(in, buffer)
@@ -65,5 +66,3 @@ object ShieldCryptoDecompressStream {
     new ShieldCryptoDecompressStream(in, conf)
   }
 }
-
-

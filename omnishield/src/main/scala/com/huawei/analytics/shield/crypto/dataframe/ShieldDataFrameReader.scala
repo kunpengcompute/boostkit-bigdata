@@ -15,26 +15,26 @@
 
 package com.huawei.analytics.shield.crypto.dataframe
 
+import com.huawei.analytics.shield.OmniContext
 import com.huawei.analytics.shield.crypto.{AES_GCM_NOPADDING, AlgorithmMode, PLAIN_TEXT}
 import com.huawei.analytics.shield.kms.common.KeyOperator
 import com.huawei.analytics.shield.utils.LogError.invalidArgumentError
-import com.huawei.analytics.shield.utils.ShieldConfParam.{genDataKeyLengthConf, genShieldCryptoModeConf, genShieldReadDataKeyConf}
+
 import org.apache.spark.sql.types.StructType
-import org.apache.spark.sql.{DataFrame, DataFrameReader, SparkSession}
+import org.apache.spark.sql.{DataFrame, DataFrameReader}
 
 /**
  * EncryptedDataFrameReader
  *
- * @param sparkSession   sparkSession
+ * @param omniContext   omniContext
  * @param encryptMode    encryptMode
  * @param keyOperator    keyOperator
  */
-class ShieldDataFrameReader(
-                             sparkSession: SparkSession,
-                             encryptMode: AlgorithmMode,
-                             keyOperator: KeyOperator) {
+class ShieldDataFrameReader(omniContext: OmniContext,
+                            encryptMode: AlgorithmMode,
+                            keyOperator: KeyOperator) {
   protected val extraOptions = new scala.collection.mutable.HashMap[String, String]
-  protected var dataFrameReader: DataFrameReader = sparkSession.read
+  protected var dataFrameReader: DataFrameReader = omniContext.getSparkSession.read
 
   def addExtraOption(key: String, value: String): this.type = {
     this.extraOptions += (key -> value)
@@ -56,13 +56,7 @@ class ShieldDataFrameReader(
       case PLAIN_TEXT =>
       case AES_GCM_NOPADDING =>
         val encryptedDataKeyStr = keyOperator.readEncryptedDataKeyFromMeta(path)
-        val dataKeyPlainKeyStr = keyOperator.encoderWithBase64(keyOperator.getDataKeyPlainText(encryptedDataKeyStr))
-        sparkSession.sparkContext.hadoopConfiguration
-          .set(genShieldReadDataKeyConf(encryptedDataKeyStr), dataKeyPlainKeyStr)
-        sparkSession.sparkContext.hadoopConfiguration
-          .set(genShieldCryptoModeConf(encryptedDataKeyStr), encryptMode.encryptionAlgorithm)
-        sparkSession.sparkContext.hadoopConfiguration
-          .set(genDataKeyLengthConf(encryptedDataKeyStr), keyOperator.getDataKeyLength.toString)
+        omniContext.setCommonConfig(encryptMode.encryptionAlgorithm, encryptedDataKeyStr, keyOperator)
       case _ =>
         invalidArgumentError("unknown EncryptMode " + AlgorithmMode.toString)
     }
@@ -83,4 +77,3 @@ class ShieldDataFrameReader(
     dataFrameReader.options(extraOptions).text(path)
   }
 }
-

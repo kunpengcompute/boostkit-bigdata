@@ -28,13 +28,8 @@ class SimpleKeyManagementService protected() extends KeyManagementService{
   val keyReaderWriter = new FileMetaHandler
   var _appId: String = _
   var _apiKey: String = _
-  var keyLength = 48
 
-  override def setDataKeyLength(length: Int): Unit = {
-    keyLength = length/8
-  }
-
-  override def getEncryptDataKey(primaryKeyName: String, config: Configuration = null): Array[Byte] = {
+  override def getEncryptDataKey(primaryKeyName: String, keyLength: Int, config: Configuration = null): Array[Byte] = {
       val randVect = (1 to keyLength).map { x => new SecureRandom().nextInt(10) }
       val dataKeyPlaintext = randVect.mkString
       var dataKeyCiphertext = ""
@@ -49,7 +44,7 @@ class SimpleKeyManagementService protected() extends KeyManagementService{
                                    config: Configuration = null,
                                    encryptedDataKey: Array[Byte]): Array[Byte] = {
       var dataKeyPlaintext = ""
-      for (i <- 0 until keyLength) {
+      for (i <- encryptedDataKey.indices) {
         dataKeyPlaintext += '0' + ((encryptedDataKey(i) - '0') -
           (primaryKeyName(i) - '0') + 10) % 10
       }

@@ -35,12 +35,7 @@ class HadoopKeyManagementService protected() extends KeyManagementService with L
     new HadoopKeyManagementService()
   }
 
-  def setDataKeyLength(length: Int): Unit = {
-    DATA_KEY_LENGTH = length / 8
-  }
-
   private val random = new SecureRandom
-  private var DATA_KEY_LENGTH = 32
   private val SIGN_KEY_LENGTH = 16
   private val IV_LENGTH = 16
 
@@ -66,12 +61,13 @@ class HadoopKeyManagementService protected() extends KeyManagementService with L
     providerList.get(0)
   }
 
-  override def getEncryptDataKey(primaryKeyName: String, config: Configuration): Array[Byte] = {
+  override def getEncryptDataKey(primaryKeyName: String, keyLength: Int, config: Configuration): Array[Byte] = {
+    val dataKeyLength = keyLength / 8
     val provider = getProvider(config)
     val meta = provider.getMetadata(primaryKeyName)
     val key = new KeyMetadata(primaryKeyName, meta.getVersions - 1, meta.getAlgorithm)
-    log.info(s"hadoop kms use ${DATA_KEY_LENGTH * 8} bit dataKey")
-    val encryptedKey = new Array[Byte](SIGN_KEY_LENGTH + DATA_KEY_LENGTH)
+    log.info(s"hadoop kms use ${dataKeyLength * 8} bit dataKey")
+    val encryptedKey = new Array[Byte](SIGN_KEY_LENGTH + dataKeyLength)
     random.nextBytes(encryptedKey)
     val iv = new Array[Byte](IV_LENGTH)
     unmangleIv(encryptedKey, iv)

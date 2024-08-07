@@ -15,9 +15,12 @@
 
 package com.huawei.analytics.shield.crypto
 
+import com.huawei.analytics.shield.kms.KeyManagementService
+import com.huawei.analytics.shield.kms.common.KeyOperator
 import com.huawei.analytics.shield.utils.LogError.invalidOperationError
-import com.huawei.analytics.shield.utils.ShieldConfParam.{WRITE_DATA_KEY_CIPHER_TEXT, genDataKeyLengthConf, genShieldCryptoModeConf}
+import com.huawei.analytics.shield.utils.ShieldConfParam.{WRITE_DATA_KEY_CIPHER_TEXT, genDataKeyLengthConf, genKmsTypeConf, genShieldCryptoModeConf, genShieldReadPrimaryKeyConf}
 import com.huawei.analytics.shield.utils.ValueConf.DEFAULT_DATA_KEY_LENGTH
+
 import org.apache.hadoop.conf.Configuration
 
 import java.nio.ByteBuffer
@@ -39,9 +42,10 @@ class ShieldEncryptor(conf: Configuration) extends ShieldCrypto(conf: Configurat
    */
   def init(conf: Configuration): Unit = {
     encryptedDataKey = conf.get(WRITE_DATA_KEY_CIPHER_TEXT)
-    val cryptoMode = AlgorithmMode.parse(conf.get(genShieldCryptoModeConf(encryptedDataKey)))
-    val keyLength = conf.getInt(genDataKeyLengthConf(encryptedDataKey), DEFAULT_DATA_KEY_LENGTH)
-    init(ENCRYPT, cryptoMode, keyLength, conf.get("shield.write.dataKey.plainText"))
+    val keyOperator = new KeyOperator
+    keyOperator.init(encryptedDataKey, conf)
+    val dataKeyPlainStr = keyOperator.encoderWithBase64(keyOperator.getDataKeyPlainText(encryptedDataKey))
+    init(ENCRYPT, keyOperator.getAlgorithmMode, keyOperator.getDataKeyLength, dataKeyPlainStr)
   }
 
   /**

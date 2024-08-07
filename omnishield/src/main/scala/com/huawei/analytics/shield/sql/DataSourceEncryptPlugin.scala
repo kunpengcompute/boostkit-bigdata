@@ -20,7 +20,7 @@ import com.huawei.analytics.shield.crypto.{AlgorithmMode, SM4_GCM_NOPADDING}
 import com.huawei.analytics.shield.kms.common.KeyOperator
 import com.huawei.analytics.shield.sql.SQLShieldOption.{COMPRESSION, CRYPTO_MODE, ENCRYPT_ENABLE, EN_DATA_KEY, KEY_LENGTH, KMS_TYPE, PKYE_NAME}
 import com.huawei.analytics.shield.utils.LogError.invalidArgumentError
-import com.huawei.analytics.shield.utils.ShieldConfParam.{WRITE_DATA_KEY_CIPHER_TEXT, WRITE_DATA_KEY_PLAIN_TEXT, genDataKeyLengthConf, genShieldCryptoModeConf, genShieldReadDataKeyConf}
+import com.huawei.analytics.shield.utils.ShieldConfParam.{WRITE_DATA_KEY_CIPHER_TEXT, genKmsTypeConf}
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.catalog.{CatalogStorageFormat, CatalogTable}
@@ -133,14 +133,14 @@ case class EncryptDataSourceRule(spark: SparkSession) extends Rule[LogicalPlan] 
     } else {
       parmaCheck(createTbProperties.get, createTbType.get)
       val keyOperator = buildKeyOperatorByMap(sc, createTbProperties.get)
-      val (plainKeyBytes, encryptKeyBytes) = keyOperator.getDataKeyPair
+      val encryptKeyBytes = keyOperator.getDataKeyCipherText
       val encryptKeyStr = keyOperator.encoderWithBase64(encryptKeyBytes)
       val newTbProperties = createTbProperties.get + (EN_DATA_KEY -> encryptKeyStr) +
         (COMPRESSION -> "com.huawei.analytics.shield.crypto.CryptoCodec")
       if (isInsertSelect) {
-        val plainKeyStr = keyOperator.encoderWithBase64(plainKeyBytes)
         val mode = createTbProperties.get(CRYPTO_MODE)
-        setSQLWriteConfig(sc, mode, plainKeyStr, encryptKeyStr, keyOperator.getDataKeyLength)
+        val kms = createTbProperties.get(KMS_TYPE)
+        setSQLWriteConfig(sc, mode, keyOperator, encryptKeyStr, kms)
       }
       replaceCreateCommandProperties(plan, newTbProperties)
     }
@@ -153,8 +153,7 @@ case class EncryptDataSourceRule(spark: SparkSession) extends Rule[LogicalPlan] 
       val mode = insertOptionMap.get(CRYPTO_MODE)
       val encryptDataKey = insertOptionMap.get(EN_DATA_KEY)
       val keyOperator = buildKeyOperatorByMap(sc, insertOptionMap.get)
-      val dataKeyPlainKeyStr = keyOperator.encoderWithBase64(keyOperator.getDataKeyPlainText(encryptDataKey))
-      setSQLWriteConfig(sc, mode, dataKeyPlainKeyStr, encryptDataKey, keyOperator.getDataKeyLength)
+      setSQLWriteConfig(sc, mode, keyOperator, encryptDataKey, insertOptionMap.get(KMS_TYPE))
     }
   }
 
@@ -168,8 +167,7 @@ case class EncryptDataSourceRule(spark: SparkSession) extends Rule[LogicalPlan] 
           val mode = tableProperties(CRYPTO_MODE)
           val encryptDataKey = tableProperties(EN_DATA_KEY)
           val keyOperator = buildKeyOperatorByMap(sc, tableProperties)
-          val dataKeyPlainKeyStr = keyOperator.encoderWithBase64(keyOperator.getDataKeyPlainText(encryptDataKey))
-          setSQLReadConfig(sc, mode, dataKeyPlainKeyStr, encryptDataKey, keyOperator.getDataKeyLength)
+          setSQLReadConfig(sc, mode, keyOperator, encryptDataKey,tableProperties(KMS_TYPE))
         }
       }
     }
@@ -203,22 +201,21 @@ case class EncryptDataSourceRule(spark: SparkSession) extends Rule[LogicalPlan] 
     val keyName = values(PKYE_NAME)
     val kms = values(KMS_TYPE)
     val keyLength = values(KEY_LENGTH)
-    sc.loadKeyOperator(keyName, kms, keyLength.toInt)
+    val algorithm = AlgorithmMode.parse(values(CRYPTO_MODE))
+    sc.loadKeyOperator(keyName, kms, keyLength.toInt, algorithm)
   }
 
-  private def setSQLWriteConfig(sc: OmniContext, mode: String, dataKeyPlainStr: String,
-                        dataKeyCipherStr: String, keyLength: Int): Unit = {
-    sc.getHadoopConf.set(WRITE_DATA_KEY_PLAIN_TEXT, dataKeyPlainStr)
+  private def setSQLWriteConfig(sc: OmniContext, mode: String, keyOperator: KeyOperator,
+                                dataKeyCipherStr: String, kmsType: String): Unit = {
+    sc.getHadoopConf.set(genKmsTypeConf(keyOperator.getPrimaryKeyName), kmsType)
     sc.getHadoopConf.set(WRITE_DATA_KEY_CIPHER_TEXT, dataKeyCipherStr)
-    sc.getHadoopConf.set(genShieldCryptoModeConf(dataKeyCipherStr), mode)
-    sc.getHadoopConf.set(genDataKeyLengthConf(dataKeyCipherStr), keyLength.toString)
+    sc.setCommonConfig(mode, dataKeyCipherStr, keyOperator)
   }
 
-  private def setSQLReadConfig(sc: OmniContext, mode: String, dataKeyPlainStr: String,
-                       dataKeyCipherStr: String, keyLength: Int): Unit = {
-    sc.getHadoopConf.set(genShieldReadDataKeyConf(dataKeyCipherStr), dataKeyPlainStr)
-    sc.getHadoopConf.set(genShieldCryptoModeConf(dataKeyCipherStr), mode)
-    sc.getHadoopConf.set(genDataKeyLengthConf(dataKeyCipherStr), keyLength.toString)
+  private def setSQLReadConfig(sc: OmniContext, mode: String, keyOperator: KeyOperator,
+                       dataKeyCipherStr: String, kmsType: String): Unit = {
+    sc.getHadoopConf.set(genKmsTypeConf(keyOperator.getPrimaryKeyName), kmsType)
+    sc.setCommonConfig(mode, dataKeyCipherStr, keyOperator)
   }
 
   /**

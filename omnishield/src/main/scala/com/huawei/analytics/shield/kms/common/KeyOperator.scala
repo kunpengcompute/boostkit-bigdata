@@ -15,11 +15,14 @@
 
 package com.huawei.analytics.shield.kms.common
 
+import com.huawei.analytics.shield.crypto.AlgorithmMode
 import com.huawei.analytics.shield.kms.KeyManagementService
+import com.huawei.analytics.shield.utils.LogError.invalidArgumentError
+import com.huawei.analytics.shield.utils.ShieldConfParam.{genDataKeyLengthConf, genKmsTypeConf, genShieldCryptoModeConf, genShieldReadPrimaryKeyConf}
+import com.huawei.analytics.shield.utils.ValueConf.DEFAULT_DATA_KEY_LENGTH
 
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.hadoop.conf.Configuration
-import org.apache.spark.sql.SparkSession
 
 import java.net.URI
 import java.util.Base64
@@ -27,23 +30,43 @@ import java.util.Base64
 /**
  * Tool for loading keys from the KMS
  *
- * @param primaryKeyName primaryKeyName or primaryKeyId
- * @param kms            kms
  */
-class KeyOperator(primaryKeyName: String = "",
-                  kms: KeyManagementService = null,
-                  dataKeyLength: Int = 256) {
-  val META_FILE_NAME = ".meta"
-  protected var encryptedDataKey: Array[Byte] = null
-  protected val hadoopConfig: Configuration =
-    if (SparkSession.builder().getOrCreate().sparkContext.hadoopConfiguration != null) {
-      SparkSession.builder().getOrCreate().sparkContext.hadoopConfiguration
-    } else {
-      new Configuration()
-    }
+class KeyOperator() {
+  private val META_FILE_NAME = ".meta"
+  private var encryptedDataKey: Array[Byte] = _
+  private var primaryKeyName: String = _
+  private var kms: KeyManagementService = _
+  private var dataKeyLength: Int = 256
+  private var mode: AlgorithmMode = _
+  private var hadoopConfig: Configuration = _
+
+  def init(encryptedDataKeyStr:String, conf: Configuration): Unit = {
+    encryptedDataKey = decoderWithBase64(encryptedDataKeyStr)
+    val keyName = conf.get(genShieldReadPrimaryKeyConf(encryptedDataKeyStr))
+    val kmsType = conf.get(genKmsTypeConf(keyName))
+    val keyLength = conf.getInt(genDataKeyLengthConf(encryptedDataKeyStr),DEFAULT_DATA_KEY_LENGTH)
+    val cryptoMode = AlgorithmMode.parse(conf.get(genShieldCryptoModeConf(encryptedDataKeyStr)))
+    init(keyName,kmsType,keyLength,cryptoMode,conf)
+  }
+
+  def init(keyName: String, kmsType: String, keyLength: Int, algorithmMode: AlgorithmMode, conf: Configuration): Unit = {
+    primaryKeyName = keyName
+    kms = loadKmsService(kmsType)
+    dataKeyLength = keyLength
+    mode = algorithmMode
+    hadoopConfig = conf
+  }
 
   def getDataKeyLength:Int = {
     dataKeyLength
+  }
+
+  def getPrimaryKeyName:String = {
+    primaryKeyName
+  }
+
+  def getAlgorithmMode:AlgorithmMode = {
+    mode
   }
 
   /**
@@ -57,29 +80,30 @@ class KeyOperator(primaryKeyName: String = "",
   }
 
   /**
+   * Convert Array[Byte] to String by base64
+   *
+   * @param input input
+   * @return
+   */
+  def decoderWithBase64(input: String): Array[Byte] = {
+    Base64.getDecoder.decode(input)
+  }
+
+  /**
    * get data key PlainText from encryptedDataKey
    *
    * @param encryptedDataKey encryptedDataKey
    * @return dataKeyPlainText
    */
   def getDataKeyPlainText(encryptedDataKey: String): Array[Byte] = {
-    kms.setDataKeyLength(dataKeyLength)
     val encryptedDataKeyBytes = Base64.getDecoder.decode(encryptedDataKey)
     val plainBytes = kms.getDataKeyPlainText(primaryKeyName, hadoopConfig, encryptedDataKeyBytes)
     plainBytes
   }
 
-  /**
-   * for encrypted data key, generate data key and encrypt it by kms
-   * for data key PlainText, decrypt encryptDataKey by kms
-   *
-   * @return data key PlainText and  encrypted data key
-   */
-  def getDataKeyPair: (Array[Byte], Array[Byte]) = {
-    kms.setDataKeyLength(dataKeyLength)
-    encryptedDataKey = kms.getEncryptDataKey(primaryKeyName, hadoopConfig)
-    val dataKeyPlainText = kms.getDataKeyPlainText(primaryKeyName, hadoopConfig, encryptedDataKey)
-    (dataKeyPlainText, encryptedDataKey)
+  def getDataKeyCipherText: Array[Byte] = {
+    encryptedDataKey = kms.getEncryptDataKey(primaryKeyName, dataKeyLength, hadoopConfig)
+    encryptedDataKey
   }
 
   def getMetaPath(outputPath: String): String = {
@@ -92,6 +116,9 @@ class KeyOperator(primaryKeyName: String = "",
    * @param fileDirPath filepath
    */
   def writeEncryptedDataKeyToMeta(fileDirPath: String): Unit = {
+    if (encryptedDataKey == null) {
+      invalidArgumentError("encryptedDataKey is null. Generate encryptedDataKey before writing it to meta file." )
+    }
     val metaPath = new Path(getMetaPath(fileDirPath)).toString
     val encryptedDataKeyStr = Base64.getEncoder.encodeToString(encryptedDataKey)
     val jsonStr = KmsMetaFormatSerializer(KmsMetaFormat(encryptedDataKeyStr))
@@ -112,6 +139,12 @@ class KeyOperator(primaryKeyName: String = "",
     val jsonStr = scala.io.Source.fromInputStream(inStream).takeWhile(_ != null).mkString
     val encryptedDataKey = KmsMetaFormatSerializer(jsonStr).encryptedDataKey
     encryptedDataKey
+  }
+
+  private def loadKmsService(className: String): KeyManagementService = {
+    val clz = Class.forName(className).newInstance()
+    val kms = clz.asInstanceOf[KeyManagementService]
+    kms
   }
 }
 
@@ -134,4 +167,3 @@ class FileMetaHandler {
     content
   }
 }
-
