@@ -71,8 +71,7 @@ class ShieldDataFrameWriter(omniContext: OmniContext,
         option("compression", "com.huawei.analytics.shield.crypto.CryptoCodec")
         val dataKeyCipherBytes = keyOperator.getDataKeyCipherText
         val dataKeyCipherTextStr = keyOperator.encoderWithBase64(dataKeyCipherBytes)
-        omniContext.getSparkSession.sparkContext.hadoopConfiguration
-          .set(WRITE_DATA_KEY_CIPHER_TEXT, dataKeyCipherTextStr)
+        omniContext.getHadoopConf.set(WRITE_DATA_KEY_CIPHER_TEXT, dataKeyCipherTextStr)
         omniContext.setCommonConfig(algorithmMode.encryptionAlgorithm, dataKeyCipherTextStr, keyOperator)
       case _ =>
         invalidArgumentError("unknown or wrong encryptMode " + AlgorithmMode.toString)
