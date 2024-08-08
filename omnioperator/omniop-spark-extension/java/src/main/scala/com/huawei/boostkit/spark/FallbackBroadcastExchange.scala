@@ -18,7 +18,6 @@
 
 package com.huawei.boostkit.spark
 
-import com.huawei.boostkit.spark.FallbackBroadcastExchange.useColumnarBroadcastExchange
 import com.huawei.boostkit.spark.util.PhysicalPlanSelector
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.optimizer.{BuildLeft, BuildRight}
@@ -30,6 +29,16 @@ import org.apache.spark.sql.execution.joins.{BroadcastHashJoinExec, BroadcastNes
 case class FallbackBroadcastExchange(session: SparkSession) extends Rule[SparkPlan] {
 
   override def apply(plan: SparkPlan): SparkPlan = PhysicalPlanSelector.maybe(session, plan) {
+
+    val SQLconf = session.sessionState.conf
+    val enableColumnarBroadcastExchange: Boolean =
+      SQLconf.getConfString("spark.omni.sql.columnar.broadcastexchange", "true").toBoolean
+    val enableColumnarBroadcastJoin: Boolean = SQLconf
+      .getConfString("spark.omni.sql.columnar.broadcastJoin", "true")
+      .toBoolean
+    val useColumnarBroadcastExchange: Boolean = enableColumnarBroadcastExchange &&
+      enableColumnarBroadcastJoin
+
     plan.foreach {
       // Falls back for BroadcastNestedLoopJoinExec
       case bnlj: BroadcastNestedLoopJoinExec =>
@@ -117,10 +126,4 @@ case class FallbackBroadcastExchange(session: SparkSession) extends Rule[SparkPl
     }
     plan
   }
-}
-
-object FallbackBroadcastExchange {
-  val columnarConf: ColumnarPluginConfig = ColumnarPluginConfig.getSessionConf
-  val useColumnarBroadcastExchange: Boolean = columnarConf.enableColumnarBroadcastExchange &&
-    columnarConf.enableColumnarBroadcastJoin
 }
