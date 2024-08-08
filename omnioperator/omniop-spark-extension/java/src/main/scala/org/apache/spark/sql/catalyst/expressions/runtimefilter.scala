@@ -54,8 +54,6 @@ case class RuntimeFilterSubquery(
   override def withNewPlan(plan: LogicalPlan): RuntimeFilterSubquery =
     copy(filterCreationSidePlan = plan)
 
-  //override def withNewHint(hint: Option[HintInfo]): SubqueryExpression = copy(hint = hint)
-
   override lazy val resolved: Boolean = {
     filterApplicationSideExp.resolved &&
       filterCreationSidePlan.resolved &&
