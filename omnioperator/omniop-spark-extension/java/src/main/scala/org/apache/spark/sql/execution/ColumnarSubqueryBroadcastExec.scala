@@ -23,11 +23,12 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans.QueryPlan
-import org.apache.spark.sql.execution.adaptive.AdaptiveSparkPlanExec
+import org.apache.spark.sql.execution.adaptive.{AdaptiveSparkPlanExec, BroadcastQueryStageExec}
 import org.apache.spark.sql.execution.exchange.ReusedExchangeExec
 import org.apache.spark.sql.execution.joins.{HashJoin, HashedRelation, LongHashedRelation}
 import org.apache.spark.sql.execution.metric.SQLMetrics
 import org.apache.spark.util.ThreadUtils
+import org.apache.spark.sql.vectorized.ColumnarBatch
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.Duration
@@ -41,10 +42,19 @@ case class SubqueryBroadcastExec(
 
   val omniEnabled = session.conf.get(ColumnarPluginConfig.OMNI_ENABLE_KEY, "true").toBoolean
 
+  override def supportsColumnar: Boolean = true
+
   override def nodeName: String = {
     val exchangeChild = child match {
       case exec: ReusedExchangeExec =>
         exec.child
+      case stageExec: BroadcastQueryStageExec =>
+        stageExec.plan match {
+          case reuseExec: ReusedExchangeExec =>
+            reuseExec.child
+          case _ =>
+            child
+        }
       case _ =>
         child
     }
@@ -93,6 +103,13 @@ case class SubqueryBroadcastExec(
         val exchangeChild = child match {
           case exec: ReusedExchangeExec =>
             exec.child
+          case stageExec: BroadcastQueryStageExec =>
+            stageExec.plan match {
+              case reuseExec: ReusedExchangeExec =>
+                reuseExec.child
+              case _ =>
+                child
+            }
           case _ =>
             child
         }
