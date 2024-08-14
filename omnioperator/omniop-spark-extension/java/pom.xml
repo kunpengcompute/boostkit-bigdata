@@ -7,7 +7,7 @@
     <parent>
         <groupId>com.huawei.kunpeng</groupId>
         <artifactId>boostkit-omniop-spark-parent</artifactId>
-        <version>3.1.1-1.5.0</version>
+        <version>3.1.1-1.6.0</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
@@ -51,7 +51,7 @@
     <dependency>
         <groupId>com.huawei.boostkit</groupId>
         <artifactId>boostkit-omniop-native-reader</artifactId>
-        <version>3.1.1-1.5.0</version>
+        <version>3.1.1-1.6.0</version>
     </dependency>
     <dependency>
         <groupId>junit</groupId>
