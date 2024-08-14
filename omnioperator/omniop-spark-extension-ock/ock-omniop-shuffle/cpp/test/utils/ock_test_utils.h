@@ -22,13 +22,15 @@ static ock::dopspark::ConcurrentMap<std::shared_ptr<ock::dopspark::OckSplitter>>
 
 static std::string Ocks_shuffle_tests_dir = "/tmp/OckshuffleTests";
 
-std::unique_ptr<BaseVector> CreateVector(DataType &dataType, int32_t rowCount, va_list &args);
+BaseVector *CreateVector(DataType &dataType, int32_t rowCount, va_list &args);
 
 VectorBatch *OckCreateInputData(const DataTypes &types, int32_t rowCount, ...);
 
 VectorBatch *OckCreateVectorBatch(const DataTypes &types, int32_t rowCount, ...);
 
 BaseVector *OckNewbuildVector(const DataTypeId &typeId, int32_t rowNumber);
+
+BaseVector *OckNewbuildVector1(int32_t rowNumber, uint32_t varlength);
 
 VectorBatch *OckCreateVectorBatch_4varcharCols_withPid(int parNum, int rowNum);
 
@@ -67,15 +69,6 @@ void OckTest_splitter_stop(long splitter_id);
 
 void OckTest_splitter_close(long splitter_id);
 
-template <typename T> BaseVector *CreateVector(int32_t length, T *values)
-{
-    std::unique_ptr<Vector<T>> vector = std::make_unique<Vector<T>>(length);
-    for (int32_t i = 0; i < length; i++) {
-        vector->SetValue(i, values[i]);
-    }
-    return vector;
-}
-
 template <omniruntime::type::DataTypeId typeId>
 BaseVector *CreateFlatVector(int32_t length, va_list &args)
 {
@@ -112,14 +105,12 @@ BaseVector *CreateDictionary(BaseVector *vector, int32_t *ids, int32_t size)
     }
 }
 
-
-
-template <typename T, typename V> T *OckCreateVector(V *values, int32_t length)
+template <typename T> BaseVector *OckCreateVector(int32_t length, T *values)
 {
-    VectorAllocator *vecAllocator = VectorAllocator::GetGlobalAllocator();
-    auto vector = new T(vecAllocator, length);
-    vector->SetValues(0, values, length);
+    Vector<T> *vector = new Vector<T>(length);
+    for (int32_t i = 0; i < length; i++) {
+        vector->SetValue(i, values[i]);
+    }
     return vector;
 }
-
 #endif // SPARK_THESTRAL_PLUGIN_TEST_UTILS_H

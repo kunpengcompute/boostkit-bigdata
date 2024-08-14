@@ -54,11 +54,14 @@ bool PrintVectorBatch(uint8_t **startAddress, uint32_t &length)
     info << "vector_batch: { ";
     for (uint32_t colIndex = 0; colIndex < gColNum; colIndex++) {
         auto typeId = static_cast<DataTypeId>(gVecTypeIds[colIndex]);
-        BaseVector *vector = OckNewbuildVector(typeId, rowNum);
-        if (typeId == OMNI_VARCHAR) {
+        BaseVector *vector;
+        if (typeId == OMNI_VARCHAR || typeId == OMNI_CHAR) {
             uint32_t varlength = 0;
             instance->CalVectorValueLength(colIndex, varlength);
             LOG_INFO("varchar vector value length : %d", varlength);
+            vector = OckNewbuildVector1(rowNum, varlength);
+        } else {
+            vector = OckNewbuildVector(typeId, rowNum);
         }
 
         if(UNLIKELY(!instance->CopyDataToVector(vector, colIndex))) {
@@ -118,12 +121,11 @@ bool PrintVectorBatch(uint8_t **startAddress, uint32_t &length)
                         valueAddress += vector->GetValueOffset(rowIndex);
                     }*/
                     uint8_t *valueAddress = nullptr;
-                    int32_t length = reinterpret_cast<Vector<LargeStringContainer<std::string_view>> *>(vector);
-                    std::string valueString(valueAddress, valueAddress + length);
+                    auto vc = reinterpret_cast<Vector<LargeStringContainer<std::string_view>> *>(vector);
                     uint32_t length = 0;
                     std::string_view value;
                     if (!vc->IsNull(rowIndex)) {
-                        value = vc->GetValue();
+                        value = vc->GetValue(rowIndex);
                         valueAddress = reinterpret_cast<uint8_t *>(reinterpret_cast<uint64_t>(value.data()));
                         length = static_cast<uint32_t>(value.length());
                     }

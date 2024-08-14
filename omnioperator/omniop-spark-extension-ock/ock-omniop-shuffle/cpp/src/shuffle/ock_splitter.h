@@ -30,7 +30,7 @@ namespace dopspark {
 class OckSplitter {
     // VectorBatchRegion record those row in one partitionId which belong to current vector batch
     using VBRegion = struct VectorBatchRegion {
-        std::vector<uint32_t> mRowIndexes {}; // cache the index of rows in preoccupied state
+        std::vector<uint32_t> mRowIndexes{}; // cache the index of rows in preoccupied state
         uint32_t mRowNum = 0;
         uint32_t mLength = 0; // the length of cached rows in bytes
     };
@@ -39,10 +39,10 @@ public:
     OckSplitter() = default;
     ~OckSplitter() = default;
 
-    OckSplitter(int32_t colNum, int32_t partitionNum, bool isSinglePt, uint64_t threadId);
+    OckSplitter(int32_t colNum, int32_t partitionNum, bool isSinglePt, uint64_t threadId, bool isRss);
 
     static std::shared_ptr<OckSplitter> Make(const std::string &partitionMethod, int partitionNum,
-        const int32_t *colTypeIds, int32_t colNum, uint64_t threadId);
+        const int32_t *colTypeIds, int32_t colNum, uint64_t threadId, bool isRss);
     bool Initialize(const int32_t *colTypeIds);
     bool Split(VectorBatch &vb);
     bool Stop();
@@ -60,13 +60,15 @@ public:
         return true;
     }
 
-    inline bool InitLocalBuffer(uint32_t regionSize, uint32_t minCapacity, uint32_t maxCapacity, bool isCompress)
+    inline bool InitLocalBuffer(uint32_t regionSize, uint32_t minCapacity, uint32_t maxCapacity, bool isCompress,
+        uint32_t &writerId)
     {
-        if (UNLIKELY(!mOckBuffer->Initialize(regionSize, minCapacity, maxCapacity, isCompress))) {
+        if (UNLIKELY(!mOckBuffer->Initialize(regionSize, minCapacity, maxCapacity, isCompress, mIsRss, writerId))) {
             LOG_ERROR("Failed to initialize ock local buffer, region size %d, capacity[%d, %d], compress %d",
-                      regionSize, minCapacity, maxCapacity, isCompress);
+                regionSize, minCapacity, maxCapacity, isCompress);
             return false;
         }
+        mRssWriter = writerId;
 
         if (UNLIKELY(!InitCacheRegion())) {
             LOG_ERROR("Failed to initialize CacheRegion");
@@ -87,7 +89,7 @@ public:
 
 private:
     static std::shared_ptr<OckSplitter> Create(const int32_t *colTypeIds, int32_t colNum, int32_t partitionNum,
-        bool isSinglePt, uint64_t threadId);
+        bool isSinglePt, uint64_t threadId, bool isRss);
     bool ToSplitterTypeId(const int32_t *vBColTypes);
 
     uint32_t GetVarVecValue(VectorBatch &vb, uint32_t rowIndex, uint32_t colIndex) const;
@@ -139,15 +141,19 @@ private:
     }
 
     bool FlushAllRegionAndGetNewBlob(VectorBatch &vb);
+    bool FlushFullRegion(VectorBatch &vb);
+    bool CommitFullRegion(VectorBatch &vb);
     bool PreoccupiedBufferSpace(VectorBatch &vb, uint32_t partitionId, uint32_t rowIndex, uint32_t rowLength,
         bool newRegion);
     bool WritePartVectorBatch(VectorBatch &vb, uint32_t partitionId);
 
-    static bool WriteNullValues(BaseVector *vector, std::vector<uint32_t> &rowIndexes, uint32_t rowNum, uint8_t *&address);
+    static bool WriteNullValues(BaseVector *vector, std::vector<uint32_t> &rowIndexes, uint32_t rowNum,
+        uint8_t *&address);
     template <typename T>
     bool WriteFixedWidthValueTemple(BaseVector *vector, bool isDict, std::vector<uint32_t> &rowIndexes, uint32_t rowNum,
         T *&address);
-    bool WriteDecimal128(BaseVector *vector, bool isDict, std::vector<uint32_t> &rowIndexes, uint32_t rowNum, uint64_t *&address);
+    bool WriteDecimal128(BaseVector *vector, bool isDict, std::vector<uint32_t> &rowIndexes, uint32_t rowNum,
+        uint64_t *&address);
     bool WriteFixedWidthValue(BaseVector *vector, ShuffleTypeId typeId, std::vector<uint32_t> &rowIndexes,
         uint32_t rowNum, uint8_t *&address);
     static bool WriteVariableWidthValue(BaseVector *vector, std::vector<uint32_t> &rowIndexes, uint32_t rowNum,
@@ -170,17 +176,19 @@ private:
     uint32_t mColNum = 0;
     uint64_t mThreadId = 0;
     bool mIsSinglePt = false;
-    uint32_t mTotalWriteBytes = 0;
-    std::vector<int64_t> mPartitionLengths {};
+    bool mIsRss = false;
+    uint32_t mRssWriter = 0;
+    uint64_t mTotalWriteBytes = 0;
+    std::vector<int64_t> mPartitionLengths{};
 
     // sum fixed columns length in byte which consist of null(1Byte) + value(1 ~ 8Byte)
     //     and fixed length in variable columns as null (1Byte) + offset(4Byte, more 1Byte)
     uint32_t mMinDataLenInVBByRow = 0;
     uint32_t mMinDataLenInVB = 0; // contains vb header and length of those var vector
 
-    std::vector<DataTypeId> mVBColDataTypes {};
-    std::vector<ShuffleTypeId> mVBColShuffleTypes {};
-    std::vector<uint32_t> mColIndexOfVarVec {};
+    std::vector<DataTypeId> mVBColDataTypes{};
+    std::vector<ShuffleTypeId> mVBColShuffleTypes{};
+    std::vector<uint32_t> mColIndexOfVarVec{};
 
     /* the region use for current vector batch ------------------------------------------------------------ */
     // this splitter which handle some vector batch by split, will exist variable param in differ vector batch which
@@ -189,7 +197,7 @@ private:
 
     // MAP<partitionId, vbRegion> => vbRegion describe one vector batch with one partitionId will write to one region
     // in ock local blob
-    std::vector<VBRegion> mCacheRegion {};
+    std::vector<VBRegion> mCacheRegion{};
 
     // the vector point to vector0 in current vb which record rowIndex -> ptId
     Vector<int32_t> *mPtViewInCurVB = nullptr;

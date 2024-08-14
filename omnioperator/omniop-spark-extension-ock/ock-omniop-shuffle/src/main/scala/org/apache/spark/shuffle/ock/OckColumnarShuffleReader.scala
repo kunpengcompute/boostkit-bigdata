@@ -72,8 +72,7 @@ class OckColumnarShuffleReader[K, C](
 
     val gatherDataStart = System.currentTimeMillis()
     val records: Iterator[OckShuffleJniReader] = OckColumnarShuffleBlockResolver.getShuffleData(ockConf, appId,
-      handle.shuffleId, readMetrics, startMapIndex, endMapIndex,
-      startPartition, endPartition, 3, 0L, typeIds, context)
+      handle.shuffleId, readMetrics, startMapIndex, endMapIndex, startPartition, endPartition, typeIds, context)
     val gatherDataEnd = System.currentTimeMillis()
 
     var aggregatedIter: Iterator[Product2[K, C]] = null

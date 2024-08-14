@@ -38,7 +38,7 @@ JNIEXPORT jboolean JNICALL Java_com_huawei_ock_spark_jni_OckShuffleJniWriter_ini
 JNIEXPORT jlong JNICALL Java_com_huawei_ock_spark_jni_OckShuffleJniWriter_nativeMake(JNIEnv *env, jobject,
     jstring jAppId, jint jShuffleId, jint jStageId, jint jStageAttemptNum, jint jMapId, jlong jTaskAttemptId,
     jstring jPartitioningMethod, jint jPartitionNum, jstring jColTypes, jint jColNum, jint jRegionSize,
-    jint jMinCapacity, jint jMaxCapacity, jboolean jIsCompress)
+    jint jMinCapacity, jint jMaxCapacity, jboolean jIsCompress, jboolean jIsRss, jobject jRssWriterId)
 {
     if (UNLIKELY(env == nullptr)) {
         LOG_ERROR("JNIEnv is null.");
@@ -80,7 +80,8 @@ JNIEXPORT jlong JNICALL Java_com_huawei_ock_spark_jni_OckShuffleJniWriter_native
         jThreadId = env->CallLongMethod(jThread, env->GetMethodID(jThreadCls, "getId", "()J"));
     }
 
-    auto splitter = OckSplitter::Make(partitionMethod, jPartitionNum, colTypes.GetIds(), jColNum, (uint64_t)jThreadId);
+    auto splitter = OckSplitter::Make(partitionMethod, jPartitionNum, colTypes.GetIds(), jColNum, (uint64_t)jThreadId,
+        (jIsRss == JNI_TRUE));
     if (UNLIKELY(splitter == nullptr)) {
         env->ThrowNew(env->FindClass(exceptionClass), std::string("Failed to make ock splitter").c_str());
         return 0;
@@ -92,10 +93,16 @@ JNIEXPORT jlong JNICALL Java_com_huawei_ock_spark_jni_OckShuffleJniWriter_native
         return 0;
     }
 
-    ret = splitter->InitLocalBuffer(jRegionSize, jMinCapacity, jMaxCapacity, (jIsCompress == JNI_TRUE));
+    uint32_t writerId = 0;
+    ret = splitter->InitLocalBuffer(jRegionSize, jMinCapacity, jMaxCapacity, (jIsCompress == JNI_TRUE), writerId);
     if (UNLIKELY(!ret)) {
         env->ThrowNew(env->FindClass(exceptionClass), std::string("Failed to initialize local buffer").c_str());
         return 0;
+    }
+    if (jIsRss == JNI_TRUE) {
+        jclass rssWriterClass = env->GetObjectClass(jRssWriterId);
+        jmethodID setIdMethod = GetMethodID(env, rssWriterClass, "setId", "(I)V");
+        env->CallVoidMethod(jRssWriterId, setIdMethod, writerId);
     }
 
     return gOckSplitterMap.Insert(std::shared_ptr<OckSplitter>(splitter));
@@ -127,14 +134,11 @@ JNIEXPORT void JNICALL Java_com_huawei_ock_spark_jni_OckShuffleJniWriter_split(J
         env->ThrowNew(env->FindClass(exceptionClass), errMsg.c_str());
         return;
     }
-
-    delete vecBatch;
 }
 
-JNIEXPORT jobject JNICALL Java_com_huawei_ock_spark_jni_OckShuffleJniWriter_stop(JNIEnv *env, jobject,
-    jlong splitterId)
+JNIEXPORT jobject JNICALL Java_com_huawei_ock_spark_jni_OckShuffleJniWriter_stop(JNIEnv *env, jobject, jlong splitterId)
 {
-     if (UNLIKELY(env == nullptr)) {
+    if (UNLIKELY(env == nullptr)) {
         LOG_ERROR("JNIEnv is null.");
         return nullptr;
     }
@@ -160,10 +164,9 @@ JNIEXPORT jobject JNICALL Java_com_huawei_ock_spark_jni_OckShuffleJniWriter_stop
         jPartitionLengths);
 }
 
-JNIEXPORT void JNICALL Java_com_huawei_ock_spark_jni_OckShuffleJniWriter_close(JNIEnv *env, jobject,
-    jlong splitterId)
+JNIEXPORT void JNICALL Java_com_huawei_ock_spark_jni_OckShuffleJniWriter_close(JNIEnv *env, jobject, jlong splitterId)
 {
-     if (UNLIKELY(env == nullptr)) {
+    if (UNLIKELY(env == nullptr)) {
         LOG_ERROR("JNIEnv is null.");
         return;
     }

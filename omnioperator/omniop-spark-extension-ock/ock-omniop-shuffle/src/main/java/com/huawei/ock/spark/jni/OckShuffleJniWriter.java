@@ -42,11 +42,13 @@ public class OckShuffleJniWriter {
      * @param maxCapacity maxCapacity
      * @param minCapacity minCapacity
      * @param isCompress isCompress
+     * @param isRss isRss
+     * @param rssWriterId rssWriterId
      * @return splitterId
      */
     public long make(String appId, int shuffleId, int stageId, int stageAttemptNumber,
             int mapId, long taskAttemptId, PartitionInfo part, int capacity, int maxCapacity,
-            int minCapacity, boolean isCompress) {
+            int minCapacity, boolean isCompress, boolean isRss, RssWriterId rssWriterId) {
         return nativeMake(
                 appId,
                 shuffleId,
@@ -61,7 +63,9 @@ public class OckShuffleJniWriter {
                 capacity,
                 maxCapacity,
                 minCapacity,
-                isCompress);
+                isCompress,
+                isRss,
+                rssWriterId);
     }
 
     /**
@@ -75,18 +79,20 @@ public class OckShuffleJniWriter {
      * @param taskAttemptId taskAttemptId
      * @param partitioningMethod partitioningMethod
      * @param numPartitions numPartitions
-     * @param inputTpyes inputTpyes
+     * @param inputTypes inputTypes
      * @param numCols numCols
      * @param capacity capacity
      * @param maxCapacity maxCapacity
      * @param minCapacity minCapacity
      * @param isCompress isCompress
+     * @param isRss isRss
+     * @param rssWriterId rssWriterId
      * @return splitterId
      */
     public native long nativeMake(String appId, int shuffleId, int stageId, int stageAttemptNumber,
         int mapId, long taskAttemptId, String partitioningMethod, int numPartitions,
-        String inputTpyes, int numCols, int capacity, int maxCapacity, int minCapacity,
-        boolean isCompress);
+        String inputTypes, int numCols, int capacity, int maxCapacity, int minCapacity,
+        boolean isCompress, boolean isRss, RssWriterId rssWriterId);
 
     private boolean doInitialize() {
         return initialize();

@@ -6,6 +6,7 @@ package org.apache.spark.shuffle.ock
 
 import com.huawei.ock.common.exception.ApplicationException
 import com.huawei.ock.ucache.shuffle.NativeShuffle
+import com.huawei.ock.ucache.shuffle.datatype.ArgOption
 import org.apache.spark._
 import org.apache.spark.executor.TempShuffleReadMetrics
 import org.apache.spark.internal.config.IO_COMPRESSION_CODEC
@@ -13,8 +14,9 @@ import org.apache.spark.internal.{Logging, config}
 import org.apache.spark.scheduler.OCKScheduler
 import org.apache.spark.serializer.Serializer
 import org.apache.spark.shuffle._
+import org.apache.spark.shuffle.ock.spark_3_x.OCKRemoteShuffleHandle
 import org.apache.spark.shuffle.sort.ColumnarShuffleManager
-import org.apache.spark.util.{OCKConf, OCKFunctions, Utils}
+import org.apache.spark.util.{OCKConf, OCKRemoteFunctions, Utils}
 
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
@@ -26,23 +28,23 @@ class OckColumnarShuffleManager(conf: SparkConf) extends ColumnarShuffleManager 
   private[this] val numMapsForOCKShuffle = new ConcurrentHashMap[Int, Long]()
   private[this] val ockConf = new OCKConf(conf)
 
-
-  val shuffleBlockResolver = new OckColumnarShuffleBlockResolver(conf, ockConf)
+  override val shuffleBlockResolver = new OckColumnarShuffleBlockResolver(conf, ockConf)
+  private val shuffleBlockResolver4RSS = new OCKRemoteShuffleBlockResolver(ockConf)
 
   var appId = ""
-  var listenFlg: Boolean = false
-  var isOckBroadcast: Boolean = ockConf.isOckBroadcast
-  @volatile var heartBeatFlag: AtomicBoolean = new AtomicBoolean(false)
-  val applicationDefaultAttemptId = "1";
+  private val listenFlg: AtomicBoolean = new AtomicBoolean(false)
+  private val setFlag: AtomicBoolean = new AtomicBoolean(false)
+  var shuffleMode: String = conf.get(OckColumnarDefines.ShuffleModeKey, ShuffleMode.ESS)
+  private val functions = new OckColumnarFunctions(shuffleMode, ockConf)
+  private val serializerClass: String = ockConf.serializerClass
+  val serializer: Serializer = Utils.classForName(serializerClass).newInstance().asInstanceOf[Serializer]
 
   if (ockConf.excludeUnavailableNodes && ockConf.appId == "driver") {
     OCKScheduler.waitAndBlacklistUnavailableNode(conf)
   }
 
-  OCKFunctions.shuffleInitialize(ockConf)
-  val isShuffleCompress: Boolean = conf.get(config.SHUFFLE_COMPRESS)
-  val compressCodec: String = conf.get(IO_COMPRESSION_CODEC);
-  OCKFunctions.setShuffleCompress(OckColumnarShuffleManager.isCompress(conf), compressCodec)
+  functions.shuffleInitialize()
+  functions.setShuffleCompress(OckColumnarShuffleManager.isCompress(conf), conf.get(IO_COMPRESSION_CODEC))
 
   /**
    * Obtains a [[ShuffleHandle]] to pass to tasks.
@@ -50,32 +52,44 @@ class OckColumnarShuffleManager(conf: SparkConf) extends ColumnarShuffleManager 
   override def registerShuffle[K, V, C](
       shuffleId: Int,
       dependency: ShuffleDependency[K, V, C]): ShuffleHandle = {
-    appId = OCKFunctions.genAppId(conf.getAppId,  SparkContext.getActive.get.applicationAttemptId.getOrElse("1"))
-    if (!listenFlg) {
-      dependency.rdd.sparkContext.addSparkListener(new OCKShuffleStageListener(conf, appId, ockConf.removeShuffleDataAfterJobFinished))
-      listenFlg = true
+    appId = functions.genAppId(None)
+    if (!listenFlg.get()) {
+      synchronized(if (!listenFlg.get()) {
+        if (ShuffleMode.RSS == shuffleMode) {
+          OCKRemoteFunctions.setLBStrategy(ockConf.lbStrategy, ockConf.lbInitRSSNum)
+          dependency.rdd.sparkContext.addSparkListener(new OCKRemoteShuffleStageListener(appId, ockConf.removeShuffleDataAfterJobFinished))
+        } else {
+          dependency.rdd.sparkContext.addSparkListener(new OCKShuffleStageListener(conf, appId, ockConf.removeShuffleDataAfterJobFinished))
+        }
+        listenFlg.set(true)
+      })
     }
-    var tokenCode: String = ""
-    if (isOckBroadcast) {
-      tokenCode = OCKFunctions.getToken(ockConf.isIsolated)
-      OckColumnarShuffleManager.registerShuffle(shuffleId, dependency.partitioner.numPartitions, conf, ockConf)
-    } else {
-      tokenCode = OckColumnarShuffleManager.registerShuffle(shuffleId, dependency.partitioner.numPartitions,
-        conf, ockConf)
-    }
-    if (ockConf.appId == "driver" && !heartBeatFlag.getAndSet(true)) {
-      OCKFunctions.tryStartHeartBeat(this, appId)
-    }
+    val tokenCode: String = OckColumnarShuffleManager.registerShuffle(shuffleId, shuffleMode, dependency, conf, ockConf)
 
-    if (dependency.isInstanceOf[ColumnarShuffleDependency[_, _, _]]) {
-      new OckColumnarShuffleHandle[K, V](
+    if (dependency.isInstanceOf[ColumnarShuffleDependency[K, V, C]]) {
+      val ockColumnarShuffleHandle = new OckColumnarShuffleHandle[K, V](
         shuffleId,
         dependency.asInstanceOf[ColumnarShuffleDependency[K, V, V]],
         tokenCode,
         SparkContext.getActive.get.applicationAttemptId.getOrElse("1"))
+      if (ShuffleMode.RSS == shuffleMode) {
+        ockColumnarShuffleHandle.setBagsInfo(ShuffleRemoteManager.bagsInfo)
+          .setNodeInfo(ShuffleRemoteManager.rssNodeInfo)
+          .setRepInfo(ShuffleRemoteManager.repInfo)
+          .setDriverRpc(ShuffleRemoteManager.driverRpcAddress)
+      } else {
+        ockColumnarShuffleHandle.setDriverRpc(ShuffleManager.driverRpcAddress)
+      }
+
+      ockColumnarShuffleHandle
     } else {
-      new OCKShuffleHandle(shuffleId, dependency, tokenCode,
-        SparkContext.getActive.get.applicationAttemptId.getOrElse("1"))
+      if (ShuffleMode.RSS == shuffleMode) {
+        new spark_3_x.OCKRemoteShuffleHandle(shuffleId, dependency, tokenCode, SparkContext.getActive.get.applicationAttemptId.getOrElse("1"),
+          ShuffleRemoteManager.bagsInfo, ShuffleRemoteManager.repInfo, ShuffleRemoteManager.rssNodeInfo, ShuffleRemoteManager.driverRpcAddress)
+      } else {
+        new OCKShuffleHandle(shuffleId, dependency, tokenCode, SparkContext.getActive.get.applicationAttemptId.getOrElse("1"),
+          ShuffleManager.driverRpcAddress)
+      }
     }
   }
 
@@ -89,18 +103,37 @@ class OckColumnarShuffleManager(conf: SparkConf) extends ColumnarShuffleManager 
 
     handle match {
       case ockColumnarShuffleHandle: OckColumnarShuffleHandle[K@unchecked, V@unchecked] =>
-        appId = OCKFunctions.genAppId(ockConf.appId, handle.asInstanceOf[OckColumnarShuffleHandle[_, _]].appAttemptId)
+        appId = functions.genAppId(Some(handle.asInstanceOf[OckColumnarShuffleHandle[_, _]].appAttemptId))
         //when ock shuffle work with memory cache will remove numMapsForOCKShuffle
-        OckColumnarShuffleManager.registerApp(appId, ockConf, handle.asInstanceOf[OckColumnarShuffleHandle[_, _]].secCode)
-        new OckColumnarShuffleWriter(appId, ockConf, ockColumnarShuffleHandle, mapId, context, metrics)
+        OckColumnarShuffleManager.registerApp(appId, ockConf, shuffleMode, ockColumnarShuffleHandle, context, isWriter = true)
+        if (ShuffleMode.RSS == shuffleMode) {
+          new OckColumnarRssShuffleWriter(appId, ockConf, ockColumnarShuffleHandle, mapId, context, metrics, ockColumnarShuffleHandle.rssNodeInfo)
+        } else {
+          new OckColumnarShuffleWriter(appId, ockConf, ockColumnarShuffleHandle, mapId, context, metrics)
+        }
       case ockShuffleHandle: OCKShuffleHandle[K@unchecked, V@unchecked, _] =>
-        appId = OCKFunctions.genAppId(ockConf.appId, handle.asInstanceOf[OCKShuffleHandle[_, _, _]].appAttemptId)
+        appId = functions.genAppId(Some(handle.asInstanceOf[OCKShuffleHandle[_, _, _]].appAttemptId))
+        NativeShuffle.linkToDriverRPC(ockShuffleHandle.driverRpc)
         //when ock shuffle work with memory cache will remove numMapsForOCKShuffle
-        OckColumnarShuffleManager.registerApp(appId, ockConf, handle.asInstanceOf[OCKShuffleHandle[_, _, _]].secCode)
-        val serializerClass: String = ockConf.serializerClass
-        val serializer: Serializer = Utils.classForName(serializerClass).newInstance().asInstanceOf[Serializer]
+        ShuffleManager.registerApp(appId, ockConf, handle.asInstanceOf[OCKShuffleHandle[_, _, _]].secCode)
         new OCKShuffleWriter(appId, ockConf, ockShuffleHandle.asInstanceOf[BaseShuffleHandle[K, V, _]],
           serializer, mapId, context, metrics)
+      case ockRemoteHandle: OCKRemoteShuffleHandle[K@unchecked, V@unchecked, _] =>
+        val shuffleHandle = handle.asInstanceOf[spark_3_x.OCKRemoteShuffleHandle[_, _, _]]
+        if (setFlag.compareAndSet(false, true)) {
+          NativeShuffle.shuffleArgsOption(ArgOption.DRIVER_RPC_ADDRESS,
+            "%s:%d".format(shuffleHandle.driverRpc.getIp, shuffleHandle.driverRpc.getPort).getBytes())
+        }
+
+        NativeShuffle.linkToDriverRPC(shuffleHandle.driverRpc)
+
+        appId = functions.genAppId(Some(shuffleHandle.appAttemptId))
+        val strategyName = ockConf.lbStrategy
+        val bagNamePrefixWithStage: String = "%s_%d_%d_%d".format(appId, handle.shuffleId, context.stageId(), context.stageAttemptNumber())
+        ShuffleRemoteManager.registerShuffleStage(appId, strategyName, bagNamePrefixWithStage, ockConf,
+          shuffleHandle.secCode, shuffleHandle.getBagsInfo, shuffleHandle.rssRepInfo)
+        new OCKRemoteShuffleWriter(appId, ockConf, shuffleBlockResolver4RSS, ockRemoteHandle.asInstanceOf[BaseShuffleHandle[K, V, _]],
+          serializer, mapId, context, metrics, shuffleHandle.rssNodeInfo, shuffleHandle.driverRpc)
     }
   }
 
@@ -118,16 +151,39 @@ class OckColumnarShuffleManager(conf: SparkConf) extends ColumnarShuffleManager 
       metrics: ShuffleReadMetricsReporter): ShuffleReader[K, C] = {
       logInfo(s"Reduce task get reader. Task info: shuffleId ${handle.shuffleId} reduceId $startPartition - $endPartition ")
 
-    if (handle.isInstanceOf[OckColumnarShuffleHandle[_, _]]) {
-      appId = OCKFunctions.genAppId(ockConf.appId, handle.asInstanceOf[OckColumnarShuffleHandle[_, _]].appAttemptId)
-      ShuffleManager.registerApp(appId, ockConf, handle.asInstanceOf[OckColumnarShuffleHandle[_, _]].secCode)
-      new OckColumnarShuffleReader(appId, handle.asInstanceOf[BaseShuffleHandle[K, _, C]],
-        startMapIndex, endMapIndex, startPartition, endPartition, context, conf, ockConf, metrics.asInstanceOf[TempShuffleReadMetrics])
-    } else {
-      appId = OCKFunctions.genAppId(ockConf.appId, handle.asInstanceOf[OCKShuffleHandle[_, _, _]].appAttemptId)
-      ShuffleManager.registerApp(appId, ockConf, handle.asInstanceOf[OCKShuffleHandle[_, _, _]].secCode)
-      new OCKShuffleReader(appId, handle.asInstanceOf[BaseShuffleHandle[K, _, C]],
-        startMapIndex, endMapIndex, startPartition, endPartition, context, conf, ockConf, metrics.asInstanceOf[TempShuffleReadMetrics])
+    handle match {
+      case ockColumnarShuffleHandle: OckColumnarShuffleHandle[K@unchecked, _] =>
+        appId = functions.genAppId(Some(handle.asInstanceOf[OckColumnarShuffleHandle[_, _]].appAttemptId))
+        if (ShuffleMode.RSS == shuffleMode) {
+          shuffleBlockResolver4RSS.releaseShuffleManager(handle.shuffleId)
+        }
+        OckColumnarShuffleManager.registerApp(appId, ockConf, shuffleMode, ockColumnarShuffleHandle, context, isWriter = false)
+        new OckColumnarShuffleReader(appId, ockColumnarShuffleHandle.asInstanceOf[BaseShuffleHandle[K, _, C]],
+          startMapIndex, endMapIndex, startPartition, endPartition, context, conf, ockConf, metrics.asInstanceOf[TempShuffleReadMetrics])
+      case ockShuffleHandle: OCKShuffleHandle[K@unchecked, _, _] =>
+        appId = functions.genAppId(Some(handle.asInstanceOf[OCKShuffleHandle[_, _, _]].appAttemptId))
+        NativeShuffle.linkToDriverRPC(ockShuffleHandle.driverRpc)
+        //when ock shuffle work with memory cache will remove numMapsForOCKShuffle
+        ShuffleManager.registerApp(appId, ockConf, handle.asInstanceOf[OCKShuffleHandle[_, _, _]].secCode)
+        new OCKShuffleReader(appId, ockShuffleHandle.asInstanceOf[BaseShuffleHandle[K, _, C]],
+          startMapIndex, endMapIndex, startPartition, endPartition, context, conf, ockConf, metrics.asInstanceOf[TempShuffleReadMetrics])
+      case ockRemoteHandle: OCKRemoteShuffleHandle[K@unchecked, _, C@unchecked] =>
+        shuffleBlockResolver4RSS.releaseShuffleManager(handle.shuffleId)
+
+        val shuffleHandle = handle.asInstanceOf[spark_3_x.OCKRemoteShuffleHandle[_, _, _]]
+        if (setFlag.compareAndSet(false, true)) {
+          NativeShuffle.shuffleArgsOption(ArgOption.DRIVER_RPC_ADDRESS, "%s:%d".format(shuffleHandle.driverRpc.getIp,
+            shuffleHandle.driverRpc.getPort).getBytes())
+        }
+
+        NativeShuffle.linkToDriverRPC(shuffleHandle.driverRpc)
+        appId = functions.genAppId(Some(shuffleHandle.appAttemptId))
+        val strategyName = ockConf.lbStrategy
+        ShuffleRemoteManager.registerApp(appId, strategyName, ockConf, shuffleHandle.secCode, shuffleHandle.rssRepInfo)
+
+        new OCKRemoteShuffleReader(appId, ockRemoteHandle.asInstanceOf[BaseShuffleHandle[K, _, C]],
+          startMapIndex, endMapIndex, startPartition, endPartition, context, conf, ockConf,
+          metrics.asInstanceOf[TempShuffleReadMetrics])
     }
   }
 
@@ -136,7 +192,11 @@ class OckColumnarShuffleManager(conf: SparkConf) extends ColumnarShuffleManager 
       logInfo(s"Unregister shuffle. Task info: shuffleId $shuffleId")
     Option(numMapsForOCKShuffle.remove(shuffleId)).foreach { numMaps =>
       (0 until numMaps.toInt).foreach { mapId =>
-        shuffleBlockResolver.removeDataByMap(shuffleId, mapId)
+        if (ShuffleMode.RSS == shuffleMode) {
+          shuffleBlockResolver4RSS.removeDataByMap(shuffleId, mapId)
+        } else {
+          shuffleBlockResolver.removeDataByMap(shuffleId, mapId)
+        }
       }
     }
     true
@@ -147,66 +207,73 @@ class OckColumnarShuffleManager(conf: SparkConf) extends ColumnarShuffleManager 
     logInfo("stop ShuffleManager")
     if (ockConf.appId == "driver") {
       if (SparkContext.getActive.isDefined) {
-        appId = OCKFunctions.genAppId(conf.getAppId, SparkContext.getActive.get.applicationAttemptId.getOrElse(applicationDefaultAttemptId))
+        appId = functions.genAppId(None)
       }
       if (appId.nonEmpty) {
-        OCKFunctions.tryStopHeartBeat(this, appId)
-        OckColumnarShuffleManager.markComplete(ockConf, appId)
+        OckColumnarShuffleManager.markComplete(appId)
       }
     }
-    shuffleBlockResolver.stop()
+    if (ShuffleMode.RSS == shuffleMode) {
+      shuffleBlockResolver4RSS.stop()
+    } else {
+      shuffleBlockResolver.stop()
+    }
   }
 }
 
 private[spark] object OckColumnarShuffleManager extends Logging {
+  private[this] val setFlag :AtomicBoolean = new AtomicBoolean(false)
 
-  var externalShuffleServiceFlag :AtomicBoolean = new AtomicBoolean(false)
-  var isWR: AtomicBoolean = new AtomicBoolean(false)
-
-  def registerShuffle(
+  private def registerShuffle[K, V, C](
       shuffleId: Int,
-      numPartitions: Int,
+      shuffleMode: String,
+      dependency: ShuffleDependency[K, V, C],
       conf: SparkConf,
       ockConf: OCKConf): String = {
-    val appId = OCKFunctions.genAppId(conf.getAppId, SparkContext.getActive.get.applicationAttemptId.getOrElse("1"))
-    val bagPartName = OCKFunctions.concatBagPartName(appId, shuffleId)
-    NativeShuffle.shuffleBagBatchCreate(appId, bagPartName, numPartitions, ockConf.priority, 0)
+    var tokenCode: String = ""
+    if (ShuffleMode.RSS == shuffleMode) {
+      tokenCode = OCKRemoteFunctions.getToken(ockConf.isIsolated)
+      ShuffleRemoteManager.registerShuffle(shuffleId, dependency.partitioner.numPartitions, conf, ockConf)
+    } else {
+      tokenCode = ShuffleManager.registerShuffle(shuffleId, dependency.partitioner.numPartitions, conf, ockConf)
+    }
+    tokenCode
+  }
 
-    if (!externalShuffleServiceFlag.get()) {
-      try {
-        val blockManagerClass = Class.forName("org.apache.spark.storage.BlockManager")
-        val externalShuffleServiceEnabledField = blockManagerClass.getDeclaredField("externalShuffleServiceEnabled")
-        externalShuffleServiceEnabledField.setAccessible(true)
-        externalShuffleServiceEnabledField.set(SparkEnv.get.blockManager, true)
-        logInfo("success to change externalShuffleServiceEnabled in block manager to " +
-          SparkEnv.get.blockManager.externalShuffleServiceEnabled)
-        externalShuffleServiceFlag.set(true)
-      } catch {
-        case _: Exception =>
-          logWarning("failed to change externalShuffleServiceEnabled in block manager," +
-            " maybe ockd could not be able to recover in shuffle process")
+  private def registerApp(
+      appId: String,
+      ockConf: OCKConf,
+      shuffleMode: String,
+      handle: OckColumnarShuffleHandle[_, _],
+      context: TaskContext,
+      isWriter: Boolean
+    ): Unit = {
+    if (ShuffleMode.RSS == shuffleMode) {
+      if (setFlag.compareAndSet(false, true)) {
+        NativeShuffle.shuffleArgsOption(ArgOption.DRIVER_RPC_ADDRESS, "%s:%d".format(handle.getDriverRpc.getIp,
+          handle.getDriverRpc.getPort).getBytes())
       }
+      NativeShuffle.linkToDriverRPC(handle.getDriverRpc)
+      val strategyName = ockConf.lbStrategy
+      if (isWriter) {
+        val bagNamePrefixWithStage: String = "%s_%d_%d_%d".format(appId, handle.shuffleId, context.stageId(), context.stageAttemptNumber())
+        ShuffleRemoteManager.registerShuffleStage(appId, strategyName, bagNamePrefixWithStage, ockConf,
+          handle.secCode, handle.getBagsInfo, handle.rssRepInfo)
+      } else {
+        ShuffleRemoteManager.registerApp(appId, strategyName, ockConf, handle.secCode, handle.rssRepInfo)
+      }
+    } else {
+      NativeShuffle.linkToDriverRPC(handle.getDriverRpc)
+      ShuffleManager.registerApp(appId, ockConf, handle.secCode)
     }
-    //  generate token code. Need 32bytes.
-    OCKFunctions.getToken(ockConf.isIsolated)
   }
 
-  def registerApp(appId: String, ockConf: OCKConf, secCode: String): Unit = {
-    if (!isWR.get()) {
-      synchronized(if (!isWR.get()) {
-        val nodeId = NativeShuffle.registerShuffleApp(appId, ockConf.removeShuffleDataAfterJobFinished, secCode)
-        isWR.set(true)
-        OCKFunctions.setNodeId(nodeId)
-      })
-    }
-  }
-
-  def markComplete(ockConf: OCKConf, appId: String): Unit = {
+  private def markComplete(appId: String): Unit = {
     try {
       NativeShuffle.markApplicationCompleted(appId)
     } catch {
       case ex: ApplicationException =>
-        logError("Failed to mark application completed")
+        logError("Failed to mark application completed for " + ex.getMessage)
     }
   }
 

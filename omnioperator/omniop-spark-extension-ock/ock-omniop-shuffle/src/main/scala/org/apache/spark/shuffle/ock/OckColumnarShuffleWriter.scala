@@ -76,7 +76,9 @@ class OckColumnarShuffleWriter[K, V](
         cap,
         maxCapacityTotal,
         minCapacityTotal,
-        enableShuffleCompress)
+        enableShuffleCompress,
+        false,
+        null)
     }
     val makeTime = System.currentTimeMillis() - startMake
 
@@ -108,6 +110,7 @@ class OckColumnarShuffleWriter[K, V](
           rowNum = cb.numRows()
         }
         jniWritter.split(nativeSplitter, vb.getNativeVectorBatch)
+        vb.close()
         dep.numInputRows.add(cb.numRows)
         writeMetrics.incRecordsWritten(1)
         markTime = System.currentTimeMillis()
@@ -141,7 +144,7 @@ class OckColumnarShuffleWriter[K, V](
       } else {
         stopping = true
         if (success) {
-          NativeShuffle.shuffleStageSetShuffleId("Spark_"+applicationId, context.stageId(), handle.shuffleId)
+          NativeShuffle.shuffleStageSetShuffleId(applicationId, handle.shuffleId, context.stageId(), 0, 0)
           Option(mapStatus)
         } else {
           None
