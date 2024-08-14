@@ -16,6 +16,9 @@
 
 namespace ock {
 namespace dopspark {
+const int H_OK = 0;
+const int H_FAIL = -1;
+
 class OckHashWriteBuffer {
 public:
     OckHashWriteBuffer() = default;
@@ -84,20 +87,16 @@ private:
     bool ResetRegionBuffer4Rss(uint32_t regionNum, uint32_t *regionIds);
     bool FlushFullRegion4Rss(uint32_t writerId, uint64_t &length, uint32_t *regionPtRecord, uint32_t *regionUsedRecord);
 
-    inline HRESULT CommitRegionInternal(uint32_t region, uint32_t writerId, uint32_t &partitionId)
+    inline int CommitRegionInternal(uint32_t region, uint32_t writerId, uint32_t &partitionId)
     {
         uint32_t regionSize = mRegionUsedSize[region];
         if (regionSize > 0) {
             partitionId = mRegionToPartition[region];
             uint8_t *address = nullptr;
-            if ((region % groupSize) == 0) {
-                address = mBaseAddress + region * mEachPartitionSize;
-            } else {
-                address = mBaseAddress + (region + 1) * mEachPartitionSize - regionSize;
-            }
+            address = mBaseAddress + region * mEachPartitionSize;
             return OckShuffleSdk::mRssCommitRegionFun(writerId, region, partitionId, address, regionSize);
         }
-        return HOK;
+        return H_OK;
     }
 
     inline bool GetNewRegion(uint32_t partitionId, uint32_t &regionId)

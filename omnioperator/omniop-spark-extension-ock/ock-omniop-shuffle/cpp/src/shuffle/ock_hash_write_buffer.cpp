@@ -137,12 +137,17 @@ OckHashWriteBuffer::ResultFlag OckHashWriteBuffer::PreoccupiedDataSpace(uint32_t
         return ResultFlag::LACK;
     }
 
-    // 3. get the near region
-    uint32_t nearRegionId = ((regionId % 2) == 0) ? (regionId + 1) : (regionId - 1);
-    // 4. compute remaining size of current region. Consider the used size of near region
-    uint32_t remainBufLength = ((regionId == (mPartitionNum - 1)) && ((regionId % 2) == 0)) ?
-        (mEachPartitionSize - mRegionUsedSize[regionId]) :
-        (mDoublePartitionSize - mRegionUsedSize[regionId] - mRegionUsedSize[nearRegionId]);
+    uint32_t remainBufLength = 0;
+    if (mIsRss) {
+        remainBufLength = mEachPartitionSize - mRegionUsedSize[regionId];
+    } else {
+        // 3. get the near region
+        uint32_t nearRegionId = ((regionId % 2) == 0) ? (regionId + 1) : (regionId - 1);
+        // 4. compute remaining size of current region. Consider the used size of near region
+        remainBufLength = ((regionId == (mPartitionNum - 1)) && ((regionId % 2) == 0)) ?
+            (mEachPartitionSize - mRegionUsedSize[regionId]) :
+            (mDoublePartitionSize - mRegionUsedSize[regionId] - mRegionUsedSize[nearRegionId]);
+    }
     if (remainBufLength >= length) {
         mRegionUsedSize[regionId] += length;
         mTotalSize += length;
@@ -163,18 +168,22 @@ uint8_t *OckHashWriteBuffer::GetEndAddressOfRegion(uint32_t partitionId, uint32_
     uint32_t offset;
     regionId = mPtCurrentRegionId[partitionId];
 
-    if ((regionId % groupSize) == 0) {
-        if (UNLIKELY(regionId * mEachPartitionSize + mRegionUsedSize[regionId] < length)) {
-            LogError("regionId * mEachPartitionSize + mRegionUsedSize[regionId] shoulld be bigger than length");
-            return nullptr;
-        }
+    if (mIsRss) {
         offset = regionId * mEachPartitionSize + mRegionUsedSize[regionId] - length;
     } else {
-        if (UNLIKELY((regionId + 1) * mEachPartitionSize < mRegionUsedSize[regionId])) {
-            LogError("(regionId + 1) * mEachPartitionSize  shoulld be bigger than mRegionUsedSize[regionId]");
-            return nullptr;
+        if ((regionId % groupSize) == 0) {
+            if (UNLIKELY(regionId * mEachPartitionSize + mRegionUsedSize[regionId] < length)) {
+                LogError("regionId * mEachPartitionSize + mRegionUsedSize[regionId] shoulld be bigger than length");
+                return nullptr;
+            }
+            offset = regionId * mEachPartitionSize + mRegionUsedSize[regionId] - length;
+        } else {
+            if (UNLIKELY((regionId + 1) * mEachPartitionSize < mRegionUsedSize[regionId])) {
+                LogError("(regionId + 1) * mEachPartitionSize  shoulld be bigger than mRegionUsedSize[regionId]");
+                return nullptr;
+            }
+            offset = (regionId + 1) * mEachPartitionSize - mRegionUsedSize[regionId];
         }
-        offset = (regionId + 1) * mEachPartitionSize - mRegionUsedSize[regionId];
     }
 
     return mBaseAddress + offset;
@@ -205,30 +214,30 @@ bool OckHashWriteBuffer::Flush(bool isFinished, uint64_t &length, uint32_t write
         flags |= isFinished ? 0x01 : 0x00;
 
         uint32_t totalSize;
-        HRESULT ret = OckShuffleSdk::mCommitLocalBlobFun(mAppId.c_str(), mBlobId, flags, mMapId, mTaskAttemptId, mPartitionNum,
+        int ret = OckShuffleSdk::mCommitLocalBlobFun(mAppId.c_str(), mBlobId, flags, mMapId, mTaskAttemptId, mPartitionNum,
             mStageId, mStageAttemptNum, mDoublePartitionSize, &totalSize);
         length = totalSize;
 
         void *address = reinterpret_cast<void *>(mIsCompress ? mBaseAddress - mDoublePartitionSize : mBaseAddress);
         OckShuffleSdk::mUnmapBlobFun(mBlobId, address);
-        return (ret == HOK);
+        return (ret == H_OK);
     }
 }
 
 bool OckHashWriteBuffer::FlushAllRegion4Rss(uint32_t writerId, uint64_t &length)
 {
-    HRESULT ret = HFAIL;
+    int ret = H_FAIL;
     for (uint32_t regionId = 0; regionId < mPartitionNum; ++regionId) {
         uint32_t partitionId = 0;
         ret = CommitRegionInternal(regionId, writerId, partitionId);
-        if (ret != HOK) {
+        if (ret != H_OK) {
             LogError("Commit regionId %d failed of partition %d", regionId, partitionId);
             return false;
         }
     }
 
     ret = OckShuffleSdk::mRssFlushRegionFun(writerId, true, &length);
-    if (ret != HOK) {
+    if (ret != H_OK) {
         LogError("Flush all region failed.");
         return false;
     }
@@ -238,21 +247,21 @@ bool OckHashWriteBuffer::FlushAllRegion4Rss(uint32_t writerId, uint64_t &length)
 bool OckHashWriteBuffer::FlushFullRegion4Rss(uint32_t writerId, uint64_t &length, uint32_t *regionPtRecord,
     uint32_t *regionUsedRecord)
 {
-    HRESULT ret = HFAIL;
+    int ret = H_FAIL;
     for (uint32_t regionId : mToCommitRegions) {
         EncodeBigEndian((uint8_t *)(&regionPtRecord[regionId]), mRegionToPartition[regionId]);
         EncodeBigEndian((uint8_t *)(&regionUsedRecord[regionId]), mRegionUsedSize[regionId]);
 
         uint32_t partitionId = 0;
         ret = CommitRegionInternal(regionId, writerId, partitionId);
-        if (ret != HOK) {
+        if (ret != H_OK) {
             LogError("Commit regionId %d failed of partition %d", regionId, partitionId);
             return false;
         }
     }
 
     ret = OckShuffleSdk::mRssFlushRegionFun(writerId, false, &length);
-    if (ret != HOK) {
+    if (ret != H_OK) {
         LogError("Flush full region failed.");
         return false;
     }
@@ -260,7 +269,7 @@ bool OckHashWriteBuffer::FlushFullRegion4Rss(uint32_t writerId, uint64_t &length
     uint32_t *regionIds = nullptr;
     uint32_t regionNum = 0;
     ret = OckShuffleSdk::mRssGetReleaseRegionFun(writerId, &regionIds, &regionNum);
-    if (ret != HOK) {
+    if (ret != H_OK) {
         LogError("Get released regionId failed.");
         return false;
     }
@@ -273,14 +282,14 @@ bool OckHashWriteBuffer::CommitFullRegion4Rss(uint32_t writerId)
     auto regionPtRecord = reinterpret_cast<uint32_t *>(mBaseAddress + mRegionPtRecordOffset);
     auto regionUsedRecord = reinterpret_cast<uint32_t *>(mBaseAddress + mRegionUsedRecordOffset);
 
-    HRESULT ret = HFAIL;
+    int ret = H_FAIL;
     for (uint32_t regionId : mToCommitRegions) {
         EncodeBigEndian((uint8_t *)(&regionPtRecord[regionId]), mRegionToPartition[regionId]);
         EncodeBigEndian((uint8_t *)(&regionUsedRecord[regionId]), mRegionUsedSize[regionId]);
 
         uint32_t partitionId = 0;
         ret = CommitRegionInternal(regionId, writerId, partitionId);
-        if (ret != HOK) {
+        if (ret != H_OK) {
             LogError("Commit regionId %d failed of partition %d", regionId, partitionId);
             return false;
         }
@@ -289,7 +298,7 @@ bool OckHashWriteBuffer::CommitFullRegion4Rss(uint32_t writerId)
     uint32_t *regionIds = nullptr;
     uint32_t regionNum = 0;
     ret = OckShuffleSdk::mRssGetReleaseRegionFun(writerId, &regionIds, &regionNum);
-    if (ret != HOK) {
+    if (ret != H_OK) {
         LogError("Get released regionId failed.");
         return false;
     }
@@ -304,11 +313,7 @@ bool OckHashWriteBuffer::ResetRegionBuffer4Rss(uint32_t regionNum, uint32_t *reg
         uint32_t regionSize = mRegionUsedSize[region];
         if (regionSize > 0) {
             uint8_t *address = nullptr;
-            if ((region % groupSize) == 0) {
-                address = mBaseAddress + region * mEachPartitionSize;
-            } else {
-                address = mBaseAddress + (region + 1) * mEachPartitionSize - regionSize;
-            }
+            address = mBaseAddress + region * mEachPartitionSize;
             if (EOK != memset_s(address, regionSize, 0, regionSize)) {
                 LogError("Failed to reset rss region buffer.");
                 return false;
