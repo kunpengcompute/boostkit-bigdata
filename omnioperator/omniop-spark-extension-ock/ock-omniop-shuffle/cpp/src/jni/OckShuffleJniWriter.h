@@ -21,10 +21,10 @@ JNIEXPORT jboolean JNICALL Java_com_huawei_ock_spark_jni_OckShuffleJniWriter_ini
 /*
  * Class:     com_huawei_ock_spark_jni_OckShuffleJniWriter
  * Method:    nativeMake
- * Signature: (Ljava/lang/String;IIIJLjava/lang/String;ILjava/lang/String;IIIIIZ)J
+ * Signature: (Ljava/lang/String;IIIIJLjava/lang/String;ILjava/lang/String;IIIIZZLjava/lang/Integer;)J
  */
 JNIEXPORT jlong JNICALL Java_com_huawei_ock_spark_jni_OckShuffleJniWriter_nativeMake(JNIEnv *, jobject, jstring,
-    jint, jint, jint, jint, jlong, jstring, jint, jstring, jint, jint, jint, jint, jboolean);
+    jint, jint, jint, jint, jlong, jstring, jint, jstring, jint, jint, jint, jint, jboolean, jboolean, jobject);
 
 /*
  * Class:     com_huawei_ock_spark_jni_OckShuffleJniWriter

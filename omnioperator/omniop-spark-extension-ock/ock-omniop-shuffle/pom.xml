@@ -6,7 +6,7 @@
    <parent>
        <groupId>com.huawei.ock</groupId>
        <artifactId>omniop-spark-extension-ock</artifactId>
-       <version>23.0.0</version>
+       <version>24.0.0</version>
    </parent>
    <properties>
      <cpp.dir>cpp/</cpp.dir>
@@ -15,10 +15,19 @@
      <protobuf.maven.version>0.6.1</protobuf.maven.version>
    </properties>
 
+   <dependencies>
+     <dependency>
+       <groupId>com.huawei.kunpeng</groupId>
+       <artifactId>boostkit-omniop-spark</artifactId>
+       <version>3.1.1-1.5.0</version>
+       <scope>compile</scope>
+     </dependency>
+   </dependencies>
+
    <artifactId>ock-omniop-shuffle-manager</artifactId>
    <packaging>jar</packaging>
    <description>Huawei Open Computing Kit for Spark, shuffle manager</description>
-   <version>23.0.0</version>
+   <version>24.0.0</version>
 
    <build>
      <!--suppress UnresolvedMavenProperty -->

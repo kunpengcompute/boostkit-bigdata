@@ -3,7 +3,6 @@
  */
 
 #include "ock_hash_write_buffer.h"
-#include "sdk/ock_shuffle_sdk.h"
 
 using namespace ock::dopspark;
 
@@ -12,17 +11,28 @@ FUNC_GET_LOCAL_BLOB OckShuffleSdk::mGetLocalBlobFun = nullptr;
 FUNC_COMMIT_LOCAL_BLOB OckShuffleSdk::mCommitLocalBlobFun = nullptr;
 FUNC_MAP_BLOB OckShuffleSdk::mMapBlobFun = nullptr;
 FUNC_UNMAP_BLOB OckShuffleSdk::mUnmapBlobFun = nullptr;
+FUNC_RSS_CREATE_WRITER OckShuffleSdk::mRssCreateWriterFun = nullptr;
+FUNC_RSS_COMMIT_REGION OckShuffleSdk::mRssCommitRegionFun = nullptr;
+FUNC_RSS_FLUSH_REGION OckShuffleSdk::mRssFlushRegionFun = nullptr;
+FUNC_RSS_GET_RELEASE_REGION OckShuffleSdk::mRssGetReleaseRegionFun = nullptr;
 
-bool OckHashWriteBuffer::Initialize(uint32_t regionSize, uint32_t minCapacity, uint32_t maxCapacity, bool isCompress)
+bool OckHashWriteBuffer::Initialize(uint32_t regionSize, uint32_t minCapacity, uint32_t maxCapacity, bool isCompress,
+    bool isRss, uint32_t &writerId)
 {
     if (UNLIKELY(mPartitionNum == 0)) {
         LogError("Partition number can't be zero.");
         return false;
     }
 
+    mIsRss = isRss;
     mIsCompress = isCompress;
+    mRegionSize = regionSize;
     uint32_t bufferNeed = regionSize * mPartitionNum;
-    mDataCapacity = std::min(std::max(bufferNeed, minCapacity), maxCapacity);
+    if (isRss) {
+        mDataCapacity = bufferNeed;
+    } else {
+        mDataCapacity = std::min(std::max(bufferNeed, minCapacity), maxCapacity);
+    }
     if (UNLIKELY(mDataCapacity < mSinglePartitionAndRegionUsedSize * mPartitionNum)) {
         LogError("mDataCapacity should be bigger than mSinglePartitionAndRegionUsedSize * mPartitionNum");
         return false;
@@ -41,6 +51,7 @@ bool OckHashWriteBuffer::Initialize(uint32_t regionSize, uint32_t minCapacity, u
     mEachPartitionSize = mDataCapacity / mPartitionNum - mSinglePartitionAndRegionUsedSize;
     mDoublePartitionSize = reserveSize * mEachPartitionSize;
 
+    // used for ess
     mRealCapacity = mIsCompress ? mDataCapacity + mDoublePartitionSize : mDataCapacity;
 
     // init meta information for local blob
@@ -48,7 +59,7 @@ bool OckHashWriteBuffer::Initialize(uint32_t regionSize, uint32_t minCapacity, u
     mRegionToPartition.resize(mPartitionNum);
     mRegionUsedSize.resize(mPartitionNum);
 
-    return GetNewBuffer();
+    return isRss ? InitRssBuffer(writerId) : GetNewBuffer();
 }
 
 bool OckHashWriteBuffer::GetNewBuffer()
@@ -70,6 +81,26 @@ bool OckHashWriteBuffer::GetNewBuffer()
                                  reinterpret_cast<uint8_t *>(address);
 
     // reset data struct for new buffer
+    mTotalSize = 0;
+    mUsedPartitionRegion = 0;
+
+    std::fill(mPtCurrentRegionId.begin(), mPtCurrentRegionId.end(), UINT32_MAX);
+    std::fill(mRegionToPartition.begin(), mRegionToPartition.end(), UINT32_MAX);
+    std::fill(mRegionUsedSize.begin(), mRegionUsedSize.end(), 0);
+
+    return true;
+}
+
+bool OckHashWriteBuffer::InitRssBuffer(uint32_t &writerId)
+{
+    uint8_t *address = nullptr;
+    int ret = OckShuffleSdk::mRssCreateWriterFun(mRegionSize, mPartitionNum, &writerId, &address);
+    if (ret != 0) {
+        LogError("Failed to create rss writer");
+        return false;
+    }
+    mBaseAddress = address;
+
     mTotalSize = 0;
     mUsedPartitionRegion = 0;
 
@@ -116,9 +147,15 @@ OckHashWriteBuffer::ResultFlag OckHashWriteBuffer::PreoccupiedDataSpace(uint32_t
         mRegionUsedSize[regionId] += length;
         mTotalSize += length;
         return ResultFlag::ENOUGH;
+    } else {
+        if (mIsRss) {
+            mToCommitRegions.push_back(regionId);
+            return ResultFlag::NEW_REGION;
+        }
     }
 
-    return (mUsedPartitionRegion + 1 >= mPartitionNum) ? ResultFlag::LACK : ResultFlag::NEW_REGION;
+    return ((mUsedPartitionRegion + 1 >= mPartitionNum) && mReleasedPartitions.empty()) ? ResultFlag::LACK :
+        ResultFlag::NEW_REGION;
 }
 
 uint8_t *OckHashWriteBuffer::GetEndAddressOfRegion(uint32_t partitionId, uint32_t &regionId, uint32_t length)
@@ -143,26 +180,149 @@ uint8_t *OckHashWriteBuffer::GetEndAddressOfRegion(uint32_t partitionId, uint32_
     return mBaseAddress + offset;
 }
 
-bool OckHashWriteBuffer::Flush(bool isFinished, uint32_t &length)
+bool OckHashWriteBuffer::Flush(bool isFinished, uint64_t &length, uint32_t writerId)
 {
     // point to the those region(pt -> regionId, region size -> regionId) the local blob
     auto regionPtRecord = reinterpret_cast<uint32_t *>(mBaseAddress + mRegionPtRecordOffset);
     auto regionUsedRecord = reinterpret_cast<uint32_t *>(mBaseAddress + mRegionUsedRecordOffset);
 
     // write meta information for those partition regions in the local blob
-    for (uint32_t index = 0; index < mPartitionNum; index++) {
-        EncodeBigEndian((uint8_t *)(&regionPtRecord[index]), mRegionToPartition[index]);
-        EncodeBigEndian((uint8_t *)(&regionUsedRecord[index]), mRegionUsedSize[index]);
+    if (!mIsRss || isFinished) {
+        for (uint32_t index = 0; index < mPartitionNum; index++) {
+            EncodeBigEndian((uint8_t *)(&regionPtRecord[index]), mRegionToPartition[index]);
+            EncodeBigEndian((uint8_t *)(&regionUsedRecord[index]), mRegionUsedSize[index]);
+        }
     }
 
-    uint32_t flags = LowBufferUsedRatio() ? (1 << 1) : 0;
-    flags |= isFinished ? 0x01 : 0x00;
+    if (mIsRss) {
+        if (isFinished) {
+            return FlushAllRegion4Rss(writerId, length);
+        } else {
+            return FlushFullRegion4Rss(writerId, length, regionPtRecord, regionUsedRecord);
+        }
+    } else {
+        uint32_t flags = LowBufferUsedRatio() ? (1 << 1) : 0;
+        flags |= isFinished ? 0x01 : 0x00;
 
-    int ret = OckShuffleSdk::mCommitLocalBlobFun(mAppId.c_str(), mBlobId, flags, mMapId, mTaskAttemptId, mPartitionNum,
-        mStageId, mStageAttemptNum, mDoublePartitionSize, &length);
+        uint32_t totalSize;
+        HRESULT ret = OckShuffleSdk::mCommitLocalBlobFun(mAppId.c_str(), mBlobId, flags, mMapId, mTaskAttemptId, mPartitionNum,
+            mStageId, mStageAttemptNum, mDoublePartitionSize, &totalSize);
+        length = totalSize;
 
-    void *address = reinterpret_cast<void *>(mIsCompress ? mBaseAddress - mDoublePartitionSize : mBaseAddress);
-    OckShuffleSdk::mUnmapBlobFun(mBlobId, address);
+        void *address = reinterpret_cast<void *>(mIsCompress ? mBaseAddress - mDoublePartitionSize : mBaseAddress);
+        OckShuffleSdk::mUnmapBlobFun(mBlobId, address);
+        return (ret == HOK);
+    }
+}
 
-    return (ret == 0);
+bool OckHashWriteBuffer::FlushAllRegion4Rss(uint32_t writerId, uint64_t &length)
+{
+    HRESULT ret = HFAIL;
+    for (uint32_t regionId = 0; regionId < mPartitionNum; ++regionId) {
+        uint32_t partitionId = 0;
+        ret = CommitRegionInternal(regionId, writerId, partitionId);
+        if (ret != HOK) {
+            LogError("Commit regionId %d failed of partition %d", regionId, partitionId);
+            return false;
+        }
+    }
+
+    ret = OckShuffleSdk::mRssFlushRegionFun(writerId, true, &length);
+    if (ret != HOK) {
+        LogError("Flush all region failed.");
+        return false;
+    }
+    return true;
+}
+
+bool OckHashWriteBuffer::FlushFullRegion4Rss(uint32_t writerId, uint64_t &length, uint32_t *regionPtRecord,
+    uint32_t *regionUsedRecord)
+{
+    HRESULT ret = HFAIL;
+    for (uint32_t regionId : mToCommitRegions) {
+        EncodeBigEndian((uint8_t *)(&regionPtRecord[regionId]), mRegionToPartition[regionId]);
+        EncodeBigEndian((uint8_t *)(&regionUsedRecord[regionId]), mRegionUsedSize[regionId]);
+
+        uint32_t partitionId = 0;
+        ret = CommitRegionInternal(regionId, writerId, partitionId);
+        if (ret != HOK) {
+            LogError("Commit regionId %d failed of partition %d", regionId, partitionId);
+            return false;
+        }
+    }
+
+    ret = OckShuffleSdk::mRssFlushRegionFun(writerId, false, &length);
+    if (ret != HOK) {
+        LogError("Flush full region failed.");
+        return false;
+    }
+
+    uint32_t *regionIds = nullptr;
+    uint32_t regionNum = 0;
+    ret = OckShuffleSdk::mRssGetReleaseRegionFun(writerId, &regionIds, &regionNum);
+    if (ret != HOK) {
+        LogError("Get released regionId failed.");
+        return false;
+    }
+
+    return ResetRegionBuffer4Rss(regionNum, regionIds);
+}
+
+bool OckHashWriteBuffer::CommitFullRegion4Rss(uint32_t writerId)
+{
+    auto regionPtRecord = reinterpret_cast<uint32_t *>(mBaseAddress + mRegionPtRecordOffset);
+    auto regionUsedRecord = reinterpret_cast<uint32_t *>(mBaseAddress + mRegionUsedRecordOffset);
+
+    HRESULT ret = HFAIL;
+    for (uint32_t regionId : mToCommitRegions) {
+        EncodeBigEndian((uint8_t *)(&regionPtRecord[regionId]), mRegionToPartition[regionId]);
+        EncodeBigEndian((uint8_t *)(&regionUsedRecord[regionId]), mRegionUsedSize[regionId]);
+
+        uint32_t partitionId = 0;
+        ret = CommitRegionInternal(regionId, writerId, partitionId);
+        if (ret != HOK) {
+            LogError("Commit regionId %d failed of partition %d", regionId, partitionId);
+            return false;
+        }
+    }
+
+    uint32_t *regionIds = nullptr;
+    uint32_t regionNum = 0;
+    ret = OckShuffleSdk::mRssGetReleaseRegionFun(writerId, &regionIds, &regionNum);
+    if (ret != HOK) {
+        LogError("Get released regionId failed.");
+        return false;
+    }
+
+    return ResetRegionBuffer4Rss(regionNum, regionIds);
+}
+
+bool OckHashWriteBuffer::ResetRegionBuffer4Rss(uint32_t regionNum, uint32_t *regionIds)
+{
+    for (uint32_t i = 0; i < regionNum; ++i) {
+        uint32_t region = *regionIds++;
+        uint32_t regionSize = mRegionUsedSize[region];
+        if (regionSize > 0) {
+            uint8_t *address = nullptr;
+            if ((region % groupSize) == 0) {
+                address = mBaseAddress + region * mEachPartitionSize;
+            } else {
+                address = mBaseAddress + (region + 1) * mEachPartitionSize - regionSize;
+            }
+            if (EOK != memset_s(address, regionSize, 0, regionSize)) {
+                LogError("Failed to reset rss region buffer.");
+                return false;
+            }
+
+            mPtCurrentRegionId[mRegionToPartition[region]] = UINT32_MAX;
+            mRegionToPartition[region] = UINT32_MAX;
+            mRegionUsedSize[region] = 0;
+
+            mReleasedPartitions.push(region);
+        }
+    }
+
+    mToCommitRegions.clear();
+
+    return true;
 }

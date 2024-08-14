@@ -25,8 +25,6 @@ class OckColumnarShuffleBufferIterator[T](
                                 endMapIndex: Int,
                                 startPartition: Int,
                                 endPartition: Int,
-                                numBuffers: Int,
-                                bufferSize: Long,
                                 mapTaskToHostInfo: MapTasksInfo,
                                 typeIds: Array[Int],
                                 context: TaskContext)
@@ -40,7 +38,7 @@ class OckColumnarShuffleBufferIterator[T](
     final private val FETCH_FINISH = 0L;
 
     private val taskContext = context
-    private val sequenceId: String = "Spark_%s_%d_%d_%d_%d_%d_%d".format(appId, shuffleId, startMapIndex,
+    private val sequenceId: String = "%s_%d_%d_%d_%d_%d_%d".format(appId, shuffleId, startMapIndex,
         endMapIndex, startPartition, endPartition, getAndIncReaderSequence())
     private var hasBlob: Boolean = false;
 
@@ -57,7 +55,7 @@ class OckColumnarShuffleBufferIterator[T](
     }
 
     private[this] def throwFetchException(fetchError: FetchError): Unit = {
-        NativeShuffle.shuffleStreamReadStop(sequenceId)
+        NativeShuffle.shuffleStreamReadStop(sequenceId, context.stageId())
         destroyMapTaskInfo()
         if (fetchError.getExecutorId() > 0) {
             logError("Fetch failed error occurred, mostly because ockd is killed in some stage, node id is: "
@@ -96,7 +94,7 @@ class OckColumnarShuffleBufferIterator[T](
 
     override def hasNext: Boolean = {
         if (!hasBlob && totalFetchNum != 0) {
-            val dataSize: Int = NativeShuffle.shuffleStreamReadStop(sequenceId)
+            val dataSize: Long = NativeShuffle.shuffleStreamReadStop(sequenceId, context.stageId())
             if (OckColumnarShuffleManager.isCompress(ockConf.sparkConf) && dataSize > 0) {
                 readMetrics.incRemoteBytesRead(dataSize)
             }

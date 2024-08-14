@@ -9,8 +9,8 @@
 using namespace omniruntime::type;
 using namespace ock::dopspark;
 
-OckSplitter::OckSplitter(int32_t colNum, int32_t partitionNum, bool isSinglePt, uint64_t threadId)
-    : mColNum(colNum), mPartitionNum(partitionNum), mIsSinglePt(isSinglePt), mThreadId(threadId)
+OckSplitter::OckSplitter(int32_t colNum, int32_t partitionNum, bool isSinglePt, uint64_t threadId, bool isRss)
+    : mColNum(colNum), mPartitionNum(partitionNum), mIsSinglePt(isSinglePt), mThreadId(threadId), mIsRss(isRss)
 {
     LOG_DEBUG("Input schema columns number: %d", colNum);
 }
@@ -59,7 +59,7 @@ bool OckSplitter::ToSplitterTypeId(const int32_t *vBColTypes)
                 mColIndexOfVarVec.emplace_back(colIndex);
                 break;
             }
-            case OMNI_VARCHAR: {        // unknown length for value vector, calculate later
+            case OMNI_VARCHAR: { // unknown length for value vector, calculate later
                 CastOmniToShuffleType(OMNI_VARCHAR, ShuffleTypeId::SHUFFLE_BINARY, uint32Size);
                 mColIndexOfVarVec.emplace_back(colIndex);
                 break;
@@ -118,9 +118,10 @@ bool OckSplitter::Initialize(const int32_t *colTypeIds)
 }
 
 std::shared_ptr<OckSplitter> OckSplitter::Create(const int32_t *colTypeIds, int32_t colNum, int32_t partitionNum,
-    bool isSinglePt, uint64_t threadId)
+    bool isSinglePt, uint64_t threadId, bool isRss)
 {
-    std::shared_ptr<OckSplitter> instance = std::make_shared<OckSplitter>(colNum, partitionNum, isSinglePt, threadId);
+    std::shared_ptr<OckSplitter> instance =
+        std::make_shared<OckSplitter>(colNum, partitionNum, isSinglePt, threadId, isRss);
     if (UNLIKELY(instance == nullptr)) {
         LOG_ERROR("Failed to new ock splitter instance.");
         return nullptr;
@@ -135,16 +136,16 @@ std::shared_ptr<OckSplitter> OckSplitter::Create(const int32_t *colTypeIds, int3
 }
 
 std::shared_ptr<OckSplitter> OckSplitter::Make(const std::string &partitionMethod, int partitionNum,
-    const int32_t *colTypeIds, int32_t colNum, uint64_t threadId)
+    const int32_t *colTypeIds, int32_t colNum, uint64_t threadId, bool isRss)
 {
     if (UNLIKELY(colTypeIds == nullptr || colNum == 0)) {
         LOG_ERROR("colTypeIds is null or colNum is 0, colNum %d", colNum);
         return nullptr;
     }
     if (partitionMethod == "hash" || partitionMethod == "rr" || partitionMethod == "range") {
-        return Create(colTypeIds, colNum, partitionNum, false, threadId);
+        return Create(colTypeIds, colNum, partitionNum, false, threadId, isRss);
     } else if (UNLIKELY(partitionMethod == "single")) {
-        return Create(colTypeIds, colNum, partitionNum, true, threadId);
+        return Create(colTypeIds, colNum, partitionNum, true, threadId, isRss);
     } else {
         LOG_ERROR("Unsupported partition method %s", partitionMethod.c_str());
         return nullptr;
@@ -177,12 +178,13 @@ uint32_t OckSplitter::GetRowLengthInBytes(VectorBatch &vb, uint32_t rowIndex) co
     return length;
 }
 
-bool OckSplitter::WriteNullValues(BaseVector *vector, std::vector<uint32_t> &rowIndexes, uint32_t rowNum, uint8_t *&address)
+bool OckSplitter::WriteNullValues(BaseVector *vector, std::vector<uint32_t> &rowIndexes, uint32_t rowNum,
+    uint8_t *&address)
 {
     uint8_t *nullAddress = address;
 
     for (uint32_t index = 0; index < rowNum; ++index) {
-        *nullAddress = const_cast<uint8_t *>((uint8_t *)(unsafe::UnsafeBaseVector::GetNulls(vector)))[rowIndexes[index]];
+        *nullAddress = vector->IsNull(rowIndexes[index]);
         nullAddress++;
     }
 
@@ -275,7 +277,7 @@ bool OckSplitter::WriteDecimal128(BaseVector *vector, bool isDict, std::vector<u
                 LOG_ERROR("Invalid rowIndex %d, srcRowCount %d.", rowIndex, srcRowCount);
                 return false;
             }
-            *dstValues++ = srcValues[rowIndexes[index] << 1]; // write value to local blob
+            *dstValues++ = srcValues[rowIndexes[index] << 1];     // write value to local blob
             *dstValues++ = srcValues[rowIndexes[index] << 1 | 1]; // write value to local blob
         }
     }
@@ -284,7 +286,7 @@ bool OckSplitter::WriteDecimal128(BaseVector *vector, bool isDict, std::vector<u
     return true;
 }
 
-bool OckSplitter::WriteFixedWidthValue(BaseVector *vector, ShuffleTypeId typeId, std::vector<uint32_t> &rowIndexes, 
+bool OckSplitter::WriteFixedWidthValue(BaseVector *vector, ShuffleTypeId typeId, std::vector<uint32_t> &rowIndexes,
     uint32_t rowNum, uint8_t *&address)
 {
     bool isDict = (vector->GetEncoding() == OMNI_DICTIONARY);
@@ -459,8 +461,8 @@ bool OckSplitter::FlushAllRegionAndGetNewBlob(VectorBatch &vb)
 
     ResetCacheRegion();
 
-    uint32_t dataSize = 0;
-    if (UNLIKELY(!mOckBuffer->Flush(false, dataSize))) {
+    uint64_t dataSize = 0;
+    if (UNLIKELY(!mOckBuffer->Flush(false, dataSize, mRssWriter))) {
         LogError("Failed to flush local blob.");
         return false;
     }
@@ -471,6 +473,49 @@ bool OckSplitter::FlushAllRegionAndGetNewBlob(VectorBatch &vb)
 
     if (UNLIKELY(!mOckBuffer->GetNewBuffer())) {
         LogError("Failed to get new local blob.");
+        return false;
+    }
+
+    return true;
+}
+
+bool OckSplitter::FlushFullRegion(VectorBatch &vb)
+{
+    if (UNLIKELY(mPartitionNum > mCacheRegion.size())) {
+        LOG_ERROR("Illegal mPartitionNum  %d", mPartitionNum);
+        return false;
+    }
+    auto partitions = mOckBuffer->GetToCommitPartition();
+    for (uint32_t partitionId : partitions) {
+        if (!WritePartVectorBatch(vb, partitionId)) {
+            return false;
+        }
+    }
+
+    uint64_t dataSize = 0;
+    if (UNLIKELY(!mOckBuffer->Flush(false, dataSize, mRssWriter))) {
+        LogError("Failed to flush local blob.");
+        return false;
+    }
+
+    if (mOckBuffer->IsCompress()) {
+        mTotalWriteBytes += dataSize; // get compressed size from ock shuffle sdk
+    }
+
+    return true;
+}
+
+bool OckSplitter::CommitFullRegion(VectorBatch &vb)
+{
+    auto partitions = mOckBuffer->GetToCommitPartition();
+    for (uint32_t partitionId : partitions) {
+        if (!WritePartVectorBatch(vb, partitionId)) {
+            return false;
+        }
+    }
+
+    if (UNLIKELY(!mOckBuffer->CommitFullRegion4Rss(mRssWriter))) {
+        LogError("Failed to flush local blob.");
         return false;
     }
 
@@ -501,20 +546,34 @@ bool OckSplitter::PreoccupiedBufferSpace(VectorBatch &vb, uint32_t partitionId, 
             break;
         }
         case OckHashWriteBuffer::ResultFlag::NEW_REGION: {
-            // write preoccupied region data to local blob when it exist
-            if (UNLIKELY(!WritePartVectorBatch(vb, partitionId))) {
-                LOG_ERROR("Failed to write part vector batch or get new region in local blob");
-                return false;
+            if (mIsRss) {
+                if (UNLIKELY(!CommitFullRegion(vb))) {
+                    LOG_ERROR("Failed to write part vector batch or reset buffer");
+                    return false;
+                }
+            } else {
+                // write preoccupied region data to local blob when it exist
+                if (UNLIKELY(!WritePartVectorBatch(vb, partitionId))) {
+                    LOG_ERROR("Failed to write part vector batch or get new region in local blob");
+                    return false;
+                }
             }
 
             // try to preoccupied new region in this local blob for this row
             return PreoccupiedBufferSpace(vb, partitionId, rowIndex, rowLength, true);
         }
         case OckHashWriteBuffer::ResultFlag::LACK: {
-            // flush all partition preoccupied region data to local blob when it exist
-            if (UNLIKELY(!FlushAllRegionAndGetNewBlob(vb))) {
-                LOG_ERROR("Failed to write part vector batch or get new local blob");
-                return false;
+            if (mIsRss) {
+                if (UNLIKELY(!FlushFullRegion(vb))) {
+                    LOG_ERROR("Failed to write part vector batch or reset buffer");
+                    return false;
+                }
+            } else {
+                // flush all partition preoccupied region data to local blob when it exist
+                if (UNLIKELY(!FlushAllRegionAndGetNewBlob(vb))) {
+                    LOG_ERROR("Failed to write part vector batch or get new local blob");
+                    return false;
+                }
             }
 
             // try preoccupied new region in new local blob for this row
@@ -550,6 +609,7 @@ bool OckSplitter::Split(VectorBatch &vb)
         // calculate row length in the vb
         uint32_t oneRowLength = GetRowLengthInBytes(vb, rowIndex);
         if (!PreoccupiedBufferSpace(vb, partitionId, rowIndex, oneRowLength, false)) {
+            mCurrentVB = nullptr;
             LOG_ERROR("Failed to preoccupied local buffer space for row index %d", rowIndex);
             return false;
         }
@@ -562,6 +622,7 @@ bool OckSplitter::Split(VectorBatch &vb)
         }
 
         if (!WritePartVectorBatch(vb, partitionId)) {
+            mCurrentVB = nullptr;
             LOG_ERROR("Failed to write rows in partitionId %d in the vector batch to local blob", partitionId);
             return false;
         }
@@ -577,8 +638,8 @@ bool OckSplitter::Split(VectorBatch &vb)
 
 bool OckSplitter::Stop()
 {
-    uint32_t dataSize = 0;
-    if (UNLIKELY(!mOckBuffer->Flush(true, dataSize))) {
+    uint64_t dataSize = 0;
+    if (UNLIKELY(!mOckBuffer->Flush(true, dataSize, mRssWriter))) {
         LogError("Failed to flush local blob when stop.");
         return false;
     }
@@ -588,6 +649,6 @@ bool OckSplitter::Stop()
     }
 
     LOG_INFO("Time cost preoccupied: %lu write_data: %lu release_resource: %lu", mPreoccupiedTime, mWriteVBTime,
-             mReleaseResource);
+        mReleaseResource);
     return true;
 }

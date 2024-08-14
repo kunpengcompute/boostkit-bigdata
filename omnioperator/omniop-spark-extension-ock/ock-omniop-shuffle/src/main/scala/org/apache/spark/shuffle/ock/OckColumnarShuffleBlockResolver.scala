@@ -27,6 +27,7 @@ class OckColumnarShuffleBlockResolver(conf: SparkConf, ockConf: OCKConf)
   }
 
   override def stop(): Unit = {}
+
 }
 
 object OckColumnarShuffleBlockResolver extends Logging {
@@ -38,13 +39,11 @@ object OckColumnarShuffleBlockResolver extends Logging {
                         endMapIndex: Int,
                         startPartition: Int,
                         endPartition: Int,
-                        numBuffers: Int,
-                        bufferSize: Long,
                         typeIds: Array[Int],
                         context: TaskContext): Iterator[OckShuffleJniReader] = {
     val blocksByAddresses = getMapSizes(shuffleId, startMapIndex, endMapIndex, startPartition, endPartition)
 
-    new OckColumnarShuffleBufferIterator(ockConf, appId, shuffleId, readMetrics, startMapIndex, endMapIndex, startPartition, endPartition, numBuffers, bufferSize,
+    new OckColumnarShuffleBufferIterator(ockConf, appId, shuffleId, readMetrics, startMapIndex, endMapIndex, startPartition, endPartition,
       OCKFunctions.parseBlocksByHost(blocksByAddresses), typeIds, context)
   }
 

@@ -17,12 +17,22 @@ using FUNC_COMMIT_LOCAL_BLOB = int (*)(const char *, uint64_t, uint32_t, uint32_
 using FUNC_MAP_BLOB = int (*)(uint64_t, void **, const char *);
 using FUNC_UNMAP_BLOB = int (*)(uint64_t, void *);
 
+// rss
+using FUNC_RSS_CREATE_WRITER = int (*)(uint32_t, uint32_t, uint32_t *, uint8_t **);
+using FUNC_RSS_COMMIT_REGION = int (*)(uint32_t, uint32_t, uint32_t, uint8_t *, uint32_t);
+using FUNC_RSS_FLUSH_REGION = int (*)(uint32_t, bool, uint64_t *);
+using FUNC_RSS_GET_RELEASE_REGION = int (*)(uint32_t, uint32_t **, uint32_t *);
+
 class OckShuffleSdk {
 public:
     static FUNC_GET_LOCAL_BLOB mGetLocalBlobFun;
     static FUNC_COMMIT_LOCAL_BLOB mCommitLocalBlobFun;
     static FUNC_MAP_BLOB mMapBlobFun;
     static FUNC_UNMAP_BLOB mUnmapBlobFun;
+    static FUNC_RSS_CREATE_WRITER mRssCreateWriterFun;
+    static FUNC_RSS_COMMIT_REGION mRssCommitRegionFun;
+    static FUNC_RSS_FLUSH_REGION mRssFlushRegionFun;
+    static FUNC_RSS_GET_RELEASE_REGION mRssGetReleaseRegionFun;
 
 #define LoadFunction(name, func)                                                                                     \
     do {                                                                                                             \
@@ -54,6 +64,18 @@ public:
 
         LoadFunction("ShuffleBlobReleaseRawAddress", &func);
         mUnmapBlobFun = reinterpret_cast<FUNC_UNMAP_BLOB>(func);
+
+        LoadFunction("RSSCreateWriter", &func);
+        mRssCreateWriterFun = reinterpret_cast<FUNC_RSS_CREATE_WRITER>(func);
+
+        LoadFunction("RSSCommitRegion", &func);
+        mRssCommitRegionFun = reinterpret_cast<FUNC_RSS_COMMIT_REGION>(func);
+
+        LoadFunction("RSSFlushRegion", &func);
+        mRssFlushRegionFun = reinterpret_cast<FUNC_RSS_FLUSH_REGION>(func);
+
+        LoadFunction("RSSGetReleaseRegionIds", &func);
+        mRssGetReleaseRegionFun = reinterpret_cast<FUNC_RSS_GET_RELEASE_REGION>(func);
 
         return true;
     }
