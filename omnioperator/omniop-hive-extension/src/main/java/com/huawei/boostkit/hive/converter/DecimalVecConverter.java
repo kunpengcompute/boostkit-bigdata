@@ -128,14 +128,14 @@ public class DecimalVecConverter implements VecConverter {
                 longVec.setNull(i);
             } else {
                 HiveDecimal hiveDecimal = (HiveDecimal) col[i];
-                longVec.set(i, getLongFromHiveDecimal((HiveDecimal) col[i], decimalTypeInfo));
+                longVec.set(i, getLongFromHiveDecimal(hiveDecimal, decimalTypeInfo));
             }
         }
         return longVec;
     }
 
     private long getLongFromHiveDecimal(HiveDecimal hiveDecimal, DecimalTypeInfo decimalTypeInfo) {
-        if (hiveDecimal.scale() < decimalTypeInfo.getScale()) {
+        if (hiveDecimal.scale() < decimalTypeInfo.getScale() || hiveDecimal.scale() > 18) {
             return hiveDecimal.scaleByPowerOfTen(decimalTypeInfo.getScale()).longValue();
         } else {
             return hiveDecimal.unscaledValue().longValue();
