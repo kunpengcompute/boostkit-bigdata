@@ -365,7 +365,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             isReduceSinkReplaceable = true;
         }
         if (edgeType == TezEdgeProperty.EdgeType.SIMPLE_EDGE && child instanceof ReduceWork) {
-            reduceSinkReplaceable = simpleEdgeForChildReplaceable(work, child);
+            isReduceSinkReplaceable = simpleEdgeForChildReplaceable(work, child);
         }
         if (child instanceof MergeJoinWork) {
             Operator reducer = ((MergeJoinWork) child).getMainWork().getAnyRootOperator();
