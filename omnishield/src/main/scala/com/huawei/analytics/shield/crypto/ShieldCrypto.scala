@@ -64,6 +64,7 @@ class ShieldCrypto(conf: Configuration) extends Crypto {
   def init(mode: OperationMode, algorithmMode: AlgorithmMode, dataKeyLength: Int, dataKeyPlaintext: String, iv: Array[Byte]): Unit = {
     // get final key (signingKey + dataKey)
     val secret = Base64.getDecoder.decode(dataKeyPlaintext)
+    clearSensitiveInformation(dataKeyPlaintext)
     val signingKey = util.Arrays.copyOfRange(secret, 0, SIGNING_KEY_BYTE_LENGTH)
     val encryptKey =
       util.Arrays.copyOfRange(secret, SIGNING_KEY_BYTE_LENGTH, SIGNING_KEY_BYTE_LENGTH + dataKeyLength / 8)
@@ -136,6 +137,13 @@ class ShieldCrypto(conf: Configuration) extends Crypto {
    */
   def clearSensitiveInformation(info: Array[Byte]): Unit = {
     util.Arrays.fill(info, 0x00.toByte)
+  }
+
+  def clearSensitiveInformation(info: String): Unit = {
+    val valueFieldOfString = classOf[String].getDeclaredField("value")
+    valueFieldOfString.setAccessible(true)
+    val value = valueFieldOfString.get(info).asInstanceOf[Array[Char]]
+    util.Arrays.fill(value, 0x00.toChar)
   }
 }
 
