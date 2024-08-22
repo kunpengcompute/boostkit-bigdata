@@ -28,12 +28,12 @@ import org.apache.spark.sql.catalyst.expressions.{Ascending, DynamicPruningSubqu
 import org.apache.spark.sql.catalyst.expressions.aggregate.{AggregateExpression, Partial, PartialMerge}
 import org.apache.spark.sql.catalyst.optimizer.{DelayCartesianProduct, HeuristicJoinReorder, MergeSubqueryFilters, RewriteSelfJoinInInPredicate}
 import org.apache.spark.sql.catalyst.rules.Rule
-import org.apache.spark.sql.execution.{RowToOmniColumnarExec, BroadcastExchangeExecProxy, _}
+import org.apache.spark.sql.execution.{BroadcastExchangeExecProxy, RowToOmniColumnarExec, _}
 import org.apache.spark.sql.execution.adaptive.{AQEShuffleReadExec, BroadcastQueryStageExec, OmniAQEShuffleReadExec, QueryStageExec, ShuffleQueryStageExec}
 import org.apache.spark.sql.execution.aggregate.{DummyLogicalPlan, ExtendedAggUtils, HashAggregateExec}
 import org.apache.spark.sql.execution.exchange.{BroadcastExchangeExec, Exchange, ReusedExchangeExec, ShuffleExchangeExec}
 import org.apache.spark.sql.execution.joins._
-import org.apache.spark.sql.execution.window.{WindowExec, TopNPushDownForWindow}
+import org.apache.spark.sql.execution.window.{TopNPushDownForWindow, WindowExec}
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.ColumnarBatchSupportUtil.checkColumnarBatchSupport
 import org.apache.spark.sql.catalyst.planning.PhysicalAggregation
@@ -41,7 +41,9 @@ import org.apache.spark.sql.catalyst.plans.LeftSemi
 import org.apache.spark.sql.catalyst.plans.logical.Aggregate
 import org.apache.spark.sql.execution.util.SparkMemoryUtils.addLeakSafeTaskCompletionListener
 
-case class ColumnarPreOverrides(isAdaptiveContext: Boolean)
+import scala.collection.mutable.ListBuffer
+
+case class ColumnarPreOverrides(isSupportAdaptive: Boolean = true)
   extends Rule[SparkPlan] {
   val columnarConf: ColumnarPluginConfig = ColumnarPluginConfig.getSessionConf
   val enableColumnarFileScan: Boolean = columnarConf.enableColumnarFileScan
@@ -63,7 +65,6 @@ case class ColumnarPreOverrides(isAdaptiveContext: Boolean)
   val enableShuffledHashJoin: Boolean = columnarConf.enableShuffledHashJoin
   val enableColumnarUnion: Boolean = columnarConf.enableColumnarUnion
   val enableFusion: Boolean = columnarConf.enableFusion
-  var isSupportAdaptive: Boolean = true
   val enableColumnarProjectFusion: Boolean = columnarConf.enableColumnarProjectFusion
   val enableLocalColumnarLimit: Boolean = columnarConf.enableLocalColumnarLimit
   val enableGlobalColumnarLimit: Boolean = columnarConf.enableGlobalColumnarLimit
@@ -579,6 +580,7 @@ case class ColumnarPreOverrides(isAdaptiveContext: Boolean)
   }
 
   override def apply(plan: SparkPlan): SparkPlan = {
+    logInfo("Using BoostKit Spark Native Sql Engine Extension ColumnarPreOverrides")
     replaceWithColumnarPlan(plan)
   }
 }
@@ -589,6 +591,7 @@ case class ColumnarPostOverrides() extends Rule[SparkPlan] {
   var isSupportAdaptive: Boolean = true
 
   def apply(plan: SparkPlan): SparkPlan = {
+    logInfo("Using BoostKit Spark Native Sql Engine Extension ColumnarPostOverrides")
     handleColumnarToRowPartialFetch(replaceWithColumnarPlan(plan))
   }
 
@@ -615,7 +618,7 @@ case class ColumnarPostOverrides() extends Rule[SparkPlan] {
       val child = replaceWithColumnarPlan(plan.child)
       logInfo(s"Columnar Processing for ${plan.getClass} is currently supported")
       RowToOmniColumnarExec(child)
-    case ColumnarToRowExec(child: ColumnarShuffleExchangeExec) =>
+    case ColumnarToRowExec(child: ColumnarShuffleExchangeExec) if isSupportAdaptive =>
       replaceWithColumnarPlan(child)
     case ColumnarToRowExec(child: ColumnarBroadcastExchangeExec) =>
       replaceWithColumnarPlan(child)
@@ -674,7 +677,49 @@ case class ColumnarOverrideRules(session: SparkSession) extends ColumnarRule wit
     (_: SparkSession) => AddTransformHintRule(),
     (_: SparkSession) => ColumnarPreOverrides(isSupportAdaptive))
 
-  def postOverrides: ColumnarPostOverrides = ColumnarPostOverrides()
+  private def postOverrides: ColumnarPostOverrides = ColumnarPostOverrides()
+
+  private def finallyRules(): List[SparkSession => Rule[SparkPlan]] = {
+    List(
+      (_: SparkSession) => RemoveTransformHintRule()
+    )
+  }
+
+  private def transformPlan(getRules: List[SparkSession => Rule[SparkPlan]],
+                             plan: SparkPlan,
+                             step: String) = {
+    logDebug(
+      s"${step}ColumnarTransitions preOverriden plan:\n${plan.toString}")
+    val overridden = getRules.foldLeft(plan) {
+      (p, getRule) =>
+        val rule = getRule(session)
+        val newPlan = rule(p)
+        newPlan
+    }
+    logDebug(
+      s"${step}ColumnarTransitions afterOverriden plan:\n${overridden.toString}")
+    overridden
+  }
+
+  // Holds the original plan for possible entire fallback.
+  private val localOriginalPlans: ThreadLocal[ListBuffer[SparkPlan]] =
+    ThreadLocal.withInitial(() => ListBuffer.empty[SparkPlan])
+
+  private def setOriginalPlan(plan: SparkPlan): Unit = {
+    localOriginalPlans.get.prepend(plan)
+  }
+
+  private def originalPlan: SparkPlan = {
+    val plan = localOriginalPlans.get.head
+    assert(plan != null)
+    plan
+  }
+
+  private def resetOriginalPlan(): Unit = localOriginalPlans.get.remove(0)
+
+  private def fallbackPolicy(): List[SparkSession => Rule[SparkPlan]] = {
+    List((_: SparkSession) => ExpandFallbackPolicy(isSupportAdaptive, originalPlan))
+  }
 
   var isSupportAdaptive: Boolean = true
 
@@ -696,25 +741,35 @@ case class ColumnarOverrideRules(session: SparkSession) extends ColumnarRule wit
   override def preColumnarTransitions: Rule[SparkPlan] = plan => PhysicalPlanSelector.
     maybe(session, plan) {
       isSupportAdaptive = supportAdaptive(plan)
-      val rule = preOverrides
-      logInfo("Using BoostKit Spark Native Sql Engine Extension ColumnarPreOverrides")
-      val overridden = rule.foldLeft(plan) {
-        (p, getRule) =>
-          val rule = getRule(session)
-          val newPlan = rule(p)
-          newPlan
-      }
-      overridden
+      setOriginalPlan(plan)
+      transformPlan(preOverrides, plan, "pre")
     }
 
   override def postColumnarTransitions: Rule[SparkPlan] = plan => PhysicalPlanSelector.
     maybe(session, plan) {
-      val rule = postOverrides
-      rule.setAdaptiveSupport(isSupportAdaptive)
-      logInfo("Using BoostKit Spark Native Sql Engine Extension ColumnarPostOverrides")
-      rule(plan)
+      val planWithFallBackPolicy = transformPlan(fallbackPolicy(), plan, "fallback")
+
+      val finalPlan = planWithFallBackPolicy match {
+        case FallbackNode(fallbackPlan) =>
+          // skip c2r and r2c replaceWithColumnarPlan
+          fallbackPlan
+        case plan =>
+          val rule = postOverrides
+          rule.setAdaptiveSupport(isSupportAdaptive)
+          rule(plan)
+      }
+      resetOriginalPlan()
+      transformPlan(finallyRules(), finalPlan, "final")
     }
 }
+
+case class RemoveTransformHintRule() extends Rule[SparkPlan] {
+  override def apply(plan: SparkPlan): SparkPlan = {
+    plan.foreach(TransformHints.untag)
+    plan
+  }
+}
+
 
 class ColumnarPlugin extends (SparkSessionExtensions => Unit) with Logging {
   override def apply(extensions: SparkSessionExtensions): Unit = {
