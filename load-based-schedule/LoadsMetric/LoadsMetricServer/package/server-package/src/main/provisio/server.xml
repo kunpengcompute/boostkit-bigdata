@@ -1,0 +1,59 @@
+<runtime>
+    <!-- Target -->
+    <archive name="${process-name}-${project.version}-${dep.os.arch}.tar.gz" />
+
+    <!-- Notices -->
+    <fileSet to="/">
+        <directory path="${basedir}">
+            <include>NOTICE</include>
+            <include>README.txt</include>
+            <include>THIRD_PARTY_OPEN_SOURCE_SOFTWARE_NOTICE</include>
+        </directory>
+    </fileSet>
+
+    <!-- Launcher -->
+    <artifactSet to="/loadsmetric-server/bin">
+        <artifact id="io.airlift:launcher:tar.gz:properties:${dep.packaging.version}">
+            <unpack filter="true" />
+        </artifact>
+    </artifactSet>
+
+    <fileSet to="/loadsmetric-server/bin">
+        <directory path="${basedir}/../src/main/resources/">
+            <include>launcher.py</include>
+            <include>launcher</include>
+        </directory>
+    </fileSet>
+
+    <fileSet to="/loadsmetric-server/etc">
+        <directory path="${basedir}/../src/main/resources/">
+            <include>jvm.config</include>
+            <include>logback.xml</include>
+            <include>workers</include>
+        </directory>
+    </fileSet>
+    <fileSet to="/loadsmetric-server/etc">
+        <directory path="${basedir}/../../server/src/main/resources/">
+            <include>application.properties</include>
+        </directory>
+    </fileSet>
+
+    <artifactSet to="/loadsmetric-server/lib">
+        <artifact id="${project.groupId}:LoadsMetricServer:jar:${dep.os.arch}:${project.version}">
+        </artifact>
+    </artifactSet>
+
+    <fileSet to="/loadsmetric-server/deploy">
+        <directory path="${basedir}/../src/main/resources/deploy/">
+            <include>*</include>
+        </directory>
+    </fileSet>
+
+    <fileSet to="/loadsmetric-server-setup">
+        <directory path="${basedir}/../src/main/resources/">
+            <include>loadsmetric_install.sh</include>
+            <include>loadsmetric_uninstall.sh</include>
+        </directory>
+    </fileSet>
+
+</runtime>
