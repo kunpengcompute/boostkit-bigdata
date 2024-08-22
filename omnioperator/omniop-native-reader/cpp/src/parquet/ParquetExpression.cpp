@@ -60,9 +60,6 @@ inline Result<std::shared_ptr<Scalar>> ParseStringToScalar(const std::shared_ptr
     if (type->id() == arrow::Type::DECIMAL256) {
         return std::make_shared<Decimal256Scalar>(Decimal256(str), type);
     }
-    if (type->id() == arrow::Type::DATE32) {
-        return std::make_shared<Date32Scalar>(std::stoi(str));
-    }
     return arrow::Scalar::Parse(type, str);
 }
 
