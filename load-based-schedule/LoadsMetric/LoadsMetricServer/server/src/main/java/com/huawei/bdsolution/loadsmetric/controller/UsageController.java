@@ -36,7 +36,6 @@ public class UsageController {
         return new ArrayList<>(nodeHeartbeatService.getAllNodeHosts());
     }
 
-
     @GetMapping("/get/byCurrTimeForPrometheus")
     public String getRecordsByCurrTimeForPrometheus(){
         return loadsRecordsCacheService.getRecordsByCurrTimeForPrometheus();

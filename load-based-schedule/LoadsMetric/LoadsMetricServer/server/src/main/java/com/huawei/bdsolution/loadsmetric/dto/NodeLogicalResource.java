@@ -1,6 +1,5 @@
 package com.huawei.bdsolution.loadsmetric.dto;
 
-
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 public class NodeLogicalResource implements Comparable<NodeLogicalResource>{

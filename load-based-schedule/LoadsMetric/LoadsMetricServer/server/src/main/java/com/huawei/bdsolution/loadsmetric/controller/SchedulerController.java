@@ -1,6 +1,5 @@
 package com.huawei.bdsolution.loadsmetric.controller;
 
-
 import com.huawei.bdsolution.loadsmetric.dto.SortReport;
 import com.huawei.bdsolution.loadsmetric.service.LoadsRecordsCacheService;
 import com.huawei.bdsolution.loadsmetric.service.SortReportService;

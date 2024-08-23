@@ -8,6 +8,5 @@ import com.huawei.bdsolution.loadsmetric.entity.LoadsRecords;
 import java.util.Map;
 
 public interface SortReportService {
-    SortReport sortNodesByUsagesWithLogicalFromCache(Map<String, FixedSizeRingBuffer<LoadsRecords>> loadsRecordsCache,
-                                                     Map<String, NodeLogicalResource> nodeLogicalResourceMap);
+    SortReport sortNodesByUsagesWithLogicalFromCache(Map<String, FixedSizeRingBuffer<LoadsRecords>> loadsRecordsCache, Map<String, NodeLogicalResource> nodeLogicalResourceMap);
 }

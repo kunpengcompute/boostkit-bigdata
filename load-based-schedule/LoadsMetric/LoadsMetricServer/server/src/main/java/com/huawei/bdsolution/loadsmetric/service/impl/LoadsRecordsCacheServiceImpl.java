@@ -88,7 +88,6 @@ public class LoadsRecordsCacheServiceImpl implements LoadsRecordsCacheService {
         return res.toString();
     }
 
-
     @PostConstruct
     public void initLoadsRecordsCacheMap() {
         Set<String> hostSet = nodeHeartbeatService.getAllNodeHosts();

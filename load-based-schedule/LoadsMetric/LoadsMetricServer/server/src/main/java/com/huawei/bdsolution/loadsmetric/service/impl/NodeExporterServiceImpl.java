@@ -56,7 +56,6 @@ public class NodeExporterServiceImpl implements NodeExporterService {
 
     private ExecutorService executorService;
 
-
     @PostConstruct
     public void init() {
         if (!nodeExporterPullEnable) {
