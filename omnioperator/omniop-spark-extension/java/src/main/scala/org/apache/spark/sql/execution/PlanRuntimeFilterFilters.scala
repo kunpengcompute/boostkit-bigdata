@@ -18,14 +18,15 @@
 package org.apache.spark.sql.execution
 
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.catalyst.expressions.{BindReferences, RuntimeFilterExpression, RuntimeFilterSubquery}
+import org.apache.spark.sql.catalyst.expressions.{BindReferences, RuntimeFilterExpression, RuntimeFilterSubquery, AttributeReference, Expression}
 import org.apache.spark.sql.catalyst.optimizer.{BuildLeft, BuildRight}
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.catalyst.trees.TreePattern.RUNTIME_FILTER_SUBQUERY
 import org.apache.spark.sql.execution.aggregate.ObjectHashAggregateExec
 import org.apache.spark.sql.execution.exchange.{BroadcastExchangeExec, ShuffleExchangeExec}
 import org.apache.spark.sql.execution.joins.{BroadcastHashJoinExec, HashedRelationBroadcastMode, HashJoin}
-import org.apache.spark.sql.execution.{BroadcastExchangeExecProxy, ColumnarBroadcastExchangeExec}
+import org.apache.spark.sql.execution.{BroadcastExchangeExecProxy, ColumnarBroadcastExchangeExec, ColumnarFilterExec, ColumnarFileSourceScanExec,
+  OmniColumnarToRowExec, ColumnarConditionProjectExec, ColumnarProjectExec}
 
 /**
  * This planner rule aims at rewriting runtime filter in order to reuse the
@@ -43,26 +44,35 @@ case class PlanRuntimeFilterFilters(sparkSession: SparkSession) extends Rule[Spa
         val sparkPlan = QueryExecution.createSparkPlan(
           sparkSession, sparkSession.sessionState.planner, buildPlan)
         val filterCreationSidePlan = getFilterCreationSidePlan(sparkPlan)
+        val executedFilterCreationSidePlan =
+          QueryExecution.prepareExecutedPlan(sparkSession, filterCreationSidePlan)
+
+        val newExecutedFilterCreationSidePlan = executedFilterCreationSidePlan transformUp {
+          case omniColumnarToRowExec: OmniColumnarToRowExec =>
+            omniColumnarToRowExec.child
+        }
+
+        val broadcastExchangeNoFallback = checkBroadcastExchangeNoFallback(newExecutedFilterCreationSidePlan)
+
+        val onlyAttributeReference = checkAttributeReference(Seq(buildKey), 0)
 
         // Using `sparkPlan` is a little hacky as it is based on the assumption that this rule is
         // the first to be applied (apart from `InsertAdaptiveSparkPlan`).
-        val canReuseExchange = conf.exchangeReuseEnabled &&
+        val canReuseExchange = conf.exchangeReuseEnabled && broadcastExchangeNoFallback && onlyAttributeReference &&
           plan.exists {
             case BroadcastHashJoinExec(_, _, _, BuildLeft, _, left, _, _) =>
-              left.sameResult(filterCreationSidePlan)
+              val executedLeft = QueryExecution.prepareExecutedPlan(sparkSession, left)
+              executedLeft.sameResult(executedFilterCreationSidePlan)
             case BroadcastHashJoinExec(_, _, _, BuildRight, _, _, right, _) =>
-              right.sameResult(filterCreationSidePlan)
+              val executedRight = QueryExecution.prepareExecutedPlan(sparkSession, right)
+              executedRight.sameResult(executedFilterCreationSidePlan)
             case _ => false
           }
 
         val executedPlan = QueryExecution.prepareExecutedPlan(sparkSession, sparkPlan)
 
         val bloomFilterSubquery = if (canReuseExchange) {
-          val executedFilterCreationSidePlan = getFilterCreationSidePlan(executedPlan)
-          val newExecutedFilterCreationSidePlan = executedFilterCreationSidePlan transformUp {
-            case omniColumnarToRowExec: OmniColumnarToRowExec =>
-              omniColumnarToRowExec.child
-          }
+          val replacePlan = getFilterCreationSidePlan(executedPlan)
           val packedKeys = BindReferences.bindReferences(
             HashJoin.rewriteKeyExpr(Seq(buildKey)), newExecutedFilterCreationSidePlan.output)
           val mode = HashedRelationBroadcastMode(packedKeys)
@@ -75,7 +85,7 @@ case class PlanRuntimeFilterFilters(sparkSession: SparkSession) extends Rule[Spa
 
           val newExecutedPlan = executedPlan transformUp {
             case hashAggregateExec: ObjectHashAggregateExec
-              if hashAggregateExec.child.eq(executedFilterCreationSidePlan) =>
+              if hashAggregateExec.child.eq(replacePlan) =>
               hashAggregateExec.copy(child = broadcastProxy)
           }
 
@@ -102,6 +112,27 @@ case class PlanRuntimeFilterFilters(sparkSession: SparkSession) extends Rule[Spa
       case shuffleExchange: ShuffleExchangeExec =>
         shuffleExchange.child.asInstanceOf[ObjectHashAggregateExec].child
       case other => other
+    }
+  }
+
+  private def checkBroadcastExchangeNoFallback(plan: SparkPlan): Boolean = {
+    plan match {
+      case columnarFilter: ColumnarFilterExec =>
+        checkBroadcastExchangeNoFallback(columnarFilter.child)
+      case columnarCondition: ColumnarConditionProjectExec =>
+        checkBroadcastExchangeNoFallback(columnarCondition.child)
+      case columnarProject: ColumnarProjectExec =>
+        checkBroadcastExchangeNoFallback(columnarProject.child)
+      case columnarFileScan: ColumnarFileSourceScanExec => true
+      case other => false
+    }
+  }
+
+  private def checkAttributeReference(buildKeys: Seq[Expression], index: Int): Boolean = {
+    if (index >= 0 && index < buildKeys.length) {
+      buildKeys(index).isInstanceOf[AttributeReference]
+    } else {
+      false
     }
   }
 }

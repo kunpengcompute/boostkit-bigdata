@@ -17,12 +17,12 @@
 
 package org.apache.spark.sql.execution.adaptive
 
-import org.apache.spark.sql.catalyst.expressions.{BindReferences, RuntimeFilterExpression}
+import org.apache.spark.sql.catalyst.expressions.{BindReferences, RuntimeFilterExpression, AttributeReference, Expression}
 import org.apache.spark.sql.catalyst.optimizer.{BuildLeft, BuildRight}
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.catalyst.trees.TreePattern.{RUNTIME_FILTER_EXPRESSION, SUBQUERY_WRAPPER}
-import org.apache.spark.sql.execution.{OmniColumnarToRowExec, ColumnarBroadcastExchangeExec, QueryExecution, ScalarSubquery, SparkPlan,
-  SubqueryAdaptiveBroadcastExec, SubqueryBroadcastExec, SubqueryExec, SubqueryWrapper}
+import org.apache.spark.sql.execution.{OmniColumnarToRowExec, ColumnarBroadcastExchangeExec, QueryExecution, ScalarSubquery, SparkPlan, ColumnarProjectExec,
+  SubqueryAdaptiveBroadcastExec, SubqueryBroadcastExec, SubqueryExec, SubqueryWrapper, ColumnarFilterExec, ColumnarFileSourceScanExec, ColumnarConditionProjectExec}
 import org.apache.spark.sql.execution.aggregate.ObjectHashAggregateExec
 import org.apache.spark.sql.execution.exchange.{BroadcastExchangeExec, ShuffleExchangeExec}
 import org.apache.spark.sql.execution.joins.{BroadcastHashJoinExec, HashedRelationBroadcastMode, HashJoin}
@@ -53,6 +53,10 @@ case class PlanAdaptiveRuntimeFilterFilters(
             omniColumnarToRowExec.child
         }
 
+        val broadcastExchangeNoFallback = checkBroadcastExchangeNoFallback(newExecutedFilterCreationSidePlan)
+
+        val onlyAttributeReference = checkAttributeReference(buildKeys, index)
+
         val packedKeys = BindReferences.bindReferences(
           HashJoin.rewriteKeyExpr(buildKeys), newExecutedFilterCreationSidePlan.output)
         val mode = HashedRelationBroadcastMode(packedKeys)
@@ -60,19 +64,21 @@ case class PlanAdaptiveRuntimeFilterFilters(
         val exchange = new ColumnarBroadcastExchangeExec(mode, newExecutedFilterCreationSidePlan)
         val compareExchange = BroadcastExchangeExec(mode, filterCreationSidePlan)
 
-        val canReuseExchange = conf.exchangeReuseEnabled && buildKeys.nonEmpty &&
+        val canReuseExchange = conf.exchangeReuseEnabled && buildKeys.nonEmpty && broadcastExchangeNoFallback && onlyAttributeReference &&
           find(rootPlan) {
             case BroadcastHashJoinExec(_, _, _, BuildLeft, _, left, _, _) =>
+              val executedLeft = QueryExecution.prepareExecutedPlan(adaptivePlan.session, left)
               if (left.isInstanceOf[BroadcastQueryStageExec]) {
-                left.asInstanceOf[BroadcastQueryStageExec].plan.sameResult(compareExchange) || left.asInstanceOf[BroadcastQueryStageExec].plan.sameResult(exchange)
+                executedLeft.asInstanceOf[BroadcastQueryStageExec].plan.sameResult(exchange)
               } else {
-                left.sameResult(compareExchange) || left.sameResult(exchange)
+                executedLeft.sameResult(exchange)
               }
             case BroadcastHashJoinExec(_, _, _, BuildRight, _, _, right, _) =>
+              val executedRight = QueryExecution.prepareExecutedPlan(adaptivePlan.session, right)
               if (right.isInstanceOf[BroadcastQueryStageExec]) {
-                right.asInstanceOf[BroadcastQueryStageExec].plan.sameResult(compareExchange) || right.asInstanceOf[BroadcastQueryStageExec].plan.sameResult(exchange)
+                executedRight.asInstanceOf[BroadcastQueryStageExec].plan.sameResult(exchange)
               } else {
-                right.sameResult(compareExchange) || right.sameResult(exchange)
+                executedRight.sameResult(exchange)
               }
             case _ => false
           }.isDefined
@@ -115,6 +121,27 @@ case class PlanAdaptiveRuntimeFilterFilters(
       case queryStageExec: ShuffleQueryStageExec =>
         getFilterCreationSidePlan(queryStageExec.plan)
       case other => other
+    }
+  }
+
+  private def checkBroadcastExchangeNoFallback(plan: SparkPlan): Boolean = {
+    plan match {
+      case columnarFilter: ColumnarFilterExec =>
+        checkBroadcastExchangeNoFallback(columnarFilter.child)
+      case columnarCondition: ColumnarConditionProjectExec =>
+        checkBroadcastExchangeNoFallback(columnarCondition.child)
+      case columnarProject: ColumnarProjectExec =>
+        checkBroadcastExchangeNoFallback(columnarProject.child)
+      case columnarFileScan: ColumnarFileSourceScanExec => true
+      case other => false
+    }
+  }
+
+   private def checkAttributeReference(buildKeys: Seq[Expression], index: Int): Boolean = {
+    if (index >= 0 && index < buildKeys.length) {
+      buildKeys(index).isInstanceOf[AttributeReference]
+    } else {
+      false
     }
   }
 }
