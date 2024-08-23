@@ -11,7 +11,7 @@ function log_audit() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$(whoami)] : [loadsmetric-install] ${1}" >> ${log_file}
 }
 
-check_and_create()
+function check_and_create()
 {
   if [ -h "${1}" ]; then
     echo "[check_and_create] The directory ${1} is a symlink"
