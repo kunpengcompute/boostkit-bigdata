@@ -1,33 +1,95 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.huawei.bdsolution.loadsmetric.util;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import java.io.*;
 import java.nio.charset.Charset;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+/**
+ * A base class for running a Shell command.
+ *
+ * <code>Shell</code> can be used to run shell commands like <code>du</code> or
+ * <code>df</code>. It also offers facilities to gate commands by
+ * time-intervals.
+ */
 public abstract class Shell {
-
     private static final Map<Shell, Object> CHILD_SHELLS =
             Collections.synchronizedMap(new WeakHashMap<Shell, Object>());
-
     public static final Logger LOG = LoggerFactory.getLogger(Shell.class);
+
+    /**
+     * Text to include when there are windows-specific problems.
+     * {@value}
+     */
     private static final String WINDOWS_PROBLEMS =
             "https://wiki.apache.org/hadoop/WindowsProblems";
+
+    /**
+     * Name of the windows utils binary: {@value}.
+     */
     static final String WINUTILS_EXE = "winutils.exe";
+
+    /**
+     * System property for the Hadoop home directory: {@value}.
+     */
     public static final String SYSPROP_HADOOP_HOME_DIR = "hadoop.home.dir";
+
+    /**
+     * Environment variable for Hadoop's home dir: {@value}.
+     */
     public static final String ENV_HADOOP_HOME = "HADOOP_HOME";
 
+    /**
+     * query to see if system is Java 7 or later.
+     * Now that Hadoop requires Java 7 or later, this always returns true.
+     * @deprecated This call isn't needed any more: please remove uses of it.
+     * @return true, always.
+     */
     @Deprecated
     public static boolean isJava7OrAbove() {
         return true;
     }
+
+    /**
+     * Maximum command line length in Windows
+     * KB830473 documents this as 8191
+     */
     public static final int WINDOWS_MAX_SHELL_LENGTH = 8191;
 
+    /**
+     * mis-spelling of {@link #WINDOWS_MAX_SHELL_LENGTH}.
+     * @deprecated use the correctly spelled constant.
+     */
     @Deprecated
     public static final int WINDOWS_MAX_SHELL_LENGHT = WINDOWS_MAX_SHELL_LENGTH;
 
+    /**
+     * Concatenates strings, using a separator.
+     *
+     * @param separator to join with
+     * @param strings to join
+     * @return the joined string
+     */
     public static String join(CharSequence separator, String[] strings) {
         // Ideally we don't have to duplicate the code here if array is iterable.
         StringBuilder sb = new StringBuilder();
@@ -43,6 +105,7 @@ public abstract class Shell {
         return sb.toString();
     }
 
+    /** Windows <code>CreateProcess</code> synchronization object. */
     public static final Object WindowsProcessLaunchLock = new Object();
 
     // OSType detection
@@ -56,6 +119,10 @@ public abstract class Shell {
         OS_TYPE_OTHER
     }
 
+    /**
+     * Get the type of the operating system, as determined from parsing
+     * the <code>os.name</code> property.
+     */
     public static final OSType osType = getOSType();
 
     private static OSType getOSType() {
@@ -79,24 +146,48 @@ public abstract class Shell {
     // Helper static vars for each platform
     public static final boolean WINDOWS = (osType == OSType.OS_TYPE_WIN);
     public static final boolean SOLARIS = (osType == OSType.OS_TYPE_SOLARIS);
-    public static final boolean MAC     = (osType == OSType.OS_TYPE_MAC);
+    public static final boolean MAC = (osType == OSType.OS_TYPE_MAC);
     public static final boolean FREEBSD = (osType == OSType.OS_TYPE_FREEBSD);
-    public static final boolean LINUX   = (osType == OSType.OS_TYPE_LINUX);
-    public static final boolean OTHER   = (osType == OSType.OS_TYPE_OTHER);
+    public static final boolean LINUX = (osType == OSType.OS_TYPE_LINUX);
+    public static final boolean OTHER = (osType == OSType.OS_TYPE_OTHER);
 
+    /**Time after which the executing script would be timedout. */
     protected long timeOutInterval = 0L;
+    /** If or not script timed out*/
     private final AtomicBoolean timedOut = new AtomicBoolean(false);
+
+    /** Indicates if the parent env vars should be inherited or not*/
     protected boolean inheritParentEnv = true;
 
+    /**
+     *  Centralized logic to discover and validate the sanity of the Hadoop
+     *  home directory.
+     *
+     *  This does a lot of work so it should only be called
+     *  privately for initialization once per process.
+     *
+     * @return A directory that exists and via was specified on the command line
+     * via <code>-Dhadoop.home.dir</code> or the <code>HADOOP_HOME</code>
+     * environment variable.
+     * @throws FileNotFoundException if the properties are absent or the specified
+     * path is not a reference to a valid directory.
+     */
     private static File checkHadoopHome() throws FileNotFoundException {
+
+        // first check the Dflag hadoop.home.dir with JVM scope
         String home = System.getProperty(SYSPROP_HADOOP_HOME_DIR);
 
+        // fall back to the system/user-global env variable
         if (home == null) {
             home = System.getenv(ENV_HADOOP_HOME);
         }
         return checkHadoopHomeInner(home);
     }
 
+    /*
+    A set of exception strings used to construct error messages;
+    these are referred to in tests
+    */
     static final String E_DOES_NOT_EXIST = "does not exist";
     static final String E_IS_RELATIVE = "is not an absolute path.";
     static final String E_NOT_DIRECTORY = "is not a directory.";
@@ -108,6 +199,13 @@ public abstract class Shell {
             + SYSPROP_HADOOP_HOME_DIR + " set to an empty string";
     static final String E_NOT_A_WINDOWS_SYSTEM = "Not a Windows system";
 
+    /**
+     *  Validate the accessibility of the Hadoop home directory.
+     *
+     * @return A directory that is expected to be the hadoop home directory
+     * @throws FileNotFoundException if the specified
+     * path is not a reference to a valid directory.
+     */
     static File checkHadoopHomeInner(String home) throws FileNotFoundException {
         // couldn't find either setting for hadoop's home directory
         if (home == null) {
@@ -139,13 +237,20 @@ public abstract class Shell {
         }
         if (!homedir.isDirectory()) {
             throw new FileNotFoundException("Hadoop home directory " + homedir
-                    + " "+ E_NOT_DIRECTORY);
+                    + " " + E_NOT_DIRECTORY);
         }
         return homedir;
     }
 
+    /**
+     * The Hadoop home directory.
+     */
     private static final File HADOOP_HOME_FILE;
 
+    /**
+     * Rethrowable cause for the failure to determine the hadoop
+     * home directory
+     */
     private static final IOException HADOOP_HOME_DIR_FAILURE_CAUSE;
 
     static {
@@ -165,14 +270,35 @@ public abstract class Shell {
         HADOOP_HOME_DIR_FAILURE_CAUSE = ex;
     }
 
+    /**
+     * Optionally extend an error message with some OS-specific text.
+     * @param message core error message
+     * @return error message, possibly with some extra text
+     */
     private static String addOsText(String message) {
         return WINDOWS ? (message + " -see " + WINDOWS_PROBLEMS) : message;
     }
 
-    private static FileNotFoundException fileNotFoundException(String text, Exception ex) {
-        return (FileNotFoundException) new FileNotFoundException(text).initCause(ex);
+    /**
+     * Create a {@code FileNotFoundException} with the inner nested cause set
+     * to the given exception. Compensates for the fact that FNFE doesn't
+     * have an initializer that takes an exception.
+     * @param text error text
+     * @param ex inner exception
+     * @return a new exception to throw.
+     */
+    private static FileNotFoundException fileNotFoundException(String text,
+                                                               Exception ex) {
+        return (FileNotFoundException) new FileNotFoundException(text)
+                .initCause(ex);
     }
 
+    /**
+     * Get the Hadoop home directory. If it is invalid,
+     * throw an exception.
+     * @return a path referring to hadoop home.
+     * @throws FileNotFoundException if the directory doesn't exist.
+     */
     private static File getHadoopHomeDir() throws FileNotFoundException {
         if (HADOOP_HOME_DIR_FAILURE_CAUSE != null) {
             throw fileNotFoundException(
@@ -182,13 +308,33 @@ public abstract class Shell {
         return HADOOP_HOME_FILE;
     }
 
+    /**
+     *  Fully qualify the path to a binary that should be in a known hadoop
+     *  bin location. This is primarily useful for disambiguating call-outs
+     *  to executable sub-components of Hadoop to avoid clashes with other
+     *  executables that may be in the path.  Caveat:  this call doesn't
+     *  just format the path to the bin directory.  It also checks for file
+     *  existence of the composed path. The output of this call should be
+     *  cached by callers.
+     *
+     * @param executable executable
+     * @return executable file reference
+     * @throws FileNotFoundException if the path does not exist
+     */
     public static File getQualifiedBin(String executable)
             throws FileNotFoundException {
         // construct hadoop bin path to the specified executable
         return getQualifiedBinInner(getHadoopHomeDir(), executable);
     }
 
-
+    /**
+     * Inner logic of {@link #getQualifiedBin(String)}, accessible
+     * for tests.
+     * @param hadoopHomeDir home directory (assumed to be valid)
+     * @param executable executable
+     * @return path to the binary
+     * @throws FileNotFoundException if the executable was not found/valid
+     */
     static File getQualifiedBinInner(File hadoopHomeDir, String executable)
             throws FileNotFoundException {
         String binDirText = "Hadoop bin directory ";
@@ -223,12 +369,22 @@ public abstract class Shell {
     @Deprecated
     public static final String WINUTILS;
 
+    /** Canonical path to winutils, private to Shell. */
     private static final String WINUTILS_PATH;
 
+    /** file reference to winutils. */
     private static final File WINUTILS_FILE;
 
+    /** the exception raised on a failure to init the WINUTILS fields. */
     private static final IOException WINUTILS_FAILURE;
 
+    /*
+     * Static WINUTILS_* field initializer.
+     * On non-Windows systems sets the paths to null, and
+     * adds a specific exception to the failure cause, so
+     * that on any attempt to resolve the paths will raise
+     * a meaningful exception.
+     */
     static {
         IOException ioe = null;
         String path = null;
@@ -260,6 +416,12 @@ public abstract class Shell {
         WINUTILS_FAILURE = ioe;
     }
 
+    /**
+     * Get a file reference to winutils.
+     * Always raises an exception if there isn't one
+     * @return the file instance referring to the winutils bin.
+     * @throws FileNotFoundException on any failure to locate that file.
+     */
     public static File getWinUtilsFile() throws FileNotFoundException {
         if (WINUTILS_FAILURE == null) {
             return WINUTILS_FILE;
@@ -270,6 +432,10 @@ public abstract class Shell {
         }
     }
 
+    /**
+     * Look for <code>setsid</code>.
+     * @return true if <code>setsid</code> was present
+     */
     private static boolean isSetsidSupported() {
         if (Shell.WINDOWS) {
             return false;
@@ -284,7 +450,7 @@ public abstract class Shell {
             LOG.debug("setsid is not available on this machine. So not using it.");
             setsidSupported = false;
         } catch (SecurityException se) {
-            LOG.debug("setsid is not allowed to run by the JVM "+
+            LOG.debug("setsid is not allowed to run by the JVM " +
                     "security manager. So not using it.");
             setsidSupported = false;
         } catch (Error err) {
@@ -297,7 +463,7 @@ public abstract class Shell {
                 LOG.info("Avoiding JDK-8047340 on BSD-based systems.", err);
                 setsidSupported = false;
             }
-        }  finally { // handle the exit code
+        } finally { // handle the exit code
             if (LOG.isDebugEnabled()) {
                 LOG.debug("setsid exited with exit code "
                         + (shexec != null ? shexec.getExitCode() : "(null executor)"));
@@ -306,6 +472,7 @@ public abstract class Shell {
         return setsidSupported;
     }
 
+    /** Token separator regex used to parse Shell tool outputs. */
     public static final String TOKEN_SEPARATOR_REGEX
             = WINDOWS ? "[|\n\r]" : "[ \t\n\r\f]";
 
@@ -317,35 +484,77 @@ public abstract class Shell {
     private Process process; // sub process used to execute the command
     private int exitCode;
     private Thread waitingThread;
+
+    /** Flag to indicate whether or not the script has finished executing. */
     private final AtomicBoolean completed = new AtomicBoolean(false);
+
+    /**
+     * Create an instance with no minimum interval between runs; stderr is
+     * not merged with stdout.
+     */
     protected Shell() {
         this(0L);
     }
 
+    /**
+     * Create an instance with a minimum interval between executions; stderr is
+     * not merged with stdout.
+     * @param interval interval in milliseconds between command executions.
+     */
     protected Shell(long interval) {
         this(interval, false);
     }
 
+    /**
+     * Create a shell instance which can be re-executed when the {@link #run()}
+     * method is invoked with a given elapsed time between calls.
+     *
+     * @param interval the minimum duration in milliseconds to wait before
+     *        re-executing the command. If set to 0, there is no minimum.
+     * @param redirectErrorStream should the error stream be merged with
+     *        the normal output stream?
+     */
     protected Shell(long interval, boolean redirectErrorStream) {
         this.interval = interval;
         this.lastTime = (interval < 0) ? 0 : -interval;
         this.redirectErrorStream = redirectErrorStream;
     }
 
+    /**
+     * Set the environment for the command.
+     * @param env Mapping of environment variables
+     */
     protected void setEnvironment(Map<String, String> env) {
         this.environment = env;
     }
 
+    /**
+     * Set the working directory.
+     * @param dir The directory where the command will be executed
+     */
     protected void setWorkingDirectory(File dir) {
         this.dir = dir;
     }
 
+    /**
+     * number of nano seconds in 1 millisecond
+     */
     private static final long NANOSECONDS_PER_MILLISECOND = 1000000;
 
+    /**
+     * Current time from some arbitrary time base in the past, counting in
+     * milliseconds, and not affected by settimeofday or similar system clock
+     * changes.  This is appropriate to use when computing how much longer to
+     * wait for an interval to expire.
+     * This function can return a negative value and it must be handled correctly
+     * by callers. See the documentation of System#nanoTime for caveats.
+     * @return a monotonic clock that counts in milliseconds.
+     */
     public static long monotonicNow() {
         return System.nanoTime() / NANOSECONDS_PER_MILLISECOND;
     }
 
+    /** Check to see if a command needs to be executed and execute if needed. */
     protected void run() throws IOException {
         if (lastTime + interval > monotonicNow()) {
             return;
@@ -357,6 +566,7 @@ public abstract class Shell {
         runCommand();
     }
 
+    /** Run the command. */
     private void runCommand() throws IOException {
         ProcessBuilder builder = new ProcessBuilder(getExecString());
         Timer timeOutTimer = null;
@@ -418,12 +628,12 @@ public abstract class Shell {
             public void run() {
                 try {
                     String line = errReader.readLine();
-                    while((line != null) && !isInterrupted()) {
+                    while ((line != null) && !isInterrupted()) {
                         errMsg.append(line)
                                 .append(System.getProperty("line.separator"));
                         line = errReader.readLine();
                     }
-                } catch(IOException ioe) {
+                } catch (IOException ioe) {
                     // Its normal to observe a "Stream closed" I/O error on
                     // command timeouts destroying the underlying process
                     // so only log a WARN if the command didn't time out
@@ -449,11 +659,11 @@ public abstract class Shell {
             parseExecResult(inReader); // parse the output
             // clear the input stream buffer
             String line = inReader.readLine();
-            while(line != null) {
+            while (line != null) {
                 line = inReader.readLine();
             }
             // wait for the process to finish and check the exit code
-            exitCode  = process.waitFor();
+            exitCode = process.waitFor();
             // make sure that the error thread exits
             joinThread(errThread);
             completed.set(true);
@@ -512,7 +722,11 @@ public abstract class Shell {
     protected abstract void parseExecResult(BufferedReader lines)
             throws IOException;
 
-
+    /**
+     * Get an environment variable.
+     * @param env the environment var
+     * @return the value or null if it was unset.
+     */
     public String getEnvironment(String env) {
         return environment.get(env);
     }
@@ -531,10 +745,17 @@ public abstract class Shell {
         return exitCode;
     }
 
+    /** get the thread that is waiting on this instance of <code>Shell</code>.
+     * @return the thread that ran runCommand() that spawned this shell
+     * or null if no thread is waiting for this shell to complete
+     */
     public Thread getWaitingThread() {
         return waitingThread;
     }
 
+    /**
+     * This is an IOException with exit code added.
+     */
     public static class ExitCodeException extends IOException {
         private final int exitCode;
 
@@ -558,7 +779,6 @@ public abstract class Shell {
         }
     }
 
-
     public interface CommandExecutor {
 
         void execute() throws IOException;
@@ -571,6 +791,14 @@ public abstract class Shell {
 
     }
 
+    /**
+     * A simple shell command executor.
+     *
+     * <code>ShellCommandExecutor</code>should be used in cases where the output
+     * of the command needs no explicit parsing and where the command, working
+     * directory and the environment remains unchanged. The output of the command
+     * is stored as-is and is expected to be small.
+     */
     public static class ShellCommandExecutor extends Shell
             implements CommandExecutor {
 
@@ -588,12 +816,12 @@ public abstract class Shell {
 
         public ShellCommandExecutor(String[] execString, File dir,
                                     Map<String, String> env) {
-            this(execString, dir, env , 0L);
+            this(execString, dir, env, 0L);
         }
 
         public ShellCommandExecutor(String[] execString, File dir,
                                     Map<String, String> env, long timeout) {
-            this(execString, dir, env , timeout, true);
+            this(execString, dir, env, timeout, true);
         }
 
         /**
@@ -658,7 +886,7 @@ public abstract class Shell {
             output = new StringBuffer();
             char[] buf = new char[512];
             int nRead;
-            while ( (nRead = lines.read(buf, 0, buf.length)) > 0 ) {
+            while ((nRead = lines.read(buf, 0, buf.length)) > 0) {
                 output.append(buf, 0, nRead);
             }
         }
@@ -695,15 +923,34 @@ public abstract class Shell {
         }
     }
 
+    /**
+     * To check if the passed script to shell command executor timed out or
+     * not.
+     *
+     * @return if the script timed out.
+     */
     public boolean isTimedOut() {
         return timedOut.get();
     }
 
-
+    /**
+     * Declare that the command has timed out.
+     *
+     */
     private void setTimedOut() {
         this.timedOut.set(true);
     }
 
+    /**
+     * Static method to execute a shell command.
+     * Covers most of the simple cases without requiring the user to implement
+     * the <code>Shell</code> interface.
+     * @param env the map of environment key=value
+     * @param cmd shell command to execute.
+     * @param timeout time in milliseconds after which script should be marked timeout
+     * @return the output of the executed command.
+     * @throws IOException on any problem.
+     */
     public static String execCommand(Map<String, String> env, String[] cmd,
                                      long timeout) throws IOException {
         ShellCommandExecutor exec = new ShellCommandExecutor(cmd, null, env,
@@ -713,6 +960,9 @@ public abstract class Shell {
     }
 
 
+    /**
+     * Timer which is used to timeout scripts spawned off by shell.
+     */
     private static class ShellTimeoutTimerTask extends TimerTask {
 
         private final Shell shell;
