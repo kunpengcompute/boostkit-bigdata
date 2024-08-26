@@ -429,7 +429,7 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] {
         plan.condition,
         left,
         right)
-    case plan: ShuffledHashJoinExec if enableShuffledHashJoin && enableDedupLeftSemiJoin => {
+    case plan: ShuffledHashJoinExec if enableShuffledHashJoin && enableDedupLeftSemiJoin && !SQLConf.get.adaptiveExecutionEnabled => {
       plan.joinType match {
         case LeftSemi => {
           if (plan.condition.isEmpty && plan.right.output.size >= dedupLeftSemiJoinThreshold) {
@@ -763,6 +763,7 @@ class ColumnarPlugin extends (SparkSessionExtensions => Unit) with Logging {
     extensions.injectOptimizerRule(_ => HeuristicJoinReorder)
     extensions.injectOptimizerRule(_ => MergeSubqueryFilters)
     extensions.injectQueryStagePrepRule(session => FallbackBroadcastExchange(session))
+    extensions.injectQueryStagePrepRule(session => DedupLeftSemiJoinAQE(session))
     extensions.injectQueryStagePrepRule(_ => TopNPushDownForWindow)
   }
 }
