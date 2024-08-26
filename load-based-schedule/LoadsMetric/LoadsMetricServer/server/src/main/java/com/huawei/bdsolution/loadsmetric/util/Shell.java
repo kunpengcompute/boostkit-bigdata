@@ -20,9 +20,18 @@ package com.huawei.bdsolution.loadsmetric.util;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.InterruptedIOException;
 import java.nio.charset.Charset;
-import java.util.*;
+import java.util.Collections;
+import java.util.Map;
+import java.util.Timer;
+import java.util.TimerTask;
+import java.util.WeakHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -181,6 +190,13 @@ public abstract class Shell {
         if (home == null) {
             home = System.getenv(ENV_HADOOP_HOME);
         }
+
+        // Ensure home is not null or empty
+        if (home == null || home.trim().isEmpty()) {
+            // Provide a default value or throw an exception
+            throw new IllegalStateException("Neither the JVM property 'hadoop.home.dir' nor the environment variable 'HADOOP_HOME' is set.");
+        }
+
         return checkHadoopHomeInner(home);
     }
 
@@ -188,16 +204,16 @@ public abstract class Shell {
     A set of exception strings used to construct error messages;
     these are referred to in tests
     */
-    static final String E_DOES_NOT_EXIST = "does not exist";
+    static final String E_DOES_NOT_EXIST = "does not exist.";
     static final String E_IS_RELATIVE = "is not an absolute path.";
     static final String E_NOT_DIRECTORY = "is not a directory.";
-    static final String E_NO_EXECUTABLE = "Could not locate Hadoop executable";
-    static final String E_NOT_EXECUTABLE_FILE = "Not an executable file";
+    static final String E_NO_EXECUTABLE = "Could not locate Hadoop executable.";
+    static final String E_NOT_EXECUTABLE_FILE = "Not an executable file.";
     static final String E_HADOOP_PROPS_UNSET = ENV_HADOOP_HOME + " and "
             + SYSPROP_HADOOP_HOME_DIR + " are unset.";
     static final String E_HADOOP_PROPS_EMPTY = ENV_HADOOP_HOME + " or "
-            + SYSPROP_HADOOP_HOME_DIR + " set to an empty string";
-    static final String E_NOT_A_WINDOWS_SYSTEM = "Not a Windows system";
+            + SYSPROP_HADOOP_HOME_DIR + " set to an empty string.";
+    static final String E_NOT_A_WINDOWS_SYSTEM = "Not a Windows system.";
 
     /**
      *  Validate the accessibility of the Hadoop home directory.
@@ -398,8 +414,6 @@ public abstract class Shell {
                 ioe = null;
             } catch (IOException e) {
                 LOG.warn("Did not find {}: {}", WINUTILS_EXE, e);
-                // stack trace comes at debug level
-                LOG.debug("Failed to find " + WINUTILS_EXE, e);
                 file = null;
                 path = null;
                 ioe = e;
