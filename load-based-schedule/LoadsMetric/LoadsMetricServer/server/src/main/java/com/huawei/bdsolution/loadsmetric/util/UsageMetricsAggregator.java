@@ -15,6 +15,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 @Component
+@PropertySource("${SPRING_CONFIG_LOCATION}")
 public class UsageMetricsAggregator {
 
     @Value("${client.heartbeat.interval:1000}")

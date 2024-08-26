@@ -15,6 +15,7 @@ import java.util.*;
 import java.util.function.Function;
 
 @Component
+@PropertySource("${SPRING_CONFIG_LOCATION}")
 public class MultiLoadResourceUsageSortPolicy {
 
     @Autowired
