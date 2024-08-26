@@ -14,7 +14,7 @@ public class LoadIndicatorController {
     UsageMetricsService usageMetricsService;
 
     @GetMapping("/get/byCurrTimeForPrometheus")
-    public String getUsageMetricsForPrometheus(){
+    public String getUsageMetricsForPrometheus() {
         return usageMetricsService.getUsageMetricsForPrometheus();
     }
 

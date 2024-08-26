@@ -7,16 +7,16 @@ public class FixedSizeRingBuffer<T> {
     private int tail = 0;
     private int count = 0;
 
-    public FixedSizeRingBuffer(int size){
-        if (size <= 0){
+    public FixedSizeRingBuffer(int size) {
+        if (size <= 0) {
             throw new IllegalArgumentException("Capacity must be greater than 0");
         }
         this.capacity = size;
         this.buffer = new Object[size];
     }
 
-    public synchronized void add(T item){
-        if (count == capacity){
+    public synchronized void add(T item) {
+        if (count == capacity) {
             head = (head + 1) % capacity;
             count--;
         }
@@ -25,12 +25,12 @@ public class FixedSizeRingBuffer<T> {
         count++;
     }
 
-    public synchronized int getSize(){
+    public synchronized int getSize() {
         return count;
     }
 
-    public synchronized T get(int index){
-        if (index < 0 || index >= count){
+    public synchronized T get(int index) {
+        if (index < 0 || index >= count) {
             throw new IndexOutOfBoundsException();
         }
         return (T) buffer[(head + index) % capacity];

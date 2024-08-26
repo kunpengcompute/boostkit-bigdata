@@ -27,17 +27,17 @@ public class UsageController {
     NodeExporterService nodeExporterService;
 
     @PostMapping("/addNodeLogicalResource")
-    public void receiveNodeLogicalResource(@RequestBody NodeLogicalResource nodeLogicalResource){
+    public void receiveNodeLogicalResource(@RequestBody NodeLogicalResource nodeLogicalResource) {
         loadsRecordsCacheService.addNodeLogicalResource(nodeLogicalResource);
     }
 
     @GetMapping("/allNodes")
-    public List<String> findAllNodes(){
+    public List<String> findAllNodes() {
         return new ArrayList<>(nodeHeartbeatService.getAllNodeHosts());
     }
 
     @GetMapping("/get/byCurrTimeForPrometheus")
-    public String getRecordsByCurrTimeForPrometheus(){
+    public String getRecordsByCurrTimeForPrometheus() {
         return loadsRecordsCacheService.getRecordsByCurrTimeForPrometheus();
     }
 }

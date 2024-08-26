@@ -22,9 +22,13 @@ public class NodeLogicalResource implements Comparable<NodeLogicalResource>{
 
     private int vcoresUsageLevel;
 
-    public void calcuMemAndVcoresUsageLevel(int memUsageLevels,int vcoresUsageLevels){
-        memUsageLevel = (int) (allocatedMem * memUsageLevels / totalMem);
-        vcoresUsageLevel = (int) (allocatedVcores * vcoresUsageLevels /totalVcores);
+    public void calcuMemAndVcoresUsageLevel(int memUsageLevels, int vcoresUsageLevels) {
+        if (totalMem != 0) {
+            memUsageLevel = (int) (allocatedMem * memUsageLevels / totalMem);
+        }
+        if (totalVcores != 0) {
+            vcoresUsageLevel = (int) (allocatedVcores * vcoresUsageLevels / totalVcores);
+        }
     }
 
     public String getHostName() {
@@ -86,11 +90,11 @@ public class NodeLogicalResource implements Comparable<NodeLogicalResource>{
 
     @Override
     public int compareTo(NodeLogicalResource other) {
-        if (other == null){
+        if (other == null) {
             return 1;
         }
         int cmp = getMemUsageLevel() - other.getMemUsageLevel();
-        if (cmp == 0){
+        if (cmp == 0) {
             cmp = getVcoresUsageLevel() - other.getVcoresUsageLevel();
         }
         return cmp;

@@ -18,9 +18,9 @@ public class SortReport {
     @JsonProperty("expiration_time")
     private long expirationTime;
 
-    public SortReport(List<String> sortedHosts, List<String> overLoadHosts, Instant expirationTimestamp){
-        this.sortedNodeHosts = String.join(",",sortedHosts);
-        this.overloadNodeHosts = String.join(",",overLoadHosts);
+    public SortReport(List<String> sortedHosts, List<String> overLoadHosts, Instant expirationTimestamp) {
+        this.sortedNodeHosts = String.join(",", sortedHosts);
+        this.overloadNodeHosts = String.join(",", overLoadHosts);
         this.expirationTime = expirationTimestamp.toEpochMilli();
     }
 }

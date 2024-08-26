@@ -7,6 +7,7 @@ import com.huawei.bdsolution.loadsmetric.entity.LoadsRecords;
 import java.util.Map;
 
 public interface LoadsRecordsCacheService {
+
     void addLoadsRecordsCache(LoadsRecords loadsRecords);
 
     Map<String, FixedSizeRingBuffer<LoadsRecords>> getLoadsRecordsCacheMap();

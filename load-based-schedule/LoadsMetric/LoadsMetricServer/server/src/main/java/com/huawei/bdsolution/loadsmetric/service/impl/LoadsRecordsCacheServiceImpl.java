@@ -35,23 +35,39 @@ public class LoadsRecordsCacheServiceImpl implements LoadsRecordsCacheService {
 
     private Map<String, NodeLogicalResource> nodeLogicalResourceMap = new ConcurrentHashMap<>();
 
+    /**
+     * add loadsRecords to loadsRecordsCacheMap
+     * @param loadsRecords
+     */
     @Override
     public void addLoadsRecordsCache(LoadsRecords loadsRecords) {
         String hostName = loadsRecords.getHostName();
         loadsRecordsCacheMap.get(hostName).add(loadsRecords);
     }
 
+    /**
+     * return loadsRecordsCacheMap
+     * @return loadsRecordsCacheMap
+     */
     @Override
     public Map<String, FixedSizeRingBuffer<LoadsRecords>> getLoadsRecordsCacheMap() {
         return loadsRecordsCacheMap;
     }
 
+    /**
+     * calcuMemAndVcoresUsageLevel and add to  nodeLogicalResourceMap
+     * @param nodeLogicalResource
+     */
     @Override
     public void addNodeLogicalResource(NodeLogicalResource nodeLogicalResource) {
         nodeLogicalResource.calcuMemAndVcoresUsageLevel(memUsageLevels, vcoresUsageLevels);
         nodeLogicalResourceMap.put(nodeLogicalResource.getHostName(), nodeLogicalResource);
     }
 
+    /**
+     * return nodeLogicalResourceMap
+     * @return nodeLogicalResourceMap
+     */
     @Override
     public Map<String, NodeLogicalResource> getNodeLogicalResourceMap() {
         return nodeLogicalResourceMap;

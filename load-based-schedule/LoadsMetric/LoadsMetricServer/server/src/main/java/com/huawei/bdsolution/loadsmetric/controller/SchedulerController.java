@@ -21,7 +21,7 @@ public class SchedulerController {
     LoadsRecordsCacheService loadsRecordsCacheService;
 
     @GetMapping("/sortWithLogical")
-    public SortReport findAverageResourceUsageForLastSecondsWithLogical(){
+    public SortReport findAverageResourceUsageForLastSecondsWithLogical() {
         return sortReportService.sortNodesByUsagesWithLogicalFromCache(
                 loadsRecordsCacheService.getLoadsRecordsCacheMap(),
                 loadsRecordsCacheService.getNodeLogicalResourceMap());

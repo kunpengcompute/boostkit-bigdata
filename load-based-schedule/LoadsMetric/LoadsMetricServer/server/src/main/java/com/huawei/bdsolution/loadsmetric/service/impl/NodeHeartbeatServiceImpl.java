@@ -26,6 +26,7 @@ import java.util.stream.Collectors;
 
 @Service
 public class NodeHeartbeatServiceImpl implements NodeHeartbeatService {
+
     private static final Logger LOG = LoggerFactory.getLogger(NodeHeartbeatServiceImpl.class);
 
     private final Set<String> allNodeHosts = new HashSet<>();
@@ -33,7 +34,7 @@ public class NodeHeartbeatServiceImpl implements NodeHeartbeatService {
     @Value("${client.lost.time:2000}")
     private long nodeLostTime;
 
-    private final Map<String,Long> allNodeHeartbeatTimes = new ConcurrentHashMap<>();
+    private final Map<String, Long> allNodeHeartbeatTimes = new ConcurrentHashMap<>();
 
     private static final ThreadLocal<SimpleDateFormat> dateFormatThreadLocal = ThreadLocal.withInitial(
             () -> new SimpleDateFormat("yyyy-MM-dd HH:mm:ss"));
@@ -44,10 +45,10 @@ public class NodeHeartbeatServiceImpl implements NodeHeartbeatService {
     @PostConstruct
     public void initAllNodeHosts() {
         try(InputStream inputStream = Files.newInputStream(Paths.get(System.getProperty("workersConfig")));
-            BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))){
+            BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
             allNodeHosts.addAll(reader.lines().collect(Collectors.toList()));
-            LOG.info("allNodeHosts:{}",allNodeHosts);
-        }catch (IOException e){
+            LOG.info("allNodeHosts:{}", allNodeHosts);
+        }catch (IOException e) {
             throw new RuntimeException("load workersConfig failed for",e);
         }
     }
@@ -60,8 +61,8 @@ public class NodeHeartbeatServiceImpl implements NodeHeartbeatService {
     public void updateNodeHeartbeatTime(LoadsRecords loadsRecords) {
         try{
             long time = dateFormatThreadLocal.get().parse(loadsRecords.getTimeStamp()).getTime();
-            allNodeHeartbeatTimes.put(loadsRecords.getHostName(),time);
-        }catch (ParseException e){
+            allNodeHeartbeatTimes.put(loadsRecords.getHostName(), time);
+        }catch (ParseException e) {
             throw new RuntimeException(e);
         }
     }
