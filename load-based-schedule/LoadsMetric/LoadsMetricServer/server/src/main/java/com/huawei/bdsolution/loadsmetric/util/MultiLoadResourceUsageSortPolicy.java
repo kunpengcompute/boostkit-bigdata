@@ -15,7 +15,6 @@ import java.util.*;
 import java.util.function.Function;
 
 @Component
-//@PropertySource("${SPRING_CONFIG_LOCATION}")
 public class MultiLoadResourceUsageSortPolicy {
 
     @Autowired
@@ -50,19 +49,6 @@ public class MultiLoadResourceUsageSortPolicy {
 
     @Value("${overload.filter.able:false}")
     private boolean isOverLoadAble;
-
-
-    //TODO 未调用函数 可删除
-
-    /**
-     * Sort nodes by weightedUsage
-     *
-     * @param loadsRecordAverageList
-     * @return LoadReport, contain sortedNodeHosts, overloadNodeHosts and expirationTime
-     */
-    public SortReport sortNodes(List<LoadsRecordAverage> loadsRecordAverageList) {
-        return sortNodes(loadsRecordAverageList, new LoadsRecordAverageComparator());
-    }
 
     /**
      * Sort nodes by weightedUsage
@@ -133,7 +119,6 @@ public class MultiLoadResourceUsageSortPolicy {
      * @param averageList
      * @return
      */
-    // 计算权重，其中cpu 0.2,mem 0.2,diskIo 0.3, netIo 0.3，并根据权重进行排序，返回排序后的结果列表
     public List<LoadsRecordAverage> calculateWeight(List<LoadsRecordAverage> averageList) {
         if (averageList.isEmpty()) {
             return averageList;
