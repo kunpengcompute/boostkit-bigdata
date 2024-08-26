@@ -12,7 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @RestController
-@RequestMapping("/loadIndicator")
+@RequestMapping("/loadStatus")
 @CrossOrigin
 @PropertySource("${SPRING_CONFIG_LOCATION}")
 public class UsageController {
