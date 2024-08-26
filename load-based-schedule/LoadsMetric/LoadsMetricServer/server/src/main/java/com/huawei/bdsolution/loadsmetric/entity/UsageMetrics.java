@@ -19,10 +19,10 @@ public class UsageMetrics {
     private Long id;
 
     @Column(name = "cpu_avg")
-    private String cpuAvg;
+    private Float cpuAvg;
 
     @Column(name = "cpu_var")
-    private String cpuVar;
+    private Float cpuVar;
 
     @Column(name = "mem_avg")
     private Float memAvg;
@@ -48,7 +48,7 @@ public class UsageMetrics {
     public UsageMetrics() {
     }
 
-    public UsageMetrics(String cpuAvg, String cpuVar,
+    public UsageMetrics(Float cpuAvg, Float cpuVar,
                         Float memAvg, Float memVar,
                         Float diskIoAvg, Float diskIoVar,
                         Float netIoAvg, Float netIoVar,
