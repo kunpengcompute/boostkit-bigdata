@@ -23,6 +23,8 @@ import com.huawei.boostkit.hive.expression.ExpressionUtils;
 import com.huawei.boostkit.hive.expression.FunctionExpression;
 import com.huawei.boostkit.hive.expression.TypeUtils;
 
+import org.apache.hadoop.hive.common.type.HiveDecimal;
+import org.apache.hadoop.hive.ql.plan.ExprNodeConstantDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDFBridge;
@@ -48,11 +50,18 @@ public class PowerExpressionProcessor implements ExpressionProcessor {
             } else {
                 PrimitiveTypeInfo typeInfo = new PrimitiveTypeInfo();
                 typeInfo.setTypeName("double");
-                GenericUDFBridge genericUDFBridge = new GenericUDFBridge("UDFToDouble", false, "org.apache.hadoop.hive.ql.udf.UDFToDouble");
-                List<ExprNodeDesc> exprNodeDescList = new ArrayList<>();
-                exprNodeDescList.add(child);
-                ExprNodeGenericFuncDesc child2 = new ExprNodeGenericFuncDesc(typeInfo, genericUDFBridge, exprNodeDescList);
-                functionExpression.add(ExpressionUtils.build(child2, inspector));
+                if (child instanceof ExprNodeConstantDesc && ((ExprNodeConstantDesc) child).getValue() instanceof HiveDecimal) {
+                    HiveDecimal val = (HiveDecimal) ((ExprNodeConstantDesc) child).getValue();
+                    ((ExprNodeConstantDesc) child).setValue(val.doubleValue());
+                    child.setTypeInfo(typeInfo);
+                    functionExpression.add(ExpressionUtils.createNode(child, inspector));
+                } else {
+                    GenericUDFBridge genericUDFBridge = new GenericUDFBridge("UDFToDouble", false, "org.apache.hadoop.hive.ql.udf.UDFToDouble");
+                    List<ExprNodeDesc> exprNodeDescList = new ArrayList<>();
+                    exprNodeDescList.add(child);
+                    ExprNodeGenericFuncDesc child2 = new ExprNodeGenericFuncDesc(typeInfo, genericUDFBridge, exprNodeDescList);
+                    functionExpression.add(ExpressionUtils.build(child2, inspector));
+                }
             }
         }
         return functionExpression;
