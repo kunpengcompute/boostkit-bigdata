@@ -1,5 +1,6 @@
 package com.huawei.bdsolution.loadsmetric.service.impl;
 
+import com.huawei.bdsolution.loadsmetric.dto.FixedSizeRingBuffer;
 import com.huawei.bdsolution.loadsmetric.entity.LoadsRecords;
 import com.huawei.bdsolution.loadsmetric.service.LoadsRecordsCacheService;
 import com.huawei.bdsolution.loadsmetric.service.NodeExporterService;
@@ -46,6 +47,9 @@ public class NodeExporterServiceImpl implements NodeExporterService {
     @Value("${node-exporter.pull.port}")
     private String nodeExporterPullPort;
 
+    @Value("5")
+    private int windowSize;
+
     private final String NODE_EXPORTER_PULL_PATH = "/metrics?" +
             "collect[]=cpu&collect[]=meminfo&collect[]=diskstats&collect[]=filesystem" +
             "&collect[]=netclass&collect[]=netdev";
@@ -90,18 +94,21 @@ public class NodeExporterServiceImpl implements NodeExporterService {
         if (!nodeExporterPullEnable) {
             return;
         }
-        List<Future<LoadsRecords>> futures = new ArrayList<>();
-        for (NodeExporterPullThread thread : nodeExporterPullThreads) {
-            futures.add(executorService.submit(thread));
-        }
 
-        for (Future<LoadsRecords> future : futures) {
+        for (NodeExporterPullThread thread : nodeExporterPullThreads) {
+            Future<LoadsRecords> future = executorService.submit(thread);
             try {
                 LoadsRecords loadsRecords = future.get();
+                if (!loadsRecordsCacheService.getLoadsRecordsCacheMap().containsKey(loadsRecords.getHostName())){
+                    loadsRecordsCacheService.getLoadsRecordsCacheMap()
+                            .put(loadsRecords.getHostName(), new FixedSizeRingBuffer<>(windowSize));
+                }
                 loadsRecordsCacheService.addLoadsRecordsCache(loadsRecords);
                 nodeHeartbeatService.updateNodeHeartbeatTime(loadsRecords);
+
             } catch (Exception e) {
                 LOG.error("future get failed for :", e);
+                loadsRecordsCacheService.getLoadsRecordsCacheMap().remove(thread.getHostName());
             }
         }
     }

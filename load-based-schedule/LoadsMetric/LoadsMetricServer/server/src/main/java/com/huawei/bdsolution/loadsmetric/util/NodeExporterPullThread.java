@@ -1,9 +1,11 @@
 package com.huawei.bdsolution.loadsmetric.util;
 
 import com.huawei.bdsolution.loadsmetric.entity.LoadsRecords;
+import lombok.Data;
 
 import java.util.concurrent.Callable;
 
+@Data
 public class NodeExporterPullThread implements Callable<LoadsRecords> {
     private String nodeExporterUrl;
     private String hostName;
