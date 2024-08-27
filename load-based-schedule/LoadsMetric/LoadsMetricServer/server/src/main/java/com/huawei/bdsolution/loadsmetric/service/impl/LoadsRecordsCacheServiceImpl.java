@@ -31,7 +31,7 @@ public class LoadsRecordsCacheServiceImpl implements LoadsRecordsCacheService {
     @Value("${logical-resource-usage.levels.vcores:10}")
     private int vcoresUsageLevels;
 
-    private Map<String, FixedSizeRingBuffer<LoadsRecords>> loadsRecordsCacheMap = new HashMap<>();
+    private Map<String, FixedSizeRingBuffer<LoadsRecords>> loadsRecordsCacheMap = new ConcurrentHashMap<>();
 
     private Map<String, NodeLogicalResource> nodeLogicalResourceMap = new ConcurrentHashMap<>();
 
