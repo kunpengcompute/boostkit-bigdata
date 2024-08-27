@@ -112,7 +112,7 @@ class OckColumnarShuffleWriter[K, V](
         jniWritter.split(nativeSplitter, vb.getNativeVectorBatch)
         vb.close()
         dep.numInputRows.add(cb.numRows)
-        writeMetrics.incRecordsWritten(1)
+        writeMetrics.incRecordsWritten(cb.numRows)
         markTime = System.currentTimeMillis()
         splitTime += markTime - endTime
       }

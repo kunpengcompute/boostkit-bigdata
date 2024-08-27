@@ -125,7 +125,7 @@ class OckColumnarRssShuffleWriter[K, V](
         vb.close()
         splitTime += System.currentTimeMillis() - endTime
         dep.numInputRows.add(cb.numRows)
-        writeMetrics.incRecordsWritten(1)
+        writeMetrics.incRecordsWritten(cb.numRows)
       }
     }
     splitResult = jniWriter.stop(nativeSplitter)
