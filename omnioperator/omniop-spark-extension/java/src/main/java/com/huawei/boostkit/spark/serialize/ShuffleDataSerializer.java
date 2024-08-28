@@ -23,14 +23,7 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import com.huawei.boostkit.spark.jni.NativeLoader;
 import nova.hetu.omniruntime.type.*;
 import nova.hetu.omniruntime.utils.OmniRuntimeException;
-import nova.hetu.omniruntime.vector.BooleanVec;
-import nova.hetu.omniruntime.vector.Decimal128Vec;
-import nova.hetu.omniruntime.vector.DoubleVec;
-import nova.hetu.omniruntime.vector.IntVec;
-import nova.hetu.omniruntime.vector.LongVec;
-import nova.hetu.omniruntime.vector.ShortVec;
-import nova.hetu.omniruntime.vector.VarcharVec;
-import nova.hetu.omniruntime.vector.Vec;
+import nova.hetu.omniruntime.vector.*;
 import nova.hetu.omniruntime.vector.serialize.OmniRowDeserializer;
 
 import org.apache.spark.sql.execution.vectorized.OmniColumnVector;
@@ -93,6 +86,14 @@ public class ShuffleDataSerializer {
                 VecData.ProtoRow protoRow = rowBatch.getRows(rowIdx);
                 byte[] array = protoRow.getData().toByteArray();
                 deserializer.parse(array, omniVecs, rowIdx);
+            }
+
+            // update initial varchar vector because it's capacity might have been expanded.
+            for (int i = 0; i < vecCount; i++) {
+                if (omniTypes[i] == VarcharDataType.VARCHAR.getId().toValue()) {
+                    Vec varcharVec = VecFactory.create(omniVecs[i], VecEncoding.OMNI_VEC_ENCODING_FLAT, VarcharDataType.VARCHAR);
+                    columnarVecs[i].setVec(varcharVec);
+                }
             }
 
             deserializer.close();
@@ -217,7 +218,7 @@ public class ShuffleDataSerializer {
                 case VEC_TYPE_CHAR:
                     sparkType = DataTypes.StringType;
                     omniTypes[i] = VarcharDataType.VARCHAR.getId().toValue();
-                    omniVec = new VarcharVec(rowCount);
+                    omniVec = new VarcharVec(rowCount); // it's capacity may be expanded.
                     break;
                 case VEC_TYPE_DECIMAL128:
                     sparkType = DataTypes.createDecimalType(protoTypeId.getPrecision(), protoTypeId.getScale());
