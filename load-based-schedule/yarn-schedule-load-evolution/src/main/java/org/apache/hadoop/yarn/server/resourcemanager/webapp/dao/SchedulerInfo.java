@@ -28,12 +28,13 @@ import org.apache.hadoop.yarn.proto.YarnServiceProtos.SchedulerResourceTypes;
 import org.apache.hadoop.yarn.server.resourcemanager.ResourceManager;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacityScheduler;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.LoadBasedCapacityScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.FairScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fifo.FifoScheduler;
 
 @XmlRootElement
 @XmlSeeAlso({ CapacitySchedulerInfo.class, FairSchedulerInfo.class,
-  FifoSchedulerInfo.class })
+        FifoSchedulerInfo.class })
 public class SchedulerInfo {
   protected String schedulerName;
   protected ResourceInfo minAllocResource;
@@ -48,7 +49,9 @@ public class SchedulerInfo {
   public SchedulerInfo(final ResourceManager rm) {
     ResourceScheduler rs = rm.getResourceScheduler();
 
-    if (rs instanceof CapacityScheduler) {
+    if (rs instanceof LoadBasedCapacityScheduler) {
+      this.schedulerName = "LoadBasedCapacity Scheduler";
+    }else if (rs instanceof CapacityScheduler) {
       this.schedulerName = "Capacity Scheduler";
     } else if (rs instanceof FairScheduler) {
       this.schedulerName = "Fair Scheduler";
@@ -61,7 +64,7 @@ public class SchedulerInfo {
     this.maxAllocResource = new ResourceInfo(rs.getMaximumResourceCapability());
     this.schedulingResourceTypes = rs.getSchedulingResourceTypes();
     this.maximumClusterPriority =
-        rs.getMaxClusterLevelAppPriority().getPriority();
+            rs.getMaxClusterLevelAppPriority().getPriority();
   }
 
   public String getSchedulerType() {
