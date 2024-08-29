@@ -25,65 +25,78 @@ import nova.hetu.omniruntime.type.DataType;
 import nova.hetu.omniruntime.vector.*;
 
 import org.apache.orc.impl.writer.TimestampTreeWriter;
+import org.apache.spark.sql.catalyst.util.CharVarcharUtils;
 import org.apache.spark.sql.catalyst.util.RebaseDateTime;
-import org.apache.hadoop.hive.ql.io.sarg.ExpressionTree;
-import org.apache.hadoop.hive.ql.io.sarg.PredicateLeaf;
-import org.apache.orc.OrcFile.ReaderOptions;
-import org.apache.orc.Reader.Options;
+import org.apache.spark.sql.sources.And;
+import org.apache.spark.sql.sources.EqualTo;
+import org.apache.spark.sql.sources.Filter;
+import org.apache.spark.sql.sources.GreaterThan;
+import org.apache.spark.sql.sources.GreaterThanOrEqual;
+import org.apache.spark.sql.sources.In;
+import org.apache.spark.sql.sources.IsNotNull;
+import org.apache.spark.sql.sources.IsNull;
+import org.apache.spark.sql.sources.LessThan;
+import org.apache.spark.sql.sources.LessThanOrEqual;
+import org.apache.spark.sql.sources.Not;
+import org.apache.spark.sql.sources.Or;
+import org.apache.spark.sql.types.BooleanType;
+import org.apache.spark.sql.types.DateType;
+import org.apache.spark.sql.types.DecimalType;
+import org.apache.spark.sql.types.DoubleType;
+import org.apache.spark.sql.types.IntegerType;
+import org.apache.spark.sql.types.LongType;
+import org.apache.spark.sql.types.Metadata;
+import org.apache.spark.sql.types.ShortType;
+import org.apache.spark.sql.types.StringType;
+import org.apache.spark.sql.types.StructField;
+import org.apache.spark.sql.types.StructType;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.math.BigDecimal;
 import java.net.URI;
-import java.sql.Date;
-import java.sql.Timestamp;
+import java.time.LocalDate;
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.List;
+import java.util.Arrays;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.TimeZone;
 
 public class OrcColumnarBatchScanReader {
     private static final Logger LOGGER = LoggerFactory.getLogger(OrcColumnarBatchScanReader.class);
 
     private boolean nativeSupportTimestampRebase;
+    private static final Pattern CHAR_TYPE = Pattern.compile("char\\(\\s*(\\d+)\\s*\\)");
+
+    private static final int MAX_LEAF_THRESHOLD = 256;
+
     public long reader;
     public long recordReader;
     public long batchReader;
+
+    // All ORC fieldNames
+    public ArrayList<String> allFieldsNames;
+
+    // Indicate columns to read
     public int[] colsToGet;
-    public int realColsCnt;
 
-    public ArrayList<String> fildsNames;
+    // Actual columns to read
+    public ArrayList<String> includedColumns;
 
-    public ArrayList<String> colToInclu;
+    // max threshold for leaf node
+    private int leafIndex;
 
-    public String[] requiredfieldNames;
-
-    public int[] precisionArray;
-
-    public int[] scaleArray;
+    // spark required schema
+    private StructType requiredSchema;
 
     public OrcColumnarBatchJniReader jniReader;
     public OrcColumnarBatchScanReader() {
         jniReader = new OrcColumnarBatchJniReader();
-        fildsNames = new ArrayList<String>();
-    }
-
-    public JSONObject getSubJson(ExpressionTree node) {
-        JSONObject jsonObject = new JSONObject();
-        jsonObject.put("op", node.getOperator().ordinal());
-        if (node.getOperator().toString().equals("LEAF")) {
-            jsonObject.put("leaf", node.toString());
-            return jsonObject;
-        }
-        ArrayList<JSONObject> child = new ArrayList<JSONObject>();
-        for (ExpressionTree childNode : node.getChildren()) {
-            JSONObject rtnJson = getSubJson(childNode);
-            child.add(rtnJson);
-        }
-        jsonObject.put("child", child);
-        return jsonObject;
+        allFieldsNames = new ArrayList<String>();
     }
 
     public String padZeroForDecimals(String [] decimalStrArray, int decimalScale) {
@@ -95,97 +108,11 @@ public class OrcColumnarBatchScanReader {
         return String.format("%1$-" + decimalScale + "s", decimalVal).replace(' ', '0');
     }
 
-    public int getPrecision(String colname) {
-        for (int i = 0; i < requiredfieldNames.length; i++) {
-            if (colname.equals(requiredfieldNames[i])) {
-                return precisionArray[i];
-            }
-        }
-
-        return -1;
-    }
-
-    public int getScale(String colname) {
-        for (int i = 0; i < requiredfieldNames.length; i++) {
-            if (colname.equals(requiredfieldNames[i])) {
-                return scaleArray[i];
-            }
-        }
-
-        return -1;
-    }
-
-    public JSONObject getLeavesJson(List<PredicateLeaf> leaves) {
-        JSONObject jsonObjectList = new JSONObject();
-        for (int i = 0; i < leaves.size(); i++) {
-            PredicateLeaf pl = leaves.get(i);
-            JSONObject jsonObject = new JSONObject();
-            jsonObject.put("op", pl.getOperator().ordinal());
-            jsonObject.put("name", pl.getColumnName());
-            jsonObject.put("type", pl.getType().ordinal());
-            if (pl.getLiteral() != null) {
-                if (pl.getType() == PredicateLeaf.Type.DATE) {
-                    jsonObject.put("literal", ((int)Math.ceil(((Date)pl.getLiteral()).getTime()* 1.0/3600/24/1000)) + "");
-                } else if (pl.getType() == PredicateLeaf.Type.DECIMAL) {
-                    int decimalP = getPrecision(pl.getColumnName());
-                    int decimalS = getScale(pl.getColumnName());
-                    String[] spiltValues = pl.getLiteral().toString().split("\\.");
-                    if (decimalS == 0) {
-                        jsonObject.put("literal", spiltValues[0] + " " + decimalP + " " + decimalS);
-                    } else {
-                        String scalePadZeroStr = padZeroForDecimals(spiltValues, decimalS);
-                        jsonObject.put("literal", spiltValues[0] + "." + scalePadZeroStr + " " + decimalP + " " + decimalS);
-                    }
-                } else if (pl.getType() == PredicateLeaf.Type.TIMESTAMP) {
-                    Timestamp t = (Timestamp)pl.getLiteral();
-                    jsonObject.put("literal",  formatSecs(t.getTime() / TimestampTreeWriter.MILLIS_PER_SECOND) + " " + formatNanos(t.getNanos()));
-                } else {
-                    jsonObject.put("literal", pl.getLiteral().toString());
-                }
-            } else {
-                jsonObject.put("literal", "");
-            }
-            if ((pl.getLiteralList() != null) && (pl.getLiteralList().size() != 0)){
-                List<String> lst = new ArrayList<>();
-                for (Object ob : pl.getLiteralList()) {
-                    if (ob == null) {
-                        lst.add(null);
-                        continue;
-                    }
-                    if (pl.getType() == PredicateLeaf.Type.DECIMAL) {
-                        int decimalP = getPrecision(pl.getColumnName());
-                        int decimalS = getScale(pl.getColumnName());
-                        String[] spiltValues = ob.toString().split("\\.");
-                        if (decimalS == 0) {
-                            lst.add(spiltValues[0] + " " + decimalP + " " + decimalS);
-                        } else {
-                            String scalePadZeroStr = padZeroForDecimals(spiltValues, decimalS);
-                            lst.add(spiltValues[0] + "." + scalePadZeroStr + " " + decimalP + " " + decimalS);
-                        }
-                    } else if (pl.getType() == PredicateLeaf.Type.DATE) {
-                        lst.add(((int)Math.ceil(((Date)ob).getTime()* 1.0/3600/24/1000)) + "");
-                    } else if (pl.getType() == PredicateLeaf.Type.TIMESTAMP) {
-                        Timestamp t = (Timestamp)pl.getLiteral();
-                        lst.add(formatSecs(t.getTime() / TimestampTreeWriter.MILLIS_PER_SECOND) + " " + formatNanos(t.getNanos()));
-                    } else {
-                        lst.add(ob.toString());
-                    }
-                }
-                jsonObject.put("literalList", lst);
-            } else {
-                jsonObject.put("literalList", new ArrayList<String>());
-            }
-            jsonObjectList.put("leaf-" + i, jsonObject);
-        }
-        return jsonObjectList;
-    }
-
     private long formatSecs(long secs) {
         DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
         long epoch;
         try {
-            epoch = dateFormat.parse(TimestampTreeWriter.BASE_TIMESTAMP_STRING).getTime() /
-                    TimestampTreeWriter.MILLIS_PER_SECOND;
+            epoch = dateFormat.parse(TimestampTreeWriter.BASE_TIMESTAMP_STRING).getTime() / 1000L;
         } catch (ParseException e) {
             throw new RuntimeException(e);
         }
@@ -224,54 +151,49 @@ public class OrcColumnarBatchScanReader {
      * Init Orc reader.
      *
      * @param uri split file path
-     * @param options split file options
      */
-    public long initializeReaderJava(URI uri, ReaderOptions options) {
+    public long initializeReaderJava(URI uri) {
         JSONObject job = new JSONObject();
-        if (options.getOrcTail() == null) {
-            job.put("serializedTail", "");
-        } else {
-            job.put("serializedTail", options.getOrcTail().getSerializedTail().toString());
-        }
+
+        job.put("serializedTail", "");
         job.put("tailLocation", 9223372036854775807L);
 
         job.put("scheme", uri.getScheme() == null ? "" : uri.getScheme());
         job.put("host", uri.getHost() == null ? "" : uri.getHost());
+        job.put("port", uri.getPort());
         job.put("path", uri.getPath() == null ? "" : uri.getPath());
-        job.put("port", uri.getPort() == -1 ? "" : String.valueOf(uri.getPort()));
 
-        reader = jniReader.initializeReader(job, fildsNames);
+        reader = jniReader.initializeReader(job, allFieldsNames);
         return reader;
     }
 
     /**
      * Init Orc RecordReader.
      *
-     * @param options split file options
+     * @param offset split file offset
+     * @param length split file read length
+     * @param pushedFilter the filter push down to native
+     * @param requiredSchema the columns read from native
      */
-    public long initializeRecordReaderJava(Options options) {
+    public long initializeRecordReaderJava(long offset, long length, Filter pushedFilter, StructType requiredSchema) {
+        this.requiredSchema = requiredSchema;
         JSONObject job = new JSONObject();
-        if (options.getInclude() == null) {
-            job.put("include", "");
-        } else {
-            job.put("include", options.getInclude().toString());
-        }
-        job.put("offset", options.getOffset());
-        job.put("length", options.getLength());
-        // When the number of pushedFilters > hive.CNF_COMBINATIONS_THRESHOLD, the expression is rewritten to
-        // 'YES_NO_NULL'. Under the circumstances, filter push down will be skipped.
-        if (options.getSearchArgument() != null
-                && !options.getSearchArgument().toString().contains("YES_NO_NULL")) {
-            LOGGER.debug("SearchArgument: {}", options.getSearchArgument().toString());
-            JSONObject jsonexpressionTree = getSubJson(options.getSearchArgument().getExpression());
-            job.put("expressionTree", jsonexpressionTree);
-            JSONObject jsonleaves = getLeavesJson(options.getSearchArgument().getLeaves());
-            job.put("leaves", jsonleaves);
+
+        job.put("offset", offset);
+        job.put("length", length);
+
+        if (pushedFilter != null) {
+            JSONObject jsonExpressionTree = new JSONObject();
+            JSONObject jsonLeaves = new JSONObject();
+            boolean flag = canPushDown(pushedFilter, jsonExpressionTree, jsonLeaves);
+            if (flag) {
+                job.put("expressionTree", jsonExpressionTree);
+                job.put("leaves", jsonLeaves);
+            }
         }
 
-        job.put("includedColumns", colToInclu.toArray());
+        job.put("includedColumns", includedColumns.toArray());
         addJulianGregorianInfo(job);
-
         recordReader = jniReader.initializeRecordReader(reader, job);
         return recordReader;
     }
@@ -318,13 +240,13 @@ public class OrcColumnarBatchScanReader {
     }
 
     public int next(Vec[] vecList, int[] typeIds) {
-        long[] vecNativeIds = new long[realColsCnt];
+        long[] vecNativeIds = new long[typeIds.length];
         long rtn = jniReader.recordReaderNext(recordReader, batchReader, typeIds, vecNativeIds);
         if (rtn == 0) {
             return 0;
         }
         int nativeGetId = 0;
-        for (int i = 0; i < realColsCnt; i++) {
+        for (int i = 0; i < colsToGet.length; i++) {
             if (colsToGet[i] != 0) {
                 continue;
             }
@@ -372,11 +294,233 @@ public class OrcColumnarBatchScanReader {
                 }
                 default: {
                     throw new RuntimeException("UnSupport type for ColumnarFileScan:" +
-                            DataType.DataTypeId.values()[typeIds[i]]);
+                        DataType.DataTypeId.values()[typeIds[i]]);
                 }
             }
             nativeGetId++;
         }
         return (int)rtn;
+    }
+
+    enum OrcOperator {
+        OR,
+        AND,
+        NOT,
+        LEAF,
+        CONSTANT
+    }
+
+    enum OrcLeafOperator {
+        EQUALS,
+        NULL_SAFE_EQUALS,
+        LESS_THAN,
+        LESS_THAN_EQUALS,
+        IN,
+        BETWEEN, // not use, spark transfers it to gt and lt
+        IS_NULL
+    }
+
+    enum OrcPredicateDataType {
+        LONG, // all of integer types
+        FLOAT, // float and double
+        STRING, // string, char, varchar
+        DATE,
+        DECIMAL,
+        TIMESTAMP,
+        BOOLEAN
+    }
+
+    private OrcPredicateDataType getOrcPredicateDataType(String attribute) {
+        StructField field = requiredSchema.apply(attribute);
+        org.apache.spark.sql.types.DataType dataType = field.dataType();
+        if (dataType instanceof ShortType || dataType instanceof IntegerType ||
+            dataType instanceof LongType) {
+            return OrcPredicateDataType.LONG;
+        } else if (dataType instanceof DoubleType) {
+            return OrcPredicateDataType.FLOAT;
+        } else if (dataType instanceof StringType) {
+            if (isCharType(field.metadata())) {
+                throw new UnsupportedOperationException("Unsupported orc push down filter data type: char");
+            }
+            return OrcPredicateDataType.STRING;
+        } else if (dataType instanceof DateType) {
+            return OrcPredicateDataType.DATE;
+        } else if (dataType instanceof DecimalType) {
+            return OrcPredicateDataType.DECIMAL;
+        } else if (dataType instanceof BooleanType) {
+            return OrcPredicateDataType.BOOLEAN;
+        } else {
+            throw new UnsupportedOperationException("Unsupported orc push down filter data type: " +
+                dataType.getClass().getSimpleName());
+        }
+    }
+
+    // Check the type whether is char type, which orc native does not support push down
+    private boolean isCharType(Metadata metadata) {
+        if (metadata != null) {
+            String rawTypeString = CharVarcharUtils.getRawTypeString(metadata).getOrElse(null);
+            if (rawTypeString != null) {
+                Matcher matcher = CHAR_TYPE.matcher(rawTypeString);
+                return matcher.matches();
+            }
+        }
+        return false;
+    }
+
+    private boolean canPushDown(Filter pushedFilter, JSONObject jsonExpressionTree,
+            JSONObject jsonLeaves) {
+        try {
+            getExprJson(pushedFilter, jsonExpressionTree, jsonLeaves);
+            if (leafIndex > MAX_LEAF_THRESHOLD) {
+                throw new UnsupportedOperationException("leaf node nums is " + leafIndex +
+                    ", which is bigger than max threshold " + MAX_LEAF_THRESHOLD + ".");
+            }
+            return true;
+        } catch (Exception e) {
+            LOGGER.info("Unable to push down orc filter because " + e.getMessage());
+            return false;
+        }
+    }
+
+    private void getExprJson(Filter filterPredicate, JSONObject jsonExpressionTree,
+             JSONObject jsonLeaves) {
+        if (filterPredicate instanceof And) {
+            addChildJson(jsonExpressionTree, jsonLeaves, OrcOperator.AND,
+                ((And) filterPredicate).left(), ((And) filterPredicate).right());
+        } else if (filterPredicate instanceof Or) {
+            addChildJson(jsonExpressionTree, jsonLeaves, OrcOperator.OR,
+                ((Or) filterPredicate).left(), ((Or) filterPredicate).right());
+        } else if (filterPredicate instanceof Not) {
+            addChildJson(jsonExpressionTree, jsonLeaves, OrcOperator.NOT,
+                ((Not) filterPredicate).child());
+        } else if (filterPredicate instanceof EqualTo) {
+            addToJsonExpressionTree("leaf-" + leafIndex, jsonExpressionTree, false);
+            addLiteralToJsonLeaves("leaf-" + leafIndex, OrcLeafOperator.EQUALS, jsonLeaves,
+                ((EqualTo) filterPredicate).attribute(), ((EqualTo) filterPredicate).value(), null);
+            leafIndex++;
+        } else if (filterPredicate instanceof GreaterThan) {
+            addToJsonExpressionTree("leaf-" + leafIndex, jsonExpressionTree, true);
+            addLiteralToJsonLeaves("leaf-" + leafIndex, OrcLeafOperator.LESS_THAN_EQUALS, jsonLeaves,
+                ((GreaterThan) filterPredicate).attribute(), ((GreaterThan) filterPredicate).value(), null);
+            leafIndex++;
+        } else if (filterPredicate instanceof GreaterThanOrEqual) {
+            addToJsonExpressionTree("leaf-" + leafIndex, jsonExpressionTree, true);
+            addLiteralToJsonLeaves("leaf-" + leafIndex, OrcLeafOperator.LESS_THAN, jsonLeaves,
+                ((GreaterThanOrEqual) filterPredicate).attribute(), ((GreaterThanOrEqual) filterPredicate).value(), null);
+            leafIndex++;
+        } else if (filterPredicate instanceof LessThan) {
+            addToJsonExpressionTree("leaf-" + leafIndex, jsonExpressionTree, false);
+            addLiteralToJsonLeaves("leaf-" + leafIndex, OrcLeafOperator.LESS_THAN, jsonLeaves,
+                ((LessThan) filterPredicate).attribute(), ((LessThan) filterPredicate).value(), null);
+            leafIndex++;
+        } else if (filterPredicate instanceof LessThanOrEqual) {
+            addToJsonExpressionTree("leaf-" + leafIndex, jsonExpressionTree, false);
+            addLiteralToJsonLeaves("leaf-" + leafIndex, OrcLeafOperator.LESS_THAN_EQUALS, jsonLeaves,
+                ((LessThanOrEqual) filterPredicate).attribute(), ((LessThanOrEqual) filterPredicate).value(), null);
+            leafIndex++;
+        } else if (filterPredicate instanceof IsNotNull) {
+            addToJsonExpressionTree("leaf-" + leafIndex, jsonExpressionTree, true);
+            addLiteralToJsonLeaves("leaf-" + leafIndex, OrcLeafOperator.IS_NULL, jsonLeaves,
+                ((IsNotNull) filterPredicate).attribute(), null, null);
+            leafIndex++;
+        } else if (filterPredicate instanceof IsNull) {
+            addToJsonExpressionTree("leaf-" + leafIndex, jsonExpressionTree, false);
+            addLiteralToJsonLeaves("leaf-" + leafIndex, OrcLeafOperator.IS_NULL, jsonLeaves,
+                ((IsNull) filterPredicate).attribute(), null, null);
+            leafIndex++;
+        } else if (filterPredicate instanceof In) {
+            addToJsonExpressionTree("leaf-" + leafIndex, jsonExpressionTree, false);
+            addLiteralToJsonLeaves("leaf-" + leafIndex, OrcLeafOperator.IN, jsonLeaves,
+                ((In) filterPredicate).attribute(), null, Arrays.stream(((In) filterPredicate).values()).toArray());
+            leafIndex++;
+        } else {
+            throw new UnsupportedOperationException("Unsupported orc push down filter operation: " +
+                filterPredicate.getClass().getSimpleName());
+        }
+    }
+
+    private void addLiteralToJsonLeaves(String leaf, OrcLeafOperator leafOperator, JSONObject jsonLeaves,
+                                        String name, Object literal, Object[] literals) {
+        JSONObject leafJson = new JSONObject();
+        leafJson.put("op", leafOperator.ordinal());
+        leafJson.put("name", name);
+        leafJson.put("type", getOrcPredicateDataType(name).ordinal());
+
+        leafJson.put("literal", getLiteralValue(literal));
+
+        ArrayList<String> literalList = new ArrayList<>();
+        if (literals != null) {
+            for (Object lit: literalList) {
+                literalList.add(getLiteralValue(literal));
+            }
+        }
+        leafJson.put("literalList", literalList);
+        jsonLeaves.put(leaf, leafJson);
+    }
+
+    private void addToJsonExpressionTree(String leaf, JSONObject jsonExpressionTree, boolean addNot) {
+        if (addNot) {
+            jsonExpressionTree.put("op", OrcOperator.NOT.ordinal());
+            ArrayList<JSONObject> child = new ArrayList<>();
+            JSONObject subJson = new JSONObject();
+            subJson.put("op", OrcOperator.LEAF.ordinal());
+            subJson.put("leaf", leaf);
+            child.add(subJson);
+            jsonExpressionTree.put("child", child);
+        } else {
+            jsonExpressionTree.put("op", OrcOperator.LEAF.ordinal());
+            jsonExpressionTree.put("leaf", leaf);
+        }
+    }
+
+    private void addChildJson(JSONObject jsonExpressionTree, JSONObject jsonLeaves,
+                              OrcOperator orcOperator, Filter ... filters) {
+        jsonExpressionTree.put("op", orcOperator.ordinal());
+        ArrayList<Object> child = new ArrayList<>();
+        for (Filter filter: filters) {
+            JSONObject subJson = new JSONObject();
+            getExprJson(filter, subJson, jsonLeaves);
+            child.add(subJson);
+        }
+        jsonExpressionTree.put("child", child);
+    }
+
+    private String getLiteralValue(Object literal) {
+        // For null literal, the predicate will not be pushed down.
+        if (literal == null) {
+            throw new UnsupportedOperationException("Unsupported orc push down filter for literal is null");
+        }
+
+        // For Decimal Type, we use the special string format to represent, which is "$decimalVal
+        // $precision $scale".
+        // e.g., Decimal(9, 3) = 123456.789, it outputs "123456.789 9 3".
+        // e.g., Decimal(9, 3) = 123456.7, it outputs "123456.700 9 3".
+        if (literal instanceof BigDecimal) {
+            BigDecimal value = (BigDecimal) literal;
+            int precision = value.precision();
+            int scale = value.scale();
+            String[] split = value.toString().split("\\.");
+            if (scale == 0) {
+                return split[0] + " " + precision + " " + scale;
+            } else {
+                String padded = padZeroForDecimals(split, scale);
+                return split[0] + "." + padded + " " + precision + " " + scale;
+            }
+        }
+        // For Date Type, spark uses Gregorian in default but orc uses Julian, which should be converted.
+        if (literal instanceof LocalDate) {
+            int epochDay = Math.toIntExact(((LocalDate) literal).toEpochDay());
+            int rebased = RebaseDateTime.rebaseGregorianToJulianDays(epochDay);
+            return String.valueOf(rebased);
+        }
+        if (literal instanceof String) {
+            return (String) literal;
+        }
+        if (literal instanceof Integer || literal instanceof Long || literal instanceof Boolean ||
+            literal instanceof Short || literal instanceof Double) {
+            return literal.toString();
+        }
+        throw new UnsupportedOperationException("Unsupported orc push down filter date type: " +
+            literal.getClass().getSimpleName());
     }
 }
