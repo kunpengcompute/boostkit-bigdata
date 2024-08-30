@@ -63,8 +63,7 @@ public class SchedulerInfo {
     this.minAllocResource = new ResourceInfo(rs.getMinimumResourceCapability());
     this.maxAllocResource = new ResourceInfo(rs.getMaximumResourceCapability());
     this.schedulingResourceTypes = rs.getSchedulingResourceTypes();
-    this.maximumClusterPriority =
-            rs.getMaxClusterLevelAppPriority().getPriority();
+    this.maximumClusterPriority = rs.getMaxClusterLevelAppPriority().getPriority();
   }
 
   public String getSchedulerType() {
