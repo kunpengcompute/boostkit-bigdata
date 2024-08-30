@@ -389,11 +389,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             if (item.getType().equals(OperatorType.PTF) && !PTFReplaceable(item)) {
                 canBeReplaced[0] = false;
             }
-            if (!(item.getOperatorId().contains("SEL") || item.getOperatorId().contains("PTF") || item.getOperatorId().contains("RS"))) {
-                canBeReplaced[0] = false;
-            }
-
-            if (!(item.getOperatorId().contains("LIM") || item.getOperatorId().contains("FS"))) {
+            if (!(item.getOperatorId().contains("SEL") || item.getOperatorId().contains("PTF") || item.getOperatorId().contains("RS") || item.getOperatorId().contains("LIM") || item.getOperatorId().contains("FS"))) {
                 canBeReplaced[0] = false;
             }
         });
