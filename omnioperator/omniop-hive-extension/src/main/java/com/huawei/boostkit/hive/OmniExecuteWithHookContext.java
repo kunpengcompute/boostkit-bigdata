@@ -389,7 +389,11 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             if (item.getType().equals(OperatorType.PTF) && !PTFReplaceable(item)) {
                 canBeReplaced[0] = false;
             }
-            if (!(item.getOperatorId().contains("SEL") || item.getOperatorId().contains("PTF") || item.getOperatorId().contains("RS") || item.getOperatorId().contains("LIM") || item.getOperatorId().contains("FS"))) {
+            if (!(item.getOperatorId().contains("SEL") || item.getOperatorId().contains("PTF") || item.getOperatorId().contains("RS"))) {
+                canBeReplaced[0] = false;
+            }
+
+            if (!(item.getOperatorId().contains("LIM") || item.getOperatorId().contains("FS"))) {
                 canBeReplaced[0] = false;
             }
         });
@@ -403,15 +407,12 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             reducer = (Operator) reducer.getChildOperators().get(0);
         }
 
-        if (!isReplaceable(reducer, true)) {
-            return false;
-        }
-        if (reducer.getType().equals(OperatorType.GROUPBY)) {
+        if (isReplaceable(reducer, true) && reducer.getType().equals(OperatorType.GROUPBY)) {
             tezWork.getEdgeProperty(work, child).setEdgeType(TezEdgeProperty.EdgeType.CUSTOM_SIMPLE_EDGE);
             return true;
         }
 
-        if (reducer.getType().equals(OperatorType.SELECT) && selectOrPtfEdgeReplaceable(child.getAllOperators())) {
+        if (isReplaceable(reducer, true) && reducer.getType().equals(OperatorType.SELECT) && selectOrPtfEdgeReplaceable(child.getAllOperators())) {
             return true;
         }
         return false;
