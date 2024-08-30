@@ -1,3 +1,6 @@
+/*
+ * CopyRight (c) Huawei Technologies Co., Ltd. 2024-2024. All rights reserved.
+ */
 package com.huawei.bdsolution.loadsmetric.controller;
 
 import com.huawei.bdsolution.loadsmetric.dto.NodeLogicalResource;
@@ -6,7 +9,12 @@ import com.huawei.bdsolution.loadsmetric.service.NodeExporterService;
 import com.huawei.bdsolution.loadsmetric.service.NodeHeartbeatService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.PropertySource;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.PostMapping;
 
 import java.util.ArrayList;
 import java.util.List;

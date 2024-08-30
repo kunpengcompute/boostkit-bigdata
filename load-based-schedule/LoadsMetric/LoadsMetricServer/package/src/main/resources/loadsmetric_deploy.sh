@@ -1,4 +1,5 @@
 #!/bin/bash
+# CopyRight (c) Huawei Technologies Co., Ltd. 2024-2024. All rights reserved.
 stty intr undef
 stty susp undef
 stty quit undef
