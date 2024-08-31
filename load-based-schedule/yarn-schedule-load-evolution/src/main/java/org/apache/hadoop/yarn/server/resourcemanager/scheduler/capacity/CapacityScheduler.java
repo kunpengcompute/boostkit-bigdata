@@ -18,33 +18,17 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Random;
-import java.util.Set;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.atomic.AtomicBoolean;
-
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.lang3.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.slf4j.Marker;
-import org.slf4j.MarkerFactory;
 import org.apache.hadoop.classification.InterfaceAudience.LimitedPrivate;
 import org.apache.hadoop.classification.InterfaceStability.Evolving;
 import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
+import org.apache.hadoop.thirdparty.com.google.common.util.concurrent.SettableFuture;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
@@ -78,7 +62,6 @@ import org.apache.hadoop.yarn.server.resourcemanager.placement.PlacementRule;
 import org.apache.hadoop.yarn.server.resourcemanager.placement.UserGroupMappingPlacementRule;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore.RMState;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.records.ApplicationStateData;
-
 import org.apache.hadoop.yarn.server.resourcemanager.reservation.ReservationConstants;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppEvent;
@@ -106,7 +89,6 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.QueueMetrics;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceLimits;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceUsage;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplication;
-
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplicationAttempt;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerDynamicEditException;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerNode;
@@ -143,9 +125,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.NodeLabelsU
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.NodeRemovedSchedulerEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.NodeResourceUpdateSchedulerEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.NodeUpdateSchedulerEvent;
-
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event
-    .QueueManagementChangeEvent;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.QueueManagementChangeEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.ReleaseContainerEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.SchedulerEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.SchedulerEventType;
@@ -161,10 +141,42 @@ import org.apache.hadoop.yarn.util.resource.DefaultResourceCalculator;
 import org.apache.hadoop.yarn.util.resource.ResourceCalculator;
 import org.apache.hadoop.yarn.util.resource.ResourceUtils;
 import org.apache.hadoop.yarn.util.resource.Resources;
+import org.apache.http.HttpEntity;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.util.EntityUtils;
+import org.codehaus.jettison.json.JSONException;
+import org.codehaus.jettison.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.Marker;
+import org.slf4j.MarkerFactory;
 
-import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
-import org.apache.hadoop.thirdparty.com.google.common.util.concurrent.SettableFuture;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Date;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Random;
+import java.util.Set;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.stream.Collectors;
 
 import static org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacitySchedulerConfiguration.QUEUE_MAPPING;
 
@@ -178,7 +190,7 @@ public class CapacityScheduler extends
 
   private static final Marker FATAL =
       MarkerFactory.getMarker("FATAL");
-  private static final Logger LOG =
+  private static Logger LOG =
       LoggerFactory.getLogger(CapacityScheduler.class);
 
   private CapacitySchedulerQueueManager queueManager;
@@ -227,6 +239,25 @@ public class CapacityScheduler extends
   @VisibleForTesting
   protected List<AsyncScheduleThread> asyncSchedulerThreads;
   private ResourceCommitterService resourceCommitterService;
+
+  protected LoadsMetricServerRequestThread loadsMetricServerRequestThread;
+  private static final String LOADS_METRIC_SERVER_REQUEST_INTERVAL_MS =
+          CapacitySchedulerConfiguration.PREFIX + "loads-metric-server.request-interval-ms";
+  private static final long DEFAULT_LOADS_METRIC_SERVER_REQUEST_INTERVAL_MS = 1000L;
+  private long loadsMetricServerRequestInterval;
+  private static final String LOADS_METRIC_SERVER_ADDRESS =
+          CapacitySchedulerConfiguration.PREFIX + "loads-metric-server.address";
+  private String loadsMetricServerAddress;
+  private String loadsMetricServerSortUrl;
+  private static final String LOADS_METRIC_SERVER_SORT_PATH = "/scheduler/sortWithLogical";
+  private String loadsMetricServerUploadNodeResourceUrl;
+  private static final String LOADS_METRIC_SERVER_UPLOAD_NODE_RESOURCE_PATH = "/loadStatus/addNodeLogicalResource";
+
+  private double asyncScheduleGlobalAllocatePercent;
+  private static final String ASYNC_SCHEDULE_GLOBAL_ALLOCATE_PERCENT =
+          CapacitySchedulerConfiguration.SCHEDULE_ASYNCHRONOUSLY_PREFIX
+                  + ".global.allocate-percent";
+  private static final double DEFAULT_ASYNC_SCHEDULE_GLOBAL_ALLOCATE_PERCENT = 100.0d;
   private RMNodeLabelsManager labelManager;
   private AppPriorityACLsManager appPriorityACLManager;
   private boolean multiNodePlacementEnabled;
@@ -248,6 +279,16 @@ public class CapacityScheduler extends
   public CapacityScheduler() {
     super(CapacityScheduler.class.getName());
     this.maxRunningEnforcer = new CSMaxRunningAppsEnforcer(this);
+  }
+
+  public CapacityScheduler(String name) {
+    super(name);
+    LOG = LoggerFactory.getLogger(name);
+    this.maxRunningEnforcer = new CSMaxRunningAppsEnforcer(this);
+  }
+
+  public LoadsMetricServerRequestThread getLoadsMetricServerRequestThread() {
+    return loadsMetricServerRequestThread;
   }
 
   @Override
@@ -370,7 +411,23 @@ public class CapacityScheduler extends
                 SCHEDULE_ASYNCHRONOUSLY_MAXIMUM_PENDING_BACKLOGS,
             CapacitySchedulerConfiguration.
                 DEFAULT_SCHEDULE_ASYNCHRONOUSLY_MAXIMUM_PENDING_BACKLOGS);
+        asyncScheduleGlobalAllocatePercent = this.conf.getDouble(ASYNC_SCHEDULE_GLOBAL_ALLOCATE_PERCENT,
+                DEFAULT_ASYNC_SCHEDULE_GLOBAL_ALLOCATE_PERCENT);
       }
+
+      loadsMetricServerRequestThread = new LoadsMetricServerRequestThread(this);
+
+      loadsMetricServerAddress = this.conf.get(LOADS_METRIC_SERVER_ADDRESS);
+      if (StringUtils.isEmpty(loadsMetricServerAddress) || !loadsMetricServerAddress.matches("[\\w.]+:\\d+")) {
+        throw new YarnRuntimeException(LOADS_METRIC_SERVER_ADDRESS + " is invalid, eg: server1:9090");
+      }
+      loadsMetricServerSortUrl = String
+              .format("http://%s/%s", loadsMetricServerAddress, LOADS_METRIC_SERVER_SORT_PATH);
+      loadsMetricServerUploadNodeResourceUrl = String
+              .format("http://%s/%s", loadsMetricServerAddress, LOADS_METRIC_SERVER_UPLOAD_NODE_RESOURCE_PATH);
+
+      loadsMetricServerRequestInterval = this.conf.getLong(LOADS_METRIC_SERVER_REQUEST_INTERVAL_MS,
+              DEFAULT_LOADS_METRIC_SERVER_REQUEST_INTERVAL_MS);
 
       // Setup how many containers we can allocate for each round
       offswitchPerHeartbeatLimit = this.conf.getOffSwitchPerHeartbeatLimit();
@@ -413,6 +470,7 @@ public class CapacityScheduler extends
 
         resourceCommitterService.start();
       }
+      loadsMetricServerRequestThread.start();
     } finally {
       writeLock.unlock();
     }
@@ -532,6 +590,51 @@ public class CapacityScheduler extends
   }
 
   /**
+   * Schedule on all nodes by global sorted.
+   *
+   * @param cs              CapacityScheduler
+   * @param sortedNodesHost List<String>
+   */
+  static void scheduleLoadBased(CapacityScheduler cs,
+                                List<String> sortedNodesHost) throws InterruptedException {
+    Collection<FiCaSchedulerNode> nodes = cs.nodeTracker.getAllNodes();
+    Map<String, FiCaSchedulerNode> nodeMap = new HashMap<>();
+    for (FiCaSchedulerNode node : nodes) {
+      nodeMap.put(node.getNodeName(), node);
+    }
+
+    // To avoid too verbose DEBUG logging, only print debug log once for
+    // every 10 secs.
+    // The '1000' converts the current time from milliseconds to seconds
+    boolean printSkipedNodeLogging = false;
+    if (Time.monotonicNow() / 1000 % 10 == 0) {
+      printSkipedNodeLogging = (!printedVerboseLoggingForAsyncScheduling);
+    } else {
+      printedVerboseLoggingForAsyncScheduling = false;
+    }
+
+    // Allocate containers of node global sorted
+    // The '100' is used to convert the percentage to a decimal
+    int allocateNodesLimit = (int) Math.ceil(cs.asyncScheduleGlobalAllocatePercent * nodes.size() / 100);
+    for (String nodeHost : sortedNodesHost) {
+      if (!nodeMap.containsKey(nodeHost)) {
+        LOG.warn("nodeHost {} not found FiCaSchedulerNode", nodeHost);
+        continue;
+      }
+      FiCaSchedulerNode node = nodeMap.get(nodeHost);
+      if (shouldSkipNodeSchedule(node, cs, printSkipedNodeLogging)) {
+        continue;
+      }
+      cs.allocateContainersToNode(node.getNodeID(), false);
+      allocateNodesLimit -= 1;
+      if (allocateNodesLimit <= 0) {
+        break;
+      }
+    }
+    Thread.sleep(cs.getAsyncScheduleInterval());
+  }
+
+  /**
    * Schedule on all nodes by starting at a random point.
    * @param cs
    */
@@ -610,7 +713,12 @@ public class CapacityScheduler extends
                 > cs.asyncMaxPendingBacklogs) {
               Thread.sleep(1);
             } else{
-              schedule(cs);
+              List<String> sortedNodesHost = cs.loadsMetricServerRequestThread.getSortedNodeHosts();
+              if (sortedNodesHost.size() > 0) {
+                scheduleLoadBased(cs, sortedNodesHost);
+              } else {
+                schedule(cs);
+              }
               if(LOG.isDebugEnabled()) {
                 // Adding a debug log here to ensure that the thread is alive
                 // and running fine.
@@ -677,6 +785,161 @@ public class CapacityScheduler extends
 
     public int getPendingBacklogs() {
       return backlogs.size();
+    }
+  }
+
+  public static class LoadsMetricServerRequestThread extends Thread {
+    private final CapacityScheduler cs;
+    private List<String> sortedNodeHosts = new ArrayList<>();
+    private Set<String> overLoadNodeHosts = new HashSet<>();
+    private long expirationTime;
+    private static final long DEFAULT_EXPIRED_TIME = 0L;
+    private final ReentrantReadWriteLock.ReadLock readLock;
+    private final ReentrantReadWriteLock.WriteLock writeLock;
+    private static final int GET_STATUS_CODE_OK = 200;
+    private static final String SORTED_NODE_HOSTS = "sorted_node_hosts";
+    private static final String OVERLOAD_NODE_HOSTS = "overload_node_hosts";
+    private static final String EXPIRATION_TIME = "expiration_time";
+    private static final String COMMA = ",";
+
+    public LoadsMetricServerRequestThread(CapacityScheduler cs) {
+      this.cs = cs;
+      setDaemon(true);
+      ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
+      this.readLock = lock.readLock();
+      this.writeLock = lock.writeLock();
+    }
+
+    public void uploadNodeResource(String hostName, Resource allocatedResource, Resource totalResource) {
+      ObjectMapper objectMapper = new ObjectMapper();
+      Map<String, Object> nodeResource = new HashMap<>();
+      nodeResource.put("host_name", hostName);
+      nodeResource.put("allocated_mem", allocatedResource.getResourceInformation(0).getValue());
+      nodeResource.put("total_mem",  totalResource.getResourceInformation(0).getValue());
+      nodeResource.put("allocated_vcores", allocatedResource.getResourceInformation(1).getValue());
+      nodeResource.put("total_vcores",  totalResource.getResourceInformation(1).getValue());
+
+      try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
+        // node loads request
+        HttpPost httpPost = new HttpPost(cs.loadsMetricServerUploadNodeResourceUrl);
+        httpPost.setHeader("Content-Type", "application/json");
+        StringEntity requestEntity = new StringEntity(
+                objectMapper.writeValueAsString(nodeResource), StandardCharsets.UTF_8);
+        httpPost.setEntity(requestEntity);
+
+        try (CloseableHttpResponse response = httpClient.execute(httpPost)) {
+          int statusCode = response.getStatusLine().getStatusCode();
+          if (statusCode != GET_STATUS_CODE_OK) {
+            LOG.error("request {} failed with status code:{}"
+                    , cs.loadsMetricServerUploadNodeResourceUrl, statusCode);
+          }
+        }
+      } catch (IOException e) {
+        LOG.error("request {} failed for {}", cs.loadsMetricServerUploadNodeResourceUrl, e.getMessage());
+      }
+    }
+
+    @Override
+    public void run() {
+      while (true) {
+        try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
+          // node loads request
+          HttpGet httpGet = new HttpGet(cs.loadsMetricServerSortUrl);
+          try (CloseableHttpResponse response = httpClient.execute(httpGet)) {
+            int statusCode = response.getStatusLine().getStatusCode();
+            if (statusCode == GET_STATUS_CODE_OK) {
+              HttpEntity entity = response.getEntity();
+              if (entity != null) {
+                JSONObject jsonObject = new JSONObject(EntityUtils.toString(entity));
+                // update stat
+                update(jsonObject);
+              } else {
+                LOG.warn("request {} with empty response", cs.loadsMetricServerSortUrl);
+              }
+            } else {
+              LOG.error("request {} failed with status code:{}", cs.loadsMetricServerSortUrl, statusCode);
+            }
+          }
+        } catch (IOException | JSONException e) {
+          LOG.error("request {} failed for {}", cs.loadsMetricServerSortUrl, e.getMessage());
+        } finally {
+          try {
+            Thread.sleep(cs.loadsMetricServerRequestInterval);
+          } catch (InterruptedException e) {
+            LOG.error("sleep failed for ", e);
+          }
+        }
+      }
+    }
+
+    private void update(JSONObject jsonObject) throws JSONException {
+      try {
+        // lock before update
+        writeLock.lock();
+        expirationTime = DEFAULT_EXPIRED_TIME;
+        // update overLoadNodesHost
+        overLoadNodeHosts = new HashSet<>();
+        if (!StringUtils.isBlank(jsonObject.getString(OVERLOAD_NODE_HOSTS))) {
+          overLoadNodeHosts.addAll(Arrays.asList(jsonObject.getString(OVERLOAD_NODE_HOSTS).split(COMMA)));
+        }
+        if (!overLoadNodeHosts.isEmpty()) {
+          LOG.warn("overLoadNodeHosts:{}", overLoadNodeHosts);
+        }
+        // update sortedNodesHost
+        sortedNodeHosts = Arrays.stream(jsonObject.getString(SORTED_NODE_HOSTS).split(COMMA))
+                .collect(Collectors.toList());
+        if (LOG.isDebugEnabled() && !sortedNodeHosts.isEmpty()) {
+          LOG.debug("sortedNodeHosts:{}", sortedNodeHosts);
+        }
+        // update expirationTime
+        expirationTime = jsonObject.getLong(EXPIRATION_TIME);
+      } finally {
+        // unlock
+        writeLock.unlock();
+      }
+    }
+
+    private boolean isExpired() {
+      if (System.currentTimeMillis() > expirationTime && !sortedNodeHosts.isEmpty()) {
+        LOG.warn("loads metric request is expired at {}", new Date(expirationTime));
+        return true;
+      }
+      return false;
+    }
+
+    /**
+     * is node overload
+     *
+     * @param nodeHost String
+     * @return true:node overload; false:node not overload
+     */
+    public boolean isNodeOverLoad(String nodeHost) {
+      try {
+        readLock.lock();
+        if (isExpired()) {
+          return false;
+        }
+        return overLoadNodeHosts.contains(nodeHost);
+      } finally {
+        readLock.unlock();
+      }
+    }
+
+    /**
+     * getSortedNodeHosts
+     *
+     * @return sortedNodeHosts
+     */
+    public List<String> getSortedNodeHosts() {
+      try {
+        readLock.lock();
+        if (isExpired()) {
+          return Collections.emptyList();
+        }
+        return sortedNodeHosts;
+      } finally {
+        readLock.unlock();
+      }
     }
   }
 
@@ -1369,8 +1632,9 @@ public class CapacityScheduler extends
         // work
         updateSchedulerHealth(lastNodeUpdateTime, rmNode.getNodeID(),
             CSAssignment.NULL_ASSIGNMENT);
-
-        allocateContainersToNode(rmNode.getNodeID(), true);
+        if (!loadsMetricServerRequestThread.isNodeOverLoad(rmNode.getHostName())) {
+          allocateContainersToNode(rmNode.getNodeID(), true);
+        }
       } finally {
         writeLock.unlock();
       }
