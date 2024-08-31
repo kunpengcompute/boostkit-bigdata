@@ -794,11 +794,8 @@ public class CapacityScheduler extends
     private Set<String> overLoadNodeHosts = new HashSet<>();
     private long expirationTime;
     private static final long DEFAULT_EXPIRED_TIME = 0L;
-
     private final ReentrantReadWriteLock.ReadLock readLock;
-
     private final ReentrantReadWriteLock.WriteLock writeLock;
-
     private static final int GET_STATUS_CODE_OK = 200;
     private static final String SORTED_NODE_HOSTS = "sorted_node_hosts";
     private static final String OVERLOAD_NODE_HOSTS = "overload_node_hosts";
