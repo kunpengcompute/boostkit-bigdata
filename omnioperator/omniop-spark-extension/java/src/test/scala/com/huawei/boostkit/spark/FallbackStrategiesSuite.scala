@@ -25,10 +25,10 @@ import org.apache.spark.sql.{QueryTest, Row}
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.Attribute
 import org.apache.spark.sql.catalyst.plans.logical.Statistics
-import org.apache.spark.sql.execution.adaptive.{AdaptiveSparkPlanExec, QueryStageExec}
-import org.apache.spark.sql.execution.exchange.Exchange
-import org.apache.spark.sql.execution.joins.BroadcastHashJoinExec
-import org.apache.spark.sql.execution.{ColumnarProjectExec, ColumnarTakeOrderedAndProjectExec, LeafExecNode, ProjectExec, SparkPlan, TakeOrderedAndProjectExec, UnaryExecNode}
+import org.apache.spark.sql.execution.adaptive.{AdaptiveSparkPlanExec, BroadcastQueryStageExec, QueryStageExec}
+import org.apache.spark.sql.execution.exchange.{BroadcastExchangeExec, Exchange}
+import org.apache.spark.sql.execution.joins.{BroadcastHashJoinExec, ColumnarBroadcastHashJoinExec}
+import org.apache.spark.sql.execution.{ColumnarBroadcastExchangeExec, ColumnarProjectExec, ColumnarTakeOrderedAndProjectExec, LeafExecNode, OmniColumnarToRowExec, ProjectExec, RowToOmniColumnarExec, SparkPlan, TakeOrderedAndProjectExec, UnaryExecNode}
 import org.apache.spark.sql.internal.{SQLConf, StaticSQLConf}
 import org.apache.spark.sql.test.SharedSparkSession
 
@@ -60,21 +60,81 @@ class FallbackStrategiesSuite extends QueryTest with SharedSparkSession {
     employees.createOrReplaceTempView("employees_for_fallback_ut_test")
   }
 
+  test("c2r doExecuteBroadcast") {
+    withSQLConf(("spark.omni.sql.columnar.wholeStage.fallback.threshold", "3"),
+      (SQLConf.ADAPTIVE_EXECUTION_ENABLED.key, "true"),
+      (SQLConf.AUTO_BROADCASTJOIN_THRESHOLD.key, "10MB"),
+      ("spark.omni.sql.columnar.broadcastJoin", "false")) {
+      val df = spark.sql("select t1.age * 2, t2.salary from employees_for_fallback_ut_test t1 join employees_for_fallback_ut_test t2 on t1.age = t2.age sort by t1.age")
+      val runRows = df.collect()
+      val expectedRows = Seq(Row(56, 21000), Row(56, 21000),
+        Row(66, 30000), Row(66, 30000),
+        Row(70, 10000), Row(76, 32000),
+        Row(76, 32000), Row(46, 29000),
+        Row(50, 23000), Row(56, 29000),
+        Row(56, 29000), Row(66, 23000),
+        Row(66, 23000),Row(76, 35000),Row(76, 35000))
+      assert(QueryTest.sameRows(runRows, expectedRows).isEmpty, "the run value is error")
+      val bhj = df.queryExecution.executedPlan.asInstanceOf[AdaptiveSparkPlanExec].executedPlan.find({
+        case _: BroadcastHashJoinExec => true
+        case _ => false
+      })
+      assert(bhj.isDefined, "bhj is fallback")
+      val c2rWithOmniBroadCast = bhj.get.children.find({
+        case p: OmniColumnarToRowExec =>
+          p.child.isInstanceOf[BroadcastQueryStageExec] &&
+            p.child.asInstanceOf[BroadcastQueryStageExec].plan.isInstanceOf[ColumnarBroadcastExchangeExec]
+        case _ => false
+      })
+      assert(c2rWithOmniBroadCast.isDefined, "bhj should use omni c2r to adapt to omni broadcast exchange")
+    }
+  }
+
+  test("r2c doExecuteBroadcast") {
+    withSQLConf(("spark.omni.sql.columnar.wholeStage.fallback.threshold", "3"),
+      (SQLConf.ADAPTIVE_EXECUTION_ENABLED.key, "true"),
+      (SQLConf.AUTO_BROADCASTJOIN_THRESHOLD.key, "10MB"),
+      ("spark.omni.sql.columnar.broadcastexchange", "false")) {
+      val df = spark.sql("select t1.age * 2, t2.salary from employees_for_fallback_ut_test t1 join employees_for_fallback_ut_test t2 on t1.age = t2.age sort by t1.age")
+      val runRows = df.collect()
+      val expectedRows = Seq(Row(56, 21000), Row(56, 21000),
+        Row(66, 30000), Row(66, 30000),
+        Row(70, 10000), Row(76, 32000),
+        Row(76, 32000), Row(46, 29000),
+        Row(50, 23000), Row(56, 29000),
+        Row(56, 29000), Row(66, 23000),
+        Row(66, 23000),Row(76, 35000),Row(76, 35000))
+      assert(QueryTest.sameRows(runRows, expectedRows).isEmpty, "the run value is error")
+      val omniBhj = df.queryExecution.executedPlan.asInstanceOf[AdaptiveSparkPlanExec].executedPlan.find({
+        case _: ColumnarBroadcastHashJoinExec => true
+        case _ => false
+      })
+      assert(omniBhj.isDefined, "bhj should be columnar")
+      val r2cWithBroadCast = omniBhj.get.children.find({
+        case p: RowToOmniColumnarExec =>
+          p.child.isInstanceOf[BroadcastQueryStageExec] &&
+            p.child.asInstanceOf[BroadcastQueryStageExec].plan.isInstanceOf[BroadcastExchangeExec]
+        case _ => false
+      })
+      assert(r2cWithBroadCast.isDefined, "OmniBhj should use omni r2c to adapt to broadcast exchange")
+    }
+  }
+
   test("Fall back stage contain bhj") {
     withSQLConf(("spark.omni.sql.columnar.wholeStage.fallback.threshold", "3"),
       ("spark.omni.sql.columnar.project", "false"),
       (SQLConf.ADAPTIVE_EXECUTION_ENABLED.key, "true"),
       (SQLConf.AUTO_BROADCASTJOIN_THRESHOLD.key, "10MB")) {
       val df = spark.sql("select t1.age * 2, t2.salary from employees_for_fallback_ut_test t1 join employees_for_fallback_ut_test t2 on t1.age = t2.age sort by t1.age")
-      val runRows = df.collect().sortBy(row => row.getInt(1))
-      val expectedRows = Seq(Row(20000, 35), Row(64000, 38),
-        Row(42000, 28), Row(60000, 33),
-        Row(46000, 33), Row(46000, 33),
-        Row(58000, 28), Row(58000, 28),
-        Row(70000, 38), Row(58000, 23),
-        Row(58000, 23), Row(46000, 25),
-        Row(46000, 25)).sortBy(row => row.getInt(1))
-      QueryTest.sameRows(runRows, expectedRows)
+      val runRows = df.collect()
+      val expectedRows = Seq(Row(56, 21000), Row(56, 21000),
+        Row(66, 30000), Row(66, 30000),
+        Row(70, 10000), Row(76, 32000),
+        Row(76, 32000), Row(46, 29000),
+        Row(50, 23000), Row(56, 29000),
+        Row(56, 29000), Row(66, 23000),
+        Row(66, 23000),Row(76, 35000),Row(76, 35000))
+      assert(QueryTest.sameRows(runRows, expectedRows).isEmpty, "the run value is error")
       val plans = df.queryExecution.executedPlan.asInstanceOf[AdaptiveSparkPlanExec].executedPlan.collect({
         case plan: BroadcastHashJoinExec => plan
       })
@@ -134,7 +194,7 @@ class FallbackStrategiesSuite extends QueryTest with SharedSparkSession {
       val originalPlan = UnaryOp2(UnaryOp1(UnaryOp2(UnaryOp1(LeafOp()))))
       val rule = ColumnarOverrideRules(spark)
       rule.preColumnarTransitions(originalPlan)
-      rule.isSupportAdaptive = true
+      rule.enableAdaptiveContext()
       // Fake output of preColumnarTransitions, mocking replacing UnaryOp1 with UnaryOp1Transformer.
       val planAfterPreOverride =
         UnaryOp2(ColumnarUnaryOp1(UnaryOp2(ColumnarUnaryOp1(LeafOp()))))
@@ -150,7 +210,7 @@ class FallbackStrategiesSuite extends QueryTest with SharedSparkSession {
       val originalPlan = UnaryOp2(UnaryOp1(UnaryOp2(UnaryOp1(LeafOp()))))
       val rule = ColumnarOverrideRules(spark)
       rule.preColumnarTransitions(originalPlan)
-      rule.isSupportAdaptive = true
+      rule.enableAdaptiveContext()
       // Fake output of preColumnarTransitions, mocking replacing UnaryOp1 with UnaryOp1Transformer.
       val planAfterPreOverride =
         UnaryOp2(ColumnarUnaryOp1(UnaryOp2(ColumnarUnaryOp1(LeafOp()))))
@@ -172,8 +232,7 @@ class FallbackStrategiesSuite extends QueryTest with SharedSparkSession {
       val originalPlan = UnaryOp2(UnaryOp1(UnaryOp2(UnaryOp1(LeafOp()))))
       val rule = ColumnarOverrideRules(spark)
       rule.preColumnarTransitions(originalPlan)
-      rule.isSupportAdaptive = true
-      // Fake output of preColumnarTransitions, mocking replacing UnaryOp1 with UnaryOp1Transformer
+      rule.enableAdaptiveContext() // Fake output of preColumnarTransitions, mocking replacing UnaryOp1 with UnaryOp1Transformer
       // and replacing LeafOp with LeafOpTransformer.
       val planAfterPreOverride =
         UnaryOp2(ColumnarUnaryOp1(UnaryOp2(ColumnarUnaryOp1(ColumnarLeafOp()))))
@@ -195,7 +254,7 @@ class FallbackStrategiesSuite extends QueryTest with SharedSparkSession {
       val originalPlan = UnaryOp2(UnaryOp1(UnaryOp2(UnaryOp1(LeafOp()))))
       val rule = ColumnarOverrideRules(spark)
       rule.preColumnarTransitions(originalPlan)
-      rule.isSupportAdaptive = true
+      rule.enableAdaptiveContext()
       // Fake output of preColumnarTransitions, mocking replacing UnaryOp1 with UnaryOp1Transformer
       // and replacing LeafOp with LeafOpTransformer.
       val planAfterPreOverride =
@@ -236,7 +295,7 @@ class FallbackStrategiesSuite extends QueryTest with SharedSparkSession {
       val originalPlan = Exchange1(UnaryOp1(UnaryOp1(UnaryOp1(LeafOp()))))
       val rule = ColumnarOverrideRules(spark)
       rule.preColumnarTransitions(originalPlan)
-      rule.isSupportAdaptive = true
+      rule.enableAdaptiveContext()
       // Fake output of preColumnarTransitions, mocking replacing UnaryOp1 with UnaryOp1Transformer.
       val planAfterPreOverride =
         ColumnarExchange1(ColumnarUnaryOp1(ColumnarUnaryOp1(ColumnarUnaryOp1(ColumnarLeafOp()))))
@@ -257,7 +316,7 @@ class FallbackStrategiesSuite extends QueryTest with SharedSparkSession {
       val originalPlan = Exchange1(UnaryOp1(UnaryOp1(mockQueryStageExec)))
       val rule = ColumnarOverrideRules(spark)
       rule.preColumnarTransitions(originalPlan)
-      rule.isSupportAdaptive = true
+      rule.enableAdaptiveContext()
       // Fake output of preColumnarTransitions, mocking replacing UnaryOp1 with UnaryOp1Transformer.
       val planAfterPreOverride =
         ColumnarExchange1(ColumnarUnaryOp1(UnaryOp1(mockQueryStageExec)))
@@ -327,8 +386,8 @@ case class ColumnarUnaryOp1(
 }
 
 case class Exchange1(
-                              override val child: SparkPlan,
-                              override val supportsColumnar: Boolean = false)
+                      override val child: SparkPlan,
+                      override val supportsColumnar: Boolean = false)
   extends Exchange {
   override protected def doExecute(): RDD[InternalRow] = throw new UnsupportedOperationException()
 
@@ -339,8 +398,8 @@ case class Exchange1(
 }
 
 case class ColumnarExchange1(
-                             override val child: SparkPlan,
-                             override val supportsColumnar: Boolean = true)
+                              override val child: SparkPlan,
+                              override val supportsColumnar: Boolean = true)
   extends Exchange {
   override protected def doExecute(): RDD[InternalRow] = throw new UnsupportedOperationException()
 

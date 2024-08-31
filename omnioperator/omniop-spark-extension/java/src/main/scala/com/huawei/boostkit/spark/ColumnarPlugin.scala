@@ -18,20 +18,20 @@
 
 package com.huawei.boostkit.spark
 
+import com.huawei.boostkit.spark.Constant.OMNI_IS_ADAPTIVE_CONTEXT
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor
 import com.huawei.boostkit.spark.util.PhysicalPlanSelector
-import nova.hetu.omniruntime.memory.MemoryManager
 import org.apache.spark.api.plugin.{DriverPlugin, ExecutorPlugin, SparkPlugin}
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{SparkSession, SparkSessionExtensions}
-import org.apache.spark.sql.catalyst.expressions.{Ascending, DynamicPruningSubquery, Expression, Literal, SortOrder}
+import org.apache.spark.sql.catalyst.expressions.{Ascending, Expression, Literal, SortOrder}
 import org.apache.spark.sql.catalyst.expressions.aggregate.{AggregateExpression, Partial, PartialMerge}
 import org.apache.spark.sql.catalyst.optimizer.{DelayCartesianProduct, HeuristicJoinReorder, MergeSubqueryFilters, RewriteSelfJoinInInPredicate}
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.{BroadcastExchangeExecProxy, RowToOmniColumnarExec, _}
-import org.apache.spark.sql.execution.adaptive.{AQEShuffleReadExec, BroadcastQueryStageExec, OmniAQEShuffleReadExec, QueryStageExec, ShuffleQueryStageExec}
+import org.apache.spark.sql.execution.adaptive.{AQEShuffleReadExec, AdaptiveSparkPlanExec, BroadcastQueryStageExec, OmniAQEShuffleReadExec, QueryStageExec, ShuffleQueryStageExec}
 import org.apache.spark.sql.execution.aggregate.{DummyLogicalPlan, ExtendedAggUtils, HashAggregateExec}
-import org.apache.spark.sql.execution.exchange.{BroadcastExchangeExec, Exchange, ReusedExchangeExec, ShuffleExchangeExec}
+import org.apache.spark.sql.execution.exchange.{BroadcastExchangeExec, ReusedExchangeExec, ShuffleExchangeExec}
 import org.apache.spark.sql.execution.joins._
 import org.apache.spark.sql.execution.window.{TopNPushDownForWindow, WindowExec}
 import org.apache.spark.sql.internal.SQLConf
@@ -43,34 +43,17 @@ import org.apache.spark.sql.execution.util.SparkMemoryUtils.addLeakSafeTaskCompl
 
 import scala.collection.mutable.ListBuffer
 
+import nova.hetu.omniruntime.memory.MemoryManager
+
 case class ColumnarPreOverrides(isSupportAdaptive: Boolean = true)
   extends Rule[SparkPlan] {
   val columnarConf: ColumnarPluginConfig = ColumnarPluginConfig.getSessionConf
-  val enableColumnarFileScan: Boolean = columnarConf.enableColumnarFileScan
-  val enableColumnarProject: Boolean = columnarConf.enableColumnarProject
-  val enableColumnarFilter: Boolean = columnarConf.enableColumnarFilter
-  val enableColumnarExpand: Boolean = columnarConf.enableColumnarExpand
-  val enableColumnarHashAgg: Boolean = columnarConf.enableColumnarHashAgg
-  val enableTakeOrderedAndProject: Boolean = columnarConf.enableTakeOrderedAndProject &&
-    columnarConf.enableColumnarShuffle
-  val enableColumnarBroadcastExchange: Boolean = columnarConf.enableColumnarBroadcastExchange &&
-    columnarConf.enableColumnarBroadcastJoin
-  val enableColumnarBroadcastJoin: Boolean = columnarConf.enableColumnarBroadcastJoin &&
-    columnarConf.enableColumnarBroadcastExchange
-  val enableColumnarSortMergeJoin: Boolean = columnarConf.enableColumnarSortMergeJoin
-  val enableColumnarTopNSort: Boolean = columnarConf.enableColumnarTopNSort
-  val enableColumnarSort: Boolean = columnarConf.enableColumnarSort
-  val enableColumnarWindow: Boolean = columnarConf.enableColumnarWindow
+
   val enableColumnarShuffle: Boolean = columnarConf.enableColumnarShuffle
-  val enableShuffledHashJoin: Boolean = columnarConf.enableShuffledHashJoin
-  val enableColumnarUnion: Boolean = columnarConf.enableColumnarUnion
   val enableFusion: Boolean = columnarConf.enableFusion
   val enableColumnarProjectFusion: Boolean = columnarConf.enableColumnarProjectFusion
-  val enableLocalColumnarLimit: Boolean = columnarConf.enableLocalColumnarLimit
-  val enableGlobalColumnarLimit: Boolean = columnarConf.enableGlobalColumnarLimit
   val enableDedupLeftSemiJoin: Boolean = columnarConf.enableDedupLeftSemiJoin
   val dedupLeftSemiJoinThreshold: Int = columnarConf.dedupLeftSemiJoinThreshold
-  val enableColumnarCoalesce: Boolean = columnarConf.enableColumnarCoalesce
   val enableRollupOptimization: Boolean = columnarConf.enableRollupOptimization
   val enableRowShuffle: Boolean = columnarConf.enableRowShuffle
   val columnsThreshold: Int = columnarConf.columnsThreshold
@@ -92,8 +75,7 @@ case class ColumnarPreOverrides(isSupportAdaptive: Boolean = true)
           plan.children.map(replaceWithColumnarPlan))
     }
     plan match {
-      case plan: FileSourceScanExec
-        if enableColumnarFileScan && checkColumnarBatchSupport(conf, plan) =>
+      case plan: FileSourceScanExec =>
         logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
         ColumnarFileSourceScanExec(
           plan.relation,
@@ -108,13 +90,13 @@ case class ColumnarPreOverrides(isSupportAdaptive: Boolean = true)
         )
       case range: RangeExec =>
         new ColumnarRangeExec(range.range)
-      case plan: ProjectExec if enableColumnarProject =>
+      case plan: ProjectExec =>
         val child = replaceWithColumnarPlan(plan.child)
         logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
         child match {
           case ColumnarFilterExec(condition, child) =>
             ColumnarConditionProjectExec(plan.projectList, condition, child)
-          case join : ColumnarBroadcastHashJoinExec =>
+          case join: ColumnarBroadcastHashJoinExec =>
             if (plan.projectList.forall(project => OmniExpressionAdaptor.isSimpleProjectForAll(project)) && enableColumnarProjectFusion) {
               ColumnarBroadcastHashJoinExec(
                 join.leftKeys,
@@ -129,7 +111,7 @@ case class ColumnarPreOverrides(isSupportAdaptive: Boolean = true)
             } else {
               ColumnarProjectExec(plan.projectList, child)
             }
-          case join : ColumnarShuffledHashJoinExec =>
+          case join: ColumnarShuffledHashJoinExec =>
             if (plan.projectList.forall(project => OmniExpressionAdaptor.isSimpleProjectForAll(project)) && enableColumnarProjectFusion) {
               ColumnarShuffledHashJoinExec(
                 join.leftKeys,
@@ -144,7 +126,7 @@ case class ColumnarPreOverrides(isSupportAdaptive: Boolean = true)
             } else {
               ColumnarProjectExec(plan.projectList, child)
             }
-          case join : ColumnarSortMergeJoinExec =>
+          case join: ColumnarSortMergeJoinExec =>
             if (plan.projectList.forall(project => OmniExpressionAdaptor.isSimpleProjectForAll(project)) && enableColumnarProjectFusion) {
               ColumnarSortMergeJoinExec(
                 join.leftKeys,
@@ -161,30 +143,30 @@ case class ColumnarPreOverrides(isSupportAdaptive: Boolean = true)
           case _ =>
             ColumnarProjectExec(plan.projectList, child)
         }
-      case plan: FilterExec if enableColumnarFilter =>
+      case plan: FilterExec =>
         val child = replaceWithColumnarPlan(plan.child)
         logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
         ColumnarFilterExec(plan.condition, child)
-      case plan: ExpandExec if enableColumnarExpand =>
+      case plan: ExpandExec =>
         val child = replaceWithColumnarPlan(plan.child)
         logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
         ColumnarExpandExec(plan.projections, plan.output, child)
-      case plan: HashAggregateExec if enableColumnarHashAgg =>
+      case plan: HashAggregateExec =>
         val child = replaceWithColumnarPlan(plan.child)
         logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
         if (enableFusion && !isSupportAdaptive) {
           if (plan.aggregateExpressions.forall(_.mode == Partial)) {
             child match {
-              case proj1 @ ColumnarProjectExec(_,
-              join1 @ ColumnarBroadcastHashJoinExec(_, _, _, _, _,
-              proj2 @ ColumnarProjectExec(_,
-              join2 @ ColumnarBroadcastHashJoinExec(_, _, _, _, _,
-              proj3 @ ColumnarProjectExec(_,
-              join3 @ ColumnarBroadcastHashJoinExec(_, _, _, _, _,
-              proj4 @ ColumnarProjectExec(_,
-              join4 @ ColumnarBroadcastHashJoinExec(_, _, _, _, _,
-              filter @ ColumnarFilterExec(_,
-              scan @ ColumnarFileSourceScanExec(_, _, _, _, _, _, _, _, _)
+              case proj1@ColumnarProjectExec(_,
+              join1@ColumnarBroadcastHashJoinExec(_, _, _, _, _,
+              proj2@ColumnarProjectExec(_,
+              join2@ColumnarBroadcastHashJoinExec(_, _, _, _, _,
+              proj3@ColumnarProjectExec(_,
+              join3@ColumnarBroadcastHashJoinExec(_, _, _, _, _,
+              proj4@ColumnarProjectExec(_,
+              join4@ColumnarBroadcastHashJoinExec(_, _, _, _, _,
+              filter@ColumnarFilterExec(_,
+              scan@ColumnarFileSourceScanExec(_, _, _, _, _, _, _, _, _)
               ), _, _, _)), _, _, _)), _, _, _)), _, _, _))
                 if checkBhjRightChild(
                   child.asInstanceOf[ColumnarProjectExec].child.children(1)
@@ -209,14 +191,14 @@ case class ColumnarPreOverrides(isSupportAdaptive: Boolean = true)
                   scan.dataFilters,
                   scan.tableIdentifier,
                   scan.disableBucketedScan)
-              case proj1 @ ColumnarProjectExec(_,
-              join1 @ ColumnarBroadcastHashJoinExec(_, _, _, _, _,
-              proj2 @ ColumnarProjectExec(_,
-              join2 @ ColumnarBroadcastHashJoinExec(_, _, _, _, _,
-              proj3 @ ColumnarProjectExec(_,
-              join3 @ ColumnarBroadcastHashJoinExec(_, _, _, _, _, _,
-              filter @ ColumnarFilterExec(_,
-              scan @ ColumnarFileSourceScanExec(_, _, _, _, _, _, _, _, _)), _, _)) , _, _, _)), _, _, _))
+              case proj1@ColumnarProjectExec(_,
+              join1@ColumnarBroadcastHashJoinExec(_, _, _, _, _,
+              proj2@ColumnarProjectExec(_,
+              join2@ColumnarBroadcastHashJoinExec(_, _, _, _, _,
+              proj3@ColumnarProjectExec(_,
+              join3@ColumnarBroadcastHashJoinExec(_, _, _, _, _, _,
+              filter@ColumnarFilterExec(_,
+              scan@ColumnarFileSourceScanExec(_, _, _, _, _, _, _, _, _)), _, _)), _, _, _)), _, _, _))
                 if checkBhjRightChild(
                   child.asInstanceOf[ColumnarProjectExec].child.children(1)
                     .asInstanceOf[ColumnarBroadcastExchangeExec].child) =>
@@ -238,14 +220,14 @@ case class ColumnarPreOverrides(isSupportAdaptive: Boolean = true)
                   scan.dataFilters,
                   scan.tableIdentifier,
                   scan.disableBucketedScan)
-              case proj1 @ ColumnarProjectExec(_,
-              join1 @ ColumnarBroadcastHashJoinExec(_, _, _, _, _,
-              proj2 @ ColumnarProjectExec(_,
-              join2 @ ColumnarBroadcastHashJoinExec(_, _, _, _, _,
-              proj3 @ ColumnarProjectExec(_,
-              join3 @ ColumnarBroadcastHashJoinExec(_, _, _, _, _,
-              filter @ ColumnarFilterExec(_,
-              scan @ ColumnarFileSourceScanExec(_, _, _, _, _, _, _, _, _)), _, _, _)) , _, _, _)), _, _, _))
+              case proj1@ColumnarProjectExec(_,
+              join1@ColumnarBroadcastHashJoinExec(_, _, _, _, _,
+              proj2@ColumnarProjectExec(_,
+              join2@ColumnarBroadcastHashJoinExec(_, _, _, _, _,
+              proj3@ColumnarProjectExec(_,
+              join3@ColumnarBroadcastHashJoinExec(_, _, _, _, _,
+              filter@ColumnarFilterExec(_,
+              scan@ColumnarFileSourceScanExec(_, _, _, _, _, _, _, _, _)), _, _, _)), _, _, _)), _, _, _))
                 if checkBhjRightChild(
                   child.asInstanceOf[ColumnarProjectExec].child.children(1)
                     .asInstanceOf[ColumnarBroadcastExchangeExec].child) =>
@@ -380,7 +362,7 @@ case class ColumnarPreOverrides(isSupportAdaptive: Boolean = true)
           }
         }
 
-      case plan: TakeOrderedAndProjectExec if enableTakeOrderedAndProject =>
+      case plan: TakeOrderedAndProjectExec =>
         val child = replaceWithColumnarPlan(plan.child)
         logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
         ColumnarTakeOrderedAndProjectExec(
@@ -388,11 +370,11 @@ case class ColumnarPreOverrides(isSupportAdaptive: Boolean = true)
           plan.sortOrder,
           plan.projectList,
           child)
-      case plan: BroadcastExchangeExec if enableColumnarBroadcastExchange =>
+      case plan: BroadcastExchangeExec =>
         val child = replaceWithColumnarPlan(plan.child)
         logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
         new ColumnarBroadcastExchangeExec(plan.mode, child)
-      case plan: BroadcastHashJoinExec if enableColumnarBroadcastJoin =>
+      case plan: BroadcastHashJoinExec =>
         logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
         val left = replaceWithColumnarPlan(plan.left)
         val right = replaceWithColumnarPlan(plan.right)
@@ -405,7 +387,7 @@ case class ColumnarPreOverrides(isSupportAdaptive: Boolean = true)
           plan.condition,
           left,
           right)
-      case plan: ShuffledHashJoinExec if enableShuffledHashJoin && enableDedupLeftSemiJoin && !SQLConf.get.adaptiveExecutionEnabled => {
+      case plan: ShuffledHashJoinExec if enableDedupLeftSemiJoin && !SQLConf.get.adaptiveExecutionEnabled => {
         plan.joinType match {
           case LeftSemi => {
             if (plan.condition.isEmpty && plan.right.output.size >= dedupLeftSemiJoinThreshold) {
@@ -471,7 +453,7 @@ case class ColumnarPreOverrides(isSupportAdaptive: Boolean = true)
           }
         }
       }
-      case plan: ShuffledHashJoinExec if enableShuffledHashJoin =>
+      case plan: ShuffledHashJoinExec =>
         val left = replaceWithColumnarPlan(plan.left)
         val right = replaceWithColumnarPlan(plan.right)
         logDebug(s"Columnar Processing for ${plan.getClass} is currently supported.")
@@ -484,7 +466,7 @@ case class ColumnarPreOverrides(isSupportAdaptive: Boolean = true)
           left,
           right,
           plan.isSkewJoin)
-      case plan: SortMergeJoinExec if enableColumnarSortMergeJoin =>
+      case plan: SortMergeJoinExec =>
         logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
         val left = replaceWithColumnarPlan(plan.left)
         val right = replaceWithColumnarPlan(plan.right)
@@ -497,15 +479,15 @@ case class ColumnarPreOverrides(isSupportAdaptive: Boolean = true)
           left,
           right,
           plan.isSkewJoin)
-      case plan: TopNSortExec if enableColumnarTopNSort =>
+      case plan: TopNSortExec =>
         val child = replaceWithColumnarPlan(plan.child)
         logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
         ColumnarTopNSortExec(plan.n, plan.strictTopN, plan.partitionSpec, plan.sortOrder, plan.global, child)
-      case plan: SortExec if enableColumnarSort =>
+      case plan: SortExec =>
         val child = replaceWithColumnarPlan(plan.child)
         logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
         ColumnarSortExec(plan.sortOrder, plan.global, child, plan.testSpillFrequency)
-      case plan: WindowExec if enableColumnarWindow =>
+      case plan: WindowExec =>
         val child = replaceWithColumnarPlan(plan.child)
         if (child.output.isEmpty) {
           return plan
@@ -521,20 +503,18 @@ case class ColumnarPreOverrides(isSupportAdaptive: Boolean = true)
           case _ =>
             ColumnarWindowExec(plan.windowExpression, plan.partitionSpec, plan.orderSpec, child)
         }
-      case plan: UnionExec if enableColumnarUnion =>
+      case plan: UnionExec =>
         val children = plan.children.map(replaceWithColumnarPlan)
         logDebug(s"Columnar Processing for ${plan.getClass} is currently supported.")
         ColumnarUnionExec(children)
-      case plan: ShuffleExchangeExec if enableColumnarShuffle || enableRowShuffle =>
+      case plan: ShuffleExchangeExec =>
         val child = replaceWithColumnarPlan(plan.child)
         if (child.output.nonEmpty) {
           logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
           if (child.output.size > columnsThreshold && enableRowShuffle) {
             new ColumnarShuffleExchangeExec(plan.outputPartitioning, child, plan.shuffleOrigin, true)
-          } else if (enableColumnarShuffle) {
-            new ColumnarShuffleExchangeExec(plan.outputPartitioning, child, plan.shuffleOrigin, false)
           } else {
-            plan
+            new ColumnarShuffleExchangeExec(plan.outputPartitioning, child, plan.shuffleOrigin, false)
           }
         } else {
           plan
@@ -560,15 +540,15 @@ case class ColumnarPreOverrides(isSupportAdaptive: Boolean = true)
           case _ =>
             plan
         }
-      case plan: LocalLimitExec if enableLocalColumnarLimit =>
+      case plan: LocalLimitExec =>
         val child = replaceWithColumnarPlan(plan.child)
         logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
         ColumnarLocalLimitExec(plan.limit, child)
-      case plan: GlobalLimitExec if enableGlobalColumnarLimit =>
+      case plan: GlobalLimitExec =>
         val child = replaceWithColumnarPlan(plan.child)
         logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
         ColumnarGlobalLimitExec(plan.limit, child)
-      case plan: CoalesceExec if enableColumnarCoalesce =>
+      case plan: CoalesceExec =>
         val child = replaceWithColumnarPlan(plan.child)
         logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
         ColumnarCoalesceExec(plan.numPartitions, child)
@@ -585,10 +565,9 @@ case class ColumnarPreOverrides(isSupportAdaptive: Boolean = true)
   }
 }
 
-case class ColumnarPostOverrides() extends Rule[SparkPlan] {
+case class ColumnarPostOverrides(isSupportAdaptive: Boolean = true) extends Rule[SparkPlan] {
 
   val columnarConf: ColumnarPluginConfig = ColumnarPluginConfig.getSessionConf
-  var isSupportAdaptive: Boolean = true
 
   def apply(plan: SparkPlan): SparkPlan = {
     logInfo("Using BoostKit Spark Native Sql Engine Extension ColumnarPostOverrides")
@@ -598,9 +577,9 @@ case class ColumnarPostOverrides() extends Rule[SparkPlan] {
   private def handleColumnarToRowPartialFetch(plan: SparkPlan): SparkPlan = {
     // simple check plan tree have OmniColumnarToRow and no LimitExec and TakeOrderedAndProjectExec plan
     val noPartialFetch = if (plan.find(_.isInstanceOf[OmniColumnarToRowExec]).isDefined) {
-        (!plan.find(node =>
-            node.isInstanceOf[LimitExec] || node.isInstanceOf[TakeOrderedAndProjectExec] ||
-            node.isInstanceOf[SortMergeJoinExec]).isDefined)
+      (!plan.find(node =>
+        node.isInstanceOf[LimitExec] || node.isInstanceOf[TakeOrderedAndProjectExec] ||
+          node.isInstanceOf[SortMergeJoinExec]).isDefined)
     } else {
       false
     }
@@ -610,8 +589,6 @@ case class ColumnarPostOverrides() extends Rule[SparkPlan] {
     }
     newPlan
   }
-
-  def setAdaptiveSupport(enable: Boolean): Unit = { isSupportAdaptive = enable }
 
   def replaceWithColumnarPlan(plan: SparkPlan): SparkPlan = plan match {
     case plan: RowToColumnarExec =>
@@ -660,7 +637,7 @@ case class ColumnarPostOverrides() extends Rule[SparkPlan] {
       p.withNewChildren(children)
   }
 
-  def replaceColumnarToRow(plan: ColumnarToRowExec, conf: SQLConf) : SparkPlan = {
+  def replaceColumnarToRow(plan: ColumnarToRowExec, conf: SQLConf): SparkPlan = {
     val child = replaceWithColumnarPlan(plan.child)
     if (conf.getConfString("spark.omni.sql.columnar.columnarToRow", "true").toBoolean) {
       OmniColumnarToRowExec(child)
@@ -672,12 +649,14 @@ case class ColumnarPostOverrides() extends Rule[SparkPlan] {
 
 case class ColumnarOverrideRules(session: SparkSession) extends ColumnarRule with Logging {
 
-  private def preOverrides: List[SparkSession => Rule[SparkPlan]] = List(
+  private def preOverrides(): List[SparkSession => Rule[SparkPlan]] = List(
     FallbackMultiCodegens,
     (_: SparkSession) => AddTransformHintRule(),
-    (_: SparkSession) => ColumnarPreOverrides(isSupportAdaptive))
+    (_: SparkSession) => ColumnarPreOverrides(isAdaptiveContext))
 
-  private def postOverrides: ColumnarPostOverrides = ColumnarPostOverrides()
+  private def postOverrides(): List[SparkSession => Rule[SparkPlan]] = List(
+    (_: SparkSession) => ColumnarPostOverrides(isAdaptiveContext)
+  )
 
   private def finallyRules(): List[SparkSession => Rule[SparkPlan]] = {
     List(
@@ -686,8 +665,8 @@ case class ColumnarOverrideRules(session: SparkSession) extends ColumnarRule wit
   }
 
   private def transformPlan(getRules: List[SparkSession => Rule[SparkPlan]],
-                             plan: SparkPlan,
-                             step: String) = {
+                            plan: SparkPlan,
+                            step: String) = {
     logDebug(
       s"${step}ColumnarTransitions preOverriden plan:\n${plan.toString}")
     val overridden = getRules.foldLeft(plan) {
@@ -701,9 +680,16 @@ case class ColumnarOverrideRules(session: SparkSession) extends ColumnarRule wit
     overridden
   }
 
+  // Just for test use.
+  def enableAdaptiveContext(): Unit = {
+    session.sparkContext.setLocalProperty(OMNI_IS_ADAPTIVE_CONTEXT, "true")
+  }
+
   // Holds the original plan for possible entire fallback.
   private val localOriginalPlans: ThreadLocal[ListBuffer[SparkPlan]] =
     ThreadLocal.withInitial(() => ListBuffer.empty[SparkPlan])
+  private val localIsAdaptiveContextFlags: ThreadLocal[ListBuffer[Boolean]] =
+    ThreadLocal.withInitial(() => ListBuffer.empty[Boolean])
 
   private def setOriginalPlan(plan: SparkPlan): Unit = {
     localOriginalPlans.get.prepend(plan)
@@ -718,31 +704,41 @@ case class ColumnarOverrideRules(session: SparkSession) extends ColumnarRule wit
   private def resetOriginalPlan(): Unit = localOriginalPlans.get.remove(0)
 
   private def fallbackPolicy(): List[SparkSession => Rule[SparkPlan]] = {
-    List((_: SparkSession) => ExpandFallbackPolicy(isSupportAdaptive, originalPlan))
+    List((_: SparkSession) => ExpandFallbackPolicy(isAdaptiveContext, originalPlan))
   }
 
-  var isSupportAdaptive: Boolean = true
+  // This is an empirical value, may need to be changed for supporting other versions of spark.
+  private val aqeStackTraceIndex = 14
 
-  private def supportAdaptive(plan: SparkPlan): Boolean = {
-    // Only QueryStage will have Exchange as Leaf Plan
-    val isLeafPlanExchange = plan match {
-      case e: Exchange => true
-      case other => false
-    }
-    isLeafPlanExchange || (SQLConf.get.adaptiveExecutionEnabled && (sanityCheck(plan) &&
-      !plan.logicalLink.exists(_.isStreaming) &&
-      !plan.expressions.exists(_.find(_.isInstanceOf[DynamicPruningSubquery]).isDefined) &&
-      plan.children.forall(supportAdaptive)))
+  private def setAdaptiveContext(): Unit = {
+    val traceElements = Thread.currentThread.getStackTrace
+    assert(
+      traceElements.length > aqeStackTraceIndex,
+      s"The number of stack trace elements is expected to be more than $aqeStackTraceIndex")
+    // ApplyColumnarRulesAndInsertTransitions is called by either QueryExecution or
+    // AdaptiveSparkPlanExec. So by checking the stack trace, we can know whether
+    // columnar rule will be applied in adaptive execution context. This part of code
+    // needs to be carefully checked when supporting higher versions of spark to make
+    // sure the calling stack has not been changed.
+    localIsAdaptiveContextFlags
+      .get()
+      .prepend(
+        traceElements(aqeStackTraceIndex).getClassName
+          .equals(AdaptiveSparkPlanExec.getClass.getName))
   }
 
-  private def sanityCheck(plan: SparkPlan): Boolean =
-    plan.logicalLink.isDefined
+  private def resetAdaptiveContext(): Unit =
+    localIsAdaptiveContextFlags.get().remove(0)
+
+  def isAdaptiveContext: Boolean = Option(session.sparkContext.getLocalProperty(OMNI_IS_ADAPTIVE_CONTEXT))
+    .getOrElse("false")
+    .toBoolean || localIsAdaptiveContextFlags.get().head
 
   override def preColumnarTransitions: Rule[SparkPlan] = plan => PhysicalPlanSelector.
     maybe(session, plan) {
-      isSupportAdaptive = supportAdaptive(plan)
+      setAdaptiveContext()
       setOriginalPlan(plan)
-      transformPlan(preOverrides, plan, "pre")
+      transformPlan(preOverrides(), plan, "pre")
     }
 
   override def postColumnarTransitions: Rule[SparkPlan] = plan => PhysicalPlanSelector.
@@ -754,11 +750,10 @@ case class ColumnarOverrideRules(session: SparkSession) extends ColumnarRule wit
           // skip c2r and r2c replaceWithColumnarPlan
           fallbackPlan
         case plan =>
-          val rule = postOverrides
-          rule.setAdaptiveSupport(isSupportAdaptive)
-          rule(plan)
+          transformPlan(postOverrides(), plan, "post")
       }
       resetOriginalPlan()
+      resetAdaptiveContext()
       transformPlan(finallyRules(), finalPlan, "final")
     }
 }
@@ -780,7 +775,6 @@ class ColumnarPlugin extends (SparkSessionExtensions => Unit) with Logging {
     extensions.injectOptimizerRule(_ => DelayCartesianProduct)
     extensions.injectOptimizerRule(_ => HeuristicJoinReorder)
     extensions.injectOptimizerRule(_ => MergeSubqueryFilters)
-    extensions.injectQueryStagePrepRule(session => FallbackBroadcastExchange(session))
     extensions.injectQueryStagePrepRule(session => DedupLeftSemiJoinAQE(session))
     extensions.injectQueryStagePrepRule(_ => TopNPushDownForWindow)
   }

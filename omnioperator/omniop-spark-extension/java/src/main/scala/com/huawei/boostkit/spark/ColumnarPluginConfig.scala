@@ -274,8 +274,13 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
   val enableBloomfilterSubqueryReuse: Boolean =
     conf.getConfString("spark.omni.sql.columnar.bloomfilterSubqueryReuse", "false").toBoolean
 
+  // The threshold for whether whole stage will fall back in AQE supported case by counting the number of vanilla SparkPlan.
+  // If it is set to -1, it means that this function is turned off
+  // otherwise, when the number of vanilla SparkPlan of the stage is greater than or equal to the threshold,
+  // all the SparkPlan of the stage will be fallback to vanilla SparkPlan
   val wholeStageFallbackThreshold: Int = conf.getConfString("spark.omni.sql.columnar.wholeStage.fallback.threshold", "-1").toInt
 
+  // it is same with wholeStageFallbackThreshold, but it is used for non AQE
   val queryFallbackThreshold: Int = conf.getConfString("spark.omni.sql.columnar.query.fallback.threshold", "-1").toInt
 }
 

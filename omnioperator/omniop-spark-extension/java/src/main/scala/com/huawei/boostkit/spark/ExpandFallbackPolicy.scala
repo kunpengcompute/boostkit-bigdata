@@ -23,18 +23,18 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.Attribute
 import org.apache.spark.sql.catalyst.rules.Rule
-import org.apache.spark.sql.execution.adaptive.{AQEShuffleReadExec, AdaptiveSparkPlanExec, BroadcastQueryStageExec, QueryStageExec, ShuffleQueryStageExec}
+import org.apache.spark.sql.execution.adaptive.{AQEShuffleReadExec, AdaptiveSparkPlanExec, BroadcastQueryStageExec, OmniAQEShuffleReadExec, QueryStageExec, ShuffleQueryStageExec}
 import org.apache.spark.sql.execution.command.ExecutedCommandExec
-import org.apache.spark.sql.execution.exchange.{BroadcastExchangeExec, ReusedExchangeExec}
 import org.apache.spark.sql.execution.joins.ColumnarBroadcastHashJoinExec
 import org.apache.spark.sql.execution._
+import org.apache.spark.sql.execution.exchange.ReusedExchangeExec
 
 /**
  * Note, this rule should only fallback to row-based plan if there is no harm.
  * The follow case should be handled carefully
  *
  * @param isAdaptiveContext If is inside AQE
- * @param originalPlan      The vanilla SparkPlan without apply gluten transform rules
+ * @param originalPlan      The vanilla SparkPlan without apply boostkit extension transform rules
  *
  * */
 case class ExpandFallbackPolicy(isAdaptiveContext: Boolean, originalPlan: SparkPlan)
@@ -53,10 +53,10 @@ case class ExpandFallbackPolicy(isAdaptiveContext: Boolean, originalPlan: SparkP
         case leafPlan: LeafExecNode if !isOmniSparkPlan(leafPlan) =>
           // Possible fallback for leaf node.
           fallbacks = fallbacks + 1
-        case p:ColumnarToRowExec => p.children.foreach(countFallbackInternal)
-        case p:RowToColumnarExec => p.children.foreach(countFallbackInternal)
+        case p@(ColumnarToRowExec(_) | RowToColumnarExec(_)) =>
+          p.children.foreach(countFallbackInternal)
         case p =>
-          if(!isOmniSparkPlan(p)) {
+          if (!isOmniSparkPlan(p)) {
             fallbacks = fallbacks + 1
           }
           p.children.foreach(countFallbackInternal)
@@ -100,17 +100,11 @@ case class ExpandFallbackPolicy(isAdaptiveContext: Boolean, originalPlan: SparkP
       return None
     }
 
-    // todo 157-162添加適配后是否需要添加這段邏輯
-    //    // not safe to fallback row-based BHJ as the broadcast exchange is already columnar
-    //    if (hasColumnarBroadcastExchangeWithJoin(plan)) {
-    //      return None
-    //    }
+    val fallbackNum = countFallback(plan)
 
-    val netFallbackNum = countFallback(plan)
-
-    if (netFallbackNum >= fallbackThreshold) {
+    if (fallbackNum >= fallbackThreshold) {
       Some(
-        s"Fallback policy is taking effect, net fallback number: $netFallbackNum, " +
+        s"Fallback policy is taking effect, net fallback number: $fallbackNum, " +
           s"threshold: $fallbackThreshold")
     } else {
       None
@@ -118,17 +112,31 @@ case class ExpandFallbackPolicy(isAdaptiveContext: Boolean, originalPlan: SparkP
   }
 
   private def fallbackToRowBasedPlan(): SparkPlan = {
-    val columnarPostOverrides = ColumnarPostOverrides()
+    val columnarPostOverrides = ColumnarPostOverrides(isAdaptiveContext)
     val planWithColumnarToRow = InsertTransitions.insertTransitions(originalPlan, false)
     planWithColumnarToRow.transform {
-      case ColumnarToRowExec(bqe: BroadcastQueryStageExec) if bqe.plan.isInstanceOf[ColumnarBroadcastExchangeExec] =>
-        val columnarBroadcastExchangeExec = bqe.plan.asInstanceOf[ColumnarBroadcastExchangeExec]
-        BroadcastQueryStageExec(bqe.id, BroadcastExchangeExec(columnarBroadcastExchangeExec.mode, ColumnarBroadcastExchangeAdaptorExec(columnarBroadcastExchangeExec, 1)), bqe._canonicalized)
-      case ColumnarToRowExec(bqe: BroadcastQueryStageExec) if bqe.plan.isInstanceOf[ReusedExchangeExec] && bqe.plan.asInstanceOf[ReusedExchangeExec].child.isInstanceOf[ColumnarBroadcastExchangeExec] =>
-        val columnarBroadcastExchangeExec = bqe.plan.asInstanceOf[ReusedExchangeExec].child.asInstanceOf[ColumnarBroadcastExchangeExec]
-        BroadcastQueryStageExec(bqe.id, BroadcastExchangeExec(columnarBroadcastExchangeExec.mode, ColumnarBroadcastExchangeAdaptorExec(columnarBroadcastExchangeExec, 1)), bqe._canonicalized)
-      case c2r@(ColumnarToRowExec(_: ShuffleQueryStageExec) | ColumnarToRowExec(_: AQEShuffleReadExec)) =>
+      case c2r@(ColumnarToRowExec(_: ShuffleQueryStageExec) |
+                ColumnarToRowExec(_: BroadcastQueryStageExec)) =>
         columnarPostOverrides.replaceColumnarToRow(c2r.asInstanceOf[ColumnarToRowExec], conf)
+      case c2r@ColumnarToRowExec(aqeShuffleReadExec: AQEShuffleReadExec) =>
+        val newPlan = columnarPostOverrides.replaceColumnarToRow(c2r, conf)
+        newPlan.withNewChildren(Seq(aqeShuffleReadExec.child match {
+          case _: ColumnarShuffleExchangeExec =>
+            OmniAQEShuffleReadExec(aqeShuffleReadExec.child, aqeShuffleReadExec.partitionSpecs)
+          case ShuffleQueryStageExec(_, _: ColumnarShuffleExchangeExec, _) =>
+            OmniAQEShuffleReadExec(aqeShuffleReadExec.child, aqeShuffleReadExec.partitionSpecs)
+          case ShuffleQueryStageExec(_, reused: ReusedExchangeExec, _) =>
+            reused match {
+              case ReusedExchangeExec(_, _: ColumnarShuffleExchangeExec) =>
+                OmniAQEShuffleReadExec(
+                  aqeShuffleReadExec.child,
+                  aqeShuffleReadExec.partitionSpecs)
+              case _ =>
+                aqeShuffleReadExec
+            }
+          case _ =>
+            aqeShuffleReadExec
+        }))
     }
   }
 
@@ -136,6 +144,9 @@ case class ExpandFallbackPolicy(isAdaptiveContext: Boolean, originalPlan: SparkP
     logInfo("Using BoostKit Spark Native Sql Engine Extension FallbackPolicy")
     val reason = fallback(plan)
     if (reason.isDefined) {
+      if (hasColumnarBroadcastExchangeWithJoin(plan)) {
+        logDebug("plan fallback using ExpandFallbackPolicy contains ColumnarBroadcastExchange")
+      }
       val fallbackPlan = fallbackToRowBasedPlan()
       TransformHints.tagAllNotTransformable(fallbackPlan, reason.get)
       FallbackNode(fallbackPlan)

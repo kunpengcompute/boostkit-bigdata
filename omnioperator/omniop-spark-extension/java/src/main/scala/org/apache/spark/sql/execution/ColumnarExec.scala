@@ -17,26 +17,23 @@
 
 package org.apache.spark.sql.execution
 
-import java.util.concurrent.TimeUnit.NANOSECONDS
-
-import scala.collection.JavaConverters._
-import scala.collection.mutable.ListBuffer
-
 import org.apache.spark.broadcast
+import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{Attribute, SortOrder, SpecializedGetters, UnsafeProjection}
 import org.apache.spark.sql.catalyst.plans.physical.Partitioning
-import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.metric.{SQLMetric, SQLMetrics}
-import org.apache.spark.sql.execution.util.SparkMemoryUtils
+import org.apache.spark.sql.execution.util.{BroadcastUtils, SparkMemoryUtils}
 import org.apache.spark.sql.execution.vectorized.{OffHeapColumnVector, OmniColumnVector, WritableColumnVector}
-import org.apache.spark.sql.types.{BinaryType, BooleanType, ByteType, CalendarIntervalType, DataType, DateType, DecimalType, DoubleType, IntegerType, LongType, ShortType, StringType, StructType, TimestampType}
+import org.apache.spark.sql.types._
 import org.apache.spark.sql.vectorized.ColumnarBatch
-import org.apache.spark.util.Utils
+
+import java.util.concurrent.TimeUnit.NANOSECONDS
+import scala.collection.JavaConverters._
+import scala.collection.mutable.ListBuffer
 
 import nova.hetu.omniruntime.vector.Vec
-
 
 /**
  * Provides an optimized set of APIs to append row based data to an array of
@@ -205,7 +202,32 @@ case class RowToOmniColumnarExec(child: SparkPlan) extends RowToColumnarTransiti
   }
 
   override def doExecuteBroadcast[T](): broadcast.Broadcast[T] = {
-    child.doExecuteBroadcast()
+    val numInputRows = longMetric("numInputRows")
+    val numOutputBatches = longMetric("numOutputBatches")
+    val rowToOmniColumnarTime = longMetric("rowToOmniColumnarTime")
+    // Instead of creating a new config we are reusing columnBatchSize. In the future if we do
+    // combine with some of the Arrow conversion tools we will need to unify some of the configs.
+    val numRows = conf.columnBatchSize
+    val enableOffHeapColumnVector = session.sqlContext.conf.offHeapColumnVectorEnabled
+    val localSchema = this.schema
+    val relation = child.executeBroadcast()
+    val mode = BroadcastUtils.getBroadCastMode(outputPartitioning)
+    val broadcast: Broadcast[T] = BroadcastUtils.sparkToOmniUnsafe(sparkContext,
+      mode,
+      relation,
+      logError,
+      InternalRowToColumnarBatch.convert(
+        enableOffHeapColumnVector,
+        numInputRows,
+        numOutputBatches,
+        rowToOmniColumnarTime,
+        numRows,
+        localSchema,
+        _)
+    )
+    val executionId = sparkContext.getLocalProperty(SQLExecution.EXECUTION_ID_KEY)
+    SQLMetrics.postDriverMetricUpdates(sparkContext, executionId, Seq(numInputRows, numOutputBatches, rowToOmniColumnarTime))
+    broadcast
   }
 
   override def nodeName: String = "RowToOmniColumnar"
@@ -233,44 +255,10 @@ case class RowToOmniColumnarExec(child: SparkPlan) extends RowToColumnarTransiti
     // plan (this) in the closure.
     val localSchema = this.schema
     child.execute().mapPartitionsInternal { rowIterator =>
-      if (rowIterator.hasNext) {
-        new Iterator[ColumnarBatch] {
-          private val converters = new OmniRowToColumnConverter(localSchema)
-
-          override def hasNext: Boolean = {
-            rowIterator.hasNext
-          }
-
-          override def next(): ColumnarBatch = {
-            val startTime = System.nanoTime()
-            val vectors: Seq[WritableColumnVector] = OmniColumnVector.allocateColumns(numRows,
-              localSchema, true)
-            val cb: ColumnarBatch = new ColumnarBatch(vectors.toArray)
-            cb.setNumRows(0)
-            vectors.foreach(_.reset())
-            var rowCount = 0
-            while (rowCount < numRows && rowIterator.hasNext) {
-              val row = rowIterator.next()
-              converters.convert(row, vectors.toArray)
-              rowCount += 1
-            }
-            if (!enableOffHeapColumnVector) {
-              vectors.foreach { v =>
-                v.asInstanceOf[OmniColumnVector].getVec.setSize(rowCount)
-              }
-            }
-            cb.setNumRows(rowCount)
-            numInputRows += rowCount
-            numOutputBatches += 1
-            rowToOmniColumnarTime += NANOSECONDS.toMillis(System.nanoTime() - startTime)
-            cb
-          }
-        }
-      } else {
-        Iterator.empty
-      }
+      InternalRowToColumnarBatch.convert(enableOffHeapColumnVector, numInputRows, numOutputBatches, rowToOmniColumnarTime, numRows, localSchema, rowIterator)
     }
   }
+
 }
 
 
@@ -298,6 +286,23 @@ case class OmniColumnarToRowExec(child: SparkPlan,
        |""".stripMargin
   }
 
+  override def doExecuteBroadcast[T](): Broadcast[T] = {
+    val numOutputRows = longMetric("numOutputRows")
+    val numInputBatches = longMetric("numInputBatches")
+    val omniColumnarToRowTime = longMetric("omniColumnarToRowTime")
+    val mode = BroadcastUtils.getBroadCastMode(outputPartitioning)
+    val relation = child.executeBroadcast()
+    val broadcast: Broadcast[T] = BroadcastUtils.omniToSparkUnsafe(sparkContext,
+      mode,
+      relation,
+      StructType.fromAttributes(output),
+      ColumnarBatchToInternalRow.convert(output, _, numOutputRows, numInputBatches, omniColumnarToRowTime)
+    )
+    val executionId = sparkContext.getLocalProperty(SQLExecution.EXECUTION_ID_KEY)
+    SQLMetrics.postDriverMetricUpdates(sparkContext, executionId, Seq(numOutputRows, numInputBatches, omniColumnarToRowTime))
+    broadcast
+  }
+
   override def doExecute(): RDD[InternalRow] = {
     val numOutputRows = longMetric("numOutputRows")
     val numInputBatches = longMetric("numInputBatches")
@@ -311,7 +316,55 @@ case class OmniColumnarToRowExec(child: SparkPlan,
   }
 
   override protected def withNewChildInternal(newChild: SparkPlan):
-    OmniColumnarToRowExec = copy(child = newChild)
+  OmniColumnarToRowExec = copy(child = newChild)
+}
+
+object InternalRowToColumnarBatch {
+
+  def convert(enableOffHeapColumnVector: Boolean,
+              numInputRows: SQLMetric,
+              numOutputBatches: SQLMetric,
+              rowToOmniColumnarTime: SQLMetric,
+              numRows: Int, localSchema: StructType,
+              rowIterator: Iterator[InternalRow]): Iterator[ColumnarBatch] = {
+    if (rowIterator.hasNext) {
+      new Iterator[ColumnarBatch] {
+        private val converters = new OmniRowToColumnConverter(localSchema)
+
+        override def hasNext: Boolean = {
+          rowIterator.hasNext
+        }
+
+        override def next(): ColumnarBatch = {
+          val startTime = System.nanoTime()
+          val vectors: Seq[WritableColumnVector] = OmniColumnVector.allocateColumns(numRows,
+            localSchema, true)
+          val cb: ColumnarBatch = new ColumnarBatch(vectors.toArray)
+          cb.setNumRows(0)
+          vectors.foreach(_.reset())
+          var rowCount = 0
+          while (rowCount < numRows && rowIterator.hasNext) {
+            val row = rowIterator.next()
+            converters.convert(row, vectors.toArray)
+            rowCount += 1
+          }
+          if (!enableOffHeapColumnVector) {
+            vectors.foreach { v =>
+              v.asInstanceOf[OmniColumnVector].getVec.setSize(rowCount)
+            }
+          }
+          cb.setNumRows(rowCount)
+          numInputRows += rowCount
+          numOutputBatches += 1
+          rowToOmniColumnarTime += NANOSECONDS.toMillis(System.nanoTime() - startTime)
+          cb
+        }
+      }
+    } else {
+      Iterator.empty
+    }
+  }
+
 }
 
 object ColumnarBatchToInternalRow {
@@ -346,16 +399,16 @@ object ColumnarBatchToInternalRow {
 
 
         SparkMemoryUtils.addLeakSafeTaskCompletionListener { _ =>
-            toClosedVecs.foreach {vec =>
-              vec.close()
-            }
+          toClosedVecs.foreach { vec =>
+            vec.close()
+          }
         }
 
-        override  def hasNext: Boolean = {
+        override def hasNext: Boolean = {
           val has = iter.hasNext
           // fetch all rows
           if (!has) {
-            toClosedVecs.foreach {vec =>
+            toClosedVecs.foreach { vec =>
               vec.close()
               toClosedVecs.remove(toClosedVecs.indexOf(vec))
             }

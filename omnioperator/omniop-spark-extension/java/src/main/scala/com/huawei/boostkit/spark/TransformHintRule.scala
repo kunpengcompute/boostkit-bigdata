@@ -20,18 +20,15 @@ package com.huawei.boostkit.spark
 
 import org.apache.commons.lang3.exception.ExceptionUtils
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.catalyst.optimizer.{BuildLeft, BuildRight}
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.catalyst.trees.TreeNodeTag
 import org.apache.spark.sql.execution.adaptive.{BroadcastQueryStageExec, OmniAQEShuffleReadExec}
 import org.apache.spark.sql.execution.aggregate.HashAggregateExec
-import org.apache.spark.sql.execution.exchange.{BroadcastExchangeExec, BroadcastExchangeLike, ReusedExchangeExec, ShuffleExchangeExec}
+import org.apache.spark.sql.execution.exchange.{BroadcastExchangeExec, ReusedExchangeExec, ShuffleExchangeExec}
 import org.apache.spark.sql.execution.joins.{BroadcastHashJoinExec, BroadcastNestedLoopJoinExec, ColumnarBroadcastHashJoinExec, ColumnarShuffledHashJoinExec, ColumnarSortMergeJoinExec, ShuffledHashJoinExec, SortMergeJoinExec}
 import org.apache.spark.sql.execution.window.WindowExec
 import org.apache.spark.sql.execution.{CoalesceExec, CodegenSupport, ColumnarBroadcastExchangeExec, ColumnarCoalesceExec, ColumnarExpandExec, ColumnarFileSourceScanExec, ColumnarFilterExec, ColumnarGlobalLimitExec, ColumnarHashAggregateExec, ColumnarLocalLimitExec, ColumnarProjectExec, ColumnarShuffleExchangeExec, ColumnarSortExec, ColumnarTakeOrderedAndProjectExec, ColumnarTopNSortExec, ColumnarUnionExec, ColumnarWindowExec, ExpandExec, FileSourceScanExec, FilterExec, GlobalLimitExec, LocalLimitExec, ProjectExec, SortExec, SparkPlan, TakeOrderedAndProjectExec, TopNSortExec, UnionExec}
 import org.apache.spark.sql.types.ColumnarBatchSupportUtil.checkColumnarBatchSupport
-
-import scala.util.control.Breaks.{break, breakable}
 
 trait TransformHint {
   val stacktrace: Option[String] =
@@ -120,10 +117,8 @@ case class AddTransformHintRule() extends Rule[SparkPlan] {
   val enableColumnarProject: Boolean = columnarConf.enableColumnarProject
   val enableColumnarFilter: Boolean = columnarConf.enableColumnarFilter
   val enableColumnarExpand: Boolean = columnarConf.enableColumnarExpand
-  val enableColumnarBroadcastExchange: Boolean = columnarConf.enableColumnarBroadcastExchange &&
-    columnarConf.enableColumnarBroadcastJoin
-  val enableColumnarBroadcastJoin: Boolean = columnarConf.enableColumnarBroadcastExchange &&
-    columnarConf.enableColumnarBroadcastJoin
+  val enableColumnarBroadcastExchange: Boolean = columnarConf.enableColumnarBroadcastExchange
+  val enableColumnarBroadcastJoin: Boolean = columnarConf.enableColumnarBroadcastJoin
   val enableColumnarSortMergeJoin: Boolean = columnarConf.enableColumnarSortMergeJoin
   val enableShuffledHashJoin: Boolean = columnarConf.enableShuffledHashJoin
   val enableColumnarFileScan: Boolean = columnarConf.enableColumnarFileScan
@@ -308,153 +303,16 @@ case class AddTransformHintRule() extends Rule[SparkPlan] {
               }
             case _ =>
           }
-          val isBhjColumnar: Boolean = try {
-            ColumnarBroadcastHashJoinExec(
-              plan.leftKeys,
-              plan.rightKeys,
-              plan.joinType,
-              plan.buildSide,
-              plan.condition,
-              plan.left,
-              plan.right,
-              plan.isNullAwareAntiJoin).buildCheck()
-            true
-          } catch {
-            case throwable@(_: UnsupportedOperationException | _: RuntimeException | _: Throwable) =>
-              val message = s"[OPERATOR FALLBACK] ${throwable} ${plan.getClass} falls back to Spark operator"
-              logDebug(message)
-              TransformHints.tagNotTransformable(plan, reason = message)
-              false
-            case l: UnsatisfiedLinkError =>
-              TransformHints.tagNotTransformable(plan)
-              throw l
-            case f: NoClassDefFoundError =>
-              TransformHints.tagNotTransformable(plan)
-              throw f
-          }
-
-          val buildSidePlan = plan.buildSide match {
-            case BuildLeft => plan.left
-            case BuildRight => plan.right
-          }
-
-          val maybeExchange = buildSidePlan
-            .find {
-              case BroadcastExchangeExec(_, _) => true
-              case _ => false
-            }
-            .map(_.asInstanceOf[BroadcastExchangeExec])
-
-          maybeExchange match {
-            case Some(exchange @ BroadcastExchangeExec(_, _)) =>
-              if (isBhjColumnar) {
-                TransformHints.tagTransformable(plan)
-              }else{
-                TransformHints.tagNotTransformable(exchange)
-                TransformHints.tagNotTransformable(plan)
-              }
-            case None =>
-              // we are in AQE, find the hidden exchange
-              // FIXME did we consider the case that AQE: OFF && Reuse: ON ?
-              var maybeHiddenExchange: Option[BroadcastExchangeLike] = None
-              breakable {
-                buildSidePlan.foreach {
-                  case e: BroadcastExchangeLike =>
-                    maybeHiddenExchange = Some(e)
-                    break
-                  case t: BroadcastQueryStageExec =>
-                    t.plan.foreach {
-                      case e2: BroadcastExchangeLike =>
-                        maybeHiddenExchange = Some(e2)
-                        break
-                      case r: ReusedExchangeExec =>
-                        r.child match {
-                          case e2: BroadcastExchangeLike =>
-                            maybeHiddenExchange = Some(e2)
-                            break
-                          case _ =>
-                        }
-                      case _ =>
-                    }
-                  case _ =>
-                }
-              }
-              // restriction to force the hidden exchange to be found
-              val exchange = maybeHiddenExchange.get
-              // to conform to the underlying exchange's type, columnar or vanilla
-              exchange match {
-                case _: ColumnarBroadcastExchangeExec =>
-                  if (!isBhjColumnar) {
-                    throw new IllegalStateException(
-                      s"BroadcastExchange has already been" +
-                        s" transformed to columnar version but BHJ is determined as" +
-                        s" non-transformable: ${plan.toString()}")
-                  }
-                  TransformHints.tagTransformable(plan)
-                case _: BroadcastExchangeExec =>
-                  TransformHints.tagNotTransformable(
-                  plan,
-                  "it's a materialized broadcast exchange or reused broadcast exchange")
-              }
-          }
-        case plan: BroadcastNestedLoopJoinExec =>
-          val buildSidePlan = plan.buildSide match {
-            case BuildLeft => plan.left
-            case BuildRight => plan.right
-          }
-
-          val maybeExchange = buildSidePlan
-            .find {
-              case BroadcastExchangeExec(_, _) => true
-              case _ => false
-            }
-            .map(_.asInstanceOf[BroadcastExchangeExec])
-
-          maybeExchange match {
-            case Some(exchange@BroadcastExchangeExec(_, _)) =>
-              TransformHints.tagNotTransformable(exchange)
-              TransformHints.tagNotTransformable(plan)
-            case None =>
-              // we are in AQE, find the hidden exchange
-              // FIXME did we consider the case that AQE: OFF && Reuse: ON ?
-              var maybeHiddenExchange: Option[BroadcastExchangeLike] = None
-              breakable {
-                buildSidePlan.foreach {
-                  case e: BroadcastExchangeLike =>
-                    maybeHiddenExchange = Some(e)
-                    break
-                  case t: BroadcastQueryStageExec =>
-                    t.plan.foreach {
-                      case e2: BroadcastExchangeLike =>
-                        maybeHiddenExchange = Some(e2)
-                        break
-                      case r: ReusedExchangeExec =>
-                        r.child match {
-                          case e2: BroadcastExchangeLike =>
-                            maybeHiddenExchange = Some(e2)
-                            break
-                          case _ =>
-                        }
-                      case _ =>
-                    }
-                  case _ =>
-                }
-              }
-              // restriction to force the hidden exchange to be found
-              val exchange = maybeHiddenExchange.get
-              // to conform to the underlying exchange's type, columnar or vanilla
-              exchange match {
-                case _: ColumnarBroadcastExchangeExec =>
-                  throw new IllegalStateException(
-                    s"BroadcastExchange has already been" +
-                      s" transformed to columnar version but BHJ is determined as" +
-                      s" non-transformable: ${plan.toString()}")
-                case _: BroadcastExchangeExec =>
-                  TransformHints.tagNotTransformable(
-                    plan,
-                    "it's a materialized broadcast exchange or reused broadcast exchange")
-              }
-          }
+          ColumnarBroadcastHashJoinExec(
+            plan.leftKeys,
+            plan.rightKeys,
+            plan.joinType,
+            plan.buildSide,
+            plan.condition,
+            plan.left,
+            plan.right,
+            plan.isNullAwareAntiJoin).buildCheck()
+          TransformHints.tagTransformable(plan)
         case plan: SortMergeJoinExec =>
           if (!enableColumnarSortMergeJoin) {
             TransformHints.tagNotTransformable(
@@ -527,16 +385,22 @@ case class AddTransformHintRule() extends Rule[SparkPlan] {
 
       }
     } catch {
-      case throwable @ (_:UnsupportedOperationException | _:RuntimeException | _:Throwable) =>
-        val message = s"[OPERATOR FALLBACK] ${throwable} ${plan.getClass} falls back to Spark operator"
+      case e: UnsupportedOperationException =>
+        val message = s"[OPERATOR FALLBACK] ${e} ${plan.getClass} falls back to Spark operator"
         logDebug(message)
         TransformHints.tagNotTransformable(plan, reason = message)
       case l: UnsatisfiedLinkError =>
-        TransformHints.tagNotTransformable(plan)
         throw l
       case f: NoClassDefFoundError =>
-        TransformHints.tagNotTransformable(plan)
         throw f
+      case r: RuntimeException =>
+        val message = s"[OPERATOR FALLBACK] ${r} ${plan.getClass} falls back to Spark operator"
+        logDebug(message)
+        TransformHints.tagNotTransformable(plan, reason = message)
+      case t: Throwable =>
+        val message = s"[OPERATOR FALLBACK] ${t} ${plan.getClass} falls back to Spark operator"
+        logDebug(message)
+        TransformHints.tagNotTransformable(plan, reason = message)
     }
   }
 }
