@@ -605,6 +605,7 @@ public class CapacityScheduler extends
 
     // To avoid too verbose DEBUG logging, only print debug log once for
     // every 10 secs.
+    // The '1000' converts the current time from milliseconds to seconds
     boolean printSkipedNodeLogging = false;
     if (Time.monotonicNow() / 1000 % 10 == 0) {
       printSkipedNodeLogging = (!printedVerboseLoggingForAsyncScheduling);
@@ -613,6 +614,7 @@ public class CapacityScheduler extends
     }
 
     // Allocate containers of node global sorted
+    // The '100' is used to convert the percentage to a decimal
     int allocateNodesLimit = (int) Math.ceil(cs.asyncScheduleGlobalAllocatePercent * nodes.size() / 100);
     for (String nodeHost : sortedNodesHost) {
       if (!nodeMap.containsKey(nodeHost)) {
@@ -811,7 +813,7 @@ public class CapacityScheduler extends
       this.writeLock = lock.writeLock();
     }
 
-    public void uploadNodeResource(String hostName,Resource allocatedResource,Resource totalResource){
+    public void uploadNodeResource(String hostName, Resource allocatedResource, Resource totalResource) {
       ObjectMapper objectMapper = new ObjectMapper();
       Map<String, Object> nodeResource = new HashMap<>();
       nodeResource.put("host_name", hostName);
@@ -831,7 +833,8 @@ public class CapacityScheduler extends
         try (CloseableHttpResponse response = httpClient.execute(httpPost)) {
           int statusCode = response.getStatusLine().getStatusCode();
           if (statusCode != GET_STATUS_CODE_OK) {
-            LOG.error("request {} failed with status code:{}", cs.loadsMetricServerUploadNodeResourceUrl, statusCode);
+            LOG.error("request {} failed with status code:{}"
+                    , cs.loadsMetricServerUploadNodeResourceUrl, statusCode);
           }
         }
       } catch (IOException e) {
