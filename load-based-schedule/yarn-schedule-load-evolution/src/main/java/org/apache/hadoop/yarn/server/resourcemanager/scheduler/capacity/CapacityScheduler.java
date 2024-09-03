@@ -20,6 +20,7 @@ package org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.logging.Log;
 import org.apache.hadoop.classification.InterfaceAudience.LimitedPrivate;
 import org.apache.hadoop.classification.InterfaceStability.Evolving;
 import org.apache.hadoop.conf.Configurable;
@@ -616,6 +617,8 @@ public class CapacityScheduler extends
     // Allocate containers of node global sorted
     // The '100' is used to convert the percentage to a decimal
     int allocateNodesLimit = (int) Math.ceil(cs.asyncScheduleGlobalAllocatePercent * nodes.size() / 100);
+    LOG.debug("Start to allocate node in order of " +
+            sortedNodesHost.subList(0, Math.min(sortedNodesHost.size(), allocateNodesLimit)));
     for (String nodeHost : sortedNodesHost) {
       if (!nodeMap.containsKey(nodeHost)) {
         LOG.warn("nodeHost {} not found FiCaSchedulerNode", nodeHost);
@@ -715,8 +718,11 @@ public class CapacityScheduler extends
             } else{
               List<String> sortedNodesHost = cs.loadsMetricServerRequestThread.getSortedNodeHosts();
               if (sortedNodesHost.size() > 0) {
+                LOG.debug("Start load based schedule in order of " + sortedNodesHost);
                 scheduleLoadBased(cs, sortedNodesHost);
               } else {
+                LOG.debug("There are no available sortedNodesHost nodes!");
+                LOG.debug("Start default based schedule.");
                 schedule(cs);
               }
               if(LOG.isDebugEnabled()) {
