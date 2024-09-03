@@ -9,7 +9,7 @@ logbackconfig=${parent_dir}/etc/logback.xml
 
 logpath=$(readlink -e "${parent_dir}/log")
 
-if test !-f ${logpath}/loadsmetric.log
+if test ! -f ${logpath}/loadsmetric.log
 then
   touch ${logpath}/loadsmetric.log
   chomd 600 ${logpath}/loadsmetric.log

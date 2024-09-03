@@ -617,8 +617,7 @@ public class CapacityScheduler extends
     // Allocate containers of node global sorted
     // The '100' is used to convert the percentage to a decimal
     int allocateNodesLimit = (int) Math.ceil(cs.asyncScheduleGlobalAllocatePercent * nodes.size() / 100);
-    LOG.debug("Start to allocate node in order of " +
-            sortedNodesHost.subList(0, Math.min(sortedNodesHost.size(), allocateNodesLimit)));
+    LOG.debug("Start to allocate " + allocateNodesLimit + " node in order of " + sortedNodesHost);
     for (String nodeHost : sortedNodesHost) {
       if (!nodeMap.containsKey(nodeHost)) {
         LOG.warn("nodeHost {} not found FiCaSchedulerNode", nodeHost);
@@ -892,8 +891,14 @@ public class CapacityScheduler extends
           LOG.warn("overLoadNodeHosts:{}", overLoadNodeHosts);
         }
         // update sortedNodesHost
-        sortedNodeHosts = Arrays.stream(jsonObject.getString(SORTED_NODE_HOSTS).split(COMMA))
-                .collect(Collectors.toList());
+        if (!StringUtils.isBlank(jsonObject.getString(SORTED_NODE_HOSTS))) {
+          sortedNodeHosts = Arrays.stream(jsonObject.getString(SORTED_NODE_HOSTS).split(COMMA))
+                  .collect(Collectors.toList());
+        } else {
+          sortedNodeHosts.clear();
+        }
+
+
         if (LOG.isDebugEnabled() && !sortedNodeHosts.isEmpty()) {
           LOG.debug("sortedNodeHosts:{}", sortedNodeHosts);
         }
