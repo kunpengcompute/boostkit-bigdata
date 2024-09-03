@@ -44,7 +44,9 @@ TEST(read, test_parquet_reader)
     ParquetReader *reader = new ParquetReader(rebaseInfoPtr);
     std::string ugi = "root@sample";
     Expression pushedFilterArray;
-    auto state1 = reader->InitRecordReader(uriInfo, 0, 1000000, 1024, false, pushedFilterArray, column_indices, ugi);
+    auto state0 = reader->InitReader(uriInfo, 1024, ugi);
+    ASSERT_EQ(state0, arrow::Status::OK());
+    auto state1 = reader->InitRecordReader(0, 1000000, false, pushedFilterArray, column_indices);
     ASSERT_EQ(state1, arrow::Status::OK());
 
     std::vector<omniruntime::vec::BaseVector*> recordBatch(column_indices.size());
@@ -113,7 +115,9 @@ TEST(read, test_varchar)
     ParquetReader *reader = new ParquetReader(rebaseInfoPtr);
     std::string ugi = "root@sample";
     Expression pushedFilterArray;
-    auto state1 = reader->InitRecordReader(uriInfo, 0, 1000000, 4096, false, pushedFilterArray, column_indices, ugi);
+    auto state0 = reader->InitReader(uriInfo, 4096, ugi);
+    ASSERT_EQ(state0, arrow::Status::OK());
+    auto state1 = reader->InitRecordReader(0, 1000000, false, pushedFilterArray, column_indices);
     ASSERT_EQ(state1, arrow::Status::OK());
     int total_nums = 0;
     int iter = 0;

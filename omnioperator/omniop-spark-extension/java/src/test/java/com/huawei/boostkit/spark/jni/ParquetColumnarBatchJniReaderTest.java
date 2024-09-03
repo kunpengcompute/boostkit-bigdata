@@ -46,6 +46,7 @@ public class ParquetColumnarBatchJniReaderTest extends TestCase {
 
     private Vec[] vecs;
 
+    private boolean[] missingColumns;
     private StructType schema;
     private List<DataType> types;
 
@@ -58,9 +59,11 @@ public class ParquetColumnarBatchJniReaderTest extends TestCase {
 
         File file = new File("src/test/java/com/huawei/boostkit/spark/jni/parquetsrc/parquet_data_all_type");
         String path = file.getAbsolutePath();
-        parquetColumnarBatchScanReader.initializeReaderJava(new Path(path), 0, 100000,
-                4096, null);
-        vecs = new Vec[9];
+        parquetColumnarBatchScanReader.initializeReaderJava(new Path(path), 4096);
+        parquetColumnarBatchScanReader.initializeRecordReaderJava(0, 100000, schema.fieldNames(), null);
+        missingColumns = new boolean[schema.fieldNames().length];
+        Arrays.fill(missingColumns, false);
+        vecs = new Vec[schema.fieldNames().length];
     }
 
     private void constructSchema() {
@@ -92,7 +95,7 @@ public class ParquetColumnarBatchJniReaderTest extends TestCase {
 
     @Test
     public void testRead() {
-        long num = parquetColumnarBatchScanReader.next(vecs, types);
+        long num = parquetColumnarBatchScanReader.next(vecs, missingColumns, types);
         assertTrue(num == 1);
     }
 }

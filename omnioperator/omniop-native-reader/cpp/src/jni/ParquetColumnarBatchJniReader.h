@@ -54,6 +54,22 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_ParquetColumnarBatchJn
 
 /*
  * Class:       com_huawei_boostkit_scan_jni_ParquetColumnarBatchJniReader
+ * Method:      initializeRecordReader
+ * Signature:   (JLorg/json/JSONObject;)J
+ */
+JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_ParquetColumnarBatchJniReader_initializeRecordReader
+    (JNIEnv *, jobject, jlong, jobject);
+
+/*
+ * Class:       com_huawei_boostkit_scan_jni_ParquetColumnarBatchJniReader
+ * Method:      getAllFieldNames
+ * Signature:   (JLjava/util/ArrayList;)J
+ */
+JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_ParquetColumnarBatchJniReader_getAllFieldNames
+    (JNIEnv *, jobject, jlong, jobject);
+
+/*
+ * Class:       com_huawei_boostkit_scan_jni_ParquetColumnarBatchJniReader
  * Method:      recordReaderNext
  * Signature:   (J[I[J)J
  */
