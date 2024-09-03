@@ -617,7 +617,8 @@ public class CapacityScheduler extends
     // Allocate containers of node global sorted
     // The '100' is used to convert the percentage to a decimal
     int allocateNodesLimit = (int) Math.ceil(cs.asyncScheduleGlobalAllocatePercent * nodes.size() / 100);
-    LOG.debug("Start to allocate node in order of " + sortedNodesHost.subList(0, allocateNodesLimit));
+    LOG.debug("Start to allocate node in order of " +
+            sortedNodesHost.subList(0, Math.min(sortedNodesHost.size(),allocateNodesLimit)));
     for (String nodeHost : sortedNodesHost) {
       if (!nodeMap.containsKey(nodeHost)) {
         LOG.warn("nodeHost {} not found FiCaSchedulerNode", nodeHost);
