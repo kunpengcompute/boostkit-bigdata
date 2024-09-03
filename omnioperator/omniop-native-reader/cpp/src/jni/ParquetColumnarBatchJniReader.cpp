@@ -78,6 +78,23 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_ParquetColumnarBatchJn
     // Get capacity for each record batch
     int64_t capacity = (int64_t)env->CallLongMethod(jsonObj, jsonMethodLong, env->NewStringUTF("capacity"));
 
+    std::unique_ptr<common::TimeRebaseInfo> rebaseInfoPtr = common::BuildTimeRebaseInfo(env, jsonObj);
+
+    ParquetReader *pReader = new ParquetReader(rebaseInfoPtr);
+    auto state = pReader->InitReader(uriInfo, capacity, ugiString);
+    if (state != Status::OK()) {
+        env->ThrowNew(runtimeExceptionClass, state.ToString().c_str());
+        return 0;
+    }
+    return (jlong)(pReader);
+    JNI_FUNC_END(runtimeExceptionClass)
+}
+
+JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_ParquetColumnarBatchJniReader_initializeRecordReader
+    (JNIEnv *env, jobject jObj, jlong reader, jobject jsonObj)
+{
+    JNI_FUNC_START
+    ParquetReader *pReader = (ParquetReader *)reader;
     int64_t start = (int64_t)env->CallLongMethod(jsonObj, jsonMethodLong, env->NewStringUTF("start"));
     int64_t end = (int64_t)env->CallLongMethod(jsonObj, jsonMethodLong, env->NewStringUTF("end"));
 
@@ -96,16 +113,34 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_ParquetColumnarBatchJn
 
     auto fieldNames = GetFieldNames(env, jsonObj);
 
-    std::unique_ptr<common::TimeRebaseInfo> rebaseInfoPtr = common::BuildTimeRebaseInfo(env, jsonObj);
-
-    ParquetReader *pReader = new ParquetReader(rebaseInfoPtr);
-    auto state = pReader->InitRecordReader(uriInfo, start, end, capacity, hasExpressionTree, pushedFilterArray,
-        fieldNames, ugiString);
+    auto state = pReader->InitRecordReader(start, end, hasExpressionTree, pushedFilterArray, fieldNames);
     if (state != Status::OK()) {
         env->ThrowNew(runtimeExceptionClass, state.ToString().c_str());
         return 0;
     }
     return (jlong)(pReader);
+    JNI_FUNC_END(runtimeExceptionClass)
+}
+
+JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_ParquetColumnarBatchJniReader_getAllFieldNames
+    (JNIEnv *env, jobject jObj, jlong reader, jobject allFieldNames)
+{
+    JNI_FUNC_START
+    ParquetReader *pReader = (ParquetReader *)reader;
+    std::shared_ptr<Schema> schema;
+    auto state = pReader->arrow_reader->GetSchema(&schema);
+    if (state != Status::OK()) {
+        env->ThrowNew(runtimeExceptionClass, state.ToString().c_str());
+        return 0;
+    }
+    std::vector<std::string> columnNames = schema->field_names();
+    auto num = columnNames.size();
+    for (uint32_t i = 0; i < num; i++) {
+        jstring fieldName = env->NewStringUTF(columnNames[i].c_str());
+        env->CallBooleanMethod(allFieldNames, arrayListAdd, fieldName);
+        env->DeleteLocalRef(fieldName);
+    }
+    return (jlong)(num);
     JNI_FUNC_END(runtimeExceptionClass)
 }
 
