@@ -720,6 +720,7 @@ public class CapacityScheduler extends
                 LOG.debug("Start load based schedule in order of " + sortedNodesHost);
                 scheduleLoadBased(cs, sortedNodesHost);
               } else {
+                LOG.debug("There are no available sortedNodesHost nodes!");
                 LOG.debug("Start default based schedule.");
                 schedule(cs);
               }
