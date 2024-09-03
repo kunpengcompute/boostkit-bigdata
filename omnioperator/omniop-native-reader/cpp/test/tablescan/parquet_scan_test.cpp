@@ -103,7 +103,7 @@ TEST(read, test_parquet_reader)
 
 TEST(read, test_varchar)
 {
-    std::string filename = "/../../../../omniop-spark-extension/java/src/test/java/com/huawei/boostkit/spark/jni/parquetsrc/date_dim.parquet";
+    std::string filename = "/../resources/date_dim.parquet";
     filename = PROJECT_PATH + filename;
     UriInfo uriInfo("", "file", filename, "", "-1");
 
