@@ -39,7 +39,7 @@ namespace omniruntime::reader {
 
         ~OmniRecordBatchReader() {}
 
-        Status ReadNext(std::vector<omniruntime::vec::BaseVector*> &out, long *batchRowSize) {
+        arrow::Status ReadNext(std::vector<omniruntime::vec::BaseVector*> &out, long *batchRowSize) {
             return batches_(out, batchRowSize);
         }
 

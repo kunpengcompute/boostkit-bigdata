@@ -1,8 +1,8 @@
-# project name
-project(native_reader)
-
 # required cmake version
 cmake_minimum_required(VERSION 3.10)
+
+# project name
+project(native_reader)
 
 # configure cmake
 set(CMAKE_CXX_STANDARD 17)
@@ -33,7 +33,7 @@ add_subdirectory(src)
 
 message(STATUS "Build by ${CMAKE_BUILD_TYPE}")
 
-option(BUILD_CPP_TESTS "test" OFF)
+option(BUILD_CPP_TESTS "test" ON)
 message(STATUS "Option BUILD_CPP_TESTS: ${BUILD_CPP_TESTS}")
 if(${BUILD_CPP_TESTS})
     enable_testing()

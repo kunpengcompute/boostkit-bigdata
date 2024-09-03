@@ -234,11 +234,11 @@ namespace omniruntime::reader {
         }
 
     protected:
-        Status IndexInBounds(int32_t index) {
+        arrow::Status IndexInBounds(int32_t index) {
             if (ARROW_PREDICT_TRUE(0 <= index && index < dictionary_length_)) {
-                return Status::OK();
+                return arrow::Status::OK();
             }
-            return Status::Invalid("Index not in dictionary bounds");
+            return arrow::Status::Invalid("Index not in dictionary bounds");
         }
 
         inline void DecodeDict(::parquet::TypedDecoder<Type>* dictionary) {
@@ -284,7 +284,7 @@ namespace omniruntime::reader {
         }
 
     private:
-        Status DecodeArrowDense(int num_values, int null_count, bool* nulls,
+        arrow::Status DecodeArrowDense(int num_values, int null_count, bool* nulls,
                                 int64_t offset,
                                 int* out_num_values, omniruntime::vec::BaseVector** out) {
             constexpr int32_t kBufferSize = 1024;
@@ -305,7 +305,7 @@ namespace omniruntime::reader {
                                 std::min<int32_t>(kBufferSize, num_values - null_count - values_decoded);
                         num_indices = idx_decoder_.GetBatch(indices, batch_size);
                         if (ARROW_PREDICT_FALSE(num_indices < 1)) {
-                            return Status::Invalid("Invalid number of indices: ", num_indices);
+                            return arrow::Status::Invalid("Invalid number of indices: ", num_indices);
                         }
                         pos_indices = 0;
                     }
@@ -321,10 +321,10 @@ namespace omniruntime::reader {
             }
 
             *out_num_values = values_decoded;
-            return Status::OK();
+            return arrow::Status::OK();
         }
 
-        Status DecodeArrowNonNull(int num_values, int* out_num_values, omniruntime::vec::BaseVector** out, int offset) {
+        arrow::Status DecodeArrowNonNull(int num_values, int* out_num_values, omniruntime::vec::BaseVector** out, int offset) {
             constexpr int32_t kBufferSize = 2048;
             int32_t indices[kBufferSize];
 
@@ -349,7 +349,7 @@ namespace omniruntime::reader {
                 offset += num_indices;
             }
             *out_num_values = values_decoded;
-            return Status::OK();
+            return arrow::Status::OK();
         }
     };
 
@@ -474,7 +474,7 @@ namespace omniruntime::reader {
         }
 
     private:
-        Status DecodeArrowDense(int num_values, int null_count, bool* nulls,
+        arrow::Status DecodeArrowDense(int num_values, int null_count, bool* nulls,
                                 int64_t offset,
                                 int* out_values_decoded, omniruntime::vec::BaseVector** out) {
             int values_decoded = 0;
@@ -488,7 +488,7 @@ namespace omniruntime::reader {
                     }
                     auto value_len = ::arrow::util::SafeLoadAs<int32_t>(data_);
                     if (ARROW_PREDICT_FALSE(value_len < 0 || value_len > INT32_MAX - 4)) {
-                        return Status::Invalid("Invalid or corrupted value_len '", value_len, "'");
+                        return arrow::Status::Invalid("Invalid or corrupted value_len '", value_len, "'");
                     }
                     auto increment = value_len + 4;
                     if (ARROW_PREDICT_FALSE(len_ < increment)) {
@@ -506,10 +506,10 @@ namespace omniruntime::reader {
 
             num_values_ -= values_decoded;
             *out_values_decoded = values_decoded;
-            return Status::OK();
+            return arrow::Status::OK();
         }
 
-        Status DecodeArrowDenseNonNull(int num_values,
+        arrow::Status DecodeArrowDenseNonNull(int num_values,
                                 int* out_values_decoded, omniruntime::vec::BaseVector** out, int64_t offset) {
             int values_decoded = 0;
             auto vec = dynamic_cast<omniruntime::vec::Vector<
@@ -521,7 +521,7 @@ namespace omniruntime::reader {
                 }
                 auto value_len = ::arrow::util::SafeLoadAs<int32_t>(data_);
                 if (ARROW_PREDICT_FALSE(value_len < 0 || value_len > INT32_MAX - 4)) {
-                    return Status::Invalid("Invalid or corrupted value_len '", value_len, "'");
+                    return arrow::Status::Invalid("Invalid or corrupted value_len '", value_len, "'");
                 }
                 auto increment = value_len + 4;
                 if (ARROW_PREDICT_FALSE(len_ < increment)) {
@@ -535,7 +535,7 @@ namespace omniruntime::reader {
             }
             num_values_ -= values_decoded;
             *out_values_decoded = values_decoded;
-            return Status::OK();
+            return arrow::Status::OK();
         }
     };
 

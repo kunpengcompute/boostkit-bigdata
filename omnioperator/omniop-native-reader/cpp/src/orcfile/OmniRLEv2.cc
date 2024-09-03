@@ -38,7 +38,7 @@ namespace omniruntime::reader {
         case omniruntime::type::OMNI_DATE64:
         	return std::make_unique<omniruntime::vec::Vector<int64_t>>(numValues);
         default:
-            printf("no switch to process!!!");
+            throw std::runtime_error("Not support for this type: " + dataTypeId);
         }
     }
 
@@ -48,7 +48,7 @@ namespace omniruntime::reader {
             case omniruntime::type::OMNI_DOUBLE:
             	return std::make_unique<omniruntime::vec::Vector<double>>(numValues);
             default:
-                printf("no switch to process!!!");
+                throw std::runtime_error("Not support double vector for this type: " + dataTypeId);
         }
     }
 

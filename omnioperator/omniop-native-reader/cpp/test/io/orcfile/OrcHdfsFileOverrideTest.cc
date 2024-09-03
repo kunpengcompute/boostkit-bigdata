@@ -22,7 +22,7 @@
 #include "orcfile_test.h"
 
 TEST(OrcReader, createLocalFileReader) {
-    std::string filename = "/resources/orc_data_all_type";
+    std::string filename = "/../../resources/orc_data_all_type";
     filename =  PROJECT_PATH + filename;
 
     std::unique_ptr<orc::Reader> reader;

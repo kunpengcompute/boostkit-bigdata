@@ -349,7 +349,6 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniRea
         throw std::runtime_error("rowReaderPtr is nullptr!!!");
     }
 
-    const orc::Type &baseTp = rowReaderPtr->getSelectedType();
     uint64_t batchRowSize = 0;
     auto ptr = env->GetIntArrayElements(typeId, JNI_FALSE);
     if (ptr == NULL) {
