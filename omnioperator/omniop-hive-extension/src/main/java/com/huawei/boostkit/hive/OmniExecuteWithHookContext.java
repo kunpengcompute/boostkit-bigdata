@@ -140,7 +140,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         (Arrays.asList(BOOLEAN, SHORT, INT, LONG, DOUBLE, STRING, DATE, DECIMAL, VARCHAR, CHAR, VOID));
 
     private static final int DECIMAL64_MAX_PRECISION = 18;
-    private static final int maxDescendantDepth = 4;
+    private static final int MAX_DESCENDANT_DEPTH = 4;
 
     private final Set<Operator> groupByOperatorNeedSort = new HashSet<>();
 
@@ -382,7 +382,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
 
     private boolean selectOrPtfEdgeReplaceable(Set<Operator<?>> operators) {
         final boolean[] canBeReplaced = {true};
-        if (operators.size() > maxDescendantDepth) {
+        if (operators.size() > MAX_DESCENDANT_DEPTH) {
             return false;
         }
 
