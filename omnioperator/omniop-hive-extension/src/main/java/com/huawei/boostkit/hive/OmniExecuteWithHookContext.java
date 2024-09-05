@@ -379,9 +379,11 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         return isReduceSinkReplaceable;
     }
 
+    public static int maxDescendantDepth = 4;
+
     private boolean selectOrPtfEdgeReplaceable(Set<Operator<?>> operators) {
         final boolean[] canBeReplaced = {true};
-        if (operators.size() > 4) {
+        if (operators.size() > maxDescendantDepth) {
             return false;
         }
 
