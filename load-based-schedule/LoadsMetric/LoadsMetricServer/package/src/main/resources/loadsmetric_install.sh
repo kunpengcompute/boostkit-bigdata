@@ -11,6 +11,12 @@ function log_audit() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$(whoami)] : [loadsmetric-install] ${1}" >> ${log_file}
 }
 
+function log_warn_echo() {
+  local log_line="[$(date '+%Y-%m-%d %H:%M:%S')][WARN] [$(whoami)] : [${software_name}-deploy] ${1}"
+  echo "${log_line}"
+  echo "${log_line}" >> "${2}"
+}
+
 function check_and_create()
 {
   if [ -h "${1}" ]; then

@@ -12,6 +12,12 @@ function log_audit()
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$(whoami)] : [loadsmetric-uninstall] ${1}" >> ${log_file}
 }
 
+function log_warn_echo() {
+  local log_line="[$(date '+%Y-%m-%d %H:%M:%S')][WARN] [$(whoami)] : [${software_name}-deploy] ${1}"
+  echo "${log_line}"
+  echo "${log_line}" >> "${2}"
+}
+
 function stop_loadsmetric()
 {
   cd ${parent_dir}/loadsmetric-${install_type}/bin
