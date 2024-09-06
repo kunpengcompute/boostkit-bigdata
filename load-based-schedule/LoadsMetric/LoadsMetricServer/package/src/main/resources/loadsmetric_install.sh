@@ -81,6 +81,12 @@ function main()
   local log_file=""
   set_log_file
 
+  if pgrep -f "LoadsMetricApplication" > /dev/null; then
+    log_warn_echo "Warning: LoadsMetricApplication process is currently running." "${log_file}"
+    log_warn_echo "Warning: Please STOP the LoadsMetricApplication service and uninstall it first." "${log_file}"
+    exit 1
+  fi
+
   log_audit "Start installation LoadsMetric"
   set_file_permission
   log_audit "Install LoadsMetric Successfully"

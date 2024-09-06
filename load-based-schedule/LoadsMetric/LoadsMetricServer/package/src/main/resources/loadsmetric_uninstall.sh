@@ -52,6 +52,12 @@ function main()
   local log_path=$(readlink -e "${parent_dir}/loadsmetric-${install_type}/log")
   log_file=${log_path}/loadsmetric.log
 
+  if pgrep -f "LoadsMetricApplication" > /dev/null; then
+    log_warn_echo "Warning: LoadsMetricApplication process is currently running." "${log_file}"
+    log_warn_echo "Warning: Please STOP the LoadsMetricApplication service first." "${log_file}"
+    exit 1
+  fi
+
   log_audit "Begin to uninstall LoadsMetric"
 
   stop_loadsmetric
