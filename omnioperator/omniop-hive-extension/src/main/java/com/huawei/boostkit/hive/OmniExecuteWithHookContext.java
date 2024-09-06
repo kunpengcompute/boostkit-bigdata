@@ -140,6 +140,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         (Arrays.asList(BOOLEAN, SHORT, INT, LONG, DOUBLE, STRING, DATE, DECIMAL, VARCHAR, CHAR, VOID));
 
     private static final int DECIMAL64_MAX_PRECISION = 18;
+    private static final int MAX_DESCENDANT_DEPTH = 4;
 
     private final Set<Operator> groupByOperatorNeedSort = new HashSet<>();
 
@@ -365,7 +366,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             isReduceSinkReplaceable = true;
         }
         if (edgeType == TezEdgeProperty.EdgeType.SIMPLE_EDGE && child instanceof ReduceWork) {
-            isReduceSinkReplaceable = groupByEdgeReplaceable(work, child);
+            isReduceSinkReplaceable = simpleEdgeForChildReplaceable(work, child);
         }
         if (child instanceof MergeJoinWork) {
             Operator reducer = ((MergeJoinWork) child).getMainWork().getAnyRootOperator();
@@ -379,14 +380,36 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         return isReduceSinkReplaceable;
     }
 
-    private boolean groupByEdgeReplaceable(BaseWork work, BaseWork child) {
+    private boolean selectOrPtfEdgeReplaceable(Set<Operator<?>> operators) {
+        final boolean[] canBeReplaced = {true};
+        if (operators.size() > MAX_DESCENDANT_DEPTH) {
+            return false;
+        }
+
+        operators.forEach(item -> {
+            if (item.getType().equals(OperatorType.PTF) && !PTFReplaceable(item)) {
+                canBeReplaced[0] = false;
+            }
+            if (!(item.getOperatorId().contains("SEL") || item.getOperatorId().contains("PTF") || item.getOperatorId().contains("RS") || item.getOperatorId().contains("LIM") || item.getOperatorId().contains("FS"))) {
+                canBeReplaced[0] = false;
+            }
+        });
+        return canBeReplaced[0];
+    }
+
+    private boolean simpleEdgeForChildReplaceable(BaseWork work, BaseWork child) {
         Operator reducer = ((ReduceWork) child).getReducer();
         if (reducer.getType() == null) {
             // is VectorOperator
             reducer = (Operator) reducer.getChildOperators().get(0);
         }
+
         if (isReplaceable(reducer, true) && reducer.getType().equals(OperatorType.GROUPBY)) {
             tezWork.getEdgeProperty(work, child).setEdgeType(TezEdgeProperty.EdgeType.CUSTOM_SIMPLE_EDGE);
+            return true;
+        }
+
+        if (isReplaceable(reducer, true) && reducer.getType().equals(OperatorType.SELECT) && selectOrPtfEdgeReplaceable(child.getAllOperators())) {
             return true;
         }
         return false;
@@ -1335,7 +1358,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
                         current.getCompilationOpContext(),
                         (ReduceSinkDesc) current.getConf(), isReduceSinkReplaceable);
                 ReduceSinkDesc conf = (ReduceSinkDesc) current.getConf();
-                if (conf.getTopN() == -1) {
+                if (conf.getTopN() == -1  && !conf.hasOrderBy()) {
                     omniReduceSinkOperator.getConf().getKeySerializeInfo().getProperties().setProperty(
                             SERIALIZATION_LIB, OmniVecBatchSerDe.class.getName());
                     omniReduceSinkOperator.getConf().getValueSerializeInfo().getProperties().setProperty(

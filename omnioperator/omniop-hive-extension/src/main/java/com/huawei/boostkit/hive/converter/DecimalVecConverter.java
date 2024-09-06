@@ -128,7 +128,7 @@ public class DecimalVecConverter implements VecConverter {
                 longVec.setNull(i);
             } else {
                 HiveDecimal hiveDecimal = (HiveDecimal) col[i];
-                longVec.set(i, getLongFromHiveDecimal((HiveDecimal) col[i], decimalTypeInfo));
+                longVec.set(i, getLongFromHiveDecimal(hiveDecimal, decimalTypeInfo));
             }
         }
         return longVec;
