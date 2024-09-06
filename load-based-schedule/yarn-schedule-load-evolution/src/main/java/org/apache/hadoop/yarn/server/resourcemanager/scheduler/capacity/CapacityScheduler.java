@@ -898,7 +898,6 @@ public class CapacityScheduler extends
           sortedNodeHosts.clear();
         }
 
-
         if (LOG.isDebugEnabled() && !sortedNodeHosts.isEmpty()) {
           LOG.debug("sortedNodeHosts:{}", sortedNodeHosts);
         }
