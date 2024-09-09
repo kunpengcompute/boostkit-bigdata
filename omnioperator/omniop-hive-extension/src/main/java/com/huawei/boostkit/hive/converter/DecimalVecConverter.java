@@ -46,6 +46,7 @@ import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
 
 public class DecimalVecConverter implements VecConverter {
     private long[] scratchLongs = new long[SCRATCH_LONGS_LEN];
+    private static final int MAX_SCALE_FOR_CONVERTING_DECIMAL_TO_LONG = 18;
 
     public Object fromOmniVec(Vec vec, int index, PrimitiveObjectInspector primitiveObjectInspector) {
         if (vec.isNull(index)) {
@@ -135,7 +136,7 @@ public class DecimalVecConverter implements VecConverter {
     }
 
     private long getLongFromHiveDecimal(HiveDecimal hiveDecimal, DecimalTypeInfo decimalTypeInfo) {
-        if (hiveDecimal.scale() < decimalTypeInfo.getScale()) {
+        if (hiveDecimal.scale() < decimalTypeInfo.getScale() || hiveDecimal.scale() > MAX_SCALE_FOR_CONVERTING_DECIMAL_TO_LONG) {
             return hiveDecimal.scaleByPowerOfTen(decimalTypeInfo.getScale()).longValue();
         } else {
             return hiveDecimal.unscaledValue().longValue();
