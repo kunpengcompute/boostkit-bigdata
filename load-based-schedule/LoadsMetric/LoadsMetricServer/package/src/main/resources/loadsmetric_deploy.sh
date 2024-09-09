@@ -315,7 +315,6 @@ restart_node_exporter() {
 function manager_node_exporter(){
 
   check_file "workers" "Thers is no workers!!!"
-  check_file "$exporter_path" "node_exporter path is not exist"
   # 从 workers 文件中读取 agents 列表
   mapfile -t agents < workers
   manager_type="${1}"
@@ -323,8 +322,12 @@ function manager_node_exporter(){
 case $manager_type in
   "start")
     for agent in "${agents[@]}"; do
-      start_node_exporter "$agent"
-	  sleep 1
+      if ! ssh root@$agent "[ -e \"$exporter_path\" ]"; then
+         log_err_echo "node_exporter path is not exist"
+      else
+         start_node_exporter "$agent"
+      fi
+	    sleep 1
     done
     ;;
   "stop")
