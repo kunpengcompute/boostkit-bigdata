@@ -11,6 +11,12 @@ function log_audit() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$(whoami)] : [loadsmetric-install] ${1}" >> ${log_file}
 }
 
+function log_warn_echo() {
+  local log_line="[$(date '+%Y-%m-%d %H:%M:%S')][WARN] [$(whoami)] : [${software_name}-deploy] ${1}"
+  echo "${log_line}"
+  echo "${log_line}" >> "${2}"
+}
+
 function check_and_create()
 {
   if [ -h "${1}" ]; then
@@ -80,6 +86,12 @@ function main()
   prepare_path
   local log_file=""
   set_log_file
+
+  if pgrep -f "LoadsMetricApplication" > /dev/null; then
+    log_warn_echo "Warning: LoadsMetricApplication process is currently running." "${log_file}"
+    log_warn_echo "Warning: Please STOP the LoadsMetricApplication service and uninstall it first." "${log_file}"
+    exit 1
+  fi
 
   log_audit "Start installation LoadsMetric"
   set_file_permission

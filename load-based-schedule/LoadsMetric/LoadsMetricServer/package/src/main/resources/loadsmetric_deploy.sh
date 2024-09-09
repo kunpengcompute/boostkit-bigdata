@@ -444,7 +444,17 @@ function main() {
       uninstall
     ;;
     "start")
-      manager "start"
+      # Check if the installation directory exists
+      local install_dir_server="${install_dir}/${software_name}-${install_type}"
+      local install_dir_setup="${install_dir}/${software_name}-${install_type}-setup"
+      if [ -d "${install_dir_server}" ] || [ -d "${install_dir_setup}" ]; then
+        # If the installation directory exists, perform the start operation
+        manager "start"
+      else
+        # If the installation directory does not exist, prompt to install first
+        log_err_echo "Installation directory not found. Please install ${software_name} before starting it."
+        exit 1
+      fi
     ;;
     "stop")
       manager "stop"

@@ -12,6 +12,12 @@ function log_audit()
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$(whoami)] : [loadsmetric-uninstall] ${1}" >> ${log_file}
 }
 
+function log_warn_echo() {
+  local log_line="[$(date '+%Y-%m-%d %H:%M:%S')][WARN] [$(whoami)] : [${software_name}-deploy] ${1}"
+  echo "${log_line}"
+  echo "${log_line}" >> "${2}"
+}
+
 function stop_loadsmetric()
 {
   cd ${parent_dir}/loadsmetric-${install_type}/bin
@@ -51,6 +57,12 @@ function main()
   install_type="${1}"
   local log_path=$(readlink -e "${parent_dir}/loadsmetric-${install_type}/log")
   log_file=${log_path}/loadsmetric.log
+
+  if pgrep -f "LoadsMetricApplication" > /dev/null; then
+    log_warn_echo "Warning: LoadsMetricApplication process is currently running." "${log_file}"
+    log_warn_echo "Warning: Please STOP the LoadsMetricApplication service first." "${log_file}"
+    exit 1
+  fi
 
   log_audit "Begin to uninstall LoadsMetric"
 
