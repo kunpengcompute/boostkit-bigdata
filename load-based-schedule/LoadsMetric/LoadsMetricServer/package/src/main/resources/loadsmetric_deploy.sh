@@ -315,7 +315,7 @@ restart_node_exporter() {
 function manager_node_exporter(){
 
   check_file "workers" "Thers is no workers!!!"
-  # 从 workers 文件中读取 agents 列表
+  # get agent lists from workers
   mapfile -t agents < workers
   manager_type="${1}"
   log_info_echo "========${manager_type} node_exporter========"
@@ -560,7 +560,6 @@ set_paths() {
 }
 
 function main() {
-
   if [ "$1" = "-h" ] || [ "$1" = "--help" ]
   then
     print_help
