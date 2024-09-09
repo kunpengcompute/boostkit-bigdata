@@ -519,15 +519,15 @@ function print_help() {
     echo "  start      Start software"
     echo "  stop       Stop software"
     echo "  restart    Restart software"
-    echo "  start_exporter      Start node_exporter"
-    echo "  stop_exporter       Stop node_exporter"
-    echo "  restart_exporter    Restart node_exporter"
-    echo "  start_prometheus      Start node_prometheus"
-    echo "  stop_prometheus       Stop node_prometheus"
-    echo "  restart_prometheus    Restart node_prometheus"
-    echo "  start_grafana      Start node_grafana"
-    echo "  stop_grafana       Stop node_grafana"
-    echo "  restart_grafana    Restart node_grafana"
+    echo "  start_exporter || start_exporter exporter_install_path    Start node_exporter"
+    echo "  stop_exporter  || stop_exporter exporter_install_path     Stop node_exporter"
+    echo "  restart_exporter || restart_exporter exporter_install_path   Restart node_exporter"
+    echo "  start_prometheus || start_prometheus prometheus_install_path     Start node_prometheus"
+    echo "  stop_prometheus  || stop_prometheus prometheus_install_path     Stop node_prometheus"
+    echo "  restart_prometheus || restart_prometheus prometheus_install_path   Restart node_prometheus"
+    echo "  start_grafana || start_grafana grafana_install_path     Start node_grafana"
+    echo "  stop_grafana  || stop_grafana grafana_install_path     Stop node_grafana"
+    echo "  restart_grafana || restart_grafana grafana_install_path   Restart node_grafana"
     echo ""
     echo "Example:"
     echo "  $0 install"
@@ -538,13 +538,28 @@ function print_help() {
     echo ""
 }
 
-function main() {
-  if [ $# -ne 1 ]
-  then
-    echo "Insufficient or too many parameters"
-    print_help
-    exit_code 0
+set_paths() {
+  local first_param="$1"
+  local second_param="$2"
+
+  if [[ "$first_param" == *exporter* ]]; then
+    exporter_path="$second_param"
+  elif [[ "$first_param" == *prometheus* ]]; then
+    prometheus_path="$second_param"
+  elif [[ "$first_param" == *grafana* ]]; then
+    grafana_path="$second_param"
+  else
+    echo "Unknown parameter: $first_param"
+    return 1
   fi
+
+  log_info_echo "Paths updated:"
+  log_info_echo "exporter_path: $exporter_path"
+  log_info_echo "prometheus_path: $prometheus_path"
+  log_info_echo "grafana_path: $grafana_path"
+}
+
+function main() {
 
   if [ "$1" = "-h" ] || [ "$1" = "--help" ]
   then
@@ -588,6 +603,10 @@ function main() {
   version
   # validate server/client properties
   validate_properties
+
+  if [ $# -eq 2 ]; then
+    set_paths "$1" "$2"
+  fi
 
   local option="${1}"
   case "${option}" in
