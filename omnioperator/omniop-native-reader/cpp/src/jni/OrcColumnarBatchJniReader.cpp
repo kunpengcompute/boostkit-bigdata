@@ -22,6 +22,7 @@
 #include <memory>
 #include "jni_common.h"
 #include "common/UriInfo.h"
+#include "common/JulianGregorianRebase.h"
 
 using namespace omniruntime::vec;
 using namespace omniruntime::type;
@@ -115,6 +116,10 @@ int GetLiteral(orc::Literal &lit, int leafType, const std::string &value)
         }
         case orc::PredicateDataType::DATE: {
             lit = orc::Literal(PredicateDataType::DATE, static_cast<int64_t>(std::stol(value)));
+            break;
+        }
+        case orc::PredicateDataType::TIMESTAMP: {
+            lit = orc::Literal(PredicateDataType::TIMESTAMP, static_cast<int64_t>(std::stol(value)));
             break;
         }
         case orc::PredicateDataType::DECIMAL: {
@@ -263,12 +268,11 @@ int initExpressionTree(JNIEnv *env, SearchArgumentBuilder &builder, jobject &jso
     return 0;
 }
 
-
 JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniReader_initializeRecordReader(JNIEnv *env,
     jobject jObj, jlong reader, jobject jsonObj)
 {
     JNI_FUNC_START
-    orc::Reader *readerPtr = (orc::Reader *)reader;
+    auto *readerPtr = (omniruntime::reader::OmniReaderImpl *)reader;
 
     // get offset from json obj
     jlong offset = env->CallLongMethod(jsonObj, jsonMethodLong, env->NewStringUTF("offset"));
@@ -306,7 +310,9 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniRea
         rowReaderOpts.searchArgument(std::unique_ptr<SearchArgument>(sargBuilded.release()));
     }
 
-    std::unique_ptr<orc::RowReader> rowReader = readerPtr->createRowReader(rowReaderOpts);
+    std::unique_ptr<common::JulianGregorianRebase> julianPtr = common::BuildJulianGregorianRebase(env, jsonObj);
+
+    std::unique_ptr<orc::RowReader> rowReader = readerPtr->createRowReader(rowReaderOpts, julianPtr);
     return (jlong)(rowReader.release());
     JNI_FUNC_END(runtimeExceptionClass)
 }

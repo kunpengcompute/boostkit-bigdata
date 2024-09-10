@@ -93,7 +93,7 @@ object OmniAdaptorUtil {
   def transColumnVector(columnVector: ColumnVector, columnSize : Int): Vec = {
     val datatype: DataType = columnVector.dataType()
     val vec: Vec = datatype match {
-      case LongType =>
+      case LongType | TimestampType =>
         val vec = new LongVec(columnSize)
         val values = new Array[Long](columnSize)
         for (i <- 0 until columnSize) {

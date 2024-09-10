@@ -39,6 +39,8 @@ constexpr int32_t DECIMAL64_LEN = 8;
                 return new ParquetPlainDecoder<::parquet::Int32Type>(descr);
             case ::parquet::Type::INT64:
                 return new ParquetPlainDecoder<::parquet::Int64Type>(descr);
+            case ::parquet::Type::INT96:
+                return new ParquetPlainDecoder<::parquet::Int96Type>(descr);
             case ::parquet::Type::DOUBLE:
                 return new ParquetPlainDecoder<::parquet::DoubleType>(descr);
             case ::parquet::Type::BYTE_ARRAY:
@@ -70,6 +72,8 @@ constexpr int32_t DECIMAL64_LEN = 8;
             return new ParquetDictDecoderImpl<::parquet::Int32Type>(descr, pool);
         case ::parquet::Type::INT64:
             return new ParquetDictDecoderImpl<::parquet::Int64Type>(descr, pool);
+        case ::parquet::Type::INT96:
+            return new ParquetDictDecoderImpl<::parquet::Int96Type>(descr, pool);
         case ::parquet::Type::DOUBLE:
             return new ParquetDictDecoderImpl<::parquet::DoubleType>(descr, pool);
         case ::parquet::Type::BYTE_ARRAY:
@@ -310,10 +314,10 @@ std::shared_ptr<OmniRecordReader> MakeByteArrayRecordReader(const ColumnDescript
     }
 }
 
-std::shared_ptr<OmniRecordReader> MakeRecordReader(const ColumnDescriptor* descr,
-    LevelInfo leaf_info, ::arrow::MemoryPool* pool,
-    bool read_dictionary,
-    const std::shared_ptr<::arrow::DataType>& type) {
+std::shared_ptr<OmniRecordReader> MakeRecordReader(const ColumnDescriptor* descr, LevelInfo leaf_info, 
+    ::arrow::MemoryPool* pool, bool read_dictionary, const std::shared_ptr<::arrow::DataType>& type, 
+    common::TimeRebaseInfo *rebaseInfoPtr) 
+{
     switch (type->id()) {
         case ::arrow::Type::BOOL: {
             return std::make_shared<ParquetTypedRecordReader<OMNI_BOOLEAN, ::parquet::BooleanType>>(descr,
@@ -331,6 +335,22 @@ std::shared_ptr<OmniRecordReader> MakeRecordReader(const ColumnDescriptor* descr
         }
         case ::arrow::Type::INT64: {
             return std::make_shared<ParquetTypedRecordReader<OMNI_LONG, ::parquet::Int64Type>>(descr, leaf_info, pool);
+        }
+        case ::arrow::Type::TIMESTAMP: {
+            switch (descr->physical_type()) {
+                case ::parquet::Type::INT64: {
+                    const ::arrow::TimeUnit::type unit = 
+                        ::arrow::internal::checked_cast<::arrow::TimestampType &>(*type).unit();
+                    return std::make_shared<ParquetTimestamp64RecordReader>(descr, leaf_info, pool, unit, 
+                        rebaseInfoPtr);
+                }
+                case ::parquet::Type::INT96:
+                    return std::make_shared<ParquetTimestamp96RecordReader>(descr, leaf_info, pool, rebaseInfoPtr);
+                default:
+                    std::stringstream ss;
+                    ss << "RecordReader not support timestamp type " << static_cast<int>(descr->physical_type());
+                    throw ParquetException(ss.str());
+            }
         }
         case ::arrow::Type::DATE64: {
             return std::make_shared<ParquetTypedRecordReader<OMNI_DATE64, ::parquet::Int64Type>>(descr,

@@ -22,6 +22,8 @@
 #include "parquet/ParquetReader.h"
 #include "parquet/ParquetExpression.h"
 #include "common/UriInfo.h"
+#include "common/JulianGregorianRebase.h"
+#include "common/TimeRebaseInfo.h"
 
 using namespace omniruntime::reader;
 
@@ -94,7 +96,9 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_ParquetColumnarBatchJn
 
     auto fieldNames = GetFieldNames(env, jsonObj);
 
-    ParquetReader *pReader = new ParquetReader();
+    std::unique_ptr<common::TimeRebaseInfo> rebaseInfoPtr = common::BuildTimeRebaseInfo(env, jsonObj);
+
+    ParquetReader *pReader = new ParquetReader(rebaseInfoPtr);
     auto state = pReader->InitRecordReader(uriInfo, start, end, capacity, hasExpressionTree, pushedFilterArray,
         fieldNames, ugiString);
     if (state != Status::OK()) {

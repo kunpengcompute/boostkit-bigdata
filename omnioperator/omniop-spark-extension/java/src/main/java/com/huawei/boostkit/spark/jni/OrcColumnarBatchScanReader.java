@@ -19,9 +19,12 @@
 package com.huawei.boostkit.spark.jni;
 import com.huawei.boostkit.scan.jni.OrcColumnarBatchJniReader;
 
+import com.huawei.boostkit.spark.timestamp.JulianGregorianRebase;
+import com.huawei.boostkit.spark.timestamp.TimestampUtil;
 import nova.hetu.omniruntime.type.DataType;
 import nova.hetu.omniruntime.vector.*;
 
+import org.apache.spark.sql.catalyst.util.DateTimeUtils;
 import org.apache.spark.sql.catalyst.util.RebaseDateTime;
 import org.apache.hadoop.hive.ql.io.sarg.ExpressionTree;
 import org.apache.hadoop.hive.ql.io.sarg.PredicateLeaf;
@@ -33,12 +36,15 @@ import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 import java.sql.Date;
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.TimeZone;
 
 public class OrcColumnarBatchScanReader {
     private static final Logger LOGGER = LoggerFactory.getLogger(OrcColumnarBatchScanReader.class);
 
+    private boolean nativeSupportTimestampRebase;
     public long reader;
     public long recordReader;
     public long batchReader;
@@ -127,6 +133,9 @@ public class OrcColumnarBatchScanReader {
                         String scalePadZeroStr = padZeroForDecimals(spiltValues, decimalS);
                         jsonObject.put("literal", spiltValues[0] + "." + scalePadZeroStr + " " + decimalP + " " + decimalS);
                     }
+                } else if (pl.getType() == PredicateLeaf.Type.TIMESTAMP) {
+                    jsonObject.put("literal",
+                            String.valueOf(DateTimeUtils.fromJavaTimestamp((Timestamp)pl.getLiteral())));
                 } else {
                     jsonObject.put("literal", pl.getLiteral().toString());
                 }
@@ -152,6 +161,8 @@ public class OrcColumnarBatchScanReader {
                         }
                     } else if (pl.getType() == PredicateLeaf.Type.DATE) {
                         lst.add(((int)Math.ceil(((Date)ob).getTime()* 1.0/3600/24/1000)) + "");
+                    } else if (pl.getType() == PredicateLeaf.Type.TIMESTAMP) {
+                        lst.add(String.valueOf(DateTimeUtils.fromJavaTimestamp((Timestamp)pl.getLiteral())));
                     } else {
                         lst.add(ob.toString());
                     }
@@ -163,6 +174,18 @@ public class OrcColumnarBatchScanReader {
             jsonObjectList.put("leaf-" + i, jsonObject);
         }
         return jsonObjectList;
+    }
+
+    private void addJulianGregorianInfo(JSONObject job) {
+        TimestampUtil instance = TimestampUtil.getInstance();
+        JulianGregorianRebase julianObject = instance.getJulianObject(TimeZone.getDefault().getID());
+        if (julianObject == null) {
+            return;
+        }
+        job.put("tz", julianObject.getTz());
+        job.put("switches", julianObject.getSwitches());
+        job.put("diffs", julianObject.getDiffs());
+        nativeSupportTimestampRebase = true;
     }
 
     /**
@@ -215,6 +238,7 @@ public class OrcColumnarBatchScanReader {
         }
 
         job.put("includedColumns", colToInclu.toArray());
+        addJulianGregorianInfo(job);
 
         recordReader = jniReader.initializeRecordReader(reader, job);
         return recordReader;
@@ -253,6 +277,14 @@ public class OrcColumnarBatchScanReader {
         }
     }
 
+    public void convertJulianToGregorianMicros(LongVec longVec, long rowNumber) {
+        long gregorianValue;
+        for (int rowIndex = 0; rowIndex < rowNumber; rowIndex++) {
+            gregorianValue = RebaseDateTime.rebaseJulianToGregorianMicros(longVec.get(rowIndex));
+            longVec.set(rowIndex, gregorianValue);
+        }
+    }
+
     public int next(Vec[] vecList, int[] typeIds) {
         long[] vecNativeIds = new long[realColsCnt];
         long rtn = jniReader.recordReaderNext(recordReader, batchReader, typeIds, vecNativeIds);
@@ -285,6 +317,13 @@ public class OrcColumnarBatchScanReader {
                 case OMNI_LONG:
                 case OMNI_DECIMAL64: {
                     vecList[i] = new LongVec(vecNativeIds[nativeGetId]);
+                    break;
+                }
+                case OMNI_TIMESTAMP: {
+                    vecList[i] = new LongVec(vecNativeIds[nativeGetId]);
+                    if (!this.nativeSupportTimestampRebase) {
+                        convertJulianToGregorianMicros((LongVec)(vecList[i]), rtn);
+                    }
                     break;
                 }
                 case OMNI_DOUBLE: {

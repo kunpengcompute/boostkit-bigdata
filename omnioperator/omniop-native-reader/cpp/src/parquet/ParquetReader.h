@@ -26,6 +26,7 @@
 #include "ParquetColumnReader.h"
 #include "common/UriInfo.h"
 #include "ParquetExpression.h"
+#include "common/TimeRebaseInfo.h"
 
 using namespace arrow::internal;
 
@@ -49,7 +50,8 @@ namespace omniruntime::reader {
 
     class ParquetReader {
     public:
-        ParquetReader() {}
+        ParquetReader(std::unique_ptr<common::TimeRebaseInfo> &rebaseInfoPtr) : rebaseInfoPtr(std::move(rebaseInfoPtr))
+        {}
 
         arrow::Status InitRecordReader(UriInfo &uri, int64_t start, int64_t end, int64_t capacity, bool hasExpressionTree,
             Expression pushedFilterArray, const std::vector<std::string>& fieldNames, std::string& ugi);
@@ -81,6 +83,7 @@ namespace omniruntime::reader {
         arrow::Status GetReader(const parquet::arrow::SchemaField &field, const std::shared_ptr<arrow::Field> &arrow_field,
             const std::shared_ptr<parquet::arrow::ReaderContext> &ctx, std::unique_ptr<ParquetColumnReader>* out);
 
+        std::unique_ptr<common::TimeRebaseInfo> rebaseInfoPtr;
     };
 
     class Filesystem {

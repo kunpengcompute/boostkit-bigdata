@@ -31,6 +31,7 @@ import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_DOUBLE;
 import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_INT;
 import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_LONG;
 import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_VARCHAR;
+import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_TIMESTAMP;
 import nova.hetu.omniruntime.type.DataTypeSerializer;
 import nova.hetu.omniruntime.vector.VecBatch;
 
@@ -100,7 +101,7 @@ public class ColumnShuffleCompressionTest extends ColumnShuffleTest {
 
     public void columnShuffleTestCompress(String compressType, String dataFile) throws IOException {
         DataType.DataTypeId[] idTypes = {OMNI_INT, OMNI_LONG, OMNI_DOUBLE, OMNI_VARCHAR, OMNI_CHAR,
-                OMNI_DATE32, OMNI_DATE64, OMNI_DECIMAL64, OMNI_DECIMAL128};
+                OMNI_DATE32, OMNI_DATE64, OMNI_DECIMAL64, OMNI_DECIMAL128, OMNI_TIMESTAMP};
         DataType[] types = dataTypeId2DataType(idTypes);
         String inputType = DataTypeSerializer.serialize(types);
         SparkJniWrapper jniWrapper = new SparkJniWrapper();

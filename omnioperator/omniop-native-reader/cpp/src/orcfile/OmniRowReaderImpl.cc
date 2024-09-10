@@ -97,12 +97,13 @@ namespace omniruntime::reader {
 
     std::unique_ptr<RowReader> OmniReaderImpl::createRowReader() const {
         RowReaderOptions defaultOpts;
-        return createRowReader(defaultOpts);
+        std::unique_ptr<common::JulianGregorianRebase> julianPtr;
+        return createRowReader(defaultOpts, julianPtr);
     }
 
     std::unique_ptr<RowReader> OmniReaderImpl::createRowReader(
-            const RowReaderOptions& opts) const {
-        return std::unique_ptr<RowReader>(new OmniRowReaderImpl(contents, opts));
+            const RowReaderOptions& opts, std::unique_ptr<common::JulianGregorianRebase> &julianPtr) const {
+        return std::unique_ptr<RowReader>(new OmniRowReaderImpl(contents, opts, julianPtr));
     }
 
     void OmniRowReaderImpl::startNextStripe() {
@@ -156,7 +157,8 @@ namespace omniruntime::reader {
                                             *contents->stream,
                                             writerTimezone,
                                             readerTimezone);
-            reader = omniBuildReader(*contents->schema, stripeStreams);
+            reader = omniBuildReader(*contents->schema, stripeStreams, 
+                                    (julianPtr == nullptr) ? nullptr : julianPtr.get());
 
             if (sargsApplier) {
                 // move to the 1st selected row group when PPD is enabled.
