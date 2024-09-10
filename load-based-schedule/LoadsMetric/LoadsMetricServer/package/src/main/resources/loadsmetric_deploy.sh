@@ -293,23 +293,53 @@ function manager(){
   sh "${install_dir}/${software_name}-server/bin/launcher" "${manager_type}"  >> "${log_file}" 2>&1
 }
 
+check_port_usage() {
+  local host=$1
+  local port=$2
+  if ssh root@$host "lsof -i :$port > /dev/null 2>&1"; then
+    return 1
+  else
+    return 0
+  fi
+}
 # start node_exporter
 start_node_exporter() {
+  local node_exporter_port=9100
+  if ! check_port_usage $1 $node_exporter_port; then
+    log_err_echo "$1 Port $node_exporter_port is already in use.Service will not be started"
+    return 1
+  fi
   (
-    ssh root@$1 "cd $exporter_path && nohup ./node_exporter --web.listen-address='0.0.0.0:9100' > node_exporter.log 2>&1 &"
+    ssh root@$1 "cd $exporter_path && nohup ./node_exporter --web.listen-address='0.0.0.0:$node_exporter_port' > node_exporter.log 2>&1 &"
   ) &
-  log_info_echo "Started node_exporter on $1"
+  if [ $? -ne 0 ]; then
+    log_err_echo "start node_exporter on $1 is unsuccessfully"
+    exit 1
+  else
+    log_info_echo "start node_exporter on $1 is successfully"
+  fi
 }
 
 # stop node_exporter
 stop_node_exporter() {
   ssh root@$1 "pkill -f node_exporter"
-  log_info_echo "Stopped node_exporter on $1"
+  if [ $? -ne 0 ]; then
+    log_err_echo "stop node_exporter on $1 is unsuccessfully"
+    exit 1
+  else
+    log_info_echo "stop node_exporter on $1 is successfully"
+  fi
 }
 # restart node_exporter
 restart_node_exporter() {
   stop_node_exporter "$1"
   start_node_exporter "$1"
+  if [ $? -ne 0 ]; then
+    log_err_echo "restart node_exporter on $1 is unsuccessfully"
+    exit 1
+  else
+    log_info_echo "restart node_exporter on $1 is successfully"
+  fi
 }
 
 function manager_node_exporter(){
@@ -318,7 +348,7 @@ function manager_node_exporter(){
   # get agent lists from workers
   mapfile -t agents < workers
   manager_type="${1}"
-  log_info_echo "========${manager_type} node_exporter========"
+  log_info_echo "${manager_type} node_exporter......"
 case $manager_type in
   "start")
     for agent in "${agents[@]}"; do
@@ -346,15 +376,24 @@ case $manager_type in
     exit 1
     ;;
 esac
-  log_info_echo "========completed ${manager_type} node_exporter====="
 }
 
 # start prometheus
 start_prometheus() {
+  local prometheus_port=9060
+  if lsof -i :$prometheus_port > /dev/null 2>&1; then
+    log_err_echo "Port $prometheus_port is already in use.Service will not be started"
+    return 1
+  fi
   (
-    cd $prometheus_path && nohup ./prometheus --web.listen-address='0.0.0.0:9060' > prometheus.log 2>&1 &
+    cd $prometheus_path && nohup ./prometheus --web.listen-address="0.0.0.0:$prometheus_port" > prometheus.log 2>&1 &
   ) &
-  log_info_echo "Started prometheus"
+  if [ $? -ne 0 ]; then
+    log_err_echo "start prometheus is unsuccessfully"
+    exit 1
+  else
+    log_info_echo "start prometheus is successfully"
+  fi
 }
 
 # stop prometheus
@@ -362,18 +401,29 @@ stop_prometheus() {
   (
     pkill -f prometheus
   ) &
-  log_info_echo "Stopped prometheus"
+  if [ $? -ne 0 ]; then
+    log_err_echo "stop prometheus is unsuccessfully"
+    exit 1
+  else
+    log_info_echo "stop prometheus is successfully"
+  fi
 }
 # restart node_exporter
 restart_prometheus() {
   stop_node_exporter
   start_node_exporter
+  if [ $? -ne 0 ]; then
+    log_err_echo "restart prometheus is unsuccessfully"
+    exit 1
+  else
+    log_info_echo "restart prometheus is successfully"
+  fi
 }
 
 function manager_prometheus(){
   check_file "$prometheus_path" "prometheus path is not exist"
   manager_type="${1}"
-  log_info_echo "========${manager_type} prometheus========"
+  log_info_echo "${manager_type} prometheus......"
 case $manager_type in
   "start")
     start_prometheus
@@ -391,7 +441,6 @@ case $manager_type in
     exit 1
     ;;
 esac
-log_info_echo "========completed ${manager_type} prometheus====="
 }
 
 # start grafana
@@ -399,24 +448,40 @@ start_grafana() {
   (
     cd $grafana_path && nohup ./grafana server > grafana.log 2>&1 &
   ) &
-  log_info_echo "Started grafana"
+  if [ $? -ne 0 ]; then
+    log_err_echo "start grafana is unsuccessfully"
+    exit 1
+  else
+    log_info_echo "start grafana is successfully"
+  fi
 }
 
 # stop grafana
 stop_grafana() {
   pkill -f grafana
-  log_info_echo "Stopped grafana"
+  if [ $? -ne 0 ]; then
+    log_err_echo "stop grafana is unsuccessfully"
+    exit 1
+  else
+    log_info_echo "stop grafana is successfully"
+  fi
 }
 # restart node_exporter
 restart_grafana() {
   stop_node_exporter
   start_node_exporter
+  if [ $? -ne 0 ]; then
+    log_err_echo "restart grafana is unsuccessfully"
+    exit 1
+  else
+    log_info_echo "restart grafana is successfully"
+  fi
 }
 
 function manager_grafana(){
   check_file "$grafana_path" "grafana path is not exist"
   manager_type="${1}"
-  log_info_echo "========${manager_type} grafana========"
+  log_info_echo "${manager_type} grafana......"
 case $manager_type in
   "start")
     start_grafana
@@ -434,7 +499,6 @@ case $manager_type in
     exit 1
     ;;
 esac
-log_info_echo "========completed ${manager_type} grafana====="
 }
 
 function validate_properties() {
