@@ -3,6 +3,10 @@
 stty intr undef
 stty susp undef
 stty quit undef
+# Path
+exporter_path="/opt/prometheus/node_exporter-1.7.0.linux-arm64"
+prometheus_path="/opt/prometheus/prometheus-2.45.4.linux-arm64"
+grafana_path="/opt/prometheus/grafana-v10.4.2/bin"
 
 function exit_code() {
     if [ "${1}" -ne 0 ]; then
@@ -289,6 +293,214 @@ function manager(){
   sh "${install_dir}/${software_name}-server/bin/launcher" "${manager_type}"  >> "${log_file}" 2>&1
 }
 
+check_port_usage() {
+  local host=$1
+  local port=$2
+  if ssh root@$host "lsof -i :$port > /dev/null 2>&1"; then
+    return 1
+  else
+    return 0
+  fi
+}
+# start node_exporter
+start_node_exporter() {
+  local node_exporter_port=9100
+  if ! check_port_usage $1 $node_exporter_port; then
+    log_err_echo "$1 Port $node_exporter_port is already in use.Service will not be started"
+    return 1
+  fi
+  (
+    ssh root@$1 "cd $exporter_path && nohup ./node_exporter --web.listen-address='0.0.0.0:$node_exporter_port' > node_exporter.log 2>&1 &"
+  ) &
+  if [ $? -ne 0 ]; then
+    log_err_echo "start node_exporter on $1 is unsuccessfully"
+    exit 1
+  else
+    log_info_echo "start node_exporter on $1 is successfully"
+  fi
+}
+
+# stop node_exporter
+stop_node_exporter() {
+  ssh root@$1 "pkill -f node_exporter"
+  if [ $? -ne 0 ]; then
+    log_err_echo "stop node_exporter on $1 is unsuccessfully"
+    exit 1
+  else
+    log_info_echo "stop node_exporter on $1 is successfully"
+  fi
+}
+# restart node_exporter
+restart_node_exporter() {
+  stop_node_exporter "$1"
+  start_node_exporter "$1"
+  if [ $? -ne 0 ]; then
+    log_err_echo "restart node_exporter on $1 is unsuccessfully"
+    exit 1
+  else
+    log_info_echo "restart node_exporter on $1 is successfully"
+  fi
+}
+
+function manager_node_exporter(){
+
+  check_file "workers" "Thers is no workers!!!"
+  # get agent lists from workers
+  mapfile -t agents < workers
+  manager_type="${1}"
+  log_info_echo "${manager_type} node_exporter......"
+case $manager_type in
+  "start")
+    for agent in "${agents[@]}"; do
+      if ! ssh root@$agent "[ -e \"$exporter_path\" ]"; then
+         log_err_echo "node_exporter path is not exist"
+      else
+         start_node_exporter "$agent"
+      fi
+	    sleep 1
+    done
+    ;;
+  "stop")
+    for agent in "${agents[@]}"; do
+      stop_node_exporter "$agent"
+	  sleep 1
+    done
+    ;;
+  "restart")
+    for agent in "${agents[@]}"; do
+      restart_node_exporter "$agent"
+	  sleep 1
+    done
+    ;;
+  *)
+    exit 1
+    ;;
+esac
+}
+
+# start prometheus
+start_prometheus() {
+  local prometheus_port=9060
+  if lsof -i :$prometheus_port > /dev/null 2>&1; then
+    log_err_echo "Port $prometheus_port is already in use.Service will not be started"
+    return 1
+  fi
+  (
+    cd $prometheus_path && nohup ./prometheus --web.listen-address="0.0.0.0:$prometheus_port" > prometheus.log 2>&1 &
+  ) &
+  if [ $? -ne 0 ]; then
+    log_err_echo "start prometheus is unsuccessfully"
+    exit 1
+  else
+    log_info_echo "start prometheus is successfully"
+  fi
+}
+
+# stop prometheus
+stop_prometheus() {
+  (
+    pkill -f prometheus
+  ) &
+  if [ $? -ne 0 ]; then
+    log_err_echo "stop prometheus is unsuccessfully"
+    exit 1
+  else
+    log_info_echo "stop prometheus is successfully"
+  fi
+}
+# restart node_exporter
+restart_prometheus() {
+  stop_node_exporter
+  start_node_exporter
+  if [ $? -ne 0 ]; then
+    log_err_echo "restart prometheus is unsuccessfully"
+    exit 1
+  else
+    log_info_echo "restart prometheus is successfully"
+  fi
+}
+
+function manager_prometheus(){
+  check_file "$prometheus_path" "prometheus path is not exist"
+  manager_type="${1}"
+  log_info_echo "${manager_type} prometheus......"
+case $manager_type in
+  "start")
+    start_prometheus
+    sleep 1
+    ;;
+  "stop")
+    stop_prometheus
+    sleep 1
+    ;;
+  "restart")
+    restart_prometheus
+    sleep 1
+    ;;
+  *)
+    exit 1
+    ;;
+esac
+}
+
+# start grafana
+start_grafana() {
+  (
+    cd $grafana_path && nohup ./grafana server > grafana.log 2>&1 &
+  ) &
+  if [ $? -ne 0 ]; then
+    log_err_echo "start grafana is unsuccessfully"
+    exit 1
+  else
+    log_info_echo "start grafana is successfully"
+  fi
+}
+
+# stop grafana
+stop_grafana() {
+  pkill -f grafana
+  if [ $? -ne 0 ]; then
+    log_err_echo "stop grafana is unsuccessfully"
+    exit 1
+  else
+    log_info_echo "stop grafana is successfully"
+  fi
+}
+# restart node_exporter
+restart_grafana() {
+  stop_node_exporter
+  start_node_exporter
+  if [ $? -ne 0 ]; then
+    log_err_echo "restart grafana is unsuccessfully"
+    exit 1
+  else
+    log_info_echo "restart grafana is successfully"
+  fi
+}
+
+function manager_grafana(){
+  check_file "$grafana_path" "grafana path is not exist"
+  manager_type="${1}"
+  log_info_echo "${manager_type} grafana......"
+case $manager_type in
+  "start")
+    start_grafana
+    sleep 1
+    ;;
+  "stop")
+    stop_grafana
+    sleep 1
+    ;;
+  "restart")
+    restart_grafana
+    sleep 1
+    ;;
+  *)
+    exit 1
+    ;;
+esac
+}
+
 function validate_properties() {
 
   server_port=$(get_value_of_properties_file "${config_file}" "server.port")
@@ -366,11 +578,20 @@ function print_help() {
     echo "Usage: $0 [-h|--help] [install|uninstall|start|stop]"
     echo ""
     echo "Command:"
-    echo "  install    Install software"
-    echo "  uninstall  Uninstall software"
-    echo "  start      Start software"
-    echo "  stop       Stop software"
-    echo "  restart    Restart software"
+    echo "  install                                                            Install software"
+    echo "  uninstall                                                          Uninstall software"
+    echo "  start                                                              Start software"
+    echo "  stop                                                               Stop software"
+    echo "  restart                                                            Restart software"
+    echo "  start_exporter     || start_exporter exporter_install_path         Start node_exporter"
+    echo "  stop_exporter      || stop_exporter exporter_install_path          Stop node_exporter"
+    echo "  restart_exporter   || restart_exporter exporter_install_path       Restart node_exporter"
+    echo "  start_prometheus   || start_prometheus prometheus_install_path     Start prometheus"
+    echo "  stop_prometheus    || stop_prometheus prometheus_install_path      Stop prometheus"
+    echo "  restart_prometheus || restart_prometheus prometheus_install_path   Restart prometheus"
+    echo "  start_grafana      || start_grafana grafana_install_path           Start grafana"
+    echo "  stop_grafana       || stop_grafana grafana_install_path            Stop grafana"
+    echo "  restart_grafana    || restart_grafana grafana_install_path         Restart grafana"
     echo ""
     echo "Example:"
     echo "  $0 install"
@@ -381,14 +602,28 @@ function print_help() {
     echo ""
 }
 
-function main() {
-  if [ $# -ne 1 ]
-  then
-    echo "Insufficient or too many parameters"
-    print_help
-    exit_code 0
+set_paths() {
+  local first_param="$1"
+  local second_param="$2"
+
+  if [[ "$first_param" == *exporter* ]]; then
+    exporter_path="$second_param"
+  elif [[ "$first_param" == *prometheus* ]]; then
+    prometheus_path="$second_param"
+  elif [[ "$first_param" == *grafana* ]]; then
+    grafana_path="$second_param"
+  else
+    echo "Unknown parameter: $first_param"
+    return 1
   fi
 
+  log_info_echo "Paths updated:"
+  log_info_echo "exporter_path: $exporter_path"
+  log_info_echo "prometheus_path: $prometheus_path"
+  log_info_echo "grafana_path: $grafana_path"
+}
+
+function main() {
   if [ "$1" = "-h" ] || [ "$1" = "--help" ]
   then
     print_help
@@ -432,6 +667,10 @@ function main() {
   # validate server/client properties
   validate_properties
 
+  if [ $# -eq 2 ]; then
+    set_paths "$1" "$2"
+  fi
+
   local option="${1}"
   case "${option}" in
     "version")
@@ -461,6 +700,33 @@ function main() {
     ;;
     "restart")
       manager "restart"
+    ;;
+    "start_exporter")
+      manager_node_exporter "start"
+    ;;
+    "restart_exporter")
+      manager_node_exporter "restart"
+    ;;
+    "stop_exporter")
+      manager_node_exporter "stop"
+    ;;
+    "start_prometheus")
+      manager_prometheus "start"
+    ;;
+    "restart_prometheus")
+      manager_prometheus "restart"
+    ;;
+    "stop_prometheus")
+      manager_prometheus "stop"
+    ;;
+    "start_grafana")
+      manager_grafana "start"
+    ;;
+    "restart_grafana")
+      manager_grafana "restart"
+    ;;
+    "stop_grafana")
+      manager_grafana "stop"
     ;;
     *)
       echo "Invalid option: ${option}"
