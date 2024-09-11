@@ -33,9 +33,6 @@ public class UsageMetricsServiceImpl implements UsageMetricsService {
     @Autowired
     private LoadsRecordsCacheService loadsRecordsCacheService;
 
-    private static final Logger LOG = LoggerFactory.getLogger(UsageMetricsServiceImpl.class);
-
-
     /**
      * get cluster's usage metric info for Prometheus
      *
@@ -63,13 +60,8 @@ public class UsageMetricsServiceImpl implements UsageMetricsService {
 
     @Override
     public UsageMetrics calcuUsageMetrics(Map<String, FixedSizeRingBuffer<LoadsRecords>> loadsRecordsCacheMap) {
-        try {
-            List<LoadsRecordAverage> loadsRecordAverageList = multiLoadResourceUsageSortPolicy.calculateAverage(loadsRecordsCacheMap);
-            UsageMetrics usageMetrics = usageMetricsAggregator.usageMetricsCalculate(loadsRecordAverageList);
-            return usageMetrics;
-        } catch (NumberFormatException e) {
-            LOG.warn("NodeExporter is stopped.");
-            return new UsageMetrics();
-        }
+        List<LoadsRecordAverage> loadsRecordAverageList = multiLoadResourceUsageSortPolicy.calculateAverage(loadsRecordsCacheMap);
+        UsageMetrics usageMetrics = usageMetricsAggregator.usageMetricsCalculate(loadsRecordAverageList);
+        return usageMetrics;
     }
 }
