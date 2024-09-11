@@ -190,7 +190,7 @@ public class OmniSelectOperator extends OmniHiveOperator<OmniSelectDesc> impleme
         }
     }
 
-    private void prepareExpression(List<ObjectInspector> colInspector, List<Integer> dataTypes, List<Integer> colVals,
+    protected void prepareExpression(List<ObjectInspector> colInspector, List<Integer> dataTypes, List<Integer> colVals,
                                    List<TypeInfo> typeInfos, ExprNodeDesc nodeDesc) {
         ObjectInspector inspector;
         Integer fieldId;
@@ -226,7 +226,7 @@ public class OmniSelectOperator extends OmniHiveOperator<OmniSelectDesc> impleme
         colVals.add(fieldId);
     }
 
-    private void checkIfHasBrotherOperators() {
+    protected void checkIfHasBrotherOperators() {
         List<Operator<? extends OperatorDesc>> parentOperators = this.getParentOperators();
         List<Operator<? extends OperatorDesc>> childOperators = parentOperators.get(0).getChildOperators();
         if (childOperators.get(childOperators.size() - 1) != this) {

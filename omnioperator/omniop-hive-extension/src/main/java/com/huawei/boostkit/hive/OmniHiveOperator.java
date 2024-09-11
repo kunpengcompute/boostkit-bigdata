@@ -27,10 +27,13 @@ import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.plan.OperatorDesc;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 
+import java.util.ArrayList;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Queue;
 
 public abstract class OmniHiveOperator<T extends OperatorDesc> extends Operator<T> {
+    protected List<Object> otherConfs = new ArrayList<>();
     private static String currentWork;
 
     public OmniHiveOperator() {
@@ -39,6 +42,12 @@ public abstract class OmniHiveOperator<T extends OperatorDesc> extends Operator<
 
     public OmniHiveOperator(CompilationOpContext ctx) {
         super(ctx);
+    }
+
+    public List<Object> getOtherConfs() {return otherConfs;}
+
+    public void addOtherConfs(Object otherConf) {
+        otherConfs.add(otherConf);
     }
 
     @Override

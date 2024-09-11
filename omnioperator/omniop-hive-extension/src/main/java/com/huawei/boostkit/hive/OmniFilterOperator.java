@@ -91,8 +91,8 @@ public class OmniFilterOperator extends OmniHiveOperator<OmniFilterDesc> impleme
         } else {
             root = ExpressionUtils.createLiteralNode(predicate);
         }
-        List<? extends StructField> allStructFieldRefs = (
-                (StructObjectInspector) inputObjInspectors[0]).getAllStructFieldRefs();
+        List<? extends StructField> allStructFieldRefs =
+                ((StructObjectInspector) inputObjInspectors[0]).getAllStructFieldRefs();
         DataType[] inputTypes = new DataType[allStructFieldRefs.size()];
         String[] projections = new String[allStructFieldRefs.size()];
         for (int i = 0; i < allStructFieldRefs.size(); i++) {
