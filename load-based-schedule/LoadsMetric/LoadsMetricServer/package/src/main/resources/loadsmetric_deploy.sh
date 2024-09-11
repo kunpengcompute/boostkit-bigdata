@@ -693,7 +693,6 @@ function main() {
       echo "${version}"
     ;;
     "install")
-      create_user  # make sure user exists
       install
     ;;
     "uninstall")
