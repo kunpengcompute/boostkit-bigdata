@@ -623,6 +623,20 @@ set_paths() {
   log_info_echo "grafana_path: $grafana_path"
 }
 
+# manager action log
+function log_action_result() {
+    local action="$1"  # action name，like "stop" or "restart"
+    local status="$2"  # exit status
+    local success_message="${action} successfully."
+    local failure_message="${action} failed."
+
+    if [ "${status}" -eq 0 ]; then
+        log_info_echo "${success_message}"
+    else
+        log_err_echo "${failure_message}"
+    fi
+}
+
 function main() {
   if [ "$1" = "-h" ] || [ "$1" = "--help" ]
   then
@@ -677,6 +691,7 @@ function main() {
       echo "${version}"
     ;;
     "install")
+      create_user  # make sure user exists
       install
     ;;
     "uninstall")
@@ -697,36 +712,47 @@ function main() {
     ;;
     "stop")
       manager "stop"
+      log_action_result "LoadsMetric stop" $?
     ;;
     "restart")
       manager "restart"
+      log_action_result "LoadsMetric restart" $?
     ;;
     "start_exporter")
       manager_node_exporter "start"
+      log_action_result "NodeExporter start" $?
     ;;
     "restart_exporter")
       manager_node_exporter "restart"
+      log_action_result "NodeExporter restart" $?
     ;;
     "stop_exporter")
       manager_node_exporter "stop"
+      log_action_result "NodeExporter stop" $?
     ;;
     "start_prometheus")
       manager_prometheus "start"
+      log_action_result "Prometheus start" $?
     ;;
     "restart_prometheus")
       manager_prometheus "restart"
+      log_action_result "Prometheus restart" $?
     ;;
     "stop_prometheus")
       manager_prometheus "stop"
+      log_action_result "Prometheus stop" $?
     ;;
     "start_grafana")
       manager_grafana "start"
+      log_action_result "Grafana stop" $?
     ;;
     "restart_grafana")
       manager_grafana "restart"
+      log_action_result "Grafana restart" $?
     ;;
     "stop_grafana")
       manager_grafana "stop"
+      log_action_result "Grafana stop" $?
     ;;
     *)
       echo "Invalid option: ${option}"
