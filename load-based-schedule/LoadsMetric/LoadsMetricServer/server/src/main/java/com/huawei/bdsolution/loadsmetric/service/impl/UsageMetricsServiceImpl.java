@@ -11,6 +11,8 @@ import com.huawei.bdsolution.loadsmetric.service.LoadsRecordsCacheService;
 import com.huawei.bdsolution.loadsmetric.service.UsageMetricsService;
 import com.huawei.bdsolution.loadsmetric.util.MultiLoadResourceUsageSortPolicy;
 import com.huawei.bdsolution.loadsmetric.util.UsageMetricsAggregator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.PropertySource;
 import org.springframework.stereotype.Service;
@@ -30,6 +32,8 @@ public class UsageMetricsServiceImpl implements UsageMetricsService {
 
     @Autowired
     private LoadsRecordsCacheService loadsRecordsCacheService;
+
+    private static final Logger LOG = LoggerFactory.getLogger(UsageMetricsServiceImpl.class);
 
 
     /**
@@ -59,8 +63,13 @@ public class UsageMetricsServiceImpl implements UsageMetricsService {
 
     @Override
     public UsageMetrics calcuUsageMetrics(Map<String, FixedSizeRingBuffer<LoadsRecords>> loadsRecordsCacheMap) {
-        List<LoadsRecordAverage> loadsRecordAverageList = multiLoadResourceUsageSortPolicy.calculateAverage(loadsRecordsCacheMap);
-        UsageMetrics usageMetrics = usageMetricsAggregator.usageMetricsCalculate(loadsRecordAverageList);
-        return usageMetrics;
+        try {
+            List<LoadsRecordAverage> loadsRecordAverageList = multiLoadResourceUsageSortPolicy.calculateAverage(loadsRecordsCacheMap);
+            UsageMetrics usageMetrics = usageMetricsAggregator.usageMetricsCalculate(loadsRecordAverageList);
+            return usageMetrics;
+        } catch (NumberFormatException e) {
+            LOG.warn("NodeExporter is stopped.");
+            return new UsageMetrics();
+        }
     }
 }

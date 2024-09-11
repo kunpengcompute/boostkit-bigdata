@@ -704,6 +704,7 @@ function main() {
       if [ -d "${install_dir_server}" ] || [ -d "${install_dir_setup}" ]; then
         # If the installation directory exists, perform the start operation
         manager "start"
+        log_action_result "LoadsMetric start" $?
       else
         # If the installation directory does not exist, prompt to install first
         log_err_echo "Installation directory not found. Please install ${software_name} before starting it."
@@ -720,39 +721,30 @@ function main() {
     ;;
     "start_exporter")
       manager_node_exporter "start"
-      log_action_result "NodeExporter start" $?
     ;;
     "restart_exporter")
       manager_node_exporter "restart"
-      log_action_result "NodeExporter restart" $?
     ;;
     "stop_exporter")
       manager_node_exporter "stop"
-      log_action_result "NodeExporter stop" $?
     ;;
     "start_prometheus")
       manager_prometheus "start"
-      log_action_result "Prometheus start" $?
     ;;
     "restart_prometheus")
       manager_prometheus "restart"
-      log_action_result "Prometheus restart" $?
     ;;
     "stop_prometheus")
       manager_prometheus "stop"
-      log_action_result "Prometheus stop" $?
     ;;
     "start_grafana")
       manager_grafana "start"
-      log_action_result "Grafana stop" $?
     ;;
     "restart_grafana")
       manager_grafana "restart"
-      log_action_result "Grafana restart" $?
     ;;
     "stop_grafana")
       manager_grafana "stop"
-      log_action_result "Grafana stop" $?
     ;;
     *)
       echo "Invalid option: ${option}"
