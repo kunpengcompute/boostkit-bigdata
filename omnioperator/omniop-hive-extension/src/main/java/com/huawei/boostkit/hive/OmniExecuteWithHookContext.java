@@ -131,13 +131,15 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
     public static final Set<OperatorType> OMNI_OPERATOR = new HashSet<>(Arrays.asList(OperatorType.JOIN,
             OperatorType.MAPJOIN, OperatorType.MERGEJOIN, OperatorType.GROUPBY, OperatorType.SELECT,
             OperatorType.FILTER, OperatorType.PTF, OperatorType.TABLESCAN, OperatorType.REDUCESINK));
-    public static final Set<Integer> SUPPORTED_JOIN = new HashSet<>(Arrays.asList(JoinDesc.INNER_JOIN,
-            JoinDesc.LEFT_OUTER_JOIN, JoinDesc.FULL_OUTER_JOIN, JoinDesc.LEFT_SEMI_JOIN));
     public static int stringLength = 1024;
 
     private static final Logger LOG = LoggerFactory.getLogger(OmniExecuteWithHookContext.class.getName());
     private static final Set<PrimitiveObjectInspector.PrimitiveCategory> SUPPORTED_TYPE = new HashSet<>
         (Arrays.asList(BOOLEAN, SHORT, INT, LONG, DOUBLE, STRING, DATE, DECIMAL, VARCHAR, CHAR, VOID));
+    private static final Set<Integer> SUPPORTED_MAP_JOIN = new HashSet<>(Arrays.asList(JoinDesc.INNER_JOIN,
+            JoinDesc.LEFT_OUTER_JOIN, JoinDesc.RIGHT_OUTER_JOIN, JoinDesc.FULL_OUTER_JOIN, JoinDesc.LEFT_SEMI_JOIN));
+    private static final Set<Integer> SUPPORTED_MERGE_JOIN = new HashSet<>(Arrays.asList(JoinDesc.INNER_JOIN,
+            JoinDesc.LEFT_OUTER_JOIN, JoinDesc.FULL_OUTER_JOIN, JoinDesc.LEFT_SEMI_JOIN));
 
     private static final int DECIMAL64_MAX_PRECISION = 18;
     private static final int MAX_DESCENDANT_DEPTH = 4;
@@ -174,6 +176,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         parentOfMapJoinOpCannotReplace.clear();
         reduceSinkReplaceableWork.clear();
         reduceSinkReplaceableWorkName.clear();
+        reduceSinkUnReplaceableWork.clear();
         inputUnReplaceableWork.clear();
         needSortSerdeReduceSinkName.clear();
         tezWork = null;
@@ -399,20 +402,29 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
 
     private boolean simpleEdgeForChildReplaceable(BaseWork work, BaseWork child) {
         Operator reducer = ((ReduceWork) child).getReducer();
-        if (reducer.getType() == null) {
+        OperatorType reducerType = reducer.getType();
+        if (reducerType == null) {
             // is VectorOperator
             reducer = (Operator) reducer.getChildOperators().get(0);
         }
 
-        if (isReplaceable(reducer, true) && reducer.getType().equals(OperatorType.GROUPBY)) {
+        boolean isReplaceable = false;
+        if (isReplaceable(reducer, true) && reducerType.equals(OperatorType.GROUPBY)) {
             tezWork.getEdgeProperty(work, child).setEdgeType(TezEdgeProperty.EdgeType.CUSTOM_SIMPLE_EDGE);
-            return true;
+            isReplaceable = true;
         }
 
         if (isReplaceable(reducer, true) && reducer.getType().equals(OperatorType.SELECT) && selectOrPtfEdgeReplaceable(child.getAllOperators())) {
-            return true;
+            isReplaceable = true;
         }
-        return false;
+
+        Operator<? extends OperatorDesc> operator = (Operator<? extends OperatorDesc>) reducer.getChildren().get(0);
+        if (reducerType.equals(OperatorType.SELECT) && isReplaceable(operator, true)
+                && operator.getType().equals(OperatorType.PTF)) {
+            tezWork.getEdgeProperty(work, child).setEdgeType(TezEdgeProperty.EdgeType.CUSTOM_SIMPLE_EDGE);
+            isReplaceable = true;
+        }
+        return isReplaceable;
     }
 
     private boolean reduceSinkOperatorReplaceable(BaseWork work) {
@@ -787,7 +799,8 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
     private boolean PTFSupportedExpression(List<PTFExpressionDef> expressions) {
         for (PTFExpressionDef expression : expressions) {
             ExprNodeDesc exprNode = expression.getExprNode();
-            if (exprNode instanceof ExprNodeGenericFuncDesc) {
+            if (exprNode instanceof ExprNodeGenericFuncDesc && (exprNode.getChildren().size() > 1
+                    || !(exprNode.getChildren().get(0) instanceof ExprNodeColumnDesc))) {
                 return false;
             }
             if (exprNode instanceof ExprNodeColumnDesc && !SUPPORTED_TYPE
@@ -809,20 +822,21 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             FunctionType windowFunctionType = TypeUtils.getWindowFunctionType(windowFunctionDef);
             List<PTFExpressionDef> args = windowFunctionDefs.get(i).getArgs();
             boolean isCountAll = (windowFunctionDef.getName().equals("count") && windowFunctionDef.isStar());
-            if (!PTFSupportedFunction(windowFunctionType, args, isCountAll)) {
+            if (!PTFSupportedFunction(windowFunctionType, windowFunctionDef.getName(), args, isCountAll)) {
                 return false;
             }
         }
         return true;
     }
 
-    private boolean PTFSupportedFunction(FunctionType windowFunctionType, List<PTFExpressionDef> args,
-        boolean isCountAll) {
+    private boolean PTFSupportedFunction(FunctionType windowFunctionType, String windowFunctionName,
+        List<PTFExpressionDef> args, boolean isCountAll) {
         if (args != null) {
             if (windowFunctionType == null || isPTFAggUnsupported(windowFunctionType, args)) {
                 return false;
             }
-            if ((!isCountAll && args.size() > 1) || (!(args.get(0).getExprNode() instanceof ExprNodeColumnDesc))) {
+            if ((!isCountAll && args.size() > 1 && !windowFunctionName.equals("rank"))
+                    || (!(args.get(0).getExprNode() instanceof ExprNodeColumnDesc))) {
                 return false;
             }
         }
@@ -967,10 +981,19 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             return false;
         }
         JoinCondDesc[] joinCondDescs = joinDesc.getConds();
-        for (JoinCondDesc joinCondDesc : joinCondDescs) {
-            if (!SUPPORTED_JOIN.contains(joinCondDesc.getType()) || joinCondDesc.getType() == JoinDesc.FULL_OUTER_JOIN
-                    && fullJoinUnReplaceable(joinDesc)) {
-                return false;
+        if (joinDesc instanceof CommonMergeJoinDesc) {
+            for (JoinCondDesc joinCondDesc : joinCondDescs) {
+                if (!SUPPORTED_MERGE_JOIN.contains(joinCondDesc.getType())
+                        || (joinCondDesc.getType() == JoinDesc.FULL_OUTER_JOIN && fullJoinUnReplaceable(joinDesc))) {
+                    return false;
+                }
+            }
+        } else {
+            for (JoinCondDesc joinCondDesc : joinCondDescs) {
+                if (!SUPPORTED_MAP_JOIN.contains(joinCondDesc.getType())
+                        || (joinCondDesc.getType() == JoinDesc.FULL_OUTER_JOIN && fullJoinUnReplaceable(joinDesc))) {
+                    return false;
+                }
             }
         }
         if (joinCondDescs.length >= 2) {
