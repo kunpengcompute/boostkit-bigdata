@@ -888,7 +888,7 @@ public class CapacityScheduler extends
           overLoadNodeHosts.addAll(Arrays.asList(jsonObject.getString(OVERLOAD_NODE_HOSTS).split(COMMA)));
         }
         if (!overLoadNodeHosts.isEmpty()) {
-          LOG.warn("overLoadNodeHosts:{}", overLoadNodeHosts);
+          LOG.warn("overLoadNodeHosts:{}", Arrays.asList(jsonObject.getString(OVERLOAD_NODE_HOSTS).split(COMMA)));
         }
         // update sortedNodesHost
         if (!StringUtils.isBlank(jsonObject.getString(SORTED_NODE_HOSTS))) {

@@ -89,7 +89,7 @@ function main()
 
   if pgrep -f "LoadsMetricApplication" > /dev/null; then
     log_warn_echo "Warning: LoadsMetricApplication process is currently running." "${log_file}"
-    log_warn_echo "Warning: Please STOP the LoadsMetricApplication service and uninstall it first." "${log_file}"
+    log_warn_echo "Warning: Please STOP the LoadsMetricApplication service first." "${log_file}"
     exit 1
   fi
 

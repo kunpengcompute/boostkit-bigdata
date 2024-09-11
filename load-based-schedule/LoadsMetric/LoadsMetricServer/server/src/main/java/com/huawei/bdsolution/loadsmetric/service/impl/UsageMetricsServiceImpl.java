@@ -31,7 +31,6 @@ public class UsageMetricsServiceImpl implements UsageMetricsService {
     @Autowired
     private LoadsRecordsCacheService loadsRecordsCacheService;
 
-
     /**
      * get cluster's usage metric info for Prometheus
      *
