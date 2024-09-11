@@ -306,17 +306,17 @@ check_port_usage() {
 start_node_exporter() {
   local node_exporter_port=9100
   if ! check_port_usage $1 $node_exporter_port; then
-    log_err_echo "$1 Port $node_exporter_port is already in use.Service will not be started"
+    log_err_echo "$1 Port $node_exporter_port is already in use. Please check if the Service is running."
     return 1
   fi
   (
     ssh root@$1 "cd $exporter_path && nohup ./node_exporter --web.listen-address='0.0.0.0:$node_exporter_port' > node_exporter.log 2>&1 &"
   ) &
   if [ $? -ne 0 ]; then
-    log_err_echo "start node_exporter on $1 is unsuccessfully"
+    log_err_echo "start node_exporter on $1 unsuccessfully"
     exit 1
   else
-    log_info_echo "start node_exporter on $1 is successfully"
+    log_info_echo "start node_exporter on $1 successfully"
   fi
 }
 
@@ -324,10 +324,10 @@ start_node_exporter() {
 stop_node_exporter() {
   ssh root@$1 "pkill -f node_exporter"
   if [ $? -ne 0 ]; then
-    log_err_echo "stop node_exporter on $1 is unsuccessfully"
+    log_err_echo "stop node_exporter on $1 unsuccessfully"
     exit 1
   else
-    log_info_echo "stop node_exporter on $1 is successfully"
+    log_info_echo "stop node_exporter on $1 successfully"
   fi
 }
 # restart node_exporter
@@ -335,10 +335,10 @@ restart_node_exporter() {
   stop_node_exporter "$1"
   start_node_exporter "$1"
   if [ $? -ne 0 ]; then
-    log_err_echo "restart node_exporter on $1 is unsuccessfully"
+    log_err_echo "restart node_exporter on $1 unsuccessfully"
     exit 1
   else
-    log_info_echo "restart node_exporter on $1 is successfully"
+    log_info_echo "restart node_exporter on $1 successfully"
   fi
 }
 
@@ -382,17 +382,17 @@ esac
 start_prometheus() {
   local prometheus_port=9060
   if lsof -i :$prometheus_port > /dev/null 2>&1; then
-    log_err_echo "Port $prometheus_port is already in use.Service will not be started"
+    log_err_echo "Port $prometheus_port is already in use. Please check if the Service is running."
     return 1
   fi
   (
     cd $prometheus_path && nohup ./prometheus --web.listen-address="0.0.0.0:$prometheus_port" > prometheus.log 2>&1 &
   ) &
   if [ $? -ne 0 ]; then
-    log_err_echo "start prometheus is unsuccessfully"
+    log_err_echo "start prometheus unsuccessfully"
     exit 1
   else
-    log_info_echo "start prometheus is successfully"
+    log_info_echo "start prometheus successfully"
   fi
 }
 
@@ -402,21 +402,21 @@ stop_prometheus() {
     pkill -f prometheus
   ) &
   if [ $? -ne 0 ]; then
-    log_err_echo "stop prometheus is unsuccessfully"
+    log_err_echo "stop prometheus unsuccessfully"
     exit 1
   else
-    log_info_echo "stop prometheus is successfully"
+    log_info_echo "stop prometheus successfully"
   fi
 }
 # restart node_exporter
 restart_prometheus() {
-  stop_node_exporter
-  start_node_exporter
+  stop_prometheus
+  start_prometheus
   if [ $? -ne 0 ]; then
-    log_err_echo "restart prometheus is unsuccessfully"
+    log_err_echo "restart prometheus unsuccessfully"
     exit 1
   else
-    log_info_echo "restart prometheus is successfully"
+    log_info_echo "restart prometheus successfully"
   fi
 }
 
@@ -449,32 +449,34 @@ start_grafana() {
     cd $grafana_path && nohup ./grafana server > grafana.log 2>&1 &
   ) &
   if [ $? -ne 0 ]; then
-    log_err_echo "start grafana is unsuccessfully"
+    log_err_echo "start grafana unsuccessfully"
     exit 1
   else
-    log_info_echo "start grafana is successfully"
+    log_info_echo "start grafana successfully"
   fi
 }
 
 # stop grafana
 stop_grafana() {
-  pkill -f grafana
+  (
+    pkill -f grafana
+  ) &
   if [ $? -ne 0 ]; then
-    log_err_echo "stop grafana is unsuccessfully"
+    log_err_echo "stop grafana unsuccessfully"
     exit 1
   else
-    log_info_echo "stop grafana is successfully"
+    log_info_echo "stop grafana successfully"
   fi
 }
 # restart node_exporter
 restart_grafana() {
-  stop_node_exporter
-  start_node_exporter
+  stop_grafana
+  start_grafana
   if [ $? -ne 0 ]; then
-    log_err_echo "restart grafana is unsuccessfully"
+    log_err_echo "restart grafana unsuccessfully"
     exit 1
   else
-    log_info_echo "restart grafana is successfully"
+    log_info_echo "restart grafana successfully"
   fi
 }
 
