@@ -330,17 +330,6 @@ stop_node_exporter() {
     log_info_echo "stop node_exporter on $1 successfully"
   fi
 }
-# restart node_exporter
-restart_node_exporter() {
-  stop_node_exporter "$1"
-  start_node_exporter "$1"
-  if [ $? -ne 0 ]; then
-    log_err_echo "restart node_exporter on $1 unsuccessfully"
-    exit 1
-  else
-    log_info_echo "restart node_exporter on $1 successfully"
-  fi
-}
 
 function manager_node_exporter(){
 
@@ -363,12 +352,6 @@ case $manager_type in
   "stop")
     for agent in "${agents[@]}"; do
       stop_node_exporter "$agent"
-	  sleep 1
-    done
-    ;;
-  "restart")
-    for agent in "${agents[@]}"; do
-      restart_node_exporter "$agent"
 	  sleep 1
     done
     ;;
@@ -408,17 +391,6 @@ stop_prometheus() {
     log_info_echo "stop prometheus successfully"
   fi
 }
-# restart node_exporter
-restart_prometheus() {
-  stop_prometheus
-  start_prometheus
-  if [ $? -ne 0 ]; then
-    log_err_echo "restart prometheus unsuccessfully"
-    exit 1
-  else
-    log_info_echo "restart prometheus successfully"
-  fi
-}
 
 function manager_prometheus(){
   check_file "$prometheus_path" "prometheus path is not exist"
@@ -431,10 +403,6 @@ case $manager_type in
     ;;
   "stop")
     stop_prometheus
-    sleep 1
-    ;;
-  "restart")
-    restart_prometheus
     sleep 1
     ;;
   *)
@@ -468,17 +436,6 @@ stop_grafana() {
     log_info_echo "stop grafana successfully"
   fi
 }
-# restart node_exporter
-restart_grafana() {
-  stop_grafana
-  start_grafana
-  if [ $? -ne 0 ]; then
-    log_err_echo "restart grafana unsuccessfully"
-    exit 1
-  else
-    log_info_echo "restart grafana successfully"
-  fi
-}
 
 function manager_grafana(){
   check_file "$grafana_path" "grafana path is not exist"
@@ -491,10 +448,6 @@ case $manager_type in
     ;;
   "stop")
     stop_grafana
-    sleep 1
-    ;;
-  "restart")
-    restart_grafana
     sleep 1
     ;;
   *)
@@ -587,13 +540,10 @@ function print_help() {
     echo "  restart                                                            Restart software"
     echo "  start_exporter     || start_exporter exporter_install_path         Start node_exporter"
     echo "  stop_exporter      || stop_exporter exporter_install_path          Stop node_exporter"
-    echo "  restart_exporter   || restart_exporter exporter_install_path       Restart node_exporter"
     echo "  start_prometheus   || start_prometheus prometheus_install_path     Start prometheus"
     echo "  stop_prometheus    || stop_prometheus prometheus_install_path      Stop prometheus"
-    echo "  restart_prometheus || restart_prometheus prometheus_install_path   Restart prometheus"
     echo "  start_grafana      || start_grafana grafana_install_path           Start grafana"
     echo "  stop_grafana       || stop_grafana grafana_install_path            Stop grafana"
-    echo "  restart_grafana    || restart_grafana grafana_install_path         Restart grafana"
     echo ""
     echo "Example:"
     echo "  $0 install"
@@ -723,26 +673,17 @@ function main() {
     "start_exporter")
       manager_node_exporter "start"
     ;;
-    "restart_exporter")
-      manager_node_exporter "restart"
-    ;;
     "stop_exporter")
       manager_node_exporter "stop"
     ;;
     "start_prometheus")
       manager_prometheus "start"
     ;;
-    "restart_prometheus")
-      manager_prometheus "restart"
-    ;;
     "stop_prometheus")
       manager_prometheus "stop"
     ;;
     "start_grafana")
       manager_grafana "start"
-    ;;
-    "restart_grafana")
-      manager_grafana "restart"
     ;;
     "stop_grafana")
       manager_grafana "stop"
