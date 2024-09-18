@@ -828,8 +828,9 @@ public class OmniReduceSinkOperator extends TerminalOperator<ReduceSinkDesc>
         if (vector.isNull(index)) {
             return null;
         } else {
-            ObjectInspector fieldObjectInspector = ((StandardStructObjectInspector) this.inputObjInspectors[0])
-                    .getAllStructFieldRefs().get(indexInVector).getFieldObjectInspector();
+            ObjectInspector fieldObjectInspector =
+                    ((StandardStructObjectInspector) (isNeedProject ? keyObjectInspector : inputObjInspectors[0]))
+                            .getAllStructFieldRefs().get(indexInVector).getFieldObjectInspector();
             return fieldObjectInspector instanceof AbstractPrimitiveJavaObjectInspector
                     ? this.getOriginValue(vector, index, fieldObjectInspector)
                     : this.getWritableValue(vector, index, fieldObjectInspector);

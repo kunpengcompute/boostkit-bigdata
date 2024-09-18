@@ -40,6 +40,7 @@ import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.plan.ExprNodeColumnDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeConstantDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
+import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
 import org.apache.hadoop.hive.ql.plan.PTFDesc;
 import org.apache.hadoop.hive.ql.plan.PTFDeserializer;
 import org.apache.hadoop.hive.ql.plan.api.OperatorType;
@@ -161,6 +162,9 @@ public class OmniPTFOperator extends OmniHiveOperator<OmniPTFDesc> implements Se
             ExprNodeDesc exprNode = ptfExpressionDef.getExprNode();
             if (exprNode instanceof ExprNodeColumnDesc) {
                 channels.add(getFieldIdFromFieldName(((ExprNodeColumnDesc) exprNode).getColumn()));
+            } else if (exprNode instanceof ExprNodeGenericFuncDesc) {
+                ExprNodeDesc exprNodeDesc = exprNode.getChildren().get(0);
+                channels.add(getFieldIdFromFieldName(((ExprNodeColumnDesc) exprNodeDesc).getColumn()));
             } else if (exprNode instanceof ExprNodeConstantDesc) {
                 // ExprNodeConstantDesc indicates that there is no partition column.
                 // Therefore, we do not need to obtain column information.
@@ -238,12 +242,16 @@ public class OmniPTFOperator extends OmniHiveOperator<OmniPTFDesc> implements Se
     private int[] getWindowArgumentKeys(List<WindowFunctionDef> windowFunctionDefs) {
         int[] argumentChannels = new int[windowFunctionDefs.size()];
         for (int i = 0; i < windowFunctionDefs.size(); i++) {
-            List<PTFExpressionDef> args = windowFunctionDefs.get(i).getArgs();
+            WindowFunctionDef windowFunctionDef = windowFunctionDefs.get(i);
+            List<PTFExpressionDef> args = windowFunctionDef.getArgs();
+            String windowFunctionDefName = windowFunctionDef.getName();
             if (args == null) {
                 argumentChannels[i] = -1;
             } else if (args.size() == 1) {
                 argumentChannels[i] = Integer
                         .valueOf(getFieldIdFromFieldName(((ExprNodeColumnDesc) args.get(0).getExprNode()).getColumn()));
+            } else if (args.size() > 1 && windowFunctionDefName.equals("rank")) {
+                argumentChannels[i] = -1;
             } else {
                 throw new UnsupportedOperationException(
                         "Unsupported! WindowFunctionDefinition.getArgumentChannels() bigger than 1: " + args.size());
