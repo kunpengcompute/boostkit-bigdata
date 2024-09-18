@@ -589,6 +589,53 @@ function log_action_result() {
     fi
 }
 
+function generate_crontab_job()
+{
+  local install_dir_server="${install_dir}/${software_name}-${install_type}"
+  local install_dir_setup="${install_dir}/${software_name}-${install_type}-setup"
+  local crontab_job_file="${install_dir_server}/etc/crontab.job"
+
+  stop_crontab_job
+
+  # back up original task
+  crontab -l > ${crontab_job_file}_backup 2>/dev/null || true
+
+  echo "* * * * * ${install_dir_setup}/check_and_restart.sh ${1}" > ${crontab_job_file}
+  chmod +x ${install_dir_setup}/check_and_restart.sh
+  if [ -s ${crontab_job_file}_backup ]; then
+    cat ${crontab_job_file}_backup >> ${crontab_job_file}
+  fi
+  rm -f ${crontab_job_file}_backup
+}
+
+function stop_crontab_job() {
+  local cur_user=$(whoami)
+  local install_dir_setup="${install_dir}/${software_name}-${install_type}-setup"
+  local pid_list=$(ps -ef -u "${cur_user}" | (grep "${install_dir_setup}"/check_and_restart.sh || true) | (grep -v grep || true)|awk '{print $2}')
+  for pid in ${pid_list}
+  do
+    if [ -n "${pid}" ]; then
+      kill -9 "${pid}"
+    fi
+  done
+}
+
+function remove_specific_cron_job() {
+  # get current dir
+  local cur_dir=$(pwd)
+
+  # back current crontab job
+  crontab -l > "${cur_dir}/current_crontab"
+
+  # delete check_and_restart.sh task
+  grep -v "check_and_restart.sh" "${cur_dir}/current_crontab" > "${cur_dir}/new_crontab"
+
+  # load original crontab again
+  crontab "${cur_dir}/new_crontab"
+
+  rm -f "${cur_dir}/current_crontab" "${cur_dir}/new_crontab"
+}
+
 function main() {
   if [ "$1" = "-h" ] || [ "$1" = "--help" ]
   then
@@ -644,6 +691,7 @@ function main() {
     ;;
     "install")
       install
+      generate_crontab_job "${install_type}"
     ;;
     "uninstall")
       uninstall
@@ -656,6 +704,8 @@ function main() {
         # If the installation directory exists, perform the start operation
         manager "start"
         log_action_result "LoadsMetric start" $?
+        crontab "${install_dir_server}"/etc/crontab.job
+        log_info_echo "daemon is started"
       else
         # If the installation directory does not exist, prompt to install first
         log_err_echo "Installation directory not found. Please install ${software_name} before starting it."
@@ -665,10 +715,19 @@ function main() {
     "stop")
       manager "stop"
       log_action_result "LoadsMetric stop" $?
+      stop_crontab_job
+      remove_specific_cron_job
+      log_info_echo "daemon is stopped"
     ;;
     "restart")
       manager "restart"
-      log_action_result "LoadsMetric restart" $?
+      status=$?
+      log_action_result "LoadsMetric restart" "${status}"
+      if [ "${status}" -ne 0 ]; then
+          stop_crontab_job
+          remove_specific_cron_job
+          log_info_echo "daemon is stopped"
+      fi
     ;;
     "start_exporter")
       manager_node_exporter "start"

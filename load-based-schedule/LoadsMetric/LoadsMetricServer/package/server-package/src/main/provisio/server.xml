@@ -53,6 +53,7 @@
         <directory path="${basedir}/../src/main/resources/">
             <include>loadsmetric_install.sh</include>
             <include>loadsmetric_uninstall.sh</include>
+            <include>check_and_restart.sh</include>
         </directory>
     </fileSet>
 
