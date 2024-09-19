@@ -727,8 +727,9 @@ function main() {
       stop_crontab_job
       remove_specific_cron_job
       log_info_echo "daemon is stopped"
-      if [ "${start_status}" -eq 0 ]; then
+      if [ "${status}" -eq 0 ]; then
         # If start is successful, regenerate crontab job and apply it
+        local install_dir_server="${install_dir}/${software_name}-${install_type}"
         generate_crontab_job "${install_type}"
         crontab "${install_dir_server}"/etc/crontab.job
         log_info_echo "daemon is restarted"
