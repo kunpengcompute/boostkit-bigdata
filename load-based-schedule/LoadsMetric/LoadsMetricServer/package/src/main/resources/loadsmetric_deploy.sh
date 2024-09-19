@@ -314,7 +314,6 @@ start_node_exporter() {
   ) &
   if [ $? -ne 0 ]; then
     log_err_echo "start node_exporter on $1 unsuccessfully"
-    exit 1
   else
     log_info_echo "start node_exporter on $1 successfully"
   fi
@@ -325,7 +324,6 @@ stop_node_exporter() {
   ssh root@$1 "pkill -f node_exporter"
   if [ $? -ne 0 ]; then
     log_err_echo "stop node_exporter on $1 unsuccessfully"
-    exit 1
   else
     log_info_echo "stop node_exporter on $1 successfully"
   fi
@@ -601,9 +599,11 @@ function generate_crontab_job()
   crontab -l > ${crontab_job_file}_backup 2>/dev/null || true
 
   echo "* * * * * ${install_dir_setup}/check_and_restart.sh ${1}" > ${crontab_job_file}
+  log_info_echo "check_and_restart is added to crontab jobs."
   chmod +x ${install_dir_setup}/check_and_restart.sh
   if [ -s ${crontab_job_file}_backup ]; then
     cat ${crontab_job_file}_backup >> ${crontab_job_file}
+    log_info_echo "original crontab tasks copied to current crontab jobs."
   fi
   rm -f ${crontab_job_file}_backup
 }
@@ -634,6 +634,7 @@ function remove_specific_cron_job() {
   crontab "${cur_dir}/new_crontab"
 
   rm -f "${cur_dir}/current_crontab" "${cur_dir}/new_crontab"
+  log_info_echo "check_and_restart is removed from crontab jobs."
 }
 
 function main() {
@@ -691,7 +692,6 @@ function main() {
     ;;
     "install")
       install
-      generate_crontab_job "${install_type}"
     ;;
     "uninstall")
       uninstall
@@ -704,6 +704,7 @@ function main() {
         # If the installation directory exists, perform the start operation
         manager "start"
         log_action_result "LoadsMetric start" $?
+        generate_crontab_job "${install_type}"
         crontab "${install_dir_server}"/etc/crontab.job
         log_info_echo "daemon is started"
       else
@@ -723,10 +724,14 @@ function main() {
       manager "restart"
       status=$?
       log_action_result "LoadsMetric restart" "${status}"
-      if [ "${status}" -ne 0 ]; then
-          stop_crontab_job
-          remove_specific_cron_job
-          log_info_echo "daemon is stopped"
+      stop_crontab_job
+      remove_specific_cron_job
+      log_info_echo "daemon is stopped"
+      if [ "${start_status}" -eq 0 ]; then
+        # If start is successful, regenerate crontab job and apply it
+        generate_crontab_job "${install_type}"
+        crontab "${install_dir_server}"/etc/crontab.job
+        log_info_echo "daemon is restarted"
       fi
     ;;
     "start_exporter")
