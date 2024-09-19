@@ -594,6 +594,7 @@ function generate_crontab_job()
   local crontab_job_file="${install_dir_server}/etc/crontab.job"
 
   stop_crontab_job
+  remove_specific_cron_job
 
   # back up original task
   crontab -l > ${crontab_job_file}_backup 2>/dev/null || true
