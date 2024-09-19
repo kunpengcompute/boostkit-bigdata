@@ -598,13 +598,12 @@ function generate_crontab_job()
 
   # back up original task
   crontab -l > ${crontab_job_file}_backup 2>/dev/null || true
-
+  # check_and_restart is added to crontab jobs
   echo "* * * * * ${install_dir_setup}/check_and_restart.sh ${1}" > ${crontab_job_file}
-  log_info_echo "check_and_restart is added to crontab jobs."
   chmod +x ${install_dir_setup}/check_and_restart.sh
   if [ -s ${crontab_job_file}_backup ]; then
+    # original crontab tasks copied to current crontab jobs
     cat ${crontab_job_file}_backup >> ${crontab_job_file}
-    log_info_echo "original crontab tasks copied to current crontab jobs."
   fi
   rm -f ${crontab_job_file}_backup
 }
@@ -635,7 +634,6 @@ function remove_specific_cron_job() {
   crontab "${cur_dir}/new_crontab"
 
   rm -f "${cur_dir}/current_crontab" "${cur_dir}/new_crontab"
-  log_info_echo "check_and_restart is removed from crontab jobs."
 }
 
 function main() {
