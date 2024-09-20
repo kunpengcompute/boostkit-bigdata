@@ -162,7 +162,7 @@ class MVRewriteRule(session: SparkSession)
         }
       }
       val sql = session.sparkContext.getLocalProperty(SparkContext.SPARK_JOB_DESCRIPTION)
-      val mvs = usingMvInfos.mkString(";").replaceAll("`", "")
+      val mvs = usingMvInfos.map(_._1).mkString(";").replaceAll("`", "")
       val costSecond = (System.currentTimeMillis() - rewriteStartSecond).toString
       val log = ("logicalPlan MVRewrite success," +
           "using materialized view:[%s],cost %s milliseconds,")

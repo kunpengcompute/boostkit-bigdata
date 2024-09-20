@@ -19,7 +19,9 @@ package com.huawei.boostkit.spark.util
 
 import com.huawei.boostkit.spark.conf.OmniMVPluginConfig
 import com.huawei.boostkit.spark.conf.OmniMVPluginConfig._
+import com.huawei.boostkit.spark.util.lock.{FileLock, OmniMVAtomic}
 import com.huawei.boostkit.spark.util.serde.KryoSerDeUtil
+
 import java.io.IOException
 import java.net.URI
 import java.util.Locale
@@ -29,8 +31,8 @@ import org.apache.commons.io.IOUtils
 import org.apache.hadoop.fs.{FileStatus, FileSystem, LocalFileSystem, Path}
 import org.json4s.DefaultFormats
 import org.json4s.jackson.Json
-import scala.collection.{mutable, JavaConverters}
 
+import scala.collection.{JavaConverters, mutable}
 import org.apache.spark.serializer.KryoSerializer
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.TableIdentifier
@@ -38,8 +40,6 @@ import org.apache.spark.sql.catalyst.catalog.{CatalogTable, HiveTableRelation, S
 import org.apache.spark.sql.catalyst.expressions.{Alias, AttributeReference, ExprId, NamedExpression}
 import org.apache.spark.sql.catalyst.optimizer.rules.RewriteTime
 import org.apache.spark.sql.catalyst.plans.logical._
-import org.apache.spark.sql.execution.datasources.LogicalRelation
-
 
 object ViewMetadata extends RewriteHelper {
 
@@ -80,6 +80,7 @@ object ViewMetadata extends RewriteHelper {
   val VIEW_CNT_FILE_LOCK = "viewCount.lock"
   val DEFAULT_DATABASE = "default"
   val VIEW_CONTAINS_TABLES_FILE = "viewContainsTables"
+  val VIEW_CONTAINS_TABLES_FILE_LOCK = "viewContainsTables.lock"
   val WASH_OUT_TIMESTAMP = "washOutTimestamp"
 
   private var kryoSerializer: KryoSerializer = _
@@ -193,7 +194,7 @@ object ViewMetadata extends RewriteHelper {
     } catch {
       case e: Throwable =>
         logDebug(s"Failed to saveViewMetadataToMap,errmsg: ${e.getMessage}")
-        throw new IOException(s"Failed to save ViewMetadata to file.")
+        throw new IOException(s"Failed to save ViewMetadata to file.", e)
     } finally {
       // reset preDatabase
       spark.sessionState.catalogManager.setCurrentNamespace(Array(preDatabase))
@@ -412,10 +413,15 @@ object ViewMetadata extends RewriteHelper {
    * save view contains tables to file
    */
   def saveViewContainsTablesToFile(dbName: String, viewName: String): Unit = {
-    val data = loadViewContainsTablesFromFile(dbName)
-    data.put(viewName, (viewToContainsTables.get(viewName).map(_.tableName),
-        System.currentTimeMillis()))
-    saveMapToDisk(dbName, VIEW_CONTAINS_TABLES_FILE, data, isAppend = true, lineFeed = true)
+    val dbPath = new Path(metadataPath, dbName)
+    val fileLock = FileLock(fs, new Path(dbPath, VIEW_CONTAINS_TABLES_FILE_LOCK))
+    OmniMVAtomic.funcWithSpinLock(fileLock) {
+      () =>
+        val data = loadViewContainsTablesFromFile(dbName)
+        data.put(viewName, (viewToContainsTables.get(viewName).map(_.tableName),
+            System.currentTimeMillis()))
+        saveMapToDisk(dbName, VIEW_CONTAINS_TABLES_FILE, data, isAppend = false, lineFeed = false)
+    }
   }
 
   /**

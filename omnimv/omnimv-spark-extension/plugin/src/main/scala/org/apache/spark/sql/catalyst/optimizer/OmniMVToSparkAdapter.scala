@@ -23,6 +23,8 @@ import org.apache.spark.sql.{AnalysisException, SparkSession}
 import org.apache.spark.sql.catalyst.{SQLConfHelper, TableIdentifier}
 import org.apache.spark.sql.catalyst.catalog._
 import org.apache.spark.sql.catalyst.optimizer.rules.MVRewriteRule
+import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
+import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.SparkOptimizer
 import org.apache.spark.sql.execution.command.DDLUtils
 import org.apache.spark.sql.types.StructType
@@ -90,4 +92,13 @@ case class OmniMVOptimizer(session: SparkSession, optimizer: Optimizer) extends
   override def defaultBatches: Seq[Batch] = {
     mvRules ++ super.defaultBatches
   }
+
+  override def earlyScanPushDownRules: Seq[Rule[LogicalPlan]] =
+    optimizer.earlyScanPushDownRules
+
+  override def preCBORules: Seq[Rule[LogicalPlan]] =
+    optimizer.preCBORules
+
+  override def extendedOperatorOptimizationRules: Seq[Rule[LogicalPlan]] =
+    optimizer.extendedOperatorOptimizationRules
 }
