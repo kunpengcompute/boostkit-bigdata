@@ -33,6 +33,7 @@ class OmniHiveConf {
     public boolean enableOperatorPtf;
     public boolean enableOperatorTablescan;
     public boolean enableOperatorReducesink;
+    public boolean enableConditionSelect;
     public int stringLength;
     private HashMap<OperatorType, Boolean> operatorEnableMap;
 
@@ -57,6 +58,7 @@ class OmniHiveConf {
             put(OperatorType.TABLESCAN, enableOperatorTablescan);
             put(OperatorType.REDUCESINK, enableOperatorReducesink);
         }};
+        enableConditionSelect = hiveConf.getBoolean("omni.hive.conditionselect.enabled", false);
         stringLength = hiveConf.getInt("omni.hive.string.length", 1024);
     }
 

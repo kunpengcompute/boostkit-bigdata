@@ -1273,7 +1273,14 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         }
         List<Operator<? extends OperatorDesc>> parents = current.getParentOperators();
         for (Operator<? extends OperatorDesc> parent : parents) {
-            if (isReplaceable(parent, isReduceSinkReplaceable)) {
+            if (omniHiveConf.enableConditionSelect && current.getType() != null
+                    && current.getType().equals(OperatorType.SELECT) && parents.size() == 1
+                    && parent.getType() != null && parent.getType().equals(OperatorType.FILTER)
+                    && parent.getChildOperators().size() == 1 && isReplaceable(parent, isReduceSinkReplaceable)) {
+                ((OmniHiveOperator<?>) omniOperator).addOtherConfs(parent.getConf());
+                replacedParents.add(parent.getParentOperators().get(0));
+                replaceOperatorList(parent.getParentOperators().get(0).getChildOperators(), parent, omniOperator);
+            } else if (isReplaceable(parent, isReduceSinkReplaceable)) {
                 replacedParents.add(parent);
                 replaceOperatorList(parent.getChildOperators(), current, omniOperator);
             } else {
@@ -1345,10 +1352,21 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
         }
         switch (current.getType()) {
             case SELECT:
-                OmniSelectOperator omniSelectOperator = new OmniSelectOperator(current.getCompilationOpContext(),
-                        (SelectDesc) current.getConf());
-                omniSelectOperator.setSchema(current.getSchema());
-                return omniSelectOperator;
+                List<Operator<? extends OperatorDesc>> parentOperators = current.getParentOperators();
+                if (omniHiveConf.enableConditionSelect && parentOperators.size() == 1
+                        && parentOperators.get(0).getType() != null
+                        && parentOperators.get(0).getType().equals(OperatorType.FILTER)
+                        && parentOperators.get(0).getChildOperators().size() == 1
+                        && isReplaceable(parentOperators.get(0), isReduceSinkReplaceable)) {
+                    OmniConditionSelectOperator omniConditionSelectOperator = new OmniConditionSelectOperator(current.getCompilationOpContext(), (SelectDesc) current.getConf());
+                    omniConditionSelectOperator.setSchema(current.getSchema());
+                    return omniConditionSelectOperator;
+                } else {
+                    OmniSelectOperator omniSelectOperator = new OmniSelectOperator(current.getCompilationOpContext(),
+                            (SelectDesc) current.getConf());
+                    omniSelectOperator.setSchema(current.getSchema());
+                    return omniSelectOperator;
+                }
             case FILTER:
                 return new OmniFilterOperator(current.getCompilationOpContext(), (FilterDesc) current.getConf());
             case MAPJOIN:
