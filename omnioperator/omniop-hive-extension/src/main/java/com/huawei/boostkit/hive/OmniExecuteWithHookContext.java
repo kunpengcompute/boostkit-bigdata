@@ -1021,6 +1021,11 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             } else if ((current instanceof ExprNodeColumnDesc || current instanceof ExprNodeConstantDesc)
                     && !SUPPORTED_TYPE.contains(((PrimitiveTypeInfo) current.getTypeInfo()).getPrimitiveCategory())) {
                 return false;
+            } else if (current instanceof ExprNodeConstantDesc &&
+                    ((ExprNodeConstantDesc) current).getValue() instanceof Double &&
+                    (((Double) ((ExprNodeConstantDesc) current).getValue()).isNaN() ||
+                            ((Double) ((ExprNodeConstantDesc) current).getValue()).isInfinite())) {
+                return false;
             }
         }
         return true;
