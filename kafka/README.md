@@ -1,0 +1,399 @@
+# Kafka加速Crc32指南
+
+## 一. 安装编译前准备
+
+### 1.1 安装KSAL库
+
+具体流程：
+
+1. wget https://kunpeng-repo.obs.cn-north-4.myhuaweicloud.com/Kunpeng%20BoostKit/Kunpeng%20BoostKit%2024.0.RC2/BoostKit-KSAL_1.6.0.zip
+2. 解压 ： unzip BoostKit-KSAL_1.6.0.zip
+3. 安装 ： rpm -ivh libksal-release-1.6.0.oe1.aarch64.rpm
+
+
+
+### 1.2 配置JAVA_HOME
+
+编译时需设置对应的JAVA_HOME，否则编译失败
+
+
+
+## 二. 编译指南
+
+### 2.1 基于开源Kafka 2.5.0tag
+
+#### 2.1.1 准备开源代码
+
+```sh
+cd /home
+wget https://github.com/apache/kafka/archive/refs/tags/2.5.0.zip
+unzip 2.5.0.zip
+cd kafka-2.5.0
+```
+
+
+
+#### 2.1.2 修改代码
+
+下载patch保存到 /home路径
+
+git apply ksal_crc32.patch
+
+
+
+#### 2.1.3 编译
+
+按照原本的编译方式进行编译，无需修改
+
+
+
+
+
+### 2.2 基于自研Kafka
+
+#### 2.2.1 修改文件
+
+文件一: clients/src/main/java/org/apache/kafka/common/utils/Crc32C.java
+
+```java
+// 静态代码块新增分支
+static {
+        if (System.getProperty("os.arch") != null && System.getProperty("os.arch").contains("aarch64")) {
+            try {
+                Native.loadNative();
+                LOG.info("Load the KSAL relevant library successfully and will use KsalChecksumFactory as the factory class");
+                CHECKSUM_FACTORY = new KsalChecksumFactory();
+            } catch (Throwable ex) {
+                LOG.warn("Failed to load native library. {}. Fall back to default ChecksumFactory.", ex.getMessage());
+            }
+        }
+        if (!Native.isLoaded()) {
+            if (Java.IS_JAVA9_COMPATIBLE)
+                CHECKSUM_FACTORY = new Java9ChecksumFactory();
+            else
+                CHECKSUM_FACTORY = new PureJavaChecksumFactory();
+        }
+}
+
+// 新增工厂类
+
+private static class KsalChecksumFactory implements ChecksumFactory{
+        @Override
+        public Checksum create() {
+            return new KsalCrc32C();
+        }
+}
+```
+
+文件二 build.gradle
+
+```groovy
+// 在project(':clients')下新增 task，并调用task
+
+task compileCrcJNI(type:Exec) {
+    def javaHome = System.getenv('JAVA_HOME')
+    commandLine 'gcc', '-fPIC', '-I', javaHome + '/include', '-I', javaHome + '/include/linux',
+            '-shared', '-o', 'src/main/resources/libNativeCrc32C.so',
+            'src/main/native/org/apache/kafka/common/utils/KsalCrc32C.c', '-lksal'
+}
+
+
+compileJava.dependsOn 'compileCrcJNI'
+```
+
+
+
+#### 2.2.2 新增文件
+
+文件1：clients/src/main/java/org/apache/kafka/common/utils/KsalCrc32C.java
+
+```java
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.kafka.common.utils;
+
+import java.nio.ByteOrder;
+import java.util.zip.Checksum;
+
+/**
+ * This class is an implementation of the Crc32 checksum that uses
+ * the Kunpeng Boostkit KSAL library to speed up the computation.
+ *
+ * @since 2024/9/14
+ */
+public class KsalCrc32C implements Checksum {
+
+    private static final int CRC32C_POLY = 0x1EDC6F41;
+    private static final int REVERSED_CRC32C_POLY = Integer.reverse(CRC32C_POLY);
+    // Lookup tables
+    // Lookup table for single byte calculations
+    private static final int[] byteTable;
+    // Lookup tables for bulk operations in 'slicing-by-8' algorithm
+    private static final int[][] byteTables = new int[8][256];
+    private static final int[] byteTable0 = byteTables[0];
+
+    /** the current CRC value, bit-flipped */
+    private int crc;
+
+    static {
+        Native.loadNative();
+        // Generate lookup tables
+        // High-order polynomial term stored in LSB of r.
+        for (int index = 0; index < byteTables[0].length; index++) {
+            int r = index;
+            for (int i = 0; i < Byte.SIZE; i++) {
+                if ((r & 1) != 0) {
+                    r = (r >>> 1) ^ REVERSED_CRC32C_POLY;
+                } else {
+                    r >>>= 1;
+                }
+            }
+            byteTables[0][index] = r;
+        }
+
+        for (int index = 0; index < byteTables[0].length; index++) {
+            int r = byteTables[0][index];
+
+            for (int k = 1; k < byteTables.length; k++) {
+                r = byteTables[0][r & 0xFF] ^ (r >>> 8);
+                byteTables[k][index] = r;
+            }
+        }
+
+        if (ByteOrder.nativeOrder() == ByteOrder.LITTLE_ENDIAN) {
+            byteTable = byteTables[0];
+        } else { // ByteOrder.BIG_ENDIAN
+            byteTable = new int[byteTable0.length];
+            System.arraycopy(byteTable0, 0, byteTable, 0, byteTable0.length);
+            for (int[] table : byteTables) {
+                for (int index = 0; index < table.length; index++) {
+                    table[index] = Integer.reverseBytes(table[index]);
+                }
+            }
+        }
+    }
+
+    public KsalCrc32C() {
+        reset();
+    }
+
+    @Override
+    public long getValue() {
+        long ret = crc;
+        return (~ret) & 0xffffffffL;
+    }
+
+    @Override
+    public void reset() {
+        crc = 0xffffffff;
+    }
+
+    @SuppressWarnings("fallthrough")
+    @Override
+    public void update(byte[] b, int off, int len) {
+        crc = update(crc, b, off, len);
+    }
+
+    @Override
+    public void update(int b) {
+        crc = (crc >>> 8) ^ byteTable[(crc ^ (b & 0xFF)) & 0xFF];
+    }
+
+    /**
+     * @param seed CRC的种子
+     * @param data CRC的字符数组
+     * @param off 数据的起始偏移量
+     * @param len 数组长度
+     * @return CRC校验和
+     */
+    public static native int update(int seed, byte[] data, int off, long len);
+}
+```
+
+
+
+文件2：clients/src/main/java/org/apache/kafka/common/utils/Native.java
+
+```java
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.kafka.common.utils;
+
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.security.AccessController;
+import java.security.PrivilegedAction;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+/**
+ * @since 2024/9/20
+ */
+public class Native {
+
+    private static final String LIB_PREFIX = "libNativeCrc32C";
+
+    private static final String LIB_SUFFIX = ".so";
+
+    private static final String RESOURCE_NAME = "/" + LIB_PREFIX + LIB_SUFFIX;
+
+    private static AtomicBoolean loaded = new AtomicBoolean(false);
+
+    /**
+     * load the JNI library and native Library
+     */
+    public static synchronized void loadNative() {
+        if (loaded.get()) {
+            return;
+        }
+        File tempLib = null;
+        try {
+            tempLib = File.createTempFile(LIB_PREFIX, LIB_SUFFIX);
+            // try to delete on exit
+            tempLib.deleteOnExit();
+
+            InputStream is = Native.class.getResourceAsStream(RESOURCE_NAME);
+            if (is == null) {
+                throw new IOException("Resource not found: " + RESOURCE_NAME);
+            }
+            Files.copy(is, tempLib.getAbsoluteFile().toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            loadLibraryFile(tempLib.getAbsolutePath());
+            loaded.set(true);
+        } catch (IOException e) {
+            ExceptionInInitializerError err = new ExceptionInInitializerError(
+                "Cannot unpack " + LIB_PREFIX + ": " + e.getMessage());
+            err.setStackTrace(e.getStackTrace());
+            throw err;
+        } finally {
+            if (tempLib != null && tempLib.exists()) {
+                tempLib.delete();
+            }
+        }
+    }
+
+    public static boolean isLoaded() {
+        return loaded.get();
+    }
+
+    private static void loadLibraryFile(final String libFileName) {
+        AccessController.doPrivileged((PrivilegedAction<Void>) () -> {
+            System.load(libFileName);
+            return null;
+        });
+    }
+}
+```
+
+
+
+文件3：clients/src/main/native/org/apache/kafka/common/utils/org_apache_kafka_common_utils_KsalCrc32C.h
+
+该文件与包路径强相关，若修改了包路径请重新生成该.h文件，相关请参考JNI调用方式
+
+```c
+/* DO NOT EDIT THIS FILE - it is machine generated */
+#include <jni.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <ksal/ksal_crc.h>
+/* Header for class org_apache_kafka_common_utils_KsalCrc32C */
+
+#ifndef _Included_org_apache_kafka_common_utils_KsalCrc32C
+#define _Included_org_apache_kafka_common_utils_KsalCrc32C
+#ifdef __cplusplus
+extern "C" {
+#endif
+/*
+ * Class:     org_apache_kafka_common_utils_KsalCrc32C
+ * Method:    update
+ * Signature: (I[BIJ)I
+ */
+JNIEXPORT jint JNICALL Java_org_apache_kafka_common_utils_KsalCrc32C_update
+  (JNIEnv *, jclass, jint, jbyteArray, jint, jlong);
+
+#ifdef __cplusplus
+}
+#endif
+#endif
+```
+
+
+
+文件4：clients/src/main/native/org/apache/kafka/common/utils/KsalCrc32C.c
+
+```c
+/*
+* Copyright (c) Huawei Technologies Co., Ltd. 2024-2024. All rights reserved.
+* Description: ksal speed up crc32
+*/
+#include <ksal/ksal_crc.h>
+#include <jni.h>
+#include "dlfcn.h"
+#include "org_apache_kafka_common_utils_KsalCrc32C.h"
+#include <stdio.h>
+#include <stdlib.h>
+
+
+JNIEXPORT jint JNICALL Java_org_apache_kafka_common_utils_KsalCrc32C_update(JNIEnv *env, jclass jc, jint seed, jbyteArray data, jint off,jlong len)
+{
+       // 将传入的jbyteArray转为C中的数据
+       jbyte* array = (*env)->GetPrimitiveArrayCritical(env, data, NULL);
+       uint8_t *buf = (uint8_t *)array;
+       buf += off;
+       uint32_t result = KsalCrc32c(seed,buf,len);
+       (*env)->ReleasePrimitiveArrayCritical(env,data,array,0);
+       return result;
+}
+```
+
+
+
+#### 2.2.3 编译
+
+按照原本的编译方式进行编译，无需修改
+
+
+
+## 三. 使用指南
+
+**部署启动流程如下所示：**
+
+1. 安装KSAL库
+2. 部署编译好的kafka
+3. 启动kafka
+
+> 当前KSAL库只支持鲲鹏处理器，其余intel处理器会走回原生kafka分支。若无安装KSAL库，也会走回原生kafka分支
+
+
+
+
+
