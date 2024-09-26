@@ -290,6 +290,16 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
 
   // it is same with wholeStageFallbackThreshold, but it is used for non AQE
   val queryFallbackThreshold: Int = conf.getConfString("spark.omni.sql.columnar.query.fallback.threshold", "-1").toInt
+
+  // enable or disable adaptive partial aggregation
+  val enableAdaptivePartialAggregation: Boolean =
+    conf.getConfString("spark.omni.sql.columnar.adaptivePartialAggregation.enabled", "false").toBoolean
+
+  val adaptivePartialAggregationMinRows: Int =
+    conf.getConfString("spark.omni.sql.columnar.adaptivePartialAggregationMinRows", "500000").toInt
+
+  val adaptivePartialAggregationRatio: Double =
+    conf.getConfString("spark.omni.sql.columnar.adaptivePartialAggregationRatio", "0.8").toDouble
 }
 
 
