@@ -32,7 +32,7 @@ import org.apache.spark.sql.catalyst.plans.{FullOuter, LeftAnti, LeftOuter, Left
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.datasources.InsertIntoHadoopFsRelationCommand
-import org.apache.spark.sql.hive.execution.{CreateHiveTableAsSelectCommand, InsertIntoHiveTable, OptimizedCreateHiveTableAsSelectCommand}
+import org.apache.spark.sql.hive.execution.{CreateHiveTableAsSelectCommand, InsertIntoHiveTable}
 import org.apache.spark.status.ElementTrackingStore
 import org.apache.spark.util.kvstore.KVIndex
 
@@ -55,8 +55,6 @@ class MVRewriteRule(session: SparkSession)
     try {
       logicalPlan match {
         case _: CreateHiveTableAsSelectCommand =>
-          tryRewritePlan(logicalPlan)
-        case _: OptimizedCreateHiveTableAsSelectCommand =>
           tryRewritePlan(logicalPlan)
         case _: InsertIntoHadoopFsRelationCommand =>
           tryRewritePlan(logicalPlan)

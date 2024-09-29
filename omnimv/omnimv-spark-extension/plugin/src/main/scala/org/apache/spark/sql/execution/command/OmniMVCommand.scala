@@ -184,7 +184,7 @@ case class OmniMVCreateMvCommand(
       catalogTable = if (tableExists) Some(table) else None)
 
     try {
-      dataSource.writeAndRead(mode, query, outputColumnNames, physicalPlan, metrics)
+      dataSource.writeAndRead(mode, query, outputColumnNames)
     } catch {
       case ex: AnalysisException =>
         logError(s"Failed to write to table ${table.identifier.unquotedString}", ex)
@@ -394,7 +394,6 @@ case class RefreshMaterializedViewCommand(
       // Most formats don't do well with duplicate columns, so lets not allow that
       SchemaUtils.checkColumnNameDuplication(
         outputColumnNames,
-        s"when inserting into $outputPath",
         sparkSession.sessionState.conf.caseSensitiveAnalysis)
 
       val hadoopConf = sparkSession.sessionState.newHadoopConfWithOptions(options)

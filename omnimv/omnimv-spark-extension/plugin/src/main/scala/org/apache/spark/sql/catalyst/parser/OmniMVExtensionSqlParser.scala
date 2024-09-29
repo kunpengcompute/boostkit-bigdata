@@ -128,4 +128,6 @@ class OmniMVExtensionSqlParser(spark: SparkSession,
         throw new ParseException(Option(command), e.message, position, position)
     }
   }
+
+  override def parseQuery(sqlText: String): LogicalPlan = parsePlan(sqlText)
 }
