@@ -601,7 +601,7 @@ case class EquivalenceClasses() {
   def getEquivalenceClasses: List[mutable.Set[ExpressionEqual]] = {
     if (cacheEquivalenceClasses == null) {
       val visited: mutable.Set[ExpressionEqual] = mutable.Set()
-      val builder: mutable.MutableList[mutable.Set[ExpressionEqual]] = mutable.MutableList()
+      val builder: mutable.ListBuffer[mutable.Set[ExpressionEqual]] = mutable.ListBuffer()
       for (set <- nodeToEquivalenceClass.values) {
         if ((visited & set).isEmpty) {
           visited ++= set

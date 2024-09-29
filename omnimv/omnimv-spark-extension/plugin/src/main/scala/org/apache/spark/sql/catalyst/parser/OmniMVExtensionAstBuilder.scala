@@ -95,7 +95,7 @@ class OmniMVExtensionAstBuilder(spark: SparkSession, delegate: ParserInterface)
   ): OmniMVHeader = withOrigin(ctx) {
     val ifNotExists = ctx.EXISTS() != null
     val multipartIdentifier = ctx.multipartIdentifier.parts.asScala.map(_.getText)
-    (multipartIdentifier, ifNotExists)
+    (multipartIdentifier.toSeq, ifNotExists)
   }
 
   override def visitRefreshMV(ctx: RefreshMVContext): LogicalPlan = withOrigin(ctx) {
@@ -337,7 +337,7 @@ class OmniMVExtensionAstBuilder(spark: SparkSession, delegate: ParserInterface)
    */
   override def visitMultipartIdentifier(ctx: MultipartIdentifierContext): Seq[String] =
     withOrigin(ctx) {
-      ctx.parts.asScala.map(_.getText)
+      ctx.parts.asScala.map(_.getText).toSeq
     }
 
   /**
@@ -351,7 +351,7 @@ class OmniMVExtensionAstBuilder(spark: SparkSession, delegate: ParserInterface)
    * Create a Sequence of Strings for an identifier list.
    */
   override def visitIdentifierSeq(ctx: IdentifierSeqContext): Seq[String] = withOrigin(ctx) {
-    ctx.ident.asScala.map(_.getText)
+    ctx.ident.asScala.map(_.getText).toSeq
   }
 
   override def visitWashOutMV(ctx: WashOutMVContext): LogicalPlan = {

@@ -280,7 +280,7 @@ trait RewriteHelper extends PredicateHelper with RewriteLogger {
       val right = equiColumnsPreds(i).asInstanceOf[EqualTo].right
       equivalenceClasses.addEquivalenceClass(ExpressionEqual(left), ExpressionEqual(right))
     }
-    (equivalenceClasses, rangePreds, residualPreds)
+    (equivalenceClasses, rangePreds.toSeq, residualPreds.toSeq)
   }
 
   /**

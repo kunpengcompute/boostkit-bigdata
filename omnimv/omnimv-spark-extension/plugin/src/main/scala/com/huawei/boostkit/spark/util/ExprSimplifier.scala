@@ -113,7 +113,7 @@ case class ExprSimplifier(unknownAsFalse: Boolean,
             canSimplify = false
           }
           if (canSimplify) {
-            return composeDisjunctions(terms, false)
+            return composeDisjunctions(terms.toSeq, false)
           }
         }
 
@@ -149,13 +149,13 @@ case class ExprSimplifier(unknownAsFalse: Boolean,
         if (notTerms.size > 0) {
           terms.++=(negateBufferTerms(notTerms))
         }
-        return composeDisjunctions(terms, false)
+        return composeDisjunctions(terms.toSeq, false)
       }
     }
     if (newBranches.size == caseWhen.branches.size) {
       return caseWhen
     }
-    CaseWhen(newBranches, newElseValue)
+    CaseWhen(newBranches.toSeq, newElseValue)
   }
 
   private def simplifyComparison(condition: BinaryComparison): Expression = {
@@ -238,7 +238,7 @@ case class ExprSimplifier(unknownAsFalse: Boolean,
     for (notTerm <- notTerms) {
       terms.+=(simplify(Not(notTerm)))
     }
-    composeConjunctions(terms, false)
+    composeConjunctions(terms.toSeq, false)
   }
 
   private def simplifyAnd2ForUnknownAsFalse(terms: mutable.Buffer[Expression],
@@ -500,7 +500,7 @@ case class ExprSimplifier(unknownAsFalse: Boolean,
         }
       }
     }
-    composeConjunctions(terms, false)
+    composeConjunctions(terms.toSeq, false)
   }
 
   private def simplifyNot(condition: Expression): Expression = {
@@ -561,7 +561,7 @@ case class ExprSimplifier(unknownAsFalse: Boolean,
     for (i <- toBeDelTerms.indices) {
       terms.-=(toBeDelTerms(i))
     }
-    composeDisjunctions(terms, false)
+    composeDisjunctions(terms.toSeq, false)
   }
 
   def simplifyIs(condition: Expression): Expression = {
