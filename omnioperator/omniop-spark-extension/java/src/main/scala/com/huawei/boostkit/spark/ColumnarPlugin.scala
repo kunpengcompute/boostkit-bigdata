@@ -40,6 +40,7 @@ import org.apache.spark.sql.catalyst.planning.PhysicalAggregation
 import org.apache.spark.sql.catalyst.plans.LeftSemi
 import org.apache.spark.sql.catalyst.plans.logical.Aggregate
 import org.apache.spark.sql.execution.util.SparkMemoryUtils.addLeakSafeTaskCompletionListener
+import org.apache.spark.sql.execution.aggregate.PushOrderedLimitThroughAgg
 
 case class ColumnarPreOverrides() extends Rule[SparkPlan] {
   val columnarConf: ColumnarPluginConfig = ColumnarPluginConfig.getSessionConf
@@ -765,6 +766,7 @@ class ColumnarPlugin extends (SparkSessionExtensions => Unit) with Logging {
     extensions.injectQueryStagePrepRule(session => FallbackBroadcastExchange(session))
     extensions.injectQueryStagePrepRule(session => DedupLeftSemiJoinAQE(session))
     extensions.injectQueryStagePrepRule(_ => TopNPushDownForWindow)
+    extensions.injectQueryStagePrepRule(_ => PushOrderedLimitThroughAgg)
   }
 }
 
