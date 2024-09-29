@@ -521,7 +521,7 @@ object ExprOptUtil {
     // negate the term in notTerms
     val negateTerms: mutable.Buffer[Expression] = negateBufferTerms(notTerms)
     negateTerms.insert(0, expr)
-    composeConjunctions(negateTerms, false)
+    composeConjunctions(negateTerms.toSeq, false)
   }
 
   def negateBufferTerms(notTerms: mutable.Buffer[Expression]): mutable.Buffer[Expression] = {
