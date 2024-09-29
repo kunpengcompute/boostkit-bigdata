@@ -101,7 +101,8 @@ object ViewMetadata extends RewriteHelper {
     REFRESH_STAT = IDLE
     status = STATUS_LOADING
 
-    kryoSerializer = new KryoSerializer(spark.sparkContext.getConf)
+    kryoSerializer = new KryoSerializer(spark.sparkContext.getConf
+      .clone().set("spark.kryo.unsafe", "false"))
 
     metadataPath = new Path(OmniMVPluginConfig.getConf.metadataPath)
     metadataPriorityPath = new Path(metadataPath, "priority")
