@@ -141,14 +141,18 @@ namespace spark {
       if (closed) {
         throw std::logic_error("Cannot write to closed stream.");
       }
-      ssize_t bytesWrite = ::write(file, buf, length);
-      if (bytesWrite == -1) {
-        throw std::runtime_error("Bad write of " + filename);
+
+      size_t bytesWritten = 0;
+      while (bytesWritten < length) {
+        ssize_t actualBytes = ::write(file, static_cast<const char *>(buf) + bytesWritten, length - bytesWritten);
+	if (actualBytes <= 0) {
+          close();
+	  std::string errMsg = "Bad write of " + filename + " since " + strerror(errno) + ",actual write bytes " +
+            std::to_string(actualBytes) + ".";
+	  throw std::runtime_error(errMsg);
+	}
+	bytesWritten += actualBytes;
       }
-      if (static_cast<uint64_t>(bytesWrite) != length) {
-        throw std::runtime_error("Short write of " + filename);
-      }
-      bytesWritten += static_cast<uint64_t>(bytesWrite);
     }
 
     const std::string& getName() const override {
