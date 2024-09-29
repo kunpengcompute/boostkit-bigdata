@@ -49,6 +49,11 @@
         <classifier>aarch64</classifier>
     </dependency>
     <dependency>
+        <groupId>com.huawei.boostkit</groupId>
+        <artifactId>boostkit-omniop-native-reader</artifactId>
+        <version>3.2.2-1.6.0</version>
+    </dependency>
+    <dependency>
         <groupId>junit</groupId>
         <artifactId>junit</artifactId>
         <scope>test</scope>
