@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2020-2022. Huawei Technologies Co., Ltd. All rights reserved.
+ * Copyright (C) 2023-2023. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -17,10 +17,10 @@
  * limitations under the License.
  */
 
-/* Header for class THESTRAL_PLUGIN_ORCCOLUMNARBATCHJNIREADER_H */
+/* Header for class OMNI_RUNTIME_ORCCOLUMNARBATCHJNIREADER_H */
 
-#ifndef THESTRAL_PLUGIN_ORCCOLUMNARBATCHJNIREADER_H
-#define THESTRAL_PLUGIN_ORCCOLUMNARBATCHJNIREADER_H
+#ifndef OMNI_RUNTIME_ORCCOLUMNARBATCHJNIREADER_H
+#define OMNI_RUNTIME_ORCCOLUMNARBATCHJNIREADER_H
 
 #include <memory>
 #include <iostream>
@@ -33,15 +33,16 @@
 #include <orc/Type.hh>
 #include <orc/Vector.hh>
 #include <orc/Reader.hh>
-#include <orc/OrcFile.hh>
 #include <orc/MemoryPool.hh>
 #include <orc/sargs/SearchArgument.hh>
 #include <orc/sargs/Literal.hh>
+#include "orcfile/OrcFileOverride.hh"
 #include <getopt.h>
 #include <jni.h>
 #include <json/json.h>
 #include <vector/vector_common.h>
 #include <util/omni_exception.h>
+#include <orcfile/OmniRowReaderImpl.hh>
 #include "common/debug.h"
 
 #ifdef __cplusplus
@@ -64,74 +65,74 @@ enum class PredicateOperatorType {
 };
 
 /*
- * Class:       com_huawei_boostkit_spark_jni_OrcColumnarBatchJniReader
+ * Class:       com_huawei_boostkit_scan_jni_OrcColumnarBatchJniReader
  * Method:      initializeReader
  * Signature:   (Ljava/lang/String;Lorg/json/simple/JSONObject;)J
  */
-JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniReader_initializeReader
-        (JNIEnv* env, jobject jObj, jstring path, jobject job);
+JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniReader_initializeReader
+        (JNIEnv* env, jobject jObj, jobject job, jobject vecFildsNames);
 
 /*
- * Class:       com_huawei_boostkit_spark_jni_OrcColumnarBatchJniReader
+ * Class:       com_huawei_boostkit_scan_jni_OrcColumnarBatchJniReader
  * Method:      initializeRecordReader
  * Signature:   (JLorg/json/simple/JSONObject;)J
  */
-JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniReader_initializeRecordReader
+JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniReader_initializeRecordReader
         (JNIEnv* env, jobject jObj, jlong reader, jobject job);
 
 /*
- * Class:       com_huawei_boostkit_spark_jni_OrcColumnarBatchJniReader
- * Method:      initializeRecordReader
+ * Class:       com_huawei_boostkit_scan_jni_OrcColumnarBatchJniReader
+ * Method:      initializeBatch
  * Signature:   (JLorg/json/simple/JSONObject;)J
  */
-JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniReader_initializeBatch
+JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniReader_initializeBatch
         (JNIEnv* env, jobject jObj, jlong rowReader, jlong batchSize);
 
 /*
- * Class:       com_huawei_boostkit_spark_jni_OrcColumnarBatchJniReader
+ * Class:       com_huawei_boostkit_scan_jni_OrcColumnarBatchJniReader
  * Method:      recordReaderNext
  * Signature:   (J[I[J)J
  */
-JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniReader_recordReaderNext
-        (JNIEnv *, jobject, jlong, jlong, jintArray, jlongArray);
+JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniReader_recordReaderNext
+    (JNIEnv *, jobject, jlong, jlong, jintArray, jlongArray);
 
 /*
- * Class:       com_huawei_boostkit_spark_jni_OrcColumnarBatchJniReader
+ * Class:       com_huawei_boostkit_scan_jni_OrcColumnarBatchJniReader
  * Method:      recordReaderGetRowNumber
  * Signature:   (J)J
  */
-JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniReader_recordReaderGetRowNumber
+JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniReader_recordReaderGetRowNumber
         (JNIEnv *, jobject, jlong);
 
 /*
- * Class:       com_huawei_boostkit_spark_jni_OrcColumnarBatchJniReader
+ * Class:       com_huawei_boostkit_scan_jni_OrcColumnarBatchJniReader
  * Method:      recordReaderGetProgress
  * Signature:   (J)F
  */
-JNIEXPORT jfloat JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniReader_recordReaderGetProgress
+JNIEXPORT jfloat JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniReader_recordReaderGetProgress
         (JNIEnv *, jobject, jlong);
 
 
 /*
- * Class:       com_huawei_boostkit_spark_jni_OrcColumnarBatchJniReader
+ * Class:       com_huawei_boostkit_scan_jni_OrcColumnarBatchJniReader
  * Method:      recordReaderClose
- * Signature:   (J)F
+ * Signature:   (JJJ)F
  */
-JNIEXPORT void JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniReader_recordReaderClose
+JNIEXPORT void JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniReader_recordReaderClose
         (JNIEnv *, jobject, jlong, jlong, jlong);
 
 /*
- * Class:       com_huawei_boostkit_spark_jni_OrcColumnarBatchJniReader
+ * Class:       com_huawei_boostkit_scan_jni_OrcColumnarBatchJniReader
  * Method:      recordReaderSeekToRow
  * Signature:   (JJ)F
  */
-JNIEXPORT void JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniReader_recordReaderSeekToRow
+JNIEXPORT void JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniReader_recordReaderSeekToRow
         (JNIEnv *, jobject, jlong, jlong);
 
-JNIEXPORT jobjectArray JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniReader_getAllColumnNames
+JNIEXPORT jobjectArray JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniReader_getAllColumnNames
         (JNIEnv *, jobject, jlong);
 
-JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_spark_jni_OrcColumnarBatchJniReader_getNumberOfRows(JNIEnv *env,
+JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniReader_getNumberOfRows(JNIEnv *env,
         jobject jObj, jlong rowReader, jlong batch);
 
 int GetLiteral(orc::Literal &lit, int leafType, const std::string &value);
@@ -140,8 +141,6 @@ int BuildLeaves(PredicateOperatorType leafOp, std::vector<orc::Literal> &litList
     const std::string &leafNameString, orc::PredicateDataType leafType, orc::SearchArgumentBuilder &builder);
 
 bool StringToBool(const std::string &boolStr);
-
-int CopyToOmniVec(const orc::Type *type, int &omniTypeId, uint64_t &omniVecId, orc::ColumnVectorBatch *field);
 
 #ifdef __cplusplus
 }

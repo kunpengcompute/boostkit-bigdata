@@ -1,0 +1,7 @@
+aux_source_directory(${CMAKE_CURRENT_LIST_DIR} FILESYSTEM_TESTS_LIST)
+set(FILESYSTEM_TEST_TARGET filesystemtest)
+add_library(${FILESYSTEM_TEST_TARGET} STATIC ${FILESYSTEM_TESTS_LIST})
+target_compile_options(${FILESYSTEM_TEST_TARGET} PUBLIC )
+target_include_directories(${FILESYSTEM_TEST_TARGET} PUBLIC ${CMAKE_BINARY_DIR}/src)
+target_include_directories(${FILESYSTEM_TEST_TARGET} PUBLIC $ENV{JAVA_HOME}/include)
+target_include_directories(${FILESYSTEM_TEST_TARGET} PUBLIC $ENV{JAVA_HOME}/include/linux)

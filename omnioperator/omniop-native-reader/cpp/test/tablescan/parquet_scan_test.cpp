@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2020-2023. Huawei Technologies Co., Ltd. All rights reserved.
+ * Copyright (C) 2023-2023. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -19,11 +19,10 @@
 
 #include <type/date32.h>
 #include <gtest/gtest.h>
-#include <cstring>
 #include "scan_test.h"
-#include "tablescan/ParquetReader.h"
+#include "parquet/ParquetReader.h"
 
-using namespace spark::reader;
+using namespace omniruntime::reader;
 using namespace arrow;
 using namespace omniruntime::vec;
 
@@ -44,49 +43,49 @@ TEST(read, test_parquet_reader)
 
     ParquetReader *reader = new ParquetReader();
     std::string ugi = "root@sample";
-    auto state1 = reader->InitRecordReader(filename, 1024, row_group_indices, column_indices, ugi);
+    UriInfo uri(filename, "", "", "", "-1");
+    auto state1 = reader->InitRecordReader(uri, 1024, row_group_indices, column_indices, ugi, false);
     ASSERT_EQ(state1, Status::OK());
 
-    std::shared_ptr<arrow::RecordBatch> batch;
-    auto state2 = reader->ReadNextBatch(&batch);
+    std::vector<omniruntime::vec::BaseVector*> recordBatch(column_indices.size());
+    long batchRowSize = 0;
+    auto state2 = reader->ReadNextBatch(recordBatch, &batchRowSize);
     ASSERT_EQ(state2, Status::OK());
-    std::cout << "num_rows: " << batch->num_rows() << std::endl;
-    std::cout << "num_columns: " << batch->num_columns() << std::endl;
-    std::cout << "Print: " << batch->ToString() << std::endl;
-    auto pair = TransferToOmniVecs(batch);
+    std::cout << "num_rows: " << batchRowSize << std::endl;
+    std::cout << "num_columns: " << recordBatch.size() << std::endl;
 
-    BaseVector *intVector = reinterpret_cast<BaseVector *>(pair.second[0]);
+    BaseVector *intVector = reinterpret_cast<BaseVector *>(recordBatch[0]);
     auto int_result = static_cast<int32_t *>(omniruntime::vec::VectorHelper::UnsafeGetValues(intVector));
     ASSERT_EQ(*int_result, 10);
 
-    auto varCharVector = reinterpret_cast<Vector<LargeStringContainer<std::string_view>> *>(pair.second[1]);
+    auto varCharVector = reinterpret_cast<Vector<LargeStringContainer<std::string_view>> *>(recordBatch[1]);
     std::string str_expected = "varchar_1";
     ASSERT_TRUE(str_expected == varCharVector->GetValue(0));
 
-    BaseVector *longVector = reinterpret_cast<BaseVector *>(pair.second[2]);
+    BaseVector *longVector = reinterpret_cast<BaseVector *>(recordBatch[2]);
     auto long_result = static_cast<int64_t *>(omniruntime::vec::VectorHelper::UnsafeGetValues(longVector));
     ASSERT_EQ(*long_result, 10000);
 
-    BaseVector *doubleVector = reinterpret_cast<BaseVector *>(pair.second[3]);
+    BaseVector *doubleVector = reinterpret_cast<BaseVector *>(recordBatch[3]);
     auto double_result = static_cast<double *>(omniruntime::vec::VectorHelper::UnsafeGetValues(doubleVector));
     ASSERT_EQ(*double_result, 1111.1111);
 
-    BaseVector *nullVector = reinterpret_cast<BaseVector *>(pair.second[4]);
+    BaseVector *nullVector = reinterpret_cast<BaseVector *>(recordBatch[4]);
     ASSERT_TRUE(nullVector->IsNull(0));
 
-    BaseVector *decimal64Vector = reinterpret_cast<BaseVector *>(pair.second[5]);
+    BaseVector *decimal64Vector = reinterpret_cast<BaseVector *>(recordBatch[5]);
     auto decimal64_result = static_cast<int64_t *>(omniruntime::vec::VectorHelper::UnsafeGetValues(decimal64Vector));
     ASSERT_EQ(*decimal64_result, 13111110);
 
-    BaseVector *booleanVector = reinterpret_cast<BaseVector *>(pair.second[6]);
+    BaseVector *booleanVector = reinterpret_cast<BaseVector *>(recordBatch[6]);
     auto boolean_result = static_cast<bool *>(omniruntime::vec::VectorHelper::UnsafeGetValues(booleanVector));
     ASSERT_EQ(*boolean_result, true);
 
-    BaseVector *smallintVector = reinterpret_cast<BaseVector *>(pair.second[7]);
+    BaseVector *smallintVector = reinterpret_cast<BaseVector *>(recordBatch[7]);
     auto smallint_result = static_cast<int16_t *>(omniruntime::vec::VectorHelper::UnsafeGetValues(smallintVector));
     ASSERT_EQ(*smallint_result, 11);
 
-    BaseVector *dateVector = reinterpret_cast<BaseVector *>(pair.second[8]);
+    BaseVector *dateVector = reinterpret_cast<BaseVector *>(recordBatch[8]);
     auto date_result = static_cast<int32_t *>(omniruntime::vec::VectorHelper::UnsafeGetValues(dateVector));
     omniruntime::type::Date32 date32(*date_result);
     char chars[11];
@@ -106,23 +105,32 @@ TEST(read, test_parquet_reader)
     delete dateVector;
 }
 
-TEST(read, test_decimal128_copy)
+TEST(read, test_varchar)
 {
-    auto decimal_type = arrow::decimal(20, 1);
-    arrow::Decimal128Builder builder(decimal_type);
-    arrow::Decimal128 value(20230420);
-    auto s1 = builder.Append(value);
-    std::shared_ptr<Array> array;
-    auto s2 = builder.Finish(&array);
-
-    int omniTypeId = 0;
-    uint64_t omniVecId = 0;
-    spark::reader::CopyToOmniVec(decimal_type, omniTypeId, omniVecId, array);
-
-    BaseVector *decimal128Vector = reinterpret_cast<BaseVector *>(omniVecId);
-    auto decimal128_result =
-        static_cast<omniruntime::type::Decimal128 *>(omniruntime::vec::VectorHelper::UnsafeGetValues(decimal128Vector));
-    ASSERT_TRUE((*decimal128_result).ToString() == "20230420");
-
-    delete decimal128Vector;
+    std::string filename = "/../../../java/src/test/java/com/huawei/boostkit/spark/jni/parquetsrc/date_dim.parquet";
+    filename = PROJECT_PATH + filename;
+    const std::vector<int> row_group_indices = {0};
+    const std::vector<int> column_indices = {23, 24, 25, 26, 27};
+    ParquetReader *reader = new ParquetReader();
+    std::string ugi = "root@sample";
+    UriInfo uriInfo(filename, "", "", "-1");
+    auto state1 = reader->InitRecordReader(uriInfo, 4096, row_group_indices, column_indices, ugi, false);
+    ASSERT_EQ(state1, Status::OK());
+    int total_nums = 0;
+    int iter = 0;
+    while (true) {
+        std::vector<omniruntime::vec::BaseVector*> recordBatch(column_indices.size());
+        long batchRowSize = 0;
+        auto state2 = reader->ReadNextBatch(recordBatch, &batchRowSize);
+        if (batchRowSize == 0) {
+            break;
+        }
+        total_nums += batchRowSize;
+        std::cout << iter++ << " num rows: " << batchRowSize << std::endl;
+        for (auto vec : recordBatch) {
+            delete vec;
+        }
+        recordBatch.clear();
+    }
+    std::cout << "total nums: " << total_nums << std::endl;
 }
