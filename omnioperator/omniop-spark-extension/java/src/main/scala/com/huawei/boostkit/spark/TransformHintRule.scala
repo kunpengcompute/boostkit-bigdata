@@ -24,10 +24,11 @@ import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.catalyst.trees.TreeNodeTag
 import org.apache.spark.sql.execution.adaptive.{BroadcastQueryStageExec, OmniAQEShuffleReadExec}
 import org.apache.spark.sql.execution.aggregate.HashAggregateExec
+import org.apache.spark.sql.execution.command.DataWritingCommandExec
 import org.apache.spark.sql.execution.exchange.{BroadcastExchangeExec, ReusedExchangeExec, ShuffleExchangeExec}
 import org.apache.spark.sql.execution.joins.{BroadcastHashJoinExec, BroadcastNestedLoopJoinExec, ColumnarBroadcastHashJoinExec, ColumnarShuffledHashJoinExec, ColumnarSortMergeJoinExec, ShuffledHashJoinExec, SortMergeJoinExec}
 import org.apache.spark.sql.execution.window.WindowExec
-import org.apache.spark.sql.execution.{CoalesceExec, CodegenSupport, ColumnarBroadcastExchangeExec, ColumnarCoalesceExec, ColumnarExpandExec, ColumnarFileSourceScanExec, ColumnarFilterExec, ColumnarGlobalLimitExec, ColumnarHashAggregateExec, ColumnarLocalLimitExec, ColumnarProjectExec, ColumnarShuffleExchangeExec, ColumnarSortExec, ColumnarTakeOrderedAndProjectExec, ColumnarTopNSortExec, ColumnarUnionExec, ColumnarWindowExec, ExpandExec, FileSourceScanExec, FilterExec, GlobalLimitExec, LocalLimitExec, ProjectExec, SortExec, SparkPlan, TakeOrderedAndProjectExec, TopNSortExec, UnionExec}
+import org.apache.spark.sql.execution.{CoalesceExec, CodegenSupport, ColumnarBroadcastExchangeExec, ColumnarCoalesceExec, ColumnarDataWritingCommandExec, ColumnarExpandExec, ColumnarFileSourceScanExec, ColumnarFilterExec, ColumnarGlobalLimitExec, ColumnarHashAggregateExec, ColumnarLocalLimitExec, ColumnarProjectExec, ColumnarShuffleExchangeExec, ColumnarSortExec, ColumnarTakeOrderedAndProjectExec, ColumnarTopNSortExec, ColumnarUnionExec, ColumnarWindowExec, ExpandExec, FileSourceScanExec, FilterExec, GlobalLimitExec, LocalLimitExec, ProjectExec, SortExec, SparkPlan, TakeOrderedAndProjectExec, TopNSortExec, UnionExec}
 import org.apache.spark.sql.types.ColumnarBatchSupportUtil.checkColumnarBatchSupport
 
 trait TransformHint {
@@ -125,6 +126,7 @@ case class AddTransformHintRule() extends Rule[SparkPlan] {
   val enableLocalColumnarLimit: Boolean = columnarConf.enableLocalColumnarLimit
   val enableGlobalColumnarLimit: Boolean = columnarConf.enableGlobalColumnarLimit
   val enableColumnarCoalesce: Boolean = columnarConf.enableColumnarCoalesce
+  val enableColumnarDataWritingCommand: Boolean = columnarConf.enableColumnarDataWritingCommand
 
   override def apply(plan: SparkPlan): SparkPlan = {
     addTransformableTags(plan)
@@ -380,6 +382,14 @@ case class AddTransformHintRule() extends Rule[SparkPlan] {
             return
           }
           ColumnarCoalesceExec(plan.numPartitions, plan.child).buildCheck()
+          TransformHints.tagTransformable(plan)
+        case plan: DataWritingCommandExec =>
+          if (!enableColumnarDataWritingCommand) {
+            TransformHints.tagNotTransformable(
+              plan, "columnar data writing is not support")
+            return
+          }
+          ColumnarDataWritingCommandExec(plan.cmd, plan.child).buildCheck()
           TransformHints.tagTransformable(plan)
         case _ => TransformHints.tagTransformable(plan)
 

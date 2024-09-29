@@ -111,6 +111,10 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
     .getConfString("spark.omni.sql.columnar.sortMergeJoin", "true")
     .toBoolean
 
+  val enableColumnarDataWritingCommand: Boolean = conf
+    .getConfString("spark.omni.sql.columnar.dataWritingCommand", "true")
+    .toBoolean
+
   val enableTakeOrderedAndProject: Boolean = conf
     .getConfString("spark.omni.sql.columnar.takeOrderedAndProject", "true").toBoolean
 

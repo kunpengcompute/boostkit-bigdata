@@ -17,6 +17,7 @@
  */
 
 #include "OrcFileOverride.hh"
+#include <filesystem>
 
 #define O_BINARY 0
 
@@ -26,6 +27,20 @@ namespace orc {
             return orc::createHdfsFileInputStream(uri);
         } else {
             return orc::readLocalFile(std::string(uri.Path()));
+        }
+    }
+
+    std::unique_ptr<OutputStream> writeFileOverride(const UriInfo &uri) {
+        if (uri.Scheme() == "hdfs") {
+            return orc::createHdfsFileOutputStream(uri);
+        }
+        else {
+            std::filesystem::path path(std::string(uri.Path()));
+            auto res = std::filesystem::create_directories(path.parent_path());
+            if (!res) {
+                throw std::runtime_error("Create local directories fail");
+            }
+            return orc::writeLocalFile(std::string(uri.Path()));
         }
     }
 }

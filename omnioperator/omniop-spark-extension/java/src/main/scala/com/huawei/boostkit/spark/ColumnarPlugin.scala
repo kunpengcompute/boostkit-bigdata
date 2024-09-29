@@ -18,6 +18,7 @@
 
 package com.huawei.boostkit.spark
 
+import nova.hetu.omniruntime.memory.MemoryManager
 import com.huawei.boostkit.spark.Constant.OMNI_IS_ADAPTIVE_CONTEXT
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor
 import com.huawei.boostkit.spark.util.PhysicalPlanSelector
@@ -39,11 +40,12 @@ import org.apache.spark.sql.types.ColumnarBatchSupportUtil.checkColumnarBatchSup
 import org.apache.spark.sql.catalyst.planning.PhysicalAggregation
 import org.apache.spark.sql.catalyst.plans.LeftSemi
 import org.apache.spark.sql.catalyst.plans.logical.Aggregate
+import org.apache.spark.sql.execution.command.{DataWritingCommand, DataWritingCommandExec}
+import org.apache.spark.sql.execution.datasources.orc.{OmniOrcFileFormat, OrcFileFormat}
+import org.apache.spark.sql.execution.datasources.{FileFormat, InsertIntoHadoopFsRelationCommand, OmniInsertIntoHadoopFsRelationCommand}
 import org.apache.spark.sql.execution.util.SparkMemoryUtils.addLeakSafeTaskCompletionListener
 
 import scala.collection.mutable.ListBuffer
-
-import nova.hetu.omniruntime.memory.MemoryManager
 
 case class ColumnarPreOverrides(isSupportAdaptive: Boolean = true)
   extends Rule[SparkPlan] {
@@ -57,6 +59,7 @@ case class ColumnarPreOverrides(isSupportAdaptive: Boolean = true)
   val enableRollupOptimization: Boolean = columnarConf.enableRollupOptimization
   val enableRowShuffle: Boolean = columnarConf.enableRowShuffle
   val columnsThreshold: Int = columnarConf.columnsThreshold
+  val enableColumnarDataWritingCommand: Boolean = columnarConf.enableColumnarDataWritingCommand
 
   def checkBhjRightChild(x: Any): Boolean = {
     x match {
@@ -552,6 +555,41 @@ case class ColumnarPreOverrides(isSupportAdaptive: Boolean = true)
         val child = replaceWithColumnarPlan(plan.child)
         logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
         ColumnarCoalesceExec(plan.numPartitions, child)
+      case plan: DataWritingCommandExec if enableColumnarDataWritingCommand =>
+        val child = replaceWithColumnarPlan(plan.child)
+        logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
+        var unSupportedColumnarCommand = false
+        var unSupportedFileFormat = false
+        val omniCmd = plan.cmd match {
+          case cmd: InsertIntoHadoopFsRelationCommand =>
+            logInfo(s"Columnar Processing for ${cmd.getClass} is currently supported.")
+            val fileFormat: FileFormat = cmd.fileFormat match {
+              case _: OrcFileFormat => new OmniOrcFileFormat()
+              case format =>
+                logInfo(s"Unsupported ${format.getClass} file " +
+                  s"format for columnar data write command.")
+                unSupportedFileFormat = true
+                null
+            }
+            if (unSupportedFileFormat) {
+              cmd
+            } else {
+              OmniInsertIntoHadoopFsRelationCommand(cmd.outputPath, cmd.staticPartitions,
+                cmd.ifPartitionNotExists, cmd.partitionColumns, cmd.bucketSpec, fileFormat,
+                cmd.options, cmd.query, cmd.mode, cmd.catalogTable,
+                cmd.fileIndex, cmd.outputColumnNames
+              )
+            }
+          case cmd: DataWritingCommand =>
+            logInfo(s"Columnar Processing for ${cmd.getClass} is currently not supported.")
+            unSupportedColumnarCommand = true
+            cmd
+        }
+        if (!unSupportedColumnarCommand && !unSupportedFileFormat) {
+          ColumnarDataWritingCommandExec(omniCmd, child)
+        } else {
+          plan
+        }
       case p =>
         val children = plan.children.map(replaceWithColumnarPlan)
         logInfo(s"Columnar Processing for ${p.getClass} is currently not supported.")
