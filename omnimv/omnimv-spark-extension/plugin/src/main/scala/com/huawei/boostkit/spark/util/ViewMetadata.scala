@@ -639,7 +639,12 @@ object ViewMetadata extends RewriteHelper {
    * formatted mv name
    */
   def formatViewName(identifier: TableIdentifier): String = {
-    identifier.toString().replace("`", "").toLowerCase(Locale.ROOT)
+    val viewName = if (identifier.database.isEmpty) {
+      identifier.table
+    } else {
+      s"${identifier.database.get}.${identifier.table}"
+    }
+    viewName.toLowerCase(Locale.ROOT)
   }
 
   /**
