@@ -533,28 +533,33 @@ object ViewMetadata extends RewriteHelper {
       threadPool.submit {
         new Runnable {
           override def run(): Unit = {
-            val viewName = file.getPath.getName
-            val is = fs.open(file.getPath)
-            val jsons: Map[String, String] = RewriteTime.withTimeStat("Json.read.C") {
-              Json(DefaultFormats).read[Map[String, String]](is)
-            }
-            is.close()
+            try {
+              val viewName = file.getPath.getName
+              val is = fs.open(file.getPath)
+              val jsons: Map[String, String] = RewriteTime.withTimeStat("Json.read.C") {
+                Json(DefaultFormats).read[Map[String, String]](is)
+              }
+              is.close()
 
-            if (!isViewEnable(jsons)) {
-              return
-            }
+              if (!isViewEnable(jsons)) {
+                return
+              }
 
-            val tablePlanStr = jsons("tablePlan")
-            val tablePlan = RewriteTime.withTimeStat("deSerTablePlan.C") {
-              KryoSerDeUtil.deserializePlan(kryoSerializer, spark, tablePlanStr)
-            }
-            viewToTablePlan.put(viewName, tablePlan)
+              val tablePlanStr = jsons("tablePlan")
+              val tablePlan = RewriteTime.withTimeStat("deSerTablePlan.C") {
+                KryoSerDeUtil.deserializePlan(kryoSerializer, spark, tablePlanStr)
+              }
+              viewToTablePlan.put(viewName, tablePlan)
 
-            val propertiesStr = jsons("properties")
-            val properties = RewriteTime.withTimeStat("deSerProperties.C") {
-              KryoSerDeUtil.deserializeFromStr[Map[String, String]](kryoSerializer, propertiesStr)
+              val propertiesStr = jsons("properties")
+              val properties = RewriteTime.withTimeStat("deSerProperties.C") {
+                KryoSerDeUtil.deserializeFromStr[Map[String, String]](kryoSerializer, propertiesStr)
+              }
+              viewProperties.put(viewName, properties)
+            } catch {
+              case e: Throwable =>
+                logError(s"Failed to deSer mv metadata.", e)
             }
-            viewProperties.put(viewName, properties)
           }
         }
       }
@@ -562,22 +567,27 @@ object ViewMetadata extends RewriteHelper {
       threadPool.submit {
         new Runnable {
           override def run(): Unit = {
-            val viewName = file.getPath.getName
-            val is = fs.open(file.getPath)
-            val jsons: Map[String, String] = RewriteTime.withTimeStat("Json.read.C") {
-              Json(DefaultFormats).read[Map[String, String]](is)
-            }
-            is.close()
+            try {
+              val viewName = file.getPath.getName
+              val is = fs.open(file.getPath)
+              val jsons: Map[String, String] = RewriteTime.withTimeStat("Json.read.C") {
+                Json(DefaultFormats).read[Map[String, String]](is)
+              }
+              is.close()
 
-            if (!isViewEnable(jsons)) {
-              return
-            }
+              if (!isViewEnable(jsons)) {
+                return
+              }
 
-            val queryPlanStr = jsons("queryPlan")
-            val queryPlan = RewriteTime.withTimeStat("deSerQueryPlan.C") {
-              KryoSerDeUtil.deserializePlan(kryoSerializer, spark, queryPlanStr)
+              val queryPlanStr = jsons("queryPlan")
+              val queryPlan = RewriteTime.withTimeStat("deSerQueryPlan.C") {
+                KryoSerDeUtil.deserializePlan(kryoSerializer, spark, queryPlanStr)
+              }
+              viewToViewQueryPlan.put(viewName, queryPlan)
+            } catch {
+              case e: Throwable =>
+                logError(s"Failed to deSer mv metadata.", e)
             }
-            viewToViewQueryPlan.put(viewName, queryPlan)
           }
         }
       }

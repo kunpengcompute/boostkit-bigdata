@@ -67,7 +67,7 @@ class MVRewriteRule(session: SparkSession)
       }
     } catch {
       case e: Throwable =>
-        logError(s"Failed to rewrite plan with mv.")
+        logError(s"Failed to rewrite plan with mv.", e)
         logicalPlan
     } finally {
       RewriteHelper.enableSqlLog()
