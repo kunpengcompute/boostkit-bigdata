@@ -81,6 +81,10 @@ public class ShuffleDataSerializer {
                 type = DataTypes.LongType;
                 vec = new LongVec(vecSize);
                 break;
+            case VEC_TYPE_TIMESTAMP:
+                type = DataTypes.TimestampType;
+                vec = new LongVec(vecSize);
+                break;
             case VEC_TYPE_DATE64:
                 type = DataTypes.DateType;
                 vec = new LongVec(vecSize);

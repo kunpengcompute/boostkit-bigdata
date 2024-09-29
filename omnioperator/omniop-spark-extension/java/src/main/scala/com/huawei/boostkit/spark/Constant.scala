@@ -36,4 +36,5 @@ object Constant {
   val IS_SKIP_VERIFY_EXP: Boolean = true
   val OMNI_DECIMAL64_TYPE: String = DataTypeId.OMNI_DECIMAL64.ordinal().toString
   val OMNI_DECIMAL128_TYPE: String = DataTypeId.OMNI_DECIMAL128.ordinal().toString
+  val OMNI_TIMESTAMP_TYPE: String = DataTypeId.OMNI_TIMESTAMP.ordinal().toString
 }

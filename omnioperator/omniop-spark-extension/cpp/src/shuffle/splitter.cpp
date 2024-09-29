@@ -488,6 +488,10 @@ void Splitter::ToSplitterTypeId(int num_cols)
                 CastOmniToShuffleType(OMNI_LONG, SHUFFLE_8BYTE);
                 break;
             }
+            case OMNI_TIMESTAMP: {
+                CastOmniToShuffleType(OMNI_TIMESTAMP, SHUFFLE_8BYTE);
+                break;
+            }
             case OMNI_DOUBLE: {
                 CastOmniToShuffleType(OMNI_DOUBLE, SHUFFLE_8BYTE);
                 break;

@@ -18,9 +18,11 @@
 
 package com.huawei.boostkit.spark.jni;
 
+import com.huawei.boostkit.spark.timestamp.LegacyBehaviorPolicy;
 import junit.framework.TestCase;
 import nova.hetu.omniruntime.vector.Vec;
 import org.apache.hadoop.fs.Path;
+import org.apache.parquet.schema.Type;
 import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
@@ -32,7 +34,9 @@ import org.junit.runners.MethodSorters;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static org.apache.spark.sql.types.DataTypes.*;
 
@@ -48,7 +52,9 @@ public class ParquetColumnarBatchJniReaderTest extends TestCase {
     @Before
     public void setUp() throws Exception {
         constructSchema();
-        parquetColumnarBatchScanReader = new ParquetColumnarBatchScanReader(schema);
+        parquetColumnarBatchScanReader = new ParquetColumnarBatchScanReader(schema, LegacyBehaviorPolicy.CORRECTED,
+                LegacyBehaviorPolicy.CORRECTED, Arrays.stream(schema.fields()).map(field -> (Type) null)
+                .collect(Collectors.toList()));
 
         File file = new File("../../omniop-native-reader/cpp/test/tablescan/resources/parquet_data_all_type");
         String path = file.getAbsolutePath();

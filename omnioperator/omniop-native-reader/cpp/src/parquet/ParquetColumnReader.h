@@ -23,18 +23,20 @@
 #include "ParquetTypedRecordReader.h"
 #include <parquet/column_reader.h>
 #include <parquet/arrow/reader_internal.h>
+#include "common/TimeRebaseInfo.h"
 
 namespace omniruntime::reader {
     class ParquetColumnReader {
     public:
         ParquetColumnReader(std::shared_ptr<::parquet::arrow::ReaderContext> ctx, std::shared_ptr<::arrow::Field> field,
-                std::unique_ptr<::parquet::arrow::FileColumnIterator> input, ::parquet::internal::LevelInfo leaf_info)
+                std::unique_ptr<::parquet::arrow::FileColumnIterator> input, ::parquet::internal::LevelInfo leaf_info,
+                common::TimeRebaseInfo *rebaseInfoPtr)
             : ctx_(std::move(ctx)),
                 field_(std::move(field)),
                 input_(std::move(input)),
                 descr_(input_->descr()) {
             record_reader_ = MakeRecordReader(descr_, leaf_info, ctx_->pool,
-                field_->type()->id() == ::arrow::Type::DICTIONARY, field_->type());
+                field_->type()->id() == ::arrow::Type::DICTIONARY, field_->type(), rebaseInfoPtr);
             NextRowGroup();
         }
 
