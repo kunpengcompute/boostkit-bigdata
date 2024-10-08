@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022-2022. Huawei Technologies Co., Ltd. All rights reserved.
+ * Copyright (C) 2024-2024. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
@@ -28,7 +28,7 @@ class PushOrderedLimitThroughAggSuite extends ColumnarSparkPlanTest {
   protected override def beforeAll(): Unit = {
     super.beforeAll()
     spark.conf.set("spark.omni.sql.columnar.topNSort", true)
-    spark.conf.set("spark.sql.execution.pushOrderedLimitThroughAggEnable.enabled", true)
+    spark.conf.set("spark.omni.sql.columnar.pushOrderedLimitThroughAggEnable.enabled", true)
     spark.conf.set("spark.sql.adaptive.enabled", true)
     df = spark.createDataFrame(
       sparkContext.parallelize(Seq(

@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2024-2024. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
@@ -28,8 +29,8 @@ object PushOrderedLimitThroughAgg extends Rule[SparkPlan] with PredicateHelper {
     if (!ColumnarPluginConfig.getConf.pushOrderedLimitThroughAggEnable) {
       return plan
     }
-
-    val enableColumnarTopNSort: Boolean = conf.getConfString("spark.omni.sql.columnar.topNSort", "true").toBoolean
+    val columnarConf: ColumnarPluginConfig = ColumnarPluginConfig.getSessionConf
+    val enableColumnarTopNSort: Boolean = columnarConf.enableColumnarTopNSort
 
     plan.transform {
       case orderAndProject @ TakeOrderedAndProjectExec(limit, sortOrder, projectList, orderAndProjectChild) => {
@@ -53,7 +54,7 @@ object PushOrderedLimitThroughAgg extends Rule[SparkPlan] with PredicateHelper {
                         )
                         LocalLimitExec(limit, child = newSortExec)
                       }
-                      ColumnarPluginConfig.getConf.pushOrderedLimitThroughAggApplied = true
+                      session.sparkContext.setLocalProperty("pushOrderedLimitThroughAggApplied", "true");
                       TakeOrderedAndProjectExec(
                         limit, sortOrder, projectList,
                         child = HashAggregateExec(

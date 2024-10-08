@@ -635,10 +635,11 @@ case class AdaptiveSparkPlanExec(
         val newLogicalPlan = logicalPlan.transformDown {
           case p if p.eq(logicalNode) => newLogicalNode
         }
-        if (!ColumnarPluginConfig.getConf.pushOrderedLimitThroughAggApplied) {
-          logicalPlan = newLogicalPlan
-        } else {
+        val pushOrderedLimitThroughAggApplied = session.sparkContext.getLocalProperty("pushOrderedLimitThroughAggApplied");
+        if (pushOrderedLimitThroughAggApplied == "true") {
           logicalPlan
+        } else {
+          logicalPlan = newLogicalPlan
         }
 
       case _ => // Ignore those earlier stages that have been wrapped in later stages.
