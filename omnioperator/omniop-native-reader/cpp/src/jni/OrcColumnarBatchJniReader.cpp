@@ -125,7 +125,13 @@ int GetLiteral(orc::Literal &lit, int leafType, const std::string &value)
             break;
         }
         case orc::PredicateDataType::TIMESTAMP: {
-            lit = orc::Literal(PredicateDataType::TIMESTAMP, static_cast<int64_t>(std::stol(value)));
+            vector<std::string> valList;
+            istringstream timestampStr(value);
+            string tmpStr;
+            while (timestampStr >> tmpStr) {
+                valList.push_back(tmpStr);
+            }
+            lit = orc::Literal(std::stoll(valList[0]), std::stoi(valList[1]));
             break;
         }
         case orc::PredicateDataType::DECIMAL: {

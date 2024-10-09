@@ -24,7 +24,7 @@ import com.huawei.boostkit.spark.timestamp.TimestampUtil;
 import nova.hetu.omniruntime.type.DataType;
 import nova.hetu.omniruntime.vector.*;
 
-import org.apache.spark.sql.catalyst.util.DateTimeUtils;
+import org.apache.orc.impl.writer.TimestampTreeWriter;
 import org.apache.spark.sql.catalyst.util.RebaseDateTime;
 import org.apache.hadoop.hive.ql.io.sarg.ExpressionTree;
 import org.apache.hadoop.hive.ql.io.sarg.PredicateLeaf;
@@ -37,6 +37,9 @@ import org.slf4j.LoggerFactory;
 import java.net.URI;
 import java.sql.Date;
 import java.sql.Timestamp;
+import java.text.DateFormat;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.TimeZone;
@@ -134,8 +137,8 @@ public class OrcColumnarBatchScanReader {
                         jsonObject.put("literal", spiltValues[0] + "." + scalePadZeroStr + " " + decimalP + " " + decimalS);
                     }
                 } else if (pl.getType() == PredicateLeaf.Type.TIMESTAMP) {
-                    jsonObject.put("literal",
-                            String.valueOf(DateTimeUtils.fromJavaTimestamp((Timestamp)pl.getLiteral())));
+                    Timestamp t = (Timestamp)pl.getLiteral();
+                    jsonObject.put("literal",  formatSecs(t.getTime() / 1000L) + " " + formatNanos(t.getNanos()));
                 } else {
                     jsonObject.put("literal", pl.getLiteral().toString());
                 }
@@ -162,7 +165,8 @@ public class OrcColumnarBatchScanReader {
                     } else if (pl.getType() == PredicateLeaf.Type.DATE) {
                         lst.add(((int)Math.ceil(((Date)ob).getTime()* 1.0/3600/24/1000)) + "");
                     } else if (pl.getType() == PredicateLeaf.Type.TIMESTAMP) {
-                        lst.add(String.valueOf(DateTimeUtils.fromJavaTimestamp((Timestamp)pl.getLiteral())));
+                        Timestamp t = (Timestamp)pl.getLiteral();
+                        lst.add(formatSecs(t.getTime() / 1000L) + " " + formatNanos(t.getNanos()));
                     } else {
                         lst.add(ob.toString());
                     }
@@ -174,6 +178,33 @@ public class OrcColumnarBatchScanReader {
             jsonObjectList.put("leaf-" + i, jsonObject);
         }
         return jsonObjectList;
+    }
+
+    private long formatSecs(long secs) {
+        DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+        long epoch;
+        try {
+            epoch = dateFormat.parse(TimestampTreeWriter.BASE_TIMESTAMP_STRING).getTime() / 1000L;
+        } catch (ParseException e) {
+            throw new RuntimeException(e);
+        }
+        return secs - epoch;
+    }
+
+    private long formatNanos(int nanos) {
+        if (nanos == 0) {
+            return 0;
+        } else if (nanos % 100 != 0) {
+            return ((long) nanos) << 3;
+        } else {
+            nanos /= 100;
+            int trailingZeros = 1;
+            while (nanos % 10 == 0 && trailingZeros < 7) {
+                nanos /= 10;
+                trailingZeros += 1;
+            }
+            return ((long) nanos) << 3 | trailingZeros;
+        }
     }
 
     private void addJulianGregorianInfo(JSONObject job) {
