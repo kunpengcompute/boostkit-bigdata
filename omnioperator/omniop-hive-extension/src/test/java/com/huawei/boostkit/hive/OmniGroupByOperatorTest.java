@@ -172,4 +172,98 @@ public class OmniGroupByOperatorTest extends CommonTest {
         }
     }
 
+    @Test
+    public void testAdptivePartialAggregationLongMin() throws IOException {
+        utRunSqlOnDriver("use ut_database");
+
+        utRunSqlOnDriver("drop table if exists adaptive_agg");
+        utRunSqlOnDriver("create table if not exists adaptive_agg(a BIGINT, b BIGINT) stored as orc");
+        utRunSqlOnDriver("insert into adaptive_agg select floor(rand() *1000), floor(rand() *1000) from (select posexplode(split(space(99999), ' ')) as (pos, x)) a");
+
+        String sql = "select a, min(b) as min_b from adaptive_agg group by a order by a, min_b limit 10";
+
+        carryAdptivePartialAggregationSql(sql);
+    }
+
+    @Test
+    public void testAdptivePartialAggregationDecimalAvg() throws IOException {
+        utRunSqlOnDriver("use ut_database");
+
+        utRunSqlOnDriver("drop table if exists adaptive_agg");
+        utRunSqlOnDriver("create table if not exists adaptive_agg(a DECIMAL(10, 2), b DECIMAL(10, 2)) stored as orc");
+        utRunSqlOnDriver("insert into adaptive_agg select cast(floor(rand() *1000) as DECIMAL(10, 2)), cast(floor(rand() *1000) as DECIMAL(10, 2)) from (select posexplode(split(space(99999), ' ')) as (pos, x)) a");
+
+        String sql = "select a, avg(b) as avg_b from adaptive_agg group by a order by a, avg_b limit 10";
+
+        carryAdptivePartialAggregationSql(sql);
+    }
+
+
+    public void carryAdptivePartialAggregationSql(String sql) throws IOException {
+        String groupByConfStr = "omni.hive.groupby.enabled";
+        String adaptiveConfStr = "omni.hive.adaptivePartialAggregation.enabled";
+        String minRowsConfStr = "omni.hive.adaptivePartialAggregationMinRows";
+        String ratioConfStr = "omni.hive.adaptivePartialAggregationRatio";
+
+        // default config
+        boolean originalGroupByEnabled = driver.getConf().getBoolean(groupByConfStr, false);
+        boolean originalAdaptiveEnabled = driver.getConf().getBoolean(adaptiveConfStr, false);
+        long originalMinRows = driver.getConf().getLong(minRowsConfStr, 10000);
+        double originalRatio = driver.getConf().getDouble(ratioConfStr, 0.8);
+
+        // enable
+        driver.getConf().set(groupByConfStr, "true");
+        driver.getConf().set(adaptiveConfStr, "true");
+        driver.getConf().set(minRowsConfStr, "100");
+        driver.getConf().set(ratioConfStr, "0.1");
+
+        // carry sql
+        utRunSqlOnDriver("explain " + sql);
+        List<String> rsExplainTrue = new ArrayList<>();
+        driver.getResults(rsExplainTrue);
+        utRunSqlOnDriver(sql);
+        List<String> rsTrue = new ArrayList<>();
+        driver.getResults(rsTrue);
+        driver.getConf().set(adaptiveConfStr, "false");
+        utRunSqlOnDriver("explain " + sql);
+        List<String> rsExplainFalse = new ArrayList<>();
+        driver.getResults(rsExplainFalse);
+        utRunSqlOnDriver(sql);
+        List<String> rsFalse = new ArrayList<>();
+        driver.getResults(rsFalse);
+
+        // default config
+        driver.getConf().set(groupByConfStr, Boolean.toString(originalGroupByEnabled));
+        driver.getConf().set(adaptiveConfStr, Boolean.toString(originalAdaptiveEnabled));
+        driver.getConf().set(minRowsConfStr, Long.toString(originalMinRows));
+        driver.getConf().set(ratioConfStr, Double.toString(originalRatio));
+        utRunSqlOnDriver("drop table if exists adaptive_agg");
+
+
+        // check explain
+        String str = "Omni Group By Operator";
+        boolean flag1 = false;
+        for (String s : rsExplainTrue) {
+            if (s.contains(str)) {
+                flag1 = true;
+                break;
+            }
+        }
+        boolean flag2 = false;
+        for (String s : rsExplainFalse) {
+            if (s.contains(str)) {
+                flag2 = true;
+                break;
+            }
+        }
+        assert flag1 : "[" + adaptiveConfStr + "=true] is invalid";
+        assert flag2 : "[" + adaptiveConfStr + "=false] is invalid";
+
+        // check result
+        Assert.assertEquals(rsTrue.size(), rsFalse.size());
+        for (int i = 0; i < rsTrue.size(); i++) {
+            Assert.assertEquals(rsTrue.get(i), rsFalse.get(i));
+        }
+    }
+
 }
