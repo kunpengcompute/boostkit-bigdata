@@ -246,6 +246,8 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
   val dedupLeftSemiJoinThreshold: Int =
     conf.getConfString("spark.omni.sql.columnar.dedupLeftSemiJoinThreshold", "3").toInt
 
+  val combineJoinedAggregatesEnabled: Boolean = conf.getConfString("spark.sql.execution.combineJoinedAggregates.enabled", "false").toBoolean
+
   val filterMergeEnable: Boolean = conf.getConfString("spark.sql.execution.filterMerge.enabled", "false").toBoolean
 
   val filterMergeThreshold: Double = conf.getConfString("spark.sql.execution.filterMerge.maxCost", "100.0").toDouble
