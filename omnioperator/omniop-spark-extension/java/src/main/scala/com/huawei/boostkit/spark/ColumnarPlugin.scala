@@ -815,6 +815,7 @@ class ColumnarPlugin extends (SparkSessionExtensions => Unit) with Logging {
     extensions.injectOptimizerRule(_ => MergeSubqueryFilters)
     extensions.injectQueryStagePrepRule(session => DedupLeftSemiJoinAQE(session))
     extensions.injectQueryStagePrepRule(_ => TopNPushDownForWindow)
+    extensions.injectQueryStagePrepRule(session => FallbackBroadcastExchange(session))
   }
 }
 
