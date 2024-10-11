@@ -30,7 +30,7 @@ namespace orc {
     class HdfsFileInputStreamOverride : public InputStream {
     private:
         std::string filename_;
-        std::unique_ptr <fs::ReadableFile> hdfs_file_;
+        std::unique_ptr<fs::ReadableFile> hdfs_file_;
         uint64_t total_length_;
         const uint64_t READ_SIZE_ = 1024 * 1024; //1 MB
 
@@ -82,7 +82,7 @@ namespace orc {
 
             char *buf_ptr = reinterpret_cast<char *>(buf);
             uint64_t total_bytes_read = 0;
-            uint64_t last_bytes_read = 0;
+            int64_t last_bytes_read = 0;
 
             do {
                 last_bytes_read = hdfs_file_->ReadAt(buf_ptr, length - total_bytes_read, offset + total_bytes_read);

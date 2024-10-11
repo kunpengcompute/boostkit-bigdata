@@ -18,11 +18,11 @@
  */
 
 #include "gtest/gtest.h"
-#include "orcfile/OmniOrcFile.hh"
+#include "orcfile/OrcFileOverride.hh"
 #include "orcfile_test.h"
 
 TEST(OrcReader, createLocalFileReader) {
-    std::string filename = "/resources/orc_data_all_type";
+    std::string filename = "/../../resources/orc_data_all_type";
     filename =  PROJECT_PATH + filename;
 
     std::unique_ptr<orc::Reader> reader;
@@ -35,6 +35,6 @@ TEST(OrcReader, createLocalFileReader) {
     cols.push_back(1);
     rowReaderOpts.include(cols);
     UriInfo uriInfo("file", filename, "", "");
-    reader = orc::createReader(orc::readOmniFile(uriInfo), readerOpts);
+    reader = orc::createReader(orc::readFileOverride(uriInfo, false), readerOpts);
     EXPECT_NE(nullptr, reader);
 }

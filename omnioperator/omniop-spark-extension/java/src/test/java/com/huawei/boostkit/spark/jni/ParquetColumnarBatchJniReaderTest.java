@@ -56,7 +56,7 @@ public class ParquetColumnarBatchJniReaderTest extends TestCase {
                 LegacyBehaviorPolicy.CORRECTED, Arrays.stream(schema.fields()).map(field -> (Type) null)
                 .collect(Collectors.toList()));
 
-        File file = new File("../../omniop-native-reader/cpp/test/tablescan/resources/parquet_data_all_type");
+        File file = new File("src/test/java/com/huawei/boostkit/spark/jni/parquetsrc/parquet_data_all_type");
         String path = file.getAbsolutePath();
         parquetColumnarBatchScanReader.initializeReaderJava(new Path(path), 0, 100000,
                 4096, null);

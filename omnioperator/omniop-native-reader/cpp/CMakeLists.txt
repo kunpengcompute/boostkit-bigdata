@@ -1,8 +1,8 @@
-# project name
-project(native_reader)
-
 # required cmake version
 cmake_minimum_required(VERSION 3.10)
+
+# project name
+project(native_reader)
 
 # configure cmake
 set(CMAKE_CXX_STANDARD 17)
@@ -11,7 +11,7 @@ set(CMAKE_CXX_COMPILER "g++")
 set(root_directory ${PROJECT_BINARY_DIR})
 
 set(CMAKE_CXX_FLAGS_DEBUG "-pipe -g -Wall -fPIC -fno-common -fno-stack-protector")
-set(CMAKE_CXX_FLAGS_RELEASE "-O2 -pipe -Wall -Wtrampolines -D_FORTIFY_SOURCE=2 -O2 -fPIC -finline-functions -fstack-protector-strong -s -Wl,-z,noexecstack -Wl,-z,relro,-z,now")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -pipe -Wall -Wtrampolines -D_FORTIFY_SOURCE=2 -fPIC -finline-functions -fstack-protector-strong -s -Wl,-z,noexecstack -Wl,-z,relro,-z,now")
 
 if (DEFINED COVERAGE)
     if(${COVERAGE} STREQUAL "ON")
@@ -33,7 +33,7 @@ add_subdirectory(src)
 
 message(STATUS "Build by ${CMAKE_BUILD_TYPE}")
 
-option(BUILD_CPP_TESTS "test" OFF)
+option(BUILD_CPP_TESTS "test" ON)
 message(STATUS "Option BUILD_CPP_TESTS: ${BUILD_CPP_TESTS}")
 if(${BUILD_CPP_TESTS})
     enable_testing()
