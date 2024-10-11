@@ -342,8 +342,7 @@ public class ParquetColumnarBatchScanReader {
         }
         Type parquetType = parquetTypes.get(index);
         if (parquetType == null) {
-            LOGGER.error("parquetType is null. index: {}", index);
-            return;
+            throw new RuntimeException("parquetType is null. index: " + index);
         }
         if (parquetType.getLogicalTypeAnnotation() instanceof LogicalTypeAnnotation.TimestampLogicalTypeAnnotation
                 && !nativeSupportTimestampRebase) {

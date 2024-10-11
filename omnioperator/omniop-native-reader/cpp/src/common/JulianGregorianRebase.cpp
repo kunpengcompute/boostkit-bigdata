@@ -1,4 +1,5 @@
 /**
+ * Copyright (C) 2024-2025. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -38,10 +39,10 @@ namespace common {
         if (micros < switches[0]) {
             return micros + (ONE_DAY_MICROS * CalculateJulianDayOffset(micros)) + offset;
         }
-        uint64_t i = switches.size();
-        do {
+        uint64_t i = switches.size() - 1;
+        while (i > 0 && micros < switches[i]) {
             i -= 1;
-        } while (i > 0 && micros < switches[i]);
+        }
         return micros + diffs[i];
     }
 
@@ -56,6 +57,11 @@ namespace common {
         int64_t step = microsOffset / JULIAN_100YEAR_MICROS - (microsOffset % JULIAN_100YEAR_MICROS == 0 ? 1 : 0);
         dayOffset += step - (step / 4);
         return dayOffset;
+    }
+
+    std::string JulianGregorianRebase::GetTz()
+    {
+        return tz;
     }
 
     std::unique_ptr<JulianGregorianRebase> BuildJulianGregorianRebase(JNIEnv *env, jobject jsonObj)

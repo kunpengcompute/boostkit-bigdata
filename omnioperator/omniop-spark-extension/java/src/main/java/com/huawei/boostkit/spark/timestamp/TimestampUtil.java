@@ -30,23 +30,24 @@ import java.util.Map;
 
 public class TimestampUtil {
 
+    private static final long MICROS_PER_SECOND = 1000_000L;
+
     private static final String JULIAN_GREGORIAN_FILE = "julian-gregorian-rebase-micros.json";
 
-    private static TimestampUtil instance;
+    private volatile static TimestampUtil instance;
 
     private final Map<String, JulianGregorianRebase> julianMap = new HashMap<>();
 
     private TimestampUtil() {
         ObjectMapper objectMapper = new ObjectMapper();
         try {
-            new org.codehaus.jackson.map.ObjectMapper();
             URL file = Utils.getSparkClassLoader().getResource(JULIAN_GREGORIAN_FILE);
             List<JulianGregorianRebase> julianObjects = objectMapper.readValue(file,
                     new TypeReference<List<JulianGregorianRebase>>() {});
             julianObjects.forEach(julianObject -> {
                 for (int i = 0; i < julianObject.getSwitches().length; i++) {
-                    julianObject.getSwitches()[i] = julianObject.getSwitches()[i] * 1000_000L;
-                    julianObject.getDiffs()[i] = julianObject.getDiffs()[i] * 1000_000L;
+                    julianObject.getSwitches()[i] = julianObject.getSwitches()[i] * MICROS_PER_SECOND;
+                    julianObject.getDiffs()[i] = julianObject.getDiffs()[i] * MICROS_PER_SECOND;
                 }
                 julianMap.put(julianObject.getTz(), julianObject);
             });
