@@ -138,7 +138,7 @@ public class OrcColumnarBatchScanReader {
                     }
                 } else if (pl.getType() == PredicateLeaf.Type.TIMESTAMP) {
                     Timestamp t = (Timestamp)pl.getLiteral();
-                    jsonObject.put("literal",  formatSecs(t.getTime() / 1000L) + " " + formatNanos(t.getNanos()));
+                    jsonObject.put("literal",  formatSecs(t.getTime() / TimestampTreeWriter.MILLIS_PER_SECOND) + " " + formatNanos(t.getNanos()));
                 } else {
                     jsonObject.put("literal", pl.getLiteral().toString());
                 }
@@ -166,7 +166,7 @@ public class OrcColumnarBatchScanReader {
                         lst.add(((int)Math.ceil(((Date)ob).getTime()* 1.0/3600/24/1000)) + "");
                     } else if (pl.getType() == PredicateLeaf.Type.TIMESTAMP) {
                         Timestamp t = (Timestamp)pl.getLiteral();
-                        lst.add(formatSecs(t.getTime() / 1000L) + " " + formatNanos(t.getNanos()));
+                        lst.add(formatSecs(t.getTime() / TimestampTreeWriter.MILLIS_PER_SECOND) + " " + formatNanos(t.getNanos()));
                     } else {
                         lst.add(ob.toString());
                     }
@@ -184,7 +184,8 @@ public class OrcColumnarBatchScanReader {
         DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
         long epoch;
         try {
-            epoch = dateFormat.parse(TimestampTreeWriter.BASE_TIMESTAMP_STRING).getTime() / 1000L;
+            epoch = dateFormat.parse(TimestampTreeWriter.BASE_TIMESTAMP_STRING).getTime() /
+                    TimestampTreeWriter.MILLIS_PER_SECOND;
         } catch (ParseException e) {
             throw new RuntimeException(e);
         }

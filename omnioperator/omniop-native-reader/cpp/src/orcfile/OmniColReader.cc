@@ -1004,7 +1004,7 @@ namespace omniruntime::reader {
                        stripe.getWriterTimezone()),
         readerTimezone(isInstantType ?
                        orc::getTimezoneByName("GMT") :
-                       orc::getLocalTimezone()),
+                       (julianPtr == nullptr ? orc::getLocalTimezone() : orc::getTimezoneByName(julianPtr->GetTz()))),
         epochOffset(writerTimezone.getEpoch()),
         sameTimezone(writerTimezone.getEpoch() == readerTimezone.getEpoch()),
         julianPtr(julianPtr) {

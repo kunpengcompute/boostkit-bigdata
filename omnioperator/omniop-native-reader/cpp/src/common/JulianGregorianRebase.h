@@ -1,4 +1,5 @@
 /**
+ * Copyright (C) 2024-2025. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -31,6 +32,8 @@ namespace common {
         JulianGregorianRebase(std::string tz, const std::vector<int64_t> &switches, const std::vector<int64_t> &diffs);
 
         int64_t RebaseJulianToGregorianMicros(int64_t micros);
+
+        std::string GetTz();
 
     private:
         int64_t CalculateJulianDayOffset(int64_t micros);
