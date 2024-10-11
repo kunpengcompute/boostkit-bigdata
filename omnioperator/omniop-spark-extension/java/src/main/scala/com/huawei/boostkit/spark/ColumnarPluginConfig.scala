@@ -18,6 +18,7 @@
 
 package com.huawei.boostkit.spark
 
+import com.huawei.boostkit.spark.ColumnarPluginConfig.{OMNI_BROADCAST_EXCHANGE_ENABLE_KEY}
 import org.apache.spark.SparkEnv
 import org.apache.spark.internal.Logging
 import org.apache.spark.shuffle.sort.ColumnarShuffleManager
@@ -68,7 +69,7 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
 
   // enable or disable columnar broadcastexchange
   val enableColumnarBroadcastExchange: Boolean =
-    conf.getConfString("spark.omni.sql.columnar.broadcastexchange", "true").toBoolean
+    conf.getConfString(OMNI_BROADCAST_EXCHANGE_ENABLE_KEY, "true").toBoolean
 
   // enable or disable columnar wholestagecodegen
   val enableColumnarWholeStageCodegen: Boolean =
@@ -292,6 +293,8 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
 object ColumnarPluginConfig {
 
   val OMNI_ENABLE_KEY: String = "spark.omni.enabled"
+
+  val OMNI_BROADCAST_EXCHANGE_ENABLE_KEY = "spark.omni.sql.columnar.broadcastexchange"
 
   var ins: ColumnarPluginConfig = null
 
