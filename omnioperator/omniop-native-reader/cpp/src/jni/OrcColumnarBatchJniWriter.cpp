@@ -209,7 +209,7 @@ void WriteDecimal128VectorBatch(BaseVector *vec, ColumnVectorBatch *fieldBatch, 
     }
     index = 0;
     for (long j = startPos; j < endPos; j++) {
-        values[index] = vector->GetValue(j).ToInt128();
+        values[index] = orc::Int128(vector->GetValue(j).HighBits(), vector->GetValue(j).LowBits());
         index++;
     }
 }

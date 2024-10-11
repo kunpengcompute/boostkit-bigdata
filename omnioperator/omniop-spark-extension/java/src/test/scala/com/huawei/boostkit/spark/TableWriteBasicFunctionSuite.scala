@@ -28,7 +28,7 @@ import org.apache.spark.sql.execution.adaptive.{AdaptiveSparkPlanExec, Broadcast
 import org.apache.spark.sql.execution.command.DataWritingCommandExec
 import org.apache.spark.sql.execution.exchange.{BroadcastExchangeExec, Exchange}
 import org.apache.spark.sql.execution.joins.{BroadcastHashJoinExec, ColumnarBroadcastHashJoinExec}
-import org.apache.spark.sql.execution.{ColumnarBroadcastExchangeExec, ColumnarProjectExec, ColumnarTakeOrderedAndProjectExec, CommandResultExec, LeafExecNode, OmniColumnarToRowExec, ProjectExec, RowToOmniColumnarExec, SparkPlan, TakeOrderedAndProjectExec, UnaryExecNode}
+import org.apache.spark.sql.execution.{ColumnarBroadcastExchangeExec, ColumnarFilterExec, ColumnarProjectExec, ColumnarTakeOrderedAndProjectExec, CommandResultExec, LeafExecNode, OmniColumnarToRowExec, ProjectExec, RowToOmniColumnarExec, SparkPlan, TakeOrderedAndProjectExec, UnaryExecNode}
 import org.apache.spark.sql.internal.{SQLConf, StaticSQLConf}
 import org.apache.spark.sql.test.SharedSparkSession
 
@@ -109,5 +109,49 @@ class TableWriteBasicFunctionSuite extends QueryTest with SharedSparkSession {
         case _ => false
       }
       )
+    assert(columnarDataWrite.isDefined, "use columnar data writing command")
+  }
+
+  test("Insert of decimal 128") {
+    val drop = spark.sql("drop table if exists table_for_decimal_128")
+    drop.collect()
+    val createTable = spark.sql("create table table_for_decimal_128 " +
+      "(amount DECIMAL(38,18)) using orc")
+    createTable.collect()
+
+    val insert = spark.sql("insert into table_for_decimal_128 " +
+      "values(529314109398732268.884038357697864858)")
+    insert.collect()
+    val select = spark.sql("select * from table_for_decimal_128")
+    val runRows = select.collect()
+    assert(runRows(0).getDecimal(0).toString ==
+      "529314109398732268.884038357697864858", "the run value is error")
+  }
+
+  test("replace child plan to columnar") {
+    val drop = spark.sql("drop table if exists test_parquet_int")
+    drop.collect()
+    val createTable = spark.sql("create table test_parquet_int(id int, age int) using parquet")
+    createTable.collect()
+    val insert = spark.sql("insert into table test_parquet_int " +
+      "values(1,28),(2,29),(3,27),(4,26),(5,28),(6,31)")
+    insert.collect()
+
+    val dropNew = spark.sql("drop table if exists test_parquet_int_new")
+    dropNew.collect()
+    val createTableNew = spark.sql("create table test_parquet_int_new(id int, age int) " +
+      "using parquet")
+    createTableNew.collect()
+
+    val insertNew = spark.sql("insert into table  test_parquet_int_new select " +
+      "* from test_parquet_int where id > 0")
+
+    val columnarFilter = insertNew.queryExecution.executedPlan.asInstanceOf[CommandResultExec]
+      .commandPhysicalPlan.find({
+        case _: ColumnarFilterExec => true
+        case _ => false
+      }
+      )
+    assert(columnarFilter.isDefined, "use columnar data writing command")
   }
 }

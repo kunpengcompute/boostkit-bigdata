@@ -588,7 +588,9 @@ case class ColumnarPreOverrides(isSupportAdaptive: Boolean = true)
         if (!unSupportedColumnarCommand && !unSupportedFileFormat) {
           ColumnarDataWritingCommandExec(omniCmd, child)
         } else {
-          plan
+          val children = plan.children.map(replaceWithColumnarPlan)
+          logInfo(s"Columnar Processing for ${plan.getClass} is currently not supported.")
+          plan.withNewChildren(children)
         }
       case p =>
         val children = plan.children.map(replaceWithColumnarPlan)
