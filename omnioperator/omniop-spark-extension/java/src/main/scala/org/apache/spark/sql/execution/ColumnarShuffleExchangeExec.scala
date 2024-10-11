@@ -348,6 +348,9 @@ object ColumnarShuffleExchangeExec extends Logging {
           newIter
         }, isOrderSensitive = isOrderSensitive)
       case h@HashPartitioning(expressions, numPartitions) =>
+        //containsRollUp(expressions): Avoid data skew caused by rollup expressions.
+        //expressions.length > 6: Avoid q11 data skew
+        //expressions.length == 3: Avoid q28 data skew when the resin rule is enabled.
         if (containsRollUp(expressions) || expressions.length > 6 || expressions.length == 3) {
           rdd.mapPartitionsWithIndexInternal((_, cbIter) => {
             val partitionKeyExtractor: InternalRow => Any = {
