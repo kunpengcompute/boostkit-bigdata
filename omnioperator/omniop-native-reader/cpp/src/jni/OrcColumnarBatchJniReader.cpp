@@ -355,7 +355,7 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniRea
     if (rowReaderPtr->next(omniVecBatch, ptr)) {
         batchRowSize = omniVecBatch->GetRowCount();
         int32_t vecCnt = omniVecBatch->GetVectorCount();
-        if (vecCnt != arrLen) {
+        if (vecCnt > arrLen) {
             throw std::runtime_error("Types should align to root fields");
         }
 
