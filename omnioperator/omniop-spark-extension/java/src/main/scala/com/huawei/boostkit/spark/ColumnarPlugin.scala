@@ -555,7 +555,7 @@ case class ColumnarPreOverrides(isSupportAdaptive: Boolean = true)
         val child = replaceWithColumnarPlan(plan.child)
         logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
         ColumnarCoalesceExec(plan.numPartitions, child)
-      case plan: DataWritingCommandExec if enableColumnarDataWritingCommand =>
+      case plan: DataWritingCommandExec =>
         val child = replaceWithColumnarPlan(plan.child)
         logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
         var unSupportedColumnarCommand = false
