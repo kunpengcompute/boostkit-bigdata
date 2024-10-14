@@ -27,7 +27,7 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{SparkSession, SparkSessionExtensions}
 import org.apache.spark.sql.catalyst.expressions.{Ascending, Expression, Literal, SortOrder}
 import org.apache.spark.sql.catalyst.expressions.aggregate.{AggregateExpression, Partial, PartialMerge}
-import org.apache.spark.sql.catalyst.optimizer.{DelayCartesianProduct, HeuristicJoinReorder, MergeSubqueryFilters, RewriteSelfJoinInInPredicate}
+import org.apache.spark.sql.catalyst.optimizer.{DelayCartesianProduct, HeuristicJoinReorder, MergeSubqueryFilters, RewriteSelfJoinInInPredicate, CombineJoinedAggregates}
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.{BroadcastExchangeExecProxy, RowToOmniColumnarExec, _}
 import org.apache.spark.sql.execution.adaptive.{AQEShuffleReadExec, AdaptiveSparkPlanExec, BroadcastQueryStageExec, OmniAQEShuffleReadExec, QueryStageExec, ShuffleQueryStageExec}
@@ -817,6 +817,7 @@ class ColumnarPlugin extends (SparkSessionExtensions => Unit) with Logging {
     extensions.injectOptimizerRule(_ => HeuristicJoinReorder)
     extensions.injectOptimizerRule(_ => MergeSubqueryFilters)
     extensions.injectQueryStagePrepRule(session => DedupLeftSemiJoinAQE(session))
+    extensions.injectOptimizerRule(_ => CombineJoinedAggregates)
     extensions.injectQueryStagePrepRule(_ => TopNPushDownForWindow)
     extensions.injectQueryStagePrepRule(session => FallbackBroadcastExchange(session))
     extensions.injectQueryStagePrepRule(_ => PushOrderedLimitThroughAgg)
