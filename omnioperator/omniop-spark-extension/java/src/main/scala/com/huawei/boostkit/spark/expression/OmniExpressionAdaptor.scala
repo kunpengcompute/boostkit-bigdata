@@ -19,8 +19,8 @@
 package com.huawei.boostkit.spark.expression
 
 import scala.collection.mutable.ArrayBuffer
-import com.huawei.boostkit.spark.Constant.{DEFAULT_STRING_TYPE_LENGTH, IS_CHECK_OMNI_EXP, OMNI_BOOLEAN_TYPE, OMNI_DATE_TYPE, OMNI_DECIMAL128_TYPE, OMNI_DECIMAL64_TYPE, OMNI_DOUBLE_TYPE, OMNI_INTEGER_TYPE, OMNI_LONG_TYPE, OMNI_SHOR_TYPE, OMNI_VARCHAR_TYPE}
-import nova.hetu.omniruntime.`type`.{BooleanDataType, DataTypeSerializer, Date32DataType, Decimal128DataType, Decimal64DataType, DoubleDataType, IntDataType, LongDataType, ShortDataType, VarcharDataType}
+import com.huawei.boostkit.spark.Constant.{DEFAULT_STRING_TYPE_LENGTH, IS_CHECK_OMNI_EXP, OMNI_BOOLEAN_TYPE, OMNI_DATE_TYPE, OMNI_DECIMAL128_TYPE, OMNI_DECIMAL64_TYPE, OMNI_DOUBLE_TYPE, OMNI_INTEGER_TYPE, OMNI_LONG_TYPE, OMNI_SHOR_TYPE, OMNI_TIMESTAMP_TYPE, OMNI_VARCHAR_TYPE}
+import nova.hetu.omniruntime.`type`.{BooleanDataType, DataTypeSerializer, Date32DataType, Decimal128DataType, Decimal64DataType, DoubleDataType, IntDataType, LongDataType, ShortDataType, VarcharDataType, TimestampDataType}
 import nova.hetu.omniruntime.constants.FunctionType
 import nova.hetu.omniruntime.constants.FunctionType.{OMNI_AGGREGATION_TYPE_AVG, OMNI_AGGREGATION_TYPE_COUNT_ALL, OMNI_AGGREGATION_TYPE_COUNT_COLUMN, OMNI_AGGREGATION_TYPE_FIRST_IGNORENULL, OMNI_AGGREGATION_TYPE_FIRST_INCLUDENULL, OMNI_AGGREGATION_TYPE_MAX, OMNI_AGGREGATION_TYPE_MIN, OMNI_AGGREGATION_TYPE_SUM, OMNI_WINDOW_TYPE_RANK, OMNI_WINDOW_TYPE_ROW_NUMBER}
 import nova.hetu.omniruntime.constants.JoinType._
@@ -730,6 +730,7 @@ object OmniExpressionAdaptor extends Logging {
           case ShortType =>
           case IntegerType =>
           case LongType =>
+          case TimestampType =>
           case DoubleType =>
           case BooleanType =>
           case DateType =>
@@ -798,6 +799,7 @@ object OmniExpressionAdaptor extends Logging {
       case BooleanType => OMNI_BOOLEAN_TYPE
       case StringType => OMNI_VARCHAR_TYPE
       case DateType => OMNI_DATE_TYPE
+      case TimestampType => OMNI_TIMESTAMP_TYPE
       case dt: DecimalType =>
         if (DecimalType.is64BitDecimalType(dt)) {
           OMNI_DECIMAL64_TYPE
@@ -840,6 +842,8 @@ object OmniExpressionAdaptor extends Logging {
         IntDataType.INTEGER
       case LongType =>
         LongDataType.LONG
+      case TimestampType =>
+        TimestampDataType.TIMESTAMP
       case DoubleType =>
         DoubleDataType.DOUBLE
       case BooleanType =>
@@ -864,7 +868,7 @@ object OmniExpressionAdaptor extends Logging {
     val metadata = attr.metadata
     val omniDataType: String = sparkTypeToOmniExpType(dataType)
     dataType match {
-      case ShortType | IntegerType | LongType | DoubleType | BooleanType | DateType =>
+      case ShortType | IntegerType | LongType | DoubleType | BooleanType | DateType | TimestampType =>
         new JSONObject().put("exprType", "FIELD_REFERENCE")
           .put("dataType", omniDataType.toInt)
           .put("colVal", colVal).toString

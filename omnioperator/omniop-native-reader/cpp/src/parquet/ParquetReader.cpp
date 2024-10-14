@@ -281,7 +281,8 @@ Status ParquetReader::GetReader(const SchemaField &field, const std::shared_ptr<
             return Status::OK();
         }
         std::unique_ptr<FileColumnIterator> input(ctx->iterator_factory(field.column_index, ctx->reader));
-        *out = std::make_unique<ParquetColumnReader>(ctx, arrow_field, std::move(input), field.level_info);
+        *out = std::make_unique<ParquetColumnReader>(ctx, arrow_field, std::move(input), field.level_info,
+            rebaseInfoPtr.get());
     } else {
         return Status::Invalid("Unsupported type: ", arrow_field->ToString());
     }

@@ -24,7 +24,9 @@ import org.apache.hadoop.mapreduce.InputSplit;
 import org.apache.hadoop.mapreduce.RecordReader;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.parquet.hadoop.ParquetInputSplit;
+import org.apache.parquet.schema.Type;
 import org.apache.spark.sql.catalyst.InternalRow;
+import org.apache.spark.sql.catalyst.util.RebaseDateTime.RebaseSpec;
 import org.apache.spark.sql.execution.vectorized.OmniColumnVectorUtils;
 import org.apache.spark.sql.execution.vectorized.OmniColumnVector;
 import org.apache.spark.sql.sources.Filter;
@@ -58,10 +60,20 @@ public class OmniParquetColumnarBatchReader extends RecordReader<Void, ColumnarB
   private StructType requiredSchema;
   private Filter pushedFilter;
 
-  public OmniParquetColumnarBatchReader(int capacity, StructType requiredSchema, Filter pushedFilter) {
+  private final RebaseSpec datetimeRebaseSpec;
+
+  private final RebaseSpec int96RebaseSpec;
+
+  private final List<Type> parquetTypes;
+
+  public OmniParquetColumnarBatchReader(int capacity, StructType requiredSchema, Filter pushedFilter,
+                                        RebaseSpec datetimeRebaseSpec, RebaseSpec int96RebaseSpec, List<Type> parquetTypes) {
     this.capacity = capacity;
     this.requiredSchema = requiredSchema;
     this.pushedFilter = pushedFilter;
+    this.datetimeRebaseSpec = datetimeRebaseSpec;
+    this.int96RebaseSpec = int96RebaseSpec;
+    this.parquetTypes = parquetTypes;
   }
 
   public ParquetColumnarBatchScanReader getReader() {
@@ -110,7 +122,7 @@ public class OmniParquetColumnarBatchReader extends RecordReader<Void, ColumnarB
   public void initialize(InputSplit inputSplit, TaskAttemptContext taskAttemptContext)
       throws IOException, InterruptedException, UnsupportedOperationException {
     ParquetInputSplit split = (ParquetInputSplit)inputSplit;
-    this.reader = new ParquetColumnarBatchScanReader(requiredSchema);
+    this.reader = new ParquetColumnarBatchScanReader(requiredSchema, datetimeRebaseSpec, int96RebaseSpec, parquetTypes);
     reader.initializeReaderJava(split.getPath(), split.getStart(), split.getEnd(),
             capacity, pushedFilter);
   }

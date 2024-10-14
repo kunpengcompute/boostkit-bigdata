@@ -120,6 +120,10 @@ public class ShuffleDataSerializer {
                 type = DataTypes.LongType;
                 vec = new LongVec(vecSize);
                 break;
+            case VEC_TYPE_TIMESTAMP:
+                type = DataTypes.TimestampType;
+                vec = new LongVec(vecSize);
+                break;
             case VEC_TYPE_DATE64:
                 type = DataTypes.DateType;
                 vec = new LongVec(vecSize);
@@ -187,6 +191,11 @@ public class ShuffleDataSerializer {
                 case VEC_TYPE_LONG:
                     sparkType = DataTypes.LongType;
                     omniTypes[i] = LongDataType.LONG.getId().toValue();
+                    omniVec = new LongVec(rowCount);
+                    break;
+                case VEC_TYPE_TIMESTAMP:
+                    sparkType = DataTypes.TimestampType;
+                    omniTypes[i] = TimestampDataType.TIMESTAMP.getId().toValue();
                     omniVec = new LongVec(rowCount);
                     break;
                 case VEC_TYPE_DATE64:

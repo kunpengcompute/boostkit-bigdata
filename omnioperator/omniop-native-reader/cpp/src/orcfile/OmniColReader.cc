@@ -82,7 +82,7 @@ namespace omniruntime::reader {
     * Create a reader for the given stripe.
     */
     std::unique_ptr<ColumnReader> omniBuildReader(const Type& type,
-                                                StripeStreams& stripe) {
+                                                 StripeStreams& stripe, common::JulianGregorianRebase *julianPtr) {
         switch (static_cast<int64_t>(type.getKind())) {
             case orc::DATE:
             case orc::INT:
@@ -116,15 +116,15 @@ namespace omniruntime::reader {
 
             case orc::STRUCT:
                 return std::unique_ptr<ColumnReader>(
-                        new OmniStructColumnReader(type, stripe));
+                        new OmniStructColumnReader(type, stripe, julianPtr));
 
             case orc::TIMESTAMP:
                 return std::unique_ptr<ColumnReader>
-                        (new OmniTimestampColumnReader(type, stripe, false));
+                        (new OmniTimestampColumnReader(type, stripe, false, julianPtr));
 
             case orc::TIMESTAMP_INSTANT:
                 return std::unique_ptr<ColumnReader>
-                        (new OmniTimestampColumnReader(type, stripe, true));
+                        (new OmniTimestampColumnReader(type, stripe, true, julianPtr));
 
             case orc::DECIMAL:
                     // Is this a Hive 0.11 or 0.12 file?
@@ -232,8 +232,8 @@ namespace omniruntime::reader {
     /**
     * OmniStructColumnReader funcs
     */
-    OmniStructColumnReader::OmniStructColumnReader(const Type& type, StripeStreams& stripe)
-                                                    : ColumnReader(type, stripe) {
+    OmniStructColumnReader::OmniStructColumnReader(const Type& type, StripeStreams& stripe,
+                                                   common::JulianGregorianRebase *julianPtr): ColumnReader(type, stripe) {
         // count the number of selected sub-columns
         const std::vector<bool> selectedColumns = stripe.getSelectedColumns();
         switch (static_cast<int64_t>(stripe.getEncoding(columnId).kind())) {
@@ -241,7 +241,7 @@ namespace omniruntime::reader {
                 for(unsigned int i=0; i < type.getSubtypeCount(); ++i) {
                     const Type& child = *type.getSubtype(i);
                     if (selectedColumns[static_cast<uint64_t>(child.getColumnId())]) {
-                        children.push_back(omniBuildReader(child, stripe));
+                        children.push_back(omniBuildReader(child, stripe, julianPtr));
                     }
                 }
                 break;
@@ -321,6 +321,9 @@ namespace omniruntime::reader {
                 return omniruntime::type::OMNI_INT;
             case orc::TypeKind::LONG:
                 return omniruntime::type::OMNI_LONG;
+            case orc::TypeKind::TIMESTAMP:
+            case orc::TypeKind::TIMESTAMP_INSTANT:
+                return omniruntime::type::OMNI_TIMESTAMP;
             case orc::TypeKind::DOUBLE:
                 return omniruntime::type::OMNI_DOUBLE;
             case orc::TypeKind::CHAR:
@@ -380,6 +383,8 @@ namespace omniruntime::reader {
                 return nextByType<omniruntime::type::OMNI_DATE32>(omnivec, numValues, notNull, baseTp, omniTypeId);
             case omniruntime::type::OMNI_DATE64:
                 return nextByType<omniruntime::type::OMNI_DATE64>(omnivec, numValues, notNull, baseTp, omniTypeId);
+            case omniruntime::type::OMNI_TIMESTAMP:
+                return nextByType<omniruntime::type::OMNI_TIMESTAMP>(omnivec, numValues, notNull, baseTp, omniTypeId);
             default:
                 throw omniruntime::exception::OmniException("EXPRESSION_NOT_SUPPORT",
                                                             "OmniTimestampColumnReader type not support!!!");
@@ -430,7 +435,13 @@ namespace omniruntime::reader {
                 if (secsBuffer[i] < 0 && nanoBuffer[i] > 999999) {
                     secsBuffer[i] -= 1;
                 }
-                vec->SetValue(static_cast<int>(i), static_cast<T>(secsBuffer[i]));
+
+                if (julianPtr != nullptr) {
+                    vec->SetValue(static_cast<int>(i), static_cast<T>(
+                            julianPtr->RebaseJulianToGregorianMicros(secsBuffer[i] * 1000000L + nanoBuffer[i] / 1000L)));
+                } else {
+                    vec->SetValue(static_cast<int>(i), static_cast<T>(secsBuffer[i] * 1000000L + nanoBuffer[i] / 1000L));
+                }
             } else {
                 vec->SetNull(static_cast<int>(i));
             }
@@ -459,6 +470,10 @@ namespace omniruntime::reader {
                 break;
             case omniruntime::type::OMNI_LONG:
                 nextByType<omniruntime::type::OMNI_LONG>
+                        (pushOmniVec, numValues, notNull, baseTp);
+                break;
+            case omniruntime::type::OMNI_TIMESTAMP:
+                nextByType<omniruntime::type::OMNI_TIMESTAMP>
                         (pushOmniVec, numValues, notNull, baseTp);
                 break;
             case omniruntime::type::OMNI_DATE32:
@@ -981,16 +996,18 @@ namespace omniruntime::reader {
 
     OmniTimestampColumnReader::OmniTimestampColumnReader(const Type& type,
                                                          StripeStreams& stripe,
-                                                         bool isInstantType
+                                                         bool isInstantType,
+                                                         common::JulianGregorianRebase *julianPtr
     ): ColumnReader(type, stripe),
         writerTimezone(isInstantType ?
                        orc::getTimezoneByName("GMT") :
                        stripe.getWriterTimezone()),
         readerTimezone(isInstantType ?
                        orc::getTimezoneByName("GMT") :
-                       stripe.getReaderTimezone()),
+                       (julianPtr == nullptr ? orc::getLocalTimezone() : orc::getTimezoneByName(julianPtr->GetTz()))),
         epochOffset(writerTimezone.getEpoch()),
-        sameTimezone(&writerTimezone == &readerTimezone){
+        sameTimezone(writerTimezone.getEpoch() == readerTimezone.getEpoch()),
+        julianPtr(julianPtr) {
         RleVersion vers = omniConvertRleVersion(stripe.getEncoding(columnId).kind());
         std::unique_ptr<SeekableInputStream> stream =
                 stripe.getStream(columnId, orc::proto::Stream_Kind_DATA, true);

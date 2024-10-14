@@ -24,6 +24,7 @@ import org.apache.spark.sql.catalyst.{CatalystTypeConverters, InternalRow}
 import org.apache.spark.sql.catalyst.expressions.Attribute
 import org.apache.spark.sql.execution.command.DataWritingCommand
 import org.apache.spark.sql.execution.metric.SQLMetric
+import org.apache.spark.sql.types.TimestampType
 import org.apache.spark.sql.vectorized.ColumnarBatch
 
 /**
@@ -71,7 +72,13 @@ case class ColumnarDataWritingCommandExec(@transient cmd: DataWritingCommand, ch
   override def supportsColumnar: Boolean = true
 
   def buildCheck(): Unit = {
-    child.output.foreach(exp => sparkTypeToOmniType(exp.dataType, exp.metadata))
+    child.output.foreach(exp =>
+      if (exp.dataType != TimestampType) {
+        sparkTypeToOmniType(exp.dataType, exp.metadata)
+      } else {
+        throw new UnsupportedOperationException("This operator doesn't support dataType TimestampType")
+      }
+    )
   }
 
   protected override def doExecute(): RDD[InternalRow] = {

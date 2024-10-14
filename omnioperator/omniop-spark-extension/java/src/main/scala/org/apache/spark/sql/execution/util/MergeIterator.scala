@@ -27,7 +27,7 @@ import nova.hetu.omniruntime.`type`.{DataType, VarcharDataType}
 import nova.hetu.omniruntime.vector.{BooleanVec, Decimal128Vec, DoubleVec, IntVec, LongVec, ShortVec, VarcharVec, Vec, VecBatch}
 import org.apache.spark.sql.execution.metric.SQLMetric
 import org.apache.spark.sql.execution.vectorized.OmniColumnVector
-import org.apache.spark.sql.types.{BooleanType, DateType, DecimalType, DoubleType, IntegerType, LongType, ShortType, StringType, StructType}
+import org.apache.spark.sql.types.{BooleanType, DateType, DecimalType, DoubleType, IntegerType, LongType, ShortType, StringType, StructType, TimestampType}
 import org.apache.spark.sql.vectorized.ColumnarBatch
 
 class MergeIterator(iter: Iterator[ColumnarBatch], localSchema: StructType,
@@ -47,7 +47,7 @@ class MergeIterator(iter: Iterator[ColumnarBatch], localSchema: StructType,
     try {
       schema.fields.zipWithIndex.foreach { case (field, index) =>
         field.dataType match {
-          case LongType =>
+          case LongType | TimestampType =>
             vecs(index) = new LongVec(columnSize)
           case DateType | IntegerType =>
             vecs(index) = new IntVec(columnSize)

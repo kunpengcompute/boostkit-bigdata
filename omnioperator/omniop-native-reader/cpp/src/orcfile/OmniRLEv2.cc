@@ -59,6 +59,8 @@ namespace omniruntime::reader {
             case orc::TypeKind::SHORT:
             case orc::TypeKind::DATE:
             case orc::TypeKind::INT:
+            case orc::TypeKind::TIMESTAMP:
+            case orc::TypeKind::TIMESTAMP_INSTANT:
             case orc::TypeKind::LONG:
                 return makeFixLenthVector(numValues, dataTypeId);
             case orc::TypeKind::DOUBLE:

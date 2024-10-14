@@ -28,6 +28,7 @@ import nova.hetu.omniruntime.type.Decimal64DataType;
 import nova.hetu.omniruntime.type.DoubleDataType;
 import nova.hetu.omniruntime.type.IntDataType;
 import nova.hetu.omniruntime.type.LongDataType;
+import nova.hetu.omniruntime.type.TimestampDataType;
 import nova.hetu.omniruntime.type.VarcharDataType;
 import nova.hetu.omniruntime.vector.Decimal128Vec;
 import nova.hetu.omniruntime.vector.DoubleVec;
@@ -54,6 +55,10 @@ abstract class ColumnShuffleTest {
                 }
                 case OMNI_LONG: {
                     types[i] = LongDataType.LONG;
+                    break;
+                }
+                case OMNI_TIMESTAMP: {
+                    types[i] = TimestampDataType.TIMESTAMP;
                     break;
                 }
                 case OMNI_DOUBLE: {
@@ -118,6 +123,7 @@ abstract class ColumnShuffleTest {
                     break;
                 }
                 case OMNI_LONG:
+                case OMNI_TIMESTAMP:
                 case OMNI_DECIMAL64:
                 case OMNI_DATE64: {
                     tmpVec = new LongVec(rowNum);

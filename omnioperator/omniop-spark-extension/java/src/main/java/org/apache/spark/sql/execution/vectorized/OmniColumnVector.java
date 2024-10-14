@@ -107,7 +107,7 @@ public class OmniColumnVector extends WritableColumnVector {
             return dictionaryData;
         }
 
-        if (type instanceof LongType) {
+        if (type instanceof LongType || type instanceof TimestampType) {
             return longDataVec;
         } else if (type instanceof BooleanType || type instanceof NullType) {
             return booleanDataVec;
@@ -142,7 +142,7 @@ public class OmniColumnVector extends WritableColumnVector {
     public void setVec(Vec vec) {
         if (vec instanceof DictionaryVec) {
             dictionaryData = (DictionaryVec) vec;
-        } else if (type instanceof LongType) {
+        } else if (type instanceof LongType || type instanceof TimestampType) {
             this.longDataVec = (LongVec) vec;
         } else if (type instanceof DecimalType) {
             if (DecimalType.is64BitDecimalType(type)) {
@@ -229,7 +229,7 @@ public class OmniColumnVector extends WritableColumnVector {
             } else {
                 return decimal128DataVec.hasNull();
             }
-        } else if (type instanceof LongType || DecimalType.is64BitDecimalType(type)) {
+        } else if (type instanceof LongType || DecimalType.is64BitDecimalType(type) || type instanceof TimestampType) {
             return longDataVec.hasNull();
         } else if (type instanceof FloatType) {
             return false;
@@ -271,7 +271,7 @@ public class OmniColumnVector extends WritableColumnVector {
             } else {
                 decimal128DataVec.setNull(rowId);
             }
-        } else if (type instanceof LongType || DecimalType.is64BitDecimalType(type)) {
+        } else if (type instanceof LongType || DecimalType.is64BitDecimalType(type) || type instanceof TimestampType) {
             longDataVec.setNull(rowId);
         } else if (type instanceof FloatType) {
             return;
@@ -306,7 +306,7 @@ public class OmniColumnVector extends WritableColumnVector {
             } else {
                 decimal128DataVec.setNulls(rowId, nullValue, 0, count);
             }
-        } else if (type instanceof LongType || DecimalType.is64BitDecimalType(type)) {
+        } else if (type instanceof LongType || DecimalType.is64BitDecimalType(type) || type instanceof TimestampType) {
             longDataVec.setNulls(rowId, nullValue, 0, count);
         } else if (type instanceof FloatType) {
             return;
@@ -341,7 +341,7 @@ public class OmniColumnVector extends WritableColumnVector {
             } else {
                 return decimal128DataVec.isNull(rowId);
             }
-        } else if (type instanceof LongType || DecimalType.is64BitDecimalType(type)) {
+        } else if (type instanceof LongType || DecimalType.is64BitDecimalType(type) || type instanceof TimestampType) {
             return longDataVec.isNull(rowId);
         } else if (type instanceof FloatType) {
             return false;
@@ -864,7 +864,7 @@ public class OmniColumnVector extends WritableColumnVector {
             } else {
                 decimal128DataVec = new Decimal128Vec(newCapacity);
             }
-        } else if (type instanceof LongType) {
+        } else if (type instanceof LongType || type instanceof TimestampType) {
             longDataVec = new LongVec(newCapacity);
         } else if (type instanceof FloatType) {
             throw new UnsupportedOperationException("reserveInternal is not supported for type:" + type);

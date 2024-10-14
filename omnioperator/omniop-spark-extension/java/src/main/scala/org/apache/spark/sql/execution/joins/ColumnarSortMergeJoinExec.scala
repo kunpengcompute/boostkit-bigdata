@@ -436,7 +436,7 @@ case class ColumnarSortMergeJoinExec(
             vecs(i) = types(i).getId match {
               case DataType.DataTypeId.OMNI_INT | DataType.DataTypeId.OMNI_DATE32 =>
                 new IntVec(0)
-              case DataType.DataTypeId.OMNI_LONG | DataType.DataTypeId.OMNI_DECIMAL64 =>
+              case DataType.DataTypeId.OMNI_LONG | DataType.DataTypeId.OMNI_DECIMAL64 | DataType.DataTypeId.OMNI_TIMESTAMP =>
                 new LongVec(0)
               case DataType.DataTypeId.OMNI_DOUBLE =>
                 new DoubleVec(0)

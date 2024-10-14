@@ -18,6 +18,7 @@
 
 package org.apache.spark.sql.execution.datasources.parquet
 
+import scala.collection.JavaConverters._
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, Path}
 import org.apache.hadoop.mapreduce._
@@ -31,6 +32,8 @@ import org.apache.spark.sql.execution.util.SparkMemoryUtils
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types._
 import org.apache.spark.util.SerializableConfiguration
+import org.apache.parquet.format.converter.ParquetMetadataConverter.SKIP_ROW_GROUPS
+import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
 
 import java.net.URI
 
@@ -77,6 +80,11 @@ class OmniParquetFileFormat extends FileFormat with DataSourceRegister with Logg
 
     val enableParquetFilterPushDown: Boolean = sqlConf.parquetFilterPushDown
 
+    val parquetOptions = new ParquetOptions(options, sparkSession.sessionState.conf)
+    val datetimeRebaseModeInRead = parquetOptions.datetimeRebaseModeInRead
+    val int96RebaseModeInRead = parquetOptions.int96RebaseModeInRead
+    val isCaseSensitive = sqlConf.caseSensitiveAnalysis
+
     (file: PartitionedFile) => {
       assert(file.partitionValues.numFields == partitionSchema.size)
 
@@ -90,6 +98,17 @@ class OmniParquetFileFormat extends FileFormat with DataSourceRegister with Logg
           Array.empty,
           null)
 
+      val sharedConf = broadcastedHadoopConf.value.value
+      lazy val footerFileMetaData =
+        ParquetFooterReader.readFooter(sharedConf, filePath, SKIP_ROW_GROUPS).getFileMetaData
+
+      val datetimeRebaseSpec = DataSourceUtils.datetimeRebaseSpec(
+        footerFileMetaData.getKeyValueMetaData.get,
+        datetimeRebaseModeInRead)
+
+      val int96RebaseSpec = DataSourceUtils.int96RebaseSpec(
+        footerFileMetaData.getKeyValueMetaData.get,
+        int96RebaseModeInRead)
 
       // Try to push down filters when filter push-down is enabled.
       val pushed = if (enableParquetFilterPushDown) {
@@ -102,7 +121,15 @@ class OmniParquetFileFormat extends FileFormat with DataSourceRegister with Logg
       val hadoopAttemptContext =
         new TaskAttemptContextImpl(broadcastedHadoopConf.value.value, attemptId)
 
-      val batchReader = new OmniParquetColumnarBatchReader(capacity, requiredSchema, pushed.orNull)
+      val nameToField = if (isCaseSensitive) {
+        footerFileMetaData.getSchema.getFields.asScala.map(field => (field.getName, field)).toMap
+      } else {
+        CaseInsensitiveMap(footerFileMetaData.getSchema.getFields.asScala.map(field => (field.getName, field)).toMap)
+      }
+      val parquetTypes = requiredSchema.fieldNames.map(fieldName => nameToField.getOrElse(fieldName, null)).toList.asJava
+
+      val batchReader = new OmniParquetColumnarBatchReader(capacity, requiredSchema, pushed.orNull,
+        datetimeRebaseSpec, int96RebaseSpec, parquetTypes)
 
       val iter = new RecordReaderIterator(batchReader)
       Option(TaskContext.get()).foreach(_.addTaskCompletionListener[Unit](_ => iter.close()))

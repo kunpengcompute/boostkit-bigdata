@@ -72,6 +72,9 @@ namespace omniruntime::reader {
             case omniruntime::type::OMNI_LONG:
                 throw std::runtime_error("OmniBooleanRleDecoder LONG not finished!!!");
                 break;
+            case omniruntime::type::OMNI_TIMESTAMP:
+                throw std::runtime_error("OmniBooleanRleDecoder TIMESTAMP not finished!!!");
+                break;
             case omniruntime::type::OMNI_DATE32:
                 throw std::runtime_error("OmniBooleanRleDecoder DATE32 not finished!!!");
                 break;
@@ -346,6 +349,10 @@ namespace omniruntime::reader {
                 break;
             case omniruntime::type::OMNI_LONG:
                 nextByType<omniruntime::type::OMNI_LONG>
+                        (pushOmniVec, numValues, notNull, baseTp);
+                break;
+            case omniruntime::type::OMNI_TIMESTAMP:
+                nextByType<omniruntime::type::OMNI_TIMESTAMP>
                         (pushOmniVec, numValues, notNull, baseTp);
                 break;
             case omniruntime::type::OMNI_DATE32:

@@ -28,7 +28,8 @@ set (SOURCE_FILES
         arrowadapter/UtilInternal.cc
         arrowadapter/HdfsAdapter.cc
         arrowadapter/LocalfsAdapter.cc
-        )
+        common/JulianGregorianRebase.cpp
+        common/TimeRebaseInfo.cpp)
 
 #Find required protobuf package
 find_package(Protobuf REQUIRED)

@@ -19,10 +19,18 @@
 package com.huawei.boostkit.spark.jni;
 
 import com.huawei.boostkit.scan.jni.ParquetColumnarBatchJniReader;
+import com.huawei.boostkit.spark.timestamp.JulianGregorianRebase;
+import com.huawei.boostkit.spark.timestamp.TimestampUtil;
 import nova.hetu.omniruntime.vector.*;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.parquet.io.ParquetDecodingException;
+import org.apache.parquet.schema.LogicalTypeAnnotation;
+import org.apache.parquet.schema.PrimitiveType;
+import org.apache.parquet.schema.Type;
+import org.apache.spark.sql.catalyst.util.RebaseDateTime;
+import org.apache.spark.sql.catalyst.util.RebaseDateTime.RebaseSpec;
+import org.apache.spark.sql.execution.datasources.DataSourceUtils;
 import org.apache.spark.sql.sources.And;
 import org.apache.spark.sql.sources.EqualTo;
 import org.apache.spark.sql.sources.Filter;
@@ -39,13 +47,14 @@ import org.apache.spark.sql.types.*;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import scala.Function1;
 
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
 import java.net.URI;
+import java.time.Instant;
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -58,9 +67,61 @@ public class ParquetColumnarBatchScanReader {
 
     private StructType requiredSchema;
 
-    public ParquetColumnarBatchScanReader(StructType requiredSchema) {
+    private final RebaseSpec datetimeRebaseSpec;
+
+    private final RebaseSpec int96RebaseSpec;
+
+    private boolean nativeSupportTimestampRebase;
+
+    private final Function1<Object, Object> timestampRebaseFunc;
+
+    private boolean nativeSupportInt96Rebase;
+
+    private final Function1<Object, Object> int96RebaseFunc;
+
+    private final List<Type> parquetTypes;
+
+    public ParquetColumnarBatchScanReader(StructType requiredSchema, RebaseSpec datetimeRebaseSpec,
+                                          RebaseSpec int96RebaseSpec, List<Type> parquetTypes) {
         this.requiredSchema = requiredSchema;
+        this.datetimeRebaseSpec = datetimeRebaseSpec;
+        this.int96RebaseSpec = int96RebaseSpec;
+        this.timestampRebaseFunc = datetimeRebaseSpec.mode() == null ? micros -> micros
+                : DataSourceUtils.createTimestampRebaseFuncInRead(datetimeRebaseSpec, "Parquet");
+        this.int96RebaseFunc = int96RebaseSpec.mode() == null ? micros -> micros
+                : DataSourceUtils.createTimestampRebaseFuncInRead(int96RebaseSpec, "Parquet INT96");
+        this.parquetTypes = parquetTypes;
         jniReader = new ParquetColumnarBatchJniReader();
+    }
+
+    private void addJulianGregorianInfo(JSONObject job) {
+        if (Arrays.stream(requiredSchema.fields()).noneMatch(field -> field.dataType() instanceof TimestampType)) {
+            return;
+        }
+        TimestampUtil instance = TimestampUtil.getInstance();
+        JulianGregorianRebase timestampRebaseJulianObject = instance.getJulianObject(datetimeRebaseSpec.timeZone());
+        if (timestampRebaseJulianObject != null && datetimeRebaseSpec.mode() != null) {
+            JSONObject timestampRebase = new JSONObject();
+            timestampRebase.put("tz", timestampRebaseJulianObject.getTz());
+            timestampRebase.put("switches", timestampRebaseJulianObject.getSwitches());
+            timestampRebase.put("diffs", timestampRebaseJulianObject.getDiffs());
+            timestampRebase.put("mode", datetimeRebaseSpec.mode().id());
+            job.put("timestampRebase", timestampRebase);
+            nativeSupportTimestampRebase = true;
+        }
+        JulianGregorianRebase int96RebaseJulianObject = instance.getJulianObject(int96RebaseSpec.timeZone());
+        if (int96RebaseJulianObject != null && int96RebaseSpec.mode() != null) {
+            JSONObject int96Rebase = new JSONObject();
+            int96Rebase.put("tz", int96RebaseJulianObject.getTz());
+            int96Rebase.put("switches", int96RebaseJulianObject.getSwitches());
+            int96Rebase.put("diffs", int96RebaseJulianObject.getDiffs());
+            int96Rebase.put("mode", int96RebaseSpec.mode().id());
+            job.put("int96Rebase", int96Rebase);
+            nativeSupportInt96Rebase = true;
+        }
+        if (nativeSupportTimestampRebase || nativeSupportInt96Rebase) {
+            job.put("lastSwitchJulianTs", RebaseDateTime.lastSwitchJulianTs());
+        }
     }
 
     public long initializeReaderJava(Path path, long start, long end, int capacity,
@@ -91,6 +152,7 @@ public class ParquetColumnarBatchScanReader {
         if (pushedFilter != null) {
             pushDownFilter(pushedFilter, job);
         }
+        addJulianGregorianInfo(job);
 
         parquetReader = jniReader.initializeReader(job);
         return parquetReader;
@@ -131,7 +193,8 @@ public class ParquetColumnarBatchScanReader {
         Decimal,
         Bool,
         Short,
-        Double
+        Double,
+        Timestamp
     }
 
     private JSONObject getSubJson(Filter filterPredicate) {
@@ -231,6 +294,8 @@ public class ParquetColumnarBatchScanReader {
             return ParquetPredicateDataType.Short.ordinal();
         } else if (value instanceof DoubleType) {
             return ParquetPredicateDataType.Double.ordinal();
+        } else if (value instanceof TimestampType) {
+            return ParquetPredicateDataType.Timestamp.ordinal();
         } else {
             String simpleName = value.getClass().getSimpleName();
             throw new ParquetDecodingException("Unsupported parquet push down filter date type: " + simpleName);
@@ -257,6 +322,8 @@ public class ParquetColumnarBatchScanReader {
             return value.toString();
         } else if (value instanceof Double) {
             return value.toString();
+        } else if (value instanceof Instant) {
+            return value.toString();
         } else {
             String simpleName = value.getClass().getSimpleName();
             throw new ParquetDecodingException("Unsupported parquet push down filter date type: " + simpleName);
@@ -267,6 +334,33 @@ public class ParquetColumnarBatchScanReader {
         json.put("op", op.ordinal());
         json.put("left", getSubJson(left));
         json.put("right", getSubJson(right));
+    }
+
+    private void tryToAdjustTimestampVec(LongVec longVec, long rowNumber, int index) {
+        if (nativeSupportTimestampRebase && nativeSupportInt96Rebase) {
+            return;
+        }
+        Type parquetType = parquetTypes.get(index);
+        if (parquetType == null) {
+            throw new RuntimeException("parquetType is null. index: " + index);
+        }
+        if (parquetType.getLogicalTypeAnnotation() instanceof LogicalTypeAnnotation.TimestampLogicalTypeAnnotation
+                && !nativeSupportTimestampRebase) {
+            long adjustValue;
+            for (int rowIndex = 0; rowIndex < rowNumber; rowIndex++) {
+                adjustValue = (long) timestampRebaseFunc.apply(longVec.get(rowIndex));
+                longVec.set(rowIndex, adjustValue);
+            }
+            return;
+        }
+        if (parquetType.asPrimitiveType().getPrimitiveTypeName() == PrimitiveType.PrimitiveTypeName.INT96
+                && !nativeSupportInt96Rebase) {
+            long adjustValue;
+            for (int rowIndex = 0; rowIndex < rowNumber; rowIndex++) {
+                adjustValue = (long) int96RebaseFunc.apply(longVec.get(rowIndex));
+                longVec.set(rowIndex, adjustValue);
+            }
+        }
     }
 
     public int next(Vec[] vecList, List<DataType> types) {
@@ -300,6 +394,9 @@ public class ParquetColumnarBatchScanReader {
                 vecList[i] = new IntVec(vecNativeIds[i]);
             } else if (type instanceof ByteType) {
                 vecList[i] = new VarcharVec(vecNativeIds[i]);
+            } else if (type instanceof TimestampType) {
+                vecList[i] = new LongVec(vecNativeIds[i]);
+                tryToAdjustTimestampVec((LongVec) vecList[i], rtn, i);
             } else {
                 throw new RuntimeException("Unsupport type for ColumnarFileScan: " + type.typeName());
             }
