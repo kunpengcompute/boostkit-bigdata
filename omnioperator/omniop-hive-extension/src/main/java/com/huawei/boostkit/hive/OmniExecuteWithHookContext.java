@@ -389,6 +389,11 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             return false;
         }
 
+        boolean isOptimizeLimitTranspose = HiveConf.getBoolVar(hookContext.getConf(), HiveConf.ConfVars.HIVE_OPTIMIZE_LIMIT_TRANSPOSE);
+        if (isOptimizeLimitTranspose) {
+            return false;
+        }
+
         operators.forEach(item -> {
             if (item.getType().equals(OperatorType.PTF) && !PTFReplaceable(item)) {
                 canBeReplaced[0] = false;
