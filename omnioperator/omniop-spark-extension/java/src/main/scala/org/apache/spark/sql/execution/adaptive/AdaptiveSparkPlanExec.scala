@@ -44,6 +44,7 @@ import org.apache.spark.sql.execution.ui.{SparkListenerSQLAdaptiveExecutionUpdat
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.vectorized.ColumnarBatch
 import org.apache.spark.util.{SparkFatalException, ThreadUtils}
+import com.huawei.boostkit.spark.ColumnarPluginConfig
 
 /**
  * A root node to execute the query plan adaptively. It splits the query plan into independent
@@ -634,7 +635,12 @@ case class AdaptiveSparkPlanExec(
         val newLogicalPlan = logicalPlan.transformDown {
           case p if p.eq(logicalNode) => newLogicalNode
         }
-        logicalPlan = newLogicalPlan
+        val pushOrderedLimitThroughAggApplied = session.sparkContext.getLocalProperty("pushOrderedLimitThroughAggApplied");
+        if (pushOrderedLimitThroughAggApplied == "true") {
+          logicalPlan
+        } else {
+          logicalPlan = newLogicalPlan
+        }
 
       case _ => // Ignore those earlier stages that have been wrapped in later stages.
     }

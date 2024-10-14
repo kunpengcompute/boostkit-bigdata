@@ -44,6 +44,7 @@ import org.apache.spark.sql.execution.command.{DataWritingCommand, DataWritingCo
 import org.apache.spark.sql.execution.datasources.orc.{OmniOrcFileFormat, OrcFileFormat}
 import org.apache.spark.sql.execution.datasources.{FileFormat, InsertIntoHadoopFsRelationCommand, OmniInsertIntoHadoopFsRelationCommand}
 import org.apache.spark.sql.execution.util.SparkMemoryUtils.addLeakSafeTaskCompletionListener
+import org.apache.spark.sql.execution.aggregate.PushOrderedLimitThroughAgg
 
 import scala.collection.mutable.ListBuffer
 
@@ -818,6 +819,7 @@ class ColumnarPlugin extends (SparkSessionExtensions => Unit) with Logging {
     extensions.injectQueryStagePrepRule(session => DedupLeftSemiJoinAQE(session))
     extensions.injectQueryStagePrepRule(_ => TopNPushDownForWindow)
     extensions.injectQueryStagePrepRule(session => FallbackBroadcastExchange(session))
+    extensions.injectQueryStagePrepRule(_ => PushOrderedLimitThroughAgg)
   }
 }
 

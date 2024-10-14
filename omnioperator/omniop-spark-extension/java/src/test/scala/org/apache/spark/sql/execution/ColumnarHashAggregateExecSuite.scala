@@ -152,4 +152,35 @@ class ColumnarHashAggregateExecSuite extends ColumnarSparkPlanTest {
       Seq(Row(0))
     )
   }
+
+  test("Test No PushOrderedLimitThroughAgg") {
+    val sql1 = """
+      SELECT a, b, SUM(c) AS sum_agg
+      FROM df_tbl
+      GROUP BY a, b
+      ORDER BY a, sum_agg, b
+      LIMIT 10
+    """
+    assertPushColumnarTopNSortThroughAggNotEffective(sql1)
+  }
+
+  private def assertPushColumnarTopNSortThroughAggNotEffective(sql: String): Unit = {
+    val omniResult = spark.sql(sql)
+    omniResult.collect();
+    val omniPlan = omniResult.queryExecution.executedPlan.toString()
+    val patternOpenTopn = """(?s)OmniColumnarShuffleExchange.*?\n.*?OmniColumnarTopNSort.*?\n.*?OmniColumnarHashAggregate""".r
+
+    assert(!patternOpenTopn.findFirstIn(omniPlan).isDefined,
+      s"SQL:${sql}\n@OmniEnv with PushColumnarTopNSortThroughAgg and topNSort, omniPlan:${omniPlan}"
+    )
+
+    spark.conf.set("spark.omni.sql.columnar.topNSort", false)
+    val omniPlanWithSortResult = spark.sql(sql)
+    omniPlanWithSortResult.collect()
+    val omniPlanWithSort = omniPlanWithSortResult.queryExecution.executedPlan.toString()
+    val patternCloseTopn = """(?s)OmniColumnarShuffleExchange.*?\n.*?OmniColumnar.*?Limit.*?\n.*?OmniColumnarSort.*?\n.*?OmniColumnarHashAggregate""".r
+    assert(!patternCloseTopn.findFirstIn(omniPlanWithSort).isDefined,
+      s"SQL:${sql}\n@OmniEnv with PushColumnarTopNSortThroughAgg, omniPlan:${omniPlanWithSort}"
+    )
+  }
 }

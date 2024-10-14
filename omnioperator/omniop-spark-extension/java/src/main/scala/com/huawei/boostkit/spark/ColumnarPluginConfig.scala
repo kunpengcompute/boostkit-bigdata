@@ -244,6 +244,7 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
 
   val topNPushDownForWindowEnable: Boolean = conf.getConfString("spark.sql.execution.topNPushDownForWindow.enabled", "true").toBoolean
 
+  val pushOrderedLimitThroughAggEnable: Boolean =  conf.getConfString("spark.omni.sql.columnar.pushOrderedLimitThroughAggEnable.enabled", "false").toBoolean
   // enable or disable deduplicate the right side of left semi join
   val enableDedupLeftSemiJoin: Boolean =
     conf.getConfString("spark.omni.sql.columnar.dedupLeftSemiJoin", "false").toBoolean
