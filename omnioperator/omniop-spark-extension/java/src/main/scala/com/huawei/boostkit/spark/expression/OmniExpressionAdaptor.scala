@@ -400,7 +400,9 @@ object OmniExpressionAdaptor extends Logging {
           .put("arguments", new JSONArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(round.child, exprsIndexMap))
             .put(rewriteToOmniJsonExpressionLiteralJsonObject(round.scale, exprsIndexMap)))
 
-      case attr: Attribute => toOmniJsonAttribute(attr, exprsIndexMap(attr.exprId))
+      case attr: Attribute => toOmniJsonLeafExpression(attr, exprsIndexMap(attr.exprId))
+      case boundReference: BoundReference =>
+        toOmniJsonLeafExpression(boundReference, boundReference.ordinal)
 
       // might_contain
       case bloomFilterMightContain: BloomFilterMightContain =>
@@ -657,14 +659,17 @@ object OmniExpressionAdaptor extends Logging {
     jsonObject
   }
 
-  def toOmniJsonAttribute(attr: Attribute, colVal: Int): JSONObject = {
+  def toOmniJsonLeafExpression(attr: LeafExpression, colVal: Int): JSONObject = {
     val omniDataType = sparkTypeToOmniExpType(attr.dataType)
     attr.dataType match {
       case StringType =>
         new JSONObject().put("exprType", "FIELD_REFERENCE")
           .put("dataType", omniDataType.toInt)
           .put("colVal", colVal)
-          .put("width", getStringLength(attr.metadata))
+          .put("width", attr match {
+            case attribute: Attribute => getStringLength(attribute.metadata)
+            case _ => DEFAULT_STRING_TYPE_LENGTH
+          })
       case dt: DecimalType =>
         new JSONObject().put("exprType", "FIELD_REFERENCE")
           .put("colVal", colVal)

@@ -24,6 +24,7 @@ import org.apache.hadoop.fs.{FileStatus, Path}
 import org.apache.hadoop.mapreduce._
 import org.apache.hadoop.mapreduce.lib.input.FileSplit
 import org.apache.hadoop.mapreduce.task.TaskAttemptContextImpl
+import org.apache.orc.OrcConf.COMPRESS
 import org.apache.orc.{OrcConf, OrcFile, TypeDescription}
 import org.apache.orc.TypeDescription.Category._
 import org.apache.orc.mapreduce.OrcInputFormat
@@ -36,7 +37,6 @@ import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.util.{SerializableConfiguration, Utils}
 import org.apache.spark.sql.types.StringType
-
 import org.apache.spark.sql.types.DecimalType
 
 class OmniOrcFileFormat extends FileFormat with DataSourceRegister with Serializable {
@@ -182,6 +182,22 @@ class OmniOrcFileFormat extends FileFormat with DataSourceRegister with Serializ
       job: Job,
       options: Map[String, String],
       dataSchema: StructType): OutputWriterFactory = {
-    throw new UnsupportedOperationException()
+    new OutputWriterFactory {
+      override def getFileExtension(context: TaskAttemptContext): String = {
+        val compressionExtension: String = {
+          val name = context.getConfiguration.get(COMPRESS.getAttribute)
+          OrcUtils.extensionsForCompressionCodecNames.getOrElse(name, "")
+        }
+
+        compressionExtension + ".orc"
+      }
+      
+      override def newInstance(
+                                path: String,
+                                dataSchema: StructType,
+                                context: TaskAttemptContext): OutputWriter = {
+        new OmniOrcOutputWriter(path, dataSchema, context)
+      }
+    }
   }
 }

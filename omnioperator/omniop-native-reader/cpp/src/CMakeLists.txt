@@ -4,6 +4,7 @@ set (PROJ_TARGET native_reader)
 
 
 set (SOURCE_FILES
+        jni/OrcColumnarBatchJniWriter.cpp
         jni/OrcColumnarBatchJniReader.cpp
         jni/jni_common.cpp
         jni/ParquetColumnarBatchJniReader.cpp

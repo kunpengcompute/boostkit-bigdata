@@ -105,4 +105,42 @@ namespace orc {
     std::unique_ptr<InputStream> createHdfsFileInputStream(const UriInfo &uri) {
         return std::unique_ptr<InputStream>(new HdfsFileInputStreamOverride(uri));
     }
+
+    class HdfsFileOutputStreamOverride : public OutputStream {
+    private:
+        std::string filename_;
+        std::unique_ptr<fs::WriteableFile> hdfs_file_;
+        uint64_t total_length_{0};
+        const uint64_t WRITE_SIZE_ = 1024 * 1024;
+
+    public:
+        explicit HdfsFileOutputStreamOverride(const UriInfo &uri) {
+            this->filename_ = uri.Path();
+            std::shared_ptr<HadoopFileSystem> fileSystemPtr = getHdfsFileSystem(uri.Host(), uri.Port());
+            this->hdfs_file_ = std::make_unique<HdfsWriteableFile>(fileSystemPtr, this->filename_, 0);
+            Status openFileSt = hdfs_file_->OpenFile();
+            if (!openFileSt.IsOk()) {
+                throw IOException(openFileSt.ToString());
+            }
+
+            this->total_length_ = hdfs_file_->GetFileSize();
+        }
+
+        ~HdfsFileOutputStreamOverride() override {}
+
+        [[nodiscard]] uint64_t getLength() const override { return total_length_; }
+
+
+        [[nodiscard]] uint64_t getNaturalWriteSize() const override { return WRITE_SIZE_; }
+
+        void write(const void *buf, size_t length) override { hdfs_file_->Write(buf, length); }
+
+        [[nodiscard]] const std::string &getName() const override { return filename_; }
+
+        void close() override { hdfs_file_->Close(); }
+    };
+
+    std::unique_ptr<OutputStream> createHdfsFileOutputStream(const UriInfo &uri) {
+        return std::unique_ptr<OutputStream>(new HdfsFileOutputStreamOverride(uri));
+    }
 }

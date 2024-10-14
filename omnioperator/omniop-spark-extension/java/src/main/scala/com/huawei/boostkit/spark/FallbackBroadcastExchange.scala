@@ -18,13 +18,12 @@
 
 package com.huawei.boostkit.spark
 
+import com.huawei.boostkit.spark.ColumnarPluginConfig.OMNI_BROADCAST_EXCHANGE_ENABLE_KEY
 import com.huawei.boostkit.spark.util.PhysicalPlanSelector
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.catalyst.optimizer.{BuildLeft, BuildRight}
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.{ColumnarBroadcastExchangeExec, SparkPlan}
 import org.apache.spark.sql.execution.exchange.BroadcastExchangeExec
-import org.apache.spark.sql.execution.joins.{BroadcastHashJoinExec, BroadcastNestedLoopJoinExec, ColumnarBroadcastHashJoinExec}
 
 case class FallbackBroadcastExchange(session: SparkSession) extends Rule[SparkPlan] {
 
@@ -32,81 +31,11 @@ case class FallbackBroadcastExchange(session: SparkSession) extends Rule[SparkPl
 
     val SQLconf = session.sessionState.conf
     val enableColumnarBroadcastExchange: Boolean =
-      SQLconf.getConfString("spark.omni.sql.columnar.broadcastexchange", "true").toBoolean
-    val enableColumnarBroadcastJoin: Boolean = SQLconf
-      .getConfString("spark.omni.sql.columnar.broadcastJoin", "true")
-      .toBoolean
-    val useColumnarBroadcastExchange: Boolean = enableColumnarBroadcastExchange &&
-      enableColumnarBroadcastJoin
+      SQLconf.getConfString(OMNI_BROADCAST_EXCHANGE_ENABLE_KEY, "true").toBoolean
 
     plan.foreach {
-      // Falls back for BroadcastNestedLoopJoinExec
-      case bnlj: BroadcastNestedLoopJoinExec =>
-        val buildSidePlan = bnlj.buildSide match {
-          case BuildLeft => bnlj.left
-          case BuildRight => bnlj.right
-        }
-
-        buildSidePlan match {
-          case exec: BroadcastExchangeExec =>
-            TransformHints.tagNotTransformable(exec)
-            logInfo(s"BroadcastExchange falls back for\n${bnlj}")
-          case _ =>
-        }
-
-        // Falls back Broadcast when disable ColumnarBroadcastExchange or unsupport BroadcastHashJoin
-      case bhj: BroadcastHashJoinExec =>
-        val buildSidePlan = bhj.buildSide match {
-          case BuildLeft => bhj.left
-          case BuildRight => bhj.right
-        }
-
-        buildSidePlan match {
-          case exec: BroadcastExchangeExec =>
-            // fallback if disable ColumnarBroadcastExchange
-            if (!useColumnarBroadcastExchange) {
-              TransformHints.tagNotTransformable(exec)
-              TransformHints.tagNotTransformable(bhj)
-              logInfo(s"BroadcastExchange falls back for disable ColumnarBroadcastExchange")
-            } else {
-              // check whether support ColumnarBroadcastHashJoinExec or not
-              try {
-                ColumnarBroadcastHashJoinExec(
-                  bhj.leftKeys,
-                  bhj.rightKeys,
-                  bhj.joinType,
-                  bhj.buildSide,
-                  bhj.condition,
-                  bhj.left,
-                  bhj.right,
-                  bhj.isNullAwareAntiJoin
-                ).buildCheck()
-              } catch {
-                case t: Throwable =>
-                  TransformHints.tagNotTransformable(exec)
-                  TransformHints.tagNotTransformable(bhj)
-                  logInfo(s"BroadcastExchange falls back for ColumnarBroadcastHashJoinExec: ${t}")
-              }
-
-              // check whether support ColumnarBroadcastExchangeExec or not
-              try {
-                new ColumnarBroadcastExchangeExec(
-                  exec.mode,
-                  exec.child
-                ).buildCheck()
-              } catch {
-                case t: Throwable =>
-                  TransformHints.tagNotTransformable(exec)
-                  TransformHints.tagNotTransformable(bhj)
-                  logInfo(s"BroadcastExchange falls back for ColumnarBroadcastExchangeExec: ${t}")
-              }
-            }
-
-          case _ =>
-        }
-
       case exec: BroadcastExchangeExec =>
-        if (!useColumnarBroadcastExchange) {
+        if (!enableColumnarBroadcastExchange) {
           TransformHints.tagNotTransformable(exec)
           logInfo(s"BroadcastExchange falls back for disable ColumnarBroadcastExchange")
         } else {
@@ -119,7 +48,7 @@ case class FallbackBroadcastExchange(session: SparkSession) extends Rule[SparkPl
           } catch {
             case t: Throwable =>
               TransformHints.tagNotTransformable(exec)
-              logInfo(s"BroadcastExchange falls back for ColumnarBroadcastExchangeExec: ${t}")
+              logDebug(s"BroadcastExchange falls back for ColumnarBroadcastExchangeExec: ${t}")
           }
         }
       case _ =>

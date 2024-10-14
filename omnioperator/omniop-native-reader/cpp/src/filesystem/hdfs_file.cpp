@@ -97,5 +97,57 @@ int64_t HdfsReadableFile::Read(void *buffer, int32_t length) {
     return hdfsRead(fileSystem_->getFileSystem(), file_, buffer, length);
 }
 
-
+HdfsWriteableFile::HdfsWriteableFile(std::shared_ptr<HadoopFileSystem> fileSystemPtr, const std::string &path,
+                                     int64_t bufferSize) :
+    fileSystem_(std::move(fileSystemPtr)),
+    path_(path), bufferSize_(bufferSize)
+{
 }
+
+HdfsWriteableFile::~HdfsWriteableFile() { this->TryClose(); }
+
+Status HdfsWriteableFile::Close() { return TryClose(); }
+
+Status HdfsWriteableFile::OpenFile() {
+    if (isOpen_) {
+        return Status::OK();
+    }
+    hdfsFile handle = hdfsOpenFile(fileSystem_->getFileSystem(), path_.c_str(), O_WRONLY, bufferSize_, 0, 0);
+    if (handle == nullptr) {
+        return Status::IOError("Fail to open hdfs file, path is " + path_);
+    }
+
+    this->file_ = handle;
+    this->isOpen_ = true;
+    return Status::OK();
+}
+
+int64_t HdfsWriteableFile::Write(const void *buffer, int32_t length) {
+    if (!OpenFile().IsOk()) {
+        return -1;
+    }
+    hdfsWrite(fileSystem_->getFileSystem(), file_, buffer, length);
+    return hdfsHFlush(fileSystem_->getFileSystem(), file_);
+}
+
+Status HdfsWriteableFile::TryClose() {
+    if (!isOpen_) {
+        return Status::OK();
+    }
+    int st = hdfsCloseFile(fileSystem_->getFileSystem(), file_);
+    if (st == -1) {
+        return Status::IOError("Fail to close hdfs file, path is " + path_);
+    }
+    this->isOpen_ = false;
+    return Status::OK();
+}
+
+int64_t HdfsWriteableFile::GetFileSize() {
+    if (!OpenFile().IsOk()) {
+        return -1;
+    }
+    FileInfo fileInfo = fileSystem_->GetFileInfo(path_);
+    return fileInfo.size();
+}
+
+} // namespace fs

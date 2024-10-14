@@ -59,7 +59,35 @@ private:
     hdfsFile file_;
 };
 
-}
+class HdfsWriteableFile : public WriteableFile {
 
+public:
+    HdfsWriteableFile(std::shared_ptr<HadoopFileSystem> fileSystemPtr, const std::string &path, int64_t bufferSize = 0);
+
+    ~HdfsWriteableFile();
+
+    Status Close() override;
+
+    Status OpenFile() override;
+
+    int64_t Write(const void *buffer, int32_t length) override;
+
+    int64_t GetFileSize() override;
+
+private:
+    Status TryClose();
+
+    std::shared_ptr<HadoopFileSystem> fileSystem_;
+
+    const std::string &path_;
+
+    int64_t bufferSize_;
+
+    bool isOpen_ = false;
+
+    hdfsFile file_{};
+};
+
+} // namespace fs
 
 #endif //SPARK_THESTRAL_PLUGIN_HDFS_FILE_H

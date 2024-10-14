@@ -48,7 +48,26 @@ public:
     virtual int64_t Read(void *buffer, int32_t length) = 0;
 };
 
-}
+class WriteableFile {
+public:
+    // Virtual destructor
+    virtual ~WriteableFile() = default;
+
+    // Close the file
+    virtual Status Close() = 0;
+
+    // Open the file
+    virtual Status OpenFile() = 0;
+
+    // Get the size of the file
+    virtual int64_t GetFileSize() = 0;
+
+    // Write data from the current position into the buffer with the given
+    // length
+    virtual int64_t Write(const void *buffer, int32_t length) = 0;
+};
+
+} // namespace fs
 
 
 #endif //SPARK_THESTRAL_PLUGIN_FILE_INTERFACE_H
