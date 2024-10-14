@@ -138,7 +138,7 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
     private transient Vec[] constantVec;
     private transient Queue<Integer> constantColIds;
     private transient boolean enableAdaptivePartialAgg = false;
-    private transient long adaptivePartialAggMinRows = 10000;
+    private transient long adaptivePartialAggMinRows = 500000;
     private transient double adaptivePartialAggRatio = 0.8;
     private transient boolean partialStep = false;
     private transient boolean hasBenefit = false;

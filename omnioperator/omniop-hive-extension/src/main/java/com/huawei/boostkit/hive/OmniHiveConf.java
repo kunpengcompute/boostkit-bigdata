@@ -62,7 +62,7 @@ class OmniHiveConf {
         }};
         stringLength = hiveConf.getInt("omni.hive.string.length", 1024);
         enableAdaptivePartialAggregation = hiveConf.getBoolean("omni.hive.adaptivePartialAggregation.enabled", false);
-        adaptivePartialAggregationMinRows = hiveConf.getLong("omni.hive.adaptivePartialAggregationMinRows", 10000);
+        adaptivePartialAggregationMinRows = hiveConf.getLong("omni.hive.adaptivePartialAggregationMinRows", 500000);
         adaptivePartialAggregationRatio = hiveConf.getDouble("omni.hive.adaptivePartialAggregationRatio", 0.8);
     }
 
