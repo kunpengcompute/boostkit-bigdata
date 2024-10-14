@@ -48,7 +48,8 @@ namespace omniruntime::reader {
         Decimal,
         Bool,
         Short,
-        Double
+        Double,
+        Timestamp
     };
 
     arrow::Result<Expression> GetSubExpr(JNIEnv *env, jobject &expressionTree, const char *sub);

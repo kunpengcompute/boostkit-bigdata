@@ -25,6 +25,7 @@
 #include <parquet/column_page.h>
 #include <parquet/column_reader.h>
 #include <arrow/util/int_util_overflow.h>
+#include "common/TimeRebaseInfo.h"
 
 using ResizableBuffer = ::arrow::ResizableBuffer;
 using namespace omniruntime::vec;
@@ -840,8 +841,70 @@ namespace omniruntime::reader {
         }
     };
 
+    class ParquetTimestamp64RecordReader : public ParquetTypedRecordReader<OMNI_TIMESTAMP, ::parquet::Int64Type> {
+    public:
+        using BASE = ParquetTypedRecordReader<OMNI_TIMESTAMP, ::parquet::Int64Type>;
+        ParquetTimestamp64RecordReader(const ::parquet::ColumnDescriptor* descr,
+            ::parquet::internal::LevelInfo leaf_info, ::arrow::MemoryPool* pool, ::arrow::TimeUnit::type unit,
+            common::TimeRebaseInfo *rebasePtr)
+            : BASE(descr, leaf_info, pool), timeUnit(unit), rebaseInfoPtr(rebasePtr)
+        {}
+
+        BaseVector* GetBaseVec() override
+        {
+            if (vec_ == nullptr) {
+                throw ::parquet::ParquetException("GetBaseVec() is nullptr!");
+            }
+            auto res = dynamic_cast<Vector<V> *>(vec_);
+            auto values = Values<T>();
+            if (timeUnit == ::arrow::TimeUnit::MILLI) {
+                for (int i = 0; i < values_written_; i++) {
+                    res->SetValue(i, rebaseInfoPtr->timestampRebaseFunc(values[i] * 1000L));
+                }
+            } else {
+                for (int i = 0; i < values_written_; i++) {
+                    res->SetValue(i, rebaseInfoPtr->timestampRebaseFunc(values[i]));
+                }
+            }
+            return vec_;
+        }
+
+    private:
+        ::arrow::TimeUnit::type timeUnit;
+        common::TimeRebaseInfo *rebaseInfoPtr;
+    };
+
+    class ParquetTimestamp96RecordReader : public ParquetTypedRecordReader<OMNI_TIMESTAMP, ::parquet::Int96Type> {
+    public:
+        using BASE = ParquetTypedRecordReader<OMNI_TIMESTAMP, ::parquet::Int96Type>;
+        ParquetTimestamp96RecordReader(const ::parquet::ColumnDescriptor* descr,
+            ::parquet::internal::LevelInfo leaf_info, ::arrow::MemoryPool* pool, common::TimeRebaseInfo *rebasePtr)
+            : BASE(descr, leaf_info, pool), rebaseInfoPtr(rebasePtr)
+        {}
+
+        BaseVector* GetBaseVec() override
+        {
+            if (vec_ == nullptr) {
+                throw ::parquet::ParquetException("GetBaseVec() is nullptr!");
+            }
+            auto res = dynamic_cast<Vector<V> *>(vec_);
+            auto values = Values<T>();
+            for (int i = 0; i < values_written_; i++) {
+                if (values[i].value[2] == 0) {
+                    res->SetValue(i, 0);
+                } else {
+                    res->SetValue(i, rebaseInfoPtr->int96RebaseFunc(Int96GetMicroSeconds(values[i])));
+                }
+            }
+            return vec_;
+        }
+
+    private:
+        common::TimeRebaseInfo *rebaseInfoPtr;
+    };
+
     std::shared_ptr<OmniRecordReader> MakeRecordReader(const ::parquet::ColumnDescriptor* descr,
-        ::parquet::internal::LevelInfo leaf_info, ::arrow::MemoryPool* pool,
-        const bool read_dictionary, const std::shared_ptr<::arrow::DataType>& type);
+        ::parquet::internal::LevelInfo leaf_info, ::arrow::MemoryPool* pool, const bool read_dictionary,
+        const std::shared_ptr<::arrow::DataType>& type, common::TimeRebaseInfo *rebaseInfoPtr);
 }
 #endif //OMNI_RUNTIME_COLUMN_TYPE_READER_H

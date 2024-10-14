@@ -17,13 +17,20 @@
  */
 
 package com.huawei.boostkit.spark.jni;
+
 import com.huawei.boostkit.scan.jni.ParquetColumnarBatchJniReader;
-
+import com.huawei.boostkit.spark.timestamp.JulianGregorianRebase;
+import com.huawei.boostkit.spark.timestamp.LegacyBehaviorPolicy;
+import com.huawei.boostkit.spark.timestamp.TimestampUtil;
 import nova.hetu.omniruntime.vector.*;
-
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.parquet.io.ParquetDecodingException;
+import org.apache.parquet.schema.OriginalType;
+import org.apache.parquet.schema.PrimitiveType;
+import org.apache.parquet.schema.Type;
+import org.apache.spark.sql.catalyst.util.RebaseDateTime;
+import org.apache.spark.sql.execution.datasources.DataSourceUtils;
 import org.apache.spark.sql.sources.And;
 import org.apache.spark.sql.sources.EqualTo;
 import org.apache.spark.sql.sources.Filter;
@@ -40,15 +47,17 @@ import org.apache.spark.sql.types.*;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import scala.Function1;
 
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
 import java.net.URI;
+import java.time.Instant;
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.TimeZone;
 
 public class ParquetColumnarBatchScanReader {
     private static final Logger LOGGER = LoggerFactory.getLogger(ParquetColumnarBatchScanReader.class);
@@ -59,9 +68,84 @@ public class ParquetColumnarBatchScanReader {
 
     private StructType requiredSchema;
 
-    public ParquetColumnarBatchScanReader(StructType requiredSchema) {
+    private final LegacyBehaviorPolicy datetimeRebaseMode;
+
+    private final LegacyBehaviorPolicy int96RebaseMode;
+
+    private boolean nativeSupportTimestampRebase;
+
+    private final Function1<Long, Long> timestampRebaseFunc;
+
+    private boolean nativeSupportInt96Rebase;
+
+    private final Function1<Long, Long> int96RebaseFunc;
+
+    private final List<Type> parquetTypes;
+
+    public ParquetColumnarBatchScanReader(StructType requiredSchema, LegacyBehaviorPolicy datetimeRebaseMode,
+                                          LegacyBehaviorPolicy int96RebaseMode, List<Type> parquetTypes) {
         this.requiredSchema = requiredSchema;
+        this.datetimeRebaseMode = datetimeRebaseMode;
+        this.int96RebaseMode = int96RebaseMode;
+        this.timestampRebaseFunc = (micros) -> {
+            switch (this.datetimeRebaseMode) {
+                case EXCEPTION:
+                    if (micros < RebaseDateTime.lastSwitchJulianTs()) {
+                        throw DataSourceUtils.newRebaseExceptionInRead("Parquet");
+                    }
+                    return micros;
+                case LEGACY:
+                    return RebaseDateTime.rebaseJulianToGregorianMicros(micros);
+                default:
+                    return micros;
+            }
+        };
+
+        this.int96RebaseFunc = (micros) -> {
+            switch (this.datetimeRebaseMode) {
+                case EXCEPTION:
+                    if (micros < RebaseDateTime.lastSwitchJulianTs()) {
+                        throw DataSourceUtils.newRebaseExceptionInRead("Parquet INT96");
+                    }
+                    return micros;
+                case LEGACY:
+                    return RebaseDateTime.rebaseJulianToGregorianMicros(micros);
+                default:
+                    return micros;
+            }
+        };
+        this.parquetTypes = parquetTypes;
         jniReader = new ParquetColumnarBatchJniReader();
+    }
+
+    private void addJulianGregorianInfo(JSONObject job) {
+        if (Arrays.stream(requiredSchema.fields()).noneMatch(field -> field.dataType() instanceof TimestampType)) {
+            return;
+        }
+        TimestampUtil instance = TimestampUtil.getInstance();
+        JulianGregorianRebase timestampRebaseJulianObject = instance.getJulianObject(TimeZone.getDefault().getID());
+        if (timestampRebaseJulianObject != null && datetimeRebaseMode != null) {
+            JSONObject timestampRebase = new JSONObject();
+            timestampRebase.put("tz", timestampRebaseJulianObject.getTz());
+            timestampRebase.put("switches", timestampRebaseJulianObject.getSwitches());
+            timestampRebase.put("diffs", timestampRebaseJulianObject.getDiffs());
+            timestampRebase.put("mode", datetimeRebaseMode.ordinal());
+            job.put("timestampRebase", timestampRebase);
+            nativeSupportTimestampRebase = true;
+        }
+        JulianGregorianRebase int96RebaseJulianObject = instance.getJulianObject(TimeZone.getDefault().getID());
+        if (int96RebaseJulianObject != null && int96RebaseMode != null) {
+            JSONObject int96Rebase = new JSONObject();
+            int96Rebase.put("tz", int96RebaseJulianObject.getTz());
+            int96Rebase.put("switches", int96RebaseJulianObject.getSwitches());
+            int96Rebase.put("diffs", int96RebaseJulianObject.getDiffs());
+            int96Rebase.put("mode", int96RebaseMode.ordinal());
+            job.put("int96Rebase", int96Rebase);
+            nativeSupportInt96Rebase = true;
+        }
+        if (nativeSupportTimestampRebase || nativeSupportInt96Rebase) {
+            job.put("lastSwitchJulianTs", RebaseDateTime.lastSwitchJulianTs());
+        }
     }
 
     public long initializeReaderJava(Path path, long start, long end, int capacity,
@@ -92,6 +176,7 @@ public class ParquetColumnarBatchScanReader {
         if (pushedFilter != null) {
             pushDownFilter(pushedFilter, job);
         }
+        addJulianGregorianInfo(job);
 
         parquetReader = jniReader.initializeReaderV2(job);
         return parquetReader;
@@ -132,7 +217,8 @@ public class ParquetColumnarBatchScanReader {
         Decimal,
         Bool,
         Short,
-        Double
+        Double,
+        Timestamp
     }
 
     private JSONObject getSubJson(Filter filterPredicate) {
@@ -232,6 +318,8 @@ public class ParquetColumnarBatchScanReader {
             return ParquetPredicateDataType.Short.ordinal();
         } else if (value instanceof DoubleType) {
             return ParquetPredicateDataType.Double.ordinal();
+        } else if (value instanceof TimestampType) {
+            return ParquetPredicateDataType.Timestamp.ordinal();
         } else {
             String simpleName = value.getClass().getSimpleName();
             throw new ParquetDecodingException("Unsupported parquet push down filter date type: " + simpleName);
@@ -258,6 +346,8 @@ public class ParquetColumnarBatchScanReader {
             return value.toString();
         } else if (value instanceof Double) {
             return value.toString();
+        } else if (value instanceof Instant) {
+            return value.toString();
         } else {
             String simpleName = value.getClass().getSimpleName();
             throw new ParquetDecodingException("Unsupported parquet push down filter date type: " + simpleName);
@@ -268,6 +358,33 @@ public class ParquetColumnarBatchScanReader {
         json.put("op", op.ordinal());
         json.put("left", getSubJson(left));
         json.put("right", getSubJson(right));
+    }
+
+    private void tryToAdjustTimestampVec(LongVec longVec, long rowNumber, int index) {
+        if (nativeSupportTimestampRebase && nativeSupportInt96Rebase) {
+            return;
+        }
+        Type parquetType = parquetTypes.get(index);
+        if (parquetType == null) {
+            throw new RuntimeException("parquetType is null. index: " + index);
+        }
+        if ((parquetType.getOriginalType() == OriginalType.TIMESTAMP_MICROS
+                || parquetType.getOriginalType() == OriginalType.TIMESTAMP_MILLIS) && !nativeSupportTimestampRebase) {
+            long adjustValue;
+            for (int rowIndex = 0; rowIndex < rowNumber; rowIndex++) {
+                adjustValue = timestampRebaseFunc.apply(longVec.get(rowIndex));
+                longVec.set(rowIndex, adjustValue);
+            }
+            return;
+        }
+        if (parquetType.asPrimitiveType().getPrimitiveTypeName() == PrimitiveType.PrimitiveTypeName.INT96
+                && !nativeSupportInt96Rebase) {
+            long adjustValue;
+            for (int rowIndex = 0; rowIndex < rowNumber; rowIndex++) {
+                adjustValue = int96RebaseFunc.apply(longVec.get(rowIndex));
+                longVec.set(rowIndex, adjustValue);
+            }
+        }
     }
 
     public int next(Vec[] vecList, List<DataType> types) {
@@ -301,6 +418,9 @@ public class ParquetColumnarBatchScanReader {
                 vecList[i] = new IntVec(vecNativeIds[i]);
             } else if (type instanceof ByteType) {
                 vecList[i] = new VarcharVec(vecNativeIds[i]);
+            } else if (type instanceof TimestampType) {
+                vecList[i] = new LongVec(vecNativeIds[i]);
+                tryToAdjustTimestampVec((LongVec) vecList[i], rtn, i);
             } else {
                 throw new RuntimeException("Unsupport type for ColumnarFileScan: " + type.typeName());
             }

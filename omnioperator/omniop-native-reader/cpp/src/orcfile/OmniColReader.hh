@@ -26,6 +26,7 @@
 #include "OmniRLEv2.hh"
 #include "orc/Int128.hh"
 #include "OmniByteRLE.hh"
+#include "common/JulianGregorianRebase.h"
 
 namespace omniruntime::reader {
     class OmniStructColumnReader: public orc::ColumnReader {
@@ -33,7 +34,7 @@ namespace omniruntime::reader {
         std::vector<std::unique_ptr<orc::ColumnReader>> children;
 
     public:
-        OmniStructColumnReader(const orc::Type& type, orc::StripeStreams& stipe);
+        OmniStructColumnReader(const orc::Type& type, orc::StripeStreams& stipe, common::JulianGregorianRebase *julianPtr);
 
         uint64_t skip(uint64_t numValues) override;
 
@@ -136,11 +137,12 @@ namespace omniruntime::reader {
         const orc::Timezone& readerTimezone;
         const int64_t epochOffset;
         const bool sameTimezone;
+        common::JulianGregorianRebase *julianPtr;
 
     public:
         OmniTimestampColumnReader(const orc::Type& type,
-                              orc::StripeStreams& stripe,
-                              bool isInstantType);
+                                orc::StripeStreams& stripe,
+                                bool isInstantType, common::JulianGregorianRebase *julianPtr);
         ~OmniTimestampColumnReader() override;
 
         uint64_t skip(uint64_t numValues) override;
@@ -352,7 +354,8 @@ namespace omniruntime::reader {
     };
 
     std::unique_ptr<orc::ColumnReader> omniBuildReader(const orc::Type& type,
-                                                  orc::StripeStreams& stripe);
+                                                    orc::StripeStreams& stripe,
+                                                    common::JulianGregorianRebase *julianPtr);
 
     void scaleInt128(orc::Int128& value, uint32_t scale, uint32_t currentScale);
 

@@ -21,6 +21,7 @@
 
 #include "orc/RowReader/Reader.hh"
 #include <vector/vector_common.h>
+#include "common/JulianGregorianRebase.h"
 
 namespace omniruntime::reader {
     class OmniReaderImpl : public orc::ReaderImpl {
@@ -31,12 +32,16 @@ namespace omniruntime::reader {
 
     std::unique_ptr<orc::RowReader> createRowReader() const override;
 
-    std::unique_ptr<orc::RowReader> createRowReader(const orc::RowReaderOptions& options) const override;
+    std::unique_ptr<orc::RowReader> createRowReader(const orc::RowReaderOptions& options,
+        std::unique_ptr<common::JulianGregorianRebase> &julianPtr) const;
     };
 
     class OmniRowReaderImpl : public orc::RowReaderImpl {
     public:
-        OmniRowReaderImpl(std::shared_ptr<orc::FileContents> contents, const orc::RowReaderOptions& options) : orc::RowReaderImpl(contents, options) {}
+        OmniRowReaderImpl(std::shared_ptr<orc::FileContents> contents, const orc::RowReaderOptions& options,
+            std::unique_ptr<common::JulianGregorianRebase> &julianPtr)
+            : orc::RowReaderImpl(contents, options), julianPtr(std::move(julianPtr))
+        {}
         /**
         * direct read VectorBatch in next
         * @param omniVecBatch the VectorBatch to push
@@ -45,6 +50,9 @@ namespace omniruntime::reader {
         bool next(omniruntime::vec::VectorBatch*& omniVecBatch, int* omniTypeId);
 
         void startNextStripe() override;
+
+    private:
+        std::unique_ptr<common::JulianGregorianRebase> julianPtr;
     };
 
     std::unique_ptr<orc::Reader> omniCreateReader(std::unique_ptr<orc::InputStream> stream,

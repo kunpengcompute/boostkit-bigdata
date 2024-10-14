@@ -19,11 +19,13 @@
 package org.apache.spark.sql.execution.datasources.parquet;
 
 import com.huawei.boostkit.spark.jni.ParquetColumnarBatchScanReader;
+import com.huawei.boostkit.spark.timestamp.LegacyBehaviorPolicy;
 import nova.hetu.omniruntime.vector.Vec;
 import org.apache.hadoop.mapreduce.InputSplit;
 import org.apache.hadoop.mapreduce.RecordReader;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.parquet.hadoop.ParquetInputSplit;
+import org.apache.parquet.schema.Type;
 import org.apache.spark.sql.catalyst.InternalRow;
 import org.apache.spark.sql.execution.vectorized.OmniColumnVectorUtils;
 import org.apache.spark.sql.execution.vectorized.OmniColumnVector;
@@ -58,10 +60,20 @@ public class OmniParquetColumnarBatchReader extends RecordReader<Void, ColumnarB
   private StructType requiredSchema;
   private Filter pushedFilter;
 
-  public OmniParquetColumnarBatchReader(int capacity, StructType requiredSchema, Filter pushedFilter) {
+  private final LegacyBehaviorPolicy datetimeRebaseMode;
+
+  private final LegacyBehaviorPolicy int96RebaseMode;
+
+  private final List<Type> parquetTypes;
+
+  public OmniParquetColumnarBatchReader(int capacity, StructType requiredSchema, Filter pushedFilter,
+                                        String datetimeRebaseMode, String int96RebaseMode, List<Type> parquetTypes) {
     this.capacity = capacity;
     this.requiredSchema = requiredSchema;
     this.pushedFilter = pushedFilter;
+    this.datetimeRebaseMode = LegacyBehaviorPolicy.valueOf(datetimeRebaseMode);
+    this.int96RebaseMode = LegacyBehaviorPolicy.valueOf(int96RebaseMode);
+    this.parquetTypes = parquetTypes;
   }
 
   public ParquetColumnarBatchScanReader getReader() {
@@ -110,7 +122,7 @@ public class OmniParquetColumnarBatchReader extends RecordReader<Void, ColumnarB
   public void initialize(InputSplit inputSplit, TaskAttemptContext taskAttemptContext)
       throws IOException, InterruptedException, UnsupportedOperationException {
     ParquetInputSplit split = (ParquetInputSplit)inputSplit;
-    this.reader = new ParquetColumnarBatchScanReader(requiredSchema);
+    this.reader = new ParquetColumnarBatchScanReader(requiredSchema, datetimeRebaseMode, int96RebaseMode, parquetTypes);
     reader.initializeReaderJava(split.getPath(), split.getStart(), split.getEnd(),
             capacity, pushedFilter);
   }

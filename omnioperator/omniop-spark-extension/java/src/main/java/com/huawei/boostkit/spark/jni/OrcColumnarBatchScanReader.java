@@ -17,28 +17,37 @@
  */
 
 package com.huawei.boostkit.spark.jni;
-
 import com.huawei.boostkit.scan.jni.OrcColumnarBatchJniReader;
+
+import com.huawei.boostkit.spark.timestamp.JulianGregorianRebase;
+import com.huawei.boostkit.spark.timestamp.TimestampUtil;
 import nova.hetu.omniruntime.type.DataType;
 import nova.hetu.omniruntime.vector.*;
+
+import org.apache.orc.impl.writer.TimestampTreeWriter;
+import org.apache.spark.sql.catalyst.util.RebaseDateTime;
 import org.apache.hadoop.hive.ql.io.sarg.ExpressionTree;
 import org.apache.hadoop.hive.ql.io.sarg.PredicateLeaf;
 import org.apache.orc.OrcFile.ReaderOptions;
 import org.apache.orc.Reader.Options;
-import org.apache.orc.TypeDescription;
-import org.apache.spark.sql.catalyst.util.RebaseDateTime;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.URI;
 import java.sql.Date;
+import java.sql.Timestamp;
+import java.text.DateFormat;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.TimeZone;
 
 public class OrcColumnarBatchScanReader {
     private static final Logger LOGGER = LoggerFactory.getLogger(OrcColumnarBatchScanReader.class);
 
+    private boolean nativeSupportTimestampRebase;
     public long reader;
     public long recordReader;
     public long batchReader;
@@ -127,6 +136,9 @@ public class OrcColumnarBatchScanReader {
                         String scalePadZeroStr = padZeroForDecimals(spiltValues, decimalS);
                         jsonObject.put("literal", spiltValues[0] + "." + scalePadZeroStr + " " + decimalP + " " + decimalS);
                     }
+                } else if (pl.getType() == PredicateLeaf.Type.TIMESTAMP) {
+                    Timestamp t = (Timestamp)pl.getLiteral();
+                    jsonObject.put("literal",  formatSecs(t.getTime() / TimestampTreeWriter.MILLIS_PER_SECOND) + " " + formatNanos(t.getNanos()));
                 } else {
                     jsonObject.put("literal", pl.getLiteral().toString());
                 }
@@ -152,6 +164,9 @@ public class OrcColumnarBatchScanReader {
                         }
                     } else if (pl.getType() == PredicateLeaf.Type.DATE) {
                         lst.add(((int)Math.ceil(((Date)ob).getTime()* 1.0/3600/24/1000)) + "");
+                    } else if (pl.getType() == PredicateLeaf.Type.TIMESTAMP) {
+                        Timestamp t = (Timestamp)pl.getLiteral();
+                        lst.add(formatSecs(t.getTime() / TimestampTreeWriter.MILLIS_PER_SECOND) + " " + formatNanos(t.getNanos()));
                     } else {
                         lst.add(ob.toString());
                     }
@@ -165,10 +180,50 @@ public class OrcColumnarBatchScanReader {
         return jsonObjectList;
     }
 
+    private long formatSecs(long secs) {
+        DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+        long epoch;
+        try {
+            epoch = dateFormat.parse(TimestampTreeWriter.BASE_TIMESTAMP_STRING).getTime() /
+                    TimestampTreeWriter.MILLIS_PER_SECOND;
+        } catch (ParseException e) {
+            throw new RuntimeException(e);
+        }
+        return secs - epoch;
+    }
+
+    private long formatNanos(int nanos) {
+        if (nanos == 0) {
+            return 0;
+        } else if (nanos % 100 != 0) {
+            return ((long) nanos) << 3;
+        } else {
+            nanos /= 100;
+            int trailingZeros = 1;
+            while (nanos % 10 == 0 && trailingZeros < 7) {
+                nanos /= 10;
+                trailingZeros += 1;
+            }
+            return ((long) nanos) << 3 | trailingZeros;
+        }
+    }
+
+    private void addJulianGregorianInfo(JSONObject job) {
+        TimestampUtil instance = TimestampUtil.getInstance();
+        JulianGregorianRebase julianObject = instance.getJulianObject(TimeZone.getDefault().getID());
+        if (julianObject == null) {
+            return;
+        }
+        job.put("tz", julianObject.getTz());
+        job.put("switches", julianObject.getSwitches());
+        job.put("diffs", julianObject.getDiffs());
+        nativeSupportTimestampRebase = true;
+    }
+
     /**
      * Init Orc reader.
      *
-     * @param uri     split file path
+     * @param uri split file path
      * @param options split file options
      */
     public long initializeReaderJava(URI uri, ReaderOptions options) {
@@ -215,6 +270,8 @@ public class OrcColumnarBatchScanReader {
         }
 
         job.put("includedColumns", colToInclu.toArray());
+        addJulianGregorianInfo(job);
+
         recordReader = jniReader.initializeRecordReader(reader, job);
         return recordReader;
     }
@@ -252,6 +309,14 @@ public class OrcColumnarBatchScanReader {
         }
     }
 
+    public void convertJulianToGregorianMicros(LongVec longVec, long rowNumber) {
+        long gregorianValue;
+        for (int rowIndex = 0; rowIndex < rowNumber; rowIndex++) {
+            gregorianValue = RebaseDateTime.rebaseJulianToGregorianMicros(longVec.get(rowIndex));
+            longVec.set(rowIndex, gregorianValue);
+        }
+    }
+
     public int next(Vec[] vecList, int[] typeIds) {
         long[] vecNativeIds = new long[realColsCnt];
         long rtn = jniReader.recordReaderNext(recordReader, batchReader, typeIds, vecNativeIds);
@@ -284,6 +349,13 @@ public class OrcColumnarBatchScanReader {
                 case OMNI_LONG:
                 case OMNI_DECIMAL64: {
                     vecList[i] = new LongVec(vecNativeIds[nativeGetId]);
+                    break;
+                }
+                case OMNI_TIMESTAMP: {
+                    vecList[i] = new LongVec(vecNativeIds[nativeGetId]);
+                    if (!this.nativeSupportTimestampRebase) {
+                        convertJulianToGregorianMicros((LongVec)(vecList[i]), rtn);
+                    }
                     break;
                 }
                 case OMNI_DOUBLE: {

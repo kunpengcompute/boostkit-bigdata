@@ -32,6 +32,8 @@ Result<std::shared_ptr<DataType>> GetLiteralDataType(JNIEnv *env, jobject &expre
             return arrow::int32();
         case PredicateDataType::Long:
             return arrow::int64();
+        case PredicateDataType::Timestamp:
+            return arrow::timestamp(arrow::TimeUnit::MICRO);
         case PredicateDataType::String:
             return arrow::utf8();
         case PredicateDataType::Date32:

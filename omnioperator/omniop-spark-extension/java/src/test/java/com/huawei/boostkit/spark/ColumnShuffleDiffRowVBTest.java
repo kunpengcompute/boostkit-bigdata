@@ -31,6 +31,7 @@ import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_DOUBLE;
 import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_INT;
 import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_LONG;
 import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_VARCHAR;
+import static nova.hetu.omniruntime.type.DataType.DataTypeId.OMNI_TIMESTAMP;
 import nova.hetu.omniruntime.type.DataTypeSerializer;
 import nova.hetu.omniruntime.vector.VecBatch;
 
@@ -78,7 +79,7 @@ public class ColumnShuffleDiffRowVBTest extends ColumnShuffleTest {
     public void columnShuffleMixColTest() throws IOException {
         shuffleDataFile = shuffleTestDir + "/shuffle_dataFile_MixCol_test";
         DataType.DataTypeId[] idTypes = {OMNI_LONG, OMNI_DOUBLE, OMNI_INT, OMNI_VARCHAR, OMNI_CHAR,
-                OMNI_DATE32, OMNI_DATE64, OMNI_DECIMAL64, OMNI_DECIMAL128};
+                OMNI_DATE32, OMNI_DATE64, OMNI_DECIMAL64, OMNI_DECIMAL128, OMNI_TIMESTAMP};
         DataType[] types = dataTypeId2DataType(idTypes);
         String tmpStr = DataTypeSerializer.serialize(types);
         SparkJniWrapper jniWrapper = new SparkJniWrapper();
@@ -108,7 +109,7 @@ public class ColumnShuffleDiffRowVBTest extends ColumnShuffleTest {
     public void columnShuffleVarCharFirstTest() throws IOException {
         shuffleDataFile = shuffleTestDir + "/shuffle_dataFile_varCharFirst_test";
         DataType.DataTypeId[] idTypes = {OMNI_VARCHAR, OMNI_LONG, OMNI_DOUBLE, OMNI_INT, OMNI_CHAR,
-                OMNI_DATE32, OMNI_DATE64, OMNI_DECIMAL64, OMNI_DECIMAL128};
+                OMNI_DATE32, OMNI_DATE64, OMNI_DECIMAL64, OMNI_DECIMAL128, OMNI_TIMESTAMP};
         DataType[] types = dataTypeId2DataType(idTypes);
         String tmpStr = DataTypeSerializer.serialize(types);
         SparkJniWrapper jniWrapper = new SparkJniWrapper();
@@ -138,7 +139,7 @@ public class ColumnShuffleDiffRowVBTest extends ColumnShuffleTest {
     public void columnShuffle1Row1024VBTest() throws IOException {
         shuffleDataFile = shuffleTestDir + "/shuffle_dataFile_1row1024vb_test";
         DataType.DataTypeId[] idTypes = {OMNI_INT, OMNI_LONG, OMNI_DOUBLE, OMNI_VARCHAR, OMNI_CHAR,
-                OMNI_DATE32, OMNI_DATE64, OMNI_DECIMAL64, OMNI_DECIMAL128};
+                OMNI_DATE32, OMNI_DATE64, OMNI_DECIMAL64, OMNI_DECIMAL128, OMNI_TIMESTAMP};
         DataType[] types = dataTypeId2DataType(idTypes);
         String tmpStr = DataTypeSerializer.serialize(types);
         SparkJniWrapper jniWrapper = new SparkJniWrapper();
@@ -168,7 +169,7 @@ public class ColumnShuffleDiffRowVBTest extends ColumnShuffleTest {
     public void columnShuffle1024Row1VBTest() throws IOException {
         shuffleDataFile = shuffleTestDir + "/shuffle_dataFile_1024row1vb_test";
         DataType.DataTypeId[] idTypes = {OMNI_INT, OMNI_LONG, OMNI_DOUBLE, OMNI_VARCHAR, OMNI_CHAR,
-                OMNI_DATE32, OMNI_DATE64, OMNI_DECIMAL64, OMNI_DECIMAL128};
+                OMNI_DATE32, OMNI_DATE64, OMNI_DECIMAL64, OMNI_DECIMAL128, OMNI_TIMESTAMP};
         DataType[] types = dataTypeId2DataType(idTypes);
         String tmpStr = DataTypeSerializer.serialize(types);
         SparkJniWrapper jniWrapper = new SparkJniWrapper();
