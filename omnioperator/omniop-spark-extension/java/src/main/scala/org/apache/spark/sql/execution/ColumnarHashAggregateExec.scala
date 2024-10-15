@@ -40,7 +40,6 @@ import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate._
 import org.apache.spark.sql.catalyst.expressions.codegen.{CodegenContext, ExprCode}
 import org.apache.spark.sql.execution.ColumnarProjection.dealPartitionData
-import org.apache.spark.sql.execution.adaptive.{OmniAQEShuffleReadExec, ShuffleQueryStageExec}
 import org.apache.spark.sql.execution.aggregate.{AggregateCodegenSupport, BaseAggregateExec}
 import org.apache.spark.sql.execution.metric.SQLMetrics
 import org.apache.spark.sql.execution.util.SparkMemoryUtils
@@ -351,12 +350,7 @@ case class ColumnarHashAggregateExec(
       })
 
       // handle the condition: only group by cols not aggregator cols
-      if (columnarConf.enableColumnarShuffle) {
-        val isShuffle = child.isInstanceOf[ColumnarShuffleExchangeExec] || child.isInstanceOf[ShuffleQueryStageExec] || child.isInstanceOf[OmniAQEShuffleReadExec]
-        partialStep = partialStep && ! isShuffle
-      } else {
-        partialStep = partialStep && aggregateExpressions.nonEmpty
-      }
+      partialStep = partialStep && aggregateExpressions.nonEmpty
 
       // The following four conditions must be met:
       // 1. The optimization switch is truned on.
@@ -410,8 +404,24 @@ case class ColumnarHashAggregateExec(
         }
 
         override def next(): ColumnarBatch = {
-          // handle adaptive partial aggregation
-          if (hasBenefit && iter.hasNext) {
+          if (opOutput.hasNext) {
+            val startGetOp = System.nanoTime()
+            val vecBatch = opOutput.next()
+            getOutputTime += NANOSECONDS.toMillis(System.nanoTime() - startGetOp)
+            val vectors: Seq[OmniColumnVector] = OmniColumnVector.allocateColumns(
+              vecBatch.getRowCount, localSchema, false)
+            vectors.zipWithIndex.foreach { case (vector, i) =>
+              vector.reset()
+              vector.setVec(vecBatch.getVectors()(i))
+            }
+
+            numOutputRows += vecBatch.getRowCount
+            numOutputVecBatches += 1
+
+            vecBatch.close()
+            new ColumnarBatch(vectors.toArray, vecBatch.getRowCount)
+          } else if (hasBenefit && iter.hasNext) {
+            // handle adaptive partial aggregation
             val batch = iter.next()
             numInputVecBatches += 1
             numInputRows += batch.numRows()
@@ -434,21 +444,7 @@ case class ColumnarHashAggregateExec(
             outputVecBatch.close()
             new ColumnarBatch(vectors.toArray, outputVecBatch.getRowCount)
           } else {
-            val startGetOp = System.nanoTime()
-            val vecBatch = opOutput.next()
-            getOutputTime += NANOSECONDS.toMillis(System.nanoTime() - startGetOp)
-            val vectors: Seq[OmniColumnVector] = OmniColumnVector.allocateColumns(
-              vecBatch.getRowCount, localSchema, false)
-            vectors.zipWithIndex.foreach { case (vector, i) =>
-              vector.reset()
-              vector.setVec(vecBatch.getVectors()(i))
-            }
-
-            numOutputRows += vecBatch.getRowCount
-            numOutputVecBatches += 1
-
-            vecBatch.close()
-            new ColumnarBatch(vectors.toArray, vecBatch.getRowCount)
+            throw new RuntimeException("The branch should not have gone")
           }
         }
       }
