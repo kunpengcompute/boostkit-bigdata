@@ -1,44 +1,24 @@
-Subject: [PATCH] ksal crc32
+From 4f7101fe1848a21369fce3e70be2082e3fec530b Mon Sep 17 00:00:00 2001
+From: qijiawei 00649235 <qijiawei5@huawei.com>
+Date: Thu, 10 Oct 2024 19:48:26 +0800
+Subject: [PATCH] ksal crc32 code
+
 ---
-Index: build.gradle
-IDEA additional info:
-Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
-<+>UTF-8
-===================================================================
-diff --git a/build.gradle b/build.gradle
---- a/build.gradle	(revision 66563e712b0b9f84f673b262f2fb87c03110084d)
-+++ b/build.gradle	(revision 865984925db291ef1aec5bfb344038c906ccf38f)
-@@ -1032,6 +1032,13 @@
-     delete "$buildDir/kafka/"
-   }
- 
-+  task compileCrcJNI(type:Exec) {
-+    def javaHome = System.getenv('JAVA_HOME')
-+    commandLine 'gcc', '-fPIC', '-I', javaHome + '/include', '-I', javaHome + '/include/linux',
-+            '-shared', '-o', 'src/main/resources/libNativeCrc32C.so',
-+            'src/main/native/org/apache/kafka/common/utils/KsalCrc32C.c', '-lksal'
-+  }
-+
-   task processMessages(type:JavaExec) {
-     main = "org.apache.kafka.message.MessageGenerator"
-     classpath = project(':generator').sourceSets.main.runtimeClasspath
-@@ -1067,6 +1074,8 @@
- 
-   compileJava.dependsOn 'processMessages'
- 
-+  compileJava.dependsOn 'compileCrcJNI'
-+
-   compileTestJava.dependsOn 'processTestMessages'
- 
-   javadoc {
-Index: clients/src/main/java/org/apache/kafka/common/utils/Crc32C.java
-IDEA additional info:
-Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
-<+>UTF-8
-===================================================================
+ .../org/apache/kafka/common/utils/Crc32C.java |  33 ++++-
+ .../apache/kafka/common/utils/KsalCrc32C.java | 113 ++++++++++++++++++
+ .../org/apache/kafka/common/utils/Native.java |  82 +++++++++++++
+ .../apache/kafka/common/utils/KsalCrc32C.c    |  22 ++++
+ ...org_apache_kafka_common_utils_KsalCrc32C.h |  24 ++++
+ 5 files changed, 269 insertions(+), 5 deletions(-)
+ create mode 100644 clients/src/main/java/org/apache/kafka/common/utils/KsalCrc32C.java
+ create mode 100644 clients/src/main/java/org/apache/kafka/common/utils/Native.java
+ create mode 100644 clients/src/main/native/org/apache/kafka/common/utils/KsalCrc32C.c
+ create mode 100644 clients/src/main/native/org/apache/kafka/common/utils/org_apache_kafka_common_utils_KsalCrc32C.h
+
 diff --git a/clients/src/main/java/org/apache/kafka/common/utils/Crc32C.java b/clients/src/main/java/org/apache/kafka/common/utils/Crc32C.java
---- a/clients/src/main/java/org/apache/kafka/common/utils/Crc32C.java	(revision 66563e712b0b9f84f673b262f2fb87c03110084d)
-+++ b/clients/src/main/java/org/apache/kafka/common/utils/Crc32C.java	(revision 865984925db291ef1aec5bfb344038c906ccf38f)
+index dfe22e8b35..31d838640b 100644
+--- a/clients/src/main/java/org/apache/kafka/common/utils/Crc32C.java
++++ b/clients/src/main/java/org/apache/kafka/common/utils/Crc32C.java
 @@ -17,6 +17,9 @@
  
  package org.apache.kafka.common.utils;
@@ -49,7 +29,7 @@ diff --git a/clients/src/main/java/org/apache/kafka/common/utils/Crc32C.java b/c
  import java.lang.invoke.MethodHandle;
  import java.lang.invoke.MethodHandles;
  import java.lang.invoke.MethodType;
-@@ -34,13 +37,26 @@
+@@ -34,13 +37,26 @@ import java.util.zip.Checksum;
   */
  public final class Crc32C {
  
@@ -81,7 +61,7 @@ diff --git a/clients/src/main/java/org/apache/kafka/common/utils/Crc32C.java b/c
      }
  
      private Crc32C() {}
-@@ -111,4 +127,11 @@
+@@ -111,4 +127,11 @@ public final class Crc32C {
              return new PureJavaCrc32C();
          }
      }
@@ -93,16 +73,12 @@ diff --git a/clients/src/main/java/org/apache/kafka/common/utils/Crc32C.java b/c
 +        }
 +    }
  }
-Index: clients/src/main/java/org/apache/kafka/common/utils/KsalCrc32C.java
-IDEA additional info:
-Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
-<+>UTF-8
-===================================================================
 diff --git a/clients/src/main/java/org/apache/kafka/common/utils/KsalCrc32C.java b/clients/src/main/java/org/apache/kafka/common/utils/KsalCrc32C.java
 new file mode 100644
---- /dev/null	(revision 865984925db291ef1aec5bfb344038c906ccf38f)
-+++ b/clients/src/main/java/org/apache/kafka/common/utils/KsalCrc32C.java	(revision 865984925db291ef1aec5bfb344038c906ccf38f)
-@@ -0,0 +1,114 @@
+index 0000000000..7d87e2063c
+--- /dev/null
++++ b/clients/src/main/java/org/apache/kafka/common/utils/KsalCrc32C.java
+@@ -0,0 +1,113 @@
 +/*
 + * Licensed to the Apache Software Foundation (ASF) under one or more
 + * contributor license agreements. See the NOTICE file distributed with
@@ -128,7 +104,6 @@ new file mode 100644
 + * This class is an implementation of the Crc32 checksum that uses
 + * the Kunpeng Boostkit KSAL library to speed up the computation.
 + *
-+ * @since 2024/9/14
 + */
 +public class KsalCrc32C implements Checksum {
 +
@@ -209,23 +184,19 @@ new file mode 100644
 +    }
 +
 +    /**
-+     * @param seed CRC的种子
-+     * @param data CRC的字符数组
-+     * @param off 数据的起始偏移量
-+     * @param len 数组长度
-+     * @return CRC校验和
++     * @param seed seed
++     * @param data date array
++     * @param off offset
++     * @param len length
++     * @return crc32 value
 +     */
 +    public static native int update(int seed, byte[] data, int off, long len);
 +}
-Index: clients/src/main/java/org/apache/kafka/common/utils/Native.java
-IDEA additional info:
-Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
-<+>UTF-8
-===================================================================
 diff --git a/clients/src/main/java/org/apache/kafka/common/utils/Native.java b/clients/src/main/java/org/apache/kafka/common/utils/Native.java
 new file mode 100644
---- /dev/null	(revision 865984925db291ef1aec5bfb344038c906ccf38f)
-+++ b/clients/src/main/java/org/apache/kafka/common/utils/Native.java	(revision 865984925db291ef1aec5bfb344038c906ccf38f)
+index 0000000000..f99709fe62
+--- /dev/null
++++ b/clients/src/main/java/org/apache/kafka/common/utils/Native.java
 @@ -0,0 +1,82 @@
 +/*
 + * Licensed to the Apache Software Foundation (ASF) under one or more
@@ -254,7 +225,7 @@ new file mode 100644
 +import java.util.concurrent.atomic.AtomicBoolean;
 +
 +/**
-+ * @since 2024/9/20
++ * Native util to load native libraries
 + */
 +public class Native {
 +
@@ -309,15 +280,11 @@ new file mode 100644
 +        });
 +    }
 +}
-Index: clients/src/main/native/org/apache/kafka/common/utils/KsalCrc32C.c
-IDEA additional info:
-Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
-<+>UTF-8
-===================================================================
 diff --git a/clients/src/main/native/org/apache/kafka/common/utils/KsalCrc32C.c b/clients/src/main/native/org/apache/kafka/common/utils/KsalCrc32C.c
 new file mode 100644
---- /dev/null	(revision 865984925db291ef1aec5bfb344038c906ccf38f)
-+++ b/clients/src/main/native/org/apache/kafka/common/utils/KsalCrc32C.c	(revision 865984925db291ef1aec5bfb344038c906ccf38f)
+index 0000000000..cac6edeff4
+--- /dev/null
++++ b/clients/src/main/native/org/apache/kafka/common/utils/KsalCrc32C.c
 @@ -0,0 +1,22 @@
 +/*
 +* Copyright (c) Huawei Technologies Co., Ltd. 2024-2024. All rights reserved.
@@ -341,15 +308,11 @@ new file mode 100644
 +       (*env)->ReleasePrimitiveArrayCritical(env,data,array,0);
 +       return result;
 +}
-Index: clients/src/main/native/org/apache/kafka/common/utils/org_apache_kafka_common_utils_KsalCrc32C.h
-IDEA additional info:
-Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
-<+>UTF-8
-===================================================================
 diff --git a/clients/src/main/native/org/apache/kafka/common/utils/org_apache_kafka_common_utils_KsalCrc32C.h b/clients/src/main/native/org/apache/kafka/common/utils/org_apache_kafka_common_utils_KsalCrc32C.h
 new file mode 100644
---- /dev/null	(revision 865984925db291ef1aec5bfb344038c906ccf38f)
-+++ b/clients/src/main/native/org/apache/kafka/common/utils/org_apache_kafka_common_utils_KsalCrc32C.h	(revision 865984925db291ef1aec5bfb344038c906ccf38f)
+index 0000000000..6a56813f04
+--- /dev/null
++++ b/clients/src/main/native/org/apache/kafka/common/utils/org_apache_kafka_common_utils_KsalCrc32C.h
 @@ -0,0 +1,24 @@
 +/* DO NOT EDIT THIS FILE - it is machine generated */
 +#include <jni.h>
@@ -375,3 +338,6 @@ new file mode 100644
 +}
 +#endif
 +#endif
+-- 
+2.21.0.windows.1
+

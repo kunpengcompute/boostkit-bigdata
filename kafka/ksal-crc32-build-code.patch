@@ -1,0 +1,40 @@
+From 37b588774c7bc32471cd20f9d1099b866c0d64d3 Mon Sep 17 00:00:00 2001
+From: qijiawei 00649235 <qijiawei5@huawei.com>
+Date: Thu, 10 Oct 2024 19:49:48 +0800
+Subject: [PATCH] ksal crc32 build code
+
+---
+ build.gradle | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/build.gradle b/build.gradle
+index 1ed38fe334..c1a200beea 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -1032,6 +1032,14 @@ project(':clients') {
+     delete "$buildDir/kafka/"
+   }
+ 
++  task compileCrcJNI(type:Exec) {
++    def javaHome = System.getenv('JAVA_HOME')
++    commandLine 'gcc', '-fPIC', '-I', javaHome + '/include', '-I', javaHome + '/include/linux',
++            '-shared', '-o', 'src/main/resources/libNativeCrc32C.so',
++            'src/main/native/org/apache/kafka/common/utils/KsalCrc32C.c', '-lksal'
++  }
++
++
+   task processMessages(type:JavaExec) {
+     main = "org.apache.kafka.message.MessageGenerator"
+     classpath = project(':generator').sourceSets.main.runtimeClasspath
+@@ -1067,6 +1075,8 @@ project(':clients') {
+ 
+   compileJava.dependsOn 'processMessages'
+ 
++  compileJava.dependsOn 'compileCrcJNI'
++
+   compileTestJava.dependsOn 'processTestMessages'
+ 
+   javadoc {
+-- 
+2.21.0.windows.1
+
