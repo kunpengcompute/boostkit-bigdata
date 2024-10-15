@@ -18,6 +18,7 @@
 
 package com.huawei.boostkit.spark
 
+import com.huawei.boostkit.spark.ColumnarPluginConfig.ENABLE_OMNI_COLUMNAR_TO_ROW
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor
 import nova.hetu.omniruntime.memory.MemoryManager
 
@@ -854,7 +855,7 @@ case class ColumnarPostOverrides() extends Rule[SparkPlan] {
       replaceWithColumnarPlan(child)
     case plan: ColumnarToRowExec =>
       val child = replaceWithColumnarPlan(plan.child)
-      if (conf.getConfString("spark.omni.sql.columnar.columnarToRow", "true").toBoolean) {
+      if (conf.getConf(ENABLE_OMNI_COLUMNAR_TO_ROW)) {
         OmniColumnarToRowExec(child)
       } else {
         ColumnarToRowExec(child)
