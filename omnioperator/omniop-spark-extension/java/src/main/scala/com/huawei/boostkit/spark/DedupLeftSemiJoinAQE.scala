@@ -35,11 +35,9 @@ case class DedupLeftSemiJoinAQE(session: SparkSession) extends Rule[SparkPlan] {
 
 
   private def matchDedupLeftSemiJoinCondition(shj: ShuffledHashJoinExec): Boolean = {
-    val conf = session.sessionState.conf
-    val enableDedupLeftSemiJoin: Boolean =
-      conf.getConfString("spark.omni.sql.columnar.dedupLeftSemiJoin", "false").toBoolean
-    val dedupLeftSemiJoinThreshold: Int =
-      conf.getConfString("spark.omni.sql.columnar.dedupLeftSemiJoinThreshold", "3").toInt
+    val conf = ColumnarPluginConfig.getSessionConf
+    val enableDedupLeftSemiJoin: Boolean = conf.enableDedupLeftSemiJoin
+    val dedupLeftSemiJoinThreshold: Int = conf.dedupLeftSemiJoinThreshold
 
     shj.joinType match {
       case LeftSemi if enableDedupLeftSemiJoin && shj.condition.isEmpty && shj.right.isInstanceOf[ShuffleExchangeExec] && (shj.right.output.size >= dedupLeftSemiJoinThreshold) => true

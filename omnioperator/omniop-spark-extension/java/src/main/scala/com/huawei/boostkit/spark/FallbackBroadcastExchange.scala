@@ -18,20 +18,18 @@
 
 package com.huawei.boostkit.spark
 
-import com.huawei.boostkit.spark.ColumnarPluginConfig.OMNI_BROADCAST_EXCHANGE_ENABLE_KEY
 import com.huawei.boostkit.spark.util.PhysicalPlanSelector
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.rules.Rule
-import org.apache.spark.sql.execution.{ColumnarBroadcastExchangeExec, SparkPlan}
 import org.apache.spark.sql.execution.exchange.BroadcastExchangeExec
+import org.apache.spark.sql.execution.{ColumnarBroadcastExchangeExec, SparkPlan}
 
 case class FallbackBroadcastExchange(session: SparkSession) extends Rule[SparkPlan] {
 
   override def apply(plan: SparkPlan): SparkPlan = PhysicalPlanSelector.maybe(session, plan) {
 
-    val SQLconf = session.sessionState.conf
     val enableColumnarBroadcastExchange: Boolean =
-      SQLconf.getConfString(OMNI_BROADCAST_EXCHANGE_ENABLE_KEY, "true").toBoolean
+      ColumnarPluginConfig.getSessionConf.enableColumnarBroadcastExchange
 
     plan.foreach {
       case exec: BroadcastExchangeExec =>

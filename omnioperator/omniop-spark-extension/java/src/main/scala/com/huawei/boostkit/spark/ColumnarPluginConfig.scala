@@ -18,294 +18,184 @@
 
 package com.huawei.boostkit.spark
 
-import com.huawei.boostkit.spark.ColumnarPluginConfig.{OMNI_BROADCAST_EXCHANGE_ENABLE_KEY}
+import com.huawei.boostkit.spark.ColumnarPluginConfig._
 import org.apache.spark.SparkEnv
 import org.apache.spark.internal.Logging
 import org.apache.spark.shuffle.sort.ColumnarShuffleManager
 import org.apache.spark.sql.internal.SQLConf
 
 class ColumnarPluginConfig(conf: SQLConf) extends Logging {
-  // enable or disable columnar exchange
-  val columnarShuffleStr: String = conf
+  def columnarShuffleStr: String = conf
     .getConfString("spark.shuffle.manager", "sort")
 
-  val enableColumnarShuffle: Boolean =
+  def enableColumnarShuffle: Boolean =
     if (!(columnarShuffleStr.equals("sort") || (columnarShuffleStr.equals("tungsten-sort")))) {
       SparkEnv.get.shuffleManager.isInstanceOf[ColumnarShuffleManager]
     } else {
       false
     }
 
-  // enable or disable columnar hashagg
-  val enableColumnarHashAgg: Boolean =
-    conf.getConfString("spark.omni.sql.columnar.hashagg", "true").toBoolean
+  def enableColumnarHashAgg: Boolean = conf.getConf(ENABLE_COLUMNAR_HASH_AGG)
 
-  val enableColumnarProject: Boolean =
-    conf.getConfString("spark.omni.sql.columnar.project", "true").toBoolean
+  def enableColumnarProject: Boolean = conf.getConf(ENABLE_COLUMNAR_PROJECT)
 
-  val enableColumnarProjFilter: Boolean =
-    conf.getConfString("spark.omni.sql.columnar.projfilter", "true").toBoolean
+  def enableColumnarProjFilter: Boolean = conf.getConf(ENABLE_COLUMNAR_PROJ_FILTER)
 
-  val enableColumnarFilter: Boolean =
-    conf.getConfString("spark.omni.sql.columnar.filter", "true").toBoolean
+  def enableColumnarFilter: Boolean = conf.getConf(ENABLE_COLUMNAR_FILTER)
 
-  val enableColumnarExpand: Boolean =
-    conf.getConfString("spark.omni.sql.columnar.expand", "true").toBoolean
+  def enableColumnarExpand: Boolean = conf.getConf(ENABLE_COLUMNAR_EXPAND)
 
-  // enable or disable columnar sort
-  val enableColumnarSort: Boolean =
-    conf.getConfString("spark.omni.sql.columnar.sort", "true").toBoolean
+  def enableColumnarSort: Boolean =  conf.getConf(ENABLE_COLUMNAR_SORT)
 
-  // enable or disable columnar TopNSort
-  val enableColumnarTopNSort: Boolean =
-    conf.getConfString("spark.omni.sql.columnar.topNSort", "true").toBoolean
+  def enableColumnarTopNSort: Boolean = conf.getConf(ENABLE_COLUMNAR_TOP_N_SORT)
 
-  val enableColumnarUnion: Boolean =
-    conf.getConfString("spark.omni.sql.columnar.union", "true").toBoolean
+  def enableColumnarUnion: Boolean = conf.getConf(ENABLE_COLUMNAR_UNION)
 
-  // enable or disable columnar window
-  val enableColumnarWindow: Boolean =
-    conf.getConfString("spark.omni.sql.columnar.window", "true").toBoolean
+  def enableColumnarWindow: Boolean = conf.getConf(ENABLE_COLUMNAR_WINDOW)
 
-  // enable or disable columnar broadcastexchange
-  val enableColumnarBroadcastExchange: Boolean =
-    conf.getConfString(OMNI_BROADCAST_EXCHANGE_ENABLE_KEY, "true").toBoolean
+  def enableColumnarBroadcastExchange: Boolean = conf.getConf(ENABLE_COLUMNAR_BROADCAST_EXCHANGE)
 
-  // enable or disable columnar wholestagecodegen
-  val enableColumnarWholeStageCodegen: Boolean =
-    conf.getConfString("spark.omni.sql.columnar.wholestagecodegen", "true").toBoolean
+  def enableColumnarWholeStageCodegen: Boolean = conf.getConf(ENABLE_COLUMNAR_WHOLE_STAGE_CODEGEN)
 
-  // enable or disable columnar BroadcastHashJoin
-  val enableColumnarBroadcastJoin: Boolean = conf
-    .getConfString("spark.omni.sql.columnar.broadcastJoin", "true")
-    .toBoolean
+  def enableColumnarBroadcastJoin: Boolean = conf.getConf(ENABLE_COLUMNAR_BROADCAST_JOIN)
 
-  // enable or disable share columnar BroadcastHashJoin hashtable
-  val enableShareBroadcastJoinHashTable: Boolean = conf
-    .getConfString("spark.omni.sql.columnar.broadcastJoin.sharehashtable", "true")
-    .toBoolean
+  def enableShareBroadcastJoinHashTable: Boolean = conf.getConf(ENABLE_SHARE_BROADCAST_JOIN_HASH_TABLE)
 
-  // enable or disable heuristic join reorder
-  val enableHeuristicJoinReorder: Boolean =
-    conf.getConfString("spark.sql.heuristicJoinReorder.enabled", "true").toBoolean
+  def enableHeuristicJoinReorder: Boolean = conf.getConf(ENABLE_HEURISTIC_JOIN_REORDER)
 
-  // enable or disable delay cartesian product
-  val enableDelayCartesianProduct: Boolean =
-    conf.getConfString("spark.sql.enableDelayCartesianProduct.enabled", "true").toBoolean
+  def enableDelayCartesianProduct: Boolean = conf.getConf(ENABLE_DELAY_CARTESIAN_PRODUCT)
 
-  // enable native table scan
-  val enableColumnarFileScan: Boolean = conf
-    .getConfString("spark.omni.sql.columnar.nativefilescan", "true")
-    .toBoolean
+  def enableColumnarFileScan: Boolean = conf.getConf(ENABLE_COLUMNAR_FILE_SCAN)
 
-  // enable orc native table scan
-  val enableOrcNativeFileScan: Boolean = conf
-    .getConfString("spark.omni.sql.columnar.orcNativefilescan", "true")
-    .toBoolean
+  def enableOrcNativeFileScan: Boolean = conf.getConf(ENABLE_ORC_NATIVE_FILE_SCAN)
 
-  // enable parquet native table scan
-  val enableParquetNativeFileScan: Boolean = conf
-    .getConfString("spark.omni.sql.columnar.parquetNativefilescan", "true")
-    .toBoolean
+  def enableParquetNativeFileScan: Boolean = conf.getConf(ENABLE_PARQUET_NATIVE_FILE_SCAN)
 
-  val enableColumnarSortMergeJoin: Boolean = conf
-    .getConfString("spark.omni.sql.columnar.sortMergeJoin", "true")
-    .toBoolean
+  def enableColumnarSortMergeJoin: Boolean = conf.getConf(ENABLE_COLUMNAR_SORT_MERGE_JOIN)
 
-  val enableColumnarDataWritingCommand: Boolean = conf
-    .getConfString("spark.omni.sql.columnar.dataWritingCommand", "true")
-    .toBoolean
+  def enableColumnarDataWritingCommand: Boolean = conf.getConf(ENABLE_COLUMNAR_DATA_WRITING_COMMAND)
 
-  val enableTakeOrderedAndProject: Boolean = conf
-    .getConfString("spark.omni.sql.columnar.takeOrderedAndProject", "true").toBoolean
-
-  val enableShuffleBatchMerge: Boolean = conf
-    .getConfString("spark.omni.sql.columnar.shuffle.merge", "true").toBoolean
-
-  val enableJoinBatchMerge: Boolean = conf
-    .getConfString("spark.omni.sql.columnar.broadcastJoin.merge", "false").toBoolean
+  def enableTakeOrderedAndProject: Boolean = conf.getConf(ENABLE_TAKE_ORDERED_AND_PROJECT)
 
-  val enableSortMergeJoinBatchMerge: Boolean = conf
-    .getConfString("spark.omni.sql.columnar.sortMergeJoin.merge", "false").toBoolean
+  def enableShuffleBatchMerge: Boolean = conf.getConf(ENABLE_SHUFFLE_BATCH_MERGE)
 
-  // prefer to use columnar operators if set to true
-  val enablePreferColumnar: Boolean =
-    conf.getConfString("spark.omni.sql.columnar.preferColumnar", "true").toBoolean
+  def enableJoinBatchMerge: Boolean =  conf.getConf(ENABLE_JOIN_BATCH_MERGE)
 
-  // fallback to row operators if there are several continous joins
-  val joinOptimizationThrottle: Integer =
-    conf.getConfString("spark.omni.sql.columnar.joinOptimizationLevel", "12").toInt
+  def enableSortMergeJoinBatchMerge: Boolean = conf.getConf(ENABLE_SORT_MERGE_JOIN_BATCH_MERGE)
 
-  // columnar shuffle spill batch row number
-  val columnarShuffleSpillBatchRowNum =
-    conf.getConfString("spark.shuffle.columnar.shuffleSpillBatchRowNum", "10000").toInt
+  def enablePreferColumnar: Boolean = conf.getConf(ENABLE_PREFER_COLUMNAR)
 
-  // columnar shuffle spill memory threshold in task level
-  val columnarShuffleTaskSpillMemoryThreshold =
-    conf.getConfString("spark.shuffle.columnar.shuffleTaskSpillMemoryThreshold",
-      "2147483648").toLong
+  def joinOptimizationThrottle: Int = conf.getConf(JOIN_OPTIMIZATION_THROTTLE)
 
-  // columnar shuffle compress block size
-  val columnarShuffleCompressBlockSize =
-    conf.getConfString("spark.shuffle.columnar.compressBlockSize", "65536").toInt
+  def columnarShuffleSpillBatchRowNum: Int = conf.getConf(COLUMNAR_SHUFFLE_SPILL_BATCH_ROW_NUM)
 
-  // enable shuffle compress
-  val enableShuffleCompress =
-    conf.getConfString("spark.shuffle.compress", "true").toBoolean
+  def columnarShuffleTaskSpillMemoryThreshold: Long = conf.getConf(COLUMNAR_SHUFFLE_TASK_SPILL_MEMORY_THRESHOLD)
 
-  // shuffle compress type, default lz4
-  val columnarShuffleCompressionCodec =
-    conf.getConfString("spark.io.compression.codec", "lz4").toString
+  def columnarShuffleCompressBlockSize: Int = conf.getConf(COLUMNAR_SHUFFLE_COMPRESS_BLOCK_SIZE)
 
-  // columnar shuffle native buffer size
-  val columnarShuffleNativeBufferSize =
-    conf.getConfString("spark.sql.execution.columnar.maxRecordsPerBatch", "4096").toInt
+  def enableShuffleCompress: Boolean = conf.getConfString("spark.shuffle.compress", "true").toBoolean
 
-  val columnarSpillWriteBufferSize: Long =
-    conf.getConfString("spark.omni.sql.columnar.spill.writeBufferSize", "4121440").toLong
+  def columnarShuffleCompressionCodec: String = conf.getConfString("spark.io.compression.codec", "lz4")
 
-  // columnar spill threshold - Percentage of memory usage, associate with the "spark.memory.offHeap" together
-  val columnarSpillMemPctThreshold: Integer =
-    conf.getConfString("spark.omni.sql.columnar.spill.memFraction", "90").toInt
+  def columnarShuffleNativeBufferSize: Int = conf.getConf(COLUMNAR_SHUFFLE_NATIVE_BUFFER_SIZE)
 
-  // columnar spill dir disk reserve Size, default 10GB
-  val columnarSpillDirDiskReserveSize: Long =
-    conf.getConfString("spark.omni.sql.columnar.spill.dirDiskReserveSize", "10737418240").toLong
+  def columnarSpillWriteBufferSize: Long = conf.getConf(COLUMNAR_SPILL_WRITE_BUFFER_SIZE)
 
-  // enable or disable columnar sort spill
-  val enableSortSpill: Boolean = conf
-    .getConfString("spark.omni.sql.columnar.sortSpill.enabled", "true").toBoolean
+  def columnarSpillMemPctThreshold: Int = conf.getConf(COLUMNAR_SPILL_MEM_PCT_THRESHOLD)
 
-  // columnar sort spill threshold
-  val columnarSortSpillRowThreshold: Integer =
-    conf.getConfString("spark.omni.sql.columnar.sortSpill.rowThreshold", Integer.MAX_VALUE.toString).toInt  
+  def columnarSpillDirDiskReserveSize: Long = conf.getConf(COLUMNAR_SPILL_DIR_DISK_RESERVE_SIZE)
 
-  // enable or disable columnar window spill
-  val enableWindowSpill: Boolean = conf
-    .getConfString("spark.omni.sql.columnar.windowSpill.enabled", "true").toBoolean
+  def enableSortSpill: Boolean = conf.getConf(ENABLE_SORT_SPILL)
 
-  // columnar window spill threshold
-  val columnarWindowSpillRowThreshold: Integer =
-    conf.getConfString("spark.omni.sql.columnar.windowSpill.rowThreshold", Integer.MAX_VALUE.toString).toInt
+  def columnarSortSpillRowThreshold: Int = conf.getConf(COLUMNAR_SORT_SPILL_ROW_THRESHOLD)
 
-  // enable or disable columnar hash aggregate spill
-  val enableHashAggSpill: Boolean = conf
-    .getConfString("spark.omni.sql.columnar.hashAggSpill.enabled", "true").toBoolean
+  def enableWindowSpill: Boolean = conf.getConf(ENABLE_WINDOW_SPILL)
 
-  // columnar hash aggregate spill threshold
-  val columnarHashAggSpillRowThreshold: Integer =
-    conf.getConfString("spark.omni.sql.columnar.hashAggSpill.rowThreshold", Integer.MAX_VALUE.toString).toInt  
+  def columnarWindowSpillRowThreshold: Int = conf.getConf(COLUMNAR_WINDOW_SPILL_ROW_THRESHOLD)
 
-  // enable or disable columnar shuffledHashJoin
-  val enableShuffledHashJoin: Boolean = conf
-    .getConfString("spark.omni.sql.columnar.shuffledHashJoin", "true")
-    .toBoolean
+  def enableHashAggSpill: Boolean = conf.getConf(ENABLE_HASH_AGG_SPILL)
 
-  // enable or disable force shuffle hash join
-  val forceShuffledHashJoin: Boolean = conf
-    .getConfString("spark.omni.sql.columnar.forceShuffledHashJoin", "true")
-    .toBoolean
+  def columnarHashAggSpillRowThreshold: Int = conf.getConf(COLUMNAR_HASH_AGG_SPILL_ROW_THRESHOLD)
 
-  // enable or disable rewrite self join in Predicate to aggregate
-  val enableRewriteSelfJoinInInPredicate: Boolean = conf
-    .getConfString("spark.omni.sql.columnar.RewriteSelfJoinInInPredicate", "false")
-    .toBoolean
+  def enableShuffledHashJoin: Boolean = conf.getConf(ENABLE_SHUFFLED_HASH_JOIN)
 
-  val enableFusion: Boolean = conf
-    .getConfString("spark.omni.sql.columnar.fusion", "false")
-    .toBoolean
+  def forceShuffledHashJoin: Boolean = conf.getConf(FORCE_SHUFFLED_HASH_JOIN)
 
-  // Pick columnar shuffle hash join if one side join count > = 0 to build local hash map, and is
-  // bigger than the other side join count, and `spark.sql.join.columnar.preferShuffledHashJoin`
-  // is true.
-  val columnarPreferShuffledHashJoin =
-    conf.getConfString("spark.sql.join.columnar.preferShuffledHashJoin", "false").toBoolean
+  def enableRewriteSelfJoinInInPredicate: Boolean = conf.getConf(ENABLE_REWRITE_SELF_JOIN_IN_IN_PREDICATE)
 
-  val maxBatchSizeInBytes =
-    conf.getConfString("spark.sql.columnar.maxBatchSizeInBytes", "2097152").toInt
+  def enableFusion: Boolean = conf.getConf(ENABLE_FUSION)
 
-  val maxRowCount =
-    conf.getConfString("spark.sql.columnar.maxRowCount", "20000").toInt
+  def columnarPreferShuffledHashJoin: Boolean = conf.getConf(COLUMNAR_PREFER_SHUFFLED_HASH_JOIN)
 
-  val mergedBatchThreshold =
-    conf.getConfString("spark.sql.columnar.mergedBatchThreshold", "100").toInt
+  def maxBatchSizeInBytes: Int = conf.getConf(MAX_BATCH_SIZE_IN_BYTES)
 
-  val enableColumnarUdf: Boolean = conf.getConfString("spark.omni.sql.columnar.udf", "true").toBoolean
+  def maxRowCount: Int = conf.getConf(MAX_ROW_COUNT)
 
-  val enableOmniExpCheck : Boolean = conf.getConfString("spark.omni.sql.omniExp.check", "true").toBoolean
+  def mergedBatchThreshold: Int = conf.getConf(MERGED_BATCH_THRESHOLD)
 
-  val enableColumnarProjectFusion : Boolean = conf.getConfString("spark.omni.sql.columnar.projectFusion", "true").toBoolean
+  def enableColumnarUdf: Boolean = conf.getConf(ENABLE_COLUMNAR_UDF)
 
-  val enableLocalColumnarLimit : Boolean = conf.getConfString("spark.omni.sql.columnar.localLimit", "true").toBoolean
+  def enableOmniExpCheck : Boolean = conf.getConf(ENABLE_OMNI_EXP_CHECK)
 
-  val enableGlobalColumnarLimit : Boolean = conf.getConfString("spark.omni.sql.columnar.globalLimit", "true").toBoolean
+  def enableColumnarProjectFusion : Boolean = conf.getConf(ENABLE_COLUMNAR_PROJECT_FUSION)
 
-  val topNPushDownForWindowThreshold = conf.getConfString("spark.sql.execution.topNPushDownForWindow.threshold", "100").toInt
+  def enableLocalColumnarLimit : Boolean = conf.getConf(ENABLE_LOCAL_COLUMNAR_LIMIT)
 
-  val topNPushDownForWindowEnable: Boolean = conf.getConfString("spark.sql.execution.topNPushDownForWindow.enabled", "true").toBoolean
+  def enableGlobalColumnarLimit : Boolean = conf.getConf(ENABLE_GLOBAL_COLUMNAR_LIMIT)
 
-  val pushOrderedLimitThroughAggEnable: Boolean =  conf.getConfString("spark.omni.sql.columnar.pushOrderedLimitThroughAggEnable.enabled", "false").toBoolean
-  // enable or disable deduplicate the right side of left semi join
-  val enableDedupLeftSemiJoin: Boolean =
-    conf.getConfString("spark.omni.sql.columnar.dedupLeftSemiJoin", "false").toBoolean
+  def topNPushDownForWindowThreshold: Int = conf.getConf(TOP_N_PUSH_DOWN_FOR_WINDOW_THRESHOLD)
 
-  val dedupLeftSemiJoinThreshold: Int =
-    conf.getConfString("spark.omni.sql.columnar.dedupLeftSemiJoinThreshold", "3").toInt
+  def topNPushDownForWindowEnable: Boolean = conf.getConf(TOP_N_PUSH_DOWN_FOR_WINDOW_ENABLE)
 
-  val combineJoinedAggregatesEnabled: Boolean = conf.getConfString("spark.omni.sql.columnar.combineJoinedAggregates.enabled", "false").toBoolean
+  def pushOrderedLimitThroughAggEnable: Boolean =  conf.getConf(PUSH_ORDERED_LIMIT_THROUGH_AGG_ENABLE)
 
-  val filterMergeEnable: Boolean = conf.getConfString("spark.sql.execution.filterMerge.enabled", "false").toBoolean
+  def enableDedupLeftSemiJoin: Boolean = conf.getConf(ENABLE_DEDUP_LEFT_SEMI_JOIN)
 
-  val filterMergeThreshold: Double = conf.getConfString("spark.sql.execution.filterMerge.maxCost", "100.0").toDouble
+  def dedupLeftSemiJoinThreshold: Int = conf.getConf(DEDUP_LEFT_SEMI_JOIN_THRESHOLD)
 
-  // enable or disable columnar CoalesceExec
-  val enableColumnarCoalesce: Boolean = conf
-    .getConfString("spark.omni.sql.columnar.coalesce", "true")
-    .toBoolean
-  val enableRollupOptimization: Boolean = conf.getConfString("spark.omni.sql.columnar.rollupOptimization.enabled", "true").toBoolean
+  def combineJoinedAggregatesEnabled: Boolean = conf.getConf(COMBINE_JOINED_AGGREGATES_ENABLED)
 
-    // enable or disable radix sort
-  val enableRadixSort: Boolean =
-    conf.getConfString("spark.omni.sql.columnar.radixSort.enabled", "false").toBoolean
+  def filterMergeEnable: Boolean = conf.getConf(FILTER_MERGE_ENABLE)
 
-  val radixSortThreshold: Int =
-    conf.getConfString("spark.omni.sql.columnar.radixSortThreshold", "1000000").toInt
+  def filterMergeThreshold: Double = conf.getConf(FILTER_MERGE_THRESHOLD)
 
-  // enable or disable row shuffle
-  val enableRowShuffle: Boolean =
-    conf.getConfString("spark.omni.sql.columnar.rowShuffle.enabled", "true").toBoolean
+  def enableColumnarCoalesce: Boolean = conf.getConf(ENABLE_COLUMNAR_COALESCE)
 
-  val columnsThreshold: Int =
-    conf.getConfString("spark.omni.sql.columnar.columnsThreshold", "10").toInt
+  def enableRadixSort: Boolean = conf.getConf(ENABLE_RADIX_SORT)
 
-  // enable or disable bloomfilter subquery reuse
-  val enableBloomfilterSubqueryReuse: Boolean =
-    conf.getConfString("spark.omni.sql.columnar.bloomfilterSubqueryReuse", "false").toBoolean
+  def enableRollupOptimization: Boolean = conf.getConf(ENABLE_ROLLUP_OPTIMIZATION)
 
-  // The threshold for whether whole stage will fall back in AQE supported case by counting the number of vanilla SparkPlan.
-  // If it is set to -1, it means that this function is turned off
-  // otherwise, when the number of vanilla SparkPlan of the stage is greater than or equal to the threshold,
-  // all the SparkPlan of the stage will be fallback to vanilla SparkPlan
-  val wholeStageFallbackThreshold: Int = conf.getConfString("spark.omni.sql.columnar.wholeStage.fallback.threshold", "-1").toInt
+  def radixSortThreshold: Int = conf.getConf(RADIX_SORT_THRESHOLD)
 
-  // it is same with wholeStageFallbackThreshold, but it is used for non AQE
-  val queryFallbackThreshold: Int = conf.getConfString("spark.omni.sql.columnar.query.fallback.threshold", "-1").toInt
+  def enableRowShuffle: Boolean = conf.getConf(ENABLE_ROW_SHUFFLE)
 
-  // enable or disable adaptive partial aggregation
-  val enableAdaptivePartialAggregation: Boolean =
-    conf.getConfString("spark.omni.sql.columnar.adaptivePartialAggregation.enabled", "false").toBoolean
+  def columnsThreshold: Int = conf.getConf(COLUMNS_THRESHOLD)
 
-  val adaptivePartialAggregationMinRows: Int =
-    conf.getConfString("spark.omni.sql.columnar.adaptivePartialAggregationMinRows", "500000").toInt
+  def enableBloomfilterSubqueryReuse: Boolean = conf.getConf(ENABLE_BLOOMFILTER_SUBQUERY_REUSE)
 
-  val adaptivePartialAggregationRatio: Double =
-    conf.getConfString("spark.omni.sql.columnar.adaptivePartialAggregationRatio", "0.8").toDouble
+  def wholeStageFallbackThreshold: Int = conf.getConf(WHOLE_STAGE_FALLBACK_THRESHOLD)
+
+  def queryFallbackThreshold: Int = conf.getConf(QUERY_FALLBACK_THRESHOLD)
+
+  def enableAdaptivePartialAggregation: Boolean = conf.getConf(ENABLE_ADAPTIVE_PARTIAL_AGGREGATION)
+
+  def adaptivePartialAggregationMinRows: Int = conf.getConf(ADAPTIVE_PARTIAL_AGGREGATION_MIN_ROWS)
+
+  def adaptivePartialAggregationRatio: Double = conf.getConf(ADAPTIVE_PARTIAL_AGGREGATION_RATIO)
+
 }
 
 
 object ColumnarPluginConfig {
 
+  import SQLConf._
+
   val OMNI_ENABLE_KEY: String = "spark.omni.enabled"
+
+  buildConf(OMNI_ENABLE_KEY)
+    .internal()
+    .booleanConf
+    .createWithDefault(true)
 
   val OMNI_BROADCAST_EXCHANGE_ENABLE_KEY = "spark.omni.sql.columnar.broadcastexchange"
 
@@ -321,4 +211,429 @@ object ColumnarPluginConfig {
   def getSessionConf: ColumnarPluginConfig = {
     new ColumnarPluginConfig(SQLConf.get)
   }
+
+  val ENABLE_COLUMNAR_HASH_AGG = buildConf("spark.omni.sql.columnar.hashagg")
+    .internal()
+    .doc("enable or disable columnar hashagg")
+    .booleanConf
+    .createWithDefault(true)
+
+  val ENABLE_COLUMNAR_PROJECT = buildConf("spark.omni.sql.columnar.project")
+    .internal()
+    .doc("enable or disable columnar project")
+    .booleanConf
+    .createWithDefault(true)
+
+  val ENABLE_COLUMNAR_PROJ_FILTER =  buildConf("spark.omni.sql.columnar.projfilter")
+    .internal()
+    .doc("enable or disable columnar project filter")
+    .booleanConf
+    .createWithDefault(true)
+
+  val ENABLE_COLUMNAR_FILTER = buildConf("spark.omni.sql.columnar.filter")
+    .internal()
+    .doc("enable or disable columnar filter")
+    .booleanConf
+    .createWithDefault(true)
+
+  val ENABLE_COLUMNAR_EXPAND = buildConf("spark.omni.sql.columnar.expand")
+    .internal()
+    .doc("enable or disable columnar project expand")
+    .booleanConf
+    .createWithDefault(true)
+
+  val ENABLE_COLUMNAR_SORT = buildConf("spark.omni.sql.columnar.sort")
+    .internal()
+    .doc("enable or disable columnar project sort")
+    .booleanConf
+    .createWithDefault(true)
+
+  val ENABLE_COLUMNAR_TOP_N_SORT = buildConf("spark.omni.sql.columnar.topNSort")
+    .internal()
+    .doc("enable or disable columnar TopNSort")
+    .booleanConf
+    .createWithDefault(true)
+
+  val ENABLE_COLUMNAR_UNION = buildConf("spark.omni.sql.columnar.union")
+    .internal()
+    .doc("enable or disable columnar union")
+    .booleanConf
+    .createWithDefault(true)
+
+  val ENABLE_COLUMNAR_WINDOW = buildConf("spark.omni.sql.columnar.window")
+    .internal()
+    .doc("enable or disable columnar window")
+    .booleanConf
+    .createWithDefault(true)
+
+  val ENABLE_COLUMNAR_BROADCAST_EXCHANGE = buildConf(OMNI_BROADCAST_EXCHANGE_ENABLE_KEY)
+    .internal()
+    .doc("enable or disable columnar broadcastexchange")
+    .booleanConf
+    .createWithDefault(true)
+
+  val ENABLE_COLUMNAR_WHOLE_STAGE_CODEGEN = buildConf("spark.omni.sql.columnar.wholestagecodegen")
+    .internal()
+    .doc("enable or disable columnar wholestagecodegen")
+    .booleanConf
+    .createWithDefault(true)
+
+  val ENABLE_COLUMNAR_BROADCAST_JOIN = buildConf("spark.omni.sql.columnar.broadcastJoin")
+    .internal()
+    .doc("enable or disable columnar broadcastJoin")
+    .booleanConf
+    .createWithDefault(true)
+
+  val ENABLE_SHARE_BROADCAST_JOIN_HASH_TABLE = buildConf("spark.omni.sql.columnar.broadcastJoin.sharehashtable")
+    .internal()
+    .doc("enable or disable share columnar BroadcastHashJoin hashtable")
+    .booleanConf
+    .createWithDefault(true)
+
+  val ENABLE_HEURISTIC_JOIN_REORDER = buildConf("spark.sql.heuristicJoinReorder.enabled")
+    .internal()
+    .doc("enable or disable heuristic join reorder")
+    .booleanConf
+    .createWithDefault(true)
+
+  val ENABLE_DELAY_CARTESIAN_PRODUCT = buildConf("spark.sql.enableDelayCartesianProduct.enabled")
+    .internal()
+    .doc("enable or disable delay cartesian product")
+    .booleanConf
+    .createWithDefault(true)
+
+  val ENABLE_COLUMNAR_FILE_SCAN = buildConf("spark.omni.sql.columnar.nativefilescan")
+    .internal()
+    .doc("enable native table scan")
+    .booleanConf
+    .createWithDefault(true)
+
+  val ENABLE_ORC_NATIVE_FILE_SCAN = buildConf("spark.omni.sql.columnar.orcNativefilescan")
+    .internal()
+    .doc("enable orc native table scan")
+    .booleanConf
+    .createWithDefault(true)
+
+  val ENABLE_PARQUET_NATIVE_FILE_SCAN = buildConf("spark.omni.sql.columnar.parquetNativefilescan")
+    .internal()
+    .doc("enable parquet native table scan")
+    .booleanConf
+    .createWithDefault(true)
+
+  val ENABLE_COLUMNAR_SORT_MERGE_JOIN = buildConf("spark.omni.sql.columnar.sortMergeJoin")
+    .internal()
+    .doc("enable columnar sortMergeJoin")
+    .booleanConf
+    .createWithDefault(true)
+
+  val ENABLE_COLUMNAR_DATA_WRITING_COMMAND = buildConf("spark.omni.sql.columnar.dataWritingCommand")
+    .internal()
+    .doc("enable columnar dataWritingCommand")
+    .booleanConf
+    .createWithDefault(true)
+
+  val ENABLE_TAKE_ORDERED_AND_PROJECT = buildConf("spark.omni.sql.columnar.takeOrderedAndProject")
+    .internal()
+    .doc("enable columnar takeOrderedAndProject")
+    .booleanConf
+    .createWithDefault(true)
+
+  val ENABLE_SHUFFLE_BATCH_MERGE = buildConf("spark.omni.sql.columnar.shuffle.merge")
+    .internal()
+    .doc("enable columnar shuffle merge")
+    .booleanConf
+    .createWithDefault(true)
+
+  val ENABLE_JOIN_BATCH_MERGE = buildConf("spark.omni.sql.columnar.broadcastJoin.merge")
+    .internal()
+    .doc("enable columnar broadcastJoin merge")
+    .booleanConf
+    .createWithDefault(false)
+
+  val ENABLE_SORT_MERGE_JOIN_BATCH_MERGE = buildConf("spark.omni.sql.columnar.sortMergeJoin.merge")
+    .internal()
+    .doc("enable columnar sortMergeJoin merge")
+    .booleanConf
+    .createWithDefault(false)
+
+  val ENABLE_PREFER_COLUMNAR = buildConf("spark.omni.sql.columnar.preferColumnar")
+    .internal()
+    .doc("prefer to use columnar operators if set to true")
+    .booleanConf
+    .createWithDefault(true)
+
+  val JOIN_OPTIMIZATION_THROTTLE = buildConf("spark.omni.sql.columnar.joinOptimizationLevel")
+    .internal()
+    .doc("fallback to row operators if there are several continous joins")
+    .intConf
+    .createWithDefault(12)
+
+  val COLUMNAR_SHUFFLE_SPILL_BATCH_ROW_NUM = buildConf("spark.shuffle.columnar.shuffleSpillBatchRowNum")
+    .internal()
+    .doc("columnar shuffle spill batch row number")
+    .intConf
+    .createWithDefault(10000)
+
+  val COLUMNAR_SHUFFLE_TASK_SPILL_MEMORY_THRESHOLD = buildConf("spark.shuffle.columnar.shuffleTaskSpillMemoryThreshold")
+    .internal()
+    .doc("columnar shuffle spill memory threshold in task level")
+    .longConf
+    .createWithDefault(2147483648L)
+
+  val COLUMNAR_SHUFFLE_COMPRESS_BLOCK_SIZE = buildConf("spark.shuffle.columnar.compressBlockSize")
+    .internal()
+    .doc("columnar shuffle compress block size")
+    .intConf
+    .createWithDefault(65536)
+
+  val COLUMNAR_SHUFFLE_NATIVE_BUFFER_SIZE = buildConf("spark.sql.execution.columnar.maxRecordsPerBatch")
+    .internal()
+    .doc("columnar shuffle native buffer size")
+    .intConf
+    .createWithDefault(4096)
+
+  val COLUMNAR_SPILL_WRITE_BUFFER_SIZE = buildConf("spark.omni.sql.columnar.spill.writeBufferSize")
+    .internal()
+    .doc("columnar spill native buffer size")
+    .longConf
+    .createWithDefault(4121440L)
+
+  val COLUMNAR_SPILL_MEM_PCT_THRESHOLD = buildConf("spark.omni.sql.columnar.spill.memFraction")
+    .internal()
+    .doc("columnar spill threshold - Percentage of memory usage," +
+      " associate with the \"spark.memory.offHeap\" together")
+    .intConf
+    .createWithDefault(90)
+
+  val COLUMNAR_SPILL_DIR_DISK_RESERVE_SIZE = buildConf("spark.omni.sql.columnar.spill.dirDiskReserveSize")
+    .internal()
+    .doc("columnar spill dir disk reserve Size, default 10GB")
+    .longConf
+    .createWithDefault(10737418240L)
+
+  val ENABLE_SORT_SPILL = buildConf("spark.omni.sql.columnar.sortSpill.enabled")
+    .internal()
+    .doc("enable or disable columnar sort spill")
+    .booleanConf
+    .createWithDefault(true)
+
+  val COLUMNAR_SORT_SPILL_ROW_THRESHOLD = buildConf("spark.omni.sql.columnar.sortSpill.rowThreshold")
+    .internal()
+    .doc("columnar sort spill threshold")
+    .intConf
+    .createWithDefault(Integer.MAX_VALUE)
+
+  val ENABLE_WINDOW_SPILL = buildConf("spark.omni.sql.columnar.windowSpill.enabled")
+    .internal()
+    .doc("enable or disable columnar window spill")
+    .booleanConf
+    .createWithDefault(true)
+
+  val COLUMNAR_WINDOW_SPILL_ROW_THRESHOLD = buildConf("spark.omni.sql.columnar.windowSpill.rowThreshold")
+    .internal()
+    .doc("columnar window spill threshold")
+    .intConf
+    .createWithDefault(Integer.MAX_VALUE)
+
+  val ENABLE_HASH_AGG_SPILL = buildConf("spark.omni.sql.columnar.hashAggSpill.enabled")
+    .internal()
+    .doc("enable or disable columnar hash aggregate spill")
+    .booleanConf
+    .createWithDefault(true)
+
+  val COLUMNAR_HASH_AGG_SPILL_ROW_THRESHOLD = buildConf("spark.omni.sql.columnar.hashAggSpill.rowThreshold")
+    .internal()
+    .doc("columnar hash aggregate spill threshold")
+    .intConf
+    .createWithDefault(Integer.MAX_VALUE)
+
+  val ENABLE_SHUFFLED_HASH_JOIN = buildConf("spark.omni.sql.columnar.shuffledHashJoin")
+    .internal()
+    .doc("enable or disable columnar shuffledHashJoin")
+    .booleanConf
+    .createWithDefault(true)
+
+  val FORCE_SHUFFLED_HASH_JOIN = buildConf("spark.omni.sql.columnar.forceShuffledHashJoin")
+    .internal()
+    .doc("enable or disable force shuffle hash join")
+    .booleanConf
+    .createWithDefault(true)
+
+  val ENABLE_REWRITE_SELF_JOIN_IN_IN_PREDICATE = buildConf("spark.omni.sql.columnar.RewriteSelfJoinInInPredicate")
+    .internal()
+    .doc("enable or disable rewrite self join in Predicate to aggregate")
+    .booleanConf
+    .createWithDefault(false)
+
+  val ENABLE_FUSION = buildConf("spark.omni.sql.columnar.fusion")
+    .internal()
+    .doc("enable or disable columnar fusion")
+    .booleanConf
+    .createWithDefault(false)
+
+  val COLUMNAR_PREFER_SHUFFLED_HASH_JOIN = buildConf("spark.sql.join.columnar.preferShuffledHashJoin")
+    .internal()
+    .doc("Pick columnar shuffle hash join if one side join count > = 0 to build local hash map, " +
+      "and is bigger than the other side join count, and `spark.sql.join.columnar.preferShuffledHashJoin`" +
+      "is true.")
+    .booleanConf
+    .createWithDefault(false)
+
+  val MAX_BATCH_SIZE_IN_BYTES = buildConf("spark.sql.columnar.maxBatchSizeInBytes")
+    .internal()
+    .intConf
+    .createWithDefault(2097152)
+
+  val MAX_ROW_COUNT = buildConf("spark.sql.columnar.maxRowCount")
+    .internal()
+    .intConf
+    .createWithDefault(20000)
+
+  val MERGED_BATCH_THRESHOLD = buildConf("spark.sql.columnar.mergedBatchThreshold")
+    .internal()
+    .intConf
+    .createWithDefault(100)
+
+  val ENABLE_COLUMNAR_UDF = buildConf("spark.omni.sql.columnar.udf")
+    .internal()
+    .booleanConf
+    .createWithDefault(true)
+
+  val ENABLE_OMNI_EXP_CHECK = buildConf("spark.omni.sql.omniExp.check")
+    .internal()
+    .booleanConf
+    .createWithDefault(true)
+
+  val ENABLE_COLUMNAR_PROJECT_FUSION = buildConf("spark.omni.sql.columnar.projectFusion")
+    .internal()
+    .booleanConf
+    .createWithDefault(true)
+
+  val ENABLE_LOCAL_COLUMNAR_LIMIT = buildConf("spark.omni.sql.columnar.localLimit")
+    .internal()
+    .booleanConf
+    .createWithDefault(true)
+
+  val ENABLE_GLOBAL_COLUMNAR_LIMIT = buildConf("spark.omni.sql.columnar.globalLimit")
+    .internal()
+    .booleanConf
+    .createWithDefault(true)
+
+  val TOP_N_PUSH_DOWN_FOR_WINDOW_THRESHOLD = buildConf("spark.sql.execution.topNPushDownForWindow.threshold")
+    .internal()
+    .intConf
+    .createWithDefault(100)
+
+  val TOP_N_PUSH_DOWN_FOR_WINDOW_ENABLE = buildConf("spark.sql.execution.topNPushDownForWindow.enabled")
+    .internal()
+    .booleanConf
+    .createWithDefault(true)
+
+  val PUSH_ORDERED_LIMIT_THROUGH_AGG_ENABLE = buildConf("spark.omni.sql.columnar.pushOrderedLimitThroughAggEnable.enabled")
+    .internal()
+    .booleanConf
+    .createWithDefault(false)
+
+  val ENABLE_DEDUP_LEFT_SEMI_JOIN = buildConf("spark.omni.sql.columnar.dedupLeftSemiJoin")
+    .internal()
+    .doc("enable or disable deduplicate the right side of left semi join")
+    .booleanConf
+    .createWithDefault(false)
+
+  val DEDUP_LEFT_SEMI_JOIN_THRESHOLD = buildConf("spark.omni.sql.columnar.dedupLeftSemiJoinThreshold")
+    .internal()
+    .intConf
+    .createWithDefault(3)
+
+  val COMBINE_JOINED_AGGREGATES_ENABLED = buildConf("spark.omni.sql.columnar.combineJoinedAggregates.enabled")
+    .internal()
+    .booleanConf
+    .createWithDefault(false)
+
+  val FILTER_MERGE_ENABLE = buildConf("spark.sql.execution.filterMerge.enabled")
+    .internal()
+    .booleanConf
+    .createWithDefault(false)
+
+  val FILTER_MERGE_THRESHOLD = buildConf("spark.sql.execution.filterMerge.maxCost")
+    .internal()
+    .doubleConf
+    .createWithDefault(100.0)
+
+  val ENABLE_COLUMNAR_COALESCE = buildConf("spark.omni.sql.columnar.coalesce")
+    .internal()
+    .doc("enable or disable columnar CoalesceExec")
+    .booleanConf
+    .createWithDefault(true)
+
+  val ENABLE_ROLLUP_OPTIMIZATION = buildConf("spark.omni.sql.columnar.rollupOptimization.enabled")
+    .internal()
+    .doc("enable or disable columnar rollupOptimization")
+    .booleanConf
+    .createWithDefault(true)
+
+  val ENABLE_RADIX_SORT = buildConf("spark.omni.sql.columnar.radixSort.enabled")
+    .internal()
+    .doc("enable or disable radix sort")
+    .booleanConf
+    .createWithDefault(false)
+
+  val RADIX_SORT_THRESHOLD = buildConf("spark.omni.sql.columnar.radixSortThreshold")
+    .internal()
+    .intConf
+    .createWithDefault(1000000)
+
+  val ENABLE_ROW_SHUFFLE = buildConf("spark.omni.sql.columnar.rowShuffle.enabled")
+    .internal()
+    .doc("enable or disable row shuffle")
+    .booleanConf
+    .createWithDefault(true)
+
+  val COLUMNS_THRESHOLD = buildConf("spark.omni.sql.columnar.columnsThreshold")
+    .internal()
+    .intConf
+    .createWithDefault(10)
+
+  val ENABLE_BLOOMFILTER_SUBQUERY_REUSE = buildConf("spark.omni.sql.columnar.bloomfilterSubqueryReuse")
+    .internal()
+    .doc("enable or disable bloomfilter subquery reuse")
+    .booleanConf
+    .createWithDefault(false)
+
+  val WHOLE_STAGE_FALLBACK_THRESHOLD = buildConf("spark.omni.sql.columnar.wholeStage.fallback.threshold")
+    .internal()
+    .doc("The threshold for whether whole stage will fall back in AQE supported case by counting the number of vanilla SparkPlan." +
+      "If it is set to -1, it means that this function is turned off" +
+      "otherwise, when the number of vanilla SparkPlan of the stage is greater than or equal to the threshold," +
+      "all the SparkPlan of the stage will be fallback to vanilla SparkPlan")
+    .intConf
+    .createWithDefault(-1)
+
+  val QUERY_FALLBACK_THRESHOLD = buildConf("spark.omni.sql.columnar.query.fallback.threshold")
+    .internal()
+    .doc("it is same with wholeStageFallbackThreshold, but it is used for non AQE")
+    .intConf
+    .createWithDefault(-1)
+
+  val ENABLE_OMNI_COLUMNAR_TO_ROW = buildConf("spark.omni.sql.columnar.columnarToRow")
+    .internal()
+    .booleanConf
+    .createWithDefault(true)
+
+  val ENABLE_ADAPTIVE_PARTIAL_AGGREGATION = buildConf("spark.omni.sql.columnar.adaptivePartialAggregation.enabled")
+    .internal()
+    .doc("enable or disable adaptive partial aggregation")
+    .booleanConf
+    .createWithDefault(false)
+
+  val ADAPTIVE_PARTIAL_AGGREGATION_MIN_ROWS = buildConf("spark.omni.sql.columnar.adaptivePartialAggregationMinRows")
+    .internal()
+    .intConf
+    .createWithDefault(500000)
+
+  val ADAPTIVE_PARTIAL_AGGREGATION_RATIO =  buildConf("spark.omni.sql.columnar.adaptivePartialAggregationRatio")
+    .internal()
+    .doubleConf
+    .createWithDefault(0.8)
+
 }
