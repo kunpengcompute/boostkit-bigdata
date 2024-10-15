@@ -81,7 +81,7 @@ namespace orc {
             }
 
             char *buf_ptr = reinterpret_cast<char *>(buf);
-            int64_t total_bytes_read = 0;
+            uint64_t total_bytes_read = 0;
             int64_t last_bytes_read = 0;
 
             do {

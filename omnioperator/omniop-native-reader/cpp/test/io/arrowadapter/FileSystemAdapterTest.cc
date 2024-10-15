@@ -67,17 +67,17 @@ protected:
 
 TEST_F(TestMockFS, FileSystemFromUriOrPath) {
     std::string path;
-    UriInfo uri1("mock", "", "", -1);
+    UriInfo uri1("mock", "", "", "-1");
     ASSERT_OK_AND_ASSIGN(fs_, FileSystemFromUriOrPath(uri1, &path));
     ASSERT_EQ(path, "");
     CheckDirs({});  // Ensures it's a MockFileSystem
 
-    UriInfo uri2("mock", "foo/bar", "", -1);
+    UriInfo uri2("mock", "foo/bar", "", "-1");
     ASSERT_OK_AND_ASSIGN(fs_, FileSystemFromUriOrPath(uri2, &path));
     ASSERT_EQ(path, "foo/bar");
     CheckDirs({});
 
-    UriInfo ur3("mock", "/foo/bar", "", -1);
+    UriInfo ur3("mock", "/foo/bar", "", "-1");
     ASSERT_OK_AND_ASSIGN(fs_, FileSystemFromUriOrPath(ur3, &path));
     ASSERT_EQ(path, "foo/bar");
     CheckDirs({});
@@ -174,27 +174,27 @@ TYPED_TEST_SUITE(TestLocalFs, PathFormatters);
 TYPED_TEST(TestLocalFs, FileSystemFromUriFile){
     std::string path;
     ASSERT_OK_AND_ASSIGN(auto uri_string, arrow::internal::UriFromAbsolutePath(this->local_path_));
-    UriInfo uri1(uri_string, "", uri_string, "", -1);
+    UriInfo uri1(uri_string, "", uri_string, "", "-1");
     this->TestFileSystemFromUri(uri1);
 
     path = "/foo/bar";
-    UriInfo uri2("file", path, "", -1);
+    UriInfo uri2("file", path, "", "-1");
     this->TestLocalUri(uri2, path);
 
     path = "/some path/%percent";
-    UriInfo uri3("file", path, "", -1);
+    UriInfo uri3("file", path, "", "-1");
     this->TestLocalUri(uri3, path);
 
     path = "/some path/%中文魑魅魍魉";
-    UriInfo uri4("file", path, "", -1);
+    UriInfo uri4("file", path, "", "-1");
     this->TestLocalUri(uri4, path);
 }
 
 TYPED_TEST(TestLocalFs, FileSystemFromUriNoScheme){
 
-    UriInfo uri1(this->local_path_, "", "", "", -1);
+    UriInfo uri1(this->local_path_, "", "", "", "-1");
     this->TestFileSystemFromUri(uri1);
 
-    UriInfo uri2("foo/bar", "", "", "", -1);
+    UriInfo uri2("foo/bar", "", "", "", "-1");
     this->TestInvalidUri(uri2);
 }

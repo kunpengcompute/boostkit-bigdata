@@ -33,7 +33,7 @@ target_link_libraries(${TP_TEST_TARGET}
         dl
         boostkit-omniop-vector-1.6.0-aarch64
         securec
-        spark_columnar_plugin)
+        native_reader)
 
 target_compile_options(${TP_TEST_TARGET} PUBLIC -g -O2 -fPIC)
 
