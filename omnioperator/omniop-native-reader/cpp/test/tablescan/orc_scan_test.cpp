@@ -54,7 +54,10 @@ protected:
 
         std::list<std::string> includedColumns = {"c1", "c2", "c3", "c4", "c5", "c7", "c8", "c9", "c10", "c11", "c13"};
         rowReaderOptions.include(includedColumns);
-        rowReader = reader->createRowReader(rowReaderOptions).release();
+
+        std::unique_ptr<common::JulianGregorianRebase> julianPtr;
+        auto readerPtr = static_cast<omniruntime::reader::OmniReaderImpl*>(reader.get());
+        rowReader = readerPtr->createRowReader(rowReaderOptions, julianPtr).release();
         omniruntime::reader::OmniRowReaderImpl *rowReaderPtr = (omniruntime::reader::OmniRowReaderImpl*) rowReader;
         omniVecBatch = new omniruntime::vec::VectorBatch(4096);
         rowReaderPtr->next(omniVecBatch, nullptr);

@@ -40,7 +40,8 @@ TEST(read, test_parquet_reader)
     UriInfo uriInfo("", "file", filename, "", "-1");
 
     const std::vector<std::string> column_indices = {"c1", "c2", "c4", "c7", "c8", "c9", "c10", "c11", "c13"};
-    ParquetReader *reader = new ParquetReader();
+    std::unique_ptr<common::TimeRebaseInfo> rebaseInfoPtr;
+    ParquetReader *reader = new ParquetReader(rebaseInfoPtr);
     std::string ugi = "root@sample";
     Expression pushedFilterArray;
     auto state1 = reader->InitRecordReader(uriInfo, 0, 1000000, 1024, false, pushedFilterArray, column_indices, ugi);
@@ -108,7 +109,8 @@ TEST(read, test_varchar)
     UriInfo uriInfo("", "file", filename, "", "-1");
 
     const std::vector<std::string> column_indices = {"d_date_sk", "d_date_id", "d_date", "d_month_seq"};
-    ParquetReader *reader = new ParquetReader();
+    std::unique_ptr<common::TimeRebaseInfo> rebaseInfoPtr;
+    ParquetReader *reader = new ParquetReader(rebaseInfoPtr);
     std::string ugi = "root@sample";
     Expression pushedFilterArray;
     auto state1 = reader->InitRecordReader(uriInfo, 0, 1000000, 4096, false, pushedFilterArray, column_indices, ugi);
