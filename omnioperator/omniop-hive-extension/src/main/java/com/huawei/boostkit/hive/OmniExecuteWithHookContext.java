@@ -886,7 +886,8 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             }
         }
         Map<Byte, List<ExprNodeDesc>> keys = mapJoinDesc.getKeys();
-        if (keys.entrySet().stream().allMatch(item -> item.getValue().isEmpty())) {
+        if (Arrays.stream(mapJoinDesc.getConds()).anyMatch(item -> item.getType() == JoinDesc.RIGHT_OUTER_JOIN)
+                && keys.entrySet().stream().allMatch(item -> item.getValue().isEmpty())) {
             return false;
         }
         List<ExprNodeDesc> exprNodeDescList = new ArrayList<>();
