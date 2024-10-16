@@ -87,7 +87,7 @@ namespace common {
 
         int64_t lastSwitchJulianTs = std::numeric_limits<int64_t>::min();
         if (hasTimestampRebase || hasInt96Rebase) {
-            lastSwitchJulianTs = env->CallIntMethod(jsonObj, jsonMethodLong, env->NewStringUTF("lastSwitchJulianTs"));
+            lastSwitchJulianTs = env->CallLongMethod(jsonObj, jsonMethodLong, env->NewStringUTF("lastSwitchJulianTs"));
         }
 
         return std::make_unique<TimeRebaseInfo>(timestampRebasePtr, timestampRebaseMode, int96RebasePtr,

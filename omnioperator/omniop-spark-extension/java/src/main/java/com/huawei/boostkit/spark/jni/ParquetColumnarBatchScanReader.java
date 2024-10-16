@@ -322,8 +322,6 @@ public class ParquetColumnarBatchScanReader {
             return value.toString();
         } else if (value instanceof Double) {
             return value.toString();
-        } else if (value instanceof Instant) {
-            return value.toString();
         } else {
             String simpleName = value.getClass().getSimpleName();
             throw new ParquetDecodingException("Unsupported parquet push down filter date type: " + simpleName);
