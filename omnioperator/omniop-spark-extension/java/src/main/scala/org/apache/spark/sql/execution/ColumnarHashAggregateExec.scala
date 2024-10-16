@@ -48,6 +48,8 @@ import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.vectorized.ColumnarBatch
 import org.apache.spark.util.Utils
 
+import scala.util.control.Breaks.{break, breakable}
+
 /**
  * Hash-based aggregate operator that can also fallback to sorting when data exceeds memory size.
  */
@@ -92,7 +94,8 @@ case class ColumnarHashAggregateExec(
     "getOutputTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni getOutput"),
     "numOutputRows" -> SQLMetrics.createMetric(sparkContext, "number of output rows"),
     "numOutputVecBatches" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatches"),
-    "spillSize" -> SQLMetrics.createSizeMetric(sparkContext, "spill size"))
+    "spillSize" -> SQLMetrics.createSizeMetric(sparkContext, "spill size"),
+    "numSkippedRows" -> SQLMetrics.createMetric(sparkContext, "number of skipped rows"))
 
   protected override def needHashTable: Boolean = true
 
@@ -226,6 +229,7 @@ case class ColumnarHashAggregateExec(
     val numOutputRows = longMetric("numOutputRows")
     val numOutputVecBatches= longMetric("numOutputVecBatches")
     val spillSize = longMetric("spillSize")
+    val numSkippedRows = longMetric("numSkippedRows")
 
     val attrExpsIdMap = getExprIdMap(child.output)
     val omniGroupByChanel = groupingExpressions.map(
@@ -238,8 +242,17 @@ case class ColumnarHashAggregateExec(
     var omniAggChannels = new Array[Array[String]](aggregateExpressions.size)
     val omniAggChannelsFilter = new Array[String](aggregateExpressions.size)
 
+    val containFirstAgg =
+      aggregateExpressions.exists(_.aggregateFunction match {
+        case First(_, _) => true
+        case _ => false
+      })
+
+    var partialStep =
+      (aggregateExpressions.count(_.mode == Partial) == aggregateExpressions.size)
+
     val finalStep =
-      (aggregateExpressions.filter (_.mode == Final).size == aggregateExpressions.size)
+      (aggregateExpressions.count(_.mode == Final) == aggregateExpressions.size)
 
     var index = 0
     for (exp <- aggregateExpressions) {
@@ -303,6 +316,10 @@ case class ColumnarHashAggregateExec(
       val spillDirDiskReserveSize = columnarConf.columnarSpillDirDiskReserveSize
       val hashAggSpillEnable = columnarConf.enableHashAggSpill
       val hashAggSpillRowThreshold = columnarConf.columnarHashAggSpillRowThreshold
+      val enableAdaptivePartialAgg = columnarConf.enableAdaptivePartialAggregation
+      val adaptivePartialAggMinRows = columnarConf.adaptivePartialAggregationMinRows
+      val adaptivePartialAggRatio = columnarConf.adaptivePartialAggregationRatio
+
       val spillDirectory = generateSpillDir(tmpSparkConf, "columnarHashAggSpill")
       val sparkSpillConf = new SparkSpillConfig(hashAggSpillEnable, spillDirectory,
         spillDirDiskReserveSize, hashAggSpillRowThreshold, spillMemPctThreshold, spillWriteBufferSize)
@@ -332,16 +349,37 @@ case class ColumnarHashAggregateExec(
         }
       })
 
-      while (iter.hasNext) {
-        val batch = iter.next()
-        val input = transColBatchToOmniVecs(batch)
-        val startInput = System.nanoTime()
-        val vecBatch = new VecBatch(input, batch.numRows())
-        operator.addInput(vecBatch)
-        addInputTime += NANOSECONDS.toMillis(System.nanoTime() - startInput)
-        numInputVecBatches+= 1
-        numInputRows += batch.numRows()
+      // handle the condition: only group by cols not aggregator cols
+      partialStep = partialStep && aggregateExpressions.nonEmpty
+
+      // The following four conditions must be met:
+      // 1. The optimization switch is truned on.
+      // 2. It can only be used in the partial agg phase.
+      // 3. Hashagg instead of agg.
+      // 4. The first aggregator is not included because data inconsistency may occur.
+      val hasBenefit = enableAdaptivePartialAgg && partialStep && hashAggregationWithExprOperatorFactory != null && !containFirstAgg
+
+      breakable {
+        while (iter.hasNext) {
+          val batch = iter.next()
+          val input = transColBatchToOmniVecs(batch)
+          val startInput = System.nanoTime()
+          val vecBatch = new VecBatch(input, batch.numRows())
+          operator.addInput(vecBatch)
+          addInputTime += NANOSECONDS.toMillis(System.nanoTime() - startInput)
+          numInputVecBatches += 1
+          numInputRows += batch.numRows()
+          // adaptive partial hashagg verification.
+          // if the aggregation rate reaches the ratio threshold, the partial phase is skipped.
+          if (hasBenefit && numInputRows.value > adaptivePartialAggMinRows) {
+            val keyNums: Long = operator.getHashMapUniqueKeys()
+            if (keyNums > adaptivePartialAggRatio * numInputRows.value) {
+              break
+            }
+          }
+        }
       }
+
       val startGetOp = System.nanoTime()
       val opOutput = operator.getOutput
       getOutputTime += NANOSECONDS.toMillis(System.nanoTime() - startGetOp)
@@ -349,34 +387,65 @@ case class ColumnarHashAggregateExec(
       var localSchema = this.schema
       if (finalStep) {
         // for final step resultExpressions's inputs from omni-final aggregator
-        val omnifinalOutSchama = groupingExpressions.map(_.toAttribute) ++ aggregateAttributes
-        localSchema = StructType.fromAttributes(omnifinalOutSchama)
+        val omnifinalOutSchema = groupingExpressions.map(_.toAttribute) ++ aggregateAttributes
+        localSchema = StructType.fromAttributes(omnifinalOutSchema)
       }
 
       val hashAggIter = new Iterator[ColumnarBatch] {
         override def hasNext: Boolean = {
           val startGetOp: Long = System.nanoTime()
-          val hasNext = opOutput.hasNext
+          var hasNext = opOutput.hasNext
           getOutputTime += NANOSECONDS.toMillis(System.nanoTime() - startGetOp)
+          // handle adaptive partial aggregation
+          if (hasBenefit) {
+            hasNext |= iter.hasNext
+          }
           hasNext
         }
 
         override def next(): ColumnarBatch = {
-          val startGetOp = System.nanoTime()
-          val vecBatch = opOutput.next()
-          getOutputTime += NANOSECONDS.toMillis(System.nanoTime() - startGetOp)
-          val vectors: Seq[OmniColumnVector] = OmniColumnVector.allocateColumns(
-            vecBatch.getRowCount, localSchema, false)
-          vectors.zipWithIndex.foreach { case (vector, i) =>
-            vector.reset()
-            vector.setVec(vecBatch.getVectors()(i))
+          if (opOutput.hasNext) {
+            val startGetOp = System.nanoTime()
+            val vecBatch = opOutput.next()
+            getOutputTime += NANOSECONDS.toMillis(System.nanoTime() - startGetOp)
+            val vectors: Seq[OmniColumnVector] = OmniColumnVector.allocateColumns(
+              vecBatch.getRowCount, localSchema, false)
+            vectors.zipWithIndex.foreach { case (vector, i) =>
+              vector.reset()
+              vector.setVec(vecBatch.getVectors()(i))
+            }
+
+            numOutputRows += vecBatch.getRowCount
+            numOutputVecBatches += 1
+
+            vecBatch.close()
+            new ColumnarBatch(vectors.toArray, vecBatch.getRowCount)
+          } else if (hasBenefit && iter.hasNext) {
+            // handle adaptive partial aggregation
+            val batch = iter.next()
+            numInputVecBatches += 1
+            numInputRows += batch.numRows()
+            numSkippedRows += batch.numRows()
+
+            val input = transColBatchToOmniVecs(batch)
+            val inputVecBatch = new VecBatch(input, batch.numRows())
+            // schema alignment
+            val outputVecBatch: VecBatch = operator.alignSchema(inputVecBatch)
+            val vectors: Seq[OmniColumnVector] = OmniColumnVector.allocateColumns(
+              outputVecBatch.getRowCount, localSchema, false)
+            vectors.zipWithIndex.foreach { case (vector, i) =>
+              vector.reset()
+              vector.setVec(outputVecBatch.getVectors()(i))
+            }
+
+            numOutputRows += outputVecBatch.getRowCount
+            numOutputVecBatches+= 1
+
+            outputVecBatch.close()
+            new ColumnarBatch(vectors.toArray, outputVecBatch.getRowCount)
+          } else {
+            throw new RuntimeException("The branch should not have gone")
           }
-
-          numOutputRows += vecBatch.getRowCount
-          numOutputVecBatches+= 1
-
-          vecBatch.close()
-          new ColumnarBatch(vectors.toArray, vecBatch.getRowCount)
         }
       }
       if (finalStep) {
