@@ -39,7 +39,4 @@ object Constant {
   val OMNI_TIMESTAMP_TYPE: String = DataTypeId.OMNI_TIMESTAMP.ordinal().toString
   // for UT
   val OMNI_IS_ADAPTIVE_CONTEXT = "omni.isAdaptiveContext"
-  val PUSH_ORDEERED_LIMIT_THROUGH_AGG_ENABLE: String = "spark.omni.sql.columnar.pushOrderedLimitThroughAggEnable.enabled"
-  val PUSH_ORDERED_LIMIT_THROUGH_AGG_APPLIED: String = "pushOrderedLimitThroughAggApplied"
-  val COMBINE_JOINED_AGGREGATES_ENABLE:String = "spark.omni.sql.columnar.combineJoinedAggregates.enabled"
 }

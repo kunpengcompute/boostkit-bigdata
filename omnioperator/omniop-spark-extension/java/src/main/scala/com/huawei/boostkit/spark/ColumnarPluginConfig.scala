@@ -23,7 +23,6 @@ import org.apache.spark.SparkEnv
 import org.apache.spark.internal.Logging
 import org.apache.spark.shuffle.sort.ColumnarShuffleManager
 import org.apache.spark.sql.internal.SQLConf
-import com.huawei.boostkit.spark.Constant.{COMBINE_JOINED_AGGREGATES_ENABLE, PUSH_ORDEERED_LIMIT_THROUGH_AGG_ENABLE}
 
 class ColumnarPluginConfig(conf: SQLConf) extends Logging {
   // enable or disable columnar exchange
@@ -245,7 +244,7 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
 
   val topNPushDownForWindowEnable: Boolean = conf.getConfString("spark.sql.execution.topNPushDownForWindow.enabled", "true").toBoolean
 
-  val pushOrderedLimitThroughAggEnable: Boolean =  conf.getConfString(PUSH_ORDEERED_LIMIT_THROUGH_AGG_ENABLE, "false").toBoolean
+  val pushOrderedLimitThroughAggEnable: Boolean =  conf.getConfString("spark.omni.sql.columnar.pushOrderedLimitThroughAggEnable.enabled", "false").toBoolean
   // enable or disable deduplicate the right side of left semi join
   val enableDedupLeftSemiJoin: Boolean =
     conf.getConfString("spark.omni.sql.columnar.dedupLeftSemiJoin", "false").toBoolean
@@ -253,7 +252,7 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
   val dedupLeftSemiJoinThreshold: Int =
     conf.getConfString("spark.omni.sql.columnar.dedupLeftSemiJoinThreshold", "3").toInt
 
-  val combineJoinedAggregatesEnabled: Boolean = conf.getConfString(COMBINE_JOINED_AGGREGATES_ENABLE, "false").toBoolean
+  val combineJoinedAggregatesEnabled: Boolean = conf.getConfString("spark.omni.sql.columnar.combineJoinedAggregates.enabled", "false").toBoolean
 
   val filterMergeEnable: Boolean = conf.getConfString("spark.sql.execution.filterMerge.enabled", "false").toBoolean
 
