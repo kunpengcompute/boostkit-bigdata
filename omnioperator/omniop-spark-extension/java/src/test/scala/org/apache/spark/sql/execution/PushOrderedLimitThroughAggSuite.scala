@@ -21,15 +21,13 @@ package org.apache.spark.sql.execution
 import org.apache.spark.sql.functions.{avg, count, first, max, min, sum}
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, Row}
+import com.huawei.boostkit.spark.Constant.PUSH_ORDEERED_LIMIT_THROUGH_AGG_ENABLE
 
 class PushOrderedLimitThroughAggSuite extends ColumnarSparkPlanTest {
   private var df: DataFrame = _
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
-    spark.conf.set("spark.omni.sql.columnar.topNSort", true)
-    spark.conf.set("spark.omni.sql.columnar.pushOrderedLimitThroughAggEnable.enabled", true)
-    spark.conf.set("spark.sql.adaptive.enabled", true)
     df = spark.createDataFrame(
       sparkContext.parallelize(Seq(
         Row(1, 2.0, 1L, "a"),
@@ -43,6 +41,9 @@ class PushOrderedLimitThroughAggSuite extends ColumnarSparkPlanTest {
   }
 
   test("Test PushOrderedLimitThroughAgg") {
+    spark.conf.set("spark.omni.sql.columnar.topNSort", true)
+    spark.conf.set(PUSH_ORDEERED_LIMIT_THROUGH_AGG_ENABLE, true)
+    spark.conf.set("spark.sql.adaptive.enabled", true)
     val sql1 = """
       SELECT a, b, SUM(c) AS sum_agg
       FROM df_tbl
@@ -50,7 +51,13 @@ class PushOrderedLimitThroughAggSuite extends ColumnarSparkPlanTest {
       ORDER BY a, sum_agg, b
       LIMIT 10
     """
-    assertPushColumnarTopNSortThroughAggEffective(sql1)
+    try {
+      assertPushColumnarTopNSortThroughAggEffective(sql1)
+    } finally {
+      spark.conf.unset("spark.omni.sql.columnar.topNSort")
+      spark.conf.unset(PUSH_ORDEERED_LIMIT_THROUGH_AGG_ENABLE)
+      spark.conf.unset("spark.sql.adaptive.enabled")
+    }
   }
 
   private def assertPushColumnarTopNSortThroughAggEffective(sql: String): Unit = {
