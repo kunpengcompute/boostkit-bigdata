@@ -56,6 +56,7 @@ object PushOrderedLimitThroughAgg extends Rule[SparkPlan] with PredicateHelper {
                         )
                         LocalLimitExec(limit, child = newSortExec)
                       }
+                      val session = SparkSession.getActiveSession.orNull
                       session.sparkContext.setLocalProperty(PUSH_ORDERED_LIMIT_THROUGH_AGG_APPLIED, "true");
                       TakeOrderedAndProjectExec(
                         limit, sortOrder, projectList,
