@@ -33,11 +33,8 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.util.SparkMemoryUtils
 import org.apache.spark.sql.sources._
-import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.types.{DecimalType, StringType, StructType, TimestampType}
 import org.apache.spark.util.{SerializableConfiguration, Utils}
-import org.apache.spark.sql.types.StringType
-
-import org.apache.spark.sql.types.DecimalType
 
 class OmniOrcFileFormat extends FileFormat with DataSourceRegister with Serializable {
 
@@ -68,23 +65,23 @@ class OmniOrcFileFormat extends FileFormat with DataSourceRegister with Serializ
       case other =>
         other match {
           case EqualTo(name, _) =>
-            dataSchema.apply(name).dataType != StringType
+            dataSchema.apply(name).dataType != StringType && dataSchema.apply(name).dataType != TimestampType
           case EqualNullSafe(name, _) =>
-            dataSchema.apply(name).dataType != StringType
+            dataSchema.apply(name).dataType != StringType && dataSchema.apply(name).dataType != TimestampType
           case LessThan(name, _) =>
-            dataSchema.apply(name).dataType != StringType
+            dataSchema.apply(name).dataType != StringType && dataSchema.apply(name).dataType != TimestampType
           case LessThanOrEqual(name, _) =>
-            dataSchema.apply(name).dataType != StringType
+            dataSchema.apply(name).dataType != StringType && dataSchema.apply(name).dataType != TimestampType
           case GreaterThan(name, _) =>
-            dataSchema.apply(name).dataType != StringType
+            dataSchema.apply(name).dataType != StringType && dataSchema.apply(name).dataType != TimestampType
           case GreaterThanOrEqual(name, _) =>
-            dataSchema.apply(name).dataType != StringType
+            dataSchema.apply(name).dataType != StringType && dataSchema.apply(name).dataType != TimestampType
           case IsNull(name) =>
-            dataSchema.apply(name).dataType != StringType
+            dataSchema.apply(name).dataType != StringType && dataSchema.apply(name).dataType != TimestampType
           case IsNotNull(name) =>
-            dataSchema.apply(name).dataType != StringType
+            dataSchema.apply(name).dataType != StringType && dataSchema.apply(name).dataType != TimestampType
           case In(name, _) =>
-            dataSchema.apply(name).dataType != StringType
+            dataSchema.apply(name).dataType != StringType && dataSchema.apply(name).dataType != TimestampType
           case _ => false
         }
     }
