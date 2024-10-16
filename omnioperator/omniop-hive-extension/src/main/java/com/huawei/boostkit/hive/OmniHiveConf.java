@@ -36,6 +36,9 @@ class OmniHiveConf {
     public boolean enableConditionSelect;
     public int stringLength;
     private HashMap<OperatorType, Boolean> operatorEnableMap;
+    public boolean enableAdaptivePartialAggregation;
+    public long adaptivePartialAggregationMinRows;
+    public double adaptivePartialAggregationRatio;
 
     public OmniHiveConf(HiveConf hiveConf) {
         enableOperatorJoin = hiveConf.getBoolean("omni.hive.join.enabled", true);
@@ -60,6 +63,9 @@ class OmniHiveConf {
         }};
         enableConditionSelect = hiveConf.getBoolean("omni.hive.conditionselect.enabled", false);
         stringLength = hiveConf.getInt("omni.hive.string.length", 1024);
+        enableAdaptivePartialAggregation = hiveConf.getBoolean("omni.hive.adaptivePartialAggregation.enabled", false);
+        adaptivePartialAggregationMinRows = hiveConf.getLong("omni.hive.adaptivePartialAggregationMinRows", 500000);
+        adaptivePartialAggregationRatio = hiveConf.getDouble("omni.hive.adaptivePartialAggregationRatio", 0.8);
     }
 
     public boolean isEnableOperator(OperatorType operatorType) {

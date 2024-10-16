@@ -65,6 +65,7 @@ import org.apache.hadoop.hive.ql.exec.GroupByOperator;
 import org.apache.hadoop.hive.ql.exec.IConfigureJobConf;
 import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.exec.vector.VectorAggregationDesc;
+import org.apache.hadoop.hive.ql.exec.ReduceSinkOperator;
 import org.apache.hadoop.hive.ql.exec.vector.VectorizationContext;
 import org.apache.hadoop.hive.ql.exec.vector.VectorizationContextRegion;
 import org.apache.hadoop.hive.ql.exec.vector.expressions.VectorExpressionWriter;
@@ -136,6 +137,14 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
     private transient List<ExprNodeConstantEvaluator> constantEvaluators;
     private transient Vec[] constantVec;
     private transient Queue<Integer> constantColIds;
+    private transient boolean enableAdaptivePartialAgg = false;
+    private transient long adaptivePartialAggMinRows = 500000;
+    private transient double adaptivePartialAggRatio = 0.8;
+    private transient boolean partialStep = false;
+    private transient boolean hasBenefit = false;
+    private transient boolean isSkipped = false;
+    private transient boolean isAggOutputFinished = false;
+    private transient long numInputRows = 0;
 
     public OmniGroupByOperator() {
         super();
@@ -146,11 +155,18 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
     }
 
     public OmniGroupByOperator(CompilationOpContext ctx, GroupByDesc conf,
-            VectorizationContext vectorizationContext, VectorizationContext vOutContext) {
+            VectorizationContext vectorizationContext, VectorizationContext vOutContext, OmniHiveConf omniHiveConf) {
         super(ctx);
         this.conf = new OmniGroupByDesc(conf);
         this.vectorizationContext = vectorizationContext;
         this.vOutContext = vOutContext;
+        this.enableAdaptivePartialAgg = omniHiveConf.enableAdaptivePartialAggregation;
+        this.adaptivePartialAggMinRows = omniHiveConf.adaptivePartialAggregationMinRows;
+        this.adaptivePartialAggRatio = omniHiveConf.adaptivePartialAggregationRatio;
+    }
+
+    private boolean allChildIsShuffle() {
+        return this.childOperators.stream().allMatch(child -> child instanceof OmniReduceSinkOperator || child instanceof ReduceSinkOperator);
     }
 
     private void commonInitialize(Configuration hconf) throws HiveException {
@@ -167,6 +183,9 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
 
         aggs = conf.getAggregators();
         int aggSize = aggs.size();
+        if (enableAdaptivePartialAgg) {
+            partialStep = aggSize > 0 ? aggs.stream().allMatch(agg -> agg.getMode() == GenericUDAFEvaluator.Mode.PARTIAL1) : allChildIsShuffle();
+        }
         aggregationParameterFields = new ExprNodeEvaluator[aggSize][];
         aggregationParameterObjectInspectors = new ObjectInspector[aggSize][];
         aggChannelFields = new ArrayList<>();
@@ -320,6 +339,7 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
         outputObjInspector = ObjectInspectorFactory.getStandardStructObjectInspector(outputFieldNames,
                 Arrays.asList(objectInspectors));
         createOmniOperator();
+        hasBenefit = enableAdaptivePartialAgg && omniOperatorFactory != null && partialStep;
         isFirstRow = true;
         constantVec = new Vec[recordConstantColIds.size()];
         for (int i = 0; i < constantVec.length; i++) {
@@ -684,6 +704,29 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
         return new VecBatch(vecs);
     }
 
+    private void commonProcess() throws HiveException {
+        // If there is no grouping key and no row came to this operator
+        if (isFirstRow && GroupByOperator.shouldEmitSummaryRow(conf)) {
+            isFirstRow = false;
+            int pos = conf.getGroupingSetPosition();
+            VecBatch vecBatch = createVecBatch(pos);
+            forward(vecBatch, outputObjInspector);
+        } else {
+            Iterator<VecBatch> output = this.omniOperator.getOutput();
+            while (output.hasNext()) {
+                VecBatch next = output.next();
+                if (outputObjInspector instanceof StandardStructObjectInspector
+                        && next.getVectorCount() != ((StandardStructObjectInspector) outputObjInspector)
+                        .getAllStructFieldRefs().size()) {
+                    next = removeVector(next, numKeys - 1);
+                }
+                forward(next, outputObjInspector);
+            }
+        }
+
+        isAggOutputFinished = true;
+    }
+
     @Override
     public void process(Object row, int tag) throws HiveException {
         VecBatch input = (VecBatch) row;
@@ -694,7 +737,22 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
         if (!recordConstantColIds.isEmpty()) {
             input = createConstVecBatch(input);
         }
-        this.omniOperator.addInput(input);
+        if (hasBenefit && numInputRows > adaptivePartialAggMinRows) {
+            long keyNums = this.omniOperator.getHashMapUniqueKeys();
+            if (keyNums > adaptivePartialAggRatio * numInputRows || isSkipped) {
+                isSkipped = true;
+                if (!isAggOutputFinished) {
+                    commonProcess();
+                }
+                forward(this.omniOperator.alignSchema(input), outputObjInspector);
+            } else {
+                numInputRows += input.getRowCount();
+                this.omniOperator.addInput(input);
+            }
+        } else {
+            numInputRows += input.getRowCount();
+            this.omniOperator.addInput(input);
+        }
     }
 
     @Override
@@ -753,25 +811,8 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
 
     @Override
     protected void closeOp(boolean abort) throws HiveException {
-        if (!abort) {
-            // If there is no grouping key and no row came to this operator
-            if (isFirstRow && GroupByOperator.shouldEmitSummaryRow(conf)) {
-                isFirstRow = false;
-                int pos = conf.getGroupingSetPosition();
-                VecBatch vecBatch = createVecBatch(pos);
-                forward(vecBatch, outputObjInspector);
-            } else {
-                Iterator<VecBatch> output = this.omniOperator.getOutput();
-                while (output.hasNext()) {
-                    VecBatch next = output.next();
-                    if (outputObjInspector instanceof StandardStructObjectInspector
-                            && next.getVectorCount() != ((StandardStructObjectInspector) outputObjInspector)
-                                .getAllStructFieldRefs().size()) {
-                        next = removeVector(next, numKeys - 1);
-                    }
-                    forward(next, outputObjInspector);
-                }
-            }
+        if (!abort && !isSkipped) {
+           commonProcess();
         }
         for (Vec vec : constantVec) {
             vec.close();

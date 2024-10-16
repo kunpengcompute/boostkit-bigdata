@@ -1410,7 +1410,7 @@ public class OmniExecuteWithHookContext implements ExecuteWithHookContext {
             case GROUPBY:
                 return new OmniGroupByOperator(current.getCompilationOpContext(),
                         (GroupByDesc) current.getConf(), vectorizationContext,
-                        isVectorized ? ((VectorGroupByOperator) current).getOutputVectorizationContext() : null);
+                        isVectorized ? ((VectorGroupByOperator) current).getOutputVectorizationContext() : null, omniHiveConf);
             case PTF:
                 return new OmniPTFOperator(current.getCompilationOpContext(), (PTFDesc) current.getConf());
             case REDUCESINK:
