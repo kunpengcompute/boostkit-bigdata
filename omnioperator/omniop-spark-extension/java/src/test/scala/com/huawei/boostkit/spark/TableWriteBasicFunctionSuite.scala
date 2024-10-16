@@ -154,4 +154,18 @@ class TableWriteBasicFunctionSuite extends QueryTest with SharedSparkSession {
       )
     assert(columnarFilter.isDefined, "use columnar data writing command")
   }
+
+  test("rebase date to julian") {
+    val drop = spark.sql("drop table if exists test_orc_date")
+    drop.collect()
+    val createTable = spark.sql("create table test_orc_date(date_col date) using orc")
+    createTable.collect()
+    val insert = spark.sql("insert into table test_orc_date values(cast('1001-01-04' as date))")
+    insert.collect()
+
+    val select = spark.sql("select * from test_orc_date")
+    val runRows = select.collect()
+    assert(runRows(0).getDate(0).toString ==
+      "1001-01-04", "the run value is error")
+  }
 }
