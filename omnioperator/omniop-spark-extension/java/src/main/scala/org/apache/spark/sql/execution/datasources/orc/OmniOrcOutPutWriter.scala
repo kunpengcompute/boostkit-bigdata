@@ -36,17 +36,22 @@ private[sql] class OmniOrcOutputWriter(path: String, dataSchema: StructType,
   val writer = new OrcColumnarBatchWriter()
   var omniTypes: Array[Int] = new Array[Int](0)
   var dataColumnsIds: Array[Boolean] = new Array[Boolean](0)
+  var allOmniTypes: Array[Int] = new Array[Int](0)
 
   def initialize(allColumns: Seq[Attribute], dataColumns: Seq[Attribute]): Unit = {
-    val filePath = new Path(new URI(path))
+    val filePath = new Path(path)
     val conf = context.getConfiguration
     val writerOptions = OrcFile.writerOptions(conf).
-      fileSystem(new Path(new URI(path)).getFileSystem(conf))
+      fileSystem(filePath.getFileSystem(conf))
     writer.initializeOutputStreamJava(filePath.toUri)
     writer.initializeSchemaTypeJava(dataSchema)
     writer.initializeWriterJava(filePath.toUri, dataSchema, writerOptions)
     dataSchema.foreach(field => {
       omniTypes = omniTypes :+ sparkTypeToOmniType(field.dataType, field.metadata).getId.ordinal()
+    })
+    allColumns.toStructType.foreach(field => {
+      allOmniTypes = allOmniTypes :+ sparkTypeToOmniType(field.dataType, field.metadata)
+        .getId.ordinal()
     })
     dataColumnsIds = allColumns.map(x => dataColumns.contains(x)).toArray
   }
@@ -58,7 +63,7 @@ private[sql] class OmniOrcOutputWriter(path: String, dataSchema: StructType,
 
   def spiltWrite(row: InternalRow, startPos: Long, endPos: Long): Unit = {
     assert(row.isInstanceOf[OmniInternalRow])
-    writer.splitWrite(omniTypes, dataColumnsIds,
+    writer.splitWrite(omniTypes, allOmniTypes, dataColumnsIds,
       row.asInstanceOf[OmniInternalRow].batch, startPos, endPos)
   }
 

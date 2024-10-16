@@ -23,7 +23,7 @@ import static org.apache.orc.CompressionKind.ZLIB;
 
 import com.huawei.boostkit.write.jni.OrcColumnarBatchJniWriter;
 
-import nova.hetu.omniruntime.vector.Vec;
+import nova.hetu.omniruntime.vector.*;
 
 import org.apache.orc.OrcFile;
 import org.apache.spark.sql.execution.vectorized.OmniColumnVector;
@@ -41,6 +41,7 @@ import org.apache.spark.sql.types.StructType;
 import org.apache.spark.sql.types.VarcharType;
 import org.apache.spark.sql.vectorized.ColumnarBatch;
 import org.json.JSONObject;
+import org.apache.spark.sql.catalyst.util.RebaseDateTime;
 
 import java.net.URI;
 import java.util.ArrayList;
@@ -81,6 +82,14 @@ public class OrcColumnarBatchWriter {
         uriJson.put("path", uri.getPath() == null ? "" : uri.getPath());
 
         outputStream = jniWriter.initializeOutputStream(uriJson);
+    }
+
+    public void convertGreGorianToJulian(IntVec intVec, int startPos, int endPos) {
+        int julianValue;
+        for (int rowIndex = startPos; rowIndex < endPos; rowIndex++) {
+            julianValue = RebaseDateTime.rebaseGregorianToJulianDays(intVec.get(rowIndex));
+            intVec.set(rowIndex, julianValue);
+        }
     }
 
     public void initializeSchemaTypeJava(StructType dataSchema) {
@@ -180,17 +189,25 @@ public class OrcColumnarBatchWriter {
             OmniColumnVector omniVec = (OmniColumnVector) columBatch.column(i);
             Vec vec = omniVec.getVec();
             vecNativeIds[i] = vec.getNativeVector();
+            boolean isDateType = (omniTypes[i] == 8);
+            if (isDateType) {
+                convertGreGorianToJulian((IntVec) vec, 0, columBatch.numRows());
+            }
         }
 
         jniWriter.write(writer, vecNativeIds, omniTypes, dataColumnsIds, columBatch.numRows());
     }
 
-    public void splitWrite(int[] omniTypes, boolean[] dataColumnsIds, ColumnarBatch inputBatch, long startPos, long endPos) {
+    public void splitWrite(int[] omniTypes, int[] allOmniTypes, boolean[] dataColumnsIds, ColumnarBatch inputBatch, long startPos, long endPos) {
         long[] vecNativeIds = new long[inputBatch.numCols()];
         for (int i = 0; i < inputBatch.numCols(); i++) {
             OmniColumnVector omniVec = (OmniColumnVector) inputBatch.column(i);
             Vec vec = omniVec.getVec();
             vecNativeIds[i] = vec.getNativeVector();
+            boolean isDateType = (allOmniTypes[i] == 8);
+            if (isDateType) {
+                convertGreGorianToJulian((IntVec) vec, (int) startPos, (int) endPos);
+            }
         }
 
         jniWriter.splitWrite(writer, vecNativeIds, omniTypes, dataColumnsIds, startPos, endPos);
