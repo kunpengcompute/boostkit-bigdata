@@ -820,7 +820,7 @@ class ColumnarPlugin extends (SparkSessionExtensions => Unit) with Logging {
     extensions.injectOptimizerRule(_ => CombineJoinedAggregates)
     extensions.injectQueryStagePrepRule(_ => TopNPushDownForWindow)
     extensions.injectQueryStagePrepRule(session => FallbackBroadcastExchange(session))
-    extensions.injectQueryStagePrepRule(_ => PushOrderedLimitThroughAgg)
+    extensions.injectQueryStagePrepRule(session => PushOrderedLimitThroughAgg(session))
   }
 }
 

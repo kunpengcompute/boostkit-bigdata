@@ -25,9 +25,9 @@ import org.apache.spark.sql.execution.{LocalLimitExec, SortExec, SparkPlan, Take
 import org.apache.spark.sql.execution.exchange.ShuffleExchangeExec
 import org.apache.spark.sql.SparkSession
 
-object PushOrderedLimitThroughAgg extends Rule[SparkPlan] with PredicateHelper {
+case class PushOrderedLimitThroughAgg(session: SparkSession) extends Rule[SparkPlan] with PredicateHelper {
   override def apply(plan: SparkPlan): SparkPlan = {
-    if (!ColumnarPluginConfig.getConf.pushOrderedLimitThroughAggEnable) {
+    if (!ColumnarPluginConfig.getSessionConf.pushOrderedLimitThroughAggEnable) {
       return plan
     }
     val columnarConf: ColumnarPluginConfig = ColumnarPluginConfig.getSessionConf
@@ -55,7 +55,6 @@ object PushOrderedLimitThroughAgg extends Rule[SparkPlan] with PredicateHelper {
                         )
                         LocalLimitExec(limit, child = newSortExec)
                       }
-                      val session = SparkSession.getActiveSession.orNull
                       session.sparkContext.setLocalProperty("pushOrderedLimitThroughAggApplied", "true");
                       TakeOrderedAndProjectExec(
                         limit, sortOrder, projectList,

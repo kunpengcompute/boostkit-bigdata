@@ -322,7 +322,7 @@ private def checkCondition(leftCondition: Expression, rightCondition: Expression
   }
 
   def apply(plan: LogicalPlan): LogicalPlan = {
-    if (!ColumnarPluginConfig.getConf.combineJoinedAggregatesEnabled) return plan
+    if (!ColumnarPluginConfig.getSessionConf.combineJoinedAggregatesEnabled) return plan
     //apply rule on children first then itself
     plan.transformUpWithPruning(_.containsAnyPattern(JOIN, AGGREGATE)) {
       case j @ Join(left: Aggregate, right: Aggregate, joinType, None, _)
