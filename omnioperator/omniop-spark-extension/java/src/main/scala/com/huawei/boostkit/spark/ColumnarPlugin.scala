@@ -18,7 +18,7 @@
 
 package com.huawei.boostkit.spark
 
-import nova.hetu.omniruntime.memory.MemoryManager
+import com.huawei.boostkit.spark.ColumnarPluginConfig.ENABLE_OMNI_COLUMNAR_TO_ROW
 import com.huawei.boostkit.spark.Constant.OMNI_IS_ADAPTIVE_CONTEXT
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor
 import com.huawei.boostkit.spark.util.PhysicalPlanSelector
@@ -27,16 +27,15 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{SparkSession, SparkSessionExtensions}
 import org.apache.spark.sql.catalyst.expressions.{Ascending, Expression, Literal, SortOrder}
 import org.apache.spark.sql.catalyst.expressions.aggregate.{AggregateExpression, Partial, PartialMerge}
-import org.apache.spark.sql.catalyst.optimizer.{DelayCartesianProduct, HeuristicJoinReorder, MergeSubqueryFilters, RewriteSelfJoinInInPredicate, CombineJoinedAggregates}
+import org.apache.spark.sql.catalyst.optimizer.{CombineJoinedAggregates, DelayCartesianProduct, HeuristicJoinReorder, MergeSubqueryFilters, RewriteSelfJoinInInPredicate}
 import org.apache.spark.sql.catalyst.rules.Rule
-import org.apache.spark.sql.execution.{BroadcastExchangeExecProxy, RowToOmniColumnarExec, _}
+import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.adaptive.{AQEShuffleReadExec, AdaptiveSparkPlanExec, BroadcastQueryStageExec, OmniAQEShuffleReadExec, QueryStageExec, ShuffleQueryStageExec}
 import org.apache.spark.sql.execution.aggregate.{DummyLogicalPlan, ExtendedAggUtils, HashAggregateExec}
 import org.apache.spark.sql.execution.exchange.{BroadcastExchangeExec, ReusedExchangeExec, ShuffleExchangeExec}
 import org.apache.spark.sql.execution.joins._
 import org.apache.spark.sql.execution.window.{TopNPushDownForWindow, WindowExec}
 import org.apache.spark.sql.internal.SQLConf
-import org.apache.spark.sql.types.ColumnarBatchSupportUtil.checkColumnarBatchSupport
 import org.apache.spark.sql.catalyst.planning.PhysicalAggregation
 import org.apache.spark.sql.catalyst.plans.LeftSemi
 import org.apache.spark.sql.catalyst.plans.logical.Aggregate
@@ -45,6 +44,8 @@ import org.apache.spark.sql.execution.datasources.orc.{OmniOrcFileFormat, OrcFil
 import org.apache.spark.sql.execution.datasources.{FileFormat, InsertIntoHadoopFsRelationCommand, OmniInsertIntoHadoopFsRelationCommand}
 import org.apache.spark.sql.execution.util.SparkMemoryUtils.addLeakSafeTaskCompletionListener
 import org.apache.spark.sql.execution.aggregate.PushOrderedLimitThroughAgg
+
+import nova.hetu.omniruntime.memory.MemoryManager
 
 import scala.collection.mutable.ListBuffer
 
@@ -680,7 +681,7 @@ case class ColumnarPostOverrides(isSupportAdaptive: Boolean = true) extends Rule
 
   def replaceColumnarToRow(plan: ColumnarToRowExec, conf: SQLConf): SparkPlan = {
     val child = replaceWithColumnarPlan(plan.child)
-    if (conf.getConfString("spark.omni.sql.columnar.columnarToRow", "true").toBoolean) {
+    if (conf.getConf(ENABLE_OMNI_COLUMNAR_TO_ROW)) {
       OmniColumnarToRowExec(child)
     } else {
       ColumnarToRowExec(child)
