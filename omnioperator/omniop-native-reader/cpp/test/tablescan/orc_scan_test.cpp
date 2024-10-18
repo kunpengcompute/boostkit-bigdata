@@ -17,14 +17,11 @@
  * limitations under the License.
  */
 
-#include <cstdint>
 #include <gtest/gtest.h>
 #include <orc/sargs/SearchArgument.hh>
 #include "jni/OrcColumnarBatchJniReader.h"
 #include "scan_test.h"
-
-static std::string filename = "/resources/orc_data_all_type";
-static orc::StructVectorBatch *root;
+#include <vector/vector_common.h>
 
 /* 
  * CREATE TABLE `orc_test` ( `c1` int, `c2` varChar(60), `c3` string, `c4` bigint,
@@ -50,25 +47,31 @@ protected:
     {
         orc::ReaderOptions readerOpts;
         orc::RowReaderOptions rowReaderOptions;
-        std::unique_ptr<orc::Reader> reader = orc::createReader(orc::readFile(PROJECT_PATH + filename), readerOpts);
-        rowReader = reader->createRowReader().release();
-        std::unique_ptr<orc::ColumnVectorBatch> batch = rowReader->createRowBatch(4096);
-        rowReader->next(*batch);
-        types = &(rowReader->getSelectedType());
-        root = static_cast<orc::StructVectorBatch *>(batch.release());
+        std::string filename = "/../resources/orc_data_all_type";
+        filename = PROJECT_PATH + filename;
+        UriInfo uriInfo("file", filename, "", "-1");
+        std::unique_ptr<orc::Reader> reader = omniruntime::reader::omniCreateReader(orc::readFileOverride(uriInfo, false), readerOpts);
+
+        std::list<std::string> includedColumns = {"c1", "c2", "c3", "c4", "c5", "c7", "c8", "c9", "c10", "c11", "c13"};
+        rowReaderOptions.include(includedColumns);
+
+        std::unique_ptr<common::JulianGregorianRebase> julianPtr;
+        auto readerPtr = static_cast<omniruntime::reader::OmniReaderImpl*>(reader.get());
+        rowReader = readerPtr->createRowReader(rowReaderOptions, julianPtr).release();
+        omniruntime::reader::OmniRowReaderImpl *rowReaderPtr = (omniruntime::reader::OmniRowReaderImpl*) rowReader;
+        omniVecBatch = new omniruntime::vec::VectorBatch(4096);
+        rowReaderPtr->next(omniVecBatch, nullptr);
     }
 
     // run after each case...
     virtual void TearDown() override {
-        delete root;
-        root = nullptr;
-        types = nullptr;
+        omniruntime::vec::VectorHelper::FreeVecBatch(omniVecBatch);
         delete rowReader;
         rowReader = nullptr;
     }
 
-    const orc::Type *types;
     orc::RowReader *rowReader;
+    omniruntime::vec::VectorBatch* omniVecBatch;
 };
 
 TEST_F(ScanTest, test_literal_get_long)
@@ -156,106 +159,66 @@ TEST_F(ScanTest, test_literal_get_bool)
     ASSERT_EQ(tmpStr, "Invalid input for stringToBool.");
 }
 
-TEST_F(ScanTest, test_copy_intVec)
+TEST_F(ScanTest, test_correctness_intVec)
 {
-    int omniType = 0;
-    uint64_t omniVecId = 0;
-    // int type
-    CopyToOmniVec(types->getSubtype(0), omniType, omniVecId, root->fields[0], false);
-    ASSERT_EQ(omniType, omniruntime::type::OMNI_INT);
-    auto *olbInt = (omniruntime::vec::Vector<int32_t> *)(omniVecId);
+    // int type, "c1"
+    auto *olbInt = (omniruntime::vec::Vector<int32_t> *)(omniVecBatch->Get(0));
     ASSERT_EQ(olbInt->GetValue(0), 10);
-    delete olbInt;
 }
 
-TEST_F(ScanTest, test_copy_varCharVec)
+TEST_F(ScanTest, test_correctness_varCharVec)
 {
-    int omniType = 0;
-    uint64_t omniVecId = 0;
-    // varchar type
-    CopyToOmniVec(types->getSubtype(1), omniType, omniVecId, root->fields[1], false);
-    ASSERT_EQ(omniType, omniruntime::type::OMNI_VARCHAR);
+    // varchar type, "c2"
     auto *olbVc = (omniruntime::vec::Vector<omniruntime::vec::LargeStringContainer<std::string_view>> *)(
-            omniVecId);
+            omniVecBatch->Get(1));
     std::string_view actualStr = olbVc->GetValue(0);
     ASSERT_EQ(actualStr, "varchar_1");
-    delete olbVc;
 }
 
-TEST_F(ScanTest, test_copy_stringVec)
+TEST_F(ScanTest, test_correctness_stringVec)
 {
-    int omniType = 0;
-    uint64_t omniVecId = 0;
-    // string type
-    CopyToOmniVec(types->getSubtype(2), omniType, omniVecId, root->fields[2], false);
-    ASSERT_EQ(omniType, omniruntime::type::OMNI_VARCHAR);
+    // string type, "c3"
     auto *olbStr = (omniruntime::vec::Vector<omniruntime::vec::LargeStringContainer<std::string_view>> *)(
-            omniVecId);
+            omniVecBatch->Get(2));
     std::string_view actualStr = olbStr->GetValue(0);
     ASSERT_EQ(actualStr, "string_type_1");
-    delete olbStr;
 }
 
-TEST_F(ScanTest, test_copy_longVec)
+TEST_F(ScanTest, test_correctness_longVec)
 {
-    int omniType = 0;
-    uint64_t omniVecId = 0;
-    // bigint type
-    CopyToOmniVec(types->getSubtype(3), omniType, omniVecId, root->fields[3], false);
-    ASSERT_EQ(omniType, omniruntime::type::OMNI_LONG);
-    auto *olbLong = (omniruntime::vec::Vector<int64_t> *)(omniVecId);
+    // bigint type, "c4"
+    auto *olbLong = (omniruntime::vec::Vector<int64_t> *)(omniVecBatch->Get(3));
     ASSERT_EQ(olbLong->GetValue(0), 10000);
-    delete olbLong;
 }
 
-TEST_F(ScanTest, test_copy_charVec)
+TEST_F(ScanTest, test_correctness_charVec)
 {
-    int omniType = 0;
-    uint64_t omniVecId = 0;
-    // char type
-    CopyToOmniVec(types->getSubtype(4), omniType, omniVecId, root->fields[4], false);
-    ASSERT_EQ(omniType, omniruntime::type::OMNI_VARCHAR);
+    // char type, "c5"
     auto *olbChar = (omniruntime::vec::Vector<omniruntime::vec::LargeStringContainer<std::string_view>> *)(
-            omniVecId);
+            omniVecBatch->Get(4));
     std::string_view actualStr = olbChar->GetValue(0);
     ASSERT_EQ(actualStr, "char_1");
-    delete olbChar;
 }
 
-TEST_F(ScanTest, test_copy_doubleVec)
+TEST_F(ScanTest, test_correctness_doubleVec)
 {
-    int omniType = 0;
-    uint64_t omniVecId = 0;
-    // double type
-    CopyToOmniVec(types->getSubtype(6), omniType, omniVecId, root->fields[6], false);
-    ASSERT_EQ(omniType, omniruntime::type::OMNI_DOUBLE);
-    auto *olbDouble = (omniruntime::vec::Vector<double> *)(omniVecId);
+    // double type, "c7"
+    auto *olbDouble = (omniruntime::vec::Vector<double> *)(omniVecBatch->Get(5));
     ASSERT_EQ(olbDouble->GetValue(0), 1111.1111);
-    delete olbDouble;
 }
 
-TEST_F(ScanTest, test_copy_booleanVec)
+TEST_F(ScanTest, test_correctness_booleanVec)
 {
-    int omniType = 0;
-    uint64_t omniVecId = 0;
-    // boolean type
-    CopyToOmniVec(types->getSubtype(9), omniType, omniVecId, root->fields[9], false);
-    ASSERT_EQ(omniType, omniruntime::type::OMNI_BOOLEAN);
-    auto *olbBoolean = (omniruntime::vec::Vector<bool> *)(omniVecId);
+    // boolean type, "c10"
+    auto *olbBoolean = (omniruntime::vec::Vector<bool> *)(omniVecBatch->Get(8));
     ASSERT_EQ(olbBoolean->GetValue(0), true);
-    delete olbBoolean;
 }
 
-TEST_F(ScanTest, test_copy_shortVec)
+TEST_F(ScanTest, test_correctness_shortVec)
 {
-    int omniType = 0;
-    uint64_t omniVecId = 0;
-    // short type
-    CopyToOmniVec(types->getSubtype(10), omniType, omniVecId, root->fields[10], false);
-    ASSERT_EQ(omniType, omniruntime::type::OMNI_SHORT);
-    auto *olbShort = (omniruntime::vec::Vector<short> *)(omniVecId);
+    // short type, "c11"
+    auto *olbShort = (omniruntime::vec::Vector<short> *)(omniVecBatch->Get(9));
     ASSERT_EQ(olbShort->GetValue(0), 11);
-    delete olbShort;
 }
 
 TEST_F(ScanTest, test_build_leafs)

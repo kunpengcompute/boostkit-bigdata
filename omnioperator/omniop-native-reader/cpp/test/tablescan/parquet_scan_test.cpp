@@ -17,14 +17,13 @@
  * limitations under the License.
  */
 
-#include <type/date32.h>
 #include <gtest/gtest.h>
 #include "scan_test.h"
 #include "parquet/ParquetReader.h"
 
 using namespace omniruntime::reader;
-using namespace arrow;
 using namespace omniruntime::vec;
+using arrow::Status;
 
 /*
  * CREATE TABLE `parquet_test` ( `c1` int, `c2` varChar(60), `c3` string, `c4` bigint,
@@ -36,16 +35,17 @@ using namespace omniruntime::vec;
  */
 TEST(read, test_parquet_reader)
 {
-    std::string filename = "/resources/parquet_data_all_type";
+    std::string filename = "/../resources/parquet_data_all_type";
     filename = PROJECT_PATH + filename;
-    const std::vector<int> row_group_indices = {0};
-    const std::vector<int> column_indices = {0, 1, 3, 6, 7, 8, 9, 10, 12};
+    UriInfo uriInfo("", "file", filename, "", "-1");
 
-    ParquetReader *reader = new ParquetReader();
+    const std::vector<std::string> column_indices = {"c1", "c2", "c4", "c7", "c8", "c9", "c10", "c11", "c13"};
+    std::unique_ptr<common::TimeRebaseInfo> rebaseInfoPtr;
+    ParquetReader *reader = new ParquetReader(rebaseInfoPtr);
     std::string ugi = "root@sample";
-    UriInfo uri(filename, "", "", "", "-1");
-    auto state1 = reader->InitRecordReader(uri, 1024, row_group_indices, column_indices, ugi, false);
-    ASSERT_EQ(state1, Status::OK());
+    Expression pushedFilterArray;
+    auto state1 = reader->InitRecordReader(uriInfo, 0, 1000000, 1024, false, pushedFilterArray, column_indices, ugi);
+    ASSERT_EQ(state1, arrow::Status::OK());
 
     std::vector<omniruntime::vec::BaseVector*> recordBatch(column_indices.size());
     long batchRowSize = 0;
@@ -87,11 +87,8 @@ TEST(read, test_parquet_reader)
 
     BaseVector *dateVector = reinterpret_cast<BaseVector *>(recordBatch[8]);
     auto date_result = static_cast<int32_t *>(omniruntime::vec::VectorHelper::UnsafeGetValues(dateVector));
-    omniruntime::type::Date32 date32(*date_result);
-    char chars[11];
-    date32.ToString(chars, 11);
-    std::string date_expected(chars);
-    ASSERT_TRUE(date_expected == "2021-12-01");
+    // "2021-12-01" in the format of epoch day is 18962.
+    ASSERT_EQ(*date_result, 18962);
 
     delete reader;
     delete intVector;
@@ -107,15 +104,17 @@ TEST(read, test_parquet_reader)
 
 TEST(read, test_varchar)
 {
-    std::string filename = "/../../../java/src/test/java/com/huawei/boostkit/spark/jni/parquetsrc/date_dim.parquet";
+    std::string filename = "/../resources/date_dim.parquet";
     filename = PROJECT_PATH + filename;
-    const std::vector<int> row_group_indices = {0};
-    const std::vector<int> column_indices = {23, 24, 25, 26, 27};
-    ParquetReader *reader = new ParquetReader();
+    UriInfo uriInfo("", "file", filename, "", "-1");
+
+    const std::vector<std::string> column_indices = {"d_date_sk", "d_date_id", "d_date", "d_month_seq"};
+    std::unique_ptr<common::TimeRebaseInfo> rebaseInfoPtr;
+    ParquetReader *reader = new ParquetReader(rebaseInfoPtr);
     std::string ugi = "root@sample";
-    UriInfo uriInfo(filename, "", "", "-1");
-    auto state1 = reader->InitRecordReader(uriInfo, 4096, row_group_indices, column_indices, ugi, false);
-    ASSERT_EQ(state1, Status::OK());
+    Expression pushedFilterArray;
+    auto state1 = reader->InitRecordReader(uriInfo, 0, 1000000, 4096, false, pushedFilterArray, column_indices, ugi);
+    ASSERT_EQ(state1, arrow::Status::OK());
     int total_nums = 0;
     int iter = 0;
     while (true) {
