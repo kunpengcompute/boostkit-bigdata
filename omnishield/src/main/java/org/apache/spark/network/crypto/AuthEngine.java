@@ -214,6 +214,16 @@ class AuthEngine implements Closeable {
         transcript,  // Passing this as the HKDF salt
         OUTPUT_IV_INFO,  // This is the HKDF info field used to differentiate IV values
         AES_GCM_KEY_SIZE_BYTES);
+    if (Sm4GcmHkdfStreaming.TRANSFORMATION.equals(conf.cipherTransformation())) {
+      SecretKeySpec sessionKey = new SecretKeySpec(sharedSecret, "SM4");
+      return new GcmTransportCipher(
+              cryptoConf,
+              conf.cipherTransformation(),
+              sessionKey,
+              isClient ? clientIv : serverIv,  // If it's the client, use the client IV first
+              isClient ? serverIv : clientIv
+      );
+    }
     SecretKeySpec sessionKey = new SecretKeySpec(sharedSecret, "AES");
     return new TransportCipher(
         cryptoConf,
