@@ -1,7 +1,26 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.apache.spark.network.crypto;
 
 import com.google.crypto.tink.subtle.*;
+import com.huawei.boostkit.omnishield.cipher.SM4Cipher;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.crypto.Cipher;
 import javax.crypto.spec.GCMParameterSpec;
@@ -13,32 +32,52 @@ import java.security.GeneralSecurityException;
 import java.security.InvalidAlgorithmParameterException;
 import java.util.Arrays;
 
+/**
+ * Sm4GcmHkdfStreaming use the SM4/GCM/NOPadding algorithm to encrypt
+ */
 public class Sm4GcmHkdfStreaming {
+    private static final Logger LOG = LoggerFactory.getLogger(SM4Cipher.class);
 
+    static {
+        LOG.info("Shuffle network IO encryption will use SM4/GCM/NOPadding algorithm");
+    }
+
+    /**
+     * transformation
+     */
     public static final String TRANSFORMATION = "SM4/GCM/NOPadding";
-    private final int keySizeInBytes;
+
+    /**
+     * sm4 key length
+     */
+    public static final int KEY_LENGTH = 16;
+
+    /**
+     * sm4 gcm block size
+     */
+    public static final int GCM_BLOCK_SIZE = 16;
+
+    /**
+     * sm4 algorithm
+     */
+    public static final String ALGORITHM = "SM4";
     private final int ciphertextSegmentSize;
     private final int plaintextSegmentSize;
-    private final int firstSegmentOffset;
     private final String hkdfAlg;
-    private final byte[] ikm;
+    private final byte[] keyBytes;
 
-    public Sm4GcmHkdfStreaming(byte[] ikm, String hkdfAlg, int keySizeInBytes, int ciphertextSegmentSize, int firstSegmentOffset) throws IOException {
-        if (ikm.length >= 16 && ikm.length >= keySizeInBytes) {
-//            Validators.validateAesKeySize(keySizeInBytes);
-            if (ciphertextSegmentSize <= firstSegmentOffset + this.getHeaderLength() + 16) {
-                // TODO exception类型
-                throw new IOException("ciphertextSegmentSize too small");
-            } else {
-                this.ikm = Arrays.copyOf(ikm, ikm.length);
-                this.hkdfAlg = hkdfAlg;
-                this.keySizeInBytes = keySizeInBytes;
-                this.ciphertextSegmentSize = ciphertextSegmentSize;
-                this.firstSegmentOffset = firstSegmentOffset;
-                this.plaintextSegmentSize = ciphertextSegmentSize - 16;
-            }
+
+    public Sm4GcmHkdfStreaming(byte[] keyBytes, String hkdfAlg, int ciphertextSegmentSize) throws IOException {
+        if (keyBytes.length != KEY_LENGTH) {
+            throw new IOException("key length is not equal to " + KEY_LENGTH);
+        }
+        if (ciphertextSegmentSize <= this.getHeaderLength() + KEY_LENGTH) {
+            throw new IOException("ciphertextSegmentSize too small");
         } else {
-            throw new IOException("ikm too short, must be >= " + Math.max(16, keySizeInBytes));
+            this.keyBytes = Arrays.copyOf(keyBytes, keyBytes.length);
+            this.hkdfAlg = hkdfAlg;
+            this.ciphertextSegmentSize = ciphertextSegmentSize;
+            this.plaintextSegmentSize = ciphertextSegmentSize - GCM_BLOCK_SIZE;
         }
     }
 
@@ -59,28 +98,16 @@ public class Sm4GcmHkdfStreaming {
     }
 
     public int getHeaderLength() {
-        return 1 + this.keySizeInBytes + 7;
-    }
-
-    public int getCiphertextOffset() {
-        return this.getHeaderLength() + this.firstSegmentOffset;
-    }
-
-    public int getCiphertextOverhead() {
-        return 16;
-    }
-
-    public int getFirstSegmentOffset() {
-        return this.firstSegmentOffset;
+        return 1 + KEY_LENGTH + 7;
     }
 
     public long expectedCiphertextSize(long plaintextSize) {
-        long offset = (long)this.getCiphertextOffset();
+        long offset = this.getHeaderLength();
         long fullSegments = (plaintextSize + offset) / (long)this.plaintextSegmentSize;
         long ciphertextSize = fullSegments * (long)this.ciphertextSegmentSize;
         long lastSegmentSize = (plaintextSize + offset) % (long)this.plaintextSegmentSize;
         if (lastSegmentSize > 0L) {
-            ciphertextSize += lastSegmentSize + 16L;
+            ciphertextSize += lastSegmentSize + GCM_BLOCK_SIZE;
         }
 
         return ciphertextSize;
@@ -91,11 +118,11 @@ public class Sm4GcmHkdfStreaming {
     }
 
     private byte[] randomSalt() {
-        return Random.randBytes(this.keySizeInBytes);
+        return Random.randBytes(KEY_LENGTH);
     }
 
     private static GCMParameterSpec paramsForSegment(byte[] prefix, long segmentNr, boolean last) throws GeneralSecurityException {
-        ByteBuffer nonce = ByteBuffer.allocate(16);
+        ByteBuffer nonce = ByteBuffer.allocate(12);
         nonce.order(ByteOrder.BIG_ENDIAN);
         nonce.put(prefix);
         SubtleUtil.putAsUnsigedInt(nonce, segmentNr);
@@ -108,11 +135,11 @@ public class Sm4GcmHkdfStreaming {
     }
 
     private SecretKeySpec deriveKeySpec(byte[] salt, byte[] aad) throws GeneralSecurityException {
-        byte[] key = Hkdf.computeHkdf(this.hkdfAlg, this.ikm, salt, aad, this.keySizeInBytes);
-        return new SecretKeySpec(key, "SM4");
+        byte[] key = Hkdf.computeHkdf(this.hkdfAlg, this.keyBytes, salt, aad, KEY_LENGTH);
+        return new SecretKeySpec(key, ALGORITHM);
     }
 
-    class Sm4GcmHkdfStreamDecrypter implements StreamSegmentDecrypter {
+    class Sm4GcmHkdfStreamDecrypter implements GcmCrypto {
         private SecretKeySpec keySpec;
         private Cipher cipher;
         private byte[] noncePrefix;
@@ -120,6 +147,7 @@ public class Sm4GcmHkdfStreaming {
         Sm4GcmHkdfStreamDecrypter() {
         }
 
+        @Override
         public synchronized void init(ByteBuffer header, byte[] aad) throws GeneralSecurityException {
             if (header.remaining() != Sm4GcmHkdfStreaming.this.getHeaderLength()) {
                 throw new InvalidAlgorithmParameterException("Invalid header length");
@@ -129,7 +157,7 @@ public class Sm4GcmHkdfStreaming {
                     throw new GeneralSecurityException("Invalid ciphertext");
                 } else {
                     this.noncePrefix = new byte[7];
-                    byte[] salt = new byte[Sm4GcmHkdfStreaming.this.keySizeInBytes];
+                    byte[] salt = new byte[KEY_LENGTH];
                     header.get(salt);
                     header.get(this.noncePrefix);
                     this.keySpec = Sm4GcmHkdfStreaming.this.deriveKeySpec(salt, aad);
@@ -138,21 +166,43 @@ public class Sm4GcmHkdfStreaming {
             }
         }
 
+        @Override
         public synchronized void decryptSegment(ByteBuffer ciphertext, int segmentNr, boolean isLastSegment, ByteBuffer plaintext) throws GeneralSecurityException {
-            GCMParameterSpec params = Sm4GcmHkdfStreaming.paramsForSegment(this.noncePrefix, (long)segmentNr, isLastSegment);
-            this.cipher.init(2, this.keySpec, params);
+            GCMParameterSpec params = Sm4GcmHkdfStreaming.paramsForSegment(this.noncePrefix, segmentNr, isLastSegment);
+            this.cipher.init(Cipher.DECRYPT_MODE, this.keySpec, params);
             this.cipher.doFinal(ciphertext, plaintext);
         }
     }
 
-    class Sm4GcmHkdfStreamEncrypter implements StreamSegmentEncrypter {
+    interface GcmCrypto {
+
+        default void init(ByteBuffer header, byte[] aad) throws GeneralSecurityException {
+            throw new UnsupportedOperationException("Unsupported function called.");
+        }
+
+        default ByteBuffer getHeader(){
+            throw new UnsupportedOperationException("Unsupported function called.");
+        }
+
+        default void encryptSegment(ByteBuffer plaintext, boolean isLastSegment, ByteBuffer ciphertext) throws GeneralSecurityException {
+            throw new UnsupportedOperationException("Unsupported function called.");
+        }
+
+        default void decryptSegment(ByteBuffer ciphertext, int segmentNr, boolean isLastSegment, ByteBuffer plaintext) throws GeneralSecurityException {
+            throw new UnsupportedOperationException("Unsupported function called.");
+        }
+
+
+    }
+    class Sm4GcmHkdfStreamEncrypter implements GcmCrypto {
         private final SecretKeySpec keySpec;
-        private final Cipher cipher = Sm4GcmHkdfStreaming.cipherInstance();
+        private final Cipher cipher;
         private final byte[] noncePrefix;
         private final ByteBuffer header;
-        private long encryptedSegments = 0L;
+        private long encryptedSegments;
 
         public Sm4GcmHkdfStreamEncrypter(byte[] aad) throws GeneralSecurityException {
+            this.cipher = Sm4GcmHkdfStreaming.cipherInstance();
             this.encryptedSegments = 0L;
             byte[] salt = Sm4GcmHkdfStreaming.this.randomSalt();
             this.noncePrefix = Sm4GcmHkdfStreaming.randomNonce();
@@ -164,26 +214,16 @@ public class Sm4GcmHkdfStreaming {
             this.keySpec = Sm4GcmHkdfStreaming.this.deriveKeySpec(salt, aad);
         }
 
+        @Override
         public ByteBuffer getHeader() {
             return this.header.asReadOnlyBuffer();
         }
 
+        @Override
         public synchronized void encryptSegment(ByteBuffer plaintext, boolean isLastSegment, ByteBuffer ciphertext) throws GeneralSecurityException {
-            this.cipher.init(1, this.keySpec, Sm4GcmHkdfStreaming.paramsForSegment(this.noncePrefix, this.encryptedSegments, isLastSegment));
+            this.cipher.init(Cipher.ENCRYPT_MODE, this.keySpec, Sm4GcmHkdfStreaming.paramsForSegment(this.noncePrefix, this.encryptedSegments, isLastSegment));
             ++this.encryptedSegments;
             this.cipher.doFinal(plaintext, ciphertext);
-        }
-
-        public synchronized void encryptSegment(ByteBuffer part1, ByteBuffer part2, boolean isLastSegment, ByteBuffer ciphertext) throws GeneralSecurityException {
-            this.cipher.init(1, this.keySpec, Sm4GcmHkdfStreaming.paramsForSegment(this.noncePrefix, this.encryptedSegments, isLastSegment));
-            ++this.encryptedSegments;
-            if (part2.hasRemaining()) {
-                this.cipher.update(part1, ciphertext);
-                this.cipher.doFinal(part2, ciphertext);
-            } else {
-                this.cipher.doFinal(part1, ciphertext);
-            }
-
         }
     }
 }

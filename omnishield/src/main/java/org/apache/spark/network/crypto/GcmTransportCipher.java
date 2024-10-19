@@ -20,8 +20,6 @@ package org.apache.spark.network.crypto;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.primitives.Longs;
-import com.google.crypto.tink.subtle.StreamSegmentDecrypter;
-import com.google.crypto.tink.subtle.StreamSegmentEncrypter;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.*;
@@ -31,7 +29,6 @@ import org.apache.spark.network.util.ByteBufferWriteableChannel;
 
 import javax.crypto.spec.SecretKeySpec;
 import java.io.IOException;
-import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.channels.WritableByteChannel;
 import java.security.GeneralSecurityException;
@@ -43,11 +40,7 @@ public class GcmTransportCipher extends TransportCipher {
     @VisibleForTesting
     static final int CIPHERTEXT_BUFFER_SIZE = 32 * 1024; // 32KB
 
-    private final Properties conf;
-    private final String cipher;
     private final SecretKeySpec key;
-    private final byte[] inIv;
-    private final byte[] outIv;
 
     public GcmTransportCipher(
             Properties conf,
@@ -56,31 +49,17 @@ public class GcmTransportCipher extends TransportCipher {
             byte[] inIv,
             byte[] outIv) {
         super(conf, cipher, key, inIv, outIv);
-        this.conf = conf;
-        this.cipher = cipher;
-        byte[] tempByte = new byte[16];
-        System.arraycopy(key.getEncoded(), 0, tempByte, 0, tempByte.length);
-        this.key = new SecretKeySpec(tempByte, "SM4");
-        this.inIv = inIv;
-        this.outIv = outIv;
+        byte[] sm4KeyByte = new byte[Sm4GcmHkdfStreaming.KEY_LENGTH];
+        System.arraycopy(key.getEncoded(), 0, sm4KeyByte, 0, sm4KeyByte.length);
+        this.key = new SecretKeySpec(sm4KeyByte, Sm4GcmHkdfStreaming.ALGORITHM);
     }
 
     Sm4GcmHkdfStreaming getSm4GcmHkdfStreaming() throws IOException {
         return new Sm4GcmHkdfStreaming(
                 key.getEncoded(),
                 HKDF_ALG,
-                key.getEncoded().length,
-                CIPHERTEXT_BUFFER_SIZE,
-                0);
+                CIPHERTEXT_BUFFER_SIZE);
     }
-
-//    /*
-//     * This method is for testing purposes only.
-//     */
-//    @VisibleForTesting
-//    public String getKeyId() throws GeneralSecurityException {
-//        return TransportCipherUtil.getKeyId(aesKey);
-//    }
 
     @VisibleForTesting
     EncryptionHandler getEncryptionHandler() throws IOException {
@@ -129,7 +108,7 @@ public class GcmTransportCipher extends TransportCipher {
         private final ByteBuffer headerByteBuffer;
         private final long bytesToRead;
         private long bytesRead = 0;
-        private final StreamSegmentEncrypter encrypter;
+        private final Sm4GcmHkdfStreaming.GcmCrypto encrypter;
         private long transferred = 0;
         private final long encryptedCount;
 
@@ -146,7 +125,7 @@ public class GcmTransportCipher extends TransportCipher {
             // If the ciphertext buffer cannot be fully written the target, transferTo may
             // return with it containing some unwritten data. The initial call we'll explicitly
             // set its limit to 0 to indicate the first call to transferTo.
-            ((Buffer) this.ciphertextBuffer).limit(0);
+            this.ciphertextBuffer.limit(0);
             this.bytesToRead = getReadableBytes();
             this.encryptedCount =
                     LENGTH_HEADER_BYTES + sm4GcmHkdfStreaming.expectedCiphertextSize(bytesToRead);
@@ -163,7 +142,7 @@ public class GcmTransportCipher extends TransportCipher {
                     .allocate(encrypterHeader.remaining() + LENGTH_HEADER_BYTES)
                     .putLong(encryptedCount)
                     .put(encrypterHeader);
-            ((Buffer) output).flip();
+            output.flip();
             return output;
         }
 
@@ -248,7 +227,7 @@ public class GcmTransportCipher extends TransportCipher {
                 if (plaintextMessage instanceof ByteBuf) {
                     ByteBuf byteBuf = (ByteBuf) plaintextMessage;
                     Preconditions.checkState(0 == plaintextBuffer.position());
-                    ((Buffer) plaintextBuffer).limit(readLimit);
+                    plaintextBuffer.limit(readLimit);
                     byteBuf.readBytes(plaintextBuffer);
                     Preconditions.checkState(readLimit == plaintextBuffer.position());
                 } else if (plaintextMessage instanceof FileRegion) {
@@ -264,16 +243,16 @@ public class GcmTransportCipher extends TransportCipher {
                     }
                 }
                 boolean lastSegment = getReadableBytes() == 0;
-                ((Buffer) plaintextBuffer).flip();
+                plaintextBuffer.flip();
                 bytesRead += plaintextBuffer.remaining();
-                ((Buffer) ciphertextBuffer).clear();
+                ciphertextBuffer.clear();
                 try {
                     encrypter.encryptSegment(plaintextBuffer, lastSegment, ciphertextBuffer);
                 } catch (GeneralSecurityException e) {
                     throw new IllegalStateException("GeneralSecurityException from encrypter", e);
                 }
-                ((Buffer) plaintextBuffer).clear();
-                ((Buffer) ciphertextBuffer).flip();
+                plaintextBuffer.clear();
+                ciphertextBuffer.flip();
                 int written = target.write(ciphertextBuffer);
                 transferredThisCall += written;
                 this.transferred += written;
@@ -315,13 +294,14 @@ public class GcmTransportCipher extends TransportCipher {
         private final ByteBuffer headerBuffer;
         private final ByteBuffer ciphertextBuffer;
         private final Sm4GcmHkdfStreaming sm4GcmHkdfStreaming;
-        private final StreamSegmentDecrypter decrypter;
+        private final Sm4GcmHkdfStreaming.GcmCrypto decrypter;
         private final int plaintextSegmentSize;
         private boolean decrypterInit = false;
         private boolean completed = false;
         private int segmentNumber = 0;
         private long expectedLength = -1;
         private long ciphertextRead = 0;
+        private boolean nextInit = false;
 
         DecryptionHandler() throws IOException {
             sm4GcmHkdfStreaming = getSm4GcmHkdfStreaming();
@@ -340,7 +320,7 @@ public class GcmTransportCipher extends TransportCipher {
                     // We did not read enough bytes to initialize the expected length.
                     return false;
                 }
-                ((Buffer) expectedLengthBuffer).flip();
+                expectedLengthBuffer.flip();
                 expectedLength = expectedLengthBuffer.getLong();
                 if (expectedLength < 0) {
                     throw new IllegalStateException("Invalid expected ciphertext length.");
@@ -354,13 +334,13 @@ public class GcmTransportCipher extends TransportCipher {
                 throws GeneralSecurityException {
             // Check if the ciphertext header has been read. This contains
             // the IV and other internal metadata.
-            if (!decrypterInit) {
+            if (!decrypterInit ) {
                 ciphertextNettyBuf.readBytes(headerBuffer);
                 if (headerBuffer.hasRemaining()) {
                     // We did not read enough bytes to initialize the header.
                     return false;
                 }
-                ((Buffer) headerBuffer).flip();
+                headerBuffer.flip();
                 byte[] lengthAad = Longs.toByteArray(expectedLength);
                 decrypter.init(headerBuffer, lengthAad);
                 decrypterInit = true;
@@ -383,6 +363,17 @@ public class GcmTransportCipher extends TransportCipher {
             // The format of the output is:
             // [8 byte length][Internal IV and header][Ciphertext][Auth Tag]
             try {
+                if (nextInit) {
+                    expectedLengthBuffer.clear();
+                    headerBuffer.clear();
+                    ciphertextBuffer.clear();
+                    segmentNumber = 0;
+                    decrypterInit = false;
+                    completed = false;
+                    expectedLength = -1;
+                    ciphertextRead = 0;
+                    nextInit = false;
+                }
                 if (!initalizeExpectedLength(ciphertextNettyBuf)) {
                     // We have not read enough bytes to initialize the expected length.
                     return;
@@ -401,13 +392,14 @@ public class GcmTransportCipher extends TransportCipher {
                     int expectedRemaining = (int) (expectedLength - ciphertextRead);
                     int bytesToRead = Integer.min(readableBytes, expectedRemaining);
                     // The smallest ciphertext size is 16 bytes for the auth tag
-                    ((Buffer) ciphertextBuffer).limit(
-                            ((Buffer) ciphertextBuffer).position() + bytesToRead);
+                    ciphertextBuffer.limit(
+                            ciphertextBuffer.position() + bytesToRead);
                     ciphertextNettyBuf.readBytes(ciphertextBuffer);
                     ciphertextRead += bytesToRead;
                     // Check if this is the last segment
                     if (ciphertextRead == expectedLength) {
                         completed = true;
+                        nextInit = true;
                     } else if (ciphertextRead > expectedLength) {
                         throw new IllegalStateException("Read more ciphertext than expected.");
                     }
@@ -415,7 +407,7 @@ public class GcmTransportCipher extends TransportCipher {
                     // then decrypt it and fire a read.
                     if (ciphertextBuffer.limit() == ciphertextBuffer.capacity() || completed) {
                         ByteBuffer plaintextBuffer = ByteBuffer.allocate(plaintextSegmentSize);
-                        ((Buffer) ciphertextBuffer).flip();
+                        ciphertextBuffer.flip();
                         decrypter.decryptSegment(
                                 ciphertextBuffer,
                                 segmentNumber,
@@ -423,12 +415,12 @@ public class GcmTransportCipher extends TransportCipher {
                                 plaintextBuffer);
                         segmentNumber++;
                         // Clear the ciphertext buffer because it's been read
-                        ((Buffer) ciphertextBuffer).clear();
-                        ((Buffer) plaintextBuffer).flip();
+                        ciphertextBuffer.clear();
+                        plaintextBuffer.flip();
                         ctx.fireChannelRead(Unpooled.wrappedBuffer(plaintextBuffer));
                     } else {
                         // Set the ciphertext buffer up to read the next chunk
-                        ((Buffer) ciphertextBuffer).limit(ciphertextBuffer.capacity());
+                        ciphertextBuffer.limit(ciphertextBuffer.capacity());
                     }
                     nettyBufReadableBytes = ciphertextNettyBuf.readableBytes();
                 }
