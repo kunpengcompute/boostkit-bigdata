@@ -73,7 +73,7 @@ public class OrcColumnarBatchJniReaderSparkORCPushDownTest extends TestCase {
             // if URISyntaxException thrown, next line assertNotNull will interrupt the test
         }
         assertNotNull(uri);
-        orcColumnarBatchScanReader.reader = orcColumnarBatchScanReader.initializeReaderJava(uri, OrcFile.readerOptions(new Configuration()));
+        orcColumnarBatchScanReader.reader = orcColumnarBatchScanReader.initializeReaderJava(uri);
         assertTrue(orcColumnarBatchScanReader.reader != 0);
     }
 

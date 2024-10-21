@@ -22,18 +22,15 @@ import com.google.common.annotations.VisibleForTesting;
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor;
 import com.huawei.boostkit.spark.jni.OrcColumnarBatchScanReader;
 import nova.hetu.omniruntime.vector.Vec;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.InputSplit;
 import org.apache.hadoop.mapreduce.RecordReader;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.input.FileSplit;
-import org.apache.orc.OrcConf;
-import org.apache.orc.OrcFile;
-import org.apache.orc.Reader;
 
 import org.apache.spark.sql.catalyst.InternalRow;
 import org.apache.spark.sql.execution.vectorized.OmniColumnVectorUtils;
 import org.apache.spark.sql.execution.vectorized.OmniColumnVector;
+import org.apache.spark.sql.sources.Filter;
 import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
@@ -49,25 +46,10 @@ import java.util.ArrayList;
 public class OmniOrcColumnarBatchReader extends RecordReader<Void, ColumnarBatch> {
 
   // The capacity of vectorized batch.
-
   private int capacity;
-
-  /**
-   * The column IDs of the physical ORC file schema which are required by this reader.
-   * -1 means this required column is partition column, or it doesn't exist in the ORC file.
-   * Ideally partition column should never appear in the physical file, and should only appear
-   * in the directory name. However, Spark allows partition columns inside physical file,
-   * but Spark will discard the values from the file, and use the partition value got from
-   * directory name. The column order will be reserved though.
-   */
-  @VisibleForTesting
-  public int[] requestedDataColIds;
 
   // Native Record reader from ORC row batch.
   private OrcColumnarBatchScanReader recordReader;
-
-  private StructField[] requiredFields;
-  private StructField[] resultFields;
 
   // The result columnar batch for vectorized execution by whole-stage codegen.
   @VisibleForTesting
@@ -82,10 +64,13 @@ public class OmniOrcColumnarBatchReader extends RecordReader<Void, ColumnarBatch
 
   private int[] vecTypeIds;
 
-  private Reader.Options options;
+  private StructType requiredSchema;
+  private Filter pushedFilter;
 
-  public OmniOrcColumnarBatchReader(int capacity) {
+  public OmniOrcColumnarBatchReader(int capacity, StructType requiredSchema, Filter pushedFilter) {
     this.capacity = capacity;
+    this.requiredSchema = requiredSchema;
+    this.pushedFilter = pushedFilter;
   }
 
 
@@ -133,121 +118,87 @@ public class OmniOrcColumnarBatchReader extends RecordReader<Void, ColumnarBatch
   public void initialize(
           InputSplit inputSplit, TaskAttemptContext taskAttemptContext) throws IOException {
     FileSplit fileSplit = (FileSplit)inputSplit;
-    Configuration conf = taskAttemptContext.getConfiguration();
-    OrcFile.ReaderOptions readerOptions = OrcFile.readerOptions(conf)
-            .maxLength(OrcConf.MAX_FILE_LENGTH.getLong(conf))
-            .filesystem(fileSplit.getPath().getFileSystem(conf));
-    options =
-            OrcColumnarNativeReader.buildOptions(conf, fileSplit.getStart(), fileSplit.getLength());
     recordReader = new OrcColumnarBatchScanReader();
-    recordReader.initializeReaderJava(fileSplit.getPath().toUri(), readerOptions);
+    recordReader.initializeReaderJava(fileSplit.getPath().toUri());
+
+    initDataColIds();
+    recordReader.initializeRecordReaderJava(fileSplit.getStart(), fileSplit.getLength(), pushedFilter, requiredSchema);
   }
 
-  public void initDataColIds(
-          StructType requiredSchema,
-          int[] requestedPartitionColIds, int[] requestedDataColIds, StructField[] resultFields,
-          int[] precisionArray, int[] scaleArray) {
+  private void initDataColIds() {
     // find requiredS fieldNames
     String[] requiredfieldNames = requiredSchema.fieldNames();
-    // find orcfile fieldNames
-    ArrayList<String> orcfieldNames = recordReader.fildsNames;
     // save valid cols and numbers of valid cols
     recordReader.colsToGet = new int[requiredfieldNames.length];
-    recordReader.realColsCnt = 0;
-    // save valid cols fieldsNames
-    recordReader.colToInclu = new ArrayList<String>();
+    recordReader.includedColumns = new ArrayList<>();
     // collect read cols types
     ArrayList<Integer> typeBuilder = new ArrayList<>();
+
     for (int i = 0; i < requiredfieldNames.length; i++) {
       String target = requiredfieldNames[i];
-      boolean is_find = false;
-      for (int j = 0; j < orcfieldNames.size(); j++) {
-        String temp = orcfieldNames.get(j);
-        if (target.equals(temp)) {
-          requestedDataColIds[i] = i;
-          recordReader.colsToGet[i] = 0;
-          recordReader.colToInclu.add(requiredfieldNames[i]);
-          recordReader.realColsCnt++;
-          typeBuilder.add(OmniExpressionAdaptor.sparkTypeToOmniType(requiredSchema.fields()[i].dataType()));
-          is_find = true;
-        }
-      }
-
-      // if invalid, set colsToGet value -1, else set colsToGet 0
-      if (!is_find) {
+      // if not find, set colsToGet value -1, else set colsToGet 0
+      if (recordReader.allFieldsNames.contains(target)) {
+        recordReader.colsToGet[i] = 0;
+        recordReader.includedColumns.add(requiredfieldNames[i]);
+        typeBuilder.add(OmniExpressionAdaptor.sparkTypeToOmniType(requiredSchema.fields()[i].dataType()));
+      } else {
         recordReader.colsToGet[i] = -1;
       }
     }
 
     vecTypeIds = typeBuilder.stream().mapToInt(Integer::intValue).toArray();
-
-    for (int i = 0; i < resultFields.length; i++) {
-      if (requestedPartitionColIds[i] != -1) {
-        requestedDataColIds[i] = -1;
-      }
-    }
-
-    // set data members resultFields and requestedDataColIdS
-    this.resultFields = resultFields;
-    this.requestedDataColIds = requestedDataColIds;
-
-    recordReader.requiredfieldNames = requiredfieldNames;
-    recordReader.precisionArray = precisionArray;
-    recordReader.scaleArray = scaleArray;
-    recordReader.initializeRecordReaderJava(options);
   }
 
   /**
    * Initialize columnar batch by setting required schema and partition information.
    * With this information, this creates ColumnarBatch with the full schema.
    *
-   * @param requiredFields The fields that are required to return,.
-   * @param resultFields All the fields that are required to return, including partition fields.
-   * @param requestedDataColIds Requested column ids from orcSchema. -1 if not existed.
-   * @param requestedPartitionColIds Requested column ids from partition schema. -1 if not existed.
+   * @param partitionColumns partition columns
    * @param partitionValues Values of partition columns.
    */
-  public void initBatch(
-          StructField[] requiredFields,
-          StructField[] resultFields,
-          int[] requestedDataColIds,
-          int[] requestedPartitionColIds,
-          InternalRow partitionValues) {
-    if (resultFields.length != requestedDataColIds.length || resultFields.length != requestedPartitionColIds.length){
-      throw new UnsupportedOperationException("This operator doesn't support orc initBatch.");
+  public void initBatch(StructType partitionColumns, InternalRow partitionValues) {
+    StructType resultSchema = new StructType();
+
+    for (StructField f: requiredSchema.fields()) {
+      resultSchema = resultSchema.add(f);
     }
 
-    this.requiredFields = requiredFields;
-
-    StructType resultSchema = new StructType(resultFields);
+    if (partitionColumns != null) {
+      for (StructField f: partitionColumns.fields()) {
+        resultSchema = resultSchema.add(f);
+      }
+    }
 
     // Just wrap the ORC column vector instead of copying it to Spark column vector.
     orcVectorWrappers = new org.apache.spark.sql.vectorized.ColumnVector[resultSchema.length()];
 
     templateWrappers = new org.apache.spark.sql.vectorized.ColumnVector[resultSchema.length()];
 
-    for (int i = 0; i < resultFields.length; i++) {
-      DataType dt = resultFields[i].dataType();
-      if (requestedPartitionColIds[i] != -1) {
-        OmniColumnVector partitionCol = new OmniColumnVector(capacity, dt, true);
-        OmniColumnVectorUtils.populate(partitionCol, partitionValues, requestedPartitionColIds[i]);
+    if (partitionColumns != null) {
+      int partitionIdx = requiredSchema.fields().length;
+      for (int i = 0; i < partitionColumns.fields().length; i++) {
+        OmniColumnVector partitionCol = new OmniColumnVector(capacity, partitionColumns.fields()[i].dataType(), true);
+        OmniColumnVectorUtils.populate(partitionCol, partitionValues, i);
         partitionCol.setIsConstant();
-        templateWrappers[i] = partitionCol;
-        orcVectorWrappers[i] = new OmniColumnVector(capacity, dt, false);;
-      } else {
-        int colId = requestedDataColIds[i];
-        // Initialize the missing columns once.
-        if (colId == -1) {
-          OmniColumnVector missingCol = new OmniColumnVector(capacity, dt, true);
-          missingCol.putNulls(0, capacity);
-          missingCol.setIsConstant();
-          templateWrappers[i] = missingCol;
-        } else {
-          templateWrappers[i] = new OmniColumnVector(capacity, dt, false);
-        }
-        orcVectorWrappers[i] = new OmniColumnVector(capacity, dt, false);
+        templateWrappers[i + partitionIdx] = partitionCol;
+        orcVectorWrappers[i + partitionIdx] = new OmniColumnVector(capacity, partitionColumns.fields()[i].dataType(), false);
       }
     }
+
+    for (int i = 0; i < requiredSchema.fields().length; i++) {
+      DataType dt = requiredSchema.fields()[i].dataType();
+      if (recordReader.colsToGet[i] == -1) {
+        // missing cols
+        OmniColumnVector missingCol = new OmniColumnVector(capacity, dt, true);
+        missingCol.putNulls(0, capacity);
+        missingCol.setIsConstant();
+        templateWrappers[i] = missingCol;
+      } else {
+        templateWrappers[i] = new OmniColumnVector(capacity, dt, false);
+      }
+      orcVectorWrappers[i] = new OmniColumnVector(capacity, dt, false);
+    }
+
     // init batch
     recordReader.initBatchJava(capacity);
     vecs = new Vec[orcVectorWrappers.length];
@@ -260,7 +211,7 @@ public class OmniOrcColumnarBatchReader extends RecordReader<Void, ColumnarBatch
    */
   private boolean nextBatch() throws IOException {
     int batchSize;
-    if ((resultFields.length == 1 && requestedDataColIds[0] == -1) || resultFields.length == 0 || requiredFields.length == 0) {
+    if (requiredSchema.fields().length == 0 || vecTypeIds.length == 0) {
       batchSize = (int) recordReader.getNumberOfRowsJava();
     } else {
       batchSize = recordReader.next(vecs, vecTypeIds);
@@ -270,10 +221,9 @@ public class OmniOrcColumnarBatchReader extends RecordReader<Void, ColumnarBatch
     }
     columnarBatch.setNumRows(batchSize);
 
-    for (int i = 0; i < resultFields.length; i++) {
-      if (requestedDataColIds[i] != -1) {
-        int colId = requestedDataColIds[i];
-        ((OmniColumnVector) orcVectorWrappers[i]).setVec(vecs[colId]);
+    for (int i = 0; i < requiredSchema.fields().length; i++) {
+      if (recordReader.colsToGet[i] != -1) {
+        ((OmniColumnVector) orcVectorWrappers[i]).setVec(vecs[i]);
       }
     }
 
