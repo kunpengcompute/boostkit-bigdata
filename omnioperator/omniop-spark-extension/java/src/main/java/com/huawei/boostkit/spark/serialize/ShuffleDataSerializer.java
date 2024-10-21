@@ -80,12 +80,12 @@ public class ShuffleDataSerializer {
             long[] omniVecs = new long[vecCount];
             int[] omniTypes = new int[vecCount];
             createEmptyVec(rowBatch, omniTypes, omniVecs, columnarVecs, vecCount, rowCount);
-            OmniRowDeserializer deserializer = new OmniRowDeserializer(omniTypes);
+            OmniRowDeserializer deserializer = new OmniRowDeserializer(omniTypes, omniVecs);
 
             for (int rowIdx = 0; rowIdx < rowCount; rowIdx++) {
                 VecData.ProtoRow protoRow = rowBatch.getRows(rowIdx);
                 byte[] array = protoRow.getData().toByteArray();
-                deserializer.parse(array, omniVecs, rowIdx);
+                deserializer.parse(array, rowIdx);
             }
 
             // update initial varchar vector because it's capacity might have been expanded.
