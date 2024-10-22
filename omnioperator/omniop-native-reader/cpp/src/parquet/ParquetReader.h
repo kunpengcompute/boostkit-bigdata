@@ -53,8 +53,10 @@ namespace omniruntime::reader {
         ParquetReader(std::unique_ptr<common::TimeRebaseInfo> &rebaseInfoPtr) : rebaseInfoPtr(std::move(rebaseInfoPtr))
         {}
 
-        arrow::Status InitRecordReader(UriInfo &uri, int64_t start, int64_t end, int64_t capacity, bool hasExpressionTree,
-            Expression pushedFilterArray, const std::vector<std::string>& fieldNames, std::string& ugi);
+        arrow::Status InitReader(UriInfo &uri, int64_t capacity, std::string& ugi);
+
+        arrow::Status InitRecordReader(int64_t start, int64_t end, bool hasExpressionTree,
+            Expression pushedFilterArray, const std::vector<std::string>& fieldNames);
 
         arrow::Status ReadNextBatch(std::vector<omniruntime::vec::BaseVector*> &batch, long *batchRowSize);
 
@@ -84,6 +86,8 @@ namespace omniruntime::reader {
             const std::shared_ptr<parquet::arrow::ReaderContext> &ctx, std::unique_ptr<ParquetColumnReader>* out);
 
         std::unique_ptr<common::TimeRebaseInfo> rebaseInfoPtr;
+
+        std::shared_ptr<arrow::io::RandomAccessFile> file;
     };
 
     class Filesystem {

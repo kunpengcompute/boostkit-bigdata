@@ -18,6 +18,7 @@
 
 package org.apache.spark.sql.execution.datasources.parquet;
 
+import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor;
 import com.huawei.boostkit.spark.jni.ParquetColumnarBatchScanReader;
 import nova.hetu.omniruntime.vector.Vec;
 import org.apache.hadoop.mapreduce.InputSplit;
@@ -46,6 +47,7 @@ public class OmniParquetColumnarBatchReader extends RecordReader<Void, ColumnarB
 
   // The capacity of vectorized batch.
   private int capacity;
+  private boolean[] missingColumns;
   private ColumnarBatch columnarBatch;
   private ParquetColumnarBatchScanReader reader;
   private org.apache.spark.sql.vectorized.ColumnVector[] wrap;
@@ -123,10 +125,31 @@ public class OmniParquetColumnarBatchReader extends RecordReader<Void, ColumnarB
       throws IOException, InterruptedException, UnsupportedOperationException {
     ParquetInputSplit split = (ParquetInputSplit)inputSplit;
     this.reader = new ParquetColumnarBatchScanReader(requiredSchema, datetimeRebaseSpec, int96RebaseSpec, parquetTypes);
-    reader.initializeReaderJava(split.getPath(), split.getStart(), split.getEnd(),
-            capacity, pushedFilter);
+    reader.initializeReaderJava(split.getPath(), capacity);
+    String[] includeFieldNames = initializeInternal();
+    reader.initializeRecordReaderJava(split.getStart(), split.getEnd(), includeFieldNames, pushedFilter);
   }
 
+  private String[] initializeInternal() throws IOException, UnsupportedOperationException {
+    String[] requiredFieldNames = requiredSchema.fieldNames();
+    StructField[] structFields = requiredSchema.fields();
+
+    missingColumns = new boolean[requiredFieldNames.length];
+    ArrayList<String> allFieldsNames = reader.getAllFieldsNames();
+
+    ArrayList<String> includeFieldNames = new ArrayList<>();
+    for (int i = 0; i < requiredFieldNames.length; i++) {
+      String target = requiredFieldNames[i];
+      if (allFieldsNames.contains(target)) {
+        missingColumns[i] = false;
+        includeFieldNames.add(target);
+        types.add(structFields[i].dataType());
+      } else {
+        missingColumns[i] = true;
+      }
+    }
+    return includeFieldNames.toArray(new String[includeFieldNames.size()]);
+  }
 
   // Creates a columnar batch that includes the schema from the data files and the additional
   // partition columns appended to the end of the batch.
@@ -138,7 +161,6 @@ public class OmniParquetColumnarBatchReader extends RecordReader<Void, ColumnarB
     StructType batchSchema = new StructType();
     for (StructField f: requiredSchema.fields()) {
       batchSchema = batchSchema.add(f);
-      types.add(f.dataType());
     }
     if (partitionColumns != null) {
       for (StructField f : partitionColumns.fields()) {
@@ -163,28 +185,38 @@ public class OmniParquetColumnarBatchReader extends RecordReader<Void, ColumnarB
       }
     }
 
+    // Initialize missing columns with nulls.
+    for (int i = 0; i < missingColumns.length; i++) {
+      // templateWrap always stores missingCol. For other requested cols from native, it will not init them.
+      if (missingColumns[i]) {
+        OmniColumnVector missingCol = new OmniColumnVector(capacity, requiredSchema.fields()[i].dataType(), true);
+        missingCol.putNulls(0, capacity);
+        missingCol.setIsConstant();
+        templateWrap[i] = missingCol;
+      } else {
+        templateWrap[i] = new OmniColumnVector(capacity, requiredSchema.fields()[i].dataType(), false);
+      }
 
-    // Init columns that need read from native
-    for (int i = 0; i < requiredSchema.fields().length; i++) {
-      templateWrap[i] = new OmniColumnVector(capacity, requiredSchema.fields()[i].dataType(), false);
+      // wrap also need to new partitionCol but not init vec
       wrap[i] = new OmniColumnVector(capacity, requiredSchema.fields()[i].dataType(), false);
     }
-
-    vecs = new Vec[types.size()];
+    vecs = new Vec[wrap.length];
   }
 
   /**
    * Advance to the next batch of rows. Return false if there are no more.
    */
   public boolean nextBatch() throws IOException {
-    int batchSize = reader.next(vecs, types);
+    int batchSize = reader.next(vecs, missingColumns, types);
     if (batchSize == 0) {
       return false;
     }
     columnarBatch.setNumRows(batchSize);
 
-    for (int i = 0; i < types.size(); i++) {
+    for (int i = 0; i < requiredSchema.fields().length; i++) {
+      if (!missingColumns[i]) {
         ((OmniColumnVector) wrap[i]).setVec(vecs[i]);
+      }
     }
 
     try {
