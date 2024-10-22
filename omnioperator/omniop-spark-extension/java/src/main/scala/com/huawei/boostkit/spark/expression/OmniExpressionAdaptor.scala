@@ -35,6 +35,7 @@ import org.apache.spark.sql.catalyst.plans.{FullOuter, Inner, JoinType, LeftAnti
 import org.apache.spark.sql.catalyst.util.CharVarcharUtils.getRawTypeString
 import org.apache.spark.sql.execution
 import org.apache.spark.sql.execution.ColumnarBloomFilterSubquery
+import org.apache.spark.sql.execution.datasources.OmniFileFormatWriter.Empty2Null
 import org.apache.spark.sql.expression.ColumnarExpressionConverter
 import org.apache.spark.sql.hive.HiveUdfAdaptorUtil
 import org.apache.spark.sql.types.{BinaryType, BooleanType, DataType, DateType, Decimal, DecimalType, DoubleType, IntegerType, LongType, Metadata, NullType, ShortType, StringType, TimestampType}
@@ -319,7 +320,12 @@ object OmniExpressionAdaptor extends Logging {
           .put("arguments", new JSONArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(subString.str, exprsIndexMap)).
             put(rewriteToOmniJsonExpressionLiteralJsonObject(subString.pos, exprsIndexMap))
             .put(rewriteToOmniJsonExpressionLiteralJsonObject(subString.len, exprsIndexMap)))
-
+      case empty2Null: Empty2Null =>
+        new JSONObject().put("exprType", "FUNCTION")
+          .put("function_name", "empty2null")
+          .addOmniExpJsonType("returnType", empty2Null.dataType)
+          .put("arguments", new JSONArray().put(rewriteToOmniJsonExpressionLiteralJsonObject
+          (empty2Null.child, exprsIndexMap)))
       // Cast
       case cast: CastBase =>
         unsupportedCastCheck(expr, cast)

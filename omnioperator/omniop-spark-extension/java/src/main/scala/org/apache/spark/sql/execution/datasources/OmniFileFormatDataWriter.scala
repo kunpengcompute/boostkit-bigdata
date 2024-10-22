@@ -157,6 +157,35 @@ abstract class OmniBaseDynamicPartitionDataWriter(
   protected val getOutputRow =
     UnsafeProjection.create(description.dataColumns, description.allColumns)
 
+  protected def getPartitionPath(partitionValues: Option[InternalRow],
+                                 bucketId: Option[Int]): String = {
+    val partDir = partitionValues.map(getPartitionPath(_))
+    partDir.foreach(updatedPartitions.add)
+
+    val bucketIdStr = bucketId.map(BucketingUtils.bucketIdToString).getOrElse("")
+
+    // The prefix and suffix must be in a form that matches our bucketing format. See BucketingUtils
+    // for details. The prefix is required to represent bucket id when writing Hive-compatible
+    // bucketed table.
+    val prefix = bucketId match {
+      case Some(id) => description.bucketSpec.get.bucketFileNamePrefix(id)
+      case _ => ""
+    }
+    val suffix = f"$bucketIdStr.c$fileCounter%03d" +
+      description.outputWriterFactory.getFileExtension(taskAttemptContext)
+    val fileNameSpec = FileNameSpec(prefix, suffix)
+
+    val customPath = partDir.flatMap { dir =>
+      description.customPartitionLocations.get(PartitioningUtils.parsePathFragment(dir))
+    }
+    val currentPath = if (customPath.isDefined) {
+      customPath.get + fileNameSpec.toString
+    } else {
+      partDir.toString + fileNameSpec.toString
+    }
+    currentPath
+  }
+
   /**
    * Opens a new OutputWriter given a partition key and/or a bucket id.
    * If bucket id is specified, we will append it to the end of the file name, but before the
@@ -276,21 +305,25 @@ class OmniDynamicPartitionDataSingleWriter(
       val nextBucketId = if (isBucketed) Some(getBucketId(record)) else None
 
       if (currentPartitionValues != nextPartitionValues || currentBucketId != nextBucketId) {
-        // See a new partition or bucket - write to a new partition dir (or a new bucket file).
-        if (isPartitioned && currentPartitionValues != nextPartitionValues) {
-          currentPartitionValues = Some(nextPartitionValues.get.copy())
-          statsTrackers.foreach(_.newPartition(currentPartitionValues.get))
-        }
-        if (isBucketed) {
-          currentBucketId = nextBucketId
-        }
+        val isFilePathSame = getPartitionPath(currentPartitionValues,
+          currentBucketId) == getPartitionPath(nextPartitionValues, nextBucketId)
+        if (!isFilePathSame) {
+          // See a new partition or bucket - write to a new partition dir (or a new bucket file).
+          if (isPartitioned && currentPartitionValues != nextPartitionValues) {
+            currentPartitionValues = Some(nextPartitionValues.get.copy())
+            statsTrackers.foreach(_.newPartition(currentPartitionValues.get))
+          }
+          if (isBucketed) {
+            currentBucketId = nextBucketId
+          }
 
-        fileCounter = 0
-        if (i != 0) {
-          writeRecord(omniInternalRow, lastIndex, i)
-          lastIndex = i
+          fileCounter = 0
+          if (i != 0) {
+            writeRecord(omniInternalRow, lastIndex, i)
+            lastIndex = i
+          }
+          renewCurrentWriter(currentPartitionValues, currentBucketId, closeCurrentWriter = true)
         }
-        renewCurrentWriter(currentPartitionValues, currentBucketId, closeCurrentWriter = true)
       } else if (
         description.maxRecordsPerFile > 0 &&
           recordsInFile >= description.maxRecordsPerFile

@@ -168,4 +168,37 @@ class TableWriteBasicFunctionSuite extends QueryTest with SharedSparkSession {
     assert(runRows(0).getDate(0).toString ==
       "1001-01-04", "the run value is error")
   }
+
+  test("empty string partition") {
+    val drop = spark.sql("drop table if exists table_insert_varchar")
+    drop.collect()
+    val createTable = spark.sql("create table table_insert_varchar" +
+      "(id int, c_varchar varchar(40)) using orc partitioned by (p_varchar varchar(40))")
+    createTable.collect()
+    val insert = spark.sql("insert into table table_insert_varchar values" +
+      "(5,'',''), (13,'6884578', null),  (6,'72135', '666')")
+    insert.collect()
+
+    val select = spark.sql("select * from table_insert_varchar order by id, c_varchar, p_varchar")
+    val runRows = select.collect()
+    val expectedRows = Seq(Row(5, "", null), Row(6, "72135", "666"), Row(13, "6884578", null))
+    assert(QueryTest.sameRows(runRows, expectedRows).isEmpty, "the run value is error")
+
+    val dropNP = spark.sql("drop table if exists table_insert_varchar_np")
+    dropNP.collect()
+    val createTableNP = spark.sql("create table table_insert_varchar_np" +
+      "(id int, c_varchar varchar(40)) using orc partitioned by " +
+      "(p_varchar1 int, p_varchar2 varchar(40), p_varchar3 varchar(40))")
+    createTableNP.collect()
+    val insertNP = spark.sql("insert into table table_insert_varchar_np values" +
+      "(5,'',1,'',''), (13,'6884578',6, null, null), (1,'abc',1,'',''), " +
+      "(3,'abcde',6,null,null), (4,'qqqqq', 8, 'a', 'b'), (6,'ooooo', 8, 'a', 'b')")
+    val selectNP = spark.sql("select * from table_insert_varchar_np " +
+      "order by id, c_varchar, p_varchar1")
+    val runRowsNP = selectNP.collect()
+    val expectedRowsNP = Seq(Row(1, "abc", 1, null, null), Row(3, "abcde", 6, null, null),
+      Row(4, "qqqqq", 8, "a", "b"), Row(5, "", 1, null, null), Row(6, "ooooo", 8, "a", "b"),
+      Row(13, "6884578", 6, null, null))
+    assert(QueryTest.sameRows(runRowsNP, expectedRowsNP).isEmpty, "the run value is error")
+  }
 }
