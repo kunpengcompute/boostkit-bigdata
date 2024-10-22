@@ -110,6 +110,46 @@ class ColumnarFuncSuite extends ColumnarSparkPlanTest {
     assertOmniProjectNotHappened(rollbackRes)
   }
 
+  test("Test Unix_timestamp Function") {
+    spark.conf.set("spark.sql.optimizer.excludedRules", "org.apache.spark.sql.catalyst.optimizer.ConstantFolding")
+    spark.conf.set("spark.sql.session.timeZone", "Asia/Shanghai")
+    spark.conf.set("spark.sql.legacy.timeParserPolicy", "CORRECTED")
+    val res1 = spark.sql("select unix_timestamp('','yyyy-MM-dd'), unix_timestamp('123-abc', " +
+      "'yyyy-MM-dd HH:mm:ss'), unix_timestamp(NULL, 'yyyy-MM-dd')")
+    assertOmniProjectHappened(res1)
+    checkAnswer(res1, Seq(Row(null, null, null)))
+
+    val res2 = spark.sql("select unix_timestamp('2024-10-21', 'yyyy-MM-dd'), " +
+      "unix_timestamp('2024-10-21 11:22:33', 'yyyy-MM-dd HH:mm:ss')")
+    assertOmniProjectHappened(res2)
+    checkAnswer(res2, Seq(Row(1729440000L, 1729480953L)))
+
+    val res3 = spark.sql("select unix_timestamp('1986-08-10 05:05:05','yyyy-MM-dd HH:mm:ss')")
+    assertOmniProjectHappened(res3)
+    checkAnswer(res3, Seq(Row(524001905L)))
+
+    val res4 = spark.sql("select unix_timestamp('2086-08-10 05:05:05','yyyy-MM-dd HH:mm:ss')")
+    assertOmniProjectHappened(res4)
+    checkAnswer(res4, Seq(Row(3679765505L)))
+  }
+
+  test("Test from_unixtime Function") {
+    spark.conf.set("spark.sql.optimizer.excludedRules", "org.apache.spark.sql.catalyst.optimizer.ConstantFolding")
+    spark.conf.set("spark.sql.session.timeZone", "Asia/Shanghai")
+    spark.conf.set("spark.sql.legacy.timeParserPolicy", "CORRECTED")
+    val res1 = spark.sql("select from_unixtime(1, 'yyyy-MM-dd HH:mm:ss'), from_unixtime(1, 'yyyy-MM-dd')")
+    assertOmniProjectHappened(res1)
+    checkAnswer(res1, Seq(Row("1970-01-01 08:00:01", "1970-01-01")))
+
+    val res2 = spark.sql("select from_unixtime(524001905, 'yyyy-MM-dd HH:mm:ss'), from_unixtime(524001905, 'yyyy-MM-dd')")
+    assertOmniProjectHappened(res2)
+    checkAnswer(res2, Seq(Row("1986-08-10 05:05:05", "1986-08-10")))
+
+    val res3 = spark.sql("select from_unixtime(3679765505, 'yyyy-MM-dd HH:mm:ss'), from_unixtime(3679765505, 'yyyy-MM-dd')")
+    assertOmniProjectHappened(res3)
+    checkAnswer(res3, Seq(Row("2086-08-10 05:05:05", "2086-08-10")))
+  }
+
   private def assertOmniProjectHappened(res: DataFrame) = {
     val executedPlan = res.queryExecution.executedPlan
     assert(executedPlan.find(_.isInstanceOf[ColumnarProjectExec]).isDefined, s"ColumnarProjectExec not happened, executedPlan as follows： \n$executedPlan")

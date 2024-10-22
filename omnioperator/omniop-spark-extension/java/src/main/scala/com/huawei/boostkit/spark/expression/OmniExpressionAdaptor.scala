@@ -101,20 +101,23 @@ object OmniExpressionAdaptor extends Logging {
   }
 
   private val timeFormatSet: Set[String] = Set("yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd")
+  private val timeZoneSet: Set[String] = Set("GMT+08:00", "Asia/Beijing", "Asia/Shanghai")
 
-  private def unsupportedTimeFormatCheck(timeFormat: String): Unit = {
+  private def unsupportedUnixTimeFunction(timeFormat: String, timeZone: String): Unit = {
+    if (!ColumnarPluginConfig.getSessionConf.enableOmniUnixTimeFunc) {
+      throw new UnsupportedOperationException(s"Not Enabled Omni UnixTime Function")
+    }
+    if (ColumnarPluginConfig.getSessionConf.timeParserPolicy == "LEGACY") {
+      throw new UnsupportedOperationException(s"Unsupported Time Parser Policy: LEGACY")
+    }
+    if (!timeZoneSet.contains(timeZone)) {
+      throw new UnsupportedOperationException(s"Unsupported Time Zone: $timeZone")
+    }
     if (!timeFormatSet.contains(timeFormat)) {
       throw new UnsupportedOperationException(s"Unsupported Time Format: $timeFormat")
     }
   }
 
-  private val timeZoneSet: Set[String] = Set("GMT+08:00", "Asia/Beijing", "Asia/Shanghai")
-
-  private def unsupportedTimeZoneCheck(timeZone: String): Unit = {
-    if (!timeZoneSet.contains(timeZone)) {
-      throw new UnsupportedOperationException(s"Unsupported Time Zone: $timeZone")
-    }
-  }
 
   def toOmniTimeFormat(format: String): String = {
     format.replace("yyyy", "%Y")
@@ -480,20 +483,21 @@ object OmniExpressionAdaptor extends Logging {
       // for date time functions
       case unixTimestamp: UnixTimestamp =>
         val timeZone = unixTimestamp.timeZoneId.getOrElse("")
-        unsupportedTimeZoneCheck(timeZone)
-        unsupportedTimeFormatCheck(unixTimestamp.format.toString)
+        unsupportedUnixTimeFunction(unixTimestamp.format.toString, timeZone)
+        val policy = ColumnarPluginConfig.getSessionConf.timeParserPolicy
         new JSONObject().put("exprType", "FUNCTION")
           .addOmniExpJsonType("returnType", unixTimestamp.dataType)
           .put("function_name", "unix_timestamp")
           .put("arguments", new JSONArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(unixTimestamp.timeExp, exprsIndexMap))
             .put(new JSONObject(toOmniTimeFormat(rewriteToOmniJsonExpressionLiteral(unixTimestamp.format, exprsIndexMap))))
             .put(new JSONObject().put("exprType", "LITERAL").put("dataType", 15).put("isNull", timeZone.isEmpty())
-                                 .put("value", timeZone).put("width", timeZone.length)))
+              .put("value", timeZone).put("width", timeZone.length))
+            .put(new JSONObject().put("exprType", "LITERAL").put("dataType", 15).put("isNull", policy.isEmpty())
+              .put("value", policy).put("width", policy.length)))
 
       case fromUnixTime: FromUnixTime =>
         val timeZone = fromUnixTime.timeZoneId.getOrElse("")
-        unsupportedTimeZoneCheck(timeZone)
-        unsupportedTimeFormatCheck(fromUnixTime.format.toString)
+        unsupportedUnixTimeFunction(fromUnixTime.format.toString, timeZone)
         new JSONObject().put("exprType", "FUNCTION")
           .addOmniExpJsonType("returnType", fromUnixTime.dataType)
           .put("function_name", "from_unixtime")

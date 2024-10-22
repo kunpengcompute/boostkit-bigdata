@@ -183,6 +183,10 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
 
   def adaptivePartialAggregationRatio: Double = conf.getConf(ADAPTIVE_PARTIAL_AGGREGATION_RATIO)
 
+  def timeParserPolicy: String = conf.getConfString("spark.sql.legacy.timeParserPolicy")
+
+  def enableOmniUnixTimeFunc: Boolean = conf.getConf(ENABLE_OMNI_UNIXTIME_FUNCTION)
+
 }
 
 
@@ -635,5 +639,11 @@ object ColumnarPluginConfig {
     .internal()
     .doubleConf
     .createWithDefault(0.8)
+
+  val ENABLE_OMNI_UNIXTIME_FUNCTION = buildConf("spark.omni.sql.columnar.unixTimeFunc.enabled")
+    .internal()
+    .doc("enable omni unix_timestamp and from_unixtime")
+    .booleanConf
+    .createWithDefault(true)
 
 }
