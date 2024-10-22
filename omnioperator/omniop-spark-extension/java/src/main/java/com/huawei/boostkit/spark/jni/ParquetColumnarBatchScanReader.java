@@ -55,6 +55,7 @@ import java.math.BigDecimal;
 import java.net.URI;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.TimeZone;
@@ -81,6 +82,8 @@ public class ParquetColumnarBatchScanReader {
     private final Function1<Long, Long> int96RebaseFunc;
 
     private final List<Type> parquetTypes;
+
+    private ArrayList<String> allFieldsNames;
 
     public ParquetColumnarBatchScanReader(StructType requiredSchema, LegacyBehaviorPolicy datetimeRebaseMode,
                                           LegacyBehaviorPolicy int96RebaseMode, List<Type> parquetTypes) {
@@ -148,8 +151,7 @@ public class ParquetColumnarBatchScanReader {
         }
     }
 
-    public long initializeReaderJava(Path path, long start, long end, int capacity,
-            Filter pushedFilter) throws UnsupportedEncodingException {
+    public long initializeReaderJava(Path path, int capacity) throws UnsupportedEncodingException {
         JSONObject job = new JSONObject();
 
         URI uri = path.toUri();
@@ -159,11 +161,7 @@ public class ParquetColumnarBatchScanReader {
         job.put("port", uri.getPort());
         job.put("path", uri.getPath() == null ? "" : uri.getPath());
 
-        job.put("start", start);
-        job.put("end", end);
-
         job.put("capacity", capacity);
-        job.put("fieldNames", requiredSchema.fieldNames());
 
         String ugi = null;
         try {
@@ -173,13 +171,33 @@ public class ParquetColumnarBatchScanReader {
         }
         job.put("ugi", ugi);
 
-        if (pushedFilter != null) {
-            pushDownFilter(pushedFilter, job);
-        }
         addJulianGregorianInfo(job);
 
         parquetReader = jniReader.initializeReaderV2(job);
         return parquetReader;
+    }
+
+    public long initializeRecordReaderJava(long start, long end, String[] fieldNames, Filter pushedFilter)
+            throws UnsupportedEncodingException {
+        JSONObject job = new JSONObject();
+        job.put("start", start);
+        job.put("end", end);
+        job.put("fieldNames", fieldNames);
+
+        if (pushedFilter != null) {
+            pushDownFilter(pushedFilter, job);
+        }
+
+        parquetReader = jniReader.initializeRecordReader(parquetReader, job);
+        return parquetReader;
+    }
+
+    public ArrayList<String> getAllFieldsNames() {
+        if (allFieldsNames == null) {
+            allFieldsNames = new ArrayList<>();
+            jniReader.getAllFieldNames(parquetReader, allFieldsNames);
+        }
+        return allFieldsNames;
     }
 
     private void pushDownFilter(Filter pushedFilter, JSONObject job) {
@@ -385,43 +403,48 @@ public class ParquetColumnarBatchScanReader {
         }
     }
 
-    public int next(Vec[] vecList, List<DataType> types) {
-        int vectorCnt = vecList.length;
-        long[] vecNativeIds = new long[vectorCnt];
+    public int next(Vec[] vecList, boolean[] missingColumns, List<DataType> types) {
+        int colsCount = missingColumns.length;
+        long[] vecNativeIds = new long[types.size()];
         long rtn = jniReader.recordReaderNext(parquetReader, vecNativeIds);
         if (rtn == 0) {
             return 0;
         }
-        for (int i = 0; i < vectorCnt; i++) {
-            DataType type = types.get(i);
+        int nativeGetId = 0;
+        for (int i = 0; i < colsCount; i++) {
+            if (missingColumns[i]) {
+                continue;
+            }
+            DataType type = types.get(nativeGetId);
             if (type instanceof LongType) {
-                vecList[i] = new LongVec(vecNativeIds[i]);
+                vecList[i] = new LongVec(vecNativeIds[nativeGetId]);
             } else if (type instanceof BooleanType) {
-                vecList[i] = new BooleanVec(vecNativeIds[i]);
+                vecList[i] = new BooleanVec(vecNativeIds[nativeGetId]);
             } else if (type instanceof ShortType) {
-                vecList[i] = new ShortVec(vecNativeIds[i]);
+                vecList[i] = new ShortVec(vecNativeIds[nativeGetId]);
             } else if (type instanceof IntegerType) {
-                vecList[i] = new IntVec(vecNativeIds[i]);
+                vecList[i] = new IntVec(vecNativeIds[nativeGetId]);
             } else if (type instanceof DecimalType) {
                 if (DecimalType.is64BitDecimalType(type)) {
-                    vecList[i] = new LongVec(vecNativeIds[i]);
+                    vecList[i] = new LongVec(vecNativeIds[nativeGetId]);
                 } else {
-                    vecList[i] = new Decimal128Vec(vecNativeIds[i]);
+                    vecList[i] = new Decimal128Vec(vecNativeIds[nativeGetId]);
                 }
             } else if (type instanceof DoubleType) {
-                vecList[i] = new DoubleVec(vecNativeIds[i]);
+                vecList[i] = new DoubleVec(vecNativeIds[nativeGetId]);
             } else if (type instanceof StringType) {
-                vecList[i] = new VarcharVec(vecNativeIds[i]);
+                vecList[i] = new VarcharVec(vecNativeIds[nativeGetId]);
             } else if (type instanceof DateType) {
-                vecList[i] = new IntVec(vecNativeIds[i]);
+                vecList[i] = new IntVec(vecNativeIds[nativeGetId]);
             } else if (type instanceof ByteType) {
-                vecList[i] = new VarcharVec(vecNativeIds[i]);
+                vecList[i] = new VarcharVec(vecNativeIds[nativeGetId]);
             } else if (type instanceof TimestampType) {
-                vecList[i] = new LongVec(vecNativeIds[i]);
+                vecList[i] = new LongVec(vecNativeIds[nativeGetId]);
                 tryToAdjustTimestampVec((LongVec) vecList[i], rtn, i);
             } else {
                 throw new RuntimeException("Unsupport type for ColumnarFileScan: " + type.typeName());
             }
+            nativeGetId++;
         }
         return (int)rtn;
     }

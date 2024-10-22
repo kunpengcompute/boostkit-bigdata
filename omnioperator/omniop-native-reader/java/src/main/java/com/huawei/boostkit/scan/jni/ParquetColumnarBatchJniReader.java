@@ -19,6 +19,8 @@
 package com.huawei.boostkit.scan.jni;
 import org.json.JSONObject;
 
+import java.util.ArrayList;
+
 public class ParquetColumnarBatchJniReader {
 
     public ParquetColumnarBatchJniReader() {
@@ -28,6 +30,10 @@ public class ParquetColumnarBatchJniReader {
     public native long initializeReader(JSONObject job);
 
     public native long initializeReaderV2(JSONObject job);
+
+    public native long initializeRecordReader(long parquetReader, JSONObject job);
+
+    public native long getAllFieldNames(long parquetReader, ArrayList<String> allFieldNames);
 
     public native long recordReaderNext(long parquetReader, long[] vecNativeId);
 

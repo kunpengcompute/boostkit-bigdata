@@ -125,9 +125,7 @@ Status ParquetReader::InitRecordReader(UriInfo &uri, int64_t capacity,
     return arrow::Status::OK();
 }
 
-
-Status ParquetReader::InitRecordReader(UriInfo &uri, int64_t start, int64_t end, int64_t capacity, bool hasExpressionTree,
-    Expression pushedFilterArray, const std::vector<std::string>& fieldNames, std::string& ugi)
+Status ParquetReader::InitReader(UriInfo &uri, int64_t capacity, std::string& ugi)
 {
     // Configure reader settings
     auto reader_properties = parquet::ReaderProperties(pool);
@@ -135,8 +133,6 @@ Status ParquetReader::InitRecordReader(UriInfo &uri, int64_t start, int64_t end,
     // Configure Arrow-specific reader settings
     auto arrow_reader_properties = parquet::ArrowReaderProperties();
     arrow_reader_properties.set_batch_size(capacity);
-
-    std::shared_ptr<arrow::io::RandomAccessFile> file;
 
     // Get the file from filesystem
     Status result;
@@ -155,6 +151,12 @@ Status ParquetReader::InitRecordReader(UriInfo &uri, int64_t start, int64_t end,
     reader_builder.properties(arrow_reader_properties);
 
     ARROW_ASSIGN_OR_RAISE(arrow_reader, reader_builder.Build());
+    return arrow::Status::OK();
+}
+
+Status ParquetReader::InitRecordReader(int64_t start, int64_t end, bool hasExpressionTree,
+    Expression pushedFilterArray, const std::vector<std::string>& fieldNames)
+{
     std::vector<int> row_group_indices;
     auto filesource = std::make_shared<dataset::FileSource>(file);
     ARROW_RETURN_NOT_OK(GetRowGroupIndices(*filesource, start, end, hasExpressionTree, pushedFilterArray, row_group_indices));

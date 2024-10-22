@@ -55,14 +55,12 @@ namespace omniruntime::reader {
 
         arrow::Status InitRecordReader(UriInfo &uri, int64_t capacity,
                                        const std::vector<int>& row_group_indices,
-                                       const std::vector<int>& column_indices, std::string& ugi);
-
-        arrow::Status InitRecordReader(UriInfo &uri, int64_t capacity,
-                                       const std::vector<int>& row_group_indices,
                                        const std::vector<int>& column_indices, std::string& ugi, bool notNeedFSCache);
 
-        arrow::Status InitRecordReader(UriInfo &uri, int64_t start, int64_t end, int64_t capacity, bool hasExpressionTree,
-            Expression pushedFilterArray, const std::vector<std::string>& fieldNames, std::string& ugi);
+        arrow::Status InitReader(UriInfo &uri, int64_t capacity, std::string& ugi);
+
+        arrow::Status InitRecordReader(int64_t start, int64_t end, bool hasExpressionTree,
+            Expression pushedFilterArray, const std::vector<std::string>& fieldNames);
 
         arrow::Status ReadNextBatch(std::vector<omniruntime::vec::BaseVector*> &batch, long *batchRowSize);
 
@@ -73,6 +71,8 @@ namespace omniruntime::reader {
         std::vector<std::shared_ptr<ParquetColumnReader>> columnReaders;
 
         arrow::MemoryPool* pool = arrow::default_memory_pool();
+
+        std::shared_ptr<arrow::io::RandomAccessFile> file;
 
     private:
         arrow::Status GetRowGroupIndices(arrow::dataset::FileSource filesource, int64_t start, int64_t end,
