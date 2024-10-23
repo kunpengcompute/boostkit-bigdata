@@ -145,6 +145,18 @@ case class ColumnarPreOverrides(isSupportAdaptive: Boolean = true)
             } else {
               ColumnarProjectExec(plan.projectList, child)
             }
+          case scan: ColumnarFileSourceScanExec if (plan.projectList.forall(project => OmniExpressionAdaptor.isSimpleAttribute(project))) =>
+            ColumnarFileSourceScanExec(
+              scan.relation,
+              plan.output,
+              scan.requiredSchema,
+              scan.partitionFilters,
+              scan.optionalBucketSet,
+              scan.optionalNumCoalescedBuckets,
+              scan.dataFilters,
+              scan.tableIdentifier,
+              scan.disableBucketedScan
+            )
           case _ =>
             ColumnarProjectExec(plan.projectList, child)
         }
