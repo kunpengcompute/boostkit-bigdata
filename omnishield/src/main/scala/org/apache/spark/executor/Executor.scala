@@ -17,26 +17,9 @@
 
 package org.apache.spark.executor
 
-import java.io.{File, NotSerializableException}
-import java.lang.Thread.UncaughtExceptionHandler
-import java.lang.management.ManagementFactory
-import java.net.{URI, URL}
-import java.nio.ByteBuffer
-import java.util.{Locale, Properties}
-import java.util.concurrent._
-import java.util.concurrent.atomic.AtomicBoolean
-import javax.annotation.concurrent.GuardedBy
-import javax.ws.rs.core.UriBuilder
-
-import scala.collection.JavaConverters._
-import scala.collection.immutable
-import scala.collection.mutable.{ArrayBuffer, HashMap, Map, WrappedArray}
-import scala.concurrent.duration._
-import scala.util.control.NonFatal
-
 import com.google.common.util.concurrent.ThreadFactoryBuilder
-import org.slf4j.MDC
-
+import com.huawei.analytics.shield.ra.{IMAMeasurementShellGeneration, RemoteAttestationAgent, ShellRunner}
+import com.huawei.analytics.shield.utils.ShieldConfParam.{SPARK_REMOTE_ATTESTATION_AGENT_CLASS, SPARK_REMOTE_ATTESTATION_ENABLE, SPARK_REMOTE_ATTESTATION_SECRET}
 import org.apache.spark._
 import org.apache.spark.deploy.SparkHadoopUtil
 import org.apache.spark.internal.Logging
@@ -51,6 +34,23 @@ import org.apache.spark.shuffle.{FetchFailedException, ShuffleBlockPusher}
 import org.apache.spark.storage.{StorageLevel, TaskResultBlockId}
 import org.apache.spark.util._
 import org.apache.spark.util.io.ChunkedByteBuffer
+import org.slf4j.MDC
+
+import java.io.{File, NotSerializableException}
+import java.lang.Thread.UncaughtExceptionHandler
+import java.lang.management.ManagementFactory
+import java.net.{URI, URL}
+import java.nio.ByteBuffer
+import java.util.concurrent._
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.{Locale, Properties}
+import javax.annotation.concurrent.GuardedBy
+import javax.ws.rs.core.UriBuilder
+import scala.collection.JavaConverters._
+import scala.collection.{immutable, mutable}
+import scala.collection.mutable.{ArrayBuffer, HashMap, Map, WrappedArray}
+import scala.concurrent.duration._
+import scala.util.control.NonFatal
 
 /**
  * Spark executor, backed by a threadpool to run tasks.
@@ -271,6 +271,40 @@ private[spark] class Executor(
       }.getOrElse(Map.empty)
     }
   updateDependencies(initialUserFiles, initialUserJars, initialUserArchives)
+
+val fileMap: mutable.Map[String, Long] = currentJars ++ currentFiles ++ currentArchives
+  Seq("files", "archives").map { key =>
+    conf.getOption(s"spark.yarn.dist.$key").map { urls =>
+      urls.split(",").map(url => fileMap.put(url, 1))
+    }
+  }
+
+if (conf.getBoolean(SPARK_REMOTE_ATTESTATION_ENABLE, defaultValue = false)) {
+    val agentClass = conf.get(SPARK_REMOTE_ATTESTATION_AGENT_CLASS, defaultValue = "")
+    if (!conf.contains(SPARK_REMOTE_ATTESTATION_AGENT_CLASS)) {
+      val e = new SparkException("spark.remote.attestation.agent.class is empty")
+      logError(e.getMessage)
+      throw e
+    }
+    // do ima Measurement
+    val shellPath: String = IMAMeasurementShellGeneration.genIMAShellContent(fileMap)
+    val shell: ShellRunner = new ShellRunner
+    shell.runCommand(shellPath, shell.defaultHandleResult)
+    // do remote Attestation
+    val clz = Class.forName(agentClass)
+    val ins = clz.newInstance()
+    val agent = ins.asInstanceOf[RemoteAttestationAgent]
+    if (!agent.doRemoteAttestation(executorHostname, executorId)) {
+      val e = new SparkException("remote Attestation not pass")
+      logError(e.getMessage)
+      throw e
+    }
+    // request secret
+    if (conf.contains(SPARK_REMOTE_ATTESTATION_SECRET)) {
+      val secretId = conf.get(SPARK_REMOTE_ATTESTATION_SECRET)
+      agent.requestSecret(executorHostname, executorId, secretId)
+    }
+  }
 
   // Plugins need to load using a class loader that includes the executor's user classpath.
   // Plugins also needs to be initialized after the heartbeater started
