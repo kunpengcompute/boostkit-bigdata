@@ -1035,4 +1035,13 @@ object OmniExpressionAdaptor extends Logging {
         false
     }
   }
+
+  def isSimpleAttribute(project: NamedExpression): Boolean = {
+    project match {
+      case attribute: AttributeReference =>
+        true
+      case _ =>
+        false
+    }
+  }
 }
