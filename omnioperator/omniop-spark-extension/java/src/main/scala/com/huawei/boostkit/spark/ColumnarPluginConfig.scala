@@ -154,6 +154,11 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
   def enableLocalColumnarLimit : Boolean = conf.getConf(ENABLE_LOCAL_COLUMNAR_LIMIT)
 
   def enableGlobalColumnarLimit : Boolean = conf.getConf(ENABLE_GLOBAL_COLUMNAR_LIMIT)
+
+  def timeParserPolicy: String = conf.getConfString("spark.sql.legacy.timeParserPolicy")
+
+  def enableOmniUnixTimeFunc: Boolean = conf.getConf(ENABLE_OMNI_UNIXTIME_FUNCTION)
+
 }
 
 
@@ -515,6 +520,12 @@ object ColumnarPluginConfig {
 
   val ENABLE_OMNI_COLUMNAR_TO_ROW = buildConf("spark.omni.sql.columnar.columnarToRow")
     .internal()
+    .booleanConf
+    .createWithDefault(true)
+
+  val ENABLE_OMNI_UNIXTIME_FUNCTION = buildConf("spark.omni.sql.columnar.unixTimeFunc.enabled")
+    .internal()
+    .doc("enable omni unix_timestamp and from_unixtime")
     .booleanConf
     .createWithDefault(true)
 
