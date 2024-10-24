@@ -419,20 +419,21 @@ public class OrcColumnarBatchScanReader {
             addLiteralToJsonLeaves("leaf-" + leafIndex, OrcLeafOperator.LESS_THAN_EQUALS, jsonLeaves,
                 ((LessThanOrEqual) filterPredicate).attribute(), ((LessThanOrEqual) filterPredicate).value(), null);
             leafIndex++;
+            // For IsNotNull/IsNull/In, pass literal = "" to native to avoid throwing exception.
         } else if (filterPredicate instanceof IsNotNull) {
             addToJsonExpressionTree("leaf-" + leafIndex, jsonExpressionTree, true);
             addLiteralToJsonLeaves("leaf-" + leafIndex, OrcLeafOperator.IS_NULL, jsonLeaves,
-                ((IsNotNull) filterPredicate).attribute(), null, null);
+                ((IsNotNull) filterPredicate).attribute(), "", null);
             leafIndex++;
         } else if (filterPredicate instanceof IsNull) {
             addToJsonExpressionTree("leaf-" + leafIndex, jsonExpressionTree, false);
             addLiteralToJsonLeaves("leaf-" + leafIndex, OrcLeafOperator.IS_NULL, jsonLeaves,
-                ((IsNull) filterPredicate).attribute(), null, null);
+                ((IsNull) filterPredicate).attribute(), "", null);
             leafIndex++;
         } else if (filterPredicate instanceof In) {
             addToJsonExpressionTree("leaf-" + leafIndex, jsonExpressionTree, false);
             addLiteralToJsonLeaves("leaf-" + leafIndex, OrcLeafOperator.IN, jsonLeaves,
-                ((In) filterPredicate).attribute(), null, Arrays.stream(((In) filterPredicate).values()).toArray());
+                ((In) filterPredicate).attribute(), "", Arrays.stream(((In) filterPredicate).values()).toArray());
             leafIndex++;
         } else {
             throw new UnsupportedOperationException("Unsupported orc push down filter operation: " +
@@ -451,8 +452,8 @@ public class OrcColumnarBatchScanReader {
 
         ArrayList<String> literalList = new ArrayList<>();
         if (literals != null) {
-            for (Object lit: literalList) {
-                literalList.add(getLiteralValue(literal));
+            for (Object lit: literals) {
+                literalList.add(getLiteralValue(lit));
             }
         }
         leafJson.put("literalList", literalList);
