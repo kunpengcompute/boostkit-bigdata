@@ -27,10 +27,14 @@ import org.apache.spark.sql.SparkSession
 
 case class PushOrderedLimitThroughAgg(session: SparkSession) extends Rule[SparkPlan] with PredicateHelper {
   override def apply(plan: SparkPlan): SparkPlan = {
-    if (!ColumnarPluginConfig.getSessionConf.pushOrderedLimitThroughAggEnable) {
+    val columnarConf: ColumnarPluginConfig = ColumnarPluginConfig.getSessionConf
+    // The two optimization principles are contrary and cannot be used at the same time.
+    // reason: the pushOrderedLimitThroughAgg rule depends on the actual aggregation result in the partial phase.
+    // However, if the partial phase is skipped, aggregation is not performed.
+    if (!columnarConf.pushOrderedLimitThroughAggEnable || columnarConf.enableAdaptivePartialAggregation) {
       return plan
     }
-    val columnarConf: ColumnarPluginConfig = ColumnarPluginConfig.getSessionConf
+
     val enableColumnarTopNSort: Boolean = columnarConf.enableColumnarTopNSort
 
     plan.transform {
