@@ -20,6 +20,9 @@ object ShieldConfParam {
   val PRIMARY_KEY_NAME = "spark.shield.primaryKey.name"
   val DATA_KEY_LENGTH = "spark.shield.dataKey.length"
   val SPARK_IO_CODECS ="spark.hadoop.io.compression.codecs"
+  val SPARK_REMOTE_ATTESTATION_ENABLE ="spark.remote.attestation.enable"
+  val SPARK_REMOTE_ATTESTATION_AGENT_CLASS ="spark.remote.attestation.agent.class"
+  val SPARK_REMOTE_ATTESTATION_SECRET ="spark.remote.attestation.secret"
 
   def genKmsTypeConf(primaryKeyName: String): String = {
     s"spark.shield.primaryKey.$primaryKeyName.kms.type"
