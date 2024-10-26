@@ -20,19 +20,27 @@ package org.apache.spark.network.crypto;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.primitives.Longs;
+
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
-import io.netty.channel.*;
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.channel.ChannelOutboundHandlerAdapter;
+import io.netty.channel.ChannelPromise;
+import io.netty.channel.FileRegion;
 import io.netty.util.ReferenceCounted;
+
 import org.apache.spark.network.util.AbstractFileRegion;
 import org.apache.spark.network.util.ByteBufferWriteableChannel;
 
-import javax.crypto.spec.SecretKeySpec;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.WritableByteChannel;
 import java.security.GeneralSecurityException;
 import java.util.Properties;
+
+import javax.crypto.spec.SecretKeySpec;
 
 public class GcmTransportCipher extends TransportCipher {
     private static final String HKDF_ALG = "HmacSha256";
@@ -79,14 +87,10 @@ public class GcmTransportCipher extends TransportCipher {
 
     @VisibleForTesting
     class EncryptionHandler extends ChannelOutboundHandlerAdapter {
-        private final ByteBuffer plaintextBuffer;
-        private final ByteBuffer ciphertextBuffer;
         private final Sm4GcmHkdfStreaming sm4GcmHkdfStreaming;
 
         EncryptionHandler() throws IOException {
             sm4GcmHkdfStreaming = getSm4GcmHkdfStreaming();
-            plaintextBuffer = ByteBuffer.allocate(sm4GcmHkdfStreaming.getPlaintextSegmentSize());
-            ciphertextBuffer = ByteBuffer.allocate(sm4GcmHkdfStreaming.getCiphertextSegmentSize());
         }
 
         @Override
@@ -95,8 +99,8 @@ public class GcmTransportCipher extends TransportCipher {
             GcmEncryptedMessage encryptedMessage = new GcmEncryptedMessage(
                     sm4GcmHkdfStreaming,
                     msg,
-                    plaintextBuffer,
-                    ciphertextBuffer);
+                    ByteBuffer.allocate(sm4GcmHkdfStreaming.getPlaintextSegmentSize()),
+                    ByteBuffer.allocate(sm4GcmHkdfStreaming.getCiphertextSegmentSize()));
             ctx.write(encryptedMessage, promise);
         }
     }
@@ -301,7 +305,6 @@ public class GcmTransportCipher extends TransportCipher {
         private int segmentNumber = 0;
         private long expectedLength = -1;
         private long ciphertextRead = 0;
-        private boolean nextInit = false;
 
         DecryptionHandler() throws IOException {
             sm4GcmHkdfStreaming = getSm4GcmHkdfStreaming();
@@ -315,7 +318,11 @@ public class GcmTransportCipher extends TransportCipher {
 
         private boolean initalizeExpectedLength(ByteBuf ciphertextNettyBuf) {
             if (expectedLength < 0) {
+                int readableBytes = ciphertextNettyBuf.readableBytes();
+                int reading = Math.min(readableBytes, expectedLengthBuffer.remaining());
+                expectedLengthBuffer.limit(expectedLengthBuffer.position() + reading);
                 ciphertextNettyBuf.readBytes(expectedLengthBuffer);
+                expectedLengthBuffer.limit(LENGTH_HEADER_BYTES);
                 if (expectedLengthBuffer.hasRemaining()) {
                     // We did not read enough bytes to initialize the expected length.
                     return false;
@@ -334,8 +341,12 @@ public class GcmTransportCipher extends TransportCipher {
                 throws GeneralSecurityException {
             // Check if the ciphertext header has been read. This contains
             // the IV and other internal metadata.
-            if (!decrypterInit ) {
+            if (!decrypterInit) {
+                int readableBytes = ciphertextNettyBuf.readableBytes();
+                int reading = Math.min(readableBytes, headerBuffer.remaining());
+                headerBuffer.limit(headerBuffer.position() + reading);
                 ciphertextNettyBuf.readBytes(headerBuffer);
+                headerBuffer.limit(sm4GcmHkdfStreaming.getHeaderLength());
                 if (headerBuffer.hasRemaining()) {
                     // We did not read enough bytes to initialize the header.
                     return false;
@@ -363,66 +374,67 @@ public class GcmTransportCipher extends TransportCipher {
             // The format of the output is:
             // [8 byte length][Internal IV and header][Ciphertext][Auth Tag]
             try {
-                if (nextInit) {
-                    expectedLengthBuffer.clear();
-                    headerBuffer.clear();
-                    ciphertextBuffer.clear();
-                    segmentNumber = 0;
-                    decrypterInit = false;
-                    completed = false;
-                    expectedLength = -1;
-                    ciphertextRead = 0;
-                    nextInit = false;
-                }
-                if (!initalizeExpectedLength(ciphertextNettyBuf)) {
-                    // We have not read enough bytes to initialize the expected length.
-                    return;
-                }
-                if (!initalizeDecrypter(ciphertextNettyBuf)) {
-                    // We have not read enough bytes to initialize a header, needed to
-                    // initialize a decrypter.
-                    return;
-                }
                 int nettyBufReadableBytes = ciphertextNettyBuf.readableBytes();
-                while (nettyBufReadableBytes > 0 && !completed) {
-                    // Read the ciphertext into the local buffer
-                    int readableBytes = Integer.min(
+                while (nettyBufReadableBytes > 0) {
+                    if (completed) {
+                        expectedLengthBuffer.clear();
+                        headerBuffer.clear();
+                        ciphertextBuffer.clear();
+                        segmentNumber = 0;
+                        decrypterInit = false;
+                        completed = false;
+                        expectedLength = -1;
+                        ciphertextRead = 0;
+                    }
+                    if (!initalizeExpectedLength(ciphertextNettyBuf)) {
+                        // We have not read enough bytes to initialize the expected length.
+                        return;
+                    }
+                    if (!initalizeDecrypter(ciphertextNettyBuf)) {
+                        // We have not read enough bytes to initialize a header, needed to
+                        // initialize a decrypter.
+                        return;
+                    }
+                    nettyBufReadableBytes = ciphertextNettyBuf.readableBytes();
+                    while (nettyBufReadableBytes > 0 && !completed) {
+                        // Read the ciphertext into the local buffer
+                        int readableBytes = Integer.min(
                             nettyBufReadableBytes,
                             ciphertextBuffer.remaining());
-                    int expectedRemaining = (int) (expectedLength - ciphertextRead);
-                    int bytesToRead = Integer.min(readableBytes, expectedRemaining);
-                    // The smallest ciphertext size is 16 bytes for the auth tag
-                    ciphertextBuffer.limit(
+                        int expectedRemaining = (int) (expectedLength - ciphertextRead);
+                        int bytesToRead = Integer.min(readableBytes, expectedRemaining);
+                        // The smallest ciphertext size is 16 bytes for the auth tag
+                        ciphertextBuffer.limit(
                             ciphertextBuffer.position() + bytesToRead);
-                    ciphertextNettyBuf.readBytes(ciphertextBuffer);
-                    ciphertextRead += bytesToRead;
-                    // Check if this is the last segment
-                    if (ciphertextRead == expectedLength) {
-                        completed = true;
-                        nextInit = true;
-                    } else if (ciphertextRead > expectedLength) {
-                        throw new IllegalStateException("Read more ciphertext than expected.");
-                    }
-                    // If the ciphertext buffer is full, or this is the last segment,
-                    // then decrypt it and fire a read.
-                    if (ciphertextBuffer.limit() == ciphertextBuffer.capacity() || completed) {
-                        ByteBuffer plaintextBuffer = ByteBuffer.allocate(plaintextSegmentSize);
-                        ciphertextBuffer.flip();
-                        decrypter.decryptSegment(
+                        ciphertextNettyBuf.readBytes(ciphertextBuffer);
+                        ciphertextRead += bytesToRead;
+                        // Check if this is the last segment
+                        if (ciphertextRead == expectedLength) {
+                            completed = true;
+                        } else if (ciphertextRead > expectedLength) {
+                            throw new IllegalStateException("Read more ciphertext than expected.");
+                        }
+                        // If the ciphertext buffer is full, or this is the last segment,
+                        // then decrypt it and fire a read.
+                        if (ciphertextBuffer.limit() == ciphertextBuffer.capacity() || completed) {
+                            ByteBuffer plaintextBuffer = ByteBuffer.allocate(plaintextSegmentSize);
+                            ciphertextBuffer.flip();
+                            decrypter.decryptSegment(
                                 ciphertextBuffer,
                                 segmentNumber,
                                 completed,
                                 plaintextBuffer);
-                        segmentNumber++;
-                        // Clear the ciphertext buffer because it's been read
-                        ciphertextBuffer.clear();
-                        plaintextBuffer.flip();
-                        ctx.fireChannelRead(Unpooled.wrappedBuffer(plaintextBuffer));
-                    } else {
-                        // Set the ciphertext buffer up to read the next chunk
-                        ciphertextBuffer.limit(ciphertextBuffer.capacity());
+                            segmentNumber++;
+                            // Clear the ciphertext buffer because it's been read
+                            ciphertextBuffer.clear();
+                            plaintextBuffer.flip();
+                            ctx.fireChannelRead(Unpooled.wrappedBuffer(plaintextBuffer));
+                        } else {
+                            // Set the ciphertext buffer up to read the next chunk
+                            ciphertextBuffer.limit(ciphertextBuffer.capacity());
+                        }
+                        nettyBufReadableBytes = ciphertextNettyBuf.readableBytes();
                     }
-                    nettyBufReadableBytes = ciphertextNettyBuf.readableBytes();
                 }
             } finally {
                 ciphertextNettyBuf.release();

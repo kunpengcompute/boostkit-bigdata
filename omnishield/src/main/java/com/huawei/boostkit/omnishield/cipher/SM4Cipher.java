@@ -68,7 +68,7 @@ public class SM4Cipher implements CryptoCipher {
 
     @Override
     public int getBlockSize() {
-        return cipher.getBlockSize();
+        return cipher.getBlockSize() * 2;
     }
 
     @Override

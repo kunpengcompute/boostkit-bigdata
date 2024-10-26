@@ -102,7 +102,7 @@ public class Sm4GcmHkdfStreaming {
     }
 
     public long expectedCiphertextSize(long plaintextSize) {
-        long offset = this.getHeaderLength();
+        long offset = 0;
         long fullSegments = (plaintextSize + offset) / (long)this.plaintextSegmentSize;
         long ciphertextSize = fullSegments * (long)this.ciphertextSegmentSize;
         long lastSegmentSize = (plaintextSize + offset) % (long)this.plaintextSegmentSize;
@@ -110,7 +110,7 @@ public class Sm4GcmHkdfStreaming {
             ciphertextSize += lastSegmentSize + GCM_BLOCK_SIZE;
         }
 
-        return ciphertextSize;
+        return ciphertextSize + getHeaderLength();
     }
 
     private static Cipher cipherInstance() throws GeneralSecurityException {
