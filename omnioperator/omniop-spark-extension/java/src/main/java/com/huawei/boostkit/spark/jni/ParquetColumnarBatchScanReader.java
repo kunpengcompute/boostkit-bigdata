@@ -300,7 +300,12 @@ public class ParquetColumnarBatchScanReader {
 
     private void putCompareOp(JSONObject json, ParquetPredicateOperator op, String field, Object value) {
         json.put("op", op.ordinal());
-        json.put("field", field);
+        if (allFieldsNames.contains(field)) {
+            json.put("field", field);
+        } else {
+            throw new ParquetDecodingException("Unsupported parquet push down missing columns: " + field);
+        }
+
         if (value == null) {
             json.put("type", 0);
         } else {
