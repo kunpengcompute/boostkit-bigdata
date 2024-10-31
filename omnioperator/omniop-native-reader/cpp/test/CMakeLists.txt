@@ -31,7 +31,7 @@ target_link_libraries(${TP_TEST_TARGET}
         pthread
         stdc++
         dl
-        boostkit-omniop-vector-1.6.0-aarch64
+        boostkit-omniop-vector-1.7.0-aarch64
         securec
         native_reader)
 
