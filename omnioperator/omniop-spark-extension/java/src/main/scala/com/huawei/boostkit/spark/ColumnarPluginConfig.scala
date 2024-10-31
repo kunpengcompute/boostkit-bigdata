@@ -186,7 +186,6 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
   def timeParserPolicy: String = conf.getConfString("spark.sql.legacy.timeParserPolicy")
 
   def enableOmniUnixTimeFunc: Boolean = conf.getConf(ENABLE_OMNI_UNIXTIME_FUNCTION)
-
 }
 
 
@@ -643,6 +642,12 @@ object ColumnarPluginConfig {
   val ENABLE_OMNI_UNIXTIME_FUNCTION = buildConf("spark.omni.sql.columnar.unixTimeFunc.enabled")
     .internal()
     .doc("enable omni unix_timestamp and from_unixtime")
+    .booleanConf
+    .createWithDefault(true)
+
+  val ENABLE_OMNI_OP_FACTORY_CACHE = buildConf("spark.omni.sql.columnar.operator.factory.cache.enabled")
+    .internal()
+    .doc("enable omni opreator factory cache")
     .booleanConf
     .createWithDefault(true)
 

@@ -19,12 +19,17 @@ package org.apache.spark.sql.execution.util
 
 import nova.hetu.omniruntime.memory
 import nova.hetu.omniruntime.memory.MemoryManager
+import nova.hetu.omniruntime.operator.OmniOperatorFactoryContext
+
+import com.huawei.boostkit.spark.ColumnarPluginConfig
 import org.apache.spark.{SparkEnv, TaskContext}
 
 object SparkMemoryUtils {
 
   val offHeapSize: Long = SparkEnv.get.conf.getSizeAsBytes("spark.memory.offHeap.size", "1g")
   MemoryManager.setGlobalMemoryLimit(offHeapSize)
+
+  OmniOperatorFactoryContext.setDefaultNeedCacheValue(SparkEnv.get.conf.get(ColumnarPluginConfig.ENABLE_OMNI_OP_FACTORY_CACHE))
 
   def init(): Unit = {}
 
