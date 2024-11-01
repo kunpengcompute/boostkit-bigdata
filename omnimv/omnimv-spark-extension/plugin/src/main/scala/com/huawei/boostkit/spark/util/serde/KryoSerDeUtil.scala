@@ -211,7 +211,7 @@ object KryoSerDeUtil {
     RewriteTime.withTimeStat("unwrap.C") {
       val newPlan = plan.transform {
         case p: WithCTE =>
-          WithCTE(wrap(p.plan), p.cteDefs.map(c => CTERelationDef(wrap(c.child), c.id)))
+          WithCTE(unwrap(spark, p.plan), p.cteDefs.map(c => CTERelationDef(unwrap(spark, c.child), c.id)))
         case p: IntersectWrapper =>
           Intersect(unwrap(spark, p.left), unwrap(spark, p.right), p.isAll)
         case p: ExceptWrapper =>

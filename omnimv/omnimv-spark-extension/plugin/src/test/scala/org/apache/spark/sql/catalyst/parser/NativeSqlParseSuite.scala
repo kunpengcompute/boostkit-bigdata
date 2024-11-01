@@ -20,7 +20,7 @@ package org.apache.spark.sql.catalyst.parser
 import org.apache.spark.sql.catalyst.optimizer.rules.RewriteSuite
 import org.apache.spark.sql.catalyst.optimizer.rules.RewriteSuite._
 import org.apache.spark.sql.catalyst.plans.logical.CommandResult
-import org.apache.spark.sql.execution.command.{DataWritingCommand, DataWritingCommandExec}
+import org.apache.spark.sql.execution.command.{DataWritingCommand, DataWritingCommandExec, ExecutedCommandExec}
 import org.apache.spark.sql.hive.execution.{CreateHiveTableAsSelectCommand, InsertIntoHiveTable}
 
 class NativeSqlParseSuite extends RewriteSuite {
@@ -46,9 +46,9 @@ class NativeSqlParseSuite extends RewriteSuite {
         |as select locationid, state from locations where locationid = 1;
         |""".stripMargin)
     var optPlan = df.queryExecution.optimizedPlan
-    assert(optPlan.isInstanceOf[CommandResult],
-      optPlan.asInstanceOf[CommandResult].commandPhysicalPlan.isInstanceOf[DataWritingCommandExec])
-    optPlan = optPlan.asInstanceOf[CommandResult].commandPhysicalPlan.asInstanceOf[DataWritingCommandExec].cmd
+    assert(optPlan.isInstanceOf[CommandResult])
+    assert(optPlan.asInstanceOf[CommandResult].commandPhysicalPlan.isInstanceOf[ExecutedCommandExec])
+    optPlan = optPlan.asInstanceOf[CommandResult].commandPhysicalPlan.asInstanceOf[ExecutedCommandExec].cmd
     assert(optPlan.isInstanceOf[CreateHiveTableAsSelectCommand])
     assert(isRewritedByMV("default", "mv_insert_select1",
       optPlan.asInstanceOf[CreateHiveTableAsSelectCommand].query))

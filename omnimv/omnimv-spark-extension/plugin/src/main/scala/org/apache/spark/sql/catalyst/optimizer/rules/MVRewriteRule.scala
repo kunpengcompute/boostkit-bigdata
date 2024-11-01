@@ -54,8 +54,8 @@ class MVRewriteRule(session: SparkSession)
     RewriteHelper.disableSqlLog()
     try {
       logicalPlan match {
-        case _: CreateHiveTableAsSelectCommand =>
-          tryRewritePlan(logicalPlan)
+        case CreateHiveTableAsSelectCommand(tableDesc, query, outputColumnNames, mode) =>
+          CreateHiveTableAsSelectCommand(tableDesc, tryRewritePlan(query), outputColumnNames, mode)
         case _: InsertIntoHadoopFsRelationCommand =>
           tryRewritePlan(logicalPlan)
         case _: InsertIntoHiveTable =>

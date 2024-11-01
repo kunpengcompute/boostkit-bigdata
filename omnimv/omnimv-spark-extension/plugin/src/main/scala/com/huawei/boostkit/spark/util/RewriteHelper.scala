@@ -129,8 +129,15 @@ trait RewriteHelper extends PredicateHelper with RewriteLogger {
     var origins = Map.empty[ExprId, Expression]
     plan.transformAllExpressions {
       case a@Alias(child, _) =>
-        origins += (a.exprId -> child)
-        a
+        child match {
+          case attr: AttributeReference =>
+            origins += (a.exprId -> attr)
+            a
+          case _: Substring =>
+            origins += (a.exprId -> a.child)
+            a
+          case e => a
+        }
       case e => e
     }
     origins
