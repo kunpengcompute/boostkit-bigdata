@@ -8,11 +8,11 @@ try:
 except ModuleNotFoundError as _:
     pass
 
-from src.candidate_generation.clickhouse.materialize_view_generation.normalize_view import ViewNormalizer
-from src.candidate_generation.clickhouse.materialize_view_generation.union_view import ViewsUnion
-from src.candidate_generation.clickhouse.projection_candidate_generation.generation_utils import \
+from src.candidate_generation.common.materialize_view_generation.normalize_view import ViewNormalizer
+from src.candidate_generation.common.materialize_view_generation.union_view import ViewsUnion
+from src.candidate_generation.common.projection_candidate_generation.generation_utils import \
     remove_special_characters
-from src.candidate_generation.clickhouse.projection_candidate_generation.sub_query_generation import TargetQueryGetter
+from src.candidate_generation.common.projection_candidate_generation.sub_query_generation import TargetQueryGetter
 from src.candidate_generation.spark.filter_view_sp import SparkViewFilter
 from src.candidate_generation.spark.spark_utils import get_text_from_hdfs, try_execute_sql, get_logger, \
     write_text_to_hdfs

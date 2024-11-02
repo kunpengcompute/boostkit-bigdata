@@ -3,10 +3,10 @@
 
 # Copyright (C) Huawei Technologies Co., Ltd. 2023-2023. All rights reserved.
 
-from src.candidate_generation.clickhouse.materialize_view_generation.join_msg import JoinMsg
-from src.candidate_generation.clickhouse.materialize_view_generation.parse_alias import AliasParser
-from src.candidate_generation.clickhouse.materialize_view_generation.parse_condition import split_conditions_by_and
-from src.candidate_generation.clickhouse.projection_candidate_generation.generation_utils import get_tokens, \
+from src.candidate_generation.common.materialize_view_generation.join_msg import JoinMsg
+from src.candidate_generation.common.materialize_view_generation.parse_alias import AliasParser
+from src.candidate_generation.common.materialize_view_generation.parse_condition import split_conditions_by_and
+from src.candidate_generation.common.projection_candidate_generation.generation_utils import get_tokens, \
     TargetIndexGetter
 
 

@@ -30,5 +30,5 @@ if __name__ == '__main__':
         change_file_permission()
         sys.exit()
     else:
-        raise ValueError("Only spark or clickhouse engine is supported\n"
-                         "Usage: python main.py [clickhouse/spark] [task]")
+        raise ValueError("Only spark or common engine is supported\n"
+                         "Usage: python main.py [common/spark] [task]")
