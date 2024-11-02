@@ -6,7 +6,6 @@
 import sys
 
 from src.preprocessor.proc_conf_spark import get_spark_schema_path
-from src.preprocessor.proc_conf_ck import get_ck_schema_path
 
 try:
     import pydoop.hdfs as hdfs
@@ -19,13 +18,7 @@ class TableSchema(object):
         self.data = {}
         self.partition_col = {}
         engine = sys.argv[1]
-        if engine == 'clickhouse':
-            schema_path = get_ck_schema_path()
-            with open(schema_path, 'r', encoding='utf-8') as file:
-                while '' != file.read(1):
-                    file.seek(file.tell() - 1)
-                    self.build_table(file, need_decode=False)
-        else:
+        if engine == 'spark':
             schema_path = get_spark_schema_path()
             with hdfs.open(schema_path, 'r', encoding='utf-8') as file:
                 while '' != file.read(1).decode('utf-8'):

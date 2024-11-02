@@ -6,7 +6,6 @@
 from sql_metadata import Parser
 
 from src.preprocessor.metadata import TableSchema
-from src.preprocessor.proc_conf_ck import get_ck_drop_projections
 
 query_tokens_cache = {}
 
@@ -48,24 +47,6 @@ def get_table_name(file_name):
     file_name = file_name.replace('_incremental.sql', '')
     table_name = file_name[0:file_name.rfind('_')]
     return table_name
-
-
-def get_table_drop_projections():
-    drop_projections = get_ck_drop_projections()
-    if drop_projections.strip().lower() == 'none':
-        return {}
-    projections = drop_projections.strip().split(',')
-    config_table_projections = {}
-    for projection in projections:
-        table_name = projection.strip().split('.')[0]
-        projection_name = projection.strip().split('.')[-1]
-        if table_name in config_table_projections.keys():
-            config_table_projections.get(table_name).append(projection_name)
-        else:
-            config_table_projections[table_name] = [projection_name]
-    return config_table_projections
-
-
 def remove_special_characters(exp):
     # 去除 " ` 等特殊字符
     quotes_index = []
