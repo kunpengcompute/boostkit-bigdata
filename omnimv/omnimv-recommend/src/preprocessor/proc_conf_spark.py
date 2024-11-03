@@ -37,6 +37,13 @@ def get_spark_database():
     g_cfg = init_config()
     return g_cfg.get("spark", "database")
 
+def get_spark_mock_database():
+    g_cfg = init_config()
+    return g_cfg.get("spark", "mock_database")
+
+def spark_mock_database_truncate_enable():
+    g_cfg = init_config()
+    return g_cfg.get("spark", "mock_database_truncate_enable") == "true"
 
 def get_logparser_path():
     g_cfg = init_config()
