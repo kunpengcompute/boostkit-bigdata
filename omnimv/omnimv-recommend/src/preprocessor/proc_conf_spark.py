@@ -171,5 +171,5 @@ def get_mv_metadata_path():
 
 
 def get_omnimv_version():
-    return f"\nProduct Name: Kunpeng BoostKit\nProduct Version: 23.0.RC2\nComponent Name: "\
-           f"BoostKit-omnimv\nComponent Version: 1.1.0"
+    return f"\nProduct Name: Kunpeng BoostKit\nProduct Version: 24.0.T15\nComponent Name: "\
+           f"BoostKit-omnimv\nComponent Version: 1.2.0"
