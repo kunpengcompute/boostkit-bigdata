@@ -164,6 +164,12 @@ def get_session_timeout():
     except ValueError as e:
         raise ValueError("session_timeout should be int type") from e
 
+
+def get_mv_metadata_path():
+    g_cfg = init_config()
+    return g_cfg.get("yarn", "mv_metadata_path")
+
+
 def get_omnimv_version():
     return f"\nProduct Name: Kunpeng BoostKit\nProduct Version: 23.0.RC2\nComponent Name: "\
            f"BoostKit-omnimv\nComponent Version: 1.1.0"
