@@ -2,7 +2,7 @@
 
 **software下面包含3个部分：**
 
-- BoostKit-omnimv_1.2.0.zip 闭源二进制软件包
+- BoostKit-omnimv_1.2.0.zip 开源python软件包
 - boostkit-omnimv-spark-3.4.3-1.2.0-aarch64.jar 视图改写工具jar包
 - boostkit-omnimv-logparser-spark-3.4.3-1.2.0-aarch64.jar 日志解析工具jar包
 

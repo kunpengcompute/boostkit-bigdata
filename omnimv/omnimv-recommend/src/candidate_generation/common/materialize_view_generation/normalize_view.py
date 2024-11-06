@@ -321,11 +321,7 @@ class ViewNormalizer(object):
 
 def get_table_out_columns(table_name):
     out_columns = []
-    engine = sys.argv[1]
-    if engine == 'common':
-        table_columns = get_table_columns(table_name)
-    else:
-        table_columns = get_spark_table_columns(table_name)
+    table_columns = get_spark_table_columns(table_name)
     for column in table_columns:
         out_columns.append(column)
     return out_columns
