@@ -31,6 +31,8 @@ def init_database():
         table_bytes[table.upper()] = mv_table_bytes
         show_create = f"show create table {table}"
         query = session.sql(show_create).collect()[0].createtab_stmt
+        if "USING text" in query and (" INT," in query or "INT)" in query):
+            query = query.replace("USING text", "")
         schema_sql += f"{query[:-1]};\n\n"
 
     session.stop()
