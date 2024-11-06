@@ -139,12 +139,15 @@ public class OmniVectorOperator extends OmniHiveOperator<OmniVectorDesc> {
             fields[i] = soi[i].getAllStructFieldRefs().stream().map(field -> (StructField) field)
                     .collect(Collectors.toList());
             converters[i] = fields[i].stream().map(field -> {
-                if (field.getFieldObjectInspector() instanceof PrimitiveObjectInspector) {
-                    PrimitiveTypeInfo primitiveTypeInfo = ((PrimitiveObjectInspector) field.getFieldObjectInspector())
+                ObjectInspector fieldObjectInspector = field.getFieldObjectInspector();
+                if (fieldObjectInspector instanceof PrimitiveObjectInspector) {
+                    PrimitiveTypeInfo primitiveTypeInfo = ((PrimitiveObjectInspector) fieldObjectInspector)
                             .getTypeInfo();
                     return CONVERTER_MAP.get(primitiveTypeInfo.getPrimitiveCategory());
+                } else if (fieldObjectInspector instanceof StructObjectInspector) {
+                    return new StructConverter((StructObjectInspector) fieldObjectInspector);
                 } else {
-                    return new StructConverter((StructObjectInspector) field.getFieldObjectInspector());
+                    return null;
                 }
             }).toArray(VecConverter[]::new);
             if (isKeyValue) {

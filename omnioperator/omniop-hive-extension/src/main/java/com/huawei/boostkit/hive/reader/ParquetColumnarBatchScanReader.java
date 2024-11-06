@@ -46,6 +46,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.URI;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public class ParquetColumnarBatchScanReader {
@@ -55,19 +57,17 @@ public class ParquetColumnarBatchScanReader {
 
     public ParquetColumnarBatchJniReader jniReader;
 
+    private ArrayList<String> allFieldsNames;
+
     public ParquetColumnarBatchScanReader() {
         jniReader = new ParquetColumnarBatchJniReader();
     }
 
-    public long initializeReaderJava(Path path, int capacity,
-            List<Integer> rowgroupIndices, List<Integer> columnIndices, String ugi) {
+    public long initializeReaderJava(Path path, int capacity, String ugi) {
         JSONObject job = new JSONObject();
         URI uri = path.toUri();
         job.put("uri", path.toString());
-        job.put("filePath", path);
         job.put("capacity", capacity);
-        job.put("rowGroupIndices", rowgroupIndices.stream().mapToInt(Integer::intValue).toArray());
-        job.put("columnIndices", columnIndices.stream().mapToInt(Integer::intValue).toArray());
         job.put("ugi", ugi);
 
         job.put("scheme", uri.getScheme() == null ? "" : uri.getScheme());
@@ -75,44 +75,113 @@ public class ParquetColumnarBatchScanReader {
         job.put("port", String.valueOf(uri.getPort()));
         job.put("path", uri.getPath() == null ? "" : uri.getPath());
         job.put("notNeedFSCache", true);
-        parquetReader = jniReader.initializeReader(job);
+        parquetReader = jniReader.initializeReaderV2(job);
         return parquetReader;
     }
 
-    public int next(Vec[] vecList, List<DataType> types) {
-        int vectorCnt = vecList.length;
+    public long initializeRecordReaderJava(long start, long end, String[] fieldNames) {
+        JSONObject job = new JSONObject();
+        job.put("start", start);
+        job.put("end", end);
+        job.put("fieldNames", fieldNames);
+
+        parquetReader = jniReader.initializeRecordReader(parquetReader, job);
+        return parquetReader;
+    }
+
+    public ArrayList<String> getAllFieldsNames() {
+        if (allFieldsNames == null) {
+            allFieldsNames = new ArrayList<>();
+            jniReader.getAllFieldNames(parquetReader, allFieldsNames);
+        }
+        return allFieldsNames;
+    }
+
+    public int next(List<DataType> types, Vec[] vecList, boolean[] missingColumns) {
+        int vectorCnt = missingColumns.length;
         long[] vecNativeIds = new long[vectorCnt];
         long rtn = jniReader.recordReaderNext(parquetReader, vecNativeIds);
         if (rtn == 0) {
             return 0;
         }
+
+        int nativeGetId = 0;
+        int rowCount = (int) rtn;
         for (int i = 0; i < vectorCnt; i++) {
+            if (missingColumns[i]) {
+                vecList[i] = getNullVec(types.get(i).getId(), rowCount);
+                continue;
+            }
             DataType type = types.get(i);
             if (type instanceof LongDataType) {
-                vecList[i] = new LongVec(vecNativeIds[i]);
+                vecList[i] = new LongVec(vecNativeIds[nativeGetId]);
             } else if (type instanceof BooleanDataType) {
-                vecList[i] = new BooleanVec(vecNativeIds[i]);
+                vecList[i] = new BooleanVec(vecNativeIds[nativeGetId]);
             } else if (type instanceof ShortDataType) {
-                vecList[i] = new ShortVec(vecNativeIds[i]);
+                vecList[i] = new ShortVec(vecNativeIds[nativeGetId]);
             } else if (type instanceof IntDataType) {
-                vecList[i] = new IntVec(vecNativeIds[i]);
+                vecList[i] = new IntVec(vecNativeIds[nativeGetId]);
             } else if (type instanceof Decimal64DataType) {
-                vecList[i] = new LongVec(vecNativeIds[i]);
+                vecList[i] = new LongVec(vecNativeIds[nativeGetId]);
             } else if (type instanceof Decimal128DataType) {
-                vecList[i] = new Decimal128Vec(vecNativeIds[i]);
+                vecList[i] = new Decimal128Vec(vecNativeIds[nativeGetId]);
             } else if (type instanceof CharDataType) {
-                vecList[i] = new VarcharVec(vecNativeIds[i]);
+                vecList[i] = new VarcharVec(vecNativeIds[nativeGetId]);
             } else if (type instanceof DoubleDataType) {
-                vecList[i] = new DoubleVec(vecNativeIds[i]);
+                vecList[i] = new DoubleVec(vecNativeIds[nativeGetId]);
             } else if (type instanceof VarcharDataType) {
-                vecList[i] = new VarcharVec(vecNativeIds[i]);
+                vecList[i] = new VarcharVec(vecNativeIds[nativeGetId]);
             } else if (type instanceof Date32DataType) {
-                vecList[i] = new IntVec(vecNativeIds[i]);
+                vecList[i] = new IntVec(vecNativeIds[nativeGetId]);
             } else {
                 throw new RuntimeException("Unsupport type for ColumnarFileScan: " + type.getId());
             }
+            nativeGetId++;
         }
         return (int) rtn;
+    }
+
+    private Vec getNullVec(DataType.DataTypeId value, int rowCount) {
+        Vec vec;
+        switch (value) {
+            case OMNI_BOOLEAN: {
+                vec = new BooleanVec(rowCount);
+                break;
+            }
+            case OMNI_SHORT: {
+                vec = new ShortVec(rowCount);
+                break;
+            }
+            case OMNI_DATE32:
+            case OMNI_INT: {
+                vec = new IntVec(rowCount);
+                break;
+            }
+            case OMNI_LONG:
+            case OMNI_DECIMAL64: {
+                vec = new LongVec(rowCount);
+                break;
+            }
+            case OMNI_DOUBLE: {
+                vec = new DoubleVec(rowCount);
+                break;
+            }
+            case OMNI_VARCHAR: {
+                vec = new VarcharVec(rowCount);
+                break;
+            }
+            case OMNI_DECIMAL128: {
+                vec = new Decimal128Vec(rowCount);
+                break;
+            }
+            default: {
+                throw new RuntimeException("UnSupport type for ColumnarFileScan:" + value);
+            }
+        }
+        byte[] nullsBuf = new byte[rowCount];
+        Arrays.fill(nullsBuf, (byte) 1);
+        vec.setNullsBuf(nullsBuf);
+        return vec;
     }
 
     public void close() {

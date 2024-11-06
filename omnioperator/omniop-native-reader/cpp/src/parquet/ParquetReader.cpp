@@ -125,7 +125,7 @@ Status ParquetReader::InitRecordReader(UriInfo &uri, int64_t capacity,
     return arrow::Status::OK();
 }
 
-Status ParquetReader::InitReader(UriInfo &uri, int64_t capacity, std::string& ugi)
+Status ParquetReader::InitReader(UriInfo &uri, int64_t capacity, std::string& ugi, bool notNeedFSCache)
 {
     // Configure reader settings
     auto reader_properties = parquet::ReaderProperties(pool);
@@ -137,7 +137,7 @@ Status ParquetReader::InitReader(UriInfo &uri, int64_t capacity, std::string& ug
     // Get the file from filesystem
     Status result;
     mutex_.lock();
-    Filesystem* fs = GetFileSystemPtr(uri, ugi, result, false);
+    Filesystem* fs = GetFileSystemPtr(uri, ugi, result, notNeedFSCache);
     mutex_.unlock();
     if (fs == nullptr || fs->filesys_ptr == nullptr) {
         return Status::IOError(result);
@@ -154,6 +154,10 @@ Status ParquetReader::InitReader(UriInfo &uri, int64_t capacity, std::string& ug
     return arrow::Status::OK();
 }
 
+Status ParquetReader::InitReader(UriInfo &uri, int64_t capacity, std::string& ugi)
+{
+    return InitReader(uri, capacity, ugi, false);
+}
 Status ParquetReader::InitRecordReader(int64_t start, int64_t end, bool hasExpressionTree,
     Expression pushedFilterArray, const std::vector<std::string>& fieldNames)
 {

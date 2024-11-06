@@ -57,6 +57,8 @@ namespace omniruntime::reader {
                                        const std::vector<int>& row_group_indices,
                                        const std::vector<int>& column_indices, std::string& ugi, bool notNeedFSCache);
 
+        arrow::Status InitReader(UriInfo &uri, int64_t capacity, std::string& ugi, bool notNeedFSCache);
+
         arrow::Status InitReader(UriInfo &uri, int64_t capacity, std::string& ugi);
 
         arrow::Status InitRecordReader(int64_t start, int64_t end, bool hasExpressionTree,

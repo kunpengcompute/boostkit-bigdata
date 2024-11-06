@@ -21,8 +21,11 @@ package com.huawei.boostkit.hive.reader;
 import static com.huawei.boostkit.hive.cache.VectorCache.BATCH;
 import static com.huawei.boostkit.hive.converter.VecConverter.CONVERTER_MAP;
 
+import com.huawei.boostkit.hive.OmniTableScanOperator;
+import com.huawei.boostkit.hive.OmniVectorizedTableScanOperator;
 import com.huawei.boostkit.hive.converter.VecConverter;
 
+import com.huawei.boostkit.hive.expression.TypeUtils;
 import nova.hetu.omniruntime.vector.IntVec;
 import nova.hetu.omniruntime.vector.LongVec;
 import nova.hetu.omniruntime.vector.Vec;
@@ -50,6 +53,7 @@ import java.math.BigInteger;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 public class OmniVectorizedParquetRecordReader extends OmniParquetRecordReader {
     private VecConverter[] partColumnConverters;
@@ -120,7 +124,11 @@ public class OmniVectorizedParquetRecordReader extends OmniParquetRecordReader {
 
     public boolean next(NullWritable key, VecBatchWrapper value) throws IOException {
         int batchSize = BATCH;
-        batchSize = recordReader.next(vecs, typeIds);
+        if (neededTypes == null) {
+            List<PrimitiveTypeInfo> primitiveTypeInfos = ((OmniVectorizedTableScanOperator) tableScanOp).getNeedTypes();
+            neededTypes = primitiveTypeInfos.stream().map(neededType -> TypeUtils.buildInputDataType(neededType)).collect(Collectors.toList());
+        }
+        batchSize = recordReader.next(neededTypes, vecs, missingColumns);
         if (batchSize == 0) {
             return false;
         }
