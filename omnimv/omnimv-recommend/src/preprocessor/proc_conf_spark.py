@@ -75,11 +75,6 @@ def get_query_log_timestamp():
     return g_cfg.get("spark", 'q_log_start_time'), g_cfg.get("spark", 'q_log_end_time')
 
 
-def get_mv_log_timestamp():
-    g_cfg = init_config()
-    return g_cfg.get("spark", 'mv_log_start_time'), g_cfg.get("spark", 'mv_log_end_time')
-
-
 def get_large_table_threshold():
     g_cfg = init_config()
     large_table_threshold = g_cfg.get("spark", "large_table_threshold")

@@ -6,7 +6,7 @@
 import pydoop.hdfs as hdfs
 
 from src.candidate_generation.spark.generate_mv_spark import generate_mv_spark
-from src.preprocessor.proc_conf_spark import get_query_log_timestamp, get_mv_log_timestamp, \
+from src.preprocessor.proc_conf_spark import get_query_log_timestamp, \
     get_mv_output_path, get_omnimv_version, get_spark_schema_path, \
     get_spark_database, get_spark_sqls_path, get_table_bytes_path, get_spark_mock_database
 from omnimv_logging import get_logger
@@ -77,12 +77,6 @@ def create_greedy_views():
     OMNIMV_LOG.info("create_greedy_views succeed!")
 
 
-def parse_mv_logs():
-    start_time, end_time = get_mv_log_timestamp()
-    file_name = "mv_logs"
-    generate_json_logs_interval(file_name, start_time, end_time)
-    OMNIMV_LOG.info("parse_mv_logs succeed!")
-
 def run_spark_task(task):
     tasks = [
         "init_database", "run_original_sqls", "parse_query_logs", "generate_views", "create_greedy_views",
@@ -105,8 +99,6 @@ def run_spark_task(task):
         spark_greedy_recommend()
     elif task == "create_greedy_views":
         create_greedy_views()
-    elif task == "parse_mv_logs":
-        parse_mv_logs()
     elif task == "--version":
         OMNIMV_LOG.info(get_omnimv_version())
     else:
