@@ -6,9 +6,9 @@
 import pydoop.hdfs as hdfs
 
 from src.candidate_generation.spark.generate_mv_spark import generate_mv_spark
-from src.preprocessor.proc_conf_spark import get_query_log_timestamp, get_mv_log_timestamp, \
+from src.preprocessor.proc_conf_spark import get_query_log_timestamp, \
     get_mv_output_path, get_omnimv_version, get_spark_schema_path, \
-    get_spark_database, get_spark_sqls_path, get_table_bytes_path
+    get_spark_database, get_spark_sqls_path, get_table_bytes_path, get_spark_mock_database
 from omnimv_logging import get_logger
 from src.candidate_generation.spark.spark_utils import write_text_to_hdfs, \
     run_sqls_on_spark, get_rewrite_sqls, create_mv_tables, \
@@ -31,6 +31,8 @@ def init_database():
         table_bytes[table.upper()] = mv_table_bytes
         show_create = f"show create table {table}"
         query = session.sql(show_create).collect()[0].createtab_stmt
+        if "USING text" in query and (" INT," in query or "INT)" in query):
+            query = query.replace("USING text", "")
         schema_sql += f"{query[:-1]};\n\n"
 
     session.stop()
@@ -45,6 +47,9 @@ def run_original_sqls():
     sql_hdfs_path = get_spark_sqls_path()
     hdfs_fs = hdfs.hdfs("default", 0)
     query_pathes = []
+    if not hdfs_fs.exists(sql_hdfs_path):
+        OMNIMV_LOG.info(f"{sql_hdfs_path} not exist")
+        return
     for sql_path in hdfs_fs.list_directory(sql_hdfs_path):
         query_pathes.append(sql_path.get('name'))
     run_sqls_on_spark(query_pathes, enable_omnimv='false')
@@ -59,7 +64,7 @@ def parse_query_logs():
 
 
 def mock_rewrite_result(mv_path):
-    mock_database = 'mock'
+    mock_database = get_spark_mock_database()
     schema_path = get_spark_schema_path()
     sqls_path = get_spark_sqls_path()
     rewrite_sqls, mv_list = get_rewrite_sqls(mock_database, schema_path, mv_path, sqls_path)
@@ -71,12 +76,6 @@ def create_greedy_views():
     create_mv_tables(greedy_mv_path, enable_omnimv='true')
     OMNIMV_LOG.info("create_greedy_views succeed!")
 
-
-def parse_mv_logs():
-    start_time, end_time = get_mv_log_timestamp()
-    file_name = "mv_logs"
-    generate_json_logs_interval(file_name, start_time, end_time)
-    OMNIMV_LOG.info("parse_mv_logs succeed!")
 
 def run_spark_task(task):
     tasks = [
@@ -100,8 +99,6 @@ def run_spark_task(task):
         spark_greedy_recommend()
     elif task == "create_greedy_views":
         create_greedy_views()
-    elif task == "parse_mv_logs":
-        parse_mv_logs()
     elif task == "--version":
         OMNIMV_LOG.info(get_omnimv_version())
     else:

@@ -23,18 +23,12 @@ def change_file_permission():
 
 if __name__ == '__main__':
     engine = sys.argv[1]
-    if engine == 'clickhouse':
-        task = sys.argv[2]
-        from clickhouse_task import run_clickhouse_task
-        run_clickhouse_task(task)
-        change_file_permission()
-        sys.exit()
-    elif engine == 'spark':
+    if engine == 'spark':
         task = sys.argv[2]
         from spark_task import run_spark_task
         run_spark_task(task)
         change_file_permission()
         sys.exit()
     else:
-        raise ValueError("Only spark or clickhouse engine is supported\n"
-                         "Usage: python main.py [clickhouse/spark] [task]")
+        raise ValueError("Only spark or common engine is supported\n"
+                         "Usage: python main.py [common/spark] [task]")

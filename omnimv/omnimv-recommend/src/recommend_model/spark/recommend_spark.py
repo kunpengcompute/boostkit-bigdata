@@ -17,7 +17,7 @@ from omnimv_logging import get_logger
 from src.candidate_generation.spark.spark_utils import get_objects_from_hdfs, get_text_from_hdfs, write_text_to_hdfs, \
     get_rewrite_sqls, get_mock_database_session
 from src.preprocessor.proc_conf_spark import get_mv_output_path, get_table_bytes_path, get_spark_model_path, \
-    get_spark_schema_path, get_spark_sqls_path, get_large_table_threshold, get_mv_limit
+    get_spark_schema_path, get_spark_sqls_path, get_large_table_threshold, get_mv_limit, get_spark_mock_database
 
 OMNIMV_LOG = get_logger()
 
@@ -60,7 +60,7 @@ def spark_greedy_recommend():
     mv_output_path = get_mv_output_path()
     candidate_mv_path = f"{mv_output_path}/mv_create_sql"
     mv_sql_path = f"{mv_output_path}/mv_create_sql"
-    mock_database = 'mock'
+    mock_database = get_spark_mock_database()
     schema_path = get_spark_schema_path()
     sqls_path = get_spark_sqls_path()
     mv_limit = get_mv_limit()

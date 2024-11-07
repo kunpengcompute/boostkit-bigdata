@@ -37,6 +37,13 @@ def get_spark_database():
     g_cfg = init_config()
     return g_cfg.get("spark", "database")
 
+def get_spark_mock_database():
+    g_cfg = init_config()
+    return g_cfg.get("spark", "mock_database")
+
+def spark_mock_database_truncate_enable():
+    g_cfg = init_config()
+    return g_cfg.get("spark", "mock_database_truncate_enable") == "true"
 
 def get_logparser_path():
     g_cfg = init_config()
@@ -66,11 +73,6 @@ def get_spark_sqls_path():
 def get_query_log_timestamp():
     g_cfg = init_config()
     return g_cfg.get("spark", 'q_log_start_time'), g_cfg.get("spark", 'q_log_end_time')
-
-
-def get_mv_log_timestamp():
-    g_cfg = init_config()
-    return g_cfg.get("spark", 'mv_log_start_time'), g_cfg.get("spark", 'mv_log_end_time')
 
 
 def get_large_table_threshold():
@@ -157,6 +159,12 @@ def get_session_timeout():
     except ValueError as e:
         raise ValueError("session_timeout should be int type") from e
 
+
+def get_mv_metadata_path():
+    g_cfg = init_config()
+    return g_cfg.get("yarn", "mv_metadata_path")
+
+
 def get_omnimv_version():
-    return f"\nProduct Name: Kunpeng BoostKit\nProduct Version: 23.0.RC2\nComponent Name: "\
-           f"BoostKit-omnimv\nComponent Version: 1.1.0"
+    return f"\nProduct Name: Kunpeng BoostKit\nProduct Version: 24.0.T15\nComponent Name: "\
+           f"BoostKit-omnimv\nComponent Version: 1.2.0"

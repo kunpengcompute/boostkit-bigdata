@@ -16,7 +16,8 @@ from omnimv_logging import get_logger, LOG_DIR
 from src.preprocessor.proc_conf_spark import get_spark_app_name, get_spark_master, get_spark_num_executors, \
     get_executor_cores, get_spark_executor_memory, \
     get_driver_memory, get_spark_database, get_cache_plugin_path, \
-    get_session_timeout, get_logparser_path, get_hdfs_inputpath, get_hdfs_outputpath
+    get_session_timeout, get_logparser_path, get_hdfs_inputpath, get_hdfs_outputpath, \
+    get_spark_mock_database, spark_mock_database_truncate_enable, get_mv_metadata_path
 
 try:
     from pyspark import SparkConf
@@ -170,6 +171,7 @@ def get_basic_args_list(enable_omnimv="false"):
         get_executor_cores(), "--executor-memory", get_spark_executor_memory(), "--master", get_spark_master(),
         "--conf", "spark.sql.extensions=com.huawei.boostkit.spark.OmniMV",
         "--conf", f"spark.sql.omnimv.enable={enable_omnimv}",
+        "--conf", f"spark.sql.omnimv.metadata.path={get_mv_metadata_path()}",
         "--jars", cache_plugin_jar_path, "--database", get_spark_database()
     ]
 
@@ -264,19 +266,29 @@ def get_rewrite_sqls(mock_database, schema_path, mv_path, sqls_path):
     return rewrite_sqls, mv_list
 
 
-def get_mock_database_session(schema_path, mock_database='mock'):
+def truncate_mock_database(session):
+    if spark_mock_database_truncate_enable():
+        tables = session.sql("SHOW TABLES").collect()
+        for table in tables:
+            table_name = table['tableName']
+            if re.match("mv\d+", table_name):
+                drop_table = f"DROP MATERIALIZED VIEW IF EXISTS {table_name}"
+            else:
+                drop_table = f"DROP TABLE IF EXISTS {table_name}"
+            session.sql(drop_table)
+
+def get_mock_database_session(schema_path, mock_database=get_spark_mock_database()):
     session = init_pyspark_plugin()
     with hdfs.open(schema_path, 'r', encoding='utf-8') as file:
         schema_sql = file.read().decode('utf-8')
     create_table_sqls = schema_sql.split(';')
-    drop_database = f"drop database if exists {mock_database} cascade"
     # create database and use database
     create_database = f"create database if not exists {mock_database}"
     use_database = f"use {mock_database}"
     try:
-        session.sql(drop_database)
         session.sql(create_database)
         session.sql(use_database)
+        truncate_mock_database(session)
     except (AnalysisException, ParseException) as exception:
         OMNIMV_LOG.error(f'{mock_database} create fail: {exception}')
     for sql in create_table_sqls[:-1]:

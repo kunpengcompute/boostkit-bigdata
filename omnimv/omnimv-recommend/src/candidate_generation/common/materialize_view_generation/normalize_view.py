@@ -5,11 +5,11 @@
 
 import sys
 
-from src.candidate_generation.clickhouse.materialize_view_generation.join_msg import TableMsg
-from src.candidate_generation.clickhouse.materialize_view_generation.parse_condition import normalize_conditions, \
+from src.candidate_generation.common.materialize_view_generation.join_msg import TableMsg
+from src.candidate_generation.common.materialize_view_generation.parse_condition import normalize_conditions, \
     ConditionNormalizer
-from src.candidate_generation.clickhouse.materialize_view_generation.parse_view import ViewParser
-from src.candidate_generation.clickhouse.projection_candidate_generation.generation_utils import get_tokens, \
+from src.candidate_generation.common.materialize_view_generation.parse_view import ViewParser
+from src.candidate_generation.common.projection_candidate_generation.generation_utils import get_tokens, \
     get_table_columns
 from src.preprocessor.metadata import get_spark_table_columns
 
@@ -321,11 +321,7 @@ class ViewNormalizer(object):
 
 def get_table_out_columns(table_name):
     out_columns = []
-    engine = sys.argv[1]
-    if engine == 'clickhouse':
-        table_columns = get_table_columns(table_name)
-    else:
-        table_columns = get_spark_table_columns(table_name)
+    table_columns = get_spark_table_columns(table_name)
     for column in table_columns:
         out_columns.append(column)
     return out_columns

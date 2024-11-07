@@ -3,7 +3,7 @@
 
 # Copyright (C) Huawei Technologies Co., Ltd. 2023-2023. All rights reserved.
 
-from src.candidate_generation.clickhouse.materialize_view_generation.filter_view import ViewFilter
+from src.candidate_generation.common.materialize_view_generation.filter_view import ViewFilter
 
 
 class SparkViewFilter(ViewFilter):

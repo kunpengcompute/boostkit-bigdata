@@ -2,9 +2,9 @@
 
 **software下面包含3个部分：**
 
-- BoostKit-omnimv_1.1.0.zip 闭源二进制软件包
-- boostkit-omnimv-spark-3.1.1-1.1.0-aarch64.jar 视图改写工具jar包
-- boostkit-omnimv-logparser-spark-3.1.1-1.1.0-aarch64.jar 日志解析工具jar包
+- BoostKit-omnimv_1.2.0.zip 开源python软件包
+- boostkit-omnimv-spark-3.4.3-1.2.0-aarch64.jar 视图改写工具jar包
+- boostkit-omnimv-logparser-spark-3.4.3-1.2.0-aarch64.jar 日志解析工具jar包
 
 ### 配置Anaconda环境
 
@@ -33,9 +33,7 @@ pip install pandas==1.3.5
 pip install PyYAML==6.0
 pip install mo-sql-parsing
 pip install sql-metadata==2.6.0
-pip install scikit-learn==1.1.2
-pip install xgboost==1.7.3
-pip install pyspark==3.1.1
+pip install pyspark==3.4.3
 pip install pydoop==2.0.0
 ```
 
@@ -65,9 +63,9 @@ schema_path = hdfs://server1:9000/omnimv/schema.sql
 # 数据库名称
 database = tpcds_bin_partitioned_decimal_orc_1000
 # 日志解析的jar包路径
-logparser_jar_path = /opt/spark/boostkit-omnimv-logparser-spark-3.1.1-1.1.0-aarch64.jar
+logparser_jar_path = /opt/spark/boostkit-omnimv-logparser-spark-3.4.3-1.2.0-aarch64.jar
 # omnimv plugin的路径
-cache_plugin_jar_path = /opt/spark/boostkit-omnimv-spark-3.1.1-1.1.0-aarch64.jar
+cache_plugin_jar_path = /opt/spark/boostkit-omnimv-spark-3.4.3-1.2.0-aarch64.jar
 # spark-defaults.conf路径下面配置的spark history输出的路径
 hdfs_input_path = hdfs://server1:9000/spark2-history
 # 通过日志解析之后，把每条日志解析成json格式，所有日志存放的路径
@@ -92,14 +90,14 @@ mv_output_path = hdfs://server1:9000/omnimv/mv
 
 ```shell
 DATABASE=tpcds_bin_partitioned_decimal_orc_1000
-views=`spark-sql --master local -e "SHOW MATERIALIZED VIEWS" --conf spark.sql.extensions=com.huawei.boostkit.spark.OmniMV --jars /opt/spark/boostkit-omnimv-spark-3.1.1-1.1.0-aarch64.jar --database ${DATABASE} | grep -P "^${DATABASE}" |awk -F "\t" '{print $2}' |grep -v "partition"` ; \
+views=`spark-sql --master local -e "SHOW MATERIALIZED VIEWS" --conf spark.sql.extensions=com.huawei.boostkit.spark.OmniMV --jars /opt/spark/boostkit-omnimv-spark-3.4.3-1.2.0-aarch64.jar --database ${DATABASE} | grep -P "^${DATABASE}" |awk -F "\t" '{print $2}' |grep -v "partition"` ; \
 drop_mv_cmd=`echo ${views}|tr -s ' ' '\n'|xargs -i echo "DROP MATERIALIZED VIEW IF EXISTS "{}";"` ;\
 drop_cmd="${drop_mv_cmd}" ;
 echo ${drop_cmd} ;\
 
 spark-sql --master local -e "${drop_cmd}" \
 --conf spark.sql.extensions=com.huawei.boostkit.spark.OmniMV \
---jars /opt/spark/boostkit-omnimv-spark-3.1.1-1.1.0-aarch64.jar --database ${DATABASE}
+--jars /opt/spark/boostkit-omnimv-spark-3.4.3-1.2.0-aarch64.jar --database ${DATABASE}
 echo ""
 
 ```
@@ -211,5 +209,4 @@ tail -f nohup.out
 3. python main.py spark parse_query_logs 表示从yarn logs中解析并提取原生sql执行相关的信息，包括执行计划，计算耗时等
 4. python main.py spark generate_views 表示从解析的sql相关信息中，提取公共子查询，作为候选的物化视图
 5. python main.py spark create_greedy_views 表示创建贪心算法推荐的物化视图，个数由配置文件中mv_limit指定
-6. python main.py spark parse_mv_logs 表示从yarn logs中解析并提取物化视图创建语句执行相关的信息
-7. python main.py spark --version 表示查看当前OmniRuntime物化视图的版本信息
+6. python main.py spark --version 表示查看当前OmniRuntime物化视图的版本信息

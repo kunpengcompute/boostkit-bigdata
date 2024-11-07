@@ -3,7 +3,7 @@
 
 # Copyright (C) Huawei Technologies Co., Ltd. 2023-2023. All rights reserved.
 
-from src.candidate_generation.clickhouse.projection_candidate_generation.generation_utils \
+from src.candidate_generation.common.projection_candidate_generation.generation_utils \
     import get_tokens, TargetIndexGetter, normalize_sql, QueryClauseGetter
 
 
