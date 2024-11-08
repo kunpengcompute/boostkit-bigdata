@@ -531,7 +531,7 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
     val views = ExprOptUtil.disjunctions(viewExpression)
 
     // 1.compute difference which queries residue
-    val difference = queries.map(ExpressionEqual) -- views.map(ExpressionEqual)
+    val difference = queries.map(ExpressionEqual).toSet -- views.map(ExpressionEqual).toSet
 
     // 2.1.queries equal to views,just return true
     if (difference.isEmpty && queries.size == views.size) {

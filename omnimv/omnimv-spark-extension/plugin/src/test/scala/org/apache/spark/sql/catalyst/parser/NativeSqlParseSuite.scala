@@ -19,6 +19,8 @@ package org.apache.spark.sql.catalyst.parser
 
 import org.apache.spark.sql.catalyst.optimizer.rules.RewriteSuite
 import org.apache.spark.sql.catalyst.optimizer.rules.RewriteSuite._
+import org.apache.spark.sql.catalyst.plans.logical.CommandResult
+import org.apache.spark.sql.execution.command.{DataWritingCommand, DataWritingCommandExec, ExecutedCommandExec}
 import org.apache.spark.sql.hive.execution.{CreateHiveTableAsSelectCommand, InsertIntoHiveTable}
 
 class NativeSqlParseSuite extends RewriteSuite {
@@ -43,7 +45,10 @@ class NativeSqlParseSuite extends RewriteSuite {
         |create table insert_select1
         |as select locationid, state from locations where locationid = 1;
         |""".stripMargin)
-    val optPlan = df.queryExecution.optimizedPlan
+    var optPlan = df.queryExecution.optimizedPlan
+    assert(optPlan.isInstanceOf[CommandResult])
+    assert(optPlan.asInstanceOf[CommandResult].commandPhysicalPlan.isInstanceOf[ExecutedCommandExec])
+    optPlan = optPlan.asInstanceOf[CommandResult].commandPhysicalPlan.asInstanceOf[ExecutedCommandExec].cmd
     assert(optPlan.isInstanceOf[CreateHiveTableAsSelectCommand])
     assert(isRewritedByMV("default", "mv_insert_select1",
       optPlan.asInstanceOf[CreateHiveTableAsSelectCommand].query))
@@ -65,7 +70,10 @@ class NativeSqlParseSuite extends RewriteSuite {
         |insert overwrite insert_select1
         |select locationid, state from locations where locationid = 2;
         |""".stripMargin)
-    val optPlan = df.queryExecution.optimizedPlan
+    var optPlan = df.queryExecution.optimizedPlan
+    assert(optPlan.isInstanceOf[CommandResult],
+      optPlan.asInstanceOf[CommandResult].commandPhysicalPlan.isInstanceOf[DataWritingCommandExec])
+    optPlan = optPlan.asInstanceOf[CommandResult].commandPhysicalPlan.asInstanceOf[DataWritingCommandExec].cmd
     assert(optPlan.isInstanceOf[InsertIntoHiveTable])
     assert(isRewritedByMV("default", "mv_insert_select2",
       optPlan.asInstanceOf[InsertIntoHiveTable].query))
@@ -77,7 +85,10 @@ class NativeSqlParseSuite extends RewriteSuite {
         |insert into insert_select1
         |select locationid, state from locations where locationid = 2;
         |""".stripMargin)
-    val optPlan = df.queryExecution.optimizedPlan
+    var optPlan = df.queryExecution.optimizedPlan
+    assert(optPlan.isInstanceOf[CommandResult],
+      optPlan.asInstanceOf[CommandResult].commandPhysicalPlan.isInstanceOf[DataWritingCommandExec])
+    optPlan = optPlan.asInstanceOf[CommandResult].commandPhysicalPlan.asInstanceOf[DataWritingCommandExec].cmd
     assert(optPlan.isInstanceOf[InsertIntoHiveTable])
     assert(isRewritedByMV("default", "mv_insert_select2",
       optPlan.asInstanceOf[InsertIntoHiveTable].query))

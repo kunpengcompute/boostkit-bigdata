@@ -129,8 +129,15 @@ trait RewriteHelper extends PredicateHelper with RewriteLogger {
     var origins = Map.empty[ExprId, Expression]
     plan.transformAllExpressions {
       case a@Alias(child, _) =>
-        origins += (a.exprId -> child)
-        a
+        child match {
+          case attr: AttributeReference =>
+            origins += (a.exprId -> attr)
+            a
+          case _: Substring =>
+            origins += (a.exprId -> a.child)
+            a
+          case e => a
+        }
       case e => e
     }
     origins
@@ -280,7 +287,7 @@ trait RewriteHelper extends PredicateHelper with RewriteLogger {
       val right = equiColumnsPreds(i).asInstanceOf[EqualTo].right
       equivalenceClasses.addEquivalenceClass(ExpressionEqual(left), ExpressionEqual(right))
     }
-    (equivalenceClasses, rangePreds, residualPreds)
+    (equivalenceClasses, rangePreds.toSeq, residualPreds.toSeq)
   }
 
   /**
@@ -884,7 +891,7 @@ case class ExpressionEqual(expression: Expression) {
   def extractRealExpr(expression: Expression): Expression = {
     expression.transform {
       case Alias(child, _) => child
-      case Cast(child, _, _) => child
+      case Cast(child, _, _, _) => child
       case other => other
     }
   }

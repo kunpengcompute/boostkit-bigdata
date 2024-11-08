@@ -61,11 +61,11 @@ pip install --global-option=build_ext --global-option="-I/usr/include/tirpc" pyd
 schema_path = hdfs://server1:9000/omnimv/schema.sql
 
 # 数据库名称
-database = tpcds_bin_partitioned_decimal_orc_1000
+database = tpcds_bin_partitioned_varchar_orc_3000
 # 日志解析的jar包路径
-logparser_jar_path = /opt/spark/boostkit-omnimv-logparser-spark-3.4.3-1.2.0-aarch64.jar
+logparser_jar_path = /opt/omnimv/boostkit-omnimv-logparser-spark-3.4.3-1.2.0-aarch64.jar
 # omnimv plugin的路径
-cache_plugin_jar_path = /opt/spark/boostkit-omnimv-spark-3.4.3-1.2.0-aarch64.jar
+cache_plugin_jar_path = /opt/omnimv/boostkit-omnimv-spark-3.4.3-1.2.0-aarch64.jar
 # spark-defaults.conf路径下面配置的spark history输出的路径
 hdfs_input_path = hdfs://server1:9000/spark2-history
 # 通过日志解析之后，把每条日志解析成json格式，所有日志存放的路径
@@ -89,15 +89,15 @@ mv_output_path = hdfs://server1:9000/omnimv/mv
 首先需要情况当前数据库中残留的候选视图，可以采用如下命令：
 
 ```shell
-DATABASE=tpcds_bin_partitioned_decimal_orc_1000
-views=`spark-sql --master local -e "SHOW MATERIALIZED VIEWS" --conf spark.sql.extensions=com.huawei.boostkit.spark.OmniMV --jars /opt/spark/boostkit-omnimv-spark-3.4.3-1.2.0-aarch64.jar --database ${DATABASE} | grep -P "^${DATABASE}" |awk -F "\t" '{print $2}' |grep -v "partition"` ; \
+DATABASE=tpcds_bin_partitioned_varchar_orc_3000
+views=`spark-sql --master local -e "SHOW MATERIALIZED VIEWS" --conf spark.sql.extensions=com.huawei.boostkit.spark.OmniMV --jars /opt/omnimv/boostkit-omnimv-spark-3.4.3-1.2.0-aarch64.jar --database ${DATABASE} | grep -P "^${DATABASE}" |awk -F "\t" '{print $2}' |grep -v "partition"` ; \
 drop_mv_cmd=`echo ${views}|tr -s ' ' '\n'|xargs -i echo "DROP MATERIALIZED VIEW IF EXISTS "{}";"` ;\
 drop_cmd="${drop_mv_cmd}" ;
 echo ${drop_cmd} ;\
 
 spark-sql --master local -e "${drop_cmd}" \
 --conf spark.sql.extensions=com.huawei.boostkit.spark.OmniMV \
---jars /opt/spark/boostkit-omnimv-spark-3.4.3-1.2.0-aarch64.jar --database ${DATABASE}
+--jars /opt/omnimv/boostkit-omnimv-spark-3.4.3-1.2.0-aarch64.jar --database ${DATABASE}
 echo ""
 
 ```
@@ -109,7 +109,7 @@ echo ""
 ```text
 # 首先需要在配置文件中指定database名字，和schema在hdfs上面存放的路径，然后执行初始化操作
 
-cd /opt/spark/BoostKit-omnimv_1.0.0
+cd /opt/omnimv/BoostKit-omnimv_1.0.0
 python main.py spark init_database
 # hdfs上可以查看结果
 hdfs dfs -ls /omnimv
@@ -121,7 +121,7 @@ hdfs dfs -ls /omnimv
 # tpcds获取路径：https://github.com/apache/spark/tree/master/sql/core/src/test/resources/tpcds 
 
 # 下载tpcds sql文件，然后将整个目录上传到指定的hdfs目录
-hdfs dfs -put /opt/spark/tpcds/ /omnimv
+hdfs dfs -put /opt/omnimv/tpcds/ /omnimv
 ```
 
 3. 上传tpcds sql文件后，先在配置文件中修改spark相应的参数，然后执行这些sql语句：

@@ -73,7 +73,7 @@ class OmniMVExtensionAstBuilder(spark: SparkSession, delegate: ParserInterface)
         OmniMVPluginConfig.getConf.defaultDataSource
       RewriteHelper.disableCachePlugin()
       val qe = spark.sql(query).queryExecution
-      val logicalPlan = qe.optimizedPlan
+      val logicalPlan = qe.commandExecuted
       if (RewriteHelper.containsMV(qe.analyzed)) {
         throw new RuntimeException("not support create mv from mv")
       }
@@ -95,7 +95,7 @@ class OmniMVExtensionAstBuilder(spark: SparkSession, delegate: ParserInterface)
   ): OmniMVHeader = withOrigin(ctx) {
     val ifNotExists = ctx.EXISTS() != null
     val multipartIdentifier = ctx.multipartIdentifier.parts.asScala.map(_.getText)
-    (multipartIdentifier, ifNotExists)
+    (multipartIdentifier.toSeq, ifNotExists)
   }
 
   override def visitRefreshMV(ctx: RefreshMVContext): LogicalPlan = withOrigin(ctx) {
@@ -137,12 +137,12 @@ class OmniMVExtensionAstBuilder(spark: SparkSession, delegate: ParserInterface)
           .collect {
             case FileSourceScanExec(relation, _, _, _, _, _, _, _, _)
             => relation.location
-            case RowDataSourceScanExec(_, _, _, _, _, relation: HadoopFsRelation, _)
+            case RowDataSourceScanExec(_, _, _, _, _, _, relation: HadoopFsRelation, _)
             => relation.location
           }
       // disable plugin
       RewriteHelper.disableCachePlugin()
-      val data = spark.sql(queryStr.get).queryExecution.optimizedPlan
+      val data = spark.sql(queryStr.get).queryExecution.commandExecuted
 
       val hadoopRelation = spark.table(catalogTable.identifier).logicalPlan match {
         case SubqueryAlias(_, LogicalRelation(t: HadoopFsRelation, _, _, _)) => t
@@ -337,7 +337,7 @@ class OmniMVExtensionAstBuilder(spark: SparkSession, delegate: ParserInterface)
    */
   override def visitMultipartIdentifier(ctx: MultipartIdentifierContext): Seq[String] =
     withOrigin(ctx) {
-      ctx.parts.asScala.map(_.getText)
+      ctx.parts.asScala.map(_.getText).toSeq
     }
 
   /**
@@ -351,7 +351,7 @@ class OmniMVExtensionAstBuilder(spark: SparkSession, delegate: ParserInterface)
    * Create a Sequence of Strings for an identifier list.
    */
   override def visitIdentifierSeq(ctx: IdentifierSeqContext): Seq[String] = withOrigin(ctx) {
-    ctx.ident.asScala.map(_.getText)
+    ctx.ident.asScala.map(_.getText).toSeq
   }
 
   override def visitWashOutMV(ctx: WashOutMVContext): LogicalPlan = {

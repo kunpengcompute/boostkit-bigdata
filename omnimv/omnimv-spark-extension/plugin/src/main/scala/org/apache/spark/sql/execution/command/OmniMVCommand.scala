@@ -22,14 +22,15 @@ import com.huawei.boostkit.spark.conf.OmniMVPluginConfig._
 import com.huawei.boostkit.spark.util.{RewriteHelper, ViewMetadata}
 import com.huawei.boostkit.spark.util.ViewMetadata._
 import com.huawei.boostkit.spark.util.lock.{FileLock, OmniMVAtomic}
+
 import java.io.{FileNotFoundException, IOException}
 import java.net.URI
 import java.rmi.UnexpectedException
 import java.util.Locale
 import org.apache.hadoop.fs.{FileSystem, Path}
-import scala.collection.{mutable, JavaConverters}
-import scala.util.control.NonFatal
 
+import scala.collection.{JavaConverters, mutable}
+import scala.util.control.NonFatal
 import org.apache.spark.internal.io.FileCommitProtocol
 import org.apache.spark.sql.{AnalysisException, Row, SaveMode, SparkSession}
 import org.apache.spark.sql.catalyst.TableIdentifier
@@ -40,7 +41,7 @@ import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference}
 import org.apache.spark.sql.catalyst.optimizer.OmniMVToSparkAdapter._
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.catalyst.util.{CaseInsensitiveMap, CharVarcharUtils}
-import org.apache.spark.sql.execution.SparkPlan
+import org.apache.spark.sql.execution.{CommandExecutionMode, SparkPlan}
 import org.apache.spark.sql.execution.command.WashOutStrategy._
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.internal.SQLConf
@@ -122,7 +123,10 @@ case class OmniMVCreateMvCommand(
           case _: HadoopFsRelation if table.partitionColumnNames.nonEmpty &&
               sparkSession.sqlContext.conf.manageFilesourcePartitions =>
             // Need to recover partitions into the metastore so our saved data is visible
-            sessionState.executePlan(AlterTableRecoverPartitionsCommand(table.identifier)).toRdd
+            sessionState.executePlan(RepairTableCommand(
+              table.identifier,
+              enableAddPartitions = true,
+              enableDropPartitions = false), CommandExecutionMode.SKIP).toRdd
           case _ =>
         }
       }
@@ -159,6 +163,9 @@ case class OmniMVCreateMvCommand(
     Seq.empty[Row]
   }
 
+  override protected def withNewChildInternal(newChild: LogicalPlan): LogicalPlan =
+    copy(query = newChild)
+
   private def saveDataIntoTable(
       session: SparkSession,
       table: CatalogTable,
@@ -177,7 +184,7 @@ case class OmniMVCreateMvCommand(
       catalogTable = if (tableExists) Some(table) else None)
 
     try {
-      dataSource.writeAndRead(mode, query, outputColumnNames, physicalPlan)
+      dataSource.writeAndRead(mode, query, outputColumnNames)
     } catch {
       case ex: AnalysisException =>
         logError(s"Failed to write to table ${table.identifier.unquotedString}", ex)
@@ -197,12 +204,12 @@ case class OmniMVCreateMvCommand(
 case class DropMaterializedViewCommand(
     tableName: TableIdentifier,
     ifExists: Boolean,
-    purge: Boolean) extends RunnableCommand {
+    purge: Boolean) extends LeafRunnableCommand {
 
   override def run(sparkSession: SparkSession): Seq[Row] = {
     ViewMetadata.init(sparkSession)
     val catalog = sparkSession.sessionState.catalog
-    val isTempView = catalog.isTemporaryTable(tableName)
+    val isTempView = catalog.isTempView(tableName)
 
     if (!isTempView && catalog.tableExists(tableName)) {
       // If the command DROP VIEW is to drop a table or DROP TABLE is to drop a view
@@ -268,7 +275,7 @@ case class DropMaterializedViewCommand(
  */
 case class ShowMaterializedViewCommand(
     databaseName: Option[String],
-    tableIdentifierPattern: Option[String]) extends RunnableCommand {
+    tableIdentifierPattern: Option[String]) extends LeafRunnableCommand {
   // The result of SHOW MaterializedView has three basic columns:
   // database, tableName and originalSql.
 
@@ -319,7 +326,7 @@ case class ShowMaterializedViewCommand(
 
 case class AlterRewriteMaterializedViewCommand(
     tableName: TableIdentifier,
-    enableRewrite: Boolean) extends RunnableCommand {
+    enableRewrite: Boolean) extends LeafRunnableCommand {
 
   override def run(sparkSession: SparkSession): Seq[Row] = {
     ViewMetadata.init(sparkSession)
@@ -387,7 +394,6 @@ case class RefreshMaterializedViewCommand(
       // Most formats don't do well with duplicate columns, so lets not allow that
       SchemaUtils.checkColumnNameDuplication(
         outputColumnNames,
-        s"when inserting into $outputPath",
         sparkSession.sessionState.conf.caseSensitiveAnalysis)
 
       val hadoopConf = sparkSession.sessionState.newHadoopConfWithOptions(options)
@@ -530,6 +536,9 @@ case class RefreshMaterializedViewCommand(
     Seq.empty[Row]
   }
 
+  override protected def withNewChildInternal(newChild: LogicalPlan): LogicalPlan =
+    copy(query = newChild)
+
   /**
    * Deletes all partition files that match the specified static prefix. Partitions with custom
    * locations are also cleared based on the custom locations map given to this class.
@@ -602,7 +611,7 @@ case class RefreshMaterializedViewCommand(
  */
 case class WashOutMaterializedViewCommand(
     dropAll: Boolean,
-    strategy: Option[List[(String, Option[Int])]]) extends RunnableCommand {
+    strategy: Option[List[(String, Option[Int])]]) extends LeafRunnableCommand {
 
   private val logFlag = "[OmniMV]"
 

@@ -460,7 +460,7 @@ object ExprOptUtil {
         !child.nullable
       case Not(child: Expression) =>
         isAlwaysFalse(child)
-      case Cast(child: Expression, _, _) =>
+      case Cast(child: Expression, _, _, _) =>
         isAlwaysTrue(child)
       case _ =>
         false
@@ -480,7 +480,7 @@ object ExprOptUtil {
         !child.nullable
       case Not(child: Expression) =>
         isAlwaysTrue(child)
-      case Cast(child: Expression, _, _) =>
+      case Cast(child: Expression, _, _, _) =>
         isAlwaysFalse(child)
       case _ =>
         false
@@ -492,7 +492,7 @@ object ExprOptUtil {
     expr match {
       case literal@Literal(_, _) =>
         literal.value == null
-      case Cast(child: Expression, _, _) =>
+      case Cast(child: Expression, _, _, _) =>
         isNull(child)
       case _ =>
         false
@@ -521,7 +521,7 @@ object ExprOptUtil {
     // negate the term in notTerms
     val negateTerms: mutable.Buffer[Expression] = negateBufferTerms(notTerms)
     negateTerms.insert(0, expr)
-    composeConjunctions(negateTerms, false)
+    composeConjunctions(negateTerms.toSeq, false)
   }
 
   def negateBufferTerms(notTerms: mutable.Buffer[Expression]): mutable.Buffer[Expression] = {
@@ -601,7 +601,7 @@ case class EquivalenceClasses() {
   def getEquivalenceClasses: List[mutable.Set[ExpressionEqual]] = {
     if (cacheEquivalenceClasses == null) {
       val visited: mutable.Set[ExpressionEqual] = mutable.Set()
-      val builder: mutable.MutableList[mutable.Set[ExpressionEqual]] = mutable.MutableList()
+      val builder: mutable.ListBuffer[mutable.Set[ExpressionEqual]] = mutable.ListBuffer()
       for (set <- nodeToEquivalenceClass.values) {
         if ((visited & set).isEmpty) {
           visited ++= set

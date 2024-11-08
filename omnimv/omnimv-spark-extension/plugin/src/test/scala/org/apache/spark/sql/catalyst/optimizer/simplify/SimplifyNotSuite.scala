@@ -57,7 +57,7 @@ class SimplifyNotSuite extends RewriteSuite {
     val simplify = ExprSimplifier(unknownAsFalse = true, pulledUpPredicates)
     val res = simplify.simplify(targetCondition
         .asInstanceOf[Project].child.asInstanceOf[Filter].condition)
-    assert("(spark_catalog.default.t1.`ID` > 1)".equals(res.sql))
+    assert("(spark_catalog.default.t1.ID > 1)".equals(res.sql))
   }
 
   test("simplify_Not_02") {
@@ -72,8 +72,8 @@ class SimplifyNotSuite extends RewriteSuite {
     val simplify = ExprSimplifier(unknownAsFalse = true, pulledUpPredicates)
     val res = simplify.simplify(targetCondition
         .asInstanceOf[Project].child.asInstanceOf[Filter].condition)
-    assert(("((spark_catalog.default.t1.`ID` <= 1) " +
-        "OR (spark_catalog.default.t1.`ID` >= 10))").equals(res.sql))
+    assert(("((spark_catalog.default.t1.ID <= 1) " +
+        "OR (spark_catalog.default.t1.ID >= 10))").equals(res.sql))
   }
 
   test("simplify_Not_03") {
@@ -103,7 +103,7 @@ class SimplifyNotSuite extends RewriteSuite {
     val simplify = ExprSimplifier(unknownAsFalse = true, pulledUpPredicates)
     val res = simplify.simplify(targetCondition
         .asInstanceOf[Project].child.asInstanceOf[Filter].condition)
-    assert("(spark_catalog.default.t1.`ID` <= 10)".equals(res.sql))
+    assert("(spark_catalog.default.t1.ID <= 10)".equals(res.sql))
   }
 
   test("clean env") {

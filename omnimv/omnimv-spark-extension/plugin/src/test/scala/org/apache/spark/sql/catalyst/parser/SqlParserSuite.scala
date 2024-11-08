@@ -216,7 +216,7 @@ class SqlParserSuite extends RewriteSuite {
   }
 
   test("mv_create_error1") {
-    compareError("view not found") {
+    compareError("cannot be found") {
       spark.sql(
         """
           |CREATE MATERIALIZED VIEW IF NOT EXISTS mv_create1
@@ -275,7 +275,7 @@ class SqlParserSuite extends RewriteSuite {
   }
 
   test("mv_create_error5") {
-    compareError("Found duplicate column(s)") {
+    compareError("already exists") {
       spark.sql(
         """
           |CREATE MATERIALIZED VIEW IF NOT EXISTS  mv_create_join1xxx

@@ -101,7 +101,8 @@ object ViewMetadata extends RewriteHelper {
     REFRESH_STAT = IDLE
     status = STATUS_LOADING
 
-    kryoSerializer = new KryoSerializer(spark.sparkContext.getConf)
+    kryoSerializer = new KryoSerializer(spark.sparkContext.getConf
+        .clone().set("spark.kryo.unsafe", "false"))
 
     metadataPath = new Path(OmniMVPluginConfig.getConf.metadataPath)
     metadataPriorityPath = new Path(metadataPath, "priority")
@@ -142,6 +143,7 @@ object ViewMetadata extends RewriteHelper {
       val viewTablePlan = RewriteTime
           .withTimeStat("viewTablePlan") {
             spark.table(tableName).queryExecution.analyzed match {
+              case SubqueryAlias(_, Project(_, child)) => child
               case SubqueryAlias(_, child) => child
               case a@_ => a
             }
@@ -447,7 +449,7 @@ object ViewMetadata extends RewriteHelper {
    */
   def loadViewContainsTablesFromFile(dbName: String): mutable.Map[String, (Set[String], Long)] = {
     val jsons = mutable.Map[String, (Set[String], Long)]().empty
-    loadDataFromDisk(dbName, VIEW_CONTAINS_TABLES_FILE, isTailLines = true, jsons) {
+    loadDataFromDisk(dbName, VIEW_CONTAINS_TABLES_FILE, jsons) {
       (preData, curData, modifyTime) =>
         for ((view, (tables, time)) <- curData) {
           if (!preData.contains(view) || preData(view)._2 < time) {
@@ -532,28 +534,33 @@ object ViewMetadata extends RewriteHelper {
       threadPool.submit {
         new Runnable {
           override def run(): Unit = {
-            val viewName = file.getPath.getName
-            val is = fs.open(file.getPath)
-            val jsons: Map[String, String] = RewriteTime.withTimeStat("Json.read.C") {
-              Json(DefaultFormats).read[Map[String, String]](is)
-            }
-            is.close()
+            try {
+              val viewName = file.getPath.getName
+              val is = fs.open(file.getPath)
+              val jsons: Map[String, String] = RewriteTime.withTimeStat("Json.read.C") {
+                Json(DefaultFormats).read[Map[String, String]](is)
+              }
+              is.close()
 
-            if (!isViewEnable(jsons)) {
-              return
-            }
+              if (!isViewEnable(jsons)) {
+                return
+              }
 
-            val tablePlanStr = jsons("tablePlan")
-            val tablePlan = RewriteTime.withTimeStat("deSerTablePlan.C") {
-              KryoSerDeUtil.deserializePlan(kryoSerializer, spark, tablePlanStr)
-            }
-            viewToTablePlan.put(viewName, tablePlan)
+              val tablePlanStr = jsons("tablePlan")
+              val tablePlan = RewriteTime.withTimeStat("deSerTablePlan.C") {
+                KryoSerDeUtil.deserializePlan(kryoSerializer, spark, tablePlanStr)
+              }
+              viewToTablePlan.put(viewName, tablePlan)
 
-            val propertiesStr = jsons("properties")
-            val properties = RewriteTime.withTimeStat("deSerProperties.C") {
-              KryoSerDeUtil.deserializeFromStr[Map[String, String]](kryoSerializer, propertiesStr)
+              val propertiesStr = jsons("properties")
+              val properties = RewriteTime.withTimeStat("deSerProperties.C") {
+                KryoSerDeUtil.deserializeFromStr[Map[String, String]](kryoSerializer, propertiesStr)
+              }
+              viewProperties.put(viewName, properties)
+            } catch {
+              case e: Throwable =>
+                logError(s"Failed to deSer mv metadata.", e)
             }
-            viewProperties.put(viewName, properties)
           }
         }
       }
@@ -561,22 +568,27 @@ object ViewMetadata extends RewriteHelper {
       threadPool.submit {
         new Runnable {
           override def run(): Unit = {
-            val viewName = file.getPath.getName
-            val is = fs.open(file.getPath)
-            val jsons: Map[String, String] = RewriteTime.withTimeStat("Json.read.C") {
-              Json(DefaultFormats).read[Map[String, String]](is)
-            }
-            is.close()
+            try {
+              val viewName = file.getPath.getName
+              val is = fs.open(file.getPath)
+              val jsons: Map[String, String] = RewriteTime.withTimeStat("Json.read.C") {
+                Json(DefaultFormats).read[Map[String, String]](is)
+              }
+              is.close()
 
-            if (!isViewEnable(jsons)) {
-              return
-            }
+              if (!isViewEnable(jsons)) {
+                return
+              }
 
-            val queryPlanStr = jsons("queryPlan")
-            val queryPlan = RewriteTime.withTimeStat("deSerQueryPlan.C") {
-              KryoSerDeUtil.deserializePlan(kryoSerializer, spark, queryPlanStr)
+              val queryPlanStr = jsons("queryPlan")
+              val queryPlan = RewriteTime.withTimeStat("deSerQueryPlan.C") {
+                KryoSerDeUtil.deserializePlan(kryoSerializer, spark, queryPlanStr)
+              }
+              viewToViewQueryPlan.put(viewName, queryPlan)
+            } catch {
+              case e: Throwable =>
+                logError(s"Failed to deSer mv metadata.", e)
             }
-            viewToViewQueryPlan.put(viewName, queryPlan)
           }
         }
       }
@@ -628,7 +640,12 @@ object ViewMetadata extends RewriteHelper {
    * formatted mv name
    */
   def formatViewName(identifier: TableIdentifier): String = {
-    identifier.toString().replace("`", "").toLowerCase(Locale.ROOT)
+    val viewName = if (identifier.database.isEmpty) {
+      identifier.table
+    } else {
+      s"${identifier.database.get}.${identifier.table}"
+    }
+    viewName.toLowerCase(Locale.ROOT)
   }
 
   /**
@@ -699,7 +716,7 @@ object ViewMetadata extends RewriteHelper {
     }
 
     val viewCounts = mutable.Map[String, Array[Long]]().empty
-    viewCounts ++= loadDataFromDisk(dbName, VIEW_CNT_FILE, isTailLines = true, viewCounts) {
+    viewCounts ++= loadDataFromDisk(dbName, VIEW_CNT_FILE, viewCounts) {
       (preData, newData, modifyTime) =>
         for (data <- newData) {
           val dataWithModifyTime = (data._1, data._2.slice(0, 2) ++ Array(modifyTime))
@@ -727,7 +744,6 @@ object ViewMetadata extends RewriteHelper {
   private def loadDataFromDisk[K: Manifest, V: Manifest](
       dbName: String,
       fileName: String,
-      isTailLines: Boolean,
       data: mutable.Map[K, V])
       (addNewDataToPreData: (
           mutable.Map[K, V],
@@ -736,12 +752,11 @@ object ViewMetadata extends RewriteHelper {
 
     val dbPath = new Path(metadataPath, dbName)
     val filePath = new Path(dbPath, fileName)
-    loadMapFromDisk(filePath, isTailLines, data)(addNewDataToPreData)
+    loadMapFromDisk(filePath, data)(addNewDataToPreData)
   }
 
   private def loadMapFromDisk[K: Manifest, V: Manifest](
       filePath: Path,
-      isTailLines: Boolean,
       data: mutable.Map[K, V])
       (addNewDataToPreData: (
           mutable.Map[K, V],
@@ -751,45 +766,12 @@ object ViewMetadata extends RewriteHelper {
     if (!fs.exists(filePath)) {
       return newData
     }
-    var readLines = OmniMVPluginConfig.getConf.metadataIndexTailLines
     val is = fs.open(filePath)
-    var pos = fs.getFileStatus(filePath).getLen - 1
     val modifyTime = fs.getFileStatus(filePath).getModificationTime
-    var lineReady = false
-    var bytes = mutable.Seq.empty[Char]
-    // tail the file
-    while (pos >= 0) {
-      is.seek(pos)
-      val readByte = is.readByte()
-      readByte match {
-        // \n
-        case SEPARATOR =>
-          if (bytes.size != 0) {
-            lineReady = true
-          }
-        case _ =>
-          bytes +:= readByte.toChar
-      }
-      pos -= 1
-
-      // find \n or file start
-      if (lineReady || pos < 0) {
-        val line = bytes.mkString("")
-        val properties = Json(DefaultFormats)
-            .read[mutable.Map[K, V]](line)
-        addNewDataToPreData(newData, properties, modifyTime)
-        lineReady = false
-        bytes = mutable.Seq.empty[Char]
-
-        if (isTailLines) {
-          readLines -= 1
-          if (readLines <= 0) {
-            return newData
-          }
-        }
-      }
-    }
+    val jsons: mutable.Map[K, V] = Json(DefaultFormats).read[mutable.Map[K, V]](is)
+    addNewDataToPreData(newData, jsons, modifyTime)
     is.close()
+
     newData
   }
 
