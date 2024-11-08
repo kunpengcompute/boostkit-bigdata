@@ -13,46 +13,42 @@
  * limitations under the License.
  */
 
-package com.huawei.analytics.shield.ra.example
+package rats
 
 import com.huawei.analytics.shield.ra.RemoteAttestationAgent
-import org.apache.spark.SparkFiles
 import org.apache.spark.internal.Logging
 
 import java.io._
 import java.lang
 import java.net.Socket
-import java.nio.charset.StandardCharsets
 import java.util.Properties
 import javax.net.ssl.SSLSocketFactory
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, Future}
 
-class RatsTLSRemoteAttestationAgent extends RemoteAttestationAgent with Logging{
+class RatsTLSRemoteAttestationAgent extends RemoteAttestationAgent with Logging {
 
   private var socket: Socket = null
   private var oos: ObjectOutputStream = null
   private var ois: ObjectInputStream = null
   private val timeOutThreshold: Int = 10 * 1000
   private val socketConf = System.getenv("HADOOP_HOME") + "/rats/socket.properties"
-  private val checkPortShell = System.getenv("HADOOP_HOME") + "/rats/check_port.sh"
-  private val serverPortFile: String = "server.port"
 
   // step 1 . check port and start rats tls server
   // step 2 . start agent socket client and connect to server
   // step 3 . agent send remote attestation request
   // step 4 . write for reply
   // step 5 . return remote attestation res(boolean)
-  override def doRemoteAttestation(executorHostName: String, executorId:String): Boolean = {
+  override def doRemoteAttestation(executorHostName: String, executorId: String): Boolean = {
     var process: lang.Process = null
     try {
-      process = startRatsTLSServer()
+      val port = checkPort(executorId)
+      process = startRatsTLSServer(port)
       setSocketConnection()
       val req = new RatsTLSRequest
-      req.setExecutorInfo(executorHostName,executorId)
-      req.setupRatsTlsServerInfo(executorHostName, readFileOneLine(new File(SparkFiles.getRootDirectory(), serverPortFile)))
-      //req.setupRatsTlsServerInfo(executorHostName, "1234")
+      req.setExecutorInfo(executorHostName, executorId)
+      req.setupRatsTlsServerInfo(executorHostName, port.toString)
       sendRequest(req)
       val reply = writeForReply()
       if (reply != null) {
@@ -67,14 +63,14 @@ class RatsTLSRemoteAttestationAgent extends RemoteAttestationAgent with Logging{
         e.printStackTrace()
         throw e
     } finally {
-      if(process!=null && process.isAlive){
+      if (process != null && process.isAlive) {
         process.destroy()
       }
       closeConnection()
     }
   }
 
-  override def requestSecret(executorHostName: String, executorId:String,secretId: String): Unit = {
+  override def requestSecret(executorHostName: String, executorId: String, secretId: String): Unit = {
     try {
       setSocketConnection()
       val req = new SecretRequest
@@ -84,7 +80,9 @@ class RatsTLSRemoteAttestationAgent extends RemoteAttestationAgent with Logging{
       val reply = writeForReply()
       if (reply != null) {
         val res = reply.asInstanceOf[SecretRes]
-        this.putSecret(secretId, res.SecretJsonStr)
+        if (res.getAvailable()) {
+          this.putSecret(secretId, res.SecretJsonStr)
+        }
       }
     } catch {
       case e: Throwable =>
@@ -94,18 +92,6 @@ class RatsTLSRemoteAttestationAgent extends RemoteAttestationAgent with Logging{
     } finally {
       closeConnection()
     }
-  }
-
-  private def readFileOneLine(file: File): String = {
-    val streamReader: InputStreamReader = new InputStreamReader(new FileInputStream(file), StandardCharsets.UTF_8);
-    val bufferedReader: BufferedReader = new BufferedReader(streamReader);
-    val content = bufferedReader.readLine()
-    if (content.isEmpty) {
-      throw new Exception("not found rats tls server port")
-    }
-    bufferedReader.close()
-    streamReader.close()
-    content
   }
 
   private def setSocketConnection(): Unit = {
@@ -147,17 +133,15 @@ class RatsTLSRemoteAttestationAgent extends RemoteAttestationAgent with Logging{
     }
   }
 
-  private def checkPort(): Unit= {
-    val process = Runtime.getRuntime.exec(s"sh $checkPortShell")
-    process.waitFor()
+  private def checkPort(executorId: String): Int = {
+    val basePort = 1233 + executorId.toInt
+    basePort
   }
 
-  private def startRatsTLSServer(): lang.Process = {
+  private def startRatsTLSServer(port: Int): lang.Process = {
     logInfo("RatsTLSServer running")
-    checkPort()
-    val port = readFileOneLine(new File(SparkFiles.getRootDirectory(), serverPortFile))
-    //val port = readFileOneLine(new File(serverPortFile))
-    val ratsTlsProcess = Runtime.getRuntime.exec(s"virtcca-server $port")
+    val ratsTlsProcess = Runtime.getRuntime.exec(s"virtcca-server -p $port")
+    logInfo(s"RatsTLSServer start on port : $port")
     ratsTlsProcess
   }
 

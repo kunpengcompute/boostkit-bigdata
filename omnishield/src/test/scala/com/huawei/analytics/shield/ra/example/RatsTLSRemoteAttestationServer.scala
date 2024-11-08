@@ -13,12 +13,12 @@
  * limitations under the License.
  */
 
-package com.huawei.analytics.shield.ra.example
+package rats
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 
-import java.io.{File, ObjectInputStream, ObjectOutputStream}
+import java.io.{File, InputStreamReader, ObjectInputStream, ObjectOutputStream}
 import javax.net.ssl.{SSLServerSocket, SSLServerSocketFactory}
 import scala.collection.mutable
 
@@ -61,7 +61,7 @@ object RatsTLSRemoteAttestationServer {
   private def handleRatsTLSRequest(rats: RatsTLSRequest, oos: ObjectOutputStream): Unit = {
     println(s"remote attestation request arrived, executorHostName: ${rats.executorName} executorId: ${rats.executorId}, start handle msg...")
     val baseInfo = readRatsTLSBaseInfoFromLocalFile(rats.executorName)
-    val exitCode = startRatsTlsClient(baseInfo)
+    val exitCode = startRatsTlsClient(baseInfo, rats.ratsTlsServerPort.toInt)
     val reply = createReplyMsg(exitCode)
     System.out.println("start reply msg")
     oos.writeObject(reply)
@@ -74,11 +74,13 @@ object RatsTLSRemoteAttestationServer {
       "start handle msg...\n")
     //Secrets can be obtained from kms or other components.
     //for demo, secrets from local files are used here.
-    val secret = keyMap(secretReq.secretId)
-
-    System.out.println("start reply msg")
     val res = new SecretRes()
-    res.setSecret(secret)
+    if (keyMap.contains(secretReq.secretId)) {
+      val secret = keyMap(secretReq.secretId)
+      res.setSecret(secret)
+      res.setAvailable()
+    }
+    System.out.println("start reply msg")
     oos.writeObject(res)
     System.out.println("msg sending completed\n")
   }
@@ -107,9 +109,10 @@ object RatsTLSRemoteAttestationServer {
     }
   }
 
-  private def startRatsTlsClient(info:MeasurementInfo) : Int = {
-    System.out.println(s"run  virtcca-client ip: ${info.ip} baseValue: ${info.baseValue} hashPath: ${info.imaHashPath}")
-    val process:Process = Runtime.getRuntime.exec(s"virtcca-client -i ${info.ip} -r ${info.baseValue} -d ${info.imaHashPath}")
+  private def startRatsTlsClient(info:MeasurementInfo, port: Int) : Int = {
+    val cmd = s"virtcca-client -i ${info.ip} -p $port -r ${info.baseValue} -d ${info.imaHashPath}"
+    System.out.println(s"run $cmd")
+    val process:Process = Runtime.getRuntime.exec(cmd)
     val exitCode = process.waitFor
     System.out.println("startRatsTlsClient Exit Code: " + exitCode)
     exitCode

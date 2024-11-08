@@ -111,7 +111,6 @@ object IMAMeasurementShellGeneration extends ShellGeneration {
   private val SPARK_LOCALIZED_LIB_DIR = "__spark_libs__"
   private val IMA_USER_ENV ="$IMA_USER"
   private val HADOOP_MEASUREMENT_DIR = "$HADOOP_MEASUREMENT_DIR"
-  private val APP_LOCAL_DIR=System.getenv("LOCAL_DIRS")
 
   def genIMAShellContent(fileMap: mutable.Map[String, Long]): String = {
     clearBuffer()
@@ -147,7 +146,7 @@ object IMAMeasurementShellGeneration extends ShellGeneration {
         addToShell(s"fi")
       }
       if (file.exists() && file.isDirectory) {
-        val tarPath = s"/$APP_LOCAL_DIR/$localName.ima"
+        val tarPath = SparkFiles.get( s"$localName.ima")
         addToShell(s"if [ ! -e $tarPath ]")
         addToShell(s"then")
         packJarFiles(file.getCanonicalFile.getPath, tarPath)
@@ -158,7 +157,7 @@ object IMAMeasurementShellGeneration extends ShellGeneration {
     }
 
     //measurement hadoop if need
-    val hadoopIMAFile = s"/$APP_LOCAL_DIR/hadoop.ima"
+    val hadoopIMAFile = SparkFiles.get(s"hadoop.ima")
     addToShell(s"if [[ $HADOOP_MEASUREMENT_DIR && ! -e $hadoopIMAFile ]]")
     addToShell(s"then")
     packJarFiles(HADOOP_MEASUREMENT_DIR,  hadoopIMAFile)
