@@ -18,8 +18,17 @@ package com.huawei.analytics.shield.ra.example
 class SecretRes extends Serializable {
   var remoteServerIp: String = _
   var SecretJsonStr: String = _
+  var isAvailable: Boolean = false
 
   def setSecret(value: String):Unit = {
     this.SecretJsonStr = value
+  }
+
+  def setAvailable():Unit = {
+    this.isAvailable = true
+  }
+
+  def getAvailable():Boolean = {
+    this.isAvailable
   }
 }
