@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
-package rats
+package com.huawei.analytics.shield.ra.example
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.scala.DefaultScalaModule

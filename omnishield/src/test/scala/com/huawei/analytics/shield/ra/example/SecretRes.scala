@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
-package rats
+package com.huawei.analytics.shield.ra.example
 
 class SecretRes extends Serializable {
   var remoteServerIp: String = _

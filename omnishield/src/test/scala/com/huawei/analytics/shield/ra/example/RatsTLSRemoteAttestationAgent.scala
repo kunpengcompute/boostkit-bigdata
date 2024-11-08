@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
-package rats
+package com.huawei.analytics.shield.ra.example
 
 import com.huawei.analytics.shield.ra.RemoteAttestationAgent
 import org.apache.spark.internal.Logging
