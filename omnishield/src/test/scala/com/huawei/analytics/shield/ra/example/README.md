@@ -176,8 +176,10 @@ yarn-daemon.sh start nodemanager
 
 5.1 在resourcemanager节点提交spark作业
 ```
-spark-submit --master yarn  --class org.apache.spark.examples.SparkPi --num-executors 1  --executor-cores 1 --executor-memory 1G --conf spark.remote.attestation.enable=true  --conf spark.remote.attestation.agent.class=rats.RatsTLSRemoteAttestationAgent --conf spark.network.timeout=1200 --conf spark.yarn.max.executor.failures=1 --conf spark.yarn.maxAppAttempts=1  --jars "omnishield-1.0-SNAPSHOT.jar,rats-tls-demo-1.0.jar"  --conf spark.executor.extraClassPath=omnishield-1.0-SNAPSHOT.jar:rats-tls-demo-1.0.jar --driver-class-path omnishield-1.0-SNAPSHOT.jar:rats-tls-demo-1.0.jar  /usr/local/spark/examples/jars/spark-examples_2.12-3.3.1.jar
+spark-submit --master yarn  --class org.apache.spark.examples.SparkPi --num-executors 1  --executor-cores 1 --executor-memory 1G --conf spark.remote.attestation.enable=true  --conf spark.remote.attestation.agent.class=com.huawei.analytics.shield.ra.example.RatsTLSRemoteAttestationAgent --conf spark.network.timeout=1200 --conf spark.yarn.max.executor.failures=1 --conf spark.yarn.maxAppAttempts=1  --jars "omnishield-1.0-SNAPSHOT.jar,omnishield-1.0-SNAPSHOT-rats-tls-demo.jar"  --conf spark.executor.extraClassPath=omnishield-1.0-SNAPSHOT.jar:omnishield-1.0-SNAPSHOT-rats-tls-demo.jar --driver-class-path omnishield-1.0-SNAPSHOT.jar:omnishield-1.0-SNAPSHOT-rats-tls-demo.jar  /usr/local/spark/examples/jars/spark-examples_2.12-3.3.1.jar
 ```
+omnishield-1.0-SNAPSHOT.jar 在经过步骤1打包后在target目录中生成
+
 5.2 观察Socket服务控制台打印日志
 
 spark executor启动时会触发远程证明，远程证明通过时socket控制台有如下日志打印
