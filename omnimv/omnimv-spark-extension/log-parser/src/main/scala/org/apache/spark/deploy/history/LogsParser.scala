@@ -234,6 +234,9 @@ class LogsParser(conf: SparkConf, eventLogDir: String, outPutDir: String) extend
         .replace(")", "")
         .replace(":", ", ")
         .split(",")).reduce((t1, t2) => {
+      if (t1.length != t2.length) {
+        return context
+      }
       val sb = new StringBuilder
       sb.append('[')
       for (i <- 0 until (t1.size)) {
