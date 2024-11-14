@@ -146,10 +146,12 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_ParquetColumnarBatchJn
     // Get capacity for each record batch
     int64_t capacity = (int64_t)env->CallLongMethod(jsonObj, jsonMethodLong, env->NewStringUTF("capacity"));
 
+    jboolean notNeedFSCache = env->CallBooleanMethod(jsonObj, jsonMethodHas, env->NewStringUTF("notNeedFSCache"));
+
     std::unique_ptr<common::TimeRebaseInfo> rebaseInfoPtr = common::BuildTimeRebaseInfo(env, jsonObj);
 
     ParquetReader *pReader = new ParquetReader(rebaseInfoPtr);
-    auto state = pReader->InitReader(uriInfo, capacity, ugiString);
+    auto state = pReader->InitReader(uriInfo, capacity, ugiString, notNeedFSCache);
     if (state != Status::OK()) {
         env->ThrowNew(runtimeExceptionClass, state.ToString().c_str());
         return 0;

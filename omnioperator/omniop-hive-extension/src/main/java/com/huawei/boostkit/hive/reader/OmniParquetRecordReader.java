@@ -22,6 +22,8 @@ import static com.huawei.boostkit.hive.cache.VectorCache.BATCH;
 
 import com.google.common.base.Strings;
 
+import com.huawei.boostkit.hive.OmniTableScanOperator;
+import com.huawei.boostkit.hive.expression.TypeUtils;
 import nova.hetu.omniruntime.type.BooleanDataType;
 import nova.hetu.omniruntime.type.DataType;
 import nova.hetu.omniruntime.type.Decimal128DataType;
@@ -50,21 +52,19 @@ import org.apache.hadoop.hive.ql.io.parquet.read.ParquetFilterPredicateConverter
 import org.apache.hadoop.hive.ql.io.sarg.ConvertAstToSearchArg;
 import org.apache.hadoop.hive.ql.io.sarg.SearchArgument;
 import org.apache.hadoop.hive.ql.plan.TableScanDesc;
-import org.apache.hadoop.hive.ql.plan.VectorTableScanDesc;
 import org.apache.hadoop.hive.ql.plan.api.OperatorType;
 import org.apache.hadoop.hive.serde2.ColumnProjectionUtils;
 import org.apache.hadoop.hive.serde2.SerDeStats;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
 import org.apache.hadoop.hive.serde2.typeinfo.DecimalTypeInfo;
-import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
+import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapred.FileSplit;
 import org.apache.hadoop.mapred.InputSplit;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.RecordReader;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.parquet.HadoopReadOptions;
 import org.apache.parquet.column.ColumnDescriptor;
 import org.apache.parquet.filter2.compat.FilterCompat;
 import org.apache.parquet.filter2.predicate.FilterPredicate;
@@ -89,12 +89,11 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import java.util.stream.Collectors;
 
 public class OmniParquetRecordReader
         implements RecordReader<NullWritable, VecBatchWrapper>, StatsProvidingRecordReader {
@@ -143,9 +142,13 @@ public class OmniParquetRecordReader
     protected Operator tableScanOp;
     protected List<DataType> typeIds;
     protected MessageType fileSchema;
-    protected List<Integer> included;
     protected ParquetInputSplit split;
     protected Configuration conf;
+    protected List<Integer> includedIds;
+    protected List<String> includedNames;
+    protected List<Type> fields;
+    protected List<DataType> neededTypes;
+    protected boolean[] missingColumns;
 
     OmniParquetRecordReader(InputSplit oldSplit, JobConf oldJobConf) throws IOException {
         this.splitLen = oldSplit.getLength();
@@ -155,15 +158,11 @@ public class OmniParquetRecordReader
         this.conf = jobConf;
         this.fileFooter = ParquetFileReader.readFooter(oldJobConf, ((FileSplit) oldSplit).getPath());
         this.fileSchema = fileFooter.getFileMetaData().getSchema();
-        this.included = ColumnProjectionUtils.getReadColumnIDs(conf);
+        this.includedIds = ColumnProjectionUtils.getReadColumnIDs(conf);
+        this.includedNames = Arrays.asList(ColumnProjectionUtils.getReadColumnNames(conf));
         Map<String, String> fileMatadata = fileFooter.getFileMetaData().getKeyValueMetaData();
         MessageType schema = getRequriedSchema(this.fileSchema);
-        List<ColumnDescriptor> columns = schema.getColumns();
-        this.typeIds = new ArrayList<DataType>();
-        for (int i = 0; i < columns.size(); i++) {
-            PrimitiveType type = columns.get(i).getPrimitiveType();
-            addTypeId(type);
-        }
+        this.fields = schema.getFields();
         this.split = getSplit(oldSplit, jobConf);
         // create a TaskInputOutputContext
         if (shouldSkipTimestampConversion
@@ -173,20 +172,38 @@ public class OmniParquetRecordReader
                     shouldSkipTimestampConversion);
         }
         this.isFilterPredicate = filter instanceof FilterCompat.FilterPredicateCompat;
-        this.recordReader = new ParquetColumnarBatchScanReader();
         // PushDown rowGroups and columns indices for native reader.
         List<Integer> rowgroupIndices = getFilteredBlocks(split.getStart(), split.getEnd());
         String ugi = UserGroupInformation.getCurrentUser().toString();
-        Collections.sort(included);
         this.recordReader = new ParquetColumnarBatchScanReader();
-        this.recordReader.initializeReaderJava(split.getPath(), BATCH, rowgroupIndices, included, ugi);
-        this.vecs = new Vec[included.size()];
+        this.recordReader.initializeReaderJava(split.getPath(), BATCH, ugi);
+        String[] includeFieldNames = initializeInternal(schema.getColumns());
+        this.recordReader.initializeRecordReaderJava(split.getStart(), split.getEnd(), includeFieldNames);
+        this.vecs = new Vec[includedIds.size()];
         this.serDeStats = new SerDeStats();
         Utilities.getMapWork(conf).getAliasToWork().values().forEach(op -> {
             if (op.getType().equals(OperatorType.TABLESCAN)) {
                 this.tableScanOp = op;
             }
         });
+    }
+
+    private String[] initializeInternal(List<ColumnDescriptor> columns) throws IOException, UnsupportedOperationException {
+        missingColumns = new boolean[includedIds.size()];
+        ArrayList<String> allFieldsNames = recordReader.getAllFieldsNames();
+        this.typeIds = new ArrayList<DataType>();
+        List<String> includeFieldNames = new ArrayList<>();
+        for (int i = 0; i < includedIds.size(); i++) {
+            String target = includedNames.get(i);
+            if (allFieldsNames.contains(target)) {
+                missingColumns[i] = false;
+                includeFieldNames.add(target);
+                addTypeId(columns.get(i).getPrimitiveType());
+            } else {
+                missingColumns[i] = true;
+            }
+        }
+        return includeFieldNames.toArray(new String[includeFieldNames.size()]);
     }
 
     private void addTypeId(PrimitiveType type) {
@@ -207,11 +224,11 @@ public class OmniParquetRecordReader
     }
 
     private MessageType getRequriedSchema(MessageType schema) {
-        Set<Integer> requiredIds = new HashSet<>(this.included);
         List<Type> typeList = new ArrayList<Type>();
-        for (int i = 0; i < schema.getFields().size(); i++) {
-            if (requiredIds.contains(i)) {
-                typeList.add(schema.getFields().get(i));
+        List<Type> schemaFields = schema.getFields();
+        for (Type schemaField : schemaFields) {
+            if (includedNames.contains(schemaField.getName())) {
+                typeList.add(schemaField);
             }
         }
         return new MessageType(schema.getName(), typeList);
@@ -453,7 +470,11 @@ public class OmniParquetRecordReader
         if (tableScanOp != null && tableScanOp.getDone()) {
             return false;
         }
-        batchSize = recordReader.next(vecs, typeIds);
+        if (neededTypes == null) {
+            List<PrimitiveTypeInfo> primitiveTypeInfos = ((OmniTableScanOperator) tableScanOp).getNeedTypes();
+            neededTypes = primitiveTypeInfos.stream().map(neededType -> TypeUtils.buildInputDataType(neededType)).collect(Collectors.toList());
+        }
+        batchSize = recordReader.next(neededTypes, vecs, missingColumns);
         if (batchSize == 0) {
             return false;
         }

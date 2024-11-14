@@ -49,6 +49,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Table Scan Operator If the data is coming from the map-reduce framework, just
@@ -57,6 +58,8 @@ import java.util.Set;
  **/
 public class OmniTableScanOperator extends TableScanOperator implements Serializable {
     private static final long serialVersionUID = 1L;
+
+    protected List<PrimitiveTypeInfo> needTypes;
 
     protected transient Set<String> partColumnNames;
 
@@ -102,6 +105,7 @@ public class OmniTableScanOperator extends TableScanOperator implements Serializ
                 neededFields.add(allStructFieldRefs.get(i));
             }
         }
+        needTypes = neededFields.stream().map(field -> ((PrimitiveObjectInspector) field.getFieldObjectInspector()).getTypeInfo()).collect(Collectors.toList());
         outputObjInspector = convertLazyToJavaInspector(neededFields);
         partColTypeInfos = standardStructObjectInspector.getAllStructFieldRefs().stream()
                 .filter(filed -> partColumnNames.contains(filed.getFieldName())).map(field ->
@@ -117,6 +121,10 @@ public class OmniTableScanOperator extends TableScanOperator implements Serializ
                     }
                 }).toArray(VecConverter[]::new);
         vecBatches = new VecBatch[childOperatorsArray.length];
+    }
+
+    public List<PrimitiveTypeInfo> getNeedTypes() {
+        return this.needTypes;
     }
 
     @Override
