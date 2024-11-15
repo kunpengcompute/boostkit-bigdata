@@ -93,7 +93,9 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 public class OmniParquetRecordReader
         implements RecordReader<NullWritable, VecBatchWrapper>, StatsProvidingRecordReader {
@@ -160,6 +162,10 @@ public class OmniParquetRecordReader
         this.fileSchema = fileFooter.getFileMetaData().getSchema();
         this.includedIds = ColumnProjectionUtils.getReadColumnIDs(conf);
         this.includedNames = Arrays.asList(ColumnProjectionUtils.getReadColumnNames(conf));
+        TreeMap<Integer, String> sortedIdsNames = new TreeMap<>(IntStream.range(0, includedIds.size()).boxed()
+                .collect(Collectors.toMap(includedIds::get, includedNames::get)));
+        this.includedIds = new ArrayList<>(sortedIdsNames.keySet());
+        this.includedNames = new ArrayList<>(sortedIdsNames.values());
         Map<String, String> fileMatadata = fileFooter.getFileMetaData().getKeyValueMetaData();
         MessageType schema = getRequriedSchema(this.fileSchema);
         this.fields = schema.getFields();
