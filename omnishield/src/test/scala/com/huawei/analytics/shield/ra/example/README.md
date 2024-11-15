@@ -55,7 +55,7 @@ vi base.json
 }
 
 ```
-2.5 编辑IMA度量的文并放到socket_server文件夹中
+2.5 编辑IMA度量的文件放到socket_server文件夹中
 
 计算jar包基线度量值，可通过如下指令计算
 ```
@@ -83,11 +83,11 @@ echo "60b79bd1e07f63c4c18e42929923c835e1fc1e32a0692326c086c395af9bab60
 
 ```
 放置virtcca-client所需证书 aik_cert.der，root_cert.pem，sub_cert.pem 文件到socket_server文件夹中 
-放置sorcket server所需证书 server.keystore，server.crt 文件到socket_server文件夹中 
+放置socket server所需证书 server.keystore，server.crt 文件到socket_server文件夹中 
 放置omnishield-1.0-SNAPSHOT-rats-tls-demo.jar文件到socket_server文件夹中 
 
 virtcca-client 证书参考virtcca或rats-tls相关文档获取
-sorcket server 证书需自行生成，演示demo中使用的是通过Openssl生成的自签名证书
+socket server 证书需自行生成，演示demo中使用的是通过Openssl生成的自签名证书
 ```
 
 2.7 检查socket_server文件夹中文件
@@ -143,7 +143,7 @@ mkdir rats
 ```
 3.7 放置证书到rats文件夹中
 ```
-放置sorcket client所需证书 client.keystore，client.crt 文件到rats文件夹中
+放置socket client所需证书 client.keystore，client.crt 文件到rats文件夹中
 ```
 3.8 编辑socket.properties并放到rats文件夹中
 ```
