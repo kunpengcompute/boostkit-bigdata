@@ -62,7 +62,7 @@ namespace omniruntime::reader {
     inline int SpacedExpand(T* buffer, int num_values, int null_count,
                             bool* nulls) {
         int idx_decode = num_values - null_count;
-        std::memset(static_cast<void*>(buffer + idx_decode), 0, null_count * sizeof(T));
+        memset_s(static_cast<void*>(buffer + idx_decode), null_count * sizeof(T), 0, null_count * sizeof(T));
         if (idx_decode == 0) {
             // All nulls, nothing more to do
             return num_values;
@@ -382,7 +382,7 @@ namespace omniruntime::reader {
             ::parquet::ParquetException::EofException();
         }
         if (bytes_to_decode > 0) {
-            memcpy(out, data, bytes_to_decode);
+            memcpy_s(out, bytes_to_decode, data, bytes_to_decode);
         }
         return static_cast<int>(bytes_to_decode);
     }
