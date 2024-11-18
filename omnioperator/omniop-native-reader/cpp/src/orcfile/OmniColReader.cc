@@ -261,10 +261,10 @@ namespace omniruntime::reader {
         return numValues;
     }
 
-    void OmniStructColumnReader::next(void*& omniVecBatch, uint64_t numValues, char *notNull,
+    void OmniStructColumnReader::next(void*& batch, uint64_t numValues, char *notNull,
                                       const orc::Type& baseTp, int* omniTypeId) {
-        auto vecBatch = reinterpret_cast<omniruntime::vec::VectorBatch*>(omniVecBatch);
-        nextInternal<false>(vecBatch, numValues, notNull, baseTp, omniTypeId);
+        auto vecs = reinterpret_cast<std::vector<omniruntime::vec::BaseVector*>*>(batch);
+        nextInternal<false>(*vecs, numValues, notNull, baseTp, omniTypeId);
     }
 
     void OmniStructColumnReader::nextEncoded(orc::ColumnVectorBatch& rowBatch, uint64_t numValues, char *notNull) {
@@ -280,7 +280,7 @@ namespace omniruntime::reader {
     }
 
     template<bool encoded>
-    void OmniStructColumnReader::nextInternal(omniruntime::vec::VectorBatch*& omniVecBatch, uint64_t numValues,
+    void OmniStructColumnReader::nextInternal(std::vector<omniruntime::vec::BaseVector*> &vecs, uint64_t numValues,
                                               char *notNull, const orc::Type& baseTp, int* omniTypeId) {
         bool hasNull = false;
         char nulls[numValues];
@@ -298,10 +298,10 @@ namespace omniruntime::reader {
                 if (omniTypeId == nullptr) {
                     int tempOmniTypeId = getOmniTypeByOrcType(type);
                     (*iter)->next(reinterpret_cast<void*&>(tempVec), numValues, notNull, *type, &tempOmniTypeId);
-                    omniVecBatch->Append(tempVec);
+                    vecs.push_back(tempVec);
                 } else {
                     (*iter)->next(reinterpret_cast<void*&>(tempVec), numValues, notNull, *type, &omniTypeId[i]);
-                    omniVecBatch->Append(tempVec);
+                    vecs.push_back(tempVec);
                 }
             }
         }

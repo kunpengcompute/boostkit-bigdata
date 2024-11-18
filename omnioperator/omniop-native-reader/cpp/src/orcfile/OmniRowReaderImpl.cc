@@ -174,9 +174,8 @@ namespace omniruntime::reader {
         }
     }
 
-    bool OmniRowReaderImpl::next(VectorBatch*& omniVecBatch, int* omniTypeId) {
+    uint64_t OmniRowReaderImpl::next(std::vector<omniruntime::vec::BaseVector*> *batch, int* omniTypeId, uint64_t batchLen) {
         if (currentStripe >= lastStripe) {
-            omniVecBatch->Resize(0);
             if (lastStripe > 0) {
                 previousRow = firstRowOfStripe[lastStripe - 1] +
                               footer->stripes(static_cast<int>(lastStripe - 1)).numberofrows();
@@ -189,7 +188,7 @@ namespace omniruntime::reader {
             startNextStripe();
         }
         uint64_t rowsToRead =
-                std::min(static_cast<uint64_t>(omniVecBatch->GetCapacity()),
+                std::min(batchLen,
                          rowsInCurrentStripe - currentRowInStripe);
         if (sargsApplier) {
             rowsToRead = computeBatchSize(rowsToRead,
@@ -198,19 +197,18 @@ namespace omniruntime::reader {
                                           footer->rowindexstride(),
                                           sargsApplier->getRowGroups());
         }
-        omniVecBatch->Resize(rowsToRead);
         if (rowsToRead == 0) {
             previousRow = lastStripe <= 0 ? footer->numberofrows() :
                           firstRowOfStripe[lastStripe - 1] +
                           footer->stripes(static_cast<int>(lastStripe - 1)).numberofrows();
-            return false;
+            return rowsToRead;
         }
         if (enableEncodedBlock) {
-        throw omniruntime::exception::OmniException("EXPRESSION_NOT_SUPPORT", "enableEncodedBlock is not finished!!!");
+            throw omniruntime::exception::OmniException("EXPRESSION_NOT_SUPPORT", "enableEncodedBlock is not finished!!!");
         }
         else {
             const orc::Type & baseTp = this->getSelectedType();
-            reader->next(reinterpret_cast<void*&>(omniVecBatch), rowsToRead, nullptr, baseTp, omniTypeId);
+            reader->next(reinterpret_cast<void*&>(batch), rowsToRead, nullptr, baseTp, omniTypeId);
         }
         // update row number
         previousRow = firstRowOfStripe[currentStripe] + currentRowInStripe;
@@ -235,6 +233,6 @@ namespace omniruntime::reader {
             currentStripe += 1;
             currentRowInStripe = 0;
         }
-        return rowsToRead != 0;
+        return rowsToRead;
     }
 }
