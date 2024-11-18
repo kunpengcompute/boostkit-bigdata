@@ -66,7 +66,7 @@ namespace omniruntime::reader {
          * @param omniTypeId the omniTypeId to push
          */
         template<bool encoded>
-        void nextInternal(omniruntime::vec::VectorBatch*& omniVecBatch, uint64_t numValues, char *notNull,
+        void nextInternal(std::vector<omniruntime::vec::BaseVector*> &vecs, uint64_t numValues, char *notNull,
                           const orc::Type& baseTp, int* omniTypeId);
 
         omniruntime::type::DataTypeId getOmniTypeByOrcType(const orc::Type* type);

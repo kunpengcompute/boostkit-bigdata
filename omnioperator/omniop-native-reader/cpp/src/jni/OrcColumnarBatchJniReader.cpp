@@ -349,28 +349,35 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniRea
         throw std::runtime_error("rowReaderPtr is nullptr!!!");
     }
 
-    uint64_t batchRowSize = 0;
     auto ptr = env->GetIntArrayElements(typeId, JNI_FALSE);
     if (ptr == NULL) {
         throw std::runtime_error("Types should not be null");
     }
     int32_t arrLen = (int32_t) env->GetArrayLength(typeId);
-    VectorBatch* omniVecBatch = new VectorBatch(batchLen);
+    std::vector<omniruntime::vec::BaseVector*> recordBatch;
+    try {
+        uint64_t batchRowSize = rowReaderPtr->next(&recordBatch, ptr, batchLen);
+        if (batchRowSize != 0) {
+            int32_t vecCnt = recordBatch.size();
+            if (vecCnt != arrLen) {
+                throw std::runtime_error("Types should align to root fields");
+            }
 
-    if (rowReaderPtr->next(omniVecBatch, ptr)) {
-        batchRowSize = omniVecBatch->GetRowCount();
-        int32_t vecCnt = omniVecBatch->GetVectorCount();
-        if (vecCnt != arrLen) {
-            throw std::runtime_error("Types should align to root fields");
+            for (int32_t id = 0; id < vecCnt; id++) {
+                jlong omniVec = reinterpret_cast<jlong>((recordBatch[id]));
+                env->SetLongArrayRegion(vecNativeId, id, 1, &omniVec);
+            }
+            batchRowSize = recordBatch[0]->GetSize();
         }
-
-        for (int32_t id = 0; id < vecCnt; id++) {
-            auto vec = omniVecBatch->GetVectors();
-            jlong omniVec = reinterpret_cast<jlong>((vec[id]));
-            env->SetLongArrayRegion(vecNativeId, id, 1, &omniVec);
+        return (jlong) batchRowSize;
+    } catch (const std::exception &e) {
+        for (auto vec : recordBatch) {
+            delete vec;
         }
+        recordBatch.clear();
+        env->ThrowNew(runtimeExceptionClass, e.what());
+        throw e;
     }
-    return (jlong) batchRowSize;
     JNI_FUNC_END(runtimeExceptionClass)
 }
 
@@ -461,9 +468,16 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniRea
 {
     JNI_FUNC_START
     omniruntime::reader::OmniRowReaderImpl *rowReaderPtr = (omniruntime::reader::OmniRowReaderImpl *)rowReader;
-    VectorBatch* omniVecBatch = new VectorBatch(batchLen);
-    rowReaderPtr->next(omniVecBatch, nullptr);
-    jlong rows = omniVecBatch->GetRowCount();
-    return rows;
+    std::vector<omniruntime::vec::BaseVector*> recordBatch;
+    try {
+        jlong rows = rowReaderPtr->next(&recordBatch, nullptr, batchLen);
+        return rows;
+    } catch (const std::exception &e) {
+        for (auto vec : recordBatch) {
+            delete vec;
+        }
+        recordBatch.clear();
+        env->ThrowNew(runtimeExceptionClass, e.what());
+    }
     JNI_FUNC_END(runtimeExceptionClass)
 }

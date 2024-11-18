@@ -44,10 +44,12 @@ namespace omniruntime::reader {
         {}
         /**
         * direct read VectorBatch in next
-        * @param omniVecBatch the VectorBatch to push
+        * @param batch the batch to push
         * @param omniTypeId the omniTypeId to push
+        * @param batchLen the max row count of batch
+        * @return the row size read
         */
-        bool next(omniruntime::vec::VectorBatch*& omniVecBatch, int* omniTypeId);
+        uint64_t next(std::vector<omniruntime::vec::BaseVector*> *batch, int* omniTypeId, uint64_t batchLen);
 
         void startNextStripe() override;
 
