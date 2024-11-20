@@ -59,19 +59,21 @@ protected:
         auto readerPtr = static_cast<omniruntime::reader::OmniReaderImpl*>(reader.get());
         rowReader = readerPtr->createRowReader(rowReaderOptions, julianPtr).release();
         omniruntime::reader::OmniRowReaderImpl *rowReaderPtr = (omniruntime::reader::OmniRowReaderImpl*) rowReader;
-        omniVecBatch = new omniruntime::vec::VectorBatch(4096);
-        rowReaderPtr->next(omniVecBatch, nullptr);
+        rowReaderPtr->next(&recordBatch, nullptr, 4096);
     }
 
     // run after each case...
     virtual void TearDown() override {
-        omniruntime::vec::VectorHelper::FreeVecBatch(omniVecBatch);
+        for (auto vec : recordBatch) {
+            delete vec;
+        }
+        recordBatch.clear();
         delete rowReader;
         rowReader = nullptr;
     }
 
     orc::RowReader *rowReader;
-    omniruntime::vec::VectorBatch* omniVecBatch;
+    std::vector<omniruntime::vec::BaseVector*> recordBatch;
 };
 
 TEST_F(ScanTest, test_literal_get_long)
@@ -162,7 +164,7 @@ TEST_F(ScanTest, test_literal_get_bool)
 TEST_F(ScanTest, test_correctness_intVec)
 {
     // int type, "c1"
-    auto *olbInt = (omniruntime::vec::Vector<int32_t> *)(omniVecBatch->Get(0));
+    auto *olbInt = (omniruntime::vec::Vector<int32_t> *)(recordBatch[0]);
     ASSERT_EQ(olbInt->GetValue(0), 10);
 }
 
@@ -170,7 +172,7 @@ TEST_F(ScanTest, test_correctness_varCharVec)
 {
     // varchar type, "c2"
     auto *olbVc = (omniruntime::vec::Vector<omniruntime::vec::LargeStringContainer<std::string_view>> *)(
-            omniVecBatch->Get(1));
+            recordBatch[1]);
     std::string_view actualStr = olbVc->GetValue(0);
     ASSERT_EQ(actualStr, "varchar_1");
 }
@@ -179,7 +181,7 @@ TEST_F(ScanTest, test_correctness_stringVec)
 {
     // string type, "c3"
     auto *olbStr = (omniruntime::vec::Vector<omniruntime::vec::LargeStringContainer<std::string_view>> *)(
-            omniVecBatch->Get(2));
+            recordBatch[2]);
     std::string_view actualStr = olbStr->GetValue(0);
     ASSERT_EQ(actualStr, "string_type_1");
 }
@@ -187,7 +189,7 @@ TEST_F(ScanTest, test_correctness_stringVec)
 TEST_F(ScanTest, test_correctness_longVec)
 {
     // bigint type, "c4"
-    auto *olbLong = (omniruntime::vec::Vector<int64_t> *)(omniVecBatch->Get(3));
+    auto *olbLong = (omniruntime::vec::Vector<int64_t> *)(recordBatch[3]);
     ASSERT_EQ(olbLong->GetValue(0), 10000);
 }
 
@@ -195,7 +197,7 @@ TEST_F(ScanTest, test_correctness_charVec)
 {
     // char type, "c5"
     auto *olbChar = (omniruntime::vec::Vector<omniruntime::vec::LargeStringContainer<std::string_view>> *)(
-            omniVecBatch->Get(4));
+            recordBatch[4]);
     std::string_view actualStr = olbChar->GetValue(0);
     ASSERT_EQ(actualStr, "char_1");
 }
@@ -203,21 +205,21 @@ TEST_F(ScanTest, test_correctness_charVec)
 TEST_F(ScanTest, test_correctness_doubleVec)
 {
     // double type, "c7"
-    auto *olbDouble = (omniruntime::vec::Vector<double> *)(omniVecBatch->Get(5));
+    auto *olbDouble = (omniruntime::vec::Vector<double> *)(recordBatch[5]);
     ASSERT_EQ(olbDouble->GetValue(0), 1111.1111);
 }
 
 TEST_F(ScanTest, test_correctness_booleanVec)
 {
     // boolean type, "c10"
-    auto *olbBoolean = (omniruntime::vec::Vector<bool> *)(omniVecBatch->Get(8));
+    auto *olbBoolean = (omniruntime::vec::Vector<bool> *)(recordBatch[8]);
     ASSERT_EQ(olbBoolean->GetValue(0), true);
 }
 
 TEST_F(ScanTest, test_correctness_shortVec)
 {
     // short type, "c11"
-    auto *olbShort = (omniruntime::vec::Vector<short> *)(omniVecBatch->Get(9));
+    auto *olbShort = (omniruntime::vec::Vector<short> *)(recordBatch[9]);
     ASSERT_EQ(olbShort->GetValue(0), 11);
 }
 

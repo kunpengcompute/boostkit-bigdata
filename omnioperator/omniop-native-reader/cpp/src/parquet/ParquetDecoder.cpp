@@ -86,7 +86,7 @@ namespace omniruntime::reader {
         int32_t* bytes_offsets =
               reinterpret_cast<int32_t*>(byte_array_offsets_->mutable_data());
         for (int i = 0; i < dictionary_length_; ++i) {
-            memcpy(bytes_data + offset, dict_values[i].ptr, dict_values[i].len);
+            memcpy_s(bytes_data + offset, total_size - offset, dict_values[i].ptr, dict_values[i].len);
             bytes_offsets[i] = offset;
             dict_values[i].ptr = bytes_data + offset;
             offset += dict_values[i].len;
@@ -107,7 +107,7 @@ namespace omniruntime::reader {
               /*shrink_to_fit=*/false));
         uint8_t* bytes_data = byte_array_data_->mutable_data();
         for (int32_t i = 0, offset = 0; i < dictionary_length_; ++i, offset += fixed_len) {
-            memcpy(bytes_data + offset, dict_values[i].ptr, fixed_len);
+            memcpy_s(bytes_data + offset, total_size - offset, dict_values[i].ptr, fixed_len);
             dict_values[i].ptr = bytes_data + offset;
         }
     }
