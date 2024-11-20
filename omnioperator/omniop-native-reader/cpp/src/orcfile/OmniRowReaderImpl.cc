@@ -174,7 +174,7 @@ namespace omniruntime::reader {
         }
     }
 
-    uint64_t OmniRowReaderImpl::next(std::vector<omniruntime::vec::BaseVector*> *batch, int* omniTypeId, uint64_t batchLen) {
+    uint64_t OmniRowReaderImpl::next(std::vector<omniruntime::vec::BaseVector*> *batch, int *omniTypeId, uint64_t batchLen) {
         if (currentStripe >= lastStripe) {
             if (lastStripe > 0) {
                 previousRow = firstRowOfStripe[lastStripe - 1] +

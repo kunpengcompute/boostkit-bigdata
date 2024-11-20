@@ -382,7 +382,7 @@ namespace omniruntime::reader {
             ::parquet::ParquetException::EofException();
         }
         if (bytes_to_decode > 0) {
-            memcpy_s(out, bytes_to_decode, data, bytes_to_decode);
+            memcpy_s(out, data_size, data, bytes_to_decode);
         }
         return static_cast<int>(bytes_to_decode);
     }

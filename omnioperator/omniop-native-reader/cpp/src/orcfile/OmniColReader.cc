@@ -224,7 +224,7 @@ namespace omniruntime::reader {
             if (posn + length > bufferSize) {
                 throw orc::ParseError("Corrupt dictionary blob in StringDictionaryColumn");
             }
-            memcpy_s(buffer + posn, static_cast<size_t>(length), chunk, static_cast<size_t>(length));
+            memcpy_s(buffer + posn, bufferSize - posn, chunk, static_cast<size_t>(length));
             posn += length;
         }
     }
@@ -261,7 +261,7 @@ namespace omniruntime::reader {
         return numValues;
     }
 
-    void OmniStructColumnReader::next(void*& batch, uint64_t numValues, char *notNull,
+    void OmniStructColumnReader::next(void *&batch, uint64_t numValues, char *notNull,
                                       const orc::Type& baseTp, int* omniTypeId) {
         auto vecs = reinterpret_cast<std::vector<omniruntime::vec::BaseVector*>*>(batch);
         nextInternal<false>(*vecs, numValues, notNull, baseTp, omniTypeId);
@@ -642,7 +642,7 @@ namespace omniruntime::reader {
         size_t bytesBuffered = 0;
         char ptr[totalLength];
         while (bytesBuffered + lastBufferLength < totalLength) {
-            memcpy_s(ptr + bytesBuffered, lastBufferLength, lastBuffer, lastBufferLength);
+            memcpy_s(ptr + bytesBuffered, totalLength - bytesBuffered, lastBuffer, lastBufferLength);
             bytesBuffered += lastBufferLength;
             const void* readBuffer;
             int readLength;

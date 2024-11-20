@@ -46,7 +46,7 @@ namespace omniruntime::reader {
          * @param baseTp the vectorBatch to push
          * @param omniTypeId the omniTypeId to push
          */
-        void next(void*& omniVecBatch, uint64_t numValues, char *notNull, const orc::Type& baseTp,
+        void next(void *&omniVecBatch, uint64_t numValues, char *notNull, const orc::Type& baseTp,
                   int* omniTypeId) override;
 
         void nextEncoded(orc::ColumnVectorBatch& rowBatch,

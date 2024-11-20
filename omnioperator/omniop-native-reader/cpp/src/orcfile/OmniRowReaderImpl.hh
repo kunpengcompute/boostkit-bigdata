@@ -49,7 +49,7 @@ namespace omniruntime::reader {
         * @param batchLen the max row count of batch
         * @return the row size read
         */
-        uint64_t next(std::vector<omniruntime::vec::BaseVector*> *batch, int* omniTypeId, uint64_t batchLen);
+        uint64_t next(std::vector<omniruntime::vec::BaseVector*> *batch, int *omniTypeId, uint64_t batchLen);
 
         void startNextStripe() override;
 
