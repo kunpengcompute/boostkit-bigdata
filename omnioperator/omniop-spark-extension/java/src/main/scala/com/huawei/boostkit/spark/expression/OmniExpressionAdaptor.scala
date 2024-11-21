@@ -102,7 +102,7 @@ object OmniExpressionAdaptor extends Logging {
   }
 
   private val timeFormatSet: Set[String] = Set("yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd")
-  private val timeZoneSet: Set[String] = Set("GMT+08:00", "Asia/Beijing", "Asia/Shanghai")
+  private val timeZoneSet: Set[String] = Set("GMT+08:00", "Asia/Shanghai")
 
   private def unsupportedUnixTimeFunction(timeFormat: String, timeZone: String): Unit = {
     if (!ColumnarPluginConfig.getSessionConf.enableOmniUnixTimeFunc) {
