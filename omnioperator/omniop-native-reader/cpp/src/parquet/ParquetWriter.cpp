@@ -17,31 +17,32 @@
  * limitations under the License.
  */
 
-#include "ParquetWrier.h"
-#incldue "ParquetReade.h"
-#incldue "arrow/array/array_base.h"
-#incldue "arrow/array/array_binary.h"
-#incldue "arrow/array/array_primitive.h"
-#incldue "arrow/array/data.h"
+#include "ParquetWriter.h"
+#include "ParquetReader.h"
+#include "arrow/array/array_base.h"
+#include "arrow/array/array_binary.h"
+#include "arrow/array/array_primitive.h"
+#include "arrow/array/data.h"
 #include <arrow/type.h>
 #include <arrow/array.h>
 #include <arrow/api.h>
-#incldue "arrow/util/bitmap.h"
-#incldue "arrow/chunked_array.h"
-#incldue "arrow/buffer_builder.h"
-#incldue "arrow/table.h"
-#incldue "arrowadapter/FileSystemAdpter.h"
-#incldue "common/UriInfo.h"
-#incldue "jni/jin_common.h"
-#incldue "parquet/arrow/reader.h"
-#incldue "parquet/exception.h"
-#incldue "parquet/properties.h"
+#include "arrow/util/bitmap.h"
+#include "arrow/chunked_array.h"
+#include "arrow/buffer_builder.h"
+#include "arrow/table.h"
+#include "arrowadapter/FileSystemAdapter.h"
+#include "common/UriInfo.h"
+#include "jni/jni_common.h"
+#include "parquet/arrow/reader.h"
+#include "parquet/exception.h"
+#include "parquet/properties.h"
 #include <mutex>
-#incldue <unordered_map>
-#incldue <iostream>
-#incldue <codecvt>
-#incldue <locale>
-#incldue <type/decimal_operations.h>
+#include <unordered_map>
+#include <iostream>
+#include <codecvt>
+#include <locale>
+#include <type/decimal_operations.h>
+
 
 using namespace arrow;
 using namespace arrow::internal;
@@ -53,7 +54,7 @@ static std::mutex mutex_;
 
 namespace omniruntime::writer {
 
-//    std::string GetReaderAddr(const std::string address) {
+//    std::string GetReadAddr(const std::string address) {
 //        std::string prefix =
 //            "hdfs://OmniOperator:9000/user/hive/warehouse/"
 //            "tpcds_bin_partitioned_varchar_orc_2.db/test_parquet_int";
@@ -62,13 +63,13 @@ namespace omniruntime::writer {
 //        return prefix + suffix;
 //    }
 
-    arrow::Status ParquetWrier::InitRecordWriter(UriInfo &uri, std:: &ugi) {
+    arrow::Status ParquetWriter::InitRecordWriter(UriInfo &uri, std::string &ugi) {
 
         // Configure writer settings
-        parquet:WriterProperities::Builder writer_properties;
+        parquet::WriterProperties::Builder writer_properties;
 
         //Configure Arrow-specific reader settings
-        parquet:ArrowWriterProperities::Builder arrow_writer_properties;
+        parquet::ArrowWriterProperties::Builder arrow_writer_properties;
 
         std::shared_ptr<io::OutputStream> outputStream;
 
@@ -82,7 +83,7 @@ namespace omniruntime::writer {
         }
 
     std::string path = uri.ToString();
-    ARROW_ASSIGN_OR_RAISE(ouputStream, fs->filesys_ptr->OpenOutputStream(path));
+    ARROW_ASSIGN_OR_RAISE(outputStream, fs->filesys_ptr->OpenOutputStream(path));
 
     writer_properties.disable_dictionary();
 
@@ -100,7 +101,7 @@ namespace omniruntime::writer {
     }
 
 //std::shared_ptr<arrow::Field>
-//ParquetWrier::BuildField(const std::string &name, int typeId, bool nullable) {
+//ParquetWriter::BuildField(const std::string &name, int typeId, bool nullable) {
 //    switch (typeId) {
 //        case Type::BOOL:
 //           return std::make_shared<Field>(name, std::make_shared<arrow::BooleanType>(),
@@ -156,7 +157,7 @@ std::shared_ptr<::arrow::ChunkedArray> buildBooleanChunk(DataTypeId typeId, Base
     arrow::internal::Bitmap bitmap(bitmapBuffer,0,vectorSize);
     bitmap.SetBitsTo(true);
 
-    //todo why use vector-> Hashll before setbitto will make other colums unormal
+    //todo why use vector-> Hashnull before setbitto will make other colums unnormal
 
     for (long j =startPos; j< endPos; j++) {
         values[index]=vector->GetValue(j);
@@ -181,10 +182,10 @@ std::shared_ptr<::arrow::ChunkedArray> buildBooleanChunk(DataTypeId typeId, Base
     auto arrayData = arrow::ArrayData::Make(booleanType, vectorSize, buffers);
 
     std::vector<std::shared_ptr<arrow::Array>> arrayVector;
-    auto booleanArray = std::make_shared<arrow::BooleanType>(arrayData);
+    auto booleanArray = std::make_shared<arrow::BooleanArray>(arrayData);
     arrayVector.emplace_back(booleanArray);
 
-    return arrow::ChunkedArray::Make(arrayVector, booleanType).ValueOrDie;
+    return arrow::ChunkedArray::Make(arrayVector, booleanType).ValueOrDie();
     }
 
 std::shared_ptr<::arrow::ChunkedArray> buildInt16Chunk(DataTypeId typeId, BaseVector *baseVector,
@@ -220,7 +221,7 @@ std::shared_ptr<::arrow::ChunkedArray> buildInt16Chunk(DataTypeId typeId, BaseVe
     builder.Resize(vectorSize);
     builder.Append(values, vectorSize);
     auto maybe_buffer = builder.Finish();
-    std::shared_ptr<arrow::Buffer> dataBuffer = *maybe_buffer;
+    std::shared_ptr<Buffer> dataBuffer = *maybe_buffer;
 
     std::vector<std::shared_ptr<Buffer>> buffers;
     buffers.emplace_back(bitmapBuffer);
@@ -229,11 +230,11 @@ std::shared_ptr<::arrow::ChunkedArray> buildInt16Chunk(DataTypeId typeId, BaseVe
     auto int16Type = std::make_shared<Int16Type>();
     auto arrayData = arrow::ArrayData::Make(int16Type, vectorSize, buffers);
 
-    std::vector<std::shared_ptr<arrow::Array>> arrayVector;
+    std::vector<std::shared_ptr<Array>> arrayVector;
     auto numericArray = std::make_shared<NumericArray<Int16Type>>(arrayData);
     arrayVector.emplace_back(numericArray);
 
-    return arrow::ChunkedArray::Make(arrayVector, int16Type).ValueOrDie;
+    return ChunkedArray::Make(arrayVector, int16Type).ValueOrDie();
     }
 
 std::shared_ptr<::arrow::ChunkedArray> buildInt32Chunk(DataTypeId typeId, BaseVector *baseVector,
@@ -269,7 +270,7 @@ std::shared_ptr<::arrow::ChunkedArray> buildInt32Chunk(DataTypeId typeId, BaseVe
 
     builder.Append(values, vectorSize);
     auto maybe_buffer = builder.Finish();
-    std::shared_ptr<arrow::Buffer> dataBuffer = *maybe_buffer;
+    std::shared_ptr<Buffer> dataBuffer = *maybe_buffer;
 
     std::vector<std::shared_ptr<Buffer>> buffers;
 
@@ -279,14 +280,14 @@ std::shared_ptr<::arrow::ChunkedArray> buildInt32Chunk(DataTypeId typeId, BaseVe
     auto int32Type = std::make_shared<Int32Type>();
     auto arrayData = arrow::ArrayData::Make(int32Type, vectorSize, buffers);
 
-    std::vector<std::shared_ptr<arrow::Array>> arrayVector;
+    std::vector<std::shared_ptr<Array>> arrayVector;
     auto numericArray = std::make_shared<NumericArray<Int32Type>>(arrayData);
     arrayVector.emplace_back(numericArray);
 
-    return arrow::ChunkedArray::Make(arrayVector, int32Type).ValueOrDie;
+    return ChunkedArray::Make(arrayVector, int32Type).ValueOrDie();
     }
 
-std::shared_ptr<arrow::ChunkedArray> buildInt64Chunk(DataTypeId typeId, BaseVector *baseVector,
+std::shared_ptr<::arrow::ChunkedArray> buildInt64Chunk(DataTypeId typeId, BaseVector *baseVector,
                                                        bool isSplitWrite = false, long startPos = 0,
                                                        long endPos = 0) {
     using T = typename NativeType<OMNI_LONG>::type;
@@ -320,7 +321,7 @@ std::shared_ptr<arrow::ChunkedArray> buildInt64Chunk(DataTypeId typeId, BaseVect
 
     builder.Append(values, vectorSize);
     auto maybe_buffer = builder.Finish();
-    std::shared_ptr<arrow::Buffer> dataBuffer = *maybe_buffer;
+    std::shared_ptr<Buffer> dataBuffer = *maybe_buffer;
 
     std::vector<std::shared_ptr<Buffer>> buffers;
 
@@ -330,14 +331,14 @@ std::shared_ptr<arrow::ChunkedArray> buildInt64Chunk(DataTypeId typeId, BaseVect
     auto int64Type = std::make_shared<Int64Type>();
     auto arrayData = arrow::ArrayData::Make(int64Type, vectorSize, buffers);
 
-    std::vector<std::shared_ptr<arrow::Array>> arrayVector;
+    std::vector<std::shared_ptr<Array>> arrayVector;
     auto numericArray = std::make_shared<NumericArray<Int64Type>>(arrayData);
     arrayVector.emplace_back(numericArray);
 
-    return arrow::ChunkedArray::Make(arrayVector, int64Type).ValueOrDie;
+    return ChunkedArray::Make(arrayVector, int64Type).ValueOrDie();
     }
 
-std::shared_ptr<arrow::ChunkedArray> buildDate32Chunk(DataTypeId typeId, BaseVector *baseVector,
+std::shared_ptr<ChunkedArray> buildDate32Chunk(DataTypeId typeId, BaseVector *baseVector,
                                                        bool isSplitWrite = false, long startPos = 0,
                                                        long endPos = 0) {
     using T = typename NativeType<OMNI_DATE32>::type;
@@ -371,26 +372,26 @@ std::shared_ptr<arrow::ChunkedArray> buildDate32Chunk(DataTypeId typeId, BaseVec
 
     builder.Append(values, vectorSize);
     auto maybe_buffer = builder.Finish();
-    std::shared_ptr<arrow::Buffer> dataBuffer = *maybe_buffer;
+    std::shared_ptr<Buffer> dataBuffer = *maybe_buffer;
 
     std::vector<std::shared_ptr<Buffer>> buffers;
 
     buffers.emplace_back(bitmapBuffer);
     buffers.emplace_back(dataBuffer);
 
-    auto date32Type = std::make_shared<Date32Type>();
+    auto date32Type = std::make_shared<arrow::Date32Type>();
     auto arrayData = arrow::ArrayData::Make(date32Type, vectorSize, buffers);
 
     //todo Array or arrow::Array
-    std::vector<std::shared_ptr<arrow::Array>> arrayVector;
-    auto date32Array = std::make_shared<NumericArray<Date32Type>>(arrayData);
+    std::vector<std::shared_ptr<Array>> arrayVector;
+    auto date32Array = std::make_shared<NumericArray<arrow::Date32Type>>(arrayData);
     arrayVector.emplace_back(date32Array);
 
-    return arrow::ChunkedArray::Make(arrayVector, int16Type).ValueOrDie;
+    return ChunkedArray::Make(arrayVector, date32Type).ValueOrDie();
     }
 
 
-std::shared_ptr<arrow::ChunkedArray> buildDate64Chunk(DataTypeId typeId, BaseVector *baseVector,
+std::shared_ptr<ChunkedArray> buildDate64Chunk(DataTypeId typeId, BaseVector *baseVector,
                                                        bool isSplitWrite = false, long startPos = 0,
                                                        long endPos = 0) {
     using T = typename NativeType<OMNI_DATE64>::type;
@@ -422,7 +423,7 @@ std::shared_ptr<arrow::ChunkedArray> buildDate64Chunk(DataTypeId typeId, BaseVec
     builder.Resize(vectorSize);
     builder.Append(values, vectorSize);
     auto maybe_buffer = builder.Finish();
-    std::shared_ptr<arrow::Buffer> dataBuffer = *maybe_buffer;
+    std::shared_ptr<Buffer> dataBuffer = *maybe_buffer;
 
     std::vector<std::shared_ptr<Buffer>> buffers;
     buffers.emplace_back(bitmapBuffer);
@@ -431,11 +432,11 @@ std::shared_ptr<arrow::ChunkedArray> buildDate64Chunk(DataTypeId typeId, BaseVec
     auto date64Type = std::make_shared<arrow::Date64Type>();
     auto arrayData = arrow::ArrayData::Make(date64Type, vectorSize, buffers);
 
-    std::vector<std::shared_ptr<arrow::Array>> arrayVector;
+    std::vector<std::shared_ptr<Array>> arrayVector;
     auto date64Array = std::make_shared<NumericArray<arrow::Date64Type>>(arrayData);
     arrayVector.emplace_back(date64Array);
 
-    return arrow::ChunkedArray::Make(arrayVector, date64Type).ValueOrDie;
+    return ChunkedArray::Make(arrayVector, date64Type).ValueOrDie();
     }
 
 std::shared_ptr<arrow::ChunkedArray> buildDoubleChunk(DataTypeId typeId, BaseVector *baseVector,
@@ -471,7 +472,7 @@ std::shared_ptr<arrow::ChunkedArray> buildDoubleChunk(DataTypeId typeId, BaseVec
 
     builder.Append(values, vectorSize);
     auto maybe_buffer = builder.Finish();
-    std::shared_ptr<arrow::Buffer> dataBuffer = *maybe_buffer;
+    std::shared_ptr<Buffer> dataBuffer = *maybe_buffer;
 
     std::vector<std::shared_ptr<Buffer>> buffers;
     buffers.emplace_back(bitmapBuffer);
@@ -480,14 +481,14 @@ std::shared_ptr<arrow::ChunkedArray> buildDoubleChunk(DataTypeId typeId, BaseVec
     auto doubleType = std::make_shared<arrow::DoubleType>();
     auto arrayData = arrow::ArrayData::Make(doubleType, vectorSize, buffers);
 
-    std::vector<std::shared_ptr<arrow::Array>> arrayVector;
+    std::vector<std::shared_ptr<Array>> arrayVector;
     auto doubleArray = std::make_shared<NumericArray<arrow::DoubleType>>(arrayData);
     arrayVector.emplace_back(doubleArray);
 
-    return arrow::ChunkedArray::Make(arrayVector, doubleType).ValueOrDie;
+    return ChunkedArray::Make(arrayVector, doubleType).ValueOrDie();
     }
 
-std::shared_ptr<arrow::ChunkedArray> buildVarcharChunk(DataTypeId typeId, BaseVector *baseVector,
+std::shared_ptr<ChunkedArray> buildVarcharChunk(DataTypeId typeId, BaseVector* baseVector,
                                                        bool isSplitWrite = false, long startPos = 0,
                                                        long endPos = 0) {
     auto vector = dynamic_cast<Vector<LargeStringContainer<std::string_view>> *>(baseVector);
@@ -505,7 +506,7 @@ std::shared_ptr<arrow::ChunkedArray> buildVarcharChunk(DataTypeId typeId, BaseVe
 
     TypedBufferBuilder<int32_t> offsetsBuilder;
     TypedBufferBuilder<char> valuesBuilder;
-    int32_t currentOffset = 0;
+    int32_t current_offset = 0;
     offsetsBuilder.Append(0);
     valuesBuilder.Resize(vectorSize);
 
@@ -538,11 +539,11 @@ std::shared_ptr<arrow::ChunkedArray> buildVarcharChunk(DataTypeId typeId, BaseVe
     auto utf8Type = std::make_shared<arrow::StringType>();
     auto arrayData = arrow::ArrayData::Make(utf8Type, vectorSize, buffers);
 
-    std::vector<std::shared_ptr<arrow::Array>> arrayVector;
+    std::vector<std::shared_ptr<Array>> arrayVector;
     auto stringArray = std::make_shared<StringArray>(arrayData);
     arrayVector.emplace_back(stringArray);
 
-    return arrow::ChunkedArray::Make(arrayVector, utf8Type).ValueOrDie;
+    return ChunkedArray::Make(arrayVector, utf8Type).ValueOrDie();
     }
 
 //arrow parquet don't have Decimal64 Type ,use Decimal128 instead of it
@@ -579,7 +580,7 @@ std::shared_ptr<arrow::ChunkedArray> buildDecimal64Chunk(DataTypeId typeId, Base
 
     builder.Append(decimalArray.data(), decimalArray.size()*16);
     auto maybe_buffer = builder.Finish();
-    std::shared_ptr<arrow::Buffer> dataBuffer = *maybe_buffer;
+    std::shared_ptr<Buffer> dataBuffer = *maybe_buffer;
 
     std::vector<std::shared_ptr<Buffer>> buffers;
     buffers.emplace_back(bitmapBuffer);
@@ -588,15 +589,15 @@ std::shared_ptr<arrow::ChunkedArray> buildDecimal64Chunk(DataTypeId typeId, Base
     auto decimal128Type = std::make_shared<arrow::Decimal128Type>(precision,scale);
     auto arrayData = arrow::ArrayData::Make(Decimal128Type, vectorSize, buffers);
 
-    std::vector<std::shared_ptr<arrow::Array>> arrayVector;
+    std::vector<std::shared_ptr<Array>> arrayVector;
     auto decimal128Array = std::make_shared<Decimal128Array>(arrayData);
     arrayVector.emplace_back(decimal128Array);
 
-    return arrow::ChunkedArray::Make(arrayVector, decimal128Type).ValueOrDie;
+    return ChunkedArray::Make(arrayVector, decimal128Type).ValueOrDie();
     }
 
 
-std::shared_ptr<arrow::ChunkedArray> buildDecimal128Chunk(DataTypeId typeId, BaseVector *baseVector, int precision, int scale,
+std::shared_ptr<ChunkedArray> buildDecimal128Chunk(DataTypeId typeId, BaseVector *baseVector, int precision, int scale,
                                                        bool isSplitWrite = false, long startPos = 0,
                                                        long endPos = 0) {
     using T = typename NativeType<OMNI_DECIMAL128>::type;
@@ -631,7 +632,7 @@ std::shared_ptr<arrow::ChunkedArray> buildDecimal128Chunk(DataTypeId typeId, Bas
 
     builder.Append(decimalArray.data(), decimalArray.size()*16);
     auto maybe_buffer = builder.Finish();
-    std::shared_ptr<arrow::Buffer> dataBuffer = *maybe_buffer;
+    std::shared_ptr<Buffer> dataBuffer = *maybe_buffer;
 
     std::vector<std::shared_ptr<Buffer>> buffers;
     buffers.emplace_back(bitmapBuffer);
@@ -640,20 +641,23 @@ std::shared_ptr<arrow::ChunkedArray> buildDecimal128Chunk(DataTypeId typeId, Bas
     auto decimal128Type = std::make_shared<arrow::Decimal128Type>(precision,scale);
     auto arrayData = arrow::ArrayData::Make(Decimal128Type, vectorSize, buffers);
 
-    std::vector<std::shared_ptr<arrow::Array>> arrayVector;
+    std::vector<std::shared_ptr<Array>> arrayVector;
     auto decimal128Array = std::make_shared<Decimal128Array>(arrayData);
     arrayVector.emplace_back(decimal128Array);
 
-    return arrow::ChunkedArray::Make(arrayVector, decimal128Type).ValueOrDie;
+    return ChunkedArray::Make(arrayVector, decimal128Type).ValueOrDie();
     }
 
-void ParquetWrier::write(long * vecNativeId, Int colNums,
+void ParquetWriter::write(long * vecNativeId, Int colNums,
                          const int *omniTypes,
                          const unsigned char *dataColumnsIds,
                          bool isSplitWrite, long startPos, long endPos) {
     std::vector<std::shared_ptr<::arrow::ChunkedArray>> chunks;
+    int decimalIndex = 0;
+    int precision = 0;
+    int scale =0 ;
     for (int i = 0; i < colNums; ++i) {
-       if (!dataColumsIds[i]) {
+       if (!dataColumnsIds[i]) {
            continue;
        }
 
@@ -685,21 +689,27 @@ void ParquetWrier::write(long * vecNativeId, Int colNums,
             chunks.emplace_back(buildVARCHARChunk(typeId, vec, isSplitWrite, startPos, endPos));
             break;
         case OMNI_DECIMAL64:
+            precision = precisions[decimalIndex];
+            scale = scales[decimalIndex];
             chunks.emplace_back(buildDECIMAL64Chunk(typeId, vec, precision, scale, isSplitWrite, startPos, endPos));
+            decimalIndex++;
             break;
         case OMNI_DECIMAL128:
+            precision = precisions[decimalIndex];
+            scale = scales[decimalIndex];
             chunks.emplace_back(buildDECIMAL128Chunk(typeId, vec, precision, scale, isSplitWrite, startPos, endPos));
+            decimalIndex++;
             break;
         default:
             throw std::runtime_error(
-                "Native columnar write not support for this type: " + typedId)
+                "Native columnar write not support for this type: " + typeId);
 
         }
     }
-     auto numRows = (chunks,empty() ? 0 : chunks[0]->length());
+     auto numRows = (chunks.empty() ? 0 : chunks[0]->length());
 
      auto table = arrow::Table::Make(schema_, std::move(chunks), numRows);
-     PARQUET_THROW_NOT_OK(arrow_writer->WriterTable(*table));
+     PARQUET_THROW_NOT_OK(arrow_writer->WriteTable(*table));
      PARQUET_THROW_NOT_OK(arrow_writer->Close());
 }
 

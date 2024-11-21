@@ -38,7 +38,7 @@ class OmniParquetOutputWriter(path: String, dataSchema: StructType,
   val writer = new ParquetColumnarBatchWriter()
   var omniTypes: Array[Int] = new Array[Int](0)
   var dataColumnsIds: Array[Boolean] = new Array[Boolean](0)
-  var allOmniTypes: Array[int] new Array[Int](0)
+  var allOmniTypes: Array[int] = new Array[Int](0)
 
   def initialize(allColumns: Seq[Attribute], dataColumns: Seq[Attribute]): Unit = {
     val filePath = new Path(path)

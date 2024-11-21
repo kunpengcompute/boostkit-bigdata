@@ -23,27 +23,28 @@
 #endif // NATIVE_READER_PARQUETWRITER_H
 
 #include <vector/vector_common.h>
-#incldue <arrow/filesystem/filesystem.h>
+#include <arrow/filesystem/filesystem.h>
 #include "common/UriInfo.h"
-#include "parquet/arrow/writer"
+#include "parquet/arrow/writer.h"
 
 using namespace arrow::internal;
  
 namespace omniruntime::writer {
 class ParquetWriter {
-pubilc:
+public:
 	ParquetWriter() {}
 	
 	arrow::Status InitRecordWriter(UriInfo &uri, std::string &ugi)
 	std::share_ptr<arrow::Field> BuildField(const std::string& name, int typeId, bool nullable)
-	void write(long *vetNativeId, int colNums, const int *omniTypes, const unsigned char *dataColumnsIds,
-					bool isSplitWrite = false, long starPos = 0, long endPos = 0);
+	void write(long *vecNativeId, int colNums, const int *omniTypes, const unsigned char *dataColumnsIds,
+					bool isSplitWrite = false, long starPos = 0,
+					long endPos = 0);
 	void write();
 
-pubilc:
+public:
 	std::unique_ptr<parquet::arrow::FileWriter> arrow_writer;
 	std::shared_ptr<arrow::Schema> schema_;
-	int precision;
-	int scale;
+	std::vector<int> precisions;
+	std::vector<int> scales;
 	};
 }

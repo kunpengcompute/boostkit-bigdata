@@ -43,11 +43,11 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_write_jni_ParquetColumnarBatchJ
 JNIEXPORT void JNICALL Java_com_huawei_boostkit_write_jni_ParquetColumnarBatchJniWriter_initializeSchema
         (JNIEnv* env, jobject jObj, long writer, jobjectArray filedNames, jintArray fieldTypes, jbooleanArray nullables, jobjectArray decimalParam);
 
-JNIEXPORT void JNICALL Java_com_huawei_boostkit_write_jni_ParquetColumnarBatchJniWriter_initializeSchema_write(
+JNIEXPORT void JNICALL Java_com_huawei_boostkit_write_jni_ParquetColumnarBatchJniWriter_write(
     JNIEnv* env,jobject jObj, jlong writer, jlongArray vecNativeId,
     jintArray omniTypes, jbooleanArray dataColumnsIds, jint numRows);
 
-JNIEXPORT void JNICALL Java_com_huawei_boostkit_write_jni_ParquetColumnarBatchJniWriter_initializeSchema_splitWrite(
+JNIEXPORT void JNICALL Java_com_huawei_boostkit_write_jni_ParquetColumnarBatchJniWriter_splitWrite(
         JNIEnv* env,jobject jObj, jlong writer, jlongArray vecNativeId, jintArray omniTypes, jbooleanArray dataColumnsIds
         jlong startPos, jlong endPos);
 

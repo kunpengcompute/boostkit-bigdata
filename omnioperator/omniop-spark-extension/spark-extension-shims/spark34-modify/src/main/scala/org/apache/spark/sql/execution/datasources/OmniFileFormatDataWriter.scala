@@ -157,9 +157,6 @@ abstract class OmniBaseDynamicPartitionDataWriter(
     row => proj(row).getInt(0)
   }
 
-  /** Returns the data columns to be written given an input row */
-  protected val getOutputRow =
-    UnsafeProjection.create(description.dataColumns, description.allColumns)
 
   protected def getPartitionPath(partitionValues: Option[InternalRow],
                                  bucketId: Option[Int]): String = {
@@ -189,6 +186,10 @@ abstract class OmniBaseDynamicPartitionDataWriter(
     }
     currentPath
   }
+
+  /** Returns the data columns to be written given an input row */
+  protected val getOutputRow =
+    UnsafeProjection.create(description.dataColumns, description.allColumns)
 
   /**
    * Opens a new OutputWriter given a partition key and/or a bucket id.
@@ -282,14 +283,14 @@ abstract class OmniBaseDynamicPartitionDataWriter(
     //  a abstract interface named OmniOutPutWriter
     currentWriter match {
               case _: OmniParquetOutputWriter =>
-                      currentWriter.asInstanceOf[OmniParquetOutputWriter]
-                        .initialize(description.allColumns, description.dataColumns)
+                      assert(currentWriter.asInstanceOf[OmniParquetOutputWriter])
+                      currentWriter.asInstanceOf[OmniParquetOutputWriter].splitWriter(record,startPos,endPos)
               case _: OmniOrcOutputWriter =>
+                      assert(currentWriter.asInstanceOf[OmniOrcOutputWriter]).splitWriter(record,startPos,endPos)
                       currentWriter.asInstanceOf[OmniOrcOutputWriter]
-                        .initialize(description.allColumns, description.dataColumns)
               case _ =>
                 throw new UnsupportedOperationException
-                (s"Unsupported ${currentWriter.getClass} Output writer!")
+                (s"writeRecord Unsupported ${currentWriter.getClass} Output writer!")
     }
 
     statsTrackers.foreach(_.newRow(currentWriter.path, record))
