@@ -97,7 +97,7 @@ public class ParquetColumnarBatchScanReader {
         return allFieldsNames;
     }
 
-    public int next(List<DataType> types, Vec[] vecList, boolean[] missingColumns) {
+    public int next(List<DataType> allTypes, List<DataType> realTypes, Vec[] vecList, boolean[] missingColumns) {
         int vectorCnt = missingColumns.length;
         long[] vecNativeIds = new long[vectorCnt];
         long rtn = jniReader.recordReaderNext(parquetReader, vecNativeIds);
@@ -109,10 +109,10 @@ public class ParquetColumnarBatchScanReader {
         int rowCount = (int) rtn;
         for (int i = 0; i < vectorCnt; i++) {
             if (missingColumns[i]) {
-                vecList[i] = getNullVec(types.get(i).getId(), rowCount);
+                vecList[i] = getNullVec(allTypes.get(i).getId(), rowCount);
                 continue;
             }
-            DataType type = types.get(i);
+            DataType type = realTypes.get(nativeGetId);
             if (type instanceof LongDataType) {
                 vecList[i] = new LongVec(vecNativeIds[nativeGetId]);
             } else if (type instanceof BooleanDataType) {
