@@ -34,8 +34,8 @@ class ParquetWriter {
 public:
 	ParquetWriter() {}
 	
-	arrow::Status InitRecordWriter(UriInfo &uri, std::string &ugi)
-	std::share_ptr<arrow::Field> BuildField(const std::string& name, int typeId, bool nullable)
+	arrow::Status InitRecordWriter(UriInfo &uri, std::string &ugi);
+	std::shared_ptr<arrow::Field> BuildField(const std::string& name, int typeId, bool nullable);
 	void write(long *vecNativeId, int colNums, const int *omniTypes, const unsigned char *dataColumnsIds,
 					bool isSplitWrite = false, long starPos = 0,
 					long endPos = 0);

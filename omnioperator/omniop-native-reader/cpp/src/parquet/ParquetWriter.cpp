@@ -41,7 +41,7 @@
 #include <iostream>
 #include <codecvt>
 #include <locale>
-#include <type/decimal_operations.h>
+
 
 
 using namespace arrow;
@@ -587,7 +587,7 @@ std::shared_ptr<arrow::ChunkedArray> buildDecimal64Chunk(DataTypeId typeId, Base
     buffers.emplace_back(dataBuffer);
 
     auto decimal128Type = std::make_shared<arrow::Decimal128Type>(precision,scale);
-    auto arrayData = arrow::ArrayData::Make(Decimal128Type, vectorSize, buffers);
+    auto arrayData = arrow::ArrayData::Make(decimal128Type, vectorSize, buffers);
 
     std::vector<std::shared_ptr<Array>> arrayVector;
     auto decimal128Array = std::make_shared<Decimal128Array>(arrayData);
@@ -619,7 +619,7 @@ std::shared_ptr<ChunkedArray> buildDecimal128Chunk(DataTypeId typeId, BaseVector
 
     long index=0;
     for (long j =startPos; j< endPos; j++) {
-        auto decimalValue=vector->GetValue(j)
+        auto decimalValue=vector->GetValue(j);
         BasicDecimal128 basicDecimal128(vector->GetValue(j).HighBits(),vector->GetValue(j).LowBits());
         decimalArray.emplace_back(BasicDecimal128(basicDecimal128));
 
@@ -639,7 +639,7 @@ std::shared_ptr<ChunkedArray> buildDecimal128Chunk(DataTypeId typeId, BaseVector
     buffers.emplace_back(dataBuffer);
 
     auto decimal128Type = std::make_shared<arrow::Decimal128Type>(precision,scale);
-    auto arrayData = arrow::ArrayData::Make(Decimal128Type, vectorSize, buffers);
+    auto arrayData = arrow::ArrayData::Make(decimal128Type, vectorSize, buffers);
 
     std::vector<std::shared_ptr<Array>> arrayVector;
     auto decimal128Array = std::make_shared<Decimal128Array>(arrayData);
@@ -648,7 +648,7 @@ std::shared_ptr<ChunkedArray> buildDecimal128Chunk(DataTypeId typeId, BaseVector
     return ChunkedArray::Make(arrayVector, decimal128Type).ValueOrDie();
     }
 
-void ParquetWriter::write(long * vecNativeId, Int colNums,
+void ParquetWriter::write(long * vecNativeId, int colNums,
                          const int *omniTypes,
                          const unsigned char *dataColumnsIds,
                          bool isSplitWrite, long startPos, long endPos) {
@@ -677,27 +677,27 @@ void ParquetWriter::write(long * vecNativeId, Int colNums,
             chunks.emplace_back(buildInt64Chunk(typeId, vec, isSplitWrite, startPos, endPos));
             break;
         case OMNI_DATE32:
-            chunks.emplace_back(buildDATE32Chunk(typeId, vec, isSplitWrite, startPos, endPos));
+            chunks.emplace_back(buildDate32Chunk(typeId, vec, isSplitWrite, startPos, endPos));
             break;
         case OMNI_DATE64:
-            chunks.emplace_back(buildDATE64Chunk(typeId, vec, isSplitWrite, startPos, endPos));
+            chunks.emplace_back(buildDate64Chunk(typeId, vec, isSplitWrite, startPos, endPos));
             break;
         case OMNI_DOUBLE:
-            chunks.emplace_back(buildDOUBLEChunk(typeId, vec, isSplitWrite, startPos, endPos));
+            chunks.emplace_back(buildDoubleChunk(typeId, vec, isSplitWrite, startPos, endPos));
             break;
         case OMNI_VARCHAR:
-            chunks.emplace_back(buildVARCHARChunk(typeId, vec, isSplitWrite, startPos, endPos));
+            chunks.emplace_back(buildVarcharChunk(typeId, vec, isSplitWrite, startPos, endPos));
             break;
         case OMNI_DECIMAL64:
             precision = precisions[decimalIndex];
             scale = scales[decimalIndex];
-            chunks.emplace_back(buildDECIMAL64Chunk(typeId, vec, precision, scale, isSplitWrite, startPos, endPos));
+            chunks.emplace_back(buildDecimal64Chunk(typeId, vec, precision, scale, isSplitWrite, startPos, endPos));
             decimalIndex++;
             break;
         case OMNI_DECIMAL128:
             precision = precisions[decimalIndex];
             scale = scales[decimalIndex];
-            chunks.emplace_back(buildDECIMAL128Chunk(typeId, vec, precision, scale, isSplitWrite, startPos, endPos));
+            chunks.emplace_back(buildDecimal128Chunk(typeId, vec, precision, scale, isSplitWrite, startPos, endPos));
             decimalIndex++;
             break;
         default:

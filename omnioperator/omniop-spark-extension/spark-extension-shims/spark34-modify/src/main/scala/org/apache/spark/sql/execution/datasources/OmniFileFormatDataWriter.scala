@@ -283,11 +283,11 @@ abstract class OmniBaseDynamicPartitionDataWriter(
     //  a abstract interface named OmniOutPutWriter
     currentWriter match {
               case _: OmniParquetOutputWriter =>
-                      assert(currentWriter.asInstanceOf[OmniParquetOutputWriter])
-                      currentWriter.asInstanceOf[OmniParquetOutputWriter].splitWriter(record,startPos,endPos)
+                      assert(currentWriter.isInstanceOf[OmniParquetOutputWriter])
+                      currentWriter.asInstanceOf[OmniParquetOutputWriter].spiltWrite(record,startPos,endPos)
               case _: OmniOrcOutputWriter =>
-                      assert(currentWriter.asInstanceOf[OmniOrcOutputWriter]).splitWriter(record,startPos,endPos)
-                      currentWriter.asInstanceOf[OmniOrcOutputWriter]
+                      assert(currentWriter.isInstanceOf[OmniOrcOutputWriter])
+                      currentWriter.asInstanceOf[OmniOrcOutputWriter].spiltWrite(record,startPos,endPos)
               case _ =>
                 throw new UnsupportedOperationException
                 (s"writeRecord Unsupported ${currentWriter.getClass} Output writer!")

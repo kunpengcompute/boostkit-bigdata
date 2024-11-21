@@ -45,7 +45,6 @@ import org.apache.spark.sql.types.StructType;
 import org.apache.spark.sql.types.VarcharType;
 import org.apache.spark.sql.vectorized.ColumnarBatch;
 import org.json.JSONObject;
-import org.apache.spark.sql.catalyst.util.RebaseDateTime;
 
 import java.io.IOException;
 import java.net.URI;

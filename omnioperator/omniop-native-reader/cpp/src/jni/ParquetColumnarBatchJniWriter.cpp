@@ -79,7 +79,7 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_write_jni_ParquetColumnarBatchJ
 }
 
 JNIEXPORT void JNICALL Java_com_huawei_boostkit_write_jni_ParquetColumnarBatchJniWriter_initializeSchema
-        (JNIEnv* env, jobject JObj, long writer, jobjectArray fileNames, jintArray fieldTypes, jbooleanArray nullables, jobjectArray decimalParam){
+        (JNIEnv* env, jobject JObj, long writer, jobjectArray fieldNames, jintArray fieldTypes, jbooleanArray nullables, jobjectArray decimalParam){
         if (pWriter == nullptr) {
             pWriter = new ParquetWriter();
         }
@@ -94,17 +94,17 @@ JNIEXPORT void JNICALL Java_com_huawei_boostkit_write_jni_ParquetColumnarBatchJn
         FieldVector fieldVector;
         for (int i =0 ;i < schemeLength; i++) {
             jint  parquetType = fieldTypesPtr[i];
-            jboolean nullable = nullablesPtr[i]
+            jboolean nullable = nullablesPtr[i];
             jstring fieldName = (jstring)env->GetObjectArrayElement(fieldNames,i);
             const char *cFieldName = env->GetStringUTFChars(fieldName, nullptr);
             std::shared_ptr<DataType> writeParquetType;
-            if (static_cast<Type::type>(parquetType) == Type::type DECIMAL) {
+            if (static_cast<Type::type>(parquetType) == Type::type::DECIMAL) {
                 auto decimalParamArray = (jintArray)env->GetObjectArrayElement(decimalParam, i);
                 auto decimalParamArrayPtr = env->GetIntArrayElements(decimalParamArray,JNI_FALSE);
                 auto precision = decimalParamArrayPtr[DECIMAL_PRECISION_INDEX];
-                pWriter->precision=decimalParamArrayPtr[DECIMAL_PRECISION_INDEX];
+                pWriter->precisions.push_back(precision);
                 auto scale = decimalParamArrayPtr[DECIMAL_SCALE_INDEX];
-                pWriter->scale = decimalParamArrayPtr[DECIMAL_SCALE_INDEX];
+                pWriter->scales.push_back(scale);
                 writeParquetType = decimal128(precision, scale);
             } else {
                 switch(static_cast<Type::type>(parquetType)) {
@@ -158,12 +158,12 @@ Java_com_huawei_boostkit_write_jni_ParquetColumnarBatchJniWriter_write(
    auto dataColumnsIdsPtr = env->GetBooleanArrayElements(dataColumnsIds, JNI_FALSE);
    pWriter->write(vecNativeIdPtr, colNums, omniTypesPtr, dataColumnsIdsPtr);
 
-   JNI_FUNC_END(runtimeExceptionClass)
+   JNI_FUNC_END_VOID(runtimeExceptionClass)
 
     }
 
 JNIEXPORT void JNICALL Java_com_huawei_boostkit_write_jni_ParquetColumnarBatchJniWriter_splitWrite(
-        JNIEnv* env,jobject jObj, jlong writer, jlongArray vecNativeId, jintArray omniTypes, jbooleanArray dataColumnsIds
+        JNIEnv* env,jobject jObj, jlong writer, jlongArray vecNativeId, jintArray omniTypes, jbooleanArray dataColumnsIds,
         jlong startPos, jlong endPos) {
     JNI_FUNC_START
     auto vecNativeIdPtr = env->GetLongArrayElements(vecNativeId, JNI_FALSE);

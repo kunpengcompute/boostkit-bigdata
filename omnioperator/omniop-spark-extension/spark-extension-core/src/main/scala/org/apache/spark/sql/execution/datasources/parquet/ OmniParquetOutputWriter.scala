@@ -25,7 +25,7 @@ import org.apache.hadoop.security.UserGroupInformation
 import org.apache.parquet.hadoop.ParquetOutputFormat
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.Attribute
-import org.apache.spark.sql.execution.datasources.{OmniFakeRow, OutputWriter}
+import org.apache.spark.sql.execution.datasources.{OmniInternalRow, OutputWriter}
 import org.apache.spark.sql.types.StructType
 
 import java.net.URI
@@ -38,7 +38,7 @@ class OmniParquetOutputWriter(path: String, dataSchema: StructType,
   val writer = new ParquetColumnarBatchWriter()
   var omniTypes: Array[Int] = new Array[Int](0)
   var dataColumnsIds: Array[Boolean] = new Array[Boolean](0)
-  var allOmniTypes: Array[int] = new Array[Int](0)
+  var allOmniTypes: Array[Int] = new Array[Int](0)
 
   def initialize(allColumns: Seq[Attribute], dataColumns: Seq[Attribute]): Unit = {
     val filePath = new Path(path)
@@ -58,7 +58,7 @@ class OmniParquetOutputWriter(path: String, dataSchema: StructType,
 
   override def write(row: InternalRow): Unit = {
     assert(row.isInstanceOf[OmniInternalRow])
-    writer.write(omniTypes, dataColumnsIds, row.asInstanceOf[OmniFakeRow].batch)
+    writer.write(omniTypes, dataColumnsIds, row.asInstanceOf[OmniInternalRow].batch)
   }
 
   def spiltWrite(row: InternalRow, startPos: Long, endPos: Long): Unit = {
