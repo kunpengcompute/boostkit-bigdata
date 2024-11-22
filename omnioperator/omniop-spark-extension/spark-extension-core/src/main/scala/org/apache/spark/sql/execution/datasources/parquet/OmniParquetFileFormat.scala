@@ -36,7 +36,7 @@ import org.apache.spark.util.SerializableConfiguration
 import org.apache.parquet.format.converter.ParquetMetadataConverter.SKIP_ROW_GROUPS
 
 import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
-import org.apache.parquet.hadoop.{ParquetOutputCommitter,ParquetOutputFormat}
+import org.apache.parquet.hadoop.{ParquetOutputCommitter, ParquetOutputFormat}
 import org.apache.parquet.hadoop.codec.CodecConfig
 import org.apache.parquet.hadoop.ParquetOutputFormat.JobSummaryLevel
 import org.apache.spark.sql.internal.SQLConf
@@ -144,20 +144,20 @@ class OmniParquetFileFormat extends FileFormat with DataSourceRegister with Logg
   }
 
   override def inferSchema(
-      sparkSession: SparkSession,
-      parameters: Map[String, String],
-      files: Seq[FileStatus]): Option[StructType] = {
+                            sparkSession: SparkSession,
+                            parameters: Map[String, String],
+                            files: Seq[FileStatus]): Option[StructType] = {
     ParquetUtils.inferSchema(sparkSession, parameters, files)
   }
 
   override def buildReaderWithPartitionValues(
-      sparkSession: SparkSession,
-      dataSchema: StructType,
-      partitionSchema: StructType,
-      requiredSchema: StructType,
-      filters: Seq[Filter],
-      options: Map[String, String],
-      hadoopConf: Configuration): (PartitionedFile) => Iterator[InternalRow] = {
+                                               sparkSession: SparkSession,
+                                               dataSchema: StructType,
+                                               partitionSchema: StructType,
+                                               requiredSchema: StructType,
+                                               filters: Seq[Filter],
+                                               options: Map[String, String],
+                                               hadoopConf: Configuration): (PartitionedFile) => Iterator[InternalRow] = {
 
     val broadcastedHadoopConf =
       sparkSession.sparkContext.broadcast(new SerializableConfiguration(hadoopConf))

@@ -1,5 +1,5 @@
 /**
-* Copyright (C) 2024-2024. Huawei Technologies Co., Ltd. All rights reserved.
+ * Copyright (C) 2024-2024. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -28,23 +28,24 @@
 #include "parquet/arrow/writer.h"
 
 using namespace arrow::internal;
- 
-namespace omniruntime::writer {
-class ParquetWriter {
-public:
-	ParquetWriter() {}
-	
-	arrow::Status InitRecordWriter(UriInfo &uri, std::string &ugi);
-	std::shared_ptr<arrow::Field> BuildField(const std::string& name, int typeId, bool nullable);
-	void write(long *vecNativeId, int colNums, const int *omniTypes, const unsigned char *dataColumnsIds,
-					bool isSplitWrite = false, long starPos = 0,
-					long endPos = 0);
-	void write();
 
-public:
-	std::unique_ptr<parquet::arrow::FileWriter> arrow_writer;
-	std::shared_ptr<arrow::Schema> schema_;
-	std::vector<int> precisions;
-	std::vector<int> scales;
+namespace omniruntime::writer
+{
+	class ParquetWriter
+	{
+	public:
+		ParquetWriter() {}
+
+		arrow::Status InitRecordWriter(UriInfo &uri, std::string &ugi);
+		std::shared_ptr<arrow::Field> BuildField(const std::string &name, int typeId, bool nullable);
+		void write(long *vecNativeId, int colNums, const int *omniTypes, const unsigned char *dataColumnsIds,
+				   bool isSplitWrite = false, long starPos = 0, long endPos = 0);
+		void write();
+
+	public:
+		std::unique_ptr<parquet::arrow::FileWriter> arrow_writer;
+		std::shared_ptr<arrow::Schema> schema_;
+		std::vector<int> precisions;
+		std::vector<int> scales;
 	};
 }

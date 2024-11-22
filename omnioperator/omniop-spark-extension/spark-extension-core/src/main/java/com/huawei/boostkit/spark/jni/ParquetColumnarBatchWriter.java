@@ -206,20 +206,20 @@ public class ParquetColumnarBatchWriter {
         }
     }
 
-    public void initializeSchemaJava(StructType dataSchema){
+    public void initializeSchemaJava(StructType dataSchema) {
         int schemaLength = dataSchema.length();
-        String [] fieldNames = new String[schemaLength];
+        String[] fieldNames = new String[schemaLength];
         int[] fieldTypes = new int[schemaLength];
         boolean[] nullables = new boolean[schemaLength];
-        String [] metaDataKeys = new String[schemaLength];
-        String [] metaDataValues = new String[schemaLength];
-        for (int i = 0; i < schemaLength; i++){
+        String[] metaDataKeys = new String[schemaLength];
+        String[] metaDataValues = new String[schemaLength];
+        for (int i = 0; i < schemaLength; i++) {
             StructField field = dataSchema.fields()[i];
             fieldNames[i] = field.name();
             fieldTypes[i] = sparkTypeToParquetLibType(field.dataType());
             nullables[i] = field.nullable();
         }
-        jniWriter.initializeSchema(writer, fieldNames, fieldTypes, nullables,extractDecimalParam(dataSchema));
+        jniWriter.initializeSchema(writer, fieldNames, fieldTypes, nullables, extractDecimalParam(dataSchema));
     }
 
     public int sparkTypeToParquetLibType(DataType dataType) {
@@ -229,7 +229,7 @@ public class ParquetColumnarBatchWriter {
             return ParquetLibTypeKind.INT16.ordinal();
         } else if (dataType instanceof IntegerType) {
             IntegerType integerType = (IntegerType) dataType;
-            switch (integerType.defaultSize()){
+            switch (integerType.defaultSize()) {
                 case 1:
                     return ParquetLibTypeKind.INT8.ordinal();
                 case 2:
@@ -246,7 +246,7 @@ public class ParquetColumnarBatchWriter {
             return ParquetLibTypeKind.INT64.ordinal();
         } else if (dataType instanceof DateType) {
             DateType dateType = (DateType) dataType;
-            switch (dateType.defaultSize()){
+            switch (dateType.defaultSize()) {
                 case 4:
                     return ParquetLibTypeKind.DATE32.ordinal();
                 case 8:
@@ -265,7 +265,7 @@ public class ParquetColumnarBatchWriter {
             return ParquetLibTypeKind.STRING.ordinal();
         } else if (dataType instanceof DecimalType) {
             DecimalType decimalType = (DecimalType) dataType;
-            switch (decimalType.defaultSize()){
+            switch (decimalType.defaultSize()) {
                 case 8:
                     return ParquetLibTypeKind.DECIMAL128.ordinal();
                 case 16:

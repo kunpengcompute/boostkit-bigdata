@@ -49,10 +49,10 @@ class OmniParquetOutputWriter(path: String, dataSchema: StructType,
       omniTypes = omniTypes :+ sparkTypeToOmniType(field.dataType, field.metadata).getId.ordinal()
     })
 
-  allColumns.toStructType.foreach(field => {
-         allOmniTypes = allOmniTypes :+ sparkTypeToOmniType(field.dataType, field.metadata)
-           .getId.ordinal()
-   })
+    allColumns.toStructType.foreach(field => {
+      allOmniTypes = allOmniTypes :+ sparkTypeToOmniType(field.dataType, field.metadata)
+        .getId.ordinal()
+    })
     dataColumnsIds = allColumns.map(x => dataColumns.contains(x)).toArray
   }
 
@@ -62,9 +62,9 @@ class OmniParquetOutputWriter(path: String, dataSchema: StructType,
   }
 
   def spiltWrite(row: InternalRow, startPos: Long, endPos: Long): Unit = {
-      assert(row.isInstanceOf[OmniInternalRow])
-      writer.splitWrite(omniTypes, allOmniTypes, dataColumnsIds,
-        row.asInstanceOf[OmniInternalRow].batch, startPos, endPos)
+    assert(row.isInstanceOf[OmniInternalRow])
+    writer.splitWrite(omniTypes, allOmniTypes, dataColumnsIds,
+      row.asInstanceOf[OmniInternalRow].batch, startPos, endPos)
   }
 
   override def close(): Unit = {

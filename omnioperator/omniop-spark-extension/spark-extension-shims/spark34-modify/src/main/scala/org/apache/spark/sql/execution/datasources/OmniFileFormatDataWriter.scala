@@ -64,8 +64,8 @@ class OmniSingleDirectoryDataWriter(
 
     currentWriter match {
       case _: OmniParquetOutputWriter =>
-              currentWriter.asInstanceOf[OmniParquetOutputWriter]
-                .initialize(description.allColumns, description.dataColumns)
+        currentWriter.asInstanceOf[OmniParquetOutputWriter]
+          .initialize(description.allColumns, description.dataColumns)
       case _: OmniOrcOutputWriter =>
         currentWriter.asInstanceOf[OmniOrcOutputWriter]
           .initialize(description.allColumns, description.dataColumns)
@@ -243,8 +243,8 @@ abstract class OmniBaseDynamicPartitionDataWriter(
 
     currentWriter match {
       case _: OmniParquetOutputWriter =>
-              currentWriter.asInstanceOf[OmniParquetOutputWriter]
-                .initialize(description.allColumns, description.dataColumns)
+        currentWriter.asInstanceOf[OmniParquetOutputWriter]
+          .initialize(description.allColumns, description.dataColumns)
       case _: OmniOrcOutputWriter =>
         currentWriter.asInstanceOf[OmniOrcOutputWriter]
           .initialize(description.allColumns, description.dataColumns)
@@ -282,15 +282,15 @@ abstract class OmniBaseDynamicPartitionDataWriter(
     // TODO After add OmniParquetOutPutWriter need extract
     //  a abstract interface named OmniOutPutWriter
     currentWriter match {
-              case _: OmniParquetOutputWriter =>
-                      assert(currentWriter.isInstanceOf[OmniParquetOutputWriter])
-                      currentWriter.asInstanceOf[OmniParquetOutputWriter].spiltWrite(record,startPos,endPos)
-              case _: OmniOrcOutputWriter =>
-                      assert(currentWriter.isInstanceOf[OmniOrcOutputWriter])
-                      currentWriter.asInstanceOf[OmniOrcOutputWriter].spiltWrite(record,startPos,endPos)
-              case _ =>
-                throw new UnsupportedOperationException
-                (s"writeRecord Unsupported ${currentWriter.getClass} Output writer!")
+      case _: OmniParquetOutputWriter =>
+        assert(currentWriter.isInstanceOf[OmniParquetOutputWriter])
+        currentWriter.asInstanceOf[OmniParquetOutputWriter].spiltWrite(record, startPos, endPos)
+      case _: OmniOrcOutputWriter =>
+        assert(currentWriter.isInstanceOf[OmniOrcOutputWriter])
+        currentWriter.asInstanceOf[OmniOrcOutputWriter].spiltWrite(record, startPos, endPos)
+      case _ =>
+        throw new UnsupportedOperationException
+        (s"writeRecord Unsupported ${currentWriter.getClass} Output writer!")
     }
 
     statsTrackers.foreach(_.newRow(currentWriter.path, record))
