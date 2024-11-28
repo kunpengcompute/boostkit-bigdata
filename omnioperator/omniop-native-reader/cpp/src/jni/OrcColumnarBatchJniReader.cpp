@@ -363,7 +363,8 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniRea
     uint64_t batchRowSize = rowReaderPtr->next(&recordBatch, ptr, batchLen);
     if (batchRowSize != 0) {
         int32_t vecCnt = recordBatch.size();
-        if (UNLIKELY(vecCnt != arrLen)) {
+        // When the Hive table scheme is changed, vecCnt > arrLen is required.
+        if (UNLIKELY(vecCnt > arrLen)) {
             throw std::runtime_error("Types should align to root fields");
         }
 
