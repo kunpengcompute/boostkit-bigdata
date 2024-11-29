@@ -199,12 +199,18 @@ public class OmniParquetRecordReader
         ArrayList<String> allFieldsNames = recordReader.getAllFieldsNames();
         this.typeIds = new ArrayList<DataType>();
         List<String> includeFieldNames = new ArrayList<>();
+        int j = 0;
         for (int i = 0; i < includedIds.size(); i++) {
-            String target = includedNames.get(i);
-            if (allFieldsNames.contains(target)) {
-                missingColumns[i] = false;
-                includeFieldNames.add(target);
-                addTypeId(columns.get(i).getPrimitiveType());
+            if (j < columns.size()) {
+                String target = columns.get(j).getPrimitiveType().getName();
+                if (allFieldsNames.contains(target)) {
+                    missingColumns[i] = false;
+                    includeFieldNames.add(target);
+                    addTypeId(columns.get(i).getPrimitiveType());
+                    j++;
+                } else {
+                    missingColumns[i] = true;
+                }
             } else {
                 missingColumns[i] = true;
             }
@@ -232,9 +238,9 @@ public class OmniParquetRecordReader
     private MessageType getRequriedSchema(MessageType schema) {
         List<Type> typeList = new ArrayList<Type>();
         List<Type> schemaFields = schema.getFields();
-        for (Type schemaField : schemaFields) {
-            if (includedNames.contains(schemaField.getName())) {
-                typeList.add(schemaField);
+        for (int i = 0; i < schemaFields.size(); i++) {
+            if (includedIds.contains(i)) {
+                typeList.add(schemaFields.get(i));
             }
         }
         return new MessageType(schema.getName(), typeList);
@@ -442,11 +448,14 @@ public class OmniParquetRecordReader
      * 2. when the real type stored in Parquet file is different with the type specified by talbe structure
      */
     public void processUnsignedData() {
-        List<Type> types = this.fileSchema.getFields();
         TableScanDesc desc = (TableScanDesc) this.tableScanOp.getConf();
         ArrayList<ColumnInfo> infoList = this.tableScanOp.getSchema().getSignature();
-        for (int i = 0; i < types.size(); i++) {
-            Type type = types.get(i);
+        int j = 0;
+        for (int i = 0; i < missingColumns.length; i++) {
+            if (missingColumns[i]) {
+                continue;
+            }
+            Type type = fields.get(j);
             if (!(type instanceof PrimitiveType) || ((PrimitiveType) type).getOriginalType() == null
                     || !((PrimitiveType) type).getOriginalType().name().contains("UINT")) {
                 continue;
@@ -467,6 +476,7 @@ public class OmniParquetRecordReader
                 LongVec vec = (LongVec) vecs[i];
                 vecs[i] = convertUnsignedLong(vec, isDecimal, decimalScale);
             }
+            j++;
         }
     }
 
@@ -480,7 +490,7 @@ public class OmniParquetRecordReader
             List<PrimitiveTypeInfo> primitiveTypeInfos = ((OmniTableScanOperator) tableScanOp).getNeedTypes();
             neededTypes = primitiveTypeInfos.stream().map(neededType -> TypeUtils.buildInputDataType(neededType)).collect(Collectors.toList());
         }
-        batchSize = recordReader.next(neededTypes, vecs, missingColumns);
+        batchSize = recordReader.next(neededTypes, typeIds, vecs, missingColumns);
         if (batchSize == 0) {
             return false;
         }

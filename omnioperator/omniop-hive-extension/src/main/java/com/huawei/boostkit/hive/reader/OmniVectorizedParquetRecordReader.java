@@ -95,12 +95,15 @@ public class OmniVectorizedParquetRecordReader extends OmniParquetRecordReader {
      * 2. when the real type stored in Parquet file is different with the type specified by talbe structure
      */
     public void processUnsignedData() {
-        List<Type> types = this.fileSchema.getFields();
         TableScanDesc desc = (TableScanDesc) this.tableScanOp.getConf();
         VectorTableScanDesc tableDesc = (VectorTableScanDesc) desc.getVectorDesc();
         TypeInfo[] info = tableDesc.getProjectedColumnTypeInfos();
-        for (int i = 0; i < types.size(); i++) {
-            Type type = types.get(i);
+        int j = 0;
+        for (int i = 0; i < missingColumns.length; i++) {
+            if (missingColumns[i]) {
+                continue;
+            }
+            Type type = fields.get(j);
             if (!(type instanceof PrimitiveType) || ((PrimitiveType) type).getOriginalType() == null
                     || !((PrimitiveType) type).getOriginalType().name().contains("UINT")) {
                 continue;
@@ -119,6 +122,7 @@ public class OmniVectorizedParquetRecordReader extends OmniParquetRecordReader {
                 LongVec vec = (LongVec) vecs[i];
                 vecs[i] = convertUnsignedLong(vec, isDecimal, decimalScale);
             }
+            j++;
         }
     }
 
@@ -128,7 +132,7 @@ public class OmniVectorizedParquetRecordReader extends OmniParquetRecordReader {
             List<PrimitiveTypeInfo> primitiveTypeInfos = ((OmniVectorizedTableScanOperator) tableScanOp).getNeedTypes();
             neededTypes = primitiveTypeInfos.stream().map(neededType -> TypeUtils.buildInputDataType(neededType)).collect(Collectors.toList());
         }
-        batchSize = recordReader.next(neededTypes, vecs, missingColumns);
+        batchSize = recordReader.next(neededTypes, typeIds, vecs, missingColumns);
         if (batchSize == 0) {
             return false;
         }
