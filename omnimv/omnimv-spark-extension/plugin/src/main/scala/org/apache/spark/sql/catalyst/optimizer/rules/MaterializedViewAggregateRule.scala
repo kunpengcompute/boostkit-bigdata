@@ -108,18 +108,20 @@ class MaterializedViewAggregateRule(sparkSession: SparkSession)
   Option[LogicalPlan] = {
     // 1.1.prepare queryAgg
     val queryAgg = queryPlan.asInstanceOf[Aggregate]
-    val queryAggExpressions = queryAgg.aggregateExpressions
+    val originQueryAgg = findOriginExpression(queryPlan).asInstanceOf[Aggregate]
+    val queryAggExpressions = originQueryAgg.aggregateExpressions
     val swappedQueryAggExpressions = swapColumnReferences(queryAggExpressions, columnMapping)
 
     // queryAgg and Group ExpressionEqual
     val queryAggExpressionEquals = swappedQueryAggExpressions.map(ExpressionEqual)
-    val queryGroupExpressionEqualsSeq = swapColumnReferences(queryAgg.groupingExpressions,
+    val queryGroupExpressionEqualsSeq = swapColumnReferences(originQueryAgg.groupingExpressions,
       columnMapping)
     val queryGroupExpressionEquals = queryGroupExpressionEqualsSeq.map(ExpressionEqual).toSet
 
     // 1.2.prepare viewAgg
     val viewAgg = viewQueryPlan.asInstanceOf[Aggregate]
-    val viewAggExpressions = viewAgg.aggregateExpressions
+    val originViewAgg = findOriginExpression(viewQueryPlan).asInstanceOf[Aggregate]
+    val viewAggExpressions = originViewAgg.aggregateExpressions
     val swappedViewAggExpressions = swapTableColumnReferences(viewAggExpressions,
       tableMapping, columnMapping)
 
@@ -127,7 +129,7 @@ class MaterializedViewAggregateRule(sparkSession: SparkSession)
     val viewAggExpressionEqualsOrdinal = swappedViewAggExpressions
         .map(ExpressionEqual).zipWithIndex.toMap
     val viewAggExpressionEquals = viewAggExpressionEqualsOrdinal.keySet
-    val viewGroupExpressionEquals = swapTableColumnReferences(viewAgg.groupingExpressions,
+    val viewGroupExpressionEquals = swapTableColumnReferences(originViewAgg.groupingExpressions,
       tableMapping, columnMapping).map(ExpressionEqual).toSet
 
     // 2.1.if queryGroupColumn not in viewGroupExpressionEquals ,it's invalid
@@ -236,7 +238,12 @@ class MaterializedViewAggregateRule(sparkSession: SparkSession)
             case a@Alias(_, _) =>
               copyAlias(a, viewTableAttr, qualifier)
             // other agg like avg or user_defined udaf not support rollUp
-            case _ => return None
+            case _ =>
+              if (viewGroupExpressionEquals.contains(aggCall)) {
+                viewTableAttr
+              } else {
+                return None
+              }
           }
         } else {
           expr match {
@@ -255,7 +262,7 @@ class MaterializedViewAggregateRule(sparkSession: SparkSession)
     // replace by Alias(rewrite expression,origin.name)(exprId=origin.exprId)
     val rewritedQueryAggExpressions = rewriteAndAliasExpressions(newQueryAggExpressions,
       swapTableColumn = true, tableMapping, columnMapping,
-      viewProjectList, viewTableAttrs, queryAgg.aggregateExpressions)
+      swappedViewAggExpressions, viewTableAttrs, queryAgg.aggregateExpressions)
 
     if (rewritedQueryAggExpressions.isEmpty) {
       return None
@@ -279,7 +286,7 @@ class MaterializedViewAggregateRule(sparkSession: SparkSession)
         // 5.2.need agg,rewrite GroupingExpressions and new agg
         val rewritedGroupingExpressions = rewriteAndAliasExpressions(newGroupingExpressions,
           swapTableColumn = true, tableMapping, columnMapping,
-          viewProjectList, viewTableAttrs,
+          swappedViewAggExpressions, viewTableAttrs,
           newGroupingExpressions.map(_.asInstanceOf[NamedExpression]))
         if (rewritedGroupingExpressions.isEmpty) {
           return None
@@ -368,9 +375,9 @@ class MaterializedViewOutJoinAggregateRule(sparkSession: SparkSession)
       viewProjectList: Seq[Expression], viewTableAttrs: Seq[Attribute]):
   Option[LogicalPlan] = {
     val simplifiedViewPlanString = simplifiedPlanString(
-      findOriginExpression(viewQueryPlan), ALL_CONDITION)
+      findOriginExpressionWrapWithAlias(viewQueryPlan), ALL_CONDITION)
     val simplifiedQueryPlanString = simplifiedPlanString(
-      findOriginExpression(queryPlan), ALL_CONDITION)
+      findOriginExpressionWrapWithAlias(queryPlan), ALL_CONDITION)
     if (simplifiedQueryPlanString != simplifiedViewPlanString) {
       return None
     }

@@ -106,12 +106,15 @@ class MaterializedViewJoinRule(sparkSession: SparkSession)
     val originQueryProjectList = queryProjectList.map(x => findOriginExpression(origins, x))
     val swapQueryProjectList = swapColumnReferences(originQueryProjectList, columnMapping)
 
+    val viewOrigins = generateOrigins(viewQueryPlan)
+    val originViewProjectList = viewProjectList.map(x => findOriginExpression(viewOrigins, x))
+
     // rewrite and alias queryProjectList
     // if the rewrite expression exprId != origin expression exprId,
     // replace by Alias(rewrite expression,origin.name)(exprId=origin.exprId)
     val rewritedQueryProjectList = rewriteAndAliasExpressions(swapQueryProjectList,
       swapTableColumn = true, tableMapping, columnMapping,
-      viewProjectList, viewTableAttrs, queryProjectList)
+      originViewProjectList, viewTableAttrs, queryProjectList)
 
     val res = Project(rewritedQueryProjectList.get
         .map(_.asInstanceOf[NamedExpression]), viewTablePlan)

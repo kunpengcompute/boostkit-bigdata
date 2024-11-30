@@ -94,14 +94,22 @@ trait RewriteHelper extends PredicateHelper with RewriteLogger {
         other.output
     }
     val exprIdToQualifier = mutable.HashMap[ExprId, AttributeReference]()
+    val existedExprId: mutable.Set[ExprId] = mutable.Set[ExprId]()
+
     for ((project, column) <- topProjectList.zip(viewTablePlan.output)) {
       project match {
         // only map attr
         case a@Alias(attr@AttributeReference(_, _, _, _), _) =>
-          exprIdToQualifier += (column.exprId ->
-              attr.copy(name = a.name)(exprId = attr.exprId, qualifier = attr.qualifier))
+          if (!existedExprId.contains(attr.exprId)) {
+            exprIdToQualifier += (column.exprId ->
+                attr.copy(name = a.name)(exprId = attr.exprId, qualifier = attr.qualifier))
+            existedExprId += attr.exprId
+          }
         case a@AttributeReference(_, _, _, _) =>
-          exprIdToQualifier += (column.exprId -> a)
+          if (!existedExprId.contains(a.exprId)) {
+            exprIdToQualifier += (column.exprId -> a)
+            existedExprId += a.exprId
+          }
         // skip function
         case _ =>
       }
@@ -129,15 +137,8 @@ trait RewriteHelper extends PredicateHelper with RewriteLogger {
     var origins = Map.empty[ExprId, Expression]
     plan.transformAllExpressions {
       case a@Alias(child, _) =>
-        child match {
-          case attr: AttributeReference =>
-            origins += (a.exprId -> attr)
-            a
-          case _: Substring =>
-            origins += (a.exprId -> a.child)
-            a
-          case e => a
-        }
+        origins += (a.exprId -> child)
+        a
       case e => e
     }
     origins
@@ -148,33 +149,49 @@ trait RewriteHelper extends PredicateHelper with RewriteLogger {
    */
   def findOriginExpression(plan: LogicalPlan): LogicalPlan = {
     val origins = generateOrigins(plan)
-    findOriginExpression(origins, plan)
+    findOriginExpression(origins, plan, wrapWithAliasEnable = false)
   }
 
   /**
    * find aliased_attr's original expression
    */
-  def findOriginExpression(origins: Map[ExprId, Expression], plan: LogicalPlan): LogicalPlan = {
+  def findOriginExpressionWrapWithAlias(plan: LogicalPlan): LogicalPlan = {
+    val origins = generateOrigins(plan)
+    findOriginExpression(origins, plan, wrapWithAliasEnable = true)
+  }
+
+  /**
+   * find aliased_attr's original expression
+   */
+  def findOriginExpression(origins: Map[ExprId, Expression], plan: LogicalPlan,
+      wrapWithAliasEnable: Boolean): LogicalPlan = {
     plan.transformAllExpressions {
       case a: Alias =>
-        a.copy(child = findOriginExpression(origins, a.child))(exprId = ExprId(0),
+        a.copy(child = findOriginExpression(origins, a.child, wrapWithAliasEnable = wrapWithAliasEnable))(exprId = ExprId(0),
           qualifier = a.qualifier,
           explicitMetadata = a.explicitMetadata,
           nonInheritableMetadataKeys = a.nonInheritableMetadataKeys)
       case expr =>
-        findOriginExpression(origins, expr)
+        findOriginExpression(origins, expr, wrapWithAliasEnable = wrapWithAliasEnable)
     }
+  }
+
+  def findOriginExpression(origins: Map[ExprId, Expression], expression: Expression): Expression = {
+    findOriginExpression(origins, expression, wrapWithAliasEnable = false)
   }
 
   /**
    * find aliased_attr's original expression
    */
   def findOriginExpression(origins: Map[ExprId, Expression],
-      expression: Expression): Expression = {
+      expression: Expression, wrapWithAliasEnable: Boolean): Expression = {
+    var replaced = false
+
     def dfs(expr: Expression): Expression = {
       expr.transform {
         case attr: AttributeReference =>
           if (origins.contains(attr.exprId)) {
+            replaced = true
             origins(attr.exprId)
           } else {
             attr
@@ -183,7 +200,17 @@ trait RewriteHelper extends PredicateHelper with RewriteLogger {
       }
     }
 
-    dfs(expression)
+    val res = dfs(expression)
+    if (wrapWithAliasEnable && replaced) {
+      expression match {
+        case attr: AttributeReference =>
+          Alias(res, attr.name)(exprId = attr.exprId)
+        case _ =>
+          res
+      }
+    } else {
+      res
+    }
   }
 
   /**

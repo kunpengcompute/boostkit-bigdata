@@ -118,7 +118,7 @@ class MaterializedViewOutJoinRule(sparkSession: SparkSession)
     val viewOrigins = generateOrigins(viewQueryPlan)
     val originViewProjectList = viewProjectList.map(x => findOriginExpression(viewOrigins, x))
     val simplifiedViewPlanString =
-      simplifiedPlanString(findOriginExpression(viewOrigins, viewQueryPlan), OUTER_JOIN_CONDITION)
+      simplifiedPlanString(findOriginExpression(viewOrigins, viewQueryPlan, wrapWithAliasEnable = true), OUTER_JOIN_CONDITION)
 
     // Push down the topmost filter condition for simplifiedPlanString() matching.
     val pushDownQueryPLan = PushDownPredicates.apply(queryPlan)
@@ -126,13 +126,13 @@ class MaterializedViewOutJoinRule(sparkSession: SparkSession)
     val res = pushDownQueryPLan.transform {
       case curPlan: Join =>
         val simplifiedQueryPlanString = simplifiedPlanString(
-          findOriginExpression(queryOrigins, curPlan), OUTER_JOIN_CONDITION)
+          findOriginExpression(queryOrigins, curPlan, wrapWithAliasEnable = true), OUTER_JOIN_CONDITION)
         if (simplifiedQueryPlanString == simplifiedViewPlanString) {
           // Predicate compensation for matching execution plans.
           val viewExpr = extractPredictExpressions(
-            findOriginExpression(viewOrigins, viewQueryPlan), EMPTY_BIMAP, COMPENSABLE_CONDITION)
+            findOriginExpression(viewOrigins, viewQueryPlan, wrapWithAliasEnable = true), EMPTY_BIMAP, COMPENSABLE_CONDITION)
           val queryExpr = extractPredictExpressions(
-            findOriginExpression(queryOrigins, curPlan), EMPTY_BIMAP, COMPENSABLE_CONDITION)
+            findOriginExpression(queryOrigins, curPlan, wrapWithAliasEnable = true), EMPTY_BIMAP, COMPENSABLE_CONDITION)
           val compensatedViewTablePlan = super.computeCompensationPredicates(viewTablePlan,
             queryExpr, viewExpr, tableMapping, columnMapping,
             extractTopProjectList(viewQueryPlan), viewTablePlan.output)
@@ -143,7 +143,7 @@ class MaterializedViewOutJoinRule(sparkSession: SparkSession)
             rewritten = true
             val (curProject: Project, _) = extractTables(Project(curPlan.output, curPlan))
             val curProjectList = curProject.projectList
-                .map(x => findOriginExpression(queryOrigins, x).asInstanceOf[NamedExpression])
+                .map(x => findOriginExpression(queryOrigins, x, wrapWithAliasEnable = true).asInstanceOf[NamedExpression])
             val swapCurProjectList = swapColumnReferences(curProjectList, columnMapping)
             val rewritedQueryProjectList = rewriteAndAliasExpressions(swapCurProjectList,
               swapTableColumn = true, tableMapping, columnMapping,
