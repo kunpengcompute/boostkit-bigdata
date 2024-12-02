@@ -159,10 +159,12 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
 
           // 4.7.compute compensationPredicates between viewQueryPlan and queryPlan
           var newViewTablePlan = RewriteTime.withTimeStat("computeCompensationPredicates") {
+            val viewOrigins= generateOrigins(viewQueryPlan)
+            val originViewProjectList = viewProjectList.map(x => findOriginExpression(viewOrigins, x))
             computeCompensationPredicates(viewTablePlan,
               queryPredictExpression, viewPredictExpression, inverseTableMapping,
               viewPredictExpression._1.getEquivalenceClassesMap,
-              viewProjectList, viewTableAttrs)
+              originViewProjectList, viewTableAttrs)
           }
           logDetail(s"computeCompensationPredicates plan:$newViewTablePlan")
           // 4.8.compensationPredicates isEmpty, because view's row data cannot satisfy query
@@ -747,7 +749,7 @@ abstract class AbstractMaterializedViewRule(sparkSession: SparkSession)
           e
         case e@Alias(Literal(_, _), _) =>
           e
-        case e: NamedExpression =>
+        case e: Expression =>
           val expressionEqual = ExpressionEqual(e)
           if (viewProjectExprToTableAttr.contains(expressionEqual)) {
             viewProjectExprToTableAttr(expressionEqual)
