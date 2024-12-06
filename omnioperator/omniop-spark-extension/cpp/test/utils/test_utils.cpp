@@ -455,26 +455,27 @@ void Test_splitter_close(long splitter_addr) {
     delete splitter;
 }
 
-void GetFilePath(const char *path, const char *filename, char *filepath) {
-    strcpy(filepath, path);
+void GetFilePath(const char *path, const char *filename, char *filepath, const uint64_t filepathLen) {
+    strcpy_s(filepath, filepathLen, path);
     if(filepath[strlen(path) - 1] != '/') {
-        strcat(filepath, "/");
+        strcat_s(filepath, filepathLen, "/");
     }
-    strcat(filepath, filename);
+    strcat_s(filepath, filepathLen, filename);
 }
 
 void DeletePathAll(const char* path) {
     DIR *dir;
     struct dirent *dirInfo;
     struct stat statBuf;
-    char filepath[256] = {0};
+    static constexpr uint32_t FILE_PATH_LEN = 256;
+    char filepath[FILE_PATH_LEN] = {0};
     lstat(path, &statBuf);
     if (S_ISREG(statBuf.st_mode)) {
         remove(path);
     } else if (S_ISDIR(statBuf.st_mode)) {
         if ((dir = opendir(path)) != NULL) {
             while ((dirInfo = readdir(dir)) != NULL) {
-                GetFilePath(path, dirInfo->d_name, filepath);
+                GetFilePath(path, dirInfo->d_name, filepath, FILE_PATH_LEN);
                 if (strcmp(dirInfo->d_name, ".") == 0 || strcmp(dirInfo->d_name, "..") == 0) {
                     continue;
                 }

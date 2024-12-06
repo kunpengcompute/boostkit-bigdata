@@ -126,7 +126,7 @@ void Test_splitter_stop(long splitter_id);
 
 void Test_splitter_close(long splitter_id);
 
-void GetFilePath(const char *path, const char *filename, char *filepath);
+void GetFilePath(const char *path, const char *filename, char *filepath, const uint64_t filepathLen);
 
 void DeletePathAll(const char* path);
 

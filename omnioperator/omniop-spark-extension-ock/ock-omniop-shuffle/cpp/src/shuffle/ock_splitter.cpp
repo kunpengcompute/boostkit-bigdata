@@ -212,7 +212,7 @@ bool OckSplitter::WriteFixedWidthValueTemple(BaseVector *vector, bool isDict, st
         for (uint32_t index = 0; index < rowNum; ++index) {
             uint32_t idIndex = rowIndexes[index];
             if (UNLIKELY(idIndex >= idsNum)) {
-                LOG_ERROR("Invalid idIndex %d, idsNum.", idIndex, idsNum);
+                LOG_ERROR("Invalid idIndex %d, idsNum %d.", idIndex, idsNum);
                 return false;
             }
             uint32_t rowIndex = reinterpret_cast<int32_t *>(ids)[idIndex];
@@ -257,7 +257,7 @@ bool OckSplitter::WriteDecimal128(BaseVector *vector, bool isDict, std::vector<u
         for (uint32_t index = 0; index < rowNum; ++index) {
             uint32_t idIndex = rowIndexes[index];
             if (UNLIKELY(idIndex >= idsNum)) {
-                LOG_ERROR("Invalid idIndex %d, idsNum.", idIndex, idsNum);
+                LOG_ERROR("Invalid idIndex %d, idsNum %d.", idIndex, idsNum);
                 return false;
             }
             uint32_t rowIndex = reinterpret_cast<int32_t *>(ids)[idIndex];
