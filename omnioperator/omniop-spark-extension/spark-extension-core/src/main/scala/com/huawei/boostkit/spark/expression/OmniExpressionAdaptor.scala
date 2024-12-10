@@ -34,7 +34,7 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate._
 import org.apache.spark.sql.catalyst.optimizer.NormalizeNaNAndZero
-import org.apache.spark.sql.catalyst.plans.{FullOuter, Inner, JoinType, LeftAnti, LeftOuter, LeftSemi, RightOuter}
+import org.apache.spark.sql.catalyst.plans.{FullOuter, Inner, JoinType, LeftAnti, LeftOuter, LeftSemi, RightOuter, ExistenceJoin}
 import org.apache.spark.sql.catalyst.optimizer.{BuildLeft, BuildRight, BuildSide}
 import org.apache.spark.sql.catalyst.util.CharVarcharUtils.getRawTypeString
 import org.apache.spark.sql.execution
@@ -1015,6 +1015,8 @@ object OmniExpressionAdaptor extends Logging {
         OMNI_JOIN_TYPE_LEFT_SEMI
       case LeftAnti =>
         OMNI_JOIN_TYPE_LEFT_ANTI
+      case ExistenceJoin(_) =>
+        OMNI_JOIN_TYPE_EXISTENCE
       case _ =>
         throw new UnsupportedOperationException(s"Join-type[$joinType] is not supported.")
     }
