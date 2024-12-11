@@ -70,7 +70,7 @@ namespace omniruntime::reader {
         for (int i = num_values - 1; i >= 0; --i) {
             if (!nulls[i]) {
                 idx_decode--;
-                std::memmove(buffer + i, buffer + idx_decode, sizeof(T));
+                memmove_s(buffer + i, sizeof(T), buffer + idx_decode, sizeof(T));
             }
         }
         assert(idx_decode == 0);

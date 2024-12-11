@@ -67,7 +67,7 @@ int32_t BytesGen(uint64_t offsetsAddr, std::string &nullStr, uint64_t valuesAddr
         }
 
         if (len != 0) {
-            memcpy((char *) (values + offsets[i]), addr, len);
+            memcpy_s((char *) (values + offsets[i]),len, addr, len);
             valueTotalLen += len;
         }
     }

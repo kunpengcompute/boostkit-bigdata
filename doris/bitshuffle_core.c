@@ -11,6 +11,7 @@
 
 #include "bitshuffle_core.h"
 #include "bitshuffle_internals.h"
+#include "securec.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -150,7 +151,7 @@ int64_t bshuf_copy(const void* in, void* out, const size_t size,
     const char* in_b = (const char*) in;
     char* out_b = (char*) out;
 
-    memcpy(out_b, in_b, size * elem_size);
+    memcpy_s(out_b, size * elem_size, in_b, size * elem_size);
     return size * elem_size;
 }
 
@@ -248,7 +249,7 @@ int64_t bshuf_trans_elem(const void* in, void* out, const size_t lda,
     char* out_b = (char*) out;
     for(ii = 0; ii < lda; ii++) {
         for(jj = 0; jj < ldb; jj++) {
-            memcpy(&out_b[(jj*lda + ii) * elem_size],
+            memcpy_s(&out_b[(jj*lda + ii) * elem_size], elem_size,
                    &in_b[(ii*ldb + jj) * elem_size], elem_size);
         }
     }
@@ -1921,7 +1922,7 @@ int64_t bshuf_blocked_wrap_fun(bshufBlockFunDef fun, const void* in, void* out, 
     last_out = (char *) ioc_get_out(&C, &this_iter);
     ioc_set_next_out(&C, &this_iter, (void *) (last_out + leftover_bytes));
 
-    memcpy(last_out, last_in, leftover_bytes);
+    memcpy_s(last_out, leftover_bytes, last_in, leftover_bytes);
 
     ioc_destroy(&C);
 

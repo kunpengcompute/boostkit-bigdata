@@ -345,7 +345,7 @@ int Splitter::SplitFixedWidthValidityBuffer(VectorBatch& vb){
                     std::shared_ptr<Buffer> validity_buffer (
                         new Buffer((uint8_t *)ptr_tmp, partition_id_cnt_cur_[pid], new_size));
                     dst_addrs[pid] = const_cast<uint8_t*>(validity_buffer->data_);
-                    std::memset(validity_buffer->data_, 0, new_size);
+                    memset_s(validity_buffer->data_, new_size, 0, new_size);
                     partition_fixed_width_buffers_[col][pid][0] = std::move(validity_buffer);
                     fixed_nullBuffer_size_[pid] += new_size;
                 }
@@ -711,12 +711,14 @@ void Splitter::SerializingFixedColumns(int32_t partitionId,
             }
             if ((onceCopyLen - destCopyedLength) >= (cacheBatchSize - splitRowInfoTmp->cacheBatchCopyedLen[fixColIndexTmp])) {
                 memCopyLen = cacheBatchSize - splitRowInfoTmp->cacheBatchCopyedLen[fixColIndexTmp];
-                memcpy((uint8_t*)(ptr_value->data_) + destCopyedLength,
+                memcpy_s((uint8_t*)(ptr_value->data_) + destCopyedLength,
+                       memCopyLen,
                        partition_cached_vectorbatch_[partitionId][splitRowInfoTmp->cacheBatchIndex[fixColIndexTmp]][fixColIndexTmp][1]->data_ + splitRowInfoTmp->cacheBatchCopyedLen[fixColIndexTmp],
                        memCopyLen);
                 // (destCopyedLength / (1 << column_type_id_[colIndexTmpSchema])) 等比例计算null数组偏移
                 if (partition_cached_vectorbatch_[partitionId][splitRowInfoTmp->cacheBatchIndex[fixColIndexTmp]][fixColIndexTmp][0] != nullptr) {
-                    memcpy((uint8_t*)(ptr_validity->data_) + (destCopyedLength / (1 << column_type_id_[colIndexTmpSchema])),
+                    memcpy_s((uint8_t*)(ptr_validity->data_) + (destCopyedLength / (1 << column_type_id_[colIndexTmpSchema])),
+                           memCopyLen / (1 << column_type_id_[colIndexTmpSchema]),
                            partition_cached_vectorbatch_[partitionId][splitRowInfoTmp->cacheBatchIndex[fixColIndexTmp]][fixColIndexTmp][0]->data_ + (splitRowInfoTmp->cacheBatchCopyedLen[fixColIndexTmp] / (1 << column_type_id_[colIndexTmpSchema])),
                            memCopyLen / (1 << column_type_id_[colIndexTmpSchema]));
                     // 释放内存
@@ -732,13 +734,15 @@ void Splitter::SerializingFixedColumns(int32_t partitionId,
                 splitRowInfoTmp->cacheBatchCopyedLen[fixColIndexTmp] = 0; // 初始化下一个cacheBatch的起始偏移
             } else {
                 memCopyLen = onceCopyLen - destCopyedLength;
-                memcpy((uint8_t*)(ptr_value->data_) + destCopyedLength,
+                memcpy_s((uint8_t*)(ptr_value->data_) + destCopyedLength,
+                    memCopyLen,
                     partition_cached_vectorbatch_[partitionId][splitRowInfoTmp->cacheBatchIndex[fixColIndexTmp]][fixColIndexTmp][1]->data_ + splitRowInfoTmp->cacheBatchCopyedLen[fixColIndexTmp],
                     memCopyLen);
                 // (destCopyedLength / (1 << column_type_id_[colIndexTmpSchema])) 等比例计算null数组偏移
 
                 if(partition_cached_vectorbatch_[partitionId][splitRowInfoTmp->cacheBatchIndex[fixColIndexTmp]][fixColIndexTmp][0] != nullptr) {
-                    memcpy((uint8_t*)(ptr_validity->data_) + (destCopyedLength / (1 << column_type_id_[colIndexTmpSchema])),
+                    memcpy_s((uint8_t*)(ptr_validity->data_) + (destCopyedLength / (1 << column_type_id_[colIndexTmpSchema])),
+                                        memCopyLen / (1 << column_type_id_[colIndexTmpSchema]),
                                         partition_cached_vectorbatch_[partitionId][splitRowInfoTmp->cacheBatchIndex[fixColIndexTmp]][fixColIndexTmp][0]->data_ + (splitRowInfoTmp->cacheBatchCopyedLen[fixColIndexTmp] / (1 << column_type_id_[colIndexTmpSchema])),
                                         memCopyLen / (1 << column_type_id_[colIndexTmpSchema]));
                 }
@@ -847,7 +851,7 @@ int32_t Splitter::ProtoWritePartition(int32_t partition_id, std::unique_ptr<Buff
         }
         uint32_t vecBatchProtoSize = reversebytes_uint32t(static_cast<uint32_t>(vecBatchProto->ByteSizeLong()));
         if (bufferStream->Next(&bufferOut, &sizeOut)) {
-            std::memcpy(bufferOut, &vecBatchProtoSize, sizeof(vecBatchProtoSize));
+            memcpy_s(bufferOut, sizeof(vecBatchProtoSize), &vecBatchProtoSize, sizeof(vecBatchProtoSize));
             if (sizeof(vecBatchProtoSize) < sizeOut) {
                 bufferStream->BackUp(sizeOut - sizeof(vecBatchProtoSize));
             }
@@ -938,7 +942,7 @@ int Splitter::protoSpillPartition(int32_t partition_id, std::unique_ptr<Buffered
             throw std::runtime_error("Allocate Memory Failed: Flush Spilled Data, Next failed.");
         }
         // set serizalized bytes to stream
-        memcpy(buffer, &vecBatchProtoSize, sizeof(vecBatchProtoSize));
+        memcpy_s(buffer, sizeof(vecBatchProtoSize), &vecBatchProtoSize, sizeof(vecBatchProtoSize));
         LogsDebug(" A Slice Of vecBatchProtoSize: %d ", reversebytes_uint32t(vecBatchProtoSize));
 
         vecBatchProto->SerializeToZeroCopyStream(bufferStream.get());
