@@ -641,7 +641,7 @@ namespace omniruntime::reader {
             uint64_t b0, b1, b2, b3, b4, b5, b6, b7;
             // Avoid updating 'bufferStart' inside the loop.
             const auto* buffer = reinterpret_cast<const unsigned char*>(bufferStart);
-            for (int i = 0; i < bufferNum; ++i) {
+            for (int64_t i = 0; i < bufferNum; ++i) {
                 b0 = static_cast<uint32_t>(*buffer);
                 b1 = static_cast<uint32_t>(*(buffer + 1));
                 b2 = static_cast<uint32_t>(*(buffer + 2));
@@ -683,7 +683,7 @@ namespace omniruntime::reader {
             uint64_t b0, b1, b2, b3, b4, b5, b6;
             // Avoid updating 'bufferStart' inside the loop.
             const auto* buffer = reinterpret_cast<const unsigned char*>(bufferStart);
-            for (int i = 0; i < bufferNum; ++i) {
+            for (int64_t i = 0; i < bufferNum; ++i) {
                 b0 = static_cast<uint32_t>(*buffer);
                 b1 = static_cast<uint32_t>(*(buffer + 1));
                 b2 = static_cast<uint32_t>(*(buffer + 2));
@@ -723,7 +723,7 @@ namespace omniruntime::reader {
             uint64_t b0, b1, b2, b3, b4, b5;
             // Avoid updating 'bufferStart' inside the loop.
             const auto* buffer = reinterpret_cast<const unsigned char*>(bufferStart);
-            for (int i = 0; i < bufferNum; ++i) {
+            for (int64_t i = 0; i < bufferNum; ++i) {
                 b0 = static_cast<uint32_t>(*buffer);
                 b1 = static_cast<uint32_t>(*(buffer + 1));
                 b2 = static_cast<uint32_t>(*(buffer + 2));
@@ -761,7 +761,7 @@ namespace omniruntime::reader {
             uint64_t b0, b1, b2, b3, b4;
             // Avoid updating 'bufferStart' inside the loop.
             const auto* buffer = reinterpret_cast<const unsigned char*>(bufferStart);
-            for (int i = 0; i < bufferNum; ++i) {
+            for (int64_t i = 0; i < bufferNum; ++i) {
                 b0 = static_cast<uint32_t>(*buffer);
                 b1 = static_cast<uint32_t>(*(buffer + 1));
                 b2 = static_cast<uint32_t>(*(buffer + 2));
@@ -797,7 +797,7 @@ namespace omniruntime::reader {
             uint32_t b0, b1, b2, b3;
             // Avoid updating 'bufferStart' inside the loop.
             const auto* buffer = reinterpret_cast<const unsigned char*>(bufferStart);
-            for (int i = 0; i < bufferNum; ++i) {
+            for (int64_t i = 0; i < bufferNum; ++i) {
                 b0 = static_cast<uint32_t>(*buffer);
                 b1 = static_cast<uint32_t>(*(buffer + 1));
                 b2 = static_cast<uint32_t>(*(buffer + 2));
@@ -832,7 +832,7 @@ namespace omniruntime::reader {
             uint32_t b0, b1, b2;
             // Avoid updating 'bufferStart' inside the loop.
             const auto* buffer = reinterpret_cast<const unsigned char*>(bufferStart);
-            for (int i = 0; i < bufferNum; ++i) {
+            for (int64_t i = 0; i < bufferNum; ++i) {
                 b0 = static_cast<uint32_t>(*buffer);
                 b1 = static_cast<uint32_t>(*(buffer + 1));
                 b2 = static_cast<uint32_t>(*(buffer + 2));
@@ -865,7 +865,7 @@ namespace omniruntime::reader {
             uint16_t b0, b1;
             // Avoid updating 'bufferStart' inside the loop.
             const auto* buffer = reinterpret_cast<const unsigned char*>(bufferStart);
-            for (int i = 0; i < bufferNum; ++i) {
+            for (int64_t i = 0; i < bufferNum; ++i) {
                 b0 = static_cast<uint16_t>(*buffer);
                 b1 = static_cast<uint16_t>(*(buffer + 1));
                 buffer += 2;
@@ -895,7 +895,7 @@ namespace omniruntime::reader {
             bufferNum = std::min(bufferNum, static_cast<int64_t>(offset + len - curIdx));
             // Avoid updating 'bufferStart' inside the loop.
             const auto* buffer = reinterpret_cast<const unsigned char*>(bufferStart);
-            for (int i = 0; i < bufferNum; ++i) {
+            for (int64_t i = 0; i < bufferNum; ++i) {
                 data[curIdx++] = *buffer++;
             }
             bufferStart = reinterpret_cast<const char*>(buffer);

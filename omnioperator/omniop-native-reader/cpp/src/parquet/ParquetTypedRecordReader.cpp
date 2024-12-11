@@ -502,7 +502,7 @@ Status RawBytesToDecimal64Bytes(const uint8_t* bytes, int32_t length,
 
 void DefLevelsToNullsSIMD(const int16_t* def_levels, int64_t num_def_levels, const int16_t max_def_level,
         int64_t* values_read, int64_t* null_count, bool* nulls) {
-    for (int i = 0; i < num_def_levels; ++i) {
+    for (int64_t i = 0; i < num_def_levels; ++i) {
         if (def_levels[i] < max_def_level) {
             nulls[i] = true;
             (*null_count)++;
