@@ -64,7 +64,7 @@ case class ColumnarBroadcastHashJoinExec(
     isNullAwareAntiJoin: Boolean = false,
     projectList: Seq[NamedExpression] = Seq.empty)
   extends HashJoin {
-
+  val shareHashTableKey : String = s"${left.id}-${right.id}"
   override def verboseStringWithOperatorId(): String = {
     val joinCondStr = if (condition.isDefined) {
       s"${condition.get}${condition.get.dataType}"
@@ -356,7 +356,7 @@ case class ColumnarBroadcastHashJoinExec(
         buildCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startBuildCodegen)
 
         if (isShared) {
-          OmniHashBuilderWithExprOperatorFactory.saveHashBuilderOperatorAndFactory(buildPlan.id,
+          OmniHashBuilderWithExprOperatorFactory.saveHashBuilderOperatorAndFactory(shareHashTableKey,
             opFactory, op)
         }
         val deserializer = VecBatchSerializerFactory.create()
@@ -371,7 +371,7 @@ case class ColumnarBroadcastHashJoinExec(
         } catch {
           case e: Exception => {
             if (isShared) {
-              OmniHashBuilderWithExprOperatorFactory.dereferenceHashBuilderOperatorAndFactory(buildPlan.id)
+              OmniHashBuilderWithExprOperatorFactory.dereferenceHashBuilderOperatorAndFactory(shareHashTableKey)
             } else {
               op.close()
               opFactory.close()
@@ -388,7 +388,7 @@ case class ColumnarBroadcastHashJoinExec(
       if (enableShareBuildOp && canShareBuildOp) {
         OmniHashBuilderWithExprOperatorFactory.gLock.lock()
         try {
-          buildOpFactory = OmniHashBuilderWithExprOperatorFactory.getHashBuilderOperatorFactory(buildPlan.id)
+          buildOpFactory = OmniHashBuilderWithExprOperatorFactory.getHashBuilderOperatorFactory(shareHashTableKey)
           if (buildOpFactory == null) {
             val (opFactory, op) = createBuildOpFactoryAndOp(true)
             buildOpFactory = opFactory
@@ -421,7 +421,7 @@ case class ColumnarBroadcastHashJoinExec(
         lookupOpFactory.close()
         if (enableShareBuildOp && canShareBuildOp) {
           OmniHashBuilderWithExprOperatorFactory.gLock.lock()
-          OmniHashBuilderWithExprOperatorFactory.dereferenceHashBuilderOperatorAndFactory(buildPlan.id)
+          OmniHashBuilderWithExprOperatorFactory.dereferenceHashBuilderOperatorAndFactory(shareHashTableKey)
           OmniHashBuilderWithExprOperatorFactory.gLock.unlock()
         } else {
           buildOp.close()
