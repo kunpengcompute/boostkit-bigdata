@@ -311,5 +311,13 @@ class OmniExpressionAdaptorSuite extends SparkFunSuite {
     checkJsonKeyValueIgnoreKeySequence(coalesceExp, coalesceResult, coalesce)
   }
 
+  test("test double -0.0") {
+    val literal = Literal(-0.0d)
+    val result = rewriteToOmniJsonExpressionLiteral(literal, Map.empty)
+    val expected = "{\"exprType\":\"LITERAL\",\"dataType\":3,\"isNull\":false,\"value\":-0.0}"
+    checkJsonKeyValueIgnoreKeySequence(expected, result, literal)
+  }
+
+
 
 }
