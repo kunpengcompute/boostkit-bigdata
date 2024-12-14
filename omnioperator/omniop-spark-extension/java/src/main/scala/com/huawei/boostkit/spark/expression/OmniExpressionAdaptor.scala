@@ -26,6 +26,7 @@ import nova.hetu.omniruntime.constants.FunctionType.{OMNI_AGGREGATION_TYPE_AVG, 
 import nova.hetu.omniruntime.constants.JoinType._
 import nova.hetu.omniruntime.operator.OmniExprVerify
 import com.huawei.boostkit.spark.ColumnarPluginConfig
+import com.google.gson.{JsonArray, JsonElement, JsonObject, JsonParser}
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.InternalRow
@@ -36,7 +37,6 @@ import org.apache.spark.sql.catalyst.util.CharVarcharUtils.getRawTypeString
 import org.apache.spark.sql.execution
 import org.apache.spark.sql.hive.HiveUdfAdaptorUtil
 import org.apache.spark.sql.types.{BinaryType, BooleanType, DataType, DateType, Decimal, DecimalType, DoubleType, IntegerType, LongType, Metadata, NullType, ShortType, StringType, TimestampType}
-import org.json.{JSONArray, JSONObject}
 
 import java.util.Locale
 import scala.collection.mutable
@@ -137,13 +137,13 @@ object OmniExpressionAdaptor extends Logging {
   }
 
   private def rewriteToOmniJsonExpressionLiteralJsonObject(expr: Expression,
-                                                           exprsIndexMap: Map[ExprId, Int]): JSONObject = {
+                                                           exprsIndexMap: Map[ExprId, Int]): JsonObject = {
     rewriteToOmniJsonExpressionLiteralJsonObject(expr, exprsIndexMap, expr.dataType)
   }
 
   private def rewriteToOmniJsonExpressionLiteralJsonObject(expr: Expression,
                                                            exprsIndexMap: Map[ExprId, Int],
-                                                           returnDatatype: DataType): JSONObject = {
+                                                           returnDatatype: DataType): JsonObject = {
     expr match {
       case subquery: execution.ScalarSubquery =>
         var result: Any = null
@@ -153,7 +153,7 @@ object OmniExpressionAdaptor extends Logging {
           case e: IllegalArgumentException => logDebug(e.getMessage)
         }
         if (result == null) {
-          new JSONObject().put("exprType", "LITERAL")
+          new JsonObject().put("exprType", "LITERAL")
             .addOmniExpJsonType("dataType", subquery.dataType)
             .put("isNull", true)
             .put("value", result)
@@ -162,25 +162,25 @@ object OmniExpressionAdaptor extends Logging {
           toOmniJsonLiteral(literal)
         }
       case unscaledValue: UnscaledValue =>
-        new JSONObject().put("exprType", "FUNCTION")
+        new JsonObject().put("exprType", "FUNCTION")
           .addOmniExpJsonType("returnType", unscaledValue.dataType)
           .put("function_name", "UnscaledValue")
-          .put("arguments", new JSONArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(unscaledValue.child, exprsIndexMap)))
+          .put("arguments", new JsonArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(unscaledValue.child, exprsIndexMap)))
       case checkOverflow: CheckOverflow =>
         rewriteToOmniJsonExpressionLiteralJsonObject(checkOverflow.child, exprsIndexMap, returnDatatype)
 
       case makeDecimal: MakeDecimal =>
         makeDecimal.child.dataType match {
           case decimalChild: DecimalType =>
-            new JSONObject().put("exprType", "FUNCTION")
+            new JsonObject().put("exprType", "FUNCTION")
               .addOmniExpJsonType("returnType", makeDecimal.dataType)
               .put("function_name", "MakeDecimal")
-              .put("arguments", new JSONArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(makeDecimal.child, exprsIndexMap)))
+              .put("arguments", new JsonArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(makeDecimal.child, exprsIndexMap)))
           case longChild: LongType =>
-            new JSONObject().put("exprType", "FUNCTION")
+            new JsonObject().put("exprType", "FUNCTION")
               .put("function_name", "MakeDecimal")
               .addOmniExpJsonType("returnType", makeDecimal.dataType)
-              .put("arguments", new JSONArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(makeDecimal.child, exprsIndexMap)))
+              .put("arguments", new JsonArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(makeDecimal.child, exprsIndexMap)))
           case _ =>
             throw new UnsupportedOperationException(s"Unsupported datatype for MakeDecimal: ${makeDecimal.child.dataType}")
         }
@@ -189,84 +189,84 @@ object OmniExpressionAdaptor extends Logging {
         rewriteToOmniJsonExpressionLiteralJsonObject(promotePrecision.child, exprsIndexMap)
 
       case sub: Subtract =>
-        new JSONObject().put("exprType", "BINARY")
+        new JsonObject().put("exprType", "BINARY")
           .addOmniExpJsonType("returnType", returnDatatype)
           .put("operator", "SUBTRACT")
           .put("left", rewriteToOmniJsonExpressionLiteralJsonObject(sub.left, exprsIndexMap))
           .put("right", rewriteToOmniJsonExpressionLiteralJsonObject(sub.right, exprsIndexMap))
 
       case add: Add =>
-        new JSONObject().put("exprType", "BINARY")
+        new JsonObject().put("exprType", "BINARY")
           .addOmniExpJsonType("returnType", returnDatatype)
           .put("operator", "ADD")
           .put("left", rewriteToOmniJsonExpressionLiteralJsonObject(add.left, exprsIndexMap))
           .put("right", rewriteToOmniJsonExpressionLiteralJsonObject(add.right, exprsIndexMap))
 
       case mult: Multiply =>
-        new JSONObject().put("exprType", "BINARY")
+        new JsonObject().put("exprType", "BINARY")
           .addOmniExpJsonType("returnType", returnDatatype)
           .put("operator", "MULTIPLY")
           .put("left", rewriteToOmniJsonExpressionLiteralJsonObject(mult.left, exprsIndexMap))
           .put("right", rewriteToOmniJsonExpressionLiteralJsonObject(mult.right, exprsIndexMap))
 
       case divide: Divide =>
-        new JSONObject().put("exprType", "BINARY")
+        new JsonObject().put("exprType", "BINARY")
           .addOmniExpJsonType("returnType", returnDatatype)
           .put("operator", "DIVIDE")
           .put("left", rewriteToOmniJsonExpressionLiteralJsonObject(divide.left, exprsIndexMap))
           .put("right", rewriteToOmniJsonExpressionLiteralJsonObject(divide.right, exprsIndexMap))
 
       case mod: Remainder =>
-        new JSONObject().put("exprType", "BINARY")
+        new JsonObject().put("exprType", "BINARY")
           .addOmniExpJsonType("returnType", returnDatatype)
           .put("operator", "MODULUS")
           .put("left", rewriteToOmniJsonExpressionLiteralJsonObject(mod.left, exprsIndexMap))
           .put("right", rewriteToOmniJsonExpressionLiteralJsonObject(mod.right, exprsIndexMap))
 
       case greaterThan: GreaterThan =>
-        new JSONObject().put("exprType", "BINARY")
+        new JsonObject().put("exprType", "BINARY")
           .addOmniExpJsonType("returnType", greaterThan.dataType)
           .put("operator", "GREATER_THAN")
           .put("left", rewriteToOmniJsonExpressionLiteralJsonObject(greaterThan.left, exprsIndexMap))
           .put("right", rewriteToOmniJsonExpressionLiteralJsonObject(greaterThan.right, exprsIndexMap))
 
       case greaterThanOrEq: GreaterThanOrEqual =>
-        new JSONObject().put("exprType", "BINARY")
+        new JsonObject().put("exprType", "BINARY")
           .addOmniExpJsonType("returnType", greaterThanOrEq.dataType)
           .put("operator", "GREATER_THAN_OR_EQUAL")
           .put("left", rewriteToOmniJsonExpressionLiteralJsonObject(greaterThanOrEq.left, exprsIndexMap))
           .put("right", rewriteToOmniJsonExpressionLiteralJsonObject(greaterThanOrEq.right, exprsIndexMap))
 
       case lessThan: LessThan =>
-        new JSONObject().put("exprType", "BINARY")
+        new JsonObject().put("exprType", "BINARY")
           .addOmniExpJsonType("returnType", lessThan.dataType)
           .put("operator", "LESS_THAN")
           .put("left", rewriteToOmniJsonExpressionLiteralJsonObject(lessThan.left, exprsIndexMap))
           .put("right", rewriteToOmniJsonExpressionLiteralJsonObject(lessThan.right, exprsIndexMap))
 
       case lessThanOrEq: LessThanOrEqual =>
-        new JSONObject().put("exprType", "BINARY")
+        new JsonObject().put("exprType", "BINARY")
           .addOmniExpJsonType("returnType", lessThanOrEq.dataType)
           .put("operator", "LESS_THAN_OR_EQUAL")
           .put("left", rewriteToOmniJsonExpressionLiteralJsonObject(lessThanOrEq.left, exprsIndexMap))
           .put("right", rewriteToOmniJsonExpressionLiteralJsonObject(lessThanOrEq.right, exprsIndexMap))
 
       case equal: EqualTo =>
-        new JSONObject().put("exprType", "BINARY")
+        new JsonObject().put("exprType", "BINARY")
           .addOmniExpJsonType("returnType", equal.dataType)
           .put("operator", "EQUAL")
           .put("left", rewriteToOmniJsonExpressionLiteralJsonObject(equal.left, exprsIndexMap))
           .put("right", rewriteToOmniJsonExpressionLiteralJsonObject(equal.right, exprsIndexMap))
 
       case or: Or =>
-        new JSONObject().put("exprType", "BINARY")
+        new JsonObject().put("exprType", "BINARY")
           .addOmniExpJsonType("returnType", or.dataType)
           .put("operator", "OR")
           .put("left", rewriteToOmniJsonExpressionLiteralJsonObject(or.left, exprsIndexMap))
           .put("right", rewriteToOmniJsonExpressionLiteralJsonObject(or.right, exprsIndexMap))
 
       case and: And =>
-        new JSONObject().put("exprType", "BINARY")
+        new JsonObject().put("exprType", "BINARY")
           .addOmniExpJsonType("returnType", and.dataType)
           .put("operator", "AND")
           .put("left", rewriteToOmniJsonExpressionLiteralJsonObject(and.left, exprsIndexMap))
@@ -277,45 +277,45 @@ object OmniExpressionAdaptor extends Logging {
       case not: Not =>
         not.child match {
           case isnull: IsNull =>
-            new JSONObject().put("exprType", "UNARY")
+            new JsonObject().put("exprType", "UNARY")
               .addOmniExpJsonType("returnType", BooleanType)
               .put("operator", "not")
               .put("expr", rewriteToOmniJsonExpressionLiteralJsonObject(isnull, exprsIndexMap))
 
           case equal: EqualTo =>
-            new JSONObject().put("exprType", "BINARY")
+            new JsonObject().put("exprType", "BINARY")
               .addOmniExpJsonType("returnType", equal.dataType)
               .put("operator", "NOT_EQUAL")
               .put("left", rewriteToOmniJsonExpressionLiteralJsonObject(equal.left, exprsIndexMap))
               .put("right", rewriteToOmniJsonExpressionLiteralJsonObject(equal.right, exprsIndexMap))
 
           case _ =>
-            new JSONObject().put("exprType", "UNARY")
+            new JsonObject().put("exprType", "UNARY")
               .addOmniExpJsonType("returnType", BooleanType)
               .put("operator", "not")
               .put("expr", rewriteToOmniJsonExpressionLiteralJsonObject(not.child, exprsIndexMap))
         }
 
       case isnotnull: IsNotNull =>
-        new JSONObject().put("exprType", "UNARY")
+        new JsonObject().put("exprType", "UNARY")
           .addOmniExpJsonType("returnType", BooleanType)
           .put("operator", "not")
-          .put("expr", new JSONObject()
+          .put("expr", new JsonObject()
             .put("exprType", "IS_NULL")
             .addOmniExpJsonType("returnType", BooleanType)
-          .put("arguments", new JSONArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(isnotnull.child, exprsIndexMap))))
+          .put("arguments", new JsonArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(isnotnull.child, exprsIndexMap))))
 
       case isNull: IsNull =>
-        new JSONObject().put("exprType", "IS_NULL")
-          .put("arguments", new JSONArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(isNull.child, exprsIndexMap)))
+        new JsonObject().put("exprType", "IS_NULL")
+          .put("arguments", new JsonArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(isNull.child, exprsIndexMap)))
           .addOmniExpJsonType("returnType", BooleanType)
 
       // Substring
       case subString: Substring =>
-        new JSONObject().put("exprType", "FUNCTION")
+        new JsonObject().put("exprType", "FUNCTION")
           .addOmniExpJsonType("returnType", subString.dataType)
           .put("function_name", "substr")
-          .put("arguments", new JSONArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(subString.str, exprsIndexMap)).
+          .put("arguments", new JsonArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(subString.str, exprsIndexMap)).
             put(rewriteToOmniJsonExpressionLiteralJsonObject(subString.pos, exprsIndexMap))
             .put(rewriteToOmniJsonExpressionLiteralJsonObject(subString.len, exprsIndexMap)))
 
@@ -325,76 +325,76 @@ object OmniExpressionAdaptor extends Logging {
         cast.child.dataType match {
           case NullType =>
             // cast(null as xx)的情况，转化为对应的类型的literal下推到omni进行运算
-            new JSONObject().put("exprType", "LITERAL")
+            new JsonObject().put("exprType", "LITERAL")
               .addOmniExpJsonType("dataType", cast.dataType)
               .put("isNull", true)
           case _ =>
             cast.dataType match {
               case StringType =>
-                new JSONObject().put("exprType", "FUNCTION")
+                new JsonObject().put("exprType", "FUNCTION")
                   .addOmniExpJsonType("returnType", cast.dataType)
                   .put("width", 50)
                   .put("function_name", "CAST")
-                  .put("arguments", new JSONArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(cast.child, exprsIndexMap)))
+                  .put("arguments", new JsonArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(cast.child, exprsIndexMap)))
 
               case _ =>
-                new JSONObject().put("exprType", "FUNCTION")
+                new JsonObject().put("exprType", "FUNCTION")
                   .addOmniExpJsonType("returnType", cast.dataType)
                   .put("function_name", "CAST")
-                  .put("arguments", new JSONArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(cast.child, exprsIndexMap)))
+                  .put("arguments", new JsonArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(cast.child, exprsIndexMap)))
             }
         }
 
       // Abs
       case abs: Abs =>
-        new JSONObject().put("exprType", "FUNCTION")
+        new JsonObject().put("exprType", "FUNCTION")
           .addOmniExpJsonType("returnType", abs.dataType)
           .put("function_name", "abs")
-          .put("arguments", new JSONArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(abs.child, exprsIndexMap)))
+          .put("arguments", new JsonArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(abs.child, exprsIndexMap)))
 
       case lower: Lower =>
-        new JSONObject().put("exprType", "FUNCTION")
+        new JsonObject().put("exprType", "FUNCTION")
           .addOmniExpJsonType("returnType", lower.dataType)
           .put("function_name", "lower")
-          .put("arguments", new JSONArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(lower.child, exprsIndexMap)))
+          .put("arguments", new JsonArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(lower.child, exprsIndexMap)))
 
       case upper: Upper =>
-        new JSONObject().put("exprType", "FUNCTION")
+        new JsonObject().put("exprType", "FUNCTION")
           .addOmniExpJsonType("returnType", upper.dataType)
           .put("function_name", "upper")
-          .put("arguments", new JSONArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(upper.child, exprsIndexMap)))
+          .put("arguments", new JsonArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(upper.child, exprsIndexMap)))
 
       case length: Length =>
-        new JSONObject().put("exprType", "FUNCTION")
+        new JsonObject().put("exprType", "FUNCTION")
           .addOmniExpJsonType("returnType", length.dataType)
           .put("function_name", "length")
-          .put("arguments", new JSONArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(length.child, exprsIndexMap)))
+          .put("arguments", new JsonArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(length.child, exprsIndexMap)))
 
       case replace: StringReplace =>
-        new JSONObject().put("exprType", "FUNCTION")
+        new JsonObject().put("exprType", "FUNCTION")
           .addOmniExpJsonType("returnType", replace.dataType)
           .put("function_name", "replace")
-          .put("arguments", new JSONArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(replace.srcExpr, exprsIndexMap))
+          .put("arguments", new JsonArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(replace.srcExpr, exprsIndexMap))
             .put(rewriteToOmniJsonExpressionLiteralJsonObject(replace.searchExpr, exprsIndexMap))
             .put(rewriteToOmniJsonExpressionLiteralJsonObject(replace.replaceExpr, exprsIndexMap)))
 
       // In
       case in: In =>
-        new JSONObject().put("exprType", "IN")
+        new JsonObject().put("exprType", "IN")
           .addOmniExpJsonType("returnType", in.dataType)
-          .put("arguments", new JSONArray(in.children.map(child => rewriteToOmniJsonExpressionLiteralJsonObject(child, exprsIndexMap)).toArray))
+          .put("arguments", new JsonArray().addFromArray(in.children.map(child => rewriteToOmniJsonExpressionLiteralJsonObject(child, exprsIndexMap)).toArray[JsonElement]))
 
       // coming from In expression with optimizerInSetConversionThreshold
       case inSet: InSet =>
-        val jSONObject = new JSONObject().put("exprType", "IN")
+        val jSONObject = new JsonObject().put("exprType", "IN")
           .addOmniExpJsonType("returnType", inSet.dataType)
-        val jsonArray = new JSONArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(inSet.child, exprsIndexMap))
+        val jsonArray = new JsonArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(inSet.child, exprsIndexMap))
         inSet.set.foreach(child => jsonArray.put(toOmniJsonLiteral(Literal(child, inSet.child.dataType))))
         jSONObject.put("arguments", jsonArray)
         jSONObject
 
       case ifExp: If =>
-        new JSONObject().put("exprType", "IF")
+        new JsonObject().put("exprType", "IF")
           .addOmniExpJsonType("returnType", ifExp.dataType)
           .put("condition", rewriteToOmniJsonExpressionLiteralJsonObject(ifExp.predicate, exprsIndexMap))
           .put("if_true", rewriteToOmniJsonExpressionLiteralJsonObject(ifExp.trueValue, exprsIndexMap))
@@ -407,7 +407,7 @@ object OmniExpressionAdaptor extends Logging {
         if (coalesce.children.length > 2) {
           throw new UnsupportedOperationException(s"Number of parameters is ${coalesce.children.length}. Exceeds the maximum number of parameters, coalesce only supports up to 2 parameters")
         }
-        new JSONObject().put("exprType", "COALESCE")
+        new JsonObject().put("exprType", "COALESCE")
           .addOmniExpJsonType("returnType", coalesce.dataType)
           .put("value1", rewriteToOmniJsonExpressionLiteralJsonObject(coalesce.children.head, exprsIndexMap))
           .put("value2", rewriteToOmniJsonExpressionLiteralJsonObject(coalesce.children(1), exprsIndexMap))
@@ -418,27 +418,27 @@ object OmniExpressionAdaptor extends Logging {
         getGreatestJsonStr(greatest, exprsIndexMap)
 
       case round: Round =>
-        new JSONObject().put("exprType", "FUNCTION")
+        new JsonObject().put("exprType", "FUNCTION")
           .addOmniExpJsonType("returnType", round.dataType)
           .put("function_name", "round")
-          .put("arguments", new JSONArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(round.child, exprsIndexMap))
+          .put("arguments", new JsonArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(round.child, exprsIndexMap))
             .put(rewriteToOmniJsonExpressionLiteralJsonObject(round.scale, exprsIndexMap)))
 
       case attr: Attribute => toOmniJsonAttribute(attr, exprsIndexMap(attr.exprId))
 
       case inStr: StringInstr =>
-        new JSONObject().put("exprType", "FUNCTION")
+        new JsonObject().put("exprType", "FUNCTION")
           .addOmniExpJsonType("returnType", inStr.dataType)
           .put("function_name", "instr")
-          .put("arguments", new JSONArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(inStr.str, exprsIndexMap))
+          .put("arguments", new JsonArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(inStr.str, exprsIndexMap))
             .put(rewriteToOmniJsonExpressionLiteralJsonObject(inStr.substr, exprsIndexMap)))
 
       // for floating numbers normalize
       case normalizeNaNAndZero: NormalizeNaNAndZero =>
-        new JSONObject().put("exprType", "FUNCTION")
+        new JsonObject().put("exprType", "FUNCTION")
           .addOmniExpJsonType("returnType", normalizeNaNAndZero.dataType)
           .put("function_name", "NormalizeNaNAndZero")
-          .put("arguments", new JSONArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(normalizeNaNAndZero.child, exprsIndexMap)))
+          .put("arguments", new JsonArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(normalizeNaNAndZero.child, exprsIndexMap)))
 
       case knownFloatingPointNormalized: KnownFloatingPointNormalized =>
         rewriteToOmniJsonExpressionLiteralJsonObject(knownFloatingPointNormalized.child, exprsIndexMap)
@@ -448,35 +448,35 @@ object OmniExpressionAdaptor extends Logging {
         val timeZone = unixTimestamp.timeZoneId.getOrElse("")
         unsupportedUnixTimeFunction(unixTimestamp.format.toString, timeZone)
         val policy = ColumnarPluginConfig.getSessionConf.timeParserPolicy
-        new JSONObject().put("exprType", "FUNCTION")
+        new JsonObject().put("exprType", "FUNCTION")
           .addOmniExpJsonType("returnType", unixTimestamp.dataType)
           .put("function_name", "unix_timestamp")
-          .put("arguments", new JSONArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(unixTimestamp.timeExp, exprsIndexMap))
-            .put(new JSONObject(toOmniTimeFormat(rewriteToOmniJsonExpressionLiteral(unixTimestamp.format, exprsIndexMap))))
-            .put(new JSONObject().put("exprType", "LITERAL").put("dataType", 15).put("isNull", timeZone.isEmpty())
+          .put("arguments", new JsonArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(unixTimestamp.timeExp, exprsIndexMap))
+            .put(new JsonParser().parse(toOmniTimeFormat(rewriteToOmniJsonExpressionLiteral(unixTimestamp.format, exprsIndexMap))))
+            .put(new JsonObject().put("exprType", "LITERAL").put("dataType", 15).put("isNull", timeZone.isEmpty())
               .put("value", timeZone).put("width", timeZone.length))
-            .put(new JSONObject().put("exprType", "LITERAL").put("dataType", 15).put("isNull", policy.isEmpty())
+            .put(new JsonObject().put("exprType", "LITERAL").put("dataType", 15).put("isNull", policy.isEmpty())
               .put("value", policy).put("width", policy.length)))
 
       case fromUnixTime: FromUnixTime =>
         val timeZone = fromUnixTime.timeZoneId.getOrElse("")
         unsupportedUnixTimeFunction(fromUnixTime.format.toString, timeZone)
-        new JSONObject().put("exprType", "FUNCTION")
+        new JsonObject().put("exprType", "FUNCTION")
           .addOmniExpJsonType("returnType", fromUnixTime.dataType)
           .put("function_name", "from_unixtime")
-          .put("arguments", new JSONArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(fromUnixTime.sec, exprsIndexMap))
-            .put(new JSONObject(toOmniTimeFormat(rewriteToOmniJsonExpressionLiteral(fromUnixTime.format, exprsIndexMap))))
-            .put(new JSONObject().put("exprType", "LITERAL").put("dataType", 15).put("isNull", timeZone.isEmpty())
+          .put("arguments", new JsonArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(fromUnixTime.sec, exprsIndexMap))
+            .put(new JsonParser().parse(toOmniTimeFormat(rewriteToOmniJsonExpressionLiteral(fromUnixTime.format, exprsIndexMap))))
+            .put(new JsonObject().put("exprType", "LITERAL").put("dataType", 15).put("isNull", timeZone.isEmpty())
               .put("value", timeZone).put("width", timeZone.length)))
 
       // for like
       case startsWith: StartsWith =>
         startsWith.right match {
           case literal: Literal =>
-            new JSONObject().put("exprType", "FUNCTION")
+            new JsonObject().put("exprType", "FUNCTION")
               .addOmniExpJsonType("returnType", startsWith.dataType)
               .put("function_name", "StartsWith")
-              .put("arguments", new JSONArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(startsWith.left, exprsIndexMap))
+              .put("arguments", new JsonArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(startsWith.left, exprsIndexMap))
                 .put(rewriteToOmniJsonExpressionLiteralJsonObject(startsWith.right, exprsIndexMap)))
 
           case _ =>
@@ -485,10 +485,10 @@ object OmniExpressionAdaptor extends Logging {
       case endsWith: EndsWith =>
         endsWith.right match {
           case literal: Literal =>
-            new JSONObject().put("exprType", "FUNCTION")
+            new JsonObject().put("exprType", "FUNCTION")
               .addOmniExpJsonType("returnType", endsWith.dataType)
               .put("function_name", "EndsWith")
-              .put("arguments", new JSONArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(endsWith.left, exprsIndexMap))
+              .put("arguments", new JsonArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(endsWith.left, exprsIndexMap))
                 .put(rewriteToOmniJsonExpressionLiteralJsonObject(endsWith.right, exprsIndexMap)))
 
           case _ =>
@@ -496,10 +496,10 @@ object OmniExpressionAdaptor extends Logging {
         }
 
       case truncDate: TruncDate =>
-        new JSONObject().put("exprType", "FUNCTION")
+        new JsonObject().put("exprType", "FUNCTION")
           .addOmniExpJsonType("returnType", truncDate.dataType)
           .put("function_name", "trunc_date")
-          .put("arguments", new JSONArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(truncDate.left, exprsIndexMap))
+          .put("arguments", new JsonArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(truncDate.left, exprsIndexMap))
             .put(rewriteToOmniJsonExpressionLiteralJsonObject(truncDate.right, exprsIndexMap)))
 
       case md5: Md5 =>
@@ -507,10 +507,10 @@ object OmniExpressionAdaptor extends Logging {
           case Cast(inputExpression, outputType, _) if outputType == BinaryType =>
             inputExpression match {
               case AttributeReference(_, dataType, _, _) if dataType == StringType =>
-                new JSONObject().put("exprType", "FUNCTION")
+                new JsonObject().put("exprType", "FUNCTION")
                   .addOmniExpJsonType("returnType", md5.dataType)
                   .put("function_name", "Md5")
-                  .put("arguments", new JSONArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(inputExpression, exprsIndexMap)))
+                  .put("arguments", new JsonArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(inputExpression, exprsIndexMap)))
             }
         }
 
@@ -519,7 +519,7 @@ object OmniExpressionAdaptor extends Logging {
           val hiveUdf = HiveUdfAdaptorUtil.asHiveSimpleUDF(expr)
           val nameSplit = hiveUdf.name.split("\\.")
           val udfName = if (nameSplit.size == 1) nameSplit(0).toLowerCase(Locale.ROOT) else nameSplit(1).toLowerCase(Locale.ROOT)
-          return new JSONObject().put("exprType", "FUNCTION")
+          return new JsonObject().put("exprType", "FUNCTION")
             .addOmniExpJsonType("returnType", hiveUdf.dataType)
             .put("function_name", udfName)
             .put("arguments", getJsonExprArgumentsByChildren(hiveUdf.children, exprsIndexMap))
@@ -529,9 +529,9 @@ object OmniExpressionAdaptor extends Logging {
   }
 
   private def getJsonExprArgumentsByChildren(children: Seq[Expression],
-                                             exprsIndexMap: Map[ExprId, Int]): JSONArray = {
+                                             exprsIndexMap: Map[ExprId, Int]): JsonArray = {
     val size = children.size
-    val jsonArray = new JSONArray()
+    val jsonArray = new JsonArray()
     if (size == 0) {
       return jsonArray
     }
@@ -550,27 +550,27 @@ object OmniExpressionAdaptor extends Logging {
     }
   }
 
-  private def getConcatJsonStr(concat: Concat, exprsIndexMap: Map[ExprId, Int]): JSONObject = {
+  private def getConcatJsonStr(concat: Concat, exprsIndexMap: Map[ExprId, Int]): JsonObject = {
     val children: Seq[Expression] = concat.children
     checkInputDataTypes(children)
 
     if (children.length == 1) {
       return rewriteToOmniJsonExpressionLiteralJsonObject(children.head, exprsIndexMap)
     }
-    val res = new JSONObject().put("exprType", "FUNCTION")
+    val res = new JsonObject().put("exprType", "FUNCTION")
       .addOmniExpJsonType("returnType", concat.dataType)
       .put("function_name", "concat")
-      .put("arguments", new JSONArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(children.head, exprsIndexMap))
+      .put("arguments", new JsonArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(children.head, exprsIndexMap))
         .put(rewriteToOmniJsonExpressionLiteralJsonObject(children(1), exprsIndexMap)))
     for (i <- 2 until children.length) {
-      val preResJson = new JSONObject(res, JSONObject.getNames(res))
-      res.put("arguments", new JSONArray().put(preResJson)
+      val preResJson = new JsonObject().addAll(res)
+      res.put("arguments", new JsonArray().put(preResJson)
         .put(rewriteToOmniJsonExpressionLiteralJsonObject(children(i), exprsIndexMap)))
     }
     res
   }
 
-  private def getGreatestJsonStr(greatest: Greatest, exprsIndexMap: Map[ExprId, Int]): JSONObject = {
+  private def getGreatestJsonStr(greatest: Greatest, exprsIndexMap: Map[ExprId, Int]): JsonObject = {
     if (greatest.children.length != 2) {
       throw new UnsupportedOperationException(s"Number of parameters is ${greatest.children.length}. " +
         "Greatest only supports up to 2 parameters")
@@ -602,10 +602,10 @@ object OmniExpressionAdaptor extends Logging {
             case base: CastBase if base.child.dataType.isInstanceOf[NullType] =>
               rewriteToOmniJsonExpressionLiteralJsonObject(children.head, exprsIndexMap)
             case _ =>
-              new JSONObject().put("exprType", "FUNCTION")
+              new JsonObject().put("exprType", "FUNCTION")
                 .addOmniExpJsonType("returnType", greatest.dataType)
                 .put("function_name", "Greatest")
-                .put("arguments", new JSONArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(children.head, exprsIndexMap))
+                .put("arguments", new JsonArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(children.head, exprsIndexMap))
                   .put(rewriteToOmniJsonExpressionLiteralJsonObject(children(1), exprsIndexMap)))
           }
         }
@@ -613,44 +613,44 @@ object OmniExpressionAdaptor extends Logging {
     }
   }
 
-  def toOmniJsonAttribute(attr: Attribute, colVal: Int): JSONObject = {
+  def toOmniJsonAttribute(attr: Attribute, colVal: Int): JsonObject = {
     val omniDataType = sparkTypeToOmniExpType(attr.dataType)
     attr.dataType match {
       case StringType =>
-        new JSONObject().put("exprType", "FIELD_REFERENCE")
+        new JsonObject().put("exprType", "FIELD_REFERENCE")
           .put("dataType", omniDataType.toInt)
           .put("colVal", colVal)
           .put("width", getStringLength(attr.metadata))
       case dt: DecimalType =>
-        new JSONObject().put("exprType", "FIELD_REFERENCE")
+        new JsonObject().put("exprType", "FIELD_REFERENCE")
           .put("colVal", colVal)
           .put("dataType", omniDataType.toInt)
           .put("precision", dt.precision)
           .put("scale", dt.scale)
-      case _ => new JSONObject().put("exprType", "FIELD_REFERENCE")
+      case _ => new JsonObject().put("exprType", "FIELD_REFERENCE")
         .put("dataType", omniDataType.toInt)
         .put("colVal", colVal)
     }
   }
 
-  def toOmniJsonLiteral(literal: Literal): JSONObject = {
+  def toOmniJsonLiteral(literal: Literal): JsonObject = {
     val omniType = sparkTypeToOmniExpType(literal.dataType)
     val value = literal.value
     if (value == null) {
-      return new JSONObject().put("exprType", "LITERAL")
+      return new JsonObject().put("exprType", "LITERAL")
         .addOmniExpJsonType("dataType", literal.dataType)
         .put("isNull", true)
     }
     literal.dataType match {
       case StringType =>
-        new JSONObject().put("exprType", "LITERAL")
+        new JsonObject().put("exprType", "LITERAL")
           .put("dataType", omniType.toInt)
           .put("isNull", false)
           .put("value", value.toString)
           .put("width", value.toString.length)
       case dt: DecimalType =>
         if (DecimalType.is64BitDecimalType(dt)) {
-          new JSONObject().put("exprType", "LITERAL")
+          new JsonObject().put("exprType", "LITERAL")
             .put("dataType", omniType.toInt)
             .put("isNull", false)
             .put("value", value.asInstanceOf[Decimal].toUnscaledLong)
@@ -658,7 +658,7 @@ object OmniExpressionAdaptor extends Logging {
             .put("scale", dt.scale)
         } else {
           // NOTES: decimal128 literal value need use string format
-          new JSONObject().put("exprType", "LITERAL")
+          new JsonObject().put("exprType", "LITERAL")
             .put("dataType", omniType.toInt)
             .put("isNull", false)
             .put("value", value.asInstanceOf[Decimal].toJavaBigDecimal.unscaledValue().toString())
@@ -666,7 +666,7 @@ object OmniExpressionAdaptor extends Logging {
             .put("scale", dt.scale)
         }
       case _ =>
-        new JSONObject().put("exprType", "LITERAL")
+        new JsonObject().put("exprType", "LITERAL")
           .put("dataType", omniType.toInt)
           .put("isNull", false)
           .put("value", value)
@@ -764,8 +764,8 @@ object OmniExpressionAdaptor extends Logging {
     }
   }
 
-  implicit private class JSONObjectExtension(val jsonObject: JSONObject) {
-    def addOmniExpJsonType(jsonAttributeKey: String, datatype: DataType): JSONObject = {
+  implicit private class JsonObjectExtension(val jsonObject: JsonObject) {
+    def addOmniExpJsonType(jsonAttributeKey: String, datatype: DataType): JsonObject = {
       val omniTypeIdStr = sparkTypeToOmniExpType(datatype)
       datatype match {
         case StringType =>
@@ -778,7 +778,46 @@ object OmniExpressionAdaptor extends Logging {
         case _ =>
           jsonObject.put(jsonAttributeKey, omniTypeIdStr.toInt)
       }
+      jsonObject
     }
+
+    def addAll(value: JsonObject): JsonObject = {
+      value.entrySet().forEach(e => {
+        jsonObject.put(e.getKey, e.getValue)
+      })
+      jsonObject
+    }
+
+    def put(jsonAttributeKey: String, value: Any): JsonObject = {
+      value match {
+        case _: String =>
+          jsonObject.addProperty(jsonAttributeKey, value.asInstanceOf[String])
+        case _: Number =>
+          jsonObject.addProperty(jsonAttributeKey, value.asInstanceOf[Number])
+        case _: Character =>
+          jsonObject.addProperty(jsonAttributeKey, value.asInstanceOf[Character])
+        case _: Boolean =>
+          jsonObject.addProperty(jsonAttributeKey, value.asInstanceOf[Boolean])
+        case _: JsonElement =>
+          jsonObject.add(jsonAttributeKey, value.asInstanceOf[JsonElement])
+        case _ => throw new UnsupportedOperationException("unsupported value type to be json ")
+      }
+      jsonObject
+    }
+  }
+
+  implicit private class JsonArrayExtension(val jsonArray: JsonArray) {
+
+    def put(value: JsonElement): JsonArray = {
+      jsonArray.add(value)
+      jsonArray
+    }
+
+    def addFromArray(values: Array[JsonElement]): JsonArray = {
+      values.foreach(jsonArray.add)
+      jsonArray
+    }
+
   }
 
   def sparkTypeToOmniType(dataType: DataType): Int = {
@@ -821,11 +860,11 @@ object OmniExpressionAdaptor extends Logging {
     val omniDataType: String = sparkTypeToOmniExpType(dataType)
     dataType match {
       case ShortType | IntegerType | LongType | DoubleType | BooleanType | DateType | TimestampType =>
-        new JSONObject().put("exprType", "FIELD_REFERENCE")
+        new JsonObject().put("exprType", "FIELD_REFERENCE")
           .put("dataType", omniDataType.toInt)
           .put("colVal", colVal).toString
       case StringType =>
-        new JSONObject().put("exprType", "FIELD_REFERENCE")
+        new JsonObject().put("exprType", "FIELD_REFERENCE")
           .put("dataType", omniDataType.toInt)
           .put("colVal", colVal)
           .put("width", getStringLength(metadata)).toString
@@ -834,7 +873,7 @@ object OmniExpressionAdaptor extends Logging {
         if (DecimalType.is64BitDecimalType(dt)) {
           omniDataType = OMNI_DECIMAL64_TYPE
         }
-        new JSONObject().put("exprType", "FIELD_REFERENCE")
+        new JsonObject().put("exprType", "FIELD_REFERENCE")
           .put("dataType", omniDataType.toInt)
           .put("colVal", colVal)
           .put("precision", dt.precision)
@@ -860,16 +899,16 @@ object OmniExpressionAdaptor extends Logging {
   }
 
   def procCaseWhenExpression(caseWhen: CaseWhen,
-                             exprsIndexMap: Map[ExprId, Int]): JSONObject = {
-    var jsonObject = new JSONObject()
+                             exprsIndexMap: Map[ExprId, Int]): JsonObject = {
+    var jsonObject = new JsonObject()
     for (i <- caseWhen.branches.indices.reverse) {
-      val outerJson = new JSONObject().put("exprType", "IF")
+      val outerJson = new JsonObject().put("exprType", "IF")
         .addOmniExpJsonType("returnType", caseWhen.dataType)
         .put("condition", rewriteToOmniJsonExpressionLiteralJsonObject(caseWhen.branches(i)._1, exprsIndexMap))
         .put("if_true", rewriteToOmniJsonExpressionLiteralJsonObject(caseWhen.branches(i)._2, exprsIndexMap))
 
       if (i != caseWhen.branches.length - 1) {
-        val innerJson = new JSONObject(jsonObject, JSONObject.getNames(jsonObject))
+        val innerJson = new JsonObject().addAll(jsonObject)
         outerJson.put("if_false", innerJson)
       } else {
         var elseValue = caseWhen.elseValue
