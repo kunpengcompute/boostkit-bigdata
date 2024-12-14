@@ -352,9 +352,12 @@ object OmniAdaptorUtil {
     if (projectExprIdList.nonEmpty) {
       val projectOutput = ListBuffer[Attribute]()
       for (index <- projectExprIdList.indices) {
-        for (col <- output) {
-          if (col.exprId.equals(projectExprIdList(index))) {
-            projectOutput += col
+        breakable {
+          for (col <- output) {
+            if (col.exprId.equals(projectExprIdList(index))) {
+              projectOutput += col
+              break
+            }
           }
         }
       }
@@ -368,10 +371,13 @@ object OmniAdaptorUtil {
     if (projectExprIdList.nonEmpty) {
       val indexList = ListBuffer[Int]()
       for (index <- projectExprIdList.indices) {
-        for (i <- output.indices) {
-          val col = output(i)
-          if (col.exprId.equals(projectExprIdList(index))) {
-            indexList += i
+        breakable {
+          for (i <- output.indices) {
+            val col = output(i)
+            if (col.exprId.equals(projectExprIdList(index))) {
+              indexList += i
+              break
+            }
           }
         }
       }
