@@ -46,7 +46,7 @@ import org.apache.spark.sql.execution.metric.SQLMetrics
 import org.apache.spark.sql.execution.util.{MergeIterator, SparkMemoryUtils}
 import org.apache.spark.sql.execution.vectorized.OmniColumnVector
 import org.apache.spark.sql.vectorized.ColumnarBatch
-
+import org.apache.spark.sql.execution.adaptive.BroadcastQueryStageExec
 /**
  * Performs an inner hash join of two child relations.  When the output RDD of this operator is
  * being constructed, a Spark job is asynchronously started to calculate the values for the
@@ -64,7 +64,7 @@ case class ColumnarBroadcastHashJoinExec(
     isNullAwareAntiJoin: Boolean = false,
     projectList: Seq[NamedExpression] = Seq.empty)
   extends HashJoin {
-  val shareHashTableKey : String = s"${left.id}-${right.id}"
+
   override def verboseStringWithOperatorId(): String = {
     val joinCondStr = if (condition.isDefined) {
       s"${condition.get}${condition.get.dataType}"
@@ -336,7 +336,12 @@ case class ColumnarBroadcastHashJoinExec(
     val projectListIndex = getProjectListIndex(projectExprIdList, prunedStreamedOutput, prunedBuildOutput)
     val lookupJoinType = OmniExpressionAdaptor.toOmniJoinType(joinType)
     val canShareBuildOp = (lookupJoinType != OMNI_JOIN_TYPE_RIGHT && lookupJoinType != OMNI_JOIN_TYPE_FULL)
-
+    val buildPlanId = buildPlan match {
+      case exec: BroadcastQueryStageExec =>
+        exec.broadcast.id
+      case _ =>
+        buildPlan.id
+    }
     streamedPlan.executeColumnar().mapPartitionsWithIndexInternal { (index, iter) =>
       val filter: Optional[String] = condition match {
         case Some(expr) =>
@@ -356,7 +361,7 @@ case class ColumnarBroadcastHashJoinExec(
         buildCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startBuildCodegen)
 
         if (isShared) {
-          OmniHashBuilderWithExprOperatorFactory.saveHashBuilderOperatorAndFactory(shareHashTableKey,
+          OmniHashBuilderWithExprOperatorFactory.saveHashBuilderOperatorAndFactory(buildPlanId,
             opFactory, op)
         }
         val deserializer = VecBatchSerializerFactory.create()
@@ -371,7 +376,7 @@ case class ColumnarBroadcastHashJoinExec(
         } catch {
           case e: Exception => {
             if (isShared) {
-              OmniHashBuilderWithExprOperatorFactory.dereferenceHashBuilderOperatorAndFactory(shareHashTableKey)
+              OmniHashBuilderWithExprOperatorFactory.dereferenceHashBuilderOperatorAndFactory(buildPlanId)
             } else {
               op.close()
               opFactory.close()
@@ -388,7 +393,7 @@ case class ColumnarBroadcastHashJoinExec(
       if (enableShareBuildOp && canShareBuildOp) {
         OmniHashBuilderWithExprOperatorFactory.gLock.lock()
         try {
-          buildOpFactory = OmniHashBuilderWithExprOperatorFactory.getHashBuilderOperatorFactory(shareHashTableKey)
+          buildOpFactory = OmniHashBuilderWithExprOperatorFactory.getHashBuilderOperatorFactory(buildPlanId)
           if (buildOpFactory == null) {
             val (opFactory, op) = createBuildOpFactoryAndOp(true)
             buildOpFactory = opFactory
@@ -421,7 +426,7 @@ case class ColumnarBroadcastHashJoinExec(
         lookupOpFactory.close()
         if (enableShareBuildOp && canShareBuildOp) {
           OmniHashBuilderWithExprOperatorFactory.gLock.lock()
-          OmniHashBuilderWithExprOperatorFactory.dereferenceHashBuilderOperatorAndFactory(shareHashTableKey)
+          OmniHashBuilderWithExprOperatorFactory.dereferenceHashBuilderOperatorAndFactory(buildPlanId)
           OmniHashBuilderWithExprOperatorFactory.gLock.unlock()
         } else {
           buildOp.close()
