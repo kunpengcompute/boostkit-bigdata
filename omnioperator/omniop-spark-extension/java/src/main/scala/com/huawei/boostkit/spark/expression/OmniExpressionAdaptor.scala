@@ -800,7 +800,11 @@ object OmniExpressionAdaptor extends Logging {
           jsonObject.addProperty(jsonAttributeKey, value.asInstanceOf[Boolean])
         case _: JsonElement =>
           jsonObject.add(jsonAttributeKey, value.asInstanceOf[JsonElement])
-        case _ => throw new UnsupportedOperationException("unsupported value type to be json ")
+        case _ =>
+          // subquery存在value为null的场景，保持原有逻辑，value为null不放入
+          if (value != null) {
+            throw new UnsupportedOperationException("unsupported value type to be json ")
+          }
       }
       jsonObject
     }
