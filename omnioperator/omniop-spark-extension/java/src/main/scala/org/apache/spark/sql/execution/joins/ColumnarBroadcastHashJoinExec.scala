@@ -338,7 +338,7 @@ case class ColumnarBroadcastHashJoinExec(
     val canShareBuildOp = (lookupJoinType != OMNI_JOIN_TYPE_RIGHT && lookupJoinType != OMNI_JOIN_TYPE_FULL)
     val buildPlanId = buildPlan match {
       case exec: BroadcastQueryStageExec =>
-        exec.broadcast.id
+        exec.plan.id
       case _ =>
         buildPlan.id
     }
