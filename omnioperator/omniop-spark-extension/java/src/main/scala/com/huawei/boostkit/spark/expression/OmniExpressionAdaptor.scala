@@ -901,6 +901,10 @@ object OmniExpressionAdaptor extends Logging {
         case _: String =>
           jsonObject.addProperty(jsonAttributeKey, value.asInstanceOf[String])
         case _: Number =>
+          val d = value.asInstanceOf[Number].doubleValue()
+          if (java.lang.Double.isInfinite(d) || java.lang.Double.isNaN(d)) {
+            throw new UnsupportedOperationException("Forbidden numeric value: " + d)
+          }
           jsonObject.addProperty(jsonAttributeKey, value.asInstanceOf[Number])
         case _: Character =>
           jsonObject.addProperty(jsonAttributeKey, value.asInstanceOf[Character])
@@ -913,6 +917,7 @@ object OmniExpressionAdaptor extends Logging {
           if (value != null) {
             throw new UnsupportedOperationException("unsupported value type to be json ")
           }
+          jsonObject.remove(jsonAttributeKey)
       }
       jsonObject
     }
