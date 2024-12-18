@@ -254,6 +254,9 @@ case class ColumnarHashAggregateExec(
     val finalStep =
       (aggregateExpressions.count(_.mode == Final) == aggregateExpressions.size)
 
+    val completeStep =
+      (aggregateExpressions.count(_.mode == Complete) == aggregateExpressions.size)
+
     var index = 0
     for (exp <- aggregateExpressions) {
       if (exp.filter.isDefined) {
@@ -291,6 +294,21 @@ case class ColumnarHashAggregateExec(
               toOmniAggInOutJSonExp(exp.aggregateFunction.children, attrExpsIdMap)
             omniInputRaws(index) = true
             omniOutputPartials(index) = true
+            if (omniAggFunctionTypes(index) == OMNI_AGGREGATION_TYPE_COUNT_ALL) {
+              omniAggChannels(index) = null
+            }
+          case _ => throw new UnsupportedOperationException(s"Unsupported aggregate aggregateFunction: ${exp}")
+        }
+      } else if (exp.mode == Complete) {
+        exp.aggregateFunction match {
+          case Sum(_, _) | Min(_) | Max(_) | Count(_) | Average(_, _) | First(_, _) =>
+            omniAggFunctionTypes(index) = toOmniAggFunType(exp, true, true)
+            omniAggOutputTypes(index) =
+              toOmniAggInOutType(exp.aggregateFunction.dataType)
+            omniAggChannels(index) =
+              toOmniAggInOutJSonExp(exp.aggregateFunction.children, attrExpsIdMap)
+            omniInputRaws(index) = true
+            omniOutputPartials(index) = false
             if (omniAggFunctionTypes(index) == OMNI_AGGREGATION_TYPE_COUNT_ALL) {
               omniAggChannels(index) = null
             }
@@ -385,7 +403,7 @@ case class ColumnarHashAggregateExec(
       getOutputTime += NANOSECONDS.toMillis(System.nanoTime() - startGetOp)
 
       var localSchema = this.schema
-      if (finalStep) {
+      if (finalStep || completeStep) {
         // for final step resultExpressions's inputs from omni-final aggregator
         val omnifinalOutSchema = groupingExpressions.map(_.toAttribute) ++ aggregateAttributes
         localSchema = StructType(omnifinalOutSchema.map(a => StructField(a.name, a.dataType, a.nullable, a.metadata)))
@@ -448,7 +466,7 @@ case class ColumnarHashAggregateExec(
           }
         }
       }
-      if (finalStep) {
+      if (finalStep || completeStep) {
         val finalOut = groupingExpressions.map(_.toAttribute) ++ aggregateAttributes
         val finalAttrExprsIdMap = getExprIdMap(finalOut)
         val projectInputTypes = finalOut.map(
