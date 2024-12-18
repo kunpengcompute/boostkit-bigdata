@@ -27,8 +27,8 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.optimizer.{BuildLeft, BuildRight, BuildSide}
 import org.apache.spark.sql.{SparkSession, SparkSessionExtensions}
 import org.apache.spark.sql.catalyst.expressions.{Alias, And, Ascending, EqualTo, Expression, GreaterThan, GreaterThanOrEqual, IntegerLiteral, LessThan, LessThanOrEqual, Literal, NamedExpression, Rank, RowNumber, SortOrder, WindowExpression}
-import org.apache.spark.sql.catalyst.expressions.aggregate.{AggregateExpression, Partial, PartialMerge}
 import org.apache.spark.sql.catalyst.optimizer.{DelayCartesianProduct, ReorderJoinEnhances, RewriteSelfJoinInInPredicate}
+import org.apache.spark.sql.catalyst.expressions.aggregate.{AggregateExpression, Partial, Complete, Final, PartialMerge}
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.adaptive.{AQEShuffleReadExec, AdaptiveSparkPlanExec, BroadcastQueryStageExec, OmniAQEShuffleReadExec, ShuffleQueryStageExec}
@@ -89,6 +89,50 @@ case class ColumnarPreOverrides(isSupportAdaptive: Boolean = true)
         splitConjunctivePredicates(cond1) ++ splitConjunctivePredicates(cond2)
       case other => other :: Nil
     }
+  }
+
+  // condition :`hashagg（partial）->hashagg（final)`
+  // If certain conditions are met, it will transformed into ` hashagg（complete)`.
+  private def combineHashAgg(plan: HashAggregateExec, child: SparkPlan): SparkPlan = {
+    var newChild: SparkPlan = new ColumnarHashAggregateExec(
+      plan.requiredChildDistributionExpressions,
+      plan.isStreaming,
+      plan.numShufflePartitions,
+      plan.groupingExpressions,
+      plan.aggregateExpressions,
+      plan.aggregateAttributes,
+      plan.initialInputBufferOffset,
+      plan.resultExpressions,
+      child)
+    child match {
+      case exec: ColumnarHashAggregateExec =>
+        if (canCombine(plan, exec)) {
+          newChild = new ColumnarHashAggregateExec(
+            exec.requiredChildDistributionExpressions,
+            exec.isStreaming,
+            exec.numShufflePartitions,
+            exec.groupingExpressions,
+            exec.aggregateExpressions.map(
+              aggregate => new AggregateExpression(aggregate.aggregateFunction,
+                Complete,
+                aggregate.isDistinct,
+                aggregate.filter,
+                aggregate.resultId)),
+            plan.aggregateAttributes,
+            exec.initialInputBufferOffset,
+            plan.resultExpressions,
+            exec.child)
+        }
+      case _ =>
+    }
+    newChild
+  }
+
+  private def canCombine(plan: HashAggregateExec, child: ColumnarHashAggregateExec): Boolean = {
+    plan.groupingExpressions.length == child.groupingExpressions.length &&
+      plan.groupingExpressions.diff(child.groupingExpressions).isEmpty &&
+      child.aggregateExpressions.forall(_.mode == Partial) &&
+      plan.aggregateExpressions.forall(_.mode == Final)
   }
 
   def replaceWithColumnarPlan(plan: SparkPlan): SparkPlan = {
@@ -366,16 +410,7 @@ case class ColumnarPreOverrides(isSupportAdaptive: Boolean = true)
                   child)
             }
           } else {
-            new ColumnarHashAggregateExec(
-              plan.requiredChildDistributionExpressions,
-              plan.isStreaming,
-              plan.numShufflePartitions,
-              plan.groupingExpressions,
-              plan.aggregateExpressions,
-              plan.aggregateAttributes,
-              plan.initialInputBufferOffset,
-              plan.resultExpressions,
-              child)
+            combineHashAgg(plan, child)
           }
         } else {
           if (child.isInstanceOf[ColumnarExpandExec]) {
@@ -453,16 +488,7 @@ case class ColumnarPreOverrides(isSupportAdaptive: Boolean = true)
                 child)
             }
           } else {
-            new ColumnarHashAggregateExec(
-              plan.requiredChildDistributionExpressions,
-              plan.isStreaming,
-              plan.numShufflePartitions,
-              plan.groupingExpressions,
-              plan.aggregateExpressions,
-              plan.aggregateAttributes,
-              plan.initialInputBufferOffset,
-              plan.resultExpressions,
-              child)
+            combineHashAgg(plan, child)
           }
         }
 
