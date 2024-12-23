@@ -27,11 +27,13 @@ public class ParquetColumnarBatchJniWriter {
         NativeReaderLoader.getInstance();
     }
 
-    public native long initializeWriter(JSONObject var1);
+    public native void initializeWriter(JSONObject var1, long writer);
 
-    public native void initializeSchema(long writer, String[] fieldNames, int[] fieldTypes, boolean[] nullables, int[][]decimalParam);
+    public native long initializeSchema(long writer, String[] fieldNames, int[] fieldTypes, boolean[] nullables, int[][] decimalParam);
 
     public native void write(long writer, long[] vecNativeId, int[] omniTypes, boolean[] dataColumnsIds, int rowNums);
 
     public native void splitWrite(long writer, long[] vecNativeId, int[] omniTypes, boolean[] dataColumnsIds, long starPos, long endPos);
+
+    public native void close(long writer);
 }

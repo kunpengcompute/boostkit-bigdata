@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2024-2024. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
@@ -28,7 +29,7 @@ import org.apache.spark.sql.catalyst.expressions.Attribute
 import org.apache.spark.sql.execution.datasources.{OmniInternalRow, OutputWriter}
 import org.apache.spark.sql.types.StructType
 
-import java.net.URI
+import scala.Array.{emptyBooleanArray, emptyIntArray}
 
 // NOTE: This class is instantiated and used on executor side only, no need to be serializable.
 class OmniParquetOutputWriter(path: String, dataSchema: StructType,
@@ -36,23 +37,31 @@ class OmniParquetOutputWriter(path: String, dataSchema: StructType,
   extends OutputWriter {
 
   val writer = new ParquetColumnarBatchWriter()
-  var omniTypes: Array[Int] = new Array[Int](0)
-  var dataColumnsIds: Array[Boolean] = new Array[Boolean](0)
-  var allOmniTypes: Array[Int] = new Array[Int](0)
+  //  var omniTypes: Array[Int] = new Array[Int](0)
+  //  var dataColumnsIds: Array[Boolean] = new Array[Boolean](0)
+  //  var allOmniTypes: Array[Int] = new Array[Int](0)
+  var omniTypes: Array[Int] = emptyIntArray
+  var dataColumnsIds: Array[Boolean] = emptyBooleanArray
+  var allOmniTypes: Array[Int] = emptyIntArray
 
   def initialize(allColumns: Seq[Attribute], dataColumns: Seq[Attribute]): Unit = {
     val filePath = new Path(path)
-    val ugi = UserGroupInformation.getCurrentUser.toString
     writer.initializeSchemaJava(dataSchema)
     writer.initializeWriterJava(filePath)
-    dataSchema.foreach(field => {
-      omniTypes = omniTypes :+ sparkTypeToOmniType(field.dataType, field.metadata).getId.ordinal()
-    })
+    //    dataSchema.foreach(field => {
+    //      omniTypes = omniTypes :+ sparkTypeToOmniType(field.dataType, field.metadata).getId.ordinal()
+    //    })
+    omniTypes = dataSchema.fields
+      .map(field => sparkTypeToOmniType(field.dataType, field.metadata).getId.ordinal())
+      .toArray
 
-    allColumns.toStructType.foreach(field => {
-      allOmniTypes = allOmniTypes :+ sparkTypeToOmniType(field.dataType, field.metadata)
-        .getId.ordinal()
-    })
+    //    allColumns.toStructType.foreach(field => {
+    //      allOmniTypes = allOmniTypes :+ sparkTypeToOmniType(field.dataType, field.metadata)
+    //        .getId.ordinal()
+    //    })
+    allOmniTypes = allColumns.toStructType.fields
+      .map(field => sparkTypeToOmniType(field.dataType, field.metadata).getId.ordinal())
+      .toArray
     dataColumnsIds = allColumns.map(x => dataColumns.contains(x)).toArray
   }
 
@@ -68,6 +77,7 @@ class OmniParquetOutputWriter(path: String, dataSchema: StructType,
   }
 
   override def close(): Unit = {
+    writer.close()
   }
 
   override def path(): String = {

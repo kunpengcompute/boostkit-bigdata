@@ -31,14 +31,10 @@ using namespace arrow;
 static constexpr int32_t DECIMAL_PRECISION_INDEX = 0;
 static constexpr int32_t DECIMAL_SCALE_INDEX = 1;
 
-// 定义全局的ParquetWriter指针
-ParquetWriter *pWriter = nullptr;
-
-JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_write_jni_ParquetColumnarBatchJniWriter_initializeWriter(
-    JNIEnv *env, jobject jObj, jobject jsonObj)
+JNIEXPORT void JNICALL Java_com_huawei_boostkit_write_jni_ParquetColumnarBatchJniWriter_initializeWriter(
+    JNIEnv *env, jobject jObj, jobject jsonObj, jlong writer)
 {
     JNI_FUNC_START
-    // Get uriStr
     jstring uri = (jstring)env->CallObjectMethod(jsonObj, jsonMethodString, env->NewStringUTF("uri"));
     const char *uriStr = env->GetStringUTFChars(uri, JNI_FALSE);
     std::string uriString(uriStr);
@@ -49,10 +45,10 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_write_jni_ParquetColumnarBatchJ
     std::string ugiString(ugi);
     env->ReleaseStringUTFChars(ugiTemp, ugi);
 
-    jstring schemeTemp = (jstring)env->CallObjectMethod(jsonObj, jsonMethodString, env->NewStringUTF("scheme"));
-    const char *scheme = env->GetStringUTFChars(schemeTemp, JNI_FALSE);
-    std::string schemeString(scheme);
-    env->ReleaseStringUTFChars(schemeTemp, scheme);
+    jstring schemaTemp = (jstring)env->CallObjectMethod(jsonObj, jsonMethodString, env->NewStringUTF("scheme"));
+    const char *schema = env->GetStringUTFChars(schemaTemp, JNI_FALSE);
+    std::string schemaString(schema);
+    env->ReleaseStringUTFChars(schemaTemp, schema);
 
     jstring hostTemp = (jstring)env->CallObjectMethod(jsonObj, jsonMethodString, env->NewStringUTF("host"));
     const char *host = env->GetStringUTFChars(hostTemp, JNI_FALSE);
@@ -66,57 +62,45 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_write_jni_ParquetColumnarBatchJ
 
     jint port = (jint)env->CallIntMethod(jsonObj, jsonMethodInt, env->NewStringUTF("port"));
 
-    UriInfo uriInfo(uriString, schemeString, pathString, hostString, std::to_string(port));
-
-    auto state = pWriter->InitRecordWriter(uriInfo, ugiString);
-    if (state != arrow::Status::OK())
-    {
-        env->ThrowNew(runtimeExceptionClass, state.ToString().c_str());
-        return 0;
+    UriInfo uriInfo(uriString, schemaString, pathString, hostString, std::to_string(port));
+    ParquetWriter *pWriter = (ParquetWriter *)writer;
+    if (pWriter == nullptr) {
+        env->ThrowNew(runtimeExceptionClass, "the pWriter is null");
     }
-    return (jlong)(pWriter);
-    JNI_FUNC_END(runtimeExceptionClass)
+    pWriter->InitRecordWriter(uriInfo, ugiString);
+    JNI_FUNC_END_VOID(runtimeExceptionClass)
 }
 
-JNIEXPORT void JNICALL Java_com_huawei_boostkit_write_jni_ParquetColumnarBatchJniWriter_initializeSchema(
-    JNIEnv *env, jobject JObj, long writer, jobjectArray fieldNames, jintArray fieldTypes, 
+JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_write_jni_ParquetColumnarBatchJniWriter_initializeSchema(
+    JNIEnv *env, jobject JObj, jlong writer, jobjectArray fieldNames, jintArray fieldTypes,
     jbooleanArray nullables, jobjectArray decimalParam)
 {
-    if (pWriter == nullptr)
-    {
-        pWriter = new ParquetWriter();
-    }
     JNI_FUNC_START
+    auto pWriter = std::make_unique<ParquetWriter>();
     auto fieldTypesPtr = env->GetIntArrayElements(fieldTypes, JNI_FALSE);
     auto nullablesPtr = env->GetBooleanArrayElements(nullables, JNI_FALSE);
-    if (fieldTypesPtr == NULL)
-    {
+    if (fieldTypesPtr == NULL) {
         throw std::runtime_error("Parquet type ids should not be null");
     }
-    auto schemeLength = (int32_t)env->GetArrayLength(fieldTypes);
-
+    auto schemaLength = (int32_t)env->GetArrayLength(fieldTypes);
     FieldVector fieldVector;
-    for (int i = 0; i < schemeLength; i++)
-    {
+    for (int i = 0; i < schemaLength; i++) {
         jint parquetType = fieldTypesPtr[i];
         jboolean nullable = nullablesPtr[i];
         jstring fieldName = (jstring)env->GetObjectArrayElement(fieldNames, i);
         const char *cFieldName = env->GetStringUTFChars(fieldName, nullptr);
         std::shared_ptr<DataType> writeParquetType;
-        if (static_cast<Type::type>(parquetType) == Type::type::DECIMAL)
-        {
+
             auto decimalParamArray = (jintArray)env->GetObjectArrayElement(decimalParam, i);
             auto decimalParamArrayPtr = env->GetIntArrayElements(decimalParamArray, JNI_FALSE);
             auto precision = decimalParamArrayPtr[DECIMAL_PRECISION_INDEX];
-            pWriter->precisions.push_back(precision);
             auto scale = decimalParamArrayPtr[DECIMAL_SCALE_INDEX];
-            pWriter->scales.push_back(scale);
-            writeParquetType = decimal128(precision, scale);
-        }
-        else
-        {
-            switch (static_cast<Type::type>(parquetType))
-            {
+            switch (static_cast<Type::type>(parquetType)) {
+            case Type::type::DECIMAL:
+                 pWriter->precisions.push_back(precision);
+                 pWriter->scales.push_back(scale);
+                 writeParquetType = decimal128(precision, scale);
+                 break;
             case Type::type::BOOL:
                 writeParquetType = arrow::boolean();
                 break;
@@ -142,17 +126,23 @@ JNIEXPORT void JNICALL Java_com_huawei_boostkit_write_jni_ParquetColumnarBatchJn
                 writeParquetType = arrow::utf8();
                 break;
             default:
-                throw std::invalid_argument("Unsupported parquet type");
+                throw std::invalid_argument("Unsupported parquet type: "+std::to_string(parquetType));
             }
-        }
         auto t = field(cFieldName, writeParquetType, nullable);
         fieldVector.emplace_back(t);
+        env->ReleaseIntArrayElements(decimalParamArray,decimalParamArrayPtr,JNI_ABORT);
         env->ReleaseStringUTFChars(fieldName, cFieldName);
     }
     auto t = std::make_unique<Schema>(fieldVector);
+    if (pWriter == nullptr) {
+            env->ThrowNew(runtimeExceptionClass, "the pWriter is null");
+    }
     pWriter->schema_ = std::make_shared<Schema>(fieldVector);
-
-    JNI_FUNC_END_VOID(runtimeExceptionClass)
+    ParquetWriter *pWriterNew= pWriter.release();
+    env->ReleaseIntArrayElements(fieldTypes,fieldTypesPtr,JNI_ABORT);
+    env->ReleaseBooleanArrayElements(nullables,nullablesPtr,JNI_ABORT);
+    return (jlong)(pWriterNew);
+    JNI_FUNC_END(runtimeExceptionClass)
 }
 
 JNIEXPORT void JNICALL
@@ -166,8 +156,13 @@ Java_com_huawei_boostkit_write_jni_ParquetColumnarBatchJniWriter_write(
     auto colNums = env->GetArrayLength(vecNativeId);
     auto omniTypesPtr = env->GetIntArrayElements(omniTypes, JNI_FALSE);
     auto dataColumnsIdsPtr = env->GetBooleanArrayElements(dataColumnsIds, JNI_FALSE);
+    if (pWriter == nullptr) {
+        env->ThrowNew(runtimeExceptionClass, "the pWriter is null");
+    }
     pWriter->write(vecNativeIdPtr, colNums, omniTypesPtr, dataColumnsIdsPtr);
-
+    env->ReleaseLongArrayElements(vecNativeId, vecNativeIdPtr, 0);
+    env->ReleaseIntArrayElements(omniTypes, omniTypesPtr, 0);
+    env->ReleaseBooleanArrayElements(dataColumnsIds, dataColumnsIdsPtr, 0);
     JNI_FUNC_END_VOID(runtimeExceptionClass)
 }
 
@@ -182,10 +177,27 @@ JNIEXPORT void JNICALL Java_com_huawei_boostkit_write_jni_ParquetColumnarBatchJn
     auto dataColumnsIdsPtr = env->GetBooleanArrayElements(dataColumnsIds, JNI_FALSE);
     auto writeRows = endPos - startPos;
     ParquetWriter *pWriter = (ParquetWriter *)writer;
+    if (pWriter == nullptr) {
+        env->ThrowNew(runtimeExceptionClass, "the pWriter is null");
+    }
     pWriter->write(vecNativeIdPtr, colNums, omniTypesPtr, dataColumnsIdsPtr, true, startPos, endPos);
 
     env->ReleaseLongArrayElements(vecNativeId, vecNativeIdPtr, 0);
     env->ReleaseIntArrayElements(omniTypes, omniTypesPtr, 0);
     env->ReleaseBooleanArrayElements(dataColumnsIds, dataColumnsIdsPtr, 0);
+    JNI_FUNC_END_VOID(runtimeExceptionClass)
+}
+
+JNIEXPORT void JNICALL Java_com_huawei_boostkit_write_jni_ParquetColumnarBatchJniWriter_close(JNIEnv *env, jobject jObj,
+   jlong writer)
+{
+    JNI_FUNC_START
+
+    ParquetWriter *pWriter = (ParquetWriter *)writer;
+    if (pWriter == nullptr) {
+        env->ThrowNew(runtimeExceptionClass, "delete nullptr error for writer");
+    }
+
+    delete pWriter;
     JNI_FUNC_END_VOID(runtimeExceptionClass)
 }

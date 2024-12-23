@@ -20,7 +20,7 @@
 #ifndef NATIVE_READER_PARQUETWRITER_H
 #define NATIVE_READER_PARQUETWRITER_H
 
-#endif // NATIVE_READER_PARQUETWRITER_H
+
 
 #include <vector/vector_common.h>
 #include <arrow/filesystem/filesystem.h>
@@ -49,3 +49,4 @@ namespace omniruntime::writer
 		std::vector<int> scales;
 	};
 }
+#endif // NATIVE_READER_PARQUETWRITER_H

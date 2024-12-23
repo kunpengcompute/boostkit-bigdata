@@ -50,6 +50,12 @@ import java.io.IOException;
 import java.net.URI;
 
 public class ParquetColumnarBatchWriter {
+    public long writer;
+
+    public long schema;
+
+    public ParquetColumnarBatchJniWriter jniWriter;
+
     public ParquetColumnarBatchWriter() {
         jniWriter = new ParquetColumnarBatchJniWriter();
     }
@@ -195,7 +201,8 @@ public class ParquetColumnarBatchWriter {
         writerOptionsJson.put("port", uri.getPort());
         writerOptionsJson.put("path", uri.getPath() == null ? "" : uri.getPath());
 
-        writer = jniWriter.initializeWriter(writerOptionsJson);
+        //  writer = jniWriter.initializeWriter(writerOptionsJson);
+        jniWriter.initializeWriter(writerOptionsJson, writer);
     }
 
     public void convertGreGorianToJulian(IntVec intVec, int startPos, int endPos) {
@@ -211,15 +218,13 @@ public class ParquetColumnarBatchWriter {
         String[] fieldNames = new String[schemaLength];
         int[] fieldTypes = new int[schemaLength];
         boolean[] nullables = new boolean[schemaLength];
-        String[] metaDataKeys = new String[schemaLength];
-        String[] metaDataValues = new String[schemaLength];
         for (int i = 0; i < schemaLength; i++) {
             StructField field = dataSchema.fields()[i];
             fieldNames[i] = field.name();
             fieldTypes[i] = sparkTypeToParquetLibType(field.dataType());
             nullables[i] = field.nullable();
         }
-        jniWriter.initializeSchema(writer, fieldNames, fieldTypes, nullables, extractDecimalParam(dataSchema));
+        writer = jniWriter.initializeSchema(writer, fieldNames, fieldTypes, nullables, extractDecimalParam(dataSchema));
     }
 
     public int sparkTypeToParquetLibType(DataType dataType) {
@@ -228,20 +233,20 @@ public class ParquetColumnarBatchWriter {
         } else if (dataType instanceof ShortType) {
             return ParquetLibTypeKind.INT16.ordinal();
         } else if (dataType instanceof IntegerType) {
-            IntegerType integerType = (IntegerType) dataType;
-            switch (integerType.defaultSize()) {
-                case 1:
-                    return ParquetLibTypeKind.INT8.ordinal();
-                case 2:
-                    return ParquetLibTypeKind.INT16.ordinal();
-                case 4:
-                    return ParquetLibTypeKind.INT32.ordinal();
-                case 8:
-                    return ParquetLibTypeKind.DATE64.ordinal();
-                default:
-                    throw new RuntimeException(
-                            "UnSupport size " + integerType.defaultSize() + " of integer type");
-            }
+//            IntegerType integerType = (IntegerType) dataType;
+//            switch (integerType.defaultSize()) {
+//                case 1:
+//                    return ParquetLibTypeKind.INT8.ordinal();
+//                case 2:
+//                    return ParquetLibTypeKind.INT16.ordinal();
+//                case 4:
+            return ParquetLibTypeKind.INT32.ordinal();
+//                case 8:
+//                    return ParquetLibTypeKind.DATE64.ordinal();
+//                default:
+//                    throw new RuntimeException(
+//                            "UnSupport size " + integerType.defaultSize() + " of integer type");
+//            }
         } else if (dataType instanceof LongType) {
             return ParquetLibTypeKind.INT64.ordinal();
         } else if (dataType instanceof DateType) {
@@ -297,7 +302,6 @@ public class ParquetColumnarBatchWriter {
     }
 
     public void write(int[] omniTypes, boolean[] dataColumnsIds, ColumnarBatch batch) {
-        JSONObject job = new JSONObject();
 
         long[] vecNativeIds = new long[batch.numCols()];
         for (int i = 0; i < batch.numCols(); i++) {
@@ -328,8 +332,8 @@ public class ParquetColumnarBatchWriter {
         jniWriter.splitWrite(writer, vecNativeIds, omniTypes, dataColumnsIds, startPos, endPos);
     }
 
-    public long writer;
+    public void close() {
+        jniWriter.close(writer);
+    }
 
-    public long schema;
-    public ParquetColumnarBatchJniWriter jniWriter;
 }

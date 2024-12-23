@@ -37,20 +37,48 @@ extern "C"
 {
 #endif
 
-    JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_write_jni_ParquetColumnarBatchJniWriter_initializeWriter
-        (JNIEnv *env, jobject jObj, jobject job);
+/*
+ * Class:       com_huawei_boostkit_writer_jni_ParquetColumnarBatchJniWriter
+ * Method:      initializeWriter
+ * Signature:
+ */
+JNIEXPORT void JNICALL Java_com_huawei_boostkit_write_jni_ParquetColumnarBatchJniWriter_initializeWriter
+    (JNIEnv *env, jobject jObj, jobject job, jlong writer);
 
-    JNIEXPORT void JNICALL Java_com_huawei_boostkit_write_jni_ParquetColumnarBatchJniWriter_initializeSchema
-        (JNIEnv *env, jobject jObj, long writer, jobjectArray filedNames, jintArray fieldTypes,
-         jbooleanArray nullables, jobjectArray decimalParam);
+/*
+ * Class:       com_huawei_boostkit_writer_jni_ParquetColumnarBatchJniWriter
+ * Method:      initializeSchema
+ * Signature:
+ */
+JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_write_jni_ParquetColumnarBatchJniWriter_initializeSchema
+    (JNIEnv *env, jobject jObj, jlong writer, jobjectArray filedNames, jintArray fieldTypes,
+    jbooleanArray nullables, jobjectArray decimalParam);
 
-    JNIEXPORT void JNICALL Java_com_huawei_boostkit_write_jni_ParquetColumnarBatchJniWriter_write(
-        JNIEnv *env, jobject jObj, jlong writer, jlongArray vecNativeId,
-        jintArray omniTypes, jbooleanArray dataColumnsIds, jint numRows);
+/*
+ * Class:       com_huawei_boostkit_writer_jni_ParquetColumnarBatchJniWriter
+ * Method:      write
+ * Signature:
+ */
+JNIEXPORT void JNICALL Java_com_huawei_boostkit_write_jni_ParquetColumnarBatchJniWriter_write(
+    JNIEnv *env, jobject jObj, jlong writer, jlongArray vecNativeId,
+    jintArray omniTypes, jbooleanArray dataColumnsIds, jint numRows);
 
-    JNIEXPORT void JNICALL Java_com_huawei_boostkit_write_jni_ParquetColumnarBatchJniWriter_splitWrite(
-        JNIEnv *env, jobject jObj, jlong writer, jlongArray vecNativeId, jintArray omniTypes,
-        jbooleanArray dataColumnsIds, jlong startPos, jlong endPos);
+/*
+ * Class:       com_huawei_boostkit_writer_jni_ParquetColumnarBatchJniWriter
+ * Method:      splitWrite
+ * Signature:
+ */
+JNIEXPORT void JNICALL Java_com_huawei_boostkit_write_jni_ParquetColumnarBatchJniWriter_splitWrite(
+    JNIEnv *env, jobject jObj, jlong writer, jlongArray vecNativeId, jintArray omniTypes,
+    jbooleanArray dataColumnsIds, jlong startPos, jlong endPos);
+
+/*
+ * Class:       com_huawei_boostkit_writer_jni_ParquetColumnarBatchJniWriter
+ * Method:      close
+ * Signature:
+ */
+JNIEXPORT void JNICALL Java_com_huawei_boostkit_write_jni_ParquetColumnarBatchJniWriter_close(JNIEnv *env, jobject jObj,
+     jlong writer);
 
 #ifdef __cplusplus
 }
