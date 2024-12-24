@@ -8,11 +8,13 @@ set (SOURCE_FILES
         jni/OrcColumnarBatchJniReader.cpp
         jni/jni_common.cpp
         jni/ParquetColumnarBatchJniReader.cpp
+        jni/ParquetColumnarBatchJniWriter.cpp
         parquet/ParquetReader.cpp
         parquet/ParquetColumnReader.cpp
         parquet/ParquetTypedRecordReader.cpp
         parquet/ParquetDecoder.cpp
         parquet/ParquetExpression.cpp
+        parquet/ParquetWriter.cpp
         common/UriInfo.cc
         orcfile/OrcFileOverride.cc
         orcfile/OrcHdfsFileOverride.cc
@@ -54,6 +56,7 @@ find_package(nlohmann_json 3.7.3 REQUIRED)
 target_include_directories(${PROJ_TARGET} PUBLIC $ENV{JAVA_HOME}/include)
 target_include_directories(${PROJ_TARGET} PUBLIC $ENV{JAVA_HOME}/include/linux)
 target_include_directories(${PROJ_TARGET} PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
+target_include_directories(${PROJ_TARGET} PUBLIC $ENV{OMNI_HOME}/lib/include)
 
 target_link_libraries (${PROJ_TARGET} PUBLIC
         Arrow::arrow_shared

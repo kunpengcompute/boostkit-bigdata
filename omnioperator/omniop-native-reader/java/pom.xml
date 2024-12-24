@@ -118,6 +118,7 @@
                         <executable>bash</executable>
                         <arguments>
                             <argument>${cpp.dir}/build.sh</argument>
+                            <argument>debug</argument>>
                             <argument>${plugin.cpp.test}</argument>
                         </arguments>
                         </configuration>
