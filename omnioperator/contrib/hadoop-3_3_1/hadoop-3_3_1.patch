@@ -1,0 +1,56 @@
+diff --git a/hadoop-hdfs-project/hadoop-hdfs-native-client/src/main/native/libhdfs/os/posix/thread_local_storage.c b/hadoop-hdfs-project/hadoop-hdfs-native-client/src/main/native/libhdfs/os/posix/thread_local_storage.c
+index 1b6dafab..beebca01 100644
+--- a/hadoop-hdfs-project/hadoop-hdfs-native-client/src/main/native/libhdfs/os/posix/thread_local_storage.c
++++ b/hadoop-hdfs-project/hadoop-hdfs-native-client/src/main/native/libhdfs/os/posix/thread_local_storage.c
+@@ -54,9 +54,10 @@ void hdfsThreadDestructor(void *v)
+
+   /* Detach the current thread from the JVM */
+   if ((env != NULL) && (*env != NULL)) {
+-    ret = (*env)->GetJavaVM(env, &vm);
++    jsize vmNum = 0;
++    ret = JNI_GetCreatedJavaVMs(&vm, 1, &vmNum);
+
+-    if (ret != 0) {
++    if (ret != 0 || vmNum <= 0) {
+       fprintf(stderr, "hdfsThreadDestructor: GetJavaVM failed with error %d\n",
+         ret);
+       jthr = (*env)->ExceptionOccurred(env);
+diff --git a/hadoop-hdfs-project/hadoop-hdfs-native-client/src/main/native/libhdfspp/lib/bindings/c/hdfs.cc b/hadoop-hdfs-project/hadoop-hdfs-native-client/src/main/native/libhdfspp/lib/bindings/c/hdfs.cc
+index 424bb6b7..4748e901 100644
+--- a/hadoop-hdfs-project/hadoop-hdfs-native-client/src/main/native/libhdfspp/lib/bindings/c/hdfs.cc
++++ b/hadoop-hdfs-project/hadoop-hdfs-native-client/src/main/native/libhdfspp/lib/bindings/c/hdfs.cc
+@@ -1402,7 +1402,7 @@ int hdfsGetBlockLocations(hdfsFS fs, const char *path, struct hdfsBlockLocations
+     hdfsBlockLocations *locations = new struct hdfsBlockLocations();
+     (*locations_out) = locations;
+
+-    explicit_bzero(locations, sizeof(*locations));
++    __builtin_bzero(locations, sizeof(*locations));
+     locations->fileLength = ppLocations->getFileLength();
+     locations->isLastBlockComplete = ppLocations->isLastBlockComplete();
+     locations->isUnderConstruction = ppLocations->isUnderConstruction();
+diff --git a/hadoop-hdfs-project/hadoop-hdfs-native-client/src/main/native/libhdfspp/tests/hdfs_ext_test.cc b/hadoop-hdfs-project/hadoop-hdfs-native-client/src/main/native/libhdfspp/tests/hdfs_ext_test.cc
+index fb551726..368824c7 100644
+--- a/hadoop-hdfs-project/hadoop-hdfs-native-client/src/main/native/libhdfspp/tests/hdfs_ext_test.cc
++++ b/hadoop-hdfs-project/hadoop-hdfs-native-client/src/main/native/libhdfspp/tests/hdfs_ext_test.cc
+@@ -475,7 +475,7 @@ TEST_F(HdfsExtTest, TestReadStats) {
+   hdfsFile file = hdfsOpenFile(fs, path.c_str(), O_WRONLY, 0, 0, 0);
+   EXPECT_NE(nullptr, file);
+   void * buf = malloc(size);
+-  explicit_bzero(buf, size);
++  __builtin_bzero(buf, size);
+   EXPECT_EQ(size, hdfsWrite(fs, file, buf, size));
+   free(buf);
+   EXPECT_EQ(0, hdfsCloseFile(fs, file));
+diff --git a/hadoop-hdfs-project/hadoop-hdfs-native-client/src/main/native/libhdfspp/tests/hdfspp_mini_dfs.h b/hadoop-hdfs-project/hadoop-hdfs-native-client/src/main/native/libhdfspp/tests/hdfspp_mini_dfs.h
+index 98edbdc1..cf2913f2 100644
+--- a/hadoop-hdfs-project/hadoop-hdfs-native-client/src/main/native/libhdfspp/tests/hdfspp_mini_dfs.h
++++ b/hadoop-hdfs-project/hadoop-hdfs-native-client/src/main/native/libhdfspp/tests/hdfspp_mini_dfs.h
+@@ -92,7 +92,7 @@ public:
+     hdfsFile file = hdfsOpenFile(*this, path.c_str(), O_WRONLY, 0, 0, 0);
+     EXPECT_NE(nullptr, file);
+     void * buf = malloc(size);
+-    explicit_bzero(buf, size);
++    __builtin_bzero(buf, size);
+     EXPECT_EQ(1024, hdfsWrite(*this, file, buf, size));
+     EXPECT_EQ(0, hdfsCloseFile(*this, file));
+     free(buf);
