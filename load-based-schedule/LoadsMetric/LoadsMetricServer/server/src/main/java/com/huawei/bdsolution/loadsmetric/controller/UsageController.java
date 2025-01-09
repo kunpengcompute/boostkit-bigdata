@@ -36,7 +36,9 @@ public class UsageController {
 
     @PostMapping("/addNodeLogicalResource")
     public void receiveNodeLogicalResource(@RequestBody NodeLogicalResource nodeLogicalResource) {
-        loadsRecordsCacheService.addNodeLogicalResource(nodeLogicalResource);
+        if (nodeHeartbeatService.getAllNodeHosts().contains(nodeLogicalResource.getHostName())){
+            loadsRecordsCacheService.addNodeLogicalResource(nodeLogicalResource);
+        }
     }
 
     @GetMapping("/allNodes")

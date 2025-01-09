@@ -37,6 +37,9 @@ public class NodeHeartbeatServiceImpl implements NodeHeartbeatService {
     @Value("${client.lost.time:2000}")
     private long nodeLostTime;
 
+    @Value("${workers.num:100000}")
+    private int workersNum;
+
     private final Map<String, Long> allNodeHeartbeatTimes = new ConcurrentHashMap<>();
 
     private static final ThreadLocal<SimpleDateFormat> dateFormatThreadLocal = ThreadLocal.withInitial(
@@ -49,7 +52,7 @@ public class NodeHeartbeatServiceImpl implements NodeHeartbeatService {
     public void initAllNodeHosts() {
         try(InputStream inputStream = Files.newInputStream(Paths.get(System.getProperty("workersConfig")));
             BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
-            allNodeHosts.addAll(reader.lines().collect(Collectors.toList()));
+            allNodeHosts.addAll(reader.lines().limit(workersNum).collect(Collectors.toList()));
             LOG.info("allNodeHosts:{}", allNodeHosts);
         }catch (IOException e) {
             throw new RuntimeException("load workersConfig failed for",e);
