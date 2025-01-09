@@ -11,7 +11,7 @@ import javax.validation.constraints.Min;
 import javax.validation.constraints.Pattern;
 
 @Component
-@ConfigurationProperties(prefix = "")
+@ConfigurationProperties
 @Validated
 public class AppConfig {
 
@@ -21,12 +21,12 @@ public class AppConfig {
 
     @Value("${logical-resource-usage.levels.mem:10}")
     @Max(value = 10, message = "The maximum value of memUsageLevels is 10")
-    @Min(value = 1, message = "The minimum value of memUsageLevels is 1")
+    @Min(value = 0, message = "The minimum value of memUsageLevels is 0")
     private int memUsageLevels;
 
     @Value("${logical-resource-usage.levels.vcores:10}")
     @Max(value = 10, message = "The maximum value of vcoresUsageLevels is 10")
-    @Min(value = 1, message = "The minimum value of vcoresUsageLevels is 1")
+    @Min(value = 0, message = "The minimum value of vcoresUsageLevels is 0")
     private int vcoresUsageLevels;
 
     @Value("${load.limit.cpu:-1.0}")
@@ -65,9 +65,34 @@ public class AppConfig {
     @Min(value = 0, message = "The minimum value of netIoWeight is 0")
     private float netIoWeight;
 
+    @Value("${expiration.time:60}")
+    @Max(value = 10000, message = "The maximum value of expirationTime is 10000")
+    @Min(value = 1, message = "The minimum value of expirationTime is 1")
+    private int expirationTime;
+
+    @Value("${client.heartbeat.interval:1000}")
+    @Max(value = 10000000, message = "The maximum value of heartbeatInterval is 10000000")
+    @Min(value = 1000, message = "The minimum value of heartbeatInterval is 1000")
+    private int heartbeatInterval;
+
     @Value("${node-exporter.pull.port}")
     @Pattern(regexp = "\\d+", message = "The port number can contain only digits")
     private String nodeExporterPullPort;
+
+    @Value("${node-exporter.pull.thread-pool.size:1000}")
+    @Max(value = 10000, message = "The maximum value of nodeExporterPullThreadPollSize is 10000")
+    @Min(value = 1, message = "The minimum value of nodeExporterPullThreadPollSize is 1")
+    private int nodeExporterPullThreadPollSize;
+
+    @Value("${client.lost.time:2000}")
+    @Max(value = 10000000, message = "The maximum value of nodeLostTime is 10000000")
+    @Min(value = 1000, message = "The minimum value of nodeLostTime is 1000")
+    private long nodeLostTime;
+
+    @Value("${workers.num:100000}")
+    @Max(value = 100000, message = "The maximum value of nodeLostTime is 100000")
+    @Min(value = 1, message = "The minimum value of nodeLostTime is 1")
+    private int workersNum;
 
     public int getWindowSize() {
         return windowSize;
@@ -157,11 +182,51 @@ public class AppConfig {
         this.netIoWeight = netIoWeight;
     }
 
+    public int getExpirationTime() {
+        return expirationTime;
+    }
+
+    public void setExpirationTime(int expirationTime) {
+        this.expirationTime = expirationTime;
+    }
+
+    public int getHeartbeatInterval() {
+        return heartbeatInterval;
+    }
+
+    public void setHeartbeatInterval(int heartbeatInterval) {
+        this.heartbeatInterval = heartbeatInterval;
+    }
+
     public String getNodeExporterPullPort() {
         return nodeExporterPullPort;
     }
 
     public void setNodeExporterPullPort(String nodeExporterPullPort) {
         this.nodeExporterPullPort = nodeExporterPullPort;
+    }
+
+    public int getNodeExporterPullThreadPollSize() {
+        return nodeExporterPullThreadPollSize;
+    }
+
+    public void setNodeExporterPullThreadPollSize(int nodeExporterPullThreadPollSize) {
+        this.nodeExporterPullThreadPollSize = nodeExporterPullThreadPollSize;
+    }
+
+    public long getNodeLostTime() {
+        return nodeLostTime;
+    }
+
+    public void setNodeLostTime(long nodeLostTime) {
+        this.nodeLostTime = nodeLostTime;
+    }
+
+    public int getWorkersNum() {
+        return workersNum;
+    }
+
+    public void setWorkersNum(int workersNum) {
+        this.workersNum = workersNum;
     }
 }
