@@ -11,7 +11,7 @@ import javax.validation.constraints.Min;
 import javax.validation.constraints.Pattern;
 
 @Component
-@ConfigurationProperties
+@ConfigurationProperties(prefix = "")
 @Validated
 public class AppConfig {
 
@@ -66,7 +66,7 @@ public class AppConfig {
     private float netIoWeight;
 
     @Value("${node-exporter.pull.port}")
-    @Pattern(regexp = "^[0-9]+$]", message = "The port number can contain only digits")
+    @Pattern(regexp = "\\d+", message = "The port number can contain only digits")
     private String nodeExporterPullPort;
 
     public int getWindowSize() {
