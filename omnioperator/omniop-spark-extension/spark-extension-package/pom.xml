@@ -1,0 +1,64 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.huawei.kunpeng</groupId>
+        <artifactId>omniop-spark-extension</artifactId>
+        <version>${project.version}</version>
+    </parent>
+
+    <artifactId>spark-extension-package</artifactId>
+    <packaging>jar</packaging>
+    <name>spark-extension-package</name>
+
+    <properties>
+
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.huawei.kunpeng</groupId>
+            <artifactId>${shim.module}</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.huawei.kunpeng</groupId>
+            <artifactId>spark-extension-core</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.huawei.kunpeng</groupId>
+            <artifactId>${modify.module}</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-assembly-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <artifactId>exec-maven-plugin</artifactId>
+                <groupId>org.codehaus.mojo</groupId>
+                <executions>
+                    <execution>
+                        <id>copy-fat-jar</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <executable>cp</executable>
+                            <arguments>
+                                <argument>target/${project.name}-${project.version}-jar-with-dependencies.jar</argument>
+                                <argument>target/boostkit-omniop-spark-${project.version}-${dep.os.arch}.jar</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

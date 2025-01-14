@@ -1,0 +1,196 @@
+/*
+ * Copyright (C) 2022-2022. Huawei Technologies Co., Ltd. All rights reserved.
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.spark.sql.execution
+
+import org.apache.spark.sql.functions.{avg, count, first, max, min, stddev, sum}
+import org.apache.spark.sql.types._
+import org.apache.spark.sql.{DataFrame, Row}
+
+class ColumnarHashAggregateExecSuite extends ColumnarSparkPlanTest {
+  private var df: DataFrame = _
+
+  protected override def beforeAll(): Unit = {
+    super.beforeAll()
+    df = spark.createDataFrame(
+      sparkContext.parallelize(Seq(
+        Row(1, 2.0, 1L, "a"),
+        Row(1, 2.0, 2L, null),
+        Row(2, 1.0, 3L, "c"),
+        Row(null, null, 6L, "e"),
+        Row(null, 5.0, 7L, "f")
+      )), new StructType().add("a", IntegerType).add("b", DoubleType)
+        .add("c", LongType).add("d", StringType))
+    df.createOrReplaceTempView("df_tbl")
+  }
+
+  test("check columnar hashAgg filter result") {
+    val res = spark.sql("select a, sum(b) filter (where c > 1) from df_tbl group by a")
+    assert(res.queryExecution.executedPlan.find(_.isInstanceOf[ColumnarHashAggregateExec]).isDefined, s"ColumnarHashAggregateExec not happened, executedPlan as follows： \n${res.queryExecution.executedPlan}")
+    checkAnswer(
+      res,
+      Seq(Row(null, 5.0), Row(1, 2.0), Row(2, 1.0))
+    )
+  }
+
+  test("validate columnar hashAgg exec happened") {
+    val res = df.groupBy("a").agg(sum("b"))
+    assert(res.queryExecution.executedPlan.find(_.isInstanceOf[ColumnarHashAggregateExec]).isDefined, s"ColumnarHashAggregateExec not happened, executedPlan as follows： \n${res.queryExecution.executedPlan}")
+  }
+
+  test("check columnar hashAgg result") {
+    val res = testData2.groupBy("a").agg(sum("b"))
+    checkAnswer(
+      res,
+      Seq(Row(1, 3), Row(2, 3), Row(3, 3))
+    )
+  }
+
+  test("check columnar hashAgg result with null") {
+    val res = df.filter(df("a").isNotNull && df("d").isNotNull).groupBy("a").agg(sum("b"))
+    checkAnswer(
+      res,
+      Seq(Row(1, 2.0), Row(2, 1.0))
+    )
+  }
+
+  test("Test ColumnarHashAggregateExec happen and result is correct when execute count(*) api") {
+    val res = df.agg(count("*"))
+    assert(res.queryExecution.executedPlan.find(_.isInstanceOf[ColumnarHashAggregateExec]).isDefined, s"ColumnarHashAggregateExec not happened, executedPlan as follows： \n${res.queryExecution.executedPlan}")
+    checkAnswer(
+      res,
+      Seq(Row(5))
+    )
+  }
+
+  test("Test ColumnarHashAggregateExec happen and result " +
+    "is correct when execute count(*) api with group by") {
+    val res = df.groupBy("a").agg(count("*"))
+    assert(res.queryExecution.executedPlan.find(_.isInstanceOf[ColumnarHashAggregateExec]).isDefined, s"ColumnarHashAggregateExec not happened, executedPlan as follows： \n${res.queryExecution.executedPlan}")
+    checkAnswer(
+      res,
+      Seq(Row(1, 2), Row(2, 1), Row(null, 2))
+    )
+  }
+
+  test("test hashAgg null") {
+    var res = df.filter(df("a").equalTo(3)).groupBy("a").agg(sum("a"))
+    checkAnswer(
+      res,
+      Seq.empty
+    )
+    res = df.filter(df("a").equalTo(3)).groupBy("a").agg(max("a"))
+    checkAnswer(
+      res,
+      Seq.empty
+    )
+    res = df.filter(df("a").equalTo(3)).groupBy("a").agg(min("a"))
+    checkAnswer(
+      res,
+      Seq.empty
+    )
+    res = df.filter(df("a").equalTo(3)).groupBy("a").agg(avg("a"))
+    checkAnswer(
+      res,
+      Seq.empty
+    )
+    res = df.filter(df("a").equalTo(3)).groupBy("a").agg(first("a"))
+    checkAnswer(
+      res,
+      Seq.empty
+    )
+    res = df.filter(df("a").equalTo(3)).groupBy("a").agg(count("a"))
+    checkAnswer(
+      res,
+      Seq.empty
+    )
+    res = df.filter(df("a").equalTo(3)).groupBy("a").agg(stddev("a"))
+    checkAnswer(
+      res,
+      Seq.empty
+    )
+  }
+  test("test agg null") {
+    var res = df.filter(df("a").equalTo(3)).agg(sum("a"))
+    checkAnswer(
+      res,
+      Seq(Row(null))
+    )
+    res = df.filter(df("a").equalTo(3)).agg(max("a"))
+    checkAnswer(
+      res,
+      Seq(Row(null))
+    )
+    res = df.filter(df("a").equalTo(3)).agg(min("a"))
+    checkAnswer(
+      res,
+      Seq(Row(null))
+    )
+    res = df.filter(df("a").equalTo(3)).agg(avg("a"))
+    checkAnswer(
+      res,
+      Seq(Row(null))
+    )
+    res = df.filter(df("a").equalTo(3)).agg(first("a"))
+    checkAnswer(
+      res,
+      Seq(Row(null))
+    )
+    res = df.filter(df("a").equalTo(3)).agg(count("a"))
+    checkAnswer(
+      res,
+      Seq(Row(0))
+    )
+    res = df.filter(df("a").equalTo(3)).agg(stddev("a"))
+    checkAnswer(
+      res,
+      Seq(Row(null))
+    )
+  }
+
+  test("Test No PushOrderedLimitThroughAgg") {
+    val sql1 = """
+      SELECT a, b, SUM(c) AS sum_agg
+      FROM df_tbl
+      GROUP BY a, b
+      ORDER BY a, sum_agg, b
+      LIMIT 10
+    """
+    assertPushColumnarTopNSortThroughAggNotEffective(sql1)
+  }
+
+  private def assertPushColumnarTopNSortThroughAggNotEffective(sql: String): Unit = {
+    val omniResult = spark.sql(sql)
+    omniResult.collect();
+    val omniPlan = omniResult.queryExecution.executedPlan.toString()
+    val patternOpenTopn = """(?s)OmniColumnarShuffleExchange.*?\n.*?OmniColumnarTopNSort.*?\n.*?OmniColumnarHashAggregate""".r
+
+    assert(!patternOpenTopn.findFirstIn(omniPlan).isDefined,
+      s"SQL:${sql}\n@OmniEnv with PushColumnarTopNSortThroughAgg and topNSort, omniPlan:${omniPlan}"
+    )
+
+    spark.conf.set("spark.omni.sql.columnar.topNSort", false)
+    val omniPlanWithSortResult = spark.sql(sql)
+    omniPlanWithSortResult.collect()
+    val omniPlanWithSort = omniPlanWithSortResult.queryExecution.executedPlan.toString()
+    val patternCloseTopn = """(?s)OmniColumnarShuffleExchange.*?\n.*?OmniColumnar.*?Limit.*?\n.*?OmniColumnarSort.*?\n.*?OmniColumnarHashAggregate""".r
+    assert(!patternCloseTopn.findFirstIn(omniPlanWithSort).isDefined,
+      s"SQL:${sql}\n@OmniEnv with PushColumnarTopNSortThroughAgg, omniPlan:${omniPlanWithSort}"
+    )
+  }
+}

@@ -8,13 +8,15 @@
     <groupId>com.huawei.boostkit</groupId>
     <artifactId>boostkit-omniop-native-reader</artifactId>
     <packaging>jar</packaging>
-    <version>3.3.1-1.7.0</version>
+    <version>${project.version}</version>
 
     <name>BoostKit Spark Native Sql Engine Extension With OmniOperator</name>
 
     <properties>
         <scala.binary.version>2.12</scala.binary.version>
         <spark.version>3.3.1</spark.version>
+        <omniruntime.version>1.7.0</omniruntime.version>
+        <project.version>${spark.version}-${omniruntime.version}</project.version>
         <cpp.test>FALSE</cpp.test>
         <cpp.dir>../cpp/</cpp.dir>
         <cpp.build.dir>../cpp/build/releases/</cpp.build.dir>
@@ -26,12 +28,40 @@
         <jars.target.dir>${project.build.directory}/scala-${scala.binary.version}/jars</jars.target.dir>
         <dep.os.arch></dep.os.arch>
     </properties>
+
+    <profiles>
+        <profile>
+            <id>spark-3.2</id>
+            <properties>
+                <spark.version>3.2.2</spark.version>
+            </properties>
+        </profile>
+        <profile>
+            <id>spark-3.3</id>
+            <properties>
+                <spark.version>3.3.1</spark.version>
+            </properties>
+        </profile>
+        <profile>
+            <id>spark-3.4</id>
+            <properties>
+                <spark.version>3.4.3</spark.version>
+            </properties>
+        </profile>
+        <profile>
+            <id>spark-3.5</id>
+            <properties>
+                <spark.version>3.5.2</spark.version>
+            </properties>
+        </profile>
+    </profiles>
+
 <dependencies>
     <dependency>
         <groupId>com.huawei.boostkit</groupId>
         <artifactId>boostkit-omniop-bindings</artifactId>
         <classifier>aarch64</classifier>
-        <version>1.7.0</version>
+        <version>${omniruntime.version}</version>
     </dependency>
     <dependency>
         <groupId>org.slf4j</groupId>

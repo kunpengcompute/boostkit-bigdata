@@ -1,0 +1,59 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.huawei.kunpeng</groupId>
+        <artifactId>omniop-spark-extension</artifactId>
+        <version>${project.version}</version>
+    </parent>
+
+    <artifactId>spark-extension-shims</artifactId>
+    <packaging>pom</packaging>
+    <name>spark-extension-shims</name>
+
+    <modules>
+        <module>${shim.module}</module>
+        <module>${modify.module}</module>
+    </modules>
+
+    <properties>
+
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.tdunning</groupId>
+            <artifactId>json</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.spark</groupId>
+            <artifactId>spark-sql_${scala.binary.version}</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.hadoop</groupId>
+            <artifactId>hadoop-client</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.huawei.boostkit</groupId>
+            <artifactId>boostkit-omniop-bindings</artifactId>
+            <classifier>aarch64</classifier>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>net.alchim31.maven</groupId>
+                <artifactId>scala-maven-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>
