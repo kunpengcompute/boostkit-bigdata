@@ -28,6 +28,7 @@ import java.util.Locale
 import java.util.concurrent.{ConcurrentHashMap, Executors, TimeUnit}
 import java.util.concurrent.atomic.AtomicLong
 import org.apache.commons.io.IOUtils
+import org.apache.commons.lang.StringUtils
 import org.apache.hadoop.fs.{FileStatus, FileSystem, LocalFileSystem, Path}
 import org.json4s.DefaultFormats
 import org.json4s.jackson.Json
@@ -102,7 +103,16 @@ object ViewMetadata extends RewriteHelper {
     status = STATUS_LOADING
 
     kryoSerializer = new KryoSerializer(spark.sparkContext.getConf
-        .clone().set("spark.kryo.unsafe", "false"))
+        .clone()
+        .set("spark.kryo.unsafe", "false")
+        .set("spark.kryo.registrationRequired", "false")
+        .set("spark.kryo.registrator", "")
+        .set("spark.kryo.classesToRegister", "")
+        .set("spark.kryo.pool", "true")
+        .set("spark.kryo.referenceTracking", "true")
+        .set("spark.kryoserializer.buffer", "64k")
+        .set("spark.kryoserializer.buffer.max", "64m")
+    )
 
     metadataPath = new Path(OmniMVPluginConfig.getConf.metadataPath)
     metadataPriorityPath = new Path(metadataPath, "priority")
@@ -267,11 +277,16 @@ object ViewMetadata extends RewriteHelper {
 
   // Called when ViewMetadata is initialized.
   def forceLoad(): Unit = this.synchronized {
-    loadViewContainsTablesFromFile()
-    loadViewMetadataFromFile()
-    loadViewPriorityFromFile()
-    loadViewCount()
-    checkViewMetadataComplete()
+    if (OmniMVPluginConfig.getConf.enableMetadataOnHdfs) {
+      loadViewContainsTablesFromFile()
+      loadViewMetadataFromFile()
+      loadViewPriorityFromFile()
+      loadViewCount()
+      checkViewMetadataComplete()
+    }
+    else {
+      forceLoadFromMetastore()
+    }
   }
 
   /**
@@ -388,13 +403,20 @@ object ViewMetadata extends RewriteHelper {
     val properties = viewProperties.get(viewName)
 
     val jsons = mutable.Map[String, String]()
+    if (OmniMVPluginConfig.getConf.kryoLogLevel > 0) {
+      com.esotericsoftware.minlog.Log.set(OmniMVPluginConfig.getConf.kryoLogLevel)
+    }
+    logDebug("serialize mv info for sql:" + spark.sparkContext.getLocalProperty(SPARK_JOB_DESCRIPTION))
 
+    logDebug("serialize tablePlan:" + tablePlan)
     val tablePlanStr = KryoSerDeUtil.serializePlan(kryoSerializer, tablePlan)
     jsons += ("tablePlan" -> tablePlanStr)
 
+    logDebug("serialize queryPlan:" + queryPlan)
     val queryPlanStr = KryoSerDeUtil.serializePlan(kryoSerializer, queryPlan)
     jsons += ("queryPlan" -> queryPlanStr)
 
+    logDebug("serialize properties:" + properties)
     val propertiesStr = KryoSerDeUtil.serializeToStr(kryoSerializer, properties)
     jsons += ("properties" -> propertiesStr)
 
@@ -407,6 +429,9 @@ object ViewMetadata extends RewriteHelper {
    * save mv metadata to file
    */
   def saveViewMetadataToFile(dbName: String, viewName: String): Unit = {
+    if (!OmniMVPluginConfig.getConf.enableMetadataOnHdfs) {
+      return
+    }
     saveViewMetadataToFile(kryoSerializer, dbName, viewName)
     saveViewContainsTablesToFile(dbName, viewName)
   }
@@ -518,13 +543,16 @@ object ViewMetadata extends RewriteHelper {
    * load mv metadata from file
    */
   def loadViewMetadataFromFile(): Unit = {
+    logDebug("enter loadViewMetadataFromFile")
     if (!fs.exists(metadataPath)) {
+      logDebug(s"exit loadViewMetadataFromFile, metadataPath:$metadataPath, not exists")
       return
     }
 
     val files = RewriteTime.withTimeStat("listStatus") {
       filterValidMetadata()
     }
+    logDebug(s"loadViewMetadataFromFile, files:${files.mkString("Array(", ", ", ")")}")
 
     val threadPool = RewriteTime.withTimeStat("threadPool") {
       Executors.newFixedThreadPool(Math.max(50, files.length * 2))
@@ -547,19 +575,26 @@ object ViewMetadata extends RewriteHelper {
               }
 
               val tablePlanStr = jsons("tablePlan")
-              val tablePlan = RewriteTime.withTimeStat("deSerTablePlan.C") {
-                KryoSerDeUtil.deserializePlan(kryoSerializer, spark, tablePlanStr)
+              logDebug(s"deSer tablePlan:$tablePlanStr, file:$file")
+              if (!StringUtils.isBlank(tablePlanStr)) {
+                val tablePlan = RewriteTime.withTimeStat("deSerTablePlan.C") {
+                  KryoSerDeUtil.deserializePlan(kryoSerializer, spark, tablePlanStr)
+                }
+                viewToTablePlan.put(viewName, tablePlan)
+              } else {
+                logDebug(s"tablePlan is empty, viewName:$viewName, file:$file")
+                return
               }
-              viewToTablePlan.put(viewName, tablePlan)
 
               val propertiesStr = jsons("properties")
+              logDebug(s"deSer propertiesStr:$propertiesStr")
               val properties = RewriteTime.withTimeStat("deSerProperties.C") {
                 KryoSerDeUtil.deserializeFromStr[Map[String, String]](kryoSerializer, propertiesStr)
               }
               viewProperties.put(viewName, properties)
             } catch {
               case e: Throwable =>
-                logError(s"Failed to deSer mv metadata.", e)
+                logError(s"Failed to deSer mv metadata:$file.", e)
             }
           }
         }
@@ -581,13 +616,18 @@ object ViewMetadata extends RewriteHelper {
               }
 
               val queryPlanStr = jsons("queryPlan")
-              val queryPlan = RewriteTime.withTimeStat("deSerQueryPlan.C") {
-                KryoSerDeUtil.deserializePlan(kryoSerializer, spark, queryPlanStr)
+              logDebug(s"deSer queryPlan:$queryPlanStr, file:$file")
+              if (!StringUtils.isBlank(queryPlanStr)) {
+                val queryPlan = RewriteTime.withTimeStat("deSerQueryPlan.C") {
+                  KryoSerDeUtil.deserializePlan(kryoSerializer, spark, queryPlanStr)
+                }
+                viewToViewQueryPlan.put(viewName, queryPlan)
+              } else {
+                logDebug(s"queryPlan is empty, viewName:$viewName, file:$file")
               }
-              viewToViewQueryPlan.put(viewName, queryPlan)
             } catch {
               case e: Throwable =>
-                logError(s"Failed to deSer mv metadata.", e)
+                logError(s"Failed to deSer mv metadata:$file.", e)
             }
           }
         }
@@ -625,6 +665,7 @@ object ViewMetadata extends RewriteHelper {
         }
       }
     }
+    logDebug(s"exit loadViewMetadataFromFile, metadataPath:$metadataPath")
   }
 
   /**
@@ -688,6 +729,9 @@ object ViewMetadata extends RewriteHelper {
 
   // Called when creating a new MV.
   def saveViewCountToFile(dbName: String): Unit = {
+    if (!OmniMVPluginConfig.getConf.enableMetadataOnHdfs) {
+      return
+    }
     val data: mutable.Map[String, Array[Long]] = mutable.Map[String, Array[Long]]()
     ViewMetadata.viewCnt.forEach {
       (name, info) =>

@@ -59,6 +59,14 @@ class OmniMVPluginConfig(conf: SQLConf) {
       .getConfString("spark.sql.omnimv.logLevel", "DEBUG")
       .toUpperCase(Locale.ROOT)
 
+  def kryoLogLevel: Int = conf
+    .getConfString("spark.sql.omnimv.kryoLogLevel", "-1")
+    .toInt
+
+  def enableMetadataOnHdfs: Boolean = conf
+    .getConfString("spark.sql.omnimv.metadata.on-hdfs.enable", "true")
+    .toBoolean
+
   // set parsed sql as JobDescription
   def enableSqlLog: Boolean = conf
       .getConfString("spark.sql.omnimv.log.enable", "true")
