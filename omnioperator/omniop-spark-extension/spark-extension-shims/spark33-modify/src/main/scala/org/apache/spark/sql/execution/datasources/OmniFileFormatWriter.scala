@@ -39,7 +39,7 @@ import org.apache.spark.sql.catalyst.plans.physical.HashPartitioning
 import org.apache.spark.sql.catalyst.util.{CaseInsensitiveMap, DateTimeUtils}
 import org.apache.spark.sql.errors.QueryExecutionErrors
 import org.apache.spark.sql.execution.datasources.FileFormatWriter.ConcurrentOutputWriterSpec
-import org.apache.spark.sql.execution.{ColumnarProjectExec, ColumnarSortExec, OmniColumnarToRowExec, ProjectExec, SQLExecution, SortExec, SparkPlan, UnsafeExternalRowSorter}
+import org.apache.spark.sql.execution.{ColumnarProjectExec, ColumnarSortExec, OmniColumnarToRowExec, ProjectExec, SQLExecution, SortExec, SparkPlan}
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.StringType
 import org.apache.spark.sql.vectorized.ColumnarBatch
