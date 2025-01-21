@@ -147,9 +147,7 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
 
   def enableGlobalColumnarLimit : Boolean = conf.getConf(ENABLE_GLOBAL_COLUMNAR_LIMIT)
 
-  def topNPushDownForWindowThreshold: Int = conf.getConf(TOP_N_PUSH_DOWN_FOR_WINDOW_THRESHOLD)
-
-  def topNPushDownForWindowEnable: Boolean = conf.getConf(TOP_N_PUSH_DOWN_FOR_WINDOW_ENABLE)
+  def topNSortThreshold: Int = conf.getConf(TOP_N_THRESHOLD)
 
   def pushOrderedLimitThroughAggEnable: Boolean =  conf.getConf(PUSH_ORDERED_LIMIT_THROUGH_AGG_ENABLE)
 
@@ -538,15 +536,10 @@ object ColumnarPluginConfig {
     .booleanConf
     .createWithDefault(true)
 
-  val TOP_N_PUSH_DOWN_FOR_WINDOW_THRESHOLD = buildConf("spark.sql.execution.topNPushDownForWindow.threshold")
+  val TOP_N_THRESHOLD = buildConf("spark.omni.sql.columnar.topN.threshold")
     .internal()
     .intConf
     .createWithDefault(100)
-
-  val TOP_N_PUSH_DOWN_FOR_WINDOW_ENABLE = buildConf("spark.sql.execution.topNPushDownForWindow.enabled")
-    .internal()
-    .booleanConf
-    .createWithDefault(true)
 
   val PUSH_ORDERED_LIMIT_THROUGH_AGG_ENABLE = buildConf("spark.omni.sql.columnar.pushOrderedLimitThroughAggEnable.enabled")
     .internal()
