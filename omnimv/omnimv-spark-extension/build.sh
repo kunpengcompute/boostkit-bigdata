@@ -1,3 +1,5 @@
 #!/bin/bash
-cpu_name="-"$(lscpu | grep Architecture | awk '{print $2}')
-mvn clean package -Ddep.os.arch="${cpu_name}"
+#mvn clean package "$@"
+#mvn clean package -DskipTests -Pspark-3.3
+mvn clean package -Pspark-3.2
+

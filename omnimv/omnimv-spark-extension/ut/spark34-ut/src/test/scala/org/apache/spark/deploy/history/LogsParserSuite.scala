@@ -17,16 +17,16 @@
 
 package org.apache.spark.deploy.history
 
-import java.io.{FileInputStream, FileNotFoundException}
-import java.text.SimpleDateFormat
-import java.util.Date
-
 import org.apache.commons.io.IOUtils
 import org.apache.commons.lang3.time.DateUtils
 import org.json4s.DefaultFormats
 import org.json4s.jackson.Json
-import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach}
 import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach}
+
+import java.io.{FileInputStream, FileNotFoundException}
+import java.text.SimpleDateFormat
+import java.util.Date
 
 class LogsParserSuite extends AnyFunSuite
     with BeforeAndAfterAll

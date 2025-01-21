@@ -41,14 +41,14 @@ import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference}
 import org.apache.spark.sql.catalyst.optimizer.OmniMVToSparkAdapter._
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.catalyst.util.{CaseInsensitiveMap, CharVarcharUtils}
-import org.apache.spark.sql.execution.{CommandExecutionMode, SparkPlan}
+import org.apache.spark.sql.execution.SparkPlan
 import org.apache.spark.sql.execution.command.WashOutStrategy._
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.internal.SQLConf.PartitionOverwriteMode
 import org.apache.spark.sql.sources.BaseRelation
 import org.apache.spark.sql.types.{StringType, StructType}
-import org.apache.spark.sql.util.SchemaUtils
+import org.apache.spark.sql.util.ShimUtil
 
 
 case class OmniMVCreateMvCommand(
@@ -60,7 +60,7 @@ case class OmniMVCreateMvCommand(
     ifNotExistsSet: Boolean = false,
     partitioning: Seq[String],
     query: LogicalPlan,
-    outputColumnNames: Seq[String]) extends DataWritingCommand {
+    outputColumnNames: Seq[String]) extends MVDataWritingCommand {
 
   override def run(sparkSession: SparkSession, child: SparkPlan): Seq[Row] = {
     try {
@@ -123,10 +123,7 @@ case class OmniMVCreateMvCommand(
           case _: HadoopFsRelation if table.partitionColumnNames.nonEmpty &&
               sparkSession.sqlContext.conf.manageFilesourcePartitions =>
             // Need to recover partitions into the metastore so our saved data is visible
-            sessionState.executePlan(RepairTableCommand(
-              table.identifier,
-              enableAddPartitions = true,
-              enableDropPartitions = false), CommandExecutionMode.SKIP).toRdd
+            ShimUtil.createMVExecutePlan(sessionState, table).toRdd
           case _ =>
         }
       }
@@ -184,7 +181,7 @@ case class OmniMVCreateMvCommand(
       catalogTable = if (tableExists) Some(table) else None)
 
     try {
-      dataSource.writeAndRead(mode, query, outputColumnNames)
+      ShimUtil.dataSourceWriteAndRead(dataSource, mode, query, outputColumnNames, physicalPlan, metrics)
     } catch {
       case ex: AnalysisException =>
         logError(s"Failed to write to table ${table.identifier.unquotedString}", ex)
@@ -204,12 +201,12 @@ case class OmniMVCreateMvCommand(
 case class DropMaterializedViewCommand(
     tableName: TableIdentifier,
     ifExists: Boolean,
-    purge: Boolean) extends LeafRunnableCommand {
+    purge: Boolean) extends MVRunnableCommand {
 
   override def run(sparkSession: SparkSession): Seq[Row] = {
     ViewMetadata.init(sparkSession)
     val catalog = sparkSession.sessionState.catalog
-    val isTempView = catalog.isTempView(tableName)
+    val isTempView = ShimUtil.catalogIsTemporaryTable(catalog, tableName)
 
     if (!isTempView && catalog.tableExists(tableName)) {
       // If the command DROP VIEW is to drop a table or DROP TABLE is to drop a view
@@ -275,7 +272,7 @@ case class DropMaterializedViewCommand(
  */
 case class ShowMaterializedViewCommand(
     databaseName: Option[String],
-    tableIdentifierPattern: Option[String]) extends LeafRunnableCommand {
+    tableIdentifierPattern: Option[String]) extends MVRunnableCommand {
   // The result of SHOW MaterializedView has three basic columns:
   // database, tableName and originalSql.
 
@@ -326,7 +323,7 @@ case class ShowMaterializedViewCommand(
 
 case class AlterRewriteMaterializedViewCommand(
     tableName: TableIdentifier,
-    enableRewrite: Boolean) extends LeafRunnableCommand {
+    enableRewrite: Boolean) extends MVRunnableCommand {
 
   override def run(sparkSession: SparkSession): Seq[Row] = {
     ViewMetadata.init(sparkSession)
@@ -368,7 +365,7 @@ case class RefreshMaterializedViewCommand(
     catalogTable: Option[CatalogTable],
     fileIndex: Seq[FileIndex],
     outputColumnNames: Seq[String])
-    extends DataWritingCommand {
+    extends MVDataWritingCommand {
 
   private lazy val parameters = CaseInsensitiveMap(options)
 
@@ -392,8 +389,9 @@ case class RefreshMaterializedViewCommand(
       sparkSession.sessionState.catalog.alterTable(tableMeta)
 
       // Most formats don't do well with duplicate columns, so lets not allow that
-      SchemaUtils.checkColumnNameDuplication(
+      ShimUtil.checkColumnNameDuplication(
         outputColumnNames,
+        s"when inserting into $outputPath",
         sparkSession.sessionState.conf.caseSensitiveAnalysis)
 
       val hadoopConf = sparkSession.sessionState.newHadoopConfWithOptions(options)
@@ -611,7 +609,7 @@ case class RefreshMaterializedViewCommand(
  */
 case class WashOutMaterializedViewCommand(
     dropAll: Boolean,
-    strategy: Option[List[(String, Option[Int])]]) extends LeafRunnableCommand {
+    strategy: Option[List[(String, Option[Int])]]) extends MVRunnableCommand {
 
   private val logFlag = "[OmniMV]"
 

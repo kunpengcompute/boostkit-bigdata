@@ -17,20 +17,15 @@
 
 package com.huawei.boostkit.spark.util.serde
 
+import com.huawei.boostkit.spark.util.serde.LogicalPlanWrapperUtil._
 import com.esotericsoftware.kryo.io.Input
 import java.io.ByteArrayOutputStream
 import java.util.Base64
-import org.apache.hadoop.fs.Path
 
 import org.apache.spark.serializer.KryoSerializer
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.catalyst.catalog.HiveTableRelation
-import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.optimizer.rules.RewriteTime
 import org.apache.spark.sql.catalyst.plans.logical._
-import org.apache.spark.sql.execution.datasources._
-import org.apache.spark.sql.execution.datasources.csv.CSVFileFormat
-import org.apache.spark.sql.execution.datasources.json.JsonFileFormat
 
 object KryoSerDeUtil {
 
@@ -132,188 +127,5 @@ object KryoSerDeUtil {
       kryoSerializer: KryoSerializer, spark: SparkSession, serializedPlan: String): LogicalPlan = {
     val wrappedPlan = deserializeFromStr[LogicalPlan](kryoSerializer, serializedPlan)
     unwrap(spark, wrappedPlan)
-  }
-
-  /**
-   * wrap logicalPlan if cannot serialize
-   *
-   * @param plan plan
-   * @return wrapped plan
-   */
-  def wrap(plan: LogicalPlan): LogicalPlan = {
-    // subqeury contains plan
-    val newPlan = plan.transformAllExpressions {
-      case e: ScalarSubquery =>
-        ScalarSubqueryWrapper(wrap(e.plan), e.children, e.exprId)
-      case e: ListQuery =>
-        ListQueryWrapper(wrap(e.plan), e.children, e.exprId, e.childOutputs)
-      case e: InSubquery =>
-        InSubqueryWrapper(
-          e.values,
-          ListQueryWrapper(
-            wrap(e.query.plan),
-            e.query.children,
-            e.query.exprId,
-            e.query.childOutputs))
-      case e: Exists =>
-        ExistsWrapper(wrap(e.plan), e.children, e.exprId)
-      case e: ScalaUDF =>
-        ScalaUDFWrapper(
-          e.function,
-          e.dataType,
-          e.children,
-          e.inputEncoders,
-          e.outputEncoder,
-          e.udfName,
-          e.nullable,
-          e.udfDeterministic)
-    }
-    newPlan.transform {
-      case p: WithCTE =>
-        WithCTE(wrap(p.plan), p.cteDefs.map(c => CTERelationDef(wrap(c.child),c.id)))
-      case p: Intersect =>
-        IntersectWrapper(wrap(p.left), wrap(p.right), p.isAll)
-      case p: Except =>
-        ExceptWrapper(wrap(p.left), wrap(p.right), p.isAll)
-      case LogicalRelation(
-      HadoopFsRelation(
-      location: FileIndex,
-      partitionSchema,
-      dataSchema,
-      bucketSpec,
-      fileFormat,
-      options),
-      output,
-      catalogTable,
-      isStreaming) =>
-        LogicalRelationWrapper(
-          HadoopFsRelationWrapper(
-            wrapFileIndex(location),
-            partitionSchema,
-            dataSchema,
-            bucketSpec,
-            wrapFileFormat(fileFormat),
-            options),
-          output,
-          catalogTable,
-          isStreaming)
-    }
-  }
-
-  /**
-   * unwrap logicalPlan to original logicalPlan
-   *
-   * @param spark spark
-   * @param plan  plan
-   * @return original logicalPlan
-   */
-  def unwrap(spark: SparkSession, plan: LogicalPlan): LogicalPlan = {
-    RewriteTime.withTimeStat("unwrap.C") {
-      val newPlan = plan.transform {
-        case p: WithCTE =>
-          WithCTE(unwrap(spark, p.plan), p.cteDefs.map(c => CTERelationDef(unwrap(spark, c.child), c.id)))
-        case p: IntersectWrapper =>
-          Intersect(unwrap(spark, p.left), unwrap(spark, p.right), p.isAll)
-        case p: ExceptWrapper =>
-          Except(unwrap(spark, p.right), unwrap(spark, p.right), p.isAll)
-        case LogicalRelationWrapper(
-        HadoopFsRelationWrapper(
-        location: FileIndex,
-        partitionSchema,
-        dataSchema,
-        bucketSpec,
-        fileFormat,
-        options),
-        output,
-        catalogTable,
-        isStreaming) =>
-          LogicalRelation(
-            HadoopFsRelation(
-              unwrapFileIndex(spark, location),
-              partitionSchema,
-              dataSchema,
-              bucketSpec,
-              unwrapFileFormat(fileFormat),
-              options)(spark),
-            output,
-            catalogTable,
-            isStreaming)
-        case h: HiveTableRelation =>
-          h.copy(prunedPartitions = None)
-      }
-
-      newPlan.transformAllExpressions {
-        case e: ScalarSubqueryWrapper =>
-          ScalarSubquery(unwrap(spark, e.plan), e.children, e.exprId)
-        case e: ListQueryWrapper =>
-          ListQueryWrapper(unwrap(spark, e.plan), e.children, e.exprId, e.childOutputs)
-        case e: InSubqueryWrapper =>
-          InSubquery(
-            e.values,
-            ListQuery(
-              unwrap(spark, e.query.plan),
-              e.query.children,
-              e.query.exprId,
-              e.query.childOutputs))
-        case e: ExistsWrapper =>
-          Exists(unwrap(spark, e.plan), e.children, e.exprId)
-        case e: ScalaUDFWrapper =>
-          ScalaUDF(
-            e.function,
-            e.dataType,
-            e.children,
-            e.inputEncoders,
-            e.outputEncoder,
-            e.udfName,
-            e.nullable,
-            e.udfDeterministic
-          )
-      }
-    }
-  }
-
-  def wrapFileIndex(fileIndex: FileIndex): FileIndex = {
-    fileIndex match {
-      case location: InMemoryFileIndex =>
-        InMemoryFileIndexWrapper(location.rootPaths.map(path => path.toString))
-      case location: CatalogFileIndex =>
-        CatalogFileIndexWrapper(location.table, location.sizeInBytes)
-      case other =>
-        other
-    }
-  }
-
-  def unwrapFileIndex(spark: SparkSession, fileIndex: FileIndex): FileIndex = {
-    fileIndex match {
-      case location: InMemoryFileIndexWrapper =>
-        new InMemoryFileIndex(
-          spark,
-          location.rootPathsSpecified.map(path => new Path(path)),
-          Map(),
-          None)
-      case location: CatalogFileIndexWrapper =>
-        new CatalogFileIndex(
-          spark,
-          location.table,
-          location.sizeInBytes)
-      case other =>
-        other
-    }
-  }
-
-  def wrapFileFormat(fileFormat: FileFormat): FileFormat = {
-    fileFormat match {
-      case _: CSVFileFormat => CSVFileFormatWrapper
-      case _: JsonFileFormat => JsonFileFormatWrapper
-      case other => other
-    }
-  }
-
-  def unwrapFileFormat(fileFormat: FileFormat): FileFormat = {
-    fileFormat match {
-      case CSVFileFormatWrapper => new CSVFileFormat
-      case JsonFileFormatWrapper => new JsonFileFormat
-      case other => other
-    }
   }
 }
