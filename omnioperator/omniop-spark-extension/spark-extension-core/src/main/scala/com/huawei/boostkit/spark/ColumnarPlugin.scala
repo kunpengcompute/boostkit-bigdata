@@ -25,7 +25,7 @@ import com.huawei.boostkit.spark.util.{ModifyUtilAdaptor, PhysicalPlanSelector}
 import org.apache.spark.api.plugin.{DriverPlugin, ExecutorPlugin, SparkPlugin}
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{SparkSession, SparkSessionExtensions}
-import org.apache.spark.sql.catalyst.expressions.{Ascending, Expression, Literal, SortOrder}
+import org.apache.spark.sql.catalyst.expressions.{Alias, And, Ascending, EqualTo, Expression, GreaterThan, GreaterThanOrEqual, IntegerLiteral, LessThan, LessThanOrEqual, Literal, NamedExpression, Rank, RowNumber, SortOrder, WindowExpression}
 import org.apache.spark.sql.catalyst.expressions.aggregate.{AggregateExpression, Partial, PartialMerge}
 import org.apache.spark.sql.catalyst.optimizer.{DelayCartesianProduct, HeuristicJoinReorder, RewriteSelfJoinInInPredicate}
 import org.apache.spark.sql.catalyst.rules.Rule
@@ -34,15 +34,15 @@ import org.apache.spark.sql.execution.adaptive.{AQEShuffleReadExec, AdaptiveSpar
 import org.apache.spark.sql.execution.aggregate.{DummyLogicalPlan, ExtendedAggUtils, HashAggregateExec}
 import org.apache.spark.sql.execution.exchange.{BroadcastExchangeExec, ReusedExchangeExec, ShuffleExchangeExec}
 import org.apache.spark.sql.execution.joins._
-import org.apache.spark.sql.execution.window.{TopNPushDownForWindow, WindowExec}
+import org.apache.spark.sql.execution.window.{WindowExec}
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.catalyst.planning.PhysicalAggregation
 import org.apache.spark.sql.catalyst.plans.LeftSemi
 import org.apache.spark.sql.catalyst.plans.logical.Aggregate
 import org.apache.spark.sql.execution.util.SparkMemoryUtils.addLeakSafeTaskCompletionListener
 import org.apache.spark.sql.execution.aggregate.PushOrderedLimitThroughAgg
-import nova.hetu.omniruntime.memory.MemoryManager
 import org.apache.spark.sql.util.ShimUtil
+import nova.hetu.omniruntime.memory.MemoryManager
 
 import scala.collection.mutable.ListBuffer
 
@@ -59,11 +59,33 @@ case class ColumnarPreOverrides(isSupportAdaptive: Boolean = true)
   val enableRowShuffle: Boolean = columnarConf.enableRowShuffle
   val columnsThreshold: Int = columnarConf.columnsThreshold
   val enableColumnarDataWritingCommand: Boolean = columnarConf.enableColumnarDataWritingCommand
+  val enableColumnarTopNSort: Boolean = columnarConf.enableColumnarTopNSort
+  val topNSortThreshold: Int = columnarConf.topNSortThreshold
 
-  def checkBhjRightChild(x: Any): Boolean = {
-    x match {
-      case _: ColumnarFilterExec | _: ColumnarConditionProjectExec => true
+  private def checkBhjRightChild(plan: Any): Boolean =
+    plan match {
+      case _: ColumnarFilterExec => true
+      case _: ColumnarConditionProjectExec => true
       case _ => false
+    }
+
+  def isTopNExpression(expr: Expression): Boolean = expr match {
+    case Alias(child, _) => isTopNExpression(child)
+    case WindowExpression(_: Rank, _) => true
+    case _ => false
+  }
+
+  def isStrictTopN(expr: Expression): Boolean = expr match {
+    case Alias(child, _) => isStrictTopN(child)
+    case WindowExpression(_: RowNumber, _) => true
+    case _ => false
+  }
+
+  private def splitConjunctivePredicates(condition: Expression): Seq[Expression] = {
+    condition match {
+      case And(cond1, cond2) =>
+        splitConjunctivePredicates(cond1) ++ splitConjunctivePredicates(cond2)
+      case other => other :: Nil
     }
   }
 
@@ -158,6 +180,65 @@ case class ColumnarPreOverrides(isSupportAdaptive: Boolean = true)
             ColumnarProjectExec(plan.projectList, child)
         }
       case plan: FilterExec =>
+        if(enableColumnarTopNSort) {
+          plan.transform {
+            case f@FilterExec(condition,
+            w@WindowExec(Seq(windowExpression), _, orderSpec, sort: SortExec))
+              if orderSpec.nonEmpty && isTopNExpression(windowExpression) =>
+              var topn = Int.MaxValue
+              val nonTopNConditions = splitConjunctivePredicates(condition).filter {
+                case LessThan(e: NamedExpression, IntegerLiteral(n))
+                  if e.exprId == windowExpression.exprId =>
+                  topn = Math.min(topn, n - 1)
+                  false
+                case GreaterThan(IntegerLiteral(n), e: NamedExpression)
+                  if e.exprId == windowExpression.exprId =>
+                  topn = Math.min(topn, n - 1)
+                  false
+                case LessThanOrEqual(e: NamedExpression, IntegerLiteral(n))
+                  if e.exprId == windowExpression.exprId =>
+                  topn = Math.min(topn, n)
+                  false
+                case EqualTo(e: NamedExpression, IntegerLiteral(n))
+                  if n == 1 && e.exprId == windowExpression.exprId =>
+                  topn = 1
+                  false
+                case EqualTo(IntegerLiteral(n), e: NamedExpression)
+                  if n == 1 && e.exprId == windowExpression.exprId =>
+                  topn = 1
+                  false
+                case GreaterThanOrEqual(IntegerLiteral(n), e: NamedExpression)
+                  if e.exprId == windowExpression.exprId =>
+                  topn = Math.min(topn, n)
+                  false
+                case _ => true
+              }
+              // topn <= SQLConf.get.topNPushDownForWindowThreshold 100.
+              val strictTopN = isStrictTopN(windowExpression)
+              val omniSupport: Boolean = try {
+                ColumnarTopNSortExec(topn, strictTopN, w.partitionSpec, w.orderSpec, sort.global, sort.child).buildCheck()
+                true
+              } catch {
+                case _: Throwable => false
+              }
+              if (topn > 0 && topn <= topNSortThreshold && omniSupport) {
+                val topNSortExec = ColumnarTopNSortExec(
+                  topn, strictTopN, w.partitionSpec, w.orderSpec, sort.global, replaceWithColumnarPlan(sort.child))
+                logInfo(s"Columnar Processing for ${topNSortExec.getClass} is currently supported.")
+                val newCondition = if (nonTopNConditions.isEmpty) {
+                  Literal.TrueLiteral
+                } else {
+                  nonTopNConditions.reduce(And)
+                }
+                val window = ColumnarWindowExec(w.windowExpression, w.partitionSpec, w.orderSpec, topNSortExec)
+                return ColumnarFilterExec(newCondition, window)
+              } else {
+                logInfo{s"topn: ${topn} is bigger than topNSortThreshold: ${topNSortThreshold}."}
+                val child = replaceWithColumnarPlan(f.child)
+                return ColumnarFilterExec(f.condition, child)
+              }
+          }
+        }
         val child = replaceWithColumnarPlan(plan.child)
         logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
         ColumnarFilterExec(plan.condition, child)
@@ -790,7 +871,6 @@ class ColumnarPlugin extends (SparkSessionExtensions => Unit) with Logging {
     extensions.injectOptimizerRule(_ => DelayCartesianProduct)
     extensions.injectOptimizerRule(_ => HeuristicJoinReorder)
     extensions.injectQueryStagePrepRule(session => DedupLeftSemiJoinAQE(session))
-    extensions.injectQueryStagePrepRule(_ => TopNPushDownForWindow)
     extensions.injectQueryStagePrepRule(session => FallbackBroadcastExchange(session))
     extensions.injectQueryStagePrepRule(session => PushOrderedLimitThroughAgg(session))
     ModifyUtilAdaptor.injectRule(extensions)
