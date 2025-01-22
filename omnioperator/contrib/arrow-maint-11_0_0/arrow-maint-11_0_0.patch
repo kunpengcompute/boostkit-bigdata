@@ -1,0 +1,64 @@
+diff --git a/cpp/cmake_modules/BuildUtils.cmake b/cpp/cmake_modules/BuildUtils.cmake
+index 89172cc..86e8bd2 100644
+--- a/cpp/cmake_modules/BuildUtils.cmake
++++ b/cpp/cmake_modules/BuildUtils.cmake
+@@ -935,9 +935,9 @@ function(ARROW_INSTALL_ALL_HEADERS PATH)
+   set(PUBLIC_HEADERS)
+   foreach(HEADER ${CURRENT_DIRECTORY_HEADERS})
+     get_filename_component(HEADER_BASENAME ${HEADER} NAME)
+-    if(HEADER_BASENAME MATCHES "internal")
+-      continue()
+-    endif()
++#    if(HEADER_BASENAME MATCHES "internal")
++#      continue()
++#    endif()
+     list(APPEND PUBLIC_HEADERS ${HEADER})
+   endforeach()
+   install(FILES ${PUBLIC_HEADERS} DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/${PATH}")
+diff --git a/cpp/src/arrow/io/hdfs_internal.cc b/cpp/src/arrow/io/hdfs_internal.cc
+index 4592392..4d425d3 100644
+--- a/cpp/src/arrow/io/hdfs_internal.cc
++++ b/cpp/src/arrow/io/hdfs_internal.cc
+@@ -146,7 +146,7 @@ Result<std::vector<PlatformFilename>> get_potential_libhdfs_paths() {
+ #elif __APPLE__
+   file_name = "libhdfs.dylib";
+ #else
+-  file_name = "libhdfs.so";
++  file_name = "libhdfs.so.0.0.0";
+ #endif
+ 
+   // Common paths
+diff --git a/cpp/src/arrow/vendored/uriparser/UriParse.c b/cpp/src/arrow/vendored/uriparser/UriParse.c
+index f5972d8..2fec54c 100644
+--- a/cpp/src/arrow/vendored/uriparser/UriParse.c
++++ b/cpp/src/arrow/vendored/uriparser/UriParse.c
+@@ -1555,6 +1555,14 @@ static const URI_CHAR * URI_FUNC(ParsePchar)(URI_TYPE(ParserState) * state,
+ 	case _UT('.'):
+ 	case _UT('_'):
+ 	case _UT('~'):
++	case _UT('|'):
++	case _UT('<'):
++	case _UT('>'):
++	case _UT('{'):
++	case _UT('}'):
++	case _UT('['):
++	case _UT(']'):
++	case _UT('`'):
+ 	case URI_SET_DIGIT:
+ 	case URI_SET_ALPHA:
+ 		return first + 1;
+@@ -1771,6 +1779,14 @@ static const URI_CHAR * URI_FUNC(ParseSegment)(URI_TYPE(ParserState) * state,
+ 	case _UT('~'):
+ 	case _UT('+'):
+ 	case _UT('='):
++	case _UT('|'):
++	case _UT('<'):
++	case _UT('>'):
++	case _UT('{'):
++	case _UT('}'):
++	case _UT('['):
++	case _UT(']'):
++	case _UT('`'):
+ 	case URI_SET_DIGIT:
+ 	case URI_SET_ALPHA:
+ 		{
