@@ -61,7 +61,7 @@ object ShimUtil {
   }
 
   def getAstBuilderCreateMVPlan(queryExecution: QueryExecution): LogicalPlan = {
-    queryExecution.optimizedPlan
+    queryExecution.commandExecuted
   }
 
   def getAstBuilderRefreshMVFileIndexs(sparkPlan: SparkPlan): Seq[FileIndex] = {
