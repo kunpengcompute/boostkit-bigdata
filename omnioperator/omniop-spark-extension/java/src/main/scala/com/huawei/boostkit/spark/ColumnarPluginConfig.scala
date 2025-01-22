@@ -87,10 +87,6 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
     .getConfString("spark.omni.sql.columnar.broadcastJoin.sharehashtable", "true")
     .toBoolean
 
-  // enable or disable heuristic join reorder
-  val enableHeuristicJoinReorder: Boolean =
-    conf.getConfString("spark.omni.sql.columnar.heuristicJoinReorder", "true").toBoolean
-
   // enable or disable delay cartesian product
   val enableDelayCartesianProduct: Boolean =
     conf.getConfString("spark.omni.sql.columnar.delayCartesianProduct", "true").toBoolean
