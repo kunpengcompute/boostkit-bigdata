@@ -20,7 +20,6 @@
 #include <jni.h>
 #include <vector/vector_common.h>
 #include <type/data_type_serializer.h>
-#include "concurrent_map.h"
 #include "shuffle/splitter.h"
 
 #ifndef SPARK_JNI_WRAPPER
@@ -51,9 +50,7 @@ Java_com_huawei_boostkit_spark_jni_SparkJniWrapper_stop(
     
 JNIEXPORT void JNICALL
 Java_com_huawei_boostkit_spark_jni_SparkJniWrapper_close(
-    JNIEnv* env, jobject, jlong splitter_id);  
-
-static ConcurrentMap<std::shared_ptr<Splitter>> g_shuffleSplitterHolder;
+    JNIEnv* env, jobject, jlong splitter_id);
 
 #ifdef __cplusplus
 }

@@ -109,8 +109,6 @@ void JNI_OnUnload(JavaVM* vm, void* reserved)
     env->DeleteGlobalRef(jsonClass);
     env->DeleteGlobalRef(arrayListClass);
     env->DeleteGlobalRef(threadClass);
-
-    g_shuffleSplitterHolder.Clear();
 }
 
 #endif //THESTRAL_PLUGIN_MASTER_JNI_COMMON_CPP
