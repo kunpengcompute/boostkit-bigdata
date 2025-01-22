@@ -27,9 +27,9 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{SparkSession, SparkSessionExtensions}
 import org.apache.spark.sql.catalyst.expressions.{Ascending, DynamicPruningSubquery, SortOrder}
 import org.apache.spark.sql.catalyst.expressions.aggregate.{AggregateExpression, Partial, PartialMerge}
-import org.apache.spark.sql.catalyst.optimizer.{DelayCartesianProduct, HeuristicJoinReorder, RewriteSelfJoinInInPredicate}
+import org.apache.spark.sql.catalyst.optimizer.{DelayCartesianProduct, RewriteSelfJoinInInPredicate}
 import org.apache.spark.sql.catalyst.rules.Rule
-import org.apache.spark.sql.execution.{RowToOmniColumnarExec, _}
+import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.adaptive.{BroadcastQueryStageExec, ColumnarCustomShuffleReaderExec, CustomShuffleReaderExec, QueryStageExec, ShuffleQueryStageExec}
 import org.apache.spark.sql.execution.aggregate.{DummyLogicalPlan, ExtendedAggUtils, HashAggregateExec}
 import org.apache.spark.sql.execution.exchange.{BroadcastExchangeExec, Exchange, ReusedExchangeExec, ShuffleExchangeExec}
@@ -933,7 +933,6 @@ class ColumnarPlugin extends (SparkSessionExtensions => Unit) with Logging {
     extensions.injectPlannerStrategy(_ => ShuffleJoinStrategy)
     extensions.injectOptimizerRule(_ => RewriteSelfJoinInInPredicate)
     extensions.injectOptimizerRule(_ => DelayCartesianProduct)
-    extensions.injectOptimizerRule(_ => HeuristicJoinReorder)
   }
 }
 
