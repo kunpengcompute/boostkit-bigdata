@@ -66,6 +66,21 @@ class ColumnarLimitExecSuit extends ColumnarSparkPlanTest {
     assert(result.count() == 0)
   }
 
+  test("limit with offset and global limit columnar exec") {
+    val result = spark.sql("SELECT y FROM right WHERE x in " +
+      "(SELECT a FROM left WHERE a = 4 LIMIT 1 OFFSET 1)")
+    val plan = result.queryExecution.executedPlan
+    assert(plan.find(_.isInstanceOf[ColumnarLocalLimitExec]).isEmpty,
+      s"not match ColumnarLocalLimitExec, real plan: ${plan}")
+    assert(plan.find(_.isInstanceOf[LocalLimitExec]).isEmpty,
+      s"real plan: ${plan}")
+    assert(plan.find(_.isInstanceOf[ColumnarGlobalLimitExec]).isDefined,
+      s"not match ColumnarGlobalLimitExec, real plan: ${plan}")
+    assert(plan.find(_.isInstanceOf[GlobalLimitExec]).isEmpty,
+      s"real plan: ${plan}")
+    assert(result.count() == 0)
+  }
+
   test("limit with rollback global limit to row-based exec") {
     spark.conf.set("spark.omni.sql.columnar.globalLimit", false)
     val result = spark.sql("SELECT a FROM left WHERE a in " +
