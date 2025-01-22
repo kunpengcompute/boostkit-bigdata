@@ -32,7 +32,7 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{Attribute, Expression, NamedExpression}
 import org.apache.spark.sql.catalyst.expressions.codegen.CodegenContext
-import org.apache.spark.sql.catalyst.optimizer.{BuildLeft, BuildSide}
+import org.apache.spark.sql.catalyst.optimizer.{BuildLeft, BuildRight, BuildSide}
 import org.apache.spark.sql.catalyst.plans.{FullOuter, Inner, JoinType, LeftAnti, LeftExistence, LeftOuter, LeftSemi, RightOuter}
 import org.apache.spark.sql.catalyst.plans.physical.Partitioning
 import org.apache.spark.sql.execution.{ExplainUtils, ShuffledHashJoinExecShim, SparkPlan}
@@ -223,7 +223,8 @@ case class ColumnarShuffledHashJoinExec(
         }
         val startBuildCodegen = System.nanoTime()
         val lookupJoinType = OmniExpressionAdaptor.toOmniJoinType(joinType)
-        val buildOpFactory = new OmniHashBuilderWithExprOperatorFactory(lookupJoinType, buildTypes,
+        val lookupBuildSide = OmniExpressionAdaptor.toOmniBuildSide(buildSide)
+        val buildOpFactory = new OmniHashBuilderWithExprOperatorFactory(lookupJoinType, lookupBuildSide, buildTypes,
           buildJoinColsExp, 1, new OperatorConfig(SpillConfig.NONE,
             new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
         val buildOp = buildOpFactory.createOperator()
@@ -337,7 +338,9 @@ case class ColumnarShuffledHashJoinExec(
             new ColumnarBatch(vecs.toArray, rowCnt)
           }
         }
-        if ("FULL OUTER" == joinType.sql) {
+        if ("FULL OUTER" == joinType.sql ||
+          ("LEFT OUTER" == joinType.sql && buildSide.equals(BuildLeft)) ||
+          ("RIGHT OUTER" == joinType.sql && buildSide.equals(BuildRight))) {
           val lookupOuterOpFactory =
             new OmniLookupOuterJoinWithExprOperatorFactory(probeTypes, probeOutputCols,
               probeHashColsExp, buildOutputCols, buildOutputTypes, buildOpFactory,

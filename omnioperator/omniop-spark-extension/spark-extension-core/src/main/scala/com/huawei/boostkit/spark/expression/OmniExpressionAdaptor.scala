@@ -24,6 +24,7 @@ import nova.hetu.omniruntime.`type`.{BooleanDataType, DataTypeSerializer, Date32
 import nova.hetu.omniruntime.constants.FunctionType
 import nova.hetu.omniruntime.constants.FunctionType.{OMNI_AGGREGATION_TYPE_AVG, OMNI_AGGREGATION_TYPE_COUNT_ALL, OMNI_AGGREGATION_TYPE_COUNT_COLUMN, OMNI_AGGREGATION_TYPE_FIRST_IGNORENULL, OMNI_AGGREGATION_TYPE_FIRST_INCLUDENULL, OMNI_AGGREGATION_TYPE_MAX, OMNI_AGGREGATION_TYPE_MIN, OMNI_AGGREGATION_TYPE_SAMP, OMNI_AGGREGATION_TYPE_SUM, OMNI_WINDOW_TYPE_RANK, OMNI_WINDOW_TYPE_ROW_NUMBER}
 import nova.hetu.omniruntime.constants.JoinType._
+import nova.hetu.omniruntime.constants.BuildSide._
 import nova.hetu.omniruntime.operator.OmniExprVerify
 import com.huawei.boostkit.spark.ColumnarPluginConfig
 import com.huawei.boostkit.spark.util.ModifyUtilAdaptor
@@ -34,6 +35,7 @@ import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate._
 import org.apache.spark.sql.catalyst.optimizer.NormalizeNaNAndZero
 import org.apache.spark.sql.catalyst.plans.{FullOuter, Inner, JoinType, LeftAnti, LeftOuter, LeftSemi, RightOuter}
+import org.apache.spark.sql.catalyst.optimizer.{BuildLeft, BuildRight, BuildSide}
 import org.apache.spark.sql.catalyst.util.CharVarcharUtils.getRawTypeString
 import org.apache.spark.sql.execution
 import org.apache.spark.sql.hive.HiveUdfAdaptorUtil
@@ -1022,6 +1024,17 @@ object OmniExpressionAdaptor extends Logging {
         OMNI_JOIN_TYPE_LEFT_ANTI
       case _ =>
         throw new UnsupportedOperationException(s"Join-type[$joinType] is not supported.")
+    }
+  }
+
+  def toOmniBuildSide(buildSide: BuildSide): nova.hetu.omniruntime.constants.BuildSide = {
+    buildSide match {
+      case BuildLeft =>
+        BUILD_LEFT
+      case BuildRight =>
+        BUILD_RIGHT
+      case _ =>
+        throw new UnsupportedOperationException(s"Build-Side[$buildSide] is not supported.")
     }
   }
 
