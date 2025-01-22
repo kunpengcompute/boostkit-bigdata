@@ -117,10 +117,6 @@ object ShimUtil {
       )
   }
 
-  def buildBuildSide(buildSide: BuildSide, joinType: JoinType): BuildSide = {
-    buildSide
-  }
-
   def createSortShuffleWriter[K, V, C](handle: BaseShuffleHandle[K, V, C],
                                        mapId: Long,
                                        context: TaskContext,

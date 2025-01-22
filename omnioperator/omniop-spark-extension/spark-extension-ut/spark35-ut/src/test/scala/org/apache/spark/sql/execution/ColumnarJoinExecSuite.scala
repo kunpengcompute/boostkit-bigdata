@@ -334,25 +334,46 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
         s" executedPlan as follows: \n${res.queryExecution.executedPlan}")
   }
 
-  test("columnar shuffledHashJoin left outer join is equal to native") {
-    val df = left.join(right.hint("SHUFFLE_HASH"), col("q") === col("c"), "leftouter")
+  test("columnar shuffledHashJoin left outer join and build left is equal to native") {
+    val df = left.hint("SHUFFLE_HASH").join(right, col("q") === col("c"), "leftouter")
     checkAnswer(df, _ => df.queryExecution.executedPlan, Seq(
-      Row("abc", "", 4, 2.0, "abc", "", 4, 1.0),
-      Row(" yeah  ", "yeah", 10, 8.0, null, null, null, null),
       Row("", "Hello", 1, 1.0, " add", "World", 1, 3.0),
-      Row(" add", "World", 8, 3.0, null, null, null, null)
-    ), false)
+      Row(" add", "World", 8, 3.0, null, null, null, null),
+      Row(" yeah  ", "yeah", 10, 8.0, null, null, null, null),
+      Row("abc", "", 4, 2.0, "abc", "", 4, 1.0)
+    ), true)
   }
 
-  test("columnar shuffledHashJoin left outer join is equal to native with null") {
+  test("columnar shuffledHashJoin left outer join and build left is equal to native with null") {
+    val df = leftWithNull.hint("SHUFFLE_HASH").join(rightWithNull,
+      col("q") === col("c"), "leftouter")
+    checkAnswer(df, _ => df.queryExecution.executedPlan, Seq(
+      Row("", "Hello", null, 1.0, null, null, null, null),
+      Row(" add", "World", 8, 3.0, null, null, null, null),
+      Row(" yeah  ", "yeah", 10, 8.0, null, null, null, null),
+      Row("abc", null, 4, 2.0, "abc", "", 4, 1.0)
+    ), true)
+  }
+
+  test("columnar shuffledHashJoin left outer join and build right is equal to native") {
+    val df = left.join(right.hint("SHUFFLE_HASH"), col("q") === col("c"), "leftouter")
+    checkAnswer(df, _ => df.queryExecution.executedPlan, Seq(
+      Row("", "Hello", 1, 1.0, " add", "World", 1, 3.0),
+      Row(" add", "World", 8, 3.0, null, null, null, null),
+      Row(" yeah  ", "yeah", 10, 8.0, null, null, null, null),
+      Row("abc", "", 4, 2.0, "abc", "", 4, 1.0)
+    ), true)
+  }
+
+  test("columnar shuffledHashJoin left outer join and build right is equal to native with null") {
     val df = leftWithNull.join(rightWithNull.hint("SHUFFLE_HASH"),
       col("q") === col("c"), "leftouter")
     checkAnswer(df, _ => df.queryExecution.executedPlan, Seq(
-      Row("abc", null, 4, 2.0, "abc", "", 4, 1.0),
       Row("", "Hello", null, 1.0, null, null, null, null),
+      Row(" add", "World", 8, 3.0, null, null, null, null),
       Row(" yeah  ", "yeah", 10, 8.0, null, null, null, null),
-      Row(" add", "World", 8, 3.0, null, null, null, null)
-    ), false)
+      Row("abc", null, 4, 2.0, "abc", "", 4, 1.0)
+    ), true)
   }
 
   test("ColumnarBroadcastHashJoin is not rolled back with not_equal filter expr") {
@@ -477,17 +498,38 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
     ), false)
   }
 
-  test("columnar ShuffledHashJoin right outer join is equal to native") {
+  test("columnar ShuffledHashJoin right outer join and build left is equal to native") {
+    val df = left.hint("SHUFFLE_HASH").join(right, col("q") === col("c"), "rightouter")
+    checkAnswer(df, _ => df.queryExecution.executedPlan, Seq(
+      Row(null, null, null, null, " yeah  ", "yeah", 0, 4.0),
+      Row("abc", "", 4, 2.0, "abc", "", 4, 1.0),
+      Row("", "Hello", 1, 1.0, " add", "World", 1, 3.0),
+      Row(null, null, null, null, "", "Hello", 2, 2.0)
+    ), true)
+  }
+
+  test("columnar ShuffledHashJoin right outer join and build left is equal to native with null") {
+    val df = leftWithNull.hint("SHUFFLE_HASH").join(rightWithNull,
+      col("q") === col("c"), "rightouter")
+    checkAnswer(df, _ => df.queryExecution.executedPlan, Seq(
+      Row("abc", null, 4, 2.0, "abc", "", 4, 1.0),
+      Row(null, null, null, null, " yeah  ", null, null, 4.0),
+      Row(null, null, null, null, " add", null, 1, null),
+      Row(null, null, null, null, "", "Hello", 2, 2.0)
+    ), true)
+  }
+
+  test("columnar ShuffledHashJoin right outer join and build right is equal to native") {
     val df = left.join(right.hint("SHUFFLE_HASH"), col("q") === col("c"), "rightouter")
     checkAnswer(df, _ => df.queryExecution.executedPlan, Seq(
       Row(null, null, null, null, " yeah  ", "yeah", 0, 4.0),
       Row("abc", "", 4, 2.0, "abc", "", 4, 1.0),
       Row("", "Hello", 1, 1.0, " add", "World", 1, 3.0),
       Row(null, null, null, null, "", "Hello", 2, 2.0)
-    ), false)
+    ), true)
   }
 
-  test("columnar ShuffledHashJoin right outer join is equal to native with null") {
+  test("columnar ShuffledHashJoin right outer join and build right is equal to native with null") {
     val df = leftWithNull.join(rightWithNull.hint("SHUFFLE_HASH"),
       col("q") === col("c"), "rightouter")
     checkAnswer(df, _ => df.queryExecution.executedPlan, Seq(
@@ -495,7 +537,7 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
       Row(null, null, null, null, " yeah  ", null, null, 4.0),
       Row(null, null, null, null, " add", null, 1, null),
       Row(null, null, null, null, "", "Hello", 2, 2.0)
-    ), false)
+    ), true)
   }
 
   test("columnar BroadcastHashJoin right outer join is equal to native") {
