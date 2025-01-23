@@ -1,0 +1,22 @@
+spark-sql --archives hdfs://{hostname}:9000/user/{user}/{omni_tar_name}.tar.gz#omni \
+--deploy-mode client \
+--driver-cores 8 \
+--driver-memory 40g \
+--master yarn \
+--executor-cores 12 \
+--executor-memory 5g \
+--conf spark.memory.offHeap.enabled=true \
+--conf spark.memory.offHeap.size=35g \
+--num-executors 24 \
+--conf spark.executor.extraJavaOptions='-XX:+UseG1GC' \
+--conf spark.locality.wait=0 \
+--conf spark.network.timeout=600 \
+--conf spark.serializer=org.apache.spark.serializer.KryoSerializer \
+--conf spark.sql.adaptive.enabled=true \
+--conf spark.sql.adaptive.skewedJoin.enabled=true \
+--conf spark.sql.autoBroadcastJoinThreshold=100M \
+--conf spark.sql.broadcastTimeout=600 \
+--conf spark.sql.shuffle.partitions=600 \
+--conf spark.sql.orc.impl=native \
+--conf spark.task.cpus=1 \
+--properties-file {spark_conf_path}/{conf_file_name}
