@@ -6,41 +6,59 @@
     <parent>
         <groupId>com.huawei.kunpeng</groupId>
         <artifactId>boostkit-omnimv-spark-parent</artifactId>
-        <version>${omnimv.version}</version>
+        <version>${project.version}</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
     <artifactId>boostkit-omnimv-spark</artifactId>
     <packaging>jar</packaging>
-    <version>${omnimv.version}</version>
+    <version>${project.version}</version>
 
     <name>plugin</name>
 
     <properties>
-        <guava.version>14.0.1</guava.version>
     </properties>
 
     <dependencies>
         <dependency>
+            <groupId>com.huawei.kunpeng</groupId>
+            <artifactId>${shim.module}</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+<!--        <dependency>
+            <groupId>com.huawei.kunpeng</groupId>
+            <artifactId>${modify.module}</artifactId>
+            <version>${omnimv.version}</version>
+        </dependency>-->
+        <dependency>
             <groupId>com.esotericsoftware</groupId>
             <artifactId>kryo-shaded</artifactId>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
-            <version>${guava.version}</version>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-sql_${scala.binary.version}</artifactId>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-catalyst_${scala.binary.version}</artifactId>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-hive_${scala.binary.version}</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.scala-lang</groupId>
+            <artifactId>scala-library</artifactId>
+            <scope>provided</scope>
         </dependency>
 
         <!-- test dependencies -->
@@ -54,14 +72,10 @@
             <artifactId>scalatest_${scala.binary.version}</artifactId>
             <scope>test</scope>
         </dependency>
-        <dependency>
-            <groupId>org.scala-lang</groupId>
-            <artifactId>scala-library</artifactId>
-        </dependency>
     </dependencies>
 
     <build>
-        <finalName>${artifactId}-${version}${dep.os.arch}</finalName>
+        <finalName>${artifactId}-${version}-${dep.os.arch}</finalName>
         <outputDirectory>target/scala-${scala.binary.version}/classes</outputDirectory>
         <testOutputDirectory>target/scala-${scala.binary.version}/test-classes</testOutputDirectory>
         <plugins>
@@ -130,7 +144,7 @@
                     <includeTestSourceDirectory>true</includeTestSourceDirectory>
                     <failOnWarning>false</failOnWarning>
                     <sourceDirectory>${project.basedir}/src/main/scala</sourceDirectory>
-                    <testSourceDirectory>${project.basedir}/src/test/scala</testSourceDirectory>
+                    <testSourceDirectory>../ut/spark34-ut/src/test/scala</testSourceDirectory>
                     <configLocation>${user.dir}/scalastyle-config.xml</configLocation>
                     <outputFile>${project.basedir}/target/scalastyle-output.xml</outputFile>
                     <inputEncoding>${project.build.sourceEncoding}</inputEncoding>
@@ -175,6 +189,30 @@
                         <goals>
                             <goal>check</goal>
                         </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-assembly-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <artifactId>exec-maven-plugin</artifactId>
+                <groupId>org.codehaus.mojo</groupId>
+                <executions>
+                    <execution>
+                        <id>copy-fat-jar</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <executable>cp</executable>
+                            <arguments>
+                                <argument>target/boostkit-omnimv-spark-${project.version}-${dep.os.arch}-jar-with-dependencies.jar</argument>
+                                <argument>target/boostkit-omnimv-spark-${project.version}-${dep.os.arch}.jar</argument>
+                            </arguments>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>

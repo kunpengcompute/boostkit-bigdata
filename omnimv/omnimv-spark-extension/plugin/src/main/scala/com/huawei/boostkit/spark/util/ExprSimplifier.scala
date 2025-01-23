@@ -644,7 +644,7 @@ case class ExprSimplifier(unknownAsFalse: Boolean,
            LessThan(_, _) | LessThanOrEqual(_, _) |
            GreaterThan(_, _) | GreaterThanOrEqual(_, _) |
            Like(_, _, _) | Add(_, _, _) | Subtract(_, _, _) |
-           Multiply(_, _, _) | Divide(_, _, _) | Cast(_, _, _, _) |
+           Multiply(_, _, _) | Divide(_, _, _) | _: Cast |
            StringTrim(_, _) | StringTrimLeft(_, _) | StringTrimRight(_, _) |
            Ceil(_) | Floor(_) | Extract(_, _, _) | Greatest(_) | Least(_) |
            TimeAdd(_, _, _)

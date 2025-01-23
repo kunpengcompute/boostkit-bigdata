@@ -191,7 +191,7 @@ class MaterializedViewAggregateRule(sparkSession: SparkSession)
               .asInstanceOf[AttributeReference]
           val qualifier = viewTableAttr.qualifier
           expr = expr match {
-            case a@Alias(agg@AggregateExpression(Sum(_, _), _, isDistinct, _, _), _) =>
+            case a@Alias(agg@AggregateExpression(_: Sum, _, isDistinct, _, _), _) =>
               if (isDistinct) {
                 return None
               }
@@ -213,11 +213,11 @@ class MaterializedViewAggregateRule(sparkSession: SparkSession)
               copyAlias(a, agg.copy(aggregateFunction = Sum(viewTableAttr)), qualifier)
             case a@Alias(AttributeReference(_, _, _, _), _) =>
               copyAlias(a, viewTableAttr, viewTableAttr.qualifier)
-            case a@Alias(agg@AggregateExpression(Average(child, _), _, isDistinct, _, _), _) =>
+            case a@Alias(agg@AggregateExpression(avg: Average, _, isDistinct, _, _), _) =>
               if (isDistinct) {
                 return None
               }
-              val count = ExpressionEqual(agg.copy(aggregateFunction = Count(child)))
+              val count = ExpressionEqual(agg.copy(aggregateFunction = Count(avg.child)))
               if (viewAggExpressionEquals.contains(count)) {
                 val countAttr = viewTableAttrs(viewAggExpressionEqualsOrdinal(count))
                     .asInstanceOf[AttributeReference]

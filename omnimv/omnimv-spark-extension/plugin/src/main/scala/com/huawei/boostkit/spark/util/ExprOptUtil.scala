@@ -460,8 +460,8 @@ object ExprOptUtil {
         !child.nullable
       case Not(child: Expression) =>
         isAlwaysFalse(child)
-      case Cast(child: Expression, _, _, _) =>
-        isAlwaysTrue(child)
+      case cast: Cast =>
+        isAlwaysTrue(cast.child)
       case _ =>
         false
     }
@@ -480,8 +480,8 @@ object ExprOptUtil {
         !child.nullable
       case Not(child: Expression) =>
         isAlwaysTrue(child)
-      case Cast(child: Expression, _, _, _) =>
-        isAlwaysFalse(child)
+      case cast: Cast =>
+        isAlwaysFalse(cast.child)
       case _ =>
         false
     }
@@ -492,8 +492,8 @@ object ExprOptUtil {
     expr match {
       case literal@Literal(_, _) =>
         literal.value == null
-      case Cast(child: Expression, _, _, _) =>
-        isNull(child)
+      case cast: Cast =>
+        isNull(cast.child)
       case _ =>
         false
     }

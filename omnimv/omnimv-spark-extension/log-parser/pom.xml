@@ -6,13 +6,13 @@
     <parent>
         <groupId>com.huawei.kunpeng</groupId>
         <artifactId>boostkit-omnimv-spark-parent</artifactId>
-        <version>${omnimv.version}</version>
+        <version>${project.version}</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
     <artifactId>boostkit-omnimv-logparser-spark</artifactId>
     <packaging>jar</packaging>
-    <version>${omnimv.version}</version>
+    <version>${project.version}</version>
 
     <name>log-parser</name>
 
@@ -20,7 +20,7 @@
         <dependency>
             <groupId>com.huawei.kunpeng</groupId>
             <artifactId>boostkit-omnimv-spark</artifactId>
-            <version>${omnimv.version}</version>
+            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.spark</groupId>
@@ -53,7 +53,7 @@
     </dependencies>
 
     <build>
-        <finalName>${artifactId}-${version}${dep.os.arch}</finalName>
+        <finalName>${artifactId}-${version}-${dep.os.arch}</finalName>
         <outputDirectory>target/scala-${scala.binary.version}/classes</outputDirectory>
         <testOutputDirectory>target/scala-${scala.binary.version}/test-classes</testOutputDirectory>
         <plugins>

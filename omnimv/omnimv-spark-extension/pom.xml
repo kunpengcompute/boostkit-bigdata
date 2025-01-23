@@ -8,21 +8,25 @@
     <groupId>com.huawei.kunpeng</groupId>
     <artifactId>boostkit-omnimv-spark-parent</artifactId>
     <packaging>pom</packaging>
-    <version>${omnimv.version}</version>
+    <version>${project.version}</version>
 
     <modules>
         <module>plugin</module>
         <module>log-parser</module>
+        <module>shims</module>
+        <module>ut</module>
     </modules>
 
     <name>BoostKit Spark MaterializedView Sql Engine Extension Parent Pom</name>
 
     <properties>
-        <omnimv.version>3.4.3-1.2.0</omnimv.version>
+        <project.version>${spark.version}-${omnimv.version}</project.version>
+        <omnimv.version>1.2.0</omnimv.version>
+        <spark.version>3.4.3</spark.version>
+        <spark.major.version>34</spark.major.version>
         <scala.version>2.12.17</scala.version>
         <scala.binary.version>2.12</scala.binary.version>
         <java.version>1.8</java.version>
-        <spark.version>3.4.3</spark.version>
         <antlr4.version>4.9.3</antlr4.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
@@ -35,11 +39,69 @@
         <scalastyle.maven.version>1.0.0</scalastyle.maven.version>
         <maven.checkstyle.version>3.1.2</maven.checkstyle.version>
         <scoverage.maven.version>1.4.11</scoverage.maven.version>
+        <assembly.maven.version>3.1.0</assembly.maven.version>
+        <exec.maven.version>3.1.0</exec.maven.version>
         <puppycrawl.checkstyle.version>8.29</puppycrawl.checkstyle.version>
         <kryo-shaded.version>4.0.2</kryo-shaded.version>
-        <dep.os.arch></dep.os.arch>
+        <guava.version>14.0.1</guava.version>
+        <shim.module>spark${spark.major.version}-shim</shim.module>
+        <modify.module>spark${spark.major.version}-modify</modify.module>
+        <ut.module>spark${spark.major.version}-ut</ut.module>
+        <dep.os.arch>aarch64</dep.os.arch>
         <scoverage.skip>true</scoverage.skip>
     </properties>
+
+    <profiles>
+        <profile>
+            <id>spark-3.1</id>
+            <properties>
+                <spark.version>3.1.1</spark.version>
+                <antlr4.version>4.8-1</antlr4.version>
+                <shim.module>spark31-shim</shim.module>
+                <modify.module>spark31-modify</modify.module>
+                <ut.module>spark31-ut</ut.module>
+            </properties>
+        </profile>
+        <profile>
+            <id>spark-3.2</id>
+            <properties>
+                <spark.version>3.2.2</spark.version>
+                <antlr4.version>4.8</antlr4.version>
+                <shim.module>spark32-shim</shim.module>
+                <modify.module>spark32-modify</modify.module>
+                <ut.module>spark32-ut</ut.module>
+            </properties>
+        </profile>
+        <profile>
+            <id>spark-3.3</id>
+            <properties>
+                <spark.version>3.3.1</spark.version>
+                <antlr4.version>4.8</antlr4.version>
+                <shim.module>spark33-shim</shim.module>
+                <modify.module>spark33-modify</modify.module>
+                <ut.module>spark33-ut</ut.module>
+            </properties>
+        </profile>
+        <profile>
+            <id>spark-3.4</id>
+            <properties>
+                <spark.version>3.4.3</spark.version>
+                <antlr4.version>4.9.3</antlr4.version>
+                <shim.module>spark34-shim</shim.module>
+                <modify.module>spark34-modify</modify.module>
+                <ut.module>spark34-ut</ut.module>
+            </properties>
+        </profile>
+        <profile>
+            <id>spark-3.5</id>
+            <properties>
+                <spark.version>3.5.2</spark.version>
+                <shim.module>spark35-shim</shim.module>
+                <modify.module>spark35-modify</modify.module>
+                <ut.module>spark35-ut</ut.module>
+            </properties>
+        </profile>
+    </profiles>
 
     <dependencyManagement>
         <dependencies>
@@ -47,6 +109,11 @@
                 <groupId>com.esotericsoftware</groupId>
                 <artifactId>kryo-shaded</artifactId>
                 <version>${kryo-shaded.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.google.guava</groupId>
+                <artifactId>guava</artifactId>
+                <version>${guava.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.apache.spark</groupId>
@@ -63,6 +130,16 @@
                 <artifactId>spark-hive_${scala.binary.version}</artifactId>
                 <version>${spark.version}</version>
             </dependency>
+            <dependency>
+                <groupId>org.apache.spark</groupId>
+                <artifactId>spark-hive-thriftserver_${scala.binary.version}</artifactId>
+                <version>${spark.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.scala-lang</groupId>
+                <artifactId>scala-library</artifactId>
+                <version>${scala.version}</version>
+            </dependency>
 
             <!-- test dependencies -->
             <dependency>
@@ -76,11 +153,6 @@
                 <artifactId>scalatest_${scala.binary.version}</artifactId>
                 <version>${scalatest.version}</version>
                 <scope>test</scope>
-            </dependency>
-            <dependency>
-                <groupId>org.scala-lang</groupId>
-                <artifactId>scala-library</artifactId>
-                <version>${scala.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
@@ -112,6 +184,33 @@
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-checkstyle-plugin</artifactId>
                     <version>${maven.checkstyle.version}</version>
+                </plugin>
+
+                <!-- assembly shim -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-assembly-plugin</artifactId>
+                    <version>${assembly.maven.version}</version>
+                    <configuration>
+                        <descriptorRefs>
+                            <descriptorRef>jar-with-dependencies</descriptorRef>
+                        </descriptorRefs>
+                    </configuration>
+                    <executions>
+                        <execution>
+                            <id>make-assembly</id>
+                            <phase>package</phase>
+                            <goals>
+                                <goal>single</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                </plugin>
+                <!--exec cmd such as: cp,sh-->
+                <plugin>
+                    <artifactId>exec-maven-plugin</artifactId>
+                    <groupId>org.codehaus.mojo</groupId>
+                    <version>${exec.maven.version}</version>
                 </plugin>
 
                 <!--Scalatest runs all Scala tests -->
