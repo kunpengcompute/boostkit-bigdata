@@ -30,6 +30,9 @@ import org.apache.spark.sql.execution.datasources.OmniFileFormatWriter.Empty2Nul
 import org.apache.spark.sql.expression.ColumnarExpressionConverter
 import org.apache.spark.sql.types.DataType
 import com.google.gson.{JsonArray, JsonObject}
+import com.huawei.boostkit.spark.{TransformHints, ColumnarPreOverrides, ColumnarPluginConfig}
+import org.apache.spark.sql.execution.ColumnarWindowGroupLimitExec
+import org.apache.spark.sql.execution.window.WindowGroupLimitExec
 
 object ModifyUtil extends Logging {
 
@@ -68,6 +71,10 @@ object ModifyUtil extends Logging {
 
   private def preReplaceSparkPlanAdapter(plan: SparkPlan, func: (SparkPlan => SparkPlan)): SparkPlan = {
     plan match {
+      case plan: WindowGroupLimitExec =>
+        val child = func(plan.child)
+        logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
+        ColumnarWindowGroupLimitExec(plan.partitionSpec, plan.orderSpec, plan.rankLikeFunction, plan.limit, plan.mode, child)
       case _ => null
     }
   }
@@ -102,10 +109,24 @@ object ModifyUtil extends Logging {
     extensions.injectOptimizerRule(_ => CombineJoinedAggregates)
   }
 
+  private def addTransformableTagAdapter(plan: SparkPlan): Unit =
+    plan match {
+      case plan: WindowGroupLimitExec =>
+        if (!ColumnarPluginConfig.getSessionConf.enableColumnarWindowGroupLimit) {
+          TransformHints.tagNotTransformable(
+            plan, "columnar Project is not enabled in WindowGroupLimitExec")
+          return
+        }
+        ColumnarWindowGroupLimitExec(plan.partitionSpec, plan.orderSpec,
+          plan.rankLikeFunction, plan.limit, plan.mode, plan.child).buildCheck()
+      case _ =>
+    }
+
   def registerFunc(): Unit = {
     ModifyUtilAdaptor.configRewriteJsonFunc(rewriteToOmniJsonExpressionAdapter)
     ModifyUtilAdaptor.configPreReplacePlanFunc(preReplaceSparkPlanAdapter)
     ModifyUtilAdaptor.configPostReplacePlanFunc(postReplaceSparkPlanAdapter)
     ModifyUtilAdaptor.configInjectRuleFunc(injectRuleAdapter)
+    ModifyUtilAdaptor.configAddTransformableFunc(addTransformableTagAdapter)
   }
 }
