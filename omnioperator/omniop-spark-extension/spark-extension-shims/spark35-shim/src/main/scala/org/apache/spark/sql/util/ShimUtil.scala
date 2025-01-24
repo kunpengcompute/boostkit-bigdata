@@ -183,16 +183,6 @@ object ShimUtil {
       )
   }
 
-  def buildBuildSide(buildSide: BuildSide, joinType: JoinType): BuildSide = {
-    if (buildSide == BuildLeft && joinType == LeftOuter) {
-      BuildRight
-    } else if (buildSide == BuildRight && joinType == RightOuter) {
-      BuildLeft
-    } else {
-      buildSide
-    }
-  }
-
   def createSortShuffleWriter[K, V, C](handle: BaseShuffleHandle[K, V, C],
                                     mapId: Long,
                                     context: TaskContext,
