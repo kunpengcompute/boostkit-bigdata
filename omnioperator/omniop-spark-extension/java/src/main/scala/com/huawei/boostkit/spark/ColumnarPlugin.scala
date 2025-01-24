@@ -216,9 +216,9 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] with PredicateHelper{
     case plan: FilterExec if enableColumnarFilter =>
       if(enableColumnarTopNSort) {
         val filterExec = plan.transform {
-          case f@FilterExec(condition,
-          w@WindowExec(Seq(windowExpression), _, orderSpec, sort: SortExec))
-            if orderSpec.nonEmpty && isTopNExpression(windowExpression) =>
+          case f@FilterExec(condition, w@WindowExec(Seq(windowExpression), _, orderSpec, child: SparkPlan)) =>
+            if (orderSpec.nonEmpty && isTopNExpression(windowExpression)) {
+            val sort: SortExec = child.asInstanceOf[SortExec]
             var topn = Int.MaxValue
             val nonTopNConditions = splitConjunctivePredicates(condition).filter {
               case LessThan(e: NamedExpression, IntegerLiteral(n))
@@ -265,6 +265,14 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] with PredicateHelper{
               val child = replaceWithColumnarPlan(f.child)
               return ColumnarFilterExec(f.condition, child)
             }
+          } else {
+              val child = replaceWithColumnarPlan(f.child)
+              return ColumnarFilterExec(f.condition, child)
+          }
+          case _ =>
+            val child = replaceWithColumnarPlan(plan.child)
+            logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
+            ColumnarFilterExec(plan.condition, child)
         }
       }
       val child = replaceWithColumnarPlan(plan.child)
