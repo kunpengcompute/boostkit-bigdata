@@ -163,8 +163,3 @@ def get_session_timeout():
 def get_mv_metadata_path():
     g_cfg = init_config()
     return g_cfg.get("yarn", "mv_metadata_path")
-
-
-def get_omnimv_version():
-    return f"\nProduct Name: Kunpeng BoostKit\nProduct Version: 24.0.T15\nComponent Name: "\
-           f"BoostKit-omnimv\nComponent Version: 1.2.0"

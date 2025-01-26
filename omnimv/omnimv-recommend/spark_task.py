@@ -7,7 +7,7 @@ import pydoop.hdfs as hdfs
 
 from src.candidate_generation.spark.generate_mv_spark import generate_mv_spark
 from src.preprocessor.proc_conf_spark import get_query_log_timestamp, \
-    get_mv_output_path, get_omnimv_version, get_spark_schema_path, \
+    get_mv_output_path, get_spark_schema_path, \
     get_spark_database, get_spark_sqls_path, get_table_bytes_path, get_spark_mock_database
 from omnimv_logging import get_logger
 from src.candidate_generation.spark.spark_utils import write_text_to_hdfs, \
@@ -80,7 +80,7 @@ def create_greedy_views():
 def run_spark_task(task):
     tasks = [
         "init_database", "run_original_sqls", "parse_query_logs", "generate_views", "create_greedy_views",
-        "parse_mv_logs", "--version"
+        "parse_mv_logs"
     ]
     if task not in tasks:
         raise Exception(f"task {task} is not supported, only following tasks are supported: {tasks}")
@@ -99,7 +99,5 @@ def run_spark_task(task):
         spark_greedy_recommend()
     elif task == "create_greedy_views":
         create_greedy_views()
-    elif task == "--version":
-        OMNIMV_LOG.info(get_omnimv_version())
     else:
         pass
