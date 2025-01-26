@@ -209,4 +209,4 @@ tail -f nohup.out
 3. python main.py spark parse_query_logs 表示从yarn logs中解析并提取原生sql执行相关的信息，包括执行计划，计算耗时等
 4. python main.py spark generate_views 表示从解析的sql相关信息中，提取公共子查询，作为候选的物化视图
 5. python main.py spark create_greedy_views 表示创建贪心算法推荐的物化视图，个数由配置文件中mv_limit指定
-6. python main.py spark --version 表示查看当前OmniRuntime物化视图的版本信息
+6. version.txt 表示查看当前OmniRuntime物化视图的版本信息
