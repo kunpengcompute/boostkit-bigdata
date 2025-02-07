@@ -24,6 +24,7 @@ namespace omniruntime::reader {
 
     const int MINIMUM_REPEAT = 3;
     const int MAXIMUM_REPEAT = 127 + MINIMUM_REPEAT;
+    const uint32_t BITS_OF_BYTE = 8;
 
     void OmniBooleanRleDecoder::seek(orc::PositionProvider& location) {
         OmniByteRleDecoder::seek(location);
@@ -54,86 +55,115 @@ namespace omniruntime::reader {
         }
     }
 
-    void OmniBooleanRleDecoder::next(omniruntime::vec::BaseVector*& omnivec, uint64_t numValues, char* notNull,
-        const orc::Type* baseTp, int omniTypeId) {
-        auto dataTypeId = static_cast<omniruntime::type::DataTypeId>(omniTypeId);
-        std::unique_ptr<omniruntime::vec::BaseVector> tempOmnivec = makeNewVector(numValues, baseTp, dataTypeId);
-        auto pushOmniVec = tempOmnivec.get();
-        switch (dataTypeId) {
-            case omniruntime::type::OMNI_BOOLEAN:
-                nextByType<omniruntime::type::OMNI_BOOLEAN>(pushOmniVec, numValues, notNull, baseTp, omniTypeId);
-                break;
-            case omniruntime::type::OMNI_SHORT:
-                throw std::runtime_error("OmniBooleanRleDecoder SHORT not finished!!!");
-                break;
-            case omniruntime::type::OMNI_INT:
-                throw std::runtime_error("OmniBooleanRleDecoder INT not finished!!!");
-                break;
-            case omniruntime::type::OMNI_LONG:
-                throw std::runtime_error("OmniBooleanRleDecoder LONG not finished!!!");
-                break;
-            case omniruntime::type::OMNI_TIMESTAMP:
-                throw std::runtime_error("OmniBooleanRleDecoder TIMESTAMP not finished!!!");
-                break;
-            case omniruntime::type::OMNI_DATE32:
-                throw std::runtime_error("OmniBooleanRleDecoder DATE32 not finished!!!");
-                break;
-            case omniruntime::type::OMNI_DATE64:
-                throw std::runtime_error("OmniBooleanRleDecoder DATE64 not finished!!!");
-                break;
-            case omniruntime::type::OMNI_DOUBLE:
-                throw std::runtime_error("OmniBooleanRleDecoder DOUBLE not finished!!!");
-                break;
-            case omniruntime::type::OMNI_CHAR:
-                throw std::runtime_error("OmniBooleanRleDecoder CHAR not finished!!!");
-            case omniruntime::type::OMNI_VARCHAR:
-                throw std::runtime_error("OmniBooleanRleDecoder VARCHAR not finished!!!");
-            case omniruntime::type::OMNI_DECIMAL64:
-                throw std::runtime_error("OmniBooleanRleDecoder DECIMAL64 should not in here!!!");
-            case omniruntime::type::OMNI_DECIMAL128:
-                throw std::runtime_error("OmniBooleanRleDecoder DECIMAL64 should not in here!!!");
-            default:
-                printf("OmniBooleanRleDecoder switch no process!!!");
-        }
-
-        omnivec = tempOmnivec.release();
-    }
-
-    template <omniruntime::type::DataTypeId TYPE_ID>
-    void OmniBooleanRleDecoder::nextByType(omniruntime::vec::BaseVector*& omnivec, uint64_t numValues, char* notNull,
-                                                const orc::Type* baseTp, int omniTypeId) {
-        using namespace omniruntime::type;
-        using T = typename NativeType<TYPE_ID>::type;
-        auto vec = reinterpret_cast<omniruntime::vec::Vector<T>*>(omnivec);
-
+    void OmniBooleanRleDecoder::nextNulls(bool *data, uint64_t numValues, bool *nulls) {
         // next spot to fill in
         uint64_t position = 0;
-
         // use up any remaining bits
-        if (notNull) {
-            while(remainingBits > 0 && position < numValues) {
-                if (notNull[position]) {
+        if (nulls) {
+            while (remainingBits > 0 && position < numValues) {
+                if (!nulls[position]) {
                     remainingBits -= 1;
-                    vec->SetValue(static_cast<int>(position), static_cast<T>((static_cast<unsigned char>(lastByte) >>
-                                    remainingBits) & 0x1));
+                    data[position] = !((static_cast<unsigned char>(lastByte) >> remainingBits) & 0x1);
                 } else {
-                    vec->SetNull(static_cast<int>(position));
+                    data[position] = true;
                 }
                 position += 1;
             }
         } else {
-            while(remainingBits > 0 && position < numValues) {
+            while (remainingBits > 0 && position < numValues) {
                 remainingBits -= 1;
-                vec->SetValue(static_cast<int>(position++), static_cast<T>((static_cast<unsigned char>(lastByte) >>
-                                remainingBits) & 0x1));
+                data[position] = !((static_cast<unsigned char>(lastByte) >> remainingBits) & 0x1);
+                position += 1;
+            }
+        }
+        // count the number of nulls remaining
+        uint64_t nonNulls = numValues - position;
+        if (nulls) {
+            for (uint64_t i = position; i < numValues; ++i) {
+                if (nulls[i]) {
+                    nonNulls -= 1;
+                }
+            }
+        }
+        // fill in the remaining values
+        if (nonNulls == 0) {
+            while (position < numValues) {
+                data[position++] = true;
+            }
+        } else if (position < numValues) {
+            // read the new bytes into array
+            uint64_t bytesRead = (nonNulls + 7) / 8;
+            OmniByteRleDecoder::next(reinterpret_cast<char *>(data + position), bytesRead, nullptr);
+            lastByte = data[position + bytesRead - 1];
+            remainingBits = bytesRead * 8 - nonNulls;
+            // expand the array backwards so that we don't clobber the data
+            uint64_t bitsLeft = bytesRead * 8 - remainingBits;
+            if (nulls) {
+                for (int64_t i = static_cast<int64_t>(numValues) - 1; i >= static_cast<int64_t>(position); --i) {
+                    if (!nulls[i]) {
+                        uint64_t shiftPosn = (-bitsLeft) % 8;
+                        data[i] = !((data[position + (bitsLeft - 1) / 8] >> shiftPosn) & 0x1);
+                        bitsLeft -= 1;
+                    } else {
+                        data[i] = true;
+                    }
+                }
+            } else {
+                for (int64_t i = static_cast<int64_t>(numValues) - 1; i >= static_cast<int64_t>(position); --i,
+                    --bitsLeft) {
+                    uint64_t shiftPosn = (-bitsLeft) % 8;
+                    data[i] = !((data[position + (bitsLeft - 1) / 8] >> shiftPosn) & 0x1);
+                }
+            }
+        }
+    }
+
+
+    void OmniBooleanRleDecoder::next(omniruntime::vec::BaseVector *omnivec, uint64_t numValues, bool *nulls,
+        int omniTypeId) {
+        switch (omniTypeId) {
+            case omniruntime::type::OMNI_BOOLEAN: {
+                auto boolValues = omniruntime::vec::unsafe::UnsafeVector::GetRawValues(
+                    static_cast<omniruntime::vec::Vector<bool>*>(omnivec));
+                return next(boolValues, numValues, nulls);
+            }
+            default:
+                throw std::runtime_error("OmniBooleanRleDecoder not support type: " + omniTypeId);
+        }
+    }
+
+    void OmniBooleanRleDecoder::next(char *data, uint64_t numValues, bool *nulls) {
+        next<char>(data, numValues, nulls);
+    }
+
+    template <typename T>
+    void OmniBooleanRleDecoder::next(T *data, uint64_t numValues, bool *nulls) {
+        // next spot to fill in
+        uint64_t position = 0;
+
+        // use up any remaining bits
+        if (nulls) {
+            while (remainingBits > 0 && position < numValues) {
+                if (!nulls[position]) {
+                    remainingBits -= 1;
+                    data[position] = static_cast<T>((static_cast<unsigned char>(lastByte) >> remainingBits) & 0x1);
+                } else {
+                    data[position] = 0;
+                }
+                position += 1;
+            }
+        } else {
+            while (remainingBits > 0 && position < numValues) {
+                remainingBits -= 1;
+                data[position++] = static_cast<T>((static_cast<unsigned char>(lastByte) >> remainingBits) & 0x1);
             }
         }
 
         // count the number of nonNulls remaining
         uint64_t nonNulls = numValues - position;
-        if (notNull) {
-            for(uint64_t i = position; i < numValues; ++i) {
-                if (!notNull[i]) {
+        if (nulls) {
+            for (uint64_t i = position; i < numValues; ++i) {
+                if (nulls[i]) {
                     nonNulls -= 1;
                 }
             }
@@ -142,35 +172,31 @@ namespace omniruntime::reader {
         // fill in the remaining values
         if (nonNulls == 0) {
             while (position < numValues) {
-                vec->SetNull(static_cast<int>(position++));
+                data[position++] = 0;
             }
         } else if (position < numValues) {
             // read the new bytes into the array
             uint64_t bytesRead = (nonNulls + 7) / 8;
-            auto *values = reinterpret_cast<char *>(omniruntime::vec::VectorHelper::UnsafeGetValues(omnivec));
-            OmniByteRleDecoder::next(values + position, bytesRead, nullptr);
-            lastByte = static_cast<char>(vec->GetValue(position + bytesRead - 1));
+            OmniByteRleDecoder::next(reinterpret_cast<char *>(data + position), bytesRead, nullptr);
+            lastByte = data[position + bytesRead - 1];
             remainingBits = bytesRead * 8 - nonNulls;
             // expand the array backwards so that we don't clobber the data
-            uint64_t bitsLeft = bytesRead * 8- remainingBits;
-            if (notNull) {
-                for (int64_t i =static_cast<int64_t>(numValues) - 1;
-                     i >= static_cast<int64_t>(position); --i) {
-                    if (notNull[i]) {
+            uint64_t bitsLeft = bytesRead * 8 - remainingBits;
+            if (nulls) {
+                for (int64_t i = static_cast<int64_t>(numValues) - 1; i >= static_cast<int64_t>(position); --i) {
+                    if (!nulls[i]) {
                         uint64_t shiftPosn = (-bitsLeft) % 8;
-                        auto value = static_cast<uint64_t>(vec->GetValue(position + (bitsLeft - 1) / 8)) >> shiftPosn;
-                        vec->SetValue(static_cast<int>(i), static_cast<T>(value & 0x1));
+                        data[i] = static_cast<T>((data[position + (bitsLeft - 1) / 8] >> shiftPosn) & 0x1);
                         bitsLeft -= 1;
                     } else {
-                        vec->SetNull(static_cast<int>(i));
+                        data[i] = 0;
                     }
                 }
             } else {
-                for(int64_t i = static_cast<int64_t>(numValues) - 1;
+                for (int64_t i = static_cast<int64_t>(numValues) - 1;
                     i >= static_cast<int64_t>(position); --i, --bitsLeft) {
                     uint64_t shiftPosn = (-bitsLeft) % 8;
-                    auto value = static_cast<uint64_t>(vec->GetValue(position + (bitsLeft - 1) / 8)) >> shiftPosn;
-                    vec->SetValue(static_cast<int>(i), static_cast<T>(value & 0x1));
+                    data[i] = static_cast<T>((data[position + (bitsLeft - 1) / 8] >> shiftPosn) & 0x1);
                 }
             }
         }
@@ -329,129 +355,5 @@ namespace omniruntime::reader {
         }
     }
 
-    void OmniByteRleDecoder::next(omniruntime::vec::BaseVector*& omnivec, uint64_t numValues, char* notNull,
-                                    const orc::Type* baseTp, int omniTypeId) {
-        auto dataTypeId = static_cast<omniruntime::type::DataTypeId>(omniTypeId);
-        std::unique_ptr<omniruntime::vec::BaseVector> tempOmnivec = makeNewVector(numValues, baseTp, dataTypeId);
-        auto pushOmniVec = tempOmnivec.get();
-        switch (dataTypeId) {
-            case omniruntime::type::OMNI_BOOLEAN:
-                nextByType<omniruntime::type::OMNI_BOOLEAN>
-                        (pushOmniVec, numValues, notNull, baseTp);
-                break;
-            case omniruntime::type::OMNI_SHORT:
-                nextByType<omniruntime::type::OMNI_SHORT>
-                        (pushOmniVec, numValues, notNull, baseTp);
-                break;
-            case omniruntime::type::OMNI_INT:
-                nextByType<omniruntime::type::OMNI_INT>
-                        (pushOmniVec, numValues, notNull, baseTp);
-                break;
-            case omniruntime::type::OMNI_LONG:
-                nextByType<omniruntime::type::OMNI_LONG>
-                        (pushOmniVec, numValues, notNull, baseTp);
-                break;
-            case omniruntime::type::OMNI_TIMESTAMP:
-                nextByType<omniruntime::type::OMNI_TIMESTAMP>
-                        (pushOmniVec, numValues, notNull, baseTp);
-                break;
-            case omniruntime::type::OMNI_DATE32:
-                nextByType<omniruntime::type::OMNI_DATE32>
-                        (pushOmniVec, numValues, notNull, baseTp);
-                break;
-            case omniruntime::type::OMNI_DATE64:
-                nextByType<omniruntime::type::OMNI_DATE64>
-                        (pushOmniVec, numValues, notNull, baseTp);
-                break;
-            case omniruntime::type::OMNI_DOUBLE:
-                nextByType<omniruntime::type::OMNI_DOUBLE>
-                        (pushOmniVec, numValues, notNull, baseTp);
-                break;
-            case omniruntime::type::OMNI_CHAR:
-                throw std::runtime_error("OmniByteRleDecoder CHAR not finished!!!");
-            case omniruntime::type::OMNI_VARCHAR:
-                throw std::runtime_error("OmniByteRleDecoder VARCHAR not finished!!!");
-            case omniruntime::type::OMNI_DECIMAL64:
-                throw std::runtime_error("OmniByteRleDecoder DECIMAL64 not finished!!!");
-            case omniruntime::type::OMNI_DECIMAL128:
-                throw std::runtime_error("OmniByteRleDecoder DECIMAL64 not finished!!!");
-            default:
-                printf("OmniByteRleDecoder swtich no process!!!");
-        }
-
-        omnivec = tempOmnivec.release();
-    }
-
-    template <omniruntime::type::DataTypeId TYPE_ID>
-    void OmniByteRleDecoder::nextByType(omniruntime::vec::BaseVector*& omnivec, uint64_t numValues, char* notNull,
-                    const orc::Type* baseTp) {
-        using namespace omniruntime::type;
-        using T = typename NativeType<TYPE_ID>::type;
-        auto vec = reinterpret_cast<omniruntime::vec::Vector<T>*>(omnivec);
-
-        uint64_t position = 0;
-        // skip over null values
-        while (notNull && position < numValues && !notNull[position]) {
-                    position += 1;
-        }
-        while (position < numValues) {
-            // if we are out of values, read more
-            if (remainingValues == 0) {
-                readHeader();
-            }
-            // how many do we read out of this block?
-            size_t count = std::min(static_cast<size_t>(numValues - position),
-                                                        remainingValues);
-            uint64_t consumed = 0;
-            if (repeating) {
-                if (notNull) {
-                    for(uint64_t i=0; i < count; ++i) {
-                        if (notNull[position + i]) {
-                            vec->SetValue(static_cast<int>(position + i), static_cast<T>(value));
-                            consumed += 1;
-                        } else {
-                            vec->SetNull(static_cast<int>(position + i));
-                        }
-                    }
-                } else {
-                    for (uint64_t i = position; i < position + count; ++i) {
-                        vec->SetValue(static_cast<int>(i), static_cast<int>(value));
-                    }
-                    consumed = count;
-                }
-            } else {
-                if (notNull) {
-                    for(uint64_t i = 0; i < count; ++i) {
-                        if (notNull[position + i]) {
-                            vec->SetValue(static_cast<int>(position + i), static_cast<T>(readByte()));
-                            consumed += 1;
-                        } else {
-                            vec->SetNull(static_cast<int>(position + i));
-                        }
-                    }
-                } else {
-                    uint64_t i = 0;
-                    while (i < count) {
-                        if (bufferStart == bufferEnd) {
-                            nextBuffer();
-                        }
-                        uint64_t copyBytes =
-                        std::min(static_cast<uint64_t>(count - i),
-                                static_cast<uint64_t>(bufferEnd - bufferStart));
-                        vec->SetValues(static_cast<int>(position + i), bufferStart, static_cast<int>(copyBytes));
-                        bufferStart += copyBytes;
-                        i += copyBytes;
-                    }
-                    consumed = count;
-                }
-            }
-            remainingValues -= consumed;
-            position += count;
-            // skip over any null values
-            while (notNull && position < numValues && !notNull[position]) {
-                position += 1;
-            }
-        }
-   }
    //OmniByteRleDecoder end
 }
