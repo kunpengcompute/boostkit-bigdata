@@ -29,7 +29,7 @@ import org.apache.spark.shuffle.sort.SortShuffleWriter
 import org.apache.spark.shuffle.{BaseShuffleHandle, ShuffleWriteMetricsReporter, ShuffleWriter}
 import org.apache.spark.sql.catalyst.expressions.aggregate.{AggregateExpression, AggregateFunction, Average, Count, Max, Min, Sum}
 import org.apache.spark.{SparkEnv, TaskContext, TaskContextImpl}
-import org.apache.spark.sql.catalyst.expressions.{Attribute, BinaryOperator, CastBase, Expression}
+import org.apache.spark.sql.catalyst.expressions.{Add, Attribute, BinaryOperator, CastBase, Divide, Expression, Multiply, Subtract}
 import org.apache.spark.sql.catalyst.optimizer.BuildSide
 import org.apache.spark.sql.catalyst.plans.JoinType
 import org.apache.spark.sql.catalyst.plans.logical.{Aggregate, CTERelationDef, CTERelationRef, LogicalPlan, Statistics}
@@ -59,7 +59,15 @@ object ShimUtil {
     new TaskContextImpl(stageId, stageAttemptNumber, partitionId, taskAttemptId, attemptNumber, taskMemoryManager, localProperties, metricsSystem, taskMetrics, cpus, resources)
   }
 
-  def unsupportedEvalModeCheck(expr: Expression): Unit = {}
+ def getOperatorFromEvalMode(expr: Expression): String = {
+    expr match {
+        case add: Add => "ADD"
+        case sub: Subtract => "SUBTRACT"
+        case mult: Multiply => "MULTIPLY"
+        case divide: Divide => "DIVIDE"
+        case _ => ""
+    }
+ }
 
   def binaryOperatorAdjust(expr: BinaryOperator, returnDataType: DataType): (Expression, Expression) = {
     (expr.left, expr.right)

@@ -60,25 +60,19 @@ object ShimUtil {
     new TaskContextImpl(stageId, stageAttemptNumber, partitionId, taskAttemptId, attemptNumber, numPartitions, taskMemoryManager, localProperties, metricsSystem, taskMetrics, cpus, resources)
   }
 
-  def unsupportedEvalModeCheck(expr: Expression): Unit = {
+def getOperatorFromEvalMode(expr: Expression): String = {
     expr match {
-      case add: Add if add.evalMode == EvalMode.TRY =>
-        throw new UnsupportedOperationException(s"Unsupported EvalMode TRY for $add")
-      case sub: Subtract if sub.evalMode == EvalMode.TRY =>
-        throw new UnsupportedOperationException(s"Unsupported EvalMode TRY for $sub")
-      case mult: Multiply if mult.evalMode == EvalMode.TRY =>
-        throw new UnsupportedOperationException(s"Unsupported EvalMode TRY for $mult")
-      case divide: Divide if divide.evalMode == EvalMode.TRY =>
-        throw new UnsupportedOperationException(s"Unsupported EvalMode TRY for $divide")
-      case mod: Remainder if mod.evalMode == EvalMode.TRY =>
-        throw new UnsupportedOperationException(s"Unsupported EvalMode TRY for $mod")
-      case sum: Sum if sum.evalMode == EvalMode.TRY =>
-        throw new UnsupportedOperationException(s"Unsupported EvalMode TRY for $sum")
-      case avg: Average if avg.evalMode == EvalMode.TRY =>
-        throw new UnsupportedOperationException(s"Unsupported EvalMode TRY for $avg")
-      case _ =>
+        case add: Add if add.evalMode == EvalMode.TRY => "TRY_ADD"
+        case add: Add => "ADD"
+        case sub: Subtract if sub.evalMode == EvalMode.TRY => "TRY_SUBTRACT"
+        case sub: Subtract => "SUBTRACT"
+        case mult: Multiply if mult.evalMode == EvalMode.TRY => "TRY_MULTIPLY"
+        case mult: Multiply => "MULTIPLY"
+        case divide: Divide if divide.evalMode == EvalMode.TRY => "TRY_DIVIDE"
+        case divide: Divide => "DIVIDE"
+        case _ => ""
     }
-  }
+ }
 
   def binaryOperatorAdjust(expr: BinaryOperator, returnDataType: DataType): (Expression, Expression) = {
     import scala.math.{max, min}

@@ -167,43 +167,38 @@ object OmniExpressionAdaptor extends Logging {
         }
 
       case sub: Subtract =>
-        ShimUtil.unsupportedEvalModeCheck(sub)
         val (left, right) = ShimUtil.binaryOperatorAdjust(sub, returnDatatype)
         new JsonObject().put("exprType", "BINARY")
           .addOmniExpJsonType("returnType", returnDatatype)
-          .put("operator", "SUBTRACT")
+          .put("operator", ShimUtil.getOperatorFromEvalMode(sub))
           .put("left", rewriteToOmniJsonExpressionLiteralJsonObject(left, exprsIndexMap))
           .put("right", rewriteToOmniJsonExpressionLiteralJsonObject(right, exprsIndexMap))
 
       case add: Add =>
-        ShimUtil.unsupportedEvalModeCheck(add)
         val (left, right) = ShimUtil.binaryOperatorAdjust(add, returnDatatype)
         new JsonObject().put("exprType", "BINARY")
           .addOmniExpJsonType("returnType", returnDatatype)
-          .put("operator", "ADD")
+          .put("operator", ShimUtil.getOperatorFromEvalMode(add))
           .put("left", rewriteToOmniJsonExpressionLiteralJsonObject(left, exprsIndexMap))
           .put("right", rewriteToOmniJsonExpressionLiteralJsonObject(right, exprsIndexMap))
 
       case mult: Multiply =>
-        ShimUtil.unsupportedEvalModeCheck(mult)
         val (left, right) = ShimUtil.binaryOperatorAdjust(mult, returnDatatype)
         new JsonObject().put("exprType", "BINARY")
           .addOmniExpJsonType("returnType", returnDatatype)
-          .put("operator", "MULTIPLY")
+          .put("operator", ShimUtil.getOperatorFromEvalMode(mult))
           .put("left", rewriteToOmniJsonExpressionLiteralJsonObject(left, exprsIndexMap))
           .put("right", rewriteToOmniJsonExpressionLiteralJsonObject(right, exprsIndexMap))
 
       case divide: Divide =>
-        ShimUtil.unsupportedEvalModeCheck(divide)
         val (left, right) = ShimUtil.binaryOperatorAdjust(divide, returnDatatype)
         new JsonObject().put("exprType", "BINARY")
           .addOmniExpJsonType("returnType", returnDatatype)
-          .put("operator", "DIVIDE")
+          .put("operator", ShimUtil.getOperatorFromEvalMode(divide))
           .put("left", rewriteToOmniJsonExpressionLiteralJsonObject(left, exprsIndexMap))
           .put("right", rewriteToOmniJsonExpressionLiteralJsonObject(right, exprsIndexMap))
 
       case mod: Remainder =>
-        ShimUtil.unsupportedEvalModeCheck(mod)
         val (left, right) = ShimUtil.binaryOperatorAdjust(mod, returnDatatype)
         new JsonObject().put("exprType", "BINARY")
           .addOmniExpJsonType("returnType", returnDatatype)
