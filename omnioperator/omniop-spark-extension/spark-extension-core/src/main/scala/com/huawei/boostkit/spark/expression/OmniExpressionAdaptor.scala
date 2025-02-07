@@ -170,7 +170,7 @@ object OmniExpressionAdaptor extends Logging {
         val (left, right) = ShimUtil.binaryOperatorAdjust(sub, returnDatatype)
         new JsonObject().put("exprType", "BINARY")
           .addOmniExpJsonType("returnType", returnDatatype)
-          .put("operator", ShimUtil.getOperatorFromEvalMode(sub))
+          .put("operator", ShimUtil.transformExpressionByEvalMode(sub))
           .put("left", rewriteToOmniJsonExpressionLiteralJsonObject(left, exprsIndexMap))
           .put("right", rewriteToOmniJsonExpressionLiteralJsonObject(right, exprsIndexMap))
 
@@ -178,7 +178,7 @@ object OmniExpressionAdaptor extends Logging {
         val (left, right) = ShimUtil.binaryOperatorAdjust(add, returnDatatype)
         new JsonObject().put("exprType", "BINARY")
           .addOmniExpJsonType("returnType", returnDatatype)
-          .put("operator", ShimUtil.getOperatorFromEvalMode(add))
+          .put("operator", ShimUtil.transformExpressionByEvalMode(add))
           .put("left", rewriteToOmniJsonExpressionLiteralJsonObject(left, exprsIndexMap))
           .put("right", rewriteToOmniJsonExpressionLiteralJsonObject(right, exprsIndexMap))
 
@@ -186,7 +186,7 @@ object OmniExpressionAdaptor extends Logging {
         val (left, right) = ShimUtil.binaryOperatorAdjust(mult, returnDatatype)
         new JsonObject().put("exprType", "BINARY")
           .addOmniExpJsonType("returnType", returnDatatype)
-          .put("operator", ShimUtil.getOperatorFromEvalMode(mult))
+          .put("operator", ShimUtil.transformExpressionByEvalMode(mult))
           .put("left", rewriteToOmniJsonExpressionLiteralJsonObject(left, exprsIndexMap))
           .put("right", rewriteToOmniJsonExpressionLiteralJsonObject(right, exprsIndexMap))
 
@@ -194,7 +194,7 @@ object OmniExpressionAdaptor extends Logging {
         val (left, right) = ShimUtil.binaryOperatorAdjust(divide, returnDatatype)
         new JsonObject().put("exprType", "BINARY")
           .addOmniExpJsonType("returnType", returnDatatype)
-          .put("operator", ShimUtil.getOperatorFromEvalMode(divide))
+          .put("operator", ShimUtil.transformExpressionByEvalMode(divide))
           .put("left", rewriteToOmniJsonExpressionLiteralJsonObject(left, exprsIndexMap))
           .put("right", rewriteToOmniJsonExpressionLiteralJsonObject(right, exprsIndexMap))
 
@@ -765,12 +765,10 @@ object OmniExpressionAdaptor extends Logging {
   def toOmniAggFunType(agg: AggregateExpression, isHashAgg: Boolean = false, isMergeCount: Boolean = false): FunctionType = {
     agg.aggregateFunction match {
       case sum: Sum =>
-        ShimUtil.unsupportedEvalModeCheck(sum)
-        OMNI_AGGREGATION_TYPE_SUM
+        ShimUtil.transformFuncTypeByEvalMode(sum)
       case Max(_) => OMNI_AGGREGATION_TYPE_MAX
       case avg: Average =>
-        ShimUtil.unsupportedEvalModeCheck(avg)
-        OMNI_AGGREGATION_TYPE_AVG
+        ShimUtil.transformFuncTypeByEvalMode(avg)
       case Min(_) => OMNI_AGGREGATION_TYPE_MIN
       case StddevSamp(_, _) => OMNI_AGGREGATION_TYPE_SAMP
       case Count(Literal(1, IntegerType) :: Nil) | Count(ArrayBuffer(Literal(1, IntegerType))) =>

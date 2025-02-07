@@ -39,6 +39,8 @@ import org.apache.spark.sql.types.{DataType, DateType, DecimalType, DoubleType, 
 
 import java.net.URI
 import java.util.{Locale, Properties}
+import nova.hetu.omniruntime.constants.FunctionType
+import nova.hetu.omniruntime.constants.FunctionType.{OMNI_AGGREGATION_TYPE_SUM,OMNI_AGGREGATION_TYPE_AVG}
 
 object ShimUtil {
 
@@ -60,13 +62,21 @@ object ShimUtil {
     new TaskContextImpl(stageId, stageAttemptNumber, partitionId, taskAttemptId, attemptNumber, taskMemoryManager, localProperties, metricsSystem, taskMetrics, resources)
   }
 
- def getOperatorFromEvalMode(expr: Expression): String = {
+ def transformExpressionByEvalMode(expr: Expression): String = {
     expr match {
         case add: Add => "ADD"
         case sub: Subtract => "SUBTRACT"
         case mult: Multiply => "MULTIPLY"
         case divide: Divide => "DIVIDE"
-        case _ => ""
+        case _ => throw new UnsupportedOperationException(s"Unsupported Operation for $expr")
+    }
+ }
+
+ def transformFuncTypeByEvalMode(expr: Expression):FunctionType = {
+    expr match {
+      case sum: Sum => OMNI_AGGREGATION_TYPE_SUM
+      case avg: Average => OMNI_AGGREGATION_TYPE_AVG
+      case _ => throw new UnsupportedOperationException(s"Unsupported Operation for $expr")
     }
  }
 
