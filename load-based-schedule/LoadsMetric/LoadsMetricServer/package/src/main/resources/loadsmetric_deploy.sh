@@ -411,6 +411,11 @@ esac
 
 # start grafana
 start_grafana() {
+  local grafana_port=3000
+  if lsof -i :$grafana_port > /dev/null 2>&1; then
+    log_err_echo "Port $grafana_port is already in use. Please check if the Service is running."
+    return 1
+  fi
   (
     cd $grafana_path && nohup ./grafana server > grafana.log 2>&1 &
   ) &
@@ -699,8 +704,15 @@ function main() {
       # Check if the installation directory exists
       local install_dir_server="${install_dir}/${software_name}-${install_type}"
       local install_dir_setup="${install_dir}/${software_name}-${install_type}-setup"
+      local config_app_properties_path="${install_dir_server}/etc/application.properties"
+      local loads_port=$(get_value_of_properties_file "${config_app_properties_path}" "server.port")
+      log_info_echo "loads_port: ${loads_port}"
       if [ -d "${install_dir_server}" ] || [ -d "${install_dir_setup}" ]; then
         # If the installation directory exists, perform the start operation
+        if lsof -i :${loads_port} > /dev/null 2>&1; then
+          log_err_echo "Port ${loads_port} is already in use. Please check if the LoadsMetric Service is running."
+          return 1
+        fi
         manager "start"
         log_action_result "LoadsMetric start" $?
         generate_crontab_job "${install_type}"
