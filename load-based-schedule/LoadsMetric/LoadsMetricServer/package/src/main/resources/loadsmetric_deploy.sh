@@ -706,7 +706,6 @@ function main() {
       local install_dir_setup="${install_dir}/${software_name}-${install_type}-setup"
       local config_app_properties_path="${install_dir_server}/etc/application.properties"
       local loads_port=$(get_value_of_properties_file "${config_app_properties_path}" "server.port")
-      log_info_echo "loads_port: ${loads_port}"
       if [ -d "${install_dir_server}" ] || [ -d "${install_dir_setup}" ]; then
         # If the installation directory exists, perform the start operation
         if lsof -i :${loads_port} > /dev/null 2>&1; then
@@ -714,7 +713,12 @@ function main() {
           return 1
         fi
         manager "start"
-        log_action_result "LoadsMetric start" $?
+        local exit_code=$?
+        log_action_result "LoadsMetric start" "${exit_code}"
+        if [[ ${exit_code} -ne 0 ]]; then
+          log_err_echo "Start failed! Please check the service running logs."
+          exit 1
+        fi
         generate_crontab_job "${install_type}"
         crontab "${install_dir_server}"/etc/crontab.job
         log_info_echo "daemon is started"
