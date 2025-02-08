@@ -32,6 +32,8 @@ import org.apache.spark.sql.vectorized.ColumnarBatch
 import org.apache.spark.util.Utils
 
 import scala.collection.mutable
+import scala.math.max
+import scala.math.abs
 
 
 /** Writes data to a single directory (used for non-dynamic-partition writes). */
@@ -287,56 +289,83 @@ class OmniDynamicPartitionDataSingleWriter(
   extends OmniBaseDynamicPartitionDataWriter(description, taskAttemptContext, committer,
     customMetrics) {
 
-  private var currentPartitionValues: Option[UnsafeRow] = None
-  private var currentBucketId: Option[Int] = None
+  private var firstPartitionValues: Option[UnsafeRow] = None
+  private var firstBucketId: Option[Int] = None
+  private var firstFilePath = ""
 
   override def write(record: InternalRow): Unit = {
     assert(record.isInstanceOf[OmniInternalRow])
     splitWrite(record)
   }
 
+  private def judgePartitionBucketSame(batch: ColumnarBatch, firstIndex: Int, lastIndex: Int): Boolean = {
+    val firstRecord = batch.getRow(firstIndex)
+    val lastRecord = batch.getRow(lastIndex)
+    var lastPartitionValues: Option[UnsafeRow] = None
+    var lastBucketId: Option[Int] = None
+    if (isPartitioned) {
+      firstPartitionValues = Some(getPartitionValues(batch.getRow(firstIndex)).copy())
+      lastPartitionValues = Some(getPartitionValues(batch.getRow(lastIndex)).copy())
+    }
+    if (isBucketed) {
+      firstBucketId = Some(getBucketId(firstRecord))
+      lastBucketId = Some(getBucketId(lastRecord))
+    }
+    return (firstPartitionValues == lastPartitionValues && firstBucketId == lastBucketId)
+  }
+
   private def splitWrite(omniInternalRow: InternalRow): Unit = {
     val batch = omniInternalRow.asInstanceOf[OmniInternalRow].batch
     val numRows = batch.numRows()
-    var lastIndex = 0
-    for (i <- 0 until numRows) {
-      val record = batch.getRow(i)
-      val nextPartitionValues = if (isPartitioned) Some(getPartitionValues(record)) else None
-      val nextBucketId = if (isBucketed) Some(getBucketId(record)) else None
-
-      if (currentPartitionValues != nextPartitionValues || currentBucketId != nextBucketId) {
-        val isFilePathSame = getPartitionPath(currentPartitionValues,
-          currentBucketId) == getPartitionPath(nextPartitionValues, nextBucketId)
-        if (!isFilePathSame) {
-          // See a new partition or bucket - write to a new partition dir (or a new bucket file).
-          if (isPartitioned && currentPartitionValues != nextPartitionValues) {
-            currentPartitionValues = Some(nextPartitionValues.get.copy())
-            statsTrackers.foreach(_.newPartition(currentPartitionValues.get))
-          }
-          if (isBucketed) {
-            currentBucketId = nextBucketId
-          }
-
-          fileCounter = 0
-          if (i != 0) {
-            writeRecord(omniInternalRow, lastIndex, i)
-            lastIndex = i
-          }
-          renewCurrentWriter(currentPartitionValues, currentBucketId, closeCurrentWriter = true)
-        }
-      } else if (
-        description.maxRecordsPerFile > 0 &&
-          recordsInFile >= description.maxRecordsPerFile
-      ) {
-        if (i != 0) {
-          writeRecord(omniInternalRow, lastIndex, i)
-          lastIndex = i
-        }
-        renewCurrentWriterIfTooManyRecords(currentPartitionValues, currentBucketId)
+    var firstIndex = 0
+    var lastIndex = numRows - 1
+    // when the partition information of the first row is equal to the last row of the batch,write them by on writer
+    if (judgePartitionBucketSame(batch, firstIndex, lastIndex)) {
+      if (!currentWriter.isInstanceOf[OmniOrcOutputWriter]) {
+        renewCurrentWriter(firstPartitionValues, firstBucketId, closeCurrentWriter = true)
+        firstFilePath = getPartitionPath(firstPartitionValues, firstBucketId)
       }
+      writeRecord(omniInternalRow, firstIndex, numRows)
     }
-    if (lastIndex < batch.numRows()) {
-      writeRecord(omniInternalRow, lastIndex, numRows)
+    // try to find the dividing line between partitions by using the dichotomy
+    else {
+      while (!judgePartitionBucketSame(batch, firstIndex, lastIndex)) {
+        var tmpIndex = lastIndex
+        lastIndex = firstIndex + (lastIndex - firstIndex) / 2
+        /*
+        the dividing line show satisfy two demands:
+        1.the partition of it should be equal to the first row of the batch
+        2.it should not be equal to the next one
+        */
+        while (!judgePartitionBucketSame(batch, firstIndex, lastIndex) || judgePartitionBucketSame(batch, lastIndex, lastIndex + 1)) {
+          if (!judgePartitionBucketSame(batch, firstIndex, lastIndex)) {
+            var tmp1Index = lastIndex
+            lastIndex = lastIndex - max(abs(tmpIndex - lastIndex) / 2, 1)
+            tmpIndex = tmp1Index
+          }
+          else if (judgePartitionBucketSame(batch, lastIndex, lastIndex + 1)) {
+            var tmp1Index = lastIndex
+            lastIndex = lastIndex + max(abs(tmpIndex - lastIndex) / 2, 1)
+            tmpIndex = tmp1Index
+          }
+        }
+        if (getPartitionPath(firstPartitionValues, firstBucketId) != firstFilePath) {
+          renewCurrentWriter(firstPartitionValues, firstBucketId, closeCurrentWriter = true)
+          firstFilePath = getPartitionPath(firstPartitionValues, firstBucketId)
+        }
+        writeRecord(omniInternalRow, firstIndex, lastIndex + 1)
+        firstIndex = lastIndex + 1;
+        lastIndex = numRows - 1
+      }
+      if (description.maxRecordsPerFile > 0 && recordsInFile >= description.maxRecordsPerFile) {
+        renewCurrentWriterIfTooManyRecords(firstPartitionValues, firstBucketId)
+      }
+      if (getPartitionPath(firstPartitionValues, firstBucketId) != firstFilePath) {
+        renewCurrentWriter(firstPartitionValues, firstBucketId, closeCurrentWriter = true)
+        firstFilePath = getPartitionPath(firstPartitionValues, firstBucketId)
+      }
+      // write the remaining data in the partition
+      writeRecord(omniInternalRow, firstIndex, numRows)
     }
   }
 }
