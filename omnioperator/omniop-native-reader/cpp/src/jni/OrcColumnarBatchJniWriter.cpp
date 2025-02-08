@@ -157,7 +157,7 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_write_jni_OrcColumnarBatchJniWr
 }
 
 template <DataTypeId TYPE_ID, typename V>
-void WriteVector(BaseVector *vec, ColumnVectorBatch *fieldBatch, bool isSplitWrite = false, long startPos = 0,
+void WriteVector(JNIEnv *env, BaseVector *vec, ColumnVectorBatch *fieldBatch, bool isSplitWrite = false, long startPos = 0,
                  long endPos = 0)
 {
     using T = typename NativeType<TYPE_ID>::type;
@@ -180,9 +180,19 @@ void WriteVector(BaseVector *vec, ColumnVectorBatch *fieldBatch, bool isSplitWri
         }
     }
     index = 0;
-    for (long j = startPos; j < endPos; j++) {
-        values[index] = vector->GetValue(j);
-        index++;
+    if(sizeof(T) == sizeof(values[0])){
+        errno_t err;
+        err = memcpy_s(values, sizeof(T) * (endPos - startPos),
+                  omniruntime::vec::unsafe::UnsafeVector::GetRawValues(vector) + startPos,
+                  sizeof(T) * (endPos - startPos));
+        if (err != EOK) {
+            env->ThrowNew(runtimeExceptionClass,"Get values from vector failed");
+        }
+    } else {
+        for (long j = startPos; j < endPos; j++) {
+                values[index] = vector->GetValue(j);
+                index++;
+            }
     }
 }
 
@@ -214,7 +224,7 @@ void WriteDecimal128VectorBatch(BaseVector *vec, ColumnVectorBatch *fieldBatch, 
     }
 }
 
-void WriteDecimal64VectorBatch(BaseVector *vec, ColumnVectorBatch *fieldBatch, bool isSplitWrite = false,
+void WriteDecimal64VectorBatch(JNIEnv *env, BaseVector *vec, ColumnVectorBatch *fieldBatch, bool isSplitWrite = false,
                                long startPos = 0, long endPos = 0)
 {
     auto vector = (Vector<int64_t> *)vec;
@@ -235,10 +245,12 @@ void WriteDecimal64VectorBatch(BaseVector *vec, ColumnVectorBatch *fieldBatch, b
             index++;
         }
     }
-    index = 0;
-    for (long j = startPos; j < endPos; j++) {
-        values[index] = vector->GetValue(j);
-        index++;
+    errno_t err;
+    err = memcpy_s(values,sizeof(values[0]) * (endPos - startPos),
+              omniruntime::vec::unsafe::UnsafeVector::GetRawValues(vector) + startPos,
+              sizeof(vector->GetValue(0)) * (endPos - startPos));
+    if (err != EOK) {
+        env->ThrowNew(runtimeExceptionClass,"Get values from vector failed");
     }
 }
 
@@ -278,17 +290,17 @@ void WriteLongVectorBatch(JNIEnv *env, DataTypeId typeId, BaseVector *baseVector
     JNI_FUNC_START
     switch (typeId) {
     case OMNI_BOOLEAN:
-        return WriteVector<OMNI_BOOLEAN, orc::LongVectorBatch>(baseVector, fieldBatch, isSplitWrite, startPos, endPos);
+        return WriteVector<OMNI_BOOLEAN, orc::LongVectorBatch>(env, baseVector, fieldBatch, isSplitWrite, startPos, endPos);
     case OMNI_SHORT:
-        return WriteVector<OMNI_SHORT, orc::LongVectorBatch>(baseVector, fieldBatch, isSplitWrite, startPos, endPos);
+        return WriteVector<OMNI_SHORT, orc::LongVectorBatch>(env, baseVector, fieldBatch, isSplitWrite, startPos, endPos);
     case OMNI_INT:
-        return WriteVector<OMNI_INT, orc::LongVectorBatch>(baseVector, fieldBatch, isSplitWrite, startPos, endPos);
+        return WriteVector<OMNI_INT, orc::LongVectorBatch>(env, baseVector, fieldBatch, isSplitWrite, startPos, endPos);
     case OMNI_LONG:
-        return WriteVector<OMNI_LONG, orc::LongVectorBatch>(baseVector, fieldBatch, isSplitWrite, startPos, endPos);
+        return WriteVector<OMNI_LONG, orc::LongVectorBatch>(env, baseVector, fieldBatch, isSplitWrite, startPos, endPos);
     case OMNI_DATE32:
-        return WriteVector<OMNI_DATE32, orc::LongVectorBatch>(baseVector, fieldBatch, isSplitWrite, startPos, endPos);
+        return WriteVector<OMNI_DATE32, orc::LongVectorBatch>(env, baseVector, fieldBatch, isSplitWrite, startPos, endPos);
     case OMNI_DATE64:
-        return WriteVector<OMNI_DATE64, orc::LongVectorBatch>(baseVector, fieldBatch, isSplitWrite, startPos, endPos);
+        return WriteVector<OMNI_DATE64, orc::LongVectorBatch>(env, baseVector, fieldBatch, isSplitWrite, startPos, endPos);
     default:
         env->ThrowNew(runtimeExceptionClass, "DealLongVectorBatch not support for type:" + typeId);
     }
@@ -316,13 +328,13 @@ void WriteVector(JNIEnv *env, long *vecNativeId, int colNums, orc::StructVectorB
             WriteLongVectorBatch(env, typeId, vec, fieldBatch, isSplitWrite, startPos, endPos);
             break;
         case OMNI_DOUBLE:
-            WriteVector<OMNI_DOUBLE, orc::DoubleVectorBatch>(vec, fieldBatch, isSplitWrite, startPos, endPos);
+            WriteVector<OMNI_DOUBLE, orc::DoubleVectorBatch>(env, vec, fieldBatch, isSplitWrite, startPos, endPos);
             break;
         case OMNI_VARCHAR:
             WriteVarCharVectorBatch(vec, fieldBatch, isSplitWrite, startPos, endPos);
             break;
         case OMNI_DECIMAL64:
-            WriteDecimal64VectorBatch(vec, fieldBatch, isSplitWrite, startPos, endPos);
+            WriteDecimal64VectorBatch(env, vec, fieldBatch, isSplitWrite, startPos, endPos);
             break;
         case OMNI_DECIMAL128:
             WriteDecimal128VectorBatch(vec, fieldBatch, isSplitWrite, startPos, endPos);
