@@ -33,6 +33,7 @@ function remove_loadsmetric()
   chmod -R 700 ${parent_dir}/loadsmetric-${install_type}
   chmod -R 700 ${parent_dir}/loadsmetric-${install_type}-setup
   if [ -d "${parent_dir}/loadsmetric-${install_type}" ] || [ -d "${parent_dir}/loadsmetric-${install_type}-setup" ];then
+    log_audit "Uninstall LoadsMetric successfully"
     if [ -d "${parent_dir}/loadsmetric-${install_type}" ];then
       echo "remove loadsmetric path ${parent_dir}/loadsmetric-${install_type}"
       rm -rf ${parent_dir}/loadsmetric-${install_type}
@@ -42,8 +43,6 @@ function remove_loadsmetric()
       echo "remove loadsmetric path ${parent_dir}/loadsmetric-${install_type}-setup"
       rm -rf ${parent_dir}/loadsmetric-${install_type}-setup
     fi
-
-    log_audit "Uninstall LoadsMetric successfully"
   else
     echo "Uninstall LoadsMetric unsuccessfully"
     echo "${parent_dir}/loadsmetric-${install_type} and ${parent_dir}/loadsmetric-${install_type}-setup not exist, no need to delete"
