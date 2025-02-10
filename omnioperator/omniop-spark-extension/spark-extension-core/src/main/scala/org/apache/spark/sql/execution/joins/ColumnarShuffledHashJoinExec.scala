@@ -24,7 +24,7 @@ import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor.{checkOmniJsonWhiteList, isSimpleColumn, isSimpleColumnForAll}
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil.{getExprIdForProjectList, getIndexArray, getProjectListIndex, pruneOutput, reorderOutputVecs, transColBatchToOmniVecs}
-import nova.hetu.omniruntime.`type`.DataType
+import nova.hetu.omniruntime.`type`.{DataType, BooleanDataType}
 import nova.hetu.omniruntime.operator.config.{OperatorConfig, OverflowConfig, SpillConfig}
 import nova.hetu.omniruntime.operator.join.{OmniHashBuilderWithExprOperatorFactory, OmniLookupJoinWithExprOperatorFactory, OmniLookupOuterJoinWithExprOperatorFactory}
 import nova.hetu.omniruntime.vector.VecBatch
@@ -33,13 +33,14 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{Attribute, Expression, NamedExpression}
 import org.apache.spark.sql.catalyst.expressions.codegen.CodegenContext
 import org.apache.spark.sql.catalyst.optimizer.{BuildLeft, BuildRight, BuildSide}
-import org.apache.spark.sql.catalyst.plans.{FullOuter, Inner, JoinType, LeftAnti, LeftExistence, LeftOuter, LeftSemi, RightOuter}
+import org.apache.spark.sql.catalyst.plans.{FullOuter, Inner, JoinType, LeftAnti, LeftExistence, LeftOuter, LeftSemi, RightOuter, ExistenceJoin}
 import org.apache.spark.sql.catalyst.plans.physical.Partitioning
 import org.apache.spark.sql.execution.{ExplainUtils, ShuffledHashJoinExecShim, SparkPlan}
 import org.apache.spark.sql.execution.metric.SQLMetrics
 import org.apache.spark.sql.execution.util.SparkMemoryUtils
 import org.apache.spark.sql.execution.vectorized.OmniColumnVector
 import org.apache.spark.sql.vectorized.ColumnarBatch
+import nova.hetu.omniruntime.constants.JoinType._
 
 case class ColumnarShuffledHashJoinExec(
     leftKeys: Seq[Expression],
@@ -114,7 +115,7 @@ case class ColumnarShuffledHashJoinExec(
 
   def buildCheck(): Unit = {
     joinType match {
-      case FullOuter | Inner | LeftAnti | LeftOuter | LeftSemi | RightOuter =>
+      case FullOuter | Inner | LeftAnti | LeftOuter | LeftSemi | RightOuter | ExistenceJoin(_) =>
       case _ =>
         throw new UnsupportedOperationException(s"Join-type[${joinType}] is not supported " +
         s"in ${this.nodeName}")
@@ -183,6 +184,8 @@ case class ColumnarShuffledHashJoinExec(
     val buildOutputCols: Array[Int] = joinType match {
       case Inner | FullOuter | LeftOuter | RightOuter =>
         getIndexArray(buildOutput, projectExprIdList)
+      case ExistenceJoin(_) =>
+        Array[Int](1)
       case LeftExistence(_) =>
         Array[Int]()
       case x =>
@@ -195,9 +198,15 @@ case class ColumnarShuffledHashJoinExec(
     }.toArray
 
     val prunedBuildOutput = pruneOutput(buildOutput, projectExprIdList)
-    val buildOutputTypes = new Array[DataType](prunedBuildOutput.size) // {2,2}, buildOutput:col1#12,col2#13
-    prunedBuildOutput.zipWithIndex.foreach { case (att, i) =>
-      buildOutputTypes(i) = OmniExpressionAdaptor.sparkTypeToOmniType(att.dataType, att.metadata)
+    var buildOutputTypes: Array[DataType] = null
+    val lookupJoinType = OmniExpressionAdaptor.toOmniJoinType(joinType)
+    if (lookupJoinType == OMNI_JOIN_TYPE_EXISTENCE) {
+      buildOutputTypes = Array[DataType](BooleanDataType.BOOLEAN)
+    } else {
+      buildOutputTypes = new Array[DataType](prunedBuildOutput.size) // {2,2}, buildOutput:col1#12,col2#13
+      prunedBuildOutput.zipWithIndex.foreach { case (att, i) =>
+        buildOutputTypes(i) = OmniExpressionAdaptor.sparkTypeToOmniType(att.dataType, att.metadata)
+      }
     }
 
     val probeTypes = new Array[DataType](streamedOutput.size)
@@ -338,7 +347,7 @@ case class ColumnarShuffledHashJoinExec(
             new ColumnarBatch(vecs.toArray, rowCnt)
           }
         }
-        if ("FULL OUTER" == joinType.sql ||
+        if (lookupJoinType == OMNI_JOIN_TYPE_FULL ||
           ("LEFT OUTER" == joinType.sql && buildSide.equals(BuildLeft)) ||
           ("RIGHT OUTER" == joinType.sql && buildSide.equals(BuildRight))) {
           val lookupOuterOpFactory =
