@@ -736,18 +736,24 @@ function main() {
       log_info_echo "daemon is stopped"
     ;;
     "restart")
-      manager "restart"
-      status=$?
-      log_action_result "LoadsMetric restart" "${status}"
+      manager "stop"
       stop_crontab_job
       remove_specific_cron_job
       log_info_echo "daemon is stopped"
+
+      manager "start"
+      local status=$?
+      log_action_result "LoadsMetric restart" "${status}"
+      if [[ ${status} -ne 0 ]]; then
+        log_err_echo "Service startup failed! Please check the service running logs."
+        exit 1
+      fi
       if [ "${status}" -eq 0 ]; then
         # If start is successful, regenerate crontab job and apply it
         local install_dir_server="${install_dir}/${software_name}-${install_type}"
         generate_crontab_job "${install_type}"
         crontab "${install_dir_server}"/etc/crontab.job
-        log_info_echo "daemon is restarted"
+        log_info_echo "daemon is started"
       fi
     ;;
     "start_exporter")
