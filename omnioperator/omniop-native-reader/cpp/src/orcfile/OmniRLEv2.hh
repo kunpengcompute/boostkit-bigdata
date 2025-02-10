@@ -25,10 +25,16 @@
 
 namespace omniruntime::reader {
 
-    std::unique_ptr<omniruntime::vec::BaseVector> makeFixLenthVector(uint64_t numValues,
+    std::unique_ptr<omniruntime::vec::BaseVector> makeFixedLengthVector(uint64_t numValues,
         omniruntime::type::DataTypeId dataTypeId);
 
     std::unique_ptr<omniruntime::vec::BaseVector> makeDoubleVector(uint64_t numValues,
+        omniruntime::type::DataTypeId dataTypeId);
+
+    std::unique_ptr<omniruntime::vec::BaseVector> makeVarcharVector(uint64_t numValues,
+        omniruntime::type::DataTypeId dataTypeId);
+
+    std::unique_ptr<omniruntime::vec::BaseVector> makeDecimalVector(uint64_t numValues,
         omniruntime::type::DataTypeId dataTypeId);
 
     std::unique_ptr<omniruntime::vec::BaseVector> makeNewVector(uint64_t numValues, const orc::Type* baseTp,
@@ -76,64 +82,27 @@ namespace omniruntime::reader {
         template<typename T>
         uint64_t copyDataFromBuffer(T *data, uint64_t offset, uint64_t numValues, uint64_t *nulls);
 
-        void readLongsByType(omniruntime::vec::BaseVector*& OmniVec, uint64_t offset,
-                                                uint64_t len, uint64_t omniOffset, uint64_t numValues, uint64_t fbs,
-                                                omniruntime::type::DataTypeId dataTypeId, const char* const notNull);
+        void readLongs(int64_t *data, uint64_t offset, uint64_t len, uint64_t fbs);
 
-        template <omniruntime::type::DataTypeId TYPE_ID>
-        void readLongs(omniruntime::vec::BaseVector*& OmniVec, int64_t *data, uint64_t offset,
-                                                uint64_t len, uint64_t omniOffset, uint64_t numValues, uint64_t fbs,
-                                                const char* const notNull);
+        void unrolledUnpack4(int64_t *data, uint64_t offset, uint64_t len);
 
-        template <omniruntime::type::DataTypeId TYPE_ID>
-        void unrolledUnpack4(omniruntime::vec::BaseVector*& OmniVec, int64_t* data, uint64_t offset,
-                                                uint64_t len, uint64_t omniOffset, uint64_t omniNumValues,
-                                                const char* const notNull);
+        void unrolledUnpack8(int64_t *data, uint64_t offset, uint64_t len);
 
-        template <omniruntime::type::DataTypeId TYPE_ID>
-        void unrolledUnpack8(omniruntime::vec::BaseVector*& OmniVec, int64_t* data, uint64_t offset,
-                                             uint64_t len, uint64_t omniOffset, uint64_t omniNumValues,
-                                             const char* const notNull);
+        void unrolledUnpack16(int64_t *data, uint64_t offset, uint64_t len);
 
-        template <omniruntime::type::DataTypeId TYPE_ID>
-        void unrolledUnpack16(omniruntime::vec::BaseVector*& OmniVec, int64_t* data, uint64_t offset,
-                                           uint64_t len, uint64_t omniOffset, uint64_t omniNumValues,
-                                           const char* const notNull);
+        void unrolledUnpack24(int64_t *data, uint64_t offset, uint64_t len);
 
-        template <omniruntime::type::DataTypeId TYPE_ID>
-        void unrolledUnpack24(omniruntime::vec::BaseVector*& OmniVec, int64_t* data, uint64_t offset,
-                                         uint64_t len, uint64_t omniOffset, uint64_t omniNumValues,
-                                         const char* const notNull);
+        void unrolledUnpack32(int64_t *data, uint64_t offset, uint64_t len);
 
-        template <omniruntime::type::DataTypeId TYPE_ID>
-        void unrolledUnpack32(omniruntime::vec::BaseVector*& OmniVec, int64_t* data, uint64_t offset,
-                                       uint64_t len, uint64_t omniOffset, uint64_t omniNumValues,
-                                       const char* const notNull);
+        void unrolledUnpack40(int64_t *data, uint64_t offset, uint64_t len);
 
-        template <omniruntime::type::DataTypeId TYPE_ID>
-        void unrolledUnpack40(omniruntime::vec::BaseVector*& OmniVec, int64_t* data, uint64_t offset,
-                                               uint64_t len, uint64_t omniOffset, uint64_t omniNumValues,
-                                               const char* const notNull);
+        void unrolledUnpack48(int64_t *data, uint64_t offset, uint64_t len);
 
-        template <omniruntime::type::DataTypeId TYPE_ID>
-        void unrolledUnpack48(omniruntime::vec::BaseVector*& OmniVec, int64_t* data, uint64_t offset,
-                                       uint64_t len, uint64_t omniOffset, uint64_t omniNumValues,
-                                       const char* const notNull);
+        void unrolledUnpack56(int64_t *data, uint64_t offset, uint64_t len);
 
-        template <omniruntime::type::DataTypeId TYPE_ID>
-        void unrolledUnpack56(omniruntime::vec::BaseVector*& OmniVec, int64_t* data, uint64_t offset,
-                                       uint64_t len, uint64_t omniOffset, uint64_t omniNumValues,
-                                       const char* const notNull);
+        void unrolledUnpack64(int64_t *data, uint64_t offset, uint64_t len);
 
-        template <omniruntime::type::DataTypeId TYPE_ID>
-        void unrolledUnpack64(omniruntime::vec::BaseVector*& OmniVec, int64_t* data, uint64_t offset,
-                                       uint64_t len, uint64_t omniOffset, uint64_t omniNumValues,
-                                       const char* const notNull);
-
-        template <omniruntime::type::DataTypeId TYPE_ID>
-        void plainUnpackLongs(omniruntime::vec::BaseVector*& OmniVec, int64_t* data, uint64_t offset,
-                                     uint64_t len, uint64_t omniOffset, uint64_t omniNumValues,
-                                     const char* const notNull, uint64_t fbs);
+        void plainUnpackLongs(int64_t *data, uint64_t offset, uint64_t len, uint64_t fbs);
     };
 }
 
