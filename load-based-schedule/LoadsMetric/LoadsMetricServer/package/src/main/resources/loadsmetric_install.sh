@@ -7,8 +7,8 @@ function log_audit() {
       echo "[loadsmetric-install] log_audit needs one parameter and log_file needs to be initialized."
       exit 1
     fi
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$(whoami)] : [loadsmetric-install] ${1}"
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$(whoami)] : [loadsmetric-install] ${1}" >> ${log_file}
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [INFO] [$(whoami)] : [loadsmetric-install] ${1}"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [INFO] [$(whoami)] : [loadsmetric-install] ${1}" >> ${log_file}
 }
 
 function log_warn_echo() {
