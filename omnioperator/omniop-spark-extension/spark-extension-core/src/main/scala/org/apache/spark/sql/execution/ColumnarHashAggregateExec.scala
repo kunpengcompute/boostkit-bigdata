@@ -362,6 +362,7 @@ case class ColumnarHashAggregateExec(
       // close operator
       SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
         val metrics = operator.getMetricsInfo()
+        // The first 100 metrics are general metrics, the rest are difined differently by every operator.
         spillSize += metrics(0)
         usedMemSize += metrics(100)
         totalMemSize += metrics(101)
