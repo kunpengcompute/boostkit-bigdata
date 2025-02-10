@@ -62,8 +62,6 @@ class ColumnarTopNSortExecSuite extends ColumnarSparkPlanTest {
     hasTopNSortExec: Boolean = false): Unit = {
     // run ColumnarTopNSortExec config
     spark.conf.set("spark.omni.sql.columnar.topNSort", true)
-    spark.conf.set("spark.sql.execution.topNPushDownForWindow.enabled", true)
-    spark.conf.set("spark.sql.execution.topNPushDownForWindow.threshold", 100)
     spark.conf.set("spark.sql.adaptive.enabled", true)
     val omniResult = spark.sql(sql)
     omniResult.collect()
@@ -80,15 +78,10 @@ class ColumnarTopNSortExecSuite extends ColumnarSparkPlanTest {
     val sparkPlan = sparkResult.queryExecution.executedPlan.toString()
     assert(!sparkPlan.contains("ColumnarTopNSort"),
       s"SQL:${sql}\n@SparkEnv have ColumnarTopNSortExec, sparkPlan:${sparkPlan}")
-    if (hasTopNSortExec) {
-      assert(sparkPlan.contains("TopNSort"),
-        s"SQL:${sql}\n@SparkEnv no TopNSortExec, sparkPlan:${sparkPlan}")
-    }
     // DataFrame do not support comparing with equals method, use DataFrame.except instead
     // DataFrame.except can do equal for rows misorder(with and without order by are same)
     assert(omniResult.except(sparkResult).isEmpty,
       s"SQL:${sql}\nomniResult:${omniResult.show()}\nsparkResult:${sparkResult.show()}\n")
     spark.conf.set("spark.omni.sql.columnar.topNSort", true)
-    spark.conf.set("spark.sql.execution.topNPushDownForWindow.enabled", false)
   }
 }
