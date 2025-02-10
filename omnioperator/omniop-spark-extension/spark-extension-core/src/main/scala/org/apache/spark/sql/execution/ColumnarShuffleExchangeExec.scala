@@ -358,6 +358,7 @@ object ColumnarShuffleExchangeExec extends Logging {
           // close operator
           addLeakSafeTaskCompletionListener[Unit](_ => {
             op.close()
+            factory.close()
           })
 
           cbIter.map { cb =>
