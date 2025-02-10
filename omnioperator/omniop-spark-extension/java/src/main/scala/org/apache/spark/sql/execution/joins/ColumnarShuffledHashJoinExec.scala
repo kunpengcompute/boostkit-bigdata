@@ -23,7 +23,7 @@ import com.huawei.boostkit.spark.Constant.IS_SKIP_VERIFY_EXP
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor.{checkOmniJsonWhiteList, isSimpleColumn, isSimpleColumnForAll}
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil
-import com.huawei.boostkit.spark.util.OmniAdaptorUtil.{getExprIdForProjectList, getIndexArray, getProjectListIndex,pruneOutput, reorderOutputVecs, transColBatchToOmniVecs}
+import com.huawei.boostkit.spark.util.OmniAdaptorUtil.{getExprIdForProjectList, getIndexArray, getProjectListIndex, pruneOutput, reorderOutputVecs, transColBatchToOmniVecs}
 import nova.hetu.omniruntime.`type`.{DataType, BooleanDataType}
 import nova.hetu.omniruntime.operator.config.{OperatorConfig, OverflowConfig, SpillConfig}
 import nova.hetu.omniruntime.operator.join.{OmniHashBuilderWithExprOperatorFactory, OmniLookupJoinWithExprOperatorFactory, OmniLookupOuterJoinWithExprOperatorFactory}
@@ -32,7 +32,7 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{Attribute, Expression, NamedExpression, SortOrder}
 import org.apache.spark.sql.catalyst.expressions.codegen.CodegenContext
-import org.apache.spark.sql.catalyst.optimizer.{BuildLeft, BuildSide}
+import org.apache.spark.sql.catalyst.optimizer.{BuildLeft, BuildRight, BuildSide}
 import org.apache.spark.sql.catalyst.plans.{ExistenceJoin, FullOuter, Inner, JoinType, LeftAnti, LeftExistence, LeftOuter, LeftSemi, RightOuter, ExistenceJoin}
 import org.apache.spark.sql.catalyst.plans.physical.Partitioning
 import org.apache.spark.sql.execution.{ExplainUtils, SparkPlan}
@@ -202,8 +202,7 @@ case class ColumnarShuffledHashJoinExec(
     var buildOutputTypes: Array[DataType] = null
     val lookupJoinType = OmniExpressionAdaptor.toOmniJoinType(joinType)
     if (lookupJoinType == OMNI_JOIN_TYPE_EXISTENCE) {
-      buildOutputTypes = new Array[DataType](1) // bool column
-      buildOutputTypes(0) = BooleanDataType.BOOLEAN
+      buildOutputTypes = Array[DataType](BooleanDataType.BOOLEAN)
     } else {
       buildOutputTypes = new Array[DataType](prunedBuildOutput.size) // {2,2}, buildOutput:col1#12,col2#13
       prunedBuildOutput.zipWithIndex.foreach { case (att, i) =>
