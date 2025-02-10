@@ -710,13 +710,13 @@ function main() {
         # If the installation directory exists, perform the start operation
         if lsof -i :${loads_port} > /dev/null 2>&1; then
           log_err_echo "Port ${loads_port} is already in use. Please check if the LoadsMetric Service is running."
-          return 1
+          exit 1
         fi
         manager "start"
         local exit_code=$?
         log_action_result "LoadsMetric start" "${exit_code}"
         if [[ ${exit_code} -ne 0 ]]; then
-          log_err_echo "Start failed! Please check the service running logs."
+          log_err_echo "Service startup failed! Please check the service running logs."
           exit 1
         fi
         generate_crontab_job "${install_type}"
