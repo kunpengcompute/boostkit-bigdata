@@ -15,5 +15,5 @@ then
   chomd 600 ${logpath}/loadsmetric.log
 fi
 
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] [INFO] [Deploy]: ${1}"
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] [INFO] [Deploy]: ${1}" >> ${logpath}/loadsmetric.log
+echo "[$(date '+%Y-%m-%d %H:%M:%S')][INFO] [Deploy]: ${1}"
+echo "[$(date '+%Y-%m-%d %H:%M:%S')][INFO] [Deploy]: ${1}" >> ${logpath}/loadsmetric.log
