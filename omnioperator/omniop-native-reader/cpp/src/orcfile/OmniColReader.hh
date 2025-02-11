@@ -333,6 +333,38 @@ namespace omniruntime::reader {
                 }
             }
 
+            void ReadValuesBatch(int64_t *data, int64_t numValues) {
+                for (int i = 0; i < numValues; ++i) {
+                    int64_t value = 0;
+                    size_t offset = 0;
+                    while (true) {
+                        readBuffer();
+                        unsigned char ch = static_cast<unsigned char>(*(buffer++));
+                        value |= static_cast<uint64_t>(ch & 0x7f) << offset;
+                        offset += 7;
+                        if (!(ch & 0x80)) {
+                            break;
+                        }
+                    }
+                    data[i] = value;
+                }
+            }
+
+            void UnScaleBatch(int64_t *data, int64_t *scales, int64_t numValues) {
+                for (int i = 0; i < numValues; i++) {
+                    int32_t currentScale = static_cast<int32_t>(scales[i]);
+                    if (scale > currentScale &&
+                        static_cast<uint64_t>(scale - currentScale) <= MAX_PRECISION_64) {
+                        data[i] *= POWERS_OF_TEN[scale - currentScale];
+                    } else if (scale < currentScale &&
+                               static_cast<uint64_t>(currentScale - scale) <= MAX_PRECISION_64) {
+                        data[i] /= POWERS_OF_TEN[currentScale - scale];
+                    } else if (scale != currentScale) {
+                        throw orc::ParseError("Decimal scale out of range");
+                    }
+                }
+            }
+
         public:
             OmniDecimal64ColumnReader(const orc::Type& type, orc::StripeStreams& stipe);
             ~OmniDecimal64ColumnReader() override;

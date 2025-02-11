@@ -18,6 +18,7 @@
 
 #include "OmniRLEv2.hh"
 #include "orc/RLEV2Util.hh"
+#include "OrcDecodeUtils.hh"
 
 using omniruntime::vec::VectorBatch;
 
@@ -178,9 +179,7 @@ namespace omniruntime::reader {
             readLongsByType(OmniVec, 0, runLength, offset , numValues, bitSize, dataTypeId, notNull);
 
             if (isSigned) {
-                for (uint64_t i = 0; i < runLength; ++i) {
-                    literals[i] = orc::unZigZag(static_cast<uint64_t>(literals[i]));
-                }
+                UnZigZagBatchHEFs8p2(reinterpret_cast<uint64_t*>(literals.data()), runLength);
             }
         }
 
