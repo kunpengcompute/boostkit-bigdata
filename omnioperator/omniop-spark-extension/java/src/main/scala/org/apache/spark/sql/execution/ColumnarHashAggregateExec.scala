@@ -270,7 +270,7 @@ case class ColumnarHashAggregateExec(
         }
       } else if (exp.mode == Complete) {
         exp.aggregateFunction match {
-          case Sum(_, _) | Min(_) | Max(_) | Count(_) | Average(_, _) | First(_, _) =>
+          case Sum(_) | Min(_) | Max(_) | Count(_) | Average(_) | First(_, _) =>
             omniAggFunctionTypes(index) = toOmniAggFunType(exp, true, true)
             omniAggOutputTypes(index) =
               toOmniAggInOutType(exp.aggregateFunction.dataType)
