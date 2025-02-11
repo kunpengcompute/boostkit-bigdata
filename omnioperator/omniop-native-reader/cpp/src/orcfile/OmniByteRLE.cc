@@ -19,6 +19,7 @@
 #include "OmniRLEv2.hh"
 #include "OmniColReader.hh"
 #include "vector/vector_helper.h"
+#include "OrcDecodeUtils.hh"
 
 namespace omniruntime::reader {
 
@@ -93,8 +94,9 @@ namespace omniruntime::reader {
         } else if (position < numValues) {
             // read the new bytes into array
             uint64_t bytesRead = (nonNulls + 7) / 8;
-            OmniByteRleDecoder::next(reinterpret_cast<char *>(data + position), bytesRead, nullptr);
-            lastByte = data[position + bytesRead - 1];
+            char bits[bytesRead];
+            OmniByteRleDecoder::next(bits, bytesRead, nullptr);
+            lastByte = bits[bytesRead - 1];
             remainingBits = bytesRead * 8 - nonNulls;
             // expand the array backwards so that we don't clobber the data
             uint64_t bitsLeft = bytesRead * 8 - remainingBits;
@@ -102,18 +104,14 @@ namespace omniruntime::reader {
                 for (int64_t i = static_cast<int64_t>(numValues) - 1; i >= static_cast<int64_t>(position); --i) {
                     if (!nulls[i]) {
                         uint64_t shiftPosn = (-bitsLeft) % 8;
-                        data[i] = !((data[position + (bitsLeft - 1) / 8] >> shiftPosn) & 0x1);
+                        data[i] = !((bits[(bitsLeft - 1) / 8] >> shiftPosn) & 0x1);
                         bitsLeft -= 1;
                     } else {
                         data[i] = true;
                     }
                 }
             } else {
-                for (int64_t i = static_cast<int64_t>(numValues) - 1; i >= static_cast<int64_t>(position); --i,
-                    --bitsLeft) {
-                    uint64_t shiftPosn = (-bitsLeft) % 8;
-                    data[i] = !((data[position + (bitsLeft - 1) / 8] >> shiftPosn) & 0x1);
-                }
+                BitsToBoolsBatchHEFs0p1(data + position, reinterpret_cast<uint8_t*>(bits), bitsLeft);
             }
         }
     }

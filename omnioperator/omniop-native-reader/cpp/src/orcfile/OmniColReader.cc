@@ -23,6 +23,7 @@
 #include "orc/Writer.hh"
 #include "orc/MemoryPool.hh"
 #include "util/omni_exception.h"
+#include "OrcDecodeUtils.hh"
 
 using omniruntime::vec::VectorBatch;
 using omniruntime::vec::BaseVector;
@@ -633,24 +634,32 @@ namespace omniruntime::reader {
         bool hasNull = vec->HasNull();
 
         // read the next group of scales
-        int64_t scaleBuffer[numValues];
-        scaleDecoder->next(scaleBuffer, numValues, nulls);
+        auto nonNullNums = numValues - vec->GetNullCount();
+        int64_t scaleBuffer[nonNullNums];
+        // read dense scales
+        scaleDecoder->next(scaleBuffer, nonNullNums, nullptr);
 
-        auto vector = reinterpret_cast<omniruntime::vec::Vector<int64_t>*>(vec);
         if (hasNull) {
+            auto vector = reinterpret_cast<omniruntime::vec::Vector<int64_t>*>(vec);
+
+            int64_t values[nonNullNums];
+            ReadValuesBatch(values, nonNullNums);
+            UnZigZagBatchHEFs8p2(reinterpret_cast<uint64_t*>(values), nonNullNums);
+            UnScaleBatch(values, scaleBuffer, nonNullNums);
+
+            int scaleIndex = 0;
             for(size_t i = 0; i < numValues; ++i) {
                 if (!nulls[i]) {
-                    int64_t value = 0;
-                    readInt64(value, static_cast<int32_t>(scaleBuffer[i]));
-                    vector->SetValue(static_cast<int>(i), static_cast<int64_t>(value));
+                    vector->SetValue(i, values[scaleIndex++]);
                 }
             }
         } else {
-            for(size_t i = 0; i < numValues; ++i) {
-                int64_t value = 0;
-                readInt64(value, static_cast<int32_t>(scaleBuffer[i]));
-                vector->SetValue(static_cast<int>(i), static_cast<int64_t>(value));
-            }
+            // special case for non null
+            auto values = omniruntime::vec::unsafe::UnsafeVector::GetRawValues(
+                static_cast<omniruntime::vec::Vector<int64_t>*>(vec));
+            ReadValuesBatch(values, nonNullNums);
+            UnZigZagBatchHEFs8p2(reinterpret_cast<uint64_t*>(values), nonNullNums);
+            UnScaleBatch(values, scaleBuffer, nonNullNums);
         }
     }
 
