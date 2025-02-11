@@ -33,7 +33,7 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{Attribute, Expression, NamedExpression, SortOrder}
 import org.apache.spark.sql.catalyst.expressions.codegen.CodegenContext
 import org.apache.spark.sql.catalyst.optimizer.{BuildLeft, BuildRight, BuildSide}
-import org.apache.spark.sql.catalyst.plans.{ExistenceJoin, FullOuter, Inner, JoinType, LeftAnti, LeftExistence, LeftOuter, LeftSemi, RightOuter, ExistenceJoin}
+import org.apache.spark.sql.catalyst.plans.{ExistenceJoin, FullOuter, Inner, JoinType, LeftAnti, LeftExistence, LeftOuter, LeftSemi, RightOuter}
 import org.apache.spark.sql.catalyst.plans.physical.Partitioning
 import org.apache.spark.sql.execution.{ExplainUtils, SparkPlan}
 import org.apache.spark.sql.execution.metric.SQLMetrics
@@ -347,7 +347,9 @@ case class ColumnarShuffledHashJoinExec(
             new ColumnarBatch(vecs.toArray, rowCnt)
           }
         }
-        if (lookupJoinType == OMNI_JOIN_TYPE_FULL) {
+        if (lookupJoinType == OMNI_JOIN_TYPE_FULL ||
+          (lookupJoinType == OMNI_JOIN_TYPE_LEFT && buildSide.equals(BuildLeft)) ||
+          (lookupJoinType == OMNI_JOIN_TYPE_RIGHT && buildSide.equals(BuildRight))) {
           val lookupOuterOpFactory =
             new OmniLookupOuterJoinWithExprOperatorFactory(probeTypes, probeOutputCols,
               probeHashColsExp, buildOutputCols, buildOutputTypes, buildOpFactory,
