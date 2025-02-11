@@ -348,8 +348,8 @@ case class ColumnarShuffledHashJoinExec(
           }
         }
         if (lookupJoinType == OMNI_JOIN_TYPE_FULL ||
-          ("LEFT OUTER" == joinType.sql && buildSide.equals(BuildLeft)) ||
-          ("RIGHT OUTER" == joinType.sql && buildSide.equals(BuildRight))) {
+          (lookupJoinType == OMNI_JOIN_TYPE_LEFT && buildSide.equals(BuildLeft)) ||
+          (lookupJoinType == OMNI_JOIN_TYPE_RIGHT && buildSide.equals(BuildRight))) {
           val lookupOuterOpFactory =
             new OmniLookupOuterJoinWithExprOperatorFactory(probeTypes, probeOutputCols,
               probeHashColsExp, buildOutputCols, buildOutputTypes, buildOpFactory,
