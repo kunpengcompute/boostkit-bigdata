@@ -8,12 +8,12 @@ function log_audit()
       echo "[loadsmetric-uninstall] log_audit needs one parameter and log_file needs to be initialized."
       exit 1
     fi
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$(whoami)] : [loadsmetric-uninstall] ${1}"
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$(whoami)] : [loadsmetric-uninstall] ${1}" >> ${log_file}
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')][INFO] [$(whoami)] : [loadsmetric-uninstall] ${1}"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')][INFO] [$(whoami)] : [loadsmetric-uninstall] ${1}" >> ${log_file}
 }
 
 function log_warn_echo() {
-  local log_line="[$(date '+%Y-%m-%d %H:%M:%S')][WARN] [$(whoami)] : [${software_name}-deploy] ${1}"
+  local log_line="[$(date '+%Y-%m-%d %H:%M:%S')][WARN] [$(whoami)] : [loadsmetric-uninstall] ${1}"
   echo "${log_line}"
   echo "${log_line}" >> "${2}"
 }
@@ -44,7 +44,7 @@ function remove_loadsmetric()
       rm -rf ${parent_dir}/loadsmetric-${install_type}-setup
     fi
   else
-    echo "Uninstall LoadsMetric successfully"
+    echo "Uninstall LoadsMetric unsuccessfully"
     echo "${parent_dir}/loadsmetric-${install_type} and ${parent_dir}/loadsmetric-${install_type}-setup not exist, no need to delete"
   fi
 }

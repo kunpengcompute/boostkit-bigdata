@@ -16,16 +16,17 @@ import javax.validation.constraints.Pattern;
 public class AppConfig {
 
     @Value("${time.windowsize:5}")
-    @Max(value = 10, message = "The maximum value of windowSize is 10")
+    @Max(value = 300, message = "The maximum value of windowSize is 300")
+    @Min(value = 1, message = "The minimum value of windowSize is 1")
     private int windowSize;
 
     @Value("${logical-resource-usage.levels.mem:10}")
-    @Max(value = 10, message = "The maximum value of memUsageLevels is 10")
+    @Max(value = 100, message = "The maximum value of memUsageLevels is 100")
     @Min(value = 0, message = "The minimum value of memUsageLevels is 0")
     private int memUsageLevels;
 
     @Value("${logical-resource-usage.levels.vcores:10}")
-    @Max(value = 10, message = "The maximum value of vcoresUsageLevels is 10")
+    @Max(value = 100, message = "The maximum value of vcoresUsageLevels is 100")
     @Min(value = 0, message = "The minimum value of vcoresUsageLevels is 0")
     private int vcoresUsageLevels;
 
