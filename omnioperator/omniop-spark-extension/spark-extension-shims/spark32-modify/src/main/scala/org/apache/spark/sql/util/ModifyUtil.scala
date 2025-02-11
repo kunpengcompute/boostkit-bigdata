@@ -70,10 +70,13 @@ object ModifyUtil extends Logging {
     extensions.injectOptimizerRule(_ => CombineJoinedAggregates)
   }
 
+  private def addTransformableTagAdapter(plan: SparkPlan): Unit = {}
+
   def registerFunc(): Unit = {
     ModifyUtilAdaptor.configRewriteJsonFunc(rewriteToOmniJsonExpressionAdapter)
     ModifyUtilAdaptor.configPreReplacePlanFunc(preReplaceSparkPlanAdapter)
     ModifyUtilAdaptor.configPostReplacePlanFunc(postReplaceSparkPlanAdapter)
     ModifyUtilAdaptor.configInjectRuleFunc(injectRuleAdapter)
+    ModifyUtilAdaptor.configAddTransformableFunc(addTransformableTagAdapter)
   }
 }

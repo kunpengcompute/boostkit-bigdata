@@ -49,6 +49,8 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
 
   def enableColumnarTopNSort: Boolean = conf.getConf(ENABLE_COLUMNAR_TOP_N_SORT)
 
+  def enableColumnarWindowGroupLimit: Boolean = conf.getConf(ENABLE_COLUMNAR_WINDOW_GROUP_LIMIT)
+
   def enableColumnarUnion: Boolean = conf.getConf(ENABLE_COLUMNAR_UNION)
 
   def enableColumnarWindow: Boolean = conf.getConf(ENABLE_COLUMNAR_WINDOW)
@@ -254,6 +256,12 @@ object ColumnarPluginConfig {
   val ENABLE_COLUMNAR_TOP_N_SORT = buildConf("spark.omni.sql.columnar.topNSort")
     .internal()
     .doc("enable or disable columnar TopNSort")
+    .booleanConf
+    .createWithDefault(true)
+
+  val ENABLE_COLUMNAR_WINDOW_GROUP_LIMIT = buildConf("spark.omni.sql.columnar.windowGroupLimit")
+    .internal()
+    .doc("enable or disable columnar WindowGroupLimit")
     .booleanConf
     .createWithDefault(true)
 

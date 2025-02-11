@@ -18,6 +18,7 @@
 
 package com.huawei.boostkit.spark
 
+import com.huawei.boostkit.spark.util.ModifyUtilAdaptor
 import org.apache.commons.lang3.exception.ExceptionUtils
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.rules.Rule
@@ -407,8 +408,9 @@ case class AddTransformHintRule() extends Rule[SparkPlan] {
           }
           ColumnarDataWritingCommandExec(plan.cmd, plan.child).buildCheck()
           TransformHints.tagTransformable(plan)
-        case _ => TransformHints.tagTransformable(plan)
-
+        case _ =>
+          TransformHints.tagTransformable(plan)
+          ModifyUtilAdaptor.addTransFormableTag(plan)
       }
     } catch {
       case e: UnsupportedOperationException =>

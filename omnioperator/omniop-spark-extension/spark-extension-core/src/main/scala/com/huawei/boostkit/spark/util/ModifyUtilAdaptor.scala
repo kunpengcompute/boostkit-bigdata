@@ -33,6 +33,8 @@ object ModifyUtilAdaptor {
 
   private var injectRuleFunc: SparkSessionExtensions => Unit = _
 
+  private var addTransFormableFunc: SparkPlan => Unit = _
+
   def configRewriteJsonFunc(func: (Expression, Map[ExprId, Int], DataType, (Expression, Map[ExprId, Int], DataType) => JsonObject) => JsonObject): Unit = {
     rewriteJsonFunc = func
   }
@@ -47,6 +49,10 @@ object ModifyUtilAdaptor {
 
   def configInjectRuleFunc(func: SparkSessionExtensions => Unit): Unit = {
     injectRuleFunc = func
+  }
+
+  def configAddTransformableFunc(func: SparkPlan => Unit): Unit = {
+    addTransFormableFunc = func
   }
 
   val registration: Unit = {
@@ -72,5 +78,9 @@ object ModifyUtilAdaptor {
 
   def injectRule(extensions: SparkSessionExtensions): Unit = {
     injectRuleFunc(extensions)
+  }
+
+  def addTransFormableTag(plan: SparkPlan): Unit = {
+    addTransFormableFunc(plan)
   }
 }
