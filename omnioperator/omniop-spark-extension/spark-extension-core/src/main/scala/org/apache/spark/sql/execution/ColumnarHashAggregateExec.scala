@@ -94,6 +94,8 @@ case class ColumnarHashAggregateExec(
     "numOutputRows" -> SQLMetrics.createMetric(sparkContext, "number of output rows"),
     "numOutputVecBatches" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatches"),
     "spillSize" -> SQLMetrics.createSizeMetric(sparkContext, "spill size"),
+    "totalMemSize" -> SQLMetrics.createSizeMetric(sparkContext, "total mem size"),
+    "usedMemSize" -> SQLMetrics.createSizeMetric(sparkContext, "used mem size"),
     "numSkippedRows" -> SQLMetrics.createMetric(sparkContext, "number of skipped rows"))
 
   protected override def needHashTable: Boolean = true
@@ -229,6 +231,8 @@ case class ColumnarHashAggregateExec(
     val numOutputRows = longMetric("numOutputRows")
     val numOutputVecBatches= longMetric("numOutputVecBatches")
     val spillSize = longMetric("spillSize")
+    val usedMemSize = longMetric("usedMemSize")
+    val totalMemSize = longMetric("totalMemSize")
     val numSkippedRows = longMetric("numSkippedRows")
 
     val attrExpsIdMap = getExprIdMap(child.output)
@@ -357,7 +361,11 @@ case class ColumnarHashAggregateExec(
 
       // close operator
       SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
-        spillSize += operator.getSpilledBytes()
+        val metrics = operator.getMetricsInfo()
+        // The first 100 metrics are general metrics, the rest are difined differently by every operator.
+        spillSize += metrics(0)
+        usedMemSize += metrics(100)
+        totalMemSize += metrics(101)
         operator.close()
         if (hashAggregationWithExprOperatorFactory != null) {
           hashAggregationWithExprOperatorFactory.close()
