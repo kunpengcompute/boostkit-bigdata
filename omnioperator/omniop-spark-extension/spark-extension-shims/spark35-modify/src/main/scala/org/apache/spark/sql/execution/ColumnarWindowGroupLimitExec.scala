@@ -93,6 +93,12 @@ case class ColumnarWindowGroupLimitExec(
   }
 
   def buildCheck(): Unit = {
+    rankLikeFunction match {
+      case _: RowNumber =>
+      case _: Rank =>
+      case _: DenseRank =>
+        throw new UnsupportedOperationException(s"This operator doesn't support DenseRank() doExecuteColumnar().")
+    }
     val omniAttrExpsIdMap = getExprIdMap(child.output)
     val omniPartitionChanels: Array[AnyRef] = partitionSpec.map(
       exp => rewriteToOmniJsonExpressionLiteral(exp, omniAttrExpsIdMap)).toArray
