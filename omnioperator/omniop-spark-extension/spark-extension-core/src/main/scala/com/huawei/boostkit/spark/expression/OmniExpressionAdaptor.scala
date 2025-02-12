@@ -167,43 +167,38 @@ object OmniExpressionAdaptor extends Logging {
         }
 
       case sub: Subtract =>
-        ShimUtil.unsupportedEvalModeCheck(sub)
         val (left, right) = ShimUtil.binaryOperatorAdjust(sub, returnDatatype)
         new JsonObject().put("exprType", "BINARY")
           .addOmniExpJsonType("returnType", returnDatatype)
-          .put("operator", "SUBTRACT")
+          .put("operator", ShimUtil.transformExpressionByEvalMode(sub))
           .put("left", rewriteToOmniJsonExpressionLiteralJsonObject(left, exprsIndexMap))
           .put("right", rewriteToOmniJsonExpressionLiteralJsonObject(right, exprsIndexMap))
 
       case add: Add =>
-        ShimUtil.unsupportedEvalModeCheck(add)
         val (left, right) = ShimUtil.binaryOperatorAdjust(add, returnDatatype)
         new JsonObject().put("exprType", "BINARY")
           .addOmniExpJsonType("returnType", returnDatatype)
-          .put("operator", "ADD")
+          .put("operator", ShimUtil.transformExpressionByEvalMode(add))
           .put("left", rewriteToOmniJsonExpressionLiteralJsonObject(left, exprsIndexMap))
           .put("right", rewriteToOmniJsonExpressionLiteralJsonObject(right, exprsIndexMap))
 
       case mult: Multiply =>
-        ShimUtil.unsupportedEvalModeCheck(mult)
         val (left, right) = ShimUtil.binaryOperatorAdjust(mult, returnDatatype)
         new JsonObject().put("exprType", "BINARY")
           .addOmniExpJsonType("returnType", returnDatatype)
-          .put("operator", "MULTIPLY")
+          .put("operator", ShimUtil.transformExpressionByEvalMode(mult))
           .put("left", rewriteToOmniJsonExpressionLiteralJsonObject(left, exprsIndexMap))
           .put("right", rewriteToOmniJsonExpressionLiteralJsonObject(right, exprsIndexMap))
 
       case divide: Divide =>
-        ShimUtil.unsupportedEvalModeCheck(divide)
         val (left, right) = ShimUtil.binaryOperatorAdjust(divide, returnDatatype)
         new JsonObject().put("exprType", "BINARY")
           .addOmniExpJsonType("returnType", returnDatatype)
-          .put("operator", "DIVIDE")
+          .put("operator", ShimUtil.transformExpressionByEvalMode(divide))
           .put("left", rewriteToOmniJsonExpressionLiteralJsonObject(left, exprsIndexMap))
           .put("right", rewriteToOmniJsonExpressionLiteralJsonObject(right, exprsIndexMap))
 
       case mod: Remainder =>
-        ShimUtil.unsupportedEvalModeCheck(mod)
         val (left, right) = ShimUtil.binaryOperatorAdjust(mod, returnDatatype)
         new JsonObject().put("exprType", "BINARY")
           .addOmniExpJsonType("returnType", returnDatatype)
@@ -770,12 +765,10 @@ object OmniExpressionAdaptor extends Logging {
   def toOmniAggFunType(agg: AggregateExpression, isHashAgg: Boolean = false, isMergeCount: Boolean = false): FunctionType = {
     agg.aggregateFunction match {
       case sum: Sum =>
-        ShimUtil.unsupportedEvalModeCheck(sum)
-        OMNI_AGGREGATION_TYPE_SUM
+        ShimUtil.transformFuncTypeByEvalMode(sum)
       case Max(_) => OMNI_AGGREGATION_TYPE_MAX
       case avg: Average =>
-        ShimUtil.unsupportedEvalModeCheck(avg)
-        OMNI_AGGREGATION_TYPE_AVG
+        ShimUtil.transformFuncTypeByEvalMode(avg)
       case Min(_) => OMNI_AGGREGATION_TYPE_MIN
       case StddevSamp(_, _) => OMNI_AGGREGATION_TYPE_SAMP
       case Count(Literal(1, IntegerType) :: Nil) | Count(ArrayBuffer(Literal(1, IntegerType))) =>

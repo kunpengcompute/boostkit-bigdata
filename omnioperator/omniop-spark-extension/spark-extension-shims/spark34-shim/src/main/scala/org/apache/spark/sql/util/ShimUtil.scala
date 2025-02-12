@@ -37,6 +37,8 @@ import org.apache.spark.sql.execution.datasources.PartitionedFile
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.DecimalType.{MAX_PRECISION, MAX_SCALE}
 import org.apache.spark.sql.types.{DataType, DateType, DecimalType, DoubleType, IntegerType, LongType, NullType, StringType}
+import nova.hetu.omniruntime.constants.FunctionType
+import nova.hetu.omniruntime.constants.FunctionType.{OMNI_AGGREGATION_TYPE_SUM,OMNI_AGGREGATION_TYPE_AVG,OMNI_AGGREGATION_TYPE_TRY_SUM,OMNI_AGGREGATION_TYPE_TRY_AVG}
 
 import java.lang.reflect.Constructor
 import java.util.{Locale, Properties}
@@ -76,25 +78,23 @@ object ShimUtil {
     new TaskContextImpl(stageId, stageAttemptNumber, partitionId, taskAttemptId, attemptNumber, numPartitions, taskMemoryManager, localProperties, metricsSystem, taskMetrics, cpus, resources)
   }
 
-  def unsupportedEvalModeCheck(expr: Expression): Unit = {
+ def transformExpressionByEvalMode(expr: Expression): String = {
     expr match {
-      case add: Add if add.evalMode == EvalMode.TRY =>
-        throw new UnsupportedOperationException(s"Unsupported EvalMode TRY for $add")
-      case sub: Subtract if sub.evalMode == EvalMode.TRY =>
-        throw new UnsupportedOperationException(s"Unsupported EvalMode TRY for $sub")
-      case mult: Multiply if mult.evalMode == EvalMode.TRY =>
-        throw new UnsupportedOperationException(s"Unsupported EvalMode TRY for $mult")
-      case divide: Divide if divide.evalMode == EvalMode.TRY =>
-        throw new UnsupportedOperationException(s"Unsupported EvalMode TRY for $divide")
-      case mod: Remainder if mod.evalMode == EvalMode.TRY =>
-        throw new UnsupportedOperationException(s"Unsupported EvalMode TRY for $mod")
-      case sum: Sum if sum.evalMode == EvalMode.TRY =>
-        throw new UnsupportedOperationException(s"Unsupported EvalMode TRY for $sum")
-      case avg: Average if avg.evalMode == EvalMode.TRY =>
-        throw new UnsupportedOperationException(s"Unsupported EvalMode TRY for $avg")
-      case _ =>
+        case add: Add => if (add.evalMode == EvalMode.TRY) "TRY_ADD" else "ADD"
+        case sub: Subtract => if (sub.evalMode == EvalMode.TRY) "TRY_SUBTRACT" else "SUBTRACT"
+        case mult: Multiply => if (mult.evalMode == EvalMode.TRY) "TRY_MULTIPLY" else "MULTIPLY"
+        case divide: Divide => if (divide.evalMode == EvalMode.TRY) "TRY_DIVIDE" else "DIVIDE"
+        case _ => throw new UnsupportedOperationException(s"Unsupported Operation for $expr")
     }
-  }
+ }
+
+   def transformFuncTypeByEvalMode(expr: Expression):FunctionType = {
+      expr match {
+        case sum: Sum => if (sum.evalMode == EvalMode.TRY) OMNI_AGGREGATION_TYPE_TRY_SUM else OMNI_AGGREGATION_TYPE_SUM
+        case avg: Average => if (avg.evalMode == EvalMode.TRY) OMNI_AGGREGATION_TYPE_TRY_AVG else OMNI_AGGREGATION_TYPE_AVG
+        case _ => throw new UnsupportedOperationException(s"Unsupported Operation for $expr")
+      }
+   }
 
   def binaryOperatorAdjust(expr: BinaryOperator, returnDataType: DataType): (Expression, Expression) = {
     import scala.math.{max, min}
