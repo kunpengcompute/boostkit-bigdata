@@ -366,7 +366,7 @@ int Splitter::SplitFixedWidthValidityBuffer(VectorBatch& vb){
             for (auto row = 0; row < num_rows; ++row) {
                 auto pid = partition_id_[row];
                 auto dst_offset = partition_buffer_idx_base_[pid] + partition_buffer_idx_offset_[pid];
-                dst_addrs[pid][dst_offset] = src_addr[row];
+                dst_addrs[pid][dst_offset] = omniruntime::BitUtil::IsBitSet(src_addr, row);
                 partition_buffer_idx_offset_[pid]++;
             }
         }
