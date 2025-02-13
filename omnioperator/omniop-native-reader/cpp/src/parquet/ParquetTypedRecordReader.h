@@ -52,7 +52,7 @@ namespace omniruntime::reader {
     ::arrow::Status RawBytesToDecimal64Bytes(const uint8_t* bytes, int32_t length, BaseVector** out_buf, int64_t index);
 
     void DefLevelsToNulls(const int16_t* def_levels, int64_t num_def_levels, ::parquet::internal::LevelInfo level_info,
-        int64_t* values_read, int64_t* null_count, bool* nulls);
+        int64_t* values_read, int64_t* null_count, uint8_t* nulls, int64_t nullsOffset);
 
     template <typename DType>
     class ParquetColumnReaderBase {
@@ -578,7 +578,7 @@ namespace omniruntime::reader {
         virtual void ReadValuesSpaced(int64_t values_with_nulls, int64_t null_count) {
             int64_t num_decoded = this->current_decoder_->DecodeSpaced(
                 ValuesHead<T>(), static_cast<int>(values_with_nulls),
-                static_cast<int>(null_count), nulls_ + values_written_);
+                static_cast<int>(null_count), nulls_, values_written_);
             CheckNumberDecoded(num_decoded, values_with_nulls);
         }
 
@@ -612,7 +612,7 @@ namespace omniruntime::reader {
             if (leaf_info_.HasNullableValues()) {
                 int64_t values_read = 0;
                 DefLevelsToNulls(def_levels() + start_levels_position, levels_position_ - start_levels_position, leaf_info_,
-                    &values_read, &null_count, nulls_ + start_levels_position);
+                    &values_read, &null_count, nulls_, start_levels_position);
                 values_to_read = values_read - null_count;
                 DCHECK_GE(values_to_read, 0);
                 ReadValuesSpaced(values_read, null_count);
@@ -671,7 +671,7 @@ namespace omniruntime::reader {
         ::parquet::internal::LevelInfo leaf_info_;
         omniruntime::vec::BaseVector* vec_ = nullptr;
         uint8_t* parquet_vec_ = nullptr;
-        bool* nulls_ = nullptr;
+        uint8_t* nulls_ = nullptr;
         int32_t byte_width_;
     };
 
@@ -752,7 +752,7 @@ namespace omniruntime::reader {
             }
             int index = 0;
             for (int64_t i = 0; i < values_written_; i++) {
-                if (nulls_ == nullptr || !nulls_[i]) {
+                if (nulls_ == nullptr || !BitUtil::IsBitSet(nulls_, i)) {
                     PARQUET_THROW_NOT_OK(RawBytesToDecimal64Bytes(GetParquetVecHeadPtr(index++), byte_width_, &vec_, i));
                 }
             }
@@ -797,7 +797,7 @@ namespace omniruntime::reader {
             }
             int index = 0;
             for (int64_t i = 0; i < values_written_; i++) {
-                if (nulls_ == nullptr || !nulls_[i]) {
+                if (nulls_ == nullptr || !BitUtil::IsBitSet(nulls_, i)) {
                     PARQUET_THROW_NOT_OK(RawBytesToDecimal128Bytes(GetParquetVecHeadPtr(index++), byte_width_, &vec_, i));
                 }
             }
