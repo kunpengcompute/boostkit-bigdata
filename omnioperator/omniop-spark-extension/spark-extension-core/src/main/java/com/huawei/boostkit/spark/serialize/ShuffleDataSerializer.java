@@ -165,7 +165,8 @@ public class ShuffleDataSerializer {
         }
         vec.setValuesBuf(protoVec.getValues().toByteArray());
         if(protoVec.getNulls().size() != 0) {
-            vec.setNullsBuf(protoVec.getNulls().toByteArray());
+            byte[] byteArray = protoVec.getNulls().toByteArray();
+            vec.setNulls(0, byteArray, 0, byteArray.length);
         }
         OmniColumnVector vecTmp = new OmniColumnVector(vecSize, type, false);
         vecTmp.setVec(vec);
