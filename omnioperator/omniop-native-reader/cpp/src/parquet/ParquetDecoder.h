@@ -59,8 +59,7 @@ namespace omniruntime::reader {
 
     // TODO: optimize batch move
     template <typename T>
-    inline int SpacedExpand(T* buffer, int num_values, int null_count,
-                            bool* nulls) {
+    inline int SpacedExpand(T* buffer, int num_values, int null_count, uint8_t* nulls, int64_t nullsOffset) {
         int idx_decode = num_values - null_count;
         memset_s(static_cast<void*>(buffer + idx_decode), null_count * sizeof(T), 0, null_count * sizeof(T));
         if (idx_decode == 0) {
@@ -68,7 +67,7 @@ namespace omniruntime::reader {
             return num_values;
         }
         for (int i = num_values - 1; i >= 0; --i) {
-            if (!nulls[i]) {
+            if (!BitUtil::IsBitSet(nulls, nullsOffset + i)) {
                 idx_decode--;
                 memmove_s(buffer + i, sizeof(T), buffer + idx_decode, sizeof(T));
             }
@@ -82,8 +81,7 @@ namespace omniruntime::reader {
     public:
         using T = typename DType::c_type;
 
-        virtual int DecodeSpaced(T* buffer, int num_values, int null_count,
-                bool* nulls) {
+        virtual int DecodeSpaced(T* buffer, int num_values, int null_count, uint8_t* nulls, int64_t nullsOffset) {
             if (null_count > 0) {
                 int values_to_read = num_values - null_count;
                 int values_read = Decode(buffer, values_to_read);
@@ -91,7 +89,7 @@ namespace omniruntime::reader {
                     throw ::parquet::ParquetException("Number of values / definition_levels read did not match");
                 }
 
-                return SpacedExpand<T>(buffer, num_values, null_count, nulls);
+                return SpacedExpand<T>(buffer, num_values, null_count, nulls, nullsOffset);
             } else {
                 return Decode(buffer, num_values);
             }
@@ -105,7 +103,7 @@ namespace omniruntime::reader {
             ::parquet::ParquetException::NYI("ParquetTypedDecoder for DecodeArrowNonNull");
         }
 
-        virtual int DecodeArrow(int num_values, int null_count, bool* nulls,
+        virtual int DecodeArrow(int num_values, int null_count, uint8_t* nulls,
                         int64_t offset, omniruntime::vec::BaseVector** outBaseVec) {
             ::parquet::ParquetException::NYI("ParquetTypedDecoder for DecodeArrow");
         }
@@ -228,7 +226,7 @@ namespace omniruntime::reader {
             ::parquet::ParquetException::NYI("ParquetTypedDecoder for DecodeArrowNonNull");
         }
 
-        virtual int DecodeArrow(int num_values, int null_count, bool* nulls,
+        virtual int DecodeArrow(int num_values, int null_count, uint8_t* nulls,
                                 int64_t offset, omniruntime::vec::BaseVector** outBaseVec) {
             ::parquet::ParquetException::NYI("ParquetTypedDecoder for DecodeArrow");
         }
@@ -275,7 +273,7 @@ namespace omniruntime::reader {
             return result;
         }
 
-        int DecodeArrow(int num_values, int null_count, bool* nulls,
+        int DecodeArrow(int num_values, int null_count, uint8_t* nulls,
                         int64_t offset, omniruntime::vec::BaseVector** vec) override {
             int result = 0;
             PARQUET_THROW_NOT_OK(DecodeArrowDense(num_values, null_count, nulls,
@@ -284,7 +282,7 @@ namespace omniruntime::reader {
         }
 
     private:
-        arrow::Status DecodeArrowDense(int num_values, int null_count, bool* nulls,
+        arrow::Status DecodeArrowDense(int num_values, int null_count, uint8_t* nulls,
                                 int64_t offset,
                                 int* out_num_values, omniruntime::vec::BaseVector** out) {
             constexpr int32_t kBufferSize = 1024;
@@ -299,7 +297,7 @@ namespace omniruntime::reader {
             int pos_indices = 0;
 
             for (int i = 0; i < num_values; i++) {
-                if (!nulls[offset + i]) {
+                if (!BitUtil::IsBitSet(nulls, offset + i)) {
                     if (num_indices == pos_indices) {
                         const auto batch_size =
                                 std::min<int32_t>(kBufferSize, num_values - null_count - values_decoded);
@@ -465,7 +463,7 @@ namespace omniruntime::reader {
             return result;
         }
 
-        int DecodeArrow(int num_values, int null_count, bool* nulls,
+        int DecodeArrow(int num_values, int null_count, uint8_t* nulls,
                         int64_t offset, omniruntime::vec::BaseVector** outBaseVec) {
             int result = 0;
             PARQUET_THROW_NOT_OK(DecodeArrowDense(num_values, null_count, nulls,
@@ -474,7 +472,7 @@ namespace omniruntime::reader {
         }
 
     private:
-        arrow::Status DecodeArrowDense(int num_values, int null_count, bool* nulls,
+        arrow::Status DecodeArrowDense(int num_values, int null_count, uint8_t* nulls,
                                 int64_t offset,
                                 int* out_values_decoded, omniruntime::vec::BaseVector** out) {
             int values_decoded = 0;
@@ -482,7 +480,7 @@ namespace omniruntime::reader {
                     omniruntime::vec::LargeStringContainer<std::string_view>>*>(*out);
 
             for (int i = 0; i < num_values; i++) {
-                if (!nulls[offset + i]) {
+                if (!BitUtil::IsBitSet(nulls, offset + i)) {
                     if (ARROW_PREDICT_FALSE(len_ < 4)) {
                         ::parquet::ParquetException::EofException();
                     }
@@ -632,8 +630,7 @@ namespace omniruntime::reader {
         using Base = ParquetPlainDecoder<::parquet::FLBAType>;
         using Base::ParquetPlainDecoder;
 
-        int DecodeSpaced(T* buffer, int num_values, int null_count,
-            bool* nulls) override {
+        int DecodeSpaced(T* buffer, int num_values, int null_count, uint8_t* nulls, int64_t nullsOffset) override {
             int values_to_read = num_values - null_count;
             Decode(buffer, values_to_read);
             return num_values;
