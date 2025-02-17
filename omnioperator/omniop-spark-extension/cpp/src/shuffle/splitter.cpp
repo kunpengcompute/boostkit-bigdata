@@ -236,7 +236,7 @@ void Splitter::SplitBinaryVector(BaseVector *varcharVector, int col_schema) {
     if (varcharVector->GetEncoding() == OMNI_DICTIONARY) {
         auto vc = reinterpret_cast<Vector<DictionaryContainer<std::string_view, LargeStringContainer>> *>(
                 varcharVector);
-	cached_vectorbatch_size_ += num_rows * (sizeof(bool) + sizeof(int32_t));
+	    cached_vectorbatch_size_ += num_rows * (sizeof(bool) + sizeof(int32_t));
         for (auto row = 0; row < num_rows; ++row) {
             auto pid = partition_id_[row];
             uint8_t *dst = nullptr;
@@ -629,7 +629,6 @@ int Splitter::SplitByRow(VectorBatch *vecBatch) {
             partition_rows[0].emplace_back(rowInfo);
             total_input_size += rowInfo->length;
         }
-        delete vecBatch;
     } else {
         auto pidVec = reinterpret_cast<Vector<int32_t> *>(vecBatch->Get(0));
         auto tmpVectorBatch = new VectorBatch(rowCount);
