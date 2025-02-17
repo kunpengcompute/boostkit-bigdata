@@ -29,50 +29,80 @@
 #include "common/JulianGregorianRebase.h"
 
 namespace omniruntime::reader {
-    class OmniStructColumnReader: public orc::ColumnReader {
+
+    class OmniColumnReader: public orc::ColumnReader {
+    public:
+        OmniColumnReader(const orc::Type& type, orc::StripeStreams& stripe);
+
+        virtual ~OmniColumnReader() {}
+
+        /**
+         * Skip number of specified rows.
+         */
+        virtual uint64_t skip(uint64_t numValues);
+
+        /**
+         * Read OmniVector in OmniTypeId, which contains specified rows.
+         */
+        virtual void next(
+            omniruntime::vec::BaseVector *omniVector,
+            uint64_t numValues,
+            bool *incomingNulls,
+            int omniTypeId) {
+            throw std::runtime_error("next() in base class should not be called");
+        }
+
+        /**
+         * Seek to beginning of a row group in the current stripe
+         * @param positions a list of PositionProviders storing the positions
+         */
+        virtual void seekToRowGroup(std::unordered_map<uint64_t, orc::PositionProvider> &positions);
+
+        std::unique_ptr<OmniBooleanRleDecoder> notNullDecoder;
+    };
+
+    class OmniStructColumnReader: public OmniColumnReader {
     private:
-        std::vector<std::unique_ptr<orc::ColumnReader>> children;
+        std::vector<std::unique_ptr<ColumnReader>> children;
 
     public:
-        OmniStructColumnReader(const orc::Type& type, orc::StripeStreams& stipe, common::JulianGregorianRebase *julianPtr);
+        OmniStructColumnReader(const orc::Type& type, orc::StripeStreams& stipe,
+            common::JulianGregorianRebase *julianPtr);
 
         uint64_t skip(uint64_t numValues) override;
 
         /**
          * direct read VectorBatch in next
          * @param omniVecBatch the VectorBatch to push
-         * @param numValues the VectorBatch to push
-         * @param notNull the VectorBatch to push
-         * @param baseTp the vectorBatch to push
+         * @param numValues the numValues of VectorBatch
+         * @param notNull the notNull array indicates value not null
+         * @param baseTp the orc type
          * @param omniTypeId the omniTypeId to push
          */
         void next(void *&omniVecBatch, uint64_t numValues, char *notNull, const orc::Type& baseTp,
                   int* omniTypeId) override;
-
-        void nextEncoded(orc::ColumnVectorBatch& rowBatch,
-                                                 uint64_t numValues,
-                                                 char *notNull) override;
 
         void seekToRowGroup(
                 std::unordered_map<uint64_t, orc::PositionProvider>& positions) override;
 
     private:
         /**
-         * direct read VectorBatch in next
+         * direct read VectorBatch in next for omni
          * @param omniVecBatch the VectorBatch to push
-         * @param numValues the VectorBatch to push
-         * @param notNull the VectorBatch to push
-         * @param baseTp the vectorBatch to push
+         * @param numValues the numValues of VectorBatch
+         * @param notNull the notNull array indicates value not null
+         * @param baseTp the orc type
          * @param omniTypeId the omniTypeId to push
          */
         template<bool encoded>
-        void nextInternal(std::vector<omniruntime::vec::BaseVector*> &vecs, uint64_t numValues, char *notNull,
+        void nextInternal(std::vector<omniruntime::vec::BaseVector*> &vecs, uint64_t numValues, bool *incomingNulls,
                           const orc::Type& baseTp, int* omniTypeId);
 
-        omniruntime::type::DataTypeId getOmniTypeByOrcType(const orc::Type* type);
+        // Get default omni type from orc type.
+        omniruntime::type::DataTypeId getDefaultOmniType(const orc::Type *type);
     };
 
-    class OmniBooleanColumnReader: public orc::ColumnReader {
+    class OmniBooleanColumnReader: public OmniColumnReader {
     protected:
         std::unique_ptr<OmniByteRleDecoder> rle;
 
@@ -82,13 +112,12 @@ namespace omniruntime::reader {
 
         uint64_t skip(uint64_t numValues) override;
 
-        void next(void*& vec, uint64_t numValues, char *notNull,
-                  const orc::Type& baseTp, int* omniTypeId) override;
+        void next(omniruntime::vec::BaseVector *vec, uint64_t numValues, bool *incomingNulls, int omniTypeId) override;
 
         void seekToRowGroup(std::unordered_map<uint64_t, orc::PositionProvider>& positions) override;
     };
 
-    class OmniByteColumnReader: public orc::ColumnReader {
+    class OmniByteColumnReader: public OmniColumnReader {
     protected:
         std::unique_ptr<OmniByteRleDecoder> rle;
 
@@ -98,14 +127,12 @@ namespace omniruntime::reader {
 
         uint64_t skip(uint64_t numValues) override;
 
-        void next(void*& vec, uint64_t numValues, char *notNull,
-                  const orc::Type& baseTp, int* omniTypeId) override;
+        void next(omniruntime::vec::BaseVector *vec, uint64_t numValues, bool *incomingNulls, int omniTypeId) override;
 
-        void seekToRowGroup(
-          std::unordered_map<uint64_t, orc::PositionProvider>& positions) override;
+        void seekToRowGroup(std::unordered_map<uint64_t, orc::PositionProvider>& positions) override;
     };
 
-    class OmniIntegerColumnReader: public orc::ColumnReader {
+    class OmniIntegerColumnReader: public OmniColumnReader {
     protected:
         std::unique_ptr<OmniRleDecoderV2> rle;
 
@@ -115,20 +142,17 @@ namespace omniruntime::reader {
 
         uint64_t skip(uint64_t numValues) override;
 
-        void next(void*& vec, uint64_t numValues, char *notNull,
-                  const orc::Type& baseTp, int* omniTypeId) override;
+        void next(omniruntime::vec::BaseVector *vec, uint64_t numValues, bool *incomingNulls, int omniTypeId) override;
 
-        void seekToRowGroup(
-          std::unordered_map<uint64_t, orc::PositionProvider>& positions) override;
+        void seekToRowGroup(std::unordered_map<uint64_t, orc::PositionProvider>& positions) override;
     };
 
-    class OmniTimestampColumnReader: public orc::ColumnReader {
+    class OmniTimestampColumnReader: public OmniColumnReader {
     public:
-        void next(void*& vec, uint64_t numValues, char* notNull,
-                  const orc::Type& baseTp, int* omniTypeId) override;
+        void next(omniruntime::vec::BaseVector *vec, uint64_t numValues, bool *incomingNulls, int omniTypeId) override;
 
-        template <omniruntime::type::DataTypeId TYPE_ID>
-        void nextByType(void*& omnivec, uint64_t numValues, char* notNull, const orc::Type& baseTp, int* omniTypeId);
+        template <typename T>
+        void nextByType(T *data, uint64_t numValues, bool *nulls);
 
     private:
         std::unique_ptr<OmniRleDecoderV2> secondsRle;
@@ -147,23 +171,20 @@ namespace omniruntime::reader {
 
         uint64_t skip(uint64_t numValues) override;
 
-        void seekToRowGroup(
-                std::unordered_map<uint64_t, orc::PositionProvider>& positions) override;
+        void seekToRowGroup(std::unordered_map<uint64_t, orc::PositionProvider>& positions) override;
     };
 
-    class OmniDoubleColumnReader: public orc::ColumnReader {
+    class OmniDoubleColumnReader: public OmniColumnReader {
     public:
         OmniDoubleColumnReader(const orc::Type& type, orc::StripeStreams& stripe);
         ~OmniDoubleColumnReader() override;
 
         uint64_t skip(uint64_t numValues) override;
 
-        void next(void*& vec, uint64_t numValues, char* notNull,
-                  const orc::Type& baseTp, int* omniTypeId) override;
+        void next(omniruntime::vec::BaseVector *vec, uint64_t numValues, bool *incomingNulls, int omniTypeId) override;
 
-        template <omniruntime::type::DataTypeId TYPE_ID>
-        void nextByType(omniruntime::vec::BaseVector*& omnivec, uint64_t numValues, char* notNull,
-                        const orc::Type& baseTp);
+        template <typename T>
+        void nextByType(T *data, uint64_t numValues, bool *nulls);
 
         void seekToRowGroup(
             std::unordered_map<uint64_t, orc::PositionProvider>& positions) override;
@@ -207,14 +228,14 @@ namespace omniruntime::reader {
 
     };
 
-    class OmniStringDictionaryColumnReader: public orc::ColumnReader {
+    class OmniStringDictionaryColumnReader: public OmniColumnReader {
     public:
-        void next(void*& vec, uint64_t  numValues, char* notNull,
-                  const orc::Type& baseTp, int* omniTypeId) override;
+        void next(omniruntime::vec::BaseVector *vec, uint64_t numValues, bool *incomingNulls, int omniTypeId) override;
         
         private:
             std::shared_ptr<orc::StringDictionary> dictionary;
             std::unique_ptr<OmniRleDecoderV2> rle;
+            bool isChar = false;
 
         public:
             OmniStringDictionaryColumnReader(const orc::Type& type, orc::StripeStreams& stipe);
@@ -222,30 +243,28 @@ namespace omniruntime::reader {
 
             uint64_t skip(uint64_t numValues) override;
 
-            void seekToRowGroup(
-                    std::unordered_map<uint64_t, orc::PositionProvider>& positions) override;
+            void seekToRowGroup(std::unordered_map<uint64_t, orc::PositionProvider>& positions) override;
     };
 
-    class OmniStringDirectColumnReader: public orc::ColumnReader {
+    class OmniStringDirectColumnReader: public OmniColumnReader {
     public:
-        void next(void*& vec, uint64_t numValues, char* notNull,
-                  const orc::Type& baseTp, int* omniTypeId) override;
+        void next(omniruntime::vec::BaseVector *vec, uint64_t numValues, bool *incomingNulls, int omniTypeId) override;
 
     private:
         std::unique_ptr<OmniRleDecoderV2> lengthRle;
         std::unique_ptr<orc::SeekableInputStream> blobStream;
         const char *lastBuffer;
         size_t lastBufferLength;
+        bool isChar = false;
 
         /**
          * Compute the total length of the values.
          * @param lengths the array of lengths
-         * @param notNull the array of notNull flags
+         * @param nulls the array of nulls flags
          * @param numValues the lengths of the arrays
          * @return the total number of bytes for the non-null values
          */
-        size_t computeSize(const int64_t *lengths, const char *notNull,
-                           uint64_t numValues);
+        size_t computeSize(const int64_t *lengths, bool *nulls, uint64_t numValues);
 
     public:
         OmniStringDirectColumnReader(const orc::Type& type, orc::StripeStreams& stipe);
@@ -257,10 +276,9 @@ namespace omniruntime::reader {
                 std::unordered_map<uint64_t, orc::PositionProvider>& positions) override;
     };
 
-    class OmniDecimal64ColumnReader: public orc::ColumnReader {
+    class OmniDecimal64ColumnReader: public OmniColumnReader {
     public:
-        void next(void*&vec, uint64_t numValues, char* notNull,
-                  const orc::Type& baseTp, int* omniTypeId) override;
+        void next(omniruntime::vec::BaseVector *vec, uint64_t numValues, bool *incomingNulls, int omniTypeId) override;
 
         public:
             static const uint32_t MAX_PRECISION_64 = 18;
@@ -315,6 +333,38 @@ namespace omniruntime::reader {
                 }
             }
 
+            void ReadValuesBatch(int64_t *data, int64_t numValues) {
+                for (int i = 0; i < numValues; ++i) {
+                    int64_t value = 0;
+                    size_t offset = 0;
+                    while (true) {
+                        readBuffer();
+                        unsigned char ch = static_cast<unsigned char>(*(buffer++));
+                        value |= static_cast<uint64_t>(ch & 0x7f) << offset;
+                        offset += 7;
+                        if (!(ch & 0x80)) {
+                            break;
+                        }
+                    }
+                    data[i] = value;
+                }
+            }
+
+            void UnScaleBatch(int64_t *data, int64_t *scales, int64_t numValues) {
+                for (int i = 0; i < numValues; i++) {
+                    int32_t currentScale = static_cast<int32_t>(scales[i]);
+                    if (scale > currentScale &&
+                        static_cast<uint64_t>(scale - currentScale) <= MAX_PRECISION_64) {
+                        data[i] *= POWERS_OF_TEN[scale - currentScale];
+                    } else if (scale < currentScale &&
+                               static_cast<uint64_t>(currentScale - scale) <= MAX_PRECISION_64) {
+                        data[i] /= POWERS_OF_TEN[currentScale - scale];
+                    } else if (scale != currentScale) {
+                        throw orc::ParseError("Decimal scale out of range");
+                    }
+                }
+            }
+
         public:
             OmniDecimal64ColumnReader(const orc::Type& type, orc::StripeStreams& stipe);
             ~OmniDecimal64ColumnReader() override;
@@ -327,8 +377,7 @@ namespace omniruntime::reader {
 
     class OmniDecimal128ColumnReader : public OmniDecimal64ColumnReader {
     public:
-        void next(void*&vec, uint64_t numValues, char* notNull,
-                  const orc::Type& baseTp, int* omniTypeId) override;
+        void next(omniruntime::vec::BaseVector *vec, uint64_t numValues, bool *incomingNulls, int omniTypeId) override;
 
     public:
         OmniDecimal128ColumnReader(const orc::Type& type, orc::StripeStreams& stipe);
@@ -349,8 +398,7 @@ namespace omniruntime::reader {
     	OmniDecimalHive11ColumnReader(const orc::Type& type, orc::StripeStreams& stipe);
     	~OmniDecimalHive11ColumnReader() override;
 
-    	void next(void*&vec, uint64_t numValues, char* notNull,
-                          const orc::Type& baseTp, int* omniTypeId) override;
+        void next(omniruntime::vec::BaseVector *vec, uint64_t numValues, bool *incomingNulls, int omniTypeId) override;
     };
 
     std::unique_ptr<orc::ColumnReader> omniBuildReader(const orc::Type& type,
