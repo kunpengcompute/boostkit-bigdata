@@ -21,6 +21,7 @@
 #include "OrcDecodeUtils.hh"
 
 using omniruntime::vec::VectorBatch;
+using omniruntime::vec::NullsHelper;
 
 namespace omniruntime::reader {
     std::unique_ptr<omniruntime::vec::BaseVector> makeFixedLengthVector(uint64_t numValues,
@@ -101,23 +102,24 @@ namespace omniruntime::reader {
         }
     }
 
-    void OmniRleDecoderV2::next(int64_t *data, uint64_t numValues, bool *nulls) {
+    void OmniRleDecoderV2::next(int64_t *data, uint64_t numValues, std::shared_ptr<NullsHelper> nulls) {
         next<int64_t>(data, numValues, nulls);
     }
 
-    void OmniRleDecoderV2::next(int32_t *data, uint64_t numValues, bool *nulls) {
+    void OmniRleDecoderV2::next(int32_t *data, uint64_t numValues, std::shared_ptr<NullsHelper> nulls) {
         next<int32_t>(data, numValues, nulls);
     }
 
-    void OmniRleDecoderV2::next(int16_t *data, uint64_t numValues, bool *nulls) {
+    void OmniRleDecoderV2::next(int16_t *data, uint64_t numValues, std::shared_ptr<NullsHelper> nulls) {
         next<int16_t>(data, numValues, nulls);
     }
 
-    void OmniRleDecoderV2::next(bool *data, uint64_t numValues, bool *nulls) {
+    void OmniRleDecoderV2::next(bool *data, uint64_t numValues, std::shared_ptr<NullsHelper> nulls) {
         next<bool>(data, numValues, nulls);
     }
 
-    void OmniRleDecoderV2::next(omniruntime::vec::BaseVector *omnivec, uint64_t numValues, bool *nulls, int omniTypeId) {
+    void OmniRleDecoderV2::next(omniruntime::vec::BaseVector *omnivec, uint64_t numValues, 
+        std::shared_ptr<NullsHelper> nulls, int omniTypeId) {
         switch (omniTypeId) {
             case omniruntime::type::OMNI_BOOLEAN: {
                 auto boolValues = omniruntime::vec::unsafe::UnsafeVector::GetRawValues(
@@ -147,12 +149,12 @@ namespace omniruntime::reader {
     }
 
     template<typename T>
-    void OmniRleDecoderV2::next(T *data, uint64_t numValues, bool *nulls) {
+    void OmniRleDecoderV2::next(T *data, uint64_t numValues, std::shared_ptr<NullsHelper> nulls) {
         uint64_t nRead = 0;
 
         while (nRead < numValues) {
             // SKip any nulls before attempting to read first byte.
-            while (nulls && nulls[nRead]) {
+            while (nulls && (*nulls)[nRead]) {
                 if (++nRead == numValues) {
                     return; //ended with null values
                 }
@@ -186,7 +188,8 @@ namespace omniruntime::reader {
     }
 
     template <typename T>
-    uint64_t OmniRleDecoderV2::nextDirect(T *data, uint64_t offset, uint64_t numValues, bool *nulls) {
+    uint64_t OmniRleDecoderV2::nextDirect(T *data, uint64_t offset, uint64_t numValues, 
+        std::shared_ptr<NullsHelper> nulls) {
         if (runRead == runLength) {
             // extract the number of fixed bits
             unsigned char fbo = (firstByte >> 1) & 0x1f;
@@ -210,7 +213,8 @@ namespace omniruntime::reader {
     }
 
     template <typename T>
-    uint64_t OmniRleDecoderV2::nextShortRepeats(T *data, uint64_t offset, uint64_t numValues, bool *nulls) {
+    uint64_t OmniRleDecoderV2::nextShortRepeats(T *data, uint64_t offset, uint64_t numValues, 
+        std::shared_ptr<NullsHelper> nulls) {
         if (runRead == runLength) {
             // extract the number of fixed bytes
             uint64_t byteSize = (firstByte >> 3) & 0x07;
@@ -233,7 +237,7 @@ namespace omniruntime::reader {
 
         if (nulls) {
             for(uint64_t pos = offset; pos < offset + nRead; ++pos) {
-                if (!nulls[pos]) {
+                if (!(*nulls)[pos]) {
                     data[pos] = static_cast<T>(literals[0]);
                     ++runRead;
                 }
@@ -249,7 +253,8 @@ namespace omniruntime::reader {
     }
 
     template <typename T>
-    uint64_t OmniRleDecoderV2::nextPatched(T *data, uint64_t offset, uint64_t numValues, bool *nulls) {
+    uint64_t OmniRleDecoderV2::nextPatched(T *data, uint64_t offset, uint64_t numValues, 
+        std::shared_ptr<NullsHelper> nulls) {
         if (runRead == runLength) {
             // extract the number of fixed bits
             unsigned char fbo = (firstByte >> 1) & 0x1f;
@@ -347,7 +352,8 @@ namespace omniruntime::reader {
     }
 
     template <typename T>
-    uint64_t OmniRleDecoderV2::nextDelta(T *data, uint64_t offset, uint64_t numValues, bool *nulls) {
+    uint64_t OmniRleDecoderV2::nextDelta(T *data, uint64_t offset, uint64_t numValues, 
+        std::shared_ptr<NullsHelper> nulls) {
         if (runRead == runLength) {
             // extract the number of fixed bits
             unsigned char fbo = (firstByte >> 1) &0x1f;
@@ -750,12 +756,13 @@ namespace omniruntime::reader {
     }
 
     template <typename T>
-    uint64_t OmniRleDecoderV2::copyDataFromBuffer(T *data, uint64_t offset, uint64_t numValues, bool *nulls) {
+    uint64_t OmniRleDecoderV2::copyDataFromBuffer(T *data, uint64_t offset, uint64_t numValues, 
+        std::shared_ptr<NullsHelper> nulls) {
         uint64_t nRead = std::min(runLength - runRead, numValues);
         if constexpr (std::is_same_v<T, int64_t>) {
            if (nulls) {
                for (uint64_t i = offset; i < (offset + nRead); ++i) {
-                   if (!nulls[i]) {
+                   if (!(*nulls)[i]) {
                        data[i] = literals[runRead++];
                    }
                }
@@ -766,7 +773,7 @@ namespace omniruntime::reader {
         } else {
             if (nulls) {
                 for (uint64_t i = offset; i < (offset + nRead); ++i) {
-                    if (!nulls[i]) {
+                    if (!(*nulls)[i]) {
                         data[i] = static_cast<T>(literals[runRead++]);
                     }
                 }

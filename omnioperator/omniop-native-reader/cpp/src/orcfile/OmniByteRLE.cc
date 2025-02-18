@@ -21,6 +21,8 @@
 #include "vector/vector_helper.h"
 #include "OrcDecodeUtils.hh"
 
+using omniruntime::vec::NullsHelper;
+
 namespace omniruntime::reader {
 
     const int MINIMUM_REPEAT = 3;
@@ -56,24 +58,25 @@ namespace omniruntime::reader {
         }
     }
 
-    void OmniBooleanRleDecoder::nextNulls(bool *data, uint64_t numValues, bool *nulls) {
+    void OmniBooleanRleDecoder::nextNulls(std::shared_ptr<NullsHelper> data, uint64_t numValues, 
+        std::shared_ptr<NullsHelper> nulls) {
         // next spot to fill in
         uint64_t position = 0;
         // use up any remaining bits
         if (nulls) {
             while (remainingBits > 0 && position < numValues) {
-                if (!nulls[position]) {
+                if (!(*nulls)[position]) {
                     remainingBits -= 1;
-                    data[position] = !((static_cast<unsigned char>(lastByte) >> remainingBits) & 0x1);
+                    data->SetNull(position, !((static_cast<unsigned char>(lastByte) >> remainingBits) & 0x1));
                 } else {
-                    data[position] = true;
+                    data->SetNull(position, true);
                 }
                 position += 1;
             }
         } else {
             while (remainingBits > 0 && position < numValues) {
                 remainingBits -= 1;
-                data[position] = !((static_cast<unsigned char>(lastByte) >> remainingBits) & 0x1);
+                data->SetNull(position, !((static_cast<unsigned char>(lastByte) >> remainingBits) & 0x1));
                 position += 1;
             }
         }
@@ -81,7 +84,7 @@ namespace omniruntime::reader {
         uint64_t nonNulls = numValues - position;
         if (nulls) {
             for (uint64_t i = position; i < numValues; ++i) {
-                if (nulls[i]) {
+                if ((*nulls)[i]) {
                     nonNulls -= 1;
                 }
             }
@@ -89,7 +92,7 @@ namespace omniruntime::reader {
         // fill in the remaining values
         if (nonNulls == 0) {
             while (position < numValues) {
-                data[position++] = true;
+                data->SetNull(position++, true);
             }
         } else if (position < numValues) {
             // read the new bytes into array
@@ -102,23 +105,27 @@ namespace omniruntime::reader {
             uint64_t bitsLeft = bytesRead * 8 - remainingBits;
             if (nulls) {
                 for (int64_t i = static_cast<int64_t>(numValues) - 1; i >= static_cast<int64_t>(position); --i) {
-                    if (!nulls[i]) {
+                    if (!(*nulls)[i]) {
                         uint64_t shiftPosn = (-bitsLeft) % 8;
-                        data[i] = !((bits[(bitsLeft - 1) / 8] >> shiftPosn) & 0x1);
+                        data->SetNull(i, !((bits[(bitsLeft - 1) / 8] >> shiftPosn) & 0x1));
                         bitsLeft -= 1;
                     } else {
-                        data[i] = true;
+                        data->SetNull(i, true);
                     }
                 }
             } else {
-                BitsToBoolsBatchHEFs0p1(data + position, reinterpret_cast<uint8_t*>(bits), bitsLeft);
+                for (int32_t i = 0; i < bitsLeft; i++) {
+                    uint64_t byteIndex = i / 8;
+                    uint64_t bitPosition = 7 - (i % 8);
+                    data->SetNull(position + i, !((bits[byteIndex] >> bitPosition) & 0x1));
+                }
             }
         }
     }
 
 
-    void OmniBooleanRleDecoder::next(omniruntime::vec::BaseVector *omnivec, uint64_t numValues, bool *nulls,
-        int omniTypeId) {
+    void OmniBooleanRleDecoder::next(omniruntime::vec::BaseVector *omnivec, uint64_t numValues, 
+        std::shared_ptr<NullsHelper> nulls, int omniTypeId) {
         switch (omniTypeId) {
             case omniruntime::type::OMNI_BOOLEAN: {
                 auto boolValues = omniruntime::vec::unsafe::UnsafeVector::GetRawValues(
@@ -130,19 +137,19 @@ namespace omniruntime::reader {
         }
     }
 
-    void OmniBooleanRleDecoder::next(char *data, uint64_t numValues, bool *nulls) {
+    void OmniBooleanRleDecoder::next(char *data, uint64_t numValues, std::shared_ptr<NullsHelper> nulls) {
         next<char>(data, numValues, nulls);
     }
 
     template <typename T>
-    void OmniBooleanRleDecoder::next(T *data, uint64_t numValues, bool *nulls) {
+    void OmniBooleanRleDecoder::next(T *data, uint64_t numValues, std::shared_ptr<NullsHelper> nulls) {
         // next spot to fill in
         uint64_t position = 0;
 
         // use up any remaining bits
         if (nulls) {
             while (remainingBits > 0 && position < numValues) {
-                if (!nulls[position]) {
+                if (!(*nulls)[position]) {
                     remainingBits -= 1;
                     data[position] = static_cast<T>((static_cast<unsigned char>(lastByte) >> remainingBits) & 0x1);
                 } else {
@@ -161,7 +168,7 @@ namespace omniruntime::reader {
         uint64_t nonNulls = numValues - position;
         if (nulls) {
             for (uint64_t i = position; i < numValues; ++i) {
-                if (nulls[i]) {
+                if ((*nulls)[i]) {
                     nonNulls -= 1;
                 }
             }
@@ -182,7 +189,7 @@ namespace omniruntime::reader {
             uint64_t bitsLeft = bytesRead * 8 - remainingBits;
             if (nulls) {
                 for (int64_t i = static_cast<int64_t>(numValues) - 1; i >= static_cast<int64_t>(position); --i) {
-                    if (!nulls[i]) {
+                    if (!(*nulls)[i]) {
                         uint64_t shiftPosn = (-bitsLeft) % 8;
                         data[i] = static_cast<T>((data[position + (bitsLeft - 1) / 8] >> shiftPosn) & 0x1);
                         bitsLeft -= 1;
@@ -292,8 +299,7 @@ namespace omniruntime::reader {
         }
     }
 
-    void OmniByteRleDecoder::next(char* data, uint64_t numValues,
-                                char* notNull) {
+    void OmniByteRleDecoder::next(char* data, uint64_t numValues, char* notNull) {
         uint64_t position = 0;
         // skip over null values
         while (notNull && position < numValues && !notNull[position]) {
