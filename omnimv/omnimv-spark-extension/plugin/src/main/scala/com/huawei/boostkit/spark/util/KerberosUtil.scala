@@ -17,12 +17,13 @@
 
 package com.huawei.boostkit.spark.util
 
-import java.io.File
+import com.huawei.boostkit.spark.conf.OmniMVPluginConfig.{MV_KEYTAB, MV_PRINCIPAL}
 
+import java.io.File
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.hadoop.security.UserGroupInformation
-
+import org.apache.spark.SparkConf
 import org.apache.spark.sql.SparkSession
 
 object KerberosUtil {
@@ -32,13 +33,13 @@ object KerberosUtil {
    */
   def newConfiguration(spark: SparkSession): Configuration = {
     val configuration: Configuration = spark.sessionState.newHadoopConf()
-    newConfiguration(configuration)
+    newConfiguration(configuration, spark.sparkContext.getConf)
   }
 
   /**
    * new configuration from configuration
    */
-  def newConfiguration(configuration: Configuration): Configuration = {
+  def newConfiguration(configuration: Configuration, sparkConf: SparkConf): Configuration = {
     val xmls = Seq("hdfs-site.xml", "core-site.xml")
     val xmlDir = System.getProperty("omnimv.hdfs_conf", ".")
     xmls.foreach { xml =>
@@ -52,10 +53,10 @@ object KerberosUtil {
     if ("kerberos".equalsIgnoreCase(configuration.get("hadoop.security.authentication"))) {
       val krb5Conf = System.getProperty("omnimv.krb5_conf", "/etc/krb5.conf")
       System.setProperty("java.security.krb5.conf", krb5Conf)
-      val principal = System.getProperty("omnimv.principal")
-      val keytab = System.getProperty("omnimv.keytab")
+      val principal = System.getProperty("omnimv.principal", sparkConf.get(MV_PRINCIPAL, null))
+      val keytab = System.getProperty("omnimv.keytab", sparkConf.get(MV_KEYTAB, null))
       if (principal == null || keytab == null) {
-        throw new RuntimeException("omnimv.principal or omnimv.keytab cannot be null")
+        throw new RuntimeException(s"${MV_PRINCIPAL} or ${MV_KEYTAB} cannot be null")
       }
       System.setProperty("java.security.krb5.conf", krb5Conf)
       UserGroupInformation.setConfiguration(configuration)

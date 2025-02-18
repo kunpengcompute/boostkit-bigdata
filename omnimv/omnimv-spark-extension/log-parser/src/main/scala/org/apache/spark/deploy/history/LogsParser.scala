@@ -18,19 +18,21 @@
 package org.apache.spark.deploy.history
 
 import com.huawei.boostkit.spark.util.{KerberosUtil, RewriteLogger}
-import java.io.FileNotFoundException
+
+import java.io.{File, FileInputStream, FileNotFoundException, IOException, InputStreamReader}
 import java.text.SimpleDateFormat
-import java.util.ServiceLoader
+import java.util.{Properties, ServiceLoader}
 import java.util.regex.Pattern
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, FileSystem, Path}
 import org.json4s.DefaultFormats
 import org.json4s.jackson.Json
+
 import scala.collection.JavaConverters.iterableAsScalaIterableConverter
 import scala.collection.mutable
+import scala.collection.Map
 import scala.util.control.Breaks
-
-import org.apache.spark.{JobExecutionStatus, SparkConf}
+import org.apache.spark.{JobExecutionStatus, SparkConf, SparkException}
 import org.apache.spark.deploy.SparkHadoopUtil
 import org.apache.spark.internal.config.Status.ASYNC_TRACKING_ENABLED
 import org.apache.spark.scheduler.ReplayListenerBus
@@ -41,6 +43,9 @@ import org.apache.spark.status._
 import org.apache.spark.util.Utils
 import org.apache.spark.util.kvstore.{InMemoryStore, KVStore}
 
+
+import java.nio.charset.StandardCharsets
+
 class LogsParser(conf: SparkConf, eventLogDir: String, outPutDir: String) extends RewriteLogger {
 
   private val LINE_SEPARATOR = "\n"
@@ -48,9 +53,62 @@ class LogsParser(conf: SparkConf, eventLogDir: String, outPutDir: String) extend
   // Visible for testing
   private[history] val fs: FileSystem = new Path(eventLogDir).getFileSystem(hadoopConf)
 
+  private def trimExceptCRLF(str: String): String = {
+    val nonSpaceOrNaturalLineDelimiter: Char => Boolean = { ch =>
+      ch > ' ' || ch == '\r' || ch == '\n'
+    }
+
+    val firstPos = str.indexWhere(nonSpaceOrNaturalLineDelimiter)
+    val lastPos = str.lastIndexWhere(nonSpaceOrNaturalLineDelimiter)
+    if (firstPos >= 0 && lastPos >= 0) {
+      str.substring(firstPos, lastPos + 1)
+    } else {
+      ""
+    }
+  }
+
+  def getPropertiesFromFile(filename: String): Map[String, String] = {
+    val file = new File(filename)
+    require(file.exists(), s"Properties file $file does not exist")
+    require(file.isFile(), s"Properties file $file is not a normal file")
+
+    val inReader = new InputStreamReader(new FileInputStream(file), StandardCharsets.UTF_8)
+    try {
+      val properties = new Properties()
+      properties.load(inReader)
+      properties.stringPropertyNames().asScala
+          .map { k => (k, trimExceptCRLF(properties.getProperty(k))) }
+          .toMap
+
+    } catch {
+      case e: IOException =>
+        throw new SparkException(s"Failed when loading Spark properties from $filename", e)
+    } finally {
+      inReader.close()
+    }
+  }
+
+  def readSparkConf(conf: SparkConf): Unit = {
+    val env = sys.env
+    val propertiesFile = env.get("SPARK_CONF_DIR")
+        .orElse(env.get("SPARK_HOME").map { t => s"$t${File.separator}conf" })
+        .map { t => new File(s"$t${File.separator}spark-defaults.conf") }
+        .filter(_.isFile)
+        .map(_.getAbsolutePath)
+        .orNull
+
+    Option(propertiesFile).foreach { filename =>
+      val properties = getPropertiesFromFile(filename)
+      properties.foreach { case (k, v) =>
+        conf.set(k, v)
+      }
+    }
+  }
+
   def confLoad(): Configuration = {
+    readSparkConf(conf)
     val configuration: Configuration = SparkHadoopUtil.get.newConfiguration(conf)
-    KerberosUtil.newConfiguration(configuration)
+    KerberosUtil.newConfiguration(configuration, conf)
   }
 
   /**

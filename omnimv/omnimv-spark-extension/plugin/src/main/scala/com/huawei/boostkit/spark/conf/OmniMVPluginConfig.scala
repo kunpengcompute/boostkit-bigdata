@@ -140,6 +140,12 @@ object OmniMVPluginConfig {
   // spark job descriptor
   val SPARK_JOB_DESCRIPTION = "spark.job.description"
 
+  // mv kerberos principal
+  val MV_PRINCIPAL = "spark.omnimv.kerberos.principal"
+
+  // mv kerberos keytab
+  val MV_KEYTAB = "spark.omnimv.kerberos.keytab"
+
   var ins: Option[OmniMVPluginConfig] = None
 
   def getConf: OmniMVPluginConfig = synchronized {
