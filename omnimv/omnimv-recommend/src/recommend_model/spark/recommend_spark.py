@@ -17,7 +17,8 @@ from omnimv_logging import get_logger
 from src.candidate_generation.spark.spark_utils import get_objects_from_hdfs, get_text_from_hdfs, write_text_to_hdfs, \
     get_rewrite_sqls, get_mock_database_session
 from src.preprocessor.proc_conf_spark import get_mv_output_path, get_table_bytes_path, get_spark_model_path, \
-    get_spark_schema_path, get_spark_sqls_path, get_large_table_threshold, get_mv_limit, get_spark_mock_database
+    get_spark_schema_path, get_spark_sqls_path, get_large_table_threshold, get_mv_limit, get_spark_mock_database, \
+    get_mv_metadata_path
 
 OMNIMV_LOG = get_logger()
 
@@ -87,8 +88,13 @@ def spark_greedy_recommend():
     OMNIMV_LOG.info(f"mv count: {len(select_mv)}, covered sql count: {len(covered_sql)}")
     OMNIMV_LOG.info(f"covered sql: {sorted(covered_sql)}")
     OMNIMV_LOG.info(f"greedy recommend for candidate mv: {select_mv}")
-    OMNIMV_LOG.info(f"final selected mv: {select_mv[:mv_limit]}")
+    final_covered_sql = set()
+    for mv_id in select_mv[:mv_limit]:
+        for sql_id in mv_sql_mappings.get(mv_id):
+            final_covered_sql.add(sql_id.split("/")[-1])
+    OMNIMV_LOG.info(f"final selected mv: {select_mv[:mv_limit]}; covered sql: [{','.join(sorted(list(final_covered_sql)))}]")
 
     for mv_id in select_mv[:mv_limit]:
         sql = get_text_from_hdfs(f"{candidate_mv_path}/{mv_id}.sql")
         write_text_to_hdfs(sql, f"{mv_output_path}/greedy_recommend_mv/{mv_id}.sql")
+    write_text_to_hdfs('\n'.join(sorted(list(final_covered_sql))),f"{get_mv_metadata_path()}/greedy_recommend_mv_covered_sql/rewrite_sqls")
