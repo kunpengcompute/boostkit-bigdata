@@ -75,17 +75,19 @@ namespace omniruntime::reader {
         /**
          * Read nulls flag to data.
          */
-        void nextNulls(bool *data, uint64_t numValues, bool *nulls);
+        void nextNulls(std::shared_ptr<omniruntime::vec::NullsHelper> data, uint64_t numValues, 
+            std::shared_ptr<omniruntime::vec::NullsHelper> nulls);
 
         /**
         * Read a number of values into the batch by nulls.
         */
-        void next(omniruntime::vec::BaseVector *omnivec, uint64_t numValues, bool *nulls, int omniTypeId);
+        void next(omniruntime::vec::BaseVector *omnivec, uint64_t numValues, 
+            std::shared_ptr<omniruntime::vec::NullsHelper> nulls, int omniTypeId);
 
         template <typename T>
-        void next(T *data, uint64_t numValues, bool *nulls);
+        void next(T *data, uint64_t numValues, std::shared_ptr<omniruntime::vec::NullsHelper> nulls);
 
-        void next(char *data, uint64_t numValues, bool *nulls);
+        void next(char *data, uint64_t numValues, std::shared_ptr<omniruntime::vec::NullsHelper> nulls);
 
     protected:
         size_t remainingBits;

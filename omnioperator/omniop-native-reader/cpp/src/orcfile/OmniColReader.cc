@@ -28,6 +28,8 @@
 using omniruntime::vec::VectorBatch;
 using omniruntime::vec::BaseVector;
 using omniruntime::exception::OmniException;
+using omniruntime::vec::NullsHelper;
+using omniruntime::vec::NullsBuffer;
 using orc::ColumnReader;
 using orc::ByteRleDecoder;
 using orc::Type;
@@ -179,14 +181,16 @@ namespace omniruntime::reader {
         }
     }
 
-    inline void readNulls(OmniColumnReader *colReader, uint64_t numValues, bool *incomingNulls, bool *nulls) {
+    inline void readNulls(OmniColumnReader *colReader, uint64_t numValues, std::shared_ptr<NullsHelper> incomingNulls, 
+        std::shared_ptr<NullsHelper> nulls) {
         if (colReader->notNullDecoder) {
             colReader->notNullDecoder->nextNulls(nulls, numValues, incomingNulls);
             // check to see if there are nulls in this batch
         } else if (incomingNulls) {
             // if we don't have a notNull stream, copy the incomingNulls
             // To do finished
-            memcpy_s(nulls, numValues, incomingNulls, numValues);
+            memcpy_s(nulls->GetNulls(), BitUtil::Nbytes(numValues), incomingNulls->GetNulls(), 
+                BitUtil::Nbytes(numValues));
             return;
         }
     }
@@ -294,14 +298,14 @@ namespace omniruntime::reader {
 
     template<bool encoded>
     void OmniStructColumnReader::nextInternal(std::vector<omniruntime::vec::BaseVector*> &vecs, uint64_t numValues,
-        bool *incomingNulls, const orc::Type& baseTp, int* omniTypeId) {
+        std::shared_ptr<NullsHelper> incomingNulls, const orc::Type& baseTp, int* omniTypeId) {
 
         if (encoded) {
             std::string message("OmniStructColumnReader::nextInternal encoded is not finished!");
             throw omniruntime::exception::OmniException("EXPRESSION_NOT_SUPPORT", message);
         }
         bool hasNull = false;
-        bool nulls[numValues];
+        auto nulls = std::make_shared<NullsHelper>(std::make_shared<NullsBuffer>(numValues));
         readNulls(this, numValues, incomingNulls, nulls);
         uint64_t i = 0;
 
@@ -358,15 +362,17 @@ namespace omniruntime::reader {
     /**
     * all next funcs
     */
-    void OmniIntegerColumnReader::next(BaseVector *vec, uint64_t numValues, bool *incomingNulls, int omniTypeId) {
-        auto nulls = omniruntime::vec::unsafe::UnsafeBaseVector::GetNulls(vec);
+    void OmniIntegerColumnReader::next(BaseVector *vec, uint64_t numValues, std::shared_ptr<NullsHelper> incomingNulls, 
+        int omniTypeId) {
+        auto nulls = omniruntime::vec::unsafe::UnsafeBaseVector::GetNullsHelper(vec);
         readNulls(this, numValues, incomingNulls, nulls);
         bool hasNull = vec->HasNull();
         rle->next(vec, numValues, hasNull ? nulls : nullptr, omniTypeId);
     }
 
-    void OmniBooleanColumnReader::next(BaseVector *vec, uint64_t numValues, bool *incomingNulls, int omniTypeId) {
-        auto nulls = omniruntime::vec::unsafe::UnsafeBaseVector::GetNulls(vec);
+    void OmniBooleanColumnReader::next(BaseVector *vec, uint64_t numValues, std::shared_ptr<NullsHelper> incomingNulls, 
+        int omniTypeId) {
+        auto nulls = omniruntime::vec::unsafe::UnsafeBaseVector::GetNullsHelper(vec);
         readNulls(this, numValues, incomingNulls, nulls);
         bool hasNull = vec->HasNull();
         if (omniTypeId != omniruntime::type::OMNI_BOOLEAN) {
@@ -376,12 +382,14 @@ namespace omniruntime::reader {
         boolDecoder->next(vec, numValues, hasNull ? nulls : nullptr, omniTypeId);
     }
 
-    void OmniByteColumnReader::next(BaseVector *vec, uint64_t numValues, bool *incomingNulls, int omniTypeId) {
+    void OmniByteColumnReader::next(BaseVector *vec, uint64_t numValues, std::shared_ptr<NullsHelper> incomingNulls, 
+        int omniTypeId) {
         throw OmniException("EXPRESSION_NOT_SUPPORT", "Not Supported yet.");
     }
 
-    void OmniTimestampColumnReader::next(BaseVector *vec, uint64_t numValues, bool *incomingNulls, int omniTypeId) {
-        auto nulls = omniruntime::vec::unsafe::UnsafeBaseVector::GetNulls(vec);
+    void OmniTimestampColumnReader::next(BaseVector *vec, uint64_t numValues,
+        std::shared_ptr<NullsHelper> incomingNulls, int omniTypeId) {
+        auto nulls = omniruntime::vec::unsafe::UnsafeBaseVector::GetNullsHelper(vec);
         readNulls(this, numValues, incomingNulls, nulls);
         bool hasNull = vec->HasNull();
         auto dataTypeId = static_cast<omniruntime::type::DataTypeId>(omniTypeId);
@@ -408,7 +416,7 @@ namespace omniruntime::reader {
     }
 
     template <typename T>
-    void OmniTimestampColumnReader::nextByType(T *data, uint64_t numValues, bool *nulls) {
+    void OmniTimestampColumnReader::nextByType(T *data, uint64_t numValues, std::shared_ptr<NullsHelper> nulls) {
         int64_t secsBuffer[numValues];
         secondsRle->next(secsBuffer, numValues, nulls);
         int64_t nanoBuffer[numValues];
@@ -416,7 +424,7 @@ namespace omniruntime::reader {
 
         // Construct the values
         for(uint64_t i = 0; i < numValues; i++) {
-            if (nulls == nullptr || !nulls[i]) {
+            if (nulls == nullptr || !(*nulls)[i]) {
                 uint64_t zeros = nanoBuffer[i] & 0x7;
                 nanoBuffer[i] >>= 3;
                 if (zeros != 0) {
@@ -453,8 +461,9 @@ namespace omniruntime::reader {
         }
     }
 
-    void OmniDoubleColumnReader::next(BaseVector *vec, uint64_t numValues, bool *incomingNulls, int omniTypeId) {
-        auto nulls = omniruntime::vec::unsafe::UnsafeBaseVector::GetNulls(vec);
+    void OmniDoubleColumnReader::next(BaseVector *vec, uint64_t numValues, std::shared_ptr<NullsHelper> incomingNulls, 
+        int omniTypeId) {
+        auto nulls = omniruntime::vec::unsafe::UnsafeBaseVector::GetNullsHelper(vec);
         readNulls(this, numValues, incomingNulls, nulls);
         bool hasNull = vec->HasNull();
         auto dataTypeId = static_cast<omniruntime::type::DataTypeId>(omniTypeId);
@@ -471,11 +480,11 @@ namespace omniruntime::reader {
     }
 
     template <typename T>
-    void OmniDoubleColumnReader::nextByType(T *data, uint64_t numValues, bool *nulls) {
+    void OmniDoubleColumnReader::nextByType(T *data, uint64_t numValues, std::shared_ptr<NullsHelper> nulls) {
         if (columnKind == orc::FLOAT) {
             if(nulls) {
                 for(size_t i = 0; i < numValues; ++i) {
-                    if(!nulls[i]) {
+                    if(!(*nulls)[i]) {
                         data[i] = static_cast<T>(readFloat());
                     }
                 }
@@ -487,7 +496,7 @@ namespace omniruntime::reader {
         } else {
             if (nulls) {
                 for(size_t i = 0; i < numValues; ++i) {
-                    if (!nulls[i]) {
+                    if (!(*nulls)[i]) {
                         data[i] = static_cast<T>(readDouble());
                     }
                 }
@@ -499,9 +508,9 @@ namespace omniruntime::reader {
         }
     }
 
-    void OmniStringDictionaryColumnReader::next(BaseVector *vec, uint64_t numValues, bool *incomingNulls,
-        int omniTypeId) {
-        auto nulls = omniruntime::vec::unsafe::UnsafeBaseVector::GetNulls(vec);
+    void OmniStringDictionaryColumnReader::next(BaseVector *vec, uint64_t numValues, 
+        std::shared_ptr<NullsHelper> incomingNulls, int omniTypeId) {
+        auto nulls = omniruntime::vec::unsafe::UnsafeBaseVector::GetNullsHelper(vec);
         readNulls(this, numValues, incomingNulls, nulls);
         bool hasNull = vec->HasNull();
 
@@ -516,7 +525,7 @@ namespace omniruntime::reader {
             omniruntime::vec::LargeStringContainer<std::string_view>>*>(vec);
         if (hasNull) {
             for(uint64_t i=0; i < numValues; ++i) {
-                if (!nulls[i]) {
+                if (!(*nulls)[i]) {
                     int64_t entry = outputLengths[i];
                     if (entry < 0 || static_cast<uint64_t>(entry) >= dictionaryCount ) {
                         throw orc::ParseError("Entry index out of range in StringDictionaryColumn");
@@ -555,8 +564,9 @@ namespace omniruntime::reader {
         }
     }
 
-    void OmniStringDirectColumnReader::next(BaseVector *vec, uint64_t numValues, bool *incomingNulls, int omniTypeId) {
-        auto nulls = omniruntime::vec::unsafe::UnsafeBaseVector::GetNulls(vec);
+    void OmniStringDirectColumnReader::next(BaseVector *vec, uint64_t numValues, 
+        std::shared_ptr<NullsHelper> incomingNulls, int omniTypeId) {
+        auto nulls = omniruntime::vec::unsafe::UnsafeBaseVector::GetNullsHelper(vec);
         readNulls(this, numValues, incomingNulls, nulls);
         bool hasNull = vec->HasNull();
 
@@ -597,7 +607,7 @@ namespace omniruntime::reader {
         char* tempPtr = ptr;
         if (hasNull) {
             while (filledSlots < numValues) {
-                if (!nulls[filledSlots]) {
+                if (!(*nulls)[filledSlots]) {
                     //求出长度，如果为char，则需要去除最后的空格
                     auto len = lengthPtr[filledSlots];
                     if (isChar) {
@@ -628,8 +638,9 @@ namespace omniruntime::reader {
         }
     }
 
-    void OmniDecimal64ColumnReader::next(BaseVector *vec, uint64_t numValues, bool *incomingNulls, int omniTypeId) {
-        auto nulls = omniruntime::vec::unsafe::UnsafeBaseVector::GetNulls(vec);
+    void OmniDecimal64ColumnReader::next(BaseVector *vec, uint64_t numValues, 
+        std::shared_ptr<NullsHelper> incomingNulls, int omniTypeId) {
+        auto nulls = omniruntime::vec::unsafe::UnsafeBaseVector::GetNullsHelper(vec);
         readNulls(this, numValues, incomingNulls, nulls);
         bool hasNull = vec->HasNull();
 
@@ -649,7 +660,7 @@ namespace omniruntime::reader {
 
             int scaleIndex = 0;
             for(size_t i = 0; i < numValues; ++i) {
-                if (!nulls[i]) {
+                if (!(*nulls)[i]) {
                     vector->SetValue(i, values[scaleIndex++]);
                 }
             }
@@ -663,8 +674,9 @@ namespace omniruntime::reader {
         }
     }
 
-    void OmniDecimal128ColumnReader::next(BaseVector *vec, uint64_t numValues, bool *incomingNulls, int omniTypeId) {
-        auto nulls = omniruntime::vec::unsafe::UnsafeBaseVector::GetNulls(vec);
+    void OmniDecimal128ColumnReader::next(BaseVector *vec, uint64_t numValues, 
+        std::shared_ptr<NullsHelper> incomingNulls, int omniTypeId) {
+        auto nulls = omniruntime::vec::unsafe::UnsafeBaseVector::GetNullsHelper(vec);
         readNulls(this, numValues, incomingNulls, nulls);
         bool hasNull = vec->HasNull();
 
@@ -676,7 +688,7 @@ namespace omniruntime::reader {
         auto vector = reinterpret_cast<omniruntime::vec::Vector<omniruntime::type::Decimal128>*>(vec);
         if (hasNull) {
             for(size_t i = 0; i < numValues; ++i) {
-                if (!nulls[i]) {
+                if (!(*nulls)[i]) {
                     orc::Int128 value = 0;
                     readInt128(value, static_cast<int32_t>(scaleBuffer[i]));
                     __int128_t dst = value.getHighBits();
@@ -697,8 +709,9 @@ namespace omniruntime::reader {
         }
     }
 
-	void OmniDecimalHive11ColumnReader::next(BaseVector *vec, uint64_t numValues, bool *incomingNulls, int omniTypeId) {
-        auto nulls = omniruntime::vec::unsafe::UnsafeBaseVector::GetNulls(vec);
+	void OmniDecimalHive11ColumnReader::next(BaseVector *vec, uint64_t numValues, 
+        std::shared_ptr<NullsHelper> incomingNulls, int omniTypeId) {
+        auto nulls = omniruntime::vec::unsafe::UnsafeBaseVector::GetNullsHelper(vec);
         readNulls(this, numValues, incomingNulls, nulls);
         bool hasNull = vec->HasNull();
         // read the next group of scales
@@ -709,7 +722,7 @@ namespace omniruntime::reader {
         auto vector = reinterpret_cast<omniruntime::vec::Vector<omniruntime::type::Decimal128>*>(vec);
        	if (hasNull) {
        		for (size_t i = 0; i < numValues; ++i) {
-       			if (!nulls[i]) {
+       			if (!(*nulls)[i]) {
        				orc::Int128 value = 0;
        				if (!readInt128(value, static_cast<int32_t>(scaleBuffer[i]))) {
        					if (throwOnOverflow) {
@@ -1018,11 +1031,12 @@ namespace omniruntime::reader {
         return numValues;
     }
 
-    size_t OmniStringDirectColumnReader::computeSize(const int64_t* lengths, bool *nulls, uint64_t numValues) {
+    size_t OmniStringDirectColumnReader::computeSize(const int64_t* lengths, std::shared_ptr<NullsHelper> nulls, 
+        uint64_t numValues) {
         size_t totalLength = 0;
         if (nulls) {
             for(size_t i = 0; i < numValues; ++i) {
-                if (!nulls[i]) {
+                if (!(*nulls)[i]) {
                     totalLength += static_cast<size_t>(lengths[i]);
                 }
             }

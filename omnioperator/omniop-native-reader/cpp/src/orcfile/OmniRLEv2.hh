@@ -43,37 +43,43 @@ namespace omniruntime::reader {
         * direct read VectorBatch in next
         * @param omnivec the BaseVector to push
         * @param numValues the numValues to push
-        * @param nulls the nullarrays to push
+        * @param nulls the nulls bits to push
         * @param baseTp the orcType to push
         * @param omniTypeId the int* of omniType to push
         */
-        void next(omniruntime::vec::BaseVector *omnivec, uint64_t numValues, bool *nulls, int omniTypeId);
+        void next(omniruntime::vec::BaseVector *omnivec, uint64_t numValues, 
+            std::shared_ptr<omniruntime::vec::NullsHelper> nulls, int omniTypeId);
 
-        void next(int64_t *data, uint64_t numValues, bool *nulls);
+        void next(int64_t *data, uint64_t numValues, std::shared_ptr<omniruntime::vec::NullsHelper> nulls);
 
-        void next(int32_t *data, uint64_t numValues, bool *nulls);
+        void next(int32_t *data, uint64_t numValues, std::shared_ptr<omniruntime::vec::NullsHelper> nulls);
 
-        void next(int16_t *data, uint64_t numValues, bool *nulls);
+        void next(int16_t *data, uint64_t numValues, std::shared_ptr<omniruntime::vec::NullsHelper> nulls);
 
-        void next(bool *data, uint64_t numValues, bool *nulls);
-
-        template<typename T>
-        void next(T *data, uint64_t numValues, bool *nulls);
+        void next(bool *data, uint64_t numValues, std::shared_ptr<omniruntime::vec::NullsHelper> nulls);
 
         template<typename T>
-        uint64_t nextShortRepeats(T *data, uint64_t offset, uint64_t numValues, bool *nulls);
+        void next(T *data, uint64_t numValues, std::shared_ptr<omniruntime::vec::NullsHelper> nulls);
 
         template<typename T>
-        uint64_t nextDirect(T *data, uint64_t offset, uint64_t numValues, bool *nulls);
+        uint64_t nextShortRepeats(T *data, uint64_t offset, uint64_t numValues, 
+            std::shared_ptr<omniruntime::vec::NullsHelper> nulls);
 
         template<typename T>
-        uint64_t nextPatched(T *data, uint64_t offset, uint64_t numValues, bool *nulls);
+        uint64_t nextDirect(T *data, uint64_t offset, uint64_t numValues, 
+            std::shared_ptr<omniruntime::vec::NullsHelper> nulls);
 
         template<typename T>
-        uint64_t nextDelta(T *data, uint64_t offset, uint64_t numValues, bool *nulls);
+        uint64_t nextPatched(T *data, uint64_t offset, uint64_t numValues, 
+            std::shared_ptr<omniruntime::vec::NullsHelper> nulls);
 
         template<typename T>
-        uint64_t copyDataFromBuffer(T *data, uint64_t offset, uint64_t numValues, bool *nulls);
+        uint64_t nextDelta(T *data, uint64_t offset, uint64_t numValues, 
+            std::shared_ptr<omniruntime::vec::NullsHelper> nulls);
+
+        template<typename T>
+        uint64_t copyDataFromBuffer(T *data, uint64_t offset, uint64_t numValues, 
+            std::shared_ptr<omniruntime::vec::NullsHelper> nulls);
 
         void readLongsByType(omniruntime::vec::BaseVector*& OmniVec, uint64_t offset,
                                                 uint64_t len, uint64_t omniOffset, uint64_t numValues, uint64_t fbs,
