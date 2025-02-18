@@ -58,12 +58,12 @@ class LogsParser(conf: SparkConf, eventLogDir: String, outPutDir: String) extend
    *
    * @param appId appId
    */
-  def parseAppHistoryLog(appId: String): Seq[Map[String, String]] = {
+  def parseAppHistoryLog(appId: String, appPath: Path): Seq[Map[String, String]] = {
     var jsons = Seq.empty[Map[String, String]]
 
     try {
       val inMemoryStore = new InMemoryStore()
-      val reader = EventLogFileReader(fs, new Path(eventLogDir, appId))
+      val reader = EventLogFileReader(fs, appPath)
       rebuildAppStore(inMemoryStore, reader.get)
 
       val sqlStatusStore = new SQLAppStatusStore(inMemoryStore)
@@ -128,15 +128,15 @@ class LogsParser(conf: SparkConf, eventLogDir: String, outPutDir: String) extend
       case e: FileNotFoundException =>
         throw e
       case e: Throwable =>
-        logWarning(s"Failed to parseAppHistoryLog $appId for ${e.getMessage}")
+        logWarning(s"Failed to parseAppHistoryLog $appPath for ${e.getMessage}")
     }
     jsons
   }
 
-  def parseAppHistoryLogs(appIds: Seq[String], fileName: String): Unit = {
+  def parseAppHistoryLogs(appIds: Seq[(String, Path)], fileName: String): Unit = {
     var jsons = Seq.empty[Map[String, String]]
-    appIds.foreach { appId =>
-      jsons ++= parseAppHistoryLog(appId)
+    appIds.foreach { case (appId, appPath) =>
+      jsons ++= parseAppHistoryLog(appId, appPath)
     }
     // write json file into hdfs
     val jsonFile: String = Json(DefaultFormats).write(jsons)
@@ -339,16 +339,18 @@ class LogsParser(conf: SparkConf, eventLogDir: String, outPutDir: String) extend
     os.close()
   }
 
-  def listAppHistoryLogs(pattern: Pattern, startTime: Long, endTime: Long): Seq[String] = {
-    var appHistoryLogs = Seq.empty[String]
-    fs.listStatus(new Path(eventLogDir)).foreach { log =>
+  def listAppHistoryLogs(pattern: Pattern, startTime: Long, endTime: Long): Seq[(String, Path)] = {
+    var appHistoryLogs = Seq.empty[(String, Path)]
+    val it = fs.listFiles(new Path(eventLogDir), true)
+    while (it.hasNext) {
+      val log = it.next()
       val logTime = log.getModificationTime
       if (startTime <= logTime && logTime <= endTime) {
         val name = log.getPath.getName
         val matcher = pattern.matcher(name)
         if (matcher.find) {
           val appId = matcher.group
-          appHistoryLogs +:= appId
+          appHistoryLogs +:= (appId, log.getPath)
         } else {
           logDebug(name + " is illegal")
         }
@@ -364,7 +366,7 @@ arg1: output dir in hdfs, eg. hdfs://server1:9000/logParser
 arg2: log file to be parsed, eg. application_1646816941391_0115.lz4
  */
 object ParseLog extends RewriteLogger {
-  val regex = ".*application_[0-9]+_[0-9]+.*(\\.lz4)?$"
+  val regex = ".*application_[0-9]+_[0-9]+.*(\\.lz4|\\.zstd)?$"
 
   def main(args: Array[String]): Unit = {
     if (args == null || args.length != 3) {
@@ -391,7 +393,7 @@ object ParseLog extends RewriteLogger {
     val matcher = pattern.matcher(logName)
     if (matcher.find) {
       val appId = matcher.group
-      logParser.parseAppHistoryLogs(Seq(appId), logName)
+      logParser.parseAppHistoryLogs(Seq((appId, new Path(sparkEventLogDir, logName))), logName)
     } else {
       throw new RuntimeException(logName + " is illegal")
     }
