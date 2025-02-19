@@ -74,7 +74,7 @@ class OmniMVPluginConfig(conf: SQLConf) {
 
   // omnimv metadata path
   def metadataPath: String = conf
-      .getConfString("spark.sql.omnimv.metadata.path", "/user/omnimv/metadata")
+      .getConfString("spark.sql.omnimv.metadata.path", "/omnimv/plugin_metadata")
 
   // enable omnimv init by query
   def enableMetadataInitByQuery: Boolean = conf
