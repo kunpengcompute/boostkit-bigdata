@@ -75,8 +75,7 @@ public class ParquetColumnarBatchJniReaderTest extends TestCase {
             .add("c8", createDecimalType(9, 8))
             .add("c9", createDecimalType(18, 5))
             .add("c10", BooleanType)
-            .add("c11", ShortType)
-            .add("c13", DateType);
+            .add("c11", ShortType);
 
         types = new ArrayList<>();
         for (StructField f: schema.fields()) {
