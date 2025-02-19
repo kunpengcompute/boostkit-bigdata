@@ -24,6 +24,7 @@ import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor
 import com.huawei.boostkit.spark.util.{ModifyUtilAdaptor, PhysicalPlanSelector}
 import org.apache.spark.api.plugin.{DriverPlugin, ExecutorPlugin, SparkPlugin}
 import org.apache.spark.internal.Logging
+import org.apache.spark.sql.catalyst.optimizer.{BuildLeft, BuildRight, BuildSide}
 import org.apache.spark.sql.{SparkSession, SparkSessionExtensions}
 import org.apache.spark.sql.catalyst.expressions.{Alias, And, Ascending, EqualTo, Expression, GreaterThan, GreaterThanOrEqual, IntegerLiteral, LessThan, LessThanOrEqual, Literal, NamedExpression, Rank, RowNumber, SortOrder, WindowExpression}
 import org.apache.spark.sql.catalyst.expressions.aggregate.{AggregateExpression, Partial, PartialMerge}
@@ -38,6 +39,7 @@ import org.apache.spark.sql.execution.window.{WindowExec}
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.catalyst.planning.PhysicalAggregation
 import org.apache.spark.sql.catalyst.plans.LeftSemi
+import org.apache.spark.sql.catalyst.plans.LeftOuter
 import org.apache.spark.sql.catalyst.plans.logical.Aggregate
 import org.apache.spark.sql.execution.util.SparkMemoryUtils.addLeakSafeTaskCompletionListener
 import org.apache.spark.sql.execution.aggregate.PushOrderedLimitThroughAgg
@@ -848,7 +850,7 @@ case class ColumnarOverrideRules(session: SparkSession) extends ColumnarRule wit
     maybe(session, plan) {
       val planWithFallBackPolicy = transformPlan(fallbackPolicy(), plan, "fallback")
 
-      val finalPlan = planWithFallBackPolicy match {
+      var finalPlan = planWithFallBackPolicy match {
         case FallbackNode(fallbackPlan) =>
           // skip c2r and r2c replaceWithColumnarPlan
           fallbackPlan
@@ -857,8 +859,35 @@ case class ColumnarOverrideRules(session: SparkSession) extends ColumnarRule wit
       }
       resetOriginalPlan()
       resetAdaptiveContext()
+      if (ShimUtil.isNeedModifyBuildSide) {
+        finalPlan = modifyBuildSide(finalPlan)
+      }
       transformPlan(finallyRules(), finalPlan, "final")
     }
+
+  def modifyBuildSide(plan: SparkPlan): SparkPlan = {
+    plan.transform {
+      case join@ShuffledHashJoinExec(
+      leftKeys,
+      rightKeys,
+      joinType,
+      buildSide,
+      condition,
+      left,
+      right,
+      isSkewJoin) =>
+        TransformHints.getHint(join) match {
+          case _: TRANSFORM_UNSUPPORTED =>
+            if (joinType == LeftOuter && buildSide.equals(BuildLeft)) {
+              join.copy(buildSide = BuildRight)
+            } else {
+              join
+            }
+          case _ =>
+            join
+        }
+    }
+  }
 }
 
 case class RemoveTransformHintRule() extends Rule[SparkPlan] {

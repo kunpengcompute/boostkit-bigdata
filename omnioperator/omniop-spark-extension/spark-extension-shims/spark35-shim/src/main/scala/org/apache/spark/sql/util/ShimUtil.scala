@@ -46,6 +46,8 @@ object ShimUtil {
 
   def isSupportDataWriter: Boolean = false
 
+  def isNeedModifyBuildSide: Boolean = true
+
   def createCTERelationRef(cteId: Long, resolved: Boolean, output: Seq[Attribute], isStreaming: Boolean,
                            tatsOpt: Option[Statistics] = None): CTERelationRef = {
     CTERelationRef(cteId, resolved, output, isStreaming, tatsOpt)

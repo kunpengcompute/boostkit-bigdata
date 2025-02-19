@@ -47,6 +47,8 @@ object ShimUtil {
 
   def isSupportDataWriter: Boolean = false
 
+  def isNeedModifyBuildSide: Boolean = false
+
   private val LOW_SPARK_VERSION_SET: Set[String] = Set("3.4.0", "3.4.1")
 
   private val cteRelationDefConstructor: Constructor[CTERelationRef] = {
