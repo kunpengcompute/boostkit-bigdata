@@ -28,7 +28,7 @@
 <!--        <dependency>
             <groupId>com.huawei.kunpeng</groupId>
             <artifactId>${modify.module}</artifactId>
-            <version>${omnimv.version}</version>
+            <version>${project.version}</version>
         </dependency>-->
         <dependency>
             <groupId>com.esotericsoftware</groupId>

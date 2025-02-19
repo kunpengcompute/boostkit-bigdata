@@ -28,7 +28,7 @@ import org.apache.spark.sql.execution.metric.SQLMetric
 import org.apache.spark.sql.internal.SessionState
 import org.apache.spark.sql.sources.BaseRelation
 
-object ShimUtil {
+object OmniMVShimUtil {
   def dataSourceWriteAndRead(
       dataSource: DataSource,
       mode: SaveMode,
