@@ -424,7 +424,7 @@ arg1: output dir in hdfs, eg. hdfs://server1:9000/logParser
 arg2: log file to be parsed, eg. application_1646816941391_0115.lz4
  */
 object ParseLog extends RewriteLogger {
-  val regex = ".*application_[0-9]+_[0-9]+.*(\\.lz4|\\.zstd)?$"
+  val regex = ".*(application_|local-)[0-9]+(_[0-9])*.*(\\.lz4|\\.zstd)?$"
 
   def main(args: Array[String]): Unit = {
     if (args == null || args.length != 3) {
