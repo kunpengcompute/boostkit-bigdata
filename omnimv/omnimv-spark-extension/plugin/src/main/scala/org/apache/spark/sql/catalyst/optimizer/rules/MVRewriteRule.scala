@@ -19,11 +19,13 @@ package org.apache.spark.sql.catalyst.optimizer.rules
 
 import com.fasterxml.jackson.annotation.JsonIgnore
 import com.huawei.boostkit.spark.conf.OmniMVPluginConfig
-import com.huawei.boostkit.spark.util.{RewriteHelper, RewriteLogger, ViewMetadata}
+import com.huawei.boostkit.spark.util.{KerberosUtil, RewriteHelper, RewriteLogger, ViewMetadata}
 import com.huawei.boostkit.spark.util.ViewMetadata._
+import org.apache.commons.io.IOUtils
+import org.apache.hadoop.fs.Path
+
 import java.util.concurrent.LinkedBlockingQueue
 import scala.collection.mutable
-
 import org.apache.spark.SparkContext
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.scheduler.{SparkListener, SparkListenerEvent}
@@ -35,6 +37,8 @@ import org.apache.spark.sql.execution.datasources.InsertIntoHadoopFsRelationComm
 import org.apache.spark.sql.hive.execution.{CreateHiveTableAsSelectCommand, InsertIntoHiveTable}
 import org.apache.spark.status.ElementTrackingStore
 import org.apache.spark.util.kvstore.KVIndex
+
+import java.io.{File, FileInputStream, InputStream}
 
 class MVRewriteRule(session: SparkSession)
     extends Rule[LogicalPlan] with RewriteHelper with RewriteLogger {
@@ -48,7 +52,7 @@ class MVRewriteRule(session: SparkSession)
   private val outJoinAggregateRule = new MaterializedViewOutJoinAggregateRule(session)
 
   override def apply(logicalPlan: LogicalPlan): LogicalPlan = {
-    if (!omniMVConf.enableOmniMV || cannotRewritePlans.contains(logicalPlan)) {
+    if (!omniMVConf.enableOmniMV || !isRewriteSqlWithStat || cannotRewritePlans.contains(logicalPlan)) {
       return logicalPlan
     }
     RewriteHelper.disableSqlLog()
@@ -208,6 +212,88 @@ class MVRewriteRule(session: SparkSession)
       ViewMetadata.autoWashOutTimestamp = Some(System.currentTimeMillis())
     }
   }
+
+  private def isRewriteSqlWithStat: Boolean = {
+    RewriteTime.clear()
+    val res =
+      RewriteTime.withTimeStat("isRewriteSql") {
+        isRewriteSql
+      }
+    logBasedOnLevel(RewriteTime.stat())
+    res
+  }
+
+  private def isRewriteSql: Boolean = {
+    // not enable
+    if (!OmniMVPluginConfig.getConf.enableDetectiveRewriteSqls) {
+      return true
+    }
+
+    // omnimv metadata path val
+    val METADATA_PATH_VAL = s"${OmniMVPluginConfig.getConf.metadataPath}/greedy_recommend_mv_covered_sql"
+    val metadataPath = new Path(METADATA_PATH_VAL)
+    val METADATA_LOCAL_PATH_VAL = s"${OmniMVPluginConfig.getConf.metadataLocalPath}/greedy_recommend_mv_covered_sql"
+    val metadataLocalPath = new File(METADATA_LOCAL_PATH_VAL)
+    val rewriteSqlMap: mutable.Map[String, String] = mutable.HashMap[String, String]()
+
+    if (metadataLocalPath.exists() && metadataLocalPath.listFiles().length > 0
+      && metadataLocalPath.lastModified() + 12 * 3600 * 1000 > System.currentTimeMillis()) {
+      RewriteTime.withTimeStat("isRewriteSql metadataLocalPath.listFiles") {
+        metadataLocalPath.listFiles().foreach {
+          sqlFile =>
+            if (!sqlFile.getName.startsWith(".")) {
+              rewriteSqlMap += (getSqlContent(new FileInputStream(sqlFile)) -> sqlFile.getName)
+            }
+        }
+      }
+    } else {
+      val conf = KerberosUtil.newConfiguration(session)
+      val curFs = metadataPath.getFileSystem(conf)
+      if (!curFs.exists(metadataPath)) {
+        return true
+      }
+      val sqlFiles = curFs.listStatus(metadataPath)
+      if (sqlFiles.size <= 0) {
+        return true
+      }
+
+      metadataLocalPath.mkdirs()
+      sqlFiles.foreach {
+        sqlFile =>
+          RewriteTime.withTimeStat("isRewriteSql metadataPath.listFiles") {
+            rewriteSqlMap += (getSqlContent(curFs.open(sqlFile.getPath)) -> sqlFile.getPath.getName)
+          }
+          RewriteTime.withTimeStat("isRewriteSql metadataPath.copyToLocalFile") {
+            curFs.copyToLocalFile(sqlFile.getPath, new Path(METADATA_LOCAL_PATH_VAL, sqlFile.getPath.getName))
+          }
+      }
+    }
+
+    val curSqlContent = session.sparkContext.getLocalProperty(SparkContext.SPARK_JOB_DESCRIPTION)
+      .replaceAll("\\n", " ").toLowerCase().trim()
+    val rewriteSqls = rewriteSqlMap.values.mkString(",")
+    if (rewriteSqlMap.contains(curSqlContent)) {
+      logBasedOnLevel(s"rewriteSqls [$rewriteSqls] contains $curSqlContent")
+      return true
+    }
+    logBasedOnLevel(s"rewriteSqls [$rewriteSqls] not contains $curSqlContent")
+    return false
+  }
+
+
+  private def getSqlContent(inpuStream: InputStream): String = {
+    val lines = IOUtils.readLines(inpuStream, "UTF-8")
+    IOUtils.closeQuietly(inpuStream)
+
+    val sql = mutable.StringBuilder.newBuilder
+    lines.forEach { line =>
+      sql.append(line)
+      sql.append(" ")
+    }
+    sql.toString().replaceAll("\\n", " ").toLowerCase().trim()
+  }
+
+
 }
 
 @DeveloperApi

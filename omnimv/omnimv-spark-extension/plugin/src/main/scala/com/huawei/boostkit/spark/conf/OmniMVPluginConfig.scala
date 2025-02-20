@@ -119,6 +119,12 @@ class OmniMVPluginConfig(conf: SQLConf) {
       .getConfString("spark.sql.omnimv.washout.automatic.enable", "false")
       .toBoolean
 
+  def enableDetectiveRewriteSqls: Boolean = conf
+    .getConfString("spark.sql.omnimv.detect-rewrite-sqls.enable", "false")
+    .toBoolean
+
+  def metadataLocalPath: String = conf
+    .getConfString("spark.sql.omnimv.metadata.local-path", "/tmp/omnimv")
 }
 
 object OmniMVPluginConfig {

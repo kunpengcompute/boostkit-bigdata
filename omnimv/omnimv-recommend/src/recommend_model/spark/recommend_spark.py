@@ -92,9 +92,21 @@ def spark_greedy_recommend():
     for mv_id in select_mv[:mv_limit]:
         for sql_id in mv_sql_mappings.get(mv_id):
             final_covered_sql.add(sql_id.split("/")[-1])
-    OMNIMV_LOG.info(f"final selected mv: {select_mv[:mv_limit]}; covered sql: [{','.join(sorted(list(final_covered_sql)))}]")
+    OMNIMV_LOG.info(f"final selected mv: {select_mv[:mv_limit]}")
 
     for mv_id in select_mv[:mv_limit]:
         sql = get_text_from_hdfs(f"{candidate_mv_path}/{mv_id}.sql")
         write_text_to_hdfs(sql, f"{mv_output_path}/greedy_recommend_mv/{mv_id}.sql")
-    write_text_to_hdfs('\n'.join(sorted(list(final_covered_sql))),f"{get_mv_metadata_path()}/greedy_recommend_mv_covered_sql/rewrite_sqls")
+    final_covered_mvs = set(select_mv[:mv_limit])
+    final_covered_sqls = list()
+    for (sql, mv_id_set) in rewrite_sqls.items():
+        covered_mvs = 0
+        for mv_id in mv_id_set:
+            if mv_id in final_covered_mvs:
+                covered_mvs += 1
+        if covered_mvs * 100 / len(mv_id_set) > 50:
+            final_covered_sqls.append(sql)
+    for sql in final_covered_sqls:
+        sql_name = sql.split("/")[-1]
+        write_text_to_hdfs(get_text_from_hdfs(sql),
+                           f"{get_mv_metadata_path()}/greedy_recommend_mv_covered_sql/{sql_name}")
