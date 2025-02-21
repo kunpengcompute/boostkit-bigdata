@@ -247,7 +247,7 @@ class MVRewriteRule(session: SparkSession)
         }
       }
     } else {
-      ViewMetadata.initFs(spark, metadataPath)
+      ViewMetadata.initFs(session, metadataPath)
       val curFs = ViewMetadata.fs
       if (!curFs.exists(metadataPath)) {
         return true
