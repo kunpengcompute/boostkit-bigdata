@@ -2,7 +2,7 @@
 if [ -n "$1" ]; then
   package_name=$1
 else
-  package_name="BoostKit-omnimv_1.2.0"
+  package_name="BoostKit-omnimv_1.2.1"
 fi
 
 if [ ! -d "${package_name}" ]; then

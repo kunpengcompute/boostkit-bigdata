@@ -33,7 +33,7 @@ import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, SubqueryAlias}
 import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.command._
 import org.apache.spark.sql.execution.datasources._
-import org.apache.spark.sql.util.ShimUtil
+import org.apache.spark.sql.util.OmniMVShimUtil
 
 /**
  * Parse extended AST to LogicalPlan
@@ -74,7 +74,7 @@ class OmniMVExtensionAstBuilder(spark: SparkSession, delegate: ParserInterface)
         OmniMVPluginConfig.getConf.defaultDataSource
       RewriteHelper.disableCachePlugin()
       val qe = spark.sql(query).queryExecution
-      val logicalPlan = ShimUtil.getAstBuilderCreateMVPlan(qe)
+      val logicalPlan = OmniMVShimUtil.getAstBuilderCreateMVPlan(qe)
       if (RewriteHelper.containsMV(qe.analyzed)) {
         throw new RuntimeException("not support create mv from mv")
       }
@@ -132,12 +132,12 @@ class OmniMVExtensionAstBuilder(spark: SparkSession, delegate: ParserInterface)
     try {
       spark.sessionState.catalogManager.setCurrentNamespace(Array(curDatabase))
       val fileIndex =
-        ShimUtil.getAstBuilderRefreshMVFileIndexs(
+        OmniMVShimUtil.getAstBuilderRefreshMVFileIndexs(
           spark.sql(queryStr.get).queryExecution.sparkPlan
         )
       // disable plugin
       RewriteHelper.disableCachePlugin()
-      val data = ShimUtil.getAstBuilderCreateMVPlan(spark.sql(queryStr.get).queryExecution)
+      val data = OmniMVShimUtil.getAstBuilderCreateMVPlan(spark.sql(queryStr.get).queryExecution)
 
       val hadoopRelation = spark.table(catalogTable.identifier).logicalPlan match {
         case SubqueryAlias(_, LogicalRelation(t: HadoopFsRelation, _, _, _)) => t

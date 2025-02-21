@@ -82,6 +82,8 @@ def run_cmd(args_list, output_path=None):
     s_return = proc.returncode
     if s_output:
         s_output = s_output.decode('utf-8').split('\n')
+    if s_err:
+        s_err = s_err.decode('utf-8').split('\n')
     return s_return, s_output, s_err
 
 
@@ -218,7 +220,7 @@ def create_mv_tables(mv_path, enable_omnimv='true'):
         output_path = f"{LOG_DIR}/{mv_id}_omnimv_plugin_{enable_omnimv}.log"
         query_arg_list = basic_args_list + ["--name", mv_id, "-f", "tmp.sql"]
         try:
-            run_cmd(query_arg_list, output_path)
+            s_return, s_output, s_err = run_cmd(query_arg_list, output_path)
         except subprocess.TimeoutExpired as exception:
             OMNIMV_LOG.error(exception)
             if os.path.exists('tmp.sql'):
@@ -269,13 +271,18 @@ def get_rewrite_sqls(mock_database, schema_path, mv_path, sqls_path):
 def truncate_mock_database(session):
     if spark_mock_database_truncate_enable():
         tables = session.sql("SHOW TABLES").collect()
+        mv_drop_sqls = []
+        table_drop_sqls = []
         for table in tables:
             table_name = table['tableName']
             if re.match("mv\d+", table_name):
                 drop_table = f"DROP MATERIALIZED VIEW IF EXISTS {table_name}"
+                mv_drop_sqls.append(drop_table)
             else:
                 drop_table = f"DROP TABLE IF EXISTS {table_name}"
-            session.sql(drop_table)
+                table_drop_sqls.append(drop_table)
+        for sql in mv_drop_sqls + table_drop_sqls:
+            session.sql(sql)
 
 def get_mock_database_session(schema_path, mock_database=get_spark_mock_database()):
     session = init_pyspark_plugin()
@@ -286,7 +293,9 @@ def get_mock_database_session(schema_path, mock_database=get_spark_mock_database
     create_database = f"create database if not exists {mock_database}"
     use_database = f"use {mock_database}"
     try:
-        session.sql(create_database)
+        databases = set(database["namespace"].lower() for database in session.sql("show databases").collect())
+        if mock_database.lower() not in databases:
+            session.sql(create_database)
         session.sql(use_database)
         truncate_mock_database(session)
     except (AnalysisException, ParseException) as exception:

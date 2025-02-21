@@ -18,19 +18,21 @@
 package org.apache.spark.deploy.history
 
 import com.huawei.boostkit.spark.util.{KerberosUtil, RewriteLogger}
-import java.io.FileNotFoundException
+
+import java.io.{File, FileInputStream, FileNotFoundException, IOException, InputStreamReader}
 import java.text.SimpleDateFormat
-import java.util.ServiceLoader
+import java.util.{Properties, ServiceLoader}
 import java.util.regex.Pattern
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, FileSystem, Path}
 import org.json4s.DefaultFormats
 import org.json4s.jackson.Json
+
 import scala.collection.JavaConverters.iterableAsScalaIterableConverter
 import scala.collection.mutable
+import scala.collection.Map
 import scala.util.control.Breaks
-
-import org.apache.spark.{JobExecutionStatus, SparkConf}
+import org.apache.spark.{JobExecutionStatus, SparkConf, SparkException}
 import org.apache.spark.deploy.SparkHadoopUtil
 import org.apache.spark.internal.config.Status.ASYNC_TRACKING_ENABLED
 import org.apache.spark.scheduler.ReplayListenerBus
@@ -41,6 +43,9 @@ import org.apache.spark.status._
 import org.apache.spark.util.Utils
 import org.apache.spark.util.kvstore.{InMemoryStore, KVStore}
 
+
+import java.nio.charset.StandardCharsets
+
 class LogsParser(conf: SparkConf, eventLogDir: String, outPutDir: String) extends RewriteLogger {
 
   private val LINE_SEPARATOR = "\n"
@@ -48,9 +53,62 @@ class LogsParser(conf: SparkConf, eventLogDir: String, outPutDir: String) extend
   // Visible for testing
   private[history] val fs: FileSystem = new Path(eventLogDir).getFileSystem(hadoopConf)
 
+  private def trimExceptCRLF(str: String): String = {
+    val nonSpaceOrNaturalLineDelimiter: Char => Boolean = { ch =>
+      ch > ' ' || ch == '\r' || ch == '\n'
+    }
+
+    val firstPos = str.indexWhere(nonSpaceOrNaturalLineDelimiter)
+    val lastPos = str.lastIndexWhere(nonSpaceOrNaturalLineDelimiter)
+    if (firstPos >= 0 && lastPos >= 0) {
+      str.substring(firstPos, lastPos + 1)
+    } else {
+      ""
+    }
+  }
+
+  def getPropertiesFromFile(filename: String): Map[String, String] = {
+    val file = new File(filename)
+    require(file.exists(), s"Properties file $file does not exist")
+    require(file.isFile(), s"Properties file $file is not a normal file")
+
+    val inReader = new InputStreamReader(new FileInputStream(file), StandardCharsets.UTF_8)
+    try {
+      val properties = new Properties()
+      properties.load(inReader)
+      properties.stringPropertyNames().asScala
+          .map { k => (k, trimExceptCRLF(properties.getProperty(k))) }
+          .toMap
+
+    } catch {
+      case e: IOException =>
+        throw new SparkException(s"Failed when loading Spark properties from $filename", e)
+    } finally {
+      inReader.close()
+    }
+  }
+
+  def readSparkConf(conf: SparkConf): Unit = {
+    val env = sys.env
+    val propertiesFile = env.get("SPARK_CONF_DIR")
+        .orElse(env.get("SPARK_HOME").map { t => s"$t${File.separator}conf" })
+        .map { t => new File(s"$t${File.separator}spark-defaults.conf") }
+        .filter(_.isFile)
+        .map(_.getAbsolutePath)
+        .orNull
+
+    Option(propertiesFile).foreach { filename =>
+      val properties = getPropertiesFromFile(filename)
+      properties.foreach { case (k, v) =>
+        conf.set(k, v)
+      }
+    }
+  }
+
   def confLoad(): Configuration = {
+    readSparkConf(conf)
     val configuration: Configuration = SparkHadoopUtil.get.newConfiguration(conf)
-    KerberosUtil.newConfiguration(configuration)
+    KerberosUtil.newConfiguration(configuration, conf)
   }
 
   /**
@@ -58,12 +116,12 @@ class LogsParser(conf: SparkConf, eventLogDir: String, outPutDir: String) extend
    *
    * @param appId appId
    */
-  def parseAppHistoryLog(appId: String): Seq[Map[String, String]] = {
+  def parseAppHistoryLog(appId: String, appPath: Path): Seq[Map[String, String]] = {
     var jsons = Seq.empty[Map[String, String]]
 
     try {
       val inMemoryStore = new InMemoryStore()
-      val reader = EventLogFileReader(fs, new Path(eventLogDir, appId))
+      val reader = EventLogFileReader(fs, appPath)
       rebuildAppStore(inMemoryStore, reader.get)
 
       val sqlStatusStore = new SQLAppStatusStore(inMemoryStore)
@@ -128,15 +186,15 @@ class LogsParser(conf: SparkConf, eventLogDir: String, outPutDir: String) extend
       case e: FileNotFoundException =>
         throw e
       case e: Throwable =>
-        logWarning(s"Failed to parseAppHistoryLog $appId for ${e.getMessage}")
+        logWarning(s"Failed to parseAppHistoryLog $appPath for ${e.getMessage}")
     }
     jsons
   }
 
-  def parseAppHistoryLogs(appIds: Seq[String], fileName: String): Unit = {
+  def parseAppHistoryLogs(appIds: Seq[(String, Path)], fileName: String): Unit = {
     var jsons = Seq.empty[Map[String, String]]
-    appIds.foreach { appId =>
-      jsons ++= parseAppHistoryLog(appId)
+    appIds.foreach { case (appId, appPath) =>
+      jsons ++= parseAppHistoryLog(appId, appPath)
     }
     // write json file into hdfs
     val jsonFile: String = Json(DefaultFormats).write(jsons)
@@ -339,16 +397,18 @@ class LogsParser(conf: SparkConf, eventLogDir: String, outPutDir: String) extend
     os.close()
   }
 
-  def listAppHistoryLogs(pattern: Pattern, startTime: Long, endTime: Long): Seq[String] = {
-    var appHistoryLogs = Seq.empty[String]
-    fs.listStatus(new Path(eventLogDir)).foreach { log =>
+  def listAppHistoryLogs(pattern: Pattern, startTime: Long, endTime: Long): Seq[(String, Path)] = {
+    var appHistoryLogs = Seq.empty[(String, Path)]
+    val it = fs.listFiles(new Path(eventLogDir), true)
+    while (it.hasNext) {
+      val log = it.next()
       val logTime = log.getModificationTime
       if (startTime <= logTime && logTime <= endTime) {
         val name = log.getPath.getName
         val matcher = pattern.matcher(name)
         if (matcher.find) {
           val appId = matcher.group
-          appHistoryLogs +:= appId
+          appHistoryLogs +:= (appId, log.getPath)
         } else {
           logDebug(name + " is illegal")
         }
@@ -364,7 +424,7 @@ arg1: output dir in hdfs, eg. hdfs://server1:9000/logParser
 arg2: log file to be parsed, eg. application_1646816941391_0115.lz4
  */
 object ParseLog extends RewriteLogger {
-  val regex = ".*application_[0-9]+_[0-9]+.*(\\.lz4)?$"
+  val regex = ".*(application_|local-)[0-9]+(_[0-9])*.*(\\.lz4|\\.zstd)?$"
 
   def main(args: Array[String]): Unit = {
     if (args == null || args.length != 3) {
@@ -391,7 +451,7 @@ object ParseLog extends RewriteLogger {
     val matcher = pattern.matcher(logName)
     if (matcher.find) {
       val appId = matcher.group
-      logParser.parseAppHistoryLogs(Seq(appId), logName)
+      logParser.parseAppHistoryLogs(Seq((appId, new Path(sparkEventLogDir, logName))), logName)
     } else {
       throw new RuntimeException(logName + " is illegal")
     }

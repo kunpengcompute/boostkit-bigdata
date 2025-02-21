@@ -24,7 +24,7 @@ import org.json4s.jackson.Json
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach}
 
-import java.io.{FileInputStream, FileNotFoundException}
+import java.io.{File, FileInputStream, FileNotFoundException}
 import java.text.SimpleDateFormat
 import java.util.Date
 
@@ -56,6 +56,24 @@ class LogsParserSuite extends AnyFunSuite
       , "log_parse_1646816941391", "2022-09-15 11:00", endTime)
     ParseLogs.main(args)
     val fis = new FileInputStream("eventlog/parse/log_parse_1646816941391.json")
+    val lines = IOUtils.readLines(fis, "UTF-8")
+    IOUtils.closeQuietly(fis)
+    val json: Seq[Map[String, String]] = Json(DefaultFormats)
+        .read[Seq[Map[String, String]]](lines.get(0))
+    assert(json.exists(map =>
+      map.contains("materialized views") &&
+          map("physical plan").contains(map("materialized views"))
+    ))
+  }
+
+  test("parse logs recursive") {
+    val path = new File(this.getClass.getResource("/").getPath).getParentFile.getPath
+    val endTime = new SimpleDateFormat("yyyy-MM-dd HH:mm")
+        .format(DateUtils.addDays(new Date(), 7))
+    val args: Array[String] = Array(path, "eventlog/parse"
+      , "log_parse_1646816941391_2", "2022-09-15 11:00", endTime)
+    ParseLogs.main(args)
+    val fis = new FileInputStream("eventlog/parse/log_parse_1646816941391_2.json")
     val lines = IOUtils.readLines(fis, "UTF-8")
     IOUtils.closeQuietly(fis)
     val json: Seq[Map[String, String]] = Json(DefaultFormats)

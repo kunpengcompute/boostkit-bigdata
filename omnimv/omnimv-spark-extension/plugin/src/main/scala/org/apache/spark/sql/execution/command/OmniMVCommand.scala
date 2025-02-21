@@ -48,7 +48,7 @@ import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.internal.SQLConf.PartitionOverwriteMode
 import org.apache.spark.sql.sources.BaseRelation
 import org.apache.spark.sql.types.{StringType, StructType}
-import org.apache.spark.sql.util.ShimUtil
+import org.apache.spark.sql.util.OmniMVShimUtil
 
 
 case class OmniMVCreateMvCommand(
@@ -123,7 +123,7 @@ case class OmniMVCreateMvCommand(
           case _: HadoopFsRelation if table.partitionColumnNames.nonEmpty &&
               sparkSession.sqlContext.conf.manageFilesourcePartitions =>
             // Need to recover partitions into the metastore so our saved data is visible
-            ShimUtil.createMVExecutePlan(sessionState, table).toRdd
+            OmniMVShimUtil.createMVExecutePlan(sessionState, table).toRdd
           case _ =>
         }
       }
@@ -181,7 +181,7 @@ case class OmniMVCreateMvCommand(
       catalogTable = if (tableExists) Some(table) else None)
 
     try {
-      ShimUtil.dataSourceWriteAndRead(dataSource, mode, query, outputColumnNames, physicalPlan, metrics)
+      OmniMVShimUtil.dataSourceWriteAndRead(dataSource, mode, query, outputColumnNames, physicalPlan, metrics)
     } catch {
       case ex: AnalysisException =>
         logError(s"Failed to write to table ${table.identifier.unquotedString}", ex)
@@ -206,7 +206,7 @@ case class DropMaterializedViewCommand(
   override def run(sparkSession: SparkSession): Seq[Row] = {
     ViewMetadata.init(sparkSession)
     val catalog = sparkSession.sessionState.catalog
-    val isTempView = ShimUtil.catalogIsTemporaryTable(catalog, tableName)
+    val isTempView = OmniMVShimUtil.catalogIsTemporaryTable(catalog, tableName)
 
     if (!isTempView && catalog.tableExists(tableName)) {
       // If the command DROP VIEW is to drop a table or DROP TABLE is to drop a view
@@ -389,7 +389,7 @@ case class RefreshMaterializedViewCommand(
       sparkSession.sessionState.catalog.alterTable(tableMeta)
 
       // Most formats don't do well with duplicate columns, so lets not allow that
-      ShimUtil.checkColumnNameDuplication(
+      OmniMVShimUtil.checkColumnNameDuplication(
         outputColumnNames,
         s"when inserting into $outputPath",
         sparkSession.sessionState.conf.caseSensitiveAnalysis)

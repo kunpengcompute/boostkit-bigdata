@@ -2,9 +2,9 @@
 
 **software下面包含3个部分：**
 
-- BoostKit-omnimv_1.2.0.zip 开源python软件包
-- boostkit-omnimv-spark-3.4.3-1.2.0-aarch64.jar 视图改写工具jar包
-- boostkit-omnimv-logparser-spark-3.4.3-1.2.0-aarch64.jar 日志解析工具jar包
+- BoostKit-omnimv_1.2.1.zip 开源python软件包
+- boostkit-omnimv-spark-3.4.3-1.2.1-aarch64.jar 视图改写工具jar包
+- boostkit-omnimv-logparser-spark-3.4.3-1.2.1-aarch64.jar 日志解析工具jar包
 
 ### 配置Anaconda环境
 
@@ -63,9 +63,9 @@ schema_path = hdfs://server1:9000/omnimv/schema.sql
 # 数据库名称
 database = tpcds_bin_partitioned_varchar_orc_3000
 # 日志解析的jar包路径
-logparser_jar_path = /opt/omnimv/boostkit-omnimv-logparser-spark-3.4.3-1.2.0-aarch64.jar
+logparser_jar_path = /opt/omnimv/boostkit-omnimv-logparser-spark-3.4.3-1.2.1-aarch64.jar
 # omnimv plugin的路径
-cache_plugin_jar_path = /opt/omnimv/boostkit-omnimv-spark-3.4.3-1.2.0-aarch64.jar
+cache_plugin_jar_path = /opt/omnimv/boostkit-omnimv-spark-3.4.3-1.2.1-aarch64.jar
 # spark-defaults.conf路径下面配置的spark history输出的路径
 hdfs_input_path = hdfs://server1:9000/spark2-history
 # 通过日志解析之后，把每条日志解析成json格式，所有日志存放的路径
@@ -90,14 +90,14 @@ mv_output_path = hdfs://server1:9000/omnimv/mv
 
 ```shell
 DATABASE=tpcds_bin_partitioned_varchar_orc_3000
-views=`spark-sql --master local -e "SHOW MATERIALIZED VIEWS" --conf spark.sql.extensions=com.huawei.boostkit.spark.OmniMV --jars /opt/omnimv/boostkit-omnimv-spark-3.4.3-1.2.0-aarch64.jar --database ${DATABASE} | grep -P "^${DATABASE}" |awk -F "\t" '{print $2}' |grep -v "partition"` ; \
+views=`spark-sql --master local -e "SHOW MATERIALIZED VIEWS" --conf spark.sql.extensions=com.huawei.boostkit.spark.OmniMV --jars /opt/omnimv/boostkit-omnimv-spark-3.4.3-1.2.1-aarch64.jar --database ${DATABASE} | grep -P "^${DATABASE}" |awk -F "\t" '{print $2}' |grep -v "partition"` ; \
 drop_mv_cmd=`echo ${views}|tr -s ' ' '\n'|xargs -i echo "DROP MATERIALIZED VIEW IF EXISTS "{}";"` ;\
 drop_cmd="${drop_mv_cmd}" ;
 echo ${drop_cmd} ;\
 
 spark-sql --master local -e "${drop_cmd}" \
 --conf spark.sql.extensions=com.huawei.boostkit.spark.OmniMV \
---jars /opt/omnimv/boostkit-omnimv-spark-3.4.3-1.2.0-aarch64.jar --database ${DATABASE}
+--jars /opt/omnimv/boostkit-omnimv-spark-3.4.3-1.2.1-aarch64.jar --database ${DATABASE}
 echo ""
 
 ```

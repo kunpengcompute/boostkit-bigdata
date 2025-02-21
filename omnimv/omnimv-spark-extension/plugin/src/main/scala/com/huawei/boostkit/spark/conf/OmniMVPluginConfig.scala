@@ -74,7 +74,7 @@ class OmniMVPluginConfig(conf: SQLConf) {
 
   // omnimv metadata path
   def metadataPath: String = conf
-      .getConfString("spark.sql.omnimv.metadata.path", "/user/omnimv/metadata")
+      .getConfString("spark.sql.omnimv.metadata.path", "/omnimv/plugin_metadata")
 
   // enable omnimv init by query
   def enableMetadataInitByQuery: Boolean = conf
@@ -119,6 +119,12 @@ class OmniMVPluginConfig(conf: SQLConf) {
       .getConfString("spark.sql.omnimv.washout.automatic.enable", "false")
       .toBoolean
 
+  def enableDetectiveRewriteSqls: Boolean = conf
+    .getConfString("spark.sql.omnimv.detect-rewrite-sqls.enable", "false")
+    .toBoolean
+
+  def metadataLocalPath: String = conf
+    .getConfString("spark.sql.omnimv.metadata.local-path", "/tmp/omnimv")
 }
 
 object OmniMVPluginConfig {
@@ -139,6 +145,12 @@ object OmniMVPluginConfig {
 
   // spark job descriptor
   val SPARK_JOB_DESCRIPTION = "spark.job.description"
+
+  // mv kerberos principal
+  val MV_PRINCIPAL = "spark.omnimv.kerberos.principal"
+
+  // mv kerberos keytab
+  val MV_KEYTAB = "spark.omnimv.kerberos.keytab"
 
   var ins: Option[OmniMVPluginConfig] = None
 

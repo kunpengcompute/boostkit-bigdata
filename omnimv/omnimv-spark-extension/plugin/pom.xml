@@ -28,7 +28,7 @@
 <!--        <dependency>
             <groupId>com.huawei.kunpeng</groupId>
             <artifactId>${modify.module}</artifactId>
-            <version>${omnimv.version}</version>
+            <version>${project.version}</version>
         </dependency>-->
         <dependency>
             <groupId>com.esotericsoftware</groupId>
@@ -211,6 +211,20 @@
                             <arguments>
                                 <argument>target/boostkit-omnimv-spark-${project.version}-${dep.os.arch}-jar-with-dependencies.jar</argument>
                                 <argument>target/boostkit-omnimv-spark-${project.version}-${dep.os.arch}.jar</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>remove-file</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <executable>rm</executable>
+                            <arguments>
+                                <argument>-f</argument>
+                                <argument>target/boostkit-omnimv-spark-${project.version}-${dep.os.arch}-jar-with-dependencies.jar</argument>
                             </arguments>
                         </configuration>
                     </execution>

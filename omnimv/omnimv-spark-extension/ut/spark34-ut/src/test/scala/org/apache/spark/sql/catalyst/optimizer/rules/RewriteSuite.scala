@@ -275,7 +275,7 @@ object RewriteSuite extends AnyFunSuite
       .config("spark.sql.omnimv.dbs", "default")
       .config("spark.sql.omnimv.metadata.initbyquery.enable", "false")
       .config("hive.in.test", "true")
-      .config("spark.sql.omnimv.metadata.path", "./user/omnimv/metadata")
+      .config("spark.sql.omnimv.metadata.path", "./omnimv/plugin_metadata")
       .config("spark.sql.omnimv.washout.automatic.enable", "false")
       .enableHiveSupport()
       .getOrCreate()
