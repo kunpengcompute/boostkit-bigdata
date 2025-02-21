@@ -247,8 +247,8 @@ class MVRewriteRule(session: SparkSession)
         }
       }
     } else {
-      val conf = KerberosUtil.newConfiguration(session)
-      val curFs = metadataPath.getFileSystem(conf)
+      ViewMetadata.initFs(spark, metadataPath)
+      val curFs = ViewMetadata.fs
       if (!curFs.exists(metadataPath)) {
         return true
       }
@@ -270,7 +270,7 @@ class MVRewriteRule(session: SparkSession)
     }
 
     val curSqlContent = session.sparkContext.getLocalProperty(SparkContext.SPARK_JOB_DESCRIPTION)
-      .replaceAll("\\n", " ").toLowerCase().trim()
+        .replaceAll("\\n", " ").replaceAll(" +", " ").toLowerCase().trim()
     val rewriteSqls = rewriteSqlMap.values.mkString(",")
     if (rewriteSqlMap.contains(curSqlContent)) {
       logBasedOnLevel(s"rewriteSqls [$rewriteSqls] contains $curSqlContent")
@@ -290,7 +290,7 @@ class MVRewriteRule(session: SparkSession)
       sql.append(line)
       sql.append(" ")
     }
-    sql.toString().replaceAll("\\n", " ").toLowerCase().trim()
+    sql.toString().replaceAll("\\n", " ").replaceAll(" +", " ").toLowerCase().trim()
   }
 
 

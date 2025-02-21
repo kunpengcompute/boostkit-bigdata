@@ -116,10 +116,7 @@ object ViewMetadata extends RewriteHelper {
 
     metadataPath = new Path(OmniMVPluginConfig.getConf.metadataPath)
     metadataPriorityPath = new Path(metadataPath, "priority")
-
-    val conf = KerberosUtil.newConfiguration(spark)
-    fs = metadataPath.getFileSystem(conf)
-
+    initFs(spark, metadataPath)
     val paths = Seq(metadataPath, metadataPriorityPath)
     paths.foreach { path =>
       if (!fs.exists(path)) {
@@ -251,6 +248,13 @@ object ViewMetadata extends RewriteHelper {
         value -= viewName
         tableToViews.put(key, value)
       }
+    }
+  }
+
+  def initFs(sparkSession: SparkSession, path: Path): Unit = {
+    if (fs == null) {
+      val conf = KerberosUtil.newConfiguration(sparkSession)
+      fs = path.getFileSystem(conf)
     }
   }
 
