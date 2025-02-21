@@ -22,7 +22,7 @@ import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor.{JsonObjectExt
 import com.huawei.boostkit.spark.util.ModifyUtilAdaptor
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.SparkSessionExtensions
-import org.apache.spark.sql.catalyst.expressions.{BloomFilterMightContain, ExprId, Expression}
+import org.apache.spark.sql.catalyst.expressions.{BloomFilterMightContain, ExprId, Expression, TryEval}
 import org.apache.spark.sql.catalyst.optimizer.{CombineJoinedAggregates, MergeSubqueryFilters}
 import org.apache.spark.sql.execution.adaptive.QueryStageExec
 import org.apache.spark.sql.execution.{BroadcastExchangeExecProxy, ColumnarBloomFilterSubquery, ColumnarToRowExec, OmniColumnarToRowExec, SparkPlan}
@@ -60,7 +60,8 @@ object ModifyUtil extends Logging {
           .put("isNull", bfAddress == 0L)
           .put("dataType", 2)
           .put("value", bfAddress)
-
+      case tryEval: TryEval =>
+        func(tryEval.child, exprsIndexMap, returnDatatype)
       case _ =>
         null
     }
