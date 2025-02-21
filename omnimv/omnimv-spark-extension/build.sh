@@ -10,7 +10,7 @@ function copy_jar() {
   done
 }
 
-#mvn clean package -Pspark-3.1
-#copy_jar
-mvn clean package -Pspark-3.4
+mvn clean package -Pspark-3.1 -DskipTests
+copy_jar
+mvn clean package -Pspark-3.4 -DskipTests
 copy_jar
