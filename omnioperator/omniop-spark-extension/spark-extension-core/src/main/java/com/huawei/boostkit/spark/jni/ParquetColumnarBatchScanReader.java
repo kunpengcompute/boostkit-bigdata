@@ -31,6 +31,8 @@ import org.apache.parquet.schema.Type;
 import org.apache.spark.sql.catalyst.util.RebaseDateTime;
 import org.apache.spark.sql.catalyst.util.RebaseDateTime.RebaseSpec;
 import org.apache.spark.sql.execution.datasources.DataSourceUtils;
+
+import org.apache.spark.sql.internal.SQLConf;
 import org.apache.spark.sql.sources.And;
 import org.apache.spark.sql.sources.EqualTo;
 import org.apache.spark.sql.sources.Filter;
@@ -80,6 +82,10 @@ public class ParquetColumnarBatchScanReader {
 
     private final Function1<Object, Object> int96RebaseFunc;
 
+    private boolean nativeSupportDateRebase;
+
+    private final Function1<Object, Object> dateRebaseFunc;
+
     private final List<Type> parquetTypes;
 
     private ArrayList<String> allFieldsNames;
@@ -93,12 +99,15 @@ public class ParquetColumnarBatchScanReader {
                 : DataSourceUtils.createTimestampRebaseFuncInRead(datetimeRebaseSpec, "Parquet");
         this.int96RebaseFunc = int96RebaseSpec.mode() == null ? micros -> micros
                 : DataSourceUtils.createTimestampRebaseFuncInRead(int96RebaseSpec, "Parquet INT96");
+        this.dateRebaseFunc = datetimeRebaseSpec.mode() == null ? date-> date
+                : DataSourceUtils.createDateRebaseFuncInRead(datetimeRebaseSpec.mode(),"Parquet");
         this.parquetTypes = parquetTypes;
         jniReader = new ParquetColumnarBatchJniReader();
     }
 
     private void addJulianGregorianInfo(JSONObject job) {
-        if (Arrays.stream(requiredSchema.fields()).noneMatch(field -> field.dataType() instanceof TimestampType)) {
+        if (Arrays.stream(requiredSchema.fields()).noneMatch(field -> field.dataType() instanceof TimestampType)
+                && Arrays.stream(requiredSchema.fields()).noneMatch(field -> field.dataType() instanceof DateType)) {
             return;
         }
         TimestampUtil instance = TimestampUtil.getInstance();
@@ -384,6 +393,20 @@ public class ParquetColumnarBatchScanReader {
         }
     }
 
+    private void tryToAdjustDateVec(IntVec intVec, long rowNumber, int index) {
+        Type parquetType = parquetTypes.get(index);
+        if (parquetType == null) {
+            throw new RuntimeException("parquetType is null. index: " + index);
+        }
+        if (parquetType.getLogicalTypeAnnotation() instanceof LogicalTypeAnnotation.DateLogicalTypeAnnotation) {
+            int adjustValue;
+            for (int rowIndex = 0; rowIndex < rowNumber; rowIndex++) {
+                adjustValue = (int) dateRebaseFunc.apply(intVec.get(rowIndex));
+                intVec.set(rowIndex, adjustValue);
+            }
+        }
+    }
+
     public int next(Vec[] vecList, boolean[] missingColumns, List<DataType> types) {
         int colsCount = missingColumns.length;
         long[] vecNativeIds = new long[types.size()];
@@ -417,6 +440,7 @@ public class ParquetColumnarBatchScanReader {
                 vecList[i] = new VarcharVec(vecNativeIds[nativeGetId]);
             } else if (type instanceof DateType) {
                 vecList[i] = new IntVec(vecNativeIds[nativeGetId]);
+                tryToAdjustDateVec((IntVec) vecList[i], rtn, i);
             } else if (type instanceof ByteType) {
                 vecList[i] = new VarcharVec(vecNativeIds[nativeGetId]);
             } else if (type instanceof TimestampType) {
