@@ -1,0 +1,17 @@
+# 构建工具
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+name = "omniadvisor"
+version = "1.0.0"
+description = "A sample Python project using Poetry"
+
+[tool.poetry.dependencies]
+# 正式版本依赖
+python = "^3.8"
+
+[tool.poetry.dev-dependencies]
+# 测试环境依赖
+tox = "^4.0"  # 添加 tox 作为开发依赖
