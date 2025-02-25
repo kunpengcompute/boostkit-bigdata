@@ -1,0 +1,23 @@
+# 构建工具
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+name = "omniadvisor"
+version = "1.0.0"
+description = "A sample Python project using Poetry"
+packages = [ { include = "top_package", from = "src" } ]
+
+[tool.poetry.dependencies]
+# 正式版本依赖
+python = "^3.8"
+
+[poetry.group.dev.dependencies]
+# 测试环境依赖
+tox = "^4.0"  # 添加 tox 作为开发依赖
+
+[tool.pytest.ini_options]
+testpaths = ["tests/ut", "tests/st"]       # 指定 pytest 搜索测试的路径
+pythonpath = ["src"]           # ⚡ 自动添加 src 到 PYTHONPATH
+addopts = "--import-mode=append" # 避免导入冲突
