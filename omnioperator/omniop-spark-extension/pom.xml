@@ -20,7 +20,7 @@
     <scala.version>2.12.10</scala.version>
     <scala.binary.version>2.12</scala.binary.version>
     <spark.version>3.3.1</spark.version>
-    <omniruntime.version>1.7.0</omniruntime.version>
+    <omniruntime.version>1.8.0</omniruntime.version>
     <hadoop.version>3.2.2</hadoop.version>
     <protobuf.version>3.13.0-h19</protobuf.version>
     <protobuf.maven.version>0.6.1</protobuf.maven.version>
