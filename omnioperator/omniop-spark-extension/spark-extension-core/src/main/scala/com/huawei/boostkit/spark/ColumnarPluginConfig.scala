@@ -67,6 +67,8 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
 
   def enableShareBroadcastJoinNestedTable: Boolean = conf.getConf(ENABLE_SHARE_BROADCAST_JOIN_NESTED_TABLE)
 
+  def enableJoinReorderEnhance: Boolean = conf.getConf(ENABLE_JOIN_REORDER_ENHANCE)
+
   def enableDelayCartesianProduct: Boolean = conf.getConf(ENABLE_DELAY_CARTESIAN_PRODUCT)
 
   def enableColumnarFileScan: Boolean = conf.getConf(ENABLE_COLUMNAR_FILE_SCAN)
@@ -310,6 +312,12 @@ object ColumnarPluginConfig {
   val ENABLE_SHARE_BROADCAST_JOIN_NESTED_TABLE = buildConf("spark.omni.sql.columnar.broadcastNestedJoin.shareBuildTable")
     .internal()
     .doc("enable or disable share columnar broadcastNestedJoin buildtable")
+    .booleanConf
+    .createWithDefault(true)
+
+  val ENABLE_JOIN_REORDER_ENHANCE = buildConf("spark.omni.sql.columnar.JoinReorderEnhance")
+    .internal()
+    .doc("enable or disable join reorder enhance")
     .booleanConf
     .createWithDefault(true)
 
