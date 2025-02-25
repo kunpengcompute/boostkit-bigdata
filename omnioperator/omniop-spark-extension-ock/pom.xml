@@ -8,7 +8,7 @@
    <artifactId>omniop-spark-extension-ock</artifactId>
    <packaging>pom</packaging>
    <description>Huawei Open Computing Kit for Spark</description>
-   <version>24.0.0</version>
+   <version>25.0.0</version>
 
    <properties>
      <spark.version>3.3.1</spark.version>
@@ -20,7 +20,7 @@
      <input.version>spark-3.3</input.version>
      <scala.plugin.version>3.2.0</scala.plugin.version>
      <maven.plugin.version>3.1.1</maven.plugin.version>
-     <global.version>24.0.0</global.version>
+     <global.version>25.0.0</global.version>
    </properties>
 
    <dependencies>
