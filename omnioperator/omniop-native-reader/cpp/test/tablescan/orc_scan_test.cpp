@@ -56,8 +56,9 @@ protected:
         rowReaderOptions.include(includedColumns);
 
         std::unique_ptr<common::JulianGregorianRebase> julianPtr;
+        std::unique_ptr<common::PredicateCondition> predicatePtr;
         auto readerPtr = static_cast<omniruntime::reader::OmniReaderImpl*>(reader.get());
-        rowReader = readerPtr->createRowReader(rowReaderOptions, julianPtr).release();
+        rowReader = readerPtr->createRowReader(rowReaderOptions, julianPtr, predicatePtr).release();
         omniruntime::reader::OmniRowReaderImpl *rowReaderPtr = (omniruntime::reader::OmniRowReaderImpl*) rowReader;
         rowReaderPtr->next(&recordBatch, nullptr, 4096);
     }

@@ -668,4 +668,9 @@ object ColumnarPluginConfig {
     .booleanConf
     .createWithDefault(true)
 
+  val ENABLE_VEC_PREDICATE_FILTER = buildConf("spark.omni.sql.columnar.vec.predicate.enabled")
+    .internal()
+    .doc("enable vectorized predicate filtering")
+    .booleanConf
+    .createWithDefault(false)
 }

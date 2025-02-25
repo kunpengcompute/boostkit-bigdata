@@ -114,7 +114,7 @@ namespace omniruntime::reader {
                     }
                 }
             } else {
-                for (int32_t i = 0; i < bitsLeft; i++) {
+                for (uint64_t i = 0; i < bitsLeft; i++) {
                     uint64_t byteIndex = i / 8;
                     uint64_t bitPosition = 7 - (i % 8);
                     data->SetNull(position + i, !((bits[byteIndex] >> bitPosition) & 0x1));
