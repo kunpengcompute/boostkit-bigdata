@@ -258,6 +258,7 @@ class MVRewriteRule(session: SparkSession)
       }
 
       metadataLocalPath.mkdirs()
+      metadataLocalPath.setLastModified(System.currentTimeMillis())
       sqlFiles.foreach {
         sqlFile =>
           RewriteTime.withTimeStat("isRewriteSql metadataPath.listFiles") {
