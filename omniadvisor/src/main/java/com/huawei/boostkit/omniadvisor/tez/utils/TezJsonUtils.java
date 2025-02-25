@@ -92,8 +92,13 @@ public class TezJsonUtils {
             long startTime = entity.get(ATSConstants.OTHER_INFO).path(ATSConstants.START_TIME).getLongValue();
             long endTime = entity.get(ATSConstants.OTHER_INFO).path(ATSConstants.FINISH_TIME).getLongValue();
             long duration = entity.get(ATSConstants.OTHER_INFO).path(ATSConstants.TIME_TAKEN).getLongValue();
-            DAGState status =
-                    DAGState.valueOf(entity.path(ATSConstants.OTHER_INFO).path(ATSConstants.STATUS).getTextValue());
+            JsonNode otherInfo = entity.path(ATSConstants.OTHER_INFO);
+            DAGState status = Optional.ofNullable(otherInfo.path(ATSConstants.STATUS))
+                    .flatMap(statusPath -> Optional.ofNullable(statusPath.getTextValue()))
+                    .filter(s -> !s.trim().isEmpty())
+                    .map(String::toUpperCase)
+                    .map(DAGState::valueOf)
+                    .orElse(DAGState.KILLED);
             dagIds.add(new TezDagIdData(dagId, startTime, endTime, duration, status));
         }
         LOG.info("Get {} dags for application {}", dagIds.size(), applicationId);
