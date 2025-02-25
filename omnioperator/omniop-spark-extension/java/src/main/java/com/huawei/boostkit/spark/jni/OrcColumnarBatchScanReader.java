@@ -19,6 +19,7 @@
 package com.huawei.boostkit.spark.jni;
 import com.huawei.boostkit.scan.jni.OrcColumnarBatchJniReader;
 
+import com.huawei.boostkit.spark.predicate.*;
 import com.huawei.boostkit.spark.timestamp.JulianGregorianRebase;
 import com.huawei.boostkit.spark.timestamp.TimestampUtil;
 import nova.hetu.omniruntime.type.DataType;
@@ -62,9 +63,12 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.TimeZone;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 public class OrcColumnarBatchScanReader {
     private static final Logger LOGGER = LoggerFactory.getLogger(OrcColumnarBatchScanReader.class);
@@ -175,7 +179,8 @@ public class OrcColumnarBatchScanReader {
      * @param pushedFilter the filter push down to native
      * @param requiredSchema the columns read from native
      */
-    public long initializeRecordReaderJava(long offset, long length, Filter pushedFilter, StructType requiredSchema) {
+    public long initializeRecordReaderJava(long offset, long length, Filter pushedFilter, StructType requiredSchema,
+        Boolean vecPredicateFilter) {
         this.requiredSchema = requiredSchema;
         JSONObject job = new JSONObject();
 
@@ -187,6 +192,9 @@ public class OrcColumnarBatchScanReader {
             JSONObject jsonLeaves = new JSONObject();
             boolean flag = canPushDown(pushedFilter, jsonExpressionTree, jsonLeaves);
             if (flag) {
+                if (vecPredicateFilter != null && vecPredicateFilter) {
+                    job.put("vecPredicateCondition", buildVecPredicateCondition(pushedFilter));
+                }
                 job.put("expressionTree", jsonExpressionTree);
                 job.put("leaves", jsonLeaves);
             }
@@ -523,5 +531,84 @@ public class OrcColumnarBatchScanReader {
         }
         throw new UnsupportedOperationException("Unsupported orc push down filter date type: " +
             literal.getClass().getSimpleName());
+    }
+
+    private String buildVecPredicateCondition(Filter filterPredicate) {
+        Map<String, Integer> nameToIndex = IntStream.range(0, includedColumns.size())
+                .boxed()
+                .collect(Collectors.toMap(includedColumns::get, i -> i));
+        return buildPredicateCondition(filterPredicate, nameToIndex).reduce().toString();
+    }
+
+    private PredicateCondition buildPredicateCondition(Filter filterPredicate, Map<String, Integer> nameToIndex) {
+        if (filterPredicate instanceof And) {
+            return new AndPredicateCondition(buildPredicateCondition(((And) filterPredicate).left(), nameToIndex),
+                    buildPredicateCondition(((And) filterPredicate).right(), nameToIndex));
+        } else if (filterPredicate instanceof Or) {
+            return new OrPredicateCondition(buildPredicateCondition(((Or) filterPredicate).left(), nameToIndex),
+                    buildPredicateCondition(((Or) filterPredicate).right(), nameToIndex));
+        } else if (filterPredicate instanceof Not) {
+            return new NotPredicateCondition(buildPredicateCondition(((Not) filterPredicate).child(), nameToIndex));
+        } else if (filterPredicate instanceof EqualTo) {
+            return buildLeafPredicateCondition(PredicateOperatorType.EQUAL_TO, ((EqualTo) filterPredicate).attribute(),
+                    ((EqualTo) filterPredicate).value(), nameToIndex);
+        } else if (filterPredicate instanceof GreaterThan) {
+            return buildLeafPredicateCondition(PredicateOperatorType.GREATER_THAN,
+                    ((GreaterThan) filterPredicate).attribute(), ((GreaterThan) filterPredicate).value(), nameToIndex);
+        } else if (filterPredicate instanceof GreaterThanOrEqual) {
+            return buildLeafPredicateCondition(PredicateOperatorType.GREATER_THAN_OR_EQUAL,
+                    ((GreaterThanOrEqual) filterPredicate).attribute(), ((GreaterThanOrEqual) filterPredicate).value(), nameToIndex);
+        } else if (filterPredicate instanceof LessThan) {
+            return buildLeafPredicateCondition(PredicateOperatorType.LESS_THAN,
+                    ((LessThan) filterPredicate).attribute(), ((LessThan) filterPredicate).value(), nameToIndex);
+        } else if (filterPredicate instanceof LessThanOrEqual) {
+            return buildLeafPredicateCondition(PredicateOperatorType.LESS_THAN_OR_EQUAL,
+                    ((LessThanOrEqual) filterPredicate).attribute(), ((LessThanOrEqual) filterPredicate).value(), nameToIndex);
+        } else if (filterPredicate instanceof IsNotNull) {
+            return buildLeafPredicateCondition(PredicateOperatorType.IS_NOT_NULL,
+                    ((IsNotNull) filterPredicate).attribute(), "-1", nameToIndex);
+        } else if (filterPredicate instanceof IsNull) {
+            return buildLeafPredicateCondition(PredicateOperatorType.IS_NULL,
+                    ((IsNull) filterPredicate).attribute(), "-1", nameToIndex);
+        } else {
+            return LeafPredicateCondition.TRUE_PREDICATE_CONDITION;
+        }
+    }
+
+    private PredicateCondition buildLeafPredicateCondition(PredicateOperatorType op, String attribute, Object literal,
+                                                           Map<String, Integer> nameToIndex) {
+        Integer index = nameToIndex.get(attribute);
+        if (index == null) {
+            return LeafPredicateCondition.TRUE_PREDICATE_CONDITION;
+        }
+        if (op == PredicateOperatorType.IS_NOT_NULL || op == PredicateOperatorType.IS_NULL) {
+            return new LeafPredicateCondition(op, index, DataType.DataTypeId.OMNI_INT, "-1");
+        }
+        DataType.DataTypeId dataType = getSupportPredicateDataType(attribute);
+        if (dataType == DataType.DataTypeId.OMNI_NONE) {
+            return LeafPredicateCondition.TRUE_PREDICATE_CONDITION;
+        }
+        String value = getLiteralValue(literal);
+        return new LeafPredicateCondition(op, index, dataType, value);
+    }
+
+    private DataType.DataTypeId getSupportPredicateDataType(String attribute) {
+        StructField field = requiredSchema.apply(attribute);
+        org.apache.spark.sql.types.DataType dataType = field.dataType();
+        if (dataType instanceof ShortType) {
+            return DataType.DataTypeId.OMNI_SHORT;
+        } else if (dataType instanceof IntegerType) {
+            return DataType.DataTypeId.OMNI_INT;
+        } else if (dataType instanceof LongType) {
+            return DataType.DataTypeId.OMNI_LONG;
+        } else if (dataType instanceof DoubleType) {
+            return DataType.DataTypeId.OMNI_DOUBLE;
+        } else if (dataType instanceof DateType) {
+            return DataType.DataTypeId.OMNI_DATE32;
+        } else if (dataType instanceof BooleanType) {
+            return DataType.DataTypeId.OMNI_BOOLEAN;
+        } else {
+            return DataType.DataTypeId.OMNI_NONE;
+        }
     }
 }

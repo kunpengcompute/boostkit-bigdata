@@ -28,7 +28,8 @@ set (SOURCE_FILES
         arrowadapter/HdfsAdapter.cc
         arrowadapter/LocalfsAdapter.cc
         common/JulianGregorianRebase.cpp
-        common/TimeRebaseInfo.cpp)
+        common/TimeRebaseInfo.cpp
+        common/PredicateUtil.cpp)
 
 #Find required protobuf package
 find_package(Protobuf REQUIRED)
@@ -38,6 +39,7 @@ else()
     message(FATAL_ERROR "protobuf library is needed but cant be found")
 endif()
 
+include_directories($ENV{OMNI_HOME}/lib/lib/APL/include)
 include_directories(${Protobuf_INCLUDE_DIRS})
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 add_library (${PROJ_TARGET} SHARED ${SOURCE_FILES} ${PROTO_SRCS} ${PROTO_HDRS} ${PROTO_SRCS_VB} ${PROTO_HDRS_VB})
@@ -45,6 +47,7 @@ add_library (${PROJ_TARGET} SHARED ${SOURCE_FILES} ${PROTO_SRCS} ${PROTO_HDRS} $
 find_package(Arrow REQUIRED)
 find_package(Parquet REQUIRED)
 find_package(ArrowDataset REQUIRED)
+find_package(nlohmann_json 3.7.3 REQUIRED)
 
 #JNI
 target_include_directories(${PROJ_TARGET} PUBLIC $ENV{JAVA_HOME}/include)
@@ -55,6 +58,7 @@ target_link_libraries (${PROJ_TARGET} PUBLIC
         Arrow::arrow_shared
         ArrowDataset::arrow_dataset_shared
         Parquet::parquet_shared
+        nlohmann_json::nlohmann_json
         orc
         boostkit-omniop-vector-1.8.0-aarch64
         hdfs
