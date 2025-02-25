@@ -56,7 +56,7 @@ target_link_libraries (${PROJ_TARGET} PUBLIC
         ArrowDataset::arrow_dataset_shared
         Parquet::parquet_shared
         orc
-        boostkit-omniop-vector-1.7.0-aarch64
+        boostkit-omniop-vector-1.8.0-aarch64
         hdfs
         )
 
