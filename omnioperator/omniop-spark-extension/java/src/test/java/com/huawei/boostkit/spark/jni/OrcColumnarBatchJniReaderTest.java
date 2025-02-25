@@ -125,7 +125,7 @@ public class OrcColumnarBatchJniReaderTest extends TestCase {
 
     private void initRecordReaderJava() {
         orcColumnarBatchScanReader.recordReader = orcColumnarBatchScanReader.
-            initializeRecordReaderJava(offset, length, null, requiredSchema);
+            initializeRecordReaderJava(offset, length, null, requiredSchema, false);
         assertTrue(orcColumnarBatchScanReader.recordReader != 0);
     }
 

@@ -98,12 +98,14 @@ namespace omniruntime::reader {
     std::unique_ptr<RowReader> OmniReaderImpl::createRowReader() const {
         RowReaderOptions defaultOpts;
         std::unique_ptr<common::JulianGregorianRebase> julianPtr;
-        return createRowReader(defaultOpts, julianPtr);
+        std::unique_ptr<common::PredicateCondition> predicate;
+        return createRowReader(defaultOpts, julianPtr, predicate);
     }
 
     std::unique_ptr<RowReader> OmniReaderImpl::createRowReader(
-            const RowReaderOptions& opts, std::unique_ptr<common::JulianGregorianRebase> &julianPtr) const {
-        return std::unique_ptr<RowReader>(new OmniRowReaderImpl(contents, opts, julianPtr));
+            const RowReaderOptions& opts, std::unique_ptr<common::JulianGregorianRebase> &julianPtr, 
+            std::unique_ptr<common::PredicateCondition> &predicate) const {
+        return std::unique_ptr<RowReader>(new OmniRowReaderImpl(contents, opts, julianPtr, predicate));
     }
 
     void OmniRowReaderImpl::startNextStripe() {
@@ -234,5 +236,10 @@ namespace omniruntime::reader {
             currentRowInStripe = 0;
         }
         return rowsToRead;
+    }
+
+    common::PredicateCondition *OmniRowReaderImpl::getPredicatePtr()
+    {
+        return predicatePtr == nullptr ? nullptr : predicatePtr.get();
     }
 }
