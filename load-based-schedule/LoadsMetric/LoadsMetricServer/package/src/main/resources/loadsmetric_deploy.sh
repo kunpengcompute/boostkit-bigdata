@@ -4,7 +4,7 @@ stty intr undef
 stty susp undef
 stty quit undef
 # Path
-exporter_path="/opt/prometheus/node_exporter-1.7.0.linux-arm64"
+exporter_path="/opt/prometheus/node_exporter-1.8.0.linux-arm64"
 prometheus_path="/opt/prometheus/prometheus-2.45.4.linux-arm64"
 grafana_path="/opt/prometheus/grafana-v10.4.2/bin"
 
