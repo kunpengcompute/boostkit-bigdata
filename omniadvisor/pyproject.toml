@@ -5,17 +5,22 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "omniadvisor"
-version = "1.0.0"
+version = "0.1.0"
 description = "A sample Python project using Poetry"
-packages = [ { include = "top_package", from = "src" } ]
+authors = ["hw"]
+packages = [
+    { include = "django_server", from = "src" },
+    { include = "omniadvisor", from = "src" }
+]
 
 [tool.poetry.dependencies]
 # 正式版本依赖
 python = "^3.8"
+django = "~4.2.10"
 
-[poetry.group.dev.dependencies]
-# 测试环境依赖
-tox = "^4.0"  # 添加 tox 作为开发依赖
+# 暂时还不需要
+#[tool.poetry.scripts]
+#test_api = "omniadvisor.test_api:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests/ut", "tests/st"]       # 指定 pytest 搜索测试的路径
