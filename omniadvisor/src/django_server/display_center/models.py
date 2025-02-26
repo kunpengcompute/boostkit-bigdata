@@ -1,6 +1,7 @@
 from django.db import models
 
-# create model for database
+# Create your models here.
+from django.db import models
 
 
 class Config(models.Model):
@@ -8,6 +9,9 @@ class Config(models.Model):
     param1 = models.IntegerField()
     param2 = models.FloatField()
     param3 = models.FloatField()
+
+    class Meta:
+        db_table = 'omniadvisor_config'  # 自定义表名
 
 
 class Workload(models.Model):
@@ -20,6 +24,9 @@ class Workload(models.Model):
     best_config_id = models.ForeignKey(Config, on_delete=models.CASCADE)
     test_config_id = models.ForeignKey(Config, on_delete=models.CASCADE, help_text="config need to be test")
 
+    class Meta:
+        db_table = 'omniadvisor_workload'  # 自定义表名
+
 
 class Task(models.Model):
     id = models.CharField(max_length=32, unique=True, primary_key=True)
@@ -31,6 +38,9 @@ class Task(models.Model):
     execute_performance = models.FloatField()
     app_id = models.CharField(help_text="when task finish, app id will be given")
 
+    class Meta:
+        db_table = 'omniadvisor_task'  # 自定义表名
+
 
 class Performance(models.Model):
     id = models.CharField(max_length=32, unique=True, primary_key=True)
@@ -41,4 +51,5 @@ class Performance(models.Model):
     poorest_performance = models.FloatField()
     best_performance = models.FloatField()
 
-
+    class Meta:
+        db_table = 'omniadvisor_performance'  # 自定义表名
