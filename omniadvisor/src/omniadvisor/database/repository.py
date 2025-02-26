@@ -1,6 +1,6 @@
 from typing import Dict
 
-from django_server.display_center.models import Config
+from django_server.app.models import Config
 
 
 class ConfigRepository:

@@ -4,7 +4,7 @@ import django
 from unittest.mock import patch
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'omniadvisor.config.settings')
 django.setup()
-from django_server.display_center.models import Config
+from django_server.app.models import Config
 
 
 # 参数化正常测试用例‌:ml-citation{ref="1,3" data="citationList"}
