@@ -18,9 +18,9 @@ packages = [
 python = "^3.8"
 django = "~4.2.10"
 
-# 暂时还不需要
-#[tool.poetry.scripts]
-#test_api = "omniadvisor.test_api:main"
+[tool.poetry.group.test.dependencies]
+pytest = "^7.4.4"
+pytest-xdist = "^3.6.1"
 
 [tool.pytest.ini_options]
 testpaths = ["tests/ut", "tests/st"]       # 指定 pytest 搜索测试的路径

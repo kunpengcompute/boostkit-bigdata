@@ -1,4 +1,13 @@
+import django
 from typing import Dict
+from django.conf import settings
+from django_server.engine.settings import DATABASES
+if not settings.configured:
+    settings.configure(
+        INSTALLED_APPS=['django_server'],  # 将当前文件视为一个“应用”
+        DATABASES=DATABASES
+    )
+    django.setup()
 
 from django_server.app.models import Config
 

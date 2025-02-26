@@ -77,7 +77,7 @@ WSGI_APPLICATION = 'engine.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': 'D:\\files\\ov_project\\code\\boostkit-bigdata\\omniadvisor\\src\\omniadvisor\\db.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3'
     }
 }
 
