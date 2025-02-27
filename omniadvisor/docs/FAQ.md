@@ -1,19 +1,12 @@
 # FAQ 文档
 
-## 开发者需要注意啥？
 
-由于 PyCharm 的导包机制可能存在不合理之处，需手动执行以下操作：
-
-**设置 `src` 为资源目录**：
-   - 右键点击 `src` 文件夹。
-   - 选择 `Mark Directory as` -> `Resources Root`。
-   - 重启 PyCharm 以生效。
 
 ---
 
 ## 如何拉起单元测试？
 
-在 `src/omniadvisor` 目录下，按照以下步骤运行单元测试：
+在 `omniadvisor` 根目录下，按照以下步骤运行单元测试：
 
 ### 安装测试环境依赖
 ```bash
