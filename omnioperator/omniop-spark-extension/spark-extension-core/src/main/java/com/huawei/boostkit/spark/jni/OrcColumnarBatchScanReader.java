@@ -181,7 +181,7 @@ public class OrcColumnarBatchScanReader {
      * @param requiredSchema the columns read from native
      */
     public long initializeRecordReaderJava(long offset, long length, Filter pushedFilter, StructType requiredSchema,
-        Boolean vecPredicateFilter) {
+        Boolean vecPredicateFilter, Boolean filterPushDown) {
         this.requiredSchema = requiredSchema;
         JSONObject job = new JSONObject();
 
@@ -189,15 +189,20 @@ public class OrcColumnarBatchScanReader {
         job.put("length", length);
 
         if (pushedFilter != null) {
-            JSONObject jsonExpressionTree = new JSONObject();
-            JSONObject jsonLeaves = new JSONObject();
-            boolean flag = canPushDown(pushedFilter, jsonExpressionTree, jsonLeaves);
-            if (flag) {
-                if (vecPredicateFilter != null && vecPredicateFilter) {
-                    job.put("vecPredicateCondition", buildVecPredicateCondition(pushedFilter));
+            if (filterPushDown != null && filterPushDown) {
+                JSONObject jsonExpressionTree = new JSONObject();
+                JSONObject jsonLeaves = new JSONObject();
+                boolean flag = canPushDown(pushedFilter, jsonExpressionTree, jsonLeaves);
+                if (flag) {
+                    job.put("expressionTree", jsonExpressionTree);
+                    job.put("leaves", jsonLeaves);
                 }
-                job.put("expressionTree", jsonExpressionTree);
-                job.put("leaves", jsonLeaves);
+            }
+            if (vecPredicateFilter != null && vecPredicateFilter) {
+                String vecPredicateCondition = buildVecPredicateCondition(pushedFilter);
+                if (vecPredicateCondition != null) {
+                    job.put("vecPredicateCondition", vecPredicateCondition);
+                }
             }
         }
 
@@ -535,10 +540,15 @@ public class OrcColumnarBatchScanReader {
     }
 
     private String buildVecPredicateCondition(Filter filterPredicate) {
-        Map<String, Integer> nameToIndex = IntStream.range(0, includedColumns.size())
-                .boxed()
-                .collect(Collectors.toMap(includedColumns::get, i -> i));
-        return buildPredicateCondition(filterPredicate, nameToIndex).reduce().toString();
+        try {
+            Map<String, Integer> nameToIndex = IntStream.range(0, includedColumns.size())
+                    .boxed()
+                    .collect(Collectors.toMap(includedColumns::get, i -> i));
+            return buildPredicateCondition(filterPredicate, nameToIndex).reduce().toString();
+        } catch (Exception e) {
+            LOGGER.info("Unable to build vec predicate because " + e.getMessage());
+            return null;
+        }
     }
 
     private PredicateCondition buildPredicateCondition(Filter filterPredicate, Map<String, Integer> nameToIndex) {
@@ -572,7 +582,8 @@ public class OrcColumnarBatchScanReader {
             return buildLeafPredicateCondition(PredicateOperatorType.IS_NULL,
                     ((IsNull) filterPredicate).attribute(), "-1", nameToIndex);
         } else {
-            return LeafPredicateCondition.TRUE_PREDICATE_CONDITION;
+            throw new UnsupportedOperationException("Unsupported orc vec predicate operation: " +
+                    filterPredicate.getClass().getSimpleName());
         }
     }
 
@@ -580,15 +591,12 @@ public class OrcColumnarBatchScanReader {
                                                            Map<String, Integer> nameToIndex) {
         Integer index = nameToIndex.get(attribute);
         if (index == null) {
-            return LeafPredicateCondition.TRUE_PREDICATE_CONDITION;
+            throw new UnsupportedOperationException("Attribute is not found in nameToIndex. attribute: " + attribute);
         }
         if (op == PredicateOperatorType.IS_NOT_NULL || op == PredicateOperatorType.IS_NULL) {
             return new LeafPredicateCondition(op, index, DataType.DataTypeId.OMNI_INT, "-1");
         }
         DataType.DataTypeId dataType = getSupportPredicateDataType(attribute);
-        if (dataType == DataType.DataTypeId.OMNI_NONE) {
-            return LeafPredicateCondition.TRUE_PREDICATE_CONDITION;
-        }
         String value = getLiteralValue(literal);
         return new LeafPredicateCondition(op, index, dataType, value);
     }
@@ -609,7 +617,8 @@ public class OrcColumnarBatchScanReader {
         } else if (dataType instanceof BooleanType) {
             return DataType.DataTypeId.OMNI_BOOLEAN;
         } else {
-            return DataType.DataTypeId.OMNI_NONE;
+            throw new UnsupportedOperationException("Unsupported orc vec predicate data type: " +
+                    dataType.getClass().getSimpleName());
         }
     }
 }

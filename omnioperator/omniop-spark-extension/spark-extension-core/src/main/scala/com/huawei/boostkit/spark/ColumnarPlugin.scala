@@ -26,16 +26,16 @@ import org.apache.spark.api.plugin.{DriverPlugin, ExecutorPlugin, SparkPlugin}
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.optimizer.{BuildLeft, BuildRight, BuildSide}
 import org.apache.spark.sql.{SparkSession, SparkSessionExtensions}
-import org.apache.spark.sql.catalyst.expressions.{Alias, And, Ascending, EqualTo, Expression, GreaterThan, GreaterThanOrEqual, IntegerLiteral, LessThan, LessThanOrEqual, Literal, NamedExpression, Rank, RowNumber, SortOrder, WindowExpression}
 import org.apache.spark.sql.catalyst.optimizer.{DelayCartesianProduct, ReorderJoinEnhances, RewriteSelfJoinInInPredicate}
 import org.apache.spark.sql.catalyst.expressions.aggregate.{AggregateExpression, Partial, Complete, Final, PartialMerge}
+import org.apache.spark.sql.catalyst.expressions.{Alias, And, Ascending, Attribute, EqualTo, Expression, GreaterThan, GreaterThanOrEqual, IntegerLiteral, IsNotNull, IsNull, LessThan, LessThanOrEqual, Literal, NamedExpression, Not, Or, Rank, RowNumber, SortOrder, WindowExpression}
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.adaptive.{AQEShuffleReadExec, AdaptiveSparkPlanExec, BroadcastQueryStageExec, OmniAQEShuffleReadExec, ShuffleQueryStageExec}
 import org.apache.spark.sql.execution.aggregate.{DummyLogicalPlan, ExtendedAggUtils, HashAggregateExec}
 import org.apache.spark.sql.execution.exchange.{BroadcastExchangeExec, ReusedExchangeExec, ShuffleExchangeExec}
 import org.apache.spark.sql.execution.joins._
-import org.apache.spark.sql.execution.window.{WindowExec}
+import org.apache.spark.sql.execution.window.WindowExec
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.catalyst.planning.PhysicalAggregation
 import org.apache.spark.sql.catalyst.plans.LeftSemi
@@ -45,6 +45,8 @@ import org.apache.spark.sql.execution.util.SparkMemoryUtils.addLeakSafeTaskCompl
 import org.apache.spark.sql.execution.aggregate.PushOrderedLimitThroughAgg
 import org.apache.spark.sql.util.ShimUtil
 import nova.hetu.omniruntime.memory.MemoryManager
+import org.apache.spark.sql.execution.datasources.orc.OrcFileFormat
+import org.apache.spark.sql.types.{BooleanType, DataType, DateType, DoubleType, IntegerType, LongType, ShortType}
 
 import scala.collection.mutable.ListBuffer
 
@@ -63,6 +65,10 @@ case class ColumnarPreOverrides(isSupportAdaptive: Boolean = true)
   val enableColumnarDataWritingCommand: Boolean = columnarConf.enableColumnarDataWritingCommand
   val enableColumnarTopNSort: Boolean = columnarConf.enableColumnarTopNSort
   val topNSortThreshold: Int = columnarConf.topNSortThreshold
+  val enableOrcFilterPushDown: Boolean = columnarConf.enableOrcFilterPushDown
+  val enableVecPredicateFilter: Boolean = columnarConf.enableVecPredicateFilter
+
+  private val SUPPORTED_DATA_TYPES = Set(ShortType, IntegerType, LongType, DoubleType, BooleanType, DateType)
 
   private def checkBhjRightChild(plan: Any): Boolean =
     plan match {
@@ -133,6 +139,77 @@ case class ColumnarPreOverrides(isSupportAdaptive: Boolean = true)
       plan.groupingExpressions.diff(child.groupingExpressions).isEmpty &&
       child.aggregateExpressions.forall(_.mode == Partial) &&
       plan.aggregateExpressions.forall(_.mode == Final)
+  }
+
+  private def isAllSupport(condition: Expression): Boolean = {
+    def isSingleExprDataTypeSupported(expr: Expression): Boolean = {
+      SUPPORTED_DATA_TYPES.exists(_.equals(expr.dataType))
+    }
+
+    def isBinaryExprDataTypeSupported(left: Expression, right: Expression): Boolean = {
+      isSingleExprDataTypeSupported(left) && isSingleExprDataTypeSupported(right)
+    }
+
+    def isBinaryExprAttributeSupported(left: Expression, right: Expression): Boolean = {
+      (isAttribute(left) && isLiteral(right)) || (isAttribute(right) && isLiteral(left))
+    }
+
+    def isBinaryExprSupported(left: Expression, right: Expression): Boolean = {
+      isBinaryExprDataTypeSupported(left, right) && isBinaryExprAttributeSupported(left, right)
+    }
+
+    def isAttribute(expr: Expression): Boolean = {
+      expr.isInstanceOf[Attribute]
+    }
+
+    def isLiteral(expr: Expression): Boolean = {
+      expr.isInstanceOf[Literal]
+    }
+
+    condition match {
+      case equalTo: EqualTo =>
+        isBinaryExprSupported(equalTo.left, equalTo.right)
+      case greaterThan: GreaterThan =>
+        isBinaryExprSupported(greaterThan.left, greaterThan.right)
+      case greaterThanOrEqual: GreaterThanOrEqual =>
+        isBinaryExprSupported(greaterThanOrEqual.left, greaterThanOrEqual.right)
+      case lessThan: LessThan =>
+        isBinaryExprSupported(lessThan.left, lessThan.right)
+      case lessThanOrEqual: LessThanOrEqual =>
+        isBinaryExprSupported(lessThanOrEqual.left, lessThanOrEqual.right)
+      case isNotNull: IsNotNull =>
+        isAttribute(isNotNull.child)
+      case isNull: IsNull =>
+        isAttribute(isNull.child)
+      case and: And =>
+        isAllSupport(and.left) && isAllSupport(and.right)
+      case or: Or =>
+        isAllSupport(or.left) && isAllSupport(or.right)
+      case not: Not =>
+        isAllSupport(not.child)
+      case _ => false
+    }
+  }
+
+  private def tryToCombineFilterAndFileSource(plan: FilterExec, child: SparkPlan): SparkPlan = {
+    if (!enableOrcFilterPushDown || !enableVecPredicateFilter) {
+      return ColumnarFilterExec(plan.condition, child)
+    }
+    child match {
+      case ColumnarFileSourceScanExec(relation, _, _, _, _, _, dataFilters, _, _) =>
+        relation.fileFormat match {
+          case orcFormat: OrcFileFormat =>
+            if (isAllSupport(plan.condition)) {
+              child
+            } else {
+              ColumnarFilterExec(plan.condition, child)
+            }
+          case _ =>
+            ColumnarFilterExec(plan.condition, child)
+        }
+      case _ =>
+        ColumnarFilterExec(plan.condition, child)
+    }
   }
 
   def replaceWithColumnarPlan(plan: SparkPlan): SparkPlan = {
@@ -289,12 +366,12 @@ case class ColumnarPreOverrides(isSupportAdaptive: Boolean = true)
             }
             case _ =>
               val child = replaceWithColumnarPlan(plan.child)
-              return ColumnarFilterExec(plan.condition, child)
+              return tryToCombineFilterAndFileSource(plan, child)
           }
         }
         val child = replaceWithColumnarPlan(plan.child)
         logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
-        ColumnarFilterExec(plan.condition, child)
+        tryToCombineFilterAndFileSource(plan, child)
       case plan: ExpandExec =>
         val child = replaceWithColumnarPlan(plan.child)
         logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
