@@ -56,12 +56,6 @@ absolute_log_path = os.path.abspath(os.path.join(project_dir, LOGGING_CONFIG['ha
 
 # 更新配置文件中的路径
 LOGGING_CONFIG['handlers']['fileHandler']['filename'] = absolute_log_path
-if not os.path.exists(absolute_log_path):
-    # 如果文件不存在，则创建空文件
-    open(absolute_log_path, 'w').close()
-    logging.debug(f"文件 '{absolute_log_path}' 已创建。")
-else:
-    logging.debug(f"文件 '{absolute_log_path}' 已存在。")
 
 # 使用dictConfig加载配置
 dictConfig(LOGGING_CONFIG)
