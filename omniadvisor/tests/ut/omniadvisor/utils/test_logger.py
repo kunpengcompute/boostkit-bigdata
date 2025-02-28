@@ -12,6 +12,9 @@ def class_fixture(test_logger):
     test_logger.info("初始化日志测试模块")
     global tmplog
     tmplog = "tmp.log"
+    # 如果原有日志文件存在 删除文件
+    if os.path.exists(tmplog):
+        os.remove(tmplog)
     # 临时替换FileHandler 用于测试
     orihandler = ""
     orihandler_index = ""
@@ -32,11 +35,6 @@ def class_fixture(test_logger):
 class TestLogger:
 
     def test_log(self, test_logger):
-        assert os.path.exists(tmplog), f"日志文件{tmplog}不存在"
-        test_logger.info(f"清空日志文{tmplog}件内容")
-        with open(tmplog, 'w') as file:
-            # 打开文件以写入模式，这将自动清空文件内容
-            pass  # 不需要写入任何内容
         logger.debug("This is a debug message")
         logger.info("This is an info message")
         logger.warning("This is a warning message")
