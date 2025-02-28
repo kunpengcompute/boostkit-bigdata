@@ -9,6 +9,7 @@ LOGGING_CONFIG = {
         'colorFormatter': {
             '()': 'colorlog.ColoredFormatter',
             'format': '%(log_color)s%(asctime)s [%(levelname)s] %(filename)s:%(lineno)d in %(funcName)s - %(message)s%(reset)s',
+            'datefmt': '%Y-%m-%d %H:%M:%S',
             'log_colors': {
                 'DEBUG': 'cyan',
                 'INFO': 'green',
@@ -19,6 +20,7 @@ LOGGING_CONFIG = {
         },
         'simpleFormatter': {
             'format': '%(asctime)s [%(levelname)s] %(filename)s:%(lineno)d in %(funcName)s - %(message)s',
+            'datefmt': '%Y-%m-%d %H:%M:%S'
         }
     },
     'handlers': {
@@ -40,7 +42,7 @@ LOGGING_CONFIG = {
         }
     },
     'loggers': {
-        '': {  # 这是root logger
+        'project_logger': {
             'level': 'DEBUG',
             'handlers': ['consoleHandler', 'fileHandler'],
         }
@@ -61,5 +63,5 @@ LOGGING_CONFIG['handlers']['fileHandler']['filename'] = absolute_log_path
 dictConfig(LOGGING_CONFIG)
 
 # 获取logger并使用
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('project_logger')
 

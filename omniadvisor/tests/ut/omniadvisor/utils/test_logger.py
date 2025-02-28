@@ -2,25 +2,39 @@ import logging
 import os
 
 import pytest
-
 from pathlib import Path
-from omniadvisor.utils.logger import logger, LOGGING_CONFIG
+
+from omniadvisor.utils.logger import logger
 
 
 @pytest.fixture(scope="class", autouse=True)
-def class_fixture():
-    logging.info("\n初始化日志测试模块")
+def class_fixture(test_logger):
+    test_logger.info("初始化日志测试模块")
+    global tmplog
+    tmplog = "tmp.log"
+    # 临时替换FileHandler 用于测试
+    orihandler = ""
+    orihandler_index = ""
+    for handler in logger.handlers:
+        if isinstance(handler, logging.FileHandler):
+            orihandler = handler
+            new_file_handler = logging.FileHandler(tmplog)
+            new_file_handler.setLevel(logging.INFO)
+            orihandler_index = logger.handlers.index(handler)
+            logger.handlers[orihandler_index] = new_file_handler
+
     yield
-    logging.info("\n清理日志测试模块")
+    logger.handlers[orihandler_index] = orihandler
+    test_logger.info(f"清理日志测试模块 移除临时文件{tmplog}")
+    os.remove(tmplog)
 
 
 class TestLogger:
 
-    def test_log(self):
-        log_file_path = LOGGING_CONFIG['handlers']['fileHandler']['filename']
-        assert os.path.exists(log_file_path), f"日志文件{log_file_path}不存在"
-        logging.info("清空日志文件内容")
-        with open(log_file_path, 'w') as file:
+    def test_log(self, test_logger):
+        assert os.path.exists(tmplog), f"日志文件{tmplog}不存在"
+        test_logger.info(f"清空日志文{tmplog}件内容")
+        with open(tmplog, 'w') as file:
             # 打开文件以写入模式，这将自动清空文件内容
             pass  # 不需要写入任何内容
         logger.debug("This is a debug message")
@@ -28,10 +42,10 @@ class TestLogger:
         logger.warning("This is a warning message")
         logger.error("This is an error message")
         logger.critical("This is a critical message")
-        assert Path(log_file_path).stat().st_size > 0, f"文件 {log_file_path} 大小为 0 字节,写入失败"
+        assert Path(tmplog).stat().st_size > 0, f"文件 {tmplog} 大小为 0 字节,写入失败"
 
         # 验证日志文件内容
-        with open(log_file_path, 'r') as file:
+        with open(tmplog, 'r') as file:
             content = file.read()
 
         assert "This is an info message" in content, "Info message not found in log file"
