@@ -63,7 +63,3 @@ dictConfig(LOGGING_CONFIG)
 # 获取logger并使用
 logger = logging.getLogger(__name__)
 
-
-def get_logger():
-    return logger
-
