@@ -8,8 +8,7 @@ from omniadvisor.utils.logger import logger
 
 
 @pytest.fixture(scope="class", autouse=True)
-def class_fixture(test_logger):
-    test_logger.info("初始化日志测试模块")
+def class_fixture():
     global tmplog
     tmplog = "tmp.log"
     # 如果原有日志文件存在 删除文件
@@ -28,13 +27,12 @@ def class_fixture(test_logger):
 
     yield
     logger.handlers[orihandler_index] = orihandler
-    test_logger.info(f"清理日志测试模块 移除临时文件{tmplog}")
     os.remove(tmplog)
 
 
 class TestLogger:
 
-    def test_log(self, test_logger):
+    def test_log(self):
         logger.debug("This is a debug message")
         logger.info("This is an info message")
         logger.warning("This is a warning message")
