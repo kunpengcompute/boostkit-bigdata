@@ -1,6 +1,6 @@
+import os
 import logging
 from logging.config import dictConfig
-import os
 
 LOGGING_CONFIG = {
     'version': 1,

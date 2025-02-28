@@ -1,8 +1,10 @@
+import logging
 import os
+
 import pytest
+
 from pathlib import Path
 from omniadvisor.utils.logger import logger, LOGGING_CONFIG
-import logging
 
 
 @pytest.fixture(scope="class", autouse=True)
