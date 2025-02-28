@@ -1,9 +1,15 @@
 import os
 import pytest
-from testpath import assert_not_path_exists
 from pathlib import Path
 from omniadvisor.utils.logger import logger, LOGGING_CONFIG
 import logging
+
+
+@pytest.fixture(scope="class", autouse=True)
+def class_fixture():
+    logging.info("\n初始化日志测试模块")
+    yield
+    logging.info("\n清理日志测试模块")
 
 
 class TestLogger:
