@@ -86,6 +86,8 @@ case class ColumnarHashAggregateExec(
     "getOutputTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omni getOutput"),
     "numOutputRows" -> SQLMetrics.createMetric(sparkContext, "number of output rows"),
     "numOutputVecBatches" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatches"),
+    "totalMemSize" -> SQLMetrics.createSizeMetric(sparkContext, "total mem size"),
+    "usedMemSize" -> SQLMetrics.createSizeMetric(sparkContext, "used mem size"),
     "spillSize" -> SQLMetrics.createSizeMetric(sparkContext, "spill size"))
 
   override def supportsColumnar: Boolean = true
@@ -208,6 +210,8 @@ case class ColumnarHashAggregateExec(
     val numOutputRows = longMetric("numOutputRows")
     val numOutputVecBatches= longMetric("numOutputVecBatches")
     val spillSize = longMetric("spillSize")
+    val usedMemSize = longMetric("usedMemSize")
+    val totalMemSize = longMetric("totalMemSize")
 
     val attrExpsIdMap = getExprIdMap(child.output)
     val omniGroupByChanel = groupingExpressions.map(
@@ -304,7 +308,11 @@ case class ColumnarHashAggregateExec(
 
       // close operator
       SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
-        spillSize += operator.getSpilledBytes()
+        val metrics = operator.getMetricsInfo()
+        // The first 100 metrics are general metrics, the rest are difined differently by every operator.
+        spillSize += metrics(0)
+        usedMemSize += metrics(100)
+        totalMemSize += metrics(101)
         operator.close()
       })
 
@@ -366,7 +374,7 @@ case class ColumnarHashAggregateExec(
         dealPartitionData(null, null, addInputTime, omniCodegenTime,
           getOutputTime, projectInputTypes, projectExpressions, hashAggIter, this.schema)
       } else {
-         hashAggIter
+        hashAggIter
       }
     }
   }
