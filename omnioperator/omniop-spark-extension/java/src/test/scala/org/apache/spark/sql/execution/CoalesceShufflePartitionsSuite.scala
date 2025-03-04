@@ -219,7 +219,10 @@ class CoalesceShufflePartitionsSuite extends SparkFunSuite with BeforeAndAfterAl
               // New HashTable changes the order of result, which may affect the compressed size of each partition
               // (lz4 is affected by the order of data).
               // Besides, the partitionDataSizes is an estimated value. So the coalesced result varies.
-                assert(reader.outputPartitioning.numPartitions === 3)
+
+              // 2025-3-4: nulls are stored with bits, which may have effect on partitionDataSizes, so the numPartitions
+              // may change.
+                assert(reader.outputPartitioning.numPartitions === 2)
               }
             }
         }
