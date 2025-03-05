@@ -22,6 +22,7 @@
 #include "orc/RowReader/Reader.hh"
 #include <vector/vector_common.h>
 #include "common/JulianGregorianRebase.h"
+#include "common/PredicateUtil.h"
 
 namespace omniruntime::reader {
     class OmniReaderImpl : public orc::ReaderImpl {
@@ -32,15 +33,17 @@ namespace omniruntime::reader {
 
     std::unique_ptr<orc::RowReader> createRowReader() const override;
 
-    std::unique_ptr<orc::RowReader> createRowReader(const orc::RowReaderOptions& options,
-        std::unique_ptr<common::JulianGregorianRebase> &julianPtr) const;
+    std::unique_ptr<orc::RowReader> createRowReader(const orc::RowReaderOptions& options, 
+        std::unique_ptr<common::JulianGregorianRebase> &julianPtr,
+        std::unique_ptr<common::PredicateCondition> &predicate) const;
     };
 
     class OmniRowReaderImpl : public orc::RowReaderImpl {
     public:
-        OmniRowReaderImpl(std::shared_ptr<orc::FileContents> contents, const orc::RowReaderOptions& options,
-            std::unique_ptr<common::JulianGregorianRebase> &julianPtr)
-            : orc::RowReaderImpl(contents, options), julianPtr(std::move(julianPtr))
+        OmniRowReaderImpl(std::shared_ptr<orc::FileContents> contents, const orc::RowReaderOptions& options, 
+            std::unique_ptr<common::JulianGregorianRebase> &julianPtr,
+            std::unique_ptr<common::PredicateCondition> &predicate)
+            : orc::RowReaderImpl(contents, options), julianPtr(std::move(julianPtr)), predicatePtr(std::move(predicate))
         {}
         /**
         * direct read VectorBatch in next
@@ -53,8 +56,11 @@ namespace omniruntime::reader {
 
         void startNextStripe() override;
 
+        common::PredicateCondition *getPredicatePtr();
+
     private:
         std::unique_ptr<common::JulianGregorianRebase> julianPtr;
+        std::unique_ptr<common::PredicateCondition> predicatePtr;
     };
 
     std::unique_ptr<orc::Reader> omniCreateReader(std::unique_ptr<orc::InputStream> stream,
