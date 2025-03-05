@@ -81,6 +81,8 @@ public class ParquetColumnarBatchScanReader {
 
     private final Function1<Long, Long> int96RebaseFunc;
 
+    private final Function1<Integer, Integer> dateRebaseFunc;
+
     private final List<Type> parquetTypes;
 
     private ArrayList<String> allFieldsNames;
@@ -115,6 +117,19 @@ public class ParquetColumnarBatchScanReader {
                     return RebaseDateTime.rebaseJulianToGregorianMicros(micros);
                 default:
                     return micros;
+            }
+        };
+        this.dateRebaseFunc = (days) -> {
+            switch (this.datetimeRebaseMode) {
+                case EXCEPTION:
+                    if (days < RebaseDateTime.lastSwitchJulianTs()) {
+                        throw DataSourceUtils.newRebaseExceptionInRead("Parquet");
+                    }
+                    return days;
+                case LEGACY:
+                    return RebaseDateTime.rebaseJulianToGregorianDays(days);
+                default:
+                    return days;
             }
         };
         this.parquetTypes = parquetTypes;
@@ -242,10 +257,10 @@ public class ParquetColumnarBatchScanReader {
     private JSONObject getSubJson(Filter filterPredicate) {
         JSONObject jsonObject = new JSONObject();
         if (filterPredicate instanceof And) {
-            And and  = (And) filterPredicate;
+            And and = (And) filterPredicate;
             putBinaryOp(jsonObject, ParquetPredicateOperator.And, and.left(), and.right());
         } else if (filterPredicate instanceof Or) {
-            Or or  = (Or) filterPredicate;
+            Or or = (Or) filterPredicate;
             putBinaryOp(jsonObject, ParquetPredicateOperator.Or, or.left(), or.right());
         } else if (filterPredicate instanceof Not) {
             jsonObject.put("op", ParquetPredicateOperator.Not.ordinal());
@@ -408,6 +423,20 @@ public class ParquetColumnarBatchScanReader {
         }
     }
 
+    private void AdjustDatestampVec(IntVec intVec, long rowNumber, int index) {
+        Type parquetType = parquetTypes.get(index);
+        if (parquetType == null) {
+            throw new RuntimeException("parquetType is null. index: " + index);
+        }
+        if ((parquetType.getOriginalType() == OriginalType.DATE)) {
+            int adjustValue;
+            for (int rowIndex = 0; rowIndex < rowNumber; rowIndex++) {
+                adjustValue = (int) dateRebaseFunc.apply(intVec.get(rowIndex));
+                intVec.set(rowIndex, adjustValue);
+            }
+        }
+    }
+
     public int next(Vec[] vecList, boolean[] missingColumns, List<DataType> types) {
         int colsCount = missingColumns.length;
         long[] vecNativeIds = new long[types.size()];
@@ -441,6 +470,7 @@ public class ParquetColumnarBatchScanReader {
                 vecList[i] = new VarcharVec(vecNativeIds[nativeGetId]);
             } else if (type instanceof DateType) {
                 vecList[i] = new IntVec(vecNativeIds[nativeGetId]);
+                AdjustDatestampVec((IntVec) vecList[i], rtn, i);
             } else if (type instanceof ByteType) {
                 vecList[i] = new VarcharVec(vecNativeIds[nativeGetId]);
             } else if (type instanceof TimestampType) {
@@ -451,7 +481,7 @@ public class ParquetColumnarBatchScanReader {
             }
             nativeGetId++;
         }
-        return (int)rtn;
+        return (int) rtn;
     }
 
     public void close() {
