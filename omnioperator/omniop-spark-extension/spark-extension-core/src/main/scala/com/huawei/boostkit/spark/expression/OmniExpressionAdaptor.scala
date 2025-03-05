@@ -31,10 +31,10 @@ import com.huawei.boostkit.spark.util.ModifyUtilAdaptor
 import com.google.gson.{JsonArray, JsonElement, JsonObject, JsonParser}
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions._
+import org.apache.spark.sql.catalyst.expressions.{Expression, _}
 import org.apache.spark.sql.catalyst.expressions.aggregate._
 import org.apache.spark.sql.catalyst.optimizer.NormalizeNaNAndZero
-import org.apache.spark.sql.catalyst.plans.{FullOuter, Inner, JoinType, LeftAnti, LeftOuter, LeftSemi, RightOuter, ExistenceJoin}
+import org.apache.spark.sql.catalyst.plans.{ExistenceJoin, FullOuter, Inner, JoinType, LeftAnti, LeftOuter, LeftSemi, RightOuter}
 import org.apache.spark.sql.catalyst.optimizer.{BuildLeft, BuildRight, BuildSide}
 import org.apache.spark.sql.catalyst.util.CharVarcharUtils.getRawTypeString
 import org.apache.spark.sql.execution
@@ -57,11 +57,10 @@ object OmniExpressionAdaptor extends Logging {
   }
 
   def getExprIdMap(inputAttrs: Seq[Attribute]): Map[ExprId, Int] = {
-    var attrMap: Map[ExprId, Int] = Map()
-    inputAttrs.zipWithIndex.foreach { case (inputAttr, i) =>
-      attrMap += (inputAttr.exprId -> i)
-    }
-    attrMap
+    inputAttrs.iterator
+      .zipWithIndex
+      .map { case (attr, idx) => attr.exprId -> idx}
+      .toMap
   }
 
   def checkOmniJsonWhiteList(filterExpr: String, projections: Array[AnyRef]): Unit = {
@@ -1061,5 +1060,44 @@ object OmniExpressionAdaptor extends Logging {
       case _ =>
         false
     }
+  }
+
+  def isSimpleExpression(expr: Expression): Boolean = {
+    expr match {
+      case attribute: AttributeReference =>
+        true
+      case alias: Alias =>
+        alias.child.isInstanceOf[AttributeReference]
+      case _ =>
+        false
+    }
+  }
+
+  def isAllSimpleExpression(exprs: Seq[Expression]): Boolean = {
+    for (expr <- exprs) {
+      if (!isSimpleExpression(expr)){
+        return false
+      }
+    }
+    true
+  }
+
+  def getExprIdFromExpressions(exprs: Seq[Expression]): ArrayBuffer[ExprId] = {
+    var ret = ArrayBuffer[ExprId]()
+    for (expr <- exprs) {
+      expr match {
+        case attributeReference: AttributeReference =>
+          ret+=attributeReference.exprId
+        case alias: Alias =>
+          alias.child match {
+            case attr: AttributeReference => ret += attr.exprId
+            case _ =>
+              throw new UnsupportedOperationException(s"Unsupported Expression")
+          }
+        case _ =>
+          throw new UnsupportedOperationException(s"Unsupported Expression")
+      }
+    }
+    ret
   }
 }
