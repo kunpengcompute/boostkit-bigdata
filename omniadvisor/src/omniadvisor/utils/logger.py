@@ -55,6 +55,10 @@ project_dir = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
 
 # 将相对路径转换为绝对路径
 absolute_log_path = os.path.abspath(os.path.join(project_dir, LOGGING_CONFIG['handlers']['fileHandler']['filename']))
+absolute_log_dir = os.path.dirname(absolute_log_path)
+
+if not os.path.exists(absolute_log_dir):
+    os.makedirs(absolute_log_dir)
 
 # 更新配置文件中的路径
 LOGGING_CONFIG['handlers']['fileHandler']['filename'] = absolute_log_path
