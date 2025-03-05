@@ -74,6 +74,10 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] with PredicateHelper{
   val enableRollupOptimization: Boolean = columnarConf.enableRollupOptimization
   val enableLocalColumnarLimit: Boolean = columnarConf.enableLocalColumnarLimit
   val enableGlobalColumnarLimit: Boolean = columnarConf.enableGlobalColumnarLimit
+  val enableOrcFilterPushDown: Boolean = columnarConf.enableOrcFilterPushDown
+  val enableVecPredicateFilter: Boolean = columnarConf.enableVecPredicateFilter
+
+  private val SUPPORTED_DATA_TYPES = Set(ShortType, IntegerType, LongType, DoubleType, BooleanType, DateType)
 
   def apply(plan: SparkPlan): SparkPlan = {
     replaceWithColumnarPlan(plan)
@@ -99,6 +103,77 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] with PredicateHelper{
   def isStrictTopN(e: Expression): Boolean = e match {
     case Alias(child, _) => isStrictTopN(child)
     case WindowExpression(windowFunction, _) => windowFunction.isInstanceOf[RowNumber]
+  }
+
+  private def isAllSupport(condition: Expression): Boolean = {
+    def isSingleExprDataTypeSupported(expr: Expression): Boolean = {
+      SUPPORTED_DATA_TYPES.exists(_.equals(expr.dataType))
+    }
+
+    def isBinaryExprDataTypeSupported(left: Expression, right: Expression): Boolean = {
+      isSingleExprDataTypeSupported(left) && isSingleExprDataTypeSupported(right)
+    }
+
+    def isBinaryExprAttributeSupported(left: Expression, right: Expression): Boolean = {
+      (isAttribute(left) && isLiteral(right)) || (isAttribute(right) && isLiteral(left))
+    }
+
+    def isBinaryExprSupported(left: Expression, right: Expression): Boolean = {
+      isBinaryExprDataTypeSupported(left, right) && isBinaryExprAttributeSupported(left, right)
+    }
+
+    def isAttribute(expr: Expression): Boolean = {
+      expr.isInstanceOf[Attribute]
+    }
+
+    def isLiteral(expr: Expression): Boolean = {
+      expr.isInstanceOf[Literal]
+    }
+
+    condition match {
+      case equalTo: EqualTo =>
+        isBinaryExprSupported(equalTo.left, equalTo.right)
+      case greaterThan: GreaterThan =>
+        isBinaryExprSupported(greaterThan.left, greaterThan.right)
+      case greaterThanOrEqual: GreaterThanOrEqual =>
+        isBinaryExprSupported(greaterThanOrEqual.left, greaterThanOrEqual.right)
+      case lessThan: LessThan =>
+        isBinaryExprSupported(lessThan.left, lessThan.right)
+      case lessThanOrEqual: LessThanOrEqual =>
+        isBinaryExprSupported(lessThanOrEqual.left, lessThanOrEqual.right)
+      case isNotNull: IsNotNull =>
+        isAttribute(isNotNull.child)
+      case isNull: IsNull =>
+        isAttribute(isNull.child)
+      case and: And =>
+        isAllSupport(and.left) && isAllSupport(and.right)
+      case or: Or =>
+        isAllSupport(or.left) && isAllSupport(or.right)
+      case not: Not =>
+        isAllSupport(not.child)
+      case _ => false
+    }
+  }
+
+  private def tryToCombineFilterAndFileSource(plan: FilterExec, child: SparkPlan): SparkPlan = {
+    if (!enableOrcFilterPushDown || !enableVecPredicateFilter) {
+      return ColumnarFilterExec(plan.condition, child)
+    }
+    child match {
+      case ColumnarFileSourceScanExec(relation, _, _, _, _, _, dataFilters, _, _) =>
+        relation.fileFormat match {
+          case orcFormat: OrcFileFormat =>
+            if (isAllSupport(plan.condition)) {
+              child
+            } else {
+              ColumnarFilterExec(plan.condition, child)
+            }
+          case _ =>
+            ColumnarFilterExec(plan.condition, child)
+        }
+      case _ =>
+        ColumnarFilterExec(plan.condition, child)
+    }
   }
 
   def replaceWithColumnarPlan(plan: SparkPlan): SparkPlan = plan match {
@@ -267,14 +342,13 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] with PredicateHelper{
             }
           } else {
               val child = replaceWithColumnarPlan(f.child)
-              return ColumnarFilterExec(f.condition, child)
+              return tryToCombineFilterAndFileSource(plan, child)
           }
         }
       }
       val child = replaceWithColumnarPlan(plan.child)
       logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
-      ColumnarFilterExec(plan.condition, child)
-
+      tryToCombineFilterAndFileSource(plan, child)
     case plan: ExpandExec if enableColumnarExpand =>
       val child = replaceWithColumnarPlan(plan.child)
       logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
