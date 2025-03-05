@@ -41,7 +41,9 @@ import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.planning.PhysicalAggregation
 import org.apache.spark.sql.catalyst.plans.LeftSemi
 import org.apache.spark.sql.catalyst.plans.logical.Aggregate
+import org.apache.spark.sql.execution.datasources.orc.OrcFileFormat
 import org.apache.spark.sql.execution.util.SparkMemoryUtils.addLeakSafeTaskCompletionListener
+import org.apache.spark.sql.types.{BooleanType, DateType, DoubleType, IntegerType, LongType, ShortType}
 
 case class ColumnarPreOverrides() extends Rule[SparkPlan] with PredicateHelper{
   val columnarConf: ColumnarPluginConfig = ColumnarPluginConfig.getSessionConf
