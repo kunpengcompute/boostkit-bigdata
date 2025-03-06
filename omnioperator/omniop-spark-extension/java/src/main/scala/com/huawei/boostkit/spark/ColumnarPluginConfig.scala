@@ -63,6 +63,8 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
 
   def enableShareBroadcastJoinHashTable: Boolean = conf.getConf(ENABLE_SHARE_BROADCAST_JOIN_HASH_TABLE)
 
+  def enableJoinReorderEnhance: Boolean = conf.getConf(ENABLE_JOIN_REORDER_ENHANCE)
+
   def enableDelayCartesianProduct: Boolean = conf.getConf(ENABLE_DELAY_CARTESIAN_PRODUCT)
 
   def enableColumnarFileScan: Boolean = conf.getConf(ENABLE_COLUMNAR_FILE_SCAN)
@@ -260,6 +262,12 @@ object ColumnarPluginConfig {
   val ENABLE_SHARE_BROADCAST_JOIN_HASH_TABLE = buildConf("spark.omni.sql.columnar.broadcastJoin.sharehashtable")
     .internal()
     .doc("enable or disable share columnar BroadcastHashJoin hashtable")
+    .booleanConf
+    .createWithDefault(true)
+
+  val ENABLE_JOIN_REORDER_ENHANCE = buildConf("spark.omni.sql.columnar.JoinReorderEnhance")
+    .internal()
+    .doc("enable or disable join reorder enhance")
     .booleanConf
     .createWithDefault(true)
 
