@@ -19,7 +19,6 @@
 package com.huawei.boostkit.spark.serialize;
 
 
-import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.huawei.boostkit.spark.jni.NativeLoader;
 import nova.hetu.omniruntime.type.*;
@@ -35,23 +34,8 @@ import org.apache.spark.sql.vectorized.ColumnarBatch;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.lang.reflect.Field;
- 
-import sun.misc.Unsafe;
-
 public class ShuffleDataSerializer {
     private static final Logger LOG = LoggerFactory.getLogger(NativeLoader.class);
-    private static final Unsafe unsafe;
-
-    static {
-        try {
-            Field field = Unsafe.class.getDeclaredField("theUnsafe");
-            field.setAccessible(true);
-            unsafe = (Unsafe) field.get(null);
-        } catch (NoSuchFieldException | IllegalAccessException e) {
-            throw new RuntimeException("create unsafe object failed. errmsg:" + e.getMessage());
-        }
-    }
 
     public static ColumnarBatch deserialize(boolean isRowShuffle, byte[] bytes) {
         if (!isRowShuffle) {
@@ -97,7 +81,12 @@ public class ShuffleDataSerializer {
             int[] omniTypes = new int[vecCount];
             createEmptyVec(rowBatch, omniTypes, omniVecs, columnarVecs, vecCount, rowCount);
             OmniRowDeserializer deserializer = new OmniRowDeserializer(omniTypes, omniVecs);
-            deserializeByRowInternal(deserializer, rowBatch);
+
+            for (int rowIdx = 0; rowIdx < rowCount; rowIdx++) {
+                VecData.ProtoRow protoRow = rowBatch.getRows(rowIdx);
+                byte[] array = protoRow.getData().toByteArray();
+                deserializer.parse(array, rowIdx);
+            }
 
             // update initial varchar vector because it's capacity might have been expanded.
             for (int i = 0; i < vecCount; i++) {
@@ -112,38 +101,6 @@ public class ShuffleDataSerializer {
         } catch (InvalidProtocolBufferException e) {
             throw new RuntimeException("deserialize failed. errmsg:" + e.getMessage());
         }
-    }
-
-    /**
-     * 反序列化行数据到内部结构的方法
-     *
-     * @param deserializer OmniRowDeserializer对象，用于反序列化操作
-     * @param rowBatch 包含待反序列化数据的ProtoRowBatch对象
-     */
-    public static void deserializeByRowInternal(OmniRowDeserializer deserializer, VecData.ProtoRowBatch rowBatch) {
-        long address = -1;
- 
-        long maxByteSize = -1;
-        int rowCount = rowBatch.getRowCnt();
-        for (int rowIdx = 0; rowIdx < rowCount; rowIdx++) {
-            VecData.ProtoRow protoRow = rowBatch.getRows(rowIdx);
-            ByteString rowData = protoRow.getData();
-            int length = protoRow.getLength();
-            if (maxByteSize < length) {
-                if (maxByteSize != -1) {
-                    unsafe.freeMemory(address);
-                }
-                address = unsafe.allocateMemory(length);
-                maxByteSize = length;
-            }
- 
-            for (int i = 0; i < length; i++) {
-                byte value = rowData.byteAt(i);
-                unsafe.putByte(address + i, value);
-            }
-            deserializer.parse(address, rowIdx);
-        }
-        unsafe.freeMemory(address);
     }
 
     private static ColumnVector buildVec(VecData.Vec protoVec, int vecSize) {
