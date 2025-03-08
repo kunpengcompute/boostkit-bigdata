@@ -21,7 +21,7 @@ django.setup()  # 初始化 Django 环境
 
 # 第二重保障：启用测试表，测试表以test_开头
 def load_test_env():
-    from omniadvisor.database.repository import ConfigRepository as config_repo_class, Config as config_class
+    from omniadvisor.database.repository import CommonRepository as config_repo_class, Config as config_class
     meta_class = getattr(config_class, '_meta')
     meta_class.db_table = f'test_{meta_class.db_table}'
     return config_repo_class, config_class
@@ -76,7 +76,7 @@ class TestConfigRepository:
     @pytest.mark.django_db(transaction=True)
     def test_save_should_create_record(self, config_data, table_operation):
         # 执行保存
-        ConfigRepository.save(config_data)
+        ConfigRepository.save_config(config_data)
         # 验证数据库记录
         record = Config.objects.get(id="test_123")
         assert record.param1 == 100
