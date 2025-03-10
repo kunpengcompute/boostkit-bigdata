@@ -1,6 +1,5 @@
 import requests
 import json
-from omniadvisor.utils.logger import logger
 
 
 class SparkFetcher:
@@ -12,25 +11,27 @@ class SparkFetcher:
         """
         self.history_server_url = history_server_url.rstrip('/')  # 确保URL末尾没有斜杠
 
+    def _make_request(self, endpoint):
+        """
+        发送GET请求并处理响应。
+
+        :param endpoint: API端点路径
+        :return: 解析后的JSON响应数据
+        :raises: requests.exceptions.HTTPError 如果HTTP请求返回了错误状态码
+        """
+        endpoint = endpoint.strip("/")
+        url = f"{self.history_server_url}/{endpoint}"
+        response = requests.get(url)
+        response.raise_for_status()  # 若status.code != 200~209则抛出异常
+        return json.loads(response.text)  # 使用response.json()代替json.loads(response.text)
+
     def get_spark_apps(self):
         """
         获取所有Spark应用的信息。
 
         :return: 返回包含所有应用信息的列表
         """
-        response = requests.get(f"{self.history_server_url}/api/v1/applications")
-        if response.status_code == 200:
-            return json.loads(response.text)
-        else:
-            logger.error(f"Failed to fetch applications: {response.status_code}")
-            raise requests.exceptions.HTTPError(f"Failed to fetch applications: {response.status_code}")
-
-    def get_spark_apps_list(self):
-        all_apps_info = self.get_spark_apps()
-        applist = []
-        for app in all_apps_info:
-            applist.append(app.get("id"))
-        return applist
+        return self._make_request("api/v1/applications")
 
     def get_application_details(self, app_id):
         """
@@ -39,12 +40,7 @@ class SparkFetcher:
         :param app_id: 应用ID
         :return: 返回指定应用的详细信息
         """
-        response = requests.get(f"{self.history_server_url}/api/v1/applications/{app_id}")
-        if response.status_code == 200:
-            return json.loads(response.text)
-        else:
-            logger.error(f"Failed to fetch applications details: {response.status_code}")
-            raise requests.exceptions.HTTPError(f"Failed to fetch applications details: {response.status_code}")
+        return self._make_request(f"api/v1/applications/{app_id}")
 
     def get_spark_sql_by_app(self, app_id):
         """
@@ -53,12 +49,7 @@ class SparkFetcher:
         :param app_id: 应用ID
         :return: 返回指定应用的SQL信息
         """
-        response = requests.get(f"{self.history_server_url}/api/v1/applications/{app_id}/sql")
-        if response.status_code == 200:
-            return json.loads(response.text)
-        else:
-            logger.error(f"Failed to fetch SQL information for {app_id}: {response.status_code}")
-            raise requests.exceptions.HTTPError(f"Failed to fetch SQL information for {app_id}: {response.status_code}")
+        return self._make_request(f"api/v1/applications/{app_id}/sql")
 
     def get_spark_stages_by_app(self, app_id):
         """
@@ -67,12 +58,7 @@ class SparkFetcher:
         :param app_id: 应用ID
         :return: 返回指定应用的阶段信息
         """
-        response = requests.get(f"{self.history_server_url}/api/v1/applications/{app_id}/stages")
-        if response.status_code == 200:
-            return json.loads(response.text)
-        else:
-            logger.error(f"Failed to fetch stages information for {app_id}: {response.status_code}")
-            raise requests.exceptions.HTTPError(f"Failed to fetch stages information for {app_id}: {response.status_code}")
+        return self._make_request(f"api/v1/applications/{app_id}/stages")
 
     def get_spark_executor_by_app(self, app_id):
         """
@@ -81,11 +67,7 @@ class SparkFetcher:
         :param app_id: 应用ID
         :return: 返回指定应用的执行器信息
         """
-        response = requests.get(f"{self.history_server_url}/api/v1/applications/{app_id}/executors")
-        if response.status_code == 200:
-            return json.loads(response.text)
-        else:
-            logger.error(f"Failed to fetch executors information information for {app_id}: {response.status_code}")
-            raise requests.exceptions.HTTPError(f"Failed to fetch executors information for {app_id}: {response.status_code}")
+        return self._make_request(f"api/v1/applications/{app_id}/executors")
+
 
 

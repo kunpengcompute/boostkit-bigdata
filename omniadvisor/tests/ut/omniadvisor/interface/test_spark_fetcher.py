@@ -54,21 +54,6 @@ class TestSparkFetcher:
         assert apps == MOCK_APPS_RESPONSE
 
     @mock.patch('requests.get')
-    def test_get_spark_apps_list(self, mock_get):
-        # 配置mock对象返回值
-        mock_response = mock.Mock()
-        mock_response.status_code = 200
-        mock_response.text = json.dumps(MOCK_APPS_RESPONSE)
-
-        # 配置mock对象的返回值
-        mock_get.return_value = mock_response
-
-        # 调用方法并断言结果
-        app_ids = spark_fetcher.get_spark_apps_list()
-        expected_app_ids = [app["id"] for app in MOCK_APPS_RESPONSE]
-        assert app_ids == expected_app_ids
-
-    @mock.patch('requests.get')
     def test_get_application_details(self, mock_get):
         # 配置mock对象返回值
         mock_response = mock.Mock()
@@ -132,8 +117,12 @@ class TestSparkFetcher:
 
         mock_response.text = json.dumps(MOCK_APPS_RESPONSE)
 
+        # 配置raise_for_status_code方法 使其根据状态码抛出HTTPError
+        mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError("HTTP error occurred", response=mock_response)
+
         # 配置mock对象的返回值
         mock_get.return_value = mock_response
+
 
         # 断言HTTPError被抛出
         with pytest.raises(requests.exceptions.HTTPError):
