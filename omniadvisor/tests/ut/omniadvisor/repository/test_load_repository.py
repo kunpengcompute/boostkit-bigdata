@@ -19,9 +19,8 @@ class TestLoadRepository:
 
         self.load_attr = {
             LoadAttrFiled.name: 'test',
-            LoadAttrFiled.exec_master: 'yarn',
-            LoadAttrFiled.exec_queue: 'root.default',
-            LoadAttrFiled.exec_load: './test.sql',
+            LoadAttrFiled.exec_load: {'cmd': 'spark-class --master yarn --queue {queue} -f test.sql',
+                                      'queue': 'root.default'},
             LoadAttrFiled.default_config: {'executor_num': 1, 'executor_cores': 2}
         }
 
@@ -42,8 +41,6 @@ class TestLoadRepository:
         # 测试add
         created_load_1 = LoadRepository.add(model_attr=self.load_attr)
         assert created_load_1.name == self.load_attr[LoadAttrFiled.name]
-        assert created_load_1.exec_master == self.load_attr[LoadAttrFiled.exec_master]
-        assert created_load_1.exec_queue == self.load_attr[LoadAttrFiled.exec_queue]
         assert created_load_1.exec_load == self.load_attr[LoadAttrFiled.exec_load]
         assert created_load_1.default_config == self.load_attr[LoadAttrFiled.default_config]
 

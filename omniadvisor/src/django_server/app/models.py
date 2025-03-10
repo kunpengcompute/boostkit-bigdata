@@ -8,9 +8,7 @@ class Load(models.Model):
     """
     id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=100, null=False)
-    exec_master = models.CharField(max_length=20, null=False)
-    exec_queue = models.CharField(max_length=20, null=False)
-    exec_load = models.CharField(max_length=100, null=False)
+    exec_load = models.JSONField(null=False)
     default_config = models.JSONField(null=False)
     best_config = models.JSONField(null=True)
     test_config = models.JSONField(null=True)

@@ -5,8 +5,6 @@ from omniadvisor.repository.repository import Repository
 class LoadAttrFiled:
     id = 'id'
     name = 'name'
-    exec_master = 'exec_master'
-    exec_queue = 'exec_queue'
     exec_load = 'exec_load'
     default_config = 'default_config'
     best_config = 'best_config'
@@ -28,17 +26,13 @@ class LoadRepository(Repository):
     # 用于存储必须要填写的参数
     _required_fields = [
         LoadAttrFiled.name,
-        LoadAttrFiled.exec_master,
-        LoadAttrFiled.exec_queue,
         LoadAttrFiled.exec_load,
         LoadAttrFiled.default_config
     ]
     # 用于存储字段格式
     _fields_format = {
         LoadAttrFiled.name: ([str], [''], []),
-        LoadAttrFiled.exec_master: ([str], [''], []),
-        LoadAttrFiled.exec_queue: ([str], [''], []),
-        LoadAttrFiled.exec_load: ([str], [''], []),
+        LoadAttrFiled.exec_load: ([dict], [dict()], []),
         LoadAttrFiled.default_config: ([dict], [], []),
         LoadAttrFiled.best_config: ([dict], [], []),
         LoadAttrFiled.test_config: ([dict], [], []),
