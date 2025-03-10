@@ -3,10 +3,10 @@ import pytest
 import requests
 from unittest import mock
 from omniadvisor.interface.spark_fetcher import SparkFetcher
-from omniadvisor.utils.config_loader import load_common_config
+from omniadvisor.utils.constants import COMMON_CONFIG
 
 
-common_config = load_common_config()
+common_config = COMMON_CONFIG
 history_server_url = common_config.get("sparkfetcher", "spark.rest.url")
 spark_fetcher = SparkFetcher(history_server_url)
 
