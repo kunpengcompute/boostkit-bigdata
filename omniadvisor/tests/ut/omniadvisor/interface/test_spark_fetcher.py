@@ -3,7 +3,7 @@ import pytest
 import requests
 from unittest import mock
 from omniadvisor.interface.spark_fetcher import SparkFetcher
-from omniadvisor.utils.constants import COMMON_CONFIG
+from constants import COMMON_CONFIG
 
 
 common_config = COMMON_CONFIG

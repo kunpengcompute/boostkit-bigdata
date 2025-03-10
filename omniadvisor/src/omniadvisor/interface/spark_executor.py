@@ -2,7 +2,7 @@ import shlex
 import subprocess
 
 from omniadvisor.utils.exception import ParameterException
-from omniadvisor.utils.constants import CODING_TYPE
+from constants import CODING_TYPE
 from omniadvisor.utils.logger import logger
 
 
