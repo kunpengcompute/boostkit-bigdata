@@ -192,6 +192,11 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
   def enableOmniUnixTimeFunc: Boolean = conf.getConf(ENABLE_OMNI_UNIXTIME_FUNCTION)
 
   def enableVecPredicateFilter: Boolean = conf.getConf(ENABLE_VEC_PREDICATE_FILTER)
+
+  def catalogCacheSize: Int = conf.getConf(CATALOG_CACHE_SIZE)
+
+  def catalogCacheExpireTime: Int = conf.getConf(CATALOG_CACHE_EXPIRE_TIME)
+
 }
 
 
@@ -675,4 +680,16 @@ object ColumnarPluginConfig {
     .doc("enable vectorized predicate filtering")
     .booleanConf
     .createWithDefault(false)
+
+  val CATALOG_CACHE_SIZE = buildConf("spark.omni.sql.columnar.catalog.cache.size")
+    .internal()
+    .doc("set catalog cache size, value <= 0 presents no cache")
+    .intConf
+    .createWithDefault(128)
+
+  val CATALOG_CACHE_EXPIRE_TIME = buildConf("spark.omni.sql.columnar.catalog.cache.expire.time")
+    .internal()
+    .doc("set catalog cache expire time in seconds")
+    .intConf
+    .createWithDefault(600)
 }
