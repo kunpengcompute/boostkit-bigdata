@@ -19,6 +19,7 @@
 package com.huawei.boostkit.hive.shuffle;
 
 import nova.hetu.omniruntime.type.DataType;
+import nova.hetu.omniruntime.utils.NullsBufHelper;
 
 public class FixedWidthColumnSortSerDe extends FixedWidthColumnSerDe {
     private final DataType.DataTypeId dataTypeId;
@@ -36,7 +37,7 @@ public class FixedWidthColumnSortSerDe extends FixedWidthColumnSerDe {
     public int serialize(byte[] writeBytes, VecWrapper vecWrapper, int offset) {
         int totalLen = offset;
         int index = vecWrapper.index;
-        if (vecWrapper.isNull[index] == 1) {
+        if (NullsBufHelper.isSet(vecWrapper.isNull, index) == 1) {
             if (columnNullMarker == 1) {
                 writeBytes[totalLen++] = (byte) (columnTypeLen - 1);
             } else {

@@ -19,6 +19,7 @@
 package com.huawei.boostkit.hive.shuffle;
 
 import org.apache.hadoop.hive.serde2.lazybinary.LazyBinaryUtils;
+import nova.hetu.omniruntime.utils.NullsBufHelper;
 
 public class VariableWidthColumnSerDe implements ColumnSerDe {
     private byte[] lengthBytes = new byte[4];
@@ -28,7 +29,7 @@ public class VariableWidthColumnSerDe implements ColumnSerDe {
     public int serialize(byte[] writeBytes, VecWrapper vecWrapper, int offset) {
         int totalLen = offset;
         int index = vecWrapper.index;
-        if (vecWrapper.isNull[index] == 1) {
+        if (NullsBufHelper.isSet(vecWrapper.isNull, index) == 1) {
             writeBytes[totalLen] = -1;
             ++totalLen;
             return totalLen;
