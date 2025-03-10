@@ -699,4 +699,10 @@ object ColumnarPluginConfig {
     .doc("set string type in join output cost")
     .intConf
     .createWithDefault(9)
+
+  val ENABLE_OMNI_TUNED = buildConf("spark.omni.sql.tuned.enabled")
+    .internal()
+    .doc("enable tuned-adm optimization")
+    .booleanConf
+    .createWithDefault(false)
 }

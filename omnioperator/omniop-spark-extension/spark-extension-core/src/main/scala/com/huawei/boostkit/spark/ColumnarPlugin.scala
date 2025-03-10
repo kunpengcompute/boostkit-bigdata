@@ -18,11 +18,11 @@
 
 package com.huawei.boostkit.spark
 
-import com.huawei.boostkit.spark.ColumnarPluginConfig.ENABLE_OMNI_COLUMNAR_TO_ROW
+import com.huawei.boostkit.spark.ColumnarPluginConfig.{ENABLE_OMNI_COLUMNAR_TO_ROW, ENABLE_OMNI_TUNED}
 import com.huawei.boostkit.spark.Constant.OMNI_IS_ADAPTIVE_CONTEXT
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor
 import com.huawei.boostkit.spark.util.{ModifyUtilAdaptor, PhysicalPlanSelector}
-import org.apache.spark.api.plugin.{DriverPlugin, ExecutorPlugin, SparkPlugin}
+import org.apache.spark.api.plugin.{DriverPlugin, ExecutorPlugin, PluginContext, SparkPlugin}
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.optimizer.{BuildLeft, BuildRight, BuildSide}
 import org.apache.spark.sql.{SparkSession, SparkSessionExtensions}
@@ -45,8 +45,13 @@ import org.apache.spark.sql.execution.util.SparkMemoryUtils.addLeakSafeTaskCompl
 import org.apache.spark.sql.execution.aggregate.PushOrderedLimitThroughAgg
 import org.apache.spark.sql.util.ShimUtil
 import nova.hetu.omniruntime.memory.MemoryManager
+import org.apache.spark.SparkEnv
 import org.apache.spark.sql.execution.datasources.orc.OrcFileFormat
 import org.apache.spark.sql.types.{BooleanType, DataType, DateType, DoubleType, IntegerType, LongType, ShortType}
+
+import java.io.BufferedReader
+import java.io.InputStreamReader
+import java.lang.management.ManagementFactory
 
 import scala.collection.mutable.ListBuffer
 
@@ -1015,7 +1020,58 @@ class ColumnarPlugin extends (SparkSessionExtensions => Unit) with Logging {
   }
 }
 
-private class OmniTaskStartExecutorPlugin extends ExecutorPlugin {
+private class OmniTaskStartExecutorPlugin extends ExecutorPlugin with Logging{
+
+  private def initTunedOptimization(): Unit = {
+    val enableTunedOptimization = SparkEnv.get.conf.get(ENABLE_OMNI_TUNED).toBoolean
+    if (enableTunedOptimization) {
+      // Initialize the process ID variable, -1 indicates that the process ID has not been successfully obtained
+      var pid: Long = -1
+      try {
+        // Get the runtime name of teh JVM, which usually contains the process ID and hostname.
+        val jvmName = ManagementFactory.getRuntimeMXBean().getName()
+        val index = jvmName.indexOf('@')
+        if (index > 0) {
+          pid = java.lang.Long.parseLong(jvmName.substring(0, index))
+          logInfo(s"pid process is ${pid}")
+        } else {
+          logError("Unable to parse the process ID from the runtime name.")
+          return
+        }
+      } catch {
+        case e: Exception =>
+          logError(s"An exception occurred while parsing the process ID: ${e.getMessage}")
+          return
+      }
+
+      try {
+
+        val command = s"/usr/sbin/tuned-adm profile spark-omni --pid ${pid}"
+        logInfo(s"command is ${command}")
+        val process = Runtime.getRuntime.exec(command)
+
+        var reader = new BufferedReader(new InputStreamReader(process.getInputStream()))
+        var line: String = null
+        //read the output of the command line by line and print it
+        while ({line = reader.readLine(); line != null}) {
+          logInfo(line)
+        }
+
+        // wait for the command to finish executing and get teh exit status code.
+        val exitCode = process.waitFor
+        logInfo(s"The command has finish executing Exit status code : $exitCode")
+
+      } catch {
+        case e: Exception =>
+          logError("An error occurred while executing the command", e)
+      }
+    }
+  }
+
+  override def init(ctx: PluginContext, extraConf: java.util.Map[String, String]): Unit = {
+    initTunedOptimization()
+  }
+
   override def onTaskStart(): Unit = {
     addLeakSafeTaskCompletionListener[Unit](_ => {
       MemoryManager.reclaimMemory()
