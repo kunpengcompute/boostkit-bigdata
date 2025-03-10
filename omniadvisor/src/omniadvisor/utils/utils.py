@@ -1,6 +1,5 @@
 import configparser
 import os
-import yaml
 
 
 def load_common_config():
