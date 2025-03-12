@@ -737,6 +737,8 @@ public class CapacityScheduler extends
         } catch (InterruptedException ie) {
           // keep interrupt signal
           Thread.currentThread().interrupt();
+        } catch (Exception e) {
+          LOG.warn("AsyncScheduleThread[" + getName() + "] failed for ", e);
         }
       }
       LOG.info("AsyncScheduleThread[" + getName() + "] exited!");
@@ -895,7 +897,7 @@ public class CapacityScheduler extends
           sortedNodeHosts = Arrays.stream(jsonObject.getString(SORTED_NODE_HOSTS).split(COMMA))
                   .collect(Collectors.toList());
         } else {
-          sortedNodeHosts.clear();
+          sortedNodeHosts = new ArrayList<>();
         }
 
 
