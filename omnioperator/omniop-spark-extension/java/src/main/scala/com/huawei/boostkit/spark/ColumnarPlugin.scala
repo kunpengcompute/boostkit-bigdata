@@ -76,7 +76,6 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] with PredicateHelper{
   val enableRollupOptimization: Boolean = columnarConf.enableRollupOptimization
   val enableLocalColumnarLimit: Boolean = columnarConf.enableLocalColumnarLimit
   val enableGlobalColumnarLimit: Boolean = columnarConf.enableGlobalColumnarLimit
-  val enableOrcFilterPushDown: Boolean = columnarConf.enableOrcFilterPushDown
   val enableVecPredicateFilter: Boolean = columnarConf.enableVecPredicateFilter
 
   private val SUPPORTED_DATA_TYPES = Set(ShortType, IntegerType, LongType, DoubleType, BooleanType, DateType)
@@ -158,7 +157,7 @@ case class ColumnarPreOverrides() extends Rule[SparkPlan] with PredicateHelper{
   }
 
   private def tryToCombineFilterAndFileSource(plan: FilterExec, child: SparkPlan): SparkPlan = {
-    if (!enableOrcFilterPushDown || !enableVecPredicateFilter) {
+    if (!enableVecPredicateFilter) {
       return ColumnarFilterExec(plan.condition, child)
     }
     child match {
