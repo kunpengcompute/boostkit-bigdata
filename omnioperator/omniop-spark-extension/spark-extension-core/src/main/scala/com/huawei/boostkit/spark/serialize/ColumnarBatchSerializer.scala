@@ -87,7 +87,7 @@ private class ColumnarBatchSerializerInstance(
             }
             ByteStreams.readFully(dIn, columnarBuffer, 0, dataSize)
             // protobuf serialize
-            val columnarBatch: ColumnarBatch = ShuffleDataSerializer.deserialize(isRowShuffle, columnarBuffer.slice(0, dataSize))
+            val columnarBatch: ColumnarBatch = ShuffleDataSerializer.deserialize(isRowShuffle, columnarBuffer, dataSize)
             dataSize = readSize()
             if (dataSize == EOF) {
               dIn.close()
@@ -116,7 +116,7 @@ private class ColumnarBatchSerializerInstance(
         }
         ByteStreams.readFully(dIn, columnarBuffer, 0, dataSize)
         // protobuf serialize
-        val columnarBatch: ColumnarBatch = ShuffleDataSerializer.deserialize(isRowShuffle, columnarBuffer.slice(0, dataSize))
+        val columnarBatch: ColumnarBatch = ShuffleDataSerializer.deserialize(isRowShuffle, columnarBuffer, dataSize)
         numBatchesTotal += 1
         numRowsTotal += columnarBatch.numRows()
         columnarBatch.asInstanceOf[T]
