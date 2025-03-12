@@ -23,6 +23,7 @@
 #include <cstdint>
 #include <memory>
 #include <utility>
+#include <set>
 #include "vector/vector_common.h"
 #include "util/bit_util.h"
 #include "xsimd/xsimd.hpp"
@@ -104,11 +105,40 @@ namespace common {
             bitMark = bitMarkBuf->GetBuffer();
         }
 
+        virtual bool isAllNull(int32_t columnIndex) {
+            return false;
+        }
+
+        virtual bool isAllNotNull(int32_t columnIndex) {
+            return false;
+        }
+
+        void buildNullColumns(int32_t columnCount) {
+            for (int32_t i = 0; i < columnCount; i++) {
+                if (isAllNull(i)) {
+                    isAllNullColumns.insert(i);
+                }
+                if (isAllNotNull(i)) {
+                    isAllNotNullColumns.insert(i);
+                }
+            }
+        }
+
+        std::set<int32_t> &getIsAllNullColumns() {
+            return isAllNullColumns;
+        }
+
+        std::set<int32_t> &getIsAllNotNullColumns() {
+            return isAllNotNullColumns;
+        }
+
     protected:
         PredicateOperatorType op;
         int32_t bitSize = 0;
         std::unique_ptr<AlignedBuffer<uint8_t>> bitMarkBuf;
         uint8_t *bitMark = nullptr;
+        std::set<int32_t> isAllNullColumns;
+        std::set<int32_t> isAllNotNullColumns;
     };
 
     template<typename T>
@@ -129,9 +159,7 @@ namespace common {
                 xsimd::batch<T> valuesBatch = xsimd::load_aligned(values + index);
                 xsimd::batch_bool<T> result = BATCH_OP(valuesBatch, broadcast);
                 uint64_t mask = result.mask();
-                uint64_t word = BitUtil::LoadBits<uint64_t>(reinterpret_cast<uint64_t *>(bitMark), index, 64);
-                uint64_t newWord = (word & (-1UL << step)) | mask;
-                BitUtil::StoreBits<uint64_t>(reinterpret_cast<uint64_t *>(bitMark), index, newWord, 64);
+                BitUtil::StoreBits<uint64_t>(reinterpret_cast<uint64_t *>(bitMark), index, mask, 64);
             }
             for (; index < vectorSize; index++) {
                 bool result = OP(values[index], value);
@@ -200,6 +228,14 @@ namespace common {
             return bitMark;
         }
 
+        bool isAllNull(int32_t columnIndex) override {
+            return columnIndex == index && op == IS_NULL;
+        }
+
+        bool isAllNotNull(int32_t columnIndex) override {
+            return columnIndex == index && op == IS_NOT_NULL;
+        }
+
     private:
         int32_t index;
         T value;
@@ -266,6 +302,14 @@ namespace common {
                 bitMark[index] = leftResult[index] & rightResult[index];
             }
             return bitMark;
+        }
+
+        bool isAllNull(int32_t columnIndex) override {
+            return left->isAllNull(columnIndex) | right->isAllNull(columnIndex);
+        }
+
+        bool isAllNotNull(int32_t columnIndex) override {
+            return left->isAllNotNull(columnIndex) | right->isAllNotNull(columnIndex);
         }
 
     private:

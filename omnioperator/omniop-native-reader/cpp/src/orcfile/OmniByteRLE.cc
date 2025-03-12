@@ -38,7 +38,7 @@ namespace omniruntime::reader {
         if (consumed != 0) {
             remainingBits = 8 - consumed;
             OmniByteRleDecoder::next(&lastByte, 1, nullptr);
-            reversedAndFlipLastByte = ~ReverseByte(lastByte);
+            reversedAndFlipLastByte = bitNotFlip[lastByte];
         }
     }
 
@@ -51,7 +51,7 @@ namespace omniruntime::reader {
             OmniByteRleDecoder::skip(bytesSkipped);
             if (numValues % 8 != 0) {
                 OmniByteRleDecoder::next(&lastByte, 1, nullptr);
-                reversedAndFlipLastByte = ~ReverseByte(lastByte);
+                reversedAndFlipLastByte = bitNotFlip[lastByte];
                 remainingBits = 8 - (numValues % 8);
             } else {
                 remainingBits = 0;
