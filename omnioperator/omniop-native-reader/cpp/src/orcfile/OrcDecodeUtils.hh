@@ -248,16 +248,33 @@ inline void BitsToBoolsBatchHEFs0p1(bool *dest, uint8_t *source, uint64_t bitsLe
     }
 }
 
-inline uint8_t ReverseByte(uint8_t byte) {
-    auto ret = ((byte & 0x01) << 7) | ((byte & 0x02) << 5) |
-        ((byte & 0x4) << 3) | ((byte & 0x08) << 1) | ((byte & 0x10) >> 1) |
-        ((byte & 0x20) >> 3) | ((byte & 0x40) >> 5) | ((byte & 0x80) >> 7);
-    return ret;
-}
+struct BitNotFlip {
+    BitNotFlip() {
+        for (int i = 0; i < (1 << N); i++) {
+            // 取反然后再翻转
+            memo_[i] = flip(~i);
+        }
+    }
+
+    static uint8_t flip(uint8_t byte) {
+        return ((byte & 0x01) << 7) | ((byte & 0x02) << 5) | ((byte & 0x04) << 3) | ((byte & 0x08) << 1) |
+               ((byte & 0x10) >> 1) |((byte & 0x20) >> 3) | ((byte & 0x40) >> 5) | ((byte & 0x80) >> 7);
+    }
+
+    uint8_t inline operator[](size_t i) const {
+        return memo_[i];
+    }
+
+private:
+    static constexpr int N = 8;
+    uint8_t memo_[1 << N]{0};
+};
+
+const static BitNotFlip bitNotFlip;
 
 inline void ReverseAndFlipBytes(uint8_t *bytes, int length) {
     for (int i = 0; i < length; i++) {
-        bytes[i] = ~ReverseByte(bytes[i]);
+        bytes[i] = bitNotFlip[bytes[i]];
     }
 }
 
