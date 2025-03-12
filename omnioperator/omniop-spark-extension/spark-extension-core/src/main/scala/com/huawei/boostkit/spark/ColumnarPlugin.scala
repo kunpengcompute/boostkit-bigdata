@@ -65,7 +65,6 @@ case class ColumnarPreOverrides(isSupportAdaptive: Boolean = true)
   val enableColumnarDataWritingCommand: Boolean = columnarConf.enableColumnarDataWritingCommand
   val enableColumnarTopNSort: Boolean = columnarConf.enableColumnarTopNSort
   val topNSortThreshold: Int = columnarConf.topNSortThreshold
-  val enableOrcFilterPushDown: Boolean = columnarConf.enableOrcFilterPushDown
   val enableVecPredicateFilter: Boolean = columnarConf.enableVecPredicateFilter
 
   private val SUPPORTED_DATA_TYPES = Set(ShortType, IntegerType, LongType, DoubleType, BooleanType, DateType)
@@ -192,7 +191,7 @@ case class ColumnarPreOverrides(isSupportAdaptive: Boolean = true)
   }
 
   private def tryToCombineFilterAndFileSource(plan: FilterExec, child: SparkPlan): SparkPlan = {
-    if (!enableOrcFilterPushDown || !enableVecPredicateFilter) {
+    if (!enableVecPredicateFilter) {
       return ColumnarFilterExec(plan.condition, child)
     }
     child match {

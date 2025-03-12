@@ -191,8 +191,6 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
 
   def enableOmniUnixTimeFunc: Boolean = conf.getConf(ENABLE_OMNI_UNIXTIME_FUNCTION)
 
-  def enableOrcFilterPushDown: Boolean = conf.orcFilterPushDown
-
   def enableVecPredicateFilter: Boolean = conf.getConf(ENABLE_VEC_PREDICATE_FILTER)
 }
 
@@ -676,11 +674,5 @@ object ColumnarPluginConfig {
     .internal()
     .doc("enable vectorized predicate filtering")
     .booleanConf
-    .createWithDefault(true)
-
-  val ENABLE_FILTER_PUSH_DOWN = buildConf("spark.omni.sql.columnar.filterPushdown.enabled")
-    .internal()
-    .doc("enable filter push down")
-    .booleanConf
-    .createWithDefault(true)
+    .createWithDefault(false)
 }

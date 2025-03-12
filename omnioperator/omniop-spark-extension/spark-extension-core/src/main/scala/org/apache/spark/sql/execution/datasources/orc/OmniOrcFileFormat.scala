@@ -17,7 +17,7 @@
 
 package org.apache.spark.sql.execution.datasources.orc
 
-import com.huawei.boostkit.spark.ColumnarPluginConfig.{ENABLE_FILTER_PUSH_DOWN, ENABLE_VEC_PREDICATE_FILTER}
+import com.huawei.boostkit.spark.ColumnarPluginConfig.ENABLE_VEC_PREDICATE_FILTER
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, Path}
 import org.apache.hadoop.mapreduce._
@@ -74,7 +74,6 @@ class OmniOrcFileFormat extends FileFormat with DataSourceRegister with Serializ
     val isCaseSensitive = sparkSession.sessionState.conf.caseSensitiveAnalysis
     val orcFilterPushDown = sparkSession.sessionState.conf.orcFilterPushDown
     val vecPredicateFilter = sparkSession.sessionState.conf.getConf(ENABLE_VEC_PREDICATE_FILTER)
-    val filterPushDown = sparkSession.sessionState.conf.getConf(ENABLE_FILTER_PUSH_DOWN)
 
     (file: PartitionedFile) => {
       val conf = broadcastedConf.value.value
@@ -82,11 +81,7 @@ class OmniOrcFileFormat extends FileFormat with DataSourceRegister with Serializ
       val filePath = ShimUtil.getPartitionedFilePath(file)
 
       // ORC predicate pushdown
-      val pushed = if (orcFilterPushDown) {
-        filters.reduceOption(And(_, _))
-      } else {
-        None
-      }
+      val pushed = filters.reduceOption(And(_, _))
 
       val taskConf = new Configuration(conf)
       val fileSplit = new FileSplit(filePath, file.start, file.length, Array.empty)
@@ -95,7 +90,7 @@ class OmniOrcFileFormat extends FileFormat with DataSourceRegister with Serializ
 
       // read data from vectorized reader
       val batchReader = new OmniOrcColumnarBatchReader(capacity, requiredSchema, pushed.orNull, vecPredicateFilter,
-          filterPushDown)
+        orcFilterPushDown)
       // SPARK-23399 Register a task completion listener first to call `close()` in all cases.
       // There is a possibility that `initialize` and `initBatch` hit some errors (like OOM)
       // after opening a file.
