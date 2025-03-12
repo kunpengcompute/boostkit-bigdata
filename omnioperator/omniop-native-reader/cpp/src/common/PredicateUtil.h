@@ -22,9 +22,13 @@
 
 #include "PredicateCondition.h"
 #include "jni/jni_common.h"
+#include <set>
 
 namespace common {
-    std::unique_ptr<PredicateCondition> BuildVecPredicateCondition(JNIEnv *env, jobject jsonObj);
+    std::unique_ptr<PredicateCondition> BuildVecPredicateCondition(JNIEnv *env, jobject jsonObj, int32_t columnCount);
+
+    bool GetFlatBaseVectorsFromBitMark(std::vector<BaseVector *> &baseVectors, std::vector<BaseVector *> &result,
+        uint8_t *bitMark, int32_t vectorSize, const std::set<int32_t>& isNullSet, const std::set<int32_t>& isNotNullSet);
 }
 
 #endif //PREDICATEUTIL_H
