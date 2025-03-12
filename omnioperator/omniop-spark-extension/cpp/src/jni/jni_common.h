@@ -57,6 +57,16 @@ jmethodID GetMethodID(JNIEnv* env, jclass this_class, const char* name, const ch
         return 0;                                         \
     }
 
+#define JNI_FUNC_END_WITH_VECTORS(exceptionClass, vectors)       \
+    } catch (const std::exception &e) {                          \
+        for (auto vec : vectors) {                               \
+            delete vec;                                          \
+        }                                                        \
+        env->ThrowNew(runtimeExceptionClass, e.what());          \
+        return;                                                  \
+    }                                                            \
+
+
 extern jclass runtimeExceptionClass;
 extern jclass splitResultClass;
 extern jclass jsonClass;

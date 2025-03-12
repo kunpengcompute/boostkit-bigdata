@@ -14,6 +14,7 @@ set (SOURCE_FILES
         common/common.cpp
         jni/SparkJniWrapper.cpp
         jni/jni_common.cpp
+        jni/deserializer.cpp
         )
 
 #Find required protobuf package
