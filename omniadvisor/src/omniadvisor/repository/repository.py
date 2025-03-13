@@ -85,7 +85,7 @@ class Repository(ABC):
                 raise ValueError(f'The value of filed {field} must be in {filed_allow}, please check.')
 
     @classmethod
-    def add(cls, model_attr: dict):
+    def _create(cls, model_attr: dict):
         """
         添加Model模型至数据库
 
@@ -97,14 +97,14 @@ class Repository(ABC):
         cls._check_field_format(model_attr)
 
         try:
-            workload = cls._model_class.objects.create(**model_attr)
+            database_model = cls._model_class.objects.create(**model_attr)
         except (DatabaseError, TypeError):
             raise
 
-        return workload
+        return database_model
 
     @classmethod
-    def search(cls, model_attr: dict):
+    def _query(cls, model_attr: dict):
         """
         根据Model属性字典，搜索符合要求的实例
 
@@ -114,18 +114,18 @@ class Repository(ABC):
         cls._check_field_format(model_attr)
 
         try:
-            workloads = cls._model_class.objects.filter(**model_attr)
+            database_models = cls._model_class.objects.filter(**model_attr)
         except FieldError:
             raise
 
-        return workloads
+        return database_models
 
     @classmethod
-    def update(cls, model: Model, model_attr: dict):
+    def _update(cls, database_model: Model, model_attr: dict):
         """
         更新Model模型至数据库
 
-        :param model: Model实例
+        :param database_model: Model实例
         :param model_attr: Model属性字典
         :return: Model实例
         """
@@ -134,10 +134,10 @@ class Repository(ABC):
 
         try:
             for key, value in model_attr.items():
-                setattr(model, key, value)
+                setattr(database_model, key, value)
 
-            model.save()
+            database_model.save()
         except (DatabaseError, TypeError):
             raise
 
-        return model
+        return database_model

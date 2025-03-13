@@ -2,70 +2,166 @@ import pytest
 
 from .common import create_test_table
 from .common import delete_test_table
-from omniadvisor.repository.task_repository import Task
-from omniadvisor.repository.task_repository import Load
-from omniadvisor.repository.task_repository import TaskAttrFiled
+from omniadvisor.utils.constant import OA_CONF
+from django_server.app.models import DatabaseLoad
+from django_server.app.models import DatabaseTask
+from omniadvisor.repository.model.task import Task
+from omniadvisor.repository.model.perf_history import PerfHistory
+from omniadvisor.repository.load_repository import LoadRepository
 from omniadvisor.repository.task_repository import TaskRepository
 
-class TestLoadRepository:
-    """
-    LoadRepository测试类
-    """
-    def setup_method(self):
-        """
-        测试前准备，创建表
-        """
-        create_test_table(Load)
-        create_test_table(Task)
 
-        load = Load(name='test_load',
-                    exec_master='yarn',
-                    exec_queue='root.default',
-                    exec_load='./test.sql',
-                    default_config={'executor_num': 1, 'executor_cores': 2})
-        load.save()
-
-        self.task_attr = {
-            TaskAttrFiled.load: load,
-            TaskAttrFiled.config: {'executor_num': 1, 'executor_cores': 2}
-        }
+class TestTaskRepository:
+    """
+    TaskRepository测试类
+    """
+    @staticmethod
+    def setup_class():
+        # 创建表
+        create_test_table(DatabaseLoad)
+        create_test_table(DatabaseTask)
 
     @staticmethod
-    def cleanup_method():
-        """
-        测试后清理，删除表
-        """
-        delete_test_table(Task)
-        delete_test_table(Load)
+    def cleanup_class():
+        # 删除表
+        delete_test_table(DatabaseLoad)
+        delete_test_table(DatabaseTask)
 
+    @staticmethod
+    def setup_method():
+        # 清空表数据
+        # 由于外键的存在，因此先删除Task
+        DatabaseTask.objects.all().delete()
+        DatabaseLoad.objects.all().delete()
 
     @pytest.mark.django_db(transaction=True)
-    def test_base_method(self):
+    def test_create(self):
+        # 创建测试数据
+        load = LoadRepository.create(
+            name='test',
+            exec_attr={'cmd': 'spark-sql -f test.sql'},
+            default_config={"param1": "value2"}
+        )
+
+        # 创建task
+        task = TaskRepository.create(
+            load=load,
+            config={"param1": "value2"}
+        )
+        assert isinstance(task, Task)
+        # 由于外层的Load没有透传到最内层，而Task返回的load为新生成的Load
+        # 因此导致这里两边的load不一致，但是属性是一致的
+        assert task.load.name == load.name
+        assert task.config == {"param1": "value2"}
+
+    @pytest.mark.django_db(transaction=True)
+    def test_query(self):
+        # 创建测试数据
+        load = LoadRepository.create(
+            name='test',
+            exec_attr={'cmd': 'spark-sql -f test.sql'},
+            default_config={"param1": "value2"}
+        )
+        task = TaskRepository.create(
+            load=load,
+            config={"param1": "value2"}
+        )
+
+        # 查询任务
+        tasks = TaskRepository.query(
+            load=load,
+            config={"param1": "value2"}
+        )
+        assert len(tasks) == 1
+        assert tasks[0].load.name == load.name
+        assert tasks[0].config == {"param1": "value2"}
+
+        # 查询失败
+        tasks = TaskRepository.query(
+            load=load,
+            config={"param2": "value2"}
+        )
+        assert len(tasks) == 0
+
+    @pytest.mark.django_db(transaction=True)
+    def test_query_perf_history_from_load(self):
         """
-        测试类中基本方法，add/search/update
+        测试 TaskRepository.query_perf_history_from_load 方法
         """
-        # TODO: 需补充完善测试，增加异常测试
-        # 测试add
-        created_task_1 = TaskRepository.add(model_attr=self.task_attr)
-        assert created_task_1.load == self.task_attr[TaskAttrFiled.load]
-        assert created_task_1.config == self.task_attr[TaskAttrFiled.config]
+        # 创建测试数据
+        load = LoadRepository.create(
+            name='test',
+            exec_attr={'cmd': 'spark-sql -f test.sql'},
+            default_config={"param1": "value2"}
+        )
+        task = TaskRepository.create(
+            load=load,
+            config={"param1": "value2"}
+        )
+        task.database_model.status = OA_CONF.TaskStatus.success
+        task.database_model.runtime = 10.0
+        task.database_model.trace = {}
+        task.database_model.save()
 
-        # 测试search
-        search_task_attr = {TaskAttrFiled.config: self.task_attr[TaskAttrFiled.config]}
-        searched_tasks_1 = TaskRepository.search(search_task_attr)
-        assert len(searched_tasks_1) == 1
+        # 查询性能历史
+        perf_history = TaskRepository.query_perf_history_from_load(load=load)
+        assert isinstance(perf_history, PerfHistory)
+        assert len(perf_history.config_perf_pairs) == 1
 
-        # 测试search
-        created_task_2 = TaskRepository.add(model_attr=self.task_attr)
-        searched_tasks_2 = TaskRepository.search(search_task_attr)
-        assert len(searched_tasks_2) == 2
-        for searched_task in searched_tasks_2.all():
-            assert searched_task.load == self.task_attr[TaskAttrFiled.load]
+    @pytest.mark.django_db(transaction=True)
+    def test_update_start_time(self):
+        # 创建测试数据
+        load = LoadRepository.create(
+            name='test',
+            exec_attr={'cmd': 'spark-sql -f test.sql'},
+            default_config={"param1": "value2"}
+        )
+        task = TaskRepository.create(
+            load=load,
+            config={"param1": "value2"}
+        )
 
-        # 测试update
-        update_task_attr = {TaskAttrFiled.config: {'executor_num': 2, 'executor_cores': 2}}
-        updated_task = TaskRepository.update(created_task_2, update_task_attr)
-        assert updated_task.config == {'executor_num': 2, 'executor_cores': 2}
-        searched_tasks_3 = TaskRepository.search(update_task_attr)
-        assert len(searched_tasks_3) == 1
-        assert searched_tasks_3.first().config == {'executor_num': 2, 'executor_cores': 2}
+        # 更新任务开始时间
+        updated_task = TaskRepository.update_start_time(task=task)
+        assert updated_task.start_time is not None
+
+    @pytest.mark.django_db(transaction=True)
+    def test_update_end_time(self):
+        # 创建测试数据
+        load = LoadRepository.create(
+            name='test',
+            exec_attr={'cmd': 'spark-sql -f test.sql'},
+            default_config={"param1": "value2"}
+        )
+        task = TaskRepository.create(
+            load=load,
+            config={"param1": "value2"}
+        )
+
+        # 更新任务开始时间
+        updated_task = TaskRepository.update_end_time(task=task)
+        assert updated_task.end_time is not None
+
+    @pytest.mark.django_db(transaction=True)
+    def test_update_task_result(self):
+        # 创建测试数据
+        load = LoadRepository.create(
+            name='test',
+            exec_attr={'cmd': 'spark-sql -f test.sql'},
+            default_config={"param1": "value2"}
+        )
+        task = TaskRepository.create(
+            load=load,
+            config={"param1": "value2"}
+        )
+
+        # 更新任务执行结果
+        updated_task = TaskRepository.update_task_result(
+            task=task,
+            status=OA_CONF.TaskStatus.success,
+            runtime=10.0,
+            trace={'step1': 1}
+        )
+        assert updated_task.database_model.status == OA_CONF.TaskStatus.success
+        assert updated_task.database_model.runtime == 10.0
+        assert updated_task.database_model.trace == {'step1': 1}
