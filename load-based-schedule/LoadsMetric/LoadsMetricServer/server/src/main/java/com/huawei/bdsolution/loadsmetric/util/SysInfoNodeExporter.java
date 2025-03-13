@@ -76,7 +76,7 @@ public class SysInfoNodeExporter extends SysInfoLinux {
     }
 
     /**
-     * request node exporter http/https interface and save data to nodeExporterResponse
+     * request node exporter http interface and save data to nodeExporterResponse
      */
     public void requestNodeExporter() {
         nodeExporterResponse.clear();
