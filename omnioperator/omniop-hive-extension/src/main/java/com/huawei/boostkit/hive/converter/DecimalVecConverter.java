@@ -166,7 +166,7 @@ public class DecimalVecConverter implements VecConverter {
             }
         }
         decimal128Vec.setValuesBuf(value);
-        decimal128Vec.setNullsBuf(isNull);
+        decimal128Vec.setNulls(0, isNull, 0, isNull.length);
         return decimal128Vec;
     }
 
