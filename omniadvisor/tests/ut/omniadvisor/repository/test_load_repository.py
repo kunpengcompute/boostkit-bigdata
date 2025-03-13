@@ -2,65 +2,103 @@ import pytest
 
 from .common import create_test_table
 from .common import delete_test_table
+from omniadvisor.repository.load_repository import DatabaseLoad
 from omniadvisor.repository.load_repository import Load
-from omniadvisor.repository.load_repository import LoadAttrFiled
 from omniadvisor.repository.load_repository import LoadRepository
 
 
+# 测试 LoadRepository 类
 class TestLoadRepository:
     """
     LoadRepository测试类
     """
-    def setup_method(self):
-        """
-        测试前准备，创建表
-        """
-        create_test_table(Load)
-
-        self.load_attr = {
-            LoadAttrFiled.name: 'test',
-            LoadAttrFiled.exec_load: {'cmd': 'spark-class --master yarn --queue {queue} -f test.sql',
-                                      'queue': 'root.default'},
-            LoadAttrFiled.default_config: {'executor_num': 1, 'executor_cores': 2}
-        }
+    @staticmethod
+    def setup_class():
+        # 创建表
+        create_test_table(DatabaseLoad)
 
     @staticmethod
-    def cleanup_method():
-        """
-        测试后清理，删除表
-        """
-        delete_test_table(Load)
+    def cleanup_class():
+        # 删除表
+        delete_test_table(DatabaseLoad)
 
+    @staticmethod
+    def setup_method():
+        # 清空表数据
+        DatabaseLoad.objects.all().delete()
 
     @pytest.mark.django_db(transaction=True)
-    def test_base_method(self):
-        """
-        测试类中基本方法，add/search/update
-        """
-        # TODO: 需补充完善测试，增加异常测试
-        # 测试add
-        created_load_1 = LoadRepository.add(model_attr=self.load_attr)
-        assert created_load_1.name == self.load_attr[LoadAttrFiled.name]
-        assert created_load_1.exec_load == self.load_attr[LoadAttrFiled.exec_load]
-        assert created_load_1.default_config == self.load_attr[LoadAttrFiled.default_config]
+    def test_create(self):
+        load = LoadRepository.create(
+            name='test',
+            exec_attr={'cmd': 'spark-sql -f test.sql'},
+            default_config={"param1": "value2"}
+        )
+        assert isinstance(load, Load)
+        assert load.database_model.name == 'test'
+        assert load.database_model.exec_attr == {'cmd': 'spark-sql -f test.sql'}
+        assert load.database_model.default_config == {"param1": "value2"}
 
-        # 测试search
-        search_load_attr = {LoadAttrFiled.name: self.load_attr[LoadAttrFiled.name]}
-        searched_loads_1 = LoadRepository.search(search_load_attr)
-        assert len(searched_loads_1) == 1
+        # 查询数据库中是否有新增数据
+        database_loads = DatabaseLoad.objects.filter(name='test')
+        assert len(database_loads) == 1
 
-        # 测试search
-        created_load_2 = LoadRepository.add(model_attr=self.load_attr)
-        searched_loads_2 = LoadRepository.search(search_load_attr)
-        assert len(searched_loads_2) == 2
-        for searched_load in searched_loads_2.all():
-            assert searched_load.name == self.load_attr[LoadAttrFiled.name]
+        # 输入无效数据
+        with pytest.raises(ValueError):
+            LoadRepository.create(name="", exec_attr={}, default_config={})
 
-        # 测试update
-        update_load_attr = {LoadAttrFiled.name: 'test2'}
-        updated_load = LoadRepository.update(created_load_2, update_load_attr)
-        assert updated_load.name == 'test2'
-        searched_loads_3 = LoadRepository.search(update_load_attr)
-        assert len(searched_loads_3) == 1
-        assert searched_loads_3.first().name == 'test2'
+    @pytest.mark.django_db(transaction=True)
+    def test_query(self):
+        # 创建测试数据
+        load = LoadRepository.create(
+            name='test',
+            exec_attr={'cmd': 'spark-sql -f test.sql'},
+            default_config={"param1": "value2"}
+        )
 
+        # 查询负载
+        loads = LoadRepository.query(
+            name='test',
+            default_config={"param1": "value2"}
+        )
+        assert len(loads) == 1
+        assert loads[0].exec_attr == {'cmd': 'spark-sql -f test.sql'}
+
+        # 查询失败
+        loads = LoadRepository.query(
+            name='t',
+            default_config={"param1": "value2"}
+        )
+        assert len(loads) == 0
+
+    @pytest.mark.django_db(transaction=True)
+    def test_update_best_config(self):
+        # 创建测试数据
+        load = LoadRepository.create(
+            name='test',
+            exec_attr={'cmd': 'spark-sql -f test.sql'},
+            default_config={"param1": "value2"}
+        )
+
+        # 更新最优配置
+        updated_load = LoadRepository.update_best_config(
+            load=load,
+            best_config={"param2": "value2"}
+        )
+        assert updated_load.best_config == {"param2": "value2"}
+
+    @pytest.mark.django_db(transaction=True)
+    def test_update_test_config(self):
+        # 创建测试数据
+        load = LoadRepository.create(
+            name='test',
+            exec_attr={'cmd': 'spark-sql -f test.sql'},
+            default_config={"param1": "value2"}
+        )
+
+        # 更新测试配置
+        updated_load = LoadRepository.update_test_config(
+            load=load,
+            test_config={"param2": "value2"}
+        )
+        assert updated_load.test_config == {"param2": "value2"}
