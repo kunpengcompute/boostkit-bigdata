@@ -71,8 +71,8 @@ public class NodeExporterServiceImpl implements NodeExporterService {
         }
 
         if (!StringUtils.hasLength(nodeExporterPullProtocol)
-                || !nodeExporterPullProtocol.matches("https?")) {
-            throw new RuntimeException(nodeExporterPullProtocol + " is invalid, eg: http or https");
+                || !nodeExporterPullProtocol.matches("http")) {
+            throw new RuntimeException(nodeExporterPullProtocol + " is invalid, eg: http");
         }
         if (!StringUtils.hasLength(nodeExporterPullPort)
                 || !nodeExporterPullPort.matches("\\d+")) {
