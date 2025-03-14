@@ -6,8 +6,7 @@ from omniadvisor.service.spark_fetcher import SparkFetcher
 from constants import COMMON_CONFIG
 
 
-common_config = COMMON_CONFIG
-history_server_url = common_config.get("sparkfetcher", "spark.rest.url")
+history_server_url = COMMON_CONFIG.get("sparkfetcher", "spark.history.rest.url")
 spark_fetcher = SparkFetcher(history_server_url)
 
 # 示例数据
