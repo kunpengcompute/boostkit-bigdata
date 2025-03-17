@@ -1,6 +1,9 @@
 import shlex
 import argparse
 from abc import ABC, abstractmethod
+from typing import Dict
+from omniadvisor.utils.logger import logger
+from constants import SPARK_NON_EXEC_ATTR_LIST
 
 
 class ParserInterface(ABC):
@@ -21,19 +24,48 @@ class ParserInterface(ABC):
 
     def _get_base_params(self):
         """
-        使用argparse来解析命令行中的输入命令，并返回解析后的参数，以字典类型保存
+        使用argparse来解析命令行中的输入命令，并返回解析后的非空参数，以字典类型保存
         :return:
         """
         if not self._submit_cmd:
             raise ValueError("Submit command cannot be null")
         param_start_index = self._submit_cmd.strip().index(" ")
         base_params = {}
+        conf_params = {}
+        exec_attr = {}
         args = shlex.split(self._submit_cmd[param_start_index:])
         params, unknown = self._parser.parse_known_args(args=args)
         options_dict = vars(params)
         for key, value in options_dict.items():
-            if value is not None:
+            # 过滤空值参数
+            if value is None:
+                continue
+            # 提取执行相关参数保存至exec_attr
+            if key not in SPARK_NON_EXEC_ATTR_LIST:
+                exec_attr[key] = value
+            # 提取conf配置
+            elif key == "conf":
+                for confitem in value:
+                    parts = confitem.split("=")
+                    if len(parts) != 2:
+                        raise ValueError(f"conf{parts}的格式不符合key=value的形式")
+                    confkey, confvalue = parts
+                    # 处理重复键问题，例如合并值为列表
+                    if confkey in conf_params:
+                        if isinstance(conf_params[confkey], list):
+                            conf_params[confkey].append(confvalue)
+                        else:
+                            conf_params[confkey] = [conf_params[key], value]
+                        logger.warn(f"{confkey}被重复配置,多次配置值如下{conf_params[confvalue]}")
+                    else:
+                        conf_params[confkey] = confvalue
+            else:
                 base_params[key] = value
+
+            # exec_attr 和 conf_params合并进入base_params
+            base_params["exec_attr"] = exec_attr
+            base_params["conf_params"] = conf_params
+
         return base_params
 
 
@@ -84,11 +116,12 @@ class SparkParameterParser(ParserInterface):
         self._parser.add_argument('-i', help='Initialization SQL file')
         self._parser.add_argument('remainder', nargs=argparse.REMAINDER, help="Collect the rest of parameters")
 
-    def process_parameter(self):
+    def process_parameter(self) -> Dict:
         """
         解析提交后的命令，得到解析的参数后，以字典的形式保存
         :return:dict
-        返回一个包含所有提取出的基础参数的字典。每个键代表一个参数名，对应的值为该参数的具体设置或值。
+        返回一个包含所有提取出的基础参数的字典,每个键代表一个参数名,详见add_argument中的配置的参数。
+        对应的值为该参数的具体设置或值。
         """
         base_params = self._get_base_params()
         return base_params

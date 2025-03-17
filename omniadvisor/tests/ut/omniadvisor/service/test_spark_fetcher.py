@@ -2,7 +2,7 @@ import json
 import pytest
 import requests
 from unittest import mock
-from omniadvisor.service.spark_fetcher import SparkFetcher
+from omniadvisor.service.spark_service.spark_fetcher import SparkFetcher
 from constants import COMMON_CONFIG
 
 

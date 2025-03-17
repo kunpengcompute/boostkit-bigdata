@@ -1,6 +1,6 @@
 import pytest
-from unittest.mock import patch
-from omniadvisor.service.spark_executor import run_cmd, execute_submit_cmd, SparkExecutor, ParameterException
+from unittest.mock import patch, MagicMock
+from omniadvisor.service.spark_service.spark_executor import run_cmd, SparkExecutor
 
 
 @patch('subprocess.getstatusoutput')
@@ -15,40 +15,22 @@ def test_run_cmd_verbose(mock_getstatusoutput):
     mock_getstatusoutput.assert_called_once_with("echo hello")
 
 
-@patch('omniadvisor.service.spark_executor.run_cmd')
-def test_execute_submit_cmd_success(mock_run_cmd):
-    # 设置mock返回值
-    mock_run_cmd.return_value = (0, ['success output'])
-
-    # 调用execute_submit_cmd并验证它不会抛出异常
-    try:
-        execute_submit_cmd(['some', 'command'])
-    except Exception as e:
-        pytest.fail(f"execute_submit_cmd raised an exception unexpectedly: {e}")
-
-
-@patch('omniadvisor.service.spark_executor.run_cmd')
-def test_execute_submit_cmd_failure(mock_run_cmd):
-    # 设置mock返回值以模拟失败情况
-    mock_run_cmd.return_value = (1, ['error message'])
-
-    # 验证execute_submit_cmd在命令失败时抛出ParameterException
-    with pytest.raises(ParameterException):
-        execute_submit_cmd(['some', 'command'])
-
-
 class TestSparkExecutor:
     def setup_class(self):
         self.spark_executor = SparkExecutor()
 
-    @patch('omniadvisor.service.spark_executor.execute_submit_cmd')
-    @patch('shlex.split')
-    def test_submit_spark_task(self, mock_shlex_split, mock_execute_submit_cmd):
-        # 设置mock返回值
-        mock_execute_submit_cmd.return_value = (0, ['success output'])
-        mock_shlex_split.return_value = ['spark-submit', 'config']
+    def test_submit_spark_task(self):
+        # 模拟run_cmd函数返回值
+        mock_run_cmd = MagicMock(return_value=(0, ["Application Id: app-12345", "Time taken: 10.5 seconds"]))
 
-        self.spark_executor.submit_spark_task("spark-submit config")
+        # 使用patch装饰器替换run_cmd的实际实现为我们mock的对象
+        with patch('omniadvisor.service.spark_service.spark_executor.run_cmd', mock_run_cmd):
+            exitcode, result_dict = self.spark_executor.submit_spark_task("spark-submit --class MyClass myApp.jar")
 
-        # 确认execute_submit_cmd被正确调用
-        mock_execute_submit_cmd.assert_called_once_with(['spark-submit', 'config'])
+            # 验证run_cmd是否被调用
+            mock_run_cmd.assert_called_once()
+
+            # 验证返回值
+            assert exitcode == 0
+            assert result_dict["application_id"] == "app-12345"
+            assert result_dict["time_taken"] == "10.5"
