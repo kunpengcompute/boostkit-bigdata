@@ -6,7 +6,7 @@ def format_config_to_str(load_config):
     return ''
 
 
-def retest(retest_times, load: Load, config):
+def retest(retest_times, load, config):
     """
     根据复测结果，更新最优配置
     """

@@ -18,7 +18,7 @@ class CommonRepository:
                                                           param3=config.get('param3'))
 
     @staticmethod
-    def find_all_configs(load: Load, knob_space: dict) -> List[Tuple[dict, Performance]]:
+    def find_all_configs(load, knob_space: dict) -> List[Tuple[dict, Performance]]:
         """
         TODO 根据负载唯一标识和参数空间得到该负载下所有的具体配置和性能记录对
         """

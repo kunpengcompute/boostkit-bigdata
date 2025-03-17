@@ -1,0 +1,10 @@
+{
+  "algo": {
+    "expert": 1,
+    "iterative": 3,
+    "migrate": 4
+  },
+  "retest": {
+    "count": 3
+  }
+}

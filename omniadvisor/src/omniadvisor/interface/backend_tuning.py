@@ -4,23 +4,21 @@ import os.path
 from typing import Tuple, List
 
 from omniadvisor.database.repository import CommonRepository
-from omniadvisor.service import spark_service
 from omniadvisor.service.config_recommendation import ConfigRecommendationFactory
 from omniadvisor.service.retest_service import retest
 from omniadvisor.utils.global_config import project_dir, max_failed_configs, retest_times
 from omniadvisor.utils.logger import logger
 
 
-def read_knob_space():
-    repo_path = os.path.join(project_dir, 'config', 'spark_repo.json')
+def read_json_file(file_path: str):
     try:
-        with open(repo_path, "r", encoding="utf-8") as file:
+        with open(file_path, "r", encoding="utf-8") as file:
             # 将 JSON 文件内容解析为 Python 对象
             data = json.load(file)
     except FileNotFoundError:
-        logger.error(f"Error: The file '{repo_path}' does not exist.")
+        logger.error(f"Error: The file '{file_path}' does not exist.")
     except json.JSONDecodeError:
-        logger.error(f"Error: The file '{repo_path}' is not a valid JSON file.")
+        logger.error(f"Error: The file '{file_path}' is not a valid JSON file.")
     except Exception as e:
         logger.error(f"An unexpected error occurred: {e}")
     else:
@@ -28,37 +26,46 @@ def read_knob_space():
     return data
 
 
-def calculate_id(load_content) -> int:
-    # TODO 这里先用hash粗略计算
-    return hash(load_content)
+def load_user_config() -> dict:
+    user_config_path = os.path.join(project_dir, 'config', 'user_config.json')
+    return read_json_file(user_config_path)
+
+
+def convert_params(args, user_config):
+    # 要返回的参数：load, tuning_algorithm, silent
+    algo_list = []
+    algos = user_config.get('algo')
+    for algo_name, tuning_times in algos.items():
+        algo_list.append((algo_name, tuning_times))
+    return args.load, algo_list, args.retest_way == 'backend'
 
 
 def main():
-    # args = parse_backend_tuning_args()
+    args = parse_backend_tuning_args()
     # # TODO 这里的负载，我认为是一个文件名？根据负载以及参数空间文件 -> 找到所有配置及其性能记录
-    unified_tuning('test_20250101_task', [('iterative', 3)], silent=True)
+    user_config = load_user_config()
+    load, tuning_algorithm, if_backend = convert_params(args, user_config)
+    unified_tuning(load, tuning_algorithm, if_backend)
 
 
-# def parse_backend_tuning_args():
-#     parser = argparse.ArgumentParser(description="self define")
-#     parser.add_argument("-w", "--workload", type=str, help="负载")
-#     parser.add_argument("-a", "--algorithm", type=str, choices=['iterative', 'expert', 'transfer'], help="算法")
-#     # parser.add_argument("-c", "--count", type=int, help="调优次数")
-#     # parser.add_argument("-u", "--up", action="store_true", help="调优方向")
-#     # parser.add_argument("-k", "--knob-space", type=str, help="参数空间")
-#     parser.add_argument("-s", "--silent-retest", action="store_true", help="静默复测")
-#     # 解析命令行参数
-#     args = parser.parse_args()
-#     return args
+def parse_backend_tuning_args():
+    parser = argparse.ArgumentParser(
+        description="Parse params that will frequently used. For other configs, change the config file.")
+    parser.add_argument("-l", "--load", type=str, help='Name of the task')
+    parser.add_argument("-r", "--retest-way", type=str, choices=['hijacking', 'backend'],
+                        help='If choose hijacking, a test will execute immediately')
+
+    args = parser.parse_args()
+    return args
 
 
-def unified_tuning(load: Load, tuning_algorithm: List[Tuple[str, int]], silent: bool):
+def unified_tuning(load, tuning_algorithm: List[Tuple[str, int]], if_backend: bool):
     """
     统一的后台调优入口
-    TODO load 里面应该包含用户配置？
     """
-    knob_space = read_knob_space()
-    if silent:
+    repo_path = os.path.join(project_dir, 'config', 'spark_repo.json')
+    knob_space = read_json_file(repo_path)
+    if if_backend:
         # 如果是后台测试，进入循环
         failed_times = max_failed_configs
         for algorithm_type, tuning_round in tuning_algorithm:
