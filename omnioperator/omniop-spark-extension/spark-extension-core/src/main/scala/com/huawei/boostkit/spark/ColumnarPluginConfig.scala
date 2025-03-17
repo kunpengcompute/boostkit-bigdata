@@ -197,6 +197,7 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
 
   def catalogCacheExpireTime: Int = conf.getConf(CATALOG_CACHE_EXPIRE_TIME)
 
+  def joinOutputStringTypeCost: Int = conf.getConf(JOIN_OUTPUT_STRING_COST_ESTIMATE)
 }
 
 
@@ -692,4 +693,10 @@ object ColumnarPluginConfig {
     .doc("set catalog cache expire time in seconds")
     .intConf
     .createWithDefault(600)
+
+  val JOIN_OUTPUT_STRING_COST_ESTIMATE = buildConf("spark.omni.sql.columnar.join.reorder.stringtype.cost")
+    .internal()
+    .doc("set string type in join output cost")
+    .intConf
+    .createWithDefault(9)
 }
