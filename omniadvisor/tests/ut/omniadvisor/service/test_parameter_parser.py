@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import patch
 
-from omniadvisor.service.spark_service.parameter_parser import SparkParameterParser
+from omniadvisor.service.spark_service.spark_parameter_parser import SparkParameterParser
 
 
 class TestParameterParser:

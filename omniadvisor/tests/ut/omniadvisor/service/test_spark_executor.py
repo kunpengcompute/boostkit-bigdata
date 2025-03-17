@@ -4,12 +4,12 @@ from omniadvisor.service.spark_service.spark_executor import run_cmd, SparkExecu
 
 
 @patch('subprocess.getstatusoutput')
-def test_run_cmd_verbose(mock_getstatusoutput):
+def test_run_cmd(mock_getstatusoutput):
     # 配置mock对象
     mock_getstatusoutput.return_value = (0, "line1\nline2\nline3")
 
     # 调用run_cmd函数
-    exitcode, output = run_cmd(['echo', 'hello'], verbose=True)
+    exitcode, output = run_cmd(['echo', 'hello'])
 
     # 确认getstatusoutput被正确调用
     mock_getstatusoutput.assert_called_once_with("echo hello")
