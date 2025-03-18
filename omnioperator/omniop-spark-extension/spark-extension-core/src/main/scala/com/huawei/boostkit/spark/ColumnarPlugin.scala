@@ -1023,7 +1023,7 @@ class ColumnarPlugin extends (SparkSessionExtensions => Unit) with Logging {
 private class OmniTaskStartExecutorPlugin extends ExecutorPlugin with Logging{
 
   private def initTunedOptimization(): Unit = {
-    val enableTunedOptimization = SparkEnv.get.conf.get(ENABLE_OMNI_TUNED).toBoolean
+    val enableTunedOptimization = SparkEnv.get.conf.get(ENABLE_OMNI_TUNED.key, "false").toBoolean
     if (enableTunedOptimization) {
       // Initialize the process ID variable, -1 indicates that the process ID has not been successfully obtained
       var pid: Long = -1
