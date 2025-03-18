@@ -278,6 +278,31 @@ inline void ReverseAndFlipBytes(uint8_t *bytes, int length) {
     }
 }
 
+struct NotNullBitMask {
+    NotNullBitMask() {
+        for (int i = 0; i < (1 << N); i++) {
+            int32_t startIndex = i * (N + 1);
+            int32_t index = startIndex;
+            for (int bit = 0; bit < N; bit++) {
+                if ((i & (1 << bit)) == 0) {
+                    memo_[++index] = bit;
+                }
+            }
+            memo_[startIndex] = index - startIndex;
+        }
+    }
+
+    const inline uint8_t* operator[](size_t i) const {
+        return memo_ + (i * (N + 1));
+    }
+
+private:
+    static constexpr int N = 8;
+    uint8_t memo_[(1 << N) * (N + 1)]{0};
+};
+
+const static NotNullBitMask notNullBitMask;
+
 }
 
 #endif // ORC_DECODE_UTILS

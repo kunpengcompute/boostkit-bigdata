@@ -212,27 +212,44 @@ namespace omniruntime::reader {
         uint64_t nRead = std::min(runLength - runRead, numValues);
         if constexpr (std::is_same_v<T, int64_t>) {
             if (nulls) {
-                uint64_t pos = offset;
+                uint64_t i = offset;
                 uint64_t end = offset + nRead;
-                while (pos < end) {
-                    // WARN: Here assume the offset of nulls is zero, so we can fold the assignment codes
-                    // if the according bits in one byte are all zero.
-                    if (pos % 8 == 0 && pos + 8 < end && reinterpret_cast<uint8_t*>(nulls)[pos/8] == 0) {
-                        data[pos] = literals[0];
-                        data[pos + 1] = literals[0];
-                        data[pos + 2] = literals[0];
-                        data[pos + 3] = literals[0];
-                        data[pos + 4] = literals[0];
-                        data[pos + 5] = literals[0];
-                        data[pos + 6] = literals[0];
-                        data[pos + 7] = literals[0];
-                        pos += 8;
+                uint64_t skipNum = std::min(BitUtil::Nbytes(offset) * 8 - offset, nRead);
+                for (; i < offset + skipNum; i++) {
+                    if (!BitUtil::IsBitSet(nulls, i)) {
+                        data[i] = literals[0];
+                        runRead++;
+                    }
+                }
+                uint8_t mask;
+                for (; i + 8 <= end; i += 8) {
+                    mask = reinterpret_cast<uint8_t*>(nulls)[i / 8];
+                    if (UNLIKELY(mask == 255)) {
+                        continue;
+                    }
+                    if (mask == 0) {
+                        data[i] = literals[0];
+                        data[i + 1] = literals[0];
+                        data[i + 2] = literals[0];
+                        data[i + 3] = literals[0];
+                        data[i + 4] = literals[0];
+                        data[i + 5] = literals[0];
+                        data[i + 6] = literals[0];
+                        data[i + 7] = literals[0];
                         runRead += 8;
-                    } else if (!BitUtil::IsBitSet(nulls, pos)) {
-                        data[pos++] = literals[0];
-                        ++runRead;
-                    } else {
-                        pos++;
+                        continue;
+                    }
+                    auto *maskArr = notNullBitMask[mask];
+                    for (int j = 1; j <= *maskArr; j++) {
+                        auto notNullIndex = i + maskArr[j];
+                        data[notNullIndex] = literals[0];
+                        runRead++;
+                    }
+                }
+                for (; i < end; i++) {
+                    if (!BitUtil::IsBitSet(nulls, i)) {
+                        data[i] = literals[0];
+                        runRead++;
                     }
                 }
             } else {
@@ -243,10 +260,32 @@ namespace omniruntime::reader {
             }
         } else {
             if (nulls) {
-                for(uint64_t pos = offset; pos < offset + nRead; ++pos) {
-                    if (!BitUtil::IsBitSet(nulls, pos)) {
-                        data[pos] = static_cast<T>(literals[0]);
-                        ++runRead;
+                uint64_t i = offset;
+                uint64_t end = offset + nRead;
+                uint64_t skipNum = std::min(BitUtil::Nbytes(offset) * 8 - offset, nRead);
+                for (; i < offset + skipNum; i++) {
+                    if (!BitUtil::IsBitSet(nulls, i)) {
+                        data[i] = static_cast<T>(literals[0]);
+                        runRead++;
+                    }
+                }
+                uint8_t mask;
+                for (; i + 8 <= end; i += 8) {
+                    mask = reinterpret_cast<uint8_t*>(nulls)[i / 8];
+                    if (UNLIKELY(mask == 255)) {
+                        continue;
+                    }
+                    auto *maskArr = notNullBitMask[mask];
+                    for (int j = 1; j <= *maskArr; j++) {
+                        auto notNullIndex = i + maskArr[j];
+                        data[notNullIndex] = static_cast<T>(literals[0]);
+                        runRead++;
+                    }
+                }
+                for (; i < end; i++) {
+                    if (!BitUtil::IsBitSet(nulls, i)) {
+                        data[i] = static_cast<T>(literals[0]);
+                        runRead++;
                     }
                 }
             } else {
@@ -844,11 +883,19 @@ namespace omniruntime::reader {
            if (nulls) {
                uint64_t i = offset;
                uint64_t end = offset + nRead;
-               while (i < end) {
-                   // WARN: Here assume the offset of nulls is zero, so we can fold the assignment codes
-                   // if the according bits in one byte are all zero.
-                   if (i % 8 == 0 && i + 8 < end && reinterpret_cast<uint8_t*>(nulls)[i/8] == 0) {
-                       // fold 8 times for one byte
+               uint64_t skipNum = std::min(BitUtil::Nbytes(offset) * 8 - offset, nRead);
+               for (; i < offset + skipNum; i++) {
+                   if (!BitUtil::IsBitSet(nulls, i)) {
+                       data[i] = literals[runRead++];
+                   }
+               }
+               uint8_t mask;
+               for (; i + 8 <= end; i += 8) {
+                   mask = reinterpret_cast<uint8_t*>(nulls)[i / 8];
+                   if (UNLIKELY(mask == 255)) {
+                       continue;
+                   }
+                   if (mask == 0) {
                        data[i] = literals[runRead];
                        data[i + 1] = literals[runRead + 1];
                        data[i + 2] = literals[runRead + 2];
@@ -857,12 +904,18 @@ namespace omniruntime::reader {
                        data[i + 5] = literals[runRead + 5];
                        data[i + 6] = literals[runRead + 6];
                        data[i + 7] = literals[runRead + 7];
-                       i += 8;
                        runRead += 8;
-                   } else if (!BitUtil::IsBitSet(nulls, i)) {
-                       data[i++] = literals[runRead++];
-                   } else {
-                       i++;
+                       continue;
+                   }
+                   auto *maskArr = notNullBitMask[mask];
+                   for (int j = 1; j <= *maskArr; j++) {
+                       auto notNullIndex = i + maskArr[j];
+                       data[notNullIndex] = literals[runRead++];
+                   }
+               }
+               for (; i < end; i++) {
+                   if (!BitUtil::IsBitSet(nulls, i)) {
+                       data[i] = literals[runRead++];
                    }
                }
            } else {
@@ -871,7 +924,27 @@ namespace omniruntime::reader {
            }
         } else {
             if (nulls) {
-                for (uint64_t i = offset; i < (offset + nRead); ++i) {
+                uint64_t i = offset;
+                uint64_t end = offset + nRead;
+                uint64_t skipNum = std::min(BitUtil::Nbytes(offset) * 8 - offset, nRead);
+                for (; i < offset + skipNum; i++) {
+                    if (!BitUtil::IsBitSet(nulls, i)) {
+                        data[i] = static_cast<T>(literals[runRead++]);
+                    }
+                }
+                uint8_t mask;
+                for (; i + 8 <= end; i += 8) {
+                    mask = reinterpret_cast<uint8_t*>(nulls)[i / 8];
+                    if (UNLIKELY(mask == 255)) {
+                        continue;
+                    }
+                    auto *maskArr = notNullBitMask[mask];
+                    for (int j = 1; j <= *maskArr; j++) {
+                        auto notNullIndex = i + maskArr[j];
+                        data[notNullIndex] = static_cast<T>(literals[runRead++]);
+                    }
+                }
+                for (; i < end; i++) {
                     if (!BitUtil::IsBitSet(nulls, i)) {
                         data[i] = static_cast<T>(literals[runRead++]);
                     }
