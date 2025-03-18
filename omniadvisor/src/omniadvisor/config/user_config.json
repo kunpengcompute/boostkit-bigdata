@@ -4,7 +4,6 @@
     "iterative": 3,
     "migrate": 4
   },
-  "retest": {
-    "count": 3
-  }
+  "retest_times": 3,
+  "max_failed_configs": 5
 }
