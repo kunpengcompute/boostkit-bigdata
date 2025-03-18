@@ -241,7 +241,13 @@ void Splitter::SplitBinaryVector(BaseVector *varcharVector, int col_schema) {
             auto pid = partition_id_[row];
             uint8_t *dst = nullptr;
             uint32_t str_len = 0;
-            if (!vc->IsNull(row)) {
+            if constexpr (hasNull) {
+                if (!vc->IsNull(row)) {
+                    std::string_view value = vc->GetValue(row);
+                    dst = reinterpret_cast<uint8_t *>(reinterpret_cast<int64_t>(value.data()));
+                    str_len = static_cast<uint32_t>(value.length());
+                }
+            } else {
                 std::string_view value = vc->GetValue(row);
                 dst = reinterpret_cast<uint8_t *>(reinterpret_cast<int64_t>(value.data()));
                 str_len = static_cast<uint32_t>(value.length());
@@ -272,11 +278,17 @@ void Splitter::SplitBinaryVector(BaseVector *varcharVector, int col_schema) {
     } else {
         auto vc = reinterpret_cast<Vector<LargeStringContainer<std::string_view>> *>(varcharVector);
         cached_vectorbatch_size_ += num_rows * (sizeof(bool) + sizeof(int32_t)) + sizeof(int32_t);
-	for (auto row = 0; row < num_rows; ++row) {
+	    for (auto row = 0; row < num_rows; ++row) {
             auto pid = partition_id_[row];
             uint8_t *dst = nullptr;
             uint32_t str_len = 0;
-            if (!vc->IsNull(row)) {
+            if constexpr (hasNull) {
+                if (!vc->IsNull(row)) {
+                    std::string_view value = vc->GetValue(row);
+                    dst = reinterpret_cast<uint8_t *>(reinterpret_cast<int64_t>(value.data()));
+                    str_len = static_cast<uint32_t>(value.length());
+                }
+            } else {
                 std::string_view value = vc->GetValue(row);
                 dst = reinterpret_cast<uint8_t *>(reinterpret_cast<int64_t>(value.data()));
                 str_len = static_cast<uint32_t>(value.length());
