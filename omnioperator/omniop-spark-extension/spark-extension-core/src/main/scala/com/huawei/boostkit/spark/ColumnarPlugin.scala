@@ -18,7 +18,7 @@
 
 package com.huawei.boostkit.spark
 
-import com.huawei.boostkit.spark.ColumnarPluginConfig.{ENABLE_OMNI_COLUMNAR_TO_ROW, ENABLE_OMNI_TUNED}
+import com.huawei.boostkit.spark.ColumnarPluginConfig.{ENABLED_NUMA_BINDING, ENABLE_OMNI_COLUMNAR_TO_ROW, NUMA_BINDING_CORE_RANGE, ENABLE_OMNI_TUNED}
 import com.huawei.boostkit.spark.Constant.OMNI_IS_ADAPTIVE_CONTEXT
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor
 import com.huawei.boostkit.spark.util.{ModifyUtilAdaptor, PhysicalPlanSelector}
@@ -47,6 +47,7 @@ import org.apache.spark.sql.util.ShimUtil
 import nova.hetu.omniruntime.memory.MemoryManager
 import org.apache.spark.SparkEnv
 import org.apache.spark.sql.execution.datasources.orc.OrcFileFormat
+import org.apache.spark.sql.execution.util.ExecutorManager
 import org.apache.spark.sql.types.{BooleanType, DataType, DateType, DoubleType, IntegerType, LongType, ShortType}
 
 import java.io.BufferedReader
@@ -1020,7 +1021,7 @@ class ColumnarPlugin extends (SparkSessionExtensions => Unit) with Logging {
   }
 }
 
-private class OmniTaskStartExecutorPlugin extends ExecutorPlugin with Logging{
+private class OmniTaskStartExecutorPlugin extends ExecutorPlugin with Logging {
 
   private def initTunedOptimization(): Unit = {
     val enableTunedOptimization = SparkEnv.get.conf.get(ENABLE_OMNI_TUNED.key, "false").toBoolean
@@ -1068,8 +1069,25 @@ private class OmniTaskStartExecutorPlugin extends ExecutorPlugin with Logging{
     }
   }
 
+  private def initNumaBind(): Unit = {
+    val enableNumaBinding: Boolean = SparkEnv.get.conf.get(ENABLED_NUMA_BINDING.key, "false").toBoolean
+    val bindingInfo = if (!enableNumaBinding) {
+      NumaBindingInfo(enableNumaBinding = false)
+    } else {
+      val tmp = SparkEnv.get.conf.get(NUMA_BINDING_CORE_RANGE.key, "")
+      if (tmp.isEmpty) {
+        NumaBindingInfo(enableNumaBinding = false)
+      } else {
+        val coreRangeList: Array[String] = tmp.split('|').map(_.trim)
+        NumaBindingInfo(enableNumaBinding = true, coreRangeList)
+      }
+    }
+    ExecutorManager.tryTaskSet(bindingInfo)
+  }
+
   override def init(ctx: PluginContext, extraConf: java.util.Map[String, String]): Unit = {
     initTunedOptimization()
+    initNumaBind()
   }
 
   override def onTaskStart(): Unit = {
