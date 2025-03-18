@@ -25,7 +25,7 @@ class TestSparkExecutor:
 
         # 使用patch装饰器替换run_cmd的实际实现为我们mock的对象
         with patch('omniadvisor.service.spark_service.spark_executor.run_cmd', mock_run_cmd):
-            exitcode, result_dict = self.spark_executor.submit_spark_task("spark-submit --class MyClass myApp.jar")
+            exitcode, spark_out_put, result_dict = self.spark_executor.submit_spark_task("spark-submit --class MyClass myApp.jar")
 
             # 验证run_cmd是否被调用
             mock_run_cmd.assert_called_once()

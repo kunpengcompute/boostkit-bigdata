@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 
 class ParserInterface(ABC):
     """
-    引擎的解析器的接口类
+    Spark, Hive等各类引擎的解析器的接口类
     :param submit_cmd: 提交的命令
     """
 

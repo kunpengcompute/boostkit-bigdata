@@ -7,7 +7,8 @@ from omniadvisor.service.spark_service.spark_parameter_parser import SparkParame
 class TestParameterParser:
     def test_process_parameter(self):
         # 准备测试数据
-        submit_cmd = "spark-submit --master local[*] --deploy-mode client --executor-memory 2g"
+        submit_cmd = "spark-submit --name test_sql --master local[*] --deploy-mode client " \
+                     "--executor-memory 2g --conf spark.memory.fraction=0.6"
 
         # 创建 SparkParameterParser 实例
         parser = SparkParameterParser(submit_cmd)
@@ -16,9 +17,9 @@ class TestParameterParser:
         params = parser.process_parameter()
 
         # 验证返回的字典包含预期的键值对
-        assert 'master' in params and params['master'] == 'local[*]'
-        assert 'deploy_mode' in params and params['deploy_mode'] == 'client'
-        assert 'executor_memory' in params['exec_attr'] and params['exec_attr']['executor_memory'] == '2g'
+        assert 'name' in params and params['name'] == "test_sql"
+        assert 'exec_attr' in params and isinstance(params['exec_attr'], dict)
+        assert 'conf_params' in params and isinstance(params['conf_params'], dict)
 
     def test_get_base_params_with_empty_submit_cmd(self):
         # 测试 _get_base_params 在提交命令为空时抛出 ValueError
@@ -38,5 +39,5 @@ class TestParameterParser:
         params = parser._get_base_params()
 
         # 验证返回的字典包含预期的键值对
-        assert 'master' in params and params['master'] == 'local[*]'
-        assert 'deploy_mode' in params and params['deploy_mode'] == 'client'
+        assert 'master' in params['exec_attr'] and params['exec_attr']['master'] == 'local[*]'
+        assert 'deploy_mode' in params['exec_attr'] and params['exec_attr']['deploy_mode'] == 'client'

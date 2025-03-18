@@ -2,7 +2,7 @@ import argparse
 import shlex
 from typing import Dict
 from omniadvisor.utils.logger import logger
-from constants import SPARK_NON_EXEC_ATTR_LIST
+from src.omniadvisor.utils.constant import SPARK_NON_EXEC_ATTR_LIST
 from omniadvisor.service.parameter_parser import ParserInterface
 
 
@@ -11,6 +11,7 @@ class SparkParameterParser(ParserInterface):
     Spark 引擎的解析器
     :param submit_cmd: 提交的命令
     """
+
     def __init__(self, submit_cmd):
         super().__init__(submit_cmd)
         self._parser.add_argument("--master",
@@ -59,6 +60,7 @@ class SparkParameterParser(ParserInterface):
         :return:dict
         返回一个包含所有提取出的基础参数的字典,每个键代表一个参数名,详见add_argument中的配置的参数。
         对应的值为该参数的具体设置或值。
+        base_params = {name:"", conf_params:{}, exec_attr:{}}
         """
         base_params = self._get_base_params()
         return base_params
