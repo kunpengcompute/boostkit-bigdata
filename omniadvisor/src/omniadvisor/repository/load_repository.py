@@ -101,3 +101,16 @@ class LoadRepository(Repository):
             model_attr=model_attr
         )
         return Load(database_model=database_load)
+
+    @classmethod
+    def query_by_id(cls, load_id: str):
+        """
+        根据 load_id 查询 load
+        @param load_id:
+        @return:
+        """
+        model_attr = {
+            Load.FieldName.id: load_id,
+        }
+        database_loads = cls._query(model_attr=model_attr)
+        return Load(database_model=database_loads.first())

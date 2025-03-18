@@ -1,6 +1,7 @@
-import os
+import json
 import subprocess
 
+from omniadvisor.utils.logger import logger
 
 
 def call_binary(command, *args, binary_path):
@@ -17,3 +18,18 @@ def call_binary(command, *args, binary_path):
     result = subprocess.run(full_command, check=True, capture_output=True, text=True)
     return result
 
+
+def read_json_file(file_path: str):
+    try:
+        with open(file_path, "r", encoding="utf-8") as file:
+            # 将 JSON 文件内容解析为 Python 对象
+            data = json.load(file)
+    except FileNotFoundError:
+        logger.error(f"Error: The file '{file_path}' does not exist.")
+    except json.JSONDecodeError:
+        logger.error(f"Error: The file '{file_path}' is not a valid JSON file.")
+    except Exception as e:
+        logger.error(f"An unexpected error occurred: {e}")
+    else:
+        logger.info(data)
+    return data
