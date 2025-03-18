@@ -73,7 +73,8 @@ public class ShuffleDataSerializer {
             address = unsafe.allocateMemory(readSize);
             unsafe.copyMemory(bytes, BYTE_ARRAY_BASE_OFFSET, null, address, readSize);
 
-            deserializer = new ShuffleDataSerializerUtils(address, readSize);
+            deserializer = new ShuffleDataSerializerUtils();
+            deserializer.init(address, readSize);
             int vecCount = deserializer.getVecCount();
             int rowCount = deserializer.getRowCount();
 

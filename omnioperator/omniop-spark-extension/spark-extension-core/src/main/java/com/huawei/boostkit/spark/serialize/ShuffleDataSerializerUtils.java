@@ -4,11 +4,17 @@
  
  package com.huawei.boostkit.spark.serialize;
 
+ import com.huawei.boostkit.spark.jni.NativeLoader;
+
  public class ShuffleDataSerializerUtils {
     private long vecBatchAddress;
     private int[] typeIdArray;
 
-    public ShuffleDataSerializerUtils(long address, int length) {
+    public ShuffleDataSerializerUtils() {
+        NativeLoader.getInstance();
+    }
+
+    public void init(long address, int length) {
         vecBatchAddress = parseInit(address, length);
     }
 
