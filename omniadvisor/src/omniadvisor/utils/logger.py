@@ -66,7 +66,3 @@ dictConfig(LOGGING_CONFIG)
 
 # 获取logger并使用
 logger = logging.getLogger('project_logger')
-
-if __name__ == "__main__":
-    logger.info("testlogger")
-    print("")
