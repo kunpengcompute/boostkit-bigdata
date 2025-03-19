@@ -40,7 +40,7 @@ object ExecutorManager extends Logging {
       val executorId = SparkEnv.get.executorId
       val coreRange = numaInfo.totalCoreRange
       val shouldBindNumaIdx = executorIdOnLocalNode.indexOf(executorId) % coreRange.size
-      System.out.println(
+      logInfo(
         s"executorId is $executorId, executorIdOnLocalNode is $executorIdOnLocalNode")
       val taskSetCmd = s"taskset -cpa ${coreRange(shouldBindNumaIdx)} ${getProcessId()}"
       System.out.println(taskSetCmd)
