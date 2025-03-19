@@ -24,6 +24,8 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.shuffle.sort.ColumnarShuffleManager
 import org.apache.spark.sql.internal.SQLConf
 
+case class NumaBindingInfo(enableNumaBinding: Boolean, totalCoreRange: Array[String] = null, numCoresPerExecutor: Int = -1) {}
+
 class ColumnarPluginConfig(conf: SQLConf) extends Logging {
   def columnarShuffleStr: String = conf
     .getConfString("spark.shuffle.manager", "sort")
@@ -697,4 +699,16 @@ object ColumnarPluginConfig {
     .doc("enable tuned-adm optimization")
     .booleanConf
     .createWithDefault(false)
+
+  val ENABLED_NUMA_BINDING =
+    buildConf("spark.omni.sql.columnar.numaBinding")
+      .internal()
+      .booleanConf
+      .createWithDefault(false)
+
+  val NUMA_BINDING_CORE_RANGE =
+    buildConf("spark.omni.sql.columnar.coreRange")
+      .internal()
+      .stringConf
+      .createOptional
 }
