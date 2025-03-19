@@ -1,4 +1,3 @@
-import pytest
 from unittest.mock import patch, MagicMock
 from omniadvisor.service.spark_service.spark_executor import run_cmd, SparkExecutor
 

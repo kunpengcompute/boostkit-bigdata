@@ -3,10 +3,10 @@ import pytest
 import requests
 from unittest import mock
 from omniadvisor.service.spark_service.spark_fetcher import SparkFetcher
-from src.omniadvisor.utils.constant import COMMON_CONFIG
+from src.omniadvisor.utils.constant import OA_CONF
 
 
-history_server_url = COMMON_CONFIG.get("sparkfetcher", "spark.history.rest.url")
+history_server_url = OA_CONF.COMMON_CONFIG.get("sparkfetcher", "spark.history.rest.url")
 spark_fetcher = SparkFetcher(history_server_url)
 
 # 示例数据

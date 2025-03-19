@@ -2,18 +2,6 @@ import os
 import configparser
 
 
-class OmniAdvisorConf:
-    """
-    OmniAdvisor常量
-    """
-    # 任务执行状态
-    class TaskStatus:
-        success = 'Success'
-        fail = 'Fail'
-        running = 'Running'
-        all = [success, fail, running]
-
-
 def load_common_config():
     """
     使用configparser库加载common_config
@@ -29,12 +17,26 @@ def load_common_config():
     return common_config
 
 
+class OmniAdvisorConf:
+    """
+    OmniAdvisor常量
+    """
+    # 任务执行状态
+    class TaskStatus:
+        success = 'Success'
+        fail = 'Fail'
+        running = 'Running'
+        all = [success, fail, running]
+
+    # 项目通用配置
+    COMMON_CONFIG = load_common_config()
+    CODING_TYPE = "utf-8"
+    SPARK_NON_EXEC_ATTR_LIST = {"name", "conf"}
+    PROJECT_DIR = os.path.dirname(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))  # 获取当前脚本所在的目录
+    DATA_DIR = "".join([PROJECT_DIR, "/data"])
+    SPARK_TRACE_DATA_DIR = "".join([DATA_DIR, "/spark_trace"])
+
+
 # 常量列表
-COMMON_CONFIG = load_common_config()
 OA_CONF = OmniAdvisorConf()
-CODING_TYPE = "utf-8"
-SPARK_NON_EXEC_ATTR_LIST = {"name", "conf"}
-PROJECT_DIR = os.path.dirname(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))  # 获取当前脚本所在的目录
-DATA_DIR = "".join([PROJECT_DIR, "/data"])
-SPARK_TRACE_DATA_DIR = "".join([DATA_DIR, "/spark_trace"])

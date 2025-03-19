@@ -1,5 +1,4 @@
-import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 from omniadvisor.service.spark_service.spark_command_reconstruct import spark_command_reconstruct
 
 
