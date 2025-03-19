@@ -59,14 +59,10 @@ message VecType {
     TimeUnit timeUnit = 6;
 }
 
-message ProtoRow {
-    bytes data = 1;
-    uint32 length = 2;
-}
-
 message ProtoRowBatch {
     int32 rowCnt = 1;
     int32 vecCnt = 2;
     repeated VecType vecTypes = 3;
-    repeated ProtoRow rows = 4;
+    bytes rows = 4;
+    bytes offsets = 5;
 }
