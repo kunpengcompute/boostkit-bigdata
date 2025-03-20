@@ -1,4 +1,4 @@
-from src.omniadvisor.utils.logger import logger
+from omniadvisor.utils.logger import logger
 
 
 def spark_command_reconstruct(load, conf):

@@ -10,10 +10,10 @@ class TestSparkCommandReconstruct:
         # 创建 mock load 对象
         mock_load = MagicMock()
         mock_load.name = "TestApp"
-        mock_load.exec_attr = [("driver-memory", "8G"), ("executor-memory", "16G")]
+        mock_load.exec_attr = {"driver-memory": "8G", "executor-memory":"16G"}
 
         # 定义 conf 参数
-        conf = [("spark.sql.shuffle.partitions", "3200"), ("spark.executor.cores", "4")]
+        conf = {"spark.sql.shuffle.partitions": "3200", "spark.executor.cores": "4"}
 
         expected_cmd = "spark-sql --name TestApp" \
                        " --driver-memory 8G" \
@@ -28,9 +28,9 @@ class TestSparkCommandReconstruct:
         # 创建 mock load 对象
         mock_load = MagicMock()
         mock_load.name = "InitScriptApp"
-        mock_load.exec_attr = [("i", "init.script.path")]
+        mock_load.exec_attr = {"i": "init.script.path"}
 
-        conf = []
+        conf = {}
 
         expected_cmd = "spark-sql --name InitScriptApp -i init.script.path"
 
