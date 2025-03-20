@@ -1,0 +1,75 @@
+from unittest.mock import patch,mock_open
+from omniadvisor.utils.utils import run_cmd, trace_data_saver  # 假设你的函数定义在 'your_module' 中
+
+
+class TestRunCmd:
+    @patch('subprocess.getstatusoutput')
+    def test_run_cmd_success(self, mock_getstatusoutput):
+        # 配置mock的返回值
+        mock_getstatusoutput.return_value = (0, "Success output")
+
+        exitcode, output = run_cmd(['echo', 'hello'])
+
+        # 验证结果
+        assert exitcode == 0
+        assert output == ["Success output"]
+        mock_getstatusoutput.assert_called_once_with('echo hello')
+
+    @patch('subprocess.getstatusoutput')
+    def test_run_cmd_failure(self, mock_getstatusoutput):
+        # 配置mock的返回值
+        mock_getstatusoutput.return_value = (1, "Error output")
+
+        exitcode, output = run_cmd(['false'])
+
+        # 验证结果
+        assert exitcode == 1
+        assert output == ["Error output"]
+
+
+class TestTraceDataSaver:
+    @patch('os.makedirs')
+    @patch('uuid.uuid4', return_value="test-uuid")
+    def test_trace_data_saver_success(self, mock_uuid, mock_makedirs):
+        data = [{"key": "value"}]
+        data_dir = "/tmp"
+        m = mock_open()
+        with patch('builtins.open', m, create=True):
+            file_path = trace_data_saver(data, data_dir)
+
+        expected_path = f"{data_dir}/test-uuid"
+        assert file_path == expected_path
+        m.assert_called_once_with(expected_path, 'w', encoding='utf-8')
+
+    @patch('os.makedirs')
+    def test_trace_data_saver_ioerror(self, mock_makedirs):
+        data = [{"key": "value"}]
+        data_dir = "/tmp"
+        m = mock_open()
+        m.side_effect = IOError("IO Error")
+
+        with patch('os.makedirs'), \
+             patch('uuid.uuid4', return_value="test-uuid"), \
+             patch('builtins.open', m, create=True):
+            try:
+                trace_data_saver(data, data_dir)
+                assert False, "Expected an IOError to be raised."
+            except IOError as e:
+                assert str(e) == "出现IO错误: IO Error", f"Unexpected error message: {str(e)}"
+
+
+    @patch('os.makedirs')
+    def test_trace_data_saver_exception(self, mock_makedirs):
+        data = [{"key": "value"}]
+        data_dir = "/tmp"
+        m = mock_open()
+        m.side_effect = Exception("Unexpected error")
+
+        with patch('os.makedirs'), \
+             patch('uuid.uuid4', return_value="test-uuid"), \
+             patch('builtins.open', m, create=True):
+            try:
+                trace_data_saver(data, data_dir)
+                assert False, "Expected an Exception to be raised."
+            except Exception as e:
+                assert str(e) == "保存过程中出现错误: Unexpected error", f"Unexpected error message: {str(e)}"
