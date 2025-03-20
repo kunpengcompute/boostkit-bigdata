@@ -75,9 +75,9 @@ class TestSparkRun:
 
         self.assertEqual(result_task, task_mock)
         mock_update_task_result.assert_called_once_with(task_mock, OA_CONF.TaskStatus.success, 10, {
-            'sql': f'{OA_CONF.DATA_DIR}/sql_info',
-            'stages': f'{OA_CONF.DATA_DIR}/stages_info',
-            'executor': f'{OA_CONF.DATA_DIR}/executor_info'
+            'sql': f'{OA_CONF.DATA_DIR}/testfile',
+            'stages': f'{OA_CONF.DATA_DIR}/testfile',
+            'executor': f'{OA_CONF.DATA_DIR}/testfile'
         })
 
     @patch('omniadvisor.service.spark_service.spark_command_reconstruct.spark_command_reconstruct')
