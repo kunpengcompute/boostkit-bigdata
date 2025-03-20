@@ -39,8 +39,8 @@ def trace_data_saver(data: List[Dict[str, str]], data_dir):
             json.dump(data, f, ensure_ascii=False, indent=4)
         print(f"数据已成功保存到 {file_path}")
     except IOError as e:
-        print(f"出现IO错误: {e}")
+        raise IOError(f"出现IO错误: {e}")
     except Exception as e:
-        print(f"保存过程中出现错误: {e}")
+        raise Exception(f"保存过程中出现错误: {e}")
     return file_path
 
