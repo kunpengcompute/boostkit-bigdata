@@ -101,3 +101,20 @@ class LoadRepository(Repository):
             model_attr=model_attr
         )
         return Load(database_model=database_load)
+
+    @classmethod
+    def update_is_need_tunning(cls, load:Load, is_need_tunning: bool):
+        """
+        更新当前负载是否需要调优这一信息
+        :param load: 负载实例
+        :param is_need_tunning: 是否需要调优 布尔型变量
+        :return: 更新完之后的负载实例
+        """
+        model_attr = {
+            Load.FieldName.is_need_tunning: is_need_tunning
+        }
+        database_load = cls._update(
+            database_model=load.database_model,
+            model_attr=model_attr
+        )
+        return Load(database_model=database_load)
