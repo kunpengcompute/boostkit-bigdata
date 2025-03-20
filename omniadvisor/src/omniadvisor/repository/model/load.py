@@ -42,8 +42,8 @@ class Load:
         return self._database_model.create_time
 
     @property
-    def is_need_tunning(self):
-        return self._database_model.is_need_tunning
+    def tuning_needed(self):
+        return self._database_model.tuning_needed
 
     @property
     def database_model(self):
@@ -57,4 +57,4 @@ class Load:
         best_config = 'best_config'
         test_config = 'test_config'
         create_time = 'create_time'
-        is_need_tunning = 'is_need_tunning'
+        tuning_needed = 'tuning_needed'
