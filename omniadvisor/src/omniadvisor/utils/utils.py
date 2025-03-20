@@ -72,6 +72,5 @@ def read_json_file(file_path: str):
         logger.error(f"Error: The file '{file_path}' is not a valid JSON file.")
     except Exception as e:
         logger.error(f"An unexpected error occurred: {e}")
-    else:
-        logger.info(data)
+
     return data

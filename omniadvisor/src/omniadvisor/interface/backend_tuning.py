@@ -78,11 +78,14 @@ def unified_tuning(args):
     """
     repo_path = os.path.join(project_dir, 'config', 'spark_repo.json')
     knob_space = read_json_file(repo_path)
+    logger.debug('成功读取到参数空间文件。')
     if args.if_backend:
-        # 进入后台测试
+        # 后台调优
+        logger.info('进入到后台调优。')
         backend_tuning(args, knob_space)
     else:
-        # 前台测试
+        # 劫持测试
+        logger.info('进入到劫持调优。')
         hijacking_tuning(args, knob_space)
 
 
@@ -93,12 +96,15 @@ def hijacking_tuning(args, knob_space):
     @param knob_space:
     @return:
     """
+    # 劫持调优，只调一轮
     algorithm_type = args.algo_list[0][0]
-    # 获取调优方法
     factory = ConfigRecommendationFactory(algorithm_type, args.load, knob_space)
     config_recommendation = factory.make()
+    # 一些算法需要初始化
+    config_recommendation.initialize()
     next_config = config_recommendation.recommend()
-    LoadRepository.update_test_config(args.load, next_config)
+    load = LoadRepository.query_by_id(args.load_id)
+    LoadRepository.update_test_config(load, next_config)
 
 
 def backend_tuning(args, knob_space):
@@ -111,8 +117,11 @@ def backend_tuning(args, knob_space):
     failed_times = args.max_failed_configs
     # 创建负载：
     load = LoadRepository.query_by_id(args.load_id)
+    if load.database_model is None:
+        # 若查询结果为空，直接返回即可
+        logger.info('Cannot find load id: %s in database.', args.load_id)
+        return
     for algorithm_type, tuning_round in args.algo_list:
-        # 最大失败次数
         if failed_times <= 0:
             break
         # 每一种算法，只创建一次
@@ -127,7 +136,8 @@ def backend_tuning(args, knob_space):
             LoadRepository.update_test_config(load, next_config)
             # 复测
             try:
-                average_performance = retest(retest_times, args.load, next_config)
+                logger.info('准备复测寻优出的配置：%s', next_config)
+                _, average_performance = retest(args.retest_times, load, next_config)
             # TODO 完善这里的异常
             except Exception:
                 failed_times -= 1

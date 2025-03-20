@@ -6,8 +6,6 @@ from ConfigSpace import ConfigurationSpace, Configuration, UniformIntegerHyperpa
 from smac import Scenario, HyperparameterOptimizationFacade
 from smac.runhistory import TrialValue
 
-from django_server.app.models import DatabaseLoad
-from omniadvisor.repository.load_repository import LoadRepository
 from omniadvisor.repository.model.load import Load
 from omniadvisor.repository.task_repository import TaskRepository
 
@@ -60,9 +58,9 @@ class IterativeTuning(ConfigRecommendation):
         scenario = Scenario(config_space, deterministic=True, n_trials=len(history.config_perf_pairs) + 1)
         smac = HyperparameterOptimizationFacade(scenario, self.train)
         # 初始化历史数据到model
-        for performance, config_value in history.config_perf_pairs:
+        for config_value, performance in history.config_perf_pairs:
             config_instance = Configuration(configuration_space=config_space, values=config_value)
-            smac.runhistory.add(config=config_instance, cost=performance.average_performance, seed=1)
+            smac.runhistory.add(config=config_instance, cost=performance, seed=1)
         self.smac = smac
 
     def recommend(self):
@@ -153,7 +151,7 @@ class TransferTuning(ConfigRecommendation):
 
 class ConfigRecommendationFactory:
 
-    def __init__(self, recommendation_type, load: str, knob_space):
+    def __init__(self, recommendation_type, load: Load, knob_space):
         self.recommendations = {
             'iterative': IterativeTuning,
             'expert': ExpertTuning,

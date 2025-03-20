@@ -19,7 +19,11 @@ def spark_run(load, conf):
 
     # 根据ApplicantID获取Trace
     trace_dict = {}
+
     application_id = result_dict.get('application_id')
+    if not application_id:
+        # TODO 这里没有错误的处理逻辑
+        pass
     history_server_url = OA_CONF.COMMON_CONFIG.get("sparkfetcher", "spark.history.rest.url")
     spark_fetcher = SparkFetcher(history_server_url)
     trace_dict['sql'] = trace_data_saver(spark_fetcher.get_spark_sql_by_app(application_id), OA_CONF.DATA_DIR)
