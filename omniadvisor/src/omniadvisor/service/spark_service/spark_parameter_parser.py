@@ -68,7 +68,7 @@ class SparkParameterParser(ParserInterface):
     def _get_base_params(self):
         """
         使用argparse来解析命令行中的输入命令，并返回解析后的非空参数，以字典类型保存
-        :return:
+        :return: {"name": "", "conf_params": {}, "exec_attr": {}} 结构的字典
         """
         if not self._submit_cmd:
             raise ValueError("Submit command cannot be null")

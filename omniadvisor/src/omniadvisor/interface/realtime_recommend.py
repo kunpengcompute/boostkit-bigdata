@@ -21,13 +21,12 @@ def realtime_recommend(spark_sql_cmd):
     if not load:  # 查询失败 创建load的同时使用租户默认配置进行测试
         load = LoadRepository.create(name=name, exec_attr=exec_attr, default_config=user_config)
         config_for_test = user_config
-    elif load.tuning_needed():
-        if load.test_config():  # TODO 关注一下这个函数查询失败时的返回值是不是bool类型的
-            config_for_test = load.test_config()
-        elif load.best_config():
-            config_for_test = load.best_config()
+    elif load.tuning_needed:
+        if load.test_config:  # test_config为空时返回None
+            config_for_test = load.test_config
+        elif load.best_config:
+            config_for_test = load.best_config
 
-    # TODO 感觉这个判断的位置可以换一换？
     if not config_for_test:
         logger.error("Failed to acquire an available execution configuration.")
         raise ValueError("Failed to acquire an available execution configuration.")
@@ -36,10 +35,8 @@ def realtime_recommend(spark_sql_cmd):
     task = spark_run(load, config_for_test)
 
     # 执行结果分析 若执行失败则调度用户默认配置重新拉起任务
-    if task.status() is not OA_CONF.TaskStatus.success and config_for_test != user_config:
+    if task.status is not OA_CONF.TaskStatus.success and config_for_test != user_config:
         task = spark_run(load, user_config)
-
-    # TODO 复测逻辑部分
 
 
 def main(argv):
