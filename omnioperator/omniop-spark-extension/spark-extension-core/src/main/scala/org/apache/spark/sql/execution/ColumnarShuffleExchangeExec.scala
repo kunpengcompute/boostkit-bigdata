@@ -27,10 +27,12 @@ import com.huawei.boostkit.spark.serialize.ColumnarBatchSerializer
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil
 import com.huawei.boostkit.spark.util.OmniAdaptorUtil.transColBatchToOmniVecs
 import com.huawei.boostkit.spark.vectorized.PartitionInfo
+import nova.hetu.omniruntime.`type`.DataType.DataTypeId
 import nova.hetu.omniruntime.`type`.{DataType, DataTypeSerializer}
 import nova.hetu.omniruntime.operator.config.{OperatorConfig, OverflowConfig, SpillConfig}
 import nova.hetu.omniruntime.operator.project.OmniProjectOperatorFactory
-import nova.hetu.omniruntime.vector.{IntVec, VecBatch}
+import nova.hetu.omniruntime.utils.ShuffleHashHelper
+import nova.hetu.omniruntime.vector.{IntVec, Vec, VecBatch}
 import org.apache.spark._
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
@@ -315,6 +317,7 @@ object ColumnarShuffleExchangeExec extends Logging {
       }
     }
 
+
     val rddWithPartitionId: RDD[Product2[Int, ColumnarBatch]] = newPartitioning match {
       case RoundRobinPartitioning(numPartitions) =>
         // 按随机数分区
@@ -349,39 +352,54 @@ object ColumnarShuffleExchangeExec extends Logging {
       case h@HashPartitioning(expressions, numPartitions) =>
         rdd.mapPartitionsWithIndexInternal((_, cbIter) => {
           val addPid2ColumnBatch = addPidToColumnBatch()
-          // omni project
-          val genHashExpression = genHashExpr()
-          val omniExpr: String = genHashExpression(expressions, numPartitions, defaultMm3HashSeed, outputAttributes)
-          val factory = new OmniProjectOperatorFactory(Array(omniExpr), inputTypes, 1,
-            new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
-          val op = factory.createOperator()
-          // close operator
-          addLeakSafeTaskCompletionListener[Unit](_ => {
-            op.close()
-            factory.close()
-          })
-
-          cbIter.map { cb =>
-            var pidVec: IntVec = null
-            try {
-              val vecs = transColBatchToOmniVecs(cb, true)
-              op.addInput(new VecBatch(vecs, cb.numRows()))
-              val res = op.getOutput
-              if (res.hasNext) {
-                val retBatch = res.next()
-                pidVec = retBatch.getVectors()(0).asInstanceOf[IntVec]
-                // close return VecBatch
-                retBatch.close()
-                addPid2ColumnBatch(pidVec, cb)
-              } else {
-                throw new Exception("Empty Project Operator Result...")
-              }
-            } catch {
-              case e: Exception =>
-                if (pidVec != null) {
-                  pidVec.close()
+          val isAllExpressionSimple = isAllSimpleExpression(expressions)
+          if (isAllExpressionSimple) {
+            // 创建一个映射：将 output 中的 Expression 与对应的索引关联起来
+            val outputIndexMap = getExprIdMap(outputAttributes)
+            val exprIds = getExprIdFromExpressions(expressions)
+            cbIter.map { cb =>
+              val vecs = transColBatchToOmniVecs(cb)
+              // 提取对应的向量
+              val projectedVecs:Array[Long] = exprIds.map(exprId => {
+                vecs(outputIndexMap(exprId)).getNativeVector
+              }).toArray
+              val nativeIntVecAddr = ShuffleHashHelper.computePartitionIds(projectedVecs, numPartitions, cb.numRows())
+              addPid2ColumnBatch(new IntVec(nativeIntVecAddr), cb)
+            }
+          } else {
+            // omni project
+            val genHashExpression = genHashExpr()
+            val omniExpr: String = genHashExpression(expressions, numPartitions, defaultMm3HashSeed, outputAttributes)
+            val factory = new OmniProjectOperatorFactory(Array(omniExpr), inputTypes, 1,
+              new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
+            val op = factory.createOperator()
+            // close operator
+            addLeakSafeTaskCompletionListener[Unit](_ => {
+              op.close()
+              factory.close()
+            })
+            cbIter.map { cb =>
+              var pidVec: IntVec = null
+              try {
+                val vecs = transColBatchToOmniVecs(cb, true)
+                op.addInput(new VecBatch(vecs, cb.numRows()))
+                val res = op.getOutput
+                if (res.hasNext) {
+                  val retBatch = res.next()
+                  pidVec = retBatch.getVectors()(0).asInstanceOf[IntVec]
+                  // close return VecBatch
+                  retBatch.close()
+                  addPid2ColumnBatch(pidVec.asInstanceOf[IntVec], cb)
+                } else {
+                  throw new Exception("Empty Project Operator Result...")
                 }
-                throw e
+              } catch {
+                case e: Exception =>
+                  if (pidVec != null) {
+                    pidVec.close()
+                  }
+                  throw e
+              }
             }
           }
         }, isOrderSensitive = isOrderSensitive)
