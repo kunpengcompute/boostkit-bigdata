@@ -17,19 +17,22 @@ def realtime_recommend(spark_sql_cmd):
 
     # 从负载数据库中查询是否有相关联的Load
     load = LoadRepository.query(name=name, default_config=user_config)
-    config_for_test = None
+    config_for_test = user_config
     if not load:  # 查询失败 创建load的同时使用租户默认配置进行测试
         load = LoadRepository.create(name=name, exec_attr=exec_attr, default_config=user_config)
         config_for_test = user_config
-    elif load.tuning_needed:
-        if load.test_config:  # test_config为空时返回None
+    elif load.tuning_needed:  # 查询成功且需要优化
+        if load.test_config:  # 有待测试配配置优先使用待测试配置 test_config为空时返回None
             config_for_test = load.test_config
-        elif load.best_config:
+        elif load.best_config:  # 否则使用推荐配置
             config_for_test = load.best_config
 
     if not config_for_test:
         logger.error("Failed to acquire an available execution configuration.")
         raise ValueError("Failed to acquire an available execution configuration.")
+    if not load:
+        logger.error("Failed to acquire an available load")
+        raise ValueError("Failed to acquire an available load")
 
     # 根据配置和负载执行Spark任务
     task = spark_run(load, config_for_test)
