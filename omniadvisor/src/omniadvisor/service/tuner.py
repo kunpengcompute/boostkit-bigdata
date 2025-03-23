@@ -1,13 +1,13 @@
 import random
 from abc import ABC, abstractmethod
 
-from ConfigSpace import ConfigurationSpace, Configuration, UniformIntegerHyperparameter, Constant, \
-    CategoricalHyperparameter, UniformFloatHyperparameter
+from ConfigSpace import Configuration
 from smac import Scenario, HyperparameterOptimizationFacade
 from smac.runhistory import TrialValue
 
 from omniadvisor.repository.model.load import Load
 from omniadvisor.repository.task_repository import TaskRepository
+from omniadvisor.utils.constant import CONFIG_SPACE
 
 
 class Tuner(ABC):
@@ -54,12 +54,11 @@ class IterativeTuner(Tuner):
 
     def initialize(self):
         history = TaskRepository.query_perf_history_from_load(self.load)
-        config_space = self.convert_to_config_space()
-        scenario = Scenario(config_space, deterministic=True, n_trials=len(history.config_perf_pairs) + 1)
+        scenario = Scenario(CONFIG_SPACE, deterministic=True, n_trials=len(history.config_perf_pairs) + 1)
         smac = HyperparameterOptimizationFacade(scenario, self.train)
         # 初始化历史数据到model
         for config_value, performance in history.config_perf_pairs:
-            config_instance = Configuration(configuration_space=config_space, values=config_value)
+            config_instance = Configuration(configuration_space=CONFIG_SPACE, values=config_value)
             smac.runhistory.add(config=config_instance, cost=performance, seed=1)
         self.smac = smac
 
@@ -71,47 +70,6 @@ class IterativeTuner(Tuner):
     def feedback(self, performance):
         value = TrialValue(cost=performance)
         self.smac.tell(self.trail_info, value)
-
-    def convert_to_config_space(self):
-        """
-        将knob_space 转为 configuration_space
-        """
-        config_space = ConfigurationSpace()
-        for knob_name, knob_value in self.knob_space.items():
-            if not knob_value['enable']:
-                continue
-            knob_type = knob_value.get('type')
-
-            if knob_type == 'uniform_int':
-                hyperparameter = UniformIntegerHyperparameter(
-                    name=knob_name,
-                    lower=knob_value.get('lower'),
-                    upper=knob_value.get('upper'),
-                    default_value=knob_value.get('default'),
-                )
-            elif knob_type == 'constant':
-                hyperparameter = Constant(
-                    name=knob_name,
-                    value=knob_value.get('default')
-                )
-            elif knob_type == 'categorical':
-                hyperparameter = CategoricalHyperparameter(
-                    name=knob_name,
-                    choices=knob_value.get('choices'),
-                    default_value=knob_value.get('default'),
-                    weights=knob_value.get('weights'),
-                )
-            elif knob_type == 'uniform_float':
-                hyperparameter = UniformFloatHyperparameter(
-                    name=knob_name,
-                    lower=knob_value.get('lower'),
-                    upper=knob_value.get('upper'),
-                    default_value=knob_value.get('default'),
-                )
-            else:
-                raise RuntimeError(f'Not supported config type: {knob_type}')
-            config_space.add(hyperparameter)
-        return config_space
 
     def train(self, config: Configuration, seed: int = 0) -> float:
         assert self is not None
@@ -152,7 +110,7 @@ class TransferTuner(Tuner):
 class TunerFactory:
 
     def __init__(self, tuner_type, load: Load, knob_space):
-        self.recommendations = {
+        self.tuners = {
             'iterative': IterativeTuner,
             'expert': ExpertTuner,
             'transfer:': TransferTuner
@@ -162,5 +120,5 @@ class TunerFactory:
         self.load = load
 
     def make(self) -> Tuner:
-        class_obj = self.recommendations.get(self.tuner_type)
+        class_obj = self.tuners.get(self.tuner_type)
         return class_obj(self.load, self.knob_space)

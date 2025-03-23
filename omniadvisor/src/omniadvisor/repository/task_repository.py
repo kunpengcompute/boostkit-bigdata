@@ -8,7 +8,7 @@ from omniadvisor.repository.model.load import Load
 from omniadvisor.repository.model.task import Task
 from omniadvisor.repository.model.perf_history import PerfHistory
 from omniadvisor.repository.repository import Repository
-from omniadvisor.utils.constant import OA_CONF
+from omniadvisor.utils.constant import TaskStatus
 
 
 class TaskRepository(Repository):
@@ -32,7 +32,7 @@ class TaskRepository(Repository):
         Task.FieldName.config: ([dict], [''], []),
         Task.FieldName.start_time: ([datetime], [''], []),
         Task.FieldName.end_time: ([datetime], [''], []),
-        Task.FieldName.status: ([str], [], OA_CONF.TaskStatus.all),
+        Task.FieldName.status: ([str], [], TaskStatus.all),
         Task.FieldName.runtime: ([float], [], []),
         Task.FieldName.trace: ([dict], [], []),
     }

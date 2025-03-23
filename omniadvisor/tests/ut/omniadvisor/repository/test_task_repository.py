@@ -1,20 +1,21 @@
 import pytest
 
-from .common import create_test_table
-from .common import delete_test_table
-from omniadvisor.utils.constant import OA_CONF
 from django_server.app.models import DatabaseLoad
 from django_server.app.models import DatabaseTask
-from omniadvisor.repository.model.task import Task
-from omniadvisor.repository.model.perf_history import PerfHistory
 from omniadvisor.repository.load_repository import LoadRepository
+from omniadvisor.repository.model.perf_history import PerfHistory
+from omniadvisor.repository.model.task import Task
 from omniadvisor.repository.task_repository import TaskRepository
+from omniadvisor.utils.constant import TaskStatus
+from .common import create_test_table
+from .common import delete_test_table
 
 
 class TestTaskRepository:
     """
     TaskRepository测试类
     """
+
     @staticmethod
     def setup_class():
         # 创建表
@@ -98,7 +99,7 @@ class TestTaskRepository:
             load=load,
             config={"param1": "value2"}
         )
-        task.database_model.status = OA_CONF.TaskStatus.success
+        task.database_model.status = TaskStatus.success
         task.database_model.runtime = 10.0
         task.database_model.trace = {}
         task.database_model.save()
@@ -158,10 +159,10 @@ class TestTaskRepository:
         # 更新任务执行结果
         updated_task = TaskRepository.update_task_result(
             task=task,
-            status=OA_CONF.TaskStatus.success,
+            status=TaskStatus.success,
             runtime=10.0,
             trace={'step1': 1}
         )
-        assert updated_task.database_model.status == OA_CONF.TaskStatus.success
+        assert updated_task.database_model.status == TaskStatus.success
         assert updated_task.database_model.runtime == 10.0
         assert updated_task.database_model.trace == {'step1': 1}
