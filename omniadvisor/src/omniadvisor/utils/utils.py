@@ -4,6 +4,10 @@ import subprocess
 import uuid
 from typing import Tuple, List, Dict
 
+from ConfigSpace import ConfigurationSpace, UniformIntegerHyperparameter, Constant, CategoricalHyperparameter, \
+    UniformFloatHyperparameter
+
+from omniadvisor.utils.constant import PROJECT_DIR
 from omniadvisor.utils.logger import logger
 
 
@@ -74,3 +78,47 @@ def read_json_file(file_path: str):
         logger.error(f"An unexpected error occurred: {e}")
 
     return data
+
+
+def load_config_space() -> ConfigurationSpace:
+    """
+    将knob_space 转为 configuration_space
+    """
+    repo_path = os.path.join(PROJECT_DIR, 'config', 'spark_repo.json')
+    knob_space = read_json_file(repo_path)
+    config_space = ConfigurationSpace()
+    for knob_name, knob_value in knob_space.items():
+        if not knob_value['enable']:
+            continue
+        knob_type = knob_value.get('type')
+
+        if knob_type == 'uniform_int':
+            hyperparameter = UniformIntegerHyperparameter(
+                name=knob_name,
+                lower=knob_value.get('lower'),
+                upper=knob_value.get('upper'),
+                default_value=knob_value.get('default'),
+            )
+        elif knob_type == 'constant':
+            hyperparameter = Constant(
+                name=knob_name,
+                value=knob_value.get('default')
+            )
+        elif knob_type == 'categorical':
+            hyperparameter = CategoricalHyperparameter(
+                name=knob_name,
+                choices=knob_value.get('choices'),
+                default_value=knob_value.get('default'),
+                weights=knob_value.get('weights'),
+            )
+        elif knob_type == 'uniform_float':
+            hyperparameter = UniformFloatHyperparameter(
+                name=knob_name,
+                lower=knob_value.get('lower'),
+                upper=knob_value.get('upper'),
+                default_value=knob_value.get('default'),
+            )
+        else:
+            raise RuntimeError(f'Not supported config type: {knob_type}')
+        config_space.add(hyperparameter)
+    return config_space

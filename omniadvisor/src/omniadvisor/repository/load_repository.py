@@ -103,7 +103,7 @@ class LoadRepository(Repository):
         return Load(database_model=database_load)
 
     @classmethod
-    def query_by_id(cls, load_id: str):
+    def query_by_id(cls, load_id: str) -> list:
         """
         根据 load_id 查询 load
         @param load_id:

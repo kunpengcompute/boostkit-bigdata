@@ -1,10 +1,6 @@
-import os
 import configparser
-
-from ConfigSpace import ConfigurationSpace, UniformIntegerHyperparameter, Constant, CategoricalHyperparameter, \
-    UniformFloatHyperparameter
-
-from omniadvisor.utils.utils import read_json_file
+import os
+from enum import Enum, auto
 
 
 def _load_common_config():
@@ -22,56 +18,24 @@ def _load_common_config():
     return common_config
 
 
-def _load_config_space():
-    """
-    将knob_space 转为 configuration_space
-    """
-    repo_path = os.path.join(PROJECT_DIR, 'config', 'spark_repo.json')
-    knob_space = read_json_file(repo_path)
-    config_space = ConfigurationSpace()
-    for knob_name, knob_value in knob_space.items():
-        if not knob_value['enable']:
-            continue
-        knob_type = knob_value.get('type')
-
-        if knob_type == 'uniform_int':
-            hyperparameter = UniformIntegerHyperparameter(
-                name=knob_name,
-                lower=knob_value.get('lower'),
-                upper=knob_value.get('upper'),
-                default_value=knob_value.get('default'),
-            )
-        elif knob_type == 'constant':
-            hyperparameter = Constant(
-                name=knob_name,
-                value=knob_value.get('default')
-            )
-        elif knob_type == 'categorical':
-            hyperparameter = CategoricalHyperparameter(
-                name=knob_name,
-                choices=knob_value.get('choices'),
-                default_value=knob_value.get('default'),
-                weights=knob_value.get('weights'),
-            )
-        elif knob_type == 'uniform_float':
-            hyperparameter = UniformFloatHyperparameter(
-                name=knob_name,
-                lower=knob_value.get('lower'),
-                upper=knob_value.get('upper'),
-                default_value=knob_value.get('default'),
-            )
-        else:
-            raise RuntimeError(f'Not supported config type: {knob_type}')
-        config_space.add(hyperparameter)
-    return config_space
-
-
 # 任务状态，供django使用
 class TaskStatus:
     success = 'Success'
     fail = 'Fail'
     running = 'Running'
     all = [success, fail, running]
+
+
+# 存几种调优算法，目前暂无赋值
+class TunerType(Enum):
+    ITERATIVE = 'iterative'
+    EXPERT = 'expert'
+    TRANSFER = 'transfer'
+
+
+class RetestWay(Enum):
+    HIJACKING = 'hijacking'
+    BACKEND = 'backend'
 
 
 # 项目通用配置
@@ -88,6 +52,3 @@ DATA_DIR = "".join([PROJECT_DIR, "/data"])
 
 # spark trace的存储路径
 SPARK_TRACE_DATA_DIR = "".join([DATA_DIR, "/spark_trace"])
-
-# 全局参数空间变量
-CONFIG_SPACE = _load_config_space()

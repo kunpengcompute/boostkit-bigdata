@@ -1,11 +1,12 @@
 from unittest.mock import patch
 
-from omniadvisor.interface.backend_tuning import main
+from omniadvisor.interface.tuning import main
 
 
 class TestBackendTuning:
 
     def test_main(self):
-        with patch('sys.argv', ['backend_tuning.py', '-w', 'to do work load', '-a', 'iterative', '-s']):
+        # 这里 -l 2 -r backend -rt 3 -t iterative
+        with patch('sys.argv', ['tuning.py', '-l', '2', '-r', 'backend', '-rt', '3', '-t', 'iterative']):
             res = main()
-            assert res is True, 'Error in main process'
+            assert res is None, 'Error in main process'
