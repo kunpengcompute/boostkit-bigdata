@@ -1,12 +1,30 @@
-from unittest.mock import patch
+from omniadvisor.interface.tuning import unified_tuning
+from omniadvisor.utils.constant import RetestWay, TunerType
 
-from omniadvisor.interface.tuning import main
 
+class TestTuning:
 
-class TestBackendTuning:
+    def test_unified_tuning_when_retest_backend(self):
+        unified_tuning(load_id='2', retest_times=3, retest_way=RetestWay.BACKEND.value,
+                       tuner_type=TunerType.ITERATIVE.value)
+        # TODO 验证最终最优配置是否被更新
+        # mock 这个 spark_executor.submit_spark_task(submit_cmd)
+        # mock 这个 spark_run中的 trace_data_saver
+        # assert best_config 被更新
 
-    def test_main(self):
-        # 这里 -l 2 -r backend -rt 3 -t iterative
-        with patch('sys.argv', ['tuning.py', '-l', '2', '-r', 'backend', '-rt', '3', '-t', 'iterative']):
-            res = main()
-            assert res is None, 'Error in main process'
+    def test_unified_tuning_when_retest_hijacking(self):
+        unified_tuning(load_id='2', retest_times=3, retest_way=RetestWay.HIJACKING.value,
+                       tuner_type=TunerType.ITERATIVE.value)
+        # TODO 验证最终的待测试配置是否被更新
+        # mock 这个 spark_executor.submit_spark_task(submit_cmd)
+        # mock 这个 spark_run中的 trace_data_saver
+        # assert best_config 被更新
+
+    def test_unified_tuning_when_load_id_not_exist(self):
+        # TODO 当load id 不存在时，是否触发了正确的行为
+        pass
+
+    def test_unified_tuning_when_retest_failed(self):
+        # TODO 当复测过程中出现失败，，复测是否终止，即使最优，结果不应被更新
+        pass
+
