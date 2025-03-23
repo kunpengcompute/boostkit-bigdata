@@ -10,13 +10,13 @@ from omniadvisor.repository.model.load import Load
 from omniadvisor.repository.task_repository import TaskRepository
 
 
-class ConfigRecommendation(ABC):
+class Tuner(ABC):
     def __init__(self, load, knob_space: dict):
         self.knob_space = knob_space
         self.load = load
 
     @abstractmethod
-    def recommend(self):
+    def tune(self):
         """
         调优算法推荐一个配置
         @return: config
@@ -41,7 +41,7 @@ class ConfigRecommendation(ABC):
         pass
 
 
-class IterativeTuning(ConfigRecommendation):
+class IterativeTuner(Tuner):
     """
     迭代调优类，目前采用贝叶斯方法
     """
@@ -63,7 +63,7 @@ class IterativeTuning(ConfigRecommendation):
             smac.runhistory.add(config=config_instance, cost=performance, seed=1)
         self.smac = smac
 
-    def recommend(self):
+    def tune(self):
         trail_info = self.smac.ask()
         self.trail_info = trail_info
         return trail_info.config.get_dictionary()
@@ -119,7 +119,7 @@ class IterativeTuning(ConfigRecommendation):
         return rand_num
 
 
-class ExpertTuning(ConfigRecommendation):
+class ExpertTuner(Tuner):
     """
     专家调优类
     """
@@ -130,11 +130,11 @@ class ExpertTuning(ConfigRecommendation):
     def initialize(self):
         pass
 
-    def recommend(self):
+    def tune(self):
         pass
 
 
-class TransferTuning(ConfigRecommendation):
+class TransferTuner(Tuner):
     """
     迁移调优类
     """
@@ -145,22 +145,22 @@ class TransferTuning(ConfigRecommendation):
     def initialize(self):
         pass
 
-    def recommend(self):
+    def tune(self):
         pass
 
 
-class ConfigRecommendationFactory:
+class TunerFactory:
 
-    def __init__(self, recommendation_type, load: Load, knob_space):
+    def __init__(self, tuner_type, load: Load, knob_space):
         self.recommendations = {
-            'iterative': IterativeTuning,
-            'expert': ExpertTuning,
-            'transfer:': TransferTuning
+            'iterative': IterativeTuner,
+            'expert': ExpertTuner,
+            'transfer:': TransferTuner
         }
-        self.recommendation_type = recommendation_type
+        self.tuner_type = tuner_type
         self.knob_space = knob_space
         self.load = load
 
-    def make(self) -> ConfigRecommendation:
-        class_obj = self.recommendations.get(self.recommendation_type)
+    def make(self) -> Tuner:
+        class_obj = self.recommendations.get(self.tuner_type)
         return class_obj(self.load, self.knob_space)

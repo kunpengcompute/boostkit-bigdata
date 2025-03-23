@@ -113,4 +113,6 @@ class LoadRepository(Repository):
             Load.FieldName.id: load_id,
         }
         database_loads = cls._query(model_attr=model_attr)
-        return Load(database_model=database_loads.first())
+        return [
+            Load(database_model=database_load) for database_load in database_loads
+        ]

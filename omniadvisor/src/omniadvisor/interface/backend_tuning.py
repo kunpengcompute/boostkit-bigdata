@@ -5,6 +5,7 @@ import django
 from django.conf import settings
 
 from django_server.engine.settings import DATABASES
+from omniadvisor.service.tuner import TunerFactory
 from omniadvisor.utils.logger import logger
 
 # 没有配置时，才启用正式的数据库；测试绕过此通路
@@ -15,7 +16,6 @@ if not settings.configured:
     )
     django.setup()
 from omniadvisor.repository.load_repository import LoadRepository
-from omniadvisor.service.config_recommendation import ConfigRecommendationFactory
 from omniadvisor.service.retest_service import retest
 from omniadvisor.utils.global_config import project_dir, retest_times
 from omniadvisor.utils.utils import read_json_file
@@ -98,11 +98,11 @@ def hijacking_tuning(args, knob_space):
     """
     # 劫持调优，只调一轮
     algorithm_type = args.algo_list[0][0]
-    factory = ConfigRecommendationFactory(algorithm_type, args.load, knob_space)
-    config_recommendation = factory.make()
+    factory = TunerFactory(algorithm_type, args.load, knob_space)
+    tunner = factory.make()
     # 一些算法需要初始化
-    config_recommendation.initialize()
-    next_config = config_recommendation.recommend()
+    tunner.initialize()
+    next_config = tunner.tune()
     load = LoadRepository.query_by_id(args.load_id)
     LoadRepository.update_test_config(load, next_config)
 
@@ -125,15 +125,14 @@ def backend_tuning(args, knob_space):
         if failed_times <= 0:
             break
         # 每一种算法，只创建一次
-        factory = ConfigRecommendationFactory(algorithm_type, load, knob_space)
+        factory = TunerFactory(algorithm_type, load, knob_space)
         # 创建不同的调优算法类
-        config_recommendation = factory.make()
+        tunner = factory.make()
         # 一些算法需要初始化
-        config_recommendation.initialize()
+        tunner.initialize()
         # 每一个tuning_round，都推荐一个配置
         for _ in range(tuning_round):
-            next_config = config_recommendation.recommend()
-            LoadRepository.update_test_config(load, next_config)
+            next_config = tunner.tune()
             # 复测
             try:
                 logger.info('准备复测寻优出的配置：%s', next_config)
@@ -142,7 +141,7 @@ def backend_tuning(args, knob_space):
             except Exception:
                 failed_times -= 1
                 continue
-            config_recommendation.feedback(average_performance)
+            tunner.feedback(average_performance)
 
 
 if __name__ == "__main__":

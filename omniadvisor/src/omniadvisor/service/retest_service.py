@@ -15,7 +15,6 @@ def retest(retest_times: int, load: Load, config: dict):
         # TODO 完善这里的异常
         except Exception as e:
             logger.info('复测第：%d 轮失败，原因：%s', e)
-            logger.debug('异常详细原因：', exc_info=True)
             return float('inf')
         logger.info('复测第：%d 轮成功！')
         perf_history.add(
