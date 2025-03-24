@@ -352,7 +352,7 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
       Row("", "Hello", null, 1.0, null, null, null, null),
       Row(" yeah  ", "yeah", 10, 8.0, null, null, null, null),
       Row(" add", "World", 8, 3.0, null, null, null, null)
-    ), true)
+    ), false)
   }
 
   test("ColumnarBroadcastHashJoin is not rolled back with not_equal filter expr") {
@@ -599,7 +599,7 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
       Row("Carter", 44678),
       Row("Adams", 24562),
       Row("Adams", 22456)
-    ), true)
+    ), false)
   }
 
   test("SortMergeJoin and project funsion test for duplicate column") {
@@ -613,7 +613,7 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
       Row("Carter", 44678, 3),
       Row("Adams", 24562, 1),
       Row("Adams", 22456, 1)
-    ), true)
+    ), false)
   }
 
   test("SortMergeJoin and project funsion test for reorder columns") {
@@ -627,7 +627,7 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
       Row(44678, "Carter", 3),
       Row(24562, "Adams", 1),
       Row(22456, "Adams", 1)
-    ), true)
+    ), false)
   }
 
   test("SortMergeJoin and project are not funsed test") {
@@ -641,7 +641,7 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
       Row(44679, "Carter"),
       Row(24563, "Adams"),
       Row(22457, "Adams")
-    ), true)
+    ), false)
   }
 
   test("SortMergeJoin and project funsion test for alias") {
@@ -655,6 +655,6 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
       Row("Carter", 44678),
       Row("Adams", 24562),
       Row("Adams", 22456)
-    ), true)
+    ), false)
   }
 }
