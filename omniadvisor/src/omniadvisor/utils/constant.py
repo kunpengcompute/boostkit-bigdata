@@ -27,15 +27,17 @@ class TaskStatus:
 
 
 # 存几种调优算法，目前暂无赋值
-class TunerType(Enum):
-    ITERATIVE = 'iterative'
-    EXPERT = 'expert'
-    TRANSFER = 'transfer'
+class TunerType:
+    iterative = 'iterative'
+    expert = 'expert'
+    transfer = 'transfer'
+    all = [iterative, expert, transfer]
 
 
-class RetestWay(Enum):
-    HIJACKING = 'hijacking'
-    BACKEND = 'backend'
+class RetestWay:
+    hijacking = 'hijacking'
+    backend = 'backend'
+    all = [hijacking, backend]
 
 
 # 项目通用配置

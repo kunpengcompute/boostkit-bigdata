@@ -5,16 +5,16 @@ from omniadvisor.utils.constant import RetestWay, TunerType
 class TestTuning:
 
     def test_unified_tuning_when_retest_backend(self):
-        unified_tuning(load_id='2', retest_times=3, retest_way=RetestWay.BACKEND.value,
-                       tuner_type=TunerType.ITERATIVE.value)
+        unified_tuning(load_id='2', retest_times=3, retest_way=RetestWay.backend,
+                       tuner_type=TunerType.iterative)
         # TODO 验证最终最优配置是否被更新
         # mock 这个 spark_executor.submit_spark_task(submit_cmd)
         # mock 这个 spark_run中的 trace_data_saver
         # assert best_config 被更新
 
     def test_unified_tuning_when_retest_hijacking(self):
-        unified_tuning(load_id='2', retest_times=3, retest_way=RetestWay.HIJACKING.value,
-                       tuner_type=TunerType.ITERATIVE.value)
+        unified_tuning(load_id='2', retest_times=3, retest_way=RetestWay.hijacking,
+                       tuner_type=TunerType.iterative)
         # TODO 验证最终的待测试配置是否被更新
         # mock 这个 spark_executor.submit_spark_task(submit_cmd)
         # mock 这个 spark_run中的 trace_data_saver

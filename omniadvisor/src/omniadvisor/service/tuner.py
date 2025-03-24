@@ -94,9 +94,9 @@ class TransferTuner(Tuner):
 
 class TunerFactory:
     TUNER_TYPES = {
-        TunerType.ITERATIVE.value: IterativeTuner,
-        TunerType.EXPERT.value: ExpertTuner,
-        TunerType.TRANSFER.value: TransferTuner
+        TunerType.iterative: IterativeTuner,
+        TunerType.expert: ExpertTuner,
+        TunerType.transfer: TransferTuner
     }
 
     def __init__(self, tuner_type: str, load: Load, config_space: ConfigurationSpace):
