@@ -1,7 +1,7 @@
 import pytest
 
 from omniadvisor.utils.constant import OA_CONF
-from django_server.app.models import DatabaseLoad
+from server.app.models import DatabaseLoad
 from omniadvisor.repository.model.load import Load
 from omniadvisor.repository.model.perf_history import PerfRecord
 from omniadvisor.repository.model.perf_history import PerfHistory
