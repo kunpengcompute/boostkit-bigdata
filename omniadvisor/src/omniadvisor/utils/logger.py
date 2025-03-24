@@ -1,8 +1,7 @@
 import os
 import logging
 from logging.config import dictConfig
-
-from omniadvisor.utils.constant import PROJECT_DIR
+from omniadvisor.utils.constant import OA_CONF
 
 LOGGING_CONFIG = {
     'version': 1,
@@ -53,7 +52,7 @@ LOGGING_CONFIG = {
 
 
 # 将相对路径转换为绝对路径
-absolute_log_path = os.path.abspath(os.path.join(PROJECT_DIR, LOGGING_CONFIG['handlers']['fileHandler']['filename']))
+absolute_log_path = os.path.abspath(os.path.join(OA_CONF.PROJECT_DIR, LOGGING_CONFIG['handlers']['fileHandler']['filename']))
 absolute_log_dir = os.path.dirname(absolute_log_path)
 
 if not os.path.exists(absolute_log_dir):

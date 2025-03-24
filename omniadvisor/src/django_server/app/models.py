@@ -1,7 +1,7 @@
 # Create your models here.
 from django.db import models
 
-from omniadvisor.utils.constant import TaskStatus
+from omniadvisor.utils.constant import OA_CONF
 
 
 class DatabaseLoad(models.Model):
@@ -25,9 +25,9 @@ class DatabaseTask(models.Model):
     任务模型
     """
     TASK_STATUS_CHOICES = [
-        (TaskStatus.success, 'Success'),
-        (TaskStatus.fail, 'Fail'),
-        (TaskStatus.running, 'Running')
+        (OA_CONF.TaskStatus.success, 'Success'),
+        (OA_CONF.TaskStatus.fail, 'Fail'),
+        (OA_CONF.TaskStatus.running, 'Running')
     ]
 
     id = models.AutoField(primary_key=True)
@@ -43,7 +43,7 @@ class DatabaseTask(models.Model):
         max_length=10,
         null=True,
         choices=TASK_STATUS_CHOICES,
-        default=TaskStatus.running
+        default=OA_CONF.TaskStatus.running
     )
     runtime = models.FloatField(null=True)
     trace = models.JSONField(null=True)

@@ -1,9 +1,8 @@
 import argparse
 import shlex
 from typing import Dict
-
-from omniadvisor.utils.constant import SPARK_NON_EXEC_ATTR_LIST
 from omniadvisor.utils.logger import logger
+from omniadvisor.utils.constant import OA_CONF
 from omniadvisor.service.parameter_parser import ParserInterface
 
 
@@ -85,7 +84,7 @@ class SparkParameterParser(ParserInterface):
             if value is None:
                 continue
             # 提取执行相关参数保存至exec_attr
-            if key not in SPARK_NON_EXEC_ATTR_LIST:
+            if key not in OA_CONF.SPARK_NON_EXEC_ATTR_LIST:
                 exec_attr[key] = value
             # 提取conf配置
             elif key == "conf":

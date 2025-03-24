@@ -1,7 +1,7 @@
 import json
 
 from omniadvisor.repository.model.load import Load
-from omniadvisor.utils.constant import TaskStatus
+from omniadvisor.utils.constant import OA_CONF
 
 
 class PerfHistory:
@@ -40,7 +40,7 @@ class PerfHistory:
     def config_perf_pairs(self):
         return [
             (perf_record.config, perf_record.runtime)
-            for perf_record in self._perf_records.values() if perf_record.status == TaskStatus.success
+            for perf_record in self._perf_records.values() if perf_record.status == OA_CONF.TaskStatus.success
         ]
 
     @property
@@ -82,17 +82,17 @@ class PerfRecord:
     @property
     def status(self):
         # 如果该配置执行失败过，则认为配置不可行
-        if TaskStatus.fail in self._status_list:
-            return TaskStatus.fail
+        if OA_CONF.TaskStatus.fail in self._status_list:
+            return OA_CONF.TaskStatus.fail
         else:
-            return TaskStatus.success
+            return OA_CONF.TaskStatus.success
 
     @property
     def runtime(self):
         # 计算执行状态为success的平均runtime
         success_runtimes = [
             runtime
-            for status, runtime in zip(self._status_list, self._runtime_list) if status == TaskStatus.success
+            for status, runtime in zip(self._status_list, self._runtime_list) if status == OA_CONF.TaskStatus.success
         ]
 
         return sum(success_runtimes) / len(success_runtimes)

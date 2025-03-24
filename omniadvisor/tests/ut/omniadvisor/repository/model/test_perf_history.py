@@ -1,10 +1,10 @@
 import pytest
 
+from omniadvisor.utils.constant import OA_CONF
 from django_server.app.models import DatabaseLoad
 from omniadvisor.repository.model.load import Load
 from omniadvisor.repository.model.perf_history import PerfRecord
 from omniadvisor.repository.model.perf_history import PerfHistory
-from omniadvisor.utils.constant import TaskStatus
 
 
 class TestPerfRecord:
@@ -17,7 +17,7 @@ class TestPerfRecord:
 
     def test_add(self):
         self.perf_record.add(
-            status=TaskStatus.success,
+            status=OA_CONF.TaskStatus.success,
             runtime=1.5,
             trace={"step": "A"}
         )
@@ -26,7 +26,7 @@ class TestPerfRecord:
         assert len(self.perf_record._trace_list) == 1
 
         self.perf_record.add(
-            status=TaskStatus.success,
+            status=OA_CONF.TaskStatus.success,
             runtime=1.5,
             trace={"step": "A"}
         )
@@ -36,33 +36,33 @@ class TestPerfRecord:
 
     def test_status(self):
         self.perf_record.add(
-            status=TaskStatus.success,
+            status=OA_CONF.TaskStatus.success,
             runtime=1.0,
             trace={}
         )
         self.perf_record.add(
-            status=TaskStatus.success,
+            status=OA_CONF.TaskStatus.success,
             runtime=2.0,
             trace={}
         )
-        assert self.perf_record.status == TaskStatus.success
+        assert self.perf_record.status == OA_CONF.TaskStatus.success
 
         # 若有一个执行失败的记录，则认为失败
         self.perf_record.add(
-            status=TaskStatus.fail,
+            status=OA_CONF.TaskStatus.fail,
             runtime=1.0,
             trace={}
         )
-        assert self.perf_record.status == TaskStatus.fail
+        assert self.perf_record.status == OA_CONF.TaskStatus.fail
 
     def test_runtime(self):
         self.perf_record.add(
-            status=TaskStatus.success,
+            status=OA_CONF.TaskStatus.success,
             runtime=1.0,
             trace={}
         )
         self.perf_record.add(
-            status=TaskStatus.success,
+            status=OA_CONF.TaskStatus.success,
             runtime=2.0,
             trace={}
         )
@@ -70,7 +70,7 @@ class TestPerfRecord:
 
         # 执行失败的执行用时，不计入平均用时的计算
         self.perf_record.add(
-            status=TaskStatus.fail,
+            status=OA_CONF.TaskStatus.fail,
             runtime=2.0,
             trace={}
         )
@@ -89,14 +89,14 @@ class TestPerfHistory:
         config1 = {"param1": "value1"}
         self.perf_history.add(
             config=config1,
-            status=TaskStatus.success,
+            status=OA_CONF.TaskStatus.success,
             runtime=1.5,
             trace={})
 
         assert len(self.perf_history._perf_records) == 1
         self.perf_history.add(
             config=config1,
-            status=TaskStatus.success,
+            status=OA_CONF.TaskStatus.success,
             runtime=1.5,
             trace={}
         )
@@ -105,7 +105,7 @@ class TestPerfHistory:
         config2 = {"param1": "value2"}
         self.perf_history.add(
             config=config2,
-            status=TaskStatus.success,
+            status=OA_CONF.TaskStatus.success,
             runtime=1.5,
             trace={}
         )
@@ -115,7 +115,7 @@ class TestPerfHistory:
         config1 = {"param1": "value1"}
         self.perf_history.add(
             config=config1,
-            status=TaskStatus.success,
+            status=OA_CONF.TaskStatus.success,
             runtime=1.5,
             trace={}
         )
@@ -126,7 +126,7 @@ class TestPerfHistory:
         config2 = {"param1": "value2"}
         self.perf_history.add(
             config=config2,
-            status=TaskStatus.success,
+            status=OA_CONF.TaskStatus.success,
             runtime=1.5,
             trace={}
         )
@@ -139,13 +139,13 @@ class TestPerfHistory:
         config2 = {"param1": "value2"}
         self.perf_history.add(
             config=config1,
-            status=TaskStatus.success,
+            status=OA_CONF.TaskStatus.success,
             runtime=1.0,
             trace={}
         )
         self.perf_history.add(
             config=config2,
-            status=TaskStatus.success,
+            status=OA_CONF.TaskStatus.success,
             runtime=2.0,
             trace={}
         )

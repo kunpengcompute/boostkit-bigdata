@@ -2,11 +2,13 @@ import random
 from abc import ABC, abstractmethod
 
 from ConfigSpace import Configuration, ConfigurationSpace
+
 from smac import Scenario, HyperparameterOptimizationFacade
 
 from omniadvisor.repository.model.load import Load
 from omniadvisor.repository.task_repository import TaskRepository
 from omniadvisor.utils.constant import TunerType
+
 
 
 class Tuner(ABC):
@@ -53,6 +55,7 @@ class IterativeTuner(Tuner):
         # 初始化历史数据到model
         for config_value, performance in history.config_perf_pairs:
             config_instance = Configuration(configuration_space=self.config_space, values=config_value)
+
             smac.runhistory.add(config=config_instance, cost=performance, seed=1)
         self.smac = smac
 
@@ -60,6 +63,7 @@ class IterativeTuner(Tuner):
         trail_info = self.smac.ask()
         self.trail_info = trail_info
         return trail_info.config.get_dictionary()
+
 
     def train(self, config: Configuration, seed: int = 0) -> float:
         # TODO 这里待改为spark调用
