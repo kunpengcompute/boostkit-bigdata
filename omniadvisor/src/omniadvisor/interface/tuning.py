@@ -25,7 +25,7 @@ from omniadvisor.utils.utils import load_config_space
 def _parse_tuning_args():
     """
     解析用户直命令行输入的参数
-    @return:
+    :return:
     """
     parser = argparse.ArgumentParser(
         description="Parse params that will frequently used. For other configs, change the config file.")
@@ -49,11 +49,11 @@ def _parse_tuning_args():
 def unified_tuning(load_id: str, retest_times: int, retest_way: str, tuner_type: str):
     """
     后台调优
-    @param load_id: 负载id
-    @param retest_times: 复测次数
-    @param retest_way: 复测方法
-    @param tuner_type: 算法的类型
-    @return:
+    :param load_id: 负载id
+    :param retest_times: 复测次数
+    :param retest_way: 复测方法
+    :param tuner_type: 算法的类型
+    :return:
     """
     # 加载参数空间
     config_space = load_config_space()

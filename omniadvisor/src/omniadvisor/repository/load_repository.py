@@ -106,8 +106,8 @@ class LoadRepository(Repository):
     def query_by_id(cls, load_id: str) -> list:
         """
         根据 load_id 查询 load
-        @param load_id:
-        @return:
+        :param load_id: 负载id
+        :return: 负载列表
         """
         model_attr = {
             Load.FieldName.id: load_id,

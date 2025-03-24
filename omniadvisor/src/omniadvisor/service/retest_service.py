@@ -7,6 +7,10 @@ from omniadvisor.utils.logger import logger
 def retest(retest_times: int, load: Load, config: dict):
     """
     根据复测结果，更新最优配置
+    :param retest_times: 复测次数
+    :param load: 负载
+    :param config: 配置
+    :return:
     """
     for _ in range(retest_times):
         try:

@@ -18,7 +18,7 @@ class Tuner(ABC):
     def tune(self):
         """
         调优算法推荐一个配置
-        @return: config
+        :return: config
         """
         pass
 
@@ -26,7 +26,7 @@ class Tuner(ABC):
     def initialize(self):
         """
         算法如需初始化，实现之
-        @return:
+        :return:
         """
         pass
 
@@ -43,6 +43,10 @@ class IterativeTuner(Tuner):
         self.trail_info = None
 
     def initialize(self):
+        """
+        初始化动作，加载参数空间文件等
+        :return:
+        """
         history = TaskRepository.query_perf_history_from_load(self.load)
         scenario = Scenario(self.config_space, deterministic=True, n_trials=len(history.config_perf_pairs) + 1)
         smac = HyperparameterOptimizationFacade(scenario, self.train)
@@ -58,6 +62,7 @@ class IterativeTuner(Tuner):
         return trail_info.config.get_dictionary()
 
     def train(self, config: Configuration, seed: int = 0) -> float:
+        # TODO 这里待改为spark调用
         assert self is not None
         rand_num = random.randint(1, 200)
         return rand_num

@@ -66,6 +66,11 @@ def call_binary(command, *args, binary_path):
 
 
 def read_json_file(file_path: str):
+    """
+    读取json文件
+    :param file_path: json文件路径
+    :return:
+    """
     try:
         with open(file_path, "r", encoding="utf-8") as file:
             # 将 JSON 文件内容解析为 Python 对象
@@ -83,6 +88,7 @@ def read_json_file(file_path: str):
 def load_config_space() -> ConfigurationSpace:
     """
     将knob_space 转为 configuration_space
+    :return: ConfigurationSpace 对象
     """
     repo_path = os.path.join(PROJECT_DIR, 'config', 'spark_repo.json')
     knob_space = read_json_file(repo_path)
