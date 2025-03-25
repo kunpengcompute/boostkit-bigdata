@@ -7,8 +7,7 @@ from smac import Scenario, HyperparameterOptimizationFacade
 
 from omniadvisor.repository.model.load import Load
 from omniadvisor.repository.task_repository import TaskRepository
-from omniadvisor.utils.constant import TunerType
-
+from omniadvisor.utils.constant import OA_CONF
 
 
 class Tuner(ABC):
@@ -64,7 +63,6 @@ class IterativeTuner(Tuner):
         self.trail_info = trail_info
         return trail_info.config.get_dictionary()
 
-
     def train(self, config: Configuration, seed: int = 0) -> float:
         # TODO 这里待改为spark调用
         assert self is not None
@@ -98,9 +96,9 @@ class TransferTuner(Tuner):
 
 class TunerFactory:
     TUNER_TYPES = {
-        TunerType.iterative: IterativeTuner,
-        TunerType.expert: ExpertTuner,
-        TunerType.transfer: TransferTuner
+        OA_CONF.TunerType.iterative: IterativeTuner,
+        OA_CONF.TunerType.expert: ExpertTuner,
+        OA_CONF.TunerType.transfer: TransferTuner
     }
 
     def __init__(self, tuner_type: str, load: Load, config_space: ConfigurationSpace):

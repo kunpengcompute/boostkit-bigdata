@@ -4,7 +4,7 @@ import django
 from django.conf import settings
 
 from django_server.engine.settings import DATABASES
-from omniadvisor.utils.constant import TunerType, RetestWay
+from omniadvisor.utils.constant import OA_CONF
 from omniadvisor.utils.logger import logger
 
 # 没有配置时，才启用正式的数据库；测试绕过此通路
@@ -31,7 +31,7 @@ def _parse_tuning_args():
         description="Parse params that will frequently used. For other configs, change the config file.")
     parser.add_argument("-l", "--load-id", type=str, required=True, help='Id of the load.')
 
-    parser.add_argument("-r", "--retest-way", type=str, choices=RetestWay.all,
+    parser.add_argument("-r", "--retest-way", type=str, choices=OA_CONF.RetestWay.all,
                         required=True,
                         help='If choose hijacking, a test will execute immediately')
 
@@ -39,7 +39,7 @@ def _parse_tuning_args():
                         help='Effective when retest way is backend.')
 
     parser.add_argument("-t", "--tuner-type", type=str, required=True,
-                        choices=TunerType.all,
+                        choices=OA_CONF.TunerType.all,
                         help='Support three tune type, for iterative, use BO; for expert ...')
 
     args = parser.parse_args()
@@ -74,7 +74,7 @@ def unified_tuning(load_id: str, retest_times: int, retest_way: str, tuner_type:
     # 推荐下一个配置
     next_config = tunner.tune()
     # 复测
-    if retest_way == RetestWay.backend:
+    if retest_way == OA_CONF.RetestWay.backend:
         retest(retest_times, load, next_config)
         perf_history = TaskRepository.query_perf_history_from_load(load)
         # 更新最优配置

@@ -7,7 +7,7 @@ from typing import Tuple, List, Dict
 from ConfigSpace import ConfigurationSpace, UniformIntegerHyperparameter, Constant, CategoricalHyperparameter, \
     UniformFloatHyperparameter
 
-from omniadvisor.utils.constant import PROJECT_DIR
+from omniadvisor.utils.constant import OA_CONF
 from omniadvisor.utils.logger import logger
 
 
@@ -50,21 +50,6 @@ def trace_data_saver(data: List[Dict[str, str]], data_dir):
     return file_path
 
 
-def call_binary(command, *args, binary_path):
-    """
-    调用二进制文件并传递参数。
-    :param command: 要执行的命令
-    :param args: 命令的参数
-    :param binary_path: 二进制文件的路径
-    """
-    # 构造完整的命令
-    full_command = [binary_path, command] + list(args)
-
-    # 调用二进制文件
-    result = subprocess.run(full_command, check=True, capture_output=True, text=True)
-    return result
-
-
 def read_json_file(file_path: str):
     """
     读取json文件
@@ -90,7 +75,7 @@ def load_config_space() -> ConfigurationSpace:
     将knob_space 转为 configuration_space
     :return: ConfigurationSpace 对象
     """
-    repo_path = os.path.join(PROJECT_DIR, 'config', 'spark_repo.json')
+    repo_path = os.path.join(OA_CONF.PROJECT_DIR, 'config', 'spark_repo.json')
     knob_space = read_json_file(repo_path)
     config_space = ConfigurationSpace()
     for knob_name, knob_value in knob_space.items():
