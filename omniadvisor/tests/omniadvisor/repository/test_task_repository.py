@@ -1,7 +1,7 @@
 import pytest
 
-from .common import create_test_table
-from .common import delete_test_table
+from .common import create_table
+from .common import delete_table
 from omniadvisor.utils.constant import OA_CONF
 from server.app.models import DatabaseLoad
 from server.app.models import DatabaseTask
@@ -15,17 +15,18 @@ class TestTaskRepository:
     """
     TaskRepository测试类
     """
+
     @staticmethod
     def setup_class():
         # 创建表
-        create_test_table(DatabaseLoad)
-        create_test_table(DatabaseTask)
+        create_table(DatabaseLoad)
+        create_table(DatabaseTask)
 
     @staticmethod
-    def cleanup_class():
+    def teardown_class():
         # 删除表
-        delete_test_table(DatabaseLoad)
-        delete_test_table(DatabaseTask)
+        delete_table(DatabaseTask)
+        delete_table(DatabaseLoad)
 
     @staticmethod
     def setup_method():
@@ -34,7 +35,6 @@ class TestTaskRepository:
         DatabaseTask.objects.all().delete()
         DatabaseLoad.objects.all().delete()
 
-    @pytest.mark.django_db(transaction=True)
     def test_create(self):
         # 创建测试数据
         load = LoadRepository.create(
@@ -54,7 +54,6 @@ class TestTaskRepository:
         assert task.load.name == load.name
         assert task.config == {"param1": "value2"}
 
-    @pytest.mark.django_db(transaction=True)
     def test_query(self):
         # 创建测试数据
         load = LoadRepository.create(
@@ -83,7 +82,6 @@ class TestTaskRepository:
         )
         assert len(tasks) == 0
 
-    @pytest.mark.django_db(transaction=True)
     def test_query_perf_history_from_load(self):
         """
         测试 TaskRepository.query_perf_history_from_load 方法
@@ -108,7 +106,6 @@ class TestTaskRepository:
         assert isinstance(perf_history, PerfHistory)
         assert len(perf_history.config_perf_pairs) == 1
 
-    @pytest.mark.django_db(transaction=True)
     def test_update_start_time(self):
         # 创建测试数据
         load = LoadRepository.create(
@@ -125,7 +122,6 @@ class TestTaskRepository:
         updated_task = TaskRepository.update_start_time(task=task)
         assert updated_task.start_time is not None
 
-    @pytest.mark.django_db(transaction=True)
     def test_update_end_time(self):
         # 创建测试数据
         load = LoadRepository.create(
@@ -142,7 +138,6 @@ class TestTaskRepository:
         updated_task = TaskRepository.update_end_time(task=task)
         assert updated_task.end_time is not None
 
-    @pytest.mark.django_db(transaction=True)
     def test_update_task_result(self):
         # 创建测试数据
         load = LoadRepository.create(

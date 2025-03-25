@@ -1,8 +1,8 @@
 import pytest
 from django.db import models
 
-from .common import create_test_table
-from .common import delete_test_table
+from .common import create_table
+from .common import delete_table
 from omniadvisor.repository.repository import Repository
 
 
@@ -32,15 +32,16 @@ class TestRepositoryClass:
     """
     Repository测试类
     """
+
     @staticmethod
     def setup_class():
         # 创建表
-        create_test_table(TestModel)
+        create_table(TestModel)
 
     @staticmethod
-    def cleanup_class():
+    def teardown_class():
         # 删除表
-        delete_test_table(TestModel)
+        delete_table(TestModel)
 
     @staticmethod
     def setup_method():
@@ -67,7 +68,6 @@ class TestRepositoryClass:
         with pytest.raises(ValueError):
             TestRepository._check_field_format({'age': 20})
 
-    @pytest.mark.django_db(transaction=True)
     def test_create(self):
         model_attr = {'name': 'John', 'age': 25}
         instance = TestRepository._create(model_attr)
@@ -75,7 +75,6 @@ class TestRepositoryClass:
         assert instance.name == 'John'
         assert instance.age == 25
 
-    @pytest.mark.django_db(transaction=True)
     def test_query(self):
         TestModel.objects.create(name='John', age=25)
         model_attr = {'name': 'John'}
@@ -83,7 +82,6 @@ class TestRepositoryClass:
         assert len(instances) == 1
         assert instances[0].name == 'John'
 
-    @pytest.mark.django_db(transaction=True)
     def test_update(self):
         instance = TestModel.objects.create(name='John', age=25)
         model_attr = {'name': 'Mike'}
