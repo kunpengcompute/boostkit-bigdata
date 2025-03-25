@@ -277,6 +277,8 @@ public:
     {
         inputVecBatch = nullptr;
     }
+
+    void SetProtoRowBatchVectorTypes();
 };
 
 

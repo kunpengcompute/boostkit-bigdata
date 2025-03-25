@@ -29,25 +29,53 @@ extern "C" {
 #endif
 
 JNIEXPORT void JNICALL
-Java_com_huawei_boostkit_spark_serialize_ShuffleDataSerializerUtils_parseColumnarBatch(
+Java_com_huawei_boostkit_spark_serialize_ShuffleDataSerializerUtils_columnarShuffleParseBatch(
     JNIEnv *env, jobject obj, jlong address, jintArray typeIdArray, jintArray precisionArray,
     jintArray scaleArray, jlongArray vecNativeIdArray);
 
 JNIEXPORT jlong JNICALL
-Java_com_huawei_boostkit_spark_serialize_ShuffleDataSerializerUtils_parseInit(
+Java_com_huawei_boostkit_spark_serialize_ShuffleDataSerializerUtils_columnarShuffleParseInit(
     JNIEnv *env, jobject obj, jlong address, jint length);
 
 JNIEXPORT void JNICALL
-Java_com_huawei_boostkit_spark_serialize_ShuffleDataSerializerUtils_parseClose(
+Java_com_huawei_boostkit_spark_serialize_ShuffleDataSerializerUtils_columnarShuffleParseClose(
     JNIEnv *env, jobject obj, jlong address);
 
 JNIEXPORT jint JNICALL
-Java_com_huawei_boostkit_spark_serialize_ShuffleDataSerializerUtils_parseVecCount(
+Java_com_huawei_boostkit_spark_serialize_ShuffleDataSerializerUtils_columnarShuffleParseVecCount(
     JNIEnv *env, jobject obj, jlong address);
 
 JNIEXPORT jint JNICALL
-Java_com_huawei_boostkit_spark_serialize_ShuffleDataSerializerUtils_parseRowCount(
+Java_com_huawei_boostkit_spark_serialize_ShuffleDataSerializerUtils_columnarShuffleParseRowCount(
     JNIEnv *env, jobject obj, jlong address);
+
+JNIEXPORT void JNICALL
+Java_com_huawei_boostkit_spark_serialize_ShuffleDataSerializerUtils_columnarShuffleParseColumnarBatch(
+    JNIEnv *env, jobject obj, jlong address, jintArray typeIdArray, jintArray precisionArray,
+    jintArray scaleArray, jlongArray vecNativeIdArray);
+
+JNIEXPORT jlong JNICALL
+Java_com_huawei_boostkit_spark_serialize_ShuffleDataSerializerUtils_rowShuffleParseInit(
+    JNIEnv *env, jobject obj, jlong address, jint length);
+
+JNIEXPORT void JNICALL
+Java_com_huawei_boostkit_spark_serialize_ShuffleDataSerializerUtils_rowShuffleParseClose(
+    JNIEnv *env, jobject obj, jlong address);
+
+JNIEXPORT jint JNICALL
+Java_com_huawei_boostkit_spark_serialize_ShuffleDataSerializerUtils_rowShuffleParseVecCount(
+    JNIEnv *env, jobject obj, jlong address);
+
+JNIEXPORT jint JNICALL
+Java_com_huawei_boostkit_spark_serialize_ShuffleDataSerializerUtils_rowShuffleParseRowCount(
+    JNIEnv *env, jobject obj, jlong address);
+
+JNIEXPORT void JNICALL
+Java_com_huawei_boostkit_spark_serialize_ShuffleDataSerializerUtils_rowShuffleParseBatch(
+    JNIEnv *env, jobject obj, jlong address, jintArray typeIdArray, jintArray precisionArray,
+    jintArray scaleArray, jlongArray vecNativeIdArray);
+
+
 #ifdef __cplusplus
 }
 #endif
