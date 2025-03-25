@@ -1,6 +1,4 @@
-import pytest
-
-from omniadvisor.utils.constant import OA_CONF
+from common.constant import OA_CONF
 from server.app.models import DatabaseLoad
 from omniadvisor.repository.model.load import Load
 from omniadvisor.repository.model.perf_history import PerfRecord

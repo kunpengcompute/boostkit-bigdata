@@ -2,7 +2,7 @@ import argparse
 import shlex
 from typing import Dict
 from omniadvisor.utils.logger import logger
-from src.omniadvisor.utils.constant import OA_CONF
+from common.constant import OA_CONF
 from omniadvisor.service.parameter_parser import ParserInterface
 
 

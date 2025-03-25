@@ -1,8 +1,6 @@
-import pytest
-
 from .common import create_table
 from .common import delete_table
-from omniadvisor.utils.constant import OA_CONF
+from common.constant import OA_CONF
 from server.app.models import DatabaseLoad
 from server.app.models import DatabaseTask
 from omniadvisor.repository.model.task import Task
