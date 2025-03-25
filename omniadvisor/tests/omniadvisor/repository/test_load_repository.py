@@ -1,5 +1,4 @@
 import pytest
-
 from .common import create_test_table
 from .common import delete_test_table
 from omniadvisor.repository.load_repository import DatabaseLoad
