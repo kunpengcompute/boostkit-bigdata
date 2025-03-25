@@ -3,6 +3,25 @@
 
 
 ---
+## 如何进度Django 后台管理页面:
+
+在`src`目录下，按照以下步骤操作
+
+### 数据库迁移
+```bash
+python init.py makemigrations
+python init.py migrate
+```
+### 创建超级用户
+```bash
+python init.py createsuperuser
+```
+按照提示输入用户名、邮箱和密码
+
+### 启动开发服务
+```bash
+python init.py runserver
+```
 
 ## 如何拉起单元测试？
 
