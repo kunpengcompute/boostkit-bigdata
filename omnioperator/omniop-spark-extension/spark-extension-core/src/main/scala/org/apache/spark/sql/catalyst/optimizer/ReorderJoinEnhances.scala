@@ -19,7 +19,6 @@
 package org.apache.spark.sql.catalyst.optimizer
 
 import com.huawei.boostkit.spark.ColumnarPluginConfig
-import com.huawei.boostkit.spark.ShuffleJoinStrategy.canBroadcastBySize
 
 import scala.annotation.tailrec
 import scala.collection.mutable
@@ -84,8 +83,17 @@ object ReorderJoinEnhances extends Rule[LogicalPlan] with PredicateHelper {
           case EqualNullSafe(l, r) => checkLeftRightExpression(l, r, left, candidateRight)
           case _ => false
         }
+      }.filter{
+        planJoinPair =>
+        val candidateRight = planJoinPair._1
+        val joinedRefs = left.outputSet ++ candidateRight.outputSet
+        conditions.exists {
+          e =>
+            e.references.subsetOf(joinedRefs) && canEvaluateWithinJoin(e)
+        }
       }
-      val hasEqualJoinConditionAndFilterCandidates = hasEqualJoinConditionCandidates.filter {
+      
+      val candidateJoins = hasEqualJoinConditionCandidates.filter {
         planJoinPair =>
           planJoinPair._1 match {
             case f: Filter if checkFilterCondition(f.condition) => true
@@ -93,18 +101,27 @@ object ReorderJoinEnhances extends Rule[LogicalPlan] with PredicateHelper {
             case _ => false
           }
       }
-      val candidateJoins = Option(hasEqualJoinConditionAndFilterCandidates.filter{
-        planJoinPair =>
-          canBroadcastBySize(planJoinPair._1, conf)
-      }).filter(_.nonEmpty).getOrElse(Option(hasEqualJoinConditionCandidates.filter {
-        planJoinPair =>
-          canBroadcastBySize(planJoinPair._1, conf)
-      }).filter(_.nonEmpty).getOrElse(hasEqualJoinConditionAndFilterCandidates))
+
       // pick the min size one if candidateJoins left
       val (right, innerJoinType) = if (candidateJoins.nonEmpty) {
         candidateJoins.minBy(_._1.stats.sizeInBytes)
       } else {
-        rest.head
+        val noHasNotEqualCandidates = hasEqualJoinConditionCandidates.filter{
+          planJoinPair =>
+          val candidateRight = planJoinPair._1
+          !conditions.exists {
+            case LessThan(l, r) => checkLeftRightExpression(l, r, left, candidateRight)
+            case LessThanOrEqual(l, r) => checkLeftRightExpression(l, r, left, candidateRight)
+            case GreaterThan(l, r) => checkLeftRightExpression(l, r, left, candidateRight)
+            case GreaterThanOrEqual(l, r) => checkLeftRightExpression(l, r, left, candidateRight)
+            case _ => false
+          }
+        }
+        if(noHasNotEqualCandidates.nonEmpty) {
+          noHasNotEqualCandidates.head
+        } else {
+          rest.head
+        }
       }
 
       val joinedRefs = left.outputSet ++ right.outputSet
