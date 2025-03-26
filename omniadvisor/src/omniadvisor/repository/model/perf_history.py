@@ -1,7 +1,7 @@
 import json
 
 from omniadvisor.repository.model.load import Load
-from omniadvisor.utils.constant import OA_CONF
+from common.constant import OA_CONF
 
 
 class PerfHistory:

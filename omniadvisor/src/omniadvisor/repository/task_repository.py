@@ -2,13 +2,13 @@ from datetime import datetime
 
 from django.utils import timezone
 
-from django_server.app.models import DatabaseLoad
-from django_server.app.models import DatabaseTask
+from server.app.models import DatabaseLoad
+from server.app.models import DatabaseTask
 from omniadvisor.repository.model.load import Load
 from omniadvisor.repository.model.task import Task
 from omniadvisor.repository.model.perf_history import PerfHistory
 from omniadvisor.repository.repository import Repository
-from omniadvisor.utils.constant import OA_CONF
+from common.constant import OA_CONF
 
 
 class TaskRepository(Repository):

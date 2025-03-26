@@ -1,7 +1,7 @@
 import os
 import logging
 from logging.config import dictConfig
-from omniadvisor.utils.constant import OA_CONF
+from common.constant import OA_CONF
 
 LOGGING_CONFIG = {
     'version': 1,

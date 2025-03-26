@@ -1,10 +1,8 @@
-import pytest
-
 from .common import create_table
 from .common import delete_table
-from omniadvisor.utils.constant import OA_CONF
-from django_server.app.models import DatabaseLoad
-from django_server.app.models import DatabaseTask
+from common.constant import OA_CONF
+from server.app.models import DatabaseLoad
+from server.app.models import DatabaseTask
 from omniadvisor.repository.model.task import Task
 from omniadvisor.repository.model.perf_history import PerfHistory
 from omniadvisor.repository.load_repository import LoadRepository

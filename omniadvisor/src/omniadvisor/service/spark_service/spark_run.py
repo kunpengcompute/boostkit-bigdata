@@ -2,7 +2,7 @@ from omniadvisor.service.spark_service.spark_fetcher import SparkFetcher
 from omniadvisor.service.spark_service.spark_executor import SparkExecutor
 from omniadvisor.repository.task_repository import TaskRepository
 from omniadvisor.service.spark_service.spark_command_reconstruct import spark_command_reconstruct
-from omniadvisor.utils.constant import OA_CONF
+from common.constant import OA_CONF
 from omniadvisor.utils.utils import trace_data_saver
 
 

@@ -9,7 +9,7 @@ version = "0.1.0"
 description = "A sample Python project using Poetry"
 authors = ["hw"]
 packages = [
-    { include = "django_server", from = "src" },
+    { include = "server", from = "src" },
     { include = "omniadvisor", from = "src" }
 ]
 
@@ -23,6 +23,6 @@ pytest = "^7.4.4"
 pytest-xdist = "^3.6.1"
 
 [tool.pytest.ini_options]
-testpaths = ["tests/ut", "tests/st"]       # 指定 pytest 搜索测试的路径
+testpaths = ["tests/"]       # 指定 pytest 搜索测试的路径
 pythonpath = ["src"]           # ⚡ 自动添加 src 到 PYTHONPATH
 addopts = "--import-mode=append" # 避免导入冲突

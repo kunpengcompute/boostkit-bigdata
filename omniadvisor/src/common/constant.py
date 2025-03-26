@@ -9,7 +9,7 @@ def load_common_config():
     """
     cur_dir_path = os.path.dirname(os.path.abspath(__file__))
     common_config = configparser.ConfigParser()
-    config_path = f"{os.path.dirname(os.path.dirname(os.path.dirname(cur_dir_path)))}/" \
+    config_path = f"{os.path.dirname(os.path.dirname(cur_dir_path))}/" \
                   f"config/common_config.cfg"
     if not os.path.exists(config_path):
         raise FileNotFoundError(f"{config_path} does not exist")
@@ -21,6 +21,7 @@ class OmniAdvisorConf:
     """
     OmniAdvisor常量
     """
+
     # 任务执行状态
     class TaskStatus:
         success = 'Success'
@@ -32,8 +33,7 @@ class OmniAdvisorConf:
     COMMON_CONFIG = load_common_config()
     CODING_TYPE = "utf-8"
     SPARK_NON_EXEC_ATTR_LIST = {"name", "conf"}
-    PROJECT_DIR = os.path.dirname(
-        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))  # 获取当前脚本所在的目录
+    PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # 获取当前脚本所在的目录
     DATA_DIR = "".join([PROJECT_DIR, "/data"])
     SPARK_TRACE_DATA_DIR = "".join([DATA_DIR, "/spark_trace"])
 
