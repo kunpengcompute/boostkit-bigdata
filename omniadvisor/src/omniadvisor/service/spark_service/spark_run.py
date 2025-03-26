@@ -28,7 +28,7 @@ def spark_run(load, conf):
     spark_submit_cmd, application_id, runtime = spark_executor.parser_spark_output(spark_output)
     # 根据ApplicantID获取Trace
     trace_dict = {}
-    history_server_url = OA_CONF.COMMON_CONFIG.get("sparkfetcher", "spark.history.rest.url")
+    history_server_url = OA_CONF.COMMON_CONFIG.SPARK_HISTORY_REST_URL
     spark_fetcher = SparkFetcher(history_server_url)
     trace_dict['sql'] = trace_data_saver(spark_fetcher.get_spark_sql_by_app(application_id), OA_CONF.DATA_DIR)
     trace_dict['stages'] = trace_data_saver(spark_fetcher.get_spark_stages_by_app(application_id), OA_CONF.DATA_DIR)
