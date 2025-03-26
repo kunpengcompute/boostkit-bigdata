@@ -31,6 +31,8 @@ using namespace arrow::internal;
 
 namespace omniruntime::writer
 {
+    std::string get_parent_path(const std::string& path);
+    int createDirectories(const std::string &path);
 	class ParquetWriter
 	{
 	public:

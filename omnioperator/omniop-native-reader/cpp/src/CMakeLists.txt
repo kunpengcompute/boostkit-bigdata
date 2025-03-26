@@ -32,7 +32,9 @@ set(SOURCE_FILES
         arrowadapter/LocalfsAdapter.cc
         common/JulianGregorianRebase.cpp
         common/TimeRebaseInfo.cpp
-        common/PredicateUtil.cpp)
+        common/PredicateUtil.cpp
+        common/Directories.cpp
+        common/Directories.h)
 
 #Find required protobuf package
 find_package(Protobuf REQUIRED)

@@ -102,10 +102,6 @@ class OmniParquetFileFormat extends FileFormat with DataSourceRegister with Logg
       SQLConf.PARQUET_OUTPUT_TIMESTAMP_TYPE.key,
       sparkSession.sessionState.conf.parquetOutputTimestampType.toString)
 
-    conf.set(
-      SQLConf.PARQUET_FIELD_ID_WRITE_ENABLED.key,
-      sparkSession.sessionState.conf.parquetFieldIdWriteEnabled.toString)
-
     // Sets compression scheme
     conf.set(ParquetOutputFormat.COMPRESSION, parquetOptions.compressionCodecClassName)
 
@@ -124,12 +120,6 @@ class OmniParquetFileFormat extends FileFormat with DataSourceRegister with Logg
     }
 
     new OutputWriterFactory {
-      // This OutputWriterFactory instance is deserialized when writing Parquet files on the
-      // executor side without constructing or deserializing ParquetFileFormat. Therefore, we hold
-      // another reference to ParquetLogRedirector.INSTANCE here to ensure the latter class is
-      // initialized.
-      private val parquetLogRedirector = ParquetLogRedirector.INSTANCE
-
       override def newInstance(
                                 path: String,
                                 dataSchema: StructType,
@@ -176,7 +166,7 @@ class OmniParquetFileFormat extends FileFormat with DataSourceRegister with Logg
     (file: PartitionedFile) => {
       assert(file.partitionValues.numFields == partitionSchema.size)
 
-      val filePath = ShimUtil.getPartitionedFilePath(file)
+      val filePath = new Path(new URI(file.filePath.toString))
       val split =
         new org.apache.parquet.hadoop.ParquetInputSplit(
           filePath,

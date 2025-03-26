@@ -44,7 +44,7 @@ import org.apache.spark.sql.catalyst.plans.logical.Aggregate
 import org.apache.spark.sql.execution.command.{DataWritingCommand, DataWritingCommandExec}
 import org.apache.spark.sql.execution.datasources.orc.{OmniOrcFileFormat, OrcFileFormat}
 import org.apache.spark.sql.execution.datasources.parquet.{OmniParquetFileFormat, ParquetFileFormat}
-import org.apache.spark.sql.execution.datasources.{FileFormat, InsertIntoHadoopFsRelationCommand, OmniInsertIntoHadoopFsRelationCommand}
+import org.apache.spark.sql.execution.datasources.{FileFormat, InsertIntoHadoopFsRelationCommand}
 import org.apache.spark.sql.execution.util.SparkMemoryUtils.addLeakSafeTaskCompletionListener
 import org.apache.spark.sql.execution.aggregate.PushOrderedLimitThroughAgg
 import org.apache.spark.sql.util.ShimUtil
@@ -780,44 +780,6 @@ case class ColumnarPreOverrides(isSupportAdaptive: Boolean = true)
         val child = replaceWithColumnarPlan(plan.child)
         logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
         ColumnarCoalesceExec(plan.numPartitions, child)
-      case plan: DataWritingCommandExec =>
-        val child = replaceWithColumnarPlan(plan.child)
-        logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
-        var unSupportedColumnarCommand = false
-        var unSupportedFileFormat = false
-        val omniCmd = plan.cmd match {
-          case cmd: InsertIntoHadoopFsRelationCommand =>
-            logInfo(s"Columnar Processing for ${cmd.getClass} is currently supported.")
-            val fileFormat: FileFormat = cmd.fileFormat match {
-              case _: OrcFileFormat => new OmniOrcFileFormat()
-              case _: ParquetFileFormat => new OmniParquetFileFormat()
-              case format =>
-                logInfo(s"Unsupported ${format.getClass} file " +
-                  s"format for columnar data write command.")
-                unSupportedFileFormat = true
-                null
-            }
-            if (unSupportedFileFormat) {
-              cmd
-            } else {
-              OmniInsertIntoHadoopFsRelationCommand(cmd.outputPath, cmd.staticPartitions,
-                cmd.ifPartitionNotExists, cmd.partitionColumns, cmd.bucketSpec, fileFormat,
-                cmd.options, cmd.query, cmd.mode, cmd.catalogTable,
-                cmd.fileIndex, cmd.outputColumnNames
-              )
-            }
-          case cmd: DataWritingCommand =>
-            logInfo(s"Columnar Processing for ${cmd.getClass} is currently not supported.")
-            unSupportedColumnarCommand = true
-            cmd
-        }
-        if (!unSupportedColumnarCommand && !unSupportedFileFormat) {
-          ColumnarDataWritingCommandExec(omniCmd, child)
-        } else {
-          val children = plan.children.map(replaceWithColumnarPlan)
-          logInfo(s"Columnar Processing for ${plan.getClass} is currently not supported.")
-          plan.withNewChildren(children)
-        }
       case p =>
         val newPlan = ModifyUtilAdaptor.preReplaceSparkPlanFunc(p, replaceWithColumnarPlan)
         if (newPlan != null) {

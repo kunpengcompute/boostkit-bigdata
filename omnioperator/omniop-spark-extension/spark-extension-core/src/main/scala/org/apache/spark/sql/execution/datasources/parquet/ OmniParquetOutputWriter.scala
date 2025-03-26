@@ -37,9 +37,6 @@ class OmniParquetOutputWriter(path: String, dataSchema: StructType,
   extends OutputWriter {
 
   val writer = new ParquetColumnarBatchWriter()
-  //  var omniTypes: Array[Int] = new Array[Int](0)
-  //  var dataColumnsIds: Array[Boolean] = new Array[Boolean](0)
-  //  var allOmniTypes: Array[Int] = new Array[Int](0)
   var omniTypes: Array[Int] = emptyIntArray
   var dataColumnsIds: Array[Boolean] = emptyBooleanArray
   var allOmniTypes: Array[Int] = emptyIntArray
@@ -48,17 +45,9 @@ class OmniParquetOutputWriter(path: String, dataSchema: StructType,
     val filePath = new Path(path)
     writer.initializeSchemaJava(dataSchema)
     writer.initializeWriterJava(filePath)
-    //    dataSchema.foreach(field => {
-    //      omniTypes = omniTypes :+ sparkTypeToOmniType(field.dataType, field.metadata).getId.ordinal()
-    //    })
     omniTypes = dataSchema.fields
       .map(field => sparkTypeToOmniType(field.dataType, field.metadata).getId.ordinal())
       .toArray
-
-    //    allColumns.toStructType.foreach(field => {
-    //      allOmniTypes = allOmniTypes :+ sparkTypeToOmniType(field.dataType, field.metadata)
-    //        .getId.ordinal()
-    //    })
     allOmniTypes = allColumns.toStructType.fields
       .map(field => sparkTypeToOmniType(field.dataType, field.metadata).getId.ordinal())
       .toArray

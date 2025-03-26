@@ -32,11 +32,12 @@
 #include "arrow/table.h"
 #include "arrowadapter/FileSystemAdapter.h"
 #include "common/UriInfo.h"
+#include "common/Directories.h"
 #include "jni/jni_common.h"
 #include "parquet/arrow/reader.h"
 #include "parquet/exception.h"
 #include "parquet/properties.h"
-#include <filesystem>
+#include <sys/stat.h>
 #include <mutex>
 #include <unordered_map>
 #include <iostream>
@@ -63,17 +64,15 @@ namespace omniruntime::writer
         parquet::ArrowWriterProperties::Builder arrow_writer_properties;
 
         arrow::Status result;
-        mutex_.lock();
         Filesystem *fs = GetFileSystemPtr(uri, ugi, result);
-        mutex_.unlock();
         if (fs == nullptr || fs->filesys_ptr == nullptr) {
             return arrow::Status::IOError(result);
         }
 
         std::string uriPath = uri.ToString();
-        std::filesystem::path path(std::string(uri.Path()));
-        auto res = std::filesystem::create_directories(path.parent_path());
-        if (!res) {
+        std::string path = uri.Path();
+        auto res = common::createDirectories(common::getParentPath(path));
+        if (res != 0) {
           throw std::runtime_error("Create local directories fail");
         }
         std::shared_ptr<io::OutputStream> outputStream;
@@ -84,11 +83,10 @@ namespace omniruntime::writer
             *schema_, arrow::default_memory_pool(), outputStream,
             writer_properties.build(), parquet::default_arrow_writer_properties());
         if (!fileWriterResult.ok()) {
-            std::cerr<<"Error opening file writer: "<<fileWriterResult.status().ToString()<<std::endl;
+            throw std::runtime_error("Error opening file writer" + fileWriterResult.status().ToString());
             return fileWriterResult.status();
         }
         ARROW_ASSIGN_OR_RAISE(arrow_writer, fileWriterResult);
-        auto pool = arrow::default_memory_pool();
         return arrow::Status::OK();
     }
 
@@ -130,9 +128,8 @@ namespace omniruntime::writer
         TypedBufferBuilder<bool> builder;
         builder.Resize(vectorSize);
 
-        builder.Append(reinterpret_cast<uint8_t *>(isSplitWrite?values:vector->GetValues()), vectorSize);
-        auto maybe_buffer = builder.Finish();
-        std::shared_ptr<arrow::Buffer> databuffer = *maybe_buffer;
+        builder.Append(reinterpret_cast<uint8_t *>(isSplitWrite?values:VectorHelper::UnsafeGetValues(vector)), vectorSize);
+        std::shared_ptr<arrow::Buffer> databuffer = *(builder.Finish());
 
         std::vector<std::shared_ptr<Buffer>> buffers;
         buffers.emplace_back(bitmapBuffer);
@@ -154,7 +151,7 @@ namespace omniruntime::writer
                                                            long endPos = 0)
     {
         using T=typename NativeType<Type_ID>::type;
-        auto vector =(Vector<T> *)baseVector;
+        auto vector =static_cast<Vector<T> *>(baseVector);
         if (!isSplitWrite) {
             startPos = 0;
             endPos = vector->GetSize();
@@ -184,7 +181,7 @@ namespace omniruntime::writer
 
         TypedBufferBuilder<ChunkType> builder;
         builder.Resize(vectorSize);
-        builder.Append(isSplitWrite?values:vector->GetValues(), vectorSize);
+        builder.Append(reinterpret_cast<T *>(isSplitWrite?values:VectorHelper::UnsafeGetValues(vector)), vectorSize);
         auto dataBuffer = *builder.Finish();
         std::vector<std::shared_ptr<Buffer>> buffers;
         buffers.emplace_back(bitmapBuffer);
@@ -223,7 +220,7 @@ namespace omniruntime::writer
         int64_t index = 0;
         for (long j = startPos; j < endPos; j++) {
             if (vector->IsNull(j)) {
-                bitmap.SetBitTo(index++, false);
+                bitmap.SetBitTo(index, false);
             }
             index++;
             std::string strValue = std::string(vector->GetValue(j));
@@ -404,7 +401,6 @@ namespace omniruntime::writer
             throw std::runtime_error("Arrow writer is not initialized");
         }
         PARQUET_THROW_NOT_OK(arrow_writer->WriteTable(*table));
-        PARQUET_THROW_NOT_OK(arrow_writer->Close());
     }
 
 } // namespace omniruntime::writer

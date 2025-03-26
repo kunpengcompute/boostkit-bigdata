@@ -30,6 +30,7 @@ import org.apache.spark.sql.execution.command.{DataWritingCommand, DataWritingCo
 import org.apache.spark.sql.execution.datasources.{FileFormat, InsertIntoHadoopFsRelationCommand, OmniInsertIntoHadoopFsRelationCommand}
 import org.apache.spark.sql.execution.datasources.OmniFileFormatWriter.Empty2Null
 import org.apache.spark.sql.execution.datasources.orc.{OmniOrcFileFormat, OrcFileFormat}
+import org.apache.spark.sql.execution.datasources.parquet.{OmniParquetFileFormat, ParquetFileFormat}
 import org.apache.spark.sql.expression.ColumnarExpressionConverter
 import org.apache.spark.sql.types.DataType
 import com.google.gson.{JsonArray, JsonObject}
@@ -84,6 +85,7 @@ object ModifyUtil extends Logging {
             logInfo(s"Columnar Processing for ${cmd.getClass} is currently supported.")
             val fileFormat: FileFormat = cmd.fileFormat match {
               case _: OrcFileFormat => new OmniOrcFileFormat()
+              case _: ParquetFileFormat => new OmniParquetFileFormat()
               case format =>
                 logInfo(s"Unsupported ${format.getClass} file " +
                   s"format for columnar data write command.")

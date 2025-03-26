@@ -201,7 +201,6 @@ public class ParquetColumnarBatchWriter {
         writerOptionsJson.put("port", uri.getPort());
         writerOptionsJson.put("path", uri.getPath() == null ? "" : uri.getPath());
 
-        //  writer = jniWriter.initializeWriter(writerOptionsJson);
         jniWriter.initializeWriter(writerOptionsJson, writer);
     }
 
@@ -228,53 +227,43 @@ public class ParquetColumnarBatchWriter {
     }
 
     public int sparkTypeToParquetLibType(DataType dataType) {
+        int parquetType;
         if (dataType instanceof BooleanType) {
-            return ParquetLibTypeKind.BOOL.ordinal();
+            parquetType =  ParquetLibTypeKind.BOOL.ordinal();
         } else if (dataType instanceof ShortType) {
-            return ParquetLibTypeKind.INT16.ordinal();
+            parquetType = ParquetLibTypeKind.INT16.ordinal();
         } else if (dataType instanceof IntegerType) {
-//            IntegerType integerType = (IntegerType) dataType;
-//            switch (integerType.defaultSize()) {
-//                case 1:
-//                    return ParquetLibTypeKind.INT8.ordinal();
-//                case 2:
-//                    return ParquetLibTypeKind.INT16.ordinal();
-//                case 4:
-            return ParquetLibTypeKind.INT32.ordinal();
-//                case 8:
-//                    return ParquetLibTypeKind.DATE64.ordinal();
-//                default:
-//                    throw new RuntimeException(
-//                            "UnSupport size " + integerType.defaultSize() + " of integer type");
-//            }
+            parquetType = ParquetLibTypeKind.INT32.ordinal();
         } else if (dataType instanceof LongType) {
-            return ParquetLibTypeKind.INT64.ordinal();
+            parquetType = ParquetLibTypeKind.INT64.ordinal();
         } else if (dataType instanceof DateType) {
             DateType dateType = (DateType) dataType;
             switch (dateType.defaultSize()) {
                 case 4:
-                    return ParquetLibTypeKind.DATE32.ordinal();
+                    parquetType = ParquetLibTypeKind.DATE32.ordinal();
+                    break;
                 case 8:
-                    return ParquetLibTypeKind.DATE64.ordinal();
+                    parquetType = ParquetLibTypeKind.DATE64.ordinal();
+                    break;
                 default:
                     throw new RuntimeException(
                             "UnSupport size " + dateType.defaultSize() + " of date type");
             }
         } else if (dataType instanceof DoubleType) {
-            return ParquetLibTypeKind.DOUBLE.ordinal();
+            parquetType = ParquetLibTypeKind.DOUBLE.ordinal();
         } else if (dataType instanceof VarcharType) {
-            return ParquetLibTypeKind.STRING.ordinal();
+            parquetType = ParquetLibTypeKind.STRING.ordinal();
         } else if (dataType instanceof StringType) {
-            return ParquetLibTypeKind.STRING.ordinal();
+            parquetType = ParquetLibTypeKind.STRING.ordinal();
         } else if (dataType instanceof CharType) {
-            return ParquetLibTypeKind.STRING.ordinal();
+            parquetType = ParquetLibTypeKind.STRING.ordinal();
         } else if (dataType instanceof DecimalType) {
             DecimalType decimalType = (DecimalType) dataType;
             switch (decimalType.defaultSize()) {
                 case 8:
-                    return ParquetLibTypeKind.DECIMAL128.ordinal();
                 case 16:
-                    return ParquetLibTypeKind.DECIMAL128.ordinal();
+                    parquetType = ParquetLibTypeKind.DECIMAL128.ordinal();
+                    break;
                 default:
                     throw new RuntimeException(
                             "UnSupport size " + decimalType.defaultSize() + " of decimal type");
@@ -283,6 +272,7 @@ public class ParquetColumnarBatchWriter {
             throw new RuntimeException(
                     "UnSupport type convert  spark type " + dataType.simpleString() + " to parquet lib type");
         }
+        return parquetType;
     }
 
     public int[][] extractDecimalParam(StructType dataSchema) {
