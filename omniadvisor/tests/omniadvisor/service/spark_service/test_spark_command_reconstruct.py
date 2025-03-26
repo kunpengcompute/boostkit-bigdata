@@ -2,9 +2,6 @@ from unittest.mock import MagicMock
 from omniadvisor.service.spark_service.spark_command_reconstruct import spark_command_reconstruct
 
 
-# 假设 spark_command_reconstruct 函数所在的模块名为 spark_utils
-
-
 class TestSparkCommandReconstruct:
     def test_basic_command_reconstruction(self):
         # 创建 mock load 对象

@@ -1,7 +1,7 @@
 import json
 from unittest.mock import patch, MagicMock, Mock
 # 根据实际情况调整导入路径
-from omniadvisor.utils.constant import OA_CONF
+from common.constant import OA_CONF
 from omniadvisor.service.spark_service.spark_run import spark_run
 
 MOCK_GET_RESPONSE = [

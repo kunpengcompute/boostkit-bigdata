@@ -2,7 +2,7 @@ import argparse
 import shlex
 from typing import Dict
 from omniadvisor.utils.logger import logger
-from omniadvisor.utils.constant import OA_CONF
+from common.constant import OA_CONF
 from omniadvisor.service.parameter_parser import ParserInterface
 
 
@@ -60,7 +60,7 @@ class SparkParameterParser(ParserInterface):
         :return:dict
         返回一个包含所有提取出的基础参数的字典,每个键代表一个参数名,详见add_argument中的配置的参数。
         对应的值为该参数的具体设置或值。
-        base_params = {"name":"", "conf_params":{}, "exec_attr":{}}
+        base_params = {name:"", conf_params:{}, exec_attr:{}}
         """
         base_params = self._get_base_params()
         return base_params
@@ -68,12 +68,12 @@ class SparkParameterParser(ParserInterface):
     def _get_base_params(self):
         """
         使用argparse来解析命令行中的输入命令，并返回解析后的非空参数，以字典类型保存
-        :return: {"name": "", "conf_params": {}, "exec_attr": {}} 结构的字典
+        :return:
         """
         if not self._submit_cmd:
             raise ValueError("Submit command cannot be null")
         param_start_index = self._submit_cmd.strip().index(" ")
-        base_params = {"name": "", "conf_params": {}, "exec_attr": {}}
+        base_params = {}
         conf_params = {}
         exec_attr = {}
         args = shlex.split(self._submit_cmd[param_start_index:])
@@ -110,59 +110,3 @@ class SparkParameterParser(ParserInterface):
             base_params["conf_params"] = conf_params
 
         return base_params
-
-
-if __name__ == "__main__":
-    submit_cmd = "spark-sql --master yarn --deploy-mode client \
-    --name ${name}_advisor_${i} \
-    --driver-cores 2 \
-    --driver-memory 8G \
-    --conf spark.sql.shuffle.partitions=3200 \
-    --conf spark.sql.result.partitions=3200 \
-    --conf spark.executor.cores=4 \
-    --conf spark.executor.memory=28G \
-    --conf spark.executor.memoryOverhead=2G \
-    --conf spark.memory.storageFraction=0.5 \
-    --conf spark.memory.fraction=0.6 \
-    --num-executors 400 \
-    --conf spark.shuffle.service.enabled=false \
-    --conf spark.shuffle.io.maxRetries=6 \
-    --conf spark.shuffle.io.retryWait=60 \
-    --conf spark.shuffle.useOldFetchProtocol=false \
-    --conf spark.shuffle.io.serverThreads=32 \
-    --conf spark.sql.hive.convertMetastoreParquet=true \
-    --conf spark.shuffle.file.buffer=1024k \
-    --conf spark.reducer.maxSizeInFlight=96M \
-    --conf spark.reducer.maxReqsInFlight=10 \
-    --conf spark.network.timeout=300s \
-    --conf spark.rpc.askTimeout=300s \
-    --conf spark.sql.adaptive.enabled=true \
-    --conf spark.sql.adaptive.coalescePartitions.enabled=true \
-    --conf spark.sql.adaptive.coalescePartitions.minPartitionNum=100 \
-    --conf spark.sql.adaptive.advisoryPartitionSizeInBytes=64M \
-    --conf spark.sql.adaptive.fetchShuffleBlocksInBatch=true \
-    --conf spark.sql.adaptive.localShuffleReader.enabled=true \
-    --conf spark.sql.adaptive.skewJoin.enabled=true \
-    --conf spark.sql.adaptive.skewJoin.skewedPartitionFactor=5 \
-    --conf spark.sql.adaptive.skewJoin.skewedPartitionThresholdInBytes=256mb \
-    --conf spark.sql.inMemoryColumnarStorage.compressed=true \
-    --conf spark.sql.sources.partitionColumnTypeInference.enabled=false \
-    --conf spark.sql.storeAssignmentPolicy=LEGACY \
-    --conf spark.sql.legacy.timeParserPolicy=LEGACY \
-    --conf spark.hadoop.mapreduce.fileoutputcommitter.algorithm.version=2 \
-    --conf spark.hadoop.fs.hdfs.impl.disable.cache=true \
-    --conf spark.dynamicAllocation.shuffleTracking.enabled=true \
-    --conf spark.speculation=true \
-    --conf spark.speculation.multiplier=5 \
-    --conf spark.speculation.quantile=0.99 \
-    --conf spark.speculation.minTaskRuntime=3000ms \
-    --conf spark.sql.autoBroadcastJoinThreshold=64mb \
-    --conf spark.sql.adaptive.coalescePartitions.minPartitionSize=32mb \
-    --conf spark.sql.adaptive.coalescePartitions.parallelismFirst=false \
-    --conf spark.sql.parquet.writeLegacyFormat=true \
-    --conf spark.driver.maxResultSize=40g \
-    -f $file"
-
-    spark_parameter_parser = SparkParameterParser(submit_cmd)
-    parsed_parameter = spark_parameter_parser.process_parameter()
-    print("")

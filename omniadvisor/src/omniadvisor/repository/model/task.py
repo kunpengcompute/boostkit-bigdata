@@ -1,4 +1,4 @@
-from django_server.app.models import DatabaseTask
+from server.app.models import DatabaseTask
 from omniadvisor.repository.model.load import Load
 
 

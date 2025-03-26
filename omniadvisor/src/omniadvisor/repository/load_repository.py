@@ -1,4 +1,4 @@
-from django_server.app.models import DatabaseLoad
+from server.app.models import DatabaseLoad
 from omniadvisor.repository.model.load import Load
 from omniadvisor.repository.repository import Repository
 

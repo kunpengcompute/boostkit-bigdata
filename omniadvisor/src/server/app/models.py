@@ -1,7 +1,7 @@
 # Create your models here.
 from django.db import models
 
-from omniadvisor.utils.constant import OA_CONF
+from common.constant import OA_CONF
 
 
 class DatabaseLoad(models.Model):

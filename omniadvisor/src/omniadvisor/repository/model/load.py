@@ -1,4 +1,4 @@
-from django_server.app.models import DatabaseLoad
+from server.app.models import DatabaseLoad
 
 
 class Load:

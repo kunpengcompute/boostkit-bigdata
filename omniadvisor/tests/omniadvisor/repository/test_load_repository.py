@@ -1,7 +1,7 @@
 import pytest
 
-from .common import create_test_table
-from .common import delete_test_table
+from .common import create_table
+from .common import delete_table
 from omniadvisor.repository.load_repository import DatabaseLoad
 from omniadvisor.repository.load_repository import Load
 from omniadvisor.repository.load_repository import LoadRepository
@@ -12,22 +12,22 @@ class TestLoadRepository:
     """
     LoadRepository测试类
     """
+
     @staticmethod
     def setup_class():
         # 创建表
-        create_test_table(DatabaseLoad)
+        create_table(DatabaseLoad)
 
     @staticmethod
-    def cleanup_class():
+    def teardown_class():
         # 删除表
-        delete_test_table(DatabaseLoad)
+        delete_table(DatabaseLoad)
 
     @staticmethod
     def setup_method():
         # 清空表数据
         DatabaseLoad.objects.all().delete()
 
-    @pytest.mark.django_db(transaction=True)
     def test_create(self):
         load = LoadRepository.create(
             name='test',
@@ -47,7 +47,6 @@ class TestLoadRepository:
         with pytest.raises(ValueError):
             LoadRepository.create(name="", exec_attr={}, default_config={})
 
-    @pytest.mark.django_db(transaction=True)
     def test_query(self):
         # 创建测试数据
         load = LoadRepository.create(
@@ -71,7 +70,6 @@ class TestLoadRepository:
         )
         assert len(loads) == 0
 
-    @pytest.mark.django_db(transaction=True)
     def test_update_best_config(self):
         # 创建测试数据
         load = LoadRepository.create(
@@ -87,7 +85,6 @@ class TestLoadRepository:
         )
         assert updated_load.best_config == {"param2": "value2"}
 
-    @pytest.mark.django_db(transaction=True)
     def test_update_test_config(self):
         # 创建测试数据
         load = LoadRepository.create(
