@@ -1,9 +1,17 @@
 import argparse
 import shlex
+from dataclasses import dataclass
 from typing import Dict
 from omniadvisor.utils.logger import logger
 from common.constant import OA_CONF
 from omniadvisor.service.parameter_parser import ParserInterface
+
+
+@dataclass(frozen=True)
+class BaseParams:
+    name: str
+    conf_params: dict
+    exec_attr: dict
 
 
 class SparkParameterParser(ParserInterface):
@@ -54,7 +62,7 @@ class SparkParameterParser(ParserInterface):
         self._parser.add_argument('-i', help='Initialization SQL file')
         self._parser.add_argument('remainder', nargs=argparse.REMAINDER, help="Collect the rest of parameters")
 
-    def process_parameter(self) -> Dict:
+    def process_parameter(self) -> BaseParams:
         """
         解析提交后的命令，得到解析的参数后，以字典的形式保存
         :return:dict
@@ -62,8 +70,7 @@ class SparkParameterParser(ParserInterface):
         对应的值为该参数的具体设置或值。
         base_params = {name:"", conf_params:{}, exec_attr:{}}
         """
-        base_params = self._get_base_params()
-        return base_params
+        return self._get_base_params()
 
     def _get_base_params(self):
         """
@@ -73,7 +80,7 @@ class SparkParameterParser(ParserInterface):
         if not self._submit_cmd:
             raise ValueError("Submit command cannot be null")
         param_start_index = self._submit_cmd.strip().index(" ")
-        base_params = {}
+        name = ""
         conf_params = {}
         exec_attr = {}
         args = shlex.split(self._submit_cmd[param_start_index:])
@@ -103,10 +110,6 @@ class SparkParameterParser(ParserInterface):
                     else:
                         conf_params[confkey] = confvalue
             else:
-                base_params[key] = value
+                name = value
 
-            # exec_attr 和 conf_params合并进入base_params
-            base_params["exec_attr"] = exec_attr
-            base_params["conf_params"] = conf_params
-
-        return base_params
+        return BaseParams(name=name, conf_params=conf_params, exec_attr=exec_attr)

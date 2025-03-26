@@ -17,9 +17,9 @@ class TestParameterParser:
         params = parser.process_parameter()
 
         # 验证返回的字典包含预期的键值对
-        assert 'name' in params and params['name'] == "test_sql"
-        assert 'exec_attr' in params and isinstance(params['exec_attr'], dict)
-        assert 'conf_params' in params and isinstance(params['conf_params'], dict)
+        assert params.name == "test_sql"
+        assert isinstance(params.exec_attr, dict)
+        assert isinstance(params.conf_params, dict)
 
     def test_get_base_params_with_empty_submit_cmd(self):
         # 测试 _get_base_params 在提交命令为空时抛出 ValueError
@@ -39,5 +39,5 @@ class TestParameterParser:
         params = parser._get_base_params()
 
         # 验证返回的字典包含预期的键值对
-        assert 'master' in params['exec_attr'] and params['exec_attr']['master'] == 'local[*]'
-        assert 'deploy_mode' in params['exec_attr'] and params['exec_attr']['deploy_mode'] == 'client'
+        assert params.exec_attr['master'] == 'local[*]'
+        assert params.exec_attr['deploy_mode'] == 'client'

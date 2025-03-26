@@ -12,7 +12,7 @@ class TestRunCmd:
 
         # 验证结果
         assert exitcode == 0
-        assert output == ["Success output"]
+        assert output == "Success output"
         mock_getstatusoutput.assert_called_once_with('echo hello')
 
     @patch('subprocess.getstatusoutput')
@@ -24,7 +24,7 @@ class TestRunCmd:
 
         # 验证结果
         assert exitcode == 1
-        assert output == ["Error output"]
+        assert output == "Error output"
 
 
 class TestTraceDataSaver:

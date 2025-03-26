@@ -13,30 +13,31 @@ class SparkExecutor:
         execute_cmd = shlex.split(execute_cmd)
         exitcode, spark_output = run_cmd(execute_cmd)
 
-        # 获取ApplicantID 以及 TimeTaken
-        result_dict = self._response_parser(spark_output)
-        return exitcode, spark_output, result_dict
+        return exitcode, spark_output
 
-    def _response_parser(self, spark_output) -> dict:
+    def parser_spark_output(self, spark_output) -> dict:
         return self._reg_match_application_id_and_time_taken(spark_output)
 
     def _reg_match_application_id_and_time_taken(self, spark_output):
-        result_dict = {}
+        spark_output = spark_output.split("\n")
+        spark_submit_cmd = ""
+        application_id = ""
+        time_taken = ""
         for item in spark_output:
             if "deploy.SparkSubmit" in item:
-                result_dict['spark_submit_cmd'] = item.strip()
+                spark_submit_cmd = item.strip()
                 break
         for item in reversed(spark_output):
             if "Application Id" in item:
                 pattern = r"Application Id:\s*(.*)"
                 match = re.search(pattern, item)
                 if match:
-                    result_dict["application_id"] = match.group(1).strip()
+                    application_id = match.group(1).strip()
             elif "Time taken" in item:
                 pattern = r"Time taken:\s*(.*)seconds"
                 match = re.search(pattern, item)
                 if match:
-                    result_dict["time_taken"] = match.group(1).strip()
-            if "application_id" in result_dict and "time_taken" in result_dict:
+                    time_taken = match.group(1).strip()
+            if application_id and time_taken:
                 break
-        return result_dict
+        return spark_submit_cmd, application_id, time_taken
