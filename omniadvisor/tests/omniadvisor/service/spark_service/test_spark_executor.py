@@ -1,35 +1,84 @@
-from unittest.mock import patch, MagicMock
-from omniadvisor.service.spark_service.spark_executor import run_cmd, SparkExecutor
-
-
-@patch('subprocess.getstatusoutput')
-def test_run_cmd(mock_getstatusoutput):
-    # 配置mock对象
-    mock_getstatusoutput.return_value = (0, "line1\nline2\nline3")
-
-    # 调用run_cmd函数
-    exitcode, output = run_cmd(['echo', 'hello'])
-
-    # 确认getstatusoutput被正确调用
-    mock_getstatusoutput.assert_called_once_with("echo hello")
+from unittest.mock import patch
+from omniadvisor.service.spark_service.spark_executor import SparkExecutor
 
 
 class TestSparkExecutor:
     def setup_class(self):
+        """在每个测试用例之前运行，初始化 SparkExecutor 实例"""
         self.spark_executor = SparkExecutor()
 
-    def test_submit_spark_task(self):
-        # 模拟run_cmd函数返回值
-        mock_run_cmd = MagicMock(return_value=(0, ["Application Id: app-12345", "Time taken: 10.5 seconds"]))
+    @patch('omniadvisor.service.spark_service.spark_executor.run_cmd')
+    def test_submit_spark_task(self, mock_run_cmd):
+        """
+        测试 submit_spark_task 方法
+        """
+        # 模拟输入的 execute_cmd 和返回值
+        execute_cmd = "spark-submit --class MyClass my_app.jar"
+        mock_run_cmd.return_value = (0, ["Output line 1 \nOutput line 2"])
 
-        # 使用patch装饰器替换run_cmd的实际实现为我们mock的对象
-        with patch('omniadvisor.service.spark_service.spark_executor.run_cmd', mock_run_cmd):
-            exitcode, spark_out_put, result_dict = self.spark_executor.submit_spark_task("spark-submit --class MyClass myApp.jar")
+        # 调用方法
+        exitcode, spark_output = self.spark_executor.submit_spark_task(execute_cmd)
 
-            # 验证run_cmd是否被调用
-            mock_run_cmd.assert_called_once()
+        # 验证结果
+        assert exitcode == 0
+        assert spark_output == ["Output line 1 \nOutput line 2"]
+        mock_run_cmd.assert_called_once_with(["spark-submit", "--class", "MyClass", "my_app.jar"])
 
-            # 验证返回值
-            assert exitcode == 0
-            assert result_dict["application_id"] == "app-12345"
-            assert result_dict["time_taken"] == "10.5"
+    def test_parser_spark_output(self):
+        """
+        测试 parser_spark_output 方法
+        """
+        # 模拟 spark_output 数据
+        spark_output ="Some log line\n" \
+                      "INFO deploy.SparkSubmit: Starting Spark job\n" \
+                      "Another log line\n" \
+                      "Application Id: application_1234567890\n" \
+                      "Time taken: 12.34 seconds"
+
+        # 调用方法
+        spark_submit_cmd, application_id, time_taken = self.spark_executor.parser_spark_output(spark_output)
+
+        # 验证结果
+        expected_result = {
+            "spark_submit_cmd": "INFO deploy.SparkSubmit: Starting Spark job",
+            "application_id": "application_1234567890",
+            "time_taken": "12.34"
+        }
+        assert spark_submit_cmd == expected_result["spark_submit_cmd"]
+        assert application_id == expected_result["application_id"]
+        assert time_taken == expected_result["time_taken"]
+
+    def test_reg_match_application_id_and_time_taken(self):
+        """
+        测试 _reg_match_application_id_and_time_taken 方法
+        """
+        # 模拟 spark_output 数据
+        spark_output ="Some log line\n" \
+                      "INFO deploy.SparkSubmit: Starting Spark job\n" \
+                      "Another log line\n" \
+                      "Application Id: application_1234567890\n" \
+                      "Time taken: 12.34 seconds"
+
+        # 调用方法
+        spark_submit_cmd, application_id, time_taken = self.spark_executor._reg_match_application_id_and_time_taken(
+            spark_output)
+
+        # 验证结果
+        assert spark_submit_cmd == "INFO deploy.SparkSubmit: Starting Spark job"
+        assert application_id == "application_1234567890"
+        assert time_taken == "12.34"
+
+    def test_parser_spark_output_with_empty_output(self):
+        """
+        测试 parser_spark_output 方法处理空输出的情况
+        """
+        # 模拟空的 spark_output 数据
+        spark_output = ""
+
+        # 调用方法
+        spark_submit_cmd, application_id, time_taken = self.spark_executor.parser_spark_output(spark_output)
+
+        # 验证结果
+        assert spark_submit_cmd == ""
+        assert application_id == ""
+        assert time_taken == ""

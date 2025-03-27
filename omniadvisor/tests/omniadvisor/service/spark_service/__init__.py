@@ -1,6 +1,7 @@
 import django
 from django.conf import settings
 
+
 if not settings.configured:
     # 启用内存数据库，确保不影响原来的数据库
     DATABASES = {

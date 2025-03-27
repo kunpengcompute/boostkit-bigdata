@@ -99,3 +99,19 @@ class TestLoadRepository:
             test_config={"param2": "value2"}
         )
         assert updated_load.test_config == {"param2": "value2"}
+
+    @pytest.mark.django_db(transaction=True)
+    def test_update_tuning_needed(self):
+        # 创建测试数据
+        load = LoadRepository.create(
+            name='test',
+            exec_attr={'cmd': 'spark-sql -f test.sql'},
+            default_config={"param1": "value2"}
+        )
+
+        # 更新测试配置
+        updated_load = LoadRepository.update_test_config(
+            load=load,
+            test_config={"is_need_tuning": True}
+        )
+        assert updated_load.test_config == {"is_need_tuning": True}
