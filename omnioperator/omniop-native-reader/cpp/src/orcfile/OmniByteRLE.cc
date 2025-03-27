@@ -160,7 +160,7 @@ namespace omniruntime::reader {
         uint64_t nonNulls = numValues - position;
         if (nulls) {
             for (uint64_t i = position; i < numValues; ++i) {
-                if (BitUtil::IsBitSet(nulls, position)) {
+                if (BitUtil::IsBitSet(nulls, i)) {
                     nonNulls -= 1;
                 }
             }
@@ -181,7 +181,7 @@ namespace omniruntime::reader {
             uint64_t bitsLeft = bytesRead * 8 - remainingBits;
             if (nulls) {
                 for (int64_t i = static_cast<int64_t>(numValues) - 1; i >= static_cast<int64_t>(position); --i) {
-                    if (!BitUtil::IsBitSet(nulls, position)) {
+                    if (!BitUtil::IsBitSet(nulls, i)) {
                         uint64_t shiftPosn = (-bitsLeft) % 8;
                         data[i] = static_cast<T>((data[position + (bitsLeft - 1) / 8] >> shiftPosn) & 0x1);
                         bitsLeft -= 1;
