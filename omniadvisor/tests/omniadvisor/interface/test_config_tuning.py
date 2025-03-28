@@ -1,0 +1,57 @@
+from unittest.mock import patch, MagicMock
+
+from common.constant import OA_CONF
+from omniadvisor.interface.config_tuning import unified_tuning
+
+
+class TestTuning:
+
+    def setup_class(self):
+        # 创建表
+        self.load_id = '2'
+        self.retest_times = 3
+        self.tuner_type = OA_CONF.TunerType.iterative
+
+    def test_unified_tuning_when_retest_backend(self):
+        """
+        后台复测顺利执行
+        :return:
+        """
+        with patch('omniadvisor.repository.load_repository.LoadRepository.query_by_id'), \
+                patch('omniadvisor.service.retest_service.spark_run'), \
+                patch(
+                    'omniadvisor.repository.task_repository.TaskRepository.query_perf_history_from_load') as mocked_query_perf, \
+                patch('omniadvisor.repository.load_repository.LoadRepository.update_best_config') as mock_update_best:
+            mock_obj = MagicMock()
+            mocked_query_perf.return_value = mock_obj
+
+            unified_tuning(load_id=self.load_id, retest_times=self.retest_times, retest_way=OA_CONF.RetestWay.backend,
+                           tuner_type=self.tuner_type)
+
+            mock_update_best.assert_called_once()
+
+    def test_unified_tuning_when_load_id_not_exist(self):
+        """
+        当 load id 不存在时
+        :return:
+        """
+        with patch('omniadvisor.repository.load_repository.LoadRepository.query_by_id') as mock_query_by_id, \
+                patch('omniadvisor.utils.logger.logger.info') as mock_info:
+            mock_query_by_id.return_value = None
+            unified_tuning(load_id=self.load_id, retest_times=self.retest_times, retest_way=OA_CONF.RetestWay.backend,
+                           tuner_type=self.tuner_type)
+
+            mock_info.assert_called_with('Cannot find load id: %s in database.', '2')
+
+    def test_unified_tuning_when_retest_failed(self):
+        """
+        前台复测
+        :return:
+        """
+        with patch('omniadvisor.repository.load_repository.LoadRepository.query_by_id'), \
+                patch('omniadvisor.repository.task_repository.TaskRepository.query_perf_history_from_load') as mocked_query_perf, \
+                patch('omniadvisor.repository.load_repository.LoadRepository.update_test_config') as mock_update_test:
+            unified_tuning(load_id=self.load_id, retest_times=self.retest_times, retest_way=OA_CONF.RetestWay.hijacking,
+                           tuner_type=self.tuner_type)
+            mocked_query_perf.assert_not_called()
+            mock_update_test.assert_called_once()
