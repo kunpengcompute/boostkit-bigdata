@@ -14,7 +14,6 @@ if not settings.configured:
         DATABASES=DATABASES
     )
     django.setup()
-from omniadvisor.service.tuner import TunerFactory
 from omniadvisor.repository.load_repository import LoadRepository
 from omniadvisor.repository.task_repository import TaskRepository
 
@@ -65,14 +64,10 @@ def unified_tuning(load_id: str, retest_times: int, retest_way: str, tuner_type:
         return
     load = loads[0]
 
-    # 每一种算法，只创建一次
-    factory = TunerFactory(tuner_type, load, config_space)
-    # 创建不同的调优算法类
-    tunner = factory.make()
-    # 一些算法需要初始化
-    tunner.initialize()
+    # TODO 这里先用参数空间采样代替，后期替换为bin目录下的具体算法
+    configuration = config_space.sample_configuration(1)
+    next_config = dict(configuration)
     # 推荐下一个配置
-    next_config = tunner.tune()
     # 复测
     if retest_way == OA_CONF.RetestWay.backend:
         retest(retest_times, load, next_config)
