@@ -2,13 +2,13 @@ from datetime import datetime
 
 from django.utils import timezone
 
-from django_server.app.models import DatabaseLoad
-from django_server.app.models import DatabaseTask
+from server.app.models import DatabaseLoad
+from server.app.models import DatabaseTask
 from omniadvisor.repository.model.load import Load
 from omniadvisor.repository.model.task import Task
 from omniadvisor.repository.model.perf_history import PerfHistory
 from omniadvisor.repository.repository import Repository
-from omniadvisor.utils.constant import OA_CONF
+from common.constant import OA_CONF
 
 
 class TaskRepository(Repository):
@@ -134,7 +134,7 @@ class TaskRepository(Repository):
         return Task(database_model=database_task)
 
     @classmethod
-    def update_task_result(cls, task: Task, status: str, runtime: float, trace: dict):
+    def update_task_result(cls, task: Task, status: str, runtime: float, trace: dict, output: list):
         """
         更新任务中的状态
 
@@ -142,6 +142,7 @@ class TaskRepository(Repository):
         :param status: 执行状态
         :param runtime: 执行用时
         :param trace: 执行Trace
+        :param output: 任务完整输出
         :return: 更新完后的任务
         """
         model_attr = {
@@ -153,4 +154,4 @@ class TaskRepository(Repository):
             database_model=task.database_model,
             model_attr=model_attr
         )
-        return Task(database_model=database_task)
+        return Task(database_model=database_task, output=output)

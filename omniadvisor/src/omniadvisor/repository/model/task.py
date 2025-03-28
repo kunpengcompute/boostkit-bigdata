@@ -1,4 +1,4 @@
-from django_server.app.models import DatabaseTask
+from server.app.models import DatabaseTask
 from omniadvisor.repository.model.load import Load
 
 
@@ -6,13 +6,15 @@ class Task:
     """
     任务
     """
-    def __init__(self, database_model: DatabaseTask):
+
+    def __init__(self, database_model: DatabaseTask, output=""):
         """
         初始化，接收任务在数据库中的模型
 
         :param database_model: 数据库任务实例
         """
         self._database_model = database_model
+        self._output = output
 
     @property
     def id(self):
@@ -49,6 +51,10 @@ class Task:
     @property
     def database_model(self):
         return self._database_model
+
+    @property
+    def output(self):
+        return self._output
 
     class FieldName:
         id = 'id'

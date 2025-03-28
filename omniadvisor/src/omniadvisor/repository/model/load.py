@@ -1,4 +1,4 @@
-from django_server.app.models import DatabaseLoad
+from server.app.models import DatabaseLoad
 
 
 class Load:
@@ -42,6 +42,10 @@ class Load:
         return self._database_model.create_time
 
     @property
+    def tuning_needed(self):
+        return self._database_model.tuning_needed
+
+    @property
     def database_model(self):
         return self._database_model
 
@@ -53,3 +57,4 @@ class Load:
         best_config = 'best_config'
         test_config = 'test_config'
         create_time = 'create_time'
+        tuning_needed = 'tuning_needed'
