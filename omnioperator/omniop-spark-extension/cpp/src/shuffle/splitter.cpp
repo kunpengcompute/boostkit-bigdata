@@ -1011,9 +1011,7 @@ int32_t Splitter::ProtoWritePartitionByRow(int32_t partition_id, std::unique_ptr
         protoRowBatch->SerializeToZeroCopyStream(bufferStream.get());
         rowCount -= onceCopyRow;
         batchCount++;
-        protoRowBatch->clear_rowcnt();
-        protoRowBatch->clear_rows();
-        protoRowBatch->clear_offsets();
+        protoRowBatch->Clear();
     }
 
     uint64_t partitionBatchSize = bufferStream->flush();
@@ -1174,9 +1172,7 @@ int Splitter::protoSpillPartitionByRow(int32_t partition_id, std::unique_ptr<Buf
         protoRowBatch->SerializeToZeroCopyStream(bufferStream.get());
         rowCount -= onceCopyRow;
         batchCount++;
-        protoRowBatch->clear_rowcnt();
-        protoRowBatch->clear_rows();
-        protoRowBatch->clear_offsets();
+        protoRowBatch->Clear();
     }
 
     uint64_t partitionBatchSize = bufferStream->flush();
