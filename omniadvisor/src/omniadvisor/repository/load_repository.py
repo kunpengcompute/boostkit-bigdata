@@ -103,7 +103,7 @@ class LoadRepository(Repository):
         return Load(database_model=database_load)
 
     @classmethod
-    def update_tuning_needed(cls, load:Load, tuning_needed: bool):
+    def update_tuning_needed(cls, load: Load, tuning_needed: bool):
         """
         更新当前负载是否需要调优这一信息
         :param load: 负载实例
@@ -118,3 +118,18 @@ class LoadRepository(Repository):
             model_attr=model_attr
         )
         return Load(database_model=database_load)
+
+    @classmethod
+    def query_by_id(cls, load_id: str) -> list:
+        """
+        根据 load_id 查询 load
+        :param load_id: 负载id
+        :return: 负载列表
+        """
+        model_attr = {
+            Load.FieldName.id: load_id,
+        }
+        database_loads = cls._query(model_attr=model_attr)
+        return [
+            Load(database_model=database_load) for database_load in database_loads
+        ]

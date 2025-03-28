@@ -29,6 +29,18 @@ class OmniAdvisorConf:
         running = 'Running'
         all = [success, fail, running]
 
+    # 存几种调优算法，目前暂无赋值
+    class TunerType:
+        iterative = 'iterative'
+        expert = 'expert'
+        transfer = 'transfer'
+        all = [iterative, expert, transfer]
+
+    class RetestWay:
+        hijacking = 'hijacking'
+        backend = 'backend'
+        all = [hijacking, backend]
+
     @staticmethod
     # 项目通用配置
     class CommonConfig:

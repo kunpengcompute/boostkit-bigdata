@@ -1,0 +1,26 @@
+{
+  "spark.driver.instances": {
+    "type": "uniform_int",
+    "default": 24,
+    "lower": 2,
+    "upper": 48,
+    "prefix": "",
+    "suffix": "",
+    "enable": true
+  },
+  "spark.sql.optimizer.runtime.bloomFilter.creationSideThreshold": {
+    "type": "uniform_int",
+    "default": 10,
+    "lower": 1,
+    "upper": 1000,
+    "prefix": "",
+    "suffix": "",
+    "enable": true
+  },
+  "spark.sql.optimizer.enableCsvExpressionOptimization": {
+    "type": "categorical",
+    "default": "true",
+    "choices": ["true", "false"],
+    "enable": true
+  }
+}

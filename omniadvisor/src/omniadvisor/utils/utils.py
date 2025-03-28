@@ -3,6 +3,11 @@ import json
 import uuid
 import subprocess
 from typing import Tuple, List, Dict
+
+from ConfigSpace import ConfigurationSpace, UniformIntegerHyperparameter, Constant, CategoricalHyperparameter, \
+    UniformFloatHyperparameter
+
+from common.constant import OA_CONF
 from omniadvisor.utils.logger import logger
 
 
@@ -43,5 +48,67 @@ def trace_data_saver(data: List[Dict[str, str]], data_dir):
         raise Exception(f"保存过程中出现错误: {e}")
     return file_path
 
-if __name__ == "__main__":
-    run_cmd(['ls'])
+
+def read_json_file(file_path: str):
+    """
+    读取json文件
+    :param file_path: json文件路径
+    :return:
+    """
+    try:
+        with open(file_path, "r", encoding="utf-8") as file:
+            # 将 JSON 文件内容解析为 Python 对象
+            data = json.load(file)
+    except FileNotFoundError:
+        logger.error(f"Error: The file '{file_path}' does not exist.")
+    except json.JSONDecodeError:
+        logger.error(f"Error: The file '{file_path}' is not a valid JSON file.")
+    except Exception as e:
+        logger.error(f"An unexpected error occurred: {e}")
+
+    return data
+
+
+def load_config_space() -> ConfigurationSpace:
+    """
+    将knob_space 转为 configuration_space
+    :return: ConfigurationSpace 对象
+    """
+    repo_path = os.path.join(OA_CONF.PROJECT_DIR, 'config', 'spark_repo.json')
+    knob_space = read_json_file(repo_path)
+    config_space = ConfigurationSpace()
+    for knob_name, knob_value in knob_space.items():
+        if not knob_value['enable']:
+            continue
+        knob_type = knob_value.get('type')
+
+        if knob_type == 'uniform_int':
+            hyperparameter = UniformIntegerHyperparameter(
+                name=knob_name,
+                lower=knob_value.get('lower'),
+                upper=knob_value.get('upper'),
+                default_value=knob_value.get('default'),
+            )
+        elif knob_type == 'constant':
+            hyperparameter = Constant(
+                name=knob_name,
+                value=knob_value.get('default')
+            )
+        elif knob_type == 'categorical':
+            hyperparameter = CategoricalHyperparameter(
+                name=knob_name,
+                choices=knob_value.get('choices'),
+                default_value=knob_value.get('default'),
+                weights=knob_value.get('weights'),
+            )
+        elif knob_type == 'uniform_float':
+            hyperparameter = UniformFloatHyperparameter(
+                name=knob_name,
+                lower=knob_value.get('lower'),
+                upper=knob_value.get('upper'),
+                default_value=knob_value.get('default'),
+            )
+        else:
+            raise RuntimeError(f'Not supported config type: {knob_type}')
+        config_space.add(hyperparameter)
+    return config_space

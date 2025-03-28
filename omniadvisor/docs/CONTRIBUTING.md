@@ -11,11 +11,11 @@
    - 重启 PyCharm 以生效。
 ---
 ## 如何在django admin的页面中显示一个model？
-   - 注册一个model（参考`django_server\app\models.py`）
-   - 在admin后台显示model（参考`django_server\app\admin.py`）
+   - 注册一个model（参考`server\app\models.py`）
+   - 在admin后台显示model（参考`server\app\admin.py`）
    - 其他高阶用法持续更新中。。。
 
 ---
 ## 在哪写数据库增删改查？
 
-在 `omniadvisor\database\repository.py`中，组织django中注册的model，实现增删改查功能
+在 `omniadvisor\repository.py`中，组织django中注册的model，实现增删改查功能
