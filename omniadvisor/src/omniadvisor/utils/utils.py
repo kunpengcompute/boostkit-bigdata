@@ -7,7 +7,7 @@ from typing import Tuple, List, Dict
 from ConfigSpace import ConfigurationSpace, UniformIntegerHyperparameter, Constant, CategoricalHyperparameter, \
     UniformFloatHyperparameter
 
-from omniadvisor.utils.constant import OA_CONF
+from common.constant import OA_CONF
 from omniadvisor.utils.logger import logger
 
 

@@ -3,14 +3,14 @@ import argparse
 import django
 from django.conf import settings
 
-from django_server.engine.settings import DATABASES
-from omniadvisor.utils.constant import OA_CONF
+from common.constant import OA_CONF
+from server.engine.settings import DATABASES
 from omniadvisor.utils.logger import logger
 
 # 没有配置时，才启用正式的数据库；测试绕过此通路
 if not settings.configured:
     settings.configure(
-        INSTALLED_APPS=['django_server'],
+        INSTALLED_APPS=['server'],
         DATABASES=DATABASES
     )
     django.setup()
@@ -84,5 +84,3 @@ def main():
     unified_tuning(args.load_id, args.retest_times, args.retest_way, args.tuner_type)
 
 
-if __name__ == "__main__":
-    main()
