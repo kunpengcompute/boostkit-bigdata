@@ -178,7 +178,7 @@ namespace omniruntime::reader {
             runLength += 1;
             runRead = 0;
 
-            readLongsByType(OmniVec, 0, runLength, offset , numValues, bitSize, dataTypeId, notNull);
+            readLongs(literals.data(), 0, runLength, bitSize);
 
             if (isSigned) {
                 UnZigZagBatchHEFs8p2(reinterpret_cast<uint64_t*>(literals.data()), runLength);
