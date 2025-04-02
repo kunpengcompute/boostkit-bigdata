@@ -28,6 +28,8 @@ def spark_command_reconstruct(load, conf):
             submit_cmd_list.append("-i")
         elif key == "f":
             submit_cmd_list.append("-f")
+        elif key == "e":
+            submit_cmd_list.append("-e")
         # 单独处理 remainder = ['--uk1','xxxx','--uk2','xxxx'] 这部分未被解析的残余参数
         elif key == 'remainder' and isinstance(value, list):
             for i, cmd in enumerate(value):

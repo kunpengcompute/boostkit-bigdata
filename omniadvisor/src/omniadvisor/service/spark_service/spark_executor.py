@@ -10,7 +10,6 @@ class SparkExecutor:
         :param submit_config_str: spark的提交命令
         :return:
         """
-        execute_cmd = shlex.split(execute_cmd)
         exitcode, spark_output = run_cmd(execute_cmd)
 
         return exitcode, spark_output
