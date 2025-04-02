@@ -40,4 +40,4 @@ class SparkExecutor:
                     time_taken = match.group(1).strip()
             if application_id and time_taken:
                 break
-        return spark_submit_cmd, application_id, time_taken
+        return spark_submit_cmd, application_id, float(time_taken)
