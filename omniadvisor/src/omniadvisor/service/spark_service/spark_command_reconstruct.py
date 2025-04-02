@@ -17,6 +17,7 @@ def spark_command_reconstruct(load, conf):
         return key
 
     def _normalize_value(value):
+        value = str(value)
         if ' ' in value:
             value = f'"{value}"'
         return value
