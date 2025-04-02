@@ -631,7 +631,10 @@ int Splitter::Split_Init(){
     for (auto i = 0; i < num_partitions_; ++i) {
         vc_partition_array_buffers_[i].resize(column_type_id_.size());
     }
-
+    partition_arena_.resize(num_partitions_);
+    partition_row_batch.resize(num_partitions_);
+    partition_row_batch_count.resize(num_partitions_);
+    std::fill(partition_row_batch_count.begin(), partition_row_batch_count.end(), 0);
     partition_rows.resize(num_partitions_);
     return 0;
 }
@@ -667,17 +670,42 @@ int Splitter::SplitByRow(VectorBatch *vecBatch) {
     } else {
         auto pidVec = reinterpret_cast<Vector<int32_t> *>(vecBatch->Get(0));
         auto tmpVectorBatch = new VectorBatch(rowCount);
+        partition_id_.resize(rowCount);
+        memset_s(partition_id_cnt_cur_, num_partitions_ * sizeof(int32_t), 0, num_partitions_ * sizeof(int32_t));
+        for (int i = 0; i < rowCount; ++i) {
+            auto pid = pidVec->GetValue(i);
+            if (pid >= num_partitions_) {
+                LogsError(" Illegal pid Value: %d >= partition number %d .", pid, num_partitions_);
+                throw std::runtime_error("Shuffle pidVec Illegal pid Value!");
+            }
+            partition_id_[i] = pid;
+            partition_id_cnt_cur_[pid]++;
+        }
+        BuildPartition2Row(rowCount);
         for (int i = 1; i < vecBatch->GetVectorCount(); ++i) {
             tmpVectorBatch->Append(vecBatch->Get(i));
         }
         vecBatch->ResizeVectorCount(1);
-        RowBatch *rowBatch = VectorHelper::TransRowBatchFromVectorBatch(tmpVectorBatch);
-        for (int i = 0; i < rowCount; ++i) {
-            auto pid = pidVec->GetValue(i);
-            RowInfo *rowInfo = rowBatch->Get(i);
-            partition_rows[pid].emplace_back(rowInfo);
-            total_input_size += rowInfo->length;
+        std::vector<DataTypeId> typeIds;
+        std::vector<Encoding> encodings;
+        int32_t vecCount = tmpVectorBatch->GetVectorCount();
+        for (int i = 0; i < vecCount; i++) {
+            typeIds.push_back(tmpVectorBatch->Get(i)->GetTypeId());
+            encodings.push_back(tmpVectorBatch->Get(i)->GetEncoding());
         }
+        auto rowBuffer = std::make_unique<RowBuffer>(typeIds, encodings, typeIds.size() - 1);
+
+        for (auto &pid: partition_used_) {
+            auto pos = partition_row_offset_base_[pid];
+            auto end = partition_row_offset_base_[pid + 1];
+            for (; pos < end; ++pos) {
+                rowBuffer->TransValueFromVectorBatch(tmpVectorBatch, static_cast<int32_t>(row_offset_row_id_[pos]));
+                auto oneRowLen = rowBuffer->FillBuffer(partition_arena_[pid]);
+                partition_rows[pid].emplace_back(new RowInfo(rowBuffer->TakeRowBuffer(), oneRowLen));
+                total_input_size += oneRowLen;
+            }
+        }
+
         delete vecBatch;
         delete tmpVectorBatch;
     }
@@ -1011,8 +1039,6 @@ int32_t Splitter::ProtoWritePartitionByRow(int32_t partition_id, std::unique_ptr
         for (uint64_t i = 0; i < onceCopyRow; ++i) {
             RowInfo *rowInfo = rowInfoPtr[i];
             rows.append(reinterpret_cast<const char*>(rowInfo->row), rowInfo->length);
-            // free row memeory
-            delete rowInfo;
         }
         protoRowBatch->set_rows(std::move(rows));
         protoRowBatch->set_offsets(reinterpret_cast<char*>(offset_vec.data()), onceCopyRow * sizeof(int32_t));
@@ -1034,7 +1060,7 @@ int32_t Splitter::ProtoWritePartitionByRow(int32_t partition_id, std::unique_ptr
         batchCount++;
         protoRowBatch->Clear();
     }
-
+    partition_arena_[partition_id].Reset();
     uint64_t partitionBatchSize = bufferStream->flush();
     total_bytes_written_ += partitionBatchSize;
     partition_lengths_[partition_id] += partitionBatchSize;
@@ -1171,8 +1197,6 @@ int Splitter::protoSpillPartitionByRow(int32_t partition_id, std::unique_ptr<Buf
         for (uint64_t i = 0; i < onceCopyRow; ++i) {
             RowInfo *rowInfo = rowInfoPtr[i];
             rows.append(reinterpret_cast<const char*>(rowInfo->row), rowInfo->length);
-            // free row memeory
-            delete rowInfo;
         }
         protoRowBatch->set_rows(std::move(rows));
         protoRowBatch->set_offsets(reinterpret_cast<char*>(offset_vec.data()), onceCopyRow * sizeof(int32_t));
@@ -1195,6 +1219,7 @@ int Splitter::protoSpillPartitionByRow(int32_t partition_id, std::unique_ptr<Buf
         batchCount++;
         protoRowBatch->Clear();
     }
+    partition_arena_[partition_id].Reset();
 
     uint64_t partitionBatchSize = bufferStream->flush();
     total_bytes_spilled_ += partitionBatchSize;
