@@ -16,11 +16,11 @@ def hijack_recommend(spark_sql_cmd):
     user_config = parsed_parameter.conf_params
 
     # 从负载数据库中查询是否有相关联的Load
-    loadlist = LoadRepository.query(name=name, default_config=user_config)
+    loads = LoadRepository.query(name=name, default_config=user_config)
 
-    def _get_load_and_config_for_test(loadlist, user_config):
+    def _get_load_and_config_for_test(loads, user_config):
         # 如果查询不到负载信息，则创建新的负载
-        if not loadlist:
+        if not loads:
             logger.info("Not exit available load, create new one.")
             # TODO 如果用户在这里创建了一个格式异常的config, 会引起spark执行失败 这个应该如何处理
             load = LoadRepository.create(name=name, exec_attr=exec_attr, default_config=user_config)
@@ -28,7 +28,7 @@ def hijack_recommend(spark_sql_cmd):
                 logger.error("Failed to create an available load")
                 raise ValueError("Failed to create an available load")
         else:
-            load = loadlist[0]
+            load = loads[0]
         # 如果负载不需要优化，直接使用默认配置
         if not load.tuning_needed:
             return load, user_config
@@ -42,7 +42,7 @@ def hijack_recommend(spark_sql_cmd):
             config_for_test = user_config
         return load, config_for_test
 
-    load, config_for_test = _get_load_and_config_for_test(loadlist, user_config)
+    load, config_for_test = _get_load_and_config_for_test(loads, user_config)
 
     # 根据配置和负载执行Spark任务
     task = spark_run(load, config_for_test)

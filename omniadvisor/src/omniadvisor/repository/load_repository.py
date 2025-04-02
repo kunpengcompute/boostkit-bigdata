@@ -62,7 +62,7 @@ class LoadRepository(Repository):
             Load.FieldName.default_config: default_config
         }
         database_loads = cls._query(model_attr=model_attr)
-        #TODO 如果query得到了多个load, 选择哪一个load作为拼接实际提交命令的load? 目前在hijack_recommend里面使用的是loadlist[0]
+        #TODO 如果query得到了多个load, 选择哪一个load作为拼接实际提交命令的load? 目前在hijack_recommend里面使用的是loads[0]
         return [
             Load(database_model=database_load) for database_load in database_loads
         ]
