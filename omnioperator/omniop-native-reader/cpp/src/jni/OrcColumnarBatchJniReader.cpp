@@ -23,6 +23,7 @@
 #include "jni_common.h"
 #include "common/UriInfo.h"
 #include "common/JulianGregorianRebase.h"
+#include "common/PredicateUtil.h"
 
 using namespace omniruntime::vec;
 using namespace omniruntime::type;
@@ -317,8 +318,9 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniRea
     }
 
     std::unique_ptr<common::JulianGregorianRebase> julianPtr = common::BuildJulianGregorianRebase(env, jsonObj);
+    std::unique_ptr<common::PredicateCondition> predicate = common::BuildVecPredicateCondition(env, jsonObj, arrLen);
 
-    std::unique_ptr<orc::RowReader> rowReader = readerPtr->createRowReader(rowReaderOpts, julianPtr);
+    std::unique_ptr<orc::RowReader> rowReader = readerPtr->createRowReader(rowReaderOpts, julianPtr, predicate);
     return (jlong)(rowReader.release());
     JNI_FUNC_END(runtimeExceptionClass)
 }
@@ -328,6 +330,11 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniRea
     jobject jObj, jlong rowReader, jlong batchSize)
 {
     JNI_FUNC_START
+    omniruntime::reader::OmniRowReaderImpl *rowReaderPtr = (omniruntime::reader::OmniRowReaderImpl*)rowReader;
+    auto predicate = rowReaderPtr->getPredicatePtr();
+    if (predicate != nullptr) {
+        predicate->init((int32_t)batchSize);
+    }
     batchLen = (uint64_t)batchSize;
     return (jlong)0xffff;
     JNI_FUNC_END(runtimeExceptionClass)
@@ -338,6 +345,62 @@ inline void FindLastNotEmpty(const char *chars, long &len)
     while (len > 0 && chars[len - 1] == ' ') {
         len--;
     }
+}
+
+void clearRecordBatch(std::vector<omniruntime::vec::BaseVector*> &recordBatch)
+{
+    for (auto vec : recordBatch) {
+        delete vec;
+    }
+    recordBatch.clear();
+}
+
+uint64_t filterData(uint8_t *bitMark, std::vector<omniruntime::vec::BaseVector*> *recordBatch, int32_t vectorSize,
+   const std::set<int32_t>& isNullSet, const std::set<int32_t>& isNotNullSet)
+{
+    std::vector<omniruntime::vec::BaseVector*> resultBatch;
+    if (common::GetFlatBaseVectorsFromBitMark(*recordBatch, resultBatch, bitMark, vectorSize, isNullSet, isNotNullSet)) {
+        clearRecordBatch(*recordBatch);
+        *recordBatch = std::move(resultBatch);
+        return (*recordBatch)[0]->GetSize();
+    }
+    // 失败返回原始的
+    clearRecordBatch(resultBatch);
+    return vectorSize;
+}
+
+bool readAndFilterData(omniruntime::reader::OmniRowReaderImpl *rowReaderPtr, jint *omniTypeId,
+    std::vector<omniruntime::vec::BaseVector*> *recordBatch, uint64_t &batchRowSize)
+{
+    batchRowSize = rowReaderPtr->next(recordBatch, omniTypeId, batchLen);
+    auto predicateCondition = rowReaderPtr->getPredicatePtr();
+    if (batchRowSize == 0 || predicateCondition == nullptr) {
+        return false;
+    }
+    try {
+        uint8_t *bitMark = predicateCondition->compute(*recordBatch);
+        int32_t vectorSize = (*recordBatch)[0]->GetSize();
+        // 数据被全部过滤完，需要重新读取
+        if (omniruntime::BitUtil::CountBits(reinterpret_cast<const uint64_t *>(bitMark), 0, vectorSize) == 0) {
+            clearRecordBatch(*recordBatch);
+            return true;
+        }
+        batchRowSize = filterData(bitMark, recordBatch, vectorSize, predicateCondition->getIsAllNullColumns(),
+            predicateCondition->getIsAllNotNullColumns());
+    } catch (const std::exception &e) {
+        LogError("filterData fail: %s", e.what());
+    }
+    return false;
+}
+
+uint64_t processNext(omniruntime::reader::OmniRowReaderImpl *rowReaderPtr, jint *omniTypeId,
+    std::vector<omniruntime::vec::BaseVector*> *recordBatch) {
+    uint64_t batchRowSize = 0;
+    bool needReadAgain = readAndFilterData(rowReaderPtr, omniTypeId, recordBatch, batchRowSize);
+    while (needReadAgain) {
+        needReadAgain = readAndFilterData(rowReaderPtr, omniTypeId, recordBatch, batchRowSize);
+    }
+    return batchRowSize;
 }
 
 JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniReader_recordReaderNext(JNIEnv *env,
@@ -354,7 +417,7 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniRea
         throw std::runtime_error("Types should not be null");
     }
     int32_t arrLen = (int32_t) env->GetArrayLength(typeId);
-    uint64_t batchRowSize = rowReaderPtr->next(&recordBatch, ptr, batchLen);
+    uint64_t batchRowSize = processNext(rowReaderPtr, ptr, &recordBatch);
     if (batchRowSize != 0) {
         int32_t vecCnt = recordBatch.size();
         if (UNLIKELY(vecCnt != arrLen)) {

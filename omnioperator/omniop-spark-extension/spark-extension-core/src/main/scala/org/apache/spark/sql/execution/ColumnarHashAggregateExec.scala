@@ -94,6 +94,8 @@ case class ColumnarHashAggregateExec(
     "numOutputRows" -> SQLMetrics.createMetric(sparkContext, "number of output rows"),
     "numOutputVecBatches" -> SQLMetrics.createMetric(sparkContext, "number of output vecBatches"),
     "spillSize" -> SQLMetrics.createSizeMetric(sparkContext, "spill size"),
+    "totalMemSize" -> SQLMetrics.createSizeMetric(sparkContext, "total mem size"),
+    "usedMemSize" -> SQLMetrics.createSizeMetric(sparkContext, "used mem size"),
     "numSkippedRows" -> SQLMetrics.createMetric(sparkContext, "number of skipped rows"))
 
   protected override def needHashTable: Boolean = true
@@ -229,6 +231,8 @@ case class ColumnarHashAggregateExec(
     val numOutputRows = longMetric("numOutputRows")
     val numOutputVecBatches= longMetric("numOutputVecBatches")
     val spillSize = longMetric("spillSize")
+    val usedMemSize = longMetric("usedMemSize")
+    val totalMemSize = longMetric("totalMemSize")
     val numSkippedRows = longMetric("numSkippedRows")
 
     val attrExpsIdMap = getExprIdMap(child.output)
@@ -253,6 +257,9 @@ case class ColumnarHashAggregateExec(
 
     val finalStep =
       (aggregateExpressions.count(_.mode == Final) == aggregateExpressions.size)
+
+    val completeStep =
+      (aggregateExpressions.count(_.mode == Complete) == aggregateExpressions.size)
 
     var index = 0
     for (exp <- aggregateExpressions) {
@@ -291,6 +298,21 @@ case class ColumnarHashAggregateExec(
               toOmniAggInOutJSonExp(exp.aggregateFunction.children, attrExpsIdMap)
             omniInputRaws(index) = true
             omniOutputPartials(index) = true
+            if (omniAggFunctionTypes(index) == OMNI_AGGREGATION_TYPE_COUNT_ALL) {
+              omniAggChannels(index) = null
+            }
+          case _ => throw new UnsupportedOperationException(s"Unsupported aggregate aggregateFunction: ${exp}")
+        }
+      } else if (exp.mode == Complete) {
+        exp.aggregateFunction match {
+          case Sum(_, _) | Min(_) | Max(_) | Count(_) | Average(_, _) | First(_, _) =>
+            omniAggFunctionTypes(index) = toOmniAggFunType(exp, true, true)
+            omniAggOutputTypes(index) =
+              toOmniAggInOutType(exp.aggregateFunction.dataType)
+            omniAggChannels(index) =
+              toOmniAggInOutJSonExp(exp.aggregateFunction.children, attrExpsIdMap)
+            omniInputRaws(index) = true
+            omniOutputPartials(index) = false
             if (omniAggFunctionTypes(index) == OMNI_AGGREGATION_TYPE_COUNT_ALL) {
               omniAggChannels(index) = null
             }
@@ -339,7 +361,11 @@ case class ColumnarHashAggregateExec(
 
       // close operator
       SparkMemoryUtils.addLeakSafeTaskCompletionListener[Unit](_ => {
-        spillSize += operator.getSpilledBytes()
+        val metrics = operator.getMetricsInfo()
+        // The first 100 metrics are general metrics, the rest are difined differently by every operator.
+        spillSize += metrics(0)
+        usedMemSize += metrics(100)
+        totalMemSize += metrics(101)
         operator.close()
         if (hashAggregationWithExprOperatorFactory != null) {
           hashAggregationWithExprOperatorFactory.close()
@@ -385,7 +411,7 @@ case class ColumnarHashAggregateExec(
       getOutputTime += NANOSECONDS.toMillis(System.nanoTime() - startGetOp)
 
       var localSchema = this.schema
-      if (finalStep) {
+      if (finalStep || completeStep) {
         // for final step resultExpressions's inputs from omni-final aggregator
         val omnifinalOutSchema = groupingExpressions.map(_.toAttribute) ++ aggregateAttributes
         localSchema = StructType(omnifinalOutSchema.map(a => StructField(a.name, a.dataType, a.nullable, a.metadata)))
@@ -448,7 +474,7 @@ case class ColumnarHashAggregateExec(
           }
         }
       }
-      if (finalStep) {
+      if (finalStep || completeStep) {
         val finalOut = groupingExpressions.map(_.toAttribute) ++ aggregateAttributes
         val finalAttrExprsIdMap = getExprIdMap(finalOut)
         val projectInputTypes = finalOut.map(

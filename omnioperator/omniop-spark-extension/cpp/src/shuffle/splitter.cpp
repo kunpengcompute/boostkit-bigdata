@@ -20,6 +20,8 @@
 #include "splitter.h"
 #include "utils.h"
 
+using namespace omniruntime::vec;
+
 SplitOptions SplitOptions::Defaults() { return SplitOptions(); }
 
 // 计算分区id,每个batch初始化
@@ -236,12 +238,18 @@ void Splitter::SplitBinaryVector(BaseVector *varcharVector, int col_schema) {
     if (varcharVector->GetEncoding() == OMNI_DICTIONARY) {
         auto vc = reinterpret_cast<Vector<DictionaryContainer<std::string_view, LargeStringContainer>> *>(
                 varcharVector);
-	cached_vectorbatch_size_ += num_rows * (sizeof(bool) + sizeof(int32_t));
+	    cached_vectorbatch_size_ += num_rows * (sizeof(bool) + sizeof(int32_t));
         for (auto row = 0; row < num_rows; ++row) {
             auto pid = partition_id_[row];
             uint8_t *dst = nullptr;
             uint32_t str_len = 0;
-            if (!vc->IsNull(row)) {
+            if constexpr (hasNull) {
+                if (!vc->IsNull(row)) {
+                    std::string_view value = vc->GetValue(row);
+                    dst = reinterpret_cast<uint8_t *>(reinterpret_cast<int64_t>(value.data()));
+                    str_len = static_cast<uint32_t>(value.length());
+                }
+            } else {
                 std::string_view value = vc->GetValue(row);
                 dst = reinterpret_cast<uint8_t *>(reinterpret_cast<int64_t>(value.data()));
                 str_len = static_cast<uint32_t>(value.length());
@@ -272,11 +280,17 @@ void Splitter::SplitBinaryVector(BaseVector *varcharVector, int col_schema) {
     } else {
         auto vc = reinterpret_cast<Vector<LargeStringContainer<std::string_view>> *>(varcharVector);
         cached_vectorbatch_size_ += num_rows * (sizeof(bool) + sizeof(int32_t)) + sizeof(int32_t);
-	for (auto row = 0; row < num_rows; ++row) {
+	    for (auto row = 0; row < num_rows; ++row) {
             auto pid = partition_id_[row];
             uint8_t *dst = nullptr;
             uint32_t str_len = 0;
-            if (!vc->IsNull(row)) {
+            if constexpr (hasNull) {
+                if (!vc->IsNull(row)) {
+                    std::string_view value = vc->GetValue(row);
+                    dst = reinterpret_cast<uint8_t *>(reinterpret_cast<int64_t>(value.data()));
+                    str_len = static_cast<uint32_t>(value.length());
+                }
+            } else {
                 std::string_view value = vc->GetValue(row);
                 dst = reinterpret_cast<uint8_t *>(reinterpret_cast<int64_t>(value.data()));
                 str_len = static_cast<uint32_t>(value.length());
@@ -366,7 +380,7 @@ int Splitter::SplitFixedWidthValidityBuffer(VectorBatch& vb){
             for (auto row = 0; row < num_rows; ++row) {
                 auto pid = partition_id_[row];
                 auto dst_offset = partition_buffer_idx_base_[pid] + partition_buffer_idx_offset_[pid];
-                dst_addrs[pid][dst_offset] = src_addr[row];
+                dst_addrs[pid][dst_offset] = omniruntime::BitUtil::IsBitSet(src_addr, row);
                 partition_buffer_idx_offset_[pid]++;
             }
         }
@@ -629,7 +643,6 @@ int Splitter::SplitByRow(VectorBatch *vecBatch) {
             partition_rows[0].emplace_back(rowInfo);
             total_input_size += rowInfo->length;
         }
-        delete vecBatch;
     } else {
         auto pidVec = reinterpret_cast<Vector<int32_t> *>(vecBatch->Get(0));
         auto tmpVectorBatch = new VectorBatch(rowCount);
@@ -966,20 +979,28 @@ int32_t Splitter::ProtoWritePartitionByRow(int32_t partition_id, std::unique_ptr
         }
 
         int64_t offset = batchCount * options_.spill_batch_row_num;
+        std::vector<int32_t> offset_vec(onceCopyRow + 1, 0);
         auto rowInfoPtr = partition_rows[partition_id].data() + offset;
         for (uint64_t i = 0; i < onceCopyRow; ++i) {
             RowInfo *rowInfo = rowInfoPtr[i];
-            spark::ProtoRow *protoRow = protoRowBatch->add_rows();
-            protoRow->set_data(rowInfo->row, rowInfo->length);
-            protoRow->set_length(rowInfo->length);
-            // free row memory
+            offset_vec[i + 1] = offset_vec[i] + rowInfo->length;
+        }
+        std::string rows;
+        rows.reserve(offset_vec[onceCopyRow]);
+        for (uint64_t i = 0; i < onceCopyRow; ++i) {
+            RowInfo *rowInfo = rowInfoPtr[i];
+            rows.append(reinterpret_cast<const char*>(rowInfo->row), rowInfo->length);
+            // free row memeory
             delete rowInfo;
         }
+        protoRowBatch->set_rows(std::move(rows));
+        protoRowBatch->set_offsets(reinterpret_cast<char*>(offset_vec.data()), onceCopyRow * sizeof(int32_t));
 
-        if (protoRowBatch->ByteSizeLong() > UINT32_MAX) {
+        auto byteSizeLong = protoRowBatch->ByteSizeLong();
+        if (byteSizeLong > UINT32_MAX) {
             throw std::runtime_error("Unsafe static_cast long to uint_32t.");
         }
-        uint32_t protoRowBatchSize = reversebytes_uint32t(static_cast<uint32_t>(protoRowBatch->ByteSizeLong()));
+        uint32_t protoRowBatchSize = reversebytes_uint32t(static_cast<uint32_t>(byteSizeLong));
         if (bufferStream->Next(&bufferOut, &sizeOut)) {
             memcpy_s(bufferOut, sizeof(protoRowBatchSize), &protoRowBatchSize, sizeof(protoRowBatchSize));
             if (sizeof(protoRowBatchSize) < static_cast<uint32_t>(sizeOut)) {
@@ -1118,20 +1139,28 @@ int Splitter::protoSpillPartitionByRow(int32_t partition_id, std::unique_ptr<Buf
         }
 
         int64_t offset = batchCount * options_.spill_batch_row_num;
+        std::vector<int32_t> offset_vec(onceCopyRow + 1, 0);
         auto rowInfoPtr = partition_rows[partition_id].data() + offset;
         for (uint64_t i = 0; i < onceCopyRow; ++i) {
             RowInfo *rowInfo = rowInfoPtr[i];
-            spark::ProtoRow *protoRow = protoRowBatch->add_rows();
-            protoRow->set_data(rowInfo->row, rowInfo->length);
-            protoRow->set_length(rowInfo->length);
-            // free row memory
+            offset_vec[i + 1] = offset_vec[i] + rowInfo->length;
+        }
+        std::string rows;
+        rows.reserve(offset_vec[onceCopyRow]);
+        for (uint64_t i = 0; i < onceCopyRow; ++i) {
+            RowInfo *rowInfo = rowInfoPtr[i];
+            rows.append(reinterpret_cast<const char*>(rowInfo->row), rowInfo->length);
+            // free row memeory
             delete rowInfo;
         }
+        protoRowBatch->set_rows(std::move(rows));
+        protoRowBatch->set_offsets(reinterpret_cast<char*>(offset_vec.data()), onceCopyRow * sizeof(int32_t));
 
-        if (protoRowBatch->ByteSizeLong() > UINT32_MAX) {
+        auto byteSizeLong = protoRowBatch->ByteSizeLong();
+        if (byteSizeLong > UINT32_MAX) {
             throw std::runtime_error("Unsafe static_cast long to uint_32t.");
         }
-        uint32_t protoRowBatchSize = reversebytes_uint32t(static_cast<uint32_t>(protoRowBatch->ByteSizeLong()));
+        uint32_t protoRowBatchSize = reversebytes_uint32t(static_cast<uint32_t>(byteSizeLong));
         void *buffer = nullptr;
         if (!bufferStream->NextNBytes(&buffer, sizeof(protoRowBatchSize))) {
             throw std::runtime_error("Allocate Memory Failed: Flush Spilled Data, Next failed.");

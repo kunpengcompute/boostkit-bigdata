@@ -29,6 +29,7 @@ import org.apache.spark.sql.catalyst.plans._
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.catalyst.rules._
 import org.apache.spark.sql.catalyst.trees.TreePattern._
+import org.apache.spark.sql.types.StringType
 
 /**
  * Reorder the joins and push all the conditions into join, so that the bottom ones have at least
@@ -68,44 +69,59 @@ object ReorderJoinEnhances extends Rule[LogicalPlan] with PredicateHelper {
       }
     } else {
       val (left, _) :: rest = input.toList
-      // collect all possible joins
-      val candidateJoins = rest.filter { planJoinPair =>
+      val hasEqualJoinConditionCandidates = rest.filter {
+        planJoinPair =>
+          planJoinPair._1 match {
+            case p: Project => p.output.count(a => a.dataType == StringType) < columnarPluginConfig.joinOutputStringTypeCost
+            case _ => true
+          }
+      }.filter {
+        planJoinPair =>
         val candidateRight = planJoinPair._1
-
-        // check two plan have equi-join
-        val joinKeysForTwoPlans = conditions.flatMap {
-          case EqualTo(l, r) if l.references.isEmpty || r.references.isEmpty => None
-          case EqualTo(l, r) if canEvaluate(l, left) && canEvaluate(r, candidateRight) => Some((l, r))
-          case EqualTo(l, r) if canEvaluate(l, candidateRight) && canEvaluate(r, left) => Some((r, l))
-          // Replace null with default value for joining key, then those rows with null in it could
-          // be joined together
-          case EqualNullSafe(l, r) if l.references.isEmpty || r.references.isEmpty => None
-          case EqualNullSafe(l, r) if canEvaluate(l, left) && canEvaluate(r, candidateRight) =>
-            Seq((Coalesce(Seq(l, Literal.default(l.dataType))),
-              Coalesce(Seq(r, Literal.default(r.dataType)))),
-              (IsNull(l), IsNull(r))
-            )  // (coalesce(l, default) = coalesce(r, default)) and (isnull(l) = isnull(r))
-          case EqualNullSafe(l, r) if canEvaluate(l, candidateRight) && canEvaluate(r, left) =>
-            Seq((Coalesce(Seq(r, Literal.default(r.dataType))),
-              Coalesce(Seq(l, Literal.default(l.dataType)))),
-              (IsNull(r), IsNull(l))
-            )  // Same as above with left/right reversed.
-          case _ => None
-        }
-
-        // check candidateRight have filter condition
-        val filterMatched = candidateRight match {
-          case Filter(filterCondition, _) if checkFilterCondition(filterCondition) => true
-          case Project(_, Filter(filterCondition, _)) if checkFilterCondition(filterCondition) => true
+        conditions.exists {
+          case EqualTo(l, r) => checkLeftRightExpression(l, r, left, candidateRight)
+          case EqualNullSafe(l, r) => checkLeftRightExpression(l, r, left, candidateRight)
           case _ => false
         }
-        joinKeysForTwoPlans.nonEmpty && filterMatched
+      }.filter{
+        planJoinPair =>
+        val candidateRight = planJoinPair._1
+        val joinedRefs = left.outputSet ++ candidateRight.outputSet
+        conditions.exists {
+          e =>
+            e.references.subsetOf(joinedRefs) && canEvaluateWithinJoin(e)
+        }
       }
+      
+      val candidateJoins = hasEqualJoinConditionCandidates.filter {
+        planJoinPair =>
+          planJoinPair._1 match {
+            case f: Filter if checkFilterCondition(f.condition) => true
+            case Project(_, f: Filter) if checkFilterCondition(f.condition) => true
+            case _ => false
+          }
+      }
+
       // pick the min size one if candidateJoins left
       val (right, innerJoinType) = if (candidateJoins.nonEmpty) {
         candidateJoins.minBy(_._1.stats.sizeInBytes)
       } else {
-        rest.head
+        val noHasNotEqualCandidates = hasEqualJoinConditionCandidates.filter{
+          planJoinPair =>
+          val candidateRight = planJoinPair._1
+          !conditions.exists {
+            case LessThan(l, r) => checkLeftRightExpression(l, r, left, candidateRight)
+            case LessThanOrEqual(l, r) => checkLeftRightExpression(l, r, left, candidateRight)
+            case GreaterThan(l, r) => checkLeftRightExpression(l, r, left, candidateRight)
+            case GreaterThanOrEqual(l, r) => checkLeftRightExpression(l, r, left, candidateRight)
+            case _ => false
+          }
+        }
+        if(noHasNotEqualCandidates.nonEmpty) {
+          noHasNotEqualCandidates.head
+        } else {
+          rest.head
+        }
       }
 
       val joinedRefs = left.outputSet ++ right.outputSet
@@ -127,14 +143,20 @@ object ReorderJoinEnhances extends Rule[LogicalPlan] with PredicateHelper {
     }
   }
 
-
   private def checkFilterCondition(condition: Expression): Boolean = {
     val conditions = splitConjunctivePredicates(condition)
     conf.constraintPropagationEnabled && !conditions.forall(_.isInstanceOf[IsNotNull])
   }
 
+  private def checkLeftRightExpression(l: Expression, r: Expression, left: LogicalPlan, candidateRight: LogicalPlan): Boolean = l.references.nonEmpty && 
+          r.references.nonEmpty && 
+          ((canEvaluate(l, left) && canEvaluate(r, candidateRight)) 
+          || (canEvaluate(r, left) && canEvaluate(l, candidateRight)))
+
+  val columnarPluginConfig = ColumnarPluginConfig.getSessionConf
+
   def apply(plan: LogicalPlan): LogicalPlan = plan.transformWithPruning(
-    ColumnarPluginConfig.getSessionConf.enableJoinReorderEnhance &&
+    columnarPluginConfig.enableJoinReorderEnhance &&
     _.containsPattern(INNER_LIKE_JOIN)) {
     case p @ ExtractFiltersAndInnerJoinsEnhances(input, conditions)
         if input.size > 2 && conditions.nonEmpty =>

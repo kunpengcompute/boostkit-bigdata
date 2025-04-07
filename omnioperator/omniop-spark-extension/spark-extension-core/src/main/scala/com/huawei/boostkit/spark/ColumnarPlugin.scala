@@ -18,24 +18,24 @@
 
 package com.huawei.boostkit.spark
 
-import com.huawei.boostkit.spark.ColumnarPluginConfig.ENABLE_OMNI_COLUMNAR_TO_ROW
+import com.huawei.boostkit.spark.ColumnarPluginConfig.{ENABLED_NUMA_BINDING, ENABLE_OMNI_COLUMNAR_TO_ROW, NUMA_BINDING_CORE_RANGE, ENABLE_OMNI_TUNED}
 import com.huawei.boostkit.spark.Constant.OMNI_IS_ADAPTIVE_CONTEXT
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor
 import com.huawei.boostkit.spark.util.{ModifyUtilAdaptor, PhysicalPlanSelector}
-import org.apache.spark.api.plugin.{DriverPlugin, ExecutorPlugin, SparkPlugin}
+import org.apache.spark.api.plugin.{DriverPlugin, ExecutorPlugin, PluginContext, SparkPlugin}
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.optimizer.{BuildLeft, BuildRight, BuildSide}
 import org.apache.spark.sql.{SparkSession, SparkSessionExtensions}
-import org.apache.spark.sql.catalyst.expressions.{Alias, And, Ascending, EqualTo, Expression, GreaterThan, GreaterThanOrEqual, IntegerLiteral, LessThan, LessThanOrEqual, Literal, NamedExpression, Rank, RowNumber, SortOrder, WindowExpression}
-import org.apache.spark.sql.catalyst.expressions.aggregate.{AggregateExpression, Partial, PartialMerge}
 import org.apache.spark.sql.catalyst.optimizer.{DelayCartesianProduct, ReorderJoinEnhances, RewriteSelfJoinInInPredicate}
+import org.apache.spark.sql.catalyst.expressions.aggregate.{AggregateExpression, Partial, Complete, Final, PartialMerge}
+import org.apache.spark.sql.catalyst.expressions.{Alias, And, Ascending, Attribute, EqualTo, Expression, GreaterThan, GreaterThanOrEqual, IntegerLiteral, IsNotNull, IsNull, LessThan, LessThanOrEqual, Literal, NamedExpression, Not, Or, Rank, RowNumber, SortOrder, WindowExpression}
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.adaptive.{AQEShuffleReadExec, AdaptiveSparkPlanExec, BroadcastQueryStageExec, OmniAQEShuffleReadExec, ShuffleQueryStageExec}
 import org.apache.spark.sql.execution.aggregate.{DummyLogicalPlan, ExtendedAggUtils, HashAggregateExec}
 import org.apache.spark.sql.execution.exchange.{BroadcastExchangeExec, ReusedExchangeExec, ShuffleExchangeExec}
 import org.apache.spark.sql.execution.joins._
-import org.apache.spark.sql.execution.window.{WindowExec}
+import org.apache.spark.sql.execution.window.WindowExec
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.catalyst.planning.PhysicalAggregation
 import org.apache.spark.sql.catalyst.plans.LeftSemi
@@ -45,6 +45,14 @@ import org.apache.spark.sql.execution.util.SparkMemoryUtils.addLeakSafeTaskCompl
 import org.apache.spark.sql.execution.aggregate.PushOrderedLimitThroughAgg
 import org.apache.spark.sql.util.ShimUtil
 import nova.hetu.omniruntime.memory.MemoryManager
+import org.apache.spark.SparkEnv
+import org.apache.spark.sql.execution.datasources.orc.OrcFileFormat
+import org.apache.spark.sql.execution.util.ExecutorManager
+import org.apache.spark.sql.types.{BooleanType, DataType, DateType, DoubleType, IntegerType, LongType, ShortType}
+
+import java.io.BufferedReader
+import java.io.InputStreamReader
+import java.lang.management.ManagementFactory
 
 import scala.collection.mutable.ListBuffer
 
@@ -63,6 +71,9 @@ case class ColumnarPreOverrides(isSupportAdaptive: Boolean = true)
   val enableColumnarDataWritingCommand: Boolean = columnarConf.enableColumnarDataWritingCommand
   val enableColumnarTopNSort: Boolean = columnarConf.enableColumnarTopNSort
   val topNSortThreshold: Int = columnarConf.topNSortThreshold
+  val enableVecPredicateFilter: Boolean = columnarConf.enableVecPredicateFilter
+
+  private val SUPPORTED_DATA_TYPES = Set(ShortType, IntegerType, LongType, DoubleType, BooleanType, DateType)
 
   private def checkBhjRightChild(plan: Any): Boolean =
     plan match {
@@ -88,6 +99,121 @@ case class ColumnarPreOverrides(isSupportAdaptive: Boolean = true)
       case And(cond1, cond2) =>
         splitConjunctivePredicates(cond1) ++ splitConjunctivePredicates(cond2)
       case other => other :: Nil
+    }
+  }
+
+  // condition :`hashagg（partial）->hashagg（final)`
+  // If certain conditions are met, it will transformed into ` hashagg（complete)`.
+  private def combineHashAgg(plan: HashAggregateExec, child: SparkPlan): SparkPlan = {
+    var newChild: SparkPlan = new ColumnarHashAggregateExec(
+      plan.requiredChildDistributionExpressions,
+      plan.isStreaming,
+      plan.numShufflePartitions,
+      plan.groupingExpressions,
+      plan.aggregateExpressions,
+      plan.aggregateAttributes,
+      plan.initialInputBufferOffset,
+      plan.resultExpressions,
+      child)
+    child match {
+      case exec: ColumnarHashAggregateExec =>
+        if (canCombine(plan, exec)) {
+          newChild = new ColumnarHashAggregateExec(
+            exec.requiredChildDistributionExpressions,
+            exec.isStreaming,
+            exec.numShufflePartitions,
+            exec.groupingExpressions,
+            exec.aggregateExpressions.map(
+              aggregate => new AggregateExpression(aggregate.aggregateFunction,
+                Complete,
+                aggregate.isDistinct,
+                aggregate.filter,
+                aggregate.resultId)),
+            plan.aggregateAttributes,
+            exec.initialInputBufferOffset,
+            plan.resultExpressions,
+            exec.child)
+        }
+      case _ =>
+    }
+    newChild
+  }
+
+  private def canCombine(plan: HashAggregateExec, child: ColumnarHashAggregateExec): Boolean = {
+    plan.groupingExpressions.length == child.groupingExpressions.length &&
+      plan.groupingExpressions.diff(child.groupingExpressions).isEmpty &&
+      child.aggregateExpressions.forall(_.mode == Partial) &&
+      plan.aggregateExpressions.forall(_.mode == Final)
+  }
+
+  private def isAllSupport(condition: Expression): Boolean = {
+    def isSingleExprDataTypeSupported(expr: Expression): Boolean = {
+      SUPPORTED_DATA_TYPES.exists(_.equals(expr.dataType))
+    }
+
+    def isBinaryExprDataTypeSupported(left: Expression, right: Expression): Boolean = {
+      isSingleExprDataTypeSupported(left) && isSingleExprDataTypeSupported(right)
+    }
+
+    def isBinaryExprAttributeSupported(left: Expression, right: Expression): Boolean = {
+      (isAttribute(left) && isLiteral(right)) || (isAttribute(right) && isLiteral(left))
+    }
+
+    def isBinaryExprSupported(left: Expression, right: Expression): Boolean = {
+      isBinaryExprDataTypeSupported(left, right) && isBinaryExprAttributeSupported(left, right)
+    }
+
+    def isAttribute(expr: Expression): Boolean = {
+      expr.isInstanceOf[Attribute]
+    }
+
+    def isLiteral(expr: Expression): Boolean = {
+      expr.isInstanceOf[Literal]
+    }
+
+    condition match {
+      case equalTo: EqualTo =>
+        isBinaryExprSupported(equalTo.left, equalTo.right)
+      case greaterThan: GreaterThan =>
+        isBinaryExprSupported(greaterThan.left, greaterThan.right)
+      case greaterThanOrEqual: GreaterThanOrEqual =>
+        isBinaryExprSupported(greaterThanOrEqual.left, greaterThanOrEqual.right)
+      case lessThan: LessThan =>
+        isBinaryExprSupported(lessThan.left, lessThan.right)
+      case lessThanOrEqual: LessThanOrEqual =>
+        isBinaryExprSupported(lessThanOrEqual.left, lessThanOrEqual.right)
+      case isNotNull: IsNotNull =>
+        isAttribute(isNotNull.child)
+      case isNull: IsNull =>
+        isAttribute(isNull.child)
+      case and: And =>
+        isAllSupport(and.left) && isAllSupport(and.right)
+      case or: Or =>
+        isAllSupport(or.left) && isAllSupport(or.right)
+      case not: Not =>
+        isAllSupport(not.child)
+      case _ => false
+    }
+  }
+
+  private def tryToCombineFilterAndFileSource(plan: FilterExec, child: SparkPlan): SparkPlan = {
+    if (!enableVecPredicateFilter) {
+      return ColumnarFilterExec(plan.condition, child)
+    }
+    child match {
+      case ColumnarFileSourceScanExec(relation, _, _, _, _, _, dataFilters, _, _) =>
+        relation.fileFormat match {
+          case orcFormat: OrcFileFormat =>
+            if (isAllSupport(plan.condition)) {
+              child
+            } else {
+              ColumnarFilterExec(plan.condition, child)
+            }
+          case _ =>
+            ColumnarFilterExec(plan.condition, child)
+        }
+      case _ =>
+        ColumnarFilterExec(plan.condition, child)
     }
   }
 
@@ -245,12 +371,12 @@ case class ColumnarPreOverrides(isSupportAdaptive: Boolean = true)
             }
             case _ =>
               val child = replaceWithColumnarPlan(plan.child)
-              return ColumnarFilterExec(plan.condition, child)
+              return tryToCombineFilterAndFileSource(plan, child)
           }
         }
         val child = replaceWithColumnarPlan(plan.child)
         logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
-        ColumnarFilterExec(plan.condition, child)
+        tryToCombineFilterAndFileSource(plan, child)
       case plan: ExpandExec =>
         val child = replaceWithColumnarPlan(plan.child)
         logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
@@ -366,16 +492,7 @@ case class ColumnarPreOverrides(isSupportAdaptive: Boolean = true)
                   child)
             }
           } else {
-            new ColumnarHashAggregateExec(
-              plan.requiredChildDistributionExpressions,
-              plan.isStreaming,
-              plan.numShufflePartitions,
-              plan.groupingExpressions,
-              plan.aggregateExpressions,
-              plan.aggregateAttributes,
-              plan.initialInputBufferOffset,
-              plan.resultExpressions,
-              child)
+            combineHashAgg(plan, child)
           }
         } else {
           if (child.isInstanceOf[ColumnarExpandExec]) {
@@ -453,16 +570,7 @@ case class ColumnarPreOverrides(isSupportAdaptive: Boolean = true)
                 child)
             }
           } else {
-            new ColumnarHashAggregateExec(
-              plan.requiredChildDistributionExpressions,
-              plan.isStreaming,
-              plan.numShufflePartitions,
-              plan.groupingExpressions,
-              plan.aggregateExpressions,
-              plan.aggregateAttributes,
-              plan.initialInputBufferOffset,
-              plan.resultExpressions,
-              child)
+            combineHashAgg(plan, child)
           }
         }
 
@@ -913,7 +1021,75 @@ class ColumnarPlugin extends (SparkSessionExtensions => Unit) with Logging {
   }
 }
 
-private class OmniTaskStartExecutorPlugin extends ExecutorPlugin {
+private class OmniTaskStartExecutorPlugin extends ExecutorPlugin with Logging {
+
+  private def initTunedOptimization(): Unit = {
+    val enableTunedOptimization = SparkEnv.get.conf.get(ENABLE_OMNI_TUNED.key, "false").toBoolean
+    if (enableTunedOptimization) {
+      // Initialize the process ID variable, -1 indicates that the process ID has not been successfully obtained
+      var pid: Long = -1
+      try {
+        // Get the runtime name of teh JVM, which usually contains the process ID and hostname.
+        val jvmName = ManagementFactory.getRuntimeMXBean().getName()
+        val index = jvmName.indexOf('@')
+        if (index > 0) {
+          pid = java.lang.Long.parseLong(jvmName.substring(0, index))
+          logInfo(s"pid process is ${pid}")
+        } else {
+          logError("Unable to parse the process ID from the runtime name.")
+          return
+        }
+      } catch {
+        case e: Exception =>
+          logError(s"An exception occurred while parsing the process ID: ${e.getMessage}")
+          return
+      }
+
+      try {
+
+        val command = s"/usr/sbin/tuned-adm profile spark-omni --pid ${pid}"
+        logInfo(s"command is ${command}")
+        val process = Runtime.getRuntime.exec(command)
+
+        var reader = new BufferedReader(new InputStreamReader(process.getInputStream()))
+        var line: String = null
+        //read the output of the command line by line and print it
+        while ({line = reader.readLine(); line != null}) {
+          logInfo(line)
+        }
+
+        // wait for the command to finish executing and get teh exit status code.
+        val exitCode = process.waitFor
+        logInfo(s"The command has finish executing Exit status code : $exitCode")
+
+      } catch {
+        case e: Exception =>
+          logError("An error occurred while executing the command", e)
+      }
+    }
+  }
+
+  private def initNumaBind(): Unit = {
+    val enableNumaBinding: Boolean = SparkEnv.get.conf.get(ENABLED_NUMA_BINDING.key, "false").toBoolean
+    val bindingInfo = if (!enableNumaBinding) {
+      NumaBindingInfo(enableNumaBinding = false)
+    } else {
+      val tmp = SparkEnv.get.conf.get(NUMA_BINDING_CORE_RANGE.key, "")
+      if (tmp.isEmpty) {
+        NumaBindingInfo(enableNumaBinding = false)
+      } else {
+        val coreRangeList: Array[String] = tmp.split('|').map(_.trim)
+        NumaBindingInfo(enableNumaBinding = true, coreRangeList)
+      }
+    }
+    ExecutorManager.tryTaskSet(bindingInfo)
+  }
+
+  override def init(ctx: PluginContext, extraConf: java.util.Map[String, String]): Unit = {
+    initTunedOptimization()
+    initNumaBind()
+  }
+
   override def onTaskStart(): Unit = {
     addLeakSafeTaskCompletionListener[Unit](_ => {
       MemoryManager.reclaimMemory()

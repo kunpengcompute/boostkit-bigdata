@@ -43,24 +43,17 @@ namespace omniruntime::reader {
         */
         virtual void next(char* data, uint64_t numValues, char* notNull);
 
-        virtual void next(omniruntime::vec::BaseVector*& omnivec, uint64_t numValues, char* notNull,
-                        const orc::Type* baseTp, int omniTypeId);
-
-        template <omniruntime::type::DataTypeId TYPE_ID>
-        void nextByType(omniruntime::vec::BaseVector*& omnivec, uint64_t numValues, char* notNull,
-                    const orc::Type* baseTp);
-
     protected:
-            inline void nextBuffer();
-            inline signed char readByte();
-            inline void readHeader();
+        inline void nextBuffer();
+        inline signed char readByte();
+        inline void readHeader();
 
-            std::unique_ptr<orc::SeekableInputStream> inputStream;
-            size_t remainingValues;
-            char value;
-            const char* bufferStart;
-            const char* bufferEnd;
-            bool repeating;
+        std::unique_ptr<orc::SeekableInputStream> inputStream;
+        size_t remainingValues;
+        char value;
+        const char *bufferStart;
+        const char *bufferEnd;
+        bool repeating;
     };
 
     class OmniBooleanRleDecoder: public OmniByteRleDecoder {
@@ -80,19 +73,25 @@ namespace omniruntime::reader {
         virtual void skip(uint64_t numValues);
 
         /**
-        * Read a number of values into the batch.
+         * Read nulls flag to data.
+         */
+        void nextNulls(char *data, uint64_t numValues, uint64_t *nulls);
+
+        /**
+        * Read a number of values into the batch by nulls.
         */
+        void next(omniruntime::vec::BaseVector *omnivec, uint64_t numValues, 
+            uint64_t *nulls, int omniTypeId);
 
-        virtual void next(omniruntime::vec::BaseVector*& omnivec, uint64_t numValues, char* notNull,
-                        const orc::Type* baseTp, int omniTypeId);
+        template <typename T>
+        void next(T *data, uint64_t numValues, uint64_t *nulls);
 
-        template <omniruntime::type::DataTypeId TYPE_ID>
-        void nextByType(omniruntime::vec::BaseVector*& omnivec, uint64_t numValues, char* notNull,
-                    const orc::Type* baseTp, int omniTypeId);
+        void next(char *data, uint64_t numValues, uint64_t *nulls);
 
     protected:
-            size_t remainingBits;
-            char lastByte;
+        size_t remainingBits;
+        char lastByte;
+        char reversedAndFlipLastByte;
     };
 }
 #endif

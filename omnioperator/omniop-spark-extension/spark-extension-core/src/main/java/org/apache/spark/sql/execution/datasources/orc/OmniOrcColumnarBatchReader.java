@@ -66,11 +66,16 @@ public class OmniOrcColumnarBatchReader extends RecordReader<Void, ColumnarBatch
 
   private StructType requiredSchema;
   private Filter pushedFilter;
+  private Boolean vecPredicateFilter;
+  private Boolean filterPushDown;
 
-  public OmniOrcColumnarBatchReader(int capacity, StructType requiredSchema, Filter pushedFilter) {
+  public OmniOrcColumnarBatchReader(int capacity, StructType requiredSchema, Filter pushedFilter,
+      Boolean vecPredicateFilter, Boolean filterPushDown) {
     this.capacity = capacity;
     this.requiredSchema = requiredSchema;
     this.pushedFilter = pushedFilter;
+    this.vecPredicateFilter = vecPredicateFilter;
+    this.filterPushDown = filterPushDown;
   }
 
 
@@ -122,7 +127,8 @@ public class OmniOrcColumnarBatchReader extends RecordReader<Void, ColumnarBatch
     recordReader.initializeReaderJava(fileSplit.getPath().toUri());
 
     initDataColIds();
-    recordReader.initializeRecordReaderJava(fileSplit.getStart(), fileSplit.getLength(), pushedFilter, requiredSchema);
+    recordReader.initializeRecordReaderJava(fileSplit.getStart(), fileSplit.getLength(), pushedFilter, requiredSchema,
+        vecPredicateFilter, filterPushDown);
   }
 
   private void initDataColIds() {

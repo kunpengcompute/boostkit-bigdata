@@ -262,7 +262,7 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
       Row(" yeah  ", "yeah", 10, 8.0, "", "Hello", 2, 2.0),
       Row(" yeah  ", "yeah", 10, 8.0, " add", null, 1, null)
 
-    ), false)
+    ), true)
   }
 
   test("validate columnar shuffledHashJoin full outer join happened") {
@@ -299,7 +299,7 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
       Row(" yeah  ", "yeah", 10, 8.0, "abc", "", 4, 1.0),
       Row(" yeah  ", "yeah", 10, 8.0, "", "Hello", 2, 2.0),
       Row(" yeah  ", "yeah", 10, 8.0, " add", null, 1, null)
-    ), false)
+    ), true)
   }
 
   test("validate columnar shuffledHashJoin left semi join happened") {
@@ -388,7 +388,7 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
       Row("Adams", 24562),
       Row("Adams", 22456),
       Row("Bush", null)
-    ), false)
+    ), true)
   }
 
   test("BroadcastHashJoin and project funsion test for duplicate column") {
@@ -403,7 +403,7 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
       Row("Adams", 24562, 1),
       Row("Adams", 22456, 1),
       Row("Bush", null, null)
-    ), false)
+    ), true)
   }
 
   test("BroadcastHashJoin and project funsion test for reorder columns") {
@@ -418,7 +418,7 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
       Row(24562, "Adams", 1),
       Row(22456, "Adams", 1),
       Row(null, "Bush", null)
-    ), false)
+    ), true)
   }
 
   test("BroadcastHashJoin and project are not funsed test") {
@@ -433,7 +433,7 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
       Row(24563, "Adams"),
       Row(22457, "Adams"),
       Row(null, "Bush")
-    ), false)
+    ), true)
   }
 
   test("BroadcastHashJoin and project funsion test for alias") {
@@ -448,7 +448,7 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
       Row("Adams", 24562),
       Row("Adams", 22456),
       Row("Bush", null)
-    ), false)
+    ), true)
   }
 
   test("validate columnar shuffledHashJoin left anti join happened") {
@@ -484,7 +484,7 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
       Row(null, null, null, null, "", "Hello", 2, 2.0),
       Row("", "Hello", 1, 1.0, " add", "World", 1, 3.0),
       Row(null, null, null, null, " yeah  ", "yeah", 0, 4.0)
-    ), false)
+    ), true)
   }
 
   test("columnar ShuffledHashJoin right outer join is equal to native with null") {
@@ -505,7 +505,7 @@ class ColumnarJoinExecSuite extends ColumnarSparkPlanTest {
       Row(null, null, null, null, "", "Hello", 2, 2.0),
       Row("", "Hello", 1, 1.0, " add", "World", 1, 3.0),
       Row(null, null, null, null, " yeah  ", "yeah", 0, 4.0)
-    ), false)
+    ), true)
   }
 
   test("columnar BroadcastHashJoin right outer join is equal to native with null") {

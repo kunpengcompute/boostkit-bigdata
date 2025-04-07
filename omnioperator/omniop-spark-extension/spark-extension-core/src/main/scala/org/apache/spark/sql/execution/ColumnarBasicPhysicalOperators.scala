@@ -375,6 +375,7 @@ case class ColumnarConditionProjectExec(projectList: Seq[NamedExpression],
        |$formattedNodeName
        |${ExplainUtils.generateFieldString("Output", projectList)}
        |${ExplainUtils.generateFieldString("Input", child.output)}
+       |Condition : ${condition}
        |""".stripMargin
   }
 }

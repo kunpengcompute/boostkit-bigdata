@@ -19,12 +19,13 @@
 package com.huawei.boostkit.spark.serialize;
 
 
+import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.huawei.boostkit.spark.jni.NativeLoader;
 import nova.hetu.omniruntime.type.*;
 import nova.hetu.omniruntime.utils.OmniRuntimeException;
 import nova.hetu.omniruntime.vector.*;
-import nova.hetu.omniruntime.vector.serialize.OmniRowDeserializer;
+import nova.hetu.omniruntime.type.DataType.DataTypeId;
 
 import org.apache.spark.sql.execution.vectorized.OmniColumnVector;
 import org.apache.spark.sql.types.DataType;
@@ -34,30 +35,52 @@ import org.apache.spark.sql.vectorized.ColumnarBatch;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.lang.reflect.Field;
+import java.util.Arrays;
+ 
+import sun.misc.Unsafe;
+
 public class ShuffleDataSerializer {
     private static final Logger LOG = LoggerFactory.getLogger(NativeLoader.class);
+    private static final Unsafe unsafe;
+    private static final long BYTE_ARRAY_BASE_OFFSET;
 
-    public static ColumnarBatch deserialize(boolean isRowShuffle, byte[] bytes) {
-        if (!isRowShuffle) {
-            return deserializeByColumn(bytes);
-        } else {
-            return deserializeByRow(bytes);
+    static {
+        try {
+            Field field = Unsafe.class.getDeclaredField("theUnsafe");
+            field.setAccessible(true);
+            unsafe = (Unsafe) field.get(null);
+            BYTE_ARRAY_BASE_OFFSET = unsafe.arrayBaseOffset(byte[].class);
+        } catch (NoSuchFieldException | IllegalAccessException e) {
+            throw new RuntimeException("create unsafe object failed. errmsg:" + e.getMessage());
         }
     }
 
-    public static ColumnarBatch deserializeByColumn(byte[] bytes) {
+    public static ColumnarBatch deserialize(boolean isRowShuffle, byte[] bytes, int readSize) {
         ColumnVector[] vecs = null;
+        long address = -1;
+        ShuffleDataSerializerUtils deserializer = null;
         try {
-            VecData.VecBatch vecBatch = VecData.VecBatch.parseFrom(bytes);
-            int vecCount = vecBatch.getVecCnt();
-            int rowCount = vecBatch.getRowCnt();
+            address = unsafe.allocateMemory(readSize);
+            unsafe.copyMemory(bytes, BYTE_ARRAY_BASE_OFFSET, null, address, readSize);
+
+            deserializer = new ShuffleDataSerializerUtils();
+            deserializer.init(address, readSize, isRowShuffle);
+            int vecCount = deserializer.getVecCount();
+            int rowCount = deserializer.getRowCount();
+
+            int[] typeIdArray = new int[vecCount];
+            int[] precisionArray = new int[vecCount];
+            int[] scaleArray = new int[vecCount];
+            long[] vecNativeIdArray = new long[vecCount];
+            deserializer.parse(typeIdArray, precisionArray, scaleArray, vecNativeIdArray);
             vecs = new ColumnVector[vecCount];
             for (int i = 0; i < vecCount; i++) {
-                vecs[i] = buildVec(vecBatch.getVecs(i), rowCount);
+                vecs[i] = buildVec(typeIdArray[i], vecNativeIdArray[i], rowCount, precisionArray[i], scaleArray[i]);
             }
+            deserializer.close();
+            unsafe.freeMemory(address);
             return new ColumnarBatch(vecs, rowCount);
-        } catch (InvalidProtocolBufferException e) {
-            throw new RuntimeException("deserialize failed. errmsg:" + e.getMessage());
         } catch (OmniRuntimeException e) {
             if (vecs != null) {
                 for (int i = 0; i < vecs.length; i++) {
@@ -67,184 +90,74 @@ public class ShuffleDataSerializer {
                     }
                 }
             }
+            if (deserializer != null) {
+                deserializer.close();
+            }
+            if (address != -1) {
+                unsafe.freeMemory(address);
+            }
             throw new RuntimeException("deserialize failed. errmsg:" + e.getMessage());
         }
     }
 
-    public static ColumnarBatch deserializeByRow(byte[] bytes) {
-        try {
-            VecData.ProtoRowBatch rowBatch = VecData.ProtoRowBatch.parseFrom(bytes);
-            int vecCount = rowBatch.getVecCnt();
-            int rowCount = rowBatch.getRowCnt();
-            OmniColumnVector[] columnarVecs = new OmniColumnVector[vecCount];
-            long[] omniVecs = new long[vecCount];
-            int[] omniTypes = new int[vecCount];
-            createEmptyVec(rowBatch, omniTypes, omniVecs, columnarVecs, vecCount, rowCount);
-            OmniRowDeserializer deserializer = new OmniRowDeserializer(omniTypes, omniVecs);
-
-            for (int rowIdx = 0; rowIdx < rowCount; rowIdx++) {
-                VecData.ProtoRow protoRow = rowBatch.getRows(rowIdx);
-                byte[] array = protoRow.getData().toByteArray();
-                deserializer.parse(array, rowIdx);
-            }
-
-            // update initial varchar vector because it's capacity might have been expanded.
-            for (int i = 0; i < vecCount; i++) {
-                if (omniTypes[i] == VarcharDataType.VARCHAR.getId().toValue()) {
-                    Vec varcharVec = VecFactory.create(omniVecs[i], VecEncoding.OMNI_VEC_ENCODING_FLAT, VarcharDataType.VARCHAR);
-                    columnarVecs[i].setVec(varcharVec);
-                }
-            }
-
-            deserializer.close();
-            return new ColumnarBatch(columnarVecs, rowCount);
-        } catch (InvalidProtocolBufferException e) {
-            throw new RuntimeException("deserialize failed. errmsg:" + e.getMessage());
-        }
-    }
-
-    private static ColumnVector buildVec(VecData.Vec protoVec, int vecSize) {
-        VecData.VecType protoTypeId = protoVec.getVecType();
+    private static ColumnVector buildVec(int typeId, long vecNativeId, int vecSize, int precision, int scale) {
         Vec vec;
         DataType type;
-        switch (protoTypeId.getTypeId()) {
-            case VEC_TYPE_INT:
+        switch (DataTypeId.values()[typeId]) {
+            case OMNI_INT:
                 type = DataTypes.IntegerType;
-                vec = new IntVec(vecSize);
+                vec = new IntVec(vecNativeId);
                 break;
-            case VEC_TYPE_DATE32:
+            case OMNI_DATE32:
                 type = DataTypes.DateType;
-                vec = new IntVec(vecSize);
+                vec = new IntVec(vecNativeId);
                 break;
-            case VEC_TYPE_LONG:
+            case OMNI_LONG:
                 type = DataTypes.LongType;
-                vec = new LongVec(vecSize);
+                vec = new LongVec(vecNativeId);
                 break;
-            case VEC_TYPE_TIMESTAMP:
+            case OMNI_TIMESTAMP:
                 type = DataTypes.TimestampType;
-                vec = new LongVec(vecSize);
+                vec = new LongVec(vecNativeId);
                 break;
-            case VEC_TYPE_DATE64:
+            case OMNI_DATE64:
                 type = DataTypes.DateType;
-                vec = new LongVec(vecSize);
+                vec = new LongVec(vecNativeId);
                 break;
-            case VEC_TYPE_DECIMAL64:
-                type = DataTypes.createDecimalType(protoTypeId.getPrecision(), protoTypeId.getScale());
-                vec = new LongVec(vecSize);
+            case OMNI_DECIMAL64:
+                type = DataTypes.createDecimalType(precision, scale);
+                vec = new LongVec(vecNativeId);
                 break;
-            case VEC_TYPE_SHORT:
+            case OMNI_SHORT:
                 type = DataTypes.ShortType;
-                vec = new ShortVec(vecSize);
+                vec = new ShortVec(vecNativeId);
                 break;
-            case VEC_TYPE_BOOLEAN:
+            case OMNI_BOOLEAN:
                 type = DataTypes.BooleanType;
-                vec = new BooleanVec(vecSize);
+                vec = new BooleanVec(vecNativeId);
                 break;
-            case VEC_TYPE_DOUBLE:
+            case OMNI_DOUBLE:
                 type = DataTypes.DoubleType;
-                vec = new DoubleVec(vecSize);
+                vec = new DoubleVec(vecNativeId);
                 break;
-            case VEC_TYPE_VARCHAR:
-            case VEC_TYPE_CHAR:
+            case OMNI_VARCHAR:
+            case OMNI_CHAR:
                 type = DataTypes.StringType;
-                vec = new VarcharVec(protoVec.getValues().size(), vecSize);
-                if (vec instanceof VarcharVec) {
-                    ((VarcharVec) vec).setOffsetsBuf(protoVec.getOffset().toByteArray());
-                }
+                vec = new VarcharVec(vecNativeId);
                 break;
-            case VEC_TYPE_DECIMAL128:
-                type = DataTypes.createDecimalType(protoTypeId.getPrecision(), protoTypeId.getScale());
-                vec = new Decimal128Vec(vecSize);
+            case OMNI_DECIMAL128:
+                type = DataTypes.createDecimalType(precision, scale);
+                vec = new Decimal128Vec(vecNativeId);
                 break;
-            case VEC_TYPE_TIME32:
-            case VEC_TYPE_TIME64:
-            case VEC_TYPE_INTERVAL_DAY_TIME:
-            case VEC_TYPE_INTERVAL_MONTHS:
+            case OMNI_TIME32:
+            case OMNI_TIME64:
+            case OMNI_INTERVAL_DAY_TIME:
+            case OMNI_INTERVAL_MONTHS:
             default:
-                throw new IllegalStateException("Unexpected value: " + protoTypeId.getTypeId());
-        }
-        vec.setValuesBuf(protoVec.getValues().toByteArray());
-        if(protoVec.getNulls().size() != 0) {
-            vec.setNullsBuf(protoVec.getNulls().toByteArray());
+                throw new IllegalStateException("Unexpected value: " + typeId);
         }
         OmniColumnVector vecTmp = new OmniColumnVector(vecSize, type, false);
         vecTmp.setVec(vec);
         return vecTmp;
-    }
-
-    public static void createEmptyVec(VecData.ProtoRowBatch rowBatch, int[] omniTypes, long[] omniVecs, OmniColumnVector[] columnarVectors, int vecCount, int rowCount) {
-        for (int i = 0; i < vecCount; i++) {
-            VecData.VecType protoTypeId = rowBatch.getVecTypes(i);
-            DataType sparkType;
-            Vec omniVec;
-            switch (protoTypeId.getTypeId()) {
-                case VEC_TYPE_INT:
-                    sparkType = DataTypes.IntegerType;
-                    omniTypes[i] = IntDataType.INTEGER.getId().toValue();
-                    omniVec = new IntVec(rowCount);
-                    break;
-                case VEC_TYPE_DATE32:
-                    sparkType = DataTypes.DateType;
-                    omniTypes[i] = Date32DataType.DATE32.getId().toValue();
-                    omniVec = new IntVec(rowCount);
-                    break;
-                case VEC_TYPE_LONG:
-                    sparkType = DataTypes.LongType;
-                    omniTypes[i] = LongDataType.LONG.getId().toValue();
-                    omniVec = new LongVec(rowCount);
-                    break;
-                case VEC_TYPE_TIMESTAMP:
-                    sparkType = DataTypes.TimestampType;
-                    omniTypes[i] = TimestampDataType.TIMESTAMP.getId().toValue();
-                    omniVec = new LongVec(rowCount);
-                    break;
-                case VEC_TYPE_DATE64:
-                    sparkType = DataTypes.DateType;
-                    omniTypes[i] = Date64DataType.DATE64.getId().toValue();
-                    omniVec = new LongVec(rowCount);
-                    break;
-                case VEC_TYPE_DECIMAL64:
-                    sparkType = DataTypes.createDecimalType(protoTypeId.getPrecision(), protoTypeId.getScale());
-                    omniTypes[i] = new Decimal64DataType(protoTypeId.getPrecision(), protoTypeId.getScale()).getId().toValue();
-                    omniVec = new LongVec(rowCount);
-                    break;
-                case VEC_TYPE_SHORT:
-                    sparkType = DataTypes.ShortType;
-                    omniTypes[i] = ShortDataType.SHORT.getId().toValue();
-                    omniVec = new ShortVec(rowCount);
-                    break;
-                case VEC_TYPE_BOOLEAN:
-                    sparkType = DataTypes.BooleanType;
-                    omniTypes[i] = BooleanDataType.BOOLEAN.getId().toValue();
-                    omniVec = new BooleanVec(rowCount);
-                    break;
-                case VEC_TYPE_DOUBLE:
-                    sparkType = DataTypes.DoubleType;
-                    omniTypes[i] = DoubleDataType.DOUBLE.getId().toValue();
-                    omniVec = new DoubleVec(rowCount);
-                    break;
-                case VEC_TYPE_VARCHAR:
-                case VEC_TYPE_CHAR:
-                    sparkType = DataTypes.StringType;
-                    omniTypes[i] = VarcharDataType.VARCHAR.getId().toValue();
-                    omniVec = new VarcharVec(rowCount); // it's capacity may be expanded.
-                    break;
-                case VEC_TYPE_DECIMAL128:
-                    sparkType = DataTypes.createDecimalType(protoTypeId.getPrecision(), protoTypeId.getScale());
-                    omniTypes[i] = new Decimal128DataType(protoTypeId.getPrecision(), protoTypeId.getScale()).getId().toValue();
-                    omniVec = new Decimal128Vec(rowCount);
-                    break;
-                case VEC_TYPE_TIME32:
-                case VEC_TYPE_TIME64:
-                case VEC_TYPE_INTERVAL_DAY_TIME:
-                case VEC_TYPE_INTERVAL_MONTHS:
-                default:
-                    throw new IllegalStateException("Unexpected value: " + protoTypeId.getTypeId());
-            }
-
-            omniVecs[i] = omniVec.getNativeVector();
-            columnarVectors[i] = new OmniColumnVector(rowCount, sparkType, false);
-            columnarVectors[i].setVec(omniVec);
-        }
     }
 }

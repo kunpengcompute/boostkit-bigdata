@@ -24,6 +24,8 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.shuffle.sort.ColumnarShuffleManager
 import org.apache.spark.sql.internal.SQLConf
 
+case class NumaBindingInfo(enableNumaBinding: Boolean, totalCoreRange: Array[String] = null, numCoresPerExecutor: Int = -1) {}
+
 class ColumnarPluginConfig(conf: SQLConf) extends Logging {
   def columnarShuffleStr: String = conf
     .getConfString("spark.shuffle.manager", "sort")
@@ -190,6 +192,14 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
   def timeParserPolicy: String = conf.getConfString("spark.sql.legacy.timeParserPolicy")
 
   def enableOmniUnixTimeFunc: Boolean = conf.getConf(ENABLE_OMNI_UNIXTIME_FUNCTION)
+
+  def enableVecPredicateFilter: Boolean = conf.getConf(ENABLE_VEC_PREDICATE_FILTER)
+
+  def catalogCacheSize: Int = conf.getConf(CATALOG_CACHE_SIZE)
+
+  def catalogCacheExpireTime: Int = conf.getConf(CATALOG_CACHE_EXPIRE_TIME)
+
+  def joinOutputStringTypeCost: Int = conf.getConf(JOIN_OUTPUT_STRING_COST_ESTIMATE)
 }
 
 
@@ -668,4 +678,45 @@ object ColumnarPluginConfig {
     .booleanConf
     .createWithDefault(true)
 
+  val ENABLE_VEC_PREDICATE_FILTER = buildConf("spark.omni.sql.columnar.vec.predicate.enabled")
+    .internal()
+    .doc("enable vectorized predicate filtering")
+    .booleanConf
+    .createWithDefault(false)
+
+  val CATALOG_CACHE_SIZE = buildConf("spark.omni.sql.columnar.catalog.cache.size")
+    .internal()
+    .doc("set catalog cache size, value <= 0 presents no cache")
+    .intConf
+    .createWithDefault(128)
+
+  val CATALOG_CACHE_EXPIRE_TIME = buildConf("spark.omni.sql.columnar.catalog.cache.expire.time")
+    .internal()
+    .doc("set catalog cache expire time in seconds")
+    .intConf
+    .createWithDefault(600)
+
+  val JOIN_OUTPUT_STRING_COST_ESTIMATE = buildConf("spark.omni.sql.columnar.join.reorder.stringtype.cost")
+    .internal()
+    .doc("set string type in join output cost")
+    .intConf
+    .createWithDefault(9)
+
+  val ENABLE_OMNI_TUNED = buildConf("spark.omni.sql.tuned.enabled")
+    .internal()
+    .doc("enable tuned-adm optimization")
+    .booleanConf
+    .createWithDefault(false)
+
+  val ENABLED_NUMA_BINDING =
+    buildConf("spark.omni.sql.columnar.numaBinding")
+      .internal()
+      .booleanConf
+      .createWithDefault(false)
+
+  val NUMA_BINDING_CORE_RANGE =
+    buildConf("spark.omni.sql.columnar.coreRange")
+      .internal()
+      .stringConf
+      .createOptional
 }
