@@ -12,13 +12,22 @@ def spark_command_reconstruct(load, conf):
     submit_cmd_list = [cmd_prefix, "--name", name]
 
     def _normalize_key(key):
+        """
+        对spark-sql命令解析出来的key做标准化处理，将_用-替换
+        :param key: 原始命令解析出来的key
+        :return: 标准化的key
+        """
         if '_' in key:
             key = key.replace('_', '-')
         return key
 
     def _normalize_value(value):
-        value = str(value)
-        if ' ' in value:
+        """
+        对spark-sql命令解析出来的value做标准化处理，将含有空格字符串类型的值用双引号包裹
+        :param value: 原始命令解析出的value
+        :return: 标准化的value
+        """
+        if isinstance(value, str) and ' ' in value:
             value = f'"{value}"'
         return value
 
