@@ -145,7 +145,7 @@ public class VecBufferCache {
         }
         vec.setValuesBuf(cache[index].byteBuffer, cache[index].offset[rowCount]);
         if (!cache[index].noNulls) {
-            vec.setNullsBuf(cache[index].isNull, rowCount);
+            vec.setNulls(0, cache[index].isNull, 0, rowCount);
         }
         return vec;
     }

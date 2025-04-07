@@ -515,10 +515,10 @@ Status RawBytesToDecimal64Bytes(const uint8_t* bytes, int32_t length,
 }
 
 void DefLevelsToNullsSIMD(const int16_t* def_levels, int64_t num_def_levels, const int16_t max_def_level,
-        int64_t* values_read, int64_t* null_count, bool* nulls) {
-    for (int i = 0; i < num_def_levels; ++i) {
+        int64_t* values_read, int64_t* null_count, uint8_t* nulls, int64_t nullsOffset) {
+    for (int64_t i = 0; i < num_def_levels; ++i) {
         if (def_levels[i] < max_def_level) {
-            nulls[i] = true;
+            BitUtil::SetBit(nulls, nullsOffset + i, true);
             (*null_count)++;
         }
     }
@@ -526,9 +526,10 @@ void DefLevelsToNullsSIMD(const int16_t* def_levels, int64_t num_def_levels, con
 }
 
 void DefLevelsToNulls(const int16_t* def_levels, int64_t num_def_levels, LevelInfo level_info,
-        int64_t* values_read, int64_t* null_count, bool* nulls) {
+        int64_t* values_read, int64_t* null_count, uint8_t* nulls, int64_t nullsOffset) {
     if (level_info.rep_level == 0) {
-        DefLevelsToNullsSIMD(def_levels, num_def_levels, level_info.def_level, values_read, null_count, nulls);
+        DefLevelsToNullsSIMD(def_levels, num_def_levels, level_info.def_level, values_read, null_count, nulls,
+            nullsOffset);
     } else {
         ::ParquetException::NYI("rep_level > 0 NYI");
     }

@@ -334,9 +334,9 @@ public class OrcColumnarBatchScanReader {
                 throw new RuntimeException("UnSupport type for ColumnarFileScan:" + value);
             }
         }
-        byte[] nullsBuf = new byte[rowCount];
-        Arrays.fill(nullsBuf, (byte) 1);
-        vec.setNullsBuf(nullsBuf);
+        byte[] nullsBuf = new byte[vec.getRawValueNulls().length];
+        Arrays.fill(nullsBuf, (byte) -1);
+        vec.setNullsByBits(0, nullsBuf, 0, rowCount);
         return vec;
     }
 }

@@ -18,6 +18,8 @@
 
 package com.huawei.boostkit.hive.shuffle;
 
+import nova.hetu.omniruntime.utils.NullsBufHelper;
+
 public class VariableWidthColumnAscSerDe implements ColumnSerDe {
     private transient byte columnNullMarker;
 
@@ -28,7 +30,7 @@ public class VariableWidthColumnAscSerDe implements ColumnSerDe {
     public int serialize(byte[] writeBytes, VecWrapper vecWrapper, int offset) {
         int totalLen = offset;
         int index = vecWrapper.index;
-        if (vecWrapper.isNull[index] == 1) {
+        if (NullsBufHelper.isSet(vecWrapper.isNull, index) == 1) {
             if (columnNullMarker == 1) {
                 writeBytes[totalLen++] = (byte) 0x7;
             } else {

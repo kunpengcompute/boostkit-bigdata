@@ -543,10 +543,8 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
         Vec flatVec = (vec instanceof DictionaryVec) ? ((DictionaryVec) vec).expandDictionary() : vec;
         byte[] rawValueNulls = vec.getRawValueNulls();
         DataType.DataTypeId dataTypeId = vec.getType().getId();
-        int[] rawValueOffset = (dataTypeId == OMNI_VARCHAR || dataTypeId == OMNI_CHAR)
-                ? ((VarcharVec) flatVec).getRawValueOffset() : new int[0];
         for (int i = 0; i < groupingSetSize; i++) {
-            newVec.setNulls(i * rowCount, rawValueNulls, 0, rowCount);
+            newVec.setNullsByBits(i * rowCount, rawValueNulls, 0, rowCount);
             if ((groupingSets.get(i) & mask) == 0) {
                 switch (dataTypeId) {
                     case OMNI_INT:
@@ -580,9 +578,9 @@ public class OmniGroupByOperator extends OmniHiveOperator<OmniGroupByDesc> imple
                         throw new RuntimeException("Not support dataType, dataTypeId: " + dataTypeId);
                 }
             } else {
-                byte[] nulls = new byte[rowCount];
-                Arrays.fill(nulls, (byte) 1);
-                newVec.setNulls(i * rowCount, nulls, 0, rowCount);
+                byte[] nulls = new byte[rawValueNulls.length];
+                Arrays.fill(nulls, (byte) -1);
+                newVec.setNullsByBits(i * rowCount, nulls, 0, rowCount);
             }
         }
         return newVec;

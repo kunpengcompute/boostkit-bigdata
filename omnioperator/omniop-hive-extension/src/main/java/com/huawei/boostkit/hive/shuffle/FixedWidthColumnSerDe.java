@@ -18,6 +18,8 @@
 
 package com.huawei.boostkit.hive.shuffle;
 
+import nova.hetu.omniruntime.utils.NullsBufHelper;
+
 public class FixedWidthColumnSerDe implements ColumnSerDe {
     protected static byte[] EMPTY = new byte[16];
 
@@ -32,7 +34,7 @@ public class FixedWidthColumnSerDe implements ColumnSerDe {
     public int serialize(byte[] writeBytes, VecWrapper vecWrapper, int offset) {
         int index = vecWrapper.index;
         int totalLen = offset;
-        if (vecWrapper.isNull[index] == 1) {
+        if (NullsBufHelper.isSet(vecWrapper.isNull, index) == 1) {
             writeBytes[totalLen] = -1;
             ++totalLen;
             return totalLen;
