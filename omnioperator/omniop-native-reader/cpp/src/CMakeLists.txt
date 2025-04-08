@@ -44,7 +44,6 @@ else ()
     message(FATAL_ERROR "protobuf library is needed but cant be found")
 endif ()
 
-include_directories($ENV{OMNI_HOME}/lib/lib/APL/include)
 include_directories(${Protobuf_INCLUDE_DIRS})
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 add_library(${PROJ_TARGET} SHARED ${SOURCE_FILES} ${PROTO_SRCS} ${PROTO_HDRS} ${PROTO_SRCS_VB} ${PROTO_HDRS_VB})
