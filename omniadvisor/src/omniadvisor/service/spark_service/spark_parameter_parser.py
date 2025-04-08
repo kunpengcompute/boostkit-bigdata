@@ -57,8 +57,10 @@ class SparkParameterParser(ParserInterface):
         self._parser.add_argument('--keytab')
         self._parser.add_argument('--queue')
         self._parser.add_argument('-d', "--database", metavar="database")
-        self._parser.add_argument('-e', '--execute', type=str, help='SQL statement to execute.')
-        self._parser.add_argument('-f', '--file', type=str, help='File containing SQL script.')
+        # TODO 使用--execute提交spark任务会出现失败，不知道是否为spark版本问题
+        self._parser.add_argument('-e', '--execute', dest='e', type=str, help='SQL statement to execute.')
+        # TODO 使用--file提交spark任务会出现失败，不知道是否为spark版本问题
+        self._parser.add_argument('-f', '--file', dest='f', type=str, help='File containing SQL script.')
         self._parser.add_argument('-i', help='Initialization SQL file')
         self._parser.add_argument('remainder', nargs=argparse.REMAINDER, help="Collect the rest of parameters")
 

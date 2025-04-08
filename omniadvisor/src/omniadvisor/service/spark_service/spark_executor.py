@@ -10,7 +10,6 @@ class SparkExecutor:
         :param submit_config_str: spark的提交命令
         :return:
         """
-        execute_cmd = shlex.split(execute_cmd)
         exitcode, spark_output = run_cmd(execute_cmd)
 
         return exitcode, spark_output
@@ -22,7 +21,7 @@ class SparkExecutor:
         spark_output = spark_output.split("\n")
         spark_submit_cmd = ""
         application_id = ""
-        time_taken = ""
+        time_taken = -1.0
         for item in spark_output:
             if "deploy.SparkSubmit" in item:
                 spark_submit_cmd = item.strip()
@@ -38,6 +37,6 @@ class SparkExecutor:
                 match = re.search(pattern, item)
                 if match:
                     time_taken = match.group(1).strip()
-            if application_id and time_taken:
+            if application_id and float(time_taken) > 0:
                 break
-        return spark_submit_cmd, application_id, time_taken
+        return spark_submit_cmd, application_id, float(time_taken)

@@ -8,7 +8,7 @@ class TestRunCmd:
         # 配置mock的返回值
         mock_getstatusoutput.return_value = (0, "Success output")
 
-        exitcode, output = run_cmd(['echo', 'hello'])
+        exitcode, output = run_cmd('echo hello')
 
         # 验证结果
         assert exitcode == 0
@@ -20,7 +20,7 @@ class TestRunCmd:
         # 配置mock的返回值
         mock_getstatusoutput.return_value = (1, "Error output")
 
-        exitcode, output = run_cmd(['false'])
+        exitcode, output = run_cmd('false')
 
         # 验证结果
         assert exitcode == 1

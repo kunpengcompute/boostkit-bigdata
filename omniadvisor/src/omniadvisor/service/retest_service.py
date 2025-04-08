@@ -11,11 +11,12 @@ def retest(retest_times: int, load: Load, config: dict):
     :param config: 配置
     :return:
     """
-    for _ in range(retest_times):
+    # TODO 这里是否需要检查一下retest_times是否为正整数？ -rt参数为负值的时候没有异常提示
+    for i in range(retest_times):
         try:
             spark_run(load, config)
         # TODO 完善这里的异常
         except Exception as e:
-            logger.info('复测第：%d 轮失败，原因：%s', e)
+            logger.info('复测第[%d] 轮失败，原因：%s', e)
             return float('inf')
-        logger.info('复测第：%d 轮成功！')
+        logger.info('复测第[%d] 轮成功！')

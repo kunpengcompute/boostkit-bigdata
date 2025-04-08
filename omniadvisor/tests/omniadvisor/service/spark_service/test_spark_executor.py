@@ -22,7 +22,7 @@ class TestSparkExecutor:
         # 验证结果
         assert exitcode == 0
         assert spark_output == ["Output line 1 \nOutput line 2"]
-        mock_run_cmd.assert_called_once_with(["spark-submit", "--class", "MyClass", "my_app.jar"])
+        mock_run_cmd.assert_called_once_with("spark-submit --class MyClass my_app.jar")
 
     def test_parser_spark_output(self):
         """
@@ -42,7 +42,7 @@ class TestSparkExecutor:
         expected_result = {
             "spark_submit_cmd": "INFO deploy.SparkSubmit: Starting Spark job",
             "application_id": "application_1234567890",
-            "time_taken": "12.34"
+            "time_taken": 12.34
         }
         assert spark_submit_cmd == expected_result["spark_submit_cmd"]
         assert application_id == expected_result["application_id"]
@@ -66,7 +66,7 @@ class TestSparkExecutor:
         # 验证结果
         assert spark_submit_cmd == "INFO deploy.SparkSubmit: Starting Spark job"
         assert application_id == "application_1234567890"
-        assert time_taken == "12.34"
+        assert time_taken == 12.34
 
     def test_parser_spark_output_with_empty_output(self):
         """
@@ -81,4 +81,4 @@ class TestSparkExecutor:
         # 验证结果
         assert spark_submit_cmd == ""
         assert application_id == ""
-        assert time_taken == ""
+        assert time_taken == -1.0
