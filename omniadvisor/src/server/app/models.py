@@ -21,14 +21,44 @@ class DatabaseLoad(models.Model):
         db_table = 'omniadvisor_load'  # 自定义表名
 
 
-class DatabaseTask(models.Model):
+class DatabaseTuningRecord(models.Model):
     """
-    任务模型
+    调优记录模型
+    """
+    TUNING_METHOD_CHOICES = {
+        (OA_CONF.TunerMethod.user, 'UserDefault'),
+        (OA_CONF.TunerMethod.iterative, 'Iterative'),
+        (OA_CONF.TunerMethod.expert, 'Expert'),
+        (OA_CONF.TunerMethod.transfer, 'Transfer'),
+    }
+
+    id = models.AutoField(primary_key=True)
+    load = models.ForeignKey(
+        DatabaseLoad,
+        on_delete=models.DO_NOTHING,
+        null=False
+    )
+    config = models.JSONField(null=False)
+    method = models.CharField(
+        max_length=10,
+        null=False,
+        choices=TUNING_METHOD_CHOICES
+    )
+    method_extend = models.CharField(max_length=20, null=True)
+    rounds = models.IntegerField(null=True)
+
+    class Meta:
+        db_table = 'omniadvisor_tuning_record'  # 自定义表名
+
+
+class DatabaseExamRecord(models.Model):
+    """
+    测试记录模型
     """
     TASK_STATUS_CHOICES = [
-        (OA_CONF.TaskStatus.success, 'Success'),
-        (OA_CONF.TaskStatus.fail, 'Fail'),
-        (OA_CONF.TaskStatus.running, 'Running')
+        (OA_CONF.ExecStatus.success, 'Success'),
+        (OA_CONF.ExecStatus.fail, 'Fail'),
+        (OA_CONF.ExecStatus.running, 'Running')
     ]
 
     id = models.AutoField(primary_key=True)
@@ -44,7 +74,7 @@ class DatabaseTask(models.Model):
         max_length=10,
         null=True,
         choices=TASK_STATUS_CHOICES,
-        default=OA_CONF.TaskStatus.running
+        default=OA_CONF.ExecStatus.running
     )
     runtime = models.FloatField(null=True)
     trace = models.JSONField(null=True)

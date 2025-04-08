@@ -48,7 +48,7 @@ def hijack_recommend(spark_sql_cmd):
     task = spark_run(load, config_for_test)
 
     # 执行结果分析 若执行失败则调度用户默认配置重新拉起任务
-    if task.status is not OA_CONF.TaskStatus.success and config_for_test != user_config:
+    if task.status is not OA_CONF.ExecStatus.success and config_for_test != user_config:
         spark_run(load, user_config)
 
 

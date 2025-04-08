@@ -100,7 +100,6 @@ class TestLoadRepository:
         )
         assert updated_load.test_config == {"param2": "value2"}
 
-    @pytest.mark.django_db(transaction=True)
     def test_update_tuning_needed(self):
         # 创建测试数据
         load = LoadRepository.create(

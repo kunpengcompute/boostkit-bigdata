@@ -23,18 +23,19 @@ class OmniAdvisorConf:
     PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # 获取当前脚本所在的目录
 
     # 任务执行状态
-    class TaskStatus:
+    class ExecStatus:
         success = 'Success'
         fail = 'Fail'
         running = 'Running'
         all = [success, fail, running]
 
     # 存几种调优算法，目前暂无赋值
-    class TunerType:
+    class TunerMethod:
+        user = 'user'
         iterative = 'iterative'
         expert = 'expert'
         transfer = 'transfer'
-        all = [iterative, expert, transfer]
+        all = [user, iterative, expert, transfer]
 
     class RetestWay:
         hijacking = 'hijacking'

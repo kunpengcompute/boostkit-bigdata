@@ -15,7 +15,7 @@ if not settings.configured:
     )
     django.setup()
 from omniadvisor.repository.load_repository import LoadRepository
-from omniadvisor.repository.task_repository import TaskRepository
+from omniadvisor.service.tuning_result.tuning_result_history import get_tuning_result_history
 
 from omniadvisor.service.retest_service import retest
 from omniadvisor.utils.utils import load_config_space
@@ -38,7 +38,7 @@ def _parse_tuning_args():
                         help='Effective when retest way is backend.')
 
     parser.add_argument("-t", "--tuner-type", type=str, required=True,
-                        choices=OA_CONF.TunerType.all,
+                        choices=OA_CONF.TunerMethod.all,
                         help='Support three tune type, for iterative, use BO; for expert ...')
 
     args = parser.parse_args()
@@ -71,7 +71,7 @@ def unified_tuning(load_id: str, retest_times: int, retest_way: str, tuner_type:
     # 复测
     if retest_way == OA_CONF.RetestWay.backend:
         retest(retest_times, load, next_config)
-        perf_history = TaskRepository.query_perf_history_from_load(load)
+        perf_history = get_tuning_result_history(load)
         # 更新最优配置
         LoadRepository.update_best_config(load, perf_history.best_config)
     else:
