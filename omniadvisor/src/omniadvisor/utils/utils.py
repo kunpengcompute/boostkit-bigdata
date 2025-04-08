@@ -19,7 +19,7 @@ def run_cmd(submit_cmd) -> Tuple[int, str]:
     :type submit_cmd: str
     :return: 返回一个包含退出状态码和命令输出的元组。
              第一个元素是整数类型的退出状态码（0表示成功），
-             第二个元素是一个字符串
+             第二个元素是一个保存在列表中的字符串 ["xxxx"]
     :rtype: Tuple[int, str]
     """
     logger.debug(f"Executor system command: {submit_cmd}")

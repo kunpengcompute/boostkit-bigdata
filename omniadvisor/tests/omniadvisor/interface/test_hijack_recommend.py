@@ -8,9 +8,9 @@ from omniadvisor.interface.hijack_recommend import hijack_recommend
 class TestHijackRecommend(unittest.TestCase):
 
     @patch("omniadvisor.interface.hijack_recommend.SparkParameterParser")
-    @patch("omniadvisor.interface.hijack_recommend.LoadRepository")
+    @patch("omniadvisor.interface.hijack_recommend.LoadRepository.query")
     @patch("omniadvisor.interface.hijack_recommend.spark_run")
-    def test_hijack_recommend_success(self, mock_spark_run, mock_load_repo, mock_parser):
+    def test_hijack_recommend_success(self, mock_spark_run, mock_load_repo_query, mock_parser):
         """
         测试 hijack_recommend 在任务成功时的行为。
         """
@@ -30,7 +30,7 @@ class TestHijackRecommend(unittest.TestCase):
         # 模拟 LoadRepository.query 返回一个有效的负载对象
         mock_load = MagicMock()
         mock_load.tuning_needed = False
-        mock_load_repo.query.return_value = mock_load
+        mock_load_repo_query.return_value = [mock_load]
 
         # 模拟 spark_run 的行为
         mock_spark_run.return_value.status = OA_CONF.TaskStatus.success
@@ -39,7 +39,7 @@ class TestHijackRecommend(unittest.TestCase):
         hijack_recommend(spark_sql_cmd)
 
         # 验证 LoadRepository.query 被正确调用
-        mock_load_repo.query.assert_called_once_with(name="example_name", default_config={"timeout": 30})
+        mock_load_repo_query.assert_called_once_with(name="example_name", default_config={"timeout": 30})
 
         # 验证 spark_run 被正确调用
         mock_spark_run.assert_called_once_with(mock_load, {"timeout": 30})
@@ -68,7 +68,7 @@ class TestHijackRecommend(unittest.TestCase):
         mock_load = MagicMock()
         mock_load.tuning_needed = True
         mock_load.test_config = {"timeout": 60}  # 使用待测试配置
-        mock_load_repo.query.return_value = mock_load
+        mock_load_repo.query.return_value = [mock_load]
 
         # 模拟 spark_run 的行为
         mock_spark_run.side_effect = [
@@ -83,7 +83,7 @@ class TestHijackRecommend(unittest.TestCase):
         mock_load_repo.query.assert_called_once_with(name="example_name", default_config={"timeout": 30})
 
         # 验证 spark_run 被调用了两次（第一次使用待测试配置，第二次回退到默认配置）
-        self.assertEqual(mock_spark_run.call_count, 2)
+        assert mock_spark_run.call_count == 2
         mock_spark_run.assert_any_call(mock_load, {"timeout": 60})  # 第一次调用
         mock_spark_run.assert_any_call(mock_load, {"timeout": 30})  # 第二次调用
 
