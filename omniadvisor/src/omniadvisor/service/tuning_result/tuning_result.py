@@ -74,8 +74,9 @@ class TuningResult:
 
     @property
     def status(self):
+        failed_times = sum([exam_record.status==OA_CONF.ExecStatus.fail for exam_record in self._exam_records])
         # 如果该配置执行失败过，则认为配置不可行
-        if sum([exam_record.status==OA_CONF.ExecStatus.fail for exam_record in self._exam_records]) > 0:
+        if failed_times >= OA_CONF.config_fail_threshold:
             return OA_CONF.ExecStatus.fail
         else:
             return OA_CONF.ExecStatus.success

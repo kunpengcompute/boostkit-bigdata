@@ -93,7 +93,7 @@ class SparkParameterParser(ParserInterface):
             if value is None:
                 continue
             # 提取执行相关参数保存至exec_attr
-            if key not in OA_CONF.SPARK_NON_EXEC_ATTR_LIST:
+            if key not in OA_CONF.spark_parse_not_exec_fields:
                 exec_attr[key] = value
             # 提取conf配置
             elif key == "conf":

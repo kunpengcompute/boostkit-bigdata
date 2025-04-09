@@ -74,8 +74,7 @@ def load_config_space() -> ConfigurationSpace:
     将knob_space 转为 configuration_space
     :return: ConfigurationSpace 对象
     """
-    repo_path = os.path.join(OA_CONF.PROJECT_DIR, 'config', 'spark_repo.json')
-    knob_space = read_json_file(repo_path)
+    knob_space = read_json_file(OA_CONF.spark_repo_path)
     config_space = ConfigurationSpace()
     for knob_name, knob_value in knob_space.items():
         if not knob_value['enable']:
