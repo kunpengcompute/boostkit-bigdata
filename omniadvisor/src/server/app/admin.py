@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import DatabaseLoad, DatabaseTask
+from .models import DatabaseLoad, DatabaseTuningRecord, DatabaseExamRecord
 
 
 # Register your models here.
@@ -11,7 +11,13 @@ class LoadAdmin(admin.ModelAdmin):
     list_filter = ()
 
 
-@admin.register(DatabaseTask)
-class TaskAdmin(admin.ModelAdmin):
+@admin.register(DatabaseTuningRecord)
+class TuningRecordAdmin(admin.ModelAdmin):
+    list_display = ('id', 'load', 'config', 'method', 'method_extend', 'rounds')
+    list_filter = ()
+
+
+@admin.register(DatabaseExamRecord)
+class ExamRecordAdmin(admin.ModelAdmin):
     list_display = ('id', 'load', 'config', 'start_time', 'end_time', 'status', 'runtime', 'trace')
     list_filter = ()

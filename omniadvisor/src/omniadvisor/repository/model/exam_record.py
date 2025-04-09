@@ -1,17 +1,17 @@
-from server.app.models import DatabaseTask
+from server.app.models import DatabaseExamRecord
 from omniadvisor.repository.model.load import Load
 
 
-class Task:
+class ExamRecord:
     """
-    任务
+    测试记录
     """
 
-    def __init__(self, database_model: DatabaseTask, output=""):
+    def __init__(self, database_model: DatabaseExamRecord, output=""):
         """
-        初始化，接收任务在数据库中的模型
+        初始化，接收测试记录在数据库中的模型
 
-        :param database_model: 数据库任务实例
+        :param database_model: 数据库测试记录实例
         """
         self._database_model = database_model
         self._output = output

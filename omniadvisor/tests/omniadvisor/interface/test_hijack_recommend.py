@@ -33,7 +33,7 @@ class TestHijackRecommend(unittest.TestCase):
         mock_load_repo_query.return_value = [mock_load]
 
         # 模拟 spark_run 的行为
-        mock_spark_run.return_value.status = OA_CONF.TaskStatus.success
+        mock_spark_run.return_value.status = OA_CONF.ExecStatus.success
 
         # 调用被测函数
         hijack_recommend(spark_sql_cmd)
@@ -72,8 +72,8 @@ class TestHijackRecommend(unittest.TestCase):
 
         # 模拟 spark_run 的行为
         mock_spark_run.side_effect = [
-            MagicMock(status=OA_CONF.TaskStatus.fail),  # 第一次任务失败
-            MagicMock(status=OA_CONF.TaskStatus.success)   # 回退到默认配置后成功
+            MagicMock(status=OA_CONF.ExecStatus.fail),  # 第一次任务失败
+            MagicMock(status=OA_CONF.ExecStatus.success)   # 回退到默认配置后成功
         ]
 
         # 调用被测函数
