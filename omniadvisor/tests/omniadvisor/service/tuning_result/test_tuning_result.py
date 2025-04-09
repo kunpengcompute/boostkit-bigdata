@@ -47,7 +47,7 @@ class TestTuningResult:
         assert result.config == {"param1": "value1", "param2": "value2"}
         assert result.method == "method1"
         assert result.method_extend == "method_extend1"
-        assert result.round == 1
+        assert result.rounds == 1
         assert result.runtime == 10
 
     def test_tuning_result_property(self, setup_mocks):
@@ -76,7 +76,7 @@ class TestTuningResult:
         assert tuning_result.config == {"param1": "value1", "param2": "value2"}
         assert tuning_result.method == 'method1'
         assert tuning_result.method_extend == "method_extend1"
-        assert tuning_result.round == 1
+        assert tuning_result.rounds == 1
         assert tuning_result.status == OA_CONF.ExecStatus.success
         assert tuning_result.runtime == 12.5
         assert tuning_result.trace == "trace_info1"

@@ -1,5 +1,4 @@
 from typing import List
-from dataclasses import dataclass
 
 from omniadvisor.repository.model.load import Load
 from omniadvisor.repository.model.tuning_record import TuningRecord
@@ -22,8 +21,6 @@ def get_tuning_result(load: Load, config: dict):
         load=load,
         config=config
     )
-    if len(tuning_records) != 1:
-        raise Exception
     tuning_record = tuning_records.pop()
 
     # 查询获得测试记录
@@ -69,11 +66,19 @@ class TuningResult:
         return self._tuning_record.method_extend
 
     @property
-    def round(self):
+    def rounds(self):
         return self._tuning_record.rounds
 
     @property
+    def exam_times(self):
+        return len(self._exam_records)
+
+    @property
     def status(self):
+        # 若配置未复测过，则默认该配置暂时为失败
+        if not self._exam_records:
+            return OA_CONF.ExecStatus.fail
+
         failed_times = sum([exam_record.status==OA_CONF.ExecStatus.fail for exam_record in self._exam_records])
         # 如果该配置执行失败过，则认为配置不可行
         if failed_times >= OA_CONF.config_fail_threshold:
@@ -83,6 +88,10 @@ class TuningResult:
 
     @property
     def runtime(self):
+        # 若配置未复测过，则runtime为失败返回值
+        if not self._exam_records:
+            return OA_CONF.exec_fail_return_value
+
         # 计算执行状态为success的平均runtime
         success_runtimes = [
             exam_record.runtime
@@ -92,6 +101,10 @@ class TuningResult:
 
     @property
     def trace(self):
+        # 若配置未复测过，则trace为失败返回值
+        if not self._exam_records:
+            return OA_CONF.exec_fail_return_trace
+
         success_exam_results = [
             exam_record
             for exam_record in self._exam_records if exam_record.status == OA_CONF.ExecStatus.success

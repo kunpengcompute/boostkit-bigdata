@@ -8,7 +8,7 @@ from omniadvisor.interface.hijack_recommend import hijack_recommend
 class TestHijackRecommend(unittest.TestCase):
 
     @patch("omniadvisor.interface.hijack_recommend.SparkParameterParser")
-    @patch("omniadvisor.interface.hijack_recommend.LoadRepository.query")
+    @patch("omniadvisor.interface.hijack_recommend.LoadRepository.query_by_name_and_default_config")
     @patch("omniadvisor.interface.hijack_recommend.spark_run")
     def test_hijack_recommend_success(self, mock_spark_run, mock_load_repo_query, mock_parser):
         """
@@ -30,6 +30,7 @@ class TestHijackRecommend(unittest.TestCase):
         # 模拟 LoadRepository.query 返回一个有效的负载对象
         mock_load = MagicMock()
         mock_load.tuning_needed = False
+        mock_load.default_config = {"timeout": 30}
         mock_load_repo_query.return_value = [mock_load]
 
         # 模拟 spark_run 的行为
@@ -68,7 +69,7 @@ class TestHijackRecommend(unittest.TestCase):
         mock_load = MagicMock()
         mock_load.tuning_needed = True
         mock_load.test_config = {"timeout": 60}  # 使用待测试配置
-        mock_load_repo.query.return_value = [mock_load]
+        mock_load_repo.query_by_name_and_default_config.return_value = [mock_load]
 
         # 模拟 spark_run 的行为
         mock_spark_run.side_effect = [
@@ -80,7 +81,7 @@ class TestHijackRecommend(unittest.TestCase):
         hijack_recommend(spark_sql_cmd)
 
         # 验证 LoadRepository.query 被正确调用
-        mock_load_repo.query.assert_called_once_with(name="example_name", default_config={"timeout": 30})
+        mock_load_repo.query_by_name_and_default_config.assert_called_once_with(name="example_name", default_config={"timeout": 30})
 
         # 验证 spark_run 被调用了两次（第一次使用待测试配置，第二次回退到默认配置）
         assert mock_spark_run.call_count == 2
@@ -107,7 +108,7 @@ class TestHijackRecommend(unittest.TestCase):
         mock_parser.return_value = mock_parser_instance
 
         # 模拟 LoadRepository.query 和 create 的行为
-        mock_load_repo.query.return_value = None
+        mock_load_repo.query_by_name_and_default_config.return_value = None
         mock_load_repo.create.return_value = None
 
         # 调用被测函数并验证抛出异常
@@ -117,5 +118,5 @@ class TestHijackRecommend(unittest.TestCase):
         self.assertEqual(str(context.exception), "Failed to create an available load")
 
         # 验证 LoadRepository.query 和 create 被正确调用
-        mock_load_repo.query.assert_called_once_with(name="example_name", default_config={"timeout": 30})
+        mock_load_repo.query_by_name_and_default_config.assert_called_once_with(name="example_name", default_config={"timeout": 30})
         mock_load_repo.create.assert_called_once_with(name="example_name", exec_attr={"cpu": 4}, default_config={"timeout": 30})

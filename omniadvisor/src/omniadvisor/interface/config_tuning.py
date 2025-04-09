@@ -63,6 +63,9 @@ def unified_tuning(load_id: str, retest_way: str, tuner_type: str):
 
 
 def main():
+    """
+    配置调优主函数
+    """
     args = _parse_tuning_args()
     unified_tuning(args.load_id, args.retest_way, args.tuner_type)
 

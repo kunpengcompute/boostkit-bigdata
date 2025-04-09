@@ -2,8 +2,6 @@ from abc import ABC
 from abc import abstractmethod
 
 from django.db.models import Model
-from django.db.utils import DatabaseError
-from django.core.exceptions import FieldError
 
 
 class Repository(ABC):
@@ -52,7 +50,7 @@ class Repository(ABC):
         """
         for field in cls._frozen_fields:
             if field in model_attr.keys():
-                raise ValueError(f'The filed {field} can not be changed, please check.')
+                raise ValueError(f'The {cls._model_class.__name__} filed {field} can not be changed.')
 
     @classmethod
     def _check_required_field(cls, model_attr: dict):
@@ -63,7 +61,7 @@ class Repository(ABC):
         """
         for field in cls._required_fields:
             if field not in model_attr.keys():
-                raise ValueError(f'The filed {field} is required, please check.')
+                raise ValueError(f'The {cls._model_class.__name__} filed {field} is required.')
 
     @classmethod
     def _check_field_format(cls, model_attr: dict):
@@ -78,11 +76,11 @@ class Repository(ABC):
 
             filed_types, filed_forbidden, filed_allow = filed_format
             if not isinstance(model_attr[field], tuple(filed_types)):
-                raise TypeError(f'The type of filed {field} must in {filed_types}, please check.')
+                raise TypeError(f'Type of {cls._model_class.__name__} filed {field} must in {filed_types}.')
             if model_attr[field] in filed_forbidden:
-                raise ValueError(f'The value of filed {field} can not be in {filed_forbidden}, please check.')
+                raise ValueError(f'Value of {cls._model_class.__name__} filed {field} cannot be in {filed_forbidden}.')
             if filed_allow and model_attr[field] not in filed_allow:
-                raise ValueError(f'The value of filed {field} must be in {filed_allow}, please check.')
+                raise ValueError(f'Value of {cls._model_class.__name__} filed {field} must be in {filed_allow}.')
 
     @classmethod
     def _create(cls, model_attr: dict):
@@ -96,11 +94,7 @@ class Repository(ABC):
         cls._check_required_field(model_attr)
         cls._check_field_format(model_attr)
 
-        try:
-            database_model = cls._model_class.objects.create(**model_attr)
-        except (DatabaseError, TypeError):
-            raise
-
+        database_model = cls._model_class.objects.create(**model_attr)
         return database_model
 
     @classmethod
@@ -113,11 +107,7 @@ class Repository(ABC):
         """
         cls._check_field_format(model_attr)
 
-        try:
-            database_models = cls._model_class.objects.filter(**model_attr)
-        except FieldError:
-            raise
-
+        database_models = cls._model_class.objects.filter(**model_attr)
         return database_models
 
     @classmethod
@@ -132,12 +122,8 @@ class Repository(ABC):
         cls._check_frozen_field(model_attr)
         cls._check_field_format(model_attr)
 
-        try:
-            for key, value in model_attr.items():
-                setattr(database_model, key, value)
+        for key, value in model_attr.items():
+            setattr(database_model, key, value)
 
-            database_model.save()
-        except (DatabaseError, TypeError):
-            raise
-
+        database_model.save()
         return database_model
