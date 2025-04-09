@@ -105,7 +105,8 @@ class ExamRecordRepository(Repository):
         return ExamRecord(database_model=database_task)
 
     @classmethod
-    def update_exam_result(cls, exam_record: ExamRecord, status: str, runtime: float, trace: dict, output: str):
+    def update_exam_result(cls, exam_record: ExamRecord, status: str = None, runtime: float = None,
+                           trace: dict = None, output: str = None):
         """
         更新测试记录中的状态
 
@@ -116,6 +117,16 @@ class ExamRecordRepository(Repository):
         :param output: 完整输出
         :return: 更新完后的测试记录
         """
+        # 对于入参为None的参数 使用exam_record本身自带的值
+        if not status:
+            status = exam_record.status
+        if not runtime:
+            runtime = exam_record.runtime
+        if not trace:
+            trace = exam_record.trace
+        if not output:
+            output = exam_record.output
+
         model_attr = {
             ExamRecord.FieldName.status: status,
             ExamRecord.FieldName.runtime: runtime,

@@ -1,7 +1,5 @@
-import argparse
 import shlex
 from dataclasses import dataclass
-from typing import Dict
 from omniadvisor.utils.logger import logger
 from common.constant import OA_CONF
 from omniadvisor.service.parameter_parser import ParserInterface
@@ -62,7 +60,6 @@ class SparkParameterParser(ParserInterface):
         # TODO 使用--file提交spark任务会出现失败，不知道是否为spark版本问题
         self._parser.add_argument('-f', '--file', dest='f', type=str, help='File containing SQL script.')
         self._parser.add_argument('-i', help='Initialization SQL file')
-        self._parser.add_argument('remainder', nargs=argparse.REMAINDER, help="Collect the rest of parameters")
 
     def process_parameter(self) -> BaseParams:
         """
@@ -93,7 +90,7 @@ class SparkParameterParser(ParserInterface):
             if value is None:
                 continue
             # 提取执行相关参数保存至exec_attr
-            if key not in OA_CONF.SPARK_NON_EXEC_ATTR_LIST:
+            if key not in OA_CONF.SPARK_NON_EXEC_ATTR_SET | OA_CONF.SPARK_CONF_SUPPLEMENT_SET:
                 exec_attr[key] = value
             # 提取conf配置
             elif key == "conf":
@@ -111,7 +108,11 @@ class SparkParameterParser(ParserInterface):
                         logger.warn(f"{confkey}被重复配置,多次配置值如下{conf_params[confvalue]}")
                     else:
                         conf_params[confkey] = confvalue
+            # 将 --num-executors --executors-cores --driver-cores这类的配置归类到conf_params中便于后续重建命令
+            elif key in OA_CONF.SPARK_CONF_SUPPLEMENT_SET:
+                conf_params[key] = value
             else:
                 name = value
-
+        logger.warn(f"The remainder unknown params {unknown} will be add to exec_attr[remainder]")
+        exec_attr["remainder"] = unknown
         return BaseParams(name=name, conf_params=conf_params, exec_attr=exec_attr)
