@@ -50,7 +50,11 @@ class OmniAdvisorConf:
 
     CODING_TYPE = "utf-8"
     SPARK_NON_EXEC_ATTR_SET = {"name", "conf"}
-    SPARK_CONF_SUPPLEMENT_SET = {"num_executors", "executor_cores", "driver_cores", "executor_memory", "driver_memory"}
+    SPARK_CONF_SUPPLEMENT_MAP = {"num_executors": "spark.executor.instances",
+                                 "executor_cores": "spark.executor.cores",
+                                 "driver_cores": "spark.driver.cores",
+                                 "executor_memory": "spark.executor.memory",
+                                 "driver_memory": "spark.driver.memory"}
     DATA_DIR = "".join([PROJECT_DIR, "/data"])
     SPARK_TRACE_DATA_DIR = "".join([DATA_DIR, "/spark_trace"])
 

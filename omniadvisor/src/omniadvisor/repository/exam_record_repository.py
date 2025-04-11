@@ -118,14 +118,10 @@ class ExamRecordRepository(Repository):
         :return: 更新完后的测试记录
         """
         # 对于入参为None的参数 使用exam_record本身自带的值
-        if not status:
-            status = exam_record.status
-        if not runtime:
-            runtime = exam_record.runtime
-        if not trace:
-            trace = exam_record.trace
-        if not output:
-            output = exam_record.output
+        status = status or exam_record.status
+        runtime = runtime or exam_record.runtime
+        trace = trace or exam_record.trace
+        output = output or exam_record.output
 
         model_attr = {
             ExamRecord.FieldName.status: status,

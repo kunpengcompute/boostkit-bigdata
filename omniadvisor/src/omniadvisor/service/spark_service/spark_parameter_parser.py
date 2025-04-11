@@ -109,8 +109,8 @@ class SparkParameterParser(ParserInterface):
                     else:
                         conf_params[confkey] = confvalue
             # 将 --num-executors --executors-cores --driver-cores这类的配置归类到conf_params中便于后续重建命令
-            elif key in OA_CONF.SPARK_CONF_SUPPLEMENT_SET:
-                conf_params[key] = value
+            elif key in OA_CONF.SPARK_CONF_SUPPLEMENT_MAP.keys():
+                conf_params[OA_CONF.SPARK_CONF_SUPPLEMENT_MAP(key)] = value
             else:
                 name = value
         logger.warn(f"The remainder unknown params {unknown} will be add to exec_attr[remainder]")
