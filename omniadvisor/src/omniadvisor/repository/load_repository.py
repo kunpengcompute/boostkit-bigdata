@@ -78,7 +78,7 @@ class LoadRepository(Repository):
         if len(database_loads) > 1:
             raise RuntimeError(f'Find {cls._model_class.__name__} combination of name {name} and default_config '
                                f'{default_config} is not unique.')
-        #TODO 如果query得到了多个load, 选择哪一个load作为拼接实际提交命令的load? 目前在hijack_recommend里面使用的是loads[0]
+        # TODO 如果query得到了多个load, 选择哪一个load作为拼接实际提交命令的load? 目前在hijack_recommend里面使用的是loads[0]
         return [
             Load(database_model=database_load) for database_load in database_loads
         ]

@@ -65,9 +65,6 @@ class OmniAdvisorConf:
     # 评估配置失效的阈值，当配置执行失败次数大于等于此值，则配置失效
     config_fail_threshold = 1
 
-    # Spark命令解析中非执行属性的字段
-    spark_parse_not_exec_fields = {'name', 'conf'}
-
     # 输入配置解析
     _common_config = load_common_config(config_path=common_config_path)
     # 配置罗列

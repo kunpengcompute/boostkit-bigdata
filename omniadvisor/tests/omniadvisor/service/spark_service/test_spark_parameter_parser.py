@@ -8,7 +8,7 @@ class TestParameterParser:
     def test_process_parameter(self):
         # 准备测试数据
         submit_cmd = "spark-submit --name test_sql --master local[*] --deploy-mode client " \
-                     "--executor-memory 2g --conf spark.memory.fraction=0.6"
+                     "--executor-memory 2g --conf spark.memory.fraction=0.6 --uk1 value1 --uk2 value2"
 
         # 创建 SparkParameterParser 实例
         parser = SparkParameterParser(submit_cmd)

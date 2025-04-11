@@ -120,3 +120,5 @@ class TestHijackRecommend(unittest.TestCase):
         # 验证 LoadRepository.query 和 create 被正确调用
         mock_load_repo.query_by_name_and_default_config.assert_called_once_with(name="example_name", default_config={"timeout": 30})
         mock_load_repo.create.assert_called_once_with(name="example_name", exec_attr={"cpu": 4}, default_config={"timeout": 30})
+
+        # TODO 端到端的用例构造里要验证一下对 --num-executors 转换为 --conf num-executors后是否能正常执行
