@@ -869,7 +869,7 @@ private[spark] class DAGScheduler(
       }
     }
   } catch {
-    case t: Throwable => logError("Error is eagerPartitions, ignoring", t)
+    case t: Throwable => logWarning("Error is eagerPartitions, ignoring", t)
   }
   
   
