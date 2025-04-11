@@ -49,7 +49,6 @@ class OmniAdvisorConf:
         SPARK_HISTORY_REST_URL = COMMON_CONFIG.get("sparkfetcher", "spark.history.rest.url")
 
     CODING_TYPE = "utf-8"
-    SPARK_NON_EXEC_ATTR_LIST = {"name", "conf"}
     DATA_DIR = "".join([PROJECT_DIR, "/data"])
     SPARK_TRACE_DATA_DIR = "".join([DATA_DIR, "/spark_trace"])
 
