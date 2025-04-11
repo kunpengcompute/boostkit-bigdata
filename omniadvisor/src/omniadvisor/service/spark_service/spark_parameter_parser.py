@@ -4,6 +4,12 @@ from omniadvisor.utils.logger import logger
 from common.constant import OA_CONF
 from omniadvisor.service.parameter_parser import ParserInterface
 
+SPARK_NON_EXEC_ATTR_SET = {"name", "conf"}
+SPARK_CONF_SUPPLEMENT_MAP = {"num_executors": "spark.executor.instances",
+                             "executor_cores": "spark.executor.cores",
+                             "driver_cores": "spark.driver.cores",
+                             "executor_memory": "spark.executor.memory",
+                             "driver_memory": "spark.driver.memory"}
 
 @dataclass(frozen=True)
 class BaseParams:
@@ -90,7 +96,7 @@ class SparkParameterParser(ParserInterface):
             if value is None:
                 continue
             # 提取执行相关参数保存至exec_attr
-            if key not in OA_CONF.SPARK_NON_EXEC_ATTR_SET | OA_CONF.SPARK_CONF_SUPPLEMENT_MAP.keys():
+            if key not in SPARK_NON_EXEC_ATTR_SET | SPARK_CONF_SUPPLEMENT_MAP.keys():
                 exec_attr[key] = value
             # 提取conf配置
             elif key == "conf":
@@ -109,8 +115,8 @@ class SparkParameterParser(ParserInterface):
                     else:
                         conf_params[confkey] = confvalue
             # 将 --num-executors --executors-cores --driver-cores这类的配置归类到conf_params中便于后续重建命令
-            elif key in OA_CONF.SPARK_CONF_SUPPLEMENT_MAP.keys():
-                conf_params[OA_CONF.SPARK_CONF_SUPPLEMENT_MAP[key]] = value
+            elif key in SPARK_CONF_SUPPLEMENT_MAP.keys():
+                conf_params[SPARK_CONF_SUPPLEMENT_MAP[key]] = value
             else:
                 name = value
         logger.warn(f"The remainder unknown params {unknown} will be add to exec_attr[remainder]")
