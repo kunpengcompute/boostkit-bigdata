@@ -38,16 +38,16 @@ def spark_run(load, conf):
 
     spark_submit_cmd, application_id, runtime = spark_executor.parser_spark_output(spark_output)
 
-    # 根据ApplicantID在子进程中获取Trace
-    p = multiprocessing.Process(target=_update_trace_from_history_server, args=(exam_record, application_id))
-    p.daemon = False
-    p.start()
-
     exam_record = ExamRecordRepository.update_exam_result(
         exam_record=exam_record,
         status=status,
         runtime=runtime
     )
+
+    # 根据ApplicantID在子进程中获取Trace
+    p = multiprocessing.Process(target=_update_trace_from_history_server, args=(exam_record, application_id))
+    p.daemon = False
+    p.start()
 
     return exam_record, spark_output
 
@@ -64,14 +64,17 @@ def _update_trace_from_history_server(exam_record: ExamRecord, application_id: s
     start_time = time.time()
     while time.time() - start_time < OA_CONF.spark_fetch_trace_timeout:
         try:
-            spark_fetcher.get_application_details(application_id)
+            trace_sql = spark_fetcher.get_spark_sql_by_app(application_id)
+            trace_stages = spark_fetcher.get_spark_stages_by_app(application_id)
+            trace_executor = spark_fetcher.get_spark_executor_by_app(application_id)
             break
         except HTTPError as httpe:
+            time.sleep(1)
             logger.warning(f"HistoryServer访问错误:{httpe}")
             continue
 
-    trace_dict['sql'] = trace_data_saver(spark_fetcher.get_spark_sql_by_app(application_id), OA_CONF.data_dir)
-    trace_dict['stages'] = trace_data_saver(spark_fetcher.get_spark_stages_by_app(application_id), OA_CONF.data_dir)
-    trace_dict['executor'] = trace_data_saver(spark_fetcher.get_spark_executor_by_app(application_id), OA_CONF.data_dir)
+    trace_dict['sql'] = trace_data_saver(data=trace_sql, data_dir=OA_CONF.data_dir)
+    trace_dict['stages'] = trace_data_saver(data=trace_stages, data_dir=OA_CONF.data_dir)
+    trace_dict['executor'] = trace_data_saver(data=trace_executor, data_dir=OA_CONF.data_dir)
 
     ExamRecordRepository.update_exam_result(exam_record, trace=trace_dict)

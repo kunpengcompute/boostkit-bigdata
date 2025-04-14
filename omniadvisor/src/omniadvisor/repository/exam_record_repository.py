@@ -126,10 +126,10 @@ class ExamRecordRepository(Repository):
         # 为避免多进程更新覆盖，因此未输入的属性不进行更新，从字典中删除
         if status is None:
             del model_attr[ExamRecord.FieldName.status]
-        if status is None:
+        if runtime is None:
             del model_attr[ExamRecord.FieldName.runtime]
-        if status is None:
-            del model_attr[ExamRecord.FieldName.runtime]
+        if trace is None:
+            del model_attr[ExamRecord.FieldName.trace]
 
         database_task = cls._update(
             database_model=exam_record.database_model,
