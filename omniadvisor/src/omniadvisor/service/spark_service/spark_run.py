@@ -5,6 +5,7 @@ from requests.exceptions import HTTPError
 from omniadvisor.utils.logger import logger
 from omniadvisor.service.spark_service.spark_fetcher import SparkFetcher
 from omniadvisor.service.spark_service.spark_executor import SparkExecutor
+from omniadvisor.repository.model.exam_record import ExamRecord
 from omniadvisor.repository.exam_record_repository import ExamRecordRepository
 from omniadvisor.service.spark_service.spark_command_reconstruct import spark_command_reconstruct
 from common.constant import OA_CONF
@@ -29,8 +30,7 @@ def spark_run(load, conf):
             exam_record=exam_record,
             status=OA_CONF.ExecStatus.fail,
             runtime=OA_CONF.exec_fail_return_runtime,
-            trace=OA_CONF.exec_fail_return_trace,
-            output=spark_output
+            trace=OA_CONF.exec_fail_return_trace
         )
 
     status = OA_CONF.ExecStatus.success
@@ -39,14 +39,20 @@ def spark_run(load, conf):
     spark_submit_cmd, application_id, runtime = spark_executor.parser_spark_output(spark_output)
 
     # 根据ApplicantID在子进程中获取Trace
-    p = multiprocessing.Process(target=_update_trace_from_history_server, args=(application_id,))
+    p = multiprocessing.Process(target=_update_trace_from_history_server, args=(exam_record, application_id))
     p.daemon = False
     p.start()
 
-    return ExamRecordRepository.update_exam_result(exam_record, status=status, runtime=runtime, output=spark_output)
+    exam_record = ExamRecordRepository.update_exam_result(
+        exam_record=exam_record,
+        status=status,
+        runtime=runtime
+    )
+
+    return exam_record, spark_output
 
 # TODO  这个也要端到端验证一下 用了子进程会不会对ExamRecordRepository有同时读写的问题？
-def _update_trace_from_history_server(application_id, time_out=10):
+def _update_trace_from_history_server(exam_record: ExamRecord, application_id: str):
     """
     创建一个子进程对history_server进行轮询 超时时间为10s
     :param application_id: applicaction_id
@@ -56,7 +62,7 @@ def _update_trace_from_history_server(application_id, time_out=10):
     history_server_url = OA_CONF.spark_history_rest_url
     spark_fetcher = SparkFetcher(history_server_url)
     start_time = time.time()
-    while time.time() - start_time < time_out:
+    while time.time() - start_time < OA_CONF.spark_fetch_trace_timeout:
         try:
             spark_fetcher.get_application_details(application_id)
             break
@@ -67,3 +73,5 @@ def _update_trace_from_history_server(application_id, time_out=10):
     trace_dict['sql'] = trace_data_saver(spark_fetcher.get_spark_sql_by_app(application_id), OA_CONF.data_dir)
     trace_dict['stages'] = trace_data_saver(spark_fetcher.get_spark_stages_by_app(application_id), OA_CONF.data_dir)
     trace_dict['executor'] = trace_data_saver(spark_fetcher.get_spark_executor_by_app(application_id), OA_CONF.data_dir)
+
+    ExamRecordRepository.update_exam_result(exam_record, trace=trace_dict)

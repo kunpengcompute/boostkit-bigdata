@@ -126,8 +126,7 @@ class TestTaskRepository:
             exam_record=task,
             status=OA_CONF.ExecStatus.success,
             runtime=10.0,
-            trace={'step1': 1},
-            output="Spark output"
+            trace={'step1': 1}
         )
         assert updated_task.database_model.status == OA_CONF.ExecStatus.success
         assert updated_task.database_model.runtime == 10.0

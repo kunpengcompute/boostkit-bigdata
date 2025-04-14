@@ -7,14 +7,13 @@ class ExamRecord:
     测试记录
     """
 
-    def __init__(self, database_model: DatabaseExamRecord, output=""):
+    def __init__(self, database_model: DatabaseExamRecord):
         """
         初始化，接收测试记录在数据库中的模型
 
         :param database_model: 数据库测试记录实例
         """
         self._database_model = database_model
-        self._output = output
 
     @property
     def id(self):
@@ -51,10 +50,6 @@ class ExamRecord:
     @property
     def database_model(self):
         return self._database_model
-
-    @property
-    def output(self):
-        return self._output
 
     class FieldName:
         id = 'id'

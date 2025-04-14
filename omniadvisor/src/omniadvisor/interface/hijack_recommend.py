@@ -24,8 +24,6 @@ def _query_or_create_load(name: str, exec_attr: dict, default_config: dict):
         logger.info("Not exit available load, create new one.")
         # TODO 如果用户在这里创建了一个格式异常的config, 会引起spark执行失败 这个应该如何处理
         load = LoadRepository.create(name=name, exec_attr=exec_attr, default_config=default_config)
-        if not load:
-            raise ValueError("Failed to create an available load")
     else:
         load = loads.pop()
 
@@ -76,15 +74,15 @@ def hijack_recommend(spark_sql_cmd: str):
     exec_config = _get_exec_config_from_load(load=load)
 
     # 根据配置和负载执行Spark任务
-    exam_record = spark_run(load, exec_config)
+    exam_record, output = spark_run(load, exec_config)
     # 执行结果分析 若执行失败则调度用户默认配置重新拉起任务
     if exam_record.status != OA_CONF.ExecStatus.success and exec_config != user_config:
-        safe_exam_record = spark_run(load, user_config)
+        safe_exam_record, safe_output = spark_run(load, user_config)
         # 打印安全机制下任务的输出
-        print(safe_exam_record.output)
+        print(safe_output)
     else:
         # 打印结果输出
-        print(exam_record.output)
+        print(output)
 
 
 def main():

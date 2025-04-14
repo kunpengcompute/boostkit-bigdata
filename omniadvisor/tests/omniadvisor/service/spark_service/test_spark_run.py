@@ -97,5 +97,4 @@ class TestSparkRun:
             status=OA_CONF.ExecStatus.fail,
             runtime=OA_CONF.exec_fail_return_runtime,
             trace=OA_CONF.exec_fail_return_trace,
-            output="failure output"
         )
