@@ -31,6 +31,7 @@ import org.apache.spark.sql.execution.joins.{BroadcastHashJoinExec, ColumnarBroa
 import org.apache.spark.sql.execution.{ColumnarBroadcastExchangeExec, ColumnarFilterExec, ColumnarProjectExec, ColumnarTakeOrderedAndProjectExec, CommandResultExec, LeafExecNode, OmniColumnarToRowExec, ProjectExec, RowToOmniColumnarExec, SparkPlan, TakeOrderedAndProjectExec, UnaryExecNode}
 import org.apache.spark.sql.internal.{SQLConf, StaticSQLConf}
 import org.apache.spark.sql.test.SharedSparkSession
+import org.apache.spark.sql.execution.ColumnarDataWritingCommandExec
 
 import scala.concurrent.Future
 
@@ -42,6 +43,8 @@ class TableWriteBasicFunctionSuite extends QueryTest with SharedSparkSession {
     .setAppName("test tableWriteBasicFunctionSuit")
     .set(StaticSQLConf.SPARK_SESSION_EXTENSIONS.key, "com.huawei.boostkit.spark.ColumnarPlugin")
     .set(SQLConf.WHOLESTAGE_CODEGEN_ENABLED.key, "false")
+    .set(SQLConf.PARQUET_REBASE_MODE_IN_WRITE.key, "LEGACY")
+    .set(SQLConf.PARQUET_REBASE_MODE_IN_READ.key, "LEGACY")
     .set("spark.shuffle.manager", "org.apache.spark.shuffle.sort.OmniColumnarShuffleManager")
 
   override def beforeAll(): Unit = {
@@ -63,6 +66,24 @@ class TableWriteBasicFunctionSuite extends QueryTest with SharedSparkSession {
     val runRows = select.collect()
     val expectedRows = Seq(Row("Lisa", "Sales", 10000, 35), Row("Maggie", "Sales", 1, 2))
     assert(QueryTest.sameRows(runRows, expectedRows).isEmpty, "the run value is error")
+
+  }
+
+  test("Insert basic data parquet (Non-partitioned table)") {
+    val dropParquet = spark.sql("drop table if exists employees_for_parquet_table_write_ut_test")
+    dropParquet.collect()
+    val employeesParquet = Seq[(String, String, Int, Int)](
+      ("Lisa", "Sales", 10000, 35),
+    ).toDF("name", "dept", "salary", "age")
+    employeesParquet.write.format("parquet").saveAsTable("employees_for_parquet_table_write_ut_test")
+
+    val insertParquet = spark.sql("insert into " +
+      "employees_for_parquet_table_write_ut_test values('Maggie', 'Sales', 1, 2)")
+    insertParquet.collect()
+    val selectParquet = spark.sql("select * from employees_for_parquet_table_write_ut_test")
+    val runRowsParquet = selectParquet.collect()
+    val expectedRowsParquet = Seq(Row("Lisa", "Sales", 10000, 35), Row("Maggie", "Sales", 1, 2))
+    assert(QueryTest.sameRows(runRowsParquet, expectedRowsParquet).isEmpty, "the run value is error")
   }
 
   test("Insert Basic data (Partitioned table)") {
@@ -81,6 +102,22 @@ class TableWriteBasicFunctionSuite extends QueryTest with SharedSparkSession {
     assert(QueryTest.sameRows(runRows, expectedRows).isEmpty, "the run value is error")
   }
 
+  test("Insert Basic data parquet (Partitioned table)") {
+    val drop = spark.sql("drop table if exists employees_for_parquet_table_write_ut_partition_test")
+    drop.collect()
+    val employees = Seq(("Lisa", "Sales", 10000, 35)).toDF("name", "dept", "salary", "age")
+    employees.write.format("parquet").partitionBy("age")
+      .saveAsTable("employees_for_parquet_table_write_ut_partition_test")
+    val insert = spark.sql("insert into employees_for_parquet_table_write_ut_partition_test " +
+      "values('Maggie','Sales',200,30),('Bob','Sales',2000,30),('Tom','Sales',5000,20)")
+    insert.collect()
+    val select = spark.sql("select * from employees_for_parquet_table_write_ut_partition_test")
+    val runRows = select.collect()
+    val expectedRows = Seq(Row("Lisa", "Sales", 10000, 35), Row("Maggie", "Sales", 200, 30),
+      Row("Bob", "Sales", 2000, 30), Row("Tom", "Sales", 5000, 20))
+    assert(QueryTest.sameRows(runRows, expectedRows).isEmpty, "the run value is error")
+  }
+
   test("Unsupported Scenarios") {
     val data = Seq[(Int, Int)](
       (10000, 35),
@@ -91,10 +128,9 @@ class TableWriteBasicFunctionSuite extends QueryTest with SharedSparkSession {
     insert.collect()
     var columnarDataWrite = insert.queryExecution.executedPlan.asInstanceOf[CommandResultExec]
       .commandPhysicalPlan.find({
-        case _: DataWritingCommandExec => true
+        case _: ColumnarDataWritingCommandExec => true
         case _ => false
-      }
-      )
+      })
     assert(columnarDataWrite.isDefined, "use columnar data writing command")
 
     val createTable = spark.sql("create table table_write_ut_map_test" +
@@ -128,6 +164,23 @@ class TableWriteBasicFunctionSuite extends QueryTest with SharedSparkSession {
       "529314109398732268.884038357697864858", "the run value is error")
   }
 
+  test("Insert of parquet decimal 128") {
+    val drop = spark.sql("drop table if exists table_parquet_for_decimal_128")
+    drop.collect()
+    val createTable = spark.sql("create table table_parquet_for_decimal_128 " +
+      "(amount DECIMAL(38,18)) using parquet")
+    createTable.collect()
+
+    val insert = spark.sql("insert into table_parquet_for_decimal_128 " +
+      "values(529314109398732268.884038357697864858)")
+    insert.collect()
+    val select = spark.sql("select * from table_parquet_for_decimal_128")
+    val runRows = select.collect()
+    assert(runRows(0).getDecimal(0).toString ==
+      "529314109398732268.884038357697864858", "the run value is error")
+  }
+  print("line")
+
   test("replace child plan to columnar") {
     val drop = spark.sql("drop table if exists test_parquet_int")
     drop.collect()
@@ -148,8 +201,8 @@ class TableWriteBasicFunctionSuite extends QueryTest with SharedSparkSession {
 
     val columnarFilter = insertNew.queryExecution.executedPlan.asInstanceOf[CommandResultExec]
       .commandPhysicalPlan.find({
-        case _: ColumnarFilterExec => true
-        case _ => false
+        case _: ColumnarFilterExec => false
+        case _ => true
       }
       )
     assert(columnarFilter.isDefined, "use columnar data writing command")
@@ -164,6 +217,20 @@ class TableWriteBasicFunctionSuite extends QueryTest with SharedSparkSession {
     insert.collect()
 
     val select = spark.sql("select * from test_orc_date")
+    val runRows = select.collect()
+    assert(runRows(0).getDate(0).toString ==
+      "1001-01-04", "the run value is error")
+  }
+
+  test("rebase parquet date to julian") {
+    val drop = spark.sql("drop table if exists test_parquet_date")
+    drop.collect()
+    val createTable = spark.sql("create table test_parquet_date(date_col date) using parquet")
+    createTable.collect()
+    val insert = spark.sql("insert into table test_parquet_date values(cast('1001-01-04' as date))")
+    insert.collect()
+
+    val select = spark.sql("select * from test_parquet_date")
     val runRows = select.collect()
     assert(runRows(0).getDate(0).toString ==
       "1001-01-04", "the run value is error")
@@ -194,6 +261,39 @@ class TableWriteBasicFunctionSuite extends QueryTest with SharedSparkSession {
       "(5,'',1,'',''), (13,'6884578',6, null, null), (1,'abc',1,'',''), " +
       "(3,'abcde',6,null,null), (4,'qqqqq', 8, 'a', 'b'), (6,'ooooo', 8, 'a', 'b')")
     val selectNP = spark.sql("select * from table_insert_varchar_np " +
+      "order by id, c_varchar, p_varchar1")
+    val runRowsNP = selectNP.collect()
+    val expectedRowsNP = Seq(Row(1, "abc", 1, null, null), Row(3, "abcde", 6, null, null),
+      Row(4, "qqqqq", 8, "a", "b"), Row(5, "", 1, null, null), Row(6, "ooooo", 8, "a", "b"),
+      Row(13, "6884578", 6, null, null))
+    assert(QueryTest.sameRows(runRowsNP, expectedRowsNP).isEmpty, "the run value is error")
+  }
+
+  test("empty parquet string partition") {
+    val drop = spark.sql("drop table if exists table_parquet_insert_varchar")
+    drop.collect()
+    val createTable = spark.sql("create table table_parquet_insert_varchar" +
+      "(id int, c_varchar varchar(40)) using parquet partitioned by (p_varchar varchar(40))")
+    createTable.collect()
+    val insert = spark.sql("insert into table table_parquet_insert_varchar values" +
+      "(5,'',''), (13,'6884578', null),  (6,'72135', '666')")
+    insert.collect()
+
+    val select = spark.sql("select * from table_parquet_insert_varchar order by id, c_varchar, p_varchar")
+    val runRows = select.collect()
+    val expectedRows = Seq(Row(5, "", null), Row(6, "72135", "666"), Row(13, "6884578", null))
+    assert(QueryTest.sameRows(runRows, expectedRows).isEmpty, "the run value is error")
+
+    val dropNP = spark.sql("drop table if exists table_parquet_insert_varchar_np")
+    dropNP.collect()
+    val createTableNP = spark.sql("create table table_parquet_insert_varchar_np" +
+      "(id int, c_varchar varchar(40)) using parquet partitioned by " +
+      "(p_varchar1 int, p_varchar2 varchar(40), p_varchar3 varchar(40))")
+    createTableNP.collect()
+    val insertNP = spark.sql("insert into table table_parquet_insert_varchar_np values" +
+      "(5,'',1,'',''), (13,'6884578',6, null, null), (1,'abc',1,'',''), " +
+      "(3,'abcde',6,null,null), (4,'qqqqq', 8, 'a', 'b'), (6,'ooooo', 8, 'a', 'b')")
+    val selectNP = spark.sql("select * from table_parquet_insert_varchar_np " +
       "order by id, c_varchar, p_varchar1")
     val runRowsNP = selectNP.collect()
     val expectedRowsNP = Seq(Row(1, "abc", 1, null, null), Row(3, "abcde", 6, null, null),

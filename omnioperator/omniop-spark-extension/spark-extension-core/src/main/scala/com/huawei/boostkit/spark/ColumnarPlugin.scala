@@ -41,6 +41,10 @@ import org.apache.spark.sql.catalyst.planning.PhysicalAggregation
 import org.apache.spark.sql.catalyst.plans.LeftSemi
 import org.apache.spark.sql.catalyst.plans.LeftOuter
 import org.apache.spark.sql.catalyst.plans.logical.Aggregate
+import org.apache.spark.sql.execution.command.{DataWritingCommand, DataWritingCommandExec}
+import org.apache.spark.sql.execution.datasources.orc.{OmniOrcFileFormat, OrcFileFormat}
+import org.apache.spark.sql.execution.datasources.parquet.{OmniParquetFileFormat, ParquetFileFormat}
+import org.apache.spark.sql.execution.datasources.{FileFormat, InsertIntoHadoopFsRelationCommand}
 import org.apache.spark.sql.execution.util.SparkMemoryUtils.addLeakSafeTaskCompletionListener
 import org.apache.spark.sql.execution.aggregate.PushOrderedLimitThroughAgg
 import org.apache.spark.sql.util.ShimUtil

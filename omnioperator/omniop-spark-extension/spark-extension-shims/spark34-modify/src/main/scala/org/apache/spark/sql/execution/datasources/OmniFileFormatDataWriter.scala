@@ -26,6 +26,7 @@ import org.apache.spark.sql.catalyst.catalog.ExternalCatalogUtils
 import org.apache.spark.sql.catalyst.expressions.{Cast, Concat, Expression, Literal, ScalaUDF, UnsafeProjection, UnsafeRow}
 import org.apache.spark.sql.connector.write.DataWriter
 import org.apache.spark.sql.execution.datasources.orc.OmniOrcOutputWriter
+import org.apache.spark.sql.execution.datasources.parquet.OmniParquetOutputWriter
 import org.apache.spark.sql.execution.metric.{CustomMetrics, SQLMetric}
 import org.apache.spark.sql.types.StringType
 import org.apache.spark.sql.vectorized.ColumnarBatch
@@ -62,6 +63,9 @@ class OmniSingleDirectoryDataWriter(
       context = taskAttemptContext)
 
     currentWriter match {
+      case _: OmniParquetOutputWriter =>
+        currentWriter.asInstanceOf[OmniParquetOutputWriter]
+          .initialize(description.allColumns, description.dataColumns)
       case _: OmniOrcOutputWriter =>
         currentWriter.asInstanceOf[OmniOrcOutputWriter]
           .initialize(description.allColumns, description.dataColumns)
@@ -153,9 +157,6 @@ abstract class OmniBaseDynamicPartitionDataWriter(
     row => proj(row).getInt(0)
   }
 
-  /** Returns the data columns to be written given an input row */
-  protected val getOutputRow =
-    UnsafeProjection.create(description.dataColumns, description.allColumns)
 
   protected def getPartitionPath(partitionValues: Option[InternalRow],
                                  bucketId: Option[Int]): String = {
@@ -185,6 +186,10 @@ abstract class OmniBaseDynamicPartitionDataWriter(
     }
     currentPath
   }
+
+  /** Returns the data columns to be written given an input row */
+  protected val getOutputRow =
+    UnsafeProjection.create(description.dataColumns, description.allColumns)
 
   /**
    * Opens a new OutputWriter given a partition key and/or a bucket id.
@@ -235,8 +240,18 @@ abstract class OmniBaseDynamicPartitionDataWriter(
       path = currentPath,
       dataSchema = description.dataColumns.toStructType,
       context = taskAttemptContext)
-    currentWriter.asInstanceOf[OmniOrcOutputWriter]
-      .initialize(description.allColumns, description.dataColumns)
+
+    currentWriter match {
+      case _: OmniParquetOutputWriter =>
+        currentWriter.asInstanceOf[OmniParquetOutputWriter]
+          .initialize(description.allColumns, description.dataColumns)
+      case _: OmniOrcOutputWriter =>
+        currentWriter.asInstanceOf[OmniOrcOutputWriter]
+          .initialize(description.allColumns, description.dataColumns)
+      case _ =>
+        throw new UnsupportedOperationException
+        (s"Unsupported ${currentWriter.getClass} Output writer!")
+    }
     statsTrackers.foreach(_.newFile(currentPath))
   }
 
@@ -266,8 +281,17 @@ abstract class OmniBaseDynamicPartitionDataWriter(
   protected def writeRecord(record: InternalRow, startPos: Long, endPos: Long): Unit = {
     // TODO After add OmniParquetOutPutWriter need extract
     //  a abstract interface named OmniOutPutWriter
-    assert(currentWriter.isInstanceOf[OmniOrcOutputWriter])
-    currentWriter.asInstanceOf[OmniOrcOutputWriter].spiltWrite(record, startPos, endPos)
+    currentWriter match {
+      case _: OmniParquetOutputWriter =>
+        assert(currentWriter.isInstanceOf[OmniParquetOutputWriter])
+        currentWriter.asInstanceOf[OmniParquetOutputWriter].spiltWrite(record, startPos, endPos)
+      case _: OmniOrcOutputWriter =>
+        assert(currentWriter.isInstanceOf[OmniOrcOutputWriter])
+        currentWriter.asInstanceOf[OmniOrcOutputWriter].spiltWrite(record, startPos, endPos)
+      case _ =>
+        throw new UnsupportedOperationException
+        (s"writeRecord Unsupported ${currentWriter.getClass} Output writer!")
+    }
 
     statsTrackers.foreach(_.newRow(currentWriter.path, record))
     recordsInFile += record.asInstanceOf[OmniInternalRow].batch.numRows()
