@@ -35,7 +35,7 @@ LOGGING_CONFIG = {
             'class': 'logging.handlers.TimedRotatingFileHandler',
             'level': 'INFO',
             'formatter': 'simpleFormatter',
-            'filename': 'logs/app.log',
+            'filename': OA_CONF.log_file_path,
             'when': 'midnight',
             'interval': 1,
             'backupCount': 7,
@@ -50,19 +50,11 @@ LOGGING_CONFIG = {
     }
 }
 
-
-# 将相对路径转换为绝对路径
-absolute_log_path = os.path.abspath(os.path.join(OA_CONF.PROJECT_DIR, LOGGING_CONFIG['handlers']['fileHandler']['filename']))
-absolute_log_dir = os.path.dirname(absolute_log_path)
-
-if not os.path.exists(absolute_log_dir):
-    os.makedirs(absolute_log_dir)
-
-# 更新配置文件中的路径
-LOGGING_CONFIG['handlers']['fileHandler']['filename'] = absolute_log_path
+# 检查并创建log文件夹
+if not os.path.exists(OA_CONF.log_dir):
+    os.makedirs(OA_CONF.log_dir)
 
 # 使用dictConfig加载配置
 dictConfig(LOGGING_CONFIG)
-
 # 获取logger并使用
 logger = logging.getLogger('project_logger')
