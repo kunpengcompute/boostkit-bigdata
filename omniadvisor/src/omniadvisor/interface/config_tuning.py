@@ -1,23 +1,9 @@
 import argparse
 
-import django
-from django.conf import settings
-
 from common.constant import OA_CONF
-from omniadvisor.repository.exam_record_repository import ExamRecordRepository
-from server.engine.settings import DATABASES
 from omniadvisor.utils.logger import logger
-
-# 没有配置时，才启用正式的数据库；测试绕过此通路
-if not settings.configured:
-    settings.configure(
-        INSTALLED_APPS=['server'],
-        DATABASES=DATABASES
-    )
-    django.setup()
 from omniadvisor.repository.load_repository import LoadRepository
 from omniadvisor.service.tuning_result.tuning_result_history import get_tuning_result_history
-
 from omniadvisor.service.retest_service import retest
 from algo.iterative.tuning import SmacAppendTuning
 
@@ -34,9 +20,6 @@ def _parse_tuning_args():
                         required=True,
                         help='If choose hijacking, a test will execute immediately')
 
-    parser.add_argument("-rt", "--retest-times", type=int, required=False, default=3,
-                        help='Effective when retest way is backend.')
-
     parser.add_argument("-t", "--tuner-type", type=str, required=True,
                         choices=OA_CONF.TunerMethod.all,
                         help='Support three tune type, for iterative, use BO; for expert ...')
@@ -45,11 +28,10 @@ def _parse_tuning_args():
     return args
 
 
-def unified_tuning(load_id: str, retest_times: int, retest_way: str, tuner_method: str):
+def unified_tuning(load_id: str, retest_way: str, tuner_method: str):
     """
     后台调优
     :param load_id: 负载id
-    :param retest_times: 复测次数
     :param retest_way: 复测方法
     :param tuner_method: 算法的类型
     :return:
@@ -72,7 +54,7 @@ def unified_tuning(load_id: str, retest_times: int, retest_way: str, tuner_metho
     # 推荐下一个配置
     # 复测
     if retest_way == OA_CONF.RetestWay.backend:
-        retest(retest_times, load, next_config)
+        retest(load, next_config)
         perf_history = get_tuning_result_history(load)
         # 更新最优配置
         LoadRepository.update_best_config(load, perf_history.best_config)
@@ -82,7 +64,10 @@ def unified_tuning(load_id: str, retest_times: int, retest_way: str, tuner_metho
 
 
 def main():
+    """
+    配置调优主函数
+    """
     args = _parse_tuning_args()
-    unified_tuning(args.load_id, args.retest_times, args.retest_way, args.tuner_type)
+    unified_tuning(args.load_id, args.retest_way, args.tuner_type)
 
 

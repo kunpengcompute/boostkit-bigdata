@@ -40,7 +40,7 @@ class TestSparkRun:
         mock_update_exam_result.return_value = task_update_mock
         mock_submit_spark_task.return_value = (0, "success output\napplication_id:app_12345\ntime_taken: 10")
         mock_parser_spark_output.return_value = ["spark-submit --master local[*]", "app_12345", 10]
-        mock_trace_data_saver.return_value = f"{OA_CONF.DATA_DIR}/testfile"
+        mock_trace_data_saver.return_value = f"{OA_CONF.data_dir}/testfile"
         load_mock = MagicMock()
         load_mock.name = "test_name"
         load_mock.exec_attr = {
@@ -52,9 +52,9 @@ class TestSparkRun:
 
         assert result_exam_record == task_update_mock
         mock_update_exam_result.assert_called_once_with(exam_record_mock, OA_CONF.ExecStatus.success, 10, {
-            'sql': f'{OA_CONF.DATA_DIR}/testfile',
-            'stages': f'{OA_CONF.DATA_DIR}/testfile',
-            'executor': f'{OA_CONF.DATA_DIR}/testfile'
+            'sql': f'{OA_CONF.data_dir}/testfile',
+            'stages': f'{OA_CONF.data_dir}/testfile',
+            'executor': f'{OA_CONF.data_dir}/testfile'
         }, "success output\napplication_id:app_12345\ntime_taken: 10")
         mock_update_exam_result.assert_called()
 
@@ -81,7 +81,7 @@ class TestSparkRun:
         task_update_mock = MagicMock()
         mock_update_exam_result.return_value = task_update_mock
         mock_submit_spark_task.return_value = (1, "failure output")
-        mock_trace_data_saver.return_value = f"{OA_CONF.DATA_DIR}/testfile"
+        mock_trace_data_saver.return_value = f"{OA_CONF.data_dir}/testfile"
 
         load_mock = MagicMock()
         load_mock.name = "test_name"
@@ -92,4 +92,9 @@ class TestSparkRun:
         result_exam_record = spark_run(load_mock, conf)
 
         assert result_exam_record == task_update_mock
-        mock_update_exam_result.assert_called_once_with(exam_record_mock, OA_CONF.ExecStatus.fail, -1, {}, "failure output")
+        mock_update_exam_result.assert_called_once_with(
+            exam_record=exam_record_mock,
+            status=OA_CONF.ExecStatus.fail,
+            runtime=OA_CONF.exec_fail_return_runtime,
+            trace=OA_CONF.exec_fail_return_trace,
+        )

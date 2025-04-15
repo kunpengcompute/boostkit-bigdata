@@ -56,7 +56,7 @@ class TestLoadRepository:
         )
 
         # 查询负载
-        loads = LoadRepository.query(
+        loads = LoadRepository.query_by_name_and_default_config(
             name='test',
             default_config={"param1": "value2"}
         )
@@ -64,7 +64,7 @@ class TestLoadRepository:
         assert loads[0].exec_attr == {'cmd': 'spark-sql -f test.sql'}
 
         # 查询失败
-        loads = LoadRepository.query(
+        loads = LoadRepository.query_by_name_and_default_config(
             name='t',
             default_config={"param1": "value2"}
         )

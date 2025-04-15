@@ -1,4 +1,3 @@
-import shlex
 import re
 from omniadvisor.utils.utils import run_cmd
 

@@ -26,8 +26,7 @@ class TestTuning:
             mock_obj = MagicMock()
             mocked_query_perf.return_value = mock_obj
 
-            unified_tuning(load_id=self.load_id, retest_times=self.retest_times, retest_way=OA_CONF.RetestWay.backend,
-                           tuner_type=self.tuner_type)
+            unified_tuning(load_id=self.load_id, retest_way=OA_CONF.RetestWay.backend, tuner_type=self.tuner_type)
 
             mock_update_best.assert_called_once()
 
@@ -41,8 +40,7 @@ class TestTuning:
             patch('omniadvisor.utils.logger.logger.info') as mock_info
         ):
             mock_query_by_id.return_value = None
-            unified_tuning(load_id=self.load_id, retest_times=self.retest_times, retest_way=OA_CONF.RetestWay.backend,
-                           tuner_type=self.tuner_type)
+            unified_tuning(load_id=self.load_id, retest_way=OA_CONF.RetestWay.backend, tuner_type=self.tuner_type)
 
             mock_info.assert_called_with('Cannot find load id: %s in database.', '2')
 
@@ -56,7 +54,6 @@ class TestTuning:
             patch('omniadvisor.interface.config_tuning.get_tuning_result_history') as mocked_query_perf,
             patch('omniadvisor.repository.load_repository.LoadRepository.update_test_config') as mock_update_test
         ):
-            unified_tuning(load_id=self.load_id, retest_times=self.retest_times, retest_way=OA_CONF.RetestWay.hijacking,
-                           tuner_type=self.tuner_type)
+            unified_tuning(load_id=self.load_id, retest_way=OA_CONF.RetestWay.hijacking, tuner_type=self.tuner_type)
             mocked_query_perf.assert_not_called()
             mock_update_test.assert_called_once()

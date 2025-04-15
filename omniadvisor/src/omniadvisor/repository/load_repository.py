@@ -39,6 +39,17 @@ class LoadRepository(Repository):
         :param default_config: 负载默认配置
         :return: 负载实例
         """
+        # 判断是否有相同name和default_config的Load存在
+        model_attr = {
+            Load.FieldName.name: name,
+            Load.FieldName.default_config: default_config
+        }
+        database_loads = cls._query(model_attr=model_attr)
+        # 强制要求name和default_config组合是唯一的
+        if len(database_loads) != 0:
+            raise RuntimeError(f'Create {cls._model_class.__name__} fail because combination of name {name} and '
+                               f'default_config {default_config} exist.')
+
         model_attr = {
             Load.FieldName.name: name,
             Load.FieldName.exec_attr: exec_attr,
@@ -48,7 +59,7 @@ class LoadRepository(Repository):
         return Load(database_model=database_load)
 
     @classmethod
-    def query(cls, name: str, default_config: dict):
+    def query_by_name_and_default_config(cls, name: str, default_config: dict):
         """
         指定名称和执行属性，查询负载
         (暂定以这两个信息进行查询，具体视现网情况而定)
@@ -62,7 +73,12 @@ class LoadRepository(Repository):
             Load.FieldName.default_config: default_config
         }
         database_loads = cls._query(model_attr=model_attr)
-        # TODO 如果query得到了多个load, 选择哪一个load作为拼接实际提交命令的load? 目前在hijack_recommend里面使用的是loads[0]
+
+        # 强制要求name和default_config组合是唯一的
+        if len(database_loads) > 1:
+            raise RuntimeError(f'Find {cls._model_class.__name__} combination of name {name} and default_config '
+                               f'{default_config} is not unique.')
+
         return [
             Load(database_model=database_load) for database_load in database_loads
         ]
@@ -131,6 +147,11 @@ class LoadRepository(Repository):
             Load.FieldName.id: load_id,
         }
         database_loads = cls._query(model_attr=model_attr)
+
+        # ID应该是唯一的
+        if len(database_loads) > 1:
+            raise RuntimeError(f'Find {cls._model_class.__name__} id {load_id} is not unique.')
+
         return [
             Load(database_model=database_load) for database_load in database_loads
         ]

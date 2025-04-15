@@ -105,8 +105,7 @@ class ExamRecordRepository(Repository):
         return ExamRecord(database_model=database_task)
 
     @classmethod
-    def update_exam_result(cls, exam_record: ExamRecord, status: str = None, runtime: float = None,
-                           trace: dict = None, output: str = None):
+    def update_exam_result(cls, exam_record: ExamRecord, status: str = None, runtime: float = None, trace: dict = None):
         """
         更新测试记录中的状态
 
@@ -114,22 +113,27 @@ class ExamRecordRepository(Repository):
         :param status: 执行状态
         :param runtime: 执行用时
         :param trace: 执行Trace
-        :param output: 完整输出
         :return: 更新完后的测试记录
         """
-        # 对于入参为None的参数 使用exam_record本身自带的值
-        status = status or exam_record.status
-        runtime = runtime or exam_record.runtime
-        trace = trace or exam_record.trace
-        output = output or exam_record.output
+        if not status and not runtime and not trace:
+            raise RuntimeError('Exam record update exam result function have nothing to update')
 
         model_attr = {
             ExamRecord.FieldName.status: status,
             ExamRecord.FieldName.runtime: runtime,
             ExamRecord.FieldName.trace: trace
         }
+        # 为避免多进程更新覆盖，因此未输入的属性不进行更新，从字典中删除
+        if status is None:
+            del model_attr[ExamRecord.FieldName.status]
+        if runtime is None:
+            del model_attr[ExamRecord.FieldName.runtime]
+        if trace is None:
+            del model_attr[ExamRecord.FieldName.trace]
+
         database_task = cls._update(
             database_model=exam_record.database_model,
             model_attr=model_attr
         )
-        return ExamRecord(database_model=database_task, output=output)
+
+        return ExamRecord(database_model=database_task)

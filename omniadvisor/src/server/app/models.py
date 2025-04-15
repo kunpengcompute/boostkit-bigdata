@@ -18,6 +18,9 @@ class DatabaseLoad(models.Model):
     tuning_needed = models.BooleanField(default=False)
 
     class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['name', 'default_config'], name='load_unique')
+        ]
         db_table = 'omniadvisor_load'  # 自定义表名
 
 
@@ -48,6 +51,9 @@ class DatabaseTuningRecord(models.Model):
     rounds = models.IntegerField(null=True)
 
     class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['load', 'config'], name='exam_record_unique')
+        ]
         db_table = 'omniadvisor_tuning_record'  # 自定义表名
 
 
@@ -80,4 +86,4 @@ class DatabaseExamRecord(models.Model):
     trace = models.JSONField(null=True)
 
     class Meta:
-        db_table = 'omniadvisor_task'  # 自定义表名
+        db_table = 'omniadvisor_exam_record'  # 自定义表名

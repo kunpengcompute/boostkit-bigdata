@@ -6,7 +6,7 @@ from omniadvisor.service.spark_service.spark_fetcher import SparkFetcher
 from common.constant import OA_CONF
 
 
-history_server_url = OA_CONF.CommonConfig.SPARK_HISTORY_REST_URL
+history_server_url = OA_CONF.spark_history_rest_url
 spark_fetcher = SparkFetcher(history_server_url)
 
 # 示例数据

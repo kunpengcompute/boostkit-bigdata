@@ -37,14 +37,16 @@ class TuningRecordRepository(Repository):
         :param method: 调优方法
         :return: 调优记录实例
         """
-        # 判断是否有相同Load和Config的调优记录存在
+        # 判断是否有相同load和config的TuningRecord存在
         model_attr = {
             TuningRecord.FieldName.load: load.database_model,
             TuningRecord.FieldName.config: config,
         }
         database_records = cls._query(model_attr=model_attr)
+        # 强制要求load和config组合是唯一的
         if len(database_records) != 0:
-            raise Exception
+            raise RuntimeError(f'Create {cls._model_class.__name__} fail because combination of load {load.id} and '
+                               f'config {config} exist.')
 
         # 获取调优伦次
         model_attr = {
@@ -93,6 +95,11 @@ class TuningRecordRepository(Repository):
             TuningRecord.FieldName.config: config,
         }
         database_records = cls._query(model_attr=model_attr)
+
+        # 强制要求load和config组合是唯一的
+        if len(database_records) > 1:
+            raise RuntimeError(f'Find {cls._model_class.__name__} combination of load {Load.id} and config {config} '
+                               f'is not unique.')
 
         return [
             TuningRecord(database_model=database_record) for database_record in database_records
