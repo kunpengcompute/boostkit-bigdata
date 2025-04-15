@@ -29,10 +29,10 @@ class DatabaseTuningRecord(models.Model):
     调优记录模型
     """
     TUNING_METHOD_CHOICES = {
-        (OA_CONF.TunerMethod.user, 'UserDefault'),
-        (OA_CONF.TunerMethod.iterative, 'Iterative'),
-        (OA_CONF.TunerMethod.expert, 'Expert'),
-        (OA_CONF.TunerMethod.transfer, 'Transfer'),
+        (OA_CONF.TuneMethod.user, 'UserDefault'),
+        (OA_CONF.TuneMethod.iterative, 'Iterative'),
+        (OA_CONF.TuneMethod.expert, 'Expert'),
+        (OA_CONF.TuneMethod.transfer, 'Transfer'),
     }
 
     id = models.AutoField(primary_key=True)

@@ -7,6 +7,7 @@ from omniadvisor.service.tuning_result.tuning_result_history import get_tuning_r
 from omniadvisor.service.retest_service import retest
 from algo.iterative.tuning import SmacAppendTuning
 
+
 def _parse_tuning_args():
     """
     解析用户直命令行输入的参数
@@ -20,20 +21,20 @@ def _parse_tuning_args():
                         required=True,
                         help='If choose hijacking, a test will execute immediately')
 
-    parser.add_argument("-t", "--tuner-type", type=str, required=True,
-                        choices=OA_CONF.TunerMethod.all,
-                        help='Support three tune type, for iterative, use BO; for expert ...')
+    parser.add_argument("-t", "--tune-method", type=str, required=True,
+                        choices=OA_CONF.TuneMethod.all,
+                        help='Support three tune method, for iterative, use BO; for expert ...')
 
     args = parser.parse_args()
     return args
 
 
-def unified_tuning(load_id: str, retest_way: str, tuner_method: str):
+def unified_tuning(load_id: str, retest_way: str, tune_method: str):
     """
     后台调优
     :param load_id: 负载id
     :param retest_way: 复测方法
-    :param tuner_method: 算法的类型
+    :param tune_method: 算法的类型
     :return:
     """
     # 加载参数空间
@@ -45,19 +46,21 @@ def unified_tuning(load_id: str, retest_way: str, tuner_method: str):
         return
     load = loads[0]
 
-    if tuner_method == OA_CONF.TunerMethod.iterative:
+    # 推荐下一个配置
+    if tune_method == OA_CONF.TuneMethod.iterative:
         smac_tuning = SmacAppendTuning()
         perf_history = get_tuning_result_history(load)
         next_config = smac_tuning.tune(perf_history.config_perf_pairs)
     else:
-        raise ValueError(f'Not supported tuning method: {tuner_method}')
-    # 推荐下一个配置
+        raise ValueError(f'Not supported tuning method: {tune_method}')
+
     # 复测
     if retest_way == OA_CONF.RetestWay.backend:
         retest(load, next_config)
         perf_history = get_tuning_result_history(load)
         # 更新最优配置
-        LoadRepository.update_best_config(load, perf_history.best_config)
+        if perf_history.best_config:
+            LoadRepository.update_best_config(load, perf_history.best_config)
     else:
         # 更新待测试配置即可
         LoadRepository.update_test_config(load, next_config)
@@ -68,6 +71,6 @@ def main():
     配置调优主函数
     """
     args = _parse_tuning_args()
-    unified_tuning(args.load_id, args.retest_way, args.tuner_type)
+    unified_tuning(args.load_id, args.retest_way, args.tune_method)
 
 

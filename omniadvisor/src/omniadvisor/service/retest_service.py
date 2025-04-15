@@ -12,12 +12,15 @@ def retest(load: Load, config: dict):
     :param config: 配置
     :return:
     """
-    # TODO 这里是否需要检查一下retest_times是否为正整数？ -rt参数为负值的时候没有异常提示
-    for i in range(OA_CONF.tuning_retest_times):
+    logger.debug('开始复测配置...')
+    for i in range(1, OA_CONF.tuning_retest_times + 1):
         try:
-            spark_run(load, config)
-        # TODO 完善这里的异常
+            exam_record, spark_output = spark_run(load, config)
         except Exception as e:
-            logger.info('复测第[%d] 轮失败，原因：%s', e)
-            return float('inf')
-        logger.info('复测第[%d] 轮成功！')
+            logger.error('复测第 %d 轮失败，原因：%s', i, e)
+            return
+
+        if exam_record.status == OA_CONF.ExecStatus.success:
+            logger.info('复测第 %d 轮成功，性能结果：%.3f', i, exam_record.runtime)
+        else:
+            logger.error('复测第 %d 轮失败，spark执行异常：%s', i, spark_output)
