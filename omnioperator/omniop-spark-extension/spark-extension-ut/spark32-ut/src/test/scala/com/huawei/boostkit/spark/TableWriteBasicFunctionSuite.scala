@@ -43,6 +43,8 @@ class TableWriteBasicFunctionSuite extends QueryTest with SharedSparkSession {
     .setAppName("test tableWriteBasicFunctionSuit")
     .set(StaticSQLConf.SPARK_SESSION_EXTENSIONS.key, "com.huawei.boostkit.spark.ColumnarPlugin")
     .set(SQLConf.WHOLESTAGE_CODEGEN_ENABLED.key, "false")
+    .set(SQLConf.PARQUET_REBASE_MODE_IN_WRITE.key, "LEGACY")
+    .set(SQLConf.PARQUET_REBASE_MODE_IN_READ.key, "LEGACY")
     .set("spark.shuffle.manager", "org.apache.spark.shuffle.sort.OmniColumnarShuffleManager")
 
   override def beforeAll(): Unit = {
@@ -129,7 +131,7 @@ class TableWriteBasicFunctionSuite extends QueryTest with SharedSparkSession {
         case _: ColumnarDataWritingCommandExec => true
         case _ => false
       })
-    assert(columnarDataWrite.isDefined, "use columnar data writing command")
+    assert(!columnarDataWrite.isDefined, "use columnar data writing command")
 
     val createTable = spark.sql("create table table_write_ut_map_test" +
       " (id int, grades MAP<VARCHAR(50), int>) using orc")

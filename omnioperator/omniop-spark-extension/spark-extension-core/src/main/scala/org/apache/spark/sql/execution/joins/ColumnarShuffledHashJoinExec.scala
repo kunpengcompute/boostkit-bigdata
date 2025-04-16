@@ -35,7 +35,7 @@ import org.apache.spark.sql.catalyst.expressions.codegen.CodegenContext
 import org.apache.spark.sql.catalyst.optimizer.{BuildLeft, BuildRight, BuildSide}
 import org.apache.spark.sql.catalyst.plans.{FullOuter, Inner, JoinType, LeftAnti, LeftExistence, LeftOuter, LeftSemi, RightOuter, ExistenceJoin}
 import org.apache.spark.sql.catalyst.plans.physical.Partitioning
-import org.apache.spark.sql.execution.{ExplainUtils, ShuffledHashJoinExecShim, SparkPlan}
+import org.apache.spark.sql.execution.{ColumnarShuffleExchangeExec, ExplainUtils, ShuffledHashJoinExecShim, SparkPlan}
 import org.apache.spark.sql.execution.metric.SQLMetrics
 import org.apache.spark.sql.execution.util.SparkMemoryUtils
 import org.apache.spark.sql.execution.vectorized.OmniColumnVector
@@ -241,7 +241,7 @@ case class ColumnarShuffledHashJoinExec(
 
         val startLookupCodegen = System.nanoTime()
         val lookupOpFactory = new OmniLookupJoinWithExprOperatorFactory(probeTypes, probeOutputCols, probeHashColsExp,
-          buildOutputCols, buildOutputTypes, buildOpFactory, filter, new OperatorConfig(SpillConfig.NONE,
+          buildOutputCols, buildOutputTypes, buildOpFactory, filter, buildPlan.isInstanceOf[ColumnarShuffleExchangeExec], new OperatorConfig(SpillConfig.NONE,
             new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
         val lookupOp = lookupOpFactory.createOperator()
         lookupCodegenTime += NANOSECONDS.toMillis(System.nanoTime() - startLookupCodegen)
