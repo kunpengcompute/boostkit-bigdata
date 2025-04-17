@@ -1,4 +1,5 @@
 from unittest.mock import MagicMock
+from common.constant import OA_CONF
 from omniadvisor.service.spark_service.spark_command_reconstruct import spark_command_reconstruct
 
 
@@ -11,8 +12,8 @@ class TestSparkCommandReconstruct:
 
         # 定义 conf 参数
         conf = {"spark.sql.shuffle.partitions": "3200", "spark.executor.cores": "4"}
-
-        expected_cmd = "spark-sql --name TestApp" \
+        cmd_prefix = f"{OA_CONF.spark_home}/bin/spark-class org.apache.spark.deploy.SparkSubmit"
+        expected_cmd = f"{cmd_prefix} --name TestApp" \
                        " --driver-memory 8G" \
                        " --executor-memory 16G" \
                        " --conf spark.sql.shuffle.partitions=3200" \
@@ -28,8 +29,8 @@ class TestSparkCommandReconstruct:
         mock_load.exec_attr = {"i": "init.script.path"}
 
         conf = {}
-
-        expected_cmd = "spark-sql --name InitScriptApp -i init.script.path"
+        cmd_prefix = f"{OA_CONF.spark_home}/bin/spark-class org.apache.spark.deploy.SparkSubmit"
+        expected_cmd = f"{cmd_prefix} --name InitScriptApp -i init.script.path"
 
         result = spark_command_reconstruct(mock_load, conf)
 

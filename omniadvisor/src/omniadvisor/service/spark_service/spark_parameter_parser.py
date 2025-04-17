@@ -1,6 +1,6 @@
 import shlex
 from dataclasses import dataclass
-from omniadvisor.utils.logger import logger
+from omniadvisor.utils.logger import global_logger
 from common.constant import OA_CONF
 from omniadvisor.service.parameter_parser import ParserInterface
 
@@ -111,7 +111,7 @@ class SparkParameterParser(ParserInterface):
                             conf_params[confkey].append(confvalue)
                         else:
                             conf_params[confkey] = [conf_params[key], value]
-                        logger.warn(f"{confkey}被重复配置,多次配置值如下{conf_params[confvalue]}")
+                        global_logger.warn(f"{confkey}被重复配置,多次配置值如下{conf_params[confvalue]}")
                     else:
                         conf_params[confkey] = confvalue
             # 将 --num-executors --executors-cores --driver-cores这类的配置归类到conf_params中便于后续重建命令
@@ -119,6 +119,6 @@ class SparkParameterParser(ParserInterface):
                 conf_params[SPARK_CONF_SUPPLEMENT_MAP[key]] = value
             else:
                 name = value
-        logger.warn(f"The remainder unknown params {unknown} will be add to exec_attr[remainder]")
+        global_logger.warn(f"The remainder unknown params {unknown} will be add to exec_attr[remainder]")
         exec_attr["remainder"] = unknown
         return BaseParams(name=name, conf_params=conf_params, exec_attr=exec_attr)

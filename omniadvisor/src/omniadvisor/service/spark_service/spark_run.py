@@ -2,7 +2,7 @@ import time
 import multiprocessing
 
 from requests.exceptions import HTTPError
-from omniadvisor.utils.logger import logger
+from omniadvisor.utils.logger import global_logger
 from omniadvisor.service.spark_service.spark_fetcher import SparkFetcher
 from omniadvisor.service.spark_service.spark_executor import SparkExecutor
 from omniadvisor.repository.model.exam_record import ExamRecord
@@ -51,7 +51,7 @@ def spark_run(load, conf):
 
     return exam_record, spark_output
 
-# TODO  这个也要端到端验证一下 用了子进程会不会对ExamRecordRepository有同时读写的问题？
+
 def _update_trace_from_history_server(exam_record: ExamRecord, application_id: str):
     """
     创建一个子进程对history_server进行轮询 超时时间为10s
@@ -67,14 +67,13 @@ def _update_trace_from_history_server(exam_record: ExamRecord, application_id: s
             trace_sql = spark_fetcher.get_spark_sql_by_app(application_id)
             trace_stages = spark_fetcher.get_spark_stages_by_app(application_id)
             trace_executor = spark_fetcher.get_spark_executor_by_app(application_id)
+            trace_dict['sql'] = trace_data_saver(data=trace_sql, data_dir=OA_CONF.data_dir)
+            trace_dict['stages'] = trace_data_saver(data=trace_stages, data_dir=OA_CONF.data_dir)
+            trace_dict['executor'] = trace_data_saver(data=trace_executor, data_dir=OA_CONF.data_dir)
             break
         except HTTPError as httpe:
             time.sleep(1)
-            logger.warning(f"HistoryServer访问错误:{httpe}")
+            global_logger.warning(f"HistoryServer访问错误:{httpe}")
             continue
-
-    trace_dict['sql'] = trace_data_saver(data=trace_sql, data_dir=OA_CONF.data_dir)
-    trace_dict['stages'] = trace_data_saver(data=trace_stages, data_dir=OA_CONF.data_dir)
-    trace_dict['executor'] = trace_data_saver(data=trace_executor, data_dir=OA_CONF.data_dir)
 
     ExamRecordRepository.update_exam_result(exam_record, trace=trace_dict)

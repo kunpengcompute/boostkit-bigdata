@@ -32,7 +32,7 @@ class TestTuning:
         :return:
         """
         with patch('omniadvisor.repository.load_repository.LoadRepository.query_by_id') as mock_query_by_id, \
-                patch('omniadvisor.utils.logger.logger.info') as mock_info:
+                patch('omniadvisor.utils.logger.global_logger.info') as mock_info:
             mock_query_by_id.return_value = None
             unified_tuning(load_id=self.load_id, retest_way=OA_CONF.RetestWay.backend, tuning_method=self.tuning_method)
             mock_info.assert_called_with('Cannot find load id: %s in database.', '2')

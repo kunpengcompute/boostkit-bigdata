@@ -8,7 +8,7 @@ from ConfigSpace import ConfigurationSpace, UniformIntegerHyperparameter, Consta
     UniformFloatHyperparameter
 
 from common.constant import OA_CONF
-from omniadvisor.utils.logger import logger
+from omniadvisor.utils.logger import global_logger
 
 
 def run_cmd(submit_cmd) -> Tuple[int, str]:
@@ -22,9 +22,9 @@ def run_cmd(submit_cmd) -> Tuple[int, str]:
              第二个元素是一个保存在列表中的字符串 ["xxxx"]
     :rtype: Tuple[int, str]
     """
-    logger.debug(f"Executor system command: {submit_cmd}")
+    global_logger.debug(f"Executor system command: {submit_cmd}")
     exitcode, data = subprocess.getstatusoutput(submit_cmd)
-    logger.debug(data)
+    global_logger.debug(data)
     return exitcode, data
 
 
@@ -60,11 +60,11 @@ def read_json_file(file_path: str):
             # 将 JSON 文件内容解析为 Python 对象
             data = json.load(file)
     except FileNotFoundError:
-        logger.error(f"Error: The file '{file_path}' does not exist.")
+        global_logger.error(f"Error: The file '{file_path}' does not exist.")
     except json.JSONDecodeError:
-        logger.error(f"Error: The file '{file_path}' is not a valid JSON file.")
+        global_logger.error(f"Error: The file '{file_path}' is not a valid JSON file.")
     except Exception as e:
-        logger.error(f"An unexpected error occurred: {e}")
+        global_logger.error(f"An unexpected error occurred: {e}")
 
     return data
 

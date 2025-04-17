@@ -3,7 +3,7 @@ import sys
 from omniadvisor.service.spark_service.spark_parameter_parser import SparkParameterParser
 from omniadvisor.repository.model.load import Load
 from omniadvisor.repository.load_repository import LoadRepository
-from omniadvisor.utils.logger import logger
+from omniadvisor.utils.logger import global_logger
 from omniadvisor.service.spark_service.spark_run import spark_run
 from common.constant import OA_CONF
 
