@@ -24,7 +24,7 @@ class TuningRecordRepository(Repository):
     # 用于存储字段格式
     _fields_format = {
         TuningRecord.FieldName.load: ([DatabaseLoad], [], []),
-        TuningRecord.FieldName.method: ([str], [], OA_CONF.TuneMethod.all),
+        TuningRecord.FieldName.method: ([str], [], OA_CONF.TuningMethod.all),
     }
 
     @classmethod
