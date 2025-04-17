@@ -906,7 +906,7 @@ case class ColumnarMultipleOperatorExec(
       buildOp1.getOutput
       val lookupOpFactory1 = new OmniLookupJoinWithExprOperatorFactory(probeTypes1, probeOutputCols1,
         probeHashColsExp1, buildOutputCols1, buildOutputTypes1, buildOpFactory1,
-        if (joinFilter1.nonEmpty) {Optional.of(joinFilter1.get)} else {Optional.empty()},
+        if (joinFilter1.nonEmpty) {Optional.of(joinFilter1.get)} else {Optional.empty()}, false,
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val lookupOp1 = lookupOpFactory1.createOperator()
       // close operator
@@ -940,7 +940,7 @@ case class ColumnarMultipleOperatorExec(
       buildOp2.getOutput
       val lookupOpFactory2 = new OmniLookupJoinWithExprOperatorFactory(probeTypes2, probeOutputCols2,
         probeHashColsExp2, buildOutputCols2, buildOutputTypes2, buildOpFactory2,
-        if (joinFilter2.nonEmpty) {Optional.of(joinFilter2.get)} else {Optional.empty()},
+        if (joinFilter2.nonEmpty) {Optional.of(joinFilter2.get)} else {Optional.empty()}, false,
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val lookupOp2 = lookupOpFactory2.createOperator()
 
@@ -975,7 +975,7 @@ case class ColumnarMultipleOperatorExec(
       buildOp3.getOutput
       val lookupOpFactory3 = new OmniLookupJoinWithExprOperatorFactory(probeTypes3, probeOutputCols3,
         probeHashColsExp3, buildOutputCols3, buildOutputTypes3, buildOpFactory3,
-        if (joinFilter3.nonEmpty) {Optional.of(joinFilter3.get)} else {Optional.empty()},
+        if (joinFilter3.nonEmpty) {Optional.of(joinFilter3.get)} else {Optional.empty()}, false,
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val lookupOp3 = lookupOpFactory3.createOperator()
 
@@ -1010,7 +1010,7 @@ case class ColumnarMultipleOperatorExec(
       buildOp4.getOutput
       val lookupOpFactory4 = new OmniLookupJoinWithExprOperatorFactory(probeTypes4, probeOutputCols4,
         probeHashColsExp4, buildOutputCols4, buildOutputTypes4, buildOpFactory4,
-        if (joinFilter4.nonEmpty) {Optional.of(joinFilter4.get)} else {Optional.empty()},
+        if (joinFilter4.nonEmpty) {Optional.of(joinFilter4.get)} else {Optional.empty()}, false,
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val lookupOp4 = lookupOpFactory4.createOperator()
 
@@ -1271,7 +1271,7 @@ case class ColumnarMultipleOperatorExec1(
       buildOp1.getOutput
       val lookupOpFactory1 = new OmniLookupJoinWithExprOperatorFactory(probeTypes1, probeOutputCols1,
         probeHashColsExp1, buildOutputCols1, buildOutputTypes1, buildOpFactory1,
-        if (joinFilter1.nonEmpty) {Optional.of(joinFilter1.get)} else {Optional.empty()},
+        if (joinFilter1.nonEmpty) {Optional.of(joinFilter1.get)} else {Optional.empty()}, false,
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val lookupOp1 = lookupOpFactory1.createOperator()
 
@@ -1306,7 +1306,7 @@ case class ColumnarMultipleOperatorExec1(
       buildOp2.getOutput
       val lookupOpFactory2 = new OmniLookupJoinWithExprOperatorFactory(probeTypes2, probeOutputCols2,
         probeHashColsExp2, buildOutputCols2, buildOutputTypes2, buildOpFactory2,
-        if (joinFilter2.nonEmpty) {Optional.of(joinFilter2.get)} else {Optional.empty()},
+        if (joinFilter2.nonEmpty) {Optional.of(joinFilter2.get)} else {Optional.empty()}, false,
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val lookupOp2 = lookupOpFactory2.createOperator()
 
@@ -1341,7 +1341,7 @@ case class ColumnarMultipleOperatorExec1(
       buildOp3.getOutput
       val lookupOpFactory3 = new OmniLookupJoinWithExprOperatorFactory(probeTypes3, probeOutputCols3,
         probeHashColsExp3, buildOutputCols3, buildOutputTypes3, buildOpFactory3,
-        if (joinFilter3.nonEmpty) {Optional.of(joinFilter3.get)} else {Optional.empty()},
+        if (joinFilter3.nonEmpty) {Optional.of(joinFilter3.get)} else {Optional.empty()}, false,
         new OperatorConfig(SpillConfig.NONE, new OverflowConfig(OmniAdaptorUtil.overflowConf()), IS_SKIP_VERIFY_EXP))
       val lookupOp3 = lookupOpFactory3.createOperator()
 
