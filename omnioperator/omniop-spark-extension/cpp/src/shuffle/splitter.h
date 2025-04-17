@@ -126,6 +126,10 @@ class Splitter {
     std::vector<int32_t> partition_id_; // 记录当前vb每一行的pid
     int32_t *partition_id_cnt_cur_; // 统计不同partition记录的行数(当前处理中的vb)
     uint64_t *partition_id_cnt_cache_; // 统计不同partition记录的行数，cache住的
+    std::vector<uint32_t> row_offset_row_id_;
+    std::vector<uint32_t> partition_used_;
+    std::vector<uint32_t> partition_row_offset_base_;
+    std::vector<SimpleArenaAllocator> partition_arena_;
     // column number
     uint32_t num_row_splited_; // cached row number
     uint64_t cached_vectorbatch_size_; // cache total vectorbatch size in bytes
@@ -155,11 +159,16 @@ class Splitter {
 
     // Data structures required to handle row formats
     std::vector<std::vector<RowInfo *>> partition_rows; // pid : std::vector<row>
+    RowBatch *array_partition_rows;
+    std::vector<std::vector<RowBatch *>> partition_row_batch;
+    std::vector<uint32_t> partition_row_batch_count;
     uint64_t total_input_size = 0; // total row size in bytes
     uint32_t expansion = 2; // expansion coefficient
     spark::ProtoRowBatch *protoRowBatch = new ProtoRowBatch();
 
 private:
+    void BuildPartition2Row(int32_t row_count);
+
     void ReleaseVarcharVector()
     {
         std::set<BaseVector *>::iterator it;
