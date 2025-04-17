@@ -7,7 +7,6 @@ from omniadvisor.service.tuning_result.tuning_result import get_tuning_result
 from common.constant import OA_CONF
 
 
-
 def get_tuning_result_history(load: Load):
     """
     指定负载，获取调优结果所有历史
@@ -54,4 +53,7 @@ class TuningResultHistory:
 
     @property
     def best_config(self):
-        return min(self.config_perf_pairs, key=lambda x: x[1])[0]
+        if self.config_perf_pairs:
+            return min(self.config_perf_pairs, key=lambda x: x[1])[0]
+        else:
+            return {}

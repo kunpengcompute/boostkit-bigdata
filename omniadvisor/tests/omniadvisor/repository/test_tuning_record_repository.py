@@ -42,23 +42,23 @@ class TestTaskRepository:
         tuning_record = TuningRecordRepository.create(
             load=load,
             config={"param1": "value2"},
-            method=OA_CONF.TunerMethod.user
+            method=OA_CONF.TuningMethod.user
         )
         assert isinstance(tuning_record, TuningRecord)
         # 由于外层的Load没有透传到最内层，而Task返回的load为新生成的Load
         # 因此导致这里两边的load不一致，但是属性是一致的
         assert tuning_record.load.name == load.name
         assert tuning_record.config == {"param1": "value2"}
-        assert tuning_record.method == OA_CONF.TunerMethod.user
+        assert tuning_record.method == OA_CONF.TuningMethod.user
         assert tuning_record.rounds == 0
 
         # 第二次创建TuningRecord
         tuning_record = TuningRecordRepository.create(
             load=load,
             config={"param2": "value2"},
-            method=OA_CONF.TunerMethod.expert
+            method=OA_CONF.TuningMethod.expert
         )
-        assert tuning_record.method == OA_CONF.TunerMethod.expert
+        assert tuning_record.method == OA_CONF.TuningMethod.expert
         assert tuning_record.rounds == 1
 
     def test_query_by_load(self):
@@ -71,7 +71,7 @@ class TestTaskRepository:
         tuning_record = TuningRecordRepository.create(
             load=load,
             config={"param1": "value2"},
-            method=OA_CONF.TunerMethod.user
+            method=OA_CONF.TuningMethod.user
         )
 
         # 查询任务
@@ -92,7 +92,7 @@ class TestTaskRepository:
         tuning_record = TuningRecordRepository.create(
             load=load,
             config={"param1": "value2"},
-            method=OA_CONF.TunerMethod.user
+            method=OA_CONF.TuningMethod.user
         )
 
         # 查询任务
