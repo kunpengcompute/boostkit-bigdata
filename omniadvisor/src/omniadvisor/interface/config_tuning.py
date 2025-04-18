@@ -22,20 +22,20 @@ def _parse_tuning_args():
                         required=True,
                         help='If choose hijacking, a test will execute immediately')
 
-    parser.add_argument("-t", "--tune-method", type=str, required=True,
-                        choices=OA_CONF.TuneMethod.all,
+    parser.add_argument("-t", "--tuning-method", type=str, required=True,
+                        choices=OA_CONF.TuningMethod.all,
                         help='Support three tune method, for iterative, use BO; for expert ...')
 
     args = parser.parse_args()
     return args
 
 
-def unified_tuning(load_id: str, retest_way: str, tune_method: str):
+def unified_tuning(load_id: str, retest_way: str, tuning_method: str):
     """
     后台调优
     :param load_id: 负载id
     :param retest_way: 复测方法
-    :param tune_method: 算法的类型
+    :param tuning_method: 算法的类型
     :return:
     """
     # 查询负载：
@@ -47,14 +47,14 @@ def unified_tuning(load_id: str, retest_way: str, tune_method: str):
     load = loads[0]
 
     # 推荐下一个配置
-    if tune_method == OA_CONF.TuneMethod.iterative:
+    if tuning_method == OA_CONF.TuningMethod.iterative:
         perf_history = get_tuning_result_history(load)
         next_config = SmacAppendTuning.tune(perf_history.tuning_history)
-    elif tune_method == OA_CONF.TuneMethod.expert:
+    elif tuning_method == OA_CONF.TuneMethod.expert:
         perf_history = get_tuning_result_history(load)
         next_config = ExpertTuning.tune(perf_history.tuning_history)
     else:
-        raise ValueError(f'Not supported tuning method: {tune_method}')
+        raise ValueError(f'Not supported tuning method: {tuning_method}')
 
     # 复测
     if retest_way == OA_CONF.RetestWay.backend:
@@ -73,4 +73,4 @@ def main():
     配置调优主函数
     """
     args = _parse_tuning_args()
-    unified_tuning(args.load_id, args.retest_way, args.tune_method)
+    unified_tuning(args.load_id, args.retest_way, args.tuning_method)

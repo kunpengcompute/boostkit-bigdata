@@ -49,7 +49,7 @@ class OmniAdvisorConf:
     exec_fail_return_trace = dict()
 
     # 调优算法
-    class TuneMethod:
+    class TuningMethod:
         user = 'user'
         iterative = 'iterative'
         expert = 'expert'
