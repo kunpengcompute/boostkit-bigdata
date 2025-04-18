@@ -71,4 +71,4 @@ def disable_console_handler(logger):
         if getattr(handler, "name", None) == 'consoleHandler':
             logger.removeHandler(handler) # 禁用 consoleHandler
             return
-    logger.info("consoleHandler not exist, no need to disable")
+    logger.debug("consoleHandler not exist, no need to disable")
