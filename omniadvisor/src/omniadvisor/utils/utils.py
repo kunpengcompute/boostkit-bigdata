@@ -28,7 +28,7 @@ def run_cmd(submit_cmd) -> Tuple[int, str]:
     return exitcode, data
 
 
-def trace_data_saver(data: List[Dict[str, str]], data_dir):
+def save_trace_data(data: List[Dict[str, str]], data_dir):
     """
     用于把各类trace信息以文件的形式保存，并返回文件的绝对路径
     :param data:通过RESTAPI 获取的list[dict]形式文件

@@ -3,6 +3,7 @@ from omniadvisor.utils.logger import global_logger, disable_console_handler
 
 
 if __name__ == '__main__':
+    # 前台劫持功能为了保证用户无感 不应在控制台有日志输出 因此禁用控制台输出
     disable_console_handler(global_logger)
     try:
         hijack_recommend.main()

@@ -9,7 +9,7 @@ from omniadvisor.repository.model.exam_record import ExamRecord
 from omniadvisor.repository.exam_record_repository import ExamRecordRepository
 from omniadvisor.service.spark_service.spark_command_reconstruct import spark_command_reconstruct
 from common.constant import OA_CONF
-from omniadvisor.utils.utils import trace_data_saver
+from omniadvisor.utils.utils import save_trace_data
 
 
 def spark_run(load, conf):
@@ -67,9 +67,9 @@ def _update_trace_from_history_server(exam_record: ExamRecord, application_id: s
             trace_sql = spark_fetcher.get_spark_sql_by_app(application_id)
             trace_stages = spark_fetcher.get_spark_stages_by_app(application_id)
             trace_executor = spark_fetcher.get_spark_executor_by_app(application_id)
-            trace_dict['sql'] = trace_data_saver(data=trace_sql, data_dir=OA_CONF.data_dir)
-            trace_dict['stages'] = trace_data_saver(data=trace_stages, data_dir=OA_CONF.data_dir)
-            trace_dict['executor'] = trace_data_saver(data=trace_executor, data_dir=OA_CONF.data_dir)
+            trace_dict['sql'] = save_trace_data(data=trace_sql, data_dir=OA_CONF.data_dir)
+            trace_dict['stages'] = save_trace_data(data=trace_stages, data_dir=OA_CONF.data_dir)
+            trace_dict['executor'] = save_trace_data(data=trace_executor, data_dir=OA_CONF.data_dir)
             break
         except HTTPError as httpe:
             time.sleep(1)

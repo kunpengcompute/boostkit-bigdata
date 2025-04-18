@@ -1,5 +1,5 @@
 from unittest.mock import patch,mock_open
-from omniadvisor.utils.utils import run_cmd, trace_data_saver  # 假设你的函数定义在 'your_module' 中
+from omniadvisor.utils.utils import run_cmd, save_trace_data  # 假设你的函数定义在 'your_module' 中
 
 
 class TestRunCmd:
@@ -30,19 +30,19 @@ class TestRunCmd:
 class TestTraceDataSaver:
     @patch('os.makedirs')
     @patch('uuid.uuid4', return_value="test-uuid")
-    def test_trace_data_saver_success(self, mock_uuid, mock_makedirs):
+    def test_save_trace_data_success(self, mock_uuid, mock_makedirs):
         data = [{"key": "value"}]
         data_dir = "/tmp"
         m = mock_open()
         with patch('builtins.open', m, create=True):
-            file_path = trace_data_saver(data, data_dir)
+            file_path = save_trace_data(data, data_dir)
 
         expected_path = f"{data_dir}/test-uuid"
         assert file_path == expected_path
         m.assert_called_once_with(expected_path, 'w', encoding='utf-8')
 
     @patch('os.makedirs')
-    def test_trace_data_saver_ioerror(self, mock_makedirs):
+    def test_save_trace_data_ioerror(self, mock_makedirs):
         data = [{"key": "value"}]
         data_dir = "/tmp"
         m = mock_open()
@@ -52,14 +52,14 @@ class TestTraceDataSaver:
              patch('uuid.uuid4', return_value="test-uuid"), \
              patch('builtins.open', m, create=True):
             try:
-                trace_data_saver(data, data_dir)
+                save_trace_data(data, data_dir)
                 assert False, "Expected an IOError to be raised."
             except IOError as e:
                 assert str(e) == "出现IO错误: IO Error", f"Unexpected error message: {str(e)}"
 
 
     @patch('os.makedirs')
-    def test_trace_data_saver_exception(self, mock_makedirs):
+    def test_save_trace_data_exception(self, mock_makedirs):
         data = [{"key": "value"}]
         data_dir = "/tmp"
         m = mock_open()
@@ -69,7 +69,7 @@ class TestTraceDataSaver:
              patch('uuid.uuid4', return_value="test-uuid"), \
              patch('builtins.open', m, create=True):
             try:
-                trace_data_saver(data, data_dir)
+                save_trace_data(data, data_dir)
                 assert False, "Expected an Exception to be raised."
             except Exception as e:
                 assert str(e) == "保存过程中出现错误: Unexpected error", f"Unexpected error message: {str(e)}"
