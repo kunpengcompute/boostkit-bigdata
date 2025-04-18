@@ -67,7 +67,7 @@ def disable_console_handler(logger):
 
     :param logger: 目标 logger 实例
     """
-    for handler in logger.handler[:]:
+    for handler in logger.handlers[:]:
         if getattr(handler, "name", None) == 'consoleHandler':
             logger.removeHandler(handler) # 禁用 consoleHandler
             return
