@@ -16,8 +16,10 @@ def retest(load: Load, config: dict):
     for i in range(1, OA_CONF.tuning_retest_times + 1):
         try:
             exam_record, spark_output = spark_run(load, config)
-        except Exception as e:
+        except RuntimeError as e:
             logger.error('复测第 %d 轮失败，原因：%s', i, e)
+            # 目前采取的策略是：抛异常，认为是其他原因导致的失败，可以肯定不是配置的原因
+            e.args[0].delete()
             return
 
         if exam_record.status == OA_CONF.ExecStatus.success:

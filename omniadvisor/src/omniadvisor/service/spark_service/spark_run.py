@@ -22,32 +22,35 @@ def spark_run(load, conf):
 
     # 执行当前的submit_cmd
     spark_executor = SparkExecutor()
-    exitcode, spark_output = spark_executor.submit_spark_task(submit_cmd)
+    try:
+        exitcode, spark_output = spark_executor.submit_spark_task(submit_cmd)
 
-    # 不存在application_id的情况下不提取time_taken 直接返回
-    if exitcode != 0:
-        return ExamRecordRepository.update_exam_result(
+        # 不存在application_id的情况下不提取time_taken 直接返回
+        if exitcode != 0:
+            return ExamRecordRepository.update_exam_result(
+                exam_record=exam_record,
+                status=OA_CONF.ExecStatus.fail,
+                runtime=OA_CONF.exec_fail_return_runtime,
+                trace=OA_CONF.exec_fail_return_trace
+            )
+
+        status = OA_CONF.ExecStatus.success
+        # 提取application_id与 time_taken(runtime)
+
+        spark_submit_cmd, application_id, runtime = spark_executor.parser_spark_output(spark_output)
+
+        exam_record = ExamRecordRepository.update_exam_result(
             exam_record=exam_record,
-            status=OA_CONF.ExecStatus.fail,
-            runtime=OA_CONF.exec_fail_return_runtime,
-            trace=OA_CONF.exec_fail_return_trace
+            status=status,
+            runtime=runtime
         )
 
-    status = OA_CONF.ExecStatus.success
-    # 提取application_id与 time_taken(runtime)
-
-    spark_submit_cmd, application_id, runtime = spark_executor.parser_spark_output(spark_output)
-
-    exam_record = ExamRecordRepository.update_exam_result(
-        exam_record=exam_record,
-        status=status,
-        runtime=runtime
-    )
-
-    # 根据ApplicantID在子进程中获取Trace
-    p = multiprocessing.Process(target=_update_trace_from_history_server, args=(exam_record, application_id))
-    p.daemon = False
-    p.start()
+        # 根据ApplicantID在子进程中获取Trace
+        p = multiprocessing.Process(target=_update_trace_from_history_server, args=(exam_record, application_id))
+        p.daemon = False
+        p.start()
+    except Exception as e:
+        raise RuntimeError(exam_record) from e
 
     return exam_record, spark_output
 
