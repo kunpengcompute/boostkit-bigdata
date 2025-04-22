@@ -1,10 +1,9 @@
-class ParameterException(Exception):
+def add_exception_prefix(e, prefix):
     """
-    由于参数配置不合理引发的异常
+    给异常消息加上前缀
+    :param e: 源异常
+    :param prefix: 消息前缀
+    :return:
     """
-    def __init__(self, parameter):
-        self.parameter = parameter
-        super().__init__(f"Invalid parameters: {parameter}")
-
-    def __str__(self):
-        return f"Invalid parameters: {self.parameter}"
+    e.args = (f"(omniadvisor) {prefix} {str(e)}",) + e.args[1:]
+    return e

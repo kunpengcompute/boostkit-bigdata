@@ -11,6 +11,8 @@ from omniadvisor.service.spark_service.spark_command_reconstruct import spark_co
 from common.constant import OA_CONF
 from omniadvisor.utils.utils import trace_data_saver
 
+from omniadvisor.utils.exception import add_exception_prefix
+
 
 def spark_run(load, conf):
     # 从解析后的参数列表中提取负载与任务的相关信息
@@ -24,35 +26,57 @@ def spark_run(load, conf):
     spark_executor = SparkExecutor()
     try:
         exitcode, spark_output = spark_executor.submit_spark_task(submit_cmd)
+    except TimeoutError as e:
+        # 任务提交超时等
+        exam_record.delete()
+        raise add_exception_prefix(e, 'Spark command submission timed out.')
+    except OSError as e:
+        # 权限不足等
+        exam_record.delete()
+        raise add_exception_prefix(e, 'Spark command submission permission denied.')
+    except Exception as e:
+        exam_record.delete()
+        raise add_exception_prefix(e, 'During Spark command submission, known error occurred.')
 
-        # 不存在application_id的情况下不提取time_taken 直接返回
-        if exitcode != 0:
+    # 不存在application_id的情况下不提取time_taken 直接返回
+    if exitcode != 0:
+        try:
             return ExamRecordRepository.update_exam_result(
                 exam_record=exam_record,
                 status=OA_CONF.ExecStatus.fail,
                 runtime=OA_CONF.exec_fail_return_runtime,
                 trace=OA_CONF.exec_fail_return_trace
             )
+        except RuntimeError:
+            exam_record.delete()
+            raise
 
-        status = OA_CONF.ExecStatus.success
-        # 提取application_id与 time_taken(runtime)
+    status = OA_CONF.ExecStatus.success
+    # 提取application_id与 time_taken(runtime)
 
+    try:
         spark_submit_cmd, application_id, runtime = spark_executor.parser_spark_output(spark_output)
+    except Exception as e:
+        exam_record.delete()
+        raise add_exception_prefix(e, 'During parsing spark output, known error occurred.')
 
+    try:
         exam_record = ExamRecordRepository.update_exam_result(
             exam_record=exam_record,
             status=status,
             runtime=runtime
         )
+    except RuntimeError:
+        exam_record.delete()
+        raise
 
-        # 根据ApplicantID在子进程中获取Trace
-        p = multiprocessing.Process(target=_update_trace_from_history_server, args=(exam_record, application_id))
-        p.daemon = False
-        p.start()
-    except Exception as e:
-        raise RuntimeError(exam_record) from e
+    # 根据ApplicantID在子进程中获取Trace
+    p = multiprocessing.Process(target=_update_trace_from_history_server, args=(exam_record, application_id))
+    p.daemon = False
+    p.start()
 
     return exam_record, spark_output
+
 
 # TODO  这个也要端到端验证一下 用了子进程会不会对ExamRecordRepository有同时读写的问题？
 def _update_trace_from_history_server(exam_record: ExamRecord, application_id: str):
