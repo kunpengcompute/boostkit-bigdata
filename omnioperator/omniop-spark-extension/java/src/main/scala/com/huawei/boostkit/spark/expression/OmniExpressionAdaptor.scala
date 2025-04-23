@@ -26,6 +26,7 @@ import nova.hetu.omniruntime.constants.FunctionType.{OMNI_AGGREGATION_TYPE_AVG, 
 import nova.hetu.omniruntime.constants.JoinType._
 import nova.hetu.omniruntime.operator.OmniExprVerify
 import com.huawei.boostkit.spark.ColumnarPluginConfig
+import org.apache.spark.sql.catalyst.expressions.objects.StaticInvoke
 import com.google.gson.{JsonArray, JsonElement, JsonObject, JsonParser}
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.expressions._
@@ -514,6 +515,25 @@ object OmniExpressionAdaptor extends Logging {
                   .put("arguments", new JsonArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(inputExpression, exprsIndexMap)))
             }
         }
+
+      case staticInvoke: StaticInvoke =>
+      {
+        val funcName = staticInvoke.functionName
+        funcName match {
+          case "varcharTypeWriteSideCheck" => {
+            val arg0 = staticInvoke.arguments(0)
+            val arg1 = staticInvoke.arguments(1)
+            new JsonObject().put("exprType", "FUNCTION")
+              .addOmniExpJsonType("returnType", staticInvoke.dataType)
+              .put("function_name", "StaticInvokeVarcharTypeWriteSideCheck")
+              .put("arguments", new JsonArray()
+                .put(rewriteToOmniJsonExpressionLiteralJsonObject(arg0, exprsIndexMap, arg0.dataType))
+                .put(rewriteToOmniJsonExpressionLiteralJsonObject(arg1, exprsIndexMap, arg1.dataType)))
+          }
+
+          case _ => throw new UnsupportedOperationException(s"StaticInvoke function: $funcName is not supported currently");
+        }
+      }
 
       case _ =>
         if (HiveUdfAdaptorUtil.isHiveUdf(expr) && ColumnarPluginConfig.getSessionConf.enableColumnarUdf) {
