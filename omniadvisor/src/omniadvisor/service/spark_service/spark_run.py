@@ -1,17 +1,16 @@
-import time
 import multiprocessing
+import time
 
 from requests.exceptions import HTTPError
-from omniadvisor.utils.logger import logger
-from omniadvisor.service.spark_service.spark_fetcher import SparkFetcher
-from omniadvisor.service.spark_service.spark_executor import SparkExecutor
-from omniadvisor.repository.model.exam_record import ExamRecord
-from omniadvisor.repository.exam_record_repository import ExamRecordRepository
-from omniadvisor.service.spark_service.spark_command_reconstruct import spark_command_reconstruct
-from common.constant import OA_CONF
-from omniadvisor.utils.utils import trace_data_saver
 
-from omniadvisor.utils.exception import add_exception_prefix
+from common.constant import OA_CONF
+from omniadvisor.repository.exam_record_repository import ExamRecordRepository
+from omniadvisor.repository.model.exam_record import ExamRecord
+from omniadvisor.service.spark_service.spark_command_reconstruct import spark_command_reconstruct
+from omniadvisor.service.spark_service.spark_executor import SparkExecutor
+from omniadvisor.service.spark_service.spark_fetcher import SparkFetcher
+from omniadvisor.utils.logger import logger
+from omniadvisor.utils.utils import trace_data_saver
 
 
 def spark_run(load, conf):
@@ -26,17 +25,20 @@ def spark_run(load, conf):
     spark_executor = SparkExecutor()
     try:
         exitcode, spark_output = spark_executor.submit_spark_task(submit_cmd)
-    except TimeoutError as e:
+    except TimeoutError:
         # 任务提交超时等
         exam_record.delete()
-        raise add_exception_prefix(e, 'Spark command submission timed out.')
-    except OSError as e:
+        logger.error('Spark command submission timed out.')
+        raise
+    except OSError:
         # 权限不足等
         exam_record.delete()
-        raise add_exception_prefix(e, 'Spark command submission permission denied.')
-    except Exception as e:
+        logger.error('Spark command submission permission denied.')
+        raise
+    except Exception:
         exam_record.delete()
-        raise add_exception_prefix(e, 'During Spark command submission, known error occurred.')
+        logger.error('During Spark command submission, known error occurred.')
+        raise
 
     # 不存在application_id的情况下不提取time_taken 直接返回
     if exitcode != 0:
@@ -56,9 +58,10 @@ def spark_run(load, conf):
 
     try:
         spark_submit_cmd, application_id, runtime = spark_executor.parser_spark_output(spark_output)
-    except Exception as e:
+    except Exception:
         exam_record.delete()
-        raise add_exception_prefix(e, 'During parsing spark output, known error occurred.')
+        logger.error('During parsing spark output, known error occurred.')
+        raise
 
     try:
         exam_record = ExamRecordRepository.update_exam_result(

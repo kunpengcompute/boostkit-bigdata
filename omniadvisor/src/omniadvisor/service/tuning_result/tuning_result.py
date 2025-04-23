@@ -1,6 +1,6 @@
 from typing import List
 
-from algo.model.model import Tuning
+from algo.common.model import Tuning
 from omniadvisor.repository.model.load import Load
 from omniadvisor.repository.model.tuning_record import TuningRecord
 from omniadvisor.repository.model.exam_record import ExamRecord

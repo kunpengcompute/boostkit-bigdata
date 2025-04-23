@@ -45,7 +45,7 @@ class TuningResultHistory:
 
     @property
     def tuning_history(self):
-        return list(map(lambda tuning_result: tuning_result.to_tuning, self._tuning_results))
+        return list(map(lambda tuning_result: tuning_result.to_tuning(), self._tuning_results))
 
     @property
     def best_config(self):
