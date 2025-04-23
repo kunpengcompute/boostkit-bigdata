@@ -56,7 +56,10 @@ public class ParquetColumnarBatchWriter {
 
     public ParquetColumnarBatchJniWriter jniWriter;
 
-    public ParquetColumnarBatchWriter() {
+    private final boolean isLegacy;
+
+    public ParquetColumnarBatchWriter(boolean isLegacy) {
+        this.isLegacy = isLegacy;
         jniWriter = new ParquetColumnarBatchJniWriter();
     }
 
@@ -205,10 +208,12 @@ public class ParquetColumnarBatchWriter {
     }
 
     public void convertGreGorianToJulian(IntVec intVec, int startPos, int endPos) {
-        int julianValue;
-        for (int rowIndex = startPos; rowIndex < endPos; rowIndex++) {
-            julianValue = RebaseDateTime.rebaseGregorianToJulianDays(intVec.get(rowIndex));
-            intVec.set(rowIndex, julianValue);
+        if(isLegacy){
+            int julianValue;
+            for (int rowIndex = startPos; rowIndex < endPos; rowIndex++) {
+                julianValue = RebaseDateTime.rebaseGregorianToJulianDays(intVec.get(rowIndex));
+                intVec.set(rowIndex, julianValue);
+            }
         }
     }
 
