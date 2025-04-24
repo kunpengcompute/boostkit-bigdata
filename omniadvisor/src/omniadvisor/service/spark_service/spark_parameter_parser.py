@@ -84,11 +84,16 @@ class SparkParameterParser(ParserInterface):
         """
         if not self._submit_cmd:
             raise ValueError("Submit command cannot be null")
-        param_start_index = self._submit_cmd.strip().index(" ")
         name = ""
         conf_params = {}
         exec_attr = {}
-        args = shlex.split(self._submit_cmd[param_start_index:])
+        # 解析spark-class的绝对路径
+        first_space_index = self._submit_cmd.strip().find(" ")
+        # 从第一个空格之后的子字符串中找到第二个空格
+        second_space_index = self._submit_cmd.strip().find(" ", first_space_index + 1)
+        exec_attr['cmd_prefix'] = self._submit_cmd[0:second_space_index]
+        # 解析参数
+        args = shlex.split(self._submit_cmd[second_space_index:])
         params, unknown = self._parser.parse_known_args(args=args)
         options_dict = vars(params)
         for key, value in options_dict.items():
