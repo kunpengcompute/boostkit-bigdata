@@ -1,14 +1,15 @@
-import time
 import multiprocessing
+import time
 
 from requests.exceptions import HTTPError
-from omniadvisor.utils.logger import logger
-from omniadvisor.service.spark_service.spark_fetcher import SparkFetcher
-from omniadvisor.service.spark_service.spark_executor import SparkExecutor
-from omniadvisor.repository.model.exam_record import ExamRecord
-from omniadvisor.repository.exam_record_repository import ExamRecordRepository
-from omniadvisor.service.spark_service.spark_command_reconstruct import spark_command_reconstruct
+
 from common.constant import OA_CONF
+from omniadvisor.repository.exam_record_repository import ExamRecordRepository
+from omniadvisor.repository.model.exam_record import ExamRecord
+from omniadvisor.service.spark_service.spark_command_reconstruct import spark_command_reconstruct
+from omniadvisor.service.spark_service.spark_executor import SparkExecutor
+from omniadvisor.service.spark_service.spark_fetcher import SparkFetcher
+from omniadvisor.utils.logger import logger
 from omniadvisor.utils.utils import trace_data_saver
 
 
@@ -22,27 +23,55 @@ def spark_run(load, conf):
 
     # 执行当前的submit_cmd
     spark_executor = SparkExecutor()
-    exitcode, spark_output = spark_executor.submit_spark_task(submit_cmd)
+    try:
+        exitcode, spark_output = spark_executor.submit_spark_task(submit_cmd)
+    except TimeoutError:
+        # 任务提交超时等
+        exam_record.delete()
+        logger.error('Spark command submission timed out.')
+        raise
+    except OSError:
+        # 权限不足等
+        exam_record.delete()
+        logger.error('Spark command submission permission denied.')
+        raise
+    except Exception:
+        exam_record.delete()
+        logger.error('During Spark command submission, known error occurred.')
+        raise
 
     # 不存在application_id的情况下不提取time_taken 直接返回
     if exitcode != 0:
-        return ExamRecordRepository.update_exam_result(
-            exam_record=exam_record,
-            status=OA_CONF.ExecStatus.fail,
-            runtime=OA_CONF.exec_fail_return_runtime,
-            trace=OA_CONF.exec_fail_return_trace
-        )
+        try:
+            return ExamRecordRepository.update_exam_result(
+                exam_record=exam_record,
+                status=OA_CONF.ExecStatus.fail,
+                runtime=OA_CONF.exec_fail_return_runtime,
+                trace=OA_CONF.exec_fail_return_trace
+            )
+        except RuntimeError:
+            exam_record.delete()
+            raise
 
     status = OA_CONF.ExecStatus.success
     # 提取application_id与 time_taken(runtime)
 
-    spark_submit_cmd, application_id, runtime = spark_executor.parser_spark_output(spark_output)
+    try:
+        spark_submit_cmd, application_id, runtime = spark_executor.parser_spark_output(spark_output)
+    except Exception:
+        exam_record.delete()
+        logger.error('During parsing spark output, known error occurred.')
+        raise
 
-    exam_record = ExamRecordRepository.update_exam_result(
-        exam_record=exam_record,
-        status=status,
-        runtime=runtime
-    )
+    try:
+        exam_record = ExamRecordRepository.update_exam_result(
+            exam_record=exam_record,
+            status=status,
+            runtime=runtime
+        )
+    except RuntimeError:
+        exam_record.delete()
+        raise
 
     # 根据ApplicantID在子进程中获取Trace
     p = multiprocessing.Process(target=_update_trace_from_history_server, args=(exam_record, application_id))
@@ -50,6 +79,7 @@ def spark_run(load, conf):
     p.start()
 
     return exam_record, spark_output
+
 
 # TODO  这个也要端到端验证一下 用了子进程会不会对ExamRecordRepository有同时读写的问题？
 def _update_trace_from_history_server(exam_record: ExamRecord, application_id: str):

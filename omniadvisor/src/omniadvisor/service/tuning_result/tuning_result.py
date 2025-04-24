@@ -1,5 +1,6 @@
 from typing import List
 
+from algo.common.model import Tuning
 from omniadvisor.repository.model.load import Load
 from omniadvisor.repository.model.tuning_record import TuningRecord
 from omniadvisor.repository.model.exam_record import ExamRecord
@@ -111,3 +112,14 @@ class TuningResult:
         ]
         best_exam_record = min(success_exam_results, key=lambda exam_record: exam_record.runtime)
         return best_exam_record.trace
+
+    def to_tuning(self) -> Tuning:
+        return Tuning(
+            round=self.rounds,
+            config=self.config,
+            method=self.method,
+            rule='',
+            status=self.status,
+            runtime=self.runtime,
+            trace=self.trace
+        )

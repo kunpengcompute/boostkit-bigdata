@@ -1,6 +1,9 @@
 import pytest
 from unittest.mock import patch, MagicMock
+
+from omniadvisor.repository.model.exam_record import ExamRecord
 from omniadvisor.repository.model.load import Load
+from omniadvisor.repository.model.tuning_record import TuningRecord
 from omniadvisor.service.tuning_result.tuning_result import TuningResult
 from omniadvisor.service.tuning_result.tuning_result_history import get_tuning_result_history, TuningResultHistory
 from common.constant import OA_CONF
@@ -10,6 +13,7 @@ class TestTuningResultHistory:
     """
     TuningHistoryResult测试类
     """
+
     @pytest.fixture
     def setup_mocks(self):
         load = MagicMock(spec=Load)
@@ -18,12 +22,17 @@ class TestTuningResultHistory:
         tuning_record_mock = MagicMock()
         tuning_record_mock.config = {"param1": "value1"}
 
-        tuning_result_mock = MagicMock(spec=TuningResult)
-        tuning_result_mock.config = tuning_record_mock.config
-        tuning_result_mock.runtime = 10
-        tuning_result_mock.status = OA_CONF.ExecStatus.success
+        mock_database_model = MagicMock()
+        mock_database_model.config = tuning_record_mock.config
+        mock_database_model.runtime = 10
+        mock_database_model.status = OA_CONF.ExecStatus.success
 
-        return load, tuning_record_mock, tuning_result_mock
+        tuning_record = TuningRecord(mock_database_model)
+        exam_record = ExamRecord(mock_database_model)
+        exam_records = [exam_record]
+        tuning_result = TuningResult(tuning_record, exam_records)
+
+        return load, tuning_record_mock, tuning_result
 
     @patch('omniadvisor.service.tuning_result.tuning_result_history.TuningRecordRepository.query_by_load')
     @patch('omniadvisor.service.tuning_result.tuning_result_history.get_tuning_result')
@@ -44,15 +53,20 @@ class TestTuningResultHistory:
     def test_tuning_result_history_config_perf_pairs(self, setup_mocks):
         load, tuning_record_mock, tuning_result_mock = setup_mocks
 
-        tuning_result_mock2 = MagicMock(spec=TuningResult)
-        tuning_result_mock2.config = {"param2": "value2"}
-        tuning_result_mock2.runtime = 5
-        tuning_result_mock2.status = OA_CONF.ExecStatus.success
+        mock_database_model = MagicMock()
+        mock_database_model.config = {"param2": "value2"}
+        mock_database_model.runtime = 5
+        mock_database_model.status = OA_CONF.ExecStatus.success
+
+        tuning_record = TuningRecord(mock_database_model)
+        exam_record = ExamRecord(mock_database_model)
+        exam_records = [exam_record]
+        tuning_result_mock2 = TuningResult(tuning_record, exam_records)
 
         tuning_result_history = TuningResultHistory(load, [tuning_result_mock, tuning_result_mock2])
 
-
-        assert tuning_result_history.config_perf_pairs == [
+        tuning_history = [(tuning.config, tuning.runtime) for tuning in tuning_result_history.tuning_history]
+        assert tuning_history == [
             (tuning_record_mock.config, tuning_result_mock.runtime),
             ({"param2": "value2"}, 5)
         ]
