@@ -6,6 +6,7 @@ from omniadvisor.repository.load_repository import LoadRepository
 from omniadvisor.service.tuning_result.tuning_result_history import get_tuning_result_history
 from omniadvisor.service.retest_service import retest
 from algo.iterative.tuning import SmacAppendTuning
+from algo.expert.tuning import ExpertTuning
 
 
 def _parse_tuning_args():
@@ -37,8 +38,7 @@ def unified_tuning(load_id: str, retest_way: str, tuning_method: str):
     :param tuning_method: 算法的类型
     :return:
     """
-    # 加载参数空间
-    # 创建负载：
+    # 查询负载：
     loads = LoadRepository.query_by_id(load_id)
     if not loads:
         # 若查询结果为空，直接返回即可
@@ -48,9 +48,11 @@ def unified_tuning(load_id: str, retest_way: str, tuning_method: str):
 
     # 推荐下一个配置
     if tuning_method == OA_CONF.TuningMethod.iterative:
-        smac_tuning = SmacAppendTuning()
         perf_history = get_tuning_result_history(load)
-        next_config = smac_tuning.tune(perf_history.config_perf_pairs)
+        next_config = SmacAppendTuning.tune(perf_history.tuning_history)
+    elif tuning_method == OA_CONF.TuneMethod.expert:
+        perf_history = get_tuning_result_history(load)
+        next_config = ExpertTuning.tune(perf_history.tuning_history)
     else:
         raise ValueError(f'Not supported tuning method: {tuning_method}')
 
@@ -72,5 +74,3 @@ def main():
     """
     args = _parse_tuning_args()
     unified_tuning(args.load_id, args.retest_way, args.tuning_method)
-
-

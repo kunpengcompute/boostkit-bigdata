@@ -4,7 +4,6 @@ from omniadvisor.repository.model.load import Load
 from omniadvisor.repository.tuning_record_repository import TuningRecordRepository
 from omniadvisor.service.tuning_result.tuning_result import TuningResult
 from omniadvisor.service.tuning_result.tuning_result import get_tuning_result
-from common.constant import OA_CONF
 
 
 def get_tuning_result_history(load: Load):
@@ -45,15 +44,12 @@ class TuningResultHistory:
         self._tuning_results = tuning_results
 
     @property
-    def config_perf_pairs(self):
-        return [
-            (tuning_result.config, tuning_result.runtime)
-            for tuning_result in self._tuning_results if tuning_result.status == OA_CONF.ExecStatus.success
-        ]
+    def tuning_history(self):
+        return list(map(lambda tuning_result: tuning_result.to_tuning(), self._tuning_results))
 
     @property
     def best_config(self):
-        if self.config_perf_pairs:
-            return min(self.config_perf_pairs, key=lambda x: x[1])[0]
+        if self.tuning_history:
+            return min(self.tuning_history, key=lambda x: x.runtime).config
         else:
             return {}
