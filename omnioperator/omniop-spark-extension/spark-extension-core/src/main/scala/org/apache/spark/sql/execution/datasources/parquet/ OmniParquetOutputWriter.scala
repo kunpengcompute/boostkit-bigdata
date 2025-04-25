@@ -27,6 +27,7 @@ import org.apache.parquet.hadoop.ParquetOutputFormat
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.Attribute
 import org.apache.spark.sql.execution.datasources.{OmniInternalRow, OutputWriter}
+import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.StructType
 
 import scala.Array.{emptyBooleanArray, emptyIntArray}
@@ -35,8 +36,9 @@ import scala.Array.{emptyBooleanArray, emptyIntArray}
 class OmniParquetOutputWriter(path: String, dataSchema: StructType,
                               context: TaskAttemptContext)
   extends OutputWriter {
+  private val datetimeRebaseMode = SQLConf.get.getConf(SQLConf.PARQUET_REBASE_MODE_IN_WRITE)
 
-  val writer = new ParquetColumnarBatchWriter()
+  val writer = new ParquetColumnarBatchWriter(datetimeRebaseMode == "LEGACY")
   var omniTypes: Array[Int] = emptyIntArray
   var dataColumnsIds: Array[Boolean] = emptyBooleanArray
   var allOmniTypes: Array[Int] = emptyIntArray
