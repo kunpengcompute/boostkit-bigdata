@@ -20,7 +20,8 @@ class SparkExecutor:
         spark_output = spark_output.split("\n")
         spark_submit_cmd = ""
         application_id = ""
-        time_taken = -1.0
+        total_time_taken = -1.0
+        time_taken_list = []
         for item in spark_output:
             if "deploy.SparkSubmit" in item:
                 spark_submit_cmd = item.strip()
@@ -35,7 +36,7 @@ class SparkExecutor:
                 pattern = r"Time taken:\s*(.*)seconds"
                 match = re.search(pattern, item)
                 if match:
-                    time_taken = match.group(1).strip()
-            if application_id and float(time_taken) > 0:
-                break
-        return spark_submit_cmd, application_id, float(time_taken)
+                    time_taken_list.append(float(match.group(1).strip()))
+        if time_taken_list:
+            total_time_taken = sum(time_taken_list)
+        return spark_submit_cmd, application_id, float(total_time_taken)

@@ -1,6 +1,6 @@
 import shlex
 from dataclasses import dataclass
-from omniadvisor.utils.logger import logger
+from omniadvisor.utils.logger import global_logger
 from common.constant import OA_CONF
 from omniadvisor.service.parameter_parser import ParserInterface
 
@@ -84,11 +84,16 @@ class SparkParameterParser(ParserInterface):
         """
         if not self._submit_cmd:
             raise ValueError("Submit command cannot be null")
-        param_start_index = self._submit_cmd.strip().index(" ")
         name = ""
         conf_params = {}
         exec_attr = {}
-        args = shlex.split(self._submit_cmd[param_start_index:])
+        # 解析spark-class的绝对路径
+        first_space_index = self._submit_cmd.strip().find(" ")
+        # 从第一个空格之后的子字符串中找到第二个空格
+        second_space_index = self._submit_cmd.strip().find(" ", first_space_index + 1)
+        exec_attr['cmd_prefix'] = self._submit_cmd[0:second_space_index]
+        # 解析参数
+        args = shlex.split(self._submit_cmd[second_space_index:])
         params, unknown = self._parser.parse_known_args(args=args)
         options_dict = vars(params)
         for key, value in options_dict.items():
@@ -111,7 +116,7 @@ class SparkParameterParser(ParserInterface):
                             conf_params[confkey].append(confvalue)
                         else:
                             conf_params[confkey] = [conf_params[key], value]
-                        logger.warn(f"{confkey}被重复配置,多次配置值如下{conf_params[confvalue]}")
+                        global_logger.warn(f"{confkey}被重复配置,多次配置值如下{conf_params[confvalue]}")
                     else:
                         conf_params[confkey] = confvalue
             # 将 --num-executors --executors-cores --driver-cores这类的配置归类到conf_params中便于后续重建命令
@@ -119,6 +124,6 @@ class SparkParameterParser(ParserInterface):
                 conf_params[SPARK_CONF_SUPPLEMENT_MAP[key]] = value
             else:
                 name = value
-        logger.warn(f"The remainder unknown params {unknown} will be add to exec_attr[remainder]")
+        global_logger.warn(f"The remainder unknown params {unknown} will be add to exec_attr[remainder]")
         exec_attr["remainder"] = unknown
         return BaseParams(name=name, conf_params=conf_params, exec_attr=exec_attr)

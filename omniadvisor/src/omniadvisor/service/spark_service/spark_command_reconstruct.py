@@ -1,4 +1,5 @@
-from omniadvisor.utils.logger import logger
+from omniadvisor.utils.logger import global_logger
+from common.constant import OA_CONF
 
 
 def spark_command_reconstruct(load, conf):
@@ -7,11 +8,15 @@ def spark_command_reconstruct(load, conf):
     :param conf: {key:value} 保存spark-sql命令中形如 --conf spark.sql.shuffle.partitions(key)=3200(value)的部分
     :return:
     """
-    cmd_prefix = "spark-sql"
+    cmd_prefix = load.exec_attr.get('cmd_prefix')
+    if not cmd_prefix:
+        raise AttributeError("the spark-sql command prefix is deprecated")
     name = load.name
     submit_cmd_list = [cmd_prefix, "--name", name]
 
     for key, value in load.exec_attr.items():
+        if key == 'cmd_prefix':
+            continue
         # -i参数在处理上不支持--的形式 单独处理
         if key == "i":
             submit_cmd_list.append("-i")
@@ -38,7 +43,7 @@ def spark_command_reconstruct(load, conf):
             submit_cmd_list.append(f"{_normalize_key(key)}={_normalize_value(value)}")
 
     submit_cmd = " ".join(submit_cmd_list)
-    logger.info(f"拼接后的spark-sql命令如下{submit_cmd}")
+    global_logger.info(f"拼接后的spark-sql命令如下{submit_cmd}")
     return submit_cmd
 
 

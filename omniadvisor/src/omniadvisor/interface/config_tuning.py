@@ -1,7 +1,7 @@
 import argparse
 
 from common.constant import OA_CONF
-from omniadvisor.utils.logger import logger
+from omniadvisor.utils.logger import global_logger
 from omniadvisor.repository.load_repository import LoadRepository
 from omniadvisor.service.tuning_result.tuning_result_history import get_tuning_result_history
 from omniadvisor.service.retest_service import retest
@@ -42,7 +42,7 @@ def unified_tuning(load_id: str, retest_way: str, tuning_method: str):
     loads = LoadRepository.query_by_id(load_id)
     if not loads:
         # 若查询结果为空，直接返回即可
-        logger.info('Cannot find load id: %s in database.', load_id)
+        global_logger.info('Cannot find load id: %s in database.', load_id)
         return
     load = loads[0]
 

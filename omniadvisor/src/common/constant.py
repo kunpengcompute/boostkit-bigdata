@@ -74,5 +74,4 @@ class OmniAdvisorConf:
     tuning_retest_times = _common_config.getint('common', 'tuning.retest.times')
     spark_history_rest_url = _common_config.get('spark', 'spark.history.rest.url')
 
-
 OA_CONF = OmniAdvisorConf()

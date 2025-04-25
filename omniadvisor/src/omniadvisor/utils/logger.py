@@ -56,5 +56,19 @@ if not os.path.exists(OA_CONF.log_dir):
 
 # 使用dictConfig加载配置
 dictConfig(LOGGING_CONFIG)
+
 # 获取logger并使用
-logger = logging.getLogger('project_logger')
+global_logger = logging.getLogger('project_logger')
+
+
+def disable_console_handler(logger):
+    """
+    如果logger中存在consoleHandler 将consoleHandler移除
+
+    :param logger: 目标 logger 实例
+    """
+    for handler in logger.handlers[:]:
+        if getattr(handler, "name", None) == 'consoleHandler':
+            logger.removeHandler(handler) # 禁用 consoleHandler
+            return
+    logger.debug("consoleHandler not exist, no need to disable")

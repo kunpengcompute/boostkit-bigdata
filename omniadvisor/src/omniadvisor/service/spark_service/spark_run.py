@@ -9,8 +9,8 @@ from omniadvisor.repository.model.exam_record import ExamRecord
 from omniadvisor.service.spark_service.spark_command_reconstruct import spark_command_reconstruct
 from omniadvisor.service.spark_service.spark_executor import SparkExecutor
 from omniadvisor.service.spark_service.spark_fetcher import SparkFetcher
-from omniadvisor.utils.logger import logger
-from omniadvisor.utils.utils import trace_data_saver
+from omniadvisor.utils.logger import global_logger
+from omniadvisor.utils.utils import save_trace_data
 
 
 def spark_run(load, conf):
@@ -28,16 +28,16 @@ def spark_run(load, conf):
     except TimeoutError:
         # 任务提交超时等
         exam_record.delete()
-        logger.error('Spark command submission timed out.')
+        global_logger.error('Spark command submission timed out.')
         raise
     except OSError:
         # 权限不足等
         exam_record.delete()
-        logger.error('Spark command submission permission denied.')
+        global_logger.error('Spark command submission permission denied.')
         raise
     except Exception:
         exam_record.delete()
-        logger.error('During Spark command submission, known error occurred.')
+        global_logger.error('During Spark command submission, known error occurred.')
         raise
 
     # 不存在application_id的情况下不提取time_taken 直接返回
@@ -60,7 +60,7 @@ def spark_run(load, conf):
         spark_submit_cmd, application_id, runtime = spark_executor.parser_spark_output(spark_output)
     except Exception:
         exam_record.delete()
-        logger.error('During parsing spark output, known error occurred.')
+        global_logger.error('During parsing spark output, known error occurred.')
         raise
 
     try:
@@ -100,11 +100,11 @@ def _update_trace_from_history_server(exam_record: ExamRecord, application_id: s
             break
         except HTTPError as httpe:
             time.sleep(1)
-            logger.warning(f"HistoryServer访问错误:{httpe}")
+            global_logger.warning(f"HistoryServer访问错误:{httpe}")
             continue
 
-    trace_dict['sql'] = trace_data_saver(data=trace_sql, data_dir=OA_CONF.data_dir)
-    trace_dict['stages'] = trace_data_saver(data=trace_stages, data_dir=OA_CONF.data_dir)
-    trace_dict['executor'] = trace_data_saver(data=trace_executor, data_dir=OA_CONF.data_dir)
+    trace_dict['sql'] = save_trace_data(data=trace_sql, data_dir=OA_CONF.data_dir)
+    trace_dict['stages'] = save_trace_data(data=trace_stages, data_dir=OA_CONF.data_dir)
+    trace_dict['executor'] = save_trace_data(data=trace_executor, data_dir=OA_CONF.data_dir)
 
     ExamRecordRepository.update_exam_result(exam_record, trace=trace_dict)
