@@ -24,9 +24,9 @@
 #include <memory>
 #include <utility>
 #include <set>
+#include <arm_neon.h>
 #include "vector/vector_common.h"
 #include "util/bit_util.h"
-#include "xsimd/xsimd.hpp"
 #include "PredicateOperatorType.h"
 
 using omniruntime::BitUtil;
@@ -38,55 +38,181 @@ using omniruntime::vec::unsafe::UnsafeBaseVector;
 using omniruntime::exception::OmniException;
 
 namespace common {
+    const static int32_t NEON_BYTE_SIZE = 16;
+    namespace vector_type {
+        template<size_t S>
+        struct neon_vector_type_impl;
 
-    template <typename V>
-    bool equalTo(const V &left, const V &right) {
-        return left == right;
+        template<>
+        struct neon_vector_type_impl<8> {
+            using signed_type = int8x16_t;
+            using unsigned_type = uint8x16_t;
+        };
+
+        template<>
+        struct neon_vector_type_impl<16> {
+            using signed_type = int16x8_t;
+            using unsigned_type = uint16x8_t;
+        };
+
+        template<>
+        struct neon_vector_type_impl<32> {
+            using signed_type = int32x4_t;
+            using unsigned_type = uint32x4_t;
+        };
+
+        template<>
+        struct neon_vector_type_impl<64> {
+            using signed_type = int64x2_t;
+            using unsigned_type = uint64x2_t;
+        };
+
+        template<class T>
+        using neon_vector_type = typename std::conditional_t<std::is_same<T, double>::value, float64x2_t,
+            typename neon_vector_type_impl<8 * sizeof(T)>::signed_type>;
     }
 
-    template <typename V>
-    bool greater(const V &left, const V &right) {
-        return left > right;
+    namespace data_transfer {
+        // broadcast操作
+        template <typename T, typename std::enable_if<std::is_same<T, int8_t>::value, int>::type = 0>
+        inline int8x16_t broadcast(T val) {
+            return vdupq_n_s8(int8_t(val));
+        }
+
+        template <typename T, typename std::enable_if<std::is_same<T, int16_t>::value, int>::type = 0>
+        inline int16x8_t broadcast(T val) {
+            return vdupq_n_s16(int16_t(val));
+        }
+
+        template <typename T, typename std::enable_if<std::is_same<T, int32_t>::value, int>::type = 0>
+        inline int32x4_t broadcast(T val) {
+            return vdupq_n_s32(int32_t(val));
+        }
+
+        template <typename T, typename std::enable_if<std::is_same<T, int64_t>::value, int>::type = 0>
+        inline int64x2_t broadcast(T val) {
+            return vdupq_n_s64(int64_t(val));
+        }
+
+        template <typename T, typename std::enable_if<std::is_same<T, double>::value, int>::type = 0>
+        inline float64x2_t broadcast(T value) {
+            return vdupq_n_f64(value);
+        }
+
+        // load操作
+        template <typename T, typename std::enable_if<std::is_same<T, int8_t>::value, int>::type = 0>
+        inline int8x16_t load_data(T const* src) {
+            return vld1q_s8((int8_t*)src);
+        }
+
+        template <typename T, typename std::enable_if<std::is_same<T, int16_t>::value, int>::type = 0>
+        inline int16x8_t load_data(T const* src) {
+            return vld1q_s16((int16_t*)src);
+        }
+
+        template <typename T, typename std::enable_if<std::is_same<T, int32_t>::value, int>::type = 0>
+        inline int32x4_t load_data(T const* src) {
+            return vld1q_s32((int32_t*)src);
+        }
+
+        template <typename T, typename std::enable_if<std::is_same<T, int64_t>::value, int>::type = 0>
+        inline int64x2_t load_data(T const* src) {
+            return vld1q_s64((int64_t*)src);
+        }
+
+        template <typename T, typename std::enable_if<std::is_same<T, double>::value, int>::type = 0>
+        inline float64x2_t load_data(T const* src) {
+            return vld1q_f64(src);
+        }
+
+        // store操作
+        template <typename T, typename std::enable_if<std::is_same<T, int8_t>::value, int>::type = 0>
+        inline void store_data(T* dst, const int8x16_t &src) {
+            vst1q_s8((int8_t*)dst, src);
+        }
+
+        template <typename T, typename std::enable_if<std::is_same<T, int16_t>::value, int>::type = 0>
+        inline void store_data(T* dst, const int16x8_t &src) {
+            vst1q_s16((int16_t*)dst, src);
+        }
+
+        template <typename T, typename std::enable_if<std::is_same<T, int32_t>::value, int>::type = 0>
+        inline void store_data(T* dst, const int32x4_t &src) {
+            vst1q_s32((int32_t*)dst, src);
+        }
+
+        template <typename T, typename std::enable_if<std::is_same<T, int64_t>::value, int>::type = 0>
+        inline void store_data(T* dst, const int64x2_t &src) {
+            vst1q_s64((int64_t*)dst, src);
+        }
+
+        template <typename T, typename std::enable_if<std::is_same<T, double>::value, int>::type = 0>
+        inline void store_data(T* dst, const float64x2_t &src) {
+            vst1q_f64(dst, src);
+        }
     }
 
-    template <typename V>
-    bool greaterEqual(const V &left, const V &right) {
-        return left >= right;
-    }
+    namespace data_operator {
+        template <typename V>
+        inline bool equalTo(const V &left, const V &right) {
+            return left == right;
+        }
 
-    template <typename V>
-    bool less(const V &left, const V &right) {
-        return left < right;
-    }
+        template <typename V>
+        inline bool greater(const V &left, const V &right) {
+            return left > right;
+        }
 
-    template <typename V>
-    bool lessEqual(const V &left, const V &right) {
-        return left <= right;
-    }
+        template <typename V>
+        inline bool greaterEqual(const V &left, const V &right) {
+            return left >= right;
+        }
 
-    template <typename V>
-    xsimd::batch_bool<V> batchEqualTo(const xsimd::batch<V> &left, const xsimd::batch<V> &right) {
-        return xsimd::eq(left, right);
-    }
+        template <typename V>
+        inline bool less(const V &left, const V &right) {
+            return left < right;
+        }
 
-    template <typename V>
-    xsimd::batch_bool<V> batchGreater(const xsimd::batch<V> &left, const xsimd::batch<V> &right) {
-        return xsimd::gt(left, right);
-    }
+        template <typename V>
+        inline bool lessEqual(const V &left, const V &right) {
+            return left <= right;
+        }
 
-    template <typename V>
-    xsimd::batch_bool<V> batchGreaterEqual(const xsimd::batch<V> &left, const xsimd::batch<V> &right) {
-        return xsimd::ge(left, right);
-    }
+        template <typename BatchType>
+        inline BatchType batchEqualTo(const BatchType &left, const BatchType &right) {
+            return left == right;
+        }
 
-    template <typename V>
-    xsimd::batch_bool<V> batchLess(const xsimd::batch<V> &left, const xsimd::batch<V> &right) {
-        return xsimd::lt(left, right);
-    }
+        template <typename BatchType>
+        inline BatchType batchGreater(const BatchType &left, const BatchType &right) {
+            return left > right;
+        }
 
-    template <typename V>
-    xsimd::batch_bool<V> batchLessEqual(const xsimd::batch<V> &left, const xsimd::batch<V> &right) {
-        return xsimd::le(left, right);
+        template <typename BatchType>
+        inline BatchType batchGreaterEqual(const BatchType &left, const BatchType &right) {
+            return left >= right;
+        }
+
+        template <typename BatchType>
+        inline BatchType batchLess(const BatchType &left, const BatchType &right) {
+            return left < right;
+        }
+
+        template <typename BatchType>
+        inline BatchType batchLessEqual(const BatchType &left, const BatchType &right) {
+            return left <= right;
+        }
+
+        template <typename T>
+        inline uint64_t mask(T *buffer, int32_t size) {
+            uint64_t res = 0;
+            for (int32_t i = 0; i < size; i++) {
+                if (buffer[i]) {
+                    res |= 1ul << i;
+                }
+            }
+            return res;
+        }
     }
 
     class PredicateCondition {
@@ -144,21 +270,25 @@ namespace common {
     template<typename T>
     class LeafPredicateCondition final : public PredicateCondition {
     public:
+        using BatchType = vector_type::neon_vector_type<T>;
+
         LeafPredicateCondition(const PredicateOperatorType &opType, int32_t index, T value)
             : PredicateCondition(opType), index(index), value(value) {
         }
 
-        template <xsimd::batch_bool<T> (*BATCH_OP)(const xsimd::batch<T> &, const xsimd::batch<T> &), bool (*OP)(const T &, const T &)>
+        template<BatchType (*BATCH_OP)(const BatchType &, const BatchType &), bool (*OP)(const T &, const T &)>
         void computeCompare(BaseVector *vector, int32_t vectorSize) {
-            xsimd::batch<T> broadcast = xsimd::batch<T>(value);
-            int32_t step = static_cast<int32_t>(xsimd::batch<T>::size);
+            BatchType broadcast = data_transfer::broadcast(value);
+            int32_t step = static_cast<int32_t>(NEON_BYTE_SIZE / sizeof(T));
             Vector<T> *realVector = reinterpret_cast<Vector<T> *>(vector);
             T *values = UnsafeVector::GetRawValues(realVector);
+            T buffer[step];
             int32_t index = 0;
             for (; index + step <= vectorSize; index += step) {
-                xsimd::batch<T> valuesBatch = xsimd::load_aligned(values + index);
-                xsimd::batch_bool<T> result = BATCH_OP(valuesBatch, broadcast);
-                uint64_t mask = result.mask();
+                BatchType valuesBatch = data_transfer::load_data(values + index);
+                BatchType result = BATCH_OP(valuesBatch, broadcast);
+                data_transfer::store_data(buffer, result);
+                uint64_t mask = data_operator::mask(buffer, step);
                 BitUtil::StoreBits<uint64_t>(reinterpret_cast<uint64_t *>(bitMark), index, mask, 64);
             }
             for (; index < vectorSize; index++) {
@@ -179,34 +309,34 @@ namespace common {
                     break;
                 }
                 case EQUAL_TO: {
-                    computeCompare<batchEqualTo, equalTo>(vector, vectorSize);
+                    computeCompare<data_operator::batchEqualTo, data_operator::equalTo>(vector, vectorSize);
                     break;
                 }
                 case GREATER_THAN: {
-                    computeCompare<batchGreater, greater>(vector, vectorSize);
+                    computeCompare<data_operator::batchGreater, data_operator::greater>(vector, vectorSize);
                     break;
                 }
                 case GREATER_THAN_OR_EQUAL: {
-                    computeCompare<batchGreaterEqual, greaterEqual>(vector, vectorSize);
+                    computeCompare<data_operator::batchGreaterEqual, data_operator::greaterEqual>(vector, vectorSize);
                     break;
                 }
                 case LESS_THAN: {
-                    computeCompare<batchLess, less>(vector, vectorSize);
+                    computeCompare<data_operator::batchLess, data_operator::less>(vector, vectorSize);
                     break;
                 }
                 case LESS_THAN_OR_EQUAL: {
-                    computeCompare<batchLessEqual, lessEqual>(vector, vectorSize);
+                    computeCompare<data_operator::batchLessEqual, data_operator::lessEqual>(vector, vectorSize);
                     break;
                 }
                 case IS_NOT_NULL: {
                     uint8_t *nulls = reinterpret_cast<uint8_t *>(UnsafeBaseVector::GetNulls(vector));
-                    int32_t step = static_cast<int32_t>(xsimd::batch<uint8_t>::size);
+                    int32_t step = static_cast<int32_t>(NEON_BYTE_SIZE / sizeof(uint8_t));
                     int32_t byteLen = BitUtil::Nbytes(vectorSize);
                     int32_t index = 0;
                     for (; index + step <= byteLen; index += step) {
-                        xsimd::batch<uint8_t> valuesBatch = xsimd::load_aligned(nulls + index);
-                        xsimd::batch<uint8_t> result = xsimd::bitwise_not(valuesBatch);
-                        result.store_aligned(bitMark + index);
+                        uint8x16_t valuesBatch = vld1q_u8(nulls + index);
+                        uint8x16_t result = ~valuesBatch;
+                        vst1q_u8(bitMark + index, result);
                     }
                     for (; index < byteLen; index++) {
                         bitMark[index] = ~nulls[index];
@@ -255,13 +385,13 @@ namespace common {
         uint8_t *compute(std::vector<BaseVector *> &vecBatch) override {
             auto vectorSize = vecBatch[0]->GetSize();
             uint8_t *childResult = child->compute(vecBatch);
-            int32_t step = static_cast<int32_t>(xsimd::batch<uint8_t>::size);
+            int32_t step = static_cast<int32_t>(NEON_BYTE_SIZE / sizeof(uint8_t));
             int32_t byteLen = BitUtil::Nbytes(vectorSize);
             int32_t index = 0;
             for (; index + step <= byteLen; index += step) {
-                xsimd::batch<uint8_t> valuesBatch = xsimd::load_aligned(childResult + index);
-                xsimd::batch<uint8_t> result = xsimd::bitwise_not(valuesBatch);
-                result.store_aligned(bitMark + index);
+                uint8x16_t valuesBatch = vld1q_u8(childResult + index);
+                uint8x16_t result = ~valuesBatch;
+                vst1q_u8(bitMark + index, result);
             }
             for (; index < byteLen; index++) {
                 bitMark[index] = ~childResult[index];
@@ -289,14 +419,14 @@ namespace common {
             auto vectorSize = vecBatch[0]->GetSize();
             uint8_t *leftResult = left->compute(vecBatch);
             uint8_t *rightResult = right->compute(vecBatch);
-            int32_t step = static_cast<int32_t>(xsimd::batch<uint8_t>::size);
+            int32_t step = static_cast<int32_t>(NEON_BYTE_SIZE / sizeof(uint8_t));
             int32_t byteLen = BitUtil::Nbytes(vectorSize);
             int32_t index = 0;
             for (; index + step <= byteLen; index += step) {
-                xsimd::batch<uint8_t> leftBatch = xsimd::load_aligned(leftResult + index);
-                xsimd::batch<uint8_t> rightBatch = xsimd::load_aligned(rightResult + index);
-                xsimd::batch<uint8_t> result = xsimd::bitwise_and(leftBatch, rightBatch);
-                result.store_aligned(bitMark + index);
+                uint8x16_t leftBatch = vld1q_u8(leftResult + index);
+                uint8x16_t rightBatch = vld1q_u8(rightResult + index);
+                uint8x16_t result = leftBatch & rightBatch;
+                vst1q_u8(bitMark + index, result);
             }
             for (; index < byteLen; index++) {
                 bitMark[index] = leftResult[index] & rightResult[index];
@@ -333,14 +463,14 @@ namespace common {
             auto vectorSize = vecBatch[0]->GetSize();
             uint8_t *leftResult = left->compute(vecBatch);
             uint8_t *rightResult = right->compute(vecBatch);
-            int32_t step = static_cast<int32_t>(xsimd::batch<uint8_t>::size);
+            int32_t step = static_cast<int32_t>(NEON_BYTE_SIZE / sizeof(uint8_t));
             int32_t byteLen = BitUtil::Nbytes(vectorSize);
             int32_t index = 0;
             for (; index + step <= byteLen; index += step) {
-                xsimd::batch<uint8_t> leftBatch = xsimd::load_aligned(leftResult + index);
-                xsimd::batch<uint8_t> rightBatch = xsimd::load_aligned(rightResult + index);
-                xsimd::batch<uint8_t> result = xsimd::bitwise_or(leftBatch, rightBatch);
-                result.store_aligned(bitMark + index);
+                uint8x16_t leftBatch = vld1q_u8(leftResult + index);
+                uint8x16_t rightBatch = vld1q_u8(rightResult + index);
+                uint8x16_t result = leftBatch | rightBatch;
+                vst1q_u8(bitMark + index, result);
             }
             for (; index < byteLen; index++) {
                 bitMark[index] = leftResult[index] | rightResult[index];
