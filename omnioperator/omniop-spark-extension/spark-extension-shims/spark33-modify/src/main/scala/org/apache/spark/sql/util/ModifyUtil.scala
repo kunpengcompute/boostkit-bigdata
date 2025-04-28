@@ -23,6 +23,7 @@ import com.huawei.boostkit.spark.util.ModifyUtilAdaptor
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.SparkSessionExtensions
 import org.apache.spark.sql.catalyst.expressions.{BloomFilterMightContain, ExprId, Expression, PromotePrecision}
+import org.apache.spark.sql.catalyst.expressions.objects.StaticInvoke
 import org.apache.spark.sql.catalyst.optimizer.{CombineJoinedAggregates, MergeSubqueryFilters}
 import org.apache.spark.sql.execution.adaptive.QueryStageExec
 import org.apache.spark.sql.execution.{BroadcastExchangeExecProxy, ColumnarBloomFilterSubquery, ColumnarDataWritingCommandExec, ColumnarToRowExec, OmniColumnarToRowExec, SparkPlan}
@@ -67,6 +68,25 @@ object ModifyUtil extends Logging {
           .put("isNull", bfAddress == 0L)
           .put("dataType", 2)
           .put("value", bfAddress)
+
+      case staticInvoke: StaticInvoke =>
+      {
+        val funcName = staticInvoke.functionName
+        funcName match {
+          case "varcharTypeWriteSideCheck" => {
+            val arg0 = staticInvoke.arguments(0)
+            val arg1 = staticInvoke.arguments(1)
+            new JsonObject().put("exprType", "FUNCTION")
+              .addOmniExpJsonType("returnType", staticInvoke.dataType)
+              .put("function_name", "StaticInvokeVarcharTypeWriteSideCheck")
+              .put("arguments", new JsonArray()
+                .put(func(arg0, exprsIndexMap, arg0.dataType))
+                .put(func(arg1, exprsIndexMap, arg1.dataType)))
+          }
+
+          case _ => throw new UnsupportedOperationException(s"StaticInvoke function: $funcName is not supported currently");
+        }
+      }
 
       case _ =>
         null
