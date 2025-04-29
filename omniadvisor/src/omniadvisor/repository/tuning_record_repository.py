@@ -104,20 +104,3 @@ class TuningRecordRepository(Repository):
         return [
             TuningRecord(database_model=database_record) for database_record in database_records
         ]
-
-    @classmethod
-    def rounds_increment_by_on(cls, tuning_record: TuningRecord):
-        """
-        更新调优记录中的调优轮次 自动+1
-
-        :param tuning_record: 测试记录实例
-        :return: 更新完后的测试记录
-        """
-        model_attr = {
-            TuningRecord.FieldName.rounds: tuning_record.rounds + 1
-        }
-        database_task = cls._update(
-            database_model=tuning_record.database_model,
-            model_attr=model_attr
-        )
-        return TuningRecord(database_model=database_task)

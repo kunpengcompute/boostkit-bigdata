@@ -137,14 +137,3 @@ class ExamRecordRepository(Repository):
         )
 
         return ExamRecord(database_model=database_task)
-
-    def query_best_performance_by_load_and_config(cls, load: Load, config: dict):
-        exam_records = cls.query_by_load_and_config(load, config)
-        # 找出exam_records列表中的最大值
-        best_performance = float('inf')
-        best_record = None
-        for record in exam_records:
-            if record.runtime < best_performance:
-                best_performance = record.runtime
-                best_record = record
-        return best_record

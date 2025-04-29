@@ -1,11 +1,11 @@
 import sys
 
 from omniadvisor.repository.exam_record_repository import ExamRecordRepository
-from omniadvisor.repository.tuning_record_repository import TuningRecordRepository
 from omniadvisor.service.spark_service.spark_parameter_parser import SparkParameterParser
 from omniadvisor.repository.model.load import Load
 from omniadvisor.repository.load_repository import LoadRepository
 from omniadvisor.repository.tuning_record_repository import TuningRecordRepository
+from omniadvisor.service.tuning_result.tuning_result import get_tuning_result
 from omniadvisor.utils.logger import global_logger
 from omniadvisor.service.spark_service.spark_run import spark_run
 from common.constant import OA_CONF
@@ -47,35 +47,33 @@ def _get_exec_config_from_load(load: Load):
 
     # 如果负载需要推荐优化配置 根据优先级选择配置
     if load.test_config:
-        tuning_records = TuningRecordRepository.query_by_load_and_config(load, load.test_config)
-        # 如果不存在调优记录 则针对当前的(负载，配置)组合创建新的调优记录
-        if not tuning_records:
-            # TODO 这个地方的method信息我获取不到 这个信息应该是tuning组件传过来的
-            tuning_records = TuningRecordRepository.create(load, load.test_config, method="Iterative")
-        else:
-            tuning_records = tuning_records.pop()
-
-        # 当前(负载，配置)组合调优轮次不足，优先推荐该配置的组合进行前台复测
-        if tuning_records.rounds < OA_CONF.tuning_retest_times:
-            # 对rounds进行 + 1
-            TuningRecordRepository.rounds_increment_by_one(tuning_records)
-            # TODO 在这里对round进行+1可能会导致一个问题 就是这条推荐失败之后 还是会有一条调优记录 这个怎么处理
-            return load.test_config
-        # 当前(负载，配置)组合的调优轮次已经达到了OA_CONF.tuning_retest_times
-        else:
-            # 比较test_config 和 best_config的性能测试 决定是否刷新load的best_config
-            test_config_bp = ExamRecordRepository.query_best_performance_by_load_and_config(load, load.test_config)
-            best_config_bp = ExamRecordRepository.query_best_performance_by_load_and_config(load, load.best_config)
-            if test_config_bp.runtime < best_config_bp.runtime:
-                LoadRepository.update_best_config(load,load.test_config)
-            # 清空当前load的test_config
-            LoadRepository.update_test_config(load, {})
+        # 第一使用待测试配置
+        return load.test_config
     elif load.best_config:
         # 第二使用最优配置
         return load.best_config
     else:
         # 最后使用租户默认配置
         return load.default_config
+
+
+def _refresh_best_config(load: Load):
+    tuning_result = get_tuning_result(load, load.test_config)
+    if tuning_result.exam_times >= OA_CONF.tuning_retest_times:
+        # 获取当前best_config的平均测试性能
+        best_config_results = ExamRecordRepository.query_by_load_and_config(load, load.best_config)
+        success_runtimes = [
+            exam_record.runtime
+            for exam_record in best_config_results if exam_record.status == OA_CONF.ExecStatus.success
+        ]
+        best_runtime = sum(success_runtimes) / len(success_runtimes)
+        # 若调优性能优于最佳性能 刷新当前的best_config
+        if tuning_result.runtime < best_runtime:
+            global_logger.info(f"tuning_runtime={tuning_result.runtime} is quicker than best_runtime={best_runtime},"
+                               f"found a better spark config")
+            LoadRepository.update_best_config(load, load.test_config)
+        # 当前test_config达到调优轮次后 置空test_config
+        LoadRepository.update_test_config(load, {})
 
 
 def hijack_recommend(spark_sql_cmd: str):
