@@ -25,10 +25,9 @@ def _parse_tuning_args():
                         required=True,
                         help='If choose hijacking, a test will execute immediately')
 
-    # TODO 待删除
-    # parser.add_argument("-t", "--tuning-method", type=str, required=True,
-    #                     choices=OA_CONF.TuningMethod.all,
-    #                     help='Support three tune method, for iterative, use BO; for expert ...')
+    parser.add_argument("-t", "--tuning-method", type=str, required=False,
+                        choices=OA_CONF.TuningMethod.all,
+                        help='Support three tune method, for iterative, use BO; for expert ...')
 
     args = parser.parse_args()
     return args
@@ -54,9 +53,11 @@ def unified_tuning(load_id: str, retest_way: str, tuning_method: str):
     if tuning_method == OA_CONF.TuningMethod.iterative:
         perf_history = get_tuning_result_history(load)
         next_config = SmacAppendTuning.tune(perf_history.tuning_history)
+        TuningRecordRepository.create(load=load, config=next_config, method=OA_CONF.TuningMethod.iterative)
     elif tuning_method == OA_CONF.TuneMethod.expert:
         perf_history = get_tuning_result_history(load)
         next_config = ExpertTuning.tune(perf_history.tuning_history)
+        TuningRecordRepository.create(load=load, config=next_config, method=OA_CONF.TuningMethod.expert)
     else:
         raise ValueError(f'Not supported tuning method: {tuning_method}')
 

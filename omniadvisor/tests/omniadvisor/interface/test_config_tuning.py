@@ -21,6 +21,7 @@ class TestTuning:
         :return:
         """
         with patch('omniadvisor.repository.load_repository.LoadRepository.query_by_id'), \
+                patch('omniadvisor.repository.tuning_record_repository.TuningRecordRepository.create'), \
                 patch('omniadvisor.service.retest_service.spark_run') as mock_spark_run, \
                 patch('omniadvisor.interface.config_tuning.get_tuning_result_history'), \
                 patch('omniadvisor.repository.load_repository.LoadRepository.update_best_config') as mock_update_best, \
@@ -41,6 +42,7 @@ class TestTuning:
         """
         caplog.set_level(logging.ERROR)
         with patch('omniadvisor.repository.load_repository.LoadRepository.query_by_id'), \
+                patch('omniadvisor.repository.tuning_record_repository.TuningRecordRepository.create'), \
                 patch('omniadvisor.service.retest_service.spark_run') as mock_spark_run, \
                 patch('omniadvisor.interface.config_tuning.get_tuning_result_history'), \
                 patch('algo.iterative.tuning.SmacAppendTuning.tune') as mock_smac_tuning, \
@@ -65,6 +67,7 @@ class TestTuning:
         """
 
         with patch('omniadvisor.repository.load_repository.LoadRepository.query_by_id'), \
+                patch('omniadvisor.repository.tuning_record_repository.TuningRecordRepository.create'), \
                 patch('omniadvisor.service.retest_service.spark_run', side_effect=RuntimeError) as mock_spark_run, \
                 patch('omniadvisor.interface.config_tuning.get_tuning_result_history'), \
                 patch('omniadvisor.repository.load_repository.LoadRepository.update_best_config') as mock_update_best, \
@@ -95,6 +98,7 @@ class TestTuning:
         :return:
         """
         with patch('omniadvisor.repository.load_repository.LoadRepository.query_by_id'), \
+                patch('omniadvisor.repository.tuning_record_repository.TuningRecordRepository.create'), \
                 patch('omniadvisor.interface.config_tuning.get_tuning_result_history') as mocked_query_perf, \
                 patch('omniadvisor.repository.load_repository.LoadRepository.update_test_config') as mock_update_test, \
                 patch('algo.iterative.tuning.SmacAppendTuning.tune') as mock_smac_tuning:
