@@ -61,15 +61,13 @@ def _refresh_best_config(load: Load):
     tuning_result = get_tuning_result(load, load.test_config)
     if tuning_result.exam_times >= OA_CONF.tuning_retest_times:
         # 获取当前best_config的平均测试性能
-        best_config_results = ExamRecordRepository.query_by_load_and_config(load, load.best_config)
-        success_runtimes = [
-            exam_record.runtime
-            for exam_record in best_config_results if exam_record.status == OA_CONF.ExecStatus.success
-        ]
-        best_runtime = sum(success_runtimes) / len(success_runtimes)
+        best_config_results = get_tuning_result(load, load.best_config)
         # 若调优性能优于最佳性能 刷新当前的best_config
-        if tuning_result.runtime < best_runtime:
-            global_logger.info(f"tuning_runtime={tuning_result.runtime} is quicker than best_runtime={best_runtime},"
+        if tuning_result.runtime < best_config_results.runtime:
+            boost_percentage = round((best_config_results.runtime - tuning_result.runtime)/best_config_results.runtime, 2)
+            global_logger.info(f"tuning_runtime={tuning_result.runtime} is "
+                               f"quicker than best_runtime={best_config_results.runtime}, "
+                               f"boost percentage = {boost_percentage}"
                                f"found a better spark config")
             LoadRepository.update_best_config(load, load.test_config)
         # 当前test_config达到调优轮次后 置空test_config
@@ -106,6 +104,9 @@ def hijack_recommend(spark_sql_cmd: str):
     else:
         # 打印结果输出
         print(output)
+
+    if exec_config == load.test_config:
+        _refresh_best_config(load=load)
 
 
 def main():
