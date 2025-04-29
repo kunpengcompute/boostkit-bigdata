@@ -18,9 +18,9 @@ def retest(load: Load, config: dict):
             exam_record, spark_output = spark_run(load, config)
         except Exception as e:
             global_logger.error('复测第 %d 轮失败，原因：%s', i, e)
-            return
+            raise
 
         if exam_record.status == OA_CONF.ExecStatus.success:
             global_logger.info('复测第 %d 轮成功，性能结果：%.3f', i, exam_record.runtime)
         else:
-            global_logger.error('复测第 %d 轮失败，spark执行异常：%s', i, spark_output)
+            raise RuntimeError('复测第 %d 轮失败，spark执行异常：%s', i, spark_output)
