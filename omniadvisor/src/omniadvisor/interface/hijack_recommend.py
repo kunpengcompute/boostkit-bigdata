@@ -5,6 +5,7 @@ from omniadvisor.repository.tuning_record_repository import TuningRecordReposito
 from omniadvisor.service.spark_service.spark_parameter_parser import SparkParameterParser
 from omniadvisor.repository.model.load import Load
 from omniadvisor.repository.load_repository import LoadRepository
+from omniadvisor.repository.tuning_record_repository import TuningRecordRepository
 from omniadvisor.utils.logger import global_logger
 from omniadvisor.service.spark_service.spark_run import spark_run
 from common.constant import OA_CONF
@@ -26,6 +27,7 @@ def _query_or_create_load(name: str, exec_attr: dict, default_config: dict):
         global_logger.info("Not exit available load, create new one.")
         # TODO 如果用户在这里创建了一个格式异常的config, 会引起spark执行失败 这个应该如何处理
         load = LoadRepository.create(name=name, exec_attr=exec_attr, default_config=default_config)
+        TuningRecordRepository.create(load=load, config=default_config, method=OA_CONF.TuningMethod.user)
     else:
         load = loads.pop()
 
