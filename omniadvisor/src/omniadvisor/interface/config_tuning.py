@@ -3,6 +3,7 @@ import argparse
 from common.constant import OA_CONF
 from omniadvisor.utils.logger import global_logger
 from omniadvisor.repository.load_repository import LoadRepository
+from omniadvisor.repository.tuning_record_repository import TuningRecordRepository
 from omniadvisor.service.tuning_result.tuning_result_history import get_tuning_result_history
 from omniadvisor.service.retest_service import retest
 from algo.iterative.tuning import SmacAppendTuning
@@ -50,9 +51,11 @@ def unified_tuning(load_id: str, retest_way: str, tuning_method: str):
     if tuning_method == OA_CONF.TuningMethod.iterative:
         perf_history = get_tuning_result_history(load)
         next_config = SmacAppendTuning.tune(perf_history.tuning_history)
+        TuningRecordRepository.create(load=load, config=next_config, method=OA_CONF.TuningMethod.iterative)
     elif tuning_method == OA_CONF.TuneMethod.expert:
         perf_history = get_tuning_result_history(load)
         next_config = ExpertTuning.tune(perf_history.tuning_history)
+        TuningRecordRepository.create(load=load, config=next_config, method=OA_CONF.TuningMethod.expert)
     else:
         raise ValueError(f'Not supported tuning method: {tuning_method}')
 
