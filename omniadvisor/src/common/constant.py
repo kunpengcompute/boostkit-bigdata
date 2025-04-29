@@ -62,10 +62,6 @@ class OmniAdvisorConf:
         backend = 'backend'
         all = [hijacking, backend]
 
-    # 规定每种调优方式的轮次
-    # TODO 瞎拍的
-    tuning_strategies = [(TuningMethod.expert, 5), (TuningMethod.iterative, 10)]
-
     # 评估配置失效的阈值，当配置执行失败次数大于等于此值，则配置失效
     config_fail_threshold = 1
 

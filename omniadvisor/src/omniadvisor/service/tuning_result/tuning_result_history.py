@@ -53,10 +53,3 @@ class TuningResultHistory:
             return min(self.tuning_history, key=lambda x: x.runtime).config
         else:
             return {}
-
-    @property
-    def latest_tuning_record(self):
-        if self._tuning_results:
-            return max(self._tuning_results, key=lambda tuning_result: tuning_result.rounds)
-        else:
-            return None

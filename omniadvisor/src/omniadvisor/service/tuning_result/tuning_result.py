@@ -40,11 +40,10 @@ class TuningResult:
     """
     调优结果，汇总相同负载和配置下的调优记录和测试记录
     """
-
     def __init__(
-            self,
-            tuning_record: TuningRecord,
-            exam_records: List[ExamRecord]
+        self,
+        tuning_record: TuningRecord,
+        exam_records: List[ExamRecord]
     ):
         """
         初始化，负载对应下的所有性能历史数据
@@ -53,7 +52,7 @@ class TuningResult:
         :param exam_records: 测试记录
         """
         self._tuning_record = tuning_record
-        self._exam_records = exam_records if exam_records is not None else []
+        self._exam_records = exam_records
 
     @property
     def config(self):
@@ -77,21 +76,16 @@ class TuningResult:
 
     @property
     def status(self):
-        """
-        对于tuning result 定义三种状态
-        成功：达到指定复测次数，并且失败次数没有超过阈值，这种情况下，对这个配置的复测流程已结束
-        失败：失败的次数超过阈值，就失败了，对这个配置的复测流程已结束
-        复测中：复测次数小于指定复测次数，且失败次数没有超过阈值，复测流程尚在进行中
-        :return:
-        """
-        failed_times = sum([exam_record.status == OA_CONF.ExecStatus.fail for exam_record in self._exam_records])
+        # 若配置未复测过，则默认该配置暂时为失败
+        if not self._exam_records:
+            return OA_CONF.ExecStatus.fail
+
+        failed_times = sum([exam_record.status==OA_CONF.ExecStatus.fail for exam_record in self._exam_records])
+        # 如果该配置执行失败过，则认为配置不可行
         if failed_times >= OA_CONF.config_fail_threshold:
-            overall_status = OA_CONF.ExecStatus.fail
-        elif len(self._exam_records) == OA_CONF.tuning_retest_times:
-            overall_status = OA_CONF.ExecStatus.success
+            return OA_CONF.ExecStatus.fail
         else:
-            overall_status = OA_CONF.ExecStatus.running
-        return overall_status
+            return OA_CONF.ExecStatus.success
 
     @property
     def runtime(self):
