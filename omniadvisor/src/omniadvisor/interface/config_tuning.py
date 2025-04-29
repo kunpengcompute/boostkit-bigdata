@@ -6,7 +6,6 @@ from algo.iterative.tuning import SmacAppendTuning
 from omniadvisor.repository.load_repository import LoadRepository
 from omniadvisor.repository.tuning_record_repository import TuningRecordRepository
 from omniadvisor.service.retest_service import retest
-from omniadvisor.repository.tuning_record_repository import TuningRecordRepository
 from omniadvisor.service.tuning_result.tuning_result_history import get_tuning_result_history
 from omniadvisor.utils.logger import global_logger
 
@@ -26,10 +25,9 @@ def _parse_tuning_args():
                         required=True,
                         help='If choose hijacking, a test will execute immediately')
 
-    # TODO 待删除
-    # parser.add_argument("-t", "--tuning-method", type=str, required=True,
-    #                     choices=OA_CONF.TuningMethod.all,
-    #                     help='Support three tune method, for iterative, use BO; for expert ...')
+    parser.add_argument("-t", "--tuning-method", type=str, required=False,
+                        choices=OA_CONF.TuningMethod.all,
+                        help='Support three tune method, for iterative, use BO; for expert ...')
 
     args = parser.parse_args()
     return args
