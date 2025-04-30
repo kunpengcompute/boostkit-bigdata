@@ -94,7 +94,7 @@ def main():
 
     # 查询上一次调优的结果是否测试完毕：
     tuning_result_history = get_tuning_result_history(load)
-    if (tuning_result_history.latest_tuning_record and tuning_result_history.latest_tuning_record.status ==
+    if (tuning_result_history.latest_tuning_result and tuning_result_history.latest_tuning_result.status ==
             OA_CONF.ExecStatus.running):
         # 有上一次调优，且调优的结果仍在复测中，提示无法调优并退出
         global_logger.info('The retest status of latest tuning result is still running, please wait.')

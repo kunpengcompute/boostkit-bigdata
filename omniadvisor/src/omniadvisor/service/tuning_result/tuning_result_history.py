@@ -77,7 +77,7 @@ class TuningResultHistory:
             return {}
 
     @property
-    def latest_tuning_record(self):
+    def latest_tuning_result(self):
         """
         获取最近的一次调优记录
         :return:
