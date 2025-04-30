@@ -4,7 +4,8 @@ from algo.expert.tuning import ExpertTuning
 from algo.iterative.tuning import SmacAppendTuning
 from omniadvisor.repository.load_repository import LoadRepository
 from omniadvisor.service.retest_service import retest
-from omniadvisor.service.tuning_result.tuning_result_history import get_tuning_result_history, get_current_tuning_method
+from omniadvisor.service.tuning_result.tuning_result_history import get_tuning_result_history, \
+    get_next_tuning_method
 from omniadvisor.utils.logger import global_logger
 
 from common.constant import OA_CONF
@@ -86,19 +87,28 @@ def main():
     配置调优主函数
     """
     args = _parse_tuning_args()
+    # 检查load 是否存在以及是否需要调优
     load = _pre_check(args.load_id)
     if not load:
         return
 
+    # 查询上一次调优的结果是否测试完毕：
+    tuning_result_history = get_tuning_result_history(load)
+    if (tuning_result_history.latest_tuning_record and tuning_result_history.latest_tuning_record.status ==
+            OA_CONF.ExecStatus.running):
+        # 有上一次调优，且调优的结果仍在复测中，提示无法调优并退出
+        global_logger.info('The retest status of latest tuning result is still running, please wait.')
+        return
+
     if args.tuning_method:
+        # 用户输入了强制调优的请求，以用户为准
         unified_tuning(load, args.retest_way, args.tuning_method)
     else:
-        # 查询上一次调优的结果是否测试完毕：
-        tuning_result_history = get_tuning_result_history(load)
-        if (tuning_result_history.latest_tuning_record and tuning_result_history.latest_tuning_record.status ==
-                OA_CONF.ExecStatus.running):
-            # 有上一次调优，且调优的结果仍在复测中，提示无法调优并退出
-            global_logger.info('The retest status of latest tuning result is still running, please wait.')
+        tuning_method = get_next_tuning_method(args.load_id)
+        if not tuning_method:
+            global_logger.info(
+                'The tuning times reaches default settings, if you want to append tuning times, add \'-t\' in your '
+                'command'
+            )
             return
-        tuning_method = get_current_tuning_method(args.load_id)
         unified_tuning(args.load_id, args.retest_way, tuning_method)
