@@ -74,7 +74,7 @@ def _pre_check(load_id):
         # 若查询结果为空，直接返回即可
         global_logger.info('Cannot find load id: %s in database, the tuning process exits.', load_id)
         return None
-    load = loads[0]
+    load = loads.pop()
     if not load.tuning_needed:
         global_logger.info('The load dont need to tune, the tuning process exits.')
         return None
