@@ -7,7 +7,8 @@ from omniadvisor.service.spark_service.spark_parameter_parser import SparkParame
 class TestParameterParser:
     def test_process_parameter(self):
         # 准备测试数据
-        submit_cmd = "spark-submit --name test_sql --master local[*] --deploy-mode client " \
+        submit_cmd = "/spark/bin/spark-class org.apache.spark.deploy.SparkSubmit" \
+                     " --name test_sql --master local[*] --deploy-mode client " \
                      "--executor-memory 2g --conf spark.memory.fraction=0.6 --uk1 value1 --uk2 value2"
 
         # 创建 SparkParameterParser 实例
