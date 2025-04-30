@@ -1,9 +1,11 @@
 import sys
 
+from omniadvisor.repository.exam_record_repository import ExamRecordRepository
 from omniadvisor.service.spark_service.spark_parameter_parser import SparkParameterParser
 from omniadvisor.repository.model.load import Load
 from omniadvisor.repository.load_repository import LoadRepository
 from omniadvisor.repository.tuning_record_repository import TuningRecordRepository
+from omniadvisor.service.tuning_result.tuning_result import get_tuning_result
 from omniadvisor.utils.logger import global_logger
 from omniadvisor.service.spark_service.spark_run import spark_run
 from common.constant import OA_CONF
@@ -39,11 +41,11 @@ def _get_exec_config_from_load(load: Load):
     :param load: 负载实例
     :return: 待执行配置
     """
-    # 如果负载不需要优化，直接使用默认配置
+    # 如果负载不需要推荐优化配置，直接使用默认配置
     if not load.tuning_needed:
         return load.default_config
 
-    # 如果负载需要优化 根据优先级选择配置
+    # 如果负载需要推荐优化配置 根据优先级选择配置
     if load.test_config:
         # 第一使用待测试配置
         return load.test_config
@@ -53,6 +55,23 @@ def _get_exec_config_from_load(load: Load):
     else:
         # 最后使用租户默认配置
         return load.default_config
+
+
+def _refresh_best_config(load: Load):
+    tuning_result = get_tuning_result(load, load.test_config)
+    if tuning_result.exam_times >= OA_CONF.tuning_retest_times:
+        # 获取当前best_config的平均测试性能
+        best_config_results = get_tuning_result(load, load.best_config)
+        # 若调优性能优于最佳性能 刷新当前的best_config
+        if tuning_result.runtime < best_config_results.runtime:
+            boost_percentage = round((best_config_results.runtime - tuning_result.runtime)/best_config_results.runtime, 2)
+            global_logger.info(f"tuning_runtime={tuning_result.runtime} is "
+                               f"quicker than best_runtime={best_config_results.runtime}, "
+                               f"boost percentage = {boost_percentage}"
+                               f"found a better spark config")
+            LoadRepository.update_best_config(load, load.test_config)
+        # 当前test_config达到调优轮次后 置空test_config
+        LoadRepository.update_test_config(load, {})
 
 
 def hijack_recommend(spark_sql_cmd: str):
@@ -85,6 +104,9 @@ def hijack_recommend(spark_sql_cmd: str):
     else:
         # 打印结果输出
         print(output)
+
+    if exec_config == load.test_config:
+        _refresh_best_config(load=load)
 
 
 def main():
