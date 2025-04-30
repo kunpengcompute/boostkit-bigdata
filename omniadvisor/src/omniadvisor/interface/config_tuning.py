@@ -1,12 +1,10 @@
 import argparse
-from itertools import chain
 
 from algo.expert.tuning import ExpertTuning
 from algo.iterative.tuning import SmacAppendTuning
 from omniadvisor.repository.load_repository import LoadRepository
-from omniadvisor.repository.tuning_record_repository import TuningRecordRepository
 from omniadvisor.service.retest_service import retest
-from omniadvisor.service.tuning_result.tuning_result_history import get_tuning_result_history
+from omniadvisor.service.tuning_result.tuning_result_history import get_tuning_result_history, get_current_tuning_method
 from omniadvisor.utils.logger import global_logger
 
 from common.constant import OA_CONF
@@ -33,21 +31,14 @@ def _parse_tuning_args():
     return args
 
 
-def unified_tuning(load_id: str, retest_way: str, tuning_method: str):
+def unified_tuning(load, retest_way: str, tuning_method: str):
     """
     后台调优
-    :param load_id: 负载id
+    :param load: 负载
     :param retest_way: 复测方法
     :param tuning_method: 算法的类型
     :return:
     """
-    # 查询负载：
-    loads = LoadRepository.query_by_id(load_id)
-    if not loads:
-        # 若查询结果为空，直接返回即可
-        global_logger.info('Cannot find load id: %s in database.', load_id)
-        return
-    load = loads[0]
 
     # 推荐下一个配置
     if tuning_method == OA_CONF.TuningMethod.iterative:
@@ -73,17 +64,23 @@ def unified_tuning(load_id: str, retest_way: str, tuning_method: str):
         LoadRepository.update_test_config(load, next_config)
 
 
-def get_current_tuning_method(load):
+def _pre_check(load_id):
     """
-    根据 load，获取调优历史记录，并根据OA_CONF中的tuning_strategies决定本轮的调优方法
-    :param load
-    :return: 当前的调优方法
+    前置检查
+    :param load_id:
+    :return:
     """
-    tuning_records = TuningRecordRepository.query_by_load(load)
-    tuning_strategy_list = list(chain(*[[strategy[0]] * strategy[1] for strategy in OA_CONF.tuning_strategies]))
-    tuning_times = len(tuning_records)
-    tuning_method = tuning_strategy_list[tuning_times]
-    return tuning_method
+    # 查询负载：
+    loads = LoadRepository.query_by_id(load_id)
+    if not loads:
+        # 若查询结果为空，直接返回即可
+        global_logger.info('Cannot find load id: %s in database, the tuning process exits.', load_id)
+        return None
+    load = loads.pop()
+    if not load.tuning_needed:
+        global_logger.info('The load dont need to tune, the tuning process exits.')
+        return None
+    return load
 
 
 def main():
@@ -91,22 +88,19 @@ def main():
     配置调优主函数
     """
     args = _parse_tuning_args()
-    # 查询负载：
-    loads = LoadRepository.query_by_id(args.load_id)
-    if not loads:
-        # 若查询结果为空，直接返回即可
-        global_logger.info('Cannot find load id: %s in database, the tuning process exits.', args.load_id)
+    load = _pre_check(args.load_id)
+    if not load:
         return
-    load = loads[0]
-    if not load.tuning_needed:
-        global_logger.info('The load dont need to tune, the tuning process exits.')
-        return
-    # 查询上一次调优的结果是否测试完毕：
-    tuning_result_history = get_tuning_result_history(load)
-    if (tuning_result_history.latest_tuning_record and tuning_result_history.latest_tuning_record.status ==
-            OA_CONF.ExecStatus.running):
-        # 有上一次调优，且调优的结果仍在复测中，提示无法调优并退出
-        global_logger.info('The retest status of latest tuning result is still running, please wait.')
-        return
-    tuning_method = get_current_tuning_method(args.load_id)
-    unified_tuning(args.load_id, args.retest_way, tuning_method)
+
+    if args.tuning_method:
+        unified_tuning(load, args.retest_way, args.tuning_method)
+    else:
+        # 查询上一次调优的结果是否测试完毕：
+        tuning_result_history = get_tuning_result_history(load)
+        if (tuning_result_history.latest_tuning_record and tuning_result_history.latest_tuning_record.status ==
+                OA_CONF.ExecStatus.running):
+            # 有上一次调优，且调优的结果仍在复测中，提示无法调优并退出
+            global_logger.info('The retest status of latest tuning result is still running, please wait.')
+            return
+        tuning_method = get_current_tuning_method(args.load_id)
+        unified_tuning(args.load_id, args.retest_way, tuning_method)

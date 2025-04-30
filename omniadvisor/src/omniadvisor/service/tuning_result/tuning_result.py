@@ -42,9 +42,9 @@ class TuningResult:
     """
 
     def __init__(
-            self,
-            tuning_record: TuningRecord,
-            exam_records: List[ExamRecord]
+        self,
+        tuning_record: TuningRecord,
+        exam_records: List[ExamRecord]
     ):
         """
         初始化，负载对应下的所有性能历史数据
