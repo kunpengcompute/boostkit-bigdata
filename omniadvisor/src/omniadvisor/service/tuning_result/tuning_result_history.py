@@ -9,17 +9,22 @@ from omniadvisor.service.tuning_result.tuning_result import get_tuning_result
 from common.constant import OA_CONF
 
 
-def get_current_tuning_method(load):
+def get_next_tuning_method(load) -> str:
     """
     根据 load，获取调优历史记录，并根据OA_CONF中的tuning_strategies决定本轮的调优方法
     :param load
     :return: 当前的调优方法
     """
     tuning_result_history = get_tuning_result_history(load)
-    tuning_strategy_list = list(chain(*[[strategy[0]] * strategy[1] for strategy in OA_CONF.tuning_strategies]))
-    tuning_times = len(tuning_result_history.tuning_results)
-    tuning_method = tuning_strategy_list[tuning_times]
-    return tuning_method
+    statistics = tuning_result_history.collect_method_calls
+    next_tuning_method = None
+    for tuning_method, expected_tuning_times in OA_CONF.tuning_strategies:
+        # 历史中该方法的调优次数已经超过了设定的调优次数，跳过（超过是因为用户强制使用）
+        if statistics.get(tuning_method) >= expected_tuning_times:
+            continue
+        next_tuning_method = tuning_method
+        break
+    return next_tuning_method
 
 
 def get_tuning_result_history(load: Load):
@@ -72,12 +77,27 @@ class TuningResultHistory:
             return {}
 
     @property
-    def latest_tuning_record(self):
+    def latest_tuning_result(self):
+        """
+        获取最近的一次调优记录
+        :return:
+        """
         if self._tuning_results:
             return max(self._tuning_results, key=lambda tuning_result: tuning_result.rounds)
         else:
             return None
 
     @property
-    def tuning_results(self):
-        return self._tuning_results
+    def collect_method_calls(self) -> dict:
+        """
+        收集历史数据中 调优方法-次数 信息
+        :return:
+        """
+        data = {}
+        for tuning_result in self._tuning_results:
+            if tuning_result.method in data:
+                data[tuning_result.method] = data.get(tuning_result.method) + 1
+            else:
+                data[tuning_result.method] = 1
+        return data
+
