@@ -18,17 +18,15 @@
 
 package org.apache.spark.sql.util
 
-import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor.{JsonObjectExtension, JsonArrayExtension}
 import com.huawei.boostkit.spark.util.ModifyUtilAdaptor
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.SparkSessionExtensions
 import org.apache.spark.sql.catalyst.expressions.{ExprId, Expression, PromotePrecision}
-import org.apache.spark.sql.catalyst.expressions.objects.StaticInvoke
 import org.apache.spark.sql.catalyst.optimizer.{CombineJoinedAggregates, MergeSubqueryFilters}
 import org.apache.spark.sql.execution.adaptive.QueryStageExec
 import org.apache.spark.sql.execution.{ColumnarToRowExec, OmniColumnarToRowExec, SparkPlan}
 import org.apache.spark.sql.types.DataType
-import com.google.gson.{JsonArray, JsonObject}
+import com.google.gson.JsonObject
 
 object ModifyUtil extends Logging {
 
@@ -39,26 +37,6 @@ object ModifyUtil extends Logging {
     expr match {
       case promotePrecision: PromotePrecision =>
         func(promotePrecision.child, exprsIndexMap, promotePrecision.child.dataType)
-
-      case staticInvoke: StaticInvoke =>
-      {
-        val funcName = staticInvoke.functionName
-        funcName match {
-          case "varcharTypeWriteSideCheck" => {
-            val arg0 = staticInvoke.arguments(0)
-            val arg1 = staticInvoke.arguments(1)
-            new JsonObject().put("exprType", "FUNCTION")
-              .addOmniExpJsonType("returnType", staticInvoke.dataType)
-              .put("function_name", "StaticInvokeVarcharTypeWriteSideCheck")
-              .put("arguments", new JsonArray()
-                .put(func(arg0, exprsIndexMap, arg0.dataType))
-                .put(func(arg1, exprsIndexMap, arg1.dataType)))
-          }
-
-          case _ => throw new UnsupportedOperationException(s"StaticInvoke function: $funcName is not supported currently");
-        }
-      }
-
       case _ =>
         null
     }
