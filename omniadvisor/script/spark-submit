@@ -24,16 +24,9 @@ fi
 # disable randomized hash for string in Python 3.3+
 export PYTHONHASHSEED=0
 if [[ -v enable_omniadvisor && "$enable_omniadvisor" = "true" ]]; then
-  echo "enable omniadvisor"
-  if [ -z "${HIJACK_PATH}" ]; then
-    # 根据实际配置修改
-    hijack_path="project_dir/src/hijack.py"
-  else
-    hijack_path=$HIJACK_PATH
-  fi
-  echo "hijack_path="$hijack_path
+  # 根据特性实际的部署路径进行修改
+  hijack_path="project_dir/src/hijack.py"
   spark_cmd=""${SPARK_HOME}"/bin/spark-class org.apache.spark.deploy.SparkSubmit "$@""
-  echo $spark_cmd
   python3 $hijack_path "$spark_cmd"
 else
   echo "${SPARK_HOME}/bin/spark-class org.apache.spark.deploy.SparkSubmit $@"
