@@ -106,9 +106,7 @@ class SparkParameterParser(ParserInterface):
             # 提取conf配置
             elif key == "conf":
                 for confitem in value:
-                    parts = confitem.split("=")
-                    if len(parts) != 2:
-                        raise ValueError(f"conf{parts}的格式不符合key=value的形式")
+                    parts = confitem.split("=", 1)
                     confkey, confvalue = parts
                     # 处理重复键问题，例如合并值为列表
                     if confkey in conf_params:
