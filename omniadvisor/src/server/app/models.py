@@ -15,7 +15,7 @@ class DatabaseLoad(models.Model):
     best_config = models.JSONField(null=True)
     test_config = models.JSONField(null=True)
     create_time = models.DateTimeField(auto_now_add=True)
-    tuning_needed = models.BooleanField(default=False)
+    tuning_needed = models.BooleanField(default=True)
 
     class Meta:
         constraints = [

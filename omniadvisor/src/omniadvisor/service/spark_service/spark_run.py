@@ -97,14 +97,14 @@ def _update_trace_from_history_server(exam_record: ExamRecord, application_id: s
             trace_sql = spark_fetcher.get_spark_sql_by_app(application_id)
             trace_stages = spark_fetcher.get_spark_stages_by_app(application_id)
             trace_executor = spark_fetcher.get_spark_executor_by_app(application_id)
-            break
         except HTTPError as httpe:
             time.sleep(1)
             global_logger.warning(f"HistoryServer访问错误:{httpe}")
             continue
 
-    trace_dict['sql'] = save_trace_data(data=trace_sql, data_dir=OA_CONF.data_dir)
-    trace_dict['stages'] = save_trace_data(data=trace_stages, data_dir=OA_CONF.data_dir)
-    trace_dict['executor'] = save_trace_data(data=trace_executor, data_dir=OA_CONF.data_dir)
+        trace_dict['sql'] = save_trace_data(data=trace_sql, data_dir=OA_CONF.data_dir)
+        trace_dict['stages'] = save_trace_data(data=trace_stages, data_dir=OA_CONF.data_dir)
+        trace_dict['executor'] = save_trace_data(data=trace_executor, data_dir=OA_CONF.data_dir)
+        break
 
     ExamRecordRepository.update_exam_result(exam_record, trace=trace_dict)
