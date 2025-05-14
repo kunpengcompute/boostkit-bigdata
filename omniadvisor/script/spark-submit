@@ -26,8 +26,7 @@ export PYTHONHASHSEED=0
 if [[ -v enable_omniadvisor && "$enable_omniadvisor" = "true" ]]; then
   # 根据特性实际的部署路径进行修改
   echo "enable_omniadvisor"
-  #hijack_path="/home/y30056354/union_test/merge/src/hijack.py"
-  hijack_path="/home/x30041342/omniadvisor/src/hijack.py"
+  hijack_path=""
   spark_cmd=""${SPARK_HOME}"/bin/spark-class org.apache.spark.deploy.SparkSubmit"
   for arg in "$@"
   do
@@ -49,6 +48,5 @@ if [[ -v enable_omniadvisor && "$enable_omniadvisor" = "true" ]]; then
   done
   python3 $hijack_path "$spark_cmd"
 else
-  echo "${SPARK_HOME}"/bin/spark-class org.apache.spark.deploy.SparkSubmit "$@"
   exec "${SPARK_HOME}"/bin/spark-class org.apache.spark.deploy.SparkSubmit "$@"
 fi
