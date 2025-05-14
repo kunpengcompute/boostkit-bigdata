@@ -1,18 +1,17 @@
 import logging
-import sys
 from unittest.mock import patch, MagicMock
 
 import pytest
 
 from common.constant import OA_CONF
-from omniadvisor.interface.config_tuning import unified_tuning, main
+from omniadvisor.interface.config_tuning import unified_tuning
 
 
 class TestTuning:
 
     def setup_class(self):
         # 创建表
-        self.load_id = '2'
+        self.load = None
         self.retest_times = 3
         self.tuning_method = OA_CONF.TuningMethod.iterative
 
@@ -31,7 +30,7 @@ class TestTuning:
             mock_exam_record.status = OA_CONF.ExecStatus.success
             spark_output = ''
             mock_spark_run.return_value = mock_exam_record, spark_output
-            unified_tuning(load=self.load_id, retest_way=OA_CONF.RetestWay.backend, tuning_method=self.tuning_method)
+            unified_tuning(load=self.load, retest_way=OA_CONF.RetestWay.backend, tuning_method=self.tuning_method)
             mock_update_best.assert_called_once()
             mock_smac_tuning.assert_called_once()
             assert mock_spark_run.call_count == OA_CONF.tuning_retest_times
