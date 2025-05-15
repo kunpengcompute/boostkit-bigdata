@@ -57,7 +57,7 @@ def spark_run(load, conf):
                 status=OA_CONF.ExecStatus.fail,
                 runtime=OA_CONF.exec_fail_return_runtime,
                 trace=OA_CONF.exec_fail_return_trace
-            ), "spark-sql failed"
+            ), ""
         except RuntimeError:
             exam_record.delete()
             raise
