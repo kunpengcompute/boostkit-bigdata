@@ -31,7 +31,9 @@ def spark_run(load, conf):
     # 执行当前的submit_cmd
     spark_executor = SparkExecutor()
     try:
+        ExamRecordRepository.update_start_time(exam_record)
         exitcode, spark_output = spark_executor.submit_spark_task(submit_cmd)
+        ExamRecordRepository.update_end_time(exam_record)
     except TimeoutError:
         # 任务提交超时等
         exam_record.delete()
