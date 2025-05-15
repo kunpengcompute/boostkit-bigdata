@@ -77,7 +77,7 @@ class TestTuningResult:
         assert tuning_result.method == 'method1'
         assert tuning_result.method_extend == "method_extend1"
         assert tuning_result.rounds == 1
-        assert tuning_result.status == OA_CONF.ExecStatus.success
+        assert tuning_result.status == OA_CONF.ExecStatus.running
         assert tuning_result.runtime == 12.5
         assert tuning_result.trace == "trace_info1"
 

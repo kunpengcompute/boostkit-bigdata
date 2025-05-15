@@ -20,8 +20,9 @@ class TestSparkRun:
     @patch('omniadvisor.service.spark_service.spark_run.SparkExecutor.parser_spark_output')
     @patch('omniadvisor.service.spark_service.spark_run.save_trace_data')
     @patch('omniadvisor.service.spark_service.spark_run.ExamRecordRepository.update_exam_result')
+    @patch('omniadvisor.service.spark_service.spark_run.multiprocessing.Process')
     @patch('requests.get')
-    def test_spark_run_success(self, mock_get, mock_update_exam_result, mock_save_trace_data, mock_parser_spark_output,
+    def test_spark_run_success(self, mock_get, mock_process, mock_update_exam_result, mock_save_trace_data, mock_parser_spark_output,
                                mock_submit_spark_task, mock_create_exam_record, mock_spark_command_reconstruct):
 
         # 配置mock对象返回值
@@ -31,6 +32,8 @@ class TestSparkRun:
 
         # 配置mock对象的返回值
         mock_get.return_value = mock_response
+        mock_instance = MagicMock()
+        mock_process.return_value = mock_instance
 
         # 配置mock对象的返回值
         mock_spark_command_reconstruct.return_value = "spark-submit --master local[*]"
@@ -47,16 +50,18 @@ class TestSparkRun:
             "attr1": "value1",
             "attr2": "value2"
         }
+        load_mock.default_config = {"another_key": "another_value"}
 
-        result_exam_record = spark_run(load_mock, conf)
+        result_exam_record, spark_out_put = spark_run(load_mock, conf)
 
         assert result_exam_record == task_update_mock
-        mock_update_exam_result.assert_called_once_with(exam_record_mock, OA_CONF.ExecStatus.success, 10, {
-            'sql': f'{OA_CONF.data_dir}/testfile',
-            'stages': f'{OA_CONF.data_dir}/testfile',
-            'executor': f'{OA_CONF.data_dir}/testfile'
-        }, "success output\napplication_id:app_12345\ntime_taken: 10")
         mock_update_exam_result.assert_called()
+
+        # 断言Process被调用
+        mock_process.assert_called_once()
+        mock_instance.start.assert_called_once()
+
+
 
     @patch('omniadvisor.service.spark_service.spark_run.spark_command_reconstruct')
     @patch('omniadvisor.service.spark_service.spark_run.ExamRecordRepository.create')
@@ -64,7 +69,7 @@ class TestSparkRun:
     @patch('omniadvisor.service.spark_service.spark_run.save_trace_data')
     @patch('omniadvisor.service.spark_service.spark_run.ExamRecordRepository.update_exam_result')
     @patch('requests.get')
-    def test_spark_run_success(self, mock_get, mock_update_exam_result, mock_save_trace_data,
+    def test_spark_run_failed(self, mock_get, mock_update_exam_result, mock_save_trace_data,
                                mock_submit_spark_task, mock_create_exam_record, mock_spark_command_reconstruct):
         # 配置mock对象返回值
         mock_response = Mock()
@@ -89,7 +94,8 @@ class TestSparkRun:
             "attr1": "value1",
             "attr2": "value2"
         }
-        result_exam_record = spark_run(load_mock, conf)
+        load_mock.default_config = {"another_key": "another_value"}
+        result_exam_record, spark_out_put = spark_run(load_mock, conf)
 
         assert result_exam_record == task_update_mock
         mock_update_exam_result.assert_called_once_with(

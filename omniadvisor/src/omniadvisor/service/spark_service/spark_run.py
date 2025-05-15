@@ -9,6 +9,7 @@ from omniadvisor.repository.model.exam_record import ExamRecord
 from omniadvisor.service.spark_service.spark_command_reconstruct import spark_command_reconstruct
 from omniadvisor.service.spark_service.spark_executor import SparkExecutor
 from omniadvisor.service.spark_service.spark_fetcher import SparkFetcher
+from omniadvisor.service.tuning_result.tuning_result import get_tuning_result
 from omniadvisor.utils.logger import global_logger
 from omniadvisor.utils.utils import save_trace_data
 
@@ -17,14 +18,22 @@ def spark_run(load, conf):
     # 从解析后的参数列表中提取负载与任务的相关信息
     submit_cmd = spark_command_reconstruct(load, conf)
 
+    # 判断当前的conf是否和load.default_config相同 不相同则在submit_cmd前增加超时时间
+    if conf != load.default_config:
+        # 获取当前default_config的平均测试性能
+        baseline_results = get_tuning_result(load, load.default_config)
+        timeout_sec = OA_CONF.timeout_ratio * baseline_results.runtime
+        submit_cmd = f"timeout {timeout_sec} " + submit_cmd
+
     # 根据执行命令创建测试记录
-    # TODO Task对象的starttime 和 endtime基本上没有用到过？
     exam_record = ExamRecordRepository.create(load, conf)
 
     # 执行当前的submit_cmd
     spark_executor = SparkExecutor()
     try:
+        ExamRecordRepository.update_start_time(exam_record)
         exitcode, spark_output = spark_executor.submit_spark_task(submit_cmd)
+        ExamRecordRepository.update_end_time(exam_record)
     except TimeoutError:
         # 任务提交超时等
         exam_record.delete()
@@ -48,7 +57,7 @@ def spark_run(load, conf):
                 status=OA_CONF.ExecStatus.fail,
                 runtime=OA_CONF.exec_fail_return_runtime,
                 trace=OA_CONF.exec_fail_return_trace
-            )
+            ), ""
         except RuntimeError:
             exam_record.delete()
             raise
@@ -97,14 +106,14 @@ def _update_trace_from_history_server(exam_record: ExamRecord, application_id: s
             trace_sql = spark_fetcher.get_spark_sql_by_app(application_id)
             trace_stages = spark_fetcher.get_spark_stages_by_app(application_id)
             trace_executor = spark_fetcher.get_spark_executor_by_app(application_id)
-            break
         except HTTPError as httpe:
             time.sleep(1)
             global_logger.warning(f"HistoryServer访问错误:{httpe}")
             continue
 
-    trace_dict['sql'] = save_trace_data(data=trace_sql, data_dir=OA_CONF.data_dir)
-    trace_dict['stages'] = save_trace_data(data=trace_stages, data_dir=OA_CONF.data_dir)
-    trace_dict['executor'] = save_trace_data(data=trace_executor, data_dir=OA_CONF.data_dir)
+        trace_dict['sql'] = save_trace_data(data=trace_sql, data_dir=OA_CONF.data_dir)
+        trace_dict['stages'] = save_trace_data(data=trace_stages, data_dir=OA_CONF.data_dir)
+        trace_dict['executor'] = save_trace_data(data=trace_executor, data_dir=OA_CONF.data_dir)
+        break
 
     ExamRecordRepository.update_exam_result(exam_record, trace=trace_dict)

@@ -3,6 +3,7 @@ import argparse
 from algo.expert.tuning import ExpertTuning
 from algo.iterative.tuning import SmacAppendTuning
 from omniadvisor.repository.load_repository import LoadRepository
+from omniadvisor.repository.tuning_record_repository import TuningRecordRepository
 from omniadvisor.service.retest_service import retest
 from omniadvisor.service.tuning_result.tuning_result_history import get_tuning_result_history, \
     get_next_tuning_method
