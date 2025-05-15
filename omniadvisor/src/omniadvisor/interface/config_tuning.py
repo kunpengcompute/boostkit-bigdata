@@ -65,7 +65,7 @@ def unified_tuning(load, retest_way: str, tuning_method: str):
         raise ValueError(f'Not supported tuning method: {tuning_method}')
 
     if next_config:
-        TuningRecordRepository.create(load=load, config=next_config, method=OA_CONF.TuningMethod.expert,
+        TuningRecordRepository.create(load=load, config=next_config, method=tuning_method,
                                       method_extend=method_extend)
     else:
         global_logger.info('The recommending config is empty, please try other tuning methods.')
@@ -76,7 +76,7 @@ def unified_tuning(load, retest_way: str, tuning_method: str):
         try:
             retest(load, next_config)
         except Exception:
-            # 如果是running，说明此调优配置不可能再被复测，那么删除对应的exam_records、tuning_record
+            # 如果之前发生错误，状态被置为running，此调优配置不可能再被复测，那么删除对应的exam_records、tuning_record
             global_logger.info('Remove tuning result because the status is running.')
             remove_tuning_result(load, next_config)
             raise

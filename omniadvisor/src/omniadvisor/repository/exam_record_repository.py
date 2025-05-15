@@ -47,8 +47,6 @@ class ExamRecordRepository(Repository):
         model_attr = {
             ExamRecord.FieldName.load: load.database_model,
             ExamRecord.FieldName.config: config,
-            ExamRecord.FieldName.start_time: timezone.now(),
-            ExamRecord.FieldName.end_time: timezone.now()
         }
         database_record = cls._create(model_attr=model_attr)
         return ExamRecord(database_model=database_record)
