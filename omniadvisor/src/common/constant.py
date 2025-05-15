@@ -77,5 +77,6 @@ class OmniAdvisorConf:
     # 配置罗列
     tuning_retest_times = _common_config.getint('common', 'tuning.retest.times')
     spark_history_rest_url = _common_config.get('spark', 'spark.history.rest.url')
+    timeout_ratio = _common_config.getfloat('spark', 'spark.sql.timeout.ratio')
 
 OA_CONF = OmniAdvisorConf()

@@ -9,6 +9,7 @@ from omniadvisor.repository.model.exam_record import ExamRecord
 from omniadvisor.service.spark_service.spark_command_reconstruct import spark_command_reconstruct
 from omniadvisor.service.spark_service.spark_executor import SparkExecutor
 from omniadvisor.service.spark_service.spark_fetcher import SparkFetcher
+from omniadvisor.service.tuning_result.tuning_result import get_tuning_result
 from omniadvisor.utils.logger import global_logger
 from omniadvisor.utils.utils import save_trace_data
 
@@ -17,8 +18,14 @@ def spark_run(load, conf):
     # 从解析后的参数列表中提取负载与任务的相关信息
     submit_cmd = spark_command_reconstruct(load, conf)
 
+    # 判断当前的conf是否和load.default_config相同 不相同则在submit_cmd前增加超时时间
+    if conf != load.default_config:
+        # 获取当前default_config的平均测试性能
+        baseline_results = get_tuning_result(load, load.default_config)
+        timeout_sec = OA_CONF.timeout_ratio * baseline_results.runtime
+        submit_cmd = f"timeout {timeout_sec} " + submit_cmd
+
     # 根据执行命令创建测试记录
-    # TODO Task对象的starttime 和 endtime基本上没有用到过？
     exam_record = ExamRecordRepository.create(load, conf)
 
     # 执行当前的submit_cmd
@@ -48,7 +55,7 @@ def spark_run(load, conf):
                 status=OA_CONF.ExecStatus.fail,
                 runtime=OA_CONF.exec_fail_return_runtime,
                 trace=OA_CONF.exec_fail_return_trace
-            )
+            ), "spark-sql failed"
         except RuntimeError:
             exam_record.delete()
             raise
