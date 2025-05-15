@@ -47,6 +47,8 @@ class ExamRecordRepository(Repository):
         model_attr = {
             ExamRecord.FieldName.load: load.database_model,
             ExamRecord.FieldName.config: config,
+            ExamRecord.FieldName.start_time: timezone.now(),
+            ExamRecord.FieldName.end_time: timezone.now()
         }
         database_record = cls._create(model_attr=model_attr)
         return ExamRecord(database_model=database_record)
@@ -137,3 +139,13 @@ class ExamRecordRepository(Repository):
         )
 
         return ExamRecord(database_model=database_task)
+
+    @classmethod
+    def delete(cls, exam_record: ExamRecord):
+        """
+        更新测试记录中的结束时间为此刻
+
+        :param exam_record: 测试记录实例
+        :return: 更新完后的测试记录
+        """
+        return exam_record.database_model.delete()

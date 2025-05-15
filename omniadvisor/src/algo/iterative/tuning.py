@@ -2,4 +2,4 @@
 class SmacAppendTuning:
     @staticmethod
     def tune(history: any):
-        return {}
+        return {}, ''
