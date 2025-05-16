@@ -95,27 +95,29 @@ class TuningResult:
 
     @property
     def runtime(self):
-        # 若配置未复测过，则runtime为失败返回值
-        if not self._exam_records:
-            return OA_CONF.exec_fail_return_value
-
         # 计算执行状态为success的平均runtime
         success_runtimes = [
             exam_record.runtime
             for exam_record in self._exam_records if exam_record.status == OA_CONF.ExecStatus.success
         ]
+
+        # 若配置成功复测的次数为0，则runtime为失败返回值
+        if not success_runtimes:
+            return OA_CONF.exec_fail_return_runtime
+
         return sum(success_runtimes) / len(success_runtimes)
 
     @property
     def trace(self):
-        # 若配置未复测过，则trace为失败返回值
-        if not self._exam_records:
-            return OA_CONF.exec_fail_return_trace
-
         success_exam_results = [
             exam_record
             for exam_record in self._exam_records if exam_record.status == OA_CONF.ExecStatus.success
         ]
+
+        # 若配置成功复测的次数为0，则trac为失败返回值
+        if not success_exam_results:
+            return OA_CONF.exec_fail_return_trace
+
         best_exam_record = min(success_exam_results, key=lambda exam_record: exam_record.runtime)
         return best_exam_record.trace
 

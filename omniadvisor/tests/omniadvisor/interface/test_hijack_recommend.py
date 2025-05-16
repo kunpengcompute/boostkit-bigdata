@@ -48,7 +48,7 @@ class TestHijackRecommend(unittest.TestCase):
     @patch("omniadvisor.interface.hijack_recommend.SparkParameterParser")
     @patch("omniadvisor.interface.hijack_recommend.LoadRepository")
     @patch("omniadvisor.interface.hijack_recommend.spark_run")
-    @patch("omniadvisor.interface.hijack_recommend._refresh_best_config")
+    @patch("omniadvisor.interface.hijack_recommend._process_load_config")
     def test_hijack_recommend_failure_with_fallback(self, mock_refreshed_load, mock_spark_run, mock_load_repo, mock_parser):
         """
         测试 hijack_recommend 在任务失败且需要回退到用户默认配置时的行为。

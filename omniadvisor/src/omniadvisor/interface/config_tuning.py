@@ -46,13 +46,16 @@ def unified_tuning(load, retest_way: str, tuning_method: str):
     if tuning_method == OA_CONF.TuningMethod.iterative:
         perf_history = get_tuning_result_history(load)
         next_config = SmacAppendTuning.tune(perf_history.tuning_history)
-        TuningRecordRepository.create(load=load, config=next_config, method=OA_CONF.TuningMethod.iterative)
     elif tuning_method == OA_CONF.TuneMethod.expert:
         perf_history = get_tuning_result_history(load)
         next_config = ExpertTuning.tune(perf_history.tuning_history)
         TuningRecordRepository.create(load=load, config=next_config, method=OA_CONF.TuningMethod.expert)
     else:
         raise ValueError(f'Not supported tuning method: {tuning_method}')
+
+    # 用户的default_config上叠加next_config叠加
+    next_config = load.default_config.copy().update(next_config) if load else next_config
+    TuningRecordRepository.create(load=load, config=next_config, method=tuning_method)
 
     # 复测
     if retest_way == OA_CONF.RetestWay.backend:
