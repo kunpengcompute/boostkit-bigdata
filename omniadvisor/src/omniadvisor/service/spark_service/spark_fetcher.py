@@ -3,7 +3,7 @@ import json
 
 
 class SparkFetcher:
-    def __init__(self, history_server_url, ):
+    def __init__(self, history_server_url,):
         """
         初始化SparkFetcher类
 

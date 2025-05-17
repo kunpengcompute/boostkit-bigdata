@@ -80,7 +80,6 @@ def unified_tuning(load, retest_way: str, tuning_method: str):
             global_logger.info('Remove tuning result because the status is running.')
             remove_tuning_result(load, next_config)
             raise
-        time.sleep(10)
         perf_history = get_tuning_result_history(load)
         # 更新最优配置
         if perf_history.best_config:
