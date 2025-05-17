@@ -14,6 +14,13 @@ use_config_file="false"
 # conf文件路径
 config_file_path="/usr/local/spark/conf/spark-defaults.conf"
 
+for arg in "$@"; do
+
+    if [[ "$arg" == "-e" ]]; then
+        exit 2
+    fi
+
+done
 
 # 如果没有使用conf文件配置参数，直接在参数中读取
 if [[ "$use_config_file" == "false" ]]; then
@@ -22,21 +29,21 @@ if [[ "$use_config_file" == "false" ]]; then
         value="${BASH_REMATCH[1]}"
         value=${value//\\/}
         if [[ "$value" != "true" ]]; then
-            echo "$input"
+            printf "%s\n" "$input"
             exit 0
         fi
     else
-        echo "$input"
+        printf "%s\n" "$input"
         exit 0
     fi
 
     # 检查堆外内存配置是否开启
     if [[ "$input" =~ --conf[[:space:]]+spark.memory.offHeap.enabled=([^[:space:]]+) ]]; then
-        value="${BASH_REMATCH[1]}"
+        value=$(printf "%s\n" "$input" | grep -oP '.*\K--conf[[:space:]]+spark\.memory\.offHeap\.enabled=\K[^[:space:]]+')
         value=${value//\\/}
         # 如果堆外内存开启，则不能借用堆内内存
         if [[ "$value" == "true" ]]; then
-            echo "$input"
+            printf "%s\n" "$input"
             exit 0
         fi
     fi
@@ -49,11 +56,11 @@ if [[ "$use_config_file" == "false" ]]; then
         if [[ "$value" =~ ^[0-9]+$ ]]; then
             memFraction=$value
             if (($(awk 'BEGIN{print ('$memFraction' > 100) ? 1 : 0}'))); then
-                echo "$input"
+                printf "%s\n" "$input"
                 exit 0
             fi
         else
-            echo "$input"
+            printf "%s\n" "$input"
             exit 0
         fi
     fi
@@ -61,22 +68,22 @@ elif [[ "$use_config_file" == "true" ]]; then
     # 判断配置文件中是否开启内存借用
     value=$(awk '$1=="spark.omni.enableBorrow"{print $2}' "$config_file_path")
     if [ -z "$value" ]; then
-        echo "$input"
+        printf "%s\n" "$input"
         exit 0
     else
         if [ "$value" != "true" ]; then
-            echo "$input"
+            printf "%s\n" "$input"
             exit 0
         fi
     fi
 
     # 检查输入参数中堆外内存配置是否开启
     if [[ "$input" =~ --conf[[:space:]]+spark.memory.offHeap.enabled=([^[:space:]]+) ]]; then
-        value="${BASH_REMATCH[1]}"
+        value=$(printf "%s\n" "$input" | grep -oP '.*\K--conf[[:space:]]+spark\.memory\.offHeap\.enabled=\K[^[:space:]]+')
         value=${value//\\/}
         # 如果堆外内存开启，则不能借用堆内内存
         if [[ "$value" == "true" ]]; then
-            echo "$input"
+            printf "%s\n" "$input"
             exit 0
         fi
     fi
@@ -84,7 +91,7 @@ elif [[ "$use_config_file" == "true" ]]; then
     value=$(awk '$1=="spark.memory.offHeap.enabled"{print $2}' "$config_file_path")
     if [ -n "$value" ]; then
         if [ "$value" == "true" ]; then
-            echo "$input"
+            printf "%s\n" "$input"
             exit 0
         fi
     fi
@@ -96,16 +103,16 @@ elif [[ "$use_config_file" == "true" ]]; then
             memFraction=$value
             if (($(awk 'BEGIN{print ('$memFraction' > 100) ? 1 : 0}'))); then
                 # echo "错误：memFraction 不能大于100，当前值为 $memFraction"
-                echo "$input"
+                printf "%s\n" "$input"
                 exit 0
             fi
         else
-            echo "$input"
+            printf "%s\n" "$input"
             exit 0
         fi
     fi
 else
-    echo "$input"
+    printf "%s\n" "$input"
     exit 0
 fi
 
@@ -117,14 +124,14 @@ if [[ "$input" =~ --executor-memory[[:space:]]+([0-9]+)[.]?[0-9]*([a-zA-Z]+) ]];
     executorMemory=$(awk "BEGIN {print $value - $borrowedMemory}")
 
 else
-    echo "$input"
+    printf "%s\n" "$input"
     exit 0
 fi
 
 # 1. 替换 --executor-memory 为 executorMemory+memoryUnit
-output=$(echo "$input" | sed -E "s/(--executor-memory[[:space:]=]+)[^#[:space:]\\]*/\1${executorMemory}${memoryUnit}/")
+output=$(printf "%s\n" "$input" | sed -E "s/(--executor-memory[[:space:]=]+)[^#[:space:]\\]*/\1${executorMemory}${memoryUnit}/")
 
 # 2. 增加新参数
 output="${output} --conf spark.memory.offHeap.enabled=true --conf spark.memory.offHeap.size=${borrowedMemory}${memoryUnit}"
 
-echo "$output"
+printf "%s\n" "$output"
