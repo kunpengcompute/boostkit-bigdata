@@ -1,8 +1,9 @@
 import argparse
-import time
 
 from algo.expert.tuning import ExpertTuning
 from algo.iterative.tuning import SmacAppendTuning
+from algo.native.tuning import NativeTuning
+from algo.transfer.tuning import TransferTuning
 from omniadvisor.repository.load_repository import LoadRepository
 from omniadvisor.repository.tuning_record_repository import TuningRecordRepository
 from omniadvisor.service.retest_service import retest
@@ -10,9 +11,6 @@ from omniadvisor.service.tuning_result.tuning_result import remove_tuning_result
 from omniadvisor.service.tuning_result.tuning_result_history import get_tuning_result_history, \
     get_next_tuning_method, get_other_tuning_result_history
 from omniadvisor.utils.logger import global_logger
-
-from algo.native.tuning import NativeTuning
-from algo.transfer.tuning import TransferTuning
 from common.constant import OA_CONF
 
 

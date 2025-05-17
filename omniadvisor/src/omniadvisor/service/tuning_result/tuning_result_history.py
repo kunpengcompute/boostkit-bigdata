@@ -10,8 +10,8 @@ from common.constant import OA_CONF
 
 
 def get_other_tuning_result_history(load: Load):
-    # TODO 暂未实现
-    pass
+    # 暂未实现
+    return None
 
 
 def get_next_tuning_method(load) -> str:

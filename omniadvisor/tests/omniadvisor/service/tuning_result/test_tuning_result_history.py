@@ -50,6 +50,7 @@ class TestTuningResultHistory:
         assert len(result._tuning_results) == 1
         assert result._tuning_results[0] == tuning_result_mock
 
+    @patch.object(TuningResult, 'to_tuning', lambda self: self)
     def test_tuning_result_history_config_perf_pairs(self, setup_mocks):
         load, tuning_record_mock, tuning_result_mock = setup_mocks
 
