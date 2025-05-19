@@ -68,10 +68,10 @@ class ColumnarBasicFunctionSuite extends QueryTest with SharedSparkSession {
       insert = spark.sql("insert into table target_table select UPPER(name) as name, SUM(amount) as total_amount from " +
         "source_table where amount >= 10 GROUP BY UPPER(name)")
       insert.collect()
-      assert(insert.queryExecution.executedPlan.asInstanceOf[CommandResultExec]
-        .commandPhysicalPlan.toString().contains("OmniColumnarHashAggregate"), "use columnar data writing command")
-      val columnarDataWrite = insert.queryExecution.executedPlan.asInstanceOf[CommandResultExec]
-        .commandPhysicalPlan.find({
+      assert(insert.queryExecution.executedPlan.toString().contains("OmniColumnarHashAggregate"),
+        "use columnar data writing command")
+      val columnarDataWrite = insert.queryExecution.executedPlan
+        .find({
           case _: HashAggregateExec => true
           case _ => false
         })
