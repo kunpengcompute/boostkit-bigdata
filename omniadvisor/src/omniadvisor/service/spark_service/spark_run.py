@@ -30,24 +30,7 @@ def spark_run(load, conf):
 
     # 执行当前的submit_cmd
     spark_executor = SparkExecutor()
-    try:
-        ExamRecordRepository.update_start_time(exam_record)
-        exitcode, spark_output = spark_executor.submit_spark_task(submit_cmd)
-        ExamRecordRepository.update_end_time(exam_record)
-    except TimeoutError:
-        # 任务提交超时等
-        exam_record.delete()
-        global_logger.error('Spark command submission timed out.')
-        raise
-    except OSError:
-        # 权限不足等
-        exam_record.delete()
-        global_logger.error('Spark command submission permission denied.')
-        raise
-    except Exception:
-        exam_record.delete()
-        global_logger.error('During Spark command submission, known error occurred.')
-        raise
+    exitcode, spark_output = _submit_spark_task(exam_record, spark_executor, submit_cmd)
 
     # 不存在application_id的情况下不提取time_taken 直接返回
     if exitcode != 0:
@@ -89,6 +72,35 @@ def spark_run(load, conf):
     p.start()
 
     return exam_record, spark_output
+
+
+def _submit_spark_task(exam_record, spark_executor, submit_cmd):
+    """
+    提交spark任务
+    :param exam_record: 测试记录
+    :param spark_executor: 执行器
+    :param submit_cmd: 命令
+    :return:
+    """
+    try:
+        ExamRecordRepository.update_start_time(exam_record)
+        exitcode, spark_output = spark_executor.submit_spark_task(submit_cmd)
+        ExamRecordRepository.update_end_time(exam_record)
+    except TimeoutError:
+        # 任务提交超时等
+        exam_record.delete()
+        global_logger.error('Spark command submission timed out.')
+        raise
+    except OSError:
+        # 权限不足等
+        exam_record.delete()
+        global_logger.error('Spark command submission permission denied.')
+        raise
+    except Exception:
+        exam_record.delete()
+        global_logger.error('During Spark command submission, known error occurred.')
+        raise
+    return exitcode, spark_output
 
 
 def _update_trace_from_history_server(exam_record: ExamRecord, application_id: str):
