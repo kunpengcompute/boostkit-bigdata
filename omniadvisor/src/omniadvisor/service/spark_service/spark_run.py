@@ -29,8 +29,7 @@ def spark_run(load, conf):
     exam_record = ExamRecordRepository.create(load, conf)
 
     # 执行当前的submit_cmd
-    spark_executor = SparkExecutor()
-    exitcode, spark_output = _submit_spark_task(exam_record, spark_executor, submit_cmd)
+    exitcode, spark_output = _submit_spark_task(exam_record, submit_cmd)
 
     # 不存在application_id的情况下不提取time_taken 直接返回
     if exitcode != 0:
@@ -49,7 +48,7 @@ def spark_run(load, conf):
     status = OA_CONF.ExecStatus.success
     # 提取application_id与 time_taken(runtime)
     try:
-        spark_submit_cmd, application_id, runtime = spark_executor.parser_spark_output(spark_output)
+        spark_submit_cmd, application_id, runtime = SparkExecutor.parser_spark_output(spark_output)
     except Exception:
         ExamRecordRepository.delete(exam_record)
         global_logger.error('During parsing spark output, known error occurred.')
@@ -74,17 +73,16 @@ def spark_run(load, conf):
     return exam_record, spark_output
 
 
-def _submit_spark_task(exam_record, spark_executor, submit_cmd):
+def _submit_spark_task(exam_record, submit_cmd):
     """
     提交spark任务
     :param exam_record: 测试记录
-    :param spark_executor: 执行器
     :param submit_cmd: 命令
     :return:
     """
     try:
         ExamRecordRepository.update_start_time(exam_record)
-        exitcode, spark_output = spark_executor.submit_spark_task(submit_cmd)
+        exitcode, spark_output = SparkExecutor.submit_spark_task(submit_cmd)
         ExamRecordRepository.update_end_time(exam_record)
     except TimeoutError:
         # 任务提交超时等
