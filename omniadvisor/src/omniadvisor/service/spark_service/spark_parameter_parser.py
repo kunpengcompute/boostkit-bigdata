@@ -1,8 +1,8 @@
 import shlex
 from dataclasses import dataclass
-from omniadvisor.utils.logger import global_logger
-from common.constant import OA_CONF
+
 from omniadvisor.service.parameter_parser import ParserInterface
+from omniadvisor.utils.logger import global_logger
 
 SPARK_NON_EXEC_ATTR_SET = {"name", "conf"}
 SPARK_CONF_SUPPLEMENT_MAP = {"num_executors": "spark.executor.instances",
@@ -10,6 +10,7 @@ SPARK_CONF_SUPPLEMENT_MAP = {"num_executors": "spark.executor.instances",
                              "driver_cores": "spark.driver.cores",
                              "executor_memory": "spark.executor.memory",
                              "driver_memory": "spark.driver.memory"}
+
 
 @dataclass(frozen=True)
 class BaseParams:
@@ -106,15 +107,17 @@ class SparkParameterParser(ParserInterface):
             # 提取conf配置
             elif key == "conf":
                 for confitem in value:
-                    parts = confitem.split("=", 1)
-                    confkey, confvalue = parts
+                    confkey, confvalue = confitem.split("=", 1)
                     # 处理重复键问题，例如合并值为列表
                     if confkey in conf_params:
                         if isinstance(conf_params[confkey], list):
                             conf_params[confkey].append(confvalue)
                         else:
                             conf_params[confkey] = [conf_params[key], value]
-                        global_logger.warn(f"{confkey}被重复配置,多次配置值如下{conf_params[confvalue]}")
+                        global_logger.warn(
+                            f"{confkey} is configured repeatedly, and the multiple configuration values are as follows:"
+                            f" {conf_params[confvalue]}"
+                        )
                     else:
                         conf_params[confkey] = confvalue
             # 将 --num-executors --executors-cores --driver-cores这类的配置归类到conf_params中便于后续重建命令

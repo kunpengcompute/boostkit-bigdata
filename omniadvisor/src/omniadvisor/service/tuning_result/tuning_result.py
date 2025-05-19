@@ -1,6 +1,6 @@
 from typing import List
 
-from algo.common.model import Tuning
+from algo.common.model import Tuning, Trace
 from omniadvisor.repository.model.load import Load
 from omniadvisor.repository.model.tuning_record import TuningRecord
 from omniadvisor.repository.model.exam_record import ExamRecord
@@ -34,6 +34,19 @@ def get_tuning_result(load: Load, config: dict):
         tuning_record=tuning_record,
         exam_records=exam_records
     )
+
+
+def remove_tuning_result(load: Load, config: dict):
+    """
+    删除给定负载和配置的执行记录
+    """
+    tuning_result = get_tuning_result(load, config)
+    # 清测试记录
+    for exam_record in tuning_result.exam_records:
+        ExamRecordRepository.delete(exam_record)
+
+    # 清调优记录
+    TuningRecordRepository.delete(tuning_result.tuning_record)
 
 
 class TuningResult:
@@ -76,6 +89,10 @@ class TuningResult:
         return len(self._exam_records)
 
     @property
+    def failed_times(self):
+        return sum([exam_record.status == OA_CONF.ExecStatus.fail for exam_record in self._exam_records])
+
+    @property
     def status(self):
         """
         对于tuning result 定义三种状态
@@ -84,8 +101,7 @@ class TuningResult:
         复测中：复测次数小于指定复测次数，且失败次数没有超过阈值，复测流程尚在进行中
         :return:
         """
-        failed_times = sum([exam_record.status == OA_CONF.ExecStatus.fail for exam_record in self._exam_records])
-        if failed_times >= OA_CONF.config_fail_threshold:
+        if self.failed_times >= OA_CONF.config_fail_threshold:
             overall_status = OA_CONF.ExecStatus.fail
         elif len(self._exam_records) == OA_CONF.tuning_retest_times:
             overall_status = OA_CONF.ExecStatus.success
@@ -121,13 +137,26 @@ class TuningResult:
         best_exam_record = min(success_exam_results, key=lambda exam_record: exam_record.runtime)
         return best_exam_record.trace
 
+    @property
+    def tuning_record(self):
+        return self._tuning_record
+
+    @property
+    def exam_records(self):
+        return self._exam_records
+
     def to_tuning(self) -> Tuning:
+        if self.trace is not None:
+            trace = Trace(stages_with_summaries=self.trace.get('stages'), sql=self.trace.get('sql'))
+        else:
+            trace = None
+
         return Tuning(
             round=self.rounds,
             config=self.config,
             method=self.method,
-            rule='',
+            rule=self.method_extend,
             status=self.status,
             runtime=self.runtime,
-            trace=self.trace
+            trace=trace
         )

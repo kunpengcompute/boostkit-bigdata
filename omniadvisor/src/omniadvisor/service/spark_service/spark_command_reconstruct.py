@@ -1,5 +1,4 @@
 from omniadvisor.utils.logger import global_logger
-from common.constant import OA_CONF
 
 
 def spark_command_reconstruct(load, conf):
@@ -43,7 +42,7 @@ def spark_command_reconstruct(load, conf):
             submit_cmd_list.append(f"{_normalize_key(key)}={_normalize_value(value)}")
 
     submit_cmd = " ".join(submit_cmd_list)
-    global_logger.info(f"拼接后的spark-sql命令如下{submit_cmd}")
+    global_logger.info(f"The complete spark-sql command is as follows {submit_cmd}")
     return submit_cmd
 
 
@@ -67,4 +66,3 @@ def _normalize_value(value):
     if isinstance(value, str) and ' ' in value:
         value = f'"{value}"'
     return value
-

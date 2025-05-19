@@ -3,9 +3,9 @@ import sys
 from unittest.mock import patch, MagicMock
 
 import pytest
+from omniadvisor.interface.config_tuning import unified_tuning, main
 
 from common.constant import OA_CONF
-from omniadvisor.interface.config_tuning import unified_tuning, main
 
 
 class TestTuning:
@@ -16,6 +16,8 @@ class TestTuning:
         self.load.default_config = {"test_config": "1"}
         self.retest_times = 3
         self.tuning_method = OA_CONF.TuningMethod.iterative
+        self.empty_str = ''
+        self.tune_return_val = ({'key': 'value'}, '')
 
     def test_unified_tuning_when_retest_backend(self):
         """
@@ -29,8 +31,9 @@ class TestTuning:
                 patch('omniadvisor.repository.load_repository.LoadRepository.update_best_config') as mock_update_best, \
                 patch('algo.iterative.tuning.SmacAppendTuning.tune') as mock_smac_tuning:
             mock_exam_record = MagicMock()
+            mock_smac_tuning.return_value = self.tune_return_val
             mock_exam_record.status = OA_CONF.ExecStatus.success
-            spark_output = ''
+            spark_output = self.empty_str
             mock_spark_run.return_value = mock_exam_record, spark_output
             unified_tuning(load=self.load, retest_way=OA_CONF.RetestWay.backend, tuning_method=self.tuning_method)
             mock_update_best.assert_called_once()
@@ -42,25 +45,32 @@ class TestTuning:
         后台复测 spark命令执行异常
         :return:
         """
-        caplog.set_level(logging.ERROR)
+        caplog.set_level(logging.WARNING)
         with patch('omniadvisor.repository.load_repository.LoadRepository.query_by_id'), \
                 patch('omniadvisor.repository.tuning_record_repository.TuningRecordRepository.create'), \
                 patch('omniadvisor.service.retest_service.spark_run') as mock_spark_run, \
                 patch('omniadvisor.interface.config_tuning.get_tuning_result_history'), \
+                patch('omniadvisor.service.retest_service.get_tuning_result') as mock_get_tuning_result, \
+                patch('omniadvisor.interface.config_tuning.remove_tuning_result') as mock_remove_tuning_result, \
                 patch('algo.iterative.tuning.SmacAppendTuning.tune') as mock_smac_tuning, \
-                patch('omniadvisor.repository.load_repository.LoadRepository.update_best_config') as mock_update_best, \
-                pytest.raises(RuntimeError):
+                patch('omniadvisor.repository.load_repository.LoadRepository.update_best_config') as mock_update_best:
             mock_exam_record = MagicMock()
             mock_exam_record.status = OA_CONF.ExecStatus.fail
-            spark_output = ''
+            spark_output = self.empty_str
             mock_spark_run.return_value = mock_exam_record, spark_output
-            unified_tuning(load=self.load, retest_way=OA_CONF.RetestWay.backend, tuning_method=self.tuning_method)
+            mock_smac_tuning.return_value = self.tune_return_val
+            mock_tuning_result = MagicMock()
+            mock_tuning_result.failed_times = OA_CONF.config_fail_threshold
+            mock_get_tuning_result.return_value = mock_tuning_result
+            with pytest.raises(RuntimeError):
+                unified_tuning(load=self.load, retest_way=OA_CONF.RetestWay.backend, tuning_method=self.tuning_method)
 
             mock_smac_tuning.assert_called_once()
             mock_spark_run.assert_called_once()
             mock_update_best.assert_not_called()
+            mock_remove_tuning_result.assert_called_once()
 
-            assert '复测第 1 轮失败，异常来源：spark运行异常' in caplog.text
+            assert 'Retest failed in round 1. Exception source: Spark exception' in caplog.text
 
     def test_unified_tuning_when_other_exception(self, caplog):
         """
@@ -72,16 +82,19 @@ class TestTuning:
                 patch('omniadvisor.repository.tuning_record_repository.TuningRecordRepository.create'), \
                 patch('omniadvisor.service.retest_service.spark_run', side_effect=RuntimeError) as mock_spark_run, \
                 patch('omniadvisor.interface.config_tuning.get_tuning_result_history'), \
-                patch('omniadvisor.repository.load_repository.LoadRepository.update_best_config') as mock_update_best, \
+                patch('omniadvisor.repository.load_repository.LoadRepository.update_best_config'), \
                 patch('algo.iterative.tuning.SmacAppendTuning.tune') as mock_smac_tuning, \
-                pytest.raises(RuntimeError):
+                patch('omniadvisor.interface.config_tuning.remove_tuning_result') as mock_remove_tuning_result:
             mock_exam_record = MagicMock()
             mock_exam_record.status = OA_CONF.ExecStatus.success
-            unified_tuning(load=self.load, retest_way=OA_CONF.RetestWay.backend, tuning_method=self.tuning_method)
-            mock_update_best.assert_called_once()
+            mock_smac_tuning.return_value = self.tune_return_val
+            with pytest.raises(RuntimeError):
+                unified_tuning(load=self.load, retest_way=OA_CONF.RetestWay.backend, tuning_method=self.tuning_method)
+
             mock_smac_tuning.assert_called_once()
             mock_spark_run.assert_called_once()
-            assert '非spark运行异常' in caplog.text
+            mock_remove_tuning_result.assert_called_once()
+            assert 'Retest failed in round 1. Exception source: Non-Spark exception' in caplog.text
 
     def test_main_when_load_id_not_exist(self):
         """
@@ -111,6 +124,7 @@ class TestTuning:
                 patch('omniadvisor.interface.config_tuning.get_tuning_result_history') as mocked_query_perf, \
                 patch('omniadvisor.repository.load_repository.LoadRepository.update_test_config') as mock_update_test, \
                 patch('algo.iterative.tuning.SmacAppendTuning.tune') as mock_smac_tuning:
+            mock_smac_tuning.return_value = self.tune_return_val
             unified_tuning(load=self.load, retest_way=OA_CONF.RetestWay.hijacking,
                            tuning_method=self.tuning_method)
             mocked_query_perf.assert_called_once()

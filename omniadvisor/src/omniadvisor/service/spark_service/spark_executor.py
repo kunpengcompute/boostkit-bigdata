@@ -3,7 +3,9 @@ from omniadvisor.utils.utils import run_cmd
 
 
 class SparkExecutor:
-    def submit_spark_task(self, execute_cmd):
+
+    @classmethod
+    def submit_spark_task(cls, execute_cmd):
         """
         在shell终端提交spark命令
         :param submit_config_str: spark的提交命令
@@ -13,10 +15,12 @@ class SparkExecutor:
 
         return exitcode, spark_output
 
-    def parser_spark_output(self, spark_output) -> dict:
-        return self._reg_match_application_id_and_time_taken(spark_output)
+    @classmethod
+    def parser_spark_output(cls, spark_output) -> dict:
+        return cls._reg_match_application_id_and_time_taken(spark_output)
 
-    def _reg_match_application_id_and_time_taken(self, spark_output):
+    @classmethod
+    def _reg_match_application_id_and_time_taken(cls, spark_output):
         spark_output = spark_output.split("\n")
         spark_submit_cmd = ""
         application_id = ""

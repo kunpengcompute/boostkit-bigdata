@@ -28,7 +28,7 @@ class TuningRecordRepository(Repository):
     }
 
     @classmethod
-    def create(cls, load: Load, config: dict, method: str):
+    def create(cls, load: Load, config: dict, method: str, method_extend: str = ''):
         """
         指定负载、参数配置和调优方法，新增调优记录
 
@@ -61,6 +61,7 @@ class TuningRecordRepository(Repository):
             TuningRecord.FieldName.config: config,
             TuningRecord.FieldName.method: method,
             TuningRecord.FieldName.rounds: tuning_rounds,
+            TuningRecord.FieldName.method_extend: method_extend
         }
         database_record = cls._create(model_attr=model_attr)
         return TuningRecord(database_model=database_record)
@@ -104,3 +105,12 @@ class TuningRecordRepository(Repository):
         return [
             TuningRecord(database_model=database_record) for database_record in database_records
         ]
+
+    @classmethod
+    def delete(cls, tuning_record: TuningRecord):
+        """
+        删除 tuning_record 记录
+        :param tuning_record:
+        :return:
+        """
+        return tuning_record.database_model.delete()
