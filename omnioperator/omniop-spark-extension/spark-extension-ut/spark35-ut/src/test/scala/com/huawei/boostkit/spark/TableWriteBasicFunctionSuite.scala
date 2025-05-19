@@ -206,56 +206,60 @@ class TableWriteBasicFunctionSuite extends QueryTest with SharedSparkSession {
   }
 
   test("Unsupported StaticInvoke function varcharTypeWriteSideCheck") {
-    val drop = spark.sql("drop table if exists source_table")
-    drop.collect()
-    val createTable = spark.sql("create table source_table" +
-      "(id int, name string, amount int) using parquet")
-    createTable.collect()
-    val dropNP = spark.sql("drop table if exists target_table")
-    dropNP.collect()
-    val createTableNP = spark.sql("create table target_table" +
-      "(name varchar(5), total_amount long) using parquet")
-    createTableNP.collect()
-    var insert = spark.sql("insert into table source_table values" +
-      "(1, 'Bob', 250), (2, '測試中文', 250), (3, NULL, 250), (4, 'abide', 250)")
-    insert.collect()
-    insert = spark.sql("insert into table target_table select UPPER(name) as name, SUM(amount) as total_amount from " +
-      "source_table where amount >= 10 GROUP BY UPPER(name)")
-    insert.collect()
-    assert(insert.queryExecution.executedPlan.asInstanceOf[CommandResultExec]
-      .commandPhysicalPlan.toString().contains("OmniColumnarHashAggregate"), "use columnar data writing command")
-    val columnarDataWrite = insert.queryExecution.executedPlan.asInstanceOf[CommandResultExec]
-      .commandPhysicalPlan.find({
-        case _: HashAggregateExec => true
-        case _ => false
-      })
-    assert(columnarDataWrite.isEmpty, "use columnar data writing command")
-    val select = spark.sql("select * from target_table order by name")
-    val runRows = select.collect()
-    val expectedRows = Seq(Row(null, 250), Row("ABIDE", 250), Row("BOB", 250), Row("測試中文", 250))
-    assert(QueryTest.sameRows(runRows, expectedRows).isEmpty, "the run value is error")
+    withSQLConf(("spark.omni.sql.columnar.staticInvoke", "true")) {
+      val drop = spark.sql("drop table if exists source_table")
+      drop.collect()
+      val createTable = spark.sql("create table source_table" +
+        "(id int, name string, amount int) using parquet")
+      createTable.collect()
+      val dropNP = spark.sql("drop table if exists target_table")
+      dropNP.collect()
+      val createTableNP = spark.sql("create table target_table" +
+        "(name varchar(5), total_amount long) using parquet")
+      createTableNP.collect()
+      var insert = spark.sql("insert into table source_table values" +
+        "(1, 'Bob', 250), (2, '測試中文', 250), (3, NULL, 250), (4, 'abide', 250)")
+      insert.collect()
+      insert = spark.sql("insert into table target_table select UPPER(name) as name, SUM(amount) as total_amount from " +
+        "source_table where amount >= 10 GROUP BY UPPER(name)")
+      insert.collect()
+      assert(insert.queryExecution.executedPlan.asInstanceOf[CommandResultExec]
+        .commandPhysicalPlan.toString().contains("OmniColumnarHashAggregate"), "use columnar data writing command")
+      val columnarDataWrite = insert.queryExecution.executedPlan.asInstanceOf[CommandResultExec]
+        .commandPhysicalPlan.find({
+          case _: HashAggregateExec => true
+          case _ => false
+        })
+      assert(columnarDataWrite.isEmpty, "use columnar data writing command")
+      val select = spark.sql("select * from target_table order by name")
+      val runRows = select.collect()
+      val expectedRows = Seq(Row(null, 250), Row("ABIDE", 250), Row("BOB", 250), Row("測試中文", 250))
+      assert(QueryTest.sameRows(runRows, expectedRows).isEmpty, "the run value is error")
+    }
   }
 
   test("Unsupported StaticInvoke function readSidePadding") {
-    val drop = spark.sql("drop table if exists source_table")
-    drop.collect()
-    val createTable = spark.sql("create table source_table" +
-      "(id int, name char(5)) using parquet")
-    createTable.collect()
-    val insert = spark.sql("insert into table source_table values" +
-      "(1, 'Bob'), (2, '測試中文'), (3, NULL), (4, 'abide')")
-    insert.collect()
-    val select = spark.sql("select * from source_table order by id")
-    val runRows = select.collect()
-    assert(select.queryExecution.executedPlan.toString().contains("OmniColumnarProject"),
-      "use columnar data writing command")
-    val columnarDataWrite = select.queryExecution.executedPlan.asInstanceOf[AdaptiveSparkPlanExec]
-      .find({
-        case _: ProjectExec => true
-        case _ => false
-      })
-    assert(columnarDataWrite.isEmpty, "use columnar data writing command")
-    val expectedRows = Seq(Row(1, "Bob  "), Row(2, "測試中文 "), Row(3, null), Row(4, "abide"))
-    assert(QueryTest.sameRows(runRows, expectedRows).isEmpty, "the run value is error")
+    withSQLConf(("spark.omni.sql.columnar.staticInvoke", "true")) {
+      val drop = spark.sql("drop table if exists source_table")
+      drop.collect()
+      val createTable = spark.sql("create table source_table" +
+        "(id int, name char(5)) using parquet")
+      createTable.collect()
+      val insert = spark.sql("insert into table source_table values" +
+        "(1, 'Bob'), (2, '測試中文'), (3, NULL), (4, 'abide')")
+      insert.collect()
+      val select = spark.sql("select * from source_table order by id")
+      val runRows = select.collect()
+      assert(select.queryExecution.executedPlan.toString().contains("OmniColumnarProject"),
+        "use columnar data writing command")
+      val columnarDataWrite = select.queryExecution.executedPlan.asInstanceOf[AdaptiveSparkPlanExec]
+        .find({
+          case _: ProjectExec => true
+          case _ => false
+        })
+      assert(columnarDataWrite.isEmpty, "use columnar data writing command")
+      val expectedRows = Seq(Row(1, "Bob  "), Row(2, "測試中文 "), Row(3, null), Row(4, "abide"))
+      assert(QueryTest.sameRows(runRows, expectedRows).isEmpty, "the run value is error")
+    }
   }
 }
