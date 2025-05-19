@@ -200,6 +200,8 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
   def catalogCacheExpireTime: Int = conf.getConf(CATALOG_CACHE_EXPIRE_TIME)
 
   def joinOutputStringTypeCost: Int = conf.getConf(JOIN_OUTPUT_STRING_COST_ESTIMATE)
+
+  def enableOmniStaticInvoke: Boolean = conf.getConf(ENABLED_OMNI_STATICINVOKE)
 }
 
 
@@ -719,4 +721,10 @@ object ColumnarPluginConfig {
       .internal()
       .stringConf
       .createOptional
+  
+  val ENABLED_OMNI_STATICINVOKE = buildConf("spark.omni.sql.columnar.staticInvoke")
+    .internal()
+    .doc("enable omni staticInvoke")
+    .booleanConf
+    .createWithDefault(false)
 }

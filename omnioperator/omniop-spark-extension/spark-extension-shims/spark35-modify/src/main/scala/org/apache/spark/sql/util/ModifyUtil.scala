@@ -20,6 +20,7 @@ package org.apache.spark.sql.util
 
 import com.huawei.boostkit.spark.expression.OmniExpressionAdaptor.{JsonObjectExtension, JsonArrayExtension}
 import com.huawei.boostkit.spark.util.ModifyUtilAdaptor
+import com.huawei.boostkit.spark.ColumnarPluginConfig
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.SparkSessionExtensions
 import org.apache.spark.sql.catalyst.expressions.{BloomFilterMightContain, ExprId, Expression, TryEval}
@@ -67,7 +68,7 @@ object ModifyUtil extends Logging {
       case tryEval: TryEval =>
         func(tryEval.child, exprsIndexMap, returnDatatype)
 
-      case staticInvoke: StaticInvoke =>
+      case staticInvoke: StaticInvoke if ColumnarPluginConfig.getSessionConf.enableOmniStaticInvoke =>
       {
         val funcName = staticInvoke.functionName
         funcName match {
