@@ -516,7 +516,7 @@ object OmniExpressionAdaptor extends Logging {
             }
         }
 
-      case staticInvoke: StaticInvoke =>
+      case staticInvoke: StaticInvoke if ColumnarPluginConfig.getSessionConf.enableOmniStaticInvoke =>
       {
         val funcName = staticInvoke.functionName
         funcName match {

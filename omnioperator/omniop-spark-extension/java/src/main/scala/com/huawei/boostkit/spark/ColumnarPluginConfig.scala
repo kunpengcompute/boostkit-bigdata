@@ -160,6 +160,8 @@ class ColumnarPluginConfig(conf: SQLConf) extends Logging {
   def enableOmniUnixTimeFunc: Boolean = conf.getConf(ENABLE_OMNI_UNIXTIME_FUNCTION)
 
   def enableVecPredicateFilter: Boolean = conf.getConf(ENABLE_VEC_PREDICATE_FILTER)
+
+  def enableOmniStaticInvoke: Boolean = conf.getConf(ENABLED_OMNI_STATICINVOKE)
 }
 
 
@@ -539,6 +541,12 @@ object ColumnarPluginConfig {
   val ENABLE_VEC_PREDICATE_FILTER = buildConf("spark.omni.sql.columnar.vec.predicate.enabled")
     .internal()
     .doc("enable vectorized predicate filtering")
+    .booleanConf
+    .createWithDefault(false)
+  
+  val ENABLED_OMNI_STATICINVOKE = buildConf("spark.omni.sql.columnar.staticInvoke")
+    .internal()
+    .doc("enable omni staticInvoke")
     .booleanConf
     .createWithDefault(false)
 }
