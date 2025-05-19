@@ -59,7 +59,7 @@ target_link_libraries (${PROJ_TARGET} PUBLIC
         Parquet::parquet_shared
         nlohmann_json::nlohmann_json
         orc
-        boostkit-omniop-vector-1.8.0-aarch64
+        boostkit-omniop-vector-1.9.0-aarch64
         hdfs
         )
 
