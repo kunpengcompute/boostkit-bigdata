@@ -57,9 +57,18 @@ def _get_exec_config_from_load(load: Load):
         return load.default_config
 
 
-def _refresh_best_config(load: Load):
+def _process_load_config(load: Load):
+    """
+    1.检查当前负载中test_config是否完成复测流程
+    2.根据复测情况判断是否需要清空load中的test_config
+    3.根据测试性能判断是否需要刷新load中保存的best_config
+    :param load: 本次测试用负载
+    :return:
+    """
     tuning_result = get_tuning_result(load, load.test_config)
-    if tuning_result.exam_times >= OA_CONF.tuning_retest_times:
+    if tuning_result.status == OA_CONF.ExecStatus.fail:
+        LoadRepository.update_test_config(load, {})
+    elif tuning_result.status == OA_CONF.ExecStatus.success:
         # 获取当前best_config的平均测试性能
         best_config_results = get_tuning_result(load, load.best_config)
         # 若调优性能优于最佳性能 刷新当前的best_config
@@ -106,7 +115,7 @@ def hijack_recommend(spark_sql_cmd: str):
         print(output)
 
     if exec_config == load.test_config:
-        _refresh_best_config(load=load)
+        _process_load_config(load=load)
 
 
 def main():

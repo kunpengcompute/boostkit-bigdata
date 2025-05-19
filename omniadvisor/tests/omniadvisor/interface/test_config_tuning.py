@@ -12,7 +12,8 @@ class TestTuning:
 
     def setup_class(self):
         # 创建表
-        self.load = None
+        self.load = MagicMock()
+        self.load.default_config = {"test_config": "1"}
         self.retest_times = 3
         self.tuning_method = OA_CONF.TuningMethod.iterative
         self.empty_str = ''
@@ -101,7 +102,7 @@ class TestTuning:
         :return:
         """
         sys.argv = ['config_tuning.py',
-                    '--load-id', self.load,
+                    '--load-id', None,
                     '--retest-way', OA_CONF.RetestWay.backend,
                     '--tuning-method', self.tuning_method]
 
