@@ -54,7 +54,11 @@ def unified_tuning(load, retest_way: str, tuning_method: str):
         raise ValueError(f'Not supported tuning method: {tuning_method}')
 
     # 用户的default_config上叠加next_config叠加
-    next_config = load.default_config.copy().update(next_config) if load else next_config
+    if load:
+        next_config = {**load.default_config, **next_config}
+    else:
+        raise ValueError("Invalid load: configuration cannot be loaded")
+
     TuningRecordRepository.create(load=load, config=next_config, method=tuning_method)
 
     # 复测
