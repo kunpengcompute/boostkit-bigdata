@@ -104,6 +104,9 @@ def main():
 
     # 查询上一次调优的结果是否测试完毕：
     tuning_result_history = get_tuning_result_history(load)
+    # 如果上一次的调优结果所使用的配置是用户默认配置 则无需调优 直接将状态设置为success
+    if tuning_result_history.latest_tuning_result.config == load.default_config:
+        tuning_result_history.latest_tuning_result.status = OA_CONF.ExecStatu.success
     if (tuning_result_history.latest_tuning_result and tuning_result_history.latest_tuning_result.status ==
             OA_CONF.ExecStatus.running):
         # 有上一次调优，且调优的结果仍在复测中，提示无法调优并退出

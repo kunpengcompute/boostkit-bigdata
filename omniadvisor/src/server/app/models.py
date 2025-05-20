@@ -52,7 +52,7 @@ class DatabaseTuningRecord(models.Model):
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=['load', 'config'], name='exam_record_unique')
+            models.UniqueConstraint(fields=['load', 'config'], name='tuning_record_unique')
         ]
         db_table = 'omniadvisor_tuning_record'  # 自定义表名
 
