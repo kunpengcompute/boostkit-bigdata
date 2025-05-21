@@ -1,6 +1,7 @@
-from itertools import chain
 from typing import List
 
+from omniadvisor.repository.exam_record_repository import ExamRecordRepository
+from omniadvisor.repository.load_prefetch_repository import LoadPrefetchRepository
 from omniadvisor.repository.model.load import Load
 from omniadvisor.repository.tuning_record_repository import TuningRecordRepository
 from omniadvisor.service.tuning_result.tuning_result import TuningResult
@@ -9,9 +10,35 @@ from omniadvisor.service.tuning_result.tuning_result import get_tuning_result
 from common.constant import OA_CONF
 
 
-def get_other_tuning_result_history(load: Load):
-    # 暂未实现
-    return None
+def get_other_tuning_result_history(exclude_load: Load):
+    """
+    查询 exclude_load 以外的所有 tuning result history
+    :param exclude_load
+    :return:
+    """
+    # 预取相关TuningRecord和ExamRecord
+    result = []
+    loads = LoadPrefetchRepository.get_loads_exclude(exclude_load.id)
+    for load in loads:
+        # 获取该Load下的所有TuningRecord
+        tuning_records = load.databasetuningrecord_set.all()
+        tuning_results = []
+        for tuning_record in tuning_records:
+            # 查询匹配的ExamRecord
+            exam_records = ExamRecordRepository.query_by_load_and_config(Load(load), tuning_record.config)
+            tuning_results.append(
+                TuningResult(
+                    tuning_record=tuning_record,
+                    exam_records=exam_records
+                )
+            )
+
+        result.append(TuningResultHistory(
+            load=load,
+            tuning_results=tuning_results
+        ))
+
+    return result
 
 
 def get_next_tuning_method(load) -> str:

@@ -32,4 +32,5 @@ def retest(load: Load, config: dict):
                                   spark_output)
             tuning_result = get_tuning_result(load, config)
             if tuning_result.failed_times >= OA_CONF.config_fail_threshold:
-                raise RuntimeError('The number of retest failures has reached the failure threshold.')
+                global_logger.info('The number of retest failures has reached the failure threshold.')
+                return

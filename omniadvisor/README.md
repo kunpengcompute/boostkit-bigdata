@@ -10,7 +10,7 @@
 - ① 若之前从未创建过用户，使用命令：`python init.py createsuperuser`，按指示设置用户名和密码。
 - ② `python init.py runserver`（可选 绑定 0.0.0.0:8000）
 - ③ 修改settings.py中的 ALLOWED_HOSTS（可选）
-- ④ 登录后台管理页面：`localhost:8000/admin/` （替换实际的ip）
+- ④ 登录后台管理页面：`localhost:8000/admin/` （替换实际的ip，若访问不通，须执行步骤 ②③）
 说明：进入页面后，可以看到APP下有若干数据表，其中 loads 就是负载表
 
 3 启用调优

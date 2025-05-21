@@ -29,7 +29,7 @@ def _parse_tuning_args():
                         help='If choose hijacking, a test will execute immediately')
 
     parser.add_argument("-t", "--tuning-method", type=str, required=False,
-                        choices=OA_CONF.TuningMethod.all,
+                        choices=[method for method in OA_CONF.TuningMethod.all if method != OA_CONF.TuningMethod.user],
                         help='Support three tune method, for iterative, use BO; for expert ...')
 
     args = parser.parse_args()
@@ -60,7 +60,9 @@ def unified_tuning(load, retest_way: str, tuning_method: str):
     elif tuning_method == OA_CONF.TuningMethod.transfer:
         perf_history = get_tuning_result_history(load)
         other_history = get_other_tuning_result_history(load)
-        next_config, method_extend = TransferTuning.tune(perf_history.tuning_history, other_history)
+        next_config, method_extend = TransferTuning.tune(
+            perf_history.tuning_history, [other.tuning_history for other in other_history]
+        )
     else:
         raise ValueError(f'Not supported tuning method: {tuning_method}')
 
@@ -84,7 +86,7 @@ def unified_tuning(load, retest_way: str, tuning_method: str):
             raise
         perf_history = get_tuning_result_history(load)
         # 更新最优配置
-        if perf_history.best_config:
+        if perf_history.best_config and perf_history.best_config != next_config:
             LoadRepository.update_best_config(load, perf_history.best_config)
     else:
         # 更新待测试配置即可
