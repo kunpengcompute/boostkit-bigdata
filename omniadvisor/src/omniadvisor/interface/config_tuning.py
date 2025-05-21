@@ -120,15 +120,14 @@ def main():
     if not load:
         return
 
-    # 查询上一次调优的结果是否测试完毕：
+    # 查询上一次调优的所推送的配置是否完成复测流程 如果满足以下所有条件，则提示无法调优并退出：
+    # 1. 存在最近的调优结果
+    # 2. 调优方法不是用户配置(用户配置无需复测)
+    # 3. 调优结果状态仍在运行中(复测中)
     tuning_result_history = get_tuning_result_history(load)
-    # 如果上一次的调优结果所使用的配置是用户默认配置 则无需调优 直接返回
-    if tuning_result_history.latest_tuning_result.tuning_record.method == OA_CONF.TuningMethod.user:
-        global_logger.info("The method of latest tuning result is user, not need to tuning")
-        return
-    if (tuning_result_history.latest_tuning_result and tuning_result_history.latest_tuning_result.status ==
-            OA_CONF.ExecStatus.running):
-        # 有上一次调优，且调优的结果仍在复测中，提示无法调优并退出
+    if (tuning_result_history.latest_tuning_result
+            and tuning_result_history.latest_tuning_result.tuning_record.method != OA_CONF.TuningMethod.user
+            and tuning_result_history.latest_tuning_result.status == OA_CONF.ExecStatus.running):
         global_logger.info('The retest status of latest tuning result is still running, please wait.')
         return
 
