@@ -58,7 +58,7 @@ class SparkFetcher:
         :param app_id: 应用ID
         :return: 返回指定应用的阶段信息
         """
-        return self._make_request(f"api/v1/applications/{app_id}/stages")
+        return self._make_request(f"api/v1/applications/{app_id}/stages?withSummaries=true")
 
     def get_spark_executor_by_app(self, app_id):
         """
@@ -68,6 +68,3 @@ class SparkFetcher:
         :return: 返回指定应用的执行器信息
         """
         return self._make_request(f"api/v1/applications/{app_id}/executors")
-
-
-

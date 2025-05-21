@@ -2,11 +2,14 @@ import argparse
 
 from algo.expert.tuning import ExpertTuning
 from algo.iterative.tuning import SmacAppendTuning
+from algo.native.tuning import NativeTuning
+from algo.transfer.tuning import TransferTuning
 from omniadvisor.repository.load_repository import LoadRepository
 from omniadvisor.repository.tuning_record_repository import TuningRecordRepository
 from omniadvisor.service.retest_service import retest
+from omniadvisor.service.tuning_result.tuning_result import remove_tuning_result
 from omniadvisor.service.tuning_result.tuning_result_history import get_tuning_result_history, \
-    get_next_tuning_method
+    get_next_tuning_method, get_other_tuning_result_history
 from omniadvisor.utils.logger import global_logger
 
 from common.constant import OA_CONF
@@ -41,29 +44,44 @@ def unified_tuning(load, retest_way: str, tuning_method: str):
     :param tuning_method: 算法的类型
     :return:
     """
+    if not load:
+        raise ValueError("Invalid load: configuration cannot be loaded")
 
     # 推荐下一个配置
     if tuning_method == OA_CONF.TuningMethod.iterative:
         perf_history = get_tuning_result_history(load)
-        next_config = SmacAppendTuning.tune(perf_history.tuning_history)
-    elif tuning_method == OA_CONF.TuneMethod.expert:
+        next_config, method_extend = SmacAppendTuning.tune(perf_history.tuning_history)
+    elif tuning_method == OA_CONF.TuningMethod.expert:
         perf_history = get_tuning_result_history(load)
-        next_config = ExpertTuning.tune(perf_history.tuning_history)
-        TuningRecordRepository.create(load=load, config=next_config, method=OA_CONF.TuningMethod.expert)
+        next_config, method_extend = ExpertTuning.tune(perf_history.tuning_history)
+    elif tuning_method == OA_CONF.TuningMethod.native:
+        perf_history = get_tuning_result_history(load)
+        next_config, method_extend = NativeTuning.tune(perf_history.tuning_history)
+    elif tuning_method == OA_CONF.TuningMethod.transfer:
+        perf_history = get_tuning_result_history(load)
+        other_history = get_other_tuning_result_history(load)
+        next_config, method_extend = TransferTuning.tune(perf_history.tuning_history, other_history)
     else:
         raise ValueError(f'Not supported tuning method: {tuning_method}')
 
-    # 用户的default_config上叠加next_config叠加
-    if load:
-        next_config = {**load.default_config, **next_config}
-    else:
-        raise ValueError("Invalid load: configuration cannot be loaded")
+    if not next_config:
+        global_logger.info('The recommending config is empty, please try other tuning methods.')
+        return
 
-    TuningRecordRepository.create(load=load, config=next_config, method=tuning_method)
+    # 用户的default_config上叠加next_config叠加
+    next_config = {**load.default_config, **next_config}
+
+    TuningRecordRepository.create(load=load, config=next_config, method=tuning_method, method_extend=method_extend)
 
     # 复测
     if retest_way == OA_CONF.RetestWay.backend:
-        retest(load, next_config)
+        try:
+            retest(load, next_config)
+        except Exception:
+            # 如果之前发生错误，状态被置为running，此调优配置不可能再被复测，那么删除对应的exam_records、tuning_record
+            global_logger.info('Remove tuning result because the status is running.')
+            remove_tuning_result(load, next_config)
+            raise
         perf_history = get_tuning_result_history(load)
         # 更新最优配置
         if perf_history.best_config:
@@ -117,11 +135,11 @@ def main():
         # 用户输入了强制调优的请求，以用户为准
         unified_tuning(load, args.retest_way, args.tuning_method)
     else:
-        tuning_method = get_next_tuning_method(args.load_id)
+        tuning_method = get_next_tuning_method(load)
         if not tuning_method:
             global_logger.info(
                 'The tuning times reaches default settings, if you want to append tuning times, add \'-t\' in your '
                 'command'
             )
             return
-        unified_tuning(args.load_id, args.retest_way, tuning_method)
+        unified_tuning(load, args.retest_way, tuning_method)

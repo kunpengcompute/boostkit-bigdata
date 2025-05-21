@@ -54,7 +54,8 @@ class OmniAdvisorConf:
         iterative = 'iterative'
         expert = 'expert'
         transfer = 'transfer'
-        all = [user, iterative, expert, transfer]
+        native = 'native'
+        all = [user, iterative, expert, transfer, native]
 
     # 复测方式
     class RetestWay:

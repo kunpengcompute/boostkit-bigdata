@@ -137,3 +137,13 @@ class ExamRecordRepository(Repository):
         )
 
         return ExamRecord(database_model=database_task)
+
+    @classmethod
+    def delete(cls, exam_record: ExamRecord):
+        """
+        更新测试记录中的结束时间为此刻
+
+        :param exam_record: 测试记录实例
+        :return: 更新完后的测试记录
+        """
+        return exam_record.database_model.delete()

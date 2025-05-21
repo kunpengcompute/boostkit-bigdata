@@ -1,6 +1,7 @@
 from common.constant import OA_CONF
 from omniadvisor.repository.model.load import Load
 from omniadvisor.service.spark_service.spark_run import spark_run
+from omniadvisor.service.tuning_result.tuning_result import get_tuning_result
 from omniadvisor.utils.logger import global_logger
 
 
@@ -17,12 +18,18 @@ def retest(load: Load, config: dict):
         try:
             exam_record, spark_output = spark_run(load, config)
         except Exception as e:
-            global_logger.error('复测第 %d 轮失败，异常来源：非spark运行异常，详情：%s', i, e)
+            global_logger.error(
+                'Retest failed in round %d. Exception source: Non-Spark exception. Details: %s.', i, e
+            )
             # 目前采取的策略是：抛异常，认为是其他原因导致的失败，可以肯定不是配置的原因
             raise
 
         if exam_record.status == OA_CONF.ExecStatus.success:
-            global_logger.info('复测第 %d 轮成功，性能结果：%.3f', i, exam_record.runtime)
+            global_logger.info('Retest succeeded in round %d. Performance result: %.3f.', i, exam_record.runtime)
         else:
             # 若是出现异常配置，也要退出
-            raise RuntimeError('复测第 %d 轮失败，异常来源：spark运行异常：%s', i, spark_output)
+            global_logger.warning('Retest failed in round %d. Exception source: Spark exception: %s.', i,
+                                  spark_output)
+            tuning_result = get_tuning_result(load, config)
+            if tuning_result.failed_times >= OA_CONF.config_fail_threshold:
+                raise RuntimeError('The number of retest failures has reached the failure threshold.')

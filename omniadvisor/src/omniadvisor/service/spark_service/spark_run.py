@@ -29,10 +29,60 @@ def spark_run(load, conf):
     exam_record = ExamRecordRepository.create(load, conf)
 
     # 执行当前的submit_cmd
-    spark_executor = SparkExecutor()
+    exitcode, spark_output = _submit_spark_task(exam_record, submit_cmd)
+
+    # 不存在application_id的情况下不提取time_taken 直接返回
+    if exitcode != 0:
+        try:
+            return ExamRecordRepository.update_exam_result(
+                exam_record=exam_record,
+                status=OA_CONF.ExecStatus.fail,
+                runtime=OA_CONF.exec_fail_return_runtime,
+                trace=OA_CONF.exec_fail_return_trace
+            ), spark_output
+        except RuntimeError:
+            global_logger.error('An error occurred when update exam record\'s status to %s', OA_CONF.ExecStatus.fail)
+            ExamRecordRepository.delete(exam_record)
+            raise
+
+    status = OA_CONF.ExecStatus.success
+    # 提取application_id与 time_taken(runtime)
+    try:
+        spark_submit_cmd, application_id, runtime = SparkExecutor.parser_spark_output(spark_output)
+    except Exception:
+        ExamRecordRepository.delete(exam_record)
+        global_logger.error('During parsing spark output, known error occurred.')
+        raise
+
+    try:
+        exam_record = ExamRecordRepository.update_exam_result(
+            exam_record=exam_record,
+            status=status,
+            runtime=runtime
+        )
+    except RuntimeError:
+        global_logger.error('An error occurred when update exam record\'s status to %s', OA_CONF.ExecStatus.fail)
+        ExamRecordRepository.delete(exam_record)
+        raise
+
+    # 根据ApplicantID在子进程中获取Trace
+    p = multiprocessing.Process(target=_update_trace_from_history_server, args=(exam_record, application_id))
+    p.daemon = False
+    p.start()
+
+    return exam_record, spark_output
+
+
+def _submit_spark_task(exam_record, submit_cmd):
+    """
+    提交spark任务
+    :param exam_record: 测试记录
+    :param submit_cmd: 命令
+    :return:
+    """
     try:
         ExamRecordRepository.update_start_time(exam_record)
-        exitcode, spark_output = spark_executor.submit_spark_task(submit_cmd)
+        exitcode, spark_output = SparkExecutor.submit_spark_task(submit_cmd)
         ExamRecordRepository.update_end_time(exam_record)
     except TimeoutError:
         # 任务提交超时等
@@ -48,49 +98,9 @@ def spark_run(load, conf):
         exam_record.delete()
         global_logger.error('During Spark command submission, known error occurred.')
         raise
-
-    # 不存在application_id的情况下不提取time_taken 直接返回
-    if exitcode != 0:
-        try:
-            return ExamRecordRepository.update_exam_result(
-                exam_record=exam_record,
-                status=OA_CONF.ExecStatus.fail,
-                runtime=OA_CONF.exec_fail_return_runtime,
-                trace=OA_CONF.exec_fail_return_trace
-            ), ""
-        except RuntimeError:
-            exam_record.delete()
-            raise
-
-    status = OA_CONF.ExecStatus.success
-    # 提取application_id与 time_taken(runtime)
-
-    try:
-        spark_submit_cmd, application_id, runtime = spark_executor.parser_spark_output(spark_output)
-    except Exception:
-        exam_record.delete()
-        global_logger.error('During parsing spark output, known error occurred.')
-        raise
-
-    try:
-        exam_record = ExamRecordRepository.update_exam_result(
-            exam_record=exam_record,
-            status=status,
-            runtime=runtime
-        )
-    except RuntimeError:
-        exam_record.delete()
-        raise
-
-    # 根据ApplicantID在子进程中获取Trace
-    p = multiprocessing.Process(target=_update_trace_from_history_server, args=(exam_record, application_id))
-    p.daemon = False
-    p.start()
-
-    return exam_record, spark_output
+    return exitcode, spark_output
 
 
-# TODO  这个也要端到端验证一下 用了子进程会不会对ExamRecordRepository有同时读写的问题？
 def _update_trace_from_history_server(exam_record: ExamRecord, application_id: str):
     """
     创建一个子进程对history_server进行轮询 超时时间为10s
@@ -108,9 +118,8 @@ def _update_trace_from_history_server(exam_record: ExamRecord, application_id: s
             trace_executor = spark_fetcher.get_spark_executor_by_app(application_id)
         except HTTPError as httpe:
             time.sleep(1)
-            global_logger.warning(f"HistoryServer访问错误:{httpe}")
+            global_logger.warning(f"Cannot access history server: {httpe}")
             continue
-
         trace_dict['sql'] = save_trace_data(data=trace_sql, data_dir=OA_CONF.data_dir)
         trace_dict['stages'] = save_trace_data(data=trace_stages, data_dir=OA_CONF.data_dir)
         trace_dict['executor'] = save_trace_data(data=trace_executor, data_dir=OA_CONF.data_dir)

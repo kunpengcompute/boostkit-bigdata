@@ -9,6 +9,11 @@ from omniadvisor.service.tuning_result.tuning_result import get_tuning_result
 from common.constant import OA_CONF
 
 
+def get_other_tuning_result_history(load: Load):
+    # 暂未实现
+    return None
+
+
 def get_next_tuning_method(load) -> str:
     """
     根据 load，获取调优历史记录，并根据OA_CONF中的tuning_strategies决定本轮的调优方法
@@ -20,7 +25,7 @@ def get_next_tuning_method(load) -> str:
     next_tuning_method = None
     for tuning_method, expected_tuning_times in OA_CONF.tuning_strategies:
         # 历史中该方法的调优次数已经超过了设定的调优次数，跳过（超过是因为用户强制使用）
-        if statistics.get(tuning_method) >= expected_tuning_times:
+        if statistics.get(tuning_method, 0) >= expected_tuning_times:
             continue
         next_tuning_method = tuning_method
         break
@@ -100,4 +105,3 @@ class TuningResultHistory:
             else:
                 data[tuning_result.method] = 1
         return data
-
