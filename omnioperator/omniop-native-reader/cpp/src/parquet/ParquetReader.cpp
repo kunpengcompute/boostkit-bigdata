@@ -23,6 +23,7 @@
 #include "common/UriInfo.h"
 #include "arrowadapter/FileSystemAdapter.h"
 #include "arrow/dataset/file_parquet.h"
+#include "mutex"
 
 using namespace arrow;
 using namespace arrow::internal;
@@ -30,6 +31,7 @@ using namespace parquet::arrow;
 using namespace omniruntime::reader;
 
 static std::mutex mutex_;
+static std::mutex map_mutex;
 static std::unordered_map<std::string, Filesystem*> restore_filesysptr;
 static constexpr int32_t LOCAL_FILE_PREFIX = 5;
 static constexpr int32_t LOCAL_FILE_PREFIX_EXT = 7;
@@ -69,12 +71,14 @@ Filesystem* omniruntime::reader::GetFileSystemPtr(UriInfo &uri, std::string& ugi
     auto key = GetFileSystemKey(fullPath, ugi);
 
     // if not find key, create the filesystem ptr
+    std::lock_guard<std::mutex> lock(map_mutex);
     auto iter = restore_filesysptr.find(key);
     if (iter == restore_filesysptr.end()) {
         Filesystem* fs = new Filesystem();
         auto result = arrow_adapter::FileSystemFromUriOrPath(uri);
         status = result.status();
         if (!status.ok()) {
+          delete fs;
           return nullptr;
         }
         fs->filesys_ptr = std::move(result).ValueUnsafe();
