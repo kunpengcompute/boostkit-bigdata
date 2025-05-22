@@ -4,18 +4,21 @@
 # Copyright (c) Huawei Technologies Co., Ltd. 2023-2023. All rights reserved.
 from django.db.models import Prefetch
 from server.app.models import DatabaseTuningRecord, DatabaseLoad
+from omniadvisor.repository.model.load import Load
+from omniadvisor.repository.model.tuning_record import TuningRecord
 from omniadvisor.repository.repository import Repository
 
 
 class LoadPrefetchRepository(Repository):
 
     @classmethod
-    def get_loads_exclude(cls, exclude_load_id: str):
+    def get_loads_prefetch(cls, exclude_load: Load):
         """
-        获取 exclude_load_id 以外的 load 及  tuning record的聚合
-        :param exclude_load_id: 排除的load id
+        获取 exclude_load 的 id 以外的 load 及  tuning record的聚合
+        :param exclude_load: 排除的load id
         :return:
         """
+        res = []
 
         # 预取相关TuningRecord和ExamRecord
         lower_str = DatabaseTuningRecord.__name__.lower()
@@ -27,8 +30,17 @@ class LoadPrefetchRepository(Repository):
         )
 
         # 获取所有不包含exclude_load的Load记录
-        loads = DatabaseLoad.objects.exclude(id=exclude_load_id) \
+        loads = DatabaseLoad.objects.exclude(id=exclude_load.id) \
             .prefetch_related(tuning_record_prefetch) \
             .all()
 
-        return loads
+        for prefetch_load in loads:
+            database_tuning_records = prefetch_load.databasetuningrecord_set.all()
+            res.append(
+                (
+                    Load(prefetch_load),
+                    [TuningRecord(database_tuning_record) for database_tuning_record in database_tuning_records]
+                )
+            )
+
+        return res

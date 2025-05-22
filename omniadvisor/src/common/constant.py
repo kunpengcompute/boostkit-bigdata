@@ -77,7 +77,6 @@ class OmniAdvisorConf:
     spark_history_rest_url = _common_config.get('spark', 'spark.history.rest.url')
     timeout_ratio = _common_config.getfloat('spark', 'spark.sql.timeout.ratio')
 
-    # 规定每种调优方式的轮次 瞎拍的
     tuning_strategies = json.loads(_common_config.get('common', 'tuning.strategy'))
 
 

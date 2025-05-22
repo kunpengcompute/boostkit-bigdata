@@ -16,14 +16,13 @@ def get_other_tuning_result_history(exclude_load: Load):
     """
     # 预取相关TuningRecord和ExamRecord
     result = []
-    loads = LoadPrefetchRepository.get_loads_exclude(exclude_load.id)
-    for load in loads:
+    load_tuning_records_pairs = LoadPrefetchRepository.get_loads_prefetch(exclude_load)
+    for load, tuning_records in load_tuning_records_pairs:
         # 获取该Load下的所有TuningRecord
-        tuning_records = load.databasetuningrecord_set.all()
         tuning_results = []
         for tuning_record in tuning_records:
             # 查询匹配的ExamRecord
-            exam_records = ExamRecordRepository.query_by_load_and_config(Load(load), tuning_record.config)
+            exam_records = ExamRecordRepository.query_by_load_and_config(load, tuning_record.config)
             tuning_results.append(
                 TuningResult(
                     tuning_record=tuning_record,

@@ -50,19 +50,19 @@ def unified_tuning(load, retest_way: str, tuning_method: str):
 
     # 推荐下一个配置
     if tuning_method == OA_CONF.TuningMethod.iterative:
-        perf_history = get_tuning_result_history(load)
-        next_config, method_extend = SmacAppendTuning.tune(perf_history.tuning_history)
+        tuning_result_history = get_tuning_result_history(load)
+        next_config, method_extend = SmacAppendTuning.tune(tuning_result_history.tuning_history)
     elif tuning_method == OA_CONF.TuningMethod.expert:
-        perf_history = get_tuning_result_history(load)
-        next_config, method_extend = ExpertTuning.tune(perf_history.tuning_history)
+        tuning_result_history = get_tuning_result_history(load)
+        next_config, method_extend = ExpertTuning.tune(tuning_result_history.tuning_history)
     elif tuning_method == OA_CONF.TuningMethod.native:
-        perf_history = get_tuning_result_history(load)
-        next_config, method_extend = NativeTuning.tune(perf_history.tuning_history)
+        tuning_result_history = get_tuning_result_history(load)
+        next_config, method_extend = NativeTuning.tune(tuning_result_history.tuning_history)
     elif tuning_method == OA_CONF.TuningMethod.transfer:
-        perf_history = get_tuning_result_history(load)
+        tuning_result_history = get_tuning_result_history(load)
         other_history = get_other_tuning_result_history(load)
         next_config, method_extend = TransferTuning.tune(
-            perf_history.tuning_history, [other.tuning_history for other in other_history]
+            tuning_result_history.tuning_history, [other.tuning_history for other in other_history]
         )
     else:
         raise ValueError(f'Not supported tuning method: {tuning_method}')
@@ -85,10 +85,10 @@ def unified_tuning(load, retest_way: str, tuning_method: str):
             global_logger.info('Remove tuning result because the status is running.')
             remove_tuning_result(load, next_config)
             raise
-        perf_history = get_tuning_result_history(load)
+        tuning_result_history = get_tuning_result_history(load)
         # 更新最优配置
-        if perf_history.best_config and perf_history.best_config != next_config:
-            LoadRepository.update_best_config(load, perf_history.best_config)
+        if tuning_result_history.best_config and tuning_result_history.best_config != next_config:
+            LoadRepository.update_best_config(load, tuning_result_history.best_config)
     else:
         # 更新待测试配置即可
         LoadRepository.update_test_config(load, next_config)
@@ -131,6 +131,11 @@ def main():
         global_logger.info('The retest status of latest tuning result is still running, please wait.')
         return
 
+    if args.tuning_method or args.retest_way == OA_CONF.RetestWay.hijacking:
+        unified_tuning(load, args.retest_way, args.tuning_method)
+        return
+
+    # 当且仅当后台复测，且未指定调优方法时，会连续拉起调优
     for tuning_strategy in OA_CONF.tuning_strategies:
         tuning_method = tuning_strategy[0]
         tuning_times = tuning_strategy[1]
