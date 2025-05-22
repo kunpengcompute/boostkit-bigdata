@@ -7,8 +7,6 @@ from omniadvisor.repository.tuning_record_repository import TuningRecordReposito
 from omniadvisor.service.tuning_result.tuning_result import TuningResult
 from omniadvisor.service.tuning_result.tuning_result import get_tuning_result
 
-from common.constant import OA_CONF
-
 
 def get_other_tuning_result_history(exclude_load: Load):
     """
@@ -39,24 +37,6 @@ def get_other_tuning_result_history(exclude_load: Load):
         ))
 
     return result
-
-
-def get_next_tuning_method(load) -> str:
-    """
-    根据 load，获取调优历史记录，并根据OA_CONF中的tuning_strategies决定本轮的调优方法
-    :param load
-    :return: 当前的调优方法
-    """
-    tuning_result_history = get_tuning_result_history(load)
-    statistics = tuning_result_history.collect_method_calls
-    next_tuning_method = None
-    for tuning_method, expected_tuning_times in OA_CONF.tuning_strategies:
-        # 历史中该方法的调优次数已经超过了设定的调优次数，跳过（超过是因为用户强制使用）
-        if statistics.get(tuning_method, 0) >= expected_tuning_times:
-            continue
-        next_tuning_method = tuning_method
-        break
-    return next_tuning_method
 
 
 def get_tuning_result_history(load: Load):

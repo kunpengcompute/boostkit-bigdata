@@ -4,15 +4,16 @@ from algo.expert.tuning import ExpertTuning
 from algo.iterative.tuning import SmacAppendTuning
 from algo.native.tuning import NativeTuning
 from algo.transfer.tuning import TransferTuning
+from common.constant import OA_CONF
+
 from omniadvisor.repository.load_repository import LoadRepository
 from omniadvisor.repository.tuning_record_repository import TuningRecordRepository
 from omniadvisor.service.retest_service import retest
 from omniadvisor.service.tuning_result.tuning_result import remove_tuning_result
 from omniadvisor.service.tuning_result.tuning_result_history import get_tuning_result_history, \
-    get_next_tuning_method, get_other_tuning_result_history
-from omniadvisor.utils.logger import global_logger
+    get_other_tuning_result_history
 
-from common.constant import OA_CONF
+from omniadvisor.utils.logger import global_logger
 
 
 def _parse_tuning_args():
@@ -130,15 +131,11 @@ def main():
         global_logger.info('The retest status of latest tuning result is still running, please wait.')
         return
 
-    if args.tuning_method:
-        # 用户输入了强制调优的请求，以用户为准
-        unified_tuning(load, args.retest_way, args.tuning_method)
-    else:
-        tuning_method = get_next_tuning_method(load)
-        if not tuning_method:
-            global_logger.info(
-                'The tuning times reaches default settings, if you want to append tuning times, add \'-t\' in your '
-                'command'
-            )
-            return
-        unified_tuning(load, args.retest_way, tuning_method)
+    for tuning_strategy in OA_CONF.tuning_strategies:
+        tuning_method = tuning_strategy[0]
+        tuning_times = tuning_strategy[1]
+        for _ in range(tuning_times):
+            try:
+                unified_tuning(load, args.retest_way, tuning_method)
+            except Exception:
+                global_logger.info('The tuning method: %s encountered an exception, trying next.', tuning_method)
