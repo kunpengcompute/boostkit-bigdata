@@ -149,7 +149,7 @@ class TuningResult:
         if self.trace is not None:
             trace = Trace(stages_with_summaries=self.trace.get('stages'), sql=self.trace.get('sql'))
         else:
-            trace = None
+            trace = Trace(stages_with_summaries=None, sql=None)
 
         return Tuning(
             round=self.rounds,
