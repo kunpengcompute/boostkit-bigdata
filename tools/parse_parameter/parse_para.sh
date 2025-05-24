@@ -16,15 +16,10 @@ config_file_path="${SPARK_HOME}/conf/spark-defaults.conf"
 
 declare -A args_map
 
-# 将整个命令行参数作为数组传入，去除命令名
-params=("${@:2}")   # 如果你用 $0 是命令名，否则改为 "${@}" 也行
+params=("${@:2}") # 如果用 $0 是命令名，否则改为 "${@}" 也行
 
 prev=""
 for arg in "$@"; do
-    if [[ "$arg" == "-e" ]]; then
-        exit 2
-    fi
-    # 处理 --key=value 类型
     if [[ "$arg" =~ ^--([a-zA-Z0-9._-]+)=(.*)$ ]]; then
         key="--${BASH_REMATCH[1]}"
         echo "$key"
@@ -135,11 +130,22 @@ if [[ -n "${args_map[--executor-memory]}" ]]; then
 else
     exit 2
 fi
+args=("$@")
 
-# 1. 替换 --executor-memory 为 executorMemory+memoryUnit
-output=$(printf "%s\n" "$input" | sed -E "s/(--executor-memory[[:space:]=]+)[^#[:space:]\\]*/\1${executorMemory}${memoryUnit}/g")
-
-# 2. 增加新参数
-output="${output} --conf spark.memory.offHeap.enabled=true --conf spark.memory.offHeap.size=${borrowedMemory}${memoryUnit}"
-
-printf "%s\n" "$output"
+new_args=()
+i=0
+while [ $i -lt ${#args[@]} ]; do
+    if [[ "${args[$i]}" == "--executor-memory" ]]; then
+        new_args+=("${args[$i]}")                    # 保留 --executor-memory
+        new_args+=("${executorMemory}${memoryUnit}") # 替换为变量值
+        ((i += 2))                                   # 跳过下一个元素
+    else
+        new_args+=("${args[$i]}")
+        ((i++))
+    fi
+done
+new_args+=("--conf" "spark.memory.offHeap.enabled=true" "--conf" "spark.memory.offHeap.size=${borrowedMemory}${memoryUnit}")
+# 用每一行输出一个参数，方便其它脚本mapfile/读入到数组
+for arg in "${new_args[@]}"; do
+    printf '%s\n' "$arg"
+done
