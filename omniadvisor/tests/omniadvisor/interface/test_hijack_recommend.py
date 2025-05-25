@@ -7,25 +7,21 @@ from omniadvisor.interface.hijack_recommend import hijack_recommend
 # 测试代码
 class TestHijackRecommend(unittest.TestCase):
 
-    @patch("omniadvisor.interface.hijack_recommend.SparkParameterParser")
+    @patch("omniadvisor.interface.hijack_recommend.SparkCMDParser.parse_cmd")
     @patch("omniadvisor.interface.hijack_recommend.LoadRepository.query_by_name_and_default_config")
     @patch("omniadvisor.interface.hijack_recommend.spark_run")
-    def test_hijack_recommend_success(self, mock_spark_run, mock_load_repo_query, mock_parser):
+    def test_hijack_recommend_success(self, mock_spark_run, mock_load_repo_query, mock_parse_cmd):
         """
         测试 hijack_recommend 在任务成功时的行为。
         """
         # 模拟输入的 Spark SQL 命令
-        spark_sql_cmd = "SELECT * FROM example_table"
+        spark_cmd_argv = ['test', '--conf', 'test=test']
 
-        # 模拟 SparkParameterParser 的行为
-        mock_parser_instance = MagicMock()
-        mock_parser_instance.process_parameter.return_value = MagicMock()
-        mock_parser_instance.process_parameter.return_value.configure_mock(
-            name="example_name",
-            exec_attr={"cpu": 4},
-            conf_params={"timeout": 30}
+        # 模拟 parse_cmd 的行为
+        mock_parse_cmd.return_value = (
+            {'name': 'example_name', 'cpu': 4},
+            {'timeout': 30}
         )
-        mock_parser.return_value = mock_parser_instance
 
         # 模拟 LoadRepository.query 返回一个有效的负载对象
         mock_load = MagicMock()
@@ -37,7 +33,7 @@ class TestHijackRecommend(unittest.TestCase):
         mock_spark_run.return_value = (MagicMock(status=OA_CONF.ExecStatus.fail), 'spark_output')
 
         # 调用被测函数
-        hijack_recommend(spark_sql_cmd)
+        hijack_recommend(argv=spark_cmd_argv)
 
         # 验证 LoadRepository.query 被正确调用
         mock_load_repo_query.assert_called_once_with(name="example_name", default_config={"timeout": 30})
@@ -45,26 +41,22 @@ class TestHijackRecommend(unittest.TestCase):
         # 验证 spark_run 被正确调用
         mock_spark_run.assert_called_once_with(mock_load, {"timeout": 30})
 
-    @patch("omniadvisor.interface.hijack_recommend.SparkParameterParser")
+    @patch("omniadvisor.interface.hijack_recommend.SparkCMDParser.parse_cmd")
     @patch("omniadvisor.interface.hijack_recommend.LoadRepository")
     @patch("omniadvisor.interface.hijack_recommend.spark_run")
     @patch("omniadvisor.interface.hijack_recommend._process_load_config")
-    def test_hijack_recommend_failure_with_fallback(self, mock_refreshed_load, mock_spark_run, mock_load_repo, mock_parser):
+    def test_hijack_recommend_failure_with_fallback(self, mock_refreshed_load, mock_spark_run, mock_load_repo, mock_parse_cmd):
         """
         测试 hijack_recommend 在任务失败且需要回退到用户默认配置时的行为。
         """
         # 模拟输入的 Spark SQL 命令
-        spark_sql_cmd = "SELECT * FROM example_table"
+        spark_cmd_argv = ['test', '--conf', 'test=test']
 
-        # 模拟 SparkParameterParser 的行为
-        mock_parser_instance = MagicMock()
-        mock_parser_instance.process_parameter.return_value = MagicMock()
-        mock_parser_instance.process_parameter.return_value.configure_mock(
-            name="example_name",
-            exec_attr={"cpu": 4},
-            conf_params={"timeout": 30}
+        # 模拟 parse_cmd 的行为
+        mock_parse_cmd.return_value = (
+            {'name': 'example_name', 'cpu': 4},
+            {'timeout': 30}
         )
-        mock_parser.return_value = mock_parser_instance
 
         # 模拟 LoadRepository.query 返回一个有效的负载对象
         mock_load = MagicMock()
@@ -79,7 +71,7 @@ class TestHijackRecommend(unittest.TestCase):
         ]
 
         # 调用被测函数
-        hijack_recommend(spark_sql_cmd)
+        hijack_recommend(argv=spark_cmd_argv)
 
         # 验证 LoadRepository.query 被正确调用
         mock_load_repo.query_by_name_and_default_config.assert_called_once_with(name="example_name",
