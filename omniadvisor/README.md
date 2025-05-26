@@ -14,7 +14,7 @@
 说明：进入页面后，可以看到APP下有若干数据表，其中 loads 就是负载表
 
 3 启用调优
-通过在根目录下，执行 `python tunning.py --help` 查看各参数说明
+通过在根目录下，执行 `python tuning.py --help` 查看各参数说明
 - ① 各参数的详细介绍
   - --load-id，即步骤2中loads表查询到的负载的id
   - --retest-way，复测方式（复测是为了保证结果的可靠），可选前台或者后台复测。若是前台复测，当用户提交任务时，跟随任务下发；若后台复测，则是由
@@ -22,9 +22,9 @@
   - --tuning-method，调优方法，不同的调优方法原理不同，iterative，即迭代调优，本质上使用贝叶斯优化方法；expert，即专家调优，通过诊断资源瓶颈，
   给出调优建议；transfer，迁移调优，迁移相似负载的调优经验到陌生负载；native 算子加速，将Spark原生算子替换为C++ Native算子，同时使能CPU向量化执行，实现性能加速
 - ② 命令示例 
-  - `python tunning.py -l 1 -r backend -t expert`。说明：使用专家调优，对id为1的负载，进行调优，期间在后台复测，复测次数为 
+  - `python tuning.py -l 1 -r backend -t expert`。说明：使用专家调优，对id为1的负载，进行调优，期间在后台复测，复测次数为 
   common_config.cfg 中 tuning.retest.times 的值
-  - `python tunning.py -l 1 -r backend`。说明：使用系统中默认的调优策略以及历史调优记录，共同决定当前的调优方式
+  - `python tuning.py -l 1 -r backend`。说明：使用系统中默认的调优策略以及历史调优记录，共同决定当前的调优方式
 说明：调优结束后，会更新负载的最优配置信息，以便步骤1能够使用最优配置
 
 

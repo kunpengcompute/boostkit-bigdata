@@ -12,7 +12,7 @@ from omniadvisor.repository.repository import Repository
 class LoadPrefetchRepository(Repository):
 
     @classmethod
-    def get_loads_prefetch(cls, exclude_load: Load):
+    def exclude_query_load_with_tuning_records(cls, exclude_load: Load):
         """
         获取 exclude_load 的 id 以外的 load 及  tuning record的聚合
         :param exclude_load: 排除的load id

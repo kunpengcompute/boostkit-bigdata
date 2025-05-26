@@ -2,7 +2,7 @@
 
 ---
 
-## 进入Django 后台管理页面？:
+## 进入Django 后台管理页面
 
 在`src`目录下，按照以下步骤操作
 
@@ -27,7 +27,7 @@ python init.py runserver
 
 
 ---
-## 拉单元测试？
+## 拉单元测试
 
 在 `omniadvisor` 根目录下，按照以下步骤运行单元测试：
 
@@ -64,7 +64,7 @@ exit
 
 ---
 
-## 自动导包配置？
+## 自动导包配置
 
 由于 PyCharm 的导包机制可能存在不合理之处，在 `alt` + `enter` 快捷键下，容易出现导包的路径错误，需手动执行以下操作：
 
@@ -74,13 +74,13 @@ exit
    - 重启 PyCharm 以生效。
 
 ---
-## 在django admin的页面中显示一个model？
+## 在django admin的页面中显示一个model
    - 注册一个model（参考`server\app\models.py`）
    - 在admin后台显示model（参考`server\app\admin.py`）
    - 其他高阶用法持续更新中。。。
 
 ---
-### 数据库迁移？
+### 数据库迁移
 ```bash
 python init.py makemigrations
 python init.py migrate

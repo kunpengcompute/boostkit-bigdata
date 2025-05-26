@@ -37,7 +37,7 @@ def _parse_tuning_args():
 
     parser.add_argument("-t", "--tuning-method", type=str, required=False,
                         choices=[method for method in OA_CONF.TuningMethod.all if method != OA_CONF.TuningMethod.user],
-                        help='Support three tune method, for iterative, use BO; for expert ...')
+                        help='Tuning methods used to give optimal config, for iterative, use BO; for expert ...')
 
     args = parser.parse_args()
     return args
@@ -54,7 +54,42 @@ def unified_tuning(load, retest_way: str, tuning_method: str):
     if not load:
         raise ValueError("Invalid load: configuration cannot be loaded")
 
-    # 推荐下一个配置
+    method_extend, next_config = _get_next_config(load, tuning_method)
+
+    if not next_config:
+        raise NoOptimalConfigError('The recommending config is empty, please try other tuning methods.')
+
+    # 用户的default_config上叠加next_config叠加
+    next_config = {**load.default_config, **next_config}
+
+    TuningRecordRepository.create(load=load, config=next_config, method=tuning_method, method_extend=method_extend)
+
+    # 复测
+    if retest_way == OA_CONF.RetestWay.backend:
+        try:
+            retest(load, next_config)
+        except Exception:
+            # 如果之前发生错误，状态被置为running，此调优配置不可能再被复测，那么删除对应的exam_records、tuning_record
+            global_logger.info('Retest process did not complete normally. Please check the detailed logs for more '
+                               'information. Remove tuning results.')
+            remove_tuning_result(load, next_config)
+            raise
+        tuning_result_history = get_tuning_result_history(load)
+        # 更新最优配置
+        if tuning_result_history.best_config and tuning_result_history.best_config != next_config:
+            LoadRepository.update_best_config(load, tuning_result_history.best_config)
+    else:
+        # 更新待测试配置即可
+        LoadRepository.update_test_config(load, next_config)
+
+
+def _get_next_config(load, tuning_method):
+    """
+    获取下一个配置
+    :param load: 负载
+    :param tuning_method: 调优方法
+    :return:
+    """
     if tuning_method == OA_CONF.TuningMethod.iterative:
         tuning_result_history = get_tuning_result_history(load)
         next_config, method_extend = SmacAppendTuning.tune(tuning_result_history.tuning_history)
@@ -72,31 +107,7 @@ def unified_tuning(load, retest_way: str, tuning_method: str):
         )
     else:
         raise ValueError(f'Not supported tuning method: {tuning_method}')
-
-    if not next_config:
-        raise NoOptimalConfigError('The recommending config is empty, please try other tuning methods.')
-
-    # 用户的default_config上叠加next_config叠加
-    next_config = {**load.default_config, **next_config}
-
-    TuningRecordRepository.create(load=load, config=next_config, method=tuning_method, method_extend=method_extend)
-
-    # 复测
-    if retest_way == OA_CONF.RetestWay.backend:
-        try:
-            retest(load, next_config)
-        except Exception:
-            # 如果之前发生错误，状态被置为running，此调优配置不可能再被复测，那么删除对应的exam_records、tuning_record
-            global_logger.info('Remove tuning result because the status is running.')
-            remove_tuning_result(load, next_config)
-            raise
-        tuning_result_history = get_tuning_result_history(load)
-        # 更新最优配置
-        if tuning_result_history.best_config and tuning_result_history.best_config != next_config:
-            LoadRepository.update_best_config(load, tuning_result_history.best_config)
-    else:
-        # 更新待测试配置即可
-        LoadRepository.update_test_config(load, next_config)
+    return method_extend, next_config
 
 
 def _pre_check(load_id):

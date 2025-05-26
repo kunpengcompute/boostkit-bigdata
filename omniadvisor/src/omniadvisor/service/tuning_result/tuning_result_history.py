@@ -16,7 +16,7 @@ def get_other_tuning_result_history(exclude_load: Load):
     """
     # 预取相关TuningRecord和ExamRecord
     result = []
-    load_tuning_records_pairs = LoadPrefetchRepository.get_loads_prefetch(exclude_load)
+    load_tuning_records_pairs = LoadPrefetchRepository.exclude_query_load_with_tuning_records(exclude_load)
     for load, tuning_records in load_tuning_records_pairs:
         # 获取该Load下的所有TuningRecord
         tuning_results = []
