@@ -21,7 +21,7 @@ def _query_or_create_load(name: str, exec_attr: dict, default_config: dict):
     :return: 负载实例
     """
     # 从负载数据库中查询是否有相关联的Load
-    loads = LoadRepository.query_by_name_and_default_config(name=name, default_config=default_config)
+    loads = LoadRepository.query_by_exec_attr_and_default_config(exec_attr=exec_attr, default_config=default_config)
     # 如果查询不到负载信息，则创建新的负载
     if not loads:
         global_logger.info("Not exit available load, create new one.")
