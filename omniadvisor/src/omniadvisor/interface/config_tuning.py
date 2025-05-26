@@ -16,6 +16,12 @@ from omniadvisor.service.tuning_result.tuning_result_history import get_tuning_r
 from omniadvisor.utils.logger import global_logger
 
 
+# 异常类暂时用于当前模块，没必要放到公共里
+class NoOptimalConfigError(Exception):
+    """仅用于调优模块的异常"""
+    pass
+
+
 def _parse_tuning_args():
     """
     解析用户直命令行输入的参数
@@ -68,8 +74,7 @@ def unified_tuning(load, retest_way: str, tuning_method: str):
         raise ValueError(f'Not supported tuning method: {tuning_method}')
 
     if not next_config:
-        global_logger.info('The recommending config is empty, please try other tuning methods.')
-        return
+        raise NoOptimalConfigError('The recommending config is empty, please try other tuning methods.')
 
     # 用户的default_config上叠加next_config叠加
     next_config = {**load.default_config, **next_config}
@@ -118,6 +123,12 @@ def main():
     配置调优主函数
     """
     args = _parse_tuning_args()
+
+    # 前台复测需要指定调优方法，否则
+    if args.retest_way == OA_CONF.RetestWay.hijacking and not args.tuning_method:
+        global_logger.info('When using retest way \'hijacking\', param --tuning-method is needed.')
+        return
+
     # 检查load 是否存在以及是否需要调优
     load = _pre_check(args.load_id)
     if not load:
@@ -142,5 +153,6 @@ def main():
         for _ in range(tuning_times):
             try:
                 unified_tuning(load, args.retest_way, tuning_method)
-            except Exception:
-                global_logger.info('The tuning method: %s encountered an exception, trying next.', tuning_method)
+            except NoOptimalConfigError:
+                global_logger.info('The tuning method: %s cannot find optimal config, trying next.', tuning_method)
+                break
