@@ -4,9 +4,10 @@ import time
 from requests.exceptions import HTTPError
 
 from common.constant import OA_CONF
+from omniadvisor.repository.model.load import Load
 from omniadvisor.repository.exam_record_repository import ExamRecordRepository
 from omniadvisor.repository.model.exam_record import ExamRecord
-from omniadvisor.service.spark_service.spark_command_reconstruct import spark_command_reconstruct
+from omniadvisor.service.spark_service.spark_cmd_parser import SparkCMDParser
 from omniadvisor.service.spark_service.spark_executor import SparkExecutor
 from omniadvisor.service.spark_service.spark_fetcher import SparkFetcher
 from omniadvisor.service.tuning_result.tuning_result import get_tuning_result
@@ -14,9 +15,16 @@ from omniadvisor.utils.logger import global_logger
 from omniadvisor.utils.utils import save_trace_data
 
 
-def spark_run(load, conf):
+def spark_run(load: Load, conf: dict):
+    """
+    输入负载与配置，执行Spark任务
+
+    :param load: 负载
+    :param conf: 参数配置
+    :return:
+    """
     # 从解析后的参数列表中提取负载与任务的相关信息
-    submit_cmd = spark_command_reconstruct(load, conf)
+    submit_cmd = SparkCMDParser.reconstruct_cmd(exec_attr=load.exec_attr, conf_params=conf)
 
     # 判断当前的conf是否和load.default_config相同 不相同则在submit_cmd前增加超时时间
     if conf != load.default_config:

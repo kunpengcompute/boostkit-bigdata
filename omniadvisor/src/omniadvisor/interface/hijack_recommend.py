@@ -1,7 +1,6 @@
 import sys
 
-from omniadvisor.repository.exam_record_repository import ExamRecordRepository
-from omniadvisor.service.spark_service.spark_parameter_parser import SparkParameterParser
+from omniadvisor.service.spark_service.spark_cmd_parser import SparkCMDParser
 from omniadvisor.repository.model.load import Load
 from omniadvisor.repository.load_repository import LoadRepository
 from omniadvisor.repository.tuning_record_repository import TuningRecordRepository
@@ -83,20 +82,18 @@ def _process_load_config(load: Load):
         LoadRepository.update_test_config(load, {})
 
 
-def hijack_recommend(spark_sql_cmd: str):
+def hijack_recommend(argv: list):
     """
     任务劫持，使能参数下发执行任务
 
-    :param spark_sql_cmd: Spark执行命令
+    :param argv: Spark执行命令字段
     """
     # 获取用户传入的Spark命令 并解析命令
-    spark_parameter_parser = SparkParameterParser(spark_sql_cmd)
-    parsed_parameter = spark_parameter_parser.process_parameter()
-
-    # 提取名字 执行参数 租户默认配置
-    name = parsed_parameter.name
-    exec_attr = parsed_parameter.exec_attr
-    user_config = parsed_parameter.conf_params
+    exec_attr, user_config = SparkCMDParser.parse_cmd(argv=argv)
+    # 提取任务名字
+    if 'name' not in exec_attr.keys():
+        raise ValueError(f'Task name not in Spark submit cmd!')
+    name = exec_attr['name']
 
     # 查询或创建相应负载
     load = _query_or_create_load(name=name, exec_attr=exec_attr, default_config=user_config)
@@ -122,8 +119,4 @@ def main():
     """
     任务劫持主函数
     """
-    # 仅支持输入一条SQL命令，例如："spark-sql --database test -f 1.sql"
-    if len(sys.argv) != 2:
-        raise ValueError(f"Excepted 1 arguments but receive {len(sys.argv) - 1}")
-
-    hijack_recommend(spark_sql_cmd=sys.argv[1])
+    hijack_recommend(argv=sys.argv[1:])

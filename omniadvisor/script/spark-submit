@@ -27,26 +27,8 @@ if [[ -v enable_omniadvisor && "$enable_omniadvisor" = "true" ]]; then
   # 根据特性实际的部署路径进行修改
   echo "enable_omniadvisor"
   hijack_path=""
-  spark_cmd=""${SPARK_HOME}"/bin/spark-class org.apache.spark.deploy.SparkSubmit"
-  for arg in "$@"
-  do
-          if [[ "$arg" == -* ]]; then
-                  spark_cmd="$spark_cmd $arg"
-                  continue
-          fi
-          # 检查是否同时包含 = 和空格
-          if [[ "$arg" =~ = && "$arg" =~ [[:space:]] ]]; then
-                  # 提取第一个等号前的内容和之后的内容
-                  before=$(echo "$arg" | sed -E 's/^([^=]*=).*/\1/')
-                  after=$(echo "$arg" | sed -E 's/^[^=]*=(.*)/\1/')
-                  # 将后面的内容加上双引号并拼接
-                  new_arg="${before}\"${after}\""
-                  spark_cmd="$spark_cmd $new_arg"
-          else
-                  spark_cmd="$spark_cmd $arg"
-          fi
-  done
-  python3 $hijack_path "$spark_cmd"
+  cmd_prefix="${SPARK_HOME}/bin/spark-class org.apache.spark.deploy.SparkSubmit"
+  python3 ${hijack_path} --omniadvisor-cmd-prefix "${cmd_prefix}" "$@"
 else
   exec "${SPARK_HOME}"/bin/spark-class org.apache.spark.deploy.SparkSubmit "$@"
 fi
