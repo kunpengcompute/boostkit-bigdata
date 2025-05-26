@@ -82,4 +82,3 @@ class TestHijackRecommend(unittest.TestCase):
         mock_spark_run.assert_any_call(mock_load, {"timeout": 60})  # 第一次调用
         mock_spark_run.assert_any_call(mock_load, {"timeout": 30})  # 第二次调用
 
-    # TODO 端到端的用例构造里要验证一下对 --num-executors 转换为 --conf num-executors后是否能正常执行
