@@ -7,6 +7,7 @@ from omniadvisor.repository.tuning_record_repository import TuningRecordReposito
 from omniadvisor.service.tuning_result.tuning_result import get_tuning_result
 from omniadvisor.utils.logger import global_logger
 from omniadvisor.service.spark_service.spark_run import spark_run
+
 from common.constant import OA_CONF
 
 
@@ -20,11 +21,10 @@ def _query_or_create_load(name: str, exec_attr: dict, default_config: dict):
     :return: 负载实例
     """
     # 从负载数据库中查询是否有相关联的Load
-    loads = LoadRepository.query_by_name_and_default_config(name=name, default_config=default_config)
+    loads = LoadRepository.query_by_exec_attr_and_default_config(exec_attr=exec_attr, default_config=default_config)
     # 如果查询不到负载信息，则创建新的负载
     if not loads:
         global_logger.info("Not exit available load, create new one.")
-        # TODO 如果用户在这里创建了一个格式异常的config, 会引起spark执行失败 这个应该如何处理
         load = LoadRepository.create(name=name, exec_attr=exec_attr, default_config=default_config)
         TuningRecordRepository.create(load=load, config=default_config, method=OA_CONF.TuningMethod.user)
     else:
@@ -72,7 +72,8 @@ def _process_load_config(load: Load):
         best_config_results = get_tuning_result(load, load.best_config)
         # 若调优性能优于最佳性能 刷新当前的best_config
         if tuning_result.runtime < best_config_results.runtime:
-            boost_percentage = round((best_config_results.runtime - tuning_result.runtime)/best_config_results.runtime, 2)
+            boost_percentage = round(
+                (best_config_results.runtime - tuning_result.runtime) / best_config_results.runtime, 2)
             global_logger.info(f"tuning_runtime={tuning_result.runtime} is "
                                f"quicker than best_runtime={best_config_results.runtime}, "
                                f"boost percentage = {boost_percentage}"

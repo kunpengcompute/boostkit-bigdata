@@ -2,6 +2,7 @@ import os
 import json
 import uuid
 import subprocess
+import shlex
 from typing import Tuple, List, Dict
 
 from ConfigSpace import ConfigurationSpace, UniformIntegerHyperparameter, Constant, CategoricalHyperparameter, \
@@ -23,7 +24,11 @@ def run_cmd(submit_cmd) -> Tuple[int, str]:
     :rtype: Tuple[int, str]
     """
     global_logger.debug(f"Executor system command: {submit_cmd}")
-    exitcode, data = subprocess.getstatusoutput(submit_cmd)
+    # exitcode, data = subprocess.getstatusoutput(submit_cmd)
+    cmd_list = shlex.split(submit_cmd)
+    result = subprocess.run(cmd_list, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=False)
+    exitcode = result.returncode
+    data = result.stdout
     global_logger.debug(data)
     return exitcode, data
 
