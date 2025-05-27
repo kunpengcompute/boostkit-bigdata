@@ -73,7 +73,8 @@ def _process_load_config(load: Load):
         # 若调优性能优于最佳性能 刷新当前的best_config
         if tuning_result.runtime < best_config_results.runtime:
             boost_percentage = round(
-                (best_config_results.runtime - tuning_result.runtime) / best_config_results.runtime, 2)
+                (best_config_results.runtime - tuning_result.runtime) / best_config_results.runtime, 2
+            )
             global_logger.info(f"tuning_runtime={tuning_result.runtime} is "
                                f"quicker than best_runtime={best_config_results.runtime}, "
                                f"boost percentage = {boost_percentage}"
