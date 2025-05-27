@@ -28,12 +28,7 @@ class DatabaseTuningRecord(models.Model):
     """
     调优记录模型
     """
-    TUNING_METHOD_CHOICES = {
-        (OA_CONF.TuningMethod.user, 'UserDefault'),
-        (OA_CONF.TuningMethod.iterative, 'Iterative'),
-        (OA_CONF.TuningMethod.expert, 'Expert'),
-        (OA_CONF.TuningMethod.transfer, 'Transfer'),
-    }
+    TUNING_METHOD_CHOICES = {(method, method.upper()) for method in OA_CONF.TuningMethod.all}
 
     id = models.AutoField(primary_key=True)
     load = models.ForeignKey(

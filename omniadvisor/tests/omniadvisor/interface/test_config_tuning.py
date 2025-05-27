@@ -49,7 +49,7 @@ class TestTuning:
         with patch('omniadvisor.repository.load_repository.LoadRepository.query_by_id'), \
                 patch('omniadvisor.repository.tuning_record_repository.TuningRecordRepository.create'), \
                 patch('omniadvisor.service.retest_service.spark_run') as mock_spark_run, \
-                patch('omniadvisor.interface.config_tuning.get_tuning_result_history'), \
+                patch('omniadvisor.interface.config_tuning.get_tuning_result_history') as mock_tuning_result_history, \
                 patch('omniadvisor.service.retest_service.get_tuning_result') as mock_get_tuning_result, \
                 patch('omniadvisor.interface.config_tuning.remove_tuning_result') as mock_remove_tuning_result, \
                 patch('algo.iterative.tuning.SmacAppendTuning.tune') as mock_smac_tuning, \
@@ -62,13 +62,15 @@ class TestTuning:
             mock_tuning_result = MagicMock()
             mock_tuning_result.failed_times = OA_CONF.config_fail_threshold
             mock_get_tuning_result.return_value = mock_tuning_result
-            with pytest.raises(RuntimeError):
-                unified_tuning(load=self.load, retest_way=OA_CONF.RetestWay.backend, tuning_method=self.tuning_method)
+            tuning_result_history = MagicMock()
+            tuning_result_history.best_config = {**self.load.default_config, **self.tune_return_val[0]}
+            mock_tuning_result_history.return_value = tuning_result_history
+            unified_tuning(load=self.load, retest_way=OA_CONF.RetestWay.backend, tuning_method=self.tuning_method)
 
             mock_smac_tuning.assert_called_once()
             mock_spark_run.assert_called_once()
             mock_update_best.assert_not_called()
-            mock_remove_tuning_result.assert_called_once()
+            mock_remove_tuning_result.assert_not_called()
 
             assert 'Retest failed in round 1. Exception source: Spark exception' in caplog.text
 

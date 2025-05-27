@@ -1,3 +1,4 @@
+import json
 import os
 import configparser
 
@@ -63,10 +64,6 @@ class OmniAdvisorConf:
         backend = 'backend'
         all = [hijacking, backend]
 
-    # 规定每种调优方式的轮次
-    # TODO 瞎拍的
-    tuning_strategies = [(TuningMethod.expert, 5), (TuningMethod.iterative, 10)]
-
     # 评估配置失效的阈值，当配置执行失败次数大于等于此值，则配置失效
     config_fail_threshold = 1
 
@@ -79,5 +76,8 @@ class OmniAdvisorConf:
     tuning_retest_times = _common_config.getint('common', 'tuning.retest.times')
     spark_history_rest_url = _common_config.get('spark', 'spark.history.rest.url')
     timeout_ratio = _common_config.getfloat('spark', 'spark.sql.timeout.ratio')
+
+    tuning_strategies = json.loads(_common_config.get('common', 'tuning.strategy'))
+
 
 OA_CONF = OmniAdvisorConf()

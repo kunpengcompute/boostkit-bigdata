@@ -103,7 +103,7 @@ class TuningResult:
         """
         if self.failed_times >= OA_CONF.config_fail_threshold:
             overall_status = OA_CONF.ExecStatus.fail
-        elif len(self._exam_records) == OA_CONF.tuning_retest_times:
+        elif len(self._exam_records) >= OA_CONF.tuning_retest_times:
             overall_status = OA_CONF.ExecStatus.success
         else:
             overall_status = OA_CONF.ExecStatus.running
@@ -149,7 +149,7 @@ class TuningResult:
         if self.trace is not None:
             trace = Trace(stages_with_summaries=self.trace.get('stages'), sql=self.trace.get('sql'))
         else:
-            trace = None
+            trace = Trace(stages_with_summaries=None, sql=None)
 
         return Tuning(
             round=self.rounds,

@@ -4,15 +4,22 @@ from algo.expert.tuning import ExpertTuning
 from algo.iterative.tuning import SmacAppendTuning
 from algo.native.tuning import NativeTuning
 from algo.transfer.tuning import TransferTuning
+from common.constant import OA_CONF
+
 from omniadvisor.repository.load_repository import LoadRepository
 from omniadvisor.repository.tuning_record_repository import TuningRecordRepository
 from omniadvisor.service.retest_service import retest
 from omniadvisor.service.tuning_result.tuning_result import remove_tuning_result
 from omniadvisor.service.tuning_result.tuning_result_history import get_tuning_result_history, \
-    get_next_tuning_method, get_other_tuning_result_history
+    get_other_tuning_result_history
+
 from omniadvisor.utils.logger import global_logger
 
-from common.constant import OA_CONF
+
+# 异常类暂时用于当前模块，没必要放到公共里
+class NoOptimalConfigError(Exception):
+    """仅用于调优模块的异常"""
+    pass
 
 
 def _parse_tuning_args():
@@ -29,8 +36,8 @@ def _parse_tuning_args():
                         help='If choose hijacking, a test will execute immediately')
 
     parser.add_argument("-t", "--tuning-method", type=str, required=False,
-                        choices=OA_CONF.TuningMethod.all,
-                        help='Support three tune method, for iterative, use BO; for expert ...')
+                        choices=[method for method in OA_CONF.TuningMethod.all if method != OA_CONF.TuningMethod.user],
+                        help='Tuning methods used to give optimal config, for iterative, use BO; for expert ...')
 
     args = parser.parse_args()
     return args
@@ -47,26 +54,10 @@ def unified_tuning(load, retest_way: str, tuning_method: str):
     if not load:
         raise ValueError("Invalid load: configuration cannot be loaded")
 
-    # 推荐下一个配置
-    if tuning_method == OA_CONF.TuningMethod.iterative:
-        perf_history = get_tuning_result_history(load)
-        next_config, method_extend = SmacAppendTuning.tune(perf_history.tuning_history)
-    elif tuning_method == OA_CONF.TuningMethod.expert:
-        perf_history = get_tuning_result_history(load)
-        next_config, method_extend = ExpertTuning.tune(perf_history.tuning_history)
-    elif tuning_method == OA_CONF.TuningMethod.native:
-        perf_history = get_tuning_result_history(load)
-        next_config, method_extend = NativeTuning.tune(perf_history.tuning_history)
-    elif tuning_method == OA_CONF.TuningMethod.transfer:
-        perf_history = get_tuning_result_history(load)
-        other_history = get_other_tuning_result_history(load)
-        next_config, method_extend = TransferTuning.tune(perf_history.tuning_history, other_history)
-    else:
-        raise ValueError(f'Not supported tuning method: {tuning_method}')
+    method_extend, next_config = _get_next_config(load, tuning_method)
 
     if not next_config:
-        global_logger.info('The recommending config is empty, please try other tuning methods.')
-        return
+        raise NoOptimalConfigError('The recommending config is empty, please try other tuning methods.')
 
     # 用户的default_config上叠加next_config叠加
     next_config = {**load.default_config, **next_config}
@@ -79,16 +70,44 @@ def unified_tuning(load, retest_way: str, tuning_method: str):
             retest(load, next_config)
         except Exception:
             # 如果之前发生错误，状态被置为running，此调优配置不可能再被复测，那么删除对应的exam_records、tuning_record
-            global_logger.info('Remove tuning result because the status is running.')
+            global_logger.info('Retest process did not complete normally. Please check the detailed logs for more '
+                               'information. Remove tuning results.')
             remove_tuning_result(load, next_config)
             raise
-        perf_history = get_tuning_result_history(load)
+        tuning_result_history = get_tuning_result_history(load)
         # 更新最优配置
-        if perf_history.best_config:
-            LoadRepository.update_best_config(load, perf_history.best_config)
+        if tuning_result_history.best_config and tuning_result_history.best_config != next_config:
+            LoadRepository.update_best_config(load, tuning_result_history.best_config)
     else:
         # 更新待测试配置即可
         LoadRepository.update_test_config(load, next_config)
+
+
+def _get_next_config(load, tuning_method):
+    """
+    获取下一个配置
+    :param load: 负载
+    :param tuning_method: 调优方法
+    :return:
+    """
+    if tuning_method == OA_CONF.TuningMethod.iterative:
+        tuning_result_history = get_tuning_result_history(load)
+        next_config, method_extend = SmacAppendTuning.tune(tuning_result_history.tuning_history)
+    elif tuning_method == OA_CONF.TuningMethod.expert:
+        tuning_result_history = get_tuning_result_history(load)
+        next_config, method_extend = ExpertTuning.tune(tuning_result_history.tuning_history)
+    elif tuning_method == OA_CONF.TuningMethod.native:
+        tuning_result_history = get_tuning_result_history(load)
+        next_config, method_extend = NativeTuning.tune(tuning_result_history.tuning_history)
+    elif tuning_method == OA_CONF.TuningMethod.transfer:
+        tuning_result_history = get_tuning_result_history(load)
+        other_history = get_other_tuning_result_history(load)
+        next_config, method_extend = TransferTuning.tune(
+            tuning_result_history.tuning_history, [other.tuning_history for other in other_history]
+        )
+    else:
+        raise ValueError(f'Not supported tuning method: {tuning_method}')
+    return method_extend, next_config
 
 
 def _pre_check(load_id):
@@ -115,6 +134,12 @@ def main():
     配置调优主函数
     """
     args = _parse_tuning_args()
+
+    # 前台复测需要指定调优方法，否则
+    if args.retest_way == OA_CONF.RetestWay.hijacking and not args.tuning_method:
+        global_logger.info('When using retest way \'hijacking\', param --tuning-method is needed.')
+        return
+
     # 检查load 是否存在以及是否需要调优
     load = _pre_check(args.load_id)
     if not load:
@@ -131,15 +156,17 @@ def main():
         global_logger.info('The retest status of latest tuning result is still running, please wait.')
         return
 
-    if args.tuning_method:
-        # 用户输入了强制调优的请求，以用户为准
+    if args.tuning_method or args.retest_way == OA_CONF.RetestWay.hijacking:
         unified_tuning(load, args.retest_way, args.tuning_method)
-    else:
-        tuning_method = get_next_tuning_method(load)
-        if not tuning_method:
-            global_logger.info(
-                'The tuning times reaches default settings, if you want to append tuning times, add \'-t\' in your '
-                'command'
-            )
-            return
-        unified_tuning(load, args.retest_way, tuning_method)
+        return
+
+    # 当且仅当后台复测，且未指定调优方法时，会连续拉起调优
+    for tuning_strategy in OA_CONF.tuning_strategies:
+        tuning_method = tuning_strategy[0]
+        tuning_times = tuning_strategy[1]
+        for _ in range(tuning_times):
+            try:
+                unified_tuning(load, args.retest_way, tuning_method)
+            except NoOptimalConfigError:
+                global_logger.info('The tuning method: %s cannot find optimal config, trying next.', tuning_method)
+                break

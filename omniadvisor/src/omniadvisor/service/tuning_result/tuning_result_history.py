@@ -1,35 +1,41 @@
-from itertools import chain
 from typing import List
 
+from omniadvisor.repository.exam_record_repository import ExamRecordRepository
+from omniadvisor.repository.load_prefetch_repository import LoadPrefetchRepository
 from omniadvisor.repository.model.load import Load
 from omniadvisor.repository.tuning_record_repository import TuningRecordRepository
 from omniadvisor.service.tuning_result.tuning_result import TuningResult
 from omniadvisor.service.tuning_result.tuning_result import get_tuning_result
 
-from common.constant import OA_CONF
 
-
-def get_other_tuning_result_history(load: Load):
-    # 暂未实现
-    return None
-
-
-def get_next_tuning_method(load) -> str:
+def get_other_tuning_result_history(exclude_load: Load):
     """
-    根据 load，获取调优历史记录，并根据OA_CONF中的tuning_strategies决定本轮的调优方法
-    :param load
-    :return: 当前的调优方法
+    查询 exclude_load 以外的所有 tuning result history
+    :param exclude_load
+    :return:
     """
-    tuning_result_history = get_tuning_result_history(load)
-    statistics = tuning_result_history.collect_method_calls
-    next_tuning_method = None
-    for tuning_method, expected_tuning_times in OA_CONF.tuning_strategies:
-        # 历史中该方法的调优次数已经超过了设定的调优次数，跳过（超过是因为用户强制使用）
-        if statistics.get(tuning_method, 0) >= expected_tuning_times:
-            continue
-        next_tuning_method = tuning_method
-        break
-    return next_tuning_method
+    # 预取相关TuningRecord和ExamRecord
+    result = []
+    load_tuning_records_pairs = LoadPrefetchRepository.exclude_query_load_with_tuning_records(exclude_load)
+    for load, tuning_records in load_tuning_records_pairs:
+        # 获取该Load下的所有TuningRecord
+        tuning_results = []
+        for tuning_record in tuning_records:
+            # 查询匹配的ExamRecord
+            exam_records = ExamRecordRepository.query_by_load_and_config(load, tuning_record.config)
+            tuning_results.append(
+                TuningResult(
+                    tuning_record=tuning_record,
+                    exam_records=exam_records
+                )
+            )
+
+        result.append(TuningResultHistory(
+            load=load,
+            tuning_results=tuning_results
+        ))
+
+    return result
 
 
 def get_tuning_result_history(load: Load):
