@@ -30,7 +30,7 @@ def spark_run(load: Load, conf: dict):
     if conf != load.default_config:
         # 获取当前default_config的平均测试性能
         baseline_results = get_tuning_result(load, load.default_config)
-        timeout_sec = OA_CONF.timeout_ratio * baseline_results.runtime
+        timeout_sec = OA_CONF.spark_exec_timeout_ratio * baseline_results.runtime
         submit_cmd = f"timeout {timeout_sec} " + submit_cmd
 
     # 根据执行命令创建测试记录
@@ -111,8 +111,9 @@ def _submit_spark_task(exam_record, submit_cmd):
 
 def _update_trace_from_history_server(exam_record: ExamRecord, application_id: str):
     """
-    创建一个子进程对history_server进行轮询 超时时间为10s
-    :param application_id: applicaction_id
+    创建一个子进程对history_server进行轮询
+
+    :param application_id: Spark任务application_id
     :return:
     """
     trace_dict = {}
@@ -125,12 +126,14 @@ def _update_trace_from_history_server(exam_record: ExamRecord, application_id: s
             trace_stages = spark_fetcher.get_spark_stages_by_app(application_id)
             trace_executor = spark_fetcher.get_spark_executor_by_app(application_id)
         except HTTPError as httpe:
-            time.sleep(1)
+            time.sleep(OA_CONF.spark_fetch_trace_interval)
             global_logger.warning(f"Cannot access history server: {httpe}")
             continue
         trace_dict['sql'] = save_trace_data(data=trace_sql, data_dir=OA_CONF.data_dir)
         trace_dict['stages'] = save_trace_data(data=trace_stages, data_dir=OA_CONF.data_dir)
         trace_dict['executor'] = save_trace_data(data=trace_executor, data_dir=OA_CONF.data_dir)
         break
+    else:
+        raise RuntimeError(f'Failed to get App {application_id} trace from {history_server_url}')
 
     ExamRecordRepository.update_exam_result(exam_record, trace=trace_dict)
