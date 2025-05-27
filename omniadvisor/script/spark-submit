@@ -23,12 +23,21 @@ fi
 
 # disable randomized hash for string in Python 3.3+
 export PYTHONHASHSEED=0
+
+# 使能OmniAdvisor劫持优化
 if [[ -v enable_omniadvisor && "$enable_omniadvisor" = "true" ]]; then
-  # 根据特性实际的部署路径进行修改
   echo "enable_omniadvisor"
+  # 根据特性实际的部署路径进行修改
   hijack_path=""
+  # OmniAdvisor劫持优化
   cmd_prefix="${SPARK_HOME}/bin/spark-class org.apache.spark.deploy.SparkSubmit"
   python3 ${hijack_path} --omniadvisor-cmd-prefix "${cmd_prefix}" "$@"
+  # 如果劫持优化执行出现异常，则帮助用户直接执行任务
+  if [ $? -ne 0 ]; then
+    exec "${SPARK_HOME}"/bin/spark-class org.apache.spark.deploy.SparkSubmit "$@"
+  fi
+
+# 不使能OmniAdvisor劫持优化
 else
   exec "${SPARK_HOME}"/bin/spark-class org.apache.spark.deploy.SparkSubmit "$@"
 fi
