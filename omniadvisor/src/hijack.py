@@ -1,3 +1,5 @@
+import os
+
 from omniadvisor.interface import hijack_recommend
 from omniadvisor.utils.logger import global_logger, disable_console_handler
 
@@ -14,8 +16,10 @@ if __name__ == '__main__':
         global_logger.exception(e)
         # 异常退出
         # 劫持任务异常退出后，需在Spark脚本内执行原Spark命令语句
-        exit(1)
+        # 选择os._exit()方式退出，避免主进程等待子进程获取Trace的阻塞
+        os._exit(1)
 
     # 正常退出
     global_logger.info('Hijack mission complete!')
-    exit(0)
+    # 选择os._exit()方式退出，避免主进程等待子进程获取Trace的阻塞
+    os._exit(0)

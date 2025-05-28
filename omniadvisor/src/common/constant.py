@@ -64,19 +64,15 @@ class OmniAdvisorConf:
         backend = 'backend'
         all = [hijacking, backend]
 
-    # 评估配置失效的阈值，当配置执行失败次数大于等于此值，则配置失效
-    config_fail_threshold = 1
-
-    # Spark从History Sever抓取Trace的超时时间
-    spark_fetch_trace_timeout = 10
-
     # 输入配置解析
     _common_config = load_common_config(config_path=common_config_path)
     # 配置罗列
     tuning_retest_times = _common_config.getint('common', 'tuning.retest.times')
+    config_fail_threshold = _common_config.getint('common', 'config.fail.threshold')
     spark_history_rest_url = _common_config.get('spark', 'spark.history.rest.url')
-    timeout_ratio = _common_config.getfloat('spark', 'spark.sql.timeout.ratio')
-
+    spark_fetch_trace_timeout = _common_config.get('spark', 'spark.fetch.trace.timeout')
+    spark_fetch_trace_interval = _common_config.get('spark', 'spark.fetch.trace.interval')
+    spark_exec_timeout_ratio = _common_config.getfloat('spark', 'spark.exec.timeout.ratio')
     tuning_strategies = json.loads(_common_config.get('common', 'tuning.strategy'))
 
 
