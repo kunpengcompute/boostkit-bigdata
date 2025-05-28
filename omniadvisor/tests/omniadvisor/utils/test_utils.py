@@ -1,29 +1,33 @@
+import subprocess
 from unittest.mock import patch,mock_open
 from omniadvisor.utils.utils import run_cmd, save_trace_data  # 假设你的函数定义在 'your_module' 中
 
 
 class TestRunCmd:
-    @patch('subprocess.getstatusoutput')
-    def test_run_cmd_success(self, mock_getstatusoutput):
+    @patch('subprocess.run')
+    def test_run_cmd_success(self, mock_run):
         # 配置mock的返回值
-        mock_getstatusoutput.return_value = (0, "Success output")
+        mock_run.return_value.returncode = 0,
+        mock_run.return_value.stdout = "Success output"
 
         exitcode, output = run_cmd('echo hello')
 
         # 验证结果
-        assert exitcode == 0
+        assert exitcode[0] == 0
         assert output == "Success output"
-        mock_getstatusoutput.assert_called_once_with('echo hello')
+        mock_run.assert_called_once_with(['echo', 'hello'],
+                                         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=False)
 
-    @patch('subprocess.getstatusoutput')
-    def test_run_cmd_failure(self, mock_getstatusoutput):
+    @patch('subprocess.run')
+    def test_run_cmd_failure(self, mock_run):
         # 配置mock的返回值
-        mock_getstatusoutput.return_value = (1, "Error output")
+        mock_run.return_value.returncode = 1,
+        mock_run.return_value.stdout = "Error output"
 
         exitcode, output = run_cmd('false')
 
         # 验证结果
-        assert exitcode == 1
+        assert exitcode[0] == 1
         assert output == "Error output"
 
 

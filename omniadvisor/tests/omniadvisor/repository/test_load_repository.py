@@ -30,17 +30,17 @@ class TestLoadRepository:
 
     def test_create(self):
         load = LoadRepository.create(
-            name='test',
-            exec_attr={'cmd': 'spark-sql -f test.sql'},
+            name='example_name',
+            exec_attr={'name': 'example_name', 'cpu': 4},
             default_config={"param1": "value2"}
         )
         assert isinstance(load, Load)
-        assert load.database_model.name == 'test'
-        assert load.database_model.exec_attr == {'cmd': 'spark-sql -f test.sql'}
+        assert load.database_model.name == 'example_name'
+        assert load.database_model.exec_attr == {'name': 'example_name', 'cpu': 4}
         assert load.database_model.default_config == {"param1": "value2"}
 
         # 查询数据库中是否有新增数据
-        database_loads = DatabaseLoad.objects.filter(name='test')
+        database_loads = DatabaseLoad.objects.filter(name='example_name')
         assert len(database_loads) == 1
 
         # 输入无效数据
@@ -50,22 +50,22 @@ class TestLoadRepository:
     def test_query(self):
         # 创建测试数据
         load = LoadRepository.create(
-            name='test',
-            exec_attr={'cmd': 'spark-sql -f test.sql'},
+            name='example_name',
+            exec_attr={'name': "example_name", 'cpu': 4},
             default_config={"param1": "value2"}
         )
 
         # 查询负载
-        loads = LoadRepository.query_by_name_and_default_config(
-            name='test',
+        loads = LoadRepository.query_by_exec_attr_and_default_config(
+            exec_attr={'name': "example_name", 'cpu': 4},
             default_config={"param1": "value2"}
         )
         assert len(loads) == 1
-        assert loads[0].exec_attr == {'cmd': 'spark-sql -f test.sql'}
+        assert loads[0].exec_attr == {'name': "example_name", 'cpu': 4}
 
         # 查询失败
-        loads = LoadRepository.query_by_name_and_default_config(
-            name='t',
+        loads = LoadRepository.query_by_exec_attr_and_default_config(
+            exec_attr={"name": "wrong_name"},
             default_config={"param1": "value2"}
         )
         assert len(loads) == 0
@@ -73,8 +73,8 @@ class TestLoadRepository:
     def test_update_best_config(self):
         # 创建测试数据
         load = LoadRepository.create(
-            name='test',
-            exec_attr={'cmd': 'spark-sql -f test.sql'},
+            name='example_name',
+            exec_attr={'name': "example_name", 'cpu': 4},
             default_config={"param1": "value2"}
         )
 
@@ -88,8 +88,8 @@ class TestLoadRepository:
     def test_update_test_config(self):
         # 创建测试数据
         load = LoadRepository.create(
-            name='test',
-            exec_attr={'cmd': 'spark-sql -f test.sql'},
+            name='example_name',
+            exec_attr={'name': "example_name", 'cpu': 4},
             default_config={"param1": "value2"}
         )
 
@@ -103,8 +103,8 @@ class TestLoadRepository:
     def test_update_tuning_needed(self):
         # 创建测试数据
         load = LoadRepository.create(
-            name='test',
-            exec_attr={'cmd': 'spark-sql -f test.sql'},
+            name='example_name',
+            exec_attr={'name': "example_name", 'cpu': 4},
             default_config={"param1": "value2"}
         )
 

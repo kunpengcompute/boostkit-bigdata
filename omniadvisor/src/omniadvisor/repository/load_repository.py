@@ -59,24 +59,24 @@ class LoadRepository(Repository):
         return Load(database_model=database_load)
 
     @classmethod
-    def query_by_name_and_default_config(cls, name: str, default_config: dict):
+    def query_by_exec_attr_and_default_config(cls, exec_attr: dict, default_config: dict):
         """
         指定名称和执行属性，查询负载
         (暂定以这两个信息进行查询，具体视现网情况而定)
 
-        :param name: 负载名称
+        :param exec_attr: 负载的执行参数
         :param default_config: 负载默认配置
         :return: 负载实例列表
         """
         model_attr = {
-            Load.FieldName.name: name,
+            Load.FieldName.exec_attr: exec_attr,
             Load.FieldName.default_config: default_config
         }
         database_loads = cls._query(model_attr=model_attr)
 
-        # 强制要求name和default_config组合是唯一的
+        # 强制要求exec_attr和default_config组合是唯一的
         if len(database_loads) > 1:
-            raise RuntimeError(f'Find {cls._model_class.__name__} combination of name {name} and default_config '
+            raise RuntimeError(f'Find {cls._model_class.__name__} combination of name {exec_attr} and default_config '
                                f'{default_config} is not unique.')
 
         return [
