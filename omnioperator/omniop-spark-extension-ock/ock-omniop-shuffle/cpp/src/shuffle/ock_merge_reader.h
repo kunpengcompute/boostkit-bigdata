@@ -16,7 +16,7 @@ public:
     bool Initialize(const int32_t *typeIds, uint32_t colNum);
     bool GetMergeVectorBatch(uint8_t *&address, uint32_t remain, uint32_t maxRowNum, uint32_t maxSize);
 
-    bool CopyPartDataToVector(uint8_t *&nulls, uint8_t *&values, uint32_t &remainingSize, uint32_t &remainingCapacity,
+    bool CopyPartDataToVector(uint8_t *&nulls, uint32_t &nullsOffset, uint8_t *&values, uint32_t &remainingSize, uint32_t &remainingCapacity,
          OckVectorPtr &srcVector);
     bool CopyDataToVector(omniruntime::vec::BaseVector *dstVector, uint32_t colIndex);
 
