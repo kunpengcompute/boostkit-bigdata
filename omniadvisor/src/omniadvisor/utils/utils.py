@@ -24,7 +24,6 @@ def run_cmd(submit_cmd) -> Tuple[int, str]:
     :rtype: Tuple[int, str]
     """
     global_logger.debug(f"Executor system command: {submit_cmd}")
-    # exitcode, data = subprocess.getstatusoutput(submit_cmd)
     cmd_list = shlex.split(submit_cmd)
     result = subprocess.run(cmd_list, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=False)
     exitcode = result.returncode
