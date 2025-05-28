@@ -166,7 +166,7 @@ bool OckMergeReader::GetMergeVectorBatch(uint8_t *&startAddress, uint32_t remain
     return true;
 }
 
-bool OckMergeReader::CopyPartDataToVector(uint8_t *&nulls, uint8_t *&values, uint32_t &remainingSize, 
+bool OckMergeReader::CopyPartDataToVector(uint8_t *&nulls, uint32_t &nullsOffset, uint8_t *&values, uint32_t &remainingSize,
     uint32_t &remainingCapacity, OckVectorPtr &srcVector)
 {
     uint32_t srcSize = srcVector->GetSize();
@@ -174,12 +174,14 @@ bool OckMergeReader::CopyPartDataToVector(uint8_t *&nulls, uint8_t *&values, uin
         LOG_ERROR("Not eneough resource. remainingSize %d, srcSize %d.", remainingSize, srcSize);
         return false;
     }
-    errno_t ret = memcpy_s(nulls, remainingSize, srcVector->GetValueNulls(), srcSize);
-    if (UNLIKELY(ret != EOK)) {
-        LOG_ERROR("Failed to copy null vector");
-        return false;
+
+    uint8_t *srcNulls = reinterpret_cast<uint8_t *>(srcVector->GetValueNulls());
+    for (uint32_t i = 0; i < srcSize; i++) {
+        if (srcNulls[i]) {
+            omniruntime::BitUtil::SetBit(nulls, nullsOffset + i);
+        }
     }
-    nulls += srcSize;
+    nullsOffset += srcSize;
     remainingSize -= srcSize;
 
     uint32_t srcCapacity = srcVector->GetCapacityInBytes();
@@ -188,7 +190,7 @@ bool OckMergeReader::CopyPartDataToVector(uint8_t *&nulls, uint8_t *&values, uin
         return false;
     }
     if (srcCapacity > 0) {
-        ret = memcpy_s(values, remainingCapacity, srcVector->GetValues(), srcCapacity);
+        errno_t  ret = memcpy_s(values, remainingCapacity, srcVector->GetValues(), srcCapacity);
         if (UNLIKELY(ret != EOK)) {
             LOG_ERROR("Failed to copy values vector");
             return false;
@@ -224,13 +226,14 @@ bool OckMergeReader::CopyDataToVector(BaseVector *dstVector, uint32_t colIndex)
         remainingCapacity = GetDataSize(colIndex) * remainingSize;
     }
 
+    uint32_t nullsOffset = 0;
     for (uint32_t cnt = 0; cnt < mMergeCnt; ++cnt) {
         if (UNLIKELY(srcVector == nullptr)) {
             LOG_ERROR("Invalid src vector");
             return false;
         }
 
-        if (UNLIKELY(!CopyPartDataToVector(nullsAddress, valuesAddress, remainingSize, remainingCapacity, srcVector))) {
+        if (UNLIKELY(!CopyPartDataToVector(nullsAddress, nullsOffset, valuesAddress, remainingSize, remainingCapacity, srcVector))) {
             return false;
         }
 
