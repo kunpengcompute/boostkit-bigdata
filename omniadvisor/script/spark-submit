@@ -26,7 +26,7 @@ export PYTHONHASHSEED=0
 
 # 使能OmniAdvisor劫持优化
 if [[ -v enable_omniadvisor && "$enable_omniadvisor" = "true" ]]; then
-  echo "enable_omniadvisor"
+  echo "*** OmniAdvisor is enabled! We will find best config to SPEEDUP! ***"
   # 根据特性实际的部署路径进行修改
   hijack_path=""
   # OmniAdvisor劫持优化
