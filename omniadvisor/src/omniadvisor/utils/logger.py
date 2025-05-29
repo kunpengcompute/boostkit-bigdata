@@ -33,7 +33,7 @@ LOGGING_CONFIG = {
         },
         'fileHandler': {
             'class': 'logging.handlers.TimedRotatingFileHandler',
-            'level': 'INFO',
+            'level': 'DEBUG',
             'formatter': 'simpleFormatter',
             'filename': OA_CONF.log_file_path,
             'when': 'midnight',
@@ -43,8 +43,8 @@ LOGGING_CONFIG = {
         }
     },
     'loggers': {
-        'project_logger': {
-            'level': 'DEBUG',
+        'omniadvisor': {
+            'level': 'INFO',
             'handlers': ['consoleHandler', 'fileHandler'],
         }
     }
@@ -58,7 +58,12 @@ if not os.path.exists(OA_CONF.log_dir):
 dictConfig(LOGGING_CONFIG)
 
 # 获取logger并使用
-global_logger = logging.getLogger('project_logger')
+global_logger = logging.getLogger('omniadvisor')
+
+# 屏蔽部分第三方库中的Logger
+modules_setting_error = ['smac']
+for model in modules_setting_error:
+    logging.getLogger(model).setLevel(logging.ERROR)
 
 
 def disable_console_handler(logger):
