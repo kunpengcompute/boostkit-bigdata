@@ -120,8 +120,10 @@ class SparkCMDParser:
             # 其余参数保存至exec_attr
             else:
                 exec_attr[key] = value
-        global_logger.warning(f"The remainder unknown params {unknown} will be add to exec_attr[unknown]")
-        exec_attr[_CMD_UNKNOWN_KEY] = unknown
+
+        if unknown:
+            global_logger.warning(f"The remainder unknown params {unknown} will be add to exec_attr[unknown]")
+            exec_attr[_CMD_UNKNOWN_KEY] = unknown
 
         return exec_attr, conf_params
 

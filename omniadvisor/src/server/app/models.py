@@ -19,7 +19,7 @@ class DatabaseLoad(models.Model):
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=['name', 'default_config'], name='load_unique')
+            models.UniqueConstraint(fields=['exec_attr', 'default_config'], name='load_unique')
         ]
         db_table = 'omniadvisor_load'  # 自定义表名
 

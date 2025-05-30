@@ -69,19 +69,23 @@ def _process_load_config(load: Load):
     :param load: 本次测试用负载
     :return:
     """
+    # 获取测试配置的调优结果
     tuning_result = get_tuning_result(load, load.test_config)
+
+    # 测试配置执行成功
     if tuning_result.status == OA_CONF.ExecStatus.fail:
         LoadRepository.update_test_config(load, {})
+    # 测试配置执行失败
     elif tuning_result.status == OA_CONF.ExecStatus.success:
         # 获取当前best_config的平均测试性能
-        best_config_results = get_tuning_result(load, load.best_config)
+        best_tuning_result = get_tuning_result(load, load.best_config)
         # 若调优性能优于最佳性能 刷新当前的best_config
-        if tuning_result.runtime < best_config_results.runtime:
+        if tuning_result.runtime < best_tuning_result.runtime:
             boost_percentage = round(
-                (best_config_results.runtime - tuning_result.runtime) / best_config_results.runtime, 2
+                (best_tuning_result.runtime - tuning_result.runtime) / best_tuning_result.runtime, 2
             )
             global_logger.info(f"Tuning_runtime = {tuning_result.runtime} is "
-                               f"quicker than best_runtime = {best_config_results.runtime}, "
+                               f"quicker than best_runtime = {best_tuning_result.runtime}, "
                                f"boost percentage = {boost_percentage}"
                                f"found a better spark config")
             LoadRepository.update_best_config(load, load.test_config)
@@ -114,7 +118,7 @@ def hijack_recommend(argv: list):
     if exam_record.status != OA_CONF.ExecStatus.success and exec_config != user_config:
         global_logger.warning("Spark execute failed, ready to activate security protection mechanism.")
         safe_exam_record, safe_output = spark_run(load, user_config)
-        global_logger.info("Spark execute success, going to print Spark output.")
+        global_logger.info("Spark execute success in security protection mechanism, going to print Spark output.")
         # 打印安全机制下任务的输出
         print(safe_output)
     else:
