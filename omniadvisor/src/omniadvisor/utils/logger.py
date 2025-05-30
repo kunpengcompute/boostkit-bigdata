@@ -59,6 +59,8 @@ dictConfig(LOGGING_CONFIG)
 
 # 获取logger并使用
 global_logger = logging.getLogger('omniadvisor')
+# 禁止logger作用域上升到root
+global_logger.propagate = False
 
 # 屏蔽部分第三方库中的Logger
 modules_setting_error = ['smac']

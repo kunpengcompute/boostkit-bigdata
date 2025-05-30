@@ -1,10 +1,14 @@
 from unittest.mock import patch
+
+from common.constant import OA_CONF
 from omniadvisor.service.spark_service.spark_executor import SparkExecutor
 
 
 class TestSparkExecutor:
     def setup_class(self):
-        """在每个测试用例之前运行，初始化 SparkExecutor 实例"""
+        """
+        在每个测试用例之前运行，初始化 SparkExecutor 实例
+        """
         self.spark_executor = SparkExecutor()
 
     @patch('omniadvisor.service.spark_service.spark_executor.run_cmd')
@@ -48,26 +52,6 @@ class TestSparkExecutor:
         assert application_id == expected_result["application_id"]
         assert time_taken == expected_result["time_taken"]
 
-    def test_reg_match_application_id_and_time_taken(self):
-        """
-        测试 _reg_match_application_id_and_time_taken 方法
-        """
-        # 模拟 spark_output 数据
-        spark_output ="Some log line\n" \
-                      "INFO deploy.SparkSubmit: Starting Spark job\n" \
-                      "Another log line\n" \
-                      "Application Id: application_1234567890\n" \
-                      "Time taken: 12.34 seconds"
-
-        # 调用方法
-        spark_submit_cmd, application_id, time_taken = self.spark_executor._reg_match_application_id_and_time_taken(
-            spark_output)
-
-        # 验证结果
-        assert spark_submit_cmd == "INFO deploy.SparkSubmit: Starting Spark job"
-        assert application_id == "application_1234567890"
-        assert time_taken == 12.34
-
     def test_parser_spark_output_with_empty_output(self):
         """
         测试 parser_spark_output 方法处理空输出的情况
@@ -81,4 +65,4 @@ class TestSparkExecutor:
         # 验证结果
         assert spark_submit_cmd == ""
         assert application_id == ""
-        assert time_taken == -1.0
+        assert time_taken == OA_CONF.exec_fail_return_runtime

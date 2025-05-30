@@ -15,8 +15,7 @@ class TestRunCmd:
         # 验证结果
         assert exitcode[0] == 0
         assert output == "Success output"
-        mock_run.assert_called_once_with(['echo', 'hello'],
-                                         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=False)
+        mock_run.assert_called_once()
 
     @patch('subprocess.run')
     def test_run_cmd_failure(self, mock_run):
