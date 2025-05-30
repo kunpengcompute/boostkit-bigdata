@@ -61,12 +61,14 @@ def unified_tuning(load, retest_way: str, tuning_method: str):
         raise NoOptimalConfigError('The recommending config is empty, please try other tuning methods.')
 
     # 用户的default_config上叠加next_config叠加
+    global_logger.info("Load config tuning success, get new config to retest.")
     next_config = {**load.default_config, **next_config}
 
     TuningRecordRepository.create(load=load, config=next_config, method=tuning_method, method_extend=method_extend)
 
     # 复测
     if retest_way == OA_CONF.RetestWay.backend:
+        global_logger.info("The way of retest is backend, going to retest the config from tuning……")
         try:
             retest(load, next_config)
         except Exception:
@@ -81,6 +83,7 @@ def unified_tuning(load, retest_way: str, tuning_method: str):
             LoadRepository.update_best_config(load, tuning_result_history.best_config)
     else:
         # 更新待测试配置即可
+        global_logger.info(f"The way of retest is hijacking, update the config from tuning to test config.")
         LoadRepository.update_test_config(load, next_config)
 
 
@@ -97,15 +100,19 @@ def _get_next_config(load: Load, tuning_method: str):
 
     # AI迭代调优
     if tuning_method == OA_CONF.TuningMethod.iterative:
+        global_logger.info("Use AI iterative optimization method to tuning.")
         tuning = SmacAppendTuning(tuning_history=tuning_result_history.tuning_history)
     # 专家规则调优
     elif tuning_method == OA_CONF.TuningMethod.expert:
+        global_logger.info("Use expert rule optimization method to tuning.")
         tuning = ExpertTuning(tuning_history=tuning_result_history.tuning_history)
     # Native特性使能
     elif tuning_method == OA_CONF.TuningMethod.native:
+        global_logger.info("Use native operator acceleration feature to tuning.")
         tuning = NativeTuning(tuning_history=tuning_result_history.tuning_history)
     # 迁移泛化调优
     elif tuning_method == OA_CONF.TuningMethod.transfer:
+        global_logger.info("Use migration generalization optimization method to tuning.")
         other_history = get_other_tuning_result_history(load)
         tuning = TransferTuning(
             tuning_history=tuning_result_history.tuning_history,
@@ -116,6 +123,7 @@ def _get_next_config(load: Load, tuning_method: str):
 
     # 调优
     next_config, method_extend = tuning.tune()
+    global_logger.debug(f"The method_extend is: {method_extend}, config from tuning is: {next_config}")
     return method_extend, next_config
 
 

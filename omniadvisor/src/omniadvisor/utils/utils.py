@@ -42,7 +42,7 @@ def save_trace_data(data: List[Dict[str, str]], data_dir):
     try:
         with open(file_path, 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=4)
-        global_logger.info(f"数据已成功保存到 {file_path}")
+        global_logger.debug(f"数据已成功保存到 {file_path}")
     except IOError as e:
         raise IOError(f"出现IO错误: {e}")
     except Exception as e:
