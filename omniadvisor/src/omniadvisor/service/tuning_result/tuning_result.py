@@ -1,12 +1,13 @@
 from typing import List
 
 from algo.common.model import Tuning, Trace
+from common.constant import OA_CONF
+
 from omniadvisor.repository.model.load import Load
 from omniadvisor.repository.model.tuning_record import TuningRecord
 from omniadvisor.repository.model.exam_record import ExamRecord
 from omniadvisor.repository.tuning_record_repository import TuningRecordRepository
 from omniadvisor.repository.exam_record_repository import ExamRecordRepository
-from common.constant import OA_CONF
 
 
 def get_tuning_result(load: Load, config: dict):
