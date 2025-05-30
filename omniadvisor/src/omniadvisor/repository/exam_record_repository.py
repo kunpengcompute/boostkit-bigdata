@@ -1,12 +1,13 @@
 from datetime import datetime
 
 from django.utils import timezone
-
+from common.constant import OA_CONF
 from server.app.models import DatabaseLoad, DatabaseExamRecord
+
 from omniadvisor.repository.model.load import Load
 from omniadvisor.repository.model.exam_record import ExamRecord
 from omniadvisor.repository.repository import Repository
-from common.constant import OA_CONF
+
 
 
 class ExamRecordRepository(Repository):

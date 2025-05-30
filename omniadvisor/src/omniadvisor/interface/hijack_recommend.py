@@ -1,4 +1,5 @@
 import sys
+from common.constant import OA_CONF
 
 from omniadvisor.service.spark_service.spark_cmd_parser import SparkCMDParser
 from omniadvisor.repository.model.load import Load
@@ -7,8 +8,6 @@ from omniadvisor.repository.tuning_record_repository import TuningRecordReposito
 from omniadvisor.service.tuning_result.tuning_result import get_tuning_result
 from omniadvisor.utils.logger import global_logger
 from omniadvisor.service.spark_service.spark_run import spark_run
-
-from common.constant import OA_CONF
 
 
 def _query_or_create_load(name: str, exec_attr: dict, default_config: dict):

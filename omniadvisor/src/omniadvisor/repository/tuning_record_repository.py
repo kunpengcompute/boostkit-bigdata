@@ -1,10 +1,9 @@
+from common.constant import OA_CONF
 from server.app.models import DatabaseLoad, DatabaseTuningRecord
 
 from omniadvisor.repository.model.load import Load
 from omniadvisor.repository.model.tuning_record import TuningRecord
 from omniadvisor.repository.repository import Repository
-
-from common.constant import OA_CONF
 
 
 class TuningRecordRepository(Repository):

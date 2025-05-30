@@ -9,7 +9,8 @@ LOGGING_CONFIG = {
     'formatters': {
         'colorFormatter': {
             '()': 'colorlog.ColoredFormatter',
-            'format': '%(log_color)s%(asctime)s [%(levelname)s] %(filename)s:%(lineno)d in %(funcName)s - %(message)s%(reset)s',
+            'format': '%(log_color)s%(asctime)s [%(levelname)s] '
+                      '%(filename)s:%(lineno)d in %(funcName)s - %(message)s%(reset)s',
             'datefmt': '%Y-%m-%d %H:%M:%S',
             'log_colors': {
                 'DEBUG': 'cyan',
