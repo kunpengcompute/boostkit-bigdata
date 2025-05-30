@@ -1,6 +1,6 @@
 from typing import List
 
-from algo.common.model import Tuning, Trace
+from algo.common.model import TuningData, Trace
 from omniadvisor.repository.model.load import Load
 from omniadvisor.repository.model.tuning_record import TuningRecord
 from omniadvisor.repository.model.exam_record import ExamRecord
@@ -145,13 +145,13 @@ class TuningResult:
     def exam_records(self):
         return self._exam_records
 
-    def to_tuning(self) -> Tuning:
+    def to_tuning(self) -> TuningData:
         if self.trace is not None:
             trace = Trace(stages_with_summaries=self.trace.get('stages'), sql=self.trace.get('sql'))
         else:
             trace = Trace(stages_with_summaries=None, sql=None)
 
-        return Tuning(
+        return TuningData(
             round=self.rounds,
             config=self.config,
             method=self.method,

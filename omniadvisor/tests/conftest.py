@@ -34,7 +34,7 @@ to_registers = {
     'algo.common.model.Trace',
     'algo.expert.tuning.ExpertTuning',
     'algo.iterative.tuning.SmacAppendTuning',
-    'algo.common.model.Tuning',
+    'algo.common.model.TuningData',
     'algo.native.tuning.NativeTuning',
     'algo.transfer.tuning.TransferTuning',
 }

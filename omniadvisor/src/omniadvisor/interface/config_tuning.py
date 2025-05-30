@@ -6,6 +6,7 @@ from algo.native.tuning import NativeTuning
 from algo.transfer.tuning import TransferTuning
 from common.constant import OA_CONF
 
+from omniadvisor.repository.model.load import Load
 from omniadvisor.repository.load_repository import LoadRepository
 from omniadvisor.repository.tuning_record_repository import TuningRecordRepository
 from omniadvisor.service.retest_service import retest
@@ -83,30 +84,38 @@ def unified_tuning(load, retest_way: str, tuning_method: str):
         LoadRepository.update_test_config(load, next_config)
 
 
-def _get_next_config(load, tuning_method):
+def _get_next_config(load: Load, tuning_method: str):
     """
-    获取下一个配置
+    调优推荐下一个配置
+
     :param load: 负载
     :param tuning_method: 调优方法
     :return:
     """
+    # 获取指定负载的调优历史记录
+    tuning_result_history = get_tuning_result_history(load)
+
+    # AI迭代调优
     if tuning_method == OA_CONF.TuningMethod.iterative:
-        tuning_result_history = get_tuning_result_history(load)
-        next_config, method_extend = SmacAppendTuning.tune(tuning_result_history.tuning_history)
+        tuning = SmacAppendTuning(tuning_history=tuning_result_history.tuning_history)
+    # 专家规则调优
     elif tuning_method == OA_CONF.TuningMethod.expert:
-        tuning_result_history = get_tuning_result_history(load)
-        next_config, method_extend = ExpertTuning.tune(tuning_result_history.tuning_history)
+        tuning = ExpertTuning(tuning_history=tuning_result_history.tuning_history)
+    # Native特性使能
     elif tuning_method == OA_CONF.TuningMethod.native:
-        tuning_result_history = get_tuning_result_history(load)
-        next_config, method_extend = NativeTuning.tune(tuning_result_history.tuning_history)
+        tuning = NativeTuning(tuning_history=tuning_result_history.tuning_history)
+    # 迁移泛化调优
     elif tuning_method == OA_CONF.TuningMethod.transfer:
-        tuning_result_history = get_tuning_result_history(load)
         other_history = get_other_tuning_result_history(load)
-        next_config, method_extend = TransferTuning.tune(
-            tuning_result_history.tuning_history, [other.tuning_history for other in other_history]
+        tuning = TransferTuning(
+            tuning_history=tuning_result_history.tuning_history,
+            other_histories=[other.tuning_history for other in other_history]
         )
     else:
         raise ValueError(f'Not supported tuning method: {tuning_method}')
+
+    # 调优
+    next_config, method_extend = tuning.tune()
     return method_extend, next_config
 
 
