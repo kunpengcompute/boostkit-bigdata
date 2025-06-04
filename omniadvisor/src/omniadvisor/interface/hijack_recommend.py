@@ -42,21 +42,21 @@ def _get_exec_config_from_load(load: Load):
     """
     # 如果负载不需要推荐优化配置，直接使用默认配置
     if not load.tuning_needed:
-        global_logger.info("Load don't need to be tuning, going to execute with default config.")
+        global_logger.info("Load doesn't need tuning, running with default config.")
         return load.default_config
 
     # 如果负载需要推荐优化配置 根据优先级选择配置
     if load.test_config:
         # 第一使用待测试配置
-        global_logger.info("Test config found, going to execute with test config.")
+        global_logger.info("Test config found, running with test config.")
         return load.test_config
     elif load.best_config:
         # 第二使用最优配置
-        global_logger.info("Best config found, going to execute with best config.")
+        global_logger.info("Best config found, running with best config.")
         return load.best_config
     else:
         # 最后使用租户默认配置
-        global_logger.info("Only default config found, going to execute with default config.")
+        global_logger.info("Only default config found, running with default config.")
         return load.default_config
 
 
