@@ -6,6 +6,7 @@ from omniadvisor.repository.model.load import Load
 from omniadvisor.repository.load_repository import LoadRepository
 from omniadvisor.repository.tuning_record_repository import TuningRecordRepository
 from omniadvisor.service.tuning_result.tuning_result import get_tuning_result
+from omniadvisor.service.tuning_result.tuning_result_history import get_tuning_result_history
 from omniadvisor.utils.logger import global_logger
 from omniadvisor.service.spark_service.spark_run import spark_run
 
@@ -76,18 +77,12 @@ def _process_load_config(load: Load):
         LoadRepository.update_test_config(load, {})
     # 测试配置执行失败
     elif tuning_result.status == OA_CONF.ExecStatus.success:
-        # 获取当前best_config的平均测试性能
-        best_tuning_result = get_tuning_result(load, load.best_config)
-        # 若调优性能优于最佳性能 刷新当前的best_config
-        if tuning_result.runtime < best_tuning_result.runtime:
-            boost_percentage = round(
-                (best_tuning_result.runtime - tuning_result.runtime) / best_tuning_result.runtime, 2
-            )
-            global_logger.info(f"Tuning_runtime = {tuning_result.runtime} is "
-                               f"quicker than best_runtime = {best_tuning_result.runtime}, "
-                               f"boost percentage = {boost_percentage}"
-                               f"found a better spark config")
-            LoadRepository.update_best_config(load, load.test_config)
+        tuning_result_history = get_tuning_result_history(load=load)
+        # 更新最优配置
+        tuning_result_history.refresh_best_config()
+        global_logger.info(f'Current tuning result: {tuning_result.runtime}, best tuning result ever: '
+                           f'{tuning_result_history.best_tuning_result.runtime}, best tuning speedup: '
+                           f'{tuning_result_history.boost_percentage} %')
         # 当前test_config达到调优轮次后 置空test_config
         LoadRepository.update_test_config(load, {})
 

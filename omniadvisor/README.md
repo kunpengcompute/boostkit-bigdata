@@ -4,13 +4,12 @@
 - ① 进入`omniadvisor/src/`目录下。
 - ② 顺序执行以下命令：`python init.py makemigrations`和`python init.py migrate`，初始化数据库
 - ③ 执行命令`python init.py createsuperuser`创建超级用户，并按指示设置用户名和密码。
-- ④ 修改`omniadvisor/src/server/engine/settings.py`中的 `ALLOWED_HOSTS`，在列表中添加当前节点IP地址
 
 2 启动历史数据库服务
 完成数据库初始化后，即可启动历史数据库，并通过Web端查看数据库内数据
 
-- ① 执行命令`python init.py runserver 0.0.0.0:8000`启动数据库。
-- ② 登录Web管理页面：`localhost:8000/admin/`，`localhost `替换实际的IP地址，并通过初始化过程中的用户名和密码登录。
+- ① 执行命令`python init.py runserver 0.0.0.0:8000`启动数据库，其中`0.0.0.0`应替换为实际节点IP。
+- ② 登录Web管理页面：`localhost:8000/admin/`，`localhost`替换实际的IP地址，并通过初始化过程中的用户名和密码登录。
 
 3 负载劫持
 首先要对用户负载进行劫持，获取用户负载及相关信息，以便后续能够调优。使能负载劫持，步骤如下：

@@ -10,9 +10,14 @@ from omniadvisor.repository.model.load import Load
 from omniadvisor.repository.load_repository import LoadRepository
 from omniadvisor.repository.tuning_record_repository import TuningRecordRepository
 from omniadvisor.service.retest_service import retest
-from omniadvisor.service.tuning_result.tuning_result import remove_tuning_result
-from omniadvisor.service.tuning_result.tuning_result_history import get_tuning_result_history, \
+from omniadvisor.service.tuning_result.tuning_result import (
+    get_tuning_result,
+    remove_tuning_result
+)
+from omniadvisor.service.tuning_result.tuning_result_history import (
+    get_tuning_result_history,
     get_other_tuning_result_history
+)
 
 from omniadvisor.utils.logger import global_logger
 
@@ -77,10 +82,14 @@ def unified_tuning(load, retest_way: str, tuning_method: str):
                                'information. Remove tuning results.')
             remove_tuning_result(load, next_config)
             raise
-        tuning_result_history = get_tuning_result_history(load)
+        tuning_result = get_tuning_result(load=load, config=next_config)
+        tuning_result_history = get_tuning_result_history(load=load)
         # 更新最优配置
-        if tuning_result_history.best_config and tuning_result_history.best_config != next_config:
-            LoadRepository.update_best_config(load, tuning_result_history.best_config)
+        tuning_result_history.refresh_best_config()
+        global_logger.info(f'Current tuning result: {tuning_result.runtime}, best tuning result ever: '
+                           f'{tuning_result_history.best_tuning_result.runtime}, best tuning speedup: '
+                           f'{tuning_result_history.boost_percentage} %')
+
     else:
         # 更新待测试配置即可
         global_logger.info(f"The way of retest is hijacking, update the config from tuning to test config.")
