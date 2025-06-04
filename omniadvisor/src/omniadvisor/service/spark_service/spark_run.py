@@ -25,13 +25,13 @@ def spark_run(load: Load, conf: dict):
     """
     # 从解析后的参数列表中提取负载与任务的相关信息
     submit_cmd = SparkCMDParser.reconstruct_cmd(exec_attr=load.exec_attr, conf_params=conf)
-
     # 判断当前的conf是否和load.default_config相同 不相同则在submit_cmd前增加超时时间
     if conf != load.default_config:
         # 获取当前default_config的平均测试性能
         baseline_results = get_tuning_result(load, load.default_config)
         timeout_sec = OA_CONF.spark_exec_timeout_ratio * baseline_results.runtime
         submit_cmd = f"timeout {timeout_sec} " + submit_cmd
+    global_logger.debug(f"The submit cmd about to execute is: {submit_cmd}")
 
     # 根据执行命令创建测试记录
     exam_record = ExamRecordRepository.create(load, conf)
@@ -41,6 +41,7 @@ def spark_run(load: Load, conf: dict):
 
     # 不存在application_id的情况下不提取time_taken 直接返回
     if exitcode != 0:
+        global_logger.info(f"Spark Load execute failed, update the exam result.")
         try:
             return ExamRecordRepository.update_exam_result(
                 exam_record=exam_record,
@@ -63,6 +64,7 @@ def spark_run(load: Load, conf: dict):
         raise
 
     try:
+        global_logger.info(f"Spark Load execute success, runtime: {runtime}, update the exam result.")
         exam_record = ExamRecordRepository.update_exam_result(
             exam_record=exam_record,
             status=status,
@@ -74,6 +76,7 @@ def spark_run(load: Load, conf: dict):
         raise
 
     # 根据ApplicantID在子进程中获取Trace
+    global_logger.info(f"Going to fetch Spark execute trace in backend.")
     p = multiprocessing.Process(target=_update_trace_from_history_server, args=(exam_record, application_id))
     p.daemon = False
     p.start()
@@ -127,11 +130,12 @@ def _update_trace_from_history_server(exam_record: ExamRecord, application_id: s
             trace_executor = spark_fetcher.get_spark_executor_by_app(application_id)
         except HTTPError as httpe:
             time.sleep(OA_CONF.spark_fetch_trace_interval)
-            global_logger.warning(f"Cannot access history server: {httpe}")
+            global_logger.debug(f"Cannot access history server: {httpe}")
             continue
         trace_dict['sql'] = save_trace_data(data=trace_sql, data_dir=OA_CONF.data_dir)
         trace_dict['stages'] = save_trace_data(data=trace_stages, data_dir=OA_CONF.data_dir)
         trace_dict['executor'] = save_trace_data(data=trace_executor, data_dir=OA_CONF.data_dir)
+        global_logger.info(f"Fetch Spark execute trace success.")
         break
     else:
         raise RuntimeError(f'Failed to get App {application_id} trace from {history_server_url}')

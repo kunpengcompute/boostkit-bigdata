@@ -70,8 +70,8 @@ class OmniAdvisorConf:
     tuning_retest_times = _common_config.getint('common', 'tuning.retest.times')
     config_fail_threshold = _common_config.getint('common', 'config.fail.threshold')
     spark_history_rest_url = _common_config.get('spark', 'spark.history.rest.url')
-    spark_fetch_trace_timeout = _common_config.get('spark', 'spark.fetch.trace.timeout')
-    spark_fetch_trace_interval = _common_config.get('spark', 'spark.fetch.trace.interval')
+    spark_fetch_trace_timeout = _common_config.getint('spark', 'spark.fetch.trace.timeout')
+    spark_fetch_trace_interval = _common_config.getint('spark', 'spark.fetch.trace.interval')
     spark_exec_timeout_ratio = _common_config.getfloat('spark', 'spark.exec.timeout.ratio')
     tuning_strategies = json.loads(_common_config.get('common', 'tuning.strategy'))
 

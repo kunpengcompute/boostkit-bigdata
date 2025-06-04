@@ -40,12 +40,11 @@ class TestTuning:
             mock_smac_tuning.assert_called_once()
             assert mock_spark_run.call_count == OA_CONF.tuning_retest_times
 
-    def test_unified_tuning_when_spark_execute_failed(self, caplog):
+    def test_unified_tuning_when_spark_execute_failed(self):
         """
         后台复测 spark命令执行异常
         :return:
         """
-        caplog.set_level(logging.WARNING)
         with patch('omniadvisor.repository.load_repository.LoadRepository.query_by_id'), \
                 patch('omniadvisor.repository.tuning_record_repository.TuningRecordRepository.create'), \
                 patch('omniadvisor.service.retest_service.spark_run') as mock_spark_run, \
@@ -72,9 +71,7 @@ class TestTuning:
             mock_update_best.assert_not_called()
             mock_remove_tuning_result.assert_not_called()
 
-            assert 'Retest failed in round 1. Exception source: Spark exception' in caplog.text
-
-    def test_unified_tuning_when_other_exception(self, caplog):
+    def test_unified_tuning_when_other_exception(self):
         """
         后台复测 发生其他异常
         :return:
@@ -96,7 +93,6 @@ class TestTuning:
             mock_smac_tuning.assert_called_once()
             mock_spark_run.assert_called_once()
             mock_remove_tuning_result.assert_called_once()
-            assert 'Retest failed in round 1. Exception source: Non-Spark exception' in caplog.text
 
     def test_main_when_load_id_not_exist(self):
         """

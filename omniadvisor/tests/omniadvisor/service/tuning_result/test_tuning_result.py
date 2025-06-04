@@ -66,6 +66,8 @@ class TestTuningResult:
         task_mock3.status = OA_CONF.ExecStatus.fail
         task_mock3.runtime = 10
         task_mock3.trace = "trace_info3"
+        # 强制设定复测次数为3，用于测试
+        OA_CONF.tuning_retest_times = 3
 
         tasks = [task_mock1, task_mock2]
         tuning_result = TuningResult(

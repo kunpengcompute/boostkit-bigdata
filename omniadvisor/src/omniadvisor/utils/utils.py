@@ -2,13 +2,8 @@ import os
 import json
 import uuid
 import subprocess
-import shlex
 from typing import Tuple, List, Dict
 
-from ConfigSpace import ConfigurationSpace, UniformIntegerHyperparameter, Constant, CategoricalHyperparameter, \
-    UniformFloatHyperparameter
-
-from common.constant import OA_CONF
 from omniadvisor.utils.logger import global_logger
 
 
@@ -24,12 +19,14 @@ def run_cmd(submit_cmd) -> Tuple[int, str]:
     :rtype: Tuple[int, str]
     """
     global_logger.debug(f"Executor system command: {submit_cmd}")
-    cmd_list = shlex.split(submit_cmd)
-    result = subprocess.run(cmd_list, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=False)
-    exitcode = result.returncode
-    data = result.stdout
-    global_logger.debug(data)
-    return exitcode, data
+    kwargs = {
+        'stdout': subprocess.PIPE,
+        'stderr': subprocess.STDOUT,
+        'shell': True,
+        'text': True
+    }
+    result = subprocess.run(submit_cmd, **kwargs)
+    return result.returncode, result.stdout
 
 
 def save_trace_data(data: List[Dict[str, str]], data_dir):
@@ -45,7 +42,7 @@ def save_trace_data(data: List[Dict[str, str]], data_dir):
     try:
         with open(file_path, 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=4)
-        global_logger.info(f"数据已成功保存到 {file_path}")
+        global_logger.debug(f"数据已成功保存到 {file_path}")
     except IOError as e:
         raise IOError(f"出现IO错误: {e}") from e
     except Exception as e:
