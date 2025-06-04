@@ -71,4 +71,4 @@ class TestTuningResultHistory:
             (tuning_record_mock.config, tuning_result_mock.runtime),
             ({"param2": "value2"}, 5)
         ]
-        assert tuning_result_history.best_config == {"param2": "value2"}
+        assert tuning_result_history.best_tuning_result.config == {"param2": "value2"}

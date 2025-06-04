@@ -1,5 +1,7 @@
 from typing import List
 
+from common.constant import OA_CONF
+from omniadvisor.repository.load_repository import LoadRepository
 from omniadvisor.repository.exam_record_repository import ExamRecordRepository
 from omniadvisor.repository.load_prefetch_repository import LoadPrefetchRepository
 from omniadvisor.repository.model.load import Load
@@ -81,11 +83,26 @@ class TuningResultHistory:
         return list(map(lambda tuning_result: tuning_result.to_tuning(), self._tuning_results))
 
     @property
-    def best_config(self):
-        if self.tuning_history:
-            return min(self.tuning_history, key=lambda x: x.runtime).config
+    def user_tuning_result(self):
+        for tuning_result in self._tuning_results:
+            if tuning_result.method == OA_CONF.TuningMethod.user:
+                return tuning_result
+        return None
+
+    @property
+    def best_tuning_result(self):
+        if self._tuning_results:
+            return min(self._tuning_results, key=lambda x: x.runtime)
         else:
-            return {}
+            return None
+
+    @property
+    def boost_percentage(self):
+        if not self.user_tuning_result:
+            return 0.0
+        return round(
+            (self.user_tuning_result.runtime - self.best_tuning_result.runtime) / self.user_tuning_result.runtime, 4
+        ) * 100
 
     @property
     def latest_tuning_result(self):
@@ -111,3 +128,14 @@ class TuningResultHistory:
             else:
                 data[tuning_result.method] = 1
         return data
+
+    def refresh_best_config(self):
+        """
+        更新负载中的最优配置字段
+        :return:
+        """
+        if self.best_tuning_result and self.best_tuning_result.config != self._load.best_config:
+            LoadRepository.update_best_config(
+                load=self._load,
+                best_config=self.best_tuning_result.config
+            )

@@ -1,4 +1,3 @@
-import logging
 import sys
 from unittest.mock import patch, MagicMock
 
@@ -27,16 +26,18 @@ class TestTuning:
         with patch('omniadvisor.repository.load_repository.LoadRepository.query_by_id'), \
                 patch('omniadvisor.repository.tuning_record_repository.TuningRecordRepository.create'), \
                 patch('omniadvisor.service.retest_service.spark_run') as mock_spark_run, \
-                patch('omniadvisor.interface.config_tuning.get_tuning_result_history'), \
-                patch('omniadvisor.repository.load_repository.LoadRepository.update_best_config') as mock_update_best, \
+                patch('omniadvisor.interface.config_tuning.get_tuning_result'), \
+                patch('omniadvisor.interface.config_tuning.get_tuning_result_history') as mock_get_history, \
                 patch('algo.iterative.tuning.SmacAppendTuning.tune') as mock_smac_tuning:
             mock_exam_record = MagicMock()
             mock_smac_tuning.return_value = self.tune_return_val
             mock_exam_record.status = OA_CONF.ExecStatus.success
             spark_output = self.empty_str
             mock_spark_run.return_value = mock_exam_record, spark_output
+            mock_tuning_history = MagicMock()
+            mock_get_history.return_value = mock_tuning_history
             unified_tuning(load=self.load, retest_way=OA_CONF.RetestWay.backend, tuning_method=self.tuning_method)
-            mock_update_best.assert_called_once()
+            mock_tuning_history.refresh_best_config.assert_called_once()
             mock_smac_tuning.assert_called_once()
             assert mock_spark_run.call_count == OA_CONF.tuning_retest_times
 
@@ -47,6 +48,7 @@ class TestTuning:
         """
         with patch('omniadvisor.repository.load_repository.LoadRepository.query_by_id'), \
                 patch('omniadvisor.repository.tuning_record_repository.TuningRecordRepository.create'), \
+                patch('omniadvisor.interface.config_tuning.get_tuning_result'), \
                 patch('omniadvisor.service.retest_service.spark_run') as mock_spark_run, \
                 patch('omniadvisor.interface.config_tuning.get_tuning_result_history') as mock_tuning_result_history, \
                 patch('omniadvisor.service.retest_service.get_tuning_result') as mock_get_tuning_result, \
