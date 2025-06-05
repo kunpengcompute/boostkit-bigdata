@@ -7,7 +7,7 @@ from omniadvisor.repository.repository import Repository
 
 
 # 创建一个测试用的 Django 模型
-class TestModel(models.Model):
+class TmpModelForTest(models.Model):
     name = models.CharField(max_length=255)
     age = models.IntegerField()
     is_active = models.BooleanField(default=True)
@@ -18,7 +18,7 @@ class TestModel(models.Model):
 
 # 创建一个具体的 Repository 子类
 class TestRepository(Repository):
-    _model_class = TestModel
+    _model_class = TmpModelForTest
     _frozen_fields = ['is_active']
     _required_fields = ['name', 'age']
     _fields_format = {
@@ -36,17 +36,17 @@ class TestRepositoryClass:
     @staticmethod
     def setup_class():
         # 创建表
-        create_table(TestModel)
+        create_table(TmpModelForTest)
 
     @staticmethod
     def teardown_class():
         # 删除表
-        delete_table(TestModel)
+        delete_table(TmpModelForTest)
 
     @staticmethod
     def setup_method():
         # 清空表数据
-        TestModel.objects.all().delete()
+        TmpModelForTest.objects.all().delete()
 
     def test_abstract_methods(self):
         with pytest.raises(TypeError):
@@ -71,19 +71,19 @@ class TestRepositoryClass:
     def test_create(self):
         model_attr = {'name': 'John', 'age': 25}
         instance = TestRepository._create(model_attr)
-        assert isinstance(instance, TestModel)
+        assert isinstance(instance, TmpModelForTest)
         assert instance.name == 'John'
         assert instance.age == 25
 
     def test_query(self):
-        TestModel.objects.create(name='John', age=25)
+        TmpModelForTest.objects.create(name='John', age=25)
         model_attr = {'name': 'John'}
         instances = TestRepository._query(model_attr)
         assert len(instances) == 1
         assert instances[0].name == 'John'
 
     def test_update(self):
-        instance = TestModel.objects.create(name='John', age=25)
+        instance = TmpModelForTest.objects.create(name='John', age=25)
         model_attr = {'name': 'Mike'}
         updated_instance = TestRepository._update(instance, model_attr)
         assert updated_instance.name == 'Mike'
