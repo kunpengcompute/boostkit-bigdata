@@ -183,7 +183,12 @@ def main():
         return
 
     if args.tuning_method or args.retest_way == OA_CONF.RetestWay.hijacking:
-        unified_tuning(load, args.retest_way, args.tuning_method)
+        try:
+            unified_tuning(load, args.retest_way, args.tuning_method)
+        except NoOptimalConfigError:
+            global_logger.error(
+                'The tuning method: %s cannot find optimal config, please try other method.', args.tuning_method
+            )
         return
 
     # 当且仅当后台复测，且未指定调优方法时，会连续拉起调优
