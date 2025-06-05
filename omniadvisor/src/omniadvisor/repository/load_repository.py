@@ -41,7 +41,7 @@ class LoadRepository(Repository):
         """
         # 判断是否有相同name和default_config的Load存在
         model_attr = {
-            Load.FieldName.name: name,
+            Load.FieldName.exec_attr: exec_attr,
             Load.FieldName.default_config: default_config
         }
         database_loads = cls._query(model_attr=model_attr)
