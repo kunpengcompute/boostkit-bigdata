@@ -41,14 +41,14 @@ class LoadRepository(Repository):
         """
         # 判断是否有相同name和default_config的Load存在
         model_attr = {
-            Load.FieldName.name: name,
+            Load.FieldName.exec_attr: exec_attr,
             Load.FieldName.default_config: default_config
         }
         database_loads = cls._query(model_attr=model_attr)
         # 强制要求name和default_config组合是唯一的
         if len(database_loads) != 0:
-            raise RuntimeError(f'Create {cls._model_class.__name__} fail because combination of name {name} and '
-                               f'default_config {default_config} exist.')
+            raise RuntimeError(f'Create {cls._model_class.__name__} fail because combination of exec_attr {exec_attr} '
+                               f'and default_config {default_config} exist.')
 
         model_attr = {
             Load.FieldName.name: name,

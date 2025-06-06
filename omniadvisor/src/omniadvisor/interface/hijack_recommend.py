@@ -108,17 +108,22 @@ def hijack_recommend(argv: list):
     # 根据配置和负载执行Spark任务
     global_logger.info("Going to execute Spark load ……")
     exam_record, output = spark_run(load, exec_config)
-    # 执行结果分析 若执行失败则调度用户默认配置重新拉起任务
-    if exam_record.status != OA_CONF.ExecStatus.success and exec_config != user_config:
-        global_logger.warning("Spark execute failed, ready to activate security protection mechanism.")
-        safe_exam_record, safe_output = spark_run(load, user_config)
-        global_logger.info("Spark execute success in security protection mechanism, going to print Spark output.")
-        # 打印安全机制下任务的输出
-        print(safe_output)
-    else:
+    # 执行结果分析
+    if exam_record.status == OA_CONF.ExecStatus.success:
         # 打印结果输出
         global_logger.info("Spark execute success, going to print Spark output.")
         print(output)
+    # 若执行失败 则判断是否需要拉起安全机制
+    else:
+        if exec_config != user_config:
+            global_logger.warning("Spark execute failed, ready to activate security protection mechanism.")
+            safe_exam_record, safe_output = spark_run(load, user_config)
+            global_logger.info("Spark execute in security protection mechanism, going to print Spark output.")
+            # 打印安全机制下任务的输出
+            print(safe_output)
+        else:
+            global_logger.warning("Spark execute failed in user config, going to print Spark output.")
+            print(output)
 
     if exec_config == load.test_config:
         _process_load_config(load=load)
