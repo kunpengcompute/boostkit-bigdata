@@ -2,89 +2,99 @@
 # Copyright (c) Huawei Technologies Co., Ltd. 2025-2025. All rights reserved.
 """
 """
+import fnmatch
 import os
-import compileall
 import shutil
+import subprocess
 
-# 要编译的文件夹的名称
-TO_COMPLIES = ['src']
-# 要保留的文件夹的名称
-TO_RETAINS = ['config']
-# 编译文件的输出路径
-OUTPUT_DIR_NAME = 'BoostKit-omniadvisor_2.0'
-# 本文件的路径
-BASE_PATH = os.path.dirname(os.path.abspath(__file__))
+PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 
+# 与src同级的其他资源文件夹
+RESOURCES_LIST = ['config']
 
-def clean_pyc_files(project_dir):
-    """删除旧的 .pyc 文件"""
-    for root, _, files in os.walk(project_dir):
-        for file in files:
-            if file.endswith(".pyc"):
-                pyc_path = os.path.join(root, file)
-                os.remove(pyc_path)
+# 要编译的源文件夹的名称
+COMPILE_FROM_NAME = 'src'
 
+# 要编译的源码目录，一般就是 src
+SOURCE_DIR = os.path.join(PROJECT_DIR, COMPILE_FROM_NAME)
 
-def compile_python_files(project_dir):
-    """编译所有 .py 文件为 .pyc"""
-    compileall.compile_dir(project_dir, force=True, quiet=1)
+# 编译后输出的根文件夹名称
+COMPILE_DEST_ROOT_NAME = 'BoostKit-omniadvisor_2.0'
 
+# 编译后输出的根目录
+OUTPUT_ROOT_DIR = os.path.join(PROJECT_DIR, COMPILE_DEST_ROOT_NAME)
 
-def replace_pyc_files(project_dir):
-    """将 __pycache__ 中的新 .pyc 移动到对应位置，替换旧的 .pyc"""
-    for root, dirs, _ in os.walk(project_dir):  # 深度 1
-        if "__pycache__" not in dirs:  # 提前跳过不相关的目录
-            continue  # 减少一层缩进
+# 编译后输出的目录
+OUTPUT_SRC_DIR = os.path.join(OUTPUT_ROOT_DIR, COMPILE_FROM_NAME)
 
-        pycache_path = os.path.join(root, "__pycache__")
-        for file in os.listdir(pycache_path):  # 深度 2
-            if not file.endswith(".pyc"):  # 跳过非 .pyc 文件
-                continue  # 减少一层缩进
+# 原样保留的文件
+RETAIN_FILES = ['*.so', '*.json', '*.cfg', '*.pyc']
 
-            # 目标 .py 文件名
-            module_name = file.partition(".")[0]  # 更安全的方式提取模块名
-            if not module_name:  # 避免空模块名
-                continue  # 减少一层缩进
-
-            target_file = os.path.join(root, f"{module_name}.pyc")
-            source_pyc = os.path.join(pycache_path, file)
-            shutil.move(source_pyc, target_file)  # 深度 2
-
-        # 可选：删除空 __pycache__ 目录
-        if not os.listdir(pycache_path):  # 深度 2
-            os.rmdir(pycache_path)  # 深度 3
+# 这个是产生的临时的编译目录
+TEMP_BUILD_DIR = os.path.join(OUTPUT_SRC_DIR, 'build')
 
 
-def remove_source_files(project_dir):
-    # 遍历文件夹
-    for root, _, files in os.walk(project_dir):
-        for file in files:
-            # 检查文件扩展名是否为 .py
-            if file.endswith(".py"):
-                file_path = os.path.join(root, file)
-                os.remove(file_path)
+def delete_files_recursively(root_dir, patterns):
+    """
+    递归删除指定目录下符合特定模式的文件
+
+    :param root_dir: 要搜索的根目录
+    :param patterns: 要删除的文件模式列表
+    """
+    # 保留必要文件，其他删除
+    for dirpath, _, filenames in os.walk(root_dir):
+        for filename in filenames:
+            filepath = os.path.join(dirpath, filename)
+            # 检查文件名是否匹配任一模式
+            if (filename in patterns or
+                    any(fnmatch.fnmatch(filename, pattern) for pattern in patterns)):
+                continue
+            try:
+                os.remove(filepath)
+            except OSError as e:
+                raise RuntimeError(f"删除 {filepath} 失败 ") from e
+
+    # 重命名，默认是 utils.cpython-38-aarch64-linux-gnu.so，即 模块名.xxx.so
+    for root, _, files in os.walk(root_dir):
+        for filename in files:
+            if not filename.endswith('.so'):
+                continue
+            parts = filename.split('.')
+            if len(parts) >= 3:  # 确保文件名符合 xxx.yyy.so 格式
+                new_name = f"{parts[0]}.so"  # 取第一个和最后一个部分
+
+                old_path = os.path.join(root, filename)
+                new_path = os.path.join(root, new_name)
+
+                os.rename(old_path, new_path)
+
+    # 清理build目录
+    if os.path.exists(TEMP_BUILD_DIR):
+        shutil.rmtree(TEMP_BUILD_DIR)
 
 
-def rebuild_pyc_files(project_dir):
-    clean_pyc_files(project_dir)
-    compile_python_files(project_dir)
-    replace_pyc_files(project_dir)
-    remove_source_files(project_dir)
+if __name__ == '__main__':
+    if os.path.exists(OUTPUT_ROOT_DIR):
+        shutil.rmtree(OUTPUT_ROOT_DIR)
 
+    shutil.copytree(SOURCE_DIR, OUTPUT_SRC_DIR)
+    for resource in RESOURCES_LIST:
+        if os.path.exists(os.path.join(PROJECT_DIR, resource)):
+            shutil.copytree(os.path.join(PROJECT_DIR, resource), os.path.join(OUTPUT_ROOT_DIR, resource))
 
-if __name__ == "__main__":
-    # 将此处替换为你的项目路径
-    output_path = os.path.join(BASE_PATH, OUTPUT_DIR_NAME)
+    # 进入 build_output 目录
+    original_dir = os.getcwd()
+    os.chdir(OUTPUT_SRC_DIR)
 
-    # 删除整个文件夹及其内容
-    if os.path.exists(output_path):
-        shutil.rmtree(output_path)
+    arg_list = ["python3", "setup.py", "build_ext", "--inplace"]
 
-    # 创建文件夹
-    os.makedirs(output_path)
+    try:
+        # 这里可以根据你的实际打包命令进行修改
+        subprocess.run(arg_list, check=True)
 
-    # copy 需要编译的目录
-    for name in TO_RETAINS + TO_COMPLIES:
-        shutil.copytree(os.path.join(BASE_PATH, name), os.path.join(output_path, name))
+    finally:
+        # 返回原始目录
+        os.chdir(original_dir)
 
-    rebuild_pyc_files(os.path.join(output_path, TO_COMPLIES[0]))
+    # 删除build_output 目录下所有无用文件
+    delete_files_recursively(OUTPUT_SRC_DIR, RETAIN_FILES)
