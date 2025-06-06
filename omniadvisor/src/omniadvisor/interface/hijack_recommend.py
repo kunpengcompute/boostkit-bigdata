@@ -125,7 +125,6 @@ def hijack_recommend(argv: list):
             global_logger.warning("Spark execute failed in user config, going to print Spark output.")
             print(output)
 
-
     if exec_config == load.test_config:
         _process_load_config(load=load)
 
