@@ -122,7 +122,7 @@ def hijack_recommend(argv: list):
             # 打印安全机制下任务的输出
             print(safe_output)
         else:
-            global_logger("Spark execute failed in user config, going to print Spark output.")
+            global_logger.warning("Spark execute failed in user config, going to print Spark output.")
             print(output)
 
 
