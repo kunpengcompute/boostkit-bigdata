@@ -1,87 +1,167 @@
 import unittest
+import pytest
 from unittest.mock import MagicMock, patch
-from common.constant import OA_CONF
 from omniadvisor.interface.hijack_recommend import hijack_recommend
 
 
 # 测试代码
 class TestHijackRecommend(unittest.TestCase):
 
-    @patch("omniadvisor.interface.hijack_recommend.SparkCMDParser.parse_cmd")
-    @patch("omniadvisor.interface.hijack_recommend.LoadRepository.query_by_exec_attr_and_default_config")
-    @patch("omniadvisor.interface.hijack_recommend.spark_run")
-    def test_hijack_recommend_success(self, mock_spark_run, mock_load_repo_query, mock_parse_cmd):
-        """
-        测试 hijack_recommend 在任务成功时的行为。
-        """
-        # 模拟输入的 Spark SQL 命令
-        spark_cmd_argv = ['test', '--conf', 'test=test']
-
-        # 模拟 parse_cmd 的行为
-        mock_parse_cmd.return_value = (
-            {'name': 'example_name', 'cpu': 4},
-            {'timeout': 30}
-        )
-
-        # 模拟 LoadRepository.query 返回一个有效的负载对象
-        mock_load = MagicMock()
-        mock_load.tuning_needed = False
-        mock_load.default_config = {"timeout": 30}
-        mock_load.attr_exec = {"name": "example_name"}
-        mock_load_repo_query.return_value = [mock_load]
-
-        # 模拟 spark_run 的行为
-        mock_spark_run.return_value = (MagicMock(status=OA_CONF.ExecStatus.fail), 'spark_output')
-
-        # 调用被测函数
-        hijack_recommend(argv=spark_cmd_argv)
-
-        # 验证 LoadRepository.query 被正确调用
-        mock_load_repo_query.assert_called_once_with(exec_attr={'name': 'example_name', 'cpu': 4},
-                                                     default_config={"timeout": 30})
-
-        # 验证 spark_run 被正确调用
-        mock_spark_run.assert_called_once_with(mock_load, {"timeout": 30})
-
-    @patch("omniadvisor.interface.hijack_recommend.SparkCMDParser.parse_cmd")
-    @patch("omniadvisor.interface.hijack_recommend.LoadRepository")
-    @patch("omniadvisor.interface.hijack_recommend.spark_run")
+    # 场景 1: 正常流程，Spark 执行成功
     @patch("omniadvisor.interface.hijack_recommend._process_load_config")
-    def test_hijack_recommend_failure_with_fallback(self, mock_refreshed_load, mock_spark_run, mock_load_repo, mock_parse_cmd):
-        """
-        测试 hijack_recommend 在任务失败且需要回退到用户默认配置时的行为。
-        """
-        # 模拟输入的 Spark SQL 命令
-        spark_cmd_argv = ['test', '--conf', 'test=test']
+    @patch("omniadvisor.interface.hijack_recommend.spark_run")
+    @patch("omniadvisor.interface.hijack_recommend._get_exec_config_from_load")
+    @patch("omniadvisor.interface.hijack_recommend._query_or_create_load")
+    @patch("omniadvisor.interface.hijack_recommend.SparkCMDParser.parse_cmd")
+    def test_successful_execution(self, mock_parse_cmd, mock_query_load, mock_get_config, mock_spark_run, mock_process_config):
+        argv = ["--class", "Job", "--conf", "spark.executor.memory=4g"]
+        exec_attr = {"name": "test_job"}
+        user_config = {"spark.executor.memory": "4g"}
+        load = MagicMock(test_config={}, default_config=user_config)
+        exec_config = user_config
 
-        # 模拟 parse_cmd 的行为
-        mock_parse_cmd.return_value = (
-            {'name': 'example_name', 'cpu': 4},
-            {'timeout': 30}
-        )
+        mock_parse_cmd.return_value = (exec_attr, user_config)
+        mock_query_load.return_value = load
+        mock_get_config.return_value = exec_config
+        mock_spark_run.return_value = (MagicMock(status="success"), "job output")
 
-        # 模拟 LoadRepository.query 返回一个有效的负载对象
-        mock_load = MagicMock()
-        mock_load.tuning_needed = True
-        mock_load.test_config = {"timeout": 60}  # 使用待测试配置
-        mock_load_repo.query_by_exec_attr_and_default_config.return_value = [mock_load]
+        hijack_recommend(argv)
+        mock_spark_run.assert_called_once_with(load, exec_config)
+        mock_process_config.assert_not_called()
 
-        # 模拟 spark_run 的行为
+    # 场景 2: 执行失败 + 进入安全机制
+    @patch("omniadvisor.interface.hijack_recommend._process_load_config")
+    @patch("omniadvisor.interface.hijack_recommend.spark_run")
+    @patch("omniadvisor.interface.hijack_recommend._get_exec_config_from_load")
+    @patch("omniadvisor.interface.hijack_recommend._query_or_create_load")
+    @patch("omniadvisor.interface.hijack_recommend.SparkCMDParser.parse_cmd")
+    def test_fallback_to_safe_config(self, mock_parse_cmd, mock_query_load, mock_get_config, mock_spark_run, mock_process_config):
+        argv = ["--class", "Job", "--conf", "spark.executor.memory=4g"]
+        exec_attr = {"name": "job_name"}
+        user_config = {"spark.executor.memory": "4g"}
+        load = MagicMock(test_config={}, default_config=user_config)
+        exec_config = {"spark.executor.memory": "8g"}
+
+        mock_parse_cmd.return_value = (exec_attr, user_config)
+        mock_query_load.return_value = load
+        mock_get_config.return_value = exec_config
+
         mock_spark_run.side_effect = [
-            (MagicMock(status=OA_CONF.ExecStatus.fail), 'spark_output1'),  # 第一次任务失败
-            (MagicMock(status=OA_CONF.ExecStatus.success), 'spark_output2')   # 回退到默认配置后成功
+            (MagicMock(status="fail"), "fail output"),
+            (MagicMock(status="success"), "safe output")
         ]
 
-        # 调用被测函数
-        hijack_recommend(argv=spark_cmd_argv)
-
-        # 验证 LoadRepository.query 被正确调用
-        mock_load_repo.query_by_exec_attr_and_default_config.assert_called_once_with(
-            exec_attr={'name': 'example_name', 'cpu': 4},
-            default_config={"timeout": 30})
-
-        # 验证 spark_run 被调用了两次（第一次使用待测试配置，第二次回退到默认配置）
+        hijack_recommend(argv)
         assert mock_spark_run.call_count == 2
-        mock_spark_run.assert_any_call(mock_load, {"timeout": 60})  # 第一次调用
-        mock_spark_run.assert_any_call(mock_load, {"timeout": 30})  # 第二次调用
+        mock_process_config.assert_not_called()
 
+    # 场景 3: 执行失败 + 不进入安全机制
+    @patch("omniadvisor.interface.hijack_recommend._process_load_config")
+    @patch("omniadvisor.interface.hijack_recommend.spark_run")
+    @patch("omniadvisor.interface.hijack_recommend._get_exec_config_from_load")
+    @patch("omniadvisor.interface.hijack_recommend._query_or_create_load")
+    @patch("omniadvisor.interface.hijack_recommend.SparkCMDParser.parse_cmd")
+    def test_failed_user_config(self, mock_parse_cmd, mock_query_load, mock_get_config, mock_spark_run, mock_process_config):
+        argv = ["--conf", "spark.executor.memory=4g"]
+        exec_attr = {"name": "job_name"}
+        user_config = {"spark.executor.memory": "4g"}
+        load = MagicMock(test_config={}, default_config=user_config)
+        exec_config = user_config
+
+        mock_parse_cmd.return_value = (exec_attr, user_config)
+        mock_query_load.return_value = load
+        mock_get_config.return_value = exec_config
+        mock_spark_run.return_value = (MagicMock(status="fail"), "fail output")
+
+        hijack_recommend(argv)
+        # 不进入安全机制的情况call_count的值为1
+        assert mock_spark_run.call_count == 1
+        mock_process_config.assert_not_called()
+
+    # 场景 4: 缺少任务名称
+    @patch("omniadvisor.interface.hijack_recommend.SparkCMDParser.parse_cmd")
+    def test_missing_task_name(self, mock_parse_cmd):
+        argv = ["--conf", "spark.executor.memory=4g"]
+        mock_parse_cmd.return_value = ({}, {"spark.executor.memory": "4g"})
+
+        with pytest.raises(ValueError, match="Task name not in Spark submit cmd"):
+            hijack_recommend(argv)
+
+    # 场景 5: 执行的是 test_config，触发 _process_load_config
+    @patch("omniadvisor.interface.hijack_recommend._process_load_config")
+    @patch("omniadvisor.interface.hijack_recommend.spark_run")
+    @patch("omniadvisor.interface.hijack_recommend._get_exec_config_from_load")
+    @patch("omniadvisor.interface.hijack_recommend._query_or_create_load")
+    @patch("omniadvisor.interface.hijack_recommend.SparkCMDParser.parse_cmd")
+    def test_process_test_config(self, mock_parse_cmd, mock_query_load, mock_get_config, mock_spark_run, mock_process_config):
+        argv = ["--class", "Job", "--conf", "spark.executor.memory=4g"]
+        exec_attr = {"name": "job"}
+        user_config = {"spark.executor.memory": "4g"}
+        test_config = {"spark.executor.memory": "6g"}
+        load = MagicMock(test_config=test_config, default_config=user_config)
+        exec_config = test_config
+
+        mock_parse_cmd.return_value = (exec_attr, user_config)
+        mock_query_load.return_value = load
+        mock_get_config.return_value = exec_config
+        mock_spark_run.return_value = (MagicMock(status="success"), "job output")
+
+        hijack_recommend(argv)
+        mock_process_config.assert_called_once_with(load=load)
+
+    # 场景 6: 命令解析异常
+    @patch("omniadvisor.interface.hijack_recommend.SparkCMDParser.parse_cmd")
+    def test_parse_cmd_raises(self, mock_parse_cmd):
+        mock_parse_cmd.side_effect = Exception("parse error")
+        with pytest.raises(Exception, match="parse error"):
+            hijack_recommend(["--conf", "x"])
+
+    # 场景 7: 创建 Load 异常
+    @patch("omniadvisor.interface.hijack_recommend._query_or_create_load")
+    @patch("omniadvisor.interface.hijack_recommend.SparkCMDParser.parse_cmd")
+    def test_query_create_load_raises(self, mock_parse_cmd, mock_query_load):
+        mock_parse_cmd.return_value = ({"name": "job"}, {})
+        mock_query_load.side_effect = Exception("db error")
+
+        with pytest.raises(Exception, match="db error"):
+            hijack_recommend(["--conf", "x"])
+
+    # 场景 8: spark_run 抛异常
+    @patch("omniadvisor.interface.hijack_recommend.spark_run")
+    @patch("omniadvisor.interface.hijack_recommend._get_exec_config_from_load")
+    @patch("omniadvisor.interface.hijack_recommend._query_or_create_load")
+    @patch("omniadvisor.interface.hijack_recommend.SparkCMDParser.parse_cmd")
+    def test_spark_run_raises(self, mock_parse_cmd, mock_query_load, mock_get_config, mock_spark_run):
+        argv = ["--conf", "spark.executor.memory=4g"]
+        exec_attr = {"name": "job"}
+        config = {"spark.executor.memory": "4g"}
+        load = MagicMock(test_config={}, default_config=config)
+
+        mock_parse_cmd.return_value = (exec_attr, config)
+        mock_query_load.return_value = load
+        mock_get_config.return_value = config
+        mock_spark_run.side_effect = RuntimeError("spark failed")
+
+        with pytest.raises(RuntimeError, match="spark failed"):
+            hijack_recommend(argv)
+
+    # 场景 9: _process_load_config 内部依赖出错
+    @patch("omniadvisor.interface.hijack_recommend._process_load_config")
+    @patch("omniadvisor.interface.hijack_recommend.spark_run")
+    @patch("omniadvisor.interface.hijack_recommend._get_exec_config_from_load")
+    @patch("omniadvisor.interface.hijack_recommend._query_or_create_load")
+    @patch("omniadvisor.interface.hijack_recommend.SparkCMDParser.parse_cmd")
+    def test_process_load_config_raises(self, mock_parse_cmd, mock_query_load, mock_get_config, mock_spark_run, mock_process_config):
+        argv = ["--conf", "spark.executor.memory=4g"]
+        exec_attr = {"name": "job"}
+        config = {"spark.executor.memory": "4g"}
+        load = MagicMock(test_config=config, default_config=config)
+
+        mock_parse_cmd.return_value = (exec_attr, config)
+        mock_query_load.return_value = load
+        mock_get_config.return_value = config
+        mock_spark_run.return_value = (MagicMock(status="success"), "output")
+        mock_process_config.side_effect = RuntimeError("process failed")
+
+        with pytest.raises(RuntimeError, match="process failed"):
+            hijack_recommend(argv)
