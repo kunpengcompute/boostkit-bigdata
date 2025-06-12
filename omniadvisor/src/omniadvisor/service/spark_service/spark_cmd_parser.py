@@ -88,6 +88,23 @@ class SparkCMDParser:
         else:
             return value
 
+    @staticmethod
+    def _append_double_dash_args(cls, key, value):
+        """
+        用于处理spark命令中以 "--" 作为前缀的参数
+        :param cls:
+        :param key:
+        :param value:
+        :return:
+        """
+        if key in _BOOLEAN_TYPE_KEYS:
+            if value is True:
+                return [f'--{key}']
+            else:
+                return []
+        else:
+            return [f'--{key}', cls._normalize_value(value)]
+
     @classmethod
     def parse_cmd(cls, argv: list):
         """
@@ -151,17 +168,14 @@ class SparkCMDParser:
             if key == _CMD_PREFIX_KEY:
                 continue
             # 单独处理 remainder = ['--uk1','xxxx','--uk2','xxxx'] 这部分未被解析的残余参数
-            if key == _CMD_UNKNOWN_KEY:
+            elif key == _CMD_UNKNOWN_KEY:
                 cmd_fields += [cls._normalize_value(item) for item in value]
-                continue
-            # 分别处理-开头的参数与--开头的参数
-            if key in _SINGLE_HORIZONTAL_BAR_KEYS:
+            # 单独处理 - 作为前缀的参数
+            elif key in _SINGLE_HORIZONTAL_BAR_KEYS:
                 cmd_fields += [f'-{key}', cls._normalize_value(value)]
+            # 处理剩余 -- 作为前缀的参数
             else:
-                if key in _BOOLEAN_TYPE_KEYS and value is True:
-                    cmd_fields += [f'--{key}']
-                else:
-                    cmd_fields += [f'--{key}', cls._normalize_value(value)]
+                cmd_fields += cls._append_double_dash_args(cls, key, value)
 
         # 处理参数配置
         for key, value in conf_params.items():
