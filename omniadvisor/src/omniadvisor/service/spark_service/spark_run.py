@@ -41,7 +41,7 @@ def spark_run(load: Load, conf: dict):
 
     # 不存在application_id的情况下不提取time_taken 直接返回
     if exitcode != 0:
-        global_logger.info(f"Spark Load execute failed, update the exam result.")
+        global_logger.info(f"Spark Load {load.id} execute failed, update the exam result.")
         try:
             return ExamRecordRepository.update_exam_result(
                 exam_record=exam_record,
@@ -64,7 +64,7 @@ def spark_run(load: Load, conf: dict):
         raise
 
     try:
-        global_logger.info(f"Spark Load execute success, runtime: {runtime}, update the exam result.")
+        global_logger.info(f"Spark Load {load.id} execute success, runtime: {runtime}, update the exam result.")
         exam_record = ExamRecordRepository.update_exam_result(
             exam_record=exam_record,
             status=status,
