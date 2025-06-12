@@ -13,6 +13,8 @@ _CMD_PREFIX_KEY = 'omniadvisor-cmd-prefix'
 _CMD_UNKNOWN_KEY = 'unknown'
 # 单横杠参数的字段
 _SINGLE_HORIZONTAL_BAR_KEYS = ['e', 'f', 'i']
+# 布尔类型的字段
+_BOOLEAN_TYPE_KEYS = ['verbose', 'supervise', 'kill', 'status']
 # 需进行转换的字段
 _SPARK_CONF_SUPPLEMENT_MAP = {
     'num-executors': 'spark.executor.instances',
@@ -148,19 +150,18 @@ class SparkCMDParser:
         for key, value in exec_attr.items():
             if key == _CMD_PREFIX_KEY:
                 continue
-            # -i参数在处理上不支持--的形式 单独处理
+            # 单独处理 remainder = ['--uk1','xxxx','--uk2','xxxx'] 这部分未被解析的残余参数
+            if key == _CMD_UNKNOWN_KEY:
+                cmd_fields += [cls._normalize_value(item) for item in value]
+                continue
+            # 分别处理-开头的参数与--开头的参数
             if key in _SINGLE_HORIZONTAL_BAR_KEYS:
                 cmd_fields += [f'-{key}', cls._normalize_value(value)]
-            # boolean类型的参数单独处理
-            elif isinstance(value, bool):
-                if value:  # True: 添加 flag
-                    cmd_fields += [f'--{key}']
-                # False: 不添加该参数
-            # 单独处理 remainder = ['--uk1','xxxx','--uk2','xxxx'] 这部分未被解析的残余参数
-            elif key == _CMD_UNKNOWN_KEY:
-                cmd_fields += [cls._normalize_value(item) for item in value]
             else:
-                cmd_fields += [f'--{key}', cls._normalize_value(value)]
+                if key in _BOOLEAN_TYPE_KEYS and value is True:
+                    cmd_fields += [f'--{key}']
+                else:
+                    cmd_fields += [f'--{key}', cls._normalize_value(value)]
 
         # 处理参数配置
         for key, value in conf_params.items():
