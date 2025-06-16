@@ -4,9 +4,8 @@ import uuid
 import subprocess
 from typing import Tuple, List, Dict
 
-from omniadvisor.utils.logger import global_logger
-
 from common.constant import OmniAdvisorConf
+from omniadvisor.utils.logger import global_logger
 
 
 def run_cmd(submit_cmd) -> Tuple[int, str]:
