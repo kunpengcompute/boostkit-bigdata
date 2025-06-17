@@ -71,7 +71,7 @@ def read_json_file(file_path: str):
     return data
 
 
-def num_format(to_format: float) -> str:
+def float_format(to_format: float) -> str:
     """
     按 decimal_digits 保留小数位数
     :param to_format: 待格式化的的小数

@@ -20,7 +20,7 @@ from omniadvisor.service.tuning_result.tuning_result_history import (
 )
 
 from omniadvisor.utils.logger import global_logger
-from omniadvisor.utils.utils import num_format
+from omniadvisor.utils.utils import float_format
 
 
 # 异常类暂时用于当前模块，没必要放到公共里
@@ -89,9 +89,9 @@ def unified_tuning(load, retest_way: str, tuning_method: str):
         tuning_result_history.refresh_best_config()
         global_logger.info(
             'Current tuning result: %s, best tuning result ever: %s, best tuning speedup: %s %%',
-            num_format(tuning_result.runtime),
-            num_format(tuning_result_history.best_tuning_result.runtime),
-            num_format(tuning_result_history.boost_percentage)
+            float_format(tuning_result.runtime),
+            float_format(tuning_result_history.best_tuning_result.runtime),
+            float_format(tuning_result_history.boost_percentage)
         )
 
     else:

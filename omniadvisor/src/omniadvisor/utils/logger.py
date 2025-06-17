@@ -10,7 +10,7 @@ LOGGING_CONFIG = {
     'version': 1,
     'disable_existing_loggers': True,
     'formatters': {
-        'colorFormatter': {
+        'consoleFormatter': {
             '()': 'colorlog.ColoredFormatter',
             'format': f'%(log_color)s{CONSOLE_FORMAT}%(reset)s',
             'datefmt': '%Y-%m-%d %H:%M:%S',
@@ -22,7 +22,7 @@ LOGGING_CONFIG = {
                 'CRITICAL': 'bold_red',
             },
         },
-        'simpleFormatter': {
+        'fileFormatter': {
             'format': FILE_FORMAT,
             'datefmt': '%Y-%m-%d %H:%M:%S'
         }
@@ -31,13 +31,13 @@ LOGGING_CONFIG = {
         'consoleHandler': {
             'class': 'logging.StreamHandler',
             'level': 'DEBUG',
-            'formatter': 'colorFormatter',
+            'formatter': 'consoleFormatter',
             'stream': 'ext://sys.stdout',
         },
         'fileHandler': {
             'class': 'logging.handlers.TimedRotatingFileHandler',
             'level': 'DEBUG',
-            'formatter': 'simpleFormatter',
+            'formatter': 'fileFormatter',
             'filename': OA_CONF.log_file_path,
             'when': 'midnight',
             'interval': 1,
