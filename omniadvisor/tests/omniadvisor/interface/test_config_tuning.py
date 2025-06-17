@@ -28,7 +28,9 @@ class TestTuning:
                 patch('omniadvisor.service.retest_service.spark_run') as mock_spark_run, \
                 patch('omniadvisor.interface.config_tuning.get_tuning_result'), \
                 patch('omniadvisor.interface.config_tuning.get_tuning_result_history') as mock_get_history, \
-                patch('algo.iterative.tuning.SmacAppendTuning.tune') as mock_smac_tuning:
+                patch('algo.iterative.tuning.SmacAppendTuning.tune') as mock_smac_tuning, \
+                patch('omniadvisor.interface.config_tuning.float_format'), \
+                patch('omniadvisor.service.retest_service.float_format'):
             mock_exam_record = MagicMock()
             mock_smac_tuning.return_value = self.tune_return_val
             mock_exam_record.status = OA_CONF.ExecStatus.success
@@ -54,7 +56,9 @@ class TestTuning:
                 patch('omniadvisor.service.retest_service.get_tuning_result') as mock_get_tuning_result, \
                 patch('omniadvisor.interface.config_tuning.remove_tuning_result') as mock_remove_tuning_result, \
                 patch('algo.iterative.tuning.SmacAppendTuning.tune') as mock_smac_tuning, \
-                patch('omniadvisor.repository.load_repository.LoadRepository.update_best_config') as mock_update_best:
+                patch('omniadvisor.repository.load_repository.LoadRepository.update_best_config') as mock_update_best, \
+                patch('omniadvisor.interface.config_tuning.float_format'), \
+                patch('omniadvisor.service.retest_service.float_format'):
             mock_exam_record = MagicMock()
             mock_exam_record.status = OA_CONF.ExecStatus.fail
             spark_output = self.empty_str
