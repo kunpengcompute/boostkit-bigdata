@@ -13,6 +13,8 @@ _CMD_PREFIX_KEY = 'omniadvisor-cmd-prefix'
 _CMD_UNKNOWN_KEY = 'unknown'
 # 单横杠参数的字段
 _SINGLE_HORIZONTAL_BAR_KEYS = ['e', 'f', 'i']
+# 布尔类型的字段
+_BOOLEAN_TYPE_KEYS = ['verbose', 'supervise', 'kill', 'status']
 # 需进行转换的字段
 _SPARK_CONF_SUPPLEMENT_MAP = {
     'num-executors': 'spark.executor.instances',
@@ -55,12 +57,8 @@ class SparkCMDParser:
     _parser.add_argument('--driver-class-path', dest='driver-class-path')
     _parser.add_argument('--executor-memory', dest='executor-memory')
     _parser.add_argument('--proxy-user', dest='proxy-user')
-    _parser.add_argument('--verbose')
     _parser.add_argument('--version')
     _parser.add_argument('--driver-cores', dest='driver-cores')
-    _parser.add_argument('--supervise')
-    _parser.add_argument('--kill')
-    _parser.add_argument('--status')
     _parser.add_argument('--total-executor-cores', dest='total-executor-cores')
     _parser.add_argument('--executor-cores', dest='executor-cores')
     _parser.add_argument('--num-executors', dest='num-executors')
@@ -71,6 +69,11 @@ class SparkCMDParser:
     _parser.add_argument('-e', type=str, help='SQL statement to execute.')
     _parser.add_argument('-f', type=str, help='File containing SQL script.')
     _parser.add_argument('-i', help='Initialization SQL file')
+    # boolean变量
+    _parser.add_argument('--verbose', action='store_true')
+    _parser.add_argument('--supervise', action='store_true')
+    _parser.add_argument('--kill', action='store_true')
+    _parser.add_argument('--status', action='store_true')
 
     @staticmethod
     def _normalize_value(value):
@@ -84,6 +87,23 @@ class SparkCMDParser:
             return f'"{value}"'
         else:
             return value
+
+    @staticmethod
+    def _append_double_dash_args(cls, key, value):
+        """
+        用于处理spark命令中以 "--" 作为前缀的参数
+        :param cls:
+        :param key:
+        :param value:
+        :return:
+        """
+        if key in _BOOLEAN_TYPE_KEYS:
+            if value is True:
+                return [f'--{key}']
+            else:
+                return []
+        else:
+            return [f'--{key}', cls._normalize_value(value)]
 
     @classmethod
     def parse_cmd(cls, argv: list):
@@ -147,14 +167,15 @@ class SparkCMDParser:
         for key, value in exec_attr.items():
             if key == _CMD_PREFIX_KEY:
                 continue
-            # -i参数在处理上不支持--的形式 单独处理
-            if key in _SINGLE_HORIZONTAL_BAR_KEYS:
-                cmd_fields += [f'-{key}', cls._normalize_value(value)]
             # 单独处理 remainder = ['--uk1','xxxx','--uk2','xxxx'] 这部分未被解析的残余参数
             elif key == _CMD_UNKNOWN_KEY:
                 cmd_fields += [cls._normalize_value(item) for item in value]
+            # 单独处理 - 作为前缀的参数
+            elif key in _SINGLE_HORIZONTAL_BAR_KEYS:
+                cmd_fields += [f'-{key}', cls._normalize_value(value)]
+            # 处理剩余 -- 作为前缀的参数
             else:
-                cmd_fields += [f'--{key}', cls._normalize_value(value)]
+                cmd_fields += cls._append_double_dash_args(cls, key, value)
 
         # 处理参数配置
         for key, value in conf_params.items():

@@ -10,7 +10,7 @@ import subprocess
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # 与src同级的其他资源文件夹
-RESOURCES_LIST = ['config']
+RESOURCES_LIST = ['config', 'script']
 
 # 要编译的源文件夹的名称
 COMPILE_FROM_NAME = 'src'
