@@ -179,12 +179,6 @@ def main():
     # 1. 存在最近的调优结果
     # 2. 调优方法不是用户配置(用户配置无需复测)
     # 3. 调优结果状态仍在运行中(复测中)
-    tuning_result_history = get_tuning_result_history(load)
-    if (tuning_result_history.latest_tuning_result
-            and tuning_result_history.latest_tuning_result.tuning_record.method != OA_CONF.TuningMethod.user
-            and tuning_result_history.latest_tuning_result.status == OA_CONF.ExecStatus.running):
-        global_logger.info('The retest status of latest tuning result is still running, please wait.')
-        return
 
     if args.tuning_method or args.retest_way == OA_CONF.RetestWay.hijacking:
         try:
