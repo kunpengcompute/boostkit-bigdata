@@ -75,5 +75,8 @@ class OmniAdvisorConf:
     spark_exec_timeout_ratio = _common_config.getfloat('spark', 'spark.exec.timeout.ratio')
     tuning_strategies = json.loads(_common_config.get('common', 'tuning.strategy'))
 
+    # 保留小数位数
+    decimal_digits = 3
+
 
 OA_CONF = OmniAdvisorConf()

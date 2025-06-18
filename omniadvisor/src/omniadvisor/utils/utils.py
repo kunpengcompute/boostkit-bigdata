@@ -4,6 +4,7 @@ import uuid
 import subprocess
 from typing import Tuple, List, Dict
 
+from common.constant import OmniAdvisorConf
 from omniadvisor.utils.logger import global_logger
 
 
@@ -69,3 +70,11 @@ def read_json_file(file_path: str):
 
     return data
 
+
+def float_format(to_format: float) -> str:
+    """
+    按 decimal_digits 保留小数位数
+    :param to_format: 待格式化的的小数
+    :return:
+    """
+    return "{:.{}f}".format(to_format, OmniAdvisorConf.decimal_digits)

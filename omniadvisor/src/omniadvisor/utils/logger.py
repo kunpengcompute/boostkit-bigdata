@@ -3,14 +3,16 @@ import logging
 from logging.config import dictConfig
 from common.constant import OA_CONF
 
+CONSOLE_FORMAT = '%(asctime)s [%(levelname)s] %(message)s'
+FILE_FORMAT = '%(asctime)s [%(levelname)s] %(filename)s:%(lineno)d in %(funcName)s - %(message)s'
+
 LOGGING_CONFIG = {
     'version': 1,
     'disable_existing_loggers': True,
     'formatters': {
-        'colorFormatter': {
+        'consoleFormatter': {
             '()': 'colorlog.ColoredFormatter',
-            'format': '%(log_color)s%(asctime)s [%(levelname)s] '
-                      '%(filename)s:%(lineno)d in %(funcName)s - %(message)s%(reset)s',
+            'format': f'%(log_color)s{CONSOLE_FORMAT}%(reset)s',
             'datefmt': '%Y-%m-%d %H:%M:%S',
             'log_colors': {
                 'DEBUG': 'cyan',
@@ -20,8 +22,8 @@ LOGGING_CONFIG = {
                 'CRITICAL': 'bold_red',
             },
         },
-        'simpleFormatter': {
-            'format': '%(asctime)s [%(levelname)s] %(filename)s:%(lineno)d in %(funcName)s - %(message)s',
+        'fileFormatter': {
+            'format': FILE_FORMAT,
             'datefmt': '%Y-%m-%d %H:%M:%S'
         }
     },
@@ -29,13 +31,13 @@ LOGGING_CONFIG = {
         'consoleHandler': {
             'class': 'logging.StreamHandler',
             'level': 'DEBUG',
-            'formatter': 'colorFormatter',
+            'formatter': 'consoleFormatter',
             'stream': 'ext://sys.stdout',
         },
         'fileHandler': {
             'class': 'logging.handlers.TimedRotatingFileHandler',
             'level': 'DEBUG',
-            'formatter': 'simpleFormatter',
+            'formatter': 'fileFormatter',
             'filename': OA_CONF.log_file_path,
             'when': 'midnight',
             'interval': 1,

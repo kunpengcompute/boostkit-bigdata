@@ -1,6 +1,6 @@
 import subprocess
 from unittest.mock import patch,mock_open
-from omniadvisor.utils.utils import run_cmd, save_trace_data  # 假设你的函数定义在 'your_module' 中
+from omniadvisor.utils.utils import run_cmd, save_trace_data, float_format  # 假设你的函数定义在 'your_module' 中
 
 
 class TestRunCmd:
@@ -76,3 +76,26 @@ class TestTraceDataSaver:
                 assert False, "Expected an Exception to be raised."
             except Exception as e:
                 assert str(e) == "保存过程中出现错误: Unexpected error", f"Unexpected error message: {str(e)}"
+
+
+class TestFloatFormat:
+
+    def test_basic_formatting(self):
+        # 正常四舍五入
+        assert float_format(3.14159) == "3.142"
+        # 补零
+        assert float_format(2.5) == "2.500"
+        # 整数输入
+        assert float_format(100) == "100.000"
+
+    def test_boundary_values(self):
+        # 零值
+        assert float_format(0) == "0.000"
+        # 负数
+        assert float_format(-3.14159) == "-3.142"
+
+    def test_special_floats(self):
+        # 无穷大
+        assert float_format(float('inf')) == "inf"
+        # 负无穷大
+        assert float_format(float('-inf')) == "-inf"

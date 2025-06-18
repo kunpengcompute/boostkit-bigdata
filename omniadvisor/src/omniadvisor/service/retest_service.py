@@ -3,6 +3,7 @@ from omniadvisor.repository.model.load import Load
 from omniadvisor.service.spark_service.spark_run import spark_run
 from omniadvisor.service.tuning_result.tuning_result import get_tuning_result
 from omniadvisor.utils.logger import global_logger
+from omniadvisor.utils.utils import float_format
 
 
 def retest(load: Load, config: dict):
@@ -25,11 +26,14 @@ def retest(load: Load, config: dict):
             raise
 
         if exam_record.status == OA_CONF.ExecStatus.success:
-            global_logger.info('Retest succeeded in round %d. Performance result: %.3f.', i, exam_record.runtime)
+            global_logger.info(
+                'Retest succeeded in round %d. Performance result: %s.',
+                i,
+                float_format(exam_record.runtime)
+            )
         else:
             # 若是出现异常配置，也要退出
-            global_logger.warning('Retest failed in round %d. Exception source: Spark exception: %s.', i,
-                                  spark_output)
+            global_logger.warning('Retest failed in round %d. Exception source: Spark exception: %s.', i, spark_output)
             tuning_result = get_tuning_result(load, config)
             if tuning_result.failed_times >= OA_CONF.config_fail_threshold:
                 global_logger.info('The number of retest failures has reached the failure threshold.')

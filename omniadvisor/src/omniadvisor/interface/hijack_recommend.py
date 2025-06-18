@@ -10,6 +10,8 @@ from omniadvisor.service.tuning_result.tuning_result_history import get_tuning_r
 from omniadvisor.utils.logger import global_logger
 from omniadvisor.service.spark_service.spark_run import spark_run
 
+from omniadvisor.utils.utils import float_format
+
 
 def _query_or_create_load(name: str, exec_attr: dict, default_config: dict):
     """
@@ -80,9 +82,12 @@ def _process_load_config(load: Load):
         tuning_result_history = get_tuning_result_history(load=load)
         # 更新最优配置
         tuning_result_history.refresh_best_config()
-        global_logger.info(f'Current tuning result: {tuning_result.runtime}, best tuning result ever: '
-                           f'{tuning_result_history.best_tuning_result.runtime}, best tuning speedup: '
-                           f'{tuning_result_history.boost_percentage} %')
+        global_logger.info(
+            'Current tuning result: %s, best tuning result ever: %s, best tuning speedup: %s %%',
+            float_format(tuning_result.runtime),
+            float_format(tuning_result_history.best_tuning_result.runtime),
+            float_format(tuning_result_history.boost_percentage)
+        )
         # 当前test_config达到调优轮次后 置空test_config
         LoadRepository.update_test_config(load, {})
 

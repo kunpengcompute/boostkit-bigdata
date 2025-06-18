@@ -4,12 +4,18 @@
 """
 import os
 import py_compile
+import sysconfig
 
 from Cython.Build import cythonize
 from setuptools import setup, Extension, find_packages
 
 # 要编译成 .pyc的文件（几个入口文件）
 pyc_files = ['__init__.py', 'init.py', 'hijack.py', 'tuning.py']
+
+sysconfig.get_config_vars()['CCSHARED'] = '-O2 -pipe -Wall -Wtrampolines -D_FORTIFY_SOURCE=2 -O2 -fPIC ' \
+                                          '-finline-functions -fstack-protector-strong ' \
+                                          '-s -Wl,-z,noexecstack -Wl,-z,relro,-z,now ' \
+                                          '-ftrapv -fstack-check'
 
 
 # 1 需要编译的文件
@@ -41,7 +47,7 @@ for py_file in find_py_files("."):
         Extension(
             module_name,
             [py_file],
-            extra_compile_args=["-O3"],  # 优化选项
+            extra_compile_args=[],  # 优化选项
         )
     )
 
