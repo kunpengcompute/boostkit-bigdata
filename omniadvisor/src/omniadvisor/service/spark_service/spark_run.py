@@ -130,7 +130,7 @@ def _update_trace_from_history_server(exam_record: ExamRecord, application_id: s
             trace_executor = spark_fetcher.get_spark_executor_by_app(application_id)
         except HTTPError as httpe:
             time.sleep(OA_CONF.spark_fetch_trace_interval)
-            global_logger.debug(f"Cannot access history server: {httpe}")
+            global_logger.debug(f"Cannot access history server: %s", httpe)
             continue
         trace_dict['sql'] = save_trace_data(data=trace_sql, data_dir=OA_CONF.data_dir)
         trace_dict['stages'] = save_trace_data(data=trace_stages, data_dir=OA_CONF.data_dir)
@@ -138,6 +138,7 @@ def _update_trace_from_history_server(exam_record: ExamRecord, application_id: s
         global_logger.info(f"Fetch Spark execute trace success.")
         break
     else:
-        raise RuntimeError(f'Failed to get App {application_id} trace from {history_server_url}')
+        global_logger.error(f'Failed to get App %s trace from %s', application_id, history_server_url)
+        return
 
     ExamRecordRepository.update_exam_result(exam_record, trace=trace_dict)
