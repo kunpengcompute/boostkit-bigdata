@@ -65,7 +65,7 @@ class TestTuning:
             mock_spark_run.return_value = mock_exam_record, spark_output
             mock_smac_tuning.return_value = self.tune_return_val
             mock_tuning_result = MagicMock()
-            mock_tuning_result.failed_times = OA_CONF.config_fail_threshold
+            mock_tuning_result.failed_count = OA_CONF.config_fail_threshold
             mock_get_tuning_result.return_value = mock_tuning_result
             tuning_result_history = MagicMock()
             tuning_result_history.best_config = {**self.load.default_config, **self.tune_return_val[0]}
