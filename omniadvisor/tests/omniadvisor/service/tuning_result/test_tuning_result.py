@@ -17,7 +17,9 @@ class TestTuningResult:
 
         # Mocking TuningRecord and ExamRecord
         tuning_record_mock = MagicMock()
-        task_mock = MagicMock()
+        exam_record_mock_1 = MagicMock()
+        exam_record_mock_2 = MagicMock()
+        exam_record_mock_3 = MagicMock()
 
         # Set up mock attributes for tuning record
         tuning_record_mock.config = {"param1": "value1", "param2": "value2"}
@@ -26,20 +28,28 @@ class TestTuningResult:
         tuning_record_mock.rounds = 1
 
         # Set up mock attributes for exam record
-        task_mock.status = OA_CONF.ExecStatus.success
-        task_mock.runtime = 10
-        task_mock.trace = "trace_info"
+        exam_record_mock_1.status = OA_CONF.ExecStatus.success
+        exam_record_mock_1.runtime = 10
+        exam_record_mock_1.trace = "trace_info1"
+        exam_record_mock_2.status = OA_CONF.ExecStatus.success
+        exam_record_mock_2.runtime = 8
+        exam_record_mock_2.trace = "trace_info2"
+        exam_record_mock_3.status = OA_CONF.ExecStatus.success
+        exam_record_mock_3.runtime = 12
+        exam_record_mock_3.trace = "trace_info3"
 
-        return load, config, tuning_record_mock, task_mock
+        return load, config, tuning_record_mock, [exam_record_mock_1, exam_record_mock_2, exam_record_mock_3]
 
     @patch('omniadvisor.service.tuning_result.tuning_result.TuningRecordRepository.query_by_load_and_config')
     @patch('omniadvisor.service.tuning_result.tuning_result.ExamRecordRepository.query_by_load_and_config')
     def test_get_tuning_result(self, mock_task_query, mock_tuning_record_query, setup_mocks):
-        load, config, tuning_record_mock, task_mock = setup_mocks
+        # 强制设定复测次数为3，用于测试
+        OA_CONF.tuning_retest_times = 3
 
-        # Set return values for mocks
+        # 准备测试数据
+        load, config, tuning_record_mock, exam_record_mock_list = setup_mocks
         mock_tuning_record_query.return_value = [tuning_record_mock]
-        mock_task_query.return_value = [task_mock]
+        mock_task_query.return_value = exam_record_mock_list
 
         result = get_tuning_result(load, config)
 
@@ -51,28 +61,16 @@ class TestTuningResult:
         assert result.runtime == 10
 
     def test_tuning_result_property(self, setup_mocks):
-        _, _, tuning_record_mock, _ = setup_mocks
-
-        # 准备测试数据
-        task_mock1 = MagicMock()
-        task_mock1.status = OA_CONF.ExecStatus.success
-        task_mock1.runtime = 10
-        task_mock1.trace = "trace_info1"
-        task_mock2 = MagicMock()
-        task_mock2.status = OA_CONF.ExecStatus.success
-        task_mock2.runtime = 15
-        task_mock2.trace = "trace_info2"
-        task_mock3 = MagicMock()
-        task_mock3.status = OA_CONF.ExecStatus.fail
-        task_mock3.runtime = 10
-        task_mock3.trace = "trace_info3"
         # 强制设定复测次数为3，用于测试
         OA_CONF.tuning_retest_times = 3
 
-        tasks = [task_mock1, task_mock2]
+        # 准备测试数据
+        _, _, tuning_record_mock, exam_record_mock_list = setup_mocks
+        exam_record_mock_list[-1].status = OA_CONF.ExecStatus.running
+
         tuning_result = TuningResult(
             tuning_record=tuning_record_mock,
-            exam_records=tasks
+            exam_records=exam_record_mock_list
         )
 
         assert tuning_result.config == {"param1": "value1", "param2": "value2"}
@@ -80,15 +78,16 @@ class TestTuningResult:
         assert tuning_result.method_extend == "method_extend1"
         assert tuning_result.rounds == 1
         assert tuning_result.status == OA_CONF.ExecStatus.running
-        assert tuning_result.runtime == 12.5
-        assert tuning_result.trace == "trace_info1"
+        assert tuning_result.runtime == 9
+        assert tuning_result.trace == "trace_info2"
 
-        tasks = [task_mock1, task_mock2, task_mock3]
+        # 准备测试数据
+        exam_record_mock_list[-1].status = OA_CONF.ExecStatus.fail
         tuning_result = TuningResult(
             tuning_record=tuning_record_mock,
-            exam_records=tasks
+            exam_records=exam_record_mock_list
         )
         assert tuning_result.status == OA_CONF.ExecStatus.fail
-        assert tuning_result.runtime == 12.5
-        assert tuning_result.trace == "trace_info1"
+        assert tuning_result.runtime == OA_CONF.exec_fail_return_runtime
+        assert tuning_result.trace == OA_CONF.exec_fail_return_trace
 

@@ -85,12 +85,16 @@ class TuningResult:
         return self._tuning_record.rounds
 
     @property
-    def exam_times(self):
+    def exam_count(self):
         return len(self._exam_records)
 
     @property
-    def failed_times(self):
+    def failed_count(self):
         return sum([exam_record.status == OA_CONF.ExecStatus.fail for exam_record in self._exam_records])
+
+    @property
+    def completed_count(self):
+        return sum([exam_record.status != OA_CONF.ExecStatus.running for exam_record in self._exam_records])
 
     @property
     def status(self):
@@ -101,9 +105,9 @@ class TuningResult:
         复测中：复测次数小于指定复测次数，且失败次数没有超过阈值，复测流程尚在进行中
         :return:
         """
-        if self.failed_times >= OA_CONF.config_fail_threshold:
+        if self.failed_count >= OA_CONF.config_fail_threshold:
             overall_status = OA_CONF.ExecStatus.fail
-        elif len(self._exam_records) >= OA_CONF.tuning_retest_times:
+        elif self.completed_count >= OA_CONF.tuning_retest_times:
             overall_status = OA_CONF.ExecStatus.success
         else:
             overall_status = OA_CONF.ExecStatus.running
@@ -111,6 +115,9 @@ class TuningResult:
 
     @property
     def runtime(self):
+        if self.status == OA_CONF.ExecStatus.fail:
+            return OA_CONF.exec_fail_return_runtime
+
         # 计算执行状态为success的平均runtime
         success_runtimes = [
             exam_record.runtime
@@ -125,6 +132,9 @@ class TuningResult:
 
     @property
     def trace(self):
+        if self.status == OA_CONF.ExecStatus.fail:
+            return OA_CONF.exec_fail_return_trace
+
         success_exam_results = [
             exam_record
             for exam_record in self._exam_records if exam_record.status == OA_CONF.ExecStatus.success
