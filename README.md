@@ -7,5 +7,4 @@ boostkit-bigdata 仓库包含为多款开源软件（包括 openLooKeng、Apache
 支持x86、鲲鹏架构下的openEuler系（例如openEuler 22.03 LTS）操作系统，支持centos系统
 
 ## 参与贡献
-如果您想为本仓库贡献代码，请向本仓库任意maintainer发送邮件<br>
 如果您找到产品中的任何Bug，欢迎您提出ISSUE
