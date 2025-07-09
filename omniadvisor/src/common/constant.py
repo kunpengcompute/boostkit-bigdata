@@ -21,6 +21,22 @@ def load_common_config(config_path: str):
     return common_config
 
 
+def check_oa_conf():
+    """
+    校验OA_CONF中参数是否正确
+    """
+    if OA_CONF.tuning_retest_times <= 0:
+        raise ValueError('The tuning retest times must > 0, please check common configuration.')
+    if OA_CONF.config_fail_threshold <= 0:
+        raise ValueError('The config fail threshold must > 0, please check common configuration.')
+    if OA_CONF.spark_fetch_trace_timeout <= 0:
+        raise ValueError('The spark fetch trace timeout must > 0, please check common configuration.')
+    if OA_CONF.spark_fetch_trace_interval <= 0:
+        raise ValueError('The spark fetch trace interval must > 0, please check common configuration.')
+    if OA_CONF.spark_exec_timeout_ratio <= 0:
+        raise ValueError('The spark exec timeout ratio must > 0, please check common configuration.')
+
+
 class OmniAdvisorConf:
     """
     OmniAdvisor常量
