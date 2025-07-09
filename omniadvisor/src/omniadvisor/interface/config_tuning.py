@@ -70,6 +70,10 @@ def unified_tuning(load, retest_way: str, tuning_method: str):
     global_logger.info("Load config tuning success, get new config to retest.")
     next_config = {**load.default_config, **next_config}
 
+    # 判断是否有重复推荐配置
+    if TuningRecordRepository.query_by_load_and_config(load=load, config=next_config):
+        raise NoOptimalConfigError('The recommending config already exists, please try other tuning methods.')
+
     TuningRecordRepository.create(load=load, config=next_config, method=tuning_method, method_extend=method_extend)
 
     # 复测
