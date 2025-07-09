@@ -726,5 +726,5 @@ object ColumnarPluginConfig {
     .internal()
     .doc("enable omni staticInvoke")
     .booleanConf
-    .createWithDefault(false)
+    .createWithDefault(true)
 }
