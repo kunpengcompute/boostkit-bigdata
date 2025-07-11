@@ -184,7 +184,7 @@ def main():
         try:
             unified_tuning(load, args.retest_way, args.tuning_method)
         except NoOptimalConfigError:
-            global_logger.error(
+            global_logger.warning(
                 'The tuning method: %s cannot find optimal config, please try other method.', args.tuning_method
             )
         return
@@ -197,5 +197,5 @@ def main():
             try:
                 unified_tuning(load, args.retest_way, tuning_method)
             except NoOptimalConfigError:
-                global_logger.info('The tuning method: %s cannot find optimal config, trying next.', tuning_method)
+                global_logger.warning('The tuning method: %s cannot find optimal config, trying next.', tuning_method)
                 break
