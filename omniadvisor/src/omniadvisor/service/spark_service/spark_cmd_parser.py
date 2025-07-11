@@ -52,7 +52,6 @@ class SparkCMDParser:
     _parser.add_argument('--archives')
     _parser.add_argument('--conf', action='append', help="Arbitrary Spark configuration property")
     _parser.add_argument('--driver-memory', dest='driver-memory')
-    _parser.add_argument('--driver-java-options', dest='driver-java-options')
     _parser.add_argument('--driver-library-path', dest='driver-library-path')
     _parser.add_argument('--driver-class-path', dest='driver-class-path')
     _parser.add_argument('--executor-memory', dest='executor-memory')
@@ -78,15 +77,12 @@ class SparkCMDParser:
     @staticmethod
     def _normalize_value(value):
         """
-        对spark-sql命令解析出来的value做标准化处理，将含有空格字符串类型的值用双引号包裹
+        对spark-sql命令解析出来的value做标准化处理，对所有value的值使用单引号包裹进行强引用，维持字符串字面量的原义
 
         :param value: 原始命令解析出的value
         :return: 标准化的value
         """
-        if isinstance(value, str) and ' ' in value:
-            return f'"{value}"'
-        else:
-            return value
+        return f"'{value}'"
 
     @staticmethod
     def _append_double_dash_args(cls, key, value):

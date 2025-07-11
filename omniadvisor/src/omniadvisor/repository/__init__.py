@@ -17,6 +17,7 @@ if not settings.configured:
         DATABASES=DATABASES,
         DEBUG=False,
         INSTALLED_APPS=['server'],
+        USE_TZ=False
     )
     # 初始化 Django 环境
     django.setup()

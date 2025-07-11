@@ -1,5 +1,6 @@
 import os
 import logging
+import warnings
 from logging.config import dictConfig
 from common.constant import OA_CONF
 
@@ -64,6 +65,9 @@ dictConfig(LOGGING_CONFIG)
 global_logger = logging.getLogger('omniadvisor')
 # 禁止logger作用域上升到root
 global_logger.propagate = False
+
+# 屏蔽warnings模块中的RuntimeWarning 避免smac库在运行时偶发的warning打印影响用户体验
+warnings.filterwarnings('ignore', category=RuntimeWarning)
 
 # 屏蔽部分第三方库中的Logger
 modules_setting_error = ['smac']
