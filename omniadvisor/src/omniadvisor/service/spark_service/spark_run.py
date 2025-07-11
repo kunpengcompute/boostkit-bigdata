@@ -48,8 +48,8 @@ def spark_run(load: Load, conf: dict):
     # 不存在application_id的情况下不提取time_taken 直接返回
     if exitcode != 0:
         exitcode_describe = CODE_MAP.get(exitcode, "Abnormal exit code")
-        global_logger.warning(f"Spark Load {load.id} did not exit normally and return a non-zero exit code {exitcode}"
-                              f", exitcode describe:{exitcode_describe}")
+        global_logger.warning(f"Spark Load %s did not exit normally and return a non-zero exit code {exitcode}"
+                              f", exitcode describe: %s", str(load.id), exitcode_describe)
         global_logger.info(f"Update exam result, set the exam exec status to %s because of %s",
                            OA_CONF.ExecStatus.fail, exitcode_describe)
         try:
