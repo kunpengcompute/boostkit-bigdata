@@ -22,8 +22,14 @@ class SparkFetcher:
         endpoint = endpoint.strip("/")
         url = f"{self.history_server_url}/{endpoint}"
         response = requests.get(url)
-        response.raise_for_status()  # 若status.code != 200~209则抛出异常
-        return json.loads(response.text)  # 使用response.json()代替json.loads(response.text)
+        # 若status.code != 200~209则抛出异常
+        response.raise_for_status()
+        # 将获取到的数据转为json返回
+        try:
+            json_data = json.loads(response.text)
+        except Exception as e:
+            raise ValueError('Something wrong in trace fetched, can not decode into Json data.') from e
+        return json_data
 
     def get_spark_apps(self):
         """
