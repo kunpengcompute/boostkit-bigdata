@@ -24,6 +24,7 @@ class TestTuning:
         :return:
         """
         with patch('omniadvisor.repository.load_repository.LoadRepository.query_by_id'), \
+                patch('omniadvisor.repository.tuning_record_repository.TuningRecordRepository.query_by_load_and_config') as mock_query_tuning_record, \
                 patch('omniadvisor.repository.tuning_record_repository.TuningRecordRepository.create'), \
                 patch('omniadvisor.service.retest_service.spark_run') as mock_spark_run, \
                 patch('omniadvisor.interface.config_tuning.get_tuning_result'), \
@@ -31,6 +32,7 @@ class TestTuning:
                 patch('algo.iterative.tuning.SmacAppendTuning.tune') as mock_smac_tuning, \
                 patch('omniadvisor.interface.config_tuning.float_format'), \
                 patch('omniadvisor.service.retest_service.float_format'):
+            mock_query_tuning_record.return_value = list()
             mock_exam_record = MagicMock()
             mock_smac_tuning.return_value = self.tune_return_val
             mock_exam_record.status = OA_CONF.ExecStatus.success
@@ -49,6 +51,7 @@ class TestTuning:
         :return:
         """
         with patch('omniadvisor.repository.load_repository.LoadRepository.query_by_id'), \
+                patch('omniadvisor.repository.tuning_record_repository.TuningRecordRepository.query_by_load_and_config') as mock_query_tuning_record, \
                 patch('omniadvisor.repository.tuning_record_repository.TuningRecordRepository.create'), \
                 patch('omniadvisor.interface.config_tuning.get_tuning_result'), \
                 patch('omniadvisor.service.retest_service.spark_run') as mock_spark_run, \
@@ -59,6 +62,7 @@ class TestTuning:
                 patch('omniadvisor.repository.load_repository.LoadRepository.update_best_config') as mock_update_best, \
                 patch('omniadvisor.interface.config_tuning.float_format'), \
                 patch('omniadvisor.service.retest_service.float_format'):
+            mock_query_tuning_record.return_value = list()
             mock_exam_record = MagicMock()
             mock_exam_record.status = OA_CONF.ExecStatus.fail
             spark_output = self.empty_str
@@ -84,12 +88,14 @@ class TestTuning:
         """
 
         with patch('omniadvisor.repository.load_repository.LoadRepository.query_by_id'), \
+                patch('omniadvisor.repository.tuning_record_repository.TuningRecordRepository.query_by_load_and_config') as mock_query_tuning_record, \
                 patch('omniadvisor.repository.tuning_record_repository.TuningRecordRepository.create'), \
                 patch('omniadvisor.service.retest_service.spark_run', side_effect=RuntimeError) as mock_spark_run, \
                 patch('omniadvisor.interface.config_tuning.get_tuning_result_history'), \
                 patch('omniadvisor.repository.load_repository.LoadRepository.update_best_config'), \
                 patch('algo.iterative.tuning.SmacAppendTuning.tune') as mock_smac_tuning, \
                 patch('omniadvisor.interface.config_tuning.remove_tuning_result') as mock_remove_tuning_result:
+            mock_query_tuning_record.return_value = list()
             mock_exam_record = MagicMock()
             mock_exam_record.status = OA_CONF.ExecStatus.success
             mock_smac_tuning.return_value = self.tune_return_val
@@ -124,10 +130,12 @@ class TestTuning:
         :return:
         """
         with patch('omniadvisor.repository.load_repository.LoadRepository.query_by_id'), \
+                patch('omniadvisor.repository.tuning_record_repository.TuningRecordRepository.query_by_load_and_config') as mock_query_tuning_record, \
                 patch('omniadvisor.repository.tuning_record_repository.TuningRecordRepository.create'), \
                 patch('omniadvisor.interface.config_tuning.get_tuning_result_history') as mocked_query_perf, \
                 patch('omniadvisor.repository.load_repository.LoadRepository.update_test_config') as mock_update_test, \
                 patch('algo.iterative.tuning.SmacAppendTuning.tune') as mock_smac_tuning:
+            mock_query_tuning_record.return_value = list()
             mock_smac_tuning.return_value = self.tune_return_val
             unified_tuning(load=self.load, retest_way=OA_CONF.RetestWay.hijacking,
                            tuning_method=self.tuning_method)

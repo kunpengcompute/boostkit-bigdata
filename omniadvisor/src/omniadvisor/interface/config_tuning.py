@@ -64,11 +64,15 @@ def unified_tuning(load, retest_way: str, tuning_method: str):
     method_extend, next_config = _get_next_config(load, tuning_method)
 
     if not next_config:
-        raise NoOptimalConfigError('The recommending config is empty, please try other tuning methods.')
+        raise NoOptimalConfigError(f'The recommending config of method {tuning_method} is empty, please try other tuning methods.')
 
     # 用户的default_config上叠加next_config叠加
     global_logger.info("Load config tuning success, get new config to retest.")
     next_config = {**load.default_config, **next_config}
+
+    # 判断是否有重复推荐配置
+    if TuningRecordRepository.query_by_load_and_config(load=load, config=next_config):
+        raise NoOptimalConfigError(f'The recommending config of method {tuning_method} already exists, please try other tuning methods.')
 
     TuningRecordRepository.create(load=load, config=next_config, method=tuning_method, method_extend=method_extend)
 
@@ -181,12 +185,7 @@ def main():
     # 3. 调优结果状态仍在运行中(复测中)
 
     if args.tuning_method or args.retest_way == OA_CONF.RetestWay.hijacking:
-        try:
-            unified_tuning(load, args.retest_way, args.tuning_method)
-        except NoOptimalConfigError:
-            global_logger.warning(
-                'The tuning method: %s cannot find optimal config, please try other method.', args.tuning_method
-            )
+        unified_tuning(load, args.retest_way, args.tuning_method)
         return
 
     # 当且仅当后台复测，且未指定调优方法时，会连续拉起调优
@@ -196,6 +195,7 @@ def main():
         for _ in range(tuning_times):
             try:
                 unified_tuning(load, args.retest_way, tuning_method)
-            except NoOptimalConfigError:
-                global_logger.warning('The tuning method: %s cannot find optimal config, trying next.', tuning_method)
+            except NoOptimalConfigError as e:
+                global_logger.warning(e)
+                global_logger.info('No config found in the loop of tuning strategy, trying next method.')
                 break
