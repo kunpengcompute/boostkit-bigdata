@@ -1,6 +1,6 @@
 import multiprocessing
 import time
-
+from dataclasses import dataclass
 from requests.exceptions import HTTPError
 
 from common.constant import OA_CONF
@@ -13,6 +13,24 @@ from omniadvisor.service.spark_service.spark_fetcher import SparkFetcher
 from omniadvisor.service.tuning_result.tuning_result import get_tuning_result
 from omniadvisor.utils.logger import global_logger
 from omniadvisor.utils.utils import save_trace_data
+
+
+@dataclass
+class ExitCodeInfo:
+    code: int
+    description: str
+
+
+class ExitCodes:
+    SUCCESS = ExitCodeInfo(0, "Success")
+    TIMEOUT = ExitCodeInfo(124, "timeout")
+    SPARK_SQL_FAIL = ExitCodeInfo(1, "Spark SQL failed")
+
+    _CODE_MAP = {
+        0: SUCCESS.description,
+        124: TIMEOUT.description,
+        1: SPARK_SQL_FAIL.description
+    }
 
 
 def spark_run(load: Load, conf: dict):
@@ -41,7 +59,11 @@ def spark_run(load: Load, conf: dict):
 
     # 不存在application_id的情况下不提取time_taken 直接返回
     if exitcode != 0:
-        global_logger.info(f"Spark Load {load.id} execute failed, update the exam result.")
+        exitcode_describe = ExitCodes._CODE_MAP.get(exitcode, ExitCodeInfo(exitcode, "Abnormal exit code").description)
+        global_logger.warning(f"Spark Load {load.id} did not exit normally and return a non-zero exit code {exitcode}"
+                              f", exitcode describe:{exitcode_describe}")
+        global_logger.info(f"Update exam result, set the exam exec status to %s because of %s",
+                           OA_CONF.ExecStatus.fail, exitcode_describe)
         try:
             return ExamRecordRepository.update_exam_result(
                 exam_record=exam_record,
