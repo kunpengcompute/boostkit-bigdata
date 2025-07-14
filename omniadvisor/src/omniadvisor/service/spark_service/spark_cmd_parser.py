@@ -65,7 +65,8 @@ class SparkCMDParser:
     _parser.add_argument('--keytab')
     _parser.add_argument('--queue')
     _parser.add_argument('-d', '--database')
-    _parser.add_argument('-e', type=str, help='SQL statement to execute.')
+    # 支持对于--e这种形式的入参解析 但是--e为spark非官方用法 故在命令reconstruct的时候仍然使用-e的方式重建命令
+    _parser.add_argument('-e', '--e', type=str, help='SQL statement to execute.')
     _parser.add_argument('-f', type=str, help='File containing SQL script.')
     _parser.add_argument('-i', help='Initialization SQL file')
     # boolean变量
