@@ -2,6 +2,7 @@ import re
 
 from common.constant import OA_CONF
 from omniadvisor.utils.utils import run_cmd
+from omniadvisor.utils.logger import global_logger
 
 
 class SparkExecutor:
@@ -39,12 +40,16 @@ class SparkExecutor:
                 pattern = r"Application Id:\s*(.*)"
                 match = re.search(pattern, item)
                 if match:
+                    global_logger.debug("Matched! Pattern: %s, item: %s", pattern, item)
                     application_id = match.group(1).strip()
             elif "Time taken" in item:
-                pattern = r"Time taken:\s*(.*)seconds"
+                pattern = r"^Time taken:\s*(.*)seconds"
                 match = re.search(pattern, item)
                 if match:
+                    global_logger.debug("Matched! Pattern: %s, item: %s", pattern, item)
                     time_taken_list.append(float(match.group(1).strip()))
+            else:
+                pass
 
         if time_taken_list:
             total_time_taken = sum(time_taken_list)
