@@ -1,31 +1,34 @@
 # OmniData Connector
 
-## Overview
+## 概述
 
-OmniData Connector is a data source connector developed for openLooKeng. 
+OmniData Connector是为 openLooKeng 开发的数据源连接器。
 
-The OmniData connector allows querying data sources where OmniData Server is deployed. It pushes down some operators such as filter to the OmniData service close to the storage to improve the performance of storage-computing-separated system.
+OmniData Connector允许查询已部署 OmniData Server 的数据源。它将过滤（filter）等算子下推到靠近存储层的 OmniData 服务端执行，从而提升存算分离系统的性能。
+## 构建 OmniData Connector
 
-## Building OmniData Connector
+OmniData Connector基于 openLooKeng 架构开发。您首先需要以非 root 用户身份构建 openLooKeng。
 
-1. OmniData Connector is developed under the architecture of openLooKeng. You need to build openLooKeng first as a non-root user.
-2. Simply run the following command from the project root directory:<br>
-`mvn clean install -Dos.detected.arch="aarch64"`<br>
-Then you will find omnidata-openlookeng-connector-*.zip in the omnidata-openlookeng-connector/connector/target/ directory.
-OmniData Connector has a comprehensive set of unit tests that can take several minutes to run. You can disable the tests during building:<br>
-`mvn clean install -DskipTests -Dos.detected.arch="aarch64"`<br>
+在项目根目录下运行以下命令：
 
-## Deploying OmniData Connector
+`mvn clean install -Dos.detected.arch="aarch64"`
 
-1. Unzip omnidata-openlookeng-connector-*.zip to the plugin directory of openLooKeng.
-2. Obtain the latest OmniData software package, and replace the boostkit-omnidata-server-\*.jar in the omnidata-openlookeng-connector-\* directory.
-3. Set "connector.name=omnidata-openlookeng" in the openLooKeng catalog properties file.
+构建完成后，您将在 omnidata-openlookeng-connector/connector/target/ 目录中找到 omnidata-openlookeng-connector-*.zip 文件。
+OmniData Connector包含一套完整的单元测试，运行可能需要几分钟。您可以在构建时禁用测试：
 
-## Contribution Guidelines
+`mvn clean install -DskipTests -Dos.detected.arch="aarch64"`
 
-Track the bugs and feature requests via GitHub issues.
+## 部署 OmniData Connector
 
-## More Information
+1. 将 omnidata-openlookeng-connector-*.zip 解压到 openLooKeng 的 plugin 目录中。
+2. 获取最新的 OmniData 软件包，并用其中的 boostkit-omnidata-server-\*.jar 文件替换解压后 omnidata-openlookeng-connector-\* 目录中的同名文件。
+3. 在 openLooKeng 的 catalog 属性文件 中设置 connector.name=omnidata-openlookeng。
 
-For further assistance, send an email to kunpengcompute@huawei.com.
+## 贡献指南
+
+请通过 GitHub issues 跟踪问题（bugs）和功能需求（feature requests）。
+
+## 更多信息
+
+如需进一步帮助，请发送电子邮件至：kunpengcompute@huawei.com
 
