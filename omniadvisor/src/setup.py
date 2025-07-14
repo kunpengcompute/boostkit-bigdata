@@ -29,7 +29,8 @@ def find_py_files(root):
                 # 编译成 .pyc，并删除原 .py文件
                 py_path = os.path.join(dirpath, f)
                 # 编译生成.pyc文件
-                py_compile.compile(py_path, cfile=py_path + 'c')
+                py_compile.compile(py_path, cfile=py_path + 'c',
+                                   invalidation_mode=py_compile.PycInvalidationMode.CHECKED_HASH)
                 # 删除原.py文件
                 os.remove(py_path)
                 continue
