@@ -17,7 +17,10 @@ from omniadvisor.utils.utils import save_trace_data
 CODE_MAP = {
     0: "Success",
     124: "timeout",
-    1: "Spark SQL failed"
+    1: "Spark SQL failed",
+    255: "Spark subprocess(eg. Excutor,external command) terminated abnormally.",
+    143: "Terminated by SIGTERM",
+    2: "CLI argument error"
 }
 
 
@@ -36,7 +39,7 @@ def spark_run(load: Load, conf: dict):
         # 获取当前default_config的平均测试性能
         baseline_results = get_tuning_result(load, load.default_config)
         timeout_sec = OA_CONF.spark_exec_timeout_ratio * baseline_results.runtime
-        submit_cmd = f"timeout {timeout_sec} " + submit_cmd
+        submit_cmd[:0] = ["timeout", str(timeout_sec)]
     global_logger.debug(f"The submit cmd about to execute is: {submit_cmd}")
 
     # 根据执行命令创建测试记录
@@ -107,16 +110,16 @@ def _submit_spark_task(exam_record, submit_cmd):
         ExamRecordRepository.update_end_time(exam_record)
     except TimeoutError:
         # 任务提交超时等
-        exam_record.delete()
+        ExamRecordRepository.delete(exam_record)
         global_logger.error('Spark command submission timed out.')
         raise
     except OSError:
         # 权限不足等
-        exam_record.delete()
+        ExamRecordRepository.delete(exam_record)
         global_logger.error('Spark command submission permission denied.')
         raise
     except Exception:
-        exam_record.delete()
+        ExamRecordRepository.delete(exam_record)
         global_logger.error('During Spark command submission, known error occurred.')
         raise
     return exitcode, spark_output
