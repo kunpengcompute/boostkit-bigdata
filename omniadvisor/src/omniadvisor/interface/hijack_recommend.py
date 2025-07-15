@@ -99,6 +99,7 @@ def hijack_recommend(argv: list):
     :param argv: Spark执行命令字段
     """
     # 获取用户传入的Spark命令 并解析命令
+    global_logger.debug("Hijack input params: %s", argv)
     exec_attr, user_config = SparkCMDParser.parse_cmd(argv=argv)
     # 提取任务名字
     if 'name' not in exec_attr.keys():

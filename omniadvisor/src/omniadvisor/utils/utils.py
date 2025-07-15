@@ -23,7 +23,7 @@ def run_cmd(submit_cmd) -> Tuple[int, str]:
     kwargs = {
         'stdout': subprocess.PIPE,
         'stderr': subprocess.STDOUT,
-        'shell': True,
+        'shell': False,
         'text': True
     }
     result = subprocess.run(submit_cmd, **kwargs)
