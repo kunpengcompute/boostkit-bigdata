@@ -125,6 +125,61 @@ class ColumnarFuncSuite extends ColumnarSparkPlanTest {
     checkAnswer(res3, Seq(Row("2086-08-10 05:05:05", "2086-08-10")))
   }
 
+  test("Test concat_ws Function") {
+    spark.conf.set("spark.sql.optimizer.excludedRules", "org.apache.spark.sql.catalyst.optimizer.ConstantFolding")
+    val res1 = spark.sql("select concat_ws('--', 'aaa', 'bbb')")
+    assertOmniProjectHappened(res1)
+    checkAnswer(res1, Seq(Row("aaa--bbb")))
+
+    val res2 = spark.sql("select concat_ws('一一', '哈哈哈', '啦啦啦')")
+    assertOmniProjectHappened(res2)
+    checkAnswer(res2, Seq(Row("哈哈哈一一啦啦啦")))
+  }
+
+  test("Test regexp Function") {
+    spark.conf.set("spark.sql.optimizer.excludedRules", "org.apache.spark.sql.catalyst.optimizer.ConstantFolding")
+    val res1 = spark.sql("select 'hello' regexp 'hel.o' as test1")
+    assertOmniProjectHappened(res1)
+    checkAnswer(res1, Seq(Row(true)))
+
+    val res2 = spark.sql("select 'aaa' regexp 'a{2,4}' as test2")
+    assertOmniProjectHappened(res2)
+    checkAnswer(res2, Seq(Row(true)))
+  }
+
+  test("Test regexp_replace Function") {
+    spark.conf.set("spark.sql.optimizer.excludedRules", "org.apache.spark.sql.catalyst.optimizer.ConstantFolding")
+    val res1 = spark.sql("select regexp_replace('abcabc', 'a', 'x')")
+    assertOmniProjectHappened(res1)
+    checkAnswer(res1, Seq(Row("xbcxbc")))
+
+    val res2 = spark.sql("select regexp_replace('你好世界', '好', '差')")
+    assertOmniProjectHappened(res2)
+    checkAnswer(res2, Seq(Row("你差世界")))
+  }
+
+  test("Test trim Function") {
+    spark.conf.set("spark.sql.optimizer.excludedRules", "org.apache.spark.sql.catalyst.optimizer.ConstantFolding")
+    val res1 = spark.sql("select trim('  hello       ')")
+    assertOmniProjectHappened(res1)
+    checkAnswer(res1, Seq(Row("hello")))
+
+    val res2 = spark.sql("select trim(both '空' from '空稀少珍稀空')")
+    assertOmniProjectHappened(res2)
+    checkAnswer(res2, Seq(Row("稀少珍稀")))
+  }
+
+  test("Test floor Function") {
+    spark.conf.set("spark.sql.optimizer.excludedRules", "org.apache.spark.sql.catalyst.optimizer.ConstantFolding")
+    val res1 = spark.sql("select floor(1.9)")
+    assertOmniProjectHappened(res1)
+    checkAnswer(res1, Seq(Row(1L)))
+
+    val res2 = spark.sql("select floor(-1.9)")
+    assertOmniProjectHappened(res2)
+    checkAnswer(res2, Seq(Row(-2L)))
+  }
+
   private def assertOmniProjectHappened(res: DataFrame) = {
     val executedPlan = res.queryExecution.executedPlan
     assert(executedPlan.find(_.isInstanceOf[ColumnarProjectExec]).isDefined, s"ColumnarProjectExec not happened, executedPlan as follows： \n$executedPlan")
