@@ -397,6 +397,10 @@ object OmniExpressionAdaptor extends Logging {
 
       case concat: Concat =>
         getConcatJsonStr(concat, exprsIndexMap)
+
+      case concatWs: ConcatWs =>
+        getConcatWsJsonStr(concatWs, exprsIndexMap)
+
       case greatest: Greatest =>
         getGreatestJsonStr(greatest, exprsIndexMap)
 
@@ -523,6 +527,18 @@ object OmniExpressionAdaptor extends Logging {
             }
         }
 
+      case regExpReplace: RegExpReplace =>
+        getRegExpReplaceStr(regExpReplace, exprsIndexMap)
+
+      case trim: StringTrim =>
+        getTrimStr(trim, exprsIndexMap)
+
+      case floor: Floor =>
+        new JsonObject().put("exprType", "FUNCTION")
+          .addOmniExpJsonType("returnType", floor.dataType)
+          .put("function_name", "floor")
+          .put("arguments", new JsonArray().put(rewriteToOmniJsonExpressionLiteralJsonObject(floor.child, exprsIndexMap)))
+
       case _ =>
         val jsonObj = ModifyUtilAdaptor.rewriteToOmniJsonExpression(expr, exprsIndexMap, returnDatatype, rewriteToOmniJsonExpressionLiteralJsonObject)
         if (jsonObj != null) {
@@ -538,6 +554,34 @@ object OmniExpressionAdaptor extends Logging {
         }
         throw new UnsupportedOperationException(s"Unsupported expression: $expr")
     }
+  }
+
+  private def getRegExpReplaceStr(regExpReplace: RegExpReplace, exprsIndexMap: Map[ExprId, Int]): JsonObject = {
+    val children: Seq[Expression] = regExpReplace.children
+    val arguments = new JsonArray()
+    for (i <- children.indices) {
+      arguments.put(rewriteToOmniJsonExpressionLiteralJsonObject(children(i), exprsIndexMap))
+    }
+    new JsonObject().put("exprType", "FUNCTION")
+      .addOmniExpJsonType("returnType", regExpReplace.dataType)
+      .put("function_name", "regexpReplace")
+      .put("arguments", arguments)
+  }
+
+  private def getTrimStr(trim: StringTrim, exprsIndexMap: Map[ExprId, Int]): JsonObject = {
+    val children: Seq[Expression] = trim.children
+    val arguments = new JsonArray()
+    arguments.put(rewriteToOmniJsonExpressionLiteralJsonObject(children.head, exprsIndexMap))
+    if (children.size == 1) {
+      arguments.put(new JsonObject().put("exprType", "LITERAL").put("dataType", 15).put("isNull", false)
+        .put("value", " ").put("width", 1))
+    } else {
+      arguments.put(rewriteToOmniJsonExpressionLiteralJsonObject(children(1), exprsIndexMap))
+    }
+    new JsonObject().put("exprType", "FUNCTION")
+      .addOmniExpJsonType("returnType", trim.dataType)
+      .put("function_name", "trim")
+      .put("arguments", arguments)
   }
 
   private def getJsonExprArgumentsByChildren(children: Seq[Expression],
@@ -580,6 +624,39 @@ object OmniExpressionAdaptor extends Logging {
         .put(rewriteToOmniJsonExpressionLiteralJsonObject(children(i), exprsIndexMap)))
     }
     res
+  }
+
+  private def getConcatWsJsonStr(concatWs: ConcatWs, exprsIndexMap: Map[ExprId, Int]): JsonObject = {
+    val children: Seq[Expression] = concatWs.children
+    checkInputDataTypes(children)
+
+    val separator = rewriteToOmniJsonExpressionLiteralJsonObject(children.head, exprsIndexMap)
+    val res = new JsonObject().put("exprType", "FUNCTION")
+      .addOmniExpJsonType("returnType", concatWs.dataType)
+      .put("function_name", "concatWs")
+    if (children.length == 1) {
+      res.put("arguments", new JsonArray().put(separator)
+        .put(createNullLiteralJson(concatWs.dataType))
+        .put(createNullLiteralJson(concatWs.dataType)))
+    } else if (children.length == 2) {
+      res.put("arguments", new JsonArray().put(separator)
+        .put(rewriteToOmniJsonExpressionLiteralJsonObject(children(1), exprsIndexMap))
+        .put(createNullLiteralJson(concatWs.dataType)))
+    } else {
+      res.put("arguments", new JsonArray().put(separator)
+        .put(rewriteToOmniJsonExpressionLiteralJsonObject(children(1), exprsIndexMap))
+        .put(rewriteToOmniJsonExpressionLiteralJsonObject(children(2), exprsIndexMap)))
+      for (i <- 3 until children.length) {
+        val preResJson = new JsonObject().addAll(res)
+        res.put("arguments", new JsonArray().put(separator).put(preResJson)
+          .put(rewriteToOmniJsonExpressionLiteralJsonObject(children(i), exprsIndexMap)))
+      }
+    }
+    res
+  }
+
+  private def createNullLiteralJson(dataType: DataType): JsonObject = {
+    new JsonObject().put("exprType", "LITERAL").addOmniExpJsonType("dataType", dataType).put("isNull", true)
   }
 
   private def getGreatestJsonStr(greatest: Greatest, exprsIndexMap: Map[ExprId, Int]): JsonObject = {
