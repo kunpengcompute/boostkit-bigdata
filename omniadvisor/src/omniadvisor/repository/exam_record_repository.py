@@ -37,17 +37,25 @@ class ExamRecordRepository(Repository):
     }
 
     @classmethod
-    def create(cls, load: Load, config: dict):
+    def create(cls, load: Load, config: dict, status: str, runtime: float, start_time: datetime, end_time: datetime):
         """
         指定负载、配置，新增测试记录
 
         :param load: 负载
         :param config: 参数配置
+        :param status: 执行状态
+        :param runtime: 执行用时
+        :param start_time: 任务开始时间
+        :param end_time: 任务结束时间
         :return: 测试记录实例
         """
         model_attr = {
             ExamRecord.FieldName.load: load.database_model,
             ExamRecord.FieldName.config: config,
+            ExamRecord.FieldName.status: status,
+            ExamRecord.FieldName.runtime: runtime,
+            ExamRecord.FieldName.start_time: start_time,
+            ExamRecord.FieldName.end_time: end_time
         }
         database_record = cls._create(model_attr=model_attr)
         return ExamRecord(database_model=database_record)
