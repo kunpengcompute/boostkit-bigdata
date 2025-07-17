@@ -63,6 +63,7 @@ class OmniAdvisorConf:
         all = [success, fail, running]
 
     exec_fail_return_runtime = float('inf')
+    exec_fail_return_app_id = ''
     exec_fail_return_trace = dict()
 
     # 调优算法

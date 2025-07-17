@@ -87,6 +87,7 @@ class TestSparkRun:
             runtime=self.mock_exec_result.duration,
             start_time=self.mock_exec_result.start_time,
             end_time=self.mock_exec_result.end_time,
+            app_id=self.mock_exec_result.app_id
         )
         mock_multiprocess.assert_called_once()
         mock_process.start.assert_called_once()
@@ -124,5 +125,6 @@ class TestSparkRun:
             runtime=OA_CONF.exec_fail_return_runtime,
             start_time=self.mock_exec_result.start_time,
             end_time=self.mock_exec_result.end_time,
+            app_id=OA_CONF.exec_fail_return_app_id
         )
         mock_multiprocess.assert_not_called()

@@ -1,5 +1,5 @@
 from server.app.models import DatabaseExamRecord
-from omniadvisor.repository.model.load import Load
+from omniadvisor.repository.model.tuning_record import TuningRecord
 
 
 class ExamRecord:
@@ -14,18 +14,23 @@ class ExamRecord:
         :param database_model: 数据库测试记录实例
         """
         self._database_model = database_model
+        self._tuning_record = TuningRecord(database_model=self._database_model.tuning_record)
 
     @property
     def id(self):
         return self._database_model.id
 
     @property
+    def tuning_record(self):
+        return self._tuning_record
+
+    @property
     def load(self):
-        return Load(database_model=self._database_model.load)
+        return self._tuning_record.load
 
     @property
     def config(self):
-        return self._database_model.config
+        return self._tuning_record.config
 
     @property
     def start_time(self):
@@ -44,6 +49,10 @@ class ExamRecord:
         return self._database_model.runtime
 
     @property
+    def app_id(self):
+        return self._database_model.app_id
+
+    @property
     def trace(self):
         return self._database_model.trace
 
@@ -53,10 +62,10 @@ class ExamRecord:
 
     class FieldName:
         id = 'id'
-        load = 'load'
-        config = 'config'
+        tuning_record = 'tuning_record'
         start_time = 'start_time'
         end_time = 'end_time'
         status = 'status'
         runtime = 'runtime'
+        app_id = 'app_id'
         trace = 'trace'

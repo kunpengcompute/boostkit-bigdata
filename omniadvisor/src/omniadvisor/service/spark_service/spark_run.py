@@ -47,19 +47,24 @@ def spark_run(load: Load, conf: dict):
     if exec_result.exitcode == 0:
         global_logger.info('Spark Load %d execute success, runtime: %.3f', load.id, exec_result.duration)
         exam_record_status = OA_CONF.ExecStatus.success
+        exam_record_runtime = exec_result.duration
+        exam_record_app_id = exec_result.app_id
     else:
         global_logger.warning('Spark Load %d execute failed, return code: %d, error code describe: %s', load.id,
                               exec_result.exitcode, _RETURN_CODE_MAP.get(exec_result.exitcode, 'Abnormal exit code'))
         exam_record_status = OA_CONF.ExecStatus.fail
+        exam_record_runtime = OA_CONF.exec_fail_return_runtime
+        exam_record_app_id = OA_CONF.exec_fail_return_app_id
 
     # 构建测试记录
     exam_record = ExamRecordRepository.create(
         load=load,
         config=conf,
         status=exam_record_status,
-        runtime=exec_result.duration,
+        runtime=exam_record_runtime,
         start_time=exec_result.start_time,
         end_time=exec_result.end_time,
+        app_id=exam_record_app_id
     )
 
     if exec_result.exitcode == 0:
@@ -112,4 +117,4 @@ def _update_trace_from_history_server(exam_record: ExamRecord, application_id: s
         global_logger.error(f'Failed to get App %s trace from %s', application_id, history_server_url)
         return
 
-    ExamRecordRepository.update_exam_result(exam_record, trace=trace_dict)
+    ExamRecordRepository.update_trace(exam_record, trace=trace_dict)
