@@ -530,9 +530,6 @@ object OmniExpressionAdaptor extends Logging {
       case regExpReplace: RegExpReplace =>
         getRegExpReplaceStr(regExpReplace, exprsIndexMap)
 
-      case trim: StringTrim =>
-        getTrimStr(trim, exprsIndexMap)
-
       case floor: Floor =>
         new JsonObject().put("exprType", "FUNCTION")
           .addOmniExpJsonType("returnType", floor.dataType)
