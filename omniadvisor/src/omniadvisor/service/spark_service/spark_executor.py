@@ -32,7 +32,8 @@ class SparkExecutor:
         :return:
         """
         if timeout:
-            cmd_fields = ['timeout', timeout] + cmd_fields
+            # 命令列表需全为str类型
+            cmd_fields = ['timeout', str(timeout)] + cmd_fields
 
         start_time = datetime.now()
         try:

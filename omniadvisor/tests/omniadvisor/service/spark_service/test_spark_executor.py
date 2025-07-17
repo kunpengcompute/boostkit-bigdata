@@ -40,7 +40,7 @@ class TestSparkExecutor:
         exec_result = self.spark_executor.submit_spark_task(cmd_fields=self.cmd_fields, timeout=self.timeout)
 
         # 验证结果
-        mock_run_cmd.assert_called_once_with(cmd_fields=['timeout', self.timeout] + self.cmd_fields)
+        mock_run_cmd.assert_called_once_with(cmd_fields=['timeout', str(self.timeout)] + self.cmd_fields)
         assert exec_result.exitcode == self.exitcode
         assert exec_result.output == self.output
         assert exec_result.app_id == self.application_id
