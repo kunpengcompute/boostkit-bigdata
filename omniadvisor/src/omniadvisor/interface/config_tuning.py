@@ -1,11 +1,11 @@
 import argparse
+import signal
 
 from algo.expert.tuning import ExpertTuning
 from algo.iterative.tuning import SmacAppendTuning
 from algo.native.tuning import NativeTuning
 from algo.transfer.tuning import TransferTuning
 from common.constant import OA_CONF
-
 from omniadvisor.repository.model.load import Load
 from omniadvisor.repository.load_repository import LoadRepository
 from omniadvisor.repository.tuning_record_repository import TuningRecordRepository
@@ -18,7 +18,6 @@ from omniadvisor.service.tuning_result.tuning_result_history import (
     get_tuning_result_history,
     get_other_tuning_result_history
 )
-
 from omniadvisor.utils.logger import global_logger
 from omniadvisor.utils.utils import float_format
 
@@ -26,6 +25,13 @@ from omniadvisor.utils.utils import float_format
 # 异常类暂时用于当前模块，没必要放到公共里
 class NoOptimalConfigError(Exception):
     """仅用于调优模块的异常"""
+    pass
+
+
+def handler():
+    """
+    用于注册异常退出信号
+    """
     pass
 
 
@@ -58,8 +64,7 @@ def unified_tuning(load, retest_way: str, tuning_method: str):
     :param tuning_method: 算法的类型
     :return:
     """
-    if not load:
-        raise ValueError("Invalid load: configuration cannot be loaded")
+    signal.signal(signal.SIGTERM, handler)
 
     method_extend, next_config = _get_next_config(load, tuning_method)
 
@@ -81,7 +86,7 @@ def unified_tuning(load, retest_way: str, tuning_method: str):
         global_logger.info("The way of retest is backend, going to retest the config from tuning……")
         try:
             retest(load, next_config)
-        except Exception:
+        except (Exception, KeyboardInterrupt, SystemExit):
             # 如果之前发生错误，状态被置为running，此调优配置不可能再被复测，那么删除对应的exam_records、tuning_record
             global_logger.info('Retest process did not complete normally. Please check the detailed logs for more '
                                'information. Remove tuning results.')
@@ -144,7 +149,7 @@ def _get_next_config(load: Load, tuning_method: str):
     return method_extend, next_config
 
 
-def _pre_check(load_id):
+def _query_and_check_load(load_id):
     """
     前置检查
     :param load_id:
@@ -169,33 +174,37 @@ def main():
     """
     args = _parse_tuning_args()
 
-    # 前台复测需要指定调优方法，否则
-    if args.retest_way == OA_CONF.RetestWay.hijacking and not args.tuning_method:
-        global_logger.info('When using retest way \'hijacking\', param --tuning-method is needed.')
-        return
-
     # 检查load 是否存在以及是否需要调优
-    load = _pre_check(args.load_id)
+    load = _query_and_check_load(args.load_id)
     if not load:
         return
 
-    # 查询上一次调优的所推送的配置是否完成复测流程 如果满足以下所有条件，则提示无法调优并退出：
-    # 1. 存在最近的调优结果
-    # 2. 调优方法不是用户配置(用户配置无需复测)
-    # 3. 调优结果状态仍在运行中(复测中)
+    # 前台复测
+    # 1. 必须指定调优方法
+    # 2. 若负载存在test_config，则说明有配置在前台调优流程中，退出
+    if args.retest_way == OA_CONF.RetestWay.hijacking:
+        if not args.tuning_method:
+            global_logger.info('When using retest way \'hijacking\', param --tuning-method is needed.')
+            return
+        if load.test_config:
+            global_logger.info('There is a config in hijacking retest, please try another load.')
+            return
+        unified_tuning(load=load, retest_way=args.retest_way, tuning_method=args.tuning_method)
 
-    if args.tuning_method or args.retest_way == OA_CONF.RetestWay.hijacking:
-        unified_tuning(load, args.retest_way, args.tuning_method)
-        return
-
-    # 当且仅当后台复测，且未指定调优方法时，会连续拉起调优
-    for tuning_strategy in OA_CONF.tuning_strategies:
-        tuning_method = tuning_strategy[0]
-        tuning_times = tuning_strategy[1]
-        for _ in range(tuning_times):
-            try:
-                unified_tuning(load, args.retest_way, tuning_method)
-            except NoOptimalConfigError as e:
-                global_logger.warning(e)
-                global_logger.info('No config found in the loop of tuning strategy, trying next method.')
-                break
+    # 后台复测
+    # 1. 若指定调优方法，则执行一轮调优；若不指定，则进入连续调优策略
+    # 2. 不做调优冲突判断，若推荐相同配置，则退出
+    elif args.retest_way == OA_CONF.RetestWay.backend:
+        if args.tuning_method:
+            unified_tuning(load=load, retest_way=args.retest_way, tuning_method=args.tuning_method)
+        else:
+            for tuning_strategy in OA_CONF.tuning_strategies:
+                tuning_method = tuning_strategy[0]
+                tuning_times = tuning_strategy[1]
+                for _ in range(tuning_times):
+                    try:
+                        unified_tuning(load, args.retest_way, tuning_method)
+                    except NoOptimalConfigError as e:
+                        global_logger.warning(e)
+                        global_logger.info('No config found in the loop of tuning strategy, trying next method.')
+                        break
