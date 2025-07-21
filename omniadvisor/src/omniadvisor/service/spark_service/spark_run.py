@@ -24,19 +24,20 @@ _RETURN_CODE_MAP = {
 }
 
 
-def spark_run(load: Load, conf: dict):
+def spark_run(load: Load, config: dict, wait_for_trace: bool = False):
     """
     输入负载与配置，执行Spark任务
 
     :param load: 负载
-    :param conf: 参数配置
+    :param config: 参数配置
+    :param wait_for_trace: 是否阻塞等待获取trace
     :return:
     """
     # 从解析后的参数列表中提取负载与任务的相关信息
-    submit_cmd = SparkCMDParser.reconstruct_cmd(exec_attr=load.exec_attr, conf_params=conf)
+    submit_cmd = SparkCMDParser.reconstruct_cmd(exec_attr=load.exec_attr, conf_params=config)
 
     # 判断当前执行配置是否为租户基线配置，若不相同则需设置超时时间
-    if conf != load.default_config:
+    if config != load.default_config:
         timeout = _calc_timeout_from_load(load=load)
     else:
         timeout = 0
@@ -59,7 +60,7 @@ def spark_run(load: Load, conf: dict):
     # 构建测试记录
     exam_record = ExamRecordRepository.create(
         load=load,
-        config=conf,
+        config=config,
         status=exam_record_status,
         runtime=exam_record_runtime,
         start_time=exec_result.start_time,
@@ -68,11 +69,17 @@ def spark_run(load: Load, conf: dict):
     )
 
     if exec_result.exitcode == 0:
-        # 根据ApplicantID在子进程中获取Trace
-        global_logger.info('Going to fetch Spark execute trace in backend.')
-        p = multiprocessing.Process(target=_update_trace_from_history_server, args=(exam_record, exec_result.app_id))
-        p.daemon = False
-        p.start()
+        # 根据ApplicantID获取Trace
+        if wait_for_trace:
+            # 阻塞获取trace
+            global_logger.info('Going to fetch Spark execute trace, the process is blocking.')
+            _update_trace_from_history_server(exam_record=exam_record, application_id=exec_result.app_id)
+        else:
+            # 不阻塞获取trace，通过子进程进行获取
+            global_logger.info('Going to fetch Spark execute trace, the process is non-blocking.')
+            p = multiprocessing.Process(target=_update_trace_from_history_server, args=(exam_record, exec_result.app_id))
+            p.daemon = False
+            p.start()
 
     return exam_record, exec_result.output
 
