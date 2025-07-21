@@ -123,22 +123,22 @@ def _get_next_config(load: Load, tuning_method: str):
     # AI迭代调优
     if tuning_method == OA_CONF.TuningMethod.iterative:
         global_logger.info("Use AI iterative optimization method to tuning.")
-        tuning = SmacAppendTuning(tuning_history=tuning_result_history.tuning_history)
+        tuning = SmacAppendTuning(tuning_history=tuning_result_history.to_tuning_data_list())
     # 专家规则调优
     elif tuning_method == OA_CONF.TuningMethod.expert:
         global_logger.info("Use expert rule optimization method to tuning.")
-        tuning = ExpertTuning(tuning_history=tuning_result_history.tuning_history)
+        tuning = ExpertTuning(tuning_history=tuning_result_history.to_tuning_data_list())
     # Native特性使能
     elif tuning_method == OA_CONF.TuningMethod.native:
         global_logger.info("Use native operator acceleration feature to tuning.")
-        tuning = NativeTuning(tuning_history=tuning_result_history.tuning_history)
+        tuning = NativeTuning(tuning_history=tuning_result_history.to_tuning_data_list())
     # 迁移泛化调优
     elif tuning_method == OA_CONF.TuningMethod.transfer:
         global_logger.info("Use migration generalization optimization method to tuning.")
         other_history = get_other_tuning_result_history(load)
         tuning = TransferTuning(
-            tuning_history=tuning_result_history.tuning_history,
-            other_histories=[other.tuning_history for other in other_history]
+            tuning_history=tuning_result_history.to_tuning_data_list(),
+            other_histories=[other.to_tuning_data_list() for other in other_history]
         )
     else:
         raise ValueError(f'Not supported tuning method: {tuning_method}')

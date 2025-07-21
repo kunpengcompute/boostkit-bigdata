@@ -1,6 +1,9 @@
+from dataclasses import dataclass
 from typing import List
 
 from algo.common.model import TuningData, Trace
+from django.contrib.messages import success
+
 from common.constant import OA_CONF
 from omniadvisor.repository.model.load import Load
 from omniadvisor.repository.model.tuning_record import TuningRecord
@@ -68,6 +71,20 @@ class TuningResult:
         self._tuning_record = tuning_record
         self._exam_records = exam_records if exam_records is not None else []
 
+        @dataclass
+        class ExamCount:
+            total: int
+            completed: int
+            success: int
+            failed: int
+
+        self._exam_count = ExamCount(
+            total=len(self._exam_records),
+            completed=sum([exam_record.status != OA_CONF.ExecStatus.running for exam_record in self._exam_records]),
+            success=sum([exam_record.status == OA_CONF.ExecStatus.success for exam_record in self._exam_records]),
+            failed=sum([exam_record.status == OA_CONF.ExecStatus.fail for exam_record in self._exam_records])
+        )
+
     @property
     def config(self):
         return self._tuning_record.config
@@ -86,36 +103,30 @@ class TuningResult:
 
     @property
     def exam_count(self):
-        return len(self._exam_records)
-
-    @property
-    def failed_count(self):
-        return sum([exam_record.status == OA_CONF.ExecStatus.fail for exam_record in self._exam_records])
-
-    @property
-    def completed_count(self):
-        return sum([exam_record.status != OA_CONF.ExecStatus.running for exam_record in self._exam_records])
+        return self._exam_count
 
     @property
     def status(self):
         """
-        对于tuning result 定义三种状态
+        对于 tuning result 定义四种状态
         成功：达到指定复测次数，并且失败次数没有超过阈值，这种情况下，对这个配置的复测流程已结束
         失败：失败的次数超过阈值，就失败了，对这个配置的复测流程已结束
         复测中：复测次数小于指定复测次数，且失败次数没有超过阈值，复测流程尚在进行中
-        :return:
+        空置: 复测次数为0，即还未完成一次复测
         """
-        if self.failed_count >= OA_CONF.config_fail_threshold:
-            overall_status = OA_CONF.ExecStatus.fail
-        elif self.completed_count >= OA_CONF.tuning_retest_times:
-            overall_status = OA_CONF.ExecStatus.success
+        if self.exam_count.failed >= OA_CONF.config_fail_threshold:
+            return OA_CONF.ResultStatus.fail
+
+        if self.exam_count.completed == 0:
+            return OA_CONF.ResultStatus.empty
+        elif self.exam_count.completed < OA_CONF.tuning_retest_times:
+            return OA_CONF.ResultStatus.running
         else:
-            overall_status = OA_CONF.ExecStatus.running
-        return overall_status
+            return OA_CONF.ResultStatus.success
 
     @property
     def runtime(self):
-        if self.status == OA_CONF.ExecStatus.fail:
+        if self.status == OA_CONF.ResultStatus.fail:
             return OA_CONF.exec_fail_return_runtime
 
         # 计算执行状态为success的平均runtime
@@ -132,7 +143,7 @@ class TuningResult:
 
     @property
     def trace(self):
-        if self.status == OA_CONF.ExecStatus.fail:
+        if self.status == OA_CONF.ResultStatus.fail:
             return OA_CONF.exec_fail_return_trace
 
         success_exam_results = [
@@ -155,7 +166,11 @@ class TuningResult:
     def exam_records(self):
         return self._exam_records
 
-    def to_tuning(self) -> TuningData:
+    def to_tuning_data(self) -> TuningData:
+        """
+        将TuningResult转为TuningData类型，用于调优
+        :return:
+        """
         if self.trace is not None:
             trace = Trace(stages_with_summaries=self.trace.get('stages'), sql=self.trace.get('sql'))
         else:

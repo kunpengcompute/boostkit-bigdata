@@ -35,6 +35,6 @@ def retest(load: Load, config: dict):
             # 若是出现异常配置，也要退出
             global_logger.warning('Retest failed in round %d. Exception source: Spark exception: %s.', i, spark_output)
             tuning_result = get_tuning_result(load, config)
-            if tuning_result.failed_count >= OA_CONF.config_fail_threshold:
+            if tuning_result.status == OA_CONF.ResultStatus.fail:
                 global_logger.info('The number of retest failures has reached the failure threshold.')
                 return
