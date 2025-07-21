@@ -1,6 +1,7 @@
 import sys
-from common.constant import OA_CONF
+import multiprocessing
 
+from common.constant import OA_CONF
 from omniadvisor.service.spark_service.spark_cmd_parser import SparkCMDParser
 from omniadvisor.repository.model.load import Load
 from omniadvisor.repository.load_repository import LoadRepository
@@ -63,33 +64,47 @@ def _get_exec_config_from_load(load: Load):
         return load.default_config
 
 
-def _process_load_config(load: Load):
+def _process_load_config(load: Load, config: dict):
     """
     1.检查当前负载中test_config是否完成复测流程
     2.根据复测情况判断是否需要清空load中的test_config
     3.根据测试性能判断是否需要刷新load中保存的best_config
     :param load: 本次测试用负载
+    :param config: 本次测试用配置
     :return:
     """
     # 获取测试配置的调优结果
-    tuning_result = get_tuning_result(load, load.test_config)
+    tuning_result = get_tuning_result(load=load, config=config)
 
-    # 测试配置执行成功
-    if tuning_result.status == OA_CONF.ExecStatus.fail:
-        LoadRepository.update_test_config(load, {})
-    # 测试配置执行失败
-    elif tuning_result.status == OA_CONF.ExecStatus.success:
-        tuning_result_history = get_tuning_result_history(load=load)
-        # 更新最优配置
-        tuning_result_history.refresh_best_config()
-        global_logger.info(
-            'Current tuning result: %s, best tuning result ever: %s, best tuning speedup: %s %%',
-            float_format(tuning_result.runtime),
-            float_format(tuning_result_history.best_tuning_result.runtime),
-            float_format(tuning_result_history.boost_percentage)
-        )
-        # 当前test_config达到调优轮次后 置空test_config
-        LoadRepository.update_test_config(load, {})
+    if config == load.best_config:
+        if tuning_result.status == OA_CONF.ResultStatus.fail:
+            # 最优配置回滚
+            tuning_result_history = get_tuning_result_history(load=load)
+            tuning_result_history.refresh_best_config()
+            global_logger.info('Best config of load failed too much, roll back to next best config.')
+        else:
+            pass
+
+    elif config == load.test_config:
+        # 测试配置执行失败
+        if tuning_result.status == OA_CONF.ExecStatus.fail:
+            # 清空test_config
+            LoadRepository.update_test_config(load=load, test_config=OA_CONF.empty_config)
+        # 测试配置执行成功
+        elif tuning_result.status == OA_CONF.ExecStatus.success:
+            # 清空test_config
+            LoadRepository.update_test_config(load=load, test_config=OA_CONF.empty_config)
+            # 更新最优配置
+            tuning_result_history = get_tuning_result_history(load=load)
+            tuning_result_history.refresh_best_config()
+            global_logger.info(
+                'Current tuning result: %s, best tuning result ever: %s, best tuning speedup: %s %%',
+                float_format(tuning_result.runtime),
+                float_format(tuning_result_history.best_tuning_result.runtime),
+                float_format(tuning_result_history.boost_percentage)
+            )
+        else:
+            pass
 
 
 def hijack_recommend(argv: list):
@@ -131,8 +146,11 @@ def hijack_recommend(argv: list):
             global_logger.warning("Spark execute failed in user config, going to print Spark output.")
             print(output, end="", flush=True)
 
-    if exec_config == load.test_config:
-        _process_load_config(load=load)
+    if exec_config != load.default_config:
+        # 创建子进程处理负载配置，不阻塞
+        p = multiprocessing.Process(target=_process_load_config, args=(load, exec_config))
+        p.daemon = False
+        p.start()
 
 
 def main():

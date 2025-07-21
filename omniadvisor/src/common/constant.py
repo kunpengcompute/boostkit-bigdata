@@ -70,6 +70,7 @@ class OmniAdvisorConf:
         running = 'Running'
         all = [empty, success, fail, running]
 
+    empty_config = dict()
     exec_fail_return_runtime = float('inf')
     exec_fail_return_app_id = ''
     exec_fail_return_trace = dict()
