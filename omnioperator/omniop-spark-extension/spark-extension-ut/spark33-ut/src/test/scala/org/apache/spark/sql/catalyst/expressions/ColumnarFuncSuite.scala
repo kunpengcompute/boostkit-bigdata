@@ -183,6 +183,17 @@ class ColumnarFuncSuite extends ColumnarSparkPlanTest {
     checkAnswer(res2, Seq(Row("你差世界")))
   }
 
+  test("Test trim Function") {
+    spark.conf.set("spark.sql.optimizer.excludedRules", "org.apache.spark.sql.catalyst.optimizer.ConstantFolding")
+    val res1 = spark.sql("select trim('  hello       ')")
+    assertOmniProjectHappened(res1)
+    checkAnswer(res1, Seq(Row("hello")))
+
+    val res2 = spark.sql("select trim(both '空' from '空稀少珍稀空')")
+    assertOmniProjectHappened(res2)
+    checkAnswer(res2, Seq(Row("稀少珍稀")))
+  }
+
   test("Test floor Function") {
     spark.conf.set("spark.sql.optimizer.excludedRules", "org.apache.spark.sql.catalyst.optimizer.ConstantFolding")
     val res1 = spark.sql("select floor(1.9)")
