@@ -6,6 +6,9 @@ class TestSparkCMDParser:
     """
     测试SparkCMDParser类的功能
     """
+    def test_validate_submit_argument(self):
+        pass
+
     # 测试命令解析
     # 场景 1: 标准参数 + conf 参数
     def test_parse_cmd_standard(self):

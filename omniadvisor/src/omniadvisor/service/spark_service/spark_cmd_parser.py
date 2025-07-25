@@ -4,6 +4,7 @@
 # Copyright (c) Huawei Technologies Co, Ltd. 2023-2023. All rights reserved.
 
 import argparse
+from typing import List
 
 from omniadvisor.utils.logger import global_logger
 
@@ -34,46 +35,75 @@ class SparkCMDParser:
     # 解析Spark CMD开头，需脚本配合
     _parser.add_argument(f'--{_CMD_PREFIX_KEY}', dest=_CMD_PREFIX_KEY,
                          help="The head of Spark CMD.")
-    # 解析Spark相关参数
-    _parser.add_argument('--master',
-                          help="spark://host:port, mesos://host:port, yarn, k8s://https://host:port, "
-                               "or local (Default: local[*]).")
+
+    # SparkSubmit Options 3.3.1
+    _parser.add_argument('--class', help="Your application's main class(for Java / Scala apps")
+    _parser.add_argument('--conf', action='append', help="Arbitrary Spark configuration property")
     _parser.add_argument('--deploy-mode', dest='deploy-mode',
                           help="Whether to launch the driver program locally (client) or on one of the worker "
                                "machines inside the cluster (cluster)(Default: client)")
-    _parser.add_argument('--class', help="Your application's main class(for Java / Scala apps")
+    _parser.add_argument('--driver-class-path', dest='driver-class-path')
+    _parser.add_argument('--driver-cores', dest='driver-cores')
+    _parser.add_argument('--driver-java-options', dest='driver-java-options')
+    _parser.add_argument('--driver-library-path', dest='driver-library-path')
+    _parser.add_argument('--driver-memory', dest='driver-memory')
+    _parser.add_argument('--executor-memory', dest='executor-memory')
+    _parser.add_argument('--files')
+    _parser.add_argument('--jars')  # TODO 这个入参和--jar有什么区别
+    _parser.add_argument('--kill', action='store_true') # TODO 这也是非SUBMIT相关的命令
+    _parser.add_argument('--master',
+                         help="spark://host:port, mesos://host:port, yarn, k8s://https://host:port, "
+                              "or local (Default: local[*]).")
     _parser.add_argument('--name', help="A name of your application")
-    _parser.add_argument('--jar')
     _parser.add_argument('--packages')
     _parser.add_argument('--exclude-packages', dest='exclude-packages')
-    _parser.add_argument('--repositories')
-    _parser.add_argument('--py-files', dest='py-files')
-    _parser.add_argument('--files')
-    _parser.add_argument('--archives')
-    _parser.add_argument('--conf', action='append', help="Arbitrary Spark configuration property")
-    _parser.add_argument('--driver-memory', dest='driver-memory')
-    _parser.add_argument('--driver-library-path', dest='driver-library-path')
-    _parser.add_argument('--driver-class-path', dest='driver-class-path')
-    _parser.add_argument('--executor-memory', dest='executor-memory')
     _parser.add_argument('--proxy-user', dest='proxy-user')
-    _parser.add_argument('--version')
-    _parser.add_argument('--driver-cores', dest='driver-cores')
+    _parser.add_argument('--py-files', dest='py-files')
+    _parser.add_argument('--repositories')
+    _parser.add_argument('--status', action='store_true') # TODO boolean
     _parser.add_argument('--total-executor-cores', dest='total-executor-cores')
+
+    # Options that do not take arguments boolean变量
+    _parser.add_argument('--help','-h', action='store_true')
+    _parser.add_argument('--supervise', action='store_true')
+    _parser.add_argument('--usage-error', action='store_true')
+    _parser.add_argument('--verbose', '-v', action='store_true')
+    _parser.add_argument('--version', action='store_true')
+
+    # YARN-only options
+    _parser.add_argument('--archives')
     _parser.add_argument('--executor-cores', dest='executor-cores')
+    _parser.add_argument('--keytab')
     _parser.add_argument('--num-executors', dest='num-executors')
     _parser.add_argument('--principal')
-    _parser.add_argument('--keytab')
     _parser.add_argument('--queue')
-    _parser.add_argument('-d', '--database')
+
+
+    # Spark Sql 相关选项
     # 支持对于--e这种形式的入参解析 但是--e为spark非官方用法 故在命令reconstruct的时候仍然使用-e的方式重建命令
     _parser.add_argument('-e', '--e', type=str, help='SQL statement to execute.')
     _parser.add_argument('-f', type=str, help='File containing SQL script.')
     _parser.add_argument('-i', help='Initialization SQL file')
-    # boolean变量
-    _parser.add_argument('--verbose', action='store_true')
-    _parser.add_argument('--supervise', action='store_true')
-    _parser.add_argument('--kill', action='store_true')
-    _parser.add_argument('--status', action='store_true')
+    _parser.add_argument('-d', '--database')
+
+    @classmethod
+    def validate_submit_arguments(cls, args: List) -> bool:
+        """
+        检查当前提交的spark-submit命令是否属于SUBMIT动作的spark命令
+        该函数与Spark 3.3.1源码中SparkSubmitArguments.scala文件中的validateSubmitArguments逻辑保持一致
+
+        :param args: 从spark-submit文件中劫持的入参列表
+        :return: 属于SUBMIT动作返回True 不属于SUBMIT动作返回False
+        """
+        if len(args) == 0:
+            raise ValueError("No arguments were provided. At least one argument is required.")
+
+        # 待检查参数列表
+        primary_resource = ""  # 其实主要就是去看这个primary_resource是从哪里拿到的 其他都是取值范围的限定 不需要我来做检查
+        params, unknown = cls._parser.parse_known_args(args=args)
+
+        if primary_resource is None:
+            return False
 
     @staticmethod
     def _normalize_value(value):
