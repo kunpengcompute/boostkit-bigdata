@@ -171,7 +171,7 @@ class TestHijackRecommend(unittest.TestCase):
         mock_get_tuning_result_history.return_value = mock_tuning_result_history
 
         # best_config执行失败场景
-        mock_tuning_result.status = OA_CONF.ResultStatus.fail
+        mock_tuning_result.status = OA_CONF.TuningResultStatus.fail
         _process_load_config(load=load, config=best_config)
         mock_update_test_config.assert_not_called()
         mock_tuning_result_history.refresh_best_config.assert_called_once()
@@ -179,7 +179,7 @@ class TestHijackRecommend(unittest.TestCase):
         # best_config执行成功场景
         mock_update_test_config.call_count = 0
         mock_tuning_result_history.refresh_best_config.call_count = 0
-        mock_tuning_result.status = OA_CONF.ResultStatus.success
+        mock_tuning_result.status = OA_CONF.TuningResultStatus.success
         _process_load_config(load=load, config=best_config)
         mock_update_test_config.assert_not_called()
         mock_tuning_result_history.refresh_best_config.assert_not_called()
@@ -187,7 +187,7 @@ class TestHijackRecommend(unittest.TestCase):
         # test_config复测失败场景
         mock_update_test_config.call_count = 0
         mock_tuning_result_history.refresh_best_config.call_count = 0
-        mock_tuning_result.status = OA_CONF.ResultStatus.fail
+        mock_tuning_result.status = OA_CONF.TuningResultStatus.fail
         _process_load_config(load=load, config=test_config)
         mock_update_test_config.assert_called_once()
         mock_tuning_result_history.refresh_best_config.assert_not_called()
@@ -195,7 +195,7 @@ class TestHijackRecommend(unittest.TestCase):
         # test_config复测成功场景
         mock_update_test_config.call_count = 0
         mock_tuning_result_history.refresh_best_config.call_count = 0
-        mock_tuning_result.status = OA_CONF.ResultStatus.success
+        mock_tuning_result.status = OA_CONF.TuningResultStatus.success
         _process_load_config(load=load, config=test_config)
         mock_update_test_config.assert_called_once()
         mock_tuning_result_history.refresh_best_config.assert_called_once()
@@ -203,7 +203,7 @@ class TestHijackRecommend(unittest.TestCase):
         # test_config复测未完毕场景
         mock_update_test_config.call_count = 0
         mock_tuning_result_history.refresh_best_config.call_count = 0
-        mock_tuning_result.status = OA_CONF.ResultStatus.running
+        mock_tuning_result.status = OA_CONF.TuningResultStatus.running
         _process_load_config(load=load, config=test_config)
         mock_update_test_config.assert_not_called()
         mock_tuning_result_history.refresh_best_config.assert_not_called()

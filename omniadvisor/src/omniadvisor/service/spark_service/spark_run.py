@@ -83,6 +83,7 @@ def spark_run(load: Load, config: dict, wait_for_trace: bool = False):
 
     return exam_record, exec_result.output
 
+
 def _calc_timeout_from_load(load: Load):
     """
     针对负载和配置，计算得到超时时间

@@ -144,5 +144,5 @@ class TuningResultHistory:
         """
         return [
             tuning_result.to_tuning_data()
-            for tuning_result in self._tuning_results if tuning_result.status != OA_CONF.ResultStatus.empty
+            for tuning_result in self._tuning_results if tuning_result.status != OA_CONF.TuningResultStatus.empty
         ]

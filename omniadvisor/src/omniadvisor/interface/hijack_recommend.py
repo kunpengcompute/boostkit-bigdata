@@ -77,7 +77,7 @@ def _process_load_config(load: Load, config: dict):
     tuning_result = get_tuning_result(load=load, config=config)
 
     if config == load.best_config:
-        if tuning_result.status == OA_CONF.ResultStatus.fail:
+        if tuning_result.status == OA_CONF.TuningResultStatus.fail:
             # 最优配置回滚
             tuning_result_history = get_tuning_result_history(load=load)
             tuning_result_history.refresh_best_config()
@@ -105,6 +105,9 @@ def _process_load_config(load: Load, config: dict):
             )
         else:
             pass
+
+    else:
+        pass
 
 
 def hijack_recommend(argv: list):

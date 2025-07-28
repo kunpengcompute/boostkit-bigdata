@@ -52,6 +52,14 @@ def remove_tuning_result(load: Load, config: dict):
     TuningRecordRepository.delete(tuning_result.tuning_record)
 
 
+@dataclass
+class _ExamCount:
+    total: int
+    completed: int
+    success: int
+    failed: int
+
+
 class TuningResult:
     """
     调优结果，汇总相同负载和配置下的调优记录和测试记录
@@ -71,14 +79,7 @@ class TuningResult:
         self._tuning_record = tuning_record
         self._exam_records = exam_records if exam_records is not None else []
 
-        @dataclass
-        class ExamCount:
-            total: int
-            completed: int
-            success: int
-            failed: int
-
-        self._exam_count = ExamCount(
+        self._exam_count = _ExamCount(
             total=len(self._exam_records),
             completed=sum([exam_record.status != OA_CONF.ExecStatus.running for exam_record in self._exam_records]),
             success=sum([exam_record.status == OA_CONF.ExecStatus.success for exam_record in self._exam_records]),
@@ -115,18 +116,18 @@ class TuningResult:
         空置: 复测次数为0，即还未完成一次复测
         """
         if self.exam_count.failed >= OA_CONF.config_fail_threshold:
-            return OA_CONF.ResultStatus.fail
+            return OA_CONF.TuningResultStatus.fail
 
         if self.exam_count.completed == 0:
-            return OA_CONF.ResultStatus.empty
+            return OA_CONF.TuningResultStatus.empty
         elif self.exam_count.completed < OA_CONF.tuning_retest_times:
-            return OA_CONF.ResultStatus.running
+            return OA_CONF.TuningResultStatus.running
         else:
-            return OA_CONF.ResultStatus.success
+            return OA_CONF.TuningResultStatus.success
 
     @property
     def runtime(self):
-        if self.status == OA_CONF.ResultStatus.fail:
+        if self.status == OA_CONF.TuningResultStatus.fail:
             return OA_CONF.exec_fail_return_runtime
 
         # 计算执行状态为success的平均runtime
@@ -143,7 +144,7 @@ class TuningResult:
 
     @property
     def trace(self):
-        if self.status == OA_CONF.ResultStatus.fail:
+        if self.status == OA_CONF.TuningResultStatus.fail:
             return OA_CONF.exec_fail_return_trace
 
         success_exam_results = [

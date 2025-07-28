@@ -63,7 +63,7 @@ class OmniAdvisorConf:
         all = [success, fail, running]
 
     # 调优结果状态
-    class ResultStatus:
+    class TuningResultStatus:
         empty = 'Empty'
         success = 'Success'
         fail = 'Fail'
