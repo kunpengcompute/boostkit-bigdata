@@ -19,5 +19,5 @@ class TuningRecordAdmin(admin.ModelAdmin):
 
 @admin.register(DatabaseExamRecord)
 class ExamRecordAdmin(admin.ModelAdmin):
-    list_display = ('id', 'load', 'config', 'start_time', 'end_time', 'status', 'runtime', 'trace')
+    list_display = ('id', 'tuning_record', 'start_time', 'end_time', 'status', 'runtime', 'app_id', 'trace')
     list_filter = ()

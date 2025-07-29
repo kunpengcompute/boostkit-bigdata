@@ -13,6 +13,7 @@ class TuningRecord:
         :param database_model: 数据库调优记录实例
         """
         self._database_model = database_model
+        self._load = Load(database_model=self._database_model.load)
 
     @property
     def id(self):
@@ -20,7 +21,7 @@ class TuningRecord:
 
     @property
     def load(self):
-        return Load(database_model=self._database_model.load)
+        return self._load
 
     @property
     def config(self):

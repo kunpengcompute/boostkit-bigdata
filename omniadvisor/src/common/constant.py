@@ -62,7 +62,17 @@ class OmniAdvisorConf:
         running = 'Running'
         all = [success, fail, running]
 
+    # 调优结果状态
+    class TuningResultStatus:
+        empty = 'Empty'
+        success = 'Success'
+        fail = 'Fail'
+        running = 'Running'
+        all = [empty, success, fail, running]
+
+    empty_config = dict()
     exec_fail_return_runtime = float('inf')
+    exec_fail_return_app_id = ''
     exec_fail_return_trace = dict()
 
     # 调优算法

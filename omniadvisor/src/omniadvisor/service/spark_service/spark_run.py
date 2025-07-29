@@ -14,115 +14,86 @@ from omniadvisor.utils.logger import global_logger
 from omniadvisor.utils.utils import save_trace_data
 
 
-CODE_MAP = {
+_RETURN_CODE_MAP = {
     0: "Success",
-    124: "timeout",
     1: "Spark SQL failed",
-    255: "Spark subprocess(eg. Excutor,external command) terminated abnormally.",
+    2: "CLI argument error",
+    124: "timeout",
     143: "Terminated by SIGTERM",
-    2: "CLI argument error"
+    255: "Spark subprocess(eg. Excutor,external command) terminated abnormally."
 }
 
 
-def spark_run(load: Load, conf: dict):
+def spark_run(load: Load, config: dict, wait_for_trace: bool = False):
     """
     输入负载与配置，执行Spark任务
 
     :param load: 负载
-    :param conf: 参数配置
+    :param config: 参数配置
+    :param wait_for_trace: 是否阻塞等待获取trace
     :return:
     """
     # 从解析后的参数列表中提取负载与任务的相关信息
-    submit_cmd = SparkCMDParser.reconstruct_cmd(exec_attr=load.exec_attr, conf_params=conf)
-    # 判断当前的conf是否和load.default_config相同 不相同则在submit_cmd前增加超时时间
-    if conf != load.default_config:
-        # 获取当前default_config的平均测试性能
-        baseline_results = get_tuning_result(load, load.default_config)
-        timeout_sec = OA_CONF.spark_exec_timeout_ratio * baseline_results.runtime
-        submit_cmd[:0] = ["timeout", str(timeout_sec)]
-    global_logger.debug(f"The submit cmd about to execute is: {submit_cmd}")
+    submit_cmd = SparkCMDParser.reconstruct_cmd(exec_attr=load.exec_attr, conf_params=config)
 
-    # 根据执行命令创建测试记录
-    exam_record = ExamRecordRepository.create(load, conf)
+    # 判断当前执行配置是否为租户基线配置，若不相同则需设置超时时间
+    if config != load.default_config:
+        timeout = _calc_timeout_from_load(load=load)
+    else:
+        timeout = 0
 
-    # 执行当前的submit_cmd
-    exitcode, spark_output = _submit_spark_task(exam_record, submit_cmd)
+    # 执行spark任务，并获得执行结果
+    global_logger.debug('Spark exec cmd is: %s, timeout is: %d', submit_cmd, timeout)
+    exec_result = SparkExecutor.submit_spark_task(cmd_fields=submit_cmd, timeout=timeout)
+    if exec_result.exitcode == 0:
+        global_logger.info('Spark Load %d execute success, runtime: %.3f', load.id, exec_result.duration)
+        exam_record_status = OA_CONF.ExecStatus.success
+        exam_record_runtime = exec_result.duration
+        exam_record_app_id = exec_result.app_id
+    else:
+        global_logger.warning('Spark Load %d execute failed, return code: %d, error code describe: %s', load.id,
+                              exec_result.exitcode, _RETURN_CODE_MAP.get(exec_result.exitcode, 'Abnormal exit code'))
+        exam_record_status = OA_CONF.ExecStatus.fail
+        exam_record_runtime = OA_CONF.exec_fail_return_runtime
+        exam_record_app_id = OA_CONF.exec_fail_return_app_id
 
-    # 不存在application_id的情况下不提取time_taken 直接返回
-    if exitcode != 0:
-        exitcode_describe = CODE_MAP.get(exitcode, "Abnormal exit code")
-        global_logger.warning(f"Spark Load %s did not exit normally and return a non-zero exit code {exitcode}"
-                              f", exitcode describe: %s", str(load.id), exitcode_describe)
-        global_logger.info(f"Update exam result, set the exam exec status to %s because of %s",
-                           OA_CONF.ExecStatus.fail, exitcode_describe)
-        try:
-            return ExamRecordRepository.update_exam_result(
-                exam_record=exam_record,
-                status=OA_CONF.ExecStatus.fail,
-                runtime=OA_CONF.exec_fail_return_runtime,
-                trace=OA_CONF.exec_fail_return_trace
-            ), spark_output
-        except RuntimeError:
-            global_logger.error('An error occurred when update exam record\'s status to %s', OA_CONF.ExecStatus.fail)
-            ExamRecordRepository.delete(exam_record)
-            raise
+    # 构建测试记录
+    exam_record = ExamRecordRepository.create(
+        load=load,
+        config=config,
+        status=exam_record_status,
+        runtime=exam_record_runtime,
+        start_time=exec_result.start_time,
+        end_time=exec_result.end_time,
+        app_id=exam_record_app_id
+    )
 
-    status = OA_CONF.ExecStatus.success
-    # 提取application_id与 time_taken(runtime)
-    try:
-        spark_submit_cmd, application_id, runtime = SparkExecutor.parser_spark_output(spark_output)
-    except Exception:
-        ExamRecordRepository.delete(exam_record)
-        global_logger.error('During parsing spark output, known error occurred.')
-        raise
+    if exec_result.exitcode == 0:
+        # 根据ApplicantID获取Trace
+        if wait_for_trace:
+            # 阻塞获取trace
+            global_logger.info('Going to fetch Spark execute trace, the process is blocking.')
+            _update_trace_from_history_server(exam_record=exam_record, application_id=exec_result.app_id)
+        else:
+            # 不阻塞获取trace，通过子进程进行获取
+            global_logger.info('Going to fetch Spark execute trace, the process is non-blocking.')
+            p = multiprocessing.Process(target=_update_trace_from_history_server, args=(exam_record, exec_result.app_id))
+            p.daemon = False
+            p.start()
 
-    try:
-        global_logger.info(f"Spark Load {load.id} execute success, runtime: {runtime}, update the exam result.")
-        exam_record = ExamRecordRepository.update_exam_result(
-            exam_record=exam_record,
-            status=status,
-            runtime=runtime
-        )
-    except RuntimeError:
-        global_logger.error('An error occurred when update exam record\'s status to %s', OA_CONF.ExecStatus.fail)
-        ExamRecordRepository.delete(exam_record)
-        raise
-
-    # 根据ApplicantID在子进程中获取Trace
-    global_logger.info(f"Going to fetch Spark execute trace in backend.")
-    p = multiprocessing.Process(target=_update_trace_from_history_server, args=(exam_record, application_id))
-    p.daemon = False
-    p.start()
-
-    return exam_record, spark_output
+    return exam_record, exec_result.output
 
 
-def _submit_spark_task(exam_record, submit_cmd):
+def _calc_timeout_from_load(load: Load):
     """
-    提交spark任务
-    :param exam_record: 测试记录
-    :param submit_cmd: 命令
+    针对负载和配置，计算得到超时时间
+
+    :param load: 负载
     :return:
     """
-    try:
-        ExamRecordRepository.update_start_time(exam_record)
-        exitcode, spark_output = SparkExecutor.submit_spark_task(submit_cmd)
-        ExamRecordRepository.update_end_time(exam_record)
-    except TimeoutError:
-        # 任务提交超时等
-        ExamRecordRepository.delete(exam_record)
-        global_logger.error('Spark command submission timed out.')
-        raise
-    except OSError:
-        # 权限不足等
-        ExamRecordRepository.delete(exam_record)
-        global_logger.error('Spark command submission permission denied.')
-        raise
-    except Exception:
-        ExamRecordRepository.delete(exam_record)
-        global_logger.error('During Spark command submission, known error occurred.')
-        raise
-    return exitcode, spark_output
+    # 超时时间为基线执行用时的倍数
+    baseline_result = get_tuning_result(load=load, config=load.default_config)
+    return int(OA_CONF.spark_exec_timeout_ratio * baseline_result.runtime)
 
 
 def _update_trace_from_history_server(exam_record: ExamRecord, application_id: str):
@@ -154,4 +125,4 @@ def _update_trace_from_history_server(exam_record: ExamRecord, application_id: s
         global_logger.error(f'Failed to get App %s trace from %s', application_id, history_server_url)
         return
 
-    ExamRecordRepository.update_exam_result(exam_record, trace=trace_dict)
+    ExamRecordRepository.update_trace(exam_record, trace=trace_dict)

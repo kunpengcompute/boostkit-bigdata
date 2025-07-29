@@ -8,25 +8,23 @@ from common.constant import OmniAdvisorConf
 from omniadvisor.utils.logger import global_logger
 
 
-def run_cmd(submit_cmd) -> Tuple[int, str]:
+def run_cmd(cmd_fields: list) -> Tuple[int, str]:
     """
     在shell终端执行命令，并返回执行结果。
 
-    :param submit_cmd: 需要执行的命令。
-    :type submit_cmd: str
+    :param cmd_fields: 需要执行的命令字段List
     :return: 返回一个包含退出状态码和命令输出的元组。
              第一个元素是整数类型的退出状态码（0表示成功），
              第二个元素是一个保存在列表中的字符串 ["xxxx"]
-    :rtype: Tuple[int, str]
     """
-    global_logger.debug(f"Executor system command: {submit_cmd}")
+    global_logger.debug(f"Executor system command: {cmd_fields}")
     kwargs = {
         'stdout': subprocess.PIPE,
         'stderr': subprocess.STDOUT,
         'shell': False,
         'text': True
     }
-    result = subprocess.run(submit_cmd, **kwargs)
+    result = subprocess.run(cmd_fields, **kwargs)
     return result.returncode, result.stdout
 
 
