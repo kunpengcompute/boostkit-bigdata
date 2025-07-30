@@ -108,12 +108,12 @@ class SparkCMDParser:
     @staticmethod
     def _normalize_value(value):
         """
-        对spark-sql命令解析出来的value做标准化处理，对所有value的值使用单引号包裹进行强引用，维持字符串字面量的原义
+        对spark-sql命令解析出来的value做标准化处理
 
         :param value: 原始命令解析出的value
         :return: 标准化的value
         """
-        return f"'{value}'"
+        return value
 
     @staticmethod
     def _append_double_dash_args(cls, key, value):
@@ -175,20 +175,21 @@ class SparkCMDParser:
         return exec_attr, conf_params
 
     @classmethod
-    def reconstruct_cmd(cls, exec_attr: dict, conf_params: dict):
+    def reconstruct_cmd(cls, exec_attr: dict, conf_params: dict) -> list:
         """
         根据执行属性和参数配置，重组命令
 
         :param exec_attr: 执行属性
         :param conf_params: 参数配置
-        :return:
+        :return: cmd_fields 参数列表
         """
         cmd_fields = list()
 
         # 处理命令行开头
         if _CMD_PREFIX_KEY not in exec_attr:
             raise ValueError(f"Cmd prefix key is not in exec_attr!")
-        cmd_fields += [exec_attr.get(_CMD_PREFIX_KEY)]
+        # 把${SPARK_HOME}/bin/spark-class org.apache.spark.deploy.SparkSubmit通过空格拆分成含有两个元素的参数列表
+        cmd_fields += exec_attr.get(_CMD_PREFIX_KEY).split(" ")
 
         # 处理执行属性
         for key, value in exec_attr.items():
@@ -208,5 +209,5 @@ class SparkCMDParser:
         for key, value in conf_params.items():
             cmd_fields += ['--conf', f'{key}={cls._normalize_value(value)}']
 
-        cmd = ' '.join(cmd_fields)
-        return cmd
+        global_logger.debug("cmd_fields = %s", cmd_fields)
+        return cmd_fields

@@ -93,14 +93,10 @@ class TestSparkCMDParser:
 
         cmd = SparkCMDParser.reconstruct_cmd(exec_attr, conf_params)
 
-        assert cmd.startswith(exec_attr['omniadvisor-cmd-prefix'])
-        assert "--master 'yarn'" in cmd
-        assert "--name 'test_app'" in cmd
-        assert "-e 'SELECT * FROM table'" in cmd
-        assert "'--unknown1' 'test'" in cmd
-        assert "'-uk' 'test'" in cmd
-        assert "--conf spark.executor.memory='4g'" in cmd
-        assert "--conf spark.driver.extraJavaOptions='-XX:+UseG1GC -XX:+UseG1GC'" in cmd
+        assert exec_attr['omniadvisor-cmd-prefix'] == cmd[0]
+        assert "SELECT * FROM table" in cmd
+        assert "spark.executor.memory=4g" in cmd
+        assert "spark.driver.extraJavaOptions=-XX:+UseG1GC -XX:+UseG1GC" in cmd
 
     # 场景 2: 缺少前缀字段抛异常
     def test_reconstruct_cmd_missing_prefix(self):
@@ -126,7 +122,7 @@ class TestSparkCMDParser:
 
         assert "--extra" in cmd
         assert "arg" in cmd
-        assert "--conf spark.executor.instances='4'" in cmd
+        assert "spark.executor.instances=4" in cmd
 
     # 场景 3: 包含 boolean 参数
     def test_reconstruct_cmd_with_boolean(self):
@@ -137,7 +133,7 @@ class TestSparkCMDParser:
             "verbose": True,
             "supervise": True,
             "kill": True,
-            "status": True
+            "status": False
         }
         conf_params = {
             "spark.executor.instances": "4"
@@ -146,9 +142,9 @@ class TestSparkCMDParser:
 
         assert "--extra" in cmd
         assert "arg" in cmd
-        assert "--conf spark.executor.instances='4'" in cmd
-        assert "verbose" in cmd
-        assert "supervise" in cmd
-        assert "kill" in cmd
-        assert "status" in cmd
+        assert "spark.executor.instances=4" in cmd
+        assert "--verbose" in cmd
+        assert "--supervise" in cmd
+        assert "--kill" in cmd
+        assert "--status" not in cmd
 

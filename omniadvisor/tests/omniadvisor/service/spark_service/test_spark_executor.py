@@ -1,68 +1,80 @@
+import pytest
 from unittest.mock import patch
+from datetime import datetime
 
-from common.constant import OA_CONF
 from omniadvisor.service.spark_service.spark_executor import SparkExecutor
 
 
 class TestSparkExecutor:
+    """
+    SparkExecutor测试类
+    """
+
     def setup_class(self):
         """
         在每个测试用例之前运行，初始化 SparkExecutor 实例
         """
+        # 构建executor
         self.spark_executor = SparkExecutor()
+
+        # 构造测试数据
+        self.cmd_fields = ['spark-submit', '--class', 'MyClass', 'my_app.jar']
+        self.timeout = 10
+        self.exitcode = 0
+        self.application_id = 'application_123456'
+        self.time_taken_list = [23.42, 25.83]
+        self.output = (f'Spark master: yarn, Application Id: {self.application_id}\n'
+                       f'XXXXXX\n'
+                       f'Time taken: {self.time_taken_list[0]} seconds\n'
+                       f'Time taken: {self.time_taken_list[1]} seconds\n'
+                       f'Spark Log [INFO]: Time taken: {self.time_taken_list[1]} seconds\n')
 
     @patch('omniadvisor.service.spark_service.spark_executor.run_cmd')
     def test_submit_spark_task(self, mock_run_cmd):
         """
         测试 submit_spark_task 方法
         """
-        # 模拟输入的 execute_cmd 和返回值
-        execute_cmd = "spark-submit --class MyClass my_app.jar"
-        mock_run_cmd.return_value = (0, ["Output line 1 \nOutput line 2"])
+        mock_run_cmd.return_value = (self.exitcode, self.output)
 
         # 调用方法
-        exitcode, spark_output = self.spark_executor.submit_spark_task(execute_cmd)
+        exec_result = self.spark_executor.submit_spark_task(cmd_fields=self.cmd_fields, timeout=self.timeout)
 
         # 验证结果
-        assert exitcode == 0
-        assert spark_output == ["Output line 1 \nOutput line 2"]
-        mock_run_cmd.assert_called_once_with("spark-submit --class MyClass my_app.jar")
+        mock_run_cmd.assert_called_once_with(cmd_fields=['timeout', str(self.timeout)] + self.cmd_fields)
+        assert exec_result.exitcode == self.exitcode
+        assert exec_result.output == self.output
+        assert exec_result.app_id == self.application_id
+        assert exec_result.duration == sum(self.time_taken_list)
+        assert type(exec_result.start_time) is datetime
+        assert type(exec_result.end_time) is datetime
 
     def test_parser_spark_output(self):
         """
         测试 parser_spark_output 方法
         """
-        # 模拟 spark_output 数据
-        spark_output ="Some log line\n" \
-                      "INFO deploy.SparkSubmit: Starting Spark job\n" \
-                      "Another log line\n" \
-                      "Application Id: application_1234567890\n" \
-                      "Time taken: 12.34 seconds"
-
-        # 调用方法
-        spark_submit_cmd, application_id, time_taken = self.spark_executor.parser_spark_output(spark_output)
-
+        # 正确解析spark output
+        app_id, total_time_taken = self.spark_executor._parser_spark_output(self.output)
         # 验证结果
-        expected_result = {
-            "spark_submit_cmd": "INFO deploy.SparkSubmit: Starting Spark job",
-            "application_id": "application_1234567890",
-            "time_taken": 12.34
-        }
-        assert spark_submit_cmd == expected_result["spark_submit_cmd"]
-        assert application_id == expected_result["application_id"]
-        assert time_taken == expected_result["time_taken"]
+        assert app_id == self.application_id
+        assert total_time_taken == sum(self.time_taken_list)
 
-    def test_parser_spark_output_with_empty_output(self):
-        """
-        测试 parser_spark_output 方法处理空输出的情况
-        """
-        # 模拟空的 spark_output 数据
-        spark_output = ""
-
-        # 调用方法
-        spark_submit_cmd, application_id, time_taken = self.spark_executor.parser_spark_output(spark_output)
-
+        # 解析spark output缺失application id
+        output = (f'Time taken: {self.time_taken_list[0]} seconds\n'
+                  f'Time taken: {self.time_taken_list[1]} seconds\n'
+                  f'Spark Log [INFO]: Time taken: {self.time_taken_list[1]} seconds\n')
         # 验证结果
-        assert spark_submit_cmd == ""
-        assert application_id == ""
-        assert time_taken == OA_CONF.exec_fail_return_runtime
+        with pytest.raises(RuntimeError):
+            _, _ = self.spark_executor._parser_spark_output(output)
+
+        # 解析spark output缺失行首Time taken
+        output = f'Spark Log [INFO]: Time taken: {self.time_taken_list[1]} seconds\n'
+        # 验证结果
+        with pytest.raises(RuntimeError):
+            _, _ = self.spark_executor._parser_spark_output(output)
+
+        # 解析spark output为空
+        output = ''
+        # 验证结果
+        with pytest.raises(RuntimeError):
+            _, _ = self.spark_executor._parser_spark_output(output)
+

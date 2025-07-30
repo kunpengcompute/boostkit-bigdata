@@ -28,7 +28,7 @@ class DatabaseTuningRecord(models.Model):
     """
     调优记录模型
     """
-    TUNING_METHOD_CHOICES = {(method, method.upper()) for method in OA_CONF.TuningMethod.all}
+    _TUNING_METHOD_CHOICES = {(method, method.upper()) for method in OA_CONF.TuningMethod.all}
 
     id = models.AutoField(primary_key=True)
     load = models.ForeignKey(
@@ -40,7 +40,7 @@ class DatabaseTuningRecord(models.Model):
     method = models.CharField(
         max_length=10,
         null=False,
-        choices=TUNING_METHOD_CHOICES
+        choices=_TUNING_METHOD_CHOICES
     )
     method_extend = models.CharField(max_length=20, null=True)
     rounds = models.IntegerField(null=True)
@@ -56,28 +56,28 @@ class DatabaseExamRecord(models.Model):
     """
     测试记录模型
     """
-    TASK_STATUS_CHOICES = [
+    _TASK_STATUS_CHOICES = [
         (OA_CONF.ExecStatus.success, 'Success'),
         (OA_CONF.ExecStatus.fail, 'Fail'),
         (OA_CONF.ExecStatus.running, 'Running')
     ]
 
     id = models.AutoField(primary_key=True)
-    load = models.ForeignKey(
-        DatabaseLoad,
+    tuning_record = models.ForeignKey(
+        DatabaseTuningRecord,
         on_delete=models.DO_NOTHING,
         null=False
     )
-    config = models.JSONField(null=False)
     start_time = models.DateTimeField(null=True, auto_now_add=False)
     end_time = models.DateTimeField(null=True, auto_now_add=False)
     status = models.CharField(
         max_length=10,
         null=True,
-        choices=TASK_STATUS_CHOICES,
+        choices=_TASK_STATUS_CHOICES,
         default=OA_CONF.ExecStatus.running
     )
     runtime = models.FloatField(null=True)
+    app_id = models.CharField(max_length=50, null=True)
     trace = models.JSONField(null=True)
 
     class Meta:

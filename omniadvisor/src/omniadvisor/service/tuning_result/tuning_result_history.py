@@ -79,10 +79,6 @@ class TuningResultHistory:
         self._tuning_results = tuning_results
 
     @property
-    def tuning_history(self):
-        return list(map(lambda tuning_result: tuning_result.to_tuning(), self._tuning_results))
-
-    @property
     def user_tuning_result(self):
         for tuning_result in self._tuning_results:
             if tuning_result.method == OA_CONF.TuningMethod.user:
@@ -139,3 +135,14 @@ class TuningResultHistory:
                 load=self._load,
                 best_config=self.best_tuning_result.config
             )
+
+    def to_tuning_data_list(self):
+        """
+        将TuningResultHistory中的每个TuningResult转为TuningData类型，并以List进行承载
+        若遇TuningResult状态为empty，即未完成任何一次复测，则不将其输入到调优模块中
+        :return:
+        """
+        return [
+            tuning_result.to_tuning_data()
+            for tuning_result in self._tuning_results if tuning_result.status != OA_CONF.TuningResultStatus.empty
+        ]

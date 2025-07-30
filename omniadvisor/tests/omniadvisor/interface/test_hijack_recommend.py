@@ -1,7 +1,9 @@
 import unittest
 import pytest
 from unittest.mock import MagicMock, patch
-from omniadvisor.interface.hijack_recommend import hijack_recommend
+
+from common.constant import OA_CONF
+from omniadvisor.interface.hijack_recommend import hijack_recommend, _process_load_config
 
 
 # 测试代码
@@ -26,16 +28,17 @@ class TestHijackRecommend(unittest.TestCase):
         mock_spark_run.return_value = (MagicMock(status="success"), "job output")
 
         hijack_recommend(argv)
-        mock_spark_run.assert_called_once_with(load, exec_config)
+        mock_spark_run.assert_called_once_with(load=load, config=exec_config, wait_for_trace=False)
         mock_process_config.assert_not_called()
 
     # 场景 2: 执行失败 + 进入安全机制
+    @patch('omniadvisor.service.spark_service.spark_run.multiprocessing.Process')
     @patch("omniadvisor.interface.hijack_recommend._process_load_config")
     @patch("omniadvisor.interface.hijack_recommend.spark_run")
     @patch("omniadvisor.interface.hijack_recommend._get_exec_config_from_load")
     @patch("omniadvisor.interface.hijack_recommend._query_or_create_load")
     @patch("omniadvisor.interface.hijack_recommend.SparkCMDParser.parse_cmd")
-    def test_fallback_to_safe_config(self, mock_parse_cmd, mock_query_load, mock_get_config, mock_spark_run, mock_process_config):
+    def test_fallback_to_safe_config(self, mock_parse_cmd, mock_query_load, mock_get_config, mock_spark_run, mock_process_config, mock_multiprocess):
         argv = ["--class", "Job", "--conf", "spark.executor.memory=4g"]
         exec_attr = {"name": "job_name"}
         user_config = {"spark.executor.memory": "4g"}
@@ -50,10 +53,12 @@ class TestHijackRecommend(unittest.TestCase):
             (MagicMock(status="fail"), "fail output"),
             (MagicMock(status="success"), "safe output")
         ]
+        mock_process = MagicMock()
+        mock_multiprocess.return_value = mock_process
 
         hijack_recommend(argv)
         assert mock_spark_run.call_count == 2
-        mock_process_config.assert_not_called()
+        mock_process.start.assert_called_once()
 
     # 场景 3: 执行失败 + 不进入安全机制
     @patch("omniadvisor.interface.hijack_recommend._process_load_config")
@@ -88,12 +93,13 @@ class TestHijackRecommend(unittest.TestCase):
             hijack_recommend(argv)
 
     # 场景 5: 执行的是 test_config，触发 _process_load_config
+    @patch('omniadvisor.service.spark_service.spark_run.multiprocessing.Process')
     @patch("omniadvisor.interface.hijack_recommend._process_load_config")
     @patch("omniadvisor.interface.hijack_recommend.spark_run")
     @patch("omniadvisor.interface.hijack_recommend._get_exec_config_from_load")
     @patch("omniadvisor.interface.hijack_recommend._query_or_create_load")
     @patch("omniadvisor.interface.hijack_recommend.SparkCMDParser.parse_cmd")
-    def test_process_test_config(self, mock_parse_cmd, mock_query_load, mock_get_config, mock_spark_run, mock_process_config):
+    def test_process_test_config(self, mock_parse_cmd, mock_query_load, mock_get_config, mock_spark_run, mock_process_config, mock_multiprocess):
         argv = ["--class", "Job", "--conf", "spark.executor.memory=4g"]
         exec_attr = {"name": "job"}
         user_config = {"spark.executor.memory": "4g"}
@@ -105,9 +111,11 @@ class TestHijackRecommend(unittest.TestCase):
         mock_query_load.return_value = load
         mock_get_config.return_value = exec_config
         mock_spark_run.return_value = (MagicMock(status="success"), "job output")
+        mock_process = MagicMock()
+        mock_multiprocess.return_value = mock_process
 
         hijack_recommend(argv)
-        mock_process_config.assert_called_once_with(load=load)
+        mock_process.start.assert_called_once()
 
     # 场景 6: 命令解析异常
     @patch("omniadvisor.interface.hijack_recommend.SparkCMDParser.parse_cmd")
@@ -145,23 +153,57 @@ class TestHijackRecommend(unittest.TestCase):
         with pytest.raises(RuntimeError, match="spark failed"):
             hijack_recommend(argv)
 
-    # 场景 9: _process_load_config 内部依赖出错
-    @patch("omniadvisor.interface.hijack_recommend._process_load_config")
-    @patch("omniadvisor.interface.hijack_recommend.spark_run")
-    @patch("omniadvisor.interface.hijack_recommend._get_exec_config_from_load")
-    @patch("omniadvisor.interface.hijack_recommend._query_or_create_load")
-    @patch("omniadvisor.interface.hijack_recommend.SparkCMDParser.parse_cmd")
-    def test_process_load_config_raises(self, mock_parse_cmd, mock_query_load, mock_get_config, mock_spark_run, mock_process_config):
-        argv = ["--conf", "spark.executor.memory=4g"]
-        exec_attr = {"name": "job"}
-        config = {"spark.executor.memory": "4g"}
-        load = MagicMock(test_config=config, default_config=config)
+    # 场景9：测试process_load_config函数
+    @patch("omniadvisor.interface.hijack_recommend.float_format")
+    @patch("omniadvisor.interface.hijack_recommend.LoadRepository.update_test_config")
+    @patch("omniadvisor.interface.hijack_recommend.get_tuning_result_history")
+    @patch("omniadvisor.interface.hijack_recommend.get_tuning_result")
+    def test_process_load_config(self, mock_get_tuning_result, mock_get_tuning_result_history, mock_update_test_config, mock_float_format):
+        best_config = {'param1': 'value1'}
+        test_config = {'param2': 'value2'}
 
-        mock_parse_cmd.return_value = (exec_attr, config)
-        mock_query_load.return_value = load
-        mock_get_config.return_value = config
-        mock_spark_run.return_value = (MagicMock(status="success"), "output")
-        mock_process_config.side_effect = RuntimeError("process failed")
+        load = MagicMock()
+        load.best_config = best_config
+        load.test_config = test_config
+        mock_tuning_result = MagicMock()
+        mock_get_tuning_result.return_value = mock_tuning_result
+        mock_tuning_result_history = MagicMock()
+        mock_get_tuning_result_history.return_value = mock_tuning_result_history
 
-        with pytest.raises(RuntimeError, match="process failed"):
-            hijack_recommend(argv)
+        # best_config执行失败场景
+        mock_tuning_result.status = OA_CONF.TuningResultStatus.fail
+        _process_load_config(load=load, config=best_config)
+        mock_update_test_config.assert_not_called()
+        mock_tuning_result_history.refresh_best_config.assert_called_once()
+
+        # best_config执行成功场景
+        mock_update_test_config.call_count = 0
+        mock_tuning_result_history.refresh_best_config.call_count = 0
+        mock_tuning_result.status = OA_CONF.TuningResultStatus.success
+        _process_load_config(load=load, config=best_config)
+        mock_update_test_config.assert_not_called()
+        mock_tuning_result_history.refresh_best_config.assert_not_called()
+
+        # test_config复测失败场景
+        mock_update_test_config.call_count = 0
+        mock_tuning_result_history.refresh_best_config.call_count = 0
+        mock_tuning_result.status = OA_CONF.TuningResultStatus.fail
+        _process_load_config(load=load, config=test_config)
+        mock_update_test_config.assert_called_once()
+        mock_tuning_result_history.refresh_best_config.assert_not_called()
+
+        # test_config复测成功场景
+        mock_update_test_config.call_count = 0
+        mock_tuning_result_history.refresh_best_config.call_count = 0
+        mock_tuning_result.status = OA_CONF.TuningResultStatus.success
+        _process_load_config(load=load, config=test_config)
+        mock_update_test_config.assert_called_once()
+        mock_tuning_result_history.refresh_best_config.assert_called_once()
+
+        # test_config复测未完毕场景
+        mock_update_test_config.call_count = 0
+        mock_tuning_result_history.refresh_best_config.call_count = 0
+        mock_tuning_result.status = OA_CONF.TuningResultStatus.running
+        _process_load_config(load=load, config=test_config)
+        mock_update_test_config.assert_not_called()
+        mock_tuning_result_history.refresh_best_config.assert_not_called()

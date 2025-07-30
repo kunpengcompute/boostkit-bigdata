@@ -2,7 +2,7 @@ import sys
 from unittest.mock import patch, MagicMock
 
 import pytest
-from omniadvisor.interface.config_tuning import unified_tuning, main
+from omniadvisor.interface.config_tuning import _single_tuning, main
 
 from common.constant import OA_CONF
 
@@ -40,7 +40,7 @@ class TestTuning:
             mock_spark_run.return_value = mock_exam_record, spark_output
             mock_tuning_history = MagicMock()
             mock_get_history.return_value = mock_tuning_history
-            unified_tuning(load=self.load, retest_way=OA_CONF.RetestWay.backend, tuning_method=self.tuning_method)
+            _single_tuning(load=self.load, retest_way=OA_CONF.RetestWay.backend, tuning_method=self.tuning_method)
             mock_tuning_history.refresh_best_config.assert_called_once()
             mock_smac_tuning.assert_called_once()
             assert mock_spark_run.call_count == OA_CONF.tuning_retest_times
@@ -74,7 +74,7 @@ class TestTuning:
             tuning_result_history = MagicMock()
             tuning_result_history.best_config = {**self.load.default_config, **self.tune_return_val[0]}
             mock_tuning_result_history.return_value = tuning_result_history
-            unified_tuning(load=self.load, retest_way=OA_CONF.RetestWay.backend, tuning_method=self.tuning_method)
+            _single_tuning(load=self.load, retest_way=OA_CONF.RetestWay.backend, tuning_method=self.tuning_method)
 
             mock_smac_tuning.assert_called_once()
             mock_spark_run.assert_called_once()
@@ -100,7 +100,7 @@ class TestTuning:
             mock_exam_record.status = OA_CONF.ExecStatus.success
             mock_smac_tuning.return_value = self.tune_return_val
             with pytest.raises(RuntimeError):
-                unified_tuning(load=self.load, retest_way=OA_CONF.RetestWay.backend, tuning_method=self.tuning_method)
+                _single_tuning(load=self.load, retest_way=OA_CONF.RetestWay.backend, tuning_method=self.tuning_method)
 
             mock_smac_tuning.assert_called_once()
             mock_spark_run.assert_called_once()
@@ -137,7 +137,7 @@ class TestTuning:
                 patch('algo.iterative.tuning.SmacAppendTuning.tune') as mock_smac_tuning:
             mock_query_tuning_record.return_value = list()
             mock_smac_tuning.return_value = self.tune_return_val
-            unified_tuning(load=self.load, retest_way=OA_CONF.RetestWay.hijacking,
+            _single_tuning(load=self.load, retest_way=OA_CONF.RetestWay.hijacking,
                            tuning_method=self.tuning_method)
             mocked_query_perf.assert_called_once()
             mock_update_test.assert_called_once()
