@@ -99,8 +99,8 @@ class SparkCMDParser:
             raise ValueError("No arguments were provided. At least one argument is required.")
 
         # 待检查参数列表
-        primary_resource = ""  # 其实主要就是去看这个primary_resource是从哪里拿到的 其他都是取值范围的限定 不需要我来做检查
         params, unknown = cls._parser.parse_known_args(args=args)
+        primary_resource = unknown
 
         if primary_resource is None:
             return False
