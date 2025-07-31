@@ -72,6 +72,9 @@ class OmniAdvisorConf:
 
     empty_config = dict()
     exec_fail_return_runtime = float('inf')
+    # 仅作为非spark-sql提交场景执行成功的占位(此时返回结果中Time taken缺失)用变量 维持spark_executor的接口不变
+    # 实际的执行时间需要从jobs中获取
+    exec_complete_return_runtime = float('inf')
     exec_fail_return_app_id = ''
     exec_fail_return_trace = dict()
 
