@@ -16,12 +16,9 @@ class DatabaseLoad(models.Model):
     test_config = models.JSONField(null=True)
     create_time = models.DateTimeField(auto_now_add=True)
     tuning_needed = models.BooleanField(default=True)
-    hash_value = models.CharField(max_length=64, null=False)
+    hash_value = models.CharField(max_length=64, null=False, unique=True)
 
     class Meta:
-        constraints = [
-            models.UniqueConstraint(fields=['hash_value'], name='load_unique')
-        ]
         db_table = 'omniadvisor_load'  # 自定义表名
 
 
