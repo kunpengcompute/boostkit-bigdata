@@ -74,13 +74,13 @@ class Repository(ABC):
             if field not in model_attr.keys():
                 continue
 
-            filed_types, filed_forbidden, filed_allow = filed_format
-            if not isinstance(model_attr[field], tuple(filed_types)):
-                raise TypeError(f'Type of {cls._model_class.__name__} filed {field} must in {filed_types}.')
-            if model_attr[field] in filed_forbidden:
-                raise ValueError(f'Value of {cls._model_class.__name__} filed {field} cannot be in {filed_forbidden}.')
-            if filed_allow and model_attr[field] not in filed_allow:
-                raise ValueError(f'Value of {cls._model_class.__name__} filed {field} must be in {filed_allow}.')
+            field_types, field_forbidden, field_allow = filed_format
+            if not isinstance(model_attr[field], tuple(field_types)):
+                raise TypeError(f'Type of {cls._model_class.__name__} filed {field} must in {field_types}.')
+            if model_attr[field] in field_forbidden:
+                raise ValueError(f'Value of {cls._model_class.__name__} filed {field} cannot be in {field_forbidden}.')
+            if field_allow and model_attr[field] not in field_allow:
+                raise ValueError(f'Value of {cls._model_class.__name__} filed {field} must be in {field_allow}.')
 
     @classmethod
     def _create(cls, model_attr: dict):

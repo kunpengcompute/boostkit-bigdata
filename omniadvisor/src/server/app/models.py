@@ -9,17 +9,18 @@ class DatabaseLoad(models.Model):
     负载模型
     """
     id = models.AutoField(primary_key=True)
-    name = models.CharField(max_length=100, null=False)
+    name = models.CharField(max_length=100, null=True)
     exec_attr = models.JSONField(null=False)
     default_config = models.JSONField(null=False)
     best_config = models.JSONField(null=True)
     test_config = models.JSONField(null=True)
     create_time = models.DateTimeField(auto_now_add=True)
     tuning_needed = models.BooleanField(default=True)
+    hash_value = models.CharField(max_length=64, null=False)
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=['exec_attr', 'default_config'], name='load_unique')
+            models.UniqueConstraint(fields=['hash_value'], name='load_unique')
         ]
         db_table = 'omniadvisor_load'  # 自定义表名
 

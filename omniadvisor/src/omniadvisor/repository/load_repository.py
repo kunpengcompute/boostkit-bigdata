@@ -1,3 +1,5 @@
+from django.db import transaction
+
 from server.app.models import DatabaseLoad
 from omniadvisor.repository.model.load import Load
 from omniadvisor.repository.repository import Repository
@@ -22,7 +24,7 @@ class LoadRepository(Repository):
     ]
     # 用于存储字段格式
     _fields_format = {
-        Load.FieldName.name: ([str], [''], []),
+        Load.FieldName.name: ([str], [], ['']),
         Load.FieldName.exec_attr: ([dict], [dict()], []),
         Load.FieldName.default_config: ([dict], [], []),
         Load.FieldName.best_config: ([dict], [], []),
@@ -30,58 +32,68 @@ class LoadRepository(Repository):
     }
 
     @classmethod
-    def create(cls, name: str, exec_attr: dict, default_config: dict):
+    def query_by_hash_value(cls, hash_value: str):
+        """
+        根据hash值，查找负载实例
+        :param hash_value: 负载实例
+        :return: 负载实例
+        """
+        model_attr = {
+            Load.FieldName.hash_value: hash_value
+        }
+        database_loads = cls._query(model_attr=model_attr)
+        return [
+            Load(database_model=database_load) for database_load in database_loads
+        ]
+
+    @classmethod
+    @transaction.atomic
+    def create_or_update(cls, name: str, exec_attr: dict, default_config: dict, hash_value: str):
+        """
+        无则创建，有则更新 name 和 exec_attr 字段。如果日期信息等一直保持不变，后期复测时，会导致测试出现异常
+        """
+        database_loads = cls.query_by_hash_value(hash_value)
+        if database_loads:
+            load = database_loads.pop()
+            return cls.update_name_and_exec_attr(load, name, exec_attr)
+        else:
+            return cls.create(name, exec_attr, default_config, hash_value)
+
+    @classmethod
+    def create(cls, name: str, exec_attr: dict, default_config: dict, hash_value: str):
         """
         指定名称、执行属性和默认配置，新增负载
 
         :param name: 负载名称
         :param exec_attr: 负载执行属性
         :param default_config: 负载默认配置
+        :param hash_value: hash值
         :return: 负载实例
         """
-        # 判断是否有相同name和default_config的Load存在
-        model_attr = {
-            Load.FieldName.exec_attr: exec_attr,
-            Load.FieldName.default_config: default_config
-        }
-        database_loads = cls._query(model_attr=model_attr)
-        # 强制要求name和default_config组合是唯一的
-        if len(database_loads) != 0:
-            raise RuntimeError(f'Create {cls._model_class.__name__} fail because combination of exec_attr {exec_attr} '
-                               f'and default_config {default_config} exist.')
-
         model_attr = {
             Load.FieldName.name: name,
             Load.FieldName.exec_attr: exec_attr,
-            Load.FieldName.default_config: default_config
+            Load.FieldName.default_config: default_config,
+            Load.FieldName.hash_value: hash_value
         }
         database_load = cls._create(model_attr=model_attr)
         return Load(database_model=database_load)
 
     @classmethod
-    def query_by_exec_attr_and_default_config(cls, exec_attr: dict, default_config: dict):
+    def update_name_and_exec_attr(cls, load: Load, name: str, exec_attr: dict):
         """
-        指定名称和执行属性，查询负载
-        (暂定以这两个信息进行查询，具体视现网情况而定)
-
-        :param exec_attr: 负载的执行参数
-        :param default_config: 负载默认配置
-        :return: 负载实例列表
+        更新和时间相关的信息
+        :param load: 负载
+        :param name: 负载名称
+        :param exec_attr: 负载执行属性
+        :return: 负载实例
         """
         model_attr = {
-            Load.FieldName.exec_attr: exec_attr,
-            Load.FieldName.default_config: default_config
+            Load.FieldName.name: name,
+            Load.FieldName.exec_attr: exec_attr
         }
-        database_loads = cls._query(model_attr=model_attr)
-
-        # 强制要求exec_attr和default_config组合是唯一的
-        if len(database_loads) > 1:
-            raise RuntimeError(f'Find {cls._model_class.__name__} combination of name {exec_attr} and default_config '
-                               f'{default_config} is not unique.')
-
-        return [
-            Load(database_model=database_load) for database_load in database_loads
-        ]
+        database_load = cls._update(load.database_model, model_attr=model_attr)
+        return Load(database_model=database_load)
 
     @classmethod
     def update_best_config(cls, load: Load, best_config: dict):

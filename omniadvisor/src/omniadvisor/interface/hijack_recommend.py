@@ -1,3 +1,6 @@
+import hashlib
+import json
+import re
 import sys
 import multiprocessing
 
@@ -13,28 +16,9 @@ from omniadvisor.service.spark_service.spark_run import spark_run
 
 from omniadvisor.utils.utils import float_format
 
-
-def _query_or_create_load(name: str, exec_attr: dict, default_config: dict):
-    """
-    根据名称和默认配置，查询或创建负载
-
-    :param name: 负载名称
-    :param exec_attr: 执行属性
-    :param default_config: 默认参数配置
-    :return: 负载实例
-    """
-    # 从负载数据库中查询是否有相关联的Load
-    loads = LoadRepository.query_by_exec_attr_and_default_config(exec_attr=exec_attr, default_config=default_config)
-    # 如果查询不到负载信息，则创建新的负载
-    if not loads:
-        global_logger.info("Load not found in database, create new one and execute.")
-        load = LoadRepository.create(name=name, exec_attr=exec_attr, default_config=default_config)
-        TuningRecordRepository.create(load=load, config=default_config, method=OA_CONF.TuningMethod.user)
-    else:
-        global_logger.info("Load found in database, ready to get config to execute.")
-        load = loads.pop()
-
-    return load
+name_str = 'name'
+user_config_str = 'user_config'
+file_content_str = 'file_content'
 
 
 def _get_exec_config_from_load(load: Load):
@@ -120,12 +104,12 @@ def hijack_recommend(argv: list):
     global_logger.debug("Hijack input params: %s", argv)
     exec_attr, user_config = SparkCMDParser.parse_cmd(argv=argv)
     # 提取任务名字
-    if 'name' not in exec_attr.keys():
-        raise ValueError(f'Task name not in Spark submit cmd!')
-    name = exec_attr['name']
+    name = exec_attr.get('name', '')
 
     # 查询或创建相应负载
-    load = _query_or_create_load(name=name, exec_attr=exec_attr, default_config=user_config)
+    hash_value = _get_hash_value(name, exec_attr, user_config)
+    load = LoadRepository.create_or_update(name=name, exec_attr=exec_attr, default_config=user_config,
+                                           hash_value=hash_value)
     # 获取待执行参数配置
     exec_config = _get_exec_config_from_load(load=load)
 
@@ -154,6 +138,46 @@ def hijack_recommend(argv: list):
         p = multiprocessing.Process(target=_process_load_config, args=(load, exec_config))
         p.daemon = False
         p.start()
+
+
+def _get_hash_value(name: str, exec_attr: dict, user_config: dict):
+    """
+    根据 执行参数和用户配置计算负载唯一标识，hash值
+    """
+    class_info = exec_attr.get('class')
+    file_content = None
+    if class_info and 'SparkSQLCLIDriver' in class_info:
+        # spark-sql，则提取 -e 和 -f，替换
+        if 'e' in exec_attr:
+            file_content = _remove_date(exec_attr.get('e'))
+        else:
+            file_content = exec_attr.get('f')
+    else:
+        # spark-submit，则提取 file 及之后的内容，包含 file的入参
+        unknown_content = exec_attr.get('unknown')
+        unknown_content = [item.strip() for item in unknown_content]
+        for i, val in reversed(list(enumerate(unknown_content))):
+            if val.startswith('-'):
+                # 找到最后一个 '-' 或者 '--' 参数，因为一般是带值的，所以距离 要执行的 jar，还有两个索引的距离，忽略之后的省份等信息
+                file_content = unknown_content[i + 2]
+
+    data = {
+        name_str: _remove_date(name),
+        user_config_str: user_config,
+        file_content_str: file_content
+    }
+    json_str = json.dumps(data, sort_keys=True)
+    hash_value = hashlib.sha256(json_str.encode()).hexdigest()
+    return hash_value
+
+
+def _remove_date(content: str):
+    """
+    移除日期信息
+    """
+    for pattern in OA_CONF.date_patterns:
+        content = re.sub(pattern, '', content)
+    return content.strip()
 
 
 def main():

@@ -58,3 +58,4 @@ class Load:
         test_config = 'test_config'
         create_time = 'create_time'
         tuning_needed = 'tuning_needed'
+        hash_value = 'hash_value'
