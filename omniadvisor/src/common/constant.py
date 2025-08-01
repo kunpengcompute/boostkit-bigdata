@@ -104,5 +104,8 @@ class OmniAdvisorConf:
     # 保留小数位数
     decimal_digits = 3
 
+    # spark-sql命令所提交的类名
+    SparkSQLCLIDriver = 'org.apache.spark.sql.hive.thriftserver.SparkSQLCLIDriver'
+
 
 OA_CONF = OmniAdvisorConf()

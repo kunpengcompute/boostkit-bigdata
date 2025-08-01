@@ -101,7 +101,7 @@ class SparkCMDParser:
         params, unknown = cls._parser.parse_known_args(args=args)
         primary_resource = unknown
 
-        if primary_resource is None:
+        if primary_resource is None and params['class'] == '':
             raise TypeError("This is not a SUBMIT type spark task.")
 
     @staticmethod
