@@ -40,8 +40,8 @@ class SparkCMDParser:
     _parser.add_argument('--class', help="Your application's main class(for Java / Scala apps")
     _parser.add_argument('--conf', action='append', help="Arbitrary Spark configuration property")
     _parser.add_argument('--deploy-mode', dest='deploy-mode',
-                          help="Whether to launch the driver program locally (client) or on one of the worker "
-                               "machines inside the cluster (cluster)(Default: client)")
+                         help="Whether to launch the driver program locally (client) or on one of the worker "
+                              "machines inside the cluster (cluster)(Default: client)")
     _parser.add_argument('--driver-class-path', dest='driver-class-path')
     _parser.add_argument('--driver-cores', dest='driver-cores')
     _parser.add_argument('--driver-java-options', dest='driver-java-options')
@@ -50,7 +50,7 @@ class SparkCMDParser:
     _parser.add_argument('--executor-memory', dest='executor-memory')
     _parser.add_argument('--files')
     _parser.add_argument('--jars')  # TODO 这个入参和--jar有什么区别
-    _parser.add_argument('--kill', action='store_true') # TODO 这也是非SUBMIT相关的命令
+    _parser.add_argument('--kill', action='store_true')  # TODO 这也是非SUBMIT相关的命令
     _parser.add_argument('--master',
                          help="spark://host:port, mesos://host:port, yarn, k8s://https://host:port, "
                               "or local (Default: local[*]).")
@@ -60,11 +60,11 @@ class SparkCMDParser:
     _parser.add_argument('--proxy-user', dest='proxy-user')
     _parser.add_argument('--py-files', dest='py-files')
     _parser.add_argument('--repositories')
-    _parser.add_argument('--status', action='store_true') # TODO boolean
+    _parser.add_argument('--status', action='store_true')  # TODO boolean
     _parser.add_argument('--total-executor-cores', dest='total-executor-cores')
 
     # Options that do not take arguments boolean变量
-    _parser.add_argument('--help','-h', action='store_true')
+    # '--help', '-h' 由于是argparse的内置 这里不显示写明
     _parser.add_argument('--supervise', action='store_true')
     _parser.add_argument('--usage-error', action='store_true')
     _parser.add_argument('--verbose', '-v', action='store_true')
@@ -78,8 +78,7 @@ class SparkCMDParser:
     _parser.add_argument('--principal')
     _parser.add_argument('--queue')
 
-
-    # Spark Sql 相关选项
+    # Spark sql 相关选项
     # 支持对于--e这种形式的入参解析 但是--e为spark非官方用法 故在命令reconstruct的时候仍然使用-e的方式重建命令
     _parser.add_argument('-e', '--e', type=str, help='SQL statement to execute.')
     _parser.add_argument('-f', type=str, help='File containing SQL script.')
@@ -87,7 +86,7 @@ class SparkCMDParser:
     _parser.add_argument('-d', '--database')
 
     @classmethod
-    def validate_submit_arguments(cls, args: List) -> bool:
+    def validate_submit_arguments(cls, args: List):
         """
         检查当前提交的spark-submit命令是否属于SUBMIT动作的spark命令
         该函数与Spark 3.3.1源码中SparkSubmitArguments.scala文件中的validateSubmitArguments逻辑保持一致
@@ -103,7 +102,7 @@ class SparkCMDParser:
         primary_resource = unknown
 
         if primary_resource is None:
-            return False
+            raise TypeError("This is not a SUBMIT type spark task.")
 
     @staticmethod
     def _normalize_value(value):

@@ -86,8 +86,8 @@ class SparkExecutor:
             total_time_taken = sum(time_taken_list)
             global_logger.debug(f'Total time taken is {total_time_taken} seconds')
         else:
-            # 没有捕获到Time Taken时使用OA_CONF.exec_complete_return_runtime作为返回值，后续需要从trace中获取实际运行时间
-            total_time_taken = OA_CONF.exec_complete_return_runtime
             global_logger.info('This spark task do not have Time taken message.')
-
+        # OA_CONF.exec_fail_return_runtime仅作为占位用变量
+        # 维持spark_executor的接口不变 实际的执行时间需要从jobs中获取
+        total_time_taken = OA_CONF.exec_fail_return_runtime
         return application_id, total_time_taken

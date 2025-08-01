@@ -1,3 +1,4 @@
+import re
 import json
 import requests
 from datetime import datetime
@@ -85,35 +86,42 @@ class SparkFetcher:
         """
         return self._make_request(f"api/v1/applications/{app_id}/jobs")
 
-    def get_spark_runtime_by_app(self) -> float:
+    def get_spark_runtime_by_app(self, app_id) -> float:
         """
         通过从HistoryServer上获取的jobs信息，计算任务的执行耗时
         runtime的计算的耗时为 最早的Job提交的时间 与 最晚的Job完成时间 之间的差值（注：最晚完成的Job并不一定是最后提交的Job）
 
         :return: runtime (seconds)
         """
-        jobs_detail = self.get_spark_jobs_by_app()
+        jobs_detail = self.get_spark_jobs_by_app(app_id)
 
-        time_format = "%Y-%m-%dT%H:%M:%S.%f"
-
-        # 获取最早的Job提交时间
-        first_submit_time = jobs_detail[-1]["submissionTime"]
-        first_submittion_timestamp = datetime.strptime(first_submit_time.replace("GMT", ""), time_format)
-
-        # 获取最后结束的Job的完成时间
-        completiontime_list = []
-        sortedcompletiontime_list = []
+        # 获取全部的时间戳信息
+        time_str_list = []
         for job_detail in jobs_detail:
-            completiontime_str = job_detail['completionTime']
-            completion_timestamp = datetime.strptime(completiontime_str.replace("GMT", ""), time_format)
-            completiontime_list.append(completion_timestamp)
-            sortedcompletiontime_list = sorted(completiontime_list)
+            time_str_list.append(job_detail['completionTime'])
+            time_str_list.append(job_detail['submissionTime'])
 
-        if sortedcompletiontime_list:
-            last_completion_timestamp = sortedcompletiontime_list[-1]
+        # 检查时间戳信息完整性 要求时间戳数目大于0且为偶数个
+        if len(time_str_list) > 0:
+            if len(time_str_list) % 2 == 0:
+                pass
+            else:
+                raise ValueError(f"Timestamps must always be submitted in even numbers "
+                                 f"({len(time_str_list)} timestamps are not allowed (because of single/unpaired)).")
         else:
-            return float('inf')
+            raise ValueError("No timestamp in jobs info. Need at least 2 timestamps")
+
+        # 从 2025-07-28T08:30:32.374GMT 中匹配出 2025-07-28T08:30:32.37
+        reg_pattern = r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}'
+        time_format = "%Y-%m-%dT%H:%M:%S.%f"
+        timestamp_list = []
+        for time_str in time_str_list:
+            match = re.search(reg_pattern, time_str)
+            if match:
+                timestamp_list.append(datetime.strptime(match.group(), time_format))
+            else:
+                raise ValueError(f"The format of timestamp '{time_str}' does not match expected pattern.")
 
         # 计算时间差
-        time_diff = last_completion_timestamp - first_submittion_timestamp
+        time_diff = max(timestamp_list) - min(timestamp_list)
         return time_diff.total_seconds()

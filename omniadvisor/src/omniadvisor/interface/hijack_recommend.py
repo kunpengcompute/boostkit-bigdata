@@ -6,7 +6,6 @@ from omniadvisor.service.spark_service.spark_cmd_parser import SparkCMDParser
 from omniadvisor.repository.model.load import Load
 from omniadvisor.repository.load_repository import LoadRepository
 from omniadvisor.repository.tuning_record_repository import TuningRecordRepository
-from omniadvisor.service.spark_service.spark_executor import SparkExecutor
 from omniadvisor.service.tuning_result.tuning_result import get_tuning_result
 from omniadvisor.service.tuning_result.tuning_result_history import get_tuning_result_history
 from omniadvisor.utils.logger import global_logger
@@ -117,12 +116,8 @@ def hijack_recommend(argv: list):
 
     :param argv: Spark执行命令字段
     """
-    if not SparkCMDParser.validate_submit_arguments(argv):
-        # 非SUBMIT动作的提交直接回退到原生Spark执行 不被特性所劫持
-        global_logger.debug("Spark command is not a SUBMIT command, going to execute directly")
-        global_logger.debug(f"The argvs list is {argv}")
-        exitcode, output = SparkExecutor.submit_spark_task(argv)
-        return
+    # 非SUBMIT动作(指kill任务/查询状态/查询版本)的提交直接回退到原生spark-submit脚本执行 不被特性所劫持
+    SparkCMDParser.validate_submit_arguments(argv)
 
     # 获取用户传入的Spark命令 并解析命令
     global_logger.debug("Hijack input params: %s", argv)
