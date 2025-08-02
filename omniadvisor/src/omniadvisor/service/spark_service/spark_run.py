@@ -105,7 +105,9 @@ def _update_trace_from_history_server(exam_record: ExamRecord, application_id: s
     """
     trace_dict = {}
     history_server_url = OA_CONF.spark_history_rest_url
-    spark_fetcher = SparkFetcher(history_server_url)
+    history_server_username = OA_CONF.spark_history_username
+    history_server_password = OA_CONF.spark_history_password
+    spark_fetcher = SparkFetcher(history_server_url, history_server_username, history_server_password)
     start_time = time.time()
     while time.time() - start_time < OA_CONF.spark_fetch_trace_timeout:
         try:

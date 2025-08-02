@@ -5,9 +5,8 @@ from unittest import mock
 from omniadvisor.service.spark_service.spark_fetcher import SparkFetcher
 from common.constant import OA_CONF
 
-
 history_server_url = OA_CONF.spark_history_rest_url
-spark_fetcher = SparkFetcher(history_server_url)
+spark_fetcher = SparkFetcher(history_server_url, None, None)
 
 # 示例数据
 MOCK_APPS_RESPONSE = [
@@ -140,5 +139,10 @@ class TestSparkFetcher:
         with pytest.raises(requests.exceptions.HTTPError):
             spark_fetcher.get_spark_executor_by_app("app-1")
 
+    def test_init_when_with_auth(self):
+        # 带用户验证情况
+        pass
 
-
+    def test_init_when_without_auth(self):
+        # 不带用户验证情况
+        pass
