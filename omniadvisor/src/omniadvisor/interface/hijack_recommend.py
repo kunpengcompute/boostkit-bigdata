@@ -140,11 +140,7 @@ def hijack_recommend(argv: list):
     # 若执行失败 则判断是否需要拉起安全机制
     else:
         if exec_config != user_config:
-            global_logger.warning("Spark execute failed, ready to activate security protection mechanism.")
-            safe_exam_record, safe_output = spark_run(load=load, config=user_config, wait_for_trace=False)
-            global_logger.info("Spark execute in security protection mechanism, going to print Spark output.")
-            # 打印安全机制下任务的输出
-            print(safe_output, end="", flush=True)
+            raise RuntimeError("Spark execute failed, ready to activate security protection mechanism.")
         else:
             global_logger.warning("Spark execute failed in user config, going to print Spark output.")
             print(output, end="", flush=True)
