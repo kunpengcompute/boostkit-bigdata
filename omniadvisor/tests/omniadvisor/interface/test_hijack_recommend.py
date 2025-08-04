@@ -66,7 +66,9 @@ class TestHijackRecommend(unittest.TestCase):
     @patch("omniadvisor.interface.hijack_recommend._get_exec_config_from_load")
     @patch("omniadvisor.interface.hijack_recommend._query_or_create_load")
     @patch("omniadvisor.interface.hijack_recommend.SparkCMDParser.parse_cmd")
-    def test_failed_user_config(self, mock_parse_cmd, mock_query_load, mock_get_config, mock_spark_run, mock_process_config):
+    @patch("omniadvisor.interface.hijack_recommend.SparkCMDParser.validate_submit_arguments")
+    def test_failed_user_config(self, mock_validate_submit_arguments, mock_parse_cmd,
+                                mock_query_load, mock_get_config, mock_spark_run, mock_process_config):
         argv = ["--conf", "spark.executor.memory=4g"]
         exec_attr = {"name": "job_name"}
         user_config = {"spark.executor.memory": "4g"}
@@ -85,7 +87,8 @@ class TestHijackRecommend(unittest.TestCase):
 
     # 场景 4: 缺少任务名称
     @patch("omniadvisor.interface.hijack_recommend.SparkCMDParser.parse_cmd")
-    def test_missing_task_name(self, mock_parse_cmd):
+    @patch("omniadvisor.interface.hijack_recommend.SparkCMDParser.validate_submit_arguments")
+    def test_missing_task_name(self, mock_validate_submit_arguments, mock_parse_cmd):
         argv = ["--conf", "spark.executor.memory=4g"]
         mock_parse_cmd.return_value = ({}, {"spark.executor.memory": "4g"})
 
@@ -99,7 +102,8 @@ class TestHijackRecommend(unittest.TestCase):
     @patch("omniadvisor.interface.hijack_recommend._get_exec_config_from_load")
     @patch("omniadvisor.interface.hijack_recommend._query_or_create_load")
     @patch("omniadvisor.interface.hijack_recommend.SparkCMDParser.parse_cmd")
-    def test_process_test_config(self, mock_parse_cmd, mock_query_load, mock_get_config, mock_spark_run, mock_process_config, mock_multiprocess):
+    def test_process_test_config(self, mock_parse_cmd, mock_query_load,
+                                 mock_get_config, mock_spark_run, mock_process_config, mock_multiprocess):
         argv = ["--class", "Job", "--conf", "spark.executor.memory=4g"]
         exec_attr = {"name": "job"}
         user_config = {"spark.executor.memory": "4g"}
@@ -119,7 +123,8 @@ class TestHijackRecommend(unittest.TestCase):
 
     # 场景 6: 命令解析异常
     @patch("omniadvisor.interface.hijack_recommend.SparkCMDParser.parse_cmd")
-    def test_parse_cmd_raises(self, mock_parse_cmd):
+    @patch("omniadvisor.interface.hijack_recommend.SparkCMDParser.validate_submit_arguments")
+    def test_parse_cmd_raises(self, mock_validate_submit_arguments, mock_parse_cmd):
         mock_parse_cmd.side_effect = Exception("parse error")
         with pytest.raises(Exception, match="parse error"):
             hijack_recommend(["--conf", "x"])
@@ -127,7 +132,8 @@ class TestHijackRecommend(unittest.TestCase):
     # 场景 7: 创建 Load 异常
     @patch("omniadvisor.interface.hijack_recommend._query_or_create_load")
     @patch("omniadvisor.interface.hijack_recommend.SparkCMDParser.parse_cmd")
-    def test_query_create_load_raises(self, mock_parse_cmd, mock_query_load):
+    @patch("omniadvisor.interface.hijack_recommend.SparkCMDParser.validate_submit_arguments")
+    def test_query_create_load_raises(self, mock_validate_submit_arguments, mock_parse_cmd, mock_query_load):
         mock_parse_cmd.return_value = ({"name": "job"}, {})
         mock_query_load.side_effect = Exception("db error")
 
@@ -139,7 +145,9 @@ class TestHijackRecommend(unittest.TestCase):
     @patch("omniadvisor.interface.hijack_recommend._get_exec_config_from_load")
     @patch("omniadvisor.interface.hijack_recommend._query_or_create_load")
     @patch("omniadvisor.interface.hijack_recommend.SparkCMDParser.parse_cmd")
-    def test_spark_run_raises(self, mock_parse_cmd, mock_query_load, mock_get_config, mock_spark_run):
+    @patch("omniadvisor.interface.hijack_recommend.SparkCMDParser.validate_submit_arguments")
+    def test_spark_run_raises(self, mock_validate_submit_arguments,
+                              mock_parse_cmd, mock_query_load, mock_get_config, mock_spark_run):
         argv = ["--conf", "spark.executor.memory=4g"]
         exec_attr = {"name": "job"}
         config = {"spark.executor.memory": "4g"}

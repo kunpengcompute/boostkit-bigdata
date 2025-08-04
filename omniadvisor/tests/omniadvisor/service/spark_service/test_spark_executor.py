@@ -22,9 +22,9 @@ class TestSparkExecutor:
         self.cmd_fields = ['spark-submit', '--class', 'MyClass', 'my_app.jar']
         self.timeout = 10
         self.exitcode = 0
-        self.application_id = 'application_123456'
+        self.application_id = 'application_123456_303209'
         self.time_taken_list = [23.42, 25.83]
-        self.output = (f'Spark master: yarn, Application Id: {self.application_id}\n'
+        self.output = (f'Client: Submitting application {self.application_id} to ResourceManager\n'
                        f'XXXXXX\n'
                        f'Time taken: {self.time_taken_list[0]} seconds\n'
                        f'Time taken: {self.time_taken_list[1]} seconds\n'

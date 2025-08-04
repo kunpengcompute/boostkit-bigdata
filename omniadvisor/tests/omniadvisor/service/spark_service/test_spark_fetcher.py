@@ -171,14 +171,14 @@ class TestSparkFetcher(unittest.TestCase):
         # 验证是否抛出异常
         with self.assertRaises(ValueError) as context:
             spark_fetcher.get_spark_runtime_by_app("app-1")
-        self.assertIn("No timestamp in jobs info. Need at least 2 timestamps", str(context.exception))
+        self.assertIn("No job information found for app_id=app-1", str(context.exception))
 
     @mock.patch('requests.get')
-    def test_get_spark_runtime_by_app_invalid_timestamp_format(self, mock_get):
-        """测试异常情况：时间戳格式错误"""
-        # 模拟返回的 jobs 数据（时间戳格式错误）
+    def test_get_spark_runtime_by_app_incomplete_jobs(self, mock_get):
+        """测试异常情况：jobs 数据中的提交与完成时间信息不完整"""
+        # 模拟返回的 jobs 数据（空列表）
         mock_jobs = [
-            {'submissionTime': 'invalid-format', 'completionTime': '2025-07-28T08:31:32.374GMT'}
+            {'submissionTime': '2025-07-28T08:30:32.374GMT'},
         ]
 
         # 配置mock对象返回值
@@ -190,10 +190,9 @@ class TestSparkFetcher(unittest.TestCase):
         mock_get.return_value = mock_response
 
         # 验证是否抛出异常
-        with self.assertRaises(ValueError) as context:
+        with self.assertRaises(KeyError) as context:
             spark_fetcher.get_spark_runtime_by_app("app-1")
-        self.assertIn("The format of timestamp 'invalid-format' does not match expected pattern",
-                      str(context.exception))
+        self.assertIn("missing 'completionTime' or 'submissionTime'", str(context.exception))
 
     @mock.patch('requests.get')
     def test_http_error_handling(self, mock_get):

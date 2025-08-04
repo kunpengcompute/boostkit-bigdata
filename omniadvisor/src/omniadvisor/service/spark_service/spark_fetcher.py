@@ -1,11 +1,13 @@
 import re
 import json
 import requests
-from datetime import datetime
+from dateutil import parser
+
+from omniadvisor.utils.logger import global_logger
 
 
 class SparkFetcher:
-    def __init__(self, history_server_url, ):
+    def __init__(self, history_server_url):
         """
         初始化SparkFetcher类
 
@@ -94,34 +96,19 @@ class SparkFetcher:
         :return: runtime (seconds)
         """
         jobs_detail = self.get_spark_jobs_by_app(app_id)
+        if not jobs_detail:
+            global_logger.error(f"No job info returned for app_id={app_id}")
+            raise ValueError(f"No job information found for app_id={app_id}")
 
         # 获取全部的时间戳信息
-        time_str_list = []
-        for job_detail in jobs_detail:
-            time_str_list.append(job_detail['completionTime'])
-            time_str_list.append(job_detail['submissionTime'])
-
-        # 检查时间戳信息完整性 要求时间戳数目大于0且为偶数个
-        if len(time_str_list) > 0:
-            if len(time_str_list) % 2 == 0:
-                pass
-            else:
-                raise ValueError(f"Timestamps must always be submitted in even numbers "
-                                 f"({len(time_str_list)} timestamps are not allowed (because of single/unpaired)).")
-        else:
-            raise ValueError("No timestamp in jobs info. Need at least 2 timestamps")
-
-        # 从 2025-07-28T08:30:32.374GMT 中匹配出 2025-07-28T08:30:32.37
-        reg_pattern = r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}'
-        time_format = "%Y-%m-%dT%H:%M:%S.%f"
         timestamp_list = []
-        for time_str in time_str_list:
-            match = re.search(reg_pattern, time_str)
-            if match:
-                timestamp_list.append(datetime.strptime(match.group(), time_format))
-            else:
-                raise ValueError(f"The format of timestamp '{time_str}' does not match expected pattern.")
+        for idx, job_detail in enumerate(jobs_detail):
+            if 'completionTime' not in job_detail or 'submissionTime' not in job_detail:
+                raise KeyError(f"Job at index {idx} is missing 'completionTime' or 'submissionTime'")
+            timestamp_list.append(parser.parse(job_detail['completionTime']).timestamp())
+            timestamp_list.append(parser.parse(job_detail['submissionTime']).timestamp())
 
         # 计算时间差
         time_diff = max(timestamp_list) - min(timestamp_list)
-        return time_diff.total_seconds()
+        global_logger.debug(f"Total time diff calculate by jobs is {time_diff} seconds")
+        return time_diff

@@ -15,7 +15,7 @@ _CMD_UNKNOWN_KEY = 'unknown'
 # 单横杠参数的字段
 _SINGLE_HORIZONTAL_BAR_KEYS = ['e', 'f', 'i']
 # 布尔类型的字段
-_BOOLEAN_TYPE_KEYS = ['verbose', 'supervise', 'kill', 'status']
+_BOOLEAN_TYPE_KEYS = ['verbose', 'supervise', 'version', 'usage_error', 'help']
 # 需进行转换的字段
 _SPARK_CONF_SUPPLEMENT_MAP = {
     'num-executors': 'spark.executor.instances',
@@ -30,7 +30,9 @@ class SparkCMDParser:
     """
     Spark 引擎的解析器
     """
-    _parser = argparse.ArgumentParser()
+    # 当用户提交-h和--help时需要退回原生执行 因此关闭argparse自带的--help/-h参数解析
+    _parser = argparse.ArgumentParser(add_help=False)
+
     # 参数命中包含'-'的参数，设置dest属性，避免参数解析中'-'被转换为'_'
     # 解析Spark CMD开头，需脚本配合
     _parser.add_argument(f'--{_CMD_PREFIX_KEY}', dest=_CMD_PREFIX_KEY,
@@ -49,8 +51,8 @@ class SparkCMDParser:
     _parser.add_argument('--driver-memory', dest='driver-memory')
     _parser.add_argument('--executor-memory', dest='executor-memory')
     _parser.add_argument('--files')
-    _parser.add_argument('--jars')  # TODO 这个入参和--jar有什么区别
-    _parser.add_argument('--kill', action='store_true')  # TODO 这也是非SUBMIT相关的命令
+    _parser.add_argument('--jars')
+    _parser.add_argument('--kill', action='store_true')
     _parser.add_argument('--master',
                          help="spark://host:port, mesos://host:port, yarn, k8s://https://host:port, "
                               "or local (Default: local[*]).")
@@ -60,11 +62,11 @@ class SparkCMDParser:
     _parser.add_argument('--proxy-user', dest='proxy-user')
     _parser.add_argument('--py-files', dest='py-files')
     _parser.add_argument('--repositories')
-    _parser.add_argument('--status', action='store_true')  # TODO boolean
+    _parser.add_argument('--status', action='store_true')
     _parser.add_argument('--total-executor-cores', dest='total-executor-cores')
 
     # Options that do not take arguments boolean变量
-    # '--help', '-h' 由于是argparse的内置 这里不显示写明
+    _parser.add_argument('-h', '--help', action='store_true')
     _parser.add_argument('--supervise', action='store_true')
     _parser.add_argument('--usage-error', action='store_true')
     _parser.add_argument('--verbose', '-v', action='store_true')
@@ -101,7 +103,7 @@ class SparkCMDParser:
         params, unknown = cls._parser.parse_known_args(args=args)
         primary_resource = unknown
 
-        if primary_resource is None and params['class'] == '':
+        if not primary_resource and vars(params)['class'] is None:
             raise TypeError("This is not a SUBMIT type spark task.")
 
     @staticmethod
@@ -194,9 +196,9 @@ class SparkCMDParser:
         for key, value in exec_attr.items():
             if key == _CMD_PREFIX_KEY:
                 continue
-            # 单独处理 remainder = ['--uk1','xxxx','--uk2','xxxx'] 这部分未被解析的残余参数
+            # 单独处理 unknown = ['xxxxxxx.jar', 'xxxxxx', 'xxxxx'] 这部分未被解析的残余参数追加到末尾 不在此处理
             elif key == _CMD_UNKNOWN_KEY:
-                cmd_fields += [cls._normalize_value(item) for item in value]
+                continue
             # 单独处理 - 作为前缀的参数
             elif key in _SINGLE_HORIZONTAL_BAR_KEYS:
                 cmd_fields += [f'-{key}', cls._normalize_value(value)]
@@ -207,6 +209,11 @@ class SparkCMDParser:
         # 处理参数配置
         for key, value in conf_params.items():
             cmd_fields += ['--conf', f'{key}={cls._normalize_value(value)}']
+
+        # 追加primary_resource
+        primary_resource = exec_attr.get(_CMD_UNKNOWN_KEY)
+        if primary_resource:
+            cmd_fields += [cls._normalize_value(item) for item in primary_resource]
 
         global_logger.debug("cmd_fields = %s", cmd_fields)
         return cmd_fields
