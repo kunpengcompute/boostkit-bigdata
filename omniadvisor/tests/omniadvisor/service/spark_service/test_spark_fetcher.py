@@ -1,9 +1,11 @@
 import json
+from unittest import mock
+
 import pytest
 import requests
-from unittest import mock
-from omniadvisor.service.spark_service.spark_fetcher import SparkFetcher
+
 from common.constant import OA_CONF
+from omniadvisor.service.spark_service.spark_fetcher import SparkFetcher
 
 history_server_url = OA_CONF.spark_history_rest_url
 spark_fetcher = SparkFetcher(history_server_url, None, None)
@@ -116,11 +118,11 @@ class TestSparkFetcher:
         mock_response.text = json.dumps(MOCK_APPS_RESPONSE)
 
         # 配置raise_for_status_code方法 使其根据状态码抛出HTTPError
-        mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError("HTTP error occurred", response=mock_response)
+        mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError("HTTP error occurred",
+                                                                                   response=mock_response)
 
         # 配置mock对象的返回值
         mock_get.return_value = mock_response
-
 
         # 断言HTTPError被抛出
         with pytest.raises(requests.exceptions.HTTPError):
@@ -139,10 +141,25 @@ class TestSparkFetcher:
         with pytest.raises(requests.exceptions.HTTPError):
             spark_fetcher.get_spark_executor_by_app("app-1")
 
-    def test_init_when_with_auth(self):
-        # 带用户验证情况
-        pass
-
-    def test_init_when_without_auth(self):
+    @mock.patch('requests.get')
+    def test_make_request_when_without_username(self, mock_get):
         # 不带用户验证情况
-        pass
+        mock_response = mock.Mock()
+        mock_response.text = "{}"
+        mock_get.return_value = mock_response
+        fetcher = SparkFetcher('server_url', '', '')
+        endpoint = 'endpoint'
+        fetcher._make_request(endpoint)
+        mock_get.assert_called_once_with('server_url/endpoint')
+
+    @mock.patch('requests.get')
+    def test_make_request_when_with_username(self, mock_get):
+        # 带用户验证情况
+        mock_response = mock.Mock()
+        mock_response.text = "{}"
+        mock_get.return_value = mock_response
+        fetcher = SparkFetcher('server_url', 'user', 'pass')
+        endpoint = 'endpoint'
+        fetcher._make_request(endpoint)
+        mock_get.assert_called_once_with('server_url/endpoint', auth=('user', 'pass'), verify=False,
+                                         allow_redirects=False)
