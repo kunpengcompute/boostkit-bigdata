@@ -15,7 +15,7 @@ _CMD_UNKNOWN_KEY = 'unknown'
 # 单横杠参数的字段
 _SINGLE_HORIZONTAL_BAR_KEYS = ['e', 'f', 'i']
 # 布尔类型的字段
-_BOOLEAN_TYPE_KEYS = ['verbose', 'supervise', 'version', 'usage_error', 'help']
+_BOOLEAN_TYPE_KEYS = ['verbose', 'supervise', 'version', 'usage-error', 'help']
 # 需进行转换的字段
 _SPARK_CONF_SUPPLEMENT_MAP = {
     'driver-memory': 'spark.driver.memory',
@@ -52,7 +52,7 @@ class SparkCMDParser:
     _parser.add_argument('--executor-memory', dest='executor-memory')
     _parser.add_argument('--files')
     _parser.add_argument('--jars')
-    _parser.add_argument('--kill', action='store_true')
+    _parser.add_argument('--kill')
     _parser.add_argument('--master',
                          help="spark://host:port, mesos://host:port, yarn, k8s://https://host:port, "
                               "or local (Default: local[*]).")
@@ -62,7 +62,7 @@ class SparkCMDParser:
     _parser.add_argument('--proxy-user', dest='proxy-user')
     _parser.add_argument('--py-files', dest='py-files')
     _parser.add_argument('--repositories')
-    _parser.add_argument('--status', action='store_true')
+    _parser.add_argument('--status')
     _parser.add_argument('--total-executor-cores', dest='total-executor-cores')
 
     # Options that do not take arguments boolean变量
