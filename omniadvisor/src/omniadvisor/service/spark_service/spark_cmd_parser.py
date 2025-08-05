@@ -18,11 +18,11 @@ _SINGLE_HORIZONTAL_BAR_KEYS = ['e', 'f', 'i']
 _BOOLEAN_TYPE_KEYS = ['verbose', 'supervise', 'version', 'usage_error', 'help']
 # 需进行转换的字段
 _SPARK_CONF_SUPPLEMENT_MAP = {
-    'num-executors': 'spark.executor.instances',
-    'executor-cores': 'spark.executor.cores',
+    'driver-memory': 'spark.driver.memory',
     'driver-cores': 'spark.driver.cores',
     'executor-memory': 'spark.executor.memory',
-    'driver-memory': 'spark.driver.memory'
+    'executor-cores': 'spark.executor.cores',
+    'num-executors': 'spark.executor.instances',
 }
 
 
@@ -68,7 +68,7 @@ class SparkCMDParser:
     # Options that do not take arguments boolean变量
     _parser.add_argument('-h', '--help', action='store_true')
     _parser.add_argument('--supervise', action='store_true')
-    _parser.add_argument('--usage-error', action='store_true')
+    _parser.add_argument('--usage-error', dest="usage-error", action='store_true')
     _parser.add_argument('--verbose', '-v', action='store_true')
     _parser.add_argument('--version', action='store_true')
 

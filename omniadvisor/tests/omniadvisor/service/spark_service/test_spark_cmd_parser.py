@@ -1,3 +1,4 @@
+import shlex
 import pytest
 from omniadvisor.service.spark_service.spark_cmd_parser import SparkCMDParser, _CMD_PREFIX_KEY, _CMD_UNKNOWN_KEY
 
@@ -75,7 +76,7 @@ class TestSparkCMDParser:
         ]
         exec_attr, _ = SparkCMDParser.parse_cmd(argv)
 
-        for flag in ["verbose", "version", "supervise", "usage_error", "help"]:
+        for flag in ["verbose", "version", "supervise", "usage-error", "help"]:
             assert exec_attr.get(flag) is True
 
         assert exec_attr[_CMD_UNKNOWN_KEY] == ["example.jar"]
@@ -175,3 +176,89 @@ class TestSparkCMDParser:
         assert "spark.executor.instances=4" in cmd
         assert "--verbose" in cmd
         assert "--supervise" not in cmd
+
+    # 全量参数测试
+    def test_parse_and_reconstruct_all_params_from_cmd_string(self):
+        cmd_string = """
+        --omniadvisor-cmd-prefix '$SPARK_HOME/bin/spark-class org.apache.spark.deploy.SparkSubmit'
+        --class com.example.MainClass
+        --name MySparkApp
+        --master yarn
+        --deploy-mode cluster
+        --driver-memory 2g
+        --driver-cores 2
+        --executor-memory 4g
+        --executor-cores 4
+        --num-executors 20
+        --queue root.default
+        --conf spark.executor.memoryOverhead=512
+        --conf spark.yarn.maxAppAttempts=1
+        --jars lib1.jar,lib2.jar
+        --files config.yaml
+        --archives env.zip#env
+        --verbose
+        --version
+        --supervise
+        --usage-error
+        --help
+        -i init_script.sql
+        -d my_database
+        --e "SELECT * FROM table"
+        -f query.sql
+        my_app.jar
+        --custom-arg custom_value
+        """
+
+        # 使用 shlex.split 来模拟 shell 行为
+        argv = shlex.split(cmd_string)
+
+        # Step 1: Parse
+        exec_attr, conf_attr = SparkCMDParser.parse_cmd(argv)
+
+        # Step 2: Reconstruct
+        reconstructed_cmd = SparkCMDParser.reconstruct_cmd(exec_attr, conf_attr)
+
+        # Step 3: 验证 reconstruct 是否保留了所有参数
+        expected = [
+            "--class", "com.example.MainClass",
+            "--name", "MySparkApp",
+            "--master", "yarn",
+            "--deploy-mode", "cluster",
+            "--conf", "spark.driver.memory=2g",
+            "--conf", "spark.driver.cores=2",
+            "--conf", "spark.executor.memory=4g",
+            "--conf", "spark.executor.cores=4",
+            "--conf", "spark.executor.instances=20",
+            "--queue", "root.default",
+            "--conf", "spark.executor.memoryOverhead=512",
+            "--conf", "spark.yarn.maxAppAttempts=1",
+            "--jars", "lib1.jar,lib2.jar",
+            "--files", "config.yaml",
+            "--archives", "env.zip#env",
+            "--verbose",
+            "--version",
+            "--supervise",
+            "--usage-error",
+            "--help",
+            "-i", "init_script.sql",
+            "--database", "my_database",
+            "-e", "SELECT * FROM table",
+            "-f", "query.sql",
+            "my_app.jar",
+            "--custom-arg", "custom_value"
+        ]
+
+        for item in expected:
+            assert item in reconstructed_cmd, f"Missing '{item}' in reconstructed command"
+
+        # Step 4: 验证 parse_cmd 是否解析了所有 key
+        expected_keys = {
+            "class", "name", "master", "deploy-mode",
+            "queue", "jars", "files", "archives",
+            "verbose", "version", "supervise", "usage-error", "help",
+            "i", "database", "e", "f",
+            _CMD_UNKNOWN_KEY
+        }
+
+        assert set(exec_attr.keys()).issuperset(expected_keys), "Missing expected keys in parsed exec_attr"
+
