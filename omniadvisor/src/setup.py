@@ -10,7 +10,7 @@ from Cython.Build import cythonize
 from setuptools import setup, Extension, find_packages
 
 # 要编译成 .pyc的文件（几个入口文件）
-pyc_files = ['__init__.py', 'init.py', 'hijack.py', 'tuning.py']
+pyc_files = ['__init__.py', 'init.py', 'hijack.py', 'tuning.py', 'version.py']
 
 sysconfig.get_config_vars()['CCSHARED'] = '-O2 -pipe -Wall -Wtrampolines -D_FORTIFY_SOURCE=2 -O2 -fPIC ' \
                                           '-finline-functions -fstack-protector-strong ' \
