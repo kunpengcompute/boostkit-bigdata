@@ -41,6 +41,12 @@ class OmniAdvisorConf:
     """
     OmniAdvisor常量
     """
+    # OmniAdvisor版本信息
+    product_name = "Kunpeng BoostKit"
+    product_version = "25.2.RC1"
+    component_name = "BoostKit-OmniAdvisor"
+    component_version = "2.0.0"
+
     # OmniAdvisor根目录
     project_base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     # Django Server根目录
