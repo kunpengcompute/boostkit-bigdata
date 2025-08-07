@@ -24,7 +24,7 @@ _RETURN_CODE_MAP = {
 }
 
 
-def spark_run(load: Load, config: dict, wait_for_trace: bool = False):
+def spark_run(load: Load, config: dict, wait_for_trace: bool = True, exec_in_isolation: bool = False):
     """
     输入负载与配置，执行Spark任务 并从Spark命令的返回值中获取
     生成一条记录本次执行信息的exam_record
@@ -33,10 +33,17 @@ def spark_run(load: Load, config: dict, wait_for_trace: bool = False):
     :param load: 负载
     :param config: 参数配置
     :param wait_for_trace: 是否阻塞等待获取trace
+    :param exec_in_isolation: 是否在隔离队列中执行
     :return:
     """
+    # 是否要在隔离中执行，若在隔离中执行，则将队列改为隔离队列
+    if exec_in_isolation and OA_CONF.backend_retest_queue:
+        exec_attr = load.exec_attr
+        exec_attr['queue'] = OA_CONF.backend_retest_queue
+    else:
+        exec_attr = load.exec_attr
     # 从解析后的参数列表中提取负载与任务的相关信息
-    submit_cmd = SparkCMDParser.reconstruct_cmd(exec_attr=load.exec_attr, conf_params=config)
+    submit_cmd = SparkCMDParser.reconstruct_cmd(exec_attr=exec_attr, conf_params=config)
 
     # 判断当前执行配置是否为租户基线配置，若不相同则需设置超时时间
     if config != load.default_config:

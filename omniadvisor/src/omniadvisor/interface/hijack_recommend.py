@@ -177,7 +177,7 @@ def hijack_recommend(argv: list):
 
     # 根据配置和负载执行Spark任务
     global_logger.info("Going to execute Spark load ……")
-    exam_record, output = spark_run(load=load, config=exec_config, wait_for_trace=False)
+    exam_record, output = spark_run(load=load, config=exec_config, wait_for_trace=False, exec_in_isolation=False)
     # 执行结果分析
     if exam_record.status == OA_CONF.ExecStatus.success:
         # 打印结果输出
