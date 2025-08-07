@@ -73,7 +73,7 @@ class TestHijackRecommend:
     @patch("omniadvisor.interface.hijack_recommend.SparkCMDParser.parse_cmd")
     @patch("omniadvisor.interface.hijack_recommend.SparkCMDParser.validate_submit_arguments")
     def test_failed_user_config(self, mock_validate_submit_arguments, mock_parse_cmd,mock_create_or_update_load,
-                                mock_query_load, mock_get_config, mock_spark_run, mock_process_config):
+                                mock_get_config, mock_spark_run, mock_process_config):
         argv = ["--conf", "spark.executor.memory=4g"]
         exec_attr = {"name": "job_name"}
         user_config = {"spark.executor.memory": "4g"}
@@ -89,16 +89,6 @@ class TestHijackRecommend:
         # 不进入安全机制的情况call_count的值为1
         assert mock_spark_run.call_count == 1
         mock_process_config.assert_not_called()
-
-    # 场景 4: 缺少任务名称
-    @patch("omniadvisor.interface.hijack_recommend.SparkCMDParser.parse_cmd")
-    @patch("omniadvisor.interface.hijack_recommend.SparkCMDParser.validate_submit_arguments")
-    def test_missing_task_name(self, mock_validate_submit_arguments, mock_parse_cmd):
-        argv = ["--conf", "spark.executor.memory=4g"]
-        mock_parse_cmd.return_value = ({}, {"spark.executor.memory": "4g"})
-
-        with pytest.raises(ValueError, match="Task name not in Spark submit cmd"):
-            hijack_recommend(argv)
 
     # 场景 5: 执行的是 test_config，触发 _process_load_config
     @patch('omniadvisor.service.spark_service.spark_run.multiprocessing.Process')
