@@ -1,40 +1,23 @@
-import sys
+import hashlib
+import json
 import multiprocessing
+import re
+import sys
 
 from common.constant import OA_CONF
-from omniadvisor.service.spark_service.spark_cmd_parser import SparkCMDParser
-from omniadvisor.repository.model.load import Load
 from omniadvisor.repository.load_repository import LoadRepository
+from omniadvisor.repository.model.load import Load
 from omniadvisor.repository.tuning_record_repository import TuningRecordRepository
+from omniadvisor.service.spark_service.spark_cmd_parser import SparkCMDParser
+from omniadvisor.service.spark_service.spark_run import spark_run
 from omniadvisor.service.tuning_result.tuning_result import get_tuning_result
 from omniadvisor.service.tuning_result.tuning_result_history import get_tuning_result_history
 from omniadvisor.utils.logger import global_logger
-from omniadvisor.service.spark_service.spark_run import spark_run
-
 from omniadvisor.utils.utils import float_format
 
-
-def _query_or_create_load(name: str, exec_attr: dict, default_config: dict):
-    """
-    根据名称和默认配置，查询或创建负载
-
-    :param name: 负载名称
-    :param exec_attr: 执行属性
-    :param default_config: 默认参数配置
-    :return: 负载实例
-    """
-    # 从负载数据库中查询是否有相关联的Load
-    loads = LoadRepository.query_by_exec_attr_and_default_config(exec_attr=exec_attr, default_config=default_config)
-    # 如果查询不到负载信息，则创建新的负载
-    if not loads:
-        global_logger.info("Load not found in database, create new one and execute.")
-        load = LoadRepository.create(name=name, exec_attr=exec_attr, default_config=default_config)
-        TuningRecordRepository.create(load=load, config=default_config, method=OA_CONF.TuningMethod.user)
-    else:
-        global_logger.info("Load found in database, ready to get config to execute.")
-        load = loads.pop()
-
-    return load
+_NAME_STR = 'name'
+_USER_CONFIG_STR = 'user_config'
+_FILE_CONTENT_STR = 'file_content'
 
 
 def _get_exec_config_from_load(load: Load):
@@ -110,10 +93,74 @@ def _process_load_config(load: Load, config: dict):
         pass
 
 
+def _get_load_name_from_exec_attr(exec_attr: dict):
+    """
+    获取任务名，无则空
+    """
+    return exec_attr.get('name', '')
+
+
+def _calculate_hash_value(exec_attr: dict, user_config: dict):
+    """
+    根据 执行参数和用户配置计算负载唯一标识，hash值
+    """
+    class_info = exec_attr.get('class', '')
+    if 'SparkSQLCLIDriver' in class_info:
+        # spark-sql，则提取 -e 和 -f，替换
+        if 'e' in exec_attr:
+            file_content = _remove_time(exec_attr.get('e', ''))
+        else:
+            file_content = exec_attr.get('f', '')
+    else:
+        # spark-submit，则提取 file 及之后的内容，包含 file的入参
+        unknown_content = exec_attr.get('unknown', [])
+        unknown_content = [item.strip() for item in unknown_content]
+        if len(unknown_content) > 0:
+            file_content = unknown_content[0]
+        else:
+            file_content = ''
+
+    name = _get_load_name_from_exec_attr(exec_attr)
+    data = {
+        _NAME_STR: _remove_time(name),
+        _USER_CONFIG_STR: user_config,
+        _FILE_CONTENT_STR: file_content
+    }
+    json_str = json.dumps(data, sort_keys=True)
+    hash_value = hashlib.sha256(json_str.encode()).hexdigest()
+    return hash_value
+
+
+def _remove_time(content: str):
+    """
+    移除时间信息，可精确到小时
+    """
+    for pattern in OA_CONF.date_patterns:
+        content = re.sub(pattern, '{date}', content)
+    return content.strip()
+
+
+def _create_or_update_load(exec_attr: dict, default_config: dict):
+    """
+    无则创建，有则更新 name 和 exec_attr 字段。如果日期信息等一直保持不变，后期复测时，会导致测试出现异常
+    """
+    name = _get_load_name_from_exec_attr(exec_attr)
+    hash_value = _calculate_hash_value(exec_attr, default_config)
+    loads = LoadRepository.query_by_hash_value(hash_value)
+    if loads:
+        global_logger.info("Load found in database, update and ready to get config to execute.")
+        return LoadRepository.update_name_and_exec_attr(loads.pop(), name, exec_attr)
+    else:
+        # 负载没有创建过
+        load = LoadRepository.create(name, exec_attr, default_config, hash_value)
+        global_logger.info("Load not found in database, created new one and execute.")
+        TuningRecordRepository.create(load=load, config=default_config, method=OA_CONF.TuningMethod.user)
+        return load
+
+
 def hijack_recommend(argv: list):
     """
     任务劫持，使能参数下发执行任务
-
     :param argv: Spark执行命令字段
     """
     # 非SUBMIT动作(指kill任务/查询状态/查询版本)的提交直接回退到原生spark-submit脚本执行 不被特性所劫持
@@ -122,13 +169,9 @@ def hijack_recommend(argv: list):
     # 获取用户传入的Spark命令 并解析命令
     global_logger.debug("Hijack input params: %s", argv)
     exec_attr, user_config = SparkCMDParser.parse_cmd(argv=argv)
-    # 提取任务名字
-    if 'name' not in exec_attr.keys():
-        raise ValueError(f'Task name not in Spark submit cmd!')
-    name = exec_attr['name']
 
     # 查询或创建相应负载
-    load = _query_or_create_load(name=name, exec_attr=exec_attr, default_config=user_config)
+    load = _create_or_update_load(exec_attr=exec_attr, default_config=user_config)
     # 获取待执行参数配置
     exec_config = _get_exec_config_from_load(load=load)
 
@@ -143,11 +186,7 @@ def hijack_recommend(argv: list):
     # 若执行失败 则判断是否需要拉起安全机制
     else:
         if exec_config != user_config:
-            global_logger.warning("Spark execute failed, ready to activate security protection mechanism.")
-            safe_exam_record, safe_output = spark_run(load=load, config=user_config, wait_for_trace=False)
-            global_logger.info("Spark execute in security protection mechanism, going to print Spark output.")
-            # 打印安全机制下任务的输出
-            print(safe_output, end="", flush=True)
+            raise RuntimeError("Spark execute failed, ready to activate security protection mechanism.")
         else:
             global_logger.warning("Spark execute failed in user config, going to print Spark output.")
             print(output, end="", flush=True)

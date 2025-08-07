@@ -1,15 +1,19 @@
 import json
+from unittest import mock
+
 import pytest
 import requests
 import unittest
 from unittest import mock
+
+from common.constant import OA_CONF
 from omniadvisor.service.spark_service.spark_fetcher import SparkFetcher
 from common.constant import OA_CONF
 from datetime import datetime
 
 
 history_server_url = OA_CONF.spark_history_rest_url
-spark_fetcher = SparkFetcher(history_server_url)
+spark_fetcher = SparkFetcher(history_server_url, None, None)
 
 # 示例数据
 MOCK_APPS_RESPONSE = [
@@ -226,5 +230,25 @@ class TestSparkFetcher(unittest.TestCase):
         with pytest.raises(requests.exceptions.HTTPError):
             spark_fetcher.get_spark_executor_by_app("app-1")
 
+    @mock.patch('requests.get')
+    def test_make_request_when_without_username(self, mock_get):
+        # 不带用户验证情况
+        mock_response = mock.Mock()
+        mock_response.text = "{}"
+        mock_get.return_value = mock_response
+        fetcher = SparkFetcher('server_url', '', '')
+        endpoint = 'endpoint'
+        fetcher._make_request(endpoint)
+        mock_get.assert_called_once_with('server_url/endpoint')
 
-
+    @mock.patch('requests.get')
+    def test_make_request_when_with_username(self, mock_get):
+        # 带用户验证情况
+        mock_response = mock.Mock()
+        mock_response.text = "{}"
+        mock_get.return_value = mock_response
+        fetcher = SparkFetcher('server_url', 'user', 'pass')
+        endpoint = 'endpoint'
+        fetcher._make_request(endpoint)
+        mock_get.assert_called_once_with('server_url/endpoint', auth=('user', 'pass'), verify=False,
+                                         allow_redirects=False)

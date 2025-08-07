@@ -50,7 +50,7 @@ class Repository(ABC):
         """
         for field in cls._frozen_fields:
             if field in model_attr.keys():
-                raise ValueError(f'The {cls._model_class.__name__} filed {field} can not be changed.')
+                raise ValueError(f'The {cls._model_class.__name__} field {field} can not be changed.')
 
     @classmethod
     def _check_required_field(cls, model_attr: dict):
@@ -61,7 +61,7 @@ class Repository(ABC):
         """
         for field in cls._required_fields:
             if field not in model_attr.keys():
-                raise ValueError(f'The {cls._model_class.__name__} filed {field} is required.')
+                raise ValueError(f'The {cls._model_class.__name__} field {field} is required.')
 
     @classmethod
     def _check_field_format(cls, model_attr: dict):
@@ -70,17 +70,17 @@ class Repository(ABC):
 
         :param model_attr: Model属性字典
         """
-        for field, filed_format in cls._fields_format.items():
+        for field, field_format in cls._fields_format.items():
             if field not in model_attr.keys():
                 continue
 
-            filed_types, filed_forbidden, filed_allow = filed_format
-            if not isinstance(model_attr[field], tuple(filed_types)):
-                raise TypeError(f'Type of {cls._model_class.__name__} filed {field} must in {filed_types}.')
-            if model_attr[field] in filed_forbidden:
-                raise ValueError(f'Value of {cls._model_class.__name__} filed {field} cannot be in {filed_forbidden}.')
-            if filed_allow and model_attr[field] not in filed_allow:
-                raise ValueError(f'Value of {cls._model_class.__name__} filed {field} must be in {filed_allow}.')
+            field_types, field_forbidden, field_allow = field_format
+            if not isinstance(model_attr[field], tuple(field_types)):
+                raise TypeError(f'Type of {cls._model_class.__name__} field {field} must in {field_types}.')
+            if model_attr[field] in field_forbidden:
+                raise ValueError(f'Value of {cls._model_class.__name__} field {field} cannot be in {field_forbidden}.')
+            if field_allow and model_attr[field] not in field_allow:
+                raise ValueError(f'Value of {cls._model_class.__name__} field {field} must be in {field_allow}.')
 
     @classmethod
     def _create(cls, model_attr: dict):

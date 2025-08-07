@@ -1,3 +1,4 @@
+from omniadvisor.interface.hijack_recommend import _calculate_hash_value
 from .common import create_table, delete_table
 from common.constant import OA_CONF
 from server.app.models import DatabaseLoad, DatabaseTuningRecord
@@ -32,10 +33,12 @@ class TestTaskRepository:
 
     def test_create(self):
         # 创建测试数据
+        hash_value = _calculate_hash_value(exec_attr={'cmd': 'spark-sql -f test.sql'}, user_config={"param1": "value2"})
         load = LoadRepository.create(
             name='test',
             exec_attr={'cmd': 'spark-sql -f test.sql'},
-            default_config={"param1": "value2"}
+            default_config={"param1": "value2"},
+            hash_value=hash_value
         )
 
         # 创建TuningRecord
@@ -63,10 +66,12 @@ class TestTaskRepository:
 
     def test_query_by_load(self):
         # 创建测试数据
+        hash_value = _calculate_hash_value(exec_attr={'cmd': 'spark-sql -f test.sql'}, user_config={"param1": "value2"})
         load = LoadRepository.create(
             name='test',
             exec_attr={'cmd': 'spark-sql -f test.sql'},
-            default_config={"param1": "value2"}
+            default_config={"param1": "value2"},
+            hash_value=hash_value
         )
         tuning_record = TuningRecordRepository.create(
             load=load,
@@ -84,10 +89,12 @@ class TestTaskRepository:
 
     def test_query_by_load_and_config(self):
         # 创建测试数据
+        hash_value = _calculate_hash_value(exec_attr={'cmd': 'spark-sql -f test.sql'}, user_config={"param1": "value2"})
         load = LoadRepository.create(
             name='test',
             exec_attr={'cmd': 'spark-sql -f test.sql'},
-            default_config={"param1": "value2"}
+            default_config={"param1": "value2"},
+            hash_value=hash_value
         )
         tuning_record = TuningRecordRepository.create(
             load=load,

@@ -36,11 +36,24 @@ def check_oa_conf():
     if OA_CONF.spark_exec_timeout_ratio <= 0:
         raise ValueError('The spark exec timeout ratio must > 0, please check common configuration.')
 
+    if not (
+            (OA_CONF.spark_history_username and OA_CONF.spark_history_password) or
+            (not OA_CONF.spark_history_username and not OA_CONF.spark_history_password)
+    ):
+        raise ValueError('The spark history username and password should be provided, or leave both blank, please check'
+                         ' common configuration.')
+
 
 class OmniAdvisorConf:
     """
     OmniAdvisor常量
     """
+    # OmniAdvisor版本信息
+    product_name = "Kunpeng BoostKit"
+    product_version = "25.2.RC1"
+    component_name = "BoostKit-OmniAdvisor"
+    component_version = "2.0.0"
+
     # OmniAdvisor根目录
     project_base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     # Django Server根目录
@@ -96,6 +109,8 @@ class OmniAdvisorConf:
     tuning_retest_times = _common_config.getint('common', 'tuning.retest.times')
     config_fail_threshold = _common_config.getint('common', 'config.fail.threshold')
     spark_history_rest_url = _common_config.get('spark', 'spark.history.rest.url')
+    spark_history_username = _common_config.get('spark', 'spark.history.username', fallback='')
+    spark_history_password = _common_config.get('spark', 'spark.history.password', fallback='')
     spark_fetch_trace_timeout = _common_config.getint('spark', 'spark.fetch.trace.timeout')
     spark_fetch_trace_interval = _common_config.getint('spark', 'spark.fetch.trace.interval')
     spark_exec_timeout_ratio = _common_config.getfloat('spark', 'spark.exec.timeout.ratio')
@@ -103,6 +118,18 @@ class OmniAdvisorConf:
 
     # 保留小数位数
     decimal_digits = 3
+
+    # spark 的 name、sql中日期匹配格式，最高精确度是小时
+    date_patterns = [
+        # YYYY-MM-DD 或 YYYY-MM-DD HH
+        r'\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])(?:\s+(0\d|1\d|2[0-3]))?',
+        # YYYY/MM/DD 或 YYYY/MM/DD HH
+        r'\d{4}/(0[1-9]|1[0-2])/(0[1-9]|[12]\d|3[01])(?:\s+(0\d|1\d|2[0-3]))?',
+        # YYYY.MM.DD 或 YYYY.MM.DD HH
+        r'\d{4}\.(0[1-9]|1[0-2])\.(0[1-9]|[12]\d|3[01])(?:\s+(0\d|1\d|2[0-3]))?',
+        # 无分隔：YYYYMMDD 或 YYYYMMDDHH
+        r'\d{4}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])((0\d|1\d|2[0-3]))?'
+    ]
 
     # spark-sql命令所提交的类名
     SparkSQLCLIDriver = 'org.apache.spark.sql.hive.thriftserver.SparkSQLCLIDriver'
