@@ -3,13 +3,15 @@ import requests
 
 
 class SparkFetcher:
-    def __init__(self, history_server_url,):
+    def __init__(self, history_server_url, username, password):
         """
         初始化SparkFetcher类
 
         :param history_server_url: Spark History Server的URL地址
         """
         self.history_server_url = history_server_url.rstrip('/')  # 确保URL末尾没有斜杠
+        self.username = username
+        self.password = password
 
     def _make_request(self, endpoint):
         """
@@ -21,7 +23,11 @@ class SparkFetcher:
         """
         endpoint = endpoint.strip("/")
         url = f"{self.history_server_url}/{endpoint}"
-        response = requests.get(url)
+        if self.username:
+            # 若用户配置了用户名和密码，那么应当走验证通道
+            response = requests.get(url, auth=(self.username, self.password), verify=False, allow_redirects=False)
+        else:
+            response = requests.get(url)
         # 若status.code != 200~209则抛出异常
         response.raise_for_status()
         # 将获取到的数据转为json返回
