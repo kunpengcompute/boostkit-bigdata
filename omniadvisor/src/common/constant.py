@@ -134,5 +134,8 @@ class OmniAdvisorConf:
     # spark-sql命令所提交的类名
     SparkSQLCLIDriver = 'org.apache.spark.sql.hive.thriftserver.SparkSQLCLIDriver'
 
+    # 所有涉及到数据库变动的sql关键字
+    modify_keywords = ['create', 'insert', 'delete', 'truncate', 'drop', 'update', 'merge']
+
 
 OA_CONF = OmniAdvisorConf()

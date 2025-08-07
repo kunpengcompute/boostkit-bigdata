@@ -13,7 +13,7 @@ from omniadvisor.service.spark_service.spark_run import spark_run
 from omniadvisor.service.tuning_result.tuning_result import get_tuning_result
 from omniadvisor.service.tuning_result.tuning_result_history import get_tuning_result_history
 from omniadvisor.utils.logger import global_logger
-from omniadvisor.utils.utils import float_format
+from omniadvisor.utils.utils import float_format, safe_read_file, file_exists, any_match
 
 _NAME_STR = 'name'
 _USER_CONFIG_STR = 'user_config'
@@ -140,6 +140,28 @@ def _remove_time(content: str):
     return content.strip()
 
 
+def _has_modify_keywords(exec_attr):
+    """
+    检查是否含有危险操作
+    """
+    class_info = exec_attr.get('class', '')
+    if 'SparkSQLCLIDriver' in class_info:
+        # spark-sql，则提取 -e 和 -f，替换
+        if 'e' in exec_attr:
+            file_content = exec_attr.get('e', '')
+        else:
+            # 这里也有可能是相对路径
+            file_name = exec_attr.get('f', '')
+            exists = file_exists(file_name)
+            if not exists:
+                return False
+            file_content = safe_read_file(file_name)
+
+        return any_match(OA_CONF.modify_keywords, file_content)
+    else:
+        return True
+
+
 def _create_or_update_load(exec_attr: dict, default_config: dict):
     """
     无则创建，有则更新 name 和 exec_attr 字段。如果日期信息等一直保持不变，后期复测时，会导致测试出现异常
@@ -152,7 +174,8 @@ def _create_or_update_load(exec_attr: dict, default_config: dict):
         return LoadRepository.update_name_and_exec_attr(loads.pop(), name, exec_attr)
     else:
         # 负载没有创建过
-        load = LoadRepository.create(name, exec_attr, default_config, hash_value)
+        backend_retest_forbidden = _has_modify_keywords(exec_attr)
+        load = LoadRepository.create(name, exec_attr, default_config, hash_value, backend_retest_forbidden)
         global_logger.info("Load not found in database, created new one and execute.")
         TuningRecordRepository.create(load=load, config=default_config, method=OA_CONF.TuningMethod.user)
         return load

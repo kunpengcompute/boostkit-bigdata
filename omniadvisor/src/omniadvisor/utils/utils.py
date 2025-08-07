@@ -1,5 +1,6 @@
 import os
 import json
+import re
 import uuid
 import subprocess
 from typing import Tuple, List, Dict
@@ -76,3 +77,31 @@ def float_format(to_format: float) -> str:
     :return:
     """
     return "{:.{}f}".format(to_format, OmniAdvisorConf.decimal_digits)
+
+
+def safe_read_file(filepath: str):
+    """
+    以多种不同的编码形式，读取文件
+    """
+    for enc in ['utf-8', 'utf-8-sig', 'gb18030', 'latin1']:
+        try:
+            with open(filepath, 'r', encoding=enc) as f:
+                return f.read()
+        except UnicodeDecodeError:
+            continue
+    return None
+
+
+def file_exists(filepath: str):
+    """
+    检查文件是否存在
+    """
+    return os.path.isfile(filepath)
+
+
+def any_match(keywords: list[str], content: str):
+    """
+    匹配关键词中任意一个
+    """
+    pattern = re.compile(r'\b(?:' + '|'.join(keywords) + r')\b', re.IGNORECASE)
+    return bool(pattern.search(content))

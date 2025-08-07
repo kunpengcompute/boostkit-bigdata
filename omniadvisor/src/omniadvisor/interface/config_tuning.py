@@ -210,7 +210,14 @@ def main():
     # 后台复测
     # 1. 若指定调优方法，则执行一轮调优；若不指定，则进入连续调优策略
     # 2. 不做调优冲突判断，若推荐相同配置，则退出
+    # 3. 当前负载不支持后台复测，则退出
     elif args.retest_way == OA_CONF.RetestWay.backend:
+        if load.backend_retest_forbidden:
+            global_logger.info(
+                'Current load contains data manipulation operations, only retest way of hijacking is supported.'
+            )
+            return
+
         if args.tuning_method:
             _single_tuning(load=load, retest_way=args.retest_way, tuning_method=args.tuning_method)
         else:
