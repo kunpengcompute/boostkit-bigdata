@@ -119,5 +119,17 @@ class OmniAdvisorConf:
     # 保留小数位数
     decimal_digits = 3
 
+    # spark 的 name、sql中日期匹配格式，最高精确度是小时
+    date_patterns = [
+        # YYYY-MM-DD 或 YYYY-MM-DD HH
+        r'\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])(?:\s+(0\d|1\d|2[0-3]))?',
+        # YYYY/MM/DD 或 YYYY/MM/DD HH
+        r'\d{4}/(0[1-9]|1[0-2])/(0[1-9]|[12]\d|3[01])(?:\s+(0\d|1\d|2[0-3]))?',
+        # YYYY.MM.DD 或 YYYY.MM.DD HH
+        r'\d{4}\.(0[1-9]|1[0-2])\.(0[1-9]|[12]\d|3[01])(?:\s+(0\d|1\d|2[0-3]))?',
+        # 无分隔：YYYYMMDD 或 YYYYMMDDHH
+        r'\d{4}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])((0\d|1\d|2[0-3]))?'
+    ]
+
 
 OA_CONF = OmniAdvisorConf()

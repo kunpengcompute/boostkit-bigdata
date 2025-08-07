@@ -1,6 +1,7 @@
 import pytest
 from datetime import datetime
 
+from omniadvisor.interface.hijack_recommend import _calculate_hash_value
 from .common import create_table, delete_table
 from common.constant import OA_CONF
 from server.app.models import (
@@ -50,10 +51,12 @@ class TestExamRecordRepository:
         DatabaseLoad.objects.all().delete()
 
         # 构建测试数据
+        hash_value = _calculate_hash_value(exec_attr={'cmd': 'spark-sql -f test.sql'}, user_config={"param1": "value2"})
         self.load = LoadRepository.create(
             name='test',
             exec_attr={'cmd': 'spark-sql -f test.sql'},
-            default_config={'param1': 'value2'}
+            default_config={'param1': 'value2'},
+            hash_value=hash_value
         )
         self.config = {'param1': 'value2'}
         self.tuning_record = TuningRecordRepository.create(

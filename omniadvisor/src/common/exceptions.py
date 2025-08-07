@@ -10,3 +10,10 @@ class SystemKilledError(Exception):
     异常，程序被异常中断，例如kill等
     """
     pass
+
+
+class DuplicateEntryError(Exception):
+    """
+    数据重复异常
+    """
+    pass
