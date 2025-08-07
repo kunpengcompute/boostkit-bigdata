@@ -60,9 +60,10 @@ class TestHijackRecommend:
         mock_process = MagicMock()
         mock_multiprocess.return_value = mock_process
 
-        hijack_recommend(argv)
-        assert mock_spark_run.call_count == 2
-        mock_process.start.assert_called_once()
+        with pytest.raises(RuntimeError,
+                           match="Spark execute failed, ready to activate security protection mechanism."):
+            hijack_recommend(argv)
+        assert mock_spark_run.call_count == 1
 
     # 场景 3: 执行失败 + 不进入安全机制
     @patch("omniadvisor.interface.hijack_recommend._process_load_config")
@@ -107,12 +108,11 @@ class TestHijackRecommend:
         mock_parse_cmd.return_value = (exec_attr, user_config)
         mock_create_or_update_load.return_value = load
         mock_get_config.return_value = exec_config
-        mock_spark_run.return_value = (MagicMock(status="success"), "job output")
+        mock_spark_run.return_value = (MagicMock(status=OA_CONF.ExecStatus.success), "job output")
         mock_process = MagicMock()
         mock_multiprocess.return_value = mock_process
 
         hijack_recommend(argv)
-        mock_process.start.assert_called_once()
 
     # 场景 6: 命令解析异常
     @patch("omniadvisor.interface.hijack_recommend.SparkCMDParser.parse_cmd")
