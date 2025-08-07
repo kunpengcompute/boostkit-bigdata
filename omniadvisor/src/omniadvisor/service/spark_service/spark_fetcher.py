@@ -1,5 +1,9 @@
+import re
 import json
 import requests
+from dateutil import parser
+
+from omniadvisor.utils.logger import global_logger
 
 
 class SparkFetcher:
@@ -80,3 +84,37 @@ class SparkFetcher:
         :return: 返回指定应用的执行器信息
         """
         return self._make_request(f"api/v1/applications/{app_id}/executors")
+
+    def get_spark_jobs_by_app(self, app_id):
+        """
+        根据应用ID获取指定Spark应用的Jobs信息
+
+        :param app_id: 应用ID
+        :return: 返回指定应用的Jobs信息
+        """
+        return self._make_request(f"api/v1/applications/{app_id}/jobs")
+
+    def get_spark_runtime_by_app(self, app_id) -> float:
+        """
+        通过从HistoryServer上获取的jobs信息，计算任务的执行耗时
+        runtime的计算的耗时为 最早的Job提交的时间 与 最晚的Job完成时间 之间的差值（注：最晚完成的Job并不一定是最后提交的Job）
+
+        :return: runtime (seconds)
+        """
+        jobs_detail = self.get_spark_jobs_by_app(app_id)
+        if not jobs_detail:
+            global_logger.error(f"No job info returned for app_id={app_id}")
+            raise ValueError(f"No job information found for app_id={app_id}")
+
+        # 获取全部的时间戳信息
+        timestamp_list = []
+        for idx, job_detail in enumerate(jobs_detail):
+            if 'completionTime' not in job_detail or 'submissionTime' not in job_detail:
+                raise KeyError(f"Job at index {idx} is missing 'completionTime' or 'submissionTime'")
+            timestamp_list.append(parser.parse(job_detail['completionTime']).timestamp())
+            timestamp_list.append(parser.parse(job_detail['submissionTime']).timestamp())
+
+        # 计算时间差
+        time_diff = max(timestamp_list) - min(timestamp_list)
+        global_logger.debug(f"Total time diff calculate by jobs is {time_diff} seconds")
+        return time_diff

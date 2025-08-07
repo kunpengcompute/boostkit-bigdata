@@ -1,4 +1,5 @@
 import pytest
+from common.constant import OA_CONF
 from unittest.mock import patch
 from datetime import datetime
 
@@ -21,9 +22,9 @@ class TestSparkExecutor:
         self.cmd_fields = ['spark-submit', '--class', 'MyClass', 'my_app.jar']
         self.timeout = 10
         self.exitcode = 0
-        self.application_id = 'application_123456'
+        self.application_id = 'application_123456_303209'
         self.time_taken_list = [23.42, 25.83]
-        self.output = (f'Spark master: yarn, Application Id: {self.application_id}\n'
+        self.output = (f'Client: Submitting application {self.application_id} to ResourceManager\n'
                        f'XXXXXX\n'
                        f'Time taken: {self.time_taken_list[0]} seconds\n'
                        f'Time taken: {self.time_taken_list[1]} seconds\n'
@@ -44,7 +45,7 @@ class TestSparkExecutor:
         assert exec_result.exitcode == self.exitcode
         assert exec_result.output == self.output
         assert exec_result.app_id == self.application_id
-        assert exec_result.duration == sum(self.time_taken_list)
+        assert exec_result.duration == OA_CONF.exec_fail_return_runtime
         assert type(exec_result.start_time) is datetime
         assert type(exec_result.end_time) is datetime
 
@@ -56,7 +57,7 @@ class TestSparkExecutor:
         app_id, total_time_taken = self.spark_executor._parser_spark_output(self.output)
         # 验证结果
         assert app_id == self.application_id
-        assert total_time_taken == sum(self.time_taken_list)
+        assert total_time_taken == OA_CONF.exec_fail_return_runtime
 
         # 解析spark output缺失application id
         output = (f'Time taken: {self.time_taken_list[0]} seconds\n'

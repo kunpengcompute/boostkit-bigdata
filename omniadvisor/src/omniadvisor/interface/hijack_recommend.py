@@ -163,6 +163,9 @@ def hijack_recommend(argv: list):
     任务劫持，使能参数下发执行任务
     :param argv: Spark执行命令字段
     """
+    # 非SUBMIT动作(指kill任务/查询状态/查询版本)的提交直接回退到原生spark-submit脚本执行 不被特性所劫持
+    SparkCMDParser.validate_submit_arguments(argv)
+
     # 获取用户传入的Spark命令 并解析命令
     global_logger.debug("Hijack input params: %s", argv)
     exec_attr, user_config = SparkCMDParser.parse_cmd(argv=argv)

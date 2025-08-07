@@ -20,6 +20,7 @@ django = "~4.2.10"
 smac = "~2.2.0"
 colorlog = "~6.9.0"
 requests = "^2.32.3"
+python-dateutil = "2.9.0.post0"
 
 [tool.poetry.group.test.dependencies]
 pytest = "^7.4.4"

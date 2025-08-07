@@ -131,10 +131,11 @@ class TuningResult:
             return OA_CONF.exec_fail_return_runtime
 
         # 计算执行状态为success的平均runtime
-        success_runtimes = [
-            exam_record.runtime
-            for exam_record in self._exam_records if exam_record.status == OA_CONF.ExecStatus.success
-        ]
+        success_runtimes = []
+        for exam_record in self._exam_records:
+            if (exam_record.status == OA_CONF.ExecStatus.success
+                    and exam_record.runtime != OA_CONF.exec_fail_return_runtime):
+                success_runtimes.append(exam_record.runtime)
 
         # 若配置成功复测的次数为0，则runtime为失败返回值
         if not success_runtimes:

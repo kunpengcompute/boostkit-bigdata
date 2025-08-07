@@ -102,7 +102,7 @@ class ExamRecordRepository(Repository):
     @classmethod
     def update_trace(cls, exam_record: ExamRecord, trace: dict):
         """
-        更新测试记录中的状态
+        更新测试记录中的trace信息
 
         :param exam_record: 测试记录实例
         :param trace: 执行Trace
@@ -110,6 +110,25 @@ class ExamRecordRepository(Repository):
         """
         model_attr = {
             ExamRecord.FieldName.trace: trace
+        }
+        database_task = cls._update(
+            database_model=exam_record.database_model,
+            model_attr=model_attr
+        )
+
+        return ExamRecord(database_model=database_task)
+
+    @classmethod
+    def update_runtime(cls, exam_record: ExamRecord, runtime: float):
+        """
+        更新从jobs中获取的runtime信息
+
+        :param exam_record: 测试记录实例
+        :param runtime: 从Jobs信息中计算出的runtime值
+        :return: 更新完后的测试记录
+        """
+        model_attr = {
+            ExamRecord.FieldName.runtime: runtime
         }
         database_task = cls._update(
             database_model=exam_record.database_model,

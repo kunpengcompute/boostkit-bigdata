@@ -25,7 +25,7 @@ class SparkExecutor:
     @classmethod
     def submit_spark_task(cls, cmd_fields: list, timeout: int):
         """
-        在shell终端提交spark命令，并解析结果
+        在shell终端提交spark命令，并在命令成功执行并返回时解析结果中的数据
 
         :param cmd_fields: Spark的提交命令
         :param timeout: 超时时间
@@ -66,24 +66,32 @@ class SparkExecutor:
     @classmethod
     def _parser_spark_output(cls, spark_output: str):
         """
-        解析Spark输出，获得spark提交命令、Application ID和执行用时
+        解析Spark输出，获得spark提交命令、Application ID和Time taken(若存在)
+        (注: Time taken后续不再作为性能指标被使用 目前仅作为性能参考获取系其数值)
 
         :param spark_output: Spark执行输出
         :return:
         """
         # 解析Application id:
-        search_obj = re.search(r'Application Id: (.*)\n', spark_output)
+        # 该条匹配模式的文本来自Spark3.3.1源码中yarn/Client.scala文件在Line224所打印的日志
+        # 若Spark版本迭代时对该日志内容做出修改 则存在application id匹配失败的风险
+        pattern = r'Client: Submitting application (application_\d+_\d+) to ResourceManager'
+        search_obj = re.search(pattern, spark_output)
         if search_obj:
             application_id = search_obj.group(1)
         else:
             raise RuntimeError('Can not find application id message in spark output.')
 
         # 解析Time Taken，只解析行首匹配字符串，避免Spark debug log中重复匹配
-        match_objs = re.findall(r'^Time taken: (.*) seconds', spark_output, re.MULTILINE)
+        pattern = r'^Time taken: (.*) seconds'
+        match_objs = re.findall(pattern, spark_output, re.MULTILINE)
         if match_objs:
             time_taken_list = [float(obj) for obj in match_objs]
             total_time_taken = sum(time_taken_list)
+            global_logger.debug(f'Total time taken is {total_time_taken} seconds')
         else:
-            raise RuntimeError('Can not find Time taken message in spark output.')
-
+            global_logger.info('This spark task do not have Time taken message.')
+        # OA_CONF.exec_fail_return_runtime仅作为占位用变量
+        # 维持spark_executor的接口不变 实际的执行时间需要从jobs中获取
+        total_time_taken = OA_CONF.exec_fail_return_runtime
         return application_id, total_time_taken

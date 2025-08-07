@@ -131,5 +131,8 @@ class OmniAdvisorConf:
         r'\d{4}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])((0\d|1\d|2[0-3]))?'
     ]
 
+    # spark-sql命令所提交的类名
+    SparkSQLCLIDriver = 'org.apache.spark.sql.hive.thriftserver.SparkSQLCLIDriver'
+
 
 OA_CONF = OmniAdvisorConf()
