@@ -131,11 +131,18 @@ class OmniAdvisorConf:
         r'\d{4}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])((0\d|1\d|2[0-3]))?'
     ]
 
+    # 所有日期-小时被替换后的变量：
+    date_replacement_value = '{date}'
+
     # spark-sql命令所提交的类名
-    SparkSQLCLIDriver = 'org.apache.spark.sql.hive.thriftserver.SparkSQLCLIDriver'
+    spark_sql_cli_driver = 'org.apache.spark.sql.hive.thriftserver.SparkSQLCLIDriver'
 
     # 所有涉及到数据库变动的sql关键字
-    modify_keywords = ['create', 'insert', 'delete', 'truncate', 'drop', 'update', 'merge']
+    modify_keywords = [
+        'create', 'alter', 'insert', 'truncate', 'drop', 'repair', 'load',
+        # 以下这些关键字，在非 hadoop表中可能是合法的
+        'update', 'merge', 'delete', 'rewrite', 'upsert', 'replace'
+    ]
 
 
 OA_CONF = OmniAdvisorConf()

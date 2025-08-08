@@ -34,7 +34,8 @@ class TestLoadRepository:
             name='example_name',
             exec_attr={'name': 'example_name', 'cpu': 4},
             default_config={'param1': 'value2'},
-            hash_value='0607'
+            hash_value='0607',
+            backend_retest_forbidden=True
         )
         assert isinstance(load, Load)
         assert load.database_model.name == 'example_name'
@@ -48,7 +49,7 @@ class TestLoadRepository:
 
         # 输入无效数据
         with pytest.raises(ValueError):
-            LoadRepository.create(name='', exec_attr={}, default_config={}, hash_value='')
+            LoadRepository.create(name='', exec_attr={}, default_config={}, hash_value='', backend_retest_forbidden=True)
 
     def test_query_by_hash_value(self):
         # 创建测试数据
@@ -58,7 +59,8 @@ class TestLoadRepository:
             name='example_name',
             exec_attr={'name': 'example_name', 'cpu': 4},
             default_config={'param1': 'value2'},
-            hash_value=hash_value
+            hash_value=hash_value,
+            backend_retest_forbidden=True
         )
 
         # 查询负载
@@ -78,7 +80,8 @@ class TestLoadRepository:
             name='example_name',
             exec_attr={'name': 'example_name', 'cpu': 4},
             default_config={'param1': 'value2'},
-            hash_value=hash_value
+            hash_value=hash_value,
+            backend_retest_forbidden=True
         )
 
         # 更新最优配置
@@ -95,7 +98,8 @@ class TestLoadRepository:
             name='example_name',
             exec_attr={'name': 'example_name', 'cpu': 4},
             default_config={'param1': 'value2'},
-            hash_value=hash_value
+            hash_value=hash_value,
+            backend_retest_forbidden=True
         )
 
         # 更新测试配置
@@ -112,7 +116,8 @@ class TestLoadRepository:
             name='example_name',
             exec_attr={'name': 'example_name', 'cpu': 4},
             default_config={'param1': 'value2'},
-            hash_value=hash_value
+            hash_value=hash_value,
+            backend_retest_forbidden=True
         )
 
         # 更新测试配置

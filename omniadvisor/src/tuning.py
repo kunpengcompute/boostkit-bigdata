@@ -1,4 +1,5 @@
 from common.constant import check_oa_conf
+from common.exceptions import TuningPreconditionError
 from omniadvisor.interface.config_tuning import (
     main,
     NoOptimalConfigError
@@ -12,7 +13,7 @@ if __name__ == '__main__':
         main()
     # 无需进行逻辑处理的异常，直接抛至该层
     # 若需进行逻辑处理（如环境清理等），则需在相应位置处理后重新抛至该层
-    except NoOptimalConfigError as e:
+    except (NoOptimalConfigError, TuningPreconditionError) as e:
         # 若未找到优化配置，则通过warning打印即可
         global_logger.warning(e)
         # 正常退出
