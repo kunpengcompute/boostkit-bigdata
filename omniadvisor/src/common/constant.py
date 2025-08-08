@@ -2,8 +2,6 @@ import json
 import os
 import configparser
 
-from server.engine.settings import BASE_DIR
-
 
 def load_common_config(config_path: str):
     """
@@ -56,8 +54,6 @@ class OmniAdvisorConf:
 
     # OmniAdvisor根目录
     project_base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    # Django Server根目录
-    server_base_dir = BASE_DIR
     # Log文件目录
     log_dir = f'{project_base_dir}/logs'
     log_file_path = f'{log_dir}/app.log'
@@ -106,13 +102,21 @@ class OmniAdvisorConf:
     # 输入配置解析
     _common_config = load_common_config(config_path=common_config_path)
     # 配置罗列
+    # common页
     tuning_retest_times = _common_config.getint('common', 'tuning.retest.times')
     config_fail_threshold = _common_config.getint('common', 'config.fail.threshold')
     tuning_strategies = json.loads(_common_config.get('common', 'tuning.strategy'))
-    backend_retest_queue = _common_config.get('common', 'backend.retest.queue', fallback='')
+    backend_retest_queue = _common_config.get('common', 'backend.retest.queue')
+    # database页
+    postgresql_database_name = _common_config.get('database', 'postgresql.database.name')
+    postgresql_database_user = _common_config.get('database', 'postgresql.database.user')
+    postgresql_database_password = _common_config.get('database', 'postgresql.database.password')
+    postgresql_database_host = _common_config.get('database', 'postgresql.database.host')
+    postgresql_database_port = _common_config.get('database', 'postgresql.database.port')
+    # spark页
     spark_history_rest_url = _common_config.get('spark', 'spark.history.rest.url')
-    spark_history_username = _common_config.get('spark', 'spark.history.username', fallback='')
-    spark_history_password = _common_config.get('spark', 'spark.history.password', fallback='')
+    spark_history_username = _common_config.get('spark', 'spark.history.username')
+    spark_history_password = _common_config.get('spark', 'spark.history.password')
     spark_fetch_trace_timeout = _common_config.getint('spark', 'spark.fetch.trace.timeout')
     spark_fetch_trace_interval = _common_config.getint('spark', 'spark.fetch.trace.interval')
     spark_exec_timeout_ratio = _common_config.getfloat('spark', 'spark.exec.timeout.ratio')

@@ -40,7 +40,7 @@ class DatabaseTuningRecord(models.Model):
         null=False,
         choices=_TUNING_METHOD_CHOICES
     )
-    method_extend = models.CharField(max_length=20, null=True)
+    method_extend = models.CharField(max_length=50, null=True)
     rounds = models.IntegerField(null=True)
 
     class Meta:
