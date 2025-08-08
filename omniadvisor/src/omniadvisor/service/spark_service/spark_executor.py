@@ -75,10 +75,14 @@ class SparkExecutor:
         # 解析Application id:
         # 该条匹配模式的文本来自Spark3.3.1源码中yarn/Client.scala文件在Line224所打印的日志
         # 若Spark版本迭代时对该日志内容做出修改 则存在application id匹配失败的风险
-        pattern = r'Client: Submitting application (application_\d+_\d+) to ResourceManager'
+        pattern = r'Client: Submitting application (application_\d+_\d+) to ResourceManager|Application Id: (.*)\n'
         search_obj = re.search(pattern, spark_output)
         if search_obj:
-            application_id = search_obj.group(1)
+            application_id = search_obj.group(1) or search_obj.group(2)
+            if search_obj.group(1):
+                global_logger.debug(f"Match group 1, application id is {application_id}")
+            if search_obj.group(2):
+                global_logger.debug(f"Match group 2, application id is {application_id}")
         else:
             raise RuntimeError('Can not find application id message in spark output.')
 
