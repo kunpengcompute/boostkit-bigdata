@@ -49,8 +49,8 @@ class ExamRecord:
         return self._database_model.runtime
 
     @property
-    def app_id(self):
-        return self._database_model.app_id
+    def application_id(self):
+        return self._database_model.application_id
 
     @property
     def trace(self):
@@ -67,5 +67,5 @@ class ExamRecord:
         end_time = 'end_time'
         status = 'status'
         runtime = 'runtime'
-        app_id = 'app_id'
+        application_id = 'application_id'
         trace = 'trace'

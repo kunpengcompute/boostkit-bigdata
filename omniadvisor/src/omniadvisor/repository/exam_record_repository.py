@@ -1,5 +1,5 @@
 from datetime import datetime
-
+from typing import List
 from common.constant import OA_CONF
 from server.app.models import (
     DatabaseTuningRecord,
@@ -33,12 +33,13 @@ class ExamRecordRepository(Repository):
         ExamRecord.FieldName.end_time: ([datetime], [''], []),
         ExamRecord.FieldName.status: ([str], [], OA_CONF.ExecStatus.all),
         ExamRecord.FieldName.runtime: ([float], [], []),
-        ExamRecord.FieldName.app_id: ([str], [], []),
+        ExamRecord.FieldName.application_id: ([str], [], []),
         ExamRecord.FieldName.trace: ([dict], [], []),
     }
 
     @classmethod
-    def create(cls, load: Load, config: dict, status: str, runtime: float, start_time: datetime, end_time: datetime, app_id: str):
+    def create(cls, load: Load, config: dict, status: str, runtime: float,
+               start_time: datetime, end_time: datetime, application_id: str) -> ExamRecord:
         """
         指定exam_record属性，新增测试记录
 
@@ -48,7 +49,7 @@ class ExamRecordRepository(Repository):
         :param runtime: 执行用时
         :param start_time: 任务开始时间
         :param end_time: 任务结束时间
-        :param app_id: Spark任务application_id
+        :param application_id: Spark任务application_id
         :return: 测试记录实例
         """
         tuning_records = TuningRecordRepository.query_by_load_and_config(load=load, config=config)
@@ -62,15 +63,15 @@ class ExamRecordRepository(Repository):
             ExamRecord.FieldName.runtime: runtime,
             ExamRecord.FieldName.start_time: start_time,
             ExamRecord.FieldName.end_time: end_time,
-            ExamRecord.FieldName.app_id: app_id
+            ExamRecord.FieldName.application_id: application_id
         }
         database_record = cls._create(model_attr=model_attr)
         return ExamRecord(database_model=database_record)
 
     @classmethod
-    def query_by_tuning_record(cls, tuning_record: TuningRecord):
+    def query_by_tuning_record(cls, tuning_record: TuningRecord) -> List[ExamRecord]:
         """
-        指定调优记录，查询测试记录
+        指定调优记录，查询与该调优记录所关联的全部测试记录，并以列表的形式返回
 
         :param tuning_record: 调优记录实例
         :return: 测试记录实例列表
@@ -84,9 +85,9 @@ class ExamRecordRepository(Repository):
         ]
 
     @classmethod
-    def query_by_load_and_config(cls, load: Load, config: dict):
+    def query_by_load_and_config(cls, load: Load, config: dict) -> List[ExamRecord]:
         """
-        指定负载、配置，查询测试记录
+        指定(负载,配置)，查询与该(负载,配置)关联的全部测试记录，并以列表形式返回
 
         :param load: 负载
         :param config: 参数配置
@@ -100,7 +101,7 @@ class ExamRecordRepository(Repository):
         return cls.query_by_tuning_record(tuning_record=tuning_record)
 
     @classmethod
-    def update_trace(cls, exam_record: ExamRecord, trace: dict):
+    def update_trace(cls, exam_record: ExamRecord, trace: dict) -> ExamRecord:
         """
         更新测试记录中的trace信息
 
@@ -119,7 +120,7 @@ class ExamRecordRepository(Repository):
         return ExamRecord(database_model=database_task)
 
     @classmethod
-    def update_runtime(cls, exam_record: ExamRecord, runtime: float):
+    def update_runtime(cls, exam_record: ExamRecord, runtime: float) -> ExamRecord:
         """
         更新从jobs中获取的runtime信息
 
@@ -138,11 +139,12 @@ class ExamRecordRepository(Repository):
         return ExamRecord(database_model=database_task)
 
     @classmethod
-    def delete(cls, exam_record: ExamRecord):
+    def delete(cls, exam_record: ExamRecord) -> None:
         """
-        更新测试记录中的结束时间为此刻
+        从数据库删除指定的测试记录
 
         :param exam_record: 测试记录实例
-        :return: 更新完后的测试记录
+        :return:
         """
+        # TODO 这个delete动作返回什么东西了？我甚至找不到这个delete函数
         return exam_record.database_model.delete()

@@ -52,7 +52,7 @@ class TestLoadRepository:
 
     def test_query_by_hash_value(self):
         # 创建测试数据
-        hash_value = _calculate_hash_value(exec_attr={'name': 'example_name', 'cpu': 4}, user_config={'param1': 'value2'})
+        hash_value = _calculate_hash_value(exec_attr={'name': 'example_name', 'cpu': 4}, config={'param1': 'value2'})
 
         LoadRepository.create(
             name='example_name',
@@ -67,13 +67,13 @@ class TestLoadRepository:
         assert loads[0].exec_attr == {'name': 'example_name', 'cpu': 4}
 
         # 查询失败
-        wrong_hash_value = _calculate_hash_value(exec_attr={'name': 'wrong_name'}, user_config={'param1': 'value2'})
+        wrong_hash_value = _calculate_hash_value(exec_attr={'name': 'wrong_name'}, config={'param1': 'value2'})
         loads = LoadRepository.query_by_hash_value(wrong_hash_value)
         assert len(loads) == 0
 
     def test_update_best_config(self):
         # 创建测试数据
-        hash_value = _calculate_hash_value(exec_attr={'name': 'example_name', 'cpu': 4}, user_config={'param1': 'value2'})
+        hash_value = _calculate_hash_value(exec_attr={'name': 'example_name', 'cpu': 4}, config={'param1': 'value2'})
         load = LoadRepository.create(
             name='example_name',
             exec_attr={'name': 'example_name', 'cpu': 4},
@@ -90,7 +90,7 @@ class TestLoadRepository:
 
     def test_update_test_config(self):
         # 创建测试数据
-        hash_value = _calculate_hash_value(exec_attr={'name': 'example_name', 'cpu': 4}, user_config={'param1': 'value2'})
+        hash_value = _calculate_hash_value(exec_attr={'name': 'example_name', 'cpu': 4}, config={'param1': 'value2'})
         load = LoadRepository.create(
             name='example_name',
             exec_attr={'name': 'example_name', 'cpu': 4},
@@ -107,7 +107,7 @@ class TestLoadRepository:
 
     def test_update_tuning_needed(self):
         # 创建测试数据
-        hash_value = _calculate_hash_value(exec_attr={'name': 'example_name', 'cpu': 4}, user_config={'param1': 'value2'})
+        hash_value = _calculate_hash_value(exec_attr={'name': 'example_name', 'cpu': 4}, config={'param1': 'value2'})
         load = LoadRepository.create(
             name='example_name',
             exec_attr={'name': 'example_name', 'cpu': 4},

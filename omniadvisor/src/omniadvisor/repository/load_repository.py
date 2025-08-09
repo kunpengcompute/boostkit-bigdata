@@ -33,7 +33,7 @@ class LoadRepository(Repository):
     }
 
     @classmethod
-    def create(cls, name: str, exec_attr: dict, default_config: dict, hash_value: str):
+    def create(cls, name: str, exec_attr: dict, default_config: dict, hash_value: str) -> Load:
         """
         指定名称、执行属性和默认配置，新增负载
 
@@ -58,7 +58,7 @@ class LoadRepository(Repository):
         return Load(database_model=database_load)
 
     @classmethod
-    def query_by_id(cls, load_id: str) -> list:
+    def query_by_id(cls, load_id: str) -> list[Load]:
         """
         根据 load_id 查询 load
         :param load_id: 负载id
@@ -74,7 +74,7 @@ class LoadRepository(Repository):
         ]
 
     @classmethod
-    def query_by_hash_value(cls, hash_value: str):
+    def query_by_hash_value(cls, hash_value: str) -> list[Load]:
         """
         根据hash值，查找负载实例
         :param hash_value: 负载实例
@@ -89,7 +89,7 @@ class LoadRepository(Repository):
         ]
 
     @classmethod
-    def update_name_and_exec_attr(cls, load: Load, name: str, exec_attr: dict):
+    def update_name_and_exec_attr(cls, load: Load, name: str, exec_attr: dict) -> Load:
         """
         更新和时间相关的信息
         :param load: 负载
@@ -105,7 +105,7 @@ class LoadRepository(Repository):
         return Load(database_model=database_load)
 
     @classmethod
-    def update_best_config(cls, load: Load, best_config: dict):
+    def update_best_config(cls, load: Load, best_config: dict) -> Load:
         """
         更新负载的最优配置
 
@@ -123,7 +123,7 @@ class LoadRepository(Repository):
         return Load(database_model=database_load)
 
     @classmethod
-    def update_test_config(cls, load: Load, test_config: dict):
+    def update_test_config(cls, load: Load, test_config: dict) -> Load:
         """
         更新负载的测试配置
 
@@ -141,7 +141,7 @@ class LoadRepository(Repository):
         return Load(database_model=database_load)
 
     @classmethod
-    def update_tuning_needed(cls, load: Load, tuning_needed: bool):
+    def update_tuning_needed(cls, load: Load, tuning_needed: bool) -> Load:
         """
         更新当前负载是否需要调优这一信息
         :param load: 负载实例

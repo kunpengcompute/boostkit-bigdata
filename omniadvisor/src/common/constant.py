@@ -5,7 +5,7 @@ import configparser
 from server.engine.settings import BASE_DIR
 
 
-def load_common_config(config_path: str):
+def load_common_config(config_path: str) -> configparser.ConfigParser:
     """
     使用configparser库加载common_config
 
@@ -21,9 +21,11 @@ def load_common_config(config_path: str):
     return common_config
 
 
-def check_oa_conf():
+def check_oa_conf() -> None:
     """
-    校验OA_CONF中参数是否正确
+    校验OA_CONF中参数是否符合要求，在参数值不符合规范时抛出异常
+
+    :raises ValueError: OA_CONF中的值不符合要求时抛出ValueError
     """
     if OA_CONF.tuning_retest_times <= 0:
         raise ValueError('The tuning retest times must > 0, please check common configuration.')
@@ -46,7 +48,9 @@ def check_oa_conf():
 
 class OmniAdvisorConf:
     """
-    OmniAdvisor常量
+    OmniAdvisor 常量配置类。
+
+    存放 OmniAdvisor 系统的全局常量，包括 API 路径、默认参数等。
     """
     # OmniAdvisor版本信息
     product_name = "Kunpeng BoostKit"
@@ -85,7 +89,7 @@ class OmniAdvisorConf:
 
     empty_config = dict()
     exec_fail_return_runtime = float('inf')
-    exec_fail_return_app_id = ''
+    exec_fail_return_application_id = ''
     exec_fail_return_trace = dict()
 
     # 调优算法
@@ -109,12 +113,12 @@ class OmniAdvisorConf:
     tuning_retest_times = _common_config.getint('common', 'tuning.retest.times')
     config_fail_threshold = _common_config.getint('common', 'config.fail.threshold')
     spark_history_rest_url = _common_config.get('spark', 'spark.history.rest.url')
-    spark_history_username = _common_config.get('spark', 'spark.history.username', fallback='')
-    spark_history_password = _common_config.get('spark', 'spark.history.password', fallback='')
+    spark_history_username = _common_config.get('spark', 'spark.history.username')
+    spark_history_password = _common_config.get('spark', 'spark.history.password')
     spark_fetch_trace_timeout = _common_config.getint('spark', 'spark.fetch.trace.timeout')
     spark_fetch_trace_interval = _common_config.getint('spark', 'spark.fetch.trace.interval')
     spark_exec_timeout_ratio = _common_config.getfloat('spark', 'spark.exec.timeout.ratio')
-    tuning_strategies = json.loads(_common_config.get('common', 'tuning.strategy'))
+    strategies_tuples = [tuple(item) for item in json.loads(_common_config.get('common', 'tuning.strategy'))]
 
     # 保留小数位数
     decimal_digits = 3

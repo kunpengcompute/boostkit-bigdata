@@ -51,7 +51,7 @@ class TestExamRecordRepository:
         DatabaseLoad.objects.all().delete()
 
         # 构建测试数据
-        hash_value = _calculate_hash_value(exec_attr={'cmd': 'spark-sql -f test.sql'}, user_config={"param1": "value2"})
+        hash_value = _calculate_hash_value(exec_attr={'cmd': 'spark-sql -f test.sql'}, config={"param1": "value2"})
         self.load = LoadRepository.create(
             name='test',
             exec_attr={'cmd': 'spark-sql -f test.sql'},
@@ -68,7 +68,7 @@ class TestExamRecordRepository:
         self.runtime = 20.4
         self.start_time = datetime(2023, 10, 5, 14, 30, 15)
         self.end_time = datetime(2024, 10, 5, 14, 30, 15)
-        self.app_id = 'application_123456'
+        self.application_id = 'application_123456'
         # 创建task
         self.exam_record = ExamRecordRepository.create(
             load=self.load,
@@ -77,7 +77,7 @@ class TestExamRecordRepository:
             runtime=self.runtime,
             start_time=self.start_time,
             end_time=self.end_time,
-            app_id=self.app_id
+            application_id=self.application_id
         )
 
     def test_create(self):
@@ -93,7 +93,7 @@ class TestExamRecordRepository:
         assert self.exam_record.runtime == self.runtime
         assert self.exam_record.start_time == self.start_time
         assert self.exam_record.end_time == self.end_time
-        assert self.exam_record.app_id == self.app_id
+        assert self.exam_record.application_id == self.application_id
 
         # 测试没有tuning_record场景
         with pytest.raises(RuntimeError):
@@ -104,7 +104,7 @@ class TestExamRecordRepository:
                 runtime=self.runtime,
                 start_time=self.start_time,
                 end_time=self.end_time,
-                app_id=self.app_id
+                application_id=self.application_id
             )
 
     def test_query_by_tuning_record(self):

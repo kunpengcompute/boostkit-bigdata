@@ -10,9 +10,10 @@ from omniadvisor.service.tuning_result.tuning_result import TuningResult
 from omniadvisor.service.tuning_result.tuning_result import get_tuning_result
 
 
-def get_other_tuning_result_history(exclude_load: Load):
+def get_other_tuning_result_history(exclude_load: Load) -> List:
     """
     查询 exclude_load 以外的所有 tuning result history
+
     :param exclude_load
     :return:
     """
@@ -39,7 +40,7 @@ def get_other_tuning_result_history(exclude_load: Load):
 
     return result
 
-
+# TODO 这个函数怎么也单独在类外部
 def get_tuning_result_history(load: Load):
     """
     指定负载，获取调优结果所有历史

@@ -10,11 +10,16 @@ from omniadvisor.repository.repository import Repository
 
 
 class LoadPrefetchRepository(Repository):
+    """
+    #TODO  这个类居然五月份就有了吗？能不能介绍一下这是个什么类。
+    #TODO 为什么这个类只有这一个函数 这是干啥用的
+    """
 
     @classmethod
     def exclude_query_load_with_tuning_records(cls, exclude_load: Load):
         """
         获取 exclude_load 的 id 以外的 load 及  tuning record的聚合
+
         :param exclude_load: 排除的load id
         :return:
         """
