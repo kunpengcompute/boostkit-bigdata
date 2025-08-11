@@ -7,7 +7,7 @@ from algo.iterative.tuning import SmacAppendTuning
 from algo.native.tuning import NativeTuning
 from algo.transfer.tuning import TransferTuning
 from common.constant import OA_CONF
-from common.exceptions import NoOptimalConfigError, SystemKilledError
+from common.exceptions import NoOptimalConfigError, SystemKilledError, TuningPreconditionError
 from omniadvisor.repository.model.load import Load
 from omniadvisor.repository.load_repository import LoadRepository
 from omniadvisor.repository.tuning_record_repository import TuningRecordRepository
@@ -192,12 +192,10 @@ def _query_and_check_load(load_id: str) -> Optional[Load]: # TODO load_id用str�
     loads = LoadRepository.query_by_id(load_id)
     if not loads:
         # 若查询结果为空，直接返回即可
-        global_logger.info('Cannot find load id: %s in database, the tuning process exits.', load_id)
-        return None
+        raise TuningPreconditionError(f'Cannot find load id: {load_id} in database, the tuning process exits.')
     load = loads.pop()
     if not load.tuning_needed:
-        global_logger.info('The load dont need to tune, the tuning process exits.')
-        return None
+        raise TuningPreconditionError('The load dont need to tune, the tuning process exits.')
     return load
 
 
@@ -209,29 +207,31 @@ def main():
 
     # 检查load 是否存在以及是否需要调优
     load = _query_and_check_load(args.load_id)
-    if not load:
-        return
 
     # 前台复测
     # 1. 必须指定调优方法
     # 2. 若负载存在test_config，则说明有配置在前台调优流程中，退出
     if args.retest_way == OA_CONF.RetestWay.hijacking:
         if not args.tuning_method:
-            global_logger.info('When using retest way \'hijacking\', param --tuning-method is needed.')
-            return
+            raise TuningPreconditionError('When using retest way \'hijacking\', param --tuning-method is needed.')
         if load.test_config:
-            global_logger.info('There is a config in hijacking retest, please try another load.')
-            return
+            raise TuningPreconditionError('There is a config in hijacking retest, please try another load.')
         _single_tuning(load=load, retest_way=args.retest_way, tuning_method=args.tuning_method)
 
     # 后台复测
     # 1. 若指定调优方法，则执行一轮调优；若不指定，则进入连续调优策略
     # 2. 不做调优冲突判断，若推荐相同配置，则退出
+    # 3. 当前负载不支持后台复测，则退出
     elif args.retest_way == OA_CONF.RetestWay.backend:
+        if load.backend_retest_forbidden:
+            raise TuningPreconditionError(
+                'Current load contains data manipulation operations, only retest way of hijacking is supported.'
+            )
+
         if args.tuning_method:
             _single_tuning(load=load, retest_way=args.retest_way, tuning_method=args.tuning_method)
         else:
             _continuous_tuning_with_strategies(load=load, tuning_strategies=OA_CONF.tuning_strategies)
 
     else:
-        raise RuntimeError('The retest way must in %s, please check cmd.', OA_CONF.RetestWay.all)
+        raise TuningPreconditionError('The retest way must in %s, please check cmd.', OA_CONF.RetestWay.all)

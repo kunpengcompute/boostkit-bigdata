@@ -46,6 +46,7 @@ class TestSparkRun:
         ]
         self.mock_response.text = json.dumps(response)
 
+    @patch('omniadvisor.service.spark_service.spark_run.SparkFetcher.get_spark_runtime_by_app')
     @patch('omniadvisor.service.spark_service.spark_run.SparkCMDParser.reconstruct_cmd')
     @patch('omniadvisor.service.spark_service.spark_run.ExamRecordRepository.create')
     @patch('omniadvisor.service.spark_service.spark_run.SparkExecutor.submit_spark_task')
@@ -53,7 +54,7 @@ class TestSparkRun:
     @patch('omniadvisor.service.spark_service.spark_run.multiprocessing.Process')
     @patch('requests.get')
     def test_spark_run_success(self, mock_requests_get, mock_multiprocess, mock_save_trace_data, mock_submit_spark_task,
-                               mock_create_exam_record, mock_reconstruct_cmd):
+                               mock_create_exam_record, mock_reconstruct_cmd, mock_get_spark_runtime):
         """
         测试 spark_run 方法
         """
@@ -71,10 +72,11 @@ class TestSparkRun:
         mock_submit_spark_task.return_value = self.mock_exec_result
         # 配置save_trace_data mock对象
         mock_save_trace_data.return_value = f'{OA_CONF.data_dir}/testfile'
+        # 配置get_spark_runtime_by_app
+        mock_get_spark_runtime.return_value = 20.4
 
         # 方法调用
-        result_exam_record, spark_output = spark_run(self.mock_load, self.conf)
-
+        result_exam_record, spark_output = spark_run(self.mock_load, self.conf, wait_for_trace=False, exec_in_isolation=False)
         # 结果验证
         assert result_exam_record == mock_exam_record
         assert spark_output == self.mock_exec_result.output

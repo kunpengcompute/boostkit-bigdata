@@ -1,18 +1,11 @@
 import django
 from django.conf import settings
 
-from common.constant import OA_CONF
+from server.engine.settings import DATABASES
 
 
 if not settings.configured:
-    # 启用内存数据库，确保不影响原来的数据库
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': OA_CONF.server_base_dir / 'db.sqlite3',
-        }
-    }
-
+    # 配置Django数据库信息
     settings.configure(
         DATABASES=DATABASES,
         DEBUG=False,

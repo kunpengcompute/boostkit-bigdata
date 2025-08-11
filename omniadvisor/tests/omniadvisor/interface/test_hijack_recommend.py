@@ -5,7 +5,7 @@ import pytest
 from common.constant import OA_CONF
 from common.exceptions import DuplicateEntryError
 from omniadvisor.interface.hijack_recommend import hijack_recommend, _process_load_config, _create_or_update_load, \
-    _remove_time, _calculate_hash_value
+    _remove_time, _calculate_hash_value, _any_modify_keywords_in_sql
 
 
 # 测试代码
@@ -31,7 +31,7 @@ class TestHijackRecommend:
         mock_spark_run.return_value = (MagicMock(status="success"), "job output")
 
         hijack_recommend(argv)
-        mock_spark_run.assert_called_once_with(load=load, config=exec_config, wait_for_trace=False)
+        mock_spark_run.assert_called_once_with(load=load, config=exec_config, wait_for_trace=False, exec_in_isolation=False)
         mock_process_config.assert_not_called()
 
     # 场景 2: 执行失败 + 进入安全机制
@@ -72,7 +72,7 @@ class TestHijackRecommend:
     @patch("omniadvisor.interface.hijack_recommend._create_or_update_load")
     @patch("omniadvisor.interface.hijack_recommend.SparkCMDParser.parse_cmd")
     @patch("omniadvisor.interface.hijack_recommend.SparkCMDParser.validate_submit_arguments")
-    def test_failed_user_config(self, mock_validate_submit_arguments, mock_parse_cmd,mock_create_or_update_load,
+    def test_failed_user_config(self, mock_validate_submit_arguments, mock_parse_cmd, mock_create_or_update_load,
                                 mock_get_config, mock_spark_run, mock_process_config):
         argv = ["--conf", "spark.executor.memory=4g"]
         exec_attr = {"name": "job_name"}
@@ -223,7 +223,7 @@ class TestHijackRecommend:
         mock_load_create.return_value = "created_object"
         mock_query_by_hash_value.return_value = []
         result = _create_or_update_load(exec_attr, default_config)
-        mock_load_create.assert_called_once_with(name, exec_attr, default_config, hash_value)
+        mock_load_create.assert_called_once_with(name, exec_attr, default_config, hash_value, True)
         mock_tuning_record_create.assert_called_once()
         assert result == "created_object"
 
@@ -316,3 +316,148 @@ class TestHijackRecommend:
         input_text = "文件名：report_2025080112_final.pdf"
         expected = "文件名：report_{date}_final.pdf"
         assert _remove_time(input_text) == expected.strip()
+
+    def test_create_table(self):
+        sql = "CREATE TABLE IF NOT EXISTS users (id INT, name STRING)"
+        assert _any_modify_keywords_in_sql(sql) is True
+
+    def test_create_view(self):
+        sql = "CREATE OR REPLACE TEMP VIEW v_users AS SELECT * FROM users"
+        assert _any_modify_keywords_in_sql(sql) is True
+
+    def test_insert_into(self):
+        sql = "INSERT INTO users SELECT * FROM new_users"
+        assert _any_modify_keywords_in_sql(sql) is True
+
+    def test_insert_overwrite(self):
+        sql = "INSERT OVERWRITE TABLE warehouse SELECT * FROM staging"
+        assert _any_modify_keywords_in_sql(sql) is True
+
+    def test_delete_statement(self):
+        sql = "DELETE FROM logs WHERE level = 'DEBUG'"
+        assert _any_modify_keywords_in_sql(sql) is True
+
+    def test_update_statement(self):
+        sql = "UPDATE customers SET status = 'active' WHERE last_login > NOW()"
+        assert _any_modify_keywords_in_sql(sql) is True
+
+    def test_merge_into(self):
+        sql = """
+        MERGE INTO customers USING updates
+        ON customers.id = updates.id
+        WHEN MATCHED THEN UPDATE SET customers.name = updates.name
+        WHEN NOT MATCHED THEN INSERT (id, name) VALUES (updates.id, updates.name)
+        """
+        assert _any_modify_keywords_in_sql(sql) is True
+
+    def test_drop_table(self):
+        sql = "DROP TABLE IF EXISTS temp_table"
+        assert _any_modify_keywords_in_sql(sql) is True
+
+    def test_truncate_table(self):
+        sql = "TRUNCATE TABLE big_table"
+        assert _any_modify_keywords_in_sql(sql) is True
+
+    def test_multiple_statements(self):
+        sql = """
+        CREATE TABLE tmp AS SELECT * FROM raw;
+        INSERT INTO final SELECT * FROM tmp;
+        """
+        assert _any_modify_keywords_in_sql(sql) is True
+
+    def test_create_database(self):
+        sql = "CREATE DATABASE IF NOT EXISTS my_db"
+        assert _any_modify_keywords_in_sql(sql) is True
+
+    def test_comment_with_real_sql(self):
+        sql = """
+        -- Let's drop the table
+        DROP TABLE users
+        """
+        assert _any_modify_keywords_in_sql(sql) is True  # 注释中是“注释”但 SQL 在有效区域
+
+    def test_select_only(self):
+        sql = "SELECT * FROM customers WHERE region = 'US'"
+        assert _any_modify_keywords_in_sql(sql) is False
+
+    def test_with_cte_select(self):
+        sql = """
+        WITH recent_orders AS (
+            SELECT * FROM orders WHERE order_date > '2025-01-01'
+        )
+        SELECT * FROM recent_orders
+        """
+        assert _any_modify_keywords_in_sql(sql) is False
+
+    def test_keywords_in_string(self):
+        """
+        注意，这里我们会选择粗暴的认为这是危险操作
+        """
+        sql = "SELECT 'drop table users' AS msg"
+        assert _any_modify_keywords_in_sql(sql) is True
+
+    def test_keywords_as_column_names(self):
+        """
+        注意，这里我们会选择粗暴的认为这是危险操作
+        """
+        sql = "SELECT create, insert, delete FROM keyword_table"
+        assert _any_modify_keywords_in_sql(sql) is True
+
+    def test_keywords_as_aliases(self):
+        """
+        注意，这里我们会选择粗暴的认为这是危险操作
+        """
+        sql = "SELECT user_id AS update, name AS delete FROM users"
+        assert _any_modify_keywords_in_sql(sql) is True
+
+    def test_function_names_overlap_keywords(self):
+        """
+        注意，这里 'update_' 'merge_'与并非有效修改、合并操作
+        """
+        sql = "SELECT update_time(), merge_fields(name, age) FROM meta"
+        assert _any_modify_keywords_in_sql(sql) is False
+
+    def test_sql_with_comments_only_keywords(self):
+        """
+        注意，这里我们会选择粗暴的认为这是危险操作
+        """
+        sql = """
+        -- DELETE FROM customers
+        -- DROP TABLE logs
+        SELECT * FROM users
+        """
+        assert _any_modify_keywords_in_sql(sql) is True
+
+    def test_empty_sql(self):
+        sql = ""
+        assert _any_modify_keywords_in_sql(sql) is False
+
+    def test_whitespace_sql(self):
+        sql = "     \n\t  "
+        assert _any_modify_keywords_in_sql(sql) is False
+
+    def test_sql_with_semicolon_and_comment(self):
+        """
+        注意，这里我们会选择粗暴的认为这是危险操作
+        """
+        sql = "SELECT * FROM table; -- insert into table"
+        assert _any_modify_keywords_in_sql(sql) is True
+
+    def test_multiple_statement_sql_file(self):
+        """
+        测试多语句的情况
+        """
+        sql = """
+        -- 创建表
+        CREATE TABLE IF NOT EXISTS tmp AS SELECT * FROM raw_data;
+
+        -- 插入
+        INSERT INTO final SELECT * FROM tmp;
+
+        -- 查询结果
+        SELECT COUNT(*) FROM final;
+
+        -- 删除临时表
+        DROP TABLE tmp;
+        """
+        assert _any_modify_keywords_in_sql(sql) is True

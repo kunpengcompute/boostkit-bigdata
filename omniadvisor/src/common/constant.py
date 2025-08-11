@@ -2,8 +2,6 @@ import json
 import os
 import configparser
 
-from server.engine.settings import BASE_DIR
-
 
 def load_common_config(config_path: str) -> configparser.ConfigParser:
     """
@@ -60,8 +58,6 @@ class OmniAdvisorConf:
 
     # OmniAdvisor根目录
     project_base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    # Django Server根目录
-    server_base_dir = BASE_DIR
     # Log文件目录
     log_dir = f'{project_base_dir}/logs'
     log_file_path = f'{log_dir}/app.log'
@@ -110,8 +106,18 @@ class OmniAdvisorConf:
     # 输入配置解析
     _common_config = load_common_config(config_path=common_config_path)
     # 配置罗列
+    # common页
     tuning_retest_times = _common_config.getint('common', 'tuning.retest.times')
     config_fail_threshold = _common_config.getint('common', 'config.fail.threshold')
+    tuning_strategies = json.loads(_common_config.get('common', 'tuning.strategy'))
+    backend_retest_queue = _common_config.get('common', 'backend.retest.queue')
+    # database页
+    postgresql_database_name = _common_config.get('database', 'postgresql.database.name')
+    postgresql_database_user = _common_config.get('database', 'postgresql.database.user')
+    postgresql_database_password = _common_config.get('database', 'postgresql.database.password')
+    postgresql_database_host = _common_config.get('database', 'postgresql.database.host')
+    postgresql_database_port = _common_config.get('database', 'postgresql.database.port')
+    # spark页
     spark_history_rest_url = _common_config.get('spark', 'spark.history.rest.url')
     spark_history_username = _common_config.get('spark', 'spark.history.username')
     spark_history_password = _common_config.get('spark', 'spark.history.password')
@@ -135,8 +141,18 @@ class OmniAdvisorConf:
         r'\d{4}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])((0\d|1\d|2[0-3]))?'
     ]
 
+    # 所有日期-小时被替换后的变量：
+    date_replacement_value = '{date}'
+
     # spark-sql命令所提交的类名
-    SparkSQLCLIDriver = 'org.apache.spark.sql.hive.thriftserver.SparkSQLCLIDriver'
+    spark_sql_cli_driver = 'org.apache.spark.sql.hive.thriftserver.SparkSQLCLIDriver'
+
+    # 所有涉及到数据库变动的sql关键字
+    modify_keywords = [
+        'create', 'alter', 'insert', 'truncate', 'drop', 'repair', 'load',
+        # 以下这些关键字，在非 hadoop表中可能是合法的
+        'update', 'merge', 'delete', 'rewrite', 'upsert', 'replace'
+    ]
 
 
 OA_CONF = OmniAdvisorConf()

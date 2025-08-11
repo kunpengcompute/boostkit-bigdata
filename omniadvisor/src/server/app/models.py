@@ -17,6 +17,7 @@ class DatabaseLoad(models.Model):
     create_time = models.DateTimeField(auto_now_add=True)
     tuning_needed = models.BooleanField(default=True)
     hash_value = models.CharField(max_length=64, null=False, unique=True)
+    backend_retest_forbidden = models.BooleanField(default=True)
 
     class Meta:
         db_table = 'omniadvisor_load'  # 自定义表名
@@ -40,7 +41,7 @@ class DatabaseTuningRecord(models.Model):
         null=False,
         choices=_TUNING_METHOD_CHOICES
     )
-    method_extend = models.CharField(max_length=20, null=True)
+    method_extend = models.CharField(max_length=50, null=True)
     rounds = models.IntegerField(null=True)
 
     class Meta:
