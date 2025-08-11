@@ -31,7 +31,7 @@ class TestHijackRecommend:
         mock_spark_run.return_value = (MagicMock(status="success"), "job output")
 
         hijack_recommend(argv)
-        mock_spark_run.assert_called_once_with(load=load, config=exec_config, wait_for_trace=False)
+        mock_spark_run.assert_called_once_with(load=load, config=exec_config, wait_for_trace=False, exec_in_isolation=False)
         mock_process_config.assert_not_called()
 
     # 场景 2: 执行失败 + 进入安全机制

@@ -17,7 +17,7 @@ def retest(load: Load, config: dict):
     global_logger.debug('Starting retest config...')
     for i in range(1, OA_CONF.tuning_retest_times + 1):
         try:
-            exam_record, spark_output = spark_run(load=load, config=config, wait_for_trace=True)
+            exam_record, spark_output = spark_run(load=load, config=config, wait_for_trace=True, exec_in_isolation=True)
         except Exception as e:
             global_logger.error(
                 'Retest failed in round %d. Exception source: Non-Spark exception. Details: %s.', i, e
