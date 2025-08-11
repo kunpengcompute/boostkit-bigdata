@@ -59,3 +59,4 @@ class Load:
         create_time = 'create_time'
         tuning_needed = 'tuning_needed'
         hash_value = 'hash_value'
+        backend_retest_forbidden = 'backend_retest_forbidden'

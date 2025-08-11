@@ -31,51 +31,48 @@ class TestRunCmd:
 
 
 class TestTraceDataSaver:
+    @patch('builtins.open', new_callable=mock_open, create=True)
     @patch('os.makedirs')
     @patch('uuid.uuid4', return_value="test-uuid")
-    def test_save_trace_data_success(self, mock_uuid, mock_makedirs):
+    def test_save_trace_data_success(self, mock_uuid, mock_makedirs, mock_file):
         data = [{"key": "value"}]
         data_dir = "/tmp"
-        m = mock_open()
-        with patch('builtins.open', m, create=True):
-            file_path = save_trace_data(data, data_dir)
+
+        file_path = save_trace_data(data, data_dir)
 
         expected_path = f"{data_dir}/test-uuid"
         assert file_path == expected_path
-        m.assert_called_once_with(expected_path, 'w', encoding='utf-8')
+        mock_file.assert_called_once_with(expected_path, 'w', encoding='utf-8')
 
+    @patch('builtins.open', new_callable=mock_open, create=True)
+    @patch('uuid.uuid4', return_value="test-uuid")
     @patch('os.makedirs')
-    def test_save_trace_data_ioerror(self, mock_makedirs):
+    def test_save_trace_data_ioerror(self, mock_makedirs, mock_uuid, mock_open_file):
         data = [{"key": "value"}]
         data_dir = "/tmp"
-        m = mock_open()
-        m.side_effect = IOError("IO Error")
 
-        with patch('os.makedirs'), \
-             patch('uuid.uuid4', return_value="test-uuid"), \
-             patch('builtins.open', m, create=True):
-            try:
-                save_trace_data(data, data_dir)
-                assert False, "Expected an IOError to be raised."
-            except IOError as e:
-                assert str(e) == "出现IO错误: IO Error", f"Unexpected error message: {str(e)}"
+        # 设置 open 的 side_effect
+        mock_open_file.side_effect = IOError("IO Error")
 
+        try:
+            save_trace_data(data, data_dir)
+            assert False, "Expected an IOError to be raised."
+        except IOError as e:
+            assert str(e) == "出现IO错误: IO Error", f"Unexpected error message: {str(e)}"
 
     @patch('os.makedirs')
-    def test_save_trace_data_exception(self, mock_makedirs):
+    @patch('uuid.uuid4', return_value="test-uuid")
+    @patch('builtins.open', new_callable=mock_open)
+    def test_save_trace_data_exception(self, mock_open, mock_uuid, mock_makedirs):
         data = [{"key": "value"}]
         data_dir = "/tmp"
-        m = mock_open()
-        m.side_effect = Exception("Unexpected error")
+        mock_open.side_effect = Exception("Unexpected error")  # 设置 mock_open 抛出异常
 
-        with patch('os.makedirs'), \
-             patch('uuid.uuid4', return_value="test-uuid"), \
-             patch('builtins.open', m, create=True):
-            try:
-                save_trace_data(data, data_dir)
-                assert False, "Expected an Exception to be raised."
-            except Exception as e:
-                assert str(e) == "保存过程中出现错误: Unexpected error", f"Unexpected error message: {str(e)}"
+        try:
+            save_trace_data(data, data_dir)
+            assert False, "Expected an Exception to be raised."
+        except Exception as e:
+            assert str(e) == "保存过程中出现错误: Unexpected error", f"Unexpected error message: {str(e)}"
 
 
 class TestFloatFormat:

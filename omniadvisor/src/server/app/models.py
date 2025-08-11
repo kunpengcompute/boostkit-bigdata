@@ -17,6 +17,7 @@ class DatabaseLoad(models.Model):
     create_time = models.DateTimeField(auto_now_add=True)
     tuning_needed = models.BooleanField(default=True)
     hash_value = models.CharField(max_length=64, null=False, unique=True)
+    backend_retest_forbidden = models.BooleanField(default=True)
 
     class Meta:
         db_table = 'omniadvisor_load'  # 自定义表名

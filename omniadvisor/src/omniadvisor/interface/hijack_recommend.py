@@ -5,6 +5,7 @@ import re
 import sys
 
 from common.constant import OA_CONF
+from common.exceptions import UnknownEncodingError
 from omniadvisor.repository.load_repository import LoadRepository
 from omniadvisor.repository.model.load import Load
 from omniadvisor.repository.tuning_record_repository import TuningRecordRepository
@@ -13,11 +14,16 @@ from omniadvisor.service.spark_service.spark_run import spark_run
 from omniadvisor.service.tuning_result.tuning_result import get_tuning_result
 from omniadvisor.service.tuning_result.tuning_result_history import get_tuning_result_history
 from omniadvisor.utils.logger import global_logger
-from omniadvisor.utils.utils import float_format
+from omniadvisor.utils.utils import float_format, safe_read_file, file_exists
 
-_NAME_STR = 'name'
+_PARAM_NAME_IN_EXEC_ATTR = 'name'
+_PARAM_F_IN_EXEC_ATTR = 'f'
+_PARAM_E_IN_EXEC_ATTR = 'e'
+_PARAM_CLASS_IN_EXEC_ATTR = 'class'
 _USER_CONFIG_STR = 'user_config'
 _FILE_CONTENT_STR = 'file_content'
+_EMPTY_STR = ''
+_UNKNOWN_STR = 'unknown'
 
 
 def _get_exec_config_from_load(load: Load):
@@ -93,36 +99,32 @@ def _process_load_config(load: Load, config: dict):
         pass
 
 
-def _get_load_name_from_exec_attr(exec_attr: dict):
-    """
-    获取任务名，无则空
-    """
-    return exec_attr.get('name', '')
-
-
 def _calculate_hash_value(exec_attr: dict, user_config: dict):
     """
     根据 执行参数和用户配置计算负载唯一标识，hash值
+
+    :param exec_attr: 执行参数
+    :param user_config: 用户配置
+    :return:
     """
-    class_info = exec_attr.get('class', '')
-    if 'SparkSQLCLIDriver' in class_info:
+    if _is_spark_sql_cli(exec_attr):
         # spark-sql，则提取 -e 和 -f，替换
-        if 'e' in exec_attr:
-            file_content = _remove_time(exec_attr.get('e', ''))
+        if _PARAM_E_IN_EXEC_ATTR in exec_attr:
+            file_content = _remove_time(exec_attr.get(_PARAM_E_IN_EXEC_ATTR, _EMPTY_STR))
         else:
-            file_content = exec_attr.get('f', '')
+            file_content = exec_attr.get(_PARAM_F_IN_EXEC_ATTR, _EMPTY_STR)
     else:
         # spark-submit，则提取 file 及之后的内容，包含 file的入参
-        unknown_content = exec_attr.get('unknown', [])
+        unknown_content = exec_attr.get(_UNKNOWN_STR, [])
         unknown_content = [item.strip() for item in unknown_content]
         if len(unknown_content) > 0:
             file_content = unknown_content[0]
         else:
-            file_content = ''
+            file_content = _EMPTY_STR
 
-    name = _get_load_name_from_exec_attr(exec_attr)
+    name = exec_attr.get(_PARAM_NAME_IN_EXEC_ATTR, _EMPTY_STR)
     data = {
-        _NAME_STR: _remove_time(name),
+        _PARAM_NAME_IN_EXEC_ATTR: _remove_time(name),
         _USER_CONFIG_STR: user_config,
         _FILE_CONTENT_STR: file_content
     }
@@ -134,17 +136,71 @@ def _calculate_hash_value(exec_attr: dict, user_config: dict):
 def _remove_time(content: str):
     """
     移除时间信息，可精确到小时
+
+    :param content: 待移除的文本内容
+    :return:
     """
     for pattern in OA_CONF.date_patterns:
-        content = re.sub(pattern, '{date}', content)
+        content = re.sub(pattern, OA_CONF.date_replacement_value, content)
     return content.strip()
+
+
+def _is_spark_sql_cli(exec_attr: dict) -> bool:
+    """
+    判断是否为 spark-sql类型
+
+    :param exec_attr: 执行参数
+    :return:
+    """
+    class_name = exec_attr.get(_PARAM_CLASS_IN_EXEC_ATTR, _EMPTY_STR)
+    return OA_CONF.spark_sql_cli_driver == class_name
+
+
+def _has_modify_keywords(exec_attr: dict) -> bool:
+    """
+    检查是否含有修改数据库的操作
+
+    :param exec_attr: 执行参数
+    :return:
+    """
+    if _is_spark_sql_cli(exec_attr):
+        # spark-sql，则提取 -e 和 -f，替换
+        if _PARAM_E_IN_EXEC_ATTR in exec_attr:
+            file_content = exec_attr.get(_PARAM_E_IN_EXEC_ATTR, _EMPTY_STR)
+        else:
+            # 这里也有可能是相对路径
+            file_path = exec_attr.get(_PARAM_F_IN_EXEC_ATTR, _EMPTY_STR)
+            exists = file_exists(file_path)
+            if not exists:
+                # 这里初步判断文件用相对路径的比较少，所以打warning
+                global_logger.warning(
+                    'File %s is not exists, for safety’s sake, it contains modify operation by default', file_path
+                )
+                return True
+            try:
+                file_content = safe_read_file(file_path)
+            except (UnknownEncodingError, Exception) as e:
+                # 初步判断，目前已有的编码，能覆盖，所以打warning
+                global_logger.warning(
+                    'An unexpected situation: %s occurred when reading file %s , for safety’s sake, it contains '
+                    'modify operation by default', e, file_path
+                )
+                return True
+
+        return _any_modify_keywords_in_sql(file_content)
+    else:
+        return True
 
 
 def _create_or_update_load(exec_attr: dict, default_config: dict):
     """
     无则创建，有则更新 name 和 exec_attr 字段。如果日期信息等一直保持不变，后期复测时，会导致测试出现异常
+
+    :param exec_attr: 执行参数
+    :param default_config: 默认配置
+    :return:
     """
-    name = _get_load_name_from_exec_attr(exec_attr)
+    name = exec_attr.get(_PARAM_NAME_IN_EXEC_ATTR, _EMPTY_STR)
     hash_value = _calculate_hash_value(exec_attr, default_config)
     loads = LoadRepository.query_by_hash_value(hash_value)
     if loads:
@@ -152,10 +208,27 @@ def _create_or_update_load(exec_attr: dict, default_config: dict):
         return LoadRepository.update_name_and_exec_attr(loads.pop(), name, exec_attr)
     else:
         # 负载没有创建过
-        load = LoadRepository.create(name, exec_attr, default_config, hash_value)
+        backend_retest_forbidden = _has_modify_keywords(exec_attr)
+        load = LoadRepository.create(name, exec_attr, default_config, hash_value, backend_retest_forbidden)
         global_logger.info("Load not found in database, created new one and execute.")
         TuningRecordRepository.create(load=load, config=default_config, method=OA_CONF.TuningMethod.user)
         return load
+
+
+def _any_modify_keywords_in_sql(sql: str):
+    """
+    判断在当前sql中是否存在任何的修改动作
+
+    :param sql: sql内容
+    :return:
+    """
+    # 正则转义关键词（虽然目前不需要，但防御性更强）
+    escaped_keywords = [re.escape(k) for k in OA_CONF.modify_keywords]
+
+    # 后缀是空格、换行、制表符、SQL常见符号 或字符串结束
+    pattern = re.compile(r'(?:' + '|'.join(escaped_keywords) + r')(?=\s|[(),;]|$)', re.IGNORECASE)
+
+    return bool(pattern.search(sql))
 
 
 def hijack_recommend(argv: list):

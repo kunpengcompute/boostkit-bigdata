@@ -56,7 +56,8 @@ class TestExamRecordRepository:
             name='test',
             exec_attr={'cmd': 'spark-sql -f test.sql'},
             default_config={'param1': 'value2'},
-            hash_value=hash_value
+            hash_value=hash_value,
+            backend_retest_forbidden=True
         )
         self.config = {'param1': 'value2'}
         self.tuning_record = TuningRecordRepository.create(
