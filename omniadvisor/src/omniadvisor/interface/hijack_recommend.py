@@ -27,7 +27,7 @@ _EMPTY_STR = ''
 _UNKNOWN_STR = 'unknown'
 
 
-def _get_exec_config_from_load(load: Load) -> dict[str, Any]:
+def _get_exec_config_from_load(load: Load) -> dict[str, str]:
     """
     根据负载属性，按优先级规则获取即将执行的参数配置
 

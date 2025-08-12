@@ -24,7 +24,7 @@ from omniadvisor.utils.logger import global_logger
 from omniadvisor.utils.utils import float_format
 
 
-def handler(signum: int, frame) -> None: # TODO 这个frame为什么是no value 以及signum是什么类型
+def handler(signum: int, frame) -> None:
     """
     用于注册异常退出信号的处理函数。
 
@@ -117,7 +117,7 @@ def _single_tuning(load: Load, retest_way: str, tuning_method: str) -> None:
         LoadRepository.update_test_config(load, next_config)
 
 
-def _get_next_config(load: Load, tuning_method: str) -> tuple[str, str]: # TODO 检查一下这个返回值类型
+def _get_next_config(load: Load, tuning_method: str) -> tuple[dict, str]:
     """
     对指定的负载通过指定的调优算法进行调优，并返回调优后的配置
 
@@ -127,7 +127,7 @@ def _get_next_config(load: Load, tuning_method: str) -> tuple[str, str]: # TODO 
     :returns: 一个元组 (method_extend, next_config)
               - **method_extend**: 调优方法描述
               - **next_config**: 优化后配置
-    :rtype: tuple[str, str]
+    :rtype: tuple[dict, str]
     """
     # 获取指定负载的调优历史记录
     tuning_result_history = get_tuning_result_history(load)
@@ -181,7 +181,7 @@ def _continuous_tuning_with_strategies(load: Load, tuning_strategies: list[tuple
                 break
 
 
-def _query_and_check_load(load_id: str) -> Optional[Load]: # TODO load_id用str类型感觉略微奇怪
+def _query_and_check_load(load_id: str) -> Optional[Load]:
     """
     根据load_id查询该负载是否存在于数据库中且需要调优
 

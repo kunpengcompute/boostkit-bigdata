@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List
+from typing import List, Tuple
 from common.constant import OA_CONF
 from server.app.models import (
     DatabaseTuningRecord,
@@ -139,12 +139,11 @@ class ExamRecordRepository(Repository):
         return ExamRecord(database_model=database_task)
 
     @classmethod
-    def delete(cls, exam_record: ExamRecord) -> None:
+    def delete(cls, exam_record: ExamRecord) -> Tuple[int, dict]:
         """
         从数据库删除指定的测试记录
 
         :param exam_record: 测试记录实例
         :return:
         """
-        # TODO 这个delete动作返回什么东西了？我甚至找不到这个delete函数
         return exam_record.database_model.delete()

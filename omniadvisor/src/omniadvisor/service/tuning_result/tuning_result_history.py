@@ -40,7 +40,7 @@ def get_other_tuning_result_history(exclude_load: Load) -> List:
 
     return result
 
-# TODO 这个函数怎么也单独在类外部
+
 def get_tuning_result_history(load: Load):
     """
     指定负载，获取调优结果所有历史

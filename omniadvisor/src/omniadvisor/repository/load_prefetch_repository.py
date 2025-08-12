@@ -11,8 +11,7 @@ from omniadvisor.repository.repository import Repository
 
 class LoadPrefetchRepository(Repository):
     """
-    #TODO  这个类居然五月份就有了吗？能不能介绍一下这是个什么类。
-    #TODO 为什么这个类只有这一个函数 这是干啥用的
+    提前批量获取反向外键相关对象的数据 避免N+1的查询问题
     """
 
     @classmethod

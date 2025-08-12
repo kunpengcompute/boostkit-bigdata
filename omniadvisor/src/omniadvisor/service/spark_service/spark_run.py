@@ -1,7 +1,9 @@
 import multiprocessing
 import time
-from requests.exceptions import HTTPError
 from typing import Tuple
+
+from requests.exceptions import HTTPError
+
 from common.constant import OA_CONF
 from omniadvisor.repository.model.load import Load
 from omniadvisor.repository.exam_record_repository import ExamRecordRepository

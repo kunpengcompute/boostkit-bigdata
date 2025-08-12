@@ -12,7 +12,6 @@ from omniadvisor.repository.tuning_record_repository import TuningRecordReposito
 from omniadvisor.repository.exam_record_repository import ExamRecordRepository
 
 
-# TODO 为什么这两个函数单独放在类外面 有点奇怪啊
 def get_tuning_result(load: Load, config: dict):
     """
     指定负载、参数配置，获取调优结果

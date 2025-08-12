@@ -1,8 +1,9 @@
-import re
 import json
+import re
+from typing import Any
+
 import requests
 from dateutil import parser
-from typing import Any
 
 from omniadvisor.utils.logger import global_logger
 
