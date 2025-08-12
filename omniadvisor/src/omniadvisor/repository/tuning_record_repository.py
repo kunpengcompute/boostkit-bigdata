@@ -1,3 +1,4 @@
+from typing import List
 from common.constant import OA_CONF
 from server.app.models import DatabaseLoad, DatabaseTuningRecord
 
@@ -29,7 +30,7 @@ class TuningRecordRepository(Repository):
     }
 
     @classmethod
-    def create(cls, load: Load, config: dict, method: str, method_extend: str = ''):
+    def create(cls, load: Load, config: dict, method: str, method_extend: str = '') -> TuningRecord:
         """
         指定负载、参数配置和调优方法，新增调优记录
 
@@ -68,12 +69,12 @@ class TuningRecordRepository(Repository):
         return TuningRecord(database_model=database_record)
 
     @classmethod
-    def query_by_load(cls, load: Load):
+    def query_by_load(cls, load: Load) -> List[TuningRecord]:
         """
-        指定负载，查询调优记录
+        指定负载，查询与该负载关联的全部调优记录
 
         :param load: 负载实例
-        :return: 调优记录实例
+        :return: 调优记录实例列表
         """
         model_attr = {
             TuningRecord.FieldName.load: load.database_model,
@@ -84,13 +85,13 @@ class TuningRecordRepository(Repository):
         ]
 
     @classmethod
-    def query_by_load_and_config(cls, load: Load, config: dict):
+    def query_by_load_and_config(cls, load: Load, config: dict) -> List[TuningRecord]:
         """
-        指定负载、参数配置，查询调优记录
+        指定负载、参数配置，查询唯一匹配的调优记录
 
         :param load: 负载实例
         :param config: 参数配置
-        :return: 调优记录实例
+        :return: 调优记录实例列表(实际上只有一个实例，返回列表是为了维护接口的数据格式统一）
         """
         model_attr = {
             TuningRecord.FieldName.load: load.database_model,
@@ -108,10 +109,10 @@ class TuningRecordRepository(Repository):
         ]
 
     @classmethod
-    def delete(cls, tuning_record: TuningRecord):
+    def delete(cls, tuning_record: TuningRecord) -> None:
         """
         删除 tuning_record 记录
-        :param tuning_record:
+        :param tuning_record:调优记录实例
         :return:
         """
         return tuning_record.database_model.delete()

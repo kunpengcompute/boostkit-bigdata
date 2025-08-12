@@ -33,7 +33,7 @@ class TestTaskRepository:
 
     def test_create(self):
         # 创建测试数据
-        hash_value = _calculate_hash_value(exec_attr={'cmd': 'spark-sql -f test.sql'}, user_config={"param1": "value2"})
+        hash_value = _calculate_hash_value(exec_attr={'cmd': 'spark-sql -f test.sql'}, config={"param1": "value2"})
         load = LoadRepository.create(
             name='test',
             exec_attr={'cmd': 'spark-sql -f test.sql'},
@@ -67,7 +67,7 @@ class TestTaskRepository:
 
     def test_query_by_load(self):
         # 创建测试数据
-        hash_value = _calculate_hash_value(exec_attr={'cmd': 'spark-sql -f test.sql'}, user_config={"param1": "value2"})
+        hash_value = _calculate_hash_value(exec_attr={'cmd': 'spark-sql -f test.sql'}, config={"param1": "value2"})
         load = LoadRepository.create(
             name='test',
             exec_attr={'cmd': 'spark-sql -f test.sql'},
@@ -91,7 +91,7 @@ class TestTaskRepository:
 
     def test_query_by_load_and_config(self):
         # 创建测试数据
-        hash_value = _calculate_hash_value(exec_attr={'cmd': 'spark-sql -f test.sql'}, user_config={"param1": "value2"})
+        hash_value = _calculate_hash_value(exec_attr={'cmd': 'spark-sql -f test.sql'}, config={"param1": "value2"})
         load = LoadRepository.create(
             name='test',
             exec_attr={'cmd': 'spark-sql -f test.sql'},

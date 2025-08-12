@@ -32,7 +32,7 @@ class TestSparkRun:
         # 构建exec_result mock对象
         self.mock_exec_result = MagicMock
         self.mock_exec_result.exitcode = 0
-        self.mock_exec_result.app_id = 'application_123456'
+        self.mock_exec_result.application_id = 'application_123456'
         self.mock_exec_result.duration = 24.2
         self.mock_exec_result.start_time = datetime(2023, 10, 5, 14, 30, 15)
         self.mock_exec_result.end_time = datetime(2023, 10, 5, 14, 30, 15)
@@ -89,7 +89,7 @@ class TestSparkRun:
             runtime=self.mock_exec_result.duration,
             start_time=self.mock_exec_result.start_time,
             end_time=self.mock_exec_result.end_time,
-            app_id=self.mock_exec_result.app_id
+            application_id=self.mock_exec_result.application_id
         )
         mock_multiprocess.assert_called_once()
         mock_process.start.assert_called_once()
@@ -127,6 +127,6 @@ class TestSparkRun:
             runtime=OA_CONF.exec_fail_return_runtime,
             start_time=self.mock_exec_result.start_time,
             end_time=self.mock_exec_result.end_time,
-            app_id=OA_CONF.exec_fail_return_app_id
+            application_id=OA_CONF.exec_fail_return_application_id
         )
         mock_multiprocess.assert_not_called()

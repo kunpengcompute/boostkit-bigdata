@@ -175,7 +175,7 @@ class TestSparkFetcher(unittest.TestCase):
         # 验证是否抛出异常
         with self.assertRaises(ValueError) as context:
             spark_fetcher.get_spark_runtime_by_app("app-1")
-        self.assertIn("No job information found for app_id=app-1", str(context.exception))
+        self.assertIn("No job information found for application_id=app-1", str(context.exception))
 
     @mock.patch('requests.get')
     def test_get_spark_runtime_by_app_incomplete_jobs(self, mock_get):

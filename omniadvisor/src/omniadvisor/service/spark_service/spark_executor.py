@@ -1,4 +1,5 @@
 import re
+from typing import Tuple
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -11,7 +12,7 @@ from omniadvisor.utils.logger import global_logger
 class SparkExecResult:
     exitcode: int
     output: str
-    app_id: str
+    application_id: str
     duration: float
     start_time: datetime
     end_time: datetime
@@ -23,13 +24,13 @@ class SparkExecutor:
     """
 
     @classmethod
-    def submit_spark_task(cls, cmd_fields: list, timeout: int):
+    def submit_spark_task(cls, cmd_fields: list, timeout: int) -> SparkExecResult:
         """
-        在shell终端提交spark命令，并在命令成功执行并返回时解析结果中的数据
+        在shell终端提交Spark任务，在Spark任务执行正常退出时解析结果中的数据，并使用SparkExecResult类返回解析后的结果
 
         :param cmd_fields: Spark的提交命令
         :param timeout: 超时时间
-        :return:
+        :return: SparkExecResult
         """
         if timeout:
             # 命令列表需全为str类型
@@ -48,7 +49,7 @@ class SparkExecutor:
             return SparkExecResult(
                 exitcode=exitcode,
                 output=output,
-                app_id=application_id,
+                application_id=application_id,
                 duration=total_time_taken,
                 start_time=start_time,
                 end_time=end_time
@@ -57,20 +58,21 @@ class SparkExecutor:
             return SparkExecResult(
                 exitcode=exitcode,
                 output=output,
-                app_id='',
+                application_id='',
                 duration=OA_CONF.exec_fail_return_runtime,
                 start_time=start_time,
                 end_time=end_time
             )
 
     @classmethod
-    def _parser_spark_output(cls, spark_output: str):
+    def _parser_spark_output(cls, spark_output: str) -> Tuple[str, float]:
         """
         解析Spark输出，获得spark提交命令、Application ID和Time taken(若存在)
         (注: Time taken后续不再作为性能指标被使用 目前仅作为性能参考获取系其数值)
 
         :param spark_output: Spark执行输出
-        :return:
+        :raises RuntimeError: 当无法从输出中匹配到 Application ID 时抛出。
+        :return: application_id, total_time_taken
         """
         # 解析Application id:
         # 该条匹配模式的文本来自Spark3.3.1源码中yarn/Client.scala文件在Line224所打印的日志

@@ -4,7 +4,7 @@
 # Copyright (c) Huawei Technologies Co, Ltd. 2023-2023. All rights reserved.
 
 import argparse
-from typing import List
+from typing import List, Any
 
 from omniadvisor.utils.logger import global_logger
 
@@ -88,13 +88,14 @@ class SparkCMDParser:
     _parser.add_argument('-d', '--database')
 
     @classmethod
-    def validate_submit_arguments(cls, args: List):
+    def validate_submit_arguments(cls, args: List) -> None:
         """
         检查当前提交的spark-submit命令是否属于SUBMIT动作的spark命令
         该函数与Spark 3.3.1源码中SparkSubmitArguments.scala文件中的validateSubmitArguments逻辑保持一致
 
         :param args: 从spark-submit文件中劫持的入参列表
-        :return: 属于SUBMIT动作返回True 不属于SUBMIT动作返回False
+        :raises ValueError: 当未提供任何参数时抛出（args 为空）。
+        :raises TypeError: 当参数不属于 SUBMIT 动作时抛出。
         """
         if len(args) == 0:
             raise ValueError("No arguments were provided. At least one argument is required.")
@@ -107,9 +108,10 @@ class SparkCMDParser:
             raise TypeError("This is not a SUBMIT type spark task.")
 
     @staticmethod
-    def _normalize_value(value):
+    def _normalize_value(value: Any) -> Any:
         """
         对spark-sql命令解析出来的value做标准化处理
+        (该函数虽然暂时不对value做任何处理 但考虑到整体代码结构 保留在此)
 
         :param value: 原始命令解析出的value
         :return: 标准化的value
@@ -117,12 +119,12 @@ class SparkCMDParser:
         return value
 
     @staticmethod
-    def _append_double_dash_args(cls, key, value):
+    def _append_double_dash_args(cls, key, value) -> List:
         """
         用于处理spark命令中以 "--" 作为前缀的参数
-        :param cls:
-        :param key:
-        :param value:
+
+        :param key: 参数名
+        :param value: 参数值
         :return:
         """
         if key in _BOOLEAN_TYPE_KEYS:
@@ -134,7 +136,7 @@ class SparkCMDParser:
             return [f'--{key}', cls._normalize_value(value)]
 
     @classmethod
-    def parse_cmd(cls, argv: list):
+    def parse_cmd(cls, argv: list) -> dict:
         """
         解析提交后的命令，得到解析的参数后，以字典的形式保存
         返回一个包含所有提取出的基础参数的字典,每个键代表一个参数名,详见add_argument中的配置的参数。

@@ -44,7 +44,7 @@ class TestSparkExecutor:
         mock_run_cmd.assert_called_once_with(cmd_fields=['timeout', str(self.timeout)] + self.cmd_fields)
         assert exec_result.exitcode == self.exitcode
         assert exec_result.output == self.output
-        assert exec_result.app_id == self.application_id
+        assert exec_result.application_id == self.application_id
         assert exec_result.duration == OA_CONF.exec_fail_return_runtime
         assert type(exec_result.start_time) is datetime
         assert type(exec_result.end_time) is datetime
@@ -54,9 +54,9 @@ class TestSparkExecutor:
         测试 parser_spark_output 方法
         """
         # 正确解析spark output
-        app_id, total_time_taken = self.spark_executor._parser_spark_output(self.output)
+        application_id, total_time_taken = self.spark_executor._parser_spark_output(self.output)
         # 验证结果
-        assert app_id == self.application_id
+        assert application_id == self.application_id
         assert total_time_taken == OA_CONF.exec_fail_return_runtime
 
         # 解析spark output缺失application id

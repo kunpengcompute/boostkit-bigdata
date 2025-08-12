@@ -39,9 +39,13 @@ def get_tuning_result(load: Load, config: dict):
     )
 
 
-def remove_tuning_result(load: Load, config: dict):
+def remove_tuning_result(load: Load, config: dict) -> None:
     """
-    删除给定负载和配置的执行记录
+    删除给定负载和配置所对应的全部执行记录
+
+    :param load: 负载实例
+    :param config: 负载配置
+    :return:
     """
     tuning_result = get_tuning_result(load, config)
     # 清测试记录

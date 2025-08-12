@@ -1,5 +1,7 @@
 import multiprocessing
 import time
+from typing import Tuple
+
 from requests.exceptions import HTTPError
 
 from common.constant import OA_CONF
@@ -24,7 +26,8 @@ _RETURN_CODE_MAP = {
 }
 
 
-def spark_run(load: Load, config: dict, wait_for_trace: bool = True, exec_in_isolation: bool = False):
+def spark_run(load: Load, config: dict, wait_for_trace: bool = True,
+              exec_in_isolation: bool = False) -> Tuple[ExamRecord, str]:
     """
     输入负载与配置，执行Spark任务 并从Spark命令的返回值中获取
     生成一条记录本次执行信息的exam_record
@@ -34,7 +37,7 @@ def spark_run(load: Load, config: dict, wait_for_trace: bool = True, exec_in_iso
     :param config: 参数配置
     :param wait_for_trace: 是否阻塞等待获取trace
     :param exec_in_isolation: 是否在隔离队列中执行
-    :return:
+    :return:测试记录实例, Spark任务执行的返回结果
     """
     # 是否要在隔离中执行，若在隔离中执行，则将队列改为隔离队列
     if exec_in_isolation and OA_CONF.backend_retest_queue:
@@ -58,13 +61,13 @@ def spark_run(load: Load, config: dict, wait_for_trace: bool = True, exec_in_iso
         global_logger.info('Spark Load %d execute success', load.id)
         exam_record_status = OA_CONF.ExecStatus.success
         exam_record_runtime = exec_result.duration
-        exam_record_app_id = exec_result.app_id
+        exam_record_application_id = exec_result.application_id
     else:
         global_logger.warning('Spark Load %d execute failed, return code: %d, error code describe: %s', load.id,
                               exec_result.exitcode, _RETURN_CODE_MAP.get(exec_result.exitcode, 'Abnormal exit code'))
         exam_record_status = OA_CONF.ExecStatus.fail
         exam_record_runtime = OA_CONF.exec_fail_return_runtime
-        exam_record_app_id = OA_CONF.exec_fail_return_app_id
+        exam_record_application_id = OA_CONF.exec_fail_return_application_id
 
     # 构建测试记录
     exam_record = ExamRecordRepository.create(
@@ -74,7 +77,7 @@ def spark_run(load: Load, config: dict, wait_for_trace: bool = True, exec_in_iso
         runtime=exam_record_runtime,
         start_time=exec_result.start_time,
         end_time=exec_result.end_time,
-        app_id=exam_record_app_id
+        application_id=exam_record_application_id
     )
 
     if exec_result.exitcode == 0:
@@ -82,32 +85,32 @@ def spark_run(load: Load, config: dict, wait_for_trace: bool = True, exec_in_iso
         if wait_for_trace:
             # 阻塞获取trace
             global_logger.info('Going to fetch Spark execute trace, the process is blocking.')
-            _update_trace_and_runtime_from_history_server(exam_record=exam_record, application_id=exec_result.app_id)
+            _update_trace_and_runtime_from_history_server(exam_record=exam_record, application_id=exec_result.application_id)
         else:
             # 不阻塞获取trace，通过子进程进行获取
             global_logger.info('Going to fetch Spark execute trace, the process is non-blocking.')
-            p = multiprocessing.Process(target=_update_trace_and_runtime_from_history_server, args=(exam_record, exec_result.app_id))
+            p = multiprocessing.Process(target=_update_trace_and_runtime_from_history_server, args=(exam_record, exec_result.application_id))
             p.daemon = False
             p.start()
 
     return exam_record, exec_result.output
 
 
-def _calc_timeout_from_load(load: Load):
+def _calc_timeout_from_load(load: Load) -> int:
     """
-    针对负载和配置，计算得到超时时间
+    根据负载的基线执行时间计算该负载在复测时的超时时间
 
     :param load: 负载
-    :return:
+    :return: 超时时间
     """
     # 超时时间为基线执行用时的倍数
     baseline_result = get_tuning_result(load=load, config=load.default_config)
     return int(OA_CONF.spark_exec_timeout_ratio * baseline_result.runtime)
 
 
-def _update_trace_and_runtime_from_history_server(exam_record: ExamRecord, application_id: str):
+def _update_trace_and_runtime_from_history_server(exam_record: ExamRecord, application_id: str) -> None:
     """
-    根据application_id对history_server进行轮询, 查询该任务的trace信息和runtime信息
+    根据application_id对history_server进行轮询, 查询该任务的trace信息和runtime信息，并刷新ExamRecord中相关字段的信息
 
     :param application_id: Spark任务application_id
     :return:

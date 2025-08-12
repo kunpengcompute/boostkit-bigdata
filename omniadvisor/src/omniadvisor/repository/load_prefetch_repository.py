@@ -10,11 +10,15 @@ from omniadvisor.repository.repository import Repository
 
 
 class LoadPrefetchRepository(Repository):
+    """
+    提前批量获取反向外键相关对象的数据 避免N+1的查询问题
+    """
 
     @classmethod
     def exclude_query_load_with_tuning_records(cls, exclude_load: Load):
         """
         获取 exclude_load 的 id 以外的 load 及  tuning record的聚合
+
         :param exclude_load: 排除的load id
         :return:
         """

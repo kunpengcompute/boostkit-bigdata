@@ -76,7 +76,7 @@ class DatabaseExamRecord(models.Model):
         default=OA_CONF.ExecStatus.running
     )
     runtime = models.FloatField(null=True)
-    app_id = models.CharField(max_length=50, null=True)
+    application_id = models.CharField(max_length=50, null=True)
     trace = models.JSONField(null=True)
 
     class Meta:
