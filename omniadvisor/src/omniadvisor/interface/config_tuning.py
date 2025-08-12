@@ -72,7 +72,7 @@ def _single_tuning(load: Load, retest_way: str, tuning_method: str) -> None:
     signal.signal(signal.SIGTERM, handler)
     signal.signal(signal.SIGINT, handler)
 
-    method_extend, next_config = _get_next_config(load, tuning_method)
+    next_config, method_extend = _get_next_config(load=load, tuning_method=tuning_method)
 
     if not next_config:
         raise NoOptimalConfigError(f'The recommending config of method {tuning_method} is empty,'
@@ -158,7 +158,7 @@ def _get_next_config(load: Load, tuning_method: str) -> tuple[dict, str]:
     # 调优
     next_config, method_extend = tuner.tune()
     global_logger.debug(f"The method_extend is: {method_extend}, config from tuning is: {next_config}")
-    return method_extend, next_config
+    return next_config, method_extend
 
 
 def _continuous_tuning_with_strategies(load: Load, tuning_strategies: list[tuple[str, int]]) -> None:
