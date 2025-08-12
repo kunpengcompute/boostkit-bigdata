@@ -3,7 +3,7 @@ import os
 import configparser
 
 
-def load_common_config(config_path: str):
+def load_cfg_config(config_path: str):
     """
     使用configparser库加载common_config
 
@@ -13,10 +13,22 @@ def load_common_config(config_path: str):
     if not os.path.exists(config_path):
         raise FileNotFoundError(f"{config_path} does not exist")
 
-    common_config = configparser.ConfigParser()
+    common_config = configparser.ConfigParser(interpolation=None)
     common_config.read(config_path, encoding='utf-8')
 
     return common_config
+
+
+def write_cfg_config(config_path, key, value):
+    """
+    写入全新的 key, value配置 到 config_path中
+    """
+    new_config = configparser.ConfigParser(interpolation=None)
+    new_config[key] = value
+
+    # 直接写入（无需读取）
+    with open(config_path, 'w', encoding='utf-8') as configfile:
+        new_config.write(configfile)
 
 
 def check_oa_conf():
@@ -100,7 +112,7 @@ class OmniAdvisorConf:
         all = [hijacking, backend]
 
     # 输入配置解析
-    _common_config = load_common_config(config_path=common_config_path)
+    _common_config = load_cfg_config(config_path=common_config_path)
     # 配置罗列
     # common页
     tuning_retest_times = _common_config.getint('common', 'tuning.retest.times')

@@ -9,26 +9,49 @@ https://docs.djangoproject.com/en/4.2/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.2/ref/settings/
 """
-
+import os
 from pathlib import Path
 
-from common.constant import OA_CONF
+from django.core.management.utils import get_random_secret_key
+
+from common.constant import OA_CONF, load_cfg_config, write_cfg_config
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-no@z!_@jyd1w6!497ewxgm3h2n-0^oaz@9go9w5b%y_9%tv2c%'
+# SECRET_KEY = "y[ol;ZK2H:Xq;g:m+XeH8lj3y!:f`0}%3r>E%:g~+G+xwt-O!Y"
+
+ENV_PATH = BASE_DIR / "secret_key.cfg"
+
+# 一旦生成这个随机变量之后，就不再变化
+if os.path.isfile(str(ENV_PATH)):
+    secret_key_config = load_cfg_config(str(ENV_PATH))
+    SECRET_KEY = secret_key_config.get('DEFAULT', 'secret_key')
+else:
+    SECRET_KEY = get_random_secret_key()
+    write_cfg_config(str(ENV_PATH), 'DEFAULT', {'secret_key': SECRET_KEY})
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
+
+# 开启 HTTP Strict Transport Security (HSTS)，告诉浏览器在一定时间内（这里是一年）只能通过 HTTPS 访问你的网站
+SECURE_HSTS_SECONDS = 31536000
+# 配合 HSTS 使用，告诉浏览器所有子域名也必须强制 HTTPS。
+SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+# 让 CSRF 的 cookie 只能通过 HTTPS 发送，防止在 HTTP 传输中被窃取
+CSRF_COOKIE_SECURE = True
+# 同样是让 session cookie 只能通过 HTTPS 发送
+SESSION_COOKIE_SECURE = True
+# 强制将所有非 HTTPS（明文 HTTP）的请求自动重定向到 HTTPS（加密连接）
+SECURE_SSL_REDIRECT = True
+# 为了确保 Django 能正确判断请求是否是通过 HTTPS 发起的，它需要一个指示正确协议的头部。
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 ALLOWED_HOSTS = ['*']
-
 
 # Application definition
 
@@ -39,7 +62,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'server.app'
+    'server.app',
+    'sslserver'
 ]
 
 MIDDLEWARE = [
