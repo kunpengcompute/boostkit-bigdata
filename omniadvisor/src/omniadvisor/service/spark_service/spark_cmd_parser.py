@@ -12,6 +12,8 @@ from omniadvisor.utils.logger import global_logger
 _CMD_PREFIX_KEY = 'omniadvisor-cmd-prefix'
 # 命令行开头的字段名称
 _CMD_UNKNOWN_KEY = 'unknown'
+# 命令行中class字段
+_CMD_CLASS_KEY = 'class'
 # 单横杠参数的字段
 _SINGLE_HORIZONTAL_BAR_KEYS = ['e', 'f', 'i']
 # 布尔类型的字段
@@ -118,7 +120,7 @@ class SparkCMDParser:
         """
         return value
 
-    @staticmethod
+    @classmethod
     def _append_double_dash_args(cls, key, value) -> List:
         """
         用于处理spark命令中以 "--" 作为前缀的参数
@@ -136,7 +138,7 @@ class SparkCMDParser:
             return [f'--{key}', cls._normalize_value(value)]
 
     @classmethod
-    def parse_cmd(cls, argv: list) -> dict:
+    def parse_cmd(cls, argv: list) -> tuple[dict, dict]:
         """
         解析提交后的命令，得到解析的参数后，以字典的形式保存
         返回一个包含所有提取出的基础参数的字典,每个键代表一个参数名,详见add_argument中的配置的参数。
@@ -194,9 +196,13 @@ class SparkCMDParser:
         # 把${SPARK_HOME}/bin/spark-class org.apache.spark.deploy.SparkSubmit通过空格拆分成含有两个元素的参数列表
         cmd_fields += exec_attr.get(_CMD_PREFIX_KEY).split(" ")
 
+        # 将命令行中的class属性提前放置，符合Spark正常执行命令
+        if _CMD_CLASS_KEY in exec_attr:
+            cmd_fields += cls._append_double_dash_args(_CMD_CLASS_KEY, exec_attr[_CMD_CLASS_KEY])
+
         # 处理执行属性
         for key, value in exec_attr.items():
-            if key == _CMD_PREFIX_KEY:
+            if key in [_CMD_PREFIX_KEY, _CMD_CLASS_KEY]:
                 continue
             # 单独处理 unknown = ['xxxxxxx.jar', 'xxxxxx', 'xxxxx'] 这部分未被解析的残余参数追加到末尾 不在此处理
             elif key == _CMD_UNKNOWN_KEY:
@@ -206,7 +212,7 @@ class SparkCMDParser:
                 cmd_fields += [f'-{key}', cls._normalize_value(value)]
             # 处理剩余 -- 作为前缀的参数
             else:
-                cmd_fields += cls._append_double_dash_args(cls, key, value)
+                cmd_fields += cls._append_double_dash_args(key, value)
 
         # 处理参数配置
         for key, value in conf_params.items():
