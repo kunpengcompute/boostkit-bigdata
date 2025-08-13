@@ -29,6 +29,20 @@ def check_oa_conf() -> None:
         raise ValueError('The tuning retest times must > 0, please check common configuration.')
     if OA_CONF.config_fail_threshold <= 0:
         raise ValueError('The config fail threshold must > 0, please check common configuration.')
+    if not isinstance(OA_CONF.tuning_strategies, list):
+        raise ValueError('The type of tuning strategies must be list, please check common configuration.')
+
+    if not OA_CONF.postgresql_database_name:
+        raise ValueError('The postgresql database name can not be empty, please check common configuration.')
+    if not OA_CONF.postgresql_database_user:
+        raise ValueError('The postgresql database user can not be empty, please check common configuration.')
+    if not OA_CONF.postgresql_database_password:
+        raise ValueError('The postgresql database password can not be empty, please check common configuration.')
+    if not OA_CONF.postgresql_database_host:
+        raise ValueError('The postgresql database host can not be empty, please check common configuration.')
+    if not OA_CONF.postgresql_database_port:
+        raise ValueError('The postgresql database port can not be empty, please check common configuration.')
+
     if OA_CONF.spark_fetch_trace_timeout <= 0:
         raise ValueError('The spark fetch trace timeout must > 0, please check common configuration.')
     if OA_CONF.spark_fetch_trace_interval <= 0:

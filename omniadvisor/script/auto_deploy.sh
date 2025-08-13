@@ -6,6 +6,7 @@ frame_dir=$prefix/BoostKit-omniadvisor_2.0.0
 ls -l $frame_dir/src
 ls -l $core_dir/src
 cp -r $core_dir/src/algo $frame_dir/src/
+cp -r $core_dir/config/* $frame_dir/config/
 
 if [ -z "${SPARK_HOME}" ]; then
   # 如果 SPARK_HOME 未设置，打印错误信息并退出
