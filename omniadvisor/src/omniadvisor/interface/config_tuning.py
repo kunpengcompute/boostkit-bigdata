@@ -1,5 +1,6 @@
 import argparse
 import signal
+from typing import Optional
 
 from algo.expert.tuning import ExpertTuning
 from algo.iterative.tuning import SmacAppendTuning
@@ -23,17 +24,22 @@ from omniadvisor.utils.logger import global_logger
 from omniadvisor.utils.utils import float_format
 
 
-def handler(signum, frame):
+def handler(signum: int, frame) -> None:
     """
-    用于注册异常退出信号
+    用于注册异常退出信号的处理函数。
+
+    :param signum: 接收到的信号编号（如 signal.SIGTERM）
+    :param frame: 当前栈帧，可能为 None
+    :raises SystemKilledError: 当接收到终止信号时抛出该异常
     """
     raise SystemKilledError(f'System is terminated, because of catching signal %s', signum)
 
 
-def _parse_tuning_args():
+def _parse_tuning_args() -> argparse.Namespace:
     """
-    解析用户直命令行输入的参数
-    :return:
+    解析调优模块用户直命令行输入的参数
+
+    :return: 解析后参数的命名空间
     """
     parser = argparse.ArgumentParser(
         description="Parse params that will frequently used. For other configs, change the config file.")
@@ -51,21 +57,26 @@ def _parse_tuning_args():
     return args
 
 
-def _single_tuning(load, retest_way: str, tuning_method: str):
+def _single_tuning(load: Load, retest_way: str, tuning_method: str) -> None:
     """
-    后台调优
+    对入参中的负载使用指定的算完成一次调优动作
+    (一次完整的调优动作包括①调优算法推出配置，②调优记录生成，③配置复测流程执行，④负载对应的test_config与best_config刷新)
+    当推出的配置符合要求时，生成对应的TuningRecord，并依据复测方式按照指定流程完成复测
+    根据复测情况对该负载相关联test_config、best_config等字段进行更新
+
     :param load: 负载
     :param retest_way: 复测方法
-    :param tuning_method: 算法的类型
-    :return:
+    :param tuning_method: 调优算法的类型
+    :raises NoOptimalConfigError: 当没有推出符合要求的优化后参数时抛出异常
     """
     signal.signal(signal.SIGTERM, handler)
     signal.signal(signal.SIGINT, handler)
 
-    method_extend, next_config = _get_next_config(load, tuning_method)
+    next_config, method_extend = _get_next_config(load=load, tuning_method=tuning_method)
 
     if not next_config:
-        raise NoOptimalConfigError(f'The recommending config of method {tuning_method} is empty, please try other tuning methods.')
+        raise NoOptimalConfigError(f'The recommending config of method {tuning_method} is empty,'
+                                   f' please try other tuning methods.')
 
     # 用户的default_config上叠加next_config叠加
     global_logger.info("Load config tuning success, get new config to retest.")
@@ -73,7 +84,8 @@ def _single_tuning(load, retest_way: str, tuning_method: str):
 
     # 判断是否有重复推荐配置
     if TuningRecordRepository.query_by_load_and_config(load=load, config=next_config):
-        raise NoOptimalConfigError(f'The recommending config of method {tuning_method} already exists, please try other tuning methods.')
+        raise NoOptimalConfigError(f'The recommending config of method {tuning_method} already exists,'
+                                   f' please try other tuning methods.')
 
     TuningRecordRepository.create(load=load, config=next_config, method=tuning_method, method_extend=method_extend)
 
@@ -105,13 +117,17 @@ def _single_tuning(load, retest_way: str, tuning_method: str):
         LoadRepository.update_test_config(load, next_config)
 
 
-def _get_next_config(load: Load, tuning_method: str):
+def _get_next_config(load: Load, tuning_method: str) -> tuple[dict, str]:
     """
-    调优推荐下一个配置
+    对指定的负载通过指定的调优算法进行调优，并返回调优后的配置
 
     :param load: 负载
     :param tuning_method: 调优方法
-    :return:
+    :raises ValueError: 当传入的调优方法不被支持时抛出异常
+    :returns: 一个元组 (method_extend, next_config)
+              - **method_extend**: 调优方法描述
+              - **next_config**: 优化后配置
+    :rtype: tuple[dict, str]
     """
     # 获取指定负载的调优历史记录
     tuning_result_history = get_tuning_result_history(load)
@@ -119,20 +135,20 @@ def _get_next_config(load: Load, tuning_method: str):
     # AI迭代调优
     if tuning_method == OA_CONF.TuningMethod.iterative:
         global_logger.info("Use AI iterative optimization method to tuning.")
-        tuning = SmacAppendTuning(tuning_history=tuning_result_history.to_tuning_data_list())
+        tuner = SmacAppendTuning(tuning_history=tuning_result_history.to_tuning_data_list())
     # 专家规则调优
     elif tuning_method == OA_CONF.TuningMethod.expert:
         global_logger.info("Use expert rule optimization method to tuning.")
-        tuning = ExpertTuning(tuning_history=tuning_result_history.to_tuning_data_list())
+        tuner = ExpertTuning(tuning_history=tuning_result_history.to_tuning_data_list())
     # Native特性使能
     elif tuning_method == OA_CONF.TuningMethod.native:
         global_logger.info("Use native operator acceleration feature to tuning.")
-        tuning = NativeTuning(tuning_history=tuning_result_history.to_tuning_data_list())
+        tuner = NativeTuning(tuning_history=tuning_result_history.to_tuning_data_list())
     # 迁移泛化调优
     elif tuning_method == OA_CONF.TuningMethod.transfer:
         global_logger.info("Use migration generalization optimization method to tuning.")
         other_history = get_other_tuning_result_history(load)
-        tuning = TransferTuning(
+        tuner = TransferTuning(
             tuning_history=tuning_result_history.to_tuning_data_list(),
             other_histories=[other.to_tuning_data_list() for other in other_history]
         )
@@ -140,12 +156,12 @@ def _get_next_config(load: Load, tuning_method: str):
         raise ValueError(f'Not supported tuning method: {tuning_method}')
 
     # 调优
-    next_config, method_extend = tuning.tune()
+    next_config, method_extend = tuner.tune()
     global_logger.debug(f"The method_extend is: {method_extend}, config from tuning is: {next_config}")
-    return method_extend, next_config
+    return next_config, method_extend
 
 
-def _continuous_tuning_with_strategies(load, tuning_strategies: list):
+def _continuous_tuning_with_strategies(load: Load, tuning_strategies: list[tuple[str, int]]) -> None:
     """
     根据输入的调优策略列表，进行连续的调优
 
@@ -165,11 +181,12 @@ def _continuous_tuning_with_strategies(load, tuning_strategies: list):
                 break
 
 
-def _query_and_check_load(load_id):
+def _query_and_check_load(load_id: str) -> Optional[Load]:
     """
-    前置检查
-    :param load_id:
-    :return:
+    根据load_id查询该负载是否存在于数据库中且需要调优
+
+    :param load_id: 负载 ID
+    :returns: 如果找到并且需要调优，则返回对应的 Load 对象；否则返回 ``None``。
     """
     # 查询负载：
     loads = LoadRepository.query_by_id(load_id)

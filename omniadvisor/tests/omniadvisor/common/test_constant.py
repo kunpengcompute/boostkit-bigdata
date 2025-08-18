@@ -17,7 +17,13 @@ class TestConstant:
         spark_fetch_trace_interval=5,
         spark_exec_timeout_ratio=0.5,
         spark_history_username='user',
-        spark_history_password='pass'
+        spark_history_password='pass',
+        tuning_strategies=[],
+        postgresql_database_name='name',
+        postgresql_database_user='user',
+        postgresql_database_password='password',
+        postgresql_database_host='host',
+        postgresql_database_port='port'
     ))
     def test_check_oa_conf_when_normal(self):
         # 不应抛异常
@@ -31,7 +37,13 @@ class TestConstant:
         spark_fetch_trace_interval=5,
         spark_exec_timeout_ratio=0.5,
         spark_history_username='user',
-        spark_history_password='pass'
+        spark_history_password='pass',
+        tuning_strategies=[],
+        postgresql_database_name='name',
+        postgresql_database_user='user',
+        postgresql_database_password='password',
+        postgresql_database_host='host',
+        postgresql_database_port='port'
     ))
     def test_check_oa_conf_when_invalid_tuning_retest_times(self):
         with pytest.raises(ValueError, match='tuning retest times'):
@@ -45,7 +57,13 @@ class TestConstant:
         spark_fetch_trace_interval=5,
         spark_exec_timeout_ratio=0.5,
         spark_history_username='user',
-        spark_history_password='pass'
+        spark_history_password='pass',
+        tuning_strategies=[],
+        postgresql_database_name='name',
+        postgresql_database_user='user',
+        postgresql_database_password='password',
+        postgresql_database_host='host',
+        postgresql_database_port='port'
     ))
     def test_check_oa_conf_when_invalid_config_fail_threshold(self):
         with pytest.raises(ValueError, match='config fail threshold'):
@@ -59,7 +77,13 @@ class TestConstant:
         spark_fetch_trace_interval=5,
         spark_exec_timeout_ratio=0.5,
         spark_history_username='user',
-        spark_history_password='pass'
+        spark_history_password='pass',
+        tuning_strategies=[],
+        postgresql_database_name='name',
+        postgresql_database_user='user',
+        postgresql_database_password='password',
+        postgresql_database_host='host',
+        postgresql_database_port='port'
     ))
     def test_check_oa_conf_when_invalid_fetch_trace_timeout(self):
         with pytest.raises(ValueError, match='spark fetch trace timeout'):
@@ -73,7 +97,13 @@ class TestConstant:
         spark_fetch_trace_interval=0,
         spark_exec_timeout_ratio=0.5,
         spark_history_username='user',
-        spark_history_password='pass'
+        spark_history_password='pass',
+        tuning_strategies=[],
+        postgresql_database_name='name',
+        postgresql_database_user='user',
+        postgresql_database_password='password',
+        postgresql_database_host='host',
+        postgresql_database_port='port'
     ))
     def test_check_oa_conf_when_invalid_fetch_trace_interval(self):
         with pytest.raises(ValueError, match='spark fetch trace interval'):
@@ -87,7 +117,13 @@ class TestConstant:
         # invalid
         spark_exec_timeout_ratio=0,
         spark_history_username='user',
-        spark_history_password='pass'
+        spark_history_password='pass',
+        tuning_strategies=[],
+        postgresql_database_name='name',
+        postgresql_database_user='user',
+        postgresql_database_password='password',
+        postgresql_database_host='host',
+        postgresql_database_port='port'
     ))
     def test_check_oa_conf_when_invalid_exec_timeout_ratio(self):
         with pytest.raises(ValueError, match='spark exec timeout ratio'):
@@ -101,7 +137,13 @@ class TestConstant:
         spark_exec_timeout_ratio=0.5,
         spark_history_username='user',
         # mismatch
-        spark_history_password=''
+        spark_history_password='',
+        tuning_strategies=[],
+        postgresql_database_name='name',
+        postgresql_database_user='user',
+        postgresql_database_password='password',
+        postgresql_database_host='host',
+        postgresql_database_port='port'
     ))
     def test_check_oa_conf_when_username_password_mismatch_case1(self):
         with pytest.raises(ValueError, match='username and password'):
@@ -115,7 +157,13 @@ class TestConstant:
         spark_exec_timeout_ratio=0.5,
         # mismatch
         spark_history_username='',
-        spark_history_password='pass'
+        spark_history_password='pass',
+        tuning_strategies=[],
+        postgresql_database_name='name',
+        postgresql_database_user='user',
+        postgresql_database_password='password',
+        postgresql_database_host='host',
+        postgresql_database_port='port'
     ))
     def test_check_oa_conf_when_username_password_mismatch_case2(self):
         with pytest.raises(ValueError, match='username and password'):

@@ -3,7 +3,7 @@ import os
 import configparser
 
 
-def load_cfg_config(config_path: str):
+def load_cfg_config(config_path: str) -> configparser.ConfigParser:
     """
     使用configparser库加载common_config
 
@@ -19,7 +19,7 @@ def load_cfg_config(config_path: str):
     return common_config
 
 
-def write_cfg_config(config_path, key, value):
+def write_cfg_config(config_path, key, value) -> None:
     """
     写入全新的 key, value配置 到 config_path中
     """
@@ -31,14 +31,30 @@ def write_cfg_config(config_path, key, value):
         new_config.write(configfile)
 
 
-def check_oa_conf():
+def check_oa_conf() -> None:
     """
-    校验OA_CONF中参数是否正确
+    校验OA_CONF中参数是否符合要求，在参数值不符合规范时抛出异常
+
+    :raises ValueError: OA_CONF中的值不符合要求时抛出ValueError
     """
     if OA_CONF.tuning_retest_times <= 0:
         raise ValueError('The tuning retest times must > 0, please check common configuration.')
     if OA_CONF.config_fail_threshold <= 0:
         raise ValueError('The config fail threshold must > 0, please check common configuration.')
+    if not isinstance(OA_CONF.tuning_strategies, list):
+        raise ValueError('The type of tuning strategies must be list, please check common configuration.')
+
+    if not OA_CONF.postgresql_database_name:
+        raise ValueError('The postgresql database name can not be empty, please check common configuration.')
+    if not OA_CONF.postgresql_database_user:
+        raise ValueError('The postgresql database user can not be empty, please check common configuration.')
+    if not OA_CONF.postgresql_database_password:
+        raise ValueError('The postgresql database password can not be empty, please check common configuration.')
+    if not OA_CONF.postgresql_database_host:
+        raise ValueError('The postgresql database host can not be empty, please check common configuration.')
+    if not OA_CONF.postgresql_database_port:
+        raise ValueError('The postgresql database port can not be empty, please check common configuration.')
+
     if OA_CONF.spark_fetch_trace_timeout <= 0:
         raise ValueError('The spark fetch trace timeout must > 0, please check common configuration.')
     if OA_CONF.spark_fetch_trace_interval <= 0:
@@ -56,7 +72,9 @@ def check_oa_conf():
 
 class OmniAdvisorConf:
     """
-    OmniAdvisor常量
+    OmniAdvisor 常量配置类。
+
+    存放 OmniAdvisor 系统的全局常量，包括 API 路径、默认参数等。
     """
     # OmniAdvisor版本信息
     product_name = "Kunpeng BoostKit"
@@ -93,7 +111,7 @@ class OmniAdvisorConf:
 
     empty_config = dict()
     exec_fail_return_runtime = float('inf')
-    exec_fail_return_app_id = ''
+    exec_fail_return_application_id = ''
     exec_fail_return_trace = dict()
 
     # 调优算法
@@ -132,6 +150,7 @@ class OmniAdvisorConf:
     spark_fetch_trace_timeout = _common_config.getint('spark', 'spark.fetch.trace.timeout')
     spark_fetch_trace_interval = _common_config.getint('spark', 'spark.fetch.trace.interval')
     spark_exec_timeout_ratio = _common_config.getfloat('spark', 'spark.exec.timeout.ratio')
+    strategies_tuples = [tuple(item) for item in json.loads(_common_config.get('common', 'tuning.strategy'))]
 
     # 保留小数位数
     decimal_digits = 3

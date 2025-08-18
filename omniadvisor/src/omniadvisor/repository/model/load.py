@@ -46,6 +46,10 @@ class Load:
         return self._database_model.tuning_needed
 
     @property
+    def backend_retest_forbidden(self):
+        return self._database_model.backend_retest_forbidden
+
+    @property
     def database_model(self):
         return self._database_model
 
