@@ -10,8 +10,8 @@ from omniadvisor.utils.logger import global_logger
 
 # 命令行开头的字段名称
 _CMD_PREFIX_KEY = 'omniadvisor-cmd-prefix'
-# 命令行开头的字段名称
-_CMD_UNKNOWN_KEY = 'unknown'
+# 命令中的primary_resource部分
+_CMD_PRIMARY_RESOURCE = 'primary_resource'
 # 命令行中class字段
 _CMD_CLASS_KEY = 'class'
 # 单横杠参数的字段
@@ -155,8 +155,17 @@ class SparkCMDParser:
         exec_attr = dict()
         conf_params = dict()
 
-        # 参数解析
+        # 原始参数解析
         params, unknown = cls._parser.parse_known_args(args=argv)
+
+        if unknown:
+            index = argv.index(unknown[0])
+            params, sub_unknown = cls._parser.parse_known_args(args=argv[:index])
+            primary_resource = argv[index:]
+            global_logger.warning(f"The remainder unknown params %s "
+                                  f"will be add to exec_attr[primary_resource]", primary_resource)
+            exec_attr[_CMD_PRIMARY_RESOURCE] = primary_resource
+
         for key, value in vars(params).items():
             # 过滤空值参数
             if value is None:
@@ -172,10 +181,6 @@ class SparkCMDParser:
             # 其余参数保存至exec_attr
             else:
                 exec_attr[key] = value
-
-        if unknown:
-            global_logger.warning(f"The remainder unknown params {unknown} will be add to exec_attr[unknown]")
-            exec_attr[_CMD_UNKNOWN_KEY] = unknown
 
         return exec_attr, conf_params
 
@@ -205,7 +210,7 @@ class SparkCMDParser:
             if key in [_CMD_PREFIX_KEY, _CMD_CLASS_KEY]:
                 continue
             # 单独处理 unknown = ['xxxxxxx.jar', 'xxxxxx', 'xxxxx'] 这部分未被解析的残余参数追加到末尾 不在此处理
-            elif key == _CMD_UNKNOWN_KEY:
+            elif key == _CMD_PRIMARY_RESOURCE:
                 continue
             # 单独处理 - 作为前缀的参数
             elif key in _SINGLE_HORIZONTAL_BAR_KEYS:
@@ -219,7 +224,7 @@ class SparkCMDParser:
             cmd_fields += ['--conf', f'{key}={cls._normalize_value(value)}']
 
         # 追加primary_resource
-        primary_resource = exec_attr.get(_CMD_UNKNOWN_KEY)
+        primary_resource = exec_attr.get(_CMD_PRIMARY_RESOURCE)
         if primary_resource:
             cmd_fields += [cls._normalize_value(item) for item in primary_resource]
 
