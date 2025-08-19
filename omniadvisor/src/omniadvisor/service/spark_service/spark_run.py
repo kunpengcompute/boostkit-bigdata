@@ -98,7 +98,7 @@ def spark_run(load: Load, config: dict, wait_for_trace: bool = True,
     return exam_record, exec_result.output
 
 
-def _calc_timeout_from_load(load: Load) -> int:
+def _calc_timeout_from_load(load: Load) -> float:
     """
     根据负载的基线执行时间计算该负载在复测时的超时时间
 
@@ -107,7 +107,7 @@ def _calc_timeout_from_load(load: Load) -> int:
     """
     # 超时时间为基线执行用时的倍数
     baseline_result = get_tuning_result(load=load, config=load.default_config)
-    return int(OA_CONF.spark_exec_timeout_ratio * baseline_result.runtime)
+    return OA_CONF.spark_exec_timeout_ratio * baseline_result.runtime
 
 
 def _update_trace_and_runtime_from_history_server(exam_record: ExamRecord, application_id: str) -> bool:
