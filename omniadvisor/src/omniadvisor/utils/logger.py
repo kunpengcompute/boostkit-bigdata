@@ -67,7 +67,7 @@ global_logger = logging.getLogger('omniadvisor')
 global_logger.propagate = False
 
 # 屏蔽warnings模块中的RuntimeWarning 避免smac库在运行时偶发的warning打印影响用户体验
-warnings.filterwarnings('ignore', category=RuntimeWarning)
+warnings.filterwarnings('ignore')
 
 # 屏蔽部分第三方库中的Logger
 modules_setting_error = ['smac']
