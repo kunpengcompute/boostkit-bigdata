@@ -25,12 +25,12 @@ _KEY_STR = 'django.secretkey'
 _DEFAULT_STR = 'default'
 
 # 一旦生成这个随机变量之后，就不再变化
-if os.path.isfile(OA_CONF.django_server_path):
-    secret_key_config = load_ini_config(OA_CONF.django_server_path)
+if os.path.isfile(OA_CONF.django_secret_key_path):
+    secret_key_config = load_ini_config(OA_CONF.django_secret_key_path)
     secret_key = secret_key_config.get(_DEFAULT_STR, _KEY_STR)
 else:
     secret_key = get_random_secret_key()
-    write_ini_config(OA_CONF.django_server_path, _DEFAULT_STR, {_KEY_STR: secret_key})
+    write_ini_config(OA_CONF.django_secret_key_path, _DEFAULT_STR, {_KEY_STR: secret_key})
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
