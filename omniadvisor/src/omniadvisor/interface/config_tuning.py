@@ -150,7 +150,8 @@ def _get_next_config(load: Load, tuning_method: str) -> tuple[dict, str]:
         other_history = get_other_tuning_result_history(load)
         tuner = TransferTuning(
             tuning_history=tuning_result_history.to_tuning_data_list(),
-            other_histories=[other.to_tuning_data_list() for other in other_history]
+            # 可能存在负载没有调优记录或调优记录状态为empty，导致to_tuning_data_list()输出列表为空
+            other_histories=[other.to_tuning_data_list() for other in other_history if other.to_tuning_data_list()]
         )
     else:
         raise ValueError(f'Not supported tuning method: {tuning_method}')

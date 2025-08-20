@@ -21,5 +21,11 @@ class TuningRecordAdmin(admin.ModelAdmin):
 
 @admin.register(DatabaseExamRecord)
 class ExamRecordAdmin(admin.ModelAdmin):
-    list_display = ('id', 'tuning_record', 'start_time', 'end_time', 'status', 'runtime', 'application_id', 'trace')
+    list_display = ('id', 'load', 'tuning_record', 'start_time', 'end_time', 'status', 'runtime', 'application_id', 'trace')
     list_filter = ()
+
+    # 增加对Load的显示
+    def load(self, model):
+        return model.tuning_record.load
+    load.short_description = 'Load'
+    load.admin_order_field = 'load'
