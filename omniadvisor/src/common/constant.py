@@ -3,7 +3,7 @@ import os
 import configparser
 
 
-def load_common_config(config_path: str) -> configparser.ConfigParser:
+def load_ini_config(config_path: str) -> configparser.ConfigParser:
     """
     使用configparser库加载common_config
 
@@ -13,10 +13,27 @@ def load_common_config(config_path: str) -> configparser.ConfigParser:
     if not os.path.exists(config_path):
         raise FileNotFoundError(f"{config_path} does not exist")
 
-    common_config = configparser.ConfigParser()
+    common_config = configparser.ConfigParser(interpolation=None)
     common_config.read(config_path, encoding='utf-8')
 
     return common_config
+
+
+def write_ini_config(config_path: str, key: str, value: dict) -> None:
+    """
+    以覆盖形式写入全新的 key, value配置 到 config_path中
+
+    :param config_path: 配置文件路径
+    :param key: 键
+    :param value: 值
+    :return: None
+    """
+    new_config = configparser.ConfigParser(interpolation=None)
+    new_config[key] = value
+
+    # 直接写入（无需读取）
+    with open(config_path, 'w', encoding='utf-8') as configfile:
+        new_config.write(configfile)
 
 
 def check_oa_conf() -> None:
@@ -81,6 +98,8 @@ class OmniAdvisorConf:
     common_config_path = f'{config_dir}/common_config.ini'
     # 数据存储目录
     data_dir = f'{project_base_dir}/data'
+    # secret_key路径
+    django_secret_key_path = f'{project_base_dir}/src/server/secret_key'
 
     # 任务执行状态
     class ExecStatus:
@@ -118,7 +137,7 @@ class OmniAdvisorConf:
         all = [hijacking, backend]
 
     # 输入配置解析
-    _common_config = load_common_config(config_path=common_config_path)
+    _common_config = load_ini_config(config_path=common_config_path)
     # 配置罗列
     # common页
     tuning_retest_times = _common_config.getint('common', 'tuning.retest.times')
