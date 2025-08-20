@@ -21,11 +21,15 @@ class TuningRecordAdmin(admin.ModelAdmin):
 
 @admin.register(DatabaseExamRecord)
 class ExamRecordAdmin(admin.ModelAdmin):
-    list_display = ('id', 'load', 'tuning_record', 'start_time', 'end_time', 'status', 'runtime', 'application_id', 'trace')
+    list_display = ('id', 'load', 'tuning_record', 'start_time', 'end_time', 'status', 'runtime_f', 'application_id', 'trace')
     list_filter = ()
 
     # 增加对Load的显示
     def load(self, model):
         return model.tuning_record.load
     load.short_description = 'Load'
-    load.admin_order_field = 'load'
+
+    # 对Runtime的浮点数保留3位有效数字
+    def runtime_f(self, model):
+        return round(model.runtime, 3)
+    runtime_f.short_description = 'Runtime'

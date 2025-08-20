@@ -93,7 +93,7 @@ class SparkExecutor:
         match_objs = re.findall(pattern, spark_output, re.MULTILINE)
         if match_objs:
             time_taken_list = [float(obj) for obj in match_objs]
-            total_time_taken = round(sum(time_taken_list), OA_CONF.decimal_digits)
+            total_time_taken = sum(time_taken_list)
             global_logger.debug(f'Total time taken is {total_time_taken} seconds')
         else:
             global_logger.info('This spark task do not have Time taken message.')

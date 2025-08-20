@@ -4,7 +4,6 @@ from typing import Any
 import requests
 from dateutil import parser
 
-from common.constant import OA_CONF
 from omniadvisor.utils.logger import global_logger
 
 
@@ -124,4 +123,4 @@ class SparkFetcher:
         # 计算时间差
         time_diff = max(timestamp_list) - min(timestamp_list)
         global_logger.debug(f"Total time diff calculate by jobs is {time_diff} seconds")
-        return round(time_diff, OA_CONF.decimal_digits)
+        return time_diff
