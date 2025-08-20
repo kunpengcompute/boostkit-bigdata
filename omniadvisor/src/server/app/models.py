@@ -9,7 +9,7 @@ class DatabaseLoad(models.Model):
     负载模型
     """
     id = models.AutoField(primary_key=True)
-    name = models.CharField(max_length=100, null=True)
+    name = models.CharField(max_length=180, null=True)
     exec_attr = models.JSONField(null=False)
     default_config = models.JSONField(null=False)
     best_config = models.JSONField(null=True)

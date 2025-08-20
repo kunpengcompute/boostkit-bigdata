@@ -78,7 +78,7 @@ class OmniAdvisorConf:
     # 配置文件路径
     config_dir = f'{project_base_dir}/config'
     spark_repo_path = f'{config_dir}/spark_repo.json'
-    common_config_path = f'{config_dir}/common_config.cfg'
+    common_config_path = f'{config_dir}/common_config.ini'
     # 数据存储目录
     data_dir = f'{project_base_dir}/data'
 

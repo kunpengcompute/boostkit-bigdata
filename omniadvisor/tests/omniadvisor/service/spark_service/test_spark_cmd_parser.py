@@ -1,6 +1,6 @@
 import shlex
 import pytest
-from omniadvisor.service.spark_service.spark_cmd_parser import SparkCMDParser, _CMD_PREFIX_KEY, _CMD_UNKNOWN_KEY
+from omniadvisor.service.spark_service.spark_cmd_parser import SparkCMDParser, _CMD_PREFIX_KEY, _CMD_PRIMARY_RESOURCE
 
 
 class TestSparkCMDParser:
@@ -48,8 +48,8 @@ class TestSparkCMDParser:
         assert conf_params["spark.executor.memory"] == "4g"
         assert conf_params["spark.executor.cores"] == "2"
         assert conf_params["spark.executor.instances"] == "5"
-        assert _CMD_UNKNOWN_KEY in exec_attr
-        assert exec_attr[_CMD_UNKNOWN_KEY] == ["example.jar"]
+        assert _CMD_PRIMARY_RESOURCE in exec_attr
+        assert exec_attr[_CMD_PRIMARY_RESOURCE] == ["example.jar"]
 
     # 场景 2: 包含 supplement 参数
     def test_parse_cmd_with_supplement(self):
@@ -79,7 +79,7 @@ class TestSparkCMDParser:
         for flag in ["verbose", "version", "supervise", "usage-error", "help"]:
             assert exec_attr.get(flag) is True
 
-        assert exec_attr[_CMD_UNKNOWN_KEY] == ["example.jar"]
+        assert exec_attr[_CMD_PRIMARY_RESOURCE] == ["example.jar"]
 
     # 场景 4: 解析单短横杠的命令
     def test_parse_cmd_single_dash_args(self):
@@ -97,7 +97,7 @@ class TestSparkCMDParser:
         assert exec_attr["f"] == "script.sql"
         assert exec_attr["i"] == "init.sql"
         assert exec_attr["database"] == "testdb"
-        assert exec_attr[_CMD_UNKNOWN_KEY] == ["example.jar"]
+        assert exec_attr[_CMD_PRIMARY_RESOURCE] == ["example.jar"]
 
     # 场景 5: 空 argv 抛出异常
     def test_parse_cmd_empty_argv(self):
@@ -141,12 +141,12 @@ class TestSparkCMDParser:
         with pytest.raises(ValueError, match="Cmd prefix key is not in exec_attr"):
             SparkCMDParser.reconstruct_cmd(exec_attr, conf_params)
 
-    # 场景 3: 包含 unknown 参数
+    # 场景 3: primary_resource中包含 unknown 参数
     def test_reconstruct_cmd_with_unknown(self):
         exec_attr = {
             "omniadvisor-cmd-prefix": "spark-submit",
             "name": "job",
-            "unknown": ["--extra", "arg"]
+            "primary_resource": ["--extra", "arg"]
         }
         conf_params = {
             "spark.executor.instances": "4"
@@ -162,7 +162,7 @@ class TestSparkCMDParser:
         exec_attr = {
             "omniadvisor-cmd-prefix": "spark-submit",
             "name": "job",
-            "unknown": ["--extra", "arg"],
+            "primary_resource": ["--extra", "arg"],
             "verbose": True,
             "supervise": False,
         }
@@ -197,7 +197,6 @@ class TestSparkCMDParser:
         --files config.yaml
         --archives env.zip#env
         --verbose
-        --version
         --supervise
         --usage-error
         --help
@@ -207,6 +206,8 @@ class TestSparkCMDParser:
         -f query.sql
         my_app.jar
         --custom-arg custom_value
+        --principal principal1
+        --version
         """
 
         # 使用 shlex.split 来模拟 shell 行为
@@ -236,7 +237,6 @@ class TestSparkCMDParser:
             "--files", "config.yaml",
             "--archives", "env.zip#env",
             "--verbose",
-            "--version",
             "--supervise",
             "--usage-error",
             "--help",
@@ -245,7 +245,9 @@ class TestSparkCMDParser:
             "-e", "SELECT * FROM table",
             "-f", "query.sql",
             "my_app.jar",
-            "--custom-arg", "custom_value"
+            "--custom-arg", "custom_value",
+            "--principal", "principal1",
+            "--version"
         ]
 
         for item in expected:
@@ -257,8 +259,18 @@ class TestSparkCMDParser:
             "queue", "jars", "files", "archives",
             "verbose", "version", "supervise", "usage-error", "help",
             "i", "database", "e", "f",
-            _CMD_UNKNOWN_KEY
+            _CMD_PRIMARY_RESOURCE
         }
 
         assert set(exec_attr.keys()).issuperset(expected_keys), "Missing expected keys in parsed exec_attr"
+
+        # Step 5 验证primary_resource是否符合预期
+        expected_primary_resource = ["my_app.jar", "--custom-arg", "custom_value",
+                                     "--principal", "principal1", "--version"]
+        assert exec_attr[_CMD_PRIMARY_RESOURCE] == expected_primary_resource
+
+        # Step 6 验证exec_attr是否不包含"--custom-arg", "--principal", "--version"
+        assert "custom-arg" not in exec_attr
+        assert "principal" not in exec_attr
+        assert exec_attr["version"] is False
 
