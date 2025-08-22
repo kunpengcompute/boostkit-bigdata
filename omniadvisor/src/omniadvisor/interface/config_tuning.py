@@ -224,7 +224,7 @@ def main():
     # 2. 不做调优冲突判断，若推荐相同配置，则退出
     # 3. 当前负载不支持后台复测，则退出
     elif args.retest_way == OA_CONF.RetestWay.backend:
-        if load.backend_retest_forbidden:
+        if not load.backend_retest_enable:
             raise TuningPreconditionError(
                 'Current load contains data manipulation operations, only retest way of hijacking is supported.'
             )

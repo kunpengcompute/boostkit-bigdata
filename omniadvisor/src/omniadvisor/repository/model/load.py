@@ -46,8 +46,8 @@ class Load:
         return self._database_model.tuning_needed
 
     @property
-    def backend_retest_forbidden(self):
-        return self._database_model.backend_retest_forbidden
+    def backend_retest_enable(self):
+        return self._database_model.backend_retest_enable
 
     @property
     def database_model(self):
@@ -63,4 +63,4 @@ class Load:
         create_time = 'create_time'
         tuning_needed = 'tuning_needed'
         hash_value = 'hash_value'
-        backend_retest_forbidden = 'backend_retest_forbidden'
+        backend_retest_enable = 'backend_retest_enable'

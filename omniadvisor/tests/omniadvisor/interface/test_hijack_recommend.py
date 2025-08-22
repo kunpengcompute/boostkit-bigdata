@@ -223,7 +223,7 @@ class TestHijackRecommend:
         mock_load_create.return_value = "created_object"
         mock_query_by_hash_value.return_value = []
         result = _create_or_update_load(exec_attr, default_config)
-        mock_load_create.assert_called_once_with(name, exec_attr, default_config, hash_value, True)
+        mock_load_create.assert_called_once_with(name, exec_attr, default_config, hash_value, False)
         mock_tuning_record_create.assert_called_once()
         assert result == "created_object"
 

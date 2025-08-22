@@ -39,7 +39,7 @@ class TestTaskRepository:
             exec_attr={'cmd': 'spark-sql -f test.sql'},
             default_config={"param1": "value2"},
             hash_value=hash_value,
-            backend_retest_forbidden=True
+            backend_retest_enable=True
         )
 
         # 创建TuningRecord
@@ -73,7 +73,7 @@ class TestTaskRepository:
             exec_attr={'cmd': 'spark-sql -f test.sql'},
             default_config={"param1": "value2"},
             hash_value=hash_value,
-            backend_retest_forbidden=True
+            backend_retest_enable=True
         )
         tuning_record = TuningRecordRepository.create(
             load=load,
@@ -97,7 +97,7 @@ class TestTaskRepository:
             exec_attr={'cmd': 'spark-sql -f test.sql'},
             default_config={"param1": "value2"},
             hash_value=hash_value,
-            backend_retest_forbidden=True
+            backend_retest_enable=True
         )
         tuning_record = TuningRecordRepository.create(
             load=load,
