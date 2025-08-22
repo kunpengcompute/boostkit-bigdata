@@ -266,6 +266,13 @@ def hijack_recommend(argv: list) -> None:
     # 根据配置和负载执行Spark任务
     global_logger.info("Going to execute Spark load ……")
     exam_record, output = spark_run(load=load, config=exec_config, wait_for_trace=False, exec_in_isolation=False)
+
+    if exec_config != load.default_config:
+        # 创建子进程处理负载配置，不阻塞
+        p = multiprocessing.Process(target=_process_load_config, args=(load, exec_config))
+        p.daemon = False
+        p.start()
+
     # 执行结果分析
     if exam_record.status == OA_CONF.ExecStatus.success:
         # 打印结果输出
@@ -278,12 +285,6 @@ def hijack_recommend(argv: list) -> None:
         else:
             global_logger.warning("Spark execute failed in user config, going to print Spark output.")
             print(output, end="", flush=True)
-
-    if exec_config != load.default_config:
-        # 创建子进程处理负载配置，不阻塞
-        p = multiprocessing.Process(target=_process_load_config, args=(load, exec_config))
-        p.daemon = False
-        p.start()
 
 
 def main():
