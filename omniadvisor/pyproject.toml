@@ -23,6 +23,8 @@ requests = "^2.32.3"
 python-dateutil = "2.9.0.post0"
 psycopg2-binary = "^2.9.10"
 django-sslserver = "0.22"
+keyring = "24.3.1"
+keyrings.alt = "5.0.2"
 
 [tool.poetry.group.test.dependencies]
 pytest = "^7.4.4"

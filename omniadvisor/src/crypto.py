@@ -1,8 +1,11 @@
 import argparse
 
-from django.core.management.utils import get_random_secret_key
-
-from common.crypto_tool import store_history_server_password, store_database_password_password, store_django_secretkey
+from common.crypto_tool import (
+    store_history_server_password,
+    store_database_password_password,
+    get_history_server_password,
+    get_database_password_password
+)
 from omniadvisor.utils.logger import global_logger
 
 
@@ -15,20 +18,31 @@ def _parse_user_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description='')
     group = parser.add_mutually_exclusive_group(required=True)
 
-    group.add_argument('-i', '--initialize', action='store_true', help='Initialize key.')
-    group.add_argument('-d', '--update-database-password', action='store_true', help='Update key.')
-    group.add_argument('-s', '--update-history-server-password', action='store_true', help='Encrypt password.')
+    group.add_argument('-i', '--initialize', action='store_true', help='Initialize passwords.')
+    group.add_argument(
+        '-d', '--update-database-password', action='store_true', help='Update password of database.'
+    )
+    group.add_argument(
+        '-s', '--update-history-server-password', action='store_true', help='Update password of history server.'
+    )
 
     user_args = parser.parse_args()
     return user_args
 
 
-def _initailize():
+def _initialize():
     """
     初始化数据库密码和history server密码
     """
     _update_database_password_interactively()
     _update_history_server_password_interactively()
+
+
+def _has_initialized():
+    """
+    检测是否已经初始化过
+    """
+    return get_history_server_password() or get_database_password_password()
 
 
 def _update_database_password_interactively():
@@ -51,8 +65,11 @@ if __name__ == '__main__':
     user_args = _parse_user_args()
     if user_args.initialize:
         # 初始化情况
-        _initailize()
-        global_logger.info('Successfully initialized.')
+        if _has_initialized():
+            global_logger.warning('Already initialized before, please check your option.')
+        else:
+            _initialize()
+            global_logger.info('Successfully initialized.')
 
     elif user_args.update_database_password:
         # 改数据库密码

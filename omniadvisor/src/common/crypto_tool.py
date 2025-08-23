@@ -3,11 +3,10 @@ from keyrings.alt.file import PlaintextKeyring
 
 keyring.set_keyring(PlaintextKeyring())
 
-SERVICE_NAME = "omniadvisor"
-
-django_secretkey_str = 'django_secretkey'
-history_server_password_str = 'history_server'
-database_password_str = 'database_password'
+_SERVICE_NAME = "omniadvisor"
+_DJANGO_SECRETKEY_STR = 'django_secretkey'
+_HISTORY_SERVER_PASSWORD_STR = 'history_server'
+_DATABASE_PASSWORD_STR = 'database_password'
 
 
 def _store_data(key: str, value: str):
@@ -18,7 +17,7 @@ def _store_data(key: str, value: str):
     :param value: 要存储的值
     :returns: None
     """
-    keyring.set_password(SERVICE_NAME, key, value)
+    keyring.set_password(_SERVICE_NAME, key, value)
 
 
 def _get_data(key: str):
@@ -28,7 +27,7 @@ def _get_data(key: str):
     :param key: 要获取的值的键
     :returns: 要获取的值
     """
-    value = keyring.get_password(SERVICE_NAME, key)
+    value = keyring.get_password(_SERVICE_NAME, key)
     if value:
         return value
     else:
@@ -42,7 +41,7 @@ def store_django_secretkey(secret_key: str):
     :param secret_key: django 密钥
     :returns: None
     """
-    _store_data(django_secretkey_str, secret_key)
+    _store_data(_DJANGO_SECRETKEY_STR, secret_key)
 
 
 def store_history_server_password(password: str):
@@ -52,7 +51,7 @@ def store_history_server_password(password: str):
     :param password: 密码
     :returns: None
     """
-    _store_data(history_server_password_str, password)
+    _store_data(_HISTORY_SERVER_PASSWORD_STR, password)
 
 
 def store_database_password_password(password: str):
@@ -62,7 +61,7 @@ def store_database_password_password(password: str):
     :param password: 密码
     :returns: None
     """
-    _store_data(database_password_str, password)
+    _store_data(_DATABASE_PASSWORD_STR, password)
 
 
 def get_django_secretkey() -> str:
@@ -70,18 +69,18 @@ def get_django_secretkey() -> str:
     从keyring中获取 django的 secret key
 
     """
-    return _get_data(django_secretkey_str)
+    return _get_data(_DJANGO_SECRETKEY_STR)
 
 
 def get_history_server_password() -> str:
     """
     从keyring中获取 history server 的密码
     """
-    return _get_data(history_server_password_str)
+    return _get_data(_HISTORY_SERVER_PASSWORD_STR)
 
 
 def get_database_password_password() -> str:
     """
     从keyring中获取 database 的密码
     """
-    return _get_data(database_password_str)
+    return _get_data(_DATABASE_PASSWORD_STR)
