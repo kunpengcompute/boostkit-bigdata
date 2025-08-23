@@ -221,8 +221,8 @@ def _create_or_update_load(exec_attr: dict, config: dict) -> Load:
         return LoadRepository.update_name_and_exec_attr(loads.pop(), name, exec_attr)
     else:
         # 负载没有创建过
-        backend_retest_forbidden = _has_modify_keywords(exec_attr)
-        load = LoadRepository.create(name, exec_attr, config, hash_value, backend_retest_forbidden)
+        backend_retest_enable = not _has_modify_keywords(exec_attr)
+        load = LoadRepository.create(name, exec_attr, config, hash_value, backend_retest_enable)
         global_logger.info("Load not found in database, created new one and execute.")
         TuningRecordRepository.create(load=load, config=config, method=OA_CONF.TuningMethod.user)
         return load

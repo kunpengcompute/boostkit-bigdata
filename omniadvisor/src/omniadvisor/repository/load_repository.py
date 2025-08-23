@@ -34,7 +34,7 @@ class LoadRepository(Repository):
 
     @classmethod
     def create(cls, name: str, exec_attr: dict, default_config: dict, hash_value: str,
-               backend_retest_forbidden: bool) -> Load:
+               backend_retest_enable: bool) -> Load:
         """
         指定名称、执行属性和默认配置，新增负载
 
@@ -42,7 +42,7 @@ class LoadRepository(Repository):
         :param exec_attr: 负载执行属性
         :param default_config: 负载默认配置
         :param hash_value: hash值
-        :param backend_retest_forbidden: 是否禁用后台复测
+        :param backend_retest_enable: 是否禁用后台复测
         :return: 负载实例
         """
         model_attr = {
@@ -50,7 +50,7 @@ class LoadRepository(Repository):
             Load.FieldName.exec_attr: exec_attr,
             Load.FieldName.default_config: default_config,
             Load.FieldName.hash_value: hash_value,
-            Load.FieldName.backend_retest_forbidden: backend_retest_forbidden
+            Load.FieldName.backend_retest_enable: backend_retest_enable
         }
         try:
             database_load = cls._create(model_attr=model_attr)

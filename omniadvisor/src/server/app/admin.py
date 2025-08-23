@@ -8,7 +8,7 @@ from .models import DatabaseLoad, DatabaseTuningRecord, DatabaseExamRecord
 @admin.register(DatabaseLoad)
 class LoadAdmin(admin.ModelAdmin):
     list_display = (
-        'id', 'name', 'exec_attr', 'default_config', 'best_config', 'test_config', 'backend_retest_forbidden'
+        'id', 'name', 'exec_attr', 'default_config', 'best_config', 'test_config', 'backend_retest_enable'
     )
     list_filter = ()
 
