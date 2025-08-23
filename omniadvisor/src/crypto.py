@@ -1,11 +1,6 @@
 import argparse
 
-from common.crypto_tool import (
-    store_history_server_password,
-    store_database_password_password,
-    get_history_server_password,
-    get_database_password_password
-)
+from common.crypto_tool import CryptoTool
 from omniadvisor.utils.logger import global_logger
 
 
@@ -42,7 +37,7 @@ def _has_initialized():
     """
     检测是否已经初始化过
     """
-    return get_history_server_password() or get_database_password_password()
+    return CryptoTool.get_history_server_password() or CryptoTool.get_database_password_password()
 
 
 def _update_database_password_interactively():
@@ -50,7 +45,7 @@ def _update_database_password_interactively():
     交互式刷新数据库密码
     """
     database_password = input("Please enter your database password: ")
-    store_database_password_password(database_password)
+    CryptoTool.store_database_password_password(database_password)
 
 
 def _update_history_server_password_interactively():
@@ -58,7 +53,7 @@ def _update_history_server_password_interactively():
     交互式刷新 history server密码
     """
     history_server_password = input("Please enter your history server password (If none, just press Enter.) : ")
-    store_history_server_password(history_server_password)
+    CryptoTool.store_history_server_password(history_server_password)
 
 
 if __name__ == '__main__':
