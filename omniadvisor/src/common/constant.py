@@ -1,6 +1,10 @@
+import configparser
 import json
 import os
-import configparser
+
+from django.core.management.utils import get_random_secret_key
+
+from common.crypto_tool import CryptoTool
 
 
 def load_ini_config(config_path: str) -> configparser.ConfigParser:
@@ -17,23 +21,6 @@ def load_ini_config(config_path: str) -> configparser.ConfigParser:
     common_config.read(config_path, encoding='utf-8')
 
     return common_config
-
-
-def write_ini_config(config_path: str, key: str, value: dict) -> None:
-    """
-    以覆盖形式写入全新的 key, value配置 到 config_path中
-
-    :param config_path: 配置文件路径
-    :param key: 键
-    :param value: 值
-    :return: None
-    """
-    new_config = configparser.ConfigParser(interpolation=None)
-    new_config[key] = value
-
-    # 直接写入（无需读取）
-    with open(config_path, 'w', encoding='utf-8') as configfile:
-        new_config.write(configfile)
 
 
 def check_oa_conf() -> None:
@@ -147,16 +134,21 @@ class OmniAdvisorConf:
     # database页
     postgresql_database_name = _common_config.get('database', 'postgresql.database.name')
     postgresql_database_user = _common_config.get('database', 'postgresql.database.user')
-    postgresql_database_password = _common_config.get('database', 'postgresql.database.password')
+    postgresql_database_password = CryptoTool.get_database_password_password()
     postgresql_database_host = _common_config.get('database', 'postgresql.database.host')
     postgresql_database_port = _common_config.get('database', 'postgresql.database.port')
     # spark页
     spark_history_rest_url = _common_config.get('spark', 'spark.history.rest.url')
     spark_history_username = _common_config.get('spark', 'spark.history.username')
-    spark_history_password = _common_config.get('spark', 'spark.history.password')
+    spark_history_password = CryptoTool.get_history_server_password()
     spark_fetch_trace_timeout = _common_config.getint('spark', 'spark.fetch.trace.timeout')
     spark_fetch_trace_interval = _common_config.getint('spark', 'spark.fetch.trace.interval')
     spark_exec_timeout_ratio = _common_config.getfloat('spark', 'spark.exec.timeout.ratio')
+    # django secret key
+    django_secret_key = CryptoTool.get_django_secretkey()
+    if not django_secret_key:
+        django_secret_key = get_random_secret_key()
+        CryptoTool.store_django_secretkey(django_secret_key)
     strategies_tuples = [tuple(item) for item in json.loads(_common_config.get('common', 'tuning.strategy'))]
 
     # 保留小数位数
