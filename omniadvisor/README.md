@@ -11,9 +11,11 @@ root
 ├── script/                     # 脚本目录
 │   └── spark-submit            # Spark submit脚本，用于替换实现任务劫持
 ├── src/                        # 源代码目录
-│   ├── init.py                 # 初始化入口
+│   ├── init.py                 # 初始化数据库入口
 │   ├── hijack.py               # 任务劫持入口
-│   └── tuning.py               # 负载调优入口
+│   │── tuning.py               # 负载调优入口
+│   │── version.py              # 查看版本信息
+│   └── crypto.py               # 初始化密码入口
 ├── tests/                      # 测试目录
 ├── pyproject.toml              # 构建文件
 └── READEME                     # README说明
@@ -26,15 +28,16 @@ root
 初始化数据库，数据库用于存储调优过程与负载执行过程。若之前执行过初始化过程，则此处可以跳过。
 
 - ① 进入`omniadvisor/src/`目录下。
-- ② 顺序执行以下命令：`python init.py makemigrations`和`python init.py migrate`，初始化数据库
-- ③ 执行命令`python init.py createsuperuser`创建超级用户，并按指示设置用户名和密码。
+- ② 进入使用 `python crypto.py -i`，按提示进行初始化数据库、history server 密码。（如后期需要更换密码，可以通过 -d 和 -s参数）
+- ③ 顺序执行以下命令：`python init.py makemigrations`和`python init.py migrate`，初始化数据库。
+- ④ 执行命令`python init.py createsuperuser`创建超级用户，并按指示设置用户名和密码。
 
 ### 2 启动历史数据库服务
 
-完成数据库初始化后，即可启动历史数据库，并通过Web端查看数据库内数据
+完成数据库初始化后，即可启动历史数据库，并通过Web端查看数据库内数据。
 
-- ① 执行命令`python init.py runserver 0.0.0.0:8000`启动数据库，其中`0.0.0.0`应替换为实际节点IP。
-- ② 登录Web管理页面：`localhost:8000/admin/`，`localhost`替换实际的IP地址，并通过初始化过程中的用户名和密码登录。
+- ① 执行命令`python init.py runsslserver 0.0.0.0:8000`启动数据库，其中`0.0.0.0`应替换为实际节点IP。
+- ② 登录Web管理页面：`https://localhost:8000/admin/` ，`localhost`替换实际的IP地址，并通过初始化过程中的用户名和密码登录。
 
 ### 3 负载劫持
 
@@ -49,7 +52,7 @@ root
 
 执行负载并劫持之后，在后台管理页面查看到相关信息
 
-- ① 登录后台管理页面：`localhost:8000/admin/` 
+- ① 登录后台管理页面：`https://localhost:8000/admin/` 
 - ② 切到Loads页面，即可查询看到负载信息
 
 ### 5 启用调优
