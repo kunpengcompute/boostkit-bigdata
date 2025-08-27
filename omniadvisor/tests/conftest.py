@@ -32,11 +32,11 @@ def dot_expansion(s):
 to_registers = {
     'algo.expert.tuning.Trace',
     'algo.common.model.Trace',
-    'algo.expert.tuning.ExpertTuning',
-    'algo.iterative.tuning.SmacAppendTuning',
+    'algo.expert.tuning.ExpertTuner',
+    'algo.iterative.tuning.IterativeTunner',
     'algo.common.model.TuningData',
-    'algo.native.tuning.NativeTuning',
-    'algo.transfer.tuning.TransferTuning',
+    'algo.native.tuning.NativeTuner',
+    'algo.transfer.tuning.TransferTuner',
 }
 
 # 注册顶层包：
@@ -44,7 +44,7 @@ sys.modules['algo'] = ModuleType('algo')
 
 for to_register in to_registers:
     expansions = dot_expansion(to_register)
-    # 注册父子间的链式关系，如algo.iterative.tuning.SmacAppendTuning，先注册一个module 'algo.iterative'，并建立与module 'algo'关系
+    # 注册父子间的链式关系，如algo.iterative.tuning.IterativeTunner，先注册一个module 'algo.iterative'，并建立与module 'algo'关系
     for idx, expansion in enumerate(expansions):
         current_node_name, pathlike = expansion
         if pathlike in sys.modules:

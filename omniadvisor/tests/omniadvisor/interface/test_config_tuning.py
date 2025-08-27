@@ -22,7 +22,7 @@ class TestTuning:
 
     @patch('omniadvisor.service.retest_service.float_format')
     @patch('omniadvisor.interface.config_tuning.float_format')
-    @patch('algo.iterative.tuning.SmacAppendTuning.tune')
+    @patch('algo.iterative.tuning.IterativeTunner.tune')
     @patch('omniadvisor.interface.config_tuning.get_tuning_result_history')
     @patch('omniadvisor.interface.config_tuning.get_tuning_result')
     @patch('omniadvisor.service.retest_service.spark_run')
@@ -61,7 +61,7 @@ class TestTuning:
     @patch('omniadvisor.service.retest_service.float_format')
     @patch('omniadvisor.interface.config_tuning.float_format')
     @patch('omniadvisor.repository.load_repository.LoadRepository.update_best_config')
-    @patch('algo.iterative.tuning.SmacAppendTuning.tune')
+    @patch('algo.iterative.tuning.IterativeTunner.tune')
     @patch('omniadvisor.interface.config_tuning.remove_tuning_result')
     @patch('omniadvisor.service.retest_service.get_tuning_result')
     @patch('omniadvisor.interface.config_tuning.get_tuning_result_history')
@@ -110,7 +110,7 @@ class TestTuning:
         mock_remove_tuning_result.assert_not_called()
 
     @patch('omniadvisor.interface.config_tuning.remove_tuning_result')
-    @patch('algo.iterative.tuning.SmacAppendTuning.tune')
+    @patch('algo.iterative.tuning.IterativeTunner.tune')
     @patch('omniadvisor.repository.load_repository.LoadRepository.update_best_config')
     @patch('omniadvisor.interface.config_tuning.get_tuning_result_history')
     @patch('omniadvisor.service.retest_service.spark_run', side_effect=RuntimeError)
@@ -167,7 +167,7 @@ class TestTuning:
         with pytest.raises(TuningPreconditionError, match='Cannot find load id'):
             main()
 
-    @patch('algo.iterative.tuning.SmacAppendTuning.tune')
+    @patch('algo.iterative.tuning.IterativeTunner.tune')
     @patch('omniadvisor.repository.load_repository.LoadRepository.update_test_config')
     @patch('omniadvisor.interface.config_tuning.get_tuning_result_history')
     @patch('omniadvisor.repository.tuning_record_repository.TuningRecordRepository.create')

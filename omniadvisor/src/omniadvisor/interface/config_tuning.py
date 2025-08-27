@@ -2,10 +2,10 @@ import argparse
 import signal
 from typing import Optional
 
-from algo.expert.tuning import ExpertTuning
-from algo.iterative.tuning import SmacAppendTuning
-from algo.native.tuning import NativeTuning
-from algo.transfer.tuning import TransferTuning
+from algo.expert.tuning import ExpertTuner
+from algo.iterative.tuning import IterativeTunner
+from algo.native.tuning import NativeTuner
+from algo.transfer.tuning import TransferTuner
 from common.constant import OA_CONF
 from common.exceptions import NoOptimalConfigError, SystemKilledError, TuningPreconditionError
 from omniadvisor.repository.model.load import Load
@@ -32,7 +32,7 @@ def handler(signum: int, frame) -> None:
     :param frame: 当前栈帧，可能为 None
     :raises SystemKilledError: 当接收到终止信号时抛出该异常
     """
-    raise SystemKilledError(f'System is terminated, because of catching signal %s', signum)
+    raise SystemKilledError(f'System is terminated, because of catching signal {signum}')
 
 
 def _parse_tuning_args() -> argparse.Namespace:
@@ -135,20 +135,20 @@ def _get_next_config(load: Load, tuning_method: str) -> tuple[dict, str]:
     # AI迭代调优
     if tuning_method == OA_CONF.TuningMethod.iterative:
         global_logger.info("Use AI iterative optimization method to tuning.")
-        tuner = SmacAppendTuning(tuning_history=tuning_result_history.to_tuning_data_list())
+        tuner = IterativeTunner(tuning_history=tuning_result_history.to_tuning_data_list())
     # 专家规则调优
     elif tuning_method == OA_CONF.TuningMethod.expert:
         global_logger.info("Use expert rule optimization method to tuning.")
-        tuner = ExpertTuning(tuning_history=tuning_result_history.to_tuning_data_list())
+        tuner = ExpertTuner(tuning_history=tuning_result_history.to_tuning_data_list())
     # Native特性使能
     elif tuning_method == OA_CONF.TuningMethod.native:
         global_logger.info("Use native operator acceleration feature to tuning.")
-        tuner = NativeTuning(tuning_history=tuning_result_history.to_tuning_data_list())
+        tuner = NativeTuner(tuning_history=tuning_result_history.to_tuning_data_list())
     # 迁移泛化调优
     elif tuning_method == OA_CONF.TuningMethod.transfer:
         global_logger.info("Use migration generalization optimization method to tuning.")
         other_history = get_other_tuning_result_history(load)
-        tuner = TransferTuning(
+        tuner = TransferTuner(
             tuning_history=tuning_result_history.to_tuning_data_list(),
             # 可能存在负载没有调优记录或调优记录状态为empty，导致to_tuning_data_list()输出列表为空
             other_histories=[other.to_tuning_data_list() for other in other_history if other.to_tuning_data_list()]
