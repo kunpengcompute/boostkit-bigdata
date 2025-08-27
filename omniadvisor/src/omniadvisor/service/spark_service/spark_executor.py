@@ -3,6 +3,8 @@ from typing import Tuple
 from dataclasses import dataclass
 from datetime import datetime
 
+from django.utils import timezone
+
 from common.constant import OA_CONF
 from omniadvisor.utils.utils import run_cmd
 from omniadvisor.utils.logger import global_logger
@@ -36,13 +38,13 @@ class SparkExecutor:
             # 命令列表需全为str类型
             cmd_fields = ['timeout', str(timeout)] + cmd_fields
 
-        start_time = datetime.now()
+        start_time = timezone.now()
         try:
             exitcode, output = run_cmd(cmd_fields=cmd_fields)
         except Exception:
             global_logger.error('During Spark command submission, unknown error occurred.')
             raise
-        end_time = datetime.now()
+        end_time = timezone.now()
 
         if exitcode == 0:
             application_id, total_time_taken = cls._parser_spark_output(spark_output=output)

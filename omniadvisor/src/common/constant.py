@@ -61,6 +61,9 @@ def check_oa_conf() -> None:
         raise ValueError('The spark history username and password should be provided, or leave both blank, please check'
                          ' common configuration.')
 
+    if not OA_CONF.admin_timezone:
+        raise ValueError('The admin timezone can not be empty, please check common configuration.')
+
 
 class OmniAdvisorConf:
     """
@@ -144,6 +147,8 @@ class OmniAdvisorConf:
     spark_fetch_trace_timeout = _common_config.getint('spark', 'spark.fetch.trace.timeout')
     spark_fetch_trace_interval = _common_config.getint('spark', 'spark.fetch.trace.interval')
     spark_exec_timeout_ratio = _common_config.getfloat('spark', 'spark.exec.timeout.ratio')
+    # webpage页
+    admin_timezone = _common_config.get('webpage', 'admin.timezone')
     # django secret key
     django_secret_key = CryptoTool.get_django_secretkey()
     if not django_secret_key:
