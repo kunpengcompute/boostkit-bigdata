@@ -3,9 +3,10 @@ import signal
 from typing import Optional
 
 from algo.expert.tuning import ExpertTuner
-from algo.iterative.tuning import IterativeTunner
+from algo.iterative.tuning import IterativeTuner
 from algo.native.tuning import NativeTuner
 from algo.transfer.tuning import TransferTuner
+from algo.common.exceptions import InvalidTuningError
 from common.constant import OA_CONF
 from common.exceptions import NoOptimalConfigError, SystemKilledError, TuningPreconditionError
 from omniadvisor.repository.model.load import Load
@@ -72,11 +73,11 @@ def _single_tuning(load: Load, retest_way: str, tuning_method: str) -> None:
     signal.signal(signal.SIGTERM, handler)
     signal.signal(signal.SIGINT, handler)
 
-    next_config, method_extend = _get_next_config(load=load, tuning_method=tuning_method)
-
-    if not next_config:
-        raise NoOptimalConfigError(f'The recommending config of method {tuning_method} is empty,'
-                                   f' please try other tuning methods.')
+    try:
+        next_config, method_extend = _get_next_config(load=load, tuning_method=tuning_method)
+    except InvalidTuningError as e:
+        global_logger.warning(e)
+        raise NoOptimalConfigError(f'The tuning method {tuning_method} is invalid, please try other tuning methods.') from e
 
     # 用户的default_config上叠加next_config叠加
     global_logger.info("Load config tuning success, get new config to retest.")
@@ -135,7 +136,7 @@ def _get_next_config(load: Load, tuning_method: str) -> tuple[dict, str]:
     # AI迭代调优
     if tuning_method == OA_CONF.TuningMethod.iterative:
         global_logger.info("Use AI iterative optimization method to tuning.")
-        tuner = IterativeTunner(tuning_history=tuning_result_history.to_tuning_data_list())
+        tuner = IterativeTuner(tuning_history=tuning_result_history.to_tuning_data_list())
     # 专家规则调优
     elif tuning_method == OA_CONF.TuningMethod.expert:
         global_logger.info("Use expert rule optimization method to tuning.")

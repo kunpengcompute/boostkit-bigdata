@@ -187,7 +187,7 @@ class TuningResult:
             config=self.config,
             method=self.method,
             rule=self.method_extend,
-            status=self.status,
+            status=True if self.status == OA_CONF.ExecStatus.success else False,
             runtime=self.runtime,
             trace=trace
         )
