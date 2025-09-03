@@ -109,7 +109,7 @@ namespace omniruntime::reader {
         const orc::Type* orcType;
 
     public:
-        OmniListColumnReader(const orc::Type& type, orc::StripeStreams& stipe,
+        OmniListColumnReader(const orc::Type& type, orc::StripeStreams& stripe,
             common::JulianGregorianRebase *julianPtr);
 
         uint64_t skip(uint64_t numValues) override;

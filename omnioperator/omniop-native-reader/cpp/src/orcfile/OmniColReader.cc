@@ -363,7 +363,7 @@ namespace omniruntime::reader {
     /**
      * OmniListColumnReader funcs
      */
-    OmniListColumnReader::OmniListColumnReader(const orc::Type& type, orc::StripeStreams& stipe,
+    OmniListColumnReader::OmniListColumnReader(const orc::Type& type, orc::StripeStreams& stripe,
         common::JulianGregorianRebase *julianPtr) {
         // count the number of selected sub-columns
         const std::vector<bool> selectedColumns = stripe.getSelectedColumns();
@@ -379,7 +379,7 @@ namespace omniruntime::reader {
         }
     }
 
-    uint64_t OmniListColumnReader:skip(uint64_t numValues) {
+    uint64_t OmniListColumnReader::skip(uint64_t numValues) {
         numValues = OmniColumnReader::skip(numValues);
         ColumnReader* childReader = child.get();
         if (childReader) {
