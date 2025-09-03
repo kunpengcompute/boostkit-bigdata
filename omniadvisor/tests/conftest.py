@@ -30,11 +30,12 @@ def dot_expansion(s):
 
 # 所有算法相关的包，都在这里注册
 to_registers = {
-    'algo.expert.tuning.Trace',
     'algo.common.model.Trace',
-    'algo.expert.tuning.ExpertTuner',
-    'algo.iterative.tuning.IterativeTunner',
     'algo.common.model.TuningData',
+    'algo.common.exceptions.InvalidTuningError',
+    'algo.expert.tuning.ExpertTuner',
+    'algo.expert.tuning.Trace',
+    'algo.iterative.tuning.IterativeTuner',
     'algo.native.tuning.NativeTuner',
     'algo.transfer.tuning.TransferTuner',
 }
