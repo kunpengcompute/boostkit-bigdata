@@ -404,7 +404,7 @@ namespace omniruntime::reader {
 
     void OmniListColumnReader::next(omniruntime::vec::BaseVector *vec, uint64_t numValues, uint64_t *incomingNulls,
         int omniTypeId) {
-        nextInternal<false>(vec, numValues, nullptr, incomingNulls, omniTypeId);
+        nextInternal<false>(vec, numValues, incomingNulls, omniTypeId);
     }
 
     void OmniListColumnReader::seekToRowGroup(std::unordered_map<uint64_t, orc::PositionProvider>& positions) {
@@ -438,10 +438,10 @@ namespace omniruntime::reader {
             for (size_t i = 0; i < numValues; ++i) {
                 if (!BitUtil::IsBitSet(nulls, i)) {
                     uint64_t tmp = static_cast<uint64_t>(offsets[i]);
-                    offsets[i] = static_cast<uint64_t>(children);
+                    offsets[i] = static_cast<uint64_t>(totalChildren);
                     totalChildren += tmp;
                 } else {
-                    offsets[i] = static_cast<uint64_t>(children);
+                    offsets[i] = static_cast<uint64_t>(totalChildren);
                 }
             }
         } else {
