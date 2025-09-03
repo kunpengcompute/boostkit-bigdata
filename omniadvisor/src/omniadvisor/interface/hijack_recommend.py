@@ -64,8 +64,9 @@ def _process_load_config(load: Load, config: dict) -> None:
     :param config: 本次测试用配置
     :return:
     """
-    # 获取测试配置的调优结果
+    # sleep等待 避免最新的trace未抓取完成时去获取历史最优数据 （该情况下正在被抓取trace数据会被遗漏）
     time.sleep(OA_CONF.spark_fetch_trace_timeout)
+    # 获取测试配置的调优结果
     tuning_result = get_tuning_result(load=load, config=config)
     if config == load.best_config:
         if tuning_result.status == OA_CONF.TuningResultStatus.fail:
