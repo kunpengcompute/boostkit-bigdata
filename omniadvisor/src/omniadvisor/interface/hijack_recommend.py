@@ -3,7 +3,7 @@ import json
 import multiprocessing
 import re
 import sys
-from typing import Any
+import time
 
 from common.constant import OA_CONF
 from common.exceptions import UnknownEncodingError
@@ -65,8 +65,8 @@ def _process_load_config(load: Load, config: dict) -> None:
     :return:
     """
     # 获取测试配置的调优结果
+    time.sleep(OA_CONF.spark_fetch_trace_timeout)
     tuning_result = get_tuning_result(load=load, config=config)
-
     if config == load.best_config:
         if tuning_result.status == OA_CONF.TuningResultStatus.fail:
             # 最优配置回滚
