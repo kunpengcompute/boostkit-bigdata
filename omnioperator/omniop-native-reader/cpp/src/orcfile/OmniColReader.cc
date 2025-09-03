@@ -509,7 +509,7 @@ namespace omniruntime::reader {
     }
 
     void OmniListColumnReader::next(omniruntime::vec::BaseVector *vec, uint64_t numValues, uint64_t *incomingNulls,
-        int* omniTypeId) {
+        int omniTypeId) {
         nextInternal<false>(vec, numValues, nullptr, incomingNulls, omniTypeId);
     }
 
@@ -523,7 +523,7 @@ namespace omniruntime::reader {
 
     template<bool encoded>
     void OmniListColumnReader::nextInternal(omniruntime::vec::BaseVector *vec, uint64_t numValues, uint64_t *incomingNulls,
-        int* omniTypeId) {
+        int omniTypeId) {
         if (encoded) {
             std::string message("OmniListColumnReader::nextInternal encoded is not finished!");
             throw omniruntime::exception::OmniException("EXPRESSION_NOT_SUPPORT", message);
