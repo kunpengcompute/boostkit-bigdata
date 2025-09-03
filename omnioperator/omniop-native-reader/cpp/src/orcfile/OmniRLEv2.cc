@@ -76,6 +76,11 @@ namespace omniruntime::reader {
         }
     }
 
+    std::unique_ptr<omniruntime::vec::BaseVector> makeArrayVector(uint64_t numValues,
+        omniruntime::type::DataTypeId dataTypeId) {
+        return std::make_unique<omniruntime::vec::ArrayVector>(numValues);
+    }
+
     std::unique_ptr<omniruntime::vec::BaseVector> makeNewVector(uint64_t numValues, const orc::Type* baseTp,
         omniruntime::type::DataTypeId dataTypeId) {
         switch (baseTp->getKind()) {
@@ -95,6 +100,8 @@ namespace omniruntime::reader {
                 return makeVarcharVector(numValues, dataTypeId);
             case orc::TypeKind::DECIMAL:
                 return makeDecimalVector(numValues, dataTypeId);
+            case orc::TypeKind::LIST:
+                return makeArrayVector(numValues, dataTypeId);
             default: {
                 throw std::runtime_error("Not support For This ORC Type: " + baseTp->getKind());
             }
