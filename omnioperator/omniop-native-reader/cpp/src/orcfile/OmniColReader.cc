@@ -364,7 +364,7 @@ namespace omniruntime::reader {
      * OmniListColumnReader funcs
      */
     OmniListColumnReader::OmniListColumnReader(const orc::Type& type, orc::StripeStreams& stripe,
-        common::JulianGregorianRebase *julianPtr) {
+        common::JulianGregorianRebase *julianPtr): OmniColumnReader(type, stripe), orcType(&type) {
         // count the number of selected sub-columns
         const std::vector<bool> selectedColumns = stripe.getSelectedColumns();
         RleVersion vers = omniConvertRleVersion(stripe.getEncoding(columnId).kind());
@@ -447,12 +447,12 @@ namespace omniruntime::reader {
         } else {
             for (size_t i = 0; i < numValues; ++i) {
                 uint64_t tmp = static_cast<uint64_t>(offsets[i]);
-                offsets[i] = static_cast<uint64_t>(children);
+                offsets[i] = static_cast<uint64_t>(totalChildren);
                 totalChildren += tmp;
             }
         }
         offsets[numValues] = static_cast<uint64_t>(totalChildren);
-        OmniColumnReader* childReader = child.get();
+        ColumnReader* childReader = child.get();
         if (childReader) {
             const Type* childOrcType = orcType->getSubtype(0);
             auto childDataTypeId = getDefaultOmniType(childOrcType);
