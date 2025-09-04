@@ -35,9 +35,3 @@ Cython = "^3.0.10"
 testpaths = ["tests/"]       # 指定 pytest 搜索测试的路径
 pythonpath = ["src"]           # ⚡ 自动添加 src 到 PYTHONPATH
 addopts = "--import-mode=append" # 避免导入冲突
-
-
-[[tool.poetry.source]]
-name = "huawei"
-url = "http://mirrors.tools.huawei.com/pypi/simple"
-priority = "primary"
