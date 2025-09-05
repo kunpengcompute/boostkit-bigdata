@@ -1,4 +1,6 @@
 import argparse
+import getpass
+import re
 
 from common.crypto_tool import CryptoTool
 from omniadvisor.utils.logger import global_logger
@@ -25,6 +27,38 @@ def _parse_user_args() -> argparse.Namespace:
     return user_args
 
 
+def validate_password(password: str) -> bool:
+    """
+    校验口令是否满足：
+    1. 长度 ≥ 8
+    2. 至少包含「小写字母、大写字母、数字、特殊字符」中的两种
+    特殊字符集合：`~!@#$%^&*()-_=+\\|[{}];:'\",<.>/? 和空格
+    返回 True 表示通过，False 表示不通过。
+
+    :param password: 密码
+    :returns: 通过则true
+    """
+    if len(password) < 8:
+        return False
+
+    # 定义四类字符的正则
+    patterns = {
+        'lower': r'[a-z]',
+        'upper': r'[A-Z]',
+        'digit': r'[0-9]',
+        'special': r'[`~!@#$%^&*()\-_=+\\|[{}];:\'",<.>/? ]'
+    }
+
+    # 统计满足的类别数
+    cnt = 0
+    for kind, pattern in patterns.items():
+        if re.search(pattern, password):
+            cnt += 1
+            if cnt >= 2:  # 提前满足即可返回
+                return True
+    return False
+
+
 def _initialize():
     """
     初始化数据库密码和history server密码
@@ -44,19 +78,39 @@ def _update_database_password_interactively():
     """
     交互式刷新数据库密码
     """
-    database_password = input("Please enter your database password: ")
-    CryptoTool.store_database_password_password(database_password)
+    password = getpass.getpass("Please enter your database password: ")
+    password2 = getpass.getpass("Please enter your database password again: ")
+    if password != password2:
+        raise ValueError("Error: Your database passwords didn't match.")
+    if not validate_password(password):
+        response = input(
+            "Bypass password validation and use password anyway? [y/N]: "
+        )
+        if response.lower() != "y":
+            global_logger.warning('Database password not set yet !')
+            return
+    CryptoTool.store_database_password_password(password)
 
 
 def _update_history_server_password_interactively():
     """
     交互式刷新 history server密码
     """
-    history_server_password = input("Please enter your history server password (If none, just press Enter.) : ")
-    CryptoTool.store_history_server_password(history_server_password)
+    password = getpass.getpass("Please enter your history server password (If none, skip.) : ")
+    password2 = getpass.getpass("Please enter your history server password again:")
+    if password != password2:
+        raise ValueError("Error: Your history server passwords didn't match.")
+    if not validate_password(password):
+        response = input(
+            "Bypass password validation and use password anyway? [y/N]: "
+        )
+        if response.lower() != "y":
+            global_logger.warning('History server password not set yet !')
+            return
+    CryptoTool.store_history_server_password(password)
 
 
-if __name__ == '__main__':
+def main():
     user_args = _parse_user_args()
     if user_args.initialize:
         # 初始化情况
@@ -75,3 +129,10 @@ if __name__ == '__main__':
         # 改 history server密码
         _update_history_server_password_interactively()
         global_logger.info('Successfully update history server password.')
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except ValueError as e:
+        global_logger.error('An error occurred when setting password: %s', e)
