@@ -48,17 +48,20 @@ log INFO "执行命令:cp -r $core_dir/config/* $frame_dir/config/ 合并配置�
 cp -r $core_dir/config/* $frame_dir/config/
 
 
-# 修改spark_submit_modified 中的hijack.pyc路径
+# 修改spark_submit_modified的文件权限 用readlink获取真实路径防止提权
 spark_submit_modified=$frame_dir/script/spark-submit
+[[ -L "$spark_submit_modified" ]] && { log ERROR "Refuse symlink: $spark_submit_modified 不允许对符号链接进行权限修改" >&2; exit 1; }
+
+# 修改spark_submit_modified 中的hijack.pyc路径
 hijack_path=$frame_dir/src/hijack.pyc
 log INFO "开始自动配置${spark_submit_modified}文件中的hijack_path路径..."
 log INFO "原始hijack.pyc文件路径:`cat $spark_submit_modified | grep "hijack_path=" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//'`"
 sed -i "s|hijack_path=\"\"|hijack_path=\"${hijack_path}\"|g" "$spark_submit_modified"
 log INFO "更新后的hijack.pyc文件路径:`cat $spark_submit_modified | grep "hijack_path=" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//'`"
-# 修改spark_submit_modified的文件权限 用readlink获取真实路径防止提权
-[[ -L "$spark_submit_modified" ]] && { log ERROR "Refuse symlink: $spark_submit_modified" >&2; exit 1; }
-chmod 550 -- "$(readlink -e -- "$spark_submit_modified")"
 
+# 最小化spark_submit_modified的文件权限 不再允许写操作
+log INFO "修改$spark_submit_modified的文件权限为550"
+chmod 550 -- "$(readlink -e -- "$spark_submit_modified")"
 
 # 替换spark-submit脚本
 spark_submit_link=$SPARK_HOME/bin/spark-submit
@@ -66,7 +69,7 @@ original_spark_submit_file=spark_submit_link
 log INFO "将软件所使用的spark-submit软链接到SPARK_HOME/bin/spark-submit"
 # 如果spark-submit不存在则直接创建软链接
 if [ -L "$spark_submit_link" ]; then
-  log INFO "${spark_submit_link}是一个已存在的软链接`ls -l $spark_submit_link`"
+  log INFO "${spark_submit_link}是一个已存在的软链接`ls -l $spark_submit_link | cut -d' ' -f10-`"
   log INFO "即将对软链接进行刷新..."
 
   original_spark_submit_file=`readlink -f $spark_submit_link`
@@ -87,13 +90,12 @@ elif [ -f "$spark_submit_link" ]; then
 else
   log INFO "$spark_submit_link 不是软连接也不是文件 创建新的软链接"
 
-  ln -n $spark_submit_modified $spark_submit_link
+  ln -sn $spark_submit_modified $spark_submit_link
   log INFO "将$spark_submit_link链接到$spark_submit_modified"
 fi
 
 # 展现修改的成果
-log INFO "更新后$spark_submit_link的链接情况如下:"
-log INFO "`ls -l $spark_submit_link`"
+log INFO "更新后$spark_submit_link的链接情况如下:`ls -l $spark_submit_link | cut -d' ' -f10-`"
 log INFO "软链接刷新前原始spark_submit的位置如下: $original_spark_submit_file"
 
 log INFO "Success! OmniAdvisor2.0自动部署完成"
