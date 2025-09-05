@@ -39,7 +39,7 @@ def check_oa_conf() -> None:
     if not OA_CONF.postgresql_database_user:
         raise ValueError('The postgresql database user can not be empty, please check common configuration.')
     if not OA_CONF.postgresql_database_password:
-        raise ValueError('The postgresql database password can not be empty, please check common configuration.')
+        raise ValueError('The postgresql database password can not be empty, please use \'crypto.pyc\' to set password.')
     if not OA_CONF.postgresql_database_host:
         raise ValueError('The postgresql database host can not be empty, please check common configuration.')
     if not OA_CONF.postgresql_database_port:
@@ -57,7 +57,7 @@ def check_oa_conf() -> None:
             (not OA_CONF.spark_history_username and not OA_CONF.spark_history_password)
     ):
         raise ValueError('The spark history username and password should be provided, or leave both blank, please check'
-                         ' common configuration.')
+                         ' common configuration or use \'crypto.pyc\' to set password.')
 
     if not OA_CONF.admin_timezone:
         raise ValueError('The admin timezone can not be empty, please check common configuration.')
