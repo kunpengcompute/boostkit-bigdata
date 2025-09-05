@@ -78,7 +78,7 @@ class OmniAdvisorConf:
     component_version = "2.0.0"
 
     # OmniAdvisor根目录
-    project_base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    project_base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
     # Log文件目录
     log_dir = f'{project_base_dir}/logs'
     log_file_path = f'{log_dir}/app.log'
