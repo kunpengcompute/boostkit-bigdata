@@ -1,9 +1,7 @@
 import configparser
 import json
 import os
-
-from django.core.management.utils import get_random_secret_key
-
+import secrets
 from common.crypto_tool import CryptoTool
 
 
@@ -152,7 +150,7 @@ class OmniAdvisorConf:
     # django secret key
     django_secret_key = CryptoTool.get_django_secretkey()
     if not django_secret_key:
-        django_secret_key = get_random_secret_key()
+        django_secret_key = secrets.token_urlsafe(50)
         CryptoTool.store_django_secretkey(django_secret_key)
     strategies_tuples = [tuple(item) for item in json.loads(_common_config.get('common', 'tuning.strategy'))]
 
