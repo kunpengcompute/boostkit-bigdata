@@ -1,3 +1,5 @@
+#!/bin/bash
+
 log() {  # 用法：log LEVEL "message"
   local level=${1:-INFO}; shift
   printf '%s [%s] %s\n' "$(date '+%F %T%z')" "$level" "$*" >&2
