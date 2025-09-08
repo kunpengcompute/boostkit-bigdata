@@ -46,12 +46,15 @@ def _validate_password(password: str, password_type: str) -> bool:
     :returns: 通过则true
     """
     if len(password) < 8:
+        global_logger.warning("This password is too short. It must contain at least 8 characters.")
         return False
 
     if password_type == PasswordType.database and password == OA_CONF.postgresql_database_user:
+        global_logger.warning("This password is the same as the username.")
         return False
 
     if password_type == PasswordType.history_server and password == OA_CONF.spark_history_username:
+        global_logger.warning("This password is the same as the username.")
         return False
 
     # 定义四类字符的正则
@@ -69,6 +72,9 @@ def _validate_password(password: str, password_type: str) -> bool:
             cnt += 1
             if cnt >= 2:  # 提前满足即可返回
                 return True
+    global_logger.warning("This password is too common.")
+    global_logger.warning("For better security, include any two of these: uppercase (A–Z), lowercase (a–z), "
+                          "digits (0–9), or special symbols (e.g., !@#$%).")
     return False
 
 
