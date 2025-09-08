@@ -346,7 +346,7 @@ namespace omniruntime::reader {
             auto keyDataTypeId = OrcUtil::tranOrcTypeToOmniType(keyOrcType);
             std::shared_ptr<BaseVector> keyVector = std::move(makeNewVector(totalChildren, keyOrcType, keyDataTypeId));
             mapvector->SetKeyVector(keyVector);
-            reinterpret_cast<OmniColumnReader*>(rawKeyReader)->next((mapvector->GetKeyVector().get()), totalChildren, nullptr, keyDataTypeId);
+            reinterpret_cast<OmniColumnReader*>(rawKeyReader)->next((mapvector->GetKeyVector().get()), totalChildren, hasNull ? reinterpret_cast<uint64_t*>(nulls) : nullptr, keyDataTypeId);
         }
         ColumnReader *rawValueReader = valueReader.get();
         if (rawValueReader) {
@@ -354,7 +354,7 @@ namespace omniruntime::reader {
             auto valueDataTypeId= OrcUtil::tranOrcTypeToOmniType(valueOrcType);
             std::shared_ptr<BaseVector> valueVector = std::move(makeNewVector(totalChildren, valueOrcType, valueDataTypeId));
             mapvector->SetValueVector(valueVector);
-            reinterpret_cast<OmniColumnReader*>(rawValueReader)->next((mapvector->GetValueVector().get()), totalChildren, nullptr, valueDataTypeId);
+            reinterpret_cast<OmniColumnReader*>(rawValueReader)->next((mapvector->GetValueVector().get()), totalChildren, hasNull ? reinterpret_cast<uint64_t*>(nulls) : nullptr, valueDataTypeId);
         }
     }
 
