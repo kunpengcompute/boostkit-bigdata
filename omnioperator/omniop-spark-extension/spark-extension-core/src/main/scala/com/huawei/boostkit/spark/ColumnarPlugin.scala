@@ -250,8 +250,9 @@ case class ColumnarPreOverrides(isSupportAdaptive: Boolean = true)
         val child = replaceWithColumnarPlan(plan.child)
         logInfo(s"Columnar Processing for ${plan.getClass} is currently supported.")
         child match {
-          case ColumnarFilterExec(condition, child) =>
-            ColumnarConditionProjectExec(plan.projectList, condition, child)
+          // disable ColumnarConditionProjectExec
+//          case ColumnarFilterExec(condition, child) =>
+//            ColumnarConditionProjectExec(plan.projectList, condition, child)
           case join: ColumnarBroadcastHashJoinExec =>
             if (plan.projectList.forall(project => OmniExpressionAdaptor.isSimpleProjectForAll(project)) && enableColumnarProjectFusion) {
               ColumnarBroadcastHashJoinExec(

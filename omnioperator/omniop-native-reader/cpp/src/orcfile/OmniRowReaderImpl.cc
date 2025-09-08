@@ -159,7 +159,7 @@ namespace omniruntime::reader {
                                             *contents->stream,
                                             writerTimezone,
                                             readerTimezone);
-            reader = omniBuildReader(*contents->schema, stripeStreams, 
+            reader = omniBuildReader(getSelectedType(), stripeStreams,
                                     (julianPtr == nullptr) ? nullptr : julianPtr.get());
 
             if (sargsApplier) {

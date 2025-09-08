@@ -59,60 +59,78 @@ namespace omniruntime::reader {
         }
     }
 
-    void OmniBooleanRleDecoder::nextNulls(char *data, uint64_t numValues, uint64_t *nulls) {
-        if (nulls) {
-            throw std::runtime_error("Not implemented yet for struct type!");
-        }
-
-        uint64_t nonNulls = numValues;
-
-        const uint32_t outputBytes = (numValues + 7) / 8;
-        if (nonNulls == 0) {
-            ::memset(data, 1, outputBytes);
-            return;
-        }
-
-        if (remainingBits >= nonNulls) {
-            // handle remaining bits, which can cover this round
-            data[0] = reversedAndFlipLastByte >> (8 - remainingBits) & 0xff >> (8 - nonNulls);
-            remainingBits -= nonNulls;
+    inline void SetNull(char *data,uint64_t position, bool isNull) {
+        if (isNull) {
+            data[position / 8] |= (1<<(position % 8));
         } else {
-            // put the remaining bits, if any, into previousByte.
-            uint8_t previousByte{0};
-            if (remainingBits > 0) {
-                previousByte = reversedAndFlipLastByte >> (8 - remainingBits);
-            }
+            data[position / 8] &= ~(1<<(position % 8));
+        }
+    }
 
-            // compute byte size that should read
-            uint64_t bytesRead = (nonNulls - remainingBits + 7) / 8;
-            OmniByteRleDecoder::next(data, bytesRead, nullptr);
 
-            ReverseAndFlipBytes(reinterpret_cast<uint8_t*>(data), bytesRead);
-            reversedAndFlipLastByte = data[bytesRead - 1];
+    void OmniBooleanRleDecoder::nextNulls(char *data, uint64_t numValues, uint64_t *nulls) {
 
-            // now shift the data in place
-            if (remainingBits > 0 ) {
-                uint64_t nonNullDWords = nonNulls / 64;
-                for (uint64_t i = 0; i < nonNullDWords; i++) {
-                    uint64_t tmp = reinterpret_cast<uint64_t*>(data)[i];
-                    reinterpret_cast<uint64_t*>(data)[i] =
-                        previousByte | tmp << remainingBits; // previousByte is LSB
-                    previousByte = (tmp >> (64 - remainingBits)) & 0xff;
+        uint64_t position = 0;
+
+        if(nulls) {
+            while(remainingBits > 0 && position < numValues) {
+                if(!BitUtil::IsBitSet(nulls, position)) {
+                    remainingBits -= 1;
+                    SetNull(data, position, !((static_cast<unsigned char>(lastByte) >> remainingBits) & 0x1));
+                } else {
+                    SetNull(data, position, true);
                 }
-
-                // shift 8 bits a time for the remaining bits
-                const uint64_t nonNullOutputBytes = (nonNulls + 7) / 8;
-                for (int32_t i = nonNullDWords * 8; i < nonNullOutputBytes; ++i) {
-                    uint8_t tmp = data[i]; // already reversed
-                    data[i] = previousByte | tmp << remainingBits; // previousByte is LSB
-                    previousByte = tmp >> (8 - remainingBits);
-                }
+                position += 1;
             }
-            remainingBits = bytesRead * 8 + remainingBits - nonNulls;
+        } else {
+            while(remainingBits > 0 && position < numValues) {
+                remainingBits -= 1;
+                SetNull(data, position, !((static_cast<unsigned char>(lastByte) >> remainingBits) & 0x1));
+                position += 1;
+            }
         }
 
-        // clear the most significant bits in the last byte which will be processed in the next round
-        data[outputBytes - 1] &= 0xff >> (outputBytes * 8 - numValues);
+        uint64_t nonNulls = numValues - position;
+        if(nulls) {
+            for(uint64_t i = position; i < numValues; ++i) {
+                if(BitUtil::IsBitSet(nulls, i)) {
+                    nonNulls -= 1;
+                }
+            }
+        }
+
+        // fill in the remaining values
+         if (nonNulls == 0) {
+             while (position < numValues) {
+                 SetNull(data, position++, true);
+             }
+         } else if (position < numValues) {
+             // read the new bytes into the array
+             uint64_t bytesRead = (nonNulls + 7) / 8;
+             char bits[bytesRead];
+             OmniByteRleDecoder::next(bits, bytesRead, nullptr);
+             lastByte = bits[bytesRead - 1];
+             remainingBits = bytesRead * 8 - nonNulls;
+             // expand the array backwards so that we don't clobber the data
+             uint64_t bitsLeft = bytesRead * 8 - remainingBits;
+             if (nulls) {
+                 for (int64_t i = static_cast<int64_t>(numValues) - 1; i >= static_cast<int64_t>(position); --i) {
+                     if (!BitUtil::IsBitSet(nulls, i)) {
+                         uint64_t shiftPosn = (-bitsLeft) % 8;
+                         SetNull(data, i, !((bits[(bitsLeft -1)/8] >> shiftPosn) & 0x1));
+                         bitsLeft -= 1;
+                     } else {
+                         SetNull(data, i, true);
+                     }
+                 }
+             } else {
+                 for (uint64_t i = 0; i < bitsLeft; i++) {
+                    uint64_t byteIndex = i/8;
+                    uint64_t bitPosition = 7 - (i%8);
+                    SetNull(data, position + i, !((bits[byteIndex] >> bitPosition) & 0x1));
+                 }
+             }
+         }
     }
 
 

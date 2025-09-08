@@ -22,6 +22,8 @@ set(SOURCE_FILES
         orcfile/OmniRLEv2.cc
         orcfile/OmniColReader.cc
         orcfile/OmniByteRLE.cc
+        orcfile/OrcUtil.cpp
+        common/UriInfo.cc
         filesystem/hdfs_file.cpp
         filesystem/hdfs_filesystem.cpp
         filesystem/io_exception.cpp

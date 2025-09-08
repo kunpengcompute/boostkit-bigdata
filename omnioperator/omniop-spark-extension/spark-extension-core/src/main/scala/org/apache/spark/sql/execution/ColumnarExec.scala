@@ -32,8 +32,7 @@ import org.apache.spark.sql.vectorized.ColumnarBatch
 import java.util.concurrent.TimeUnit.NANOSECONDS
 import scala.collection.JavaConverters._
 import scala.collection.mutable.ListBuffer
-
-import nova.hetu.omniruntime.vector.Vec
+import nova.hetu.omniruntime.vector.{MapVec, StructVec, Vec}
 
 /**
  * Provides an optimized set of APIs to append row based data to an array of
@@ -44,12 +43,14 @@ private[execution] class OmniRowToColumnConverter(schema: StructType) extends Se
     f => OmniRowToColumnConverter.getConverterForType(f.dataType, f.nullable)
   }
 
-  final def convert(row: InternalRow, vectors: Array[WritableColumnVector]): Unit = {
+  final def convert(rows: Seq[InternalRow], size: Int): Seq[WritableColumnVector] = {
     var idx = 0
-    while (idx < row.numFields) {
-      converters(idx).append(row, idx, vectors(idx))
+    val res = new Array[WritableColumnVector](schema.fields.length)
+    while (idx < schema.fields.length) {
+      res(idx) = converters(idx).add(rows, idx, size)
       idx += 1
     }
+    res.toSeq
   }
 }
 
@@ -62,16 +63,7 @@ private object OmniRowToColumnConverter {
 
   private abstract class TypeConverter extends Serializable {
     def append(row: SpecializedGetters, column: Int, cv: WritableColumnVector): Unit
-  }
-
-  private final case class BasicNullableTypeConverter(base: TypeConverter) extends TypeConverter {
-    override def append(row: SpecializedGetters, column: Int, cv: WritableColumnVector): Unit = {
-      if (row.isNullAt(column)) {
-        cv.appendNull
-      } else {
-        base.append(row, column, cv)
-      }
-    }
+    def add(rows: Seq[SpecializedGetters], column: Int, size: Int): WritableColumnVector
   }
 
   private def getConverterForType(dataType: DataType, nullable: Boolean): TypeConverter = {
@@ -80,87 +72,346 @@ private object OmniRowToColumnConverter {
       case BooleanType => BooleanConverter
       case ByteType => ByteConverter
       case ShortType => ShortConverter
-      case IntegerType | DateType => IntConverter
-      case LongType | TimestampType => LongConverter
+      case IntegerType | DateType => IntConverter(dataType)
+      case LongType | TimestampType => LongConverter(dataType)
       case DoubleType => DoubleConverter
       case StringType => StringConverter
       case CalendarIntervalType => CalendarConverter
       case dt: DecimalType => DecimalConverter(dt)
+      case struct: StructType =>
+        val fieldConverters = struct.fields.map { f =>
+          getConverterForType(f.dataType, f.nullable)
+        }
+        StructConverter(fieldConverters, struct)
+      case map: MapType =>
+        val keyConverter = getConverterForType(map.keyType, nullable)
+        val valueConverter = getConverterForType(map.valueType, map.valueContainsNull)
+        MapConverter(keyConverter, valueConverter, map)
       case unknown => throw new UnsupportedOperationException(
         s"Type $unknown not supported")
     }
+    core
+  }
 
-    if (nullable) {
-      dataType match {
-        case _ => new BasicNullableTypeConverter(core)
+  private case class MapConverter(
+      keyConverter: TypeConverter,
+      valueConverter: TypeConverter,
+      dataType: MapType) extends TypeConverter {
+    override def append(row: SpecializedGetters, column: Int, cv: WritableColumnVector): Unit = {
+      throw new UnsupportedOperationException("StructConverter not support append()")
+    }
+
+    override def add(rows: Seq[SpecializedGetters],
+               column: Int, size: Int): WritableColumnVector = {
+      val cv = new OmniColumnVector(size, dataType, true)
+      // count total offset
+      var totalLen = 0
+      val offsets = new ListBuffer[Int]
+      val nulls = new ListBuffer[Byte]
+      offsets += 0
+      for (row <- rows) {
+        val mapData = if (row == null) null else row.getMap(column)
+        if (mapData == null) {
+          nulls += 1
+        } else {
+          nulls += 0
+          val num = mapData.numElements
+          totalLen += num
+        }
+        offsets += totalLen
       }
-    } else {
-      core
+
+      val keyVector = new OmniColumnVector(totalLen, dataType.keyType, true)
+      val valueVector = new OmniColumnVector(totalLen, dataType.valueType, true)
+      for (row <- rows) {
+        val mapData = if (row == null) null else row.getMap(column)
+        if (mapData != null) {
+          val mapLength = mapData.numElements
+          for (i <- 0 until mapLength) {
+            keyConverter.append(mapData.keyArray(), i, keyVector)
+            valueConverter.append(mapData.valueArray(), i, valueVector)
+          }
+        }
+      }
+
+      cv.setChild(keyVector, 0)
+      cv.setChild(valueVector, 1)
+      cv.setOffsets(offsets.toArray)
+      cv.updateVec()
+      cv.putNulls(0, nulls.toArray, size)
+      cv
+    }
+  }
+
+  private case class StructConverter(childConverters: Array[TypeConverter], dataType: StructType)
+      extends TypeConverter {
+    override def append(row: SpecializedGetters, column: Int, cv: WritableColumnVector): Unit = {
+     throw new UnsupportedOperationException("StructConverter not support append()")
+    }
+
+    override def add(rows: Seq[SpecializedGetters],
+             column: Int, size: Int): WritableColumnVector = {
+      // not init child
+      val cv = new OmniColumnVector(size, dataType, true)
+      val structRows = new ListBuffer[SpecializedGetters]()
+      val nulls = new ListBuffer[Byte]()
+      for (row <- rows) {
+        val struct = if (row == null) null else row.getStruct(column, childConverters.length)
+        if (struct == null) {
+          nulls += 1
+        } else {
+          nulls += 0
+        }
+        structRows += struct
+      }
+      childConverters.zipWithIndex.foreach { case (childConverter, fieldIndex) =>
+        val vector = childConverter.add(structRows, fieldIndex, size).asInstanceOf[OmniColumnVector]
+        cv.setChild(vector, fieldIndex)
+      }
+      cv.updateVec()
+      cv.putNulls(0, nulls.toArray, size)
+      cv
     }
   }
 
   private object BinaryConverter extends TypeConverter {
     override def append(row: SpecializedGetters, column: Int, cv: WritableColumnVector): Unit = {
-      val bytes = row.getBinary(column)
-      cv.appendByteArray(bytes, 0, bytes.length)
+      if (row == null || row.isNullAt(column)) {
+        cv.appendNull
+      } else {
+        val bytes = row.getBinary(column)
+        cv.appendByteArray(bytes, 0, bytes.length)
+      }
+    }
+
+    override def add(rows: Seq[SpecializedGetters],
+               column: Int, size: Int): WritableColumnVector = {
+      val cv = new OmniColumnVector(size, BinaryType, true)
+      for (row <- rows) {
+        if (row == null || row.isNullAt(column)) {
+          cv.appendNull
+        } else {
+          append(row, column, cv)
+        }
+      }
+      cv
     }
   }
 
   private object BooleanConverter extends TypeConverter {
-    override def append(row: SpecializedGetters, column: Int, cv: WritableColumnVector): Unit =
-      cv.appendBoolean(row.getBoolean(column))
+    override def append(row: SpecializedGetters, column: Int, cv: WritableColumnVector): Unit = {
+      if (row == null || row.isNullAt(column)) {
+        cv.appendNull
+      } else {
+        cv.appendBoolean(row.getBoolean(column))
+      }
+    }
+
+    override def add(rows: Seq[SpecializedGetters],
+                     column: Int, size: Int): WritableColumnVector = {
+      val cv = new OmniColumnVector(size, BooleanType, true)
+      for (row <- rows) {
+        if (row == null || row.isNullAt(column)) {
+          cv.appendNull
+        } else {
+          append(row, column, cv)
+        }
+      }
+      cv
+    }
   }
 
   private object ByteConverter extends TypeConverter {
-    override def append(row: SpecializedGetters, column: Int, cv: WritableColumnVector): Unit =
-      cv.appendByte(row.getByte(column))
+    override def append(row: SpecializedGetters, column: Int, cv: WritableColumnVector): Unit = {
+      if (row == null || row.isNullAt(column)) {
+        cv.appendNull
+      } else {
+        cv.appendByte(row.getByte(column))
+      }
+    }
+
+    override def add(rows: Seq[SpecializedGetters],
+              column: Int, size: Int): WritableColumnVector = {
+      val cv = new OmniColumnVector(size, ByteType, true)
+      for (row <- rows) {
+        if (row == null || row.isNullAt(column)) {
+          cv.appendNull
+        } else {
+          append(row, column, cv)
+        }
+      }
+      cv
+    }
   }
 
   private object ShortConverter extends TypeConverter {
-    override def append(row: SpecializedGetters, column: Int, cv: WritableColumnVector): Unit =
-      cv.appendShort(row.getShort(column))
+    override def append(row: SpecializedGetters, column: Int, cv: WritableColumnVector): Unit = {
+      if (row == null || row.isNullAt(column)) {
+        cv.appendNull
+      } else {
+        cv.appendShort(row.getShort(column))
+      }
+    }
+
+    override def add(rows: Seq[SpecializedGetters],
+                     column: Int, size: Int): WritableColumnVector = {
+      val cv = new OmniColumnVector(size, ShortType, true)
+      for (row <- rows) {
+        if (row == null || row.isNullAt(column)) {
+          cv.appendNull
+        } else {
+          append(row, column, cv)
+        }
+      }
+      cv
+    }
   }
 
-  private object IntConverter extends TypeConverter {
-    override def append(row: SpecializedGetters, column: Int, cv: WritableColumnVector): Unit =
-      cv.appendInt(row.getInt(column))
+  private case class IntConverter(dataType: DataType) extends TypeConverter {
+    override def append(row: SpecializedGetters, column: Int, cv: WritableColumnVector): Unit = {
+      if (row == null || row.isNullAt(column)) {
+        cv.appendNull
+      } else {
+        cv.appendInt(row.getInt(column))
+      }
+    }
+
+    override def add(rows: Seq[SpecializedGetters],
+                     column: Int, size: Int): WritableColumnVector = {
+      val cv = new OmniColumnVector(size, dataType, true)
+      for (row <- rows) {
+        if (row == null || row.isNullAt(column)) {
+          cv.appendNull
+        } else {
+          append(row, column, cv)
+        }
+      }
+      cv
+    }
   }
 
-  private object LongConverter extends TypeConverter {
-    override def append(row: SpecializedGetters, column: Int, cv: WritableColumnVector): Unit =
-      cv.appendLong(row.getLong(column))
+  private case class LongConverter(dataType: DataType) extends TypeConverter {
+    override def append(row: SpecializedGetters, column: Int, cv: WritableColumnVector): Unit = {
+      if (row == null || row.isNullAt(column)) {
+        cv.appendNull
+      } else {
+        cv.appendLong(row.getLong(column))
+      }
+    }
+
+    override def add(rows: Seq[SpecializedGetters],
+                     column: Int, size: Int): WritableColumnVector = {
+      val cv = new OmniColumnVector(size, dataType, true)
+      for (row <- rows) {
+        if (row == null || row.isNullAt(column)) {
+          cv.appendNull
+        } else {
+          append(row, column, cv)
+        }
+      }
+      cv
+    }
   }
 
   private object DoubleConverter extends TypeConverter {
-    override def append(row: SpecializedGetters, column: Int, cv: WritableColumnVector): Unit =
-      cv.appendDouble(row.getDouble(column))
+    override def append(row: SpecializedGetters, column: Int, cv: WritableColumnVector): Unit = {
+      if (row == null || row.isNullAt(column)) {
+        cv.appendNull
+      } else {
+        cv.appendDouble(row.getDouble(column))
+      }
+    }
+
+    override def add(rows: Seq[SpecializedGetters],
+                     column: Int, size: Int): WritableColumnVector = {
+      val cv = new OmniColumnVector(size, DoubleType, true)
+      for (row <- rows) {
+        if (row == null || row.isNullAt(column)) {
+          cv.appendNull
+        } else {
+          append(row, column, cv)
+        }
+      }
+      cv
+    }
   }
 
   private object StringConverter extends TypeConverter {
     override def append(row: SpecializedGetters, column: Int, cv: WritableColumnVector): Unit = {
-      val data = row.getUTF8String(column).getBytes
-      cv.asInstanceOf[OmniColumnVector].appendString(data.length, data, 0)
+      if (row == null || row.isNullAt(column)) {
+        cv.appendNull
+      } else {
+        val data = row.getUTF8String(column).getBytes
+        cv.asInstanceOf[OmniColumnVector].appendString(data.length, data, 0)
+      }
+    }
+
+    override def add(rows: Seq[SpecializedGetters],
+                     column: Int, size: Int): WritableColumnVector = {
+      val cv = new OmniColumnVector(size, StringType, true)
+      for (row <- rows) {
+        if (row == null || row.isNullAt(column)) {
+          cv.appendNull
+        } else {
+          append(row, column, cv)
+        }
+      }
+      cv
     }
   }
 
   private object CalendarConverter extends TypeConverter {
     override def append(row: SpecializedGetters, column: Int, cv: WritableColumnVector): Unit = {
-      val c = row.getInterval(column)
-      cv.appendStruct(false)
-      cv.getChild(0).appendInt(c.months)
-      cv.getChild(1).appendInt(c.days)
-      cv.getChild(2).appendLong(c.microseconds)
+      if (row == null || row.isNullAt(column)) {
+        cv.appendNull
+      } else {
+        val c = row.getInterval(column)
+        cv.appendStruct(false)
+        cv.getChild(0).appendInt(c.months)
+        cv.getChild(1).appendInt(c.days)
+        cv.getChild(2).appendLong(c.microseconds)
+      }
+    }
+
+    override def add(rows: Seq[SpecializedGetters],
+                     column: Int, size: Int): WritableColumnVector = {
+      val cv = new OmniColumnVector(size, CalendarIntervalType, true)
+      for (row <- rows) {
+        if (row == null || row.isNullAt(column)) {
+          cv.appendNull
+        } else {
+          append(row, column, cv)
+        }
+      }
+      cv
     }
   }
 
   private case class DecimalConverter(dt: DecimalType) extends TypeConverter {
     override def append(row: SpecializedGetters, column: Int, cv: WritableColumnVector): Unit = {
-      val d = row.getDecimal(column, dt.precision, dt.scale)
-      if (DecimalType.is64BitDecimalType(dt)) {
-        cv.appendLong(d.toUnscaledLong)
+      if (row == null || row.isNullAt(column)) {
+        cv.appendNull
       } else {
-        cv.asInstanceOf[OmniColumnVector].appendDecimal(d)
+        val d = row.getDecimal(column, dt.precision, dt.scale)
+        if (DecimalType.is64BitDecimalType(dt)) {
+          cv.appendLong(d.toUnscaledLong)
+        } else {
+          cv.asInstanceOf[OmniColumnVector].appendDecimal(d)
+        }
       }
+    }
+
+    override def add(rows: Seq[SpecializedGetters],
+                     column: Int, size: Int): WritableColumnVector = {
+      val cv = new OmniColumnVector(size, dt, true)
+      for (row <- rows) {
+        if (row == null || row.isNullAt(column)) {
+          cv.appendNull
+        } else {
+          append(row, column, cv)
+        }
+      }
+      cv
     }
   }
 }
@@ -226,7 +477,8 @@ case class RowToOmniColumnarExec(child: SparkPlan) extends RowToColumnarTransiti
         _)
     )
     val executionId = sparkContext.getLocalProperty(SQLExecution.EXECUTION_ID_KEY)
-    SQLMetrics.postDriverMetricUpdates(sparkContext, executionId, Seq(numInputRows, numOutputBatches, rowToOmniColumnarTime))
+    SQLMetrics.postDriverMetricUpdates(sparkContext, executionId,
+      Seq(numInputRows, numOutputBatches, rowToOmniColumnarTime))
     broadcast
   }
 
@@ -237,7 +489,8 @@ case class RowToOmniColumnarExec(child: SparkPlan) extends RowToColumnarTransiti
   override lazy val metrics: Map[String, SQLMetric] = Map(
     "numInputRows" -> SQLMetrics.createMetric(sparkContext, "number of input rows"),
     "numOutputBatches" -> SQLMetrics.createMetric(sparkContext, "number of output batches"),
-    "rowToOmniColumnarTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in row to OmniColumnar")
+    "rowToOmniColumnarTime" -> SQLMetrics.createTimingMetric(sparkContext,
+      "time in row to OmniColumnar")
   )
 
   override protected def withNewChildInternal(newChild: SparkPlan): RowToOmniColumnarExec =
@@ -255,7 +508,8 @@ case class RowToOmniColumnarExec(child: SparkPlan) extends RowToColumnarTransiti
     // plan (this) in the closure.
     val localSchema = this.schema
     child.execute().mapPartitionsInternal { rowIterator =>
-      InternalRowToColumnarBatch.convert(enableOffHeapColumnVector, numInputRows, numOutputBatches, rowToOmniColumnarTime, numRows, localSchema, rowIterator)
+      InternalRowToColumnarBatch.convert(enableOffHeapColumnVector, numInputRows, numOutputBatches,
+        rowToOmniColumnarTime, numRows, localSchema, rowIterator)
     }
   }
 
@@ -275,7 +529,8 @@ case class OmniColumnarToRowExec(child: SparkPlan,
   override lazy val metrics: Map[String, SQLMetric] = Map(
     "numOutputRows" -> SQLMetrics.createMetric(sparkContext, "number of output rows"),
     "numInputBatches" -> SQLMetrics.createMetric(sparkContext, "number of input batches"),
-    "omniColumnarToRowTime" -> SQLMetrics.createTimingMetric(sparkContext, "time in omniColumnar to row")
+    "omniColumnarToRowTime" ->
+      SQLMetrics.createTimingMetric(sparkContext, "time in omniColumnar to row")
   )
 
   override def verboseStringWithOperatorId(): String = {
@@ -337,22 +592,17 @@ object InternalRowToColumnarBatch {
 
         override def next(): ColumnarBatch = {
           val startTime = System.nanoTime()
-          val vectors: Seq[WritableColumnVector] = OmniColumnVector.allocateColumns(numRows,
-            localSchema, true)
-          val cb: ColumnarBatch = new ColumnarBatch(vectors.toArray)
-          cb.setNumRows(0)
-          vectors.foreach(_.reset())
+
           var rowCount = 0
+          val bufferRow = ListBuffer[InternalRow]()
           while (rowCount < numRows && rowIterator.hasNext) {
-            val row = rowIterator.next()
-            converters.convert(row, vectors.toArray)
+            var row = rowIterator.next()
+            bufferRow += row.copy()
             rowCount += 1
           }
-          if (!enableOffHeapColumnVector) {
-            vectors.foreach { v =>
-              v.asInstanceOf[OmniColumnVector].getVec.setSize(rowCount)
-            }
-          }
+
+          val vectors = converters.convert(bufferRow, rowCount)
+          val cb: ColumnarBatch = new ColumnarBatch(vectors.toArray)
           cb.setNumRows(rowCount)
           numInputRows += rowCount
           numOutputBatches += 1

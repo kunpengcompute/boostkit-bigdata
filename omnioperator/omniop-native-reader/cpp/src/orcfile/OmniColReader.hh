@@ -26,6 +26,7 @@
 #include "OmniRLEv2.hh"
 #include "orc/Int128.hh"
 #include "OmniByteRLE.hh"
+#include "OrcUtil.h"
 #include "common/JulianGregorianRebase.h"
 
 namespace omniruntime::reader {
@@ -64,6 +65,7 @@ namespace omniruntime::reader {
     class OmniStructColumnReader: public OmniColumnReader {
     private:
         std::vector<std::unique_ptr<ColumnReader>> children;
+        const orc::Type *type_;
 
     public:
         OmniStructColumnReader(const orc::Type& type, orc::StripeStreams& stipe,
@@ -82,6 +84,16 @@ namespace omniruntime::reader {
         void next(void *&omniVecBatch, uint64_t numValues, char *notNull, const orc::Type& baseTp,
                   int* omniTypeId) override;
 
+        /**
+        * direct read VectorBatch in next
+        * @param vec the vec to push
+        * @param numValues the numValues of VectorBatch
+        * @param incomingNulls the notNull array indicates value not null
+        * @param omniTypeId the omniTypeId to push
+        */
+        void next(omniruntime::vec::BaseVector *vec, uint64_t numValues,
+            uint64_t *incomingNulls, int omniTypeId) override;
+
         void seekToRowGroup(
                 std::unordered_map<uint64_t, orc::PositionProvider>& positions) override;
 
@@ -97,9 +109,45 @@ namespace omniruntime::reader {
         template<bool encoded>
         void nextInternal(std::vector<omniruntime::vec::BaseVector*> &vecs, uint64_t numValues, 
             uint64_t *incomingNulls, const orc::Type& baseTp, int* omniTypeId);
+    };
 
-        // Get default omni type from orc type.
-        omniruntime::type::DataTypeId getDefaultOmniType(const orc::Type *type);
+    class OmniMapColumnReader: public OmniColumnReader {
+    private:
+        std::unique_ptr<ColumnReader> keyReader;
+        std::unique_ptr<ColumnReader> valueReader;
+        std::unique_ptr<OmniRleDecoderV2> rle;
+        const orc::Type* orcType;
+
+    public:
+        OmniMapColumnReader(const orc::Type& type, orc::StripeStreams& stipe,
+            common::JulianGregorianRebase *julianPtr);
+
+        uint64_t skip(uint64_t numValues) override;
+
+        /**
+         * direct read VectorBatch in next
+         * @param vec the vec to push
+         * @param numValues the numValues of VectorBatch
+         * @param incomingNulls the notNull array indicates value not null
+         * @param omniTypeId the omniTypeId to push
+         */
+        void next(omniruntime::vec::BaseVector *vec, uint64_t numValues, 
+            uint64_t *incomingNulls, int omniTypeId) override;
+
+        void seekToRowGroup(std::unordered_map<uint64_t, orc::PositionProvider>& positions) override;
+
+    private:
+        /**
+         * direct read VectorBatch in next for omni
+         * @param vec the vec to push
+         * @param numValues the numValues of VectorBatch
+         * @param incomingNulls the notNull array indicates value not null
+         * @param omniTypeId the omniTypeId to push
+         */
+        template<bool encoded>
+        void nextInternal(omniruntime::vec::BaseVector *vec, uint64_t numValues, 
+            uint64_t *incomingNulls, int omniTypeId);
+
     };
 
     class OmniBooleanColumnReader: public OmniColumnReader {
