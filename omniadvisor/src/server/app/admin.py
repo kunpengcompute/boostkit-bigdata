@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.contrib.auth.models import User, Group
 
 from .models import DatabaseLoad, DatabaseTuningRecord, DatabaseExamRecord
 
@@ -8,6 +9,13 @@ _TUNING_RECORD_FIELDS = ('id', 'load', 'config', 'method', 'method_extend', 'rou
 _EXAM_RECORD_FIELDS = (
     'id', 'load', 'tuning_record', 'start_time', 'end_time', 'status', 'runtime_f', 'application_id', 'trace'
 )
+
+
+# 取消注册默认的User和Group模型
+admin.site.site_url = None
+admin.site.password_change_url = None
+admin.site.unregister(User)
+admin.site.unregister(Group)
 
 
 def remove_then_add(org_tuple: tuple, to_remove: tuple, to_add: tuple) -> tuple:

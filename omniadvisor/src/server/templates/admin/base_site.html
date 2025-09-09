@@ -1,0 +1,7 @@
+<!-- templates/admin/base_site.html -->
+{% extends "admin/base.html" %}
+
+{% block userlinks %}
+    {# 只保留“Log out”链接，移除“Change password” #}
+    <a href="{% url 'admin:logout' %}">Log out</a>
+{% endblock %}
