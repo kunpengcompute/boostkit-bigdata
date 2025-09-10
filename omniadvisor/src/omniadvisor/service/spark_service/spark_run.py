@@ -85,15 +85,18 @@ def spark_run(load: Load, config: dict, wait_for_trace: bool = True,
         if wait_for_trace:
             # 阻塞获取trace
             global_logger.info('Going to fetch Spark execute trace, the process is blocking.')
-            status = _update_trace_and_runtime_from_history_server(exam_record=exam_record, application_id=exec_result.application_id)
+            status = _update_trace_and_runtime_from_history_server(exam_record=exam_record,
+                                                                   application_id=exec_result.application_id)
             if not status:
                 raise RuntimeError('Unknown exception happen when fetching spark trace, please check history server.')
         else:
             # 不阻塞获取trace，通过子进程进行获取
             global_logger.info('Going to fetch Spark execute trace, the process is non-blocking.')
-            p = multiprocessing.Process(target=_update_trace_and_runtime_from_history_server,
-                                        args=(exam_record, exec_result.application_id),
-                                        name="fetch_trace_and_runtime")
+            p = multiprocessing.Process(
+                target=_update_trace_and_runtime_from_history_server,
+                args=(exam_record, exec_result.application_id),
+                name="omniadvisor_fetch_trace_and_runtime"
+            )
             p.daemon = False
             p.start()
 

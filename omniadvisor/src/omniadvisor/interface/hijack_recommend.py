@@ -270,7 +270,8 @@ def hijack_recommend(argv: list) -> None:
 
     if exec_config != load.default_config:
         # 创建子进程处理负载配置，不阻塞
-        p = multiprocessing.Process(target=_process_load_config, args=(load, exec_config), name="process_load_config")
+        p = multiprocessing.Process(target=_process_load_config, args=(load, exec_config),
+                                    name="omniadvisor_process_load_config")
         p.daemon = False
         p.start()
 
