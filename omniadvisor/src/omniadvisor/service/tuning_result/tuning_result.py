@@ -25,7 +25,11 @@ def get_tuning_result(load: Load, config: dict):
         load=load,
         config=config
     )
-    tuning_record = tuning_records.pop()
+
+    try:
+        tuning_record = tuning_records.pop()
+    except IndexError:
+        raise RuntimeError("Tuning records is empty")
 
     # 查询获得测试记录
     exam_records = ExamRecordRepository.query_by_load_and_config(
