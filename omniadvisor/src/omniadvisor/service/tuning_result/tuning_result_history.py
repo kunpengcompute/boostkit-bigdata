@@ -95,7 +95,8 @@ class TuningResultHistory:
 
     @property
     def boost_percentage(self):
-        if not self.user_tuning_result:
+        # abs(self.user_tuning_result.runtime) <= 1e-12用于保证分母不为0
+        if not self.user_tuning_result or abs(self.user_tuning_result.runtime) <= 1e-12:
             return 0.0
         return round(
             (self.user_tuning_result.runtime - self.best_tuning_result.runtime) / self.user_tuning_result.runtime, 4

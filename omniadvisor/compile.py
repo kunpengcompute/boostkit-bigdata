@@ -7,7 +7,7 @@ import os
 import shutil
 import subprocess
 
-PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_DIR = os.path.dirname(os.path.realpath(__file__))
 
 # 与src同级的其他资源文件夹
 RESOURCES_LIST = ['config', 'script']

@@ -66,7 +66,7 @@ ROOT_URLCONF = 'server.engine.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / "templates"],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -95,6 +95,9 @@ DATABASES = {
         'PORT': OA_CONF.postgresql_database_port,
     }
 }
+
+# 会话强制退出时间一天
+SESSION_COOKIE_AGE = 24 * 60 * 60
 
 
 # Password validation

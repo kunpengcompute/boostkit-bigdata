@@ -78,13 +78,12 @@ LOGGING_CONFIG = {
             'stream': 'ext://sys.stdout',
         },
         'fileHandler': {
-            '()': SecureTimedRotatingFileHandler,
+            'class': 'logging.handlers.RotatingFileHandler',
             'level': 'DEBUG',
             'formatter': 'fileFormatter',
             'filename': OA_CONF.log_file_path,
-            'when': 'midnight',
-            'interval': 1,
-            'backupCount': 7,
+            'maxBytes': 100 * 1024 * 1024,  # 单个文件最大 100MB
+            'backupCount': 20,              # 保留 20 个旧文件，超过就覆盖最早的
             'encoding': 'utf-8',
         }
     },

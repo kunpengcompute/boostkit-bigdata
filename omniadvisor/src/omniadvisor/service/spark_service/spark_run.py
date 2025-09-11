@@ -85,13 +85,20 @@ def spark_run(load: Load, config: dict, wait_for_trace: bool = True,
         if wait_for_trace:
             # 阻塞获取trace
             global_logger.info('Going to fetch Spark execute trace, the process is blocking.')
-            status = _update_trace_and_runtime_from_history_server(exam_record=exam_record, application_id=exec_result.application_id)
+            status = _update_trace_and_runtime_from_history_server(
+                exam_record=exam_record,
+                application_id=exec_result.application_id
+            )
             if not status:
                 raise RuntimeError('Unknown exception happen when fetching spark trace, please check history server.')
         else:
             # 不阻塞获取trace，通过子进程进行获取
             global_logger.info('Going to fetch Spark execute trace, the process is non-blocking.')
-            p = multiprocessing.Process(target=_update_trace_and_runtime_from_history_server, args=(exam_record, exec_result.application_id))
+            p = multiprocessing.Process(
+                target=_update_trace_and_runtime_from_history_server,
+                args=(exam_record, exec_result.application_id),
+                name="omniadvisor_fetch_trace_and_runtime"
+            )
             p.daemon = False
             p.start()
 
@@ -139,10 +146,10 @@ def _update_trace_and_runtime_from_history_server(exam_record: ExamRecord, appli
         trace_dict['sql'] = save_trace_data(data=trace_sql, data_dir=OA_CONF.data_dir)
         trace_dict['stages'] = save_trace_data(data=trace_stages, data_dir=OA_CONF.data_dir)
         trace_dict['executor'] = save_trace_data(data=trace_executor, data_dir=OA_CONF.data_dir)
-        global_logger.info(f"Fetch Spark execute trace success.")
+        global_logger.info(f"Fetch Spark execute trace and runtime success.")
         break
     else:
-        global_logger.error(f'Failed to get App %s trace from %s', application_id, history_server_url)
+        global_logger.error(f'Failed to get App %s trace and runtime from %s', application_id, history_server_url)
         return False
 
     ExamRecordRepository.update_runtime(exam_record, runtime=runtime)

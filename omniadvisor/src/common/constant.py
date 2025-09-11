@@ -1,9 +1,7 @@
 import configparser
 import json
 import os
-
-from django.core.management.utils import get_random_secret_key
-
+import secrets
 from common.crypto_tool import CryptoTool
 
 
@@ -41,7 +39,7 @@ def check_oa_conf() -> None:
     if not OA_CONF.postgresql_database_user:
         raise ValueError('The postgresql database user can not be empty, please check common configuration.')
     if not OA_CONF.postgresql_database_password:
-        raise ValueError('The postgresql database password can not be empty, please check common configuration.')
+        raise ValueError('The postgresql database password can not be empty, please use \'crypto.pyc\' to set password.')
     if not OA_CONF.postgresql_database_host:
         raise ValueError('The postgresql database host can not be empty, please check common configuration.')
     if not OA_CONF.postgresql_database_port:
@@ -59,7 +57,7 @@ def check_oa_conf() -> None:
             (not OA_CONF.spark_history_username and not OA_CONF.spark_history_password)
     ):
         raise ValueError('The spark history username and password should be provided, or leave both blank, please check'
-                         ' common configuration.')
+                         ' common configuration or use \'crypto.pyc\' to set password.')
 
     if not OA_CONF.admin_timezone:
         raise ValueError('The admin timezone can not be empty, please check common configuration.')
@@ -78,7 +76,7 @@ class OmniAdvisorConf:
     component_version = "2.0.0"
 
     # OmniAdvisor根目录
-    project_base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    project_base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
     # Log文件目录
     log_dir = f'{project_base_dir}/logs'
     log_file_path = f'{log_dir}/app.log'
@@ -152,7 +150,7 @@ class OmniAdvisorConf:
     # django secret key
     django_secret_key = CryptoTool.get_django_secretkey()
     if not django_secret_key:
-        django_secret_key = get_random_secret_key()
+        django_secret_key = secrets.token_urlsafe(50)
         CryptoTool.store_django_secretkey(django_secret_key)
     strategies_tuples = [tuple(item) for item in json.loads(_common_config.get('common', 'tuning.strategy'))]
 

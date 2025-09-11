@@ -3,7 +3,7 @@ import json
 import multiprocessing
 import re
 import sys
-from typing import Any
+import time
 
 from common.constant import OA_CONF
 from common.exceptions import UnknownEncodingError
@@ -64,9 +64,10 @@ def _process_load_config(load: Load, config: dict) -> None:
     :param config: 本次测试用配置
     :return:
     """
+    # sleep等待 避免最新的trace未抓取完成时去获取历史最优数据 （该情况下正在被抓取trace数据会被遗漏）
+    time.sleep(OA_CONF.spark_fetch_trace_timeout)
     # 获取测试配置的调优结果
     tuning_result = get_tuning_result(load=load, config=config)
-
     if config == load.best_config:
         if tuning_result.status == OA_CONF.TuningResultStatus.fail:
             # 最优配置回滚
@@ -269,7 +270,10 @@ def hijack_recommend(argv: list) -> None:
 
     if exec_config != load.default_config:
         # 创建子进程处理负载配置，不阻塞
-        p = multiprocessing.Process(target=_process_load_config, args=(load, exec_config))
+        p = multiprocessing.Process(
+            target=_process_load_config, args=(load, exec_config),
+            name="omniadvisor_process_load_config"
+        )
         p.daemon = False
         p.start()
 
