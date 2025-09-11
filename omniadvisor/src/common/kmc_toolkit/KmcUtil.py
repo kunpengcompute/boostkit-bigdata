@@ -185,3 +185,6 @@ class Kmc:
             logger.error("decrypt failed.")
         del cipher_text
         return ret, plain_text
+
+
+kmc = Kmc()

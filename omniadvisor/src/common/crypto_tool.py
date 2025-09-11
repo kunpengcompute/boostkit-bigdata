@@ -1,6 +1,8 @@
 import keyring
 from keyrings.alt.file import PlaintextKeyring
 
+from common.kmc_toolkit.KmcUtil import kmc
+
 keyring.set_keyring(PlaintextKeyring())
 
 _SERVICE_NAME = "omniadvisor"
@@ -14,25 +16,28 @@ class CryptoTool:
     @classmethod
     def _store_data(cls, key: str, value: str):
         """
-        向keyring中存储 key-value信息
+        向keyring中存储 key-value信息，value使用kmc进行加密
 
         :param key: 要存储的键
         :param value: 要存储的值
         :returns: None
         """
-        keyring.set_password(_SERVICE_NAME, key, value)
+        # TODO 1 这里如果kmc失败了，需要抛出异常 2 kmc 的log日志文件写到项目的logs中去 3 想办法合并两个日志体系
+        ret, encrypted_value = kmc.encrypt(value)
+        keyring.set_password(_SERVICE_NAME, key, encrypted_value)
 
     @classmethod
     def _get_data(cls, key: str):
         """
-        从keyring中获取 key对应的value值
+        从keyring中获取 key对应的value值，value使用kmc进行解密
 
         :param key: 要获取的值的键
         :returns: 要获取的值
         """
         value = keyring.get_password(_SERVICE_NAME, key)
         if value:
-            return value
+            ret, decrypted_value = kmc.decrypt(value)
+            return decrypted_value
         else:
             return None
 
