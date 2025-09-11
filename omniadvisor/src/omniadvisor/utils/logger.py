@@ -2,7 +2,7 @@ import os
 import logging
 import warnings
 from logging.config import dictConfig
-from logging.handlers import TimedRotatingFileHandler
+from logging.handlers import RotatingFileHandler
 
 from common.constant import OA_CONF
 
@@ -10,9 +10,9 @@ CONSOLE_FORMAT = '%(asctime)s [%(levelname)s] %(message)s'
 FILE_FORMAT = '%(asctime)s [%(levelname)s] %(filename)s:%(lineno)d in %(funcName)s - %(message)s'
 
 
-class SecureTimedRotatingFileHandler(TimedRotatingFileHandler):
+class SecureRotatingFileHandler(RotatingFileHandler):
     """
-    自定义TimedRotatingFileHandler，支持设置文件权限
+    自定义RotatingFileHandler，支持设置文件权限
     """
     def _open(self):
         """
@@ -78,7 +78,7 @@ LOGGING_CONFIG = {
             'stream': 'ext://sys.stdout',
         },
         'fileHandler': {
-            'class': 'logging.handlers.RotatingFileHandler',
+            '()': SecureRotatingFileHandler,
             'level': 'DEBUG',
             'formatter': 'fileFormatter',
             'filename': OA_CONF.log_file_path,

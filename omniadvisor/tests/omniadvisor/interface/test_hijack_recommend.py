@@ -11,6 +11,10 @@ from omniadvisor.interface.hijack_recommend import hijack_recommend, _process_lo
 # 测试代码
 class TestHijackRecommend:
 
+    def setup_class(self):
+        # 为了避免抓取trace子进程的等待
+        OA_CONF.spark_fetch_trace_timeout = 0
+
     # 场景 1: 正常流程，Spark 执行成功
     @patch("omniadvisor.interface.hijack_recommend._process_load_config")
     @patch("omniadvisor.interface.hijack_recommend.spark_run")
