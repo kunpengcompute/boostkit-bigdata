@@ -225,7 +225,7 @@ object OmniAdaptorUtil {
         for (i <- 1 until columnSize + 1) {
           offsets(i) = offsets(i - 1) + columnVector.getArray(i - 1).numElements()
         }
-        val vec = new ArrayVec(new ArrayDataType(sparkTypeToOmniTypeWithComplex(elementType, Metadata.empty), offsets(columnSize))
+        val vec = new ArrayVec(new ArrayDataType(sparkTypeToOmniTypeWithComplex(elementType, Metadata.empty)), offsets(columnSize))
         vec.addElements(transColumnVector(columnVector.getChild(0), offsets(columnSize)))
         vec.addOffsets(offsets)
         vec
