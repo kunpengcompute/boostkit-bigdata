@@ -38,10 +38,14 @@ def save_trace_data(data: List[Dict[str, str]], data_dir):
     """
     if not os.path.exists(data_dir):
         os.makedirs(data_dir)
+        # 数据目录权限设置为750
+        os.chmod(data_dir, 0o750)
     file_path = "".join([data_dir, "/", str(uuid.uuid4())])
     try:
         with open(file_path, 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=4)
+        # 数据文件权限设置为640
+        os.chmod(file_path, 0o640)
         global_logger.debug(f"数据已成功保存到 {file_path}")
     except IOError as e:
         raise IOError(f"出现IO错误: {e}") from e

@@ -2,10 +2,52 @@ import os
 import logging
 import warnings
 from logging.config import dictConfig
+from logging.handlers import RotatingFileHandler
+
 from common.constant import OA_CONF
 
 CONSOLE_FORMAT = '%(asctime)s [%(levelname)s] %(message)s'
 FILE_FORMAT = '%(asctime)s [%(levelname)s] %(filename)s:%(lineno)d in %(funcName)s - %(message)s'
+
+
+class SecureRotatingFileHandler(RotatingFileHandler):
+    """
+    自定义RotatingFileHandler，支持设置文件权限
+    """
+    def _open(self):
+        """
+        打开文件并设置权限
+        """
+        stream = super()._open()
+        # 正在记录的日志文件权限设置为640
+        os.chmod(self.baseFilename, 0o640)
+        return stream
+
+    def doRollover(self):
+        """
+        执行日志滚动并设置归档文件权限
+        """
+        # 调用父类方法执行滚动
+        super().doRollover()
+
+        # 设置所有归档文件的权限
+        self._set_archive_permissions()
+
+    def _set_archive_permissions(self):
+        """
+        设置所有归档日志文件的权限为440
+        """
+        # 获取日志目录和基本文件名
+        dir_name, base_name = os.path.split(self.baseFilename)
+
+        # 获取所有可能的归档文件
+        file_names = os.listdir(dir_name)
+        for file_name in file_names:
+            if file_name.startswith(base_name) and file_name != os.path.basename(self.baseFilename):
+                archive_path = os.path.join(dir_name, file_name)
+                # 归档的日志文件权限设置为440
+                os.chmod(archive_path, 0o440)
+
 
 LOGGING_CONFIG = {
     'version': 1,
@@ -36,7 +78,7 @@ LOGGING_CONFIG = {
             'stream': 'ext://sys.stdout',
         },
         'fileHandler': {
-            'class': 'logging.handlers.RotatingFileHandler',
+            '()': SecureRotatingFileHandler,
             'level': 'DEBUG',
             'formatter': 'fileFormatter',
             'filename': OA_CONF.log_file_path,
@@ -56,6 +98,8 @@ LOGGING_CONFIG = {
 # 检查并创建log文件夹
 if not os.path.exists(OA_CONF.log_dir):
     os.makedirs(OA_CONF.log_dir)
+    # 日志文件目录权限设置为750
+    os.chmod(OA_CONF.log_dir, 0o750)
 
 # 使用dictConfig加载配置
 dictConfig(LOGGING_CONFIG)
