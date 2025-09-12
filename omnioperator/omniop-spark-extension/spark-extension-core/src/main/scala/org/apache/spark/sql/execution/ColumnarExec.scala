@@ -179,7 +179,7 @@ private object OmniRowToColumnConverter {
           if (arrayData != null) {
             val arrayLength = arrayData.numElements
             for (i <- 0 until arrayLength) {
-              elementVector.append(arrayData, i, elementVector)
+              elementConverter.append(arrayData, i, elementVector)
             }
           }
         }
