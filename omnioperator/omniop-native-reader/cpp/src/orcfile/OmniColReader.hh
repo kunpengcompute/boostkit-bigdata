@@ -187,9 +187,6 @@ namespace omniruntime::reader {
         template<bool encoded>
         void nextInternal(omniruntime::vec::BaseVector *vec, uint64_t numValues, uint64_t *incomingNulls,
             int omniTypeId);
-
-        // Get default omni type from orc type.
-        omniruntime::type::DataTypeId getDefaultOmniType(const orc::Type *type);
     };
 
     class OmniBooleanColumnReader: public OmniColumnReader {

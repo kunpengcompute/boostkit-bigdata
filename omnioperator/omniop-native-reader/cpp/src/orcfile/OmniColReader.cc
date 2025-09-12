@@ -478,7 +478,7 @@ namespace omniruntime::reader {
         if (stream == nullptr) {
             throw OmniException("EXPRESSION_NOT_SUPPORT", "Length stream not found in List column");
         }
-        rle = createOmniRleDecoder(std::move(stream), true, vers, memoryPool);
+        rle = createOmniRleDecoder(std::move(stream), false, vers, memoryPool);
         const Type& childType = *type.getSubtype(0);
         if (selectedColumns[static_cast<uint64_t>(childType.getColumnId())]) {
             child = omniBuildReader(childType, stripe, julianPtr);
@@ -561,47 +561,10 @@ namespace omniruntime::reader {
         ColumnReader* childReader = child.get();
         if (childReader) {
             const Type* childOrcType = orcType->getSubtype(0);
-            auto childDataTypeId = getDefaultOmniType(childOrcType);
+            auto childDataTypeId = OrcUtil::tranOrcTypeToOmniType(childOrcType);
             std::shared_ptr<BaseVector> childVector = std::move(makeNewVector(totalChildren, childOrcType, childDataTypeId));
-            arrayVector->SetElementVector(childVector); // TODO: 和 JIT 适配
+            arrayVector->SetElementVector(childVector);
             reinterpret_cast<OmniColumnReader*>(childReader)->next((arrayVector->GetElementVector().get()), totalChildren, nullptr, childDataTypeId);
-        }
-    }
-
-    omniruntime::type::DataTypeId OmniListColumnReader::getDefaultOmniType(const Type* type) {
-        constexpr int32_t OMNI_MAX_DECIMAL64_DIGITS = 18;
-        switch (type->getKind()) {
-            case orc::TypeKind::BOOLEAN:
-                return omniruntime::type::OMNI_BOOLEAN;
-            case orc::TypeKind::SHORT:
-                return omniruntime::type::OMNI_SHORT;
-            case orc::TypeKind::DATE:
-                // To do check if the DATE is DATE64 type
-                return omniruntime::type::OMNI_DATE32;
-            case orc::TypeKind::INT:
-                return omniruntime::type::OMNI_INT;
-            case orc::TypeKind::LONG:
-                return omniruntime::type::OMNI_LONG;
-            case orc::TypeKind::TIMESTAMP:
-            case orc::TypeKind::TIMESTAMP_INSTANT:
-                return omniruntime::type::OMNI_TIMESTAMP;
-            case orc::TypeKind::DOUBLE:
-                return omniruntime::type::OMNI_DOUBLE;
-            case orc::TypeKind::CHAR:
-            case orc::TypeKind::STRING:
-            case orc::TypeKind::VARCHAR:
-                return omniruntime::type::OMNI_VARCHAR;
-            case orc::TypeKind::DECIMAL:
-                if (type->getPrecision() > OMNI_MAX_DECIMAL64_DIGITS) {
-                    return omniruntime::type::OMNI_DECIMAL128;
-                } else {
-                    return omniruntime::type::OMNI_DECIMAL64;
-                }
-            case orc::TypeKind::LIST:
-                return omniruntime::type::OMNI_ARRAY;
-            default:
-                throw omniruntime::exception::OmniException(
-                    "EXPRESSION_NOT_SUPPORT", "OmniListColumnReader Not Supported Type: " + type->getKind());
         }
     }
 
