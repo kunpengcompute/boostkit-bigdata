@@ -35,6 +35,23 @@ SESSION_COOKIE_SECURE = True
 SECURE_SSL_REDIRECT = True
 # 为了确保 Django 能正确判断请求是否是通过 HTTPS 发起的，它需要一个指示正确协议的头部。
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+# 禁止 JavaScript 读取 Session Cookie
+SESSION_COOKIE_HTTPONLY = True
+# 禁止 JavaScript 读取 CSRF Cookie
+CSRF_COOKIE_HTTPONLY = True
+# 浏览器关闭后清除 Session
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+# 启用浏览器 XSS 过滤
+SECURE_BROWSER_XSS_FILTER = True
+# 禁止 MIME 类型混淆
+SECURE_CONTENT_TYPE_NOSNIFF = True
+# 禁止页面被 iframe 嵌入，防御点击劫持
+X_FRAME_OPTIONS = "DENY"
+# 使用CSP防御XSS和资源注入
+CSP_DEFAULT_SRC = ("'self'", )
+CSP_SCRIPT_SRC = ("'self'", )
+CSP_STYLE_SRC = ("'self'", "fonts.googleapis.com")
+CSP_FONT_SRC = ("'self'", "fonts.gstatic.com")
 
 ALLOWED_HOSTS = ['*']
 

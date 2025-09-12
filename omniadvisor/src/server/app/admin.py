@@ -1,5 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.models import User, Group
+from django.utils.decorators import method_decorator
+from django.views.decorators.cache import never_cache
 
 from .models import DatabaseLoad, DatabaseTuningRecord, DatabaseExamRecord
 
@@ -56,6 +58,21 @@ class BaseAdmin(admin.ModelAdmin):
     # 禁止添加数据
     def has_add_permission(self, request, obj=None):
         return False
+
+    # 禁用change_view的缓存
+    @method_decorator(never_cache)
+    def change_view(self, request, object_id, form_url='', extra_context=None):
+        return super().change_view(request, object_id, form_url, extra_context)
+
+    # 禁用add_view的缓存
+    @method_decorator(never_cache)
+    def add_view(self, request, form_url='', extra_context=None):
+        return super().add_view(request, form_url, extra_context)
+
+    # 禁用changelist_view的缓存
+    @method_decorator(never_cache)
+    def changelist_view(self, request, extra_context=None):
+        return super().changelist_view(request, extra_context)
 
 
 # 定义内联模型：TuningRecord
