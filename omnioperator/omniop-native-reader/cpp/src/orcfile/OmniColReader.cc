@@ -621,7 +621,8 @@ namespace omniruntime::reader {
         char *blob = dictionary->dictionaryBlob.data();
         int64_t *dictionaryOffsets = dictionary->dictionaryOffset.data();
         auto nullsTrans = reinterpret_cast<uint64_t*>(nulls);
-        int64_t outputLengths[numValues];
+        std::unique_ptr<int64_t[]> sp = std::make_unique<int64_t[]>(numValues);
+        int64_t *outputLengths = sp.get();
         rle->next(outputLengths, numValues, nullsTrans);
         uint64_t dictionaryCount = dictionary->dictionaryOffset.size() - 1;
 
@@ -685,7 +686,8 @@ namespace omniruntime::reader {
         // Load data from the blob stream into our buffer until we have enough
         // to get the rest directly out of the stream's buffer.
         size_t bytesBuffered = 0;
-        char ptr[totalLength];
+        std::unique_ptr<char[]> sp =std::make_unique<char[]>(totalLength);
+        char *ptr = sp.get();
         while (bytesBuffered + lastBufferLength < totalLength) {
             memcpy_s(ptr + bytesBuffered, totalLength - bytesBuffered, lastBuffer, lastBufferLength);
             bytesBuffered += lastBufferLength;
