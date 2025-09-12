@@ -83,10 +83,10 @@ TEST_F(ScanArrayTest, array_test_correctness_array)
 
 
     auto elementVector = reinterpret_cast<omniruntime::vec::Vector<int>*>(arrayVec->GetElementVector().get());
-    ASSERT_EQ(valueVector->GetValue(0), 1);
-    ASSERT_EQ(valueVector->GetValue(1), 2);
-    ASSERT_EQ(valueVector->GetValue(2), 3);
-    ASSERT_EQ(valueVector->GetValue(3), 4);
-    ASSERT_EQ(valueVector->GetValue(4), 5);
-    ASSERT_EQ(valueVector->GetValue(5), 6);
+    ASSERT_EQ(elementVector->GetValue(0), 1);
+    ASSERT_EQ(elementVector->GetValue(1), 2);
+    ASSERT_EQ(elementVector->GetValue(2), 3);
+    ASSERT_EQ(elementVector->GetValue(3), 4);
+    ASSERT_EQ(elementVector->GetValue(4), 5);
+    ASSERT_EQ(elementVector->GetValue(5), 6);
 }
