@@ -33,7 +33,7 @@ protected:
         std::string filename = "/../resources/orc_nested_type";
         filename = PROJECT_PATH + filename;
         UriInfo uriInfo("file", filename, "", "-1");
-        std::unique_ptr<orc::Reader> reader = omniruntime::reader::omniCreateReader(orc::readFileOverride(uriInfo, false), readerOpts);
+        std::unique_ptr<orc::Reader> reader = omniruntime::reader::omniCreateReader(orc::readFileOverride(uriInfo), readerOpts);
 
         std::list<std::string> includedColumns = {"c1", "c2", "c3", "c4", "c5", "c14"};
         rowReaderOptions.include(includedColumns);
