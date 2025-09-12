@@ -112,7 +112,7 @@ public class OrcColumnarBatchJniArrayReaderTest extends TestCase {
 
     @After
     public void tearDown() throws Exception {
-        System.out.println("OrcColumnarBatchJniMapReaderTest test finished");
+        System.out.println("OrcColumnarBatchJniArrayReaderTest test finished");
     }
 
     private void initReaderJava() {
