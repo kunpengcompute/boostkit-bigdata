@@ -16,7 +16,17 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
+from django.http import HttpResponseForbidden
+
+
+# 拦截部分url路径
+def url_disabled(request):
+    return HttpResponseForbidden('This page is disabled.')
+
 
 urlpatterns = [
+    # 禁用Admin Password Change页面
+    path('admin/password_change/', url_disabled),
+    # Admin页面
     path('admin/', admin.site.urls),
 ]

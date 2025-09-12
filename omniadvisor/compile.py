@@ -73,6 +73,31 @@ def delete_files_recursively(root_dir, patterns):
         shutil.rmtree(TEMP_BUILD_DIR)
 
 
+def set_permissions(root_dir: dir):
+    """
+    为项目目录下的文件和目录设置权限：
+
+    :param root_dir: 要搜索的根目录
+    """
+    config_dir_list = [
+        f'{root_dir}/config',
+    ]
+
+    for root, _, files in os.walk(root_dir):
+        # 判断是否配置目录
+        if root in config_dir_list:
+            os.chmod(root, 0o750)
+            for file in files:
+                file_path = os.path.join(root, file)
+                os.chmod(file_path, 0o640)
+        # 非配置目录，则为程序目录
+        os.chmod(root, 0o550)
+        for file in files:
+            file_path = os.path.join(root, file)
+            os.chmod(file_path, 0o550)
+
+
+
 if __name__ == '__main__':
     if os.path.exists(OUTPUT_ROOT_DIR):
         shutil.rmtree(OUTPUT_ROOT_DIR)
@@ -98,3 +123,6 @@ if __name__ == '__main__':
 
     # 删除build_output 目录下所有无用文件
     delete_files_recursively(OUTPUT_SRC_DIR, RETAIN_FILES)
+
+    # 设置输出文件的权限
+    set_permissions(OUTPUT_ROOT_DIR)
