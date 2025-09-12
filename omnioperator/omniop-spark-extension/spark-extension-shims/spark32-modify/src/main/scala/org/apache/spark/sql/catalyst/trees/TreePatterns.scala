@@ -78,6 +78,10 @@ object TreePattern extends Enumeration  {
   val SCALAR_SUBQUERY: Value = Value
   val SCALAR_SUBQUERY_REFERENCE: Value = Value
   val SCALA_UDF: Value = Value
+  val SESSION_WINDOW: Value = Value
+  val REBALANCE_PARTITIONS: Value = Value
+  val GET_JSON_OBJECT: Value = Value
+  val WINDOW_GROUP_LIMIT: Value = Value
   val SORT: Value = Value
   val SUBQUERY_ALIAS: Value = Value
   val SUM: Value = Value

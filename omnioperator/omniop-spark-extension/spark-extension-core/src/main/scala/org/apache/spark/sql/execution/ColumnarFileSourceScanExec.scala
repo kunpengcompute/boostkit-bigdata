@@ -386,6 +386,11 @@ abstract class BaseColumnarFileSourceScanExec(
   def buildCheck(): Unit = {
     output.zipWithIndex.foreach {
       case (attr, i) =>
+        sparkTypeToOmniTypeWithComplex(attr.dataType, attr.metadata)
+    }
+    val partitionSchema = relation.partitionSchema
+    partitionSchema.zipWithIndex.foreach {
+      case (attr, i) =>
         sparkTypeToOmniType(attr.dataType, attr.metadata)
     }
   }

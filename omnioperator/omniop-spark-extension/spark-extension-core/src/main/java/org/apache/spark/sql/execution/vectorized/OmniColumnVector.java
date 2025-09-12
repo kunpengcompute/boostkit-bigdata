@@ -18,12 +18,14 @@
 
 package org.apache.spark.sql.execution.vectorized;
 
+import nova.hetu.omniruntime.utils.OmniRuntimeException;
 import nova.hetu.omniruntime.vector.*;
 
 import org.apache.spark.sql.catalyst.util.RebaseDateTime;
 import org.apache.spark.sql.types.*;
 import org.apache.spark.unsafe.Platform;
 import org.apache.spark.unsafe.types.UTF8String;
+import com.huawei.boostkit.spark.expression.*;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -84,9 +86,12 @@ public class OmniColumnVector extends WritableColumnVector {
     private Decimal128Vec decimal128DataVec;
     private VarcharVec charsTypeDataVec;
     private DictionaryVec dictionaryData;
+    private MapVec mapDataVec;
+    private StructVec structVec;
 
     // init vec
     private boolean initVec;
+    private int[] offsets;
 
     public OmniColumnVector(int capacity, DataType type, boolean initVec) {
         super(capacity, type);
@@ -129,6 +134,10 @@ public class OmniColumnVector extends WritableColumnVector {
             return intDataVec;
         } else if (type instanceof ByteType) {
             return charsTypeDataVec;
+        } else if (type instanceof MapType) {
+            return mapDataVec;
+        } else if (type instanceof StructType) {
+            return structVec;
         } else {
             return null;
         }
@@ -164,6 +173,15 @@ public class OmniColumnVector extends WritableColumnVector {
             this.intDataVec = (IntVec) vec;
         } else if (type instanceof ByteType) {
             this.charsTypeDataVec = (VarcharVec) vec;
+        } else if (type instanceof MapType) {
+            this.mapDataVec = (MapVec) vec;
+            ((OmniColumnVector)(getChild(0))).setVec(mapDataVec.getKeyVec());
+            ((OmniColumnVector)(getChild(1))).setVec(mapDataVec.getValueVec());
+        } else if (type instanceof StructType) {
+            this.structVec = (StructVec) vec;
+            for (int i = 0; i < ((StructType) type).fields().length; i++) {
+                ((OmniColumnVector)(getChild(i))).setVec(structVec.getChild(i));
+            }
         } else {
             return;
         }
@@ -204,6 +222,14 @@ public class OmniColumnVector extends WritableColumnVector {
             dictionaryData.close();
             dictionaryData = null;
         }
+        if (mapDataVec != null) {
+            mapDataVec.close();
+            mapDataVec = null;
+        }
+        if (structVec != null) {
+            structVec.close();
+            structVec = null;
+        }
     }
 
     //
@@ -239,6 +265,10 @@ public class OmniColumnVector extends WritableColumnVector {
             return charsTypeDataVec.hasNull();
         } else if (type instanceof DateType) {
             return intDataVec.hasNull();
+        } else if (type instanceof MapType) {
+            return mapDataVec.hasNull();
+        } else if (type instanceof StructType) {
+            return structVec.hasNull();
         }
         throw new UnsupportedOperationException("hasNull is not supported for type:" + type);
     }
@@ -281,6 +311,10 @@ public class OmniColumnVector extends WritableColumnVector {
             charsTypeDataVec.setNull(rowId);
         } else if (type instanceof DateType) {
             intDataVec.setNull(rowId);
+        } else if (type instanceof MapType) {
+            mapDataVec.setNull(rowId);
+        } else if (type instanceof StructType) {
+            structVec.setNull(rowId);
         }
     }
 
@@ -316,6 +350,46 @@ public class OmniColumnVector extends WritableColumnVector {
             charsTypeDataVec.setNulls(rowId, nullValue, 0, count);
         } else if (type instanceof DateType) {
             intDataVec.setNulls(rowId, nullValue, 0, count);
+        } else if (type instanceof MapType) {
+            mapDataVec.setNulls(rowId, nullValue, 0, count);
+        } else if (type instanceof StructType) {
+            structVec.setNulls(rowId, nullValue, 0, count);
+        }
+    }
+
+    public void putNulls(int rowId, byte[] nullValue, int count) {
+        if (dictionaryData != null) {
+            dictionaryData.setNulls(rowId, nullValue, 0, count);
+            return;
+        }
+        if (type instanceof BooleanType || type instanceof NullType) {
+            booleanDataVec.setNulls(rowId, nullValue, 0, count);
+        } else if (type instanceof ByteType) {
+            charsTypeDataVec.setNulls(rowId, nullValue, 0, count);
+        } else if (type instanceof ShortType) {
+            shortDataVec.setNulls(rowId, nullValue, 0, count);
+        } else if (type instanceof IntegerType) {
+            intDataVec.setNulls(rowId, nullValue, 0, count);
+        } else if (type instanceof DecimalType) {
+            if (DecimalType.is64BitDecimalType(type)) {
+                longDataVec.setNulls(rowId, nullValue, 0, count);
+            } else {
+                decimal128DataVec.setNulls(rowId, nullValue, 0, count);
+            }
+        } else if (type instanceof LongType || DecimalType.is64BitDecimalType(type) || type instanceof TimestampType) {
+            longDataVec.setNulls(rowId, nullValue, 0, count);
+        } else if (type instanceof FloatType) {
+            return;
+        } else if (type instanceof DoubleType) {
+            doubleDataVec.setNulls(rowId, nullValue, 0, count);
+        } else if (type instanceof StringType) {
+            charsTypeDataVec.setNulls(rowId, nullValue, 0, count);
+        } else if (type instanceof DateType) {
+            intDataVec.setNulls(rowId, nullValue, 0, count);
+        } else if (type instanceof MapType) {
+            mapDataVec.setNulls(rowId, nullValue, 0, count);
+        } else if (type instanceof StructType) {
+            structVec.setNulls(rowId, nullValue, 0, count);
         }
     }
 
@@ -351,6 +425,10 @@ public class OmniColumnVector extends WritableColumnVector {
             return charsTypeDataVec.isNull(rowId);
         } else if (type instanceof DateType) {
             return intDataVec.isNull(rowId);
+        } else if (type instanceof MapType) {
+            return mapDataVec.isNull(rowId);
+        } else if (type instanceof StructType) {
+            return structVec.isNull(rowId);
         } else {
 
             throw new UnsupportedOperationException("isNullAt is not supported for type:" + type);
@@ -764,12 +842,12 @@ public class OmniColumnVector extends WritableColumnVector {
 
     @Override
     public int getArrayLength(int rowId) {
-        throw new UnsupportedOperationException("getArrayLength is not supported");
+        return (int)mapDataVec.getSize(rowId);
     }
 
     @Override
     public int getArrayOffset(int rowId) {
-        throw new UnsupportedOperationException("getArrayOffset is not supported");
+        return (int)mapDataVec.getOffset(rowId);
     }
 
     @Override
@@ -873,6 +951,12 @@ public class OmniColumnVector extends WritableColumnVector {
             charsTypeDataVec = new VarcharVec(newCapacity);
         } else if (type instanceof DateType) {
             intDataVec = new IntVec(newCapacity);
+        } else if (type instanceof MapType){
+            nova.hetu.omniruntime.type.MapDataType dataType = (nova.hetu.omniruntime.type.MapDataType) OmniExpressionAdaptor.sparkTypeToOmniTypeWithComplex(type, Metadata.empty());
+            mapDataVec = new MapVec(dataType, newCapacity, true);
+        } else if (type instanceof StructType) {
+            nova.hetu.omniruntime.type.StructDataType dataType = (nova.hetu.omniruntime.type.StructDataType) OmniExpressionAdaptor.sparkTypeToOmniTypeWithComplex(type, Metadata.empty());
+            structVec = new StructVec(dataType, newCapacity, true);
         } else {
             throw new UnsupportedOperationException("reserveInternal is not supported for type:" + type);
         }
@@ -881,10 +965,33 @@ public class OmniColumnVector extends WritableColumnVector {
 
     @Override
     protected OmniColumnVector reserveNewColumn(int capacity, DataType type) {
-        return new OmniColumnVector(capacity, type, true);
+        return new OmniColumnVector(capacity, type, false);
+    }
+
+    public void setChild(WritableColumnVector child, int index) {
+        this.childColumns[index] = child;
     }
 
     public boolean isConstant() {
         return isConstant;
+    }
+
+    public void updateVec() {
+        if (type instanceof MapType) {
+            mapDataVec.AddKeys(((OmniColumnVector) (getChild(0))).getVec());
+            mapDataVec.AddValues(((OmniColumnVector) (getChild(1))).getVec());
+            if (offsets == null) {
+                throw new OmniRuntimeException("MapVec need offsets!");
+            }
+            mapDataVec.AddOffsets(offsets);
+        } else if (type instanceof StructType) {
+            for (int i = 0; i < ((StructType) type).fields().length; i++) {
+                structVec.append(((OmniColumnVector) (getChild(i))).getVec());
+            }
+        }
+    }
+
+    public void setOffsets(int[] offsets) {
+        this.offsets = offsets;
     }
 }
