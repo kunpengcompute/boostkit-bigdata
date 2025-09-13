@@ -34,11 +34,11 @@ class Logger(object):
     def __init__(
         self,
         filename,
-        level="info",
+        level="error",
         when="D",
         back_count=10,
-        fmt="%(asctime)s- %(process)d-%(thread)d-%(threadName)s-%(pathname)s-%(funcName)s[line:%(lineno)d]"
-        " - %(levelname)s: %(message)s",
+        # 和omniadvisor保持一致
+        fmt="%(asctime)s [%(levelname)s] %(message)s",
     ):
         filenames = f"{LOG_PATH}{os.sep}{filename}"
         self.log = logging.getLogger(filenames)
@@ -46,10 +46,6 @@ class Logger(object):
         self.log.setLevel(self.level_relations.get(level))  # 设置日志级别
         stream_handle = logging.StreamHandler()  # 往屏幕上输出
         stream_handle.setFormatter(format_str)  # 设置屏幕上显示的格式
-        # TODO 待删除
-        # log_handle = handlers.TimedRotatingFileHandler(
-        #     filename=filenames, when=when, backupCount=back_count, encoding="utf-8"
-        # )
         # 往文件里写入#指定间隔时间自动生成文件的处理器
         # 实例化TimedRotatingFileHandler
         # interval是时间间隔，backupCount是备份文件的个数，如果超过这个个数，就会自动删除，when是间隔的时间单位，单位有以下几种：
@@ -60,19 +56,26 @@ class Logger(object):
         # W 每星期（interval==0时代表星期一）
         # midnight 每天凌晨
         # 设置文件里写入的格式
-        # TODO 待删除
-        # log_handle.setFormatter(format_str)
         # 把对象加到logger里
         self.log.addHandler(stream_handle)
-        # TODO 待删除
-        # self.log.addHandler(log_handle)
 
 
-__other_logs = Logger("server.log", level="info")
+__other_logs = Logger("server.log", level="error")
 logger = __other_logs.log
 
-__kmc_logs = Logger("kmc.log", level="info")
+__kmc_logs = Logger("kmc.log", level="error")
 kmc_logger = __kmc_logs.log
+
+logger.disabled = True
+kmc_logger.disabled = True
+
+
+def enable_kmc_logger():
+    """
+    全局禁用日志输出
+    """
+    logger.disabled = False
+    kmc_logger.disabled = False
 
 
 def method_metric_log(func):

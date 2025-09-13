@@ -1,9 +1,11 @@
+from common.kmc_toolkit.log import enable_kmc_logger
 from server.manage import main
 from omniadvisor.utils.logger import global_logger
 from common.constant import check_oa_conf
 
 
 if __name__ == '__main__':
+    enable_kmc_logger()
     try:
         check_oa_conf()
         main()
