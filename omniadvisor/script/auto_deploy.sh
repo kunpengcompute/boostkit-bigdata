@@ -52,7 +52,7 @@ cp -r $core_dir/config/* $frame_dir/config/
 log INFO "执行命令:mkdir -p $frame_dir/kmc_env && cp -r $core_dir/kmc_env/ $frame_dir/ 合并kmc模块"
 mkdir -p $frame_dir/kmc_env && cp -r $core_dir/kmc_env/ $frame_dir/
 log INFO "修改$frame_dir/kmc_env的目录权限为550"
-chmod  "$(readlink -e -- "$frame_dir/kmc_env")"
+chmod 550 "$(readlink -e -- "$frame_dir/kmc_env")"
 
 # 修改spark_submit_modified的文件权限 用readlink获取真实路径防止提权
 spark_submit_modified=$frame_dir/script/spark-submit
