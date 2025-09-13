@@ -91,10 +91,11 @@ def set_permissions(root_dir: dir):
                 file_path = os.path.join(root, file)
                 os.chmod(file_path, 0o640)
         # 非配置目录，则为程序目录
-        os.chmod(root, 0o550)
-        for file in files:
-            file_path = os.path.join(root, file)
-            os.chmod(file_path, 0o550)
+        else:
+            os.chmod(root, 0o550)
+            for file in files:
+                file_path = os.path.join(root, file)
+                os.chmod(file_path, 0o550)
 
 
 
