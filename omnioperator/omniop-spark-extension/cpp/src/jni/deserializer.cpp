@@ -73,7 +73,7 @@ Java_com_huawei_boostkit_spark_serialize_ShuffleDataSerializerUtils_columnarShuf
     spark::VecBatch* vecBatch = reinterpret_cast<spark::VecBatch*>(address);
     int32_t vecCount = vecBatch->veccnt();
     int32_t rowCount = vecBatch->rowcnt();
-    omniruntime::vec::BaseVector* vecs[vecCount];
+    omniruntime::vec::BaseVector* vecs[vecCount]{};
 
     JNI_FUNC_START
     jint *typeIdArrayElements = env->GetIntArrayElements(typeIdArray, NULL);

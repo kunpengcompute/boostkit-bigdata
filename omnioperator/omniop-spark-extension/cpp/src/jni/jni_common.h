@@ -57,9 +57,16 @@ jmethodID GetMethodID(JNIEnv* env, jclass this_class, const char* name, const ch
         return 0;                                         \
     }
 
+/**
+ * Note: Some vectors may be nullptr if allocation failed
+ *       (e.g., off-heap memory limit exceeded -> MEM_CAP_EXCEEDED).
+ */
 #define JNI_FUNC_END_WITH_VECTORS(exceptionClass, vectors)       \
     } catch (const std::exception &e) {                          \
         for (auto vec : vectors) {                               \
+            if (vec == nullptr) {                                 \
+                continue;                                        \
+            }                                                    \
             delete vec;                                          \
         }                                                        \
         env->ThrowNew(runtimeExceptionClass, e.what());          \
