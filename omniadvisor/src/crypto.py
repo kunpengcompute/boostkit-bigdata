@@ -4,6 +4,7 @@ import re
 
 from common.constant import OA_CONF
 from common.crypto_tool import CryptoTool
+from common.exceptions import KmcError
 from omniadvisor.utils.logger import global_logger
 
 
@@ -145,3 +146,5 @@ if __name__ == '__main__':
         main()
     except KeyboardInterrupt:
         global_logger.info('Bye!')
+    except KmcError as e:
+        global_logger.error(e)
