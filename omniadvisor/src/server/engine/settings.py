@@ -85,6 +85,9 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'server.engine.urls'
 
+# 后端存储session引擎
+SESSION_ENGINE = "django.contrib.sessions.backends.signed_cookies"
+
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',

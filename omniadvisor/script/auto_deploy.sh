@@ -49,6 +49,8 @@ cp -r $core_dir/src/algo $frame_dir/src/
 log INFO "执行命令:cp -r $core_dir/config/* $frame_dir/config/ 合并配置文件"
 cp -r $core_dir/config/* $frame_dir/config/
 
+log INFO "执行命令:mkdir -p $frame_dir/kmc_env && cp -r $core_dir/kmc_env/ $frame_dir/ 合并kmc模块"
+mkdir -p $frame_dir/kmc_env && cp -r $core_dir/kmc_env/ $frame_dir/
 
 # 修改spark_submit_modified的文件权限 用readlink获取真实路径防止提权
 spark_submit_modified=$frame_dir/script/spark-submit
