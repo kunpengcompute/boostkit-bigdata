@@ -31,3 +31,10 @@ class UnknownEncodingError(Exception):
     未知编码异常
     """
     pass
+
+
+class KmcError(Exception):
+    """
+    异常，KMC加解密异常
+    """
+    pass

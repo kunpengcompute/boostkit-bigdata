@@ -7,12 +7,13 @@ import os
 import platform
 
 # kmc comfig param item
-ROOT_DIR_PATH = os.path.realpath(os.path.join(os.path.split(os.path.realpath(__file__))[0], ".."))
-LINUX_KMC_PATH = os.path.realpath(os.path.sep.join([ROOT_DIR_PATH, "3rd", "release", "lib", "linux"]))
-LINUX_KMC_EXT_SO = "libkmcext.so.23.0.0"
-LINUX_KMC_SO = "libkmc.so.23.0.0"
-LINUX_KMC_SDP_SO = "libsdp.so.23.0.0"
-LINUX_KMC_CRYPTO_SO = "libcrypto.so.1.1"
+ROOT_DIR_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))), 'kmc_env')
+LINUX_KMC_PATH = os.path.join(ROOT_DIR_PATH, 'lib')
+
+LINUX_KMC_EXT_SO = "libkmcext.so"
+LINUX_KMC_SO = "libkmc.so"
+LINUX_KMC_SDP_SO = "libsdp.so"
+LINUX_KMC_CRYPTO_SO = "libcrypto.so"
 LINUX_KMC_SECUREC_SO = "libsecurec.so"
 LINUX_KMC_CRYPTO_SO_PATH = os.path.realpath(os.path.sep.join([LINUX_KMC_PATH, LINUX_KMC_CRYPTO_SO]))
 LINUX_KMC_SECUREC_SO_PATH = os.path.realpath(os.path.sep.join([LINUX_KMC_PATH, LINUX_KMC_SECUREC_SO]))

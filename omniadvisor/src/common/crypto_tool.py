@@ -1,6 +1,8 @@
 import keyring
 from keyrings.alt.file import PlaintextKeyring
 
+import common.kmc_toolkit.constants as CONSTANTS
+from common.exceptions import KmcError
 from common.kmc_toolkit.KmcUtil import kmc
 
 keyring.set_keyring(PlaintextKeyring())
@@ -22,9 +24,11 @@ class CryptoTool:
         :param value: 要存储的值
         :returns: None
         """
-        # TODO 1 这里如果kmc失败了，需要抛出异常 2 kmc 的log日志文件写到项目的logs中去 3 想办法合并两个日志体系
-        ret, encrypted_value = kmc.encrypt(value)
-        keyring.set_password(_SERVICE_NAME, key, encrypted_value)
+        if value:
+            ret, encrypted_value = kmc.encrypt(value)
+            if ret != CONSTANTS.RET_SUCCESS:
+                raise KmcError(f'Kmc error when encrypt password: {value}')
+            keyring.set_password(_SERVICE_NAME, key, encrypted_value)
 
     @classmethod
     def _get_data(cls, key: str):
@@ -37,6 +41,8 @@ class CryptoTool:
         value = keyring.get_password(_SERVICE_NAME, key)
         if value:
             ret, decrypted_value = kmc.decrypt(value)
+            if ret != CONSTANTS.RET_SUCCESS:
+                raise KmcError(f'Kmc error when decrypt password: {value}')
             return decrypted_value
         else:
             return None
