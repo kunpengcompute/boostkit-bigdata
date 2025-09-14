@@ -68,9 +68,9 @@ spark_submit_modified=$frame_dir/script/spark-submit
 hijack_path=$frame_dir/src/hijack.pyc
 log INFO "开始自动配置${spark_submit_modified}文件中的hijack_path路径..."
 log INFO "原始hijack.pyc文件路径:`cat $spark_submit_modified | grep "hijack_path=" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//'`"
-chmod 750 -- "$(readlink -e -- "$spark_submit_modified")"
+chmod 750 -- "$(readlink -e -- "$(dirname $spark_submit_modified)/")"
 sed -i "s|hijack_path=\"\"|hijack_path=\"${hijack_path}\"|g" "$spark_submit_modified"
-chmod 550 -- "$(readlink -e -- "$spark_submit_modified")"
+chmod 550 -- "$(readlink -e -- "$(dirname $spark_submit_modified)")"
 log INFO "更新后的hijack.pyc文件路径:`cat $spark_submit_modified | grep "hijack_path=" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//'`"
 
 # 最小化spark_submit_modified的文件权限 不再允许写操作
