@@ -43,8 +43,14 @@ log INFO "将算法模块合并到执行框架目录中..."
 log INFO "OmniAdvisor2.0框架模块目录: $frame_dir"
 log INFO "OmniAdvisor2.0算法模块目录: $core_dir"
 
+log INFO "合并算法模块，为 $frame_dir/src/ 添加写入权限"
+chmod 750 -- "$(readlink -e -- "$frame_dir/src/")"
+
 log INFO "执行命令:cp -r $core_dir/src/algo $frame_dir/src/ 合并算法模块"
 cp -r $core_dir/src/algo $frame_dir/src/
+
+log INFO "合并算法模块完成，最小化 $frame_dir/src/ 权限"
+chmod 550 -- "$(readlink -e -- "$frame_dir/src/")"
 
 log INFO "执行命令:cp -r $core_dir/config/* $frame_dir/config/ 合并配置文件"
 cp -r $core_dir/config/* $frame_dir/config/
