@@ -13,8 +13,6 @@ from logging.handlers import RotatingFileHandler
 
 base_path = os.path.dirname(__file__)
 LOG_PATH = os.path.join(base_path, r"log")
-if not os.path.exists(LOG_PATH):
-    os.makedirs(LOG_PATH)
 
 
 class Logger(object):

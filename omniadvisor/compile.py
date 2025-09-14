@@ -82,6 +82,9 @@ def set_permissions(root_dir: dir):
     config_dir_list = [
         f'{root_dir}/config',
     ]
+    migrations_dir_list = [
+        f'{root_dir}/src/server/app/migrations',
+    ]
 
     for root, _, files in os.walk(root_dir):
         # 判断是否配置目录
@@ -90,6 +93,12 @@ def set_permissions(root_dir: dir):
             for file in files:
                 file_path = os.path.join(root, file)
                 os.chmod(file_path, 0o640)
+        # 判断是否为特殊目录（Django Migrations)
+        elif root in migrations_dir_list:
+            os.chmod(root, 0o750)
+            for file in files:
+                file_path = os.path.join(root, file)
+                os.chmod(file_path, 0o550)
         # 非配置目录，则为程序目录
         else:
             os.chmod(root, 0o550)
