@@ -96,7 +96,8 @@ def set_permissions(root_dir: dir):
             for file in files:
                 file_path = os.path.join(root, file)
                 os.chmod(file_path, 0o550)
-
+    # 配置用户主目录权限
+    os.chmod(root_dir, 0o750)
 
 
 if __name__ == '__main__':
