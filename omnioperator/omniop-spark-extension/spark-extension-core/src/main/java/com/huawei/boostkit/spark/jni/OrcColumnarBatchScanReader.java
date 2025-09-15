@@ -268,7 +268,7 @@ public class OrcColumnarBatchScanReader {
             if (colsToGet[i] != 0) {
                 continue;
             }
-            switch (DataType.DataTypeId.values()[typeIds[nativeGetId]]) {
+            switch (DataType.DataTypeId.fromValue(typeIds[nativeGetId]) {
                 case OMNI_BOOLEAN: {
                     vecList[i] = new BooleanVec(vecNativeIds[nativeGetId]);
                     break;

@@ -95,7 +95,7 @@ public class OrcColumnarBatchJniArrayReaderTest extends TestCase {
                     StructField field = requiredSchema.fields()[i];
                     nova.hetu.omniruntime.type.DataType dataType =
                     OmniExpressionAdaptor.sparkTypeToOmniTypeWithComplex(field.dataType(), field.metadata());
-                    typeBuilder.add(dataType.getId().ordinal());
+                    typeBuilder.add(dataType.getIdValue());
                     dataTypes.add(dataType);
                     is_find = true;
                     break;
