@@ -245,6 +245,14 @@ def _any_modify_keywords_in_sql(sql: str) -> bool:
     return bool(pattern.search(sql))
 
 
+def _spark_output_print(output):
+    if OA_CONF.spark_output_merge_switch:
+        print(output.stdout, end="", flush=True)
+    else:
+        print(output.stdout, end="", flush=True)
+        print(output.stderr, end="", flush=True, file=sys.stderr)
+
+
 def hijack_recommend(argv: list) -> None:
     """
     对用户的任务进行劫持，使能参数并下发执行任务
@@ -252,6 +260,7 @@ def hijack_recommend(argv: list) -> None:
     :param argv: Spark任务的执行命令
     :return:
     """
+
     # 非SUBMIT动作(指kill任务/查询状态/查询版本)的提交直接回退到原生spark-submit脚本执行 不被特性所劫持
     SparkCMDParser.validate_submit_arguments(argv)
 
@@ -281,14 +290,14 @@ def hijack_recommend(argv: list) -> None:
     if exam_record.status == OA_CONF.ExecStatus.success:
         # 打印结果输出
         global_logger.info("Spark execute success, going to print Spark output.")
-        print(output, end="", flush=True)
+        _spark_output_print(output)
     # 若执行失败 则判断是否需要拉起安全机制
     else:
         if exec_config != user_config:
             raise RuntimeError("Spark execute failed, ready to activate security protection mechanism.")
         else:
             global_logger.warning("Spark execute failed in user config, going to print Spark output.")
-            print(output, end="", flush=True)
+            _spark_output_print(output)
 
 
 def main():
