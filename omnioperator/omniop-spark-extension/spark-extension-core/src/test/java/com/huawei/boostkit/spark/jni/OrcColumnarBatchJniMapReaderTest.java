@@ -99,7 +99,7 @@ public class OrcColumnarBatchJniMapReaderTest extends TestCase {
                     StructField field = requiredSchema.fields()[i];
                     nova.hetu.omniruntime.type.DataType dataType =
                     OmniExpressionAdaptor.sparkTypeToOmniTypeWithComplex(field.dataType(), field.metadata());
-                    typeBuilder.add(dataType.getIdValue();
+                    typeBuilder.add(dataType.getIdValue());
                     dataTypes.add(dataType);
                     is_find = true;
                     break;
