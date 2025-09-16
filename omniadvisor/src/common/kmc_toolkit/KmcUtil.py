@@ -61,7 +61,7 @@ class Kmc:
         standby_ksf = CONSTANTS.KMC_KSF_STANDBY
 
         # initial sem key
-        sem_key = CONSTANTS.DEFAULT_SEM_KEY + random.randint(CONSTANTS.MIN_HEX_SEM_KEY, CONSTANTS.MAX_HEX_SEM_KEY)
+        sem_key = CONSTANTS.DEFAULT_SEM_KEY + CONSTANTS.MIN_HEX_SEM_KEY
 
         kmc_config = KmcConfig(
             primary_ksf.encode("utf-8"),
