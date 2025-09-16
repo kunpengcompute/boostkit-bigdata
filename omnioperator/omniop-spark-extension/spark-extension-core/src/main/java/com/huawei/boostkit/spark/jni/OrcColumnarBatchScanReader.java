@@ -302,6 +302,10 @@ public class OrcColumnarBatchScanReader {
                     vecList[i] = new DoubleVec(vecNativeIds[nativeGetId]);
                     break;
                 }
+                case OMNI_FLOAT: {
+                    vecList[i] = new FloatVec(vecNativeIds[nativeGetId]);
+                    break;
+                }
                 case OMNI_VARCHAR: {
                     vecList[i] = new VarcharVec(vecNativeIds[nativeGetId]);
                     break;

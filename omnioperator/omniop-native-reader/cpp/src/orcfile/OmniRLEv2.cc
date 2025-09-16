@@ -52,6 +52,16 @@ namespace omniruntime::reader {
         }
     }
 
+    std::unique_ptr<omniruntime::vec::BaseVector> makeFloatVector(uint64_t numValues,
+                                                                   omniruntime::type::DataTypeId dataTypeId) {
+        switch (dataTypeId) {
+            case omniruntime::type::OMNI_FLOAT:
+                return std::make_unique<omniruntime::vec::Vector<float>>(numValues);
+            default:
+                throw std::runtime_error("MakeFloatVector Not support float vector for this type: " + dataTypeId);
+        }
+    }
+
     std::unique_ptr<omniruntime::vec::BaseVector> makeDecimalVector(uint64_t numValues,
         omniruntime::type::DataTypeId dataTypeId) {
         switch (dataTypeId) {
@@ -104,6 +114,8 @@ namespace omniruntime::reader {
                 return makeFixedLengthVector(numValues, dataTypeId);
             case orc::TypeKind::DOUBLE:
                 return makeDoubleVector(numValues, dataTypeId);
+            case orc::TypeKind::FLOAT:
+                return makeFloatVector(numValues, dataTypeId);
             case orc::TypeKind::CHAR:
             case orc::TypeKind::STRING:
             case orc::TypeKind::VARCHAR:

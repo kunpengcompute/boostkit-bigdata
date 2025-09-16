@@ -177,6 +177,7 @@ namespace omniruntime::reader {
             case orc::LIST:
                 return std::make_unique<OmniListColumnReader>(type, stripe, julianPtr);
             case orc::FLOAT:
+                return std::make_unique<OmniFloatColumnReader>(type, stripe);
             case orc::DOUBLE:
                 return std::make_unique<OmniDoubleColumnReader>(type, stripe);
 
@@ -717,7 +718,40 @@ namespace omniruntime::reader {
         }
     }
 
-    void OmniStringDictionaryColumnReader::next(BaseVector *vec, uint64_t numValues, 
+    void OmniFloatColumnReader::next(BaseVector *vec, uint64_t numValues, uint64_t *incomingNulls,
+                                      int omniTypeId) {
+        auto nulls = omniruntime::vec::unsafe::UnsafeBaseVector::GetNulls(vec);
+        readNulls(this, numValues, incomingNulls, nulls);
+        bool hasNull = vec->HasNull();
+        auto dataTypeId = static_cast<omniruntime::type::DataTypeId>(omniTypeId);
+        switch (dataTypeId) {
+            case omniruntime::type::OMNI_FLOAT: {
+                auto values = omniruntime::vec::unsafe::UnsafeVector::GetRawValues(
+                        static_cast<omniruntime::vec::Vector<float>*>(vec));
+                return nextByType(values, numValues, hasNull ? reinterpret_cast<uint64_t*>(nulls) : nullptr);
+            }
+            default:
+                throw omniruntime::exception::OmniException(
+                        "EXPRESSION_NOT_SUPPORT", "OmniFloatColumnReader type not support: " + dataTypeId);
+        }
+    }
+
+    template <typename T>
+    void OmniFloatColumnReader::nextByType(T *data, uint64_t numValues, uint64_t *nulls) {
+        if(nulls) {
+            for(size_t i = 0; i < numValues; ++i) {
+                if(!BitUtil::IsBitSet(nulls, i)) {
+                    data[i] = static_cast<T>(readFloat());
+                }
+            }
+        } else {
+            for(size_t i = 0; i < numValues; ++i) {
+                data[i] = static_cast<T>(readFloat());
+            }
+        }
+    }
+
+    void OmniStringDictionaryColumnReader::next(BaseVector *vec, uint64_t numValues,
         uint64_t *incomingNulls, int omniTypeId) {
         auto nulls = omniruntime::vec::unsafe::UnsafeBaseVector::GetNulls(vec);
         readNulls(this, numValues, incomingNulls, nulls);
@@ -1419,6 +1453,52 @@ namespace omniruntime::reader {
 
     void OmniDoubleColumnReader::seekToRowGroup(
         std::unordered_map<uint64_t, orc::PositionProvider>& positions) {
+        OmniColumnReader::seekToRowGroup(positions);
+        inputStream->seek(positions.at(columnId));
+        // clear buffer state after seek
+        bufferEnd = nullptr;
+        bufferPointer = nullptr;
+    }
+
+    OmniFloatColumnReader::OmniFloatColumnReader(const Type& type,
+                                                   StripeStreams& stripe
+    ): OmniColumnReader(type, stripe),
+       columnKind(type.getKind()),
+       bytesPerValue(4),
+       bufferPointer(nullptr),
+       bufferEnd(nullptr) {
+        inputStream = stripe.getStream(columnId, orc::proto::Stream_Kind_DATA, true);
+        if (inputStream == nullptr)
+            throw orc::ParseError("DATA stream not found in Float column");
+    }
+
+    OmniFloatColumnReader::~OmniFloatColumnReader() {
+        // PASS
+    }
+
+    uint64_t OmniFloatColumnReader::skip(uint64_t numValues) {
+        numValues = OmniColumnReader::skip(numValues);
+
+        if (static_cast<size_t>(bufferEnd - bufferPointer) >=
+            bytesPerValue * numValues) {
+            bufferPointer += bytesPerValue * numValues;
+        } else {
+            size_t sizeToSkip = bytesPerValue * numValues -
+                                static_cast<size_t>(bufferEnd - bufferPointer);
+            const size_t cap = static_cast<size_t>(std::numeric_limits<int>::max());
+            while (sizeToSkip != 0) {
+                size_t step = sizeToSkip > cap ? cap : sizeToSkip;
+                inputStream->Skip(static_cast<int>(step));
+                sizeToSkip -= step;
+            }
+            bufferEnd = nullptr;
+            bufferPointer = nullptr;
+        }
+        return numValues;
+    }
+
+    void OmniFloatColumnReader::seekToRowGroup(
+            std::unordered_map<uint64_t, orc::PositionProvider>& positions) {
         OmniColumnReader::seekToRowGroup(positions);
         inputStream->seek(positions.at(columnId));
         // clear buffer state after seek

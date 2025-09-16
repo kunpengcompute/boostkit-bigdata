@@ -17,6 +17,8 @@ namespace omniruntime::reader {
             case orc::TypeKind::TIMESTAMP:
             case orc::TypeKind::TIMESTAMP_INSTANT:
                 return omniruntime::type::OMNI_TIMESTAMP;
+            case orc::TypeKind::FLOAT:
+                return omniruntime::type::OMNI_FLOAT;
             case orc::TypeKind::DOUBLE:
                 return omniruntime::type::OMNI_DOUBLE;
             case orc::TypeKind::CHAR:

@@ -320,6 +320,51 @@ namespace omniruntime::reader {
 
     };
 
+    class OmniFloatColumnReader: public OmniColumnReader {
+    public:
+        OmniFloatColumnReader(const orc::Type& type, orc::StripeStreams& stripe);
+        ~OmniFloatColumnReader() override;
+
+        uint64_t skip(uint64_t numValues) override;
+
+        void next(omniruntime::vec::BaseVector *vec, uint64_t numValues,
+                  uint64_t *incomingNulls, int omniTypeId) override;
+
+        template <typename T>
+        void nextByType(T *data, uint64_t numValues, uint64_t *nulls);
+
+        void seekToRowGroup(
+                std::unordered_map<uint64_t, orc::PositionProvider>& positions) override;
+
+    private:
+        std::unique_ptr<orc::SeekableInputStream> inputStream;
+        orc::TypeKind columnKind;
+        const uint64_t bytesPerValue;
+        const char *bufferPointer;
+        const char *bufferEnd;
+
+        unsigned char readByte() {
+            if (bufferPointer == bufferEnd) {
+                int length;
+                if (!inputStream->Next
+                        (reinterpret_cast<const void**>(&bufferPointer), &length)) {
+                    throw orc::ParseError("bad read in FloatColumnReader::next()");
+                }
+                bufferEnd = bufferPointer + length;
+            }
+            return static_cast<unsigned char>(*(bufferPointer++));
+        }
+
+        float readFloat() {
+            int32_t bits = 0;
+            for (uint64_t i=0; i < 4; i++) {
+                bits |= readByte() << (i*8);
+            }
+            float *result = reinterpret_cast<float*>(&bits);
+            return static_cast<float>(*result);
+        }
+    };
+
     class OmniStringDictionaryColumnReader: public OmniColumnReader {
     public:
         void next(omniruntime::vec::BaseVector *vec, uint64_t numValues, 
