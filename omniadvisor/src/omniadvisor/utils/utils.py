@@ -3,7 +3,7 @@ import os
 import subprocess
 import uuid
 from typing import Tuple, List, Dict
-
+from common.constant import OA_CONF
 from common.constant import OmniAdvisorConf
 from common.exceptions import UnknownEncodingError
 from omniadvisor.utils.logger import global_logger
@@ -21,12 +21,14 @@ def run_cmd(cmd_fields: list) -> Tuple[int, str]:
     global_logger.debug(f"Executor system command: {cmd_fields}")
     kwargs = {
         'stdout': subprocess.PIPE,
-        'stderr': subprocess.STDOUT,
+        'stderr': subprocess.PIPE,
         'shell': False,
         'text': True
     }
+    if OA_CONF.spark_output_merge_switch:
+        kwargs['stderr'] = subprocess.STDOUT
     result = subprocess.run(cmd_fields, **kwargs)
-    return result.returncode, result.stdout
+    return result.returncode, result
 
 
 def save_trace_data(data: List[Dict[str, str]], data_dir):

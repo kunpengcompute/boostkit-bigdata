@@ -96,7 +96,7 @@ class TestSparkCMDParser:
         assert exec_attr["e"] == "SELECT 1"
         assert exec_attr["f"] == "script.sql"
         assert exec_attr["i"] == "init.sql"
-        assert exec_attr["database"] == "testdb"
+        assert exec_attr["define"] == "testdb"
         assert exec_attr[_CMD_PRIMARY_RESOURCE] == ["example.jar"]
 
     # 场景 5: 空 argv 抛出异常
@@ -201,7 +201,7 @@ class TestSparkCMDParser:
         --usage-error
         --help
         -i init_script.sql
-        -d my_database
+        --database my_database
         --e "SELECT * FROM table"
         -f query.sql
         my_app.jar

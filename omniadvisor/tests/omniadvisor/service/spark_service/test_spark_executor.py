@@ -1,6 +1,6 @@
 import pytest
 from common.constant import OA_CONF
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 from datetime import datetime
 
 from omniadvisor.service.spark_service.spark_executor import SparkExecutor
@@ -24,11 +24,12 @@ class TestSparkExecutor:
         self.exitcode = 0
         self.application_id = 'application_123456_303209'
         self.time_taken_list = [23.42, 25.83]
-        self.output = (f'Client: Submitting application {self.application_id} to ResourceManager\n'
-                       f'XXXXXX\n'
-                       f'Time taken: {self.time_taken_list[0]} seconds\n'
-                       f'Time taken: {self.time_taken_list[1]} seconds\n'
-                       f'Spark Log [INFO]: Time taken: {self.time_taken_list[1]} seconds\n')
+        self.output = MagicMock(stdout=None,
+                                stderr=f'Client: Submitting application {self.application_id} to ResourceManager\n'
+                                       f'XXXXXX\n'
+                                       f'Time taken: {self.time_taken_list[0]} seconds\n'
+                                       f'Time taken: {self.time_taken_list[1]} seconds\n'
+                                       f'Spark Log [INFO]: Time taken: {self.time_taken_list[1]} seconds\n')
 
     @patch('omniadvisor.service.spark_service.spark_executor.run_cmd')
     def test_submit_spark_task(self, mock_run_cmd):
@@ -60,22 +61,22 @@ class TestSparkExecutor:
         assert total_time_taken == OA_CONF.exec_fail_return_runtime
 
         # 解析spark output缺失application id
-        output = (f'Time taken: {self.time_taken_list[0]} seconds\n'
-                  f'Time taken: {self.time_taken_list[1]} seconds\n'
-                  f'Spark Log [INFO]: Time taken: {self.time_taken_list[1]} seconds\n')
+        self.output.stderr = (f'Time taken: {self.time_taken_list[0]} seconds\n'
+                              f'Time taken: {self.time_taken_list[1]} seconds\n'
+                              f'Spark Log [INFO]: Time taken: {self.time_taken_list[1]} seconds\n')
         # 验证结果
         with pytest.raises(RuntimeError):
-            _, _ = self.spark_executor._parser_spark_output(output)
+            _, _ = self.spark_executor._parser_spark_output(self.output)
 
         # 解析spark output缺失行首Time taken
-        output = f'Spark Log [INFO]: Time taken: {self.time_taken_list[1]} seconds\n'
+        self.output.stderr = f'Spark Log [INFO]: Time taken: {self.time_taken_list[1]} seconds\n'
         # 验证结果
         with pytest.raises(RuntimeError):
-            _, _ = self.spark_executor._parser_spark_output(output)
+            _, _ = self.spark_executor._parser_spark_output(self.output)
 
         # 解析spark output为空
-        output = ''
+        self.output.stderr = ''
         # 验证结果
         with pytest.raises(RuntimeError):
-            _, _ = self.spark_executor._parser_spark_output(output)
+            _, _ = self.spark_executor._parser_spark_output(self.output)
 

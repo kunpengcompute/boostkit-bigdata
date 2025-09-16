@@ -87,7 +87,9 @@ class SparkCMDParser:
     _parser.add_argument('-e', '--e', type=str, help='SQL statement to execute.')
     _parser.add_argument('-f', type=str, help='File containing SQL script.')
     _parser.add_argument('-i', help='Initialization SQL file')
-    _parser.add_argument('-d', '--database')
+    _parser.add_argument('-d', '--define')
+    _parser.add_argument('--database')
+
 
     @classmethod
     def validate_submit_arguments(cls, args: List) -> None:

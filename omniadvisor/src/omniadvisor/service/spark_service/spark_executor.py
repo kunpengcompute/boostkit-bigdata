@@ -76,11 +76,18 @@ class SparkExecutor:
         :raises RuntimeError: 当无法从输出中匹配到 Application ID 时抛出。
         :return: application_id, total_time_taken
         """
+        # 对stdout和stderr进行合并
+        spark_output_str = ""
+        # 拼接字符串之前确保输入流非空有数据
+        if spark_output.stdout:
+            spark_output_str += str(spark_output.stdout)
+        if spark_output.stderr:
+            spark_output_str += str(spark_output.stderr)
         # 解析Application id:
         # 该条匹配模式的文本来自Spark3.3.1源码中yarn/Client.scala文件在Line224所打印的日志
         # 若Spark版本迭代时对该日志内容做出修改 则存在application id匹配失败的风险
         pattern = r'Client: Submitting application (application_\d+_\d+) to ResourceManager|Application Id: (.*)\n'
-        search_obj = re.search(pattern, spark_output)
+        search_obj = re.search(pattern, spark_output_str)
         if search_obj:
             application_id = search_obj.group(1) or search_obj.group(2)
             if search_obj.group(1):
@@ -92,7 +99,7 @@ class SparkExecutor:
 
         # 解析Time Taken，只解析行首匹配字符串，避免Spark debug log中重复匹配
         pattern = r'^Time taken: (.*) seconds'
-        match_objs = re.findall(pattern, spark_output, re.MULTILINE)
+        match_objs = re.findall(pattern, spark_output_str, re.MULTILINE)
         if match_objs:
             time_taken_list = [float(obj) for obj in match_objs]
             total_time_taken = sum(time_taken_list)

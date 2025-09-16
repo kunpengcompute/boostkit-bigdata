@@ -1,5 +1,5 @@
 import subprocess
-from unittest.mock import patch,mock_open
+from unittest.mock import patch, mock_open, MagicMock
 from omniadvisor.utils.utils import run_cmd, save_trace_data, float_format  # 假设你的函数定义在 'your_module' 中
 
 
@@ -7,27 +7,30 @@ class TestRunCmd:
     @patch('subprocess.run')
     def test_run_cmd_success(self, mock_run):
         # 配置mock的返回值
-        mock_run.return_value.returncode = 0,
+        mock_run.return_value.returncode = 0
         mock_run.return_value.stdout = "Success output"
-
-        exitcode, output = run_cmd('echo hello')
+        mock_run.return_value.stderr = None
+        exitcode, output = run_cmd(['echo', 'hello'])
 
         # 验证结果
-        assert exitcode[0] == 0
-        assert output == "Success output"
+        assert exitcode == 0
+        assert output.stdout == "Success output"
+        assert output.stderr is None
         mock_run.assert_called_once()
 
     @patch('subprocess.run')
     def test_run_cmd_failure(self, mock_run):
         # 配置mock的返回值
-        mock_run.return_value.returncode = 1,
-        mock_run.return_value.stdout = "Error output"
+        mock_run.return_value.returncode = 1
+        mock_run.return_value.stdout = None
+        mock_run.return_value.stderr = "Error output"
 
         exitcode, output = run_cmd('false')
 
         # 验证结果
-        assert exitcode[0] == 1
-        assert output == "Error output"
+        assert exitcode == 1
+        assert output.stdout is None
+        assert output.stderr == "Error output"
 
 
 class TestTraceDataSaver:

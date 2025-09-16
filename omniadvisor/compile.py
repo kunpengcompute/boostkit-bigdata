@@ -28,7 +28,7 @@ OUTPUT_ROOT_DIR = os.path.join(PROJECT_DIR, COMPILE_DEST_ROOT_NAME)
 OUTPUT_SRC_DIR = os.path.join(OUTPUT_ROOT_DIR, COMPILE_FROM_NAME)
 
 # 原样保留的文件
-RETAIN_FILES = ['*.so', '*.json', '*.cfg', '*.pyc']
+RETAIN_FILES = ['*.so', '*.json', '*.cfg', '*.pyc', '*.html']
 
 # 这个是产生的临时的编译目录
 TEMP_BUILD_DIR = os.path.join(OUTPUT_SRC_DIR, 'build')

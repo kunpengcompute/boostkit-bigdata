@@ -55,6 +55,8 @@ CSP_FONT_SRC = ("'self'", "fonts.gstatic.com")
 CSP_IMG_SRC = ("'self'", "data:")
 CSP_OBJECT_SRC = ("'none'",)
 CSP_FRAME_ANCESTORS = ("'none'",)
+# CSRF Token存储在session中，而不是单独的cookie
+CSRF_USE_SESSIONS = True
 
 ALLOWED_HOSTS = ['*']
 

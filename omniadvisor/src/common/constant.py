@@ -145,6 +145,7 @@ class OmniAdvisorConf:
     spark_fetch_trace_timeout = _common_config.getint('spark', 'spark.fetch.trace.timeout')
     spark_fetch_trace_interval = _common_config.getint('spark', 'spark.fetch.trace.interval')
     spark_exec_timeout_ratio = _common_config.getfloat('spark', 'spark.exec.timeout.ratio')
+    spark_output_merge_switch = _common_config.getboolean('spark', 'spark.output.merge.switch')
     # webpage页
     admin_timezone = _common_config.get('webpage', 'admin.timezone')
     # django secret key

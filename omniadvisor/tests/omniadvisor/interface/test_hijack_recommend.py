@@ -32,7 +32,7 @@ class TestHijackRecommend:
         mock_parse_cmd.return_value = (exec_attr, user_config)
         mock_create_or_update_load.return_value = load
         mock_get_config.return_value = exec_config
-        mock_spark_run.return_value = (MagicMock(status="success"), "job output")
+        mock_spark_run.return_value = (MagicMock(status="success"), MagicMock(stdout="job output", stderr=None))
 
         hijack_recommend(argv)
         mock_spark_run.assert_called_once_with(load=load, config=exec_config, wait_for_trace=False, exec_in_isolation=False)
@@ -58,8 +58,8 @@ class TestHijackRecommend:
         mock_get_config.return_value = exec_config
 
         mock_spark_run.side_effect = [
-            (MagicMock(status="fail"), "fail output"),
-            (MagicMock(status="success"), "safe output")
+            (MagicMock(status="fail"), MagicMock(stdout=None, stderr="fail output")),
+            (MagicMock(status="success"), MagicMock(stdout="Safe output", stderr=None))
         ]
         mock_process = MagicMock()
         mock_multiprocess.return_value = mock_process
@@ -87,7 +87,8 @@ class TestHijackRecommend:
         mock_parse_cmd.return_value = (exec_attr, user_config)
         mock_create_or_update_load.return_value = load
         mock_get_config.return_value = exec_config
-        mock_spark_run.return_value = (MagicMock(status="fail"), "fail output")
+        mock_spark_output = MagicMock(stdout="job output", stderr=None)
+        mock_spark_run.return_value = (MagicMock(status="fail"), mock_spark_output)
 
         hijack_recommend(argv)
         # 不进入安全机制的情况call_count的值为1
@@ -113,7 +114,8 @@ class TestHijackRecommend:
         mock_parse_cmd.return_value = (exec_attr, user_config)
         mock_create_or_update_load.return_value = load
         mock_get_config.return_value = exec_config
-        mock_spark_run.return_value = (MagicMock(status=OA_CONF.ExecStatus.success), "job output")
+        mock_spark_run.return_value = (MagicMock(status=OA_CONF.ExecStatus.success),
+                                       MagicMock(stdout="job output", stderr=None))
         mock_process = MagicMock()
         mock_multiprocess.return_value = mock_process
 
