@@ -29,7 +29,7 @@ import nova.hetu.omniruntime.operator.OmniOperator
 import nova.hetu.omniruntime.operator.aggregator.{OmniAggregationWithExprOperatorFactory, OmniHashAggregationWithExprOperatorFactory}
 import nova.hetu.omniruntime.operator.config.{OperatorConfig, OverflowConfig, SpillConfig}
 import nova.hetu.omniruntime.vector._
-import nova.hetu.omniruntime.`type`.{DataType => OmniDataType, MapDataType, StructDataType}
+import nova.hetu.omniruntime.`type`.{DataType => OmniDataType, MapDataType, StructDataType, ArrayDataType}
 import org.apache.spark.sql.catalyst.expressions.{Alias, Attribute, AttributeReference, ExprId, NamedExpression, SortOrder}
 import org.apache.spark.sql.execution.datasources.orc.OrcColumnVector
 import org.apache.spark.sql.execution.metric.SQLMetric
@@ -218,6 +218,16 @@ object OmniAdaptorUtil {
         vec.AddKeys(transColumnVector(columnVector.getChild(0), offsets(columnSize)))
         vec.AddValues(transColumnVector(columnVector.getChild(1), offsets(columnSize)))
         vec.AddOffsets(offsets)
+        vec
+      case ArrayType(elementType, valueContainsNull) =>
+        val offsets = new Array[Int](columnSize + 1)
+        offsets(0) = 0
+        for (i <- 1 until columnSize + 1) {
+          offsets(i) = offsets(i - 1) + columnVector.getArray(i - 1).numElements()
+        }
+        val vec = new ArrayVec(new ArrayDataType(sparkTypeToOmniTypeWithComplex(elementType, Metadata.empty)), offsets(columnSize))
+        vec.addElements(transColumnVector(columnVector.getChild(0), offsets(columnSize)))
+        vec.addOffsets(offsets)
         vec
       case _ =>
         throw new UnsupportedOperationException("unsupport column vector!")

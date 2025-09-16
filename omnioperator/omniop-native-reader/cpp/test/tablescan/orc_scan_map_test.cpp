@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2023-2023. Huawei Technologies Co., Ltd. All rights reserved.
+ * Copyright (C) 2025-2025. Huawei Technologies Co., Ltd. All rights reserved.
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -33,7 +33,7 @@ protected:
         std::string filename = "/../resources/orc_nested_type";
         filename = PROJECT_PATH + filename;
         UriInfo uriInfo("file", filename, "", "-1");
-        std::unique_ptr<orc::Reader> reader = omniruntime::reader::omniCreateReader(orc::readFileOverride(uriInfo, false), readerOpts);
+        std::unique_ptr<orc::Reader> reader = omniruntime::reader::omniCreateReader(orc::readFileOverride(uriInfo), readerOpts);
 
         std::list<std::string> includedColumns = {"c1", "c2", "c3", "c4", "c5", "c17"};
         rowReaderOptions.include(includedColumns);

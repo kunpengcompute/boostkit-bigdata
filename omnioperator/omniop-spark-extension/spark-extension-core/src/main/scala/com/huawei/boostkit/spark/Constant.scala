@@ -39,6 +39,7 @@ object Constant {
   val OMNI_TIMESTAMP_TYPE: String = DataTypeId.OMNI_TIMESTAMP.ordinal().toString
   val OMNI_ROW_TYPE: String = DataTypeId.OMNI_ROW.toValue.toString
   val OMNI_MAP_TYPE: String = DataTypeId.OMNI_MAP.toValue.toString
+  val OMNI_ARRAY_TYPE: String = DataTypeId.OMNI_ARRAY.toValue.toString
   // for UT
   val OMNI_IS_ADAPTIVE_CONTEXT = "omni.isAdaptiveContext"
 }

@@ -37,6 +37,9 @@ namespace omniruntime::reader {
     std::unique_ptr<omniruntime::vec::BaseVector> makeDecimalVector(uint64_t numValues,
         omniruntime::type::DataTypeId dataTypeId);
 
+    std::unique_ptr<omniruntime::vec::BaseVector> makeArrayVector(uint64_t numValues,
+        omniruntime::type::DataTypeId dataTypeId);
+
     std::unique_ptr<omniruntime::vec::BaseVector> makeMapVector(uint64_t numValues,
         omniruntime::type::DataTypeId dataTypeId);
 

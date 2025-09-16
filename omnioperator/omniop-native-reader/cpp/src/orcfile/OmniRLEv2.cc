@@ -76,6 +76,11 @@ namespace omniruntime::reader {
         }
     }
 
+    std::unique_ptr<omniruntime::vec::BaseVector> makeArrayVector(uint64_t numValues,
+        omniruntime::type::DataTypeId dataTypeId) {
+        return std::make_unique<omniruntime::vec::ArrayVector>(numValues);
+    }
+
     std::unique_ptr<omniruntime::vec::BaseVector> makeMapVector(uint64_t numValues,
         omniruntime::type::DataTypeId dataTypeId) {
             return std::make_unique<omniruntime::vec::MapVector>(numValues);
@@ -105,6 +110,8 @@ namespace omniruntime::reader {
                 return makeVarcharVector(numValues, dataTypeId);
             case orc::TypeKind::DECIMAL:
                 return makeDecimalVector(numValues, dataTypeId);
+            case orc::TypeKind::LIST:
+                return makeArrayVector(numValues, dataTypeId);
             case orc::TypeKind::MAP:
                 return makeMapVector(numValues, dataTypeId);
             case orc::TypeKind::STRUCT:

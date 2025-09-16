@@ -29,6 +29,8 @@ namespace omniruntime::reader {
                 } else {
                     return omniruntime::type::OMNI_DECIMAL64;
                 }
+            case orc::TypeKind::LIST:
+                return omniruntime::type::OMNI_ARRAY;
             case orc::TypeKind::MAP:
                 return omniruntime::type::OMNI_MAP;
             case orc::TypeKind::STRUCT:

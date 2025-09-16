@@ -32,7 +32,7 @@ import org.apache.spark.sql.vectorized.ColumnarBatch
 import java.util.concurrent.TimeUnit.NANOSECONDS
 import scala.collection.JavaConverters._
 import scala.collection.mutable.ListBuffer
-import nova.hetu.omniruntime.vector.{MapVec, StructVec, Vec}
+import nova.hetu.omniruntime.vector.{MapVec, StructVec, ArrayVec, Vec}
 
 /**
  * Provides an optimized set of APIs to append row based data to an array of
@@ -87,6 +87,9 @@ private object OmniRowToColumnConverter {
         val keyConverter = getConverterForType(map.keyType, nullable)
         val valueConverter = getConverterForType(map.valueType, map.valueContainsNull)
         MapConverter(keyConverter, valueConverter, map)
+      case array: ArrayType =>
+        val elementConverter = getConverterForType(array.elementType, nullable)
+        ArrayConverter(elementConverter, array)
       case unknown => throw new UnsupportedOperationException(
         s"Type $unknown not supported")
     }
@@ -98,7 +101,7 @@ private object OmniRowToColumnConverter {
       valueConverter: TypeConverter,
       dataType: MapType) extends TypeConverter {
     override def append(row: SpecializedGetters, column: Int, cv: WritableColumnVector): Unit = {
-      throw new UnsupportedOperationException("StructConverter not support append()")
+      throw new UnsupportedOperationException("MapConverter not support append()")
     }
 
     override def add(rows: Seq[SpecializedGetters],
@@ -142,6 +145,52 @@ private object OmniRowToColumnConverter {
       cv
     }
   }
+
+  private case class ArrayConverter(
+        elementConverter: TypeConverter,
+        dataType: ArrayType) extends TypeConverter {
+      override def append(row: SpecializedGetters, column: Int, cv: WritableColumnVector): Unit = {
+        throw new UnsupportedOperationException("ArrayConverter not support append()")
+      }
+
+      override def add(rows: Seq[SpecializedGetters],
+                 column: Int, size: Int): WritableColumnVector = {
+        val cv = new OmniColumnVector(size, dataType, true)
+        // count total offset
+        var totalLen = 0
+        val offsets = new ListBuffer[Int]
+        val nulls = new ListBuffer[Byte]
+        offsets += 0
+        for (row <- rows) {
+          val arrayData = if (row == null) null else row.getArray(column)
+          if (arrayData == null) {
+            nulls += 1
+          } else {
+            nulls += 0
+            val num = arrayData.numElements
+            totalLen += num
+          }
+          offsets += totalLen
+        }
+
+        val elementVector = new OmniColumnVector(totalLen, dataType.elementType, true)
+        for (row <- rows) {
+          val arrayData = if (row == null) null else row.getArray(column)
+          if (arrayData != null) {
+            val arrayLength = arrayData.numElements
+            for (i <- 0 until arrayLength) {
+              elementConverter.append(arrayData, i, elementVector)
+            }
+          }
+        }
+
+        cv.setChild(elementVector, 0)
+        cv.setOffsets(offsets.toArray)
+        cv.updateVec()
+        cv.putNulls(0, nulls.toArray, size)
+        cv
+      }
+    }
 
   private case class StructConverter(childConverters: Array[TypeConverter], dataType: StructType)
       extends TypeConverter {
