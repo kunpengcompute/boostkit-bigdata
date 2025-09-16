@@ -9,12 +9,10 @@ from common.exceptions import UnknownEncodingError
 from omniadvisor.utils.logger import global_logger
 
 
-
 def run_cmd(cmd_fields: list) -> Tuple[int, str]:
     """
     在shell终端执行命令，并返回执行结果。
 
-    :param merged_results: 布尔型变量 默认为真 用于控制是否需要将标准输出和标准错误合并
     :param cmd_fields: 需要执行的命令字段List
     :return: 返回一个包含退出状态码和命令输出的元组。
              第一个元素是整数类型的退出状态码（0表示成功），
