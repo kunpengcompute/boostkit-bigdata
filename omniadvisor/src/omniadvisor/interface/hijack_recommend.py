@@ -260,6 +260,8 @@ def hijack_recommend(argv: list) -> None:
     :param argv: Spark任务的执行命令
     :return:
     """
+    # 对spark入参中的driver_java_options参数进行预处理
+    SparkCMDParser.pre_handler_driver_java_options(argv)
 
     # 非SUBMIT动作(指kill任务/查询状态/查询版本)的提交直接回退到原生spark-submit脚本执行 不被特性所劫持
     SparkCMDParser.validate_submit_arguments(argv)

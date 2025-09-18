@@ -14,6 +14,10 @@ _CMD_PREFIX_KEY = 'omniadvisor-cmd-prefix'
 _CMD_PRIMARY_RESOURCE = 'primary_resource'
 # 命令行中class字段
 _CMD_CLASS_KEY = 'class'
+# spark-sql命令在spark-submit中对应的的类名
+_SPARK_SQL_CLASS = 'org.apache.spark.sql.hive.thriftserver.SparkSQLCLIDriver'
+# spark参数driver-java-options
+_DRIVER_JAVA_OPTIONS = '--driver-java-options'
 # 单横杠参数的字段
 _SINGLE_HORIZONTAL_BAR_KEYS = ['e', 'f', 'i']
 # 布尔类型的字段
@@ -88,8 +92,20 @@ class SparkCMDParser:
     _parser.add_argument('-f', type=str, help='File containing SQL script.')
     _parser.add_argument('-i', help='Initialization SQL file')
     _parser.add_argument('-d', '--define')
-    _parser.add_argument('--database')
+    _parser.add_argument('-database', '--database')
 
+    @classmethod
+    def pre_handler_driver_java_options(cls, argv):
+        """
+        :param argv: 对入参列表中的argv中driver-java-options的参数值进行处理 使用双引号包裹方便后续argparse模块识别
+        :return:
+        """
+        global_logger.debug(f"Before pre_handler_driver_java_options %s", argv)
+        driver_java_options_indices = [i for i, arg in enumerate(argv) if arg == _DRIVER_JAVA_OPTIONS]
+        for idx in driver_java_options_indices:
+            if idx + 1 < len(argv):
+                argv[idx + 1] = f'\"{argv[idx + 1]}\"'
+        global_logger.debug(f"After pre_handler_driver_java_options执行后 %s", argv)
 
     @classmethod
     def validate_submit_arguments(cls, args: List) -> None:
@@ -107,9 +123,12 @@ class SparkCMDParser:
         # 待检查参数列表
         params, unknown = cls._parser.parse_known_args(args=args)
         primary_resource = unknown
-
+        # 非spark-submit的提交类任务
         if not primary_resource and vars(params)['class'] is None:
-            raise TypeError("This is not a SUBMIT type spark task.")
+            raise TypeError("This is not a spark-submit SUBMIT type spark task.")
+        # 检查是否为spark-sql提交的执行类任务
+        if vars(params)['class'] == _SPARK_SQL_CLASS and vars(params)['e'] is None and vars(params)['f'] is None:
+            raise TypeError("This is not a spark-sql SUBMIT type spark task.")
 
     @staticmethod
     def _normalize_value(value: Any) -> Any:
