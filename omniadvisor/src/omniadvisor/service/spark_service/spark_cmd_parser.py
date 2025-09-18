@@ -32,12 +32,18 @@ _SPARK_CONF_SUPPLEMENT_MAP = {
 }
 
 
+class SilentArgumentParser(argparse.ArgumentParser):
+    def error(self, message):
+        # 不打印错误 把异常往上层抛出
+        raise argparse.ArgumentError(None, message)
+
+
 class SparkCMDParser:
     """
     Spark 引擎的解析器
     """
     # 当用户提交-h和--help时需要退回原生执行 因此关闭argparse自带的--help/-h参数解析
-    _parser = argparse.ArgumentParser(add_help=False)
+    _parser = SilentArgumentParser(add_help=False)
 
     # 参数命中包含'-'的参数，设置dest属性，避免参数解析中'-'被转换为'_'
     # 解析Spark CMD开头，需脚本配合
