@@ -147,6 +147,6 @@ class TestExamRecordRepository:
         # 更新任务执行结果
         updated_task = ExamRecordRepository.update_trace(
             exam_record=self.exam_record,
-            trace={'step1': 1}
+            sql_trace='text'
         )
-        assert updated_task.database_model.trace == {'step1': 1}
+        assert updated_task.database_model.sql_trace == 'text'

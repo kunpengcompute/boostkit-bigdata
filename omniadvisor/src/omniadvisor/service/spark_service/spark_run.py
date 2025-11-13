@@ -1,3 +1,4 @@
+import json
 import multiprocessing
 import time
 from typing import Tuple
@@ -13,7 +14,6 @@ from omniadvisor.service.spark_service.spark_executor import SparkExecutor
 from omniadvisor.service.spark_service.spark_fetcher import SparkFetcher
 from omniadvisor.service.tuning_result.tuning_result import get_tuning_result
 from omniadvisor.utils.logger import global_logger
-from omniadvisor.utils.utils import save_trace_data
 
 
 _RETURN_CODE_MAP = {
@@ -125,7 +125,6 @@ def _update_trace_and_runtime_from_history_server(exam_record: ExamRecord, appli
     :param application_id: Spark任务application_id
     :return:
     """
-    trace_dict = {}
     history_server_url = OA_CONF.spark_history_rest_url
     history_server_username = OA_CONF.spark_history_username
     history_server_password = OA_CONF.spark_history_password
@@ -135,7 +134,6 @@ def _update_trace_and_runtime_from_history_server(exam_record: ExamRecord, appli
         try:
             trace_sql = spark_fetcher.get_spark_sql_by_app(application_id)
             trace_stages = spark_fetcher.get_spark_stages_by_app(application_id)
-            trace_executor = spark_fetcher.get_spark_executor_by_app(application_id)
             runtime = spark_fetcher.get_spark_runtime_by_app(application_id)
         except HTTPError as httpe:
             time.sleep(OA_CONF.spark_fetch_trace_interval)
@@ -144,9 +142,6 @@ def _update_trace_and_runtime_from_history_server(exam_record: ExamRecord, appli
         except Exception as e:
             global_logger.error('Unknown exception happen, error info: %s', e)
             return False
-        trace_dict['sql'] = save_trace_data(data=trace_sql, data_dir=OA_CONF.data_dir)
-        trace_dict['stages'] = save_trace_data(data=trace_stages, data_dir=OA_CONF.data_dir)
-        trace_dict['executor'] = save_trace_data(data=trace_executor, data_dir=OA_CONF.data_dir)
         global_logger.info(f"Fetch Spark execute trace and runtime success.")
         break
     else:
@@ -154,5 +149,9 @@ def _update_trace_and_runtime_from_history_server(exam_record: ExamRecord, appli
         return False
 
     ExamRecordRepository.update_runtime(exam_record, runtime=runtime)
-    ExamRecordRepository.update_trace(exam_record, trace=trace_dict)
+    ExamRecordRepository.update_trace(
+        exam_record,
+        sql_trace=json.dumps(trace_sql),
+        stage_trace=json.dumps(trace_stages)
+    )
     return True

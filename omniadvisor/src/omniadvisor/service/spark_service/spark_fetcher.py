@@ -5,9 +5,41 @@ import requests
 from dateutil import parser
 
 from omniadvisor.utils.logger import global_logger
+from omniadvisor.utils.utils import filter_list_of_dicts
 
 
 class SparkFetcher:
+    _SQL_FILTER_KEYS = [
+        "nodes"
+    ]
+
+    _STAGE_FILTER_KEYS = [
+        "stageId",
+        "status",
+        "submissionTime",
+        "completionTime",
+        "firstTaskLaunchedTime",
+        "jvmGcTime",
+        "executorRunTime",
+        "numKilledTasks",
+        "numTasks",
+        "executorDeserializeTime",
+        "resultSerializationTime",
+        "shuffleFetchWaitTime",
+        "shuffleWriteTime",
+        "shuffleReadBytes",
+        "taskMetricsDistributions.executorDeserializeCpuTime",
+        "taskMetricsDistributions.duration",
+        "taskMetricsDistributions.memoryBytesSpilled",
+        "taskMetricsDistributions.peakExecutionMemory",
+        "taskMetricsDistributions.inputMetrics.bytesRead",
+        "taskMetricsDistributions.outputMetrics.bytesWritten"
+        "taskMetricsDistributions.shuffleReadMetrics.readBytes",
+        "taskMetricsDistributions.shuffleWriteMetrics.writeBytes",
+        "taskMetricsDistributions.shuffleReadMetrics.fetchWaitTime",
+        "taskMetricsDistributions.shuffleWriteMetrics.writeTime",
+    ]
+
     def __init__(self, history_server_url: str, username: str, password: str):
         """
         初始化SparkFetcher类
@@ -71,7 +103,8 @@ class SparkFetcher:
         :param application_id: 应用ID
         :return: 返回指定应用的SQL信息
         """
-        return self._make_request(f"api/v1/applications/{application_id}/sql")
+        data = self._make_request(f"api/v1/applications/{application_id}/sql")
+        return filter_list_of_dicts(dicts_list=data, keys=self._SQL_FILTER_KEYS)
 
     def get_spark_stages_by_app(self, application_id: str) -> dict[str, Any]:
         """
@@ -80,7 +113,8 @@ class SparkFetcher:
         :param application_id: 应用ID
         :return: 返回指定应用的阶段信息
         """
-        return self._make_request(f"api/v1/applications/{application_id}/stages?withSummaries=true")
+        data = self._make_request(f"api/v1/applications/{application_id}/stages?withSummaries=true")
+        return filter_list_of_dicts(dicts_list=data, keys=self._STAGE_FILTER_KEYS)
 
     def get_spark_executor_by_app(self, application_id: str) -> dict[str, Any]:
         """

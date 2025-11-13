@@ -53,8 +53,12 @@ class ExamRecord:
         return self._database_model.application_id
 
     @property
-    def trace(self):
-        return self._database_model.trace
+    def sql_trace(self):
+        return self._database_model.sql_trace
+
+    @property
+    def stage_trace(self):
+        return self._database_model.stage_trace
 
     @property
     def database_model(self):
@@ -68,4 +72,5 @@ class ExamRecord:
         status = 'status'
         runtime = 'runtime'
         application_id = 'application_id'
-        trace = 'trace'
+        sql_trace = 'sql_trace'
+        stage_trace = 'stage_trace'
