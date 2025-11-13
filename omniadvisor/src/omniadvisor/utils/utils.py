@@ -48,7 +48,7 @@ def save_trace_data(data: List[Dict[str, str]], data_dir):
             json.dump(data, f, ensure_ascii=False, indent=4)
         # 数据文件权限设置为640
         os.chmod(file_path, 0o640)
-        global_logger.debug(f"数据已成功保存到 {file_path}")
+        global_logger.debug(f"Trace数据已成功保存")
     except IOError as e:
         raise IOError(f"出现IO错误: {e}") from e
     except Exception as e:

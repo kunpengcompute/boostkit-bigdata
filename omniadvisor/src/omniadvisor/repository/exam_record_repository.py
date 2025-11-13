@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import List, Tuple
 from common.constant import OA_CONF
-from server.app.models import (
+from server.models import (
     DatabaseTuningRecord,
     DatabaseExamRecord
 )

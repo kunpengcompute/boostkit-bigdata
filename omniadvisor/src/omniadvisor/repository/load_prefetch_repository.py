@@ -3,7 +3,7 @@
 
 # Copyright (c) Huawei Technologies Co., Ltd. 2023-2023. All rights reserved.
 from django.db.models import Prefetch
-from server.app.models import DatabaseTuningRecord, DatabaseLoad
+from server.models import DatabaseTuningRecord, DatabaseLoad
 from omniadvisor.repository.model.load import Load
 from omniadvisor.repository.model.tuning_record import TuningRecord
 from omniadvisor.repository.repository import Repository
