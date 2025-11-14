@@ -86,8 +86,6 @@ class OmniAdvisorConf:
     common_config_path = f'{config_dir}/common_config.ini'
     # 数据存储目录
     data_dir = f'{project_base_dir}/data'
-    # secret_key路径
-    django_secret_key_path = f'{project_base_dir}/src/server/secret_key'
 
     # 任务执行状态
     class ExecStatus:

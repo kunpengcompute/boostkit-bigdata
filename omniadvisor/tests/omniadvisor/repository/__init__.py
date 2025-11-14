@@ -13,7 +13,7 @@ if not settings.configured:
     settings.configure(
         DATABASES=DATABASES,
         DEBUG=False,
-        INSTALLED_APPS=['server'],
+        INSTALLED_APPS=['omniadvisor'],
     )
     # 初始化 Django 环境
     django.setup()

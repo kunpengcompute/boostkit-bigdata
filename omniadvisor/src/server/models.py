@@ -20,6 +20,7 @@ class DatabaseLoad(models.Model):
     backend_retest_enable = models.BooleanField(default=False)
 
     class Meta:
+        app_label = 'server'
         db_table = 'omniadvisor_load'  # 自定义表名
 
 
@@ -45,6 +46,7 @@ class DatabaseTuningRecord(models.Model):
     rounds = models.IntegerField(null=True)
 
     class Meta:
+        app_label = 'server'
         constraints = [
             models.UniqueConstraint(fields=['load', 'config'], name='tuning_record_unique')
         ]
@@ -81,4 +83,5 @@ class DatabaseExamRecord(models.Model):
     stage_trace = models.TextField()
 
     class Meta:
+        app_label = 'server'
         db_table = 'omniadvisor_exam_record'  # 自定义表名

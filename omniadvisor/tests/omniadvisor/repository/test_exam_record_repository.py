@@ -4,7 +4,7 @@ from datetime import datetime
 from omniadvisor.interface.hijack_recommend import _calculate_hash_value
 from .common import create_table, delete_table
 from common.constant import OA_CONF
-from server.app.models import (
+from server.models import (
     DatabaseLoad,
     DatabaseTuningRecord,
     DatabaseExamRecord
