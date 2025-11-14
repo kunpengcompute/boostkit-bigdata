@@ -1,7 +1,7 @@
 from omniadvisor.interface.hijack_recommend import _calculate_hash_value
 from .common import create_table, delete_table
 from common.constant import OA_CONF
-from server.app.models import DatabaseLoad, DatabaseTuningRecord
+from server.models import DatabaseLoad, DatabaseTuningRecord
 from omniadvisor.repository.model.tuning_record import TuningRecord
 from omniadvisor.repository.load_repository import LoadRepository
 from omniadvisor.repository.tuning_record_repository import TuningRecordRepository

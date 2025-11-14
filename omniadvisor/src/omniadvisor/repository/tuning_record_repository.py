@@ -1,6 +1,6 @@
 from typing import List
 from common.constant import OA_CONF
-from server.app.models import DatabaseLoad, DatabaseTuningRecord
+from server.models import DatabaseLoad, DatabaseTuningRecord
 
 from omniadvisor.repository.model.load import Load
 from omniadvisor.repository.model.tuning_record import TuningRecord

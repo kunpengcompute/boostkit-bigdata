@@ -1,4 +1,4 @@
-from server.app.models import DatabaseLoad
+from server.models import DatabaseLoad
 
 
 class Load:

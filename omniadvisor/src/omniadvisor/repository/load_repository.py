@@ -1,7 +1,7 @@
 from django.db import IntegrityError
 
 from common.exceptions import DuplicateEntryError
-from server.app.models import DatabaseLoad
+from server.models import DatabaseLoad
 from omniadvisor.repository.model.load import Load
 from omniadvisor.repository.repository import Repository
 

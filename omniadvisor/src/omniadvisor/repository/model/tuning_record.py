@@ -1,4 +1,4 @@
-from server.app.models import DatabaseTuningRecord
+from server.models import DatabaseTuningRecord
 from omniadvisor.repository.load_repository import Load
 
 

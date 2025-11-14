@@ -1,5 +1,5 @@
 from common.kmc_toolkit.log import enable_kmc_logger
-from server.manage import main
+from server.init import django_create_table
 from omniadvisor.utils.logger import global_logger
 from common.constant import check_oa_conf
 
@@ -8,7 +8,7 @@ if __name__ == '__main__':
     enable_kmc_logger()
     try:
         check_oa_conf()
-        main()
+        django_create_table()
     # 无需进行逻辑处理的异常，直接抛至该层
     # 若需进行逻辑处理（如环境清理等），则需在相应位置处理后重新抛至该层
     except Exception as e:
