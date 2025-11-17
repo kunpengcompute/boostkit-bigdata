@@ -3,7 +3,7 @@
 """ kmc可配置项
 """
 
-from common import user_configs
+from common.config_parser import user_configs
 
 # kmc配置
 KMC_SEM_KEY = int(user_configs.get('crypto', 'kmc.sem.key'), 16)

@@ -1,7 +1,7 @@
 import json
 import os
 from common.crypto_tool import CryptoTool
-from common import user_configs
+from common.config_parser import user_configs
 
 
 def check_oa_conf() -> None:
