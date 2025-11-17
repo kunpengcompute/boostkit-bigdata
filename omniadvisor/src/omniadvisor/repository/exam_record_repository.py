@@ -34,7 +34,8 @@ class ExamRecordRepository(Repository):
         ExamRecord.FieldName.status: ([str], [], OA_CONF.ExecStatus.all),
         ExamRecord.FieldName.runtime: ([float], [], []),
         ExamRecord.FieldName.application_id: ([str], [], []),
-        ExamRecord.FieldName.trace: ([dict], [], []),
+        ExamRecord.FieldName.sql_trace: ([str], [], []),
+        ExamRecord.FieldName.stage_trace: ([str], [], []),
     }
 
     @classmethod
@@ -101,16 +102,18 @@ class ExamRecordRepository(Repository):
         return cls.query_by_tuning_record(tuning_record=tuning_record)
 
     @classmethod
-    def update_trace(cls, exam_record: ExamRecord, trace: dict) -> ExamRecord:
+    def update_trace(cls, exam_record: ExamRecord, sql_trace: str, stage_trace: str) -> ExamRecord:
         """
         更新测试记录中的trace信息
 
         :param exam_record: 测试记录实例
-        :param trace: 执行Trace
+        :param sql_trace: 执行SQL Trace
+        :param stage_trace: 执行Stage Trace
         :return: 更新完后的测试记录
         """
         model_attr = {
-            ExamRecord.FieldName.trace: trace
+            ExamRecord.FieldName.sql_trace: sql_trace,
+            ExamRecord.FieldName.stage_trace: stage_trace
         }
         database_task = cls._update(
             database_model=exam_record.database_model,

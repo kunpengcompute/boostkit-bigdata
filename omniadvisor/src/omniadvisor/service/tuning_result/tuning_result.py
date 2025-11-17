@@ -166,7 +166,10 @@ class TuningResult:
             return OA_CONF.exec_fail_return_trace
 
         best_exam_record = min(success_exam_results, key=lambda exam_record: exam_record.runtime)
-        return best_exam_record.trace
+        return {
+            'sql': best_exam_record.sql_trace,
+            'stages': best_exam_record.stage_trace
+        }
 
     @property
     def tuning_record(self):

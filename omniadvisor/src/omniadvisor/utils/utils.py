@@ -106,3 +106,34 @@ def file_exists(filepath: str):
     检查文件是否存在
     """
     return os.path.isfile(filepath)
+
+
+def filter_dict_with_keys(data_dict: dict, keys: list):
+    """
+    过滤单个 dict，只保留指定键（支持嵌套key，用'.'表示层级），
+    若不存在则自动填充 None。
+    """
+    result = dict()
+    for key in keys:
+        parts = key.split(".")
+        cur = data_dict
+        for part in parts:
+            if isinstance(cur, dict) and part in cur:
+                cur = cur[part]
+            else:
+                cur = None
+                break
+        cur_result = result
+        for part in parts[:-1]:
+            cur_result = cur_result.setdefault(part, dict())
+        cur_result[parts[-1]] = cur
+    return result
+
+
+def filter_list_of_dicts(dicts_list: list, keys: list):
+    """
+    过滤一个 list[dict]，返回新的 list[dict]
+    """
+    if not isinstance(dicts_list, list):
+        raise TypeError("Input must be a list of dicts")
+    return [filter_dict_with_keys(item, keys) for item in dicts_list]

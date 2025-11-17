@@ -79,7 +79,8 @@ class DatabaseExamRecord(models.Model):
     )
     runtime = models.FloatField(null=True)
     application_id = models.CharField(max_length=50, null=True)
-    trace = models.JSONField(null=True)
+    sql_trace = models.TextField()
+    stage_trace = models.TextField()
 
     class Meta:
         app_label = 'server'
