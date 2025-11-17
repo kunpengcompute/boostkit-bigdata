@@ -27,7 +27,7 @@ class CryptoTool:
         if value:
             ret, encrypted_value = kmc.encrypt(value)
             if ret != CONSTANTS.RET_SUCCESS:
-                raise KmcError(f'Kmc error when encrypt password: {value}')
+                raise KmcError(f'Kmc error when encrypt password.')
             keyring.set_password(_SERVICE_NAME, key, encrypted_value)
 
     @classmethod
@@ -42,7 +42,7 @@ class CryptoTool:
         if value:
             ret, decrypted_value = kmc.decrypt(value)
             if ret != CONSTANTS.RET_SUCCESS:
-                raise KmcError(f'Kmc error when decrypt password: {value}')
+                raise KmcError(f'Kmc error when decrypt password.')
             return decrypted_value
         else:
             return None
