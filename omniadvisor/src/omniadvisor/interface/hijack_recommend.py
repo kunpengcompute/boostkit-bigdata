@@ -1,6 +1,7 @@
 import hashlib
 import json
 import multiprocessing
+import os.path
 import re
 import sys
 import time
@@ -183,6 +184,8 @@ def _has_modify_keywords(exec_attr: dict) -> bool:
         else:
             # 这里也有可能是相对路径
             file_path = exec_attr.get(_PARAM_F_IN_EXEC_ATTR, _EMPTY_STR)
+            # 转为绝对路径
+            file_path = os.path.realpath(file_path)
             exists = file_exists(file_path)
             if not exists:
                 # 这里初步判断文件用相对路径的比较少，所以打warning

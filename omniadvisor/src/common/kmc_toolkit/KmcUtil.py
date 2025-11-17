@@ -5,12 +5,12 @@ KMC类
 """
 
 import ctypes
-import random
 import common.kmc_toolkit.constants as CONSTANTS
 from common.kmc_toolkit.KmcWrapperAPI import KmcWrapper
 from common.kmc_toolkit.msg_type import KmcConfig
 from common.kmc_toolkit.log import kmc_logger
 from common.kmc_toolkit.log import logger
+from common import kmc_settings
 
 
 @ctypes.CFUNCTYPE(None, ctypes.c_int, ctypes.c_char_p)
@@ -61,7 +61,7 @@ class Kmc:
         standby_ksf = CONSTANTS.KMC_KSF_STANDBY
 
         # initial sem key
-        sem_key = CONSTANTS.DEFAULT_SEM_KEY + CONSTANTS.MIN_HEX_SEM_KEY
+        sem_key = CONSTANTS.DEFAULT_SEM_KEY + kmc_settings.KMC_SEM_KEY
 
         kmc_config = KmcConfig(
             primary_ksf.encode("utf-8"),
@@ -152,7 +152,7 @@ class Kmc:
             self.finalize()
 
         if ret == CONSTANTS.RET_SUCCESS:
-            logger.info("encrypt success, cipher_text: %s", cipher_text)
+            logger.info("encrypt success.")
         else:
             logger.error("encrypt failed.")
         del plain_text
@@ -180,7 +180,7 @@ class Kmc:
             self.finalize()
 
         if ret == CONSTANTS.RET_SUCCESS:
-            logger.info("decrypt success, plain_text: %s", plain_text)
+            logger.info("decrypt success.")
         else:
             logger.error("decrypt failed.")
         del cipher_text

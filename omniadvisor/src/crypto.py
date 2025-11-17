@@ -118,6 +118,8 @@ def _password_interactively(password_type: str):
             global_logger.warning('The %s password not changed!', content)
             return
     store_func(password)
+    del password
+    del password2
 
 
 def main():

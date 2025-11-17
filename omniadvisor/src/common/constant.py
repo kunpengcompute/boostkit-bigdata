@@ -3,22 +3,7 @@ import json
 import os
 import secrets
 from common.crypto_tool import CryptoTool
-
-
-def load_ini_config(config_path: str) -> configparser.ConfigParser:
-    """
-    使用configparser库加载common_config
-
-    :param config_path: 配置文件路径
-    :return: 返回common_config的内容
-    """
-    if not os.path.exists(config_path):
-        raise FileNotFoundError(f"{config_path} does not exist")
-
-    common_config = configparser.ConfigParser(interpolation=None)
-    common_config.read(config_path, encoding='utf-8')
-
-    return common_config
+from common import user_configs
 
 
 def check_oa_conf() -> None:
@@ -124,36 +109,33 @@ class OmniAdvisorConf:
         backend = 'backend'
         all = [hijacking, backend]
 
-    # 输入配置解析
-    _common_config = load_ini_config(config_path=common_config_path)
-    # 配置罗列
     # common页
-    tuning_retest_times = _common_config.getint('common', 'tuning.retest.times')
-    config_fail_threshold = _common_config.getint('common', 'config.fail.threshold')
-    tuning_strategies = json.loads(_common_config.get('common', 'tuning.strategy'))
-    backend_retest_queue = _common_config.get('common', 'backend.retest.queue')
+    tuning_retest_times = user_configs.getint('common', 'tuning.retest.times')
+    config_fail_threshold = user_configs.getint('common', 'config.fail.threshold')
+    tuning_strategies = json.loads(user_configs.get('common', 'tuning.strategy'))
+    backend_retest_queue = user_configs.get('common', 'backend.retest.queue')
     # database页
-    postgresql_database_name = _common_config.get('database', 'postgresql.database.name')
-    postgresql_database_user = _common_config.get('database', 'postgresql.database.user')
+    postgresql_database_name = user_configs.get('database', 'postgresql.database.name')
+    postgresql_database_user = user_configs.get('database', 'postgresql.database.user')
     postgresql_database_password = CryptoTool.get_database_password_password()
-    postgresql_database_host = _common_config.get('database', 'postgresql.database.host')
-    postgresql_database_port = _common_config.get('database', 'postgresql.database.port')
+    postgresql_database_host = user_configs.get('database', 'postgresql.database.host')
+    postgresql_database_port = user_configs.get('database', 'postgresql.database.port')
     # spark页
-    spark_history_rest_url = _common_config.get('spark', 'spark.history.rest.url')
-    spark_history_username = _common_config.get('spark', 'spark.history.username')
+    spark_history_rest_url = user_configs.get('spark', 'spark.history.rest.url')
+    spark_history_username = user_configs.get('spark', 'spark.history.username')
     spark_history_password = CryptoTool.get_history_server_password()
-    spark_fetch_trace_timeout = _common_config.getint('spark', 'spark.fetch.trace.timeout')
-    spark_fetch_trace_interval = _common_config.getint('spark', 'spark.fetch.trace.interval')
-    spark_exec_timeout_ratio = _common_config.getfloat('spark', 'spark.exec.timeout.ratio')
-    spark_output_merge_switch = _common_config.getboolean('spark', 'spark.output.merge.switch')
+    spark_fetch_trace_timeout = user_configs.getint('spark', 'spark.fetch.trace.timeout')
+    spark_fetch_trace_interval = user_configs.getint('spark', 'spark.fetch.trace.interval')
+    spark_exec_timeout_ratio = user_configs.getfloat('spark', 'spark.exec.timeout.ratio')
+    spark_output_merge_switch = user_configs.getboolean('spark', 'spark.output.merge.switch')
     # webpage页
-    admin_timezone = _common_config.get('webpage', 'admin.timezone')
+    admin_timezone = user_configs.get('webpage', 'admin.timezone')
     # django secret key
     django_secret_key = CryptoTool.get_django_secretkey()
     if not django_secret_key:
         django_secret_key = secrets.token_urlsafe(50)
         CryptoTool.store_django_secretkey(django_secret_key)
-    strategies_tuples = [tuple(item) for item in json.loads(_common_config.get('common', 'tuning.strategy'))]
+    strategies_tuples = [tuple(item) for item in json.loads(user_configs.get('common', 'tuning.strategy'))]
 
     # 保留小数位数
     decimal_digits = 3
