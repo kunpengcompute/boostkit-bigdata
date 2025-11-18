@@ -1,9 +1,7 @@
-import configparser
 import json
 import os
-import secrets
 from common.crypto_tool import CryptoTool
-from common import user_configs
+from common.config_parser import user_configs
 
 
 def check_oa_conf() -> None:
@@ -128,11 +126,7 @@ class OmniAdvisorConf:
     spark_output_merge_switch = user_configs.getboolean('spark', 'spark.output.merge.switch')
     # webpage页
     admin_timezone = user_configs.get('webpage', 'admin.timezone')
-    # django secret key
-    django_secret_key = CryptoTool.get_django_secretkey()
-    if not django_secret_key:
-        django_secret_key = secrets.token_urlsafe(50)
-        CryptoTool.store_django_secretkey(django_secret_key)
+    # 调优策略
     strategies_tuples = [tuple(item) for item in json.loads(user_configs.get('common', 'tuning.strategy'))]
 
     # 保留小数位数

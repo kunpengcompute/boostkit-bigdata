@@ -33,7 +33,7 @@ class SparkFetcher:
         "taskMetricsDistributions.memoryBytesSpilled",
         "taskMetricsDistributions.peakExecutionMemory",
         "taskMetricsDistributions.inputMetrics.bytesRead",
-        "taskMetricsDistributions.outputMetrics.bytesWritten"
+        "taskMetricsDistributions.outputMetrics.bytesWritten",
         "taskMetricsDistributions.shuffleReadMetrics.readBytes",
         "taskMetricsDistributions.shuffleWriteMetrics.writeBytes",
         "taskMetricsDistributions.shuffleReadMetrics.fetchWaitTime",
