@@ -35,6 +35,8 @@ class SparkExecutor:
         :return: SparkExecResult
         """
         if timeout:
+            # timeout不宜过小，设置最小值进行限制
+            timeout = 100 if timeout < 100 else timeout
             # 命令列表需全为str类型
             cmd_fields = ['timeout', str(timeout)] + cmd_fields
 
