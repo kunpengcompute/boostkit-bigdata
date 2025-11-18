@@ -8,8 +8,8 @@ log() {  # 用法：log LEVEL "message"
 log INFO "即将开始自动部署OmniAdvisor2.0..."
 # 获取软件包路径
 prefix=$(dirname `dirname $(pwd)`)
-core_dir=$prefix/BoostKit-omniadvisor_core_2.0.0
-frame_dir=$prefix/BoostKit-omniadvisor_2.0.0
+core_dir=$prefix/omniruntime-omniadvisor-core-2.0.0
+frame_dir=$prefix/omniruntime-omniadvisor-2.0.0
 
 log INFO "检查目标路径是否存在..."
 # 路径存在性检查

@@ -19,7 +19,7 @@ COMPILE_FROM_NAME = 'src'
 SOURCE_DIR = os.path.join(PROJECT_DIR, COMPILE_FROM_NAME)
 
 # 编译后输出的根文件夹名称
-COMPILE_DEST_ROOT_NAME = 'BoostKit-omniadvisor_2.0.0'
+COMPILE_DEST_ROOT_NAME = 'omniruntime-omniadvisor-2.0.0'
 
 # 编译后输出的根目录
 OUTPUT_ROOT_DIR = os.path.join(PROJECT_DIR, COMPILE_DEST_ROOT_NAME)
