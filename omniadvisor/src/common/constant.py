@@ -54,7 +54,7 @@ class OmniAdvisorConf:
     """
     # OmniAdvisor版本信息
     product_name = "Kunpeng BoostKit"
-    product_version = "25.2.RC1"
+    product_version = "25.3.0"
     component_name = "BoostKit-OmniAdvisor"
     component_version = "2.0.0"
 
