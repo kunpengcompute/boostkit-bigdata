@@ -55,7 +55,6 @@ def spark_run(load: Load, config: dict, wait_for_trace: bool = True,
         timeout = 0
 
     # 执行spark任务，并获得执行结果
-    global_logger.debug('Spark exec cmd is: %s, timeout is: %d', submit_cmd, timeout)
     exec_result = SparkExecutor.submit_spark_task(cmd_fields=submit_cmd, timeout=timeout)
 
     if exec_result.exitcode == 0:
