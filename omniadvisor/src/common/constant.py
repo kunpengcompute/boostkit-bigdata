@@ -42,9 +42,6 @@ def check_oa_conf() -> None:
         raise ValueError('The spark history username and password should be provided, or leave both blank, please check'
                          ' common configuration or use \'crypto.pyc\' to set password.')
 
-    if not OA_CONF.admin_timezone:
-        raise ValueError('The admin timezone can not be empty, please check common configuration.')
-
 
 class OmniAdvisorConf:
     """
@@ -124,8 +121,6 @@ class OmniAdvisorConf:
     spark_fetch_trace_interval = user_configs.getint('spark', 'spark.fetch.trace.interval')
     spark_exec_timeout_ratio = user_configs.getfloat('spark', 'spark.exec.timeout.ratio')
     spark_output_merge_switch = user_configs.getboolean('spark', 'spark.output.merge.switch')
-    # webpage页
-    admin_timezone = user_configs.get('webpage', 'admin.timezone')
     # 调优策略
     strategies_tuples = [tuple(item) for item in json.loads(user_configs.get('common', 'tuning.strategy'))]
 
