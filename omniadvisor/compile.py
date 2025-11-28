@@ -83,7 +83,7 @@ def set_permissions(root_dir: dir):
         f'{root_dir}/config',
     ]
     migrations_dir_list = [
-        f'{root_dir}/src/server/app/migrations',
+        f'{root_dir}/src/server/migrations',
     ]
 
     for root, _, files in os.walk(root_dir):
