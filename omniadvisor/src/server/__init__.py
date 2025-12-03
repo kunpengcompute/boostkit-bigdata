@@ -22,8 +22,7 @@ if not settings.configured:
             }
         },
         DEFAULT_AUTO_FIELD='django.db.models.BigAutoField',
-        USE_TZ=True,
-        TIME_ZONE=OA_CONF.admin_timezone
+        USE_TZ=True
     )
     # 初始化 Django 环境
     django.setup()
