@@ -23,8 +23,7 @@ class TestConstant:
         postgresql_database_user='user',
         postgresql_database_password='password',
         postgresql_database_host='host',
-        postgresql_database_port='port',
-        admin_timezone='Asia/Shanghai'
+        postgresql_database_port='port'
     ))
     def test_check_oa_conf_when_normal(self):
         # 不应抛异常
