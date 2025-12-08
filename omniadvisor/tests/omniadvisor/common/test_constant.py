@@ -23,7 +23,11 @@ class TestConstant:
         postgresql_database_user='user',
         postgresql_database_password='password',
         postgresql_database_host='host',
-        postgresql_database_port='port'
+        postgresql_database_port='port',
+        spark_history_sslverify=True,
+        spark_history_sslrootca="tmp/ca",
+        spark_history_sslcrt="tmp/ssl.crt",
+        spark_history_sslkey="tmp/ssl.key"
     ))
     def test_check_oa_conf_when_normal(self):
         # 不应抛异常
@@ -167,4 +171,50 @@ class TestConstant:
     ))
     def test_check_oa_conf_when_username_password_mismatch_case2(self):
         with pytest.raises(ValueError, match='username and password'):
+            check_oa_conf()
+
+    @patch(OA_CONF_PATH, new=SimpleNamespace(
+        tuning_retest_times=1,
+        config_fail_threshold=1,
+        spark_fetch_trace_timeout=10,
+        spark_fetch_trace_interval=5,
+        spark_exec_timeout_ratio=0.5,
+        spark_history_username='user',
+        spark_history_password='pass',
+        tuning_strategies=[],
+        postgresql_database_name='name',
+        postgresql_database_user='user',
+        postgresql_database_password='password',
+        postgresql_database_host='host',
+        postgresql_database_port='port',
+        # mismatch
+        spark_history_sslverify=True,
+        spark_history_sslrootca=None,
+        spark_history_sslcrt="tmp/ssl.crt",
+        spark_history_sslkey="tmp/ssl.key"
+    ))
+    def test_check_oa_conf_when_spark_history_server_sslverify_mismatch(self):
+        with pytest.raises(ValueError, match='SSL verification requires all certificate files'):
+            check_oa_conf()
+
+    @patch(OA_CONF_PATH, new=SimpleNamespace(
+        tuning_retest_times=1,
+        config_fail_threshold=1,
+        spark_fetch_trace_timeout=10,
+        spark_fetch_trace_interval=5,
+        spark_exec_timeout_ratio=0.5,
+        spark_history_username='user',
+        spark_history_password='pass',
+        tuning_strategies=[],
+        postgresql_database_name='name',
+        postgresql_database_user='user',
+        postgresql_database_password='password',
+        postgresql_database_host='host',
+        postgresql_database_port='port',
+        spark_history_sslverify=False,
+        spark_history_sslrootca=None,
+        spark_history_sslcrt=None,
+        spark_history_sslkey="tmp/ssl.key"
+    ))
+    def test_check_oa_conf_when_spark_history_server_sslverify_false(self):
             check_oa_conf()

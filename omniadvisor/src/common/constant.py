@@ -127,7 +127,7 @@ class OmniAdvisorConf:
     spark_history_rest_url = user_configs.get('spark', 'spark.history.rest.url')
     spark_history_username = user_configs.get('spark', 'spark.history.username')
     spark_history_password = CryptoTool.get_history_server_password()
-    spark_history_sslverify = user_configs.get('spark', 'spark.history.sslverify')
+    spark_history_sslverify = user_configs.getboolean('spark', 'spark.history.sslverify')
     spark_history_sslrootca = user_configs.get('spark', 'spark.history.sslrootca')
     spark_history_sslcrt = user_configs.get('spark', 'spark.history.sslcrt')
     spark_history_sslkey = user_configs.get('spark', 'spark.history.sslkey')
