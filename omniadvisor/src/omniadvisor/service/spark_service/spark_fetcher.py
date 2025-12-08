@@ -50,7 +50,10 @@ class SparkFetcher:
         self.history_server_url = history_server_url.rstrip('/')  # 确保URL末尾没有斜杠
         self.username = username
         self.password = password
-
+        if OA_CONF.spark_history_sslverify:
+            self.sslrootca = OA_CONF.spark_history_sslrootca
+            self.sslcrt = OA_CONF.spark_history_sslcrt
+            self.sslkey = OA_CONF.spark_history_sslkey
 
     def _make_request(self, endpoint: str) -> dict[str, Any]:
         """
@@ -69,13 +72,14 @@ class SparkFetcher:
         url = f"{self.history_server_url}/{endpoint}"
         if self.username:
             # 若用户配置了用户名和密码，那么应当走验证通道 联通定制化分支
-            response = requests.get(url, auth=(self.username, self.password), verify=False, allow_redirects=False)
+            if OA_CONF.spark_history_sslverify:
+                response = requests.get(url, auth=(self.username, self.password),
+                                        cert=(self.sslcrt, self.sslkey), verify=self.sslrootca, allow_redirects=False)
+            else:
+                response = requests.get(url, auth=(self.username, self.password), verify=False, allow_redirects=False)
         # 启用spark history ssl双向认证
         elif OA_CONF.spark_history_sslverify:
-            sslrootca = OA_CONF.spark_history_sslrootca
-            sslcrt = OA_CONF.spark_history_sslcrt
-            sslkey = OA_CONF.spark_history_sslkey
-            response = requests.get(url, cert=(sslcrt, sslkey), verify=sslrootca)
+            response = requests.get(url, cert=(self.sslcrt, self.sslkey), verify=self.sslrootca)
         # 不启用spark history server ssl双向认证
         else:
             response = requests.get(url)
