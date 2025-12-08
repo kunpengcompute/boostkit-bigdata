@@ -6,6 +6,7 @@ from dateutil import parser
 
 from omniadvisor.utils.logger import global_logger
 from omniadvisor.utils.utils import filter_list_of_dicts
+from common.constant import OA_CONF
 
 
 class SparkFetcher:
@@ -50,6 +51,7 @@ class SparkFetcher:
         self.username = username
         self.password = password
 
+
     def _make_request(self, endpoint: str) -> dict[str, Any]:
         """
         发送 GET 请求到 History Server，并返回解析后的 JSON 数据。
@@ -66,8 +68,15 @@ class SparkFetcher:
         endpoint = endpoint.strip("/")
         url = f"{self.history_server_url}/{endpoint}"
         if self.username:
-            # 若用户配置了用户名和密码，那么应当走验证通道
+            # 若用户配置了用户名和密码，那么应当走验证通道 联通定制化分支
             response = requests.get(url, auth=(self.username, self.password), verify=False, allow_redirects=False)
+        # 启用spark history ssl双向认证
+        elif OA_CONF.spark_history_sslverify:
+            sslrootca = OA_CONF.spark_history_sslrootca
+            sslcrt = OA_CONF.spark_history_sslcrt
+            sslkey = OA_CONF.spark_history_sslkey
+            response = requests.get(url, cert=(sslcrt, sslkey), verify=sslrootca)
+        # 不启用spark history server ssl双向认证
         else:
             response = requests.get(url)
         # 若status.code != 200~209则抛出异常

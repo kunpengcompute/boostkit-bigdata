@@ -34,13 +34,23 @@ def check_oa_conf() -> None:
         raise ValueError('The spark fetch trace interval must > 0, please check common configuration.')
     if OA_CONF.spark_exec_timeout_ratio <= 0:
         raise ValueError('The spark exec timeout ratio must > 0, please check common configuration.')
-
     if not (
             (OA_CONF.spark_history_username and OA_CONF.spark_history_password) or
             (not OA_CONF.spark_history_username and not OA_CONF.spark_history_password)
     ):
         raise ValueError('The spark history username and password should be provided, or leave both blank, please check'
                          ' common configuration or use \'crypto.pyc\' to set password.')
+    if not isinstance(OA_CONF.spark_history_sslverify, bool):
+        raise ValueError('The spark history sslverify should be provided and must be boolean type,'
+                         ' please check common configuration.')
+    # 当前spark history ssl校验开关被打开的时候，才要求sslrootca,sslcrt,sslkey必须被配置
+    if OA_CONF.spark_history_sslverify and not all([
+        OA_CONF.spark_history_sslrootca,
+        OA_CONF.spark_history_sslcrt,
+        OA_CONF.spark_history_sslkey
+    ]):
+        raise ValueError("SSL verification requires all certificate files: "
+                         "spark_history_sslrootca, spark_history_sslcrt, spark_history_sslkey")
 
 
 class OmniAdvisorConf:
@@ -117,6 +127,10 @@ class OmniAdvisorConf:
     spark_history_rest_url = user_configs.get('spark', 'spark.history.rest.url')
     spark_history_username = user_configs.get('spark', 'spark.history.username')
     spark_history_password = CryptoTool.get_history_server_password()
+    spark_history_sslverify = user_configs.get('spark', 'spark.history.sslverify')
+    spark_history_sslrootca = user_configs.get('spark', 'spark.history.sslrootca')
+    spark_history_sslcrt = user_configs.get('spark', 'spark.history.sslcrt')
+    spark_history_sslkey = user_configs.get('spark', 'spark.history.sslkey')
     spark_fetch_trace_timeout = user_configs.getint('spark', 'spark.fetch.trace.timeout')
     spark_fetch_trace_interval = user_configs.getint('spark', 'spark.fetch.trace.interval')
     spark_exec_timeout_ratio = user_configs.getfloat('spark', 'spark.exec.timeout.ratio')
