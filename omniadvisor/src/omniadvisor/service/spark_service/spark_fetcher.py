@@ -71,7 +71,7 @@ class SparkFetcher:
         endpoint = endpoint.strip("/")
         url = f"{self.history_server_url}/{endpoint}"
         if self.username:
-            # 若用户配置了用户名和密码，那么应当走验证通道 联通定制化分支
+            # 若用户配置了用户名和密码，那么应当走验证通道
             if OA_CONF.spark_history_sslverify:
                 response = requests.get(url, auth=(self.username, self.password),
                                         cert=(self.sslcrt, self.sslkey), verify=self.sslrootca, allow_redirects=False)
