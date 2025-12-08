@@ -19,6 +19,12 @@ if not settings.configured:
                 'PASSWORD': OA_CONF.postgresql_database_password,
                 'HOST': OA_CONF.postgresql_database_host,
                 'PORT': OA_CONF.postgresql_database_port,
+                'OPTIONS': {
+                    'sslmode': OA_CONF.postgresql_database_sslmode,
+                    'sslrootcrt': OA_CONF.postgresql_database_sslrootcrt,
+                    'sslcert': OA_CONF.postgresql_database_sslcert,
+                    'sslkey': OA_CONF.postgresql_database_sslkey,
+                }
             }
         },
         DEFAULT_AUTO_FIELD='django.db.models.BigAutoField',
