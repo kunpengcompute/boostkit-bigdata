@@ -29,14 +29,14 @@ def check_oa_conf() -> None:
         raise ValueError('The postgresql database port can not be empty, please check common configuration.')
     if not OA_CONF.postgresql_database_sslmode:
         raise ValueError('The postgresql database sslmode can not be empty, please check common configuration.')
-    if OA_CONF.postgresql_database_sslmode == 'verify-ca' and not OA_CONF.postgresql_database_sslrootcrt:
-        raise ValueError('When the postgresql database sslmode is verify-ca, postgresql_database_sslrootcrt can not '
+    if OA_CONF.postgresql_database_sslmode == 'verify-ca' and not OA_CONF.postgresql_database_sslrootcert:
+        raise ValueError('When the postgresql database sslmode is verify-ca, postgresql_database_sslrootcert can not '
                          'be empty, please check common configuration.')
     if OA_CONF.postgresql_database_sslmode == 'verify-full':
-        if (not OA_CONF.postgresql_database_sslrootcrt or not OA_CONF.postgresql_database_sslcert
+        if (not OA_CONF.postgresql_database_sslrootcert or not OA_CONF.postgresql_database_sslcert
                 or not OA_CONF.postgresql_database_sslkey):
             raise ValueError(
-                'When the postgresql database sslmode is verify-full. postgresql_database_sslrootcrt、'
+                'When the postgresql database sslmode is verify-full. postgresql_database_sslrootcert、'
                 'postgresql_database_sslcert、postgresql_database_sslkey can not '
                 'be empty, please check common configuration.')
 
@@ -136,7 +136,7 @@ class OmniAdvisorConf:
     postgresql_database_host = user_configs.get('database', 'postgresql.database.host')
     postgresql_database_port = user_configs.get('database', 'postgresql.database.port')
     postgresql_database_sslmode = user_configs.get('database', 'postgresql.database.sslmode')
-    postgresql_database_sslrootcrt = user_configs.get('database', 'postgresql.database.sslrootcrt')
+    postgresql_database_sslrootcert = user_configs.get('database', 'postgresql.database.sslrootcert')
     postgresql_database_sslcert = user_configs.get('database', 'postgresql.database.sslcert')
     postgresql_database_sslkey = user_configs.get('database', 'postgresql.database.sslkey')
     # spark页

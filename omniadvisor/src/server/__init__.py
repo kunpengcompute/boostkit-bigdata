@@ -21,7 +21,7 @@ if not settings.configured:
                 'PORT': OA_CONF.postgresql_database_port,
                 'OPTIONS': {
                     'sslmode': OA_CONF.postgresql_database_sslmode,
-                    'sslrootcrt': OA_CONF.postgresql_database_sslrootcrt,
+                    'sslrootcert': OA_CONF.postgresql_database_sslrootcert,
                     'sslcert': OA_CONF.postgresql_database_sslcert,
                     'sslkey': OA_CONF.postgresql_database_sslkey,
                 }
