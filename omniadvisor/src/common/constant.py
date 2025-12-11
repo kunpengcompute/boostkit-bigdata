@@ -139,6 +139,7 @@ class OmniAdvisorConf:
     postgresql_database_sslrootcert = user_configs.get('database', 'postgresql.database.sslrootcert')
     postgresql_database_sslcert = user_configs.get('database', 'postgresql.database.sslcert')
     postgresql_database_sslkey = user_configs.get('database', 'postgresql.database.sslkey')
+    postgresql_database_sslpassword = user_configs.get('database', 'postgresql.database.sslpassword')
     # spark页
     spark_history_rest_url = user_configs.get('spark', 'spark.history.rest.url')
     spark_history_username = user_configs.get('spark', 'spark.history.username')

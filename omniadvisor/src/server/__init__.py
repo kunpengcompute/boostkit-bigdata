@@ -24,6 +24,7 @@ if not settings.configured:
                     'sslrootcert': OA_CONF.postgresql_database_sslrootcert,
                     'sslcert': OA_CONF.postgresql_database_sslcert,
                     'sslkey': OA_CONF.postgresql_database_sslkey,
+                    'sslpassword': OA_CONF.postgresql_database_sslpassword,
                 }
             }
         },
