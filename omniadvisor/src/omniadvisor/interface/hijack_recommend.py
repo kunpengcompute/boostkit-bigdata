@@ -5,6 +5,7 @@ import os.path
 import re
 import sys
 import time
+from django import db
 
 from common.constant import OA_CONF
 from common.exceptions import UnknownEncodingError
@@ -67,6 +68,8 @@ def _process_load_config(load: Load, config: dict) -> None:
     """
     # sleep等待 避免最新的trace未抓取完成时去获取历史最优数据 （该情况下正在被抓取trace数据会被遗漏）
     time.sleep(OA_CONF.spark_fetch_trace_timeout)
+    # 重置数据库连接, 避免复用ssl连接导致bad record mac error
+    db.connection.close()
     # 获取测试配置的调优结果
     tuning_result = get_tuning_result(load=load, config=config)
     if config == load.best_config:
