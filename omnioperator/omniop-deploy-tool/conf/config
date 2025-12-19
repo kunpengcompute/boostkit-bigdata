@@ -2,7 +2,7 @@
 # omnioperator期望的spark版本号，当前支持的spark版本有：3.1.1   3.3.1   3.4.3   3.5.2
 expect_spark_version=3.3.1
 # omnioperator版本号
-omnioperator_version=1.9.0
+omnioperator_version=2.0.0
 # 部署目录
 target_path=/opt/omni-operator
 # 是否安装sve版本的omnioperator，默认为false(小写字母)
