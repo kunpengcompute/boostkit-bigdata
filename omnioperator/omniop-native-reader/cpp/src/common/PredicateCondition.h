@@ -308,6 +308,13 @@ namespace common {
                     }
                     break;
                 }
+                case FALSE: {
+                    errno_t opFalseRet = memset_s(bitMark, BitUtil::Nbytes(bitSize), 0, BitUtil::Nbytes(bitSize));
+                    if (UNLIKELY(opFalseRet != EOK)) {
+                        throw OmniException("OPERATOR_RUNTIME_ERROR", "LeafPredicateCondition FALSE memset_s fail.");
+                    }
+                    break;
+                }
                 case EQUAL_TO: {
                     computeCompare<data_operator::batchEqualTo, data_operator::equalTo>(vector, vectorSize);
                     break;

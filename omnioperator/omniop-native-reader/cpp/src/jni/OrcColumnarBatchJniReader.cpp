@@ -284,10 +284,16 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_scan_jni_OrcColumnarBatchJniRea
     // get offset from json obj
     jlong offset = env->CallLongMethod(jsonObj, jsonMethodLong, env->NewStringUTF("offset"));
     jlong length = env->CallLongMethod(jsonObj, jsonMethodLong, env->NewStringUTF("length"));
+    jboolean hasIncludedColumns = env->CallBooleanMethod(jsonObj, jsonMethodHas, env->NewStringUTF("includedColumns"));
+    if(!hasIncludedColumns){
+        RowReaderOptions rowReaderOpts;
+        std::unique_ptr<common::JulianGregorianRebase> julianPtr;
+        std::unique_ptr<common::PredicateCondition> predicate;
+        std::unique_ptr<orc::RowReader> rowReader = readerPtr->createRowReader(rowReaderOpts, julianPtr, predicate);
+        return (jlong)(rowReader.release());
+    }
     jobjectArray includedColumns =
         (jobjectArray)env->CallObjectMethod(jsonObj, jsonMethodObj, env->NewStringUTF("includedColumns"));
-    if (includedColumns == NULL)
-        return -1;
     std::list<std::string> includedColumnsLenArray;
     jint arrLen = env->GetArrayLength(includedColumns);
     jboolean isCopy = JNI_FALSE;

@@ -30,6 +30,11 @@ void HdfsOptions::ConfigureHost(const std::string &host) {
     this->host_ = host;
 }
 
+void HdfsOptions::ConfigureScheme(const std::string &scheme)
+{
+    this->scheme_ = scheme;
+}
+
 void HdfsOptions::ConfigurePort(int port) {
     this->port_ = port;
 }
@@ -99,7 +104,8 @@ Status HadoopFileSystem::Init() {
     if (bld == nullptr) {
         return Status::FSError("Fail to create hdfs builder");
     }
-    hdfsBuilderSetNameNode(bld, options_.host_.c_str());
+    auto nn = options_.scheme_ + "://" + options_.host_;
+    hdfsBuilderSetNameNode(bld, nn.c_str());
     hdfsBuilderSetNameNodePort(bld, options_.port_);
     hdfsBuilderSetForceNewInstance(bld);
     hdfsFS fileSystem = hdfsBuilderConnect(bld);
@@ -114,8 +120,13 @@ Status HadoopFileSystem::Init() {
 static std::map<std::string, std::shared_ptr<HadoopFileSystem>> fsMap_;
 static std::mutex mutex_;
 
-std::shared_ptr<HadoopFileSystem> getHdfsFileSystem(const std::string &host, const std::string &port) {
+std::shared_ptr<HadoopFileSystem> getHdfsFileSystem(const UriInfo &uri)
+{
     std::shared_ptr<HadoopFileSystem> fileSystemPtr;
+
+    auto host = uri.Host();
+    auto port = uri.Port();
+    auto scheme = uri.Scheme();
 
     mutex_.lock();
     std::string key = host + ":" + port;
@@ -128,6 +139,7 @@ std::shared_ptr<HadoopFileSystem> getHdfsFileSystem(const std::string &host, con
 
     HdfsOptions options;
     options.ConfigureHost(host);
+    options.ConfigureScheme(scheme);
     int portInt = 0;
     if (!port.empty()) {
         portInt = std::stoi(port);

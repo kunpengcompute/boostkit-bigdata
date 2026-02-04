@@ -43,6 +43,8 @@ namespace omniruntime::reader {
         */
         virtual void next(char* data, uint64_t numValues, char* notNull);
 
+        void nextBatch(char *data, uint64_t numValues, uint64_t *nulls);
+
     protected:
         inline void nextBuffer();
         inline signed char readByte();
@@ -93,5 +95,118 @@ namespace omniruntime::reader {
         char lastByte;
         char reversedAndFlipLastByte;
     };
+}
+
+namespace omniruntime::writer {
+
+    using BoolFlatVector = omniruntime::vec::Vector<bool>;
+    using BoolDictVector = omniruntime::vec::Vector<omniruntime::vec::DictionaryContainer<bool>>;
+    using ByteFlatVector = omniruntime::vec::Vector<int8_t>;
+    using ByteDictVector = omniruntime::vec::Vector<omniruntime::vec::DictionaryContainer<int8_t>>;
+
+    /* omni encoder start */
+    class OmniByteRleEncoder : public orc::ByteRleEncoder
+    {
+        public:
+            OmniByteRleEncoder(std::unique_ptr<orc::BufferedOutputStream> output);
+            virtual ~OmniByteRleEncoder() override;
+         /**
+         * Encode the next batch of values.
+         * @param data to be encoded
+         * @param numValues the number of values to be encoded
+         * @param notNull If the pointer is null, all values are read. If the
+         *    pointer is not null, positions that are false are skipped.
+         */
+         virtual void add(const char* data, uint64_t numValues,
+                              const char* notNull) override;
+
+         void add(const int8_t* data,
+                  uint64_t offset,
+                  uint64_t numValues,
+                  omniruntime::vec::NullsBuffer* nullsBuffer);
+
+         void add(ByteDictVector* data,
+                  uint64_t offset,
+                  uint64_t numValue);
+
+        /**
+         * Get size of buffer used so far.
+         */
+        virtual uint64_t getBufferSize() const override;
+
+        /**
+         * Flush underlying BufferedOutputStream.
+         */
+        virtual uint64_t flush() override;
+
+        virtual void recordPosition(orc::PositionRecorder* recorder) const override;
+
+        protected:
+          std::unique_ptr<orc::BufferedOutputStream> outputStream;
+          char* literals;
+          int numLiterals;
+          bool repeat;
+          int tailRunLength;
+          int bufferPosition;
+          int bufferLength;
+          char* buffer;
+
+          void writeByte(char c);
+          void writeValues();
+          void write(char c);
+    };
+
+    std::unique_ptr<orc::ByteRleEncoder> createOmniByteRleEncoder(std::unique_ptr<orc::BufferedOutputStream> output);
+
+
+    class OmniBooleanRleEncoder : public OmniByteRleEncoder
+    {
+        public:
+        OmniBooleanRleEncoder(std::unique_ptr<orc::BufferedOutputStream> output);
+        virtual ~OmniBooleanRleEncoder() override = default;
+
+        void add(omniruntime::vec::NullsBuffer *nullsBuffer,
+            omniruntime::vec::NullsBuffer *pNullsBuffer,
+            uint64_t offset,
+            uint64_t numValues);
+
+        void add(const bool* data,
+            uint64_t offset,
+            uint64_t numValues,
+            omniruntime::vec::NullsBuffer *nullsBuffer);
+
+        /**
+         * Encode the next batch of values
+         * @param data to be encoded
+         * @param numValues the number of values to be encoded
+         * @param notNull If the pointer is null, all values are read. If the
+         *    pointer is not null, positions that are false are skipped.
+         */
+        virtual void add(const char* data, uint64_t numValues,
+                          const char* notNull) override;
+
+        void add(BoolDictVector *vec, uint64_t offset, uint64_t numValues);
+
+        /**
+         * Flushing underlying BufferedOutputStream
+         */
+        virtual uint64_t flush() override;
+
+        virtual void recordPosition(orc::PositionRecorder* recorder) const override;
+
+        private:
+            int bitsRemained;
+            char current;
+    };
+
+
+      /**
+       * Create a boolean RLE encoder.
+       * @param output the output stream to write to
+       */
+      std::unique_ptr<orc::ByteRleEncoder> createOmniBooleanRleEncoder
+                                     (std::unique_ptr<orc::BufferedOutputStream> output);
+
+    /* omni encoder start */
 }
 #endif

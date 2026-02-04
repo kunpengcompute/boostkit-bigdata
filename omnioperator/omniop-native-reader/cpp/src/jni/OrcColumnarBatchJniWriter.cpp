@@ -20,12 +20,12 @@
 #include "OrcColumnarBatchJniWriter.h"
 #include <memory>
 #include <orc/Type.hh>
-#include <orc/Vector.hh>
-#include <orc/Writer.hh>
 #include "jni_common.h"
+#include "orcfile/OmniWriter.hh"
 
 using namespace omniruntime::vec;
 using namespace omniruntime::type;
+using namespace omniruntime::writer;
 using namespace orc;
 
 static constexpr int32_t DECIMAL_PRECISION_INDEX = 0;
@@ -59,35 +59,53 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_write_jni_OrcColumnarBatchJniWr
 }
 
 JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_write_jni_OrcColumnarBatchJniWriter_initializeSchemaType(
-    JNIEnv *env, jobject jObj, jintArray orcTypeIds, jobjectArray schemaNames, jobjectArray decimalParam)
+        JNIEnv *env, jobject jObj, jintArray orcTypeIds, jobjectArray schemaNames, jobjectArray decimalParam)
 {
     JNI_FUNC_START
     auto orcTypeIdPtr = env->GetIntArrayElements(orcTypeIds, JNI_FALSE);
     if (orcTypeIdPtr == NULL) {
         env->ThrowNew(runtimeExceptionClass, "Orc type ids should not be null.");
     }
-    auto orcTypeIdLength = (int32_t)env->GetArrayLength(orcTypeIds);
+    // 获取列名长度，orcTypeIds长度已经不确定，包含嵌套子列
+    auto schemaNamesLength = (int32_t)env->GetArrayLength(schemaNames);
     auto writeType = createPrimitiveType(orc::TypeKind::STRUCT);
 
-    for (int i = 0; i < orcTypeIdLength; ++i) {
-        jint orcType = orcTypeIdPtr[i];
+    int typeOffset = 0;  //用来给嵌套类型做偏移
+
+    for (int i = 0; i < schemaNamesLength; ++i) {
+        jint orcType = orcTypeIdPtr[i + typeOffset];
         jstring schemaName = (jstring)env->GetObjectArrayElement(schemaNames, i);
         const char *cSchemaName = env->GetStringUTFChars(schemaName, nullptr);
         std::unique_ptr<orc::Type> writeOrcType;
-        if (static_cast<TypeKind>(orcType) == orc::TypeKind::DECIMAL) {
+
+        // 遇到LIST类型，取出紧随其后的子类型，并让偏移量+1，map类型则偏移量+2
+        if (static_cast<TypeKind>(orcType) == orc::TypeKind::LIST) {
+            jint elementTypeId = orcTypeIdPtr[i + typeOffset + 1];
+            writeOrcType = createListType(createPrimitiveType(static_cast<TypeKind>(elementTypeId)));
+            typeOffset += 1;
+        }else if (static_cast<TypeKind>(orcType) == orc::TypeKind::MAP) {
+            jint keyTypeId = orcTypeIdPtr[i + typeOffset + 1];
+            jint valueTypeId = orcTypeIdPtr[i + typeOffset + 2];
+            writeOrcType = createMapType(
+                    createPrimitiveType(static_cast<TypeKind>(keyTypeId)),
+                    createPrimitiveType(static_cast<TypeKind>(valueTypeId)));
+            typeOffset += 2;
+        }
+        else if (static_cast<TypeKind>(orcType) == orc::TypeKind::DECIMAL) {
             auto decimalParamArray = (jintArray)env->GetObjectArrayElement(decimalParam, i);
             auto decimalParamArrayPtr = env->GetIntArrayElements(decimalParamArray, JNI_FALSE);
             auto precision = decimalParamArrayPtr[DECIMAL_PRECISION_INDEX];
             auto scale = decimalParamArrayPtr[DECIMAL_SCALE_INDEX];
             writeOrcType = createDecimalType(precision, scale);
-        }
-        else {
+            env->ReleaseIntArrayElements(decimalParamArray, decimalParamArrayPtr, JNI_ABORT);
+        } else {
             writeOrcType = createPrimitiveType(static_cast<TypeKind>(orcType));
         }
         writeType->addStructField(std::string(cSchemaName), std::move(writeOrcType));
         env->ReleaseStringUTFChars(schemaName, cSchemaName);
     }
 
+    env->ReleaseIntArrayElements(orcTypeIds, orcTypeIdPtr, JNI_ABORT);
     orc::Type *writerTypeNew = writeType.release();
     return (jlong)(writerTypeNew);
     JNI_FUNC_END(runtimeExceptionClass)
@@ -136,214 +154,26 @@ JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_write_jni_OrcColumnarBatchJniWr
         (jint)env->CallIntMethod(writerOptionsJson, jsonMethodInt, env->NewStringUTF("compression strategy"));
     writerOptions.setCompressionStrategy(static_cast<CompressionStrategy>(compressionStrategyJint));
 
+    jstring timezoneKey = env->NewStringUTF("timezone");
+    jstring timezoneJStr = (jstring)env->CallObjectMethod(writerOptionsJson, jsonMethodString, timezoneKey);
+    env->DeleteLocalRef(timezoneKey);
+    if (timezoneJStr != NULL) {
+        const char *tzChars = env->GetStringUTFChars(timezoneJStr, NULL);
+        std::string tzName(tzChars);
+        writerOptions.setTimezoneName(tzName);
+        env->ReleaseStringUTFChars(timezoneJStr, tzChars);
+        env->DeleteLocalRef(timezoneJStr);
+    } else {
+        std::cout << "[warning] OrcColumnarBatchJniWriter : timezone not found in writerOptions" << std::endl;
+    }
+
     orc::OutputStream *stream = (orc::OutputStream *)outputStream;
     orc::Type *writeType = (orc::Type *)schemaType;
 
-    std::unique_ptr<orc::Writer> writer = createWriter((*writeType), stream, writerOptions);
-    orc::Writer *writerNew = writer.release();
+    std::unique_ptr<OmniWriter> writer = createOmniWriter((*writeType), stream, writerOptions);
+    OmniWriter *writerNew = writer.release();
     return (jlong)(writerNew);
     JNI_FUNC_END(runtimeExceptionClass)
-}
-
-JNIEXPORT jlong JNICALL Java_com_huawei_boostkit_write_jni_OrcColumnarBatchJniWriter_initializeBatch(JNIEnv *env,
-                                                                                                     jobject jObj,
-                                                                                                     jlong writer,
-                                                                                                     jlong batchSize)
-{
-    orc::Writer *writerPtr = (orc::Writer *)writer;
-    auto rowBatch = writerPtr->createRowBatch(batchSize);
-    orc::ColumnVectorBatch *batch = rowBatch.release();
-    return (jlong)(batch);
-}
-
-template <DataTypeId TYPE_ID, typename V>
-void WriteVector(JNIEnv *env, BaseVector *vec, ColumnVectorBatch *fieldBatch, bool isSplitWrite = false, long startPos = 0,
-                 long endPos = 0)
-{
-    using T = typename NativeType<TYPE_ID>::type;
-    auto vector = (Vector<T> *)vec;
-    V *lvb = dynamic_cast<V *>(fieldBatch);
-    auto values = lvb->data.data();
-    auto notNulls = lvb->notNull.data();
-    long index = 0;
-    if (!isSplitWrite) {
-        startPos = 0;
-        endPos = vector->GetSize();
-    }
-    if (vector->HasNull()) {
-        lvb->hasNulls = true;
-        for (long j = startPos; j < endPos; j++) {
-            if (vector->IsNull(j)) {
-                notNulls[index] = 0;
-            }
-            index++;
-        }
-    }
-    index = 0;
-    if(sizeof(T) == sizeof(values[0])){
-        errno_t err;
-        err = memcpy_s(values, sizeof(T) * (endPos - startPos),
-                  omniruntime::vec::unsafe::UnsafeVector::GetRawValues(vector) + startPos,
-                  sizeof(T) * (endPos - startPos));
-        if (err != EOK) {
-            env->ThrowNew(runtimeExceptionClass,"Get values from vector failed");
-        }
-    } else {
-        for (long j = startPos; j < endPos; j++) {
-                values[index] = vector->GetValue(j);
-                index++;
-            }
-    }
-}
-
-void WriteDecimal128VectorBatch(BaseVector *vec, ColumnVectorBatch *fieldBatch, bool isSplitWrite = false,
-                                long startPos = 0, long endPos = 0)
-{
-    auto vector = (Vector<Decimal128> *)vec;
-    auto *lvb = dynamic_cast<orc::Decimal128VectorBatch *>(fieldBatch);
-    auto values = lvb->values.data();
-    auto notNulls = lvb->notNull.data();
-    long index = 0;
-    if (!isSplitWrite) {
-        startPos = 0;
-        endPos = vector->GetSize();
-    }
-    if (vector->HasNull()) {
-        lvb->hasNulls = true;
-        for (long j = startPos; j < endPos; j++) {
-            if (vector->IsNull(j)) {
-                notNulls[index] = 0;
-            }
-            index++;
-        }
-    }
-    index = 0;
-    for (long j = startPos; j < endPos; j++) {
-        values[index] = orc::Int128(vector->GetValue(j).HighBits(), vector->GetValue(j).LowBits());
-        index++;
-    }
-}
-
-void WriteDecimal64VectorBatch(JNIEnv *env, BaseVector *vec, ColumnVectorBatch *fieldBatch, bool isSplitWrite = false,
-                               long startPos = 0, long endPos = 0)
-{
-    auto vector = (Vector<int64_t> *)vec;
-    auto *lvb = dynamic_cast<orc::Decimal64VectorBatch *>(fieldBatch);
-    auto values = lvb->values.data();
-    auto notNulls = lvb->notNull.data();
-    long index = 0;
-    if (!isSplitWrite) {
-        startPos = 0;
-        endPos = vector->GetSize();
-    }
-    if (vector->HasNull()) {
-        lvb->hasNulls = true;
-        for (long j = startPos; j < endPos; j++) {
-            if (vector->IsNull(j)) {
-                notNulls[index] = 0;
-            }
-            index++;
-        }
-    }
-    errno_t err;
-    err = memcpy_s(values,sizeof(values[0]) * (endPos - startPos),
-              omniruntime::vec::unsafe::UnsafeVector::GetRawValues(vector) + startPos,
-              sizeof(vector->GetValue(0)) * (endPos - startPos));
-    if (err != EOK) {
-        env->ThrowNew(runtimeExceptionClass,"Get values from vector failed");
-    }
-}
-
-void WriteVarCharVectorBatch(BaseVector *baseVector, ColumnVectorBatch *fieldBatch, bool isSplitWrite = false,
-                             long startPos = 0, long endPos = 0)
-{
-    auto vector = (Vector<LargeStringContainer<std::string_view>> *)baseVector;
-    auto *lvb = dynamic_cast<orc::StringVectorBatch *>(fieldBatch);
-    auto values = lvb->data.data();
-    auto notNulls = lvb->notNull.data();
-    auto lens = lvb->length.data();
-    long index = 0;
-    if (!isSplitWrite) {
-        startPos = 0;
-        endPos = vector->GetSize();
-    }
-    if (vector->HasNull()) {
-        lvb->hasNulls = true;
-        for (long j = startPos; j < endPos; j++) {
-            if (vector->IsNull(j)) {
-                notNulls[index] = 0;
-            }
-            index++;
-        }
-    }
-    index = 0;
-    for (long j = startPos; j < endPos; j++) {
-        values[index] = const_cast<char *>(vector->GetValue(j).data());
-        lens[index] = vector->GetValue(j).size();
-        index++;
-    }
-}
-
-void WriteLongVectorBatch(JNIEnv *env, DataTypeId typeId, BaseVector *baseVector, ColumnVectorBatch *fieldBatch,
-                          bool isSplitWrite = false, long startPos = 0, long endPos = 0)
-{
-    JNI_FUNC_START
-    switch (typeId) {
-    case OMNI_BOOLEAN:
-        return WriteVector<OMNI_BOOLEAN, orc::LongVectorBatch>(env, baseVector, fieldBatch, isSplitWrite, startPos, endPos);
-    case OMNI_SHORT:
-        return WriteVector<OMNI_SHORT, orc::LongVectorBatch>(env, baseVector, fieldBatch, isSplitWrite, startPos, endPos);
-    case OMNI_INT:
-        return WriteVector<OMNI_INT, orc::LongVectorBatch>(env, baseVector, fieldBatch, isSplitWrite, startPos, endPos);
-    case OMNI_LONG:
-        return WriteVector<OMNI_LONG, orc::LongVectorBatch>(env, baseVector, fieldBatch, isSplitWrite, startPos, endPos);
-    case OMNI_DATE32:
-        return WriteVector<OMNI_DATE32, orc::LongVectorBatch>(env, baseVector, fieldBatch, isSplitWrite, startPos, endPos);
-    case OMNI_DATE64:
-        return WriteVector<OMNI_DATE64, orc::LongVectorBatch>(env, baseVector, fieldBatch, isSplitWrite, startPos, endPos);
-    default:
-        env->ThrowNew(runtimeExceptionClass, "DealLongVectorBatch not support for type:" + typeId);
-    }
-    JNI_FUNC_END_VOID(runtimeExceptionClass)
-}
-
-void WriteVector(JNIEnv *env, long *vecNativeId, int colNums, orc::StructVectorBatch *batch, const int *omniTypes,
-                 const unsigned char *dataColumnsIds, bool isSplitWrite = false, long startPos = 0, long endPos = 0)
-{
-    JNI_FUNC_START
-    for (int i = 0; i < colNums; ++i) {
-        if (!dataColumnsIds[i]) {
-            continue;
-        }
-        auto vec = (BaseVector *)vecNativeId[i];
-        auto typeId = static_cast<DataTypeId>(omniTypes[i]);
-        auto fieldBatch = batch->fields[i];
-        switch (typeId) {
-        case OMNI_BOOLEAN:
-        case OMNI_SHORT:
-        case OMNI_INT:
-        case OMNI_LONG:
-        case OMNI_DATE32:
-        case OMNI_DATE64:
-            WriteLongVectorBatch(env, typeId, vec, fieldBatch, isSplitWrite, startPos, endPos);
-            break;
-        case OMNI_DOUBLE:
-            WriteVector<OMNI_DOUBLE, orc::DoubleVectorBatch>(env, vec, fieldBatch, isSplitWrite, startPos, endPos);
-            break;
-        case OMNI_VARCHAR:
-            WriteVarCharVectorBatch(vec, fieldBatch, isSplitWrite, startPos, endPos);
-            break;
-        case OMNI_DECIMAL64:
-            WriteDecimal64VectorBatch(env, vec, fieldBatch, isSplitWrite, startPos, endPos);
-            break;
-        case OMNI_DECIMAL128:
-            WriteDecimal128VectorBatch(vec, fieldBatch, isSplitWrite, startPos, endPos);
-            break;
-        default:
-            env->ThrowNew(runtimeExceptionClass, "Native columnar write not support for this type: " + typeId);
-        }
-    }
-    JNI_FUNC_END_VOID(runtimeExceptionClass)
 }
 
 JNIEXPORT void JNICALL Java_com_huawei_boostkit_write_jni_OrcColumnarBatchJniWriter_write(
@@ -356,12 +186,16 @@ JNIEXPORT void JNICALL Java_com_huawei_boostkit_write_jni_OrcColumnarBatchJniWri
     auto colNums = env->GetArrayLength(vecNativeId);
     auto omniTypesPtr = env->GetIntArrayElements(omniTypes, JNI_FALSE);
     auto dataColumnsIdsPtr = env->GetBooleanArrayElements(dataColumnsIds, JNI_FALSE);
-    orc::Writer *writerPtr = (orc::Writer *)writer;
-    auto rowBatch = writerPtr->createRowBatch(numRows);
-    rowBatch->numElements = numRows;
-    orc::StructVectorBatch *batch = static_cast<orc::StructVectorBatch *>(rowBatch.get());
-    WriteVector(env, vecNativeIdPtr, colNums, batch, omniTypesPtr, dataColumnsIdsPtr);
-    writerPtr->add(*batch);
+    OmniWriter *writerPtr = (OmniWriter *)writer;
+    std::vector<BaseVector *> colVecs;
+    for (int i = 0; i < colNums; ++i) {
+        if (!dataColumnsIdsPtr[i]) {
+            continue;
+        }
+        colVecs.push_back((BaseVector *)vecNativeIdPtr[i]);
+    }
+    std::unique_ptr<RowVector> rowVec = std::make_unique<RowVector>(numRows, colVecs);
+    writerPtr->add(rowVec.get(), 0, numRows);
     JNI_FUNC_END_VOID(runtimeExceptionClass)
 }
 
@@ -375,12 +209,16 @@ JNIEXPORT void JNICALL Java_com_huawei_boostkit_write_jni_OrcColumnarBatchJniWri
     auto omniTypesPtr = env->GetIntArrayElements(omniTypes, JNI_FALSE);
     auto dataColumnsIdsPtr = env->GetBooleanArrayElements(dataColumnsIds, JNI_FALSE);
     auto writeRows = endPos - startPos;
-    orc::Writer *writerPtr = (orc::Writer *)writer;
-    auto rowBatch = writerPtr->createRowBatch(writeRows);
-    rowBatch->numElements = writeRows;
-    orc::StructVectorBatch *batch = static_cast<orc::StructVectorBatch *>(rowBatch.get());
-    WriteVector(env, vecNativeIdPtr, colNums, batch, omniTypesPtr, dataColumnsIdsPtr, true, startPos, endPos);
-    writerPtr->add(*batch);
+    OmniWriter *writerPtr = (OmniWriter *)writer;
+    std::vector<BaseVector *> colVecs;
+    for (int i = 0; i < colNums; ++i) {
+        if (!dataColumnsIdsPtr[i]) {
+            continue;
+        }
+        colVecs.push_back((BaseVector *)vecNativeIdPtr[i]);
+    }
+    std::unique_ptr<RowVector> rowVec = std::make_unique<RowVector>(writeRows, colVecs);
+    writerPtr->add(rowVec.get(), startPos, endPos);
     JNI_FUNC_END_VOID(runtimeExceptionClass)
 }
 
@@ -391,7 +229,7 @@ JNIEXPORT void JNICALL Java_com_huawei_boostkit_write_jni_OrcColumnarBatchJniWri
 {
     JNI_FUNC_START
 
-    orc::Writer *writerPtr = (orc::Writer *)writer;
+    OmniWriter *writerPtr = (OmniWriter *)writer;
     if (writerPtr == nullptr) {
         env->ThrowNew(runtimeExceptionClass, "delete nullptr error for writer");
     }
@@ -404,12 +242,6 @@ JNIEXPORT void JNICALL Java_com_huawei_boostkit_write_jni_OrcColumnarBatchJniWri
         errorMsg += e;
         env->ThrowNew(runtimeExceptionClass, errorMsg.c_str());
     }
-
-    orc::OutputStream *outputStreamPtr = (orc::OutputStream *)outputStream;
-    if (outputStreamPtr == nullptr) {
-        env->ThrowNew(runtimeExceptionClass, "delete nullptr error for write output stream");
-    }
-    delete outputStreamPtr;
 
     orc::Type *schemaTypePtr = (orc::Type *)schemaType;
     if (schemaTypePtr == nullptr) {

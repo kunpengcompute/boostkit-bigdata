@@ -62,7 +62,8 @@ case class ColumnarProjectExec(projectList: Seq[NamedExpression], child: SparkPl
   def buildCheck(): Unit = {
     val omniAttrExpsIdMap = getExprIdMap(child.output)
     child.output.map(
-      exp => sparkTypeToOmniType(exp.dataType, exp.metadata)).toArray
+      // TODO RowToColumnTest
+      exp => sparkTypeToOmniTypeWithComplex(exp.dataType, exp.metadata)).toArray
     val omniExpressions: Array[AnyRef] = projectList.map(
       exp => rewriteToOmniJsonExpressionLiteral(exp, omniAttrExpsIdMap)).toArray
     checkOmniJsonWhiteList("", omniExpressions)
@@ -77,7 +78,8 @@ case class ColumnarProjectExec(projectList: Seq[NamedExpression], child: SparkPl
 
     val omniAttrExpsIdMap = getExprIdMap(child.output)
     val omniInputTypes = child.output.map(
-      exp => sparkTypeToOmniType(exp.dataType, exp.metadata)).toArray
+      // TODO RowToColumnTest
+      exp => sparkTypeToOmniTypeWithComplex(exp.dataType, exp.metadata)).toArray
     val omniExpressions = projectList.map(
       exp => rewriteToOmniJsonExpressionLiteral(exp, omniAttrExpsIdMap)).toArray
 
@@ -180,7 +182,7 @@ case class ColumnarFilterExec(condition: Expression, child: SparkPlan)
   def buildCheck(): Unit = {
     val omniAttrExpsIdMap = getExprIdMap(child.output)
     child.output.map(
-      exp => sparkTypeToOmniType(exp.dataType, exp.metadata)).toArray
+      exp => sparkTypeToOmniTypeWithComplex(exp.dataType, exp.metadata)).toArray
     val filterExpression = rewriteToOmniJsonExpressionLiteral(condition, omniAttrExpsIdMap)
     checkOmniJsonWhiteList(filterExpression, new Array[AnyRef](0))
   }
@@ -196,7 +198,7 @@ case class ColumnarFilterExec(condition: Expression, child: SparkPlan)
 
     val omniAttrExpsIdMap = getExprIdMap(child.output)
     val omniInputTypes = child.output.map(
-      exp => sparkTypeToOmniType(exp.dataType, exp.metadata)).toArray
+      exp => sparkTypeToOmniTypeWithComplex(exp.dataType, exp.metadata)).toArray
     val omniProjectIndices = child.output.map(
       exp => sparkProjectionToOmniJsonProjection(exp, omniAttrExpsIdMap(exp.exprId))).toArray
 
@@ -298,7 +300,7 @@ case class ColumnarConditionProjectExec(projectList: Seq[NamedExpression],
 
     val omniAttrExpsIdMap = getExprIdMap(child.output)
     val omniInputTypes = child.output.map(
-      exp => sparkTypeToOmniType(exp.dataType, exp.metadata)).toArray
+      exp => sparkTypeToOmniTypeWithComplex(exp.dataType, exp.metadata)).toArray
     val omniExpressions = projectList.map(
       exp => rewriteToOmniJsonExpressionLiteral(exp, omniAttrExpsIdMap)).toArray
 

@@ -38,6 +38,7 @@ import org.apache.spark.sql.vectorized.ColumnarBatch;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.List;
 
 /**
  * To support vectorization in WholeStageCodeGen, this reader returns ColumnarBatch.
@@ -63,6 +64,7 @@ public class OmniOrcColumnarBatchReader extends RecordReader<Void, ColumnarBatch
   private Vec[] vecs;
 
   private int[] vecTypeIds;
+  private List<nova.hetu.omniruntime.type.DataType> dataTypes = new ArrayList<>();
 
   private StructType requiredSchema;
   private Filter pushedFilter;
@@ -145,8 +147,13 @@ public class OmniOrcColumnarBatchReader extends RecordReader<Void, ColumnarBatch
       // if not find, set colsToGet value -1, else set colsToGet 0
       if (recordReader.allFieldsNames.contains(target)) {
         recordReader.colsToGet[i] = 0;
-        recordReader.includedColumns.add(requiredfieldNames[i]);
-        typeBuilder.add(OmniExpressionAdaptor.sparkTypeToOmniType(requiredSchema.fields()[i].dataType()));
+        StructField field = requiredSchema.fields()[i];
+        recordReader.includedColumns.add(target);
+        nova.hetu.omniruntime.type.DataType dataType =
+          OmniExpressionAdaptor.sparkTypeToOmniTypeWithComplex(field.dataType(), field.metadata());
+
+        typeBuilder.add(dataType.getIdValue());
+        dataTypes.add(dataType);
       } else {
         recordReader.colsToGet[i] = -1;
       }
@@ -220,7 +227,7 @@ public class OmniOrcColumnarBatchReader extends RecordReader<Void, ColumnarBatch
     if (requiredSchema.fields().length == 0 || vecTypeIds.length == 0) {
       batchSize = (int) recordReader.getNumberOfRowsJava();
     } else {
-      batchSize = recordReader.next(vecs, vecTypeIds);
+      batchSize = recordReader.next(vecs, vecTypeIds, dataTypes);
     }
     if (batchSize == 0) {
       return false;

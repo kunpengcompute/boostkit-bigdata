@@ -20,8 +20,14 @@ set(SOURCE_FILES
         orcfile/OrcHdfsFileOverride.cc
         orcfile/OmniRowReaderImpl.cc
         orcfile/OmniRLEv2.cc
+        orcfile/OmniRLE.cc
         orcfile/OmniColReader.cc
         orcfile/OmniByteRLE.cc
+        orcfile/OrcUtil.cpp
+        orcfile/OmniColumnWriter.cc
+        orcfile/OmniWriter.cc
+        common/UriInfo.cc
+        common/RebaseDate.cpp
         filesystem/hdfs_file.cpp
         filesystem/hdfs_filesystem.cpp
         filesystem/io_exception.cpp

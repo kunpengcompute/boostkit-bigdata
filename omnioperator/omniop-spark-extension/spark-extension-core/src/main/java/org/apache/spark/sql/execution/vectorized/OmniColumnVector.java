@@ -18,12 +18,14 @@
 
 package org.apache.spark.sql.execution.vectorized;
 
+import nova.hetu.omniruntime.utils.OmniRuntimeException;
 import nova.hetu.omniruntime.vector.*;
 
 import org.apache.spark.sql.catalyst.util.RebaseDateTime;
 import org.apache.spark.sql.types.*;
 import org.apache.spark.unsafe.Platform;
 import org.apache.spark.unsafe.types.UTF8String;
+import com.huawei.boostkit.spark.expression.*;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -84,9 +86,11 @@ public class OmniColumnVector extends WritableColumnVector {
     private Decimal128Vec decimal128DataVec;
     private VarcharVec charsTypeDataVec;
     private DictionaryVec dictionaryData;
+    private ArrayVec arrayDataVec;
 
     // init vec
     private boolean initVec;
+    private int[] offsets;
 
     public OmniColumnVector(int capacity, DataType type, boolean initVec) {
         super(capacity, type);
@@ -129,6 +133,8 @@ public class OmniColumnVector extends WritableColumnVector {
             return intDataVec;
         } else if (type instanceof ByteType) {
             return charsTypeDataVec;
+        } else if (type instanceof ArrayType) {
+            return arrayDataVec;
         } else {
             return null;
         }
@@ -164,6 +170,9 @@ public class OmniColumnVector extends WritableColumnVector {
             this.intDataVec = (IntVec) vec;
         } else if (type instanceof ByteType) {
             this.charsTypeDataVec = (VarcharVec) vec;
+        } else if (type instanceof ArrayType) {
+            this.arrayDataVec = (ArrayVec) vec;
+            ((OmniColumnVector)(getChild(0))).setVec(arrayDataVec.getElementVec());
         } else {
             return;
         }
@@ -204,6 +213,10 @@ public class OmniColumnVector extends WritableColumnVector {
             dictionaryData.close();
             dictionaryData = null;
         }
+        if (arrayDataVec != null) {
+            arrayDataVec.close();
+            arrayDataVec = null;
+        }
     }
 
     //
@@ -239,6 +252,8 @@ public class OmniColumnVector extends WritableColumnVector {
             return charsTypeDataVec.hasNull();
         } else if (type instanceof DateType) {
             return intDataVec.hasNull();
+        } else if (type instanceof ArrayType) {
+            return arrayDataVec.hasNull();
         }
         throw new UnsupportedOperationException("hasNull is not supported for type:" + type);
     }
@@ -281,6 +296,8 @@ public class OmniColumnVector extends WritableColumnVector {
             charsTypeDataVec.setNull(rowId);
         } else if (type instanceof DateType) {
             intDataVec.setNull(rowId);
+        } else if (type instanceof ArrayType) {
+            arrayDataVec.setNull(rowId);
         }
     }
 
@@ -316,6 +333,42 @@ public class OmniColumnVector extends WritableColumnVector {
             charsTypeDataVec.setNulls(rowId, nullValue, 0, count);
         } else if (type instanceof DateType) {
             intDataVec.setNulls(rowId, nullValue, 0, count);
+        } else if (type instanceof ArrayType) {
+            arrayDataVec.setNulls(rowId, nullValue, 0, count);
+        }
+    }
+
+    public void putNulls(int rowId, byte[] nullValue, int count) {
+        if (dictionaryData != null) {
+            dictionaryData.setNulls(rowId, nullValue, 0, count);
+            return;
+        }
+        if (type instanceof BooleanType || type instanceof NullType) {
+            booleanDataVec.setNulls(rowId, nullValue, 0, count);
+        } else if (type instanceof ByteType) {
+            charsTypeDataVec.setNulls(rowId, nullValue, 0, count);
+        } else if (type instanceof ShortType) {
+            shortDataVec.setNulls(rowId, nullValue, 0, count);
+        } else if (type instanceof IntegerType) {
+            intDataVec.setNulls(rowId, nullValue, 0, count);
+        } else if (type instanceof DecimalType) {
+            if (DecimalType.is64BitDecimalType(type)) {
+                longDataVec.setNulls(rowId, nullValue, 0, count);
+            } else {
+                decimal128DataVec.setNulls(rowId, nullValue, 0, count);
+            }
+        } else if (type instanceof LongType || DecimalType.is64BitDecimalType(type) || type instanceof TimestampType) {
+            longDataVec.setNulls(rowId, nullValue, 0, count);
+        } else if (type instanceof FloatType) {
+            return;
+        } else if (type instanceof DoubleType) {
+            doubleDataVec.setNulls(rowId, nullValue, 0, count);
+        } else if (type instanceof StringType) {
+            charsTypeDataVec.setNulls(rowId, nullValue, 0, count);
+        } else if (type instanceof DateType) {
+            intDataVec.setNulls(rowId, nullValue, 0, count);
+        } else if (type instanceof ArrayType) {
+            arrayDataVec.setNulls(rowId, nullValue, 0, count);
         }
     }
 
@@ -351,6 +404,8 @@ public class OmniColumnVector extends WritableColumnVector {
             return charsTypeDataVec.isNull(rowId);
         } else if (type instanceof DateType) {
             return intDataVec.isNull(rowId);
+        } else if (type instanceof ArrayType) {
+            return arrayDataVec.isNull(rowId);
         } else {
 
             throw new UnsupportedOperationException("isNullAt is not supported for type:" + type);
@@ -873,6 +928,9 @@ public class OmniColumnVector extends WritableColumnVector {
             charsTypeDataVec = new VarcharVec(newCapacity);
         } else if (type instanceof DateType) {
             intDataVec = new IntVec(newCapacity);
+        } else if (type instanceof ArrayType) {
+            nova.hetu.omniruntime.type.ArrayDataType dataType = (nova.hetu.omniruntime.type.ArrayDataType) OmniExpressionAdaptor.sparkTypeToOmniTypeWithComplex(type, Metadata.empty());
+            arrayDataVec = new ArrayVec(dataType, newCapacity, true);
         } else {
             throw new UnsupportedOperationException("reserveInternal is not supported for type:" + type);
         }
@@ -881,10 +939,28 @@ public class OmniColumnVector extends WritableColumnVector {
 
     @Override
     protected OmniColumnVector reserveNewColumn(int capacity, DataType type) {
-        return new OmniColumnVector(capacity, type, true);
+        return new OmniColumnVector(capacity, type, false);
+    }
+
+    public void setChild(WritableColumnVector child, int index) {
+        this.childColumns[index] = child;
     }
 
     public boolean isConstant() {
         return isConstant;
+    }
+
+    public void updateVec() {
+        if (type instanceof ArrayType) {
+            arrayDataVec.addElements(((OmniColumnVector) (getChild(0))).getVec());
+            if (offsets == null) {
+                throw new OmniRuntimeException("ArrayVec need offsets!");
+            }
+            arrayDataVec.addOffsets(offsets);
+        }
+    }
+
+    public void setOffsets(int[] offsets) {
+        this.offsets = offsets;
     }
 }

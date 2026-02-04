@@ -28,6 +28,8 @@ namespace omniruntime::reader {
         switch (dataTypeId) {
             case omniruntime::type::OMNI_BOOLEAN:
                 return std::make_unique<omniruntime::vec::Vector<bool>>(numValues);
+            case omniruntime::type::OMNI_BYTE:
+ 	            return std::make_unique<omniruntime::vec::Vector<int8_t>>(numValues);
             case omniruntime::type::OMNI_SHORT:
                 return std::make_unique<omniruntime::vec::Vector<int16_t>>(numValues);
             case omniruntime::type::OMNI_INT:
@@ -49,6 +51,16 @@ namespace omniruntime::reader {
             	return std::make_unique<omniruntime::vec::Vector<double>>(numValues);
             default:
                 throw std::runtime_error("MakeDoubleVector Not support double vector for this type: " + dataTypeId);
+        }
+    }
+
+    std::unique_ptr<omniruntime::vec::BaseVector> makeFloatVector(uint64_t numValues,
+                                                                   omniruntime::type::DataTypeId dataTypeId) {
+        switch (dataTypeId) {
+            case omniruntime::type::OMNI_FLOAT:
+                return std::make_unique<omniruntime::vec::Vector<float>>(numValues);
+            default:
+                throw std::runtime_error("MakeFloatVector Not support float vector for this type: " + dataTypeId);
         }
     }
 
@@ -76,10 +88,21 @@ namespace omniruntime::reader {
         }
     }
 
+    std::unique_ptr<omniruntime::vec::BaseVector> makeArrayVector(uint64_t numValues,
+        omniruntime::type::DataTypeId dataTypeId) {
+        return std::make_unique<omniruntime::vec::ArrayVector>(numValues);
+    }
+
+    std::unique_ptr<omniruntime::vec::BaseVector> makeRowVector(uint64_t numValues, const orc::Type *structType,
+            omniruntime::type::DataTypeId dataTypeId) {
+        return std::make_unique<omniruntime::vec::RowVector>(numValues);
+    }
+
     std::unique_ptr<omniruntime::vec::BaseVector> makeNewVector(uint64_t numValues, const orc::Type* baseTp,
         omniruntime::type::DataTypeId dataTypeId) {
         switch (baseTp->getKind()) {
             case orc::TypeKind::BOOLEAN:
+            case orc::TypeKind::BYTE:
             case orc::TypeKind::SHORT:
             case orc::TypeKind::DATE:
             case orc::TypeKind::INT:
@@ -89,12 +112,18 @@ namespace omniruntime::reader {
                 return makeFixedLengthVector(numValues, dataTypeId);
             case orc::TypeKind::DOUBLE:
                 return makeDoubleVector(numValues, dataTypeId);
+            case orc::TypeKind::FLOAT:
+                return makeFloatVector(numValues, dataTypeId);
             case orc::TypeKind::CHAR:
             case orc::TypeKind::STRING:
             case orc::TypeKind::VARCHAR:
                 return makeVarcharVector(numValues, dataTypeId);
             case orc::TypeKind::DECIMAL:
                 return makeDecimalVector(numValues, dataTypeId);
+            case orc::TypeKind::LIST:
+                return makeArrayVector(numValues, dataTypeId);
+            case orc::TypeKind::STRUCT:
+                return makeRowVector(numValues, baseTp, dataTypeId);
             default: {
                 throw std::runtime_error("Not support For This ORC Type: " + baseTp->getKind());
             }

@@ -27,6 +27,7 @@
 
 using omniruntime::vec::VectorBatch;
 using omniruntime::vec::BaseVector;
+using omniruntime::vec::ArrayVector;
 using omniruntime::exception::OmniException;
 using omniruntime::vec::NullsBuffer;
 using orc::ColumnReader;
@@ -170,8 +171,10 @@ namespace omniruntime::reader {
                 } else {
                     return std::make_unique<OmniDecimal128ColumnReader>(type, stripe);
                 }
-
+            case orc::LIST:
+                return std::make_unique<OmniListColumnReader>(type, stripe, julianPtr);
             case orc::FLOAT:
+                return std::make_unique<OmniFloatColumnReader>(type, stripe);
             case orc::DOUBLE:
                 return std::make_unique<OmniDoubleColumnReader>(type, stripe);
 
@@ -252,7 +255,7 @@ namespace omniruntime::reader {
     * OmniStructColumnReader funcs
     */
     OmniStructColumnReader::OmniStructColumnReader(const Type& type, StripeStreams& stripe,
-        common::JulianGregorianRebase *julianPtr): OmniColumnReader(type, stripe) {
+        common::JulianGregorianRebase *julianPtr): OmniColumnReader(type, stripe), type_(&type) {
         // count the number of selected sub-columns
         const std::vector<bool> selectedColumns = stripe.getSelectedColumns();
         switch (static_cast<int64_t>(stripe.getEncoding(columnId).kind())) {
@@ -312,7 +315,7 @@ namespace omniruntime::reader {
             const Type* orcType = baseTp.getSubtype(i);
             omniruntime::type::DataTypeId dataTypeId;
             if (omniTypeId == nullptr) {
-                dataTypeId = getDefaultOmniType(orcType);
+                dataTypeId = OrcUtil::tranOrcTypeToOmniType(orcType);
             } else {
                 dataTypeId = static_cast<omniruntime::type::DataTypeId>(omniTypeId[i]);
             }
@@ -323,38 +326,124 @@ namespace omniruntime::reader {
         }
     }
 
-    omniruntime::type::DataTypeId OmniStructColumnReader::getDefaultOmniType(const Type* type) {
-        constexpr int32_t OMNI_MAX_DECIMAL64_DIGITS = 18;
-        switch (type->getKind()) {
-            case orc::TypeKind::BOOLEAN:
-                return omniruntime::type::OMNI_BOOLEAN;
-            case orc::TypeKind::SHORT:
-                return omniruntime::type::OMNI_SHORT;
-            case orc::TypeKind::DATE:
-                //To do check if  the DATE is DATE64 type
-                return omniruntime::type::OMNI_DATE32;
-            case orc::TypeKind::INT:
-                return omniruntime::type::OMNI_INT;
-            case orc::TypeKind::LONG:
-                return omniruntime::type::OMNI_LONG;
-            case orc::TypeKind::TIMESTAMP:
-            case orc::TypeKind::TIMESTAMP_INSTANT:
-                return omniruntime::type::OMNI_TIMESTAMP;
-            case orc::TypeKind::DOUBLE:
-                return omniruntime::type::OMNI_DOUBLE;
-            case orc::TypeKind::CHAR:
-            case orc::TypeKind::STRING:
-            case orc::TypeKind::VARCHAR:
-                return omniruntime::type::OMNI_VARCHAR;
-            case orc::TypeKind::DECIMAL:
-                if (type->getPrecision() > OMNI_MAX_DECIMAL64_DIGITS) {
-                    return omniruntime::type::OMNI_DECIMAL128;
-                } else {
-                    return omniruntime::type::OMNI_DECIMAL64;
+    void OmniStructColumnReader::next(omniruntime::vec::BaseVector *vec, uint64_t numValues,
+            uint64_t *incomingNulls, int omniTypeId) {
+        auto nulls = omniruntime::vec::unsafe::UnsafeBaseVector::GetNulls(vec);
+        readNulls(this, numValues, incomingNulls, nulls);
+        bool hasNull = vec->HasNull();
+
+        auto rowVector = reinterpret_cast<omniruntime::vec::RowVector*>(vec);
+
+        uint64_t i = 0;
+        for(auto iter = children.begin(); iter != children.end(); ++iter, ++i) {
+            const orc::Type *child = type_->getSubtype(i);
+            auto dataTypeId =  OrcUtil::tranOrcTypeToOmniType(child);
+            auto childVec = std::shared_ptr<omniruntime::vec::BaseVector>(makeNewVector(numValues, child, dataTypeId).release());
+            reinterpret_cast<OmniColumnReader*>(&(*iter->get()))->next(childVec.get(), numValues,
+                hasNull ? reinterpret_cast<uint64_t*>(nulls) : nullptr, dataTypeId);
+            rowVector->AddChild(childVec);
+        }
+    }
+
+    /**
+     * OmniListColumnReader funcs
+     */
+    OmniListColumnReader::OmniListColumnReader(const orc::Type& type, orc::StripeStreams& stripe,
+        common::JulianGregorianRebase *julianPtr): OmniColumnReader(type, stripe), orcType(&type) {
+        // count the number of selected sub-columns
+        const std::vector<bool> selectedColumns = stripe.getSelectedColumns();
+        RleVersion vers = omniConvertRleVersion(stripe.getEncoding(columnId).kind());
+        std::unique_ptr<SeekableInputStream> stream = stripe.getStream(columnId, orc::proto::Stream_Kind_LENGTH, true);
+        if (stream == nullptr) {
+            throw OmniException("EXPRESSION_NOT_SUPPORT", "Length stream not found in List column");
+        }
+        rle = createOmniRleDecoder(std::move(stream), false, vers, memoryPool);
+        const Type& childType = *type.getSubtype(0);
+        if (selectedColumns[static_cast<uint64_t>(childType.getColumnId())]) {
+            child = omniBuildReader(childType, stripe, julianPtr);
+        }
+    }
+
+    uint64_t OmniListColumnReader::skip(uint64_t numValues) {
+        numValues = OmniColumnReader::skip(numValues);
+        ColumnReader* childReader = child.get();
+        if (childReader) {
+            const uint64_t BUFFER_SIZE = 1024;
+            int64_t buffer[BUFFER_SIZE];
+            uint64_t childrenElements = 0;
+            uint64_t lengthsRead = 0;
+            while (lengthsRead < numValues) {
+                uint64_t chunk = std::min(numValues - lengthsRead, BUFFER_SIZE);
+                rle->next(buffer, chunk, nullptr);
+                for (size_t i = 0; i < chunk; ++i) {
+                    childrenElements += static_cast<size_t>(buffer[i]);
                 }
-            default:
-                throw omniruntime::exception::OmniException(
-                    "EXPRESSION_NOT_SUPPORT", "Not Supported Type: " + type->getKind());
+                lengthsRead += chunk;
+            }
+            childReader->skip(childrenElements);
+        } else {
+            rle->skip(numValues);
+        }
+        return numValues;
+    }
+
+    void OmniListColumnReader::next(omniruntime::vec::BaseVector *vec, uint64_t numValues, uint64_t *incomingNulls,
+        int omniTypeId) {
+        nextInternal<false>(vec, numValues, incomingNulls, omniTypeId);
+    }
+
+    void OmniListColumnReader::seekToRowGroup(std::unordered_map<uint64_t, orc::PositionProvider>& positions) {
+        OmniColumnReader::seekToRowGroup(positions);
+        rle->seek(positions.at(columnId));
+        if (child.get()) {
+            child->seekToRowGroup(positions);
+        }
+    }
+
+    template<bool encoded>
+    void OmniListColumnReader::nextInternal(omniruntime::vec::BaseVector *vec, uint64_t numValues, uint64_t *incomingNulls,
+        int omniTypeId) {
+        if (encoded) {
+            std::string message("OmniListColumnReader::nextInternal encoded is not finished!");
+            throw omniruntime::exception::OmniException("EXPRESSION_NOT_SUPPORT", message);
+        }
+
+        auto nulls = omniruntime::vec::unsafe::UnsafeBaseVector::GetNulls(vec);
+        readNulls(this, numValues, incomingNulls, nulls);
+        bool hasNull = vec->HasNull();
+
+        auto arrayVector = reinterpret_cast<omniruntime::vec::ArrayVector*>(vec);
+
+        int64_t* offsets = arrayVector->GetOffsets();
+        auto nullsTrans = reinterpret_cast<uint64_t*>(nulls);
+        rle->next(offsets, numValues, nullsTrans);
+
+        uint64_t totalChildren = 0;
+        if (hasNull) {
+            for (size_t i = 0; i < numValues; ++i) {
+                if (!BitUtil::IsBitSet(nulls, i)) {
+                    uint64_t tmp = static_cast<uint64_t>(offsets[i]);
+                    offsets[i] = static_cast<uint64_t>(totalChildren);
+                    totalChildren += tmp;
+                } else {
+                    offsets[i] = static_cast<uint64_t>(totalChildren);
+                }
+            }
+        } else {
+            for (size_t i = 0; i < numValues; ++i) {
+                uint64_t tmp = static_cast<uint64_t>(offsets[i]);
+                offsets[i] = static_cast<uint64_t>(totalChildren);
+                totalChildren += tmp;
+            }
+        }
+        offsets[numValues] = static_cast<uint64_t>(totalChildren);
+        ColumnReader* childReader = child.get();
+        if (childReader) {
+            const Type* childOrcType = orcType->getSubtype(0);
+            auto childDataTypeId = OrcUtil::tranOrcTypeToOmniType(childOrcType);
+            std::shared_ptr<BaseVector> childVector = std::move(makeNewVector(totalChildren, childOrcType, childDataTypeId));
+            arrayVector->SetElementVector(childVector);
+            reinterpret_cast<OmniColumnReader*>(childReader)->next((arrayVector->GetElementVector().get()), totalChildren, nullptr, childDataTypeId);
         }
     }
 
@@ -381,10 +470,18 @@ namespace omniruntime::reader {
         boolDecoder->next(vec, numValues, hasNull ? reinterpret_cast<uint64_t*>(nulls) : nullptr, omniTypeId);
     }
 
-    void OmniByteColumnReader::next(BaseVector *vec, uint64_t numValues, uint64_t *incomingNulls,
-        int omniTypeId) {
-        throw OmniException("EXPRESSION_NOT_SUPPORT", "Not Supported yet.");
-    }
+     void OmniByteColumnReader::next(BaseVector *vec, uint64_t numValues, uint64_t *incomingNulls,
+ 	    int omniTypeId) {
+ 	    auto nulls = omniruntime::vec::unsafe::UnsafeBaseVector::GetNulls(vec);
+ 	    readNulls(this, numValues, incomingNulls, nulls);
+ 	    bool hasNull = vec->HasNull();
+ 	    if (omniTypeId != omniruntime::type::OMNI_BYTE) {
+ 	        throw OmniException("EXPRESSION_NOT_SUPPORT", "Not Supported Type: " + omniTypeId);
+ 	    }
+ 	    OmniByteRleDecoder *byteDecoder = reinterpret_cast<OmniByteRleDecoder*>(rle.get());
+ 	    byteDecoder->nextBatch(reinterpret_cast<char *>(reinterpret_cast<omniruntime::vec::Vector<int8_t> *>(vec)->GetValuesBuffer()),
+ 	        numValues, hasNull ? reinterpret_cast<uint64_t *>(nulls) : nullptr);
+ 	 }
 
     void OmniTimestampColumnReader::next(BaseVector *vec, uint64_t numValues,
         uint64_t *incomingNulls, int omniTypeId) {
@@ -507,7 +604,40 @@ namespace omniruntime::reader {
         }
     }
 
-    void OmniStringDictionaryColumnReader::next(BaseVector *vec, uint64_t numValues, 
+    void OmniFloatColumnReader::next(BaseVector *vec, uint64_t numValues, uint64_t *incomingNulls,
+                                      int omniTypeId) {
+        auto nulls = omniruntime::vec::unsafe::UnsafeBaseVector::GetNulls(vec);
+        readNulls(this, numValues, incomingNulls, nulls);
+        bool hasNull = vec->HasNull();
+        auto dataTypeId = static_cast<omniruntime::type::DataTypeId>(omniTypeId);
+        switch (dataTypeId) {
+            case omniruntime::type::OMNI_FLOAT: {
+                auto values = omniruntime::vec::unsafe::UnsafeVector::GetRawValues(
+                        static_cast<omniruntime::vec::Vector<float>*>(vec));
+                return nextByType(values, numValues, hasNull ? reinterpret_cast<uint64_t*>(nulls) : nullptr);
+            }
+            default:
+                throw omniruntime::exception::OmniException(
+                        "EXPRESSION_NOT_SUPPORT", "OmniFloatColumnReader type not support: " + dataTypeId);
+        }
+    }
+
+    template <typename T>
+    void OmniFloatColumnReader::nextByType(T *data, uint64_t numValues, uint64_t *nulls) {
+        if(nulls) {
+            for(size_t i = 0; i < numValues; ++i) {
+                if(!BitUtil::IsBitSet(nulls, i)) {
+                    data[i] = static_cast<T>(readFloat());
+                }
+            }
+        } else {
+            for(size_t i = 0; i < numValues; ++i) {
+                data[i] = static_cast<T>(readFloat());
+            }
+        }
+    }
+
+    void OmniStringDictionaryColumnReader::next(BaseVector *vec, uint64_t numValues,
         uint64_t *incomingNulls, int omniTypeId) {
         auto nulls = omniruntime::vec::unsafe::UnsafeBaseVector::GetNulls(vec);
         readNulls(this, numValues, incomingNulls, nulls);
@@ -516,7 +646,8 @@ namespace omniruntime::reader {
         char *blob = dictionary->dictionaryBlob.data();
         int64_t *dictionaryOffsets = dictionary->dictionaryOffset.data();
         auto nullsTrans = reinterpret_cast<uint64_t*>(nulls);
-        int64_t outputLengths[numValues];
+        std::unique_ptr<int64_t[]> sp = std::make_unique<int64_t[]>(numValues);
+        int64_t *outputLengths = sp.get();
         rle->next(outputLengths, numValues, nullsTrans);
         uint64_t dictionaryCount = dictionary->dictionaryOffset.size() - 1;
 
@@ -580,7 +711,8 @@ namespace omniruntime::reader {
         // Load data from the blob stream into our buffer until we have enough
         // to get the rest directly out of the stream's buffer.
         size_t bytesBuffered = 0;
-        char ptr[totalLength];
+        std::unique_ptr<char[]> sp =std::make_unique<char[]>(totalLength);
+        char *ptr = sp.get();
         while (bytesBuffered + lastBufferLength < totalLength) {
             memcpy_s(ptr + bytesBuffered, totalLength - bytesBuffered, lastBuffer, lastBufferLength);
             bytesBuffered += lastBufferLength;
@@ -1166,7 +1298,6 @@ namespace omniruntime::reader {
         rle->seek(positions.at(columnId));
     }
 
-
     OmniDoubleColumnReader::OmniDoubleColumnReader(const Type& type,
                                         StripeStreams& stripe
                                         ): OmniColumnReader(type, stripe),
@@ -1208,6 +1339,52 @@ namespace omniruntime::reader {
 
     void OmniDoubleColumnReader::seekToRowGroup(
         std::unordered_map<uint64_t, orc::PositionProvider>& positions) {
+        OmniColumnReader::seekToRowGroup(positions);
+        inputStream->seek(positions.at(columnId));
+        // clear buffer state after seek
+        bufferEnd = nullptr;
+        bufferPointer = nullptr;
+    }
+
+    OmniFloatColumnReader::OmniFloatColumnReader(const Type& type,
+                                                   StripeStreams& stripe
+    ): OmniColumnReader(type, stripe),
+       columnKind(type.getKind()),
+       bytesPerValue(4),
+       bufferPointer(nullptr),
+       bufferEnd(nullptr) {
+        inputStream = stripe.getStream(columnId, orc::proto::Stream_Kind_DATA, true);
+        if (inputStream == nullptr)
+            throw orc::ParseError("DATA stream not found in Float column");
+    }
+
+    OmniFloatColumnReader::~OmniFloatColumnReader() {
+        // PASS
+    }
+
+    uint64_t OmniFloatColumnReader::skip(uint64_t numValues) {
+        numValues = OmniColumnReader::skip(numValues);
+
+        if (static_cast<size_t>(bufferEnd - bufferPointer) >=
+            bytesPerValue * numValues) {
+            bufferPointer += bytesPerValue * numValues;
+        } else {
+            size_t sizeToSkip = bytesPerValue * numValues -
+                                static_cast<size_t>(bufferEnd - bufferPointer);
+            const size_t cap = static_cast<size_t>(std::numeric_limits<int>::max());
+            while (sizeToSkip != 0) {
+                size_t step = sizeToSkip > cap ? cap : sizeToSkip;
+                inputStream->Skip(static_cast<int>(step));
+                sizeToSkip -= step;
+            }
+            bufferEnd = nullptr;
+            bufferPointer = nullptr;
+        }
+        return numValues;
+    }
+
+    void OmniFloatColumnReader::seekToRowGroup(
+            std::unordered_map<uint64_t, orc::PositionProvider>& positions) {
         OmniColumnReader::seekToRowGroup(positions);
         inputStream->seek(positions.at(columnId));
         // clear buffer state after seek
