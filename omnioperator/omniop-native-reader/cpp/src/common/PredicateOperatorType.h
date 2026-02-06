@@ -32,7 +32,8 @@ namespace common {
         IS_NULL = 7,
         OR = 8,
         AND = 9,
-        NOT = 10
+        NOT = 10,
+        FALSE = 11
     };
 }
 

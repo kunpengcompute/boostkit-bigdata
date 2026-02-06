@@ -23,6 +23,7 @@
 #include "filesystem.h"
 #include "hdfs.h"
 #include "status.h"
+#include "common/UriInfo.h"
 
 namespace fs {
 
@@ -32,9 +33,12 @@ struct HdfsOptions {
     ~HdfsOptions() = default;
 
     std::string host_;
+    std::string scheme_;
     int port_ = 0;
 
     void ConfigureHost(const std::string &host);
+
+    void ConfigureScheme(const std::string &scheme);
 
     void ConfigurePort(int port);
 
@@ -89,7 +93,7 @@ private:
 * @param host the host of hdfs filesystem
 * @param port the port of hdfs filesystem
 */
-std::shared_ptr<HadoopFileSystem> getHdfsFileSystem(const std::string &host, const std::string &port);
+std::shared_ptr<HadoopFileSystem> getHdfsFileSystem(const UriInfo& uri);
 
 }
 

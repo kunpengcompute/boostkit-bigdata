@@ -37,7 +37,7 @@ namespace orc {
     public:
         HdfsFileInputStreamOverride(const UriInfo& uri) {
             this->filename_ = uri.Path();
-            std::shared_ptr<HadoopFileSystem> fileSystemPtr = getHdfsFileSystem(uri.Host(), uri.Port());
+            std::shared_ptr<HadoopFileSystem> fileSystemPtr = getHdfsFileSystem(uri);
             this->hdfs_file_ = std::make_unique<HdfsReadableFile>(fileSystemPtr, this->filename_, 0);
 
             Status openFileSt = hdfs_file_->OpenFile();
@@ -116,7 +116,7 @@ namespace orc {
     public:
         explicit HdfsFileOutputStreamOverride(const UriInfo &uri) {
             this->filename_ = uri.Path();
-            std::shared_ptr<HadoopFileSystem> fileSystemPtr = getHdfsFileSystem(uri.Host(), uri.Port());
+            std::shared_ptr<HadoopFileSystem> fileSystemPtr = getHdfsFileSystem(uri);
             this->hdfs_file_ = std::make_unique<HdfsWriteableFile>(fileSystemPtr, this->filename_, 0);
             Status openFileSt = hdfs_file_->OpenFile();
             if (!openFileSt.IsOk()) {

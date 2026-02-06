@@ -31,10 +31,24 @@ namespace omniruntime::reader {
     std::unique_ptr<omniruntime::vec::BaseVector> makeDoubleVector(uint64_t numValues,
         omniruntime::type::DataTypeId dataTypeId);
 
+    std::unique_ptr<omniruntime::vec::BaseVector> makeFloatVector(uint64_t numValues,
+        omniruntime::type::DataTypeId dataTypeId);
+
     std::unique_ptr<omniruntime::vec::BaseVector> makeVarcharVector(uint64_t numValues,
         omniruntime::type::DataTypeId dataTypeId);
 
     std::unique_ptr<omniruntime::vec::BaseVector> makeDecimalVector(uint64_t numValues,
+        omniruntime::type::DataTypeId dataTypeId);
+
+    std::unique_ptr<omniruntime::vec::BaseVector> makeArrayVector(uint64_t numValues,
+        omniruntime::type::DataTypeId dataTypeId);
+
+
+
+    std::unique_ptr<omniruntime::vec::BaseVector> makeRowVector(uint64_t numValues, const orc::Type *structType,
+        omniruntime::type::DataTypeId dataTypeId);
+
+    std::unique_ptr<omniruntime::vec::BaseVector> makeArrayVector(uint64_t numValues,
         omniruntime::type::DataTypeId dataTypeId);
 
     std::unique_ptr<omniruntime::vec::BaseVector> makeNewVector(uint64_t numValues, const orc::Type* baseTp,
@@ -105,5 +119,4 @@ namespace omniruntime::reader {
         void plainUnpackLongs(int64_t *data, uint64_t offset, uint64_t len, uint64_t fbs);
     };
 }
-
 #endif

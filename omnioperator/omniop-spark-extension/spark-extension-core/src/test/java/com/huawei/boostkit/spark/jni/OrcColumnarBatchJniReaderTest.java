@@ -137,7 +137,7 @@ public class OrcColumnarBatchJniReaderTest extends TestCase {
     @Test
     public void testNext() {
         Vec[] vecs = new Vec[2];
-        long rtn = orcColumnarBatchScanReader.next(vecs, vecTypeIds);
+        long rtn = orcColumnarBatchScanReader.next(vecs, vecTypeIds, null);
         assertTrue(rtn == 4096);
         assertTrue(((LongVec) vecs[0]).get(0) == 1);
         String str = new String(((VarcharVec) vecs[1]).get(0));

@@ -29,7 +29,6 @@ public class OrcColumnarBatchJniWriter {
      public native long initializeOutputStream(JSONObject uriJson);
      public native long initializeSchemaType(int[]orcTypeIds, String[] schemaNames, int[][] decimalParam);
      public native long initializeWriter(long outputStream, long schemaType, JSONObject writerOptions);
-     public native long initializeBatch(long writer, long batchSize);
      public native void write(long writer, long[] vecNativeId, int[] omniTypes, boolean[] dataColumnsIds, int rowNums);
      public native void splitWrite(long writer, long[] vecNativeId, int[] omniTypes, boolean[] dataColumnsIds, long startPos, long endPos);
      public native void close(long outputSteam, long schemaType, long writer);

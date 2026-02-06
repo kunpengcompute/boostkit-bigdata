@@ -59,6 +59,7 @@ namespace common {
         PredicateOperatorType op = jsonCondition["op"].get<PredicateOperatorType>();
         switch (op) {
             case TRUE:
+            case FALSE:
             case EQUAL_TO:
             case GREATER_THAN:
             case GREATER_THAN_OR_EQUAL:

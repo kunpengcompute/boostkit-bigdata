@@ -84,14 +84,6 @@ public class OrcColumnarBatchWriter {
         outputStream = jniWriter.initializeOutputStream(uriJson);
     }
 
-    public void convertGreGorianToJulian(IntVec intVec, int startPos, int endPos) {
-        int julianValue;
-        for (int rowIndex = startPos; rowIndex < endPos; rowIndex++) {
-            julianValue = RebaseDateTime.rebaseGregorianToJulianDays(intVec.get(rowIndex));
-            intVec.set(rowIndex, julianValue);
-        }
-    }
-
     public void initializeSchemaTypeJava(StructType dataSchema) {
         schemaType = jniWriter.initializeSchemaType(sparkTypeToOrcLibType(dataSchema), extractSchemaName(dataSchema),
                 extractDecimalParam(dataSchema));
@@ -189,10 +181,6 @@ public class OrcColumnarBatchWriter {
             OmniColumnVector omniVec = (OmniColumnVector) columBatch.column(i);
             Vec vec = omniVec.getVec();
             vecNativeIds[i] = vec.getNativeVector();
-            boolean isDateType = (omniTypes[i] == 8);
-            if (isDateType) {
-                convertGreGorianToJulian((IntVec) vec, 0, columBatch.numRows());
-            }
         }
 
         jniWriter.write(writer, vecNativeIds, omniTypes, dataColumnsIds, columBatch.numRows());
@@ -204,10 +192,6 @@ public class OrcColumnarBatchWriter {
             OmniColumnVector omniVec = (OmniColumnVector) inputBatch.column(i);
             Vec vec = omniVec.getVec();
             vecNativeIds[i] = vec.getNativeVector();
-            boolean isDateType = (allOmniTypes[i] == 8);
-            if (isDateType) {
-                convertGreGorianToJulian((IntVec) vec, (int) startPos, (int) endPos);
-            }
         }
 
         jniWriter.splitWrite(writer, vecNativeIds, omniTypes, dataColumnsIds, startPos, endPos);

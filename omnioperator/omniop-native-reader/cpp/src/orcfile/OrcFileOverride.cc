@@ -25,7 +25,7 @@
 namespace orc
 {
     std::unique_ptr<InputStream> readFileOverride(const UriInfo &uri) {
-        if (uri.Scheme() == "hdfs") {
+        if (uri.Scheme() == "hdfs" || uri.Scheme() == "viewfs" ) {
             return orc::createHdfsFileInputStream(uri);
         }
         else {
@@ -35,7 +35,7 @@ namespace orc
 
     std::unique_ptr<OutputStream> writeFileOverride(const UriInfo &uri)
     {
-        if (uri.Scheme() == "hdfs") {
+        if (uri.Scheme() == "hdfs" || uri.Scheme() == "viewfs") {
             return orc::createHdfsFileOutputStream(uri);
         }
         else {

@@ -16,7 +16,6 @@
  * limitations under the License.
  */
 
-#include "OmniRLEv2.hh"
 #include "OmniColReader.hh"
 #include "vector/vector_helper.h"
 #include "OrcDecodeUtils.hh"
@@ -59,60 +58,78 @@ namespace omniruntime::reader {
         }
     }
 
-    void OmniBooleanRleDecoder::nextNulls(char *data, uint64_t numValues, uint64_t *nulls) {
-        if (nulls) {
-            throw std::runtime_error("Not implemented yet for struct type!");
-        }
-
-        uint64_t nonNulls = numValues;
-
-        const uint32_t outputBytes = (numValues + 7) / 8;
-        if (nonNulls == 0) {
-            ::memset(data, 1, outputBytes);
-            return;
-        }
-
-        if (remainingBits >= nonNulls) {
-            // handle remaining bits, which can cover this round
-            data[0] = reversedAndFlipLastByte >> (8 - remainingBits) & 0xff >> (8 - nonNulls);
-            remainingBits -= nonNulls;
+    inline void SetNull(char *data,uint64_t position, bool isNull) {
+        if (isNull) {
+            data[position / 8] |= (1<<(position % 8));
         } else {
-            // put the remaining bits, if any, into previousByte.
-            uint8_t previousByte{0};
-            if (remainingBits > 0) {
-                previousByte = reversedAndFlipLastByte >> (8 - remainingBits);
-            }
+            data[position / 8] &= ~(1<<(position % 8));
+        }
+    }
 
-            // compute byte size that should read
-            uint64_t bytesRead = (nonNulls - remainingBits + 7) / 8;
-            OmniByteRleDecoder::next(data, bytesRead, nullptr);
 
-            ReverseAndFlipBytes(reinterpret_cast<uint8_t*>(data), bytesRead);
-            reversedAndFlipLastByte = data[bytesRead - 1];
+    void OmniBooleanRleDecoder::nextNulls(char *data, uint64_t numValues, uint64_t *nulls) {
 
-            // now shift the data in place
-            if (remainingBits > 0 ) {
-                uint64_t nonNullDWords = nonNulls / 64;
-                for (uint64_t i = 0; i < nonNullDWords; i++) {
-                    uint64_t tmp = reinterpret_cast<uint64_t*>(data)[i];
-                    reinterpret_cast<uint64_t*>(data)[i] =
-                        previousByte | tmp << remainingBits; // previousByte is LSB
-                    previousByte = (tmp >> (64 - remainingBits)) & 0xff;
+        uint64_t position = 0;
+
+        if(nulls) {
+            while(remainingBits > 0 && position < numValues) {
+                if(!BitUtil::IsBitSet(nulls, position)) {
+                    remainingBits -= 1;
+                    SetNull(data, position, !((static_cast<unsigned char>(lastByte) >> remainingBits) & 0x1));
+                } else {
+                    SetNull(data, position, true);
                 }
-
-                // shift 8 bits a time for the remaining bits
-                const uint64_t nonNullOutputBytes = (nonNulls + 7) / 8;
-                for (int32_t i = nonNullDWords * 8; i < nonNullOutputBytes; ++i) {
-                    uint8_t tmp = data[i]; // already reversed
-                    data[i] = previousByte | tmp << remainingBits; // previousByte is LSB
-                    previousByte = tmp >> (8 - remainingBits);
-                }
+                position += 1;
             }
-            remainingBits = bytesRead * 8 + remainingBits - nonNulls;
+        } else {
+            while(remainingBits > 0 && position < numValues) {
+                remainingBits -= 1;
+                SetNull(data, position, !((static_cast<unsigned char>(lastByte) >> remainingBits) & 0x1));
+                position += 1;
+            }
         }
 
-        // clear the most significant bits in the last byte which will be processed in the next round
-        data[outputBytes - 1] &= 0xff >> (outputBytes * 8 - numValues);
+        uint64_t nonNulls = numValues - position;
+        if(nulls) {
+            for(uint64_t i = position; i < numValues; ++i) {
+                if(BitUtil::IsBitSet(nulls, i)) {
+                    nonNulls -= 1;
+                }
+            }
+        }
+
+        // fill in the remaining values
+         if (nonNulls == 0) {
+             while (position < numValues) {
+                 SetNull(data, position++, true);
+             }
+         } else if (position < numValues) {
+             // read the new bytes into the array
+             uint64_t bytesRead = (nonNulls + 7) / 8;
+             char bits[bytesRead];
+             OmniByteRleDecoder::next(bits, bytesRead, nullptr);
+             lastByte = bits[bytesRead - 1];
+             remainingBits = bytesRead * 8 - nonNulls;
+             // expand the array backwards so that we don't clobber the data
+             uint64_t bitsLeft = bytesRead * 8 - remainingBits;
+             if (nulls) {
+                 for (int64_t i = static_cast<int64_t>(numValues) - 1; i >= static_cast<int64_t>(position); --i) {
+                     if (!BitUtil::IsBitSet(nulls, i)) {
+                         uint64_t shiftPosn = (-bitsLeft) % 8;
+                         SetNull(data, i, !((bits[(bitsLeft -1)/8] >> shiftPosn) & 0x1));
+                         bitsLeft -= 1;
+                     } else {
+                         SetNull(data, i, true);
+                     }
+                 }
+             } else {
+                 for (uint64_t i = 0; i < bitsLeft; i++) {
+                    uint64_t byteIndex = i/8;
+                    uint64_t bitPosition = 7 - (i%8);
+                    SetNull(data, position + i, !((bits[byteIndex] >> bitPosition) & 0x1));
+                 }
+             }
+         }
     }
 
 
@@ -352,5 +369,420 @@ namespace omniruntime::reader {
         }
     }
 
+   void OmniByteRleDecoder::nextBatch(char *data, uint64_t numValues, uint64_t *nulls) {
+         uint64_t position = 0;
+         // skip over null values
+         while (nulls && position < numValues && BitUtil::IsBitSet(nulls, position)) {
+             position += 1;
+         }
+         while (position < numValues) {
+             // if we are out of values, read more
+             if (remainingValues == 0) {
+                 readHeader();
+             }
+             // how many do we read out of this block?
+             size_t count = std::min(static_cast<size_t>(numValues - position),
+                                     remainingValues);
+             uint64_t consumed = 0;
+             if (repeating) {
+                 if (nulls) {
+                     for(uint64_t i=0; i < count; ++i) {
+                         if (!BitUtil::IsBitSet(nulls, position + i)) {
+                             data[position + i] = value;
+                             consumed += 1;
+                         }
+                     }
+                 } else {
+                     memset_s(data + position, count, value, count);
+                     consumed = count;
+                 }
+             } else {
+                 if (nulls) {
+                     for(uint64_t i=0; i < count; ++i) {
+                         if (!BitUtil::IsBitSet(nulls, position + i)) {
+                             data[position + i] = readByte();
+                             consumed += 1;
+                         }
+                     }
+                 } else {
+                     uint64_t i = 0;
+                     while (i < count) {
+                         if (bufferStart == bufferEnd) {
+                             nextBuffer();
+                         }
+                         uint64_t copyBytes =
+                                 std::min(static_cast<uint64_t>(count - i),
+                                          static_cast<uint64_t>(bufferEnd - bufferStart));
+                         memcpy_s(data + position + i, copyBytes, bufferStart, copyBytes);
+                         bufferStart += copyBytes;
+                         i += copyBytes;
+                     }
+                     consumed = count;
+                 }
+             }
+             remainingValues -= consumed;
+             position += count;
+             // skip over any null values
+             while (nulls && position < numValues && BitUtil::IsBitSet(nulls, position)) {
+                 position += 1;
+             }
+         }
+     }
    //OmniByteRleDecoder end
+}
+
+namespace omniruntime::writer {
+      const int BYTE_RLE_MINIMUM_REPEAT = 3;
+      const int BYTE_RLE_MAXIMUM_REPEAT = 127 + BYTE_RLE_MINIMUM_REPEAT;
+      const int BYTE_RLE_MAX_LITERAL_SIZE = 128;
+    /* omni encoder start */
+   OmniByteRleEncoder::OmniByteRleEncoder(std::unique_ptr<orc::BufferedOutputStream> output)
+    : outputStream(std::move(output)) {
+        literals = new char[BYTE_RLE_MAX_LITERAL_SIZE ];
+        numLiterals = 0;
+        tailRunLength = 0;
+        repeat = false;
+        bufferPosition = 0;
+        bufferLength = 0;
+        buffer = nullptr;
+   }
+
+   OmniByteRleEncoder::~OmniByteRleEncoder() {
+    // PASS
+    delete [] literals;
+   }
+
+
+  void OmniByteRleEncoder::writeByte(char c) {
+    if (bufferPosition == bufferLength) {
+      int addedSize = 0;
+      if (!outputStream->Next(reinterpret_cast<void **>(&buffer), &addedSize)) {
+        throw std::bad_alloc();
+      }
+      bufferPosition = 0;
+      bufferLength = addedSize;
+    }
+    buffer[bufferPosition++] = c;
+  }
+
+  void OmniByteRleEncoder::add(const char* data, uint64_t numValues, const char* notNull) {
+    for (uint64_t i = 0; i < numValues; ++i) {
+      if (!notNull || notNull[i]) {
+        write(data[i]);
+      }
+    }
+  }
+
+  void OmniByteRleEncoder::add(const int8_t* data,
+                               uint64_t offset,
+                               uint64_t numValues,
+                               omniruntime::vec::NullsBuffer* nullsBuffer) {
+      for (uint64_t i = 0; i < numValues; ++i) {
+          if (!nullsBuffer || !nullsBuffer->IsNull(offset + i)) {
+              write(static_cast<char>(data[i]));
+          }
+      }
+  }
+
+  void OmniByteRleEncoder::add(ByteDictVector* data,
+                               uint64_t offset,
+                               uint64_t numValues) {
+      for (uint64_t i = 0; i < numValues; ++i) {
+          uint64_t rowIdx = offset + i;
+          if (!data->IsNull(rowIdx)) {
+              write(static_cast<char>(data->GetValue(rowIdx)));
+          }
+      }
+  }
+
+    void OmniByteRleEncoder::writeValues() {
+    if (numLiterals != 0) {
+      if (repeat) {
+        writeByte(
+            static_cast<char>(numLiterals - static_cast<int>(BYTE_RLE_MINIMUM_REPEAT)));
+        writeByte(literals[0]);
+      } else {
+        writeByte(static_cast<char>(-numLiterals));
+        for (int i = 0; i < numLiterals; ++i) {
+          writeByte(literals[i]);
+        }
+      }
+      repeat = false;
+      tailRunLength = 0;
+      numLiterals = 0;
+    }
+  }
+
+  uint64_t OmniByteRleEncoder::flush() {
+    writeValues();
+    outputStream->BackUp(bufferLength - bufferPosition);
+    uint64_t dataSize = outputStream->flush();
+    bufferLength = bufferPosition = 0;
+    return dataSize;
+  }
+
+  void OmniByteRleEncoder::write(char value) {
+    if (numLiterals == 0) {
+      literals[numLiterals++] = value;
+      tailRunLength = 1;
+    } else if (repeat) {
+      if (value == literals[0]) {
+        numLiterals += 1;
+        if (numLiterals == BYTE_RLE_MAXIMUM_REPEAT) {
+          writeValues();
+        }
+      } else {
+        writeValues();
+        literals[numLiterals++] = value;
+        tailRunLength = 1;
+      }
+    } else {
+      if (value == literals[numLiterals - 1]) {
+        tailRunLength += 1;
+      } else {
+        tailRunLength = 1;
+      }
+      if (tailRunLength == BYTE_RLE_MINIMUM_REPEAT ) {
+        if (numLiterals + 1 == BYTE_RLE_MINIMUM_REPEAT ) {
+          repeat = true;
+          numLiterals += 1;
+        } else {
+          numLiterals -= static_cast<int>(BYTE_RLE_MINIMUM_REPEAT  - 1);
+          writeValues();
+          literals[0] = value;
+          repeat = true;
+          numLiterals = BYTE_RLE_MINIMUM_REPEAT ;
+        }
+      } else {
+        literals[numLiterals++] = value;
+        if (numLiterals == BYTE_RLE_MAX_LITERAL_SIZE ) {
+          writeValues();
+        }
+      }
+    }
+  }
+
+  uint64_t OmniByteRleEncoder::getBufferSize() const {
+    return outputStream->getSize();
+  }
+
+  void OmniByteRleEncoder::recordPosition(orc::PositionRecorder *recorder) const {
+    uint64_t flushedSize = outputStream->getSize();
+    uint64_t unflushedSize = static_cast<uint64_t>(bufferPosition);
+    if (outputStream->isCompressed()) {
+      // start of the compression chunk in the stream
+      recorder->add(flushedSize);
+      // number of decompressed bytes that need to be consumed
+      recorder->add(unflushedSize);
+    } else {
+      flushedSize -= static_cast<uint64_t>(bufferLength);
+      // byte offset of the RLE run’s start location
+      recorder->add(flushedSize + unflushedSize);
+    }
+    recorder->add(static_cast<uint64_t>(numLiterals));
+  }
+
+  std::unique_ptr<orc::ByteRleEncoder> createOmniByteRleEncoder
+                              (std::unique_ptr<orc::BufferedOutputStream> output) {
+    return std::unique_ptr<orc::ByteRleEncoder>(new OmniByteRleEncoder(std::move(output)));
+  }
+
+
+  OmniBooleanRleEncoder::OmniBooleanRleEncoder(std::unique_ptr<orc::BufferedOutputStream> output)
+    : OmniByteRleEncoder(std::move(output)) {
+    bitsRemained = 8;
+    current = static_cast<char>(0);
+  }
+
+  void OmniBooleanRleEncoder::add(
+                                  const char* data,
+                                  uint64_t numValues,
+                                  const char* notNull) {
+    for (uint64_t i = 0; i < numValues; ++i) {
+      if (bitsRemained == 0) {
+        write(current);
+        current = static_cast<char>(0);
+        bitsRemained = 8;
+      }
+
+      if (!notNull || notNull[i]) {
+        if (!data || data[i]) {
+          current =
+            static_cast<char>(current | (0x80 >> (8 - bitsRemained)));
+        }
+        --bitsRemained;
+      }
+    }
+    if (bitsRemained == 0) {
+      write(current);
+      current = static_cast<char>(0);
+      bitsRemained = 8;
+    }
+  }
+
+  void OmniBooleanRleEncoder::add(BoolDictVector *vec, uint64_t offset, uint64_t numValues) {
+    bool hasNull = vec->HasNull();
+    uint64_t curPos  = offset;
+    for (uint64_t i = 0; i < numValues; ++i, ++curPos) {
+      if (bitsRemained == 0) {
+        write(current);
+        current = static_cast<char>(0);
+        bitsRemained = 8;
+      }
+      if (!hasNull || !vec->IsNull(curPos)) {
+        if (vec->GetValue(curPos)) {
+          current =
+            static_cast<char>(current | (0x80 >> (8 - bitsRemained)));
+        }
+        --bitsRemained;
+      }
+    }
+    if (bitsRemained == 0) {
+      write(current);
+      current = static_cast<char>(0);
+      bitsRemained = 8;
+    }
+  }
+
+  void OmniBooleanRleEncoder::add(
+          omniruntime::vec::NullsBuffer *nullsBuffer,
+          omniruntime::vec::NullsBuffer *pNullsBuffer,
+          uint64_t offset,
+          uint64_t numValues) {
+
+      if (numValues == 0) return;
+
+      const bool pHasNull = (pNullsBuffer != nullptr && pNullsBuffer->HasNull());
+      const bool cHasNull = (nullsBuffer != nullptr && nullsBuffer->HasNull());
+
+      if (!pHasNull) {
+          // path 1: pNullsBuffer doesn't have null, nullsBuffer doesn't have null
+          if (!cHasNull) {
+              for (uint64_t i = 0; i < numValues; ++i) {
+                  if (bitsRemained == 0) {
+                      write(current);
+                      current = 0;
+                      bitsRemained = 8;
+                  }
+                  current = static_cast<char>(current | (0x80 >> (8 - bitsRemained)));
+                  --bitsRemained;
+              }
+          } else {
+              // path 2: pNullsBuffer doesn't have null, nullsBuffer has null
+              for (uint64_t i = 0; i < numValues; ++i) {
+                  if (bitsRemained == 0) {
+                      write(current);
+                      current = 0;
+                      bitsRemained = 8;
+                  }
+                  if (!nullsBuffer->IsNull(offset + i)) {
+                      current = static_cast<char>(current | (0x80 >> (8 - bitsRemained)));
+                  }
+                  --bitsRemained;
+              }
+          }
+      } else {
+          // path 3: pNullsBuffer has null, nullsBuffer doesn't have null
+          if (!cHasNull) {
+              for (uint64_t i = 0; i < numValues; ++i) {
+                  if (bitsRemained == 0) {
+                      write(current);
+                      current = 0;
+                      bitsRemained = 8;
+                  }
+                  if (!pNullsBuffer->IsNull(offset + i)) {
+                      current = static_cast<char>(current | (0x80 >> (8 - bitsRemained)));
+                  }
+                  --bitsRemained;
+              }
+          } else {
+              // path 4: pNullsBuffer has null, nullsBuffer has nulls
+              for (uint64_t i = 0; i < numValues; ++i) {
+                  if (bitsRemained == 0) {
+                      write(current);
+                      current = 0;
+                      bitsRemained = 8;
+                  }
+                  if (!pNullsBuffer->IsNull(offset + i) && !nullsBuffer->IsNull(offset + i)) {
+                      current = static_cast<char>(current | (0x80 >> (8 - bitsRemained)));
+                  }
+                  --bitsRemained;
+              }
+          }
+      }
+
+      if (bitsRemained == 0) {
+          write(current);
+          current = static_cast<char>(0);
+          bitsRemained = 8;
+      }
+  }
+
+  void OmniBooleanRleEncoder::add(
+          const bool* data,
+          uint64_t offset,
+          uint64_t numValues,
+          omniruntime::vec::NullsBuffer* nullsBuffer) {
+      if (numValues == 0) return;
+
+      const bool hasNull = (nullsBuffer != nullptr && nullsBuffer->HasNull());
+
+      if (!hasNull) {
+          for (uint64_t i = 0; i < numValues; ++i) {
+              if (bitsRemained == 0) {
+                  write(current);
+                  current = 0;
+                  bitsRemained = 8;
+              }
+              if (data[i]) {
+                  current = static_cast<char>(current | (0x80 >> (8 - bitsRemained)));
+              }
+              --bitsRemained;
+          }
+      } else {
+          for (uint64_t i = 0; i < numValues; ++i) {
+              if (bitsRemained == 0) {
+                  write(current);
+                  current = 0;
+                  bitsRemained = 8;
+              }
+              if (!nullsBuffer->IsNull(offset + i)) {
+                  if (data[i]) {
+                      current = static_cast<char>(current | (0x80 >> (8 - bitsRemained)));
+                  }
+                  --bitsRemained;
+              }
+          }
+      }
+
+      if (bitsRemained == 0) {
+          write(current);
+          current = static_cast<char>(0);
+          bitsRemained = 8;
+      }
+  }
+
+  uint64_t OmniBooleanRleEncoder::flush() {
+    if (bitsRemained != 8) {
+      write(current);
+    }
+    bitsRemained = 8;
+    current = static_cast<char>(0);
+    return OmniByteRleEncoder::flush();
+  }
+
+  void OmniBooleanRleEncoder::recordPosition(orc::PositionRecorder* recorder) const {
+    OmniByteRleEncoder::recordPosition(recorder);
+    recorder->add(static_cast<uint64_t>(8 - bitsRemained));
+  }
+
+
+   std::unique_ptr<orc::ByteRleEncoder> createOmniBooleanRleEncoder
+        (std::unique_ptr<orc::BufferedOutputStream> output)
+   {
+      orc::ByteRleEncoder* encoder =
+         new OmniBooleanRleEncoder(std::move(output)) ;
+            return std::unique_ptr<orc::ByteRleEncoder>(encoder);
+   }
+   /* omni encoder end  */
 }

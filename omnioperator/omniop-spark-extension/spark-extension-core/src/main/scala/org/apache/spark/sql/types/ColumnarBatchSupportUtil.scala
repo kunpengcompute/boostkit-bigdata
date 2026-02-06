@@ -37,7 +37,7 @@ object ColumnarBatchSupportUtil {
        val supportBatchReader: Boolean = {
            val partitionSchema = plan.relation.partitionSchema
            val resultSchema = StructType(plan.requiredSchema.fields ++ partitionSchema.fields)
-           (conf.orcVectorizedReaderEnabled || conf.parquetVectorizedReaderEnabled) && resultSchema.forall(_.dataType.isInstanceOf[AtomicType])
+           (conf.orcVectorizedReaderEnabled || conf.parquetVectorizedReaderEnabled)
        }
        supportBatchReader && isSupportFormat
    }

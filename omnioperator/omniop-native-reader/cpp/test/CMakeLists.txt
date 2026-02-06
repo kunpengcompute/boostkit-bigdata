@@ -32,7 +32,7 @@ target_link_libraries(${TP_TEST_TARGET}
         stdc++
         dl
         boostkit-omniop-vector-2.0.0-aarch64
-        securec
+        boundscheck
         native_reader)
 
 target_compile_options(${TP_TEST_TARGET} PUBLIC -g -O2 -fPIC)
