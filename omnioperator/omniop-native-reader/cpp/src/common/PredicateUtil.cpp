@@ -282,6 +282,13 @@ namespace common {
         if (UNLIKELY(encodingType == OMNI_DICTIONARY)) {
             throw omniruntime::exception::OmniException("UNSUPPORTED_ERROR", "OMNI_DICTIONARY is unsupported.");
         }
+        for (int32_t i = 0; i < baseVectors.size(); i++) {
+            auto dataType = baseVectors[i]->GetTypeId();
+            if (dataType == OMNI_ARRAY || dataType == OMNI_MAP) {
+                return false;
+            }
+        }
+
         result.resize(baseVectors.size(), nullptr);
         for (int32_t i = 0; i < baseVectors.size(); i++) {
             auto baseVector = baseVectors[i];
