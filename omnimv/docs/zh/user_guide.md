@@ -1,4 +1,4 @@
-# 使用指南<a name="ZH-CN_TOPIC_0000002551561105"></a>
+# 用户指南<a name="ZH-CN_TOPIC_0000002551561105"></a>
 
 ## 使用特性<a name="ZH-CN_TOPIC_0000002520361124"></a>
 
@@ -8,7 +8,7 @@
 
 **前提条件<a name="zh-cn_topic_0000001664980174_section2080521443512"></a>**
 
-请参见[zh-cn\_topic\_0000002520041122.md](zh-cn_topic_0000002520041122.md)完成OmniMV物化视图安装，并参见《[Spark 部署指南](https://www.hikunpeng.com/document/detail/zh/kunpengbds/ecosystemEnable/Spark/kunpengspark_04_0001.html)》完成Spark的部署。
+请参见《[安装指南](./installation_guide.md)》完成OmniMV物化视图安装，并参见《[Spark 部署指南](https://www.hikunpeng.com/document/detail/zh/kunpengbds/ecosystemEnable/Spark/kunpengspark_04_0001.html)》完成Spark的部署。
 
 **使用OmniMV物化视图执行SQL的方式<a name="zh-cn_topic_0000001664980174_zh-cn_topic_0000001518847449_section18710143819163"></a>**
 
@@ -55,7 +55,7 @@
     2. Spark参数可根据集群配置进行调整。
     3. 手动执行SQL。
 
-- 方式二：使用脚本批量执行SQL**。**
+- 方式二：使用脚本批量执行SQL。
 
     Spark参数可根据集群配置进行调整。主要是通过-f调用写好的SQL文件，用户仿照此例自定义脚本，批量执行SQL。例如：
 
@@ -110,7 +110,6 @@
 |Refresh MV （更新视图数据）|REFRESH MATERIALIZED VIEW [db_name.]mv_name;|
 |WASH OUT MATERIALIZED VIEW（淘汰视图）--ALL：淘汰所有视图--UNUSED_DAYS策略（默认）：淘汰${UNUSED_DAYS}未使用过的视图--RESERVE_QUANTITY_BY_VIEW_COUNT策略：保留使用次数前${RESERVE_QUANTITY_BY_VIEW_COUNT}的视图--DROP_QUANTITY_BY_SPACE_CONSUMED策略：淘汰占用空间前${DROP_QUANTITY_BY_SPACE_CONSUMED}的视图|WASH OUT [ALL] MATERIALIZED VIEW [USING[UNUSED_DAYS,][RESERVE_QUANTITY_BY_VIEW_COUNT,][DROP_QUANTITY_BY_SPACE_CONSUMED]]|
 
-
 **OmniMV物化视图Spark启动参数信息<a name="section1817324859"></a>**
 
 **表 2** OmniMV物化视图Spark启动参数信息<a id="OmniMV物化视图Spark启动参数信息"></a>
@@ -124,7 +123,7 @@
 |spark.sql.omnimv.log.enable|true|是否把解析的SQL输出到event log。true：把解析的SQL输出到event log。false：不把解析的SQL输出到event log。|
 |spark.sql.omnimv.metadata.path|/omnimv/plugin_metadata|OmniMV物化视图元数据HDFS路径。|
 |spark.sql.omnimv.metadata.initbyquery.enable|false|用于OmniMV物化视图元数据加载加速，是否只加载查询SQL用到的表相关的OmniMV物化视图元数据。true：只加载查询SQL用到的表相关的OmniMV物化视图元数据。false：加载查询所有的物化视图元数据。|
-|spark.sql.omnimv.dbs|没有缺省值，请根据实际情况自行配置|用于OmniMV物化视图元数据加载加速，是否只加载某些数据库下的OmniMV物化视图元数据。可配置例如omnimv、omnimv1。|
+|spark.sql.omnimv.dbs|没有缺省值，请根据实际情况自行配置。|用于OmniMV物化视图元数据加载加速，是否只加载某些数据库下的OmniMV物化视图元数据。可配置例如omnimv、omnimv1。|
 |spark.sql.omnimv.washout.automatic.enable|false|是否开启OmniMV物化视图的自动淘汰，自动删除旧的物化视图，默认采取UNUSED_DAYS策略。true：开启OmniMV物化视图的自动淘汰。false：不开启OmniMV物化视图的自动淘汰。|
 |spark.sql.omnimv.washout.unused.day|30|UNUSED_DAYS策略（默认），淘汰30天未被使用的视图。|
 |spark.sql.omnimv.washout.reserve.quantity.byViewCnt|25|RESERVE_QUANTITY_BY_VIEW_COUNT策略，按视图使用次数降序排序后，淘汰25名之后的。|
@@ -133,7 +132,6 @@
 |spark.sql.omnimv.washout.automatic.checkTime.interval|3600|一个session里，尝试自动淘汰，间隔多少秒。|
 |spark.sql.omnimv.washout.automatic.view.quantity|20|触发自动淘汰的最少视图数量。|
 |spark.sql.omnimv.detect-rewrite-sqls.enable|false|用于OmniMV物化视图元数据加载加速，是否只针对视图可改写SQL生效，降低不生效SQL因元数据加载耗时带来的劣化。true：只针对OmniMV物化视图可改写SQL生效。false：针对所有SQL生效。|
-
 
 **OmniMV物化视图使用到Kryo相关的参数信息<a name="section2231112814185"></a>**
 
@@ -151,7 +149,6 @@ OmniMV物化视图使用Kryo进行物化视图元数据序列化时，可能存�
 |spark.kryo.referenceTracking|true|启用引用追踪。|
 |spark.kryoserializer.buffer|64k|设置Kryo序列化缓冲区的初始大小。|
 |spark.kryoserializer.buffer.max|64m|设置Kryo序列化缓冲区的最大大小。|
-
 
 **查看OmniMV物化视图Spark引擎是否加载成功<a name="section214462292214"></a>**
 
@@ -218,7 +215,6 @@ OmniMV物化视图使用Kryo进行物化视图元数据序列化时，可能存�
 
     ![](figures/zh-cn_image_0000002520361130.png)
 
-为用户提供了两种使用OmniMV物化视图Spark引擎执行SQL的方式，均可用于重写SQL的物理执行计划。
 ### 推荐视图<a name="ZH-CN_TOPIC_0000002520361126"></a>
 
 用户可根据实际需要提供数据表，使用OmniMV物化视图最终得到推荐的视图集。
@@ -266,7 +262,6 @@ OmniMV物化视图使用Kryo进行物化视图元数据序列化时，可能存�
 |cache_plugin_jar_path|OmniMV的JAR包路径。|/opt/omnimv/boostkit-omnimv-spark-3.1.1-1.2.0-aarch64.jar/opt/omnimv/boostkit-omnimv-spark-3.4.3-1.2.0-aarch64.jar|
 |hdfs_input_path|Spark任务运行日志在HDFS上的访问地址。|hdfs://server1:9000/spark2-history|
 |sqls_path|测试SQL在HDFS上的访问地址。|hdfs://server1:9000/omnimv/tpcds|
-
 
 2. 获取测试SQL（以TPC-DS为例）。
     1. 下载[Spark源码](https://github.com/apache/spark)并解压，在“spark-master/sql/core/src/test/resources/tpcds/“路径下获取TPC-DS测试SQL。
@@ -350,9 +345,6 @@ OmniMV物化视图使用Kryo进行物化视图元数据序列化时，可能存�
     python main.py spark create_greedy_views
     ```
 
-用户可根据实际需要提供数据表，使用OmniMV物化视图最终得到推荐的视图集。
-
-
 ## 维护特性<a name="ZH-CN_TOPIC_0000002520361120"></a>
 
 升级OmniMV物化视图软件需先删除所有的库文件，包括二进制SO以及OmniMV物化视图相关文件，然后上传最新的版本压缩包完成安装步骤，即可完成升级。升级步骤需在管理节点操作并确保OmniMV物化视图上层引擎处于没有任务执行的状态。卸载OmniMV物化视图软件删除配置文件、二进制SO文件以及OmniMV物化视图相关文件即可完成卸载。卸载步骤仅需在管理节点操作。可通过命令查询OmniMV物化视图相关版本信息。
@@ -365,7 +357,7 @@ OmniMV物化视图使用Kryo进行物化视图元数据序列化时，可能存�
     rm -rf /opt/omnimv
     ```
 
-2. 下载并上传最新版本的OmniMV物化视图到管理节点，参见[zh-cn\_topic\_0000002520041116.md](zh-cn_topic_0000002520041116.md)完成安装。
+2. 下载并上传最新版本的OmniMV物化视图到管理节点，参见[安装指南](./installation_guide.md)完成安装。
 3. 更新Spark版本后需刷新物化视图元数据，如Spark版本未更新则不需要执行。
     1. 删除物化视图元数据。
         1. 设置数据库名称。
@@ -435,6 +427,3 @@ OmniMV物化视图使用Kryo进行物化视图元数据序列化时，可能存�
     ```
     cat /opt/omnimv/BoostKit-omnimv_1.2.0/version.txt
     ```
-
-升级OmniMV物化视图软件需先删除所有的库文件，包括二进制SO以及OmniMV物化视图相关文件，然后上传最新的版本压缩包完成安装步骤，即可完成升级。升级步骤需在管理节点操作并确保OmniMV物化视图上层引擎处于没有任务执行的状态。卸载OmniMV物化视图软件删除配置文件、二进制SO文件以及OmniMV物化视图相关文件即可完成卸载。卸载步骤仅需在管理节点操作。可通过命令查询OmniMV物化视图相关版本信息。
-

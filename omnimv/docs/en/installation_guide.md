@@ -16,7 +16,6 @@ A server can function as a management node and a compute node at the same time. 
 **Figure  1**  Networking diagram<a name="en-us_topic_0000001713019717_fig195021730155013"></a>  
 ![](figures/networking-diagram.png "networking-diagram")
 
-You are advised to use a storage and compute coupled network, that is, use nodes as both storage and compute nodes.
 ### Environment Requirements<a name="EN-US_TOPIC_0000002551410733"></a>
 
 Before installing OmniMV, prepare the hardware and software environments to facilitate subsequent installation operations.
@@ -86,7 +85,6 @@ Verify a software package as follows:
 2. Obtain the  [verification tool and guide](https://support.huawei.com/enterprise/en/tool/pgp-verify-TL1000000054).
 3. Verify the package integrity by following the procedure described in the  _OpenPGP Signature Verification Guide_  obtained from the URL.
 
-Before installing OmniMV, prepare the hardware and software environments to facilitate subsequent installation operations.
 
 
 ## Installing the Feature<a name="EN-US_TOPIC_0000002551130865"></a>
@@ -119,7 +117,7 @@ Check that the configuration of each node meets the OmniMV installation requirem
     >![](public_sys-resources/icon-note.gif) **NOTE:** 
     >You can select a cluster mode based on the application scenario requirements. The secure mode \(Kerberos\) is recommended if the storage mode is HDFS.
 
-Check that the configuration of each node meets the OmniMV installation requirements. Before compiling the source code, install GCC/G++, make, CMake, and glibc on each node and ensure that they meet the version requirements. Before installing OmniMV, prepare the cluster environment and those components required for installing the Spark engine based on the OS and software requirements.
+
 ### Installing OmniMV<a name="EN-US_TOPIC_0000002551410763"></a>
 
 To install OmniMV on openEuler 22.03, install Conda and create an OmniMV virtual environment. Then use  **pip**  to download the Python dependency library, including the dependency packages of the Spark engine. After that, download and extract the OmniMV recommendation algorithm software package, and remove other user groups' read and execute permissions.
@@ -220,6 +218,5 @@ To install OmniMV on openEuler 22.03, install Conda and create an OmniMV virtual
     >![](public_sys-resources/icon-note.gif) **NOTE:** 
     >You are advised to extract the package as a non-root user so that the generated directory has the minimum permission to prevent files from being replaced.
 
-To install OmniMV on openEuler 22.03, install Conda and create an OmniMV virtual environment. Then use  **pip**  to download the Python dependency library, including the dependency packages of the Spark engine. After that, download and extract the OmniMV recommendation algorithm software package, and remove other user groups' read and execute permissions.
 
 

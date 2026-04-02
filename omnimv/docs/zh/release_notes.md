@@ -12,7 +12,7 @@
 </tr>
 <tr id="row237mcpsimp"><th class="firstcol" valign="top" width="30%" id="mcps1.1.3.2.1"><p id="p239mcpsimp"><a name="p239mcpsimp"></a><a name="p239mcpsimp"></a>产品版本</p>
 </th>
-<td class="cellrowborder" valign="top" width="70%" headers="mcps1.1.3.2.1 "><p id="p241mcpsimp"><a name="p241mcpsimp"></a><a name="p241mcpsimp"></a>25.3.0</p>
+<td class="cellrowborder" valign="top" width="70%" headers="mcps1.1.3.2.1 "><p id="p241mcpsimp"><a name="p241mcpsimp"></a><a name="p241mcpsimp"></a>25.0.RC1</p>
 </td>
 </tr>
 <tr id="row242mcpsimp"><th class="firstcol" valign="top" width="30%" id="mcps1.1.3.3.1"><p id="p244mcpsimp"><a name="p244mcpsimp"></a><a name="p244mcpsimp"></a>软件名称和版本</p>
@@ -234,14 +234,16 @@ OmniMV 1.2.0版本不支持ClickHouse 22.3.6.5。
 
 |文档名称|内容简介|交付形式|
 |--|--|--|
-|《Kunpeng BoostKit 25.3.0 大数据OmniRuntime 1.9.0 版本说明书》|本文档提供OmniRuntime的版本发布信息。|开源仓|
-|《Kunpeng BoostKit 25.3.0 大数据OmniRuntime 特性指南》|本文档提供OmniRuntime安装部署等指导。|开源仓|
+|《OmniMV 1.2.0 版本说明书》|OmniMV的版本更新内容与发布说明。|开源仓|
+|《OmniMV 安装指南》|提供OmniMV的安装部署指导。|开源仓|
+|《OmniMV 用户指南》|提供OmniMV的使用操作指导。|开源仓|
+|《OmniMV 常见问题》|记录安装、部署和使用OmniMV过程中可能遇到的问题及其解决方法。|开源仓|
 
 
 
 ### 获取文档的方法<a name="ZH-CN_TOPIC_0000002550168171"></a>
 
-您可以通过访问[鲲鹏社区](https://www.hikunpeng.com/document/detail/zh/kunpengbds/overview/kunpengbds.html)浏览和获取相关文档。
+您可以通过访问[开源仓](https://gitcode.com/boostkit/boostkit-bigdata/tree/br_feature_omnimv_spark343/omnimv)浏览和获取相关文档。
 
 
 

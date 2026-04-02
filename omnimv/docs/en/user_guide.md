@@ -6,7 +6,7 @@ You can use the OmniMV Spark engine to execute SQL statements in either of the t
 
 **Prerequisites<a name="en-us_topic_0000001664980174_section2080521443512"></a>**
 
-Install OmniMV by following instructions in  [en-us\_topic\_0000002520041122.md](en-us_topic_0000002520041122.md)  and deploy Spark by following instructions in  [Spark Deployment Guide](https://www.hikunpeng.com/document/detail/en/kunpengbds/ecosystemEnable/Spark/kunpengspark_04_0001.html).
+Install OmniMV by following instructions in  [Installation Guide]((./docs/en/installation_guide.md))  and deploy Spark by following instructions in  [Spark Deployment Guide](https://www.hikunpeng.com/document/detail/en/kunpengbds/ecosystemEnable/Spark/kunpengspark_04_0001.html).
 
 **Methods<a name="en-us_topic_0000001664980174_en-us_topic_0000001518847449_section18710143819163"></a>**
 
@@ -216,7 +216,6 @@ When OmniMV uses Kryo to serialize materialized view metadata, the user's config
 
     ![](figures/en-us_image_0000002520361130.png)
 
-You can use the OmniMV Spark engine to execute SQL statements in either of the two methods. After the SQL statements are executed, the physical SQL execution plan is rewritten.
 ## Recommended Views<a name="EN-US_TOPIC_0000002520361126"></a>
 
 You can provide data tables as required and use OmniMV to obtain the recommended view set.
@@ -348,7 +347,6 @@ In this example, the TPC-DS data table is used as the test table.
     python main.py spark create_greedy_views
     ```
 
-You can provide data tables as required and use OmniMV to obtain the recommended view set.
 ## Maintaining the Feature<a name="EN-US_TOPIC_0000002520361120"></a>
 
 To upgrade OmniMV, delete all library files, including binary SO files and OmniMV files. Then upload the latest package and install it. Perform the following steps on the management node. Ensure that no task is being executed on the upper-layer engine of OmniMV. Uninstalling the OmniMV software requires deleting the configuration file, binary SO files, and OmniMV files. Perform the following steps only on the management node. You can run the command to query the OmniMV version.
@@ -361,7 +359,7 @@ To upgrade OmniMV, delete all library files, including binary SO files and OmniM
     rm -rf /opt/omnimv
     ```
 
-2. Download and upload the latest OmniMV installation package to the management node. Then installing OmniMV by following instructions in  [en-us\_topic\_0000002520041116.md](en-us_topic_0000002520041116.md).
+2. Download and upload the latest OmniMV installation package to the management node. Then installing OmniMV by following instructions in [Installation Guide](./docs/en/installation_guide.md).
 3. After the Spark version is updated, update the materialized view metadata. If the Spark version is not updated, skip this step.
     1. Delete the materialized view metadata.
         1. Set the database name.
@@ -431,6 +429,3 @@ To upgrade OmniMV, delete all library files, including binary SO files and OmniM
     ```
     cat /opt/omnimv/BoostKit-omnimv_1.2.0/version.txt
     ```
-
-To upgrade OmniMV, delete all library files, including binary SO files and OmniMV files. Then upload the latest package and install it. Perform the following steps on the management node. Ensure that no task is being executed on the upper-layer engine of OmniMV. Uninstalling the OmniMV software requires deleting the configuration file, binary SO files, and OmniMV files. Perform the following steps only on the management node. You can run the command to query the OmniMV version.
-

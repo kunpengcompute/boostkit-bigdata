@@ -35,7 +35,7 @@ OmniMV uses AI algorithms to recommend the optimal materialized view from histor
 
 [Figure 1](#en-us_topic_0000002543922601_fig1354413504399)  shows the architecture.
 
-**Figure  1**  Software architecture of OmniMV<a name="en-us_topic_0000002543922601_fig1354413504399"></a>  
+**Figure  1**  Software architecture of OmniMV<a name="en-us_topic_0000002543922601_fig1354413504399"></a>
 ![](figures/software-architecture-of-omnimv.png "software-architecture-of-omnimv")
 
 OmniMV consists of two modules: candidate view generation module and SQL rewrite module.
@@ -77,15 +77,17 @@ The full project directory structure is as follows:
 
 ```
 ├── docs                                                      # Project document directory
-│   └── en                                                   # English document directory
+│   └── zh                                                   # English document directory
 │       ├── figures                                          # Directory of images in English documents
-│       ├── quick_start.md                                   # Quick Start
 │       ├── release_notes.md                                 # OmniMV Release Notes
 │       ├── installation_guide.md                            # OmniMV Installation Guide
 │       ├── user_guide.md                                    # OmniMV User Guide
-│       ├── best_practices.md                                # OmniMV Scenario-specific Application Best Practices
-│       ├── api_reference.md                                 # OmniMV API Reference
-│       ├── design_guide.md                                  # OmniMV Design Guide
+│       ├── faq.md                                           # OmniMV Installation FAQs
+│   └── en                                                   # English document directory
+│       ├── figures                                          # Directory of images in English documents
+│       ├── release_notes.md                                 # OmniMV Release Notes
+│       ├── installation_guide.md                            # OmniMV Installation Guide
+│       ├── user_guide.md                                    # OmniMV User Guide
 │       ├── faq.md                                           # OmniMV Installation FAQs
 ├── omnimv-recommend                                         # OmniMV view recommendation module
 │   ├── config                                               # Configuration file directory
@@ -121,19 +123,17 @@ For details about the environment dependencies and installation methods of OmniM
 
 ## Quick Start<a name="EN-US_TOPIC_0000002520858280"></a>
 
-For instructions on quickly verifying whether OmniMV is active and its performance improvements, see [quick_start.md](./docs/en/user_guide.md).
+None.
 
 
 ## Helpful Links<a name="EN-US_TOPIC_0000002552058261"></a>
 
 |Name|Path|Overview|
 |--|--|--|
-|Quick Start|[quick_start.md](./docs/en/quick_start.md)|Provides guidance on how to quickly enable and verify the OmniMV feature.|
-|Release Notes|[release_notes.md](./docs/en/release_notes.md)|Provides basic information and feature updates of each OmniMV version.|
-|Installation Guide|[installation_guide.md](./docs/en/installation_guide.md)|Describes how to install OmniMV.|
-|User Guide|[user_guide.md](./docs/en/user_guide.md)|Provides details about how to use OmniMV.|
-|Best Practices|[best_practices.md](./docs/en/best_practices.md)|Provides practice cases of OmniMV.|
-|FAQs|[faq.md](./docs/en/faq.md)|Provides answers to frequently asked questions (FAQs) about installing and using OmniMV.|
+|Release Notes|[Release Notes](./docs/en/release_notes.md)|Provides basic information and feature updates of each OmniMV version.|
+|Installation Guide|[Installation Guide](./docs/en/installation_guide.md)|Describes how to install OmniMV.|
+|User Guide|[User Guide](./docs/en/user_guide.md)|Provides details about how to use OmniMV.|
+|FAQs|[FAQs](./docs/en/faq.md)|Provides answers to frequently asked questions (FAQs) about installing and using OmniMV.|
 
 
 
@@ -289,7 +289,7 @@ You are welcome to contribute to the community. If you have any questions or sug
 
 OmniMV is jointly developed by the following Huawei departments:
 
-- Kunpeng Computing BoostKit Development Dept
+Kunpeng Computing BoostKit Development Dept
 
 Thank you to everyone in the community for your PRs. We warmly welcome contributions to OmniMV!
 

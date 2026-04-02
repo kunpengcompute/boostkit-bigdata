@@ -35,7 +35,7 @@ OmniMV物化视图特性是通过AI算法从历史SQL查询中推荐出最优物
 
 OmniMV物化视图架构如[**图 1** OmniMV物化视图软件架构](#OmniMV物化视图软件架构)所示。
 
-**图 1** OmniMV物化视图软件架构<a name="zh-cn_topic_0000002543922601_fig1354413504399"></a><a id="OmniMV物化视图软件架构"></a>
+**图 1** OmniMV物化视图软件架构<a name="zh-cn_topic_0000002543922601_fig1354413504399"></a><a id="OmniMV物化视图软件架构"></a><br>
 ![](figures/OmniMV物化视图软件架构.png "OmniMV物化视图软件架构")
 
 OmniMV物化视图主要包含两大模块：物化视图候选视图生成模块、物化视图SQL改写模块。
@@ -79,13 +79,15 @@ OmniMV物化视图的使用流程如下。
 ├── docs                                                      # 项目文档目录
 │   └── zh                                                   # 中文文档目录
 │       ├── figures                                          # 中文文档图片资源目录
-│       ├── quick_start.md                                   # 快速入门
 │       ├── release_notes.md                                 # OmniMV版本说明书
 │       ├── installation_guide.md                            # OmniMV安装指导
 │       ├── user_guide.md                                    # OmniMV使用指导
-│       ├── best_practices.md                                # OmniMV场景化应用最佳实践
-│       ├── api_reference.md                                 # OmniMV接口参考
-│       ├── design_guide.md                                  # OmniMV设计指南
+│       ├── faq.md                                           # OmniMV安装使用常见问题
+│   └── en                                                   # 中文文档目录
+│       ├── figures                                          # 中文文档图片资源目录
+│       ├── release_notes.md                                 # OmniMV版本说明书
+│       ├── installation_guide.md                            # OmniMV安装指导
+│       ├── user_guide.md                                    # OmniMV使用指导
 │       ├── faq.md                                           # OmniMV安装使用常见问题
 ├── omnimv-recommend                                         # OmniMV视图推荐模块
 │   ├── config                                               # 配置文件目录
@@ -122,18 +124,16 @@ OmniMV物化视图的使用流程如下。
 
 ## 快速入门<a name="ZH-CN_TOPIC_0000002520858280"></a>
 
-安装OmniMV后如何快速验证OmniMV是否生效，性能是否提升，具体请参见[快速入门](./docs/zh/user_guide.md)。
+无。
 
 
 ## 学习文档<a name="ZH-CN_TOPIC_0000002552058261"></a>
 
 |名称| 路径                                                      |简介|
 |--|---------------------------------------------------------|--|
-|快速入门| [快速入门](./docs/zh/quick_start.md)                            |提供快速使能并验证OmniMV加速能力的快速入门指导。|
 |版本说明书| [版本说明书](./docs/zh/release_notes.md)          |提供OmniMV每个发布版本的基础信息和特性更新信息。|
 |安装指南| [安装指南](./docs/zh/installation_guide.md) |提供安装OmniMV的详细指导。|
 |使用指南| [使用指南](./docs/zh/user_guide.md)                |提供使用OmniMV的详细指导。|
-|最佳实践| [最佳实践](./docs/zh/best_practices.md)        |提供OmniMV的实践案例。|
 |常见问题| [常见问题](./docs/zh/faq.md)                              |提供OmniMV安装、使用过程的常见问题和解决方法。|
 |视频课程| OmniRuntime特性大揭秘                                        |提供操作视频，帮助开发者在鲲鹏服务器上了解、使能OmniRuntime特性。|
 |技术干货| 大数据OmniMV ClickHouse 性能测试指南通过AI算法在Apache Spark上智能推荐高性能物化视图 |提供大数据平台在组件部署、应用加速与性能调优方面的实战经验。|
@@ -292,7 +292,7 @@ OmniMV docs目录下的文档适用CC-BY 4.0许可证，具体请参见[LICENSE]
 
 OmniMV由华为公司的下列部门联合贡献：
 
-- 鲲鹏计算BoostKit开发部
+鲲鹏计算BoostKit开发部
 
 感谢来自社区的每一个PR，欢迎贡献OmniMV！
 
