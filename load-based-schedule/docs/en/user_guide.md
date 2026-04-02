@@ -201,5 +201,4 @@ Contact Huawei technical support to download the OmniScheduler Yarn software ins
         ${HADOOP_HOME}/sbin/start-yarn.sh
         ```
 
-Follow the operating instructions when upgrading or uninstalling OmniScheduler.
 
