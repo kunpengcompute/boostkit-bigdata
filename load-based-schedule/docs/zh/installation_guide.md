@@ -11,10 +11,9 @@ OmniScheduler Yarn负载调度算法组网规划的环境由4台服务器组成�
 - 管理节点为server1，用于管理任务，以及运行Prometheus、Grafana和LoadsMetric。
 - 计算节点为agent1、agent2和agent3，用于运行计算服务以及Node Exporter。
 
-**图 1** 安装组网图<a name="zh-cn_topic_0000002197227009_fig734218245342"></a><a id="安装组网图"></a>
+**图 1** 安装组网图<a name="zh-cn_topic_0000002197227009_fig734218245342"></a><a id="安装组网图"></a><br>
 ![](figures/安装组网图.png "安装组网图")
 
-建议采用存算一体组网，即存储节点和计算节点共用，充分发挥OmniScheduler Yarn负载调度算法特性在大数据场景的负载均衡效果。
 ### 环境要求<a name="ZH-CN_TOPIC_0000002551411963"></a>
 
 安装OmniScheduler Yarn负载调度算法特性前，请参见本节内容，提前准备软硬件安装环境，以确保后续安装操作顺利进行。
@@ -70,7 +69,6 @@ OmniScheduler Yarn负载调度算法组网规划的环境由4台服务器组成�
 |OmniSchedulerYarn负载调度算法|BoostKit-loadsmetric-1.0.0-aarch64.zip|开源|OmniSchedulerYarn负载调度算法软件安装包。|获取链接|
 
 
-安装OmniScheduler Yarn负载调度算法特性前，请参见本节内容，提前准备软硬件安装环境，以确保后续安装操作顺利进行。
 
 
 ## 安装特性<a name="ZH-CN_TOPIC_0000002520291900"></a>
@@ -79,13 +77,13 @@ OmniScheduler Yarn负载调度算法组网规划的环境由4台服务器组成�
 
 该配置在所有节点均需执行。
 
-1. 打开“/etc/hosts“文件。
+1. 打开`/etc/hosts`文件。
 
     ```
     vi /etc/hosts
     ```
 
-2. 按“i“进入编辑模式，在文件中修改以下内容，IP地址需修改为节点对应的IP地址。
+2. 按`i`进入编辑模式，在文件中修改以下内容，IP地址需修改为节点对应的IP地址。
 
     ```
     server1 IP地址
@@ -94,9 +92,8 @@ OmniScheduler Yarn负载调度算法组网规划的环境由4台服务器组成�
     agent3 IP地址
     ```
 
-3. 按“Esc“键，输入:**wq!**，按“Enter“保存并退出编辑。
+3. 按`Esc`键，输入:**wq!**，按`Enter`保存并退出编辑。
 
-该配置在所有节点均需执行。
 ### 安装LoadsMetric<a name="ZH-CN_TOPIC_0000002519971998"></a>
 
 LoadsMetric是负载采集与分析工具，负责从Node Exporter中获取机器指标信息，进行分析处理后，将集群负载信息与均衡性数据上报给Prometheus进行存储。安装LoadsMetric步骤仅需在server1节点执行。
@@ -107,7 +104,7 @@ LoadsMetric是负载采集与分析工具，负责从Node Exporter中获取机�
     useradd hadoop
     ```
 
-2. 新建安装目录“/home/hadoop/loadsmetric-software“，从[**表 3** OmniScheduler Yarn负载调度算法软件获取列表](#OmniScheduler Yarn负载调度算法软件获取列表)获取软件安装所需依赖配置，上传到该目录下，并解压。
+2. 新建安装目录`/home/hadoop/loadsmetric-software`，从[**表 3** OmniScheduler Yarn负载调度算法软件获取列表](#OmniScheduler Yarn负载调度算法软件获取列表)获取软件安装所需依赖配置，上传到该目录下，并解压。
 
     ```
     mkdir -p /home/hadoop/loadsmetric-software
@@ -133,7 +130,7 @@ LoadsMetric是负载采集与分析工具，负责从Node Exporter中获取机�
         vi workers
         ```
 
-    2. 按“i“进入编辑模式，按需修改文件中的内容。
+    2. 按`i`进入编辑模式，按需修改文件中的内容。
 
         ```
         agent1
@@ -141,7 +138,7 @@ LoadsMetric是负载采集与分析工具，负责从Node Exporter中获取机�
         agent3
         ```
 
-    3. 按“Esc“键，输入:**wq!**，按“Enter“保存并退出编辑。
+    3. 按`Esc`键，输入:**wq!**，按`Enter`保存并退出编辑。
 
 5. 修改loadsmetric\_configfile.properties，配置相关含义见[相关参考](相关参考.md)。
     1. 打开loadsmetric\_configfile.properties文件。
@@ -150,7 +147,7 @@ LoadsMetric是负载采集与分析工具，负责从Node Exporter中获取机�
         vi loadsmetric_configfile.properties
         ```
 
-    2. 按“i“进入编辑模式，在文件中添加以下内容。
+    2. 按`i`进入编辑模式，在文件中添加以下内容。
 
         ```
         # bash properties
@@ -203,7 +200,7 @@ LoadsMetric是负载采集与分析工具，负责从Node Exporter中获取机�
         node-exporter.pull.thread-pool.size=1000
         ```
 
-    3. 按“Esc“键，输入:**wq!**，按“Enter“保存并退出编辑。
+    3. 按`Esc`键，输入:**wq!**，按`Enter`保存并退出编辑。
 
 6. 执行安装命令。
 
@@ -235,7 +232,6 @@ LoadsMetric是负载采集与分析工具，负责从Node Exporter中获取机�
 >![](public_sys-resources/icon-note.gif) **说明：** 
 >LoadsMetric服务支持安装、卸载、启动、停止等操作，同时支持一键启停Prometheus、Node Exporter、Grafana等其他相关软件，基本运维命令见[zh-cn\_topic\_0000002520291910.md](zh-cn_topic_0000002520291910.md)。
 
-LoadsMetric是负载采集与分析工具，负责从Node Exporter中获取机器指标信息，进行分析处理后，将集群负载信息与均衡性数据上报给Prometheus进行存储。安装LoadsMetric步骤仅需在server1节点执行。
 ### 安装OmniScheduler<a name="ZH-CN_TOPIC_0000002519971980"></a>
 
 安装OmniScheduler Yarn负载调度算法步骤在server1节点执行，在安装前需要在所有节点部署Hadoop 3.3.4。
@@ -269,7 +265,7 @@ OmniScheduler Yarn负载调度算法以JAR包形式进行插件化部署，对Ha
         vi ${HADOOP_HOME}/etc/hadoop/yarn-site.xml
         ```
 
-    2. 按“i“进入编辑模式，在yarn-site.xml文件中追加如下内容。
+    2. 按`i`进入编辑模式，在yarn-site.xml文件中追加如下内容。
 
         ```
         <!-- 设定rm使用LoadBasedCapacityScheduler -->
@@ -279,7 +275,7 @@ OmniScheduler Yarn负载调度算法以JAR包形式进行插件化部署，对Ha
         </property>
         ```
 
-    3. 按“Esc“键，输入:**wq!**，按“Enter“保存并退出编辑。
+    3. 按`Esc`键，输入:**wq!**，按`Enter`保存并退出编辑。
 
 3. 修改capacity-scheduler.xml配置文件。
     1. 打开配置文件。
@@ -288,7 +284,7 @@ OmniScheduler Yarn负载调度算法以JAR包形式进行插件化部署，对Ha
         vi ${HADOOP_HOME}/etc/hadoop/capacity-scheduler.xml
         ```
 
-    2. 按“i“进入编辑模式，在capacity-scheduler.xml中追加如下内容。
+    2. 按`i`进入编辑模式，在capacity-scheduler.xml中追加如下内容。
 
         ```
         <!-- 是否开启异步调度 -->
@@ -318,7 +314,7 @@ OmniScheduler Yarn负载调度算法以JAR包形式进行插件化部署，对Ha
         </property>
         ```
 
-    3. 按“Esc“键，输入:**wq!**，按“Enter“保存并退出编辑。
+    3. 按`Esc`键，输入:**wq!**，按`Enter`保存并退出编辑。
 
 4. 将上述配置文件同步到集群其他节点。
 
@@ -342,7 +338,6 @@ OmniScheduler Yarn负载调度算法以JAR包形式进行插件化部署，对Ha
 
     ![](figures/zh-cn_image_0000002551412133.png)
 
-安装OmniScheduler Yarn负载调度算法步骤在server1节点执行，在安装前需要在所有节点部署Hadoop 3.3.4。
 ### 安装Prometheus、Grafana、Node Exporter<a name="ZH-CN_TOPIC_0000002551411931"></a>
 
 #### 软件包放置说明<a name="ZH-CN_TOPIC_0000002519971948"></a>
@@ -355,7 +350,7 @@ OmniScheduler Yarn负载调度算法以JAR包形式进行插件化部署，对Ha
 - Node Exporter是Prometheus生态系统中的一个组件，用于收集和暴露机器级别的指标（metrics），包括但不限于CPU使用率、内存使用情况、磁盘I/O、网络I/O和文件系统信息等。
 - Grafana是从Prometheus获取负载信息和均衡性数据，并将其可视化为图表和仪表板，进行前端UI展示。
 
-1. 在server1创建目录“/opt/prometheus“，并下载[**表 2** 操作系统和软件要求](#操作系统和软件要求)要求的Go、Node、Prometheus、Node Exporter、Grafana等软件安装包，放置于该目录下。
+1. 在server1创建目录`/opt/prometheus`，并下载[**表 2** 操作系统和软件要求](#操作系统和软件要求)要求的Go、Node、Prometheus、Node Exporter、Grafana等软件安装包，放置于该目录下。
 
     ```
     mkdir -p /opt/prometheus
@@ -367,7 +362,7 @@ OmniScheduler Yarn负载调度算法以JAR包形式进行插件化部署，对Ha
     wget --no-check-certificate https://dl.grafana.com/enterprise/release/grafana-enterprise-10.4.2.linux-arm64.tar.gz
     ```
 
-    下载完成后目录“/opt/prometheus/“下将包含如下压缩包。
+    下载完成后目录`/opt/prometheus/`下将包含如下压缩包。
 
     ```
     go1.22.2.linux-arm64.tar.gz
@@ -397,7 +392,7 @@ OmniScheduler Yarn负载调度算法以JAR包形式进行插件化部署，对Ha
     prometheus-2.45.4.linux-arm64
     ```
 
-3. 将“/opt/prometheus/“目录下Go、Node Exporter、Node安装目录复制到其他节点的“/opt/prometheus/“目录下，其他节点若无该目录请先创建。
+3. 将`/opt/prometheus/`目录下Go、Node Exporter、Node安装目录复制到其他节点的`/opt/prometheus/`目录下，其他节点若无该目录请先创建。
 
     ```
     #目录列表
@@ -410,7 +405,6 @@ OmniScheduler Yarn负载调度算法以JAR包形式进行插件化部署，对Ha
     scp -r node_exporter-1.7.0.linux-arm64 node-v19.9.0-linux-arm64 go agent3:/opt/prometheus/
     ```
 
-软件包放置仅需在server1节点执行。
 #### 部署Go环境<a name="ZH-CN_TOPIC_0000002551411955"></a>
 
 所有节点均需部署Go环境。
@@ -421,14 +415,14 @@ OmniScheduler Yarn负载调度算法以JAR包形式进行插件化部署，对Ha
     vi /etc/profile
     ```
 
-2. 按“i“进入编辑模式，末尾写入如下内容。
+2. 按`i`进入编辑模式，末尾写入如下内容。
 
     ```
     export GO_HOME=/opt/prometheus/go
     export PATH=$GO_HOME/bin:$PATH
     ```
 
-3. 按“Esc“键，输入:**wq!**，按“Enter“保存并退出编辑。
+3. 按`Esc`键，输入:**wq!**，按`Enter`保存并退出编辑。
 4. 刷新环境变量。
 
     ```
@@ -441,10 +435,9 @@ OmniScheduler Yarn负载调度算法以JAR包形式进行插件化部署，对Ha
     go version
     ```
 
-所有节点均需部署Go环境。
 #### 安装Node Exporter<a name="ZH-CN_TOPIC_0000002519971964"></a>
 
-Node Exporter需要在所有计算节点上部署，按照软件包放置说明章节将相关安装包放置到“/opt/prometheus/“目录即可。
+Node Exporter需要在所有计算节点上部署，按照软件包放置说明章节将相关安装包放置到`/opt/prometheus/`目录即可。
 
 **启动服务<a name="zh-cn_topic_0000002161746160_section17887248101712"></a>**
 
@@ -480,7 +473,6 @@ Node Exporter需要在所有计算节点上部署，按照软件包放置说明�
     kill ID
     ```
 
-Node Exporter需要在所有计算节点上部署，按照软件包放置说明章节将相关安装包放置到“/opt/prometheus/“目录即可。
 #### 安装Prometheus<a name="ZH-CN_TOPIC_0000002551132003"></a>
 
 安装Prometheus仅需在server1上安装。
@@ -498,7 +490,7 @@ Node Exporter需要在所有计算节点上部署，按照软件包放置说明�
         vi prometheus.yml
         ```
 
-    2. 按“i“进入编辑模式，配置为如下内容。
+    2. 按`i`进入编辑模式，配置为如下内容。
 
         ```
         # my global config
@@ -556,7 +548,7 @@ Node Exporter需要在所有计算节点上部署，按照软件包放置说明�
         >- targets: ["agent1:9100","agent2:9100","agent3:9100"]
         >```
 
-    3. 按“Esc“键，输入:**wq!**，按“Enter“保存并退出编辑。
+    3. 按`Esc`键，输入:**wq!**，按`Enter`保存并退出编辑。
 
 3. 启动Prometheus。
 
@@ -591,7 +583,6 @@ Node Exporter需要在所有计算节点上部署，按照软件包放置说明�
         kill ID
         ```
 
-安装Prometheus仅需在server1上安装。
 #### 安装Grafana<a name="ZH-CN_TOPIC_0000002551131869"></a>
 
 安装Grafana仅需在server1上进行。
@@ -612,20 +603,20 @@ Node Exporter需要在所有计算节点上部署，按照软件包放置说明�
 
     ![](figures/zh-cn_image_0000002520292088.png)
 
-4. 首次登录账号/密码为admin/admin，输入账号密码后单击“Log in“。
+4. 首次登录账号/密码为admin/admin，输入账号密码后单击`Log in`。
 
     ![](figures/zh-cn_image_0000002519972078.png)
 
-5. 要求修改密码，输入新密码，或者可以单击“Skip“跳过密码重置环节。
+5. 要求修改密码，输入新密码，或者可以单击`Skip`跳过密码重置环节。
 
     ![](figures/zh-cn_image_0000002551132081.png)
 
 6. 进入主页配置数据源。
-    1. 选择“Datasource“。
+    1. 选择`Datasource`。
 
         ![](figures/zh-cn_image_0000002519972072.png)
 
-    2. 单击“Add data source“添加新的数据源。
+    2. 单击`Add data source`添加新的数据源。
 
         ![](figures/zh-cn_image_0000002551412089.png)
 
@@ -637,7 +628,7 @@ Node Exporter需要在所有计算节点上部署，按照软件包放置说明�
 
         ![](figures/zh-cn_image_0000002551412083.png)
 
-    5. 页面下拉选择“Save&test“。
+    5. 页面下拉选择`Save&test`。
 
         ![](figures/zh-cn_image_0000002520292094.png)
 
@@ -651,11 +642,11 @@ Node Exporter需要在所有计算节点上部署，按照软件包放置说明�
         >配置数据源时请确保Prometheus已启动，否则会连接失败。
 
 7. 配置面板。
-    1. “Dashboards“。
+    1. `Dashboards`。
 
         ![](figures/zh-cn_image_0000002551132087.png)
 
-    2. 页面单击右上角“New“后单击“Import“。
+    2. 页面单击右上角`New`后单击`Import`。
 
         ![](figures/zh-cn_image_0000002519972074.png)
 
@@ -663,7 +654,7 @@ Node Exporter需要在所有计算节点上部署，按照软件包放置说明�
 
         ![](figures/zh-cn_image_0000002519972076.png)
 
-    4. 上传后单击“Import“。
+    4. 上传后单击`Import`。
 
         ![](figures/zh-cn_image_0000002519972082.png)
 
@@ -675,7 +666,7 @@ Node Exporter需要在所有计算节点上部署，按照软件包放置说明�
         >-   面板显示数据需要确保server1的LoadsMetricApplication进程已启动，Prometheus已启动，其他agent节点Node Exporter均启动。
         >-   如果显示不了数据，是因为开源软件Bug导致，可以尝试重启Grafana。
 
-8. 查看数据，登录server1:3000，选择Dashboards，选择“LoadsMetric“。
+8. 查看数据，登录server1:3000，选择Dashboards，选择`LoadsMetric`。
 
     ![](figures/zh-cn_image_0000002520292086.png)
 
@@ -691,8 +682,6 @@ Node Exporter需要在所有计算节点上部署，按照软件包放置说明�
         ```
         kill ID
         ```
-
-安装Grafana仅需在server1上进行。
 
 
 

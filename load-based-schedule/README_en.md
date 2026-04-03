@@ -60,50 +60,24 @@ Learn about the application scenarios of OmniScheduler before using the feature.
 
 ## Constraints<a name="EN-US_TOPIC_0000002552058163"></a>
 
-OmniStream has restrictions on supported data types, operators, and state backends. Plan your tasks accordingly and avoid unsupported scenarios.
-
-**SQL<a name="en-us_topic_0000002512242608_section9207153194615"></a>**
-
-- OmniStream Flink Native supports the Nexmark benchmarking suite, including Nexmark data types and built-in functions.
-- Supported data types: BIGINT, TIMESTAMP\(3\), and VARCHAR.
-- Supported expressions: + - \* /
-- Supported built-in functions: LOWER, SPLIT\_INDEX, DATE\_FORMAT, MOD, and COUNT\_CHAR.
-- Supported GroupAggregate functions: SUM\(BIGINT\), COUNT\(BIGINT\), AVG \(BIGINT\), MIN\(BIGINT\), MIN\(VARCHAR\), MAX \(BIGINT\), and MAX\(VARCHAR\).
-- The join key of the join operator must be of the BIGINT type, and the operation type must be Inner Join.
-- The Deduplicate and Rank operators allow only Partition By BIGINT. All fields in the query table must be of the supported data type and only the ROW\_NUMBER function is supported. Partition By of Rank supports only one field of the BIGINT type. Order By of TOPN supports only one BIGINT field, whose sorting rule is DESC. Order By of TOP1 supports a maximum of two fields. The type can be BIGINT TIMESTAMP\(3\), and the sorting rule can be DESC or ASC.
-- The Group By column of the Aggregate operator allows only BIGINT.
-- The aggregate function of the LocalWindowAGG and GlobalWindowAGG operators is COUNT or MAX. The aggregate function of the GroupWindowAGG operator is COUNT.
-- The LocalWindowAGG and GlobalWindowAGG operators support only the TUMBLE and HOP windows.
-- The GroupWindowAGG operator supports only the SESSION window.
-- The external table data source of the Lookup Join operator supports only CSV files.
-- The state backend supports only the memory and RocksDB.
-- Flink stores states in the memory state backend, and the memory usage grows over time as the volume of data increases. In comparison, OmniStream uses the columnar vectorized architecture to optimize performance. Its state storage behaves the same as the native Flink while delivering a higher processing speed and consuming the memory space faster. Therefore, the Nexmark benchmark test cases support a maximum of 50 million data records.
-
-**DataStream<a name="en-us_topic_0000002512242608_section14862183194614"></a>**
-
-For details, see  [Supported DataStream Operators and UDFs](en-us_topic_0000002512242732.md).
-
-- Source and Sink support only Kafka data sources.
-- These operators are supported: Map, FlatMap, GroupReduce, Filter, Source, and Sink.
-- The Filter operator must be RichFilterFunction.
-- The state backend supports only memory and does not support checkpoints.
-
-OmniStream has restrictions on supported data types, operators, and state backends. Plan your tasks accordingly and avoid unsupported scenarios.
+None.
 ## Directory Structure<a name="EN-US_TOPIC_0000002520858170"></a>
 
 The full project directory structure is as follows:
 
 ```
 ├── docs                                                      # Project document directory
-│   └── en                                                   # English document directory
+│   └── zh                                                   # English document directory
 │       ├── figures                                          # Directory of images in English documents
-│       ├── quick_start.md                                   # Quick Start
 │       ├── release_notes.md                                 # OmniScheduler Release Notes
 │       ├── installation_guide.md                            # OmniScheduler Installation Guide
 │       ├── user_guide.md                                    # OmniScheduler User Guide
-│       ├── best_practices.md                                # OmniScheduler Scenario-specific Application Best Practices
-│       ├── api_reference.md                                 # OmniScheduler API Reference
-│       ├── design_guide.md                                  # OmniScheduler Design Guide
+│       ├── faq.md                                           # OmniScheduler Installation FAQs
+│   └── en                                                   # English document directory
+│       ├── figures                                          # Directory of images in English documents
+│       ├── release_notes.md                                 # OmniScheduler Release Notes
+│       ├── installation_guide.md                            # OmniScheduler Installation Guide
+│       ├── user_guide.md                                    # OmniScheduler User Guide
 │       ├── faq.md                                           # OmniScheduler Installation FAQs
 ├── LoadsMetric                                              # LoadsMetric service module
 │   ├── LoadsMetricServer                                    # LoadsMetric service implementation
@@ -128,20 +102,15 @@ For details about feature changes in each version, see [release_notes.md](./docs
 For details about the environment dependencies and installation methods of OmniScheduler, see [installation_guide.md](./docs/en/installation_guide.md).
 
 
-## Quick Start<a name="EN-US_TOPIC_0000002552098147"></a>
-
-For instructions on quickly verifying whether OmniScheduler is active and its performance improvements, see [quick_start.md](./docs/en/user_guide.md).
 
 
 ## Helpful Links<a name="EN-US_TOPIC_0000002521018170"></a>
 
 |Name|Path|Overview|
 |--|--|--|
-|Quick Start|[quick_start.md](./docs/en/quick_start.md)|Provides guidance on how to quickly enable and verify the OmniScheduler feature.|
 |Release Notes|[release_notes.md](./docs/en/release_notes.md)|Provides basic information and feature updates of each OmniScheduler version.|
 |Installation Guide|[installation_guide.md](./docs/en/installation_guide.md)|Describes how to install OmniScheduler.|
 |User Guide|[user_guide.md](./docs/en/user_guide.md)|Provides details about how to use OmniScheduler.|
-|Best Practices|[best_practices.md](./docs/en/best_practices.md)|Provides practice cases of OmniScheduler.|
 |FAQs|[faq.md](./docs/zh/faq.md)|Provides answers to frequently asked questions (FAQs) about installing and using OmniScheduler.|
 
 

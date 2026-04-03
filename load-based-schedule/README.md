@@ -60,35 +60,7 @@ OmniScheduler Yarn负载调度算法特性适用于Hadoop集群节点间负载�
 
 ## 约束与限制<a name="ZH-CN_TOPIC_0000002552058163"></a>
 
-OmniStream Flink Native化的配置限制包括数据类型、算子支持、状态后端等，请合理规划任务并规避不支持的场景。
-
-**SQL<a name="zh-cn_topic_0000002512242608_section9207153194615"></a>**
-
-- 当前OmniStream Flink Native化版本支持Nexmark用例集，支持Nexmark中的数据类型及内置函数。
-- 支持的数据类型：BIGINT、TIMESTAMP\(3\)和VARCHAR。
-- 支持的表达式：+ - \* /。
-- 支持的内置函数：LOWER、SPLIT\_INDEX、DATE\_FORMAT、MOD和COUNT\_CHAR。
-- 支持的GroupAggregate聚合函数类型：SUM\(BIGINT\)、COUNT\(BIGINT\)、AVG \(BIGINT\)、MIN\(BIGINT\)、MIN\(VARCHAR\)、MAX \(BIGINT\)、MAX\(VARCHAR\)。
-- Join算子的JoinKey只支持BIGINT类型，操作类型只支持InnerJoin。
-- Deduplicate和Rank算子partition by只支持BIGINT类型，查询表的所有字段需要为支持的数据类型，且只支持ROW\_NUMBER函数。Rank的PARTITION BY仅支持一个字段，且类型为BIGINT。TOPN的ORDER BY支持一个字段BIGINT，并且是DESC。TOP1的ORDER BY支持最多两个字段，类型可以是BIGINT TIMESTAMP\(3\)，排序规则可以是DESC，ASC。
-- Aggregate算子的group by列只支持BIGINT类型。
-- LocalWindowAGG/GlobalWindowAGG算子聚合函数只支持COUNT、MAX函数，GroupWindowAGG算子聚合函数只支持COUNT函数。
-- LocalWindowAGG/GlobalWindowAGG算子只支持滚动窗口TUMBLE、滑动窗口HOP。
-- GroupWindowAGG算子只支持SESSION会话窗口。
-- LookupJoin算子的外部表数据源仅支持CSV文件。
-- 状态后端只支持内存和RocksDB。
-- Flink会将状态存储在内存状态后端中，内存使用会随时间和处理数据量增长，OmniStream使用列式向量化架构优化性能，状态存储跟原生行为一致，处理速度比原生Flink更快，使用内存增长速度比原生快，提升性能的同时对于空间的需求也增大，因此当前Nexmark基准测试用例输入数据量最大只支持5千万数据。
-
-**DataStream<a name="zh-cn_topic_0000002512242608_section14862183194614"></a>**
-
-详情请见[DataStream算子和UDF支持情况](zh-cn_topic_0000002512242732.md)。
-
-- Source和Sink目前只支持Kafka数据源。
-- 支持的算子有限：Map、FlatMap、GroupReduce、Filter、Source、Sink。
-- Filter算子目前只支持RichFilterFunction。
-- 状态后端只支持内存，不支持Checkpoint。
-
-OmniStream Flink Native化的配置限制包括数据类型、算子支持、状态后端等，请合理规划任务并规避不支持的场景。
+无。
 ## 目录结构<a name="ZH-CN_TOPIC_0000002520858170"></a>
 
 项目全量目录层级介绍如下：
@@ -97,13 +69,15 @@ OmniStream Flink Native化的配置限制包括数据类型、算子支持、状
 ├── docs                                                     # 项目文档目录
 │   └── zh                                                   # 中文文档目录
 │       ├── figures                                          # 中文文档图片资源目录
-│       ├── quick_start.md                                   # 快速入门
 │       ├── release_notes.md                                 # OmniScheduler版本说明书
 │       ├── installation_guide.md                            # OmniScheduler安装指导
 │       ├── user_guide.md                                    # OmniScheduler使用指导
-│       ├── best_practices.md                                # OmniScheduler场景化应用最佳实践
-│       ├── api_reference.md                                 # OmniScheduler接口参考
-│       ├── design_guide.md                                  # OmniScheduler设计指南
+│       ├── faq.md                                           # OmniScheduler安装使用常见问题
+│   └── en                                                   # 中文文档目录
+│       ├── figures                                          # 中文文档图片资源目录
+│       ├── release_notes.md                                 # OmniScheduler版本说明书
+│       ├── installation_guide.md                            # OmniScheduler安装指导
+│       ├── user_guide.md                                    # OmniScheduler使用指导
 │       ├── faq.md                                           # OmniScheduler安装使用常见问题
 ├── LoadsMetric                                              # LoadsMetric服务模块
 │   ├── LoadsMetricServer                                    # LoadsMetric服务实现
@@ -128,19 +102,14 @@ OmniStream Flink Native化的配置限制包括数据类型、算子支持、状
 介绍OmniScheduler的环境依赖及安装方式，具体请参见[安装指南](./docs/zh/installation_guide.md)。
 
 
-## 快速入门<a name="ZH-CN_TOPIC_0000002552098147"></a>
-
-安装OmniScheduler后如何快速验证OmniScheduler是否生效，性能是否提升，具体请参见[快速入门](./docs/zh/user_guide.md)。
 
 ## 学习文档<a name="ZH-CN_TOPIC_0000002521018170"></a>
 
 |名称|路径|简介|
 |--|--|--|
-|快速入门|[快速入门](./docs/zh/quick_start.md)|提供快速使能并验证OmniScheduler加速能力的快速入门指导。|
 |版本说明书|[版本说明书](./docs/zh/release_notes.md)|提供OmniScheduler每个发布版本的基础信息和特性更新信息。|
 |安装指南|[安装指南](./docs/zh/installation_guide.md)|提供安装OmniScheduler的详细指导。|
 |使用指南|[使用指南](./docs/zh/user_guide.md)|提供使用OmniScheduler的详细指导。|
-|最佳实践|[最佳实践](./docs/zh/best_practices.md)|提供OmniScheduler的实践案例。|
 |常见问题|[常见问题](./docs/zh/faq.md)|提供OmniScheduler安装、使用过程的常见问题和解决方法。|
 |视频课程|OmniRuntime特性大揭秘|提供操作视频，帮助开发者在鲲鹏服务器上了解、使能OmniRuntime特性。|
 
@@ -192,7 +161,7 @@ OmniStream Flink Native化的配置限制包括数据类型、算子支持、状
 
 在部署安装过程中，需要通过SSH连接服务器。由于root用户拥有最高权限，直接使用root用户登录服务器可能会存在安全风险。建议您使用普通用户登录服务器进行安装部署，并建议您通过配置禁止root用户SSH登录的选项，来提升系统安全性。操作步骤：
 
-用户登录系统后检查“/etc/ssh/sshd\_config”配置项“PermitRootLogin“。
+用户登录系统后检查`/etc/ssh/sshd\_config`配置项`PermitRootLogin`。
 
 - 如果显示no，说明禁止了root用户SSH登录。
 - 如果显示yes，说明需要修改PermitRootLogin为no。

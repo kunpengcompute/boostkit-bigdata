@@ -14,7 +14,6 @@ This storage and compute coupled network consists of four servers, which are one
 **Figure  1**  Networking diagram<a name="en-us_topic_0000002197227009_fig734218245342"></a>  
 ![](figures/networking-diagram.png "networking-diagram")
 
-A storage and compute coupled network is recommended for OmniScheduler. Use nodes as both storage and compute nodes to maximize the load balancing effect in big data scenarios.
 ### Environment Requirements<a name="EN-US_TOPIC_0000002551411963"></a>
 
 Before installing OmniScheduler, prepare the hardware and software environments to facilitate subsequent installation operations.
@@ -70,7 +69,6 @@ Before installing OmniScheduler, prepare the hardware and software environments 
 |OmniScheduler|BoostKit-loadsmetric-1.0.0-aarch64.zip|Open source|OmniScheduler software package|Link|
 
 
-Before installing OmniScheduler, prepare the hardware and software environments to facilitate subsequent installation operations.
 
 
 ## Installing the Feature<a name="EN-US_TOPIC_0000002520291900"></a>
@@ -96,7 +94,6 @@ Perform the following steps on all nodes.
 
 3. Press  **Esc**, type  **:wq!**, and press  **Enter**  to save the file and exit.
 
-Perform the following steps on all nodes.
 ### Installing LoadsMetric<a name="EN-US_TOPIC_0000002519971998"></a>
 
 LoadsMetric is a load collection and analysis tool. It obtains machine metric information from the Node Exporter, analyzes and processes the information, and reports the generated cluster load and balancing data to Prometheus. Install LoadsMetric on the server1 node only.
@@ -235,7 +232,6 @@ LoadsMetric is a load collection and analysis tool. It obtains machine metric in
 >![](public_sys-resources/icon-note.gif) **NOTE:** 
 >The LoadsMetric service can be installed, uninstalled, started, and stopped. It allows starting and stopping Prometheus, Node Exporter, and Grafana with one click. For details about basic O&M commands, see  [Using LoadsMetric](en-us_topic_0000002520291910.md).
 
-LoadsMetric is a load collection and analysis tool. It obtains machine metric information from the Node Exporter, analyzes and processes the information, and reports the generated cluster load and balancing data to Prometheus. Install LoadsMetric on the server1 node only.
 ### Installing OmniScheduler<a name="EN-US_TOPIC_0000002519971980"></a>
 
 Install OmniScheduler on the server1 node only. Before the installation, deploy Hadoop 3.3.4 on all nodes.
@@ -342,7 +338,6 @@ For details about the classes of open source Hadoop, see  [Table 1](#en-us_topic
 
     ![](figures/en-us_image_0000002551412133.png)
 
-Install OmniScheduler on the server1 node only. Before the installation, deploy Hadoop 3.3.4 on all nodes.
 ### Installing Prometheus, Grafana, and Node Exporter<a name="EN-US_TOPIC_0000002551411931"></a>
 
 #### Storing Software Packages<a name="EN-US_TOPIC_0000002519971948"></a>
@@ -410,7 +405,6 @@ Where,
     scp -r node_exporter-1.7.0.linux-arm64 node-v19.9.0-linux-arm64 go agent3:/opt/prometheus/
     ```
 
-Perform the following operations on the  **server1**  node.
 #### Deploying the Go Environment<a name="EN-US_TOPIC_0000002551411955"></a>
 
 Deploy the Go environment on all nodes.
@@ -441,7 +435,6 @@ Deploy the Go environment on all nodes.
     go version
     ```
 
-Deploy the Go environment on all nodes.
 #### Installing Node Exporter<a name="EN-US_TOPIC_0000002519971964"></a>
 
 Deploy Node Exporter on all compute nodes. Place the installation package to the  **/opt/prometheus/**  directory \(see the section of "Storing Software Packages"\).
@@ -480,7 +473,6 @@ Deploy Node Exporter on all compute nodes. Place the installation package to the
     kill ID
     ```
 
-Deploy Node Exporter on all compute nodes. Place the installation package to the  **/opt/prometheus/**  directory \(see the section of "Storing Software Packages"\).
 #### Installing Prometheus<a name="EN-US_TOPIC_0000002551132003"></a>
 
 Install Prometheus only on the server1 node only.
@@ -591,7 +583,6 @@ Install Prometheus only on the server1 node only.
         kill ID
         ```
 
-Install Prometheus only on the server1 node only.
 #### Installing Grafana<a name="EN-US_TOPIC_0000002551131869"></a>
 
 Install Grafana on the server1 node only.
@@ -692,7 +683,6 @@ Install Grafana on the server1 node only.
         kill ID
         ```
 
-Install Grafana on the server1 node only.
 
 
 
