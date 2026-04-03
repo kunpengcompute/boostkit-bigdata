@@ -12,7 +12,7 @@
 </tr>
 <tr id="row237mcpsimp"><th class="firstcol" valign="top" width="30%" id="mcps1.1.3.2.1"><p id="p239mcpsimp"><a name="p239mcpsimp"></a><a name="p239mcpsimp"></a>Product Version</p>
 </th>
-<td class="cellrowborder" valign="top" width="70%" headers="mcps1.1.3.2.1 "><p id="p241mcpsimp"><a name="p241mcpsimp"></a><a name="p241mcpsimp"></a>25.3.0</p>
+<td class="cellrowborder" valign="top" width="70%" headers="mcps1.1.3.2.1 "><p id="p241mcpsimp"><a name="p241mcpsimp"></a><a name="p241mcpsimp"></a>25.0.RC1</p>
 </td>
 </tr>
 <tr id="row242mcpsimp"><th class="firstcol" valign="top" width="30%" id="mcps1.1.3.3.1"><p id="p244mcpsimp"><a name="p244mcpsimp"></a><a name="p244mcpsimp"></a>Software Name and Version</p>
@@ -234,14 +234,16 @@ None
 
 |Document|Description|Delivery Method|
 |--|--|--|
-|Kunpeng BoostKit 25.3.0 Big Data OmniRuntime 1.9.0 Release Notes|Provides the OmniRuntime version release information.|Open source repository|
-|Kunpeng BoostKit 25.3.0 Big Data OmniRuntime Feature Guide|Describes how to install and deploy OmniRuntime.|Open source repository|
+|OmniMV 1.2.0 Release Notes|Provides the OmniMV version release information.|Open source repository|
+|OmniMV Installation Guide|Describes how to install and deploy OmniRuntime.|Open source repository|
+|OmniMV User Guide|Provides OmniMV operation and usage guidance.|Open source repository|
+|OmniMV FAQs|Documents potential issues and corresponding solutions encountered during OmniMV installation, deployment and usage.|Open source repository|
 
 
 
 ### Obtaining Documentation<a name="EN-US_TOPIC_0000002550168171"></a>
 
-Visit the open source repository to view or download required documents.
+Visit the [open source repository](https://gitcode.com/boostkit/boostkit-bigdata/tree/br_feature_omnimv_spark343/omnimv) to view or download required documents.
 
 
 
