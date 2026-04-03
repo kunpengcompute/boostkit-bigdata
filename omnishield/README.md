@@ -32,8 +32,9 @@ OmniShield机密大数据作为Spark的机密计算组件，通过Spark提供的
 
 OmniShield机密大数据架构如[**图 1** OmniShield机密大数据特性软件架构](#OmniShield机密大数据特性软件架构)所示。
 
-**图 1** OmniShield机密大数据特性软件架构<a name="zh-cn_topic_0000002512402638_fig26911981620"></a><a id="OmniShield机密大数据特性软件架构"></a>
 ![](docs/zh/figures/OmniShield机密大数据特性软件架构.png "OmniShield机密大数据特性软件架构")
+
+**图 1** OmniShield机密大数据特性软件架构<a name="zh-cn_topic_0000002512402638_fig26911981620"></a><a id="OmniShield机密大数据特性软件架构"></a>
 
 OmniShield机密大数据特性：
 

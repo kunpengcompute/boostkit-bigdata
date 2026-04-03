@@ -14,10 +14,10 @@ OmniShield机密大数据的组网规划采用存算分离架构，组网规划�
 - 计算节点用于在TEE侧运行计算服务。
 - 存储节点用于在REE侧存储加密数据。
 
-**图 1** 安装组网图<a name="fig1311646111411"></a><a id="安装组网图"></a>
 ![](figures/安装组网图.png "安装组网图")
 
-采用存算分离组网，即存储节点和计算节点分离，充分发挥OmniShield机密大数据特性在隐私计算场景下的安全性。
+**图 1** 安装组网图<a name="fig1311646111411"></a><a id="安装组网图"></a>
+
 ### 环境要求<a name="ZH-CN_TOPIC_0000002520014778"></a>
 
 安装OmniShield机密大数据特性前，请参见本节内容，提前准备软硬件安装环境，以确保后续安装操作顺利进行。
@@ -79,9 +79,6 @@ OmniShield机密大数据的组网规划采用存算分离架构，组网规划�
 2. [获取校验工具和校验方法](https://support.huawei.com/enterprise/zh/tool/pgp-verify-TL1000000054)。
 3. 参见上述链接下载的《OpenPGP签名验证指南》进行软件安装包完整性检查。
 
-安装OmniShield机密大数据特性前，请参见本节内容，提前准备软硬件安装环境，以确保后续安装操作顺利进行。
-
-
 ## 安装特性<a name="ZH-CN_TOPIC_0000002551414731"></a>
 
 ### 安装依赖<a name="ZH-CN_TOPIC_0000002551534623"></a>
@@ -109,7 +106,6 @@ OmniShield机密大数据的组网规划采用存算分离架构，组网规划�
 
 4. 按“Esc“键，输入**:wq!**，按“Enter“保存并退出编辑。
 
-通过本地方式安装OmniShield机密大数据，需在管理节点和所有计算节点安装Bouncy Castle的JAR包，并放在JDK的依赖目录。
 ### 安装OmniShield<a name="ZH-CN_TOPIC_0000002551414655"></a>
 
 安装依赖完成后，即可安装OmniShield机密大数据软件包。在管理节点和所有计算节点上操作。
@@ -134,7 +130,6 @@ OmniShield机密大数据的组网规划采用存算分离架构，组网规划�
         cp kms.jar /opt/omnishield
         ```
 
-安装依赖完成后，即可安装OmniShield机密大数据软件包。在管理节点和所有计算节点上操作。
 ### 安装机密计算TEE套件<a name="ZH-CN_TOPIC_0000002520334770"></a>
 
 当前OmniShield机密大数据在REE环境下也可以使用。如果需要远程证明功能，需要执行安装机密计算TEE套件，详情参见《[Kunpeng BoostKit 24.0.0 机密计算TEE套件 特性指南](https://support.huawei.com/enterprisesoftwareapply/docApplyAction?currentSelectDocId=EDOC1100405698&offeringId=PBI2-253662285)》。

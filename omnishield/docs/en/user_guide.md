@@ -91,7 +91,6 @@ When using the OmniShield feature to execute Spark services, start Spark to subm
     >-   **-t**  specifies the data source file format, which is CSV, JSON, or TXT.
     >-   **-e**  specifies the working mode, which is  **encrypt**  or  **decrypt**.
 
-When using the OmniShield feature to execute Spark services, start Spark to submit tasks.
 ### Encrypting and Decrypting Spark SQL Row-based Data Sources<a name="EN-US_TOPIC_0000002520631472"></a>
 
 When using the OmniShield feature to execute Spark services, start Spark to submit tasks.
@@ -135,7 +134,6 @@ When using the OmniShield feature to execute Spark services, start Spark to subm
     >![](public_sys-resources/icon-note.gif) **NOTE:** 
     >If the command output contains  **encryptdatakey**  in  **OPTIONS**, the table is encrypted.
 
-When using the OmniShield feature to execute Spark services, start Spark to submit tasks.
 ### Encrypting and Decrypting Spark SQL ORC Data Sources Using SM Algorithms<a name="EN-US_TOPIC_0000002551631473"></a>
 
 When using the OmniShield feature to execute Spark services, start Spark to submit tasks.
@@ -175,7 +173,6 @@ When using the OmniShield feature to execute Spark services, start Spark to subm
     >![](public_sys-resources/icon-note.gif) **NOTE:** 
     >If the command output contains  **orc.encrypt**  in  **Storage Properties**, the table is encrypted.
 
-When using the OmniShield feature to execute Spark services, start Spark to submit tasks.
 ### Enabling SM Algorithms for Shuffle Secure I/Os<a name="EN-US_TOPIC_0000002520631464"></a>
 
 When using the OmniShield feature to execute Spark services, start Spark to submit tasks.
@@ -208,7 +205,6 @@ When using the OmniShield feature to execute Spark services, start Spark to subm
 
         ![](figures/en-us_image_0000002551631477.png)
 
-When using the OmniShield feature to execute Spark services, start Spark to submit tasks.
 ### Performing Spark on Yarn Application-Level Remote Attestation<a name="EN-US_TOPIC_0000002520471486"></a>
 
 1. <a name="li6709341143217"></a>Add a user for IMA measurement to the virtCCA confidential VM \(cVM\).
@@ -300,6 +296,3 @@ Go to the  **/opt/omnishield**  directory and delete the OmniShield JAR package.
 cd /opt/omnishield
 rm -rf omnishield-1.0-SNAPSHOT.jar
 ```
-
-Follow the operating instructions when upgrading or uninstalling OmniShield.
-

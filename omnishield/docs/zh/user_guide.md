@@ -91,7 +91,7 @@
     >-   -t用于指定数据源文件格式，目前支持CSV/JSON/TXT。
     >-   -e用于指定工作模式，encryp表示加密，decrypt表示解密。
 
-使用OmniShield机密大数据特性执行Spark引擎业务，需通过启动Spark提交任务执行。
+
 ### Spark-SQL行式数据源加解密<a name="ZH-CN_TOPIC_0000002520631472"></a>
 
 使用OmniShield机密大数据特性执行Spark引擎业务，需通过启动Spark提交任务执行。
@@ -135,7 +135,7 @@
     >![](public_sys-resources/icon-note.gif) **说明：** 
     >在SQL运行结果的OPTIONS中如果包含encryptdatakey项则为加密表。
 
-使用OmniShield机密大数据特性执行Spark引擎业务，需通过启动Spark提交任务执行。
+
 ### Spark-SQL ORC数据源国密加解密<a name="ZH-CN_TOPIC_0000002551631473"></a>
 
 使用OmniShield机密大数据特性执行Spark引擎业务，需通过启动Spark提交任务执行。
@@ -175,7 +175,7 @@
     >![](public_sys-resources/icon-note.gif) **说明：** 
     >在SQL运行结果的Storage Properties中如果包含orc.encrypt项则为加密表。
 
-使用OmniShield机密大数据特性执行Spark引擎业务，需通过启动Spark提交任务执行。
+
 ### 支持国密算法的Shuffle安全IO<a name="ZH-CN_TOPIC_0000002520631464"></a>
 
 使用OmniShield机密大数据特性执行Spark引擎业务，需通过启动Spark提交任务执行。
@@ -208,7 +208,7 @@
 
         ![](figures/zh-cn_image_0000002551631477.png)
 
-使用OmniShield机密大数据特性执行Spark引擎业务，需通过启动Spark提交任务执行。
+
 ### Spark on Yarn应用级远程证明<a name="ZH-CN_TOPIC_0000002520471486"></a>
 
 1. <a name="li6709341143217"></a>在virtCCA机密虚拟机内添加用于做IMA度量的用户。
@@ -300,6 +300,3 @@
 cd /opt/omnishield
 rm -rf omnishield-1.0-SNAPSHOT.jar
 ```
-
-升级或卸载OmniShield时请满足操作规范。
-
