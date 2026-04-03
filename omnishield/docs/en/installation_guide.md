@@ -17,7 +17,6 @@ Where,
 **Figure  1**  Networking diagram<a name="fig1311646111411"></a>  
 ![](figures/networking-diagram.png "networking-diagram")
 
-The OmniShield feature works on a storage-compute decoupled network, where storage nodes are separated from compute nodes to enhance data security in privacy computing.
 ### Environment Requirements<a name="EN-US_TOPIC_0000002520014778"></a>
 
 Before installing OmniShield, prepare the hardware and software environments to facilitate subsequent installation operations.
@@ -79,8 +78,6 @@ Verify a software package as follows:
 2. Obtain the  [verification tool and guide](https://support.huawei.com/enterprise/en/tool/pgp-verify-TL1000000054).
 3. Verify the package integrity by following the procedure described in the  _OpenPGP Signature Verification Guide_  obtained from the URL.
 
-Before installing OmniShield, prepare the hardware and software environments to facilitate subsequent installation operations.
-
 
 ## Installing the Feature<a name="EN-US_TOPIC_0000002551414731"></a>
 
@@ -109,7 +106,6 @@ When installing OmniShield in local mode, install the Bouncy Castle JAR package 
 
 4. Press  **Esc**, type  **:wq!**, and press  **Enter**  to save the file and exit.
 
-When installing OmniShield in local mode, install the Bouncy Castle JAR package on the management node and all compute nodes and place the package in the JDK dependency directory.
 ### Installing OmniShield<a name="EN-US_TOPIC_0000002551414655"></a>
 
 After installing the dependency packages, install the OmniShield software. Perform the following operations on the management node and all compute nodes.
@@ -134,7 +130,6 @@ After installing the dependency packages, install the OmniShield software. Perfo
         cp kms.jar /opt/omnishield
         ```
 
-After installing the dependency packages, install the OmniShield software. Perform the following operations on the management node and all compute nodes.
 ### Installing the Confidential Computing TEE Kit<a name="EN-US_TOPIC_0000002520334770"></a>
 
 OmniShield can be used in the REE. If you need the remote attestation function, install the Confidential Computing TEE Kit. For details, see  [Kunpeng BoostKit 24.0.0 Confidential Computing TEE Kit Feature Guide](https://support.huawei.com/enterprisesoftwareapply/docApplyAction?currentSelectDocId=EDOC1100405698&offeringId=PBI2-253662285).
