@@ -223,7 +223,7 @@ OmniShield机密大数据作为大数据引擎Spark的插件，提供数据源�
 
 ### 获取文档的方法<a name="ZH-CN_TOPIC_0000002518568516"></a>
 
-您可以通过访问开源仓浏览和获取相关文档。
+您可以通过访问[开源仓](https://gitcode.com/boostkit/boostkit-bigdata/tree/main/omnishield)浏览和获取相关文档。
 
 
 

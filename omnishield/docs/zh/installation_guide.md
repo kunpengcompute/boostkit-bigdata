@@ -6,7 +6,7 @@
 
 采用存算分离组网，即存储节点和计算节点分离，充分发挥OmniShield机密大数据特性在隐私计算场景下的安全性。
 
-OmniShield机密大数据的组网规划采用存算分离架构，组网规划如[**图 1** 安装组网图](#安装组网图)所示。由5个节点构成，包括1个管理节点、2个计算节点和2个存储节点，一台服务器可以同时充当管理节点和计算节点（如果是单机安装模式，后续文章中提到的在管理节点/计算节点上执行的操作，均需要在一个节点上执行）。
+OmniShield机密大数据的组网规划采用存算分离架构，组网规划如下图所示。由5个节点构成，包括1个管理节点、2个计算节点和2个存储节点，一台服务器可以同时充当管理节点和计算节点（如果是单机安装模式，后续文章中提到的在管理节点/计算节点上执行的操作，均需要在一个节点上执行）。
 
 其中：
 
@@ -15,9 +15,6 @@ OmniShield机密大数据的组网规划采用存算分离架构，组网规划�
 - 存储节点用于在REE侧存储加密数据。
 
 ![](figures/安装组网图.png "安装组网图")
-
-**图 1** 安装组网图<a name="fig1311646111411"></a><a id="安装组网图"></a>
-
 ### 环境要求<a name="ZH-CN_TOPIC_0000002520014778"></a>
 
 安装OmniShield机密大数据特性前，请参见本节内容，提前准备软硬件安装环境，以确保后续安装操作顺利进行。
@@ -47,11 +44,11 @@ OmniShield机密大数据的组网规划采用存算分离架构，组网规划�
 |项目|版本|说明|管理节点|计算/存储节点|
 |--|--|--|--|--|
 |操作系统|openEuler 22.03 LTS SP4|无特殊说明。|√|√|
-|JDK|毕昇JDK 1.8.0_342|毕昇JDK安装指南请参见[《毕昇JDK 8 安装指南》](https://gitee.com/openeuler/bishengjdk-8/wikis/%E4%B8%AD%E6%96%87%E6%96%87%E6%A1%A3/%E6%AF%95%E6%98%87JDK%208%20%E5%AE%89%E8%A3%85%E6%8C%87%E5%8D%97)|√|√|
+|JDK|毕昇JDK 1.8.0_342|毕昇JDK安装指南请参见[《毕昇JDK 8 安装指南》](https://gitee.com/openeuler/bishengjdk-8/wikis/%E4%B8%AD%E6%96%87%E6%96%87%E6%A1%A3/%E6%AF%95%E6%98%87JDK%208%20%E5%AE%89%E8%A3%85%E6%8C%87%E5%8D%97)。|√|√|
 |Bouncy Castle|1.64|Bouncy Castle用于为JDK提供国密算法。|√|√|
 |Hadoop|3.3.1|部署指南请参见[《Hadoop 集群部署（CentOS 7.6&openEuler 20.03）》](https://www.hikunpeng.com/document/detail/zh/kunpengbds/ecosystemEnable/Hadoop/kunpenghadoop_04_0001.html)。|√|√|
 |Spark|3.3.1|部署指南请参见[《Spark 部署指南（CentOS 7.6&openEuler 20.03）》](https://www.hikunpeng.com/document/detail/zh/kunpengbds/ecosystemEnable/Spark/kunpengspark_04_0001.html)。|√|-|
-|Hive|3.1.0|部署指南请参见[《Hive部署指南（CentOS 7.6&openEuler 20.03）》](https://www.hikunpeng.com/document/detail/zh/kunpengbds/ecosystemEnable/Hive/kunpenghive_04_0001.html)|√|-|
+|Hive|3.1.0|部署指南请参见[《Hive部署指南（CentOS 7.6&openEuler 20.03）》](https://www.hikunpeng.com/document/detail/zh/kunpengbds/ecosystemEnable/Hive/kunpenghive_04_0001.html)。|√|-|
 
 
 >![](public_sys-resources/icon-note.gif) **说明：** 
@@ -64,9 +61,9 @@ OmniShield机密大数据的组网规划采用存算分离架构，组网规划�
 
 **表 3** OmniShield机密大数据软件获取列表<a id="OmniShield机密大数据软件获取列表"></a>
 
-|名称|包名|发布类型|说明|获取地址|
-|--|--|--|--|--|
-|OmniShield|boostkit-omnishield-spark-3.3.1-1.1.0-aarch64.zip|开源|OmniShield机密大数据软件安装包。|获取链接|
+|名称|包名|发布类型|说明| 获取地址     |
+|--|--|--|--|----------|
+|OmniShield|boostkit-omnishield-spark-3.3.1-1.1.0-aarch64.zip|开源|OmniShield机密大数据软件安装包。| [获取链接](https://gitee.com/kunpengcompute/boostkit-bigdata/releases/download/24.0.0-OmniShield-Spark-331/boostkit-omnishield-spark-3.3.1-1.1.0-aarch64.zip) |
 
 
 **软件安装包完整性校验<a name="zh-cn_topic_0000001924407076_zh-cn_topic_0000001843026488_zh-cn_topic_0000001664980070_section3857759151915"></a>**
@@ -110,7 +107,7 @@ OmniShield机密大数据的组网规划采用存算分离架构，组网规划�
 
 安装依赖完成后，即可安装OmniShield机密大数据软件包。在管理节点和所有计算节点上操作。
 
-1. 从[软件安装包获取](环境要求.md#zh-cn_topic_0000001924407076_zh-cn_topic_0000001843026488_zh-cn_topic_0000001664980070_section3489574613)下载OmniShield软件安装包存放至“/home/“目录下，执行以下命令进行解压。
+1. 下载OmniShield软件安装包存放至“/home/“目录下，执行以下命令进行解压。
 
     ```
     unzip boostkit-omnishield-spark-3.3.1-1.1.0-aarch64.zip
