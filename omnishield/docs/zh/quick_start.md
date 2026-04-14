@@ -8,7 +8,7 @@
 
 **环境准备<a name="section176201755124016"></a>**
 
-参考 [安装指南.md](./docs/zh/installation_guide.md) 进行环境部署安装。
+参考 [安装指南](./docs/zh/installation_guide.md) 进行环境部署安装。
 
 **使用OmniShield特性<a name="section1819738555"></a>**
 

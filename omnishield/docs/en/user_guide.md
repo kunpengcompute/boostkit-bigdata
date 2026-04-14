@@ -1,7 +1,5 @@
 # User Guide<a name="EN-US_TOPIC_0000002520471488"></a>
 
-Kunpeng BoostKit 26.0.RC1 does not include the OmniShield feature. To use this feature, contact Huawei technical support to obtain a historical software package. For details about the feature documentation, see  [Kunpeng BoostKit 24.0.0 OmniRuntime Feature Guide](https://www.hikunpeng.com/document/detail/en/kunpengboostkithistory/2400/bds/kunpengbds_omniruntime_20_0002.html).
-
 ## Using the Feature<a name="EN-US_TOPIC_0000002520471492"></a>
 
 ### Encrypting and Decrypting DataFrame Row-based Data Sources<a name="EN-US_TOPIC_0000002551631467"></a>

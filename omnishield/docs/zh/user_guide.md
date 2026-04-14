@@ -1,7 +1,5 @@
 # 使用指南<a name="ZH-CN_TOPIC_0000002520471488"></a>
 
-鲲鹏BoostKit 26.0.RC1版本未发布OmniShield机密大数据特性，如需使用OmniShield机密大数据特性，请在[鲲鹏社区](https://www.hikunpeng.com/zh/developer/download?title=%E5%A4%A7%E6%95%B0%E6%8D%AE&subTitle=OmniRuntime&version=23.0.0)获取历史软件包，特性文档请参见历史版本《[鲲鹏BoostKit 24.0.0 OmniRuntime特性指南](https://www.hikunpeng.com/document/detail/zh/kunpengboostkithistory/2400/bds/kunpengbds_omniruntime_20_0002.html)》。
-
 ## 使用特性<a name="ZH-CN_TOPIC_0000002520471492"></a>
 
 ### DataFrame行式数据源加解密<a name="ZH-CN_TOPIC_0000002551631467"></a>
