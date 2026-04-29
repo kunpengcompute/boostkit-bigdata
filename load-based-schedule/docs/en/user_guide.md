@@ -83,9 +83,9 @@ cd /home/hadoop/loadsmetric-software/
 
 **Starting and Stopping Prometheus, Node Exporter, and Grafana Using LoadsMetric<a name="en-us_topic_0000002161905900_section11313142953"></a>**
 
-[Table 1](#en-us_topic_0000002161905900_table6515133412584)  describes the commands of starting and stopping Prometheus, Node Exporter, and Grafana with one click.
+[Table 1](#table_1)  describes the commands of starting and stopping Prometheus, Node Exporter, and Grafana with one click.
 
-**Table  1**  Starting and stopping Prometheus, Node Exporter, and Grafana using the LoadsMetric service with one click
+**Table  1**  Starting and stopping Prometheus, Node Exporter, and Grafana using the LoadsMetric service with one click<a id="table_1"></a>
 
 |**Function**|**Command**|**Description**|
 |--|--|--|
@@ -116,7 +116,7 @@ cd /home/hadoop/loadsmetric-software/
         vim application.properties
         ```
 
-    2. Press  **i**  to enter the insert mode. Modify the usage threshold and usage weight as required. The former affects the determination of overloaded nodes in the cluster, and the latter affects the node load sorting result. For details about the parameters, see  [en-us\_topic\_0000002551533573.md](en-us_topic_0000002551533573.md).
+    2. Press  **i**  to enter the insert mode. Modify the usage threshold and usage weight as required. The former affects the determination of overloaded nodes in the cluster, and the latter affects the node load sorting result. For details about the parameters, see  [References](installation_guide.md#references).
 
         ```
         # limits for multi resource usage
@@ -192,7 +192,7 @@ Contact Huawei technical support to download the OmniScheduler Yarn software ins
         rm -rf boostkit-yarn-schedule-load-evolution-1.0.0.jar
         ```
 
-    2. Comment out the new configuration items in the  **yarn-site.xml**  and  **capacity-scheduler.xml**  files on the  **server1**  node, or delete them. For details about the new configuration items, see  [en-us\_topic\_0000002520013706.md](en-us_topic_0000002520013706.md).
+    2. Comment out the new configuration items in the  **yarn-site.xml**  and  **capacity-scheduler.xml**  files on the  **server1**  node, or delete them. For details about the new configuration items, see  [Installing OmniScheduler](installation_guide.md#installing-omnischeduler).
     3. Synchronize the two configuration items on the  **server1**  node to the other nodes.
     4. Restart the Yarn cluster for the configurations to take effect.
 

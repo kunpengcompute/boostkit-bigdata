@@ -44,7 +44,7 @@ Bitshuffle算法核心是将输入数据分成多个小块，然后对每个小�
     sh /opt/tools/installed/apache-doris-2.1.2-bin-arm64/be/bin/stop_be.sh
     ```
 
-3. 用编译后的“/opt/tools/installed/doris-2.1.2-rc04/be/output/lib/doris\_be“替换集群Backend（BE）中的所有doris\_be，路径为“/opt/tools/installed/apache-doris-2.1.2-bin-arm64/be/lib/doris\_be“。
+3. 用编译后的`/opt/tools/installed/doris-2.1.2-rc04/be/output/lib/doris\_be`替换集群Backend（BE）中的所有doris\_be，路径为`/opt/tools/installed/apache-doris-2.1.2-bin-arm64/be/lib/doris\_be`。
 
     ```
     cp /opt/tools/installed/doris-2.1.2-rc04/be/output/lib/doris_be /opt/tools/installed/apache-doris-2.1.2-bin-arm64/be/lib/doris_be
@@ -69,7 +69,7 @@ Bitshuffle算法核心是将输入数据分成多个小块，然后对每个小�
 以Doris指令优化在TPC-H测试集上的测试步骤为例测试性能。
 
 1. 下载安装TPC-H工具包。
-    1. 从已下载的Doris源码中拷贝tpch-tools文件夹到“/opt/tools/installed“目录下。
+    1. 从已下载的Doris源码中拷贝tpch-tools文件夹到`/opt/tools/installed`目录下。
 
         ```
         cp -r /opt/tools/installed/doris-2.1.2-rc04/tools/tpch-tools /opt/tools/installed
@@ -95,28 +95,28 @@ Bitshuffle算法核心是将输入数据分成多个小块，然后对每个小�
             vi bin/build-tpch-dbgen.sh
             ```
 
-        2. 按“i”进行编辑，在文件中进行以下修改。
+        2. 按`i”进行编辑，在文件中进行以下修改。
 
             ```
             #wget "https://doris-build-1308700295.cos.ap-beijing.myqcloud.com/tools/TPC-H_Tools_v3.0.0new.zip"
             ```
 
-        3. 按“Esc“键，输入:**wq!**，按“Enter“保存并退出编辑。
+        3. 按`Esc`键，输入:**wq!**，按`Enter`保存并退出编辑。
 
-    5. 在“TPC-H\_Tools\_v3.0.0/“目录下生成dbgen二进制文件。
+    5. 在`TPC-H\_Tools\_v3.0.0/`目录下生成dbgen二进制文件。
 
         ```
         sh bin/build-tpch-dbgen.sh
         ```
 
-2. 更改测试工具的配置文件“conf/doris-cluster.conf“。
+2. 更改测试工具的配置文件`conf/doris-cluster.conf`。
     1. 打开配置文件。
 
         ```
         vi conf/doris-cluster.conf
         ```
 
-    2. 按“i“进入编辑模式，在文件中修改以下内容。
+    2. 按`i`进入编辑模式，在文件中修改以下内容。
 
         ```
         # Any of FE host
@@ -141,7 +141,7 @@ Bitshuffle算法核心是将输入数据分成多个小块，然后对每个小�
         >-   PASSWORD是密码，如无配置则为空。
         >-   DB是TPC-H对应的数据库名称。
 
-    3. 按“Esc“键，输入:**wq!**，按“Enter“保存并退出编辑。
+    3. 按`Esc`键，输入:**wq!**，按`Enter`保存并退出编辑。
 
 3. 生成TPC-H数据集。
 

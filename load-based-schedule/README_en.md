@@ -67,18 +67,11 @@ The full project directory structure is as follows:
 
 ```
 ├── docs                                                      # Project document directory
-│   └── zh                                                   # English document directory
-│       ├── figures                                          # Directory of images in English documents
-│       ├── release_notes.md                                 # OmniScheduler Release Notes
-│       ├── installation_guide.md                            # OmniScheduler Installation Guide
-│       ├── user_guide.md                                    # OmniScheduler User Guide
-│       ├── faq.md                                           # OmniScheduler Installation FAQs
 │   └── en                                                   # English document directory
 │       ├── figures                                          # Directory of images in English documents
 │       ├── release_notes.md                                 # OmniScheduler Release Notes
 │       ├── installation_guide.md                            # OmniScheduler Installation Guide
 │       ├── user_guide.md                                    # OmniScheduler User Guide
-│       ├── faq.md                                           # OmniScheduler Installation FAQs
 ├── LoadsMetric                                              # LoadsMetric service module
 │   ├── LoadsMetricServer                                    # LoadsMetric service implementation
 │       ├── package                                          # Packaging code directory
@@ -89,17 +82,18 @@ The full project directory structure is as follows:
 │   ├── pom.xml                                              # Maven project configuration file
 ├── build.sh                                                 # Compilation script
 ├── LoadsMetric.json                                         # LoadsMetric configuration file
+├── README_en.md                                             # Project instroduction file
 ```
 
 
 ## Release Notes<a name="EN-US_TOPIC_0000002520858176"></a>
 
-For details about feature changes in each version, see [release_notes.md](./docs/en/release_notes.md).
+For details about feature changes in each version, see [Release Notes](./docs/en/release_notes.md).
 
 
 ## Environment Deployment<a name="EN-US_TOPIC_0000002521018162"></a>
 
-For details about the environment dependencies and installation methods of OmniScheduler, see [installation_guide.md](./docs/en/installation_guide.md).
+For details about the environment dependencies and installation methods of OmniScheduler, see [Installation Guide](./docs/en/installation_guide.md).
 
 
 
@@ -108,10 +102,9 @@ For details about the environment dependencies and installation methods of OmniS
 
 |Name|Path|Overview|
 |--|--|--|
-|Release Notes|[release_notes.md](./docs/en/release_notes.md)|Provides basic information and feature updates of each OmniScheduler version.|
-|Installation Guide|[installation_guide.md](./docs/en/installation_guide.md)|Describes how to install OmniScheduler.|
-|User Guide|[user_guide.md](./docs/en/user_guide.md)|Provides details about how to use OmniScheduler.|
-|FAQs|[faq.md](./docs/zh/faq.md)|Provides answers to frequently asked questions (FAQs) about installing and using OmniScheduler.|
+|1.0.0 Release Notes|[Release Notes](./docs/en/release_notes.md)|Provides basic information and feature updates of each OmniScheduler version.|
+|Installation Guide|[Installation Guide](./docs/en/installation_guide.md)|Describes how to install OmniScheduler.|
+|User Guide|[User Guide](./docs/en/user_guide.md)|Provides details about how to use OmniScheduler.|
 
 
 
@@ -371,19 +364,17 @@ The documents in the docs directory of OmniScheduler are licensed under CC-BY 4.
     9. After your PR is approved and all tests pass, the CI system will merge it into the project's main branch.
 
 
-## Legal Statement<a name="EN-US_TOPIC_0000002520858168"></a>
-
 
 ## Suggestions and Feedback<a name="EN-US_TOPIC_0000002520858172"></a>
 
-You are welcome to contribute to the community. If you have any questions or suggestions, please submit an  [issue](https://gitcode.com/boostkit/omnistream). We will respond as soon as possible. Thank you for your support.
+You are welcome to contribute to the community. If you have any questions or suggestions, please submit an  [issue](https://gitcode.com/boostkit/boostkit-bigdata/tree/main/load-based-schedule). We will respond as soon as possible. Thank you for your support.
 
 
 ## Acknowledgments<a name="EN-US_TOPIC_0000002552098143"></a>
 
 OmniScheduler is jointly developed by the following Huawei departments:
 
-- Kunpeng Computing BoostKit Development Dept
+Kunpeng Computing BoostKit Development Dept
 
 Thank you to everyone in the community for your PRs. We warmly welcome contributions to OmniScheduler!
 

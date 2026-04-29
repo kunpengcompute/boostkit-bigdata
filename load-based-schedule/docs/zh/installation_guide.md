@@ -29,8 +29,8 @@ OmniScheduler Yarn负载调度算法组网规划的环境由4台服务器组成�
 |处理器|鲲鹏920 5250处理器|
 |内存大小|384GB（12 * 32GB）|
 |内存频率|2666MHz|
-|网络|业务网络10GE管理网络1GE|
-|硬盘|系统盘：1 * RAID 0（1 * 1.2TB SAS HDD）数据盘：12 * RAID 0（12 * 8TB SATA HDD）|
+|网络|业务网络10GE </br>管理网络1GE|
+|硬盘|系统盘：1 * RAID 0（1 * 1.2TB SAS HDD） </br>数据盘：12 * RAID 0（12 * 8TB SATA HDD）|
 |RAID控制卡|LSI SAS3508|
 
 
@@ -42,17 +42,17 @@ OmniScheduler Yarn负载调度算法组网规划的环境由4台服务器组成�
 
 |项目|版本|说明|管理节点|计算/存储节点|
 |--|--|--|--|--|
-|操作系统|openEuler 22.03 LTS SP3|无特殊说明。|√|√|
-|JDK|毕昇JDK 1.8.0_342|毕昇JDK安装指南请参见《毕昇JDK 8 安装指南》|√|√|
-|Hadoop|3.3.4|部署指南请参见《Hadoop 集群部署（CentOS 7.6&openEuler 20.03）》。|√|√|
-|Spark|3.1.1/3.3.1|部署指南请参见《Spark 部署指南（CentOS 7.6&openEuler 20.03）》。|√|-|
-|Hive|3.1.0|部署指南请参见《Hive部署指南（CentOS 7.6&openEuler 20.03）》。|√|-|
-|Prometheus|2.45.4|从官网链接下载：获取链接|√|-|
-|Grafana|10.4.2|从官网链接下载：获取链接|√|-|
-|Node Exporter|1.7.0|从官网链接下载：获取链接|-|√|
-|Go|1.22.2|从官网链接下载：获取链接|√|√|
-|Node|19.9.0|从官网链接下载：获取链接|√|√|
-|Python|3.6.0及以上|无特殊说明。|√|-|
+|操作系统|openEuler 22.03 LTS SP3|无特殊要求。|√|√|
+|JDK|[毕昇JDK 1.8.0_342](https://mirror.iscas.ac.cn/kunpeng/archive/compiler/bisheng_jdk/bisheng-jdk-8u262-linux-aarch64.tar.gz)|毕昇JDK安装指南请参见《[毕昇JDK 8 安装指南](https://gitee.com/openeuler/bishengjdk-8/wikis/%E4%B8%AD%E6%96%87%E6%96%87%E6%A1%A3/%E6%AF%95%E6%98%87JDK%208%20%E5%AE%89%E8%A3%85%E6%8C%87%E5%8D%97)》|√|√|
+|Hadoop|3.3.4|部署指南请参见《[Hadoop 集群部署（CentOS 7.6&openEuler 20.03）](https://www.hikunpeng.com/document/detail/zh/kunpengbds/ecosystemEnable/Hadoop/kunpenghadoop_04_0001.html)》。|√|√|
+|Spark|3.1.1/3.3.1|部署指南请参见《[Spark 部署指南（CentOS 7.6&openEuler 20.03）](https://www.hikunpeng.com/document/detail/zh/kunpengbds/ecosystemEnable/Spark/kunpengspark_04_0001.html)》。|√|-|
+|Hive|3.1.0|部署指南请参见《[Hive部署指南（CentOS 7.6&openEuler 20.03）](https://www.hikunpeng.com/document/detail/zh/kunpengbds/ecosystemEnable/Hive/kunpenghive_04_0001.html)》。|√|-|
+|Prometheus|2.45.4|从官网链接下载：[获取链接](https://github.com/prometheus/prometheus/releases/download/v2.45.4/prometheus-2.45.4.linux-arm64.tar.gz)|√|-|
+|Grafana|10.4.2|从官网链接下载：[获取链接](https://dl.grafana.com/enterprise/release/grafana-enterprise-10.4.2.linux-arm64.tar.gz)|√|-|
+|Node Exporter|1.7.0|从官网链接下载：[获取链接](https://github.com/prometheus/node_exporter/releases/download/v1.7.0/node_exporter-1.7.0.linux-arm64.tar.gz)|-|√|
+|Go|1.22.2|从官网链接下载：[获取链接](https://go.dev/dl/go1.22.2.linux-arm64.tar.gz)|√|√|
+|Node|19.9.0|从官网链接下载：[获取链接](https://cdn.npmmirror.com/binaries/node/v19.9.0/node-v19.9.0-linux-arm64.tar.xz)|√|√|
+|Python|3.6.0及以上|无特殊要求。|√|-|
 
 
 >![](public_sys-resources/icon-notice.gif) **须知：** 
@@ -66,7 +66,7 @@ OmniScheduler Yarn负载调度算法组网规划的环境由4台服务器组成�
 
 |名称|包名|发布类型|说明|获取地址|
 |--|--|--|--|--|
-|OmniSchedulerYarn负载调度算法|BoostKit-loadsmetric-1.0.0-aarch64.zip|开源|OmniSchedulerYarn负载调度算法软件安装包。|获取链接|
+|OmniSchedulerYarn负载调度算法|BoostKit-loadsmetric-1.0.0-aarch64.zip|开源|OmniSchedulerYarn负载调度算法软件安装包。|[获取链接](https://gitee.com/kunpengcompute/boostkit-bigdata/releases/download/25.0.RC1-LoadsMetric-release/BoostKit-loadsmetric-1.0.0-aarch64.zip)|
 
 
 
@@ -140,7 +140,7 @@ LoadsMetric是负载采集与分析工具，负责从Node Exporter中获取机�
 
     3. 按`Esc`键，输入:**wq!**，按`Enter`保存并退出编辑。
 
-5. 修改loadsmetric\_configfile.properties，配置相关含义见[相关参考](相关参考.md)。
+5. 修改loadsmetric\_configfile.properties，配置相关含义见本文档的[相关参考](#相关参考)章节。
     1. 打开loadsmetric\_configfile.properties文件。
 
         ```
@@ -230,7 +230,7 @@ LoadsMetric是负载采集与分析工具，负责从Node Exporter中获取机�
     ![](figures/zh-cn_image_0000002519972102.png)
 
 >![](public_sys-resources/icon-note.gif) **说明：** 
->LoadsMetric服务支持安装、卸载、启动、停止等操作，同时支持一键启停Prometheus、Node Exporter、Grafana等其他相关软件，基本运维命令见[zh-cn\_topic\_0000002520291910.md](zh-cn_topic_0000002520291910.md)。
+>LoadsMetric服务支持安装、卸载、启动、停止等操作，同时支持一键启停Prometheus、Node Exporter、Grafana等其他相关软件，基本运维命令见《用户指南》的[LoadsMetric基本使用](user_guide.md#loadsmetric基本使用)章节。
 
 ### 安装OmniScheduler<a name="ZH-CN_TOPIC_0000002519971980"></a>
 

@@ -67,7 +67,7 @@ OmniShield机密大数据特性适用于安全多方计算领域的隐私集合�
 - 当前只支持SM4/GCM/NOPadding 128位密钥长度。
 - OmniShield机密大数据不提供KMS服务，也不限定使用的KMS，需用户自己提供KMS服务和KMS的实现。
 - OmniShield机密大数据不提供远程证明中Verifier和Attester等实现，需要用户自行对接。
-- 在使用OmniShield机密大数据的“Spark-SQL ORC数据源国密加解密”特性时，需要关闭Spark的ORC谓词下推功能，设置Spark参数spark.sql.orc.filterPushdown=false。
+- 在使用OmniShield机密大数据的`Spark-SQL ORC数据源国密加解密”特性时，需要关闭Spark的ORC谓词下推功能，设置Spark参数spark.sql.orc.filterPushdown=false。
 
 在特性配置前，请先了解OmniShield机密大数据特性的使用限制。
 ## 目录结构<a name="ZH-CN_TOPIC_0000002551514291"></a>
@@ -92,27 +92,27 @@ OmniShield机密大数据特性适用于安全多方计算领域的隐私集合�
 
 ## 版本说明<a name="ZH-CN_TOPIC_0000002520474302"></a>
 
-每个版本的特性变更详细信息，请参见\[quick\_start.md\]\(./docs/zh/quick\_start.md\)。
+每个版本的特性变更详细信息，请参见《[版本说明书](docs/zh/release_notes)》。
 
 
 ## 环境部署<a name="ZH-CN_TOPIC_0000002520634288"></a>
 
-介绍OmniShield的环境依赖及安装方式，具体请参见\[installation\_guide.md\]\(./docs/zh/installation\_guide.md\)。
+介绍OmniShield的环境依赖及安装方式，具体请参见《[安装指南](docs/zh/installation_guide.md)》。
 
 
 ## 快速入门<a name="ZH-CN_TOPIC_0000002520634290"></a>
 
-安装OmniShield后如何快速验证OmniShield是否生效，性能是否提升，具体请参见\[quick\_start.md\]\(./docs/zh/quick\_start.md\)。
+安装OmniShield后如何快速验证OmniShield是否生效，性能是否提升，具体请参见《[快速入门](docs/zh/quick_start.md)》。
 
 
 ## 学习文档<a name="ZH-CN_TOPIC_0000002551514289"></a>
 
-|名称| 路径                                         |简介|
-|--|--------------------------------------------|--|
-|安装指南| [安装指南.md](./docs/zh/installation_guide.md) |提供安装OmniShield的详细指导。|
-|快速入门| [快速入门.md](docs/zh/quick_start.md)          |提供快速使能并验证OmniShield加速能力的快速入门指导。|
-|使用指南| [使用指南.md](./docs/zh/user_guide.md)         |提供使用OmniShield的详细指导。|
-|视频课程| OmniRuntime特性大揭秘                           |提供操作视频，帮助开发者在鲲鹏服务器上了解、使能OmniRuntime特性。|
+|名称|简介|
+|--|--|
+| [安装指南](./docs/zh/installation_guide.md) |提供安装OmniShield的详细指导。|
+| [快速入门](docs/zh/quick_start.md)          |提供快速使能并验证OmniShield加速能力的快速入门指导。|
+| [使用指南](./docs/zh/user_guide.md)         |提供使用OmniShield的详细指导。|
+|视频课程：[OmniRuntime特性大揭秘](https://www.hikunpeng.com/document/video-detail/2849)|提供操作视频，帮助开发者在鲲鹏服务器上了解、使能OmniRuntime特性。|
 
 
 
@@ -134,20 +134,20 @@ OmniShield机密大数据特性适用于安全多方计算领域的隐私集合�
 登录会话30分钟（或更短）的时间内没有活动的情况下应该超时。具体操作步骤如下：
 
 1. 登录安装Ascend-mindxdl-mindio组件的节点。
-2. 执行以下命令，打开“/etc/profile“文件。
+2. 执行以下命令，打开`/etc/profile`文件。
 
     ```
     vim /etc/profile
     ```
 
-3. 按“i“进入编辑模式，在文件尾部增加以下内容。
+3. 按`i`进入编辑模式，在文件尾部增加以下内容。
 
     ```
     export TMOUT=1800
     readonly TMOUT
     ```
 
-4. 按“Esc“键，输入**:wq!**，按“Enter“保存并退出编辑。
+4. 按`Esc`键，输入 **:wq!**，按`Enter`保存并退出编辑。
 
 
 ### 设置禁用history命令<a name="ZH-CN_TOPIC_0000002520682472"></a>
@@ -155,34 +155,34 @@ OmniShield机密大数据特性适用于安全多方计算领域的隐私集合�
 为了防止通过history查看历史操作信息，需要设置禁用history命令。具体操作步骤如下：
 
 1. 登录安装Ascend-mindxdl-mindio组件的节点。
-2. 执行以下命令，打开“/etc/profile“文件。
+2. 执行以下命令，打开`/etc/profile`文件。
 
     ```
     vim /etc/profile
     ```
 
-3. 按“i“进入编辑模式，在文件尾部增加以下内容。
+3. 按`i`进入编辑模式，在文件尾部增加以下内容。
 
     ```
     export HISTFILESIZE=0
     readonly HISTFILESIZE
     ```
 
-4. 按“Esc“键，输入**:wq!**，按“Enter“保存并退出编辑。
+4. 按`Esc`键，输入 **:wq!**，按`Enter`保存并退出编辑。
 
 
 ### 设置umask<a name="ZH-CN_TOPIC_0000002551682471"></a>
 
 建议用户服务器的umask设置为027\~777，调整文件权限。以设置umask为027为例，具体操作如下所示：
 
-1. 以root用户登录服务器，打开“/etc/profile“文件。
+1. 以root用户登录服务器，打开`/etc/profile`文件。
 
     ```
     vim /etc/profile
     ```
 
-2. 按“i“进入编辑模式，在文件末尾加上**umask 027**。
-3. 按“Esc“键，输入:**wq!**，按“Enter“保存并退出编辑。
+2. 按`i`进入编辑模式，在文件末尾加上**umask 027**。
+3. 按`Esc`键，输入:**wq!**，按`Enter`保存并退出编辑。
 4. 执行如下命令使配置生效。
 
     ```
@@ -225,14 +225,14 @@ OmniShield机密大数据特性适用于安全多方计算领域的隐私集合�
 
     修复建议：
 
-    目前厂商已发布升级补丁以修复漏洞，请参见[Github](https://github.com/netty/netty/security/advisories/GHSA-9vjp-v76f-g363)修复漏洞。
+    目前厂商已发布升级补丁以修复漏洞，请参见[GitHub](https://github.com/netty/netty/security/advisories/GHSA-9vjp-v76f-g363)修复漏洞。
 
 
 ### SSH加固<a name="ZH-CN_TOPIC_0000002551517487"></a>
 
 在部署安装过程中，需要通过SSH连接服务器。由于root用户拥有最高权限，直接使用root用户登录服务器可能会存在安全风险。建议您使用普通用户登录服务器进行安装部署，并建议您通过配置禁止root用户SSH登录的选项，来提升系统安全性。操作步骤：
 
-用户登录系统后检查“/etc/ssh/sshd\_config”配置项“PermitRootLogin“。
+用户登录系统后检查`/etc/ssh/sshd\_config”配置项`PermitRootLogin`。
 
 - 如果显示no，说明禁止了root用户SSH登录。
 - 如果显示yes，说明需要修改PermitRootLogin为no。
@@ -261,9 +261,9 @@ OmniShield机密大数据特性适用于安全多方计算领域的隐私集合�
 
 ## License<a name="ZH-CN_TOPIC_0000002551634293"></a>
 
-OmniShield的使用许可证，具体请参见[LICENSE](License.md)文件。
+OmniShield的使用许可证，具体请参见[LICENSE](../LICENSE)文件。
 
-xxxdocs目录下的文档适用CC-BY 4.0许可证，具体请参见[LICENSE](License.md)文件。
+docs目录下的文档适用CC-BY 4.0许可证，具体请参见[LICENSE](../LICENSE)文件。
 
 
 ## 贡献声明<a name="ZH-CN_TOPIC_0000002551634285"></a>
@@ -284,8 +284,6 @@ xxxdocs目录下的文档适用CC-BY 4.0许可证，具体请参见[LICENSE](Lic
     9. 审核和测试通过后，CI会将您的PR合并入到项目的主干分支。
 
 
-## 法律声明<a name="ZH-CN_TOPIC_0000002520634292"></a>
-
 
 ## 建议与交流<a name="ZH-CN_TOPIC_0000002551634283"></a>
 
@@ -296,7 +294,7 @@ xxxdocs目录下的文档适用CC-BY 4.0许可证，具体请参见[LICENSE](Lic
 
 OmniShield由华为公司的下列部门联合贡献：
 
-- 鲲鹏计算BoostKit开发部
+鲲鹏计算BoostKit开发部
 
 感谢来自社区的每一个PR，欢迎贡献OmniShield！
 

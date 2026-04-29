@@ -1,21 +1,21 @@
-# 版本说明书<a name="ZH-CN_TOPIC_0000002550208189"></a>
+# Release Notes
 
-## 版本配套说明<a name="ZH-CN_TOPIC_0000002550168243"></a>
+## Version Mapping
 
-### 产品版本信息<a name="ZH-CN_TOPIC_0000002550208261"></a>
+### Product Version
 
 <a name="table227mcpsimp"></a>
-<table><tbody><tr id="row232mcpsimp"><th class="firstcol" valign="top" width="30%" id="mcps1.1.3.1.1"><p id="p234mcpsimp"><a name="p234mcpsimp"></a><a name="p234mcpsimp"></a>产品名称</p>
+<table><tbody><tr id="row232mcpsimp"><th class="firstcol" valign="top" width="30%" id="mcps1.1.3.1.1"><p id="p234mcpsimp"><a name="p234mcpsimp"></a><a name="p234mcpsimp"></a>Product Name</p>
 </th>
 <td class="cellrowborder" valign="top" width="70%" headers="mcps1.1.3.1.1 "><p id="p236mcpsimp"><a name="p236mcpsimp"></a><a name="p236mcpsimp"></a>Kunpeng BoostKit</p>
 </td>
 </tr>
-<tr id="row237mcpsimp"><th class="firstcol" valign="top" width="30%" id="mcps1.1.3.2.1"><p id="p239mcpsimp"><a name="p239mcpsimp"></a><a name="p239mcpsimp"></a>产品版本</p>
+<tr id="row237mcpsimp"><th class="firstcol" valign="top" width="30%" id="mcps1.1.3.2.1"><p id="p239mcpsimp"><a name="p239mcpsimp"></a><a name="p239mcpsimp"></a>Product Version</p>
 </th>
 <td class="cellrowborder" valign="top" width="70%" headers="mcps1.1.3.2.1 "><p id="p241mcpsimp"><a name="p241mcpsimp"></a><a name="p241mcpsimp"></a>25.3.0</p>
 </td>
 </tr>
-<tr id="row242mcpsimp"><th class="firstcol" valign="top" width="30%" id="mcps1.1.3.3.1"><p id="p244mcpsimp"><a name="p244mcpsimp"></a><a name="p244mcpsimp"></a>软件名称和版本</p>
+<tr id="row242mcpsimp"><th class="firstcol" valign="top" width="30%" id="mcps1.1.3.3.1"><p id="p244mcpsimp"><a name="p244mcpsimp"></a><a name="p244mcpsimp"></a>Software Name and Version</p>
 </th>
 <td class="cellrowborder" valign="top" width="70%" headers="mcps1.1.3.3.1 "><p id="p386219202323"><a name="p386219202323"></a><a name="p386219202323"></a>OmniShield 1.1.0</p>
 </td>
@@ -24,12 +24,12 @@
 </table>
 
 
-### 软件版本配套说明<a name="ZH-CN_TOPIC_0000002518728412"></a>
+### Software Version Mapping
 
-|项目|版本|
+|Item|Version|
 |--|--|
-|操作系统|openEuler 22.03 LTS SP4|
-|JDK|毕昇JDK 1.8.0_342|
+|OS|openEuler 22.03 LTS SP4|
+|JDK|BiSheng JDK 1.8.0_342|
 |Bouncy Castle|1.64|
 |Hadoop|3.3.1|
 |Spark|3.3.1|
@@ -37,26 +37,26 @@
 
 
 
-### 硬件版本配套说明<a name="ZH-CN_TOPIC_0000002550168191"></a>
+### Hardware Version Mapping
 
 <a name="table305mcpsimp"></a>
-<table><tbody><tr id="row315mcpsimp"><th class="firstcol" valign="top" width="30%" id="mcps1.1.3.1.1"><p id="p317mcpsimp"><a name="p317mcpsimp"></a><a name="p317mcpsimp"></a>处理器</p>
+<table><tbody><tr id="row315mcpsimp"><th class="firstcol" valign="top" width="30%" id="mcps1.1.3.1.1"><p id="p317mcpsimp"><a name="p317mcpsimp"></a><a name="p317mcpsimp"></a>Processor</p>
 </th>
-<td class="cellrowborder" valign="top" width="70%" headers="mcps1.1.3.1.1 "><p id="p319mcpsimp"><a name="p319mcpsimp"></a><a name="p319mcpsimp"></a>鲲鹏920系列处理器</p>
+<td class="cellrowborder" valign="top" width="70%" headers="mcps1.1.3.1.1 "><p id="p319mcpsimp"><a name="p319mcpsimp"></a><a name="p319mcpsimp"></a>Kunpeng 920</p>
 </td>
 </tr>
-<tr id="row320mcpsimp"><th class="firstcol" valign="top" width="30%" id="mcps1.1.3.2.1"><p id="p322mcpsimp"><a name="p322mcpsimp"></a><a name="p322mcpsimp"></a>内存大小</p>
+<tr id="row320mcpsimp"><th class="firstcol" valign="top" width="30%" id="mcps1.1.3.2.1"><p id="p322mcpsimp"><a name="p322mcpsimp"></a><a name="p322mcpsimp"></a>Memory</p>
 </th>
-<td class="cellrowborder" valign="top" width="70%" headers="mcps1.1.3.2.1 "><p id="p324mcpsimp"><a name="p324mcpsimp"></a><a name="p324mcpsimp"></a>32GB以上</p>
+<td class="cellrowborder" valign="top" width="70%" headers="mcps1.1.3.2.1 "><p id="p324mcpsimp"><a name="p324mcpsimp"></a><a name="p324mcpsimp"></a>32 GB or above</p>
 </td>
 </tr>
 </tbody>
 </table>
 
 
-### 病毒扫描结果<a name="ZH-CN_TOPIC_0000002518728368"></a>
+### Virus Scan Results
 
-本软件包、版本文档、产品文档经过防病毒软件扫描，未发现病毒。详细信息如下：
+The software packages, release documents, and product documents have been scanned by multiple antivirus software, and no virus is found. The following tables describe the details.
 
 <a name="table357mcpsimp"></a>
 <table><tbody><tr id="row362mcpsimp"><th class="firstcol" valign="top" width="30%" id="mcps1.1.3.1.1"><p id="p12130195313518"><a name="p12130195313518"></a><a name="p12130195313518"></a><strong id="b14130553173510"><a name="b14130553173510"></a><a name="b14130553173510"></a>Engine Name</strong></p>
@@ -147,83 +147,85 @@
 
 
 
-## V1.1.0<a name="ZH-CN_TOPIC_0000002550208207"></a>
+## V1.1.0
 
-### 更新说明<a name="ZH-CN_TOPIC_0000002518568472"></a>
+### Change Description
 
-OmniShield机密大数据作为大数据引擎Spark的插件，提供数据源加解密的功能，通过在基于硬件的TEE环境中执行计算过程的方式，为使用中的数据提供保护，保证数据在整个计算链路中的安全性。
+OmniShield is a plugin of the big data engine Spark and provides the data source encryption and decryption functions. It protects data in use by executing the computing process in the hardware-based trusted execution environment \(TEE\). OmniShield ensures data security throughout the entire computing link.
 
-**新增特性<a name="section9559165534817"></a>**
+**New Features**
 
--   Spark Shuffle安全IO支持国密算法。
--   OmniShield机密大数据支持远程证明。
+-   Added SM algorithm support for Spark shuffle secure I/Os.
+-   Added remote attestation support for OmniShield.
 
-**修改特性<a name="section299616132492"></a>**
+**Modified Features**
 
-无
+None
 
-**删除特性<a name="section65399205498"></a>**
+**Removed Features**
 
-无
-
-
-### 已解决的问题<a name="ZH-CN_TOPIC_0000002550208215"></a>
-
-无
+None
 
 
-### 遗留问题<a name="ZH-CN_TOPIC_0000002518728422"></a>
+### Resolved Issues
 
-无
-
-
-
-## V1.0.0<a name="ZH-CN_TOPIC_0000002550168223"></a>
-
-### 更新说明<a name="ZH-CN_TOPIC_0000002550168183"></a>
-
-OmniShield机密大数据作为大数据引擎Spark的插件，提供数据源加解密的功能，通过在基于硬件的TEE环境中执行计算过程的方式，为使用中的数据提供保护，保证数据在整个计算链路中的安全性。
-
-**新增特性<a name="section9559165534817"></a>**
-
--   DataFrame CSV/JSON/text行式数据源读写支持AES加解密。
--   Spark SQL数据源支持加解密。
--   Spark SQL ORC数据源读写支持国密算法加解密。
-
-**修改特性<a name="section299616132492"></a>**
-
-无
-
-**删除特性<a name="section65399205498"></a>**
-
-无
+None
 
 
-### 已解决的问题<a name="ZH-CN_TOPIC_0000002518728404"></a>
+### Known Issues
 
-无
-
-
-### 遗留问题<a name="ZH-CN_TOPIC_0000002550208241"></a>
-
-无
+None
 
 
 
-## 版本配套文档<a name="ZH-CN_TOPIC_0000002518728372"></a>
+## V1.0.0
 
-### 版本配套文档<a name="ZH-CN_TOPIC_0000002550208223"></a>
+### Change Description
 
-|文档名称|内容简介|交付形式|
+OmniShield is a plugin of the big data engine Spark and provides the data source encryption and decryption functions. It protects data in use by executing the computing process in the hardware-based trusted execution environment \(TEE\). OmniShield ensures data security throughout the entire computing link.
+
+**New Features**
+
+-   Enables AES encryption and decryption for reading and writing DataFrame CSV/JSON/text row-based data sources.
+-   Added encryption and decryption functions for the Spark SQL data source.
+-   Added encryption and decryption functions with SM algorithms for reading and writing the Spark SQL ORC data source.
+
+**Modified Features**
+
+None
+
+**Removed Features**
+
+None
+
+
+### Resolved Issues
+
+None
+
+
+### Known Issues
+
+None
+
+
+
+## Related Documentation
+
+### Related Documentation
+
+|Document|Description|Delivery Method|
 |--|--|--|
-|《Kunpeng BoostKit 25.3.0 大数据OmniRuntime 1.9.0 版本说明书》|本文档提供OmniRuntime的版本发布信息。|开源仓|
-|《Kunpeng BoostKit 25.3.0 大数据OmniRuntime 特性指南》|本文档提供OmniRuntime安装部署等指导。|开源仓|
+|1.1.0 Release Notes|PProvides the OmniShield version release information.|Open source repository|
+|Quick Start|Provides guidance on how to quickly enable and verify the OmniShield feature.|Open source repository|
+|Installation Guide|Describes how to install OmniShield.|Open source repository|
+|User Guide|Provides details about how to use OmniShield.|Open source repository|
 
 
 
-### 获取文档的方法<a name="ZH-CN_TOPIC_0000002518568516"></a>
+### Obtaining Documentation
 
-您可以通过访问开源仓浏览和获取相关文档。
+Visit the [open source repository](https://gitcode.com/boostkit/boostkit-bigdata/tree/main/omnishield) to view or download required documents.
 
 
 
