@@ -43,7 +43,7 @@ OmniShield机密大数据的组网规划采用存算分离架构，组网规划�
 
 |项目|版本|说明|管理节点|计算/存储节点|
 |--|--|--|--|--|
-|操作系统|openEuler 22.03 LTS SP4|无特殊说明。|√|√|
+|操作系统|openEuler 22.03 LTS SP4|无特殊要求。|√|√|
 |JDK|毕昇JDK 1.8.0_342|毕昇JDK安装指南请参见[《毕昇JDK 8 安装指南》](https://gitee.com/openeuler/bishengjdk-8/wikis/%E4%B8%AD%E6%96%87%E6%96%87%E6%A1%A3/%E6%AF%95%E6%98%87JDK%208%20%E5%AE%89%E8%A3%85%E6%8C%87%E5%8D%97)。|√|√|
 |Bouncy Castle|1.64|Bouncy Castle用于为JDK提供国密算法。|√|√|
 |Hadoop|3.3.1|部署指南请参见[《Hadoop 集群部署（CentOS 7.6&openEuler 20.03）》](https://www.hikunpeng.com/document/detail/zh/kunpengbds/ecosystemEnable/Hadoop/kunpenghadoop_04_0001.html)。|√|√|
@@ -82,7 +82,7 @@ OmniShield机密大数据的组网规划采用存算分离架构，组网规划�
 
 通过本地方式安装OmniShield机密大数据，需在管理节点和所有计算节点安装Bouncy Castle的JAR包，并放在JDK的依赖目录。
 
-1. 从[**表 2** 操作系统和软件要求](#操作系统和软件要求)获取Bouncy Castle的JAR包，上传到“/home“目录，将其复制到JDK的依赖目录下。
+1. 从[**表 2** 操作系统和软件要求](#操作系统和软件要求)获取Bouncy Castle的JAR包，上传到`/home`目录，将其复制到JDK的依赖目录下。
 
     ```
     cd /home
@@ -95,33 +95,33 @@ OmniShield机密大数据的组网规划采用存算分离架构，组网规划�
     vi $JAVA_HOME/jre/lib/security/java.security
     ```
 
-3. 按“i“进入编辑模式，添加bc库。
+3. 按`i`进入编辑模式，添加bc库。
 
     ```
     security.provider.10=org.bouncycastle.jce.provider.BouncyCastleProvider
     ```
 
-4. 按“Esc“键，输入**:wq!**，按“Enter“保存并退出编辑。
+4. 按`Esc`键，输入**:wq!**，按`Enter`保存并退出编辑。
 
 ### 安装OmniShield<a name="ZH-CN_TOPIC_0000002551414655"></a>
 
 安装依赖完成后，即可安装OmniShield机密大数据软件包。在管理节点和所有计算节点上操作。
 
-1. 下载OmniShield软件安装包存放至“/home/“目录下，执行以下命令进行解压。
+1. 下载OmniShield软件安装包存放至`/home/`目录下，执行以下命令进行解压。
 
     ```
     unzip boostkit-omnishield-spark-3.3.1-1.1.0-aarch64.zip
     ```
 
-2. 复制JAR包到“/opt“目录下。
-    1. 复制OmniShield机密大数据的JAR包到“/opt/omnishield“目录下。
+2. 复制JAR包到`/opt`目录下。
+    1. 复制OmniShield机密大数据的JAR包到`/opt/omnishield`目录下。
 
         ```
         mkdir -p /opt/omnishield
         cp omnishield-1.0-SNAPSHOT.jar /opt/omnishield
         ```
 
-    2. 复制KMS的JAR包到“/opt/omnishield“目录下，KMS需要使用者自行按照OmniShield机密大数据提供的接口实现并编译构建JAR包。
+    2. 复制KMS的JAR包到`/opt/omnishield`目录下，KMS需要使用者自行按照OmniShield机密大数据提供的接口实现并编译构建JAR包。
 
         ```
         cp kms.jar /opt/omnishield

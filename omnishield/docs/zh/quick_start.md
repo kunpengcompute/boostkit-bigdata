@@ -8,7 +8,7 @@
 
 **环境准备<a name="section176201755124016"></a>**
 
-参考 [安装指南](./docs/zh/installation_guide.md) 进行环境部署安装。
+请参见 《[安装指南](./docs/zh/installation_guide.md)》 进行环境部署安装。
 
 **使用OmniShield特性<a name="section1819738555"></a>**
 
@@ -17,7 +17,7 @@
       ```
       hadoop key create key2
       ```
-2. 在“/opt/omnishield”目录下执行如下命令启动Spark-SQL。
+2. 在`/opt/omnishield`目录下执行如下命令启动Spark-SQL。
       ```
       spark-sql --master local --conf spark.sql.extensions=com.huawei.analytics.shield.sql.DataSourceEncryptPlugin --conf spark.hadoop.io.compression.codecs=com.huawei.analytics.shield.crypto.CryptoCodec --jars omnishield-1.0-SNAPSHOT.jar,kms.jar  --conf spark.executor.extraClassPath=omnishield-1.0-SNAPSHOT.jar:kms.jar --driver-class-path omnishield-1.0-SNAPSHOT.jar:kms.jar
       ```

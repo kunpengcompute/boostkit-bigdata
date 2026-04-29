@@ -190,14 +190,15 @@ None
 
 |Document|Description|Delivery Method|
 |--|--|--|
-|Kunpeng BoostKit 25.3.0 Big Data OmniRuntime 1.9.0 Release Notes|Provides the OmniRuntime version release information.|Open source repository|
-|Kunpeng BoostKit 25.3.0 Big Data OmniRuntime Feature Guide|Describes how to install and deploy OmniRuntime.|Open source repository|
+|1.0.0 Release Notes|PProvides the OmniScheduler version release information.|Open source repository|
+|Installation Guide|Describes how to install OmniScheduler.|Open source repository|
+|User Guide|Provides details about how to use OmniScheduler.|Open source repository|
 
 
 
 ### Obtaining Documentation<a name="EN-US_TOPIC_0000002550208011"></a>
 
-Visit the open source repository to view or download required documents.
+Visit the [open source repository](https://gitcode.com/boostkit/boostkit-bigdata/tree/main/load-based-schedule/docs) to view or download required documents.
 
 
 

@@ -72,13 +72,6 @@ OmniScheduler Yarn负载调度算法特性适用于Hadoop集群节点间负载�
 │       ├── release_notes.md                                 # OmniScheduler版本说明书
 │       ├── installation_guide.md                            # OmniScheduler安装指导
 │       ├── user_guide.md                                    # OmniScheduler使用指导
-│       ├── faq.md                                           # OmniScheduler安装使用常见问题
-│   └── en                                                   # 中文文档目录
-│       ├── figures                                          # 中文文档图片资源目录
-│       ├── release_notes.md                                 # OmniScheduler版本说明书
-│       ├── installation_guide.md                            # OmniScheduler安装指导
-│       ├── user_guide.md                                    # OmniScheduler使用指导
-│       ├── faq.md                                           # OmniScheduler安装使用常见问题
 ├── LoadsMetric                                              # LoadsMetric服务模块
 │   ├── LoadsMetricServer                                    # LoadsMetric服务实现
 │       ├── package                                          # 打包代码目录
@@ -89,17 +82,18 @@ OmniScheduler Yarn负载调度算法特性适用于Hadoop集群节点间负载�
 │   ├── pom.xml                                              # Maven项目配置文件
 ├── build.sh                                                 # 编译脚本
 ├── LoadsMetric.json                                         # LoadsMetric配置文件
+├── README.md                                                # 项目介绍
 ```
 
 
 ## 版本说明<a name="ZH-CN_TOPIC_0000002520858176"></a>
 
-每个版本的特性变更详细信息，请参见[版本说明书](./docs/zh/release_notes.md)。
+每个版本的特性变更详细信息，请参见《[版本说明书](./docs/zh/release_notes.md)》。
 
 
 ## 环境部署<a name="ZH-CN_TOPIC_0000002521018162"></a>
 
-介绍OmniScheduler的环境依赖及安装方式，具体请参见[安装指南](./docs/zh/installation_guide.md)。
+介绍OmniScheduler的环境依赖及安装方式，具体请参见《[安装指南](./docs/zh/installation_guide.md)》。
 
 
 
@@ -371,19 +365,17 @@ OmniScheduler docs目录下的文档适用CC-BY 4.0许可证，具体请参见[L
     9. 审核和测试通过后，CI会将您的PR合并入到项目的主干分支。
 
 
-## 法律声明<a name="ZH-CN_TOPIC_0000002520858168"></a>
-
 
 ## 建议与交流<a name="ZH-CN_TOPIC_0000002520858172"></a>
 
-欢迎大家为社区做贡献。如果有任何疑问或建议，请提交[Issues](https://gitcode.com/boostkit/omnistream)，我们会尽快回复。感谢您的支持。
+欢迎大家为社区做贡献。如果有任何疑问或建议，请提交[Issues](https://gitcode.com/boostkit/boostkit-bigdata/tree/main/load-based-schedule)，我们会尽快回复。感谢您的支持。
 
 
 ## 致谢<a name="ZH-CN_TOPIC_0000002552098143"></a>
 
 OmniScheduler由华为公司的下列部门联合贡献：
 
-- 鲲鹏计算BoostKit开发部
+鲲鹏计算BoostKit开发部
 
 感谢来自社区的每一个PR，欢迎贡献OmniScheduler！
 

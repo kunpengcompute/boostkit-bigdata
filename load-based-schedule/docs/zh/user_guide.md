@@ -83,9 +83,9 @@ cd /home/hadoop/loadsmetric-software/
 
 **LoadsMetric一键启停Prometheus、Node\_exporter、Grafana<a name="zh-cn_topic_0000002161905900_section11313142953"></a>**
 
-一键启停Prometheus、Node\_exporter、Grafana命令请参见[**表 1** LoadsMetric服务一键启停Prometheus、Node\_exporter、Grafana方法](#LoadsMetric服务一键启停Prometheus、Node\_exporter、Grafana方法)。
+一键启停Prometheus、Node\_exporter、Grafana命令请参见[**表 1**](#table_1)。
 
-**表 1** LoadsMetric服务一键启停Prometheus、Node\_exporter、Grafana方法<a id="LoadsMetric服务一键启停Prometheus、Node\_exporter、Grafana方法"></a>
+**表 1** LoadsMetric服务一键启停Prometheus、Node\_exporter、Grafana方法<a id="table_1"></a>
 
 |**功能**|**命令**|**说明**|
 |--|--|--|
@@ -116,7 +116,7 @@ cd /home/hadoop/loadsmetric-software/
         vim application.properties
         ```
 
-    2. 按`i`进入编辑模式，按需修改利用率阈值配置项和利用率权重配置项，前者影响集群超载节点的判断，后者影响节点负载排序结果，参数说明请参见[zh-cn\_topic\_0000002551533573.md](zh-cn_topic_0000002551533573.md)。
+    2. 按`i`进入编辑模式，按需修改利用率阈值配置项和利用率权重配置项，前者影响集群超载节点的判断，后者影响节点负载排序结果，参数说明请参见《安装指南》的[相关参考](installation_guide.md#相关参考)章节。
 
         ```
         # limits for multi resource usage
@@ -192,7 +192,7 @@ cd /home/hadoop/loadsmetric-software/
         rm -rf boostkit-yarn-schedule-load-evolution-1.0.0.jar
         ```
 
-    2. 注释掉或删除server1节点yarn-site.xml和capacity-scheduler.xml中新增配置内容，具体新增内容见[zh-cn\_topic\_0000002520013706.md](zh-cn_topic_0000002520013706.md)。
+    2. 注释掉或删除server1节点yarn-site.xml和capacity-scheduler.xml中新增配置内容，具体新增内容见[安装OmniScheduler](installation_guide.md#installing-omnischeduler)。
     3. 将server1节点两个配置项内容同步到其他节点。
     4. 重启Yarn集群以使配置生效。
 

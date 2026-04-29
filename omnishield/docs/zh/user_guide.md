@@ -14,7 +14,7 @@
         vi core-site.xml
         ```
 
-    2. 按“i“进入编辑模式，在<configuration\>标签中添加以下内容。
+    2. 按`i`进入编辑模式，在<configuration\>标签中添加以下内容。
 
         ```
         <property>
@@ -23,7 +23,7 @@
         </property>
         ```
 
-    3. 按“Esc“键，输入:**wq!**，按“Enter“保存并退出编辑。
+    3. 按`Esc`键，输入 **:wq!**，按`Enter`保存并退出编辑。
     4. 复制core-site.xml文件给Spark。
 
         ```
@@ -47,14 +47,14 @@
         >-   在修改core-site.xml时将第二步中的x.x.x.x修改为实际的IP地址。
         >-   如果key1已经存在，在创建key1前执行**hadoop key delete key1**指令删除key1。
 
-2. 在“/home“目录下生成待加密的CSV数据源文件。
-    1. 编辑“simple.csv“文件。
+2. 在`/home`目录下生成待加密的CSV数据源文件。
+    1. 编辑`simple.csv`文件。
 
         ```
         vi simple.csv
         ```
 
-    2. 按“i“进入编辑模式，在文件中添加以下内容。
+    2. 按`i`进入编辑模式，在文件中添加以下内容。
 
         ```
         name,age,job
@@ -65,15 +65,15 @@
         user5,16,Engineer
         ```
 
-    3. 按“Esc“键，输入:**wq!**，按“Enter“保存并退出编辑。
+    3. 按`Esc`键，输入 **:wq!**，按`Enter`保存并退出编辑。
 
-3. 在“/opt/omnishield“目录下执行数据源加密的命令如下, 指令执行完成后将生成“/home/en“目录，并存放加密后的simple.csv数据。
+3. 在`/opt/omnishield`目录下执行数据源加密的命令如下, 指令执行完成后将生成`/home/en`目录，并存放加密后的simple.csv数据。
 
     ```
     spark-submit --class com.huawei.analytics.shield.utils.Encrypt --master local --conf spark.hadoop.io.compression.codecs=com.huawei.analytics.shield.crypto.CryptoCodec  --conf spark.shield.primaryKey.name=key1 --conf spark.shield.primaryKey.key1.kms.type=test.example.HadoopKeyManagementService --jars omnishield-1.0-SNAPSHOT.jar,kms.jar omnishield-1.0-SNAPSHOT.jar  -i file:///home/simple.csv -o file:///home/en -a AES/GCM/NOPadding -t csv -e encrypt
     ```
 
-4. 在“/opt/omnishield“目录下执行数据源解密的命令如下，指令执行完成后将生成“/home/de“目录，并存放解密后的数据。
+4. 在`/opt/omnishield`目录下执行数据源解密的命令如下，指令执行完成后将生成`/home/de`目录，并存放解密后的数据。
 
     ```
     spark-submit --class com.huawei.analytics.shield.utils.Encrypt --master local --conf spark.hadoop.io.compression.codecs=com.huawei.analytics.shield.crypto.CryptoCodec  --conf spark.shield.primaryKey.name=key1 --conf spark.shield.primaryKey.key1.kms.type=test.example.HadoopKeyManagementService --jars omnishield-1.0-SNAPSHOT.jar,kms.jar omnishield-1.0-SNAPSHOT.jar  -i file:///home/en -o file:///home/de -a AES/GCM/NOPadding -t csv -e decrypt
@@ -103,7 +103,7 @@
     >![](public_sys-resources/icon-note.gif) **说明：** 
     >Hadoop KMS 的启动步骤与[1](DataFrame行式数据源加解密.md#zh-cn_topic_0000001984634968_zh-cn_topic_0000001842867824_zh-cn_topic_0000001519205317_li39371321142320)中的相同。如果Hadoop KMS已经启动，创建Key时无需重复启动KMS。
 
-2. 在“/opt/omnishield“目录下执行如下命令启动Spark-SQL。
+2. 在`/opt/omnishield`目录下执行如下命令启动Spark-SQL。
 
     ```
     spark-sql --master local --conf spark.sql.extensions=com.huawei.analytics.shield.sql.DataSourceEncryptPlugin --conf spark.hadoop.io.compression.codecs=com.huawei.analytics.shield.crypto.CryptoCodec --jars omnishield-1.0-SNAPSHOT.jar,kms.jar  --conf spark.executor.extraClassPath=omnishield-1.0-SNAPSHOT.jar:kms.jar --driver-class-path omnishield-1.0-SNAPSHOT.jar:kms.jar
@@ -147,7 +147,7 @@
     >![](public_sys-resources/icon-note.gif) **说明：** 
     >Hadoop KMS 的启动步骤与[1](DataFrame行式数据源加解密.md#zh-cn_topic_0000001984634968_zh-cn_topic_0000001842867824_zh-cn_topic_0000001519205317_li39371321142320)中的相同。如果Hadoop KMS已经启动，创建Key时无需重复启动KMS。
 
-2. 在“/opt/omnishield“目录下执行如下命令启动Spark-SQL。
+2. 在`/opt/omnishield`目录下执行如下命令启动Spark-SQL。
 
     ```
     spark-sql --master local --conf spark.sql.extensions=com.huawei.analytics.shield.sql.DataSourceEncryptPlugin --conf spark.hadoop.io.compression.codecs=com.huawei.analytics.shield.crypto.CryptoCodec --conf spark.sql.orc.filterPushdown=false --jars omnishield-1.0-SNAPSHOT.jar,kms.jar  --conf spark.executor.extraClassPath=omnishield-1.0-SNAPSHOT.jar:kms.jar --driver-class-path omnishield-1.0-SNAPSHOT.jar:kms.jar
@@ -178,7 +178,7 @@
 
 使用OmniShield机密大数据特性执行Spark引擎业务，需通过启动Spark提交任务执行。
 
-1. 在“/opt/omnishield“目录下执行SQL并打开Shuffle IO加密，命令如下。
+1. 在`/opt/omnishield`目录下执行SQL并打开Shuffle IO加密，命令如下。
 
     ```
     spark-sql --driver-cores 5 --driver-memory 20g --num-executors 6 --executor-cores 4 --executor-memory 20g --conf spark.executor.memoryOverhead=20g --master yarn --conf spark.memory.offHeap.enabled=true --conf spark.memory.offHeap.size=18g --conf spark.task.cpus=1 --conf spark.driver.maxResultSize=40g  --conf spark.authenticate.secret=testSecret  --conf spark.authenticate=true --conf spark.io.encryption.enabled=true  --conf spark.io.encryption.commons.config.cipher.classes=com.huawei.boostkit.omnishield.cipher.SM4Cipher --conf spark.io.crypto.cipher.transformation=SM4/GCM/NOPadding  --conf spark.network.crypto.enabled=true  --conf spark.network.crypto.cipher=SM4/GCM/NOPadding  --conf spark.driver.extraClassPath=omnishield-1.0-SNAPSHOT.jar --conf spark.executor.extraClassPath=omnishield-1.0-SNAPSHOT.jar  --jars omnishield-1.0-SNAPSHOT.jar --database tpcds_bin_partitioned_varchar_orc_2 -f /automated/lib/bd/testcase/scripts/omniop/conf/Spark_OmniRuntime_ShuffleEnhance/Spark_OmniRuntime_ShuffleEnhance_002.sql
@@ -216,13 +216,13 @@
     ```
 
 2. 在virtCCA机密虚拟机内配置IMA度量策略。
-    1. 打开“policy“文件。
+    1. 打开`policy`文件。
 
         ```
         vi policy
         ```
 
-    2. 按“i“进入编辑模式，在文件中添加以下内容。
+    2. 按`i`进入编辑模式，在文件中添加以下内容。
 
         ```
         measure func=FILE_CHECK mask=MAY_READ fowner=1001
@@ -235,7 +235,7 @@
         >-   fowner=1001表示被度量的文件的属主ID为1001。
         >-   3条参数规则结合在一起时表示：当属主为1001的文件被读取时将触发IMA度量。
 
-    3. 按“Esc“键，输入:**wq!**，按“Enter“保存并退出编辑。
+    3. 按`Esc`键，输入 **:wq!**，按`Enter`保存并退出编辑。
 
 3. 在virtCCA机密虚拟机内生效IMA度量策略。
 
@@ -244,13 +244,13 @@
     ```
 
 4. 在virtCCA机密虚拟机内配置IMA度量用户的环境变量。
-    1. 打开“/etc/profile“文件。
+    1. 打开`/etc/profile`文件。
 
         ```
         vi /etc/profile
         ```
 
-    2. 按“i“进入编辑模式，在文件中添加以下内容。
+    2. 按`i`进入编辑模式，在文件中添加以下内容。
 
         ```
         export IMA_USER=attest
@@ -259,7 +259,7 @@
         >![](public_sys-resources/icon-note.gif) **说明：** 
         >IMA\_USER用户名称是[1](#li6709341143217)新建的用户。
 
-    3. 按“Esc“键，输入:**wq!**，按“Enter“保存并退出编辑。
+    3. 按`Esc`键，输入 **:wq!**，按`Enter`保存并退出编辑。
 
 5. 在Yarn的ResourceManager节点提交Spark作业并进行远程证明，如可以通过如下指令启动Spark example中计算Pi值的作业。
 
@@ -292,7 +292,7 @@
 >-   当前步骤仅供需要卸载OmniShield时参考，不属于部署OmniShield的必要操作步骤。
 >-   卸载OmniShield前需先停止所有运行业务，并在所有安装OmniShield的节点进行卸载操作。
 
-进入“/opt/omnishield“目录，删除相关OmniShield的JAR包。
+进入`/opt/omnishield`目录，删除相关OmniShield的JAR包。
 
 ```
 cd /opt/omnishield

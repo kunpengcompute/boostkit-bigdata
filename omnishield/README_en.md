@@ -32,7 +32,7 @@ OmniShield can work as a plugin of Spark to encrypt and decrypt CSV, JSON, and T
 
 [Figure 1](#en-us_topic_0000002512402638_fig26911981620)  shows the OmniShield architecture.
 
-**Figure  1**  Software architecture of OmniShield<a name="en-us_topic_0000002512402638_fig26911981620"></a>  
+**Figure  1**  Software architecture of OmniShield<a id="en-us_topic_0000002512402638_fig26911981620"></a>  
 ![](figures/software-architecture-of-omnishield.png "software-architecture-of-omnishield")
 
 OmniShield performs the following functions:
@@ -81,38 +81,37 @@ The full project directory structure is as follows:
 │       ├── release_notes.md                                 # OmniShield Release Notes
 │       ├── installation_guide.md                            # OmniShield Installation Guide
 │       ├── user_guide.md                                    # OmniShield User Guide
-│       ├── best_practices.md                                # OmniShield Scenario-specific Application Best Practices
-│       ├── api_reference.md                                 # OmniShield API Reference
-│       ├── design_guide.md                                  # OmniShield Design Guide
-│       ├── faq.md                                           # OmniShield Installation FAQs
+├── script                                                   # Script directory
+│   └── build.sh                                             # Compilation script
+├── src                                                      # Source code directory
+│   ├── main                                                 # Feature source code directory
+│   └── test                                                 # Unit test directory
 ```
 
 
 ## Release Notes<a name="EN-US_TOPIC_0000002520474302"></a>
 
-For details about feature changes in each version, see \[quick\_start.md\]\(./docs/en/quick\_start.md\).
+For details about feature changes in each version, see [Release Notes](./docs/en/release_notes.md).
 
 
 ## Environment Deployment<a name="EN-US_TOPIC_0000002520634288"></a>
 
-For details about the environment dependencies and installation methods of OmniShield, see \[installation\_guide.md\]\(./docs/en/installation\_guide.md\).
+For details about the environment dependencies and installation methods of OmniShield, see [Installation Guide](./docs/en/installation_guide.md).
 
 
 ## Quick Start<a name="EN-US_TOPIC_0000002520634290"></a>
 
-For instructions on quickly verifying whether OmniShield is active and its performance improvements, see \[quick\_start.md\]\(./docs/en/quick\_start.md\).
+For instructions on quickly verifying whether OmniShield is active and its performance improvements, see [Quick Start](./docs/en/quick_start.md).
 
 
 ## Helpful Links<a name="EN-US_TOPIC_0000002551514289"></a>
 
-|Name|Path|Overview|
-|--|--|--|
-|Quick Start|[quick_start.md](./docs/en/quick_start.md)|Provides guidance on how to quickly enable and verify the OmniShield feature.|
-|Release Notes|[release_notes.md](./docs/en/release_notes.md)|Provides basic information and feature updates of each OmniShield version.|
-|Installation Guide|[installation_guide.md](./docs/en/installation_guide.md)|Describes how to install OmniShield.|
-|User Guide|[user_guide.md](./docs/en/user_guide.md)|Provides details about how to use OmniShield.|
-|Best Practices|[best_practices.md](./docs/en/best_practices.md)|Provides practice cases of OmniShield.|
-|FAQs|[faq.md](./docs/en/faq.md)|Provides answers to frequently asked questions (FAQs) about installing and using OmniShield.|
+|Name|Overview|
+|--|--|
+|[Quick Start](./docs/en/quick_start.md)|Provides guidance on how to quickly enable and verify the OmniShield feature.|
+|[Release Notes](./docs/en/release_notes.md)|Provides basic information and feature updates of each OmniShield version.|
+|[Installation Guide](./docs/en/installation_guide.md)|Describes how to install OmniShield.|
+|[User Guide](./docs/en/user_guide.md)|Provides details about how to use OmniShield.|
 
 
 
@@ -261,9 +260,9 @@ If you do not want your model or dataset to be mentioned in OmniShield, or if yo
 
 ## License<a name="EN-US_TOPIC_0000002551634293"></a>
 
-For details, see the  [License](license.md)  file.
+For details, see the  [License](../LICENSE)  file.
 
-The documents in the  _xxxdocs_  directory are licensed under CC BY 4.0. For details, see the  [License](license.md)  file.
+The documents in the  _docs_  directory are licensed under CC BY 4.0. For details, see the  [License](../LICENSE)  file.
 
 
 ## Contribution Statement<a name="EN-US_TOPIC_0000002551634285"></a>
@@ -284,7 +283,6 @@ The documents in the  _xxxdocs_  directory are licensed under CC BY 4.0. For det
     9. After your PR is approved and all tests pass, the CI system will merge it into the project's main branch.
 
 
-## Legal Statement<a name="EN-US_TOPIC_0000002520634292"></a>
 
 
 ## Suggestions and Feedback<a name="EN-US_TOPIC_0000002551634283"></a>
@@ -296,7 +294,7 @@ You are welcome to contribute to the community. If you have any questions or sug
 
 OmniShield is jointly developed by the following Huawei departments:
 
-- Kunpeng Computing BoostKit Development Dept
+Kunpeng Computing BoostKit Development Dept
 
 Thank you to everyone in the community for your PRs. We warmly welcome contributions to OmniShield!
 

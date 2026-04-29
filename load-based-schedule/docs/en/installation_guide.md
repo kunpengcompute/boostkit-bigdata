@@ -20,38 +20,38 @@ Before installing OmniScheduler, prepare the hardware and software environments 
 
 **Hardware Requirements<a name="en-us_topic_0000002161905896_section197116445713"></a>**
 
-[Table 1](#en-us_topic_0000002161905896___d0e1171)  lists the hardware requirements for each node in the cluster.
+[Table 1](#hardware_requirements)  lists the hardware requirements for each node in the cluster.
 
-**Table  1**  Hardware requirements
+**Table  1**  Hardware requirements<a id="hardware_requirements"></a>
 
 |Item|Management/Compute/Storage Node|
 |--|--|
 |Processor|Kunpeng 920 5250|
 |Memory size|384 GB (12 x 32 GB)|
 |Memory frequency|2666 MHz|
-|Network|Service network: 10GEManagement network: 1GE|
-|Drive|System drive: 1 x RAID 0 (1 x 1.2 TB SAS HDD)Data drive: 12 x RAID 0 (12 x 8 TB SATA HDD)|
+|Network|Service network: 10GE <br> Management network: 1GE|
+|Drive|System drive: 1 x RAID 0 (1 x 1.2 TB SAS HDD) <br> Data drive: 12 x RAID 0 (12 x 8 TB SATA HDD)|
 |RAID controller card|LSI SAS3508|
 
 
 **OS and Software Requirements<a name="en-us_topic_0000002161905896_en-us_topic_0000001843026488_en-us_topic_0000001664980070_section12083304460"></a>**
 
-[Table 2](#en-us_topic_0000002161905896_en-us_topic_0000001843026488_en-us_topic_0000001664980070_table564mcpsimp)  lists the OS and software requirements for each node in the cluster.
+[Table 2](#os_software_requirements)  lists the OS and software requirements for each node in the cluster.
 
-**Table  2**  OS and software requirements
+**Table  2**  OS and software requirements<a id="os_software_requirements"></a>
 
 |Item|Version|Description|Management Node|Compute/Storage Node|
 |--|--|--|--|--|
 |OS|openEuler 22.03 LTS SP3|None|√|√|
-|JDK|BiSheng JDK 1.8.0_342|For details about how to install the BiSheng JDK, see BiSheng JDK 8 Installation Guide.|√|√|
-|Hadoop|3.3.4|See Hadoop Deployment Guide (CentOS 7.6 & openEuler 20.03).|√|√|
-|Spark|3.1.1/3.3.1|See Spark Deployment Guide (CentOS 7.6 & openEuler 20.03).|√|-|
-|Hive|3.1.0|See Hive Deployment Guide (CentOS 7.6 & openEuler 20.03).|√|-|
-|Prometheus|2.45.4|Download it from the official website: Link|√|-|
-|Grafana|10.4.2|Download it from the official website: Link|√|-|
-|Node Exporter|1.7.0|Download it from the official website: Link|-|√|
-|Go|1.22.2|Download it from the official website: Link|√|√|
-|Node|19.9.0|Download it from the official website: Link|√|√|
+|JDK|[BiSheng JDK 1.8.0_342](https://mirror.iscas.ac.cn/kunpeng/archive/compiler/bisheng_jdk/bisheng-jdk-8u342-linux-aarch64.tar.gz)|For details about how to install the BiSheng JDK, see [BiSheng JDK 8 Installation Guide](https://gitee.com/openeuler/bishengjdk-8/wikis/English%20Documentation/BiSheng%20JDK%208%20Installation%20Guide#installation-guide).|√|√|
+|Hadoop|3.3.4|See [Hadoop Deployment Guide (CentOS 7.6 & openEuler 20.03)](https://www.hikunpeng.com/document/detail/en/kunpengbds/ecosystemEnable/Hadoop/kunpenghadoop_04_0001.html).|√|√|
+|Spark|3.1.1/3.3.1|See Spark [Deployment Guide (CentOS 7.6 & openEuler 20.03)](https://www.hikunpeng.com/document/detail/en/kunpengbds/ecosystemEnable/Spark/kunpengspark_04_0001.html).|√|-|
+|Hive|3.1.0|See Hive [Deployment Guide (CentOS 7.6 & openEuler 20.03)](https://www.hikunpeng.com/document/detail/en/kunpengbds/ecosystemEnable/Hive/kunpenghive_04_0001.html).|√|-|
+|Prometheus|2.45.4|Download it from the official website: [Link](https://github.com/prometheus/prometheus/releases/download/v2.45.4/prometheus-2.45.4.linux-arm64.tar.gz)|√|-|
+|Grafana|10.4.2|Download it from the official website: [Link](https://dl.grafana.com/enterprise/release/grafana-enterprise-10.4.2.linux-arm64.tar.gz)|√|-|
+|Node Exporter|1.7.0|Download it from the official website: [Link](https://github.com/prometheus/node_exporter/releases/download/v1.7.0/node_exporter-1.7.0.linux-arm64.tar.gz)|-|√|
+|Go|1.22.2|Download it from the official website: [Link](https://go.dev/dl/go1.22.2.linux-arm64.tar.gz)|√|√|
+|Node|19.9.0|Download it from the official website: [Link](https://cdn.npmmirror.com/binaries/node/v19.9.0/node-v19.9.0-linux-arm64.tar.xz)|√|√|
 |Python|3.6.0 or later|None|√|-|
 
 
@@ -62,11 +62,11 @@ Before installing OmniScheduler, prepare the hardware and software environments 
 
 **Obtaining the Software Package<a name="en-us_topic_0000002161905896_section6777173841917"></a>**
 
-**Table  3**  OmniScheduler software package
+**Table  3**  OmniScheduler software package<a id="table_3"></a>
 
 |Software Name|Package Name|Release Type|Description|Download URL|
 |--|--|--|--|--|
-|OmniScheduler|BoostKit-loadsmetric-1.0.0-aarch64.zip|Open source|OmniScheduler software package|Link|
+|OmniScheduler|BoostKit-loadsmetric-1.0.0-aarch64.zip|Open source|OmniScheduler software package|[Link](https://gitee.com/kunpengcompute/boostkit-bigdata/releases/download/25.0.RC1-LoadsMetric-release/BoostKit-loadsmetric-1.0.0-aarch64.zip)|
 
 
 
@@ -104,7 +104,7 @@ LoadsMetric is a load collection and analysis tool. It obtains machine metric in
     useradd hadoop
     ```
 
-2. Create  **/home/hadoop/loadsmetric-software**  to use it as the installation directory. Obtain the dependency package from  [Table 3](environment-requirements.md#en-us_topic_0000002161905896_en-us_topic_0000001924407076_en-us_topic_0000001843026488_en-us_topic_0000001664980070__table677mcpsimp), upload it to the created directory, and extract the package.
+2. Create  **/home/hadoop/loadsmetric-software**  to use it as the installation directory. Obtain the dependency package from  [Table 3](#table_3), upload it to the created directory, and extract the package.
 
     ```
     mkdir -p /home/hadoop/loadsmetric-software
@@ -140,7 +140,7 @@ LoadsMetric is a load collection and analysis tool. It obtains machine metric in
 
     3. Press  **Esc**, type  **:wq!**, and press  **Enter**  to save the file and exit.
 
-5. Modify  **loadsmetric\_configfile.properties**. For details about the configuration items, see  [References](references.md).
+5. Modify  **loadsmetric\_configfile.properties**. For details about the configuration items, see  [References](#references).
     1. Open the  **loadsmetric\_configfile.properties**  file.
 
         ```
@@ -230,7 +230,7 @@ LoadsMetric is a load collection and analysis tool. It obtains machine metric in
     ![](figures/en-us_image_0000002519972102.png)
 
 >![](public_sys-resources/icon-note.gif) **NOTE:** 
->The LoadsMetric service can be installed, uninstalled, started, and stopped. It allows starting and stopping Prometheus, Node Exporter, and Grafana with one click. For details about basic O&M commands, see  [Using LoadsMetric](en-us_topic_0000002520291910.md).
+>The LoadsMetric service can be installed, uninstalled, started, and stopped. It allows starting and stopping Prometheus, Node Exporter, and Grafana with one click. For details about basic O&M commands, see  [Using LoadsMetric](user_guide.md#using-loadsmetric).
 
 ### Installing OmniScheduler<a name="EN-US_TOPIC_0000002519971980"></a>
 

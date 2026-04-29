@@ -14,7 +14,7 @@ Where,
 - A compute node runs compute services in the TEE.
 - A storage node stores encrypted data in the REE.
 
-**Figure  1**  Networking diagram<a name="fig1311646111411"></a>  
+**Figure  1**  Networking diagram<a id="fig1311646111411"></a>  
 ![](figures/networking-diagram.png "networking-diagram")
 
 ### Environment Requirements<a name="EN-US_TOPIC_0000002520014778"></a>
@@ -23,25 +23,25 @@ Before installing OmniShield, prepare the hardware and software environments to 
 
 **Hardware Requirements<a name="en-us_topic_0000001924407076_en-us_topic_0000001843026488_en-us_topic_0000001664980070_section4570887453"></a>**
 
-[Table 1](#en-us_topic_0000001924407076_en-us_topic_0000001843026488_table7203101022718)  lists the hardware requirements for each node in the cluster.
+[Table 1](#hardware_requirements)  lists the hardware requirements for each node in the cluster.
 
-**Table  1**  Hardware requirements
+**Table  1**  Hardware requirements<a id="hardware_requirements"></a>
 
 |Item|Management Node|Compute Node|Storage Node|
 |--|--|--|--|
 |Processor|Kunpeng 920 7260|Subject to the processor required by the TEE Kit|Kunpeng 920 7260|
 |Memory size|512 GB|512 GB|512 GB|
 |Memory frequency|2666 MHz|2666 MHz|2666 MHz|
-|Network|Service network: 10GEManagement network: 1GE|Service network: 10GEManagement network: 1GE|Service network: 10GEManagement network: 1GE|
-|Drive|System drive: 1 x RAID 0 (1 x 1.2 TB SAS HDD)Data drive: 12 x RAID 0 (12 x 8 TB SATA HDD)|System drive: 1 x RAID 0 (1 x 1.2 TB SAS HDD)Data drive: 12 x RAID 0 (12 x 8 TB SATA HDD)|System drive: 1 x RAID 0 (1 x 1.2 TB SAS HDD)Data drive: 12 x RAID 0 (12 x 8 TB SATA HDD)|
+|Network|Service network: 10GE <br> Management network: 1GE|Service network: 10GE <br> Management network: 1GE|Service network: 10GE <br> Management network: 1GE|
+|Drive|System drive: 1 x RAID 0 (1 x 1.2 TB SAS HDD) <br>Data drive: 12 x RAID 0 (12 x 8 TB SATA HDD)|System drive: 1 x RAID 0 (1 x 1.2 TB SAS HDD) <br>Data drive: 12 x RAID 0 (12 x 8 TB SATA HDD)|System drive: 1 x RAID 0 (1 x 1.2 TB SAS HDD) <br> Data drive: 12 x RAID 0 (12 x 8 TB SATA HDD)|
 |RAID controller card|LSI SAS3508|LSI SAS3508|LSI SAS3508|
 
 
 **OS and Software Requirements<a name="en-us_topic_0000001924407076_en-us_topic_0000001843026488_en-us_topic_0000001664980070_section12083304460"></a>**
 
-[Table 2](#en-us_topic_0000001924407076_en-us_topic_0000001843026488_en-us_topic_0000001664980070_table564mcpsimp)  lists the OS and software requirements for each node in the cluster.
+[Table 2](#os_and_software_requirements)  lists the OS and software requirements for each node in the cluster.
 
-**Table  2**  OS and software requirements
+**Table  2**  OS and software requirements<a id="os_and_software_requirements"></a>
 
 |Item|Version|Description|Management Node|Compute/Storage Node|
 |--|--|--|--|--|
@@ -61,7 +61,7 @@ Before installing OmniShield, prepare the hardware and software environments to 
 
 **Obtaining the Software Package<a name="en-us_topic_0000001924407076_en-us_topic_0000001843026488_en-us_topic_0000001664980070_section3489574613"></a>**
 
-**Table  3**  OmniShield software package
+**Table  3**  OmniShield software package<a id="omnishield_software_package">
 
 |Software Name|Package Name|Release Type|Description|Download URL|
 |--|--|--|--|--|
@@ -85,7 +85,7 @@ Verify a software package as follows:
 
 When installing OmniShield in local mode, install the Bouncy Castle JAR package on the management node and all compute nodes and place the package in the JDK dependency directory.
 
-1. Obtain the Bouncy Castle JAR package from  [Table 2](environment-requirements.md#en-us_topic_0000001924407076_en-us_topic_0000001843026488_en-us_topic_0000001664980070_table564mcpsimp), upload it to the  **/home**  directory, and copy it to the JDK dependency directory.
+1. Obtain the Bouncy Castle JAR package from [Table 2](#os_and_software_requirements), upload it to the  **/home**  directory, and copy it to the JDK dependency directory.
 
     ```
     cd /home
@@ -110,7 +110,7 @@ When installing OmniShield in local mode, install the Bouncy Castle JAR package 
 
 After installing the dependency packages, install the OmniShield software. Perform the following operations on the management node and all compute nodes.
 
-1. Download the OmniShield installation package from  [Obtaining the Software Package](environment-requirements.md#en-us_topic_0000001924407076_en-us_topic_0000001843026488_en-us_topic_0000001664980070_section3489574613), save it to the  **/home/**  directory, and run the following command to extract the package:
+1. Download the OmniShield installation package from  [Table 3](#omnishield_software_package), save it to the  **/home/**  directory, and run the following command to extract the package:
 
     ```
     unzip boostkit-omnishield-spark-3.3.1-1.1.0-aarch64.zip
