@@ -2,12 +2,12 @@
 
 ## 使用特性<a name="ZH-CN_TOPIC_0000002520471492"></a>
 
-### DataFrame行式数据源加解密<a name="ZH-CN_TOPIC_0000002551631467"></a>
+### DataFrame行式数据源加解密<a name="DataFrame"></a>
 
 使用OmniShield机密大数据特性执行Spark引擎业务，需通过启动Spark提交任务执行。
 
 1. 部署相应KMS服务，创建好所需的Primary Key。例如可以通过以下指令启动Hadoop KMS，并创建Primary Key。
-    1. 编辑Hadoop配置文件。
+     1. <a id="step_1"></a>编辑Hadoop配置文件。
 
         ```
         cd $HADOOP_HOME/etc/hadoop
@@ -101,7 +101,7 @@
     ```
 
     >![](public_sys-resources/icon-note.gif) **说明：** 
-    >Hadoop KMS 的启动步骤与[1](DataFrame行式数据源加解密.md#zh-cn_topic_0000001984634968_zh-cn_topic_0000001842867824_zh-cn_topic_0000001519205317_li39371321142320)中的相同。如果Hadoop KMS已经启动，创建Key时无需重复启动KMS。
+    >Hadoop KMS 的启动步骤与[步骤1](#step_1)相同。如果Hadoop KMS已经启动，创建Key时无需重复启动KMS。
 
 2. 在`/opt/omnishield`目录下执行如下命令启动Spark-SQL。
 
@@ -122,7 +122,7 @@
     >-   kmstype是指定Primary Key的KMS类型，KMS需要使用者自行按照OmniShield机密大数据提供的接口实现，该项的值需要指定KMS在kms.jar中的具体类路径。
     >-   cryptomode是指定加密数据时使用的加密算法，支持AES/GCM/NOPadding和SM4/GCM/NoPadding。
     >-   keylength是指定加密的密钥长度，当使用AES/GCM/NOPadding加密算法时该项的值可以是128或256，当使用SM4/GCM/NoPadding加密算法时该项的值是128。
-    >-   可以通过指定数据源格式创建不同类型的数据表，如创建JSON格式数据表需将[3](#zh-cn_topic_0000002021075065_li1973462017298)中的using csv替换using json。目前支CSV/JSON/TXT式。
+    >-   可以通过指定数据源格式创建不同类型的数据表，如创建JSON格式数据表需将using csv替换using json。目前支CSV/JSON/TXT式。
 
 4. 在Spark-SQL命令行执行如下SQL检测数据表是否为加密数据表。
 
@@ -145,7 +145,7 @@
     ```
 
     >![](public_sys-resources/icon-note.gif) **说明：** 
-    >Hadoop KMS 的启动步骤与[1](DataFrame行式数据源加解密.md#zh-cn_topic_0000001984634968_zh-cn_topic_0000001842867824_zh-cn_topic_0000001519205317_li39371321142320)中的相同。如果Hadoop KMS已经启动，创建Key时无需重复启动KMS。
+    >Hadoop KMS 的启动步骤与[步骤1](#step_1)相同。如果Hadoop KMS已经启动，创建Key时无需重复启动KMS。
 
 2. 在`/opt/omnishield`目录下执行如下命令启动Spark-SQL。
 
@@ -209,7 +209,7 @@
 
 ### Spark on Yarn应用级远程证明<a name="ZH-CN_TOPIC_0000002520471486"></a>
 
-1. <a name="li6709341143217"></a>在virtCCA机密虚拟机内添加用于做IMA度量的用户。
+1. <a id="attest"></a>在virtCCA机密虚拟机内添加用于做IMA度量的用户。
 
     ```
     useradd attest
@@ -229,7 +229,7 @@
         ```
 
         >![](public_sys-resources/icon-note.gif) **说明：** 
-        >-   **1001**是[1](#li6709341143217)中attest用户的ID，policy中fowner指定的ID需根据实际情况修改，可通过**cat /etc/passwd | grep attest**查看用户ID。
+        >-   **1001**是[步骤1](#attest)中attest用户的ID，policy中fowner指定的ID需根据实际情况修改，可通过**cat /etc/passwd | grep attest**查看用户ID。
         >-   func=FILE\_CHECK表示IMA度量的对象为文件。
         >-   mask=MAY\_READ表示IMA度量的触发动作为读取操作。
         >-   fowner=1001表示被度量的文件的属主ID为1001。
@@ -257,7 +257,7 @@
         ```
 
         >![](public_sys-resources/icon-note.gif) **说明：** 
-        >IMA\_USER用户名称是[1](#li6709341143217)新建的用户。
+        >IMA\_USER用户名称是[步骤1](#attest)新建的用户。
 
     3. 按`Esc`键，输入 **:wq!**，按`Enter`保存并退出编辑。
 

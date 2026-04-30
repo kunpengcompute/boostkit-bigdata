@@ -99,13 +99,12 @@ OmniScheduler Yarn负载调度算法特性适用于Hadoop集群节点间负载�
 
 ## 学习文档<a name="ZH-CN_TOPIC_0000002521018170"></a>
 
-|名称|路径|简介|
-|--|--|--|
-|版本说明书|[版本说明书](./docs/zh/release_notes.md)|提供OmniScheduler每个发布版本的基础信息和特性更新信息。|
-|安装指南|[安装指南](./docs/zh/installation_guide.md)|提供安装OmniScheduler的详细指导。|
-|使用指南|[使用指南](./docs/zh/user_guide.md)|提供使用OmniScheduler的详细指导。|
-|常见问题|[常见问题](./docs/zh/faq.md)|提供OmniScheduler安装、使用过程的常见问题和解决方法。|
-|视频课程|OmniRuntime特性大揭秘|提供操作视频，帮助开发者在鲲鹏服务器上了解、使能OmniRuntime特性。|
+|名称|简介|
+|--|--|
+|[版本说明书](./docs/zh/release_notes.md)|提供OmniScheduler每个发布版本的基础信息和特性更新信息。|
+|[安装指南](./docs/zh/installation_guide.md)|提供安装OmniScheduler的详细指导。|
+|[使用指南](./docs/zh/user_guide.md)|提供使用OmniScheduler的详细指导。|
+|视频课程：[OmniRuntime特性大揭秘](https://www.hikunpeng.com/document/video-detail/2849)|提供操作视频，帮助开发者在鲲鹏服务器上了解、使能OmniRuntime特性。|
 
 
 
@@ -148,7 +147,7 @@ OmniScheduler Yarn负载调度算法特性适用于Hadoop集群节点间负载�
 
     修复建议：
 
-    目前厂商已发布升级补丁以修复漏洞，请参见[Github](https://github.com/netty/netty/security/advisories/GHSA-9vjp-v76f-g363)修复漏洞。
+    目前厂商已发布升级补丁以修复漏洞，请参见[GitHub](https://github.com/netty/netty/security/advisories/GHSA-9vjp-v76f-g363)修复漏洞。
 
 
 ### SSH加固<a name="ZH-CN_TOPIC_0000002520858166"></a>

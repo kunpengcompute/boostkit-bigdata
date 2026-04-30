@@ -44,11 +44,11 @@ OmniShield机密大数据的组网规划采用存算分离架构，组网规划�
 |项目|版本|说明|管理节点|计算/存储节点|
 |--|--|--|--|--|
 |操作系统|openEuler 22.03 LTS SP4|无特殊要求。|√|√|
-|JDK|毕昇JDK 1.8.0_342|毕昇JDK安装指南请参见[《毕昇JDK 8 安装指南》](https://gitee.com/openeuler/bishengjdk-8/wikis/%E4%B8%AD%E6%96%87%E6%96%87%E6%A1%A3/%E6%AF%95%E6%98%87JDK%208%20%E5%AE%89%E8%A3%85%E6%8C%87%E5%8D%97)。|√|√|
+|JDK|毕昇JDK 1.8.0_342|毕昇JDK安装指南请参见《[毕昇JDK 8 安装指南](https://gitee.com/openeuler/bishengjdk-8/wikis/%E4%B8%AD%E6%96%87%E6%96%87%E6%A1%A3/%E6%AF%95%E6%98%87JDK%208%20%E5%AE%89%E8%A3%85%E6%8C%87%E5%8D%97)》。|√|√|
 |Bouncy Castle|1.64|Bouncy Castle用于为JDK提供国密算法。|√|√|
-|Hadoop|3.3.1|部署指南请参见[《Hadoop 集群部署（CentOS 7.6&openEuler 20.03）》](https://www.hikunpeng.com/document/detail/zh/kunpengbds/ecosystemEnable/Hadoop/kunpenghadoop_04_0001.html)。|√|√|
-|Spark|3.3.1|部署指南请参见[《Spark 部署指南（CentOS 7.6&openEuler 20.03）》](https://www.hikunpeng.com/document/detail/zh/kunpengbds/ecosystemEnable/Spark/kunpengspark_04_0001.html)。|√|-|
-|Hive|3.1.0|部署指南请参见[《Hive部署指南（CentOS 7.6&openEuler 20.03）》](https://www.hikunpeng.com/document/detail/zh/kunpengbds/ecosystemEnable/Hive/kunpenghive_04_0001.html)。|√|-|
+|Hadoop|3.3.1|部署指南请参见《[Hadoop 集群部署（CentOS 7.6&openEuler 20.03）](https://www.hikunpeng.com/document/detail/zh/kunpengbds/ecosystemEnable/Hadoop/kunpenghadoop_04_0001.html)》。|√|√|
+|Spark|3.3.1|部署指南请参见《[Spark 部署指南（CentOS 7.6&openEuler 20.03）](https://www.hikunpeng.com/document/detail/zh/kunpengbds/ecosystemEnable/Spark/kunpengspark_04_0001.html)》。|√|-|
+|Hive|3.1.0|部署指南请参见《[Hive部署指南（CentOS 7.6&openEuler 20.03）](https://www.hikunpeng.com/document/detail/zh/kunpengbds/ecosystemEnable/Hive/kunpenghive_04_0001.html)》。|√|-|
 
 
 >![](public_sys-resources/icon-note.gif) **说明：** 

@@ -13,7 +13,7 @@
 **使用OmniShield特性<a name="section1819738555"></a>**
 
 **使用Spark-SQL行式数据源加解密特性对数据源进行加解密**
-1. 部署相应KMS服务，创建好所需的Primary Key。（hadoop 提供了KMS服务，下面以Hadoop KMS为例，可以通过以下指令在Hadoop KMS中创建Primary Key）。
+1. 部署相应KMS服务，创建好所需的Primary Key。Hadoop 提供了KMS服务，下面以Hadoop KMS为例，可以通过以下指令在Hadoop KMS中创建Primary Key。
       ```
       hadoop key create key2
       ```
