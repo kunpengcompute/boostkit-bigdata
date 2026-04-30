@@ -59,13 +59,13 @@ Before installing OmniShield, prepare the hardware and software environments to 
 >-   If the preceding third-party software has vulnerabilities, fix the vulnerabilities based on official instructions.
 >-   The preceding component versions may be different from those in the  _Deployment Guide_. The  _Deployment Guide_  is for reference only.
 
-**Obtaining the Software Package<a name="en-us_topic_0000001924407076_en-us_topic_0000001843026488_en-us_topic_0000001664980070_section3489574613"></a>**
+**Obtaining the Software Package**
 
 **Table  3**  OmniShield software package<a id="omnishield_software_package">
 
 |Software Name|Package Name|Release Type|Description|Download URL|
 |--|--|--|--|--|
-|OmniShield|boostkit-omnishield-spark-3.3.1-1.1.0-aarch64.zip|Open source|OmniShield software package|Link|
+|OmniShield|boostkit-omnishield-spark-3.3.1-1.1.0-aarch64.zip|Open source|OmniShield software package|[Link](https://gitee.com/kunpengcompute/boostkit-bigdata/releases/download/24.0.0-OmniShield-Spark-331/boostkit-omnishield-spark-3.3.1-1.1.0-aarch64.zip)|
 
 
 **Verifying the Software Package Integrity<a name="en-us_topic_0000001924407076_en-us_topic_0000001843026488_en-us_topic_0000001664980070_section3857759151915"></a>**

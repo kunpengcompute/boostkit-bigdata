@@ -240,9 +240,9 @@ Install OmniScheduler on the server1 node only. Before the installation, deploy 
 
 OmniScheduler is deployed as a plugin using the OmniScheduler JAR package. It overwrites open source classes of Hadoop.
 
-For details about the classes of open source Hadoop, see  [Table 1](#en-us_topic_0000002197112573_table146811513442).
+For details about the classes of open source Hadoop, see  [**Table  1**  Classes of the open source Hadoop](#Classes).
 
-**Table  1**  Classes of the open source Hadoop
+**Table  1**  Classes of the open source Hadoop<a id="Classes"></a>
 
 |Class Name|JAR Package|JAR Package Directory|
 |--|--|--|

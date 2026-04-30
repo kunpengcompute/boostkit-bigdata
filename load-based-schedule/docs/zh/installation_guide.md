@@ -62,7 +62,7 @@ OmniScheduler Yarn负载调度算法组网规划的环境由4台服务器组成�
 
 **软件安装包获取<a name="zh-cn_topic_0000002161905896_section6777173841917"></a>**
 
-**表 3** OmniScheduler Yarn负载调度算法软件获取列表<a id="OmniScheduler Yarn负载调度算法软件获取列表"></a>
+**表 3** OmniScheduler Yarn负载调度算法软件获取列表<a id="software"></a>
 
 |名称|包名|发布类型|说明|获取地址|
 |--|--|--|--|--|
@@ -104,7 +104,7 @@ LoadsMetric是负载采集与分析工具，负责从Node Exporter中获取机�
     useradd hadoop
     ```
 
-2. 新建安装目录`/home/hadoop/loadsmetric-software`，从[**表 3** OmniScheduler Yarn负载调度算法软件获取列表](#OmniScheduler Yarn负载调度算法软件获取列表)获取软件安装所需依赖配置，上传到该目录下，并解压。
+2. 新建安装目录`/home/hadoop/loadsmetric-software`，从[**表 3** OmniScheduler Yarn负载调度算法软件获取列表](#software)获取软件安装所需依赖配置，上传到该目录下，并解压。
 
     ```
     mkdir -p /home/hadoop/loadsmetric-software

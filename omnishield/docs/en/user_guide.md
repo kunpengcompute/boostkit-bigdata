@@ -6,7 +6,7 @@
 
 When using the OmniShield feature to execute Spark services, start Spark to submit tasks.
 
-1. Deploy the KMS service and create the primary key. For example, you can run the following command to start the Hadoop KMS and create a primary key:
+1. <a id="step_1"></a>Deploy the KMS service and create the primary key. For example, you can run the following command to start the Hadoop KMS and create a primary key:
     1. Open the Hadoop configuration file.
 
         ```
@@ -100,7 +100,7 @@ When using the OmniShield feature to execute Spark services, start Spark to subm
     ```
 
     >![](public_sys-resources/icon-note.gif) **NOTE:** 
-    >The procedure for starting the Hadoop KMS is the same as that in  [1](encrypting-and-decrypting-dataframe-row-based-data-sources.md#en-us_topic_0000001984634968_en-us_topic_0000001842867824_en-us_topic_0000001519205317_li39371321142320). If the Hadoop KMS has been started, you do not need to start the KMS again when creating a key.
+    >The procedure for starting the Hadoop KMS is the same as that in [Step 1](#step_1). If the Hadoop KMS has been started, you do not need to start the KMS again when creating a key.
 
 2. In the  **/opt/omnishield**  directory, run the following command to start Spark SQL:
 
@@ -121,7 +121,7 @@ When using the OmniShield feature to execute Spark services, start Spark to subm
     >-   The  **kmstype**  parameter specifies the KMS type of the primary key. Implement the KMS by yourself based on the APIs provided by OmniShield. The value of this parameter must include the specific class path of the KMS in the  **kms.jar**  package.
     >-   The  **cryptomode**  parameter specifies the encryption algorithm, which is AES/GCM/NOPadding or SM4/GCM/NoPadding.
     >-   The  **keylength**  parameter specifies the length of the encrypted key. For AES/GCM/NOPadding, the key length is  **128**  or  **256**; for SM4/GCM/NoPadding, the key length is  **128**.
-    >-   You can create different types of data tables by specifying the data source format. For example, to create a data table in JSON format, replace  **using json**  with  **using csv**  in  [3](#en-us_topic_0000002021075065_li1973462017298). The table type is CSV, JSON, or TXT.
+    >-   You can create different types of data tables by specifying the data source format. For example, to create a data table in JSON format, replace  **using json**  with  **using csv**. The table type is CSV, JSON, or TXT.
 
 4. Run the following command in the Spark SQL CLI to check whether the data table is encrypted:
 
@@ -143,7 +143,7 @@ When using the OmniShield feature to execute Spark services, start Spark to subm
     ```
 
     >![](public_sys-resources/icon-note.gif) **NOTE:** 
-    >The procedure for starting the Hadoop KMS is the same as that in  [1](encrypting-and-decrypting-dataframe-row-based-data-sources.md#en-us_topic_0000001984634968_en-us_topic_0000001842867824_en-us_topic_0000001519205317_li39371321142320). If the Hadoop KMS has been started, you do not need to start the KMS again when creating a key.
+    >The procedure for starting the Hadoop KMS is the same as that in [Step 1](#step_1). If the Hadoop KMS has been started, you do not need to start the KMS again when creating a key.
 
 2. In the  **/opt/omnishield**  directory, run the following command to start Spark SQL:
 
@@ -205,7 +205,7 @@ When using the OmniShield feature to execute Spark services, start Spark to subm
 
 ### Performing Spark on Yarn Application-Level Remote Attestation<a name="EN-US_TOPIC_0000002520471486"></a>
 
-1. <a name="li6709341143217"></a>Add a user for IMA measurement to the virtCCA confidential VM \(cVM\).
+1. <a id="attest"></a>Add a user for IMA measurement to the virtCCA confidential VM \(cVM\).
 
     ```
     useradd attest
@@ -225,7 +225,7 @@ When using the OmniShield feature to execute Spark services, start Spark to subm
         ```
 
         >![](public_sys-resources/icon-note.gif) **NOTE:** 
-        >-   **1001**  is the ID of the  **attest**  user in  [1](#li6709341143217). Replace the ID specified by  **fowner**  in the  **policy**  file with the actual one. You can run  **cat /etc/passwd | grep attest**  to view the user ID.
+        >-   **1001**  is the ID of the  **attest**  user in  [ Step 1](#attest). Replace the ID specified by  **fowner**  in the  **policy**  file with the actual one. You can run  **cat /etc/passwd | grep attest**  to view the user ID.
         >-   **func=FILE\_CHECK**  indicates that the IMA measurement object is a file.
         >-   **mask=MAY\_READ**  indicates that the IMA measurement is triggered by a read operation.
         >-   **fowner=1001**  indicates that the owner ID of the file to be measured is  **1001**.
@@ -253,7 +253,7 @@ When using the OmniShield feature to execute Spark services, start Spark to subm
         ```
 
         >![](public_sys-resources/icon-note.gif) **NOTE:** 
-        >**IMA\_USER**  is the name of the user you added in  [1](#li6709341143217).
+        >**IMA\_USER**  is the name of the user you added in  [Step 1](#attest).
 
     3. Press  **Esc**, type  **:wq!**, and press  **Enter**  to save the file and exit.
 
