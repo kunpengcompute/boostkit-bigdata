@@ -12,7 +12,7 @@ Install OmniMV by following instructions in  [Installation Guide]((./docs/en/ins
 
 You can use the OmniMV Spark engine to execute SQL statements in either of the following ways. After the SQL statements are executed, the execution plan is automatically rewritten.
 
-- <a name="en-us_topic_0000001518847449_li4881163716166"></a>Method 1: Log in to the spark-sql client and manually run SQL statements.
+- <a id="Method_1"></a>Method 1: Log in to the spark-sql client and manually run SQL statements.
     1. Log in to the client.
         - Spark 3.1.1
 
@@ -153,7 +153,7 @@ When OmniMV uses Kryo to serialize materialized view metadata, the user's config
 
 **Checking Whether the OmniMV Spark Engine Is Successfully Loaded<a name="section214462292214"></a>**
 
-1. Log in to the Spark SQL client and manually execute SQL statements \([Method 1](#en-us_topic_0000001518847449_li4881163716166)\).
+1. Log in to the Spark SQL client and manually execute SQL statements [Method 1](#Method_1).
 2. Run the command of showing views. If the following information is displayed, the plugin is successfully loaded.
 
     ```

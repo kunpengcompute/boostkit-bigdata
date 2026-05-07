@@ -46,7 +46,7 @@ The  **tirpc**  directory is not specified during pip installation.
     yum install -y libtirpc*+
     ```
 
-2. <a name="en-us_topic_0000001503521325_li103561205329"></a>Find the absolute path of the  **types.h**  header file.
+2. <a id="step_2"></a>Find the absolute path of the  **types.h**  header file.
 
     ```
     find /usr -name "types.h" | grep rpc
@@ -59,7 +59,7 @@ The  **tirpc**  directory is not specified during pip installation.
     ```
 
     >![](public_sys-resources/icon-note.gif) **NOTE:** 
-    >If the absolute path found in  [2](#en-us_topic_0000001503521325_li103561205329)  is not  **/usr/include/tirpc**, change  **/usr/include/tirpc**  in the preceding command to the absolute path found in  [2](#en-us_topic_0000001503521325_li103561205329).
+    >If the absolute path found in [Step 2](#step_2) is not  **/usr/include/tirpc**, change  **/usr/include/tirpc**  in the preceding command to the absolute path found in [Step 2](#step_2).
 
 
 ## Failed to Install GLPK<a name="EN-US_TOPIC_0000002520361780"></a>

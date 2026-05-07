@@ -46,7 +46,7 @@ pip安装时未指定tirpc的目录。
     yum install -y libtirpc*+
     ```
 
-2. <a name="zh-cn_topic_0000001503521325_li103561205329"></a>找到types.h头文件的绝对路径。
+2. <a id="step_2"></a>找到types.h头文件的绝对路径。
 
     ```
     find /usr -name "types.h" | grep rpc
@@ -59,7 +59,7 @@ pip安装时未指定tirpc的目录。
     ```
 
     >![](public_sys-resources/icon-note.gif) **说明：** 
-    >如果[2](#zh-cn_topic_0000001503521325_li103561205329)中找到的绝对路径不是“/usr/include/tirpc“，需要将上述命令中“/usr/include/tirpc“的修改为[2](#zh-cn_topic_0000001503521325_li103561205329)找到的绝对路径。
+    >如果[步骤2](#step_2)中找到的绝对路径不是“/usr/include/tirpc“，需要将上述命令中“/usr/include/tirpc“的修改为[步骤2](#step_2)找到的绝对路径。
 
 
 ## 安装GLPK失败的解决方法<a name="ZH-CN_TOPIC_0000002520361780"></a>
@@ -118,7 +118,7 @@ z3-solver安装失败。
 此处以升级到GCC 7.3.0和CMake 3.13.4为例。
 
 1. 升级GCC。
-    1. 参考[GCC升级](https://www.hikunpeng.com/document/detail/zh/kunpengcpfs/ecosystemEnable/OpenStack/kunpengopenstack_05_0017.html)，完成升级。
+    1. 请参见[GCC升级](https://www.hikunpeng.com/document/detail/zh/kunpengcpfs/ecosystemEnable/OpenStack/kunpengopenstack_05_0017.html)，完成升级。
     2. 升级完成后，新增环境变量。
 
         ```
