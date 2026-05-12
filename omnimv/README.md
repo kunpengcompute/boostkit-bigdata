@@ -83,12 +83,6 @@ OmniMV物化视图的使用流程如下。
 │       ├── installation_guide.md                            # OmniMV安装指导
 │       ├── user_guide.md                                    # OmniMV使用指导
 │       ├── faq.md                                           # OmniMV安装使用常见问题
-│   └── en                                                   # 中文文档目录
-│       ├── figures                                          # 中文文档图片资源目录
-│       ├── release_notes.md                                 # OmniMV版本说明书
-│       ├── installation_guide.md                            # OmniMV安装指导
-│       ├── user_guide.md                                    # OmniMV使用指导
-│       ├── faq.md                                           # OmniMV安装使用常见问题
 ├── omnimv-recommend                                         # OmniMV视图推荐模块
 │   ├── config                                               # 配置文件目录
 │   ├── src                                                  # 推荐代码目录
@@ -114,29 +108,25 @@ OmniMV物化视图的使用流程如下。
 
 ## 版本说明<a name="ZH-CN_TOPIC_0000002521018268"></a>
 
-每个版本的特性变更详细信息，请参见[版本说明书](./docs/zh/release_notes.md)。
+每个版本的特性变更详细信息，请参见《[版本说明书](./docs/zh/release_notes.md)》。
 
 
 ## 环境部署<a name="ZH-CN_TOPIC_0000002552058253"></a>
 
-介绍OmniMV的环境依赖及安装方式，具体请参见[安装指南](./docs/zh/installation_guide.md)。
+介绍OmniMV的环境依赖及安装方式，具体请参见《[安装指南](./docs/zh/installation_guide.md)》。
 
-
-## 快速入门<a name="ZH-CN_TOPIC_0000002520858280"></a>
-
-无。
 
 
 ## 学习文档<a name="ZH-CN_TOPIC_0000002552058261"></a>
 
-|名称| 路径                                                      |简介|
-|--|---------------------------------------------------------|--|
-|版本说明书| [版本说明书](./docs/zh/release_notes.md)          |提供OmniMV每个发布版本的基础信息和特性更新信息。|
-|安装指南| [安装指南](./docs/zh/installation_guide.md) |提供安装OmniMV的详细指导。|
-|使用指南| [使用指南](./docs/zh/user_guide.md)                |提供使用OmniMV的详细指导。|
-|常见问题| [常见问题](./docs/zh/faq.md)                              |提供OmniMV安装、使用过程的常见问题和解决方法。|
-|视频课程| OmniRuntime特性大揭秘                                        |提供操作视频，帮助开发者在鲲鹏服务器上了解、使能OmniRuntime特性。|
-|技术干货| 大数据OmniMV ClickHouse 性能测试指南通过AI算法在Apache Spark上智能推荐高性能物化视图 |提供大数据平台在组件部署、应用加速与性能调优方面的实战经验。|
+|名称|简介|
+|--|--|
+| [版本说明书](./docs/zh/release_notes.md)          |提供OmniMV每个发布版本的基础信息和特性更新信息。|
+|[安装指南](./docs/zh/installation_guide.md) |提供安装OmniMV的详细指导。|
+|[使用指南](./docs/zh/user_guide.md)                |提供使用OmniMV的详细指导。|
+|[常见问题](./docs/zh/faq.md)                              |提供OmniMV安装、使用过程的常见问题和解决方法。|
+|视频课程：[OmniRuntime特性大揭秘](https://www.hikunpeng.com/document/video-detail/2849)|提供操作视频，帮助开发者在鲲鹏服务器上了解、使能OmniRuntime特性。|
+|技术干货：《[大数据OmniMV ClickHouse 性能测试指南](https://www.hikunpeng.com/zh/developer/techArticles/20250922-7)》、《[通过AI算法在Apache Spark上智能推荐高性能物化视图](https://www.hikunpeng.com/zh/developer/techArticles/20250510-1)》|提供大数据平台在组件部署、应用加速与性能调优方面的实战经验。|
 
 
 
@@ -179,7 +169,7 @@ OmniMV物化视图的使用流程如下。
 
     修复建议：
 
-    目前厂商已发布升级补丁以修复漏洞，请参见[Github](https://github.com/netty/netty/security/advisories/GHSA-9vjp-v76f-g363)修复漏洞。
+    目前厂商已发布升级补丁以修复漏洞，请参见[GitHub](https://github.com/netty/netty/security/advisories/GHSA-9vjp-v76f-g363)修复漏洞。
 
 
 ### SSH加固<a name="ZH-CN_TOPIC_0000002521018258"></a>
@@ -190,52 +180,6 @@ OmniMV物化视图的使用流程如下。
 
 - 如果显示no，说明禁止了root用户SSH登录。
 - 如果显示yes，说明需要修改PermitRootLogin为no。
-
-
-### 公网地址声明<a name="ZH-CN_TOPIC_0000002552058259"></a>
-
-**表 1** 公网地址声明<a id="公网地址声明"></a>
-
-<a name="zh-cn_topic_0000002547269015_table5591719574"></a>
-<table><tbody><tr id="zh-cn_topic_0000002547269015_row13592819778"><th class="firstcol" valign="top" width="30%" id="mcps1.2.3.1.1"><p id="zh-cn_topic_0000002547269015_p559212199711"><a name="zh-cn_topic_0000002547269015_p559212199711"></a><a name="zh-cn_topic_0000002547269015_p559212199711"></a>开源软件/第三方软件</p>
-</th>
-<td class="cellrowborder" valign="top" width="70%" headers="mcps1.2.3.1.1 "><p id="zh-cn_topic_0000002547269015_p1259291919710"><a name="zh-cn_topic_0000002547269015_p1259291919710"></a><a name="zh-cn_topic_0000002547269015_p1259291919710"></a>GCC</p>
-</td>
-</tr>
-<tr id="zh-cn_topic_0000002547269015_row959213199719"><th class="firstcol" valign="top" width="30%" id="mcps1.2.3.2.1"><p id="zh-cn_topic_0000002547269015_p25928193714"><a name="zh-cn_topic_0000002547269015_p25928193714"></a><a name="zh-cn_topic_0000002547269015_p25928193714"></a>类型</p>
-</th>
-<td class="cellrowborder" valign="top" width="70%" headers="mcps1.2.3.2.1 "><p id="zh-cn_topic_0000002547269015_p259214193711"><a name="zh-cn_topic_0000002547269015_p259214193711"></a><a name="zh-cn_topic_0000002547269015_p259214193711"></a>开源软件</p>
-</td>
-</tr>
-<tr id="zh-cn_topic_0000002547269015_row15921819775"><th class="firstcol" valign="top" width="30%" id="mcps1.2.3.3.1"><p id="zh-cn_topic_0000002547269015_p145921119774"><a name="zh-cn_topic_0000002547269015_p145921119774"></a><a name="zh-cn_topic_0000002547269015_p145921119774"></a>公网IP地址/公网URL地址/域名/邮箱地址</p>
-</th>
-<td class="cellrowborder" valign="top" width="70%" headers="mcps1.2.3.3.1 "><p id="zh-cn_topic_0000002547269015_p8592141918714"><a name="zh-cn_topic_0000002547269015_p8592141918714"></a><a name="zh-cn_topic_0000002547269015_p8592141918714"></a><a href="https://gcc.gnu.org/bugs/" target="_blank" rel="noopener noreferrer">https://gcc.gnu.org/bugs/</a></p>
-</td>
-</tr>
-<tr id="zh-cn_topic_0000002547269015_row559214191971"><th class="firstcol" valign="top" width="30%" id="mcps1.2.3.4.1"><p id="zh-cn_topic_0000002547269015_p1359219191070"><a name="zh-cn_topic_0000002547269015_p1359219191070"></a><a name="zh-cn_topic_0000002547269015_p1359219191070"></a>所在文件类型</p>
-</th>
-<td class="cellrowborder" valign="top" width="70%" headers="mcps1.2.3.4.1 "><p id="zh-cn_topic_0000002547269015_p1059214191475"><a name="zh-cn_topic_0000002547269015_p1059214191475"></a><a name="zh-cn_topic_0000002547269015_p1059214191475"></a>二进制</p>
-</td>
-</tr>
-<tr id="zh-cn_topic_0000002547269015_row185922197711"><th class="firstcol" valign="top" width="30%" id="mcps1.2.3.5.1"><p id="zh-cn_topic_0000002547269015_p7593619372"><a name="zh-cn_topic_0000002547269015_p7593619372"></a><a name="zh-cn_topic_0000002547269015_p7593619372"></a>文件名</p>
-</th>
-<td class="cellrowborder" valign="top" width="70%" headers="mcps1.2.3.5.1 "><p id="zh-cn_topic_0000002547269015_p1559317198713"><a name="zh-cn_topic_0000002547269015_p1559317198713"></a><a name="zh-cn_topic_0000002547269015_p1559317198713"></a>libboostkit-omniop-vector-2.0.0-aarch64.so</p>
-</td>
-</tr>
-<tr id="zh-cn_topic_0000002547269015_row0593141917711"><th class="firstcol" valign="top" width="30%" id="mcps1.2.3.6.1"><p id="zh-cn_topic_0000002547269015_p1459319197711"><a name="zh-cn_topic_0000002547269015_p1459319197711"></a><a name="zh-cn_topic_0000002547269015_p1459319197711"></a>用途描述</p>
-</th>
-<td class="cellrowborder" valign="top" width="70%" headers="mcps1.2.3.6.1 "><p id="zh-cn_topic_0000002547269015_p2059320191370"><a name="zh-cn_topic_0000002547269015_p2059320191370"></a><a name="zh-cn_topic_0000002547269015_p2059320191370"></a>对应的邮箱地址为GCC开源组件官网地址，为编译开源组件时被动引入，产品实际未使用。</p>
-</td>
-</tr>
-<tr id="zh-cn_topic_0000002547269015_row259317197712"><th class="firstcol" valign="top" width="30%" id="mcps1.2.3.7.1"><p id="zh-cn_topic_0000002547269015_p195931919976"><a name="zh-cn_topic_0000002547269015_p195931919976"></a><a name="zh-cn_topic_0000002547269015_p195931919976"></a>软件包</p>
-</th>
-<td class="cellrowborder" valign="top" width="70%" headers="mcps1.2.3.7.1 "><p id="zh-cn_topic_0000002547269015_p12877016104"><a name="zh-cn_topic_0000002547269015_p12877016104"></a><a name="zh-cn_topic_0000002547269015_p12877016104"></a>BoostKit-omniop_2.0.0.zip</p>
-<p id="zh-cn_topic_0000002547269015_p1959311194714"><a name="zh-cn_topic_0000002547269015_p1959311194714"></a><a name="zh-cn_topic_0000002547269015_p1959311194714"></a>boostkit-omniop-operator-2.0.0-aarch64-centos.tar.gz</p>
-</td>
-</tr>
-</tbody>
-</table>
-
 
 
 ## 免责声明<a name="ZH-CN_TOPIC_0000002552058255"></a>
@@ -279,8 +223,6 @@ OmniMV docs目录下的文档适用CC-BY 4.0许可证，具体请参见[LICENSE]
     8. 当您的PR获得足够数量的检视者批准后，Committer会进行最终审核。
     9. 审核和测试通过后，CI会将您的PR合并入到项目的主干分支。
 
-
-## 法律声明<a name="ZH-CN_TOPIC_0000002521018260"></a>
 
 
 ## 建议与交流<a name="ZH-CN_TOPIC_0000002521018264"></a>

@@ -11,9 +11,9 @@ The environment planned in this document for OmniMV consists of four servers, wh
 - The management node is server1, which is used to manage tasks.
 - The compute nodes are agent1, agent2, and agent3, which are used to run OmniMV query engine services and store datasets.
 
-A server can function as a management node and a compute node at the same time. In single-node mode, operations performed on the management node or compute node mentioned in the following sections are performed on the same node.  [Figure 1](#en-us_topic_0000001713019717_fig195021730155013)  shows the networking diagram.
+A server can function as a management node and a compute node at the same time. In single-node mode, operations performed on the management node or compute node mentioned in the following sections are performed on the same node.  [Figure 1](#networking-diagram)  shows the networking diagram.
 
-**Figure  1**  Networking diagram<a name="en-us_topic_0000001713019717_fig195021730155013"></a>  
+**Figure  1**  Networking diagram<a id="networking-diagram"></a>  
 ![](figures/networking-diagram.png "networking-diagram")
 
 ### Environment Requirements<a name="EN-US_TOPIC_0000002551410733"></a>
@@ -22,35 +22,34 @@ Before installing OmniMV, prepare the hardware and software environments to faci
 
 **Hardware Requirements<a name="en-us_topic_0000001665139878_section197116445713"></a>**
 
-[Table 1](#en-us_topic_0000001713099729___d0e1171)  lists the hardware requirements for each node in the cluster.
+[Table 1](#hardware_requirements)  lists the hardware requirements for each node in the cluster.
 
-**Table  1**  Hardware requirements
+**Table  1**  Hardware requirements<a id="hardware_requirements"></a>
 
 |Item|Management/Compute/Storage Node|
 |--|--|
 |Processor|Kunpeng 920 5250 processor/New Kunpeng 920 processor model|
 |Memory size|384 GB (12 x 32 GB)|
 |Memory frequency|2666 MHz|
-|Network|Service network: 10GEManagement network: 1GE|
-|Drive|System drive: 1 x RAID 0 (1 x 1.2 TB SAS HDD)Data drive: 12 x RAID 0 (12 x 8 TB SATA HDD)|
+|Network|Service network: 10GE <br>Management network: 1GE|
+|Drive|System drive: 1 x RAID 0 (1 x 1.2 TB SAS HDD) <br>Data drive: 12 x RAID 0 (12 x 8 TB SATA HDD)|
 |RAID controller card|LSI SAS3508|
 
 
 **OS and Software Requirements<a name="en-us_topic_0000001665139878_section112781416185717"></a>**
 
-[Table 2](#en-us_topic_0000001665139878_table97421444205)  lists the OS and software requirements for each node in the cluster.
+[Table 2](#os_software_requirements)  lists the OS and software requirements for each node in the cluster.
 
-**Table  2**  OS and software requirements
+**Table  2**  OS and software requirements<a id="os_software_requirements"></a>
 
 |Item|Version|Description|Management Node (Server)|Compute/Storage Node|
 |--|--|--|--|--|
 |OS|openEuler 22.03 LTS SP1|None|√|√|
-|JDK|BiSheng JDK 1.8.0_342|For details about how to install the BiSheng JDK, see BiSheng JDK 8 Installation Guide.|√|√|
-|Hadoop|3.2.0|See Hadoop Deployment Guide (CentOS 7.6 & openEuler 20.03).|√|√|
-|Spark|3.1.1/3.4.3|See Spark Deployment Guide (CentOS 7.6 & openEuler 20.03).|√|-|
-|ZooKeeper|3.6.2 or later|See ZooKeeper Deployment Guide (CentOS 7.6 & openEuler 20.03).|-|√|
+|JDK|[BiSheng JDK 1.8.0_342](https://mirror.iscas.ac.cn/kunpeng/archive/compiler/bisheng_jdk/bisheng-jdk-8u342-linux-aarch64.tar.gz)|For details about how to install the BiSheng JDK, see [BiSheng JDK 8 Installation Guide](https://gitee.com/openeuler/bishengjdk-8/wikis/English%20Documentation/BiSheng%20JDK%208%20Installation%20Guide#installation-guide).|√|√|
+|Hadoop|3.2.0|See [Hadoop Deployment Guide (CentOS 7.6 & openEuler 20.03)](https://www.hikunpeng.com/document/detail/en/kunpengbds/ecosystemEnable/Hadoop/kunpenghadoop_04_0001.html).|√|√|
+|Spark|3.1.1/3.4.3|See [Spark Deployment Guide (CentOS 7.6 & openEuler 20.03)](https://www.hikunpeng.com/document/detail/en/kunpengbds/ecosystemEnable/Spark/kunpengspark_04_0001.html).|√|-|
+|ZooKeeper|3.6.2 or later|See [ZooKeeper Deployment Guide (CentOS 7.6 & openEuler 20.03)](https://www.hikunpeng.com/document/detail/en/kunpengbds/ecosystemEnable/ZooKeeper/kunpengzookeeper_04_0001.html).|-|√|
 |Python|3.10.2 or later|None|√|√|
-|√: indicates that the item is required on the node.-: indicates that the item is not required on the node.|
 
 
 >![](public_sys-resources/icon-note.gif) **NOTE:** 
@@ -61,18 +60,63 @@ Before installing OmniMV, prepare the hardware and software environments to faci
 
 **Obtaining Software<a name="en-us_topic_0000001665139878_section73341541215"></a>**
 
-[Table 3](#en-us_topic_0000001665139878_table1238345073817)  describes the OmniMV software packages and how to obtain them.
+[Table 3](#software) describes the OmniMV software packages and how to obtain them.
 
-**Table  3**  Software required for OmniMV
+**Table  3**  Software required for OmniMV<a id="software"></a>
 
-|Software Name|Package Name|Release Type|Description|Download URL|
-|--|--|--|--|--|
-|OmniMV software installation package|BoostKit-omnimv_1.2.0.zip|Open source|-|Link|
-|OmniMV plugin JAR package|boostkit-omnimv-spark-3.1.1-1.2.0-aarch64.jar|Open source|Spark extension package for using the OmniMV feature.|Link|
-|boostkit-omnimv-spark-3.4.3-1.2.0-aarch64.jar|Open source|Spark extension package for using the OmniMV feature.|Link|
-|OmniMV log parser JAR package|boostkit-omnimv-logparser-spark-3.1.1-1.2.0-aarch64.jar|Open source|Function package for OmniMV to parse Spark logs.|Link|
-|boostkit-omnimv-logparser-spark-3.4.3-1.2.0-aarch64.jar|Open source|Function package for OmniMV to parse Spark logs.|Link|
-|hive-testbench|hive-testbench-hdp3.zip|Open source|TestBench source package used for generating TPC-DS/TPC-H data.|Link|
+<table border="1" cellpadding="6" cellspacing="0">
+  <thead>
+    <tr>
+      <th>Software Name</th>
+      <th>Package Name</th>
+      <th>Release Type</th>
+      <th>Description</th>
+      <th>Download URL</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>OmniMV software installation package</td>
+      <td>BoostKit-omnimv_1.2.0.zip</td>
+      <td>Open source</td>
+      <td>-</td>
+      <td><a href="https://gitcode.com/boostkit/boostkit-bigdata/releases/download/25.0.RC1-OmniMV-release/BoostKit-omnimv_1.2.0.zip" target="_blank">Link</a></td>
+    </tr>
+    <tr>
+      <td rowspan="2">OmniMV plugin JAR package</td>
+      <td>boostkit-omnimv-spark-3.1.1-1.2.0-aarch64.jar</td>
+      <td>Open source</td>
+      <td>Spark extension package for using the OmniMV feature.</td>
+      <td><a href="https://gitcode.com/boostkit/boostkit-bigdata/releases/download/25.0.RC1-OmniMV-release/boostkit-omnimv-spark-3.1.1-1.2.0-aarch64.jar" target="_blank">Link</a></td>
+    </tr>
+    <tr>      
+      <td>boostkit-omnimv-spark-3.4.3-1.2.0-aarch64.jar</td>
+      <td>Open source</td>
+      <td>Spark extension package for using the OmniMV feature.</td>
+      <td><a href="https://gitcode.com/boostkit/boostkit-bigdata/releases/download/25.0.RC1-OmniMV-release/boostkit-omnimv-spark-3.4.3-1.2.0-aarch64.jar" target="_blank">Link</a></td>
+    </tr>
+    <tr>
+      <td rowspan="2">OmniMV log parser JAR package</td>
+      <td>boostkit-omnimv-logparser-spark-3.1.1-1.2.0-aarch64.jar</td>
+      <td>Open source</td>
+      <td>Function package for OmniMV to parse Spark logs.</td>
+      <td><a href="https://gitcode.com/boostkit/boostkit-bigdata/releases/download/25.0.RC1-OmniMV-release/boostkit-omnimv-logparser-spark-3.1.1-1.2.0-aarch64.jar" target="_blank">Link</a></td>
+    </tr>
+    <tr>      
+      <td>boostkit-omnimv-logparser-spark-3.4.3-1.2.0-aarch64.jar</td>
+      <td>Open source</td>
+      <td>Function package for OmniMV to parse Spark logs.</td>
+      <td><a href="https://gitcode.com/boostkit/boostkit-bigdata/releases/download/25.0.RC1-OmniMV-release/boostkit-omnimv-logparser-spark-3.4.3-1.2.0-aarch64.jar" target="_blank">Link</a></td>
+    </tr>
+    <tr>
+      <td>hive-testbench</td>
+      <td>hive-testbench-hdp3.zip</td>
+      <td>Open source</td>
+      <td>TestBench source package used for generating TPC-DS/TPC-H data.</td>
+      <td><a href="https://github.com/hortonworks/hive-testbench/archive/refs/heads/hdp3.zip" target="_blank">Link</a></td>
+    </tr>
+  </tbody>
+</table>
 
 
 **Verifying the Software Package Integrity<a name="en-us_topic_0000001665139878_section16501429204018"></a>**
@@ -93,9 +137,9 @@ Verify a software package as follows:
 
 Check that the configuration of each node meets the OmniMV installation requirements. Before compiling the source code, install GCC/G++, make, CMake, and glibc on each node and ensure that they meet the version requirements. Before installing OmniMV, prepare the cluster environment and those components required for installing the Spark engine based on the OS and software requirements.
 
-- Before using the source code for compilation, install GCC/G++, Make, CMake, and glibc on each node. The version requirements are listed in  [Table 1](#en-us_topic_0000001664980146_en-us_topic_0000001519207349_table98249491204).
+- Before using the source code for compilation, install GCC/G++, Make, CMake, and glibc on each node. The version requirements are listed in  [Table 1](#table_1).
 
-    **Table  1**  Software required for source code compilation
+    **Table  1**  Software required for source code compilation<a id="table_1"></a>
 
 |Software Name|Software Version|
 |--|--|
@@ -105,9 +149,9 @@ Check that the configuration of each node meets the OmniMV installation requirem
 |glibc|2.25 or later|
 
 
-- Before installing OmniMV, install related components in the cluster environment based on  [OS and Software Requirements](environment-requirements.md#en-us_topic_0000001665139878_section112781416185717).  [Table 2](#en-us_topic_0000001664980146_table673mcpsimp)  lists the components required by the Spark engine.
+- Before installing OmniMV, install related components in the cluster environment based on  [Table 2](#Table_2)  lists the components required by the Spark engine.
 
-    **Table  2**  Required components
+    **Table  2**  Required components<a id="Table_2"></a>
 
 |Engine Using OmniMV|Required Components|
 |--|--|
@@ -187,7 +231,7 @@ To install OmniMV on openEuler 22.03, install Conda and create an OmniMV virtual
 
 3. Download the OmniMV recommendation algorithm software package.
 
-    Spark engine: Download the OmniMV recommendation algorithm software package, and save the JAR package of the Spark SQL plugin and log parser JAR package to the server node of the Spark cluster. For details about how to obtain the software packages, see  [Obtaining Software](environment-requirements.md#en-us_topic_0000001665139878_section73341541215). There is no special requirement on the software package paths. For example, you can save them in  **/opt/omnimv**.
+    Spark engine: Download the OmniMV recommendation algorithm software package, and save the JAR package of the Spark SQL plugin and log parser JAR package to the server node of the Spark cluster. For details about how to obtain the software packages, see [Table 3](#software). There is no special requirement on the software package paths. For example, you can save them in  **/opt/omnimv**.
 
     - Spark 3.1.1
 

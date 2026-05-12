@@ -33,9 +33,9 @@ This section describes the OmniMV architecture.
 
 OmniMV uses AI algorithms to recommend the optimal materialized view from historical SQL queries, automatically matches SQL statements with a materialized view in Spark, and replaces part of the SQL statements in an execution plan with the matched materialized view. This feature reduces repeated calculations and increases query efficiency. You can submit an SQL task to a Spark cluster. The cluster management node distributes the task to multiple compute nodes as subtasks for execution.
 
-[Figure 1](#en-us_topic_0000002543922601_fig1354413504399)  shows the architecture.
+[Figure 1](#architecture)  shows the architecture.
 
-**Figure  1**  Software architecture of OmniMV<a name="en-us_topic_0000002543922601_fig1354413504399"></a>
+**Figure  1**  Software architecture of OmniMV<a id="architecture"></a>
 ![](figures/software-architecture-of-omnimv.png "software-architecture-of-omnimv")
 
 OmniMV consists of two modules: candidate view generation module and SQL rewrite module.
@@ -58,9 +58,9 @@ The OmniMV feature is designed for scenarios where SQL analysis tasks in a data 
 
 ## Constraints<a name="EN-US_TOPIC_0000002552098247"></a>
 
-For Spark,  [Table 1](#en-us_topic_0000002543922575_table1497943022517)  describes the scenarios and rules in which OmniMV does not allow rewriting or extracting materialized views.
+For Spark,  [Table 1](#table_1)  describes the scenarios and rules in which OmniMV does not allow rewriting or extracting materialized views.
 
-**Table  1**  Scenarios and rules on Spark
+**Table  1**  Scenarios and rules on Spark<a name="table_1"></a>
 
 |Scenario|Rule|Description|
 |--|--|--|
@@ -77,12 +77,6 @@ The full project directory structure is as follows:
 
 ```
 ├── docs                                                      # Project document directory
-│   └── zh                                                   # English document directory
-│       ├── figures                                          # Directory of images in English documents
-│       ├── release_notes.md                                 # OmniMV Release Notes
-│       ├── installation_guide.md                            # OmniMV Installation Guide
-│       ├── user_guide.md                                    # OmniMV User Guide
-│       ├── faq.md                                           # OmniMV Installation FAQs
 │   └── en                                                   # English document directory
 │       ├── figures                                          # Directory of images in English documents
 │       ├── release_notes.md                                 # OmniMV Release Notes
@@ -113,27 +107,23 @@ The full project directory structure is as follows:
 
 ## Release Notes<a name="EN-US_TOPIC_0000002521018268"></a>
 
-For details about feature changes in each version, see [release_notes.md](./docs/zh/release_notes.md).
+For details about feature changes in each version, see [Release Notes](./docs/zh/release_notes.md).
 
 
 ## Environment Deployment<a name="EN-US_TOPIC_0000002552058253"></a>
 
-For details about the environment dependencies and installation methods of OmniMV, see [installation_guide.md](./docs/en/installation_guide.md).
+For details about the environment dependencies and installation methods of OmniMV, see [Installation Guide](./docs/en/installation_guide.md).
 
-
-## Quick Start<a name="EN-US_TOPIC_0000002520858280"></a>
-
-None.
 
 
 ## Helpful Links<a name="EN-US_TOPIC_0000002552058261"></a>
 
-|Name|Path|Overview|
-|--|--|--|
-|Release Notes|[Release Notes](./docs/en/release_notes.md)|Provides basic information and feature updates of each OmniMV version.|
-|Installation Guide|[Installation Guide](./docs/en/installation_guide.md)|Describes how to install OmniMV.|
-|User Guide|[User Guide](./docs/en/user_guide.md)|Provides details about how to use OmniMV.|
-|FAQs|[FAQs](./docs/en/faq.md)|Provides answers to frequently asked questions (FAQs) about installing and using OmniMV.|
+|Name|Overview|
+|--|--|
+|[Release Notes](./docs/en/release_notes.md)|Provides basic information and feature updates of each OmniMV version.|
+|[Installation Guide](./docs/en/installation_guide.md)|Describes how to install OmniMV.|
+|[User Guide](./docs/en/user_guide.md)|Provides details about how to use OmniMV.|
+|[FAQs](./docs/en/faq.md)|Provides answers to frequently asked questions (FAQs) about installing and using OmniMV.|
 
 
 
@@ -189,51 +179,6 @@ Check the  **PermitRootLogin**  configuration item in  **/etc/ssh/sshd\_config**
 - If the value is  yes, change it to  no.
 
 
-### Public Network Address Statement<a name="EN-US_TOPIC_0000002552058259"></a>
-
-**Table  1**  Public network address statement
-
-<a name="en-us_topic_0000002547269015_table5591719574"></a>
-<table><tbody><tr id="en-us_topic_0000002547269015_row13592819778"><th class="firstcol" valign="top" width="30%" id="mcps1.2.3.1.1"><p id="en-us_topic_0000002547269015_p559212199711"><a name="en-us_topic_0000002547269015_p559212199711"></a><a name="en-us_topic_0000002547269015_p559212199711"></a>Open Source/Third-Party Software</p>
-</th>
-<td class="cellrowborder" valign="top" width="70%" headers="mcps1.2.3.1.1 "><p id="en-us_topic_0000002547269015_p1259291919710"><a name="en-us_topic_0000002547269015_p1259291919710"></a><a name="en-us_topic_0000002547269015_p1259291919710"></a>GCC</p>
-</td>
-</tr>
-<tr id="en-us_topic_0000002547269015_row959213199719"><th class="firstcol" valign="top" width="30%" id="mcps1.2.3.2.1"><p id="en-us_topic_0000002547269015_p25928193714"><a name="en-us_topic_0000002547269015_p25928193714"></a><a name="en-us_topic_0000002547269015_p25928193714"></a>Type</p>
-</th>
-<td class="cellrowborder" valign="top" width="70%" headers="mcps1.2.3.2.1 "><p id="en-us_topic_0000002547269015_p259214193711"><a name="en-us_topic_0000002547269015_p259214193711"></a><a name="en-us_topic_0000002547269015_p259214193711"></a>Open source software</p>
-</td>
-</tr>
-<tr id="en-us_topic_0000002547269015_row15921819775"><th class="firstcol" valign="top" width="30%" id="mcps1.2.3.3.1"><p id="en-us_topic_0000002547269015_p145921119774"><a name="en-us_topic_0000002547269015_p145921119774"></a><a name="en-us_topic_0000002547269015_p145921119774"></a>Public IP Address/Public URL/Domain Name/Email Address</p>
-</th>
-<td class="cellrowborder" valign="top" width="70%" headers="mcps1.2.3.3.1 "><p id="en-us_topic_0000002547269015_p8592141918714"><a name="en-us_topic_0000002547269015_p8592141918714"></a><a name="en-us_topic_0000002547269015_p8592141918714"></a><a href="https://gcc.gnu.org/bugs/" target="_blank" rel="noopener noreferrer">https://gcc.gnu.org/bugs/</a></p>
-</td>
-</tr>
-<tr id="en-us_topic_0000002547269015_row559214191971"><th class="firstcol" valign="top" width="30%" id="mcps1.2.3.4.1"><p id="en-us_topic_0000002547269015_p1359219191070"><a name="en-us_topic_0000002547269015_p1359219191070"></a><a name="en-us_topic_0000002547269015_p1359219191070"></a>File Type</p>
-</th>
-<td class="cellrowborder" valign="top" width="70%" headers="mcps1.2.3.4.1 "><p id="en-us_topic_0000002547269015_p1059214191475"><a name="en-us_topic_0000002547269015_p1059214191475"></a><a name="en-us_topic_0000002547269015_p1059214191475"></a>Binary</p>
-</td>
-</tr>
-<tr id="en-us_topic_0000002547269015_row185922197711"><th class="firstcol" valign="top" width="30%" id="mcps1.2.3.5.1"><p id="en-us_topic_0000002547269015_p7593619372"><a name="en-us_topic_0000002547269015_p7593619372"></a><a name="en-us_topic_0000002547269015_p7593619372"></a>File Name</p>
-</th>
-<td class="cellrowborder" valign="top" width="70%" headers="mcps1.2.3.5.1 "><p id="en-us_topic_0000002547269015_p1559317198713"><a name="en-us_topic_0000002547269015_p1559317198713"></a><a name="en-us_topic_0000002547269015_p1559317198713"></a>libboostkit-omniop-vector-2.0.0-aarch64.so</p>
-</td>
-</tr>
-<tr id="en-us_topic_0000002547269015_row0593141917711"><th class="firstcol" valign="top" width="30%" id="mcps1.2.3.6.1"><p id="en-us_topic_0000002547269015_p1459319197711"><a name="en-us_topic_0000002547269015_p1459319197711"></a><a name="en-us_topic_0000002547269015_p1459319197711"></a>Usage</p>
-</th>
-<td class="cellrowborder" valign="top" width="70%" headers="mcps1.2.3.6.1 "><p id="en-us_topic_0000002547269015_p2059320191370"><a name="en-us_topic_0000002547269015_p2059320191370"></a><a name="en-us_topic_0000002547269015_p2059320191370"></a>This email address is the official address of the open source component GCC, and is used only to compile the open source component. This email address is not used inside this product.</p>
-</td>
-</tr>
-<tr id="en-us_topic_0000002547269015_row259317197712"><th class="firstcol" valign="top" width="30%" id="mcps1.2.3.7.1"><p id="en-us_topic_0000002547269015_p195931919976"><a name="en-us_topic_0000002547269015_p195931919976"></a><a name="en-us_topic_0000002547269015_p195931919976"></a>Software Package</p>
-</th>
-<td class="cellrowborder" valign="top" width="70%" headers="mcps1.2.3.7.1 "><p id="en-us_topic_0000002547269015_p12877016104"><a name="en-us_topic_0000002547269015_p12877016104"></a><a name="en-us_topic_0000002547269015_p12877016104"></a>BoostKit-omniop_2.0.0.zip</p>
-<p id="en-us_topic_0000002547269015_p1959311194714"><a name="en-us_topic_0000002547269015_p1959311194714"></a><a name="en-us_topic_0000002547269015_p1959311194714"></a>boostkit-omniop-operator-2.0.0-aarch64-centos.tar.gz</p>
-</td>
-</tr>
-</tbody>
-</table>
-
-
 
 ## Disclaimer<a name="EN-US_TOPIC_0000002552058255"></a>
 
@@ -276,8 +221,6 @@ The documents in the docs directory of OmniMV are licensed under CC-BY 4.0. See 
     8. After your PR is approved by the required number of reviewers, the committer will conduct the final review.
     9. After your PR is approved and all tests pass, the CI system will merge it into the project's main branch.
 
-
-## Legal Statement<a name="EN-US_TOPIC_0000002521018260"></a>
 
 
 ## Suggestions and Feedback<a name="EN-US_TOPIC_0000002521018264"></a>

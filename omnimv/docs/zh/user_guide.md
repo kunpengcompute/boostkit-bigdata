@@ -14,7 +14,7 @@
 
 可以通过两种方式使用OmniMV物化视图Spark引擎执行SQL，均可自动进行执行计划重写。
 
-- <a name="zh-cn_topic_0000001518847449_li4881163716166"></a>方式一：进入spark-sql客户端手动执行SQL。
+- <a id="Method_1"></a>方式一：进入spark-sql客户端手动执行SQL。
     1. 进入客户端。
         - Spark 3.1.1。
 
@@ -141,7 +141,7 @@ OmniMV物化视图使用Kryo进行物化视图元数据序列化时，可能存�
 
 |参数名称|固定值|含义|
 |--|--|--|
-|spark.kryo.unsafe|false|不使用Kryo的“unsafe”模式。|
+|spark.kryo.unsafe|false|不使用Kryo的`unsafe”模式。|
 |spark.kryo.registrationRequired|false|不强制要求所有需要序列化的类都必须在Kryo中注册。|
 |spark.kryo.registrator|""|不指定自定义的Kryo注册器类。|
 |spark.kryo.classesToRegister|""|不指定需要注册的类列表。|
@@ -152,7 +152,7 @@ OmniMV物化视图使用Kryo进行物化视图元数据序列化时，可能存�
 
 **查看OmniMV物化视图Spark引擎是否加载成功<a name="section214462292214"></a>**
 
-1. 使用[方式一](#zh-cn_topic_0000001518847449_li4881163716166)进入spark-sql客户端手动执行SQL。
+1. 使用[方式一](#Method_1)进入spark-sql客户端手动执行SQL。
 2. 执行枚举视图命令，返回信息如下图所示，说明Plugin加载成功。
 
     ```
@@ -223,14 +223,14 @@ OmniMV物化视图使用Kryo进行物化视图元数据序列化时，可能存�
 
 1. 修改配置文件。
 
-    1. 打开“config/omnimv\_config\_spark.cfg“文件。
+    1. 打开`config/omnimv\_config\_spark.cfg`文件。
 
         ```
         cd /opt/omnimv/BoostKit-omnimv_1.2.0
         vi config/omnimv_config_spark.cfg
         ```
 
-    2. 按“i“进入编辑模式，参考如下内容修改。
+    2. 按`i`进入编辑模式，参考如下内容修改。
         - Spark 3.1.1：
 
             ```
@@ -251,7 +251,7 @@ OmniMV物化视图使用Kryo进行物化视图元数据序列化时，可能存�
             sqls_path = hdfs://server1:9000/omnimv/tpcds
             ```
 
-    3. 按“Esc“键，输入**:wq!**，按“Enter“保存并退出编辑。
+    3. 按`Esc`键，输入 **:wq!**，按`Enter`保存并退出编辑。
 
     **表 1** OmniMV物化视图部分配置<a id="OmniMV物化视图部分配置"></a>
 
@@ -264,7 +264,7 @@ OmniMV物化视图使用Kryo进行物化视图元数据序列化时，可能存�
 |sqls_path|测试SQL在HDFS上的访问地址。|hdfs://server1:9000/omnimv/tpcds|
 
 2. 获取测试SQL（以TPC-DS为例）。
-    1. 下载[Spark源码](https://github.com/apache/spark)并解压，在“spark-master/sql/core/src/test/resources/tpcds/“路径下获取TPC-DS测试SQL。
+    1. 下载[Spark源码](https://github.com/apache/spark)并解压，在`spark-master/sql/core/src/test/resources/tpcds/`路径下获取TPC-DS测试SQL。
     2. 将测试SQL传到HDFS上（路径为配置文件中sqls\_path的值）。
 
         ```
@@ -274,7 +274,7 @@ OmniMV物化视图使用Kryo进行物化视图元数据序列化时，可能存�
 
 3. 初始化数据库。这一步主要是获取目标表的建表信息，用于后续创建推荐视图。
 
-    屏幕打印“init\_database succeed!”说明执行成功。
+    屏幕打印`init\_database succeed!”说明执行成功。
 
     ```
     python main.py spark init_database
@@ -282,7 +282,7 @@ OmniMV物化视图使用Kryo进行物化视图元数据序列化时，可能存�
 
 4. 运行测试SQL（以TPC-DS测试SQL为例）。
 
-    屏幕打印“run\_original\_sqls succeed!”说明执行成功。
+    屏幕打印`run\_original\_sqls succeed!”说明执行成功。
 
     ```
     python main.py spark run_original_sqls
@@ -290,13 +290,13 @@ OmniMV物化视图使用Kryo进行物化视图元数据序列化时，可能存�
 
 5. 解析运行日志。
     1. 通过http://ip:18080地址访问Spark History Server查看SQL任务起止时间。
-    2. 打开配置文件“config/omnimv\_config\_spark.cfg“。
+    2. 打开配置文件`config/omnimv\_config\_spark.cfg`。
 
         ```
         vi config/omnimv_config_spark.cfg
         ```
 
-    3. 按“i“进入编辑模式，修改参数如下。
+    3. 按`i`进入编辑模式，修改参数如下。
 
         ```
         # 测试SQL运行开始时间
@@ -305,33 +305,33 @@ OmniMV物化视图使用Kryo进行物化视图元数据序列化时，可能存�
         q_log_end_time = 2022-09-15 17:15
         ```
 
-    4. 按“Esc“键，输入**:wq!**，按“Enter“保存并退出编辑。
+    4. 按`Esc`键，输入 **:wq!**，按`Enter`保存并退出编辑。
     5. 运行日志解析脚本。
 
-        屏幕打印“parse\_query\_logs succeed!”说明执行成功。
+        屏幕打印`parse\_query\_logs succeed!”说明执行成功。
 
         ```
         python main.py spark parse_query_logs
         ```
 
 6. 生成候选视图。
-    1. 打开配置文件“config/omnimv\_config\_spark.cfg“。
+    1. 打开配置文件`config/omnimv\_config\_spark.cfg`。
 
         ```
         vi config/omnimv_config_spark.cfg
         ```
 
-    2. 按“i“进入编辑模式，修改参数如下。
+    2. 按`i`进入编辑模式，修改参数如下。
 
         ```
         # 候选TOP mv的数量限制，实际推荐数量小于等于该值
         mv_limit = 10
         ```
 
-    3. 按“Esc“键，输入**:wq!**，按“Enter“保存并退出编辑。
+    3. 按`Esc`键，输入 **:wq!**，按`Enter`保存并退出编辑。
     4. 运行脚本。
 
-        屏幕打印“greedy recommend for candidate mv”说明执行成功。
+        屏幕打印`greedy recommend for candidate mv”说明执行成功。
 
         ```
         python main.py spark generate_views
@@ -351,13 +351,13 @@ OmniMV物化视图使用Kryo进行物化视图元数据序列化时，可能存�
 
 **升级OmniMV<a name="zh-cn_topic_0000001664980122_section5436016134"></a>**
 
-1. 删除二进制SO文件以及OmniMV物化视图相关文件，安装目录以“/opt/omnimv“为例。
+1. 删除二进制SO文件以及OmniMV物化视图相关文件，安装目录以`/opt/omnimv`为例。
 
     ```
     rm -rf /opt/omnimv
     ```
 
-2. 下载并上传最新版本的OmniMV物化视图到管理节点，参见[安装指南](./installation_guide.md)完成安装。
+2. 下载并上传最新版本的OmniMV物化视图到管理节点，参见《[安装指南](./installation_guide.md)》完成安装。
 3. 更新Spark版本后需刷新物化视图元数据，如Spark版本未更新则不需要执行。
     1. 删除物化视图元数据。
         1. 设置数据库名称。
@@ -410,13 +410,13 @@ OmniMV物化视图使用Kryo进行物化视图元数据序列化时，可能存�
 >![](public_sys-resources/icon-notice.gif) **须知：** 
 >当前步骤仅供需要卸载OmniMV时参考，不属于部署OmniMV的必要操作步骤。
 
-1. 删除OmniMV，安装目录以“/opt/omnimv“为例。
+1. 删除OmniMV，安装目录以`/opt/omnimv`为例。
 
     ```
     rm -rf /opt/omnimv
     ```
 
-2. 删除Python环境，安装目录以“/opt/anaconda3“为例。
+2. 删除Python环境，安装目录以`/opt/anaconda3`为例。
 
     ```
     rm -rf /opt/anaconda3

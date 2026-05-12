@@ -31,8 +31,8 @@ OmniMV物化视图组网规划的环境由4台服务器组成，使用存算一�
 |处理器|鲲鹏920 5250处理器/鲲鹏920新型号处理器|
 |内存大小|384GB（12 * 32GB）|
 |内存频率|2666MHz|
-|网络|业务网络10GE管理网络1GE|
-|硬盘|系统盘：1 * RAID 0（1 * 1.2TB SAS HDD）数据盘：12 * RAID 0（12 * 8TB SATA HDD）|
+|网络|业务网络10GE<br>管理网络1GE|
+|硬盘|系统盘：1 * RAID 0（1 * 1.2TB SAS HDD）<br>数据盘：12 * RAID 0（12 * 8TB SATA HDD）|
 |RAID控制卡|LSI SAS3508|
 
 
@@ -44,13 +44,12 @@ OmniMV物化视图组网规划的环境由4台服务器组成，使用存算一�
 
 |项目|版本|说明|管理节点（Server）|计算/存储节点|
 |--|--|--|--|--|
-|操作系统|openEuler 22.03 LTS SP1|无特殊说明。|√|√|
-|JDK|毕昇JDK 1.8.0_342|毕昇JDK安装指南请参见《毕昇JDK 8 安装指南》。|√|√|
-|Hadoop|3.2.0|部署指南请参见《Hadoop 集群部署（CentOS 7.6&openEuler 20.03）》。|√|√|
-|Spark|3.1.1/3.4.3|部署指南请参见《Spark 部署指南（CentOS 7.6&openEuler 20.03）》。|√|-|
-|ZooKeeper|3.6.2及以上|部署指南请参见《ZooKeeper 部署指南（CentOS 7.6&openEuler 20.03）》。|-|√|
-|Python|3.10.2及以上|无特殊说明。|√|√|
-|√：表示对应节点需要安装该项目。-：表示对应节点不需要安装该项目。|
+|操作系统|openEuler 22.03 LTS SP1|无特殊要求。|√|√|
+|JDK|[毕昇JDK 1.8.0_342](https://mirror.iscas.ac.cn/kunpeng/archive/compiler/bisheng_jdk/bisheng-jdk-8u342-linux-aarch64.tar.gz)|毕昇JDK安装指南请参见《[毕昇JDK 8 安装指南](https://gitee.com/openeuler/bishengjdk-8/wikis/%E4%B8%AD%E6%96%87%E6%96%87%E6%A1%A3/%E6%AF%95%E6%98%87JDK%208%20%E5%AE%89%E8%A3%85%E6%8C%87%E5%8D%97)》。|√|√|
+|Hadoop|3.2.0|部署指南请参见《[Hadoop 集群部署（CentOS 7.6&openEuler 20.03）](https://www.hikunpeng.com/document/detail/zh/kunpengbds/ecosystemEnable/Hadoop/kunpenghadoop_04_0001.html)》。|√|√|
+|Spark|3.1.1/3.4.3|部署指南请参见《[Spark 部署指南（CentOS 7.6&openEuler 20.03）](https://www.hikunpeng.com/document/detail/zh/kunpengbds/ecosystemEnable/Spark/kunpengspark_04_0001.html)》。|√|-|
+|ZooKeeper|3.6.2及以上|部署指南请参见《[ZooKeeper 部署指南（CentOS 7.6&openEuler 20.03）](https://www.hikunpeng.com/document/detail/zh/kunpengbds/ecosystemEnable/ZooKeeper/kunpengzookeeper_04_0001.html)》。|-|√|
+|Python|3.10.2及以上|无特殊要求。|√|√|
 
 
 >![](public_sys-resources/icon-note.gif) **说明：** 
@@ -65,14 +64,59 @@ OmniMV物化视图组网规划的环境由4台服务器组成，使用存算一�
 
 **表 3** OmniMV物化视图软件获取列表<a id="OmniMV物化视图软件获取列表"></a>
 
-|名称|包名|发布类型|说明|获取地址|
-|--|--|--|--|--|
-|OmniMV物化视图软件安装包|BoostKit-omnimv_1.2.0.zip|开源|-|获取链接|
-|OmniMV Plugin的JAR包|boostkit-omnimv-spark-3.1.1-1.2.0-aarch64.jar|开源|使用OmniMV物化视图能力时，Spark引擎扩展包。|获取链接|
-|boostkit-omnimv-spark-3.4.3-1.2.0-aarch64.jar|开源|使用OmniMV物化视图能力时，Spark引擎扩展包。|获取链接|
-|OmniMV日志解析JAR包|boostkit-omnimv-logparser-spark-3.1.1-1.2.0-aarch64.jar|开源|使用OmniMV物化视图解析Spark日志时使用的功能包。|获取链接|
-|boostkit-omnimv-logparser-spark-3.4.3-1.2.0-aarch64.jar|开源|使用OmniMV物化视图解析Spark日志时使用的功能包。|获取链接|
-|hive-testbench|hive-testbench-hdp3.zip|开源|生成TPC-DS/TPCH数据时使用的TestBench源码包。|获取链接|
+<table border="1" cellpadding="6" cellspacing="0">
+  <thead>
+    <tr>
+      <th>名称</th>
+      <th>包名</th>
+      <th>发布类型</th>
+      <th>说明</th>
+      <th>获取地址</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>OmniMV物化视图软件安装包</td>
+      <td>BoostKit-omnimv_1.2.0.zip</td>
+      <td>开源</td>
+      <td>-</td>
+      <td><a href="https://gitcode.com/boostkit/boostkit-bigdata/releases/download/25.0.RC1-OmniMV-release/BoostKit-omnimv_1.2.0.zip" target="_blank">获取链接</a></td>
+    </tr>
+    <tr>
+      <td rowspan="2">OmniMV Plugin的JAR包</td>
+      <td>boostkit-omnimv-spark-3.1.1-1.2.0-aarch64.jar</td>
+      <td>开源</td>
+      <td>使用OmniMV物化视图能力时，Spark引擎扩展包。</td>
+      <td><a href="https://gitcode.com/boostkit/boostkit-bigdata/releases/download/25.0.RC1-OmniMV-release/boostkit-omnimv-spark-3.1.1-1.2.0-aarch64.jar" target="_blank">获取链接</a></td>
+    </tr>
+    <tr>      
+      <td>boostkit-omnimv-spark-3.4.3-1.2.0-aarch64.jar</td>
+      <td>开源</td>
+      <td>使用OmniMV物化视图能力时，Spark引擎扩展包。</td>
+      <td><a href="https://gitcode.com/boostkit/boostkit-bigdata/releases/download/25.0.RC1-OmniMV-release/boostkit-omnimv-spark-3.4.3-1.2.0-aarch64.jar" target="_blank">获取链接</a></td>
+    </tr>
+    <tr>
+      <td rowspan="2">OmniMV日志解析JAR包</td>
+      <td>boostkit-omnimv-logparser-spark-3.1.1-1.2.0-aarch64.jar</td>
+      <td>开源</td>
+      <td>使用OmniMV物化视图解析Spark日志时使用的功能包。</td>
+      <td><a href="https://gitcode.com/boostkit/boostkit-bigdata/releases/download/25.0.RC1-OmniMV-release/boostkit-omnimv-logparser-spark-3.1.1-1.2.0-aarch64.jar" target="_blank">获取链接</a></td>
+    </tr>
+    <tr>      
+      <td>boostkit-omnimv-logparser-spark-3.4.3-1.2.0-aarch64.jar</td>
+      <td>开源</td>
+      <td>使用OmniMV物化视图解析Spark日志时使用的功能包。</td>
+      <td><a href="https://gitcode.com/boostkit/boostkit-bigdata/releases/download/25.0.RC1-OmniMV-release/boostkit-omnimv-logparser-spark-3.4.3-1.2.0-aarch64.jar" target="_blank">获取链接</a></td>
+    </tr>
+    <tr>
+      <td>hive-testbench</td>
+      <td>hive-testbench-hdp3.zip</td>
+      <td>开源</td>
+      <td>生成TPC-DS/TPCH数据时使用的TestBench源码包。</td>
+      <td><a href="https://github.com/hortonworks/hive-testbench/archive/refs/heads/hdp3.zip" target="_blank">获取链接</a></td>
+    </tr>
+  </tbody>
+</table>
 
 
 **软件安装包完整性校验<a name="zh-cn_topic_0000001665139878_section16501429204018"></a>**
@@ -105,7 +149,7 @@ OmniMV物化视图组网规划的环境由4台服务器组成，使用存算一�
 |glibc|2.25及以上|
 
 
-- 安装OmniMV物化视图前，集群环境请参见[操作系统和软件要求](环境要求.md#zh-cn_topic_0000001665139878_section112781416185717)完成相关组件安装，Spark引擎所需组件请参见[**表 2** Spark引擎所需必备组件](#Spark引擎所需必备组件)。
+- 安装OmniMV物化视图前，集群环境请参见[**表 2** 操作系统和软件要求](#操作系统和软件要求)完成相关组件安装，Spark引擎所需组件请参见[**表 2** Spark引擎所需必备组件](#Spark引擎所需必备组件)。
 
     **表 2** Spark引擎所需必备组件<a id="Spark引擎所需必备组件"></a>
 
@@ -186,7 +230,7 @@ OmniMV物化视图组网规划的环境由4台服务器组成，使用存算一�
 
 3. 下载OmniMV物化视图推荐算法软件安装包。
 
-    Spark引擎下载OmniMV物化视图推荐算法软件安装包，并将Spark SQL Plugin的JAR包、日志解析JAR包放到Spark集群的server节点，软件安装包获取路径请参见[软件获取](环境要求.md#zh-cn_topic_0000001665139878_section73341541215)，软件安装包路径没有特殊要求。例如以“/opt/omnimv“为例。
+    Spark引擎下载OmniMV物化视图推荐算法软件安装包，并将Spark SQL Plugin的JAR包、日志解析JAR包放到Spark集群的server节点，软件安装包获取路径请参见[**表 3** OmniMV物化视图软件获取列表](#OmniMV物化视图软件获取列表)，软件安装包路径没有特殊要求。例如以“/opt/omnimv“为例。
 
     - Spark 3.1.1。
 
