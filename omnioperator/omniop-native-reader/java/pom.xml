@@ -15,7 +15,7 @@
     <properties>
         <scala.binary.version>2.12</scala.binary.version>
         <spark.version>3.3.1</spark.version>
-        <omniruntime.version>2.1.0</omniruntime.version>
+        <omniruntime.version>2.2.0</omniruntime.version>
         <project.version>${spark.version}-${omniruntime.version}</project.version>
         <cpp.test>FALSE</cpp.test>
         <cpp.dir>../cpp/</cpp.dir>
