@@ -1,3 +1,0 @@
-spark.executor.memory
-spark.executor.cores
-spark.executor.instances

@@ -1,1 +1,0 @@
-# omniop-spark-extension
