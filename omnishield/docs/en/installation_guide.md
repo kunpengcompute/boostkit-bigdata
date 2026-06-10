@@ -29,7 +29,7 @@ Before installing OmniShield, prepare the hardware and software environments to 
 
 |Item|Management Node|Compute Node|Storage Node|
 |--|--|--|--|
-|Processor|Kunpeng 920 7260|Subject to the processor required by the TEE Kit|Kunpeng 920 7260|
+|Processor|Kunpeng 920|Subject to the processor required by the TEE Kit|Kunpeng 920|
 |Memory size|512 GB|512 GB|512 GB|
 |Memory frequency|2666 MHz|2666 MHz|2666 MHz|
 |Network|Service network: 10GE <br> Management network: 1GE|Service network: 10GE <br> Management network: 1GE|Service network: 10GE <br> Management network: 1GE|

@@ -26,7 +26,7 @@ Before installing OmniScheduler, prepare the hardware and software environments 
 
 |Item|Management/Compute/Storage Node|
 |--|--|
-|Processor|Kunpeng 920 5250|
+|Processor|Kunpeng 920|
 |Memory size|384 GB (12 x 32 GB)|
 |Memory frequency|2666 MHz|
 |Network|Service network: 10GE <br> Management network: 1GE|
