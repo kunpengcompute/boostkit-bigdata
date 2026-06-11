@@ -28,7 +28,7 @@ Before installing OmniMV, prepare the hardware and software environments to faci
 
 |Item|Management/Compute/Storage Node|
 |--|--|
-|Processor|Kunpeng 920 5250 processor/New Kunpeng 920 processor model|
+|Processor|Kunpeng 920 processor/New Kunpeng 920 processor model|
 |Memory size|384 GB (12 x 32 GB)|
 |Memory frequency|2666 MHz|
 |Network|Service network: 10GE <br>Management network: 1GE|
