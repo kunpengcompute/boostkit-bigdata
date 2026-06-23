@@ -1,6 +1,6 @@
 env:
   username: "hadoop" # ssh登录用户名
-  password: "123456" # ssh登录密码
+  password: "XXXXXX" # ssh登录密码
   port: 22 # 需要各个节点ssh登录端口一致
   jumper_host: "server1" # 通过jumper传送软件包到其他节点上
   server_hosts: # server节点ip，支持server1这种hostname形式、192.168.1.1的ip格式、192.168.1.10-210网段形式
