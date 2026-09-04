@@ -93,9 +93,6 @@ Doris docs目录下的文档适用CC-BY 4.0许可证，具体请参见[LICENSE](
 
 ## 致谢<a name="ZH-CN_TOPIC_0000002522483086"></a>
 
-Doris由华为公司的下列部门联合贡献：
-
-鲲鹏计算BoostKit开发部
 
 感谢来自社区的每一个PR，欢迎贡献Doris！
 

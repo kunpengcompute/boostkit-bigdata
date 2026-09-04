@@ -21,8 +21,3 @@ Contribution Guidelines
 ========
 
 Track the bugs and feature requests via GitHub [issues].
-
-More Information
-========
-
-For further assistance, send an email to kunpengcompute@huawei.com.
