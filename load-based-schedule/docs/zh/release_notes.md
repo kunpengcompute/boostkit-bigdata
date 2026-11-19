@@ -23,7 +23,6 @@
 </tbody>
 </table>
 
-
 ### 软件版本配套说明<a name="ZH-CN_TOPIC_0000002550208049"></a>
 
 |项目|版本|
@@ -40,8 +39,6 @@
 |Node|19.9.0|
 |Python|3.6.0及以上|
 
-
-
 ### 硬件版本配套说明<a name="ZH-CN_TOPIC_0000002550208079"></a>
 
 <a name="table305mcpsimp"></a>
@@ -57,7 +54,6 @@
 </tr>
 </tbody>
 </table>
-
 
 ### 病毒扫描结果<a name="ZH-CN_TOPIC_0000002550168033"></a>
 
@@ -150,8 +146,6 @@
 </tbody>
 </table>
 
-
-
 ## V1.0.0<a name="ZH-CN_TOPIC_0000002550208065"></a>
 
 ### 更新说明<a name="ZH-CN_TOPIC_0000002518568282"></a>
@@ -172,17 +166,13 @@
 
 无
 
-
 ### 已解决的问题<a name="ZH-CN_TOPIC_0000002518568322"></a>
 
 无
 
-
 ### 遗留问题<a name="ZH-CN_TOPIC_0000002518568298"></a>
 
 无
-
-
 
 ## 版本配套文档<a name="ZH-CN_TOPIC_0000002518728230"></a>
 
@@ -194,11 +184,12 @@
 |安装指南|提供OmniScheduler的安装部署指导。|开源仓|
 |使用指南|提供OmniScheduler的使用操作指导。|开源仓|
 
-
-
 ### 获取文档的方法<a name="ZH-CN_TOPIC_0000002550208011"></a>
 
-您可以通过访问[开源仓](https://gitcode.com/boostkit/boostkit-bigdata/tree/main/load-based-schedule/docs)浏览和获取相关文档。
+您可以通过访问[开源仓](http://gitcode.com/boostkit/boostkit-bigdata/tree/main/load-based-schedule/docs)浏览和获取相关文档。
 
+## 修订记录
 
-
+| 文档版本 | 发布日期 | 修改说明 |
+| --- | --- | --- |
+| 01 | 2025-03-30 | 第一次正式发布。 |

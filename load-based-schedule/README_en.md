@@ -4,7 +4,6 @@
 
 - \[2025-03-30\]: Released OmniScheduler 1.0.0. In a Hadoop cluster with unbalanced load between nodes, the OmniScheduler Yarn load scheduling algorithm optimizes the open source Capacity Scheduler to schedule resources based on the weight calculation and sorting results of cluster nodes' physical resources. This algorithm enables balanced resource configuration and efficient resource utilization.
 
-
 ## Introduction to the Project<a name="EN-US_TOPIC_0000002552058153"></a>
 
 ### Overview<a name="EN-US_TOPIC_0000002521018158"></a>
@@ -24,7 +23,6 @@ Compatible open source components and versions:
 - Hive 3.1.0
 - Hadoop 3.3.4
 
-
 ### Architecture<a name="EN-US_TOPIC_0000002521018166"></a>
 
 Yet Another Resource Negotiator \(Yarn\) is a framework for resource management and job scheduling in a Hadoop cluster. It allocates resources and schedules jobs in a cluster so that multiple computing frameworks \(such as MapReduce, Spark, and Tez\) can share the same cluster resources. YARN employs the ResourceManager \(RM\), NodeManager \(NM\), and ApplicationMaster \(AM\) to manage resources and schedule jobs. Yarn offers multiple schedulers, including the First In First Out \(FIFO\) Scheduler, Capacity Scheduler, and Fair Scheduler. Choose the scheduler most appropriate to your service environment.
@@ -42,7 +40,6 @@ It consists of five modules:
 - Grafana: It obtains cluster load and balancing data from Prometheus, and visualizes the data in charts and dashboards for display on the user interface.
 - OmniScheduler: It obtains the node load sorting information from LoadsMetric and prioritizes job scheduling for nodes with lower loads.
 
-
 ### Application Scenarios<a name="EN-US_TOPIC_0000002552098145"></a>
 
 Learn about the application scenarios of OmniScheduler before using the feature. OmniScheduler supports Hadoop 3.3.4.
@@ -50,22 +47,22 @@ Learn about the application scenarios of OmniScheduler before using the feature.
 OmniScheduler balances load between nodes of a Hadoop cluster. After a user submits a computing job \(such as a Spark job\) to Yarn, OmniScheduler assigns the job to less-loaded nodes based on specified parameters. This ensures balanced configuration and efficient utilization of cluster resources.
 
 Learn about the application scenarios of OmniScheduler before using the feature. OmniScheduler supports Hadoop 3.3.4.
+
 ### Related Concepts<a name="EN-US_TOPIC_0000002552098137"></a>
 
 - Prometheus: This open-source event monitoring system and time series database is widely used to manage various infrastructure resources.
 - Node Exporter: It is a component in the Prometheus ecosystem used to collect and expose machine-level metrics.
 - Grafana: This open-source analytics and monitoring platform is used to build and visualize time series data of various data sources. Grafana supports multiple data sources, including Prometheus, InfluxDB, Elasticsearch, and MySQL.
 
-
-
 ## Constraints<a name="EN-US_TOPIC_0000002552058163"></a>
 
 None.
+
 ## Directory Structure<a name="EN-US_TOPIC_0000002520858170"></a>
 
 The full project directory structure is as follows:
 
-```
+```text
 ├── docs                                                      # Project document directory
 │   └── en                                                   # English document directory
 │       ├── figures                                          # Directory of images in English documents
@@ -85,18 +82,13 @@ The full project directory structure is as follows:
 ├── README_en.md                                             # Project instroduction file
 ```
 
-
 ## Release Notes<a name="EN-US_TOPIC_0000002520858176"></a>
 
 For details about feature changes in each version, see [Release Notes](./docs/en/release_notes.md).
 
-
 ## Environment Deployment<a name="EN-US_TOPIC_0000002521018162"></a>
 
 For details about the environment dependencies and installation methods of OmniScheduler, see [Installation Guide](./docs/en/installation_guide.md).
-
-
-
 
 ## Helpful Links<a name="EN-US_TOPIC_0000002521018170"></a>
 
@@ -106,20 +98,16 @@ For details about the environment dependencies and installation methods of OmniS
 |Installation Guide|[Installation Guide](./docs/en/installation_guide.md)|Describes how to install OmniScheduler.|
 |User Guide|[User Guide](./docs/en/user_guide.md)|Provides details about how to use OmniScheduler.|
 
-
-
 ## Security Statement<a name="EN-US_TOPIC_0000002521018160"></a>
 
 ### Routine Antivirus Software Check<a name="EN-US_TOPIC_0000002552058159"></a>
 
 Periodically scan clusters and Spark components for viruses. This protects clusters from viruses, malicious code, spyware, and malicious programs, reducing risks such as system breakdown and information leakage. Mainstream antivirus software can be recommended for antivirus check.
 
-
 ### Log Control<a name="EN-US_TOPIC_0000002552058155"></a>
 
 - Check whether the system can limit the size of a single log file.
 - Check whether there is a mechanism for clearing logs when the log space is used up.
-
 
 ### Vulnerability Fixing<a name="EN-US_TOPIC_0000002552058157"></a>
 
@@ -149,7 +137,6 @@ To ensure the security of the production environment and reduce the risk of atta
 
     Currently, the vendor has released an upgrade patch to fix the vulnerability. For details, visit  [GitHub](https://github.com/netty/netty/security/advisories/GHSA-9vjp-v76f-g363).
 
-
 ### SSH Hardening<a name="EN-US_TOPIC_0000002520858166"></a>
 
 During the installation and deployment, you need to connect to the server through SSH. The  **root**  user has all the operation permissions. Logging in to the server as the  **root**  user may pose security risks. You are advised to log in to the server as a common user for installation and deployment and disable  **root**  user login using SSH to improve system security. 
@@ -158,7 +145,6 @@ Check the  **PermitRootLogin**  configuration item in  **/etc/ssh/sshd\_config**
 
 - If the value is  no,  **root**  user login using SSH is disabled.
 - If the value is  yes, change it to  no.
-
 
 ### Communication Matrix<a name="EN-US_TOPIC_0000002521018168"></a>
 
@@ -320,8 +306,6 @@ Check the  **PermitRootLogin**  configuration item in  **/etc/ssh/sshd\_config**
 </tbody>
 </table>
 
-
-
 ## Disclaimer<a name="EN-US_TOPIC_0000002521018164"></a>
 
 **To OmniScheduler users**
@@ -338,13 +322,11 @@ Check the  **PermitRootLogin**  configuration item in  **/etc/ssh/sshd\_config**
 
 If you do not want your model or dataset to be mentioned in OmniScheduler, or if you wish to update its description, please submit an issue on GitCode. We will delete or update your description according to your request. Thank you for your understanding and contribution to OmniScheduler.
 
-
 ## License<a name="EN-US_TOPIC_0000002552058161"></a>
 
 For the OmniScheduler product license, see the [LICENSE](../LICENSE) file for details.
 
 The documents in the docs directory of OmniScheduler are licensed under CC-BY 4.0. See the [LICENSE](../LICENSE) file for details.
-
 
 ## Contribution Statement<a name="EN-US_TOPIC_0000002552098139"></a>
 
@@ -363,12 +345,9 @@ The documents in the docs directory of OmniScheduler are licensed under CC-BY 4.
     8. After your PR is approved by the required number of reviewers, the committer will conduct the final review.
     9. After your PR is approved and all tests pass, the CI system will merge it into the project's main branch.
 
-
-
 ## Suggestions and Feedback<a name="EN-US_TOPIC_0000002520858172"></a>
 
-You are welcome to contribute to the community. If you have any questions or suggestions, please submit an  [issue](https://gitcode.com/boostkit/boostkit-bigdata/tree/main/load-based-schedule). We will respond as soon as possible. Thank you for your support.
-
+You are welcome to contribute to the community. If you have any questions or suggestions, please submit an  [issue](https://gitcode.com/boostkit/boostkit-bigdata/blob/main/README.md). We will respond as soon as possible. Thank you for your support.
 
 ## Acknowledgments<a name="EN-US_TOPIC_0000002552098143"></a>
 
@@ -377,5 +356,3 @@ OmniScheduler is jointly developed by the following Huawei departments:
 Kunpeng Computing BoostKit Development Dept
 
 Thank you to everyone in the community for your PRs. We warmly welcome contributions to OmniScheduler!
-
-

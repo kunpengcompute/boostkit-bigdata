@@ -2,8 +2,7 @@
 
 ## 最新消息<a name="ZH-CN_TOPIC_0000002552098141"></a>
 
-- \[2025.03.30\]：发布OmniScheduler 1.0.0。在Hadoop集群节点间负载不均衡场景下，OmniScheduler Yarn负载调度算法优化开源版本Capacity Scheduler调度器，拆分为基于物理资源权重计算及排序结果进行资源调度。该算法实现了资源的均衡分配和高效利用。
-
+- \[2025-03-30\]：发布OmniScheduler 1.0.0。在Hadoop集群节点间负载不均衡场景下，OmniScheduler Yarn负载调度算法优化开源版本Capacity Scheduler调度器，拆分为基于物理资源权重计算及排序结果进行资源调度。该算法实现了资源的均衡分配和高效利用。
 
 ## 项目简介<a name="ZH-CN_TOPIC_0000002552058153"></a>
 
@@ -24,7 +23,6 @@ OmniScheduler Yarn负载调度算法为OmniRuntime的特性之一。OmniSchedule
 - Hive 3.1.0
 - Hadoop 3.3.4
 
-
 ### 架构介绍<a name="ZH-CN_TOPIC_0000002521018166"></a>
 
 Yarn（Yet Another Resource Negotiator）是Hadoop生态系统中的一个资源管理和调度框架。它负责集群中资源的分配和任务的调度，使得多个计算框架（如MapReduce、Spark、Tez等）可以共享同一个集群资源。Yarn通过ResourceManager（RM）、NodeManager（NM）和ApplicationMaster（AM）三个主要组件来实现资源管理和任务调度。Yarn提供了多种调度算法，包括FIFO Scheduler（先进先出调度器）、Capacity Scheduler（容量调度器）、Fair Scheduler（公平调度器）等调度算法，用户可以根据具体需求选择合适的调度器。
@@ -42,7 +40,6 @@ OmniScheduler Yarn负载调度算法优化开源版本Capacity Scheduler调度�
 - Grafana：从Prometheus获取负载信息和均衡性数据，并将其可视化为图表和仪表板，进行前端UI展示。
 - Yarn负载调度算法：从LoadsMetric中获取节点负载排序信息，并按照顺序优先调度低负载节点。
 
-
 ### 应用场景<a name="ZH-CN_TOPIC_0000002552098145"></a>
 
 在应用特性前，请先了解OmniScheduler Yarn负载调度算法特性的应用场景，支持Hadoop 3.3.4。
@@ -50,22 +47,22 @@ OmniScheduler Yarn负载调度算法优化开源版本Capacity Scheduler调度�
 OmniScheduler Yarn负载调度算法特性适用于Hadoop集群节点间负载不均衡场景，用户在提交计算任务（如Spark任务）到Yarn后，通过给定参数可以利用Yarn负载调度算法使得任务优先调度到负载低的节点，实现集群资源的均衡配置和高效利用。
 
 在应用特性前，请先了解OmniScheduler Yarn负载调度算法特性的应用场景，支持Hadoop 3.3.4。
+
 ### 相关概念<a name="ZH-CN_TOPIC_0000002552098137"></a>
 
 - Prometheus：一个开源的监控系统和时间序列数据库，广泛用于监控各种服务和基础设施。
 - Node Exporter：Prometheus生态系统中的一个组件，用于收集和暴露机器级别的指标（metrics）。
 - Grafana：一个开源的分析和监控平台，用于构建和展示各种数据源的时间序列数据。Grafana支持多种数据源，包括Prometheus、InfluxDB、Elasticsearch、MySQL等。
 
-
-
 ## 约束与限制<a name="ZH-CN_TOPIC_0000002552058163"></a>
 
 无。
+
 ## 目录结构<a name="ZH-CN_TOPIC_0000002520858170"></a>
 
 项目全量目录层级介绍如下：
 
-```
+```text
 ├── docs                                                     # 项目文档目录
 │   └── zh                                                   # 中文文档目录
 │       ├── figures                                          # 中文文档图片资源目录
@@ -85,17 +82,13 @@ OmniScheduler Yarn负载调度算法特性适用于Hadoop集群节点间负载�
 ├── README.md                                                # 项目介绍
 ```
 
-
 ## 版本说明<a name="ZH-CN_TOPIC_0000002520858176"></a>
 
 每个版本的特性变更详细信息，请参见《[版本说明书](./docs/zh/release_notes.md)》。
 
-
 ## 环境部署<a name="ZH-CN_TOPIC_0000002521018162"></a>
 
 介绍OmniScheduler的环境依赖及安装方式，具体请参见《[安装指南](./docs/zh/installation_guide.md)》。
-
-
 
 ## 学习文档<a name="ZH-CN_TOPIC_0000002521018170"></a>
 
@@ -104,9 +97,6 @@ OmniScheduler Yarn负载调度算法特性适用于Hadoop集群节点间负载�
 |[版本说明书](./docs/zh/release_notes.md)|提供OmniScheduler每个发布版本的基础信息和特性更新信息。|
 |[安装指南](./docs/zh/installation_guide.md)|提供安装OmniScheduler的详细指导。|
 |[使用指南](./docs/zh/user_guide.md)|提供使用OmniScheduler的详细指导。|
-|视频课程：[OmniRuntime特性大揭秘](https://www.hikunpeng.com/document/video-detail/2849)|提供操作视频，帮助开发者在鲲鹏服务器上了解、使能OmniRuntime特性。|
-
-
 
 ## 安全声明<a name="ZH-CN_TOPIC_0000002521018160"></a>
 
@@ -114,12 +104,10 @@ OmniScheduler Yarn负载调度算法特性适用于Hadoop集群节点间负载�
 
 定期开展对集群和Spark组件的防病毒扫描，防病毒例行检查会帮助集群免受病毒、恶意代码、间谍软件以及恶意程序，降低系统瘫痪、信息泄露等风险。建议使用业界主流防病毒软件进行防病毒检查。
 
-
 ### 日志控制<a name="ZH-CN_TOPIC_0000002552058155"></a>
 
 - 检查系统是否可以限制单个日志文件的大小。
 - 检查日志空间占满后，是否存在机制进行清理。
-
 
 ### 漏洞修复<a name="ZH-CN_TOPIC_0000002552058157"></a>
 
@@ -149,7 +137,6 @@ OmniScheduler Yarn负载调度算法特性适用于Hadoop集群节点间负载�
 
     目前厂商已发布升级补丁以修复漏洞，请参见[GitHub](https://github.com/netty/netty/security/advisories/GHSA-9vjp-v76f-g363)修复漏洞。
 
-
 ### SSH加固<a name="ZH-CN_TOPIC_0000002520858166"></a>
 
 在部署安装过程中，需要通过SSH连接服务器。由于root用户拥有最高权限，直接使用root用户登录服务器可能会存在安全风险。建议您使用普通用户登录服务器进行安装部署，并建议您通过配置禁止root用户SSH登录的选项，来提升系统安全性。操作步骤：
@@ -158,7 +145,6 @@ OmniScheduler Yarn负载调度算法特性适用于Hadoop集群节点间负载�
 
 - 如果显示no，说明禁止了root用户SSH登录。
 - 如果显示yes，说明需要修改PermitRootLogin为no。
-
 
 ### 通信矩阵<a name="ZH-CN_TOPIC_0000002521018168"></a>
 
@@ -320,8 +306,6 @@ OmniScheduler Yarn负载调度算法特性适用于Hadoop集群节点间负载�
 </tbody>
 </table>
 
-
-
 ## 免责声明<a name="ZH-CN_TOPIC_0000002521018164"></a>
 
 **致OmniScheduler使用者**
@@ -338,13 +322,11 @@ OmniScheduler Yarn负载调度算法特性适用于Hadoop集群节点间负载�
 
 如果您不希望您的模型或数据集等信息在OmniScheduler中被提及，或希望更新OmniScheduler中有关的描述，请在GitCode提交issue，我们将根据您的issue要求删除或更新您相关描述。衷心感谢您对OmniScheduler的理解和贡献。
 
-
 ## License<a name="ZH-CN_TOPIC_0000002552058161"></a>
 
 OmniScheduler产品的使用许可证，具体请参见[LICENSE](../LICENSE)文件。
 
 OmniScheduler docs目录下的文档适用CC-BY 4.0许可证，具体请参见[LICENSE](../LICENSE)文件。
-
 
 ## 贡献声明<a name="ZH-CN_TOPIC_0000002552098139"></a>
 
@@ -363,19 +345,16 @@ OmniScheduler docs目录下的文档适用CC-BY 4.0许可证，具体请参见[L
     8. 当您的PR获得足够数量的检视者批准后，Committer会进行最终审核。
     9. 审核和测试通过后，CI会将您的PR合并入到项目的主干分支。
 
-
-
 ## 建议与交流<a name="ZH-CN_TOPIC_0000002520858172"></a>
 
-欢迎大家为社区做贡献。如果有任何疑问或建议，请提交[Issues](https://gitcode.com/boostkit/boostkit-bigdata/tree/main/load-based-schedule)，我们会尽快回复。感谢您的支持。
-
+欢迎大家为社区做贡献。如果有任何疑问或建议，请提交[Issues](http://gitcode.com/boostkit/boostkit-bigdata/tree/main/load-based-schedule)，我们会尽快回复。感谢您的支持。
 
 ## 致谢<a name="ZH-CN_TOPIC_0000002552098143"></a>
 
-OmniScheduler由华为公司的下列部门联合贡献：
-
-鲲鹏计算BoostKit开发部
-
 感谢来自社区的每一个PR，欢迎贡献OmniScheduler！
 
+## 修订记录
 
+| 文档版本 | 发布日期 | 修改说明 |
+| --- | --- | --- |
+| 01 | 2025-03-30 | 第一次正式发布。 |
