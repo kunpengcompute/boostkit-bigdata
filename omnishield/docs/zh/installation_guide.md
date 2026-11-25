@@ -1,5 +1,7 @@
 # 安装指南<a name="ZH-CN_TOPIC_0000002520334680"></a>
 
+本文档介绍OmniShield机密大数据的安装流程，涵盖组网规划、环境要求、软件安装包获取与完整性校验，以及安装依赖、安装OmniShield和安装机密计算TEE套件的操作步骤，适用于在管理节点和计算节点上部署该特性的用户。
+
 ## 安装简介<a name="ZH-CN_TOPIC_0000002551414709"></a>
 
 ### 组网规划<a name="ZH-CN_TOPIC_0000002551414637"></a>
@@ -14,7 +16,8 @@ OmniShield机密大数据的组网规划采用存算分离架构，组网规划�
 - 计算节点用于在TEE侧运行计算服务。
 - 存储节点用于在REE侧存储加密数据。
 
-![](figures/安装组网图.png "安装组网图")
+![存算分离组网架构：1个管理节点、2个计算节点与2个存储节点互联，计算节点在TEE侧运行计算服务](figures/安装组网图.png "安装组网图")
+
 ### 环境要求<a name="ZH-CN_TOPIC_0000002520014778"></a>
 
 安装OmniShield机密大数据特性前，请参见本节内容，提前准备软硬件安装环境，以确保后续安装操作顺利进行。
@@ -31,9 +34,8 @@ OmniShield机密大数据的组网规划采用存算分离架构，组网规划�
 |内存大小|512GB|512GB|512GB|
 |内存频率|2666MHz|2666MHz|2666MHz|
 |网络|业务网络10GE管理网络1GE|业务网络10GE管理网络1GE|业务网络10GE管理网络1GE|
-|硬盘|系统盘：1 * RAID 0（1 * 1.2T SAS HDD）数据盘：12 * RAID 0（12 * 8T SATA HDD）|系统盘：1 * RAID 0（1 * 1.2T SAS HDD）数据盘：12 * RAID 0（12 * 8T SATA HDD）|系统盘：1 * RAID 0（1 * 1.2T SAS HDD）数据盘：12 * RAID 0（12 * 8T SATA HDD）|
+|硬盘|系统盘：1 *RAID 0（1* 1.2T SAS HDD）数据盘：12 *RAID 0（12* 8T SATA HDD）|系统盘：1 *RAID 0（1* 1.2T SAS HDD）数据盘：12 *RAID 0（12* 8T SATA HDD）|系统盘：1 *RAID 0（1* 1.2T SAS HDD）数据盘：12 *RAID 0（12* 8T SATA HDD）|
 |RAID控制卡|LSI SAS3508|LSI SAS3508|LSI SAS3508|
-
 
 **操作系统和软件要求<a name="zh-cn_topic_0000001924407076_zh-cn_topic_0000001843026488_zh-cn_topic_0000001664980070_section12083304460"></a>**
 
@@ -50,12 +52,12 @@ OmniShield机密大数据的组网规划采用存算分离架构，组网规划�
 |Spark|3.3.1|部署指南请参见《[Spark 部署指南（CentOS 7.6&openEuler 20.03）](https://www.hikunpeng.com/document/detail/zh/kunpengbds/ecosystemEnable/Spark/kunpengspark_04_0001.html)》。|√|-|
 |Hive|3.1.0|部署指南请参见《[Hive部署指南（CentOS 7.6&openEuler 20.03）](https://www.hikunpeng.com/document/detail/zh/kunpengbds/ecosystemEnable/Hive/kunpenghive_04_0001.html)》。|√|-|
 
-
 >![](public_sys-resources/icon-note.gif) **说明：** 
->-   √：表示对应节点需要安装该项目。
->-   -：表示对应节点不需要安装该项目。
->-   以上第三方依赖版本如有漏洞请根据官方说明进行漏洞修复。
->-   以上组件版本，可能和部署指南中的组件版本不一致，部署指南仅供部署参考。
+>
+>- √：表示对应节点需要安装该项目。
+>- -：表示对应节点不需要安装该项目。
+>- 以上第三方依赖版本如有漏洞请根据官方说明进行漏洞修复。
+>- 以上组件版本，可能和部署指南中的组件版本不一致，部署指南仅供部署参考。
 
 **软件安装包获取<a name="zh-cn_topic_0000001924407076_zh-cn_topic_0000001843026488_zh-cn_topic_0000001664980070_section3489574613"></a>**
 
@@ -63,8 +65,7 @@ OmniShield机密大数据的组网规划采用存算分离架构，组网规划�
 
 |名称|包名|发布类型|说明| 获取地址     |
 |--|--|--|--|----------|
-|OmniShield|boostkit-omnishield-spark-3.3.1-1.1.0-aarch64.zip|开源|OmniShield机密大数据软件安装包。| [获取链接](https://gitee.com/kunpengcompute/boostkit-bigdata/releases/download/24.0.0-OmniShield-Spark-331/boostkit-omnishield-spark-3.3.1-1.1.0-aarch64.zip) |
-
+|OmniShield|boostkit-omnishield-spark-3.3.1-1.1.0-aarch64.zip|开源|OmniShield机密大数据软件安装包。| [OmniShield机密大数据软件安装包下载地址](https://gitee.com/kunpengcompute/boostkit-bigdata/releases/download/24.0.0-OmniShield-Spark-331/boostkit-omnishield-spark-3.3.1-1.1.0-aarch64.zip) |
 
 **软件安装包完整性校验<a name="zh-cn_topic_0000001924407076_zh-cn_topic_0000001843026488_zh-cn_topic_0000001664980070_section3857759151915"></a>**
 
@@ -84,20 +85,20 @@ OmniShield机密大数据的组网规划采用存算分离架构，组网规划�
 
 1. 从[**表 2** 操作系统和软件要求](#操作系统和软件要求)获取Bouncy Castle的JAR包，上传到`/home`目录，将其复制到JDK的依赖目录下。
 
-    ```
+    ```bash
     cd /home
     mv bcprov-ext-jdk15on-1.64.jar $JAVA_HOME/jre/lib/ext
     ```
 
 2. 打开JDK Security的配置文件。
 
-    ```
+    ```bash
     vi $JAVA_HOME/jre/lib/security/java.security
     ```
 
 3. 按`i`进入编辑模式，添加bc库。
 
-    ```
+    ```bash
     security.provider.10=org.bouncycastle.jce.provider.BouncyCastleProvider
     ```
 
@@ -109,21 +110,21 @@ OmniShield机密大数据的组网规划采用存算分离架构，组网规划�
 
 1. 下载OmniShield软件安装包存放至`/home/`目录下，执行以下命令进行解压。
 
-    ```
+    ```bash
     unzip boostkit-omnishield-spark-3.3.1-1.1.0-aarch64.zip
     ```
 
 2. 复制JAR包到`/opt`目录下。
     1. 复制OmniShield机密大数据的JAR包到`/opt/omnishield`目录下。
 
-        ```
+        ```bash
         mkdir -p /opt/omnishield
         cp omnishield-1.0-SNAPSHOT.jar /opt/omnishield
         ```
 
     2. 复制KMS的JAR包到`/opt/omnishield`目录下，KMS需要使用者自行按照OmniShield机密大数据提供的接口实现并编译构建JAR包。
 
-        ```
+        ```bash
         cp kms.jar /opt/omnishield
         ```
 
@@ -131,5 +132,8 @@ OmniShield机密大数据的组网规划采用存算分离架构，组网规划�
 
 当前OmniShield机密大数据在REE环境下也可以使用。如果需要远程证明功能，需要执行安装机密计算TEE套件，详情参见《[Kunpeng BoostKit 24.0.0 机密计算TEE套件 特性指南](https://support.huawei.com/enterprisesoftwareapply/docApplyAction?currentSelectDocId=EDOC1100405698&offeringId=PBI2-253662285)》。
 
+## 修订记录
 
-
+| 文档版本 | 发布日期 | 修改说明 |
+| --- | --- | --- |
+| 01 | 2024-12-30 | 第一次正式发布。 |

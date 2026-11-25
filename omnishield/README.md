@@ -1,10 +1,11 @@
 # OmniShield介绍<a name="ZH-CN_TOPIC_0000002551634289"></a>
 
+本文档介绍OmniShield机密大数据特性，说明其作为大数据引擎Spark的机密计算组件在TEE环境内提供数据源加解密与远程证明能力，适用于需要在Spark场景下处理敏感数据并保障数据安全的用户。
+
 ## 最新消息<a name="ZH-CN_TOPIC_0000002520474308"></a>
 
-- \[2024.12.30\]：发布OmniShield 1.1.0。OmniShield机密大数据支持远程证明。
-- \[2024.09.30\]：发布OmniShield 1.0.0。OmniShield机密大数据作为大数据引擎Spark的插件，提供数据源加解密的功能，通过在基于硬件的TEE环境中执行计算过程的方式，为使用中的数据提供保护，保证数据在整个计算链路中的安全性。DataFrame CSV/JSON/text行式数据源读写支持AES加解密。Spark SQL数据源支持加解密。Spark SQL ORC数据源读写支持国密算法加解密。
-
+- \[2024-12-30\]：发布OmniShield 1.1.0。OmniShield机密大数据支持远程证明。
+- \[2024-09-30\]：发布OmniShield 1.0.0。OmniShield机密大数据作为大数据引擎Spark的插件，提供数据源加解密的功能，通过在基于硬件的TEE环境中执行计算过程的方式，为使用中的数据提供保护，保证数据在整个计算链路中的安全性。DataFrame CSV/JSON/text行式数据源读写支持AES加解密。Spark SQL数据源支持加解密。Spark SQL ORC数据源读写支持国密算法加解密。
 
 ## 项目简介<a name="ZH-CN_TOPIC_0000002551514287"></a>
 
@@ -23,7 +24,6 @@ OmniShield机密大数据为OmniRuntime的特性之一。OmniShield机密大数�
 - Spark 3.3.1
 - Hive 3.1.0
 
-
 ### 架构介绍<a name="ZH-CN_TOPIC_0000002520634296"></a>
 
 OmniShield机密大数据特性是一个大数据引擎Spark的机密计算组件，运行在客户数据中心的TEE环境内，通过在基于硬件的TEE环境中执行计算过程对数据进行加解密，保证数据在REE侧也是安全隐私的。
@@ -32,7 +32,7 @@ OmniShield机密大数据作为Spark的机密计算组件，通过Spark提供的
 
 OmniShield机密大数据架构如[**图 1** OmniShield机密大数据特性软件架构](#OmniShield机密大数据特性软件架构)所示。
 
-![](docs/zh/figures/OmniShield机密大数据特性软件架构.png "OmniShield机密大数据特性软件架构")
+![OmniShield机密大数据特性软件架构图，展示Spark插件机制下各数据源与磁盘网络IO的加解密分层关系](docs/zh/figures/OmniShield机密大数据特性软件架构.png "OmniShield机密大数据特性软件架构")
 
 **图 1** OmniShield机密大数据特性软件架构<a name="zh-cn_topic_0000002512402638_fig26911981620"></a><a id="OmniShield机密大数据特性软件架构"></a>
 
@@ -45,6 +45,7 @@ OmniShield机密大数据特性：
 - 提供基于openEuler操作系统IMA（Integrity Measurement Architecture）度量的Spark on Yarn应用级远程证明，支持在Spark Executor启动时生成IMA度量报告，并进行远程证明。
 
 OmniShield机密大数据特性是一个大数据引擎Spark的机密计算组件，运行在客户数据中心的TEE环境内，通过在基于硬件的TEE环境中执行计算过程对数据进行加解密，保证数据在REE侧也是安全隐私的。
+
 ### 应用场景<a name="ZH-CN_TOPIC_0000002551514295"></a>
 
 在应用特性前，请先了解OmniShield机密大数据特性的应用场景，支持Spark 3.3.1引擎。
@@ -52,12 +53,11 @@ OmniShield机密大数据特性是一个大数据引擎Spark的机密计算组�
 OmniShield机密大数据特性适用于安全多方计算领域的隐私集合求交，保证除集合交集结果外无任何额外元素信息的泄露。用户在提交Spark作业时，Executor会对应用进行远程证明，保证所运行环境和应用的可信，通过给定参数使用OmniShield机密大数据特性即可对数据源进行加解密，并打开网络和磁盘IO加解密配置SM4/GCM/NOPadding，保障安全隐私性。
 
 在应用特性前，请先了解OmniShield机密大数据特性的应用场景，支持Spark 3.3.1引擎。
+
 ### 相关概念<a name="ZH-CN_TOPIC_0000002551634291"></a>
 
 - REE（Rich Execution Environment）：指的是远程执行环境，通常指的是在一个相对不受信任的环境中执行计算任务的情况。
 - TEE（Trusted Execution Environment）：指的是受信任执行环境，它提供了一种安全的硬件和软件环境，用于执行敏感计算任务。
-
-
 
 ## 约束与限制<a name="ZH-CN_TOPIC_0000002520474310"></a>
 
@@ -70,11 +70,12 @@ OmniShield机密大数据特性适用于安全多方计算领域的隐私集合�
 - 在使用OmniShield机密大数据的`Spark-SQL ORC数据源国密加解密”特性时，需要关闭Spark的ORC谓词下推功能，设置Spark参数spark.sql.orc.filterPushdown=false。
 
 在特性配置前，请先了解OmniShield机密大数据特性的使用限制。
+
 ## 目录结构<a name="ZH-CN_TOPIC_0000002551514291"></a>
 
 项目全量目录层级介绍如下：
 
-```
+```text
 ├── docs                                                     # 项目文档目录
 │   └── zh                                                   # 中文文档目录
 │       ├── figures                                          # 中文文档图片资源目录
@@ -89,21 +90,17 @@ OmniShield机密大数据特性适用于安全多方计算领域的隐私集合�
 │   └── test                                                 # 单元测试目录
 ```
 
-
 ## 版本说明<a name="ZH-CN_TOPIC_0000002520474302"></a>
 
-每个版本的特性变更详细信息，请参见《[版本说明书](docs/zh/release_notes)》。
-
+每个版本的特性变更详细信息，请参见《[版本说明书]()》。
 
 ## 环境部署<a name="ZH-CN_TOPIC_0000002520634288"></a>
 
 介绍OmniShield的环境依赖及安装方式，具体请参见《[安装指南](docs/zh/installation_guide.md)》。
 
-
 ## 快速入门<a name="ZH-CN_TOPIC_0000002520634290"></a>
 
 安装OmniShield后如何快速验证OmniShield是否生效，性能是否提升，具体请参见《[快速入门](docs/zh/quick_start.md)》。
-
 
 ## 学习文档<a name="ZH-CN_TOPIC_0000002551514289"></a>
 
@@ -114,20 +111,16 @@ OmniShield机密大数据特性适用于安全多方计算领域的隐私集合�
 | [使用指南](./docs/zh/user_guide.md)         |提供使用OmniShield的详细指导。|
 |视频课程：[OmniRuntime特性大揭秘](https://www.hikunpeng.com/document/video-detail/2849)|提供操作视频，帮助开发者在鲲鹏服务器上了解、使能OmniRuntime特性。|
 
-
-
 ## 安全声明<a name="ZH-CN_TOPIC_0000002551517483"></a>
 
 ### 防病毒软件例行检查<a name="ZH-CN_TOPIC_0000002520477492"></a>
 
 定期开展对集群和Spark组件的防病毒扫描，防病毒例行检查会帮助集群免受病毒、恶意代码、间谍软件以及恶意程序，降低系统瘫痪、信息泄露等风险。建议使用业界主流防病毒软件进行防病毒检查。
 
-
 ### 日志控制<a name="ZH-CN_TOPIC_0000002520637490"></a>
 
 - 检查系统是否可以限制单个日志文件的大小。
 - 检查日志空间占满后，是否存在机制进行清理。
-
 
 ### 设置登录会话超时时间<a name="ZH-CN_TOPIC_0000002520522492"></a>
 
@@ -136,19 +129,18 @@ OmniShield机密大数据特性适用于安全多方计算领域的隐私集合�
 1. 登录安装Ascend-mindxdl-mindio组件的节点。
 2. 执行以下命令，打开`/etc/profile`文件。
 
-    ```
+    ```bash
     vim /etc/profile
     ```
 
 3. 按`i`进入编辑模式，在文件尾部增加以下内容。
 
-    ```
+    ```bash
     export TMOUT=1800
     readonly TMOUT
     ```
 
 4. 按`Esc`键，输入 **:wq!**，按`Enter`保存并退出编辑。
-
 
 ### 设置禁用history命令<a name="ZH-CN_TOPIC_0000002520682472"></a>
 
@@ -157,19 +149,18 @@ OmniShield机密大数据特性适用于安全多方计算领域的隐私集合�
 1. 登录安装Ascend-mindxdl-mindio组件的节点。
 2. 执行以下命令，打开`/etc/profile`文件。
 
-    ```
+    ```bash
     vim /etc/profile
     ```
 
 3. 按`i`进入编辑模式，在文件尾部增加以下内容。
 
-    ```
+    ```bash
     export HISTFILESIZE=0
     readonly HISTFILESIZE
     ```
 
 4. 按`Esc`键，输入 **:wq!**，按`Enter`保存并退出编辑。
-
 
 ### 设置umask<a name="ZH-CN_TOPIC_0000002551682471"></a>
 
@@ -177,7 +168,7 @@ OmniShield机密大数据特性适用于安全多方计算领域的隐私集合�
 
 1. 以root用户登录服务器，打开`/etc/profile`文件。
 
-    ```
+    ```bash
     vim /etc/profile
     ```
 
@@ -185,10 +176,9 @@ OmniShield机密大数据特性适用于安全多方计算领域的隐私集合�
 3. 按`Esc`键，输入:**wq!**，按`Enter`保存并退出编辑。
 4. 执行如下命令使配置生效。
 
-    ```
+    ```bash
     source /etc/profile
     ```
-
 
 ### 缓冲区溢出安全保护<a name="ZH-CN_TOPIC_0000002551722491"></a>
 
@@ -197,7 +187,6 @@ OmniShield机密大数据特性适用于安全多方计算领域的隐私集合�
 开启方式：
 
 **echo 2 \>/proc/sys/kernel/randomize\_va\_space**
-
 
 ### 漏洞修复<a name="ZH-CN_TOPIC_0000002551637469"></a>
 
@@ -227,7 +216,6 @@ OmniShield机密大数据特性适用于安全多方计算领域的隐私集合�
 
     目前厂商已发布升级补丁以修复漏洞，请参见[GitHub](https://github.com/netty/netty/security/advisories/GHSA-9vjp-v76f-g363)修复漏洞。
 
-
 ### SSH加固<a name="ZH-CN_TOPIC_0000002551517487"></a>
 
 在部署安装过程中，需要通过SSH连接服务器。由于root用户拥有最高权限，直接使用root用户登录服务器可能会存在安全风险。建议您使用普通用户登录服务器进行安装部署，并建议您通过配置禁止root用户SSH登录的选项，来提升系统安全性。操作步骤：
@@ -236,11 +224,6 @@ OmniShield机密大数据特性适用于安全多方计算领域的隐私集合�
 
 - 如果显示no，说明禁止了root用户SSH登录。
 - 如果显示yes，说明需要修改PermitRootLogin为no。
-
-
-
-## 账户清单<a name="ZH-CN_TOPIC_0000002520477498"></a>
-
 
 ## 免责声明<a name="ZH-CN_TOPIC_0000002520474306"></a>
 
@@ -258,13 +241,11 @@ OmniShield机密大数据特性适用于安全多方计算领域的隐私集合�
 
 如果您不希望您的模型或数据集等信息在OmniShield中被提及，或希望更新OmniShield中有关的描述，请在GitCode提交issue，我们将根据您的issue要求删除或更新您相关描述。衷心感谢您对OmniShield的理解和贡献。
 
-
 ## License<a name="ZH-CN_TOPIC_0000002551634293"></a>
 
 OmniShield的使用许可证，具体请参见[LICENSE](../LICENSE)文件。
 
 docs目录下的文档适用CC-BY 4.0许可证，具体请参见[LICENSE](../LICENSE)文件。
-
 
 ## 贡献声明<a name="ZH-CN_TOPIC_0000002551634285"></a>
 
@@ -283,19 +264,16 @@ docs目录下的文档适用CC-BY 4.0许可证，具体请参见[LICENSE](../LIC
     8. 当您的PR获得足够数量的检视者批准后，Committer会进行最终审核。
     9. 审核和测试通过后，CI会将您的PR合并入到项目的主干分支。
 
-
-
 ## 建议与交流<a name="ZH-CN_TOPIC_0000002551634283"></a>
 
-欢迎大家为社区做贡献。如果有任何疑问或建议，请提交[Issues](https://gitcode.com/boostkit/boostkit-bigdata/tree/main/omnishield)，我们会尽快回复。感谢您的支持。
-
+欢迎大家为社区做贡献。如果有任何疑问或建议，请提交[Issues](httpS//gitcode.com/boostkit/boostkit-bigdata/tree/main/omnishield)，我们会尽快回复。感谢您的支持。
 
 ## 致谢<a name="ZH-CN_TOPIC_0000002551514285"></a>
 
-OmniShield由华为公司的下列部门联合贡献：
-
-鲲鹏计算BoostKit开发部
-
 感谢来自社区的每一个PR，欢迎贡献OmniShield！
 
+## 修订记录
 
+| 文档版本 | 发布日期 | 修改说明 |
+| --- | --- | --- |
+| 01 | 2024-12-30 | 第一次正式发布。 |

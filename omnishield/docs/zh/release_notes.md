@@ -23,7 +23,6 @@
 </tbody>
 </table>
 
-
 ### 软件版本配套说明<a name="ZH-CN_TOPIC_0000002518728412"></a>
 
 |项目|版本|
@@ -34,8 +33,6 @@
 |Hadoop|3.3.1|
 |Spark|3.3.1|
 |Hive|3.1.0|
-
-
 
 ### 硬件版本配套说明<a name="ZH-CN_TOPIC_0000002550168191"></a>
 
@@ -52,7 +49,6 @@
 </tr>
 </tbody>
 </table>
-
 
 ### 病毒扫描结果<a name="ZH-CN_TOPIC_0000002518728368"></a>
 
@@ -145,8 +141,6 @@
 </tbody>
 </table>
 
-
-
 ## V1.1.0<a name="ZH-CN_TOPIC_0000002550208207"></a>
 
 ### 更新说明<a name="ZH-CN_TOPIC_0000002518568472"></a>
@@ -155,8 +149,8 @@ OmniShield机密大数据作为大数据引擎Spark的插件，提供数据源�
 
 **新增特性<a name="section9559165534817"></a>**
 
--   Spark Shuffle安全IO支持国密算法。
--   OmniShield机密大数据支持远程证明。
+- Spark Shuffle安全IO支持国密算法。
+- OmniShield机密大数据支持远程证明。
 
 **修改特性<a name="section299616132492"></a>**
 
@@ -166,17 +160,13 @@ OmniShield机密大数据作为大数据引擎Spark的插件，提供数据源�
 
 无
 
-
 ### 已解决的问题<a name="ZH-CN_TOPIC_0000002550208215"></a>
 
 无
 
-
 ### 遗留问题<a name="ZH-CN_TOPIC_0000002518728422"></a>
 
 无
-
-
 
 ## V1.0.0<a name="ZH-CN_TOPIC_0000002550168223"></a>
 
@@ -186,9 +176,9 @@ OmniShield机密大数据作为大数据引擎Spark的插件，提供数据源�
 
 **新增特性<a name="section9559165534817"></a>**
 
--   DataFrame CSV/JSON/text行式数据源读写支持AES加解密。
--   Spark SQL数据源支持加解密。
--   Spark SQL ORC数据源读写支持国密算法加解密。
+- DataFrame CSV/JSON/text行式数据源读写支持AES加解密。
+- Spark SQL数据源支持加解密。
+- Spark SQL ORC数据源读写支持国密算法加解密。
 
 **修改特性<a name="section299616132492"></a>**
 
@@ -198,17 +188,13 @@ OmniShield机密大数据作为大数据引擎Spark的插件，提供数据源�
 
 无
 
-
 ### 已解决的问题<a name="ZH-CN_TOPIC_0000002518728404"></a>
 
 无
 
-
 ### 遗留问题<a name="ZH-CN_TOPIC_0000002550208241"></a>
 
 无
-
-
 
 ## 版本配套文档<a name="ZH-CN_TOPIC_0000002518728372"></a>
 
@@ -221,11 +207,6 @@ OmniShield机密大数据作为大数据引擎Spark的插件，提供数据源�
 |安装指南|提供OmniShield的安装部署指导。|开源仓|
 |使用指南|提供OmniShield的使用操作指导。|开源仓|
 
-
-
 ### 获取文档的方法<a name="ZH-CN_TOPIC_0000002518568516"></a>
 
-您可以通过访问[开源仓](https://gitcode.com/boostkit/boostkit-bigdata/tree/main/omnishield)浏览和获取相关文档。
-
-
-
+您可以通过访问[开源仓](http://gitcode.com/boostkit/boostkit-bigdata/tree/main/omnishield)浏览和获取相关文档。

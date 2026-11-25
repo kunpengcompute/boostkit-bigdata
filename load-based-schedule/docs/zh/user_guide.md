@@ -1,5 +1,7 @@
 # 用户指南<a name="ZH-CN_TOPIC_0000002520333564"></a>
 
+本文档介绍LoadsMetric集群负载采集与分析工具的使用与维护方法，包括查看使用命令、LoadsMetric服务基本运维、日志配置、一键启停Prometheus、Node Exporter和Grafana、OmniScheduler Yarn负载调度算法规格配置以及升级与卸载操作，适用于负责集群负载调度的运维和开发人员。
+
 ## 使用特性<a name="ZH-CN_TOPIC_0000002520013624"></a>
 
 ### LoadsMetric基本使用<a name="ZH-CN_TOPIC_0000002520333568"></a>
@@ -10,53 +12,53 @@ LoadsMetric为集群负载采集与分析工具，支持安装、卸载、启动
 
 1. 进入server1节点的`/home/hadoop/loadsmetric-software`目录。
 
-    ```
+    ```bash
     cd /home/hadoop/loadsmetric-software
     ```
 
 2. 执行**sh loadsmetric\_deploy.sh**查看脚本运行方法。
 
-    ```
+    ```bash
     sh loadsmetric_deploy.sh
     ```
 
-    ![](figures/zh-cn_image_0000002520013734.png)
+    ![执行sh loadsmetric_deploy.sh后终端显示的脚本用法说明与可用命令列表](figures/zh-cn_image_0000002520013734.png)
 
 **LoadsMetric服务基本运维方法<a name="zh-cn_topic_0000002161905900_section188892817419"></a>**
 
 脚本执行建议进入到脚本放置目录中执行。
 
-```
+```bash
 cd /home/hadoop/loadsmetric-software/
 ```
 
 - 安装LoadsMetric。
 
-    ```
+    ```bash
     sh loadsmetric_deploy.sh install
     ```
 
 - 卸载LoadsMetric。
 
-    ```
+    ```bash
     sh loadsmetric_deploy.sh uninstall
     ```
 
 - 启动LoadsMetric。
 
-    ```
+    ```bash
     sh loadsmetric_deploy.sh start
     ```
 
 - 停止LoadsMetric。
 
-    ```
+    ```bash
     sh loadsmetric_deploy.sh stop
     ```
 
 - 重启LoadsMetric。
 
-    ```
+    ```bash
     sh loadsmetric_deploy.sh restart
     ```
 
@@ -64,13 +66,13 @@ cd /home/hadoop/loadsmetric-software/
 
 1. 打开日志配置文件。
 
-    ```
+    ```bash
     vi /home/hadoop/loadsmetric-install/loadsmetric-server/etc/logback.xml
     ```
 
 2. 按`i`进入编辑模式，按需修改如下参数。
 
-    ```
+    ```bash
     <!--LOG FILE RETENTION DAYS -->   #设置保留的历史日志文件天数
     <MaxHistory>30</MaxHistory>
     <!-- LOG FILE MAX SIZE -->        #设置单个日志文件的最大大小
@@ -99,26 +101,24 @@ cd /home/hadoop/loadsmetric-software/
 |一键启动Grafana|**sh loadsmetric_deploy.sh start_grafana "安装路径"**如：**sh loadsmetric_deploy.sh start_grafana `/opt/prometheus/grafana-v10.4.2/bin”**|Grafana安装目录为其他路径时，一键启动server节点的Grafana。|
 |一键停止Grafana|**sh loadsmetric_deploy.sh stop_grafana**|一键停止server节点的Grafana。|
 
-
-
 ### 使用OmniScheduler Yarn负载调度算法<a name="ZH-CN_TOPIC_0000002551413723"></a>
 
 1. 进入`/home/hadoop/loadsmetric-install/loadsmetric-server/etc`目录。
 
-    ```
+    ```bash
     cd /home/hadoop/loadsmetric-install/loadsmetric-server/etc
     ```
 
 2. 按需修改LoadsMetric配置项（不需要则忽略）。
     1. 打开配置文件。
 
-        ```
+        ```bash
         vim application.properties
         ```
 
     2. 按`i`进入编辑模式，按需修改利用率阈值配置项和利用率权重配置项，前者影响集群超载节点的判断，后者影响节点负载排序结果，参数说明请参见《安装指南》的[相关参考](installation_guide.md#相关参考)章节。
 
-        ```
+        ```bash
         # limits for multi resource usage
         load.limit.cpu=80
         load.limit.mem=80
@@ -136,18 +136,16 @@ cd /home/hadoop/loadsmetric-software/
 
 3. 重启LoadsMetric服务，使配置项生效。
 
-    ```
+    ```bash
     cd /home/hadoop/loadsmetric-software
     sh loadsmetric_deploy.sh restart
     ```
 
 4. 执行计算任务（如Spark任务），开始Yarn资源调度，参考命令如下。
 
-    ```
+    ```bash
     spark-sql --deploy-mode client --driver-cores 8 --driver-memory 20g --num-executors 3 --executor-cores 7 --executor-memory 26g --master yarn  --conf spark.task.cpus=1 --conf spark.sql.orc.impl=native --conf spark.sql.shuffle.partitions=1000 --conf spark.network.timeout=600  --conf spark.sql.adaptive.enabled=true --conf spark.sql.adaptive.skewedJoin.enabled=true --conf spark.serializer=org.apache.spark.serializer.KryoSerializer --conf spark.sql.autoBroadcastJoinThreshold=100M --properties-file /home/spark.conf --database tpcds_bin_partitioned_decimal_orc_3000
     ```
-
-
 
 ## 维护特性<a name="ZH-CN_TOPIC_0000002520013630"></a>
 
@@ -167,7 +165,7 @@ cd /home/hadoop/loadsmetric-software/
 
 1. 在相关节点上停止Prometheus、Grafana和Node Exporter服务，删除所有节点`/opt/prometheus`目录的安装包。
 
-    ```
+    ```bash
     cd /opt/prometheus
     rm -rf *
     ```
@@ -176,7 +174,7 @@ cd /home/hadoop/loadsmetric-software/
 
     停止LoadsMetricApplication进程，然后执行卸载脚本。完成卸载后，删除`/home/hadoop`目录所有内容。
 
-    ```
+    ```bash
     cd /home/hadoop/loadsmetric-software
     sh loadsmetric_deploy.sh stop
     sh loadsmetric_deploy.sh uninstall
@@ -187,19 +185,22 @@ cd /home/hadoop/loadsmetric-software/
 3. 卸载OmniScheduler。
     1. 在server1节点删除OmniScheduler的JAR包。
 
-        ```
+        ```bash
         cd ${HADOOP_HOME}/share/hadoop/yarn/lib
         rm -rf boostkit-yarn-schedule-load-evolution-1.0.0.jar
         ```
 
-    2. 注释掉或删除server1节点yarn-site.xml和capacity-scheduler.xml中新增配置内容，具体新增内容见[安装OmniScheduler](installation_guide.md#installing-omnischeduler)。
+    2. 注释掉或删除server1节点yarn-site.xml和capacity-scheduler.xml中新增配置内容，具体新增内容见[安装OmniScheduler](installation_guide.md)。
     3. 将server1节点两个配置项内容同步到其他节点。
     4. 重启Yarn集群以使配置生效。
 
-        ```
+        ```bash
         ${HADOOP_HOME}/sbin/stop-yarn.sh
         ${HADOOP_HOME}/sbin/start-yarn.sh
         ```
 
+## 修订记录
 
-
+| 文档版本 | 发布日期 | 修改说明 |
+| --- | --- | --- |
+| 01 | 2025-03-30 | 第一次正式发布。 |

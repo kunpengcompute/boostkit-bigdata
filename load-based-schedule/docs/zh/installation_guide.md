@@ -1,5 +1,7 @@
 # 安装指南<a name="ZH-CN_TOPIC_0000002551411851"></a>
 
+本文档介绍OmniScheduler Yarn负载调度算法的安装流程，涵盖组网规划、环境要求、LoadsMetric与OmniScheduler安装以及Prometheus、Grafana、Node Exporter的部署与验证，适用于在鲲鹏服务器集群上安装该特性的用户。
+
 ## 安装简介<a name="ZH-CN_TOPIC_0000002551412039"></a>
 
 ### 组网规划<a name="ZH-CN_TOPIC_0000002519971848"></a>
@@ -12,7 +14,7 @@ OmniScheduler Yarn负载调度算法组网规划的环境由4台服务器组成�
 - 计算节点为agent1、agent2和agent3，用于运行计算服务以及Node Exporter。
 
 **图 1** 安装组网图<a name="zh-cn_topic_0000002197227009_fig734218245342"></a><a id="安装组网图"></a><br>
-![](figures/安装组网图.png "安装组网图")
+![OmniScheduler Yarn负载调度算法存算一体组网图，server1为管理节点，agent1至agent3为计算节点](figures/安装组网图.png)
 
 ### 环境要求<a name="ZH-CN_TOPIC_0000002551411963"></a>
 
@@ -29,10 +31,9 @@ OmniScheduler Yarn负载调度算法组网规划的环境由4台服务器组成�
 |处理器|鲲鹏920 5250处理器|
 |内存大小|384GB（12 * 32GB）|
 |内存频率|2666MHz|
-|网络|业务网络10GE </br>管理网络1GE|
-|硬盘|系统盘：1 * RAID 0（1 * 1.2TB SAS HDD） </br>数据盘：12 * RAID 0（12 * 8TB SATA HDD）|
+|网络|业务网络10GE 管理网络1GE|
+|硬盘|系统盘：1 *RAID 0（1 * 1.2TB SAS HDD）数据盘：12*RAID 0（12 * 8TB SATA HDD）|
 |RAID控制卡|LSI SAS3508|
-
 
 **操作系统和软件要求<a name="zh-cn_topic_0000002161905896_zh-cn_topic_0000001843026488_zh-cn_topic_0000001664980070_section12083304460"></a>**
 
@@ -47,18 +48,18 @@ OmniScheduler Yarn负载调度算法组网规划的环境由4台服务器组成�
 |Hadoop|3.3.4|部署指南请参见《[Hadoop 集群部署（CentOS 7.6&openEuler 20.03）](https://www.hikunpeng.com/document/detail/zh/kunpengbds/ecosystemEnable/Hadoop/kunpenghadoop_04_0001.html)》。|√|√|
 |Spark|3.1.1/3.3.1|部署指南请参见《[Spark 部署指南（CentOS 7.6&openEuler 20.03）](https://www.hikunpeng.com/document/detail/zh/kunpengbds/ecosystemEnable/Spark/kunpengspark_04_0001.html)》。|√|-|
 |Hive|3.1.0|部署指南请参见《[Hive部署指南（CentOS 7.6&openEuler 20.03）](https://www.hikunpeng.com/document/detail/zh/kunpengbds/ecosystemEnable/Hive/kunpenghive_04_0001.html)》。|√|-|
-|Prometheus|2.45.4|从官网链接下载：[获取链接](https://github.com/prometheus/prometheus/releases/download/v2.45.4/prometheus-2.45.4.linux-arm64.tar.gz)|√|-|
-|Grafana|10.4.2|从官网链接下载：[获取链接](https://dl.grafana.com/enterprise/release/grafana-enterprise-10.4.2.linux-arm64.tar.gz)|√|-|
-|Node Exporter|1.7.0|从官网链接下载：[获取链接](https://github.com/prometheus/node_exporter/releases/download/v1.7.0/node_exporter-1.7.0.linux-arm64.tar.gz)|-|√|
-|Go|1.22.2|从官网链接下载：[获取链接](https://go.dev/dl/go1.22.2.linux-arm64.tar.gz)|√|√|
-|Node|19.9.0|从官网链接下载：[获取链接](https://cdn.npmmirror.com/binaries/node/v19.9.0/node-v19.9.0-linux-arm64.tar.xz)|√|√|
+|Prometheus|2.45.4|从官网链接下载：[Prometheus 2.45.4 linux-arm64安装包下载](https://github.com/prometheus/prometheus/releases/download/v2.45.4/prometheus-2.45.4.linux-arm64.tar.gz)|√|-|
+|Grafana|10.4.2|从官网链接下载：[Grafana Enterprise 10.4.2 linux-arm64安装包下载](https://dl.grafana.com/enterprise/release/grafana-enterprise-10.4.2.linux-arm64.tar.gz)|√|-|
+|Node Exporter|1.7.0|从官网链接下载：[Node Exporter 1.7.0 linux-arm64安装包下载](https://github.com/prometheus/node_exporter/releases/download/v1.7.0/node_exporter-1.7.0.linux-arm64.tar.gz)|-|√|
+|Go|1.22.2|从官网链接下载：[Go 1.22.2 linux-arm64安装包下载](https://go.dev/dl/go1.22.2.linux-arm64.tar.gz)|√|√|
+|Node|19.9.0|从官网链接下载：[Node.js v19.9.0 linux-arm64安装包下载](https://cdn.npmmirror.com/binaries/node/v19.9.0/node-v19.9.0-linux-arm64.tar.xz)|√|√|
 |Python|3.6.0及以上|无特殊要求。|√|-|
 
-
 >![](public_sys-resources/icon-notice.gif) **须知：** 
->-   √：表示对应节点需要安装该项目。
->-   -：表示对应节点不需要安装该项目。
->-   当前特性仅支持Hadoop 3.3.4版本，对其他版本Hadoop暂不兼容。
+>
+>- √：表示对应节点需要安装该项目。
+>- -：表示对应节点不需要安装该项目。
+>- 当前特性仅支持Hadoop 3.3.4版本，对其他版本Hadoop暂不兼容。
 
 **软件安装包获取<a name="zh-cn_topic_0000002161905896_section6777173841917"></a>**
 
@@ -66,10 +67,7 @@ OmniScheduler Yarn负载调度算法组网规划的环境由4台服务器组成�
 
 |名称|包名|发布类型|说明|获取地址|
 |--|--|--|--|--|
-|OmniSchedulerYarn负载调度算法|BoostKit-loadsmetric-1.0.0-aarch64.zip|开源|OmniSchedulerYarn负载调度算法软件安装包。|[获取链接](https://gitee.com/kunpengcompute/boostkit-bigdata/releases/download/25.0.RC1-LoadsMetric-release/BoostKit-loadsmetric-1.0.0-aarch64.zip)|
-
-
-
+|OmniSchedulerYarn负载调度算法|BoostKit-loadsmetric-1.0.0-aarch64.zip|开源|OmniSchedulerYarn负载调度算法软件安装包。|[BoostKit-loadsmetric-1.0.0-aarch64.zip下载链接](https://gitee.com/kunpengcompute/boostkit-bigdata/releases/download/25.0.RC1-LoadsMetric-release/BoostKit-loadsmetric-1.0.0-aarch64.zip)|
 
 ## 安装特性<a name="ZH-CN_TOPIC_0000002520291900"></a>
 
@@ -79,13 +77,13 @@ OmniScheduler Yarn负载调度算法组网规划的环境由4台服务器组成�
 
 1. 打开`/etc/hosts`文件。
 
-    ```
+    ```bash
     vi /etc/hosts
     ```
 
 2. 按`i`进入编辑模式，在文件中修改以下内容，IP地址需修改为节点对应的IP地址。
 
-    ```
+    ```bash
     server1 IP地址
     agent1 IP地址
     agent2 IP地址
@@ -100,13 +98,13 @@ LoadsMetric是负载采集与分析工具，负责从Node Exporter中获取机�
 
 1. 如果hadoop用户不存在，首先创建用户hadoop。
 
-    ```
+    ```bash
     useradd hadoop
     ```
 
 2. 新建安装目录`/home/hadoop/loadsmetric-software`，从[**表 3** OmniScheduler Yarn负载调度算法软件获取列表](#software)获取软件安装所需依赖配置，上传到该目录下，并解压。
 
-    ```
+    ```bash
     mkdir -p /home/hadoop/loadsmetric-software
     cd /home/hadoop/loadsmetric-software
     unzip BoostKit-loadsmetric-1.0.0-aarch64.zip
@@ -114,7 +112,7 @@ LoadsMetric是负载采集与分析工具，负责从Node Exporter中获取机�
 
 3. 观察解压后是否包含如下文件。
 
-    ```
+    ```bash
     workers
     loadsmetric_configfile.properties
     loadsmetric_deploy.sh
@@ -126,13 +124,13 @@ LoadsMetric是负载采集与分析工具，负责从Node Exporter中获取机�
 4. 修改workers为计算节点列表。
     1. 打开workers文件。
 
-        ```
+        ```bash
         vi workers
         ```
 
     2. 按`i`进入编辑模式，按需修改文件中的内容。
 
-        ```
+        ```bash
         agent1
         agent2
         agent3
@@ -143,13 +141,13 @@ LoadsMetric是负载采集与分析工具，负责从Node Exporter中获取机�
 5. 修改loadsmetric\_configfile.properties，配置相关含义见本文档的[相关参考](#相关参考)章节。
     1. 打开loadsmetric\_configfile.properties文件。
 
-        ```
+        ```bash
         vi loadsmetric_configfile.properties
         ```
 
     2. 按`i`进入编辑模式，在文件中添加以下内容。
 
-        ```
+        ```bash
         # bash properties
         ## software version
         version=1.0.0-SNAPSHOT
@@ -204,7 +202,7 @@ LoadsMetric是负载采集与分析工具，负责从Node Exporter中获取机�
 
 6. 执行安装命令。
 
-    ```
+    ```bash
     cd /home/hadoop/loadsmetric-software
     sh loadsmetric_deploy.sh install
     ```
@@ -213,21 +211,21 @@ LoadsMetric是负载采集与分析工具，负责从Node Exporter中获取机�
 
     回显存在对应目录及安装成功。
 
-    ```
+    ```bash
     ll /home/hadoop/loadsmetric-install/loadsmetric-server
     ```
 
-    ![](figures/zh-cn_image_0000002551412111.png)
+    ![执行ll命令查看loadsmetric-server目录，回显显示对应目录及安装成功信息](figures/zh-cn_image_0000002551412111.png)
 
 8. 启动LoadsMetric。
 
-    ```
+    ```bash
     sh loadsmetric_deploy.sh start
     ```
 
 9. 使用**jps**命令查看是否启动成功，出现LoadsMetricApplication进程为启动成功。
 
-    ![](figures/zh-cn_image_0000002519972102.png)
+    ![执行jps命令后的回显，进程列表中出现LoadsMetricApplication表示启动成功](figures/zh-cn_image_0000002519972102.png)
 
 >![](public_sys-resources/icon-note.gif) **说明：** 
 >LoadsMetric服务支持安装、卸载、启动、停止等操作，同时支持一键启停Prometheus、Node Exporter、Grafana等其他相关软件，基本运维命令见《用户指南》的[LoadsMetric基本使用](user_guide.md#loadsmetric基本使用)章节。
@@ -249,25 +247,24 @@ OmniScheduler Yarn负载调度算法以JAR包形式进行插件化部署，对Ha
 |org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacityScheduler|hadoop-yarn-server-resourcemanager-3.3.4.jar|${HADOOP_HOME}/share/hadoop/yarn/|
 |org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.SchedulerInfo|hadoop-yarn-server-resourcemanager-3.3.4.jar|${HADOOP_HOME}/share/hadoop/yarn/|
 
-
 **安装步骤<a name="zh-cn_topic_0000002197112573_section1792964311399"></a>**
 
 1. 将OmniScheduler Yarn负载调度算法插件化JAR包放置到Hadoop对应目录中。
 
-    ```
+    ```bash
     cp /home/hadoop/loadsmetric-software/boostkit-yarn-schedule-load-evolution-1.0.0.jar ${HADOOP_HOME}/share/hadoop/yarn/lib
     ```
 
 2. 修改yarn-site.xml配置文件。
     1. 打开配置文件。
 
-        ```
+        ```bash
         vi ${HADOOP_HOME}/etc/hadoop/yarn-site.xml
         ```
 
     2. 按`i`进入编辑模式，在yarn-site.xml文件中追加如下内容。
 
-        ```
+        ```bash
         <!-- 设定rm使用LoadBasedCapacityScheduler -->
         <property>
           <name>yarn.resourcemanager.scheduler.class</name>
@@ -280,13 +277,13 @@ OmniScheduler Yarn负载调度算法以JAR包形式进行插件化部署，对Ha
 3. 修改capacity-scheduler.xml配置文件。
     1. 打开配置文件。
 
-        ```
+        ```bash
         vi ${HADOOP_HOME}/etc/hadoop/capacity-scheduler.xml
         ```
 
     2. 按`i`进入编辑模式，在capacity-scheduler.xml中追加如下内容。
 
-        ```
+        ```bash
         <!-- 是否开启异步调度 -->
         <property>
           <name>yarn.scheduler.capacity.schedule-asynchronously.enable</name>
@@ -318,7 +315,7 @@ OmniScheduler Yarn负载调度算法以JAR包形式进行插件化部署，对Ha
 
 4. 将上述配置文件同步到集群其他节点。
 
-    ```
+    ```bash
     scp ${HADOOP_HOME}/etc/hadoop/yarn-site.xml agent1:${HADOOP_HOME}/etc/hadoop/
     scp ${HADOOP_HOME}/etc/hadoop/capacity-scheduler.xml agent1:${HADOOP_HOME}/etc/hadoop/
     scp ${HADOOP_HOME}/etc/hadoop/yarn-site.xml agent2:${HADOOP_HOME}/etc/hadoop/
@@ -329,14 +326,14 @@ OmniScheduler Yarn负载调度算法以JAR包形式进行插件化部署，对Ha
 
 5. 重启Yarn集群。
 
-    ```
+    ```bash
     ${HADOOP_HOME}/sbin/stop-yarn.sh
     ${HADOOP_HOME}/sbin/start-yarn.sh
     ```
 
 6. 验证OmniScheduler Yarn负载调度算法JAR包是否生效，观察Hadoop管理界面http://_server1_:8088/，Scheduler Type显示为LoadBasedCapacityScheduler。
 
-    ![](figures/zh-cn_image_0000002551412133.png)
+    ![Hadoop管理界面Scheduler Type栏显示LoadBasedCapacityScheduler，表示调度插件已生效](figures/zh-cn_image_0000002551412133.png)
 
 ### 安装Prometheus、Grafana、Node Exporter<a name="ZH-CN_TOPIC_0000002551411931"></a>
 
@@ -352,7 +349,7 @@ OmniScheduler Yarn负载调度算法以JAR包形式进行插件化部署，对Ha
 
 1. 在server1创建目录`/opt/prometheus`，并下载[**表 2** 操作系统和软件要求](#操作系统和软件要求)要求的Go、Node、Prometheus、Node Exporter、Grafana等软件安装包，放置于该目录下。
 
-    ```
+    ```bash
     mkdir -p /opt/prometheus
     cd /opt/prometheus
     wget --no-check-certificate https://go.dev/dl/go1.22.2.linux-arm64.tar.gz
@@ -364,7 +361,7 @@ OmniScheduler Yarn负载调度算法以JAR包形式进行插件化部署，对Ha
 
     下载完成后目录`/opt/prometheus/`下将包含如下压缩包。
 
-    ```
+    ```output
     go1.22.2.linux-arm64.tar.gz
     grafana-enterprise-10.4.2.linux-arm64.tar.gz
     node_exporter-1.7.0.linux-arm64.tar.gz
@@ -374,7 +371,7 @@ OmniScheduler Yarn负载调度算法以JAR包形式进行插件化部署，对Ha
 
 2. 将所有压缩包解压。
 
-    ```
+    ```bash
     tar -zxvf go1.22.2.linux-arm64.tar.gz
     tar -zxvf grafana-enterprise-10.4.2.linux-arm64.tar.gz
     tar -zxvf node_exporter-1.7.0.linux-arm64.tar.gz
@@ -384,7 +381,7 @@ OmniScheduler Yarn负载调度算法以JAR包形式进行插件化部署，对Ha
 
     解压后包含如下目录。
 
-    ```
+    ```bash
     go
     grafana-v10.4.2
     node_exporter-1.7.0.linux-arm64
@@ -394,7 +391,7 @@ OmniScheduler Yarn负载调度算法以JAR包形式进行插件化部署，对Ha
 
 3. 将`/opt/prometheus/`目录下Go、Node Exporter、Node安装目录复制到其他节点的`/opt/prometheus/`目录下，其他节点若无该目录请先创建。
 
-    ```
+    ```bash
     #目录列表
     node_exporter-1.7.0.linux-arm64
     node-v19.9.0-linux-arm64
@@ -411,13 +408,13 @@ OmniScheduler Yarn负载调度算法以JAR包形式进行插件化部署，对Ha
 
 1. 打开环境变量配置文件。
 
-    ```
+    ```bash
     vi /etc/profile
     ```
 
 2. 按`i`进入编辑模式，末尾写入如下内容。
 
-    ```
+    ```bash
     export GO_HOME=/opt/prometheus/go
     export PATH=$GO_HOME/bin:$PATH
     ```
@@ -425,13 +422,13 @@ OmniScheduler Yarn负载调度算法以JAR包形式进行插件化部署，对Ha
 3. 按`Esc`键，输入:**wq!**，按`Enter`保存并退出编辑。
 4. 刷新环境变量。
 
-    ```
+    ```bash
     source /etc/profile
     ```
 
 5. 查看版本号验证是否安装成功。
 
-    ```
+    ```bash
     go version
     ```
 
@@ -443,13 +440,13 @@ Node Exporter需要在所有计算节点上部署，按照软件包放置说明�
 
 1. 进入Node Exporter的目录。
 
-    ```
+    ```bash
     cd /opt/prometheus/node_exporter-1.7.0.linux-arm64/
     ```
 
 2. 执行启动命令。
 
-    ```
+    ```bash
     nohup ./node_exporter --web.listen-address="0.0.0.0:9100" &
     ```
 
@@ -457,19 +454,19 @@ Node Exporter需要在所有计算节点上部署，按照软件包放置说明�
 
     登录地址http://$\{IP\}:9100/metrics，显示如下图表示启动成功。
 
-    ![](figures/zh-cn_image_0000002551412101.png)
+    ![浏览器访问Node Exporter的9100/metrics页面，显示机器指标数据表示启动成功](figures/zh-cn_image_0000002551412101.png)
 
 **停止服务<a name="zh-cn_topic_0000002161746160_section151699211188"></a>**
 
 1. 找到Node Exporter服务进程ID。
 
-    ```
+    ```bash
     ps -aux | grep node_exporter
     ```
 
 2. 使用**kill**命令停止node\_exporter。
 
-    ```
+    ```bash
     kill ID
     ```
 
@@ -479,20 +476,20 @@ Node Exporter需要在所有计算节点上部署，按照软件包放置说明�
 
 1. 进入Prometheus目录。
 
-    ```
+    ```bash
     cd /opt/prometheus/prometheus-2.45.4.linux-arm64/
     ```
 
 2. 配置prometheus.yml。
     1. 打开文件。
 
-        ```
+        ```bash
         vi prometheus.yml
         ```
 
     2. 按`i`进入编辑模式，配置为如下内容。
 
-        ```
+        ```yaml
         # my global config
         global:
           scrape_interval: 15s # Set the scrape interval to every 15 seconds. Default is every 1 minute.
@@ -544,6 +541,7 @@ Node Exporter需要在所有计算节点上部署，按照软件包放置说明�
 
         >![](public_sys-resources/icon-notice.gif) **须知：** 
         >若计算节点不为agent1/agent2/agent3，请按照实际集群规划修改如下行。
+>
         >```
         >- targets: ["agent1:9100","agent2:9100","agent3:9100"]
         >```
@@ -563,7 +561,7 @@ Node Exporter需要在所有计算节点上部署，按照软件包放置说明�
     http://server1:9060/targets
     ```
 
-    ![](figures/zh-cn_image_0000002551412109.png)
+    ![Prometheus的targets页面，loads_metric、loads_metric_detail与node_exporter均为UP状态](figures/zh-cn_image_0000002551412109.png)
 
     显示界面如上，loads\_metric、loads\_metric\_detail以及node\_exporter均为UP状态。
 
@@ -589,54 +587,54 @@ Node Exporter需要在所有计算节点上部署，按照软件包放置说明�
 
 1. 进入Grafana目录。
 
-    ```
+    ```bash
     cd /opt/prometheus/grafana-v10.4.2/bin
     ```
 
 2. 启动Grafana。
 
-    ```
+    ```bash
     nohup ./grafana server &
     ```
 
 3. 验证部署是否成功，访问页面http://$\{server1\}:3000，页面可成功显示。
 
-    ![](figures/zh-cn_image_0000002520292088.png)
+    ![浏览器访问server1的3000端口，显示Grafana登录页面表示部署成功](figures/zh-cn_image_0000002520292088.png)
 
 4. 首次登录账号/密码为admin/admin，输入账号密码后单击`Log in`。
 
-    ![](figures/zh-cn_image_0000002519972078.png)
+    ![Grafana登录页面，输入账号密码admin/admin后单击Log in按钮](figures/zh-cn_image_0000002519972078.png)
 
 5. 要求修改密码，输入新密码，或者可以单击`Skip`跳过密码重置环节。
 
-    ![](figures/zh-cn_image_0000002551132081.png)
+    ![首次登录后的修改密码页面，可输入新密码或单击Skip跳过密码重置](figures/zh-cn_image_0000002551132081.png)
 
 6. 进入主页配置数据源。
     1. 选择`Datasource`。
 
-        ![](figures/zh-cn_image_0000002519972072.png)
+        ![Grafana主页左侧菜单选择Datasource，进入数据源配置入口](figures/zh-cn_image_0000002519972072.png)
 
     2. 单击`Add data source`添加新的数据源。
 
-        ![](figures/zh-cn_image_0000002551412089.png)
+        ![单击Add data source添加新的数据源的操作界面截图](figures/zh-cn_image_0000002551412089.png)
 
     3. 选择Prometheus。
 
-        ![](figures/zh-cn_image_0000002551132083.png)
+        ![选择Prometheus的操作界面截图](figures/zh-cn_image_0000002551132083.png)
 
-    4. 配置Prometheus的URL为http://server1:9060/。
+    4. 配置Prometheus的URL如图所示。
 
-        ![](figures/zh-cn_image_0000002551412083.png)
+        ![数据源配置页面将Prometheus的URL填写为server1的9060端口](figures/zh-cn_image_0000002551412083.png)
 
     5. 页面下拉选择`Save&test`。
 
-        ![](figures/zh-cn_image_0000002520292094.png)
+        ![页面下拉选择Save&test的执行回显](figures/zh-cn_image_0000002520292094.png)
 
     6. 成功后显示如下提示。
 
-        ![](figures/zh-cn_image_0000002551412079.png)
+        ![数据源保存成功后显示连接成功提示的执行回显](figures/zh-cn_image_0000002551412079.png)
 
-        ![](figures/zh-cn_image_0000002551412087.png)
+        ![数据源配置成功后的提示回显，建议结合图面内容补充本步骤特有的提示信息](figures/zh-cn_image_0000002551412087.png)
 
         >![](public_sys-resources/icon-notice.gif) **须知：** 
         >配置数据源时请确保Prometheus已启动，否则会连接失败。
@@ -644,46 +642,44 @@ Node Exporter需要在所有计算节点上部署，按照软件包放置说明�
 7. 配置面板。
     1. `Dashboards`。
 
-        ![](figures/zh-cn_image_0000002551132087.png)
+        ![Grafana主页左侧菜单单击Dashboards进入面板列表的操作入口](figures/zh-cn_image_0000002551132087.png)
 
     2. 页面单击右上角`New`后单击`Import`。
 
-        ![](figures/zh-cn_image_0000002519972074.png)
+        ![页面单击右上角New后单击Import的操作界面截图](figures/zh-cn_image_0000002519972074.png)
 
-    3. 从[**表 3** OmniScheduler Yarn负载调度算法软件获取列表](#OmniScheduler Yarn负载调度算法软件获取列表)获取BoostKit-loadsmetric-1.0.0-aarch64.zip中的LoadMetric.json文件上传到此处。
+    3. 从[**表 3** OmniScheduler Yarn负载调度算法软件获取列表](#安装指南)获取BoostKit-loadsmetric-1.0.0-aarch64.zip中的LoadMetric.json文件上传到此处。
 
-        ![](figures/zh-cn_image_0000002519972076.png)
+        ![Import页面中导入面板文件的提示与上传入口操作界面截图](figures/zh-cn_image_0000002519972076.png)
 
     4. 上传后单击`Import`。
 
-        ![](figures/zh-cn_image_0000002519972082.png)
+        ![上传面板文件后单击Import完成导入的操作界面截图](figures/zh-cn_image_0000002519972082.png)
 
     5. 出现面板。
 
-        ![](figures/zh-cn_image_0000002520292090.png)
+        ![导入后面板生成并展示负载指标数据的界面截图](figures/zh-cn_image_0000002520292090.png)
 
         >![](public_sys-resources/icon-notice.gif) **须知：** 
-        >-   面板显示数据需要确保server1的LoadsMetricApplication进程已启动，Prometheus已启动，其他agent节点Node Exporter均启动。
-        >-   如果显示不了数据，是因为开源软件Bug导致，可以尝试重启Grafana。
+        >- 面板显示数据需要确保server1的LoadsMetricApplication进程已启动，Prometheus已启动，其他agent节点Node Exporter均启动。
+        >- 如果显示不了数据，是因为开源软件Bug导致，可以尝试重启Grafana。
 
 8. 查看数据，登录server1:3000，选择Dashboards，选择`LoadsMetric`。
 
-    ![](figures/zh-cn_image_0000002520292086.png)
+    ![选择LoadsMetric面板后展示集群负载与均衡性数据的界面截图](figures/zh-cn_image_0000002520292086.png)
 
 9. 停止Grafana服务。
     1. 找到Grafana服务进程ID。
 
-        ```
+        ```bash
         ps -aux | grep grafana
         ```
 
     2. 使用**kill**命令停止Grafana。
 
-        ```
+        ```bash
         kill ID
         ```
-
-
 
 ## 相关参考<a name="ZH-CN_TOPIC_0000002520291882"></a>
 
@@ -717,5 +713,8 @@ Node Exporter需要在所有计算节点上部署，按照软件包放置说明�
 |node-exporter.pull.port|9100|node_exporter相关配置，保持默认即可。|
 |node-exporter.pull.thread-pool.size|1000|node_exporter相关配置，保持默认即可。|
 
+## 修订记录
 
-
+| 文档版本 | 发布日期 | 修改说明 |
+| --- | --- | --- |
+| 01 | 2025-03-30 | 第一次正式发布。 |

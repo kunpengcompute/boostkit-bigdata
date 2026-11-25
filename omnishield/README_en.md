@@ -5,7 +5,6 @@
 - \[2024-12-30\]: Released OmniShield 1.1.0. Added remote attestation support for OmniShield.
 - \[2024-09-30\]: Released OmniShield 1.0.0. OmniShield is a plugin of the big data engine Spark and provides the data source encryption and decryption functions. It protects data in use by executing the computing process in the hardware-based trusted execution environment \(TEE\). OmniShield ensures data security throughout the entire computing link. It enables AES encryption and decryption for reading and writing DataFrame CSV/JSON/text row-based data sources. It provides encryption and decryption functions for the Spark SQL data source, and encryption and decryption functions with SM algorithms for reading and writing the Spark SQL ORC data source.
 
-
 ## Introduction to the Project<a name="EN-US_TOPIC_0000002551514287"></a>
 
 ### Overview<a name="EN-US_TOPIC_0000002520634294"></a>
@@ -23,7 +22,6 @@ Compatible open source components and versions:
 - Spark 3.3.1
 - Hive 3.1.0
 
-
 ### Architecture<a name="EN-US_TOPIC_0000002520634296"></a>
 
 OmniShield is a confidential computing component for the Spark big data engine. It runs in the TEE of the customer's data center to encrypt and decrypt data by executing the computing process in the hardware-based TEE. With OmniShield, data security in the REE is also safeguarded.
@@ -33,7 +31,6 @@ OmniShield can work as a plugin of Spark to encrypt and decrypt CSV, JSON, and T
 [Figure 1](#en-us_topic_0000002512402638_fig26911981620)  shows the OmniShield architecture.
 
 **Figure  1**  Software architecture of OmniShield<a id="en-us_topic_0000002512402638_fig26911981620"></a>  
-![](figures/software-architecture-of-omnishield.png "software-architecture-of-omnishield")
 
 OmniShield performs the following functions:
 
@@ -44,6 +41,7 @@ OmniShield performs the following functions:
 - Provides Spark on Yarn application-level remote attestation based on the Integrity Measurement Architecture \(IMA\) of the openEuler OS. An IMA-based measurement report can be generated and remote attestation can be initiated when starting the Spark Executor.
 
 OmniShield is a confidential computing component for the Spark big data engine. It runs in the TEE of the customer's data center to encrypt and decrypt data by executing the computing process in the hardware-based TEE. With OmniShield, data security in the REE is also safeguarded.
+
 ### Application Scenarios<a name="EN-US_TOPIC_0000002551514295"></a>
 
 Understand the OmniShield application scenarios before using the feature. OmniShield can be used on Spark 3.3.1.
@@ -51,12 +49,11 @@ Understand the OmniShield application scenarios before using the feature. OmniSh
 OmniShield can process the intersection of privacy sets in secure multi-party computation. It ensures that no additional element information is disclosed except the intersection of privacy sets. When a user submits a Spark job, the Executor executes remote attestation on the application to check whether the application and operating environment are trusted. OmniShield encrypts and decrypts the data sources using specified parameters, and enables the SM4/GCM/NOPadding algorithm for drive and network I/O encryption and decryption to ensure security and privacy.
 
 Understand the OmniShield application scenarios before using the feature. OmniShield can be used on Spark 3.3.1.
+
 ### Related Concepts<a name="EN-US_TOPIC_0000002551634291"></a>
 
 - Rich execution environment \(REE\): A standard operating system that a device is running. Compared with a TEE, an REE is a traditional server running environment.
 - Trusted execution environment \(TEE\): A hardware security feature that is isolated from a normal operating system, for example, an REE.
-
-
 
 ## Constraints<a name="EN-US_TOPIC_0000002520474310"></a>
 
@@ -69,11 +66,12 @@ Understand the OmniShield usage restrictions before configuring the feature.
 - When using the "Encrypting and Decrypting Spark SQL ORC Data Sources Using SM Algorithms" feature of OmniShield, disable the ORC predicate pushdown function of Spark and set the Spark parameter  **spark.sql.orc.filterPushdown**  to  **false**.
 
 Understand the OmniShield usage restrictions before configuring the feature.
+
 ## Directory Structure<a name="EN-US_TOPIC_0000002551514291"></a>
 
 The full project directory structure is as follows:
 
-```
+```text
 ├── docs                                                      # Project document directory
 │   └── en                                                   # English document directory
 │       ├── figures                                          # Directory of images in Chinese documents
@@ -88,21 +86,17 @@ The full project directory structure is as follows:
 │   └── test                                                 # Unit test directory
 ```
 
-
 ## Release Notes<a name="EN-US_TOPIC_0000002520474302"></a>
 
 For details about feature changes in each version, see [Release Notes](./docs/en/release_notes.md).
-
 
 ## Environment Deployment<a name="EN-US_TOPIC_0000002520634288"></a>
 
 For details about the environment dependencies and installation methods of OmniShield, see [Installation Guide](./docs/en/installation_guide.md).
 
-
 ## Quick Start<a name="EN-US_TOPIC_0000002520634290"></a>
 
 For instructions on quickly verifying whether OmniShield is active and its performance improvements, see [Quick Start](./docs/en/quick_start.md).
-
 
 ## Helpful Links<a name="EN-US_TOPIC_0000002551514289"></a>
 
@@ -113,20 +107,16 @@ For instructions on quickly verifying whether OmniShield is active and its perfo
 |[Installation Guide](./docs/en/installation_guide.md)|Describes how to install OmniShield.|
 |[User Guide](./docs/en/user_guide.md)|Provides details about how to use OmniShield.|
 
-
-
 ## Security Statement<a name="EN-US_TOPIC_0000002551517483"></a>
 
 ### Routine Antivirus Software Check<a name="EN-US_TOPIC_0000002520477492"></a>
 
 Periodically scan clusters and Spark components for viruses. This protects clusters from viruses, malicious code, spyware, and malicious programs, reducing risks such as system breakdown and information leakage. Mainstream antivirus software can be recommended for antivirus check.
 
-
 ### Log Control<a name="EN-US_TOPIC_0000002520637490"></a>
 
 - Check whether the system can limit the size of a single log file.
 - Check whether there is a mechanism for clearing logs when the log space is used up.
-
 
 ### Setting the Login Session Timeout<a name="EN-US_TOPIC_0000002520522492"></a>
 
@@ -135,19 +125,18 @@ A login session should time out if it is inactive for 30 minutes or shorter. Per
 1. Log in to the node where Ascend-mindxdl-mindio is installed.
 2. Open the  **/etc/profile**  file.
 
-    ```
+    ```bash
     vim /etc/profile
     ```
 
 3. Press  **i**  to enter the insert mode and add the following content to the end of the file:
 
-    ```
+    ```bash
     export TMOUT=1800
     readonly TMOUT
     ```
 
 4. Press  **Esc**, type  **:wq!**, and press  **Enter**  to save the file and exit.
-
 
 ### Disabling the History Command<a name="EN-US_TOPIC_0000002520682472"></a>
 
@@ -156,19 +145,18 @@ To prevent the history command from being executed to view historical operations
 1. Log in to the node where Ascend-mindxdl-mindio is installed.
 2. Open the  **/etc/profile**  file.
 
-    ```
+    ```bash
     vim /etc/profile
     ```
 
 3. Press  **i**  to enter the insert mode and add the following content to the end of the file:
 
-    ```
+    ```bash
     export HISTFILESIZE=0
     readonly HISTFILESIZE
     ```
 
 4. Press  **Esc**, type  **:wq!**, and press  **Enter**  to save the file and exit.
-
 
 ### Setting the umask Value<a name="EN-US_TOPIC_0000002551682471"></a>
 
@@ -176,7 +164,7 @@ You are advised to set the umask of the server to a value ranging from 027 to 77
 
 1. Log in to the server as the root user and open the  **/etc/profile**  file.
 
-    ```
+    ```bash
     vim /etc/profile
     ```
 
@@ -184,10 +172,9 @@ You are advised to set the umask of the server to a value ranging from 027 to 77
 3. Press  **Esc**, type  **:wq!**, and press  **Enter**  to save the file and exit.
 4. Make the setting take effect.
 
-    ```
+    ```bash
     source /etc/profile
     ```
-
 
 ### Buffer Overflow Prevention<a name="EN-US_TOPIC_0000002551722491"></a>
 
@@ -196,7 +183,6 @@ To prevent buffer overflow attacks, you are advised to use the address space lay
 How to enable this function:
 
 **echo 2 \>/proc/sys/kernel/randomize\_va\_space**
-
 
 ### Vulnerability Fixing<a name="EN-US_TOPIC_0000002551637469"></a>
 
@@ -226,7 +212,6 @@ To ensure the security of the production environment and reduce the risk of atta
 
     Currently, the vendor has released an upgrade patch to fix the vulnerability. For details, visit  [GitHub](https://github.com/netty/netty/security/advisories/GHSA-9vjp-v76f-g363).
 
-
 ### SSH Hardening<a name="EN-US_TOPIC_0000002551517487"></a>
 
 During the installation and deployment, you need to connect to the server through SSH. The  **root**  user has all the operation permissions. Logging in to the server as the  **root**  user may pose security risks. You are advised to log in to the server as a common user for installation and deployment and disable  **root**  user login using SSH to improve system security. 
@@ -236,10 +221,7 @@ Check the  **PermitRootLogin**  configuration item in  **/etc/ssh/sshd\_config**
 - If the value is  no,  **root**  user login using SSH is disabled.
 - If the value is  yes, change it to  no.
 
-
-
 ## Account List<a name="EN-US_TOPIC_0000002520477498"></a>
-
 
 ## Disclaimer<a name="EN-US_TOPIC_0000002520474306"></a>
 
@@ -257,13 +239,11 @@ Check the  **PermitRootLogin**  configuration item in  **/etc/ssh/sshd\_config**
 
 If you do not want your model or dataset to be mentioned in OmniShield, or if you wish to update its description, please submit an issue on GitCode. We will delete or update your description according to your request. Thank you for your understanding and contribution to OmniShield.
 
-
 ## License<a name="EN-US_TOPIC_0000002551634293"></a>
 
 For details, see the  [License](../LICENSE)  file.
 
 The documents in the  _docs_  directory are licensed under CC BY 4.0. For details, see the  [License](../LICENSE)  file.
-
 
 ## Contribution Statement<a name="EN-US_TOPIC_0000002551634285"></a>
 
@@ -282,13 +262,9 @@ The documents in the  _docs_  directory are licensed under CC BY 4.0. For detail
     8. After your PR is approved by the required number of reviewers, the committer will conduct the final review.
     9. After your PR is approved and all tests pass, the CI system will merge it into the project's main branch.
 
-
-
-
 ## Suggestions and Feedback<a name="EN-US_TOPIC_0000002551634283"></a>
 
-You are welcome to contribute to the community. If you have any questions or suggestions, please submit an  [issue](https://gitcode.com/boostkit/boostkit-bigdata/tree/main/omnishield). We will respond as soon as possible. Thank you for your support.
-
+You are welcome to contribute to the community. If you have any questions or suggestions, please submit an  [issue](https://gitcode.com/boostkit/boostkit-bigdata/blob/main/README.md). We will respond as soon as possible. Thank you for your support.
 
 ## Acknowledgments<a name="EN-US_TOPIC_0000002551514285"></a>
 
@@ -297,5 +273,3 @@ OmniShield is jointly developed by the following Huawei departments:
 Kunpeng Computing BoostKit Development Dept
 
 Thank you to everyone in the community for your PRs. We warmly welcome contributions to OmniShield!
-
-
