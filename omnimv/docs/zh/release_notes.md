@@ -23,7 +23,6 @@
 </tbody>
 </table>
 
-
 ### 软件版本配套说明<a name="ZH-CN_TOPIC_0000002550208165"></a>
 
 |项目|版本|
@@ -35,8 +34,6 @@
 |Spark|3.1.1、3.4.3|
 |ZooKeeper|3.6.2及以上|
 |Python|3.11.2及以上|
-
-
 
 ### 硬件版本配套说明<a name="ZH-CN_TOPIC_0000002518728266"></a>
 
@@ -53,7 +50,6 @@
 </tr>
 </tbody>
 </table>
-
 
 ### 病毒扫描结果<a name="ZH-CN_TOPIC_0000002550208121"></a>
 
@@ -146,8 +142,6 @@
 </tbody>
 </table>
 
-
-
 ## V1.2.0<a name="ZH-CN_TOPIC_0000002518728290"></a>
 
 ### 更新说明<a name="ZH-CN_TOPIC_0000002550208123"></a>
@@ -167,17 +161,13 @@
 
 OmniMV 1.2.0版本不支持ClickHouse 22.3.6.5。
 
-
 ### 已解决的问题<a name="ZH-CN_TOPIC_0000002518728262"></a>
 
 无
 
-
 ### 遗留问题<a name="ZH-CN_TOPIC_0000002518568390"></a>
 
 无
-
-
 
 ## V1.1.0<a name="ZH-CN_TOPIC_0000002518568366"></a>
 
@@ -191,17 +181,13 @@ OmniMV 1.2.0版本不支持ClickHouse 22.3.6.5。
 - 基于ClickHouse引擎，完成候选视图的生成、成本评估模型训练和视图选择模型训练。
 - 优化AI算法推荐模块。
 
-
 ### 已解决的问题<a name="ZH-CN_TOPIC_0000002518728312"></a>
 
 无
 
-
 ### 遗留问题<a name="ZH-CN_TOPIC_0000002518568406"></a>
 
 无
-
-
 
 ## V1.0.0<a name="ZH-CN_TOPIC_0000002518568376"></a>
 
@@ -216,17 +202,13 @@ OmniMV 1.2.0版本不支持ClickHouse 22.3.6.5。
 - 候选视图生成、成本评估模型训练和视图选择模型训练。
 - 支持Spark引擎。
 
-
 ### 已解决的问题<a name="ZH-CN_TOPIC_0000002550168129"></a>
 
 无
 
-
 ### 遗留问题<a name="ZH-CN_TOPIC_0000002550168173"></a>
 
 无
-
-
 
 ## 版本配套文档<a name="ZH-CN_TOPIC_0000002550208125"></a>
 
@@ -239,11 +221,6 @@ OmniMV 1.2.0版本不支持ClickHouse 22.3.6.5。
 |OmniMV 用户指南|提供OmniMV的使用操作指导。|开源仓|
 |OmniMV 常见问题|记录安装、部署和使用OmniMV过程中可能遇到的问题及其解决方法。|开源仓|
 
-
-
 ### 获取文档的方法<a name="ZH-CN_TOPIC_0000002550168171"></a>
 
 您可以通过访问[开源仓](https://gitcode.com/boostkit/boostkit-bigdata/tree/br_feature_omnimv_spark343/omnimv)浏览和获取相关文档。
-
-
-

@@ -1,11 +1,12 @@
 # OmniMV介绍<a name="ZH-CN_TOPIC_0000002521018266"></a>
 
+本文档介绍OmniMV物化视图特性，通过AI算法从历史SQL查询中推荐最优物化视图并在Spark中自动匹配替换用户SQL执行计划，减少重复计算、提升查询性能，适用于大数据SQL分析场景下需要提升查询性能的用户。
+
 ## 最新消息<a name="ZH-CN_TOPIC_0000002520858274"></a>
 
-- \[2025.03.30\]：发布OmniMV 1.2.0。新增支持Spark 3.4.3版本。
-- \[2023.07.11\]：发布OmniMV 1.1.0。支持ClickHouse引擎物化视图智能推荐。 基于ClickHouse引擎，完成候选视图生成、成本评估模型训练和视图选择模型训练。 优化AI算法推荐模块。
-- \[2022.12.30\]：发布OmniMV 1.0.0。鲲鹏BoostKit大数据OmniRuntime OmniMV物化视图特性通过AI算法从历史SQL查询中推荐出最优物化视图，并会自动对用户SQL进行物化视图匹配，将匹配成功的物化视图替换到用户SQL的执行计划中，大幅减少重复计算，提升查询性能。
-
+- \[2025-03-30\]：发布OmniMV 1.2.0。新增支持Spark 3.4.3版本。
+- \[2023-07-11\]：发布OmniMV 1.1.0。支持ClickHouse引擎物化视图智能推荐。 基于ClickHouse引擎，完成候选视图生成、成本评估模型训练和视图选择模型训练。 优化AI算法推荐模块。
+- \[2022-12-30\]：发布OmniMV 1.0.0。鲲鹏BoostKit大数据OmniRuntime OmniMV物化视图特性通过AI算法从历史SQL查询中推荐出最优物化视图，并会自动对用户SQL进行物化视图匹配，将匹配成功的物化视图替换到用户SQL的执行计划中，大幅减少重复计算，提升查询性能。
 
 ## 项目简介<a name="ZH-CN_TOPIC_0000002552098237"></a>
 
@@ -26,7 +27,6 @@ OmniMV物化视图为OmniRuntime的特性之一。OmniMV物化视图通过AI算�
 - Hive 3.1.0
 - ClickHouse 22.3.6.5
 
-
 ### 架构介绍<a name="ZH-CN_TOPIC_0000002552058257"></a>
 
 介绍OmniMV物化视图特性架构。
@@ -36,7 +36,7 @@ OmniMV物化视图特性是通过AI算法从历史SQL查询中推荐出最优物
 OmniMV物化视图架构如[**图 1** OmniMV物化视图软件架构](#OmniMV物化视图软件架构)所示。
 
 **图 1** OmniMV物化视图软件架构<a name="zh-cn_topic_0000002543922601_fig1354413504399"></a><a id="OmniMV物化视图软件架构"></a><br>
-![](figures/OmniMV物化视图软件架构.png "OmniMV物化视图软件架构")
+![OmniMV物化视图软件架构：候选视图生成模块与物化视图SQL改写模块的组成及SQL改写流程](figures/OmniMV物化视图软件架构.png "OmniMV物化视图软件架构")
 
 OmniMV物化视图主要包含两大模块：物化视图候选视图生成模块、物化视图SQL改写模块。
 
@@ -50,11 +50,10 @@ OmniMV物化视图的使用流程如下。
 3. 从[2](#zh-cn_topic_0000002543922601_zh-cn_topic_0000001713099745_li04271433183)得到的信息中，进行候选视图生成，然后使用贪心选择TOP N的候选视图。
 
 介绍OmniMV物化视图特性架构。
+
 ### 应用场景<a name="ZH-CN_TOPIC_0000002520858278"></a>
 
 大数据OmniMV物化视图特性适用于数仓中SQL分析任务中存在较多相同的子查询的场景，对这些子查询重复地进行计算会浪费大量的计算资源，影响查询效率。通过AI算法从历史SQL查询中推荐出最优物化视图，并自动对用户SQL进行物化视图匹配，将匹配成功的物化视图替换到用户SQL的执行计划中，减少重复计算，提升查询性能。
-
-
 
 ## 约束与限制<a name="ZH-CN_TOPIC_0000002552098247"></a>
 
@@ -69,13 +68,11 @@ OmniMV物化视图的使用流程如下。
 |不支持重写|Aggregate规则|视图逻辑计划树根节点必须是Aggregate算子。像order by、having的根节点是Sort、Filter，这种视图不支持重写。查询和视图逻辑计划树匹配，两边根节点都必须是Aggregate算子，然后会通过isValidPlan检查子树是否满足最小单元的要求，不满足则不支持重写。查询中出现了视图中不存在的聚合函数，不支持重写。查询group by字段是视图group by字段的子集，只支持对以下聚合函数（不带distinct，min/max除外）rollup，不满足则不支持重写。SUMMINMAXCOUNT|
 |不支持提取视图|查询逻辑过于单一或者过于复杂|不支持从单表查询中提取物化视图。查询中如果出现了多层嵌套子查询，只支持从最内层子查询中提取视图，而不支持从外层子查询提取物化视图。不支持从含有临时表的子查询中提取物化视图。|
 
-
-
 ## 目录结构<a name="ZH-CN_TOPIC_0000002521018262"></a>
 
 项目全量目录层级介绍如下：
 
-```
+```text
 ├── docs                                                      # 项目文档目录
 │   └── zh                                                   # 中文文档目录
 │       ├── figures                                          # 中文文档图片资源目录
@@ -105,17 +102,13 @@ OmniMV物化视图的使用流程如下。
 
 ```
 
-
 ## 版本说明<a name="ZH-CN_TOPIC_0000002521018268"></a>
 
 每个版本的特性变更详细信息，请参见《[版本说明书](./docs/zh/release_notes.md)》。
 
-
 ## 环境部署<a name="ZH-CN_TOPIC_0000002552058253"></a>
 
 介绍OmniMV的环境依赖及安装方式，具体请参见《[安装指南](./docs/zh/installation_guide.md)》。
-
-
 
 ## 学习文档<a name="ZH-CN_TOPIC_0000002552058261"></a>
 
@@ -128,20 +121,16 @@ OmniMV物化视图的使用流程如下。
 |视频课程：[OmniRuntime特性大揭秘](https://www.hikunpeng.com/document/video-detail/2849)|提供操作视频，帮助开发者在鲲鹏服务器上了解、使能OmniRuntime特性。|
 |技术干货：《[大数据OmniMV ClickHouse 性能测试指南](https://www.hikunpeng.com/zh/developer/techArticles/20250922-7)》、《[通过AI算法在Apache Spark上智能推荐高性能物化视图](https://www.hikunpeng.com/zh/developer/techArticles/20250510-1)》|提供大数据平台在组件部署、应用加速与性能调优方面的实战经验。|
 
-
-
 ## 安全声明<a name="ZH-CN_TOPIC_0000002552058251"></a>
 
 ### 防病毒软件例行检查<a name="ZH-CN_TOPIC_0000002552098243"></a>
 
 定期开展对集群和Spark组件的防病毒扫描，防病毒例行检查会帮助集群免受病毒、恶意代码、间谍软件以及恶意程序，降低系统瘫痪、信息泄露等风险。建议使用业界主流防病毒软件进行防病毒检查。
 
-
 ### 日志控制<a name="ZH-CN_TOPIC_0000002552098239"></a>
 
 - 检查系统是否可以限制单个日志文件的大小。
 - 检查日志空间占满后，是否存在机制进行清理。
-
 
 ### 漏洞修复<a name="ZH-CN_TOPIC_0000002552098241"></a>
 
@@ -171,7 +160,6 @@ OmniMV物化视图的使用流程如下。
 
     目前厂商已发布升级补丁以修复漏洞，请参见[GitHub](https://github.com/netty/netty/security/advisories/GHSA-9vjp-v76f-g363)修复漏洞。
 
-
 ### SSH加固<a name="ZH-CN_TOPIC_0000002521018258"></a>
 
 在部署安装过程中，需要通过SSH连接服务器。由于root用户拥有最高权限，直接使用root用户登录服务器可能会存在安全风险。建议您使用普通用户登录服务器进行安装部署，并建议您通过配置禁止root用户SSH登录的选项，来提升系统安全性。操作步骤：
@@ -180,7 +168,6 @@ OmniMV物化视图的使用流程如下。
 
 - 如果显示no，说明禁止了root用户SSH登录。
 - 如果显示yes，说明需要修改PermitRootLogin为no。
-
 
 ## 免责声明<a name="ZH-CN_TOPIC_0000002552058255"></a>
 
@@ -198,13 +185,11 @@ OmniMV物化视图的使用流程如下。
 
 如果您不希望您的模型或数据集等信息在OmniMV中被提及，或希望更新OmniMV中有关的描述，请在GitCode提交issue，我们将根据您的issue要求删除或更新您相关描述。衷心感谢您对OmniMV的理解和贡献。
 
-
 ## License<a name="ZH-CN_TOPIC_0000002552098245"></a>
 
 OmniMV产品的使用许可证，具体请参见[LICENSE](../LICENSE)文件。
 
 OmniMV docs目录下的文档适用CC-BY 4.0许可证，具体请参见[LICENSE](../LICENSE)文件。
-
 
 ## 贡献声明<a name="ZH-CN_TOPIC_0000002520858272"></a>
 
@@ -223,19 +208,10 @@ OmniMV docs目录下的文档适用CC-BY 4.0许可证，具体请参见[LICENSE]
     8. 当您的PR获得足够数量的检视者批准后，Committer会进行最终审核。
     9. 审核和测试通过后，CI会将您的PR合并入到项目的主干分支。
 
-
-
 ## 建议与交流<a name="ZH-CN_TOPIC_0000002521018264"></a>
 
-欢迎大家为社区做贡献。如果有任何疑问或建议，请提交[Issues](https://gitcode.com/boostkit/boostkit-bigdata/tree/main/omnimv/omnimv-spark-extension)，我们会尽快回复。感谢您的支持。
-
+欢迎大家为社区做贡献。如果有任何疑问或建议，请提交[Issues](https://gitcode.com/boostkit/boostkit-bigdata/blob/main/README.md)，我们会尽快回复。感谢您的支持。
 
 ## 致谢<a name="ZH-CN_TOPIC_0000002520858276"></a>
 
-OmniMV由华为公司的下列部门联合贡献：
-
-鲲鹏计算BoostKit开发部
-
 感谢来自社区的每一个PR，欢迎贡献OmniMV！
-
-

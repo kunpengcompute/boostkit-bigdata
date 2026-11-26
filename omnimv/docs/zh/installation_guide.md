@@ -1,5 +1,7 @@
 # 安装指南<a name="ZH-CN_TOPIC_0000002551410827"></a>
 
+本文档介绍OmniMV物化视图的安装流程，涵盖存算一体组网规划、软硬件环境要求与软件安装步骤，适用于在openEuler 22.03环境下部署OmniMV物化视图的集群管理员。
+
 ## 安装简介<a name="ZH-CN_TOPIC_0000002519970740"></a>
 
 ### 组网规划<a name="ZH-CN_TOPIC_0000002551410855"></a>
@@ -14,7 +16,7 @@ OmniMV物化视图组网规划的环境由4台服务器组成，使用存算一�
 一台服务器可以同时充当管理节点、计算节点（如果是单机安装模式，后续文章中提到的在管理节点/计算节点上执行的操作，均需要在一个节点上执行），组网规划如[**图 1** 安装组网图](#安装组网图)所示。
 
 **图 1** 安装组网图<a name="zh-cn_topic_0000001713019717_fig195021730155013"></a><a id="安装组网图"></a>
-![](figures/安装组网图.png "安装组网图")
+![存算一体组网结构：1台管理节点server1管理任务，3台计算节点agent1至agent3运行查询引擎并存储数据](figures/安装组网图.png "安装组网图")
 
 ### 环境要求<a name="ZH-CN_TOPIC_0000002551410733"></a>
 
@@ -29,12 +31,11 @@ OmniMV物化视图组网规划的环境由4台服务器组成，使用存算一�
 |硬件环境|管理/计算/存储节点|
 |--|--|
 |处理器|鲲鹏920 5250处理器/鲲鹏920新型号处理器|
-|内存大小|384GB（12 * 32GB）|
+|内存大小|384GB（12 × 32GB）|
 |内存频率|2666MHz|
 |网络|业务网络10GE<br>管理网络1GE|
-|硬盘|系统盘：1 * RAID 0（1 * 1.2TB SAS HDD）<br>数据盘：12 * RAID 0（12 * 8TB SATA HDD）|
+|硬盘|系统盘：1 × RAID 0（1 × 1.2TB SAS HDD）<br>数据盘：12 × RAID 0（12 × 8TB SATA HDD）|
 |RAID控制卡|LSI SAS3508|
-
 
 **操作系统和软件要求<a name="zh-cn_topic_0000001665139878_section112781416185717"></a>**
 
@@ -51,12 +52,12 @@ OmniMV物化视图组网规划的环境由4台服务器组成，使用存算一�
 |ZooKeeper|3.6.2及以上|部署指南请参见《[ZooKeeper 部署指南（CentOS 7.6&openEuler 20.03）](https://www.hikunpeng.com/document/detail/zh/kunpengbds/ecosystemEnable/ZooKeeper/kunpengzookeeper_04_0001.html)》。|-|√|
 |Python|3.10.2及以上|无特殊要求。|√|√|
 
-
 >![](public_sys-resources/icon-note.gif) **说明：** 
->-   √：表示对应节点需要安装该项目。
->-   -：表示对应节点不需要安装该项目。
->-   以上第三方依赖版本如有漏洞请根据官方说明进行漏洞修复。
->-   以上组件版本，可能和部署指南中的组件版本不一致，部署指南仅供部署参考。
+>
+>- √：表示对应节点需要安装该项目。
+>- -：表示对应节点不需要安装该项目。
+>- 以上第三方依赖版本如有漏洞请根据官方说明进行漏洞修复。
+>- 以上组件版本，可能和部署指南中的组件版本不一致，部署指南仅供部署参考。
 
 **软件获取<a name="zh-cn_topic_0000001665139878_section73341541215"></a>**
 
@@ -80,44 +81,43 @@ OmniMV物化视图组网规划的环境由4台服务器组成，使用存算一�
       <td>BoostKit-omnimv_1.2.0.zip</td>
       <td>开源</td>
       <td>-</td>
-      <td><a href="https://gitcode.com/boostkit/boostkit-bigdata/releases/download/25.0.RC1-OmniMV-release/BoostKit-omnimv_1.2.0.zip" target="_blank">获取链接</a></td>
+      <td><a href="https://gitcode.com/boostkit/boostkit-bigdata/releases/download/25.0.RC1-OmniMV-release/BoostKit-omnimv_1.2.0.zip" target="_blank">OmniMV物化视图软件安装包BoostKit-omnimv_1.2.0.zip</a></td>
     </tr>
     <tr>
       <td rowspan="2">OmniMV Plugin的JAR包</td>
       <td>boostkit-omnimv-spark-3.1.1-1.2.0-aarch64.jar</td>
       <td>开源</td>
       <td>使用OmniMV物化视图能力时，Spark引擎扩展包。</td>
-      <td><a href="https://gitcode.com/boostkit/boostkit-bigdata/releases/download/25.0.RC1-OmniMV-release/boostkit-omnimv-spark-3.1.1-1.2.0-aarch64.jar" target="_blank">获取链接</a></td>
+      <td><a href="https://gitcode.com/boostkit/boostkit-bigdata/releases/download/25.0.RC1-OmniMV-release/boostkit-omnimv-spark-3.1.1-1.2.0-aarch64.jar" target="_blank">Spark 3.1.1引擎对应的OmniMV Plugin JAR包</a></td>
     </tr>
     <tr>      
       <td>boostkit-omnimv-spark-3.4.3-1.2.0-aarch64.jar</td>
       <td>开源</td>
       <td>使用OmniMV物化视图能力时，Spark引擎扩展包。</td>
-      <td><a href="https://gitcode.com/boostkit/boostkit-bigdata/releases/download/25.0.RC1-OmniMV-release/boostkit-omnimv-spark-3.4.3-1.2.0-aarch64.jar" target="_blank">获取链接</a></td>
+      <td><a href="https://gitcode.com/boostkit/boostkit-bigdata/releases/download/25.0.RC1-OmniMV-release/boostkit-omnimv-spark-3.4.3-1.2.0-aarch64.jar" target="_blank">Spark 3.4.3引擎对应的OmniMV Plugin JAR包</a></td>
     </tr>
     <tr>
       <td rowspan="2">OmniMV日志解析JAR包</td>
       <td>boostkit-omnimv-logparser-spark-3.1.1-1.2.0-aarch64.jar</td>
       <td>开源</td>
       <td>使用OmniMV物化视图解析Spark日志时使用的功能包。</td>
-      <td><a href="https://gitcode.com/boostkit/boostkit-bigdata/releases/download/25.0.RC1-OmniMV-release/boostkit-omnimv-logparser-spark-3.1.1-1.2.0-aarch64.jar" target="_blank">获取链接</a></td>
+      <td><a href="https://gitcode.com/boostkit/boostkit-bigdata/releases/download/25.0.RC1-OmniMV-release/boostkit-omnimv-logparser-spark-3.1.1-1.2.0-aarch64.jar" target="_blank">Spark 3.1.1引擎对应的OmniMV日志解析JAR包</a></td>
     </tr>
     <tr>      
       <td>boostkit-omnimv-logparser-spark-3.4.3-1.2.0-aarch64.jar</td>
       <td>开源</td>
       <td>使用OmniMV物化视图解析Spark日志时使用的功能包。</td>
-      <td><a href="https://gitcode.com/boostkit/boostkit-bigdata/releases/download/25.0.RC1-OmniMV-release/boostkit-omnimv-logparser-spark-3.4.3-1.2.0-aarch64.jar" target="_blank">获取链接</a></td>
+      <td><a href="https://gitcode.com/boostkit/boostkit-bigdata/releases/download/25.0.RC1-OmniMV-release/boostkit-omnimv-logparser-spark-3.4.3-1.2.0-aarch64.jar" target="_blank">Spark 3.4.3引擎对应的OmniMV日志解析JAR包</a></td>
     </tr>
     <tr>
       <td>hive-testbench</td>
       <td>hive-testbench-hdp3.zip</td>
       <td>开源</td>
       <td>生成TPC-DS/TPCH数据时使用的TestBench源码包。</td>
-      <td><a href="https://github.com/hortonworks/hive-testbench/archive/refs/heads/hdp3.zip" target="_blank">获取链接</a></td>
+      <td><a href="https://github.com/hortonworks/hive-testbench/archive/refs/heads/hdp3.zip" target="_blank">hive-testbench源码包hive-testbench-hdp3.zip</a></td>
     </tr>
   </tbody>
 </table>
-
 
 **软件安装包完整性校验<a name="zh-cn_topic_0000001665139878_section16501429204018"></a>**
 
@@ -128,8 +128,6 @@ OmniMV物化视图组网规划的环境由4台服务器组成，使用存算一�
 1. 获取软件数字证书和软件安装包。
 2. [获取校验工具和校验方法](https://support.huawei.com/enterprise/zh/tool/pgp-verify-TL1000000054)。
 3. 参见上述链接下载的《OpenPGP签名验证指南》进行软件安装包完整性检查。
-
-
 
 ## 安装特性<a name="ZH-CN_TOPIC_0000002551130865"></a>
 
@@ -148,7 +146,6 @@ OmniMV物化视图组网规划的环境由4台服务器组成，使用存算一�
 |CMake|3.13.4及以上|
 |glibc|2.25及以上|
 
-
 - 安装OmniMV物化视图前，集群环境请参见[**表 2** 操作系统和软件要求](#操作系统和软件要求)完成相关组件安装，Spark引擎所需组件请参见[**表 2** Spark引擎所需必备组件](#Spark引擎所需必备组件)。
 
     **表 2** Spark引擎所需必备组件<a id="Spark引擎所需必备组件"></a>
@@ -156,7 +153,6 @@ OmniMV物化视图组网规划的环境由4台服务器组成，使用存算一�
 |使用OmniMV物化视图的引擎|集群必备组件|
 |--|--|
 |Spark|OS、JDK、Hadoop、Spark、Hive、HDFS|
-
 
     >![](public_sys-resources/icon-note.gif) **说明：** 
     >用户根据使用场景要求，选择安装相应的集群模式。若存储安装模式为HDFS，则建议使用安全模式（Kerberos）。
@@ -168,39 +164,39 @@ OmniMV物化视图组网规划的环境由4台服务器组成，使用存算一�
 1. 下载Conda软件安装包，并激活Conda虚拟环境。
     1. 下载Conda。
 
-        ```
+        ```bash
         cd /opt
         wget -k https://repo.anaconda.com/archive/Anaconda3-2022.05-Linux-aarch64.sh
         ```
 
     2. 安装Conda，安装路径可以选择在“/opt/anaconda3“路径下面。
 
-        ```
+        ```bash
         bash Anaconda3-2022.05-Linux-aarch64.sh
         ```
 
     3. 初始化Conda。
 
-        ```
+        ```bash
         source /opt/anaconda3/etc/profile.d/conda.sh
         ```
 
     4. 创建Conda虚拟环境，名字是omnimv。
 
-        ```
+        ```bash
         conda create -n omnimv python=3.11
         ```
 
     5. 激活Conda虚拟环境。
 
-        ```
+        ```bash
         conda activate omnimv
         ```
 
 2. 使用pip下载Python依赖库。
     - Spark 3.1.1引擎依赖包。
 
-        ```
+        ```bash
         pip install Cython==0.29.24
         pip install pandas==1.3.5
         pip install PyYAML==6.0
@@ -215,7 +211,7 @@ OmniMV物化视图组网规划的环境由4台服务器组成，使用存算一�
 
     - Spark 3.4.3引擎依赖包。
 
-        ```
+        ```bash
         pip install Cython==0.29.24
         pip install pandas==1.3.5
         pip install PyYAML==6.0
@@ -234,7 +230,7 @@ OmniMV物化视图组网规划的环境由4台服务器组成，使用存算一�
 
     - Spark 3.1.1。
 
-        ```
+        ```bash
         mkdir -p /opt/omnimv
         mv boostkit-omnimv-spark-3.1.1-1.2.0-aarch64.jar /opt/omnimv
         mv boostkit-omnimv-logparser-spark-3.1.1-1.2.0-aarch64.jar /opt/omnimv
@@ -243,7 +239,7 @@ OmniMV物化视图组网规划的环境由4台服务器组成，使用存算一�
 
     - Spark 3.4.3。
 
-        ```
+        ```bash
         mkdir -p /opt/omnimv
         mv boostkit-omnimv-spark-3.4.3-1.2.0-aarch64.jar /opt/omnimv
         mv boostkit-omnimv-logparser-spark-3.4.3-1.2.0-aarch64.jar /opt/omnimv
@@ -252,7 +248,7 @@ OmniMV物化视图组网规划的环境由4台服务器组成，使用存算一�
 
 4. 解压OmniMV物化视图组件包，并移除其他用户组的读取和可执行文件权限。
 
-    ```
+    ```bash
     cd /opt/omnimv
     unzip BoostKit-omnimv_1.2.0.zip
     chmod -R o-r BoostKit-omnimv_1.2.0
@@ -261,3 +257,8 @@ OmniMV物化视图组网规划的环境由4台服务器组成，使用存算一�
     >![](public_sys-resources/icon-note.gif) **说明：** 
     >建议使用非root用户进行解压，使得解压的目录获得尽可能小的权限，避免被替换文件。
 
+## 修订记录
+
+| 文档版本 | 发布日期 | 修改说明 |
+| --- | --- | --- |
+| 01 | 2025-03-30 | 第一次正式发布。 |
