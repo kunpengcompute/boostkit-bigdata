@@ -18,7 +18,7 @@
     1. 进入客户端。
         - Spark 3.1.1。
 
-            ```
+            ```bash
             spark-sql \
             --deploy-mode client \
             --driver-cores 5 \
@@ -36,7 +36,7 @@
 
         - Spark 3.4.3。
 
-            ```
+            ```bash
             spark-sql \
             --deploy-mode client \
             --driver-cores 5 \
@@ -61,7 +61,7 @@
 
     - Spark 3.1.1。
 
-        ```
+        ```bash
         spark-sql \
         --deploy-mode client \
         --driver-cores 5 \
@@ -80,7 +80,7 @@
 
     - Spark 3.4.3。
 
-        ```
+        ```bash
         spark-sql \
         --deploy-mode client \
         --driver-cores 5 \
@@ -103,7 +103,7 @@
 
 |操作名称|操作语法|
 |--|--|
-|Create MV（创建视图）|CREATE MATERIALIZED VIEW [IF NOT EXISTS] [db_name.]mv_name[DISABLE REWRITE][COMMENT 'mv_comment'][PARTITIONED BY (col_name, ...)]AS<query>;|
+|Create MV（创建视图）|CREATE MATERIALIZED VIEW [IF NOT EXISTS] [db_name.]mv_name[DISABLE REWRITE][COMMENT 'mv_comment'][PARTITIONED BY (col_name, ...)]AS;|
 |Drop MV（删除视图）|DROP MATERIALIZED VIEW [IF EXISTS] [db_name.]mv_name;|
 |Show MVS（枚举视图）|SHOW MATERIALIZED VIEWS [ON [db_name.]mv_name];|
 |Alter MV rewrite（更新视图配置，是否参与重写）|ALTER MATERIALIZED VIEW [db_name.]mv_name ENABLE|DISABLE REWRITE;|
@@ -155,7 +155,7 @@ OmniMV物化视图使用Kryo进行物化视图元数据序列化时，可能存�
 1. 使用[方式一](#Method_1)进入spark-sql客户端手动执行SQL。
 2. 执行枚举视图命令，返回信息如下图所示，说明Plugin加载成功。
 
-    ```
+    ```bash
     SHOW MATERIALIZED VIEWS;
     ```
 
@@ -163,7 +163,7 @@ OmniMV物化视图使用Kryo进行物化视图元数据序列化时，可能存�
 
 3. 创建样例基本表和样例视图。
 
-    ```
+    ```bash
     CREATE TABLE IF NOT EXISTS column_type(
         empid INT,
         deptno INT,
@@ -198,7 +198,7 @@ OmniMV物化视图使用Kryo进行物化视图元数据序列化时，可能存�
 
 4. 创建物化视图。
 
-    ```
+    ```bash
     CREATE MATERIALIZED VIEW IF NOT EXISTS mv_create1
     AS
     SELECT * FROM column_type;
@@ -208,7 +208,7 @@ OmniMV物化视图使用Kryo进行物化视图元数据序列化时，可能存�
 
 5. 通过EXPLAIN SQL，来查看查询的执行计划是否被重写。
 
-    ```
+    ```bash
     EXPLAIN
     SELECT * FROM column_type;
     ```
@@ -221,53 +221,53 @@ OmniMV物化视图使用Kryo进行物化视图元数据序列化时，可能存�
 
 本次任务示例使用TPC-DS的数据表作为测试表。
 
-1. 修改配置文件。
+    1. 修改配置文件。
 
-    1. 打开`config/omnimv\_config\_spark.cfg`文件。
+        1. 打开`config/omnimv\_config\_spark.cfg`文件。
 
-        ```
-        cd /opt/omnimv/BoostKit-omnimv_1.2.0
-        vi config/omnimv_config_spark.cfg
-        ```
-
-    2. 按`i`进入编辑模式，参考如下内容修改。
-        - Spark 3.1.1：
-
-            ```
-            database = tpcds_bin_partitioned_varchar_orc_3000
-            logparser_jar_path = /opt/omnimv/boostkit-omnimv-logparser-spark-3.1.1-1.2.0-aarch64.jar
-            cache_plugin_jar_path = /opt/omnimv/boostkit-omnimv-spark-3.1.1-1.2.0-aarch64.jar
-            hdfs_input_path = hdfs://server1:9000/spark2-history
-            sqls_path = hdfs://server1:9000/omnimv/tpcds
+            ```bash
+            cd /opt/omnimv/BoostKit-omnimv_1.2.0
+            vi config/omnimv_config_spark.cfg
             ```
 
-        - Spark 3.4.3：
+        2. 按`i`进入编辑模式，参考如下内容修改。
+            - Spark 3.1.1：
 
-            ```
-            database = tpcds_bin_partitioned_varchar_orc_3000
-            logparser_jar_path = /opt/omnimv/boostkit-omnimv-logparser-spark-3.4.3-1.2.0-aarch64.jar
-            cache_plugin_jar_path = /opt/omnimv/boostkit-omnimv-spark-3.4.3-1.2.0-aarch64.jar
-            hdfs_input_path = hdfs://server1:9000/spark2-history
-            sqls_path = hdfs://server1:9000/omnimv/tpcds
-            ```
+                ```bash
+                database = tpcds_bin_partitioned_varchar_orc_3000
+                logparser_jar_path = /opt/omnimv/boostkit-omnimv-logparser-spark-3.1.1-1.2.0-aarch64.jar
+                cache_plugin_jar_path = /opt/omnimv/boostkit-omnimv-spark-3.1.1-1.2.0-aarch64.jar
+                hdfs_input_path = hdfs://server1:9000/spark2-history
+                sqls_path = hdfs://server1:9000/omnimv/tpcds
+                ```
 
-    3. 按`Esc`键，输入 **:wq!**，按`Enter`保存并退出编辑。
+            - Spark 3.4.3：
 
-    **表 1** OmniMV物化视图部分配置<a id="OmniMV物化视图部分配置"></a>
+                ```bash
+                database = tpcds_bin_partitioned_varchar_orc_3000
+                logparser_jar_path = /opt/omnimv/boostkit-omnimv-logparser-spark-3.4.3-1.2.0-aarch64.jar
+                cache_plugin_jar_path = /opt/omnimv/boostkit-omnimv-spark-3.4.3-1.2.0-aarch64.jar
+                hdfs_input_path = hdfs://server1:9000/spark2-history
+                sqls_path = hdfs://server1:9000/omnimv/tpcds
+                ```
 
-|配置项|含义|参考值|
-|--|--|--|
-|database|用于测试的数据库名称。|-|
-|logparser_jar_path|日志解析JAR包路径。|/opt/omnimv/boostkit-omnimv-logparser-spark-3.1.1-1.2.0-aarch64.jar/opt/omnimv/boostkit-omnimv-logparser-spark-3.4.3-1.2.0-aarch64.jar|
-|cache_plugin_jar_path|OmniMV的JAR包路径。|/opt/omnimv/boostkit-omnimv-spark-3.1.1-1.2.0-aarch64.jar/opt/omnimv/boostkit-omnimv-spark-3.4.3-1.2.0-aarch64.jar|
-|hdfs_input_path|Spark任务运行日志在HDFS上的访问地址。|hdfs://server1:9000/spark2-history|
-|sqls_path|测试SQL在HDFS上的访问地址。|hdfs://server1:9000/omnimv/tpcds|
+        3. 按`Esc`键，输入 **:wq!**，按`Enter`保存并退出编辑。
+
+        **表 1** OmniMV物化视图部分配置<a id="OmniMV物化视图部分配置"></a>
+
+    |配置项|含义|参考值|
+    |--|--|--|
+    |database|用于测试的数据库名称。|-|
+    |logparser_jar_path|日志解析JAR包路径。|/opt/omnimv/boostkit-omnimv-logparser-spark-3.1.1-1.2.0-aarch64.jar/opt/omnimv/boostkit-omnimv-logparser-spark-3.4.3-1.2.0-aarch64.jar|
+    |cache_plugin_jar_path|OmniMV的JAR包路径。|/opt/omnimv/boostkit-omnimv-spark-3.1.1-1.2.0-aarch64.jar/opt/omnimv/boostkit-omnimv-spark-3.4.3-1.2.0-aarch64.jar|
+    |hdfs_input_path|Spark任务运行日志在HDFS上的访问地址。|hdfs://server1:9000/spark2-history|
+    |sqls_path|测试SQL在HDFS上的访问地址。|hdfs://server1:9000/omnimv/tpcds|
 
 2. 获取测试SQL（以TPC-DS为例）。
     1. 下载[Spark源码](https://github.com/apache/spark)并解压，在`spark-master/sql/core/src/test/resources/tpcds/`路径下获取TPC-DS测试SQL。
     2. 将测试SQL传到HDFS上（路径为配置文件中sqls\_path的值）。
 
-        ```
+        ```bash
         hdfs dfs -mkdir -p hdfs://server1:9000/omnimv/tpcds
         hdfs dfs -put /spark源码目录/sql/core/src/test/resources/tpcds/* hdfs://server1:9000/omnimv/tpcds/
         ```
@@ -276,7 +276,7 @@ OmniMV物化视图使用Kryo进行物化视图元数据序列化时，可能存�
 
     屏幕打印`init\_database succeed!”说明执行成功。
 
-    ```
+    ```bash
     python main.py spark init_database
     ```
 
@@ -284,21 +284,21 @@ OmniMV物化视图使用Kryo进行物化视图元数据序列化时，可能存�
 
     屏幕打印`run\_original\_sqls succeed!”说明执行成功。
 
-    ```
+    ```bash
     python main.py spark run_original_sqls
     ```
 
 5. 解析运行日志。
-    1. 通过http://ip:18080地址访问Spark History Server查看SQL任务起止时间。
+    1. 通过server1:18080地址访问Spark History Server查看SQL任务起止时间。
     2. 打开配置文件`config/omnimv\_config\_spark.cfg`。
 
-        ```
+        ```bash
         vi config/omnimv_config_spark.cfg
         ```
 
     3. 按`i`进入编辑模式，修改参数如下。
 
-        ```
+        ```bash
         # 测试SQL运行开始时间
         q_log_start_time = 2022-09-15 11:58
         # 测试SQL运行结束时间
@@ -310,20 +310,20 @@ OmniMV物化视图使用Kryo进行物化视图元数据序列化时，可能存�
 
         屏幕打印`parse\_query\_logs succeed!”说明执行成功。
 
-        ```
+        ```bash
         python main.py spark parse_query_logs
         ```
 
 6. 生成候选视图。
     1. 打开配置文件`config/omnimv\_config\_spark.cfg`。
 
-        ```
+        ```bash
         vi config/omnimv_config_spark.cfg
         ```
 
     2. 按`i`进入编辑模式，修改参数如下。
 
-        ```
+        ```bash
         # 候选TOP mv的数量限制，实际推荐数量小于等于该值
         mv_limit = 10
         ```
@@ -333,7 +333,7 @@ OmniMV物化视图使用Kryo进行物化视图元数据序列化时，可能存�
 
         屏幕打印`greedy recommend for candidate mv”说明执行成功。
 
-        ```
+        ```bash
         python main.py spark generate_views
         ```
 
@@ -341,7 +341,7 @@ OmniMV物化视图使用Kryo进行物化视图元数据序列化时，可能存�
 
     需要人工确认，是否可以真实地创建这个候选的视图。
 
-    ```
+    ```bash
     python main.py spark create_greedy_views
     ```
 
@@ -353,7 +353,7 @@ OmniMV物化视图使用Kryo进行物化视图元数据序列化时，可能存�
 
 1. 删除二进制SO文件以及OmniMV物化视图相关文件，安装目录以`/opt/omnimv`为例。
 
-    ```
+    ```bash
     rm -rf /opt/omnimv
     ```
 
@@ -362,13 +362,13 @@ OmniMV物化视图使用Kryo进行物化视图元数据序列化时，可能存�
     1. 删除物化视图元数据。
         1. 设置数据库名称。
 
-            ```
+            ```bash
             DATABASE="tpcds_bin_partitioned_varchar_orc_3000"
             ```
 
         2. 删除物化视图元数据。
 
-            ```
+            ```bash
             hdfs dfs -rm -r -f /omnimv/plugin_metadata/${DATABASE}
             hdfs dfs -rm -r -f /omnimv/plugin_metadata/mock
             ```
@@ -376,7 +376,7 @@ OmniMV物化视图使用Kryo进行物化视图元数据序列化时，可能存�
     2. 刷新Spark 3.1.1版本在数据库中的物化视图元数据。
         1. 获取刷新物化视图元数据命令。
 
-            ```
+            ```bash
             sqls=""
             mvs=`spark-sql --master local -e "SHOW MATERIALIZED VIEWS" --conf spark.sql.extensions=com.huawei.boostkit.spark.OmniMV --jars /opt/omnimv/boostkit-omnimv-spark-3.1.1-1.2.0-aarch64.jar --database ${DATABASE} | grep -P "^${DATABASE}" |awk -F "\t" '{print $2}' |grep -v "partition"` ; \
             for mv in `echo "$mvs"|tr -s '|' ' '`;do sqls="ALTER MATERIALIZED VIEW $mv ENABLE REWRITE;$sqls" ; done
@@ -385,14 +385,14 @@ OmniMV物化视图使用Kryo进行物化视图元数据序列化时，可能存�
 
         2. 执行刷新物化视图元数据命令。
 
-            ```
+            ```bash
             spark-sql --master local --database ${DATABASE} --jars /opt/omnimv/boostkit-omnimv-spark-3.1.1-1.2.0-aarch64.jar --conf 'spark.sql.extensions=com.huawei.boostkit.spark.OmniMV' -e "$sqls"
             ```
 
     3. 刷新Spark 3.4.3版本在数据库中的物化视图元数据。
         1. 获取刷新物化视图元数据命令。
 
-            ```
+            ```bash
             sqls=""
             mvs=`spark-sql --master local -e "SHOW MATERIALIZED VIEWS" --conf spark.sql.extensions=com.huawei.boostkit.spark.OmniMV --jars /opt/omnimv/boostkit-omnimv-spark-3.4.3-1.2.0-aarch64.jar --database ${DATABASE} | grep -P "^${DATABASE}" |awk -F "\t" '{print $2}' |grep -v "partition"` ; \
             for mv in `echo "$mvs"|tr -s '|' ' '`;do sqls="ALTER MATERIALIZED VIEW $mv ENABLE REWRITE;$sqls" ; done
@@ -401,7 +401,7 @@ OmniMV物化视图使用Kryo进行物化视图元数据序列化时，可能存�
 
         2. 执行刷新物化视图元数据命令。
 
-            ```
+            ```bash
             spark-sql --master local --database ${DATABASE} --jars /opt/omnimv/boostkit-omnimv-spark-3.4.3-1.2.0-aarch64.jar --conf 'spark.sql.extensions=com.huawei.boostkit.spark.OmniMV' -e "$sqls"
             ```
 
@@ -412,18 +412,24 @@ OmniMV物化视图使用Kryo进行物化视图元数据序列化时，可能存�
 
 1. 删除OmniMV，安装目录以`/opt/omnimv`为例。
 
-    ```
+    ```bash
     rm -rf /opt/omnimv
     ```
 
 2. 删除Python环境，安装目录以`/opt/anaconda3`为例。
 
-    ```
+    ```bash
     rm -rf /opt/anaconda3
     ```
 
 3. 可通过version.txt查询OmniMV的版本信息。
 
-    ```
+    ```bash
     cat /opt/omnimv/BoostKit-omnimv_1.2.0/version.txt
     ```
+    
+## 修订记录
+
+| 文档版本 | 发布日期 | 修改说明 |
+| --- | --- | --- |
+| 01 | 2025-03-30 | 第一次正式发布。 |
