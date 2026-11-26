@@ -239,7 +239,8 @@ namespace omniruntime::reader {
             uint64_t *incomingNulls, int omniTypeId) override;
         
         private:
-            std::shared_ptr<orc::StringDictionary> dictionary;
+            std::vector<int64_t> dictionaryOffset;
+            std::vector<char> dictionaryBlob;
             std::unique_ptr<OmniRleDecoderV2> rle;
             bool isChar = false;
 

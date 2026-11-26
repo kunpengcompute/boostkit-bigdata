@@ -25,6 +25,9 @@
 #include "util/omni_exception.h"
 #include "OrcDecodeUtils.hh"
 
+#include <limits>
+#include <vector>
+
 using omniruntime::vec::VectorBatch;
 using omniruntime::vec::BaseVector;
 using omniruntime::exception::OmniException;
@@ -225,26 +228,48 @@ namespace omniruntime::reader {
         }
     }
 
-    inline void FindLastNotEmpty(const char *chars, long &len)
+    inline void FindLastNotEmpty(const char *chars, int64_t &len)
     {
         while (len > 0 && chars[len - 1] == ' ') {
             len--;
         }
     }
 
-    void omniReadFully(char* buffer, int64_t bufferSize, SeekableInputStream* stream) {
-        int64_t posn = 0;
-        while (posn < bufferSize) {
-            const void* chunk;
-            int length;
-            if (!stream->Next(&chunk, &length)) {
-                throw orc::ParseError("bad read in omniReadFully");
+    static uint64_t checkedStringLength(uint64_t offset, int64_t length, uint64_t limit) {
+        if (length < 0 || offset > limit || static_cast<uint64_t>(length) > limit - offset) {
+            throw orc::ParseError("Invalid ORC string length or offset overflow");
+        }
+        return offset + static_cast<uint64_t>(length);
+    }
+
+    static size_t nextStringChunk(SeekableInputStream& stream, const char*& data) {
+        const void* chunk;
+        int length;
+        while (stream.Next(&chunk, &length)) {
+            if (length < 0 || (length > 0 && chunk == nullptr)) {
+                throw orc::ParseError("Invalid ORC string stream chunk");
             }
-            if (posn + length > bufferSize) {
-                throw orc::ParseError("Corrupt dictionary blob in StringDictionaryColumn");
+            if (length > 0) {
+                data = static_cast<const char*>(chunk);
+                return static_cast<size_t>(length);
             }
-            memcpy_s(buffer + posn, bufferSize - posn, chunk, static_cast<size_t>(length));
-            posn += length;
+        }
+        return 0;
+    }
+
+    static void readStringBlob(std::vector<char>& blob, size_t total, SeekableInputStream& stream,
+        const char*& pending, size_t& pendingLength) {
+        while (blob.size() < total) {
+            if (pendingLength == 0) {
+                pendingLength = nextStringChunk(stream, pending);
+                if (pendingLength == 0) {
+                    throw orc::ParseError("Truncated ORC string data stream");
+                }
+            }
+            const size_t count = std::min(pendingLength, total - blob.size());
+            blob.insert(blob.end(), pending, pending + count);
+            pending += count;
+            pendingLength -= count;
         }
     }
 
@@ -513,15 +538,16 @@ namespace omniruntime::reader {
         readNulls(this, numValues, incomingNulls, nulls);
         bool hasNull = vec->HasNull();
 
-        char *blob = dictionary->dictionaryBlob.data();
-        int64_t *dictionaryOffsets = dictionary->dictionaryOffset.data();
+        const char* blob = dictionaryBlob.empty() ? "" : dictionaryBlob.data();
+        int64_t *dictionaryOffsets = dictionaryOffset.data();
         auto nullsTrans = reinterpret_cast<uint64_t*>(nulls);
         int64_t outputLengths[numValues];
         rle->next(outputLengths, numValues, nullsTrans);
-        uint64_t dictionaryCount = dictionary->dictionaryOffset.size() - 1;
+        uint64_t dictionaryCount = dictionaryOffset.size() - 1;
 
         auto varcharVector = reinterpret_cast<omniruntime::vec::Vector<
             omniruntime::vec::LargeStringContainer<std::string_view>>*>(vec);
+        uint64_t outputSize = 0;
         if (hasNull) {
             for(uint64_t i=0; i < numValues; ++i) {
                 if (!BitUtil::IsBitSet(nullsTrans, i)) {
@@ -533,10 +559,11 @@ namespace omniruntime::reader {
                     //求出长度，如果为char，则需要去除最后的空格
                     auto len = dictionaryOffsets[entry+1] -
                                dictionaryOffsets[entry];
-                    char* ptr = blob + dictionaryOffsets[entry];
+                    const char* ptr = blob + dictionaryOffsets[entry];
                     if (isChar) {
                         FindLastNotEmpty(ptr, len);
                     }
+                    outputSize = checkedStringLength(outputSize, len, std::numeric_limits<int32_t>::max());
                     auto data = std::string_view(ptr, len);
                     varcharVector->SetValue(i, data);
                 } else {
@@ -553,10 +580,11 @@ namespace omniruntime::reader {
                 //求出长度，如果为char，则需要去除最后的空格
                 auto len = dictionaryOffsets[entry+1] -
                            dictionaryOffsets[entry];
-                char* ptr = blob + dictionaryOffsets[entry];
+                const char* ptr = blob + dictionaryOffsets[entry];
                 if (isChar) {
                     FindLastNotEmpty(ptr, len);
                 }
+                outputSize = checkedStringLength(outputSize, len, std::numeric_limits<int32_t>::max());
                 auto data = std::string_view(ptr, len);
                 varcharVector->SetValue(i, data);
             }
@@ -569,41 +597,26 @@ namespace omniruntime::reader {
         readNulls(this, numValues, incomingNulls, nulls);
         bool hasNull = vec->HasNull();
 
-        int64_t lengthPtr[numValues];
+        std::vector<int64_t> lengthPtr(numValues);
         auto nullsTrans = reinterpret_cast<uint64_t*>(nulls);
         // read the length vector
-        lengthRle->next(lengthPtr, numValues, nullsTrans);
+        lengthRle->next(lengthPtr.data(), numValues, nullsTrans);
 
         // figure out the total length of data we need from the blob stream
-        const size_t totalLength = computeSize(lengthPtr, nullsTrans, numValues);
+        const size_t totalLength = computeSize(lengthPtr.data(), nullsTrans, numValues);
 
-        // Load data from the blob stream into our buffer until we have enough
-        // to get the rest directly out of the stream's buffer.
-        size_t bytesBuffered = 0;
-        char ptr[totalLength];
-        while (bytesBuffered + lastBufferLength < totalLength) {
-            memcpy_s(ptr + bytesBuffered, totalLength - bytesBuffered, lastBuffer, lastBufferLength);
-            bytesBuffered += lastBufferLength;
-            const void* readBuffer;
-            int readLength;
-            if (!blobStream->Next(&readBuffer, &readLength)) {
-                throw orc::ParseError("failed to read in OmniStringDirectColumnReader.next");
-            }
-            lastBuffer = static_cast<const char*>(readBuffer);
-            lastBufferLength = static_cast<size_t>(readLength);
+        std::vector<char> blob;
+        if (totalLength > blob.max_size() ||
+            (!isChar && totalLength > static_cast<size_t>(std::numeric_limits<int32_t>::max()))) {
+            throw orc::ParseError("DATA size exceeds buffer capacity in StringDirectColumn");
         }
-
-        if (bytesBuffered < totalLength) {
-            size_t moreBytes = totalLength - bytesBuffered;
-            memcpy_s(ptr + bytesBuffered, moreBytes, lastBuffer, moreBytes);
-            lastBuffer += moreBytes;
-            lastBufferLength -= moreBytes;
-        }
+        readStringBlob(blob, totalLength, *blobStream, lastBuffer, lastBufferLength);
 
         auto varcharVector = reinterpret_cast<omniruntime::vec::Vector<
             omniruntime::vec::LargeStringContainer<std::string_view>>*>(vec);
         size_t filledSlots = 0;
-        char* tempPtr = ptr;
+        const char* tempPtr = totalLength == 0 ? "" : blob.data();
+        uint64_t outputSize = 0;
         if (hasNull) {
             while (filledSlots < numValues) {
                 if (!BitUtil::IsBitSet(nullsTrans, filledSlots)) {
@@ -611,6 +624,7 @@ namespace omniruntime::reader {
                     auto len = lengthPtr[filledSlots];
                     if (isChar) {
                         FindLastNotEmpty(tempPtr, len);
+                        outputSize = checkedStringLength(outputSize, len, std::numeric_limits<int32_t>::max());
                     }
                     auto data = std::string_view(tempPtr, len);
                     varcharVector->SetValue(filledSlots, data);
@@ -627,6 +641,7 @@ namespace omniruntime::reader {
                 auto len = lengthPtr[filledSlots];
                 if (isChar) {
                     FindLastNotEmpty(tempPtr, len);
+                    outputSize = checkedStringLength(outputSize, len, std::numeric_limits<int32_t>::max());
                 }
                 auto data = std::string_view(tempPtr, len);
                 varcharVector->SetValue(filledSlots, data);
@@ -1008,13 +1023,19 @@ namespace omniruntime::reader {
             uint64_t step = std::min(BUFFER_SIZE,
                                      static_cast<size_t>(numValues - done));
             lengthRle->next(buffer, step, nullptr);
-            totalBytes += computeSize(buffer, nullptr, step);
+            const size_t length = computeSize(buffer, nullptr, step);
+            if (length > std::numeric_limits<size_t>::max() - totalBytes) {
+                throw orc::ParseError("String skip size overflow in StringDirectColumn");
+            }
+            totalBytes += length;
             done += step;
         }
         if (totalBytes <= lastBufferLength) {
             // subtract the needed bytes from the ones left over
             lastBufferLength -= totalBytes;
-            lastBuffer += totalBytes;
+            if (totalBytes != 0) {
+                lastBuffer += totalBytes;
+            }
         } else {
             // move the stream forward after accounting for the buffered bytes
             totalBytes -= lastBufferLength;
@@ -1036,12 +1057,12 @@ namespace omniruntime::reader {
         if (nulls) {
             for(size_t i = 0; i < numValues; ++i) {
                 if (!BitUtil::IsBitSet(nulls, i)) {
-                    totalLength += static_cast<size_t>(lengths[i]);
+                    totalLength = checkedStringLength(totalLength, lengths[i], std::numeric_limits<size_t>::max());
                 }
             }
         } else {
             for(size_t i = 0; i < numValues; ++i) {
-                totalLength += static_cast<size_t>(lengths[i]);
+                totalLength = checkedStringLength(totalLength, lengths[i], std::numeric_limits<size_t>::max());
             }
         }
         return totalLength;
@@ -1058,41 +1079,58 @@ namespace omniruntime::reader {
     }
 
     OmniStringDictionaryColumnReader::OmniStringDictionaryColumnReader(const Type& type, StripeStreams& stripe)
-        : OmniColumnReader(type, stripe), dictionary(new orc::StringDictionary(stripe.getMemoryPool())) {
+        : OmniColumnReader(type, stripe) {
         RleVersion rleVersion = omniConvertRleVersion(stripe.getEncoding(columnId)
                                                             .kind());
-        uint32_t dictSize = stripe.getEncoding(columnId).dictionarysize();
+        const uint64_t dictSize = stripe.getEncoding(columnId).dictionarysize();
+        if (dictSize + 1 > dictionaryOffset.max_size()) {
+            throw orc::ParseError("Offset count exceeds buffer capacity in StringDictionaryColumn");
+        }
         std::unique_ptr<SeekableInputStream> stream =
                 stripe.getStream(columnId, orc::proto::Stream_Kind_DATA, true);
         if (stream == nullptr) {
             throw orc::ParseError("DATA stream not found in StringDictionaryColumn");
         }
         rle = createOmniRleDecoder(std::move(stream), false, rleVersion, memoryPool);
-        stream = stripe.getStream(columnId, orc::proto::Stream_Kind_LENGTH, false);
+        stream = stripe.getStream(columnId, orc::proto::Stream_Kind_LENGTH, true);
         if (dictSize > 0 && stream == nullptr) {
             throw orc::ParseError("LENGTH stream not found in StringDictionaryColumn");
         }
-        std::unique_ptr<OmniRleDecoderV2> lengthDecoder =
-                createOmniRleDecoder(std::move(stream), false, rleVersion, memoryPool);
-        dictionary->dictionaryOffset.resize(dictSize + 1);
-        int64_t* lengthArray = dictionary->dictionaryOffset.data();
-        lengthDecoder->next(lengthArray + 1, dictSize, nullptr);
-        lengthArray[0] = 0;
-        for(uint32_t i = 1; i < dictSize + 1; ++i) {
-            if (lengthArray[i] < 0) {
-                throw orc::ParseError("Negative dictionary entry length");
+        auto blobStream = stripe.getStream(columnId, orc::proto::Stream_Kind_DICTIONARY_DATA, true);
+        dictionaryOffset.push_back(0);
+        uint64_t blobSize = 0;
+        const uint64_t maxBlobSize = std::min<uint64_t>(dictionaryBlob.max_size(), std::numeric_limits<int64_t>::max());
+        if (stream != nullptr) {
+            auto* input = stream.get();
+            auto lengthDecoder = createOmniRleDecoder(std::move(stream), false, rleVersion, memoryPool);
+            constexpr uint64_t BATCH_SIZE = 512;
+            int64_t lengths[BATCH_SIZE];
+            for (uint64_t decoded = 0; decoded < dictSize;) {
+                const uint64_t count = std::min(BATCH_SIZE, dictSize - decoded);
+                lengthDecoder->next(lengths, count, nullptr);
+                for (uint64_t i = 0; i < count; ++i) {
+                    blobSize = checkedStringLength(blobSize, lengths[i], maxBlobSize);
+                    lengths[i] = static_cast<int64_t>(blobSize);
+                }
+                if (blobSize != 0 && blobStream == nullptr) {
+                    throw orc::ParseError("DICTIONARY_DATA stream not found in StringDictionaryColumn");
+                }
+                dictionaryOffset.insert(dictionaryOffset.end(), lengths, lengths + count);
+                decoded += count;
             }
-            lengthArray[i] += lengthArray[i - 1];
+            const char* chunk;
+            if (lengthDecoder->hasBufferedValues() || nextStringChunk(*input, chunk) != 0) {
+                throw orc::ParseError("LENGTH stream has more entries than the dictionary size");
+            }
         }
-        int64_t blobSize = lengthArray[dictSize];
-        dictionary->dictionaryBlob.resize(static_cast<uint64_t>(blobSize));
-        std::unique_ptr<SeekableInputStream> blobStream =
-                stripe.getStream(columnId, orc::proto::Stream_Kind_DICTIONARY_DATA, false);
-        if (blobSize > 0 && blobStream == nullptr) {
-            throw orc::ParseError(
-                    "DICTIONARY_DATA stream not found in StringDictionaryColumn");
+        if (blobStream != nullptr) {
+            const char* pending = nullptr;
+            size_t pendingLength = 0;
+            readStringBlob(dictionaryBlob, static_cast<size_t>(blobSize), *blobStream, pending, pendingLength);
+            if (pendingLength != 0 || nextStringChunk(*blobStream, pending) != 0) {
+                throw orc::ParseError("DICTIONARY_DATA length does not match dictionary offsets");
+            }
         }
-        omniReadFully(dictionary->dictionaryBlob.data(), blobSize, blobStream.get());
         if (type.getKind() == orc::TypeKind::CHAR) {
             isChar = true;
         }
