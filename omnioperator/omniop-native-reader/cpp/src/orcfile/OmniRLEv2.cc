@@ -185,6 +185,10 @@ namespace omniruntime::reader {
         }
     }
 
+    bool OmniRleDecoderV2::hasBufferedValues() const {
+        return runRead != runLength || bufferStart != bufferEnd;
+    }
+
     template <typename T>
     uint64_t OmniRleDecoderV2::nextDirect(T *data, uint64_t offset, uint64_t numValues, 
         uint64_t *nulls) {

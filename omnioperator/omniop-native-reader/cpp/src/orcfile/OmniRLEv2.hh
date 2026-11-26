@@ -64,6 +64,8 @@ namespace omniruntime::reader {
 
         void next(bool *data, uint64_t numValues, uint64_t *nulls);
 
+        bool hasBufferedValues() const;
+
         template<typename T>
         void next(T *data, uint64_t numValues, uint64_t *nulls);
 
